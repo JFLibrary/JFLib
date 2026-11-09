@@ -8,7 +8,7 @@ The crates, their dependencies and the library's version come from the Cargo man
 
   python build_rs.py lib    [--target win|linux|both]        every library crate
   python build_rs.py app NAME [--style S]                    apps/NAME -> build/<t>/NAME[.exe]
-                                                                (+ its loadable modules, e.g. PaintCraft's jxlenc: section "jxl-module")
+                                                                (+ its loadable modules, e.g. codectest's jxlenc: section "jxl-module")
   python build_rs.py app NAME --style S1,S2,..               one variant per style: build/<t>/<style>/NAME[.exe]
                                                                 (each variant a package of the tool's own)
   python build_rs.py all                                     libraries + every app
@@ -43,21 +43,18 @@ The crates, their dependencies and the library's version come from the Cargo man
                                                                 placeholders and plural forms; --update adds the
                                                                 missing rows (untranslated); --check: the suite's
                                                                 check (errors only, the gaps are reported)
-  python build_rs.py plugin [NAME]                           plugins/NAME -> <out>/<t>/plugins/NAME.dll|.so
-                                                                (PaintCraft plugins: section "rust-plugin")
   options: --target win|linux|both|web|all|android|mac|ios (default both; run: win), --release, --out DIR, -j N (Cargo's jobs),
            --sim (ios: the simulator's build into ios-sim; mac and ios build on a Mac, docs/APPLE.md),
            --profile size|o2 (release variants, section "r13-measure"),
            --arch x86_64|aarch64 (default x86_64; docs/ARM64.md, no run or test yet)
 
 Cargo: every target builds in a Cargo folder of its own below <out> (cargo, cargo-glibc,
-cargo-web-<mode>, cargo-android-<abi>, cargo-modules, cargo-plugins), side by side.  One `cargo
+cargo-web-<mode>, cargo-android-<abi>, cargo-modules), side by side.  One `cargo
 build` per target and run builds the apps in their own style and their BINS (Builder.cargo_build),
 another one each further style; the programs come from Cargo's JSON messages.  The browser and
 Android load an app as a library, Cargo cannot swap a dependency for a style variant: for both the
 tool makes a package of each app in a workspace of its own (derived_workspace, <out>/cargo-<t>-ws);
-the apps themselves stay programs.  The modules link over modrt / modplat (cargo_module), the Rust
-plugins with their own settings (PluginBuilder).
+the apps themselves stay programs.  The modules link over modrt / modplat (cargo_module).
 
 Output folders (--out overrides): build/<target> for development builds, build/release/<target>
 for --release, build/<profile>/<target> for --profile (so the variants never rebuild each
@@ -83,7 +80,7 @@ development build (incremental_flags).
 
 Rules checked before every build (`check`):
   * every crate root starts with #![no_std]; only alloc / core are `extern crate`d
-  * `unsafe` is allowed only in rt, simd, plat, plugin, gpu: every other library and style
+  * `unsafe` is allowed only in rt, simd, plat, gpu: every other library and style
     crate has #![forbid(unsafe_code)], every app #![deny(unsafe_code)] (its one exception
     is the ui::main! entry point)
   * every app, further program, app-local crate and style is a package whose manifest names the
@@ -138,7 +135,7 @@ ARCHS = ("x86_64", "aarch64")
 ARM64_TRIPLE = {"win": "aarch64-pc-windows-msvc", "linux": "aarch64-unknown-linux-gnu"}
 ARM64_FOLDER = {"win": "win-arm64", "linux": "linux-arm64"}
 RUSTC_VERSION = manifests.workspace()["package"]["rust-version"]  # the toolchain this code is written for (checked, minor ignored)
-UNSAFE_OK = {"rt", "simd", "plat", "plugin", "gpu"}   # gpu: the Vulkan FFI (lib/gpu/vk_*.rs)
+UNSAFE_OK = {"rt", "simd", "plat", "gpu"}   # gpu: the Vulkan FFI (lib/gpu/vk_*.rs)
 
 # library crates: name -> (root file, dependencies), and what a crate needs on one target only:
 # lib/*/Cargo.toml, in the order of the root Cargo.toml
@@ -185,9 +182,9 @@ def run_cmd(cmd, quiet=False, env=None):
 
 # ---------------------------------------------------------------- crates
 def compute_crate(name):
-    """crates whose speed matters in development builds too (opt-level 2; Kritzel and PaintCraft
-    draw with their own pixel loops)"""
-    return (name in ("gfx", "text", "simd", "fx", "Kritzel", "PaintCraft", "crypto", "compress", "cas", "spell")
+    """crates whose speed matters in development builds too (opt-level 2; Kritzel draws with its
+    own pixel loops)"""
+    return (name in ("gfx", "text", "simd", "fx", "Kritzel", "crypto", "compress", "cas", "spell")
             or name.startswith("img_"))
 
 
@@ -799,7 +796,7 @@ def lint():
                 prev = s
                 if ln[:2] in ('")', '",', '";'):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: a string literal broken by a line end (a script edit?)")
-    return bad + plugin_lint() + module_lint() + perm_lint() + manifest_lint()   # rust-plugin: lib/plugin, plugins/*; jxl-module: modules/*; manifests
+    return bad + module_lint() + perm_lint() + manifest_lint()   # jxl-module: modules/*; manifests
 
 
 # ---------------------------------------------------------------- r13-measure: build profiles
@@ -1077,14 +1074,12 @@ class Builder:
 
     def cargo_module(self, name):
         """jxl-module through Cargo: modules/NAME over modrt / modplat (--cfg jflib_module), fat LTO, no
-        imports, no entry, into the Builder's folder, checked the way PaintCraft's loader checks a
-        library -> its path"""
+        imports, no entry, into the Builder's folder, checked the way plat's loader checks a library
+        -> its path"""
         t = self.target
         out = self.dir / module_file(name, t)
         mapf = out.parent / (out.stem + ".map" if t == "win" else out.name + ".map")
-        pb = PluginBuilder.__new__(PluginBuilder)       # its link flags (no imports, no entry)
-        pb.target = t
-        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}=", "--cfg", "jflib_module"] + pb.link_flags()
+        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}=", "--cfg", "jflib_module"] + nolib_link_flags(t)
         flags += ["-C", f"link-arg={'/MAP:' if t == 'win' else '-Map='}{mapf}"] + (["-C", "relocation-model=pic"] if t == "linux" else [])
         profile = "RELEASE" if self.release else "DEV"
         env = {"CARGO_TARGET_DIR": str(self.out / "cargo-modules"), "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(flags),
@@ -1100,7 +1095,7 @@ class Builder:
             raise BuildError(f"cargo built no module {name}")
         shutil.copyfile(lib, out)
         shutil.copymode(lib, out)
-        bad = plugin_verify(out, t, export=f"{name}_module")
+        bad = lib_verify(out, t, export=f"{name}_module")
         if bad:
             out.unlink()
             raise BuildError(f"module {name} ({t}) would be rejected by the loader:\n  " + "\n  ".join(bad))
@@ -1451,31 +1446,6 @@ def run_app_tests(name, target, exe, verify_dirty=False, report=None):
     return records
 
 
-# the test plugins of apps/PaintCraft/tests/plugins*.uis (`--plugins @ptest`): build.py's
-# plugin_test_dir, filled from the asm reference plugins (<ref>/<target>/plugins, built by
-# `python legacy/build.py plugin --out build/rwref`); never the real exe folder
-PLUGIN_TEST_SET = {"Effects": ["swapchan", "sepiastr", "crash", "crashpf", "crashq", "toonew", "badinfo"],
-                   "FileTypes": ["qoi"], "Shapes": ["pshapes"]}
-
-
-def plugin_test_dir(base, target, ref=None):
-    """<base>/<target>/ptest/{Effects,FileTypes,Shapes} from the reference plugins -> False when
-    they are missing (the plugins scripts then fail on both sides)"""
-    ref = Path(ref or os.environ.get("jfgui_REF") or ROOT / "build" / "rwref")
-    src = ref / target / "plugins"
-    ext = ".dll" if target == "win" else ".so"
-    if not all((src / (n + ext)).exists() for names in PLUGIN_TEST_SET.values() for n in names):
-        return False
-    d = Path(base) / target / "ptest"
-    for folder, names in PLUGIN_TEST_SET.items():
-        (d / folder).mkdir(parents=True, exist_ok=True)
-        for f in (d / folder).iterdir():
-            f.unlink()
-        for n in names:
-            shutil.copy(src / (n + ext), d / folder)
-    return True
-
-
 def run_tests(builders, out, quick):
     fails = []
     total = 0
@@ -1486,8 +1456,6 @@ def run_tests(builders, out, quick):
             exe = exes[(b.target, name)]
             if exe is None:
                 continue
-            if name == "PaintCraft" and not plugin_test_dir(exe.parent.parent, b.target):
-                print(f"[{b.target}] note: no reference plugins for PaintCraft's ptest (python legacy/build.py plugin --out build/rwref)")
             for record in run_app_tests(name, b.target, exe):
                 if record['status'] == 'skipped':
                     skipped += 1
@@ -1500,9 +1468,6 @@ def run_tests(builders, out, quick):
                     for ln in record['output'].splitlines():
                         if ln.startswith(("FAIL", "error", "panic", "UIWARN")):
                             print("   " + ln)
-        n, f = rust_plugin_scripts(b)               # rust-plugin: plugins*.uis with the Rust plugins
-        total += n
-        fails += f
     print(f"{total - len(fails)} of {total} scripts passed" + (f" ({skipped} pending)" if skipped else ""))
     # what only runs on a device (G4c): the serial of a device or emulator in jfgui_TEST_ANDROID, its builds
     # with `app androidGallery|gputest --target android`; nobody's phone is touched without it
@@ -1660,108 +1625,25 @@ def dev_command(a):
         return 1
 
 
-# ---------------------------------------------------------------- rust-plugin
-# PaintCraft plugins written in Rust (plugins/README.md; ABI crate lib/plugin):
-#   python build_rs.py plugin [NAME] [--target win|linux|both] [--out DIR]
-# plugins/NAME/lib.rs -> <out>/<t>/plugins/NAME.dll | NAME.so: a no_std cdylib that depends
-# only on the crate `plugin` (+ core), panic=abort with the plugin's own #[panic_handler], fat
-# LTO (core included: only what the plugin uses), linked against nothing -- Windows: lld-link
-# /NOENTRY /NODEFAULTLIB (no imports, export pn_plugin_query only); Linux: ld.lld -shared
-# -Bsymbolic --no-undefined (no DT_NEEDED, only RELATIVE relocations).  Each binary is then
-# checked the way PaintCraft's loader checks it (plugin_verify: lib/plat/win_lib.rs,
-# linux_elfload.rs) -- a plugin the loader would reject fails the build.  Cargo builds a plugin as
-# the package jflib-plugin-NAME into <out>/<t>/cargo-plugins.  `test` also runs apps/PaintCraft/tests/plugins*.uis on the
-# Rust PaintCraft with the Rust plugins (<out>/<t>/rsptest, the layout of PLUGIN_TEST_SET).
-PLUGIN_LIB_ROOT = RS / "lib" / "plugin" / "lib.rs"
-PLUGINS_RS = RS / "plugins"
+# ---------------------------------------------------------------- loader checks
+# A library built to be loaded by plat's own loader (lib/plat/win_lib.rs, linux_elfload.rs): a
+# module of jxl-module, linked against nothing -- Windows: lld-link /NOENTRY /NODEFAULTLIB (no
+# imports, one export); Linux: ld.lld -shared -Bsymbolic --no-undefined (no DT_NEEDED, only
+# RELATIVE relocations).  lib_verify checks the result the way the loader does: a library it
+# would reject fails the build.  (PaintCraft's Rust plugins were built the same way until the
+# app moved to its own repository, JFLibrary/JFPainter, in 2026-11.)
+def nolib_link_flags(target):
+    """rustc's flags for such a library: no entry, no imports"""
+    if target == "win":
+        args = ["/NOENTRY", "/NODEFAULTLIB", "/DEBUG:NONE", "/Brepro"]
+        return ["-C", f"linker={tool('lld-link')}"] + [x for a in args for x in ("-C", "link-arg=" + a)]
+    args = ["-Bsymbolic", "--no-undefined", "--hash-style=both", "-z", "noexecstack", "-z", "now", "--build-id=none"]
+    return ["-C", f"linker={tool('ld.lld')}", "-C", "linker-flavor=ld"] + [x for a in args for x in ("-C", "link-arg=" + a)]
 
 
-def rs_plugin_names():
-    return sorted(p.name for p in PLUGINS_RS.iterdir() if p.is_dir() and entrypoint(p, "lib", False)) if PLUGINS_RS.is_dir() else []
-
-
-def plugin_lint():
-    """the rules of lint() for the plugin crate and every plugins/NAME: #![no_std]; plugins
-    #![deny(unsafe_code)] (entry!() is their one exception) or forbid; alloc / core only"""
-    bad = []
-    crates = [(resolve_root(PLUGIN_LIB_ROOT), True)] + [(entrypoint(PLUGINS_RS / n, "lib"), False) for n in rs_plugin_names()]
-    for root, is_lib in crates:
-        if not root.exists():
-            continue
-        head = root.read_text(encoding="utf-8")
-        if "#![no_std]" not in head:
-            bad.append(f"{root.relative_to(ROOT)}: missing #![no_std]")
-        if not is_lib and "#![deny(unsafe_code)]" not in head and "#![forbid(unsafe_code)]" not in head:
-            bad.append(f"{root.relative_to(ROOT)}: missing #![deny(unsafe_code)]")
-        for f in project_sources(root):
-            text = f.read_text(encoding="utf-8")
-            bad += kernel_lint(f, text)
-            for i, ln in enumerate(text.splitlines(), 1):
-                s = ln.strip()
-                if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;", "extern crate modrt as rt;",
-                                                      "extern crate modplat as plat;"):
-                    bad.append(f"{f.relative_to(ROOT)}:{i}: only alloc / core may be extern crates")
-                if s.startswith("use std") or " std::" in s.split("//")[0]:
-                    bad.append(f"{f.relative_to(ROOT)}:{i}: std is not available (no_std)")
-                if ln[:2] in ('")', '",', '";'):
-                    bad.append(f"{f.relative_to(ROOT)}:{i}: a string literal broken by a line end (a script edit?)")
-    return bad
-
-
-class PluginBuilder:
-    """the plugins of one target: plugins/NAME (package jflib-plugin-NAME) through Cargo into
-    <out>/<t>/cargo-plugins, always optimised (opt-level 3, one codegen unit, fat LTO, stripped),
-    copied to <out>/<t>/plugins and checked the way PaintCraft's loader checks them"""
-
-    def __init__(self, target, out, arch="x86_64"):
-        self.target = target
-        self.arch = arch
-        self.dir = out / arch_folder(target, arch) / "plugins"
-        self.cargo_dir = out / arch_folder(target, arch) / "cargo-plugins"
-        self.dir.mkdir(parents=True, exist_ok=True)
-
-    def link_flags(self):
-        if self.target == "win":
-            args = ["/NOENTRY", "/NODEFAULTLIB", "/DEBUG:NONE", "/Brepro"]
-            return ["-C", f"linker={tool('lld-link')}"] + [x for a in args for x in ("-C", "link-arg=" + a)]
-        args = ["-Bsymbolic", "--no-undefined", "--hash-style=both", "-z", "noexecstack", "-z", "now", "--build-id=none"]
-        return ["-C", f"linker={tool('ld.lld')}", "-C", "linker-flavor=ld"] + [x for a in args for x in ("-C", "link-arg=" + a)]
-
-    def path(self, name):
-        return self.dir / (name + (".dll" if self.target == "win" else ".so"))
-
-    def build(self, name):
-        """plugins/NAME -> the checked plugin library (Cargo builds it again when something changed)"""
-        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}="] + (["-C", "relocation-model=pic"] if self.target == "linux" else [])
-        env = {k: v for k, v in os.environ.items() if k != "RUSTFLAGS"}
-        env.update({"CARGO_TARGET_DIR": str(self.cargo_dir), "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(flags + self.link_flags()),
-                    "CARGO_PROFILE_RELEASE_OPT_LEVEL": "3", "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "1",
-                    "CARGO_PROFILE_RELEASE_LTO": "fat", "CARGO_PROFILE_RELEASE_STRIP": "symbols"})
-        cmd = ["cargo", "build", "--locked", "--release", "--target", arch_triple(self.target, self.arch),
-               "--message-format=json-render-diagnostics", "-p", f"jflib-plugin-{name}"]
-        r = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
-        if r.returncode:
-            raise BuildError(r.stderr.strip() or f"cargo build of plugin {name} failed")
-        lib = None
-        for ln in r.stdout.splitlines():
-            m = json.loads(ln) if ln.startswith("{") else {}
-            if m.get("reason") == "compiler-artifact" and "cdylib" in m["target"]["kind"]:
-                lib = next(Path(f) for f in m["filenames"] if f.endswith((".dll", ".so")))
-        if lib is None:
-            raise BuildError(f"cargo built no plugin {name}")
-        out = self.path(name)
-        shutil.copyfile(lib, out)
-        shutil.copymode(lib, out)
-        bad = plugin_verify(out, self.target)
-        if bad:
-            out.unlink()
-            raise BuildError(f"plugin {name} ({self.target}) would be rejected by PaintCraft's loader:\n  " + "\n  ".join(bad))
-        return out
-
-
-def plugin_verify(path, target, export="pn_plugin_query"):
-    """the checks of PaintCraft's plugin loader (and the rules of PLUGINS.md §8) -> problems
-    (jxl-module: `export` = the one export expected, jxlenc_module for the JPEG XL module)"""
+def lib_verify(path, target, export):
+    """the checks of plat's loader -> problems (`export`: the one export expected, jxlenc_module
+    for the JPEG XL module)"""
     b = path.read_bytes()
     if len(b) > 64 << 20:
         return ["larger than LIB_FILE_MAX (64 MB)"]
@@ -1780,10 +1662,10 @@ def _u64(b, o):
     return int.from_bytes(b[o:o + 8], "little")
 
 
-def pe_verify(b, export="pn_plugin_query"):
+def pe_verify(b, export):
     """win_lib.rs pe_check + lib_sym: PE32+ x86-64 DLL, no imports / delay imports / TLS, no entry
     point, the section table inside the first 4 KB of headers, <= 15 sections, no W+X section,
-    one export: pn_plugin_query in an executable section"""
+    one export: `export` in an executable section"""
     if len(b) < 512 or b[:2] != b"MZ":
         return ["not a PE file"]
     bad = []
@@ -1855,12 +1737,12 @@ def pe_verify(b, export="pn_plugin_query"):
     return bad
 
 
-def elf_verify(b, export="pn_plugin_query"):
+def elf_verify(b, export):
     """linux_elfload.rs elf_map / elf_load / elf_rela / lib_sym: ELF64 LE ET_DYN x86-64, 1..64
     program headers, <= 16 PT_LOAD ascending and page-disjoint, never W+X, inside 256 MB, one
     PT_DYNAMIC, no PT_INTERP / PT_TLS, no DT_NEEDED / DT_INIT / init arrays / DT_REL, RELA
     relocations NONE / RELATIVE / 64 / GLOB_DAT / JUMP_SLOT against defined symbols, the one
-    defined dynamic symbol pn_plugin_query in an executable segment"""
+    defined dynamic symbol `export` in an executable segment"""
     if len(b) < 64 or b[:4] != b"\x7fELF" or b[4] != 2 or b[5] != 1 or b[6] != 1:
         return ["not an ELF64 little-endian file"]
     if _u16(b, 16) != 3 or _u16(b, 18) != 62 or _u32(b, 20) != 1 or _u16(b, 54) != 56:
@@ -1945,64 +1827,24 @@ def elf_verify(b, export="pn_plugin_query"):
     return sorted(set(bad), key=bad.index)
 
 
-def build_plugins(targets, out, name, arch="x86_64"):
-    for t in targets:
-        pb = PluginBuilder(t, out, arch)
-        for n in [name] if name else rs_plugin_names():
-            p = pb.build(n)
-            print(f"[{arch_folder(t, arch)}] plugin {n}: {p.relative_to(ROOT) if p.is_relative_to(ROOT) else p} ({p.stat().st_size} bytes)")
-
-
-def rust_plugin_scripts(b):
-    """apps/PaintCraft/tests/plugins*.uis on the Rust PaintCraft with the Rust ports of the asm
-    plugins in <out>/<t>/rsptest (`--plugins=@ptest` -> `@rsptest`), then plugins/tests/*.uis
-    with the other Rust plugins in <out>/<t>/rsplug/Effects -> (scripts run, failed tags);
-    nothing while PaintCraft or one of the plugins of PLUGIN_TEST_SET is missing"""
-    exe = b.dir / ("PaintCraft.exe" if b.target == "win" else "PaintCraft")
-    names = [n for ns in PLUGIN_TEST_SET.values() for n in ns]
-    if not exe.exists() or not all(entrypoint(PLUGINS_RS / n, "lib", False) for n in names):
-        return 0, []
-    pb = PluginBuilder(b.target, b.dir.parent, b.arch)
-    sets = {"rsptest": PLUGIN_TEST_SET, "rsplug": {"Effects": [n for n in rs_plugin_names() if n not in names]}}
-    for dname, layout in sets.items():
-        for folder, ns in layout.items():
-            (b.dir / dname / folder).mkdir(parents=True, exist_ok=True)
-            for f in (b.dir / dname / folder).iterdir():
-                f.unlink()
-            for n in ns:
-                shutil.copy(pb.build(n), b.dir / dname / folder)
-    total, fails = 0, []
-    for uis in sorted((ROOT / "apps" / "PaintCraft" / "tests").glob("plugins*.uis")) + sorted((PLUGINS_RS / "tests").glob("*.uis")):
-        args = [a.replace("--plugins=@ptest", "--plugins=@rsptest") for a in script_args(uis)]
-        total += 1
-        r = run_exe(b.target, exe, args + ["--script", uis.relative_to(ROOT).as_posix()])
-        tag = f"[{b.target}] PaintCraft/{uis.name} (Rust plugins)" if uis.parent.parent != PLUGINS_RS else \
-            f"[{b.target}] PaintCraft/rs/plugins/tests/{uis.name}"
-        if r.returncode != 0:
-            fails.append(tag)
-            print(f"FAIL {tag} (exit {r.returncode})")
-            for ln in (r.stdout + r.stderr).splitlines():
-                if ln.startswith(("FAIL", "error", "panic", "UIWARN")):
-                    print("   " + ln)
-    return total, fails
-# ---------------------------------------------------------------- end rust-plugin
+# ---------------------------------------------------------------- end loader checks
 
 
 # ---------------------------------------------------------------- jxl-module
 # Loadable modules (rewrite/AGENTS.md "JPEG XL encoder as a loadable module"; the ABI in
 # lib/plat/modabi.rs): modules/NAME -> <app folder>/NAME.dll | NAME.so, built with every
-# app that loads it (APP_MODULES: PaintCraft loads jxlenc, the JPEG XL writer), in the Builder's
+# app that loads it (APP_MODULES: codectest --jxlenc FILE loads jxlenc, the JPEG XL writer), in the Builder's
 # folder with its flags (dev, --release, --profile).  Cargo builds the package jflib-module-NAME
 # with --cfg jflib_module into <out>/cargo-modules: the library crates it contains then name
 # modules/modrt as `rt` and modules/modplat as `plat` (the module runtime: the host's allocator,
-# worker pool and crash report through a function table); the cdylib links like a Rust plugin: panic=abort, fat LTO, linked against nothing (lld-link
+# worker pool and crash report through a function table); the cdylib links as section "loader checks" says: panic=abort, fat LTO, linked against nothing (lld-link
 # /NOENTRY /NODEFAULTLIB; ld.lld -shared -Bsymbolic --no-undefined), a .map next to it, and
-# checked the way PaintCraft's loader checks a library (plugin_verify with the export
+# checked the way plat's loader checks a library (lib_verify with the export
 # NAME_module).  Lint: #![no_std]; modrt / modplat may contain unsafe (the module's rt / plat),
 # a module crate #![deny(unsafe_code)] with module_entry!() as its one exception.
 MODULES_RS = RS / "modules"
 MOD_RT = {"rt": "modrt", "plat": "modplat"}         # the crates a module gets as rt / plat
-APP_MODULES = {"PaintCraft": ["jxlenc"]}              # the modules an app's folder gets
+APP_MODULES = {"codectest": ["jxlenc"]}               # the modules an app's folder gets
 
 
 def module_file(name, target):
@@ -2048,56 +1890,13 @@ def build_app_modules(b, app, vdir=None):
         if app not in b.mod_ready:
             for m in APP_MODULES.get(app, []):
                 b.cargo_module(m)
-            build_pdn_host(b, app)
             b.mod_ready.add(app)
     if vdir is not None and vdir != b.dir:
         for m in APP_MODULES.get(app, []):
             shutil.copyfile(b.dir / module_file(m, b.target), vdir / module_file(m, b.target))
-        for f in pdn_host_files(app, b.target):
-            if (b.dir / f).exists():
-                (vdir / f).parent.mkdir(exist_ok=True)
-                shutil.copyfile(b.dir / f, vdir / f)
 # ---------------------------------------------------------------- end jxl-module
 
 
-# ---------------------------------------------------------------- pdn-host
-# PaintCraft's host for original paint.net plugins (tools/paintcraft-pdn-host/README.md): our own
-# .NET assembly, built against the paint.net on this machine.  Its references are not copied
-# (Private=false), so nothing of paint.net is redistributed.  Without the .NET SDK or paint.net
-# the app goes without it and its menu says so; a user needs paint.net, not the SDK.
-PDN_HOST = ROOT / "tools" / "paintcraft-pdn-host"
-
-
-def pdn_host_files(app, target):
-    """the host's files relative to the app's folder (tools/package.py); .dll only is enough
-    on paint.net's own runtime, the other two let --pdn-dotnet start it"""
-    if app != "PaintCraft" or target != "win":
-        return []
-    return [f"pdn-host/PaintCraft.PdnHost{e}" for e in (".dll", ".runtimeconfig.json", ".deps.json")]
-
-
-def build_pdn_host(b, app):
-    """the host into <out>/win/pdn-host, unless it is newer than its sources"""
-    files = pdn_host_files(app, b.target)
-    if not files:
-        return
-    dll = b.dir / files[0]
-    sources = [*PDN_HOST.glob("*.cs"), *PDN_HOST.glob("*.csproj"), *PDN_HOST.glob("*.props")]
-    if dll.exists() and max(s.stat().st_mtime for s in sources) <= dll.stat().st_mtime:
-        return
-    install = Path(os.environ.get("PaintDotNetDir") or Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "paint.net")
-    if not shutil.which("dotnet") or not (install / "PaintDotNet.Effects.Core.dll").exists():
-        print(f"[{b.target}] note: no .NET SDK or paint.net here: {app} without its plugin host")
-        return
-    r = subprocess.run(["dotnet", "build", str(PDN_HOST / "PaintCraft.PdnHost.csproj"), "-c", "Release", "-o", str(dll.parent),
-                        f"-p:PaintDotNetDir={install}", "--nologo", "-v:q"],
-                       stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if r.returncode:
-        # another paint.net version may not compile: that costs the plugin host, not the app;
-        # the host of an older build must not pass for this one
-        dll.unlink(missing_ok=True)
-        print(f"[{b.target}] warning: {app}'s plugin host did not build:\n{r.stdout[-2000:]}")
-# ---------------------------------------------------------------- end pdn-host
 
 
 def check_toolchain():
@@ -2118,7 +1917,7 @@ def main():
         i = argv.index("--")
         argv, extra = argv[:i], argv[i + 1:]
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["lib", "app", "all", "run", "test", "check", "plugin",
+    ap.add_argument("cmd", choices=["lib", "app", "all", "run", "test", "check",
                                     "new", "api-diff", "changelog", "release", "site", "i18n", "watch"])
     ap.add_argument("name", nargs="?")
     ap.add_argument("--target", choices=["win", "linux", "both", "web", "all", "android", "mac", "ios"])
@@ -2166,7 +1965,7 @@ def main():
                               + (["--check"] if a.check else []), cwd=ROOT).returncode
     if a.cmd == "i18n":                             # tools/i18n_check.py
         if a.update and not a.name:
-            print("i18n: --update needs the app (python build_rs.py i18n PaintCraft --update)")
+            print("i18n: --update needs the app (python build_rs.py i18n Kritzel --update)")
             return 1
         return subprocess.run([sys.executable, str(ROOT / "tools" / "i18n_check.py")] + ([a.name] if a.name else [])
                               + [f for f, on in (("--update", a.update), ("--check", a.check), ("--unused", a.unused)) if on],
@@ -2206,8 +2005,8 @@ def main():
             raise BuildError("mac and ios support app, lib and run; the iPhone itself: python tools/apple.py device APP.app")
         if a.cmd == "run" and targets == ["ios"] and not a.sim:
             raise BuildError("run --target ios starts the simulator's build (--sim); the iPhone: python tools/apple.py device APP.app")
-    if a.cmd in ("run", "test", "plugin") and "web" in targets:
-        raise BuildError("Use app/all --target web to build browser bundles; serve their index.html for browser tests. Native run/test/plugin requires win/linux/both.")
+    if a.cmd in ("run", "test") and "web" in targets:
+        raise BuildError("Use app/all --target web to build browser bundles; serve their index.html for browser tests. Native run/test requires win/linux/both.")
     out = ((ROOT / a.out).resolve() if a.out else ROOT / "build" / a.profile if a.profile
            else ROOT / "build" / "release" if a.release else ROOT / "build")
     builders = make_builders(targets, out, a.release, a.j, a.profile, a.web_mode, a.android_abi, a.arch, a.sim)
@@ -2241,8 +2040,6 @@ def main():
             for b, n, exe in build_apps(builders, apps()):
                 if exe:
                     print(f"[{b.folder}] app {n}: {exe.relative_to(ROOT)} ({exe.stat().st_size} bytes)")
-        elif a.cmd == "plugin":                     # rust-plugin
-            build_plugins(targets, out, a.name, a.arch)
         elif a.cmd == "test":
             ok = run_app_suite(builders, a.name) if a.name else run_tests(builders, out, a.quick)
             print(f"test: {'ok' if ok else 'FAILED'} ({time.perf_counter() - t0:.1f} s)")

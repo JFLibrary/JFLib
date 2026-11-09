@@ -1,7 +1,7 @@
 use text_shape::Engine;
 
 fn font() -> Engine {
-    let file=std::env::var("PAINTCRAFT_SHAPING_FONT").expect("set PAINTCRAFT_SHAPING_FONT to a font with Latin/Arabic/Hebrew coverage");
+    let file=std::env::var("JFLIB_SHAPING_FONT").expect("set JFLIB_SHAPING_FONT to a font with Latin/Arabic/Hebrew coverage");
     Engine::new(&std::fs::read(file).unwrap(),0).unwrap()
 }
 #[test]
@@ -31,7 +31,7 @@ fn combining_mark_shares_cluster() {
 fn malformed_font_is_rejected() { assert!(Engine::new(b"bad font",0).is_none()); }
 #[test]
 fn fallback_shapes_an_entire_arabic_run() {
-    let path=std::env::var("PAINTCRAFT_SHAPING_FONT").unwrap();
+    let path=std::env::var("JFLIB_SHAPING_FONT").unwrap();
     let mut data=std::fs::read(path).unwrap();
     let count=u16::from_be_bytes([data[4],data[5]]) as usize;
     let record=(0..count).map(|i|12+i*16).find(|&i|&data[i..i+4]==b"cmap").unwrap();

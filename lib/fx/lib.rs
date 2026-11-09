@@ -1,7 +1,7 @@
 // fx -- the effect and adjustment kernels: the FXDESC registry, prepare / render on ROIs from
 // worker threads, deterministic per pixel                       [src/fx/*.s, inc/fx.inc]
 //
-// The contract (fx.inc).  An application (PaintCraft, efftest) runs an effect by
+// The contract (fx.inc).  An application (JFPainter, efftest) runs an effect by
 //   1. copying the source layer (FMT_ARGB, straight alpha) -> FxArgs::src,
 //   2. calling desc.prepare once when it has one (global statistics, LUTs, noise tables):
 //      Ok(Some(aux)) / Ok(None) / Err(ERR_*) -- ERR_CANCEL when the job was cancelled,

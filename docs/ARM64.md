@@ -43,7 +43,7 @@ Nur auf x86-64 ausgelegt:
 | Assembler `rt` | `memcpy` und Verwandte, `cpuid`, x87-Mathematik, `__chkstk`, Syscall | `rt/mem.rs`, `rt/cpu.rs`, `rt/x87.rs`, `rt/fx.rs`, `rt/os.rs` |
 | Guard um Plugin-Aufrufe | Trampolin und Test-Code | `plat/plib.rs` (2 Blöcke) |
 | Assembler Plugins und Module | `memcpy` und Verwandte, `ud2`, `prepare_tramp` | `plugin/mem.rs`, `plugin/lib.rs`, `plugin/fx.rs`, `modules/modrt/lib.rs` |
-| Plugin- und Modul-ABI | 90-mal `extern "win64"` in 13 Dateien, auch auf Linux | `lib/plugin/`, `modules/`, `plat/modabi.rs`, `plat/modhost.rs`, `plat/plib.rs`, `apps/plattest/`, PaintCraft `plugins/native.rs` |
+| Plugin- und Modul-ABI | 90-mal `extern "win64"` in 13 Dateien, auch auf Linux | `modules/`, `plat/modabi.rs`, `plat/modhost.rs`, `plat/plib.rs`, `apps/plattest/` (PaintCraft's plugins: since 2026-11 in JFLibrary/JFPainter) |
 | Eigene Loader | nur `EM_X86_64` und `R_X86_64_*`, nur PE-Machine `0x8664` | `plat/linux_elfload.rs`, `plat/win_lib.rs`, `pe_verify` / `elf_verify` in `build_rs.py` |
 | Crash-Berichte | `CONTEXT`, `ucontext`, DWARF-Register, Erkennen von `call` | `plat/win_crash.rs`, `plat/linux_crash.rs` |
 | Sandbox | `AUDIT_ARCH_X86_64`, Liste der Syscall-Nummern | `plat/linux_sandbox.rs` |
@@ -192,7 +192,7 @@ Das wäre echte ARM-Hardware ohne Zukauf (ob `/data/local/tmp` das zulässt, zei
 - Sandbox: `AUDIT_ARCH_AARCH64` (`0xC00000B7`), die Sperrliste kommt schon aus der Tabelle.
 - glibc-Variante: `_start`, `TPIDR_EL0` statt `arch_prctl`.
 - `plat/cpu.rs` (Stack-Zeiger, AVX-Probe) und die Crash-Tests in `plat/lib.rs`, für die es den Zweig für
-  Android schon gibt. `plattest`, `linuxtest` und PaintCraft (`src/diagnostics/crash.rs`) rufen sie auf.
+  Android schon gibt. `plattest` und `linuxtest` rufen sie auf (und JFPainter, früher PaintCraft, in seinem eigenen Repository).
 - Testprogramme: `jfgui_gt_code` in `plib.rs`, `plugins/crash`, `plugins/crashpf`, `modrt`,
   `tools/memory_safety/native_probe.rs`.
 
@@ -210,8 +210,8 @@ Sandbox-Tests müssen zeigen, dass jeder gesperrte Aufruf wirklich scheitert.
   Auswahl in `rt/lib.rs` gilt dort nicht. Dazu kommen `ud2` und der Testfehler `JXT_FAULT` in `modrt/lib.rs`.
 - `build_rs.py plugin`, `pe_verify`, `elf_verify`, Meldung für Plugins der falschen Architektur.
 
-**Fertig, wenn:** die PaintCraft-Plugins, das Modul `jxlenc` und `plattest` (`t_guard`, `t_lib`) auf
-ARM64 und unverändert auf x86-64 laufen.
+**Fertig, wenn:** das Modul `jxlenc` und `plattest` (`t_guard`, `t_lib`) auf ARM64 und unverändert auf x86-64
+laufen (JFPainters Plugins: in dessen Repository).
 
 ### ARM5: Windows ARM64 (M)
 
@@ -294,7 +294,7 @@ QEMU reicht dafür nicht, siehe Fallen.
 
 ### ARM8: Fenster und GPU (M)
 
-- Wayland und X11 in der VM, `.uis`-Skripte der wichtigen Apps (`gallery`, `PaintCraft`, `jfWord`).
+- Wayland und X11 in der VM, `.uis`-Skripte der wichtigen Apps (`gallery`, `jfWord`; JFPainter in seinem Repository).
 - `gputest` und `uigputest` mit lavapipe in der VM, Treiber auf echtem Gerät, sobald eines da ist.
 - Windows: Verhalten, wenn `vulkan-1.dll` fehlt oder kein Treiber da ist, der Software-Renderer bleibt
   der Rückfall.

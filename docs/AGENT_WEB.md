@@ -246,7 +246,7 @@ Abbruch und verschachtelte Schleifen behalten ihre bisherigen Verträge. Die and
 Varianten verwenden weiterhin den kooperativen `web_pool.rs`-Fallback.
 
 Gemeinsamer Speicher benötigt Cross-Origin-Isolation. `python tools/serve_web.py
-build/web/PaintCraft` setzt die benötigten COOP-/COEP-Header auf localhost. Ohne Isolation
+build/web/portabletest` setzt die benötigten COOP-/COEP-Header auf localhost. Ohne Isolation
 bleibt SIMD mit einem App-Worker verfügbar. Der Standard nutzt bis zu acht zusätzliche
 Worker (Hardware-Threads minus eins); `?compute=scalar|simd|threads&workers=4` erlaubt
 kontrollierte Vergleiche. Details zu Build, Lebensdauer, Grenzen und reproduzierbaren

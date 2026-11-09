@@ -335,7 +335,8 @@ plugin: `PERMDENY fs.write C:/x (plugin qoi)`, `Denial::plugin`.
 | manifest | no manifest | nothing (fail closed) |
 | manifest | `<name>.permissions` | both rule sets |
 
-PaintCraft does this for its plugins (`integrations/plugins/native.rs`: the rights are read
+JFPainter (until 2026-11 PaintCraft in this repository) does this for its plugins
+(`integrations/plugins/native.rs` there: the rights are read
 before the library is opened, `gcall` runs query, render, decode, encode ... in the scope). A
 question of an `ask` line that a plugin's call raises says which plugin it is for.
 

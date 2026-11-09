@@ -7,8 +7,8 @@ icon size, cuts anti-aliased rounded corners and writes
   python tools/mkicon.py NAME --glyph E771 --color 1E78E6
 
 The glyph is an IC_* code point (lib/ui/keys.rs) of lib/style_assets/assets/icons.bin (Fluent UI
-System Icons, tools/icons_fluent.txt); the committed icons are installer E896 2E9E5B, PaintCraft
-E771 1E78E6 and Kritzel EB7E D9822B.  tools/refrender.py (the reference of the library's glyph
+System Icons, tools/icons_fluent.txt); the committed icons are installer E896 2E9E5B and Kritzel
+EB7E D9822B (PaintCraft's was E771 1E78E6).  tools/refrender.py (the reference of the library's glyph
 rasterizer) draws them with the layout of the former assembly icongen app: 48 bands from the
 colour mixed with 28 % white (top) to the colour (bottom), the glyph centred (GLYPH below).
 """

@@ -1,16 +1,16 @@
 // img_jxl_enc -- the new JPEG XL writer (jxl-plus: a port of libjxl 0.11.1's encoder; jxl-tools,
-// jxl-speed), split out of img_jxl so that PaintCraft can load it as a module (jxl-module)
+// jxl-speed), split out of img_jxl so that an app can load it as a module (jxl-module)
 //                                                                       [jxl-plus: no asm]
 //
 //   use_static()                   the app saves JPEG XL with this writer, linked in (codectest,
-//                                  the check tools): img_jxl::writer::set_static(enew::encode_px)
+//                                  JFPainter, the check tools): img_jxl::writer::set_static(enew::encode_px)
 //   enew::encode / encode_px / encode_with_splines   the writer itself (options: the header
 //                                  of img_jxl/lib.rs)
 //
 // Who links what: img_jxl (reader, the assembly-compatible writer, the writer's options and
 // samples in writer.rs) is in every app that registers JPEG XL; this crate only where the
-// app calls use_static() or one of its functions (codectest).  PaintCraft does not: it calls
-// img_jxl::writer::use_module(), and the module jxlenc (modules/jxlenc: this crate built
+// app calls use_static() or one of its functions (codectest, JFPainter).  An app that calls
+// img_jxl::writer::use_module() instead (codectest --jxlenc FILE) gets the module jxlenc (modules/jxlenc: this crate built
 // as a no_std cdylib over the module runtime) runs encode_px on the samples the host read.
 // The output is the same byte for byte either way, for any number of threads.
 //

@@ -51,8 +51,8 @@ through it and for the two tools around it:
 | `jflib-installer`, `jflib-appimagert` | nothing: the setup stub and the AppImage runtime that `cargo jflib package` of the same version builds |
 | `jflib-modrt`, `jflib-modplat` | not yet: loadable modules are built, but not tested for programs outside this repository |
 
-Not published and no part of it: PaintCraft's plugin ABI (`lib/plugin`, `REPO_ONLY` in
-`tools/gendoc.py`), the apps, `build_rs.py` and `tools/`. `build_rs.py check` keeps what `jflib`
+Not published and no part of it: the apps, `build_rs.py` and `tools/` (and crates listed in
+`REPO_ONLY` of `tools/gendoc.py`: none since PaintCraft's plugin ABI went with the app, 2026-11). `build_rs.py check` keeps what `jflib`
 shows equal to what API.md documents (a crate that is neither documented nor hidden fails), and
 `api-diff` compares exactly that.
 

@@ -1,5 +1,5 @@
 // modrt -- the runtime of a loadable module (jxl-module): what `rt` is for an app, for a no_std
-// cdylib without imports that runs inside a host process (PaintCraft loads modules/jxlenc)
+// cdylib without imports that runs inside a host process (codectest loads modules/jxlenc)
 //                                                                       [jxl-module: no asm]
 //
 // The module build (build_rs.py section jxl-module) passes this crate as `rt` (and
@@ -18,13 +18,14 @@
 //   (global allocator)          the host's allocator (HostTable::alloc / free): blocks move
 //                               between host and module as Vec raw parts
 //   (panic handler)             the message to HostTable::panic: the host's crash report
-//   (memcpy, memset, ...)       a copy of lib/plugin/mem.rs (assembly: never an export)
+//   (memcpy, memset, ...)       mem.rs (assembly: never an export; it was a copy of PaintCraft's
+//                               plugin crate until that moved to JFLibrary/JFPainter)
 //
 // shared/ holds byte-equal copies, because a package may not reach outside its folder
 // (docs/CRATES.md); build_rs.py's lint refuses a copy that differs from its source.
 //
 // One of the crates that may contain `unsafe` (it is the module's rt); a module's own code is
-// `#![deny(unsafe_code)]` with module_entry!() as its one exception (as plugin::entry!).
+// `#![deny(unsafe_code)]` with module_entry!() as its one exception.
 #![no_std]
 
 extern crate alloc;
@@ -48,7 +49,6 @@ pub mod sync;
 pub mod x87;
 #[path = "shared/plat/modabi.rs"]
 pub mod modabi;
-#[path = "shared/plugin/mem.rs"]
 mod mem;
 
 use alloc::vec::Vec;

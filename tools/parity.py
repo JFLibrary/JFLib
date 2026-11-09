@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT))
 from pngutil import read_png  # noqa: E402
-from build_rs import app_targets, plugin_test_dir, run_exe, script_args  # noqa: E402  (r12-inst: app_targets)
+from build_rs import app_targets, run_exe, script_args  # noqa: E402  (r12-inst: app_targets)
 
 REF = Path(os.environ.get("jfgui_REF") or ROOT / "build" / "rwref")  # jfgui_REF: a shared reference build
 RS = ROOT / "build"
@@ -127,8 +127,6 @@ def outputs_of(uis):
 
 
 def run_script(base, target, name, uis, keep):
-    if name == "PaintCraft" and uis.name.startswith("plugins"):
-        plugin_test_dir(base, target)  # the plugins scripts' `--plugins @ptest` (as build.py test)
     for _, f in outputs_of(uis):
         f.parent.mkdir(parents=True, exist_ok=True)
         if f.exists():

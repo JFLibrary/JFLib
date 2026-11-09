@@ -29,7 +29,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DISTRO = os.environ.get("jfgui_WSL_DISTRO", "Ubuntu-24.04")
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-import testenv  # noqa: E402,F401  (keeps PaintCraft away from the user's settings)
+import testenv  # noqa: E402,F401  (German texts in real windows)
 
 FAILS = []
 PRESSURE_ONE = 65535

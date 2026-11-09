@@ -93,7 +93,7 @@ static FMTS: SpinLock<[FmtInfo; IMGF_COUNT as usize]> = SpinLock::new([
     fi("HEIC", "heic;heif=HEIC", "image/heic", IFC_ALPHA | IFC_LOSSY | IFC_HDR | IFC_ICC | IFC_EXIF | IFC_XMP),
     fi("JPEG XL", "jxl=JPEG XL", "image/jxl", PROPS[11]),
     fi("JPEG XR", "jxr;wdp;hdp;wmp=JPEG XR", "image/jxr", PROPS[12]),
-    fi("Paint.NET", "pdn=Paint.NET", "image/x-PaintCraft", PROPS[13]),
+    fi("Paint.NET", "pdn=Paint.NET", "image/x-paint.net", PROPS[13]),
     FREE,
     FREE,
     FREE,

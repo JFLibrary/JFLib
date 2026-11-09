@@ -1,27 +1,24 @@
 #!/usr/bin/env python3
-"""accept.py -- the whole acceptance of the plat-shared agent (R4): print, portal, plugin loader,
-crash guard and monitor profile of the Rust rebuild against the assembly reference.
+"""accept.py -- what is left of the acceptance of the plat-shared agent (R4): the portal and the
+monitor profile of the Rust rebuild against the assembly reference.  (Its print, clipboard and
+plugin-loader parts imported PaintCraft's check scripts, which moved with the app to its own
+repository, JFLibrary/JFPainter, in 2026-11.)
 
-  python tools/platshared/accept.py [--ref build/rwref] [--rs build] [--fuzz N]
+  python tools/platshared/accept.py [--ref build/rwref] [--rs build]
 
 Runs (each also on its own):
-  tools/platshared/print_rs_check.py        plat::print (layout, PDFs, the PDF printer)
-  tools/platshared/clip_rs_check.py         clipboard DIB / BMP conversions (template's clip dib / file)
-  tools/platshared/lib_check.py             guard, loader with the assembly's plugins, loader fuzz
-  tools/platshared/portal_bus.py (in WSL)   OpenURI / OpenDirectory, FileChooser, Print on a fake bus
+  tools/platshared/portal_bus.py (in WSL)   OpenURI / OpenDirectory, FileChooser on a fake bus
   icc (here)                                   plattest --test icc against codectest op 325 of the
                                                assembly (primary monitor: length, key, header)
   tools/platshared/icc_x11.py (in WSL)      the root window's _ICC_PROFILE on X11 (plattest
                                                --test iccx11, an unmapped window of its own)
 Needs in --ref (a copy of the reference build, see tools/platshared/README.md): win/ and
-linux/ PaintCraft, gfxtest, codectest, template; plugins/win/*.dll, plugins/linux/*.so (and the
-Rust plattest + template built).  Exit code 0 = passed.
+linux/ gfxtest and codectest (and the Rust plattest built).  Exit code 0 = passed.
 """
 import argparse, re, struct, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "tools"))
 
 
@@ -51,13 +48,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ref", default="build/rwref")
     ap.add_argument("--rs", default="build")
-    ap.add_argument("--fuzz", default="1200")
     a = ap.parse_args()
-    py = sys.executable
     res = {}
-    res["print"] = subprocess.run([py, str(HERE / "print_rs_check.py"), "--ref", a.ref, "--rs", a.rs], cwd=ROOT).returncode
-    res["clip"] = subprocess.run([py, str(HERE / "clip_rs_check.py"), "--ref", a.ref, "--rs", a.rs], cwd=ROOT).returncode
-    res["lib"] = subprocess.run([py, str(HERE / "lib_check.py"), "--ref", a.ref, "--rs", a.rs, "--fuzz", a.fuzz], cwd=ROOT).returncode
     res["portal"] = subprocess.run(["wsl.exe", "-d", "Ubuntu-24.04", "--cd", str(ROOT), "-e", "python3",
                                     "tools/platshared/portal_bus.py", "--ref", a.ref, "--rs", a.rs], cwd=ROOT).returncode
     res["icc"] = 0 if icc(a.ref, a.rs) else 1

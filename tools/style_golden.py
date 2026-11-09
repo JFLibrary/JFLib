@@ -4,7 +4,7 @@ byte-identical while the drawing code moves from ASMLIB/src/ui into ASMLIB/style
 
 Renders (each target):
   * every `shot F ...` of every apps/*/tests/*.uis script (run with its #!args), hashed right
-    after the run -- covers dialogs, popups, tool windows, PaintCraft states;
+    after the run -- covers dialogs, popups, tool windows, app states;
   * each app's default frame via --shot, light / dark x 100 / 150 %;
   * the gallery page scrolled step by step (light / dark x 100 / 150 %).
 The hashes (SHA-1 of the PNG bytes; our PNG encoder is deterministic) go to

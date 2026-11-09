@@ -48,7 +48,6 @@ Portions of this software are copyright © 1996-2026 The FreeType Project
 | DejaVu fonts | 2.37 | Bitstream Vera / Arev license, public domain changes | `lib/doc_view`, `apps/termtest`, styles `kde`, `classic` | `DejaVu-LICENSE.txt` |
 | Inter font | – | SIL Open Font License 1.1 | styles `jfoffice`, `backupcraft`, `netlab`, `apps/officeicontest` | `styles/*/assets/OFL-Inter.txt` |
 | WordCraft icon motifs | 2026 | MIT | style `jfoffice` (`icons.bin`, also used by `backupcraft` and `netlab`) | `styles/jfoffice/LICENSE-icons.txt` |
-| Dynamic Draw brush tips | v4.0 (`722ccb2`) | MIT | `apps/PaintCraft/resources/brush-factory` | `DynamicDraw-LICENSE.txt` |
 | HarfRust and its crates | see notice | MIT, Apache-2.0, Zlib, Unicode-3.0 | `lib/text_shape` | `lib/text_shape/NOTICE.md` |
 
 ## libjxl
@@ -254,10 +253,6 @@ is in the public domain.
   contributors): the office icon artwork of `styles/jfoffice/icon_art.py` and
   `styles/jfoffice/assets/icons.bin`, which the styles `backupcraft` and `netlab` embed too;
   `styles/jfoffice/LICENSE-icons.txt`.
-- Dynamic Draw brush tips (MIT, copyright (c) 2017 Joshua Lamusga): the six
-  `apps/PaintCraft/resources/brush-factory/BrCircle*.png` images from
-  NinthDesertDude/Dynamic-Draw, embedded unchanged by PaintCraft (see `NOTICE.md` there;
-  PaintCraft also shows the license in its brush dialog).
 - The fonts and icons of the other styles: see each style's license files in
   `styles/<style>/` and `styles/<style>/assets/` and `styles/NOTICE.md`.
 

@@ -53,8 +53,7 @@ style when the package's original default is outside that subset.
   same candidates. `request.json`, `tests.json` and `result.json` record settings, results
   and artifact hashes. A failed stage does not publish a successful result.
 - Release tests run every existing non-pending `.uis` on each selected native style/target,
-  with `--verify-dirty`. The shared runner honors `#!args`; PaintCraft test plugins are built
-  from the existing Rust plugin sources. No tests is reported explicitly. Web bundles have
+  with `--verify-dirty`. The shared runner honors `#!args`. No tests is reported explicitly. Web bundles have
   no native UI-test certification.
 
 Some existing app tests assert fixed WinUI geometry. Selecting a different style can

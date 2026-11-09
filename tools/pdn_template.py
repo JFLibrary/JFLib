@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Extract the NRBF class skeleton of a real paint.net file into ASMLIB/src/img/pdn.s.
 
-  python tools/pdn_template.py [--src apps/PaintCraft/tests/fixtures/pdn/a_1x1.pdn] [--print]
+  python tools/pdn_template.py [--src apps/codectest/fixtures/pdn/a_1x1.pdn] [--print]
 
 The writer in pdn.s (pdn_encode) emits the object graph paint.net 5.1 writes; the class
 records (names, member names, member types, library references), the library names, the

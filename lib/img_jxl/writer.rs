@@ -10,7 +10,7 @@
 //                              everywhere; alpha: a pixel not opaque); image_of checks the size
 //                              first (ERR_DIMS) like the writer does
 //   set_static(f)              the writer linked into the app (img_jxl_enc::use_static())
-//   use_module(path)           the writer of the loadable module (PaintCraft): <exe folder>/jxlenc.dll
+//   use_module(path)           the writer of the loadable module (codectest --jxlenc): <exe folder>/jxlenc.dll
 //                              (Linux jxlenc.so), or path; "off" = none.  plat loads it on the
 //                              first JPEG XL save and keeps it (plat::jxlenc_*)
 //   kind() -> Kind             which writer a save without IOF_JXL_COMPAT uses: Static, Module

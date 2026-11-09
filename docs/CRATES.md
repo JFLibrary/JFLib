@@ -389,7 +389,8 @@ kleinen JSON-Leser für Cargos Meldungen hat sie selbst. Vorlage und Web-Host tr
     beendet `watch` mit 0. Das Wiedereinspielen selbst prüft `tools/tests/test_hotreload.py`.
   - **`plugin`: gestrichen am 2026-11-06** (Entscheidung des Nutzers). Das Plugin-ABI (`lib/plugin`, `plugins/*`)
     gehört zu PaintCraft und wird bewusst nicht veröffentlicht; ein Crate-Nutzer könnte kein Plugin bauen, das
-    irgendwo geladen wird. PaintCrafts Plugins baut weiter `build_rs.py plugin`. Ladbare Module eigener Apps
+    irgendwo geladen wird. PaintCrafts Plugins baute weiter `build_rs.py plugin`, bis sie im November 2026 mit der App
+    nach JFLibrary/JFPainter zogen (CR7 Schritt 1). Ladbare Module eigener Apps
     (`modrt`, `modplat`) wären ein eigenes Thema, ihr Laden ist bisher nicht getestet.
 - **Reihenfolge danach:** CR5.
 - **Umfang:** rund 2.350 Zeilen Python aus `tools/package.py`, `pkg_linux.py`, `pkg_msix.py`, `pkgmeta.py`,
@@ -551,6 +552,16 @@ wünscht. Die Doku nennt das (CR6f), technisch verhindern lässt es sich nicht.
 Braucht eine eigene Zusage. Namen und Versionen lassen sich danach nur noch zurückziehen (yank), nicht löschen.
 
 1. Die echten Apps und JFScript in eigene Repos, die Test-Apps bleiben hier.
+   **PaintCraft zuerst (2026-11-08/09):** jetzt **JFPainter** in [JFLibrary/JFPainter](https://github.com/JFLibrary/JFPainter)
+   (Entscheidungen des Nutzers: Name JFPainter, App-ID `org.jfreund.JFPainter`; `jflib = "0.1"` von crates.io, für
+   Bibliotheksänderungen vorübergehend ein `[patch.crates-io]`; ein neuer erster Commit, der Verlauf bleibt hier). Dort
+   baut es mit Cargo und `cargo jflib` (Windows, Linux, Web, Android, Pakete); die Rust-Plugins sind ein eigener Workspace,
+   der paint.net-Host kommt über `PACKAGE` `win_files` ins Setup (`cargo-jflib` nach 0.1.0), der JPEG-XL-Schreiber ist
+   fest eingebaut; die Prüfskripte zogen mit. Hier entfernt: `apps/PaintCraft`, `plugins/`, `lib/plugin`,
+   `tools/paintcraft-pdn-host`, PaintCrafts Prüfskripte und die vier platshared-Vergleiche, die sie importierten
+   (`clip_rs_check`, `lib_check`, `print_rs_check`, der Druckteil von `portal_bus`); `build_rs.py` ohne `plugin`, Plugin-Lint
+   und pdn-host. Das Modul `jxlenc` baut jetzt neben `codectest` (`--jxlenc FILE`); die Fixtures der Codec-Prüfungen
+   (`a1_rgba.png`, `a6_photo.png`, `pdn/`) liegen in `apps/codectest/fixtures/`.
 2. `cargo publish --workspace --dry-run`, dann in Abhängigkeitsreihenfolge hochladen. Vorher die aktuellen Limits von
    crates.io für neue Crates prüfen, bei 57 Stück kann das dauern. Stand 2026-11-08: `cargo publish --workspace
    --dry-run` baut und packt alle 60 Crates in ihrer Reihenfolge (Exit 0, ohne Warnungen); `cargo publish` in einem

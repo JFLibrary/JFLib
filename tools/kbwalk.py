@@ -2,8 +2,8 @@
 """kbwalk -- walk an app with the keyboard (headless) and list where the focus goes.
 
     python tools/kbwalk.py build/win/gallery.exe
-    python tools/kbwalk.py build/win/PaintCraft.exe --size "1280 800" --keys ctrl+f6 -n 8
-    python tools/kbwalk.py build/win/PaintCraft.exe --pre "cmd 271" --pre "wait 300" -n 30
+    python tools/kbwalk.py build/win/gallery.exe --size "1280 800" --keys ctrl+f6 -n 8
+    python tools/kbwalk.py build/win/jfWord.exe --pre "wait 300" -n 30
     python tools/kbwalk.py EXE --pre-file setup.uis --keys f8 -n 10 --args --lang de
 
 The script it writes runs the setup lines (--pre / --pre-file), then presses the keys

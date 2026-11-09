@@ -393,7 +393,7 @@ fn solid_row(argb: u32) -> [u8; 4 * SPX] {
 // one mode: n pixels into out from lhs (None: out itself), the top and the coverage (None:
 // 255), in blocks of BPX pixels (SPX with a solid colour); a solid colour and a missing
 // coverage row are block-long rows (no per-call zeroing of large stack buffers: short rows
-// are common, PaintCraft composes 64-pixel tile rows); the last n mod PX pixels are one more
+// are common, JFPainter composes 64-pixel tile rows); the last n mod PX pixels are one more
 // block of one step on copies (padding: zero pixels without coverage), so the step code
 // exists once
 #[inline(always)]

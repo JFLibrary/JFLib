@@ -10,14 +10,9 @@ rust-project.json
 /apps/JFNetworker/books
 /apps/JFDiagrammer/context
 /apps/BackupCraft/context
-/tools/paintcraft-pdn-host/obj
 *.pyc
 *.csproj
 *.props
-# except the project files of the Paint.NET plugin host (tools/paintcraft-pdn-host/README.md)
-!/tools/paintcraft-pdn-host/*.csproj
-!/tools/paintcraft-pdn-host/tests/*.csproj
-!/tools/paintcraft-pdn-host/Directory.Build.props
 *.log
 .env
 rust-project.json

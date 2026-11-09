@@ -22,7 +22,8 @@ try {
   for(const engine of (process.env.ENGINES||'chromium,firefox').split(',')) {
     const browser=await pw[engine].launch({headless:true,...(engine==='chromium'?chromiumOptions():{})});
     try {
-      for(const [app,mode,isolated] of [['portabletest','threads',true],['PaintCraft','threads',true],['PaintCraft','simd',true],['PaintCraft','scalar',true],['PaintCraft','auto',false]]) {
+      // (the compute modes of an app's own effects: JFPainter's tests/wasm_compute.mjs, since PaintCraft left for its repository)
+      for(const [app,mode,isolated] of [['portabletest','threads',true]]) {
         const page=await browser.newPage({viewport:{width:1280,height:800}}),logs=[],errors=[];
         await page.addInitScript(()=>{addEventListener('jfgui-ready',()=>window.__jfguiReady=true);});
         if(app==='portabletest')await page.addInitScript(()=>{const click=HTMLInputElement.prototype.click;HTMLInputElement.prototype.click=function(){if(this.type!=='file')click.call(this);};});
@@ -37,7 +38,6 @@ try {
           assert.ok(logs.some(x=>x.includes('overlap=4 nested=320 cancellation restart')),logs.join('\n'));
           assert.ok(logs.some(x=>x.includes('digest=edea7e9d9579c77a')),logs.join('\n'));
         }
-        if(app==='PaintCraft'&&mode==='threads')assert.equal(compute.workers,4);
         results.push({engine,app,mode,isolated,compute,logs,ok:true});console.log(JSON.stringify(results.at(-1)));
         await page.close();
       }

@@ -9,7 +9,7 @@ between them at run time ([Switching the style at run time](#switching-the-style
 
 | Style | Crate | Look | Used by |
 |---|---|---|---|
-| `winui` (default) | `styles/winui` | Windows 11 / WinUI 3 Fluent: rounded controls, JFLib Sans (Selawik), accent pills, Mica colours | Kritzel, PaintCraft, every app without a `STYLE` file |
+| `winui` (default) | `styles/winui` | Windows 11 / WinUI 3 Fluent: rounded controls, JFLib Sans (Selawik), accent pills, Mica colours | Kritzel, every app without a `STYLE` file |
 | `classic` | `styles/classic` | Windows 2000 / Office 97: grey 3D bevels, square controls, DejaVu Sans Condensed, navy selection, gradient title bars | `--style classic` |
 | `macos` | `styles/macos` | macOS Sonoma: grey window, white push buttons, blue default button and selection, pop-up buttons with the blue chevron square, overlay scrollers, traffic-light title bars (close at the left, centred titles), dialog buttons right-aligned with the default last; JFLib Sans stands in for SF Pro | `--style macos` |
 | `kde` | `styles/kde` | KDE Plasma Breeze: light buttons with an outline, highlight-blue hover and focus frames, Breeze window decoration (chevron buttons, round red close on hover), dialog buttons right-aligned with the default first; DejaVu Sans | `--style kde` |
@@ -17,7 +17,7 @@ between them at run time ([Switching the style at run time](#switching-the-style
 | `backupcraft` | `styles/backupcraft` | WinUI layering with KDE Breeze framing: slate window / panel / card layers with soft shadows, framed inputs, outlined push buttons with an accent outline on hover, accent-filled primary buttons and checks, pills for the selected row and navigation item, full-width tab underlines, visible scroll tracks; petrol accent (#0B7285 light, #3BC9DB dark), Inter, compact 32 DIP controls, own vector icons | BackupCraft; `--style backupcraft` |
 | `netlab` | `styles/netlab` | sober and timeless: flat grey window / panel / field layers without gradients, a 1 DIP frame on every control, card and dock group, 3 DIP corners (4 on flyouts and dialogs, none on dock panels and grids), one soft shadow only on flyouts and dialogs; the selection a 16 % accent tint with a 1 DIP accent frame, a 1 DIP focus ring with a 1 DIP gap, 2 DIP tab underlines, classic dock tabs (the shown tab framed on three sides), visible thin scroll tracks, dialog buttons right-aligned with the default first; "Signalblau" accent (#1F5FA8 light, #6FA3E0 dark), Inter 13 DIP, compact 28 DIP controls and 22 DIP grid rows, own vector icons | JFNetworker; `--style netlab` |
 
-The installer lets the user pick one of them for paint and PaintCraft ([PACKAGING.md](PACKAGING.md)).
+The installer lets the user pick one of them for an app's package ([PACKAGING.md](PACKAGING.md)).
 The four Rust styles render pixel-identical to the assembly styles of `legacy/ASMLIB/styles`.
 The new `jfoffice` style has no assembly counterpart. Its current scope and asset provenance
 are described in [styles/jfoffice/README.md](../styles/jfoffice/README.md). `backupcraft` has no

@@ -1,3 +1,0 @@
-<ps:SimpleGeometryShape xmlns:ps="clr-namespace:PaintDotNet.Shapes;assembly=PaintDotNet.Framework"
-                        DisplayName="Kaputt"
-                        Geometry="M 0 0 L 10 10 Q" />

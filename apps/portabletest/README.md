@@ -42,7 +42,7 @@ remaining precision limitation; the UI/effect representative tests cover -20 to 
 Real canvas/browser acceptance is separate:
 
 ```text
-node tools/tests/web_apps.mjs build/office-universal --engine=chromium,firefox --only=template,gallery,jfWord,Kritzel,PaintCraft
+node tools/tests/web_apps.mjs build/office-universal --engine=chromium,firefox --only=template,gallery,jfWord,Kritzel
 python tools/tests/web_transfer.py build/office-universal
 ```
 

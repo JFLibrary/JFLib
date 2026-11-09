@@ -731,7 +731,7 @@ FMT_TABLE = {
     10: ("HEIC", "heic;heif=HEIC", "image/heic"),
     11: ("JPEG XL", "jxl=JPEG XL", "image/jxl"),
     12: ("JPEG XR", "jxr;wdp;hdp;wmp=JPEG XR", "image/jxr"),
-    13: ("Paint.NET", "pdn=Paint.NET", "image/x-PaintCraft"),
+    13: ("Paint.NET", "pdn=Paint.NET", "image/x-paint.net"),
 }
 
 

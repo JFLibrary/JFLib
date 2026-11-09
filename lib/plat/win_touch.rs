@@ -19,7 +19,7 @@
 // press and hold into a right click.  EnableMouseInPointer stays off: the mouse keeps its messages.
 //
 // Which window a finger belongs to: a contact is wide and the system gives it to a window frame it
-// touches (measured with InjectTouchInput, a contact 60 px wide): a finger on PaintCraft's zoom slider
+// touches (measured with InjectTouchInput, a contact 60 px wide): a finger on JFPainter's zoom slider
 // arrived as WM_NCPOINTERDOWN HTBOTTOM on the tool window above it, whose invisible resize border ends
 // at the status bar, and resized that window.  So a finger over a border belongs to the window whose
 // client area is under its centre (z-order, from the window that got it), also a contact the system

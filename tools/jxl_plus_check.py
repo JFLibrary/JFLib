@@ -436,7 +436,7 @@ def synth(kind, w, h, seed=7):
 
 def fixture(name):
     import jxl_enc_ref as E
-    w, h, rgba = E.read_png(ROOT / "apps/PaintCraft/tests/fixtures" / name)
+    w, h, rgba = E.read_png(ROOT / "apps/codectest/fixtures" / name)
     return np.frombuffer(rgba, np.uint8).reshape(h, w, 4).copy()
 
 

@@ -12,7 +12,7 @@ Library checks (runs apps/codectest ops 220..239 and 240 / 252 through tools/img
   python tools/pdn_check.py --target both --out build/cp            all suites
   python tools/pdn_check.py --target win --out build/cp --only samples,fuzz --no-build
 
-Suites: samples (our decoder vs this reader on apps/PaintCraft/tests/fixtures/pdn/*.pdn: every layer
+Suites: samples (our decoder vs this reader on apps/codectest/fixtures/pdn/*.pdn: every layer
 bit-exact, all properties and metadata, flattened composite, img_decode_ex / img_probe),
 roundtrip (paint.net's files re-encoded: NRBF byte-identical to paint.net's, payload layout;
 synthetic documents: names, hidden layers, opacity, all 14 blend modes, metadata, ICC, DPI
@@ -47,7 +47,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
-SAMPLES = ROOT / "apps" / "PaintCraft" / "tests" / "fixtures" / "pdn"
+SAMPLES = ROOT / "apps" / "codectest" / "fixtures" / "pdn"
 
 
 class PdnError(Exception):

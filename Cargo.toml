@@ -1,5 +1,5 @@
-# The library's crates, the apps of this repository, their programs and crates, PaintCraft's Rust
-# plugins.  Cargo builds them; build_rs.py is the tool on top that reads what it needs from here
+# The library's crates, the apps of this repository, their programs and crates.  Cargo builds
+# them; build_rs.py is the tool on top that reads what it needs from here
 # (tools/manifests.py).  docs/CRATES.md is the plan.
 [workspace]
 resolver = "3"
@@ -65,7 +65,6 @@ members = [
     "lib/jflib",
     "lib/jflib_build",
     "lib/cargo_jflib",
-    "lib/plugin",
     "styles/winui",
     "styles/classic",
     "styles/kde",
@@ -76,17 +75,6 @@ members = [
     "modules/modrt",
     "modules/modplat",
     "modules/jxlenc",
-    "plugins/badinfo",
-    "plugins/crash",
-    "plugins/crashpf",
-    "plugins/crashq",
-    "plugins/prepcheck",
-    "plugins/pshapes",
-    "plugins/qoi",
-    "plugins/rsdemo",
-    "plugins/sepiastr",
-    "plugins/swapchan",
-    "plugins/toonew",
     "apps/BackupCraft",
     "apps/BackupCraft/server",
     "apps/BackupCraft/agent",
@@ -102,7 +90,6 @@ members = [
     "apps/JFNetworker/crates/jfn_run",
     "apps/JFNetworker/crates/jfn_sim",
     "apps/Kritzel",
-    "apps/PaintCraft",
     "apps/agenttest",
     "apps/androidGallery",
     "apps/appimagert",
@@ -237,8 +224,7 @@ modplat = { package = "jflib-modplat", path = "modules/modplat", version = "=0.1
 jflib-build = { path = "lib/jflib_build", version = "=0.1.0" }
 installer = { package = "jflib-installer", path = "lib/installer", version = "=0.1.0" }
 appimagert = { package = "jflib-appimagert", path = "lib/appimagert", version = "=0.1.0" }
-# PaintCraft's plugins written in Rust (plugins/*) and the styles of the apps: not published
-plugin = { package = "jflib-plugin", path = "lib/plugin" }
+# the styles of the apps: not published
 style_jfoffice = { package = "jflib-style-jfoffice", path = "styles/jfoffice" }
 style_backupcraft = { package = "jflib-style-backupcraft", path = "styles/backupcraft" }
 style_netlab = { package = "jflib-style-netlab", path = "styles/netlab" }
@@ -267,7 +253,7 @@ codegen-units = 16
 strip = "symbols"
 
 # the crates whose speed matters in development builds too (build_rs.py's compute_crate): pixels and
-# codecs stay fast in the tests, Kritzel and PaintCraft draw with their own pixel loops
+# codecs stay fast in the tests, Kritzel draws with its own pixel loops
 [profile.dev.package.jflib-gfx]
 opt-level = 2
 
@@ -350,9 +336,6 @@ opt-level = 2
 opt-level = 2
 
 [profile.dev.package.Kritzel]
-opt-level = 2
-
-[profile.dev.package.PaintCraft]
 opt-level = 2
 
 # text_shape and the crates it pins from crates.io: optimised as build_rs.py's earlier Cargo build of them did

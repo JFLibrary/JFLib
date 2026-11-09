@@ -48,7 +48,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[API](#img_avif-api) · [modules](#img_avif-modules)
 - [img_jxl](#img_jxl) -- JPEG XL
   <br>[API](#img_jxl-api) · [modules](#img_jxl-modules)
-- [img_jxl_enc](#img_jxl_enc) -- the new JPEG XL writer (linked into codectest; PaintCraft loads it as the module jxlenc)
+- [img_jxl_enc](#img_jxl_enc) -- the new JPEG XL writer (linked into codectest, and the module jxlenc that codectest --jxlenc loads)
   <br>[API](#img_jxl_enc-api) · [modules](#img_jxl_enc-modules)
 - [img_jxr](#img_jxr) -- JPEG XR
   <br>[API](#img_jxr-api) · [modules](#img_jxr-modules)
@@ -104,8 +104,6 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
-- [plugin](#plugin) -- the PaintCraft plugin ABI for plugins written in Rust
-  <br>[lib.rs](#plugin-crate-root) · [abi.rs](#pluginabirs) · [api.rs](#pluginapirs) · [ft.rs](#pluginftrs) · [fx.rs](#pluginfxrs)
 
 ## ui
 
@@ -693,7 +691,7 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   ui_timer(id, ms): App::command(UIC_TIMER, id) after ms (replaces a timer with the
   same id)
 - **`fn last_reset(&mut self)`**
-  g_last_rect = 0, g_last_state = 0: the apps' hidden probe records (PaintCraft's \*\_sem
+  g_last_rect = 0, g_last_state = 0: the apps' hidden probe records (JFPainter's \*\_sem
   helpers zero both before ui_sem; later records of the pass see the zeroes too)  // pn-core
 - **`fn last_set(&mut self, rect: [i32; 4], state: u32)`**
   g_last_rect = rect, g_last_state = state (apps that build a widget from drawing calls
@@ -15239,7 +15237,7 @@ Source: [`lib/img_all/psd/document.rs`](../lib/img_all/psd/document.rs)
 
 - **`struct Document`**
   - `meta: ImgMeta`
-  - `layers: Vec<Layer>` -- PaintCraft order: bottom layer first.
+  - `layers: Vec<Layer>` -- Bottom layer first (the order of a layered editor such as JFPainter).
   - `converted: bool` -- Mask application, cropped off-canvas pixels, high depth or Photoshop-specific blocks.
 
 - **`struct LayerRef<'a>`**
@@ -16170,7 +16168,7 @@ splines).  jxl-module: writer (the new writer's options, samples and hook).  The
 itself (libjxl 0.11.1's encoder: enew, evdct, emod, ema, eans, efrm, eicc, etx, dctk, eaq,
 eacs, ecfl, epatch, edots, espline, enoise, efeat, ebutter, ebq) is the crate img_jxl_enc
 (lib/img_jxl_enc/lib.rs), linked into codectest and built into the module jxlenc
-(modules/jxlenc) that PaintCraft loads; Recon and decode_linear below are its reconstruction
+(modules/jxlenc) that codectest --jxlenc loads; Recon and decode_linear below are its reconstruction
 helpers.
 ```
 
@@ -16341,22 +16339,22 @@ The codec's building blocks (public for the codec test app `codectest`; see thei
 
 ## img_jxl_enc
 
-*the new JPEG XL writer (linked into codectest; PaintCraft loads it as the module jxlenc)* -- crate root [`lib/img_jxl_enc/lib.rs`](../lib/img_jxl_enc/lib.rs)
+*the new JPEG XL writer (linked into codectest, and the module jxlenc that codectest --jxlenc loads)* -- crate root [`lib/img_jxl_enc/lib.rs`](../lib/img_jxl_enc/lib.rs)
 
 ```text
 img_jxl_enc -- the new JPEG XL writer (jxl-plus: a port of libjxl 0.11.1's encoder; jxl-tools,
-jxl-speed), split out of img_jxl so that PaintCraft can load it as a module (jxl-module)
+jxl-speed), split out of img_jxl so that an app can load it as a module (jxl-module)
                                                                       [jxl-plus: no asm]
 
   use_static()                   the app saves JPEG XL with this writer, linked in (codectest,
-                                 the check tools): img_jxl::writer::set_static(enew::encode_px)
+                                 JFPainter, the check tools): img_jxl::writer::set_static(enew::encode_px)
   enew::encode / encode_px / encode_with_splines   the writer itself (options: the header
                                  of img_jxl/lib.rs)
 
 Who links what: img_jxl (reader, the assembly-compatible writer, the writer's options and
 samples in writer.rs) is in every app that registers JPEG XL; this crate only where the
-app calls use_static() or one of its functions (codectest).  PaintCraft does not: it calls
-img_jxl::writer::use_module(), and the module jxlenc (modules/jxlenc: this crate built
+app calls use_static() or one of its functions (codectest, JFPainter).  An app that calls
+img_jxl::writer::use_module() instead (codectest --jxlenc FILE) gets the module jxlenc (modules/jxlenc: this crate built
 as a no_std cdylib over the module runtime) runs encode_px on the samples the host read.
 The output is the same byte for byte either way, for any number of threads.
 
@@ -16624,9 +16622,9 @@ the MS-NRBF (.NET BinaryFormatter) parser / writer they are built on
 
 The document records of the assembly (img.inc PDNDOC / PDNLAYER) are PdnDoc / PdnLayer:
 the reader returns an owned PdnDoc (pdn_free = drop).  The writer takes a borrowed view,
-DocRef / LayerRef, so a caller hands its own layers over without copying pixels (PaintCraft's
+DocRef / LayerRef, so a caller hands its own layers over without copying pixels (JFPainter's
 save_pdn borrows its layer surfaces the same way); PdnDoc::view() makes one of a PdnDoc.
-PaintCraft (R11): open_pdn = decode(data, Some(&dec)), then move each layer's surface, name
+JFPainter (PaintCraft in R11): open_pdn = decode(data, Some(&dec)), then move each layer's surface, name
 and metadata blob out of doc.layers (core::mem::take) and use doc.unit / dpux / dpuy;
 save_pdn = a DocRef over its layers (LayerRef per layer) and encode(&docref, Some(&opt)).
 Field semantics are those of the asm records: opacity / visible / blend / isbg as stored,
@@ -16952,7 +16950,7 @@ layers alive at once (deeper opacity is applied to the paints), use cycles are c
 fx -- the effect and adjustment kernels: the FXDESC registry, prepare / render on ROIs from
 worker threads, deterministic per pixel                       [src/fx/*.s, inc/fx.inc]
 
-The contract (fx.inc).  An application (PaintCraft, efftest) runs an effect by
+The contract (fx.inc).  An application (JFPainter, efftest) runs an effect by
   1. copying the source layer (FMT_ARGB, straight alpha) -> FxArgs::src,
   2. calling desc.prepare once when it has one (global statistics, LUTs, noise tables):
      Ok(Some(aux)) / Ok(None) / Err(ERR_*) -- ERR_CANCEL when the job was cancelled,
@@ -28409,7 +28407,7 @@ messages, a pinch into Ctrl + wheel (preset steps), a two-finger pan into nothin
 press and hold into a right click.  EnableMouseInPointer stays off: the mouse keeps its messages.
 
 Which window a finger belongs to: a contact is wide and the system gives it to a window frame it
-touches (measured with InjectTouchInput, a contact 60 px wide): a finger on PaintCraft's zoom slider
+touches (measured with InjectTouchInput, a contact 60 px wide): a finger on JFPainter's zoom slider
 arrived as WM_NCPOINTERDOWN HTBOTTOM on the tool window above it, whose invisible resize border ends
 at the status bar, and resized that window.  So a finger over a border belongs to the window whose
 client area is under its centre (z-order, from the window that got it), also a contact the system
@@ -32507,8 +32505,8 @@ modabi -- the ABI of loadable modules (jxl-module): the records the host (modhos
 module (the module runtime modules/modrt, which has a copy of this file) exchange
                                                                       [jxl-module: no asm]
 
-A module is a no_std cdylib linked against nothing (no imports; built and checked like a
-Rust PaintCraft plugin, build_rs.py section jxl-module) that exports exactly one function
+A module is a no_std cdylib linked against nothing (no imports; built and checked as
+build_rs.py's sections jxl-module and "loader checks" say) that exports exactly one function
 
     <name>_module(host: *const HostTable) -> *const ModTable          extern "win64"
 
@@ -46902,674 +46900,3 @@ handler, the allocator and the memory functions then (lib.rs, mem.rs and os.rs l
   (feature std) std's panics end as rt's panic handler ends them without std: one line on stderr,
   the crash hook, exit code 3.  plat's start of a std program installs it; replacing it with
   `std::panic::set_hook` gives up JFLib's crash report for panics.
-
-## plugin
-
-*the PaintCraft plugin ABI for plugins written in Rust* -- crate root [`lib/plugin/lib.rs`](../lib/plugin/lib.rs)
-
-```text
-plugin -- the PaintCraft plugin ABI for plugins written in Rust (no_std cdylib, no imports)
-                    [ASMLIB/inc/plugin.inc; docs apps/PaintCraft/docs/PLUGINS.md, plugins/README.md]
-
-A plugin is a library exporting one function, pn_plugin_query(PNAPI*) -> PLUGININFO*, that
-PaintCraft (the Rust and the assembly build alike) loads from <root>/Effects, FileTypes or
-Shapes.  It is linked against nothing: no rt, no plat, no system library -- the host's
-functions come through the PNAPI table.  This crate is all a plugin depends on (+ core):
-
-  abi       the records of plugin.inc / fx.inc / img.inc as #[repr(C)] types (layouts
-            asserted): PnApi, PluginInfo, FxDesc, FxProp, FtDesc, ShapeDesc, FxArgs,
-            Surface, Job, ImgDec, ImgMeta, ImgOpt; their const constructors
-  api       the host table after pn_plugin_query (api()): Block (a PA_ALLOC buffer),
-            parallel_for, hash32, log / log!, nthreads; PnAlloc (opt-in global allocator)
-  fx        Effect (render / prepare of an effect or adjustment) and its safe view Fx
-            (source rows, the destination rows of the ROI, parameters, cancel polling)
-  ft        FileType (probe / decode / encode of a file type): Decoder, Image
-  mem       memcpy / memmove / memset / memcmp / bcmp (and the MSVC support symbols) for
-            core, in assembly so that they never become exports
-
-The unsafe parts (raw host records, the trampolines the host calls) live here; a plugin's
-own code stays safe: `#![deny(unsafe_code)]`, with entry!() as its one exception (the
-#[unsafe(no_mangle)] export).  Minimal plugin (see plugins/sepiastr):
-
-  #![no_std]
-  #![deny(unsafe_code)]
-  use plugin::*;
-  struct Sepia;
-  impl Effect for Sepia {
-      type Aux = ();
-      fn render(fx: &mut Fx, _: Option<&()>) -> Result<(), i32> { ... }
-  }
-  static PROPS: [FxProp; 1] = [FxProp::int(0, c"Stärke", 0.0, 100.0, 60.0)];
-  static FX: FxDesc = FxDesc::new::<Sepia>(c"Sepia-Stärke", FXF_ADJ, FXC_ADJUST, &PROPS);
-  static FX_LIST: [&FxDesc; 1] = [&FX];
-  static INFO: PluginInfo = PluginInfo::new(c"Sepia-Stärke (Beispiel)", c"1.0").effects(&FX_LIST);
-  fn query(_: &'static PnApi) -> Option<&'static PluginInfo> { Some(&INFO) }
-  plugin::entry!(query);
-  #[panic_handler]
-  fn panic(info: &core::panic::PanicInfo) -> ! { plugin::panic(info) }
-
-Panics: `plugin::panic` logs "panic at FILE:LINE" through PA_LOG and executes ud2,
-`plugin::trap` only executes ud2 -- the host's crash guard catches it and disables the plugin
-("Absturz in render (ungültiger Befehl ...)"), like any other fault inside plugin code.
-
-Build: python build_rs.py plugin [NAME] (section rust-plugin: cdylib, panic=abort, fat LTO,
-linked against nothing, checked like PaintCraft's loader checks it).
-```
-
-### `plugin` crate root
-
-*plugin.inc*
-
-```rust
-PNAPI_VERSION: u32 = 1  // the PNAPI version this crate is written for
-PLUGIN_MAGIC: u32 = 0x4950_4E50  // "PNPI" little endian
-PA_SIZE_V1: u32 = 96  // PNAPI table size of version 1
-PI_SIZE_V1: u32 = 88  // PLUGININFO size of version 1
-```
-
-*error codes (jfgui.inc)*
-
-```rust
-ERR_FAIL: i32 = -1
-ERR_TRUNC: i32 = -1  // input ends early
-ERR_HDR: i32 = -2  // bad header / signature
-ERR_NOMEM: i32 = -8  // allocation failed
-ERR_UNSUPPORTED: i32 = -9  // valid but unsupported variant
-ERR_DIMS: i32 = -12  // width / height out of range
-ERR_IO: i32 = -13
-ERR_CANCEL: i32 = -14  // cancelled through a cancel flag
-ERR_LIMIT: i32 = -15  // resource limit
-ERR_FAULT: i32 = -64  // a guarded call faulted (the plugin is disabled)
-```
-
-*fx.inc*
-
-```rust
-FX_NSLOTS: usize = 32  // parameter slots per effect
-FXF_ADJ: u32 = 1  // adjustment (Korrekturen) rather than effect (Effekte)
-FXF_PREPARE: u32 = 2  // has a prepare step
-FXF_SEED: u32 = 4  // uses a random seed (has an FP_SEED property)
-FXF_BANDS: u32 = 8  // render wants full-width row bands
-FXF_WHOLE: u32 = 16  // render must get the whole image in one call
-FXF_NO_DIALOG: u32 = 32  // applied at once, without the property dialog
-FXF_SLOW: u32 = 64  // hint: show progress
-FXC_ADJUST: u32 = 0  // categories (FXD_CATEGORY)
-FXC_ARTISTIC: u32 = 1
-FXC_BLUR: u32 = 2
-FXC_COLOR: u32 = 3
-FXC_DISTORT: u32 = 4
-FXC_NOISE: u32 = 5
-FXC_OBJECT: u32 = 6
-FXC_PHOTO: u32 = 7
-FXC_RENDER: u32 = 8
-FXC_STYLIZE: u32 = 9
-FP_INT: u8 = 1  // property types: slot i64
-FP_DEC: u8 = 2  // f64
-FP_BOOL: u8 = 3  // i64 0 / 1
-FP_CHOICE: u8 = 4  // i64 index
-FP_ANGLE: u8 = 5  // f64 degrees
-FP_PAN: u8 = 6  // two slots: f64 x, f64 y (-1..1)
-FP_COLOR: u8 = 7  // straight ARGB in the low half
-FP_SEED: u8 = 8  // i64 seed
-FPF_LOG: u8 = 1  // the slider maps logarithmically
-```
-
-*img.inc / jfgui.inc*
-
-```rust
-FMT_PARGB: u8 = 1  // premultiplied 0xAARRGGBB
-FMT_ARGB: u8 = 3  // straight 0xAARRGGBB (bytes B, G, R, A)
-IMG_MAXDIM: u32 = 65535  // largest width / height of a decoded image
-IMGD_STRAIGHT: u32 = 1  // decode flags (ImgDec::flags)
-IMGD_ICC: u32 = 2
-IMGD_EXIF: u32 = 4
-IMGD_XMP: u32 = 8
-IMGD_NO_ORIENT: u32 = 16
-IMGD_PROBE: u32 = 32  // header + metadata only: pixels optional
-IMGD_THUMB: u32 = 64
-IMM_GRAY: u8 = 1  // colour models (ImgMeta::model)
-IMM_RGB: u8 = 2
-IMM_PAL: u8 = 3
-IMM_CMYK: u8 = 4
-IMM_YCC: u8 = 5
-IMF_ALPHA: u32 = 1  // ImgMeta::flags
-IMF_SRC_PREMUL: u32 = 2
-IMF_LOSSLESS: u32 = 4
-IMF_ANIMATED: u32 = 8
-IMF_HDR: u32 = 16
-IFC_ALPHA: u32 = 4  // file type capabilities (FtDesc::caps)
-IFC_ANIM: u32 = 16
-IFC_PAGES: u32 = 32
-IFC_LOSSY: u32 = 128
-IFC_LOSSLESS: u32 = 256
-IFC_HDR: u32 = 512
-```
-
-- **`entry!(...)`**
-  export pn_plugin_query(PNAPI\*) -> PLUGININFO\* | 0, calling `query` with the host's table
-  (kept for api() when it is a complete version-1 table).  \\`query: fn(&'static PnApi) ->
-  Option&lt;&'static PluginInfo>\\`; None refuses loading.  The plugin's one unsafe item.
-
-- **`fn panic(info: &core::panic::PanicInfo) -> !`**
-  the panic handler of a plugin: "panic at FILE:LINE" into the plugin log when the host
-  table is known, then a fault the host's guard catches (the plugin is disabled).  The
-  message itself is left out: formatting it would link core::fmt into every plugin (+6 KB);
-  a handler of your own can log it with log!("{}", info.message()).  (Inlined, so that the
-  optimizer sees that the message is never read and drops it.)
-
-- **`fn trap() -> !`**
-  an illegal instruction (ud2): the host's crash guard disables the plugin
-
-### `plugin/abi.rs`
-
-Source: [`lib/plugin/abi.rs`](../lib/plugin/abi.rs)
-
-```text
-abi -- the records of the plugin ABI, version 1, as #[repr(C)] types, and the const
-constructors of the descriptors a plugin puts into statics
-                     [ASMLIB/inc/plugin.inc, fx.inc (FXARGS, FXDESC, FXPROP), img.inc
-                      (IMGDEC, IMGMETA, IMGOPT), thread.inc (JOB), jfgui.inc (SURFACE)]
-
-Every function pointer uses the Win64 ABI (`extern "win64"`) on Linux too.  The layouts are
-asserted against the offsets of the include files at the end of this file.  Strings are
-NUL-terminated UTF-8 (`c"..."` literals); lists are static slices.  The descriptors hold raw
-pointers into the plugin's own image -- the host checks every one of them against the
-image's segments before it reads anything.
-```
-
-- **`type ItemFn = extern "win64" fn(ctx: *const c_void, index: u64, job: *const Job)`**
-  fn(ctx, index, job) of PA_PARFOR
-
-- **`type PrepareFn = extern "win64" fn(*const FxArgs) -> *mut c_void`**
-  FXD_PREPARE: fn(FXARGS\*) -> rax aux | 0 (0 also on error: the code in edx)
-
-- **`type RenderFn = extern "win64" fn(*const FxArgs) -> i32`**
-  FXD_RENDER: fn(FXARGS\*) -> eax 0 / ERR_CANCEL / ERR_\*
-
-- **`type FreeFn = extern "win64" fn(*mut c_void)`**
-  FXD_FREE: fn(aux)
-
-- **`type ProbeFn = extern "win64" fn(*const u8, usize, *mut ImgMeta) -> u32`**
-  FT_PROBE: fn(data, len, meta) -> eax 1 recognised / 0
-
-- **`type DecodeFn = extern "win64" fn(*const u8, usize, *mut Surface, *const ImgDec) -> i32`**
-  FT_DECODE: fn(data, len, sf, dec) -> eax 0 / ERR_\*
-
-- **`type EncodeFn = extern "win64" fn(*const Surface, *const ImgOpt, *mut *mut u8, *mut usize) -> i32`**
-  FT_ENCODE: fn(sf, opt, &buf, &len) -> eax 0 / ERR_\*
-
-- **`struct PnApi`**
-  PNAPI -- the host's function table, passed to pn_plugin_query (PA_\*).  Later versions only
-  append entries; `size` says how many there are.
-  - `size: u32`
-  - `version: u32`
-  - `alloc: extern "win64" fn(usize) -> *mut u8` -- (size) -> zeroed, 64-byte aligned block | 0; thread safe
-  - `free: extern "win64" fn(*mut u8)` -- (ptr) (0 allowed)
-  - `realloc: extern "win64" fn(*mut u8, usize) -> *mut u8` -- (ptr, size) -> block | 0
-  - `parfor: extern "win64" fn(ItemFn, *const c_void, u64) -> i32` -- (fn, ctx, count) -> 0 / ERR_CANCEL / ERR_FAULT: fn(ctx, index, job) on the workers
-  - `hash32: extern "win64" fn(u32, u32, u32, u32) -> u32` -- (x, y, seed, stream) -> deterministic per-pixel random bits (fx_hash32)
-  - `log: extern "win64" fn(*const u8)` -- (msg) a UTF-8 line into the plugin log (stderr, "PaintCraft: Plugin &lt;file>: msg")
-  - `row: extern "win64" fn(*const Surface, i32) -> *mut u8` -- (sf, y) -> row y of a SURFACE | 0
-  - `surfalloc: extern "win64" fn(*mut Surface, i32, i32, *const ImgDec) -> i32` -- (sf, w, h, dec) -> 0 / ERR_\*: a zeroed straight FMT_ARGB surface for decoders
-  - `cancelled: extern "win64" fn(*const Job) -> i32` -- (job) -> 1 when the job's cancel flag is set
-  - `fmt: *const c_void` -- (buf, cap, fmt, ...) -> length: the host's printf subset (C variadic; core::fmt and
-    log_fmt are the Rust way)
-  - `nthreads: extern "win64" fn() -> u32` -- () -> worker threads
-
-- **`struct Surface`**
-  SURFACE (jfgui.inc SF_\*): pixels as rows of `stride` bytes, 0xAARRGGBB per pixel
-  - `px: *mut u8`
-  - `w: i32`
-  - `h: i32`
-  - `stride: i32`
-  - `fmt: u8`
-  - `flags: u8`
-  - `opac: u8`
-  - `blend: u8`
-  - `aux: u64`
-
-- **`struct Job`**
-  JOB (thread.inc): plugins only read `cancel`
-  - `func: *const c_void`
-  - `ctx: *const c_void`
-  - `count: u64`
-  - `next: u64`
-  - `done: u64`
-  - `user: u64`
-  - `cancel: AtomicU32` -- nonzero: the job is cancelled (written by the host at any time)
-  - `state: u32`
-  - `active: u32`
-  - `flags: u32`
-  - `link: *const c_void`
-  - `rsv: u64`
-
-- **`struct FxArgs`**
-  FXARGS (fx.inc FXA_\*): one prepare / render call
-  - `src: *const Surface` -- source (FMT_ARGB, straight), read-only, the whole image
-  - `dst: *const Surface` -- destination: written only inside the ROI
-  - `x0: i32`
-  - `y0: i32`
-  - `x1: i32`
-  - `y1: i32`
-  - `param: *const u64` -- FX_NSLOTS 8-byte parameter slots (see FxProp)
-  - `aux: *const c_void` -- what prepare returned, or 0
-  - `job: *const Job` -- poll JOB_CANCEL once per row (0 = none)
-  - `sel: *const c_void` -- the selection (TMASK) or 0; not available to plugins of the Rust host
-
-- **`struct ImgDec`**
-  IMGDEC (img.inc ID_\*): decode options
-  - `flags: u32` -- IMGD_\*
-  - `frame: u32`
-  - `hint: u32`
-  - `rsv: u32`
-  - `maxpx: u64`
-  - `meta: *mut ImgMeta` -- IMGMETA to fill, or 0
-  - `cancel: *const AtomicU32` -- pointer to a u32 that cancels when nonzero, or 0
-  - `maxmem: u64`
-
-- **`struct ImgMeta`**
-  IMGMETA (img.inc IM_\*): what a probe / decode reports about the image
-  - `fmt: u32`
-  - `w: u32` -- stored width / height
-  - `h: u32`
-  - `bits: u8` -- bits per sample of the source
-  - `model: u8` -- IMM_\*
-  - `orient: u8`
-  - `channels: u8` -- samples per pixel incl. alpha (0 = unknown)
-  - `flags: u32` -- IMF_\*
-  - `frames: u32`
-  - `dpix: u32`
-  - `dpiy: u32`
-  - `cicp: u32`
-  - `gamma: u32`
-  - `icc: *const u8`
-  - `icclen: u64`
-  - `exif: *const u8`
-  - `exiflen: u64`
-  - `xmp: *const u8`
-  - `xmplen: u64`
-  - `delay: u32`
-  - `loops: u32`
-  - `quality: u32`
-  - `resunit: u32`
-  - `chrm: [u16; 8]`
-  - `dxgi: u16`
-  - `texfl: u8`
-  - `rsv: u8`
-  - `texn: u32`
-
-- **`struct ImgOpt`**
-  IMGOPT (img.inc IO_\*): encoder options
-  - `fmt: u32`
-  - `quality: u32` -- 1..100 (0 = format default)
-  - `flags: u32` -- IOF_\*
-  - `bitdepth: u32`
-  - `samplebits: u32`
-  - `dither: u32`
-  - `athresh: u32`
-  - `chroma: u32`
-  - `effort: u32`
-  - `ddsfmt: u32`
-  - `mipfilter: u32`
-  - `tiffcomp: u32`
-  - `meta: *const ImgMeta`
-  - `cancel: *const AtomicU32`
-
-- **`struct FxProp`**
-  FXPROP (fx.inc FXP_\*): one property of an effect, shown in the generic dialog
-  - `typ: u8` -- FP_\*
-  - `dec: u8` -- decimals shown (FP_DEC / FP_ANGLE)
-  - `slot: u8` -- first slot in the parameter block
-  - `flags: u8` -- FPF_\*
-  - `rsv: u32`
-  - `name: *const u8` -- the label of the dialog
-  - `min: f64`
-  - `max: f64`
-  - `def: f64` -- default (FP_COLOR: the colour in the low 32 bits of the bit pattern)
-  - `choices: *const u8` -- FP_CHOICE: the choice list (strings, then an empty one); FP_PAN: the y default as f64
-    bits
-
-- **`struct FxDesc`**
-  FXDESC (fx.inc FXD_\*): an effect or adjustment
-  - `id: u32` -- ignored for plugins (the host assigns one)
-  - `flags: u32` -- FXF_\*
-  - `name: *const u8` -- the menu name (1..47 bytes, unique; also the settings key)
-  - `prepare: Option<PrepareFn>`
-  - `render: Option<RenderFn>`
-  - `free: Option<FreeFn>`
-  - `nprops: u32`
-  - `rsv: u32`
-  - `props: *const FxProp`
-  - `category: u32` -- FXC_\*
-  - `rsv2: u32`
-
-- **`struct FtDesc`**
-  FTDESC (plugin.inc FT_\*): a file type (decoder and / or encoder)
-  - `name: *const u8` -- display name ("QOI")
-  - `exts: *const u8` -- 1..8 extensions without dots, ';'-separated ("qoi")
-  - `mime: *const u8` -- MIME type or 0
-  - `probe: Option<ProbeFn>`
-  - `decode: Option<DecodeFn>`
-  - `encode: Option<EncodeFn>`
-  - `caps: u32` -- IFC_\*
-  - `rsv: u32`
-
-- **`struct ShapeDesc`**
-  SHAPEDESC (plugin.inc PSD_\*): a shape of the Formen tool
-  - `name: *const u8` -- display name (1..63 bytes)
-  - `data: *const u8` -- path data in the Geometry syntax of paint.net ShapeKit XAML ("M 0,0 L 100,0 ...")
-
-- **`struct PluginInfo`**
-  PLUGININFO (plugin.inc PI_\*): what pn_plugin_query returns
-  - `magic: u32`
-  - `size: u32` -- size of this record (>= PI_SIZE_V1)
-  - `apimin: u32` -- the lowest PNAPI version the plugin needs
-  - `flags: u32`
-  - `name: *const u8` -- 1..63 bytes
-  - `version: *const u8` -- 1..31 bytes
-  - `author: *const u8`
-  - `url: *const u8`
-  - `nfx: u32`
-  - `nft: u32`
-  - `fx: *const *const FxDesc` -- FXDESC\*[nfx]
-  - `ft: *const FtDesc` -- FTDESC[nft]
-  - `nshape: u32`
-  - `rsv: u32`
-  - `shapes: *const ShapeDesc` -- SHAPEDESC[nshape]
-
-**`impl PluginInfo`**
-
-- **`const fn new(name: &'static CStr, version: &'static CStr) -> PluginInfo`**
-  a plugin named `name` (1..63 bytes) in version `version` (1..31 bytes), PNAPI 1,
-  nothing in it yet
-- **`const fn author(mut self, author: &'static CStr) -> PluginInfo`**
-- **`const fn url(mut self, url: &'static CStr) -> PluginInfo`**
-  origin / URL (1..127 bytes)
-- **`const fn api_min(mut self, v: u32) -> PluginInfo`**
-  the lowest PNAPI version the plugin needs (default 1)
-- **`const fn effects(mut self, list: &'static [&'static FxDesc]) -> PluginInfo`**
-  the effects / adjustments (at most 16)
-- **`const fn file_types(mut self, list: &'static [FtDesc]) -> PluginInfo`**
-  the file types (at most 4)
-- **`const fn shapes(mut self, list: &'static [ShapeDesc]) -> PluginInfo`**
-  the shapes (at most 32)
-
-**`impl ShapeDesc`**
-
-- **`const fn new(name: &'static CStr, data: &'static CStr) -> ShapeDesc`**
-
-**`impl FtDesc`**
-
-- **`const fn new<T: crate::FileType>( name: &'static CStr, exts: &'static CStr, mime: Option<&'static CStr>, caps: u32, ) -> FtDesc`**
-  a file type with the functions of T (only those T says it has); `exts` = "a;b",
-  `caps` = IFC_\*
-
-**`impl FxDesc`**
-
-- **`const fn new<E: crate::Effect>(name: &'static CStr, flags: u32, category: u32, props: &'static [FxProp]) -> FxDesc`**
-  the effect E named `name` (the menu name, 1..47 bytes), FXF_\* `flags` (FXF_PREPARE is
-  added when E has a prepare step), FXC_\* `category`, the properties of its dialog
-
-**`impl FxProp`**
-
-- **`const fn int(slot: u8, name: &'static CStr, min: f64, max: f64, def: f64) -> FxProp`**
-  FP_INT: an integer slider min..max (slot: i64)
-- **`const fn dec(slot: u8, name: &'static CStr, dec: u8, min: f64, max: f64, def: f64) -> FxProp`**
-  FP_DEC: a number with `dec` decimals (slot: f64)
-- **`const fn angle(slot: u8, name: &'static CStr, dec: u8, min: f64, max: f64, def: f64) -> FxProp`**
-  FP_ANGLE: degrees with `dec` decimals (slot: f64)
-- **`const fn boolean(slot: u8, name: &'static CStr, def: bool) -> FxProp`**
-  FP_BOOL: a check box (slot: i64 0 / 1)
-- **`const fn choice(slot: u8, name: &'static CStr, list: &'static [u8], def: u32) -> FxProp`**
-  FP_CHOICE: one of the entries of `list` = b"first\\0second\\0...\\0\\0" (UTF-8; slot: i64
-  index); `def` = the index chosen by default
-- **`const fn pan(slot: u8, name: &'static CStr, dec: u8, x: f64, y: f64) -> FxProp`**
-  FP_PAN: a point -1..1 (slots slot and slot + 1: f64 x, y)
-- **`const fn color(slot: u8, name: &'static CStr, argb: u32) -> FxProp`**
-  FP_COLOR: a straight ARGB colour (slot: the colour in the low 32 bits)
-- **`const fn seed(slot: u8, name: &'static CStr) -> FxProp`**
-  FP_SEED: a random seed with a "Neu würfeln" button (slot: i64)
-- **`const fn log(mut self) -> FxProp`**
-  the slider maps logarithmically (FPF_LOG)
-
-### `plugin/api.rs`
-
-Source: [`lib/plugin/api.rs`](../lib/plugin/api.rs)
-
-```text
-api -- the host's PNAPI table after pn_plugin_query, and safe wrappers of its functions
-                                                 [ASMLIB/inc/plugin.inc PA_*; PLUGINS.md §2]
-
-  api() -> Option<&Api>          the table (None before pn_plugin_query, or when the host's
-                                 table is shorter than version 1)
-  Block::new(cap) -> Option<Block>      a zeroed PA_ALLOC buffer (64-byte aligned) with a
-                                 length; freed on drop, or handed to the host (into_raw:
-                                 the encoder's output)
-  parallel_for(count, &f) -> Result     f(index, job) for 0..count on the host's workers
-                                 (each item guarded by the host; nesting allowed)
-  hash32(x, y, seed, stream), nthreads(), log(msg), log_fmt(format_args!(..)), log!(..)
-  PnAlloc                        a #[global_allocator] on PA_ALLOC / PA_FREE / PA_REALLOC for
-                                 plugins that use `alloc` (opt-in: declare it in the plugin)
-
-The table pointer is written once (pn_plugin_query, UI thread) and read by every thread
-afterwards: an atomic.  Everything else here is stateless.
-```
-
-- **`struct Api(PnApi)`**
-  the host table, checked to be a complete version-1 table
-
-- **`fn query_entry(api: *const PnApi, query: fn(&'static PnApi) -> Option<&'static PluginInfo>) -> *const PluginInfo`**
-  pn_plugin_query's body (entry!): keep the table, ask the plugin
-
-- **`fn api() -> Option<&'static Api>`**
-  the host's functions (None before pn_plugin_query or with an incomplete table)
-
-**`impl Api`**
-
-- **`fn raw(&self) -> &PnApi`**
-  the raw table (size, version, function pointers)
-- **`fn hash32(&self, x: u32, y: u32, seed: u32, stream: u32) -> u32`**
-  PA_HASH32: deterministic per-pixel random bits (fx_hash32)
-- **`fn nthreads(&self) -> u32`**
-  PA_NTHREADS: the host's worker threads
-- **`fn log(&self, msg: &str)`**
-  PA_LOG: one line (UTF-8, cut at 511 bytes) into the plugin log
-- **`fn parallel_for<F: Fn(usize, &Job) + Sync>(&self, count: usize, f: &F) -> Result<(), i32>`**
-  PA_PARFOR: f(index, job) for every index 0..count on the host's worker threads and the
-  caller -> Ok, Err(ERR_CANCEL) (the job was cancelled) or Err(ERR_FAULT) (an item
-  crashed: the plugin is disabled).  `job` is the PNAPI job of the run (poll it in long
-  items with Job::is_cancelled).
-
-**`impl Job`**
-
-- **`fn is_cancelled(&self) -> bool`**
-  JOB_CANCEL is set: stop early (the host discards the result)
-
-- **`fn parallel_for<F: Fn(usize, &Job) + Sync>(count: usize, f: &F) -> Result<(), i32>`**
-  parallel_for through api() (Err(ERR_FAIL) without the host table)
-
-- **`fn hash32(x: u32, y: u32, seed: u32, stream: u32) -> u32`**
-  PA_HASH32 through api() (0 without the host table)
-
-- **`fn nthreads() -> u32`**
-  PA_NTHREADS through api() (1 without the host table)
-
-- **`fn log(msg: &str)`**
-  PA_LOG through api() (nothing without the host table)
-
-- **`fn log_fmt(args: core::fmt::Arguments)`**
-  a formatted line into the plugin log: log_fmt(format_args!("{} px", n)) (no allocation)
-
-- **`log!(...)`**
-  log!("fmt", args..) -- log_fmt(format_args!(..))
-
-- **`struct Block`**
-  a byte buffer in host memory (PA_ALLOC: zeroed, 64-byte aligned): capacity fixed at
-  creation, a length that grows with push / extend.  Dropping it frees it (PA_FREE);
-  into_raw hands it to the host (an encoder's output, which the host frees).
-
-**`impl Block`**
-
-- **`fn new(cap: usize) -> Option<Block>`**
-  a zeroed block of cap bytes (None: no host table / out of memory)
-- **`fn capacity(&self) -> usize`**
-- **`fn len(&self) -> usize`**
-- **`fn is_empty(&self) -> bool`**
-- **`fn buf(&mut self) -> &mut [u8]`**
-  the whole capacity (zeroed where nothing was written)
-- **`fn as_slice(&self) -> &[u8]`**
-  the first len bytes
-- **`fn set_len(&mut self, n: usize)`**
-  set the length (n &lt;= capacity, else a panic)
-- **`fn push(&mut self, b: u8)`**
-  append one byte (a panic when full)
-- **`fn extend(&mut self, s: &[u8])`**
-  append bytes (a panic when they do not fit)
-- **`fn into_raw(self) -> (*mut u8, usize)`**
-  hand the block to the host: (pointer, length); the host frees it
-
-- **`struct PnAlloc`**
-  a global allocator on the host's PA_ALLOC / PA_FREE / PA_REALLOC (alignment up to 64; thread
-  safe).  Opt-in for plugins that use the alloc crate:
-  ```text
-  extern crate alloc;
-  #[global_allocator]
-  static A: plugin::PnAlloc = plugin::PnAlloc;
-  ```
-  Allocations before pn_plugin_query fail (null).
-
-### `plugin/ft.rs`
-
-Source: [`lib/plugin/ft.rs`](../lib/plugin/ft.rs)
-
-```text
-ft -- file types: the FileType trait, the safe views of a decode / encode call and the
-trampolines the host calls                 [ASMLIB/inc/plugin.inc FT_*, img.inc; PLUGINS.md §3]
-
-  trait FileType { const PROBE / DECODE / ENCODE; fn probe(data, meta); fn decode(data, d);
-                   fn encode(img, opt) -> Block }
-  FtDesc::new::<T>(name, exts, mime, caps)     (abi.rs) points at the trampolines
-  Decoder: flags() (IMGD_*), meta(), cancelled(), alloc(w, h) (PA_SURFALLOC: a zeroed
-           straight FMT_ARGB surface the host owns), row_mut(y), width / height / stride
-  Image:   the straight FMT_ARGB surface to encode: width, height, row(y)
-
-Same contract as the built-in codecs (IMGCODEC): any thread, possibly several calls at once,
-no globals.  probe: a magic check (fill meta when given).  decode: never read beyond the
-data; an error after alloc is fine (the host frees the surface).  encode: the output is a
-Block (PA_ALLOC), which the host frees.
-```
-
-- **`trait FileType: 'static`**
-  a file type: implement it on a unit struct and describe it with FtDesc::new::&lt;T>(..);
-  the consts say which functions it has (at least DECODE or ENCODE)
-  - `const PROBE: bool = false`
-  - `const DECODE: bool = false`
-  - `const ENCODE: bool = false`
-  - `fn probe(data: &[u8], meta: Option<&mut ImgMeta>) -> bool`
-    data starts with this format's signature (fill meta when given: w, h, bits, model,
-    channels, flags)
-  - `fn decode(data: &[u8], d: &mut Decoder<'_>) -> Result<(), i32>`
-    decode data into d (d.alloc(w, h), then the rows) -> Ok / Err(ERR_\*)
-  - `fn encode(img: &Image<'_>, opt: &ImgOpt) -> Result<Block, i32>`
-    encode img -> the file's bytes in a Block (Block::new(cap), push / extend) / Err(ERR_\*)
-
-- **`struct Decoder<'a>`**
-  one decode call: the options and the host's SURFACE record to fill
-
-**`impl<'a> Decoder<'a>`**
-
-- **`fn flags(&self) -> u32`**
-  IMGD_\* of the call (IMGD_PROBE: metadata only, pixels optional)
-- **`fn meta(&mut self) -> Option<&mut ImgMeta>`**
-  the IMGMETA to fill (None: the host wants none)
-- **`fn cancelled(&self) -> bool`**
-  ID_CANCEL is set: return Err(ERR_CANCEL)
-- **`fn alloc(&mut self, w: i32, h: i32) -> Result<(), i32>`**
-  PA_SURFALLOC: a zeroed straight FMT_ARGB surface w x h for the result (once; checked
-  against the decode limits: ERR_DIMS / ERR_LIMIT / ERR_NOMEM)
-- **`fn width(&self) -> i32`**
-  the size after alloc (0 before)
-- **`fn height(&self) -> i32`**
-- **`fn row_mut(&mut self, y: i32) -> &mut [u32]`**
-  row y of the result: width pixels 0xAARRGGBB (after alloc, 0 &lt;= y &lt; height, else a
-  panic)
-
-- **`struct Image<'a>`**
-  the image to encode: straight FMT_ARGB (the host converts)
-
-**`impl<'a> Image<'a>`**
-
-- **`fn width(&self) -> i32`**
-- **`fn height(&self) -> i32`**
-- **`fn row(&self, y: i32) -> &'a [u32]`**
-  row y: width pixels 0xAARRGGBB (0 &lt;= y &lt; height, else a panic)
-
-### `plugin/fx.rs`
-
-Source: [`lib/plugin/fx.rs`](../lib/plugin/fx.rs)
-
-```text
-fx -- effects and adjustments: the Effect trait, the safe view of a render / prepare call,
-and the trampolines the host calls                  [ASMLIB/inc/fx.inc; PLUGINS.md §3, §4]
-
-  trait Effect { type Aux; const PREPARE; fn render(fx, aux); fn prepare(fx) }
-  FxDesc::new::<E>(name, flags, category, props)    (abi.rs) points at the trampolines
-  Fx: width / height, the ROI (x0, y0, x1, y1), src_row(y) (the whole source row),
-      rows(y) (the ROI parts of the source and destination row y), dst_row(y), param_*(slot),
-      cancelled(), job()
-
-Rules of the host (fx.inc): render runs on many worker threads at once, each call for one
-ROI, and writes the destination only inside it; the result of a pixel depends only on the
-source, the parameters and aux (never on the ROI split); no writable globals; poll the
-cancel flag once per row.  Pixels are straight 0xAARRGGBB.  The destination of the Rust
-host is backed only inside the ROI -- Fx never hands out anything outside it.
-```
-
-- **`trait Effect: 'static`**
-  an effect or adjustment: implement it on a unit struct and describe it with
-  FxDesc::new::&lt;E>(..)
-  - `type Aux: Sync + 'static`
-    what prepare computes for render (FXA_AUX); `()` for effects without prepare
-  - `const PREPARE: bool = false`
-    has a prepare step (called once per run on one worker before any render)
-  - `fn render(fx: &mut Fx<'_>, aux: Option<&Self::Aux>) -> Result<(), i32>`
-    write the destination inside the ROI -> Ok, Err(ERR_CANCEL) when cancelled, Err(ERR_\*)
-  - `fn prepare(fx: &Fx<'_>) -> Result<Option<Self::Aux>, i32>`
-    global statistics, tables, ... over the whole source -> Ok(Some(aux)), Ok(None) (no aux)
-    or Err(ERR_\*) (only with PREPARE = true)
-
-- **`struct Fx<'a>`**
-  one call of render / prepare: the validated FXARGS
-  - `x0: i32` -- the ROI: x0 &lt;= x &lt; x1, y0 &lt;= y &lt; y1 inside the image
-  - `y0: i32`
-  - `x1: i32`
-  - `y1: i32`
-
-**`impl<'a> Fx<'a>`**
-
-- **`fn width(&self) -> i32`**
-  the image width (source and destination)
-- **`fn height(&self) -> i32`**
-- **`fn src_row(&self, y: i32) -> &'a [u32]`**
-  the whole source row y (0 &lt;= y &lt; height, else a panic)
-- **`fn src_px(&self, x: i32, y: i32) -> u32`**
-  the source pixel (x, y) (a panic outside the image)
-- **`fn dst_row(&mut self, y: i32) -> &mut [u32]`**
-  the destination row y inside the ROI: index i is pixel x0 + i (y0 &lt;= y &lt; y1, else a
-  panic)
-- **`fn rows(&mut self, y: i32) -> (&'a [u32], &mut [u32])`**
-  the ROI parts of source and destination row y (index i = pixel x0 + i)
-- **`fn param(&self, slot: usize) -> u64`**
-  the raw 8 bytes of parameter slot `slot` (0 when the host passed none)
-- **`fn param_int(&self, slot: usize) -> i64`**
-  FP_INT / FP_BOOL / FP_CHOICE / FP_SEED: the slot as i64
-- **`fn param_f64(&self, slot: usize) -> f64`**
-  FP_DEC / FP_ANGLE / FP_PAN: the slot as f64
-- **`fn param_bool(&self, slot: usize) -> bool`**
-  FP_BOOL: slot != 0
-- **`fn param_color(&self, slot: usize) -> u32`**
-  FP_COLOR: the straight ARGB colour in the low half
-- **`fn cancelled(&self) -> bool`**
-  the run's cancel flag is set: return Err(ERR_CANCEL) (poll it once per row)
-- **`fn job(&self) -> Option<&'a Job>`**
-  the run's JOB (None: the host passed none)
