@@ -1855,7 +1855,14 @@ shot build/template.png
 ```sh
 cargo jflib test                    # build it, run every tests/*.uis with --script
 cargo jflib test --release          # ... the release build
+cargo jflib test --features engine --dir tests/engine
+                                    # ... built with the feature engine, the scripts of tests/engine/
+cargo jflib test --no-default-features   # ... without the default features (an app's mock build)
 ```
+
+`--features` takes Cargo's forms (`a,b`, `"a b"`, repeated), `--dir DIR` is relative to the
+package's folder; the scripts run in that folder, so their paths (`shot build/x.png`) stay the
+same.
 
 In this repository:
 
