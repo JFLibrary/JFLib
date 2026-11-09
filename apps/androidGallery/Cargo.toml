@@ -23,6 +23,13 @@ plat.workspace = true
 gfx.workspace = true
 ui.workspace = true
 style = { package = "jflib-style-winui", path = "../../styles/winui" }
+# (G5e2) the page "3D-Ansicht" (pg_view.rs): a render3d scene in a view; its check takes render3dtest's geometry and ray
+# caster (common.rs, cpu.rs, gltfgen.rs, included as they are), which need gltf and the image crates
+gpu.workspace = true
+render3d.workspace = true
+gltf.workspace = true
+img_core.workspace = true
+img_jpeg.workspace = true
 
 [build-dependencies]
 jflib-build.workspace = true

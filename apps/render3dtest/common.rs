@@ -5,7 +5,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render3d::{Camera, Instance, InstanceId, Light, LightKind, Material, MaterialId, MeshData, MeshId, Renderer, Scene, Sun, Transform};
+use render3d::{Camera, Instance, InstanceId, Light, LightKind, Material, MaterialId, MeshData, MeshId, Renderer, RendererDesc, Scene, Sun, Transform};
 
 use crate::cpu;
 
@@ -165,6 +165,21 @@ pub struct Off {
 
 pub const CLEAR: [f32; 4] = [0.2, 0.4, 0.6, 1.0];
 pub const CLEAR8: [u8; 3] = [51, 102, 153];
+
+/// a renderer whose 8-bit targets get the linear light, as the ray caster compares it (G5e2: RendererDesc::new has
+/// the fragment shaders encode sRGB for an 8-bit target without sRGB; the test `srgb` checks that encoding)
+pub fn linear_desc(color: Format) -> RendererDesc {
+    let mut d = RendererDesc::new(color);
+    d.encode_srgb = false;
+    d
+}
+
+/// the same with n frames in flight (Rgba8Unorm)
+pub fn frames_desc(n: usize) -> RendererDesc {
+    let mut d = linear_desc(Format::Rgba8Unorm);
+    d.frames_in_flight = n;
+    d
+}
 
 impl Off {
     pub fn new(dev: &Device, w: u32, h: u32, format: Format) -> Result<Off> {
@@ -410,14 +425,15 @@ pub fn tex_gallery(r: &mut Renderer) -> Result<Scene> {
 /// the galleries that came with G5c (and G5d's "occl"), by name, after the five above: every path must draw them alike
 pub const LATER: [&str; 5] = ["pbr", "shadow", "lights", "env", "occl"];
 
-/// one of LATER in a fresh renderer of its own
-pub fn later_gallery(name: &str, r: &mut Renderer) -> Result<Scene> {
+/// one of LATER in a fresh renderer of its own, of this colour format (frames drawn before the image go into a
+/// target of it)
+pub fn later_gallery_in(name: &str, r: &mut Renderer, format: Format) -> Result<Scene> {
     match name {
         "pbr" => pbr_gallery(r),
         "shadow" => shadow_gallery(r),
         "lights" => lights_gallery(r),
         "env" => env_gallery(r),
-        "occl" => occl_gallery(r),
+        "occl" => occl_gallery(r, format),
         _ => Err(GpuError::Invalid("no such gallery")),
     }
 }
@@ -691,7 +707,7 @@ pub fn occl_camera(at: [f64; 3], f: usize, a: f64) -> Camera {
 
 /// (G5d) the occlusion scene with detail levels after five frames of its flight, at the camera of the sixth (a jump: phase 2 of the
 /// occlusion test draws much of it)
-pub fn occl_gallery(r: &mut Renderer) -> Result<Scene> {
+pub fn occl_gallery(r: &mut Renderer, format: Format) -> Result<Scene> {
     for g in &occl_geos() {
         r.add_mesh(&g.data())?;
     }
@@ -708,7 +724,7 @@ pub fn occl_gallery(r: &mut Renderer) -> Result<Scene> {
     let aspect = GALLERY_W as f64 / GALLERY_H as f64;
     // the frames before: into a target without a read-back (the browser maps a read-back after the frame that fills it)
     let dev = r.device().clone();
-    let color = dev.create_texture(&TextureDesc::d2(GALLERY_W, GALLERY_H, Format::Rgba8Unorm, TextureUsage::COLOR_TARGET))?;
+    let color = dev.create_texture(&TextureDesc::d2(GALLERY_W, GALLERY_H, format, TextureUsage::COLOR_TARGET))?;
     let depth = dev.create_texture(&TextureDesc::d2(GALLERY_W, GALLERY_H, Format::Depth32Float, TextureUsage::DEPTH_TARGET | TextureUsage::SAMPLED))?;
     for f in 0..6 {
         sc.set_camera(&occl_camera([0.0; 3], f, aspect));

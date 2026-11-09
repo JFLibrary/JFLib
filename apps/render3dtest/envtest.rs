@@ -10,7 +10,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render3d::{Camera, EnvironmentData, Material, Renderer, RendererDesc, Sky, Sun, Tonemap};
+use render3d::{Camera, EnvironmentData, Material, Renderer, Sky, Sun, Tonemap};
 
 use crate::common::*;
 use crate::cpu::{self, RefEnv};
@@ -130,7 +130,7 @@ fn prefiltered(f: &dyn Fn([f64; 3]) -> [f64; 3], n: [f64; 3], rough: f64) -> [f6
 fn env_on_cpu(t: &mut T) {
     let Some(g) = crate::tests::setup(t) else { return };
     let Some(dev) = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device") else { return };
-    let Some(mut r) = t.res(Renderer::new(&dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new") else { return };
+    let Some(mut r) = t.res(Renderer::new(&dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new") else { return };
     let sky = Sky::DEFAULT;
     let t0 = plat::time_us();
     if t.res(r.set_environment(&EnvironmentData::Sky(sky)), "set_environment").is_none() {

@@ -581,6 +581,10 @@ struct Verify {
     rb: Buffer,
     fb: Surface,
     loose: Vec<[i32; 4]>,
+    /// (G5e2) where the output's pass drew views: not compared.  Their frame reaches the framebuffer here only when its
+    /// read-back has come, later than the image that shows it (gpu_view.rs); at rest the framebuffer has it, which the
+    /// tests compare with the screen
+    late: Vec<[i32; 4]>,
 }
 
 /// (the browser) a new device's small picture on its way back
@@ -1325,7 +1329,8 @@ fn show(w: &mut Win, core: &Core, fb: &Surface) -> gpu::Result<Shown> {
             let n = snap.px.len();
             snap.px.copy_from_slice(&fb.px[..n]);
             let loose = w.sp.quads.iter().filter(|q| matches!(q.src, QuadSrc::Canvas { loose: true, .. })).flat_map(|q| q.rects.iter().copied()).collect();
-            w.verify_wait.push(Verify { rb, fb: snap, loose });
+            let late = w.sp.quads.iter().filter(|q| matches!(q.src, QuadSrc::View { .. })).flat_map(|q| q.rects.iter().copied()).collect();
+            w.verify_wait.push(Verify { rb, fb: snap, loose, late });
         }
     }
     #[cfg(not(target_arch = "wasm32"))]
@@ -1377,6 +1382,9 @@ fn verify_poll(w: &mut Win, core: &Core) {
             img.extend_from_slice(&r[..row]);
         }
         loose_compare(&mut img, &v.fb, &v.loose, swap_rb, &mut w.out);
+        // (a view's frame, which the framebuffer gets later: those pixels as the framebuffer has them)
+        let mut ignore = GpuOutput::default();
+        loose_compare(&mut img, &v.fb, &v.late, swap_rb, &mut ignore);
         let (x, y, bad) = compare(&img, &v.fb, swap_rb);
         w.out.verified += 1;
         if bad != 0 {
@@ -3130,7 +3138,11 @@ impl Ui {
             let attached = e.devgen != 0 && dev.as_ref().is_some_and(|d| d.1 == e.devgen);
             let size = ((*w).max(0) as u32, (*h).max(0) as u32);
             e.info.size = size;
-            e.moved = false;
+            // (the browser: a read-back that came after its Draw goes to the framebuffer as a new frame would)
+            e.moved = core::mem::take(&mut e.arrived);
+            if e.moved {
+                e.rest_at = now + VIEW_REST_US;
+            }
             // ---- a frame
             let key = (rec.ver, size, e.devgen);
             if attached && !unseen && size.0 > 0 && size.1 > 0 && size.0 <= lim && size.1 <= lim && e.tried != Some(key) {
@@ -3161,8 +3173,10 @@ impl Ui {
             if apart {
                 wp.dirty.canv.push((rec.index, [*x, *y, *w, *h]));
             }
-            // ---- the CPU's way: another frame or another painting, its cells drawn again
-            *ver = rec.ver.wrapping_mul(0x9E37_79B9) ^ (frame as u32).wrapping_mul(0x85EB_CA6B) ^ (frame >> 32) as u32;
+            // ---- the CPU's way: another frame or another painting, its cells drawn again (the browser: also the frame its
+            // read-back brought, which comes later)
+            let read = if cfg!(target_arch = "wasm32") { e.sh.c.borrow().image_frame as u32 } else { 0 };
+            *ver = rec.ver.wrapping_mul(0x9E37_79B9) ^ (frame as u32).wrapping_mul(0x85EB_CA6B) ^ (frame >> 32) as u32 ^ read.wrapping_mul(0xC2B2_AE35);
         }
         // (their own device, when no view is on it any more)
         if let Own::Ready { devgen, .. } = gview.own {
@@ -3284,6 +3298,51 @@ impl Ui {
             return;
         }
         views.retain(|e| e.content.strong_count() > 0);
+        // (G5e2, the browser) a read-back answered after the Draw that asked for it: the cells where the output's pass
+        // draws the view lack the frame now (owed: any settle, by hand or at rest, takes it there), the next render takes
+        // it to the cells under something (gp_views_begin, as a new frame) and the CPU path's cells (its command's
+        // hash).  Before, a view at rest kept the frame its last Draw had, an older one
+        #[cfg(target_arch = "wasm32")]
+        {
+            let Mods { gout, gview, .. } = &mut self.m;
+            let mut came = false;
+            for e in gview.views.iter_mut() {
+                let mut c = e.sh.c.borrow_mut();
+                let Some(g) = c.gpu.as_ref() else { continue };
+                if g.wait.is_none() {
+                    // (at rest, with no read-back on its way: the newest frame is asked for here, not only by a Draw,
+                    // which may not come again; Firefox 159 kept an older frame without this)
+                    if e.rest_at == 0 && c.image_frame != c.frame && c.error.is_none() {
+                        c.read();
+                    }
+                    continue;
+                }
+                let before = c.image_frame;
+                c.read();
+                if c.image_frame == before {
+                    continue;
+                }
+                e.arrived = true;
+                e.rest_at = now + VIEW_REST_US;
+                came = true;
+                let Some(Some(w)) = gout.wins.get_mut(e.win) else { continue };
+                let sp = &mut w.sp;
+                let mine = Rc::as_ptr(&e.draw) as *const ();
+                if let Some(q) = sp.quads.iter().position(|q| matches!(&q.src, QuadSrc::View { f, .. } if Rc::as_ptr(f) as *const () == mine)) {
+                    let tag = q as u8 + 1;
+                    for (owed, hole) in sp.owed.iter_mut().zip(sp.hole.iter()) {
+                        if *hole == tag {
+                            *owed = true;
+                            sp.any_owed = true;
+                        }
+                    }
+                }
+            }
+            if came {
+                self.invalidate();
+            }
+        }
+        let views = &mut self.m.gview.views;
         let mut rest: Vec<usize> = Vec::new();
         for e in views.iter_mut().filter(|e| e.rest_at != 0 && now >= e.rest_at) {
             e.rest_at = 0;

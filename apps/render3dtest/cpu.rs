@@ -517,6 +517,8 @@ pub struct RefScene {
     pub lights: Vec<RefLight>,
     /// (G5c) the environment in place of the uniform ambient light
     pub env: Option<RefEnv>,
+    /// (G5e2) the image is 8-bit sRGB (the fragment shader encodes, or an sRGB target does): the codes by the definition
+    pub srgb: bool,
 }
 
 /// (G5c) the environment as the GPU holds it (data like a texture's texels): the irradiance's harmonics over pi,
@@ -687,7 +689,7 @@ pub struct Quad {
 impl RefScene {
     pub fn new(sun_dir: V, sun: [f64; 3], ambient: [f64; 3]) -> RefScene {
         RefScene { tris: Vec::new(), inst: Vec::new(), textures: Vec::new(), sun_dir: norm(sun_dir), sun, ambient, exposure: 1.0, tonemap: true, shadows: false, lights: Vec::new(),
-                   env: None }
+                   env: None, srgb: false }
     }
 
     /// an instance of one colour: its triangles in the world
@@ -920,10 +922,11 @@ impl RefScene {
         if self.occluded(from, self.sun_dir) { 0.0 } else { 1.0 }
     }
 
-    /// light (times the exposure) as the target's 8-bit value, through the tone mapper
+    /// light (times the exposure) as the target's 8-bit value, through the tone mapper (and sRGB's encoding)
     pub fn to_rgb8(&self, c: [f64; 3]) -> [u8; 3] {
         let c = if self.tonemap { neutral(c) } else { c };
-        let px = |v: f64| (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
+        let srgb = self.srgb;
+        let px = |v: f64| if srgb { srgb_encode(v) } else { (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u8 };
         [px(c[0]), px(c[1]), px(c[2])]
     }
 

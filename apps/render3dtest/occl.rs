@@ -12,7 +12,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render3d::{InstanceId, Material, Renderer, RendererDesc, Scene};
+use render3d::{InstanceId, Material, Renderer, Scene};
 
 use crate::common::*;
 use crate::cpu::{self, RefScene};
@@ -100,7 +100,7 @@ pub fn drawn(t: &mut T, dev: &Device, s: &Scene) -> Option<(Vec<u32>, u32, u32)>
 fn fly(t: &mut T, dev: &Device, level: &str, at: [f64; 3]) -> Option<()> {
     let geos = occl_geos();
     let colors = gallery_colors(24);
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     for g in &geos {
         t.res(r.add_mesh(&g.data()), "add_mesh")?;
     }
@@ -274,7 +274,7 @@ fn read_r32(t: &mut T, dev: &Device, view: &TextureView, w: u32, h: u32) -> Opti
 fn pyramid(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let geos = occl_geos();
     let colors = gallery_colors(24);
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     for g in &geos {
         t.res(r.add_mesh(&g.data()), "add_mesh")?;
     }

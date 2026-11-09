@@ -14,7 +14,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render3d::{AlphaClass, Camera, Material, MaterialId, MeshId, Mip, Renderer, RendererDesc, Sampling, Scene, TextureData, TextureId, TextureRef, Transform, Wrap};
+use render3d::{AlphaClass, Camera, Material, MaterialId, MeshId, Mip, Renderer, Sampling, Scene, TextureData, TextureId, TextureRef, Transform, Wrap};
 
 use crate::common::*;
 use crate::cpu::{self, RefScene, RefTexture};
@@ -212,7 +212,7 @@ fn lods_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     use crate::lodtest::{LEVELS, geos as lod_geos, pick, read, size_of, specs};
     let geos = lod_geos();
     let colors = gallery_colors(12);
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     for g in &geos {
         t.res(r.add_mesh(&g.data()), "add_mesh")?;
     }
@@ -355,7 +355,7 @@ fn occlusion_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let colors = gallery_colors(12);
     let mut mats = vec![holed(0.7, 0.7, 0.75, true)];
     mats.extend(colors.iter().enumerate().map(|(i, c)| holed(c[0], c[1], c[2], i % 3 == 0)));
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     for g in &geos {
         t.res(r.add_mesh(&g.data()), "add_mesh")?;
     }
