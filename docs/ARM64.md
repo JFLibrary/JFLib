@@ -196,7 +196,7 @@ Das wäre echte ARM-Hardware ohne Zukauf (ob `/data/local/tmp` das zulässt, zei
   nur Signal, `pc` und Adresse: Register und Aufrufkette kennen nur x86-64. Plugin-Loader und Guard
   (`linux_elfload.rs`, `linux_guard.rs`, `plib.rs`, `modhost.rs` mit `win64`) sind auf Linux ARM64 aus, `lib.rs` nimmt
   dort wie Android `web_lib.rs` und `web_modhost.rs`; `current_exe` und `plat_tid` stehen bis ARM4 als Kopie in
-  `linux.rs`. Windows ARM64 bleibt, wie es war (ARM4 und ARM5).
+  `linux.rs`. Für Windows ARM64 gilt das nicht (ARM4 und ARM5).
   Die x86-Teile tragen ihr `cfg` in derselben Zeile, so verschiebt sich keine Zeilennummer (Panic-Stellen).
 - **Outline-Atomics:** Die `compiler_builtins` von Rust für `aarch64-unknown-linux-gnu` enthält den C-Teil von
   compiler-rt. Dessen `__aarch64_cas*`, `__aarch64_ldadd*` usw. nehmen LSE (die Atomics von ARMv8.1) nur, wenn
@@ -240,15 +240,28 @@ entstehen bei Ergebnissen nahe 0. Außerhalb von ±20 reduziert `portable/math.r
 von `portabletest`). Die Effekte, Audio und die Oberfläche nutzen diese Funktionen; bitgleiche Bilder zu x86-64 sind
 damit dort nicht zu erwarten, wo Ergebnisse von `pow`, `sin` oder `cos` in Pixel oder Samples gerundet werden.
 
-**A56:** TODO-A56
+**A56** (SM-A566B, Android 16, Kernel 6.6 mit 4-KB-Seiten, Cortex-A720 und A520 mit LSE): Das statische `coretest`
+aus `/data/local/tmp`, gestartet über `adb shell` mit eigenem `TMPDIR`, läuft auf echter ARM-Hardware: 4720 von 4724
+Prüfungen grün. Die vier Fehler kommen von Android, nicht von ARM: `hard link` verbietet die Shell dort (ein `ln` in
+`/data/local/tmp` scheitert ebenso), vermutlich aus demselben Grund `unix bind` mit EACCES, und für die beiden Prüfungen
+der lokalen Zeitzone fehlt `/etc/localtime` (Android hat die Zone in `persist.sys.timezone`). Vorher geprüft: Das Telefon war seit zehn Minuten nicht bedient, der Bildschirm
+bleibt dort wegen einer sehr langen Zeitsperre an; das Programm berührt die Oberfläche nicht und wurde danach gelöscht.
 
-**x86-64 unverändert:** TODO-X86
+**x86-64 unverändert:** Release-Bau von `coretest`, `plattest`, `gallery` und `PaintCraft` mit `jxlenc` für Windows und
+Linux, `16ec0ab4` und dieser Stand nacheinander aus demselben Verzeichnis: Alle Programme sind Byte für Byte gleich,
+unter Windows bis auf den Zeitstempel des Linkers (die `.map` nur in dessen Zeile), unter Linux auch `gallery` und
+`PaintCraft` gegen glibc. Anders ist nur der C#-Host `pdn-host`, den `dotnet` baut, mit unveränderten Quellen.
+`cargo check -p jflib` mit und ohne `std` ist grün für Windows, Linux, wasm32 und Android, für Linux ARM64 ohne `std`;
+mit `std` fehlt dort `SYS_ARCH_PRCTL` (`plat/linux_glibc.rs`, ARM3). `build_rs.py lib --target linux --arch aarch64`
+baut die ganze Bibliothek. Windows ARM64 kommt jetzt durch `rt` und endet an 26-mal `win64` in `plat` (ARM4), dahinter
+wartet `__chkstk` (ARM5).
 
 **Beim Merge mit `apple/ap2`** (AP2 der Apple-Portierung, nicht gemergt) widersprechen sich zwei Stellen, beide mit
 derselben Lösung, nämlich beide Bedingungen in das `any(...)`: in `lib/rt/lib.rs` die Zeilen vor `pub mod cpu;` und
 `pub mod x87;` (`target_arch = "aarch64"` gegen `target_vendor = "apple"`), in `lib/plat/lib.rs` die vor `mod plib;`
-und `mod modhost;` (dort `all(target_os = "linux", target_arch = "aarch64")`). `rt/mem.rs` schließt AP2 auf Apple ganz aus, das passt zur Trennung hier. In
-`tools/host_exec.py` und `build_rs.py` ändern beide Branches nur benachbarte Stellen.
+und `mod modhost;` (dort `all(target_os = "linux", target_arch = "aarch64")`), dazu `CHANGELOG.md` (beide Einträge
+behalten). `rt/mem.rs` schließt AP2 auf Apple ganz aus, das passt zur Trennung hier. `tools/host_exec.py` und
+`build_rs.py` mischen sich ohne Konflikt (geprüft mit `git merge-tree`).
 
 ### ARM3: `plat` auf Linux ARM64 (L)
 
