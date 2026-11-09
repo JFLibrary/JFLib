@@ -1,6 +1,7 @@
 # Apple-Plan: macOS und iOS nativ
 
-Stand 2026-11-08, auf Basis von `main` 2a20b91e. Noch nichts davon ist umgesetzt, die Aufwände sind geschätzt.
+Stand 2026-11-10, auf Basis von `main` 2a20b91e. Umgesetzt ist AP0 (Mac und iPhone bereit), noch kein Code der
+Bibliothek. Die Aufwände sind geschätzt.
 In der Roadmap stehen die Punkte unter [ROADMAP.md](ROADMAP.md) §9 (macOS P1, iOS P2, Safari P2).
 
 ## Ziel
@@ -65,6 +66,25 @@ Größe: S klein, M mittel, L groß, nur relativ zueinander.
 
 **Fertig, wenn:** ein kleines Rust-Programm per SSH im Terminal des Macs, im Simulator (`xcrun simctl`) und auf
 dem iPhone (`xcrun devicectl`) läuft.
+
+**Umgesetzt (2026-11-10):** Mac mini mit M2 (16 GB, macOS 27.2, Xcode 27.2), iPhone 14 mit iOS 27.2. Auf dem Mac
+liegen Rust 1.98.1 über rustup mit `aarch64-apple-ios` und `aarch64-apple-ios-sim` und Python 3.11 über `uv`, beides
+ohne sudo. Ein Rust-Programm, das Betriebssystem und Architektur ausgibt, läuft per SSH auf dem Mac (der Linker
+signiert ad hoc), in einem Simulator ohne Fenster (`simctl boot`, `simctl spawn`) und auf dem iPhone
+(`devicectl device install app`, `devicectl device process launch --console`):
+`JFLib AP0: hello from ios / aarch64`.
+
+- **Fürs iPhone signieren geht nicht per SSH.** Der Schlüsselbund ist in jeder SSH-Sitzung gesperrt („User
+  interaction is not allowed“), `codesign` scheitert dann mit `errSecInternalComponent`. Bis AP5 signiert ein Skript
+  in der angemeldeten Sitzung: `open sign.command` startet es per SSH im Terminal des Macs. Für AP5 braucht es einen
+  eigenen Schlüsselbund nur zum Signieren, eingerichtet vom Nutzer.
+- **Das Profil kommt nur aus Xcode.** Mit der kostenlosen Apple-ID legt Xcode es an, wenn ein Projekt auf dem Gerät
+  startet (hier `org.jflib.JFHello`, Team `6RBCBNA6DJ`). Es gilt sieben Tage, danach das Projekt einmal neu starten.
+- **Das Zwischenzertifikat G3** von Apple fehlte im Schlüsselbund. `security find-identity -v` zählte das
+  Zertifikat deshalb als ungültig, `codesign` fand keine Kette.
+- **`process launch` wartet still**, solange das iPhone gesperrt ist, ohne Meldung und ohne Ende.
+- Xcode 27 hat kein Fenster „Devices and Simulators“ mehr, Geräte zeigt der „Device Hub“. Per SSH reichen
+  `devicectl` und `xctrace`.
 
 ### AP1: Safari prüfen (S, sofort, parallel)
 
@@ -186,10 +206,10 @@ Zeiger des Nutzers.
 
 ## Offene Fragen
 
-1. **Mac:** Welcher Chip (M1 bis M5, oder doch Intel), welches macOS, ist Xcode installiert, nutzt ihn noch jemand?
-2. **iPhone:** Modell und iOS-Version. Ist es das Alltagsgerät, also Tests nur auf Zuruf wie beim A56?
-3. **Apple Developer Program** (99 € im Jahr) oder erst die kostenlose Apple-ID? Kostenlos laufen Apps auf dem
-   iPhone nur sieben Tage, ohne TestFlight und ohne Notarisierung.
+1. **Mac:** Mac mini M2 (AP0). Offen: Nutzt ihn noch jemand?
+2. **iPhone:** iPhone 14 mit iOS 27.2 (AP0). Offen: Ist es das Alltagsgerät, also Tests nur auf Zuruf wie beim A56?
+3. **Apple Developer Program** (99 € im Jahr) oder die kostenlose Apple-ID? Vorerst die kostenlose (AP0): Apps laufen
+   auf dem iPhone nur sieben Tage, ohne TestFlight und ohne Notarisierung.
 4. **Welche Apps zuerst?** Vorschlag: `gallery`, dann JFPainter und `jfWord`; auf dem iPhone die Gallery, dann
    `Kritzel`.
 5. **App Store** als späteres Ziel für iOS? Das ändert Sandbox, Plugins und die Prüfregeln.
