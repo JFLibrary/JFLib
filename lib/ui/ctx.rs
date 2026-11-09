@@ -1129,6 +1129,28 @@ impl Ui {
         &mut self.sems[n - 1]
     }
 
+    /// sem_rect(kind, id, rect, label, value) -> the record: a semantic record of content the app
+    /// draws itself (a link or heading of a web page inside a canvas) at rect (px of the window, as
+    /// last_rect), without a hit box of its own and without a state; last_rect and the state of
+    /// the last widget stay.  Scripts find it by its label (`click "Label"` presses at its middle,
+    /// on the hit box that lies there: the canvas), screen readers read it (section 19 of the
+    /// guide).  Publish the records of what is visible, after the canvas.
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn sem_rect(&mut self, kind: u16, id: u32, rect: [i32; 4], label: Option<&str>, value: i32) -> &mut Sem {
+        let (lr, ls) = (self.wp.ctx.last_rect, self.wp.ctx.last_state);
+        self.wp.ctx.last_rect = rect;
+        self.wp.ctx.last_state = 0;
+        let n = self.sems.len();
+        self.sem(kind, id, label, value);
+        self.wp.ctx.last_rect = lr;
+        self.wp.ctx.last_state = ls;
+        if self.sems.len() > n {
+            &mut self.sems[n]
+        } else {
+            &mut self.sem_dummy
+        }
+    }
+
     // ------------------------------------------------------------------ clipping, layers
 
     /// ui_clip_push(x, y, w, h): px; intersects drawing and hit clipping

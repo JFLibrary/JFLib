@@ -2870,6 +2870,24 @@ if self.grid {
   `SS_SELECTED`, `SS_OPEN`); a slider-like widget sets `rec.min` / `rec.max` and applies
   `ui.a11y_value(id)` (a text widget `ui.a11y_text(id)`) when a screen reader sets a value.
 * Records without area (hidden probe records) are left out.
+* **Content drawn inside a canvas** (the links, headings and images of a web page an engine
+  draws, the shapes of a diagram): `ui.sem_rect(kind, id, rect, label, value)` after the canvas
+  adds a record at `rect` (px of the window, as `last_rect`) without a hit box of its own and
+  without touching `last_rect`. Screen readers read it with the role of its kind (`K_LINK`,
+  `K_HEADING` with the level as value, `K_IMAGE`, `K_TEXT`, `K_BUTTON`, `K_LIST` /
+  `K_LISTITEM` ...), a script finds it by its label, and a click on it -- the script's
+  `click "Label"`, a screen reader's -- is a press in its middle, so it reaches the canvas as
+  any click does. Publish what is visible, every frame:
+
+  ```rust
+  let inp = ui.canvas(ID_PAGE, Some(d), 0, self.ver).clone();
+  for l in self.page.visible_links() {                     // rectangles relative to the page
+      let r = [inp.rect[0] + l.x, inp.rect[1] + l.y, l.w, l.h];
+      ui.sem_rect(K_LINK, 0, r, Some(&l.text), 0);
+  }
+  ```
+
+  Tables have no kind of their own yet: their cells are `K_TEXT` records.
 
 **Screen magnifiers** follow the focus and the text caret. Text boxes report their caret
 (`ime_pos`, which a text widget of your own calls with its caret's rectangle, like the IME): the

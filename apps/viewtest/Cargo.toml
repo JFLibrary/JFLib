@@ -20,6 +20,7 @@ workspace = true
 
 [dependencies]
 rt.workspace = true
+plat.workspace = true
 ui.workspace = true
 style = { package = "jflib-style-winui", path = "../../styles/winui" }
 
