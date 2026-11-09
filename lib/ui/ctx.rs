@@ -419,8 +419,12 @@ impl Ui {
 
     /// key_take -> the first unconsumed key this frame (VK | mods << 16), consumed; 0 when none
     /// is left.  A canvas with HB_KEYS takes every key with it while it has the focus (`ev &
-    /// EV_FOCUS`, call it until 0); the keys a focused text box keeps stay with the box.
+    /// EV_FOCUS`, call it until 0); the keys a focused text box keeps stay with the box, and
+    /// while a popup of the window is open (a menu, a flyout) the keys are its.
     pub fn key_take(&mut self) -> u32 {
+        if self.popup_count() != 0 {
+            return 0;
+        }
         for i in 0..self.wp.ctx.keyq.len() {
             let k = self.wp.ctx.keyq[i];
             if (k as i32) >= 0 && self.text_key_filter(Some(i)).is_some() {

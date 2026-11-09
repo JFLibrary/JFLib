@@ -162,7 +162,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
-- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
+- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
@@ -671,7 +671,8 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
 - **`fn key_take(&mut self) -> u32`**
   key_take -> the first unconsumed key this frame (VK | mods &lt;&lt; 16), consumed; 0 when none
   is left.  A canvas with HB_KEYS takes every key with it while it has the focus (\\`ev &
-  EV_FOCUS\\`, call it until 0); the keys a focused text box keeps stay with the box.
+  EV_FOCUS\\`, call it until 0); the keys a focused text box keeps stay with the box, and
+  while a popup of the window is open (a menu, a flyout) the keys are its.
 - **`fn text_take(&mut self, cap: usize) -> Vec<u32>`**
   ui_text_take(cap): the typed codepoints (at most cap), consumed; when cap leaves some,
   they come in the next pass (nothing typed is lost)
@@ -1004,6 +1005,11 @@ numbers for them.
 - **`fn popup_open(&mut self, id: u32)`**
   ui_popup_open(id): open popup `id` (inside a flyout: as a child of that flyout,
   otherwise it replaces every open popup); an open popup only loses its children
+- **`fn popup_open_at(&mut self, id: u32, x: i32, y: i32)`**
+  popup_open_at(id, x, y): open popup `id` as popup_open does, its flyout hanging at the
+  point (x, y) (px of the window, as last_rect: a canvas's UiInput::rect plus its x, y)
+  instead of at the last widget; an open one moves there.  For a place the app learns later
+  than the click (a web engine's context menu); the app draws flyout_begin(id, ..) as usual.
 - **`fn popup_close(&mut self)`**
   ui_popup_close: close every popup (the focus returns to where it was)
 - **`fn flyout_begin(&mut self, id: u32, flags: u32) -> bool`**
@@ -1067,6 +1073,12 @@ numbers for them.
   ui_menu_popup(menu): open a menu at the pointer (the runtime draws it); for the
   menu key / Shift+F10 (an EV_RCLICK kbnav.rs gave the focused widget in this pass) at
   the widget's lower left corner with its first row focused
+- **`fn menu_popup_at(&mut self, menu: &'static [Mi], x: i32, y: i32)`**
+  menu_popup_at(menu, x, y): open a menu at the point (x, y) (px of the window, as
+  last_rect; a canvas: UiInput::rect plus its x, y), the runtime draws it as menu_popup's.
+  For a context menu whose place the app learns after the right click (a web engine
+  answers later): open it in the frame the answer comes; rows that change with the answer:
+  a flyout of the app's own through popup_open_at.
 - **`fn context_menu(&mut self, menu: &'static [Mi]) -> u32`**
   ui_context_menu(menu) -> EV_OPEN while `menu` is open for the last widget.  Opens on a
   right click (released over the widget), or with the menu key / Shift+F10 while the
@@ -4976,11 +4988,12 @@ HB_OWNKEYS: u32 = 0x20000
 // around it (touch.rs; the cursors of splitters, text and crosshairs say so by themselves)
 HB_GRAB_H: u32 = 0x40000
 HB_GRAB_V: u32 = 0x80000
-// every key is the widget's while it has the focus, Ctrl + letter, Tab and the arrows too: no
-// accelerator, no keyboard navigation, no Enter / Space action and no ui.undo_keys takes one (a
-// canvas that shows a web page takes them with ui.key_take; ui.accel_run hands one back to the
-// command table).  Unlike HB_TEXT no text box rules: no reserved keys, no input method, no
-// on-screen keyboard.  A canvas takes it from next_flags.
+// every key is the widget's while it has the focus and no popup of the window is open (a menu
+// keeps its keys), Ctrl + letter, Tab and the arrows too: no accelerator, no keyboard
+// navigation, no Enter / Space action and no ui.undo_keys takes one (a canvas that shows a web
+// page takes them with ui.key_take; ui.accel_run hands one back to the command table).  Unlike
+// HB_TEXT no text box rules: no reserved keys, no input method, no on-screen keyboard.  A
+// canvas takes it from next_flags.
 HB_KEYS: u32 = 0x10_0000
 // canvas only (next_flags): its cursor bits as given, CUR_ARROW (0) included; without it 0 is the
 // crosshair

@@ -724,7 +724,8 @@ if self.tab == 0 {
   without a version change.
 * **A canvas that takes the keyboard** (a web page, a terminal, an emulator): with
   `next_flags(HB_KEYS)` every key is the canvas's while it has the focus (a press gives it the
-  focus, `ui.focus(id)` too): no accelerator of the command table, no Tab, arrow or F6 of the
+  focus, `ui.focus(id)` too) and no popup of the window is open (a menu keeps its keys, and
+  `key_take` gives none then): no accelerator of the command table, no Tab, arrow or F6 of the
   keyboard navigation (section 27), no Enter / Space action and no `ui.undo_keys` takes one. The
   canvas takes them with `ui.key_take()` (the first unconsumed key, `VK | mods << 16`, consumed;
   0 when none is left) and typed text with `ui.text_take`; a key it does not use goes back to the
@@ -893,6 +894,22 @@ ui.menubar(None);                        // the menu bar of the AppDesc
 
   A widget without `context_menu` gets the menu key as a right click (`EV_RCLICK`); a
   `menu_popup` in answer to it opens at the widget (§27).
+  **At a point the app learns later** (a web engine answers a right click with the menu's
+  rows and place a moment after it): `menu_popup_at(menu, x, y)` opens a menu, `popup_open_at(id,
+  x, y)` a flyout of the app's own (drawn with `flyout_begin(id, ..)` as usual) at the point
+  (x, y), px of the window as `last_rect` (a canvas: `UiInput::rect` plus its `x`, `y`), in the
+  frame the answer comes:
+
+  ```rust
+  if inp.ev & EV_RCLICK != 0 {
+      self.page.context_menu(inp.x, inp.y);          // the engine answers later
+  }
+  if let Some(info) = self.page.take_context_menu() { // a later frame
+      ui.menu_popup_at(&M_PAGE, inp.rect[0] + info.x, inp.rect[1] + info.y);
+  }
+  ```
+
+  `apps/viewtest` (`tests/menus.uis`) does both.
   A row whose keys the app handles itself (no command of the table, e.g. inside a pane that
   captures them with `capture_shortcut`) shows them with `menu_item_keys(id, label,
   &ui.key_text(VK_F5, MOD_CTRL))`: `key_text(vk, mods)` writes a key as the accelerator texts
