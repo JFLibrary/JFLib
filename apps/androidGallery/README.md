@@ -134,7 +134,9 @@ eine Szene mit Fenster und View, das Bild als Inhalt ihres Layers, Finger, Apple
 Hardware-Tastatur, sichere Bereiche, Drehen, Hintergrund. Der Rest ist der Host-Pfad von Android
 (`lib/plat/web*.rs`, `HostRuntime` in `lib/ui/runtime.rs`). Zwischenablage über `UIPasteboard`, Öffnen,
 Speichern unter und Ordner über `UIDocumentPickerViewController`, Rechtschreibung über `UITextChecker`,
-der sichere Speicher im Schlüsselbund. Die Sensoren-Seiten haben auf iOS noch keine Daten.
+der sichere Speicher im Schlüsselbund, Mitteilungen über `UNUserNotificationCenter`, die Sensoren-Seiten über
+Core Motion und Core Location. Über der Bildschirmtastatur steht „Fertig“: das iPhone hat keine Taste, die sie
+schließt.
 
 Auf dem Mac, vom Repository-Verzeichnis:
 

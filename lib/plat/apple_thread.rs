@@ -178,6 +178,13 @@ pub(crate) fn wake_consume() -> Event {
 
 /// any thread: make the UI thread's wait return with E_WAKE (coalesced)  [plat_wake]
 pub fn wake() {
+    // iOS under the UIKit host: nobody waits on the pipe (and so nobody would take the flag back);
+    // the host's next tick takes the wake-up (apple_ios.rs)
+    #[cfg(target_os = "ios")]
+    if super::ios::hosted() {
+        super::ios::wake();
+        return;
+    }
     if WAKE_FLAG.swap(1, Ordering::SeqCst) != 0 {
         return; // already signalled, not consumed yet
     }
@@ -191,8 +198,6 @@ pub fn wake() {
     // a window backend waits in AppKit's loop, not on the pipe
     #[cfg(target_os = "macos")]
     super::mac::wake_app();
-    #[cfg(target_os = "ios")]
-    super::disp::wake_app();
 }
 
 /// (apple_mac.rs wait) a wake() is waiting to be taken (wake_consume)

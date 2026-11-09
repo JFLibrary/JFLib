@@ -26311,7 +26311,8 @@ device pointed when it started).
 
 Android (android/GallerySensors.java, web_sensors.rs): SensorManager and LocationManager (GPS
 and network providers, no Google Play services), ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION
-asked when location_watch starts.  Browser (web/sensors.js, web_sensors.rs): DeviceMotionEvent,
+asked when location_watch starts.  iOS (apple_ios_motion.rs, web_sensors.rs): Core Motion's device
+motion and Core Location ("when in use", asked when location_watch starts).  Browser (web/sensors.js, web_sensors.rs): DeviceMotionEvent,
 DeviceOrientationEvent (Safari's requestPermission from the click), navigator.geolocation; no
 magnetic field.  Windows and Linux: everything is Unavailable (docs/ROADMAP.md names what a
 native version would use).  Scripts feed readings (`sensor ...`, `location ...`; lib/ui/auto.rs):
@@ -31224,7 +31225,7 @@ Source: [`lib/plat/apple_ios_services.rs`](../lib/plat/apple_ios_services.rs)
 
 ```text
 apple_ios_services -- iOS's system services of AP5b (docs/APPLE.md): the clipboard (UIPasteboard),
-the system's file picker (UIDocumentPickerViewController).
+the system's file picker (UIDocumentPickerViewController), notifications (UNUserNotificationCenter).
 
   clip_set / clip_set_many / clip_get / clip_has   as on macOS (apple_mac.rs): one pasteboard item
                                with a representation per format (text as a string); CLIP_IMAGE gets a
@@ -31237,6 +31238,11 @@ the system's file picker (UIDocumentPickerViewController).
                                one at a time ((0, 0) while one is open), (-1, 0) without a window
   file_dialog_poll()           None while it is open, then once (1, 0, path) / (0, 0, "") -- the
                                path a security-scoped URL's, its access started for the session
+  notes::*                     (tray.rs) notifications: no symbol of a notification area on iOS;
+                               notify asks the user once (alert, sound) and hands the note to the
+                               centre when allowed -- refused, it goes away at once (NoteClosed); one
+                               arriving while the app is in front shows all the same; a tap opens the
+                               app: NoteClicked.  Only in an app (a bundle identifier).
 
 Reading what another app copied makes iOS ask the user once ("Allow Paste"); asking which types the
 pasteboard has does not.
@@ -32273,14 +32279,15 @@ into UIC_SUSPEND.
 Source: [`lib/plat/web_sensors.rs`](../lib/plat/web_sensors.rs)
 
 ```text
-web_sensors -- (sensors.rs) the sensors and the location in the browser and on Android
+web_sensors -- (sensors.rs) the sensors and the location in the browser, on Android and on iOS
 
 Browser (web/sensors.js): REQUEST_SENSORS, u32 SENSOR_* union (0: stop) and REQUEST_LOCATION,
 u32 LOC_STOP / LOC_START / LOC_RESUME; no completion.  The page answers with jfgui_sensor,
 jfgui_sensor_state and jfgui_location; while it has not, a sensor is Waiting and the location
 Searching.  Android (android/GallerySensors.java): CALL_SENSORS, u32 union -> u32 the bits this
 device has; CALL_LOCATION, u32 op -> u32 LocationState; it asks ACCESS_FINE_LOCATION /
-ACCESS_COARSE_LOCATION on LOC_START and answers later through the same exports:
+ACCESS_COARSE_LOCATION on LOC_START and answers later through the same exports.  iOS
+(apple_ios_motion.rs): Core Motion and Core Location in this process, the same answers:
 
   jfgui_sensor(bit, x, y, z, w, flags) -> 1   a reading (flags: accuracy 0..3, 4 absolute)
   jfgui_sensor_state(mask, state) -> 1        Waiting 1, Denied 4, Unavailable 6

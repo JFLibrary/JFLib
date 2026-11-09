@@ -68,11 +68,9 @@ pub use system_host::{jfgui_note, jfgui_system};
 pub use system_host::jfgui_touch_reached;
 pub(crate) use system_host::sys_settings_host;
 // sensors.rs: the host's readings and fixes (web/sensors.js, android/GallerySensors.java)
-// (iOS: Core Motion and Core Location come with a later step, docs/APPLE.md)
-#[cfg(not(target_os = "ios"))]
+// (iOS: Core Motion and Core Location answer through it, apple_ios_motion.rs)
 #[path = "web_sensors.rs"]
 pub(crate) mod sensors_host;
-#[cfg(not(target_os = "ios"))]
 pub use sensors_host::{jfgui_location, jfgui_sensor, jfgui_sensor_state};
 #[cfg(target_os = "android")]
 #[path = "android_gpu.rs"]

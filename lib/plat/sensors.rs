@@ -36,7 +36,8 @@
 //
 // Android (android/GallerySensors.java, web_sensors.rs): SensorManager and LocationManager (GPS
 // and network providers, no Google Play services), ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION
-// asked when location_watch starts.  Browser (web/sensors.js, web_sensors.rs): DeviceMotionEvent,
+// asked when location_watch starts.  iOS (apple_ios_motion.rs, web_sensors.rs): Core Motion's device
+// motion and Core Location ("when in use", asked when location_watch starts).  Browser (web/sensors.js, web_sensors.rs): DeviceMotionEvent,
 // DeviceOrientationEvent (Safari's requestPermission from the click), navigator.geolocation; no
 // magnetic field.  Windows and Linux: everything is Unavailable (docs/ROADMAP.md names what a
 // native version would use).  Scripts feed readings (`sensor ...`, `location ...`; lib/ui/auto.rs):
@@ -709,10 +710,10 @@ pub fn test_location_age(age_ms: u64) {
     crate::wake();
 }
 
-#[cfg(any(target_arch = "wasm32", target_os = "android"))]
+#[cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))]
 use crate::web::sensors_host as native;
 
-#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android", target_os = "ios")))]
 mod native {
     // Windows and Linux: nothing yet (docs/ROADMAP.md)
     pub fn sensors(_mask: u32) -> Option<u32> {

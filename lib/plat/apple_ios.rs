@@ -15,8 +15,10 @@
 // Apple Pencil is a pen (pressure, tilt), the pointer of an iPad's trackpad or mouse a mouse.  It is
 // the UIKeyInput of the on-screen keyboard (insertText -> jfgui_text, deleteBackward -> Backspace),
 // first responder after a gesture reached a widget (jfgui_touch_reached) while the app wants text
-// (REQUEST_IME with a height), resigning when the app no longer does.  The view controller takes the
-// keys of a hardware keyboard the text system does not (pressesBegan).
+// (REQUEST_IME with a height), resigning when the app no longer does or the user taps "Done" on the
+// bar above the keyboard (an iPhone's keyboard has no key to close it; the text field keeps the focus,
+// a tap into it brings the keyboard back).  The view controller takes the keys of a hardware keyboard
+// the text system does not (pressesBegan).
 // The ticks: a CADisplayLink while the app animates (jfgui_frame_delay 0), else paused with a timer
 // for the delay; input and wake-ups unpause it.  Px per point: the screen's scale, at most 2 and at
 // most 2048 px on the longer side (as Android's bitmap); dpi 96 x that.
@@ -39,10 +41,14 @@ use crate::{E_DOWN, E_DPI, E_FOCUS_IN, E_FOCUS_OUT, E_KEY_DOWN, E_KEY_UP, E_MOVE
 
 type CfRef = *const c_void;
 
-// the system services of AP5b: the clipboard, the file picker
+// the system services of AP5b: the clipboard, the file picker, notifications
 #[path = "apple_ios_services.rs"]
 mod services;
+pub(crate) use services::notes;
 pub use services::{clip_get, clip_has, clip_set, clip_set_many, file_dialog, file_dialog_poll};
+// the motion sensors and the location (sensors.rs through web_sensors.rs)
+#[path = "apple_ios_motion.rs"]
+pub(crate) mod motion;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -135,6 +141,8 @@ struct Host {
     /// (UIStatusBarStyle: 1 light content, 3 dark content)
     edge: Cell<u32>,
     bar: Cell<isize>,
+    /// the bar above the on-screen keyboard (a UIToolbar with "Done")
+    accessory: Cell<Id>,
 }
 struct Main(Host);
 // SAFETY: only the main thread touches the host (every function here but wake() runs there).
@@ -159,8 +167,16 @@ static HOST: Main = Main(Host {
     traits: Cell::new(u32::MAX),
     edge: Cell::new(u32::MAX),
     bar: Cell::new(0),
+    accessory: Cell::new(NIL),
 });
 static WAKE_QUEUED: AtomicBool = AtomicBool::new(false);
+/// UIKit runs the app (run): wake() goes to the host, not to the pipe of a waiting loop
+static HOSTED: AtomicBool = AtomicBool::new(false);
+
+/// (apple_thread.rs wake, any thread) the UIKit host runs the app
+pub(crate) fn hosted() -> bool {
+    HOSTED.load(Ordering::Acquire)
+}
 
 fn host() -> &'static Host {
     &HOST.0
@@ -231,6 +247,7 @@ pub(crate) fn before_main() {
 
 /// (apple.rs main, an app installed its runtime) UIKit takes the main thread
 pub(crate) fn run() -> ! {
+    HOSTED.store(true, Ordering::Release);
     register();
     let name = nsstring("JFAppDelegate");
     // SAFETY: the process's own argc / argv (dyld's); UIApplicationMain never returns.
@@ -284,6 +301,8 @@ fn register() {
         (c"hasText", yes as Imp, c"B@:"),
         (c"insertText:", view_insert_text as Imp, c"v@:@"),
         (c"deleteBackward", view_delete_backward as Imp, c"v@:"),
+        (c"inputAccessoryView", view_accessory as Imp, c"@@:"),
+        (c"jfDone:", view_done as Imp, c"v@:@"),
         // UITextInputTraits: the keyboard types what it is given, nothing corrected or replaced
         (c"autocorrectionType", trait_no as Imp, c"q@:"),
         (c"spellCheckingType", trait_no as Imp, c"q@:"),
@@ -604,7 +623,7 @@ fn request_frame() {
     }
 }
 
-/// (any thread; apple_thread.rs wake) the next tick takes E_WAKE
+/// (any thread; apple_thread.rs wake under the host) the next tick takes E_WAKE
 pub(crate) fn wake() {
     crate::web::host_wake();
     if !WAKE_QUEUED.swap(true, Ordering::AcqRel) {
@@ -912,6 +931,38 @@ extern "C" fn view_insert_text(_this: Id, _sel: Sel, text: Id) {
     }
     jfgui_input(time_ms());
     request_frame();
+}
+
+/// the bar above the keyboard: "Done" on the right (the system's word for it, in the system's language)
+extern "C" fn view_accessory(this: Id, _sel: Sel) -> Id {
+    let h = host();
+    if h.accessory.get().is_null() {
+        // SAFETY: UIKit objects made here on the main thread; the bar is kept for the process.
+        unsafe {
+            let bar: Id = msg!(class(c"UIToolbar"), c"alloc"; Id);
+            let bar: Id = msg!(bar, c"initWithFrame:", NSRect::new(0.0, 0.0, 320.0, 44.0) => NSRect; Id);
+            let item = |kind: isize, target: Id, action: Sel| -> Id {
+                let i: Id = msg!(class(c"UIBarButtonItem"), c"alloc"; Id);
+                msg!(i, c"initWithBarButtonSystemItem:target:action:", kind => isize, target => Id, action => Sel; Id)
+            };
+            // UIBarButtonSystemItemFlexibleSpace 5, UIBarButtonSystemItemDone 0
+            let items = [item(5, NIL, core::ptr::null()), item(0, this, super::objc::sel(c"jfDone:"))];
+            let arr: Id = msg!(class(c"NSArray"), c"arrayWithObjects:count:", items.as_ptr() => *const Id, 2usize => usize; Id);
+            msg!(bar, c"setItems:", arr => Id; ());
+            msg!(bar, c"sizeToFit"; ());
+            for i in items {
+                release(i);
+            }
+            h.accessory.set(bar);
+        }
+    }
+    h.accessory.get()
+}
+
+/// "Done": the keyboard goes, the text field keeps the focus (a tap into it brings it back)
+extern "C" fn view_done(_this: Id, _sel: Sel, _item: Id) {
+    host().gesture.set(false);
+    keyboard(false);
 }
 
 extern "C" fn view_delete_backward(_this: Id, _sel: Sel) {
