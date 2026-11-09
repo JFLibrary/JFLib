@@ -57,7 +57,7 @@ def crate_name(name):
 
 
 def type_name(name):
-    """'my_tool' / 'hello-world' / 'PaintCraft' -> 'MyTool' / 'HelloWorld' / 'PaintCraft'"""
+    """'my_tool' / 'hello-world' / 'BackupCraft' -> 'MyTool' / 'HelloWorld' / 'BackupCraft'"""
     parts = [p for p in re.split(r"[_-]+", name) if p]
     return "".join(p[:1].upper() + p[1:] for p in parts) or "App"
 

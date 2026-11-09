@@ -80,9 +80,10 @@ UI_AREAS = [
 ]
 
 # (crate, title, kind): "full" = every public item, "codec" = see the docstring
-# documented for this repository's own code only, not published (PaintCraft's plugin ABI): no
-# part of what the crates promise (docs/VERSIONING.md), left out of api-diff
-REPO_ONLY = {"plugin"}
+# documented for this repository's own code only, not published: no part of what the crates
+# promise (docs/VERSIONING.md), left out of api-diff (none since PaintCraft's plugin ABI went with
+# the app to its own repository, JFLibrary/JFPainter, in 2026-11)
+REPO_ONLY = set()
 
 CRATES = [
     ("ui", "the immediate-mode UI: runtime, layout, widgets, windows, style contract", "full"),
@@ -105,7 +106,7 @@ CRATES = [
     ("img_av1", "AV1 intra coding", "codec"),
     ("img_avif", "AVIF", "codec"),
     ("img_jxl", "JPEG XL", "codec"),
-    ("img_jxl_enc", "the new JPEG XL writer (linked into codectest; PaintCraft loads it as the module jxlenc)",
+    ("img_jxl_enc", "the new JPEG XL writer (linked into codectest, and the module jxlenc that codectest --jxlenc loads)",
      "codec"),                                                                             # jxl-module
     ("img_jxr", "JPEG XR", "codec"),
     ("img_dds", "DDS and BC1..BC7 block compression", "codec"),
@@ -145,7 +146,6 @@ CRATES = [
     ("doc_io", "conservative DOCX interchange and bounded file I/O", "full"),
     ("rt", "the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records",
      "full"),
-    ("plugin", "the PaintCraft plugin ABI for plugins written in Rust", "full"),
 ]
 SKIP_FILES = {"rt": {"os.rs", "mem.rs"}}            # rt::os: the OS calls plat is built on
 # codec crates: further items to show, per module ("*" = all public items of the module)

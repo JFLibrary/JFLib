@@ -1,5 +1,5 @@
 // jxlenc -- the JPEG XL writer as a loadable module (jxl-module): img_jxl_enc in a no_std cdylib
-// without imports (jxlenc.dll / jxlenc.so next to PaintCraft), loaded on the first JPEG XL save
+// without imports (jxlenc.dll / jxlenc.so next to the app, codectest), loaded on the first JPEG XL save
 //                                                                       [jxl-module: no asm]
 //
 // Export: jxlenc_module(&HostTable) -> &ModTable (lib/plat/modabi.rs).  ModTable::jxl_encode
@@ -7,8 +7,8 @@
 // img_jxl_enc::enew::encode_px -- the function an app with the linked writer runs, so the file
 // is the same byte for byte; its parallel parts run on the host's pool, its blocks come from
 // the host's allocator (modules/modrt, modplat).  Built by `python build_rs.py app
-// PaintCraft` into the app's folder (section jxl-module: the library crates once more over modrt
-// / modplat, fat LTO, checked like PaintCraft's plugin loader checks a library).
+// codectest` into the app's folder (section jxl-module: the library crates once more over modrt
+// / modplat, fat LTO, checked the way plat's loader checks a library).
 #![no_std]
 #![deny(unsafe_code)]
 

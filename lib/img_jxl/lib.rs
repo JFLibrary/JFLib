@@ -82,7 +82,7 @@
 // itself (libjxl 0.11.1's encoder: enew, evdct, emod, ema, eans, efrm, eicc, etx, dctk, eaq,
 // eacs, ecfl, epatch, edots, espline, enoise, efeat, ebutter, ebq) is the crate img_jxl_enc
 // (lib/img_jxl_enc/lib.rs), linked into codectest and built into the module jxlenc
-// (modules/jxlenc) that PaintCraft loads; Recon and decode_linear below are its reconstruction
+// (modules/jxlenc) that codectest --jxlenc loads; Recon and decode_linear below are its reconstruction
 // helpers.
 #![no_std]
 #![forbid(unsafe_code)]

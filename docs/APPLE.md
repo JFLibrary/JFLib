@@ -68,7 +68,7 @@ dem iPhone (`xcrun devicectl`) läuft.
 
 ### AP1: Safari prüfen (S, sofort, parallel)
 
-- Die Web-Ausgabe (`gallery`, `PaintCraft`, `jfWord`, `Kritzel`) in Safari auf dem Mac (`safaridriver`) und auf
+- Die Web-Ausgabe (`gallery`, `jfWord`, `Kritzel`) in Safari auf dem Mac (`safaridriver`) und auf
   dem iPhone (Web-Inspektor über den Mac). Das ist heute der Weg für Apple und noch nie getestet.
 
 **Fertig, wenn:** die Browser-Skripte in Safari auf dem Mac laufen und die Abweichungen auf dem iPhone notiert sind.

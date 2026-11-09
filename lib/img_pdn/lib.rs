@@ -16,9 +16,9 @@
 //
 // The document records of the assembly (img.inc PDNDOC / PDNLAYER) are PdnDoc / PdnLayer:
 // the reader returns an owned PdnDoc (pdn_free = drop).  The writer takes a borrowed view,
-// DocRef / LayerRef, so a caller hands its own layers over without copying pixels (PaintCraft's
+// DocRef / LayerRef, so a caller hands its own layers over without copying pixels (JFPainter's
 // save_pdn borrows its layer surfaces the same way); PdnDoc::view() makes one of a PdnDoc.
-// PaintCraft (R11): open_pdn = decode(data, Some(&dec)), then move each layer's surface, name
+// JFPainter (PaintCraft in R11): open_pdn = decode(data, Some(&dec)), then move each layer's surface, name
 // and metadata blob out of doc.layers (core::mem::take) and use doc.unit / dpux / dpuy;
 // save_pdn = a DocRef over its layers (LayerRef per layer) and encode(&docref, Some(&opt)).
 // Field semantics are those of the asm records: opacity / visible / blend / isbg as stored,

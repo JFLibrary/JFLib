@@ -35,7 +35,7 @@ Existing rows are never changed; a text with a tab or a line break cannot be a r
 
 Texts of the sources (*.rs below the app; files named *test.rs are left out)
   t("…") tc("…") tr("…")  a text the app translates (ui::i18n::t, its tr.rs, tc with a context
-                          after '|', PaintCraft's localization::tr); i18n::tr("…") is the
+                          after '|', an app's own localization::tr); i18n::tr("…") is the
                           library's and left out
   tf("…", ..)             filled by i18n::fill: only "{}", in order
   msg!("…", ..), Msg::new("…", ..), phrase("…")
@@ -53,7 +53,7 @@ Only texts with a letter count.  The library: tr("…") in lib/**/*.rs.
 
 Catalogues: apps/NAME/**/locales/*.tsv.  The first line names the languages ("de\ten";
 Catalog::from_tsv), or a comment "# languages: de en fr" does (a catalogue the app reads
-itself, PaintCraft's); then one row per text: the source text, a tab, the translations; lines
+itself); then one row per text: the source text, a tab, the translations; lines
 that start with "#" are comments.
 
 Placeholders: "{}" (in order), "{0}".."{9}", "{name}" and the forms of i18n::msg ("{n, number}",
@@ -104,7 +104,7 @@ PLURALS = {
 CATEGORIES = {"zero", "one", "two", "few", "many", "other"}
 # complete today (2026-11-02): in --check a missing or untranslated text is an error there too,
 # so they stay complete; the other apps' gaps are reported only
-COMPLETE = ("BackupCraft", "JFNetworker", "PaintCraft", "androidGallery", "audiotest", "datagallery", "diagramtest", "dndtest", "docktest",
+COMPLETE = ("BackupCraft", "JFNetworker", "androidGallery", "audiotest", "datagallery", "diagramtest", "dndtest", "docktest",
             "editortest", "fontpicktest", "gallery", "mdviewtest", "prefstest", "spelltest", "svgtest", "template", "lib")
 
 

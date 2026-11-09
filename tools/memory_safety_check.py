@@ -66,7 +66,7 @@ def compile_log(out, name, cmd, asan=False):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("mode", choices=["native", "asan", "tsan", "loader"])
-    ap.add_argument("--out", default="build/PaintCraft-memory")
+    ap.add_argument("--out", default="build/memory-safety")
     args = ap.parse_args()
     os.chdir(ROOT)
     out = (ROOT / args.out).resolve()

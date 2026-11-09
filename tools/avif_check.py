@@ -52,7 +52,7 @@ OP_AV1DEC, OP_AV1ENC, OP_HEICTIME = 140, 141, 161
 OP_ENCMETA = 260                     # img_encode with an IMGMETA (png_ops.s)
 STRAIGHT = C.IMGD_STRAIGHT
 ROOT = Path(__file__).resolve().parent.parent
-PHOTO = ROOT / "apps" / "PaintCraft" / "tests" / "fixtures" / "a6_photo.png"
+PHOTO = ROOT / "apps" / "codectest" / "fixtures" / "a6_photo.png"
 URN_ALPHA = b"urn:mpeg:mpegB:cicp:systems:auxiliary:alpha"
 LOC = {0: 1, 1: 0, 2: 2}            # chroma_sample_position -> chroma location type (yuv.s)
 

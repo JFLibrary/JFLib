@@ -364,7 +364,7 @@ def enc_images():
     import numpy as np
     import jxl_enc_ref as E
     out = []
-    fx = ROOT / "apps" / "PaintCraft" / "tests" / "fixtures"
+    fx = ROOT / "apps" / "codectest" / "fixtures"
     for n in ("a1_rgba.png", "a6_photo.png"):
         w, h, rgba = E.read_png(fx / n)
         out.append((n, w, h, rgba))

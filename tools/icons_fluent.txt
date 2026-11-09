@@ -180,7 +180,7 @@ Bell                ic_fluent_alert_16_regular
 Backspace           ic_fluent_backspace_16_regular
 Return              ic_fluent_arrow_enter_left_20_regular
 
-# --- PaintCraft (agent A0): chrome and tool placeholders ------------------------------------------
+# --- JFPainter, then PaintCraft (agent A0): chrome and tool placeholders ------------------------------------------
 ClearSelection      ic_fluent_select_all_off_16_regular           # Segoe: dashed rect. with arrow
 Scan                ic_fluent_scan_camera_16_regular              # Segoe: flatbed scanner
 Ruler               ic_fluent_ruler_16_regular
@@ -189,6 +189,6 @@ SaveCopy            ic_fluent_save_copy_20_regular
 MagicSelect         ic_fluent_wand_16_regular                     # Segoe: dashed square, sparkle
 TouchPointer        ic_fluent_hand_point_16_regular               # pointing hand
 
-# --- PaintCraft (agent A2): history window --------------------------------------------------------
+# --- JFPainter, then PaintCraft (agent A2): history window --------------------------------------------------------
 Previous            ic_fluent_previous_16_regular
 Next                ic_fluent_next_16_regular

@@ -6,7 +6,8 @@ The library is designed to be used by AI Agents, not by Humans – Thus the enti
 
 JFLIB brings widgets, layout, text, 2D graphics, image formats, and platform integration
 together in one library. This repository contains both the library and its applications:
-from small GUI examples to Kritzel, PaintCraft, jfWord, and the Build Manager.
+from small GUI examples to Kritzel, jfWord, and the Build Manager. JFPainter, the image editor
+formerly called PaintCraft, has its own repository, [JFLibrary/JFPainter](https://github.com/JFLibrary/JFPainter).
 The Rust code uses `#![no_std]`, `core`, and `alloc`; an app of its own may use `std` and `std`
 crates (the feature `std` of `jflib`, [docs/GUIDE.md](docs/GUIDE.md)). Cargo builds the library and the apps;
 a Python build script (`build_rs.py`) sits on top for this repository's own apps, its tests and
@@ -162,7 +163,7 @@ The following table describes the build paths available in the current repositor
 | **Android** | Native APK, `--target android` | `androidGallery`, ARM64 and x86-64 emulator; Android 8 / API 26 or later |
 | **macOS** | Browser output through `--target web` | Access through the web port; the current build script has no native Apple target |
 | **iOS** | Browser output through `--target web` | Access through the web port; the current build script has no native iOS app/IPA target |
-| **Web** | WebAssembly and a shared browser host, `--target web` | Includes `template`, `gallery`, `Kritzel`, `PaintCraft`, and `jfWord` |
+| **Web** | WebAssembly and a shared browser host, `--target web` | Includes `template`, `gallery`, `Kritzel`, and `jfWord` |
 
 The documented browser test matrix covers Chromium and Firefox. Separate Safari/iOS
 validation has not yet been documented here. The `macos` style is independent of the
@@ -183,7 +184,7 @@ Pass the app names in the first column exactly as written to `build_rs.py app NA
 | [`template`](apps/template/main.rs) | A click counter as a starting point for your own GUIs | Windows, Linux, Web |
 | [`gallery`](apps/gallery/main.rs) | A widget gallery for exploring controls, layout, and styles | Windows, Linux, Web |
 | [`Kritzel`](apps/Kritzel/README.md) | A drawing app with brushes, shapes, text, selections, and layers | Windows, Linux, Web |
-| [`PaintCraft`](apps/PaintCraft/src/main.rs) | An image editor with layers, history, effects, many image formats, and native plugins | Windows, Linux, Web |
+| [JFPainter](https://github.com/JFLibrary/JFPainter) | An image editor with layers, history, effects, many image formats, and native plugins; formerly PaintCraft, now in its own repository and built from the crate `jflib` on crates.io | Windows, Linux, Web |
 | [`jfWord`](apps/jfWord/README.md) | A word processor with a ribbon, page view, text styles, tables, references, and DOCX support | Windows, Linux, Web |
 | [`buildManager`](apps/buildManager/README.md) | A graphical build app for applications, styles, profiles, tests, and release packages | Windows, Linux |
 | [`BackupCraft`](apps/BackupCraft/README.md) | A backup suite: console, server (`bc-server`), agents (`bc-agent`), and `bcctl`; deduplicated, encrypted, signed backups with schedules, roles, and audit; copy jobs, replication with failover, continuous protection, tape, QEMU/KVM VMs with instant start and boot checks, volume images, a central view of several servers | Windows, Linux |
@@ -194,26 +195,14 @@ jfWord is under active development; full Word feature coverage and file compatib
 are not yet complete. Native plugins and operating-system services are more limited
 in the browser than on the desktop.
 
-PaintCraft now imports PSD/PSB raster layers, exports layered 8-bit PSD, offers
-bitmap brush tips and dynamics, and connects to standalone G'MIC-Qt on Windows
-and Linux. Its text tool supports OpenType shaping, bidirectional text and basic
-IME composition display; English and French UI catalogs are available with German
-fallback for untranslated strings. High-depth imports are converted to its 8-bit
-SDR canvas. The [handbook comparison](apps/PaintCraft/docs/MANUAL_PARITY.md) lists
-tested behavior and the remaining Photoshop, HDR and plugin limitations.
-The Paint.NET DLL host runs classic, v5 CPU and GPU effects on Windows and also connects to
-native Linux PaintCraft through Wine. Brush Factory / Dynamic Draw JSON and legacy XML presets can be
-imported for supported controls, with unsupported active parameters reported explicitly.
-See the [Wine setup](tools/paintcraft-pdn-host/README.md#linuxwine-setup) and
-[preset guide](apps/PaintCraft/docs/CREATIVE_TOOLS.md#brush-factory--dynamic-draw-presets).
+JFPainter (until November 2026 `apps/PaintCraft` here) imports PSD/PSB raster layers, offers
+bitmap brush tips, connects to G'MIC-Qt and runs original paint.net plugins through its own
+host. It lives in [its own repository](https://github.com/JFLibrary/JFPainter) and builds against the crate `jflib` from
+crates.io like any app outside this repository.
 
-PaintCraft's Rust sources are organized by domain under `apps/PaintCraft/src/`.
-The [architecture guide](apps/PaintCraft/docs/ARCHITECTURE.md) covers application
-state, documents, tools, effects, workspace components and external integrations.
+**JFPainter: dark WinUI style, with tools, colors, history, and layers**
 
-**PaintCraft: dark WinUI style, with tools, colors, history, and layers**
-
-![PaintCraft with the JF drawing open and its tool windows visible](docs/images/readme/paintcraft-dark.png)
+![JFPainter with the JF drawing open and its tool windows visible](docs/images/readme/paintcraft-dark.png)
 
 **BackupCraft: the jobs page in the dark backupcraft style (demo data)**
 
@@ -314,7 +303,7 @@ smoke test and a README; the [developer guide](docs/GUIDE.md) (section 2) explai
 ```sh
 # Build individual apps
 python build_rs.py app Kritzel --target win
-python build_rs.py app PaintCraft --target win
+python build_rs.py app Kritzel --target win
 python build_rs.py app jfWord --target win
 
 # Build Windows and Linux together; both Rust targets must be installed
@@ -324,7 +313,7 @@ python build_rs.py app jfWord --target both
 python build_rs.py run gallery --target win -- --theme dark
 
 # Optimized build in build/release/win/
-python build_rs.py app PaintCraft --target win --release
+python build_rs.py app Kritzel --target win --release
 
 # Build all apps for a target, or just the library components
 python build_rs.py all --target win
@@ -348,7 +337,7 @@ Development builds produce `build/win/NAME.exe` or `build/linux/NAME`.
 When building multiple styles, the path also includes the style, for example
 `build/win/classic/gallery.exe`. Selecting a single explicit style does not add this
 subdirectory. Builds are incremental, and warnings are treated as build errors.
-PaintCraft's additional modules, such as `jxlenc.dll` or `jxlenc.so`, are built automatically.
+An app's loadable modules, such as codectest's `jxlenc.dll` or `jxlenc.so`, are built automatically.
 
 ### Browser builds
 
@@ -448,10 +437,10 @@ in `build-profiles.json`.
 To build a package directly from the terminal, for example forCraft:
 
 ```sh
-python tools/package.py PaintCraft --styles winui,classic --no-deb
+python tools/package.py Kritzel --styles winui,classic --no-deb
 ```
 
-This creates the Windows installer at `build/dist/PaintCraft_Setup.exe`.
+This creates the Windows installer at `build/dist/Kritzel_Setup.exe`.
 `--formats all` also writes an AppImage, a Flatpak bundle, an MSIX package and an RPM .spec.
 See the [Build Manager documentation](apps/buildManager/README.md) and
 [packaging guide](docs/PACKAGING.md) for details.
@@ -635,9 +624,7 @@ python build_rs.py test --quick --target win
 `check` validates the source-code rules. `test --quick` starts the broader test suite
 and skips the historical assembly parity checks; `test NAME` builds one app and runs only its
 scripts. `python build_rs.py api-diff` lists the changes of the public API since the last
-release ([versions](docs/VERSIONING.md)). Some existing PaintCraft tests still
-expect reference plugins under `build/rwref`, which are not included in a fresh checkout.
-The full parity run also requires the separate assembly reference.
+release ([versions](docs/VERSIONING.md)). The full parity run also requires the separate assembly reference.
 rust-analyzer reads the Cargo workspace in the root `Cargo.toml` directly.
 
 ## Documentation
@@ -660,7 +647,6 @@ rust-analyzer reads the Cargo workspace in the root `Cargo.toml` directly.
 | [ARM64 plan](docs/ARM64.md) | The planned port to ARM64 on Windows and Linux: milestones, traps, how it is tested (German) |
 | [Android Gallery](apps/androidGallery/README.md) | APKs, Android prerequisites, input, and port status |
 | [Web and agent control](docs/AGENT_WEB.md) | Browser host and explicit CLI/JSON/MCP interfaces |
-| [PaintCraft plugins](plugins/README.md) | Native plugins and plugin builds |
 | [jfWord](apps/jfWord/README.md) | Document editing and current feature coverage |
 | [BackupJF](apps/BackupCraft/README.md) | Server, agents, console and bcctl: setup, architecture, security model, tests |
 
@@ -704,7 +690,7 @@ links lead nowhere.
 ## License
 
 JFLib is dual-licensed under the [MIT License](LICENSE-MIT) or the
-[Apache License 2.0](LICENSE-APACHE), at your option. The apps PaintCraft, Kritzel and
+[Apache License 2.0](LICENSE-APACHE), at your option. The apps Kritzel and
 BackupCraft are released under the MIT License (their `license.txt`). Third-party code,
 data and fonts keep their own licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 and [styles/NOTICE.md](styles/NOTICE.md).

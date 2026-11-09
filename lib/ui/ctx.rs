@@ -1038,7 +1038,7 @@ impl Ui {
 
     // ------------------------------------------------------------------ semantic records
 
-    /// g_last_rect = 0, g_last_state = 0: the apps' hidden probe records (PaintCraft's *_sem
+    /// g_last_rect = 0, g_last_state = 0: the apps' hidden probe records (JFPainter's *_sem
     /// helpers zero both before ui_sem; later records of the pass see the zeroes too)  // pn-core
     pub fn last_reset(&mut self) {
         self.wp.ctx.last_rect = [0; 4];

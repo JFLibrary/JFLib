@@ -162,7 +162,7 @@ fn codectest() -> i32 {
         img_all::use_core_codecs();
     }
     // jxl-module: the JPEG XL writer linked in, or with --jxlenc FILE that of the module file
-    // (as PaintCraft loads it; the check tools compare both)
+    // (the module next to codectest, built by build_rs.py: APP_MODULES; the check tools compare both)
     match args.value("--jxlenc") {
         Some(f) => img_jxl::writer::use_module(Some(f)),
         None => img_jxl_enc::use_static(),

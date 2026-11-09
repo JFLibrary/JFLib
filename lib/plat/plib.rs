@@ -422,7 +422,7 @@ pub fn guard_run<R, F: FnOnce() -> R>(f: F, info: Option<&mut GuardInfo>) -> Res
     }
 }
 
-// pn-sys: the host side of the plugin API (PaintCraft's PNAPI) gets addresses from plugin code
+// pn-sys: the host side of the plugin API (JFPainter's PNAPI) gets addresses from plugin code
 // -- records it passes back (SURFACE, IMGDEC, JOB), strings, buffers on its stack -- that
 // may lie anywhere; these two touch such memory under the crash guard.
 /// copy len bytes at any address under the crash guard -> None when addr is 0, the copy

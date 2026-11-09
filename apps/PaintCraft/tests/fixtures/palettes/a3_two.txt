@@ -1,3 +1,0 @@
-; a3_two.txt -- two colours (agent A3)
-FF112233
-FF445566

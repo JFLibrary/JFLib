@@ -1,10 +1,10 @@
 // mem -- the C symbols core needs in a library without a C runtime: memcpy, memmove, memset,
 // memcmp, bcmp; on Windows also _fltused, __chkstk and __CxxFrameHandler3
-//                                               [the plugin counterpart of lib/rt/mem.rs]
+//                                               [the module counterpart of lib/rt/mem.rs]
 //
 // Written in assembly (global_asm) rather than as #[no_mangle] Rust functions: rustc exports
-// every #[no_mangle] item of every crate from a cdylib, and a plugin must export exactly
-// pn_plugin_query.  Assembly symbols are invisible to rustc's export list (Windows: not in the
+// every #[no_mangle] item of every crate from a cdylib, and a module must export exactly its
+// NAME_module.  Assembly symbols are invisible to rustc's export list (Windows: not in the
 // .def file; Linux: local through the version script).  rep movsb / stosb as in rt; the C
 // calling convention of the platform (Windows x64: rcx, rdx, r8; System V: rdi, rsi, rdx).
 

@@ -43,7 +43,7 @@ async function appWorker(app,width=1280,height=800,dpi=96){
 }
 const event=(type,x,y,button=0,data=0,mods=0)=>({type:'event',event:[type,button,mods,0,x,y,data>>>0]});
 const only=process.argv.find(a=>a.startsWith('--apps='))?.slice(7).split(',');
-for(const app of only||['template','gallery','Kritzel','PaintCraft','jfWord']){
+for(const app of only||['template','gallery','Kritzel','jfWord']){
   const one=await appWorker(app),batch=await appWorker(app);
   const initial=one.hash();assert.equal(batch.hash(),initial);
   // Curves, repeated pressure changes and release must not collapse to an endpoint.
@@ -57,7 +57,7 @@ for(const app of only||['template','gallery','Kritzel','PaintCraft','jfWord']){
   for(const message of steps)await one.send(message);
   for(let i=0;i<steps.length;i+=19){await batch.send({type:'batch',messages:steps.slice(i,i+19)});await batch.fullCheck();}
   assert.equal(batch.hash(),one.hash(),`${app}: batched strokes/keys equal individually rendered input`);
-  if(app==='Kritzel'||app==='PaintCraft')assert.notEqual(one.hash(),initial,'drawing changes the image');
+  if(app==='Kritzel')assert.notEqual(one.hash(),initial,'drawing changes the image');
   await one.fullCheck();
   // Menu overlay, close, resize and expose do not leave stale pixels behind.
   for(const message of [event(5,0,0,0,18,4),event(6,0,0,0,18),event(5,0,0,0,27),event(6,0,0,0,27),
@@ -74,7 +74,7 @@ for(const app of only||['template','gallery','Kritzel','PaintCraft','jfWord']){
   const result={app,ok:true,strokeChanged:one.hash()!==initial,idle,hover};results.push(result);console.log(JSON.stringify(result));
 }
 // DPI and patch bounds at narrow/high-density viewports.
-for(const app of ['PaintCraft','gallery'].filter(a=>!only||only.includes(a)))for(const dpi of [144,192]){
+for(const app of ['gallery'].filter(a=>!only||only.includes(a)))for(const dpi of [144,192]){
   const instance=await appWorker(app,950,1268,dpi);
   for(let i=0;i<12;i++){await instance.send(event(1,420+i*10,700));await instance.fullCheck();}
   results.push({app,dpi,ok:true});

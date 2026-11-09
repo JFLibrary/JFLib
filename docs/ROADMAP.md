@@ -848,7 +848,7 @@ Fensterrand hinaus.
   Fokusstopp, Strg+Bild auf / ab, `DockState::focus` für Kommandos). Getestet mit
   `apps/docktest` (8 Skripte, Windows und Linux). PaintCraft behält seine eigene Platzierung
   schwebender Paletten im Hauptfenster (anderes Modell,
-  [`dock.rs`](../apps/PaintCraft/src/workspace/panels/dock.rs)).
+  [`dock.rs`](https://github.com/JFLibrary/JFPainter/blob/main/src/workspace/panels/dock.rs), heute in JFPainter).
 - **P2** · *erledigt* · Allgemeine Undo/Redo-History für Apps
   ([`ui/history.rs`](../lib/ui/history.rs)): `History<S>` mit `Edit` (apply / revert / merge),
   `Snapshot` für kleine Zustände, Gruppen, Grenze, gespeicherter Stand (`dirty`), `undo_keys()`
@@ -1986,7 +1986,7 @@ Fensterrand hinaus.
     Browser auf einem echten Telefon ist nur in Chromiums Emulation geprüft.
 - **P2** · *erledigt, auf dem Gerät noch zu prüfen* (2026-11-01) · Finger auf dem Desktop, angestoßen von PaintCraft auf einem
   Surface ([GUIDE §37](GUIDE.md), [`lib/plat/win_touch.rs`](../lib/plat/win_touch.rs),
-  [`apps/PaintCraft/docs/TOUCH.md`](../apps/PaintCraft/docs/TOUCH.md)):
+  [`docs/TOUCH.md`](https://github.com/JFLibrary/JFPainter/blob/main/docs/TOUCH.md) von JFPainter):
   - Windows: `WM_POINTER` statt Maus-Emulation (kein Strg + Rad aus dem Pinch, keine Rechtsklicks), mehrere Finger mit Id;
     ein Finger über einem Fensterrahmen gehört dem Fenster, dessen Inhalt darunter liegt (der breite Kontakt traf sonst den
     unsichtbaren Rahmen eines Werkzeugfensters); ein Fenster folgt dem Finger selbst (`begin_move`). Bildschirmtastatur über

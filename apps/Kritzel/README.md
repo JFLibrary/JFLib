@@ -6,7 +6,7 @@ brushes, shapes, text, selections, and a layer panel in a compact desktop interf
 
 Use it for sketches, annotations, cropping, resizing, and simple image edits. For
 more image formats, layered PDN documents, effects, and plugins, see
-[PaintCraft](../PaintCraft/README.md).
+[JFPainter](https://github.com/JFLibrary/JFPainter).
 
 ![Kritzel with the WinUI style, drawing toolbar, color palette, and a canvas containing text and shapes](../../docs/images/readme/kritzel-winui.png)
 
@@ -47,7 +47,7 @@ Text and shapes also become raster pixels when committed.
 
 The canvas uses 8-bit color channels, and Kritzel has no animation editor. Additional
 JFLib codecs such as TIFF, WebP, AVIF, HEIC, JPEG XL, PDN, and PSD are available
-through [PaintCraft](../PaintCraft/README.md#supported-file-formats); they are not
+through [JFPainter](https://github.com/JFLibrary/JFPainter#supported-file-formats); they are not
 wired into this app's file workflow.
 
 ## Build and run
@@ -152,11 +152,11 @@ python build_rs.py app Kritzel --target win --style classic --out build/kritzel-
 - **Layer-preserving files:** the app has an editable layer stack, but PNG, JPEG,
   BMP, and GIF exports are flattened. A dedicated project format is not implemented.
 - **More file formats:** the Open/Save workflow currently exposes only the four
-  core formats above; wider format support is available in PaintCraft.
+  core formats above; wider format support is available in JFPainter.
 - **Localization and accessibility:** the current UI uses German labels;
   accessibility remains a shared [JFLib TODO](../../Todo.md).
 - **Plugins:** Kritzel has no plugin host. Work on original paint.net plugin
-  compatibility belongs to [PaintCraft](../PaintCraft/README.md#original-paintnet-plugins).
+  compatibility belongs to [JFPainter](https://github.com/JFLibrary/JFPainter#original-paintnet-plugins).
 
 ## License
 
@@ -168,4 +168,4 @@ Kritzel is released under the MIT License; see [license.txt](license.txt).
 - [Build Manager](../buildManager/README.md)
 - [Shared UI styles](../../README.md#styles)
 - [Packaging guide](../../docs/PACKAGING.md)
-- [PaintCraft and its extended format support](../PaintCraft/README.md)
+- [JFPainter and its extended format support](https://github.com/JFLibrary/JFPainter)

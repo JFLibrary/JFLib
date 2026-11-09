@@ -63,7 +63,7 @@ try{
   for(const engine of ['chromium','firefox']){
     const browser=await pw[engine].launch({headless:true,...(engine==='chromium'?chromiumOptions():{})});
     try{
-      for(const variant of Object.keys(roots).reverse())for(const app of ['template','gallery','Kritzel','PaintCraft','jfWord']){
+      for(const variant of Object.keys(roots).reverse())for(const app of ['template','gallery','Kritzel','jfWord']){
         const context=await browser.newContext({locale:'de-DE',viewport:{width:1280,height:838}}),page=await context.newPage(),errors=[];
         page.on('pageerror',e=>errors.push(String(e)));
         await page.addInitScript(instruments);
@@ -83,7 +83,7 @@ try{
             assert.equal(slow.maxFlight,1);assert.ok(slow.frames<=4);assert.ok(slow.elapsedMs<700);
             await page.evaluate(()=>{window.__renderStats.delay=0;});
             // Close a real modal before the resize; partial presentation must not keep it.
-            if(app==='PaintCraft'||app==='Kritzel'){
+            if(app==='Kritzel'){
               await page.locator('#input').press('Control+n');await settle(page);
               await page.locator('#input').press('Escape');await settle(page);
             }
@@ -98,7 +98,7 @@ try{
         }catch(error){results.push({engine,variant,app,ok:false,error:String(error.stack||error),errors});console.error(`${engine} ${variant} ${app}: ${error.stack||error}`);await page.screenshot({path:resolve(artifact,`${engine}-${variant}-${app}-failure.png`)}).catch(()=>{});}
         finally{await context.close();}
       }
-      for(const app of ['Kritzel','PaintCraft']){
+      for(const app of ['Kritzel']){
         const context=await browser.newContext({locale:'de-DE',viewport:{width:640,height:838},deviceScaleFactor:2}),page=await context.newPage();
         await page.addInitScript(instruments);
         try{

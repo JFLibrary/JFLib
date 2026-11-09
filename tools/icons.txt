@@ -173,7 +173,7 @@ Bell                EA8F
 Backspace           E750
 Return              E751
 
-# --- PaintCraft (agent A0): chrome and tool placeholders -------------------------------------
+# --- JFPainter, then PaintCraft (agent A0): chrome and tool placeholders -------------------------------------
 ClearSelection      E8E6    # dashed rectangle with arrow (Auswahl aufheben)
 Scan                E8FE    # scanner (Übernehmen > Von Scanner oder Kamera)
 Ruler               ED5E    # ruler (Lineale)
@@ -182,6 +182,6 @@ SaveCopy            EA35    # two disks (Alles speichern)
 MagicSelect         EB1D    # dashed square with sparkle (Zauberstab placeholder)
 TouchPointer        F271    # pointing hand (Ausschnitt verschieben placeholder)
 
-# --- PaintCraft (agent A2): history window -------------------------------------------------------
+# --- JFPainter, then PaintCraft (agent A2): history window -------------------------------------------------------
 Previous            E892    # bar + left triangle (Verlauf: Zum Anfang / Alles rückgängig machen)
 Next                E893    # right triangle + bar (Verlauf: Zum Ende / Alles wiederherstellen)

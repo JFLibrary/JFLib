@@ -2,8 +2,8 @@
 // module (the module runtime modules/modrt, which has a copy of this file) exchange
 //                                                                       [jxl-module: no asm]
 //
-// A module is a no_std cdylib linked against nothing (no imports; built and checked like a
-// Rust PaintCraft plugin, build_rs.py section jxl-module) that exports exactly one function
+// A module is a no_std cdylib linked against nothing (no imports; built and checked as
+// build_rs.py's sections jxl-module and "loader checks" say) that exports exactly one function
 //
 //     <name>_module(host: *const HostTable) -> *const ModTable          extern "win64"
 //

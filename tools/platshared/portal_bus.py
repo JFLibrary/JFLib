@@ -3,7 +3,7 @@
 session bus, the assembly next to the Rust build wherever the assembly can run them headless
 (agent plat-shared, R4).  Run inside WSL / Linux from the repository root:
 
-  python3 tools/platshared/portal_bus.py [--ref build/rwref] [--rs build] [--only open,url,filedlg,print]
+  python3 tools/platshared/portal_bus.py [--ref build/rwref] [--rs build] [--only open,url,filedlg]
 
 The fake bus (SASL EXTERNAL, NEGOTIATE_UNIX_FD, little-endian messages, SCM_RIGHTS) plays
 org.freedesktop.portal.Desktop.  Every message a client sends is recorded raw.
@@ -22,17 +22,14 @@ org.freedesktop.portal.Desktop.  Every message a client sends is recorded raw.
            Response's uri (host, %XX) and current_filter -> path + index, the extension added
            when saving, cancel (1), no portal (error reply), no bus; canonical marshalling;
            FD_FOLDER (OpenFile with "directory", the folder as current_folder, no filters)
-  print    tools/print_portal_bus.py's cases for the assembly's PaintCraft (script: Drucken...)
-           and plattest --test printjob --case 0: PreparePrint / Print byte for byte, the PDF
-           in the descriptor byte for byte (and checked like print_check.py), the results
+(The print cases ran PaintCraft, which moved to its own repository, JFLibrary/JFPainter, in
+2026-11; the other bus tools in this folder import the marshalling below.)
 Exit code 0 = passed.
 """
 import argparse, os, socket, struct, subprocess, sys, tempfile, threading
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tools"))
-import print_check as pc  # noqa: E402
 
 TMP = tempfile.mkdtemp(prefix="psbus")
 MM = 72 / 25.4
@@ -556,66 +553,11 @@ def suite_filedlg(rs):
 
 
 # ------------------------------------------------------------------ print: asm vs Rust
-def suite_print(ref, rs):
-    out = ref  # PaintCraft's --config goes below the reference folder (this worktree's copy)
-    work = Path(TMP) / "print"
-    work.mkdir()
-    px = pc.make_pixels()
-    png = work / "druck_test.png"
-    pc.write_png(png, px)
-
-    def asm(error=None, tag="x"):
-        scr = work / f"asm_{tag}.uis"
-        pc.script(scr, [], None, error)
-        return [f"./{ref}/linux/PaintCraft", "--config", f"{out}/cfg", "--open", str(png), "--script", str(scr)]
-
-    def rust(expect=0):
-        return [f"./{rs}/linux/plattest", "--test", "printjob", "--case", "0", "--expect", str(expect)]
-
-    portal = {"jfgui_PRINT_PORTAL": "1"}
-    ra, la, wa, oa = run(asm(tag="ok"), "ok", env_extra=portal, wait=25)
-    rr, lr, wr, orr = run(rust(), "ok", env_extra=portal, wait=25)
-    check("print ok: Rust printed", rr == 0, orr[-400:])
-    check(f"print ok: SASL + {len(wa)} messages byte for byte (Hello, AddMatch, PreparePrint, AddMatch, Print)",
-          wa == wr and len(wa) >= 8, (strs(la), strs(lr)))
-    fa = [a for a in la if isinstance(a, tuple) and a[0] == "fd"]
-    fr = [a for a in lr if isinstance(a, tuple) and a[0] == "fd"]
-    check("print ok: one descriptor, the PDF byte for byte", fa and fr and fr[0][1] == 1 and fr[0][2] == 1 and fa[0][3] == fr[0][3],
-          (len(fa and fa[0][3]), len(fr and fr[0][3])))
-    if fr and fr[0][3]:
-        lay = pc.layout(0, 0, 0, 100, 1, 5, page=(279.4 * MM, 215.9 * MM), insets=(6.35 * MM,) * 4)
-        pc.check_ours("print ok: portal PDF (Letter landscape from the page setup)", fr[0][3], px, lay)
-    prep = args_of(lr, "PreparePrint")
-    if prep:
-        parent, title, settings, setup, opts = prep[0][2]
-        check("print ok: PreparePrint suggests A4 portrait, modal, handle_token",
-              title == "druck_test.png" and settings == {"orientation": ("s", "portrait")}
-              and setup.get("Name") == ("s", "iso_a4") and setup.get("Width") == ("d", 210.0) and setup.get("Height") == ("d", 297.0)
-              and opts.get("modal") == ("b", 1) and opts.get("handle_token", ("s", ""))[1].startswith("jfgui"), prep[0][2])
-        check("print ok: PreparePrint canonical marshalling", W().all("ssa{sv}a{sv}a{sv}", prep[0][2]) == prep[0][3])
-    pr = args_of(lr, "Print")
-    check("print ok: Print(parent, title, h 0, {handle_token, modal, token})",
-          pr and pr[0][2][1] == "druck_test.png" and pr[0][2][2] == 0 and pr[0][2][3].get("token") == ("u", TOKEN), pr)
-    cases = [("cancel", -14, None, True, True), ("noportal", -9, pc.MSG_UNSUPPORTED, True, True),
-             ("printfail", -13, pc.MSG_FAIL, True, True), ("nofd", -9, pc.MSG_UNSUPPORTED, True, True),
-             ("ok", -9, pc.MSG_UNSUPPORTED, False, True), ("ok", -9, pc.MSG_UNSUPPORTED, True, False)]
-    for mode, want, err, penv, bus in cases:
-        name = f"print {mode}{'' if penv else ' (no jfgui_PRINT_PORTAL)'}{'' if bus else ' (no bus)'}"
-        env = portal if penv else {}
-        w = 3 if not penv else 25
-        ra, la, wa, oa = run(asm(err, tag=mode), mode, bus=bus, env_extra=env, wait=w)
-        rr, lr, wr, orr = run(rust(want), mode, bus=bus, env_extra=env, wait=w)
-        check(f"{name}: Rust -> {want}", rr == 0, orr[-300:])
-        check(f"{name}: SASL + {len(wa)} messages byte for byte", wa == wr, (strs(la), strs(lr)))
-        if not penv:
-            check(f"{name}: no bus contact", not any(l.startswith("AUTH") for l in strs(lr)), lr)
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ref", default=os.environ.get("jfgui_REF_REL", "build/rwref"))
     ap.add_argument("--rs", default="build")
-    ap.add_argument("--only", default="open,url,filedlg,print")
+    ap.add_argument("--only", default="open,url,filedlg")
     a = ap.parse_args()
     only = a.only.split(",")
     if "open" in only:
@@ -624,8 +566,6 @@ def main():
         suite_url(a.rs)
     if "filedlg" in only:
         suite_filedlg(a.rs)
-    if "print" in only:
-        suite_print(a.ref, a.rs)
     print("portal_bus:", "all passed" if fails == 0 else f"{fails} FAILED")
     return 1 if fails else 0
 

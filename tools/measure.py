@@ -11,7 +11,7 @@ the frozen assembly reference (legacy/, binaries in build/rwref).
         the biggest symbols / crates from the .map files
   python tools/measure.py sizexp [--variants a,b] [--apps ...] [--targets win,linux] [--no-speed]
         size-oriented release settings (opt-level s / z, LTO variants, codegen units, per-crate
-        opt levels, linker flags): size of gallery / Kritzel / PaintCraft and speed checks per variant
+        opt levels, linker flags): size of gallery / Kritzel and speed checks per variant
   python tools/measure.py speed  [--parts startup,bench,scripts,codec,tools] [--targets ...] [--runs N]
         start-up + first frame, frame build / render times (`bench` script command), every
         apps/*/tests/*.uis, codec conversions (12 MP), the check tools' bench suites;
@@ -552,7 +552,7 @@ def cmd_size(a):
                 res["ref_equal"][f"{name}_{t}"] = same_as_ref(fa, fr)
         res["apps"][name] = row
     # where the bytes are: the Linux maps (exact input-section sizes)
-    for name in ("template", "gallery", "Kritzel", "PaintCraft", "codectest"):
+    for name in ("template", "gallery", "Kritzel", "codectest"):
         for mode in ("dev", "rel"):
             mp = M / mode / "linux" / (name + ".map")
             if mp.exists():
@@ -601,7 +601,7 @@ def print_size(res):
     print("\n| App / Build | Code | RO-Daten | Daten | Relocs | Unwind | Rest |")
     print("|---|---|---|---|---|---|---|")
     for key, g in res["groups"].items():
-        if key.split("_")[0] in ("gallery", "Kritzel", "PaintCraft", "template", "codectest"):
+        if key.split("_")[0] in ("gallery", "Kritzel", "template", "codectest"):
             print(f"| {key} | {fmt_kb(g['code'])} | {fmt_kb(g['rodata'])} | {fmt_kb(g['data'])} | "
                   f"{fmt_kb(g['reloc'])} | {fmt_kb(g['unwind'])} | {fmt_kb(g['other'])} |")
     for key, b in res["breakdown"].items():
@@ -748,7 +748,7 @@ def impl_exe(impl, name, target):
 
 
 # ---------------------------------------------------------------- start-up, frame times
-GUI_APPS = ["template", "gallery", "Kritzel", "PaintCraft"]
+GUI_APPS = ["template", "gallery", "Kritzel"]
 BENCH_RE = re.compile(r"bench: frame build (\d+) us, full render (\d+) us, unchanged frame (\d+) us \((\d+)x(\d+) px\)")
 
 
@@ -799,12 +799,10 @@ def speed_startup(targets, impls, reps):
 # ---------------------------------------------------------------- the .uis scripts
 def speed_scripts(targets, impls, reps, apps=None):
     """every apps/NAME/tests/*.uis (as build_rs.py test runs them): wall time, best of reps"""
-    from build_rs import plugin_test_dir, script_args
+    from build_rs import script_args
     out = {}
     for t in targets:
         jobs, keys = [], []
-        for impl in impls:
-            plugin_test_dir(IMPL_DIRS[impl], t, REF)          # PaintCraft's --plugins=@ptest
         for name in sorted(APPS_RS, key=str.lower):
             if apps and name not in apps:
                 continue
@@ -1205,7 +1203,7 @@ def seed_variant(name, seed, targets):
     """nothing to seed any more: every variant builds in a Cargo folder of its own (build_rs.py)"""
 
 
-XP_APPS = ["gallery", "Kritzel", "PaintCraft", "codectest", "efftest"]
+XP_APPS = ["gallery", "Kritzel", "codectest", "efftest"]
 
 
 def variant_dir(name):
@@ -1240,7 +1238,7 @@ def cmd_sizexp(a):
     res = load("sizexp")
     targets = a.targets.split(",")
     names = a.variants.split(",") if a.variants else ["rel"] + [n for n, v in VARIANTS.items() if not v.get("extra")]
-    gui = ["gallery", "Kritzel", "PaintCraft"]
+    gui = ["gallery", "Kritzel"]
     stg = a.speed_targets.split(",")
     for name in names:
         r = res.setdefault(name, {})
@@ -1279,7 +1277,7 @@ def cmd_sizexp(a):
 
 
 def speed_variants(res, names, targets, runs):
-    """the speed checks of each variant: start-up, frame times, the Kritzel / PaintCraft scripts,
+    """the speed checks of each variant: start-up, frame times, the Kritzel scripts,
     codec conversions (12 MP), effects; with asm and the default release as reference"""
     impls = ["asm"]
     for name in ["rel"] + [n for n in names if n != "rel"]:
@@ -1290,7 +1288,7 @@ def speed_variants(res, names, targets, runs):
     impls = list(dict.fromkeys(impls))
     sp = {}
     sp["startup"] = speed_startup(targets, impls, runs)
-    sp["scripts"] = speed_scripts(targets, impls, 2, apps=["Kritzel", "PaintCraft"])
+    sp["scripts"] = speed_scripts(targets, impls, 2, apps=["Kritzel"])
     sp["codec"] = speed_codec(targets, impls, 2, fmts=XP_CODEC)
     sp["fx"] = speed_fx(targets, impls, only=XP_FX)
     res["_speed"] = sp
@@ -1320,15 +1318,15 @@ def print_sizexp(res):
     if not sp:
         return
     impls = [k for k in next(iter(sp["startup"].values()))["gallery"].keys()]
-    print("\n| Variante | Target | Start gallery/Kritzel/PaintCraft (ms) | Frame+Render 1080p gallery/Kritzel/PaintCraft (µs) | Skripte Kritzel + PaintCraft (s) | Codecs dekodieren+kodieren (s) | Effekte (s) |")
+    print("\n| Variante | Target | Start gallery/Kritzel (ms) | Frame+Render 1080p gallery/Kritzel (µs) | Skripte Kritzel (s) | Codecs dekodieren+kodieren (s) | Effekte (s) |")
     print("|---|---|---|---|---|---|---|")
     for t in sp["startup"]:
         for impl in impls:
             st = sp["startup"][t]
-            starts = "/".join(f"{(st[a].get(impl, {}).get('start') or 0) * 1000:.0f}" for a in ("gallery", "Kritzel", "PaintCraft"))
+            starts = "/".join(f"{(st[a].get(impl, {}).get('start') or 0) * 1000:.0f}" for a in ("gallery", "Kritzel"))
             frames = "/".join(f"{(st[a].get(impl, {}).get('bench_1920x1080') or [0, 0])[0]}+"
-                              f"{(st[a].get(impl, {}).get('bench_1920x1080') or [0, 0])[1]}" for a in ("gallery", "Kritzel", "PaintCraft"))
-            scr = sum((e.get(impl) or 0) for app in ("Kritzel", "PaintCraft") for e in sp["scripts"].get(t, {}).get(app, {}).values())
+                              f"{(st[a].get(impl, {}).get('bench_1920x1080') or [0, 0])[1]}" for a in ("gallery", "Kritzel"))
+            scr = sum((e.get(impl) or 0) for app in ("Kritzel",) for e in sp["scripts"].get(t, {}).get(app, {}).values())
             cod = sum((e.get(w, {}).get(impl) or 0) for f, e in sp["codec"].get(t, {}).items() if not f.startswith("_")
                       for w in ("dec", "enc"))
             fxe = sp["fx"].get(t, {}).get(impl, {})

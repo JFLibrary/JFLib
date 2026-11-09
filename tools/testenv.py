@@ -1,21 +1,17 @@
 """testenv.py -- shared environment for tools that start real app windows.
 
-PaintCraft saves its settings when a real window closes (apps/PaintCraft/docs/SETTINGS.md).  Test
-tools must never create the user's real configuration (%APPDATA%/PaintCraft, ~/.config/PaintCraft),
-so importing this module points PaintCraft_CONFIG_DIR at build/test_cfg (unless it is already set)
-and passes it on to WSL processes (WSLENV, path translated).
-
 Apps with a catalogue follow the system's languages in a real window, the tools look for German
-texts: jfgui_LANG=de (unless it is already set), passed on the same way.
+texts: importing this module sets jfgui_LANG=de (unless it is already set) and passes it on to WSL
+processes (WSLENV).  (It also kept PaintCraft's settings in build/test_cfg through
+PaintCraft_CONFIG_DIR, until the app moved to its own repository, JFLibrary/JFPainter, in 2026-11.)
 """
 import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-os.environ.setdefault("PaintCraft_CONFIG_DIR", str(ROOT / "build" / "test_cfg"))
 os.environ.setdefault("jfgui_LANG", "de")
-_wslenv = [e for e in os.environ.get("WSLENV", "").split(":") if e and not e.startswith(("PaintCraft_CONFIG_DIR", "jfgui_LANG"))]
-os.environ["WSLENV"] = ":".join(_wslenv + ["PaintCraft_CONFIG_DIR/p", "jfgui_LANG"])
+_wslenv = [e for e in os.environ.get("WSLENV", "").split(":") if e and not e.startswith("jfgui_LANG")]
+os.environ["WSLENV"] = ":".join(_wslenv + ["jfgui_LANG"])
 
 
 def build_cmd(app, target, out):

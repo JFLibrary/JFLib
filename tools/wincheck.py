@@ -36,7 +36,7 @@ import ctypes.wintypes as wt
 import json
 import os
 import subprocess
-import testenv  # noqa: F401  (keeps PaintCraft away from the user's settings)
+import testenv  # noqa: F401  (German texts in real windows)
 import sys
 import time
 

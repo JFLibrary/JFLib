@@ -7,9 +7,9 @@
 //        patterns) -- tools/platshared/print_rs_check.py replays print_check.py's layout
 //   plattest --test printjob --case N [--expect E]   one job of tools/print_check.py's CASES
 //        through plat::print (its 37 x 23 straight RGBA test image, title "druck_test.png",
-//        the resolution chain of PaintCraft for a PNG pHYs): with jfgui_PRINT_TO / _PRINTER /
+//        the resolution chain of JFPainter (then PaintCraft) for a PNG pHYs): with jfgui_PRINT_TO / _PRINTER /
 //        _SMASK / _PORTAL set by the caller.  The zlib hook is img_core's deflate (the PDF is
-//        byte-identical to PaintCraft's).  Prints "print: result R, copies C, page W x H".
+//        byte-identical to PaintCraft's, now JFPainter's).  Prints "print: result R, copies C, page W x H".
 //                     [ASMLIB/src/plat/print.s, img/pdfwrite.s; tools/print_check.py]
 
 use alloc::format;
@@ -51,7 +51,7 @@ const CASES: [(u32, bool, u32, u32, bool, u32, u32); 3] = [
     (2, false, PJS_DPI, 100, true, 12, 11811), // 300 dpi as a PNG stores it
 ];
 
-/// the dpi PaintCraft derives from a PNG pHYs: img ppm_dpi (16.16) -> set_dpi (per cm) ->
+/// the dpi JFPainter (then PaintCraft) derives from a PNG pHYs: img ppm_dpi (16.16) -> set_dpi (per cm) ->
 /// print_dpi; no pHYs: 96
 fn png_dpi(ppm: u32) -> f64 {
     if ppm == 0 {

@@ -1,29 +1,24 @@
 # platshared -- the plat-shared acceptance tools (agent plat-shared, R4)
 
-Printing, the xdg-desktop-portal client, the plugin loader / crash guard and the monitor
-profile of `lib/plat` against the assembly reference.  Nothing here opens a real dialog,
-touches a printer (only "Microsoft Print to PDF" into files) or the user's clipboard.
+The xdg-desktop-portal client and the monitor profile of `lib/plat` against the assembly
+reference, and fake buses for the other Linux services (Rust only).  Nothing here opens a real
+dialog or touches the user's clipboard.  (The print, clipboard and plugin-loader comparisons went
+with PaintCraft to its own repository, JFLibrary/JFPainter, in 2026-11.)
 
 The tools need a copy of the reference build inside the checkout they run in (WSL paths are
 repo-relative):
 
-    mkdir -p build/rwref/win build/rwref/linux build/rwref/plugins/win build/rwref/plugins/linux
-    copy <ref>/win/{PaintCraft,gfxtest,codectest,template}.exe  -> build/rwref/win/
-    copy <ref>/linux/{PaintCraft,gfxtest,codectest,template}    -> build/rwref/linux/
-    copy <asm build>/{win,linux}/plugins/*           -> build/rwref/plugins/{win,linux}/
-         (python build.py plugin --target both --out <asm build>)
+    mkdir -p build/rwref/win build/rwref/linux
+    copy <ref>/win/{gfxtest,codectest}.exe  -> build/rwref/win/
+    copy <ref>/linux/{gfxtest,codectest}    -> build/rwref/linux/
     python build_rs.py app plattest --target both
-    python build_rs.py app template --target both
     python tools/platshared/accept.py
 
 | Tool | What |
 |---|---|
-| `accept.py` | everything below + the monitor profile (plattest --test icc against codectest op 325) |
-| `print_rs_check.py` | layout replay; jfgui_PRINT_TO PDFs byte for byte with PaintCraft (Linux); Microsoft Print to PDF files byte for byte apart from their dates (Windows) |
-| `clip_rs_check.py` | clip_check.py's DIB / BMP variants through template's `clip dib` / `clip file` + `clip save bmp`: the BMPs byte for byte with the assembly, the expected pixels, invalid DIBs refused |
-| `lib_check.py` | plattest --test guard / guardcrash / lib (the assembly's test plugins); loader fuzz counts against PaintCraft --plugin-fuzz |
+| `accept.py` | `portal_bus.py` and `icc_x11.py` + the monitor profile (plattest --test icc against codectest op 325); the print, clipboard and plugin-loader comparisons imported PaintCraft's check scripts and went with the app (JFLibrary/JFPainter, 2026-11) |
 | `icc_x11.py` | (inside WSL) a raw X11 client sets / restores the root window's _ICC_PROFILE around plattest --test iccx11 (valid, invalid, above 1 MB, none) |
-| `portal_bus.py` | (inside WSL) fake session bus: OpenDirectory / OpenURI (gfxtest --open) and Print (PaintCraft) byte for byte; FileChooser and OpenURI of plattest --test portal checked |
+| `portal_bus.py` | (inside WSL) fake session bus: OpenDirectory / OpenURI (gfxtest --open) byte for byte; FileChooser and OpenURI of plattest --test portal checked |
 | `tray_bus.py` | (inside WSL, Rust only) fake session bus playing StatusNotifierWatcher, a panel and org.freedesktop.Notifications against plattest --test tray-bus: item properties, dbusmenu layout and clicks, Notify, ActionInvoked |
 | `settings_bus.py` | (inside WSL, Rust only) fake settings portal (ReadAll: appearance, GNOME interface, a11y, mouse, wm.preferences) against plattest --test settings-bus: theme, accent (ddd), contrast, motion, text scale (d), blink and double-click times, font smoothing / hinting / subpixel order, the title bar's button-layout and click actions; a second run without appearance keys against --test settings-bus-files: GTK's settings.ini and KDE's kdeglobals in a scratch XDG_CONFIG_HOME fill in |
 | `life_bus.py` | (inside WSL, Rust only) fake system bus (logind PrepareForSleep) and session bus (settings portal SettingChanged, a connection per client) against plattest --test life-bus: E_POWER, E_SETTINGS (SET_THEME, SET_FONTS, SET_OTHER for button-layout), a kdeglobals renamed into place in a scratch XDG_CONFIG_HOME (inotify: one E_SETTINGS), then SIGTERM: E_SESSION_END |

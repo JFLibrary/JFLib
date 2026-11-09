@@ -17,10 +17,8 @@ Runs the rstest ops `pdraster` and `pdfuzz` (apps/rstest/src/ops_dash.s):
   prefixes) each copied to the end of a page mapping (reads past it would fault), parsed,
   emitted, dash-stroked, rasterized; every line must report a result, and the result
   (ok / error class) must agree with the Python parser.
-* --xaml N (default 40, 0 = off; needs build/.../PaintCraft): N mutated ShapeKit XAML files
-  (apps/PaintCraft/tests/fixtures/shapes + random geometry) are loaded by PaintCraft's shape
-  library (hook cmd 795 8<<16|2, folder in PDN_SHAPES_DIR) and every loaded shape is drawn;
-  the script must end normally.
+(The XAML fuzz through PaintCraft's shape library went with the app to its own repository,
+JFLibrary/JFPainter, in 2026-11.)
 """
 
 import argparse
@@ -444,59 +442,6 @@ def fuzz_lines(n, seed):
     return out
 
 
-def xaml_fuzz(target, out, n, seed=77):
-    """PaintCraft loads n mutated XAML files and draws every custom shape; 0 = ok"""
-    exe = out / target / ("PaintCraft.exe" if target == "win" else "PaintCraft")
-    if n <= 0 or not exe.exists():
-        return 0
-    rng = random.Random(seed)
-    d = out / "xamlfuzz" / target
-    shutil.rmtree(d, ignore_errors=True)
-    d.mkdir(parents=True)
-    fx = sorted((ROOT / "apps/PaintCraft/tests/fixtures/shapes").glob("*.xaml"))
-    base = [f.read_bytes() for f in fx]
-    geo = fuzz_lines(n, seed)
-    for i in range(n):
-        if i % 2:
-            b = bytearray(rng.choice(base))
-            for _ in range(rng.randrange(1, 8)):
-                j = rng.randrange(len(b) + 1)
-                op = rng.randrange(4)
-                if op == 0 and j < len(b):
-                    del b[j]
-                elif op == 1:
-                    b.insert(j, rng.choice(b'<>/"= &;#xMLZ0123456789.,-'))
-                elif op == 2 and j < len(b):
-                    b[j] = rng.randrange(256)
-                else:
-                    del b[j:]
-        else:
-            b = ('<ps:SimpleGeometryShape DisplayName="F%d &amp; &#x41;&#66;" Geometry="%s"/>'
-                 % (i, geo[i].replace('"', ''))).encode("utf-8", "surrogateescape")
-        (d / ("f%03d.xaml" % i)).write_bytes(bytes(b))
-    lines = ["size 800 600", "key o", "key o", "cmd 795 524290"]
-    for i in range(29, 29 + n):
-        lines += ["cmd 795 %d" % (4 << 16 | i), "cmd 795 %d" % (5 << 16 | (i % 3)),
-                  "drag 300,200 %d,%d" % (340 + i % 50, 250 + i % 40), "key enter"]
-    lines += ["cmd 795 262144"]
-    scr = d / "run.uis"
-    scr.write_text("\n".join(lines) + "\n")
-    rel = lambda p: str(Path(p).resolve().relative_to(ROOT)).replace("\\", "/")
-    if target == "win":
-        cmd = [str(exe), "--script", rel(scr)]
-        env = dict(os.environ, PDN_SHAPES_DIR=rel(d))
-    else:
-        cmd = ["wsl.exe", "-d", "Ubuntu-24.04", "--cd", str(ROOT), "-e", "env",
-               "PDN_SHAPES_DIR=" + rel(d), "./" + rel(exe), "--script", rel(scr)]
-        env = None
-    res = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, env=env, timeout=600)
-    ok = res.returncode == 0 and "crash" not in (res.stdout + res.stderr)
-    print(f"[{target}] xaml fuzz: {n} files, exit {res.returncode}: {'ok' if ok else 'FAIL'}")
-    if not ok:
-        print(res.stdout[-2000:], res.stderr[-2000:])
-    return 0 if ok else 1
-
-
 def check_target(target, out, a):
     R = Runner(target, out, name="pdcheck")
     fails = 0
@@ -597,13 +542,11 @@ def main():
     ap.add_argument("--out", default="build/t4")
     ap.add_argument("--fuzz", type=int, default=2000)
     ap.add_argument("--keep", action="store_true")
-    ap.add_argument("--xaml", type=int, default=40)
     a = ap.parse_args()
     out = (ROOT / a.out).resolve()
     fails = 0
     for t in (["win", "linux"] if a.target == "both" else [a.target]):
         fails += check_target(t, out, a)
-        fails += xaml_fuzz(t, out, a.xaml)
     sys.exit(1 if fails else 0)
 
 

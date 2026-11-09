@@ -1471,7 +1471,7 @@ if (desc.render)(&args, &mut dst) == 0 {
   `FxArgs::job`); `FXF_BANDS` wants full-width bands, `FXF_WHOLE` one call. The output never
   depends on the split. Pass a selection mask as `FxArgs::sel` and blend the result back through
   it with `gfx::straight::lerp_mask_row`.
-* `fx::register(&GROUP)` adds effects of your own; PaintCraft plugins add effects through the
+* `fx::register(&GROUP)` adds effects of your own; JFPainter's plugins add effects through its
   plugin ABI (section 14).
 
 ## 11. Styles, theme, fonts
@@ -1650,9 +1650,8 @@ if (desc.render)(&args, &mut dst) == 0 {
   `build_rs.py watch`; development builds, §30), `jfgui_EDITOR` / `jfgui_SRC` (the inspector's
   editor command and source folder; development builds, §30).
 * **Never start an app without `--shot`, `--script` or `--auto-close`**: a plain start opens a
-  real window on the user's desktop. PaintCraft saves its settings when a real window closes:
-  every real-window run needs `--config build/<name>/cfg` (the capture tools set
-  `PaintCraft_CONFIG_DIR`).
+  real window on the user's desktop. An app that saves its settings when a real window closes
+  needs its own test folder for every real-window run (JFPainter: `--config build/<name>/cfg`).
 * Linux binaries run through WSL:
   `wsl.exe -d Ubuntu-24.04 --cd <repo> -e ./build/linux/NAME --script apps/NAME/tests/x.uis`
   (`jfgui_BACKEND=x11` through `-e env jfgui_BACKEND=x11 ./build/linux/NAME ...`).
@@ -1857,11 +1856,12 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
 
 ## 14. Plugins
 
-PaintCraft loads effects, file types and shapes from plugins (DLL / .so). Plugins written in Rust
-use the crate `lib/plugin` (safe `Effect` / `FileType` traits over the PNAPI ABI) and are
-built with `python build_rs.py plugin NAME`; see `plugins/README.md` and
-`apps/PaintCraft/docs/PLUGINS.md`. The plugin ABI belongs to this repository: it is not published
-as a crate.
+JFPainter (until November 2026 PaintCraft in this repository) loads effects, file types and shapes
+from plugins (DLL / .so). Its plugin ABI, the crate for plugins written in Rust and the plugins
+themselves belong to [its repository](https://github.com/JFLibrary/JFPainter) ([`plugins/README.md`](https://github.com/JFLibrary/JFPainter/blob/main/plugins/README.md),
+[`docs/PLUGINS.md`](https://github.com/JFLibrary/JFPainter/blob/main/docs/PLUGINS.md)); JFLib publishes no plugin ABI. What the library
+gives such a host: `plat`'s own loader, which checks a library before it runs any of its code
+(`lib/plat/win_lib.rs`, `linux_elfload.rs`), and the crash guard around calls into it.
 
 ## 15. Data views and app shells
 
@@ -1980,8 +1980,8 @@ self.dock.focus(P_PROPS);
   (a `move` during the hold does not count towards the drag).
   A floating window is `window 501`, and `window any` + `drag tab:"…" X,Y hold 320` drags its
   tab onto a marker of the main window.
-  PaintCraft keeps its own placement of floating palettes inside the main window
-  (`apps/PaintCraft/src/workspace/panels/dock.rs`), a different model.
+  JFPainter keeps its own placement of floating palettes inside the main window
+  ([`src/workspace/panels/dock.rs`](https://github.com/JFLibrary/JFPainter/blob/main/src/workspace/panels/dock.rs) there), a different model.
 
 **Charts**: `sparkline(id, values, color)`, `bar_chart(id, labels, &[BarSeries], stacked)`,
 `donut(id, &[DonutSlice], center, sub)` and `legend(items)`; colours 0 take the style's chart
@@ -2083,7 +2083,7 @@ against `LIB_TEXTS`), `--update` adds the missing texts as rows with empty cells
 catalogue (the one whose texts come from the same folder, `src/` or `crates/`), at its end in
 source order; existing rows are never changed, and the app keeps showing German there until
 the cells are filled. A catalogue the app reads itself without `Catalog::from_tsv` names its
-languages in a comment (`# languages: de en fr`, PaintCraft's). The suite runs
+languages in a comment (`# languages: de en fr`). The suite runs
 `i18n --check`: it fails on errors and on gaps in the catalogues that are complete
 (`COMPLETE`: all of them today, the library too) and only counts the others.
 
@@ -3549,7 +3549,7 @@ text colour) and appears only after a key was used.
 * A decoration that looks like a control is no Tab stop: `ui.next_flags(ST_NOFOCUS)` before a
   button or swatch.
 * Do not take F6, F8, Tab or the menu key as accelerators unless the app needs them (an
-  accelerator wins: PaintCraft keeps paint.net's F5 .. F8 for its windows, Ctrl+F6 still
+  accelerator wins: JFPainter keeps paint.net's F5 .. F8 for its windows, Ctrl+F6 still
   switches them).
 * Test it: `key tab`, `key ctrl+f6`, `expect S focused`, `expect window ID keys` (§12), and
   `tools/kbwalk.py` for the whole ring.
@@ -5286,8 +5286,8 @@ if let Some(t) = ui.touch_two() {
 `scale` (their distance against the one at the start), `began` (the first read of this pair) and `taken_back`:
 the first finger's press went out less than 200 ms ago and was taken back for this pair, so undo what it began
 (its release comes through as usual). A stroke older than that goes on, and `touch_two` stays `None` until
-it ends. When one of the two lifts the gesture is over; another finger makes a new pair. PaintCraft's view
-(`apps/PaintCraft/src/workspace/view.rs`) is the full example.
+it ends. When one of the two lifts the gesture is over; another finger makes a new pair. JFPainter's view
+([`src/workspace/view.rs`](https://github.com/JFLibrary/JFPainter/blob/main/src/workspace/view.rs) there) is the full example.
 
 **Touch targets:** a widget smaller than 44 DIP in a direction is hit by a finger as if it were 44 DIP wide
 around its middle, but only from the background (a title bar, an empty bar, no hit box at all). An exact hit on another
@@ -5297,7 +5297,7 @@ sees none of this and nothing is drawn differently.
 
 **Windows:** the title bar of every window (`window_begin`, dialogs) moves it with the finger in all
 directions, from where the finger came down. `WF_TOUCH_HOLD` asks for a press and hold first (`TF_HOLD |
-TF_HOLD_LONG`): for a panel that lies over something a finger works on, as PaintCraft's tool windows do. A line along
+TF_HOLD_LONG`): for a panel that lies over something a finger works on, as JFPainter's tool windows do. A line along
 the bar's lower edge shows how far the hold is (`ui.touch_hold_part(id)` for a bar of your own). So: a dialog's or a
 free window's bar moves at once, a panel over a canvas after the hold, the main window's bar is the system's where it
 has one (on Windows: moves, snaps, double tap).
@@ -5351,9 +5351,9 @@ scroll.
 
 Test it: `apps/androidGallery/tests/touch.uis` and `touch_rtl.uis`, `apps/mdviewtest/tests/touch.uis`,
 `apps/editortest/tests/touch.uis`, `apps/termtest/tests/touch.uis`, `apps/desktest/tests/touch.uis` (two fingers,
-the hold, the keyboard), `apps/PaintCraft/tests/touch.uis` (scripts, Windows and Linux), `touch_web.mjs` (Chromium's
+the hold, the keyboard), JFPainter's `tests/touch.uis` (scripts, Windows and Linux), `touch_web.mjs` (Chromium's
 touch emulation), `android_touch.py` (emulator or phone: `input motionevent` and `input swipe`, positions from
 `uiautomator dump`). The platform's part: `plattest --test touch` (fakes of the pointer API on Windows, fed `wl_touch`
-and XInput 2.2 events on Linux) and `python tools/touchcheck.py` (Windows: a real window and real contacts through
+and XInput 2.2 events on Linux) and JFPainter's `python tools/touchcheck.py` (Windows: a real window and real contacts through
 `InjectTouchInput`, no touch screen needed; it skips with a message when the desktop is locked or the window covered).
-What to try on a real tablet: `apps/PaintCraft/docs/TOUCH.md`.
+What to try on a real tablet: JFPainter's [`docs/TOUCH.md`](https://github.com/JFLibrary/JFPainter/blob/main/docs/TOUCH.md).

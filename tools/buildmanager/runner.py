@@ -13,20 +13,6 @@ from tools import package
 from .model import write_json
 
 
-def prepare_tests(app, target, exe, cache):
-    if app != 'PaintCraft':
-        return
-    scripts = list((build.ROOT / 'apps' / app / 'tests').glob('*.uis'))
-    if not any('@ptest' in p.read_text(encoding='utf-8').splitlines()[0] for p in scripts if p.stat().st_size):
-        return
-    builder = build.PluginBuilder(target, cache / 'test-plugins')
-    for folder, names in build.PLUGIN_TEST_SET.items():
-        destination = exe.parent / 'ptest' / folder
-        destination.mkdir(parents=True, exist_ok=True)
-        for name in names:
-            shutil.copyfile(builder.build(name), destination / (name + ('.dll' if target == 'win' else '.so')))
-
-
 def build_arguments(spec, cache):
     targets = spec['targets']
     mode = [] if spec['mode'] == 'development' else package.rs_mode(spec['optimization'])
@@ -48,12 +34,6 @@ def execute(spec, emit):
         launch = spec['launch']
         artifact = launch['artifact']
         emit('phase', phase='App läuft')
-        # Development sessions get their own settings just like other tool launches.
-        config = build.ROOT / 'build/manager/run-config' / spec['app']
-        config.mkdir(parents=True, exist_ok=True)
-        os.environ['PaintCraft_CONFIG_DIR'] = str(config)
-        os.environ['WSLENV'] = ':'.join([x for x in os.environ.get('WSLENV', '').split(':')
-            if x and not x.startswith('PaintCraft_CONFIG_DIR')] + ['PaintCraft_CONFIG_DIR/p'])
         result = build.run_exe(artifact['target'], Path(artifact['path']), launch['argv'], timeout=None)
         print(result.stdout + result.stderr)
         if result.returncode:
@@ -116,13 +96,11 @@ def execute(spec, emit):
             continue
         if not release and not spec['tests']:
             continue
-        prepare_tests(app, target, exe, cache)
         config = stage / 'test-config' / style / target
         config.mkdir(parents=True, exist_ok=True)
-        os.environ['PaintCraft_CONFIG_DIR'] = str(config)
         os.environ['ASMINST_SHELL_DIR'] = str(config / 'shell')
         os.environ['WSLENV'] = ':'.join([x for x in os.environ.get('WSLENV', '').split(':')
-            if x and not x.startswith(('PaintCraft_CONFIG_DIR', 'ASMINST_SHELL_DIR'))] + ['PaintCraft_CONFIG_DIR/p', 'ASMINST_SHELL_DIR/p'])
+            if x and not x.startswith('ASMINST_SHELL_DIR')] + ['ASMINST_SHELL_DIR/p'])
         def report(record):
             value = dict(record, target=target, style=style)
             tests.append(value)

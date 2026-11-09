@@ -6,15 +6,15 @@ time; the installed program contains only that style.  The setup and the .deb ar
 `--formats` adds AppImage, RPM, Flatpak and MSIX (below, "Other formats").
 
 ```
-python tools/package.py PaintCraft                         # build/dist/PaintCraft_Setup.exe
-                                                         # build/dist/PaintCraft_0.1.0_amd64.deb
+python tools/package.py Kritzel                          # build/dist/Kritzel_Setup.exe
+                                                         # build/dist/kritzel_0.1.0_amd64.deb
 python tools/package.py Kritzel --styles winui,classic   # a subset of the styles
 python tools/package.py Kritzel --no-deb                 # Windows only (--no-win: .deb only)
-python tools/package.py PaintCraft --out build/pkg         # another output folder
-python tools/package.py PaintCraft --impl asm              # legacy: the assembly reference, build/dist_asm
-python tools/package.py PaintCraft --sign                  # every signature required (below)
-python tools/package.py PaintCraft --repo build/repo       # also a signed apt repository
-python tools/package.py PaintCraft --update build/channel  # also a signed update channel (UPDATES.md)
+python tools/package.py Kritzel --out build/pkg          # another output folder
+python tools/package.py Kritzel --impl asm               # legacy: the assembly reference, build/dist_asm
+python tools/package.py Kritzel --sign                   # every signature required (below)
+python tools/package.py Kritzel --repo build/repo        # also a signed apt repository
+python tools/package.py Kritzel --update build/channel   # also a signed update channel (UPDATES.md)
 python tools/package.py template --formats all             # every format (--formats appimage,flatpak, ...)
 ```
 
@@ -24,7 +24,7 @@ What it does:
    --target both --out <out>/rs_size` for every style and target (the libraries are built
    once, both targets side by side, the style variants linked in parallel into
    `<out>/rs_size/<target>/<style>/`); each exe is copied to `<out>/<App>/<style>/<target>/`.
-   A package of PaintCraft with four styles and both targets takes about 7 minutes from scratch
+   A package of PaintCraft (then in this repository) with four styles and both targets took about 7 minutes from scratch
    on 12 logical CPUs (one style after the other: 19.5), less when the libraries are built
    already; the eight LTO links then run at once and set the time. For a quick try,
    `--styles winui --no-deb` builds one variant. `--profile size` (the
@@ -39,15 +39,10 @@ What it does:
    `<out>/<App>_Setup.exe` = stub + payload + trailer.
 3. **Linux**: assembles the package tree and runs `dpkg-deb` in WSL (Ubuntu-24.04).
 4. **Modules** (jxl-module): the loadable modules of the app (`build_rs.py` `APP_MODULES`:
-   PaintCraft's JPEG XL writer `jxlenc.dll` / `jxlenc.so`, the same file for every style) are
+   codectest's JPEG XL writer `jxlenc.dll` / `jxlenc.so`, the same file for every style) are
    built with the variants and installed next to the exe: one extra-file entry (kind 5) of
    the setup -- installed into the program folder, listed in `install.ini`, removed by
    `uninstall.exe` -- and `/usr/lib/<deb>/` in the .deb.
-5. **Plugin host** (pdn-host): where the .NET SDK and paint.net exist, PaintCraft's host for
-   original paint.net plugins goes to `pdn-host/` of the Windows program folder, signed with
-   the modules. It is our own assembly only; paint.net's files are never copied. A build
-   machine without them prints a note and packages PaintCraft without it, and its menu then
-   says that the host is missing (`tools/paintcraft-pdn-host/README.md`).
 
 `--impl asm` does the same with `legacy/build.py` and the assembly setup stub (the frozen
 reference; it needs the assembly toolchain). Both modes produce the same payload format and
@@ -57,35 +52,35 @@ the same .deb layout.
 
 | File | Content |
 |---|---|
-| `apps/NAME/PACKAGE` | `key=value` lines: `display` (shown name), `version` (the app's own `MAJOR.MINOR.PATCH`: the build checks it and every program of the app reads it as `rt::app_version!()`, [VERSIONING.md](VERSIONING.md)), `publisher`, `summary` (one line, .deb / .desktop comment), `description` (one line), `generic` (.desktop GenericName), `categories` (.desktop), `deb_name`, `default_win` / `default_linux` (preselected style), `styles` (the variants, in order); optional `filetypes` and `schemes` (the file types and URL schemes the app opens, below); for `--update`: `update_app` (the manifest's app id, default the folder name), `update_notes`, `update_expires_days`; for the other formats (below): `app_id` (reverse DNS, default `org.jflib.<App>`: the library's own demo, test and template apps keep it; the author's apps set `org.jfreund.<App>`, e.g. PaintCraft and BackupCraft; an app of someone else sets a domain of its own), `homepage` (AppStream; Flathub wants it), `license` (SPDX, default `LicenseRef-proprietary`), `appimage_update`, `flatpak_runtime`, `flatpak_args`, `flatpak_repo_url` (the address of the Flatpak repository an installation updates from), `msix_name`, `msix_publisher`, `msix_alias` (an execution alias, `name.exe`), `appinstaller_url` (the folder the `.appinstaller` and the `.msix` are published in), `appinstaller_hours` (App Installer's `HoursBetweenUpdateChecks`, default 0: every start), `language` |
+| `apps/NAME/PACKAGE` | `key=value` lines: `display` (shown name), `version` (the app's own `MAJOR.MINOR.PATCH`: the build checks it and every program of the app reads it as `rt::app_version!()`, [VERSIONING.md](VERSIONING.md)), `publisher`, `summary` (one line, .deb / .desktop comment), `description` (one line), `generic` (.desktop GenericName), `categories` (.desktop), `deb_name`, `default_win` / `default_linux` (preselected style), `styles` (the variants, in order); optional `filetypes` and `schemes` (the file types and URL schemes the app opens, below); for `--update`: `update_app` (the manifest's app id, default the folder name), `update_notes`, `update_expires_days`; for the other formats (below): `app_id` (reverse DNS, default `org.jflib.<App>`: the library's own demo, test and template apps keep it; the author's apps set `org.jfreund.<App>`, e.g. Kritzel and BackupCraft; an app of someone else sets a domain of its own), `homepage` (AppStream; Flathub wants it), `license` (SPDX, default `LicenseRef-proprietary`), `appimage_update`, `flatpak_runtime`, `flatpak_args`, `flatpak_repo_url` (the address of the Flatpak repository an installation updates from), `msix_name`, `msix_publisher`, `msix_alias` (an execution alias, `name.exe`), `appinstaller_url` (the folder the `.appinstaller` and the `.msix` are published in), `appinstaller_hours` (App Installer's `HoursBetweenUpdateChecks`, default 0: every start), `language` |
 | `apps/NAME/PERMISSIONS` | the app's permissions ([PERMISSIONS.md](PERMISSIONS.md)): the Flatpak finish-args, the MSIX capabilities and StartupTask follow them |
 | `apps/NAME/res/app.ico` | icon resource 1 of the Windows exe (`build_rs.py` compiles it with `llvm-rc` and links it: window, taskbar, Explorer, shortcuts) |
 | `apps/NAME/res/app_{48,128,256}.png` | Linux icons (hicolor theme); the MSIX logos are scaled from them. Missing sizes are scaled down from the largest; an app without any gets a plain placeholder (and a note) |
 | `styles/S/INFO` | line 1: the style's name in the setup / debconf, line 2: a one-line description (`--impl asm`: `legacy/ASMLIB/styles/S/INFO`) |
 
-Texts are German (the setup and the .deb questions are). Example, `apps/PaintCraft/PACKAGE`:
+Texts are German (the setup and the .deb questions are). Example, `apps/Kritzel/PACKAGE`:
 
 ```
-display=PaintCraft
+display=Kritzel
 version=0.1.0
 publisher=JFLib
-summary=Bildbearbeitung im Stil von paint.net
-description=Bildbearbeitung mit Ebenen, Effekten und vielen Bildformaten, geschrieben in Rust mit JFLib.
-generic=Bildbearbeitung
+summary=Zeichnen und Skizzieren mit Ebenen
+description=Zeichnen, Skizzieren und kleine Bildkorrekturen: Stift, Pinsel, Formen, Text, Auswahl und Ebenen in einer kompakten Oberfläche, geschrieben in Rust mit JFLib.
+generic=Zeichenprogramm
 categories=Graphics;2DGraphics;RasterGraphics;
-deb_name=PaintCraft
+deb_name=kritzel
+app_id=org.jfreund.Kritzel
 default_win=winui
 default_linux=kde
 styles=winui classic macos kde
 ```
 
-**Icons**: `python tools/mkicon.py NAME --glyph E771 --color 1E78E6` renders a glyph of the icon
+**Icons**: `python tools/mkicon.py NAME --glyph EB7E --color D9822B` renders a glyph of the icon
 font on a gradient square in every icon size (16..256 px), cuts anti-aliased rounded corners
 (`tools/pngutil.py`) and writes `app.ico` and the PNGs. The glyph comes from
 `lib/style_assets/assets/icons.bin` (Fluent UI System Icons, MIT; the styles that use it ship
 `LICENSE-FluentSystemIcons.txt`) and is drawn by `tools/refrender.py`, so no build is needed. The
-committed icons are installer `--glyph E896 --color 2E9E5B`, PaintCraft `E771 1E78E6` and paint
-`E790 D9822B`.
+committed icons are installer `--glyph E896 --color 2E9E5B` and paint `E790 D9822B`.
 
 ## Windows: setup.exe
 
@@ -161,7 +156,7 @@ little endian, offsets relative to the payload start):
 |---|---|
 | header | `"AIPK"`, u32 entry count (at most 256) |
 | entry (128 bytes each) | u32 kind, u32 stored size, u32 unpacked size, u32 flags (1 = zlib), u64 offset, u64 0, name[48], label[48] (UTF-8, NUL-padded) |
-| kinds | 1 manifest (`key=value` lines: `app`, `display`, `version`, `publisher`, `default`, `desc_<style>`), 2 a style variant (the exe; name = style id, label = INFO name), 3 its preview PNG, 5 an extra file (name = its path in the program folder; e.g. PaintCraft's `jxlenc.dll`) |
+| kinds | 1 manifest (`key=value` lines: `app`, `display`, `version`, `publisher`, `default`, `desc_<style>`), 2 a style variant (the exe; name = style id, label = INFO name), 3 its preview PNG, 5 an extra file (name = its path in the program folder; e.g. codectest's `jxlenc.dll` or `licenses/...`) |
 | trailer | `"ASMINST1"`, u64 stub size, u64 payload size (the last 24 bytes of the file; in a signed setup the last 24 bytes before the Authenticode certificate table and its padding to 8 bytes) |
 
 A signed setup (below) keeps this layout: signtool appends the certificate table after the
@@ -173,7 +168,7 @@ setup's signature covers the payload too.
 
 Built in WSL (`dpkg-deb --root-owner-group -Zxz`, inside the Linux file system for the
 permissions). Every variant goes to `/usr/lib/<deb>/<App>-<style>`, the app's modules next to
-them (`/usr/lib/PaintCraft/jxlenc.so`: the program looks next to its real path); debconf asks for the look
+them (`/usr/lib/<deb>/jxlenc.so`: the program looks next to its real path); debconf asks for the look
 (`<deb>/style`, a select question), `postinst` registers every variant with
 `update-alternatives` and points `/usr/bin/<deb>` at the chosen one. Change it later with
 `sudo dpkg-reconfigure <deb>`. Also installed: `/usr/share/applications/<deb>.desktop` and the
@@ -184,7 +179,7 @@ get a shared-mime-info package `/usr/share/mime/packages/<deb>.xml` (glob patter
 description), and `postinst` runs `update-mime-database`.
 
 ```
-# apps/PaintCraft/PACKAGE
+# an image editor's PACKAGE
 filetypes=png|image/png|PNG-Bild; jpg,jpeg|image/jpeg|JPEG-Bild; pdn|image/x-paint.net|Paint.NET-Bild
 # an app's own format and its links (myapp://...):
 filetypes=myd|application/x-mydoc|MyApp-Dokument|own
@@ -210,8 +205,8 @@ on Windows a setup's ProgID with another command counts as another program's (as
 and put back).
 
 ```
-sudo apt install ./build/dist/PaintCraft_0.1.0_amd64.deb
-sudo dpkg-reconfigure PaintCraft          # pick another style
+sudo apt install ./build/dist/kritzel_0.1.0_amd64.deb
+sudo dpkg-reconfigure kritzel             # pick another style
 ```
 
 Tests never install the package on the real WSL system: check it with
@@ -239,8 +234,8 @@ ignored by git. The code is in [`tools/codesign.py`](../tools/codesign.py).
 A user adds the signed repository with:
 
 ```
-sudo curl -o /usr/share/keyrings/paintcraft.gpg https://example.org/repo/repo.gpg
-echo "deb [signed-by=/usr/share/keyrings/paintcraft.gpg] https://example.org/repo ./" | sudo tee /etc/apt/sources.list.d/paintcraft.list
+sudo curl -o /usr/share/keyrings/kritzel.gpg https://example.org/repo/repo.gpg
+echo "deb [signed-by=/usr/share/keyrings/kritzel.gpg] https://example.org/repo ./" | sudo tee /etc/apt/sources.list.d/kritzel.list
 ```
 
 apt checks the repository's signature (`InRelease`), and through it the SHA-256 of every

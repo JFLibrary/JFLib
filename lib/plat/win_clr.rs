@@ -106,7 +106,7 @@ pub fn clr_run(dir: &str, app: &str, args: &[String]) -> Result<i32, String> {
     let (key_ptrs, value_ptrs) = (pointers(&keys), pointers(&values));
     let argv: Vec<Vec<u8>> = args.iter().map(|a| utf8z(a)).collect();
     let argv_ptrs = pointers(&argv);
-    let (exe, domain, app_z) = (utf8z(&exe), utf8z("PaintCraft.PdnHost"), utf8z(&app));
+    let (exe, domain, app_z) = (utf8z(&exe), utf8z("JFLib.ClrHost"), utf8z(&app));
     // SAFETY: NUL-terminated strings that outlive the calls; the two entry points have the
     // signatures of coreclrhost.h; the handle stays loaded for the rest of the process.
     unsafe {

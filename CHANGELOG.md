@@ -27,6 +27,14 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - The guide and the README install `cargo-jflib` from crates.io; the hint to install it from a checkout
   is gone. `tools/publish.py` keeps Cargo's output in `build/publish.log` too.
 - **render3d:** A material row is 80 bytes (G5a: 64) and what reaches the colour target is opaque (alpha 1), as glTF wants for OPAQUE and MASK
+- **img_core:** The MIME type of Paint.NET files is `image/x-paint.net` (it was `image/x-PaintCraft`, a leftover of a renaming).
+- **plat:** The CoreCLR host's AppDomain is called `JFLib.ClrHost` (was `PaintCraft.PdnHost`).
+- **Modules:** `modules/jxlenc` is built next to `codectest`, which loads it with `--jxlenc FILE` (`build_rs.py` APP_MODULES); `modules/modrt/mem.rs` is modrt's own file now (it was a copy of `lib/plugin/mem.rs`).
+- **Tests:** `lib/text_shape`'s shaping test reads its font from `JFLIB_SHAPING_FONT` (was `PAINTCRAFT_SHAPING_FONT`); the codec checks' fixtures (`a1_rgba.png`, `a6_photo.png`, `pdn/`) are in `apps/codectest/fixtures/`.
+
+### Removed
+
+- **PaintCraft** moved to its own repository, [JFLibrary/JFPainter](https://github.com/JFLibrary/JFPainter), as JFPainter (docs/CRATES.md, CR7 step 1), with its Rust plugins (`plugins/`, `lib/plugin`), its paint.net host (`tools/paintcraft-pdn-host`) and its check scripts; `build_rs.py plugin`, the plugin lint and the pdn-host section are gone, and so are the platshared comparisons that imported those scripts (`clip_rs_check`, `lib_check`, `print_rs_check`, the print part of `portal_bus`) and `pathdata_check`'s XAML fuzz through PaintCraft. `testenv` no longer sets `PaintCraft_CONFIG_DIR`.
 
 ## [0.1.0] - 2026-11-08
 

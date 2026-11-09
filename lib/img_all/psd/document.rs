@@ -14,7 +14,7 @@ pub struct Layer {
 }
 pub struct Document {
     pub meta: ImgMeta,
-    /// PaintCraft order: bottom layer first.
+    /// Bottom layer first (the order of a layered editor such as JFPainter).
     pub layers: Vec<Layer>,
     /// Mask application, cropped off-canvas pixels, high depth or Photoshop-specific blocks.
     pub converted: bool,

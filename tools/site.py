@@ -110,8 +110,6 @@ DOCS = [
     ("docs/SHADER.md", "Shaders (SPIR-V)", "Reference", "de", "Writing, reading and validating SPIR-V"),
     ("docs/WGSL.md", "WGSL compiler", "Reference", "de", "From WGSL text to a checked, typed module and on to SPIR-V"),
     ("apps/Kritzel/README.md", "Kritzel", "Apps", "en", "A small drawing and image-editing app"),
-    ("apps/PaintCraft/README.md", "PaintCraft", "Apps", "en", "A raster graphics editor with layers, effects and plugins"),
-    ("plugins/README.md", "PaintCraft plugins", "Apps", "en", "Native plugins and plugin builds"),
     ("apps/jfWord/README.md", "jfWord", "Apps", "de", "Document editing and current feature coverage"),
     ("apps/buildManager/README.md", "Build Manager", "Apps", "en", "Profiles, queue, tests, launching, and releases"),
     ("apps/BackupCraft/README.md", "BackupCraft", "Apps", "en", "Server, agents, console and bcctl: setup, architecture, security model, tests"),
