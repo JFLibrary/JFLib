@@ -109,12 +109,27 @@ mod imp {
 
     /// # Safety
     /// Raw system call: the arguments must be valid for the call.
+    #[cfg(target_arch = "x86_64")]
     #[inline]
     pub unsafe fn syscall6(n: usize, a: usize, b: usize, c: usize, d: usize, e: usize, f: usize) -> isize {
         let r: isize;
         unsafe {
             asm!("syscall", inlateout("rax") n as isize => r, in("rdi") a, in("rsi") b, in("rdx") c,
                  in("r10") d, in("r8") e, in("r9") f, lateout("rcx") _, lateout("r11") _, options(nostack));
+        }
+        r
+    }
+
+    /// # Safety
+    /// Raw system call: the arguments must be valid for the call.  ARM64: the number in x8, the
+    /// result in x0; the kernel keeps every other register.
+    #[cfg(target_arch = "aarch64")]
+    #[inline]
+    pub unsafe fn syscall6(n: usize, a: usize, b: usize, c: usize, d: usize, e: usize, f: usize) -> isize {
+        let r: isize;
+        unsafe {
+            asm!("svc 0", in("x8") n, inlateout("x0") a as isize => r, in("x1") b, in("x2") c,
+                 in("x3") d, in("x4") e, in("x5") f, options(nostack));
         }
         r
     }
@@ -264,5 +279,65 @@ mod imp {
     #[unsafe(no_mangle)]
     pub extern "C" fn _Unwind_Resume() -> ! {
         exit(4)
+    }
+
+    // ---- a static ARM64 program (docs/ARM64.md): what the C runtime would do at the start.
+    // compiler-builtins brings compiler-rt's outline atomics for this target, whose constructor in
+    // .init_array asks getauxval(AT_HWCAP) whether the CPU has LSE (the atomics of ARMv8.1) and only
+    // then uses them, LL/SC otherwise; their object needs getauxval to link at all.  rt answers it from
+    // the auxiliary vector, process_start runs the constructors.  With glibc (or std) libc does both.
+    #[cfg(all(target_arch = "aarch64", not(jfgui_glibc), not(feature = "std")))]
+    static AUXV: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+
+    /// The start of a static ARM64 program, before anything else (plat's _start): sp is the stack
+    /// the kernel started the process with (argc, argv, 0, envp, 0, then the auxiliary vector),
+    /// which answers getauxval from now on; then the constructors of .init_array run.
+    ///
+    /// # Safety
+    /// Once, on the only thread, with the kernel's initial stack pointer.
+    #[cfg(all(target_arch = "aarch64", not(jfgui_glibc), not(feature = "std")))]
+    #[doc(hidden)]
+    pub unsafe fn process_start(sp: *const usize) {
+        unsafe extern "C" {
+            static __init_array_start: usize; // the linker's bounds of .init_array
+            static __init_array_end: usize;
+        }
+        // SAFETY: the layout the kernel built (the caller's promise); the linker sorted the
+        // constructors' addresses between the two symbols (0 and -1 are no function).
+        unsafe {
+            let mut p = sp.add(*sp + 2); // envp
+            while *p != 0 {
+                p = p.add(1);
+            }
+            AUXV.store(p.add(1) as usize, core::sync::atomic::Ordering::Relaxed);
+            let mut f = &raw const __init_array_start;
+            while f < &raw const __init_array_end {
+                if *f != 0 && *f != usize::MAX {
+                    core::mem::transmute::<usize, extern "C" fn()>(*f)();
+                }
+                f = f.add(1);
+            }
+        }
+    }
+
+    /// getauxval(type) for compiler-builtins' C code: the value of that entry of the auxiliary
+    /// vector, 0 when it has none (or before process_start)
+    #[cfg(all(target_arch = "aarch64", not(jfgui_glibc), not(feature = "std")))]
+    #[unsafe(no_mangle)]
+    pub extern "C" fn getauxval(typ: usize) -> usize {
+        let mut p = AUXV.load(core::sync::atomic::Ordering::Relaxed) as *const usize;
+        if p.is_null() {
+            return 0;
+        }
+        // SAFETY: the vector process_start found: pairs of type and value, ended by AT_NULL (0).
+        unsafe {
+            while *p != 0 {
+                if *p == typ {
+                    return *p.add(1);
+                }
+                p = p.add(2);
+            }
+        }
+        0
     }
 }

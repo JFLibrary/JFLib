@@ -45,7 +45,7 @@ struct ThreadRec {
 // clone(flags, stack = rec, parent_tid = &rec.tid, child_tid = &rec.tid, tls = 0; rdx, r10, r8 in
 // x86-64's order, rt::os::clone_args): the child starts on its own stack (rsp = rec,
 // 16-aligned) with the record in r9 and calls thread_main(rec)
-#[cfg(not(jfgui_glibc))] core::arch::global_asm!(
+#[cfg(all(target_arch = "x86_64", not(jfgui_glibc)))] core::arch::global_asm!(
     ".globl jfgui_rs_clone",
     "jfgui_rs_clone:",
     "    mov r9, rsi",
@@ -410,3 +410,28 @@ impl Thread {
         }
     }
 }
+
+// ARM64 (docs/ARM64.md): jfgui_rs_clone as above.  clone(flags, stack = rec, parent_tid = &rec.tid,
+// tls = 0, child_tid = &rec.tid) in ARM64's order (rt::os::clone_args); the kernel keeps every register
+// but x0, so the child finds the record in x1 and starts on its own stack (sp = rec, 16-aligned) with
+// frame pointer and link register 0
+#[cfg(all(target_arch = "aarch64", not(jfgui_glibc)))]
+core::arch::global_asm!(
+    ".globl jfgui_rs_clone",
+    "jfgui_rs_clone:",
+    "    mov x2, x1",
+    "    mov x3, xzr",
+    "    mov x4, x1",
+    "    mov x8, #{nr}",
+    "    svc 0",
+    "    cbz x0, 2f",
+    "    ret",
+    "2:",
+    "    mov x29, xzr",
+    "    mov x30, xzr",
+    "    mov x0, x1",
+    "    bl {main}",
+    "    brk #1",
+    main = sym thread_main,
+    nr = const SYS_CLONE,
+);

@@ -29491,6 +29491,10 @@ information: linux_thread.rs; windows: linux_disp.rs (Wayland / X11 backends).
 
 - **`fn sleep_ms(ms: u32)`**
 
+- **`fn current_exe() -> Option<String>`**
+  Absolute path of the running native executable, independent of argv[0] (here for Linux ARM64 until ARM4 of
+  docs/ARM64.md, otherwise in modhost.rs)
+
 ### `plat/linux_disp.rs` (Linux)
 
 Source: [`lib/plat/linux_disp.rs`](../lib/plat/linux_disp.rs)

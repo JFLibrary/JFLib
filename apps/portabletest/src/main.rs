@@ -11,6 +11,8 @@ use alloc::{format, vec::Vec};
 mod vectors;
 #[cfg(web_threads)]
 mod pool_checks;
+#[cfg(not(target_arch = "wasm32"))]
+mod mathdump;
 
 #[cfg(not(target_arch = "wasm32"))]
 use rt::portable::{fx, math};
@@ -555,6 +557,10 @@ fn task_checks() {
 }
 
 fn main() -> i32 {
+    #[cfg(not(target_arch = "wasm32"))]
+    if plat::args().iter().any(|a| a == "--math-dump") {
+        return mathdump::run(); // tests/math_diff.py
+    }
     #[cfg(web_threads)]
     pool_checks::run();
     #[cfg(not(web_threads))]
