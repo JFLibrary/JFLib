@@ -21,14 +21,14 @@ pub fn lods(t: &mut T) {
 }
 
 /// the meshes: ball 16 x 24 (with levels), ball 8 x 12, ball 4 x 6, cube
-fn geos() -> Vec<Geo> {
+pub fn geos() -> Vec<Geo> {
     vec![ball(16, 24), ball(8, 12), ball(4, 6), cube()]
 }
 
-const LEVELS: [Lod; 3] = [Lod { mesh: Some(MeshId(1)), below: 0.08 }, Lod { mesh: Some(MeshId(2)), below: 0.03 }, Lod { mesh: None, below: 0.008 }];
+pub const LEVELS: [Lod; 3] = [Lod { mesh: Some(MeshId(1)), below: 0.08 }, Lod { mesh: Some(MeshId(2)), below: 0.03 }, Lod { mesh: None, below: 0.008 }];
 
 /// the CPU's pick: Some(mesh) or None (left out), from the size r fy / d of the culling sphere
-fn pick(mesh: u32, size: f64) -> Option<u32> {
+pub fn pick(mesh: u32, size: f64) -> Option<u32> {
     if mesh != 0 {
         return Some(mesh);
     }
@@ -42,7 +42,7 @@ fn pick(mesh: u32, size: f64) -> Option<u32> {
 }
 
 /// the size of an instance as the GPU sees it (the culling sphere), for the camera
-fn size_of(r: &Renderer, sp: &Spec, cam: &Camera) -> (f64, [f64; 3], f64) {
+pub fn size_of(r: &Renderer, sp: &Spec, cam: &Camera) -> (f64, [f64; 3], f64) {
     let (c, rad) = r.cull_sphere(MeshId(sp.mesh)).unwrap_or(([0.0; 3], 1.0));
     let (wc, wr) = cpu::world_sphere(c, rad, sp.pos, sp.rot, sp.scale);
     let d = cpu::sqrt(cpu::dot([wc[0] - cam.eye[0], wc[1] - cam.eye[1], wc[2] - cam.eye[2]], [wc[0] - cam.eye[0], wc[1] - cam.eye[1], wc[2] - cam.eye[2]]));
@@ -51,7 +51,7 @@ fn size_of(r: &Renderer, sp: &Spec, cam: &Camera) -> (f64, [f64; 3], f64) {
 }
 
 /// n instances in front of the camera, none within 2 % of a threshold
-fn specs(r: &Renderer, cam: &Camera, n: usize) -> Vec<Spec> {
+pub fn specs(r: &Renderer, cam: &Camera, n: usize) -> Vec<Spec> {
     let mut rng = Rng(808);
     let mut v = Vec::new();
     while v.len() < n {
@@ -77,7 +77,7 @@ fn specs(r: &Renderer, cam: &Camera, n: usize) -> Vec<Spec> {
 }
 
 /// list index -> (mesh, mirrored), and the slots per list of a set of draw records and visible list
-fn read(t: &mut T, dev: &Device, s: &Scene, draws: &Buffer, visible: &Buffer) -> Option<Vec<(u32, u32)>> {
+pub fn read(t: &mut T, dev: &Device, s: &Scene, draws: &Buffer, visible: &Buffer) -> Option<Vec<(u32, u32)>> {
     let lists = s.lists();
     let mut d = vec![0u32; draws.size() as usize / 4];
     let mut v = vec![0u32; visible.size() as usize / 4];
@@ -85,7 +85,7 @@ fn read(t: &mut T, dev: &Device, s: &Scene, draws: &Buffer, visible: &Buffer) ->
     t.res(dev.queue().read_buffer(visible, 0, &mut v), "read visible")?;
     let mut out = Vec::new();
     for (i, l) in lists.iter().enumerate() {
-        let c = d[i * 5 + 1].min(l.capacity);
+        let c = d[l.record as usize * 5 + 1].min(l.capacity);
         for k in 0..c {
             out.push((v[(l.first + k) as usize], i as u32));
         }

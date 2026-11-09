@@ -69,11 +69,16 @@ pub struct Built {
 
 /// meshes, textures, one material per item, a scene and its reference
 pub fn build(t: &mut T, dev: &Device, geos: &[Geo], texs: &[Tex], items: &[(Spec, Material)], cam: &Camera) -> Option<Built> {
+    build_with(t, dev, &sun_of(), geos, texs, items, cam)
+}
+
+/// the same under another sun
+pub fn build_with(t: &mut T, dev: &Device, sun: &render3d::Sun, geos: &[Geo], texs: &[Tex], items: &[(Spec, Material)], cam: &Camera) -> Option<Built> {
     let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
     for g in geos {
         t.res(r.add_mesh(&g.data()), "add_mesh")?;
     }
-    let sun = sun_of();
+    let sun = *sun;
     let mut rs = RefScene::new(sun.direction, sun.color.map(|v| v as f64), sun.ambient.map(|v| v as f64));
     for x in texs {
         t.res(r.add_texture(&TextureData { width: x.w, height: x.h, rgba: &x.rgba, srgb: x.srgb, nearest: x.nearest }), "add_texture")?;

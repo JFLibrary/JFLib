@@ -1,0 +1,4 @@
+#!args --test alpha
+# lists per alpha class: an instance switching between opaque and MASK (Scene::set_material and a material's own class),
+# mirrored MASK instances, a change after prepare, against scenes built anew and the ray caster; detail levels with
+# MASK materials; a MASK plate switched in the shadows; the occlusion test behind a MASK wall; Voll and Basis

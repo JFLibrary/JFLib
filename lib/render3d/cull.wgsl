@@ -1,6 +1,7 @@
 // cull: one view's visibility.  Every instance whose bounding sphere is not completely outside one of
-// the view's six planes goes into the list of its mesh: visible[lists[l].x + n] = instance, with n
-// from draws[l].instance_count, which is then the list's indirect draw (docs/RENDER3D.md).  A free slot
+// the view's six planes goes into its list (of its mesh, side and alpha class): visible[lists[l].x + n] = instance,
+// with n from draws[lists[l].w].instance_count, which is then the list's indirect draw (docs/RENDER3D.md; the
+// records lie by width of indices, class and side, so a combination is one multi-draw).  A free slot
 // has radius -f32::MAX, so its first plane test rejects it and no shader line is spent on it; with
 // pc.all (Scene::set_culling(false)) it is the only test.
 //
@@ -46,8 +47,8 @@ struct Push {
 @group(0) @binding(0) var<uniform> view: View;
 @group(0) @binding(1) var<storage, read> spheres: array<vec4f>;
 @group(0) @binding(2) var<storage, read> list_of: array<u32>;
-// per list: its first place in `visible`, its detail levels' first entry and number; then the levels: threshold
-// (f32 bits), list
+// per list: its first place in `visible`, its detail levels' first entry and number, its draw record; then the
+// levels: threshold (f32 bits), list
 @group(0) @binding(3) var<storage, read> lists: array<vec4u>;
 @group(0) @binding(4) var<storage, read_write> draws: array<DrawCmd>;
 @group(0) @binding(5) var<storage, read_write> visible: array<u32>;
@@ -94,8 +95,9 @@ fn pick(i: u32, s: vec4f) -> u32 {
 
 // slot i into list l
 fn add(i: u32, l: u32) {
-    let n = atomicAdd(&draws[l].instance_count, 1u);
-    visible[lists[l].x + n] = i;
+    let info = lists[l];
+    let n = atomicAdd(&draws[info.w].instance_count, 1u);
+    visible[info.x + n] = i;
 }
 
 @compute @workgroup_size(256)

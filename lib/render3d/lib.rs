@@ -1,9 +1,10 @@
 // render3d -- the core of the 3D engine on lib/gpu (G5a to G5d; docs/RENDER3D.md): meshes in shared buffers,
 // a table of glTF's PBR materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
-// instance list per mesh and side (mirrored instances turn their faces round); (G5d) the camera's occlusion test
-// against a depth pyramid in two phases.  No draw per object anywhere: a frame is a few compute dispatches and one
-// indirect draw per list and phase (level Basis) or one multi-draw per side and phase for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
-// Vulkan, handed to the browser as text on WebGPU.
+// instance list per mesh, side (mirrored instances turn their faces round) and alpha class (opaque without a discard
+// in its pipelines, MASK with one); (G5d) the camera's occlusion test against a depth pyramid in two phases.  No draw
+// per object anywhere: a frame is a few compute dispatches and one indirect draw per list and phase (level Basis) or
+// one multi-draw per side, alpha class and phase for all of them (level Voll).  The same WGSL on every path: compiled
+// ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
 //
 //   Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines and the pools of one colour format
 //   renderer.add_mesh(&MeshData) -> Result<MeshId>              positions, normals, uv, indices into the pools
@@ -110,8 +111,11 @@ pub const HIZ_DOWN_SPV: &[u32] = spv::HIZ_DOWN;
 pub const SCATTER_SPV: &[u32] = spv::SCATTER;
 #[cfg(not(target_arch = "wasm32"))]
 pub const VS_SPV: &[u32] = spv::VS;
+/// the main pass's fragment shader of opaque lists (no discard); FS_MASK_SPV: that of MASK lists
 #[cfg(not(target_arch = "wasm32"))]
 pub const FS_SPV: &[u32] = spv::FS;
+#[cfg(not(target_arch = "wasm32"))]
+pub const FS_MASK_SPV: &[u32] = spv::FS_MASK;
 #[cfg(not(target_arch = "wasm32"))]
 pub const VS_DEPTH_SPV: &[u32] = spv::VS_DEPTH;
 #[cfg(not(target_arch = "wasm32"))]
@@ -161,6 +165,37 @@ pub struct Lod {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MaterialId(pub u32);
 
+/// how a material's alpha is drawn, and so the lists and pipelines its instances take (docs/RENDER3D.md "Listen je
+/// Alpha-Modus"; Material::alpha_class).  glTF's BLEND is drawn opaque.  A third class (blended, sorted) may come
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum AlphaClass {
+    /// nothing is dropped: pipelines without a discard (the early depth test stays theirs)
+    Opaque,
+    /// glTF's MASK: fragments whose alpha is below the cutoff are dropped
+    Mask,
+}
+
+/// how many alpha classes there are (the lists of a mesh and side, the main pass's pipelines per side)
+pub(crate) const ALPHA_CLASSES: usize = 2;
+
+impl AlphaClass {
+    /// in the order of their pipelines and draw records
+    pub(crate) const ALL: [AlphaClass; ALPHA_CLASSES] = [AlphaClass::Opaque, AlphaClass::Mask];
+
+    pub(crate) const fn index(self) -> usize {
+        match self {
+            AlphaClass::Opaque => 0,
+            AlphaClass::Mask => 1,
+        }
+    }
+
+    /// of a material row (its alpha_cutoff word: negative for opaque)
+    fn of_words(w: &[u32; MATERIAL_WORDS]) -> AlphaClass {
+        if f32::from_bits(w[11]) >= 0.0 { AlphaClass::Mask } else { AlphaClass::Opaque }
+    }
+}
+
 /// where a mesh lies in the pools, and its bounding sphere in its own coordinates
 #[derive(Clone, Copy, Debug)]
 pub struct MeshInfo {
@@ -198,7 +233,8 @@ pub struct Material {
     pub occlusion_strength: f32,
     /// sRGB, times emissive
     pub emissive_texture: Option<TextureRef>,
-    /// glTF's alpha mode MASK: fragments whose alpha is below it are not drawn (None: opaque)
+    /// glTF's alpha mode MASK: fragments whose alpha is below it are not drawn (None: opaque).  It decides the
+    /// alpha class: an instance of a MASK material is in a list of MASK instances, drawn by pipelines with a discard
     pub alpha_cutoff: Option<f32>,
 }
 
@@ -215,6 +251,11 @@ impl Material {
         let mut m = Material::color(1.0, 1.0, 1.0);
         m.base_color_texture = Some(t);
         m
+    }
+
+    /// the lists and pipelines its instances take: Mask with an alpha_cutoff, else Opaque
+    pub const fn alpha_class(&self) -> AlphaClass {
+        if self.alpha_cutoff.is_some() { AlphaClass::Mask } else { AlphaClass::Opaque }
     }
 
     /// the 80 bytes of draw.wgsl's Material
@@ -293,10 +334,11 @@ pub struct Renderer {
     hiz: core::cell::OnceCell<alloc::boxed::Box<hiz::Node>>,
     hiz_clock: Cell<u64>,
     scatter: ComputePipeline,
-    /// front faces counter-clockwise; clockwise for the lists of mirrored instances
-    draw: RenderPipeline,
-    draw_mirrored: RenderPipeline,
-    /// (G5c) the shadow passes: depth only (MASK casts full shadows), or with fs_shadow (its holes)
+    /// per alpha class (fs without a discard, fs_mask with one): front faces counter-clockwise, and clockwise for the
+    /// lists of mirrored instances
+    draw: [[RenderPipeline; 2]; ALPHA_CLASSES],
+    /// (G5c) the shadow passes: depth only (opaque casters; MASK casters without set_shadow_mask, full shadows), or with
+    /// fs_shadow (MASK casters, their holes)
     shadow_depth: RenderPipeline,
     shadow_mask: RenderPipeline,
     mask_in_shadow: bool,
@@ -319,6 +361,8 @@ pub struct Renderer {
     pub(crate) bounds: Vec<([f64; 3], f64)>,
     pub(crate) lod_gen: u32,
     materials: Vec<[u32; MATERIAL_WORDS]>,
+    /// counts set_material calls that moved a material to another alpha class (scenes move its instances)
+    pub(crate) class_gen: u32,
     pub(crate) counts: Arc<Counts>,
     pub(crate) material_buf: Buffer,
     /// counts the material and vertex buffers (a scene's bindings follow)
@@ -341,6 +385,7 @@ struct Modules {
     scatter: ShaderModule,
     vs: ShaderModule,
     fs: ShaderModule,
+    fs_mask: ShaderModule,
     vs_depth: ShaderModule,
     vs_shadow: ShaderModule,
     fs_shadow: ShaderModule,
@@ -350,7 +395,8 @@ struct Modules {
 fn modules(dev: &Device) -> Result<Modules> {
     let m = |w: &[u32]| ShaderModule::from_spirv(dev, w);
     Ok(Modules { cull: m(CULL_SPV)?, cull_early: m(CULL_EARLY_SPV)?, cull_late: m(CULL_LATE_SPV)?, hiz_depth: m(HIZ_DEPTH_SPV)?, hiz_down: m(HIZ_DOWN_SPV)?,
-                 scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, fs: m(FS_SPV)?, vs_depth: m(VS_DEPTH_SPV)?, vs_shadow: m(VS_SHADOW_SPV)?, fs_shadow: m(FS_SHADOW_SPV)? })
+                 scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, fs: m(FS_SPV)?, fs_mask: m(FS_MASK_SPV)?, vs_depth: m(VS_DEPTH_SPV)?, vs_shadow: m(VS_SHADOW_SPV)?,
+                 fs_shadow: m(FS_SHADOW_SPV)? })
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -359,7 +405,7 @@ fn modules(dev: &Device) -> Result<Modules> {
     let c = ShaderModule::from_wgsl(dev, CULL_WGSL)?;
     let h = ShaderModule::from_wgsl(dev, HIZ_WGSL)?;
     Ok(Modules { cull: c.clone(), cull_early: c.clone(), cull_late: c, hiz_depth: h.clone(), hiz_down: h, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: d.clone(),
-                 fs: d.clone(), vs_depth: d.clone(), vs_shadow: d.clone(), fs_shadow: d })
+                 fs: d.clone(), fs_mask: d.clone(), vs_depth: d.clone(), vs_shadow: d.clone(), fs_shadow: d })
 }
 
 impl Renderer {
@@ -410,10 +456,10 @@ impl Renderer {
         let cull_early = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&md.cull_early, "early") })?;
         let cull_late = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &late_pl, shader: ShaderStage::new(&md.cull_late, "late") })?;
         let scatter = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &scatter_pl, shader: ShaderStage::new(&md.scatter, "main") })?;
-        let pipeline = |front_cw| dev.create_render_pipeline(&RenderPipelineDesc {
+        let pipeline = |fragment: ShaderStage, front_cw| dev.create_render_pipeline(&RenderPipelineDesc {
             layout: &draw_pl,
             vertex: ShaderStage::new(&md.vs, "vs"),
-            fragment: Some(ShaderStage::new(&md.fs, "fs")),
+            fragment: Some(fragment),
             buffers: &[],
             topology: Topology::Triangles,
             cull: Cull::Back,
@@ -421,7 +467,9 @@ impl Renderer {
             targets: &[ColorTarget { format: desc.color, blend: None, write_mask: 0xF }],
             depth: Some(DepthState { format: Format::Depth32Float, write: true, compare: Compare::Greater }),
         });
-        let (draw, draw_mirrored) = (pipeline(false)?, pipeline(true)?);
+        // (the order of AlphaClass::ALL)
+        let (opaque, mask) = (|| ShaderStage::new(&md.fs, "fs"), || ShaderStage::new(&md.fs_mask, "fs_mask"));
+        let draw = [[pipeline(opaque(), false)?, pipeline(opaque(), true)?], [pipeline(mask(), false)?, pipeline(mask(), true)?]];
         // both sides of every triangle cast (glTF's single-sided plates too)
         let depth_only = |vertex: ShaderStage, fragment: Option<ShaderStage>| dev.create_render_pipeline(&RenderPipelineDesc {
             layout: &shadow_pl,
@@ -452,6 +500,7 @@ impl Renderer {
             bounds: Vec::new(),
             lod_gen: 0,
             materials: Vec::new(),
+            class_gen: 0,
             counts: Arc::new(Counts { meshes: AtomicU32::new(0), materials: AtomicU32::new(0) }),
             material_buf: dev.create_buffer(&BufferDesc { size: MATERIAL_BYTES * 64, usage: BufferUsage::STORAGE, memory: MemoryKind::Device })?,
             bindings_gen: 0,
@@ -473,7 +522,6 @@ impl Renderer {
             hiz_clock: Cell::new(0),
             scatter,
             draw,
-            draw_mirrored,
             shadow_depth,
             shadow_mask,
             mask_in_shadow: true,
@@ -500,8 +548,9 @@ impl Renderer {
         self.max_instances
     }
 
-    /// (G5c) false: the shadow passes run without a fragment shader and MASK materials cast full shadows
-    /// (what that saves: docs/RENDER3D.md); true at first: their holes let the sun through
+    /// (G5c) false: the shadow passes of MASK lists run without a fragment shader too and MASK materials cast full
+    /// shadows (what that saves: docs/RENDER3D.md); true at first: their holes let the sun through.  Opaque lists cast
+    /// without a fragment shader either way
     pub fn set_shadow_mask(&mut self, on: bool) {
         self.mask_in_shadow = on;
     }
@@ -670,13 +719,22 @@ impl Renderer {
         Ok(MaterialId(i))
     }
 
-    /// a row of the table; the next frame shows it
+    /// a row of the table; the next frame shows it.  A new alpha class moves the material's instances to the lists of
+    /// that class with their scenes' next prepare
     pub fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()> {
         let words = m.words(&self.textures)?;
         let Some(row) = self.materials.get_mut(id.0 as usize) else { return Err(GpuError::Invalid("set_material: no such material")) };
+        if AlphaClass::of_words(row) != AlphaClass::of_words(&words) {
+            self.class_gen = self.class_gen.wrapping_add(1);
+        }
         *row = words;
         self.mark_material(id.0);
         Ok(())
+    }
+
+    /// the alpha class of a material (Opaque for one the renderer does not have)
+    pub fn alpha_class(&self, id: MaterialId) -> AlphaClass {
+        self.materials.get(id.0 as usize).map_or(AlphaClass::Opaque, AlphaClass::of_words)
     }
 
     fn mark_material(&mut self, i: u32) {
@@ -941,30 +999,61 @@ impl Renderer {
         Ok(())
     }
 
-    /// (G5c) one cascade's lists into its depth pass: one pipeline for both sides (no culling of faces)
+    /// (G5c) one cascade's lists into its depth pass, both sides alike (no culling of faces): opaque lists depth only,
+    /// MASK lists with fs_shadow (their holes) unless set_shadow_mask(false).  On Voll neighbouring runs with the same
+    /// width of indices and pipeline are one multi-draw (the records lie by width, class and side)
     fn draw_shadow<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, v: &'a scene::ViewLists) {
-        if !s.lists.iter().any(|l| l.room > 0) {
+        if !s.runs.iter().any(|r| r.room) {
             return;
         }
-        e.set_render_pipeline(if self.mask_in_shadow { &self.shadow_mask } else { &self.shadow_depth });
-        e.set_bind_group(0, &v.render);
-        e.set_bind_group(1, &self.textures.group);
+        let holes = |c: AlphaClass| c == AlphaClass::Mask && self.mask_in_shadow;
+        let mut bound: Option<bool> = None;
+        let mut set = |e: &mut CommandEncoder<'a>, h: bool| -> bool {
+            if bound == Some(h) {
+                return false;
+            }
+            bound = Some(h);
+            e.set_render_pipeline(if h { &self.shadow_mask } else { &self.shadow_depth });
+            e.set_bind_group(0, &v.render);
+            e.set_bind_group(1, &self.textures.group);
+            true
+        };
         if self.multi {
-            e.push_constants(0, &[0u32]);
-            for &(first, count, wide, _) in &s.runs {
-                self.bind_indices(e, wide);
-                e.draw_indexed_indirect_multi(&v.draws, first as u64 * DRAW_BYTES, count, DRAW_BYTES as u32);
+            // (first record, count, wide, holes, room) of the merged runs
+            let mut merged: Vec<(u32, u32, bool, bool, bool)> = Vec::new();
+            for r in &s.runs {
+                let h = holes(r.class);
+                match merged.last_mut() {
+                    Some(m) if m.0 + m.1 == r.first && m.2 == r.wide && m.3 == h => {
+                        m.1 += r.count;
+                        m.4 |= r.room;
+                    }
+                    _ => merged.push((r.first, r.count, r.wide, h, r.room)),
+                }
+            }
+            for &(first, count, wide, h, room) in &merged {
+                if room {
+                    if set(e, h) {
+                        e.push_constants(0, &[0u32]);
+                    }
+                    self.bind_indices(e, wide);
+                    e.draw_indexed_indirect_multi(&v.draws, first as u64 * DRAW_BYTES, count, DRAW_BYTES as u32);
+                }
             }
         } else {
-            let mut bound = None;
-            for (i, l) in s.lists.iter().enumerate() {
+            let mut wide = None;
+            for &i in &s.order {
+                let l = &s.lists[i as usize];
                 if l.room > 0 {
-                    if bound != Some(l.wide) {
+                    if set(e, holes(l.class)) {
+                        wide = None;
+                    }
+                    if wide != Some(l.wide) {
                         self.bind_indices(e, l.wide);
-                        bound = Some(l.wide);
+                        wide = Some(l.wide);
                     }
                     e.push_constants(0, &[l.first]);
-                    e.draw_indexed_indirect(&v.draws, i as u64 * DRAW_BYTES);
+                    e.draw_indexed_indirect(&v.draws, l.record as u64 * DRAW_BYTES);
                 }
             }
         }
@@ -994,37 +1083,40 @@ impl Renderer {
         }
     }
 
-    /// one view's lists into the running pass (a depth-only pipeline can take the same lists): those of
-    /// instances as they are, then those of mirrored ones with the pipeline whose front faces are clockwise
+    /// one view's lists into the running pass: per side (those of instances as they are, then those of mirrored ones with
+    /// the pipelines whose front faces are clockwise) and alpha class (opaque without a discard, then MASK), only the
+    /// combinations with room
     fn draw_lists<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, v: &'a scene::ViewLists) {
         for mirrored in [false, true] {
-            if !s.lists.iter().any(|l| l.mirrored == mirrored && l.room > 0) {
-                continue;
-            }
-            e.set_render_pipeline(if mirrored { &self.draw_mirrored } else { &self.draw });
-            e.set_bind_group(0, &v.render);
-            e.set_bind_group(1, &self.textures.group);
-            e.set_bind_group(2, &self.shadow.group);
-            if self.multi {
-                // lists side by side with the same width of indices and side are one multi-draw (usually all)
-                e.push_constants(0, &[0u32]);
-                for &(first, count, wide, m) in &s.runs {
-                    if m == mirrored {
-                        self.bind_indices(e, wide);
-                        e.draw_indexed_indirect_multi(&v.draws, first as u64 * DRAW_BYTES, count, DRAW_BYTES as u32);
-                    }
+            for class in AlphaClass::ALL {
+                let mine = |r: &&scene::Run| r.mirrored == mirrored && r.class == class && r.room;
+                if !s.runs.iter().any(|r| mine(&r)) {
+                    continue;
                 }
-            } else {
-                // WebGPU and Vulkan 1.1: no first instance is sure to work; a list's start comes as a push constant
-                let mut bound = None;
-                for (i, l) in s.lists.iter().enumerate() {
-                    if l.room > 0 && l.mirrored == mirrored {
-                        if bound != Some(l.wide) {
-                            self.bind_indices(e, l.wide);
-                            bound = Some(l.wide);
+                e.set_render_pipeline(&self.draw[class.index()][mirrored as usize]);
+                e.set_bind_group(0, &v.render);
+                e.set_bind_group(1, &self.textures.group);
+                e.set_bind_group(2, &self.shadow.group);
+                if self.multi {
+                    // a combination's lists lie side by side, one run per width of indices (usually one)
+                    e.push_constants(0, &[0u32]);
+                    for r in s.runs.iter().filter(mine) {
+                        self.bind_indices(e, r.wide);
+                        e.draw_indexed_indirect_multi(&v.draws, r.first as u64 * DRAW_BYTES, r.count, DRAW_BYTES as u32);
+                    }
+                } else {
+                    // WebGPU and Vulkan 1.1: no first instance is sure to work; a list's start comes as a push constant
+                    let mut bound = None;
+                    for &i in &s.order {
+                        let l = &s.lists[i as usize];
+                        if l.room > 0 && l.mirrored == mirrored && l.class == class {
+                            if bound != Some(l.wide) {
+                                self.bind_indices(e, l.wide);
+                                bound = Some(l.wide);
+                            }
+                            e.push_constants(0, &[l.first]);
+                            e.draw_indexed_indirect(&v.draws, l.record as u64 * DRAW_BYTES);
                         }
-                        e.push_constants(0, &[l.first]);
-                        e.draw_indexed_indirect(&v.draws, i as u64 * DRAW_BYTES);
                     }
                 }
             }

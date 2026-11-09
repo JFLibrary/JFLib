@@ -313,8 +313,8 @@ pub fn read_lists(t: &mut T, dev: &Device, s: &mut Scene, off: &mut Off, r: &mut
     t.res(rd.read(0, &mut draws), "read draws")?;
     t.res(rv.read(0, &mut vis), "read visible")?;
     let mut out = Seen { slots: Vec::new(), per_list: Vec::new(), wrong_list: 0 };
-    for (i, l) in lists.iter().enumerate() {
-        let n = draws[i * 5 + 1];
+    for l in &lists {
+        let n = draws[l.record as usize * 5 + 1];
         out.per_list.push(n);
         for k in 0..n.min(l.capacity) {
             let slot = vis[(l.first + k) as usize];
@@ -547,8 +547,28 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     t.ok(reused == 250, &format!("{level}: 250 added after 300 removed: {reused} on places that came free"));
     let stale = s.set_transform(freed[0], &Transform::at([0.0; 3]));
     t.ok(stale.is_err(), &format!("{level}: an old id does not reach the instance now on its place"));
-    t.ok(s.lists().iter().zip(&before).all(|(a, b)| a.first == b.first && a.capacity == b.capacity), &format!("{level}: coming and going within their capacity, the lists keep their places"));
     same(t, &mut off, &mut r, &mut s, &list, "250 added on free places")?;
+    // (lists are settled by prepare: judged after the frame.  A list whose room went past its capacity grows and moves
+    // those after it; the others keep their capacity, and every list its draw record)
+    let after = s.lists();
+    let grown = after.iter().zip(&before).filter(|(a, b)| a.capacity != b.capacity).count();
+    let wrongly = after.iter().zip(&before).filter(|(a, b)| a.capacity != b.capacity && a.room <= b.capacity).count();
+    let kept = grown > 0 || after.iter().zip(&before).all(|(a, b)| a.first == b.first);
+    t.ok(after.len() == before.len() && wrongly == 0 && kept && after.iter().zip(&before).all(|(a, b)| a.record == b.record),
+         &format!("{level}: coming and going: {grown} of {} lists grew (more instances than their capacity), {wrongly} without need; the draw records stay", after.len()));
+    // within their capacity (as many instances of the same meshes come as go) every list keeps its place
+    let before = s.lists();
+    for _ in 0..50 {
+        let k = rng.below(list.len() as u32) as usize;
+        let mut w = list.swap_remove(k);
+        t.res(s.remove(w.id), "remove")?;
+        w.spec.pos[1] += 0.5;
+        w.id = t.res(s.add(w.spec.instance()), "add")?;
+        list.push(w);
+    }
+    same(t, &mut off, &mut r, &mut s, &list, "50 removed and added again")?;
+    t.ok(s.lists().iter().zip(&before).all(|(a, b)| a.first == b.first && a.capacity == b.capacity && a.record == b.record),
+         &format!("{level}: coming and going within their capacity, the lists keep their places"));
     // material and mesh of instances, a row of the table
     for k in 0..40 {
         let (id, m) = (list[k * 7].id, (k as u32 * 3) % materials);
@@ -905,7 +925,7 @@ fn errors(t: &mut T) {
     t.ok(inv(r.set_material(MaterialId(5), &Material::color(1.0, 1.0, 1.0))), "set_material of a material not there: Invalid");
     let Some(mut s) = t.res(Scene::new(&r), "Scene::new") else { return };
     let mirrored = Transform { pos: [0.0; 3], rot: [0.0, 0.0, 0.0, 1.0], scale: [-1.0, 1.0, 1.0] };
-    t.ok(s.add(render3d::Instance { mesh, material: mat, transform: mirrored }).is_ok() && s.lists().iter().any(|l| l.mirrored), "a negative scale: a mirrored instance in a list of its own (G5b)");
+    t.ok(s.add(render3d::Instance { mesh, material: mat, transform: mirrored }).is_ok() && s.lists().is_empty(), "a negative scale: accepted (its list comes with prepare)");
     let infinite = Transform { scale: [f32::INFINITY, 1.0, 1.0], ..mirrored };
     t.ok(inv(s.add(render3d::Instance { mesh, material: mat, transform: infinite }).map(|_| ())), "a scale not finite: Invalid");
     let no_rot = Transform { pos: [0.0; 3], rot: [0.0; 4], scale: [1.0; 3] };
@@ -920,6 +940,7 @@ fn errors(t: &mut T) {
     }
     let Some(other) = t.res(dev.create_texture(&TextureDesc::d2(16, 16, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET)), "texture") else { return };
     if t.res(s.prepare(&mut r), "prepare").is_some() {
+        t.ok(s.lists().iter().any(|l| l.mirrored), "a negative scale: after prepare a mirrored instance in a list of its own (G5b)");
         if let Some(mut e) = t.res(dev.encoder(), "encoder") {
             let ca = ColorAttachment { view: off.color.view(), load: Load::Clear, clear: CLEAR, store: true, before: Layout::Undefined, after: Layout::CopySrc };
             t.ok(inv(r.record(&mut e, &s, ca, None)), "no depth attachment and no set_size: Invalid");
@@ -1021,7 +1042,7 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
     let opt = wgsl::CompileOptions { robust: false, ..wgsl::CompileOptions::new(shader::BASIS) };
     let mut outv = Vec::new();
     for (src, list) in [(render3d::CULL_WGSL, &[("CULL", "main"), ("CULL_EARLY", "early"), ("CULL_LATE", "late")][..]), (render3d::SCATTER_WGSL, &[("SCATTER", "main")][..]),
-                        (render3d::DRAW_WGSL, &[("VS", "vs"), ("FS", "fs"), ("VS_DEPTH", "vs_depth"), ("VS_SHADOW", "vs_shadow"), ("FS_SHADOW", "fs_shadow")][..]),
+                        (render3d::DRAW_WGSL, &[("VS", "vs"), ("FS", "fs"), ("FS_MASK", "fs_mask"), ("VS_DEPTH", "vs_depth"), ("VS_SHADOW", "vs_shadow"), ("FS_SHADOW", "fs_shadow")][..]),
                         (render3d::HIZ_WGSL, &[("HIZ_DEPTH", "from_depth"), ("HIZ_DOWN", "down")][..])] {
         match wgsl::compile(src, &opt) {
             Ok(o) => {
@@ -1067,8 +1088,9 @@ fn shaders(t: &mut T) {
         t.ok(false, "the WGSL compiles");
         return;
     };
-    let table: [(&str, &[u32]); 11] = [("CULL", render3d::CULL_SPV), ("CULL_EARLY", render3d::CULL_EARLY_SPV), ("CULL_LATE", render3d::CULL_LATE_SPV),
-                                       ("SCATTER", render3d::SCATTER_SPV), ("VS", render3d::VS_SPV), ("FS", render3d::FS_SPV), ("VS_DEPTH", render3d::VS_DEPTH_SPV),
+    let table: [(&str, &[u32]); 12] = [("CULL", render3d::CULL_SPV), ("CULL_EARLY", render3d::CULL_EARLY_SPV), ("CULL_LATE", render3d::CULL_LATE_SPV),
+                                       ("SCATTER", render3d::SCATTER_SPV), ("VS", render3d::VS_SPV), ("FS", render3d::FS_SPV), ("FS_MASK", render3d::FS_MASK_SPV),
+                                       ("VS_DEPTH", render3d::VS_DEPTH_SPV),
                                        ("VS_SHADOW", render3d::VS_SHADOW_SPV), ("FS_SHADOW", render3d::FS_SHADOW_SPV), ("HIZ_DEPTH", render3d::HIZ_DEPTH_SPV),
                                        ("HIZ_DOWN", render3d::HIZ_DOWN_SPV)];
     for (name, embedded) in table {
@@ -1242,11 +1264,11 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 18] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
+    let list: [(&str, fn(&mut T)); 19] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
                                           ("levels", levels), ("coords", coords), ("frames", frames), ("errors", errors), ("textures", crate::tex::textures),
                                           ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf), ("pbr", crate::pbr::pbr),
                                           ("shadows", crate::shadowtest::shadows), ("lights", crate::lighttest::lights), ("env", crate::envtest::env),
-                                          ("occlusion", crate::occl::occlusion), ("lods", crate::lodtest::lods)];
+                                          ("occlusion", crate::occl::occlusion), ("lods", crate::lodtest::lods), ("alpha", crate::alphatest::alpha)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {
