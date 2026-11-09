@@ -71,7 +71,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -8633,6 +8633,15 @@ Linux program, the browser), or without a GPU, it prints a SKIP once and does no
   gpu lose               the device behaves as lost from now on (Device::test_lose)
   gpu hold MS            real time passes, the windows stay as they are (a look from outside)
   gpu print              the counters
+```
+
+```rust
+/// the embedded shaders of the output and their source (uigputest: the embedding check)
+GPU_OUT_WGSL: &str = include_str!("gpu_out.wgsl")
+GPU_OUT_VS: &[u32] = spv::VS
+GPU_OUT_FS: &[u32] = spv::FS
+GPU_OUT_FS_IMAGE: &[u32] = spv::FS_IMAGE
+GPU_OUT_FS_TILE: &[u32] = spv::FS_TILE
 ```
 
 **`impl Ui`**
@@ -19307,6 +19316,9 @@ well.  The system then says SUBOPTIMAL at every present while the display is tur
 nothing here: a new size is seen in window_size (a surface there never says OUT_OF_DATE for it).
 ```
 
+- **`struct Surface(pub(crate) Arc<SurfShared>)`**
+  a window as a target for swapchains
+
 **`impl Surface`**
 
 - **`fn track_size(&self)`**
@@ -19320,11 +19332,24 @@ nothing here: a new size is seen in window_size (a surface there never says OUT_
   the surface of a window given by its handles (Windows: the child of plat::win_gpu_child)
   whose size and state are those of plat window `window`
 
+- **`struct Frame`**
+  an acquired swapchain image (present it with Swapchain::present)
+
+- **`enum TryAcquire`**
+  what Swapchain::try_acquire found
+  - `Frame(Frame)`
+  - `NotReady` -- no image is free yet, or the frame slot's previous submission still runs: try again later
+  - `Stale` -- the swapchain does not fit the window any more: Swapchain::rebuild first
+  - `NoArea` -- the window is minimised or has no area
+
 **`impl Frame`**
 
 - **`fn index(&self) -> u32`**
   the image's index in the swapchain
 - **`fn size(&self) -> (u32, u32)`**
+
+- **`struct Swapchain`**
+  the images a window shows, presented in turn
 
 **`impl Device`**
 
@@ -24133,6 +24158,9 @@ Source: [`lib/plat/process_win.rs`](../lib/plat/process_win.rs)
 Windows child pipes and job ownership; no console window and only explicit handles inherited.
 ```
 
+- **`struct Child`**
+  Native child with captured output and a kill-on-close Windows job.
+
 **`impl Child`**
 
 - **`fn read_stdout(&mut self, bytes: &mut [u8]) -> Result<Option<usize>, u32>`**
@@ -24155,6 +24183,9 @@ Source: [`lib/plat/process_linux.rs`](../lib/plat/process_linux.rs)
 ```text
 Linux child pipes, exec and owned process groups. All allocations precede fork.
 ```
+
+- **`struct Child`**
+  Native child with independent output pipes; drop terminates its process group.
 
 **`impl Child`**
 
@@ -27016,6 +27047,98 @@ SOUND_NOTIFY: u32 = 5
 - **`fn theme_path(kind: u32) -> Option<String>`** *(Linux)*
   (tests, Linux) the sound theme's file for a SOUND_\* kind (".disabled": switched off)
 
+### `plat/win_audio.rs` (Windows)
+
+Source: [`lib/plat/win_audio.rs`](../lib/plat/win_audio.rs)
+
+```text
+win_audio -- (audio.rs) WASAPI in shared mode: one thread per stream, event-driven
+
+  open(feed, name) -> Dev    the thread (COM multithreaded, "Audio" MMCSS class) opens the
+                             default render device (IMMDeviceEnumerator, eRender / eConsole),
+                             IAudioClient::Initialize in f32 with the stream's rate and
+                             channels (AUTOCONVERTPCM + SRC_DEFAULT_QUALITY: the engine
+                             converts to its mix format), a buffer of Core::dev_ms; open waits
+                             for that first answer (no device: Unavailable)
+  the loop                   waits for the buffer event or a kick; tops the buffer up from
+                             the Feed (GetCurrentPadding / GetBuffer / ReleaseBuffer); pause:
+                             Stop, stop(): Stop + Reset, the end: drained, then Stop
+  default device             an IMMNotificationClient of the thread: OnDefaultDeviceChanged
+                             (render, console) reopens on the new device; an invalidated
+                             device (unplugged) the same; none at all: State::Lost, retried
+                             every second and on the next change
+  system_sound(kind)         PlaySoundW(alias, SND_ALIAS | SND_ASYNC | SND_NODEFAULT |
+                             SND_SYSTEM): the sound scheme's own sound (none assigned: false)
+  Loopback                   (tests) the default render device's mix captured
+                             (AUDCLNT_STREAMFLAGS_LOOPBACK) on a thread of its own
+
+COM objects are used through their vtable slots (as win_spell.rs, win_taskbar.rs).  The
+stream's name is not shown: the volume mixer names the program.
+```
+
+- **`struct Loopback`**
+  (tests) the default render device's mix captured while it runs (WASAPI loopback)
+
+**`impl Loopback`**
+
+- **`fn start() -> Result<Loopback, AudioError>`**
+  start capturing -> Err(Unavailable): no render device
+- **`fn finish(mut self) -> (u32, u16, Vec<f32>)`**
+  stop -> (frames per second, channels, interleaved samples)
+
+### `plat/linux_audio.rs` (Linux)
+
+Source: [`lib/plat/linux_audio.rs`](../lib/plat/linux_audio.rs)
+
+```text
+linux_audio -- (audio.rs) sound through a PulseAudio server (pipewire-pulse on current
+desktops, WSLg's server), one connection and thread per stream; the freedesktop sound theme
+
+  open(feed, name) -> Dev   the thread connects (linux_pulse.rs), creates a playback stream
+                            (float32le, the stream's rate and channels, tlength =
+                            Core::dev_ms, ADJUST_LATENCY, no device named: the server's
+                            default -- the server moves the stream when the default changes)
+                            and answers the server's REQUESTs from the Feed; open waits for
+                            that first answer (no server: Unavailable)
+  the loop                  poll on the socket and an eventfd (kicks): pause = CORK, start =
+                            uncork, stop() = cork + FLUSH, the end = DRAIN (its reply: Ended,
+                            corked again); GET_PLAYBACK_LATENCY every 250 ms while playing
+                            (the sink's latency + what the server holds); PLAYBACK_STREAM_MOVED:
+                            the new device's name, device_changes(); UNDERFLOW counts; a killed
+                            stream or a lost connection: State::Lost, reconnected every second
+  system_sound(kind)        org.gnome.desktop.sound from the settings portal: event-sounds off
+                            -> nothing; theme-name (else freedesktop) with its Inherits=, the
+                            names dialog-information / -warning / -error / -question, bell,
+                            message-new-instant (and fallbacks) as .disabled / .oga / .ogg /
+                            .wav in the theme's Directories= (else stereo) below
+                            $XDG_DATA_HOME/sounds and $XDG_DATA_DIRS/sounds; decoded once,
+                            played through play(); no file: None (audio.rs plays a tone)
+                            (jfgui_SOUND_THEME, jfgui_EVENT_SOUNDS=0|1 override the portal)
+
+ALSA (/dev/snd) is not used: without a sound server there is no output (Unavailable).
+```
+
+- **`struct ServerStream`**
+  (tests) a playback stream as the PulseAudio server lists it
+  - `index: u32` -- the sink input (Stream::server_id)
+  - `name: String`
+  - `sink: u32`
+  - `rate: u32`
+  - `channels: u8`
+  - `buffer_us: u64` -- what the server holds and the sink's latency (microseconds)
+  - `sink_us: u64`
+  - `corked: bool`
+  - `props: Vec<(String, String)>`
+
+- **`fn server_streams() -> Option<Vec<ServerStream>>`**
+  (tests) the server's playback streams (GET_SINK_INPUT_INFO_LIST on a connection of its own)
+
+- **`fn server_info() -> Option<(String, String, String)>`**
+  (tests) the server: (its name, its version, the default sink)
+
+- **`fn pulse_selftest() -> Vec<(&'static str, bool)>`**
+  (tests) the wire format against hand-made bytes -> (check, passed)
+
 ### `plat/screen.rs`
 
 Source: [`lib/plat/screen.rs`](../lib/plat/screen.rs)
@@ -27991,6 +28114,12 @@ Nonblocking byte-mode named pipes with an explicit current-user DACL and remote 
 Security APIs are loaded dynamically from advapi32; no additional static DLL dependency.
 ```
 
+- **`struct Listener`**
+  User-private listener. Dropping closes the accepting handle; peer handles are separate.
+
+- **`struct Stream`**
+  One accepted nonblocking local connection.
+
 **`impl Listener`**
 
 - **`fn bind(app: &str) -> Result<Self, i32>`**
@@ -28015,6 +28144,12 @@ Source: [`lib/plat/control_ipc_linux.rs`](../lib/plat/control_ipc_linux.rs)
 Nonblocking Unix sockets restricted to the effective user. Linux raw syscalls.
 New code; socket paths never accept external directory or filename input.
 ```
+
+- **`struct Listener`**
+  Private local listener. Dropping it closes and removes only its own socket path.
+
+- **`struct Stream`**
+  One nonblocking authenticated local connection.
 
 **`impl Listener`**
 
@@ -31486,6 +31621,52 @@ REQUEST_UNSAVED: u32 = 22
 
 - **`extern "C" fn jfgui_complete(id: u32, status: i32) -> u32`**
   Confirm a host operation: 0 durable, 1 exported, 2 completed; negatives are explicit errors.
+
+### `plat/android_files.rs`
+
+Source: [`lib/plat/android_files.rs`](../lib/plat/android_files.rs)
+
+```text
+Android's files: the virtual names of the host adapter (/config, /data, /cache, /tmp,
+/documents, /imports -- the same as in the browser, so the permissions and the vfs see one
+layout) on real files of the app's internal storage, through Bionic.  They survive restarts.
+
+  /cache/..  -> <cacheDir>/cache/..   (the system may clear it when storage runs low)
+  /tmp/..    -> <cacheDir>/tmp/..     (emptied when the app starts)
+  /..        -> <filesDir>/fs/..      (config, data, documents, imports and anything else)
+GalleryActivity passes filesDir / cacheDir before the start (jfgui_ANDROID_FILES,
+jfgui_ANDROID_CACHE); without them every file call fails.
+
+write_file and AtomicFile write a sibling "NAME.tmp-PID-SEQ-TIME", fsync it and rename it
+over the target (readers see the old or the new file, also after a crash).  FileLock is
+flock (across processes of the app).  open_temp unlinks its file at once.  Writing needs the
+folder to exist (as on Linux; config:// etc. create theirs).  The documents of other apps
+are content:// names (content.rs, android_host.rs), not paths.
+```
+
+- **`fn cwd() -> String`**
+  Current virtual directory; it is unrelated to the process's working directory.
+
+- **`fn config_dir() -> Option<String>`**
+  The app's settings below internal storage.
+
+- **`fn data_dir() -> Option<String>`**
+  The app's data below internal storage.
+
+- **`fn cache_dir() -> Option<String>`**
+  The cache below the app's cache folder (the system may clear it).
+
+- **`fn temp_dir() -> Option<String>`**
+  Temporary files (emptied when the app starts).
+
+- **`fn home() -> Option<String>`**
+  The app's own documents (internal storage; the user's documents are content:// names).
+
+- **`fn drives() -> Vec<String>`**
+  One virtual root.
+
+- **`fn dev_ino(_path: &str) -> Option<(u64, u64)>`**
+  Device / inode identity is not exposed for the virtual names.
 
 ### `plat/web_files.rs`
 
