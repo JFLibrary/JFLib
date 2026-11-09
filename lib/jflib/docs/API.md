@@ -305,6 +305,7 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   - `image_uploads: u64`
   - `image_hits: u64`
   - `image_evicted: u64`
+  - `view_quads: u32` -- (G5e1) views of GPU content (ui.gpu_view) the output's render pass drew in the window's last frame
   - `canvas_apart: u32` -- canvases (canvas.rs): those whose view comes from tiles now in this window, those drawn so
     in its last frame, its frames that moved one; of all windows: tiles, their bytes, tiles drawn
     and the time that took (us), tiles evicted, gestures ended by the CPU's picture
@@ -5191,6 +5192,7 @@ AF_LIGHT: u32 = 8  // force light theme
 AF_SINGLE_INSTANCE: u32 = 16  // one window per user: later starts hand their command line over (UIC_OPEN)
 AF_LOG_FILE: u32 = 32  // window mode: the log also goes to logs://APP.log (1 MiB, 3 older files)
 AF_SAVE_STATE: u32 = 64  // window mode: the main and tool windows' placement kept in config://windows.ini
+AF_GPU_3D: u32 = 128  // the app shows 3D views (ui.gpu_view): the UI's GPU device at level Voll on the fastest adapter
 ```
 
 *theme tokens (color)*
@@ -8582,6 +8584,20 @@ CanvasDesc::ver, ui.canvas_gpu_damage) ends the gesture at once and costs no til
 drawn when a view moves over it.  Nothing of it exists before the first move, and nothing SETTLE
 + CANVAS_UNUSED_US after the last one.  Right-to-left windows draw canvases on the CPU.
 
+Views (G5e1, gpu_view.rs).  A view of GPU content (ui.gpu_view: a 3D scene between widgets) draws its frames
+on this device into a texture of its size (gp_views_begin, at render time before the cells are hashed: a new
+ver, size or device draws one, nothing else does).  Where the window is on its swapchain and the view ends up
+on top it is a quad like an image's (QuadSrc::View, drawn by the shader that copies: `fs` at its place), its
+command's hash stands for where it lies as a canvas apart's (dirty.canv), and a new frame counts as a canvas's
+move: its cells owed and stale, the cells with something over it and under a layer drawn again by the CPU,
+whose Draw reads the frame back (the only way the CPU gets it: a copy to a read-back buffer, waited for).
+VIEW_REST_US after the last frame gp_tick settles the window once: at rest the framebuffer holds the picture.
+Anywhere else the view's command hashes its frame's number, so each new frame is drawn by the CPU, which reads
+it back.  AF_GPU_3D makes the device at level Voll on the fastest adapter; without the flag views work on the
+Basis device of the frugal adapter.  Without an output in this run (not wanted, never possible) views make a
+device of their own (gp_view_device).  A lost device detaches every content (gp_views_gone) and attaches it to
+the next one.
+
 A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
 usable adapter or surface, a display that takes or imports no dma-bufs: the CPU path for good,
@@ -8596,7 +8612,9 @@ jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget), jfgui
 canvas uses tiles), jfgui_GPU_CANVAS_CPU=a,b (the canvases named so draw on the CPU),
 jfgui_GPU_CANVAS_PAN=a,b (they only pan from tiles), jfgui_GPU_CANVAS_ZOOM=a,b (they also zoom from
 tiles, whatever the widget chose), jfgui_GPU_CANVAS_MB=n (the tiles' budget),
-jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move);
+jfgui_GPU_CANVAS_SETTLE_MS=n (the time until the CPU's picture follows a move), jfgui_GPU_OUTPUT=0 (the
+windows through the CPU path, the GPU stays for views, which read every frame back), jfgui_GPU_VIEWS=0 (no view
+is drawn by the output's render pass: every frame read back into the framebuffer);
 lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 
 Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
@@ -8758,6 +8776,99 @@ frame; the widget's code stays the same on every target.
   the custom command recorded last shows this content through this view (module header)
 - **`fn canvas_gpu_damage(&mut self, id: u32, r: [f64; 4])`**
   the content rectangle x0, y0, x1, y1 (content units) of canvas id changed: its tiles go
+
+#### `ui/gpu_view.rs`
+
+Source: [`lib/ui/gpu_view.rs`](../lib/ui/gpu_view.rs)
+
+```text
+gpu_view -- GPU content in a window: a 3D view between widgets (G5e1; docs/GPU.md "3D-Ansicht")
+
+The framebuffer stays the truth: a view is drawn into it like any canvas, its command's Draw copies the view's
+last frame there.  What is new is where that frame comes from: the app's content (GpuContent; a render3d Renderer
+and Scene, or anything else on lib/gpu: lib/ui knows nothing of render3d) draws it on the UI's own device into a
+texture of the view's size, and the frame is read back from there.
+
+  ui.gpu_view(id, &content, ver) -> &UiInput   the view in the layout's next rectangle (next_size), its input
+                                               as ui.canvas's; a new ver (or size, or device) draws a frame
+  GpuContent::attach(dev) / detach()           a device for the view: the first one, a new one after a loss /
+                                               it goes; build and drop what the frames need there
+  GpuContent::draw(e, target, size)            a frame into target (GPU_VIEW_FORMAT, the view's size)
+  GpuContent::submitted(id)                    the frame went to the queue
+  GpuContent::paint(g, r)                      what the view shows without a device
+  ui.gpu_view_info(win, id)                    what a view does now (tests, measurements)
+  AF_GPU_3D                                    the app shows views: the UI's device at level Voll on the
+                                               fastest adapter (without it, as ever: Basis, the frugal one)
+
+Where a frame shows (gpu_out.rs "views"):
+  - the window on its swapchain and the view on top in its cells: the output's render pass draws the texture
+    there (a quad, as an image's), the framebuffer lacks those pixels (Split::owed) until somebody reads it:
+    gp_settle runs the Draw, which reads the texture back.  At rest (REST after the last frame) gp_tick does
+    that once, so the framebuffer holds the picture again without anybody asking.  A layer over the view gets
+    the frame below it the same way; cells with something of the base over the view are drawn by the CPU over
+    the frame read back.
+  - anywhere else (the CPU path: before the switch, a new size, minimised, the inspector, right to left,
+    jfgui_GPU_OUTPUT=0, jfgui_GPU_VIEWS=0, a script without `gpu on`): the frame is read back at once and the
+    Draw copies it into the framebuffer, in the cells the CPU draws.
+  - no device (jfgui_GPU=0, no Vulkan or no usable adapter, a static Linux program, a lost device not back
+    yet): the last frame read back, else GpuContent::paint.
+The device is the UI output's (one for all windows); without an output in this run (not wanted, never
+possible) the views make one of their own on first use.  A new device (generation) detaches the content from
+the old one and attaches it to the new one; its next frame follows.
+
+The browser cannot wait: a read-back there is answered later, the Draw shows the last frame that came back
+(G5e2 tests it).
+```
+
+```rust
+/// the format of a view's target: what the output samples and what is read back byte for byte into the
+/// framebuffer (B, G, R, x).  The content's colours go in as it writes them, no sRGB encoding
+GPU_VIEW_FORMAT: gpu::Format = gpu::Format::Bgra8Unorm
+```
+
+- **`trait GpuContent`**
+  what a view (ui.gpu_view) shows: content drawn on the UI's GPU device.  The app keeps it in an
+  `Rc<RefCell<..>>` and hands the same one every frame; lib/ui keeps a Weak and calls these at render time
+  - `fn attach(&mut self, dev: &gpu::Device) -> gpu::Result<()>`
+    a device for the view: the first, or a new one after the last was lost (what was built on an earlier one is
+    dead).  Build what the frames need on it.  Err: the view paints until the next device
+  - `fn detach(&mut self)`
+    the device goes (lost, the output ended, another content took the view's id): drop what was built on it
+  - `fn draw<'a>(&'a mut self, e: &mut gpu::CommandEncoder<'a>, target: gpu::ColorAttachment<'a>, size: (u32, u32)) -> gpu::Result<()>`
+    one frame: record into e a render pass into target (GPU_VIEW_FORMAT, size w x h px).  Keep its view, before
+    and after (the pass may set its own load and clear: `ColorAttachment { clear: .., ..target }`); passes that
+    split it (render3d's occlusion test) begin with its before and end with its after.  lib/ui submits e
+  - `fn submitted(&mut self, id: gpu::SubmitId)`
+    the frame went to the queue as id (render3d: Scene::submitted)
+  - `fn paint(&self, g: &mut Gfx, r: [i32; 4])`
+    what the view shows without a device (no GPU, jfgui_GPU=0, before the first frame): painted on the CPU into
+    g, clipped to r (x, y, w, h); a dark grey unless the content says otherwise
+
+- **`struct GpuViewInfo`**
+  what a view does now (Ui::gpu_view_info; tests and measurements)
+  - `device: bool` -- its content is attached to a device: its frames come from the GPU
+  - `output: bool` -- that device is the UI output's (else the views' own: no output in this run)
+  - `level: Option<gpu::Level>` -- the device's level
+  - `generation: u32` -- the device's generation (a new one after a lost device; 0: none)
+  - `apart: bool` -- the output's render pass drew it in the window's last frame (else the CPU copies the frame read back)
+  - `attaches: u32` -- the content attached and detached so far
+  - `detaches: u32`
+  - `frames: u64` -- frames drawn, the CPU time recording and submitting them took (us)
+  - `draw_us: u64`
+  - `reads: u64` -- frames read back into the CPU's copy, the time that took (us: submit, wait, copy)
+  - `read_us: u64`
+  - `size: (u32, u32)` -- the size of its target (px)
+  - `error: Option<String>` -- what the last failure said
+
+**`impl Ui`**
+
+- **`fn gpu_view<C: GpuContent + 'static>(&mut self, id: u32, content: &Rc<RefCell<C>>, ver: u32) -> &UiInput`**
+  a view of GPU content (gpu_view.rs): the layout's next rectangle (next_size) shows what `content` draws on
+  the UI's device, between the widgets, under popups and tooltips; its input is ui.canvas's.  `ver` stands for
+  everything the view shows (scene, camera, an animation's time): another value draws a frame, the same one
+  none (an animation asks for passes itself, ui.invalidate).  Hand the same content every frame
+- **`fn gpu_view_info(&self, win: u32, id: u32) -> Option<GpuViewInfo>`**
+  what view `id` of window `win` (0 = main) does now; None: no such view
 
 #### `ui/inspect.rs`
 
