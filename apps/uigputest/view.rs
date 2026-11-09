@@ -18,7 +18,7 @@
 //   viewoff    jfgui_GPU=0: no device, the content paints
 //   viewbasis  without AF_GPU_3D: the UI's Basis device, the same pictures
 //
-//   uigputest --bench view [--n N] [--basis] [--idle] [--offscreen [--read]]   a window of 1280 x 800, a view of
+//   uigputest --bench view [--n N] [--basis] [--idle] [--timer MS] [--offscreen [--read]]   a window of 1280 x 800, a view of
 //              1200 x 700 of render3dtest's gallery (3000 instances), turning: per frame the CPU of render and present,
 //              of the view's frame and its read-backs, the GPU of render3d's frame (timestamps), memory.  Modes by
 //              the environment as ever: jfgui_GPU_VIEWS=0 (every frame read back), jfgui_GPU_OUTPUT=0 (the CPU
@@ -608,6 +608,10 @@ impl Test {
                 let reached = if self.pc == 5 { at > self.mark[1] } else { at == self.mark[1] };
                 if reached {
                     if self.wait_on(ui, 8000) == Some(true) {
+                        // (G5e2) a frame of the view after the swapchain's first one, which is whole and so never
+                        // apart: on Wayland nothing else may follow it (the Fedora's KWin, 150 %)
+                        let _ = self.view_turn(u32::MAX);
+                        self.mode = 0;
                         self.next();
                     }
                 } else if self.after(8000) {
@@ -618,6 +622,13 @@ impl Test {
             6 => {
                 if self.after(150) {
                     let i = self.view_info(ui, 0, VIEW_ID);
+                    // (G5e2: KWin under Wayland at 150 %: the first swapchain of the new scale goes stale at once, the
+                    // window is on the CPU path for a frame and switches again; the steady state is what counts)
+                    if !(i.apart && o.on) && !self.after(5000) {
+                        let _ = self.view_turn(u32::MAX);
+                        self.mode = 0;
+                        return;
+                    }
                     let c = self.one();
                     self.ok(i.apart && i.size == (r[2] as u32, r[3] as u32), &format!("150 %: the view {:?}, drawn by the output: {}", i.size, i.apart));
                     self.view_check(ui, &c, r, true, false, "150 %");
@@ -989,6 +1000,10 @@ struct ViewBench {
     gaps: Vec<u64>,
     last: u64,
     seen: u64,
+    /// (G5e2) the frames the output presented through the GPU at the first measured frame
+    gpu_frames0: u64,
+    /// (G5e2) the animation's timer (ms; --timer, 1: as fast as the loop takes it)
+    timer: u32,
 }
 
 impl App for ViewBench {
@@ -1011,11 +1026,12 @@ impl App for ViewBench {
         let i = ui.gpu_view_info(0, VIEW_ID).unwrap_or_default();
         let now = plat::time_us();
         // (the device and the first frames first: 3 s, or 1.5 s without an output)
-        let warm = if o.wanted { o.on && now > self.started + 3_000_000 } else { now > self.started + 1_500_000 };
+        // (G5e2: an output that never comes, a GPU that cannot show this window: as without one)
+        let warm = if o.wanted && !o.never { o.on && now > self.started + 3_000_000 } else { now > self.started + 1_500_000 };
         if !warm || i.frames == 0 {
             self.content.borrow_mut().angle += 0.01;
             self.ver += 1;
-            ui.timer(1, 1); // (the next pass: an animation's timer, as fast as the loop takes it)
+            ui.timer(1, self.timer); // (the next pass: an animation's timer, as fast as the loop takes it)
             return;
         }
         let counters = [o.frames + o.cpu_frames, o.render_us, o.present_us, i.draw_us, i.read_us, i.reads, i.frames];
@@ -1024,12 +1040,13 @@ impl App for ViewBench {
             self.t_base = now;
             self.last = now;
             self.seen = i.frames;
+            self.gpu_frames0 = o.frames;
             self.content.borrow_mut().gpu_ms.clear();
             if self.idle {
                 self.started = plat::win_test_usage().0; // (now: the CPU time at the start)
                 ui.timer(1, 5100); // (one look after 5 s, nothing before)
             } else {
-                ui.timer(1, 1);
+                ui.timer(1, self.timer);
             }
             return;
         };
@@ -1062,16 +1079,17 @@ impl App for ViewBench {
             let (_, ws, private) = plat::win_test_usage();
             let mode = if !o.wanted { "CPU path (jfgui_GPU_OUTPUT=0)" } else if i.apart { "composed by the output" } else { "read back every frame (jfgui_GPU_VIEWS=0)" };
             out(&format!("view bench, {mode}, {:?}, {} x {}: {} frames in {:.0} ms; per frame: interval {med:.3} ms (median), render {:.1} us, present {:.1} us, the view's draw {:.1} us, \
-                          read-back {:.1} us ({:.2} per frame), render3d GPU {gpu:.3} ms (median); {} frames presented; reserved {:.1} MiB, working set {:.1} MiB, private {:.1} MiB",
+                          read-back {:.1} us ({:.2} per frame), render3d GPU {gpu:.3} ms (median); {} frames presented ({} through the GPU, on {}, pending {}, switches {}, \
+                          leaves {}); reserved {:.1} MiB, working set {:.1} MiB, private {:.1} MiB",
                          i.level, i.size.0, i.size.1, f as u64, (now - self.t_base) as f64 / 1000.0, per(1), per(2), per(3), per(4), per(5), counters[0] - base[0],
-                         o.reserved as f64 / 1048576.0, ws as f64 / 1048576.0, private as f64 / 1048576.0));
+                         o.frames - self.gpu_frames0, o.on, o.pending, o.switches, o.leaves, o.reserved as f64 / 1048576.0, ws as f64 / 1048576.0, private as f64 / 1048576.0));
             self.done = true;
             ui.quit();
             return;
         }
         self.content.borrow_mut().angle += 0.01;
         self.ver += 1;
-        ui.timer(1, 1);
+        ui.timer(1, self.timer);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
@@ -1178,7 +1196,8 @@ pub fn view_bench(n: usize) -> i32 {
     }
     let content = View3d::new(Kind::Gallery, 0.0);
     content.borrow_mut().stats = true;
-    let mut app = ViewBench { content, ver: 1, n, idle: has("--idle"), started: 0, base: None, t_base: 0, done: false, gaps: Vec::new(), last: 0, seen: 0 };
+    let mut app = ViewBench { content, ver: 1, n, idle: has("--idle"), started: 0, base: None, t_base: 0, done: false, gaps: Vec::new(), last: 0, seen: 0, gpu_frames0: 0,
+                             timer: plat::arg_value("--timer").and_then(|v| v.parse().ok()).filter(|v: &u32| *v > 0).unwrap_or(1) };
     let flags = if has("--basis") { AF_RESIZABLE } else { AF_RESIZABLE | AF_GPU_3D };
     let d = AppDesc { w: 1280, h: 800, flags, ..crate::DESC };
     ui::run_window(&d, &mut app, &style::STYLE)
