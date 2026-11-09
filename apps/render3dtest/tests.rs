@@ -514,7 +514,7 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     // nothing changed: only view and lights go up
     let _ = shot(t, dev, &mut off, &mut r, &mut s, "idle")?;
     let idle = s.upload_info();
-    t.ok(idle.bytes == 192 + 480 && idle.changed == 0 && !idle.full, &format!("{level}: a frame without changes sends {} bytes (view and lights)", idle.bytes));
+    t.ok(idle.bytes == 208 + 480 && idle.changed == 0 && !idle.full, &format!("{level}: a frame without changes sends {} bytes (view and lights)", idle.bytes));
     // moving a few: k changes, 96 bytes each
     let mut rng = Rng(5);
     for _ in 0..37 {
@@ -621,7 +621,7 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     }
     let got = shot(t, dev, &mut off, &mut r, &mut big, "200 moved")?;
     let info = big.upload_info();
-    t.ok(info.changed == 200 && !info.full && info.bytes == 192 + 480 + 200 * 96, &format!("{level}: 200 of 10 000 moved: {} changes, {} bytes", info.changed, info.bytes));
+    t.ok(info.changed == 200 && !info.full && info.bytes == 208 + 480 + 200 * 96, &format!("{level}: 200 of 10 000 moved: {} changes, {} bytes", info.changed, info.bytes));
     let mut f = rebuilt(t, &r, &blist, &cam, false)?;
     let want = shot(t, dev, &mut off, &mut r, &mut f, "200 moved")?;
     let (n, m) = diff(&got, &want);
@@ -1242,11 +1242,11 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 17] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
+    let list: [(&str, fn(&mut T)); 18] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
                                           ("levels", levels), ("coords", coords), ("frames", frames), ("errors", errors), ("textures", crate::tex::textures),
                                           ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf), ("pbr", crate::pbr::pbr),
                                           ("shadows", crate::shadowtest::shadows), ("lights", crate::lighttest::lights), ("env", crate::envtest::env),
-                                          ("occlusion", crate::occl::occlusion)];
+                                          ("occlusion", crate::occl::occlusion), ("lods", crate::lodtest::lods)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {

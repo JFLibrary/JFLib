@@ -19914,6 +19914,8 @@ Errors are gpu's: Invalid for ids and values this crate can judge, the rest from
 DEPTH_CLEAR: f32 = 0.0
 /// the most frames the CPU may record ahead of the GPU
 FRAMES_MAX: usize = 3
+/// (G5d) the most detail levels of a mesh
+LODS_MAX: usize = 8
 /// the WGSL sources and their embedded words (render3dtest: the embedding check)
 CULL_WGSL: &str = include_str!("cull.wgsl")
 SCATTER_WGSL: &str = include_str!("scatter.wgsl")
@@ -19953,6 +19955,12 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 
 - **`struct MeshId(pub u32)`**
   a mesh of a Renderer
+
+- **`struct Lod`**
+  (G5d) a detail level of a mesh (Renderer::set_lods): an instance whose bounding sphere's projected diameter is less
+  than `below` of the view's height is drawn with `mesh` instead; None: not drawn at all (contribution culling)
+  - `mesh: Option<MeshId>`
+  - `below: f32`
 
 - **`struct MaterialId(pub u32)`**
   a material of a Renderer
@@ -20018,6 +20026,17 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   a mesh into the pools (they grow; nothing waits).  The vertices must be there in equal numbers, the
   indices in threes and in range, positions finite.
 - **`fn mesh_info(&self, id: MeshId) -> Option<MeshInfo>`**
+- **`fn set_lods(&mut self, mesh: MeshId, lods: &[Lod]) -> Result<()>`**
+  (G5d) a mesh's detail levels: other meshes (or none) for its instances below a projected size, thresholds
+  falling, at most LODS_MAX; empty: none.  The visibility picks per instance from the camera's distance (the shadow
+  cascades take the camera's pick, so a shadow matches its caster); the sphere culling takes for the mesh's instances
+  grows to hold every level (cull_sphere).  Scenes send all their instances again with their next frame.  Invalid
+  for meshes the renderer does not have and thresholds not finite, not above 0 or not falling
+- **`fn lods(&self, mesh: MeshId) -> &[Lod]`**
+  (G5d) a mesh's detail levels (empty: none)
+- **`fn cull_sphere(&self, mesh: MeshId) -> Option<([f64; 3], f64)>`**
+  (G5d) the sphere (centre, radius in the mesh's coordinates) the visibility takes for a mesh's instances: its own,
+  grown to hold its detail levels
 - **`fn add_texture(&mut self, d: &TextureData) -> Result<TextureId>`**
   a texture into the array of its size class with all its mip levels (texture.rs: resampled when it is
   not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission
@@ -20327,6 +20346,7 @@ commands without a barrier against the frames still on the GPU.
   - `mirrored: bool` -- its instances are mirrored (drawn with clockwise front faces)
   - `count: u32` -- the instances of this mesh, and the room for them in the visible list
   - `capacity: u32`
+  - `room: u32` -- (G5d) the instances that may land here: its own and those of meshes that take it as a detail level
   - `first: u32` -- its first place in the visible list
 
 - **`struct FrameStats`**

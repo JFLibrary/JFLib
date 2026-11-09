@@ -689,7 +689,7 @@ pub fn occl_camera(at: [f64; 3], f: usize, a: f64) -> Camera {
 }
 
 
-/// (G5d) the occlusion scene after five frames of its flight, at the camera of the sixth (a jump: phase 2 of the
+/// (G5d) the occlusion scene with detail levels after five frames of its flight, at the camera of the sixth (a jump: phase 2 of the
 /// occlusion test draws much of it)
 pub fn occl_gallery(r: &mut Renderer) -> Result<Scene> {
     for g in &occl_geos() {
@@ -698,6 +698,8 @@ pub fn occl_gallery(r: &mut Renderer) -> Result<Scene> {
     for c in &gallery_colors(24) {
         r.add_material(&Material::color(c[0], c[1], c[2]))?;
     }
+    // (detail levels too: far balls become prisms, the farthest are left out)
+    r.set_lods(MeshId(1), &[render3d::Lod { mesh: Some(MeshId(2)), below: 0.03 }, render3d::Lod { mesh: None, below: 0.006 }])?;
     let mut sc = Scene::new(r)?;
     sc.set_sun(&Sun::DEFAULT);
     for sp in occl_world([0.0; 3], 2400, 77) {

@@ -1,0 +1,4 @@
+#!args --test lods
+# (G5d) detail levels: balls take coarser balls below a projected size and are left out below a third (a third
+# mirrored); the pick per instance against the CPU, the image against the ray caster with the same pick, the shadow
+# cascades take the camera's pick, a level beyond its mesh grows the culling sphere, what set_lods refuses; Voll and Basis

@@ -1,8 +1,12 @@
 // cull: one view's visibility.  Every instance whose bounding sphere is not completely outside one of
-// the view's six planes goes into the list of its mesh: visible[list_first[l] + n] = instance, with n
+// the view's six planes goes into the list of its mesh: visible[lists[l].x + n] = instance, with n
 // from draws[l].instance_count, which is then the list's indirect draw (docs/RENDER3D.md).  A free slot
 // has radius -f32::MAX, so its first plane test rejects it and no shader line is spent on it; with
 // pc.all (Scene::set_culling(false)) it is the only test.
+//
+// (G5d) Detail levels: a list whose mesh has them names them (lists[l].y, .z: the first, how many; each a threshold
+// and a list, u32::MAX: not drawn); an instance takes the last one whose threshold its projected size (the sphere's
+// diameter over the view's height, from the camera: view.lod) is below.
 //
 // (G5d) The camera's occlusion test in two phases (docs/RENDER3D.md "Verdeckung"): `early` takes what phase 2 of
 // the frame before found visible (a bit per slot in `hidden`, 0: visible or changed since), `late` tests every
@@ -16,6 +20,9 @@ struct View {
     // (G5d) clip x = proj.x * x, clip y = proj.y * y, depth = proj.z + proj.w / z in the camera's space (z along
     // forward)
     proj: vec4f,
+    // (G5d) the camera's eye (relative to the origin) and fy: a sphere of radius r at distance d has the size
+    // r fy / d (the same in every view)
+    lod: vec4f,
 }
 
 // VkDrawIndexedIndirectCommand
@@ -39,7 +46,9 @@ struct Push {
 @group(0) @binding(0) var<uniform> view: View;
 @group(0) @binding(1) var<storage, read> spheres: array<vec4f>;
 @group(0) @binding(2) var<storage, read> list_of: array<u32>;
-@group(0) @binding(3) var<storage, read> list_first: array<u32>;
+// per list: its first place in `visible`, its detail levels' first entry and number; then the levels: threshold
+// (f32 bits), list
+@group(0) @binding(3) var<storage, read> lists: array<vec4u>;
 @group(0) @binding(4) var<storage, read_write> draws: array<DrawCmd>;
 @group(0) @binding(5) var<storage, read_write> visible: array<u32>;
 // (G5d) bit i & 31 of word i >> 5: slot i was hidden in phase 2 of the frame before
@@ -63,11 +72,30 @@ fn in_view(s: vec4f) -> bool {
     return true;
 }
 
-// slot i into its list
-fn add(i: u32) {
-    let l = list_of[i];
+const NONE: u32 = 0xffffffffu;
+
+// (G5d) the list of slot i with sphere s: its mesh's, or that of the detail level its size picks (NONE: not drawn)
+fn pick(i: u32, s: vec4f) -> u32 {
+    var l = list_of[i];
+    let info = lists[l];
+    if info.z > 0u && view.lod.w > 0.0 {
+        let size = s.w * view.lod.w / max(distance(s.xyz, view.lod.xyz), 1e-30);
+        for (var k = 0u; k < info.z; k++) {
+            let e = lists[info.y + k];
+            if size >= bitcast<f32>(e.x) {
+                break;
+            }
+            l = e.y;
+        }
+    }
+    return l;
+}
+
+
+// slot i into list l
+fn add(i: u32, l: u32) {
     let n = atomicAdd(&draws[l].instance_count, 1u);
-    visible[list_first[l] + n] = i;
+    visible[lists[l].x + n] = i;
 }
 
 @compute @workgroup_size(256)
@@ -81,10 +109,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         if s.w < 0.0 {
             return;
         }
-    } else if !in_view(s) {
+        add(i, list_of[i]);
         return;
     }
-    add(i);
+    if !in_view(s) {
+        return;
+    }
+    let l = pick(i, s);
+    if l != NONE {
+        add(i, l);
+    }
 }
 
 // (G5d) phase 1: what the frame before saw (or what changed since), in the view
@@ -99,7 +133,10 @@ fn early(@builtin(global_invocation_id) gid: vec3u) {
     }
     let s = spheres[i];
     if in_view(s) {
-        add(i);
+        let l = pick(i, s);
+        if l != NONE {
+            add(i, l);
+        }
     }
 }
 
@@ -163,9 +200,12 @@ fn late(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
         let s = spheres[i];
         let drawn = ((hidden[i >> 5u] >> (i & 31u)) & 1u) == 0u;
         if in_view(s) {
-            hide = occluded(s);
-            if !hide && !drawn {
-                add(i);
+            let l = pick(i, s);
+            if l != NONE {
+                hide = occluded(s);
+                if !hide && !drawn {
+                    add(i, l);
+                }
             }
         }
     }

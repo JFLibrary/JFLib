@@ -26,6 +26,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **gltf:** KHR_lights_punctual: Document::lights, Node::light, lights_of(scene), Limits::lights; the extension may stand in extensionsRequired (docs/GLTF.md)
 - **render3d:** Occlusion test of the camera against a depth pyramid in two phases (Scene::set_occlusion, on by default when the depth attachment can be sampled): phase 1 draws what phase 2 of the frame before saw, a compute shader builds an R32Float pyramid of the minimum depth (reverse Z), phase 2 tests every instance in the view against it and draws what is newly visible; the same WGSL on Voll, Basis and WebGPU; Renderer::depth_texture, Renderer::pyramid, Scene::late_buffers, FrameStats::late and FrameStats::occlusion; render3dtest --test occlusion (docs/RENDER3D.md)
 - **gpu:** TextureView::usage (public on Vulkan, new in the browser) and TextureView::same (identity of a view and its clones, a cache's key)
+- **render3d:** Detail levels (Renderer::set_lods, Lod, LODS_MAX, lods, cull_sphere): a mesh takes other meshes, or none (contribution culling), below a projected size; the visibility picks per instance from the camera's distance, the shadow cascades take the camera's pick; ListInfo::room; render3dtest --test lods
 
 ### Changed
 
@@ -38,7 +39,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** The CoreCLR host's AppDomain is called `JFLib.ClrHost` (was `PaintCraft.PdnHost`).
 - **Modules:** `modules/jxlenc` is built next to `codectest`, which loads it with `--jxlenc FILE` (`build_rs.py` APP_MODULES); `modules/modrt/mem.rs` is modrt's own file now (it was a copy of `lib/plugin/mem.rs`).
 - **Tests:** `lib/text_shape`'s shaping test reads its font from `JFLIB_SHAPING_FONT` (was `PAINTCRAFT_SHAPING_FONT`); the codec checks' fixtures (`a1_rgba.png`, `a6_photo.png`, `pdn/`) are in `apps/codectest/fixtures/`.
-- **render3d:** The renderer's own depth buffer (Renderer::set_size) can be sampled (TextureUsage::SAMPLED), a view's uniform block is 192 bytes (UploadInfo::bytes of a frame without changes: 672), FrameStats::visible counts both phases of the occlusion test and FrameStats::draw both passes
+- **render3d:** The renderer's own depth buffer (Renderer::set_size) can be sampled (TextureUsage::SAMPLED), FrameStats::visible counts both phases of the occlusion test and FrameStats::draw both passes
+- **render3d:** A view's uniform block is 208 bytes (UploadInfo::bytes of a frame without changes: 688); the bounding sphere of a mesh with detail levels holds every level
 
 ### Removed
 

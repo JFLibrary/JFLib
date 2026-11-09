@@ -61,7 +61,9 @@ pub const DEPTH_CLEAR: f32 = 0.0;
 pub const FRAMES_MAX: usize = 3;
 
 /// a view's uniform block: cull.wgsl's View (draw.wgsl declares its first 176 bytes)
-pub(crate) const VIEW_BYTES: u64 = 192;
+pub(crate) const VIEW_BYTES: u64 = 208;
+/// (G5d) the most detail levels of a mesh
+pub const LODS_MAX: usize = 8;
 /// draw.wgsl's Lights: sun, ambient, exposure, tone mapper, shadows, 4 cascades of 64 bytes, the environment
 /// and its 9 harmonics
 pub(crate) const LIGHTS_BYTES: u64 = 480;
@@ -146,6 +148,14 @@ pub struct MeshData<'a> {
 /// a mesh of a Renderer
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MeshId(pub u32);
+
+/// (G5d) a detail level of a mesh (Renderer::set_lods): an instance whose bounding sphere's projected diameter is less
+/// than `below` of the view's height is drawn with `mesh` instead; None: not drawn at all (contribution culling)
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Lod {
+    pub mesh: Option<MeshId>,
+    pub below: f32,
+}
 
 /// a material of a Renderer
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -303,6 +313,11 @@ pub struct Renderer {
     indices16: Pool,
     indices32: Pool,
     pub(crate) meshes: Vec<MeshInfo>,
+    /// (G5d) per mesh: its detail levels, the sphere culling takes (its own, grown to hold its levels), and a count of
+    /// set_lods (scenes send their instances again)
+    pub(crate) lods: Vec<Vec<Lod>>,
+    pub(crate) bounds: Vec<([f64; 3], f64)>,
+    pub(crate) lod_gen: u32,
     materials: Vec<[u32; MATERIAL_WORDS]>,
     pub(crate) counts: Arc<Counts>,
     pub(crate) material_buf: Buffer,
@@ -433,6 +448,9 @@ impl Renderer {
             indices16: Pool::new(dev, BufferUsage::INDEX, 2, 1 << 14)?,
             indices32: Pool::new(dev, BufferUsage::INDEX, 4, 1 << 8)?,
             meshes: Vec::new(),
+            lods: Vec::new(),
+            bounds: Vec::new(),
+            lod_gen: 0,
             materials: Vec::new(),
             counts: Arc::new(Counts { meshes: AtomicU32::new(0), materials: AtomicU32::new(0) }),
             material_buf: dev.create_buffer(&BufferDesc { size: MATERIAL_BYTES * 64, usage: BufferUsage::STORAGE, memory: MemoryKind::Device })?,
@@ -569,12 +587,52 @@ impl Renderer {
         };
         self.vertices.used += nv;
         self.meshes.push(MeshInfo { first_index: first, indices: ni, base_vertex: base, vertices: nv, wide, center, radius: math::sqrt(r2) });
+        self.lods.push(Vec::new());
+        self.bounds.push((center, math::sqrt(r2)));
         self.counts.meshes.store(self.meshes.len() as u32, Ordering::Relaxed);
         Ok(MeshId(self.meshes.len() as u32 - 1))
     }
 
     pub fn mesh_info(&self, id: MeshId) -> Option<MeshInfo> {
         self.meshes.get(id.0 as usize).copied()
+    }
+
+    /// (G5d) a mesh's detail levels: other meshes (or none) for its instances below a projected size, thresholds
+    /// falling, at most LODS_MAX; empty: none.  The visibility picks per instance from the camera's distance (the shadow
+    /// cascades take the camera's pick, so a shadow matches its caster); the sphere culling takes for the mesh's instances
+    /// grows to hold every level (cull_sphere).  Scenes send all their instances again with their next frame.  Invalid
+    /// for meshes the renderer does not have and thresholds not finite, not above 0 or not falling
+    pub fn set_lods(&mut self, mesh: MeshId, lods: &[Lod]) -> Result<()> {
+        let m = mesh.0 as usize;
+        let n = self.meshes.len();
+        if m >= n || lods.iter().any(|l| l.mesh.is_some_and(|x| x.0 as usize >= n)) {
+            return Err(GpuError::Invalid("set_lods: a mesh the renderer does not have"));
+        }
+        let falling = lods.windows(2).all(|w| w[1].below < w[0].below);
+        if lods.len() > LODS_MAX || !falling || lods.iter().any(|l| !(l.below.is_finite() && l.below > 0.0)) {
+            return Err(GpuError::Invalid("set_lods: at most LODS_MAX levels, thresholds finite, above 0 and falling"));
+        }
+        let base = self.meshes[m];
+        let mut radius = base.radius;
+        for o in lods.iter().filter_map(|l| l.mesh) {
+            let o = self.meshes[o.0 as usize];
+            radius = radius.max(math::len(math::sub(o.center, base.center)) + o.radius);
+        }
+        self.bounds[m] = (base.center, radius);
+        self.lods[m] = lods.to_vec();
+        self.lod_gen += 1;
+        Ok(())
+    }
+
+    /// (G5d) a mesh's detail levels (empty: none)
+    pub fn lods(&self, mesh: MeshId) -> &[Lod] {
+        self.lods.get(mesh.0 as usize).map_or(&[], |v| &v[..])
+    }
+
+    /// (G5d) the sphere (centre, radius in the mesh's coordinates) the visibility takes for a mesh's instances: its own,
+    /// grown to hold its detail levels
+    pub fn cull_sphere(&self, mesh: MeshId) -> Option<([f64; 3], f64)> {
+        self.bounds.get(mesh.0 as usize).copied()
     }
 
     /// a texture into the array of its size class with all its mip levels (texture.rs: resampled when it is
@@ -780,8 +838,9 @@ impl Renderer {
         }
         let lists = s.lists.len() as u64;
         if let Some(up) = &s.lists_up {
-            e.copy_buffer(up, 0, &s.list_first, 0, lists * 4);
-            e.copy_buffer(up, lists * 4, &s.template, 0, lists * DRAW_BYTES);
+            let info = s.info_len as u64 * 16;
+            e.copy_buffer(up, 0, &s.list_first, 0, info);
+            e.copy_buffer(up, info, &s.template, 0, lists * DRAW_BYTES);
             e.barrier(Access::COPY_WRITE, Access::COPY_READ);
         }
         if lists > 0 {
@@ -884,7 +943,7 @@ impl Renderer {
 
     /// (G5c) one cascade's lists into its depth pass: one pipeline for both sides (no culling of faces)
     fn draw_shadow<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, v: &'a scene::ViewLists) {
-        if !s.lists.iter().any(|l| l.count > 0) {
+        if !s.lists.iter().any(|l| l.room > 0) {
             return;
         }
         e.set_render_pipeline(if self.mask_in_shadow { &self.shadow_mask } else { &self.shadow_depth });
@@ -899,7 +958,7 @@ impl Renderer {
         } else {
             let mut bound = None;
             for (i, l) in s.lists.iter().enumerate() {
-                if l.count > 0 {
+                if l.room > 0 {
                     if bound != Some(l.wide) {
                         self.bind_indices(e, l.wide);
                         bound = Some(l.wide);
@@ -939,7 +998,7 @@ impl Renderer {
     /// instances as they are, then those of mirrored ones with the pipeline whose front faces are clockwise
     fn draw_lists<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, v: &'a scene::ViewLists) {
         for mirrored in [false, true] {
-            if !s.lists.iter().any(|l| l.mirrored == mirrored && l.count > 0) {
+            if !s.lists.iter().any(|l| l.mirrored == mirrored && l.room > 0) {
                 continue;
             }
             e.set_render_pipeline(if mirrored { &self.draw_mirrored } else { &self.draw });
@@ -959,7 +1018,7 @@ impl Renderer {
                 // WebGPU and Vulkan 1.1: no first instance is sure to work; a list's start comes as a push constant
                 let mut bound = None;
                 for (i, l) in s.lists.iter().enumerate() {
-                    if l.count > 0 && l.mirrored == mirrored {
+                    if l.room > 0 && l.mirrored == mirrored {
                         if bound != Some(l.wide) {
                             self.bind_indices(e, l.wide);
                             bound = Some(l.wide);

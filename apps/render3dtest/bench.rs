@@ -135,8 +135,36 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     // (four corners per face: uv 0 ..= 1 over each)
     let uv: Vec<[f32; 2]> = (0..pos.len()).map(|i| [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]][i % 4]).collect();
     let idx: Vec<u32> = sb::cube_indices().iter().map(|&v| v as u32).collect();
+    // (G5d) --ball S: balls of S x 2S segments in place of the cubes; --lods: their detail levels, balls of S/2 and S/4
+    // below 0.02 and 0.008 of the view's height; --min-px P: nothing below P pixels (contribution culling)
+    let ball_n = plat::arg_value("--ball").and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+    let lods = plat::args().iter().any(|a| a == "--lods");
+    let min_px = plat::arg_value("--min-px").and_then(|v| v.parse::<f32>().ok()).unwrap_or(0.0);
+    let geo = |g: &crate::common::Geo| -> (Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, Vec<u32>) { (g.pos.clone(), g.nrm.clone(), g.uv.clone(), g.idx.clone()) };
+    let (pos, nrm, uv, idx) = if ball_n > 0 { geo(&crate::common::ball(ball_n, 2 * ball_n)) } else { (pos, nrm, uv, idx) };
+    let mut bases = Vec::new();
     for _ in 0..meshes {
-        t.res(r.add_mesh(&MeshData { positions: &pos, normals: &nrm, uvs: &uv, indices: &idx }), "add_mesh")?;
+        bases.push(t.res(r.add_mesh(&MeshData { positions: &pos, normals: &nrm, uvs: &uv, indices: &idx }), "add_mesh")?);
+    }
+    let mut levels = Vec::new();
+    if lods && ball_n > 0 {
+        for (s, below) in [((ball_n / 2).max(2), 0.02f32), ((ball_n / 4).max(2), 0.008)] {
+            let (p, nn, u, i) = geo(&crate::common::ball(s, 2 * s));
+            let m = t.res(r.add_mesh(&MeshData { positions: &p, normals: &nn, uvs: &u, indices: &i }), "add_mesh")?;
+            levels.push(render3d::Lod { mesh: Some(m), below });
+        }
+    }
+    if min_px > 0.0 {
+        levels.push(render3d::Lod { mesh: None, below: min_px / h as f32 });
+    }
+    if !levels.is_empty() {
+        for &b in &bases {
+            t.res(r.set_lods(b, &levels), "set_lods")?;
+        }
+        out(&format!("  detail levels: {}", levels.iter().map(|l| format!("{} below {}", l.mesh.map_or("nothing".into(), |m| format!("mesh {}", m.0)), l.below)).collect::<Vec<_>>().join(", ")));
+    }
+    if ball_n > 0 {
+        out(&format!("  balls of {} x {} segments ({} triangles) in place of the cubes", ball_n, 2 * ball_n, idx.len() / 3));
     }
     let tt = plat::time_us();
     let mut tex = Vec::new();
@@ -277,7 +305,7 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     }
     let fps = if fs.mean > 0.0 { 1000.0 / fs.mean } else { 0.0 };
     out(&format!("  frame: {:.3} ms mean ({fps:.0} fps), {:.3} median, {:.3} p99", fs.mean, fs.med, fs.p99));
-    out(&format!("RESULT engine n={n} res={w}x{h} lists={meshes} moved={moved} textures={textures}x{tex_size} level={:?} inflight={k} frames={} occl={} vis={:.4} late={:.4} prep={:.4}/{:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} wait={:.4}/{:.4} up={:.4}/{:.4} cull={:.4}/{:.4} shcull={:.4}/{:.4} shdraw={:.4}/{:.4} draw={:.4}/{:.4} hiz={:.4}/{:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} frame={:.4}/{:.4} framemean={:.4} busy={:.3}",
+    out(&format!("RESULT engine n={n} res={w}x{h} lists={meshes} moved={moved} textures={textures}x{tex_size} level={:?} inflight={k} frames={} occl={} ball={ball_n} lods={lods} minpx={min_px} vis={:.4} late={:.4} prep={:.4}/{:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} wait={:.4}/{:.4} up={:.4}/{:.4} cull={:.4}/{:.4} shcull={:.4}/{:.4} shdraw={:.4}/{:.4} draw={:.4}/{:.4} hiz={:.4}/{:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} frame={:.4}/{:.4} framemean={:.4} busy={:.3}",
                  dev.level(), m.len(), occlusion as u32, vis.med / n as f64, late.med / n as f64, ps.med, ps.p99, rs.med, rs.p99, cs.med, cs.p99, ws.med, ws.p99, up.med, up.p99, cull.med, cull.p99,
                  shcull.med, shcull.p99, shdraw.med, shdraw.p99, draw.med, draw.p99, hiz[0].med, hiz[1].med, hiz[2].med, all.med, all.p99, gap.med, gap.p99, fs.med, fs.p99, fs.mean, busy));
     if verify {
