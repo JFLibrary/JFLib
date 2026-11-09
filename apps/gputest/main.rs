@@ -28,8 +28,9 @@
 //                    and a new device after it
 //        queues      (G5d) the compute queue (t_queue.rs): rounds on one buffer alternating between the queues
 //                    with waits through the timeline, = the CPU; a storage texture written on the compute queue,
-//                    read on the device queue; waits, ids, a dropped buffer, refused uses, the fallback
-//                    (jfgui_GPU_COMPUTE=0); with --validate a missing wait between the queues must be reported
+//                    read on the device queue; waits, ids, a dropped buffer, refused uses; only when asked
+//                    for (create_device_with), the fallback (jfgui_GPU_COMPUTE=0); a missing wait between the
+//                    queues is found by the values (the validation layer does not report it)
 //        syncval     (--validate only) two copies into one buffer without a barrier: the
 //                    validation layer must report the hazard (synchronization validation on)
 //        spec        pipeline constants (t_spec.rs): lib/shader's spec_fill as SPIR-V 1.3

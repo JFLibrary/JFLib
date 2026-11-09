@@ -5,8 +5,9 @@
 // waits).  A storage texture written on the compute queue (its layout changed there) and read on the device queue.
 // Waiting and is_done for the compute queue's ids, wait_idle over both, a buffer dropped while the compute queue uses
 // it, barriers with graphics stages on the compute queue, timestamps there.  What is refused: command buffers of the
-// other family, a render pass on the compute queue, waiting for a submission not made.  jfgui_GPU_COMPUTE=0: no
-// compute queue (the fallback).  With --validate: the same rounds without the wait between two of them must be
+// other family, a render pass on the compute queue, waiting for a submission not made.  The queue only when asked
+// for (Adapter::create_device_with, DeviceOptions::compute_queue): create_device has none; jfgui_GPU_COMPUTE=0: none
+// even when asked for (the fallback).  With --validate: the same rounds without the wait between two of them must be
 // reported by synchronization validation (a hazard between the queues).  A rough look at whether the two queues run
 // at once on this GPU (two long dispatches, apart and together).
 
@@ -85,20 +86,24 @@ fn group<'a>(t: &mut T, dev: &Device, bgl: &BindGroupLayout, res: &[Resource<'a>
 
 pub fn queues(t: &mut T) {
     let Some(g) = setup(t) else { return };
-    let dev = &g.dev;
-    match dev.compute_queue() {
-        Some(cq) => {
-            out("  the device has a compute queue (a family without graphics)");
-            let _ = with_queue(t, dev, cq);
+    // without asking: one queue, as in 0.1.0
+    t.ok(g.dev.compute_queue().is_none(), "create_device (no DeviceOptions::compute_queue): Device::compute_queue is None");
+    let asked = DeviceOptions::DEFAULT.with_compute_queue();
+    if let Some(dev) = t.res(g.adapter.create_device_with(&DeviceDesc::DEFAULT, &asked), "device with a compute queue asked for") {
+        match dev.compute_queue() {
+            Some(cq) => {
+                out("  the device has a compute queue (a family without graphics)");
+                let _ = with_queue(t, &dev, cq);
+            }
+            None => out("  note: this device has no family without graphics: no compute queue (everything on Device::queue)"),
         }
-        None => out("  note: this device has no family without graphics: no compute queue (everything on Device::queue)"),
     }
-    // the fallback: jfgui_GPU_COMPUTE=0
+    // the fallback: jfgui_GPU_COMPUTE=0, even when asked for
     plat::setenv("jfgui_GPU_COMPUTE", Some("0"));
-    let d2 = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device without a compute queue");
+    let d2 = t.res(g.adapter.create_device_with(&DeviceDesc::DEFAULT, &asked), "device without a compute queue");
     plat::setenv("jfgui_GPU_COMPUTE", None);
     if let Some(d2) = d2 {
-        t.ok(d2.compute_queue().is_none(), "jfgui_GPU_COMPUTE=0: Device::compute_queue is None");
+        t.ok(d2.compute_queue().is_none(), "jfgui_GPU_COMPUTE=0 with the queue asked for: Device::compute_queue is None");
         let _ = rounds(t, &d2, None, true, "one queue");
     }
 }

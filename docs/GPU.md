@@ -108,9 +108,10 @@ rb.read(0, &mut out)?;
   `set_vertex_buffer`, `set_index_buffer`, `draw`, `draw_indexed`, `draw_indirect`,
   `draw_indexed_indirect`; auf Voll `draw_indexed_indirect_multi` und
   `draw_indexed_indirect_count`), Zeitstempel (`reset_timestamps`, `timestamp`); `finish()`.
-- **Rechen-Warteschlange** (G5d, [unten](#rechen-warteschlange-g5d)): `device.compute_queue()` gibt
-  `Option<&ComputeQueue>` (`encoder()`, `submit`, `submit_after(&[id], ..)`); `queue.submit_after(&[id], ..)`
-  wartet auf Übergaben der anderen.
+- **Rechen-Warteschlange** (G5d, [unten](#rechen-warteschlange-g5d)): nur auf Wunsch,
+  `adapter.create_device_with(&desc, &DeviceOptions::DEFAULT.with_compute_queue())`; dann gibt
+  `device.compute_queue()` `Option<&ComputeQueue>` (`encoder()`, `submit`, `submit_after(&[id], ..)`);
+  `queue.submit_after(&[id], ..)` wartet auf Übergaben der anderen.
 - **Warteschlange**: `submit([cmd, ..])` gibt eine `SubmitId` (Zeitleisten-Semaphor);
   `write_buffer`, `write_texture`, `write_texture_rects` (Rechtecke eines Bildes mit eigener
   Zeilenlänge, ein Übergang für alle) und `write_texture_rects_at` (dasselbe aus einem größeren
@@ -214,12 +215,18 @@ der Basis-Pfade auf großer Hardware).
 
 ## Rechen-Warteschlange (G5d)
 
-**Eine zweite Warteschlange für Rechen-Shader und Kopien, neben der des Geräts.** `Device::compute_queue()`
-gibt sie, wo das Gerät eine Familie mit Compute und ohne Grafik hat (die RTX 2070 SUPER: Familie 2), sonst
-`None`; im Browser immer `None` (WebGPU hat eine Warteschlange), und `jfgui_GPU_COMPUTE=0` schaltet sie ab.
+**Eine zweite Warteschlange für Rechen-Shader und Kopien, neben der des Geräts, nur auf Wunsch.** Ein Gerät aus
+`create_device` hat eine Warteschlange und exklusive Ressourcen wie in 0.1.0. Die zweite fordert
+`Adapter::create_device_with` mit `DeviceOptions::compute_queue` an (`DeviceOptions` ist `#[non_exhaustive]`:
+von `DEFAULT` ausgehen). Dann gibt `Device::compute_queue()` sie, wo das Gerät eine Familie mit Compute und ohne
+Grafik hat (die RTX 2070 SUPER: Familie 2), sonst `None`; im Browser immer `None` (WebGPU hat eine
+Warteschlange), und `jfgui_GPU_COMPUTE=0` schaltet sie auch dann ab. Warum nur auf Wunsch: Mit ihr teilt das Gerät
+jeden Puffer und jede Textur außer Renderzielen zwischen beiden Familien (concurrent). Auf der NVIDIA kostet das
+nichts Messbares, auf anderen GPUs (AMD) könnte es Kompression kosten, und render3d nutzt die Warteschlange nicht.
 Ohne sie läuft alles über `device.queue()`: Wer `Option` prüft, hat beide Wege mit demselben Code.
 
 ```rust
+let dev = adapter.create_device_with(&DeviceDesc::DEFAULT, &DeviceOptions::DEFAULT.with_compute_queue())?;
 let cq = dev.compute_queue();                       // Option<&ComputeQueue>
 let mut e = match cq { Some(q) => q.encoder()?, None => dev.encoder()? };
 e.set_compute_pipeline(&p); e.set_bind_group(0, &g); e.dispatch(n, 1, 1);
@@ -258,8 +265,8 @@ erste liest, was `write_buffer` bereitgelegt hat: 0 von 65 536 Werten falsch; ei
 Rechen-Warteschlange geschrieben (ihre Layouts dort gewechselt), auf der des Geräts gelesen: 0 von 960 Texeln falsch;
 `wait` und `is_done` mit der `SubmitId` der Rechen-Warteschlange; ein Puffer, der fällt, während sie ihn noch
 benutzt; Zeitstempel dort; verweigert: Befehlspuffer der anderen Familie in beide Richtungen, ein Render-Durchgang,
-ein Warten auf eine Übergabe, die es nicht gibt; ohne Rechen-Warteschlange (`jfgui_GPU_COMPUTE=0`) dieselben acht
-Runden auf einer. **Absichtlich fehlende Synchronisation:** zwei Dispatches auf demselben Puffer ohne Barriere in
+ein Warten auf eine Übergabe, die es nicht gibt; `create_device` ohne Wunsch hat keine; ohne Rechen-Warteschlange
+(`jfgui_GPU_COMPUTE=0`, auch mit Wunsch) dieselben acht Runden auf einer. **Absichtlich fehlende Synchronisation:** zwei Dispatches auf demselben Puffer ohne Barriere in
 einem Befehlspuffer der Rechen-Warteschlange meldet die Validierung (1 Fehler). Ein fehlendes Warten *zwischen*
 den Warteschlangen meldet die Schicht (1.4.363) nicht, und auch zwei Übergaben an *eine* Warteschlange ohne
 Synchronisation dazwischen meldet sie nicht (geprüft mit einer ersten Übergabe, die noch lief, als die zweite kam:
@@ -272,7 +279,8 @@ ab (`0xC0000005` in einer DLL, nicht im Programm), beide Male beim Abbau des Tes
 Swapchain benutzt hatte; ohne Validierung, mit `jfgui_GPU_COMPUTE=0`, ohne den Swapchain-Teil und mit denselben Tests
 in Teilfolgen nicht, auch nicht in der genauen Folge bis `bindless`, die beim ersten Mal abstürzte. Danach fragt
 `lib/gpu` die Zeitleiste der Rechen-Warteschlange nur noch, wenn auf ihr etwas aussteht (vorher bei jedem Aufräumen),
-und die ganze Reihe lief grün; ob das die Ursache war, ist nicht belegt (vermutet: die Schicht).
+und die ganze Reihe lief grün; ob das die Ursache war, ist nicht belegt (vermutet: die Schicht). Seit dem Review
+hat ein Gerät die Rechen-Warteschlange nur auf Wunsch; die Tests außer `queues` laufen ohne sie.
 
 **Läuft etwas nebeneinander?** Zwei lange Dispatches (1 Mio. × 2000 Schritte, je ein Puffer) nacheinander auf der
 Warteschlange des Geräts: 1,75 ms; je einer auf jeder: 1,46 ms (ein Lauf, `gputest --test queues`). Die
@@ -1079,7 +1087,7 @@ Dazu `gpu.js` (16 816 Byte, gzip 5 940), das nur geladen wird, wenn die Ausgabe 
 | `jfgui_GPU_DLL=name` | anderer Loader statt `vulkan-1.dll` (Name: nur aus System32; Pfad: aus seinem Ordner) bzw. `libvulkan.so.1` (wie `ld.so` sucht) |
 | `jfgui_GPU_ADAPTER=n` / `=name` | Adapter n von `adapters()` oder der erste, dessen Name das Wort enthält |
 | `jfgui_GPU_PRESENT=fifo\|mailbox\|immediate` | Darstellungsmodus jeder neuen Swapchain |
-| `jfgui_GPU_COMPUTE=0` (oder `off`) | (G5d) keine eigene Rechen-Warteschlange: `Device::compute_queue()` ist `None`, Ressourcen exklusiv |
+| `jfgui_GPU_COMPUTE=0` (oder `off`) | (G5d) keine eigene Rechen-Warteschlange, auch wenn `DeviceOptions::compute_queue` sie anfordert: `Device::compute_queue()` ist `None`, Ressourcen exklusiv |
 | `jfgui_GPU_VALIDATE=1` | Khronos-Validierungsschicht mit Synchronisationsprüfung, wenn installiert |
 | `jfgui_GPU_DEBUG=1` | die Debug-Meldungen des Treibers (ab Info-Stufe) auf stderr |
 

@@ -339,6 +339,11 @@ impl Adapter {
         true
     }
 
+    /// (G5d) as create_device: WebGPU has one queue, so a compute queue asked for stays None
+    pub fn create_device_with(&self, desc: &DeviceDesc, _opts: &DeviceOptions) -> Result<Device> {
+        self.create_device(desc)
+    }
+
     /// the device of this adapter, which prepare got (WebGPU gives one per adapter: a second one
     /// takes a new Instance)
     pub fn create_device(&self, _desc: &DeviceDesc) -> Result<Device> {

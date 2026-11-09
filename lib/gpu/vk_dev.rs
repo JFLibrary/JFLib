@@ -16,8 +16,9 @@
 //        shaders, the extended storage image formats, storage reads without format.  Not
 //        enabled: robust buffer access (speed; lib/wgsl's back end clamps indices instead).
 //   device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>, submit_after(&[id], [cmd, ..])
-//   device.compute_queue() -> Option<&ComputeQueue>    (G5d) a queue of its own for compute and copies: a family
-//        without graphics where the device has one (jfgui_GPU_COMPUTE=0: none); encoder(), submit, submit_after
+//   device.compute_queue() -> Option<&ComputeQueue>    (G5d) a queue of its own for compute and copies when
+//        DeviceOptions::compute_queue asked for it (Adapter::create_device_with): a family without graphics where the
+//        device has one (jfgui_GPU_COMPUTE=0: none); encoder(), submit, submit_after
 //   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
 //   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
 //   queue.write_texture_rects(&tex, &rects, &[u8], stride, before, after)   rectangles of a frame
@@ -44,7 +45,8 @@
 // small rectangles costs what they hold, not a full frame or a new allocation.
 // Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 // call returns GpuError::DeviceLost (objects are still destroyed normally).
-// (G5d) The compute queue has a timeline of its own (two queues signalling one timeline semaphore could reach its
+// (G5d) The compute queue comes only when asked for (DeviceOptions; without it a device is what it was in 0.1.0: one
+// queue, every resource exclusive).  It has a timeline of its own (two queues signalling one timeline semaphore could reach its
 // values out of order); its SubmitIds carry COMPUTE_ID.  A submission waits for the other queue's values through
 // the timeline (submit_after, at all commands).  A dropped resource waits for the latest submission of both queues;
 // command slots come from a pool of each family.  Resources are shared between the families concurrently: every
@@ -62,7 +64,7 @@ use rt::sync::SpinLock;
 use crate::vk_ffi as vk;
 use crate::vk_inst::{Adapter, InstShared, err};
 use crate::vk_mem::{Alloc, Allocator};
-use crate::{AdapterInfo, DataLayout, DeviceDesc, Features, GpuError, Layout, Level, Limits, MemoryKind, Pod, Result,
+use crate::{AdapterInfo, DataLayout, DeviceDesc, DeviceOptions, Features, GpuError, Layout, Level, Limits, MemoryKind, Pod, Result,
             SubmitId, TextureRegion};
 
 /// what waits for the GPU before it is destroyed
@@ -289,8 +291,14 @@ fn pick<const N: usize>(have: &[u32; N], want: &[usize]) -> [u32; N] {
 }
 
 impl Adapter {
-    /// a device of this adapter (level: the highest up to desc.max_level)
+    /// a device of this adapter (level: the highest up to desc.max_level), with one queue
     pub fn create_device(&self, desc: &DeviceDesc) -> Result<Device> {
+        self.create_device_with(desc, &DeviceOptions::DEFAULT)
+    }
+
+    /// (G5d) a device of this adapter with options: a compute queue of its own (Device::compute_queue) where the
+    /// adapter has a family without graphics and jfgui_GPU_COMPUTE is not 0
+    pub fn create_device_with(&self, desc: &DeviceDesc, opts: &DeviceOptions) -> Result<Device> {
         if let Some(why) = self.info.missing {
             return Err(GpuError::Unsupported(why));
         }
@@ -379,9 +387,9 @@ impl Adapter {
             p_queue_priorities: &prio,
             ..vk::Zero::zero()
         };
-        // (G5d) the compute queue: a family of its own, unless jfgui_GPU_COMPUTE=0
+        // (G5d) the compute queue: a family of its own when asked for, unless jfgui_GPU_COMPUTE=0
         let off = plat::env("jfgui_GPU_COMPUTE").is_some_and(|v| v == "0" || v.eq_ignore_ascii_case("off"));
-        let cfam = self.compute_family.filter(|_| !off);
+        let cfam = self.compute_family.filter(|_| opts.compute_queue && !off);
         let qis = [qi, vk::DeviceQueueCreateInfo { queue_family_index: cfam.map_or(0, |c| c.0), ..qi }];
         let info = vk::DeviceCreateInfo {
             s_type: vk::STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -1303,8 +1311,9 @@ impl Device {
     pub fn queue(&self) -> &Queue {
         &self.queue
     }
-    /// (G5d) the queue of its own for compute and copies (a family without graphics; jfgui_GPU_COMPUTE=0: none);
-    /// None where the device has none (then everything goes through queue())
+    /// (G5d) the queue of its own for compute and copies (a family without graphics), when DeviceOptions asked for it;
+    /// None where the device has none, without asking and with jfgui_GPU_COMPUTE=0 (then everything goes through
+    /// queue())
     pub fn compute_queue(&self) -> Option<&ComputeQueue> {
         self.compute.as_ref()
     }

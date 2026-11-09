@@ -245,15 +245,16 @@ Eine Transformation mit negativer Determinante (eine ungerade Zahl negativer Ska
 
 ## Zweite Warteschlange (G5d)
 
-`lib/gpu` hat seit G5d eine Rechen-Warteschlange ([GPU.md](GPU.md#rechen-warteschlange-g5d)). **render3d benutzt sie
-nicht**: Die Messung zeigt keinen klaren Gewinn.
+`lib/gpu` hat seit G5d eine Rechen-Warteschlange, nur auf Wunsch (`DeviceOptions::compute_queue`,
+[GPU.md](GPU.md#rechen-warteschlange-g5d)). **render3d benutzt sie nicht**: Die Messung zeigt keinen klaren Gewinn.
 
 - **Was danebenlaufen könnte.** Die Sichtbarkeit der Kaskaden (0,19 ms) braucht der Tiefen-Durchgang desselben Bildes,
   und der Hauptdurchgang braucht die Schattenkarte; neben ihr läge nur die Sichtbarkeit der Kamera (0,04 ms). Neben dem
   Zeichnen des laufenden Bildes liefe nur Arbeit des *nächsten* Bildes, mit doppelt gepufferten Listen oder
   Instanzdaten: `scatter` der Änderungen für das nächste Bild (bei 100 000 Änderungen je Bild 1,5 ms GPU) oder die
   Sichtbarkeit der Kaskaden des nächsten Bildes.
-- **Gemessen** (`render3dtest --bench 1000000 --async-work N --async-on compute|main`): neben jedem Bild läuft der
+- **Gemessen** (`render3dtest --bench 1000000 --async-work N --async-on compute|main`; `compute` fordert die
+  Rechen-Warteschlange an, `--compute-queue 1` auch ohne Arbeit daneben): neben jedem Bild läuft der
   echte `scatter`-Shader mit N Änderungen in eine zweite Kopie der Instanzdaten, auf der Rechen-Warteschlange oder
   nach dem Bild auf der des Geräts; gemessen wird der Bildabstand auf der GPU (Tabelle unter
   [Messwerte G5d](#g5d-verdeckung-detailstufen-zweite-warteschlange)). Ohne Schatten (Bild 0,57 ms) versteckt die
@@ -264,8 +265,10 @@ nicht**: Die Messung zeigt keinen klaren Gewinn.
   mehr) und jede Änderung in beide Kopien schriebe; bei 10 000 Änderungen je Bild ist aber die CPU der Engpass
   (rund 5 ms je Bild), und große Änderungsmengen gehören in einen eigenen Rechen-Shader zum Bewegen (nicht gebaut).
   Kein klarer Gewinn: render3d bleibt bei einer Warteschlange.
-- **Concurrent sharing kostet nichts Messbares**: dieselbe Szene mit Rechen-Warteschlange (Puffer concurrent) und mit
-  `jfgui_GPU_COMPUTE=0` (exklusiv): 0,551 gegen 0,550 ms GPU je Bild.
+- **Concurrent sharing kostet hier nichts Messbares**: dieselbe Szene mit Rechen-Warteschlange (Puffer concurrent) und mit
+  `jfgui_GPU_COMPUTE=0` (exklusiv): 0,551 gegen 0,550 ms GPU je Bild. Gemessen nur auf der NVIDIA; weil andere GPUs
+  (AMD) dafür Kompression aufgeben könnten und render3d die Warteschlange nicht nutzt, legt `lib/gpu` sie seit dem
+  Review nur auf Wunsch an.
 
 ## WebGPU
 
@@ -423,13 +426,14 @@ Dieselbe Maschine und Messszene (Release, offscreen, 1080p, 300 Bilder nach 60, 
 im Wechsel (`render3dtest --bench 1000000`), Median der Mediane, in Klammern die Spanne. GPU-Last anderer Sitzungen
 vor dem ersten Satz 1 %; die 29 bis 48 % nach den Sätzen zeigte `nvidia-smi` direkt nach dem eigenen Lauf. „Zeichnen“
 sind beide Durchgänge der Kamera; Pyramide / Phase 2 sind Bau der Pyramide, Sichtbarkeit und Durchgang der Phase 2
-(in „Zeichnen“ steckt der Durchgang der Phase 2 mit).
+(in „Zeichnen“ steckt der Durchgang der Phase 2 mit). Alle Zeilen außer der dritten liefen mit Rechen-Warteschlange,
+damals die Vorgabe (heute `--compute-queue 1`); die dritte zeigt, dass sie hier nichts kostet.
 
 | 1 Mio., ms | gezeichnet | Sichtbarkeit (Phase 1) | Pyramide / Sichtbarkeit / Durchgang Phase 2 | Zeichnen | GPU gesamt | Bildabstand |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Würfel ohne Verdeckung | 528 700 | 0,064 | – | 1,566 (1,555–1,576) | 1,637 | 1,653 |
 | Würfel mit Verdeckung | 30 200 (Phase 2: 11 900) | 0,038 | 0,045 / 0,077 / 0,036 | 0,382 (0,382–0,382) | 0,551 (0,550–0,552) | 0,567 |
-| dasselbe, eine Warteschlange (`jfgui_GPU_COMPUTE=0`) | 30 200 | 0,038 | 0,045 / 0,077 / 0,037 | 0,381 | 0,550 (0,549–0,550) | 0,565 |
+| dasselbe, eine Warteschlange (`jfgui_GPU_COMPUTE=0`; seit dem Review die Vorgabe) | 30 200 | 0,038 | 0,045 / 0,077 / 0,037 | 0,381 | 0,550 (0,549–0,550) | 0,565 |
 | Kugeln 8 × 16 (256 Dreiecke) ohne Verdeckung | 527 200 | 0,064 | – | 16,885 (16,755–16,889) | 16,956 | 16,972 |
 | Kugeln mit Verdeckung | 78 800 | 0,045 | 0,057 / 0,080 / 0,897 | 2,530 (2,515–2,535) | 2,732 | 2,748 |
 | Kugeln mit Verdeckung und Detailstufen (4 × 8 unter 0,02, 2 × 4 unter 0,008 der Bildhöhe) | 88 200 | 0,051 | 0,054 / 0,083 / 0,104 | 0,669 (0,665–0,669) | 0,867 (0,860–0,867) | 0,882 |

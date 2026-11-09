@@ -107,8 +107,13 @@ pub fn bench(n: u32, validate: bool) -> i32 {
     let (basis, verify) = (args.iter().any(|a| a == "--basis"), args.iter().any(|a| a == "--verify"));
     let Some(g) = setup(&mut t) else { return (t.fails > 0) as i32 };
     let desc = DeviceDesc { max_level: if basis { Level::Basis } else { Level::Voll } };
-    let Some(dev) = t.res(g.adapter.create_device(&desc), "device") else { return 1 };
-    out(&format!("{} ({}), level {:?}", dev.info().name, dev.info().driver_info, dev.level()));
+    // (G5d) --compute-queue 1: the device asks for a compute queue (DeviceOptions); work beside the frame on the
+    // compute queue (--async-work N, --async-on compute) asks for it too
+    let async_on_compute = num("--async-work", 0) > 0 && plat::arg_value("--async-on").is_none_or(|v| v != "main");
+    let opts = if num("--compute-queue", 0) != 0 || async_on_compute { DeviceOptions::DEFAULT.with_compute_queue() } else { DeviceOptions::DEFAULT };
+    let Some(dev) = t.res(g.adapter.create_device_with(&desc, &opts), "device") else { return 1 };
+    out(&format!("{} ({}), level {:?}{}", dev.info().name, dev.info().driver_info, dev.level(),
+                 if dev.compute_queue().is_some() { ", a compute queue" } else { "" }));
     let sh = if shadows > 0 { Some((shadow, shadow_mask)) } else { None };
     if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size, sh, lights, env, occlusion).is_none() && t.fails == 0 {
         t.ok(false, "the run stopped");

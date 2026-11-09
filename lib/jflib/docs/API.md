@@ -18077,12 +18077,14 @@ Planned: Metal; it provides the same types and methods.
   instance.prepare() -> Result<bool>             adapter and device are there (false: the browser's
                    answer is on its way; never waits; true at once elsewhere)
   adapter.info() / features() / limits() / level() / create_device(&DeviceDesc)
+         create_device_with(&DeviceDesc, &DeviceOptions)   (G5d) options: compute_queue (asked for, off by default)
   instance.validating(), validation_messages() -> (errors, warnings)   jfgui_GPU_VALIDATE
   device.queue() -> &Queue; features(), limits(), info(), level(), is_lost(), poll(),
          wait(id, timeout_ns), wait_idle(), memory_reserved()
-  device.compute_queue() -> Option<&ComputeQueue>   (G5d) a queue of its own for compute and copies
-         (Vulkan: a family without graphics; None in the browser and without one): encoder(),
-         submit, submit_after(&[id], ..); queue.submit_after(&[id], ..) waits for the other
+  device.compute_queue() -> Option<&ComputeQueue>   (G5d) a queue of its own for compute and copies, when
+         DeviceOptions asked for it (Vulkan: a family without graphics; None in the browser, without one
+         and when not asked for): encoder(), submit, submit_after(&[id], ..); queue.submit_after(&[id], ..)
+         waits for the other
   device.create_buffer(&BufferDesc)               Buffer: size(), write(off, &[T]),
                                                   read(off, &mut [T]) (Upload / Readback)
   device.create_texture(&TextureDesc)             Texture: view(), create_view(&ViewDesc),
@@ -18142,7 +18144,7 @@ read_buffer, Timestamps::read_*).
 
 Environment: jfgui_GPU=0 (off), jfgui_GPU_DLL (the loader's file name or path),
 jfgui_GPU_ADAPTER (index or name part), jfgui_GPU_PRESENT=fifo|mailbox|immediate, jfgui_GPU_COMPUTE=0 (no
-queue of its own for compute),
+queue of its own for compute, even when DeviceOptions asks for one),
 jfgui_GPU_VALIDATE=1 (the Khronos validation layer with synchronization validation when it is
 installed, messages on stderr), jfgui_GPU_DEBUG=1 (the driver's debug messages).
 ```
@@ -18304,6 +18306,19 @@ COLOR_TARGETS_MAX: usize = 8
 **`impl DeviceDesc`**
 
 - **`const DEFAULT: DeviceDesc = DeviceDesc { max_level: Level::Voll }`**
+
+- **`struct DeviceOptions`**
+  (G5d) what Adapter::create_device_with sets up beyond DeviceDesc; DEFAULT is what create_device does.  Fields may
+  come in later versions: start from DEFAULT
+  - `compute_queue: bool` -- a queue of its own for compute and copies (Device::compute_queue): Vulkan, where the device has a family
+    without graphics.  Then every buffer and every texture that is no render target is shared by both queues'
+    families (concurrently), which some GPUs may pay for; off by default, and jfgui_GPU_COMPUTE=0 turns it off
+
+**`impl DeviceOptions`**
+
+- **`const DEFAULT: DeviceOptions = DeviceOptions { compute_queue: false }`**
+- **`const fn with_compute_queue(self) -> DeviceOptions`**
+  these options with a compute queue asked for
 
 - **`struct SubmitId(pub u64)`**
   a submission's place on the device timeline (Device::wait)
@@ -18837,8 +18852,9 @@ buffer slots, staged uploads, submission
        shaders, the extended storage image formats, storage reads without format.  Not
        enabled: robust buffer access (speed; lib/wgsl's back end clamps indices instead).
   device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>, submit_after(&[id], [cmd, ..])
-  device.compute_queue() -> Option<&ComputeQueue>    (G5d) a queue of its own for compute and copies: a family
-       without graphics where the device has one (jfgui_GPU_COMPUTE=0: none); encoder(), submit, submit_after
+  device.compute_queue() -> Option<&ComputeQueue>    (G5d) a queue of its own for compute and copies when
+       DeviceOptions::compute_queue asked for it (Adapter::create_device_with): a family without graphics where the
+       device has one (jfgui_GPU_COMPUTE=0: none); encoder(), submit, submit_after
   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
   queue.write_texture_rects(&tex, &rects, &[u8], stride, before, after)   rectangles of a frame
@@ -18865,7 +18881,8 @@ by the next one that fits and released when none came for a second (Device::poll
 small rectangles costs what they hold, not a full frame or a new allocation.
 Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 call returns GpuError::DeviceLost (objects are still destroyed normally).
-(G5d) The compute queue has a timeline of its own (two queues signalling one timeline semaphore could reach its
+(G5d) The compute queue comes only when asked for (DeviceOptions; without it a device is what it was in 0.1.0: one
+queue, every resource exclusive).  It has a timeline of its own (two queues signalling one timeline semaphore could reach its
 values out of order); its SubmitIds carry COMPUTE_ID.  A submission waits for the other queue's values through
 the timeline (submit_after, at all commands).  A dropped resource waits for the latest submission of both queues;
 command slots come from a pool of each family.  Resources are shared between the families concurrently: every
@@ -18888,14 +18905,18 @@ Pending uploads run on the device's queue: a compute submission flushes them fir
 **`impl Adapter`**
 
 - **`fn create_device(&self, desc: &DeviceDesc) -> Result<Device>`**
-  a device of this adapter (level: the highest up to desc.max_level)
+  a device of this adapter (level: the highest up to desc.max_level), with one queue
+- **`fn create_device_with(&self, desc: &DeviceDesc, opts: &DeviceOptions) -> Result<Device>`**
+  (G5d) a device of this adapter with options: a compute queue of its own (Device::compute_queue) where the
+  adapter has a family without graphics and jfgui_GPU_COMPUTE is not 0
 
 **`impl Device`**
 
 - **`fn queue(&self) -> &Queue`**
 - **`fn compute_queue(&self) -> Option<&ComputeQueue>`**
-  (G5d) the queue of its own for compute and copies (a family without graphics; jfgui_GPU_COMPUTE=0: none);
-  None where the device has none (then everything goes through queue())
+  (G5d) the queue of its own for compute and copies (a family without graphics), when DeviceOptions asked for it;
+  None where the device has none, without asking and with jfgui_GPU_COMPUTE=0 (then everything goes through
+  queue())
 - **`fn info(&self) -> &AdapterInfo`**
 - **`fn features(&self) -> &Features`**
   what this device has enabled
@@ -19612,6 +19633,8 @@ them from the compute workers of the threads bundle (docs/GPU.md "Ausgabe im Bro
 - **`fn level(&self) -> Level`**
   always Basis in the browser
 - **`fn can_present(&self, _surface: &crate::Surface) -> bool`**
+- **`fn create_device_with(&self, desc: &DeviceDesc, _opts: &DeviceOptions) -> Result<Device>`**
+  (G5d) as create_device: WebGPU has one queue, so a compute queue asked for stays None
 - **`fn create_device(&self, _desc: &DeviceDesc) -> Result<Device>`**
   the device of this adapter, which prepare got (WebGPU gives one per adapter: a second one
   takes a new Instance)
