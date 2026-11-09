@@ -71,7 +71,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -27550,6 +27550,10 @@ Bounded control-channel IO primitives. Only explicitly enabled callers read stdi
   Read bytes from the process standard input, retrying interrupted system calls and waiting
   on a descriptor inherited non-blocking.
 
+- **`fn read_stdin(bytes: &mut [u8]) -> Result<usize, u32>`** *(Apple)*
+  Read bytes from the process standard input (macOS, iOS), as on Linux: interrupted calls are
+  retried, a descriptor inherited non-blocking is waited on.
+
 ### `plat/control_ipc_win.rs` (Windows)
 
 Source: [`lib/plat/control_ipc_win.rs`](../lib/plat/control_ipc_win.rs)
@@ -30268,6 +30272,241 @@ WT_SHOW: u32 = 18
 - **`fn gpu_test_presented() -> Vec<(u64, u64)>`**
   (bench: jfgui_WL_FEEDBACK=1 on Wayland) the commits since the last call and when each reached the
   screen (wp_presentation): (time of the commit, time on the screen; 0: discarded), time_us
+
+### `plat/apple.rs` (Apple)
+
+Source: [`lib/plat/apple.rs`](../lib/plat/apple.rs)
+
+```text
+apple -- macOS and iOS through libSystem (docs/APPLE.md)
+
+Apple keeps only libSystem stable, not the system calls under it (decision 2), so everything here
+is a libSystem call, as on Android through Bionic.  This is the start of the port (AP2): process,
+environment, time, files (apple_sys.rs), threads, semaphores, the wake-up, system information
+(apple_thread.rs); windows answer as on a system without a display (apple_disp.rs) until AP4.
+
+main(): libSystem's start calls it (a program without std); it calls the app's jfgui_main and ends
+the process with its result.  The arguments and the environment come from _NSGetArgv and
+_NSGetEnviron, so a program with std (whose main is std's) reads the same.
+```
+
+- **`extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32`**
+  the entry libSystem's start calls (a program without std; std brings its own main)
+
+- **`fn time_us() -> u64`**
+  monotonic time in microseconds (CLOCK_MONOTONIC)
+
+- **`fn unix_time_ns() -> i64`**
+  wall-clock time: nanoseconds since 1970-01-01 00:00 UTC (CLOCK_REALTIME)
+
+- **`fn args() -> Vec<String>`**
+  the command line, argument 0 (the program) first
+
+- **`fn env(name: &str) -> Option<String>`**
+  the value of an environment variable  [plat_env / plat_getenv]
+
+- **`fn getenv(name: &str) -> Option<String>`**
+  the same as env (ASMLIB's plat_getenv)
+
+- **`fn setenv(name: &str, value: Option<&str>) -> bool`**
+  set (Some) or remove (None) an environment variable of this process  [plat_setenv]
+
+- **`fn sleep_ms(ms: u32)`**
+  sleep for ms milliseconds (EINTR: the rest is slept)
+
+- **`fn current_exe() -> Option<String>`**
+  the path of this program's file (\_NSGetExecutablePath; modhost.rs has it on Windows and Linux),
+  None when it cannot be read
+
+### `plat/apple_sys.rs` (Apple)
+
+Source: [`lib/plat/apple_sys.rs`](../lib/plat/apple_sys.rs)
+
+```text
+apple_sys -- files, directories and well-known paths on macOS and iOS (libSystem; the same
+functions as linux_sys.rs, whose comments say what each one promises)
+
+No static buffers: every function may run on any thread.  OsFile::read_at / write_at are pread /
+pwrite, so several threads may use one file at the same time.  sync is F_FULLFSYNC: on Apple a
+plain fsync leaves the data in the drive's cache.
+```
+
+- **`fn dev_ino(path: &str) -> Option<(u64, u64)>`**
+  (st_dev, st_ino) of a path (links followed), None when it cannot be read  [fd_visit_once]
+
+- **`fn config_dir() -> Option<String>`**
+  ~/Library/Application Support (on iOS inside the app's container, whose root is $HOME).  The same
+  folder as data_dir, as Rust's `dirs` crate has it: config:// and data:// share the app's folder.
+
+- **`fn data_dir() -> Option<String>`**
+  ~/Library/Application Support
+
+- **`fn cache_dir() -> Option<String>`**
+  ~/Library/Caches
+
+- **`fn temp_dir() -> Option<String>`**
+  $TMPDIR (absolute; macOS gives each user one, iOS each app), else /tmp
+
+- **`fn cwd() -> String`**
+  the current directory ("" on failure)  [plat_cwd]
+
+### `plat/apple_thread.rs` (Apple)
+
+Source: [`lib/plat/apple_thread.rs`](../lib/plat/apple_thread.rs)
+
+```text
+apple_thread -- threads (pthreads), semaphores (libdispatch), the wake-up of the UI thread, system
+information and the date on macOS and iOS (the same functions as linux_thread.rs)
+
+A dispatch semaphore is created at 0 and posted to its initial count: libdispatch ends the process
+when a semaphore is freed with a count below the one it was created with.  The wake-up is a
+non-blocking pipe: wait_events polls it (headless), a window backend will watch it next to its
+own events (AP4).
+```
+
+- **`struct Thread(usize)`**
+  a thread started by thread_spawn; join it to wait for its end
+
+- **`fn thread_spawn(stack: usize, f: Start) -> Option<Thread>`**
+  run f on a new thread with stack bytes of stack (0 = 1 MB)  [plat_thread_create]
+
+**`impl Thread`**
+
+- **`fn join(self)`**
+  wait until the thread has ended  [plat_thread_join]
+
+- **`fn thread_yield()`**
+  give the rest of the time slice away  [plat_thread_yield]
+
+- **`struct Sem(*mut c_void)`**
+  a counting semaphore
+
+**`impl Sem`**
+
+- **`fn new(initial: u32) -> Option<Sem>`**
+- **`fn post(&self, n: u32)`**
+  add n units, wake sleepers (0: nothing)
+- **`fn wait(&self, ms: i32) -> bool`**
+  take one unit: true taken, false timeout (ms -1 = forever, 0 = only try)
+
+- **`fn wake()`**
+  any thread: make the UI thread's wait return with E_WAKE (coalesced)  [plat_wake]
+
+- **`fn wait_events(deadline_us: u64, on_event: &mut dyn FnMut(&Event)) -> u32`**
+  headless wait (no display): until a wake-up (E_WAKE to on_event, returns 1) or the deadline in
+  time_us() (0 = only poll, u64::MAX = forever; returns 0)
+
+- **`fn cpu_count() -> u32`**
+  CPUs online, >= 1  [plat_cpu_count]
+
+- **`fn mem_total() -> u64`**
+  physical memory in bytes (hw.memsize), 0 unknown  [plat_mem_total]
+
+- **`fn date() -> (Date, bool)`**
+  the date and time in UTC (as linux_thread.rs: no time zone database); the flag is true (UTC)
+  [plat_date]
+
+### `plat/apple_disp.rs` (Apple)
+
+Source: [`lib/plat/apple_disp.rs`](../lib/plat/apple_disp.rs)
+
+```text
+apple_disp -- the window API on macOS and iOS before there are windows (docs/APPLE.md AP4)
+
+Every function answers as linux_disp.rs does without a display: no window opens, sizes are 0, the
+dpi is 96, the clipboard is empty, wait() sleeps until its deadline or a wake().  The main window
+ends the process with exit code 1 and a message, as on Linux without Wayland or X11.
+```
+
+- **`fn win_create(_title: &str, _w_dip: i32, _h_dip: i32, _flags: u32, owner: i32, _x: i32, _y: i32) -> i32`**
+  see win_api.rs (Windows) for the semantics of every function
+
+- **`fn win_destroy(_w: i32)`**
+
+- **`fn win_show(_w: i32, _mode: u32)`**
+
+- **`fn win_activate(_w: i32)`**
+
+- **`fn win_enable(_w: i32, _on: bool)`**
+
+- **`fn win_set_rect(_w: i32, _x: i32, _y: i32, _cw: i32, _ch: i32)`**
+
+- **`fn win_get_rect(_w: i32) -> Option<[i32; 4]>`**
+
+- **`fn win_work_area(_w: i32) -> Option<[i32; 4]>`**
+
+- **`fn win_set_title(_w: i32, _title: &str)`**
+
+- **`fn win_state(_w: i32) -> u32`**
+
+- **`fn win_cmd(_w: i32, _cmd: u32)`**
+
+- **`fn win_begin_move(_w: i32)`**
+
+- **`fn win_begin_resize(_w: i32, _edges: u32)`**
+
+- **`fn win_show_menu(_w: i32, _x: i32, _y: i32)`**
+
+- **`fn win_size(_w: i32) -> (i32, i32)`**
+
+- **`fn win_dpi(_w: i32) -> i32`**
+
+- **`fn win_set_min_size(_w: i32, _w_dip: i32, _h_dip: i32)`**
+
+- **`fn win_present(_w: i32, _f: &Frame, _rects: Option<&[[i32; 4]]>)`**
+
+- **`fn win_set_cursor(_w: i32, _shape: u32)`**
+
+- **`fn win_hit_hook(_f: Option<fn(i32, i32, i32) -> u32>)`**
+
+- **`fn win_move_hook(_f: Option<fn(i32, &mut [i32; 4])>)`**
+
+- **`fn set_refresh(_f: Option<fn()>)`**
+
+- **`fn wait(deadline_us: u64) -> u32`**
+  without a display: sleep until the deadline (0 = poll, u64::MAX = forever) or a wake()
+
+- **`fn popup(_slot: u32, _owner: i32, _rect: Option<[i32; 4]>, _f: Option<&Frame>)`**
+
+- **`fn popup_anchor(_slot: u32, _anchor: [i32; 4], _kind: u32, _nat: [i32; 2])`**
+
+- **`fn popup_placed(_slot: u32) -> Option<[i32; 2]>`**
+
+- **`fn cursor_create(_px: &[u8], _w: i32, _h: i32, _hot_x: i32, _hot_y: i32, _dpi: i32) -> i32`**
+
+- **`fn cursor_destroy(_id: i32)`**
+
+- **`fn cursor_dpi(dpi: i32) -> i32`**
+  the dpi to draw a cursor for a window of this dpi (no display: the dpi itself)
+
+- **`fn clip_set(_fmt: u32, _data: &[u8]) -> bool`**
+
+- **`fn clip_set_many(_entries: &[(u32, &[u8])]) -> bool`**
+
+- **`fn clip_get(_fmt: u32) -> Option<Vec<u8>>`**
+
+- **`fn clip_has(_fmt: u32) -> bool`**
+
+- **`fn ime_pos(_x: i32, _y: i32, _h: i32)`**
+
+- **`fn theme() -> i32`**
+  0 light, 1 dark, -1 unknown: jfgui_THEME=light|dark, else unknown (the system's appearance
+  comes with the window backend)
+
+- **`fn pen_devices() -> i32`**
+  pens / pen tablets (-1 = unknown)
+
+- **`fn home() -> Option<String>`**
+  $HOME (or "/")  [plat_home]
+
+- **`fn drives() -> Vec<String>`**
+  the root "/"  [plat_drives]
+
+- **`fn spawn_self(_args: &[&str]) -> i32`**
+  starting this program again: not yet on Apple (posix_spawn comes with the processes, AP3) -> -1
+
+- **`fn restart_self(_args: &[&str]) -> i32`**
+  like spawn_self -> -1
 
 ### `plat/web.rs`
 

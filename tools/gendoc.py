@@ -19,8 +19,8 @@ What ends up in API.md, per crate (the CRATES table below sets order and groupin
 modules, items re-exported with `pub use` (globs too, through private modules), pub methods
 of public types, every method of a public trait.  An item's text is its /// comment; consts,
 fields and variants also take the // comment that ends their line, consts the plain //
-lines right above them.  Files of #[cfg(windows)] / #[cfg(target_os = "linux")] modules are
-marked (Windows) / (Linux).
+lines right above them.  Files of #[cfg(windows)] / #[cfg(target_os = "linux")] /
+#[cfg(target_vendor = "apple")] modules are marked (Windows) / (Linux) / (Apple).
 
 ui: the files are grouped by area (UI_AREAS), with an index of the Ui methods per area.
 Codec crates (img_png ... img_pdn): the crate root, the items re-exported there, the items
@@ -158,7 +158,8 @@ CODEC_EXTRA = {
     "img_jxl_enc": {"enew": ["encode", "encode_px", "encode_with_splines"]},
 }
 CFG_LABEL = [(re.compile(r'cfg\(\s*windows\s*\)'), "Windows"),
-             (re.compile(r'cfg\(\s*target_os\s*=\s*"linux"\s*\)'), "Linux")]
+             (re.compile(r'cfg\(\s*target_os\s*=\s*"linux"\s*\)'), "Linux"),
+             (re.compile(r'cfg\(\s*target_vendor\s*=\s*"apple"\s*\)'), "Apple")]
 VALUE_MAX = 60                                      # longer const values are cut
 
 
