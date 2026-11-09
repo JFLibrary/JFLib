@@ -717,9 +717,40 @@ if self.tab == 0 {
   (`btn`, `pressed`, `released`, bit `1 << BTN_*`), `wheel_x` / `wheel_y` (120 per notch),
   `mods`, all move points `pts`, the first unconsumed key, and pen data (`pressure`, `ptype`,
   `ppress`, tilt; `legacy/ASMLIB/docs/modules/PEN_INPUT.md`). The cursor shape comes from
-  `next_flags(CUR_* << HB_CURSOR_SHIFT)`. `ui.canvas` returns a borrow of `ui`: clone the
+  `next_flags(CUR_* << HB_CURSOR_SHIFT)`, the crosshair without one; with `HB_CURSOR_SET` the
+  bits count as given, so `CUR_ARROW` (0) is the arrow (a web page's cursor changes with what lies
+  under the pointer: set it every frame). `ui.canvas` returns a borrow of `ui`: clone the
   input before calling more `ui` methods. `canvas_damage(id, x, y, w, h)` redraws a part
   without a version change.
+* **A canvas that takes the keyboard** (a web page, a terminal, an emulator): with
+  `next_flags(HB_KEYS)` every key is the canvas's while it has the focus (a press gives it the
+  focus, `ui.focus(id)` too): no accelerator of the command table, no Tab, arrow or F6 of the
+  keyboard navigation (section 27), no Enter / Space action and no `ui.undo_keys` takes one. The
+  canvas takes them with `ui.key_take()` (the first unconsumed key, `VK | mods << 16`, consumed;
+  0 when none is left) and typed text with `ui.text_take`; a key it does not use goes back to the
+  command table with `ui.accel_run(key)` (true when a command ran). Unlike `HB_TEXT` there are no
+  text box rules: no reserved keys, no input method, no on-screen keyboard. Keys the app must
+  keep for itself (Ctrl+T, Ctrl+Tab in a browser) it takes before it hands the rest on:
+
+  ```rust
+  ui.next_flags(HB_KEYS | HB_CURSOR_SET | self.cursor << HB_CURSOR_SHIFT);
+  let inp = ui.canvas(ID_PAGE, Some(d), 0, self.ver).clone();
+  if inp.ev & EV_FOCUS != 0 {
+      loop {
+          let k = ui.key_take();
+          if k == 0 {
+              break;
+          }
+          if reserved(k) {
+              ui.accel_run(k);         // the app's own shortcut
+          } else {
+              self.page.key_down(k);   // the engine; one it did not use comes back as accel_run(k)
+          }
+      }
+  }
+  ```
+
+  `apps/viewtest` is such a page (`tests/keys.uis`).
 * Zoom and pan without a re-raster: right after the canvas's command, `ui.canvas_gpu(CanvasDesc {
   id, name, rect, view, ver, content, gpu, exact_pan })` says what it shows. `content` is an
   `Rc<dyn CanvasContent>` whose `draw_view(g, view, rect)` draws the content through any
@@ -3574,9 +3605,11 @@ text colour) and appears only after a key was used.
   `HB_FOCUS` (it is a Tab stop and takes the focus on a press), reacts to `EV_ACT` (Space /
   Enter) and calls `ui.focus_ring_draw(ev)` after its painting. `HB_NOTAB`: focusable but no
   Tab stop; `HB_CURRENT`: the member a group is entered at; `HB_SPACE`: Space acts, Enter
-  does not; `HB_OWNKEYS`: Space and Enter are the widget's own; `HB_SPLITTER`: a splitter
-  F8 reaches -- `ui.splitter_keys(ev, along_x)` says how far (DIP) the arrows move it. Give
-  it a `sem` record.
+  does not; `HB_OWNKEYS`: Space and Enter are the widget's own; `HB_KEYS`: every key is the
+  widget's while it has the focus, Tab, F6 and the accelerators too (a canvas that shows a web
+  page, section 5: it takes them with `ui.key_take()` and gives back the focus itself);
+  `HB_SPLITTER`: a splitter F8 reaches -- `ui.splitter_keys(ev, along_x)` says how far (DIP) the
+  arrows move it. Give it a `sem` record.
 * Mark tool bars and button grids as one Tab stop: `ui.focus_group_begin(id)` ..
   `ui.focus_group_end()` (id 0: the current box). A selection that follows the focus (tabs)
   asks `ui.group_arrived(id)`.
