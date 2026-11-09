@@ -159,10 +159,10 @@ hclip_text_* / open_folder / open_url (ui-edit).
 
 - [App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks): `fb`, `client_size`, `anim_off`, `set_anim_off`, `headless`, `invalidate`, `quit`, `set_title`, `title`, `spawn`, `spawner`, `tasks_live`
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
-- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
+- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
-- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
+- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
@@ -218,6 +218,13 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   the program's own calls `jflib::plat::std_start()`.
 
 - **`main!(...)`**
+  (see above)
+
+- **`__ui_panic_check!(...)`**
+  ui::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
+  std built with the feature `unwind` may unwind as well
+
+- **`__ui_panic_check!(...)`**
   (see above)
 
 - **`__jfgui_main!(...)`**
@@ -661,6 +668,11 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   ui_key_down(vk): held (mods: VK_SHIFT / VK_CONTROL / VK_MENU)
 - **`fn key_first(&self) -> u32`**
   ui_key_first: the first unconsumed key this frame (VK | mods &lt;&lt; 16) or 0
+- **`fn key_take(&mut self) -> u32`**
+  key_take -> the first unconsumed key this frame (VK | mods &lt;&lt; 16), consumed; 0 when none
+  is left.  A canvas with HB_KEYS takes every key with it while it has the focus (\\`ev &
+  EV_FOCUS\\`, call it until 0); the keys a focused text box keeps stay with the box, and
+  while a popup of the window is open (a menu, a flyout) the keys are its.
 - **`fn text_take(&mut self, cap: usize) -> Vec<u32>`**
   ui_text_take(cap): the typed codepoints (at most cap), consumed; when cap leaves some,
   they come in the next pass (nothing typed is lost)
@@ -709,6 +721,13 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
 - **`fn sem(&mut self, kind: u16, id: u32, label: Option<&str>, value: i32) -> &mut Sem`**
   ui_sem(kind, id, label, value) -> the record (rect = last_rect, state from the last
   behave); the label is copied
+- **`fn sem_rect(&mut self, kind: u16, id: u32, rect: [i32; 4], label: Option<&str>, value: i32) -> &mut Sem`**
+  sem_rect(kind, id, rect, label, value) -> the record: a semantic record of content the app
+  draws itself (a link or heading of a web page inside a canvas) at rect (px of the window, as
+  last_rect), without a hit box of its own and without a state; last_rect and the state of
+  the last widget stay.  Scripts find it by its label (`click "Label"` presses at its middle,
+  on the hit box that lies there: the canvas), screen readers read it (section 19 of the
+  guide).  Publish the records of what is visible, after the canvas.
 - **`fn clip_push(&mut self, x: i32, y: i32, w: i32, h: i32)`**
   ui_clip_push(x, y, w, h): px; intersects drawing and hit clipping
 - **`fn clip_pop(&mut self)`**
@@ -888,7 +907,9 @@ Label strings are copied, so they may live in scratch buffers.
 - **`fn canvas(&mut self, id: u32, draw: Option<DrawRef>, user: usize, version: u32) -> &UiInput`**
   ui_canvas(id, draw, user, version) -> &UiInput: a custom area.  The hit box wants
   every pointer move; the cursor comes from next_flags bits 12..15 (CUR_\* &lt;&lt;
-  HB_CURSOR_SHIFT), default crosshair.
+  HB_CURSOR_SHIFT), default crosshair (with HB_CURSOR_SET as given: 0 is the arrow).
+  next_flags(HB_KEYS): every key is the canvas's while it has the focus (a press gives it
+  the focus, so does ui.focus(id)); it takes them with ui.key_take.
 
 ### Popups, menus, command table, tooltips
 
@@ -979,6 +1000,11 @@ numbers for them.
 
 **`impl Ui`**
 
+- **`fn accel_run(&mut self, key: u32) -> bool`**
+  accel_run(key) -> true when key (VK | mods &lt;&lt; 16, as ui.key_take gives it) is the
+  accelerator of an enabled, visible command of the table: it runs (cmd_run(id, 0), after the
+  frame) as if the key had reached the table, open popups close.  For a widget with HB_KEYS
+  that hands a key back (one a web page did not use, say).
 - **`fn popup_is_open(&self, id: u32) -> bool`**
   ui_popup_is_open(id): popup `id` is open
 - **`fn popup_count(&self) -> u32`**
@@ -986,6 +1012,11 @@ numbers for them.
 - **`fn popup_open(&mut self, id: u32)`**
   ui_popup_open(id): open popup `id` (inside a flyout: as a child of that flyout,
   otherwise it replaces every open popup); an open popup only loses its children
+- **`fn popup_open_at(&mut self, id: u32, x: i32, y: i32)`**
+  popup_open_at(id, x, y): open popup `id` as popup_open does, its flyout hanging at the
+  point (x, y) (px of the window, as last_rect: a canvas's UiInput::rect plus its x, y)
+  instead of at the last widget; an open one moves there.  For a place the app learns later
+  than the click (a web engine's context menu); the app draws flyout_begin(id, ..) as usual.
 - **`fn popup_close(&mut self)`**
   ui_popup_close: close every popup (the focus returns to where it was)
 - **`fn flyout_begin(&mut self, id: u32, flags: u32) -> bool`**
@@ -1049,6 +1080,12 @@ numbers for them.
   ui_menu_popup(menu): open a menu at the pointer (the runtime draws it); for the
   menu key / Shift+F10 (an EV_RCLICK kbnav.rs gave the focused widget in this pass) at
   the widget's lower left corner with its first row focused
+- **`fn menu_popup_at(&mut self, menu: &'static [Mi], x: i32, y: i32)`**
+  menu_popup_at(menu, x, y): open a menu at the point (x, y) (px of the window, as
+  last_rect; a canvas: UiInput::rect plus its x, y), the runtime draws it as menu_popup's.
+  For a context menu whose place the app learns after the right click (a web engine
+  answers later): open it in the frame the answer comes; rows that change with the answer:
+  a flyout of the app's own through popup_open_at.
 - **`fn context_menu(&mut self, menu: &'static [Mi]) -> u32`**
   ui_context_menu(menu) -> EV_OPEN while `menu` is open for the last widget.  Opens on a
   right click (released over the widget), or with the menu key / Shift+F10 while the
@@ -4958,6 +4995,16 @@ HB_OWNKEYS: u32 = 0x20000
 // around it (touch.rs; the cursors of splitters, text and crosshairs say so by themselves)
 HB_GRAB_H: u32 = 0x40000
 HB_GRAB_V: u32 = 0x80000
+// every key is the widget's while it has the focus and no popup of the window is open (a menu
+// keeps its keys), Ctrl + letter, Tab and the arrows too: no accelerator, no keyboard
+// navigation, no Enter / Space action and no ui.undo_keys takes one (a canvas that shows a web
+// page takes them with ui.key_take; ui.accel_run hands one back to the command table).  Unlike
+// HB_TEXT no text box rules: no reserved keys, no input method, no on-screen keyboard.  A
+// canvas takes it from next_flags.
+HB_KEYS: u32 = 0x10_0000
+// canvas only (next_flags): its cursor bits as given, CUR_ARROW (0) included; without it 0 is the
+// crosshair
+HB_CURSOR_SET: u32 = 0x20_0000
 ```
 
 *the finger (touch.rs)*
@@ -8070,7 +8117,8 @@ all back.  Text fields keep their own undo; the edits here are the app's.
 
 - **`fn undo_keys(&mut self) -> Option<bool>`**
   undo_keys() -> Some(true) for Ctrl+Z, Some(false) for Ctrl+Y / Ctrl+Shift+Z, when no
-  text field has the keyboard (they keep their own undo); the key is consumed
+  text field (they keep their own undo) or widget with HB_KEYS has the keyboard; the key is
+  consumed
 
 #### `ui/hyph.rs`
 
@@ -24387,7 +24435,8 @@ sync -- blocking primitives for worker threads (servers, background jobs)
 One primitive per OS: wait on a 32-bit word while it holds a value, wake one / all waiters
 (Windows WaitOnAddress, Linux private futexes).  Mutex and Condvar are the futex algorithms
 of Rust's std; RwLock and the channel are built on them.  A lock is not poisoned by a panic
-(panics abort the process here).
+(panics abort the process here; with jflib's feature unwind a panic the app catches releases
+the locks its guards held).
 Not here: rt::SpinLock (rt keeps spin locks for the allocator and for modules, where plat is
 replaced).
 ```
@@ -28504,7 +28553,8 @@ E_WAKE.  Timers live in one list with the thread that registered them; each exec
 its own.  Blocking jobs run on up to BLOCKING_MAX threads of their own (not the compute pool:
 a job waiting for a disk must not starve parallel_for); where no thread can start (the
 browser without shared memory, Android) the executors run them inline, one per run.  A panic
-in a task or job ends the process like any panic (rt's handler: crash hook, exit code 3).
+in a task or job ends the process like any panic (rt's handler: crash hook, exit code 3), with
+jflib's feature unwind too unless the task's own code catches it (rt::abort_on_unwind).
 ```
 
 ```rust
@@ -28813,7 +28863,7 @@ threads, wake-up: win_thread.rs; the user32/gdi32 windows: win_api.rs)
 - **`fn std_start() -> !`**
   (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
   program's own): what mainCRTStartup does without std, with rt's panic hook first and the end
-  through std::process::exit
+  through std::process::exit; with the feature unwind a panic that leaves the app ends it there
 
 - **`fn time_us() -> u64`**
 
@@ -30839,7 +30889,8 @@ a driver's getenv reads the start environment.
 - **`fn std_start() -> !`**
   (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
   program's own): std's arguments and environment as a block like the initial stack, then what
-  glibc_main does, with rt's panic hook first; the end through std::process::exit
+  glibc_main does, with rt's panic hook first; the end through std::process::exit.  With the
+  feature unwind a panic that leaves the app ends it there.
 
 - **`fn exit(code: i32) -> !`**
   end the process: glibc's exit (at_exit handlers, the destructors of the loaded libraries);
@@ -47515,6 +47566,8 @@ semantics, the minimal OS calls the runtime itself needs, panic handling.
   rt::main!(body)  the entry symbol of console programs (boot first, then body); with the
            feature std also their fn main
   rt::panic_hook()  (feature std) std's panics take the crash report of rt's panic handler
+  rt::abort_on_unwind(f)  a panic that leaves f ends the program (feature unwind; else f())
+  rt::panic_take()  (feature unwind) the last panic of the calling thread, as text
   rt::Alloc  (feature std, Windows and Linux) rt's allocator for a program with std that wants it
   rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (the root Cargo.toml, SemVer;
            docs/VERSIONING.md), also as plat::VERSION and ui::VERSION
@@ -47558,6 +47611,13 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
 - **`main!(...)`**
   (see above)
 
+- **`__rt_panic_check!(...)`**
+  rt::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
+  std built with the feature `unwind` may unwind as well
+
+- **`__rt_panic_check!(...)`**
+  (see above)
+
 - **`__jfgui_main!(...)`**
   rt::main!'s `jfgui_main`, without and with std
 
@@ -47565,6 +47625,12 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
   the `fn main` of a program with std: plat's start (jfgui_std_start), which calls jfgui_main.  In
   a library crate (an app whose program only links it, like the template) it is not the entry
   point and stays unused: the program's own main calls `plat::std_start()`.
+
+- **`fn abort_on_unwind<R>(f: impl FnOnce() -> R) -> R`**
+  run `f`; with the feature `unwind` (a program with std built with `panic = "unwind"`) a panic
+  that leaves it ends the program as an uncaught panic: JFLib's crash report, exit code 3.  plat
+  runs its threads and the program's start through it.  Without that feature a panic never
+  unwinds, and this is `f()`.
 
 **`mod portable`**
 
@@ -47993,10 +48059,31 @@ hosted -- what rt has for a program with the standard library (feature std, docs
 CR6); the only file of rt that names std, compiled only with that feature.  std brings the panic
 handler, the allocator and the memory functions then (lib.rs, mem.rs and os.rs leave theirs out).
 
-  panic_hook()   std's panics end as rt's panic handler ends them without std
+  panic_hook()          std's panics end as rt's panic handler ends them without std
+  abort_on_unwind(f)    (feature unwind) a panic that leaves f ends the program as an uncaught one
+  panic_take()          (feature unwind) the last panic of the calling thread, as text
+
+With the feature unwind and panic = "unwind" a panic unwinds: the hook only keeps its text (LAST)
+and reports nothing, since the app may catch it.  It is reported where it leaves JFLib's threads
+and the program's start (abort_on_unwind) or reaches a function that cannot unwind (an extern
+callback such as a window procedure: core panics once more there, with one of NOUNWIND's texts).
 ```
 
 - **`fn panic_hook()`**
   (feature std) std's panics end as rt's panic handler ends them without std: one line on stderr,
   the crash hook, exit code 3.  plat's start of a std program installs it; replacing it with
-  `std::panic::set_hook` gives up JFLib's crash report for panics.
+  `std::panic::set_hook` gives up JFLib's crash report for panics.  With the feature `unwind` and
+  `panic = "unwind"` it reports only a panic nobody catches: one that leaves the program's start or
+  a thread of JFLib's, or reaches a callback of the system ([`abort_on_unwind`]).
+
+- **`fn abort_on_unwind<R>(f: impl FnOnce() -> R) -> R`**
+  (feature `unwind`) run `f`; a panic that leaves it ends the program as an uncaught panic:
+  JFLib's crash report (the panic's text on stderr, the crash hook), exit code 3.  plat runs its
+  threads and the program's start through it, so only the app's own `std::panic::catch_unwind`
+  (on any thread) keeps a panic from ending the program.  With `panic = "abort"` it is `f()`.
+
+- **`fn panic_take() -> Option<String>`**
+  (feature `unwind`) the last panic on the calling thread as JFLib's crash report shows it
+  (`"panicked at FILE:LINE:COL:\nMESSAGE"`), taken: for a panic the app caught with
+  `std::panic::catch_unwind`, whose payload holds the message alone.  None when no panic came
+  since the last call (or the program is built with `panic = "abort"`).

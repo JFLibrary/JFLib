@@ -98,7 +98,8 @@ extern "C" fn glibc_main(_argc: i32, argv: *const usize, _envp: *const usize) ->
 
 /// (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
 /// program's own): std's arguments and environment as a block like the initial stack, then what
-/// glibc_main does, with rt's panic hook first; the end through std::process::exit
+/// glibc_main does, with rt's panic hook first; the end through std::process::exit.  With the
+/// feature unwind a panic that leaves the app ends it there.
 #[cfg(feature = "std")]
 pub fn std_start() -> ! {
     // SAFETY: written once, first thing in the program's main, before anything reads it.
@@ -109,7 +110,7 @@ pub fn std_start() -> ! {
     crate::cpu::simd_override();
     rt::boot::set_handler(crate::boot::start); // rt::main!: name, app://, manifest
     // SAFETY: the program's entry symbol (ui::main!, rt::main!).
-    let code = unsafe { super::jfgui_main() };
+    let code = rt::abort_on_unwind(|| unsafe { super::jfgui_main() });
     crate::exit(code) // hosted.rs: std::process::exit
 }
 

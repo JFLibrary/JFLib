@@ -79,7 +79,7 @@ struct ThreadRec {
         syscall3(SYS_SIGALTSTACK, ss.as_ptr() as usize, 0, 0);
         Box::from_raw((*rec).start)
     };
-    f();
+    rt::abort_on_unwind(f); // feature unwind: a panic that leaves the thread ends the program
     // SAFETY: ends this thread only (the kernel clears and wakes rec.tid).
     unsafe { syscall3(SYS_EXIT, 0, 0, 0) };
     loop {}
@@ -372,7 +372,7 @@ extern "C" fn thread_main(rec: *mut u8) -> *mut u8 {
         syscall3(SYS_SIGALTSTACK, ss.as_ptr() as usize, 0, 0);
         Box::from_raw((*rec).start)
     };
-    f();
+    rt::abort_on_unwind(f); // feature unwind: a panic that leaves the thread ends the program
     core::ptr::null_mut()
 }
 
