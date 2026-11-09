@@ -18080,6 +18080,9 @@ Planned: Metal; it provides the same types and methods.
   instance.validating(), validation_messages() -> (errors, warnings)   jfgui_GPU_VALIDATE
   device.queue() -> &Queue; features(), limits(), info(), level(), is_lost(), poll(),
          wait(id, timeout_ns), wait_idle(), memory_reserved()
+  device.compute_queue() -> Option<&ComputeQueue>   (G5d) a queue of its own for compute and copies
+         (Vulkan: a family without graphics; None in the browser and without one): encoder(),
+         submit, submit_after(&[id], ..); queue.submit_after(&[id], ..) waits for the other
   device.create_buffer(&BufferDesc)               Buffer: size(), write(off, &[T]),
                                                   read(off, &mut [T]) (Upload / Readback)
   device.create_texture(&TextureDesc)             Texture: view(), create_view(&ViewDesc),
@@ -18138,7 +18141,8 @@ before the drop (the device's timeline).  Nothing waits on the CPU unless asked 
 read_buffer, Timestamps::read_*).
 
 Environment: jfgui_GPU=0 (off), jfgui_GPU_DLL (the loader's file name or path),
-jfgui_GPU_ADAPTER (index or name part), jfgui_GPU_PRESENT=fifo|mailbox|immediate,
+jfgui_GPU_ADAPTER (index or name part), jfgui_GPU_PRESENT=fifo|mailbox|immediate, jfgui_GPU_COMPUTE=0 (no
+queue of its own for compute),
 jfgui_GPU_VALIDATE=1 (the Khronos validation layer with synchronization validation when it is
 installed, messages on stderr), jfgui_GPU_DEBUG=1 (the driver's debug messages).
 ```
@@ -18744,6 +18748,9 @@ write), CopySrc / CopyDst (transfer), Sampled (vertex + fragment + compute shade
 (colour output), DepthTarget (early + late fragment tests), DepthRead (fragment tests and
 shaders), Present (as Undefined; bottom of pipe).
 Viewport: y flipped (origin top left, NDC y up: lib.rs conventions).
+(G5d) An encoder of the compute queue (ComputeQueue::encoder) records no render pass, and its barriers keep the
+stages and accesses a compute family has (compute, copies, indirect arguments, the host): the graphics stages of a
+layout or of Access flags fall away there.
 ```
 
 - **`struct CommandEncoder<'a>`**
@@ -18755,7 +18762,7 @@ Viewport: y flipped (origin top left, NDC y up: lib.rs conventions).
 **`impl Device`**
 
 - **`fn encoder(&self) -> Result<CommandEncoder<'_>>`**
-  a command encoder (a recording command buffer)
+  a command encoder (a recording command buffer) of the device's queue
 
 **`impl<'a> CommandEncoder<'a>`**
 
@@ -18829,7 +18836,9 @@ buffer slots, staged uploads, submission
        primitive index (geometryShader), sample-rate shading, dual-source blending in
        shaders, the extended storage image formats, storage reads without format.  Not
        enabled: robust buffer access (speed; lib/wgsl's back end clamps indices instead).
-  device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
+  device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>, submit_after(&[id], [cmd, ..])
+  device.compute_queue() -> Option<&ComputeQueue>    (G5d) a queue of its own for compute and copies: a family
+       without graphics where the device has one (jfgui_GPU_COMPUTE=0: none); encoder(), submit, submit_after
   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
   queue.write_texture_rects(&tex, &rects, &[u8], stride, before, after)   rectangles of a frame
@@ -18856,10 +18865,22 @@ by the next one that fits and released when none came for a second (Device::poll
 small rectangles costs what they hold, not a full frame or a new allocation.
 Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 call returns GpuError::DeviceLost (objects are still destroyed normally).
+(G5d) The compute queue has a timeline of its own (two queues signalling one timeline semaphore could reach its
+values out of order); its SubmitIds carry COMPUTE_ID.  A submission waits for the other queue's values through
+the timeline (submit_after, at all commands).  A dropped resource waits for the latest submission of both queues;
+command slots come from a pool of each family.  Resources are shared between the families concurrently: every
+buffer, and every texture that is no render target (render targets stay exclusive to the device's queue: render
+passes run there only, and some GPUs compress exclusive targets) -- no ownership transfers in the caller's code.
+Pending uploads run on the device's queue: a compute submission flushes them first and waits for them.
 ```
 
 - **`struct Device`**
   a logical GPU device: creates resources, records commands, owns the queue
+
+- **`struct ComputeQueue`**
+  (G5d) a queue of its own for compute shaders and copies, beside the device's queue (Device::compute_queue): its
+  encoders record no render passes, its submissions run in parallel with the device queue's unless one waits for the
+  other (submit_after)
 
 - **`struct Queue`**
   the device's queue (graphics, compute, copies, presentation)
@@ -18872,6 +18893,9 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 **`impl Device`**
 
 - **`fn queue(&self) -> &Queue`**
+- **`fn compute_queue(&self) -> Option<&ComputeQueue>`**
+  (G5d) the queue of its own for compute and copies (a family without graphics; jfgui_GPU_COMPUTE=0: none);
+  None where the device has none (then everything goes through queue())
 - **`fn info(&self) -> &AdapterInfo`**
 - **`fn features(&self) -> &Features`**
   what this device has enabled
@@ -18888,13 +18912,13 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 - **`fn poll(&self) -> Result<()>`**
   free what the GPU has finished with (also done by submit and wait)
 - **`fn wait(&self, id: SubmitId, timeout_ns: u64) -> Result<bool>`**
-  wait for a submission -> false when timeout_ns passed first
+  wait for a submission (of either queue) -> false when timeout_ns passed first
 - **`fn wait_idle(&self) -> Result<()>`**
-  wait for every submission so far
+  wait for every submission so far (of both queues)
 - **`fn completed(&self) -> SubmitId`**
   the last submission the GPU has finished
 - **`fn is_done(&self, id: SubmitId) -> bool`**
-  the submission id is done on the GPU (asks the driver; never waits)
+  the submission id (of either queue) is done on the GPU (asks the driver; never waits)
 - **`fn memory_reserved(&self) -> u64`**
   bytes of device and host memory the device holds in blocks
 
@@ -18902,6 +18926,9 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 
 - **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId>`**
   run command buffers in order (after the pending uploads) -> their timeline value
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, wait: &[SubmitId], cmds: I) -> Result<SubmitId>`**
+  (G5d) run command buffers in order once the submissions `wait` (of either queue; Device::compute_queue) are
+  done: a wait through the timeline, at all commands
 - **`fn flush(&self) -> Result<SubmitId>`**
   submit the pending uploads now
 - **`fn write_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, data: &[T]) -> Result<()>`**
@@ -18921,6 +18948,18 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 - **`fn read_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, out: &mut [T]) -> Result<()>`**
   read a buffer's contents at offset (copies through a readback buffer when needed,
   submits and waits for the GPU: the slow path, for tools and tests)
+
+**`impl ComputeQueue`**
+
+- **`fn encoder(&self) -> Result<crate::CommandEncoder<'_>>`**
+  (G5d) an encoder of this queue's family: copies, fills, barriers, compute and timestamps (where the family has
+  them); a render pass is Invalid (from finish)
+- **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId>`**
+  (G5d) run this queue's command buffers in order -> their SubmitId (Device::wait takes it); the pending uploads go
+  first, on the device's queue
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, wait: &[SubmitId], cmds: I) -> Result<SubmitId>`**
+  (G5d) the same once the submissions `wait` (of either queue) are done: a wait through the timeline, at all
+  commands
 
 ### `gpu/vk_inst.rs`
 
@@ -19583,9 +19622,21 @@ them from the compute workers of the threads bundle (docs/GPU.md "Ausgabe im Bro
 - **`struct Queue`**
   the device's queue
 
+- **`struct ComputeQueue`**
+  (G5d) a queue of its own for compute: WebGPU has one queue, so Device::compute_queue is None here and there is no
+  value of this type
+
+**`impl ComputeQueue`**
+
+- **`fn encoder(&self) -> Result<crate::CommandEncoder<'_>>`**
+- **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _cmds: I) -> Result<SubmitId>`**
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _wait: &[SubmitId], _cmds: I) -> Result<SubmitId>`**
+
 **`impl Device`**
 
 - **`fn queue(&self) -> &Queue`**
+- **`fn compute_queue(&self) -> Option<&ComputeQueue>`**
+  (G5d) WebGPU has one queue: None
 - **`fn info(&self) -> &AdapterInfo`**
 - **`fn features(&self) -> &Features`**
 - **`fn limits(&self) -> &Limits`**
@@ -19610,6 +19661,8 @@ them from the compute workers of the threads bundle (docs/GPU.md "Ausgabe im Bro
 
 - **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId>`**
   run command buffers in order -> their number
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _wait: &[SubmitId], cmds: I) -> Result<SubmitId>`**
+  (G5d) one queue: its submissions run in order, so this is submit
 - **`fn flush(&self) -> Result<SubmitId>`**
   nothing waits for a submission here
 - **`fn write_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, data: &[T]) -> Result<()>`**

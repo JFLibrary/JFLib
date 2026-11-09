@@ -26,6 +26,10 @@
 //        errors      jfgui_GPU=0, a missing loader (jfgui_GPU_DLL), jfgui_GPU_ADAPTER without a
 //                    match, invalid calls (Err, no crash), a lost device (Device::test_lose)
 //                    and a new device after it
+//        queues      (G5d) the compute queue (t_queue.rs): rounds on one buffer alternating between the queues
+//                    with waits through the timeline, = the CPU; a storage texture written on the compute queue,
+//                    read on the device queue; waits, ids, a dropped buffer, refused uses, the fallback
+//                    (jfgui_GPU_COMPUTE=0); with --validate a missing wait between the queues must be reported
 //        syncval     (--validate only) two copies into one buffer without a barrier: the
 //                    validation layer must report the hazard (synchronization validation on)
 //        spec        pipeline constants (t_spec.rs): lib/shader's spec_fill as SPIR-V 1.3
@@ -91,6 +95,7 @@ mod measure;
 mod scene;
 mod shaders;
 mod t_compute;
+mod t_queue;
 mod t_glibc;
 mod t_render;
 mod t_scene;
@@ -508,7 +513,7 @@ fn run() -> i32 {
         return 2;
     };
     let all = test == "all";
-    let tests: [(&str, fn(&mut T)); 18] = [
+    let tests: [(&str, fn(&mut T)); 19] = [
         ("info", info),
         ("compute", t_compute::compute),
         ("copies", t_compute::copies),
@@ -522,6 +527,7 @@ fn run() -> i32 {
         ("window", t_window::window),
         ("errors", errors),
         ("syncval", syncval),
+        ("queues", t_queue::queues),
         ("scene", t_scene::scene),
         ("wgsl", t_wgsl::wgsl),
         ("bench_smoke", t_scene::bench_smoke),

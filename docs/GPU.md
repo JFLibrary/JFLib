@@ -108,6 +108,9 @@ rb.read(0, &mut out)?;
   `set_vertex_buffer`, `set_index_buffer`, `draw`, `draw_indexed`, `draw_indirect`,
   `draw_indexed_indirect`; auf Voll `draw_indexed_indirect_multi` und
   `draw_indexed_indirect_count`), Zeitstempel (`reset_timestamps`, `timestamp`); `finish()`.
+- **Rechen-Warteschlange** (G5d, [unten](#rechen-warteschlange-g5d)): `device.compute_queue()` gibt
+  `Option<&ComputeQueue>` (`encoder()`, `submit`, `submit_after(&[id], ..)`); `queue.submit_after(&[id], ..)`
+  wartet auf Übergaben der anderen.
 - **Warteschlange**: `submit([cmd, ..])` gibt eine `SubmitId` (Zeitleisten-Semaphor);
   `write_buffer`, `write_texture`, `write_texture_rects` (Rechtecke eines Bildes mit eigener
   Zeilenlänge, ein Übergang für alle) und `write_texture_rects_at` (dasselbe aus einem größeren
@@ -208,6 +211,65 @@ Fragment-Shadern; so bindet `wgsl::feature::for_device` die Erweiterung ans Ger�
 in `Features` gemeldet (`mesh_shader`, `ray_query`, `ray_pipeline`), aber noch nicht
 eingeschaltet. `DeviceDesc { max_level: Level::Basis }` erzwingt ein Basis-Gerät (zum Testen
 der Basis-Pfade auf großer Hardware).
+
+## Rechen-Warteschlange (G5d)
+
+**Eine zweite Warteschlange für Rechen-Shader und Kopien, neben der des Geräts.** `Device::compute_queue()`
+gibt sie, wo das Gerät eine Familie mit Compute und ohne Grafik hat (die RTX 2070 SUPER: Familie 2), sonst
+`None`; im Browser immer `None` (WebGPU hat eine Warteschlange), und `jfgui_GPU_COMPUTE=0` schaltet sie ab.
+Ohne sie läuft alles über `device.queue()`: Wer `Option` prüft, hat beide Wege mit demselben Code.
+
+```rust
+let cq = dev.compute_queue();                       // Option<&ComputeQueue>
+let mut e = match cq { Some(q) => q.encoder()?, None => dev.encoder()? };
+e.set_compute_pipeline(&p); e.set_bind_group(0, &g); e.dispatch(n, 1, 1);
+let id = match cq { Some(q) => q.submit([e.finish()?])?, None => dev.queue().submit([e.finish()?])? };
+dev.queue().submit_after(&[id], [weiter.finish()?])?;   // wartet über die Zeitleiste, an allen Befehlen
+dev.wait(id, timeout)?;                             // Device::wait, is_done, wait_idle nehmen beide
+```
+
+- **Eine Zeitleiste je Warteschlange.** Zwei Warteschlangen, die dasselbe Zeitleisten-Semaphor signalisieren,
+  könnten seine Werte in falscher Reihenfolge erreichen (ein Signal muss größer sein als der Stand). Die
+  `SubmitId` der Rechen-Warteschlange trägt deshalb Bit 63 (`SubmitId` ist ein öffentliches Tupel, ein Feld mehr
+  ginge nicht additiv); `Device::wait`, `is_done` und `submit_after` erkennen es. `submit_after` wartet an
+  allen Befehlen (`ALL_COMMANDS`); feinere Wartestufen sind nicht gebaut.
+- **Gemeinsame Ressourcen: concurrent sharing, keine Übergabe des Besitzes.** Jeder Puffer und jede Textur, die
+  kein Renderziel ist, wird mit beiden Familien angelegt (`VK_SHARING_MODE_CONCURRENT`). Eine Übergabe des Besitzes
+  bräuchte für jede Ressource bei jedem Wechsel eine Freigabe-Barriere auf der einen und eine Übernahme-Barriere auf
+  der anderen Warteschlange, im Code des Aufrufers, in derselben Reihenfolge; im Browser und ohne zweite Familie
+  wären es leere Befehle. Concurrent kostet bei Puffern nach allem Bekannten nichts (gemessen: unten); bei Texturen
+  kann es auf manchen GPUs die Kompression von Renderzielen kosten, deshalb bleiben Farb- und Tiefenziele exklusiv
+  bei der Familie des Geräts (Render-Durchgänge laufen nur dort). Eine Textur, die die Rechen-Warteschlange
+  benutzt, darf also kein Renderziel sein.
+- **Kodierer je Familie.** `ComputeQueue::encoder()` gibt einen Kodierer aus einem Befehlspool ihrer Familie: Kopien,
+  Füllen, Barrieren, Rechen-Shader, Zeitstempel (wo die Familie welche hat; die RTX hat sie). Ein Render-Durchgang
+  ist `Invalid` (aus `finish`). Seine Barrieren behalten nur Stufen und Zugriffe, die eine Rechen-Familie kennt
+  (Compute, Kopie, indirekte Argumente, Host); was Grafik betrifft (in `Access` oder im Layout einer Textur), fällt
+  weg, statt dass die Validierung es meldet. Ein Befehlspuffer der einen Familie auf der anderen Warteschlange ist
+  `Invalid`.
+- **Uploads** (`queue.write_buffer`, `write_texture`) laufen weiter vor der nächsten Übergabe der Warteschlange
+  des Geräts. Eine Übergabe an die Rechen-Warteschlange schickt sie, wenn welche warten, zuerst dort ab und wartet
+  darauf.
+- **Lebensdauer.** Eine fallen gelassene Ressource wartet auf die jeweils letzte Übergabe beider Warteschlangen.
+
+**Getestet** (`gputest --test queues`, unter Validierung): acht Runden `b = 3b + k` auf einem Puffer, abwechselnd
+auf beiden Warteschlangen, jede nach der davor (`submit_after`), alle abgeschickt, bevor die CPU einmal wartet, die
+erste liest, was `write_buffer` bereitgelegt hat: 0 von 65 536 Werten falsch; eine Speichertextur, auf der
+Rechen-Warteschlange geschrieben (ihre Layouts dort gewechselt), auf der des Geräts gelesen: 0 von 960 Texeln falsch;
+`wait` und `is_done` mit der `SubmitId` der Rechen-Warteschlange; ein Puffer, der fällt, während sie ihn noch
+benutzt; Zeitstempel dort; verweigert: Befehlspuffer der anderen Familie in beide Richtungen, ein Render-Durchgang,
+ein Warten auf eine Übergabe, die es nicht gibt; ohne Rechen-Warteschlange (`jfgui_GPU_COMPUTE=0`) dieselben acht
+Runden auf einer. **Absichtlich fehlende Synchronisation:** zwei Dispatches auf demselben Puffer ohne Barriere in
+einem Befehlspuffer der Rechen-Warteschlange meldet die Validierung (1 Fehler). Ein fehlendes Warten *zwischen*
+den Warteschlangen meldet die Schicht (1.4.363) nicht, und auch zwei Übergaben an *eine* Warteschlange ohne
+Synchronisation dazwischen meldet sie nicht (geprüft mit einer ersten Übergabe, die noch lief, als die zweite kam:
+0 Meldungen). Deshalb prüft der Test das Warten an den Werten: ein langer Dispatch (1 Mio. × 20 000 Schritte) auf
+der Warteschlange des Geräts, danach die Rechen-Warteschlange auf seinem Puffer. Mit `submit_after`: 0 von 512
+Stichproben falsch; ohne: 260 von 512 falsch.
+
+**Läuft etwas nebeneinander?** Zwei lange Dispatches (1 Mio. × 2000 Schritte, je ein Puffer) nacheinander auf der
+Warteschlange des Geräts: 1,75 ms; je einer auf jeder: 1,46 ms (ein Lauf, `gputest --test queues`). Die
+Messungen in render3d stehen in [RENDER3D.md](RENDER3D.md#zweite-warteschlange-g5d).
 
 ## Fehler und verlorene Geräte
 
@@ -1010,6 +1072,7 @@ Dazu `gpu.js` (16 816 Byte, gzip 5 940), das nur geladen wird, wenn die Ausgabe 
 | `jfgui_GPU_DLL=name` | anderer Loader statt `vulkan-1.dll` (Name: nur aus System32; Pfad: aus seinem Ordner) bzw. `libvulkan.so.1` (wie `ld.so` sucht) |
 | `jfgui_GPU_ADAPTER=n` / `=name` | Adapter n von `adapters()` oder der erste, dessen Name das Wort enthält |
 | `jfgui_GPU_PRESENT=fifo\|mailbox\|immediate` | Darstellungsmodus jeder neuen Swapchain |
+| `jfgui_GPU_COMPUTE=0` (oder `off`) | (G5d) keine eigene Rechen-Warteschlange: `Device::compute_queue()` ist `None`, Ressourcen exklusiv |
 | `jfgui_GPU_VALIDATE=1` | Khronos-Validierungsschicht mit Synchronisationsprüfung, wenn installiert |
 | `jfgui_GPU_DEBUG=1` | die Debug-Meldungen des Treibers (ab Info-Stufe) auf stderr |
 
@@ -1068,6 +1131,7 @@ für Messungen den Configurator ausschalten.
 | `bench_smoke.uis` | kurze Läufe der Bildschleife der Messszene mit `--verify`: indirekt und einzeln ohne Fenster, Fenster mit FIFO und IMMEDIATE; indirekt und einzeln mit den WGSL-Shadern |
 | `spec.uis` | Pipeline-Konstanten: `shader::samples::spec_fill` als SPIR-V 1.3 (`WorkgroupSize`-Built-in) und 1.6 (`LocalSizeId`) mit den Standardwerten und mit Konstanten für alle fünf Overrides, Workgroup-Größen 1, 32, 256 und das Gerätelimit (1024; sie bemisst auch ein Workgroup-Array) = `spec_fill_ref` Wort für Wort; `constants()`; die Umwandlungen wie WebGPU (u32 1,9 = 1, bool 0,5 = wahr, i32 −2,7 = −2); `Invalid` für fremde und doppelte Nummern, Werte außerhalb des Typs, NaN, unendlich, Workgroup-Größe 0 und über dem Limit, einen fehlenden Entry Point |
 | `textures.uis` | Texturen in Shadern aus `lib/shader` gegen CPU-Referenzen (unten) |
+| `queues.uis` | (G5d) die Rechen-Warteschlange: Runden auf einem Puffer abwechselnd auf beiden Warteschlangen mit Warten über die Zeitleiste (= CPU), eine Speichertextur von der einen zur anderen, Warten und Ids beider, ein Puffer, der fällt, während er noch benutzt wird, was verweigert wird, ohne Rechen-Warteschlange (`jfgui_GPU_COMPUTE=0`); mit `--validate` eine fehlende Barriere auf der Rechen-Warteschlange |
 | `validate.uis` | alles einmal mit Validierungsschicht (siehe oben), auch `scene`, `bench_smoke`, `spec`, `textures` und `wgsl` (ohne Meldung) |
 | `glibc.uis` | (Linux, gegen glibc gelinkt; sonst `SKIP`) Argumente und Umgebung; Hauptthread und jeder `plat`-Thread mit eigenem Kontrollblock und TLS (FS-Basis = `pthread_self`, eigenes `errno`, eigener `dlerror`-Text); der verlangte Stapel; 300 Threads hinterlassen keine Abbildung; Vulkan auf einem `plat`-Thread von 2 MiB. In Kindprozessen: `exit` von glibc aus `main` und von einem Thread, auch mit laufenden Threads und einem noch offenen Gerät; Absturz auf dem Haupt- und einem `plat`-Thread, Stapelüberlauf und Panik mit Bericht, Code 3 und ohne `at_exit` |
 | `noloader.uis` | `jfgui_GPU_DLL` nennt eine fehlende Datei (Name, Pfad) oder eine Bibliothek, die kein Vulkan-Loader ist: `Err(NoLoader)`; ein Programm ohne Loader startet, `--info` meldet `SKIP`, Code 0 |
@@ -1477,8 +1541,8 @@ zurücklesen 2,8 ms; Instanz 29–37 ms, Gerät 3 ms (RTX: 23–32 ms, 65–70 m
 
 - Unter Android keine Validierung (die Schicht liegt keiner APK bei). Unter Linux lief noch keine Validierung und
   noch keine ältere glibc als 2.39 ([Linux](#linux)); nur Intel und KWin als Treiber und Compositor ([Ausgabe unter Linux](#ausgabe-unter-linux)).
-- Eine Warteschlange; keine eigene Rechen- oder Kopierwarteschlange (die Messszene könnte so
-  `move` und `cull` neben dem Zeichnen laufen lassen).
+- Keine eigene Kopierwarteschlange; die Rechen-Warteschlange (G5d) wartet an allen Befehlen (keine feineren
+  Wartestufen), und die Validierungsschicht meldet fehlende Synchronisation zwischen Übergaben nicht.
 - Keine Pipeline-Statistik-Abfragen (Vertex-, Primitiv-, Fragment-Zähler); nur Zeitstempel.
 - Kein Pipeline-Cache, kein MSAA, keine Stencil-Operationen, keine Textur-zu-Textur-Kopien und
   kein Blit (Mip-Erzeugung).

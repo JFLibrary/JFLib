@@ -377,9 +377,32 @@ pub struct Queue {
     pub(crate) d: Rc<DevInner>,
 }
 
+/// (G5d) a queue of its own for compute: WebGPU has one queue, so Device::compute_queue is None here and there is no
+/// value of this type
+#[derive(Clone)]
+pub struct ComputeQueue {
+    _none: (),
+}
+
+impl ComputeQueue {
+    pub fn encoder(&self) -> Result<crate::CommandEncoder<'_>> {
+        Err(GpuError::Unsupported("a compute queue in the browser"))
+    }
+    pub fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _cmds: I) -> Result<SubmitId> {
+        Err(GpuError::Unsupported("a compute queue in the browser"))
+    }
+    pub fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _wait: &[SubmitId], _cmds: I) -> Result<SubmitId> {
+        Err(GpuError::Unsupported("a compute queue in the browser"))
+    }
+}
+
 impl Device {
     pub fn queue(&self) -> &Queue {
         &self.queue
+    }
+    /// (G5d) WebGPU has one queue: None
+    pub fn compute_queue(&self) -> Option<&ComputeQueue> {
+        None
     }
     pub fn info(&self) -> &AdapterInfo {
         &self.d.info
@@ -455,6 +478,11 @@ impl Queue {
         *self.d.spare.borrow_mut() = words;
         self.d.last.set(id as u64);
         Ok(SubmitId(id as u64))
+    }
+
+    /// (G5d) one queue: its submissions run in order, so this is submit
+    pub fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _wait: &[SubmitId], cmds: I) -> Result<SubmitId> {
+        self.submit(cmds)
     }
 
     /// nothing waits for a submission here

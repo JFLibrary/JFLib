@@ -230,7 +230,7 @@ Eine Transformation mit negativer Determinante (eine ungerade Zahl negativer Ska
 | Farbe zwischen den Durchgängen (`ColorTarget → ColorTarget`) | Farbausgabe, Schreiben | Farbausgabe, Lesen und Schreiben | zwei Durchgänge schreiben dasselbe Ziel |
 | nach `late` | Rechen-Shader schreibt | indirekte Befehle, Vertex-Shader, Kopie | die Zeichenbefehle und Listen der Phase 2 vor ihrem Durchgang (und der Kopie für die Statistik). **Mutation**: ohne sie 10 Fehler (`READ_AFTER_WRITE`, „vkCmdDrawIndexedIndirect … VERTEX reads VkBuffer … written by vkCmdDispatch“), und auf dieser GPU falsche Bilder (bis 515 Pixel) |
 | Bits zwischen Phase 1 und Phase 2 | Phase 1 liest | Phase 2 liest und schreibt | Schreiben nach Lesen: gedeckt durch die Barrieren dazwischen (nach den Kulls, die der Pyramide mit Quelle „alle Befehle“) |
-| Bits zwischen den Bildern | Phase 2 schreibt | `scatter` und Phase 1 des nächsten Bildes | die Barriere am Anfang des Bildes (Rechen-Shader schreibt → Rechen-Shader). **Mutation** (Barriere am Anfang ohne Quelle): 0 Meldungen, auch mit sieben Bildern in Flug (`frames`). So weit ich es lese, deckt die Kette aus der Barriere nach `late` (ihr Ziel schließt Kopien ein) und der Barriere nach den Kopien des nächsten Bildes das Lesen der Phase 1 schon; für `scatter`, das vor jener Barriere liegt, meldet die Prüfung auch nichts (dass die Heuristik dessen `atomicAnd` übergeht, ist eine Vermutung, nicht geprüft). Die Barriere am Anfang bleibt |
+| Bits zwischen den Bildern | Phase 2 schreibt | `scatter` und Phase 1 des nächsten Bildes | die Barriere am Anfang des Bildes (Rechen-Shader schreibt → Rechen-Shader). **Mutation** (Barriere am Anfang ohne Quelle): 0 Meldungen, auch mit sieben Bildern in Flug (`frames`). Der Grund steht seit Schritt 3 fest: Die Schicht (1.4.363) prüft nicht zwischen Übergaben, auch nicht auf einer Warteschlange (`gputest --test queues`, [GPU.md](GPU.md#rechen-warteschlange-g5d)); jedes Bild ist eine Übergabe. Gelesen: Die Kette aus der Barriere nach `late` (ihr Ziel schließt Kopien ein) und der Barriere nach den Kopien des nächsten Bildes deckt das Lesen der Phase 1 auch ohne sie; `scatter` liegt vor jener Barriere und braucht die am Anfang. Sie bleibt |
 
 ## Detailstufen (G5d)
 
@@ -242,6 +242,21 @@ Eine Transformation mit negativer Determinante (eine ungerade Zahl negativer Ska
 - **Keine Vereinfachung in der Bibliothek**: Der Aufrufer gibt die Meshes; `render3dtest` erzeugt sie (Kugeln mit weniger Segmenten). glTF bleibt, wie es ist (kein `MSFT_lod`).
 
 **Kleine Objekte auslassen (contribution culling) passt auf denselben Weg**: eine Stufe ohne Mesh. Sie kostet nichts, wenn sie keiner setzt, und gilt wie jede Stufe auch für die Schatten. Für die fernen Schattenkaskaden habe ich zusätzlich eine eigene Grenze in Texeln der Kaskade gebaut und gemessen (eine Wegwerf-Änderung, `Shadows::min_size`): In der Messszene sind die Würfel in der fernsten Kaskade 10 bis 30 Texel groß. Bis 4 Texel ließ sie nichts aus (Tiefe der fernsten Kaskade 1,81 ms gleich), mit 10 Texeln 1,65 ms, mit 30 Texeln fiel alles weg. Ihre 1,8 ms kommen also von der Zahl der Werfer, nicht von winzigen Werfern; eine Grenze, die etwas spart, nähme sichtbare Schatten weg. Die Messung trägt es nicht, die Grenze ist wieder entfernt.
+
+## Zweite Warteschlange (G5d)
+
+`lib/gpu` hat seit G5d eine Rechen-Warteschlange ([GPU.md](GPU.md#rechen-warteschlange-g5d)). **render3d benutzt sie
+nicht**: Die Messung zeigt keinen klaren Gewinn.
+
+- **Was danebenlaufen könnte.** Die Sichtbarkeit der Kaskaden (0,19 ms) braucht der Tiefen-Durchgang desselben Bildes,
+  und der Hauptdurchgang braucht die Schattenkarte; neben ihr läge nur die Sichtbarkeit der Kamera (0,04 ms). Neben dem
+  Zeichnen des laufenden Bildes liefe nur Arbeit des *nächsten* Bildes, mit doppelt gepufferten Listen oder
+  Instanzdaten: `scatter` der Änderungen für das nächste Bild (bei 100 000 Änderungen je Bild 1,5 ms GPU) oder die
+  Sichtbarkeit der Kaskaden des nächsten Bildes.
+- **Gemessen** (`render3dtest --bench 1000000 --async-work N --async-on compute|main`): neben jedem Bild läuft der
+  echte `scatter`-Shader mit N Änderungen in eine zweite Kopie der Instanzdaten, auf der Rechen-Warteschlange oder
+  nach dem Bild auf der des Geräts; gemessen wird der Bildabstand auf der GPU (Zahlen unten unter
+  [Messwerte G5d](#g5d-verdeckung-detailstufen-zweite-warteschlange)).
 
 ## WebGPU
 

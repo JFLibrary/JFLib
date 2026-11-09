@@ -226,6 +226,17 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     let mut rng = Rng(123);
     let mut last = plat::time_us();
     let mut first_frame = 0.0;
+    // (G5d) --async-work N --async-on compute|main: beside every frame render3d's scatter shader puts N changes into a
+    // second copy of the instance data (what scattering the next frame's changes into double-buffered data would
+    // cost), on the compute queue or after the frame on the device queue: does it run beside the drawing?
+    let async_n = plat::arg_value("--async-work").and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+    let on_compute = plat::arg_value("--async-on").is_none_or(|v| v != "main");
+    let side = if async_n > 0 { Some(t.res(Side::new(dev, n, async_n), "async work")?) } else { None };
+    if side.is_some() {
+        out(&format!("  beside every frame: render3d's scatter shader with {async_n} changes into a second copy of the instance data, on {}",
+                     if on_compute && dev.compute_queue().is_some() { "the compute queue" } else { "the device queue after the frame" }));
+    }
+    let mut side_ids: Vec<SubmitId> = Vec::new();
     for f in 0..total {
         let tw = plat::time_us();
         t.res(s.wait_slot(), "wait")?;
@@ -251,6 +262,14 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
         let id = t.res(dev.queue().submit([cmd]), "submit")?;
         let t1 = plat::time_us();
         s.submitted(id);
+        if let Some(sd) = &side {
+            // (at most three in flight, like the frames)
+            if side_ids.len() >= 3 {
+                let old = side_ids.remove(0);
+                t.res(dev.wait(old, 10_000_000_000), "wait")?;
+            }
+            side_ids.push(t.res(sd.run(dev, on_compute), "async work")?);
+        }
         wait[f] = (t0 - tw) as f64 / 1000.0;
         prep[f] = (tp - t0) as f64 / 1000.0;
         rec[f] = (tr - tp) as f64 / 1000.0;
@@ -329,6 +348,59 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
         }
     }
     Some(())
+}
+
+/// (G5d) the work beside the frames: render3d's scatter shader over its own buffers
+struct Side {
+    pipe: ComputePipeline,
+    group: BindGroup,
+    n: u32,
+}
+
+impl Side {
+    fn new(dev: &Device, cap: u32, n: u32) -> gpu::Result<Side> {
+        let m = ShaderModule::from_spirv(dev, render3d::SCATTER_SPV)?;
+        let b = |binding, kind| Binding { binding, kind, stages: Stages::COMPUTE };
+        let bgl = dev.create_bind_group_layout(&[b(0, BindingKind::StorageBufferRead), b(1, BindingKind::StorageBuffer), b(2, BindingKind::StorageBuffer),
+                                                 b(3, BindingKind::StorageBuffer), b(4, BindingKind::StorageBuffer)])?;
+        let pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&bgl], push_constants: 4 })?;
+        let pipe = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &pl, shader: ShaderStage::new(&m, "main") })?;
+        let buf = |size: u64, memory| dev.create_buffer(&BufferDesc { size, usage: BufferUsage::STORAGE, memory });
+        // changes of 96 bytes: slot, list, 2 reserved, the sphere, the instance's 16 words
+        let mut rng = Rng(77);
+        let rows: Vec<[u32; 24]> = (0..n).map(|_| {
+            let mut r = [0u32; 24];
+            r[0] = rng.below(cap);
+            r[7] = 1.0f32.to_bits();
+            r
+        }).collect();
+        let changes = buf(n as u64 * 96, MemoryKind::Upload)?;
+        changes.write(0, &rows)?;
+        let (spheres, list_of, inst, hidden) = (buf(cap as u64 * 16, MemoryKind::Device)?, buf(cap as u64 * 4, MemoryKind::Device)?, buf(cap as u64 * 64, MemoryKind::Device)?,
+                                                buf(cap.div_ceil(32) as u64 * 4, MemoryKind::Device)?);
+        let e = |binding, buffer| BindEntry { binding, resource: Resource::Buffer { buffer, offset: 0, size: 0 } };
+        let group = dev.create_bind_group(&BindGroupDesc { layout: &bgl, entries: &[e(0, &changes), e(1, &spheres), e(2, &list_of), e(3, &inst), e(4, &hidden)] })?;
+        Ok(Side { pipe, group, n })
+    }
+
+    fn run(&self, dev: &Device, on_compute: bool) -> gpu::Result<SubmitId> {
+        let cq = dev.compute_queue().filter(|_| on_compute);
+        let mut e = match cq {
+            Some(q) => q.encoder()?,
+            None => dev.encoder()?,
+        };
+        // the run before wrote the same buffers
+        e.barrier(Access::COMPUTE_WRITE, Access::COMPUTE_WRITE);
+        e.set_compute_pipeline(&self.pipe);
+        e.set_bind_group(0, &self.group);
+        e.push_constants(0, &[self.n]);
+        e.dispatch(self.n.div_ceil(64), 1, 1);
+        let cmd = e.finish()?;
+        match cq {
+            Some(q) => q.submit([cmd]),
+            None => dev.queue().submit([cmd]),
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

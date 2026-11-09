@@ -478,6 +478,8 @@ pub struct Adapter {
     pub(crate) api: u32,
     pub(crate) family: u32,
     pub(crate) ts_bits: u32,
+    /// (G5d) a family with compute and without graphics (a queue of its own for compute), its timestamp bits
+    pub(crate) compute_family: Option<(u32, u32)>,
     pub(crate) exts: Exts,
     pub(crate) f10: [u32; vk::F10_COUNT],
     pub(crate) f11: [u32; vk::F11_COUNT],
@@ -673,6 +675,9 @@ fn probe(sh: &Arc<InstShared>, pd: vk::PhysicalDevice) -> Adapter {
     let gc = vk::QUEUE_GRAPHICS_BIT | vk::QUEUE_COMPUTE_BIT;
     let family = qf.iter().position(|q| q.queue_flags & gc == gc && q.queue_count > 0);
     let ts_bits = family.map_or(0, |i| qf[i].timestamp_valid_bits);
+    // (G5d) the compute queue: the first family with compute and without graphics
+    let compute_family = qf.iter().position(|q| q.queue_flags & vk::QUEUE_COMPUTE_BIT != 0 && q.queue_flags & vk::QUEUE_GRAPHICS_BIT == 0 && q.queue_count > 0)
+        .map(|i| (i as u32, qf[i].timestamp_valid_bits));
 
     let mut mem: vk::PhysicalDeviceMemoryProperties = vk::Zero::zero();
     // SAFETY: plain out-parameter.
@@ -836,6 +841,7 @@ fn probe(sh: &Arc<InstShared>, pd: vk::PhysicalDevice) -> Adapter {
         api,
         family: family.unwrap_or(0) as u32,
         ts_bits,
+        compute_family,
         exts,
         f10: f2.f,
         f11: f11.f,

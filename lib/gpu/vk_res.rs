@@ -480,8 +480,12 @@ impl Device {
         {
             return Err(GpuError::Invalid("colour targets need colour formats, depth targets depth formats"));
         }
+        // (G5d) shared with the compute queue's family, render targets excepted (they stay the device queue's)
+        let fams = sh.sharing().filter(|_| !d.usage.intersects(TextureUsage::COLOR_TARGET | TextureUsage::DEPTH_TARGET));
         let ii = vk::ImageCreateInfo {
             s_type: vk::STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            queue_family_index_count: if fams.is_some() { 2 } else { 0 },
+            p_queue_family_indices: fams.as_ref().map_or(core::ptr::null(), |f| f.as_ptr()),
             flags: if d.cube { vk::IMAGE_CREATE_CUBE_COMPATIBLE_BIT } else { 0 },
             image_type: if d.depth > 1 { vk::IMAGE_TYPE_3D } else { vk::IMAGE_TYPE_2D },
             format: fmt,
@@ -491,7 +495,7 @@ impl Device {
             samples: vk::SAMPLE_COUNT_1_BIT,
             tiling: vk::IMAGE_TILING_OPTIMAL,
             usage,
-            sharing_mode: vk::SHARING_MODE_EXCLUSIVE,
+            sharing_mode: if fams.is_some() { vk::SHARING_MODE_CONCURRENT } else { vk::SHARING_MODE_EXCLUSIVE },
             initial_layout: vk::IMAGE_LAYOUT_UNDEFINED,
             ..vk::Zero::zero()
         };

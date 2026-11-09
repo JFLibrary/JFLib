@@ -29,6 +29,9 @@
 // (colour output), DepthTarget (early + late fragment tests), DepthRead (fragment tests and
 // shaders), Present (as Undefined; bottom of pipe).
 // Viewport: y flipped (origin top left, NDC y up: lib.rs conventions).
+// (G5d) An encoder of the compute queue (ComputeQueue::encoder) records no render pass, and its barriers keep the
+// stages and accesses a compute family has (compute, copies, indirect arguments, the host): the graphics stages of a
+// layout or of Access flags fall away there.
 
 use alloc::vec::Vec;
 use core::marker::PhantomData;
@@ -112,6 +115,13 @@ pub(crate) unsafe fn image_barrier(f: &vk::DeviceFns, cb: vk::CommandBuffer, ima
     unsafe { (f.cmd_pipeline_barrier)(cb, ss, ds, 0, 0, core::ptr::null(), 0, core::ptr::null(), 1, &b) };
 }
 
+/// (G5d) the stages and accesses a queue family without graphics has
+const COMPUTE_STAGES: u32 = vk::PIPELINE_STAGE_TOP_OF_PIPE_BIT | vk::PIPELINE_STAGE_DRAW_INDIRECT_BIT | vk::PIPELINE_STAGE_COMPUTE_SHADER_BIT
+    | vk::PIPELINE_STAGE_TRANSFER_BIT | vk::PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT | vk::PIPELINE_STAGE_HOST_BIT | vk::PIPELINE_STAGE_ALL_COMMANDS_BIT;
+const COMPUTE_ACCESS: u32 = vk::ACCESS_INDIRECT_COMMAND_READ_BIT | vk::ACCESS_UNIFORM_READ_BIT | vk::ACCESS_SHADER_READ_BIT | vk::ACCESS_SHADER_WRITE_BIT
+    | vk::ACCESS_TRANSFER_READ_BIT | vk::ACCESS_TRANSFER_WRITE_BIT | vk::ACCESS_HOST_READ_BIT | vk::ACCESS_HOST_WRITE_BIT | vk::ACCESS_MEMORY_READ_BIT
+    | vk::ACCESS_MEMORY_WRITE_BIT;
+
 /// (stages, source access, destination access) of Access flags
 fn access_of(a: Access) -> (u32, u32, u32) {
     let table: [(Access, u32, u32, u32); 12] = [
@@ -165,10 +175,12 @@ struct Pass {
 pub struct CommandEncoder<'a> {
     sh: &'a Shared,
     slot: Option<Slot>,
+    /// (G5d) of the compute queue's family
+    compute: bool,
     cb: vk::CommandBuffer,
     err: Option<GpuError>,
     pass: Option<Pass>,
-    compute: Option<&'a PipeInner>,
+    compute_pipe: Option<&'a PipeInner>,
     graphics: Option<&'a PipeInner>,
     index: bool,
     _borrow: PhantomData<&'a ()>,
@@ -205,20 +217,33 @@ impl Drop for CommandEncoder<'_> {
 }
 
 impl Device {
-    /// a command encoder (a recording command buffer)
+    /// a command encoder (a recording command buffer) of the device's queue
     pub fn encoder(&self) -> Result<CommandEncoder<'_>> {
-        let slot = self.sh.take_slot()?;
+        CommandEncoder::of(&self.sh, false)
+    }
+}
+
+impl<'a> CommandEncoder<'a> {
+    /// (G5d) an encoder of the device queue's family or of the compute queue's
+    pub(crate) fn of(sh: &'a Shared, compute: bool) -> Result<CommandEncoder<'a>> {
+        let slot = sh.take_slot_for(compute)?;
         Ok(CommandEncoder {
-            sh: &self.sh,
+            sh,
             cb: slot.cb,
             slot: Some(slot),
+            compute,
             err: None,
             pass: None,
-            compute: None,
+            compute_pipe: None,
             graphics: None,
             index: false,
             _borrow: PhantomData,
         })
+    }
+
+    /// (G5d) stages and accesses this encoder's queue has
+    fn fit(&self, stages: u32, access: u32) -> (u32, u32) {
+        if self.compute { (stages & COMPUTE_STAGES, access & COMPUTE_ACCESS) } else { (stages, access) }
     }
 }
 
@@ -319,6 +344,7 @@ impl<'a> CommandEncoder<'a> {
         }
         let (ss, sa, _) = access_of(before);
         let (ds, _, da) = access_of(after);
+        let ((ss, sa), (ds, da)) = (self.fit(ss, sa), self.fit(ds, da));
         let mb = vk::MemoryBarrier { s_type: vk::STRUCTURE_TYPE_MEMORY_BARRIER, src_access_mask: sa, dst_access_mask: da,
                                      ..vk::Zero::zero() };
         let ss = if ss == 0 { vk::PIPELINE_STAGE_TOP_OF_PIPE_BIT } else { ss };
@@ -344,8 +370,14 @@ impl<'a> CommandEncoder<'a> {
             return;
         }
         let range = subresources(tex, base_mip, mips, base_layer, layers);
+        let (mut b, ss, ds) = image_barrier_info(tex.image(), range, before, after);
+        let ((ss, sa), (ds, da)) = (self.fit(ss, b.src_access_mask), self.fit(ds, b.dst_access_mask));
+        b.src_access_mask = sa;
+        b.dst_access_mask = da;
+        let ss = if ss == 0 { vk::PIPELINE_STAGE_TOP_OF_PIPE_BIT } else { ss };
+        let ds = if ds == 0 { vk::PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT } else { ds };
         // SAFETY: recording outside a pass.
-        unsafe { image_barrier(&self.sh.f, self.cb, tex.image(), range, before, after) };
+        unsafe { (self.sh.f.cmd_pipeline_barrier)(self.cb, ss, ds, 0, 0, core::ptr::null(), 0, core::ptr::null(), 1, &b) };
     }
 
     // ------------------------------------------------------------ compute
@@ -354,7 +386,7 @@ impl<'a> CommandEncoder<'a> {
         if self.outside("set_compute_pipeline inside a render pass").is_none() {
             return;
         }
-        self.compute = Some(&p.0);
+        self.compute_pipe = Some(&p.0);
         // SAFETY: recording; the pipeline belongs to this device.
         unsafe { (self.sh.f.cmd_bind_pipeline)(self.cb, vk::PIPELINE_BIND_POINT_COMPUTE, p.0.h) };
     }
@@ -365,7 +397,7 @@ impl<'a> CommandEncoder<'a> {
         let (p, bp) = if self.pass.is_some() {
             (self.graphics, vk::PIPELINE_BIND_POINT_GRAPHICS)
         } else {
-            (self.compute, vk::PIPELINE_BIND_POINT_COMPUTE)
+            (self.compute_pipe, vk::PIPELINE_BIND_POINT_COMPUTE)
         };
         self.ok(p.is_some(), "bind group / push constants before a pipeline")?;
         p.map(|p| (p, bp))
@@ -403,7 +435,7 @@ impl<'a> CommandEncoder<'a> {
 
     pub fn dispatch(&mut self, x: u32, y: u32, z: u32) {
         let m = self.sh.limits.max_compute_workgroups;
-        let ok = self.pass.is_none() && self.compute.is_some() && x <= m[0] && y <= m[1] && z <= m[2];
+        let ok = self.pass.is_none() && self.compute_pipe.is_some() && x <= m[0] && y <= m[1] && z <= m[2];
         if self.ok(ok, "dispatch: no compute pipeline, inside a pass or too many workgroups").is_none() {
             return;
         }
@@ -413,7 +445,7 @@ impl<'a> CommandEncoder<'a> {
 
     /// workgroup counts (3 x u32) from buf at offset
     pub fn dispatch_indirect(&mut self, buf: &'a Buffer, offset: u64) {
-        let ok = self.pass.is_none() && self.compute.is_some() && buf.usage().contains(BufferUsage::INDIRECT) && offset % 4 == 0
+        let ok = self.pass.is_none() && self.compute_pipe.is_some() && buf.usage().contains(BufferUsage::INDIRECT) && offset % 4 == 0
             && offset + 12 <= buf.size();
         if self.ok(ok, "dispatch_indirect: pipeline, INDIRECT usage, offset or range").is_none() {
             return;
@@ -425,7 +457,9 @@ impl<'a> CommandEncoder<'a> {
     // ------------------------------------------------------------ render passes
 
     pub fn begin_render(&mut self, desc: &RenderPassDesc<'_, 'a>) {
-        if self.outside("begin_render inside a render pass").is_none() {
+        if self.outside("begin_render inside a render pass").is_none()
+            || self.ok(!self.compute, "begin_render: a render pass on the compute queue").is_none()
+        {
             return;
         }
         let n = desc.color.len();
@@ -690,7 +724,7 @@ impl<'a> CommandEncoder<'a> {
 
     /// timestamps first .. first + n may be written again (outside render passes)
     pub fn reset_timestamps(&mut self, ts: &'a Timestamps, first: u32, n: u32) {
-        let ok = self.pass.is_none() && n > 0 && first.checked_add(n).is_some_and(|e| e <= ts.0.count);
+        let ok = self.pass.is_none() && n > 0 && first.checked_add(n).is_some_and(|e| e <= ts.0.count) && self.timestamps_here();
         if self.ok(ok, "reset_timestamps: inside a pass or range").is_none() {
             return;
         }
@@ -700,11 +734,16 @@ impl<'a> CommandEncoder<'a> {
 
     /// write timestamp i once every earlier command has finished (reset it first)
     pub fn timestamp(&mut self, ts: &'a Timestamps, i: u32) {
-        if self.ok(i < ts.0.count, "timestamp: index outside the set").is_none() {
+        if self.ok(i < ts.0.count && self.timestamps_here(), "timestamp: index outside the set, or no timestamps on this queue").is_none() {
             return;
         }
         // SAFETY: recording; index checked.
         unsafe { (self.sh.f.cmd_write_timestamp)(self.cb, vk::PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, ts.0.pool, i) };
+    }
+
+    /// (G5d) this encoder's queue writes timestamps (the compute queue's family may have none)
+    fn timestamps_here(&self) -> bool {
+        !self.compute || self.sh.lane.as_ref().is_some_and(|l| l.ts_bits > 0)
     }
 
     // ------------------------------------------------------------ end
