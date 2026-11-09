@@ -207,6 +207,10 @@ fn check_image(t: &mut T, b: &Built, cam: &Camera, off: &Off, img: &[u8], depth:
     }
 }
 
+pub fn pixel_of(img: &[u8], w: u32, x: u32, y: u32) -> [u8; 3] {
+    pixel(img, w, x, y)
+}
+
 fn pixel(img: &[u8], w: u32, x: u32, y: u32) -> [u8; 3] {
     let a = ((y * w + x) * 4) as usize;
     [img[a], img[a + 1], img[a + 2]]
@@ -510,7 +514,7 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     // nothing changed: only view and lights go up
     let _ = shot(t, dev, &mut off, &mut r, &mut s, "idle")?;
     let idle = s.upload_info();
-    t.ok(idle.bytes == 176 + 48 && idle.changed == 0 && !idle.full, &format!("{level}: a frame without changes sends {} bytes (view and lights)", idle.bytes));
+    t.ok(idle.bytes == 176 + 320 && idle.changed == 0 && !idle.full, &format!("{level}: a frame without changes sends {} bytes (view and lights)", idle.bytes));
     // moving a few: k changes, 96 bytes each
     let mut rng = Rng(5);
     for _ in 0..37 {
@@ -617,7 +621,7 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     }
     let got = shot(t, dev, &mut off, &mut r, &mut big, "200 moved")?;
     let info = big.upload_info();
-    t.ok(info.changed == 200 && !info.full && info.bytes == 176 + 48 + 200 * 96, &format!("{level}: 200 of 10 000 moved: {} changes, {} bytes", info.changed, info.bytes));
+    t.ok(info.changed == 200 && !info.full && info.bytes == 176 + 320 + 200 * 96, &format!("{level}: 200 of 10 000 moved: {} changes, {} bytes", info.changed, info.bytes));
     let mut f = rebuilt(t, &r, &blist, &cam, false)?;
     let want = shot(t, dev, &mut off, &mut r, &mut f, "200 moved")?;
     let (n, m) = diff(&got, &want);
@@ -1016,7 +1020,8 @@ fn errors(t: &mut T) {
 fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
     let opt = wgsl::CompileOptions { robust: false, ..wgsl::CompileOptions::new(shader::BASIS) };
     let mut outv = Vec::new();
-    for (src, list) in [(render3d::CULL_WGSL, &[("CULL", "main")][..]), (render3d::SCATTER_WGSL, &[("SCATTER", "main")][..]), (render3d::DRAW_WGSL, &[("VS", "vs"), ("FS", "fs")][..])] {
+    for (src, list) in [(render3d::CULL_WGSL, &[("CULL", "main")][..]), (render3d::SCATTER_WGSL, &[("SCATTER", "main")][..]),
+                        (render3d::DRAW_WGSL, &[("VS", "vs"), ("FS", "fs"), ("VS_DEPTH", "vs_depth"), ("VS_SHADOW", "vs_shadow"), ("FS_SHADOW", "fs_shadow")][..])] {
         match wgsl::compile(src, &opt) {
             Ok(o) => {
                 for (name, entry) in list {
@@ -1061,7 +1066,8 @@ fn shaders(t: &mut T) {
         t.ok(false, "the WGSL compiles");
         return;
     };
-    let table: [(&str, &[u32]); 4] = [("CULL", render3d::CULL_SPV), ("SCATTER", render3d::SCATTER_SPV), ("VS", render3d::VS_SPV), ("FS", render3d::FS_SPV)];
+    let table: [(&str, &[u32]); 7] = [("CULL", render3d::CULL_SPV), ("SCATTER", render3d::SCATTER_SPV), ("VS", render3d::VS_SPV), ("FS", render3d::FS_SPV),
+                                      ("VS_DEPTH", render3d::VS_DEPTH_SPV), ("VS_SHADOW", render3d::VS_SHADOW_SPV), ("FS_SHADOW", render3d::FS_SHADOW_SPV)];
     for (name, embedded) in table {
         let made = v.iter().find(|x| x.0 == name).map_or(&[][..], |x| &x.1[..]);
         t.ok(made == embedded, &format!("{name}: {} words embedded, as wgsl::compile makes them (if not: render3dtest --gen-shaders lib/render3d/shaders_spv.rs)", embedded.len()));
@@ -1233,9 +1239,10 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 13] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
+    let list: [(&str, fn(&mut T)); 14] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
                                           ("levels", levels), ("coords", coords), ("frames", frames), ("errors", errors), ("textures", crate::tex::textures),
-                                          ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf), ("pbr", crate::pbr::pbr)];
+                                          ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf), ("pbr", crate::pbr::pbr),
+                                          ("shadows", crate::shadowtest::shadows)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {

@@ -408,12 +408,13 @@ pub fn tex_gallery(r: &mut Renderer) -> Result<Scene> {
 // ---------------------------------------------------------------- the galleries of G5c
 
 /// the galleries that came with G5c, by name, after the five above: every path must draw them alike
-pub const LATER: [&str; 1] = ["pbr"];
+pub const LATER: [&str; 2] = ["pbr", "shadow"];
 
 /// one of LATER in a fresh renderer of its own
 pub fn later_gallery(name: &str, r: &mut Renderer) -> Result<Scene> {
     match name {
         "pbr" => pbr_gallery(r),
+        "shadow" => shadow_gallery(r),
         _ => Err(GpuError::Invalid("no such gallery")),
     }
 }
@@ -485,6 +486,79 @@ pub fn pbr_gallery(r: &mut Renderer) -> Result<Scene> {
         let id = r.add_material(m)?;
         let pos = [k as f64 * 3.4 - 5.1, -3.1, 0.5];
         sc.add(Instance { mesh: plate, material: id, transform: Transform { pos, rot: quat([1.0, 0.0, 0.0], -0.5), scale: [1.5, 1.2, 1.0] } })?;
+    }
+    Ok(sc)
+}
+
+/// no turn
+const NO_TURN: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
+pub const SHADOW_W: u32 = 400;
+pub const SHADOW_H: u32 = 225;
+
+
+/// (G5c) the shadow scene's meshes, textures (size, rgba, sRGB) and items at world offset `at`: a ground, cubes,
+/// a ball, a pole, a mirrored cube, a MASK plate facing the sun
+pub fn shadow_scene(at: [f64; 3]) -> (Vec<Geo>, Vec<(u32, Vec<u8>, bool)>, Vec<(Spec, Material)>) {
+    let geos = vec![plate(), cube(), ball(16, 24), prism(8, 1.0)];
+    // MASK: square holes, nearest without levels (the shadow pass's uv derivatives are not the camera's)
+    // (white: inside the opaque squares a texel's edge changes nothing, at the holes the rays see what is behind)
+    let holes: Vec<u8> = (0..128u32 * 128).flat_map(|i| { let (x, y) = (i % 128, i / 128); [255u8, 255, 255, if (x / 16 + y / 16) % 2 == 0 { 30 } else { 230 }] }).collect();
+    let texs = vec![(128, holes, true)];
+    let mask = render3d::Sampling { mag_nearest: true, min_nearest: true, mip: render3d::Mip::None, wrap_u: render3d::Wrap::Repeat, wrap_v: render3d::Wrap::Repeat };
+    let flat = quat([1.0, 0.0, 0.0], -core::f64::consts::FRAC_PI_2);
+    let p = |x: f64, y: f64, z: f64| [at[0] + x, at[1] + y, at[2] + z];
+    let s = |mesh: u32, pos: [f64; 3], rot: [f32; 4], scale: [f32; 3]| Spec { mesh, material: 0, pos, rot, scale };
+    let m = |r: f32, g: f32, b: f32, metallic: f32, roughness: f32| Material { metallic, roughness, ..Material::color(r, g, b) };
+    let mut items = vec![
+        (s(0, p(0.0, 0.0, -25.0), flat, [30.0, 45.0, 1.0]), m(0.8, 0.8, 0.75, 0.0, 0.9)),
+        (s(1, p(-3.0, 1.0, 0.0), quat([0.0, 1.0, 0.0], 0.4), [1.0; 3]), m(0.9, 0.3, 0.2, 0.0, 0.6)),
+        (s(1, p(4.0, 1.5, -8.0), quat([0.0, 1.0, 0.0], 1.1), [1.5; 3]), m(0.2, 0.6, 0.9, 0.3, 0.5)),
+        (s(1, p(-6.0, 2.0, -20.0), NO_TURN, [2.0; 3]), m(0.3, 0.8, 0.3, 0.0, 0.7)),
+        (s(1, p(8.0, 3.0, -40.0), quat([0.0, 1.0, 0.0], 0.7), [3.0; 3]), m(0.9, 0.8, 0.2, 1.0, 0.5)),
+        (s(1, p(-10.0, 2.5, -58.0), NO_TURN, [2.5; 3]), m(0.7, 0.4, 0.9, 0.0, 0.8)),
+        (s(2, p(1.0, 1.2, 6.0), NO_TURN, [1.2; 3]), m(0.95, 0.9, 0.85, 0.0, 0.4)),
+        (s(3, p(-1.0, 4.0, -14.0), NO_TURN, [0.4, 4.0, 0.4]), m(0.6, 0.6, 0.6, 0.0, 0.8)),
+        (s(1, p(2.5, 0.8, -2.0), quat([0.0, 1.0, 0.0], 0.3), [-0.8, 0.8, 0.8]), m(0.9, 0.5, 0.7, 0.0, 0.6)),
+    ];
+    let mut holed = Material { base_color_texture: Some(render3d::TextureRef { texture: render3d::TextureId(0), sampling: mask }), alpha_cutoff: Some(0.5), ..m(0.9, 0.85, 0.7, 0.0, 0.8) };
+    holed.roughness = 0.8;
+    // facing the sun's way (the sun is at 0.6, 0.45, 0.35): its holes' shadow on the ground
+    items.push((s(0, p(6.0, 2.6, -4.0), quat([0.0, 1.0, 0.0], 1.04), [2.0, 2.0, 1.0]), holed));
+    (geos, texs, items)
+}
+
+pub fn shadow_sun() -> Sun {
+    Sun { direction: [0.6, 0.45, 0.35], color: [0.7 * core::f32::consts::PI; 3], ambient: [0.3; 3] }
+}
+
+pub fn shadow_camera(at: [f64; 3]) -> Camera {
+    Camera::look_at([at[0], at[1] + 7.0, at[2] + 16.0], [at[0], at[1], at[2] - 15.0], [0.0, 1.0, 0.0], 1.0, SHADOW_W as f64 / SHADOW_H as f64, 0.1, f64::INFINITY)
+}
+
+pub const SHADOWS: render3d::Shadows = render3d::Shadows { cascades: 4, size: 2048, distance: 90.0, split: 0.75, reach: 50.0 };
+
+
+/// (G5c) the shadow scene with the sun's four cascades
+pub fn shadow_gallery(r: &mut Renderer) -> Result<Scene> {
+    use render3d::TextureData;
+    let (geos, pics, items) = shadow_scene([0.0; 3]);
+    let mut meshes = Vec::new();
+    for g in &geos {
+        meshes.push(r.add_mesh(&g.data())?);
+    }
+    for (n, px, srgb) in &pics {
+        r.add_texture(&TextureData { width: *n, height: *n, rgba: px, srgb: *srgb, nearest: true })?;
+    }
+    let mut sc = Scene::new(r)?;
+    sc.set_camera(&shadow_camera([0.0; 3]));
+    sc.set_sun(&shadow_sun());
+    sc.set_shadows(Some(&SHADOWS))?;
+    let mut cam = shadow_camera([0.0; 3]);
+    cam.aspect = GALLERY_W as f64 / GALLERY_H as f64;
+    sc.set_camera(&cam);
+    for (spec, m) in &items {
+        let id = r.add_material(m)?;
+        sc.add(Instance { material: id, ..spec.instance() })?;
     }
     Ok(sc)
 }

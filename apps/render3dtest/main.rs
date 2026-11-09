@@ -24,6 +24,9 @@
 //        pbr         (G5c) glTF's BRDF against the ray caster: materials, the metallic-roughness texture, normal maps
 //                    (turned, mirrored, mirrored uv, which way they lean), emission, occlusion, exposure, both tone
 //                    mappers, the light itself in Rgba16Float, a white furnace; the BRDF's albedo on the CPU (pbr.rs)
+//        shadows     (G5c) the sun's cascaded shadow maps against exact shadow rays, at the origin and at 1e7,
+//                    MASK with and without the shadow pass's fragment shader, the cascades' snapping on the CPU
+//                    and in the map read back (shadowtest.rs)
 //        all         all of the above
 //        window      a real window (one, briefly; not in `all`): the presented image = the offscreen image
 //   render3dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--warmup W] [--inflight K] [--basis]
@@ -57,6 +60,8 @@ mod bench;
 mod gltftest;
 #[cfg(not(target_arch = "wasm32"))]
 mod pbr;
+#[cfg(not(target_arch = "wasm32"))]
+mod shadowtest;
 #[cfg(not(target_arch = "wasm32"))]
 mod tests;
 #[cfg(not(target_arch = "wasm32"))]

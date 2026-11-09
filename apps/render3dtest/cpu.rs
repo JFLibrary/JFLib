@@ -72,7 +72,7 @@ fn mul(a: V, k: f64) -> V {
     [a[0] * k, a[1] * k, a[2] * k]
 }
 
-fn dot(a: V, b: V) -> f64 {
+pub fn dot(a: V, b: V) -> f64 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
@@ -511,6 +511,8 @@ pub struct RefScene {
     pub exposure: f64,
     /// Khronos PBR Neutral (else none)
     pub tonemap: bool,
+    /// (G5c) the sun casts shadows: exact shadow rays (both sides of every triangle block, MASK's holes not)
+    pub shadows: bool,
 }
 
 /// what a ray found
@@ -525,6 +527,9 @@ pub struct Hit {
     pub v: f64,
     /// the light leaving the point towards the eye, times the exposure, before the tone mapper
     pub linear: [f64; 3],
+    /// (G5c) of it, the sun's part unshadowed, and how much of the sun reaches the point (0 or 1)
+    pub sun: [f64; 3],
+    pub vis: f64,
 }
 
 /// the rays through the centres of the pixel's 2 x 2 quad that the GPU's fine derivatives take: along x
@@ -539,7 +544,7 @@ pub struct Quad {
 
 impl RefScene {
     pub fn new(sun_dir: V, sun: [f64; 3], ambient: [f64; 3]) -> RefScene {
-        RefScene { tris: Vec::new(), inst: Vec::new(), textures: Vec::new(), sun_dir: norm(sun_dir), sun, ambient, exposure: 1.0, tonemap: true }
+        RefScene { tris: Vec::new(), inst: Vec::new(), textures: Vec::new(), sun_dir: norm(sun_dir), sun, ambient, exposure: 1.0, tonemap: true, shadows: false }
     }
 
     /// an instance of one colour: its triangles in the world
@@ -683,21 +688,75 @@ impl RefScene {
         Surface { base, metallic: metallic.clamp(0.0, 1.0), roughness: roughness.clamp(0.0, 1.0), n, ao, emissive }
     }
 
-    /// the light a surface at p sends towards the eye, times the exposure (before the tone mapper)
-    pub fn light(&self, sf: &Surface, _p: V, eye: V) -> [f64; 3] {
-        let v = norm(sub(eye, _p));
+    /// the light a surface at p sends towards the eye, times the exposure (before the tone mapper), the sun
+    /// shadowed by vis; and the sun's part unshadowed
+    pub fn light(&self, sf: &Surface, p: V, eye: V, vis: f64) -> ([f64; 3], [f64; 3]) {
+        let v = norm(sub(eye, p));
         let m = sf.metallic;
         let c_diff = [sf.base[0] * (1.0 - m), sf.base[1] * (1.0 - m), sf.base[2] * (1.0 - m)];
         let f0 = [0.04 + (sf.base[0] - 0.04) * m, 0.04 + (sf.base[1] - 0.04) * m, 0.04 + (sf.base[2] - 0.04) * m];
         let a = (sf.roughness * sf.roughness).max(ALPHA_MIN);
         let sun = brdf(sf.n, v, self.sun_dir, c_diff, f0, a * a);
         let (sa, sb) = env_ab(sf.roughness, dot(sf.n, v).clamp(0.0, 1.0));
-        let mut out = [0.0; 3];
+        let (mut out, mut sun_part) = ([0.0; 3], [0.0; 3]);
         for k in 0..3 {
             let spec = f0[k] * sa + sb;
-            out[k] = (sun[k] * self.sun[k] + self.ambient[k] * (spec + c_diff[k] * (1.0 - spec)) * sf.ao + sf.emissive[k]) * self.exposure;
+            sun_part[k] = sun[k] * self.sun[k] * self.exposure;
+            out[k] = (self.ambient[k] * (spec + c_diff[k] * (1.0 - spec)) * sf.ao + sf.emissive[k]) * self.exposure + sun_part[k] * vis;
         }
-        out
+        (out, sun_part)
+    }
+
+    /// (G5c) something lies between p and the sun: any triangle, either side, beyond a hair of p; MASK's
+    /// holes (base alpha at level 0) let it through
+    pub fn occluded(&self, p: V, dir: V) -> bool {
+        let dd = dot(dir, dir);
+        for inst in &self.inst {
+            let oc = sub(inst.center, p);
+            let along = dot(oc, dir);
+            if along < -sqrt(inst.r2) || dot(oc, oc) - along * along / dd > inst.r2 {
+                continue;
+            }
+            for t in &self.tris[inst.first..inst.last] {
+                let q = cross(dir, t.e2);
+                let det = dot(t.e1, q);
+                if det == 0.0 {
+                    continue;
+                }
+                let o = sub(p, t.v0);
+                let u = dot(o, q) / det;
+                if !(0.0..=1.0).contains(&u) {
+                    continue;
+                }
+                let r = cross(o, t.e1);
+                let v = dot(dir, r) / det;
+                if v < 0.0 || u + v > 1.0 {
+                    continue;
+                }
+                let z = dot(t.e2, r) / det;
+                if z <= 1e-9 {
+                    continue;
+                }
+                if let Some(cut) = inst.look.cutoff {
+                    if self.base(&inst.look, t, u, v, p, None)[3] < cut {
+                        continue;
+                    }
+                }
+                return true;
+            }
+        }
+        false
+    }
+
+    /// (G5c) how much of the sun reaches a point of a triangle with geometric normal ng (shadow rays from a
+    /// hair above the surface)
+    fn sun_vis(&self, p: V, ng: V) -> f64 {
+        if !self.shadows || dot(ng, self.sun_dir) <= 0.0 {
+            return 1.0;
+        }
+        let big = p[0].abs().max(p[1].abs()).max(p[2].abs()).max(1.0);
+        let from = add(p, mul(ng, big * 1e-9 + 1e-6));
+        if self.occluded(from, self.sun_dir) { 0.0 } else { 1.0 }
     }
 
     /// light (times the exposure) as the target's 8-bit value, through the tone mapper
@@ -707,12 +766,21 @@ impl RefScene {
         [px(c[0]), px(c[1]), px(c[2])]
     }
 
-    /// the light of instance k's triangle ti at (u, v), seen from eye
-    fn shade(&self, k: usize, ti: usize, u: f64, v: f64, eye: V, quad: Option<&Quad>, normal: Option<V>) -> [f64; 3] {
+    /// the light of instance k's triangle ti at (u, v), seen from eye; the sun's part unshadowed; the sun's reach
+    fn shade_parts(&self, k: usize, ti: usize, u: f64, v: f64, eye: V, quad: Option<&Quad>, normal: Option<V>) -> ([f64; 3], [f64; 3], f64) {
         let t = &self.tris[ti];
         let sf = self.surface(&self.inst[k].look, t, u, v, eye, quad, normal);
         let p = add(add(t.v0, mul(t.e1, u)), mul(t.e2, v));
-        self.light(&sf, p, eye)
+        let w = 1.0 - u - v;
+        let ng = norm(add(add(mul(t.n[0], w), mul(t.n[1], u)), mul(t.n[2], v)));
+        let vis = self.sun_vis(p, ng);
+        let (c, sun) = self.light(&sf, p, eye, vis);
+        (c, sun, vis)
+    }
+
+    /// the light of instance k's triangle ti at (u, v), seen from eye
+    fn shade(&self, k: usize, ti: usize, u: f64, v: f64, eye: V, quad: Option<&Quad>, normal: Option<V>) -> [f64; 3] {
+        self.shade_parts(k, ti, u, v, eye, quad, normal).0
     }
 
     /// (diagnostics) the uv of a hit
@@ -768,8 +836,8 @@ impl RefScene {
             }
         }
         let (z, k, ti, u, v) = best?;
-        let linear = self.shade(k, ti, u, v, eye, quad, None);
-        Some(Hit { z, rgb: self.to_rgb8(linear), inst: k, tri: ti, u, v, linear })
+        let (linear, sun, vis) = self.shade_parts(k, ti, u, v, eye, quad, None);
+        Some(Hit { z, rgb: self.to_rgb8(linear), inst: k, tri: ti, u, v, linear, sun, vis })
     }
 
     /// this colour is one the hit's instance shows near the hit: between the colours of the hit and of its
@@ -889,6 +957,134 @@ pub fn compare_tol(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3
         }
     }
     out.objects_seen = seen.iter().filter(|v| **v).count() as u32;
+    out
+}
+
+/// (G5c) what comparing a shadowed image with exact shadow rays found
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ShadowCompared {
+    /// pixels away from geometric edges, of them on objects, of them in the sun's shadow by the rays
+    pub solid: u32,
+    pub on_objects: u32,
+    pub shadowed: u32,
+    /// solid pixels whose colour lies on no mix of their point's shadowed and lit colour (tolerance): wrong
+    pub bad: u32,
+    /// the mix the GPU shows is nearer the other side than the rays' (more than half): within 3 pixels of a
+    /// pixel whose ray says otherwise (a shadow's edge, the filter's and the bias's doing), or not (acne, leaks)
+    pub at_edges: u32,
+    pub inside: u32,
+    /// pixels at geometric edges, and of them wrong
+    pub edges: u32,
+    pub edges_bad: u32,
+    pub first: Option<(u32, u32, [u8; 3], [u8; 3])>,
+    pub first_inside: Option<(u32, u32, f64, f64)>,
+}
+
+impl ShadowCompared {
+    pub fn text(&self) -> alloc::string::String {
+        let share = |n: u32| n as f64 * 100.0 / self.on_objects.max(1) as f64;
+        format!("{} solid ({} on objects, {} shadowed by the rays): {} other side at a shadow's edge ({:.2} %), {} inside ({:.3} %), {} wrong; {} at geometric edges, {} wrong{}{}",
+                self.solid, self.on_objects, self.shadowed, self.at_edges, share(self.at_edges), self.inside, share(self.inside), self.bad, self.edges, self.edges_bad,
+                self.first.map_or(alloc::string::String::new(), |f| format!(" (first wrong at {}, {}: {:?}, expected {:?})", f.0, f.1, f.2, f.3)),
+                self.first_inside.map_or(alloc::string::String::new(), |f| format!(" (first inside at {}, {}: shows {:.2}, rays {})", f.0, f.1, f.2, f.3)))
+    }
+}
+
+/// (G5c) an image of a scene whose sun casts shadows against exact shadow rays: each solid pixel must show a
+/// mix of its point's shadowed and lit colour (the filter's penumbra), and that mix is judged against the rays
+pub fn compare_shadows(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3], image: &[u8], tol: u8) -> ShadowCompared {
+    const NEAR_EDGE: f64 = 1.0 / 64.0;
+    let mut out = ShadowCompared::default();
+    let shoot = |x: f64, y: f64| sc.trace(cam.eye, cam.ray(x, y, w, h), cam.near, cam.far);
+    // the rays' answer per pixel first: -1 for no object
+    let mut vis = alloc::vec![-1.0f64; (w * h) as usize];
+    let mut hits = alloc::vec![None; (w * h) as usize];
+    for y in 0..h {
+        for x in 0..w {
+            let c = shoot(x as f64 + 0.5, y as f64 + 0.5);
+            if let Some(hit) = c {
+                vis[(y * w + x) as usize] = hit.vis;
+            }
+            hits[(y * w + x) as usize] = c;
+        }
+    }
+    let mix = |hit: &Hit, t: f64| -> [u8; 3] {
+        let d = [hit.linear[0] - hit.vis * hit.sun[0], hit.linear[1] - hit.vis * hit.sun[1], hit.linear[2] - hit.vis * hit.sun[2]];
+        sc.to_rgb8([d[0] + t * hit.sun[0], d[1] + t * hit.sun[1], d[2] + t * hit.sun[2]])
+    };
+    // the mix nearest to the colour: (distance, t)
+    let nearest = |hit: &Hit, got: [u8; 3]| -> (u8, f64) {
+        let mut best = (255u8, 0.0);
+        for k in 0..=64 {
+            let t = k as f64 / 64.0;
+            let c = mix(hit, t);
+            let d = (0..3).map(|i| c[i].abs_diff(got[i])).max().unwrap_or(0);
+            if d < best.0 {
+                best = (d, t);
+            }
+        }
+        best
+    };
+    for y in 0..h {
+        for x in 0..w {
+            let at = ((y * w + x) * 4) as usize;
+            let got = [image[at], image[at + 1], image[at + 2]];
+            let (cx, cy) = (x as f64 + 0.5, y as f64 + 0.5);
+            let c = hits[(y * w + x) as usize];
+            let around = [shoot(cx - NEAR_EDGE, cy), shoot(cx + NEAR_EDGE, cy), shoot(cx, cy - NEAR_EDGE), shoot(cx, cy + NEAR_EDGE)];
+            let same = around.iter().all(|h| h.map(|v| v.inst) == c.map(|v| v.inst));
+            if !same {
+                out.edges += 1;
+                let fine = c.iter().chain(around.iter().flatten()).any(|h| nearest(h, got).0 <= tol + 1) || near_rgb(got, clear, tol)
+                    || c.iter().chain(around.iter().flatten()).any(|h| sc.could_show(h, cam.eye, got));
+                if !fine {
+                    out.edges_bad += 1;
+                }
+                continue;
+            }
+            out.solid += 1;
+            let Some(hit) = c else {
+                if !near_rgb(got, clear, tol) {
+                    out.bad += 1;
+                    out.first.get_or_insert((x, y, got, clear));
+                }
+                continue;
+            };
+            out.on_objects += 1;
+            out.shadowed += (hit.vis < 0.5) as u32;
+            let (d, t) = nearest(&hit, got);
+            if d > tol {
+                out.bad += 1;
+                out.first.get_or_insert((x, y, got, hit.rgb));
+                continue;
+            }
+            // a sun too weak here to tell shadow from light
+            let (lit, dark) = (mix(&hit, 1.0), mix(&hit, 0.0));
+            if (0..3).map(|i| lit[i].abs_diff(dark[i])).max().unwrap_or(0) < 4 {
+                continue;
+            }
+            if (t - hit.vis).abs() > 0.5 {
+                let mut edge = false;
+                for dy in -3i32..=3 {
+                    for dx in -3i32..=3 {
+                        let (xx, yy) = (x as i32 + dx, y as i32 + dy);
+                        if xx >= 0 && yy >= 0 && (xx as u32) < w && (yy as u32) < h {
+                            let v = vis[(yy as u32 * w + xx as u32) as usize];
+                            if v >= 0.0 && (v - hit.vis).abs() > 0.5 {
+                                edge = true;
+                            }
+                        }
+                    }
+                }
+                if edge {
+                    out.at_edges += 1;
+                } else {
+                    out.inside += 1;
+                    out.first_inside.get_or_insert((x, y, t, hit.vis));
+                }
+            }
+        }
+    }
     out
 }
 

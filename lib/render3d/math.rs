@@ -30,6 +30,12 @@ pub fn tan(x: f64) -> f64 {
     s / c
 }
 
+/// the largest integer not above x (|x| below 2^63)
+pub fn floor(x: f64) -> f64 {
+    let t = x as i64 as f64;
+    if t > x { t - 1.0 } else { t }
+}
+
 pub fn add(a: V3, b: V3) -> V3 {
     [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
 }

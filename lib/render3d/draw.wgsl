@@ -22,6 +22,11 @@
 // position and the uv (bumped; how that differs from MikkTSpace: docs/RENDER3D.md).  A uniform ambient
 // light reaches the surface through the split-sum approximation with its second sum from a table (env_ab,
 // dfg.rs); occlusion acts on it only.
+//
+// Shadows (G5c): the sun's cascades are views of their own (cull.wgsl fills their lists), drawn into the layers
+// of a depth array by vs_depth (no fragment shader) or vs_shadow + fs_shadow (MASK's holes), both with a
+// cascade's orthographic view_proj in `view`; the main pass filters them with a comparison sampler
+// (sun_shadow).
 
 struct View {
     view_proj: mat4x4f,
@@ -39,12 +44,24 @@ struct Instance {
     material: u32,
 }
 
+// a shadow cascade (G5c): rows taking a point (relative to the origin) to (u, v, depth) of its map; info.x
+// one texel in world units, info.y the depth of one world unit
+struct Cascade {
+    u: vec4f,
+    v: vec4f,
+    d: vec4f,
+    info: vec4f,
+}
+
 // sun_dir: towards the sun (a unit vector), w the exposure; sun_color: illuminance per channel (lux), w 1
-// for the neutral tone mapper, 0 for none; ambient: the radiance of a uniform environment
+// for the neutral tone mapper, 0 for none; ambient: the radiance of a uniform environment; shadow.x the
+// sun's cascades (0: no shadows), shadow.y texels a side of each cascade's map
 struct Lights {
     sun_dir: vec4f,
     sun_color: vec4f,
     ambient: vec4f,
+    shadow: vec4f,
+    cascades: array<Cascade, 4>,
 }
 
 // 80 bytes: glTF's metallic-roughness material.  alpha_cutoff < 0: opaque.  Texture words (u32::MAX: none):
@@ -103,6 +120,10 @@ struct VsOut {
 @group(1) @binding(10) var smp: sampler;
 // (G5c) the split-sum's second sum (A, B) over n.v (x) and roughness (y), 32 x 32 (dfg.rs)
 @group(1) @binding(11) var<storage, read> dfg: array<vec2f>;
+// (G5c) group 2, the main pass's alone (the shadow passes write the map: WebGPU forbids it bound there):
+// the sun's cascades in the layers of one depth array (reverse Z), compared by a linear comparison sampler
+@group(2) @binding(0) var shadow_map: texture_depth_2d_array;
+@group(2) @binding(1) var shadow_cmp: sampler_comparison;
 var<immediate> pc: Push;
 
 const NO_TEXTURE: u32 = 0xffffffffu;
@@ -251,6 +272,94 @@ fn sample_texture(t: u32, uv: vec2f, dx: vec2f, dy: vec2f) -> vec4f {
     return mix(a, array_at(which, layer, uv, wrap, size, l0 + 1.0, nearest), d - l0);
 }
 
+// ---------------------------------------------------------------- shadow passes (G5c)
+
+struct ShadowOut {
+    @builtin(position) position: vec4f,
+    @location(0) @interpolate(flat) material: u32,
+    @location(1) uv: vec2f,
+}
+
+// a vertex of a cascade (its view_proj, orthographic): casters nearer the sun than the cascade's near plane
+// are flattened onto it (pancaking), so they cast without a depth range reaching the sun
+fn shadow_position(vi: u32, ii: u32) -> vec4f {
+    let inst = instances[visible[pc.first + ii]];
+    let v = vertices[vi];
+    let p = vec4f(v.position_u.xyz, 1.0);
+    let world = vec4f(dot(inst.m0, p), dot(inst.m1, p), dot(inst.m2, p), 1.0);
+    var out = view.view_proj * world;
+    out.z = min(out.z, out.w);
+    return out;
+}
+
+// depth only: MASK casts full shadows
+@vertex
+fn vs_depth(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> @builtin(position) vec4f {
+    return shadow_position(vi, ii);
+}
+
+@vertex
+fn vs_shadow(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> ShadowOut {
+    var out: ShadowOut;
+    out.position = shadow_position(vi, ii);
+    let inst = instances[visible[pc.first + ii]];
+    let v = vertices[vi];
+    out.material = inst.material;
+    out.uv = vec2f(v.position_u.w, v.normal_v.w);
+    return out;
+}
+
+// MASK's holes let the sun through; every other material returns at once
+@fragment
+fn fs_shadow(f: ShadowOut) {
+    let dx = dpdxFine(f.uv);
+    let dy = dpdyFine(f.uv);
+    let m = materials[f.material];
+    if m.alpha_cutoff < 0.0 {
+        return;
+    }
+    var a = m.base_color.w;
+    if m.textures.x != NO_TEXTURE {
+        a = a * sample_texture(m.textures.x, f.uv, dx, dy).w;
+    }
+    if a < m.alpha_cutoff {
+        discard;
+    }
+}
+
+// ---------------------------------------------------------------- shading
+
+// receivers look up their cascade a little off the surface: along the normal by NORMAL_BIAS texels of the
+// cascade (enough for the filter's reach on any slope) and towards the sun by DEPTH_BIAS texels
+const NORMAL_BIAS: f32 = 2.0;
+const DEPTH_BIAS: f32 = 0.25;
+
+// how much of the sun reaches a point (relative to the origin) with geometric normal ng: the first cascade
+// whose map holds it with the filter's reach, 3 x 3 taps of the bilinear comparison (a 4 x 4 texel tent);
+// 1 outside all of them
+fn sun_shadow(p: vec3f, ng: vec3f) -> f32 {
+    let n = u32(lights.shadow.x);
+    let size = lights.shadow.y;
+    let texel = 1.0 / size;
+    for (var k = 0u; k < n; k++) {
+        let c = lights.cascades[k];
+        let q = vec4f(p + ng * (c.info.x * NORMAL_BIAS), 1.0);
+        let s = vec3f(dot(c.u, q), dot(c.v, q), dot(c.d, q));
+        let lo = 2.0 * texel;
+        if s.x >= lo && s.x <= 1.0 - lo && s.y >= lo && s.y <= 1.0 - lo && s.z >= 0.0 && s.z <= 1.0 {
+            let r = s.z + c.info.x * c.info.y * DEPTH_BIAS;
+            var sum = 0.0;
+            for (var j = -1; j <= 1; j++) {
+                for (var i = -1; i <= 1; i++) {
+                    sum += textureSampleCompareLevel(shadow_map, shadow_cmp, s.xy + vec2f(f32(i), f32(j)) * texel, k, r);
+                }
+            }
+            return sum * (1.0 / 9.0);
+        }
+    }
+    return 1.0;
+}
+
 const PI: f32 = 3.141592653589793;
 // the least alpha (= roughness squared) the BRDF takes: roughness 0 would divide 0 by 0 at the highlight
 const ALPHA_MIN: f32 = 0.001;
@@ -372,6 +481,9 @@ fn fs(f: VsOut) -> @location(0) vec4f {
     let f0 = mix(vec3f(0.04), c.xyz, metallic);
     let a = max(roughness * roughness, ALPHA_MIN);
     var light = direct(n, v, lights.sun_dir.xyz, c_diff, f0, a * a) * lights.sun_color.xyz;
+    if lights.shadow.x > 0.0 && any(light > vec3f(0.0)) {
+        light = light * sun_shadow(f.world, ng);
+    }
     // the uniform environment: what the specular lobe does not take goes to the diffuse
     let ab = env_ab(roughness, clamp(dot(n, v), 0.0, 1.0));
     let spec = f0 * ab.x + ab.y;

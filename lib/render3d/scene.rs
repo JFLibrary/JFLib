@@ -23,7 +23,8 @@ use core::sync::atomic::Ordering;
 use gpu::*;
 
 use crate::math::{self, V3};
-use crate::{CHANGE_WORDS, Counts, DRAW_BYTES, INSTANCE_WORDS, LIGHTS_AT, MaterialId, MeshId, Renderer};
+use crate::shadow::{self, CASCADES_MAX, Cascade, Shadows};
+use crate::{CASCADE_AT, CASCADE_STRIDE, CHANGE_WORDS, Counts, DRAW_BYTES, INSTANCE_WORDS, LIGHTS_AT, MaterialId, MeshId, Renderer, STAMPS};
 
 /// where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis.
 /// Negative scales mirror: an odd number of them turns the winding round, the instance goes to its mesh's
@@ -186,9 +187,13 @@ pub struct FrameStats {
     pub frame: u64,
     /// instances the compute shader found visible
     pub visible: u64,
-    /// the GPU's clock (ms) at the start, after the uploads, after culling, after the render pass (no
+    /// the GPU's clock (ms) at the start, after the uploads, after the camera's culling, after the frame (no
     /// timestamps here: None)
     pub stamps: Option<[f64; 4]>,
+    /// (G5c) per cascade of the sun, ms: its culling, its depth pass (0 for cascades not drawn)
+    pub cascades: [[f64; 2]; CASCADES_MAX],
+    /// (G5c) the main render pass, ms
+    pub draw: f64,
 }
 
 #[derive(Clone, Copy)]
@@ -214,13 +219,15 @@ pub(crate) struct List {
     pub wide: bool,
 }
 
-/// one view's data of a frame: its uniform block, its lists.  G5a has the camera's; shadow cascades (G5c)
-/// and the second round of Hi-Z (G5d) add more of these (the layout of the lists is the scene's)
+/// one view's data of a frame: its uniform block, its lists, its bind groups for culling and drawing.  The
+/// camera's, one per shadow cascade (G5c); the second round of Hi-Z (G5d) adds more (the layout of the lists
+/// is the scene's)
 pub(crate) struct ViewLists {
     pub ubo: Buffer,
     pub draws: Buffer,
     pub visible: Buffer,
     pub group: BindGroup,
+    pub render: BindGroup,
 }
 
 /// a frame in flight's own data
@@ -249,6 +256,8 @@ pub struct Scene {
     live: u32,
     camera: Camera,
     sun: Sun,
+    shadows: Option<Shadows>,
+    cascade_info: Vec<Cascade>,
     exposure: f32,
     tonemap: Tonemap,
     origin: V3,
@@ -264,7 +273,8 @@ pub struct Scene {
     pub(crate) template: Buffer,
     pub(crate) list_first: Buffer,
     pub(crate) view: ViewLists,
-    pub(crate) render_group: BindGroup,
+    /// (G5c) one per cascade of the sun, made when shadows want them
+    pub(crate) cascades: Vec<ViewLists>,
     pub(crate) frames: Vec<FrameSlot>,
     pub(crate) ts: Option<Timestamps>,
     seen_materials: u32,
@@ -309,6 +319,18 @@ fn render_group(dev: &Device, r: &Renderer, ubo: &Buffer, instances: &Buffer, li
     })
 }
 
+/// the buffers of a view of the scene's sizes, and its groups
+#[allow(clippy::too_many_arguments)]
+fn view_lists(dev: &Device, r: &Renderer, list_cap: u32, visible_cap: u32, spheres: &Buffer, list_of: &Buffer, list_first: &Buffer, instances: &Buffer,
+              lights: &Buffer) -> Result<ViewLists> {
+    let ubo = dev.create_buffer(&BufferDesc { size: crate::VIEW_BYTES, usage: BufferUsage::UNIFORM, memory: MemoryKind::Device })?;
+    let draws = storage(dev, list_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
+    let visible = storage(dev, visible_cap as u64 * 4, BufferUsage::NONE)?;
+    let group = cull_group(dev, r, &ubo, spheres, list_of, list_first, &draws, &visible)?;
+    let render = render_group(dev, r, &ubo, instances, lights, &visible)?;
+    Ok(ViewLists { ubo, draws, visible, group, render })
+}
+
 /// the record of a slot: its bounding sphere relative to origin, safe against what f32 rounds (nothing
 /// visible may go missing), and its instance words
 fn records(s: &Slot, r: &Renderer, origin: V3) -> ([f32; 4], [u32; INSTANCE_WORDS]) {
@@ -346,17 +368,13 @@ impl Scene {
         let spheres = storage(&dev, cap as u64 * 16, none)?;
         let list_of = storage(&dev, cap as u64 * 4, none)?;
         let instances = storage(&dev, cap as u64 * 64, none)?;
-        let device_uniform = |size: u64| dev.create_buffer(&BufferDesc { size, usage: BufferUsage::UNIFORM, memory: MemoryKind::Device });
-        let (ubo, lights) = (device_uniform(crate::VIEW_BYTES)?, device_uniform(crate::LIGHTS_BYTES)?);
+        let lights = dev.create_buffer(&BufferDesc { size: crate::LIGHTS_BYTES, usage: BufferUsage::UNIFORM, memory: MemoryKind::Device })?;
         let template = dev.create_buffer(&BufferDesc { size: list_cap as u64 * DRAW_BYTES, usage: none, memory: MemoryKind::Device })?;
         let list_first = storage(&dev, list_cap as u64 * 4, none)?;
-        let draws = storage(&dev, list_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
-        let visible = storage(&dev, visible_cap as u64 * 4, BufferUsage::NONE)?;
-        let group = cull_group(&dev, r, &ubo, &spheres, &list_of, &list_first, &draws, &visible)?;
-        let rg = render_group(&dev, r, &ubo, &instances, &lights, &visible)?;
+        let view = view_lists(&dev, r, list_cap, visible_cap, &spheres, &list_of, &list_first, &instances, &lights)?;
         let mut frames = Vec::new();
         for _ in 0..r.desc.frames_in_flight {
-            let stage = dev.create_buffer(&BufferDesc { size: LIGHTS_AT + crate::LIGHTS_BYTES, usage: none, memory: MemoryKind::Upload })?;
+            let stage = dev.create_buffer(&BufferDesc { size: CASCADE_AT + CASCADE_STRIDE * CASCADES_MAX as u64, usage: none, memory: MemoryKind::Upload })?;
             frames.push(FrameSlot { stage, changes: None, scatter_group: None, readback: None, last: None });
         }
         Ok(Scene {
@@ -372,6 +390,8 @@ impl Scene {
             live: 0,
             camera: Camera::look_at([0.0, 0.0, 5.0], [0.0; 3], [0.0, 1.0, 0.0], 1.0, 1.0, 0.1, f64::INFINITY),
             sun: Sun::DEFAULT,
+            shadows: None,
+            cascade_info: Vec::new(),
             exposure: 1.0,
             tonemap: Tonemap::Neutral,
             origin: [0.0; 3],
@@ -386,8 +406,8 @@ impl Scene {
             lights,
             template,
             list_first,
-            view: ViewLists { ubo, draws, visible, group },
-            render_group: rg,
+            view,
+            cascades: Vec::new(),
             frames,
             ts: None,
             seen_materials: r.bindings_gen,
@@ -598,6 +618,29 @@ impl Scene {
         self.tonemap = t;
     }
 
+    /// (G5c) the sun's shadows, None (at first) for none; Invalid for values out of range
+    pub fn set_shadows(&mut self, s: Option<&Shadows>) -> Result<()> {
+        if let Some(s) = s {
+            s.check()?;
+        }
+        self.shadows = s.copied();
+        Ok(())
+    }
+
+    pub fn shadows(&self) -> Option<Shadows> {
+        self.shadows
+    }
+
+    /// (G5c; tests, tools) the cascades the last prepare computed
+    pub fn cascades(&self) -> &[Cascade] {
+        &self.cascade_info
+    }
+
+    /// (G5c; tests, tools) a cascade's draw records and visible list after a frame's culling
+    pub fn cascade_buffers(&self, k: usize) -> Option<(&Buffer, &Buffer)> {
+        self.cascades.get(k).map(|v| (&v.draws, &v.visible))
+    }
+
     /// the point of the world that is (0, 0, 0) on the GPU.  Keep it near the camera: f32 has seven
     /// digits.  Moving it uploads every instance once
     pub fn set_origin(&mut self, origin: [f64; 3]) {
@@ -676,8 +719,18 @@ impl Scene {
         }
         let n = self.lists.len().min(draws.len() / 5);
         let visible = (0..n).map(|i| draws[i * 5 + 1] as u64).sum();
-        let stamps = self.ts.as_ref().and_then(|ts| ts.read_ms(slot as u32 * 4, 4).ok()).map(|v| [v[0], v[1], v[2], v[3]]);
-        self.finished.push(FrameStats { frame, visible, stamps });
+        let v = self.ts.as_ref().and_then(|ts| ts.read_ms(slot as u32 * STAMPS, STAMPS).ok());
+        let mut cascades = [[0.0; 2]; CASCADES_MAX];
+        let mut draw = 0.0;
+        if let Some(v) = &v {
+            // stamps: 0 start, 1 uploads, 2 the camera's culling, 3 + k cascade k's culling, 7 + k its pass, 11 the end
+            for (k, c) in cascades.iter_mut().enumerate() {
+                *c = [v[3 + k] - v[2 + k], v[7 + k] - v[6 + k]];
+            }
+            draw = v[11] - v[10];
+        }
+        let stamps = v.map(|v| [v[0], v[1], v[2], v[11]]);
+        self.finished.push(FrameStats { frame, visible, stamps, cascades, draw });
     }
 
     /// the finished frames' stats since the last call
@@ -713,11 +766,12 @@ impl Scene {
             groups = true;
         }
         let lists = self.lists.len() as u32;
+        let mut draws_new = false;
         if lists > self.list_cap {
             self.list_cap = lists.max(self.list_cap * 2);
             self.template = dev.create_buffer(&BufferDesc { size: self.list_cap as u64 * DRAW_BYTES, usage: none, memory: MemoryKind::Device })?;
             self.list_first = storage(&dev, self.list_cap as u64 * 4, none)?;
-            self.view.draws = storage(&dev, self.list_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
+            draws_new = true;
             self.lists_dirty = true;
             groups = true;
         }
@@ -725,22 +779,39 @@ impl Scene {
         if room > u32::MAX as u64 {
             return Err(GpuError::Unsupported("Scene: the visible lists have grown too large"));
         }
+        let mut visible_new = false;
         if room as u32 > self.visible_cap {
             self.visible_cap = (room as u32).max(self.visible_cap.saturating_mul(2));
-            self.view.visible = storage(&dev, self.visible_cap as u64 * 4, BufferUsage::NONE)?;
+            visible_new = true;
             groups = true;
         }
+        // (G5c) a view per cascade of the sun's shadows
+        let want = self.shadows.map_or(0, |s| s.cascades as usize);
+        while self.cascades.len() < want {
+            let v = view_lists(&dev, r, self.list_cap, self.visible_cap, &self.spheres, &self.list_of, &self.list_first, &self.instances, &self.lights)?;
+            self.cascades.push(v);
+        }
+        let (list_cap, visible_cap) = (self.list_cap, self.visible_cap);
+        for v in core::iter::once(&mut self.view).chain(self.cascades.iter_mut()) {
+            if draws_new {
+                v.draws = storage(&dev, list_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
+            }
+            if visible_new {
+                v.visible = storage(&dev, visible_cap as u64 * 4, BufferUsage::NONE)?;
+            }
+            if groups {
+                v.group = cull_group(&dev, r, &v.ubo, &self.spheres, &self.list_of, &self.list_first, &v.draws, &v.visible)?;
+            }
+            if groups || self.seen_materials != r.bindings_gen {
+                v.render = render_group(&dev, r, &v.ubo, &self.instances, &self.lights, &v.visible)?;
+            }
+        }
         if groups {
-            let v = &mut self.view;
-            v.group = cull_group(&dev, r, &v.ubo, &self.spheres, &self.list_of, &self.list_first, &v.draws, &v.visible)?;
             for f in &mut self.frames {
                 f.scatter_group = None;
             }
         }
-        if groups || self.seen_materials != r.bindings_gen {
-            self.render_group = render_group(&dev, r, &self.view.ubo, &self.instances, &self.lights, &self.view.visible)?;
-            self.seen_materials = r.bindings_gen;
-        }
+        self.seen_materials = r.bindings_gen;
         Ok(())
     }
 
@@ -900,7 +971,7 @@ impl Scene {
         // this device's stats need a read-back per frame and timestamps
         if self.stats_on {
             if self.ts.is_none() && self.dev.features().timestamps {
-                self.ts = Some(self.dev.create_timestamps(4 * self.frames.len() as u32)?);
+                self.ts = Some(self.dev.create_timestamps(STAMPS * self.frames.len() as u32)?);
             }
             let size = self.list_cap as u64 * DRAW_BYTES;
             let f = &mut self.frames[slot];
@@ -917,11 +988,26 @@ impl Scene {
         let s = &self.sun;
         let d = math::norm(s.direction);
         let tm = if self.tonemap == Tonemap::Neutral { 1.0 } else { 0.0 };
-        let lights = [d[0] as f32, d[1] as f32, d[2] as f32, self.exposure, s.color[0], s.color[1], s.color[2], tm, s.ambient[0], s.ambient[1], s.ambient[2], 0.0];
+        let mut lights = [0.0f32; crate::LIGHTS_BYTES as usize / 4];
+        lights[..12].copy_from_slice(&[d[0] as f32, d[1] as f32, d[2] as f32, self.exposure, s.color[0], s.color[1], s.color[2], tm, s.ambient[0], s.ambient[1], s.ambient[2], 0.0]);
+        // (G5c) the sun's cascades
+        self.cascade_info = match &self.shadows {
+            Some(sh) => {
+                r.shadow.ensure(&self.dev, sh.size)?;
+                shadow::cascades(&self.camera, s.direction, sh)
+            }
+            None => Vec::new(),
+        };
+        lights[12] = self.cascade_info.len() as f32;
+        lights[13] = self.shadows.map_or(1.0, |sh| sh.size as f32);
         let f = &self.frames[slot];
+        for (k, c) in self.cascade_info.iter().enumerate() {
+            lights[16 + k * 16..32 + k * 16].copy_from_slice(&c.receiver(self.origin));
+            f.stage.write(CASCADE_AT + k as u64 * CASCADE_STRIDE, &c.view_block(self.origin))?;
+        }
         f.stage.write(0, &self.camera.view_block(self.origin))?;
         f.stage.write(LIGHTS_AT, &lights)?;
-        self.upload.bytes += crate::VIEW_BYTES + crate::LIGHTS_BYTES;
+        self.upload.bytes += crate::VIEW_BYTES * (1 + self.cascade_info.len() as u64) + crate::LIGHTS_BYTES;
         self.prepared = true;
         Ok(())
     }

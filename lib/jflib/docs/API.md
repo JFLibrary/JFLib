@@ -63,7 +63,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
-  <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [texture.rs](#render3dtexturers)
+  <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -19916,6 +19916,9 @@ CULL_SPV: &[u32] = spv::CULL
 SCATTER_SPV: &[u32] = spv::SCATTER
 VS_SPV: &[u32] = spv::VS
 FS_SPV: &[u32] = spv::FS
+VS_DEPTH_SPV: &[u32] = spv::VS_DEPTH
+VS_SHADOW_SPV: &[u32] = spv::VS_SHADOW
+FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 ```
 
 - **`struct RendererDesc`**
@@ -19988,6 +19991,11 @@ FS_SPV: &[u32] = spv::FS
   this device draws its lists with one multi-draw (level Voll)
 - **`fn max_instances(&self) -> u32`**
   the most instances a scene can hold on this device
+- **`fn set_shadow_mask(&mut self, on: bool)`**
+  (G5c) false: the shadow passes run without a fragment shader and MASK materials cast full shadows
+  (what that saves: docs/RENDER3D.md); true at first: their holes let the sun through
+- **`fn shadow_map(&self) -> &Texture`**
+  (G5c; tests) the sun's shadow map: CASCADES_MAX layers of Depth32Float, in Layout::Sampled between frames
 - **`fn add_mesh(&mut self, m: &MeshData) -> Result<MeshId>`**
   a mesh into the pools (they grow; nothing waits).  The vertices must be there in equal numbers, the
   indices in threes and in range, positions finite.
@@ -20081,6 +20089,9 @@ math -- what the scene computes on the CPU, in f64 (no libm in no_std; the matri
 
 - **`fn tan(x: f64) -> f64`**
   the tangent of a small angle (a field of view below pi): sine over cosine by their series
+
+- **`fn floor(x: f64) -> f64`**
+  the largest integer not above x (|x| below 2^63)
 
 - **`fn add(a: V3, b: V3) -> V3`**
 
@@ -20211,8 +20222,10 @@ commands without a barrier against the frames still on the GPU.
   what a finished frame measured (Scene::set_stats)
   - `frame: u64` -- counts the scene's frames from 0
   - `visible: u64` -- instances the compute shader found visible
-  - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after culling, after the render pass (no
+  - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after the camera's culling, after the frame (no
     timestamps here: None)
+  - `cascades: [[f64; 2]; CASCADES_MAX]` -- (G5c) per cascade of the sun, ms: its culling, its depth pass (0 for cascades not drawn)
+  - `draw: f64` -- (G5c) the main render pass, ms
 
 - **`struct Scene`**
   instances, camera and sun of one scene of a Renderer
@@ -20241,6 +20254,13 @@ commands without a barrier against the frames still on the GPU.
 - **`fn exposure(&self) -> f32`**
 - **`fn set_tonemap(&mut self, t: Tonemap)`**
   Tonemap::Neutral at first
+- **`fn set_shadows(&mut self, s: Option<&Shadows>) -> Result<()>`**
+  (G5c) the sun's shadows, None (at first) for none; Invalid for values out of range
+- **`fn shadows(&self) -> Option<Shadows>`**
+- **`fn cascades(&self) -> &[Cascade]`**
+  (G5c; tests, tools) the cascades the last prepare computed
+- **`fn cascade_buffers(&self, k: usize) -> Option<(&Buffer, &Buffer)>`**
+  (G5c; tests, tools) a cascade's draw records and visible list after a frame's culling
 - **`fn set_origin(&mut self, origin: [f64; 3])`**
   the point of the world that is (0, 0, 0) on the GPU.  Keep it near the camera: f32 has seven
   digits.  Moving it uploads every instance once
@@ -20269,6 +20289,59 @@ commands without a barrier against the frames still on the GPU.
   the frame's data for Renderer::record: waits for this slot's last frame, sends what changed
 - **`fn submitted(&mut self, id: SubmitId)`**
   the frame went to the GPU: Queue::submit's or Swapchain::present's answer
+
+### `render3d/shadow.rs`
+
+Source: [`lib/render3d/shadow.rs`](../lib/render3d/shadow.rs)
+
+```text
+shadow -- the sun's cascaded shadow maps (G5c; docs/RENDER3D.md "Schatten"): one Depth32Float array of
+CASCADES_MAX layers owned by the Renderer, group 2 of the main pass with a linear comparison sampler, and the
+cascades' geometry on the CPU in f64.
+
+A cascade covers a slice of the camera's view (splits between uniform and logarithmic) by the bounding
+sphere of the slice: its radius depends only on the camera's field of view and the splits, so turning the
+camera changes nothing in the map's scale; its centre is snapped to the map's texel grid in the light's
+basis, in world coordinates (f64, not relative to the origin), so moving the camera moves the map by whole
+texels only.  Light space: z towards the sun, x and y from a fixed reference (world y, or x for a sun
+overhead).  Depth is reverse Z (the near plane, towards the sun, at 1), the planes of the visibility
+test are the box's four sides and its far side; there is no near plane: casters between the sun and the
+cascade stay in the list and are flattened onto the near plane by the vertex shader (pancaking).
+
+The map stays in Layout::Sampled between frames: a cascade's pass takes its layer from Sampled to
+DepthTarget and back (the pass's own barriers: the last frame's fragment reads before the depth writes, the
+depth writes before this frame's fragment reads).
+```
+
+```rust
+/// the most cascades of the sun
+CASCADES_MAX: usize = 4
+```
+
+- **`struct Shadows`**
+  the sun's shadows: cascaded shadow maps (Scene::set_shadows)
+  - `cascades: u32` -- 1 ..= CASCADES_MAX
+  - `size: u32` -- texels a side of each cascade's map (16 ..= 8192)
+  - `distance: f64` -- how far along the view shadows reach (the last cascade's far end)
+  - `split: f64` -- how the slices are split: 0 uniform, 1 logarithmic
+  - `reach: f64` -- how far towards the sun beyond a cascade's sphere casters keep their depth; nearer the sun they are
+    flattened onto the near plane and still cast (a triangle crossing that plane gets a wrong depth)
+
+**`impl Shadows`**
+
+- **`const DEFAULT: Shadows = Shadows { cascades: 4, size: 2048, distance: 100.0, split ...`**
+  4 cascades of 2048 texels up to 100 from the eye, split 0.75, reach 100
+
+- **`struct Cascade`**
+  a cascade as the CPU computed it for a frame (Scene::cascades)
+  - `near: f64` -- the slice of the view it covers (distances along the camera's forward)
+  - `far: f64`
+  - `center: [f64; 3]` -- its sphere's centre after snapping (world coordinates), its radius, one texel in world units
+  - `radius: f64`
+  - `texel: f64`
+  - `axes: [[f64; 3]; 3]` -- the light's basis: x and y of the map, z towards the sun
+  - `z_far: f64` -- the depth range along z (world, absolute): far side, near side
+  - `z_near: f64`
 
 ### `render3d/texture.rs`
 
