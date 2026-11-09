@@ -38,6 +38,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** macOS and iOS: system_languages and system_locale ask CoreFoundation (LANGUAGE and LC_* set by hand still win, LANG alone does not)
 - **plat:** macOS services (docs/APPLE.md, AP7b): the tray as an NSStatusItem with its menu, notifications through UNUserNotificationCenter (in an app bundle), the Dock tile (badge, progress, the tasks as the Dock menu), files and URLs the system opens with the app (application:openURLs:, as UIC_OPEN), global shortcuts (Carbon RegisterEventHotKey), autostart as a LaunchAgent
 - **render3d:** Lists per alpha class: a list is keyed by mesh, side and AlphaClass (Opaque, also glTF's BLEND, and Mask); opaque lists are drawn by a fragment shader without discard (fs, so the early depth test stays), MASK lists by fs_mask; in the shadow passes opaque casters are always depth only, MASK casters take fs_shadow unless Renderer::set_shadow_mask(false); on Voll one multi-draw per side, class, index width and pass, only for combinations with room; detail levels take the lists of the same side and class. AlphaClass, Material::alpha_class, Renderer::alpha_class, ListInfo::class, ListInfo::record, FS_MASK_SPV; render3dtest --test alpha and --bench --mask P (docs/RENDER3D.md)
+- **build:** build_rs.py packs every mac program as NAME.app as well (tools/apple.py mac_bundle): Info.plist from PACKAGE (name, version, app_id, file types, URL schemes), the icon as .icns from res/app_*.png, signed ad hoc; with sandbox in PERMISSIONS the App Sandbox and the entitlements its rules need; tools/apple.py gui runs the bundled copy (notifications)
+- **cargo-jflib:** cargo jflib mac [--run]: the app as target/jflib-mac/NAME.app on a Mac (as build_rs.py's bundle); cargo jflib test skips a script whose #!only line does not name the target's system
 
 ### Changed
 
@@ -71,6 +73,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 - **build:** build_rs.py runs with Python 3.11 again, as the README says (tools/gendoc.py needed 3.12)
 - **update:** an update's new file is created with create_new on Apple too (never written through an existing name or link)
+- **plat:** macOS and iOS: the system font folders (/System/Library/Fonts, /Library/Fonts, ~/Library/Fonts) are scanned; the print dialog of macOS opens only when the app has a window (headless runs: ERR_UNSUPPORTED as on Linux)
 
 ## [0.1.0] - 2026-11-08
 

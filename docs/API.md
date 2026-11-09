@@ -12318,7 +12318,8 @@ match styles, cache the result                                      [src/text/fo
        FDB_RESCAN: ignore the cache).  Folders: jfgui_FONTDIRS (';' separated, on Linux
        also ':'), else Windows %WINDIR%/Fonts and %LOCALAPPDATA%/Microsoft/Windows/Fonts;
        Linux /usr/share/fonts, /usr/local/share/fonts, $XDG_DATA_HOME/fonts (else
-       ~/.local/share/fonts), ~/.fonts (directories are visited once: symlink loops)
+       ~/.local/share/fonts), ~/.fonts; macOS and iOS /System/Library/Fonts, /Library/Fonts,
+       ~/Library/Fonts (directories are visited once: symlink loops)
   scan_dirs(dirs, flags) -> faces found   the same in these folders only (tests, apps with
        their own font folders)
   resolve(conf, family, lang, weight, italic) -> (face, FS_SYN_*, family)   the first installed
@@ -25288,8 +25289,9 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn font_dirs() -> Vec<String>`**
   the system font folders in the order fontdb scans them: jfgui_FONTDIRS (';' separated,
-  on Linux also ':'), else the Windows / XDG folders; on Linux then fontconfig's own folders
-  (fontconfig_dirs: NixOS, TeX fonts, a &lt;dir> of the user) and in Flatpak the host's fonts
+  on Linux also ':'), else the Windows / XDG folders (macOS and iOS: /System/Library/Fonts,
+  /Library/Fonts, ~/Library/Fonts); on Linux then fontconfig's own folders (fontconfig_dirs:
+  NixOS, TeX fonts, a &lt;dir> of the user) and in Flatpak the host's fonts
 
 - **`fn net_connect_allowed(addr: &crate::net::SocketAddr) -> bool`**
   whether a TCP connection or a UDP datagram to addr is allowed: a net.connect rule with
@@ -31267,6 +31269,8 @@ reaches the system's event stream.
     WT_DOCK [k, a]           the Dock tile: k 0 the badge's number (-1 none), 1 progress shown, 2 the Dock
                              menu's rows, 3 choose its row a
     WT_OPEN_URLS             application:openURLs: with build/plattest_open.txt and an https URL
+    WT_NOTE_CLICK [id]       the notification centre's delegate told of a click on notification id
+    WT_BUNDLE                1 when the program runs inside an app bundle
   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms: Cancel, or (saving)
                              OK with name (a full path)
 ```
@@ -31292,6 +31296,8 @@ WT_SIGTERM: u32 = 38
 WT_TRAY: u32 = 39
 WT_DOCK: u32 = 40
 WT_OPEN_URLS: u32 = 41
+WT_NOTE_CLICK: u32 = 42
+WT_BUNDLE: u32 = 43
 // WT_SEND / WT_POPUP_SEND kinds
 TS_MOVE: i32 = 1
 TS_DOWN: i32 = 2
@@ -31374,7 +31380,8 @@ tool windows as panels, the print dialog
                             window only for a click into a text field (the hit hook's HB_TEXT), as on
                             Windows (MA_NOACTIVATE); JFPanel's sendEvent: notes the event
                             needsPanelToBecomeKey looks at
-  print_dialog(job)         (apple_disp.rs print) NSPrintPanel: printer, paper, orientation, copies;
+  print_dialog(job)         (apple_disp.rs print) NSPrintPanel: printer, paper, orientation, copies
+                            (without a window of the app -- headless runs -- ERR_UNSUPPORTED);
                             the job laid out on the chosen paper and its printable area as a one-page
                             PDF (print.rs), printed through PDFKit without a second panel
   print_dialog_autoclose(ms) (test aid) the next print panel is cancelled after ms (NSApp abortModal)

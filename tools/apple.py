@@ -6,6 +6,7 @@ the iPhone.  Runs on a Mac only (Xcode's tools: codesign, xcrun simctl, xcrun de
     python tools/apple.py sign build/ios/NAME.app [--via-terminal]
                                                             sign it for the iPhone only
     python tools/apple.py gui build/mac/NAME [ARGS..]       start a program with windows from SSH
+    python tools/apple.py mac build/mac/NAME [APP]           pack a macOS program as NAME.app beside it
 
 build_rs.py packs every program it builds for ios into NAME.app next to it (bundle); the simulator's
 build is signed ad hoc there.  The iPhone needs the Apple Development certificate and a provisioning
@@ -17,7 +18,15 @@ codesign fails with errSecInternalComponent: --via-terminal signs in the logged-
 
 A program with windows started from SSH reaches no window server: host_exec.run_native starts the
 apps with `ui` through gui_run there -- `open` starts a small runner bundle in the logged-in session,
-which runs the program in the repository folder and hands back its output and exit code.
+which runs the program in the repository folder and hands back its output and exit code.  When the
+program has its NAME.app beside it, the copy inside the bundle runs (its bundle identifier: macOS
+gives notifications only to bundled programs).
+
+build_rs.py packs every program it builds for mac into NAME.app too (mac_bundle, docs/APPLE.md AP7c):
+Info.plist from apps/APP/PACKAGE (display, version, app_id, filetypes= as document types -- "own"
+ones also exported as types of the app --, schemes= as URL types), the icon as NAME.icns from
+res/app_*.png (none without), signed ad hoc; PERMISSIONS with `sandbox` turns on the App Sandbox with
+the entitlements its rules need (mac_entitlements).
 
     jfgui_SIM_DEVICE=UDID     the simulator to use (default: the first available iPhone)
     jfgui_SIM_KEEP=1          leave a simulator running that this tool booted
@@ -37,6 +46,10 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 IOS_MIN = "16.0"          # docs/APPLE.md, decision 7 (build_rs.py APPLE_MIN)
+MAC_MIN = "13.0"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pkgmeta  # noqa: E402  (PACKAGE, PERMISSIONS, the icon)
+import struct  # noqa: E402
 
 
 def run(cmd, timeout=600, check=True):
@@ -81,6 +94,139 @@ def bundle(exe, sim=False):
     return app
 
 
+# ---------------------------------------------------------------- macOS: the app bundle
+
+# (ICNS type, PNG size): 16, 32, 64, 128, 256 px and their @2x forms; larger ones only from a larger
+# res/app_*.png (pkgmeta.icon does not scale up)
+ICNS = [(b"icp4", 16), (b"icp5", 32), (b"ic11", 32), (b"icp6", 64), (b"ic12", 64), (b"ic07", 128), (b"ic13", 256),
+        (b"ic08", 256), (b"ic14", 512), (b"ic09", 512), (b"ic10", 1024)]
+
+
+def mac_icns(app):
+    """the app's icon as an ICNS file (PNG entries), None without res/app_*.png"""
+    res = ROOT / "apps" / app / "res"
+    sizes = sorted(int(m.group(1)) for p in res.glob("app_*.png") if (m := re.fullmatch(r"app_(\d+)\.png", p.name))) \
+        if res.is_dir() else []
+    if not sizes:
+        return None
+    body = b""
+    for ty, size in ICNS:
+        if size > sizes[-1]:
+            continue
+        png = pkgmeta.icon(app, size)
+        body += ty + struct.pack(">I", 8 + len(png)) + png
+    return b"icns" + struct.pack(">I", 8 + len(body)) + body
+
+
+def mac_entitlements(perms):
+    """the App Sandbox's entitlements of a PERMISSIONS manifest -- only with `sandbox` (the opt-in of
+    the OS sandbox, docs/PERMISSIONS.md); None: no sandbox.  Inside the sandbox the app's own folders
+    ($CONFIG, $APPDATA, $APPCACHE, $TEMP) are its container; other fs rules become the folders macOS
+    names (Downloads, Pictures, Music, Movies) or temporary exceptions (home-relative, absolute)"""
+    if perms is None or not any(k == "sandbox" for k, _ in perms):
+        return None
+    e = {"com.apple.security.app-sandbox": True}
+    folders = {"$DOWNLOADS": "files.downloads", "$PICTURES": "assets.pictures", "$MUSIC": "assets.music",
+               "$VIDEOS": "assets.movies"}
+    own = ("$CONFIG", "$APPDATA", "$APPCACHE", "$APPLOG", "$TEMP", "$EXE")
+    home_rw, home_ro, abs_rw, abs_ro = [], [], [], []
+    for key, words in perms:
+        if key == "net.connect":
+            e["com.apple.security.network.client"] = True
+        elif key == "net.listen":
+            e["com.apple.security.network.server"] = True
+        elif key == "fs.user":
+            e["com.apple.security.files.user-selected.read-write"] = True
+        elif key == "print":
+            e["com.apple.security.print"] = True
+        elif key == "location":
+            e["com.apple.security.personal-information.location"] = True
+        elif key in ("fs.read", "fs.write", "plugins"):
+            rw = key == "fs.write"
+            for w in words:
+                base = re.sub(r"/\*\*?$|/[^/]*\*[^/]*$", "", w)          # the folder above the glob
+                top = re.match(r"\$[A-Z]+", base)
+                if top and top.group(0) in own:
+                    continue
+                if top and top.group(0) in folders:
+                    k = f"com.apple.security.{folders[top.group(0)]}.read-" + ("write" if rw else "only")
+                    if not e.get(k.replace("read-only", "read-write")):
+                        e[k] = True
+                elif top and top.group(0) in ("$HOME", "$DOCUMENTS", "$DESKTOP"):
+                    rel = base.replace("$HOME", "").replace("$DOCUMENTS", "/Documents").replace("$DESKTOP", "/Desktop")
+                    (home_rw if rw else home_ro).append(rel.rstrip("/") + "/")
+                elif base.startswith("/"):
+                    (abs_rw if rw else abs_ro).append(base.rstrip("/") + "/")
+    for k, v in (("home-relative-path.read-write", home_rw), ("home-relative-path.read-only", home_ro),
+                 ("absolute-path.read-write", abs_rw), ("absolute-path.read-only", abs_ro)):
+        if v:
+            e["com.apple.security.temporary-exception.files." + k] = sorted(set(v))
+    return e
+
+
+def mac_plist(exe_name, app):
+    """Info.plist of the bundle: name, id, version, icon, document and URL types from PACKAGE"""
+    f = ROOT / "apps" / app / "PACKAGE"
+    meta = pkgmeta.kv_file(f) if f.exists() else {}
+    aid = pkgmeta.app_id(meta, app)
+    version = meta.get("version", "0.1.0")
+    p = {
+        "CFBundleExecutable": exe_name, "CFBundleIdentifier": aid, "CFBundleName": meta.get("display", app)[:15],
+        "CFBundleDisplayName": meta.get("display", app), "CFBundlePackageType": "APPL", "CFBundleInfoDictionaryVersion": "6.0",
+        "CFBundleShortVersionString": version, "CFBundleVersion": version, "LSMinimumSystemVersion": MAC_MIN,
+        "NSHighResolutionCapable": True, "NSPrincipalClass": "NSApplication", "CFBundleSupportedPlatforms": ["MacOSX"],
+    }
+    if meta.get("publisher"):
+        p["NSHumanReadableCopyright"] = meta["publisher"]
+    types = pkgmeta.filetypes(meta)
+    if types:
+        p["CFBundleDocumentTypes"] = [
+            {"CFBundleTypeName": desc, "CFBundleTypeRole": "Editor", "CFBundleTypeExtensions": exts, "CFBundleTypeMIMETypes": [mime],
+             "LSHandlerRank": "Owner" if own else "Alternate",
+             **({"LSItemContentTypes": [f"{aid}.{exts[0]}"]} if own else {})}
+            for exts, mime, desc, own in types]
+        exported = [{"UTTypeIdentifier": f"{aid}.{exts[0]}", "UTTypeDescription": desc, "UTTypeConformsTo": ["public.data"],
+                     "UTTypeTagSpecification": {"public.filename-extension": exts, "public.mime-type": [mime]}}
+                    for exts, mime, desc, own in types if own]
+        if exported:
+            p["UTExportedTypeDeclarations"] = exported
+    schemes = pkgmeta.schemes(meta)
+    if schemes:
+        p["CFBundleURLTypes"] = [{"CFBundleURLName": aid, "CFBundleURLSchemes": schemes}]
+    return p
+
+
+def mac_bundle(exe, app=None):
+    """the macOS program exe as exe.app beside it: Contents/MacOS/NAME (a copy), Info.plist (mac_plist),
+    Resources/NAME.icns, signed ad hoc (with the sandbox's entitlements when PERMISSIONS asks for it)
+    -> the bundle's path"""
+    exe = Path(exe)
+    name, app = exe.name, app or exe.name
+    bundle = exe.with_name(name + ".app")
+    if bundle.exists():
+        shutil.rmtree(bundle)
+    contents = bundle / "Contents"
+    (contents / "MacOS").mkdir(parents=True)
+    shutil.copy2(exe, contents / "MacOS" / name)
+    plist = mac_plist(name, app)
+    icns = mac_icns(app)
+    if icns:
+        (contents / "Resources").mkdir()
+        (contents / "Resources" / f"{name}.icns").write_bytes(icns)
+        plist["CFBundleIconFile"] = name
+    (contents / "Info.plist").write_bytes(plistlib.dumps(plist, fmt=plistlib.FMT_XML))
+    (contents / "PkgInfo").write_bytes(b"APPL????")
+    ent = mac_entitlements(pkgmeta.permissions(app))
+    cmd = ["codesign", "-f", "-s", "-", "--timestamp=none"]
+    with tempfile.TemporaryDirectory() as d:
+        if ent:
+            ef = Path(d) / "entitlements.plist"
+            ef.write_bytes(plistlib.dumps(ent, fmt=plistlib.FMT_XML))
+            cmd += ["--entitlements", ef]
+        run(cmd + [bundle])
+    return bundle
+
+
 # ---------------------------------------------------------------- macOS: windows from SSH
 
 RUNNER = """#!/bin/sh
@@ -121,7 +267,11 @@ def gui_run(exe, args, timeout=600, env=None):
     for k, v in want.items():
         if k.startswith("jfgui_") or (env is not None and os.environ.get(k) != v):
             cmd += ["--env", f"{k}={v}"]
-    cmd += [mac_runner(), "--args", ROOT, code, pidf, Path(exe).resolve(), *map(str, args)]
+    exe = Path(exe).resolve()
+    inside = exe.with_name(exe.name + ".app") / "Contents" / "MacOS" / exe.name
+    if inside.exists() and inside.stat().st_mtime >= exe.stat().st_mtime:
+        exe = inside                       # the bundled copy: its bundle identifier counts
+    cmd += [mac_runner(), "--args", ROOT, code, pidf, exe, *map(str, args)]
     try:
         subprocess.run([str(c) for c in cmd], capture_output=True, timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -278,11 +428,14 @@ def device_run(app, args, timeout=600):
 
 
 def main():
-    if len(sys.argv) < 3 or sys.argv[1] not in ("sim", "device", "sign", "gui"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("sim", "device", "sign", "gui", "mac"):
         print(__doc__)
         return 2
     cmd, path, rest = sys.argv[1], sys.argv[2], sys.argv[3:]
     try:
+        if cmd == "mac":
+            print(mac_bundle(path, rest[0] if rest else None))
+            return 0
         if cmd in ("sim", "gui"):
             r = sim_run(path, rest) if cmd == "sim" else gui_run(path, rest)
             sys.stdout.write(r.stdout)

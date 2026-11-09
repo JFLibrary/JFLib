@@ -841,3 +841,45 @@ pub(super) fn test_open(path: &str) -> i64 {
     }
     0
 }
+
+/// WT_NOTE_CLICK: the notification centre's delegate method with a stand-in response for our
+/// notification id (as a click on it would come)
+pub(super) fn test_note_click(id: u32) -> i64 {
+    let (cls, _) = subclass(c"NSObject", c"JFTestNoteResponse", &[
+        (c"notification", tn_self as *const c_void, c"@@:"),
+        (c"request", tn_self as *const c_void, c"@@:"),
+        (c"identifier", tn_identifier as *const c_void, c"@@:"),
+        (c"actionIdentifier", tn_action as *const c_void, c"@@:"),
+    ], &[]);
+    NOTE_ID.store(id, core::sync::atomic::Ordering::SeqCst);
+    // SAFETY: a pool of ours; the delegate method with a stand-in object of ours (released after).
+    unsafe {
+        let pool = crate::apple::objc::objc_autoreleasePoolPush();
+        let r: Id = msg!(cls, c"new"; Id);
+        d_note_response(NIL, core::ptr::null(), NIL, r, core::ptr::null());
+        release(r);
+        crate::apple::objc::objc_autoreleasePoolPop(pool);
+    }
+    0
+}
+
+static NOTE_ID: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+
+extern "C" fn tn_self(this: Id, _cmd: Sel) -> Id {
+    this
+}
+extern "C" fn tn_identifier(_this: Id, _cmd: Sel) -> Id {
+    let s = nsstring(&format!("jflib-note-{}", NOTE_ID.load(core::sync::atomic::Ordering::SeqCst)));
+    // SAFETY: handed out autoreleased (the caller's pool).
+    unsafe { msg!(s, c"autorelease"; Id) }
+}
+extern "C" fn tn_action(_this: Id, _cmd: Sel) -> Id {
+    let s = nsstring("com.apple.UNNotificationDefaultActionIdentifier");
+    // SAFETY: handed out autoreleased (the caller's pool).
+    unsafe { msg!(s, c"autorelease"; Id) }
+}
+
+/// WT_BUNDLE: 1 when the program runs inside an app bundle (a bundle identifier)
+pub(super) fn test_bundled() -> i64 {
+    tray::bundle_id().is_some() as i64
+}

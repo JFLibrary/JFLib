@@ -10,6 +10,8 @@
 //!                                      the app for the browser in target/jflib-web/NAME/
 //! cargo jflib android [-p PKG] [--release] [--abi arm64-v8a|x86_64] [--install]
 //!                                      the app as an APK in target/jflib-android/
+//! cargo jflib mac [-p PKG] [--release] [--run [-- ARGS]]
+//!                                      the app as NAME.app in target/jflib-mac/ (on a Mac)
 //! cargo jflib package [-p PKG] [--styles winui,kde] [--formats setup,deb,..|all] [--no-win] [--no-deb]
 //!                     [--sign] [--repo DIR] [--update DIR [--update-url URL] [--update-key FILE]]
 //!                                      setup, MSIX, .deb, AppImage, RPM, Flatpak in target/jflib-package/
@@ -28,6 +30,7 @@ mod json;
 mod linux;
 mod linuxpkg;
 mod lz4;
+mod mac;
 mod msix;
 mod new;
 mod notices;
@@ -45,7 +48,7 @@ mod zip;
 
 use std::process::ExitCode;
 
-const HELP: &str = "cargo jflib -- a JFLib app's new project, tests, browser bundle, APK and packages
+const HELP: &str = "cargo jflib -- a JFLib app's new project, tests, browser bundle, APK, Mac app and packages
 
 USAGE:
     cargo jflib new [--std] NAME
@@ -64,6 +67,9 @@ USAGE:
     cargo jflib android [-p PKG] [--release] [--abi arm64-v8a|x86_64] [--install]
         the app as an APK: target/jflib-android/NAME-ABI-debug.apk (--release: signed with the key
         of jfgui_ANDROID_KEYSTORE); needs the Android SDK and NDK and a JDK; --install: adb install
+    cargo jflib mac [-p PKG] [--release] [--run [-- ARGS]]
+        the app as NAME.app: target/jflib-mac/NAME.app (Info.plist from PACKAGE, the icon from res/,
+        signed ad hoc; with `sandbox` in PERMISSIONS the App Sandbox); on a Mac; --run starts it
     cargo jflib package [-p PKG] [--styles winui,kde] [--formats setup,deb,..|all] [--no-win] [--no-deb]
         the app with every style built in, the look picked at installation, in target/jflib-package/:
         setup (NAME_Setup.exe) and deb by default, also msix (MakeAppx), appimage (one per style),
@@ -131,6 +137,7 @@ fn main() -> ExitCode {
         Some("web") => web::run(&args[1..]),
         Some("watch") => watch::run(&args[1..]),
         Some("android") => android::run_cmd(&args[1..]),
+        Some("mac") => mac::run_cmd(&args[1..]),
         Some("package") => package::run(&args[1..]),
         Some("keygen") => update::keygen(&args[1..]),
         Some("--version" | "-V") => {

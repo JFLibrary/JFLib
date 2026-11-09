@@ -19,7 +19,8 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use plat::taskbar::{JumpTask, TaskbarProgress, taskbar_badge, taskbar_progress, taskbar_supported, taskbar_tasks};
-use plat::tray::{Note, TI_CHECKED, TI_DISABLED, TI_SEPARATOR, Tray, TrayEvent, TrayIcon, TrayItem, notify, tray_remove, tray_set, tray_supported, tray_take};
+use plat::tray::{Note, TI_CHECKED, TI_DISABLED, TI_SEPARATOR, Tray, TrayEvent, TrayIcon, TrayItem, notify, notify_close, tray_remove, tray_set,
+                 tray_supported, tray_take};
 use plat::*;
 
 use crate::T;
@@ -432,8 +433,17 @@ pub fn t_window(t: &mut T) {
     t.check(tray_take() == [TrayEvent::Activate], "tray: ... a click is Activate");
     tray_remove();
     t.check(win_test(WT_TRAY, 0, [0; 4]) == -1, "tray: removed");
-    t.check(notify(&Note { title: String::from("plattest"), body: String::from("Hallo"), icon: None }) == 0,
-            "notify: a program outside an app bundle gets none (0, no crash)");
+    let note = Note { title: String::from("plattest"), body: String::from("Eine Mitteilung des Fenstertests"), icon: None };
+    if win_test(WT_BUNDLE, 0, [0; 4]) == 1 {
+        let id = notify(&note);
+        t.check(id != 0, "notify: in the app bundle a notification is sent (macOS asks once for the permission)");
+        tray_take();
+        win_test(WT_NOTE_CLICK, 0, [id as i32, 0, 0, 0]);
+        t.check(tray_take() == [TrayEvent::NoteClicked(id)], "notify: a click on it -> NoteClicked(its id)");
+        notify_close(id);
+    } else {
+        t.check(notify(&note) == 0, "notify: a program outside an app bundle gets none (0, no crash)");
+    }
     t.check(taskbar_supported() && taskbar_badge(3, None) && win_test(WT_DOCK, 0, [0; 4]) == 3, "dock: the badge shows 3");
     t.check(taskbar_badge(0, None) && win_test(WT_DOCK, 0, [0; 4]) == -1, "dock: ... and goes");
     t.check(taskbar_progress(TaskbarProgress::Normal(0.4)) && win_test(WT_DOCK, 0, [1, 0, 0, 0]) == 1, "dock: progress drawn into the tile");

@@ -290,6 +290,33 @@ deshalb 0, die echte Prüfung folgt mit den Bündeln in AP7c (macOS fragt den Nu
 Abschlussblöcke des Systems sind Objective-C-Blöcke: Ihre Funktion liegt im Block-Literal bei Offset 16, eigene
 Blöcke sind globale Blöcke (`_NSConcreteGlobalBlock`).
 
+**AP7c umgesetzt (2026-11-10), damit ist AP7 fertig:** `build_rs.py` packt jedes Programm für `mac` zusätzlich als
+`NAME.app` ([`tools/apple.py`](../tools/apple.py) `mac_bundle`). `Info.plist` kommt aus `PACKAGE`: Name, Version,
+`app_id`, `filetypes=` als Dokumenttypen (eigene Typen auch als exportierte UTIs) und `schemes=` als URL-Typen. Das
+Symbol entsteht als `NAME.icns` aus `res/app_*.png`, das Bündel wird ad hoc signiert. Mit `sandbox` in PERMISSIONS
+schaltet es die App Sandbox ein, mit den Entitlements, die die Regeln brauchen: Netz, vom Nutzer gewählte Dateien,
+Drucken, Standort, die Ordner Downloads, Bilder, Musik und Filme sowie befristete Ausnahmen für andere Pfade.
+`cargo jflib mac [--run]` macht dasselbe für Apps außerhalb des Repos. `tools/apple.py gui` startet die Kopie im
+Bündel, die damit eine Bundle-ID hat und Mitteilungen senden darf.
+
+Geprüft auf dem Mac: `--test window` (77) aus dem Bündel, mit einer gesendeten Mitteilung und dem Klick darauf.
+`jfWord` 51 von 53 Skripten (die zwei `rich_field`-Skripte scheitern im Worktree auch unter Windows und Linux),
+`BackupCraft` 10 von 10, beide auch im echten Fenster. JFPainter mit `cargo jflib mac` gegen diesen JFLib-Stand (ein
+lokaler `[patch.crates-io]` in der Mac-Kopie): 72 von 72 Skripten, die vier Plugin-Skripte übersprungen, dazu ein Lauf im
+echten Fenster. Dabei behoben:
+
+- **Schriften:** Die Ordner von macOS (`/System/Library/Fonts`, `/Library/Fonts`, `~/Library/Fonts`) fehlten,
+  die Schriftliste war leer.
+- **Drucken:** Ohne Fenster der App (headless) geht kein Druckdialog auf, das Ergebnis ist `ERR_UNSUPPORTED` wie
+  unter Linux ohne Display.
+- **`cargo jflib test`:** Eine Zeile `#!only windows linux` lässt ein Skript nur auf diesen Systemen laufen.
+- **JFPainter** (eigenes Repo, Branch `claude/mac-ap7c`): Native Plugins nutzen die x86-64-Konvention `win64`.
+  Der Plugin-Host läuft deshalb nur auf x86-64 unter Windows und Linux, anderswo gibt es nur die eingebauten Effekte.
+  Die Systemdienste (Update-Prüfung, Scanner über SANE) laufen jetzt auch auf macOS.
+
+Offen für AP8: `.dmg`, Developer-ID-Signatur und Notarisierung (dann mit Hardened Runtime), `SMAppService` für
+Autostart in der Sandbox, eine Bildaufnahme über ImageCaptureCore statt SANE.
+
 ### AP8: Pakete, Updates, CI, Dokumentation (M)
 
 - `.app` als `.dmg`, Signatur mit Developer ID und Notarisierung, Update-Kanal `macos-aarch64`, iOS über TestFlight,

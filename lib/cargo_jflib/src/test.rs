@@ -1,5 +1,7 @@
 // cargo jflib test: build the package's program, then run every tests/*.uis with --script in the
 // package's folder (a script's first line "#!args ..." adds arguments), as JFLib's build_rs.py does.
+// A line "#!only windows linux .." among the script's first lines runs it on these systems only
+// (target_os of --target, else of this machine; others: skipped), e.g. scripts of native plugins.
 
 use std::fs;
 use std::process::Command;
@@ -29,9 +31,15 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
         .filter(|f| f.extension().is_some_and(|x| x == "uis"))
         .collect();
     scripts.sort();
-    let mut failed = 0;
+    let os = target_os(o.target.as_deref());
+    let (mut failed, mut skipped) = (0, 0);
     for s in &scripts {
         let text = fs::read_to_string(s).map_err(|e| format!("{}: {e}", s.display()))?;
+        if !runs_on(&text, os) {
+            skipped += 1;
+            println!("skip tests/{} (#!only: not on {os})", s.file_name().unwrap_or_default().to_string_lossy());
+            continue;
+        }
         let extra: Vec<&str> = text.lines().next().and_then(|l| l.strip_prefix("#!args")).map(|a| a.split_whitespace().collect()).unwrap_or_default();
         // the folders a `shot FILE` or `dump FILE` writes into (target/ may lie elsewhere: CARGO_TARGET_DIR)
         for file in text.lines().filter_map(|l| l.strip_prefix("shot ").or_else(|| l.strip_prefix("dump "))).filter_map(|r| r.split_whitespace().next()) {
@@ -53,6 +61,48 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
             }
         }
     }
-    println!("{} of {} scripts passed", scripts.len() - failed, scripts.len());
+    let ran = scripts.len() - skipped;
+    println!("{} of {ran} scripts passed{}", ran - failed, if skipped > 0 { format!(" ({skipped} skipped: #!only)") } else { String::new() });
     if failed > 0 { Err(format!("{failed} scripts failed")) } else { Ok(()) }
+}
+
+/// the target_os the program is built for: of --target's triple, else of this machine
+fn target_os(triple: Option<&str>) -> &'static str {
+    let Some(t) = triple else { return std::env::consts::OS };
+    if t.contains("windows") {
+        "windows"
+    } else if t.contains("android") {
+        "android"
+    } else if t.contains("linux") {
+        "linux"
+    } else if t.contains("apple-darwin") {
+        "macos"
+    } else if t.contains("apple-ios") {
+        "ios"
+    } else if t.starts_with("wasm32") {
+        "wasm32"
+    } else {
+        "other"
+    }
+}
+
+/// a "#!only os .." line among the script's first five lines: the script runs on these only
+fn runs_on(text: &str, os: &str) -> bool {
+    match text.lines().take(5).find_map(|l| l.strip_prefix("#!only")) {
+        Some(list) => list.split_whitespace().any(|w| w == os),
+        None => true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_lines() {
+        assert!(runs_on("#!args --x\n# text\n", "macos"));
+        assert!(runs_on("#!args --x\n#!only windows linux\n", "linux") && !runs_on("#!args --x\n#!only windows linux\n", "macos"));
+        assert_eq!((target_os(Some("aarch64-apple-darwin")), target_os(Some("x86_64-pc-windows-msvc")), target_os(Some("aarch64-linux-android"))),
+                   ("macos", "windows", "android"));
+    }
 }

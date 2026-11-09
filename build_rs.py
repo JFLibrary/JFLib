@@ -1135,6 +1135,9 @@ class Builder:
         if self.target == "ios":                          # the program in NAME.app (tools/apple.py)
             from tools.apple import bundle
             bundle(exe, sim=self.ios_sim)
+        if self.target == "mac":                          # NAME.app beside it (tools/apple.py mac_bundle)
+            from tools.apple import mac_bundle
+            mac_bundle(exe, name)
         if app_bins(name) and any(b not in self.cargo_builder(name, k).cargo_out for b, _, k in app_bins(name)):
             self.base.cargo_build([name])                 # a variant: the BINS stay in the app's own style
         for b, _, kind in app_bins(name):

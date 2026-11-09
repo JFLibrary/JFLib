@@ -17,7 +17,8 @@
 //                             window only for a click into a text field (the hit hook's HB_TEXT), as on
 //                             Windows (MA_NOACTIVATE); JFPanel's sendEvent: notes the event
 //                             needsPanelToBecomeKey looks at
-//   print_dialog(job)         (apple_disp.rs print) NSPrintPanel: printer, paper, orientation, copies;
+//   print_dialog(job)         (apple_disp.rs print) NSPrintPanel: printer, paper, orientation, copies
+//                             (without a window of the app -- headless runs -- ERR_UNSUPPORTED);
 //                             the job laid out on the chosen paper and its printable area as a one-page
 //                             PDF (print.rs), printed through PDFKit without a second panel
 //   print_dialog_autoclose(ms) (test aid) the next print panel is cancelled after ms (NSApp abortModal)
@@ -298,7 +299,9 @@ pub fn print_dialog_autoclose(ms: u32) {
 /// (apple_disp.rs print) the system's print panel, then the job on the chosen page as a PDF printed by
 /// PDFKit -> 0 printed / ERR_CANCEL / ERR_UNSUPPORTED / ERR_IO / print_pdf's errors
 pub(crate) fn print_dialog(job: &mut crate::PrintJob<'_>) -> i32 {
-    if !super::init() {
+    // no window of ours (the UI's headless runs: scripts, --shot): never a dialog, an error -- as
+    // linux_print.rs without a display
+    if !super::init() || with(|s| s.wins.iter().all(Option::is_none)).unwrap_or(true) {
         return crate::ERR_UNSUPPORTED;
     }
     let suggest = crate::page_init(job.paper, job.flags);
