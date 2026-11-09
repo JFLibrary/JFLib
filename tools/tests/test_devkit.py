@@ -402,6 +402,55 @@ class ApiDiffTest(Temp):
         d = apidiff.diff(new, old)                   # the deprecation taken back: no break
         self.assertEqual(d["breaking"], [])
 
+    def test_module_per_platform(self):
+        """a module declared once per platform under one name (plat/process.rs: three `mod native`)
+        keeps every variant, each with its cfg; variants under a cfg without a flag (target_arch)
+        give one identity several signatures, compared as a set"""
+        native = "pub struct Child { h: u32 }\nimpl Child {\n    /// wait\n    pub fn wait(&mut self) -> {} { 0 }\n}\n"
+        files = {
+            "lib.rs": "//! demo\npub mod process;\npub mod kernel;\n",
+            "process.rs": "\n".join(f'#[cfg({c})]\n#[path = "process_{n}.rs"]\nmod native;' for c, n in (
+                ("windows", "win"), ('target_os = "linux"', "linux"), ('target_vendor = "apple"', "apple")))
+            + "\npub use native::Child;\n",
+            "process_win.rs": native.replace("{}", "u32"),
+            "process_linux.rs": native.replace("{}", "i32"),
+            "process_apple.rs": native.replace("{}", "i32"),
+            "kernel.rs": "pub use arch::*;\n#[cfg(target_arch = \"x86_64\")]\nmod arch { pub struct Stat { pub n: u64 } }\n"
+                         "#[cfg(target_arch = \"aarch64\")]\nmod arch { pub struct Stat { pub n: u32 } }\n",
+        }
+        lines = self.crate(files)
+        got = {(p, k, f) for p, k, _, f in lines if p.startswith("demo::process")}
+        self.assertEqual(got, {(p, k, f) for f in ("windows", "linux", "apple")
+                               for p, k in (("demo::process::Child", "struct"), ("demo::process::Child::wait", "method"))})
+        self.assertEqual({s for p, _, s, _ in lines if p == "demo::kernel::Stat.n"}, {"n: u64", "n: u32"})
+        old = gendoc.LIB
+        gendoc.LIB = self.dir / "lib"
+        try:
+            crate = gendoc.Crate("demo")                    # API.md: a section per variant, each marked
+            w = gendoc.Writer()
+            for f in crate.file_list():
+                if gendoc.has_public(crate, f):
+                    w.file_section(crate, f, 3, lambda it: id(it) in crate.reach)
+        finally:
+            gendoc.LIB = old
+        text = "\n".join(w.md)
+        for mark in ("process_win.rs` (Windows)", "process_linux.rs` (Linux)", "process_apple.rs` (Apple)"):
+            self.assertIn(mark, text)
+        self.assertEqual(text.count("**`struct Child`**"), 3)
+
+        no_apple = self.crate({**files, "process.rs": files["process.rs"].replace(
+            '#[cfg(target_vendor = "apple")]\n#[path = "process_apple.rs"]\nmod native;\n', "")})
+        d = apidiff.diff(lines, no_apple)
+        self.assertEqual({(what, ln[0], ln[3]) for what, ln, _ in d["breaking"]},
+                         {("removed", "demo::process::Child", "apple"), ("removed", "demo::process::Child::wait", "apple")})
+        self.assertEqual(d["added"], [])
+        one_arch = [ln for ln in lines if ln[2] != "n: u64"]          # a snapshot that saw one target only
+        d = apidiff.diff(one_arch, lines)
+        self.assertEqual((d["breaking"], [ln[2] for _, ln, _ in d["added"]]), ([], ["n: u64"]))
+        d = apidiff.diff(lines, one_arch)                               # a target's signature gone
+        self.assertEqual([(what, ln[0], detail) for what, ln, detail in d["breaking"]],
+                         [("changed", "demo::kernel::Stat.n", "n: u64")])
+
     def test_versions(self):
         nv = apidiff.next_version
         self.assertEqual((nv("0.1.0", "breaking"), nv("0.1.0", "added"), nv("0.1.0", "none")), ("0.2.0", "0.1.1", "0.1.1"))

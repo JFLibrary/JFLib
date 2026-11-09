@@ -21,7 +21,11 @@ Snapshot lines (sorted; # starts a comment):  PATH <TAB> KIND <TAB> SIGNATURE <T
   FLAGS  comma list: windows / linux / apple (the item's cfg), deprecated, provided (a trait member with a
          default), all-pub (a struct whose fields are all public), non-exhaustive
 A line's identity is PATH, KIND, its cfg and, for impl, the trait; signatures compare without
-whitespace and trailing commas (rustfmt reflowing a signature is no change).
+whitespace and trailing commas (rustfmt reflowing a signature is no change).  A module declared
+once per target under one name keeps every variant (gendoc); variants under a cfg without a flag
+(target_arch, wasm32, Android) give one identity several signatures (rt::kernel::Stat per
+target_arch): they compare as a set -- an old signature that is gone is a change, one more is an
+addition.
 
 Classification (diff):
   breaking    removed items, changed signatures, a new variant of an exhaustive enum, a new
@@ -257,24 +261,25 @@ class PathWalk:
                 self.add(it, mod, f"{self.c.name}::{it.name}")
             elif it.vis == "pub" and it.kind != "impl" and it.name:
                 self.add(it, mod, f"{path}::{it.name}")
-        for name, ch in mod.children.items():
-            if ch.vis == "pub":
-                self.export(ch, f"{path}::{name}")
+        for name, variants in mod.children.items():
+            for ch in variants:
+                if ch.vis == "pub":
+                    self.export(ch, f"{path}::{name}")
         for vis, trees, text in mod.uses:
             if vis != "pub":
                 continue
             for segs, alias, glob in trees:
-                target, rest = self.c.resolve(mod, segs)
-                if target is None:
-                    name = "*" if glob else (alias or (segs[-1] if segs else ""))
-                    if name and name != "self":
-                        self.external.append((f"{path}::{name}", "::".join(segs) + ("::*" if glob else ""), mod))
-                elif glob and not rest:
-                    self.export(target, path)
-                elif not glob and len(rest) == 1:
-                    self.mark(target, rest[0], f"{path}::{alias or rest[0]}")
-                elif not glob and not rest:
-                    self.export(target, f"{path}::{alias or segs[-1]}")
+                for target, rest in self.c.resolve(mod, segs):     # one per cfg variant on the way
+                    if target is None:
+                        name = "*" if glob else (alias or (segs[-1] if segs else ""))
+                        if name and name != "self":
+                            self.external.append((f"{path}::{name}", "::".join(segs) + ("::*" if glob else ""), mod))
+                    elif glob and not rest:
+                        self.export(target, path)
+                    elif not glob and len(rest) == 1:
+                        self.mark(target, rest[0], f"{path}::{alias or rest[0]}")
+                    elif not glob and not rest:
+                        self.export(target, f"{path}::{alias or segs[-1]}")
 
     def mark(self, mod, name, path, depth=0):
         """the item `name` of mod, re-exported as path"""
@@ -283,22 +288,22 @@ class PathWalk:
             if it.name == name and it.kind != "impl":
                 self.add(it, mod, path)
                 found = True
-        if name in mod.children:
-            self.export(mod.children[name], path)
+        for ch in mod.children.get(name, ()):
+            self.export(ch, path)
             found = True
         if found or depth > 8:
             return
         for vis, trees, text in mod.uses:
             for segs, alias, glob in trees:
-                target, rest = self.c.resolve(mod, segs)
-                if target is None:
-                    if not glob and (alias or (segs[-1] if segs else "")) == name:
-                        self.external.append((path, "::".join(segs), mod))
-                    continue
-                if glob and not rest:
-                    self.mark(target, name, path, depth + 1)
-                elif not glob and len(rest) == 1 and (alias or rest[0]) == name:
-                    self.mark(target, rest[0], path, depth + 1)
+                for target, rest in self.c.resolve(mod, segs):
+                    if target is None:
+                        if not glob and (alias or (segs[-1] if segs else "")) == name:
+                            self.external.append((path, "::".join(segs), mod))
+                        continue
+                    if glob and not rest:
+                        self.mark(target, name, path, depth + 1)
+                    elif not glob and len(rest) == 1 and (alias or rest[0]) == name:
+                        self.mark(target, rest[0], path, depth + 1)
 
 
 def best(paths):
@@ -412,50 +417,71 @@ def read_snapshot(path):
 
 
 # ---------------------------------------------------------------- the diff
+def cfg_of(flags):
+    """'linux,provided' -> 'linux': the cfg part of a line's flags"""
+    return ",".join(f for f in flags.split(",") if f in ("windows", "linux", "apple"))
+
+
 def key(line):
     path, kind, sig, flags = line
-    cfg = ",".join(f for f in flags.split(",") if f in ("windows", "linux", "apple"))
-    return (path, kind, cfg, canon(sig) if kind == "impl" else "")
+    return (path, kind, cfg_of(flags), canon(sig) if kind == "impl" else "")
 
 
 def has(line, flag):
     return flag in line[3].split(",")
 
 
+def by_key(lines):
+    """{identity: {canonical signature: line}}: an identity has several signatures when a module
+    exists once per target under a cfg without a flag (rt::kernel's `mod arch` per target_arch)"""
+    out = {}
+    for ln in sorted(lines):
+        out.setdefault(key(ln), {})[canon(ln[2], ln[1])] = ln
+    return out
+
+
 def diff(old, new):
     """two snapshots -> {"breaking": [(what, line, detail)], "deprecated": [...], "added": [...],
     "notes": [...]}"""
-    o = {key(ln): ln for ln in old}
-    n = {key(ln): ln for ln in new}
+    o, n = by_key(old), by_key(new)
     res = {"breaking": [], "deprecated": [], "added": [], "notes": []}
     owners = {ln[0]: ln for ln in old if ln[1] in ("struct", "union", "enum", "trait")}
-    for k, ln in o.items():
+    for k, sigs in o.items():
         if k not in n:
-            res["breaking"].append(("removed", ln, "deprecated before" if has(ln, "deprecated") else ""))
-    for k, ln in n.items():
+            for ln in sigs.values():
+                res["breaking"].append(("removed", ln, "deprecated before" if has(ln, "deprecated") else ""))
+    for k, sigs in n.items():
         if k in o:
-            was = o[k]
-            if canon(was[2], was[1]) != canon(ln[2], ln[1]):
-                res["breaking"].append(("changed", ln, was[2]))
-            elif has(was, "provided") and not has(ln, "provided"):
-                res["breaking"].append(("required", ln, "the default body was removed"))
-            elif not has(was, "non-exhaustive") and has(ln, "non-exhaustive"):
-                res["breaking"].append(("non-exhaustive", ln, "#[non_exhaustive] added"))
-            if has(ln, "deprecated") and not has(was, "deprecated"):
-                res["deprecated"].append(("deprecated", ln, ""))
+            olds = o[k]
+            gone = [ln for c, ln in olds.items() if c not in sigs]       # signatures of the item that changed
+            fresh = [ln for c, ln in sigs.items() if c not in olds]
+            for i, was in enumerate(gone):
+                now = fresh[min(i, len(fresh) - 1)] if fresh else next(iter(sigs.values()))
+                res["breaking"].append(("changed", now, was[2]))
+            for ln in fresh[len(gone):]:                                # one more target's signature
+                res["added"].append(("added", ln, ""))
+            for c in olds.keys() & sigs.keys():
+                was, ln = olds[c], sigs[c]
+                if has(was, "provided") and not has(ln, "provided"):
+                    res["breaking"].append(("required", ln, "the default body was removed"))
+                elif not has(was, "non-exhaustive") and has(ln, "non-exhaustive"):
+                    res["breaking"].append(("non-exhaustive", ln, "#[non_exhaustive] added"))
+                if has(ln, "deprecated") and not has(was, "deprecated"):
+                    res["deprecated"].append(("deprecated", ln, ""))
             continue
-        parent = ln[0].rsplit("::", 1)[0] if ln[1] in ("variant", "trait-fn", "trait-const", "trait-type") \
-            else ln[0].rsplit(".", 1)[0] if ln[1] == "field" else None
-        pline = owners.get(parent) if parent else None
-        if ln[1] == "variant" and pline and pline[1] == "enum" and not has(pline, "non-exhaustive"):
-            res["breaking"].append(("variant", ln, "a new variant of an exhaustive enum (matches without _ break)"))
-        elif ln[1].startswith("trait-") and pline and pline[1] == "trait" and not has(ln, "provided"):
-            res["breaking"].append(("trait", ln, "a new required member (implementations break)"))
-        elif ln[1] == "field" and pline and has(pline, "all-pub"):
-            res["added"].append(("added", ln, ""))
-            res["notes"].append(("field", ln, "literal constructions without ..NONE / ..Default::default() break"))
-        else:
-            res["added"].append(("added", ln, ""))
+        for ln in sigs.values():
+            parent = ln[0].rsplit("::", 1)[0] if ln[1] in ("variant", "trait-fn", "trait-const", "trait-type") \
+                else ln[0].rsplit(".", 1)[0] if ln[1] == "field" else None
+            pline = owners.get(parent) if parent else None
+            if ln[1] == "variant" and pline and pline[1] == "enum" and not has(pline, "non-exhaustive"):
+                res["breaking"].append(("variant", ln, "a new variant of an exhaustive enum (matches without _ break)"))
+            elif ln[1].startswith("trait-") and pline and pline[1] == "trait" and not has(ln, "provided"):
+                res["breaking"].append(("trait", ln, "a new required member (implementations break)"))
+            elif ln[1] == "field" and pline and has(pline, "all-pub"):
+                res["added"].append(("added", ln, ""))
+                res["notes"].append(("field", ln, "literal constructions without ..NONE / ..Default::default() break"))
+            else:
+                res["added"].append(("added", ln, ""))
     for v in res.values():
         v.sort(key=lambda r: (r[1][0], r[1][1]))
     return res
@@ -472,9 +498,10 @@ def report(d, base, version, limit=None):
             continue
         out.append(f"{title} ({len(rows)}):")
         for what, (path, kind, sig, flags), detail in rows[:limit]:
-            line = f"  {what:<14} {path}  [{kind}] {sig}"
+            tag = kind + (f", {cfg_of(flags)}" if cfg_of(flags) else "")       # [method, windows]
+            line = f"  {what:<14} {path}  [{tag}] {sig}"
             if what == "changed":
-                line = f"  {what:<14} {path}  [{kind}]\n      was: {detail}\n      now: {sig}"
+                line = f"  {what:<14} {path}  [{tag}]\n      was: {detail}\n      now: {sig}"
             elif detail:
                 line += f"  -- {detail}"
             out.append(line)
