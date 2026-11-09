@@ -55,7 +55,7 @@ pub use sys::*;
 #[path = "linux_thread.rs"]
 mod thread;
 pub use thread::*;
-#[cfg_attr(target_arch = "aarch64", allow(dead_code))] #[path = "linux_crash.rs"]
+#[path = "linux_crash.rs"]
 mod crash;
 // plat-shared: printing, plugin libraries (own ELF loader) + crash guard
 #[path = "linux_print.rs"]
