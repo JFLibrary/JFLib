@@ -63,7 +63,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
-  <br>[lib.rs](#render3d-crate-root) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [texture.rs](#render3dtexturers)
+  <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [texture.rs](#render3dtexturers)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -19869,8 +19869,8 @@ A swapchain cannot be read back into this turn: Buffer::read later (web_res.rs).
 *the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU* -- crate root [`lib/render3d/lib.rs`](../lib/render3d/lib.rs)
 
 ```text
-render3d -- the core of the 3D engine on lib/gpu (G5a, G5b; docs/RENDER3D.md): meshes in shared buffers,
-a table of materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
+render3d -- the core of the 3D engine on lib/gpu (G5a to G5c; docs/RENDER3D.md): meshes in shared buffers,
+a table of glTF's PBR materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
 instance list per mesh and side (mirrored instances turn their faces round).  No draw per object
 anywhere: a frame is one compute dispatch and one indirect draw per list (level Basis) or one multi-draw
 per side for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
@@ -19893,8 +19893,9 @@ Vulkan, handed to the browser as text on WebGPU.
        materials, and its instances for a Scene (gltf.rs)
 
 Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
-of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, colours
-linear (an sRGB target encodes them).  Positions are f64 on the CPU and f32 relative to the scene's
+of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
+units of KHR_lights_punctual, times the scene's exposure, tone mapped in the fragment shader (Khronos PBR
+Neutral, or none), colours linear (an sRGB target encodes them).  Positions are f64 on the CPU and f32 relative to the scene's
 origin on the GPU.
 
 Errors are gpu's: Invalid for ids and values this crate can judge, the rest from the backend.
@@ -19952,20 +19953,21 @@ FS_SPV: &[u32] = spv::FS
   - `radius: f64`
 
 - **`struct Material`**
-  a row of the material table: glTF's metallic-roughness material.  G5b shows the base colour times its
-  texture under Lambert lighting and drops fragments below alpha_cutoff; the rest is laid out for PBR (G5c).
-  What reaches the target is opaque (alpha 1)
+  a row of the material table: glTF's metallic-roughness material, shaded as glTF 2.0 Appendix B says (G5c;
+  draw.wgsl).  Fragments whose alpha is below alpha_cutoff are dropped.  What reaches the target is opaque
+  (alpha 1)
   - `base_color: [f32; 4]` -- linear rgb and alpha (the texture's sRGB is decoded first)
-  - `metallic: f32`
+  - `metallic: f32` -- 0 ..= 1 (clamped in the shader, after the texture)
   - `roughness: f32`
-  - `emissive: [f32; 3]`
+  - `emissive: [f32; 3]` -- linear radiance (before the exposure)
   - `base_color_texture: Option<TextureRef>`
-  - `metallic_roughness_texture: Option<TextureRef>` -- linear: roughness in g, metallic in b
-  - `normal_texture: Option<TextureRef>`
+  - `metallic_roughness_texture: Option<TextureRef>` -- linear: roughness in g, metallic in b (times the factors)
+  - `normal_texture: Option<TextureRef>` -- linear, glTF's tangent space (+y up in the image); the tangent frame comes from the derivatives
+    (docs/RENDER3D.md: how that differs from MikkTSpace); scale multiplies x and y
   - `normal_scale: f32`
-  - `occlusion_texture: Option<TextureRef>`
+  - `occlusion_texture: Option<TextureRef>` -- linear, r: how much of the ambient (indirect) light reaches the surface, 1 + strength (r - 1)
   - `occlusion_strength: f32`
-  - `emissive_texture: Option<TextureRef>`
+  - `emissive_texture: Option<TextureRef>` -- sRGB, times emissive
   - `alpha_cutoff: Option<f32>` -- glTF's alpha mode MASK: fragments whose alpha is below it are not drawn (None: opaque)
 
 **`impl Material`**
@@ -20008,6 +20010,31 @@ FS_SPV: &[u32] = spv::FS
 - **`fn record<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, color: ColorAttachment<'a>, depth: Option<DepthAttachment<'a>>) -> Result<()>`**
   one frame of a prepared scene into e: its uploads, its culling, its render pass with a clear of
   colour and depth as the attachments say.  depth None: the renderer's own (set_size), cleared
+
+### `render3d/dfg.rs`
+
+Source: [`lib/render3d/dfg.rs`](../lib/render3d/dfg.rs)
+
+```text
+dfg -- the second sum of the split-sum approximation for draw.wgsl's BRDF (G5c; docs/RENDER3D.md "PBR"): a
+table of (A, B) such that the specular light a white uniform environment reflects is f0 A + B, over n.v (x)
+and roughness (y), 32 x 32 points from 0 to 1, read bilinearly by the fragment shader from a storage buffer
+(no texture slot, the same exact weights on every path).  Made ahead by dfg_table (render3dtest --gen-dfg
+writes dfg_table.rs, --test shaders compares the embedded table with a fresh one): GGX importance sampling
+of the half vector, 4096 points of the Hammersley set per entry, in f64.  Karis' analytic fit was the
+first choice; for this BRDF's separable Smith term it lies up to 0.19 from the integral (measured by
+render3dtest --test pbr), the table within a few thousandths.
+```
+
+```rust
+/// points of the table per axis
+DFG_N: usize = 32
+/// the embedded table: entry j * DFG_N + i holds (A, B) at n.v = i / (DFG_N - 1), roughness j / (DFG_N - 1)
+DFG: [[f32; 2]; DFG_N * DFG_N] = { let mut out = [[0.0f32; 2]; DFG_N * DFG_N]; let mut k = ...
+```
+
+- **`fn dfg_table() -> Vec<[f32; 2]>`**
+  the table computed (what dfg_table.rs holds; slow: some 4 million samples)
 
 ### `render3d/gltf.rs`
 
@@ -20072,6 +20099,9 @@ math -- what the scene computes on the CPU, in f64 (no libm in no_std; the matri
 
 - **`fn rotation(q: [f32; 4]) -> [V3; 3]`**
   the rotation matrix's columns of a quaternion (x, y, z, w; any length except 0)
+
+- **`fn sincos(x: f64) -> (f64, f64)`**
+  sine and cosine: reduced to -pi ..= pi, then their series
 
 - **`fn ln(x: f64) -> f64`**
   the natural logarithm (x &lt;= 0: -inf): x = m 2^e, ln m by the series of atanh
@@ -20146,14 +20176,21 @@ commands without a barrier against the frames still on the GPU.
   at eye looking at target; `up` says which way is up on the screen
 
 - **`struct Sun`**
-  one sun and an ambient light (linear colours)
+  one sun and an ambient light, linear, in the units of KHR_lights_punctual: a white matte surface facing
+  the sun shows color / pi, one under the ambient light alone shows ambient (before the exposure)
   - `direction: [f64; 3]` -- towards the sun, any length
-  - `color: [f32; 3]`
-  - `ambient: [f32; 3]`
+  - `color: [f32; 3]` -- illuminance per channel (lux)
+  - `ambient: [f32; 3]` -- the radiance of a uniform environment around the scene
 
 **`impl Sun`**
 
-- **`const DEFAULT: Sun = Sun { direction: [0.3, 0.8, 0.5], color: [0.75; 3], ambie ...`**
+- **`const DEFAULT: Sun = Sun { direction: [0.3, 0.8, 0.5], color: [0.75 * core::f3 ...`**
+  a white matte face towards the sun shows 0.75 + 0.25 (0.75 pi lux, ambient 0.25)
+
+- **`enum Tonemap`**
+  what the fragment shader does with the light it computed (times the exposure)
+  - `Neutral` -- Khronos PBR Neutral: base colours stay up to 0.76, highlights are compressed towards white
+  - `None` -- none: linear values, clamped by the target's format (HDR targets such as Rgba16Float keep them)
 
 - **`struct UploadInfo`**
   what prepare sent for this frame
@@ -20199,6 +20236,11 @@ commands without a barrier against the frames still on the GPU.
 - **`fn set_camera(&mut self, c: &Camera)`**
 - **`fn camera(&self) -> &Camera`**
 - **`fn set_sun(&mut self, s: &Sun)`**
+- **`fn set_exposure(&mut self, e: f32)`**
+  what the light is multiplied by before the tone mapper (1 at first; not finite: 1)
+- **`fn exposure(&self) -> f32`**
+- **`fn set_tonemap(&mut self, t: Tonemap)`**
+  Tonemap::Neutral at first
 - **`fn set_origin(&mut self, origin: [f64; 3])`**
   the point of the world that is (0, 0, 0) on the GPU.  Keep it near the camera: f32 has seven
   digits.  Moving it uploads every instance once

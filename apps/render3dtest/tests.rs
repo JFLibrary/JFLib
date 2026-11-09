@@ -153,7 +153,8 @@ fn read_depth(t: &mut T, dev: &Device, off: &Off) -> Option<Vec<f32>> {
 }
 
 pub fn sun_of() -> Sun {
-    Sun { direction: [0.3, 0.8, 0.5], color: [0.7, 0.7, 0.7], ambient: [0.3, 0.3, 0.3] }
+    // (0.7 pi lux: a white matte face towards the sun shows 0.7 + 0.3 before the tone mapper)
+    Sun { direction: [0.3, 0.8, 0.5], color: [0.7 * core::f32::consts::PI; 3], ambient: [0.3, 0.3, 0.3] }
 }
 
 /// meshes, materials (one colour per spec), a scene and its reference
@@ -695,10 +696,11 @@ fn many_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
 
 // ---------------------------------------------------------------- levels, coordinates, frames
 
-/// the gallery's images: mixed, changed, far away (G5a), textured with mirrored instances, the glTF scene (G5b)
+/// the gallery's images: mixed, changed, far away (G5a), textured with mirrored instances, the glTF scene (G5b),
+/// then those of common::LATER (G5c)
 pub const GALLERY_NAMES: [&str; 5] = ["mix", "changed", "far", "tex", "gltf"];
 
-fn gallery_image(t: &mut T, dev: &Device) -> Option<[Vec<u8>; 5]> {
+fn gallery_image(t: &mut T, dev: &Device) -> Option<Vec<Vec<u8>>> {
     let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
     let (meshes, materials) = t.res(gallery_fill(&mut r), "fill")?;
     let mut off = t.res(Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm), "target")?;
@@ -714,7 +716,13 @@ fn gallery_image(t: &mut T, dev: &Device) -> Option<[Vec<u8>; 5]> {
     let mut rg = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
     let mut sg = t.res(gltf_gallery(&mut rg), "glTF gallery")?;
     let e = shot(t, dev, &mut off, &mut rg, &mut sg, "gallery, glTF")?;
-    Some([a, b, c, d, e])
+    let mut all = vec![a, b, c, d, e];
+    for name in LATER {
+        let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+        let mut s = t.res(later_gallery(name, &mut r), name)?;
+        all.push(shot(t, dev, &mut off, &mut r, &mut s, name)?);
+    }
+    Some(all)
 }
 
 fn levels(t: &mut T) {
@@ -727,8 +735,9 @@ fn levels(t: &mut T) {
     let Some(a) = gallery_image(t, &voll) else { return };
     let Some(basis) = t.res(g.adapter.create_device(&DeviceDesc { max_level: Level::Basis }), "Basis device") else { return };
     let Some(b) = gallery_image(t, &basis) else { return };
-    for (i, name) in ["3000 instances, 48 meshes, 96 materials", "changed", "far away", "7 textures in 4 classes, 600 instances, a third mirrored, MASK",
-                      "the glTF scene"].iter().enumerate() {
+    let mut names = vec!["3000 instances, 48 meshes, 96 materials", "changed", "far away", "7 textures in 4 classes, 600 instances, a third mirrored, MASK", "the glTF scene"];
+    names.extend_from_slice(&LATER);
+    for (i, name) in names.iter().enumerate() {
         let (n, m) = diff(&a[i], &b[i]);
         t.ok(n == 0, &format!("Voll against Basis, {name}: {n} of {} pixels differ (largest {m})", GALLERY_W * GALLERY_H));
     }
@@ -1057,6 +1066,32 @@ fn shaders(t: &mut T) {
         let made = v.iter().find(|x| x.0 == name).map_or(&[][..], |x| &x.1[..]);
         t.ok(made == embedded, &format!("{name}: {} words embedded, as wgsl::compile makes them (if not: render3dtest --gen-shaders lib/render3d/shaders_spv.rs)", embedded.len()));
     }
+    // (G5c) the split-sum's table
+    let fresh = render3d::dfg_table();
+    let same = fresh.len() == render3d::DFG.len() && fresh.iter().zip(render3d::DFG.iter()).all(|(a, b)| a[0].to_bits() == b[0].to_bits() && a[1].to_bits() == b[1].to_bits());
+    t.ok(same, &format!("DFG: {} entries embedded, as dfg_table makes them (if not: render3dtest --gen-dfg lib/render3d/dfg_table.rs)", render3d::DFG.len()));
+}
+
+fn gen_dfg(path: &str) -> i32 {
+    let v = render3d::dfg_table();
+    let mut s = String::from("// written by render3dtest --gen-dfg from render3d::dfg_table (dfg.rs): (A, B) as f32 bits, n.v along a row; do not edit\n");
+    s.push_str(&format!("pub const DFG_BITS: [u32; {}] = [\n", v.len() * 2));
+    for row in v.chunks(4) {
+        s.push_str("    ");
+        for e in row {
+            s.push_str(&format!("{:#010x}, {:#010x}, ", e[0].to_bits(), e[1].to_bits()));
+        }
+        s.truncate(s.trim_end().len());
+        s.push('\n');
+    }
+    s.push_str("];\n");
+    if plat::write_file(path, s.as_bytes()) {
+        out(&format!("{path}: {} entries", v.len()));
+        0
+    } else {
+        out(&format!("FAIL cannot write {path}"));
+        1
+    }
 }
 
 /// a real window, a few frames with the swapchain's format, the presented image against the offscreen one
@@ -1159,7 +1194,7 @@ fn dump(dir: &str) -> i32 {
     for (level, dev) in [("voll", voll), ("basis", basis)] {
         let Some(dev) = dev else { continue };
         let Some(imgs) = gallery_image(&mut t, &dev) else { continue };
-        for (i, name) in GALLERY_NAMES.iter().enumerate() {
+        for (i, name) in GALLERY_NAMES.iter().chain(LATER.iter()).enumerate() {
             let file = format!("{dir}/{level}_{name}.rgba");
             t.ok(plat::write_file(&file, &imgs[i]), &format!("write {file}"));
             names.push(file);
@@ -1178,6 +1213,9 @@ pub fn run() -> i32 {
     if let Some(p) = plat::arg_value("--gen-shaders") {
         return gen_shaders(&p);
     }
+    if let Some(p) = plat::arg_value("--gen-dfg") {
+        return gen_dfg(&p);
+    }
     if let Some(d) = plat::arg_value("--dump") {
         return dump(&d);
     }
@@ -1195,9 +1233,9 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 12] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
+    let list: [(&str, fn(&mut T)); 13] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
                                           ("levels", levels), ("coords", coords), ("frames", frames), ("errors", errors), ("textures", crate::tex::textures),
-                                          ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf)];
+                                          ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf), ("pbr", crate::pbr::pbr)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {

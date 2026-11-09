@@ -154,6 +154,8 @@ impl Rng {
 pub struct Off {
     pub w: u32,
     pub h: u32,
+    /// bytes per pixel
+    pub bpp: u32,
     pub stride: u32,
     pub color: Texture,
     pub depth: Texture,
@@ -166,10 +168,12 @@ pub const CLEAR8: [u8; 3] = [51, 102, 153];
 
 impl Off {
     pub fn new(dev: &Device, w: u32, h: u32, format: Format) -> Result<Off> {
-        let stride = (w * 4).div_ceil(256) * 256;
+        let bpp = format.block_bytes();
+        let stride = (w * bpp).div_ceil(256) * 256;
         Ok(Off {
             w,
             h,
+            bpp,
             stride,
             color: dev.create_texture(&TextureDesc::d2(w, h, format, TextureUsage::COLOR_TARGET | TextureUsage::COPY_SRC))?,
             depth: dev.create_texture(&TextureDesc::d2(w, h, Format::Depth32Float, TextureUsage::DEPTH_TARGET | TextureUsage::SAMPLED))?,
@@ -196,14 +200,14 @@ impl Off {
         Ok(id)
     }
 
-    /// the image as RGBA rows without padding (the browser: Err(NotReady) until it has answered)
+    /// the image as rows without padding (RGBA8: 4 bytes a pixel; the browser: Err(NotReady) until it has answered)
     pub fn read(&self) -> Result<Vec<u8>> {
         let mut raw = vec![0u8; self.rb.size() as usize];
         self.rb.read(0, &mut raw)?;
-        let mut out = Vec::with_capacity((self.w * self.h * 4) as usize);
+        let mut out = Vec::with_capacity((self.w * self.h * self.bpp) as usize);
         for y in 0..self.h as usize {
             let at = y * self.stride as usize;
-            out.extend_from_slice(&raw[at..at + self.w as usize * 4]);
+            out.extend_from_slice(&raw[at..at + (self.w * self.bpp) as usize]);
         }
         Ok(out)
     }
@@ -397,6 +401,90 @@ pub fn tex_gallery(r: &mut Renderer) -> Result<Scene> {
         }
         let (mesh, material) = (meshes[rng.below(geos.len() as u32) as usize], mats[rng.below(mats.len() as u32) as usize]);
         sc.add(Instance { mesh, material, transform: render3d::Transform { pos, rot: quat(axis, rng.range(0.0, 6.0)), scale } })?;
+    }
+    Ok(sc)
+}
+
+// ---------------------------------------------------------------- the galleries of G5c
+
+/// the galleries that came with G5c, by name, after the five above: every path must draw them alike
+pub const LATER: [&str; 1] = ["pbr"];
+
+/// one of LATER in a fresh renderer of its own
+pub fn later_gallery(name: &str, r: &mut Renderer) -> Result<Scene> {
+    match name {
+        "pbr" => pbr_gallery(r),
+        _ => Err(GpuError::Invalid("no such gallery")),
+    }
+}
+
+/// a normal map from a height field of bumps: rgb = (n + 1) / 2 in glTF's tangent space (+x along u, +y up
+/// in the image, i.e. towards decreasing v)
+pub fn bump_map(size: u32, seed: u32) -> Vec<u8> {
+    let mut r = Rng(seed);
+    let bumps: Vec<(f64, f64, f64, f64)> = (0..12).map(|_| (r.range(0.0, 1.0), r.range(0.0, 1.0), r.range(0.05, 0.2), r.range(-0.6, 0.6))).collect();
+    let height = |u: f64, v: f64| -> f64 {
+        bumps.iter().map(|&(cu, cv, rad, k)| {
+            let d2 = ((u - cu) * (u - cu) + (v - cv) * (v - cv)) / (rad * rad);
+            if d2 < 1.0 { k * (1.0 - d2) * (1.0 - d2) * rad } else { 0.0 }
+        }).sum()
+    };
+    let mut out = Vec::with_capacity((size * size * 4) as usize);
+    let e = 1.0 / size as f64;
+    for y in 0..size {
+        for x in 0..size {
+            let (u, v) = ((x as f64 + 0.5) * e, (y as f64 + 0.5) * e);
+            let du = (height(u + e, v) - height(u - e, v)) / (2.0 * e);
+            let dv = (height(u, v + e) - height(u, v - e)) / (2.0 * e);
+            // up in the image is -v
+            let n = cpu::norm([-du, dv, 1.0]);
+            let c = |x: f64| ((x + 1.0) * 0.5 * 255.0 + 0.5) as u8;
+            out.extend_from_slice(&[c(n[0]), c(n[1]), c(n[2]), 255]);
+        }
+    }
+    out
+}
+
+/// (G5c) materials of every kind: balls dielectric and metallic from smooth to rough, and plates with a normal
+/// map (trilinear), a metallic-roughness texture, emission, occlusion; the sun, the ambient light, an
+/// exposure, the neutral tone mapper
+pub fn pbr_gallery(r: &mut Renderer) -> Result<Scene> {
+    use render3d::{Sampling, TextureData, TextureRef};
+    let ball = r.add_mesh(&ball(16, 24).data())?;
+    let plate = r.add_mesh(&plate().data())?;
+    let picture = crate::gltfgen::picture(128, 128, 91, &|_, _| 255);
+    let mut mr = noise_rgba(128, 128, 92);
+    for p in mr.chunks_exact_mut(4) {
+        p[1] = 64 + (p[1] as u32 * 191 / 255) as u8;
+    }
+    let pics: [(Vec<u8>, bool); 4] = [(picture, true), (bump_map(128, 93), false), (mr, false), (noise_rgba(128, 128, 94), false)];
+    let mut tex = Vec::new();
+    for (px, srgb) in &pics {
+        tex.push(r.add_texture(&TextureData { width: 128, height: 128, rgba: px, srgb: *srgb, nearest: false })?);
+    }
+    let t = |k: usize, s: Sampling| Some(TextureRef { texture: tex[k], sampling: s });
+    let colors = gallery_colors(10);
+    let mut sc = Scene::new(r)?;
+    sc.set_camera(&Camera::look_at([2.0, 3.0, 16.0], [0.0, 0.0, 0.0], [0.0, 1.0, 0.0], 1.0, GALLERY_W as f64 / GALLERY_H as f64, 0.1, f64::INFINITY));
+    sc.set_sun(&Sun { direction: [0.4, 0.7, 0.5], ..Sun::DEFAULT });
+    sc.set_exposure(1.2);
+    for i in 0..10u32 {
+        let c = colors[i as usize];
+        let m = Material { metallic: (i / 5) as f32, roughness: 0.2 + 0.2 * (i % 5) as f32, ..Material::color(c[0], c[1], c[2]) };
+        let id = r.add_material(&m)?;
+        let pos = [(i % 5) as f64 * 2.6 - 5.2, 2.6 - (i / 5) as f64 * 2.4, 0.0];
+        sc.add(Instance { mesh: ball, material: id, transform: Transform { pos, rot: [0.0, 0.0, 0.0, 1.0], scale: [1.1; 3] } })?;
+    }
+    let plates = [
+        Material { normal_texture: t(1, Sampling::LINEAR), base_color_texture: t(0, Sampling::LINEAR), roughness: 0.4, ..Material::color(1.0, 1.0, 1.0) },
+        Material { metallic: 1.0, metallic_roughness_texture: t(2, Sampling::NEAREST), ..Material::color(0.9, 0.8, 0.5) },
+        Material { emissive: [1.2, 0.6, 0.3], emissive_texture: t(0, Sampling::NEAREST), ..Material::color(0.2, 0.2, 0.2) },
+        Material { occlusion_texture: t(3, Sampling::LINEAR), occlusion_strength: 0.8, ..Material::color(0.8, 0.8, 0.8) },
+    ];
+    for (k, m) in plates.iter().enumerate() {
+        let id = r.add_material(m)?;
+        let pos = [k as f64 * 3.4 - 5.1, -3.1, 0.5];
+        sc.add(Instance { mesh: plate, material: id, transform: Transform { pos, rot: quat([1.0, 0.0, 0.0], -0.5), scale: [1.5, 1.2, 1.0] } })?;
     }
     Ok(sc)
 }

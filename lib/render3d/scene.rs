@@ -127,17 +127,30 @@ impl Camera {
     }
 }
 
-/// one sun and an ambient light (linear colours)
+/// one sun and an ambient light, linear, in the units of KHR_lights_punctual: a white matte surface facing
+/// the sun shows color / pi, one under the ambient light alone shows ambient (before the exposure)
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Sun {
     /// towards the sun, any length
     pub direction: [f64; 3],
+    /// illuminance per channel (lux)
     pub color: [f32; 3],
+    /// the radiance of a uniform environment around the scene
     pub ambient: [f32; 3],
 }
 
 impl Sun {
-    pub const DEFAULT: Sun = Sun { direction: [0.3, 0.8, 0.5], color: [0.75; 3], ambient: [0.25; 3] };
+    /// a white matte face towards the sun shows 0.75 + 0.25 (0.75 pi lux, ambient 0.25)
+    pub const DEFAULT: Sun = Sun { direction: [0.3, 0.8, 0.5], color: [0.75 * core::f32::consts::PI; 3], ambient: [0.25; 3] };
+}
+
+/// what the fragment shader does with the light it computed (times the exposure)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Tonemap {
+    /// Khronos PBR Neutral: base colours stay up to 0.76, highlights are compressed towards white
+    Neutral,
+    /// none: linear values, clamped by the target's format (HDR targets such as Rgba16Float keep them)
+    None,
 }
 
 /// what prepare sent for this frame
@@ -236,6 +249,8 @@ pub struct Scene {
     live: u32,
     camera: Camera,
     sun: Sun,
+    exposure: f32,
+    tonemap: Tonemap,
     origin: V3,
     pub(crate) culling: bool,
     pub(crate) stats_on: bool,
@@ -357,6 +372,8 @@ impl Scene {
             live: 0,
             camera: Camera::look_at([0.0, 0.0, 5.0], [0.0; 3], [0.0, 1.0, 0.0], 1.0, 1.0, 0.1, f64::INFINITY),
             sun: Sun::DEFAULT,
+            exposure: 1.0,
+            tonemap: Tonemap::Neutral,
             origin: [0.0; 3],
             culling: true,
             stats_on: false,
@@ -565,6 +582,20 @@ impl Scene {
 
     pub fn set_sun(&mut self, s: &Sun) {
         self.sun = *s;
+    }
+
+    /// what the light is multiplied by before the tone mapper (1 at first; not finite: 1)
+    pub fn set_exposure(&mut self, e: f32) {
+        self.exposure = if e.is_finite() { e } else { 1.0 };
+    }
+
+    pub fn exposure(&self) -> f32 {
+        self.exposure
+    }
+
+    /// Tonemap::Neutral at first
+    pub fn set_tonemap(&mut self, t: Tonemap) {
+        self.tonemap = t;
     }
 
     /// the point of the world that is (0, 0, 0) on the GPU.  Keep it near the camera: f32 has seven
@@ -885,7 +916,8 @@ impl Scene {
         }
         let s = &self.sun;
         let d = math::norm(s.direction);
-        let lights = [d[0] as f32, d[1] as f32, d[2] as f32, 0.0, s.color[0], s.color[1], s.color[2], 0.0, s.ambient[0], s.ambient[1], s.ambient[2], 0.0];
+        let tm = if self.tonemap == Tonemap::Neutral { 1.0 } else { 0.0 };
+        let lights = [d[0] as f32, d[1] as f32, d[2] as f32, self.exposure, s.color[0], s.color[1], s.color[2], tm, s.ambient[0], s.ambient[1], s.ambient[2], 0.0];
         let f = &self.frames[slot];
         f.stage.write(0, &self.camera.view_block(self.origin))?;
         f.stage.write(LIGHTS_AT, &lights)?;

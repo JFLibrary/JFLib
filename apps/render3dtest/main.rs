@@ -21,6 +21,9 @@
 //                    from inside, their visibility (tex.rs)
 //        gltf        (G5b) lib/gltf against files of its own: three forms, contents, broken files, the scene
 //                    drawn against the ray caster (gltftest.rs, gltfgen.rs)
+//        pbr         (G5c) glTF's BRDF against the ray caster: materials, the metallic-roughness texture, normal maps
+//                    (turned, mirrored, mirrored uv, which way they lean), emission, occlusion, exposure, both tone
+//                    mappers, the light itself in Rgba16Float, a white furnace; the BRDF's albedo on the CPU (pbr.rs)
 //        all         all of the above
 //        window      a real window (one, briefly; not in `all`): the presented image = the offscreen image
 //   render3dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--warmup W] [--inflight K] [--basis]
@@ -29,6 +32,7 @@
 //   render3dtest --bench-upload              texture upload and mip levels per size class (bench.rs)
 //   render3dtest --bench-gltf [--nodes N | --vertices V]   a generated glTF: load time, memory (bench.rs)
 //   render3dtest --gen-shaders FILE          lib/render3d/shaders_spv.rs from lib/render3d/*.wgsl
+//   render3dtest --gen-dfg FILE              lib/render3d/dfg_table.rs: the split-sum's table (render3d::dfg_table)
 //   render3dtest --dump DIR                  the gallery's images per level, for tests/engine_web.mjs
 //   In the browser: the same gallery, step by step as the browser answers (web.rs; tests/engine_web.mjs).
 //
@@ -51,6 +55,8 @@ mod gltfgen;
 mod bench;
 #[cfg(not(target_arch = "wasm32"))]
 mod gltftest;
+#[cfg(not(target_arch = "wasm32"))]
+mod pbr;
 #[cfg(not(target_arch = "wasm32"))]
 mod tests;
 #[cfg(not(target_arch = "wasm32"))]

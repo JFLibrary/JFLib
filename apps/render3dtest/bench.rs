@@ -146,7 +146,7 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     let palette = objs.len().min(1024) as u32;
     let mut s = t.res(Scene::new(&r), "Scene::new")?;
     let amb = 0.25f32;
-    s.set_sun(&Sun { direction: [0.3, 0.8, 0.5], color: [1.0 - amb; 3], ambient: [amb; 3] });
+    s.set_sun(&Sun { direction: [0.3, 0.8, 0.5], color: [(1.0 - amb) * core::f32::consts::PI; 3], ambient: [amb; 3] });
     let mut ids: Vec<InstanceId> = Vec::with_capacity(n as usize);
     for (i, o) in objs.iter().enumerate() {
         let transform = Transform { pos: [o.pos[0] as f64, o.pos[1] as f64, o.pos[2] as f64], rot: o.rot, scale: [o.scale; 3] };

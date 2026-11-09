@@ -1,9 +1,10 @@
 // draw: an instance's vertices through its finished matrix (three rows; nothing per vertex beyond that),
-// Lambert with one sun and an ambient light (PBR: G5c).  Everything comes from storage buffers: the
-// fixed-function fetch of the same data costs three quarters more on the RTX 2070 SUPER (docs/RENDER3D.md).  A list
-// starts at its first instance on Voll and at pc.first on Basis.  The material is read per fragment: small
-// far objects have more vertices than fragments.  Mirrored instances run through the same code with a
-// pipeline whose front faces are clockwise; their normals come out right through the signed scale.
+// shaded after glTF 2.0's metallic-roughness model (G5c; docs/RENDER3D.md "PBR").  Everything comes from
+// storage buffers: the fixed-function fetch of the same data costs three quarters more on the RTX 2070
+// SUPER (docs/RENDER3D.md).  A list starts at its first instance on Voll and at pc.first on Basis.  The
+// material is read per fragment: small far objects have more vertices than fragments.  Mirrored instances
+// run through the same code with a pipeline whose front faces are clockwise; their normals come out right
+// through the signed scale.
 //
 // Textures (G5b): one texture array per size class (128 << k, k = 0 .. 4) and colour space in group 1, one
 // repeating trilinear sampler.  A material's texture word says layer | class << 16 | mode << 20 | linear
@@ -13,6 +14,14 @@
 // done here at explicit levels, exactly since a class is a power of two: clamp and mirror by the texel
 // centres of the level, nearest filters at a texel's centre, the level from the derivatives as Vulkan
 // defines it (rho = the longer of the two derivatives in texels).
+//
+// Shading (G5c): the BRDF of glTF 2.0 Appendix B (Lambert diffuse, GGX / Trowbridge-Reitz, the separable
+// Smith visibility, Schlick's Fresnel), linear light in the units of KHR_lights_punctual (the sun in lux),
+// times the scene's exposure, then Khronos PBR Neutral (or no tone mapping) right here: no pass after it.
+// Normal maps without a TANGENT attribute: the triangle's tangent frame from the derivatives of the world
+// position and the uv (bumped; how that differs from MikkTSpace: docs/RENDER3D.md).  A uniform ambient
+// light reaches the surface through the split-sum approximation with its second sum from a table (env_ab,
+// dfg.rs); occlusion acts on it only.
 
 struct View {
     view_proj: mat4x4f,
@@ -30,6 +39,8 @@ struct Instance {
     material: u32,
 }
 
+// sun_dir: towards the sun (a unit vector), w the exposure; sun_color: illuminance per channel (lux), w 1
+// for the neutral tone mapper, 0 for none; ambient: the radiance of a uniform environment
 struct Lights {
     sun_dir: vec4f,
     sun_color: vec4f,
@@ -37,8 +48,7 @@ struct Lights {
 }
 
 // 80 bytes: glTF's metallic-roughness material.  alpha_cutoff < 0: opaque.  Texture words (u32::MAX: none):
-// base colour, metallic-roughness, normal, occlusion, then emissive.  G5b reads the base colour; the rest
-// is PBR's (G5c)
+// base colour, metallic-roughness, normal, occlusion, then emissive
 struct Material {
     base_color: vec4f,
     emissive: vec3f,
@@ -69,6 +79,8 @@ struct VsOut {
     @location(0) normal: vec3f,
     @location(1) @interpolate(flat) material: u32,
     @location(2) uv: vec2f,
+    // relative to the scene's origin, as the eye
+    @location(3) world: vec3f,
 }
 
 @group(0) @binding(0) var<uniform> view: View;
@@ -89,6 +101,8 @@ struct VsOut {
 @group(1) @binding(8) var l3: texture_2d_array<f32>;
 @group(1) @binding(9) var l4: texture_2d_array<f32>;
 @group(1) @binding(10) var smp: sampler;
+// (G5c) the split-sum's second sum (A, B) over n.v (x) and roughness (y), 32 x 32 (dfg.rs)
+@group(1) @binding(11) var<storage, read> dfg: array<vec2f>;
 var<immediate> pc: Push;
 
 const NO_TEXTURE: u32 = 0xffffffffu;
@@ -107,6 +121,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VsOut
     out.normal = vec3f(dot(inst.m0.xyz, n), dot(inst.m1.xyz, n), dot(inst.m2.xyz, n));
     out.material = inst.material;
     out.uv = vec2f(v.position_u.w, v.normal_v.w);
+    out.world = world.xyz;
     return out;
 }
 
@@ -126,6 +141,22 @@ fn array_level(which: u32, uv: vec2f, layer: u32, level: f32) -> vec4f {
     }
 }
 
+// one array's texel at a level
+fn array_load(which: u32, c: vec2i, layer: u32, level: i32) -> vec4f {
+    switch which {
+        case 0u: { return textureLoad(s0, c, layer, level); }
+        case 1u: { return textureLoad(s1, c, layer, level); }
+        case 2u: { return textureLoad(s2, c, layer, level); }
+        case 3u: { return textureLoad(s3, c, layer, level); }
+        case 4u: { return textureLoad(s4, c, layer, level); }
+        case 5u: { return textureLoad(l0, c, layer, level); }
+        case 6u: { return textureLoad(l1, c, layer, level); }
+        case 7u: { return textureLoad(l2, c, layer, level); }
+        case 8u: { return textureLoad(l3, c, layer, level); }
+        default: { return textureLoad(l4, c, layer, level); }
+    }
+}
+
 // one array, trilinear by the sampler from the derivatives
 fn array_grad(which: u32, uv: vec2f, layer: u32, dx: vec2f, dy: vec2f) -> vec4f {
     switch which {
@@ -142,22 +173,18 @@ fn array_grad(which: u32, uv: vec2f, layer: u32, dx: vec2f, dy: vec2f) -> vec4f 
     }
 }
 
+// mirrored repeat (2) as a coordinate in 0 ..= 1: at the seam both sides are the edge texel
+fn mirror(u: f32) -> f32 {
+    let t = u - 2.0 * floor(u * 0.5);
+    return select(t, 2.0 - t, t > 1.0);
+}
+
 // a coordinate on a level of n texels for the repeating sampler: wrap 0 repeat, 1 clamp to edge, 2 mirrored
-// repeat (clamped on the mirrored coordinate: at the seam both are the edge texel); nearest: a texel's centre
-fn wrap_coord(u: f32, wrap: u32, n: f32, nearest: bool) -> f32 {
+// repeat (clamped on the mirrored coordinate)
+fn wrap_coord(u: f32, wrap: u32, n: f32) -> f32 {
     var x = u;
     if wrap == 2u {
-        let t = x - 2.0 * floor(x * 0.5);
-        x = select(t, 2.0 - t, t > 1.0);
-    }
-    if nearest {
-        var i = floor(x * n);
-        if wrap == 0u {
-            i = i - n * floor(i / n);
-        } else {
-            i = clamp(i, 0.0, n - 1.0);
-        }
-        return (i + 0.5) / n;
+        x = mirror(x);
     }
     if wrap != 0u {
         x = clamp(x, 0.5 / n, 1.0 - 0.5 / n);
@@ -165,9 +192,29 @@ fn wrap_coord(u: f32, wrap: u32, n: f32, nearest: bool) -> f32 {
     return x;
 }
 
+// the texel of a coordinate on a level of n texels (nearest filtering), wrapped as wrap_coord does
+fn wrap_texel(u: f32, wrap: u32, n: f32) -> i32 {
+    var x = u;
+    if wrap == 2u {
+        x = mirror(x);
+    }
+    var i = floor(x * n);
+    if wrap == 0u {
+        i = i - n * floor(i / n);
+    } else {
+        i = clamp(i, 0.0, n - 1.0);
+    }
+    return i32(i);
+}
+
+// a level's colour at uv: nearest filtering loads the texel (exact: a texel's centre through the linear
+// sampler mixes in 1/256 of a neighbour on this hardware, which shading can multiply), else bilinear
 fn array_at(which: u32, layer: u32, uv: vec2f, wrap: vec2u, size: f32, level: f32, nearest: bool) -> vec4f {
     let n = size / exp2(level);
-    return array_level(which, vec2f(wrap_coord(uv.x, wrap.x, n, nearest), wrap_coord(uv.y, wrap.y, n, nearest)), layer, level);
+    if nearest {
+        return array_load(which, vec2i(wrap_texel(uv.x, wrap.x, n), wrap_texel(uv.y, wrap.y, n)), layer, i32(level));
+    }
+    return array_level(which, vec2f(wrap_coord(uv.x, wrap.x, n), wrap_coord(uv.y, wrap.y, n)), layer, level);
 }
 
 // a texture word's colour at uv (the derivatives of uv come from uniform control flow), sRGB decoded
@@ -204,19 +251,134 @@ fn sample_texture(t: u32, uv: vec2f, dx: vec2f, dy: vec2f) -> vec4f {
     return mix(a, array_at(which, layer, uv, wrap, size, l0 + 1.0, nearest), d - l0);
 }
 
+const PI: f32 = 3.141592653589793;
+// the least alpha (= roughness squared) the BRDF takes: roughness 0 would divide 0 by 0 at the highlight
+const ALPHA_MIN: f32 = 0.001;
+
+// glTF 2.0 Appendix B for one light from l: f = (1 - F) c_diff / pi + F D V with Schlick's F, GGX's D and the
+// separable Smith V = G / (4 |N.L| |N.V|); times N.L.  a2 = alpha squared
+fn direct(n: vec3f, v: vec3f, l: vec3f, c_diff: vec3f, f0: vec3f, a2: f32) -> vec3f {
+    let nl = dot(n, l);
+    if !(nl > 0.0) {
+        return vec3f(0.0);
+    }
+    let nv = clamp(dot(n, v), 0.0, 1.0);
+    let hv = l + v;
+    let h = hv * inverseSqrt(max(dot(hv, hv), 1e-30));
+    let nh = clamp(dot(n, h), 0.0, 1.0);
+    let vh = clamp(dot(v, h), 0.0, 1.0);
+    let x = 1.0 - vh;
+    let x2 = x * x;
+    let f = f0 + (1.0 - f0) * (x2 * x2 * x);
+    let t = nh * nh * (a2 - 1.0) + 1.0;
+    let d = a2 / (PI * t * t);
+    let vis = 1.0 / ((nl + sqrt(a2 + (1.0 - a2) * nl * nl)) * (nv + sqrt(a2 + (1.0 - a2) * nv * nv)));
+    return ((1.0 - f) * c_diff * (1.0 / PI) + f * (d * vis)) * nl;
+}
+
+// the second sum of the split-sum approximation: scale and bias of f0, bilinear in the table (dfg.rs)
+fn env_ab(roughness: f32, nv: f32) -> vec2f {
+    let x = clamp(nv, 0.0, 1.0) * 31.0;
+    let y = clamp(roughness, 0.0, 1.0) * 31.0;
+    let i = min(u32(x), 30u);
+    let j = min(u32(y), 30u);
+    let fx = x - f32(i);
+    let fy = y - f32(j);
+    let k = j * 32u + i;
+    return mix(mix(dfg[k], dfg[k + 1u], fx), mix(dfg[k + 32u], dfg[k + 33u], fx), fy);
+}
+
+// Khronos PBR Neutral: base colours stay as they are below 0.76, highlights are compressed towards white
+fn neutral(c: vec3f) -> vec3f {
+    let x = min(c.x, min(c.y, c.z));
+    let offset = select(0.04, x - 6.25 * x * x, x < 0.08);
+    var col = c - offset;
+    let peak = max(col.x, max(col.y, col.z));
+    if peak < 0.76 {
+        return col;
+    }
+    let d = 0.24;
+    let new_peak = 1.0 - d * d / (peak + d - 0.76);
+    col = col * (new_peak / peak);
+    let g = 1.0 - 1.0 / (0.15 * (peak - new_peak) + 1.0);
+    return mix(col, vec3f(new_peak), g);
+}
+
+// a normal map's tangent-space normal t on the geometric normal ng: the tangent is the triangle's dp/du
+// (from the derivatives of the world position p and of uv), made orthogonal to ng; the bitangent
+// cross(ng, tangent) points where v decreases (glTF: +y is up in the image), so mirrored uv and mirrored
+// instances come out right.  No uv gradient (uv constant): ng
+fn bumped(ng: vec3f, t: vec3f, px: vec3f, py: vec3f, dx: vec2f, dy: vec2f) -> vec3f {
+    let det = dx.x * dy.y - dx.y * dy.x;
+    if det == 0.0 {
+        return ng;
+    }
+    let s = sign(det);
+    let dpdu = (px * dy.y - py * dx.y) * s;
+    let dpdv = (py * dx.x - px * dy.x) * s;
+    let tt = dpdu - ng * dot(ng, dpdu);
+    let lt = dot(tt, tt);
+    if !(lt > 0.0) {
+        return ng;
+    }
+    let tn = tt * inverseSqrt(lt);
+    var b = cross(ng, tn);
+    if dot(b, dpdv) > 0.0 {
+        b = -b;
+    }
+    return normalize(tn * t.x + b * t.y + ng * t.z);
+}
+
 @fragment
 fn fs(f: VsOut) -> @location(0) vec4f {
+    // (derivatives in uniform control flow, before anything depends on the material)
     let dx = dpdxFine(f.uv);
     let dy = dpdyFine(f.uv);
+    let px = dpdxFine(f.world);
+    let py = dpdyFine(f.world);
     let m = materials[f.material];
     var c = m.base_color;
-    let t = m.textures.x;
-    if t != NO_TEXTURE {
-        c = c * sample_texture(t, f.uv, dx, dy);
+    if m.textures.x != NO_TEXTURE {
+        c = c * sample_texture(m.textures.x, f.uv, dx, dy);
     }
     if c.w < m.alpha_cutoff {
         discard;
     }
-    let ndl = max(dot(normalize(f.normal), lights.sun_dir.xyz), 0.0);
-    return vec4f(c.xyz * (lights.ambient.xyz + lights.sun_color.xyz * ndl), 1.0);
+    var metallic = m.metallic;
+    var roughness = m.roughness;
+    if m.textures.y != NO_TEXTURE {
+        let mr = sample_texture(m.textures.y, f.uv, dx, dy);
+        roughness = roughness * mr.y;
+        metallic = metallic * mr.z;
+    }
+    metallic = clamp(metallic, 0.0, 1.0);
+    roughness = clamp(roughness, 0.0, 1.0);
+    let ng = normalize(f.normal);
+    var n = ng;
+    if m.textures.z != NO_TEXTURE {
+        let t = sample_texture(m.textures.z, f.uv, dx, dy).xyz * 2.0 - 1.0;
+        n = bumped(ng, t * vec3f(m.normal_scale, m.normal_scale, 1.0), px, py, dx, dy);
+    }
+    var ao = 1.0;
+    if m.textures.w != NO_TEXTURE {
+        ao = 1.0 + m.occlusion * (sample_texture(m.textures.w, f.uv, dx, dy).x - 1.0);
+    }
+    var emissive = m.emissive;
+    if m.emissive_texture != NO_TEXTURE {
+        emissive = emissive * sample_texture(m.emissive_texture, f.uv, dx, dy).xyz;
+    }
+    let v = normalize(view.eye.xyz - f.world);
+    let c_diff = c.xyz * (1.0 - metallic);
+    let f0 = mix(vec3f(0.04), c.xyz, metallic);
+    let a = max(roughness * roughness, ALPHA_MIN);
+    var light = direct(n, v, lights.sun_dir.xyz, c_diff, f0, a * a) * lights.sun_color.xyz;
+    // the uniform environment: what the specular lobe does not take goes to the diffuse
+    let ab = env_ab(roughness, clamp(dot(n, v), 0.0, 1.0));
+    let spec = f0 * ab.x + ab.y;
+    light = light + lights.ambient.xyz * (spec + c_diff * (1.0 - spec)) * ao + emissive;
+    var out = light * lights.sun_dir.w;
+    if lights.sun_color.w != 0.0 {
+        out = neutral(out);
+    }
+    return vec4f(out, 1.0);
 }

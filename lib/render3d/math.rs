@@ -72,6 +72,22 @@ pub fn rotation(q: [f32; 4]) -> [V3; 3] {
     ]
 }
 
+/// sine and cosine: reduced to -pi ..= pi, then their series
+pub fn sincos(x: f64) -> (f64, f64) {
+    let tau = core::f64::consts::TAU;
+    let k = (x / tau + if x < 0.0 { -0.5 } else { 0.5 }) as i64;
+    let r = x - k as f64 * tau;
+    let (r2, mut s, mut c, mut ts, mut tc) = (r * r, 0.0, 0.0, r, 1.0);
+    for n in 0..30 {
+        let n = n as f64;
+        s += ts;
+        c += tc;
+        ts *= -r2 / ((2.0 * n + 2.0) * (2.0 * n + 3.0));
+        tc *= -r2 / ((2.0 * n + 1.0) * (2.0 * n + 2.0));
+    }
+    (s, c)
+}
+
 /// the natural logarithm (x <= 0: -inf): x = m 2^e, ln m by the series of atanh
 pub fn ln(x: f64) -> f64 {
     if x <= 0.0 || x.is_nan() {

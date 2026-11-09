@@ -1,5 +1,5 @@
-// render3d -- the core of the 3D engine on lib/gpu (G5a, G5b; docs/RENDER3D.md): meshes in shared buffers,
-// a table of materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
+// render3d -- the core of the 3D engine on lib/gpu (G5a to G5c; docs/RENDER3D.md): meshes in shared buffers,
+// a table of glTF's PBR materials with textures, scenes of instances, a camera, a sun, visibility on the GPU and one
 // instance list per mesh and side (mirrored instances turn their faces round).  No draw per object
 // anywhere: a frame is one compute dispatch and one indirect draw per list (level Basis) or one multi-draw
 // per side for all of them (level Voll).  The same WGSL on every path: compiled ahead (shaders_spv.rs) on
@@ -22,8 +22,9 @@
 //        materials, and its instances for a Scene (gltf.rs)
 //
 // Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
-// of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, colours
-// linear (an sRGB target encodes them).  Positions are f64 on the CPU and f32 relative to the scene's
+// of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
+// units of KHR_lights_punctual, times the scene's exposure, tone mapped in the fragment shader (Khronos PBR
+// Neutral, or none), colours linear (an sRGB target encodes them).  Positions are f64 on the CPU and f32 relative to the scene's
 // origin on the GPU.
 //
 // Errors are gpu's: Invalid for ids and values this crate can judge, the rest from the backend.
@@ -39,12 +40,14 @@ use core::sync::atomic::{AtomicU32, Ordering};
 
 use gpu::*;
 
+mod dfg;
 pub mod gltf;
 pub mod math;
 mod scene;
 mod texture;
 
-pub use scene::{Camera, FrameStats, Instance, InstanceId, ListInfo, Scene, Sun, Transform, UploadInfo};
+pub use dfg::{DFG, DFG_N, dfg_table};
+pub use scene::{Camera, FrameStats, Instance, InstanceId, ListInfo, Scene, Sun, Tonemap, Transform, UploadInfo};
 pub use texture::{CLASSES, CLASS_MAX, CLASS_MIN, Mip, Sampling, TextureData, TextureId, TextureInfo, TextureRef, Wrap, class_of, mip_chain};
 
 /// what a depth attachment of this engine clears to (reverse Z: 0 is infinitely far)
@@ -131,23 +134,29 @@ pub struct MeshInfo {
     pub radius: f64,
 }
 
-/// a row of the material table: glTF's metallic-roughness material.  G5b shows the base colour times its
-/// texture under Lambert lighting and drops fragments below alpha_cutoff; the rest is laid out for PBR (G5c).
-/// What reaches the target is opaque (alpha 1)
+/// a row of the material table: glTF's metallic-roughness material, shaded as glTF 2.0 Appendix B says (G5c;
+/// draw.wgsl).  Fragments whose alpha is below alpha_cutoff are dropped.  What reaches the target is opaque
+/// (alpha 1)
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Material {
     /// linear rgb and alpha (the texture's sRGB is decoded first)
     pub base_color: [f32; 4],
+    /// 0 ..= 1 (clamped in the shader, after the texture)
     pub metallic: f32,
     pub roughness: f32,
+    /// linear radiance (before the exposure)
     pub emissive: [f32; 3],
     pub base_color_texture: Option<TextureRef>,
-    /// linear: roughness in g, metallic in b
+    /// linear: roughness in g, metallic in b (times the factors)
     pub metallic_roughness_texture: Option<TextureRef>,
+    /// linear, glTF's tangent space (+y up in the image); the tangent frame comes from the derivatives
+    /// (docs/RENDER3D.md: how that differs from MikkTSpace); scale multiplies x and y
     pub normal_texture: Option<TextureRef>,
     pub normal_scale: f32,
+    /// linear, r: how much of the ambient (indirect) light reaches the surface, 1 + strength (r - 1)
     pub occlusion_texture: Option<TextureRef>,
     pub occlusion_strength: f32,
+    /// sRGB, times emissive
     pub emissive_texture: Option<TextureRef>,
     /// glTF's alpha mode MASK: fragments whose alpha is below it are not drawn (None: opaque)
     pub alpha_cutoff: Option<f32>,
@@ -299,7 +308,7 @@ impl Renderer {
             b(3, BindingKind::StorageBuffer, cs),
         ])?;
         let draw_layout = dev.create_bind_group_layout(&[
-            b(0, BindingKind::UniformBuffer, vf),
+            b(0, BindingKind::UniformBuffer, vf | Stages::FRAGMENT),
             b(1, BindingKind::StorageBufferRead, vf),
             b(2, BindingKind::UniformBuffer, Stages::FRAGMENT),
             b(3, BindingKind::StorageBufferRead, Stages::FRAGMENT),
