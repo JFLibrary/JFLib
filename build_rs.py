@@ -44,7 +44,8 @@ The crates, their dependencies and the library's version come from the Cargo man
                                                                 missing rows (untranslated); --check: the suite's
                                                                 check (errors only, the gaps are reported)
   options: --target win|linux|both|web|all|android|mac|ios (default both; run: win), --release, --out DIR, -j N (Cargo's jobs),
-           --sim (ios: the simulator's build into ios-sim; mac and ios build on a Mac, docs/APPLE.md),
+           --sim (ios: the simulator's build into ios-sim; mac and ios build on a Mac, docs/APPLE.md; mac: test NAME
+                 too, programs with windows start in the logged-in session from SSH),
            --profile size|o2 (release variants, section "r13-measure"),
            --arch x86_64|aarch64 (default x86_64; docs/ARM64.md, no run or test yet)
 
@@ -1404,7 +1405,9 @@ def wsl_path(p):
 
 
 def run_exe(target, exe, args, timeout=600):
-    return run_native(target, exe, args, timeout)
+    name = Path(exe).name
+    gui = target == "mac" and name in apps() and "ui" in app_crates(name)   # windows (tools/apple.py gui_run)
+    return run_native(target, exe, args, timeout, gui=gui)
 
 
 def script_args(uis):
@@ -2001,8 +2004,9 @@ def main():
     if set(targets) & set(APPLE):                   # docs/APPLE.md: Apple's SDK and tools are on a Mac only
         if sys.platform != "darwin":
             raise BuildError("mac and ios build on a Mac (Apple's SDK; docs/APPLE.md).")
-        if a.cmd not in ("app", "lib", "run"):
-            raise BuildError("mac and ios support app, lib and run; the iPhone itself: python tools/apple.py device APP.app")
+        if a.cmd not in ("app", "lib", "run") and not (a.cmd == "test" and a.name and targets == ["mac"]):
+            raise BuildError("mac and ios support app, lib and run (mac also test NAME); the iPhone itself: "
+                             "python tools/apple.py device APP.app")
         if a.cmd == "run" and targets == ["ios"] and not a.sim:
             raise BuildError("run --target ios starts the simulator's build (--sim); the iPhone: python tools/apple.py device APP.app")
     if a.cmd in ("run", "test") and "web" in targets:

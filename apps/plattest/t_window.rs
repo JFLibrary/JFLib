@@ -10,12 +10,20 @@
 // docked to the owner when it moves), enable, the clipboard round trip (text, PNG, image +
 // DIB), the IME caret, the system file dialog (closed by a timer: Cancel, then a name + OK),
 // a WM_DROPFILES of jfgui_TEST_DROPFILES, wake() from a thread, close and destroy.
-// The clipboard's text is saved and put back at the end.  Windows only (Linux: linuxtest).
+// The clipboard's text is saved and put back at the end.  Windows here; macOS: t_window_mac.rs
+// (Linux: linuxtest).
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 pub fn t_window(t: &mut crate::T) {
-    t.info("  (window: the Windows smoke test; X11 / Wayland have linuxtest)\n");
+    t.info("  (window: the Windows and macOS smoke test; X11 / Wayland have linuxtest)\n");
 }
+
+// macOS: t_window_mac.rs
+#[cfg(target_os = "macos")]
+#[path = "t_window_mac.rs"]
+mod mac;
+#[cfg(target_os = "macos")]
+pub use mac::t_window;
 
 #[cfg(windows)]
 pub use win::t_window;

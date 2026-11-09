@@ -71,7 +71,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -30739,90 +30739,13 @@ own events (AP4).
 Source: [`lib/plat/apple_disp.rs`](../lib/plat/apple_disp.rs)
 
 ```text
-apple_disp -- the window API on macOS and iOS before there are windows (docs/APPLE.md AP4)
-
-Every function answers as linux_disp.rs does without a display: no window opens, sizes are 0, the
-dpi is 96, the clipboard is empty, wait() sleeps until its deadline or a wake().  The main window
-ends the process with exit code 1 and a message, as on Linux without Wayland or X11.
+apple_disp -- what macOS and iOS share of the window-level API (home, drives, printing, the file
+dialog, opening URLs and folders, starting this program again), and iOS's windows before AP5
+(docs/APPLE.md): every window function there answers as linux_disp.rs does without a display (no
+window opens, sizes are 0, the dpi is 96, the clipboard is empty, wait() sleeps until its deadline
+or a wake(); the main window ends the process with exit code 1 and a message).  macOS's windows:
+apple_mac.rs.
 ```
-
-- **`fn win_create(_title: &str, _w_dip: i32, _h_dip: i32, _flags: u32, owner: i32, _x: i32, _y: i32) -> i32`**
-  see win_api.rs (Windows) for the semantics of every function
-
-- **`fn win_destroy(_w: i32)`**
-
-- **`fn win_show(_w: i32, _mode: u32)`**
-
-- **`fn win_activate(_w: i32)`**
-
-- **`fn win_enable(_w: i32, _on: bool)`**
-
-- **`fn win_set_rect(_w: i32, _x: i32, _y: i32, _cw: i32, _ch: i32)`**
-
-- **`fn win_get_rect(_w: i32) -> Option<[i32; 4]>`**
-
-- **`fn win_work_area(_w: i32) -> Option<[i32; 4]>`**
-
-- **`fn win_set_title(_w: i32, _title: &str)`**
-
-- **`fn win_state(_w: i32) -> u32`**
-
-- **`fn win_cmd(_w: i32, _cmd: u32)`**
-
-- **`fn win_begin_move(_w: i32)`**
-
-- **`fn win_begin_resize(_w: i32, _edges: u32)`**
-
-- **`fn win_show_menu(_w: i32, _x: i32, _y: i32)`**
-
-- **`fn win_size(_w: i32) -> (i32, i32)`**
-
-- **`fn win_dpi(_w: i32) -> i32`**
-
-- **`fn win_set_min_size(_w: i32, _w_dip: i32, _h_dip: i32)`**
-
-- **`fn win_present(_w: i32, _f: &Frame, _rects: Option<&[[i32; 4]]>)`**
-
-- **`fn win_set_cursor(_w: i32, _shape: u32)`**
-
-- **`fn win_hit_hook(_f: Option<fn(i32, i32, i32) -> u32>)`**
-
-- **`fn win_move_hook(_f: Option<fn(i32, &mut [i32; 4])>)`**
-
-- **`fn set_refresh(_f: Option<fn()>)`**
-
-- **`fn wait(deadline_us: u64) -> u32`**
-  without a display: sleep until the deadline (0 = poll, u64::MAX = forever) or a wake()
-
-- **`fn popup(_slot: u32, _owner: i32, _rect: Option<[i32; 4]>, _f: Option<&Frame>)`**
-
-- **`fn popup_anchor(_slot: u32, _anchor: [i32; 4], _kind: u32, _nat: [i32; 2])`**
-
-- **`fn popup_placed(_slot: u32) -> Option<[i32; 2]>`**
-
-- **`fn cursor_create(_px: &[u8], _w: i32, _h: i32, _hot_x: i32, _hot_y: i32, _dpi: i32) -> i32`**
-
-- **`fn cursor_destroy(_id: i32)`**
-
-- **`fn cursor_dpi(dpi: i32) -> i32`**
-  the dpi to draw a cursor for a window of this dpi (no display: the dpi itself)
-
-- **`fn clip_set(_fmt: u32, _data: &[u8]) -> bool`**
-
-- **`fn clip_set_many(_entries: &[(u32, &[u8])]) -> bool`**
-
-- **`fn clip_get(_fmt: u32) -> Option<Vec<u8>>`**
-
-- **`fn clip_has(_fmt: u32) -> bool`**
-
-- **`fn ime_pos(_x: i32, _y: i32, _h: i32)`**
-
-- **`fn theme() -> i32`**
-  0 light, 1 dark, -1 unknown: jfgui_THEME=light|dark, else unknown (the system's appearance
-  comes with the window backend)
-
-- **`fn pen_devices() -> i32`**
-  pens / pen tablets (-1 = unknown)
 
 - **`fn home() -> Option<String>`**
   $HOME (or "/")  [plat_home]
@@ -30836,8 +30759,8 @@ ends the process with exit code 1 and a message, as on Linux without Wayland or 
   then ERR_UNSUPPORTED
 
 - **`fn file_dialog(_flags: u32, _path: &mut String, _exts: &[&str]) -> (i32, u32)`**
-  the system's file dialog: not before the window backend (AP4) -> (-1, 0): the library's own
-  dialog, as in a browser without the File System Access API  [plat_file_dialog]
+  iOS: no system file dialog before AP5 -> (-1, 0): the library's own dialog, as in a browser without
+  the File System Access API (macOS: apple_mac.rs)  [plat_file_dialog]
 
 - **`fn open_folder(path: &str) -> i32`**
   show a folder / a file in the Finder -> 0 / -1  [plat_open_folder]
@@ -30851,6 +30774,244 @@ ends the process with exit code 1 and a message, as on Linux without Wayland or 
 
 - **`fn restart_self(args: &[&str]) -> i32`**
   like spawn_self: the program file now at this process's path (an update replaced it) -> 0 / -1
+
+### `plat/apple_mac.rs` (Apple)
+
+Source: [`lib/plat/apple_mac.rs`](../lib/plat/apple_mac.rs)
+
+```text
+apple_mac -- windows on macOS: AppKit through the Objective-C runtime (docs/APPLE.md AP4)
+
+Each window is an NSWindow with a view of our class JFView (flipped: y grows downwards) and a
+delegate of our class JFWindowDelegate; both carry the window's index in their instance variable.
+The view and the delegate never act: they push events into the ring (evq.rs), as win_api.rs does.
+
+  present   the frame (rows of B, G, R, x) becomes a CGImage, the contents of the view's layer
+            (copied: the layer keeps the last picture for the window server)
+  wait      the own event loop: nextEventMatchingMask until the deadline, sendEvent; wake() from any
+            thread signals a run loop source whose callback posts an application-defined event
+  sizes     points of AppKit times the window's backingScaleFactor = pixels; the dpi 96 * scale
+  keys      NSEvent keyCode -> Windows VK (letters and digits as the layout names them); text
+            through NSTextInputClient (dead keys, input methods: E_PREEDIT, E_IME_COMMIT)
+  modifiers Command is MOD_CTRL (the library's shortcuts are Ctrl+..), Control MOD_SUPER, Option
+            MOD_ALT
+  gestures  the trackpad's pinch becomes Ctrl + wheel (120 per 0.2 of magnification), as Windows
+            makes it of a touchpad's pinch; two-finger scrolling is the wheel with fine steps
+  settings  a change of the appearance or the accent colour (distributed notifications) and of the
+            screens push E_SETTINGS (SET_THEME, SET_MONITORS) for window 0
+  frame     PWF_SYSFRAME: the system's title bar; otherwise the content reaches under a transparent
+            title bar without its buttons (the app draws its own), HB_DRAG drags the window
+  popups    (menus, lists, tooltips that leave the window) borderless non-activating panels, child
+            windows of their owner; they never take the keyboard, their pointer input is pushed as
+            events of the owner in owner client coordinates (as win_popup.rs does)
+  owned     windows with an owner hang on it as child windows while shown: above it, moved with it
+  dialogs   file_dialog: NSOpenPanel / NSSavePanel, modal (FD_FOLDER chooses a folder)
+  system    monitors (NSScreen), the appearance, the accent colour and the accessibility settings
+            (sys_settings_os), custom cursors (NSCursor of an NSBitmapImageRep)
+  dnd       apple_mac_dnd.rs: every view a dragging destination, drag_start a dragging session
+  tests     apple_mac_test.rs: win_test, file_dialog_autoclose (events to our own windows only)
+
+Everything runs on the main thread (AppKit's rule); the state is reached through short borrows
+that never span a call into AppKit (AppKit calls back into the view and the delegate).
+```
+
+- **`fn theme() -> i32`**
+  0 light, 1 dark: jfgui_THEME=light|dark, else the application's appearance
+
+- **`fn pen_devices() -> i32`**
+
+- **`fn win_create(title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x: i32, y: i32) -> i32`**
+  see win_api.rs (Windows) for the semantics of every function
+
+- **`fn win_destroy(w: i32)`**
+
+- **`fn win_show(w: i32, mode: u32)`**
+
+- **`fn win_activate(w: i32)`**
+
+- **`fn win_enable(w: i32, on: bool)`**
+  a disabled window takes no input (its owned dialog is modal)
+
+- **`fn win_set_rect(w: i32, x: i32, y: i32, cw: i32, ch: i32)`**
+
+- **`fn win_get_rect(w: i32) -> Option<[i32; 4]>`**
+
+- **`fn win_work_area(w: i32) -> Option<[i32; 4]>`**
+
+- **`fn win_set_title(w: i32, title: &str)`**
+
+- **`fn win_state(w: i32) -> u32`**
+
+- **`fn win_cmd(w: i32, cmd: u32)`**
+
+- **`fn win_begin_move(w: i32)`**
+
+- **`fn win_begin_resize(_w: i32, _edges: u32)`**
+  the system resizes at the edges itself (a resizable window's frame)
+
+- **`fn win_show_menu(_w: i32, _x: i32, _y: i32)`**
+
+- **`fn win_size(w: i32) -> (i32, i32)`**
+
+- **`fn win_dpi(w: i32) -> i32`**
+
+- **`fn win_set_min_size(w: i32, w_dip: i32, h_dip: i32)`**
+
+- **`fn win_present(w: i32, f: &Frame, _rects: Option<&[[i32; 4]]>)`**
+  show the frame in window w (the whole frame; the layer keeps it for the window server)
+
+- **`fn win_set_cursor(w: i32, shape: u32)`**
+
+- **`fn win_hit_hook(f: Option<fn(i32, i32, i32) -> u32>)`**
+
+- **`fn win_move_hook(f: Option<fn(i32, &mut [i32; 4])>)`**
+
+- **`fn set_refresh(f: Option<fn()>)`**
+
+- **`fn wait(deadline_us: u64) -> u32`**
+  pump AppKit until an event is queued or the deadline passes (0 = poll, u64::MAX = forever);
+  before any window: sleep until the deadline or a wake() (headless)
+
+- **`fn popup(slot: u32, owner: i32, rect: Option<[i32; 4]>, f: Option<&Frame>)`**
+  show / move / present popup slot `slot` over window owner: rect = x, y, w, h px of the owner's
+  client area (popup pixel 0, 0 = owner pixel x, y); the layer keeps the frame.  rect None hides it.
+
+- **`fn popup_anchor(_slot: u32, _anchor: [i32; 4], _kind: u32, _nat: [i32; 2])`**
+  (§6) how the next popup() hangs at its anchor: the UI places popups on macOS itself
+
+- **`fn popup_placed(_slot: u32) -> Option<[i32; 2]>`**
+  (§6) the platform never moves a popup on macOS
+
+- **`fn cursor_create(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, dpi: i32) -> i32`**
+  a cursor from w x h premultiplied 0xAARRGGBB pixels (rows of w \* 4 bytes), hot spot in px, drawn
+  for dpi (the window's: its points are px \* 96 / dpi) -> CUR_USER0 + k / -1
+
+- **`fn cursor_destroy(id: i32)`**
+  free a custom cursor; windows showing it fall back to the arrow
+
+- **`fn cursor_dpi(dpi: i32) -> i32`**
+  the dpi to draw a cursor for a window of this dpi (the window's own)
+
+- **`fn file_dialog(flags: u32, path: &mut String, exts: &[&str]) -> (i32, u32)`**
+  the system's Open / Save panel (modal) -> (1 chosen / 0 cancelled / -1 none, index of the chosen
+  extension entry).  flags: FD_SAVE, FD_FOLDER (an Open panel for folders), the selected entry in
+  bits 8..15 (FD_EXT_SHIFT); path: the start (a folder, or a file whose folder and, saving, name
+  are taken) in, the chosen path out; exts: ["png=PNG-Bild", "jpg;jpeg"] (see win_filedlg.rs)
+
+- **`fn clip_set(fmt: u32, data: &[u8]) -> bool`**
+  CLIP_TEXT / CLIP_HTML / CLIP_RTF / CLIP_DOCX as clip_set_many; CLIP_PNG: the PNG file;
+  CLIP_IMAGE: a CLIPIMG record (clipimg_pack): its PNG, else a PNG made of its BMP, and the BMP
+
+- **`fn clip_set_many(entries: &[(u32, &[u8])]) -> bool`**
+  several representations of one selection (text formats, cliprich.rs)
+
+- **`fn clip_get(fmt: u32) -> Option<Vec<u8>>`**
+  CLIP_IMAGE: the PNG, else a TIFF (screenshots, Preview) as a PNG, else a BMP (clip_bmp_fix)
+
+- **`fn clip_has(fmt: u32) -> bool`**
+
+- **`fn ime_pos(x: i32, y: i32, h: i32)`**
+  where the input method's candidate window goes: the caret (px of the current window)
+
+### `plat/apple_mac_test.rs` (Apple)
+
+Source: [`lib/plat/apple_mac_test.rs`](../lib/plat/apple_mac_test.rs)
+
+```text
+apple_mac_test -- test aids of the macOS window backend (plattest --test window).  Events made here
+go to our own windows only ([NSWindow sendEvent:] or straight to our view's method); nothing
+reaches the system's event stream.
+
+  win_test(op, w, a) -> i64
+    WT_PIXEL [x, y]          0xRRGGBB of the frame window w shows (its layer's image), -1 none
+    WT_MOVE [x, y, w, h]     the user moves / resizes window w (its client rect, px): reported
+    WT_CURSOR_IS [shape]     1 when the application's current cursor is that shape's
+    WT_VISIBLE, WT_ACTIVE, WT_ENABLED   1 / 0 (shown, the key window, win_enable)
+    WT_POPUP_RECT            popup slot w: x | y << 16 | w << 32 | h << 48 (screen px), -1 hidden
+    WT_POPUP_PIXEL [x, y]    a pixel of popup slot w
+    WT_POPUP_SEND [kind, 0, x, y]   a mouse event (TS_MOVE / TS_DOWN / TS_UP) at popup px x, y
+    WT_CARET                 the input method's caret (firstRectForCharacterRange), client px x | y << 32
+    WT_SEND [kind, a, b, 0]  an event to window w: TS_MOVE / TS_DOWN / TS_UP at client px a, b;
+                             TS_KEY key code a with the character b (keyDown, the input system);
+                             TS_TEXT the character a (insertText:); TS_WHEEL a lines (up > 0);
+                             TS_PINCH a magnification of a / 1000 (magnifyWithEvent:, at client px b, c)
+    WT_PARENT [popup]        the index of the window w (popup = 1: popup slot w) hangs on, -1 none
+    WT_MIN_SIZE              window w's minimum client size (DIP): w | h << 32
+  file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms: Cancel, or (saving)
+                             OK with name (a full path)
+```
+
+```rust
+WT_PIXEL: u32 = 1
+WT_MOVE: u32 = 3
+WT_CURSOR_IS: u32 = 5
+WT_VISIBLE: u32 = 6
+WT_POPUP_RECT: u32 = 7
+WT_POPUP_PIXEL: u32 = 8
+WT_ENABLED: u32 = 9
+WT_CARET: u32 = 10
+WT_ACTIVE: u32 = 11
+WT_POPUP_SEND: u32 = 13
+WT_SEND: u32 = 32
+WT_PARENT: u32 = 33
+WT_MIN_SIZE: u32 = 34
+// WT_SEND / WT_POPUP_SEND kinds
+TS_MOVE: i32 = 1
+TS_DOWN: i32 = 2
+TS_UP: i32 = 3
+TS_KEY: i32 = 4
+TS_TEXT: i32 = 5
+TS_WHEEL: i32 = 6
+TS_PINCH: i32 = 7
+```
+
+- **`fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64`**
+  see the file header
+
+- **`fn file_dialog_autoclose(ms: u32, name: Option<&str>)`**
+  the next file_dialog is closed after ms: Cancel, or OK with name (a full path; saving only)
+
+### `plat/apple_mac_dnd.rs` (Apple)
+
+Source: [`lib/plat/apple_mac_dnd.rs`](../lib/plat/apple_mac_dnd.rs)
+
+```text
+apple_mac_dnd -- (dnd.rs) drag and drop on macOS: every window's view is a dragging destination;
+drag_start drags the app's content out through a dragging session of the view
+
+  register(view)            (win_create) registerForDraggedTypes: file URLs, URLs, text, HTML, PNG,
+                            TIFF
+  the view's methods        draggingEntered: / draggingUpdated: ask the UI (dnd::drag_query at the
+                            point, px) and answer its effect; E_DRAG on enter and on every new
+                            point, data 0 on draggingExited:; performDragOperation: reads only the
+                            kinds the UI takes (file URLs as paths, text, HTML, other URLs, the PNG
+                            or a TIFF as PNG), then E_DROP (data = the number of paths)
+  os_drag_start(data)       (dnd.rs drag_start) remember the drag; wait() starts it (run_pending):
+                            beginDraggingSessionWithItems:event:source: with the last left-button
+                            event of a window (note_mouse).  The session ends in
+                            draggingSession:endedAtPoint:operation: -> E_DRAG_END (the effect) and
+                            the E_UP the session took
+  writers(data)             what a drag (and dnd_test_formats) puts on the pasteboard: an NSURL per
+                            file, one NSPasteboardItem with the text (else the first URL), HTML, the
+                            PNG (else one made of the BMP, and the BMP) and the URL; further URLs as
+                            NSURLs
+  dnd_test_formats(data) / dnd_test_drop(data, w, x, y, mask)   (plattest, no user) the writers on
+                            a private pasteboard: its types and bytes; the view's destination
+                            methods fed with it through a stand-in NSDraggingInfo (mask: the
+                            NSDragOperation bits the source offers, as AppKit hands them on)
+
+Effects: AppKit narrows the source's mask by the modifier keys itself (Option copy, Command move),
+so the UI's pick gets no keys; NSDragOperationGeneric counts as a move.  Everything a drop brings
+is bounded by dnd.rs / clipdrop.rs (drop_add, drop_set_*).
+```
+
+- **`fn dnd_test_formats(data: &DragData) -> Option<Vec<(String, Vec<u8>)>>`**
+  (plattest) the pasteboard a drag of data fills: (type, bytes) of each item's types
+
+- **`fn dnd_test_drop(data: &DragData, w: i32, x: i32, y: i32, mask: u64) -> Option<u32>`**
+  (plattest) a drop of data at px x, y of window w, the source offering `mask` (NSDragOperation
+  bits): draggingEntered:, draggingUpdated:, then performDragOperation: (or draggingExited: when
+  refused) of the view, with a stand-in NSDraggingInfo -> the effect (0 refused); None: no window
 
 ### `plat/web.rs`
 

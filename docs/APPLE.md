@@ -170,6 +170,46 @@ eines Unix-Sockets im Temp-Ordner des Simulators ist länger als die 104 Bytes v
 
 **Fertig, wenn:** `gallery`, `uitest` und `dndtest` mit ihren Skripten auf dem Mac grün sind.
 
+**Umgesetzt (2026-11-10), mit einer Änderung am Prüfkriterium:** `build_rs.py test gallery|uitest|dndtest --target mac`
+ist grün (42, 1 und 3 Skripte). Skripte laufen aber immer headless (`--script`), sie prüfen das AppKit-Backend gar
+nicht. Das übernehmen deshalb zwei Tests in echten Fenstern ohne Benutzer: `plattest --test window` (50 Prüfungen) und
+`plattest --test dnd` (49), dazu ein Lauf der echten Gallery mit `--auto-close`. Ereignisse gehen dabei nur an die
+eigenen Fenster (`[NSWindow sendEvent:]` oder direkt an die View), nichts erreicht den Ereignisstrom des Systems.
+
+- **Backend:** [`apple_mac.rs`](../lib/plat/apple_mac.rs) über die Objective-C-Laufzeit
+  ([`apple_objc.rs`](../lib/plat/apple_objc.rs): Klassen, Selektoren, `objc_msgSend` mit genauer Signatur pro Aufruf,
+  eigene Klassen mit Methoden und einer Instanzvariable). `NSApplication` mit der eigenen Schleife
+  (`nextEventMatchingMask` bis zur Frist, `wake()` über eine `CFRunLoopSource`, die ein anwendungsdefiniertes Ereignis
+  postet); jedes Fenster ein `NSWindow` mit eigener View `JFView` (gespiegelt, mit Layer) und eigenem Delegate. Das Bild
+  wird als `CGImage` Inhalt des Layers, die Größe ist Punkte mal `backingScaleFactor`. Ohne `PWF_SYSFRAME` reicht der
+  Inhalt unter eine durchsichtige Titelleiste ohne Knöpfe, `HB_DRAG` zieht das Fenster über
+  `performWindowDragWithEvent:`.
+- **Eingabe:** Maus, Rad (Trackpad fein: 3 pro Punkt, Mausrad 120 pro Zeile), die Pinch-Geste als Strg + Rad wie unter
+  Windows, Tasten als Windows-VK (Buchstaben und Ziffern nach dem Layout), Text und Eingabemethoden über
+  `NSTextInputClient` (`E_PREEDIT`, `E_IME_COMMIT`, das Kandidatenfenster am Caret). Command ist `MOD_CTRL`, Control
+  `MOD_SUPER`, Option `MOD_ALT`; ein Key-up mit Command reicht die Schleife selbst ans Fenster weiter.
+- **Fenster:** Popups als randlose, nicht aktivierende `NSPanel` mit runden Ecken und Schatten, Kindfenster des
+  Besitzers, ihre Eingabe kommt als Ereignis des Besitzers; Fenster mit Besitzer hängen als Kindfenster an ihm (über ihm,
+  ziehen mit); `win_enable`, eigene Cursor (`NSBitmapImageRep`), `CUR_NONE`; eigene Größenänderungen werden nicht
+  zurückgemeldet.
+- **System:** Zwischenablage (Text, HTML, RTF, PNG, Bilder: TIFF kommt als PNG an, ein BMP allein bekommt ein PNG dazu),
+  Öffnen- und Sichern-Dialog (`NSOpenPanel`, `NSSavePanel`, `FD_FOLDER` wählt einen Ordner), Drag and Drop in beide
+  Richtungen ([`apple_mac_dnd.rs`](../lib/plat/apple_mac_dnd.rs)), Monitore (`NSScreen`), Hell/Dunkel, Akzentfarbe, mehr
+  Kontrast, weniger Bewegung, Doppelklickzeit; ein Wechsel von Erscheinungsbild, Akzentfarbe oder Bildschirmen schickt
+  `E_SETTINGS`. Der Quell-Inspektor öffnet den Editor auch auf macOS.
+- **Bau und Start:** `gallery`, `uitest` und `dndtest` bauen für `mac`, `build_rs.py test NAME --target mac` geht.
+  Programme mit Fenstern, die per SSH starten, laufen über `tools/apple.py gui` in der angemeldeten Sitzung: `open`
+  startet ein kleines Bündel, dessen Skript das Programm im Repository startet und Ausgabe und Exit-Code zurückgibt.
+  `build_rs.py` nimmt diesen Weg selbst für Apps mit `ui`.
+- **Testhilfen** ([`apple_mac_test.rs`](../lib/plat/apple_mac_test.rs)): `win_test` mit `WT_SEND` (Maus, Tasten, Text,
+  Rad, Pinch an das eigene Fenster), `WT_MOVE` (der Benutzer verschiebt), Pixel des Layers, Popup-Lage und -Eingabe,
+  Elternfenster, Caret, Mindestgröße; `file_dialog_autoclose`; `dnd_test_formats` und `dnd_test_drop` (ein
+  Stellvertreter für `NSDraggingInfo`).
+- **Noch offen:** Der Test-Mac hängt an einem 1080p-Bildschirm (Skala 1), Retina ist also nur im Code berücksichtigt,
+  nicht geprüft. Tool-Fenster nehmen beim Klick die Tastatur (unter Windows nur ein Textfeld, auf macOS ginge das mit
+  `NSPanel`). Menüleiste, Cmd+Q, `E_POWER` und `E_SESSION_END` folgen mit AP7, Farbwähler und Bildschirmfoto
+  (`screen.rs`) später. Der Monitor des Test-Macs meldet keinen Namen.
+
 ### AP5: iOS (M)
 
 - Host in Rust über die Objective-C-Laufzeit: App-Delegate, View mit `CALayer`, Berührung und Apple Pencil,
@@ -234,8 +274,9 @@ mit Apple Silicon ist echte ARM-Hardware für die Prüfung der Atomics.
   jedem Bau, die Freigabe ginge jedes Mal verloren. Für solche Tests ein festes Zertifikat nehmen.
 - **Schlüsselbund über SSH gesperrt:** Signieren mit dem Entwicklerzertifikat scheitert per SSH
   (`errSecInternalComponent`), solange der Schlüsselbund dort nicht entsperrt ist. Ad hoc geht immer.
-- **Fenster aus SSH** erscheinen nur in der Sitzung des angemeldeten Nutzers, gestartet über `open` oder
-  `launchctl asuser`. Ob das für die Skripte reicht, zeigt AP0.
+- **Fenster aus SSH** erscheinen nur in der Sitzung des angemeldeten Nutzers. `launchctl asuser` braucht root, `open`
+  geht: `tools/apple.py gui` startet darüber ein Bündel, dessen Skript das Programm im Repository-Ordner startet (bei
+  LaunchServices ist der Arbeitsordner sonst `/`).
 - **iOS:** kein nachgeladener Code, keine fremden Prozesse, Hintergrund nur eingeschränkt. Die Agenten von
   BackupCraft gibt es dort nicht.
 - **Rosetta** als Übergang für x86-64 lohnt nicht: Apple hat angekündigt, es nach macOS 27 nur noch eingeschränkt
@@ -251,13 +292,25 @@ mit Apple Silicon ist echte ARM-Hardware für die Prüfung der Atomics.
   `sun_path` fasst 104 statt 108 Bytes. Abstrakte Socket-Namen gibt es nicht.
 - **`posix_spawn` statt `fork`:** In einem Prozess mit Threads ist `fork` unsicher, `posix_spawn` erledigt Umleitung,
   Prozessgruppe, Signale und das Schließen der übrigen Deskriptoren in einem Aufruf.
+- **Skripte sind headless:** `--script` öffnet nie ein Fenster. Grüne Gallery-Skripte sagen nichts über AppKit, das
+  prüfen `plattest --test window` und `--test dnd`.
+- **Kein `windowDidMove`,** wenn eine Größenänderung den Ursprung verschiebt (Ziehen an der oberen oder linken Kante,
+  `setFrame` mit neuer Lage und Größe). Das Backend vergleicht deshalb die Lage nach jeder Änderung selbst.
+- **Key-up mit Command** behält `NSApplication` für sich, es kommt nie beim Fenster an.
+- **Der Sichern-Dialog läuft in einem anderen Prozess:** `ok:` aus dem eigenen Code bewirkt nichts, `cancel:` schon. Die
+  Testhilfe beendet ihn mit `[NSApp stopModal]`.
+- **Benachrichtigungen wecken die Schleife nicht:** Ein Rückruf, der ein Ereignis einreiht, muss `wake()` auslösen, sonst
+  wartet `nextEventMatchingMask` weiter auf ein Ereignis von AppKit.
+- **Synthetische Mausbewegungen** schickt `[NSWindow sendEvent:]` an den First Responder, nicht an die View unter dem
+  Punkt; echte kommen über die Tracking-Area. Ein Panel hat keine View als First Responder.
+- **`clip_set_many`** nimmt nur Textformate (cliprich.rs), Bilder gehen über `clip_set`.
 
 ## Testen
 
 | Was | Wo | Grenze |
 |---|---|---|
 | Logik, `coretest`, `portabletest` | Terminal des Macs per SSH | keine |
-| Fenster macOS | angemeldete Sitzung auf dem Mac | Mac darf nicht schlafen, Freigaben (TCC) für Bildschirm und Eingabe |
+| Fenster macOS | angemeldete Sitzung auf dem Mac, per SSH über `tools/apple.py gui` | Mac darf nicht schlafen; Bildschirmfotos bräuchten eine Freigabe (TCC), die Tests lesen die Pixel des eigenen Layers |
 | iOS | Simulator per `xcrun simctl`, iPhone per `xcrun devicectl` | Gerät gekoppelt, entsperrt, Entwicklermodus; Signatur braucht den entsperrten Schlüsselbund |
 | Safari | Mac per `safaridriver`, iPhone per Web-Inspektor | `safaridriver --enable` einmal per Hand (Admin-Passwort) |
 | CI | macOS-Runner von GitHub | keine echten Geräte, nur Simulator |
