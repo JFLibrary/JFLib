@@ -476,7 +476,8 @@ fn drawn(t: &mut T, dev: &Device, level: &str, sc: &GScene, doc: &g::Document) -
     // (bilinear and trilinear textures in the scene: within 6, as in the texture tests)
     let c = cpu::compare_tol(&rs, &ref_camera(&cam), w, h, CLEAR8, &img, None, 6);
     t.ok(c.fine() && c.objects_seen as usize == imp.instances.len(), &format!("{level}: the scene drawn ({} instances, {} textures, a mirrored node, MASK) against the ray caster: {}", imp.instances.len(), imp.textures, c.text()));
-    t.ok(imp.notes.is_empty() && imp.sheared == 0, &format!("{level}: upload's notes: {:?}", imp.notes));
+    let tangents = imp.notes.len() == 1 && imp.notes[0].contains("MikkTSpace");
+    t.ok(tangents && imp.sheared == 0, &format!("{level}: upload's notes (the normal map's tangent frame only): {:?}", imp.notes));
     Some(())
 }
 

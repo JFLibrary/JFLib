@@ -116,6 +116,9 @@ pub fn upload(r: &mut Renderer, doc: &g::Document, scene: Option<usize>) -> Resu
         if m.double_sided {
             note(&mut out, String::from("double-sided materials are drawn from the front only"));
         }
+        if mat.normal_texture.is_some() {
+            note(&mut out, String::from("normal maps take the triangle's tangent frame from derivatives, not MikkTSpace (docs/RENDER3D.md)"));
+        }
         out.materials.push(r.add_material(&mat)?);
     }
     // (a Document's fields are public: one built by hand is checked here, not trusted)
