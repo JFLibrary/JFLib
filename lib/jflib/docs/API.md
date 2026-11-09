@@ -63,7 +63,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
-  <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
+  <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -19994,6 +19994,12 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`fn set_shadow_mask(&mut self, on: bool)`**
   (G5c) false: the shadow passes run without a fragment shader and MASK materials cast full shadows
   (what that saves: docs/RENDER3D.md); true at first: their holes let the sun through
+- **`fn set_environment(&mut self, d: &EnvironmentData) -> Result<()>`**
+  (G5c) the environment's light: a procedural sky or six faces, prefiltered on the CPU (the levels of a
+  cube texture per roughness, 9 harmonics for the diffuse part); scenes take it with
+  Scene::set_environment.  The upload goes with the next submission
+- **`fn environment(&self) -> Option<&Environment>`**
+  (G5c; tests, tools) the environment as the GPU holds it
 - **`fn shadow_map(&self) -> &Texture`**
   (G5c; tests) the sun's shadow map: CASCADES_MAX layers of Depth32Float, in Layout::Sampled between frames
 - **`fn add_mesh(&mut self, m: &MeshData) -> Result<MeshId>`**
@@ -20043,6 +20049,69 @@ DFG: [[f32; 2]; DFG_N * DFG_N] = { let mut out = [[0.0f32; 2]; DFG_N * DFG_N]; l
 
 - **`fn dfg_table() -> Vec<[f32; 2]>`**
   the table computed (what dfg_table.rs holds; slow: some 4 million samples)
+
+### `render3d/env.rs`
+
+Source: [`lib/render3d/env.rs`](../lib/render3d/env.rs)
+
+```text
+env -- the environment's light (G5c; docs/RENDER3D.md "Umgebungslicht"): diffuse through 9 spherical harmonics
+(the irradiance's coefficients, in the lights' uniform block: no texture slot), specular through a cube texture
+prefiltered per roughness (level k holds roughness k / (levels - 1)) read with the split-sum's table (dfg.rs).
+The source is a procedural sky or the caller's six faces of linear radiance (RGBA f32); levels down to 4 x 4.  Everything is made on
+the CPU in f64 when it is set: level 0 is the source, every further level a GGX convolution with N = V = R
+(importance sampling of the half vector, 128 points of the Hammersley set; a face source is read at the level
+of its own box-filtered chain the sample's solid angle asks for), the harmonics from the source's texels
+weighted by their solid angle (a sky through a 32 x 32 grid per face), times the cosine lobe's factors
+(Ramamoorthi and Hanrahan).  Uploaded as Rgba16Float with every level.
+
+Faces in Vulkan's order: +x, -x, +y, -y, +z, -z; texel (i, j) of face f looks along the direction Vulkan's
+face selection maps to it (env_dir).
+```
+
+```rust
+/// texels a side of a sky's level 0
+SKY_SIZE: u32 = 64
+```
+
+- **`struct Sky`**
+  a procedural sky: linear radiance; smooth everywhere (a glow, no sharp sun disc)
+  - `zenith: [f32; 3]`
+  - `horizon: [f32; 3]`
+  - `ground: [f32; 3]`
+  - `sun: [f64; 3]` -- towards the sun's glow (any length), its colour at the centre, falling off as cos^8
+  - `glow: [f32; 3]`
+
+**`impl Sky`**
+
+- **`const DEFAULT: Sky = Sky { zenith: [0.25, 0.45, 0.9], horizon: [0.8, 0.85, 0.9 ...`**
+- **`fn radiance(&self, d: V3) -> [f64; 3]`**
+  the radiance along a unit vector
+
+- **`enum EnvironmentData<'a>`**
+  what Renderer::set_environment takes
+  - `Sky(Sky)`
+  - `Faces { size: u32, rgba: [&'a [f32]; 6] }` -- six faces of size x size texels (a power of two, 4 ..= 1024), rows from the top, RGBA f32 linear radiance
+    (alpha unused; RGBE, half floats and the like converted by the caller)
+
+- **`struct Environment`**
+  the environment as the GPU holds it (tests, tools): each level's six faces, RGBA as f32 of the half floats
+  uploaded, and the irradiance's harmonics (divided by pi: what a white matte surface shows)
+  - `size: u32`
+  - `levels: Vec<Vec<[f32; 4]>>`
+  - `sh: [[f32; 3]; 9]`
+
+- **`fn env_dir(f: usize, s: f64, t: f64) -> V3`**
+  the unit vector of a point (s, t) in 0 ..= 1 of face f (Vulkan's face selection, inverted)
+
+- **`fn env_face(d: V3) -> (usize, f64, f64)`**
+  the face and (s, t) a unit vector falls on (Vulkan's face selection)
+
+- **`fn to_half(v: f32) -> u16`**
+  an f32 as IEEE half (nearest, ties to even; large values to infinity, which radiance never reaches here)
+
+- **`fn from_half(h: u16) -> f32`**
+  a half as f32
 
 ### `render3d/gltf.rs`
 
@@ -20278,6 +20347,9 @@ commands without a barrier against the frames still on the GPU.
 - **`fn set_shadows(&mut self, s: Option<&Shadows>) -> Result<()>`**
   (G5c) the sun's shadows, None (at first) for none; Invalid for values out of range
 - **`fn shadows(&self) -> Option<Shadows>`**
+- **`fn set_environment(&mut self, k: Option<f32>)`**
+  (G5c) Some(k): the renderer's environment (Renderer::set_environment) times k lights the scene in place of
+  Sun::ambient (until it has one, Sun::ambient does); None (at first): Sun::ambient
 - **`fn set_lights(&mut self, lights: &[Light]) -> Result<()>`**
   (G5c) the point and spot lights (all of them: they go up with the next frame); Invalid for values out of
   range, and nothing changes then

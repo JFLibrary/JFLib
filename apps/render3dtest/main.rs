@@ -29,6 +29,8 @@
 //                    and in the map read back (shadowtest.rs)
 //        lights      (G5c) point and spot lights against the ray caster (falloff, range, cone; 64 at once, HDR,
 //                    changes, 1e7, refusals) and KHR_lights_punctual in lib/gltf: read, placed, drawn, broken (lighttest.rs)
+//        env         (G5c) the environment's light: the sky's harmonics and prefiltered levels on the CPU, balls in the
+//                    sky against the ray caster, a white furnace, the caller's faces, switched off (envtest.rs)
 //        all         all of the above
 //        window      a real window (one, briefly; not in `all`): the presented image = the offscreen image
 //   render3dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--warmup W] [--inflight K] [--basis]
@@ -62,6 +64,8 @@ mod bench;
 mod gltftest;
 #[cfg(not(target_arch = "wasm32"))]
 mod pbr;
+#[cfg(not(target_arch = "wasm32"))]
+mod envtest;
 #[cfg(not(target_arch = "wasm32"))]
 mod lighttest;
 #[cfg(not(target_arch = "wasm32"))]

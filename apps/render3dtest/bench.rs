@@ -99,6 +99,8 @@ pub fn bench(n: u32, validate: bool) -> i32 {
     let shadow_mask = num("--shadow-mask", 1) != 0;
     // (G5c) --lights N point lights spread over the scene, range an eighth of its extent
     let lights = num("--lights", 0);
+    // (G5c) --env 1: the procedural sky lights the scene
+    let env = num("--env", 0) != 0;
     let args = plat::args();
     let (basis, verify) = (args.iter().any(|a| a == "--basis"), args.iter().any(|a| a == "--verify"));
     let Some(g) = setup(&mut t) else { return (t.fails > 0) as i32 };
@@ -106,7 +108,7 @@ pub fn bench(n: u32, validate: bool) -> i32 {
     let Some(dev) = t.res(g.adapter.create_device(&desc), "device") else { return 1 };
     out(&format!("{} ({}), level {:?}", dev.info().name, dev.info().driver_info, dev.level()));
     let sh = if shadows > 0 { Some((shadow, shadow_mask)) } else { None };
-    if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size, sh, lights).is_none() && t.fails == 0 {
+    if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size, sh, lights, env).is_none() && t.fails == 0 {
         t.ok(false, "the run stopped");
     }
     if validate {
@@ -118,7 +120,7 @@ pub fn bench(n: u32, validate: bool) -> i32 {
 
 #[allow(clippy::too_many_arguments)]
 fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: usize, k: usize, moved: usize, meshes: usize, verify: bool, textures: usize, tex_size: u32,
-       shadows: Option<(render3d::Shadows, bool)>, lights: usize) -> Option<()> {
+       shadows: Option<(render3d::Shadows, bool)>, lights: usize, env: bool) -> Option<()> {
     let extent = sb::extent_for(n);
     let push = sb::Push { time: 0.0, count: n, seed: 1, extent, object_index: 0 };
     let objs = sb::move_all(&push);
@@ -157,6 +159,11 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     let mut s = t.res(Scene::new(&r), "Scene::new")?;
     let amb = 0.25f32;
     s.set_sun(&Sun { direction: [0.3, 0.8, 0.5], color: [(1.0 - amb) * core::f32::consts::PI; 3], ambient: [amb; 3] });
+    if env {
+        t.res(r.set_environment(&render3d::EnvironmentData::Sky(render3d::Sky::DEFAULT)), "set_environment")?;
+        s.set_environment(Some(1.0));
+        out("  the procedural sky lights the scene");
+    }
     if lights > 0 {
         let mut lr = Rng(321);
         let e = extent as f64 * 0.5;

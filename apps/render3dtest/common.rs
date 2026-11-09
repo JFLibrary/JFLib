@@ -408,7 +408,7 @@ pub fn tex_gallery(r: &mut Renderer) -> Result<Scene> {
 // ---------------------------------------------------------------- the galleries of G5c
 
 /// the galleries that came with G5c, by name, after the five above: every path must draw them alike
-pub const LATER: [&str; 3] = ["pbr", "shadow", "lights"];
+pub const LATER: [&str; 4] = ["pbr", "shadow", "lights", "env"];
 
 /// one of LATER in a fresh renderer of its own
 pub fn later_gallery(name: &str, r: &mut Renderer) -> Result<Scene> {
@@ -416,6 +416,7 @@ pub fn later_gallery(name: &str, r: &mut Renderer) -> Result<Scene> {
         "pbr" => pbr_gallery(r),
         "shadow" => shadow_gallery(r),
         "lights" => lights_gallery(r),
+        "env" => env_gallery(r),
         _ => Err(GpuError::Invalid("no such gallery")),
     }
 }
@@ -615,6 +616,25 @@ pub fn lights_gallery(r: &mut Renderer) -> Result<Scene> {
         let id = r.add_material(m)?;
         sc.add(Instance { material: id, ..spec.instance() })?;
     }
+    Ok(sc)
+}
+
+/// (G5c) balls dielectric and metallic, smooth to rough, a ground, in the procedural sky with the sun
+pub fn env_gallery(r: &mut Renderer) -> Result<Scene> {
+    let ball = r.add_mesh(&ball(20, 28).data())?;
+    let plate = r.add_mesh(&plate().data())?;
+    r.set_environment(&render3d::EnvironmentData::Sky(render3d::Sky::DEFAULT))?;
+    let mut sc = Scene::new(r)?;
+    sc.set_camera(&Camera::look_at([0.0, 2.0, 11.0], [0.0, 0.0, 0.0], [0.0, 1.0, 0.0], 1.0, GALLERY_W as f64 / GALLERY_H as f64, 0.1, f64::INFINITY));
+    sc.set_sun(&Sun { direction: [0.3, 0.8, 0.5], color: [2.0; 3], ambient: [0.0; 3] });
+    sc.set_environment(Some(1.0));
+    for i in 0..8u32 {
+        let c = [[0.9f32, 0.9, 0.9], [0.9, 0.5, 0.3], [0.3, 0.8, 0.4], [0.5, 0.6, 0.95]][(i % 4) as usize];
+        let m = r.add_material(&Material { metallic: (i / 4) as f32, roughness: (i % 4) as f32 / 3.0, ..Material::color(c[0], c[1], c[2]) })?;
+        sc.add(Instance { mesh: ball, material: m, transform: Transform { pos: [(i % 4) as f64 * 2.5 - 3.75, 2.4 - (i / 4) as f64 * 2.5, 0.0], rot: [0.0, 0.0, 0.0, 1.0], scale: [1.1; 3] } })?;
+    }
+    let ground = r.add_material(&Material { roughness: 0.7, ..Material::color(0.6, 0.6, 0.6) })?;
+    sc.add(Instance { mesh: plate, material: ground, transform: Transform { pos: [0.0, -1.5, 0.0], rot: quat([1.0, 0.0, 0.0], -core::f64::consts::FRAC_PI_2), scale: [9.0, 5.0, 1.0] } })?;
     Ok(sc)
 }
 

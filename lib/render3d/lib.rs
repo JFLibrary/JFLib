@@ -41,6 +41,7 @@ use core::sync::atomic::{AtomicU32, Ordering};
 use gpu::*;
 
 mod dfg;
+mod env;
 pub mod gltf;
 pub mod math;
 mod scene;
@@ -48,6 +49,7 @@ mod shadow;
 mod texture;
 
 pub use dfg::{DFG, DFG_N, dfg_table};
+pub use env::{Environment, EnvironmentData, SKY_SIZE, Sky, env_dir, env_face, from_half, to_half};
 pub use shadow::{CASCADES_MAX, Cascade, Shadows};
 pub use scene::{Camera, FrameStats, Instance, InstanceId, Light, LightKind, ListInfo, Scene, Sun, Tonemap, Transform, UploadInfo};
 pub use texture::{CLASSES, CLASS_MAX, CLASS_MIN, Mip, Sampling, TextureData, TextureId, TextureInfo, TextureRef, Wrap, class_of, mip_chain};
@@ -58,12 +60,13 @@ pub const DEPTH_CLEAR: f32 = 0.0;
 pub const FRAMES_MAX: usize = 3;
 
 pub(crate) const VIEW_BYTES: u64 = 176;
-/// draw.wgsl's Lights: sun, ambient, exposure, tone mapper, shadows, 4 cascades of 64 bytes
-pub(crate) const LIGHTS_BYTES: u64 = 320;
+/// draw.wgsl's Lights: sun, ambient, exposure, tone mapper, shadows, 4 cascades of 64 bytes, the environment
+/// and its 9 harmonics
+pub(crate) const LIGHTS_BYTES: u64 = 480;
 /// where the lights lie in a frame's staging buffer (behind the view)
 pub(crate) const LIGHTS_AT: u64 = 256;
 /// (G5c) where the cascades' views lie in it, and how far apart
-pub(crate) const CASCADE_AT: u64 = 576;
+pub(crate) const CASCADE_AT: u64 = 736;
 pub(crate) const CASCADE_STRIDE: u64 = 192;
 /// timestamps per frame: start, uploads, the camera's culling, 4 cascades' culling, 4 depth passes, the end
 pub(crate) const STAMPS: u32 = 12;
@@ -268,6 +271,8 @@ pub struct Renderer {
     shadow_mask: RenderPipeline,
     mask_in_shadow: bool,
     pub(crate) shadow: shadow::ShadowMap,
+    /// (G5c) the environment as the GPU holds it, None before set_environment
+    pub(crate) env: Option<Environment>,
     pub(crate) textures: texture::Textures,
     pub(crate) cull_layout: BindGroupLayout,
     pub(crate) scatter_layout: BindGroupLayout,
@@ -417,6 +422,7 @@ impl Renderer {
             shadow_mask,
             mask_in_shadow: true,
             shadow,
+            env: None,
             textures,
             cull_layout,
             scatter_layout,
@@ -442,6 +448,23 @@ impl Renderer {
     /// (what that saves: docs/RENDER3D.md); true at first: their holes let the sun through
     pub fn set_shadow_mask(&mut self, on: bool) {
         self.mask_in_shadow = on;
+    }
+
+    /// (G5c) the environment's light: a procedural sky or six faces, prefiltered on the CPU (the levels of a
+    /// cube texture per roughness, 9 harmonics for the diffuse part); scenes take it with
+    /// Scene::set_environment.  The upload goes with the next submission
+    pub fn set_environment(&mut self, d: &EnvironmentData) -> Result<()> {
+        let (size, levels, sh) = env::build(d)?;
+        let (tex, held) = env::upload(&self.dev, size, &levels)?;
+        self.shadow.set_env(&self.dev, tex)?;
+        let sh = sh.map(|c| [c[0] as f32, c[1] as f32, c[2] as f32]);
+        self.env = Some(Environment { size, levels: held, sh });
+        Ok(())
+    }
+
+    /// (G5c; tests, tools) the environment as the GPU holds it
+    pub fn environment(&self) -> Option<&Environment> {
+        self.env.as_ref()
     }
 
     /// (G5c; tests) the sun's shadow map: CASCADES_MAX layers of Depth32Float, in Layout::Sampled between frames

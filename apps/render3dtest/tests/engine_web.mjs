@@ -15,7 +15,7 @@ import {loadPlaywright, chromiumOptions} from '../../../tools/tests/playwright.m
 
 const args=process.argv.slice(2), build=resolve(args.find(a=>!a.startsWith('--')) || 'build');
 const option=(name,fallback)=>args.find(a=>a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
-const WIDTH=320, HEIGHT=180, NAMES=['mix','changed','far','tex','gltf','pbr','shadow','lights'];
+const WIDTH=320, HEIGHT=180, NAMES=['mix','changed','far','tex','gltf','pbr','shadow','lights','env'];
 // The two paths differ in their shader compilers, so a colour may round the other way; more than this
 // is a real difference (the numbers of a run stand in docs/RENDER3D.md)
 const MAX_DELTA=Number(option('max-delta','2')), MAX_SHARE=Number(option('max-share','0.01'));

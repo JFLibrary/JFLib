@@ -57,12 +57,16 @@ struct Cascade {
 // for the neutral tone mapper, 0 for none; ambient: the radiance of a uniform environment; shadow.x the
 // sun's cascades (0: no shadows), shadow.y texels a side of each cascade's map, shadow.z the point and spot
 // lights
+// env.x the environment's strength (0: Sun::ambient instead), env.y its cube's top level; sh the irradiance's
+// 9 harmonics divided by pi
 struct Lights {
     sun_dir: vec4f,
     sun_color: vec4f,
     ambient: vec4f,
     shadow: vec4f,
     cascades: array<Cascade, 4>,
+    env: vec4f,
+    sh: array<vec4f, 9>,
 }
 
 // 80 bytes: glTF's metallic-roughness material.  alpha_cutoff < 0: opaque.  Texture words (u32::MAX: none):
@@ -134,6 +138,9 @@ struct Punctual {
 // the sun's cascades in the layers of one depth array (reverse Z), compared by a linear comparison sampler
 @group(2) @binding(0) var shadow_map: texture_depth_2d_array;
 @group(2) @binding(1) var shadow_cmp: sampler_comparison;
+// (G5c) the environment's cube, level k prefiltered for roughness k / top (env.rs)
+@group(2) @binding(2) var env_cube: texture_cube<f32>;
+@group(2) @binding(3) var env_smp: sampler;
 var<immediate> pc: Push;
 
 const NO_TEXTURE: u32 = 0xffffffffu;
@@ -432,6 +439,14 @@ fn env_ab(roughness: f32, nv: f32) -> vec2f {
     return mix(mix(dfg[k], dfg[k + 1u], fx), mix(dfg[k + 32u], dfg[k + 33u], fx), fy);
 }
 
+// the environment's irradiance over pi at a unit normal: its 9 harmonics (a polynomial, no texture)
+fn sh_irradiance(n: vec3f) -> vec3f {
+    let c = lights.sh;
+    return c[0].xyz * 0.282095 + c[1].xyz * (0.488603 * n.y) + c[2].xyz * (0.488603 * n.z) + c[3].xyz * (0.488603 * n.x)
+        + c[4].xyz * (1.092548 * n.x * n.y) + c[5].xyz * (1.092548 * n.y * n.z) + c[6].xyz * (0.315392 * (3.0 * n.z * n.z - 1.0))
+        + c[7].xyz * (1.092548 * n.x * n.z) + c[8].xyz * (0.546274 * (n.x * n.x - n.y * n.y));
+}
+
 // Khronos PBR Neutral: base colours stay as they are below 0.76, highlights are compressed towards white
 fn neutral(c: vec3f) -> vec3f {
     let x = min(c.x, min(c.y, c.z));
@@ -526,7 +541,14 @@ fn fs(f: VsOut) -> @location(0) vec4f {
     // the uniform environment: what the specular lobe does not take goes to the diffuse
     let ab = env_ab(roughness, clamp(dot(n, v), 0.0, 1.0));
     let spec = f0 * ab.x + ab.y;
-    light = light + lights.ambient.xyz * (spec + c_diff * (1.0 - spec)) * ao + emissive;
+    // (G5c) or the environment: its harmonics for the diffuse part, its prefiltered cube along the reflection
+    var diffuse = lights.ambient.xyz;
+    var specular = lights.ambient.xyz;
+    if lights.env.x > 0.0 {
+        diffuse = sh_irradiance(n) * lights.env.x;
+        specular = textureSampleLevel(env_cube, env_smp, reflect(-v, n), roughness * lights.env.y).xyz * lights.env.x;
+    }
+    light = light + (specular * spec + diffuse * c_diff * (1.0 - spec)) * ao + emissive;
     var out = light * lights.sun_dir.w;
     if lights.sun_color.w != 0.0 {
         out = neutral(out);

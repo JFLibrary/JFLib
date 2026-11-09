@@ -168,13 +168,16 @@ impl Cascade {
     }
 }
 
-/// the renderer's shadow map and group 2
+/// the renderer's shadow map, its environment's cube (G5c) and group 2
 pub(crate) struct ShadowMap {
     pub tex: Texture,
     pub layers: Vec<TextureView>,
     array: TextureView,
     pub size: u32,
     sampler: Sampler,
+    env: Texture,
+    env_view: TextureView,
+    env_sampler: Sampler,
     pub layout: BindGroupLayout,
     pub group: BindGroup,
 }
@@ -184,11 +187,25 @@ impl ShadowMap {
         let layout = dev.create_bind_group_layout(&[
             Binding { binding: 0, kind: BindingKind::Texture, stages: Stages::FRAGMENT },
             Binding { binding: 1, kind: BindingKind::Sampler, stages: Stages::FRAGMENT },
+            Binding { binding: 2, kind: BindingKind::Texture, stages: Stages::FRAGMENT },
+            Binding { binding: 3, kind: BindingKind::Sampler, stages: Stages::FRAGMENT },
         ])?;
         let sampler = dev.create_sampler(&SamplerDesc { compare: Some(Compare::GreaterEqual), mip: Filter::Nearest, ..SamplerDesc::LINEAR })?;
+        let env_sampler = dev.create_sampler(&SamplerDesc::LINEAR)?;
+        let env = crate::env::placeholder(dev)?;
+        let env_view = env.create_view(&ViewDesc { dim: ViewDim::Cube, base_mip: 0, mips: 0, base_layer: 0, layers: 0 })?;
         let (tex, layers, array) = ShadowMap::texture(dev, 1)?;
-        let group = ShadowMap::make_group(dev, &layout, &array, &sampler)?;
-        Ok(ShadowMap { tex, layers, array, size: 1, sampler, layout, group })
+        let group = ShadowMap::make_group(dev, &layout, &array, &sampler, &env_view, &env_sampler)?;
+        Ok(ShadowMap { tex, layers, array, size: 1, sampler, env, env_view, env_sampler, layout, group })
+    }
+
+    /// (G5c) a new environment cube (the old one goes when the GPU is done with it)
+    pub fn set_env(&mut self, dev: &Device, env: Texture) -> Result<()> {
+        let view = env.create_view(&ViewDesc { dim: ViewDim::Cube, base_mip: 0, mips: 0, base_layer: 0, layers: 0 })?;
+        self.group = ShadowMap::make_group(dev, &self.layout, &self.array, &self.sampler, &view, &self.env_sampler)?;
+        self.env = env;
+        self.env_view = view;
+        Ok(())
     }
 
     /// a map of size x size x CASCADES_MAX, cleared and left in Layout::Sampled (its own submission)
@@ -210,8 +227,9 @@ impl ShadowMap {
         Ok((tex, layers, array))
     }
 
-    fn make_group(dev: &Device, layout: &BindGroupLayout, array: &TextureView, sampler: &Sampler) -> Result<BindGroup> {
-        dev.create_bind_group(&BindGroupDesc { layout, entries: &[BindEntry { binding: 0, resource: Resource::Texture(array) }, BindEntry { binding: 1, resource: Resource::Sampler(sampler) }] })
+    fn make_group(dev: &Device, layout: &BindGroupLayout, array: &TextureView, sampler: &Sampler, env: &TextureView, env_sampler: &Sampler) -> Result<BindGroup> {
+        dev.create_bind_group(&BindGroupDesc { layout, entries: &[BindEntry { binding: 0, resource: Resource::Texture(array) }, BindEntry { binding: 1, resource: Resource::Sampler(sampler) },
+                                                                 BindEntry { binding: 2, resource: Resource::Texture(env) }, BindEntry { binding: 3, resource: Resource::Sampler(env_sampler) }] })
     }
 
     /// a map of this size (a new one, the old one goes when the GPU is done with it)
@@ -220,7 +238,7 @@ impl ShadowMap {
             return Ok(());
         }
         let (tex, layers, array) = ShadowMap::texture(dev, size)?;
-        self.group = ShadowMap::make_group(dev, &self.layout, &array, &self.sampler)?;
+        self.group = ShadowMap::make_group(dev, &self.layout, &array, &self.sampler, &self.env_view, &self.env_sampler)?;
         self.tex = tex;
         self.layers = layers;
         self.array = array;

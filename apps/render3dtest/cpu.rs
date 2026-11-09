@@ -515,6 +515,111 @@ pub struct RefScene {
     pub shadows: bool,
     /// (G5c) point and spot lights, no shadows
     pub lights: Vec<RefLight>,
+    /// (G5c) the environment in place of the uniform ambient light
+    pub env: Option<RefEnv>,
+}
+
+/// (G5c) the environment as the GPU holds it (data like a texture's texels): the irradiance's harmonics over pi,
+/// the cube's levels; sampled as Vulkan defines cube maps (face selection, bilinear across face edges, linear
+/// between levels), written here from the specification
+pub struct RefEnv {
+    pub k: f64,
+    pub sh: [[f64; 3]; 9],
+    pub size: u32,
+    pub levels: Vec<Vec<[f32; 4]>>,
+}
+
+/// Vulkan's cube face selection: (face, s, t)
+pub fn cube_face(d: V) -> (usize, f64, f64) {
+    let (ax, ay, az) = (d[0].abs(), d[1].abs(), d[2].abs());
+    let (f, sc, tc, ma) = if ax >= ay && ax >= az {
+        if d[0] >= 0.0 { (0, -d[2], -d[1], ax) } else { (1, d[2], -d[1], ax) }
+    } else if ay >= az {
+        if d[1] >= 0.0 { (2, d[0], d[2], ay) } else { (3, d[0], -d[2], ay) }
+    } else if d[2] >= 0.0 {
+        (4, d[0], -d[1], az)
+    } else {
+        (5, -d[0], -d[1], az)
+    };
+    (f, 0.5 * (sc / ma + 1.0), 0.5 * (tc / ma + 1.0))
+}
+
+/// the (unnormalized) direction of face coordinates sc, tc in -1 ..= 1 (and beyond, past the face's edge)
+fn face_point(f: usize, sc: f64, tc: f64) -> V {
+    match f {
+        0 => [1.0, -tc, -sc],
+        1 => [-1.0, -tc, sc],
+        2 => [sc, 1.0, tc],
+        3 => [sc, -1.0, -tc],
+        4 => [sc, -tc, 1.0],
+        _ => [-sc, -tc, -1.0],
+    }
+}
+
+impl RefEnv {
+    /// irradiance over pi at a unit normal
+    pub fn irradiance(&self, n: V) -> [f64; 3] {
+        let (x, y, z) = (n[0], n[1], n[2]);
+        let b = [0.282095, 0.488603 * y, 0.488603 * z, 0.488603 * x, 1.092548 * x * y, 1.092548 * y * z, 0.315392 * (3.0 * z * z - 1.0), 1.092548 * x * z,
+                 0.546274 * (x * x - y * y)];
+        let mut out = [0.0; 3];
+        for k in 0..9 {
+            for c in 0..3 {
+                out[c] += self.sh[k][c] * b[k];
+            }
+        }
+        out
+    }
+
+    /// texel (i, j) of face f at a level; beyond the face's edge the texel of the face its centre's direction
+    /// falls on, beyond a corner the mean of the three texels there (Vulkan's cube map edge handling)
+    fn texel(&self, l: usize, f: usize, i: i64, j: i64) -> [f64; 3] {
+        let n = (self.size as i64 >> l).max(1);
+        let (out_i, out_j) = (i < 0 || i >= n, j < 0 || j >= n);
+        if out_i && out_j {
+            let (ci, cj) = (i.clamp(0, n - 1), j.clamp(0, n - 1));
+            let (a, b, c) = (self.texel(l, f, ci, cj), self.texel(l, f, i, cj), self.texel(l, f, ci, j));
+            return [(a[0] + b[0] + c[0]) / 3.0, (a[1] + b[1] + c[1]) / 3.0, (a[2] + b[2] + c[2]) / 3.0];
+        }
+        let (f, i, j) = if i < 0 || j < 0 || i >= n || j >= n {
+            let d = face_point(f, 2.0 * (i as f64 + 0.5) / n as f64 - 1.0, 2.0 * (j as f64 + 0.5) / n as f64 - 1.0);
+            let (g, s, t) = cube_face(d);
+            (g, (floor(s * n as f64) as i64).clamp(0, n - 1), (floor(t * n as f64) as i64).clamp(0, n - 1))
+        } else {
+            (f, i, j)
+        };
+        let p = self.levels[l][(f as i64 * n * n + j * n + i) as usize];
+        [p[0] as f64, p[1] as f64, p[2] as f64]
+    }
+
+    fn bilinear(&self, l: usize, d: V) -> [f64; 3] {
+        let (f, s, t) = cube_face(d);
+        let n = (self.size >> l).max(1) as f64;
+        let (u, v) = (s * n - 0.5, t * n - 0.5);
+        let (i, j) = (floor(u), floor(v));
+        let (a, b) = (u - i, v - j);
+        let (i, j) = (i as i64, j as i64);
+        let (t00, t10, t01, t11) = (self.texel(l, f, i, j), self.texel(l, f, i + 1, j), self.texel(l, f, i, j + 1), self.texel(l, f, i + 1, j + 1));
+        let mut out = [0.0; 3];
+        for k in 0..3 {
+            out[k] = (t00[k] * (1.0 - a) + t10[k] * a) * (1.0 - b) + (t01[k] * (1.0 - a) + t11[k] * a) * b;
+        }
+        out
+    }
+
+    /// the prefiltered radiance along d at a level (linear between levels)
+    pub fn specular(&self, d: V, lod: f64) -> [f64; 3] {
+        let top = (self.levels.len() - 1) as f64;
+        let l = lod.clamp(0.0, top);
+        let l0 = floor(l);
+        let a = self.bilinear(l0 as usize, d);
+        if l0 >= top {
+            return a;
+        }
+        let b = self.bilinear(l0 as usize + 1, d);
+        let t = l - l0;
+        [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+    }
 }
 
 /// (G5c) a point or spot light as KHR_lights_punctual defines it
@@ -581,7 +686,8 @@ pub struct Quad {
 
 impl RefScene {
     pub fn new(sun_dir: V, sun: [f64; 3], ambient: [f64; 3]) -> RefScene {
-        RefScene { tris: Vec::new(), inst: Vec::new(), textures: Vec::new(), sun_dir: norm(sun_dir), sun, ambient, exposure: 1.0, tonemap: true, shadows: false, lights: Vec::new() }
+        RefScene { tris: Vec::new(), inst: Vec::new(), textures: Vec::new(), sun_dir: norm(sun_dir), sun, ambient, exposure: 1.0, tonemap: true, shadows: false, lights: Vec::new(),
+                   env: None }
     }
 
     /// an instance of one colour: its triangles in the world
@@ -744,11 +850,20 @@ impl RefScene {
                 }
             }
         }
+        let (mut diffuse, mut specular) = (self.ambient, self.ambient);
+        if let Some(env) = &self.env {
+            let e = env.irradiance(sf.n);
+            let nv = dot(sf.n, v);
+            let r = sub(mul(sf.n, 2.0 * nv), v);
+            let s = env.specular(r, sf.roughness * (env.levels.len() - 1) as f64);
+            diffuse = [e[0] * env.k, e[1] * env.k, e[2] * env.k];
+            specular = [s[0] * env.k, s[1] * env.k, s[2] * env.k];
+        }
         let (mut out, mut sun_part) = ([0.0; 3], [0.0; 3]);
         for k in 0..3 {
             let spec = f0[k] * sa + sb;
             sun_part[k] = sun[k] * self.sun[k] * self.exposure;
-            out[k] = (self.ambient[k] * (spec + c_diff[k] * (1.0 - spec)) * sf.ao + sf.emissive[k] + punctual[k]) * self.exposure + sun_part[k] * vis;
+            out[k] = ((specular[k] * spec + diffuse[k] * c_diff[k] * (1.0 - spec)) * sf.ao + sf.emissive[k] + punctual[k]) * self.exposure + sun_part[k] * vis;
         }
         (out, sun_part)
     }

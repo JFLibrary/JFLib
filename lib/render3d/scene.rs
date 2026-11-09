@@ -320,6 +320,8 @@ pub struct Scene {
     sun: Sun,
     shadows: Option<Shadows>,
     cascade_info: Vec<Cascade>,
+    /// (G5c) the renderer's environment times this instead of Sun::ambient
+    environment: Option<f32>,
     /// (G5c) the point and spot lights; their buffer, its room, whether they go up with the next frame
     punctual: Vec<Light>,
     pub(crate) punctual_buf: Buffer,
@@ -464,6 +466,7 @@ impl Scene {
             sun: Sun::DEFAULT,
             shadows: None,
             cascade_info: Vec::new(),
+            environment: None,
             punctual: Vec::new(),
             punctual_buf,
             punctual_cap,
@@ -706,6 +709,12 @@ impl Scene {
 
     pub fn shadows(&self) -> Option<Shadows> {
         self.shadows
+    }
+
+    /// (G5c) Some(k): the renderer's environment (Renderer::set_environment) times k lights the scene in place of
+    /// Sun::ambient (until it has one, Sun::ambient does); None (at first): Sun::ambient
+    pub fn set_environment(&mut self, k: Option<f32>) {
+        self.environment = k.filter(|v| v.is_finite() && *v >= 0.0);
     }
 
     /// (G5c) the point and spot lights (all of them: they go up with the next frame); Invalid for values out of
@@ -1103,6 +1112,14 @@ impl Scene {
         };
         lights[12] = self.cascade_info.len() as f32;
         lights[13] = self.shadows.map_or(1.0, |sh| sh.size as f32);
+        // (G5c) the environment: on (its strength), its cube's top level, the harmonics
+        if let (Some(k), Some(env)) = (self.environment, &r.env) {
+            lights[80] = k.max(1e-30);
+            lights[81] = (env.levels.len() - 1) as f32;
+            for (i, c) in env.sh.iter().enumerate() {
+                lights[84 + i * 4..87 + i * 4].copy_from_slice(c);
+            }
+        }
         // (G5c) the point and spot lights, when they changed (or the origin did, or what went up was lost)
         lights[14] = self.punctual.len() as f32;
         self.punctual_up = 0;

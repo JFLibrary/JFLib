@@ -21,12 +21,16 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **render3d:** Mirrored instances: a transform with a negative determinant goes to its mesh's list of mirrored instances, drawn by a second pipeline with clockwise front faces and correct normals; negative scales are no longer Invalid
 - **render3d:** render3d::gltf::upload puts a jflib-gltf Document on the GPU: its primitives as meshes, its images as textures, its materials, and the instances of a scene for Scene::add; render3dtest tests textures, mirroring and glTF against the ray caster and in the browser
 
+- **render3d:** PBR after glTF 2.0 Appendix B (GGX, separable Smith, Schlick) with all five textures (normal maps on a tangent frame from derivatives), exposure and Khronos PBR Neutral in the fragment shader (Scene::set_exposure, set_tonemap), the split-sum's second sum from an embedded table (DFG); cascaded shadow maps of the sun (Scene::set_shadows, Shadows: up to four cascades culled on the GPU, snapped to the texel grid, PCF, MASK's holes); point and spot lights after KHR_lights_punctual (Scene::set_lights, Light); environment light from 9 spherical harmonics and a prefiltered cube (Renderer::set_environment with a procedural Sky or six faces, Scene::set_environment); render3d::gltf::upload returns lights and suns (docs/RENDER3D.md)
+- **gltf:** KHR_lights_punctual: Document::lights, Node::light, lights_of(scene), Limits::lights; the extension may stand in extensionsRequired (docs/GLTF.md)
+
 ### Changed
 
 - **gpu:** Validation with jfgui_GPU_VALIDATE now also checks what shaders read and write through their bindings (syncval_shader_accesses_heuristic, off in the layer by default): a missing barrier between two shaders no longer goes unreported
 - The guide and the README install `cargo-jflib` from crates.io; the hint to install it from a checkout
   is gone. `tools/publish.py` keeps Cargo's output in `build/publish.log` too.
 - **render3d:** A material row is 80 bytes (G5a: 64) and what reaches the colour target is opaque (alpha 1), as glTF wants for OPAQUE and MASK
+- **render3d:** Sun::color is illuminance in lux (KHR_lights_punctual; Sun::DEFAULT 0.75 pi), materials are shaded as PBR instead of Lambert, nearest texture filtering loads the texel (textureLoad) instead of sampling its centre
 
 ## [0.1.0] - 2026-11-08
 
