@@ -5,7 +5,10 @@
 //                           our IDataObject read as a drop target reads it (EnumFormatEtc,
 //                           GetData of every format), our IDropTarget fed with it (DragEnter,
 //                           DragOver, Drop -> E_DRAG / E_DROP and the content), the
-//                           IDropSource's answers, a real window registered with OLE
+//                           IDropSource's answers, a real window registered with OLE; macOS
+//                           (in the logged-in session: tools/apple.py gui): the pasteboard our
+//                           drag fills, our view's destination methods fed with it through a
+//                           stand-in NSDraggingInfo (E_DRAG / E_DROP and the content)
 //   plattest --test dnd-x11 (Linux, X11; tools/platshared/dnd_x11.py drives it with a raw X11
 //                           client and synthetic X events) XDND both ways: a drop of a
 //                           URI list, UTF-8 text, HTML and a 300 KB image (INCR) onto window
@@ -30,10 +33,34 @@ fn tiny_png() -> Vec<u8> {
     img_png::encode(&[0, 0, 255, 255, 255, 0, 0, 255], 2, 1, 8, false)
 }
 
+// a 1 x 1 BMP: file header + BITMAPV5HEADER + one pixel
+#[cfg(any(windows, target_os = "macos"))]
+fn tiny_bmp() -> Vec<u8> {
+    let mut b = vec![0u8; 14 + 124 + 4];
+    b[0] = b'B';
+    b[1] = b'M';
+    b[2..6].copy_from_slice(&(142u32).to_le_bytes());
+    b[10..14].copy_from_slice(&(138u32).to_le_bytes());
+    b[14..18].copy_from_slice(&124u32.to_le_bytes());
+    b[18..22].copy_from_slice(&1u32.to_le_bytes());
+    b[22..26].copy_from_slice(&1u32.to_le_bytes());
+    b[26..28].copy_from_slice(&1u16.to_le_bytes());
+    b[28..30].copy_from_slice(&32u16.to_le_bytes());
+    b[30..34].copy_from_slice(&3u32.to_le_bytes()); // BI_BITFIELDS
+    b[54..58].copy_from_slice(&0x00FF_0000u32.to_le_bytes());
+    b[58..62].copy_from_slice(&0x0000_FF00u32.to_le_bytes());
+    b[62..66].copy_from_slice(&0x0000_00FFu32.to_le_bytes());
+    b[66..70].copy_from_slice(&0xFF00_0000u32.to_le_bytes());
+    b[138..142].copy_from_slice(&[1, 2, 3, 255]);
+    b
+}
+
 pub fn t_dnd(t: &mut T) {
     shared(t);
     #[cfg(windows)]
     ole(t);
+    #[cfg(target_os = "macos")]
+    appkit(t);
     drag_hook(None);
 }
 
@@ -93,26 +120,7 @@ fn ole(t: &mut T) {
     const MK_LBUTTON: u32 = 1;
     const MK_SHIFT: u32 = 4;
     let png = tiny_png();
-    let bmp = {
-        // a 1 x 1 BMP: file header + BITMAPV5HEADER + one pixel
-        let mut b = vec![0u8; 14 + 124 + 4];
-        b[0] = b'B';
-        b[1] = b'M';
-        b[2..6].copy_from_slice(&(142u32).to_le_bytes());
-        b[10..14].copy_from_slice(&(138u32).to_le_bytes());
-        b[14..18].copy_from_slice(&124u32.to_le_bytes());
-        b[18..22].copy_from_slice(&1u32.to_le_bytes());
-        b[22..26].copy_from_slice(&1u32.to_le_bytes());
-        b[26..28].copy_from_slice(&1u16.to_le_bytes());
-        b[28..30].copy_from_slice(&32u16.to_le_bytes());
-        b[30..34].copy_from_slice(&3u32.to_le_bytes()); // BI_BITFIELDS
-        b[54..58].copy_from_slice(&0x00FF_0000u32.to_le_bytes());
-        b[58..62].copy_from_slice(&0x0000_FF00u32.to_le_bytes());
-        b[62..66].copy_from_slice(&0x0000_00FFu32.to_le_bytes());
-        b[66..70].copy_from_slice(&0xFF00_0000u32.to_le_bytes());
-        b[138..142].copy_from_slice(&[1, 2, 3, 255]);
-        b
-    };
+    let bmp = tiny_bmp();
     let data = DragData {
         files: vec![String::from("C:\\jf\\a.txt"), String::from("rel/b.txt")],
         text: Some(String::from("Hallo\nWelt")),
@@ -211,6 +219,100 @@ fn ole(t: &mut T) {
     t.check(at == Some((33, 44, 0)), "dnd-ole: E_DROP in client px of window 0");
     drop_data_take();
     plat::win_destroy(0);
+}
+
+#[cfg(target_os = "macos")]
+fn appkit(t: &mut T) {
+    use plat::{E_DRAG, E_DROP};
+    const COPY: u64 = 1; // NSDragOperationCopy
+    const MOVE: u64 = 16; // NSDragOperationMove
+    let png = tiny_png();
+    let cwd = plat::cwd();
+    let data = DragData {
+        files: vec![String::from("/tmp/jf/a.txt"), String::from("rel/b.txt")],
+        text: Some(String::from("Hallo\nWelt")),
+        urls: vec![String::from("https://example.org/"), String::from("https://example.com/x")],
+        html: Some(String::from("<b>fett</b>")),
+        image: Some(png.clone()),
+        effects: DE_COPY | DE_MOVE,
+        ..DragData::default()
+    };
+    // ---- the pasteboard our drag fills
+    let Some(f) = dnd_test_formats(&data) else {
+        t.check(false, "dnd-appkit: AppKit is there");
+        return;
+    };
+    let names: Vec<&str> = f.iter().map(|e| e.0.as_str()).collect();
+    crate::out(&alloc::format!("  types: {}\n", names.join(", ")));
+    for want in ["public.file-url", "public.utf8-plain-text", "public.html", "public.png", "public.url"] {
+        t.check(names.contains(&want), &alloc::format!("dnd-appkit: the pasteboard has {want}"));
+    }
+    let all = |n: &str| f.iter().filter(|e| e.0 == n).map(|e| String::from_utf8_lossy(&e.1).into_owned()).collect::<Vec<_>>();
+    let one = |n: &str| f.iter().find(|e| e.0 == n).map(|e| e.1.clone()).unwrap_or_default();
+    let want_files = [String::from("file:///tmp/jf/a.txt"), alloc::format!("file://{}/rel/b.txt", cwd.trim_end_matches('/'))];
+    t.check(all("public.file-url") == want_files, "dnd-appkit: a file URL per file (relative paths made absolute)");
+    t.check(all("public.utf8-plain-text").first().map(String::as_str) == Some("Hallo\nWelt"), "dnd-appkit: the text as it is");
+    t.check(one("public.html") == b"<b>fett</b>" && one("public.png") == png, "dnd-appkit: HTML and the PNG");
+    t.check(all("public.url") == ["https://example.org/", "https://example.com/x"], "dnd-appkit: the URLs");
+    // ---- our view fed with it
+    let w = plat::win_create("plattest dnd", 200, 120, 0, PW_NOOWNER, PW_DEFAULT, PW_DEFAULT);
+    t.check(w == 0, "dnd-appkit: a window (its view takes drags)");
+    if w != 0 {
+        return;
+    }
+    drag_hook(Some(hook_all));
+    evq_clear();
+    drop_data_take();
+    let eff = dnd_test_drop(&data, 0, 20, 30, COPY | MOVE);
+    t.check(eff == Some(DE_COPY), "dnd-appkit: the drop answers copy");
+    let mut evs = Vec::new();
+    while let Some(e) = evq_pop() {
+        evs.push(e);
+    }
+    let drags = evs.iter().filter(|e| e.typ == E_DRAG).count();
+    let drop = evs.iter().find(|e| e.typ == E_DROP);
+    t.check(drags == 1 && evs.first().is_some_and(|e| e.typ == E_DRAG && e.x == 20 && e.y == 30
+            && e.data == DT_FILES | DT_TEXT | DT_URL | DT_HTML | DT_IMAGE | (DE_COPY | DE_MOVE) << 8),
+            "dnd-appkit: draggingEntered: E_DRAG with the kinds and effects (draggingUpdated: at the same point: none)");
+    t.check(drop.is_some_and(|e| e.x == 20 && e.y == 30 && e.data == 2 && e.win == 0), "dnd-appkit: performDragOperation: E_DROP at the point, two paths");
+    let got = drop_data_take();
+    t.check(got.files == ["/tmp/jf/a.txt", &alloc::format!("{}/rel/b.txt", cwd.trim_end_matches('/'))], "dnd-appkit: the paths");
+    if got.files != ["/tmp/jf/a.txt", &alloc::format!("{}/rel/b.txt", cwd.trim_end_matches('/'))] {
+        crate::out(&alloc::format!("  (paths {:?})\n", got.files));
+    }
+    t.check(got.text.as_deref() == Some("Hallo\nWelt") && got.html.as_deref() == Some("<b>fett</b>"), "dnd-appkit: the text and HTML");
+    t.check(got.urls == ["https://example.org/", "https://example.com/x"], "dnd-appkit: the URLs (not the files)");
+    if got.urls != ["https://example.org/", "https://example.com/x"] {
+        crate::out(&alloc::format!("  (URLs {:?})\n", got.urls));
+    }
+    t.check(got.image.as_deref() == Some(&png[..]) && got.effects == DE_COPY, "dnd-appkit: the PNG, the effect");
+    // Command held: AppKit offers only a move -- text is moved, files never
+    let txt = DragData { text: Some(String::from("weg")), effects: DE_COPY | DE_MOVE, ..DragData::default() };
+    t.check(dnd_test_drop(&txt, 0, 20, 30, MOVE) == Some(DE_MOVE), "dnd-appkit: a move-only drag moves text");
+    let files = DragData { files: vec![String::from("/tmp/jf/c.txt")], effects: DE_COPY | DE_MOVE, ..DragData::default() };
+    t.check(dnd_test_drop(&files, 0, 20, 30, MOVE) == Some(0), "dnd-appkit: files are never moved (a move-only drag is refused)");
+    t.check(dnd_test_drop(&files, 0, 20, 30, COPY | MOVE) == Some(DE_COPY), "dnd-appkit: ... and copied otherwise");
+    // a BMP without PNG: our drag adds a PNG made of it, the drop takes that
+    let bmp = DragData { bmp: Some(tiny_bmp()), ..DragData::default() };
+    drop_data_take();
+    let _ = dnd_test_drop(&bmp, 0, 20, 30, COPY);
+    let got = drop_data_take();
+    t.check(got.image.as_deref().is_some_and(|b| b.starts_with(b"\x89PNG\r\n\x1a\n")), "dnd-appkit: a BMP arrives as a PNG made of it");
+    // refused at the point: no drop, the last event is E_DRAG leave
+    evq_clear();
+    t.check(dnd_test_drop(&txt, 0, 150, 30, COPY) == Some(0), "dnd-appkit: refused at the point: no effect");
+    let mut last = None;
+    while let Some(e) = evq_pop() {
+        if e.typ == E_DROP {
+            last = Some(E_DROP);
+        } else if e.typ == E_DRAG {
+            last = Some(e.data as u8);
+        }
+    }
+    t.check(last == Some(0), "dnd-appkit: refused: the last event is E_DRAG leave, no E_DROP");
+    drop_data_take();
+    plat::win_destroy(0);
+    evq_clear();
 }
 
 #[cfg(not(target_os = "linux"))]

@@ -30,7 +30,8 @@
 //   found           CLion (clion64.exe in PATH, the Toolbox's and the installer's folders;
 //                   Linux: clion / clion.sh in PATH, the Toolbox's script, the snap), then VS
 //                   Code (code.cmd in PATH -> Code.exe beside it, its install folders; Linux:
-//                   code in PATH)
+//                   code in PATH; macOS: clion / code in PATH, the Toolbox's script, the apps'
+//                   command-line tools in /Applications)
 // The file is opened by its absolute path: below jfgui_SRC, else below the folder that holds the
 // program's build folder (ROOT/build/<target>/NAME), else below the working folder.
 // Starting the editor is the app starting a program (plat::process::launch): the app's manifest
@@ -126,14 +127,14 @@ fn src_root() -> String {
     exe_root().unwrap_or_else(plat::cwd)
 }
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn exe_root() -> Option<String> {
     let exe = plat::current_exe()?;
     let k = exe.replace('\\', "/").rfind("/build/")?;
     Some(String::from(&exe[..k]))
 }
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
 fn exe_root() -> Option<String> {
     None
 }
@@ -289,19 +290,40 @@ fn found_editor(file: &str, line: u32) -> Option<(String, Vec<String>)> {
     Some((p, alloc::vec![String::from("-g"), format!("{}:{}", file, line)]))
 }
 
-// the browser and Android start no programs
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(target_os = "macos")]
+fn found_editor(file: &str, line: u32) -> Option<(String, Vec<String>)> {
+    let exists = |p: &String| plat::file_exists(p) == 1;
+    let mut clion: Vec<String> = Vec::new();
+    if let Some(h) = plat::env("HOME").filter(|h| !h.is_empty()) {
+        clion.push(format!("{}/Library/Application Support/JetBrains/Toolbox/scripts/clion", h));
+    }
+    clion.push(String::from("/Applications/CLion.app/Contents/MacOS/clion"));
+    if let Some(p) = plat::process::find("clion").or_else(|| clion.into_iter().find(exists)) {
+        return Some((p, alloc::vec![String::from("--line"), format!("{}", line), String::from(file)]));
+    }
+    let code = String::from("/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code");
+    let p = plat::process::find("code").or_else(|| Some(code).filter(exists))?;
+    Some((p, alloc::vec![String::from("-g"), format!("{}:{}", file, line)]))
+}
+
+// the browser, Android and iOS start no programs
+#[cfg(target_os = "ios")]
 fn found_editor(_file: &str, _line: u32) -> Option<(String, Vec<String>)> {
     None
 }
 
-// start the editor on its own (plat::process::launch; the browser and Android: not supported)
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
+fn found_editor(_file: &str, _line: u32) -> Option<(String, Vec<String>)> {
+    None
+}
+
+// start the editor on its own (plat::process::launch; the browser, Android and iOS: not supported)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 fn start(prog: &str, args: &[&str]) -> Result<(), u32> {
     plat::process::launch(prog, args)
 }
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
 fn start(_prog: &str, _args: &[&str]) -> Result<(), u32> {
     Err(50)
 }

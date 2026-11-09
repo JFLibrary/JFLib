@@ -391,9 +391,9 @@ fn swap(cfg: &Config, target: &str, src: &Src, appimage: bool) -> Result<(), Err
     }
     // never write through a name that already exists (a leftover or a planted link)
     plat::delete(&new);
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     let file = plat::File::create_new(&new);
-    #[cfg(not(any(windows, target_os = "linux")))]
+    #[cfg(not(any(windows, target_os = "linux", target_vendor = "apple")))]
     let file = plat::File::open(&new, plat::FO_RW);
     let mut wrong: Option<Error> = None;
     let written = file.is_some_and(|f| {

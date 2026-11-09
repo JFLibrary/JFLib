@@ -5,6 +5,7 @@ the iPhone.  Runs on a Mac only (Xcode's tools: codesign, xcrun simctl, xcrun de
     python tools/apple.py device build/ios/NAME.app [ARGS..] sign, install and start it on the iPhone
     python tools/apple.py sign build/ios/NAME.app [--via-terminal]
                                                             sign it for the iPhone only
+    python tools/apple.py gui build/mac/NAME [ARGS..]       start a program with windows from SSH
 
 build_rs.py packs every program it builds for ios into NAME.app next to it (bundle); the simulator's
 build is signed ad hoc there.  The iPhone needs the Apple Development certificate and a provisioning
@@ -13,6 +14,10 @@ the phone once (docs/APPLE.md AP0).  Such a profile is for one app id, so the ap
 (installs of different apps replace each other).  The keychain is locked in an SSH session, where
 codesign fails with errSecInternalComponent: --via-terminal signs in the logged-in session instead
 (a Terminal window opens on the Mac); `device` does that by itself when it finds itself over SSH.
+
+A program with windows started from SSH reaches no window server: host_exec.run_native starts the
+apps with `ui` through gui_run there -- `open` starts a small runner bundle in the logged-in session,
+which runs the program in the repository folder and hands back its output and exit code.
 
     jfgui_SIM_DEVICE=UDID     the simulator to use (default: the first available iPhone)
     jfgui_SIM_KEEP=1          leave a simulator running that this tool booted
@@ -24,6 +29,7 @@ import os
 import plistlib
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -73,6 +79,64 @@ def bundle(exe, sim=False):
     if sim:
         run(["codesign", "-f", "-s", "-", "--timestamp=none", app])
     return app
+
+
+# ---------------------------------------------------------------- macOS: windows from SSH
+
+RUNNER = """#!/bin/sh
+# jfrun DIR CODE PID PROGRAM ARGS..: PROGRAM in DIR, its pid into the file PID, its exit code into CODE
+cd "$1" || exit 1
+code="$2"; pidf="$3"; shift 3
+"$@" &
+echo $! > "$pidf"
+wait $!
+echo $? > "$code"
+"""
+
+
+def mac_runner():
+    """build/mac/.runner/jfrun.app: a bundle whose program is a shell script; started through
+    LaunchServices (open) it runs in the logged-in session, where windows reach the window server"""
+    app = ROOT / "build" / "mac" / ".runner" / "jfrun.app"
+    exe = app / "Contents" / "MacOS" / "jfrun"
+    if not exe.exists() or exe.read_text(encoding="utf-8") != RUNNER:
+        exe.parent.mkdir(parents=True, exist_ok=True)
+        exe.write_text(RUNNER, encoding="utf-8")
+        exe.chmod(0o755)
+        plist = {"CFBundleExecutable": "jfrun", "CFBundleIdentifier": "org.jflib.jfrun", "CFBundleName": "jfrun",
+                 "CFBundlePackageType": "APPL", "LSUIElement": True}
+        (app / "Contents" / "Info.plist").write_bytes(plistlib.dumps(plist, fmt=plistlib.FMT_XML))
+        run(["codesign", "-f", "-s", "-", app], check=False)
+    return app
+
+
+def gui_run(exe, args, timeout=600, env=None):
+    """a program with windows from SSH: started by the runner in the logged-in session, in ROOT; the
+    jfgui_* variables and those env changes are passed on -> CompletedProcess (its exit code, output).
+    A timeout kills the program and raises subprocess.TimeoutExpired as subprocess.run does."""
+    work = Path(tempfile.mkdtemp(prefix="jfrun-"))
+    out, err, code, pidf = (work / n for n in ("out", "err", "code", "pid"))
+    want = os.environ if env is None else env
+    cmd = ["open", "-W", "-n", "--stdout", out, "--stderr", err]
+    for k, v in want.items():
+        if k.startswith("jfgui_") or (env is not None and os.environ.get(k) != v):
+            cmd += ["--env", f"{k}={v}"]
+    cmd += [mac_runner(), "--args", ROOT, code, pidf, Path(exe).resolve(), *map(str, args)]
+    try:
+        subprocess.run([str(c) for c in cmd], capture_output=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.kill(int(pidf.read_text().strip()), 9)
+        except (OSError, ValueError):
+            pass
+        shutil.rmtree(work, ignore_errors=True)
+        raise
+    text = code.read_text().strip() if code.exists() else ""
+    rc = int(text) if text.isdigit() else 1
+    result = subprocess.CompletedProcess(cmd, rc, out.read_text(encoding="utf-8", errors="replace") if out.exists() else "",
+                                         err.read_text(encoding="utf-8", errors="replace") if err.exists() else "")
+    shutil.rmtree(work, ignore_errors=True)
+    return result
 
 
 # ---------------------------------------------------------------- the simulator
@@ -214,13 +278,13 @@ def device_run(app, args, timeout=600):
 
 
 def main():
-    if len(sys.argv) < 3 or sys.argv[1] not in ("sim", "device", "sign"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("sim", "device", "sign", "gui"):
         print(__doc__)
         return 2
     cmd, path, rest = sys.argv[1], sys.argv[2], sys.argv[3:]
     try:
-        if cmd == "sim":
-            r = sim_run(path, rest)
+        if cmd in ("sim", "gui"):
+            r = sim_run(path, rest) if cmd == "sim" else gui_run(path, rest)
             sys.stdout.write(r.stdout)
             sys.stderr.write(r.stderr)
             return r.returncode

@@ -26,6 +26,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **gltf:** KHR_lights_punctual: Document::lights, Node::light, lights_of(scene), Limits::lights; the extension may stand in extensionsRequired (docs/GLTF.md)
 - **plat:** macOS and iOS: plat without windows (docs/APPLE.md, AP3): processes through posix_spawn, sync, sockets, file system, random numbers, folder watching (FSEvents, macOS), trusted certificates (Security framework), services (launchd), local control sockets and the single instance, the keychain as secret store, crash reports through signals with the call chain; coretest and plattest's windowless tests pass on a Mac
 - **plat:** plat::service::plist_text: the launchd property list a service install writes on macOS
+- **plat:** macOS windows through AppKit (docs/APPLE.md, AP4): NSApplication with the library's own event loop, windows with a layer-backed view of our own (the frame as a CGImage, Retina scale, the library's frame or the system's title bar), mouse, keys (Command acts as Ctrl), text and input methods through NSTextInputClient, the trackpad (fine scrolling, the pinch as Ctrl + wheel), cursors (custom ones, CUR_NONE), popup windows, owned windows hanging on their owner, win_enable, the pasteboard (text, HTML, RTF, PNG, images: a TIFF arrives as PNG), the Open and Save panels (FD_FOLDER chooses a folder), drag and drop both ways, monitors, the appearance, accent colour and accessibility settings with E_SETTINGS on a change; plattest --test window and --test dnd test it in real windows without a user
+- **build:** build_rs.py test NAME --target mac; programs with windows started from SSH run in the logged-in session (tools/apple.py gui); gallery, uitest and dndtest build for mac
+- **ui:** the source inspector opens the editor on macOS too (CLion, VS Code: in PATH, the Toolbox's script, /Applications)
 - **render3d:** Occlusion test of the camera against a depth pyramid in two phases (Scene::set_occlusion, on by default when the depth attachment can be sampled): phase 1 draws what phase 2 of the frame before saw, a compute shader builds an R32Float pyramid of the minimum depth (reverse Z), phase 2 tests every instance in the view against it and draws what is newly visible; the same WGSL on Voll, Basis and WebGPU; Renderer::depth_texture, Renderer::pyramid, Scene::late_buffers, FrameStats::late and FrameStats::occlusion; render3dtest --test occlusion (docs/RENDER3D.md)
 - **gpu:** TextureView::usage (public on Vulkan, new in the browser) and TextureView::same (identity of a view and its clones, a cache's key)
 - **render3d:** Detail levels (Renderer::set_lods, Lod, LODS_MAX, lods, cull_sphere): a mesh takes other meshes, or none (contribution culling), below a projected size; the visibility picks per instance from the camera's distance, the shadow cascades take the camera's pick; ListInfo::room; render3dtest --test lods
@@ -59,6 +62,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 ### Fixed
 
 - **build:** build_rs.py runs with Python 3.11 again, as the README says (tools/gendoc.py needed 3.12)
+- **update:** an update's new file is created with create_new on Apple too (never written through an existing name or link)
 
 ## [0.1.0] - 2026-11-08
 

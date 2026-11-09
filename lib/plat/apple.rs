@@ -22,6 +22,16 @@ pub use thread::*;
 #[path = "apple_disp.rs"]
 mod disp;
 pub use disp::*;
+// the Objective-C runtime (classes, selectors, typed objc_msgSend)
+#[path = "apple_objc.rs"]
+#[cfg_attr(target_os = "ios", allow(dead_code))] // (iOS: from AP5 on)
+pub(crate) mod objc;
+// macOS's windows: AppKit (AP4)
+#[cfg(target_os = "macos")]
+#[path = "apple_mac.rs"]
+pub(crate) mod mac;
+#[cfg(target_os = "macos")]
+pub use mac::*;
 #[path = "apple_crash.rs"]
 mod crash;
 

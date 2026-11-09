@@ -188,6 +188,17 @@ pub fn wake() {
     let one = 1u8;
     // SAFETY: one byte into the non-blocking pipe; a full pipe already wakes the reader.
     while unsafe { ffi::write(fd, (&one as *const u8).cast(), 1) } < 0 && ffi::errno() == ffi::EINTR {}
+    // a window backend waits in AppKit's loop, not on the pipe
+    #[cfg(target_os = "macos")]
+    super::mac::wake_app();
+    #[cfg(target_os = "ios")]
+    super::disp::wake_app();
+}
+
+/// (apple_mac.rs wait) a wake() is waiting to be taken (wake_consume)
+#[allow(dead_code)]
+pub(crate) fn wake_pending() -> bool {
+    WAKE_FLAG.load(Ordering::SeqCst) != 0
 }
 
 /// headless wait (no display): until a wake-up (E_WAKE to on_event, returns 1) or the deadline in

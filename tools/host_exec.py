@@ -40,10 +40,15 @@ def run_linux(args, cwd=ROOT, timeout=600, env=None):
                                            err.read().decode('utf-8', 'replace'))
 
 
-def run_native(target, exe, args, timeout=600, env=None):
+def run_native(target, exe, args, timeout=600, env=None, gui=False):
+    """run a built program of target here; gui: it opens windows (the Mac from SSH starts it in the
+    logged-in session, tools/apple.py gui_run)"""
     if target == 'linux':
         return run_linux([linux_path(exe), *args], timeout=timeout, env=env)
     if target == 'mac':                     # docs/APPLE.md: on the Mac itself
+        if gui and os.environ.get('SSH_CONNECTION'):
+            from tools.apple import gui_run
+            return gui_run(exe, args, timeout=timeout, env=env)
         return subprocess.run([str(exe), *args], cwd=ROOT, timeout=timeout, env=env,
                               capture_output=True, text=True, encoding='utf-8', errors='replace')
     if target == 'ios-sim':                 # in a simulator without a window (tools/apple.py)
