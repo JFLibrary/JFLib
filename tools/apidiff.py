@@ -18,7 +18,7 @@ Snapshot lines (sorted; # starts a comment):  PATH <TAB> KIND <TAB> SIGNATURE <T
          trait-fn / trait-const / trait-type (a member of a public trait), impl (a derive or an
          `impl Trait for Type` of a public type; SIGNATURE names the trait), use (a re-export of
          another crate's item)
-  FLAGS  comma list: windows / linux (the item's cfg), deprecated, provided (a trait member with a
+  FLAGS  comma list: windows / linux / apple (the item's cfg), deprecated, provided (a trait member with a
          default), all-pub (a struct whose fields are all public), non-exhaustive
 A line's identity is PATH, KIND, its cfg and, for impl, the trait; signatures compare without
 whitespace and trailing commas (rustfmt reflowing a signature is no change).
@@ -186,7 +186,7 @@ def item_sig(it):
 
 
 def cfg_flag(cfg):
-    return {"Windows": "windows", "Linux": "linux"}.get(cfg, "")
+    return {"Windows": "windows", "Linux": "linux", "Apple": "apple"}.get(cfg, "")
 
 
 def flags_of(it, extra=()):
@@ -414,7 +414,7 @@ def read_snapshot(path):
 # ---------------------------------------------------------------- the diff
 def key(line):
     path, kind, sig, flags = line
-    cfg = ",".join(f for f in flags.split(",") if f in ("windows", "linux"))
+    cfg = ",".join(f for f in flags.split(",") if f in ("windows", "linux", "apple"))
     return (path, kind, cfg, canon(sig) if kind == "impl" else "")
 
 
