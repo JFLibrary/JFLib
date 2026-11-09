@@ -303,7 +303,7 @@ const SHOW_TRIES: u32 = 300;
 const VIEW_REST_US: u64 = 180_000;
 
 /// the shaders, compiled from gpu_out.wgsl (uigputest --test shaders compares them with what
-/// wgsl::compile makes of it, --devgen-shaders writes them again); the browser takes the WGSL itself
+/// wgsl::compile makes of it, --gen-shaders writes them again); the browser takes the WGSL itself
 #[cfg(not(target_arch = "wasm32"))]
 mod spv {
     include!("gpu_out_spv.rs");
@@ -1636,16 +1636,29 @@ fn view_frame(e: &mut Entry, content: &Rc<core::cell::RefCell<dyn GpuContent>>, 
         e.tex = Some(Rc::new(ViewTex { t, group, w, h, fresh: core::cell::Cell::new(true) }));
     }
     let Some(tex) = e.tex.clone() else { return Err(GpuError::Invalid("no target")) };
-    let before = if tex.fresh.get() { Layout::Undefined } else { Layout::Sampled };
+    let fresh = tex.fresh.get();
+    if let Err(err) = view_draw(&tex, content, dev, size, if fresh { Layout::Undefined } else { Layout::Sampled }) {
+        // (nothing went to the queue: a new target holds no frame, so neither the output's pass nor a read-back may
+        // take it; the next frame makes it again)
+        if fresh {
+            e.tex = None;
+            e.sh.c.borrow_mut().gpu = None;
+        }
+        return Err(err);
+    }
+    tex.fresh.set(false);
+    e.sh.c.borrow_mut().frame += 1;
+    Ok(())
+}
+
+/// view_frame's pass: the content's frame into tex, submitted
+fn view_draw(tex: &ViewTex, content: &Rc<core::cell::RefCell<dyn GpuContent>>, dev: &Device, size: (u32, u32), before: Layout) -> gpu::Result<()> {
     let mut c = content.try_borrow_mut().map_err(|_| GpuError::Invalid("the view's content is borrowed"))?;
     let mut enc = dev.encoder()?;
     let target = ColorAttachment { view: tex.t.view(), load: Load::Clear, clear: [0.0, 0.0, 0.0, 1.0], store: true, before, after: Layout::Sampled };
     c.draw(&mut enc, target, size)?;
     let id = dev.queue().submit([enc.finish()?])?;
     c.submitted(id);
-    drop(c);
-    tex.fresh.set(false);
-    e.sh.c.borrow_mut().frame += 1;
     Ok(())
 }
 
@@ -3282,6 +3295,9 @@ impl Ui {
             self.gp_settle(i);
         }
     }
+
+    /// render_live, after dirty_compute: is this frame drawn layer by layer?  (Else it goes as
+    /// without layers: the whole base texture holds the framebuffer's cells then.)
     pub(crate) fn gp_split_begin(&mut self, n: i32) -> bool {
         if !self.wp.dirty.split {
             return false;
