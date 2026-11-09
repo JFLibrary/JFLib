@@ -937,7 +937,7 @@ pub extern "C" fn jfgui_start(width: i32, height: i32, dpi: i32, args_len: u32) 
     windows::viewport(width, height, dpi);
     rt::boot::set_handler(crate::boot::start); // rt::main!: name, app://, manifest
     // SAFETY: app entry is linked into this module, invoked only once on its worker.
-    let code = unsafe { jfgui_main() };
+    let code = rt::abort_on_unwind(|| unsafe { jfgui_main() }); // feature unwind (Android): as std_start
     // (Android) the first frame starts the app, so the activity is resumed and has the
     // keyboard: its focus-in (onResume) came before the start (UIC_ACTIVE 1)
     #[cfg(target_os = "android")]

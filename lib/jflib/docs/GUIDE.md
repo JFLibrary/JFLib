@@ -81,7 +81,8 @@ jflib = { features = ["std"], version = "0.1" }
 ```
 
 The program then has std's entry point, panic handler and allocator instead of JFLib's own; a
-panic still ends with JFLib's crash report (`rt::panic_hook`). What changes against the template:
+panic still ends with JFLib's crash report (`rt::panic_hook`; with the feature `unwind` only a
+panic nobody catches, below). What changes against the template:
 
 | File | With std |
 | --- | --- |
@@ -100,6 +101,41 @@ panic still ends with JFLib's crash report (`rt::panic_hook`). What changes agai
 `cargo jflib package` makes a std app's packages on their own system: `setup` and `msix` on
 Windows, `deb`, `appimage`, `rpm` and `flatpak` on Linux, `dmg` on a Mac (`cargo jflib mac` builds
 `NAME.app` there; [APPLE.md](APPLE.md)).
+
+**Panics that unwind: the feature `unwind`.** JFLib's runtime needs `panic = "abort"`, and an app
+with std as well, unless it turns on the feature `unwind` (it implies `std`). That is for an app
+that must survive a panic of its own code, a web browser whose engine runs each page on a thread
+of its own and catches a page's panic, say. Both profiles then say `panic = "unwind"`:
+
+```toml
+[dependencies]
+jflib = { features = ["unwind"], version = "0.1" }
+
+[profile.dev]
+panic = "unwind"      # the other lines as in the template
+
+[profile.release]
+panic = "unwind"
+```
+
+* A panic the app catches with `std::panic::catch_unwind` leaves the program running, on any
+  thread: its own `std::thread`s, a thread of `plat::thread_spawn`, the UI thread inside
+  `App::frame`. JFLib writes nothing for it; `rt::panic_take()` gives its text as the crash report
+  would show it, with file and line (`"panicked at src/page.rs:12:5:\nindex out of bounds: ..."`),
+  where the payload holds the message alone.
+* A panic nobody catches ends the program as before: JFLib's crash report (stderr, the crash
+  hook), exit code 3. That holds when it leaves the program's start (`App::frame`, `command`, the
+  tasks of `ui.spawn`), a thread of JFLib's (`plat::thread_spawn`, the jobs of
+  `plat::task::spawn_blocking`, sound) or reaches a callback of the system (a window procedure):
+  JFLib's code is not written to go on after a panic. `rt::abort_on_unwind(f)` does the same for
+  an entry point of the app's own.
+* A thread of `std::thread::spawn` whose panic nobody catches ends quietly: `join()` returns the
+  payload, as in std, without std's line on stderr.
+* Catch around the app's own code, not around calls into `ui`: what a panic leaves halfway done
+  in the UI's state is not repaired. The locks of `plat::sync` are released by a caught panic, not
+  poisoned.
+* In the browser std does not unwind (rustup's std for `wasm32` is built with `panic = "abort"`):
+  every panic ends the program there.
 
 **One window loop, one runtime.** With JFLib an app does not put a window crate, an event loop
 and a UI crate together, as egui apps do with eframe and the crates around it: `ui::launch` is

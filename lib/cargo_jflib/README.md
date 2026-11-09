@@ -8,7 +8,7 @@ cargo install cargo-jflib
 
 | Command | What it does |
 | --- | --- |
-| `cargo jflib new [--std] NAME` | a new app from the template of the crate `jflib`: a window, its tests, the settings for Windows and Linux; `--std`: the same app with the standard library (`jflib`'s feature `std`), so it may use `std` crates |
+| `cargo jflib new [--std] NAME` | a new app from the template of the crate `jflib`: a window, its tests, the settings for Windows and Linux; `--std`: the same app with the standard library (`jflib`'s feature `std`), so it may use `std` crates; its `Cargo.toml` says how it catches panics instead (the feature `unwind`, `panic = "unwind"`) |
 | `cargo jflib test` | builds the app, then runs every `tests/*.uis` with `--script`; a line `#!only windows linux ..` among a script's first lines runs it on these systems only (`target_os` of `--target`, else of this machine) |
 | `cargo jflib watch [-- ARGS]` | hot reload: each save of the project's files builds the app again and restarts it in its session, the input replayed so it comes back where it was; a failed build keeps the running version and shows the error in its inspector |
 | `cargo jflib web [--serve]` | the app for the browser in `target/jflib-web/NAME/`: scalar, SIMD and threads, the host page, the licences; `--serve` serves it with the headers threads need |

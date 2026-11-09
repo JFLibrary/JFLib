@@ -24,6 +24,10 @@ workspace = true
 # functions and entry; rt::panic_hook gives std's panics JFLib's crash report, rt::Alloc is rt's
 # allocator on request.  Cargo turns it on for the whole program (jflib's feature std).
 std = []
+# (with std) a program built with panic = "unwind" (docs/GUIDE.md, "An app with std"): a panic the app's
+# code catches (std::panic::catch_unwind) leaves the program running; rt::panic_hook reports a panic only
+# when it leaves JFLib's threads and entry points uncaught (rt::abort_on_unwind)
+unwind = ["std"]
 
 [dependencies]
 

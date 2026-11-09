@@ -222,6 +222,13 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
 - **`main!(...)`**
   (see above)
 
+- **`__ui_panic_check!(...)`**
+  ui::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
+  std built with the feature `unwind` may unwind as well
+
+- **`__ui_panic_check!(...)`**
+  (see above)
+
 - **`__jfgui_main!(...)`**
   ui::main!'s `jfgui_main`, without and with std
 
@@ -25522,7 +25529,8 @@ sync -- blocking primitives for worker threads (servers, background jobs)
 One primitive per OS: wait on a 32-bit word while it holds a value, wake one / all waiters
 (Windows WaitOnAddress, Linux private futexes).  Mutex and Condvar are the futex algorithms
 of Rust's std; RwLock and the channel are built on them.  A lock is not poisoned by a panic
-(panics abort the process here).
+(panics abort the process here; with jflib's feature unwind a panic the app catches releases
+the locks its guards held).
 Not here: rt::SpinLock (rt keeps spin locks for the allocator and for modules, where plat is
 replaced).
 ```
@@ -29709,7 +29717,8 @@ E_WAKE.  Timers live in one list with the thread that registered them; each exec
 its own.  Blocking jobs run on up to BLOCKING_MAX threads of their own (not the compute pool:
 a job waiting for a disk must not starve parallel_for); where no thread can start (the
 browser without shared memory, Android) the executors run them inline, one per run.  A panic
-in a task or job ends the process like any panic (rt's handler: crash hook, exit code 3).
+in a task or job ends the process like any panic (rt's handler: crash hook, exit code 3), with
+jflib's feature unwind too unless the task's own code catches it (rt::abort_on_unwind).
 ```
 
 ```rust
@@ -30018,7 +30027,7 @@ threads, wake-up: win_thread.rs; the user32/gdi32 windows: win_api.rs)
 - **`fn std_start() -> !`**
   (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
   program's own): what mainCRTStartup does without std, with rt's panic hook first and the end
-  through std::process::exit
+  through std::process::exit; with the feature unwind a panic that leaves the app ends it there
 
 - **`fn time_us() -> u64`**
 
@@ -32040,7 +32049,8 @@ a driver's getenv reads the start environment.
 - **`fn std_start() -> !`**
   (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
   program's own): std's arguments and environment as a block like the initial stack, then what
-  glibc_main does, with rt's panic hook first; the end through std::process::exit
+  glibc_main does, with rt's panic hook first; the end through std::process::exit.  With the
+  feature unwind a panic that leaves the app ends it there.
 
 - **`fn exit(code: i32) -> !`**
   end the process: glibc's exit (at_exit handlers, the destructors of the loaded libraries);
@@ -48936,6 +48946,8 @@ semantics, the minimal OS calls the runtime itself needs, panic handling.
   rt::main!(body)  the entry symbol of console programs (boot first, then body); with the
            feature std also their fn main
   rt::panic_hook()  (feature std) std's panics take the crash report of rt's panic handler
+  rt::abort_on_unwind(f)  a panic that leaves f ends the program (feature unwind; else f())
+  rt::panic_take()  (feature unwind) the last panic of the calling thread, as text
   rt::Alloc  (feature std, Windows and Linux) rt's allocator for a program with std that wants it
   rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (the root Cargo.toml, SemVer;
            docs/VERSIONING.md), also as plat::VERSION and ui::VERSION
@@ -48980,6 +48992,13 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
 - **`main!(...)`**
   (see above)
 
+- **`__rt_panic_check!(...)`**
+  rt::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
+  std built with the feature `unwind` may unwind as well
+
+- **`__rt_panic_check!(...)`**
+  (see above)
+
 - **`__jfgui_main!(...)`**
   rt::main!'s `jfgui_main`, without and with std
 
@@ -48987,6 +49006,12 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
   the `fn main` of a program with std: plat's start (jfgui_std_start), which calls jfgui_main.  In
   a library crate (an app whose program only links it, like the template) it is not the entry
   point and stays unused: the program's own main calls `plat::std_start()`.
+
+- **`fn abort_on_unwind<R>(f: impl FnOnce() -> R) -> R`**
+  run `f`; with the feature `unwind` (a program with std built with `panic = "unwind"`) a panic
+  that leaves it ends the program as an uncaught panic: JFLib's crash report, exit code 3.  plat
+  runs its threads and the program's start through it.  Without that feature a panic never
+  unwinds, and this is `f()`.
 
 **`mod portable`**
 
@@ -49415,10 +49440,31 @@ hosted -- what rt has for a program with the standard library (feature std, docs
 CR6); the only file of rt that names std, compiled only with that feature.  std brings the panic
 handler, the allocator and the memory functions then (lib.rs, mem.rs and os.rs leave theirs out).
 
-  panic_hook()   std's panics end as rt's panic handler ends them without std
+  panic_hook()          std's panics end as rt's panic handler ends them without std
+  abort_on_unwind(f)    (feature unwind) a panic that leaves f ends the program as an uncaught one
+  panic_take()          (feature unwind) the last panic of the calling thread, as text
+
+With the feature unwind and panic = "unwind" a panic unwinds: the hook only keeps its text (LAST)
+and reports nothing, since the app may catch it.  It is reported where it leaves JFLib's threads
+and the program's start (abort_on_unwind) or reaches a function that cannot unwind (an extern
+callback such as a window procedure: core panics once more there, with one of NOUNWIND's texts).
 ```
 
 - **`fn panic_hook()`**
   (feature std) std's panics end as rt's panic handler ends them without std: one line on stderr,
   the crash hook, exit code 3.  plat's start of a std program installs it; replacing it with
-  `std::panic::set_hook` gives up JFLib's crash report for panics.
+  `std::panic::set_hook` gives up JFLib's crash report for panics.  With the feature `unwind` and
+  `panic = "unwind"` it reports only a panic nobody catches: one that leaves the program's start or
+  a thread of JFLib's, or reaches a callback of the system ([`abort_on_unwind`]).
+
+- **`fn abort_on_unwind<R>(f: impl FnOnce() -> R) -> R`**
+  (feature `unwind`) run `f`; a panic that leaves it ends the program as an uncaught panic:
+  JFLib's crash report (the panic's text on stderr, the crash hook), exit code 3.  plat runs its
+  threads and the program's start through it, so only the app's own `std::panic::catch_unwind`
+  (on any thread) keeps a panic from ending the program.  With `panic = "abort"` it is `f()`.
+
+- **`fn panic_take() -> Option<String>`**
+  (feature `unwind`) the last panic on the calling thread as JFLib's crash report shows it
+  (`"panicked at FILE:LINE:COL:\nMESSAGE"`), taken: for a panic the app caught with
+  `std::panic::catch_unwind`, whose payload holds the message alone.  None when no panic came
+  since the last call (or the program is built with `panic = "abort"`).
