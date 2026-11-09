@@ -47093,8 +47093,8 @@ Source: [`lib/rt/portable/math.rs`](../lib/rt/portable/math.rs)
 
 ```text
 Portable replacement for the native x87 entry points. Decimal scaling emulates the x87
-64-bit significand after each multiply/divide. Transcendentals use explicit scalar binary64
-series, pow / sin / cos with double-doubles (below); native x87 is the comparison reference.
+64-bit significand after each multiply/divide. The transcendentals carry double-doubles
+(below) and stay within about half an ulp; native x87 is the comparison reference.
 ```
 
 - **`fn scale(m: u64, e: i32) -> f64`**
@@ -47107,10 +47107,11 @@ series, pow / sin / cos with double-doubles (below); native x87 is the compariso
   Nearest integer decimal logarithm; nonpositive inputs produce the SSE indefinite value.
 
 - **`fn log2(x: f64) -> f64`**
-  Binary logarithm using a normalized mantissa and a convergent atanh series.
+  Binary logarithm within about half an ulp (a table and a series in double-doubles).
 
 - **`fn exp2(x: f64) -> f64`**
-  Platform-independent base-two exponent; finite underflow rounds into subnormals.
+  Platform-independent base-two exponent within about half an ulp (double-doubles, rounded
+  once, subnormal results too); finite underflow rounds into subnormals, 1024 on is inf.
 
 - **`fn rz_log2(x: f64) -> f64`**
   Existing rotation/zoom base-two logarithm API.
@@ -47124,7 +47125,9 @@ series, pow / sin / cos with double-doubles (below); native x87 is the compariso
   within 0.501 ulp in the tests (|y log2 x| up to 1074); x = +inf gives inf (y > 0) or 0.
 
 - **`fn atan2(y: f64, x: f64) -> f64`**
-  Quadrant-aware arctangent, including signed zeros and infinite operands.
+  Quadrant-aware arctangent, including signed zeros and infinite operands: c + atan(n / d)
+  or c - atan(n / d) with c = 0, pi/2 or pi as double-doubles, rounded once (within about
+  half an ulp).
 
 - **`fn sincos(x: f64) -> (f64, f64)`**
   Cosine and sine with shared quadrant reduction; return order matches the x87 API.

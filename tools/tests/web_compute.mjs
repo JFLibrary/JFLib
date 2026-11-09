@@ -36,7 +36,7 @@ try {
         assert.equal(compute.mode,mode==='auto'?'simd':mode);assert.deepEqual(errors,[]);
         if(app==='portabletest') {
           assert.ok(logs.some(x=>x.includes('overlap=4 nested=320 cancellation restart')),logs.join('\n'));
-          assert.ok(logs.some(x=>x.includes('digest=edea7e9d9579c77a')),logs.join('\n'));
+          assert.ok(logs.some(x=>x.includes('digest=af6940ef15c56d1f')),logs.join('\n'));
         }
         results.push({engine,app,mode,isolated,compute,logs,ok:true});console.log(JSON.stringify(results.at(-1)));
         await page.close();

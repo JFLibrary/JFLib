@@ -219,29 +219,29 @@ Das wäre echte ARM-Hardware ohne Zukauf (ob `/data/local/tmp` das zulässt, zei
 **Mathematik:** ARM64 rechnet `rt::x87` mit `portable/math.rs`. `portabletest --math-dump` gibt beide Fassungen für
 dieselben 360 000 Eingaben aus, `apps/portabletest/tests/math_diff.py` vergleicht den Lauf auf x86-64 mit dem auf ARM64
 und misst beide gegen die C-Bibliothek (Pythons `math`, etwa 1 ulp genau). `portable/math.rs` gibt auf beiden
-Prozessoren in allen Zeilen dieselben Bits. Je 20 000 Eingaben, Stand nach dem Nachtrag unten (in Klammern die Werte
-von ARM2 davor):
+Prozessoren in allen Zeilen dieselben Bits. Je 20 000 Eingaben, Stand nach den beiden Nachträgen unten (in Klammern die
+Werte von ARM2 davor):
 
 | Gruppe | Eingaben | gleiche Bits | ARM64 zu x86-64, max / 99 % | x86-64 zur libm, max | ARM64 zur libm, max |
 |---|---|---|---|---|---|
 | `scale` (`f64_parse`) | m < 2^63, 10^-340 bis 10^308 | 100 % | – | – | – |
 | `log10_round`, `scale_round` (`f64_format`) | jeder positive Double, 1 bis 17 Stellen | 100 % | – | – | – |
-| `exp2` | -1100 bis 1030, -1 bis 1 | 40–42 % | 4 / 3 ulp | 1 ulp | 4 ulp |
-| `log2` | jeder positive Double; 0,5 bis 2 | 99,8 %; 57 % | 2; 5 ulp | 1 ulp | 5 ulp |
+| `exp2` | -1100 bis 1030, -1 bis 1 | 99,97–99,99 % (40–42 %) | 1 / 1 ulp (4 / 3) | 1 ulp | 1 ulp (4) |
+| `log2` | jeder positive Double; 0,5 bis 2 | 99,96 %; 99,98 % (99,8 %; 57 %) | 1 ulp (2; 5) | 1 ulp | 1 ulp (5) |
 | `pow` | x bis 100, y ±20 | 99,56 % (5,8 %) | 1 / 1 ulp (118 / 59) | 1 ulp | 1 ulp (118) |
 | `pow` (Gamma) | x 0 bis 1, y 0,1 bis 10 | 99,95 % (22 %) | 1 / 1 ulp (58 / 17) | 1 ulp | 1 ulp (58) |
 | `sin`, `cos`, `sincos` | -20 bis 20 | 99,91–99,97 % (23–24 %) | 1 ulp, `cos` 38 (9036 / 141) | 1 ulp, `cos` 38 | 1 ulp (9037) |
 | `sin`, `cos` weit | -10^6 bis 10^6 | 11 % (0 %) | 47 500 / 309 ulp, absolut ≤ 1,3e-15 (3,9e-11) | 47 500 ulp | 1 ulp (1,4e9) |
-| `atan2` | ±100, ±100 | 67 % | 5 / 3 ulp | 1 ulp | 5 ulp |
-| `rz_exp2`, `rz_log2` | ±16; 0 bis 256 | 41 %; 96 % | 4; 2 ulp | 1 ulp | 4; 2 ulp |
+| `atan2` | ±100, ±100 | 99,97 % (67 %) | 1 / 1 ulp (5 / 3) | 1 ulp | 1 ulp (5) |
+| `rz_exp2`, `rz_log2` | ±16; 0 bis 256 | über 99,99 %; 99,97 % (41 %; 96 %) | 1 ulp (4; 2) | 1 ulp | 1 ulp (4; 2) |
 
 Der Text einer Zahl und die Zahl eines Textes sind also auf ARM64 dieselben wie auf x86-64 (`f64_format` korrigiert
-`log10_round` ohnehin selbst). `pow`, `sin` und `cos` geben in 99,6 bis 99,97 % der Fälle dieselben Bits wie x87; wo
-nicht, liegt eine Seite ein ulp daneben, bei `cos` nahe seinen Nullstellen x87 selbst (bis 38 ulp). Außerhalb von ±20
-ist jetzt x87 der ungenauere Teil: `fsin` und `fcos` reduzieren mit einem 66-Bit-π (bis 47 500 ulp), `portable/math.rs`
-bleibt bei 1 ulp zur libm. `exp2`, `log2` und `atan2` (auch `rz_exp2`, `rz_log2`) weichen weiter um 2 bis 5 ulp ab.
-Die Effekte, Audio und die Oberfläche nutzen diese Funktionen; bitgleiche Bilder zu x86-64 sind damit nicht garantiert,
-wo Ergebnisse in Pixel oder Samples gerundet werden, von `pow`, `sin` und `cos` her aber selten verschieden.
+`log10_round` ohnehin selbst). `exp2`, `log2`, `pow`, `sin`, `cos` und `atan2` (auch `rz_exp2`, `rz_log2`) geben in
+99,6 bis über 99,99 % der Fälle dieselben Bits wie x87; wo nicht, liegt eine Seite ein ulp daneben, bei `cos` nahe seinen
+Nullstellen x87 selbst (bis 38 ulp). Außerhalb von ±20 ist jetzt x87 der ungenauere Teil: `fsin` und `fcos` reduzieren
+mit einem 66-Bit-π (bis 47 500 ulp), `portable/math.rs` bleibt bei 1 ulp zur libm. Die Effekte, Audio und die
+Oberfläche nutzen diese Funktionen; bitgleiche Bilder zu x86-64 sind damit nicht garantiert, wo Ergebnisse in Pixel oder
+Samples gerundet werden, aber selten verschieden.
 
 **Nachtrag: `pow`, `sin` und `cos` genauer** (2026-11-09). `portable/math.rs` rechnet die drei mit Double-Doubles
 (hi + lo, Dekkers Produkte mit Veltkamp-Teilung, also ohne FMA) und rundet erst am Ende:
@@ -260,6 +260,30 @@ kommt von der libm. Weiterhin nur IEEE-Operationen auf Doubles und Ganzzahlen, k
 `44721bded2985ff2` unter Windows und Linux auf x86-64 (auch mit `--simd sse2`), unter `qemu-aarch64` und in Nodes
 WebAssembly (`compare.mjs`, `portabletest.wasm` und `.simd.wasm`). Zeit je Aufruf auf dem Entwicklungsrechner (x86-64,
 unter Last gemessen): `pow` 70 ns (vorher 80), `sin` 54 ns (46), `sincos` 71 ns (47).
+
+**Nachtrag: `exp2`, `log2` und `atan2` genauer** (2026-11-09). Sie bauen auf denselben Double-Doubles auf:
+
+- `exp2` ist das `exp2` aus `pow` (Tabelle `2^(j/32)`) mit exaktem Argument. Subnormale Ergebnisse rundet es jetzt
+  einmal statt zweimal: Zu r in [0,98, 2) kommt C = 2^(-1022 - n), dessen ulp genau dem Raster von 2^-1074 nach dem
+  Skalieren entspricht; danach ist das Abziehen von C und das Skalieren exakt (gilt auch für `pow`).
+- `log2` ist das gerundete `log2` aus `pow` (Tabelle `log2(1 + j/64)`). `log10_round` behält die alte Reihe
+  (`log2_series`): Seine ganzen Zahlen müssen die von `fldlg2`/`fyl2x`/`fistp` bleiben, und nahe halben Zahlen
+  entscheidet die letzte Stelle.
+- `atan2`: t = n/d mit 0 < n ≤ d als Double-Double (der Rest über ein exaktes Produkt), c = j/32 der nächste Wert,
+  atan t = atan c + atan((t - c) / (1 + t c)) mit |s| ≤ 1/64, `atan(j/32)` aus einer Tabelle (33 Einträge), die Reihe
+  in s bis s^11. Dazu 0, π/2 oder π als Double-Double, eine Rundung am Ende. Sehr kleine Quotienten (t < 2^-60) gehen
+  direkt durch, sehr große oder kleine Operanden werden vorher mit 2^±600 skaliert.
+
+Gegen die exakte Referenz (`decimal`, 70 Stellen) liegen 20 Gruppen mit je 20 000 Eingaben höchstens 0,50002 ulp
+daneben: die Bereiche der Tabelle, dazu `exp2` mit subnormalen Ergebnissen, knapp unter 1024 und nahe ganzen Zahlen,
+`log2` nahe 1 und für subnormale x, `atan2` mit beliebigen Doubles, Quotienten von 2^-70 bis 2^70, nahe den
+Stützstellen j/32, an den Grenzen 2^±400 und 2^-60 und mit subnormalen Operanden; Vorzeichen von Nullen und Unendlich
+wie vorher. `pow`, `sin` und `cos` bleiben bei 0,502 ulp. `math_diff.py`: `log10_round` weiter 100 % gleich, die
+Tabelle oben. Neuer Digest von `portabletest`: `af6940ef15c56d1f` unter Windows und Linux auf x86-64 (auch mit `--simd
+sse2`), unter `qemu-aarch64` und in Node (`compare.mjs`, `portabletest.wasm` und `.simd.wasm`). Das Tempo ist nicht
+schlechter (Rechner unter Last, verrauscht): `exp2` 26 ns (vorher 38–45), `log2` 33–60 ns (43–48), `atan2` 54–70 ns
+(55–80). Die Zeilen 1 bis 260 von `math.rs` behalten ihre Nummern; auf x86-64 nutzt `base/num.rs` daraus nur `scale`
+und `scale_round`, beide unverändert.
 
 **A56** (SM-A566B, Android 16, Kernel 6.6 mit 4-KB-Seiten, Cortex-A720 und A520 mit LSE): Das statische `coretest`
 aus `/data/local/tmp`, gestartet über `adb shell` mit eigenem `TMPDIR`, läuft auf echter ARM-Hardware: 4720 von 4724

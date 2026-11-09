@@ -1,6 +1,6 @@
 // Portable replacement for the native x87 entry points. Decimal scaling emulates the x87
-// 64-bit significand after each multiply/divide. Transcendentals use explicit scalar binary64
-// series, pow / sin / cos with double-doubles (below); native x87 is the comparison reference.
+// 64-bit significand after each multiply/divide. The transcendentals carry double-doubles
+// (below) and stay within about half an ulp; native x87 is the comparison reference.
 
 use super::fx;
 
@@ -185,11 +185,11 @@ pub fn scale_round(v: f64, k: i32) -> i64 {
 }
 /// Nearest integer decimal logarithm; nonpositive inputs produce the SSE indefinite value.
 pub fn log10_round(v: f64) -> i32 {
-    fx::cvtd(log2(v) * core::f64::consts::LOG10_2)
+    fx::cvtd(log2_series(v) * core::f64::consts::LOG10_2)
 }
 
-/// Binary logarithm using a normalized mantissa and a convergent atanh series.
-pub fn log2(x: f64) -> f64 {
+/// Binary logarithm by a convergent atanh series: log10_round's, the same bits as x87 there.
+fn log2_series(x: f64) -> f64 {
     if x.is_nan() {
         return x + x;
     }
@@ -221,35 +221,35 @@ pub fn log2(x: f64) -> f64 {
     }
     e as f64 + (2.0 * sum) / LN2
 }
-/// Platform-independent base-two exponent; finite underflow rounds into subnormals.
+/// Binary logarithm within about half an ulp (a table and a series in double-doubles).
+pub fn log2(x: f64) -> f64 {
+    if x.is_nan() {
+        return x + x;
+    }
+    if x == 0.0 {
+        return f64::NEG_INFINITY;
+    }
+    if x < 0.0 {
+        return f64::from_bits(0xfff8000000000000);
+    }
+    if x == f64::INFINITY {
+        return x;
+    }
+    log2_dd(x).0
+}
+/// Platform-independent base-two exponent within about half an ulp (double-doubles, rounded
+/// once, subnormal results too); finite underflow rounds into subnormals, 1024 on is inf.
 pub fn exp2(x: f64) -> f64 {
     if x.is_nan() {
         return x + x;
     }
-    if x >= 1024.0 {
-        return f64::INFINITY;
-    }
-    if x <= -1075.0 {
-        return 0.0;
-    }
-    let n = fx::cvtd(x);
-    let f = (x - n as f64) * LN2;
-    let mut sum = 1.0;
-    let mut term = 1.0;
-    let mut i = 1;
-    while i <= 20 {
-        term *= f / i as f64;
-        sum += term;
-        i += 1;
-    }
-    if n > 1023 {
-        (sum * 2.0) * f64::from_bits(2046u64 << 52)
-    } else if n < -1022 {
-        (sum * f64::from_bits(((n + 1077) as u64) << 52)) * f64::from_bits(969u64 << 52)
-    } else {
-        sum * f64::from_bits(((n + 1023) as u64) << 52)
-    }
+    exp2_dd(x, 0.0)
 }
+// log10_round keeps the series of log2_series: its integers must match the x87 unit's
+// fldlg2 / fyl2x / fistp bit for bit (portabletest decimal_checks, math_diff.py), and the
+// more exact log2 could change the rare roundings near half integers away from x87's.
+// rz_log2 / rz_exp2 are log2 / exp2 here; their x87 originals (fyl2x alone, f2xm1 + fscale)
+// are not, so ARM64 is nearer the true value there than x86-64.
 /// Existing rotation/zoom base-two logarithm API.
 pub fn rz_log2(x: f64) -> f64 {
     log2(x)
@@ -259,10 +259,10 @@ pub fn rz_exp2(x: f64) -> f64 {
     exp2(x)
 }
 
-// pow, sin and cos carry their intermediate results as double-doubles, so they stay within
-// about half an ulp of the true value; sin and cos reduce any finite angle exactly enough
-// (Cody-Waite with pi/2 in four parts below 2^19, Payne-Hanek with 1216 bits of 2/pi above).
-// Only IEEE double operations and integer arithmetic: the same bits on every processor.
+// exp2, log2, pow, sin, cos and atan2 carry their intermediate results as double-doubles, so
+// they stay within about half an ulp of the true value; sin and cos reduce any finite angle
+// exactly enough (Cody-Waite with pi/2 in four parts below 2^19, Payne-Hanek with 1216 bits of
+// 2/pi above). Only IEEE double operations and integer arithmetic: the same bits everywhere.
 //
 // Double-double arithmetic: a value is hi + lo with |lo| at most about half an ulp of hi.
 // Products split their factors into 26 + 27 bits (Veltkamp), so no step needs an FMA.
@@ -465,7 +465,7 @@ fn log2_dd(x: f64) -> (f64, f64) {
     fast_two_sum(h, l2 + l)
 }
 
-/// 2^(wh + wl) for |wl| <= ulp(wh), rounded once at the end (subnormal results twice):
+/// 2^(wh + wl) for |wl| <= ulp(wh), rounded once at the end (subnormal results too):
 /// 2^w = 2^n 2^(j/32) exp(g) with g = (w - n - j/32) ln 2, |g| <= ln 2 / 64
 fn exp2_dd(wh: f64, wl: f64) -> f64 {
     if wh >= 1024.0 {
@@ -486,15 +486,16 @@ fn exp2_dd(wh: f64, wl: f64) -> f64 {
     let el = el + (gl + gh * gh * q);
     let (th, tl) = EXP2_T[(k & 31) as usize];
     let (rh, rl) = two_prod(th, eh);
-    let r = rh + (rl + (th * el + tl * eh)); // in [0.98, 2)
+    let rl = rl + (th * el + tl * eh); // rh + rl in [0.98, 2)
     let n = k >> 5;
-    if n > 1023 {
-        r * 2.0 * pow2(n - 1)
-    } else if n < -1022 {
-        r * pow2(n + 64) * pow2(-64)
-    } else {
-        r * pow2(n)
+    if n < -1022 {
+        // subnormal: C + r with C = 2^(-1022 - n) rounds r to the multiples of 2^(-1074 - n)
+        let c = pow2(-1022 - n);
+        let (s, e) = fast_two_sum(c, rh);
+        return ((s + (e + rl)) - c) * pow2(n + 64) * pow2(-64); // both products exact
     }
+    let r = rh + rl;
+    if n > 1023 { r * 2.0 * pow2(n - 1) } else { r * pow2(n) }
 }
 
 /// Effect power contract: y=0 yields 1, nonpositive bases yield 0, NaNs propagate canonically.
@@ -532,55 +533,115 @@ pub fn pow(x: f64, y: f64) -> f64 {
     exp2_dd(wh, wl)
 }
 
-fn atan_reduced(mut x: f64) -> f64 {
-    let inverse = x > 1.0;
-    if inverse {
-        x = 1.0 / x;
+// atan2: atan(n / d) for 0 < n <= d from a table, atan t = atan c + atan((t - c) / (1 + t c))
+// with c = j/32 the nearest, |(t - c) / (1 + t c)| <= 1/64; t and the quotient as double-doubles
+const PI_H: f64 = PI;
+const PI_L: f64 = 1.2246467991473532e-16;
+/// atan(j/32) for j = 0 ..= 32 as hi + lo
+const ATAN_T: [(f64, f64); 33] = [
+    (0.0, 0.0),
+    (0.031239833430268277, -1.188442711587748e-18),
+    (0.06241880999595735, -1.5490756308295046e-18),
+    (0.09347678115858947, -6.2844725995420954e-18),
+    (0.12435499454676144, -3.1253241424539383e-18),
+    (0.15499674192394097, 9.585415594114324e-18),
+    (0.18534794999569476, 4.180692268843079e-18),
+    (0.21535769969773805, 4.738160130078733e-19),
+    (0.24497866312686414, 1.0698755618734451e-17),
+    (0.2741674511196588, 8.261353575163773e-18),
+    (0.3028848683749714, -1.1010827903001369e-17),
+    (0.3310960767041321, -7.952610375793799e-18),
+    (0.35877067027057225, -2.4623815582638635e-17),
+    (0.38588266939807375, 2.378822732491941e-17),
+    (0.4124104415973873, -1.587652227770689e-17),
+    (0.43833655985795783, -2.494277030626541e-17),
+    (0.4636476090008061, 2.2698777452961687e-17),
+    (0.48833395105640554, -1.1373236189329585e-17),
+    (0.5123894603107377, -2.5462781472855804e-17),
+    (0.5358112379604637, -4.0637956834825575e-18),
+    (0.5585993153435624, -5.4556305485916264e-18),
+    (0.5807563535676704, -1.441464378193067e-17),
+    (0.6022873461349642, 2.950430737228402e-17),
+    (0.6231993299340659, 2.672403885140095e-17),
+    (0.6435011087932844, 1.5834785051444286e-17),
+    (0.6632029927060933, -3.076054864429649e-17),
+    (0.6823165548747481, 6.943223671560008e-18),
+    (0.7008544078844502, -1.987626234335816e-17),
+    (0.7188299996216245, -2.1478388444456983e-17),
+    (0.7362574289814281, 3.473937648299457e-17),
+    (0.7531512809621944, -2.4256934659182068e-17),
+    (0.7695264804056583, -3.704991905602721e-17),
+    (0.7853981633974483, 3.061616997868383e-17),
+];
+/// (-1)^k / (2k + 1) for k = 1 ..= 5: atan s = s + s^3 (-1/3 + s^2/5 - ...)
+const ATAN_P: [f64; 5] = [-0.3333333333333333, 0.2, -0.14285714285714285, 0.1111111111111111, -0.09090909090909091];
+
+/// atan(n / d) as hi + lo for 0 < n <= d (d may be infinite), relative error below 2^-62
+fn atan_dd(mut n: f64, mut d: f64) -> (f64, f64) {
+    let th = n / d;
+    if th < 8.673617379884035e-19 {
+        return (th, 0.0); // t < 2^-60: atan t = t (1 - t^2/3 + ...) rounds like t
     }
-    let transformed = x > 0.41421356237309503;
-    if transformed {
-        x = (x - 1.0) / (x + 1.0);
+    if d > pow2(400) {
+        (n, d) = (n * pow2(-600), d * pow2(-600)); // exact: n >= 2^-60 d, two_prod fits
+    } else if d < pow2(-400) {
+        (n, d) = (n * pow2(600), d * pow2(600));
     }
-    let xx = -x * x;
-    let mut term = x;
-    let mut sum = x;
-    let mut i = 3;
-    while i <= 61 {
-        term *= xx;
-        sum += term / i as f64;
-        i += 2;
+    let (p, pe) = two_prod(th, d);
+    let tl = ((n - p) - pe) / d; // t = th + tl
+    let jf = (th * 32.0 + ROUND) - ROUND;
+    let c = jf * (1.0 / 32.0);
+    let (nh, nl) = two_sum(th - c, tl); // th - c is exact (Sterbenz, or c = 0)
+    let (q, qe) = two_prod(th, c);
+    let (bh, bl) = fast_two_sum(1.0, q);
+    let bl = bl + (qe + tl * c); // 1 + t c = bh + bl
+    let sh = nh / bh;
+    let (p, pe) = two_prod(sh, bh);
+    let sl = ((((nh - p) - pe) + nl) - sh * bl) / bh; // s = (t - c) / (1 + t c) = sh + sl
+    let u = sh * sh;
+    let mut k = ATAN_P[4];
+    for &a in ATAN_P[..4].iter().rev() {
+        k = a + u * k;
     }
-    if transformed {
-        sum += core::f64::consts::FRAC_PI_4;
-    }
-    if inverse { HALF_PI - sum } else { sum }
+    let (ah, al) = ATAN_T[jf as usize];
+    let (h, l) = two_sum(ah, sh);
+    (h, l + (al + (sl + sh * u * k)))
 }
 
-/// Quadrant-aware arctangent, including signed zeros and infinite operands.
+/// Quadrant-aware arctangent, including signed zeros and infinite operands: c + atan(n / d)
+/// or c - atan(n / d) with c = 0, pi/2 or pi as double-doubles, rounded once (within about
+/// half an ulp).
 pub fn atan2(y: f64, x: f64) -> f64 {
     if y.is_nan() || x.is_nan() {
         return x + y;
     }
-    let ax = x.abs();
-    let ay = y.abs();
-    let mut a = if ay == 0.0 {
-        0.0
-    } else if ax == 0.0 {
-        HALF_PI
-    } else if ax.is_infinite() && ay.is_infinite() {
-        core::f64::consts::FRAC_PI_4
-    } else {
-        atan_reduced(ay / ax)
-    };
-    if x.is_sign_negative() {
-        a = PI - a;
+    let (mut ax, mut ay) = (x.abs(), y.abs());
+    if ax.is_infinite() && ay.is_infinite() {
+        (ax, ay) = (1.0, 1.0);
     }
-    if y.is_sign_negative() { -a } else { a }
+    let swap = ay > ax;
+    // x >= 0: atan(ay/ax) or pi/2 - atan(ax/ay); x < 0: pi - atan(ay/ax) or pi/2 + atan(ax/ay)
+    let (ch, cl, minus) = match (x.is_sign_negative(), swap) {
+        (false, false) => (0.0, 0.0, 0),
+        (false, true) => (PIO2_H, PIO2_L, 1u64 << 63),
+        (true, false) => (PI_H, PI_L, 1 << 63),
+        (true, true) => (PIO2_H, PIO2_L, 0),
+    };
+    let (ah, al) = if ay == 0.0 {
+        (0.0, 0.0)
+    } else if swap {
+        atan_dd(ax, ay)
+    } else {
+        atan_dd(ay, ax)
+    };
+    let (h, l) = two_sum(ch, f64::from_bits(ah.to_bits() ^ minus));
+    let a = h + (l + (cl + f64::from_bits(al.to_bits() ^ minus)));
+    f64::from_bits(a.to_bits() ^ y.to_bits() & 1 << 63)
 }
 
 // sin and cos: |x| = q pi/2 + r with |r| <= pi/4, r as a double-double, then Taylor series
 // in r whose leading terms are double-doubles too
-const PIO2_H: f64 = 1.5707963267948966; // pi / 2
+const PIO2_H: f64 = HALF_PI; // pi / 2
 const PIO2_L: f64 = 6.123233995736766e-17;
 const INV_PIO2: f64 = 0.6366197723675814; // 2 / pi
 const CW_P1: f64 = 1.5707963267341256; // pi / 2 = P1 + P2 + P3 + P4
