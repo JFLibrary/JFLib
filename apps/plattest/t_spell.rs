@@ -62,7 +62,7 @@ fn checker(t: &mut T) {
     let langs = sys_spell_languages();
     t.info(&format!("  system spell checker: {:?}\n", langs));
     t.check(sys_spell_find("xx-QQ").is_none(), "spell: an unknown language is not found");
-    if !cfg!(windows) {
+    if !cfg!(any(windows, target_os = "macos")) {
         t.check(langs.is_empty() && sys_spell_find("de-DE").is_none() && SysSpeller::open("de-DE").is_none(), "spell: no system checker here");
         return;
     }

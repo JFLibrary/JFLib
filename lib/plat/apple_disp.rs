@@ -132,8 +132,8 @@ pub fn drives() -> Vec<String> {
 }
 
 /// printing as linux_print.rs checks it: the manifest, a job without pixels (ERR_DIMS), the test
-/// variant jfgui_PRINT_TO=FILE (the PDF into a file); the system's print dialog comes with AP7, until
-/// then ERR_UNSUPPORTED
+/// variant jfgui_PRINT_TO=FILE (the PDF into a file); macOS: the system's print dialog
+/// (apple_mac_app.rs print_dialog); iOS: ERR_UNSUPPORTED before AP5
 pub fn print(job: &mut crate::PrintJob<'_>) -> i32 {
     job.copies = 0;
     if !crate::policy::print_allowed() {
@@ -157,6 +157,9 @@ pub fn print(job: &mut crate::PrintJob<'_>) -> i32 {
         job.copies = 1;
         return 0;
     }
+    #[cfg(target_os = "macos")]
+    return super::mac::print_dialog(job);
+    #[cfg(not(target_os = "macos"))]
     crate::ERR_UNSUPPORTED
 }
 

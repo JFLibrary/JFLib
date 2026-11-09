@@ -17,6 +17,12 @@
 //                              TS_PINCH a magnification of a / 1000 (magnifyWithEvent:, at client px b, c)
 //     WT_PARENT [popup]        the index of the window w (popup = 1: popup slot w) hangs on, -1 none
 //     WT_MIN_SIZE              window w's minimum client size (DIP): w | h << 32
+//     WT_MENU                  the main menu: its items | the app menu's items << 8 | (1 << 16 when its
+//                              Quit is Cmd+Q)
+//     WT_TERMINATE             [NSApp terminate:] (Cmd+Q, the Dock's Quit) -> 0 when the app goes on
+//     WT_WORKSPACE [k]         NSWorkspace's notification k (0 will sleep, 1 did wake, 2 will power off)
+//                              posted in this process
+//     WT_SIGTERM               SIGTERM to this process (kill)
 //   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms: Cancel, or (saving)
 //                              OK with name (a full path)
 
@@ -38,6 +44,10 @@ pub const WT_POPUP_SEND: u32 = 13;
 pub const WT_SEND: u32 = 32;
 pub const WT_PARENT: u32 = 33;
 pub const WT_MIN_SIZE: u32 = 34;
+pub const WT_MENU: u32 = 35;
+pub const WT_TERMINATE: u32 = 36;
+pub const WT_WORKSPACE: u32 = 37;
+pub const WT_SIGTERM: u32 = 38;
 // WT_SEND / WT_POPUP_SEND kinds
 pub const TS_MOVE: i32 = 1;
 pub const TS_DOWN: i32 = 2;
@@ -55,6 +65,16 @@ unsafe extern "C" {
     fn CGImageGetDataProvider(i: CfRef) -> CfRef;
     fn CGDataProviderCopyData(p: CfRef) -> CfRef;
     fn CGEventCreateScrollWheelEvent2(src: CfRef, units: u32, count: u32, w1: i32, w2: i32, w3: i32) -> CfRef;
+}
+#[link(name = "AppKit", kind = "framework")]
+unsafe extern "C" {
+    static NSWorkspaceWillSleepNotification: Id;
+    static NSWorkspaceDidWakeNotification: Id;
+    static NSWorkspaceWillPowerOffNotification: Id;
+}
+unsafe extern "C" {
+    fn kill(pid: i32, sig: i32) -> i32;
+    fn getpid() -> i32;
 }
 #[link(name = "CoreFoundation", kind = "framework")]
 unsafe extern "C" {
@@ -162,6 +182,29 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
                 .flatten()
                 .map_or(-1, |k| k as i64)
         }
+        WT_MENU => menu_shape(),
+        WT_TERMINATE => {
+            let Some(app) = super::app() else { return -1 };
+            // SAFETY: terminate: of the application (its delegate decides).
+            unsafe { msg!(app, c"terminate:", NIL => Id; ()) };
+            0
+        }
+        WT_WORKSPACE => {
+            // SAFETY: NSWorkspace's centre; a notification of ours in this process.
+            unsafe {
+                let name = match a[0] {
+                    0 => NSWorkspaceWillSleepNotification,
+                    1 => NSWorkspaceDidWakeNotification,
+                    _ => NSWorkspaceWillPowerOffNotification,
+                };
+                let ws: Id = msg!(class(c"NSWorkspace"), c"sharedWorkspace"; Id);
+                let nc: Id = msg!(ws, c"notificationCenter"; Id);
+                msg!(nc, c"postNotificationName:object:", name => Id, ws => Id; ());
+            }
+            0
+        }
+        // SAFETY: a signal to this process (the backend's dispatch source takes it).
+        WT_SIGTERM => unsafe { kill(getpid(), 15) as i64 },
         WT_MIN_SIZE => {
             let Some((win, _, _)) = ids(w) else { return -1 };
             // SAFETY: contentMinSize of our window (points = DIP).
@@ -169,6 +212,33 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
             round(m.w) as i64 | (round(m.h) as i64) << 32
         }
         _ => -1,
+    }
+}
+
+/// WT_MENU: the main menu's shape
+fn menu_shape() -> i64 {
+    let Some(app) = super::app() else { return -1 };
+    // SAFETY: the main menu and its items (objects of the application).
+    unsafe {
+        let bar: Id = msg!(app, c"mainMenu"; Id);
+        if bar.is_null() {
+            return -1;
+        }
+        let n: isize = msg!(bar, c"numberOfItems"; isize);
+        let first: Id = if n > 0 { msg!(bar, c"itemAtIndex:", 0isize => isize; Id) } else { NIL };
+        let sub: Id = if first.is_null() { NIL } else { msg!(first, c"submenu"; Id) };
+        let m: isize = if sub.is_null() { 0 } else { msg!(sub, c"numberOfItems"; isize) };
+        let mut quit = 0i64;
+        for k in 0..m {
+            let it: Id = msg!(sub, c"itemAtIndex:", k => isize; Id);
+            let act: super::Sel = msg!(it, c"action"; super::Sel);
+            if act == crate::apple::objc::sel(c"terminate:") {
+                let key = super::string_of(msg!(it, c"keyEquivalent"; Id));
+                let mask: u64 = msg!(it, c"keyEquivalentModifierMask"; u64);
+                quit = (key == "q" && mask & (1 << 20) != 0) as i64;
+            }
+        }
+        n as i64 | (m as i64) << 8 | quit << 16
     }
 }
 

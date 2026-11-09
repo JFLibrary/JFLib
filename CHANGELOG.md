@@ -33,6 +33,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **gpu:** TextureView::usage (public on Vulkan, new in the browser) and TextureView::same (identity of a view and its clones, a cache's key)
 - **render3d:** Detail levels (Renderer::set_lods, Lod, LODS_MAX, lods, cull_sphere): a mesh takes other meshes, or none (contribution culling), below a projected size; the visibility picks per instance from the camera's distance, the shadow cascades take the camera's pick; ListInfo::room; render3dtest --test lods
 - **gpu:** A queue of its own for compute and copies on Vulkan (Device::compute_queue -> Option<&ComputeQueue>: a family without graphics where the device has one, None in the browser and with jfgui_GPU_COMPUTE=0): ComputeQueue::encoder, submit, submit_after; Queue::submit_after waits for submissions of either queue through their timelines; Device::wait, is_done and wait_idle take both; buffers and textures other than render targets are shared concurrently (docs/GPU.md)
+- **plat:** macOS: the app in the system (docs/APPLE.md, AP7a): the app and Window menus (Cmd+Q asks the main window through E_CLOSE), the Dock icon brings the main window back, E_POWER and E_SESSION_END (NSWorkspace, SIGTERM), tool windows that take the keyboard only for a text field, inhibit (IOKit power assertions), trash (the Finder's trash), the recent documents (NSDocumentController), the system's spell checker (NSSpellChecker), the print dialog (NSPrintPanel, the job's PDF through PDFKit)
+- **plat:** macOS and iOS: system_languages and system_locale ask CoreFoundation (LANGUAGE and LC_* set by hand still win, LANG alone does not)
 
 ### Changed
 

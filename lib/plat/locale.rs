@@ -8,7 +8,9 @@
 // Windows: GetUserPreferredUILanguages and GetUserDefaultLocaleName.  Linux, the browser and
 // Android: the environment -- LANGUAGE (a ':' list, GNU), LC_ALL, LC_MESSAGES, LANG for the
 // languages; LC_ALL, LC_TIME, LC_NUMERIC, LANG for the format.  The browser host sets LANGUAGE
-// from navigator.languages, the Android host from the system's locale list.
+// from navigator.languages, the Android host from the system's locale list.  macOS and iOS:
+// CoreFoundation's preferred languages and current locale; LANGUAGE / LC_ALL / LC_MESSAGES and
+// LC_ALL / LC_TIME / LC_NUMERIC set by hand win (LANG alone does not).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -52,8 +54,44 @@ fn env_tag(names: &[&str]) -> Option<String> {
 }
 
 /// the UI languages in order of preference (empty when the system names none)
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_vendor = "apple")))]
 pub fn system_languages() -> Vec<String> {
+    env_languages()
+}
+
+/// the regional format (numbers, dates, currency) of the user
+#[cfg(not(any(windows, target_vendor = "apple")))]
+pub fn system_locale() -> Option<String> {
+    env_tag(&["LC_ALL", "LC_TIME", "LC_NUMERIC", "LANG"]).or_else(|| system_languages().into_iter().next())
+}
+
+/// Apple: the system's preferred languages (CFLocaleCopyPreferredLanguages); LANGUAGE, LC_ALL or
+/// LC_MESSAGES set by hand win (LANG alone does not: Terminal sets it from the region)
+#[cfg(target_vendor = "apple")]
+pub fn system_languages() -> Vec<String> {
+    if ["LANGUAGE", "LC_ALL", "LC_MESSAGES"].iter().any(|n| crate::env(n).is_some_and(|v| !v.is_empty())) {
+        let v = env_languages();
+        if !v.is_empty() {
+            return v;
+        }
+    }
+    let v = dedup(cf::preferred_languages().iter().filter_map(|s| locale_tag(s)).collect());
+    if v.is_empty() { env_languages() } else { v }
+}
+
+/// Apple: LC_ALL, LC_TIME or LC_NUMERIC set by hand, else the system's current locale
+/// (CFLocaleCopyCurrent: "de_DE", "en_US@rg=dezzzz" -> "en-US"), else LANG, else the first language
+#[cfg(target_vendor = "apple")]
+pub fn system_locale() -> Option<String> {
+    env_tag(&["LC_ALL", "LC_TIME", "LC_NUMERIC"])
+        .or_else(|| cf::current_locale().and_then(|s| locale_tag(&s)))
+        .or_else(|| env_tag(&["LANG"]))
+        .or_else(|| system_languages().into_iter().next())
+}
+
+/// the languages of LANGUAGE, LC_ALL, LC_MESSAGES and LANG (GNU gettext's rules)
+#[cfg(not(windows))]
+fn env_languages() -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let raw = ["LC_ALL", "LC_MESSAGES", "LANG"].iter().find_map(|n| crate::env(n).filter(|v| !v.is_empty()));
     // LANGUAGE does not count under the "C" locale (as with GNU gettext)
@@ -66,10 +104,68 @@ pub fn system_languages() -> Vec<String> {
     dedup(out)
 }
 
-/// the regional format (numbers, dates, currency) of the user
-#[cfg(not(windows))]
-pub fn system_locale() -> Option<String> {
-    env_tag(&["LC_ALL", "LC_TIME", "LC_NUMERIC", "LANG"]).or_else(|| system_languages().into_iter().next())
+// Apple: CoreFoundation's locale (also without an application object)
+#[cfg(target_vendor = "apple")]
+mod cf {
+    use alloc::string::String;
+    use alloc::vec::Vec;
+
+    type CfRef = *const core::ffi::c_void;
+
+    #[link(name = "CoreFoundation", kind = "framework")]
+    unsafe extern "C" {
+        fn CFLocaleCopyPreferredLanguages() -> CfRef;
+        fn CFLocaleCopyCurrent() -> CfRef;
+        fn CFLocaleGetIdentifier(l: CfRef) -> CfRef;
+        fn CFArrayGetCount(a: CfRef) -> isize;
+        fn CFArrayGetValueAtIndex(a: CfRef, i: isize) -> CfRef;
+        fn CFStringGetCString(s: CfRef, buf: *mut u8, n: isize, encoding: u32) -> u8;
+        fn CFRelease(r: CfRef);
+    }
+
+    fn string(s: CfRef) -> Option<String> {
+        if s.is_null() {
+            return None;
+        }
+        let mut buf = [0u8; 128];
+        // SAFETY: a CFString and a buffer of 128 bytes (UTF-8, NUL-terminated on success).
+        if unsafe { CFStringGetCString(s, buf.as_mut_ptr(), buf.len() as isize, 0x0800_0100) } == 0 {
+            return None;
+        }
+        let n = buf.iter().position(|&b| b == 0).unwrap_or(0);
+        core::str::from_utf8(&buf[..n]).ok().map(String::from)
+    }
+
+    /// "de-DE", "en-US", ... in the user's order
+    pub fn preferred_languages() -> Vec<String> {
+        let mut out = Vec::new();
+        // SAFETY: a copied array of CFStrings, released after.
+        unsafe {
+            let a = CFLocaleCopyPreferredLanguages();
+            if a.is_null() {
+                return out;
+            }
+            for k in 0..CFArrayGetCount(a).min(32) {
+                out.extend(string(CFArrayGetValueAtIndex(a, k)));
+            }
+            CFRelease(a);
+        }
+        out
+    }
+
+    /// the current locale's identifier ("de_DE")
+    pub fn current_locale() -> Option<String> {
+        // SAFETY: a copied locale (released after); its identifier belongs to it.
+        unsafe {
+            let l = CFLocaleCopyCurrent();
+            if l.is_null() {
+                return None;
+            }
+            let id = string(CFLocaleGetIdentifier(l));
+            CFRelease(l);
+            id
+        }
+    }
 }
 
 fn dedup(v: Vec<String>) -> Vec<String> {

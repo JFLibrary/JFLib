@@ -24,7 +24,7 @@ fn contract(t: &mut T) {
 
 pub fn t_power(t: &mut T) {
     contract(t);
-    if cfg!(windows) {
+    if cfg!(any(windows, target_os = "macos")) {
         let a = inhibit("plattest: power test (system)", INHIBIT_SUSPEND);
         t.check(a.as_ref().is_some_and(|g| g.what() == INHIBIT_SUSPEND), "power: a system power request");
         t.expect_i(inhibited() as i64, INHIBIT_SUSPEND as i64, "power: inhibited() = suspend");

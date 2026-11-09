@@ -94,8 +94,12 @@ fn dip(v: i32, dpi: i32) -> i32 {
     (v * dpi + 48) / 96
 }
 
-/// the caption strip (never clicked by the test: HB_DRAG starts the system's window drag)
-fn hit_test(_w: i32, _x: i32, y: i32) -> u32 {
+/// the caption strip (never clicked by the test: HB_DRAG starts the system's window drag); window 1
+/// (the tool window): a text field right of x = 60
+fn hit_test(w: i32, x: i32, y: i32) -> u32 {
+    if w == 1 {
+        return if x >= 60 { HB_TEXT } else { 0 };
+    }
     if y < 30 { HB_DRAG } else { 0 }
 }
 
@@ -176,7 +180,8 @@ pub fn t_window(t: &mut T) {
     let ev = pump(300);
     t.check(win_test(WT_VISIBLE, 0, [0; 4]) == 1, "window: win_show shows it");
     t.check(ev.iter().any(|e| e.typ == E_PAINT && e.win == 0), "window: shown -> E_PAINT");
-    t.info(&format!("  (key window after win_show: {}, state {:#x})\n", win_test(WT_ACTIVE, 0, [0; 4]), win_state(0)));
+    let active = win_test(WT_ACTIVE, 0, [0; 4]) == 1;
+    t.info(&format!("  (key window after win_show: {}, state {:#x})\n", active as i32, win_state(0)));
 
     // ---- present
     let (ca, cb) = (0x0033_6699u32, 0x00CC_2211);
@@ -302,6 +307,25 @@ pub fn t_window(t: &mut T) {
     pump(50);
     t.check(win_test(WT_ACTIVE, 1, [0; 4]) == 0 && win_test(WT_ACTIVE, 0, [0; 4]) == key0, "tool: PWS_SHOWNA does not activate it");
     t.check(win_test(WT_PARENT, 1, [0; 4]) == 0, "tool: a child window of its owner");
+    // a panel: a click leaves the keyboard with the owner, a click into a text field takes it
+    win_hit_hook(Some(hit_test));
+    win_test(WT_SEND, 1, [TS_DOWN, 20, 30, 0]);
+    win_test(WT_SEND, 1, [TS_UP, 20, 30, 0]);
+    let after_button = win_test(WT_ACTIVE, 1, [0; 4]);
+    win_test(WT_SEND, 1, [TS_DOWN, 80, 30, 0]);
+    win_test(WT_SEND, 1, [TS_UP, 80, 30, 0]);
+    let after_text = win_test(WT_ACTIVE, 1, [0; 4]);
+    if active {
+        t.check(after_button == 0 && after_text == 1, "tool: a click keeps the keyboard with the owner, a click into a text field takes it");
+        if (after_button, after_text) != (0, 1) {
+            t.info(&format!("  (key after the button: {after_button}, after the text field: {after_text})\n"));
+        }
+    } else {
+        t.info("  (tool: the app is not active -- the screen locked? -- the panel's keyboard is not tested)\n");
+    }
+    win_hit_hook(None);
+    win_activate(0);
+    pump(50);
     evq_clear();
     win_test(WT_MOVE, 0, [o[0] + 30, o[1], o[2], o[3]]);
     let ev = pump(50);
@@ -341,6 +365,16 @@ pub fn t_window(t: &mut T) {
     t.info(&format!("  (file dialog: {} {} {path})\n", r.0, r.1));
     t.check(r == (1, 1) && path == full, "filedlg: a name + OK -> the path, the type");
 
+    // ---- the print panel (cancelled by a timer: nothing reaches a printer)
+    let px = vec![0xFFu8; 8 * 8 * 4];
+    let mut job = PrintJob::new(Some(PrintSrc { px: &px, w: 8, h: 8, stride: 32, fmt: PRINT_ARGB }), "plattest");
+    print_dialog_autoclose(500);
+    let r = print(&mut job);
+    t.check(r == ERR_CANCEL && job.copies == 0, "print: the system's print panel, cancelled -> ERR_CANCEL");
+    if r != ERR_CANCEL {
+        t.info(&format!("  (print answered {r})\n"));
+    }
+
     // ---- monitors, settings, process level
     let mons = monitors();
     for m in &mons {
@@ -357,6 +391,25 @@ pub fn t_window(t: &mut T) {
     let home = home().unwrap_or_default();
     t.check(th == 0 || th == 1, "system: theme() reads the appearance (0 light / 1 dark)");
     t.check(!home.is_empty() && file_exists(&home) == 2, "system: home() is a folder");
+
+    // ---- the app in the system (docs/APPLE.md AP7a)
+    let m = win_test(WT_MENU, 0, [0; 4]);
+    t.check(m >= 0 && m & 0xFF == 2 && (m >> 8) & 0xFF >= 5 && (m >> 16) & 1 == 1, "app: the main menu: the app menu (Quit is Cmd+Q) and the Window menu");
+    evq_clear();
+    win_test(WT_TERMINATE, 0, [0; 4]);
+    let e = pump_for(E_CLOSE, 500);
+    t.check(e.is_some_and(|e| e.win == 0), "app: Cmd+Q / the Dock's Quit asks the main window (E_CLOSE), the app goes on");
+    for (k, typ, data, what) in [(0, E_POWER, 1, "will sleep -> E_POWER 1"), (1, E_POWER, 0, "did wake -> E_POWER 0"),
+                                 (2, E_SESSION_END, 0, "will power off -> E_SESSION_END")] {
+        evq_clear();
+        win_test(WT_WORKSPACE, 0, [k, 0, 0, 0]);
+        let e = pump_for(typ, 500);
+        t.check(e.is_some_and(|e| e.data == data), &format!("app: NSWorkspace {what}"));
+    }
+    evq_clear();
+    win_test(WT_SIGTERM, 0, [0; 4]);
+    let e = pump_for(E_SESSION_END, 1000);
+    t.check(e.is_some(), "app: SIGTERM -> E_SESSION_END (the app saves and ends itself)");
 
     // ---- wake from another thread, close, destroy
     evq_clear();

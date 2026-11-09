@@ -329,7 +329,7 @@ pub use web::*;
 
 mod clipdrop;
 // drag and drop between programs (the shared part; win_dnd.rs, linux_x11_dnd.rs, linux_wl_clip.rs)
-#[cfg_attr(target_vendor = "apple", allow(dead_code))] // no windows on Apple yet (docs/APPLE.md AP4)
+#[cfg_attr(target_os = "ios", allow(dead_code))] // no windows on iOS yet (docs/APPLE.md AP5)
 mod dnd;
 pub use dnd::*;
 // clipboard_platform: reusable rich clipboard framing.

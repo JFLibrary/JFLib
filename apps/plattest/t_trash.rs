@@ -48,16 +48,57 @@ pub fn t_trash(t: &mut T) {
     t.check(!plat::trash(&format!("{base}/work/missing.txt")), "trash: a missing file is no success");
     t.check(plat::write_file("mem://t.txt", b"m") && !plat::trash("mem://t.txt") && plat::file_exists("mem://t.txt") == 1,
         "trash: mem:// has no trash (the file stays)");
-    if cfg!(target_vendor = "apple") {
-        t.info("trash: not on Apple yet (docs/APPLE.md AP7)\n");
+    if cfg!(target_os = "ios") {
+        t.check(!plat::trash(&format!("{base}/work")), "trash: iOS has none");
         return;
     }
     if cfg!(windows) {
         windows(t, &base);
+    } else if cfg!(target_os = "macos") {
+        mac(t, &base);
     } else {
         linux(t, &base);
     }
     installed(t, &base);
+    if cfg!(target_os = "macos") {
+        empty_from_trash(&["go.txt"]); // installed()'s file
+    }
+}
+
+/// macOS: into the Finder's trash (~/.Trash for the home volume); what the test put there goes again
+fn mac(t: &mut T, base: &str) {
+    let tag = format!("{:x}", plat::time_us() & 0xFFFF_FFFF);
+    let (fname, dname) = (format!("jflib-plattest-{tag}.txt"), format!("jflib-plattest-{tag}-folder"));
+    let f = format!("{base}/work/{fname}");
+    t.check(plat::write_file(&f, b"plattest: this file may be deleted"), "trash: a throwaway file");
+    t.check(plat::trash(&f), "trash: into the Finder's trash");
+    t.expect_i(plat::file_exists(&f) as i64, 0, "trash: the file is gone from its place");
+    let home = plat::env("HOME").unwrap_or_default();
+    t.check(plat::read_file(&format!("{home}/.Trash/{fname}")).is_some(), "trash: ... and in ~/.Trash");
+    let dir = format!("{base}/work/{dname}");
+    t.check(plat::mkdir(&dir) && plat::write_file(&format!("{dir}/inner.txt"), b"in") && plat::trash(&dir), "trash: a folder");
+    t.check(plat::file_exists(&dir) == 0 && plat::read_file(&format!("{home}/.Trash/{dname}/inner.txt")).is_some(), "trash: ... with its files");
+    t.check(vfs::mount("scratch", Arc::new(DirFs::new(&format!("{base}/work")))), "trash: a DirFs mount");
+    let vname = format!("jflib-plattest-{tag}-v.txt");
+    t.check(plat::write_file(&format!("scratch://{vname}"), b"vfs") && plat::trash(&format!("scratch://{vname}"))
+        && plat::file_exists(&format!("scratch://{vname}")) == 0, "trash: a vfs name of a folder mount");
+    t.check(!plat::trash("scratch://"), "trash: the mount's root is refused");
+    vfs::unmount("scratch");
+    t.check(!plat::trash("/") && !plat::trash(&format!("{base}/work/missing-{tag}")), "trash: the root and a missing file are refused");
+    empty_from_trash(&[&fname, &dname, &vname]);
+}
+
+/// remove what the test put into ~/.Trash (macOS)
+fn empty_from_trash(names: &[&str]) {
+    let home = plat::env("HOME").unwrap_or_default();
+    for n in names {
+        let p = format!("{home}/.Trash/{n}");
+        if plat::file_exists(&p) == 2 {
+            rm_tree(&p);
+        } else {
+            plat::delete(&p);
+        }
+    }
 }
 
 fn windows(t: &mut T, base: &str) {

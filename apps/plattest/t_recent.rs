@@ -112,10 +112,6 @@ fn count(hay: &str, needle: &str) -> usize {
 }
 
 pub fn t_recent(t: &mut T) {
-    if cfg!(target_vendor = "apple") {
-        t.info("recent: not on Apple yet (docs/APPLE.md AP7)\n");
-        return;
-    }
     let base = scratch(t, "recent");
     let saved = plat::env("jfgui_RECENT");
     let xbel = format!("{base}/recent.xbel");
@@ -185,13 +181,24 @@ pub fn t_recent(t: &mut T) {
     plat::setenv("jfgui_RECENT", Some(&xbel));
     t.check(recent_add(&a), "recent: recent_os(false): jfgui_RECENT still written");
     plat::setenv("jfgui_RECENT", None);
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
     let data = plat::env("XDG_DATA_HOME");
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
     plat::setenv("XDG_DATA_HOME", Some(&format!("{base}/data")));
     t.check(!recent_add(&a) && !recent_clear(), "recent: recent_os(false): the system's list is left alone");
     plat::recent::recent_os(true);
-    #[cfg(not(windows))]
+    // macOS: the app's recent documents (NSDocumentController); what was there before comes back
+    #[cfg(target_os = "macos")]
+    {
+        let before = recent_list(usize::MAX);
+        t.check(recent_add(&a) && recent_add(&b) && recent_list(2) == [b.clone(), a.clone()], "recent: macOS: the app's recent documents, newest first");
+        t.check(recent_remove(&b) && recent_list(10).first() == Some(&a) && !recent_list(10).contains(&b), "recent: macOS: one removed");
+        t.check(recent_clear() && recent_list(10).is_empty(), "recent: macOS: cleared");
+        for p in before.iter().rev() {
+            recent_add(p);
+        }
+    }
+    #[cfg(target_os = "linux")]
     {
         let def = format!("{base}/data/recently-used.xbel");
         t.check(plat::file_exists(&def) == 0, "recent: nothing written while off");

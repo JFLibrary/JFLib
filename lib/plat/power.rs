@@ -27,7 +27,8 @@
 // notice.  logind's Inhibit is not used: it answers with a file descriptor, which plat's
 // D-Bus client does not receive.  Browser and Android (web_power.rs): the Screen Wake Lock
 // (INHIBIT_IDLE only; taken again when the tab is visible again), FLAG_KEEP_SCREEN_ON and a
-// partial WakeLock (INHIBIT_SUSPEND).
+// partial WakeLock (INHIBIT_SUSPEND).  macOS (apple_power.rs): IOKit power assertions
+// (PreventUserIdleSystemSleep, with INHIBIT_IDLE also PreventUserIdleDisplaySleep); iOS: None.
 
 use alloc::string::String;
 use core::sync::atomic::{AtomicU32, Ordering};
@@ -105,7 +106,11 @@ mod native;
 #[path = "web_power.rs"]
 mod native;
 
-#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android")))]
+#[cfg(target_os = "macos")]
+#[path = "apple_power.rs"]
+mod native;
+
+#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android", target_os = "macos")))]
 mod native {
     pub struct Held;
     pub fn hold(_reason: &str, _what: u32) -> Option<Held> {
