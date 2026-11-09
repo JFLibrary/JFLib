@@ -269,8 +269,26 @@ Papierkorb (`NSFileManager`), zuletzt benutzte Dateien ([`apple_recent.rs`](../l
 
 Geprüft auf dem Mac: `plattest --test trash` (19), `power` (10), `spell` (57), `recent` (43), `all` (212) per SSH,
 `--test window` (57) in der angemeldeten Sitzung, mit Testhilfen für Menü, Beenden, `NSWorkspace`, SIGTERM und das
-abgebrochene Druckpanel. Noch nicht geprüft: Der Panel-Fokus braucht eine aktive App, und der Test-Mac stand beim
-Lauf auf dem Sperrbildschirm.
+abgebrochene Druckpanel. Der Panel-Fokus braucht eine aktive App; er lief erst mit AP7b, als der Test-Mac nicht mehr
+auf dem Sperrbildschirm stand.
+
+**AP7b umgesetzt (2026-11-10):** [`apple_mac_services.rs`](../lib/plat/apple_mac_services.rs): das Statusmenü als
+`NSStatusItem` (Symbol 18 Punkte hoch, sonst das der App; mit Menü öffnet ein Klick das Menü wie auf dem Mac üblich,
+ohne Menü meldet er `Activate`), Mitteilungen über `UNUserNotificationCenter` mit Delegate für Klicks und für das
+Zeigen im Vordergrund, das Dock (Badge, der Fortschritt in die Kachel gezeichnet, die Aufgaben als Dock-Menü), Dateien
+und URLs, die das System mit der App öffnet (`application:openURLs:`), und globale Tastenkürzel über Carbons
+`RegisterEventHotKey`, das keine Freigabe braucht. Gewählte Dock-Aufgaben und vom System geöffnete Dateien kommen bei
+der App an wie ein späterer Start (`instance::queue_push`, `UIC_OPEN`), ganz ohne zweiten Prozess. Autostart
+([`apple_autostart.rs`](../lib/plat/apple_autostart.rs)) ist ein LaunchAgent in `~/Library/LaunchAgents`, der auch
+ohne Bündel geht.
+
+Geprüft auf dem Mac: `plattest --test autostart` (12) in einem Scratch-`$HOME`, `--test window` (76) mit Statusmenü
+(Menü, gewählte Zeile, Klick), Dock (Badge, Fortschritt, Aufgaben), `openURLs` und einem Tastenkürzel (sein
+Carbon-Ereignis, dasselbe Kürzel ein zweites Mal ergibt `Conflict`). **Fallen:** macOS verweigert Mitteilungen für
+Programme ohne Bundle-ID; `currentNotificationCenter` wirft dort sogar eine Ausnahme. Ohne Bündel liefert `notify`
+deshalb 0, die echte Prüfung folgt mit den Bündeln in AP7c (macOS fragt den Nutzer dann einmal um Erlaubnis).
+Abschlussblöcke des Systems sind Objective-C-Blöcke: Ihre Funktion liegt im Block-Literal bei Offset 16, eigene
+Blöcke sind globale Blöcke (`_NSConcreteGlobalBlock`).
 
 ### AP8: Pakete, Updates, CI, Dokumentation (M)
 

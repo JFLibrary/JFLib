@@ -41,7 +41,9 @@
 // the state when it closes; Query is answered), understood by KDE Plasma, Ubuntu's dock /
 // Dash to Dock and Plank.  Linux knows no paused / error / indeterminate look (paused and
 // error show the bar, indeterminate none) and no jump list at run time (that is the .desktop
-// file's Actions).  Web and Android: nothing (false).
+// file's Actions).  macOS (apple_mac_services.rs): the Dock tile -- badgeLabel, the progress drawn
+// into the tile (blue, yellow paused, red error, grey busy), the tasks as the Dock menu (a chosen
+// one reaches the app as UIC_OPEN, without a second start).  Web and Android: nothing (false).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -255,7 +257,10 @@ mod native;
 #[path = "linux_taskbar.rs"]
 mod native;
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(target_os = "macos")]
+use crate::apple::mac::services::dock as native;
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 mod native {
     use super::{JumpTask, State};
     pub fn progress(_s: &State) -> bool {

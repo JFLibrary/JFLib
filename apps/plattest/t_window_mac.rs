@@ -18,6 +18,8 @@ use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 
+use plat::taskbar::{JumpTask, TaskbarProgress, taskbar_badge, taskbar_progress, taskbar_supported, taskbar_tasks};
+use plat::tray::{Note, TI_CHECKED, TI_DISABLED, TI_SEPARATOR, Tray, TrayEvent, TrayIcon, TrayItem, notify, tray_remove, tray_set, tray_supported, tray_take};
 use plat::*;
 
 use crate::T;
@@ -410,6 +412,55 @@ pub fn t_window(t: &mut T) {
     win_test(WT_SIGTERM, 0, [0; 4]);
     let e = pump_for(E_SESSION_END, 1000);
     t.check(e.is_some(), "app: SIGTERM -> E_SESSION_END (the app saves and ends itself)");
+
+    // ---- services (docs/APPLE.md AP7b): the status item, notifications, the Dock, opened files, shortcuts
+    let menu = vec![
+        TrayItem { id: 11, label: String::from("Öffnen"), ..TrayItem::default() },
+        TrayItem { flags: TI_SEPARATOR, ..TrayItem::default() },
+        TrayItem { id: 12, label: String::from("Pause"), flags: TI_CHECKED, ..TrayItem::default() },
+        TrayItem { id: 13, label: String::from("Gesperrt"), flags: TI_DISABLED, ..TrayItem::default() },
+    ];
+    let icon = TrayIcon { w: 16, h: 16, px: vec![0xFF33_66CC; 256] };
+    t.check(tray_supported() && tray_set(&Tray { icon: Some(icon), tooltip: String::from("plattest"), menu }), "tray: a status item with a menu");
+    t.check(win_test(WT_TRAY, 0, [0; 4]) == 4, "tray: its menu has the four rows");
+    tray_take();
+    win_test(WT_TRAY, 0, [1, 2, 0, 0]);
+    t.check(tray_take() == [TrayEvent::Menu(12)], "tray: a chosen row -> TrayEvent::Menu(its id)");
+    t.check(tray_set(&Tray { icon: None, tooltip: String::from("plattest"), menu: Vec::new() }) && win_test(WT_TRAY, 0, [0; 4]) == 0,
+            "tray: without a menu (the app's icon)");
+    win_test(WT_TRAY, 0, [2, 0, 0, 0]);
+    t.check(tray_take() == [TrayEvent::Activate], "tray: ... a click is Activate");
+    tray_remove();
+    t.check(win_test(WT_TRAY, 0, [0; 4]) == -1, "tray: removed");
+    t.check(notify(&Note { title: String::from("plattest"), body: String::from("Hallo"), icon: None }) == 0,
+            "notify: a program outside an app bundle gets none (0, no crash)");
+    t.check(taskbar_supported() && taskbar_badge(3, None) && win_test(WT_DOCK, 0, [0; 4]) == 3, "dock: the badge shows 3");
+    t.check(taskbar_badge(0, None) && win_test(WT_DOCK, 0, [0; 4]) == -1, "dock: ... and goes");
+    t.check(taskbar_progress(TaskbarProgress::Normal(0.4)) && win_test(WT_DOCK, 0, [1, 0, 0, 0]) == 1, "dock: progress drawn into the tile");
+    t.check(taskbar_progress(TaskbarProgress::None) && win_test(WT_DOCK, 0, [1, 0, 0, 0]) == 0, "dock: ... and taken away");
+    let tasks = [JumpTask { title: String::from("Neues Fenster"), args: vec![String::from("--new")], desc: String::new() },
+                 JumpTask { title: String::from("Datei"), args: vec![String::from("a b.txt")], desc: String::from("öffnet a b.txt") }];
+    t.check(taskbar_tasks(&tasks) && win_test(WT_DOCK, 0, [2, 0, 0, 0]) == 2, "dock: the tasks as the Dock menu");
+    plat::instance::take();
+    win_test(WT_DOCK, 0, [3, 1, 0, 0]);
+    let reqs = plat::instance::take();
+    t.check(reqs.len() == 1 && reqs[0].args == ["a b.txt"] && reqs[0].paths() == [format!("{}/a b.txt", cwd())],
+            "dock: a chosen task reaches the app as a later start (UIC_OPEN)");
+    taskbar_tasks(&[]);
+    win_test(WT_OPEN_URLS, 0, [0; 4]);
+    let reqs = plat::instance::take();
+    t.check(reqs.len() == 1 && reqs[0].paths() == [format!("{}/build/plattest_open.txt", cwd()), String::from("https://example.org/jflib")],
+            "open: application:openURLs: -> the paths and URLs as a later start's (UIC_OPEN)");
+    let chord = plat::hotkey::Chord::parse("Ctrl+Alt+Shift+F13").unwrap_or_default();
+    let reg = plat::hotkey::hotkey_register(7, chord, "plattest");
+    t.check(reg.is_ok(), "hotkey: Ctrl+Alt+Shift+F13 registered (Carbon)");
+    if reg.is_err() {
+        t.info(&format!("  (hotkey: {reg:?})\n"));
+    }
+    plat::hotkey::hotkey_take();
+    t.check(hotkey_test_post(7) && plat::hotkey::hotkey_take() == [plat::hotkey::HotkeyEvent::Pressed(7)], "hotkey: its event -> Pressed(7)");
+    t.check(plat::hotkey::hotkey_register(8, chord, "plattest") == Err(plat::hotkey::HotkeyError::Conflict), "hotkey: the same chord again -> Conflict");
+    t.check(plat::hotkey::hotkey_unregister(7), "hotkey: unregistered");
 
     // ---- wake from another thread, close, destroy
     evq_clear();

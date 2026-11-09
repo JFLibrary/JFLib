@@ -27,7 +27,10 @@
 // Conflict.  Wayland and Flatpak (linux_hotkey.rs): the GlobalShortcuts portal on a thread of
 // its own: a session, BindShortcuts with the description and the preferred trigger -- the
 // desktop asks the user, who may choose another chord or none; what is not bound comes as
-// Refused(id, Dismissed); Activated -> Pressed.  Browser and Android: Unavailable.
+// Refused(id, Dismissed); Activated -> Pressed.  macOS (apple_mac_services.rs): Carbon's
+// RegisterEventHotKey on the application's event target (no permission needed; Command acts as
+// Ctrl, Control as Super); a chord another program holds is Conflict.  Browser and Android:
+// Unavailable.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -355,7 +358,10 @@ use crate::win_hotkey as native;
 #[cfg(target_os = "linux")]
 use crate::linux_hotkey as native;
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(target_os = "macos")]
+use crate::apple::mac::services::hotkey as native;
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 mod native {
     use super::{Chord, HotkeyError};
     pub fn available() -> bool {

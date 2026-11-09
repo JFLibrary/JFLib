@@ -20,8 +20,10 @@
 // (linux_tray.rs): StatusNotifierItem with a com.canonical.dbusmenu menu and
 // org.freedesktop.Notifications, on a session-bus connection of its own thread.  Browser and
 // Android (web_notify.rs): notifications only -- the Notification API (the permission asked for
-// from the user's gesture), NotificationManager with POST_NOTIFICATIONS; no symbol.  Elsewhere
-// nothing is shown.  jfgui_TRAY_DRYRUN=1 prints what would be shown instead (tests).
+// from the user's gesture), NotificationManager with POST_NOTIFICATIONS; no symbol.  macOS
+// (apple_mac_services.rs): an NSStatusItem in the menu bar (with a menu a click opens it, the Mac's
+// way; without one a click is Activate), UNUserNotificationCenter in an app bundle (a program
+// without a bundle identifier gets no notifications: 0).  Elsewhere nothing is shown.  jfgui_TRAY_DRYRUN=1 prints what would be shown instead (tests).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -214,7 +216,10 @@ use crate::linux_tray as native;
 #[path = "web_notify.rs"]
 mod native;
 
-#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android")))]
+#[cfg(target_os = "macos")]
+use crate::apple::mac::services::tray as native;
+
+#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android", target_os = "macos")))]
 mod native {
     use super::{Note, Tray};
     pub fn tray_set(_t: &Tray) -> bool {

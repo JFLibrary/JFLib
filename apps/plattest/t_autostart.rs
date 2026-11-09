@@ -7,7 +7,10 @@
 //                                   XDG_CONFIG_HOME (jfgui_AUTOSTART=file, desktop id
 //                                   plattest-autostart): the .desktop file, Exec quoting
 //                                   (spaces, %, quotes, backslashes, $), Hidden=true and
-//                                   X-GNOME-Autostart-enabled=false read as off, removed
+//                                   X-GNOME-Autostart-enabled=false read as off, removed.
+//                                   macOS: a LaunchAgent in a scratch $HOME (Library/LaunchAgents/
+//                                   <app id>.plist): ProgramArguments, RunAtLoad, Disabled read as
+//                                   off, removed
 //   plattest --test autostart-bus --mode grant|deny|none   (Linux; tools/platshared/desktop_bus.py
 //                                   starts it on a fake session bus) the Background portal:
 //                                   granted (on, then off, remembered in config://autostart),
@@ -36,15 +39,45 @@ fn scratch(t: &mut T, tag: &str) -> String {
 
 pub fn t_autostart(t: &mut T) {
     t.check(autostart_set(true, &["a\0b"]) == Err(AutostartError::Invalid), "autostart: an argument with NUL refused");
-    if cfg!(target_vendor = "apple") {
-        t.info("autostart: not on Apple yet (docs/APPLE.md AP7)\n");
+    if cfg!(target_os = "ios") {
+        t.check(autostart_set(true, &[]) == Err(AutostartError::Unavailable), "autostart: iOS has none");
         return;
     }
     if cfg!(windows) {
         windows(t);
+    } else if cfg!(target_os = "macos") {
+        mac(t);
     } else {
         linux(t);
     }
+}
+
+/// macOS: a LaunchAgent of the user, in a scratch $HOME
+fn mac(t: &mut T) {
+    let base = scratch(t, "autostart");
+    let home = plat::env("HOME");
+    plat::setenv("HOME", Some(&base));
+    let id = plat::vfs::app_id();
+    let f = format!("{base}/Library/LaunchAgents/{id}.plist");
+    t.check(!autostart_get() && autostart_entry().is_none(), "autostart: no agent at the start");
+    t.check(autostart_set(true, &ARGS).is_ok(), "autostart: the LaunchAgent written");
+    let text = String::from_utf8(plat::read_file(&f).unwrap_or_default()).unwrap_or_default();
+    let exe = plat::current_exe().unwrap_or_default();
+    t.check(text.contains(&format!("<key>Label</key>\n\t<string>{id}</string>")) && text.contains("<key>RunAtLoad</key>\n\t<true/>")
+        && text.contains("<string>Aqua</string>"), "autostart: Label, RunAtLoad, the logged-in session only");
+    t.check(text.contains(&format!("<string>{exe}</string>")) && text.contains("<string>a b</string>") && text.contains("<string>x\"y</string>")
+        && text.contains("<string>back\\slash</string>") && text.contains("<string>$HOME</string>"), "autostart: ProgramArguments: the program and the arguments");
+    t.check(autostart_get(), "autostart: on");
+    let e = autostart_entry().unwrap_or_default();
+    t.info(&format!("  (entry: {e})\n"));
+    t.check(e.starts_with(&exe) && e.contains("\"a b\"") && e.contains("\"x\\\"y\"") && e.ends_with("$HOME"), "autostart: the entry's command line");
+    t.check(autostart_set(true, &["--min"]).is_ok() && autostart_entry().is_some_and(|e| e.ends_with(" --min")), "autostart: replaced");
+    let off = text.replace("</dict>", "\t<key>Disabled</key>\n\t<true/>\n</dict>");
+    t.check(plat::write_file(&f, off.as_bytes()) && !autostart_get(), "autostart: Disabled reads as off");
+    t.check(autostart_set(false, &[]).is_ok() && plat::file_exists(&f) == 0 && !autostart_get(), "autostart: removed");
+    t.check(autostart_set(false, &[]).is_ok(), "autostart: removing it again is fine");
+    plat::setenv("HOME", home.as_deref());
+    crate::rm_tree(&base);
 }
 
 #[cfg(not(windows))]

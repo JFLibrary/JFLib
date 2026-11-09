@@ -25981,8 +25981,10 @@ toast; without a visible symbol a hidden one is added for the time it is shown).
 (linux_tray.rs): StatusNotifierItem with a com.canonical.dbusmenu menu and
 org.freedesktop.Notifications, on a session-bus connection of its own thread.  Browser and
 Android (web_notify.rs): notifications only -- the Notification API (the permission asked for
-from the user's gesture), NotificationManager with POST_NOTIFICATIONS; no symbol.  Elsewhere
-nothing is shown.  jfgui_TRAY_DRYRUN=1 prints what would be shown instead (tests).
+from the user's gesture), NotificationManager with POST_NOTIFICATIONS; no symbol.  macOS
+(apple_mac_services.rs): an NSStatusItem in the menu bar (with a menu a click opens it, the Mac's
+way; without one a click is Activate), UNUserNotificationCenter in an app bundle (a program
+without a bundle identifier gets no notifications: 0).  Elsewhere nothing is shown.  jfgui_TRAY_DRYRUN=1 prints what would be shown instead (tests).
 ```
 
 ```rust
@@ -26327,8 +26329,9 @@ as the Desktop Entry spec wants, $APPIMAGE instead of the executable when set.  
 the Background portal (RequestBackground with autostart and the command line): the desktop
 may ask the user, and the call waits for the answer (at most AUTOSTART_WAIT_MS); the sandbox
 cannot see the host's autostart folder, so the answer is remembered in
-config://autostart.  jfgui_AUTOSTART=portal / file picks the way (tests).  Web and
-Android: Unavailable.
+config://autostart.  jfgui_AUTOSTART=portal / file picks the way (tests).  macOS
+(apple_autostart.rs): a LaunchAgent ~/Library/LaunchAgents/<app id>.plist (RunAtLoad, the
+executable and the arguments).  Web, Android and iOS: Unavailable.
 ```
 
 ```rust
@@ -26512,7 +26515,9 @@ progress-visible, count, count-visible}) on a session-bus connection kept open (
 the state when it closes; Query is answered), understood by KDE Plasma, Ubuntu's dock /
 Dash to Dock and Plank.  Linux knows no paused / error / indeterminate look (paused and
 error show the bar, indeterminate none) and no jump list at run time (that is the .desktop
-file's Actions).  Web and Android: nothing (false).
+file's Actions).  macOS (apple_mac_services.rs): the Dock tile -- badgeLabel, the progress drawn
+into the tile (blue, yellow paused, red error, grey busy), the tasks as the Dock menu (a chosen
+one reaches the app as UIC_OPEN, without a second start).  Web and Android: nothing (false).
 ```
 
 - **`enum TaskbarProgress`**
@@ -27285,7 +27290,10 @@ and Num Lock, KeyPress on the root window; BadAccess (another client grabbed it)
 Conflict.  Wayland and Flatpak (linux_hotkey.rs): the GlobalShortcuts portal on a thread of
 its own: a session, BindShortcuts with the description and the preferred trigger -- the
 desktop asks the user, who may choose another chord or none; what is not bound comes as
-Refused(id, Dismissed); Activated -> Pressed.  Browser and Android: Unavailable.
+Refused(id, Dismissed); Activated -> Pressed.  macOS (apple_mac_services.rs): Carbon's
+RegisterEventHotKey on the application's event target (no permission needed; Command acts as
+Ctrl, Control as Super); a chord another program holds is Conflict.  Browser and Android:
+Unavailable.
 ```
 
 - **`struct Chord`**
@@ -31092,6 +31100,8 @@ The view and the delegate never act: they push events into the ring (evq.rs), as
   dnd       apple_mac_dnd.rs: every view a dragging destination, drag_start a dragging session
   the app   apple_mac_app.rs: the main menu (Cmd+Q asks the main window), NSApp's delegate,
             E_POWER / E_SESSION_END (NSWorkspace, SIGTERM), tool windows as panels, printing
+  services  apple_mac_services.rs: the status item and notifications, the Dock tile, files the
+            system opens with the app, global shortcuts
   tests     apple_mac_test.rs: win_test, file_dialog_autoclose (events to our own windows only)
 
 Everything runs on the main thread (AppKit's rule); the state is reached through short borrows
@@ -31226,6 +31236,10 @@ reaches the system's event stream.
     WT_WORKSPACE [k]         NSWorkspace's notification k (0 will sleep, 1 did wake, 2 will power off)
                              posted in this process
     WT_SIGTERM               SIGTERM to this process (kill)
+    WT_TRAY [k, a]           the status item: k 0 its menu rows (-1 none), 1 choose row a, 2 a click
+    WT_DOCK [k, a]           the Dock tile: k 0 the badge's number (-1 none), 1 progress shown, 2 the Dock
+                             menu's rows, 3 choose its row a
+    WT_OPEN_URLS             application:openURLs: with build/plattest_open.txt and an https URL
   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms: Cancel, or (saving)
                              OK with name (a full path)
 ```
@@ -31248,6 +31262,9 @@ WT_MENU: u32 = 35
 WT_TERMINATE: u32 = 36
 WT_WORKSPACE: u32 = 37
 WT_SIGTERM: u32 = 38
+WT_TRAY: u32 = 39
+WT_DOCK: u32 = 40
+WT_OPEN_URLS: u32 = 41
 // WT_SEND / WT_POPUP_SEND kinds
 TS_MOVE: i32 = 1
 TS_DOWN: i32 = 2
