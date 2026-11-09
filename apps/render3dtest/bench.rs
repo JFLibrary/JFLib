@@ -435,8 +435,8 @@ fn verify_lists(t: &mut T, dev: &Device, s: &Scene, objs: &[sb::Object], n: usiz
     t.res(dev.queue().read_buffer(s.draws_buffer(), 0, &mut draws), "read draws")?;
     let mut in_list = vec![false; n];
     let mut got = 0;
-    for (i, l) in lists.iter().enumerate() {
-        let c = draws[i * 5 + 1] as usize;
+    for l in &lists {
+        let c = draws[l.record as usize * 5 + 1] as usize;
         let mut v = vec![0u32; c];
         if c > 0 {
             t.res(dev.queue().read_buffer(s.visible_buffer(), l.first as u64 * 4, &mut v), "read visible")?;

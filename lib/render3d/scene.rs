@@ -3,10 +3,13 @@
 // On the CPU: one Slot per instance with its f64 position; free places on a list, used again first.
 // On the GPU, per slot: spheres (16 bytes, read by cull), list_of (4 bytes, read by cull only for what
 // is visible), instances (64 bytes, the finished matrix, read by the vertex shader).  Per list (one per
-// mesh and side in use: a mirrored instance, its scales' product negative, turns its faces round and is
-// drawn by the pipeline whose front faces are clockwise): a draw record, a first place in the visible
-// list.  Capacities double, a list keeps room for its instances, so frames with instances coming and
-// going rewrite no list layout.
+// mesh, side and alpha class in use: a mirrored instance, its scales' product negative, turns its faces round and
+// is drawn by the pipelines whose front faces are clockwise; an instance of a MASK material is drawn by the pipelines
+// with a discard): a draw record, a first place in the visible list.  Which list an instance is in is settled by
+// prepare (the class is its material's, which the renderer holds).  The draw records lie by width of indices, class
+// and side, so each combination is one multi-draw; a list's record is the fourth word of its entry in list_first.
+// Capacities double, a list keeps room for its instances, so frames with instances coming and going rewrite no list
+// layout.
 //
 // What a frame sends (prepare, then Renderer::record copies it inside the frame's commands, behind the
 // barrier against the frame before): always the view and the lights of this frame's slot; the changed
@@ -24,11 +27,11 @@ use gpu::*;
 
 use crate::math::{self, V3};
 use crate::shadow::{self, CASCADES_MAX, Cascade, Shadows};
-use crate::{CASCADE_AT, CASCADE_STRIDE, CHANGE_WORDS, Counts, DRAW_BYTES, INSTANCE_WORDS, LIGHTS_AT, MaterialId, MeshId, Renderer, STAMPS};
+use crate::{ALPHA_CLASSES, AlphaClass, CASCADE_AT, CASCADE_STRIDE, CHANGE_WORDS, Counts, DRAW_BYTES, INSTANCE_WORDS, LIGHTS_AT, MaterialId, MeshId, Renderer, STAMPS};
 
 /// where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis.
 /// Negative scales mirror: an odd number of them turns the winding round, the instance goes to its mesh's
-/// list of mirrored instances and keeps its outside in front.  0 on some of the axes leaves faces without
+/// lists of mirrored instances and keeps its outside in front.  0 on some of the axes leaves faces without
 /// a normal, they come out black
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Transform {
@@ -240,13 +243,18 @@ pub struct ListInfo {
     pub mesh: MeshId,
     /// its instances are mirrored (drawn with clockwise front faces)
     pub mirrored: bool,
-    /// the instances of this mesh, and the room for them in the visible list
+    /// the alpha class of its instances' materials (drawn with or without a discard)
+    pub class: AlphaClass,
+    /// the instances of this mesh, side and class, and the room for them in the visible list
     pub count: u32,
     pub capacity: u32,
     /// (G5d) the instances that may land here: its own and those of meshes that take it as a detail level
     pub room: u32,
     /// its first place in the visible list
     pub first: u32,
+    /// its draw record (draws_buffer, late_buffers, cascade_buffers: 5 u32 each); the records lie by width of indices,
+    /// class and side
+    pub record: u32,
 }
 
 /// what a finished frame measured (Scene::set_stats)
@@ -274,7 +282,8 @@ pub(crate) struct Slot {
     t: Transform,
     mesh: u32,
     material: u32,
-    /// the list, how often the place has been left (the ids of those before are dead), alive, among the changes
+    /// the list prepare settled (NO_LIST: none yet), how often the place has been left (the ids of those before are
+    /// dead), alive, among the changes
     list: u32,
     era: u32,
     live: bool,
@@ -285,6 +294,7 @@ pub(crate) struct Slot {
 pub(crate) struct List {
     mesh: u32,
     pub mirrored: bool,
+    pub class: AlphaClass,
     pub count: u32,
     /// (G5d) its own instances and those that may pick its mesh as a detail level
     pub room: u32,
@@ -292,6 +302,23 @@ pub(crate) struct List {
     pub first: u32,
     /// its mesh's indices have 32 bits
     pub wide: bool,
+    /// its draw record
+    pub record: u32,
+}
+
+/// a slot in no list (none settled yet)
+const NO_LIST: u32 = u32::MAX;
+
+/// a run of draw records side by side with the same width of indices, side and alpha class: one multi-draw on Voll.
+/// room: one of its lists has room (instances may land there)
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Run {
+    pub first: u32,
+    pub count: u32,
+    pub wide: bool,
+    pub mirrored: bool,
+    pub class: AlphaClass,
+    pub room: bool,
 }
 
 /// one view's data of a frame: its uniform block, its lists, its bind groups for culling and drawing.  The
@@ -325,11 +352,14 @@ pub struct Scene {
     dirty: Vec<u32>,
     full_dirty: bool,
     pub(crate) lists: Vec<List>,
-    /// runs of lists with the same width of indices and side: first, count, wide, mirrored
-    pub(crate) runs: Vec<(u32, u32, bool, bool)>,
-    /// the list of each mesh, as it is and mirrored
-    list_of_mesh: Vec<[u32; 2]>,
+    /// the lists in the order of their draw records, and the runs of those records (Run)
+    pub(crate) order: Vec<u32>,
+    pub(crate) runs: Vec<Run>,
+    /// the list of each mesh per side (as it is, mirrored) and alpha class
+    list_of_mesh: Vec<[[u32; ALPHA_CLASSES]; 2]>,
     lists_dirty: bool,
+    /// the renderer's count of materials that changed their class, as the last prepare saw it
+    seen_classes: u32,
     live: u32,
     camera: Camera,
     sun: Sun,
@@ -497,9 +527,11 @@ impl Scene {
             dirty: Vec::new(),
             full_dirty: false,
             lists: Vec::new(),
+            order: Vec::new(),
             runs: Vec::new(),
             list_of_mesh: Vec::new(),
             lists_dirty: false,
+            seen_classes: r.class_gen,
             live: 0,
             camera: Camera::look_at([0.0, 0.0, 5.0], [0.0; 3], [0.0, 1.0, 0.0], 1.0, 1.0, 0.1, f64::INFINITY),
             sun: Sun::DEFAULT,
@@ -583,41 +615,69 @@ impl Scene {
         }
     }
 
-    fn list_for(&mut self, mesh: u32, mirrored: bool) -> u32 {
+    fn list_for(&mut self, mesh: u32, mirrored: bool, class: AlphaClass) -> u32 {
         let m = mesh as usize;
         if self.list_of_mesh.len() <= m {
-            self.list_of_mesh.resize(m + 1, [u32::MAX; 2]);
+            self.list_of_mesh.resize(m + 1, [[NO_LIST; ALPHA_CLASSES]; 2]);
         }
-        let side = mirrored as usize;
-        if self.list_of_mesh[m][side] == u32::MAX {
-            self.list_of_mesh[m][side] = self.lists.len() as u32;
-            self.lists.push(List { mesh, mirrored, count: 0, room: 0, cap: 0, first: 0, wide: false });
+        let (side, c) = (mirrored as usize, class.index());
+        if self.list_of_mesh[m][side][c] == NO_LIST {
+            self.list_of_mesh[m][side][c] = self.lists.len() as u32;
+            self.lists.push(List { mesh, mirrored, class, count: 0, room: 0, cap: 0, first: 0, wide: false, record: 0 });
             self.lists_dirty = true;
         }
-        self.list_of_mesh[m][side]
+        self.list_of_mesh[m][side][c]
     }
 
-    /// (the room of the lists follows in prepare: fit_lists)
-    fn enter_list(&mut self, mesh: u32, mirrored: bool) -> u32 {
-        let l = self.list_for(mesh, mirrored);
-        self.lists[l as usize].count += 1;
-        l
+    /// every changed slot into the list of its mesh, side and its material's alpha class (out of the one it was in);
+    /// when a material changed its class, every slot is looked at, and those that move go up again.  (The room of the
+    /// lists follows: fit_lists)
+    fn settle_lists(&mut self, r: &Renderer) {
+        let all = self.seen_classes != r.class_gen;
+        self.seen_classes = r.class_gen;
+        let n = if all { self.slots.len() } else { self.dirty.len() };
+        for k in 0..n {
+            let i = if all { k } else { self.dirty[k] as usize };
+            let s = self.slots[i];
+            if !s.live {
+                if s.list != NO_LIST {
+                    self.lists[s.list as usize].count -= 1;
+                    self.slots[i].list = NO_LIST;
+                }
+                continue;
+            }
+            let class = r.alpha_class(MaterialId(s.material));
+            if s.list != NO_LIST {
+                let l = &self.lists[s.list as usize];
+                if l.mesh == s.mesh && l.mirrored == s.mirrored && l.class == class {
+                    continue;
+                }
+                self.lists[s.list as usize].count -= 1;
+            }
+            let to = self.list_for(s.mesh, s.mirrored, class);
+            self.lists[to as usize].count += 1;
+            self.slots[i].list = to;
+            // (list_of changes: up again)
+            if all {
+                self.mark(i as u32);
+            }
+        }
     }
 
     /// (G5d) every list's room: its own instances and those of meshes that may pick it as a detail level (lists of
-    /// detail levels are made here); capacities double when the room does not fit
+    /// detail levels are made here, of the same side and alpha class); capacities double when the room does not fit
     fn fit_lists(&mut self, r: &Renderer) {
         for l in &mut self.lists {
             l.room = l.count;
         }
         for i in 0..self.lists.len() {
-            let (mesh, mirrored, count) = (self.lists[i].mesh, self.lists[i].mirrored, self.lists[i].count);
+            let (mesh, mirrored, class, count) = (self.lists[i].mesh, self.lists[i].mirrored, self.lists[i].class, self.lists[i].count);
             if count == 0 {
                 continue;
             }
             for k in 0..r.lods[mesh as usize].len() {
                 if let Some(t) = r.lods[mesh as usize][k].mesh {
-                    let to = self.list_for(t.0, mirrored) as usize;
+                    let to = self.list_for(t.0, mirrored, class) as usize;
                     self.lists[to].room += count;
                 }
             }
@@ -638,27 +698,26 @@ impl Scene {
         }
     }
 
-    /// a new instance, on a place that came free if there is one
+    /// a new instance, on a place that came free if there is one (its list: with the next prepare)
     pub fn add(&mut self, i: Instance) -> Result<InstanceId> {
         Scene::check_transform(&i.transform)?;
         self.check_mesh(i.mesh)?;
         self.check_material(i.material)?;
         self.stale = true;
         let mirrored = i.transform.mirrored();
-        let list = self.enter_list(i.mesh.0, mirrored);
         let slot = match self.free.pop() {
             Some(f) => f,
             None => {
                 let f = self.slots.len() as u32;
-                self.slots.push(Slot { t: i.transform, mesh: 0, material: 0, list: 0, era: 0, live: false, dirty: false, mirrored: false });
+                self.slots.push(Slot { t: i.transform, mesh: 0, material: 0, list: NO_LIST, era: 0, live: false, dirty: false, mirrored: false });
                 f
             }
         };
+        // (a place that came free keeps its old list until prepare settles it)
         let s = &mut self.slots[slot as usize];
         s.t = i.transform;
         s.mesh = i.mesh.0;
         s.material = i.material.0;
-        s.list = list;
         s.live = true;
         s.mirrored = mirrored;
         let era = s.era;
@@ -674,14 +733,12 @@ impl Scene {
         }
     }
 
-    /// the instance goes; its place comes free
+    /// the instance goes; its place comes free (and its list loses it with the next prepare)
     pub fn remove(&mut self, id: InstanceId) -> Result<()> {
         let i = self.get(id)?;
         let s = &mut self.slots[i];
         s.live = false;
         s.era = s.era.wrapping_add(1);
-        let l = s.list as usize;
-        self.lists[l].count -= 1;
         self.free.push(id.slot);
         self.live -= 1;
         self.mark(id.slot);
@@ -689,16 +746,13 @@ impl Scene {
     }
 
     /// a new transform; one that mirrors where the old did not (or the other way round) moves the instance
-    /// to its mesh's other list, as set_mesh does
+    /// to its mesh's list of the other side, as set_mesh does (with the next prepare)
     pub fn set_transform(&mut self, id: InstanceId, t: &Transform) -> Result<()> {
         Scene::check_transform(t)?;
         let i = self.get(id)?;
         let mirrored = t.mirrored();
         if mirrored != self.slots[i].mirrored {
             self.stale = true;
-            let old = self.slots[i].list as usize;
-            self.lists[old].count -= 1;
-            self.slots[i].list = self.enter_list(self.slots[i].mesh, mirrored);
             self.slots[i].mirrored = mirrored;
         }
         self.slots[i].t = *t;
@@ -710,6 +764,8 @@ impl Scene {
         Ok(self.slots[self.get(id)?].t)
     }
 
+    /// a material of another alpha class moves the instance to the list of that class with the next prepare (until then
+    /// a frame shows the old material: it goes up with prepare too)
     pub fn set_material(&mut self, id: InstanceId, m: MaterialId) -> Result<()> {
         self.check_material(m)?;
         let i = self.get(id)?;
@@ -718,16 +774,12 @@ impl Scene {
         Ok(())
     }
 
+    /// the instance's list of the new mesh, with the next prepare
     pub fn set_mesh(&mut self, id: InstanceId, m: MeshId) -> Result<()> {
         self.check_mesh(m)?;
         let i = self.get(id)?;
         self.stale = true;
-        let old = self.slots[i].list as usize;
-        self.lists[old].count -= 1;
-        let list = self.enter_list(m.0, self.slots[i].mirrored);
-        let s = &mut self.slots[i];
-        s.mesh = m.0;
-        s.list = list;
+        self.slots[i].mesh = m.0;
         self.mark(id.slot);
         Ok(())
     }
@@ -857,12 +909,15 @@ impl Scene {
         self.upload
     }
 
-    /// the lists in order (list i = the i-th draw record of draws_buffer)
+    /// the lists as the last prepare settled them, in order (list i is what list_of holds for its instances; its draw
+    /// record: ListInfo::record)
     pub fn lists(&self) -> Vec<ListInfo> {
-        self.lists.iter().map(|l| ListInfo { mesh: MeshId(l.mesh), mirrored: l.mirrored, count: l.count, capacity: l.cap, room: l.room, first: l.first }).collect()
+        self.lists.iter().map(|l| ListInfo { mesh: MeshId(l.mesh), mirrored: l.mirrored, class: l.class, count: l.count, capacity: l.cap, room: l.room, first: l.first,
+                                             record: l.record }).collect()
     }
 
-    /// (tests, tools) the camera's draw records after a frame's culling: 5 u32 per list, instance_count second
+    /// (tests, tools) the camera's draw records after a frame's culling: 5 u32 per list at ListInfo::record,
+    /// instance_count second
     pub fn draws_buffer(&self) -> &Buffer {
         &self.view.draws
     }
@@ -1034,31 +1089,47 @@ impl Scene {
         self.lists_dirty = false;
         let mut first = 0u32;
         let n = self.lists.len();
+        for l in &mut self.lists {
+            l.wide = r.meshes[l.mesh as usize].wide;
+        }
+        // the draw records by width of indices, alpha class and side: each combination's lists side by side (one
+        // multi-draw per side and class in the main pass, and the shadow passes' pipelines take both sides)
+        self.order.clear();
+        self.order.extend(0..n as u32);
+        let lists = &self.lists;
+        self.order.sort_by_key(|&i| {
+            let l = &lists[i as usize];
+            (l.wide, l.class.index(), l.mirrored, i)
+        });
+        for (k, &i) in self.order.iter().enumerate() {
+            self.lists[i as usize].record = k as u32;
+        }
         let mut places: Vec<[u32; 4]> = Vec::with_capacity(n);
         let mut levels: Vec<[u32; 4]> = Vec::new();
-        let mut draws = Vec::with_capacity(n);
+        let mut draws = vec![[0u32; 5]; n];
         for l in &mut self.lists {
             let m = &r.meshes[l.mesh as usize];
             l.first = first;
-            l.wide = m.wide;
-            // (G5d) its detail levels: threshold and list (u32::MAX: not drawn), after the lists
+            // (G5d) its detail levels: threshold and list (u32::MAX: not drawn), after the lists: the lists of the
+            // same side and class
             let lods = &r.lods[l.mesh as usize];
-            places.push([first, (n + levels.len()) as u32, lods.len() as u32, 0]);
+            places.push([first, (n + levels.len()) as u32, lods.len() as u32, l.record]);
             for d in lods {
-                let to = d.mesh.map_or(u32::MAX, |t| self.list_of_mesh.get(t.0 as usize).map_or(u32::MAX, |x| x[l.mirrored as usize]));
+                let to = d.mesh.map_or(NO_LIST, |t| self.list_of_mesh.get(t.0 as usize).map_or(NO_LIST, |x| x[l.mirrored as usize][l.class.index()]));
                 levels.push([d.below.to_bits(), to, 0, 0]);
             }
             // (Basis: no first instance is sure to work: the list's start is an offset of the vertex buffer)
-            draws.push([m.indices, 0, m.first_index, m.base_vertex, if r.multi { first } else { 0 }]);
+            draws[l.record as usize] = [m.indices, 0, m.first_index, m.base_vertex, if r.multi { first } else { 0 }];
             first += l.cap;
         }
         places.extend_from_slice(&levels);
         self.info_len = places.len() as u32;
         self.runs.clear();
-        for (i, l) in self.lists.iter().enumerate() {
+        for &i in &self.order {
+            let l = &self.lists[i as usize];
             match self.runs.last_mut() {
-                Some(r) if r.2 == l.wide && r.3 == l.mirrored => r.1 += 1,
-                _ => self.runs.push((i as u32, 1, l.wide, l.mirrored)),
+                Some(r) if r.wide == l.wide && r.mirrored == l.mirrored && r.class == l.class => r.count += 1,
+                _ => self.runs.push(Run { first: l.record, count: 1, wide: l.wide, mirrored: l.mirrored, class: l.class, room: false }),
             }
         }
         let info = self.info_len as u64 * 16;
@@ -1070,6 +1141,16 @@ impl Scene {
         self.upload.bytes += size;
         self.lists_up = Some(up);
         Ok(())
+    }
+
+    /// which runs have room this frame (rooms change with every prepare, the runs only with the lists' layout)
+    fn mark_runs(&mut self) {
+        let mut at = 0usize;
+        for run in &mut self.runs {
+            let lists = &self.order[at..at + run.count as usize];
+            run.room = lists.iter().any(|&i| self.lists[i as usize].room > 0);
+            at += run.count as usize;
+        }
     }
 
     /// every slot, from a temporary buffer: spheres, list_of, instances
@@ -1197,9 +1278,11 @@ impl Scene {
         self.full_up = None;
         self.changed = 0;
         self.upload.bytes += r.prepare_materials()?;
+        self.settle_lists(r);
         self.fit_lists(r);
         self.grow(r)?;
         self.upload_lists(r)?;
+        self.mark_runs();
         // this device's stats need a read-back per frame and timestamps
         if self.stats_on {
             if self.ts.is_none() && self.dev.features().timestamps {

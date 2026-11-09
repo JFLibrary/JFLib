@@ -88,8 +88,8 @@ pub fn drawn(t: &mut T, dev: &Device, s: &Scene) -> Option<(Vec<u32>, u32, u32)>
     }
     let (mut slots, mut early, mut late) = (Vec::new(), 0, 0);
     for (phase, (d, v)) in [(&words[0], &words[1]), (&words[2], &words[3])].into_iter().enumerate() {
-        for (i, l) in lists.iter().enumerate() {
-            let c = d[i * 5 + 1].min(l.capacity);
+        for l in &lists {
+            let c = d[l.record as usize * 5 + 1].min(l.capacity);
             if phase == 0 { early += c } else { late += c }
             slots.extend_from_slice(&v[l.first as usize..(l.first + c) as usize]);
         }
