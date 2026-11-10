@@ -1,0 +1,7 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#0078D4" android:pathData="M0,0h108v108h-108z" />
+    <!-- two lines meeting at a corner -->
+    <path android:fillColor="#FFFFFF" android:pathData="M24,70l36,-36l6,6l-36,36z" />
+    <path android:fillColor="#9CDAFF" android:pathData="M60,34l26,26l-6,6l-26,-26z" />
+</vector>

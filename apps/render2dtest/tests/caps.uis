@@ -1,0 +1,3 @@
+#!args --test caps
+# butt, round and square caps at twelve angles and four widths, points with caps, against lib/gfx (dash_stroke, exact-area
+# coverage); Voll and Basis

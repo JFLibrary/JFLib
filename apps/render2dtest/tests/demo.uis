@@ -1,0 +1,16 @@
+#!args --demo
+# the demo headless: its view draws on a device of its own and every frame is read back; a drag pans the drawing with
+# the pointer, the wheel zooms at the pointer (the red line through x = 0 is 9 px wide, at the view's middle, x 360; the
+# blue line through y = 50 is 5 px wide, at y 222; the view starts at y 32, 1 unit = 1 px)
+wait 600
+expect pixel 358 300 #D02020
+expect pixel 600 222 #2040C0
+drag 358,300 458,300
+wait 200
+expect pixel 458 300 #D02020
+expect pixel 358 300 #F4F1EA
+# one notch at (458, 300): 2^(1/4) larger about the pointer, the red line stays under it, the blue line moves up to 207
+wheel 458,300 120
+wait 200
+expect pixel 458 300 #D02020
+expect pixel 600 207 #2040C0

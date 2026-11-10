@@ -1,0 +1,52 @@
+// render2dtest -- tests and measurements of lib/render2d (docs/RENDER2D.md), offscreen except `window` and the demo.
+//
+//   render2dtest --test NAME [--validate]    a test on the device's own level and on one limited to Basis:
+//        shaders     wgsl::compile of lib/render2d/*.wgsl (common.wgsl in front) = the embedded SPIR-V, word for word
+//        caps        butt, round and square caps at many angles, widths in pixels, against lib/gfx (dash_stroke,
+//                    exact-area coverage) on the CPU (refimg.rs: what is compared and the tolerance)
+//        joins       miter (also beyond its limit), bevel and round joins, sharp and blunt, open and closed
+//                    polylines, against lib/gfx
+//        hairlines   width 0 (1 px) at every angle and fractional positions; widths below a pixel drawn as one
+//        units       widths in drawing units and in pixels at several scales and a rotation: the same against lib/gfx
+//        overlap     translucent polylines at sharp corners, a closed one, against lib/gfx's non-zero fill (blended
+//                    once) and against the same polyline opaque: no pixel blended twice
+//        layers      layer order, hidden layers, the order of insertion, translucent entities over each other
+//        changes     insert, update (in place, growing at the end, growing in the middle: the layer laid out anew),
+//                    remove (free places, laid out anew), style changes, many changes at once (the scatter shader):
+//                    the image = that of a scene built anew; only what changed goes up
+//        visibility  the visible lists against the exact test on the CPU (random scenes, fixed seeds, rotated
+//                    cameras, records exactly at the target's edges); culled = not culled
+//        coords      the same drawing at the origin and at 1e7: the same image; a deep zoom to 1e-6 units per pixel
+//                    with tiny pans: every line where it belongs within 1/16 px, also lines 1e7 long
+//        levels      Basis and Voll draw the same image, byte for byte
+//        errors      what the API refuses, an empty scene
+//        all         all of the above
+//        window      a real window (once; not in `all`): the demo in a ui.gpu_view, a pan and a zoom at a point,
+//                    the view in the framebuffer = the same scene offscreen
+//   render2dtest --bench N [--res 1080p|WxH] [--frames F] [--basis]   N segments (polylines of random lengths), frame
+//                GPU time and what uploads cost (bench.rs)
+//   render2dtest --demo                      the demo: a drawing in a view, pan by dragging, zoom with the wheel at
+//                                            the pointer (in the browser and on Android the app is this)
+//   render2dtest --gen-shaders FILE          lib/render2d/shaders_spv.rs from lib/render2d/*.wgsl
+//
+// Without Vulkan or a usable GPU every test prints SKIP and passes.  Exit code 1 when a check failed.
+#![no_std]
+#![no_main]
+#![deny(unsafe_code)]
+
+extern crate alloc;
+
+mod demo;
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+mod bench;
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+mod refimg;
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+mod scenes;
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+mod tests;
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+ui::main!(tests::run());
+#[cfg(any(target_arch = "wasm32", target_os = "android"))]
+ui::main!(demo::launch());

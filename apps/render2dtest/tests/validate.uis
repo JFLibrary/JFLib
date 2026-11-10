@@ -1,0 +1,3 @@
+#!args --test all --validate
+# every test but the window once with VK_LAYER_KHRONOS_validation and synchronization validation: a validation error
+# fails; without the layer (no Vulkan SDK) as without --validate

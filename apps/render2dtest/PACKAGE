@@ -1,0 +1,12 @@
+# apps/render2dtest/PACKAGE: the app's identity (docs/PACKAGING.md) -- the test program of lib/render2d
+display=2D-Test
+version=0.1.0
+publisher=JFLib
+summary=Tests und Messung des 2D-Renderers für CAD (lib/render2d): Vulkan unter Windows, eine Ansicht im Fenster
+description=2D-Test: Striche gegen lib/gfx als Referenz auf der CPU (Kappen, Verbindungen, Haarlinien, Breiten in Pixeln und Einheiten, Durchscheinendes an Ecken), Ebenen und Reihenfolge, Änderungen, Sichtbarkeit gegen den exakten Test, große Koordinaten, Voll gegen Basis, eine Ansicht zum Schieben und Zoomen; die Testanwendung von lib/render2d.
+generic=2D-Test
+categories=Development;
+deb_name=render2dtest
+# Flatpak, AppStream and the MSIX identity: reverse DNS of a domain or project you control
+app_id=org.jflib.render2dtest
+homepage=https://github.com/JFLibrary/JFLib
