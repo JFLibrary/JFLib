@@ -41,8 +41,21 @@ pub struct Shadows {
 }
 
 impl Shadows {
-    /// 4 cascades of 2048 texels up to 100 from the eye, split 0.75, reach 100
+    /// 4 cascades of 2048 texels up to 100 from the eye, split 0.75, reach 100: the default for level Voll
     pub const DEFAULT: Shadows = Shadows { cascades: 4, size: 2048, distance: 100.0, split: 0.75, reach: 100.0 };
+    /// (G5e3) 2 cascades of 1024 texels, the rest as DEFAULT (up to 100, split 0.75, reach 100): the default for level
+    /// Basis (the browser, older and weak GPUs, phones), half the shadows' GPU time or less, coarser texels near the
+    /// camera (docs/RENDER3D.md)
+    pub const BASIS: Shadows = Shadows { cascades: 2, size: 1024, ..Shadows::DEFAULT };
+
+    /// (G5e3) the default for a device of this level: BASIS on Basis, DEFAULT on Voll
+    /// (`Shadows::for_level(dev.level())`)
+    pub const fn for_level(level: Level) -> Shadows {
+        match level {
+            Level::Basis => Shadows::BASIS,
+            _ => Shadows::DEFAULT,
+        }
+    }
 
     pub(crate) fn check(&self) -> Result<()> {
         let fine = (1..=CASCADES_MAX as u32).contains(&self.cascades) && (16..=8192).contains(&self.size) && self.distance.is_finite() && self.distance > 0.0

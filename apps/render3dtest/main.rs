@@ -56,6 +56,8 @@
 //   render3dtest --dump DIR [--format rgba8|bgra8|rgba8srgb|rgba16f|rgba32f [--linear]]   the gallery's images per level,
 //                                            for tests/engine_web.mjs (linear Rgba8Unorm; --format: renderers and targets
 //                                            of that format, as RendererDesc::new has them; --linear: encode_srgb false)
+//   render3dtest --shadow-shots DIR [--res WxH]   (G5e3) the shadow gallery on Basis, 4 x 2048 and the Basis default
+//                                            2 x 1024 (Shadows::for_level), as DIR/basis_4x2048.rgba and basis_2x1024.rgba
 //   In the browser: the same gallery, step by step as the browser answers (web.rs; tests/engine_web.mjs).
 //
 // Without Vulkan or a usable GPU every test prints SKIP and passes.  Exit code 1 when a check failed.
