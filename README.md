@@ -163,8 +163,8 @@ The following table describes the build paths available in the current repositor
 | **Windows** | Native x86-64 app, `--target win` | Win32 windows and desktop integration |
 | **Linux** | Native x86-64 app, `--target linux` | Wayland and X11; the backend is selected at startup |
 | **Android** | Native APK, `--target android` | `androidGallery`, ARM64 and x86-64 emulator; Android 8 / API 26 or later |
-| **macOS** | Browser output through `--target web` | Access through the web port; the current build script has no native Apple target |
-| **iOS** | Browser output through `--target web` | Access through the web port; the current build script has no native iOS app/IPA target |
+| **macOS** | Native ARM64 app, `--target mac` (built on a Mac) | AppKit windows, menus, Dock, notifications and services; `NAME.app` and `.dmg`, updates of the whole bundle; Apple silicon, macOS 13 or later |
+| **iOS** | Native ARM64 app, `--target ios` (built on a Mac; `--sim` for the simulator) | `androidGallery` as an iPhone app: UIKit host, touch, Apple Pencil, keyboards, sensors, files, clipboard; iOS 16 or later |
 | **Web** | WebAssembly and a shared browser host, `--target web` | Includes `template`, `gallery`, `Kritzel`, and `jfWord` |
 
 The documented browser test matrix covers Chromium and Firefox. Separate Safari/iOS
@@ -389,6 +389,24 @@ signed with a local debug key. `--release` signs with the release key named by
 resources.
 
 <img src="docs/images/readme/pocket-gallery.png" alt="Pocket Gallery desktop preview with buttons, a checkbox, a switch, a slider, accent colors, and text input" width="320">
+
+### macOS and iOS
+
+Apple's SDK and tools (Xcode) are on a Mac, so these targets build there, on Apple silicon:
+
+```sh
+rustup target add aarch64-apple-darwin aarch64-apple-ios aarch64-apple-ios-sim
+python build_rs.py app gallery --target mac
+python build_rs.py test gallery --target mac
+python build_rs.py test androidGallery --target ios --sim
+python tools/package.py BackupCraft --formats dmg
+```
+
+A macOS program is also packed as `NAME.app` beside it; `tools/package.py --formats dmg` (and `cargo jflib
+package --formats dmg`) puts it on a disk image. The signature is ad hoc unless `jfgui_MAC_IDENTITY` names a
+Developer ID certificate. For an iPhone, `python tools/apple.py device build/ios/androidGallery.app` signs, installs
+and starts the app (a development certificate and profile from Xcode). The plan and its state:
+[docs/APPLE.md](docs/APPLE.md).
 
 ## Build Manager
 

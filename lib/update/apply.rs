@@ -13,6 +13,11 @@
 // way) from staged/ as NAME.jfupd-new, checked as an AppImage whose signature follows the
 // running one's (appimage.rs), renamed over the old file (atomic on Linux); the old file is
 // the backup.  Large files are copied in pieces, never read whole.
+// An app bundle (kind "app", macOS) is replaced as a whole: its files unpacked as
+// NAME.app.jfupd-new, the bundle's signature checked against the installed one's requirement
+// (plat::pkg::app_bundle_follows), a copy of the installed bundle in backup/app/ (backup/list:
+// "A NAME.app"), the two folders exchanged in one step (plat::pkg::app_bundle_swap) and the old
+// one removed; the rollback exchanges the copy back the same way.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -187,6 +192,56 @@ pub(crate) fn program(cfg: &Config) -> Option<String> {
     Some(String::from(p.strip_suffix(" (deleted)").unwrap_or(&p)))
 }
 
+/// (macOS) the app bundle the program file is in (NAME.app/Contents/MacOS/NAME), else None
+pub(crate) fn app_bundle(cfg: &Config) -> Option<String> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
+    let exe = program(cfg)?;
+    let (macos, _) = split_dir(&exe);
+    let (contents, m) = split_dir(macos);
+    let (bundle, c) = split_dir(contents);
+    (m == "MacOS" && c == "Contents" && bundle.ends_with(".app") && bundle.len() > 4).then(|| String::from(bundle))
+}
+
+/// the kind an installation takes as a whole: AppImage for an AppImage, App for an app bundle,
+/// None for one updated by its files
+pub(crate) fn whole(cfg: &Config, inst: &Packaged) -> Option<Kind> {
+    match inst {
+        Packaged::AppImage(_) => Some(Kind::AppImage),
+        Packaged::Plain if app_bundle(cfg).is_some() => Some(Kind::App),
+        _ => None,
+    }
+}
+
+// a folder and the folders above it
+fn mkdirs(dir: &str) -> bool {
+    if plat::file_exists(dir) == 2 {
+        return true;
+    }
+    let (up, _) = split_dir(dir);
+    (up == dir || up.is_empty() || mkdirs(up)) && (plat::mkdir(dir) || plat::file_exists(dir) == 2)
+}
+
+// a copy of the folder src at dst (the files' modes kept) -> whether it worked
+fn copy_tree(src: &str, dst: &str) -> bool {
+    if !mkdirs(dst) {
+        return false;
+    }
+    let mut entries = Vec::new();
+    if !plat::dir_list(src, &mut |n, d, _| entries.push((String::from(n), d))) {
+        return false;
+    }
+    entries.into_iter().all(|(n, d)| {
+        let (s, t) = (format!("{}/{}", src, n), format!("{}/{}", dst, n));
+        if d {
+            copy_tree(&s, &t)
+        } else {
+            copy_file(&s, &t) && plat::fs::stat(&s).is_none_or(|m| plat::fs::set_mode(&t, m.mode & 0o7777))
+        }
+    })
+}
+
 // the rule of PERMISSIONS that lets an update write the program's folder
 fn rule(cfg: &Config) -> &'static str {
     if matches!(install(cfg), Packaged::AppImage(_)) { "fs.write $APPIMAGE/**" } else { "fs.write $EXE/**" }
@@ -242,7 +297,8 @@ fn staged_manifest(cfg: &Config, st: &State) -> Result<(Manifest, Package), Erro
         return Err(Error::Signature);
     }
     let man = Manifest::parse(&m).map_err(Error::Manifest)?;
-    let pkg = man.package_for(&cfg.target, Kind::parse(&st.kind) == Some(Kind::AppImage)).cloned().ok_or(Error::Nothing)?;
+    let whole = Kind::parse(&st.kind).filter(|k| matches!(k, Kind::AppImage | Kind::App));
+    let pkg = man.package_for_kind(&cfg.target, whole).cloned().ok_or(Error::Nothing)?;
     if man.expires != 0 && crate::now_secs() > man.expires {
         return Err(Error::Expired);
     }
@@ -398,7 +454,7 @@ fn swap(cfg: &Config, target: &str, src: &Src, appimage: bool) -> Result<(), Err
     let mut wrong: Option<Error> = None;
     let written = file.is_some_and(|f| {
         // the old file's permissions (a new file: executable, like a program), before the data
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         {
             let mode = plat::fs::stat(target).map_or(0o755, |m| m.mode & 0o7777);
             plat::fs::set_mode(&new, mode);
@@ -475,8 +531,15 @@ pub(crate) fn apply_staged(cfg: &Config, st: &mut State) -> Result<(), Error> {
         (Some(Kind::Package), _) => {
             return Err(Error::Unsupported(String::from("ein Installationspaket wird nicht von selbst eingespielt (Updater::staged)")));
         }
+        (Some(Kind::App), Packaged::Plain) => {
+            return match app_bundle(cfg) {
+                Some(bundle) => apply_app(cfg, st, &bundle),
+                None => refuse(st, String::from("ein App-Update, aber das Programm läuft nicht aus einem App-Bündel")),
+            };
+        }
         (Some(Kind::AppImage), Packaged::AppImage(_)) | (Some(Kind::Exe | Kind::Bundle), Packaged::Plain) => {}
         (Some(Kind::AppImage), _) => return refuse(st, String::from("ein AppImage-Update, aber das Programm läuft nicht als AppImage")),
+        (Some(Kind::App), _) => return refuse(st, String::from("ein App-Update, aber das Programm läuft nicht aus einem App-Bündel")),
         (Some(Kind::Exe | Kind::Bundle), other) => {
             return refuse(st, format!("das Programm läuft als {}; es wird über dieses Paket aktualisiert", sealed_name(other)));
         }
@@ -544,6 +607,75 @@ pub(crate) fn apply_staged(cfg: &Config, st: &mut State) -> Result<(), Error> {
     save(cfg, st)
 }
 
+// (macOS) the staged app bundle in place of `bundle` (the lock is held) -> Ok: stage Trial
+fn apply_app(cfg: &Config, st: &mut State, bundle: &str) -> Result<(), Error> {
+    let fail = |st: &mut State, e: Error| {
+        drop_staged(cfg, st); // it would be refused at every start
+        Err(e)
+    };
+    let data = match staged_bytes(cfg, st) {
+        Ok((_, d)) => d,
+        Err(e) => return fail(st, e),
+    };
+    let Some(b) = plat::vfs::Bundle::new(data) else {
+        return fail(st, Error::Manifest(String::from("das App-Bündel ist beschädigt")));
+    };
+    let names: Vec<String> = b.names().into_iter().map(String::from).collect();
+    if !names.iter().any(|n| n == "Contents/Info.plist") || !names.iter().any(|n| n.starts_with("Contents/MacOS/")) {
+        return fail(st, Error::Manifest(String::from("das Update ist kein App-Bündel (Contents/Info.plist, Contents/MacOS)")));
+    }
+    // the new bundle beside the installed one
+    let new = format!("{}.jfupd-new", bundle);
+    remove_tree(&new);
+    for n in &names {
+        if !rel_ok(n) {
+            remove_tree(&new);
+            return fail(st, Error::Manifest(format!("unzulässiger Pfad im App-Bündel: {}", n)));
+        }
+        let Some(bytes) = plat::vfs::Provider::read(&b, n) else {
+            remove_tree(&new);
+            return fail(st, Error::Manifest(format!("{} im App-Bündel ist beschädigt", n)));
+        };
+        let target = format!("{}/{}", new, n);
+        if !(mkdirs(split_dir(&target).0) && plat::write_file(&target, &bytes)) {
+            remove_tree(&new);
+            return Err(not_writable(cfg, bundle));
+        }
+        plat::fs::set_mode(&target, if n.starts_with("Contents/MacOS/") { 0o755 } else { 0o644 });
+    }
+    // it may follow the installed one
+    if let Err(why) = plat::pkg::app_bundle_follows(bundle, &new) {
+        remove_tree(&new);
+        return fail(st, Error::Rejected(why));
+    }
+    // the backup: a copy of the installed bundle
+    let backup = path(cfg, "backup");
+    let fresh = path(cfg, "backup.new");
+    remove_tree(&fresh);
+    let name = split_dir(bundle).1;
+    let list = format!("from={}\nA {}\n", cfg.version, name);
+    if !copy_tree(bundle, &format!("{}/app/{}", fresh, name)) || !write(&format!("{}/list", fresh), list.as_bytes()) {
+        remove_tree(&new);
+        remove_tree(&fresh);
+        return Err(Error::Io(format!("die Sicherung von {} in {} kann nicht geschrieben werden", bundle, backup)));
+    }
+    remove_tree(&backup);
+    if !plat::rename(&fresh, &backup) {
+        remove_tree(&new);
+        return Err(Error::Io(format!("die Sicherung in {} kann nicht geschrieben werden", backup)));
+    }
+    // the two bundles exchanged in one step; the old one (now at the new one's name) goes
+    if !plat::pkg::app_bundle_swap(&new, bundle) {
+        remove_tree(&new);
+        return Err(not_writable(cfg, bundle));
+    }
+    remove_tree(&new);
+    st.stage = Stage::Trial;
+    st.from = String::from(&cfg.version);
+    st.starts = 0;
+    save(cfg, st)
+}
+
 // the backed-up state of the files (only: of these; new ones removed)
 fn restore(cfg: &Config, dir: &str, only: Option<&[&str]>) -> bool {
     let backup = path(cfg, "backup");
@@ -561,6 +693,17 @@ fn restore(cfg: &Config, dir: &str, only: Option<&[&str]>) -> bool {
                 ok &= plat::file_exists(&old) == 1 && swap(cfg, &target, &Src::File(old, None), false).is_ok();
             }
             "N" => retire(&target),
+            // (macOS) the whole app bundle: the copy exchanged with the installed one
+            "A" => {
+                let Some(bundle) = app_bundle(cfg).filter(|b| split_dir(b).1 == rel) else {
+                    ok = false;
+                    continue;
+                };
+                let new = format!("{}.jfupd-new", bundle);
+                remove_tree(&new);
+                ok &= copy_tree(&format!("{}/app/{}", backup, rel), &new) && plat::pkg::app_bundle_swap(&new, &bundle);
+                remove_tree(&new);
+            }
             _ => {}
         }
     }
@@ -600,6 +743,13 @@ pub(crate) fn drop_staged(cfg: &Config, st: &mut State) {
 /// remove what earlier updates left in the program's folder (NAME.jfupd-*: files of ended
 /// processes; a file still in use stays for a later start)
 pub(crate) fn cleanup(cfg: &Config) {
+    // (macOS) a new app bundle an ended update left beside the installed one
+    if let Some(b) = app_bundle(cfg) {
+        let new = format!("{}.jfupd-new", b);
+        if plat::file_exists(&new) == 2 {
+            remove_tree(&new);
+        }
+    }
     let Some(exe) = program(cfg) else { return };
     let (dir, _) = split_dir(&exe);
     let mut dirs = alloc::vec![String::from(dir)];

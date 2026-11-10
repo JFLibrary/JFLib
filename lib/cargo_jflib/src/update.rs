@@ -122,6 +122,13 @@ impl App<'_> {
             if let Some(img) = self.appimages.borrow().get(style) {
                 files.push(("linux-x86_64", "appimage", img.clone(), img.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string()));
             }
+            // macOS: the app bundle (an installed app replaces its bundle) and the .dmg
+            if let Some((dmg, bundle)) = self.dmgs.borrow().get(style) {
+                let jfa = self.work.join(format!("{}-{}-{style}-mac.jfa", self.name, self.version));
+                package::write(&jfa, &jfa1(bundle)?)?;
+                files.push(("macos-aarch64", "app", jfa.clone(), jfa.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string()));
+                files.push(("macos-aarch64", "package", dmg.clone(), dmg.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string()));
+            }
             if files.is_empty() {
                 continue;
             }
@@ -189,4 +196,55 @@ mod tests {
         assert!(parse_key("JFUPDKEY1 0011").is_err());
         assert_eq!(json_str("a\"b\\c\n"), "\"a\\\"b\\\\c\\n\"");
     }
+}
+
+/// a folder as a JFA1 bundle (tools/assetpack.py's format, every file stored): the files below dir,
+/// '/' separated names relative to it, sorted bytewise, names starting with '.' left out
+fn jfa1(dir: &Path) -> Result<Vec<u8>, String> {
+    fn collect(root: &Path, dir: &Path, out: &mut Vec<(String, Vec<u8>)>) -> Result<(), String> {
+        for e in std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))? {
+            let e = e.map_err(|e| format!("{}: {e}", dir.display()))?;
+            let (path, name) = (e.path(), e.file_name());
+            let name = name.to_str().ok_or_else(|| format!("{}: the name is not UTF-8", path.display()))?;
+            if name.starts_with('.') {
+                continue;
+            }
+            if path.is_dir() {
+                collect(root, &path, out)?;
+            } else if path.is_file() {
+                let rel: Vec<&str> = path.strip_prefix(root).unwrap_or(&path).components().filter_map(|c| c.as_os_str().to_str()).collect();
+                out.push((rel.join("/"), package::read(&path)?));
+            }
+        }
+        Ok(())
+    }
+    let mut files = Vec::new();
+    collect(dir, dir, &mut files)?;
+    files.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+    let n32 = |n: usize, what: &str| u32::try_from(n).map_err(|_| format!("{what}: larger than 4 GiB"));
+    let pool: usize = files.iter().map(|f| f.0.len()).sum();
+    let mut data_off = 12 + 20 * files.len() + pool;
+    let mut out = b"JFA1".to_vec();
+    out.extend_from_slice(&n32(files.len(), "the bundle")?.to_le_bytes());
+    out.extend_from_slice(&n32(pool, "the names")?.to_le_bytes());
+    let mut name_off = 0;
+    for (name, data) in &files {
+        let len = u16::try_from(name.len()).map_err(|_| format!("{name}: the name is too long"))?;
+        out.extend_from_slice(&n32(name_off, "the names")?.to_le_bytes());
+        out.extend_from_slice(&len.to_le_bytes());
+        out.extend_from_slice(&[0, 0]); // stored
+        out.extend_from_slice(&n32(data_off, "the bundle")?.to_le_bytes());
+        out.extend_from_slice(&n32(data.len(), name)?.to_le_bytes());
+        out.extend_from_slice(&n32(data.len(), name)?.to_le_bytes());
+        name_off += name.len();
+        data_off += data.len();
+    }
+    for (name, _) in &files {
+        out.extend_from_slice(name.as_bytes());
+    }
+    for (_, data) in &files {
+        out.extend_from_slice(data);
+    }
+    n32(out.len(), "the bundle")?;
+    Ok(out)
 }

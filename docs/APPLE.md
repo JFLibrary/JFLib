@@ -393,6 +393,39 @@ Autostart in der Sandbox, eine Bildaufnahme über ImageCaptureCore statt SANE.
 **Fertig, wenn:** ein signiertes und notarisiertes Programm auf einem fremden Mac ohne Warnung startet und sich
 aktualisiert.
 
+**Aufteilung (2026-11-09).** Der Nutzer tritt dem Apple Developer Program bei (Frage 3 unten); bis Zertifikat und
+Zugang da sind, entsteht alles, was ohne sie geht. Dabei fiel auf: `update::target()` meldet auf dem Mac
+`linux-aarch64`. AP8 läuft in vier Schritten:
+
+- **AP8a, Pakete und Updates auf dem Mac:** `.dmg` (`hdiutil`, mit einer Verknüpfung auf `/Applications`) aus
+  `tools/package.py --formats dmg` und `cargo jflib package --formats dmg`. `update::target()` meldet
+  `macos-aarch64` und `ios-aarch64`. Eine neue Update-Art `app` ersetzt das ganze Bündel (die Signatur deckt das
+  Bündel, nicht nur das Programm): neben das alte entpackt, die Signatur des neuen gegen die Anforderung des laufenden
+  geprüft, getauscht, neu gestartet; Probe und Rückfall wie bei `exe`. Ein Programm an einem Ort ohne Schreibrecht
+  oder von macOS verschoben (App Translocation) bekommt `ReadOnly`. `tools/package.py --update` schreibt den Kanal mit.
+- **AP8b, CI:** `.github/workflows/apple.yml` auf den arm64-Runnern von GitHub, nur per Hand gestartet: Bau für
+  `mac` und den Simulator, die Skripte der Gallery und von `androidGallery`, `coretest`, `plattest` ohne Fenster, ein
+  `.dmg` als Artefakt.
+- **AP8c, Developer ID und Notarisierung:** Signatur mit „Developer ID Application“, gehärteter Laufzeit und
+  Zeitstempel, `notarytool` über ein Profil im Schlüsselbund, `stapler`. Abnahme: ein `.dmg` mit dem
+  Quarantäne-Attribut eines Downloads startet ohne Warnung (`spctl --assess`) und aktualisiert sich. TestFlight für
+  iOS danach, falls gewünscht.
+- **AP8d, Dokumentation:** README, [PACKAGING.md](PACKAGING.md), GUIDE und die Website (deren Inhalt vorher mit dem
+  Nutzer abgestimmt).
+
+**AP8a umgesetzt (2026-11-09):** `tools/package.py --formats dmg` und `cargo jflib package --formats dmg` bauen auf dem
+Mac je Stil ein `.dmg` (BackupCraft, JFPainter mit vier Stilen); `jfgui_MAC_IDENTITY` schaltet die Signatur von ad hoc
+auf ein Zertifikat mit gehärteter Laufzeit und Zeitstempel um. Die Update-Art `app` ([UPDATES.md](UPDATES.md) „macOS
+app bundles“) tauscht das Bündel als Ganzes; `updatetest --test app` prüft Einspielen, Signatur, Rückfall und die
+Ablehnungen, `--test update` und `--test apply` laufen jetzt auch auf dem Mac. Dabei gefunden: Ein `exe`-Update verlor
+auf dem Mac das Ausführrecht, und `cargo jflib keygen` baute sein Signierprogramm dort für Linux.
+
+**AP8b umgesetzt (2026-11-09):** [`.github/workflows/apple.yml`](../.github/workflows/apple.yml), nur per Hand: `coretest`,
+die Skripte von `gallery` und `updatetest`, `plattest` ohne Fenster (`all`, `cliprich`, `spell`), `androidGallery` im
+Simulator und ein `.dmg` von BackupCraft als Artefakt. Auf dem Mac zu Hause liefen alle Schritte grün; der erste Lauf
+auf GitHub folgt nach dem Push. `build_rs.py` startet Programme mit `ui` auf dem Mac über ihr Bündel (`tools/apple.py
+gui`); updatetest nimmt dann eine Programmdatei außerhalb davon, sonst bekäme es nur `app`-Einträge.
+
 ## Reihenfolge
 
 ```text
@@ -486,8 +519,8 @@ Zeiger des Nutzers.
 
 1. **Mac:** Mac mini M2 (AP0). Offen: Nutzt ihn noch jemand?
 2. **iPhone:** iPhone 14 mit iOS 27.2 (AP0). Offen: Ist es das Alltagsgerät, also Tests nur auf Zuruf wie beim A56?
-3. **Apple Developer Program** (99 € im Jahr) oder die kostenlose Apple-ID? Vorerst die kostenlose (AP0): Apps laufen
-   auf dem iPhone nur sieben Tage, ohne TestFlight und ohne Notarisierung.
+3. **Apple Developer Program** (99 € im Jahr) oder die kostenlose Apple-ID? Bis AP7 die kostenlose (AP0): Apps laufen
+   auf dem iPhone nur sieben Tage, ohne TestFlight und ohne Notarisierung. Für AP8 tritt der Nutzer bei (2026-11-09).
 4. **Welche Apps zuerst?** Vorschlag: `gallery`, dann JFPainter und `jfWord`; auf dem iPhone die Gallery, dann
    `Kritzel`.
 5. **App Store** als späteres Ziel für iOS? Das ändert Sandbox, Plugins und die Prüfregeln.

@@ -114,7 +114,7 @@ Two files at the channel's address, written by `tools/update_manifest.py` (or
 
 * `update.json.sig` -- the Ed25519 signature over the exact bytes of `update.json`, Base64.
 
-`target` is `windows-x86_64`, `linux-x86_64`, `linux-aarch64`, ... (`update::target()`).
+`target` is `windows-x86_64`, `linux-x86_64`, `linux-aarch64`, `macos-aarch64`, ... (`update::target()`).
 `kind`:
 
 | kind | Put in place by the updater | Use |
@@ -123,6 +123,7 @@ Two files at the channel's address, written by `tools/update_manifest.py` (or
 | `bundle` | yes: every file of a JFA1 bundle (`tools/assetpack.py`) goes to its path relative to the program's folder | the program with its modules (`jxlenc.dll`) or further programs (`BINS`) |
 | `package` | no: downloaded and checked, `Updater::staged()` names the file | an installer or a `.deb` the user or the package manager installs (programs in `/usr/lib` or `Program Files` cannot replace themselves) |
 | `appimage` | yes: replaces the running AppImage's file | an AppImage of the style ("Packages" below); only a program that runs as an AppImage takes it, and it takes nothing else |
+| `app` | yes: replaces the macOS app bundle the program runs from as a whole | a JFA1 bundle of `NAME.app` (`tools/assetpack.py pack`); only a program in an app bundle takes it, and it takes nothing else ("macOS app bundles" below) |
 
 A channel may list several entries for one target: a program running as an AppImage picks the
 first `appimage` entry of its target, every other program the first entry of another kind (so
@@ -200,6 +201,32 @@ net.connect updates.example.org:443   # the channel (and the host of absolute fi
 fs.write $EXE/**                      # putting updates in place
 fs.write $APPIMAGE/**                 # ... as an AppImage
 ```
+
+## macOS app bundles
+
+A program on macOS runs from `NAME.app/Contents/MacOS/NAME`, and its signature covers the whole
+bundle (`Contents/_CodeSignature`), so replacing the program file alone would break it.  A program
+in an app bundle (found by its path; `Config::exe` set to a program inside one works the same)
+takes the channel's `app` entry for its target and nothing else; `check()` reports
+`Error::ReadOnly` when the bundle's folder cannot be written or macOS moved the app away (App
+Translocation, a quarantined app started from its download folder).  `startup()` / `apply()`:
+
+1. unpack the staged bundle as `NAME.app.jfupd-new` beside the installed one (the files of
+   `Contents/MacOS/` executable);
+2. check its signature (strict, the whole bundle) against the installed bundle's designated
+   requirement: a bundle signed by a team (Developer ID) must come from the same team with the
+   same identifier; an installed bundle signed ad hoc asks only for a valid signature and the same
+   identifier (`plat::pkg::app_bundle_follows`; refused: `Startup::Failed(Error::Rejected)`, the
+   staged update is dropped);
+3. copy the installed bundle to `backup/app/` (`backup/list`: `A NAME.app`);
+4. exchange the two folders in one step (`renamex_np` with `RENAME_SWAP`,
+   `plat::pkg::app_bundle_swap`: the app is never missing) and remove the old one.
+
+Trial, `healthy()` and the rollback (the copy exchanged back the same way) are those of an `exe`.
+`tools/package.py APP --formats dmg --update DIR` and `cargo jflib package --formats dmg --update DIR`
+write the `app` entry and the `.dmg` (kind `package`) for `macos-aarch64`.  Tested by
+`updatetest --test app` on a Mac (a copy of a signed bundle replaced, rolled back, a bundle of another
+identifier, one changed after signing and one that is no bundle refused).
 
 ## Packages: AppImage, Flatpak, MSIX, Snap
 

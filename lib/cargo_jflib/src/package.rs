@@ -33,7 +33,8 @@ const STYLES: [&str; 4] = ["winui", "classic", "kde", "macos"];
 const PREVIEW: &str = "1100x700";
 const THUMB: (usize, usize) = (480, 305);
 /// the formats and the system each one packages
-const FORMATS: [(&str, &str); 6] = [("setup", "win"), ("msix", "win"), ("deb", "linux"), ("appimage", "linux"), ("rpm", "linux"), ("flatpak", "linux")];
+const FORMATS: [(&str, &str); 7] =
+    [("setup", "win"), ("msix", "win"), ("deb", "linux"), ("appimage", "linux"), ("rpm", "linux"), ("flatpak", "linux"), ("dmg", "mac")];
 
 const PK_MANIFEST: u32 = 1;
 const PK_STYLE: u32 = 2;
@@ -111,7 +112,8 @@ fn options(args: &[String]) -> Result<Opts, String> {
                     (it always builds --release)".to_string());
     }
     let known: Vec<&str> = FORMATS.iter().map(|f| f.0).collect();
-    let wanted: Vec<String> = if formats.trim() == "all" { known.iter().map(|f| f.to_string()).collect() }
+    // (all: the formats of Windows and Linux; a dmg is made on a Mac, named by itself)
+    let wanted: Vec<String> = if formats.trim() == "all" { FORMATS.iter().filter(|f| f.1 != "mac").map(|f| f.0.to_string()).collect() }
                               else { formats.split(',').map(|f| f.trim().to_string()).filter(|f| !f.is_empty()).collect() };
     if let Some(bad) = wanted.iter().find(|f| !known.contains(&f.as_str())) {
         return Err(format!("--formats: unknown {bad} (known: {}, all)", known.join(", ")));
@@ -133,6 +135,9 @@ fn style_info(styles: &BTreeMap<String, PathBuf>, style: &str) -> (String, Strin
 fn build(p: &Project, triple: &str, style: &str) -> Result<PathBuf, String> {
     let mut cmd = cargo::command();
     cmd.current_dir(&p.package.dir).env("JFLIB_STYLE", style).args(["build", "--release", "-p", &p.package.name, "--target", triple]);
+    if triple == crate::mac::TRIPLE {
+        cmd.env("MACOSX_DEPLOYMENT_TARGET", crate::mac::MAC_MIN);
+    }
     let programs: Vec<PathBuf> = cargo::build(&mut cmd)?.into_iter().filter(|a| a.package_id == p.package.id).filter_map(|a| a.executable).collect();
     programs.iter().find(|e| e.file_stem().is_some_and(|s| s == p.package.name.as_str())).or(programs.first()).cloned()
         .ok_or_else(|| format!("{}: cargo built no program for {triple}", p.package.name))
@@ -196,7 +201,8 @@ pub(crate) const APPIMAGERT: Stub = Stub { name: "appimagert", deps: &["jflib-ap
 /// Ed25519 keys and signatures of an update channel with lib/crypto (cargo-jflib has no curve
 /// arithmetic of its own), for the machine it runs on
 pub(crate) const SIGNER: Stub = Stub { name: "jflib-sign", deps: &["jflib-rt", "jflib-plat", "jflib-crypto"], source: include_str!("signer.rs.in"),
-                                       console: true, triple: if cfg!(windows) { WIN } else { LINUX }, linux_static: false };
+                                       console: true, triple: if cfg!(windows) { WIN } else if cfg!(target_os = "macos") { crate::mac::TRIPLE } else { LINUX },
+                                       linux_static: false };
 
 /// a stub: its crates in a project of its own below the target folder, built like the app (its
 /// profiles, its Cargo.lock, its .cargo/config.toml) -> the program
@@ -227,6 +233,9 @@ pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, Stri
     }
     let mut cmd = cargo::command();
     cmd.current_dir(&p.package.dir).arg("build").arg("--release").args(["--target", s.triple]).arg("--manifest-path").arg(&manifest);
+    if s.triple == crate::mac::TRIPLE {
+        cmd.env("MACOSX_DEPLOYMENT_TARGET", crate::mac::MAC_MIN);
+    }
     if s.linux_static {
         cmd.arg("--target-dir").arg(p.target_dir.join("jflib-package").join("static-target"));
         // these flags instead of every target.*.rustflags of the configuration
@@ -293,6 +302,8 @@ pub(crate) struct App<'a> {
     pub deb_made: RefCell<Option<(PathBuf, String)>>,
     /// the AppImage of each style (the update channel)
     pub appimages: RefCell<BTreeMap<String, PathBuf>>,
+    /// (macOS) per style: the .dmg and the app bundle on it
+    pub dmgs: RefCell<BTreeMap<String, (PathBuf, PathBuf)>>,
 }
 
 impl App<'_> {
@@ -522,6 +533,9 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
         return Err(format!("style {bad}: the styles are {}", STYLES.join(", ")));
     }
     let wants = |f: &str| o.formats.contains(&f);
+    if wants("dmg") && !cfg!(target_os = "macos") {
+        return Err("a dmg is made on a Mac (Apple's hdiutil and codesign): there --formats dmg".to_string());
+    }
     let host = if cfg!(windows) { Some("win") } else if cfg!(target_os = "linux") { Some("linux") } else { None };
     let mut targets: Vec<&str> = Vec::new();
     if wants("setup") || wants("msix") {
@@ -571,6 +585,7 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
         signing: OnceCell::new(),
         deb_made: RefCell::new(None),
         appimages: RefCell::new(BTreeMap::new()),
+        dmgs: RefCell::new(BTreeMap::new()),
     };
     if o.repo.is_some() && !wants("deb") {
         return Err("--repo is an apt repository of the .deb: it needs the format deb".to_string());
@@ -611,6 +626,21 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
             "appimage" => app.appimages()?,
             "rpm" => app.rpm()?,
             "flatpak" => app.flatpak()?,
+            "dmg" => {
+                for s in &app.styles {
+                    println!("[{s}] build mac");
+                    let exe = build(&p, crate::mac::TRIPLE, s)?;
+                    let dir = app.work.join(s).join("mac");
+                    fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+                    let bundle = crate::mac::bundle(&p.package.dir, &app.version, &exe, &dir)?;
+                    let file = if app.styles.len() > 1 { format!("{}-{}-{s}-arm64.dmg", app.name, app.version) }
+                               else { format!("{}-{}-arm64.dmg", app.name, app.version) };
+                    let out = app.dist.join(file);
+                    crate::mac::dmg(&bundle, &out, &app.display)?;
+                    app.dmgs.borrow_mut().insert(s.clone(), (out.clone(), bundle));
+                    app.made(out)?;
+                }
+            }
             _ => {}
         }
     }
