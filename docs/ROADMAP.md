@@ -1904,15 +1904,14 @@ Fensterrand hinaus.
   AP8, zusammen mit iOS: [APPLE.md](APPLE.md).
 - **P2** · *fehlt* · Native iOS-Version, auf dem Host-Weg von Android ([APPLE.md](APPLE.md) AP5).
 - **P2** · *teilweise* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
-  `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 nur auf Android. Plan mit
+  `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 auf Android und Linux, Windows ARM64 noch nicht. Plan mit
   den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).
-  - Erledigt: `build_rs.py --arch aarch64` (ARM0, der Bau endet noch in `rt`), Syscall-Nummern, Flags und
-    Kernel-Layouts in einer Tabelle pro Architektur
-    ([`lib/rt/kernel.rs`](../lib/rt/kernel.rs), ARM1; auf ARM noch nicht gelaufen), NEON für `lib/simd`
-    (ARM6), das auf Android schon jetzt wirkt.
-  - Zu tun: Assembler in `rt` und `plat`, Plugin- und Modul-ABI (90-mal `extern "win64"`), eigene
-    ELF- und PE-Loader, Crash-Berichte, Sandbox, Pakete. Die Arbeit nützt später auch macOS und iOS
-    auf ARM.
+  - Erledigt: `build_rs.py --arch aarch64` (ARM0), Syscall-Nummern, Flags und Kernel-Layouts in einer
+    Tabelle pro Architektur ([`lib/rt/kernel.rs`](../lib/rt/kernel.rs), ARM1), `rt` (ARM2) und `plat` (ARM3)
+    auf Linux ARM64, Plugins und Module mit `rt::plugin_abi!` und `LIBE_ARCH` (ARM4, 2026-11-10), NEON für
+    `lib/simd` (ARM6), das auf Android schon jetzt wirkt.
+  - Zu tun: Windows ARM64 (ARM5: `__chkstk`, `CONTEXT`, Unwind-Daten), Atomics auf echter Hardware (ARM7),
+    Fenster und GPU (ARM8), Pakete und CI (ARM9). Die Arbeit nützt später auch macOS und iOS auf ARM.
   - Getestet wird mit QEMU in WSL und den ARM-Runnern von GitHub; für das Speichermodell und die GPU
     braucht es echte Hardware.
 - **P2** · *erledigt* (2026-10-20) · Android vervollständigen: Dateiauswahl, dauerhafter

@@ -53,6 +53,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **update:** lib/update: kind app replaces a macOS app bundle as a whole (unpacked beside it, its signature checked against the installed one's designated requirement, the two folders exchanged in one step, a copy of the old bundle as the backup; trial and rollback as for an exe); plat::pkg::app_bundle_follows and app_bundle_swap; tools/package.py and cargo jflib package write the app entry and the .dmg into the channel for macos-aarch64; updatetest --test app (docs/UPDATES.md)
 - **build:** CI for Apple: .github/workflows/apple.yml (started by hand) runs coretest, the scripts of gallery and updatetest on macOS, plattest's windowless tests, androidGallery in the iOS simulator and packs a .dmg of BackupCraft on GitHub's arm64 Mac runners (docs/APPLE.md AP8b)
 - **ui:** StyleList::scrollbar_room: a style whose scroll bars stay visible keeps their room free right of the content of a view that scrolls only vertically, overflowing or not (as CSS scrollbar-gutter: stable), and counts it in the view's natural width; netlab keeps 10 DIP, so content no longer runs under its bar (the other styles keep floating bars)
+- **plat:** Linux on ARM64: plugins and loadable modules (docs/ARM64.md, ARM4): rt::plugin_abi!, the calling convention of plugins and modules as a macro (extern "win64" on x86-64 as before, extern "C" on ARM64 and elsewhere; a function pointer type and a function); the crash guard with its AAPCS64 trampoline, the ELF loader for EM_AARCH64 (its relocations, the instruction cache, the kernel's page size) and the module host on Linux ARM64; the module jxlenc for ARM64 (modules/modrt with rt's ARM64 files and its own memcpy and relatives for ARM64); plattest's guard and lib tests and codectest --jxlenc pass under qemu-aarch64 and in an ARM64 VM with 4 and 64 KB pages
+- **plat:** plat::LIBE_ARCH: lib_open refuses a plugin or module built for the other processor (x86-64 on ARM64, ARM64 on x86-64) with its own code instead of LIBE_FORMAT, on Windows too (ERROR_BAD_EXE_FORMAT and the file's Machine); the module host's line says "built for another processor"
+- **build:** build_rs.py builds the loadable modules for --arch aarch64: on Linux with segments aligned to 64 KB (-z max-page-size=65536: they load on kernels with 4, 16 and 64 KB pages) and inline atomics (compiler-rt's outline helpers need a constructor), on Windows as ARM64 DLLs; pe_verify and elf_verify check the architecture and name a library of the other one
 
 ### Changed
 
@@ -85,6 +88,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Fixed
 
+- **Tests:** plattest --test lib matches JFPainter's Rust test plugins (it was written for PaintCraft's assembly plugins and failed 4 checks on x86-64 too): crashq's trap is found by its instruction, crash and crashpf get FXARGS on a test surface, badinfo's list pointer is the one outside the image; a new check: a plugin of the other processor -> LIBE_ARCH
 - **build:** build_rs.py runs with Python 3.11 again, as the README says (tools/gendoc.py needed 3.12)
 - **update:** an update's new file is created with create_new on Apple too (never written through an existing name or link)
 - **plat:** macOS and iOS: the system font folders (/System/Library/Fonts, /Library/Fonts, ~/Library/Fonts) are scanned; the print dialog of macOS opens only when the app has a window (headless runs: ERR_UNSUPPORTED as on Linux)
