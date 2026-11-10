@@ -189,6 +189,116 @@ fn menus() {
     }
 }
 
+// ---------------------------------------------------------------- the app's menus (sysmenu.rs)
+//
+// The app's menus go between the app menu and the Window menu.  Every row's target is one object of
+// our class JFSysMenu; its action reports the row's tag (the id) to sysmenu's queue.  Rows are
+// enabled and checked as the list says (no automatic validation).
+
+static SYSMENU_N: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+static SYSMENU_TARGET: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
+const SHIFT: u64 = 1 << 17;
+
+/// whether the app's menus go into the menu bar: once the app has a window (headless runs keep the
+/// window's own menu bar); jfgui_SYSMENU=0 keeps it in the window too
+pub(crate) fn sysmenu_supported() -> bool {
+    GUI.load(Ordering::SeqCst) && !crate::getenv("jfgui_SYSMENU").is_some_and(|v| v.starts_with('0'))
+}
+
+fn sysmenu_target() -> Id {
+    let t = SYSMENU_TARGET.load(Ordering::SeqCst);
+    if !t.is_null() {
+        return t;
+    }
+    let (cls, _) = crate::apple::objc::subclass(c"NSObject", c"JFSysMenu", &[(c"jfSysMenu:", sm_chosen as *const c_void, c"v@:@")], &[]);
+    // SAFETY: an instance of our class, kept for the process.
+    let obj: Id = unsafe { msg!(cls, c"new"; Id) };
+    SYSMENU_TARGET.store(obj, Ordering::SeqCst);
+    obj
+}
+
+extern "C" fn sm_chosen(_this: Id, _cmd: Sel, sender: Id) {
+    // SAFETY: the tag of the menu item that sent the action.
+    let tag: isize = unsafe { msg!(sender, c"tag"; isize) };
+    if tag > 0 {
+        crate::sysmenu::push(tag as u32);
+    }
+}
+
+/// the rows of a menu
+fn sm_rows(menu: Id, items: &[crate::sysmenu::SysMenuItem], target: Id) {
+    use crate::sysmenu::{TI_CHECKED, TI_DISABLED, TI_SEPARATOR};
+    for it in items {
+        // SAFETY: menu items and menus of ours; the menu keeps what it holds.
+        unsafe {
+            if it.flags & TI_SEPARATOR != 0 {
+                let sep: Id = msg!(class(c"NSMenuItem"), c"separatorItem"; Id);
+                msg!(menu, c"addItem:", sep => Id; ());
+                continue;
+            }
+            let (t, k) = (nsstring(&it.label), nsstring(&it.key));
+            let mi: Id = msg!(class(c"NSMenuItem"), c"alloc"; Id);
+            let mi: Id = msg!(mi, c"initWithTitle:action:keyEquivalent:", t => Id, sel(c"jfSysMenu:") => Sel, k => Id; Id);
+            if !it.key.is_empty() {
+                let m = it.mods;
+                let mask = if m & crate::MOD_CTRL as u32 != 0 { COMMAND } else { 0 }
+                    | if m & crate::MOD_ALT as u32 != 0 { OPTION } else { 0 }
+                    | if m & crate::MOD_SHIFT as u32 != 0 { SHIFT } else { 0 };
+                msg!(mi, c"setKeyEquivalentModifierMask:", mask => u64; ());
+            }
+            msg!(mi, c"setTarget:", target => Id; ());
+            msg!(mi, c"setTag:", it.id as isize => isize; ());
+            let enabled = it.flags & TI_DISABLED == 0;
+            msg!(mi, c"setEnabled:", enabled => bool; ());
+            msg!(mi, c"setState:", (it.flags & TI_CHECKED != 0) as isize => isize; ());
+            if !it.sub.is_empty() {
+                let sub: Id = msg!(class(c"NSMenu"), c"alloc"; Id);
+                let sub: Id = msg!(sub, c"initWithTitle:", t => Id; Id);
+                msg!(sub, c"setAutoenablesItems:", false => bool; ());
+                sm_rows(sub, &it.sub, target);
+                msg!(mi, c"setSubmenu:", sub => Id; ());
+                release(sub);
+            }
+            msg!(menu, c"addItem:", mi => Id; ());
+            release(mi);
+            release(t);
+            release(k);
+        }
+    }
+}
+
+/// the app's menus (top level: the menus of the bar) between the app menu and the Window menu
+pub(crate) fn sysmenu_set(menus: &[crate::sysmenu::SysMenuItem]) {
+    let Some(app) = app() else { return };
+    let target = sysmenu_target();
+    // SAFETY: the application's main menu (menus()) and menus of ours it keeps.
+    unsafe {
+        let pool = crate::apple::objc::objc_autoreleasePoolPush();
+        let bar: Id = msg!(app, c"mainMenu"; Id);
+        if !bar.is_null() {
+            for _ in 0..SYSMENU_N.load(Ordering::SeqCst) {
+                msg!(bar, c"removeItemAtIndex:", 1isize => isize; ());
+            }
+            for (k, m) in menus.iter().enumerate() {
+                let t = nsstring(&m.label);
+                let sub: Id = msg!(class(c"NSMenu"), c"alloc"; Id);
+                let sub: Id = msg!(sub, c"initWithTitle:", t => Id; Id);
+                msg!(sub, c"setAutoenablesItems:", false => bool; ());
+                sm_rows(sub, &m.sub, target);
+                let top: Id = msg!(class(c"NSMenuItem"), c"new"; Id);
+                msg!(top, c"setTitle:", t => Id; ());
+                msg!(top, c"setSubmenu:", sub => Id; ());
+                msg!(bar, c"insertItem:atIndex:", top => Id, (k + 1) as isize => isize; ());
+                release(top);
+                release(sub);
+                release(t);
+            }
+            SYSMENU_N.store(menus.len(), Ordering::SeqCst);
+        }
+        crate::apple::objc::objc_autoreleasePoolPop(pool);
+    }
+}
+
 // ---------------------------------------------------------------- the delegate, the system's events
 
 /// (init) the observer becomes NSApp's delegate and hears NSWorkspace

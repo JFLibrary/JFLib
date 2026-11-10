@@ -162,6 +162,8 @@ pub mod instance;
 pub mod spell;
 /// The app's symbol in the notification area and system notifications.
 pub mod tray;
+/// The app's menus in the system's own menu bar (macOS).
+pub mod sysmenu;
 /// Keeping the computer awake: no standby, no screen saver while a guard lives.
 pub mod power;
 pub use power::{INHIBIT_IDLE, INHIBIT_SUSPEND, Inhibit, inhibit, inhibited};
