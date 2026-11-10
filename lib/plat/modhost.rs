@@ -138,7 +138,7 @@ fn load(path: &str) -> Option<Loaded> {
         Ok(l) => l,
         Err(e) => {
             if e != crate::LIBE_IO {
-                note(path, "refused by the loader", e as usize);
+                note(path, if e == crate::LIBE_ARCH { "built for another processor" } else { "refused by the loader" }, e as usize);
             }
             return None;
         }

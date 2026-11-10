@@ -45,12 +45,13 @@ pub const LIBA_W: u32 = 2;
 pub const LIBA_X: u32 = 4;
 
 pub const LIBE_IO: u32 = 1; // file missing / unreadable / larger than LIB_FILE_MAX
-pub const LIBE_FORMAT: u32 = 2; // not an x86-64 ELF shared object / PE DLL, or damaged
+pub const LIBE_FORMAT: u32 = 2; // not an ELF shared object / PE DLL, or damaged
 pub const LIBE_DEPS: u32 = 3; // needs other libraries / undefined symbols
 pub const LIBE_RELOC: u32 = 4; // unsupported relocation
 pub const LIBE_NOMEM: u32 = 5;
 pub const LIBE_INIT: u32 = 6; // TLS, initialisers or an interpreter (not supported)
 pub const LIBE_MAP: u32 = 7; // mmap / mprotect failed
+pub const LIBE_ARCH: u32 = 8; // built for another processor: x86-64 on ARM64 or ARM64 on x86-64 (docs/ARM64.md)
 pub const LIB_FILE_MAX: u64 = 64 << 20;
 pub const LH_SEGMAX: usize = 16;
 

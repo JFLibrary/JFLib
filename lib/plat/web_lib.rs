@@ -23,6 +23,8 @@ pub const LIBE_NOMEM: u32 = 5;
 pub const LIBE_INIT: u32 = 6;
 /// Unsupported native mapping.
 pub const LIBE_MAP: u32 = 7;
+/// A native library built for another processor (x86-64 / ARM64).
+pub const LIBE_ARCH: u32 = 8;
 /// Native plugin size limit, retained in the common API.
 pub const LIB_FILE_MAX: u64 = 64 << 20;
 /// Native segment count limit.

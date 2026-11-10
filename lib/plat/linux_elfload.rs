@@ -25,7 +25,7 @@ use alloc::vec::Vec;
 use rt::os::{syscall6, SYS_MMAP, SYS_MPROTECT, SYS_MUNMAP};
 
 use crate::{
-    OsFile, LH_SEGMAX, LIB_FILE_MAX, LIBE_DEPS, LIBE_FORMAT, LIBE_INIT, LIBE_IO, LIBE_MAP, LIBE_NOMEM,
+    OsFile, LH_SEGMAX, LIB_FILE_MAX, LIBE_ARCH, LIBE_DEPS, LIBE_FORMAT, LIBE_INIT, LIBE_IO, LIBE_MAP, LIBE_NOMEM,
     LIBE_RELOC, Lib, LibSeg,
 };
 
@@ -167,6 +167,9 @@ fn elf_map(b: &[u8], l: &mut Lib) -> Result<(), u32> {
     // ---- ELF header
     if b[..4] != *b"\x7FELF" || b[4] != 2 || b[5] != 1 || b[6] != 1 {
         return Err(fmt); // ELFCLASS64, little endian, version
+    }
+    if matches!(g16(b, 18), Some(62 | 183)) && g16(b, 18) != Some(EM) {
+        return Err(LIBE_ARCH); // EM_X86_64 on ARM64, EM_AARCH64 on x86-64
     }
     if g16(b, 16) != Some(3) || g16(b, 18) != Some(EM) || g32(b, 20) != Some(1) || g16(b, 54) != Some(56) {
         return Err(fmt); // ET_DYN, EM_X86_64 / EM_AARCH64, e_phentsize
