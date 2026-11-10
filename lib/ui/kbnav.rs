@@ -450,7 +450,8 @@ impl Ui {
             self.m.kbnav.ctx = 0;
         }
         self.kb_autofocus();
-        let n = self.wp.ctx.keyq.len();
+        // a focused widget with HB_KEYS keeps Tab, the arrows, F6 ... as well
+        let n = if self.focus_has_keys() { 0 } else { self.wp.ctx.keyq.len() };
         for qi in 0..n {
             let k = self.wp.ctx.keyq[qi];
             if (k as i32) < 0 {

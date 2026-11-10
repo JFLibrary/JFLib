@@ -318,13 +318,32 @@ macro_rules! main {
     };
 }
 
+/// ui::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
+/// std built with the feature `unwind` may unwind as well
+#[cfg(not(feature = "unwind"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __ui_panic_check {
+    () => {
+        #[cfg(panic = "unwind")]
+        compile_error!("JFLib needs panic = \"abort\": add [profile.dev] and [profile.release] with panic = \"abort\" to this project's Cargo.toml (a program with std may turn on jflib's feature unwind instead)");
+    };
+}
+
+/// (see above)
+#[cfg(feature = "unwind")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __ui_panic_check {
+    () => {};
+}
+
 /// ui::main!'s `jfgui_main`, without and with std
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __jfgui_main {
     ($body:expr) => {
-        #[cfg(panic = "unwind")]
-        compile_error!("JFLib needs panic = \"abort\": add [profile.dev] and [profile.release] with panic = \"abort\" to this project's Cargo.toml");
+        $crate::__ui_panic_check!();
         #[allow(unsafe_code, unexpected_cfgs)]
         #[unsafe(no_mangle)]
         fn jfgui_main() -> i32 {

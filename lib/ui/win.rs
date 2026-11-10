@@ -1600,7 +1600,8 @@ impl Ui {
         }
     }
 
-    // uiw_focus_is_text(i): the focused widget of window i was a text input in the last pass
+    // uiw_focus_is_text(i): the focused widget of window i was a text input (or kept every key,
+    // HB_KEYS) in the last pass
     fn uiw_focus_is_text(&self, i: u32) -> bool {
         let Some(p) = self.uiw_parts(i) else { return false };
         let f = p.ctx.focus;
@@ -1609,7 +1610,7 @@ impl Ui {
         }
         let list = &p.ctx.hits[p.ctx.hit_cur ^ 1];
         match list.iter().rev().find(|h| h.id == f) {
-            Some(h) => h.flags as u32 & HB_TEXT != 0,
+            Some(h) => h.flags as u32 & HB_TEXT != 0 || h.keys,
             None => false,
         }
     }
