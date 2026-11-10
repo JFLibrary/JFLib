@@ -1223,7 +1223,8 @@ def t_notices():
     check(not lost, "notices: a style ships the notices of the styles it embeds"
           + (f" -- missing: {', '.join(lost)}" if lost else ""))
     jfoffice = Path("licenses/jfoffice/LICENSE-icons.txt")
-    check(all(jfoffice in build_rs.style_notices(s) for s in ("backupcraft", "netlab"))
+    check(jfoffice in build_rs.style_notices("backupcraft")
+          and Path("licenses/netlab/LICENSE-icons.txt") in build_rs.style_notices("netlab")   # its own copy: a package of its own
           and all(Path(f"licenses/{s}/DejaVu-LICENSE.txt") in build_rs.style_notices(s)
                   for s in ("kde", "classic")),
           "notices: backupcraft and netlab ship WordCraft's MIT notice, kde and classic the DejaVu license")
