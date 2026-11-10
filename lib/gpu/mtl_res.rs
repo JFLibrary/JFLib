@@ -341,6 +341,9 @@ impl Device {
         if d.cube && (d.layers % 6 != 0 || d.width != d.height) {
             return Err(GpuError::Invalid("cube textures are square with 6 * n layers"));
         }
+        if d.cube && d.layers > 6 && cfg!(target_abi = "sim") {
+            return Err(GpuError::Unsupported("cube arrays: the simulator's Metal has none")); // (it would abort the process)
+        }
         if d.usage == TextureUsage::NONE {
             return Err(GpuError::Invalid("texture without usage"));
         }

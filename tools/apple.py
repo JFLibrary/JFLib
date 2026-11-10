@@ -2,6 +2,7 @@
 the iPhone.  Runs on a Mac only (Xcode's tools: codesign, xcrun simctl, xcrun devicectl).
 
     python tools/apple.py sim build/ios-sim/NAME [ARGS..]   start the program in a simulator (no window)
+    python tools/apple.py simapp build/ios-sim/NAME [ARGS..] its bundle in a simulator under UIKit (a window, a CAMetalLayer)
     python tools/apple.py device build/ios/NAME.app [ARGS..] sign, install and start it on the iPhone
     python tools/apple.py sign build/ios/NAME.app [--via-terminal]
                                                             sign it for the iPhone only
@@ -460,6 +461,34 @@ def sim_run(exe, args, timeout=600):
             run(["xcrun", "simctl", "shutdown", udid], check=False)
 
 
+def sim_app(exe, args, seconds=60):
+    """start the simulator's bundle of a program under UIKit (not simctl spawn: it has a window and a
+    CAMetalLayer) with its console attached; it ends with the program or after `seconds` -> CompletedProcess
+    (no exit code comes through simctl launch: 1 when the output says a check failed)"""
+    udid, booted = sim_device()
+    if not booted:
+        run(["xcrun", "simctl", "boot", udid])
+        run(["xcrun", "simctl", "bootstatus", udid, "-b"], timeout=300)
+    exe = Path(exe).resolve()
+    run(["xcrun", "simctl", "install", udid, exe.with_name(exe.name + ".app")], timeout=120)
+    env = dict(os.environ)
+    for k, v in os.environ.items():         # the caller's jfgui_* settings reach the program too
+        if k.startswith("jfgui_"):
+            env["SIMCTL_CHILD_" + k] = v
+    cmd = ["xcrun", "simctl", "launch", "--console-pty", "--terminate-running-process", udid, app_id(exe.name), *map(str, args)]
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", env=env)
+    try:
+        out = p.communicate(timeout=seconds)[0]
+    except subprocess.TimeoutExpired:
+        run(["xcrun", "simctl", "terminate", udid, app_id(exe.name)], check=False)
+        p.kill()
+        out = p.communicate()[0]
+    finally:
+        if not booted and os.environ.get("jfgui_SIM_KEEP") != "1":
+            run(["xcrun", "simctl", "shutdown", udid], check=False)
+    return subprocess.CompletedProcess(cmd, 1 if "FAIL" in out or "check(s) failed" in out else 0, out, "")
+
+
 # ---------------------------------------------------------------- the iPhone
 
 def devicectl_json(args, timeout=120):
@@ -568,7 +597,7 @@ def device_run(app, args, timeout=600):
 
 
 def main():
-    if len(sys.argv) < 3 or sys.argv[1] not in ("sim", "device", "sign", "gui", "mac", "dmg", "notarize"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("sim", "simapp", "device", "sign", "gui", "mac", "dmg", "notarize"):
         print(__doc__)
         return 2
     cmd, path, rest = sys.argv[1], sys.argv[2], sys.argv[3:]
@@ -582,8 +611,8 @@ def main():
         if cmd == "notarize":
             mac_notarize(path)
             return 0
-        if cmd in ("sim", "gui"):
-            r = sim_run(path, rest) if cmd == "sim" else gui_run(path, rest)
+        if cmd in ("sim", "simapp", "gui"):
+            r = sim_run(path, rest) if cmd == "sim" else sim_app(path, rest) if cmd == "simapp" else gui_run(path, rest)
             sys.stdout.write(r.stdout)
             sys.stderr.write(r.stderr)
             return r.returncode

@@ -337,6 +337,10 @@ pub fn scene(t: &mut T) {
 }
 
 pub fn bench_smoke(t: &mut T) {
+    if cfg!(target_os = "ios") {
+        crate::out("SKIP: a plain program has no window on iOS (UIKit's host: uigputest)");
+        return;
+    }
     let Some(g) = setup(t) else { return };
     let n = if t.validate { 5000 } else { 20_000 };
     let swap = crate::windows(&g.dev);

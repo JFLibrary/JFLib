@@ -70,6 +70,10 @@ unsafe extern "C" fn presented(_b: *const Block, drawable: Id) {
     }
     // SAFETY: a CAMetalDrawable the system hands to its presented handler; layer is its property.
     let layer = unsafe { msg!(drawable, c"layer"; Id) } as usize;
+    note_shown(layer);
+}
+
+fn note_shown(layer: usize) {
     let mut s = SHOWN.lock();
     match s.iter_mut().find(|x| x.0 == layer) {
         Some(x) => x.1 += 1,
@@ -151,21 +155,15 @@ impl Surface {
 
     /// the surface of plat window `window`: its GPU layer, shown
     pub fn new(instance: &Instance, window: i32) -> Result<Surface> {
-        #[cfg(target_os = "macos")]
-        {
-            let nw = plat::win_native(window).ok_or(GpuError::Invalid("no such window"))?;
-            Surface::native(instance, nw, window)
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            let _ = (instance, window);
-            Err(GpuError::Unsupported("window surfaces on iOS (AP6e)"))
-        }
+        // (iOS without UIKit's host, simctl spawn: no window to draw into)
+        let Some(nw) = plat::win_native(window) else {
+            return Err(if cfg!(target_os = "ios") { GpuError::Unsupported("no window without UIKit's host") } else { GpuError::Invalid("no such window") });
+        };
+        Surface::native(instance, nw, window)
     }
 
     /// the surface of a window given by its GPU layer (plat::win_gpu_child) whose size and state are
     /// those of plat window `window`
-    #[cfg(target_os = "macos")]
     pub fn native(_instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface> {
         let layer = Obj::retained(nw.layer as Id).ok_or(GpuError::SurfaceLost)?;
         let size = core::sync::atomic::AtomicU64::new(((nw.size.0 as u32 as u64) << 32) | nw.size.1 as u32 as u64);
@@ -385,8 +383,15 @@ impl Swapchain {
     /// submit the frame's commands; the last command buffer presents its drawable
     pub fn present<'a, I: IntoIterator<Item = CommandBuffer<'a>>>(&self, mut frame: Frame, cmds: I) -> Result<SubmitId> {
         let Some(d) = frame.drawable.take() else { return Err(GpuError::Invalid("present: a frame presented twice")) };
-        // SAFETY: addPresentedHandler: (macOS 10.15.4, iOS 10.3) with a global block.
-        unsafe { msg!(d.id(), c"addPresentedHandler:", presented_block() => *const c_void; ()) };
+        // SAFETY: addPresentedHandler: (macOS 10.15.4, iOS 10.3) with a global block; the simulator's
+        // drawables do not have it: there every present counts as shown at once (nextDrawable waits).
+        unsafe {
+            if msg!(d.id(), c"respondsToSelector:", objc::sel(c"addPresentedHandler:") => objc::Sel; bool) {
+                msg!(d.id(), c"addPresentedHandler:", presented_block() => *const c_void; ());
+            } else {
+                note_shown(self.layer() as usize);
+            }
+        }
         let cbs: Vec<Obj> = cmds.into_iter().map(|c| c.into_obj()).collect();
         self.dev.sh.submit_present(cbs, Some(d)).map(SubmitId)
     }

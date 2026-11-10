@@ -122,6 +122,8 @@ struct Host {
     scale: Cell<f64>,
     /// the scene is active: the display link may run
     resumed: Cell<bool>,
+    /// the GPU's CAMetalLayer, a sublayer of JFView's (NIL until lib/gpu or the UI's output asks)
+    gpu: Cell<Id>,
     /// the app wants text (REQUEST_IME with a height) / the view is first responder (the keyboard)
     ime_visible: Cell<bool>,
     ime_shown: Cell<bool>,
@@ -156,6 +158,7 @@ static HOST: Main = Main(Host {
     size: Cell::new((0, 0, 0)),
     scale: Cell::new(2.0),
     resumed: Cell::new(false),
+    gpu: Cell::new(NIL),
     ime_visible: Cell::new(false),
     ime_shown: Cell::new(false),
     gesture: Cell::new(false),
@@ -170,6 +173,8 @@ static HOST: Main = Main(Host {
     accessory: Cell::new(NIL),
 });
 static WAKE_QUEUED: AtomicBool = AtomicBool::new(false);
+/// the scene is not active: no GPU work (iOS refuses a background app's command buffers)
+static GPU_HOLD: AtomicBool = AtomicBool::new(false);
 /// UIKit runs the app (run): wake() goes to the host, not to the pipe of a waiting loop
 static HOSTED: AtomicBool = AtomicBool::new(false);
 
@@ -385,6 +390,7 @@ extern "C" fn scene_window(_this: Id, _sel: Sel) -> Id {
 extern "C" fn scene_set_window(_this: Id, _sel: Sel, _window: Id) {}
 
 extern "C" fn scene_active(_this: Id, _sel: Sel, _scene: Id) {
+    GPU_HOLD.store(false, Ordering::Release);
     life(E_FOCUS_IN, 0);
     host().resumed.set(true);
     request_frame();
@@ -392,7 +398,10 @@ extern "C" fn scene_active(_this: Id, _sel: Sel, _scene: Id) {
 
 extern "C" fn scene_inactive(_this: Id, _sel: Sel, _scene: Id) {
     cancel_gestures();
+    // (before the scene goes to the background: the output leaves the GPU in the tick below)
+    GPU_HOLD.store(true, Ordering::Release);
     life(E_FOCUS_OUT, 0);
+    tick_now();
     host().resumed.set(false);
 }
 
@@ -530,6 +539,123 @@ extern "C" fn view_layout(this: Id, _sel: Sel) {
         (b, if traits.is_null() { 2.0 } else { msg!(traits, c"displayScale"; f64) })
     };
     resize(bounds.size.w, bounds.size.h, if scale > 0.0 { scale } else { 2.0 });
+    gpu_layer_fit();
+}
+
+// ---------------------------------------------------------------- the GPU's layer (apple_ios_gpu.rs)
+
+/// a scene that is not active does no GPU work
+pub(crate) fn gpu_hold() -> bool {
+    GPU_HOLD.load(Ordering::Acquire)
+}
+
+/// run f in a Core Animation transaction without animation
+fn no_animation(f: impl FnOnce()) {
+    // SAFETY: begin / setDisableActions: / commit of the class, on the main thread.
+    unsafe {
+        let tx = class(c"CATransaction");
+        msg!(tx, c"begin"; ());
+        msg!(tx, c"setDisableActions:", true => bool; ());
+        f();
+        msg!(tx, c"commit"; ());
+    }
+}
+
+/// the layer follows the view's bounds and the canvas's scale (no autoresizing of layers on iOS)
+fn gpu_layer_fit() {
+    let h = host();
+    let (l, view) = (h.gpu.get(), h.view.get());
+    if l.is_null() || view.is_null() {
+        return;
+    }
+    no_animation(|| {
+        // SAFETY: our layer and our view, on the main thread.
+        unsafe {
+            let b: NSRect = msg!(view, c"bounds"; NSRect);
+            msg!(l, c"setFrame:", b => NSRect; ());
+            msg!(l, c"setContentsScale:", h.scale.get() => f64; ());
+        }
+    });
+}
+
+/// the CAMetalLayer of the view, made at the first call and retained for the caller (a NativeWindow);
+/// None without UIKit's host
+pub(crate) fn gpu_layer() -> Option<usize> {
+    let h = host();
+    let view = h.view.get();
+    if view.is_null() {
+        return None;
+    }
+    if h.gpu.get().is_null() {
+        let cls = class(c"CAMetalLayer");
+        if cls.is_null() {
+            return None;
+        }
+        let mut made = NIL;
+        no_animation(|| {
+            // SAFETY: [CAMetalLayer layer] is autoreleased and retained here (the host keeps it for the
+            // process); a sublayer of our view's layer, hidden until gpu_layer_show.
+            unsafe {
+                let l: Id = msg!(cls, c"layer"; Id);
+                if l.is_null() {
+                    return;
+                }
+                msg!(l, c"retain"; Id);
+                // (not opaque: without a drawable yet the view's picture below shows through)
+                msg!(l, c"setOpaque:", false => bool; ());
+                msg!(l, c"setHidden:", true => bool; ());
+                let host_layer: Id = msg!(view, c"layer"; Id);
+                msg!(host_layer, c"addSublayer:", l => Id; ());
+                made = l;
+            }
+        });
+        if made.is_null() {
+            return None;
+        }
+        h.gpu.set(made);
+        gpu_layer_fit();
+    }
+    let l = h.gpu.get();
+    // SAFETY: a live layer; the caller's reference (gpu_layer_release).
+    unsafe { msg!(l, c"retain"; Id) };
+    Some(l as usize)
+}
+
+/// (any thread) a reference gpu_layer gave out goes
+pub(crate) fn gpu_layer_release(layer: usize) {
+    release(layer as Id);
+}
+
+/// the layer is shown, or hidden with its last drawable gone (the view's picture shows again)
+pub(crate) fn gpu_layer_show(on: bool) {
+    let l = host().gpu.get();
+    if l.is_null() {
+        return;
+    }
+    no_animation(|| {
+        // SAFETY: our layer, on the main thread.
+        unsafe {
+            msg!(l, c"setHidden:", !on => bool; ());
+            if !on {
+                msg!(l, c"setContents:", NIL => Id; ());
+            }
+        }
+    });
+}
+
+/// the view layer's own picture is not needed while the GPU shows the window
+pub(crate) fn gpu_release_picture() {
+    let view = host().view.get();
+    if view.is_null() {
+        return;
+    }
+    no_animation(|| {
+        // SAFETY: the layer of our view, on the main thread.
+        unsafe {
+            let layer: Id = msg!(view, c"layer"; Id);
+            msg!(layer, c"setContents:", NIL => Id; ());
+        }
+    });
 }
 
 /// the view's size in points -> the canvas (E_DPI, E_RESIZE) and a frame at once

@@ -358,6 +358,9 @@ impl Test {
             self.ok(o.verify_bad == 0, &format!("{} presented images read back, {} differ", o.verified, o.verify_bad));
         }
         self.done = true;
+        if cfg!(target_os = "ios") {
+            out(&if self.fails != 0 { format!("{} check(s) failed", self.fails) } else { String::from("all checks passed") });
+        }
         ui.quit();
     }
 
@@ -3212,6 +3215,12 @@ fn run() -> i32 {
         "shaders" => return t_shaders(),
         "adapter" => return t_adapter(),
         "hwnd" => return t_hwnd(),
+        // (iOS: one window the system sizes, no second one, no way to look at what it shows)
+        "resize" | "minimize" | "dpi" | "windows" | "csd" | "monitors" | "layers" | "canvas" | "off" | "canvasoff" | "viewoff" | "views2" | "view"
+        | "viewsize" | "viewcpu" | "viewgate" if cfg!(target_os = "ios") => {
+            out("SKIP: needs the windows of a desktop");
+            return 0;
+        }
         "noloader" if cfg!(target_vendor = "apple") => {
             out("SKIP: no loader to miss here: Metal is part of the system");
             return 0;
@@ -3252,6 +3261,7 @@ fn run() -> i32 {
     if test == "imgplain" || test == "canvasplain" || test == "viewplain" {
         plat::setenv("jfgui_GPU_VERIFY", None);
     }
+    #[cfg_attr(target_os = "ios", allow(unused_mut))]
     let mut t = new_test(&test);
     let d = if test == "csd" {
         AppDesc { flags: AF_RESIZABLE | AF_CUSTOM_TITLEBAR, ..DESC }
@@ -3260,19 +3270,28 @@ fn run() -> i32 {
     } else {
         DESC
     };
+    // (iOS: UIKit's host runs the app, ui.quit ends the process: finish says the result)
+    #[cfg(target_os = "ios")]
+    return ui::launch(&d, t, &style::STYLE);
+    #[cfg(not(target_os = "ios"))]
     let code = ui::run_window(&d, &mut t, &style::STYLE);
+    #[cfg(not(target_os = "ios"))]
     if code != 0 {
         return code;
     }
+    #[cfg(not(target_os = "ios"))]
     if t.fails != 0 {
         out(&format!("{} check(s) failed", t.fails));
         return 1;
     }
+    #[cfg(not(target_os = "ios"))]
     if !t.done {
         out("FAIL the test did not end");
         return 1;
     }
+    #[cfg(not(target_os = "ios"))]
     out("all checks passed");
+    #[cfg(not(target_os = "ios"))]
     0
 }
 

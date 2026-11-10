@@ -237,6 +237,28 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
     rt::os::exit(code)
 }
 
+/// (test aid) the process's CPU time (us), resident memory and its own footprint (bytes), as on
+/// Windows and Linux (render3dtest and uigputest measure with it)
+pub fn win_test_usage() -> (u64, u64, u64) {
+    unsafe extern "C" {
+        fn getrusage(who: i32, usage: *mut u64) -> i32;
+        static mach_task_self_: u32;
+        fn task_info(task: u32, flavor: u32, info: *mut u64, count: *mut u32) -> i32;
+    }
+    let mut ru = [0u64; 18]; // struct rusage: two timevals (16 bytes each) first
+    let mut vm = [0u64; 48]; // task_vm_info: resident_size at word 2, phys_footprint at word 19
+    let mut count = (vm.len() * 2) as u32; // in natural_t (4 bytes)
+    // SAFETY: getrusage(RUSAGE_SELF) into a buffer as large as struct rusage; task_info with
+    // TASK_VM_INFO (22) into a buffer of `count` natural_t; mach_task_self_ is the task's port.
+    let (r, k) = unsafe { (getrusage(0, ru.as_mut_ptr()), task_info(mach_task_self_, 22, vm.as_mut_ptr(), &mut count)) };
+    let tv = |i: usize| ru[i * 2] * 1_000_000 + (ru[i * 2 + 1] & 0xffff_ffff);
+    let cpu = if r == 0 { tv(0) + tv(1) } else { 0 };
+    if k != 0 {
+        return (cpu, 0, 0);
+    }
+    (cpu, vm[2], vm[19])
+}
+
 /// monotonic time in microseconds (CLOCK_MONOTONIC)
 pub fn time_us() -> u64 {
     let mut ts = ffi::Timespec::default();

@@ -246,7 +246,8 @@ fn probe(inst: &Arc<InstShared>, dev: Obj) -> Adapter {
     .iter()
     .find(|(f, _)| supports(d, *f))
     .map_or("", |x| x.1);
-    let missing = if !(apple || mac2) { Some("a Metal GPU of family Apple3 / Mac2 or later") } else { None };
+    // (the simulator's device answers to none of the families; what it cannot do shows in the tests)
+    let missing = if !(apple || mac2 || cfg!(target_abi = "sim")) { Some("a Metal GPU of family Apple3 / Mac2 or later") } else { None };
     let info = AdapterInfo {
         name,
         vendor_id: 0x106b,

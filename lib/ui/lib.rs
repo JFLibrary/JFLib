@@ -143,12 +143,12 @@ mod ids;
 // the output through a swapchain: Windows and Linux programs against glibc, their windows only
 // (docs/GPU.md "Ausgabe der UI"), Android, macOS (Metal, AP6), the browser (WebGPU: "Ausgabe im
 // Browser"); static Linux programs link nothing of it
-#[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
+#[cfg(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32"))]
 mod gpu_out;
-#[cfg(not(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32")))]
+#[cfg(not(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32")))]
 #[path = "gpu_out_off.rs"]
 mod gpu_out;
-#[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos"))]
+#[cfg(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple"))]
 pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_FS_TILE, GPU_OUT_VS, GPU_OUT_WGSL};
 // a canvas whose zoom and pan go through GPU textures (canvas.rs); on every target
 mod canvas;
