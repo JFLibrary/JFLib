@@ -52,8 +52,11 @@ def run_linux(args, cwd=ROOT, timeout=600, env=None):
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
         p = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=out, stderr=err,
                              env=env, creationflags=subprocess.CREATE_NO_WINDOW)
+        timed_out = False
         try:
             p.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out = True
         finally:
             p.stdin.close()
             try:
@@ -63,9 +66,10 @@ def run_linux(args, cwd=ROOT, timeout=600, env=None):
                 p.wait()
         out.seek(0)
         err.seek(0)
-        return subprocess.CompletedProcess(command, p.returncode,
-                                           out.read().decode('utf-8', 'replace'),
-                                           err.read().decode('utf-8', 'replace'))
+        stdout, stderr = out.read().decode('utf-8', 'replace'), err.read().decode('utf-8', 'replace')
+        if timed_out:       # as subprocess.run: the program is gone, what it wrote comes along
+            raise subprocess.TimeoutExpired(command, timeout, output=stdout, stderr=stderr)
+        return subprocess.CompletedProcess(command, p.returncode, stdout, stderr)
 
 
 def run_native(target, exe, args, timeout=600, env=None, gui=False):

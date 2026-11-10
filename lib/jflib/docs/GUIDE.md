@@ -1748,7 +1748,9 @@ shot build/template.png
 ```
 
 * A first line `#!args --open file.png` adds program arguments when `build_rs.py test` runs
-  the script (pass them yourself when you run it by hand).
+  the script (pass them yourself when you run it by hand). A line `#!timeout 1800` among the
+  first five sets the seconds it may take there (600 otherwise); a script that takes longer
+  counts as failed and the others still run.
 * `--dump` / `dump` print the widget tree (kind, id, label, rect in DIP, states, value): use it
   to find ids and positions without looking at pixels. Prefer `#id` and labels over coordinates.
 * Popups may leave their window (§6): their dump rectangles can be negative or beyond the
