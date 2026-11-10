@@ -31,6 +31,9 @@ impl StyleList for Netlab {
     fn scrollbar_min_thumb(&self, ui: &mut Ui) -> i32 {
         ui.dp(24)
     }
+    fn scrollbar_room(&self, ui: &mut Ui) -> i32 {
+        ui.dp(10) // the track stays visible: the content ends before it
+    }
     fn scrollbar(&self, ui: &mut Ui, sp: &Sp) {
         scrollbar(ui, sp)
     }

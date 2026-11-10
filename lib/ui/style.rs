@@ -410,6 +410,12 @@ pub trait StyleList {
     fn scrollbar_min_thumb(&self, _ui: &mut Ui) -> i32 {
         0
     }
+    /// room a view that scrolls only vertically keeps free right of its content for the bar,
+    /// overflowing or not, so the content ends before a bar that stays visible (px; 0 = the
+    /// bar floats over the content)
+    fn scrollbar_room(&self, _ui: &mut Ui) -> i32 {
+        0
+    }
     /// flags 1 = vertical, value expansion 0..256, s[0] track start, s[1] thumb length,
     /// value2 thumb offset (px)
     fn scrollbar(&self, _ui: &mut Ui, _sp: &Sp) {}

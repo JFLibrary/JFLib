@@ -71,6 +71,9 @@ pub(crate) struct BoxFrame {
     /// grid's run and the cell (col, row, cols, rows)
     pub(crate) grid: u16,
     pub(crate) gcell: (u16, [u16; 4]),
+    /// width kept free right of the content (a scroll view's bar, StyleList::scrollbar_room);
+    /// part of the natural width
+    pub(crate) gutter: i32,
 }
 
 /// a row of a wrapping box (BOX_WRAP): its height (the tallest child) and its children's
@@ -607,12 +610,13 @@ impl Ui {
                 }
             }
         }
-        // measured natural size (content + padding)
+        // measured natural size (content + padding, + a scroll bar's room)
         let p2 = b.pad.wrapping_add(b.pad);
         let (mut w, mut h) = (b.fixed.wrapping_add(p2), b.cross.wrapping_add(p2));
         if b.flags & BOX_V != 0 {
             core::mem::swap(&mut w, &mut h);
         }
+        w = w.wrapping_add(b.gutter);
         let s = *self.slot(b.id);
         let size_changed = b.flags & BOX_FIXED == 0 && (w != s.measw || h != s.meash);
         if size_changed || b.fixed != s.fixed || b.wsum != s.wsum {
