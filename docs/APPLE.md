@@ -469,7 +469,9 @@ gestartet) fand einen Fehler, den `spctl` nicht sieht: `tools/package.py` kopier
 die App öffnete nicht; behoben, `mac_dmg` lehnt ein solches Bündel jetzt ab, danach startete sie mit der üblichen
 Rückfrage. Signieren in der CI gehört in die Repositories der Apps, nicht in JFLib (Entscheidung des Nutzers vom
 2026-11-10): Die Test-Apps der Bibliothek bleiben ad hoc signiert, [PACKAGING.md](PACKAGING.md) „macOS: .dmg“ zeigt
-die Schritte für den Workflow einer App. Offen: TestFlight für iOS (falls gewünscht).
+die Schritte für den Workflow einer App. TestFlight ist gestrichen (Nutzer, 2026-11-10): Es verteilt eine echte App
+an Tester und gehört damit zur iOS-Version einer App in ihrem eigenen Repository, nicht zur Test-Galerie der
+Bibliothek.
 
 **AP8d umgesetzt (2026-11-10), damit ist AP8 fertig:** README, [PACKAGING.md](PACKAGING.md), [UPDATES.md](UPDATES.md)
 und GUIDE nennen macOS und iOS (mit AP8a–AP8c). Die Website jflib.org (Repository jflibWebsite, Inhalt vorher mit dem
