@@ -478,10 +478,10 @@ pub extern "C" fn crash_test() -> ! { core::arch::wasm32::unreachable() }
 #[cfg(target_arch = "wasm32")]
 pub extern "C" fn crash_test_caller() -> ! { crash_test() }
 
-/// a deliberate crash for tests on Apple's arm64: x0 = 16, then a 4-byte write to address 0x10 -- the
+/// a deliberate crash for tests on ARM64 (Apple, Linux): x0 = 16, then a 4-byte write to address 0x10 -- the
 /// faulting instruction is at crash_test + 4
 #[unsafe(naked)]
-#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+#[cfg(all(target_arch = "aarch64", any(target_vendor = "apple", target_os = "linux")))]
 pub extern "C" fn crash_test() -> ! {
     core::arch::naked_asm!("mov x0, #16", "str w0, [x0]", "brk #0")
 }
@@ -489,7 +489,7 @@ pub extern "C" fn crash_test() -> ! {
 /// crash_test called from a known place (bl): the return address crash_test_caller + 4 must be
 /// among CrashInfo::frames
 #[unsafe(naked)]
-#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+#[cfg(all(target_arch = "aarch64", any(target_vendor = "apple", target_os = "linux")))]
 pub extern "C" fn crash_test_caller() -> ! {
     core::arch::naked_asm!("bl {0}", "brk #0", sym crash_test)
 }

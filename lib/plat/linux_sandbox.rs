@@ -222,7 +222,7 @@ fn sf(code: u16, jt: u8, jf: u8, k: u32) -> SockFilter {
     SockFilter { code, jt, jf, k }
 }
 
-const AUDIT_ARCH_X86_64: u32 = 0xC000_003E;
+#[cfg(target_arch = "x86_64")] const AUDIT_ARCH: u32 = 0xC000_003E; // AUDIT_ARCH_X86_64
 const X32_BIT: u32 = 0x4000_0000;
 const SECCOMP_RET_ALLOW: u32 = 0x7FFF_0000;
 const SECCOMP_RET_ERRNO_EPERM: u32 = 0x0005_0001;
@@ -230,7 +230,7 @@ const SECCOMP_SET_MODE_FILTER: usize = 1;
 
 // syscalls denied with EPERM: tracing, cross-process memory, kexec, module loading, mount,
 // bpf, perf_event_open, userfaultfd, keyrings, handle reopen, namespace juggling
-const DENY: &[usize] = &[
+pub(crate) const DENY: &[usize] = &[
     SYS_PTRACE,
     SYS_PROCESS_VM_READV, SYS_PROCESS_VM_WRITEV,
     SYS_KEXEC_LOAD, SYS_KEXEC_FILE_LOAD,
@@ -250,7 +250,7 @@ fn seccomp(exec_allowed: bool, st: &mut Status) {
     let n = DENY.len() + if exec_allowed { 0 } else { 2 };
     let deny_idx = (5 + n) as u8; // the index of the EPERM return
     prog.push(sf(0x20, 0, 0, 4)); // 0: load arch (offset 4)
-    prog.push(sf(0x15, 0, deny_idx - 2, AUDIT_ARCH_X86_64)); // 1: arch != x86-64 -> deny
+    prog.push(sf(0x15, 0, deny_idx - 2, AUDIT_ARCH)); // 1: another architecture -> deny
     prog.push(sf(0x20, 0, 0, 0)); // 2: load nr (offset 0)
     prog.push(sf(0x35, deny_idx - 4, 0, X32_BIT)); // 3: nr >= x32 bit -> deny
     let mut i: u8 = 4;
@@ -306,3 +306,9 @@ pub fn apply(plan: &LinuxPlan) -> Status {
     }
     st
 }
+
+// ARM64 (docs/ARM64.md): the filter checks AUDIT_ARCH_AARCH64.  The deny list has ARM64's numbers (rt's
+// kernel table); step 3 (the x32 bit of x86-64) stays: no ARM64 number reaches 0x4000_0000, so it never
+// matches there.
+#[cfg(target_arch = "aarch64")]
+const AUDIT_ARCH: u32 = 0xC000_00B7; // AUDIT_ARCH_AARCH64: EM_AARCH64 | 64-bit | little endian

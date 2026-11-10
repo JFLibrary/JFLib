@@ -105,7 +105,7 @@ pub fn t_guard(t: &mut T) {
             "guard: int3 -> GK_BREAK");
     let k = tc(T_DIV0);
     let r = guard_call(k, 0, 0, 0, 0, Some(&mut gi));
-    t.check(r.0 == FAULT && gi.kind == GK_ARITH && gi.code == code::DIV0 && gi.pc == k as u64 + 9,
+    t.check(r.0 == FAULT && gi.kind == GK_ARITH && gi.code == code::DIV0 && gi.pc == k as u64 + if cfg!(target_arch = "aarch64") { 40 } else { 9 },
             "guard: division by zero -> GK_ARITH at the div");
     let r = guard_call(tc(T_SUM), 1, 1, 1, 1, Some(&mut gi));
     t.check(r == (10, 0) && gi.kind == 0, "guard: the next call after faults runs normally (info cleared)");
@@ -145,7 +145,7 @@ pub fn t_guard(t: &mut T) {
     let r = guard_call(h_inner_fault as *const () as usize, 0, 0, 0, 0, Some(&mut gi));
     t.check(r.0 == 42 && gi.kind == 0, "guard: a fault inside a nested guard stays there");
     let r = guard_call(h_host_fault as *const () as usize, 0, 0, 0, 0, Some(&mut gi));
-    t.check(r.0 == FAULT && gi.kind == GK_ACCESS && gi.addr == 0x10 && gi.pc == plat::crash_test as *const () as u64 + 5,
+    t.check(r.0 == FAULT && gi.kind == GK_ACCESS && gi.addr == 0x10 && gi.pc == plat::crash_test as *const () as u64 + if cfg!(target_arch = "aarch64") { 4 } else { 5 },
             "guard: a fault after an inner guard ended goes to the enclosing guard");
     t.check(guard_tag() == 0, "guard: no guard left active");
     // ---- guard_run (Rust closures)

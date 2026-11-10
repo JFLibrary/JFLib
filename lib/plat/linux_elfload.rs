@@ -6,10 +6,10 @@
 //                                         DT_GNU_HASH chains)
 //   (crate) lib_unload(h)                 munmap (lib_close / drop)
 //
-// Accepted: ELFCLASS64, little endian, ET_DYN, EM_X86_64, program headers of 56 bytes
+// Accepted: ELFCLASS64, little endian, ET_DYN, EM_X86_64 (ARM64: EM_AARCH64), program headers of 56 bytes
 // (1..64), at most LH_SEGMAX PT_LOAD segments in ascending, page-disjoint order, never
 // writable AND executable, one PT_DYNAMIC; relocations R_X86_64_NONE / RELATIVE and
-// R_X86_64_64 / GLOB_DAT / JUMP_SLOT against symbols the object defines itself (RELA only).
+// R_X86_64_64 / GLOB_DAT / JUMP_SLOT against symbols the object defines itself (RELA only; ARM64 at the end).
 // Rejected: DT_NEEDED or undefined symbols (LIBE_DEPS), PT_INTERP / PT_TLS / DT_INIT /
 // DT_INIT_ARRAY / DT_PREINIT_ARRAY (LIBE_INIT: nothing of the object runs while loading),
 // DT_REL and other relocation types (LIBE_RELOC), everything malformed (LIBE_FORMAT).
@@ -64,11 +64,11 @@ const DT_INIT_ARRAYSZ: u64 = 27;
 const DT_PREINIT_ARRAYSZ: u64 = 33;
 const DT_GNU_HASH: u64 = 0x6FFF_FEF5;
 const R_NONE: u32 = 0;
-const R_64: u32 = 1;
-const R_GLOB_DAT: u32 = 6;
-const R_JUMP_SLOT: u32 = 7;
-const R_RELATIVE: u32 = 8;
-const SHN_ABS: u32 = 0xFFF1;
+#[cfg(target_arch = "x86_64")] const R_64: u32 = 1;
+#[cfg(target_arch = "x86_64")] const R_GLOB_DAT: u32 = 6;
+#[cfg(target_arch = "x86_64")] const R_JUMP_SLOT: u32 = 7;
+#[cfg(target_arch = "x86_64")] const R_RELATIVE: u32 = 8;
+const SHN_ABS: u32 = 0xFFF1; #[cfg(target_arch = "x86_64")] const EM: u32 = 62; #[cfg(target_arch = "x86_64")] const RELA_GOT_ADDEND: bool = false; #[cfg(target_arch = "x86_64")] #[inline(always)] fn page_mask() -> u64 { 4095 }
 
 fn g16(b: &[u8], o: u64) -> Option<u32> {
     let o = o as usize;
@@ -168,8 +168,8 @@ fn elf_map(b: &[u8], l: &mut Lib) -> Result<(), u32> {
     if b[..4] != *b"\x7FELF" || b[4] != 2 || b[5] != 1 || b[6] != 1 {
         return Err(fmt); // ELFCLASS64, little endian, version
     }
-    if g16(b, 16) != Some(3) || g16(b, 18) != Some(62) || g32(b, 20) != Some(1) || g16(b, 54) != Some(56) {
-        return Err(fmt); // ET_DYN, EM_X86_64, e_phentsize
+    if g16(b, 16) != Some(3) || g16(b, 18) != Some(EM) || g32(b, 20) != Some(1) || g16(b, 54) != Some(56) {
+        return Err(fmt); // ET_DYN, EM_X86_64 / EM_AARCH64, e_phentsize
     }
     let phnum = g16(b, 56).ok_or(fmt)? as u64;
     if phnum == 0 || phnum > 64 {
@@ -200,12 +200,12 @@ fn elf_map(b: &[u8], l: &mut Lib) -> Result<(), u32> {
                 if flags & (PF_W | PF_X) == PF_W | PF_X {
                     return Err(fmt); // W^X
                 }
-                if va & !4095 < span || el.nseg >= LH_SEGMAX {
+                if va & !page_mask() < span || el.nseg >= LH_SEGMAX {
                     return Err(fmt); // overlaps the previous segment's pages
                 }
                 el.segs[el.nseg] = Seg { va, end: va + memsz, off, fsz: filesz, flags };
                 el.nseg += 1;
-                span = (va + memsz + 4095) & !4095;
+                span = (va + memsz + page_mask()) & !page_mask();
             }
             PT_DYNAMIC => {
                 if el.dynsz != 0 {
@@ -336,16 +336,16 @@ fn elf_load(b: &[u8], el: &mut El, base: usize) -> Result<(), u32> {
             }
             elf_rela(m, el, base, el.jmprel, el.pltrelsz)?;
         }
-    }
+    } #[cfg(target_arch = "aarch64")] sync_icache(el, base);
     // ---- protection: segments, PROT_NONE gaps, RELRO read-only
     let mut cur = 0u64; // page cursor
     for k in 0..el.nseg {
         let s = el.segs[k];
-        let start = s.va & !4095;
+        let start = s.va & !page_mask();
         if cur < start && !em_mprotect(base, cur, start - cur, 0) {
             return Err(LIBE_MAP);
         }
-        let end = (s.end + 4095) & !4095;
+        let end = (s.end + page_mask()) & !page_mask();
         cur = end;
         let mut prot = 0;
         if s.flags & PF_R != 0 {
@@ -364,8 +364,8 @@ fn elf_load(b: &[u8], el: &mut El, base: usize) -> Result<(), u32> {
     }
     let (rv, rs) = (el.relro_va, el.relro_sz);
     if rs != 0 && rv < span && rs <= span - rv {
-        let e = (rv + rs) & !4095; // never protect a partial page
-        let s = rv & !4095;
+        let e = (rv + rs) & !page_mask(); // never protect a partial page
+        let s = rv & !page_mask();
         if e > s && !em_mprotect(base, s, e - s, PROT_READ) {
             return Err(LIBE_MAP);
         }
@@ -449,8 +449,8 @@ fn elf_rela(m: &mut [u8], el: &El, base: usize, va: u64, size: u64) -> Result<()
         let v = match typ {
             R_RELATIVE => (base as u64).wrapping_add(addend),
             R_64 | R_GLOB_DAT | R_JUMP_SLOT => {
-                if typ != R_64 {
-                    addend = 0; // GLOB_DAT / JUMP_SLOT: no addend
+                if typ != R_64 && !RELA_GOT_ADDEND {
+                    addend = 0; // GLOB_DAT / JUMP_SLOT: no addend (x86-64; ARM64 adds it)
                 }
                 if sym == 0 || sym >= el.nsym {
                     return Err(LIBE_RELOC);
@@ -528,5 +528,70 @@ pub(crate) fn lib_unload(h: &mut Lib) {
         // SAFETY: our reservation of span bytes, unmapped once.
         unsafe { syscall6(SYS_MUNMAP, h.base, h.span, 0, 0, 0, 0) };
         h.base = 0;
+    }
+}
+
+// ---------------------------------------------------------------- ARM64 (docs/ARM64.md)
+//
+// EM_AARCH64 (183) and its RELA relocations: R_AARCH64_NONE (0), RELATIVE (1027: B + A), ABS64 (257),
+// GLOB_DAT (1025) and JUMP_SLOT (1026), the last three S + A -- unlike x86-64, the GOT entries keep the
+// addend.  Pages in the kernel's size (rt::os::page_size: 4, 16 or 64 KB): segments that share a page of
+// that size are refused (a plugin linked for 4 KB pages on a 16 KB kernel), as their protection could
+// not be set apart.  ARM64 does not keep the instruction cache coherent with the data the loader
+// wrote: sync_icache cleans the executable segments to the point of unification and invalidates them
+// in the instruction cache (what __clear_cache does), before the protection is set.  Linux on ARM64
+// compiles this with ARM4 (plib is off there until then).
+#[cfg(target_arch = "aarch64")]
+const EM: u32 = 183;
+#[cfg(target_arch = "aarch64")]
+const R_64: u32 = 257;
+#[cfg(target_arch = "aarch64")]
+const R_GLOB_DAT: u32 = 1025;
+#[cfg(target_arch = "aarch64")]
+const R_JUMP_SLOT: u32 = 1026;
+#[cfg(target_arch = "aarch64")]
+const R_RELATIVE: u32 = 1027;
+#[cfg(target_arch = "aarch64")]
+const RELA_GOT_ADDEND: bool = true;
+
+/// the kernel's page size - 1
+#[cfg(target_arch = "aarch64")]
+fn page_mask() -> u64 {
+    rt::os::page_size() as u64 - 1
+}
+
+/// clean the executable segments of the mapped image to the point of unification, then invalidate
+/// them in the instruction cache; the line sizes from CTR_EL0, whose IDC / DIC bits say when a step
+/// is not needed
+#[cfg(target_arch = "aarch64")]
+fn sync_icache(el: &El, base: usize) {
+    let ctr: u64;
+    // SAFETY: CTR_EL0 is readable from user space on Linux (or emulated by the kernel).
+    unsafe { core::arch::asm!("mrs {}, ctr_el0", out(reg) ctr, options(nomem, nostack, preserves_flags)) };
+    let (dline, iline) = (4usize << (ctr >> 16 & 15), 4usize << (ctr & 15));
+    let (idc, dic) = (ctr >> 28 & 1 != 0, ctr >> 29 & 1 != 0);
+    for s in el.segs[..el.nseg].iter().filter(|s| s.flags & PF_X != 0) {
+        let (lo, hi) = (base + s.va as usize, base + s.end as usize);
+        // SAFETY: cache maintenance by address on our own mapping (readable: the protection is not set
+        // yet); it changes no data.
+        unsafe {
+            if !idc {
+                let mut a = lo & !(dline - 1);
+                while a < hi {
+                    core::arch::asm!("dc cvau, {}", in(reg) a, options(nostack, preserves_flags));
+                    a += dline;
+                }
+            }
+            core::arch::asm!("dsb ish", options(nostack, preserves_flags));
+            if !dic {
+                let mut a = lo & !(iline - 1);
+                while a < hi {
+                    core::arch::asm!("ic ivau, {}", in(reg) a, options(nostack, preserves_flags));
+                    a += iline;
+                }
+                core::arch::asm!("dsb ish", options(nostack, preserves_flags));
+            }
+            core::arch::asm!("isb", options(nostack, preserves_flags));
+        }
     }
 }

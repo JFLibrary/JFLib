@@ -31,11 +31,11 @@ const SS_DISABLE: usize = 2;
 const ALT_SIZE: usize = 65536;
 const PROT_RW: usize = 3;
 const MAP_PRIVATE_ANON: usize = 0x22;
-const UC_GREGS: usize = 40; // ucontext: uc_flags, uc_link, uc_stack, then the registers
-const REG_RBP: usize = 10;
-const REG_RSP: usize = 15;
-const REG_RIP: usize = 16;
-const REG_EFL: usize = 17;
+#[cfg(target_arch = "x86_64")] const UC_GREGS: usize = 40; // ucontext: uc_flags, uc_link, uc_stack, then the registers
+#[cfg(target_arch = "x86_64")] const REG_RBP: usize = 10;
+#[cfg(target_arch = "x86_64")] const REG_RSP: usize = 15;
+#[cfg(target_arch = "x86_64")] const REG_RIP: usize = 16;
+#[cfg(target_arch = "x86_64")] const REG_EFL: usize = 17;
 const SIGI_ADDR: usize = 16; // siginfo: si_addr
 
 // the previous k_sigaction of every signal: handler, flags, restorer, mask
@@ -44,7 +44,7 @@ const OLD0: [AtomicUsize; 4] = [const { AtomicUsize::new(0) }; 4];
 static OLD_ACT: [[AtomicUsize; 4]; 32] = [OLD0; 32];
 
 // return path of guard_sig
-core::arch::global_asm!(
+#[cfg(target_arch = "x86_64")] core::arch::global_asm!(
     ".globl jfgui_rs_guard_sigret",
     "jfgui_rs_guard_sigret:",
     "    mov eax, {nr}",
@@ -98,7 +98,7 @@ pub(crate) fn guard_os_install() {
 }
 
 /// the signal handler (SysV entry: sig, siginfo, ucontext)  [guard_sig]
-extern "C" fn guard_sig(sig: i32, si: *mut u8, uc: *mut u8) {
+#[cfg(target_arch = "x86_64")] extern "C" fn guard_sig(sig: i32, si: *mut u8, uc: *mut u8) {
     let kind = match sig {
         SIGSEGV => GK_ACCESS,
         SIGBUS => GK_BUS,
@@ -116,6 +116,65 @@ extern "C" fn guard_sig(sig: i32, si: *mut u8, uc: *mut u8) {
             *greg(REG_RSP) = rsp;
             *greg(REG_RBP) = rbp;
             *greg(REG_EFL) &= !0x400; // DF = 0
+            return;
+        }
+    }
+    // not ours: the previous handler, or the default action
+    let h = OLD_ACT[(sig & 31) as usize][0].load(Ordering::SeqCst);
+    if h > 1 {
+        // SAFETY: a SA_SIGINFO handler installed before us (the crash handler).
+        let f: extern "C" fn(i32, *mut u8, *mut u8) = unsafe { core::mem::transmute(h) };
+        f(sig, si, uc);
+        return;
+    }
+    let dfl = [0usize; 4];
+    sys(SYS_RT_SIGACTION, sig as usize, dfl.as_ptr() as usize, 0, 8);
+    let pid = sys(SYS_GETPID, 0, 0, 0, 0);
+    sys(SYS_TGKILL, pid as usize, plat_tid() as usize, sig as usize, 0); // pending until we return
+}
+
+// ---------------------------------------------------------------- ARM64 (docs/ARM64.md)
+//
+// The return path and guard_sig for ARM64 (compiled there with ARM4, when plib comes back).  The
+// sigcontext (linux_crash.rs): x0 .. x30 from 184, sp at 432, pc at 440.  With an active guard the
+// handler resumes at jfgui_guard_fault_ip with sp and x29 of the trampoline's body (plib.rs restores
+// FPCR and d8 .. d15 there); rt_sigreturn restores the rest from the frame.
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    ".globl jfgui_rs_guard_sigret",
+    "jfgui_rs_guard_sigret:",
+    "    mov x8, #{nr}",
+    "    svc 0",
+    "    brk #1",
+    nr = const rt::os::SYS_RT_SIGRETURN,
+);
+
+#[cfg(target_arch = "aarch64")]
+const UC_X29: usize = 184 + 29 * 8;
+#[cfg(target_arch = "aarch64")]
+const UC_SP: usize = 184 + 31 * 8;
+#[cfg(target_arch = "aarch64")]
+const UC_PC: usize = UC_SP + 8;
+
+/// the signal handler (sig, siginfo, ucontext)  [guard_sig]
+#[cfg(target_arch = "aarch64")]
+extern "C" fn guard_sig(sig: i32, si: *mut u8, uc: *mut u8) {
+    let kind = match sig {
+        SIGSEGV => GK_ACCESS,
+        SIGBUS => GK_BUS,
+        SIGILL => GK_ILLEGAL,
+        SIGFPE => GK_ARITH,
+        _ => GK_BREAK,
+    };
+    // SAFETY: the kernel passes a valid siginfo and ucontext for this signal.
+    unsafe {
+        let reg = |off: usize| uc.add(off) as *mut u64;
+        let pc = *reg(UC_PC);
+        let addr = if kind == GK_ACCESS || kind == GK_BUS { *(si.add(SIGI_ADDR) as *const u64) } else { 0 };
+        if let Some((sp, fp)) = guard_hit(plat_tid(), kind, sig as u32, pc, addr) {
+            *reg(UC_PC) = guard_fault_ip() as u64;
+            *reg(UC_SP) = sp;
+            *reg(UC_X29) = fp;
             return;
         }
     }
