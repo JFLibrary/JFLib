@@ -23,6 +23,8 @@ pub const LIBE_NOMEM: u32 = 5;
 pub const LIBE_INIT: u32 = 6;
 /// Unsupported native mapping.
 pub const LIBE_MAP: u32 = 7;
+/// A native library built for another processor (x86-64 / ARM64).
+pub const LIBE_ARCH: u32 = 8;
 /// Native plugin size limit, retained in the common API.
 pub const LIB_FILE_MAX: u64 = 64 << 20;
 /// Native segment count limit.
@@ -74,8 +76,8 @@ impl Lib {
 }
 /// Reject native DLL/SO input on WebAssembly.
 pub fn lib_open(_path: &str) -> Result<Lib, u32> {
-    // macOS, iOS, Linux on ARM64 before ARM4: the manifest first, as the native loaders ask it (a refusal is recorded); then refused
-    #[cfg(any(target_vendor = "apple", all(target_os = "linux", target_arch = "aarch64")))]
+    // macOS, iOS: the manifest first, as the native loaders ask it (a refusal is recorded); then refused
+    #[cfg(target_vendor = "apple")]
     if !crate::policy::plugin_allowed(_path) {
         return Err(LIBE_IO);
     }

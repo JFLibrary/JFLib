@@ -6,8 +6,8 @@
 // modules/modplat as `plat`) to every library crate the module contains (simd, gfx,
 // img_core, img_jpeg, img_jxl, img_jxl_enc), so their unchanged sources compile against it:
 //
-//   cpu, crash, fx, sync, x87   copies of the files of lib/rt in shared/ (the same SSE /
-//                               x87 float semantics, the same CPU feature bits, spin lock)
+//   cpu, crash, fx, sync, x87   copies of the files of lib/rt in shared/ (the same float semantics,
+//   plugin_abi!                 CPU feature bits, spin lock; ARM64: portable/, aarch64/fx.rs)
 //   os                          what rt::os is, through the host: yield_now, exit (a panic),
 //                               write_stdout / write_stderr (the host's log)
 //   modabi                      a copy of lib/plat/modabi.rs: the host / module records
@@ -18,8 +18,8 @@
 //   (global allocator)          the host's allocator (HostTable::alloc / free): blocks move
 //                               between host and module as Vec raw parts
 //   (panic handler)             the message to HostTable::panic: the host's crash report
-//   (memcpy, memset, ...)       mem.rs (assembly: never an export; it was a copy of PaintCraft's
-//                               plugin crate until that moved to JFLibrary/JFPainter)
+//   (memcpy, memset, ...)       mem.rs (assembly for x86-64 and ARM64: never an export; it was a copy
+//                               of PaintCraft's plugin crate until that moved to JFLibrary/JFPainter)
 //
 // shared/ holds byte-equal copies, because a package may not reach outside its folder
 // (docs/CRATES.md); build_rs.py's lint refuses a copy that differs from its source.
@@ -30,11 +30,11 @@
 
 extern crate alloc;
 
-#[path = "shared/rt/cpu.rs"]
+#[cfg_attr(not(target_arch = "aarch64"), path = "shared/rt/cpu.rs")] #[cfg_attr(target_arch = "aarch64", path = "shared/rt/portable/cpu.rs")]
 pub mod cpu;
 #[path = "shared/rt/crash.rs"]
 pub mod crash;
-#[path = "shared/rt/fx.rs"]
+#[cfg_attr(not(target_arch = "aarch64"), path = "shared/rt/fx.rs")] #[cfg_attr(target_arch = "aarch64", path = "shared/rt/aarch64/fx.rs")]
 pub mod fx;
 #[path = "shared/rt/portable/fx.rs"]
 pub mod scalar_fx;
@@ -45,7 +45,7 @@ pub mod portable {
 }
 #[path = "shared/rt/sync.rs"]
 pub mod sync;
-#[path = "shared/rt/x87.rs"]
+#[cfg_attr(not(target_arch = "aarch64"), path = "shared/rt/x87.rs")] #[cfg_attr(target_arch = "aarch64", path = "shared/rt/portable/math.rs")]
 pub mod x87;
 #[path = "shared/plat/modabi.rs"]
 pub mod modabi;
@@ -72,10 +72,10 @@ pub fn host() -> &'static HostTable {
     unsafe { &*p }
 }
 
-/// ud2: a fault the host's crash handler reports
+/// ud2 (ARM64: udf): a fault the host's crash handler reports
 pub fn trap() -> ! {
     // SAFETY: an illegal instruction, nothing else.
-    unsafe { core::arch::asm!("ud2", options(noreturn, nomem, nostack)) }
+    unsafe { #[cfg(target_arch = "x86_64")] core::arch::asm!("ud2", options(noreturn, nomem, nostack)); #[cfg(target_arch = "aarch64")] core::arch::asm!("udf #0", options(noreturn, nomem, nostack)); }
 }
 
 /// the OS calls rt makes, through the host
@@ -154,15 +154,15 @@ pub fn entry(h: *const HostTable, tab: &'static ModTable) -> *const ModTable {
     tab
 }
 
-/// the module's one export: `name(&HostTable) -> &TABLE` (extern "win64", #[no_mangle])
+/// the module's one export: `name(&HostTable) -> &TABLE` (plugin_abi!, #[no_mangle])
 #[macro_export]
 macro_rules! module_entry {
     ($name:ident, $table:path) => {
-        /// the module's entry (lib/plat/modabi.rs)
-        #[allow(unsafe_code)]
-        #[unsafe(no_mangle)]
-        pub extern "win64" fn $name(host: *const $crate::modabi::HostTable) -> *const $crate::modabi::ModTable {
-            $crate::entry(host, &$table)
+        $crate::plugin_abi! {
+            /// the module's entry (lib/plat/modabi.rs)
+            #[allow(unsafe_code)] #[unsafe(no_mangle)]
+            pub fn $name(host: *const $crate::modabi::HostTable) -> *const $crate::modabi::ModTable {
+                $crate::entry(host, &$table) }
         }
     };
 }
@@ -217,7 +217,7 @@ unsafe fn blob<'a>(on: bool, p: *const u8, n: usize) -> Option<&'a [u8]> {
 
 const ERR_HDR: i32 = -2;
 
-extern "win64" fn jxl_encode<W: JxlWriter>(req: *const JxlReq, res: *mut JxlRes) -> i32 {
+crate::plugin_abi! { fn jxl_encode<W: JxlWriter>(req: *const JxlReq, res: *mut JxlRes) -> i32 {
     if req.is_null() || res.is_null() {
         return ERR_HDR;
     }
@@ -232,7 +232,7 @@ extern "win64" fn jxl_encode<W: JxlWriter>(req: *const JxlReq, res: *mut JxlRes)
     match r.test {
         JXT_PANIC => panic!("test panic inside the module (jfgui_JXLENC_TEST=panic)"),
         // SAFETY: a deliberate 4-byte write to address 0x10 (the crash tests of the host).
-        JXT_FAULT => unsafe { core::arch::asm!("mov dword ptr [{0}], {1:e}", in(reg) 0x10usize, in(reg) 16u32, options(nostack)) },
+        #[cfg(target_arch = "x86_64")] JXT_FAULT => unsafe { core::arch::asm!("mov dword ptr [{0}], {1:e}", in(reg) 0x10usize, in(reg) 16u32, options(nostack)) }, #[cfg(target_arch = "aarch64")] JXT_FAULT => unsafe { core::arch::asm!("str {1:w}, [{0}]", in(reg) 0x10usize, in(reg) 16u32, options(nostack)) },
         _ => {}
     }
     // SAFETY: the blobs and the cancel flag live in the host during the call.
@@ -261,4 +261,10 @@ extern "win64" fn jxl_encode<W: JxlWriter>(req: *const JxlReq, res: *mut JxlRes)
         }
         Err(e) => e,
     }
-}
+}}
+
+// the shared modabi.rs names the macro rt::plugin_abi!, as plat's copy does: this crate is the
+// module's rt
+extern crate self as rt;
+#[path = "shared/rt/abi.rs"]
+mod abi;

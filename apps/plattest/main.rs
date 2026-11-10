@@ -192,13 +192,13 @@ mod t_touch;
 mod t_spawn;
 mod t_window;
 // plat-shared: printing, the crash guard, the plugin loader, the portal
-#[cfg(not(any(target_vendor = "apple", all(target_os = "linux", target_arch = "aarch64"))))]
+#[cfg(not(target_vendor = "apple"))]
 mod t_guard;
-// Apple loads no native plugins yet (docs/APPLE.md, decision 6), Linux on ARM64 not before ARM4 (docs/ARM64.md): nothing to guard or load
-#[cfg(any(target_vendor = "apple", all(target_os = "linux", target_arch = "aarch64")))]
+// Apple loads no native plugins yet (docs/APPLE.md, decision 6): nothing to guard or load
+#[cfg(target_vendor = "apple")]
 mod t_guard {
     pub fn t_guard(t: &mut crate::T) {
-        t.info(if cfg!(target_vendor = "apple") { "guard: no native plugins on Apple (docs/APPLE.md, decision 6)\n" } else { "guard: Linux on ARM64 has no plugins before ARM4 (docs/ARM64.md)\n" });
+        t.info("guard: no native plugins on Apple (docs/APPLE.md, decision 6)\n");
     }
     pub fn t_guardlimit(t: &mut crate::T) {
         t_guard(t);
@@ -212,12 +212,12 @@ mod t_icc;
 mod t_instance;
 mod t_kernel;
 mod t_life;
-#[cfg(not(any(target_vendor = "apple", all(target_os = "linux", target_arch = "aarch64"))))]
+#[cfg(not(target_vendor = "apple"))]
 mod t_lib;
-#[cfg(any(target_vendor = "apple", all(target_os = "linux", target_arch = "aarch64")))]
+#[cfg(target_vendor = "apple")]
 mod t_lib {
     pub fn t_lib(t: &mut crate::T) {
-        t.info(if cfg!(target_vendor = "apple") { "lib: no native plugins on Apple (docs/APPLE.md, decision 6)\n" } else { "lib: Linux on ARM64 has no plugins before ARM4 (docs/ARM64.md)\n" });
+        t.info("lib: no native plugins on Apple (docs/APPLE.md, decision 6)\n");
     }
     pub fn t_libfuzz(t: &mut crate::T) {
         t_lib(t);
