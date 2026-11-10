@@ -545,6 +545,7 @@ dependencies = [
  "jflib-netio",
  "jflib-netpkt",
  "jflib-plat",
+ "jflib-render2d",
  "jflib-render3d",
  "jflib-rt",
  "jflib-shader",
@@ -1018,6 +1019,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "jflib-render2d"
+version = "0.1.0"
+dependencies = [
+ "jflib-gpu",
+]
+
+[[package]]
 name = "jflib-render3d"
 version = "0.1.0"
 dependencies = [
@@ -1376,6 +1384,22 @@ dependencies = [
  "font-types",
  "once_cell",
  "yoke",
+]
+
+[[package]]
+name = "render2dtest"
+version = "0.1.0"
+dependencies = [
+ "jflib-build",
+ "jflib-gfx",
+ "jflib-gpu",
+ "jflib-plat",
+ "jflib-render2d",
+ "jflib-rt",
+ "jflib-shader",
+ "jflib-style-winui",
+ "jflib-ui",
+ "jflib-wgsl",
 ]
 
 [[package]]

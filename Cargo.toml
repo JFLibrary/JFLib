@@ -61,6 +61,7 @@ members = [
     "lib/installer",
     "lib/appimagert",
     "lib/render3d",
+    "lib/render2d",
     "lib/gltf",
     "lib/jflib",
     "lib/jflib_build",
@@ -124,6 +125,7 @@ members = [
     "apps/plattest",
     "apps/portabletest",
     "apps/prefstest",
+    "apps/render2dtest",
     "apps/render3dtest",
     "apps/rstest",
     "apps/sandboxtest",
@@ -208,6 +210,7 @@ gpu = { package = "jflib-gpu", path = "lib/gpu", version = "=0.1.0" }
 eapm = { package = "jflib-eapm", path = "lib/eapm", version = "=0.1.0" }
 style_assets = { package = "jflib-style-assets", path = "lib/style_assets", version = "=0.1.0" }
 render3d = { package = "jflib-render3d", path = "lib/render3d", version = "=0.1.0" }
+render2d = { package = "jflib-render2d", path = "lib/render2d", version = "=0.1.0" }
 gltf = { package = "jflib-gltf", path = "lib/gltf", version = "=0.1.0" }
 style_winui = { package = "jflib-style-winui", path = "styles/winui", version = "=0.1.0" }
 style_classic = { package = "jflib-style-classic", path = "styles/classic", version = "=0.1.0" }

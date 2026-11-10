@@ -64,6 +64,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
+- [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines and polylines with layers and styles, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
+  <br>[lib.rs](#render2d-crate-root) · [math.rs](#render2dmathrs) · [scene.rs](#render2dsceners)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -20958,6 +20960,281 @@ CLASS_MAX: u32 = CLASS_MIN << (CLASSES - 1)
 - **`fn mip_chain(d: &TextureData) -> Vec<Vec<u8>>`**
   what add_texture uploads, without a device (tools, measurements): the texels resampled to their class's
   size, then each mip level down to 1 x 1; rows of 4 bytes per texel.  Empty when the data is too short
+
+## render2d
+
+*the core of the 2D renderer for CAD: a retained scene of lines and polylines with layers and styles, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU* -- crate root [`lib/render2d/lib.rs`](../lib/render2d/lib.rs)
+
+```text
+render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a1; docs/RENDER2D.md): a retained scene of entities
+with stable ids (lines and polylines now), layers and styles; strokes as quads whose coverage the fragment shader
+computes from the geometry (no MSAA), with exact butt, square and round caps and miter, bevel and round joins; f64
+coordinates, a pair of f32 per axis on the GPU with the camera subtracted first; visibility in compute shaders that
+keep the painter's order and write the indirect draws.  Hosted like render3d as the content of a ui.gpu_view (the
+app glues it with a GpuContent; lib/ui knows nothing of it).  The same WGSL on every path: compiled ahead
+(shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
+
+  Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines of one colour format
+  Scene::new(&renderer) -> Result<Scene>
+  scene.add_style(&Style) -> StyleId, set_style; add_layer(&Layer) -> LayerId, set_layer, remove_layer
+  scene.insert(layer, style, &Shape) -> EntityId, update(id, &Shape), set_entity_style(id, style), remove(id)
+  scene.set_camera(&Camera)                                   centre (f64), scale (units per pixel), rotation
+  a frame:
+       scene.prepare(&mut renderer, (w, h))?;         waits for this slot's last frame, uploads what changed
+       renderer.record(&mut encoder, &scene, color)?;
+       let id = queue.submit([encoder.finish()?])?;   (or swapchain.present)
+       scene.submitted(id);
+
+Draw order: layers by Layer::order (then by when they were added), within a layer the order of insertion (an update
+keeps an entity's place); colours are sRGB codes with straight alpha, blended in code space as lib/gfx blends
+(the target holds codes: a Unorm format such as ui's Bgra8Unorm, no sRGB format).  The camera's y axis points up
+on the screen.  Errors are gpu's: Invalid for ids and values this crate can judge, the rest from the backend.
+```
+
+### `render2d` crate root
+
+```rust
+/// the most frames the CPU may record ahead of the GPU
+FRAMES_MAX: usize = 3
+/// records per page: the unit of the pool's regions and of a workgroup of culling (common.wgsl PAGE)
+PAGE: u32 = 256
+/// quads per instance of a draw (stroke.wgsl BATCH): the u16 indices of one instance reach 4 * BATCH corners
+BATCH: u32 = 16384
+/// the most visible layers (stroke.wgsl: first_instance = layer << 16 on Voll)
+LAYERS_MAX: u32 = 65535
+/// the WGSL sources as the device gets them (common.wgsl in front of each)
+COMMON_WGSL: &str = include_str!("common.wgsl")
+CULL_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("cull.w ...
+SCATTER_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("scatte ...
+STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("stroke ...
+COUNT_SPV: &[u32] = spv::COUNT
+SCAN_SPV: &[u32] = spv::SCAN
+WRITE_SPV: &[u32] = spv::WRITE
+SCATTER_SPV: &[u32] = spv::SCATTER
+VS_SPV: &[u32] = spv::VS
+FS_SPV: &[u32] = spv::FS
+```
+
+- **`struct RendererDesc`**
+  Renderer::new.  Made with `new` and changed field by field (it may grow)
+  - `color: Format` -- the format of the colour targets: one without sRGB (the codes are blended as they are)
+  - `frames_in_flight: usize` -- frames the CPU may record ahead of the GPU (1 ..= FRAMES_MAX)
+
+**`impl RendererDesc`**
+
+- **`const fn new(color: Format) -> RendererDesc`**
+
+- **`struct Renderer`**
+  the pipelines of one colour format on one device
+
+**`impl Renderer`**
+
+- **`fn new(dev: &Device, desc: &RendererDesc) -> Result<Renderer>`**
+- **`fn device(&self) -> &Device`**
+- **`fn desc(&self) -> &RendererDesc`**
+- **`fn multi_draw(&self) -> bool`**
+  this device draws the visible layers with one multi-draw (level Voll)
+- **`fn max_records(&self) -> u32`**
+  the most records (segments, free places included) a scene's pool can hold on this device
+- **`fn record<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, color: ColorAttachment<'a>) -> Result<()>`**
+  one frame of a prepared scene into e: its uploads, its visibility, its render pass (the colour attachment's load
+  and clear as it says, sRGB codes)
+
+### `render2d/math.rs`
+
+Source: [`lib/render2d/math.rs`](../lib/render2d/math.rs)
+
+```text
+math -- what the scene computes on the CPU in f64 (no libm in no_std; render3d's math.rs has the same)
+```
+
+- **`fn sqrt(x: f64) -> f64`**
+  the square root (x &lt;= 0: 0)
+
+- **`fn sincos(x: f64) -> (f64, f64)`**
+  sine and cosine: reduced to -pi ..= pi, then their series
+
+- **`fn split(x: f64) -> (f32, f32)`**
+  a coordinate as the two f32 the GPU holds of it: hi = f32(x), lo = f32(x - hi) (decision 28; docs/RENDER2D.md)
+
+### `render2d/scene.rs`
+
+Source: [`lib/render2d/scene.rs`](../lib/render2d/scene.rs)
+
+```text
+scene -- a scene's entities, layers, styles and camera, and what goes up of them (lib.rs has the overview,
+docs/RENDER2D.md the reasons)
+
+On the CPU: one Ent per entity with its f64 geometry, one LayerSlot per layer.  On the GPU: one record of 64 bytes
+per segment (common.wgsl Record) in one pool.  Every layer owns a region of the pool, whole pages of 256 records:
+its entities' records lie there in the order of insertion, each entity's together, so the pages of the visible
+layers in their draw order are the painter's order the visibility keeps (cull.wgsl).  An insert appends at its
+layer's end; an update in place when its records fit what the entity holds (alloc), else the layer is laid out
+anew with room for it (repack); a remove leaves free records (zeros), and a layer whose free records outgrow its
+live ones is laid out anew without them.  A region that is too small, a repack, a new or removed layer: a new
+pool, the GPU copies what stays across (no copy within one buffer: WebGPU forbids it), only changed entities'
+records come from the CPU.
+
+What a frame sends (prepare, then Renderer::record copies it inside the frame's commands, behind the barrier
+against the frame before): the view; the styles when they changed; the visible layers' pages and table when they
+changed; the changed records, in runs (few runs: a copy each) or through the scatter shader (many).  A prepare
+that never reached a submission: the next sends everything again.
+```
+
+- **`struct Camera`**
+  what a scene shows: the point of the drawing at the target's middle, drawing units per pixel, and the rotation
+  (radians, counter-clockwise: the drawing turns that way on the screen).  The y axis points up on the screen
+  - `center: [f64; 2]`
+  - `scale: f64`
+  - `rotation: f64`
+
+**`impl Camera`**
+
+- **`const fn new(center: [f64; 2], scale: f64) -> Camera`**
+- **`fn to_screen(&self, p: [f64; 2], size: (u32, u32)) -> [f64; 2]`**
+  a point of the drawing in pixels of a target of `size` (x right, y down from its top left corner; a pixel's
+  centre at + 0.5)
+- **`fn to_drawing(&self, q: [f64; 2], size: (u32, u32)) -> [f64; 2]`**
+  the point of the drawing under a pixel position of a target of `size`
+- **`fn pan(&mut self, dx: f64, dy: f64)`**
+  the drawing follows a pointer that moved by (dx, dy) pixels (a drag)
+- **`fn zoom_at(&mut self, q: [f64; 2], factor: f64, size: (u32, u32))`**
+  zoom in by `factor` (below 1: out) about the pixel position q of a target of `size`: the point under q stays
+
+- **`enum Unit`**
+  how a style's width is measured
+  - `Px` -- pixels of the target, whatever the zoom
+  - `Drawing` -- units of the drawing: the stroke grows and shrinks with the zoom
+
+- **`enum Cap`**
+  how an open end ends
+  - `Butt` -- at the end point
+  - `Round` -- a half circle around it
+  - `Square` -- half the width beyond it
+
+- **`enum Join`**
+  how two segments of a polyline meet on the outer side of the turn
+  - `Miter` -- the outer edges meet, up to the miter limit; beyond it a bevel
+  - `Round` -- a circle around the vertex
+  - `Bevel` -- a straight cut between the outer corners
+
+- **`struct Style`**
+  a stroke's look.  Made with `new` and changed field by field (it may grow: dash patterns come)
+  - `color: u32` -- 0xAARRGGBB: sRGB codes as the target shows them, straight alpha
+  - `width: f32` -- in `unit`s; 0 (or anything thinner than a pixel): a hairline, 1 px wide
+  - `unit: Unit`
+  - `cap: Cap`
+  - `join: Join`
+  - `miter_limit: f32` -- the longest miter over the width (lib/gfx's and SVG's ratio); at least 1
+
+**`impl Style`**
+
+- **`const fn new(color: u32) -> Style`**
+  a hairline of a colour: width 0, butt caps, miter joins with the limit 4
+
+- **`struct StyleId(pub u32)`**
+  a style of a Scene
+
+- **`struct Layer`**
+  a layer's settings.  Made with `new` and changed field by field (it may grow)
+  - `visible: bool`
+  - `order: i32` -- layers are drawn by this, lowest first; equal ones in the order they were added
+
+**`impl Layer`**
+
+- **`const fn new(order: i32) -> Layer`**
+
+- **`struct LayerId`**
+  a layer of a Scene; dead after remove_layer
+  - `slot: u32`
+
+- **`struct EntityId`**
+  an entity of a Scene; dead after remove, also when its place has gone to another one
+  - `slot: u32`
+
+- **`enum Shape<'a>`**
+  what an entity is (more kinds come: arcs, curves, fills, text)
+  - `Line { a: [f64; 2], b: [f64; 2] }`
+  - `Polyline { points: &'a [[f64; 2]], closed: bool }` -- at least one point; closed: a segment from the last back to the first, joined at every point
+
+- **`struct UploadInfo`**
+  what prepare sent for this frame
+  - `records: u32` -- records that came from the CPU (changed entities, free places), and in how many runs
+  - `runs: u32`
+  - `scatter: bool` -- they went through the scatter shader (many runs), else a copy per run
+  - `rebuild: bool` -- a new pool (a layout changed), and the records the GPU copied across into it
+  - `moved: u64`
+  - `tables: bool` -- the visible layers' pages and table went up
+  - `bytes: u64` -- everything prepare wrote for the GPU, the view included
+
+- **`struct FrameStats`**
+  what a finished frame measured (Scene::set_stats)
+  - `frame: u64` -- counts the scene's frames from 0
+  - `visible: u64` -- records the visibility found in the target
+  - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after the visibility, after the draw (None: no
+    timestamps here)
+
+- **`struct Scene`**
+  entities, layers, styles and the camera of one scene of a Renderer
+
+**`impl Scene`**
+
+- **`fn new(r: &Renderer) -> Result<Scene>`**
+- **`fn add_style(&mut self, s: &Style) -> Result<StyleId>`**
+  a style for entities; the next frame shows it
+- **`fn set_style(&mut self, id: StyleId, s: &Style) -> Result<()>`**
+  a style changed: every entity of it shows the change with the next frame (nothing else goes up)
+- **`fn style(&self, id: StyleId) -> Option<Style>`**
+- **`fn add_layer(&mut self, l: &Layer) -> Result<LayerId>`**
+  a new layer, empty, on top of those of its order
+- **`fn set_layer(&mut self, id: LayerId, l: &Layer) -> Result<()>`**
+  shown or hidden, its place in the draw order (nothing of its entities goes up)
+- **`fn layer(&self, id: LayerId) -> Result<Layer>`**
+- **`fn remove_layer(&mut self, id: LayerId) -> Result<()>`**
+  the layer goes, with every entity on it
+- **`fn drawn_layers(&self) -> Vec<LayerId>`**
+  the visible layers in the order the last prepare drew them (the lists' order: lists_buffer)
+- **`fn insert(&mut self, layer: LayerId, style: StyleId, s: &Shape) -> Result<EntityId>`**
+  a new entity at the end of its layer (drawn over everything there)
+- **`fn update(&mut self, id: EntityId, s: &Shape) -> Result<()>`**
+  new geometry; the entity keeps its place in the draw order
+- **`fn set_entity_style(&mut self, id: EntityId, style: StyleId) -> Result<()>`**
+  another style: its records go up again
+- **`fn remove(&mut self, id: EntityId) -> Result<()>`**
+  the entity goes; its records become free places (and its id dead)
+- **`fn len(&self) -> u32`**
+  entities alive
+- **`fn is_empty(&self) -> bool`**
+- **`fn locate(&self, id: EntityId) -> Option<(u32, u32)>`**
+  (tests, tools) an entity's records as the last prepare laid them out: its first record's place in the pool
+  and the records of its geometry (a polyline of n points: n - 1, closed n; a point: 1)
+- **`fn set_camera(&mut self, c: &Camera) -> Result<()>`**
+- **`fn camera(&self) -> &Camera`**
+- **`fn set_culling(&mut self, on: bool)`**
+  false: every live record of a visible layer is drawn (a test's comparison, a debugging aid)
+- **`fn set_stats(&mut self, on: bool)`**
+  FrameStats of each frame: the records found visible (a small copy per frame), the GPU's times
+- **`fn upload_info(&self) -> UploadInfo`**
+  what the last prepare sent
+- **`fn lists_buffer(&self) -> &Buffer`**
+  (tests, tools) after a frame's visibility: per visible layer in draw order (drawn_layers) its first place in the
+  visible list and its count (16 bytes each); the visible list (record places in the pool); the indirect draws
+- **`fn visible_buffer(&self) -> &Buffer`**
+- **`fn draws_buffer(&self) -> &Buffer`**
+- **`fn pool_buffer(&self) -> &Buffer`**
+  (tests, tools) the pool of records (common.wgsl Record, 64 bytes each)
+- **`fn wait_slot(&mut self) -> Result<()>`**
+  wait for the frame that last used this frame's slot, so its data can be written; prepare does it too.  The
+  browser cannot wait, and needs not: its writes go in queue order
+- **`fn take_stats(&mut self) -> Vec<FrameStats>`**
+  the finished frames' stats since the last call
+- **`fn collect_stats(&mut self)`**
+  after Device::wait_idle: the stats of what was still in flight
+- **`fn prepare(&mut self, r: &mut Renderer, size: (u32, u32)) -> Result<()>`**
+  the frame's data for Renderer::record: waits for this slot's last frame, sends what changed.  size: the
+  target's in pixels
+- **`fn submitted(&mut self, id: SubmitId)`**
+  the frame went to the GPU: Queue::submit's or Swapchain::present's answer
 
 ## gltf
 

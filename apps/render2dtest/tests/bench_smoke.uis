@@ -1,0 +1,2 @@
+#!args --bench 20000 --res 320x180 --frames 6
+# a short run of the measurement on both levels: it runs, its numbers are printed (not judged)
