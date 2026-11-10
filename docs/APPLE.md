@@ -2,7 +2,7 @@
 
 Nachtrag 2026-11-10: AP5 ist auch von Hand auf dem iPhone geprüft, AP8 (Pakete, Updates, CI, Developer ID und
 Notarisierung, Dokumentation und Website) ist fertig; offen sind AP1 (Safari) und AP6 (Metal). Für AP6 steht seit
-2026-11-10 ein Stufenplan (AP6a–AP6g) unter AP6, drei Entscheidungen darin sind offen.
+2026-11-10 ein Stufenplan (AP6a–AP6g) unter AP6; der Nutzer hat den Shaderweg SPIR-V nach MSL gewählt.
 
 Stand 2026-11-09, auf Basis von `main` ba9e6d03. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
 und der Kern von `plat`), AP3 (`plat` ohne Fenster), AP4 (Fenster auf macOS), AP7 (Desktop-Dienste) und AP5 (iOS) bis
@@ -309,7 +309,8 @@ Metal-Toolchain (`xcrun metal`: „missing Metal Toolchain“, ein eigener Downl
 
 **Entscheidungen (Vorschläge, 2026-11-10).**
 
-1. **Shaderweg: SPIR-V nach MSL in `lib/shader`, nicht WGSL nach MSL in `lib/wgsl`** (offen, Frage an den Nutzer). Das
+1. **Shaderweg: SPIR-V nach MSL in `lib/shader`, nicht WGSL nach MSL in `lib/wgsl`** (entschieden vom Nutzer am
+   2026-11-10). Das
    Metal-Backend nimmt `ShaderModule::from_spirv` wie Vulkan und übersetzt die Wörter beim Anlegen einer Pipeline nach
    MSL, mit den Pipeline-Konstanten eingesetzt; Metal übersetzt das MSL. Dann ändert sich kein Aufrufer: `gpu_out`,
    `render3d`, `render2d` und jede App mit eigenem SPIR-V laufen ohne Eingriff, `gputest` prüft auf Metal dieselben
@@ -322,12 +323,12 @@ Metal-Toolchain (`xcrun metal`: „missing Metal Toolchain“, ein eigener Downl
    Programm, kostet aber eine API-Ergänzung, in `gpu_out`, `render3d` und später `render2d` je einen dritten Zweig und
    eine Datei, und `gputest` braucht WGSL-Fassungen seiner handgebauten Tests. Beide Wege brauchen dieselbe Arbeit für
    Layouts (MSLs `float3` hat 16 Byte), Robustheit, Pufferlängen und eingebaute Funktionen.
-2. **Erst Stufe Basis** (offen, Frage an den Nutzer), wie im Browser: Rechnen, Speicherpuffer, einzelne indirekte
+2. **Erst Stufe Basis** (Empfehlung, vom Nutzer am 2026-11-10 nicht beanstandet), wie im Browser: Rechnen, Speicherpuffer, einzelne indirekte
    Aufrufe, Textur-Arrays, Zeitstempel. render3d und die 3D-Ansicht laufen auf Basis (Test `viewbasis`); `uigputest
    view` und `viewcpu` verlangen bei `AF_GPU_3D` heute Voll und prüfen dann die höchste Stufe des Adapters. Voll
    (Bindless über Argument-Puffer, `draw_indexed_indirect_count` nachgebildet, Subgroups als SIMD-Gruppen) folgt als
    eigene Stufe AP6g.
-3. **MSL prüft der Übersetzer zur Laufzeit** (offen, Frage an den Nutzer): `gputest --test msl` übersetzt auf dem Mac
+3. **MSL prüft der Übersetzer zur Laufzeit** (Empfehlung, vom Nutzer am 2026-11-10 nicht beanstandet): `gputest --test msl` übersetzt auf dem Mac
    jedes Modul mit `newLibraryWithSource:`, also auf dem Weg, den die Bibliothek nimmt. Die Metal-Toolchain
    (`xcodebuild -downloadComponent MetalToolchain`) bräuchte es nur für `xcrun metal` und vorübersetzte `.metallib`.
 4. **Bindungen flach:** Jede Pipeline legt fest, an welchem Platz (`[[buffer(n)]]`, `[[texture(n)]]`, `[[sampler(n)]]`)
