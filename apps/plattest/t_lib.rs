@@ -57,13 +57,13 @@ fn lib_str(h: &Lib, p: u64) -> Option<String> {
 static PF_FAULT_KIND: AtomicU32 = AtomicU32::new(0);
 static PF_FAULT_ITEM: AtomicU32 = AtomicU32::new(u32::MAX);
 
-extern "win64" fn h_zero() -> u64 {
+rt::plugin_abi! { fn h_zero() -> u64 {
     0
-}
+}}
 
-/// PA_PARFOR(fn, ctx, count) -> eax 0 / ERR_FAULT: fn(ctx, index, job) on the workers, every
-/// item under its own guard; a fault cancels the rest
-extern "win64" fn h_parfor(f: u64, ctx: u64, count: u64) -> u64 {
+// PA_PARFOR(fn, ctx, count) -> eax 0 / ERR_FAULT: fn(ctx, index, job) on the workers, every
+// item under its own guard; a fault cancels the rest
+rt::plugin_abi! { fn h_parfor(f: u64, ctx: u64, count: u64) -> u64 {
     let r = parallel_for(count as u32 as usize, &move |i, job| {
         let mut gi = GuardInfo::default();
         let (r, _) = guard_call(f as usize, ctx, i as u64, 0, 0, Some(&mut gi));
@@ -74,7 +74,7 @@ extern "win64" fn h_parfor(f: u64, ctx: u64, count: u64) -> u64 {
         }
     });
     if r.is_err() || PF_FAULT_ITEM.load(SeqCst) != u32::MAX { ERR_FAULT as u32 as u64 } else { 0 }
-}
+}}
 
 /// the PNAPI table: size / version, then the functions (unused ones return 0)
 fn pnapi() -> [u64; 12] {

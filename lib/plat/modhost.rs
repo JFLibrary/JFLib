@@ -165,9 +165,9 @@ fn load(path: &str) -> Option<Loaded> {
         panic: h_panic,
     }));
     // SAFETY: entry is the module's exported jxlenc_module (inside an executable segment of
-    // the image lib_open mapped and relocated), extern "win64" fn(*const HostTable) ->
-    // *const ModTable by the module ABI (modabi.rs).
-    let f: extern "win64" fn(*const HostTable) -> *const ModTable = unsafe { core::mem::transmute(entry) };
+    // the image lib_open mapped and relocated), rt::plugin_abi!(fn(*const HostTable) ->
+    // *const ModTable) by the module ABI (modabi.rs).
+    let f: rt::plugin_abi!(fn(*const HostTable) -> *const ModTable) = unsafe { core::mem::transmute(entry) };
     let t = f(host) as usize;
     // the table must lie inside a readable segment of the image, and its function in an
     // executable one
@@ -274,7 +274,7 @@ pub fn jxlenc_encode(req: JxlEncReq) -> Option<Result<Vec<u8>, i32>> {
 
 // ---------------------------------------------------------------- the host table
 
-extern "win64" fn h_alloc(size: usize, align: usize, zeroed: u32) -> *mut u8 {
+rt::plugin_abi! { fn h_alloc(size: usize, align: usize, zeroed: u32) -> *mut u8 {
     match Layout::from_size_align(size, align) {
         // SAFETY: a valid layout of non-zero size.
         Ok(l) if size != 0 => unsafe {
@@ -282,9 +282,9 @@ extern "win64" fn h_alloc(size: usize, align: usize, zeroed: u32) -> *mut u8 {
         },
         _ => core::ptr::null_mut(),
     }
-}
+}}
 
-extern "win64" fn h_free(p: *mut u8, size: usize, align: usize) {
+rt::plugin_abi! { fn h_free(p: *mut u8, size: usize, align: usize) {
     if p.is_null() || size == 0 {
         return;
     }
@@ -292,36 +292,36 @@ extern "win64" fn h_free(p: *mut u8, size: usize, align: usize) {
         // SAFETY: the module frees a block of h_alloc with the layout it allocated it with.
         unsafe { alloc::alloc::dealloc(p, l) };
     }
-}
+}}
 
-extern "win64" fn h_parallel_for(count: usize, ctx: *const c_void, item: ItemFn) -> u32 {
+rt::plugin_abi! { fn h_parallel_for(count: usize, ctx: *const c_void, item: ItemFn) -> u32 {
     let ctx = ctx as usize; // the module's loop body; valid until parallel_for returns
     let r = parallel_for(count, &|i, job: &JobCtl| item(ctx as *const c_void, i, job as *const JobCtl as *const c_void));
     r.is_err() as u32
-}
+}}
 
-extern "win64" fn h_job_cancel(job: *const c_void) {
+rt::plugin_abi! { fn h_job_cancel(job: *const c_void) {
     // SAFETY: the module passes back the job pointer h_parallel_for gave the item, during
     // that item (the job lives until parallel_for returns).
     unsafe { (*(job as *const JobCtl)).cancel() }
-}
+}}
 
-extern "win64" fn h_job_cancelled(job: *const c_void) -> u32 {
+rt::plugin_abi! { fn h_job_cancelled(job: *const c_void) -> u32 {
     // SAFETY: as h_job_cancel.
     unsafe { (*(job as *const JobCtl)).cancelled() as u32 }
-}
+}}
 
-extern "win64" fn h_thr_count() -> u32 {
+rt::plugin_abi! { fn h_thr_count() -> u32 {
     thr_count()
-}
+}}
 
-extern "win64" fn h_thr_self() -> usize {
+rt::plugin_abi! { fn h_thr_self() -> usize {
     thr_self()
-}
+}}
 
-extern "win64" fn h_yield() {
+rt::plugin_abi! { fn h_yield() {
     rt::os::yield_now()
-}
+}}
 
 /// the module's text (UTF-8 by the ABI; anything else shows as "?")
 fn text<'a>(msg: *const u8, len: usize) -> &'a str {
@@ -332,14 +332,14 @@ fn text<'a>(msg: *const u8, len: usize) -> &'a str {
     core::str::from_utf8(unsafe { core::slice::from_raw_parts(msg, len) }).unwrap_or("?")
 }
 
-extern "win64" fn h_log(msg: *const u8, len: usize) {
+rt::plugin_abi! { fn h_log(msg: *const u8, len: usize) {
     let mut s = rt::crash::StackText::<4200>::new();
     let _ = writeln!(s, "jxlenc: {}", text(msg, len));
     crate::write_stderr(s.bytes());
-}
+}}
 
-/// a panic inside the module: what rt's panic handler does for the host's own panics
-extern "win64" fn h_panic(msg: *const u8, len: usize) -> ! {
+// a panic inside the module: what rt's panic handler does for the host's own panics
+rt::plugin_abi! { fn h_panic(msg: *const u8, len: usize) -> ! {
     if rt::crash::busy() {
         rt::os::exit(3);
     }
@@ -351,4 +351,4 @@ extern "win64" fn h_panic(msg: *const u8, len: usize) -> ! {
     ci.kind = rt::crash::CK_PANIC;
     ci.msg = line.strip_prefix("panic: ").unwrap_or(line);
     rt::crash::report(&ci)
-}
+}}

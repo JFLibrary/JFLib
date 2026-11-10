@@ -13,7 +13,7 @@
 //                                          Windows, SIGSEGV / SIGBUS / SIGILL / SIGFPE /
 //                                          SIGTRAP on Linux; linux_guard.rs)
 //   guard_call(f, a1, a2, a3, a4, info) -> (rax, rdx)
-//        calls the code at address f with the Win64 ABI (on Linux too: the plugin ABI) as
+//        calls the code at address f with the plugin ABI (rt::plugin_abi!: Win64 on x86-64) as
 //        f(a1, a2, a3, a4); a fault inside it on this thread (also in nested host code)
 //        resumes here with rax = rdx = ERR_FAULT and info (GuardInfo) filled; otherwise
 //        info.kind = 0 and rax / rdx are those of f.  Nested calls are allowed.  ERR_LIMIT
@@ -33,7 +33,7 @@
 //
 // Safety contract: guard_call runs untrusted machine code at an arbitrary address; it is a
 // safe function only in the sense the assembly API is: the caller hands it addresses of
-// loaded plugin code (lib_sym) or of its own `extern "win64"` functions.  Pointers a plugin
+// loaded plugin code (lib_sym) or of its own `rt::plugin_abi!` functions.  Pointers a plugin
 // returns are checked with lib_seg before the host reads through them.
 
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -405,14 +405,14 @@ pub fn guard_run<R, F: FnOnce() -> R>(f: F, info: Option<&mut GuardInfo>) -> Res
         f: Option<F>,
         r: Option<R>,
     }
-    extern "win64" fn thunk<R, F: FnOnce() -> R>(p: u64) -> u64 {
+    rt::plugin_abi! { fn thunk<R, F: FnOnce() -> R>(p: u64) -> u64 {
         // SAFETY: p is the Ctx of guard_run below, alive for the whole guarded call.
         let c = unsafe { &mut *(p as *mut Ctx<F, R>) };
         if let Some(f) = c.f.take() {
             c.r = Some(f());
         }
         0
-    }
+    }}
     let mut c = Ctx { f: Some(f), r: None };
     guard_call(thunk::<R, F> as *const () as usize, &mut c as *mut Ctx<F, R> as u64, 0, 0, 0, info);
     match c.r.take() {
@@ -608,8 +608,8 @@ pub fn guard_test_state() -> (u32, u32, bool) {
 // meaning: rsp / rbp = sp / x29 of the body, mxcsr = FPCR, xmm = d8 .. d15 (80 .. 143; AAPCS64 keeps
 // only their low halves), rax / rdx = x0 / x1 of the call.  The fault path (linux_guard.rs: pc, sp,
 // x29 in the signal frame) restores FPCR and d8 .. d15 from the record; the epilogue restores x19 ..
-// x28, x29 and x30 from the frame; sp comes from x29.  Linux on ARM64 compiles this with ARM4 (plib
-// is off there until then); Windows on ARM64 needs unwind data for it (ARM5).
+// x28, x29 and x30 from the frame; sp comes from x29.  Linux on ARM64 runs this since ARM4; Windows
+// on ARM64 needs unwind data for it (ARM5).
 #[cfg(target_arch = "aarch64")]
 core::arch::global_asm!(
     ".globl jfgui_guard_run",

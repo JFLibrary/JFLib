@@ -1081,8 +1081,11 @@ class Builder:
         t = self.target
         out = self.dir / module_file(name, t)
         mapf = out.parent / (out.stem + ".map" if t == "win" else out.name + ".map")
-        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}=", "--cfg", "jflib_module"] + nolib_link_flags(t)
+        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}=", "--cfg", "jflib_module"] + nolib_link_flags(t, self.arch)
         flags += ["-C", f"link-arg={'/MAP:' if t == 'win' else '-Map='}{mapf}"] + (["-C", "relocation-model=pic"] if t == "linux" else [])
+        # Linux on ARM64: atomics inline (LL/SC), not compiler-rt's outline helpers, whose LSE check needs
+        # getauxval and a constructor in .init_array -- the loader runs no code at load time
+        flags += ["-C", "target-feature=-outline-atomics"] if t == "linux" and self.arch == "aarch64" else []
         profile = "RELEASE" if self.release else "DEV"
         env = {"CARGO_TARGET_DIR": str(self.out / "cargo-modules"), "CARGO_ENCODED_RUSTFLAGS": "\x1f".join(flags),
                f"CARGO_PROFILE_{profile}_LTO": "fat", f"CARGO_PROFILE_{profile}_STRIP": "symbols"}
@@ -1097,7 +1100,7 @@ class Builder:
             raise BuildError(f"cargo built no module {name}")
         shutil.copyfile(lib, out)
         shutil.copymode(lib, out)
-        bad = lib_verify(out, t, export=f"{name}_module")
+        bad = lib_verify(out, t, export=f"{name}_module", arch=self.arch)
         if bad:
             out.unlink()
             raise BuildError(f"module {name} ({t}) would be rejected by the loader:\n  " + "\n  ".join(bad))
@@ -1649,23 +1652,35 @@ def dev_command(a):
 # imports, one export); Linux: ld.lld -shared -Bsymbolic --no-undefined (no DT_NEEDED, only
 # RELATIVE relocations).  lib_verify checks the result the way the loader does: a library it
 # would reject fails the build.  (PaintCraft's Rust plugins were built the same way until the
-# app moved to its own repository, JFLibrary/JFPainter, in 2026-11.)
-def nolib_link_flags(target):
+# app moved to its own repository, JFLibrary/JFPainter, in 2026-11.)  Per architecture (--arch,
+# docs/ARM64.md decision 4): an x86-64 library is refused on ARM64 and the other way round
+# (LIBE_ARCH); on ARM64 the segments are aligned to 64 KB (-z max-page-size=65536), so the library
+# loads on kernels with 4, 16 and 64 KB pages (the loader refuses segments that share a page).
+LIB_MACHINE = {"x86_64": (0x8664, 62, "x86-64"), "aarch64": (0xAA64, 183, "ARM64")}   # PE Machine, ELF e_machine
+
+
+def nolib_link_flags(target, arch="x86_64"):
     """rustc's flags for such a library: no entry, no imports"""
     if target == "win":
         args = ["/NOENTRY", "/NODEFAULTLIB", "/DEBUG:NONE", "/Brepro"]
         return ["-C", f"linker={tool('lld-link')}"] + [x for a in args for x in ("-C", "link-arg=" + a)]
     args = ["-Bsymbolic", "--no-undefined", "--hash-style=both", "-z", "noexecstack", "-z", "now", "--build-id=none"]
+    args += ["-z", "max-page-size=65536"] if arch == "aarch64" else []
     return ["-C", f"linker={tool('ld.lld')}", "-C", "linker-flavor=ld"] + [x for a in args for x in ("-C", "link-arg=" + a)]
 
 
-def lib_verify(path, target, export):
+def lib_verify(path, target, export, arch="x86_64"):
     """the checks of plat's loader -> problems (`export`: the one export expected, jxlenc_module
-    for the JPEG XL module)"""
+    for the JPEG XL module; `arch`: the processor the library must be for)"""
     b = path.read_bytes()
     if len(b) > 64 << 20:
         return ["larger than LIB_FILE_MAX (64 MB)"]
-    return pe_verify(b, export) if target == "win" else elf_verify(b, export)
+    return pe_verify(b, export, arch) if target == "win" else elf_verify(b, export, arch)
+
+
+def lib_arch_name(machine, pe):
+    """the --arch name of a PE Machine / ELF e_machine, or its number"""
+    return next((n for n, (m, e, _) in LIB_MACHINE.items() if (m if pe else e) == machine), f"machine 0x{machine:x}")
 
 
 def _u16(b, o):
@@ -1680,18 +1695,21 @@ def _u64(b, o):
     return int.from_bytes(b[o:o + 8], "little")
 
 
-def pe_verify(b, export):
-    """win_lib.rs pe_check + lib_sym: PE32+ x86-64 DLL, no imports / delay imports / TLS, no entry
-    point, the section table inside the first 4 KB of headers, <= 15 sections, no W+X section,
-    one export: `export` in an executable section"""
+def pe_verify(b, export, arch="x86_64"):
+    """win_lib.rs pe_check + lib_sym: PE32+ DLL for `arch` (x86-64: Machine 0x8664, ARM64:
+    0xAA64), no imports / delay imports / TLS, no entry point, the section table inside the first
+    4 KB of headers, <= 15 sections, no W+X section, one export: `export` in an executable section"""
     if len(b) < 512 or b[:2] != b"MZ":
         return ["not a PE file"]
     bad = []
+    machine, _, label = LIB_MACHINE[arch]
     nt = _u32(b, 0x3C)
     if not 64 <= nt <= 4096 - 24 - 240:
         return ["e_lfanew outside the first page"]
-    if b[nt:nt + 4] != b"PE\0\0" or _u16(b, nt + 4) != 0x8664 or not _u16(b, nt + 22) & 0x2000:
-        return ["not an x86-64 DLL"]
+    if b[nt:nt + 4] != b"PE\0\0" or not _u16(b, nt + 22) & 0x2000:
+        return [f"not an {label} DLL"]
+    if _u16(b, nt + 4) != machine:
+        return [f"built for {lib_arch_name(_u16(b, nt + 4), True)}, not for {arch} (the loader refuses it: LIBE_ARCH)"]
     nsec, ohsize, oh = _u16(b, nt + 6), _u16(b, nt + 20), nt + 24
     if _u16(b, oh) != 0x20B or ohsize < 112 + 16 * 8:
         return ["not PE32+"]
@@ -1755,16 +1773,23 @@ def pe_verify(b, export):
     return bad
 
 
-def elf_verify(b, export):
-    """linux_elfload.rs elf_map / elf_load / elf_rela / lib_sym: ELF64 LE ET_DYN x86-64, 1..64
-    program headers, <= 16 PT_LOAD ascending and page-disjoint, never W+X, inside 256 MB, one
-    PT_DYNAMIC, no PT_INTERP / PT_TLS, no DT_NEEDED / DT_INIT / init arrays / DT_REL, RELA
-    relocations NONE / RELATIVE / 64 / GLOB_DAT / JUMP_SLOT against defined symbols, the one
-    defined dynamic symbol `export` in an executable segment"""
+def elf_verify(b, export, arch="x86_64"):
+    """linux_elfload.rs elf_map / elf_load / elf_rela / lib_sym: ELF64 LE ET_DYN for `arch`
+    (EM_X86_64, EM_AARCH64), 1..64 program headers, <= 16 PT_LOAD ascending and page-disjoint
+    (ARM64: in 64 KB pages, the largest a kernel uses), never W+X, inside 256 MB, one PT_DYNAMIC,
+    no PT_INTERP / PT_TLS, no DT_NEEDED / DT_INIT / init arrays / DT_REL, RELA relocations NONE /
+    RELATIVE / 64 / GLOB_DAT / JUMP_SLOT against defined symbols, the one defined dynamic symbol
+    `export` in an executable segment"""
     if len(b) < 64 or b[:4] != b"\x7fELF" or b[4] != 2 or b[5] != 1 or b[6] != 1:
         return ["not an ELF64 little-endian file"]
-    if _u16(b, 16) != 3 or _u16(b, 18) != 62 or _u32(b, 20) != 1 or _u16(b, 54) != 56:
-        return ["not an x86-64 shared object (ET_DYN)"]
+    _, em, label = LIB_MACHINE[arch]
+    if _u16(b, 16) != 3 or _u32(b, 20) != 1 or _u16(b, 54) != 56:
+        return [f"not an {label} shared object (ET_DYN)"]
+    if _u16(b, 18) != em:
+        return [f"built for {lib_arch_name(_u16(b, 18), False)}, not for {arch} (the loader refuses it: LIBE_ARCH)"]
+    page = 65536 if arch == "aarch64" else 4096
+    # RELA types: NONE, then those against a symbol (64 / ABS64, GLOB_DAT, JUMP_SLOT), RELATIVE
+    rnone, rsym, rrel = (0, (257, 1025, 1026), 1027) if arch == "aarch64" else (0, (1, 6, 7), 8)
     bad = []
     phnum, phoff = _u16(b, 56), _u64(b, 32)
     if not 1 <= phnum <= 64 or phoff + phnum * 56 > len(b):
@@ -1779,10 +1804,10 @@ def elf_verify(b, export):
                 bad.append(f"PT_LOAD {k}: sizes / offsets")
             if fl & 3 == 3:
                 bad.append(f"PT_LOAD {k}: writable and executable")
-            if va & ~4095 < span:
-                bad.append(f"PT_LOAD {k}: overlaps the pages of the previous segment")
+            if va & ~(page - 1) < span:
+                bad.append(f"PT_LOAD {k}: overlaps the {page // 1024} KB pages of the previous segment")
             loads.append((va, va + msz, o, fsz, fl))
-            span = (va + msz + 4095) & ~4095
+            span = (va + msz + page - 1) & ~(page - 1)
         elif typ == 2:
             if dyn is not None:
                 bad.append("two PT_DYNAMIC")
@@ -1833,9 +1858,9 @@ def elf_verify(b, export):
         for k in range(rsz // 24):
             info = _u64(b, ro + 24 * k + 8)
             typ, sym = info & 0xFFFFFFFF, info >> 32
-            if typ not in (0, 1, 6, 7, 8):
+            if typ not in (rnone, *rsym, rrel):
                 bad.append(f"relocation type {typ}")
-            elif typ in (1, 6, 7) and (sym == 0 or sym >= nsym or syms[sym][1] == 0):
+            elif typ in rsym and (sym == 0 or sym >= nsym or syms[sym][1] == 0):
                 bad.append(f"relocation against an undefined symbol ({syms[sym][0] if 0 < sym < nsym else sym})")
     defined = [(nm, v) for nm, shndx, v in syms[1:] if shndx and nm]
     if [nm for nm, v in defined] != [export]:
@@ -1891,8 +1916,8 @@ def module_lint():
             bad += kernel_lint(f, text)
             for i, ln in enumerate(text.splitlines(), 1):
                 s = ln.strip()
-                if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;"):
-                    bad.append(f"{f.relative_to(ROOT)}:{i}: only alloc / core may be extern crates")
+                if s.startswith("extern crate") and s not in ("extern crate alloc;", "extern crate core;", "extern crate self as rt;"):
+                    bad.append(f"{f.relative_to(ROOT)}:{i}: only alloc / core may be extern crates (and modrt itself as rt)")
                 if s.startswith("use std") or " std::" in s.split("//")[0]:
                     bad.append(f"{f.relative_to(ROOT)}:{i}: std is not available (no_std)")
     return bad

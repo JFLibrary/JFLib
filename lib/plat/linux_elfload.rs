@@ -539,8 +539,8 @@ pub(crate) fn lib_unload(h: &mut Lib) {
 // that size are refused (a plugin linked for 4 KB pages on a 16 KB kernel), as their protection could
 // not be set apart.  ARM64 does not keep the instruction cache coherent with the data the loader
 // wrote: sync_icache cleans the executable segments to the point of unification and invalidates them
-// in the instruction cache (what __clear_cache does), before the protection is set.  Linux on ARM64
-// compiles this with ARM4 (plib is off there until then).
+// in the instruction cache (what __clear_cache does), before the protection is set.  On since ARM4;
+// only real hardware shows the cache (QEMU keeps code and data coherent by itself).
 #[cfg(target_arch = "aarch64")]
 const EM: u32 = 183;
 #[cfg(target_arch = "aarch64")]
