@@ -1,7 +1,8 @@
 # Apple-Plan: macOS und iOS nativ
 
 Nachtrag 2026-11-10: AP5 ist auch von Hand auf dem iPhone geprüft, AP8 (Pakete, Updates, CI, Developer ID und
-Notarisierung, Dokumentation und Website) ist fertig; offen sind AP1 (Safari) und AP6 (Metal, im Plan der GPU-Arbeit).
+Notarisierung, Dokumentation und Website) ist fertig, AP1 (Safari auf dem Mac und dem iPhone) ebenso; offen ist AP6
+(Metal, eigene Sitzung).
 
 Stand 2026-11-09, auf Basis von `main` ba9e6d03. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
 und der Kern von `plat`), AP3 (`plat` ohne Fenster), AP4 (Fenster auf macOS), AP7 (Desktop-Dienste) und AP5 (iOS) bis
@@ -111,6 +112,10 @@ danach Safari neu starten (sonst läuft die Sitzung „while connecting to a Saf
 über Tastatur-Aktionen); Init-Skripte laufen erst nach dem Laden, deshalb erkennt der Test „bereit“ auch am
 `data-compute` des Body; ein beendeter Tunnel ließ `safaridriver` auf dem Mac weiterlaufen (ohne Terminal kein
 Hangup), das Skript beendet ihn jetzt über die geschlossene Eingabe.
+
+**AP1 auf dem iPhone geprüft (2026-11-10), damit ist AP1 fertig:** Der Nutzer hat die Galerie von jflib.org in
+Safari auf dem iPhone 14 (iOS 27.2) von Hand ausprobiert (Knöpfe, Schieberegler, Textfeld mit der Tastatur, Scrollen,
+Drehen): Sie funktioniert, Abweichungen gab es keine.
 
 ### AP2: Bau und `rt` (M)
 
