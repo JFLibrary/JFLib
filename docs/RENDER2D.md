@@ -151,7 +151,7 @@ Farben sind sRGB-Codes mit geradem Alpha (`0xAARRGGBB`), gemischt im Code-Raum, 
 | `demo` | dieselbe Demo ohne Fenster über das Skript: Ziehen und Rad bewegen die Zeichnung | Pixel an den erwarteten Stellen |
 | `bench_smoke` | die Messung, klein | läuft |
 
-16 von 16 Skripten bestehen (207 Prüfungen in `--test all` je Lauf, dazu Validierung und Fenster).
+16 von 16 Skripten bestehen (213 Prüfungen in `--test all` je Lauf, dazu Validierung und Fenster).
 
 **Toleranzen** ([`refimg.rs`](../apps/render2dtest/refimg.rs), `Tol`): beide Seiten rechnen die genaue Fläche des Pixels im Polygon; `lib/gfx` hält sie als Byte und mischt ganzzahlig, die GPU in Gleitkomma: 1 bis 2 Codes (`STRAIGHT`). Kreise: Die GPU schneidet sie an der Tangente, `lib/gfx` zeichnet ein Vieleck, dessen Kanten bis 0,05 Pixel innen liegen: bis 13 Codes entlang jedes Bogens, mehr bei Kreisen von einem halben Pixel Radius (`round`). Innere Ecken: Der Umriss von `lib/gfx` dreht sich durch die Ecke, und seine Nicht-null-Füllung summiert die Umläufe eines Pixels, bevor sie begrenzt; wo der Umriss sich selbst überlappt, kommt ein Anteil zu hoch heraus, bis voll. Die GPU rechnet die Vereinigung; nachgeprüft Pixel für Pixel gegen den genauen Anteil einer überabgetasteten Vereinigung (GPU 0,6026, genau 0,6025, `lib/gfx` 1,0) (`corners`). Zufällige Polylinien, die auf sich zurückfalten, tun das an vielen Stellen, dazu mischen ihre Stücke, die sich fern einer Ecke treffen, auf der GPU zweimal, in `lib/gfx` einmal (`folded`). Je Vergleich also: fast jedes Pixel innerhalb `small` Codes, eine begrenzte Zahl darüber, keines über `max`, die Tinte (Summe der Abstände vom Hintergrund) innerhalb `ink`.
 
