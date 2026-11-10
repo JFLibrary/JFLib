@@ -110,6 +110,8 @@ pub(crate) struct Hit {
     pub(crate) continuation: bool,
     /// HB_* (cursor in bits 12..15)
     pub(crate) flags: u16,
+    /// HB_KEYS: every key is the widget's while it has the focus
+    pub(crate) keys: bool,
     /// the axes along which a finger belongs to the widget (touch.rs, AX_*)
     pub(crate) grab: u8,
     pub(crate) layer: u8,
@@ -413,6 +415,24 @@ impl Ui {
     /// ui_key_first: the first unconsumed key this frame (VK | mods << 16) or 0
     pub fn key_first(&self) -> u32 {
         self.wp.ctx.keyq.iter().copied().find(|&k| (k as i32) >= 0).unwrap_or(0)
+    }
+
+    /// key_take -> the first unconsumed key this frame (VK | mods << 16), consumed; 0 when none
+    /// is left.  A canvas with HB_KEYS takes every key with it while it has the focus (`ev &
+    /// EV_FOCUS`, call it until 0); the keys a focused text box keeps stay with the box, and
+    /// while a popup of the window is open (a menu, a flyout) the keys are its.
+    pub fn key_take(&mut self) -> u32 {
+        if self.popup_count() != 0 {
+            return 0;
+        }
+        for i in 0..self.wp.ctx.keyq.len() {
+            let k = self.wp.ctx.keyq[i];
+            if (k as i32) >= 0 && self.text_key_filter(Some(i)).is_some() {
+                self.wp.ctx.keyq[i] |= 0x8000_0000;
+                return k;
+            }
+        }
+        0
     }
 
     /// ui_text_take(cap): the typed codepoints (at most cap), consumed; when cap leaves some,
@@ -745,6 +765,7 @@ impl Ui {
             id,
             continuation: false,
             flags: (hbflags | notab) as u16,
+            keys: hbflags & HB_KEYS != 0,
             grab: super::touch::hit_grab(hbflags),
             layer: c.cmd_layer_ui as u8,
             kind: 0,
@@ -830,7 +851,7 @@ impl Ui {
         }
         if c.focus == id {
             ev |= EV_FOCUS;
-            if flags & (HB_TEXT | HB_OWNKEYS) == 0 && flags & HB_FOCUS != 0 && (self.key(VK_SPACE) || flags & HB_SPACE == 0 && self.key(VK_RETURN)) {
+            if flags & (HB_TEXT | HB_OWNKEYS | HB_KEYS) == 0 && flags & HB_FOCUS != 0 && (self.key(VK_SPACE) || flags & HB_SPACE == 0 && self.key(VK_RETURN)) {
                 ev |= EV_ACT;
                 self.wp.ctx.focus_visible = true;
             }
@@ -1106,6 +1127,28 @@ impl Ui {
         let n = self.sems.len();
         self.src_sem(n - 1); // the inspector's source of the record (inspect_src.rs)
         &mut self.sems[n - 1]
+    }
+
+    /// sem_rect(kind, id, rect, label, value) -> the record: a semantic record of content the app
+    /// draws itself (a link or heading of a web page inside a canvas) at rect (px of the window, as
+    /// last_rect), without a hit box of its own and without a state; last_rect and the state of
+    /// the last widget stay.  Scripts find it by its label (`click "Label"` presses at its middle,
+    /// on the hit box that lies there: the canvas), screen readers read it (section 19 of the
+    /// guide).  Publish the records of what is visible, after the canvas.
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn sem_rect(&mut self, kind: u16, id: u32, rect: [i32; 4], label: Option<&str>, value: i32) -> &mut Sem {
+        let (lr, ls) = (self.wp.ctx.last_rect, self.wp.ctx.last_state);
+        self.wp.ctx.last_rect = rect;
+        self.wp.ctx.last_state = 0;
+        let n = self.sems.len();
+        self.sem(kind, id, label, value);
+        self.wp.ctx.last_rect = lr;
+        self.wp.ctx.last_state = ls;
+        if self.sems.len() > n {
+            &mut self.sems[n]
+        } else {
+            &mut self.sem_dummy
+        }
     }
 
     // ------------------------------------------------------------------ clipping, layers

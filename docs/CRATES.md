@@ -543,6 +543,25 @@ einbinden. Empfohlen bleibt eine App in `no_std`.
   scheitert ein verbotener Pfad auch über `std::fs` (Landlock; die Mitigation Policies von Windows sperren keine
   Pfade). Die bisherigen `no_std`-Prüfungen bleiben.
 
+- **CR6h: Panics, die abwickeln (Feature `unwind`).** Nachtrag 2026-11-09 für den Browser Narsil (Plan „Narsil“,
+  E12, Entscheidung 5 des Nutzers: opt-in, nur mit `std`). Das Feature `unwind` an `jflib` (weitergereicht an `rt`,
+  `plat`, `ui`; es schließt `std` ein) erlaubt `panic = "unwind"`: `ui::main!` und `rt::main!` lassen das
+  `compile_error!` weg, die Meldung ohne das Feature nennt es. `rt::panic_hook` merkt sich eine Panic dann nur (ihr
+  Text pro Thread, `rt::panic_take`) und meldet nichts, denn die App kann sie fangen. Gemeldet wird sie, wo sie
+  ungefangen JFLibs Code verlässt: `rt::abort_on_unwind` um `jfgui_main` in `std_start` (und `jfgui_start` unter
+  Android) und um jeden Thread von `plat::thread_spawn`, also auch den Pool und `spawn_blocking`; erreicht sie eine
+  Funktion, die nicht abwickeln darf (Fensterprozedur, `extern "C"`), panikt core dort noch einmal („panic in a
+  function that cannot unwind“), und der Hook meldet die erste. Bericht und Exit-Code bleiben (Zeile auf stderr,
+  Absturz-Hook, 3). Ein `std::thread` ohne Fang endet still, `join()` liefert die Nutzlast. Ohne das Feature oder mit
+  `panic = "abort"` bleibt alles wie zuvor. Geprüft am 2026-11-09 unter Windows mit einer Test-App (Feature `unwind`,
+  `panic = "unwind"`, Debug): gefangen auf einem `std::thread`, einem Thread von `plat`, dem Hauptthread und in
+  `App::frame` läuft sie weiter (`--shot` geschrieben); ungefangen im Hauptthread, in `App::frame`, auf einem Thread
+  von `plat` und in einer `extern "C"`-Funktion Absturzbericht mit der ursprünglichen Meldung und Exit 3; ohne das
+  Feature mit `panic = "unwind"` das `compile_error!`, mit dem Feature und `panic = "abort"` wie bisher (Exit 3).
+  `crates_accept.py` prüft es zuletzt an `hallo3` (`check_unwind`); `cargo check -p jflib` ohne Feature, mit `std` und
+  mit `unwind` für Windows, Linux, `wasm32` und Android. Im Browser wickelt `std` nicht ab (rustup liefert es mit
+  `panic = "abort"`).
+
 **Risiken:** Code einer `std`-Crate auf einem Thread von `plat` (CR6b); zwei Fensterschleifen oder eine
 Async-Laufzeit auf dem Hauptthread; unter Windows die COM-Initialisierung, wenn eine andere Crate sie anders
 wünscht. Die Doku nennt das (CR6f), technisch verhindern lässt es sich nicht.
