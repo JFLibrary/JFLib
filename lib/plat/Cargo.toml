@@ -22,6 +22,9 @@ workspace = true
 # a program with the standard library (docs/CRATES.md, CR6): no entry point of its own, std_start
 # instead; on Linux plat's glibc build (pthreads, the dynamic linker), as for the GPU drivers
 std = ["rt/std"]
+# (with std) a program built with panic = "unwind": plat's threads and the start of the program end a
+# panic that leaves them uncaught as before (rt::abort_on_unwind: JFLib's crash report, exit code 3)
+unwind = ["std", "rt/unwind"]
 
 [dependencies]
 # compress: LZ4 of the app:// bundles (vfs); crypto: DH, AES, SHA-256 (secret)
