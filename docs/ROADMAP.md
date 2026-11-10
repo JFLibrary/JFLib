@@ -1530,8 +1530,8 @@ Fensterrand hinaus.
 - **P2** · *entschieden* (2026-10-31) · Allgemeiner GPU-Support in der Library für die UI,
   2D-CAD und 3D-Spiele (Entscheidungsvorlage „GPU-Rendering in JFLib“, Fassung vom
   31.10.2026, alle acht Empfehlungen freigegeben).
-  - Grafik-APIs: Vulkan unter Windows, Linux und Android, WebGPU im Browser, Metal später für
-    einen nativen Apple-Port; D3D12 höchstens als späterer Rückfall unter Windows (Remote-Desktop,
+  - Grafik-APIs: Vulkan unter Windows, Linux und Android, WebGPU im Browser, Metal auf macOS und iOS
+    (Stufe Basis seit AP6, [APPLE.md](APPLE.md)); D3D12 höchstens als späterer Rückfall unter Windows (Remote-Desktop,
     VMs, WARP). D3D11, WebGL2 und GLES entfallen.
   - Shader in WGSL mit eigenem Compiler nach SPIR-V (später MSL); der Browser nimmt WGSL direkt.
   - Linux: GUI- und Spielprogramme werden dynamisch gegen glibc gelinkt (sonst nichts),
@@ -1771,7 +1771,7 @@ Fensterrand hinaus.
 - **P3** · *fehlt* · Mit der ersten richtigen 3D-Test-App (Entscheidung des Nutzers vom 09.11.2026): die Zähler der Listen in `cull.wgsl` je Arbeitsgruppe vorsammeln, statt dass jede sichtbare Instanz einzeln auf den Zähler ihrer Liste addiert. Liegen deckende und MASK-Objekte in denselben Arbeitsgruppen, steigt die Sichtbarkeit ohne Verdeckung sonst von 0,064 auf 0,145 ms (1 Mio. Würfel); mit Verdeckung, der Vorgabe, kostet es nichts. Mehrere deckende Listen im Wechsel kosten heute ebenso. Vorher und nachher in der App und in der Messszene messen ([Messung](RENDER3D.md#messung-der-listen-je-alpha-modus)).
 - **P3** · *fehlt* · G6: 2D-Renderer für CAD (Linien mit Breite und Muster, Kurven,
   Füllungen, Schraffuren, Text, Auswahl und Fang, große Koordinaten). G7: Spiel-Bausteine
-  (Animation, Nachladen großer Welten, Physik, Werkzeuge). Später: Metal, D3D12-Rückfall,
+  (Animation, Nachladen großer Welten, Physik, Werkzeuge). Später: D3D12-Rückfall,
   GPU-Rasterung der Widgets.
 - **P2** · *erledigt* (2026-10-22) · Stufe 0 des GPU-Plans, Teil 1: Scroll-Kopie
   (`lib/ui/scrollcopy.rs`). Hat sich in einer Scroll-Ansicht nur der Inhalt verschoben, werden

@@ -98,7 +98,8 @@ impl Instance {
             return Err(GpuError::Disabled);
         }
         let validate = desc.validate || env_on("jfgui_GPU_VALIDATE");
-        if validate && plat::env("MTL_DEBUG_LAYER").is_none() {
+        // (the simulator: its validation aborts indirect draws, which its Metal then runs correctly)
+        if validate && !cfg!(target_abi = "sim") && plat::env("MTL_DEBUG_LAYER").is_none() {
             // Metal reads it when the first device is made (before that in this process)
             // SAFETY: NUL-terminated strings; setenv copies them.
             unsafe { setenv(b"MTL_DEBUG_LAYER\0".as_ptr(), b"1\0".as_ptr(), 1) };

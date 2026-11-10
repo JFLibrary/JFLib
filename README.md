@@ -163,8 +163,8 @@ The following table describes the build paths available in the current repositor
 | **Windows** | Native x86-64 app, `--target win` | Win32 windows and desktop integration |
 | **Linux** | Native x86-64 app, `--target linux` | Wayland and X11; the backend is selected at startup |
 | **Android** | Native APK, `--target android` | `androidGallery`, ARM64 and x86-64 emulator; Android 8 / API 26 or later |
-| **macOS** | Native ARM64 app, `--target mac` (built on a Mac) | AppKit windows, menus, Dock, notifications and services; `NAME.app` and `.dmg`, updates of the whole bundle; Apple silicon, macOS 13 or later |
-| **iOS** | Native ARM64 app, `--target ios` (built on a Mac; `--sim` for the simulator) | `androidGallery` as an iPhone app: UIKit host, touch, Apple Pencil, keyboards, sensors, files, clipboard; iOS 16 or later |
+| **macOS** | Native ARM64 app, `--target mac` (built on a Mac) | AppKit windows, menus, Dock, notifications and services; GPU through Metal; `NAME.app` and `.dmg`, updates of the whole bundle; Apple silicon, macOS 13 or later |
+| **iOS** | Native ARM64 app, `--target ios` (built on a Mac; `--sim` for the simulator) | `androidGallery` as an iPhone app: UIKit host, touch, Apple Pencil, keyboards, sensors, files, clipboard, GPU through Metal; iOS 16 or later |
 | **Web** | WebAssembly and a shared browser host, `--target web` | Includes `template`, `gallery`, `Kritzel`, and `jfWord` |
 
 The documented browser test matrix covers Chromium and Firefox. Separate Safari/iOS

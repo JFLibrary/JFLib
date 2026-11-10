@@ -1,8 +1,8 @@
 # Apple-Plan: macOS und iOS nativ
 
 Nachtrag 2026-11-10: AP5 ist auch von Hand auf dem iPhone geprüft, AP8 (Pakete, Updates, CI, Developer ID und
-Notarisierung, Dokumentation und Website) ist fertig; offen sind AP1 (Safari) und AP6 (Metal). Für AP6 steht seit
-2026-11-10 ein Stufenplan (AP6a–AP6g) unter AP6; der Nutzer hat den Shaderweg SPIR-V nach MSL gewählt.
+Notarisierung, Dokumentation und Website) ist fertig; offen ist AP1 (Safari). AP6 (Metal) ist bis AP6f gebaut (Stufe
+Basis, macOS und iOS-Simulator; das iPhone und drei offene Bildvergleiche von `render3dtest` stehen aus, unter AP6).
 
 Stand 2026-11-09, auf Basis von `main` ba9e6d03. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
 und der Kern von `plat`), AP3 (`plat` ohne Fenster), AP4 (Fenster auf macOS), AP7 (Desktop-Dienste) und AP5 (iOS) bis
@@ -443,6 +443,32 @@ CPU-Weg, Popup 6,3 gegen 7,2 ms; Wandzeit beide bei 20 ms. Reserviert 4–9 MiB.
 16,9 ms Bildabstand, das Bild der Ansicht 1,5 ms; auf dem CPU-Weg zusätzlich 1,5 ms Zurücklesen je Bild. **Nicht
 gemessen:** die Latenz bis zum Bildschirm und der Vergleich in Ruhe (`--bench idle`/`caret` enden nicht von selbst und
 brauchen einen Messfühler von außen).
+
+**AP6e umgesetzt (2026-11-10):** iOS. `lib/plat/apple_ios_gpu.rs` ist das Gegenstück zu `android_gpu.rs`, der
+`CAMetalLayer` ein Unterlayer des Layers von `JFView` (`apple_ios.rs`, in `view_layout` an Grenzen und Skala); nur Fenster 0
+und nur, solange die Leinwand nichts anderes zeigt (Popups und Werkzeugfenster liegen darauf). Eine Szene, die nicht aktiv
+ist, tut keine GPU-Arbeit: Ab `sceneWillResignActive` sagt `win_state` `WST_HIDDEN`, die Ausgabe geht im selben Tick auf den
+CPU-Weg zurück, beim Aktivieren wieder auf die Swapchain (im Simulator geprüft: Einstellungen davor, 1,4 ms zurück, 4 ms hin).
+Simulator: Sein Gerät meldet keine GPU-Familie (`missing` gilt dort nicht), keine Cube-Arrays (`create_texture`:
+`Unsupported`, sonst bricht Metal ab), keine Presented-Handler (ein Present gilt sofort als gezeigt), und seine
+API-Validierung bricht bei indirekten Aufrufen ab, die sein Metal korrekt ausführt (`--validate` ohne Wirkung).
+Ein schlichtes Programm (`simctl spawn`) hat kein Fenster: `Surface::new` sagt `Unsupported`, die Fenstertests von `gputest` und
+`render3dtest` sind dort `SKIP`. `tools/apple.py simapp` startet das Bündel unter UIKit mit der Konsole.
+Im Simulator: `gputest --test all` grün (461 Prüfungen, `msl` 718 von 721), `render3dtest` 23 von 26 mit denselben drei
+offenen Fällen wie auf dem Mac (unten), `uigputest` unter UIKit (`simapp`): `switch`, `images`, `imgplain`, `viewplain`,
+`viewbasis`, `viewlose`, `lose`, `canvasplain`, `idle` grün; was Fenster eines Desktops braucht (neue Größe, zweites
+Fenster, DC), ist dort `SKIP`, `view` kam bis zur Ruhe nach der Animation grün und wartet danach auf eine neue Größe. Die Mobile Gallery
+zeigt mit `jfgui_GPU=1` im Simulator dasselbe Bild über Metal. **Offen:** das iPhone (braucht die Freigabe und das
+Entsperren durch den Nutzer), Drehen des Geräts (`simctl` kann es nicht).
+
+**AP6f umgesetzt (2026-11-10):** [GPU.md](GPU.md), CHANGELOG, API.md, ROADMAP. Stufe Voll (AP6g) bleibt eine eigene Entscheidung.
+
+**Offen in AP6, zu entscheiden.** (1) `render3dtest`: `srgb`, `validate` und `pbr` weichen auf dem M2 (Mac und Simulator)
+ab: das Bild „tex“ in 20–70 von 57 600 Pixeln, in Quad-Paaren und von Lauf zu Lauf anders, die Tiefe bitgleich;
+`pbr` Normal-Maps 28 bzw. 121 Pixel. Die Vermutung ist ein Verhalten der Hardware (Apple-GPUs setzen Quads aus Fragmenten
+verschiedener Dreiecke zusammen, die Ableitungen an Kanten hängen dann von der Reihenfolge ab), belegt ist sie nicht.
+Mit `MTL_SHADER_VALIDATION=1` verschwindet die Abweichung. (2) Der Standard der UI-Ausgabe auf Apple (`DEFAULT_ON_APPLE`,
+vorerst aus): die Zahlen stehen unter AP6d, die Latenz bis zum Bildschirm fehlt.
 
 **Fallen, schon bekannt.** Metal schaltet beim Übersetzen zur Laufzeit schnelle Mathematik ein (NaN, Unendlich,
 Kontraktion); MSLs `float3` ist 16 Byte groß (in Puffern `packed_float3`); `[[vertex_id]]` und `[[instance_id]]`

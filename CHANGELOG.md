@@ -57,6 +57,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** Ui::gpu_test_hold(win, on) (test aid): a window's frames are not shown while on, as if the display did not answer; GpuViewInfo::held counts the frames of a view that had to wait for its window
 - **build:** Notarization for macOS: with jfgui_MAC_NOTARY (a profile of xcrun notarytool store-credentials) beside a Developer ID in jfgui_MAC_IDENTITY, tools/package.py --formats dmg and cargo jflib package --formats dmg send the bundle and then the image to Apple's notary service and staple both tickets, so a downloaded .dmg passes Gatekeeper; tools/apple.py notarize; over SSH tools/apple.py runs codesign with a certificate and notarytool in the Mac's logged-in session (the keychain); updatetest --test app with jfgui_MAC_IDENTITY checks Developer ID bundles and refuses the same app signed ad hoc (docs/APPLE.md AP8c, docs/PACKAGING.md)
 - **ui:** ui.form_factor() and ui.mobile() (FF_DESKTOP, FF_TABLET, FF_PHONE; jfgui_FORM): on a phone or a tablet only, the title bar has no caption buttons, a menu bar that does not fit becomes one menu button, the status bar and vertical scroll views roll sideways while too wide, windows and content dialogs keep inside the screen and roll their content; a desktop window stays as it was however narrow (docs/GUIDE.md §38)
+- **gpu:** Metal backend of lib/gpu (level Basis) on macOS and iOS, MSL from SPIR-V in lib/shader (shader::msl); the UI's output through a CAMetalLayer, off by default on Apple (jfgui_GPU=1)
 
 ### Changed
 
