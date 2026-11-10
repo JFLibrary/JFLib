@@ -503,7 +503,13 @@ impl<'a> M<'a> {
                 }
                 Ok(format!("{}{}x{}", Self::scalar_name(s)?, cols, n))
             }
-            Ty::Array { elem, len } => Ok(format!("jf_arr<{}, {}>", self.tname(elem.0)?, self.cu32(len.0)?)),
+            Ty::Array { elem, len } => {
+                let n = self.cu32(len.0)?;
+                if n == 0 {
+                    return err("an array of length 0 (an override of 0?)");
+                }
+                Ok(format!("jf_arr<{}, {}>", self.tname(elem.0)?, n))
+            }
             Ty::RuntimeArray { .. } => err("a runtime array outside a buffer"),
             Ty::Struct { .. } => Ok(format!("S{}", t)),
             Ty::Image { .. } => self.image_name(t, self.img_access.get(&t).copied().unwrap_or(Access::ReadWrite)),
@@ -1216,9 +1222,12 @@ impl<'a> M<'a> {
                                 out_copy.push_str(&format!("o.b{} = g{}; ", g, g));
                             }
                             x if x == Bi::PointSize as u32 => {
-                                has_psize = true;
-                                out_members.push_str(&format!("    float b{} [[point_size]];\n", g));
-                                out_copy.push_str(&format!("o.b{} = g{}; ", g, g));
+                                // only for a point list: Metal refuses a point size with other topologies
+                                if opt.point_size {
+                                    has_psize = true;
+                                    out_members.push_str(&format!("    float b{} [[point_size]];\n", g));
+                                    out_copy.push_str(&format!("o.b{} = g{}; ", g, g));
+                                }
                             }
                             x if x == Bi::ClipDistance as u32 => {
                                 let Ty::Array { len, .. } = self.ty(t)? else { return err("ClipDistance is no array") };
@@ -1381,5 +1390,15 @@ template<typename T, uint N> struct jf_arr {
     const threadgroup T& operator[](uint i) const threadgroup { return e[i]; }
 };
 template<typename T> T jf_fmod(T a, T b) { return a - b * floor(a / b); }
+// atan2 with IEEE's signed zeros (Metal's gives -pi/2 for atan2(1, -0))
+static inline float jf_atan2(float y, float x) {
+    if (y == 0.0f) { return signbit(x) ? copysign(M_PI_F, y) : copysign(0.0f, y); }
+    if (x == 0.0f) { return copysign(M_PI_2_F, y); }
+    return atan2(y, x);
+}
+static inline half jf_atan2(half y, half x) { return half(jf_atan2(float(y), float(x))); }
+// asinh of negative numbers through the positive side (Metal's loses digits there)
+static inline float jf_asinh(float x) { return x < 0.0f ? -asinh(-x) : asinh(x); }
+static inline half jf_asinh(half x) { return half(jf_asinh(float(x))); }
 template<typename T> T jf_smod(T a, T b) { T r = a % b; return select(r, r + b, (r != T(0)) & ((r < T(0)) != (b < T(0)))); }\n";
 

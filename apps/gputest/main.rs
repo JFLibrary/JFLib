@@ -56,6 +56,8 @@
 //        glibc       (Linux) the process start, threads and exit of a program linked against glibc
 //                    (t_glibc.rs)
 //        noloader    a missing Vulkan loader: Err(NoLoader), the program starts (t_glibc.rs)
+//        msl         (AP6) every shader of the repository through the MSL translation (t_msl.rs): on
+//                    Metal translated and compiled by ShaderModule::from_spirv, elsewhere translated
 //        all         every test above
 //   --validate      with VK_LAYER_KHRONOS_validation (jfgui_GPU_VALIDATE, synchronization
 //                   validation); a validation error fails the test.  Without the layer: a note,
@@ -96,6 +98,7 @@ mod measure;
 mod scene;
 mod shaders;
 mod t_compute;
+mod t_msl;
 mod t_queue;
 mod t_glibc;
 mod t_render;
@@ -230,12 +233,13 @@ fn info(t: &mut T) {
     for (i, a) in list.iter().enumerate() {
         let n = a.info();
         out(&format!(
-            "adapter {i}: {} [{:?}, {} {:04x}:{:04x}] Vulkan {}.{}.{}, driver {} {} ({}), level {:?}{}",
+            "adapter {i}: {} [{:?}, {} {:04x}:{:04x}] {} {}.{}.{}, driver {} {} ({}), level {:?}{}",
             n.name,
             n.kind,
             n.vendor,
             n.vendor_id,
             n.device_id,
+            n.backend,
             n.api_version.0,
             n.api_version.1,
             n.api_version.2,
@@ -514,7 +518,7 @@ fn run() -> i32 {
         return 2;
     };
     let all = test == "all";
-    let tests: [(&str, fn(&mut T)); 19] = [
+    let tests: [(&str, fn(&mut T)); 20] = [
         ("info", info),
         ("compute", t_compute::compute),
         ("copies", t_compute::copies),
@@ -534,6 +538,7 @@ fn run() -> i32 {
         ("bench_smoke", t_scene::bench_smoke),
         ("glibc", t_glibc::glibc),
         ("noloader", t_glibc::noloader),
+        ("msl", t_msl::msl),
     ];
     let mut ran = false;
     for (name, f) in tests {

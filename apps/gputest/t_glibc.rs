@@ -79,6 +79,10 @@ fn child(t: &mut T, args: &[&str], env: &[(&str, Option<&str>)]) -> Option<(i32,
 }
 
 pub fn noloader(t: &mut T) {
+    if cfg!(target_vendor = "apple") {
+        crate::out("SKIP: Metal is part of the system, there is no loader to miss");
+        return;
+    }
     let (missing, not_vulkan): ([&str; 2], &str) = if cfg!(windows) {
         (["jfgui-no-such-vulkan.dll", "C:\\jfgui-no-such-dir\\vulkan-1.dll"], "kernel32.dll")
     } else {

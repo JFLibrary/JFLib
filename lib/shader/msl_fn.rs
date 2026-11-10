@@ -1480,10 +1480,16 @@ impl Fx<'_, '_> {
             19 => call(self, "sinh", 1)?,
             20 => call(self, "cosh", 1)?,
             21 => call(self, "tanh", 1)?,
-            22 => call(self, "asinh", 1)?,
+            22 => {
+                let x = arg(self, 0)?;
+                self.cw(t, |c| format!("jf_asinh({}{})", x, c))?
+            }
             23 => call(self, "acosh", 1)?,
             24 => call(self, "atanh", 1)?,
-            g::Atan2 => call(self, "atan2", 2)?,
+            g::Atan2 => {
+                let (y, x) = (arg(self, 0)?, arg(self, 1)?);
+                self.cw(t, |c| format!("jf_atan2({}{}, {}{})", y, c, x, c))?
+            }
             g::Pow => call(self, "pow", 2)?,
             g::Exp => call(self, "exp", 1)?,
             g::Log => call(self, "log", 1)?,

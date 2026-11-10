@@ -2,8 +2,9 @@
 // and WebGPU over one backend per target (docs/GPU.md).  Backends now: Vulkan on Windows, on Linux,
 // there in programs linked against glibc, and on Android (vulkan-1.dll, libvulkan.so.1, libvulkan.so
 // loaded at run time; vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs), WebGPU in the
-// browser (web_*.rs, web/gpu.js; WGSL instead of SPIR-V, what it cannot do is said in web_dev.rs).
-// Planned: Metal; it provides the same types and methods.
+// browser (web_*.rs, web/gpu.js; WGSL instead of SPIR-V, what it cannot do is said in web_dev.rs),
+// Metal on macOS and iOS (mtl_*.rs, AP6 in docs/APPLE.md: SPIR-V translated to MSL by shader::msl,
+// level Basis; what it lacks is said in mtl_dev.rs).
 //
 //   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
 //                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
@@ -90,21 +91,21 @@ extern crate alloc;
 
 use alloc::string::String;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
 mod vk_cmd;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
 mod vk_dev;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
 mod vk_ffi;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
 mod vk_inst;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
 mod vk_load;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
 mod vk_mem;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
 mod vk_res;
-#[cfg(not(any(jfgui_glibc, target_arch = "wasm32")))]
+#[cfg(not(any(jfgui_glibc, target_arch = "wasm32", target_vendor = "apple")))]
 mod vk_swap;
 // Linux: images without a VkSurface, handed to the window by plat as dma-bufs; the same types
 #[cfg(jfgui_glibc)]
@@ -119,17 +120,28 @@ mod web_dev;
 mod web_res;
 #[cfg(target_arch = "wasm32")]
 mod web_swap;
+// macOS and iOS: Metal, the same types (AP6, docs/APPLE.md); shaders are SPIR-V translated to MSL
+#[cfg(target_vendor = "apple")]
+mod mtl_cmd;
+#[cfg(target_vendor = "apple")]
+mod mtl_dev;
+#[cfg(target_vendor = "apple")]
+mod mtl_objc;
+#[cfg(target_vendor = "apple")]
+mod mtl_res;
+#[cfg(target_vendor = "apple")]
+mod mtl_swap;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
 pub use vk_cmd::{CommandBuffer, CommandEncoder};
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
 pub use vk_dev::{ComputeQueue, Device, Queue};
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
 pub use vk_inst::{Adapter, Instance, low_power_rank, validation_messages};
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
 pub use vk_res::{BindGroup, BindGroupLayout, Bindless, Buffer, ComputePipeline, PipelineLayout, RenderPipeline, Sampler,
                  ShaderModule, Texture, TextureView, Timestamps};
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
 pub use vk_swap::{Frame, Surface, Swapchain, TryAcquire};
 #[cfg(target_arch = "wasm32")]
 pub use web_cmd::{CommandBuffer, CommandEncoder};
@@ -140,6 +152,15 @@ pub use web_res::{BindGroup, BindGroupLayout, Bindless, Buffer, ComputePipeline,
                   ShaderModule, Texture, TextureView, Timestamps};
 #[cfg(target_arch = "wasm32")]
 pub use web_swap::{Frame, Surface, Swapchain, TryAcquire};
+#[cfg(target_vendor = "apple")]
+pub use mtl_cmd::{CommandBuffer, CommandEncoder};
+#[cfg(target_vendor = "apple")]
+pub use mtl_dev::{Adapter, ComputeQueue, Device, Instance, Queue, low_power_rank, validation_messages};
+#[cfg(target_vendor = "apple")]
+pub use mtl_res::{BindGroup, BindGroupLayout, Bindless, Buffer, ComputePipeline, PipelineLayout, RenderPipeline, Sampler,
+                  ShaderModule, Texture, TextureView, Timestamps};
+#[cfg(target_vendor = "apple")]
+pub use mtl_swap::{Frame, Surface, Swapchain, TryAcquire};
 
 pub type Result<T> = core::result::Result<T, GpuError>;
 
@@ -183,8 +204,10 @@ impl core::fmt::Display for GpuError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match self {
             GpuError::Disabled => f.write_str("GPU disabled (jfgui_GPU=0)"),
-            #[cfg(not(target_arch = "wasm32"))]
+            #[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
             GpuError::NoLoader => f.write_str("no GPU API installed (Vulkan loader missing)"),
+            #[cfg(target_vendor = "apple")]
+            GpuError::NoLoader => f.write_str("no Metal device"),
             #[cfg(target_arch = "wasm32")]
             GpuError::NoLoader => f.write_str("no WebGPU in this browser"),
             GpuError::NoAdapter => f.write_str("no usable GPU"),

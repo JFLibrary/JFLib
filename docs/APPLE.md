@@ -396,6 +396,22 @@ Modulen an; behoben: gepackte Vektoren und Matrizen in Konstanten (globale Konst
 mit Matrizen (kein Konstruktor in `threadgroup`, jetzt roher Speicher), 64-Bit-Atomics (`atomic_max_explicit`
 ohne alten Wert), 1D-Texturen (ohne Mip-Stufe).
 
+**AP6b umgesetzt (2026-11-10):** `lib/gpu` hat auf Apple das Metal-Backend (`mtl_objc.rs`, `mtl_dev.rs`, `mtl_res.rs`,
+`mtl_cmd.rs`; `mtl_swap.rs` folgt mit AP6c): Instanz und Adapter (`MTLCopyAllDevices`, Familie, Limits), Gerät mit
+Warteschlange und Zeitleiste (`MTLSharedEvent`), Puffer (privat / geteilt), Texturen und Ansichten, Sampler,
+`ShaderModule::from_spirv` (übersetzt mit `shader::msl` und kompiliert beim Anlegen; Pipelines mit Konstanten oder einer
+Punktliste übersetzen eigens), Bindungsgruppen flach an den Plätzen der Übersetzung, Rechen- und Render-Pipelines,
+Kodierer (Blit, Compute, Render; Barrieren beenden den Encoder), Uploads über einen Staging-Ring wie unter Vulkan
+(Stücke von 256 KiB, große Uploads mit eigenem Puffer, der eine Sekunde nach der letzten Nutzung geht), `read_buffer`.
+`fill_buffer` mit einem Muster aus vier verschiedenen Bytes läuft über einen kleinen eigenen Kernel. Noch nicht:
+Zeitstempel, Bindless, Multi-Draw und indirekte Anzahl (Stufe Voll), Fenster. `gputest --test all` auf dem Mac mini:
+520 Prüfungen grün, die einzigen Fehler sind die Fenstertests (AP6c); `msl` 718 von 721 Modulen (3 erwartete Ausnahmen),
+`wgsl` 228 (jeder Operator und jede eingebaute Funktion gegen den Konstantenauswerter, die Subgroup- und Quad-Funktionen
+über SIMD-Gruppen), `scene` 117 (die Messszene bitgleich, WGSL-Bilder = SPIR-V-Bilder), `textures` 46, `spec` 46,
+`upload` 12. Gefunden und behoben: Metals `atan2(1, -0)` gibt −π/2 und `asinh` verliert bei negativen Zahlen Stellen
+(eigene Hilfsfunktionen in der Übersetzung); ein Vertex-Shader mit `PointSize` lässt Metal eine Pipeline für Dreiecke
+ablehnen (die Übersetzung gibt die Punktgröße nur noch für Punktlisten aus); offene Upload-Encoder beim Abbau des Geräts.
+
 **Fallen, schon bekannt.** Metal schaltet beim Übersetzen zur Laufzeit schnelle Mathematik ein (NaN, Unendlich,
 Kontraktion); MSLs `float3` ist 16 Byte groß (in Puffern `packed_float3`); `[[vertex_id]]` und `[[instance_id]]`
 enthalten Basis-Vertex und erste Instanz wie unter Vulkan; Metal hat keine Push-Konstanten; `nextDrawable` wartet;
