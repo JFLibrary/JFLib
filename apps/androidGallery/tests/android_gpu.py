@@ -14,6 +14,9 @@ program cannot see of itself:
   turned, full resolution and capped: the same pixels in the view's rectangle;
 - guard: a run that dies while the GPU comes up (jfgui_GPU_TEST_DIE=1): the state file says so, a second
   dies too, the third start stays on the CPU path and works; a new state is written when it is cleared;
+- view (G5e2): the page "3D-Ansicht" runs its self-test (pg_view.rs, jfgui_GPU_VIEWCHECK=1): a render3d scene in a
+  view against offscreen and the ray caster, at rest, below a popup, after a lost device; its log lines (logcat, tag
+  jfgui) are the result.  Without a usable GPU the content paints, and that is checked;
 - the manifest: the APK does not require Vulkan (`aapt2 dump badging` when build-tools are there);
   gputest's window-less checks are apps/gputest/tests/android.py.
 
@@ -88,7 +91,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--serial", help="adb device (default: the only one)")
     ap.add_argument("--apk", help="install this APK first (default: the debug build of the device's ABI)")
-    ap.add_argument("--phases", default="off,nogpu,path,images,screen,guard", help="what to run")
+    ap.add_argument("--phases", default="off,nogpu,path,images,screen,guard,view", help="what to run")
     ap.add_argument("--package", default="org.jflib.gallery", help="the APK's package (a test build with jfgui_ANDROID_PACKAGE)")
     a = ap.parse_args()
     PKG = a.package
@@ -136,7 +139,7 @@ def main():
 
     phases = a.phases.split(",")
     view = None
-    for phase in [p for p in phases if p not in ("guard", "screen")]:
+    for phase in [p for p in phases if p not in ("guard", "screen", "view")]:
         good, line, v = instrument(phase)
         view = v.get("view_rect", view)
         if v.get("skip") == "1":
@@ -193,6 +196,27 @@ def main():
                             first = first or (x + left, y)
                             top_diff = max(top_diff, max(abs(pa[x * bpp + i] - pb[x * bpp + i]) for i in range(3)))
             ok(top_diff <= levels, f"the screen, {name}: the Bitmap's and the swapchain's picture are the same ({w}x{h}; {bad} pixels differ, first at {first}, by up to {top_diff})")
+
+    if "view" in phases:
+        # (G5e2) the 3D view's self-test: its lines in the log, "done: N checks, M failed; ..." at the end
+        run("shell", "am", "force-stop", PKG, check=False)
+        run("logcat", "-c", check=False)
+        run("shell", "am", "start", "-W", "-n", ACTIVITY, "--es", "jfgui_LANG", "de", "--es", "jfgui_GPU", "1", "--es", "jfgui_GPU_VERIFY", "1",
+            "--es", "jfgui_GPU_VIEWCHECK", "1", "--es", "jfgui_GPU_RETRY_MS", "300", check=False, timeout=60)
+        lines, done, t0 = [], None, time.time()
+        while time.time() < t0 + 150 and not done:
+            time.sleep(1.0)
+            log = run("logcat", "-d", "-s", "jfgui:I", check=False)
+            lines = [ln.split("viewcheck: ", 1)[1].strip() for ln in log.splitlines() if "viewcheck: " in ln]
+            done = next((ln for ln in lines if ln.startswith("done:")), None)
+        for ln in lines:
+            print("       " + ln)
+        for ln in lines:
+            m = re.match(r"check (\d+): (ok|FAIL) (.*)", ln)
+            if m:
+                ok(m.group(2) == "ok", f"view check {m.group(1)}: {m.group(3)[:100]}")
+        ok(done is not None and " 0 failed" in done and " 0 differ" in done, f"the 3D view's self-test: {done or 'no end in 150 s'}")
+        run("shell", "am", "force-stop", PKG, check=False)
 
     if "guard" in phases:
         # a driver that kills the program: two chances, then the CPU path until the system changes

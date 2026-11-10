@@ -9,7 +9,7 @@ use alloc::format;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render3d::{Camera, Material, Renderer, RendererDesc, Sampling, Scene, Sun, TextureData, TextureId, TextureRef, Tonemap};
+use render3d::{Camera, Material, Renderer, Sampling, Scene, Sun, TextureData, TextureId, TextureRef, Tonemap};
 
 use crate::common::*;
 use crate::cpu::{self, RefScene, RefTexture};
@@ -33,7 +33,7 @@ pub struct Lit {
 /// meshes, textures (as the reference holds them), a material per item, a sun, the target's format
 #[allow(clippy::too_many_arguments)]
 pub fn build_lit(t: &mut T, dev: &Device, format: Format, sun: &Sun, geos: &[Geo], texs: &[Tex], items: &[(Spec, Material)], cam: &Camera) -> Option<Lit> {
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(format)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(format)), "Renderer::new")?;
     for g in geos {
         t.res(r.add_mesh(&g.data()), "add_mesh")?;
     }

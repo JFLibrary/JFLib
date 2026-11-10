@@ -4,7 +4,8 @@
 // main.rs: the start page (the cards 01 to 07) and the way between the pages (nav.rs).  The cards
 // files.rs, secrets.rs, system.rs; behind them what the big gallery (apps/gallery) has, for the
 // finger: pg_basic.rs, pg_menus.rs, pg_text.rs, pg_lists.rs, pg_boxes.rs, pg_colors.rs,
-// pg_windows.rs, pg_edge.rs, pg_image.rs; the phone's own: pg_sensors.rs (Wasserwaage, Handylage, Kompass, GPS).
+// pg_windows.rs, pg_edge.rs, pg_image.rs, pg_view.rs (G5e2: a 3D view); the phone's own: pg_sensors.rs (Wasserwaage,
+// Handylage, Kompass, GPS).
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -25,6 +26,22 @@ mod pg_lists;
 mod pg_menus;
 mod pg_sensors;
 mod pg_text;
+// (G5e2) a render3d scene between the widgets (ui.gpu_view: where lib/gpu is there); render3dtest's geometry and ray
+// caster for its check, included as uigputest has them
+#[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+mod pg_view;
+#[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+#[allow(dead_code)]
+#[path = "../render3dtest/common.rs"]
+mod common;
+#[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+#[allow(dead_code)]
+#[path = "../render3dtest/cpu.rs"]
+mod cpu;
+#[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+#[allow(dead_code)]
+#[path = "../render3dtest/gltfgen.rs"]
+mod gltfgen;
 mod pg_windows;
 mod secrets;
 mod system;
@@ -48,6 +65,8 @@ struct Gallery {
     basic: pg_basic::Basic, menus: pg_menus::Menus, texts: pg_text::Texts, lists: pg_lists::Lists,
     boxes: pg_boxes::Boxes, colors: pg_colors::Colors, windows: pg_windows::Windows, edge: pg_edge::Edge,
     images: pg_image::Images, sensors: pg_sensors::Sensors,
+    #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+    view3d: pg_view::View3d,
 }
 impl Default for Gallery {
     fn default() -> Self {
@@ -56,7 +75,9 @@ impl Default for Gallery {
             page: Page::Home, next: None, started: false, home_y: 0, home_restore: 0,
             basic: Default::default(), menus: Default::default(), texts: Default::default(), lists: Default::default(),
             boxes: Default::default(), colors: Default::default(), windows: Default::default(), edge: Default::default(),
-            images: Default::default(), sensors: Default::default() }
+            images: Default::default(), sensors: Default::default(),
+            #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+            view3d: Default::default() }
     }
 }
 impl Gallery {
@@ -107,6 +128,10 @@ impl Gallery {
                 Page::Colors => self.colors.page(ui),
                 Page::Windows => self.windows.page(ui),
                 Page::Images => self.images.page(ui),
+                #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+                Page::View3d => self.view3d.page(ui),
+                #[cfg(not(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32")))]
+                Page::View3d => ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, t("Auf diesem System gibt es keine 3D-Ansicht.")),
                 Page::Level => self.sensors.level(ui),
                 Page::Attitude => self.sensors.attitude(ui),
                 Page::Compass => self.sensors.compass(ui),
@@ -237,6 +262,11 @@ impl App for Gallery {
     fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
         // a reading, a fix, the age's timer (pg_sensors.rs)
         if self.sensors.command(ui, id, arg) {
+            return true;
+        }
+        // (G5e2) the 3D view's animation and check
+        #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+        if self.page == Page::View3d && self.view3d.command(ui, id, arg) {
             return true;
         }
         // Esc and the back key (plat::back_trap): a page goes back when nothing took it

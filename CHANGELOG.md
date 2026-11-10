@@ -48,6 +48,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** plat::sandbox::denied_syscalls (Linux): the system calls the seccomp filter refuses with EPERM; sandboxtest calls every one of them
 - **build:** jflib-build: the glibc stubs of ARM64 bring getauxval (rt::os::page_size)
 - **plat:** iOS after the check on the iPhone: a bar with Done above the on-screen keyboard (an iPhone has no key that closes it), notifications through UNUserNotificationCenter (asked the first time; refused: NoteClosed), the motion sensors and the location through Core Motion and Core Location (web_sensors.rs's host interface, as on Android); the block helpers of macOS's notifications are shared with iOS (apple_block.rs)
+- **ui:** GpuViewInfo::read_frame, the newest frame of a view read back into its CPU copy; jfgui_GPU_VERIFY in the browser leaves out the rectangles the output's pass draws views in
 - **build:** A .dmg for macOS: tools/package.py --formats dmg and cargo jflib package --formats dmg (on a Mac; per style) put NAME.app on a compressed disk image beside a link to /Applications; tools/apple.py dmg; with jfgui_MAC_IDENTITY the bundle and the image are signed with that certificate, the hardened runtime and a time stamp instead of ad hoc (docs/APPLE.md AP8a)
 - **update:** lib/update: kind app replaces a macOS app bundle as a whole (unpacked beside it, its signature checked against the installed one's designated requirement, the two folders exchanged in one step, a copy of the old bundle as the backup; trial and rollback as for an exe); plat::pkg::app_bundle_follows and app_bundle_swap; tools/package.py and cargo jflib package write the app entry and the .dmg into the channel for macos-aarch64; updatetest --test app (docs/UPDATES.md)
 - **build:** CI for Apple: .github/workflows/apple.yml (started by hand) runs coretest, the scripts of gallery and updatetest on macOS, plattest's windowless tests, androidGallery in the iOS simulator and packs a .dmg of BackupCraft on GitHub's arm64 Mac runners (docs/APPLE.md AP8b)
@@ -74,6 +75,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **render3d:** The renderer's own depth buffer (Renderer::set_size) can be sampled (TextureUsage::SAMPLED), FrameStats::visible counts both phases of the occlusion test and FrameStats::draw both passes
 - **render3d:** A view's uniform block is 208 bytes (UploadInfo::bytes of a frame without changes: 688); the bounding sphere of a mesh with detail levels holds every level
 - **render3d:** Scene: which list an instance is in is settled by Scene::prepare (the class is its material's, which the renderer holds): add, remove, set_mesh, set_transform and set_material only mark it, Scene::lists shows what the last prepare settled, a material that changes its class through Renderer::set_material moves its instances with each scene's next prepare; draws_buffer, late_buffers and cascade_buffers hold a list's draw record at ListInfo::record (records lie by index width, class and side), no longer at the list's index; FS_SPV is now the opaque lists' fragment shader without discard
+- **render3d:** render3d encodes sRGB in the fragment shader for 8-bit colour targets without sRGB (Rgba8Unorm, Bgra8Unorm: a window's swapchain, ui::GPU_VIEW_FORMAT), by the definition, the clear colour too; RendererDesc::encode_srgb (default true, false keeps the light linear), RendererDesc::encodes_srgb, Renderer::desc; RendererDesc is #[non_exhaustive] (RendererDesc::new, then set fields)
 
 ### Removed
 
@@ -90,6 +92,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** build_rs.py runs with Python 3.11 again, as the README says (tools/gendoc.py needed 3.12)
 - **update:** an update's new file is created with create_new on Apple too (never written through an existing name or link)
 - **plat:** macOS and iOS: the system font folders (/System/Library/Fonts, /Library/Fonts, ~/Library/Fonts) are scanned; the print dialog of macOS opens only when the app has a window (headless runs: ERR_UNSUPPORTED as on Linux)
+- **ui:** Views of GPU content in the browser: a read-back that comes after its Draw now reaches the framebuffer (the cells the output draws are owed again, the next render and the settle at rest take it there); before, the framebuffer kept an older frame or the content's painting
 - **update:** update::target() names macOS and iOS (macos-aarch64, ios-aarch64); a Mac reported linux-aarch64
 - **update:** lib/update on macOS: an exe update kept the old file's permissions only on Linux, so an updated program on a Mac lost its executable bit; cargo jflib keygen and the update channel's signer build for macOS on a Mac
 

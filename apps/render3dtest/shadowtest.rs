@@ -208,7 +208,7 @@ pub fn read_layer(t: &mut T, dev: &Device, tex: &Texture, layer: u32) -> Option<
 fn cascades_on_cpu(t: &mut T) {
     let Some(g) = crate::tests::setup(t) else { return };
     let Some(dev) = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device") else { return };
-    let Some(mut r) = t.res(Renderer::new(&dev, &render3d::RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new") else { return };
+    let Some(mut r) = t.res(Renderer::new(&dev, &crate::common::linear_desc(Format::Rgba8Unorm)), "Renderer::new") else { return };
     let Some(mut s) = t.res(Scene::new(&r), "Scene::new") else { return };
     s.set_sun(&shadow_sun());
     if t.res(s.set_shadows(Some(&SHADOWS)), "set_shadows").is_none() {

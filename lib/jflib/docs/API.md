@@ -8866,13 +8866,15 @@ The device is the UI output's (one for all windows); without an output in this r
 possible) the views make one of their own on first use.  A new device (generation) detaches the content from
 the old one and attaches it to the new one; its next frame follows.
 
-The browser cannot wait: a read-back there is answered later, the Draw shows the last frame that came back
-(G5e2 tests it).
+The browser cannot wait: a read-back there is answered later, the Draw shows the last frame that came back.  When
+the answer comes (gp_views_tick looks), the next render takes it to the framebuffer as it would a new frame, and at
+rest it is settled again (G5e2: before, a view at rest or under a layer kept an older frame in the framebuffer).
 ```
 
 ```rust
 /// the format of a view's target: what the output samples and what is read back byte for byte into the
-/// framebuffer (B, G, R, x).  The content's colours go in as it writes them, no sRGB encoding
+/// framebuffer (B, G, R, x).  The content's colours go in as it writes them, as sRGB codes like the framebuffer's:
+/// no hardware encodes them (G5e2: render3d's fragment shaders do, RendererDesc::encode_srgb)
 GPU_VIEW_FORMAT: gpu::Format = gpu::Format::Bgra8Unorm
 ```
 
@@ -8907,6 +8909,8 @@ GPU_VIEW_FORMAT: gpu::Format = gpu::Format::Bgra8Unorm
   - `draw_us: u64`
   - `reads: u64` -- frames read back into the CPU's copy, the time that took (us: submit, wait, copy)
   - `read_us: u64`
+  - `read_frame: u64` -- (G5e2) the newest frame read back into the CPU's copy (1, 2, ..; 0: none): the framebuffer can hold the view's
+    newest frame once it equals `frames` (in the browser a read-back comes later)
   - `size: (u32, u32)` -- the size of its target (px)
   - `error: Option<String>` -- what the last failure said
 
@@ -20165,7 +20169,8 @@ ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
 Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
 of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
 units of KHR_lights_punctual, times the scene's exposure, tone mapped in the fragment shader (Khronos PBR
-Neutral, or none), colours linear (an sRGB target encodes them).  Positions are f64 on the CPU and f32 relative to the scene's
+Neutral, or none), colours linear (an sRGB target encodes them; G5e2: for an 8-bit target without sRGB the fragment
+shaders do, RendererDesc::encode_srgb).  Positions are f64 on the CPU and f32 relative to the scene's
 origin on the GPU.
 
 Errors are gpu's: Invalid for ids and values this crate can judge, the rest from the backend.
@@ -20202,13 +20207,19 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 ```
 
 - **`struct RendererDesc`**
-  Renderer::new
+  Renderer::new.  Made with `new` and changed field by field (it may grow)
   - `color: Format` -- the format of the colour targets
   - `frames_in_flight: usize` -- frames the CPU may record ahead of the GPU (1 ..= FRAMES_MAX); G1 measured 2 to be enough
+  - `encode_srgb: bool` -- (G5e2) an 8-bit colour format without sRGB (Rgba8Unorm, Bgra8Unorm, Rg8Unorm, R8Unorm): the fragment shaders
+    encode the colours to sRGB, by the definition, as an sRGB target's hardware does (true, the default: what a
+    window's swapchain or a view of lib/ui shows).  false: the linear light as it is (tests that compare light, an
+    app that encodes later).  sRGB formats are encoded by the hardware and float formats stay linear either way
 
 **`impl RendererDesc`**
 
 - **`const fn new(color: Format) -> RendererDesc`**
+- **`const fn encodes_srgb(&self) -> bool`**
+  the fragment shaders encode sRGB with this description: encode_srgb and an 8-bit format without sRGB
 
 - **`struct MeshData<'a>`**
   a mesh's data: one normal and one uv per position, three indices per triangle, counter-clockwise from
@@ -20282,6 +20293,8 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 
 - **`fn new(dev: &Device, desc: &RendererDesc) -> Result<Renderer>`**
 - **`fn device(&self) -> &Device`**
+- **`fn desc(&self) -> &RendererDesc`**
+  what it was made with (G5e2: desc().encodes_srgb(), whether its fragment shaders encode sRGB)
 - **`fn multi_draw(&self) -> bool`**
   this device draws its lists with one multi-draw (level Voll)
 - **`fn max_instances(&self) -> u32`**

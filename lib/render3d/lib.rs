@@ -25,7 +25,8 @@
 // Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
 // of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
 // units of KHR_lights_punctual, times the scene's exposure, tone mapped in the fragment shader (Khronos PBR
-// Neutral, or none), colours linear (an sRGB target encodes them).  Positions are f64 on the CPU and f32 relative to the scene's
+// Neutral, or none), colours linear (an sRGB target encodes them; G5e2: for an 8-bit target without sRGB the fragment
+// shaders do, RendererDesc::encode_srgb).  Positions are f64 on the CPU and f32 relative to the scene's
 // origin on the GPU.
 //
 // Errors are gpu's: Invalid for ids and values this crate can judge, the rest from the backend.
@@ -123,19 +124,39 @@ pub const VS_SHADOW_SPV: &[u32] = spv::VS_SHADOW;
 #[cfg(not(target_arch = "wasm32"))]
 pub const FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW;
 
-/// Renderer::new
+/// Renderer::new.  Made with `new` and changed field by field (it may grow)
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 pub struct RendererDesc {
     /// the format of the colour targets
     pub color: Format,
     /// frames the CPU may record ahead of the GPU (1 ..= FRAMES_MAX); G1 measured 2 to be enough
     pub frames_in_flight: usize,
+    /// (G5e2) an 8-bit colour format without sRGB (Rgba8Unorm, Bgra8Unorm, Rg8Unorm, R8Unorm): the fragment shaders
+    /// encode the colours to sRGB, by the definition, as an sRGB target's hardware does (true, the default: what a
+    /// window's swapchain or a view of lib/ui shows).  false: the linear light as it is (tests that compare light, an
+    /// app that encodes later).  sRGB formats are encoded by the hardware and float formats stay linear either way
+    pub encode_srgb: bool,
 }
 
 impl RendererDesc {
     pub const fn new(color: Format) -> RendererDesc {
-        RendererDesc { color, frames_in_flight: 2 }
+        RendererDesc { color, frames_in_flight: 2, encode_srgb: true }
     }
+
+    /// the fragment shaders encode sRGB with this description: encode_srgb and an 8-bit format without sRGB
+    pub const fn encodes_srgb(&self) -> bool {
+        self.encode_srgb && matches!(self.color, Format::Rgba8Unorm | Format::Bgra8Unorm | Format::Rg8Unorm | Format::R8Unorm)
+    }
+}
+
+/// (G5e2) a linear colour as sRGB's code values (0 ..= 1; alpha as it is), by the definition as draw.wgsl's srgb_encode
+fn srgb_clear(c: [f32; 4]) -> [f32; 4] {
+    let e = |v: f32| {
+        let v = (v as f64).clamp(0.0, 1.0);
+        (if v <= 0.003_130_8 { v * 12.92 } else { 1.055 * math::pow(v, 1.0 / 2.4) - 0.055 }) as f32
+    };
+    [e(c[0]), e(c[1]), e(c[2]), c[3]]
 }
 
 /// a mesh's data: one normal and one uv per position, three indices per triangle, counter-clockwise from
@@ -467,8 +488,9 @@ impl Renderer {
             targets: &[ColorTarget { format: desc.color, blend: None, write_mask: 0xF }],
             depth: Some(DepthState { format: Format::Depth32Float, write: true, compare: Compare::Greater }),
         });
-        // (the order of AlphaClass::ALL)
-        let (opaque, mask) = (|| ShaderStage::new(&md.fs, "fs"), || ShaderStage::new(&md.fs_mask, "fs_mask"));
+        // (the order of AlphaClass::ALL; G5e2: ENCODE_SRGB, draw.wgsl's override 0, for 8-bit targets without sRGB)
+        let encode: &[Constant] = if desc.encodes_srgb() { &[Constant { id: 0, value: 1.0 }] } else { &[] };
+        let (opaque, mask) = (|| ShaderStage { module: &md.fs, entry: "fs", constants: encode }, || ShaderStage { module: &md.fs_mask, entry: "fs_mask", constants: encode });
         let draw = [[pipeline(opaque(), false)?, pipeline(opaque(), true)?], [pipeline(mask(), false)?, pipeline(mask(), true)?]];
         // both sides of every triangle cast (glTF's single-sided plates too)
         let depth_only = |vertex: ShaderStage, fragment: Option<ShaderStage>| dev.create_render_pipeline(&RenderPipelineDesc {
@@ -536,6 +558,11 @@ impl Renderer {
 
     pub fn device(&self) -> &Device {
         &self.dev
+    }
+
+    /// what it was made with (G5e2: desc().encodes_srgb(), whether its fragment shaders encode sRGB)
+    pub fn desc(&self) -> &RendererDesc {
+        &self.desc
     }
 
     /// this device draws its lists with one multi-draw (level Voll)
@@ -813,6 +840,9 @@ impl Renderer {
         if color.view.format() != self.desc.color {
             return Err(GpuError::Invalid("record: the colour target is not in the renderer's format"));
         }
+        // (G5e2) the clear colour is linear light like the rest: encoded as the fragment shaders encode (an sRGB
+        // target's hardware does the same with it)
+        let color = if self.desc.encodes_srgb() { ColorAttachment { clear: srgb_clear(color.clear), ..color } } else { color };
         let depth = match depth {
             Some(d) => {
                 if d.view.format() != Format::Depth32Float {

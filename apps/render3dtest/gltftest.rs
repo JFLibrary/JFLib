@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 
 use ::gltf as g;
 use gpu::*;
-use render3d::{Renderer, RendererDesc, Scene};
+use render3d::{Renderer, Scene};
 
 use crate::common::*;
 use crate::cpu::{self, Look, RWrap, RefSampling, RefScene, RefTexture};
@@ -421,7 +421,7 @@ fn ref_sampler(s: [u32; 4]) -> RefSampling {
 fn drawn(t: &mut T, dev: &Device, level: &str, sc: &GScene, doc: &g::Document) -> Option<()> {
     let (w, h) = (GALLERY_W, GALLERY_H);
     let mut off = t.res(Off::new(dev, w, h, Format::Rgba8Unorm), "target")?;
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     let imp = t.res(render3d::gltf::upload(&mut r, doc, None), "gltf::upload")?;
     let mut s = t.res(Scene::new(&r), "Scene::new")?;
     let cam = gg::test_camera(w as f64 / h as f64);

@@ -9,7 +9,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render3d::{Camera, Material, MeshId, Mip, Renderer, RendererDesc, Sampling, Scene, TextureData, TextureId, TextureRef, Transform, Wrap};
+use render3d::{Camera, Material, MeshId, Mip, Renderer, Sampling, Scene, TextureData, TextureId, TextureRef, Transform, Wrap};
 
 use crate::common::*;
 use crate::cpu::{self, Look, RWrap, RefSampling, RefScene, RefTexture};
@@ -74,7 +74,7 @@ pub fn build(t: &mut T, dev: &Device, geos: &[Geo], texs: &[Tex], items: &[(Spec
 
 /// the same under another sun
 pub fn build_with(t: &mut T, dev: &Device, sun: &render3d::Sun, geos: &[Geo], texs: &[Tex], items: &[(Spec, Material)], cam: &Camera) -> Option<Built> {
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     for g in geos {
         t.res(r.add_mesh(&g.data()), "add_mesh")?;
     }
@@ -225,7 +225,7 @@ fn textures_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
             let img = shot(t, dev, &mut off, &mut b.r, &mut b.s, "resampled")?;
             check(t, &b, &cam, &off, &img, 2, &format!("{level}: {name} resampled to 128 (against its own resampling, within 2)"));
         }
-        let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+        let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
         let wide = noise(4096, 64, 23);
         let id = t.res(r.add_texture(&TextureData { width: 4096, height: 64, rgba: &wide, srgb: true, nearest: false }), "add_texture")?;
         let info = r.texture_info(id)?;
@@ -254,7 +254,7 @@ fn textures_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
         t.ok(n == 0, &format!("{level}: MASK with the factor's alpha 0.4 < 0.5: against the plate behind alone {n} pixels differ (largest {m})"));
     }
     // what add_texture and materials refuse
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     let inv = |x: gpu::Result<()>| matches!(x, Err(GpuError::Invalid(_)));
     t.ok(inv(r.add_texture(&TextureData { width: 0, height: 4, rgba: &[], srgb: true, nearest: false }).map(|_| ())), &format!("{level}: a texture 0 wide: Invalid"));
     t.ok(inv(r.add_texture(&TextureData { width: 4, height: 4, rgba: &[0; 60], srgb: true, nearest: false }).map(|_| ())), &format!("{level}: 60 bytes for 4 x 4: Invalid"));
@@ -399,7 +399,7 @@ fn mirror_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let img = shot(t, dev, &mut off, &mut b.r, &mut b.s, "inside")?;
     t.ok(img.chunks_exact(4).all(|p| p[0..3] == CLEAR8), &format!("{level}: from inside a mirrored cube: back faces culled, only the clear colour"));
     // visibility of mirrored instances: their spheres by the absolute scales
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     for g in &geos {
         t.res(r.add_mesh(&g.data()), "add_mesh")?;
     }

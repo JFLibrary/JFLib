@@ -1,0 +1,4 @@
+#!args --test srgb
+# (G5e2) the fragment shaders encode sRGB for 8-bit targets without sRGB: the gallery's ten images against their float
+# images encoded on the CPU, Bgra8Unorm = Rgba8Unorm, against an sRGB target (the hardware encodes), the linear way
+# (encode_srgb false) against the float images rounded; five shapes against the ray caster in sRGB codes; Voll and Basis

@@ -155,15 +155,24 @@ impl plat::web::WebApplication for HostRuntime {
             _ => {}
         }
         let o = ui.gpu_output(0);
+        // (G5e2) the first view of GPU content (gpu_view.rs): what it does now
+        #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+        let v = ui.m.gview.views.first().and_then(|e| ui.gpu_view_info(e.win as u32, e.id)).map(|i| {
+            alloc::format!(" view_device={} view_level={} view_gen={} view_apart={} view_attaches={} view_detaches={} view_frames={} view_reads={} view_read_frame={} view_size={}x{}",
+                           i.device as u8, i.level.map_or("none", |l| if l == gpu::Level::Voll { "Voll" } else { "Basis" }), i.generation, i.apart as u8, i.attaches,
+                           i.detaches, i.frames, i.reads, i.read_frame, i.size.0, i.size.1)
+        }).unwrap_or_default();
+        #[cfg(not(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32")))]
+        let v = String::new();
         Some(alloc::format!(
             "wanted={} on={} building={} pending={} never={} adapter={} present_mode={} reserved={} frames={} cpu_frames={} upload_bytes={} upload_base={} \
              layer_textures={} layer_bytes={} layer_store={} split_frames={} image_quads={} image_textures={} image_bytes={} canvas_apart={} canvas_quads={} \
              canvas_frames={} canvas_tiles={} canvas_bytes={} canvas_fills={} canvas_settles={} canvas_diff_px={} canvas_diff_max={} base_px={} render_us={} present_us={} switches={} leaves={} verified={} verify_bad={} \
-             fb={}x{} dpi={} error={}",
+             fb={}x{} dpi={} view_quads={}{v} error={}",
             o.wanted as u8, o.on as u8, o.building as u8, o.pending as u8, o.never as u8, o.adapter.replace(' ', "_"), o.present_mode, o.reserved, o.frames, o.cpu_frames,
             o.upload_bytes, o.upload_base, o.layer_textures, o.layer_bytes, o.layer_store, o.split_frames, o.image_quads, o.image_textures, o.image_bytes,
             o.canvas_apart, o.canvas_quads, o.canvas_frames, o.canvas_tiles, o.canvas_bytes, o.canvas_fills, o.canvas_settles, o.canvas_diff_px, o.canvas_diff_max, o.base_px, o.render_us, o.present_us,
-            o.switches, o.leaves, o.verified, o.verify_bad, ui.wp.rt.fb.w, ui.wp.rt.fb.h, ui.wp.rt.dpi, o.error.unwrap_or_default().replace(' ', "_")))
+            o.switches, o.leaves, o.verified, o.verify_bad, ui.wp.rt.fb.w, ui.wp.rt.fb.h, ui.wp.rt.dpi, o.view_quads, o.error.unwrap_or_default().replace(' ', "_")))
     }
     fn control(&mut self, line: &[u8]) -> Option<String> {
         let envelope = agent_core::json::parse(line).ok()?;
