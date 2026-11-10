@@ -173,6 +173,22 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     t.res(p.swap_style(2, style(0xC0FF_2020, 5.0, Cap::Round, Join::Round)), "set_entity_style")?;
     let info = judge(t, dev, &mut r, &mut off, &mut p, &cam, &format!("{level}: an entity took another style"), false)?;
     t.ok(info.runs == 1 && !info.rebuild, &format!("{level}: its records go up ({} records, {} runs)", info.records, info.runs));
+    // a growth in the middle of a layer is only noted until the next frame: what comes before that frame must go by what
+    // the layer really holds.  Grown and removed before a frame: the neighbours stay
+    let first = p.d.items.len();
+    let wide = |c: u32| style(c, 9.0, Cap::Butt, Join::Miter);
+    t.res(p.insert(1, wide(0xFFFF_0000), Geo::Line([20.0, 20.0], [300.0, 220.0])), "insert")?;
+    t.res(p.insert(1, wide(0xFF00_FF00), Geo::Line([20.0, 220.0], [300.0, 20.0])), "insert")?;
+    t.res(p.insert(1, wide(0xFF00_00FF), Geo::Line([160.0, 10.0], [160.0, 230.0])), "insert")?;
+    judge(t, dev, &mut r, &mut off, &mut p, &cam, &format!("{level}: three crossing lines"), false)?;
+    let zig = |n: usize| -> Vec<[f64; 2]> { (0..n).map(|i| [20.0 + 280.0 * i as f64 / (n - 1) as f64, 120.0 + if i % 2 == 0 { 25.0 } else { -25.0 }]).collect() };
+    t.res(p.update(first, Geo::Poly(zig(12), false)), "update")?;
+    t.res(p.remove(first), "remove")?;
+    judge(t, dev, &mut r, &mut off, &mut p, &cam, &format!("{level}: grown and removed before the frame"), false)?;
+    // grown twice before a frame (the first time just up to the end of the layer): it stays under the line after it
+    t.res(p.update(first, Geo::Poly(zig(3), false)), "update")?;
+    t.res(p.update(first, Geo::Poly(zig(30), false)), "update")?;
+    judge(t, dev, &mut r, &mut off, &mut p, &cam, &format!("{level}: grown twice before the frame"), false)?;
     // many changes at once: thousands of lines, every second one moved (the scatter shader), then most removed (the
     // layer laid out anew without its free places)
     let base = p.d.items.len();

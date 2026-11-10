@@ -337,6 +337,12 @@ fn pages(n: u32) -> u32 {
     n.div_ceil(PAGE) * PAGE
 }
 
+/// the records of the layer's layout that entity `slot` holds from `at` on (its alloc can be more: an update in the
+/// middle of the layer raises it at once, the layout follows with the next prepare)
+fn held(l: &LayerSlot, at: u32, slot: u32) -> u32 {
+    l.owners[at as usize..].iter().take_while(|&&o| o == slot).count() as u32
+}
+
 /// entities, layers, styles and the camera of one scene of a Renderer
 pub struct Scene {
     dev: Device,
@@ -666,7 +672,7 @@ impl Scene {
         let (li, at, alloc) = (self.ents[i].layer as usize, self.ents[i].at, self.ents[i].alloc);
         if count > alloc {
             let l = &mut self.layers[li];
-            if at + alloc == l.used {
+            if at + held(l, at, i as u32) == l.used {
                 // the last of its layer: it grows in place
                 l.used = at + count;
                 l.owners.resize(l.used as usize, i as u32);
@@ -706,8 +712,9 @@ impl Scene {
         let e = &mut self.ents[i];
         e.live = false;
         e.era = e.era.wrapping_add(1);
-        let (li, at, n) = (e.layer as usize, e.at, e.alloc);
+        let (li, at) = (e.layer as usize, e.at);
         let l = &mut self.layers[li];
+        let n = held(l, at, i as u32);
         for o in &mut l.owners[at as usize..(at + n) as usize] {
             *o = NONE;
         }
