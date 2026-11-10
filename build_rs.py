@@ -2001,7 +2001,7 @@ def main():
     a = ap.parse_args(argv)
     set_static_ui(a.static)                         # section "glibc"
     if a.arch != "x86_64" and (a.cmd == "watch" or a.cmd == "test" and not a.name):
-        print(f"{a.cmd}: not for --arch {a.arch} yet (docs/ARM64.md: the whole suite needs ARM3 and ARM4); "
+        print(f"{a.cmd}: not for --arch {a.arch} (docs/ARM64.md: qemu-aarch64 starts static programs only, the whole suite runs in the ARM64 VM); "
               f"one app: python build_rs.py test coretest --target linux --arch {a.arch}")
         return 1
     if a.cmd == "site":                             # tools/site.py (its own process: `site` is a stdlib name)
