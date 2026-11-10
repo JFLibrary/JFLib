@@ -1,0 +1,3 @@
+#!args --test shaders
+# the embedded SPIR-V = wgsl::compile of lib/render2d/*.wgsl (common.wgsl in front; the visibility and the vertex shader
+# exact), word for word

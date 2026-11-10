@@ -1,16 +1,16 @@
-// t_lib -- (plat-shared) the plugin loader with the assembly's example / test plugins of
-// PaintCraft (apps/PaintCraft/plugins, built by build.py plugin), without PaintCraft:
+// t_lib -- (plat-shared) the plugin loader with JFPainter's test plugins (JFLibrary/JFPainter
+// plugins/, written in Rust, built by its tools/plugins.py; once PaintCraft's assembly plugins):
 //   plattest --test lib --dir DIR      DIR holds swapchan, sepiastr, qoi, pshapes, crash,
-//        crashpf, crashq, toonew, badinfo (.dll / .so): open, the exported query in an
-//        executable segment, PLUGININFO / descriptors read through lib_seg-checked copies,
-//        a query that executes ud2 (GK_ILLEGAL), an effect writing to address 0 (GK_ACCESS),
-//        an effect whose PNAPI parallel_for item divides by zero on a worker (nested guards,
-//        ERR_FAULT), swapchan's render on a test surface (relocated descriptors, the Win64
-//        ABI), loader errors (missing file, not an object, truncated), close
+//        crashpf, crashq, toonew, badinfo (.dll / .so, one architecture: x86-64 or ARM64): open,
+//        the exported query in an executable segment, PLUGININFO / descriptors read through
+//        lib_seg-checked copies, a query that traps (ud2 / udf: GK_ILLEGAL), an effect writing
+//        to address 0 (GK_ACCESS), an effect whose PNAPI parallel_for item divides by zero on a
+//        worker (ARM64: SIGFPE; nested guards, ERR_FAULT), swapchan's render on a test surface
+//        (relocated descriptors, the plugin ABI), loader errors (missing file, not an object,
+//        truncated), close
 //   plattest --test libfuzz --dir DIR  every file of DIR through lib_open / lib_sym /
-//        lib_close under the guard (PaintCraft --plugin-fuzz): "plugin-fuzz:
+//        lib_close under the guard (JFPainter --plugin-fuzz): "plugin-fuzz:
 //        files,loaded,rejected,faults = ..." and every guarded fault (a loader bug)
-//                    [apps/PaintCraft/src/plugins.s plug_fuzz; tools/plugin_check.py]
 
 use alloc::format;
 use alloc::string::String;
@@ -19,7 +19,7 @@ use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering::SeqCst};
 
 use plat::{
-    ERR_FAULT, GK_ACCESS, GK_ARITH, GK_ILLEGAL, GuardInfo, LIBA_R, LIBA_X, LIBE_FORMAT, LIBE_IO, Lib, guard_call,
+    ERR_FAULT, GK_ACCESS, GK_ARITH, GK_ILLEGAL, GuardInfo, LIBA_R, LIBA_X, LIBE_ARCH, LIBE_FORMAT, LIBE_IO, Lib, guard_call,
     guard_run, lib_open, lib_read, lib_seg, lib_sym, parallel_for,
 };
 
@@ -57,13 +57,13 @@ fn lib_str(h: &Lib, p: u64) -> Option<String> {
 static PF_FAULT_KIND: AtomicU32 = AtomicU32::new(0);
 static PF_FAULT_ITEM: AtomicU32 = AtomicU32::new(u32::MAX);
 
-extern "win64" fn h_zero() -> u64 {
+rt::plugin_abi! { fn h_zero() -> u64 {
     0
-}
+}}
 
-/// PA_PARFOR(fn, ctx, count) -> eax 0 / ERR_FAULT: fn(ctx, index, job) on the workers, every
-/// item under its own guard; a fault cancels the rest
-extern "win64" fn h_parfor(f: u64, ctx: u64, count: u64) -> u64 {
+// PA_PARFOR(fn, ctx, count) -> eax 0 / ERR_FAULT: fn(ctx, index, job) on the workers, every
+// item under its own guard; a fault cancels the rest
+rt::plugin_abi! { fn h_parfor(f: u64, ctx: u64, count: u64) -> u64 {
     let r = parallel_for(count as u32 as usize, &move |i, job| {
         let mut gi = GuardInfo::default();
         let (r, _) = guard_call(f as usize, ctx, i as u64, 0, 0, Some(&mut gi));
@@ -74,7 +74,7 @@ extern "win64" fn h_parfor(f: u64, ctx: u64, count: u64) -> u64 {
         }
     });
     if r.is_err() || PF_FAULT_ITEM.load(SeqCst) != u32::MAX { ERR_FAULT as u32 as u64 } else { 0 }
-}
+}}
 
 /// the PNAPI table: size / version, then the functions (unused ones return 0)
 fn pnapi() -> [u64; 12] {
@@ -130,8 +130,10 @@ pub fn t_lib(t: &mut T) {
         let mut gi = GuardInfo { tag: 1, ..GuardInfo::default() };
         let (r, _) = guard_call(p.query, api.as_ptr() as u64, 0, 0, 0, Some(&mut gi));
         if p.name == "crashq" {
-            t.check(r == FAULT && gi.kind == GK_ILLEGAL && gi.pc == p.query as u64,
-                    "lib: crashq: the query's ud2 is caught (GK_ILLEGAL at the query)");
+            // the trap of the query (after its check of the table): ud2 (0F 0B), ARM64 udf #0 (0)
+            let trap = lib_read(&p.lib, gi.pc as usize, 4).is_some_and(|b| if cfg!(target_arch = "aarch64") { b == [0; 4] } else { b[..2] == [0x0F, 0x0B] });
+            t.check(r == FAULT && gi.kind == GK_ILLEGAL && lib_seg(&p.lib, gi.pc as usize).1 & LIBA_X != 0 && trap,
+                    "lib: crashq: the query's ud2 (ARM64: udf) is caught (GK_ILLEGAL in its code)");
             infos.push((0, Vec::new()));
             continue;
         }
@@ -150,8 +152,8 @@ pub fn t_lib(t: &mut T) {
     t.check(rd32(info_of("toonew"), 8) == 2 && rd32(info_of("swapchan"), 8) == 1, "lib: toonew needs PNAPI version 2");
     let bad = info_of("badinfo");
     let bl = &get("badinfo").lib;
-    let first = if bad.len() >= 64 { lib_read(bl, rd64(bad, 56) as usize, 8).map_or(0, |v| rd64(&v, 0)) } else { 0 };
-    t.check(rd32(bad, 48) == 1 && first == 0x1000 && lib_seg(bl, first as usize).0 == 0,
+    let list = if bad.len() >= 64 { rd64(bad, 56) } else { 0 };
+    t.check(rd32(bad, 48) == 1 && list == 0x1000 && lib_seg(bl, list as usize).0 == 0 && lib_read(bl, list as usize, 8).is_none(),
             "lib: badinfo: its effect list points outside the image");
     let qoi = info_of("qoi");
     t.check(qoi.len() >= 72 && rd32(qoi, 52) == 1 && lib_read(&get("qoi").lib, rd64(qoi, 64) as usize, 56).is_some(),
@@ -165,22 +167,30 @@ pub fn t_lib(t: &mut T) {
         let r = lib_read(l, fx, 64).map_or(0, |v| rd64(&v, FXD_RENDER) as usize);
         if lib_seg(l, r).1 & LIBA_X != 0 { r } else { 0 }
     };
+    // FXARGS on a 16 x 8 test surface, ROI 2..14 x 1..7 (the plugins check them before they run)
+    let (w, h) = (16usize, 8usize);
+    let src: Vec<u8> = (0..w * h * 4).map(|i| (i * 37 + 11) as u8).collect();
+    let mut tmp = vec![0xEEu8; w * h * 4];
+    let ssf = [src.as_ptr() as u64, w as u64 | (h as u64) << 32, (w * 4) as u64 | 3 << 32, 0];
+    let tsf = [tmp.as_mut_ptr() as u64, w as u64 | (h as u64) << 32, (w * 4) as u64 | 3 << 32, 0];
+    let zero = [0u64; 4];
+    let fxa = [ssf.as_ptr() as u64, tsf.as_ptr() as u64, 2 | 1 << 32, 14 | 7 << 32, zero.as_ptr() as u64, 0, 0, 0];
     let rc = render("crash");
     let mut gi = GuardInfo::default();
-    let (r, _) = guard_call(rc, 0, 0, 0, 0, Some(&mut gi));
-    t.check(rc != 0 && r == FAULT && gi.kind == GK_ACCESS && gi.addr == 0 && gi.pc == rc as u64 + 2,
+    let (r, _) = guard_call(rc, fxa.as_ptr() as u64, 0, 0, 0, Some(&mut gi));
+    t.info(&format!("  (crash: render -> {}, kind {} at render +{:x}, address {:x})\n", r as u32 as i32, gi.kind,
+                    gi.pc.wrapping_sub(rc as u64), gi.addr));
+    t.check(rc != 0 && r == FAULT && gi.kind == GK_ACCESS && gi.addr == 0 && lib_seg(&get("crash").lib, gi.pc as usize).1 & LIBA_X != 0,
             "lib: crash: render's write to address 0 is caught");
-    // ---- crashpf: PNAPI parallel_for, item 11 divides by zero on some thread
+    // ---- crashpf: PNAPI parallel_for, item 11 divides by zero on some thread (ARM64: SIGFPE / brk)
     let rp = render("crashpf");
-    let (r, _) = guard_call(rp, 0, 0, 0, 0, Some(&mut gi));
+    let (r, _) = guard_call(rp, fxa.as_ptr() as u64, 0, 0, 0, Some(&mut gi));
     t.info(&format!("  (crashpf: render -> {}, item {} kind {})\n", r as u32 as i32, PF_FAULT_ITEM.load(SeqCst),
                     PF_FAULT_KIND.load(SeqCst)));
     t.check(rp != 0 && r as u32 as i32 == ERR_FAULT && gi.kind == 0 && PF_FAULT_ITEM.load(SeqCst) == 11
             && PF_FAULT_KIND.load(SeqCst) == GK_ARITH, "lib: crashpf: the parallel item's fault stays in its guard, render returns ERR_FAULT");
     // ---- swapchan: render on a 16 x 8 surface, ROI 2..14 x 1..7, every mode
     let rs = render("swapchan");
-    let (w, h) = (16usize, 8usize);
-    let src: Vec<u8> = (0..w * h * 4).map(|i| (i * 37 + 11) as u8).collect();
     let mut all = rs != 0;
     for mode in 0..3u64 {
         let mut dst = vec![0xEEu8; w * h * 4];
@@ -219,10 +229,22 @@ pub fn t_lib(t: &mut T) {
     let good = plat::read_file(&format!("{dir}/swapchan{EXT}")).unwrap_or_default();
     plat::write_file(&scratch, &good[..good.len().min(600)]);
     let e3 = lib_open(&scratch).err();
+    // swapchan as a plugin of the other processor (its machine field: PE Machine AMD64 <-> ARM64,
+    // ELF e_machine EM_X86_64 <-> EM_AARCH64) -> LIBE_ARCH (docs/ARM64.md, decision 4)
+    let mut other = good.clone();
+    let mo = if cfg!(windows) { rd32(&good, 0x3C) as usize + 4 } else { 18 };
+    let m: u16 = match (cfg!(windows), cfg!(target_arch = "aarch64")) { (true, false) => 0xAA64, (true, true) => 0x8664, (false, false) => 183, (false, true) => 62 };
+    if other.len() >= mo + 2 {
+        other[mo..mo + 2].copy_from_slice(&m.to_le_bytes());
+    }
+    plat::write_file(&scratch, &other);
+    let e4 = lib_open(&scratch).err();
     plat::delete(&scratch);
     t.info(&format!("  (text file -> {e2:?}, truncated -> {e3:?})\n"));
     t.check(e2 == Some(LIBE_FORMAT), "lib: not an object file -> LIBE_FORMAT");
     t.check(e3 == Some(LIBE_FORMAT), "lib: a truncated plugin -> LIBE_FORMAT");
+    t.info(&format!("  (the other processor's plugin -> {e4:?})\n"));
+    t.check(e4 == Some(LIBE_ARCH), "lib: a plugin of the other processor (x86-64 / ARM64) -> LIBE_ARCH");
     let n = plugs.len();
     for p in plugs {
         plat::lib_close(p.lib);

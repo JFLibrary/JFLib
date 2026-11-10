@@ -106,6 +106,7 @@ DOCS = [
     ("docs/WASM_COMPUTE.md", "WASM compute", "Reference", "de", "SIMD and parallel jobs in the browser"),
     ("docs/GPU.md", "GPU layer", "Reference", "de", "Direct access to the graphics card: compute, rendering, swapchains"),
     ("docs/RENDER3D.md", "3D engine", "Reference", "de", "Meshes, textured materials, scenes of instances, visibility on the GPU"),
+    ("docs/RENDER2D.md", "2D renderer", "Reference", "de", "Lines and polylines for CAD: layers, styles, analytic strokes, f64 coordinates, visibility on the GPU"),
     ("docs/GLTF.md", "glTF import", "Reference", "de", "glTF 2.0 scenes (.gltf, .glb) read without a GPU, checked as untrusted input"),
     ("docs/SHADER.md", "Shaders (SPIR-V)", "Reference", "de", "Writing, reading and validating SPIR-V"),
     ("docs/WGSL.md", "WGSL compiler", "Reference", "de", "From WGSL text to a checked, typed module and on to SPIR-V"),

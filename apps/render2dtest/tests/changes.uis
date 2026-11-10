@@ -1,0 +1,4 @@
+#!args --test changes
+# insert, update in place, growing at a layer's end and in its middle (laid out anew), remove, set_style, set_entity_style,
+# 1500 scattered changes (the scatter shader), 2600 removed (laid out anew), a layer removed, a prepare without a frame:
+# the image = the scene built anew, only what changed goes up; Voll and Basis

@@ -1,8 +1,9 @@
 # ARM64-Plan: Windows und Linux auf ARM-Prozessoren
 
-Stand 2026-11-09, auf Basis von `main` 39e30a8d. Umgesetzt sind ARM0, ARM1, ARM2, ARM3 und ARM6: `rt` und `plat` laufen
+Stand 2026-11-10, auf Basis von `main` 3044b5ac. Umgesetzt sind ARM0 bis ARM4 und ARM6: `rt` und `plat` laufen
 auf Linux ARM64, statisch und gegen glibc; `plattest`, `linuxtest`, `lifetest` und `sandboxtest` sind in einer ARM64-VM
-grün, Plugins und Module fehlen noch (ARM4). Für den Rest gilt: Die Zahlen sind aus dem Code gezählt, die Aufwände
+grün, seit ARM4 auch Plugins und das Modul `jxlenc`. Als Nächstes Windows ARM64 (ARM5). Für den Rest gilt: Die Zahlen sind
+aus dem Code gezählt, die Aufwände
 geschätzt. Syscalls, Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`),
 die Relocations mit ARM3 an einem Test-Plugin. Der Eintrag in der Roadmap steht in
 [ROADMAP.md](ROADMAP.md) §9.
@@ -431,6 +432,100 @@ JFPainter.
 **Fertig, wenn:** das Modul `jxlenc` und `plattest` (`t_guard`, `t_lib`) auf ARM64 und unverändert auf x86-64
 laufen (JFPainters Plugins: in dessen Repository).
 
+**Umgesetzt** (2026-11-10). `lib/plugin` (mit `prepare_tramp`, seinem `mem.rs` und `trap`) und `build_rs.py plugin` sind mit
+PaintCraft nach JFLibrary/JFPainter gezogen; in JFLib bleiben `plat`, `modules/` und `plattest`. Was JFPainter braucht, steht
+unten unter „JFPainter“.
+
+- **Makro:** `rt::plugin_abi!` (`lib/rt/abi.rs`, Kopie in `modules/modrt/shared/rt/`): auf x86-64 `extern "win64"` wie bisher,
+  auf jedem anderen Prozessor `extern "C"`. Die Typform `plugin_abi!(fn(u32) -> u32)` steht in den Records von `modabi.rs`, die
+  Form für Funktionen `plugin_abi! { pub fn f(a: u32) -> u32 { a } }` reicht Attribute, Sichtbarkeit, `unsafe`, Generics und den
+  Rumpf unverändert durch. Auf x86-64 entsteht genau der alte Code. `modabi.rs`, `modhost.rs`, `plib.rs` (`thunk`), `modrt`,
+  `modplat` und die Host-Funktionen in `plattest` nutzen es; übrig sind nur die Deklarationen der x86-Assembler-Symbole
+  (`unsafe extern "win64" { … }` neben ihrem `global_asm!`).
+- **Für ARM5 festgelegt:** Windows ARM64 nimmt ebenfalls `extern "C"`, also Microsofts ARM64-Konvention. Für die Funktionen
+  dieser ABIs (ganze Zahlen und Zeiger, höchstens acht Argumente, Ergebnis in `x0`/`x1`, nichts Variadisches) übergibt sie
+  dieselben Register wie AAPCS64; `x18` gehört dort dem System, Code von rustc fasst es nicht an, das Trampolin auch nicht. Die
+  Records sind auf beiden Systemen gleich, ein Plugin bleibt pro Prozessor und System eine eigene Datei. Das Modul `jxlenc` baut
+  schon für `aarch64-pc-windows-msvc` (2,2 MB, Machine `0xAA64`, keine Importe, ein Export; `pe_verify` grün), gestartet ist es
+  dort nicht. Apple auf ARM64 bekäme ebenso `extern "C"`, lädt aber keine Plugins ([APPLE.md](APPLE.md), Entscheidung 6):
+  `modabi.rs`, `t_guard` und `t_lib` werden dort nicht übersetzt, neu ist dort nur das Makro selbst.
+- **Zwei Rückgaberegister:** `guard_call` gibt auf ARM64 `x0` und `x1` zurück (das Trampolin aus ARM3). `prepare_tramp` gibt
+  in JFPainters Plugins dort eine `#[repr(C)]`-Struktur aus zwei Wörtern zurück, die AAPCS64 in `x0` und `x1` legt.
+- **Eingeschaltet:** auf Linux ARM64 `plib` und `modhost` (`plat/lib.rs`), `linux_elfload.rs` und `linux_guard.rs` (`linux.rs`);
+  die Kopien von `plat_tid` und `current_exe` in `linux.rs` und das `allow(dead_code)` an `open_read_nofollow` sind weg. In
+  `plattest` sind die Platzhalter für `t_guard` und `t_lib` wieder nur auf Apple, `web_lib.rs` fragt das Manifest nur dort.
+- **`modules/modrt`:** `cpu`, `fx` und `x87` nehmen auf ARM64 Kopien von `rt/portable/cpu.rs`, `rt/aarch64/fx.rs` und
+  `rt/portable/math.rs` (`lint()` hält sie gleich); `trap()` ist `udf #0`, `JXT_FAULT` schreibt mit `str` nach 0x10. `mem.rs` hat
+  einen ARM64-Block für beide Systeme: `memcpy`, `memmove`, `memset` in 32-Byte-Schritten wie `rt/aarch64/mem.rs`, `memcmp` und
+  `bcmp` Byte für Byte, dazu für Windows ARM64 `__chkstk` (Größe in `x15` mal 16), `__CxxFrameHandler3` und `_fltused`. Ein
+  Prüfprogramm ohne libc vergleicht die vier mit Byte-Schleifen: jede Länge bis 200 an allen Versätzen bis 16, Überlappung in
+  beide Richtungen, 103 767 Prüfungen, unter `qemu-aarch64` und in der VM ohne Fehler; ein eingebauter Fehler im Rückwärtszweig
+  von `memmove` fiel mit 5986 Fehlern auf.
+- **`build_rs.py`:** Module für `--arch aarch64`: Linux linkt mit `-z max-page-size=65536` und baut mit
+  `-C target-feature=-outline-atomics` (siehe Fallen). `pe_verify` und `elf_verify` prüfen die Architektur (Machine `0xAA64`,
+  `EM_AARCH64`, die vier `R_AARCH64`-Relocations, Segmente in 64-KB-Seiten) und nennen eine Bibliothek der anderen
+  („built for aarch64, not for x86_64 (the loader refuses it: LIBE_ARCH)“).
+- **`LIBE_ARCH`** (8, neu in `plat`): Der ELF-Loader lehnt `EM_X86_64` auf ARM64 und `EM_AARCH64` auf x86-64 damit ab, der
+  PE-Loader, wenn `LoadLibraryExW` `ERROR_BAD_EXE_FORMAT` meldet und der Kopf der Datei die andere Machine nennt (gelesen wird
+  nur die erste Seite); `pe_check` nimmt die Machine des Prozesses (ARM64 für ARM5). Der Modul-Host schreibt dazu „built for
+  another processor (error 8)“ und speichert mit dem gelinkten Writer.
+- **`plattest --test lib`** passte nicht mehr zu seinen Test-Plugins: Es war für PaintCraft's Assembler-Plugins geschrieben, mit
+  JFPainters Rust-Plugins scheiterten auch auf x86-64 vier von 31 Prüfungen (die Falle von `crashq` liegt hinter der Prüfung der
+  Tabelle, bei `badinfo` liegt schon der Listenzeiger außerhalb, `crash` und `crashpf` prüfen ihre FXARGS, bevor sie abstürzen).
+  Jetzt wird die Falle an ihrem Befehl erkannt (`ud2`, auf ARM64 `udf`) im Code des Plugins, `crash` und `crashpf` bekommen FXARGS
+  auf einer Testfläche, und `swapchan` mit der Machine der anderen Architektur muss `LIBE_ARCH` ergeben: 32 Prüfungen.
+
+Getestet mit JFPainters Test-Plugins, für jede Architektur gebaut (für ARM64 aus einer portierten Kopie, siehe „JFPainter“), und
+dem Modul `jxlenc` (`codectest --convert-ex … --jxlenc FILE`: zwei Bilder verlustfrei und mit Qualität 90 müssen Byte für Byte
+die Datei des gelinkten Writers ergeben, `jfgui_JXLENC_TEST=panic` und `fault` enden mit Exit 3 und Bericht, das Modul der
+anderen Architektur ergibt `LIBE_ARCH`):
+
+| Wo | `guard` | `guardlimit` | `guardcrash` | `plugperm` | `lib` | `libfuzz` | `jxlenc` |
+|---|---|---|---|---|---|---|---|
+| Windows x86-64 | 24 / 24 | 3 / 3 | 8 / 8 | 28 / 28 | 32 / 32 | 11 Dateien, kein Fehler | 6 / 6, `LIBE_ARCH` |
+| Linux x86-64 (WSL) | 24 / 24 | 3 / 3 | 8 / 8 | 28 / 28 | 32 / 32 | 11, kein Fehler | 6 / 6, `LIBE_ARCH` |
+| `qemu-aarch64` (statisch) | 24 / 24 | 3 / 3 | 7 / 8 (kein ESR) | 28 / 28 | 32 / 32 | 11, kein Fehler | 6 / 6, `LIBE_ARCH` |
+| VM, 64-KB-Seiten | 24 / 24 | 3 / 3 | 8 / 8 | 28 / 28 | 32 / 32 | 11, kein Fehler | 6 / 6 gegen glibc und statisch, `LIBE_ARCH` |
+| VM, 4-KB-Seiten | 24 / 24 | 3 / 3 | 8 / 8 | 28 / 28 | 32 / 32 | 11, kein Fehler | 6 / 6 gegen glibc und statisch, `LIBE_ARCH` |
+| A56 (statisch, `adb`) | 24 / 24 | 3 / 3 | 8 / 8 | 28 / 28 | 32 / 32 | 11, kein Fehler | 2 Bilder gleich, Panik und Fehler mit Exit 3, `LIBE_ARCH` |
+
+Dazu in der VM mit 4-KB-Seiten einmal alle 42 Skripte von `plattest` (jetzt mit `plib`): 41 grün, `screen.uis` scheitert wie bei
+ARM3 nur an Xvfb. `build_rs.py test coretest` und `test plattest` sind für Windows und Linux auf x86-64 grün (42 von 42), `test
+coretest --target linux --arch aarch64` unter `qemu-aarch64` ebenso.
+
+**A56** (SM-A566B, Android 16, Kernel 6.6 mit 4-KB-Seiten, Cortex-A720 und A520): die statischen Programme aus
+`/data/local/tmp`, gestartet über `adb shell`, je einmal (Zeile oben), dazu memtest ohne Fehler. Frisch geladene und relozierte
+Plugins laufen also auf echter ARM-Hardware, mit `sync_icache`; ein Lauf ist aber keine Stressprobe, ohne `sync_icache` wären
+Fehler zufällig. Das Telefon war unbedient, es gab keine Eingaben, der Ordner wurde danach gelöscht.
+
+**x86-64 unverändert:** Release-Bau von `coretest`, `plattest`, `gallery` und `codectest` mit `jxlenc` für Windows und Linux,
+drei Stände nacheinander aus demselben Verzeichnis (Basis `3044b5ac`, Teil 1, Teil 2). Teil 1 (Makro, ARM64-Code, `build_rs.py`)
+ist Byte für Byte gleich zur Basis: alle 174 Dateien samt `.map`, `jxlenc.dll` und `jxlenc.so`, unter Windows bis auf den
+Zeitstempel des Linkers. Teil 2 (`LIBE_ARCH`, `t_lib`) ändert absichtlich `plattest` und `codectest`, die Programme mit dem
+Loader; `coretest`, `gallery` und das Modul bleiben gleich, in ihren `.map` verschiebt sich nur die Nummer anonymer Konstanten
+(`.Lanon….2059` statt `.2060`), weil `plat` neue Konstanten hat. `cargo check -p jflib` mit und ohne `std` ist grün für Windows,
+Linux, wasm32, Android und Linux ARM64, `cargo check -p jflib-rt` für Windows ARM64.
+
+**JFPainter** (eigenes Repository, dort nichts geändert): Seine Plugins und sein Host brauchen für ARM64 dasselbe. Eine portierte
+Kopie von `plugins/` (Stand `abc3551`) liegt in den Übergabenotizen von ARM4, mit Skript und Diff; mit ihr laufen die Tests oben:
+
+- `plugin/abi.rs`: das Makro (eine Kopie von `rt::plugin_abi!`, das Plugin hängt an keiner JFLib-Crate) für alle Funktionszeiger;
+  `PrepareFn` auf ARM64 `extern "C" fn(*const FxArgs) -> AuxErr` mit `#[repr(C)] struct AuxErr { aux, err: i64 }`.
+- `plugin/fx.rs`: `prepare_tramp` mit `naked_asm!` nur auf x86-64, auf ARM64 ein gewöhnliches `extern "C" fn`, das `AuxErr`
+  zurückgibt; die übrigen Trampoline (`fx.rs`, `ft.rs`, `api.rs`) und `pn_plugin_query` über das Makro.
+- `plugin/lib.rs`: `trap()` mit `udf #0`; `plugin/mem.rs`: die x86-Blöcke unter `target_arch = "x86_64"`, dazu der ARM64-Block
+  aus `modules/modrt/mem.rs`.
+- `crash`: das Schreiben nach 0 als `str`; `crashpf`: auf Linux ARM64 `tgkill(getpid, gettid, SIGFPE)` statt `div`, auf Windows
+  ARM64 `brk #0xF003`.
+- `.cargo/config.toml`: `[target.aarch64-unknown-linux-gnu]` wie x86-64, dazu `-z max-page-size=65536` und
+  `-C target-feature=-outline-atomics`; `[target.aarch64-pc-windows-msvc]` wie x86-64. `tools/plugins.py` braucht die Ziele.
+- Der Host (`src/integrations/plugins/native.rs`): die PNAPI-Funktionen über das Makro (`rt::plugin_abi!` aus jflib, sobald eine
+  Version mit ARM4 veröffentlicht ist), `prepare` liest wie bisher die beiden Ergebnisse von `guard_call`; `LIBE_ARCH` als
+  eigener Text unter Einstellungen > Plugins. Native Plugins bleiben auf Apple aus.
+
+Offen: der Befehlscache auf echter Hardware (auf dem A56 ein Lauf grün, keine Stressprobe), Windows ARM64 (ARM5: `__chkstk` in `rt`, `x18`, `CONTEXT`, Unwind-Daten
+für das Trampolin, `FlushInstructionCache` im PE-Loader), ein Kernel mit 16-KB-Seiten.
+
 ### ARM5: Windows ARM64 (M)
 
 - `__chkstk` (Größe in `x15` mal 16, nur `x16` und `x17` frei), TEB über `x18` statt `gs:`
@@ -575,14 +670,21 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
   gar nicht. Ein grüner Lauf dort sagt über Signale und Sandbox wenig.
 - **`c_char`:** auf Linux ARM64 `u8`, auf Windows ARM64 `i8`, das meldet der Compiler aber. Beim Stand von ARM0
   meldet er dazu nichts.
+- **Outline-Atomics in Bibliotheken ohne libc:** Der erste Atomic-Helfer von `compiler_builtins` (`__aarch64_cas4_acq` usw.)
+  zieht `getauxval` und einen Konstruktor in `.init_array` herein. Programme erledigen das seit ARM2 selbst, ein Plugin oder
+  Modul darf aber nichts importieren und keinen Code beim Laden haben: `getauxval` fehlt beim Linken, sonst lehnt der Loader
+  `DT_INIT_ARRAY` ab. Sie bauen mit `-C target-feature=-outline-atomics` (LL/SC inline, läuft auf jedem ARMv8.0).
+- **Division durch null:** Die ganzzahlige Division von ARM64 hat keinen Trap. Tests, die `GK_ARITH` erwarten, schicken sich
+  unter Linux `SIGFPE` mit `tgkill`; unter Windows erzeugt `brk #0xF003` `STATUS_INTEGER_DIVIDE_BY_ZERO` (so macht es MSVC).
 
 ## Testen
 
 | Was | Wo | Grenze |
 |---|---|---|
 | `coretest`, `portabletest`, Logik | `qemu-aarch64` in WSL: `build_rs.py test NAME --target linux --arch aarch64` | kein echtes Speichermodell, nur statische Programme; `-cpu cortex-a53` prüft ARMv8.0 ohne LSE |
-| Signale, Sandbox, Crash, glibc, Fenster | `qemu-system-aarch64` in WSL: Ubuntu 24.04 arm64, Kernel mit 4- und 64-KB-Seiten (ARM3; Skripte in den Übergabenotizen von ARM3) | TCG, etwa so schnell wie `qemu-aarch64`, Start 5 Minuten; kein echtes Speichermodell, kein Befehlscache; Weston und Xvfb ohne volles RandR |
+| Signale, Sandbox, Crash, glibc, Fenster, Plugins | `qemu-system-aarch64` in WSL: Ubuntu 24.04 arm64, Kernel mit 4- und 64-KB-Seiten (ARM3; Skripte in den Übergabenotizen von ARM3 und ARM4) | TCG, etwa so schnell wie `qemu-aarch64`, Start 5 Minuten; kein echtes Speichermodell, kein Befehlscache; Weston und Xvfb ohne volles RandR |
 | Echte ARM-CPU unter Linux | `ubuntu-24.04-arm`, statische Programme per `adb` auf dem A56 | Fenster auf dem Runner offen, das Telefon steckt nur auf Zuruf |
+| Plugins | JFPainters Test-Plugins (`plugins/` in dessen Repository) für jede Architektur gebaut, `plattest --test lib --dir DIR`; für ARM64 bis zum Patch in JFPainter eine portierte Kopie (Notizen von ARM4) | JFLib lässt `--test lib` in keinem Skript laufen |
 | Windows ARM64 | `windows-11-arm` | Fenster-Skripte laufen, die Windows-Einrichtung verdeckt aber den Bildschirm (ARM0); lokal keine Möglichkeit |
 | Android und NEON | A56, Emulator | Emulator ist x86-64 |
 | Echte GPU auf ARM | noch kein Gerät | Vulkan sonst nur mit lavapipe |
@@ -598,4 +700,5 @@ höchstens drei Runden pro Variante. Die Runner von GitHub sind für öffentlich
 3. **CI:** Sollen die ARM-Läufe später auch automatisch bei jedem Push laufen? Vorschlag: nur bei Releases
    und per Hand.
 4. **64-KB-Seiten:** Nur für manche Server-Kernel relevant, nach Entscheidung 7 zunächst nicht unterstützt. Seit ARM3
-   laufen `rt` und `plat` dort (VM mit Ubuntus Kernel `generic-64k`); offen ist, ob Pakete und Plugins das zusagen sollen.
+   laufen `rt` und `plat` dort (VM mit Ubuntus Kernel `generic-64k`), seit ARM4 auch Module und Plugins (gelinkt mit
+   `-z max-page-size=65536`); offen ist, ob die Pakete das zusagen sollen.

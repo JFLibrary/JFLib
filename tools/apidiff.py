@@ -110,12 +110,25 @@ def snapshot_path(version):
 def canon(sig, kind=""):
     """a signature without layout: whitespace only between two word characters, no trailing
     commas; a function's parameter names are no part of it (renaming `_id` to `id` is no
-    change for a caller)"""
-    s = re.sub(r"\s+", " ", sig).strip()
+    change for a caller); rt::plugin_abi!(fn ...) is the type it stands for on x86-64,
+    extern "win64" fn ... (lib/rt/abi.rs: the same type as before ARM4 there, docs/ARM64.md)"""
+    s = plugin_abi(re.sub(r"\s+", " ", sig).strip())
     if kind in ("fn", "method", "trait-fn"):
         s = param_types(s)
     s = re.sub(r"\s+(?=\W)|(?<=\W)\s+", "", s)
     return re.sub(r",(?=[)\]}>])", "", s)
+
+
+def plugin_abi(s):
+    """'rt::plugin_abi!(fn(u32) -> u32)' -> 'extern "win64" fn(u32) -> u32' (parentheses matched)"""
+    while (i := s.find("plugin_abi!(")) >= 0:
+        start = i - len("rt::") if s[:i].endswith("rt::") else i
+        j, depth = i + len("plugin_abi!("), 1
+        while j < len(s) and depth:
+            depth += {"(": 1, ")": -1}.get(s[j], 0)
+            j += 1
+        s = s[:start] + 'extern "win64" ' + s[i + len("plugin_abi!("):j - 1] + s[j:]
+    return s
 
 
 def param_types(sig):

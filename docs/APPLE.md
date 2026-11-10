@@ -1,7 +1,7 @@
 # Apple-Plan: macOS und iOS nativ
 
 Nachtrag 2026-11-10: AP5 ist auch von Hand auf dem iPhone geprüft, AP8 (Pakete, Updates, CI, Developer ID und
-Notarisierung, Dokumentation und Website) ist fertig; offen ist AP1 (Safari). AP6 (Metal) ist bis AP6f gebaut (Stufe
+Notarisierung, Dokumentation und Website) ist fertig, AP1 (Safari auf dem Mac und dem iPhone) ebenso. AP6 (Metal) ist bis AP6f gebaut (Stufe
 Basis, macOS und iOS-Simulator; das iPhone und drei offene Bildvergleiche von `render3dtest` stehen aus, unter AP6).
 
 Stand 2026-11-09, auf Basis von `main` ba9e6d03. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
@@ -96,6 +96,26 @@ signiert ad hoc), in einem Simulator ohne Fenster (`simctl boot`, `simctl spawn`
   dem iPhone (Web-Inspektor über den Mac). Das ist heute der Weg für Apple und noch nie getestet.
 
 **Fertig, wenn:** die Browser-Skripte in Safari auf dem Mac laufen und die Abweichungen auf dem iPhone notiert sind.
+
+**AP1 auf dem Mac umgesetzt (2026-11-10):** `tools/tests/web_apps.mjs --engine=safari` fährt dieselben Prüfungen wie
+in Chromium und Firefox in einem echten Safari (27.2) über `safaridriver`. Playwright steuert kein Safari (sein
+„webkit“ ist ein eigener WebKit-Bau); [`tools/tests/safari.mjs`](../tools/tests/safari.mjs) bildet deshalb den Teil
+von Playwrights API nach, den der Test braucht, über W3C WebDriver. [`tools/tests/safari_tunnel.py`](../tools/tests/safari_tunnel.py)
+startet `safaridriver` auf dem Mac und trägt beide Richtungen über eine SSH-Verbindung: Der Test läuft auf dem PC
+(auf dem Mac ist kein Node nötig), Safari lädt die Seiten unter derselben Adresse. `template`, `gallery`, `jfWord`
+und `Kritzel` bestehen, auch die Pixelgleichheit mit Rusts PNG-Renderer, das Speichern in IndexedDB mit den
+Fehlerfällen, Tastenkürzel, IME, das Einfügen-Ereignis und die Dateiauswahl. Nicht nachstellbar: die Sprache
+(Safari nimmt die des Macs, hier Deutsch, wie der Test erwartet) und die Pixeldichten 1,5 und 2 (der Mac mini hat
+1×). Einmalig auf dem Mac: `safaridriver --enable`, in Safari Entwickler → „Entfernte Automatisierung erlauben“,
+danach Safari neu starten (sonst läuft die Sitzung „while connecting to a Safari instance“ in ein Timeout).
+**Fallen:** Das versteckte Texteingabefeld des Hosts nimmt keine Elementeingabe von WebDriver an (der Adapter tippt
+über Tastatur-Aktionen); Init-Skripte laufen erst nach dem Laden, deshalb erkennt der Test „bereit“ auch am
+`data-compute` des Body; ein beendeter Tunnel ließ `safaridriver` auf dem Mac weiterlaufen (ohne Terminal kein
+Hangup), das Skript beendet ihn jetzt über die geschlossene Eingabe.
+
+**AP1 auf dem iPhone geprüft (2026-11-10), damit ist AP1 fertig:** Der Nutzer hat die Galerie von jflib.org in
+Safari auf dem iPhone 14 (iOS 27.2) von Hand ausprobiert (Knöpfe, Schieberegler, Textfeld mit der Tastatur, Scrollen,
+Drehen): Sie funktioniert, Abweichungen gab es keine.
 
 ### AP2: Bau und `rt` (M)
 
@@ -566,6 +586,25 @@ echten Fenster. Dabei behoben:
 Offen für AP8: `.dmg`, Developer-ID-Signatur und Notarisierung (dann mit Hardened Runtime), `SMAppService` für
 Autostart in der Sandbox, eine Bildaufnahme über ImageCaptureCore statt SANE.
 
+#### Menüs in der Menüleiste (2026-11-10)
+
+Die Hand-Probe des Nutzers im Vollbild zeigte: macOS legt dort, sobald der Zeiger den oberen Bildschirmrand
+erreicht, seine Menüleiste und einen Streifen mit der Titelleiste des Fensters über dessen oberen Rand, genau über
+die Menüzeile der App. Zwei Varianten wurden gebaut: A, die Menüs der App in der Menüleiste von macOS, und B, im
+Vollbild rückt die View unter diesen Streifen. Der Nutzer hat A gewählt, wie es auf dem Mac üblich ist.
+
+- [`plat::sysmenu`](../lib/plat/sysmenu.rs) (`sysmenu_supported`, `sysmenu_set`, `sysmenu_take`, `SysMenuItem`):
+  die Menüs einer App in der Menüleiste des Systems. Auf macOS stehen sie zwischen dem App-Menü und dem
+  Fenster-Menü ([`apple_mac_app.rs`](../lib/plat/apple_mac_app.rs)); jede Zeile meldet ihre ID über ein Objekt
+  unserer Klasse `JFSysMenu`, aktiv und Häkchen wie in der Liste, Tastenkürzel mit Command, Option und Shift.
+  Anderswo nicht unterstützt.
+- `ui.menubar(None)` des Hauptfensters gibt auf dem Mac mit Fenster die Menüs des `AppDesc` dorthin weiter (Befehle
+  mit Beschriftung, Zustand und Kürzel, die Zeilen von `Mi::List` oder ihr Platzhalter) und zeichnet im Fenster
+  keine Zeile. Eine dort gewählte Zeile läuft wie ein Klick (`cmd_run`). Läufe ohne Fenster (Skripte) behalten die
+  Zeile im Fenster, `jfgui_SYSMENU=0` ebenso.
+- Geprüft: `plattest --test window` (Menüs, Zeilen, Häkchen, Kürzel, eine gewählte Zeile, Ersetzen, Entfernen)
+  und die Skripte der Gallery auf dem Mac.
+
 ### AP8: Pakete, Updates, CI, Dokumentation (M)
 
 - `.app` als `.dmg`, Signatur mit Developer ID und Notarisierung, Update-Kanal `macos-aarch64`, iOS über TestFlight,
@@ -627,7 +666,11 @@ sofort, wenn es außerhalb des Bündels läuft („invalid Info.plist“); updat
 das einfache Programm neben dem Bündel. Die Hand-Probe des Nutzers (die `.dmg` aus „Downloads“ geöffnet, die App
 gestartet) fand einen Fehler, den `spctl` nicht sieht: `tools/package.py` kopierte das Programm ohne Ausführrecht,
 die App öffnete nicht; behoben, `mac_dmg` lehnt ein solches Bündel jetzt ab, danach startete sie mit der üblichen
-Rückfrage. Offen: Signieren in der CI (Zertifikat als Geheimnis) und TestFlight für iOS (falls gewünscht).
+Rückfrage. Signieren in der CI gehört in die Repositories der Apps, nicht in JFLib (Entscheidung des Nutzers vom
+2026-11-10): Die Test-Apps der Bibliothek bleiben ad hoc signiert, [PACKAGING.md](PACKAGING.md) „macOS: .dmg“ zeigt
+die Schritte für den Workflow einer App. TestFlight ist gestrichen (Nutzer, 2026-11-10): Es verteilt eine echte App
+an Tester und gehört damit zur iOS-Version einer App in ihrem eigenen Repository, nicht zur Test-Galerie der
+Bibliothek.
 
 **AP8d umgesetzt (2026-11-10), damit ist AP8 fertig:** README, [PACKAGING.md](PACKAGING.md), [UPDATES.md](UPDATES.md)
 und GUIDE nennen macOS und iOS (mit AP8a–AP8c). Die Website jflib.org (Repository jflibWebsite, Inhalt vorher mit dem

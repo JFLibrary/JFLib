@@ -1769,10 +1769,10 @@ Fensterrand hinaus.
 - **P2** · *erledigt* (2026-11-10) · G5e3: die Entscheidungen des Nutzers vom 10.11.2026 nach G5e2. Schatten auf Stufe Basis 2 Kaskaden × 1024 bis 100 (`Shadows::BASIS`, `Shadows::for_level`; [RENDER3D.md](RENDER3D.md#g5e2-schatten-auf-basis-schwache-gpus), dort auch, wie es aussieht). Das Bild einer Ansicht ist an den Bildschirm gebunden: Ein neues Bild des Inhalts erst, wenn das letzte des Fensters dargestellt ist, höchstens 100 ms später (`GpuViewInfo::held`, `uigputest --test viewgate`; [GPU.md](GPU.md#3d-ansicht-g5e1), „G5e3“). Ohne Takt stellt das Fenster unter Linux auf Intel jetzt 294–300 von 300 Bildern dar statt keins, im Takt bleibt es gleich. Dazu der Lauf auf dem Telefon (Galaxy A56): der Selbsttest der Ansicht fünf von fünf, vor und nach der Bindung, 300 von 300 Bildern bei 120 Hz.
 - **P2** · *fehlt* · Nach G5e3: Windows mit zwei GPUs, die Validierung unter Linux (die Schicht ist auf Fedora und ThinkPad nicht installiert), Firefox in Ruhe nach dem Drehen (das Bild davor blieb im Framebuffer; die Korrektur ist gebaut, aber nicht bestätigt), ein Telefon mit Adreno oder Mali, die T500 unter Linux mit der Bindung, „angekommen“ unter Windows als Bildwiederholung statt Übergabe (`VK_KHR_present_wait` fehlt in `lib/gpu`).
 - **P3** · *fehlt* · Mit der ersten richtigen 3D-Test-App (Entscheidung des Nutzers vom 09.11.2026): die Zähler der Listen in `cull.wgsl` je Arbeitsgruppe vorsammeln, statt dass jede sichtbare Instanz einzeln auf den Zähler ihrer Liste addiert. Liegen deckende und MASK-Objekte in denselben Arbeitsgruppen, steigt die Sichtbarkeit ohne Verdeckung sonst von 0,064 auf 0,145 ms (1 Mio. Würfel); mit Verdeckung, der Vorgabe, kostet es nichts. Mehrere deckende Listen im Wechsel kosten heute ebenso. Vorher und nachher in der App und in der Messszene messen ([Messung](RENDER3D.md#messung-der-listen-je-alpha-modus)).
-- **P3** · *fehlt* · G6: 2D-Renderer für CAD (Linien mit Breite und Muster, Kurven,
-  Füllungen, Schraffuren, Text, Auswahl und Fang, große Koordinaten). G7: Spiel-Bausteine
-  (Animation, Nachladen großer Welten, Physik, Werkzeuge). Später: D3D12-Rückfall,
-  GPU-Rasterung der Widgets.
+- **P2** · *entschieden* (2026-11-10) · G6: 2D-Renderer für CAD (Linien mit Breite und Muster, Kurven, Füllungen, Schraffuren, Text, Auswahl und Fang, große Koordinaten). Entscheidungen des Nutzers vom 10.11.2026, alle wie vorgeschlagen: eine eigene Bibliothek `lib/render2d` (`jflib-render2d`) als Inhalt einer `gpu_view` mit einer Test-App, echte Apps später; eine Szene mit IDs, Ebenen und Stilen, dazu eine Überlagerung je Bild; Strecken und Bögen analytisch im Shader (Deckung aus dem Abstand, kein MSAA), Kurven je Zoomstufe auf der CPU zerlegt, Breiten und Strichmuster in Pixeln oder Einheiten; Füllungen auf der CPU in Dreiecke zerlegt (f64, mit Löchern) mit geglättetem Umriss, Schraffuren im Fragment-Shader, weit draußen als Flächenton; Text aus einem MSDF-Atlas aus den Umrissen von `lib/text`; Koordinaten in f64, auf der GPU als Paar aus zwei f32 relativ zur Kamera; ohne GPU zeichnet ein CPU-Weg mit `lib/gfx` dieselbe Szene (auch die Referenz der Tests); Auswahl und Fang auf der CPU über einen R-Baum; ein DXF-Leser als eigene Bibliothek. Stufen: G6a Kern (G6a1 Szene, Strecken und Polylinien, große Koordinaten, Sichtbarkeit, Test-App unter Windows; G6a2 Bögen und Kreise, Strichmuster, Browser, Messszene), G6b Flächen (Kurven, Füllungen, Schraffuren, Transparenz, Blöcke), G6c Text, G6d Auswahl und Fang, G6e CPU-Weg, DXF, andere Ziele. Messziel: 1 Mio. Strecken und 100 000 Zeichen Text im Bildtakt auf RTX 2070 SUPER und Iris Xe, mindestens 30 Bilder/s auf der HD 610 und im Browser; bis ±10⁷ Einheiten ruhig bis 10⁻⁶ Einheiten je Pixel.
+- **P2** · *erledigt* (2026-11-10) · G6a1: der Kern von [`lib/render2d`](RENDER2D.md): eine Szene aus Entitäten, Ebenen und Stilen, Strecken und Polylinien mit Breite, Enden und Ecken (Deckung exakt im Fragment-Shader, kein MSAA; durchscheinend ohne doppeltes Mischen an Ecken), f64-Koordinaten als Paare aus zwei f32 relativ zur Kamera, Sichtbarkeit in Compute-Shadern in Zeichenreihenfolge, Stufen Basis und Voll, die Test-App `render2dtest` gegen `lib/gfx`. Bisher nur unter Windows auf der RTX 2070 SUPER gelaufen; Linux, Android und Web sind gebaut. 1 Mio. Haarlinien im schlimmsten Fall (dichter Zufallsweg): 61,6 ms je Bild, das Messziel ist also noch nicht gezeigt.
+- **P2** · *fehlt* · G6a2: Bögen und Kreise, Strichmuster, der Browser (dort gibt es kein `exact` für die Rechnung mit den f32-Paaren), eine Messszene mit langen Linien und danach, falls nötig, ein schneller Weg für Haarlinien.
+- **P3** · *fehlt* · G7: Spiel-Bausteine (Animation, Nachladen großer Welten, Physik, Werkzeuge). Später: D3D12-Rückfall, GPU-Rasterung der Widgets.
 - **P2** · *erledigt* (2026-10-22) · Stufe 0 des GPU-Plans, Teil 1: Scroll-Kopie
   (`lib/ui/scrollcopy.rs`). Hat sich in einer Scroll-Ansicht nur der Inhalt verschoben, werden
   die noch sichtbaren Pixel im Framebuffer verschoben (Zeilen per `copy_within`, Reihenfolge
@@ -1905,15 +1905,14 @@ Fensterrand hinaus.
   AP8, zusammen mit iOS: [APPLE.md](APPLE.md).
 - **P2** · *fehlt* · Native iOS-Version, auf dem Host-Weg von Android ([APPLE.md](APPLE.md) AP5).
 - **P2** · *teilweise* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
-  `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 nur auf Android. Plan mit
+  `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 auf Android und Linux, Windows ARM64 noch nicht. Plan mit
   den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).
-  - Erledigt: `build_rs.py --arch aarch64` (ARM0, der Bau endet noch in `rt`), Syscall-Nummern, Flags und
-    Kernel-Layouts in einer Tabelle pro Architektur
-    ([`lib/rt/kernel.rs`](../lib/rt/kernel.rs), ARM1; auf ARM noch nicht gelaufen), NEON für `lib/simd`
-    (ARM6), das auf Android schon jetzt wirkt.
-  - Zu tun: Assembler in `rt` und `plat`, Plugin- und Modul-ABI (90-mal `extern "win64"`), eigene
-    ELF- und PE-Loader, Crash-Berichte, Sandbox, Pakete. Die Arbeit nützt später auch macOS und iOS
-    auf ARM.
+  - Erledigt: `build_rs.py --arch aarch64` (ARM0), Syscall-Nummern, Flags und Kernel-Layouts in einer
+    Tabelle pro Architektur ([`lib/rt/kernel.rs`](../lib/rt/kernel.rs), ARM1), `rt` (ARM2) und `plat` (ARM3)
+    auf Linux ARM64, Plugins und Module mit `rt::plugin_abi!` und `LIBE_ARCH` (ARM4, 2026-11-10), NEON für
+    `lib/simd` (ARM6), das auf Android schon jetzt wirkt.
+  - Zu tun: Windows ARM64 (ARM5: `__chkstk`, `CONTEXT`, Unwind-Daten), Atomics auf echter Hardware (ARM7),
+    Fenster und GPU (ARM8), Pakete und CI (ARM9). Die Arbeit nützt später auch macOS und iOS auf ARM.
   - Getestet wird mit QEMU in WSL und den ARM-Runnern von GitHub; für das Speichermodell und die GPU
     braucht es echte Hardware.
 - **P2** · *erledigt* (2026-10-20) · Android vervollständigen: Dateiauswahl, dauerhafter

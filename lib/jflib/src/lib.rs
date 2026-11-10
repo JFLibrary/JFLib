@@ -62,6 +62,7 @@ pub use netpkt;
 pub use gpu;
 pub use eapm;
 pub use render3d;
+pub use render2d;
 pub use gltf;
 #[doc(hidden)]
 pub use style_assets;

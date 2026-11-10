@@ -135,7 +135,7 @@ pub(crate) fn guard_os_install() {
 
 // ---------------------------------------------------------------- ARM64 (docs/ARM64.md)
 //
-// The return path and guard_sig for ARM64 (compiled there with ARM4, when plib comes back).  The
+// The return path and guard_sig for ARM64 (written with ARM3, on since ARM4).  The
 // sigcontext (linux_crash.rs): x0 .. x30 from 184, sp at 432, pc at 440.  With an active guard the
 // handler resumes at jfgui_guard_fault_ip with sp and x29 of the trampoline's body (plib.rs restores
 // FPCR and d8 .. d15 there); rt_sigreturn restores the rest from the frame.

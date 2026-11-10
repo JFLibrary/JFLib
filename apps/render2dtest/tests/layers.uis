@@ -1,0 +1,3 @@
+#!args --test layers
+# layers out of order, one hidden, 60 translucent entities, then ordered anew and shown by set_layer (no record goes up),
+# against lib/gfx; Voll and Basis
