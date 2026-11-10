@@ -57,6 +57,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** Popups at a point the app learns later (a web engine's context menu): ui.popup_open_at(id, x, y) opens a flyout of the app's own anchored at the point, ui.menu_popup_at(menu, x, y) a runtime-drawn menu there; while a popup of the window is open a canvas with HB_KEYS leaves the keys to it (ui.key_take gives none); apps/viewtest tests/menus.uis
 - **ui:** ui.sem_rect(kind, id, rect, label, value): a semantic record of content an app draws itself inside a canvas (the links and headings of a web page), without a hit box of its own and without touching last_rect: scripts find it by its label and a click on it reaches the canvas at that place, screen readers get it with its kind's role; apps/viewtest tests/links.uis
 - **cargo-jflib:** cargo jflib test takes --features F,.. (repeated, Cargo's forms), --no-default-features and --dir DIR (DIR/*.uis instead of tests/*.uis, relative to the package's folder), for scripts of a build with other features; the other commands refuse these options instead of ignoring them
+- **ui:** StyleList::scrollbar_room: a style whose scroll bars stay visible keeps their room free right of the content of a view that scrolls only vertically, overflowing or not (as CSS scrollbar-gutter: stable), and counts it in the view's natural width; netlab keeps 10 DIP, so content no longer runs under its bar (the other styles keep floating bars)
 
 ### Changed
 
