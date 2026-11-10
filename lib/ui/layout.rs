@@ -154,6 +154,19 @@ impl Ui {
         &mut b[n - 1]
     }
 
+    // box_room(child) -> (px the current box lays its children out in across its width, px its other
+    // children took along a row in the last pass, the row has fill children): the room a child box
+    // with the natural width (id `child`) has (form.rs: a menu bar that does not fit its row)
+    pub(crate) fn box_room(&mut self, child: u32) -> (i32, i32, bool) {
+        let prev = self.slot(child).measw;
+        let b = *self.top();
+        if b.flags & BOX_V != 0 {
+            (b.len[0], 0, false)
+        } else {
+            (b.len[0], b.fixedp.wrapping_sub(prev).max(0), b.wsump > 0)
+        }
+    }
+
     /// layout_root(x, y, w, h)
     pub(crate) fn layout_root(&mut self, x: i32, y: i32, w: i32, h: i32) {
         let id = self.wp.lay.root_id;

@@ -1,0 +1,3 @@
+#!args --test visibility
+# the visible lists against the exact test on the CPU (random scenes, rotated cameras, a spread of 1e6), records at the
+# target's edges, the painter's order within a layer, culled = not culled; Voll and Basis

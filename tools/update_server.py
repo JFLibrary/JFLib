@@ -292,21 +292,27 @@ def app_channels(out, t, app, seed, exe_path):
     """macOS: app bundles of PROGRAM, signed ad hoc as APP_ID: DIR/app/running.app (1.0.0, the
     "installed" one, which the test copies), channels app (2.0.0), app-otherid (another
     identifier: refused), app-tampered (Info.plist changed after signing: refused), app-notapp (no
-    Contents/Info.plist: refused)"""
+    Contents/Info.plist: refused).  With jfgui_MAC_IDENTITY (a Developer ID) they are signed with that
+    certificate instead, and app-adhoc (the same identifier, signed ad hoc) must be refused too."""
     if sys.platform != "darwin":
         return
     d = out / "app"
     shutil.rmtree(d, ignore_errors=True)
     d.mkdir(parents=True)
+    devid = os.environ.get("jfgui_MAC_IDENTITY", "").strip()
 
-    def make(where, version, ident=APP_ID, tamper=False):
+    def make(where, version, ident=APP_ID, tamper=False, adhoc=False):
         b = d / where / "updatetest.app"
         (b / "Contents" / "MacOS").mkdir(parents=True)
         shutil.copy2(exe_path, b / "Contents" / "MacOS" / "updatetest")
         plist = {"CFBundleExecutable": "updatetest", "CFBundleIdentifier": ident, "CFBundlePackageType": "APPL",
                  "CFBundleShortVersionString": version, "CFBundleVersion": version}
         (b / "Contents" / "Info.plist").write_bytes(plistlib.dumps(plist, fmt=plistlib.FMT_XML))
-        subprocess.run(["codesign", "-f", "-s", "-", "--timestamp=none", str(b)], check=True, capture_output=True)
+        if devid and not adhoc:
+            import apple   # the keychain: in the Mac's session when this runs over SSH
+            apple.keychain_run(["codesign", "-f", "-s", devid, "--timestamp=none", b], timeout=120)
+        else:
+            subprocess.run(["codesign", "-f", "-s", "-", "--timestamp=none", str(b)], check=True, capture_output=True)
         if tamper:
             plist["CFBundleShortVersionString"] = version + "x"
             (b / "Contents" / "Info.plist").write_bytes(plistlib.dumps(plist, fmt=plistlib.FMT_XML))
@@ -318,6 +324,8 @@ def app_channels(out, t, app, seed, exe_path):
     channel("app-otherid", app, "2.0.0", [(t, "app", "updatetest-2.0.0.jfa", assetpack.pack(make("other", "2.0.0", "org.jflib.someoneelse")))], seed)
     channel("app-tampered", app, "2.0.0", [(t, "app", "updatetest-2.0.0.jfa", assetpack.pack(make("tampered", "2.0.0", tamper=True)))], seed)
     channel("app-notapp", app, "2.0.0", [(t, "app", "updatetest-2.0.0.jfa", assetpack.pack_files({"README": b"no bundle"}))], seed)
+    if devid:
+        channel("app-adhoc", app, "2.0.0", [(t, "app", "updatetest-2.0.0.jfa", assetpack.pack(make("adhoc", "2.0.0", adhoc=True)))], seed)
 
 
 def main():
@@ -330,7 +338,13 @@ def main():
     a = ap.parse_args()
     out = Path(a.dir)
     out.mkdir(parents=True, exist_ok=True)
-    exe = Path(a.exe).read_bytes()
+    exe_path = Path(a.exe)
+    if ".app/Contents/MacOS/" in a.exe:
+        # macOS: the program of an app bundle is bound to its Info.plist (a Developer ID signed copy
+        # outside it is killed): the plain program beside the bundle, which build_rs.py builds too
+        plain = Path(a.exe.split(".app/Contents/MacOS/")[0])
+        exe_path = plain if plain.is_file() else exe_path
+    exe = exe_path.read_bytes()
     seed, other = os.urandom(32), os.urandom(32)
     t, app = a.target, a.app
 

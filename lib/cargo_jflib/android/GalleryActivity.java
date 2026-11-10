@@ -63,11 +63,15 @@ public final class GalleryActivity extends Activity {
     static native void nativeFinger(int phase, int id, int x, int y, long time, boolean last);
     // the gesture that just ended reached a widget (a tap, a drag), it did not only scroll
     private static native boolean nativeFingerReached();
+    // the colour at the app's edge 0 top, 1 bottom, 2 left, 3 right (0xFFRRGGBB, 0: no frame yet;
+    // lib/plat/android_edges.rs): the system's bars take it
+    private static native int nativeEdge(int side);
     // the accessibility tree (GalleryAccessibility): mirror on / off, its updates, an action
     static native void nativeA11y(boolean on);
     static native byte[] nativeA11yTake();
     static native void nativeA11yAct(int win, int keyLo, int keyHi, int act, int a, int b, double value, byte[] text);
     private GalleryView gallery;
+    private EdgeLayout root;
     private static GalleryActivity current;
     private SurfaceView gpuView;
     // the frames fill the view's pixels (else scale()'s limit): the device is expected to show them
@@ -254,14 +258,18 @@ public final class GalleryActivity extends Activity {
             setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
             | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.rgb(243, 243, 243));
+        // the bars in the system's light or dark grey until the app's first frame gives its colours
+        boolean night = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+            == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        root = new EdgeLayout(this, night ? Color.rgb(32, 32, 32) : Color.rgb(243, 243, 243));
         if (Build.VERSION.SDK_INT >= 30) {
             getWindow().setDecorFitsSystemWindows(false);
             root.setOnApplyWindowInsetsListener((view, insets) -> {
                 android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars()
                     | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
                 view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                view.invalidate();
+                barIcons(); // (the navigation bar moves to a side when a phone turns)
                 return insets;
             });
         } else {
@@ -271,18 +279,78 @@ public final class GalleryActivity extends Activity {
         if (gpuView != null) root.addView(gpuView, new FrameLayout.LayoutParams(-1, -1));
         root.addView(gallery, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
+        // the bars are painted here, their icons chosen to match (barIcons): no scrim of the system
+        // (after setContentView: the window takes the theme's values when it builds its decor)
+        if (Build.VERSION.SDK_INT >= 29) {
+            getWindow().setNavigationBarContrastEnforced(false);
+            getWindow().setStatusBarContrastEnforced(false);
+        }
+        // (the theme's light navigation bar colour would force dark icons: FORCE_LIGHT_NAVIGATION_BARS)
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        barIcons();
+        root.requestApplyInsets();
+    }
+
+    // ---- the system's bars in the colours at the app's edges (lib/plat/android_edges.rs)
+
+    /* The frame around the app's view: its padding is where the status bar, the navigation bar and
+     * a cut-out lie (the insets), painted in the colour at the app's edge next to each. */
+    private static final class EdgeLayout extends FrameLayout {
+        final int[] colors = new int[4]; // top, bottom, left, right
+        private final Paint fill = new Paint();
+        EdgeLayout(Context context, int first) {
+            super(context);
+            setWillNotDraw(false);
+            java.util.Arrays.fill(colors, first);
+        }
+        @Override protected void onDraw(Canvas canvas) {
+            int w = getWidth(), h = getHeight();
+            int l = getPaddingLeft(), t = getPaddingTop(), r = getPaddingRight(), b = getPaddingBottom();
+            band(canvas, colors[0], 0, 0, w, t);
+            band(canvas, colors[1], 0, h - b, w, h);
+            band(canvas, colors[2], 0, t, l, h - b);
+            band(canvas, colors[3], w - r, t, w, h - b);
+        }
+        private void band(Canvas canvas, int color, int x0, int y0, int x1, int y1) {
+            if (x1 <= x0 || y1 <= y0) return;
+            fill.setColor(color);
+            canvas.drawRect(x0, y0, x1, y1, fill);
+        }
+    }
+    // after a frame: the edges' colours changed -> the bars and their icons follow
+    void edgesFollow() {
+        if (root == null) return;
+        boolean changed = false;
+        for (int i = 0; i < 4; i++) {
+            int c = nativeEdge(i);
+            if (c != 0 && c != root.colors[i]) { root.colors[i] = c; changed = true; }
+        }
+        if (!changed) return;
+        root.invalidate();
+        barIcons();
+    }
+    private static boolean bright(int c) {
+        return Color.red(c) * 299 + Color.green(c) * 587 + Color.blue(c) * 114 > 140000;
+    }
+    // dark icons on a light bar, light ones on a dark bar (the navigation bar: below, or at a side)
+    private void barIcons() {
+        if (root == null) return;
+        boolean top = bright(root.colors[0]);
+        int side = root.getPaddingBottom() > 0 ? 1 : root.getPaddingRight() > 0 ? 3 : root.getPaddingLeft() > 0 ? 2 : 1;
+        boolean nav = bright(root.colors[side]);
         if (Build.VERSION.SDK_INT >= 30) {
             WindowInsetsController controller = getWindow().getInsetsController();
-            if (controller != null) {
-                int appearance = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
-                    | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
-                controller.setSystemBarsAppearance(appearance, appearance);
-            }
+            if (controller == null) return;
+            int mask = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+            controller.setSystemBarsAppearance((top ? WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS : 0)
+                | (nav ? WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS : 0), mask);
         } else {
-            getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+            View decor = getWindow().getDecorView();
+            int flags = decor.getSystemUiVisibility() & ~(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+            decor.setSystemUiVisibility(flags | (top ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR : 0)
+                | (nav ? View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR : 0));
         }
-        root.requestApplyInsets();
     }
     @Override public void onResume() { super.onResume(); gallery.resume(); }
     @Override public void onPause() { gallery.pause(); super.onPause(); }
@@ -365,6 +433,7 @@ public final class GalleryActivity extends Activity {
         @Override public void doFrame(long time) {
             if (!resumed) return;
             render();
+            ((GalleryActivity)getContext()).edgesFollow();
             if (connection != null) connection.syncFromNative();
             a11y.pull();
             // a text box went away (its dialog closed): the keyboard goes with it

@@ -7,7 +7,9 @@
 // through `open` (in the logged-in session, also from SSH) and waits for it.  jfgui_MAC_IDENTITY
 // names a certificate of the keychain ("Developer ID Application: NAME (TEAM)"): then the bundle is
 // signed with it, the hardened runtime and a secure time stamp instead of ad hoc (sign).  dmg puts a
-// bundle on a compressed disk image beside a link to /Applications (cargo jflib package --formats dmg).
+// bundle on a compressed disk image beside a link to /Applications (cargo jflib package --formats dmg);
+// jfgui_MAC_NOTARY names a profile of `xcrun notarytool store-credentials`: then the bundle and the
+// image are notarized and their tickets stapled (notarize, docs/APPLE.md AP8c).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -126,9 +128,71 @@ fn link_applications(dir: &Path) -> Result<(), String> {
     }
 }
 
+/// the notarytool keychain profile of jfgui_MAC_NOTARY (None: no notarization)
+fn notary() -> Option<String> {
+    std::env::var("jfgui_MAC_NOTARY").ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+}
+
+/// notarize a bundle or disk image signed with the Developer ID: notarytool submits it (a bundle as a
+/// zip) with the keychain profile of jfgui_MAC_NOTARY and waits for Apple's verdict; the ticket is
+/// stapled to it.  The keychain must be open (the logged-in session, not SSH).
+pub(crate) fn notarize(path: &Path) -> Result<(), String> {
+    let profile = notary().ok_or("jfgui_MAC_NOTARY names no notarytool profile")?;
+    if identity().is_none() {
+        return Err("notarizing needs a Developer ID signature (jfgui_MAC_IDENTITY)".into());
+    }
+    let zip = path.with_extension("notary.zip");
+    let bundle = path.extension().is_some_and(|e| e == "app");
+    if bundle {
+        let st = Command::new("ditto").args(["-c", "-k", "--keepParent"]).arg(path).arg(&zip).status()
+            .map_err(|e| format!("ditto: {e}"))?;
+        if !st.success() {
+            return Err(format!("ditto: {} not packed for notarizing", path.display()));
+        }
+    }
+    let out = Command::new("xcrun").args(["notarytool", "submit"]).arg(if bundle { zip.as_path() } else { path })
+        .args(["--keychain-profile", &profile, "--wait", "--timeout", "45m", "--output-format", "json"]).output();
+    if bundle {
+        let _ = fs::remove_file(&zip);
+    }
+    let out = out.map_err(|e| format!("xcrun notarytool: {e}"))?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let verdict = text.find('{').and_then(|i| crate::json::parse(&text[i..]).ok());
+    let (id, status) = verdict.as_ref().map(|v| (v.s("id").to_string(), v.s("status").to_string())).unwrap_or_default();
+    if !id.is_empty() && status.is_empty() {
+        return Err(format!("notarizing {}: no verdict from Apple within 45 minutes (the first submissions of a new account can \
+                            take hours); later: xcrun notarytool wait {id} --keychain-profile {profile}, then xcrun stapler \
+                            staple {} -- or package again", path.display(), path.display()));
+    }
+    if status != "Accepted" {
+        let log = if id.is_empty() {
+            String::new()
+        } else {
+            Command::new("xcrun").args(["notarytool", "log", &id, "--keychain-profile", &profile]).output()
+                .map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default()
+        };
+        return Err(format!("notarizing {}: {} {}\n{}", path.display(), if status.is_empty() { "no verdict" } else { &status },
+                           String::from_utf8_lossy(&out.stderr).trim(), log.trim()));
+    }
+    let st = Command::new("xcrun").args(["stapler", "staple"]).arg(path).status().map_err(|e| format!("xcrun stapler: {e}"))?;
+    if !st.success() {
+        return Err(format!("stapler: the ticket of {} not stapled", path.display()));
+    }
+    println!("notarized: {} ({id})", path.display());
+    Ok(())
+}
+
 /// the bundle on a compressed disk image (hdiutil, UDZO) beside a link to /Applications, signed like
-/// the bundle when there is an identity
+/// the bundle when there is an identity; with jfgui_MAC_NOTARY as well the bundle (a copy dragged out
+/// works offline) and then the image are notarized and stapled
 pub(crate) fn dmg(app: &Path, out: &Path, volume: &str) -> Result<(), String> {
+    let notarized = identity().is_some() && notary().is_some();
+    if notary().is_some() && identity().is_none() {
+        return Err("jfgui_MAC_NOTARY without jfgui_MAC_IDENTITY: only a Developer ID signature can be notarized".into());
+    }
+    if notarized {
+        notarize(app)?;
+    }
     let stage = out.with_extension("dmg-stage");
     let _ = fs::remove_dir_all(&stage);
     let dir = stage.join(volume);
@@ -149,6 +213,9 @@ pub(crate) fn dmg(app: &Path, out: &Path, volume: &str) -> Result<(), String> {
     made?;
     if identity().is_some() {
         sign(out, None)?;
+    }
+    if notarized {
+        notarize(out)?;
     }
     Ok(())
 }

@@ -297,9 +297,26 @@ compressed disk image beside a link to `/Applications`: `<App>-<ver>-<style>-arm
 signature is ad hoc unless `jfgui_MAC_IDENTITY` names a certificate of the keychain ("Developer ID
 Application: NAME (TEAM)"): then the bundle is signed with it, the hardened runtime and a secure time
 stamp, and the image is signed too.  An ad-hoc signed app downloaded from the internet does not start
-on another Mac without the user's consent (Gatekeeper); that needs Developer ID and notarization
-([APPLE.md](APPLE.md) AP8c).  With `--update` the channel gets the bundle (kind `app`) and the image
+on another Mac without the user's consent (Gatekeeper); that needs Developer ID and notarization.
+`jfgui_MAC_NOTARY` names a notarytool profile in the keychain: then the bundle and, after it, the
+image go to Apple's notary service, and both get their ticket stapled (a copy dragged out of the
+image starts offline too).  With `--update` the channel gets the bundle (kind `app`) and the image
 (kind `package`), [UPDATES.md](UPDATES.md) "macOS app bundles".
+
+Setting it up once, on the Mac (a membership of the Apple Developer Program; [APPLE.md](APPLE.md) AP8c):
+
+1. Xcode → Settings → Accounts → the team (not "Personal Team") → Manage Certificates → "+" →
+   Developer ID Application.  (When Xcode refuses with "only the Account Holder": sign out and in
+   again, or request the certificate on developer.apple.com with a signing request of Keychain Access.)
+2. An app-specific password on account.apple.com (Sign-In and Security), then in Terminal:
+   `xcrun notarytool store-credentials PROFILE --apple-id APPLE_ID --team-id TEAM` (it asks for the
+   password; an App Store Connect API key works too: `--key`, `--key-id`, `--issuer`).
+3. `export jfgui_MAC_IDENTITY="Developer ID Application: NAME (TEAM)" jfgui_MAC_NOTARY=PROFILE`, then
+   `tools/package.py APP --formats dmg`.
+
+The keychain is locked in an SSH session: `tools/package.py` (tools/apple.py `keychain_run`) runs
+codesign with the certificate and notarytool in the logged-in session of the Mac then; `cargo jflib`
+expects the session itself.  Each notarization takes a few minutes.
 
 ### AppImage
 

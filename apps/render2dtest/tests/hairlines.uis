@@ -1,0 +1,3 @@
+#!args --test hairlines
+# width 0 (1 px) at 36 angles and fractional positions, on and between pixel centres; widths below a pixel drawn as one;
+# against lib/gfx; Voll and Basis

@@ -404,7 +404,8 @@ python tools/package.py BackupCraft --formats dmg
 
 A macOS program is also packed as `NAME.app` beside it; `tools/package.py --formats dmg` (and `cargo jflib
 package --formats dmg`) puts it on a disk image. The signature is ad hoc unless `jfgui_MAC_IDENTITY` names a
-Developer ID certificate. For an iPhone, `python tools/apple.py device build/ios/androidGallery.app` signs, installs
+Developer ID certificate; with `jfgui_MAC_NOTARY` (a notarytool profile) the app and the image are notarized as
+well, so a downloaded `.dmg` passes Gatekeeper ([docs/PACKAGING.md](docs/PACKAGING.md) "macOS: .dmg"). For an iPhone, `python tools/apple.py device build/ios/androidGallery.app` signs, installs
 and starts the app (a development certificate and profile from Xcode). The plan and its state:
 [docs/APPLE.md](docs/APPLE.md).
 

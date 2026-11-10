@@ -1,0 +1,3 @@
+#!args --test joins
+# miter, bevel and round joins, blunt to sharp, a hairpin, closed polylines, a flattened arc, the miter limit (4 and 10)
+# either side of it, against lib/gfx; Voll and Basis

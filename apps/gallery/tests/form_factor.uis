@@ -1,0 +1,51 @@
+# form_factor -- the device kinds (lib/ui/form.rs): a desktop window keeps its menu bar, its title bar
+# buttons and its status bar however narrow it is; on a phone or a tablet (jfgui_FORM here) a menu bar
+# that does not fit its row becomes one menu button whose rows are the menus (submenus), one that fits
+# stays, and the title bar has no caption buttons.
+size 230 900
+theme light
+# ---- the desktop: narrow, but as ever
+expect menu:"Datei" exists
+expect menu:"Menü" missing
+system env jfgui_CSD 1
+expect #0xFFFF7403 exists
+# ---- a phone: one menu button, no caption buttons
+system env jfgui_FORM phone
+expect menu:"Menü" exists
+expect menu:"Datei" missing
+expect #0xFFFF7401 missing
+expect #0xFFFF7403 missing
+click menu:"Menü"
+expect menu:"Menü" open
+expect menuitem:"Datei" exists
+expect menuitem:"Ansicht" exists
+# a menu is a submenu of the button's menu (in a narrow window it covers its row)
+move menuitem:"Ansicht"
+expect menuitem:"Ansicht" open
+expect menuitem:"Raster" checked
+move menuitem:"Zoom"
+expect menuitem:"Zoom" open
+click menuitem:"Vergrößern"
+expect menuitem:"Vergrößern" missing
+expect menuitem:"Datei" missing
+expect text:"Letzter Befehl: Vergrößern   Form: Quadrat   Stärke: Mittel   Zoom: 110 %" exists
+# the keyboard reaches it as it reaches a bar (Alt, Down)
+click "Standard"
+key alt
+expect menu:"Menü" focused
+key down
+expect menu:"Menü" open
+key esc
+key esc
+# ---- wide enough: the bar stays a bar on a tablet too
+size 1000 900
+system env jfgui_FORM tablet
+expect menu:"Datei" exists
+expect menu:"Menü" missing
+expect #0xFFFF7403 missing
+# ---- back on the desktop
+system env jfgui_FORM -
+size 230 900
+expect menu:"Datei" exists
+expect #0xFFFF7403 exists
+system env jfgui_CSD -

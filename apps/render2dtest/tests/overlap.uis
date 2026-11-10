@@ -1,0 +1,3 @@
+#!args --test overlap
+# translucent polylines at sharp corners, a hairpin and a closed one with every join: against lib/gfx (blended once) and
+# no pixel blended twice; Voll and Basis

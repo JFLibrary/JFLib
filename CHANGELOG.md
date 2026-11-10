@@ -55,6 +55,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** StyleList::scrollbar_room: a style whose scroll bars stay visible keeps their room free right of the content of a view that scrolls only vertically, overflowing or not (as CSS scrollbar-gutter: stable), and counts it in the view's natural width; netlab keeps 10 DIP, so content no longer runs under its bar (the other styles keep floating bars)
 - **render3d:** Shadows::BASIS (2 cascades of 1024 texels up to 100, split and reach as DEFAULT) and Shadows::for_level(Level): the shadow default for a device's level, decided for level Basis (the browser, older and weak GPUs, phones); Shadows::DEFAULT stays the default for Voll; render3dtest --shadow-shots DIR draws the shadow gallery on Basis with both (docs/RENDER3D.md)
 - **ui:** Ui::gpu_test_hold(win, on) (test aid): a window's frames are not shown while on, as if the display did not answer; GpuViewInfo::held counts the frames of a view that had to wait for its window
+- **build:** Notarization for macOS: with jfgui_MAC_NOTARY (a profile of xcrun notarytool store-credentials) beside a Developer ID in jfgui_MAC_IDENTITY, tools/package.py --formats dmg and cargo jflib package --formats dmg send the bundle and then the image to Apple's notary service and staple both tickets, so a downloaded .dmg passes Gatekeeper; tools/apple.py notarize; over SSH tools/apple.py runs codesign with a certificate and notarytool in the Mac's logged-in session (the keychain); updatetest --test app with jfgui_MAC_IDENTITY checks Developer ID bundles and refuses the same app signed ad hoc (docs/APPLE.md AP8c, docs/PACKAGING.md)
+- **ui:** ui.form_factor() and ui.mobile() (FF_DESKTOP, FF_TABLET, FF_PHONE; jfgui_FORM): on a phone or a tablet only, the title bar has no caption buttons, a menu bar that does not fit becomes one menu button, the status bar and vertical scroll views roll sideways while too wide, windows and content dialogs keep inside the screen and roll their content; a desktop window stays as it was however narrow (docs/GUIDE.md §38)
+- **render2d:** render2d: the core of the 2D renderer for CAD (G6a1): a retained scene of lines and polylines with layers and styles, strokes with analytic coverage and exact caps and joins, f64 coordinates relative to the camera, visibility on the GPU; test app render2dtest
 
 ### Changed
 
@@ -94,6 +97,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** Views of GPU content in the browser: a read-back that comes after its Draw now reaches the framebuffer (the cells the output draws are owed again, the next render and the settle at rest take it there); before, the framebuffer kept an older frame or the content's painting
 - **update:** update::target() names macOS and iOS (macos-aarch64, ios-aarch64); a Mac reported linux-aarch64
 - **update:** lib/update on macOS: an exe update kept the old file's permissions only on Linux, so an updated program on a Mac lost its executable bit; cargo jflib keygen and the update channel's signer build for macOS on a Mac
+- **plat:** Android: the status bar and the navigation bar take the colours at the app's edges with matching icons and no system scrim, instead of a fixed light grey around a dark app
+- **build:** The .dmg of tools/package.py held the program without its execute bit (copied without its mode), so the app did not open ("kann nicht geöffnet werden"); NAME.app's program is always 0755 now and tools/apple.py dmg refuses a bundle whose program cannot run (found by the hand check of AP8c)
 
 ## [0.1.0] - 2026-11-08
 

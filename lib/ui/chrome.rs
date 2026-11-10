@@ -36,7 +36,7 @@
 //        its footer below the content box (pinned to the bottom)
 //
 // Ids: dialog parts (id << 3 | k) | 0x80000000; title bar 0xFFFF7400.. (min +1, max +2,
-// close +3); status bar 0xFFFF7410, 0xFFFF7411; edge grips 0xFFFF7430..
+// close +3); status bar 0xFFFF7410 .. 0xFFFF7412; edge grips 0xFFFF7430..
 
 use alloc::string::String;
 
@@ -45,7 +45,7 @@ use super::ctx::Hit;
 use super::consts::*;
 use super::keys::*;
 use super::layout::BOX_STACK_MAX;
-use super::win::{Shared, UWI_BUILDING, WCH_BASE, WCH_BTN, WCH_CLOSE, WCH_CONTENT, WCH_FOOTER};
+use super::win::{Shared, UWI_BUILDING, WCH_BASE, WCH_BTN, WCH_CLOSE, WCH_CONTENT, WCH_FOOTER, WCH_ROLL};
 use super::{Sp, Ui};
 
 const TB_ID: u32 = 0xFFFF_7400;
@@ -54,6 +54,7 @@ const TB_MAX_ID: u32 = 0xFFFF_7402;
 const TB_CLOSE_ID: u32 = 0xFFFF_7403;
 const SB_ID: u32 = 0xFFFF_7410;
 const SB_INNER_ID: u32 = 0xFFFF_7411;
+const SB_SCROLL_ID: u32 = 0xFFFF_7412; // (form.rs) the rolling status bar's view
 const GRIP_ID: u32 = 0xFFFF_7430; // + 0..7
 
 // what a headless run would have asked the window manager for (S::wm_req: kind | arg << 8;
@@ -108,6 +109,8 @@ pub(crate) fn wm_req_name(r: u32) -> String {
 /// win.rs)
 #[derive(Default)]
 pub(crate) struct W {
+    /// (form.rs) the status bar being built rolls sideways (a phone's, too narrow for its items)
+    sb_scroll: bool,
     dlg_clip: [i32; 4],
     dlg_openp: Option<Shared<i32>>,
     pub(crate) dlg_active: bool,
@@ -124,6 +127,10 @@ pub(crate) struct W {
     /// the title bar being built, the style's window_titlebar behind it (reset with the pass)
     pub(crate) tb_rect: Option<[i32; 4]>,
     /// dialog_buttons closed the content box of a dialog window
+    /// (form.rs) the content of the window being built rolls (a phone's screen cut it short)
+    /// (form.rs) the content of the open content dialog rolls (taller than a phone's window)
+    dlg_roll: bool,
+    wc_roll: bool,
     wc_footer: bool,
     /// the caption buttons' hit boxes of this pass: edge_grips puts them on top again, so
     /// the buttons win over the resize band where they are (cap_n: how many; reset with
@@ -213,8 +220,12 @@ impl Ui {
             dw = 1;
         }
         let x = (w - dw) >> 1;
-        let y = ((h - nh) >> 1).max(0);
-        self.next_rect_px(x, y, dw, 0);
+        // (form.rs) on a phone or a tablet a dialog taller than the window keeps inside it, its
+        // content rolls (the footer stays below); a desktop's dialogs never change
+        let roll = self.mobile() && nh > h - m;
+        self.wp.chrome.dlg_roll = roll;
+        let (y, dh) = if roll { (m >> 1, h - m) } else { (((h - nh) >> 1).max(0), 0) };
+        self.next_rect_px(x, y, dw, dh);
         self.box_begin(id, BOX_V | BOX_BLOCK, 0);
         let r = self.wp.ctx.last_rect;
         // footer height from its last measurement
@@ -230,6 +241,11 @@ impl Ui {
         // content: title, then the caller's widgets
         let gap = st.metric(SM_DLG_CONTENT_GAP);
         let flags = st.metric(SM_DLG_CONTENT_BOX) as u32;
+        if roll {
+            self.next_size(0, -1);
+            self.scroll_begin(dlg_part(id, 2), SC_V); // (part 2: free; 5 .. 7 are the buttons)
+            self.next_size(-1, 0);
+        }
         self.box_begin(dlg_part(id, 3), flags, gap);
         let ts = st.metric(SM_DLG_TITLE_TS) as u32;
         self.text(ts, title);
@@ -250,6 +266,9 @@ impl Ui {
             c.dlg_phase = 2;
             let id = c.dlg_id;
             self.box_end(); // content
+            if self.wp.chrome.dlg_roll {
+                self.scroll_end();
+            }
             let r = self.dlg_footer(dlg_part(id, 4), dlg_part(id, 5), primary, secondary, close);
             if r != 0 {
                 if let Some(o) = &self.wp.chrome.dlg_openp {
@@ -275,6 +294,9 @@ impl Ui {
         self.wp.chrome.wc_footer = true;
         let ids = cur << 4 | WCH_BASE;
         self.wc_pop_to(ids + WCH_CONTENT);
+        if core::mem::take(&mut self.wp.chrome.wc_roll) {
+            self.scroll_end();
+        }
         let r = self.dlg_footer(ids + WCH_FOOTER, ids + WCH_BTN, primary, secondary, close);
         if r != 0 {
             if let Some(o) = openp {
@@ -390,7 +412,11 @@ impl Ui {
                 self.repass();
             }
             self.box_end(); // content
+            if self.wp.chrome.dlg_roll {
+                self.scroll_end();
+            }
         }
+        self.wp.chrome.dlg_roll = false;
         self.box_end(); // outer
         let c = &self.wp.chrome;
         let (clip, dis, layer) = (c.dlg_clip, c.dlg_dis, c.dlg_layer);
@@ -482,6 +508,13 @@ impl Ui {
         }
         self.next_rect_px(r[0] + pad, r[1], w, r[3]);
         let gap = st.metric(SM_SB_GAP); // gap between the items (DIP)
+        // (form.rs) on a phone or a tablet the items roll sideways with the finger while they are
+        // wider than the bar (their widths of the last pass); a desktop's bar never changes
+        let roll = self.mobile() && self.slot(SB_INNER_ID).fixed > w;
+        self.wp.chrome.sb_scroll = roll;
+        if roll {
+            self.scroll_begin(SB_SCROLL_ID, SC_H | SC_NOBAR | BOX_XCENTER);
+        }
         self.box_begin(SB_INNER_ID, BOX_H | BOX_XCENTER, gap);
     }
 
@@ -490,6 +523,9 @@ impl Ui {
     pub fn statusbar_end(&mut self) {
         let _src = self.src_scope();
         self.box_end();
+        if core::mem::take(&mut self.wp.chrome.sb_scroll) {
+            self.scroll_end();
+        }
         self.box_end();
     }
 
@@ -680,6 +716,9 @@ impl Ui {
     // (plat::TB_BTN_*, 0 ends): the system's layout, else the style's (SM_CAP_LEFT: close,
     // minimize, maximize at the left; else minimize, maximize, close at the right)
     fn tb_side(&self, right: bool) -> [u8; 3] {
+        if self.mobile() && self.uiw_cur == 0 {
+            return [0; 3]; // a phone's or a tablet's system owns the app's window (form.rs)
+        }
         if let Some((l, r)) = self.tb_sys.buttons {
             return if right { r } else { l };
         }
@@ -848,16 +887,31 @@ impl Ui {
         }
         // content
         self.next_size(0, -1);
+        // (form.rs) on a phone or a tablet a window the screen cut shorter than its content rolls
+        // it (a dialog's footer stays below); a desktop's windows never change
+        let roll = self.mobile() && {
+            let mut natural = self.slot(ids + WCH_CONTENT).meash;
+            if flags & WF_DIALOG != 0 {
+                natural += self.slot(ids + WCH_FOOTER).meash;
+            }
+            natural > self.wp.rt.fb.h - b * 2 - self.dp(tbh)
+        };
+        self.wp.chrome.wc_roll = roll;
+        let fixed = if roll { 0 } else { BOX_FIXED };
+        if roll {
+            self.scroll_begin(ids + WCH_ROLL, SC_V);
+            self.next_size(-1, 0);
+        }
         if flags & WF_DIALOG != 0 {
             let gap = st.metric(SM_DLG_CONTENT_GAP);
-            let bf = st.metric(SM_DLG_CONTENT_BOX) as u32 | BOX_FIXED;
+            let bf = st.metric(SM_DLG_CONTENT_BOX) as u32 | fixed;
             self.box_begin(ids + WCH_CONTENT, bf, gap);
             // dialog: the content area on the layer colour, the footer on the background
             let mut sp = Sp::default();
             sp.place(self.wp.ctx.last_rect);
             st.window_dialog_fill(self, &sp);
         } else {
-            self.box_begin(ids + WCH_CONTENT, BOX_V | BOX_FIXED, 0);
+            self.box_begin(ids + WCH_CONTENT, BOX_V | fixed, 0);
         }
     }
 
@@ -892,6 +946,9 @@ impl Ui {
         let footer = self.wp.chrome.wc_footer;
         if !footer {
             self.wc_pop_to(ids + WCH_CONTENT);
+            if core::mem::take(&mut self.wp.chrome.wc_roll) {
+                self.scroll_end();
+            }
         }
         let mut h = self.slot(ids + WCH_CONTENT).meash;
         if footer {
