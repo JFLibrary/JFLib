@@ -53,6 +53,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **update:** lib/update: kind app replaces a macOS app bundle as a whole (unpacked beside it, its signature checked against the installed one's designated requirement, the two folders exchanged in one step, a copy of the old bundle as the backup; trial and rollback as for an exe); plat::pkg::app_bundle_follows and app_bundle_swap; tools/package.py and cargo jflib package write the app entry and the .dmg into the channel for macos-aarch64; updatetest --test app (docs/UPDATES.md)
 - **build:** CI for Apple: .github/workflows/apple.yml (started by hand) runs coretest, the scripts of gallery and updatetest on macOS, plattest's windowless tests, androidGallery in the iOS simulator and packs a .dmg of BackupCraft on GitHub's arm64 Mac runners (docs/APPLE.md AP8b)
 - **ui:** StyleList::scrollbar_room: a style whose scroll bars stay visible keeps their room free right of the content of a view that scrolls only vertically, overflowing or not (as CSS scrollbar-gutter: stable), and counts it in the view's natural width; netlab keeps 10 DIP, so content no longer runs under its bar (the other styles keep floating bars)
+- **ui:** ui.form_factor() and ui.mobile() (FF_DESKTOP, FF_TABLET, FF_PHONE; jfgui_FORM): on a phone or a tablet only, the title bar has no caption buttons, a menu bar that does not fit becomes one menu button, the status bar and vertical scroll views roll sideways while too wide, windows and content dialogs keep inside the screen and roll their content; a desktop window stays as it was however narrow (docs/GUIDE.md §38)
 
 ### Changed
 
@@ -91,6 +92,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** Views of GPU content in the browser: a read-back that comes after its Draw now reaches the framebuffer (the cells the output draws are owed again, the next render and the settle at rest take it there); before, the framebuffer kept an older frame or the content's painting
 - **update:** update::target() names macOS and iOS (macos-aarch64, ios-aarch64); a Mac reported linux-aarch64
 - **update:** lib/update on macOS: an exe update kept the old file's permissions only on Linux, so an updated program on a Mac lost its executable bit; cargo jflib keygen and the update channel's signer build for macOS on a Mac
+- **plat:** Android: the status bar and the navigation bar take the colours at the app's edges with matching icons and no system scrim, instead of a fixed light grey around a dark app
 
 ## [0.1.0] - 2026-11-08
 

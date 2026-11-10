@@ -155,15 +155,15 @@ impl Ui {
     }
 
     // box_room(child) -> (px the current box lays its children out in across its width, px its other
-    // children took along a row in the last pass): the room a child box with the natural width
-    // (id `child`) has (form.rs: a menu bar that does not fit its row)
-    pub(crate) fn box_room(&mut self, child: u32) -> (i32, i32) {
+    // children took along a row in the last pass, the row has fill children): the room a child box
+    // with the natural width (id `child`) has (form.rs: a menu bar that does not fit its row)
+    pub(crate) fn box_room(&mut self, child: u32) -> (i32, i32, bool) {
         let prev = self.slot(child).measw;
         let b = *self.top();
         if b.flags & BOX_V != 0 {
-            (b.len[0], 0)
+            (b.len[0], 0, false)
         } else {
-            (b.len[0], b.fixedp.wrapping_sub(prev).max(0))
+            (b.len[0], b.fixedp.wrapping_sub(prev).max(0), b.wsump > 0)
         }
     }
 

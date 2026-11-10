@@ -81,6 +81,7 @@ const MENU_MAX: usize = 250;
 // (form.rs) the compact menu bar's button: its name for screen readers, its least width (DIP)
 const MB_COMPACT_LABEL: &str = "Menü";
 const MB_COMPACT_W: i32 = 44;
+const MB_FILL_MIN: i32 = 64; // DIP the fill widgets of the bar's row keep before it becomes a button
 const MB_MAX: usize = 16; // menus per menu bar (fixed: wider than any window; more: limit_hit)
 const LAB_MAX: usize = 256;
 pub(crate) const CATCH_ID: u32 = 0x7FFE_0C0C; // hit box under the popups (light dismiss)
@@ -1778,7 +1779,7 @@ impl Ui {
     }
 
     // (form.rs) mb_compact_wanted(bar, n, base) -> the bar's menus do not fit the row it is in (the
-    // other widgets of the row as wide as in the last pass; fill widgets give way first)
+    // other widgets of the row as wide as in the last pass; fill widgets give way, down to MB_FILL_MIN)
     fn mb_compact_wanted(&mut self, mb: &'static [Mi], n: usize, base: u32) -> bool {
         let st = self.style;
         let mut full = self.dp(4) * 2 + self.dp(4) * (n as i32 - 1); // PAD_4, gap 4
@@ -1788,8 +1789,11 @@ impl Ui {
             let mut sp = Sp { label: Some(&lab), ..Sp::default() };
             full += st.menubar_item_size(self, &mut sp).0;
         }
-        let (room, others) = self.box_room(base | 0xFF);
-        room > 0 && others + full > room
+        // fill widgets of the row (an image list beside the bar) keep at least MB_FILL_MIN: one
+        // squeezed to nothing would be gone
+        let (room, others, fill) = self.box_room(base | 0xFF);
+        let keep = if fill { self.dp(MB_FILL_MIN) } else { 0 };
+        room > 0 && others + full + keep > room
     }
 
     // (form.rs) mb_compact_bar(bar, n) -> a bar with one menu: the n menus of `bar` as its rows
