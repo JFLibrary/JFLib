@@ -25,7 +25,7 @@ extern "C" fn thread_main(arg: *mut c_void) -> *mut c_void {
     super::crash::thread_alt_stack(); // the crash handler runs there (a stack overflow of this thread too)
     // SAFETY: thread_spawn handed over a Box<Start> through Box::into_raw, taken back once here.
     let f = unsafe { Box::from_raw(arg as *mut Start) };
-    f();
+    rt::abort_on_unwind(f); // feature unwind: a panic that leaves the thread ends the program
     core::ptr::null_mut()
 }
 
