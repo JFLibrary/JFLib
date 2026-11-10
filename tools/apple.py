@@ -8,6 +8,7 @@ the iPhone.  Runs on a Mac only (Xcode's tools: codesign, xcrun simctl, xcrun de
     python tools/apple.py gui build/mac/NAME [ARGS..]       start a program with windows from SSH
     python tools/apple.py mac build/mac/NAME [APP]           pack a macOS program as NAME.app beside it
     python tools/apple.py dmg build/mac/NAME.app [OUT.dmg]   the bundle as a disk image (docs/APPLE.md AP8)
+    python tools/apple.py notarize PATH.app|PATH.dmg         notarize and staple (Developer ID, AP8c)
 
 build_rs.py packs every program it builds for ios into NAME.app next to it (bundle); the simulator's
 build is signed ad hoc there.  The iPhone needs the Apple Development certificate and a provisioning
@@ -30,8 +31,14 @@ res/app_*.png (none without), signed ad hoc; PERMISSIONS with `sandbox` turns on
 the entitlements its rules need (mac_entitlements).  The signature is ad hoc unless jfgui_MAC_IDENTITY names a
 certificate of the keychain ("Developer ID Application: NAME (TEAM)"): then with the hardened runtime and a
 secure time stamp, as notarization wants (mac_sign).  mac_dmg puts a bundle on a compressed disk image
-(hdiutil, UDZO) beside a link to /Applications; with an identity the image is signed too.
+(hdiutil, UDZO) beside a link to /Applications; with an identity the image is signed too.  With
+jfgui_MAC_NOTARY (a profile of `xcrun notarytool store-credentials`) as well, mac_dmg notarizes the
+bundle and then the image and staples their tickets (mac_notarize, docs/APPLE.md AP8c).  Over SSH the
+keychain is locked: codesign with a certificate and notarytool run in the logged-in session then
+(keychain_run through gui_run, no window).
 
+    jfgui_MAC_IDENTITY=NAME   sign with this certificate ("Developer ID Application: NAME (TEAM)")
+    jfgui_MAC_NOTARY=PROFILE  notarize .dmg files with this notarytool profile (needs the identity)
     jfgui_SIM_DEVICE=UDID     the simulator to use (default: the first available iPhone)
     jfgui_SIM_KEEP=1          leave a simulator running that this tool booted
     jfgui_IOS_DEVICE=UDID     the iPhone (default: the only connected one)
@@ -250,11 +257,29 @@ def mac_identity():
     return os.environ.get("jfgui_MAC_IDENTITY", "").strip() or None
 
 
+def mac_notary():
+    """the notarytool keychain profile of jfgui_MAC_NOTARY (None: no notarization)"""
+    return os.environ.get("jfgui_MAC_NOTARY", "").strip() or None
+
+
+def keychain_run(cmd, timeout=600, check=True):
+    """a command that needs the login keychain (codesign with a certificate, notarytool's profile).  In an
+    SSH session the keychain is locked: there the command runs in the logged-in session (gui_run, no
+    window; someone must be logged in) -> CompletedProcess"""
+    if not os.environ.get("SSH_CONNECTION"):
+        return run(cmd, timeout=timeout, check=check)
+    exe = shutil.which(str(cmd[0])) or str(cmd[0])
+    r = gui_run(exe, [str(c) for c in cmd[1:]], timeout=timeout)
+    if check and r.returncode:
+        raise RuntimeError(f"{' '.join(map(str, cmd[:4]))} (in the Mac's session): {(r.stderr or r.stdout).strip()}")
+    return r
+
+
 def mac_sign(path, entitlements=None):
     """sign a bundle or a disk image: ad hoc, or with jfgui_MAC_IDENTITY, the hardened runtime and a time
     stamp (what notarization requires; a disk image gets neither runtime nor entitlements)"""
     ident = mac_identity()
-    path = Path(path)
+    path = Path(path).resolve()
     image = path.suffix == ".dmg"
     cmd = ["codesign", "-f", "-s", ident or "-"]
     cmd += ["--timestamp"] if ident else ["--timestamp=none"]
@@ -265,17 +290,55 @@ def mac_sign(path, entitlements=None):
             ef = Path(d) / "entitlements.plist"
             ef.write_bytes(plistlib.dumps(entitlements, fmt=plistlib.FMT_XML))
             cmd += ["--entitlements", ef]
-        run(cmd + [path], timeout=300)
+        (keychain_run if ident else run)(cmd + [path], timeout=300)
+
+
+def mac_notarize(path):
+    """notarize a bundle or disk image signed with the Developer ID: notarytool submits it (a bundle as a
+    zip) with the keychain profile of jfgui_MAC_NOTARY and waits for Apple's verdict; the ticket is
+    stapled to it, so Gatekeeper accepts it offline too.  A refusal raises with Apple's log."""
+    profile, path = mac_notary(), Path(path).resolve()
+    if not profile or not mac_identity():
+        raise RuntimeError("notarizing needs jfgui_MAC_IDENTITY (a Developer ID) and jfgui_MAC_NOTARY (a notarytool profile)")
+    with tempfile.TemporaryDirectory() as d:
+        sub = path
+        if path.suffix == ".app":
+            sub = Path(d) / f"{path.stem}.zip"
+            run(["ditto", "-c", "-k", "--keepParent", path, sub], timeout=600)
+        r = keychain_run(["xcrun", "notarytool", "submit", sub, "--keychain-profile", profile, "--wait", "--timeout", "45m",
+                          "--output-format", "json"], timeout=3000, check=False)
+    m = re.search(r"\{.*\}", r.stdout, re.S)
+    info = json.loads(m.group(0)) if m else {}
+    if info.get("id") and not info.get("status"):
+        raise RuntimeError(f"notarizing {path.name}: no verdict from Apple within 45 minutes (the first submissions of a new "
+                           f"account can take hours); later: xcrun notarytool wait {info['id']} --keychain-profile {profile}, "
+                           f"then xcrun stapler staple {path} -- or package again")
+    if info.get("status") != "Accepted":
+        log = ""
+        if info.get("id"):
+            log = keychain_run(["xcrun", "notarytool", "log", info["id"], "--keychain-profile", profile], timeout=300,
+                               check=False).stdout.strip()
+        raise RuntimeError(f"notarizing {path.name}: {info.get('status') or 'no verdict'} "
+                           f"{(r.stderr or r.stdout).strip()[-400:]}\n{log}")
+    run(["xcrun", "stapler", "staple", path], timeout=300)
+    print(f"notarized: {path.name} ({info['id']})")
 
 
 def mac_dmg(bundle, out=None, volume=None):
     """the bundle on a compressed disk image beside a link to /Applications (drag it there to install)
-    -> the image's path (default: NAME.dmg beside the bundle)"""
+    -> the image's path (default: NAME.dmg beside the bundle).  With jfgui_MAC_IDENTITY the image is
+    signed too; with jfgui_MAC_NOTARY as well the bundle (a copy dragged out works offline) and then
+    the image are notarized and stapled."""
     bundle = Path(bundle)
     if bundle.suffix != ".app" or not (bundle / "Contents" / "Info.plist").exists():
         raise RuntimeError(f"{bundle} is no app bundle")
     out = Path(out) if out else bundle.with_suffix(".dmg")
     volume = volume or bundle.stem
+    notarize = bool(mac_identity() and mac_notary())
+    if mac_notary() and not mac_identity():
+        raise RuntimeError("jfgui_MAC_NOTARY without jfgui_MAC_IDENTITY: only a Developer ID signature can be notarized")
+    if notarize:
+        mac_notarize(bundle)
     with tempfile.TemporaryDirectory() as d:
         stage = Path(d) / volume
         stage.mkdir()
@@ -287,6 +350,8 @@ def mac_dmg(bundle, out=None, volume=None):
              "-quiet", out], timeout=600)
     if mac_identity():
         mac_sign(out)
+    if notarize:
+        mac_notarize(out)
     return out
 
 
@@ -499,7 +564,7 @@ def device_run(app, args, timeout=600):
 
 
 def main():
-    if len(sys.argv) < 3 or sys.argv[1] not in ("sim", "device", "sign", "gui", "mac", "dmg"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("sim", "device", "sign", "gui", "mac", "dmg", "notarize"):
         print(__doc__)
         return 2
     cmd, path, rest = sys.argv[1], sys.argv[2], sys.argv[3:]
@@ -509,6 +574,9 @@ def main():
             return 0
         if cmd == "dmg":
             print(mac_dmg(path, rest[0] if rest else None))
+            return 0
+        if cmd == "notarize":
+            mac_notarize(path)
             return 0
         if cmd in ("sim", "gui"):
             r = sim_run(path, rest) if cmd == "sim" else gui_run(path, rest)

@@ -118,6 +118,18 @@ fn read_text(p: &str) -> Option<String> {
     plat::read_file(p).map(|b| String::from(String::from_utf8_lossy(&b).trim()))
 }
 
+// this program's file; from an app bundle (macOS, through tools/apple.py gui) the plain program beside
+// the bundle (build_rs.py builds both; this app may not look there itself): the bundle's copy is bound
+// to the bundle's Info.plist, and macOS kills a copy of a Developer ID signed one that runs outside it
+// ("invalid Info.plist").  tools/update_server.py makes the same choice for its programs.
+fn plain_exe() -> String {
+    let exe = plat::current_exe().unwrap_or_default();
+    match exe.find(".app/Contents/MacOS/") {
+        Some(i) => String::from(&exe[..i]),
+        None => exe,
+    }
+}
+
 fn start_server(t: &mut T, dir: &str) -> Option<Server> {
     let exe = plat::current_exe().unwrap_or_default();
     let srv = format!("{}/srv", dir);
@@ -461,8 +473,17 @@ fn t_app(t: &mut T) {
     t.eq(update::startup(&c), Startup::RollingBack(String::from("2.0.0")), "app: the next start rolls it back");
     t.check(plist(&installed).contains("<string>1.0.0</string>"), "app: the bundle is 1.0.0 again");
     t.check(plat::pkg::app_bundle_follows(&installed, &installed).is_ok(), "app: and its signature checks");
-    // refused: another identifier, a changed file, no bundle; the installed app stays as it was
-    for (chan, why) in [("app-otherid", "another identifier"), ("app-tampered", "Info.plist changed after signing"), ("app-notapp", "no bundle")] {
+    // refused: another identifier, a changed file, no bundle; with a Developer ID (jfgui_MAC_IDENTITY:
+    // tools/update_server.py signs with it) also the same app signed ad hoc; the installed app stays
+    let devid = plat::env("jfgui_MAC_IDENTITY").is_some_and(|s| !s.trim().is_empty());
+    if devid {
+        plat::write_stdout(b"app: the bundles carry the Developer ID of jfgui_MAC_IDENTITY\n");
+    }
+    let mut refused = alloc::vec![("app-otherid", "another identifier"), ("app-tampered", "Info.plist changed after signing"), ("app-notapp", "no bundle")];
+    if devid {
+        refused.push(("app-adhoc", "signed ad hoc, the installed one with a Developer ID"));
+    }
+    for (chan, why) in refused {
         reset(t);
         let c = cfg(chan, &format!("s-{}", chan));
         let u = Updater::new(c.clone());
@@ -809,8 +830,16 @@ fn t_apply(t: &mut T) {
     // the "installed" program: a copy of this one (version 1.0.0)
     let inst = format!("{}/inst", dir);
     let prog = format!("{}/{}", inst, exe_name());
-    let me = plat::current_exe().and_then(|p| plat::read_file(&p)).unwrap_or_default();
-    t.check(!me.is_empty() && plat::mkdir(&inst) && plat::write_file(&prog, &me), "apply: this program copied to the scratch folder");
+    // (from an app bundle the plain program beside it, copied by ditto: this app reads only its own folder)
+    let plain = plain_exe();
+    let own = |p: &str| {
+        let me = plat::current_exe().and_then(|e| plat::read_file(&e)).unwrap_or_default();
+        !me.is_empty() && plat::write_file(p, &me)
+    };
+    let copied = plat::mkdir(&inst)
+        && if plat::current_exe().as_deref() == Some(plain.as_str()) { own(&prog) } else { run_ok("/usr/bin/ditto", &[&plain, &prog]) || own(&prog) };
+    let me = plat::read_file(&prog).unwrap_or_default();
+    t.check(copied && !me.is_empty(), "apply: this program copied to the scratch folder");
     #[cfg(not(windows))]
     plat::fs::set_mode(&prog, 0o755);
     let log = format!("{}/log.txt", dir);
