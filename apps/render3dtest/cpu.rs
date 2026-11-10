@@ -6,7 +6,11 @@
 // an edge and may show the colour, under some light, of what those rays see (the GPU's normal there lies a
 // little beyond the triangle's end).  The snapping can also turn a triangle seen almost edge on towards
 // the eye, which for the rays stays a back face: a sliver on a silhouette.  Those are counted, and may only
-// be few and show the colour of an object a neighbouring pixel's ray sees.
+// be few and show the colour of an object a neighbouring pixel's ray sees.  The same snapping covers a pixel
+// whose centre lies a hair outside a triangle, and the GPU reads the triangle's attributes there, beyond its
+// end: on a cube's rim uv is -0.00002, and Repeat reads the texture's other side (found on llvmpipe, where 14
+// checks failed by such pixels, each 0.0001 to 0.0005 pixels outside and showing that texel exactly).  Such a
+// pixel is judged by the colour at that very point, RefScene::beyond_rim.
 //
 // Textures (G5b): levels made by its own box filter, sRGB by the definition (its own exp and ln), sampled
 // as Vulkan defines nearest, bilinear and trilinear filtering with the three wrap modes, the level from
@@ -170,6 +174,13 @@ impl RefCamera {
         let nx = 2.0 * x / w as f64 - 1.0;
         let ny = 1.0 - 2.0 * y / h as f64;
         add(add(self.f, mul(self.r, nx * self.tx)), mul(self.u, ny * self.ty))
+    }
+
+    /// where a point lies on the image, in the pixel coordinates of ray (None: not in front of the near plane)
+    pub fn pixel(&self, p: V, w: u32, h: u32) -> Option<[f64; 2]> {
+        let d = sub(p, self.eye);
+        let z = dot(d, self.f);
+        (z > self.near).then(|| [(dot(d, self.r) / (z * self.tx) + 1.0) * 0.5 * w as f64, (1.0 - dot(d, self.u) / (z * self.ty)) * 0.5 * h as f64])
     }
 
     /// reverse Z: the depth buffer's value at distance z along forward
@@ -1022,6 +1033,50 @@ impl RefScene {
         }
         (0..3).all(|k| got[k] as i32 >= lo[k] as i32 - 2 && got[k] as i32 <= hi[k] as i32 + 2)
     }
+
+    /// (a textured instance) this colour is what the GPU reads at the pixel's centre in a front face whose
+    /// outline passes within RIM of it, nearer than `before`: the centre outside the triangle, covered once the
+    /// vertices have snapped, the attributes and so the texels (with their wrap modes), the MASK and the light
+    /// those of that point, beyond the triangle's end
+    #[allow(clippy::too_many_arguments)]
+    fn beyond_rim(&self, cam: &RefCamera, w: u32, h: u32, centre: [f64; 2], q: &Quad, before: f64, got: [u8; 3], tol: u8) -> bool {
+        let d = cam.ray(centre[0], centre[1], w, h);
+        let off = |a: [f64; 2], b: [f64; 2]| {
+            let (ex, ey) = (b[0] - a[0], b[1] - a[1]);
+            ((centre[0] - a[0]) * ey - (centre[1] - a[1]) * ex).abs() / sqrt(ex * ex + ey * ey).max(1e-12)
+        };
+        for (k, inst) in self.inst.iter().enumerate() {
+            if !inst.look.textured() {
+                continue;
+            }
+            for ti in inst.first..inst.last {
+                let t = &self.tris[ti];
+                let p = cross(d, t.e2);
+                let det = dot(t.e1, p);
+                if det <= 0.0 {
+                    continue;
+                }
+                let o = sub(cam.eye, t.v0);
+                let q2 = cross(o, t.e1);
+                let (u, v) = (dot(o, p) / det, dot(d, q2) / det);
+                let z = dot(t.e2, q2) / det;
+                let (Some(a), Some(b), Some(c)) = (cam.pixel(t.v0, w, h), cam.pixel(add(t.v0, t.e1), w, h), cam.pixel(add(t.v0, t.e2), w, h)) else { continue };
+                // the sides the centre lies beyond (barycentric u is the weight of corner b, opposite side c-a)
+                let near = (u >= 0.0 || off(c, a) <= RIM) && (v >= 0.0 || off(a, b) <= RIM) && (u + v <= 1.0 || off(b, c) <= RIM);
+                if !near || (u >= 0.0 && v >= 0.0 && u + v <= 1.0) || z < cam.near || z > cam.far || z >= before {
+                    continue;
+                }
+                if inst.look.cutoff.is_some_and(|cut| self.base(&inst.look, t, u, v, cam.eye, Some(q))[3] < cut) {
+                    continue;
+                }
+                let (light, _, _) = self.shade_parts(k, ti, u, v, cam.eye, Some(q), None);
+                if near_rgb(got, self.to_rgb8(light), tol) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 /// what comparing an image with the rays found
@@ -1034,6 +1089,8 @@ pub struct Compared {
     pub edges: u32,
     /// solid pixels that show an object a neighbouring pixel's ray sees: slivers
     pub slivers: u32,
+    /// pixels showing what a textured triangle holds a hair beyond its end (RefScene::beyond_rim)
+    pub rims: u32,
     /// solid pixels off by more than the tolerance, edge pixels showing none of what their rays see
     pub bad: u32,
     /// the first bad pixel: x, y, got rgb, want rgb
@@ -1046,6 +1103,10 @@ pub struct Compared {
     pub largest: u8,
     pub differ: u32,
 }
+
+/// how far a pixel's centre may lie outside a triangle the GPU still draws there, in pixels: the vertices snap to
+/// 1/256 of a pixel, by up to 0.0028 along a side, and the vertex shader's f32 add little
+const RIM: f64 = 1.0 / 128.0;
 
 fn near_rgb(a: [u8; 3], b: [u8; 3], tol: u8) -> bool {
     (0..3).all(|k| a[k].abs_diff(b[k]) <= tol)
@@ -1090,6 +1151,8 @@ pub fn compare_tol(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3
                                 shoot(cx + 1.0, cy - 1.0, &q), shoot(cx - 1.0, cy + 1.0, &q), shoot(cx + 1.0, cy + 1.0, &q)];
                     if wide.iter().any(|h| h.is_some_and(|v| sc.could_show(&v, cam.eye, got))) {
                         out.slivers += 1;
+                    } else if sc.beyond_rim(cam, w, h, [cx, cy], &q, c.map_or(f64::INFINITY, |v| v.z), got, tol) {
+                        out.rims += 1;
                     } else {
                         out.bad += 1;
                         out.first.get_or_insert((x, y, got, want));
@@ -1114,8 +1177,12 @@ pub fn compare_tol(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3
                 let fine = near_rgb(got, want, tol) || around.iter().any(|h| near_rgb(got, rgb(h), tol) || h.is_some_and(|v| sc.could_show(&v, cam.eye, got)))
                     || c.is_some_and(|v| sc.could_show(&v, cam.eye, got));
                 if !fine {
-                    out.bad += 1;
-                    out.first.get_or_insert((x, y, got, want));
+                    if sc.beyond_rim(cam, w, h, [cx, cy], &q, c.map_or(f64::INFINITY, |v| v.z), got, tol) {
+                        out.rims += 1;
+                    } else {
+                        out.bad += 1;
+                        out.first.get_or_insert((x, y, got, want));
+                    }
                 }
             }
         }
@@ -1253,14 +1320,14 @@ pub fn compare_shadows(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u
 }
 
 impl Compared {
-    /// nothing wrong, slivers few
+    /// nothing wrong, slivers and rims few
     pub fn fine(&self) -> bool {
-        self.bad == 0 && self.solid > 0 && self.slivers * 100 <= self.solid_hit + 200
+        self.bad == 0 && self.solid > 0 && (self.slivers + self.rims) * 100 <= self.solid_hit + 200
     }
 
     pub fn text(&self) -> alloc::string::String {
-        format!("{} solid ({} on objects, {} objects seen; {} differ, largest {}), {} at edges, {} slivers, {} wrong{}", self.solid, self.solid_hit, self.objects_seen,
-                self.differ, self.largest, self.edges, self.slivers, self.bad,
+        format!("{} solid ({} on objects, {} objects seen; {} differ, largest {}), {} at edges, {} slivers, {} beyond a rim, {} wrong{}", self.solid, self.solid_hit, self.objects_seen,
+                self.differ, self.largest, self.edges, self.slivers, self.rims, self.bad,
                 self.first.map_or(alloc::string::String::new(), |f| format!(" (first at {}, {}: {:?}, expected {:?})", f.0, f.1, f.2, f.3)))
     }
 }
