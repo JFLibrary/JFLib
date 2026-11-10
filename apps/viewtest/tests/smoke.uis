@@ -1,0 +1,6 @@
+# viewtest: the window comes up with its page (build_rs.py test runs every tests/*.uis; the
+# script language: docs/GUIDE.md section 12)
+expect "Tastensenke" checked
+expect #101 exists
+expect text:"Befehle: Tab 0 Laden 0" exists
+shot build/viewtest.png

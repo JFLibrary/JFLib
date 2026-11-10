@@ -30,6 +30,11 @@ workspace = true
 # allocator and entry instead of JFLib's own, so the app may use any std crate.  Its main.rs has
 # neither #![no_std] nor #![no_main]; ui::main! and rt::main! stay.
 std = ["rt/std", "plat/std", "ui/std", "gpu/std"]
+# With std, a program built with panic = "unwind" (docs/GUIDE.md, "An app with std"): a panic the app
+# catches with std::panic::catch_unwind leaves it running (a thread of a web engine, say).  A panic that
+# leaves JFLib's threads, callbacks or the program's start uncaught ends it as before: JFLib's crash
+# report, exit code 3.  Without this feature JFLib needs panic = "abort".
+unwind = ["std", "rt/unwind", "plat/unwind", "ui/unwind"]
 
 [dependencies]
 rt.workspace = true

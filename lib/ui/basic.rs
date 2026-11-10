@@ -870,17 +870,19 @@ impl Ui {
 
     /// ui_canvas(id, draw, user, version) -> &UiInput: a custom area.  The hit box wants
     /// every pointer move; the cursor comes from next_flags bits 12..15 (CUR_* <<
-    /// HB_CURSOR_SHIFT), default crosshair.
+    /// HB_CURSOR_SHIFT), default crosshair (with HB_CURSOR_SET as given: 0 is the arrow).
+    /// next_flags(HB_KEYS): every key is the canvas's while it has the focus (a press gives it
+    /// the focus, so does ui.focus(id)); it takes them with ui.key_take.
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn canvas(&mut self, id: u32, draw: Option<DrawRef>, user: usize, version: u32) -> &UiInput {
         let _src = self.src_scope();
         let f = self.take_flags();
         let r = self.place(0, 0);
         let mut cur = f & (15 << HB_CURSOR_SHIFT);
-        if cur == 0 {
+        if cur == 0 && f & HB_CURSOR_SET == 0 {
             cur = CUR_CROSS << HB_CURSOR_SHIFT;
         }
-        let ev = self.behave(id, cur | HB_MOVES | HB_GRAB_H | HB_GRAB_V); // (a finger is its input)
+        let ev = self.behave(id, cur | (f & HB_KEYS) | HB_MOVES | HB_GRAB_H | HB_GRAB_V); // (a finger is its input)
         // custom draw command
         self.cmd_custom(r[0], r[1], r[2], r[3], draw, user, version);
         let key = self.rtl_text_key(self.key_first()); // right-to-left: arrows as drawn
