@@ -96,6 +96,22 @@ signiert ad hoc), in einem Simulator ohne Fenster (`simctl boot`, `simctl spawn`
 
 **Fertig, wenn:** die Browser-Skripte in Safari auf dem Mac laufen und die Abweichungen auf dem iPhone notiert sind.
 
+**AP1 auf dem Mac umgesetzt (2026-11-10):** `tools/tests/web_apps.mjs --engine=safari` fährt dieselben Prüfungen wie
+in Chromium und Firefox in einem echten Safari (27.2) über `safaridriver`. Playwright steuert kein Safari (sein
+„webkit“ ist ein eigener WebKit-Bau); [`tools/tests/safari.mjs`](../tools/tests/safari.mjs) bildet deshalb den Teil
+von Playwrights API nach, den der Test braucht, über W3C WebDriver. [`tools/tests/safari_tunnel.py`](../tools/tests/safari_tunnel.py)
+startet `safaridriver` auf dem Mac und trägt beide Richtungen über eine SSH-Verbindung: Der Test läuft auf dem PC
+(auf dem Mac ist kein Node nötig), Safari lädt die Seiten unter derselben Adresse. `template`, `gallery`, `jfWord`
+und `Kritzel` bestehen, auch die Pixelgleichheit mit Rusts PNG-Renderer, das Speichern in IndexedDB mit den
+Fehlerfällen, Tastenkürzel, IME, das Einfügen-Ereignis und die Dateiauswahl. Nicht nachstellbar: die Sprache
+(Safari nimmt die des Macs, hier Deutsch, wie der Test erwartet) und die Pixeldichten 1,5 und 2 (der Mac mini hat
+1×). Einmalig auf dem Mac: `safaridriver --enable`, in Safari Entwickler → „Entfernte Automatisierung erlauben“,
+danach Safari neu starten (sonst läuft die Sitzung „while connecting to a Safari instance“ in ein Timeout).
+**Fallen:** Das versteckte Texteingabefeld des Hosts nimmt keine Elementeingabe von WebDriver an (der Adapter tippt
+über Tastatur-Aktionen); Init-Skripte laufen erst nach dem Laden, deshalb erkennt der Test „bereit“ auch am
+`data-compute` des Body; ein beendeter Tunnel ließ `safaridriver` auf dem Mac weiterlaufen (ohne Terminal kein
+Hangup), das Skript beendet ihn jetzt über die geschlossene Eingabe.
+
 ### AP2: Bau und `rt` (M)
 
 - `build_rs.py` und `cargo-jflib`: `--target mac` und `--target ios` (mit `--sim`), `TRIPLE`, `TARGETS` der Apps,
