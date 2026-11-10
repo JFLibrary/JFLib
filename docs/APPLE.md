@@ -1,5 +1,8 @@
 # Apple-Plan: macOS und iOS nativ
 
+Nachtrag 2026-11-10: AP5 ist auch von Hand auf dem iPhone geprüft, AP8 (Pakete, Updates, CI, Developer ID und
+Notarisierung, Dokumentation und Website) ist fertig; offen sind AP1 (Safari) und AP6 (Metal, im Plan der GPU-Arbeit).
+
 Stand 2026-11-09, auf Basis von `main` ba9e6d03. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
 und der Kern von `plat`), AP3 (`plat` ohne Fenster), AP4 (Fenster auf macOS), AP7 (Desktop-Dienste) und AP5 (iOS) bis
 auf die Prüfung von Hand auf dem iPhone. Die Aufwände sind geschätzt.
@@ -440,8 +443,15 @@ ab. `updatetest --test app` mit `jfgui_MAC_IDENTITY` aktualisiert Bündel mit de
 App ad hoc signiert ab. Die erste Notarisierung des neuen Kontos brauchte rund zwei Stunden, danach dauerten beide
 Einreichungen zusammen gut eine Minute. Dabei gefunden: Das Programm eines Bündels mit Developer ID beendet macOS
 sofort, wenn es außerhalb des Bündels läuft („invalid Info.plist“); updatetest nimmt für seine `exe`-Tests deshalb
-das einfache Programm neben dem Bündel. Offen: Signieren in der CI (Zertifikat als Geheimnis), TestFlight für
-iOS (falls gewünscht) und eine Hand-Probe auf einem fremden Mac.
+das einfache Programm neben dem Bündel. Die Hand-Probe des Nutzers (die `.dmg` aus „Downloads“ geöffnet, die App
+gestartet) fand einen Fehler, den `spctl` nicht sieht: `tools/package.py` kopierte das Programm ohne Ausführrecht,
+die App öffnete nicht; behoben, `mac_dmg` lehnt ein solches Bündel jetzt ab, danach startete sie mit der üblichen
+Rückfrage. Offen: Signieren in der CI (Zertifikat als Geheimnis) und TestFlight für iOS (falls gewünscht).
+
+**AP8d umgesetzt (2026-11-10), damit ist AP8 fertig:** README, [PACKAGING.md](PACKAGING.md), [UPDATES.md](UPDATES.md)
+und GUIDE nennen macOS und iOS (mit AP8a–AP8c). Die Website jflib.org (Repository jflibWebsite, Inhalt vorher mit dem
+Nutzer abgestimmt) führt beide als native Ziele auf der Startseite, unter Features, im Vergleich und in der Roadmap
+(dort „Fertig“; als Nächstes Metal und VoiceOver), in allen fünf Sprachen; Docs und Galerie kommen aus `8c94d080`.
 
 ## Reihenfolge
 
