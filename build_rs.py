@@ -718,8 +718,7 @@ def manifest_lint():
     bad = []
     members = manifests.workspace()["members"]
     published = [m for m in members if manifests.read(ROOT / m / "Cargo.toml")["package"].get("publish", True)]
-    # netlab is published for an app that names it itself (JFNetworker), not shown by the facade
-    styles = {f"style_{Path(m).name}": m for m in published if m.startswith("styles/") and m != "styles/netlab"}
+    styles = {f"style_{Path(m).name}": m for m in published if m.startswith("styles/")}
     facade = manifests.read(ROOT / manifests.FACADE / "Cargo.toml")
     named = set(facade["dependencies"]) | {d for t in facade["target"].values() for d in t["dependencies"]}
     # a crate is named by `pub use NAME;` or, a style, by `pub mod NAME { pub use ::NAME::STYLE; }`
@@ -1051,7 +1050,7 @@ class Builder:
     def cargo_libs(self):
         """`build_rs.py lib`: every library crate of the target (the crate jflib names them all) and the
         styles the apps use -> the packages"""
-        pkgs = ["jflib"] + ([f"jflib-style-{s}" for s in ("jfoffice", "backupcraft", "netlab")] if self.target != "web" else [])
+        pkgs = ["jflib"] + ([f"jflib-style-{s}" for s in ("jfoffice", "backupcraft")] if self.target != "web" else [])
         self.cargo(["cargo", "build", "--locked"] + [x for p in pkgs for x in ("-p", p)])
         return pkgs
 

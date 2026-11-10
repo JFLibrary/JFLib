@@ -83,6 +83,7 @@ style_winui.workspace = true
 style_classic.workspace = true
 style_kde.workspace = true
 style_macos.workspace = true
+style_netlab.workspace = true
 
 # plat has no fs and net there
 [target.'cfg(not(any(target_arch = "wasm32", target_os = "android")))'.dependencies]
