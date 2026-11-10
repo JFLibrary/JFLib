@@ -1192,6 +1192,9 @@ impl Ui {
     /// uiw_pass_begin(w, h): start recording the live window (w x h px): empty command
     /// lists and hit list, background, root layout box
     pub(crate) fn uiw_pass_begin(&mut self, w: i32, h: i32) {
+        if self.uiw_cur == 0 {
+            self.form_update(w, h); // the device of this frame (form.rs)
+        }
         self.cmd_reset();
         let c = &mut self.wp.ctx;
         c.cmd_layer_ui = 0;

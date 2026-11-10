@@ -219,6 +219,12 @@ JNIEXPORT jlong JNICALL Java_org_jflib_gallery_GalleryActivity_nativePresentUs(J
     (void)env; (void)cls;
     return (jlong)jfgui_present_us();
 }
+/* the colour at the app's edge side (lib/plat/android_edges.rs): 0xFFRRGGBB, 0 = no frame yet */
+extern uint32_t jfgui_edge(uint32_t side);
+JNIEXPORT jint JNICALL Java_org_jflib_gallery_GalleryActivity_nativeEdge(JNIEnv *env, jclass cls, jint side) {
+    (void)env; (void)cls;
+    return started ? (jint)jfgui_edge((uint32_t)side) : 0;
+}
 JNIEXPORT jint JNICALL Java_org_jflib_gallery_GalleryActivity_nativeFrameDelay(JNIEnv *env, jclass cls) {
     (void)env; (void)cls;
     return started ? (jint)jfgui_frame_delay() : 250;

@@ -63,6 +63,12 @@ pub const TF_DECLINE: u32 = 32;
 pub const TF_REST: u32 = 64;
 pub const TF_HOLD_LONG: u32 = 128;
 
+// ------------------------------------------------------------------ the device (form.rs)
+// ui.form_factor(): what the app runs on -- a desktop (however small its window), a tablet, a phone
+pub const FF_DESKTOP: u32 = 0;
+pub const FF_TABLET: u32 = 1;
+pub const FF_PHONE: u32 = 2;
+
 // ------------------------------------------------------------------ semantic kinds and states
 pub const K_BOX: u16 = 0;
 pub const K_TEXT: u16 = 1;

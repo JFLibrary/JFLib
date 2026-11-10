@@ -587,6 +587,16 @@ impl Ui {
     pub fn scroll_begin(&mut self, id: u32, flags: u32) {
         let _src = self.src_scope();
         self.scr_open(id, flags & !SCR_F_LIST, 0);
+        // (form.rs) on a phone or a tablet a view that rolls only up and down rolls sideways too
+        // while its content is wider than it (the last pass's): nothing is out of the finger's reach.
+        // A desktop's views never change.
+        if flags & SC_H == 0 && self.mobile() {
+            let top = self.scr_top();
+            let e = self.wp.list.scr[top];
+            if self.slot(id).measw > e.rect[2] {
+                self.wp.list.scr[top].flags |= SC_H | SC_V;
+            }
+        }
         self.scr_offset();
     }
 
