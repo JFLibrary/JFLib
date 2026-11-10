@@ -51,7 +51,7 @@ type Start = Box<dyn FnOnce() + Send + 'static>;
 extern "system" fn thread_entry(p: *mut c_void) -> u32 {
     // SAFETY: p is the Box<Start> thread_spawn leaked; this thread takes it over once.
     let f = unsafe { Box::from_raw(p as *mut Start) };
-    f();
+    rt::abort_on_unwind(f); // feature unwind: a panic that leaves the thread ends the program
     0
 }
 

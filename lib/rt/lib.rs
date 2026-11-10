@@ -13,6 +13,8 @@
 //   rt::main!(body)  the entry symbol of console programs (boot first, then body); with the
 //            feature std also their fn main
 //   rt::panic_hook()  (feature std) std's panics take the crash report of rt's panic handler
+//   rt::abort_on_unwind(f)  a panic that leaves f ends the program (feature unwind; else f())
+//   rt::panic_take()  (feature unwind) the last panic of the calling thread, as text
 //   rt::Alloc  (feature std, Windows and Linux) rt's allocator for a program with std that wants it
 //   rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (the root Cargo.toml, SemVer;
 //            docs/VERSIONING.md), also as plat::VERSION and ui::VERSION
@@ -106,13 +108,32 @@ macro_rules! main {
     };
 }
 
+/// rt::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
+/// std built with the feature `unwind` may unwind as well
+#[cfg(not(feature = "unwind"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __rt_panic_check {
+    () => {
+        #[cfg(panic = "unwind")]
+        compile_error!("JFLib needs panic = \"abort\": add [profile.dev] and [profile.release] with panic = \"abort\" to this project's Cargo.toml (a program with std may turn on jflib's feature unwind instead)");
+    };
+}
+
+/// (see above)
+#[cfg(feature = "unwind")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __rt_panic_check {
+    () => {};
+}
+
 /// rt::main!'s `jfgui_main`, without and with std
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __jfgui_main {
     ($body:expr) => {
-        #[cfg(panic = "unwind")]
-        compile_error!("JFLib needs panic = \"abort\": add [profile.dev] and [profile.release] with panic = \"abort\" to this project's Cargo.toml");
+        $crate::__rt_panic_check!();
         #[allow(unsafe_code, unexpected_cfgs)]
         #[unsafe(no_mangle)]
         fn jfgui_main() -> i32 {
@@ -194,6 +215,18 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 mod hosted;
 #[cfg(feature = "std")]
 pub use hosted::panic_hook;
+#[cfg(feature = "unwind")]
+pub use hosted::{abort_on_unwind, panic_take};
+
+/// run `f`; with the feature `unwind` (a program with std built with `panic = "unwind"`) a panic
+/// that leaves it ends the program as an uncaught panic: JFLib's crash report, exit code 3.  plat
+/// runs its threads and the program's start through it.  Without that feature a panic never
+/// unwinds, and this is `f()`.
+#[cfg(not(feature = "unwind"))]
+#[inline(always)]
+pub fn abort_on_unwind<R>(f: impl FnOnce() -> R) -> R {
+    f()
+}
 
 pub(crate) fn panic_report(info: &dyn core::fmt::Display) -> ! {
     use core::fmt::Write;
