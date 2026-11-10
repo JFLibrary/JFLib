@@ -251,10 +251,11 @@ impl<S: 'static> History<S> {
 
 impl Ui {
     /// undo_keys() -> Some(true) for Ctrl+Z, Some(false) for Ctrl+Y / Ctrl+Shift+Z, when no
-    /// text field has the keyboard (they keep their own undo); the key is consumed
+    /// text field (they keep their own undo) or widget with HB_KEYS has the keyboard; the key is
+    /// consumed
     pub fn undo_keys(&mut self) -> Option<bool> {
         // (called before the widgets of the pass: the last pass knows the focused one)
-        if self.focus_is_text() || self.focus_was_text() {
+        if self.focus_is_text() || self.focus_was_text() || self.focus_has_keys() {
             return None;
         }
         let k = self.key_first();

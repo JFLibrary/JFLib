@@ -42,6 +42,16 @@ pub const HB_OWNKEYS: u32 = 0x20000;
 // around it (touch.rs; the cursors of splitters, text and crosshairs say so by themselves)
 pub const HB_GRAB_H: u32 = 0x40000;
 pub const HB_GRAB_V: u32 = 0x80000;
+// every key is the widget's while it has the focus and no popup of the window is open (a menu
+// keeps its keys), Ctrl + letter, Tab and the arrows too: no accelerator, no keyboard
+// navigation, no Enter / Space action and no ui.undo_keys takes one (a canvas that shows a web
+// page takes them with ui.key_take; ui.accel_run hands one back to the command table).  Unlike
+// HB_TEXT no text box rules: no reserved keys, no input method, no on-screen keyboard.  A
+// canvas takes it from next_flags.
+pub const HB_KEYS: u32 = 0x10_0000;
+// canvas only (next_flags): its cursor bits as given, CUR_ARROW (0) included; without it 0 is the
+// crosshair
+pub const HB_CURSOR_SET: u32 = 0x20_0000;
 
 // ------------------------------------------------------------------ the finger (touch.rs)
 // ui.touch_take(flags) after a widget, instead of what its hit box says by itself: TF_V / TF_H a
