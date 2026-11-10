@@ -204,7 +204,6 @@ pub struct MTLClearColor {
 
 #[repr(C)]
 #[derive(Clone, Copy, Default, Debug)]
-#[allow(dead_code)] // (the drawable size of a CAMetalLayer: mtl_swap.rs, AP6c)
 pub struct CGSize {
     pub w: f64,
     pub h: f64,

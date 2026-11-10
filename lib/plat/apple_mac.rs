@@ -75,6 +75,10 @@ mod dnd;
 mod sysapp;
 #[path = "apple_mac_services.rs"]
 pub(crate) mod services;
+// (AP6) the GPU's layer in a window: lib/gpu's Metal swapchains
+#[path = "apple_mac_gpu.rs"]
+mod gpu;
+pub use gpu::*;
 pub use services::hotkey::hotkey_test_post;
 pub(crate) use sysapp::print_dialog;
 pub use sysapp::print_dialog_autoclose;
@@ -178,6 +182,7 @@ struct Win {
     owner: i32,    // the owner window (-1: none): a child window of it while shown
     enabled: bool, // win_enable: a disabled window takes no input
     pos: [i32; 2], // the client origin last reported (E_WINPOS) or set
+    gpu: Id,       // the GPU's CAMetalLayer over the view's picture (nil: none yet; apple_mac_gpu.rs)
 }
 
 /// one popup slot: a panel with a view of ours (index POP_BASE + slot), a child window of its
@@ -495,7 +500,7 @@ pub fn win_create(title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x
     let (w, h) = (round(w_dip as f64 * scale), round(h_dip as f64 * scale));
     let owner = if owner >= 0 && (owner as usize) < PW_MAX { owner } else { -1 };
     with(|s| s.wins[slot] = Some(Win { win, view, del, scale, w, h, cursor: CUR_ARROW, ime: [0; 3], owner, enabled: true,
-                                                        pos: [i32::MIN; 2] }));
+                                                        pos: [i32::MIN; 2], gpu: NIL }));
     if x == PW_DEFAULT || y == PW_DEFAULT {
         // an owned window: 32 DIP below and right of the owner's client origin
         let at = if owner >= 0 {
@@ -537,6 +542,7 @@ pub fn win_destroy(w: i32) {
         msg!(r.win, c"orderOut:", NIL => Id; ());
         msg!(r.win, c"close"; ());
     }
+    gpu::drop_layer(r.gpu);
     release(r.win);
     release(r.del);
     if w == 0 {
@@ -1576,6 +1582,9 @@ fn size_changed(w: i32, force: bool) {
         o
     })
     .unwrap_or((0, 0));
+    if scale != old_scale {
+        gpu::layer_scale(rec(w, |r| r.gpu).unwrap_or(NIL), scale);
+    }
     if quiet {
         return;
     }

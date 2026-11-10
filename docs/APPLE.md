@@ -412,6 +412,20 @@ Zeitstempel, Bindless, Multi-Draw und indirekte Anzahl (Stufe Voll), Fenster. `g
 (eigene Hilfsfunktionen in der Übersetzung); ein Vertex-Shader mit `PointSize` lässt Metal eine Pipeline für Dreiecke
 ablehnen (die Übersetzung gibt die Punktgröße nur noch für Punktlisten aus); offene Upload-Encoder beim Abbau des Geräts.
 
+**AP6c umgesetzt (2026-11-10):** Swapchains über einen `CAMetalLayer` ([`mtl_swap.rs`](../lib/gpu/mtl_swap.rs)): plat legt
+ihn als Unterlayer des Layers der View an ([`apple_mac_gpu.rs`](../lib/plat/apple_mac_gpu.rs): `win_native` gezeigt,
+`win_gpu_child` verborgen bis `win_gpu_child_show`; er folgt den Grenzen der View und ihrer Skala), BGRA8 (sRGB auf
+Wunsch), Farbraum sRGB wie das `CGImage` des CPU-Pfads. `try_acquire` wartet nie: `nextDrawable` nur, solange weniger
+Drawables in Gebrauch sind, als der Layer hat (die Presented-Handler der Drawables zählen, was den Bildschirm erreicht
+hat). Darstellungsmodus nur Fifo: Ohne `displaySyncEnabled` zeigt ein Fenster auf macOS trotzdem im Takt des
+Compositors (gemessen 8,3 ms je Bild in beiden Fällen). Zwischen allen Encodern eines Befehlspuffers steht ein
+`MTLFence` (der Nachfolger wartet), denn Metals Verfolgung sieht nicht durch Textur-Ansichten. `gputest --test all` in
+der angemeldeten Sitzung (`tools/apple.py gui`): 541 Prüfungen grün, keine Fehler; `render3dtest` 23 von 26 Skripten.
+**Offen:** `srgb`/`validate` (das texturierte Bild „tex“: 20–70 Pixel, Paare in Quads, weichen zwischen zwei Renderings
+derselben Szene ab, die Tiefe ist bitgleich; mit Metals Shader-Validierung verschwindet es; vermutet: Ableitungen und
+Helper-Lanes oder die Hidden-Surface-Removal der Apple-GPU) und `pbr` (Normal-Maps: 28 Pixel über der Toleranz,
+deterministisch; vermutet: grobe statt feiner Ableitungen).
+
 **Fallen, schon bekannt.** Metal schaltet beim Übersetzen zur Laufzeit schnelle Mathematik ein (NaN, Unendlich,
 Kontraktion); MSLs `float3` ist 16 Byte groß (in Puffern `packed_float3`); `[[vertex_id]]` und `[[instance_id]]`
 enthalten Basis-Vertex und erste Instanz wie unter Vulkan; Metal hat keine Push-Konstanten; `nextDrawable` wartet;

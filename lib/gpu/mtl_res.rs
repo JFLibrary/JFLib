@@ -311,8 +311,7 @@ fn make_view(t: &Arc<TexInner>, dim: ViewDim, base_mip: u32, mips: u32, base_lay
     Ok(TextureView(Arc::new(ViewInner { h, tex: t.clone(), base_mip, mips, base_layer, layers })))
 }
 
-/// a drawable's texture as a Texture (mtl_swap.rs, AP6c)
-#[allow(dead_code)]
+/// a drawable's texture as a Texture (mtl_swap.rs)
 pub(crate) fn wrap_texture(sh: &Arc<Shared>, h: Obj, desc: TextureDesc) -> Texture {
     let t = Arc::new(TexInner { sh: sh.clone(), h: h.clone(), desc, bytes: 0 });
     let view = TextureView(Arc::new(ViewInner { h, tex: t.clone(), base_mip: 0, mips: 1, base_layer: 0, layers: 1 }));

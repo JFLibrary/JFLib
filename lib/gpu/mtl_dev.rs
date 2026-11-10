@@ -634,6 +634,11 @@ impl Shared {
     /// commit command buffers (after the pending uploads); the last one signals the timeline ->
     /// its value
     pub fn submit(&self, cbs: Vec<Obj>) -> Result<u64> {
+        self.submit_present(cbs, None)
+    }
+
+    /// submit, the last command buffer also presenting a drawable (mtl_swap.rs)
+    pub fn submit_present(&self, cbs: Vec<Obj>, drawable: Option<Obj>) -> Result<u64> {
         self.check()?;
         let mut st = self.st.lock();
         self.collect(&mut st);
@@ -653,6 +658,9 @@ impl Shared {
             // SAFETY: command buffers whose encoders have all ended; the event outlives them.
             unsafe {
                 if i == last {
+                    if let Some(d) = &drawable {
+                        msg!(cb.id(), c"presentDrawable:", d.id() => Id; ());
+                    }
                     msg!(cb.id(), c"encodeSignalEvent:value:", self.event.id() => Id, v => u64; ());
                 }
                 msg!(cb.id(), c"commit"; ());

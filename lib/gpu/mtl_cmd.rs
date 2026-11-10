@@ -46,6 +46,8 @@ pub struct CommandEncoder<'a> {
     dirty: bool,
     /// index buffer, its offset, 4-byte indices
     index: Option<(Id, u64, bool)>,
+    /// the fence the last encoder updated when it ended: the next one waits for it
+    fence: Option<Obj>,
     _borrow: PhantomData<&'a ()>,
 }
 
@@ -77,6 +79,7 @@ impl Device {
             push: [0; PUSH_CONSTANTS_MAX as usize],
             dirty: true,
             index: None,
+            fence: None,
             _borrow: PhantomData,
         })
     }
@@ -117,10 +120,39 @@ impl<'a> CommandEncoder<'a> {
         self.cb.as_ref().map_or(objc::NIL, |c| c.id())
     }
 
+    /// end the open encoder; it updates a fence the next encoder waits for, so encoders run one after
+    /// the other as Vulkan's barriers order them (Metal's own tracking does not see through texture
+    /// views: Hi-Z pyramids read and write mips of one texture through views of their own)
     fn end_encoder(&mut self) {
-        if let Some((e, _)) = self.enc.take() {
-            // SAFETY: the open encoder of this command buffer, ended once.
-            unsafe { msg!(e.id(), c"endEncoding"; ()) };
+        if let Some((e, k)) = self.enc.take() {
+            // SAFETY: newFence returns a new fence (+1); updateFence: on the open encoder before it ends, once.
+            unsafe {
+                let f = Obj::new(msg!(self.sh.dev.id(), c"newFence"; Id));
+                if let Some(f) = &f {
+                    if k == Kind::Render {
+                        msg!(e.id(), c"updateFence:afterStages:", f.id() => Id, 7usize => usize; ()); // vertex | fragment | tile
+                    } else {
+                        msg!(e.id(), c"updateFence:", f.id() => Id; ());
+                    }
+                }
+                msg!(e.id(), c"endEncoding"; ());
+                self.fence = f;
+            }
+        }
+    }
+
+    /// a new encoder waits for the fence of the one before it
+    fn wait_fence(&self, e: Id, k: Kind) {
+        if let Some(f) = &self.fence {
+            // SAFETY: waitForFence: on a new open encoder; the fence was updated by an earlier encoder of
+            // this command buffer.
+            unsafe {
+                if k == Kind::Render {
+                    msg!(e, c"waitForFence:beforeStages:", f.id() => Id, 7usize => usize; ());
+                } else {
+                    msg!(e, c"waitForFence:", f.id() => Id; ());
+                }
+            }
         }
     }
 
@@ -147,6 +179,7 @@ impl<'a> CommandEncoder<'a> {
             return None;
         };
         let id = e.id();
+        self.wait_fence(id, k);
         self.enc = Some((e, k));
         self.dirty = true;
         Some(id)
@@ -499,6 +532,7 @@ impl<'a> CommandEncoder<'a> {
             self.err.get_or_insert(GpuError::OutOfMemory);
             return;
         };
+        self.wait_fence(e.id(), Kind::Render);
         self.enc = Some((e, Kind::Render));
         self.pass = Some(Pass { colors, n, depth: desc.depth.map(|d| d.view.format()), size: (w, h) });
         self.graphics = None;
