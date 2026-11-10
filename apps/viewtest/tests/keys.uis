@@ -1,0 +1,37 @@
+# viewtest: a canvas with HB_KEYS keeps every key; the canvas cursor as given (E1, E1a)
+#
+# with HB_KEYS ("Tastensenke" on): Ctrl+T and Tab reach the page, no accelerator runs, the
+# focus stays
+click #101
+expect #101 focused
+key ctrl+t tab
+expect text:"Tasten: Strg+T Tab" exists
+expect text:"Befehle: Tab 0 Laden 0" exists
+expect #101 focused
+key shift+tab ctrl+z
+expect text:"Tasten: Strg+T Tab Umschalt+Tab Strg+Z" exists
+expect #101 focused
+# F5 the page does not use: ui.accel_run hands it to the command table
+key f5
+expect text:"Befehle: Tab 0 Laden 1" exists
+# the cursor: the arrow on the page (HB_CURSOR_SET, CUR_ARROW), the hand the app asks for over
+# a link, the crosshair on a canvas without flags
+move #101
+expect text:"Zeiger: Pfeil" exists
+move 60,160
+expect text:"Zeiger: Hand" exists
+move #102
+expect text:"Zeiger: Kreuz" exists
+# without HB_KEYS the defaults: the accelerator runs, Tab moves the focus on
+click "Tastensenke"
+click #101
+key ctrl+t
+expect text:"Befehle: Tab 1 Laden 1" exists
+key tab
+expect "Tastensenke" focused
+# the plain canvas the same
+click #102
+expect #102 focused
+key ctrl+t
+expect text:"Befehle: Tab 2 Laden 1" exists
+expect text:"Tasten: Strg+T Tab Umschalt+Tab Strg+Z" exists

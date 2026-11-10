@@ -3,7 +3,7 @@
 // same app with the standard library (jflib's feature std): no #![no_std], a fn main of its own, a
 // .cargo/config.toml that only links the C runtime in on Windows (std links with the system's
 // linker) and no PERMISSIONS (in a program with std it covers only JFLib's own calls,
-// docs/PERMISSIONS.md).
+// docs/PERMISSIONS.md).  Its Cargo.toml names the feature unwind, for an app that catches panics.
 
 use std::fs;
 use std::path::Path;
@@ -75,6 +75,12 @@ rustflags = ["-C", "target-feature=+crt-static"]
 rustflags = ["-C", "target-feature=+crt-static"]
 "#;
 
+/// the end of the profiles' note in the Cargo.toml of an app with std: the feature unwind
+const STD_UNWIND: &str = "build JFLib is tested with.  An app that catches panics
+# (std::panic::catch_unwind) takes jflib's feature \"unwind\" in place of \"std\" and panic = \"unwind\"
+# in both profiles (docs/GUIDE.md of jflib, \"An app with std\").
+";
+
 /// the files an app with std leaves out: see the head of this file
 const NOT_STD: [&str; 1] = ["PERMISSIONS"];
 
@@ -86,6 +92,7 @@ pub(crate) fn with_std(path: &str, text: &str, name: &str) -> Result<String, Str
         "Cargo.toml" => vec![
             ("made by cargo jflib new", "made by cargo jflib new --std".to_string()),
             ("jflib = \"", "jflib = { features = [\"std\"], version = \"".to_string()),
+            ("build JFLib is tested with.\n", STD_UNWIND.to_string()),
         ],
         "src/main.rs" => return Ok(STD_MAIN.replace("hallo", &krate)),
         ".cargo/config.toml" => return Ok(STD_CONFIG.to_string()),
@@ -178,6 +185,7 @@ mod tests {
         let cargo = with_std("Cargo.toml", &personal("Cargo.toml", FILES[0].1, "my-app").unwrap(), "my-app").unwrap();
         let line = cargo.lines().find(|l| l.starts_with("jflib = ")).unwrap();
         assert!(line.starts_with("jflib = { features = [\"std\"], version = \"") && line.ends_with("\" }"), "{line}");
+        assert!(cargo.contains("feature \"unwind\"") && cargo.contains("panic = \"abort\""), "{cargo}");
         assert!(with_std("src/main.rs", "", "my-app").unwrap().contains("extern crate my_app;"));
         let config = with_std(".cargo/config.toml", "", "my-app").unwrap();
         assert!(config.contains("+crt-static") && !config.contains("rust-lld") && !config.contains("jfgui_glibc"));
