@@ -546,7 +546,8 @@ impl View3d {
         let now = plat::time_us();
         let i = ui.gpu_view_info(0, ID_VIEW).unwrap_or_default();
         let o = ui.gpu_output(0);
-        let warm = now > self.bench_t0 + 3_000_000 && i.frames > 0 && (!o.wanted || o.on || o.never);
+        // the 3 s of warming up only before the first measured frame: bench_t0 is the measurement's start after it
+        let warm = self.bench_base.is_some() || (now > self.bench_t0 + 3_000_000 && i.frames > 0 && (!o.wanted || o.on || o.never));
         let counters = [o.frames + o.cpu_frames, o.render_us, o.present_us, i.draw_us, i.frames];
         if warm {
             let Some(base) = self.bench_base else {

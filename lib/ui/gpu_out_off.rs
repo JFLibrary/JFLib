@@ -68,6 +68,9 @@ impl Ui {
     /// where the GPU shows windows: the pixels of the GPU's images into the framebuffer
     pub fn gpu_settle(&mut self) {}
 
+    /// (test aid, G5e3) where the GPU shows windows: window `win`'s frames are not shown while on
+    pub fn gpu_test_hold(&mut self, _win: u32, _on: bool) {}
+
     /// (test aid) where the GPU shows windows: the bytes image textures may take
     pub fn gpu_test_image_budget(&mut self, _bytes: u64) {}
 

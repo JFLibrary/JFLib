@@ -8650,10 +8650,14 @@ move: its cells owed and stale, the cells with something over it and under a lay
 whose Draw reads the frame back (the only way the CPU gets it: a copy to a read-back buffer, waited for).
 VIEW_REST_US after the last frame gp_tick settles the window once: at rest the framebuffer holds the picture.
 Anywhere else the view's command hashes its frame's number, so each new frame is drawn by the CPU, which reads
-it back.  AF_GPU_3D makes the device at level Voll on the fastest adapter; without the flag views work on the
-Basis device of the frugal adapter.  Without an output in this run (not wanted, never possible) views make a
-device of their own (gp_view_device).  A lost device detaches every content (gp_views_gone) and attaches it to
-the next one.
+it back.  A view's frame is bound to the display (G5e3, docs/GPU.md "3D-Ansicht"): while its window is on its
+swapchain with a frame not shown yet (Win::pending), a new ver waits; gp_views_wake asks for a render once the
+window's frame has been shown, at the latest VIEW_HOLD_US after the first frame waited (a display that never
+answers does not stop the view).  Without this a view drawn as fast as the app can starved the compositor on the
+same GPU (Intel under Linux: no frame presented at all).  AF_GPU_3D makes the device at level Voll on the fastest
+adapter; without the flag views work on the Basis device of the frugal adapter.  Without an output in this run (not
+wanted, never possible) views make a device of their own (gp_view_device).  A lost device detaches every content
+(gp_views_gone) and attaches it to the next one.
 
 A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
@@ -8726,6 +8730,9 @@ GPU_OUT_FS_TILE: &[u32] = spv::FS_TILE
 - **`fn gpu_test_lose(&mut self)`**
   (test aid) the device behaves as lost from now on: the next frame goes back to the CPU
   path, a new device follows
+- **`fn gpu_test_hold(&mut self, win: u32, on: bool)`**
+  (test aid, G5e3) window `win`'s frames are not shown while on (as if the display did not answer): they stay in
+  its texture, its views' new frames wait for them; off: the next look shows the newest
 - **`fn gpu_test_image_budget(&mut self, bytes: u64)`**
   (test aid) the bytes image textures may take
 - **`fn gpu_test_canvas_budget(&mut self, bytes: u64)`**
@@ -8754,6 +8761,8 @@ against glibc, Android, the browser): every frame takes the platform's path, no 
   (test aid) where the GPU shows windows: the device behaves as lost from now on
 - **`fn gpu_settle(&mut self)`**
   where the GPU shows windows: the pixels of the GPU's images into the framebuffer
+- **`fn gpu_test_hold(&mut self, _win: u32, _on: bool)`**
+  (test aid, G5e3) where the GPU shows windows: window `win`'s frames are not shown while on
 - **`fn gpu_test_image_budget(&mut self, _bytes: u64)`**
   (test aid) where the GPU shows windows: the bytes image textures may take
 - **`fn gpu_test_canvas_budget(&mut self, _bytes: u64)`**
@@ -8876,6 +8885,12 @@ the old one and attaches it to the new one; its next frame follows.
 The browser cannot wait: a read-back there is answered later, the Draw shows the last frame that came back.  When
 the answer comes (gp_views_tick looks), the next render takes it to the framebuffer as it would a new frame, and at
 rest it is settled again (G5e2: before, a view at rest or under a layer kept an older frame in the framebuffer).
+
+A view's frame is bound to the display (G5e3): while its window is on its swapchain and the window's last frame has
+not been shown yet (gpu_out.rs Win::pending: no free image, the display has not answered, less than 4 ms since the
+last present), a new ver does not ask the content to draw; renders in between take the view's last frame.  Once the
+window's frame is shown gp_views_wake asks for a render, which draws the newest ver; a frame that is never shown
+holds the view at most VIEW_HOLD_US, then it draws one anyway.  GpuViewInfo::held counts the frames that waited.
 ```
 
 ```rust
@@ -8918,6 +8933,9 @@ GPU_VIEW_FORMAT: gpu::Format = gpu::Format::Bgra8Unorm
   - `read_us: u64`
   - `read_frame: u64` -- (G5e2) the newest frame read back into the CPU's copy (1, 2, ..; 0: none): the framebuffer can hold the view's
     newest frame once it equals `frames` (in the browser a read-back comes later)
+  - `held: u64` -- (G5e3) frames that had to wait: a new ver (size, device) came while the view's window had not shown its last
+    frame yet, so the content was not asked to draw then (each ver counted once; the newest is drawn when the
+    window's frame has arrived)
   - `size: (u32, u32)` -- the size of its target (px)
   - `error: Option<String>` -- what the last failure said
 
@@ -20787,7 +20805,14 @@ CASCADES_MAX: usize = 4
 **`impl Shadows`**
 
 - **`const DEFAULT: Shadows = Shadows { cascades: 4, size: 2048, distance: 100.0, split ...`**
-  4 cascades of 2048 texels up to 100 from the eye, split 0.75, reach 100
+  4 cascades of 2048 texels up to 100 from the eye, split 0.75, reach 100: the default for level Voll
+- **`const BASIS: Shadows = Shadows { cascades: 2, size: 1024, ..Shadows::DEFAULT }`**
+  (G5e3) 2 cascades of 1024 texels, the rest as DEFAULT (up to 100, split 0.75, reach 100): the default for level
+  Basis (the browser, older and weak GPUs, phones), half the shadows' GPU time or less, coarser texels near the
+  camera (docs/RENDER3D.md)
+- **`const fn for_level(level: Level) -> Shadows`**
+  (G5e3) the default for a device of this level: BASIS on Basis, DEFAULT on Voll
+  (`Shadows::for_level(dev.level())`)
 
 - **`struct Cascade`**
   a cascade as the CPU computed it for a frame (Scene::cascades)
