@@ -71,6 +71,7 @@ pub(crate) const WCH_CLOSE: u32 = 1; // close button
 pub(crate) const WCH_CONTENT: u32 = 2; // content box
 pub(crate) const WCH_FOOTER: u32 = 3; // dialog footer (dialog_buttons in a WF_DIALOG window)
 pub(crate) const WCH_BTN: u32 = 4; // footer buttons 4, 5, 6
+pub(crate) const WCH_ROLL: u32 = 7; // (form.rs) the scroll view of content taller than a phone's window
 /// root box id of window i (> 0): WROOT_BASE | i
 pub(crate) const WROOT_BASE: u32 = 0xFFFF_7F00;
 
@@ -1088,6 +1089,23 @@ impl Ui {
         self.m.win.recs[iu].rect.set(rc);
     }
 
+    // (form.rs) uiw_keep_on_screen(i, rect): a phone's or a tablet's window is at most as large as the
+    // app's screen, and one the main window owns lies inside it (what does not fit rolls: chrome.rs)
+    fn uiw_keep_on_screen(&self, iu: usize, rc: &mut WinRect) {
+        if iu == 0 {
+            return;
+        }
+        let (owner, tbh) = (self.m.win.recs[iu].owner, self.m.win.recs[iu].tbh);
+        let (mw, mh, _) = self.uiw_outer_dip(0);
+        let edge = 2; // the window's border, both sides (DIP, rounded up)
+        rc.w = rc.w.min(mw - edge).max(1);
+        rc.h = rc.h.min(mh - tbh - edge).max(1);
+        if owner == 0 && rc.flags & WRF_POS != 0 {
+            rc.x = rc.x.min(mw - edge - rc.w).max(0);
+            rc.y = rc.y.min(mh - edge - rc.h).max(tbh);
+        }
+    }
+
     // uiw_outer_dip(i) -> (outer width, outer height (DIP), y of the outer top edge relative
     // to the client origin (-title bar height; main window: 0))
     fn uiw_outer_dip(&self, i: u32) -> (i32, i32, i32) {
@@ -1118,6 +1136,9 @@ impl Ui {
         }
         if rc.h > SIZE_MAX_DIP {
             rc.h = SIZE_MAX_DIP;
+        }
+        if self.mobile() {
+            self.uiw_keep_on_screen(iu, &mut rc);
         }
         self.m.win.recs[iu].rect.set(rc);
         if !self.wp.rt.fb.px.is_empty() && rc == self.m.win.recs[iu].applied {
@@ -1343,6 +1364,11 @@ impl Ui {
         };
         if pw < 0 {
             return;
+        }
+        // (form.rs) the system's bars take the colours at the app's edges
+        #[cfg(target_os = "android")]
+        if cur == 0 && !self.headless {
+            plat::host_edges(super::form::edge_colors(&self.wp.rt.fb));
         }
         if self.gp_present(cur, pw, n) {
             return;

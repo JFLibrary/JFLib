@@ -71,7 +71,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -3789,7 +3789,7 @@ Windows (win.rs):
        its footer below the content box (pinned to the bottom)
 
 Ids: dialog parts (id << 3 | k) | 0x80000000; title bar 0xFFFF7400.. (min +1, max +2,
-close +3); status bar 0xFFFF7410, 0xFFFF7411; edge grips 0xFFFF7430..
+close +3); status bar 0xFFFF7410 .. 0xFFFF7412; edge grips 0xFFFF7430..
 ```
 
 **`impl Ui`**
@@ -4988,6 +4988,15 @@ TF_SLOP: u32 = 16
 TF_DECLINE: u32 = 32
 TF_REST: u32 = 64
 TF_HOLD_LONG: u32 = 128
+```
+
+*the device (form.rs)*
+
+```rust
+// ui.form_factor(): what the app runs on -- a desktop (however small its window), a tablet, a phone
+FF_DESKTOP: u32 = 0
+FF_TABLET: u32 = 1
+FF_PHONE: u32 = 2
 ```
 
 *semantic kinds and states*
@@ -7762,6 +7771,43 @@ box), "opsz_auto" (ids.rs).
   the font picker (see the module header) -> EV_ACT when sel changed
 - **`fn font_dialog(&mut self, id: u32, open: &Shared<i32>, sel: &mut FontSel) -> u32`**
   the font dialog (see the module header) -> EV_ACT when OK took the choice
+
+#### `ui/form.rs`
+
+Source: [`lib/ui/form.rs`](../lib/ui/form.rs)
+
+```text
+form -- the kind of device the app runs on: a desktop, a tablet or a phone
+
+  form_factor() -> FF_DESKTOP / FF_TABLET / FF_PHONE
+  mobile() -> bool                 a tablet or a phone (form_factor() != FF_DESKTOP)
+
+The platform decides, never the window's size alone: Windows, Linux, macOS and the browser are
+FF_DESKTOP however small a window is dragged (a narrow desktop window keeps the desktop's
+behaviour); Android and iOS are FF_TABLET, and FF_PHONE where the main window's shorter side is
+below 600 DIP (Android's own line between a phone and a tablet, `sw600dp`; a tablet's app in a
+narrow split screen is laid out like a phone's then).  The shorter side keeps a phone a phone
+when it is turned.
+
+jfgui_FORM=desktop|tablet|phone decides instead (any platform: tests, and a look at the phone's
+layout on the desktop; scripts: `system env jfgui_FORM phone`).
+
+What the library does by itself on a phone or a tablet (only there):
+  the title bar has no caption buttons (chrome.rs: the system owns the app's window);
+  a menu bar that does not fit its row becomes one menu button (popup.rs, menubar);
+  the status bar's items roll sideways with the finger when the bar is too narrow (chrome.rs);
+  windows and content dialogs keep inside the screen, what does not fit rolls (win.rs, chrome.rs);
+  Android and iOS paint the system's bars in the colours at the app's edges (the hosts).
+Apps ask form_factor() for what only they know: which panels a phone shows, which a tablet.
+```
+
+**`impl Ui`**
+
+- **`fn form_factor(&self) -> u32`**
+  ui_form_factor: FF_DESKTOP, FF_TABLET or FF_PHONE (the platform's; jfgui_FORM decides
+  instead).  A desktop window stays FF_DESKTOP however narrow it is.
+- **`fn mobile(&self) -> bool`**
+  ui_mobile: the app runs on a phone or a tablet (form_factor() != FF_DESKTOP)
 
 #### `ui/grid.rs`
 
@@ -32588,6 +32634,26 @@ This adapter shares the host's single UI thread and never invokes Android under 
 
 - **`extern "C" fn jfgui_editor_replace(id: u32, len: u32, anchor: u32, caret: u32) -> u32`**
   Queue a bounded, valid editor replacement from the shared JNI input buffer.
+
+### `plat/android_edges.rs`
+
+Source: [`lib/plat/android_edges.rs`](../lib/plat/android_edges.rs)
+
+```text
+android_edges -- the colours at the app's edges for Android's system bars (form.rs)
+
+The UI hands over the colours along the main window's top, bottom, left and right edge after
+every present of it (host_edges); GalleryActivity reads them each frame (bridge.c nativeEdges ->
+jfgui_edge) and paints the status bar, the navigation bar and a cut-out's strip in them, with
+light or dark system icons to match: the bars follow the app, not the system's appearance (an app
+may keep its own theme).  iOS does the same in its host (apple_ios.rs edge_color).
+```
+
+- **`fn host_edges(colors: [u32; 4])`**
+  the colours (0xRRGGBB) along the main window's top, bottom, left and right edge
+
+- **`extern "C" fn jfgui_edge(side: u32) -> u32`**
+  (bridge.c) the colour of edge `side` (0 top, 1 bottom, 2 left, 3 right): 0xFFRRGGBB, 0 = none yet
 
 ### `plat/web_threads.rs`
 

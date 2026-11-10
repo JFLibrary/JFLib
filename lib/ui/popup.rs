@@ -78,6 +78,10 @@ const CST_LIMIT: usize = 1536; // at most this many commands with a state
 // rows of a menu (fixed: a row's record index is a byte; more: limit_hit), all of them
 // reachable by keys and mnemonics
 const MENU_MAX: usize = 250;
+// (form.rs) the compact menu bar's button: its name for screen readers, its least width (DIP)
+const MB_COMPACT_LABEL: &str = "Menü";
+const MB_COMPACT_W: i32 = 44;
+const MB_FILL_MIN: i32 = 64; // DIP the fill widgets of the bar's row keep before it becomes a button
 const MB_MAX: usize = 16; // menus per menu bar (fixed: wider than any window; more: limit_hit)
 const LAB_MAX: usize = 256;
 pub(crate) const CATCH_ID: u32 = 0x7FFE_0C0C; // hit box under the popups (light dismiss)
@@ -205,6 +209,8 @@ pub(crate) struct S {
     pub(crate) lists: Vec<(u32, Vec<String>)>,
     /// what an empty Mi::List says instead of its placeholder (by base id; "": the placeholder)
     pub(crate) list_empty: Vec<(u32, String)>,
+    /// (form.rs) the one-menu bars of compact menu bars, by the address of the bar
+    compact: Vec<((usize, usize), &'static [Mi])>,
 }
 
 /// per-window state (ui_popup_wb0 .. ui_popup_wb1: popup stack, flyouts, menu bar, tooltip)
@@ -1342,7 +1348,7 @@ impl Ui {
                     }
                     ev
                 }
-                Mi::Sub(label, sub) => {
+                Mi::Sub(label, sub) | Mi::Menu(label, sub) => {
                     let spid = menu_pid(sub, rid); // submenu popup id
                     let sopen = self.pp_find(spid) >= 0;
                     let mf = if sopen { MIF_SUB | MIF_OPEN } else { MIF_SUB };
@@ -1395,7 +1401,6 @@ impl Ui {
                     }
                     continue;
                 }
-                Mi::Menu(..) => continue,
             };
             // .mf_row: Cmd / Item rows
             if ev & EV_ACT != 0 {
@@ -1419,7 +1424,7 @@ impl Ui {
             let sel = (0..rows).rev().find(|&j| ids[j] == focus).map(|j| (ids[j], recs[j] as usize));
             // Right on a submenu row opens it with the focus inside
             if let Some((rid, ri)) = sel {
-                if let Mi::Sub(_, sub) = menu[ri] {
+                if let Mi::Sub(_, sub) | Mi::Menu(_, sub) = menu[ri] {
                     if self.key(VK_RIGHT) {
                         self.mf_open_sub(sub, rid);
                         break 'keys;
@@ -1448,7 +1453,7 @@ impl Ui {
                 }
                 self.key(vk);
                 let rid = ids[j];
-                if let Mi::Sub(_, sub) = rec {
+                if let Mi::Sub(_, sub) | Mi::Menu(_, sub) = rec {
                     self.focus(rid);
                     self.mf_open_sub(sub, rid);
                 } else {
@@ -1547,6 +1552,15 @@ impl Ui {
         }
         if n == 0 {
             return 0;
+        }
+        // (form.rs) on a phone or a tablet a bar that does not fit its row is one menu button: a
+        // bar with a single menu whose rows are the menus.  A desktop's bar never changes.
+        let compact = self.mobile() && self.mb_compact_wanted(mb, n, base);
+        let mb = if compact { self.mb_compact_bar(mb, n) } else { mb };
+        if compact {
+            n = 1;
+            mn[0] = 0;
+            mpos[0] = 0xFF;
         }
         let mut open = self.mb_open_index(mb, base, n);
         let fi0 = self.wp.ctx.focus.wrapping_sub(base);
@@ -1670,9 +1684,12 @@ impl Ui {
         let mut rects = [[0i32; 4]; MB_MAX];
         for i in 0..n {
             let Mi::Menu(label, _) = mb[i] else { break };
-            let lab = strip_amp(label).0;
-            let mut sp = Sp { label: Some(&lab), ..Sp::default() };
-            let (w, h) = st.menubar_item_size(self, &mut sp);
+            let lab = if compact { String::from(MB_COMPACT_LABEL) } else { strip_amp(label).0 };
+            let mut sp = Sp { label: Some(if compact { "" } else { &lab }), ..Sp::default() };
+            let (mut w, h) = st.menubar_item_size(self, &mut sp);
+            if compact {
+                w = w.max(self.dp(MB_COMPACT_W));
+            }
             let r = self.place(w, h);
             rects[i] = r;
             let id = base.wrapping_add(i as u32); // item id
@@ -1715,6 +1732,9 @@ impl Ui {
                 sp.value = mpos[i] as i32;
             }
             st.menubar_item(self, &sp);
+            if compact {
+                self.mb_compact_icon(sp.rect());
+            }
             if fi == i as i32 && open < 0 {
                 self.focus_ring_draw(ev);
             }
@@ -1756,6 +1776,44 @@ impl Ui {
             }
         }
         if open >= 0 { EV_OPEN } else { 0 }
+    }
+
+    // (form.rs) mb_compact_wanted(bar, n, base) -> the bar's menus do not fit the row it is in (the
+    // other widgets of the row as wide as in the last pass; fill widgets give way, down to MB_FILL_MIN)
+    fn mb_compact_wanted(&mut self, mb: &'static [Mi], n: usize, base: u32) -> bool {
+        let st = self.style;
+        let mut full = self.dp(4) * 2 + self.dp(4) * (n as i32 - 1); // PAD_4, gap 4
+        for rec in mb.iter().take(n) {
+            let Mi::Menu(label, _) = *rec else { break };
+            let lab = strip_amp(label).0;
+            let mut sp = Sp { label: Some(&lab), ..Sp::default() };
+            full += st.menubar_item_size(self, &mut sp).0;
+        }
+        // fill widgets of the row (an image list beside the bar) keep at least MB_FILL_MIN: one
+        // squeezed to nothing would be gone
+        let (room, others, fill) = self.box_room(base | 0xFF);
+        let keep = if fill { self.dp(MB_FILL_MIN) } else { 0 };
+        room > 0 && others + full + keep > room
+    }
+
+    // (form.rs) mb_compact_bar(bar, n) -> a bar with one menu: the n menus of `bar` as its rows
+    fn mb_compact_bar(&mut self, mb: &'static [Mi], n: usize) -> &'static [Mi] {
+        let key = (mb.as_ptr() as usize, n);
+        let c = &mut self.m.popup.compact;
+        if let Some(e) = c.iter().find(|e| e.0 == key) {
+            return e.1;
+        }
+        let bar: &'static [Mi] = alloc::boxed::Box::leak(alloc::vec![Mi::Menu("", &mb[..n])].into_boxed_slice());
+        c.push((key, bar));
+        bar
+    }
+
+    // (form.rs) mb_compact_icon(rect): the menu button's icon, centred on its item
+    fn mb_compact_icon(&mut self, r: [i32; 4]) {
+        let s = self.dp(16);
+        let c = self.color(T_TEXT);
+        self.draw_color(c);
+        self.draw_icon(IC_MENU, r[0] + (r[2] - s) / 2, r[1] + (r[3] - s) / 2, s << 8);
     }
 
     // ------------------------------------------------------------------ context menus

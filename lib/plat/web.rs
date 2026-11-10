@@ -88,6 +88,11 @@ pub use web_gpu::*;
 mod android_ime;
 #[cfg(target_os = "android")]
 pub use android_ime::*;
+#[cfg(target_os = "android")]
+#[path = "android_edges.rs"]
+mod android_edges;
+#[cfg(target_os = "android")]
+pub use android_edges::*;
 #[cfg(web_threads)]
 #[path = "web_threads.rs"]
 mod threads;
