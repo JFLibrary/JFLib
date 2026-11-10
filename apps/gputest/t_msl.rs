@@ -19,6 +19,7 @@ const LIB_WGSL: &[(&str, &str)] = &[
     ("render3d_scatter", include_str!("../../lib/render3d/scatter.wgsl")),
 ];
 
+#[cfg(not(target_os = "android"))]
 const CORPUS: &str = "tools/wgsl_corpus";
 
 /// what the translation refuses on purpose: (name part, why)
@@ -27,6 +28,12 @@ const EXPECTED: &[(&str, &str)] = &[
     ("cs_bindless_sample", "a runtime array of textures (Bindless, level Voll)"),
 ];
 
+#[cfg(target_os = "android")]
+fn corpus() -> Vec<(String, String)> {
+    Vec::new() // (no repository on a phone; the test is for Apple anyway)
+}
+
+#[cfg(not(target_os = "android"))]
 fn corpus() -> Vec<(String, String)> {
     let mut v = Vec::new();
     let Some(dirs) = plat::fs::read_dir(CORPUS) else { return v };
