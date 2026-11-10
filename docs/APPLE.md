@@ -467,7 +467,9 @@ sofort, wenn es außerhalb des Bündels läuft („invalid Info.plist“); updat
 das einfache Programm neben dem Bündel. Die Hand-Probe des Nutzers (die `.dmg` aus „Downloads“ geöffnet, die App
 gestartet) fand einen Fehler, den `spctl` nicht sieht: `tools/package.py` kopierte das Programm ohne Ausführrecht,
 die App öffnete nicht; behoben, `mac_dmg` lehnt ein solches Bündel jetzt ab, danach startete sie mit der üblichen
-Rückfrage. Offen: Signieren in der CI (Zertifikat als Geheimnis) und TestFlight für iOS (falls gewünscht).
+Rückfrage. Signieren in der CI gehört in die Repositories der Apps, nicht in JFLib (Entscheidung des Nutzers vom
+2026-11-10): Die Test-Apps der Bibliothek bleiben ad hoc signiert, [PACKAGING.md](PACKAGING.md) „macOS: .dmg“ zeigt
+die Schritte für den Workflow einer App. Offen: TestFlight für iOS (falls gewünscht).
 
 **AP8d umgesetzt (2026-11-10), damit ist AP8 fertig:** README, [PACKAGING.md](PACKAGING.md), [UPDATES.md](UPDATES.md)
 und GUIDE nennen macOS und iOS (mit AP8a–AP8c). Die Website jflib.org (Repository jflibWebsite, Inhalt vorher mit dem
