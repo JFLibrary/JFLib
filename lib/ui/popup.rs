@@ -248,6 +248,38 @@ pub(crate) struct W {
 
 // ------------------------------------------------------------------ small helpers
 
+/// a VK_* accelerator as the key equivalent of a row in the system's menu bar (macOS: a character,
+/// function and cursor keys as AppKit's private-use characters; "" = none, the key then reaches the
+/// window as before)
+fn sysmenu_key(vk: u32) -> String {
+    let c: u32 = match vk {
+        VK_A..=VK_Z => vk - VK_A + b'a' as u32,
+        VK_0..=VK_9 => vk,
+        VK_F1..=VK_F12 => 0xF704 + (vk - VK_F1),
+        VK_UP => 0xF700,
+        VK_DOWN => 0xF701,
+        VK_LEFT => 0xF702,
+        VK_RIGHT => 0xF703,
+        VK_INSERT => 0xF727,
+        VK_DELETE => 0xF728,
+        VK_HOME => 0xF729,
+        VK_END => 0xF72B,
+        VK_PRIOR => 0xF72C,
+        VK_NEXT => 0xF72D,
+        VK_BACK => 0x08,
+        VK_TAB => 0x09,
+        VK_RETURN => 0x0D,
+        VK_ESCAPE => 0x1B,
+        VK_SPACE => 0x20,
+        VK_OEM_PLUS | VK_ADD => b'+' as u32,
+        VK_OEM_MINUS | VK_SUBTRACT => b'-' as u32,
+        VK_OEM_COMMA => b',' as u32,
+        VK_OEM_PERIOD => b'.' as u32,
+        _ => return String::new(),
+    };
+    char::from_u32(c).map_or(String::new(), |ch| String::from(ch))
+}
+
 /// strip_amp(src) -> (src without the '&' markers ("&&" = '&'; at most LAB_MAX - 1 bytes),
 /// mnemonic (upper-case ASCII, 0 = none), byte offset of the mnemonic in the result or -1)
 fn strip_amp(src: &str) -> (String, u32, i32) {
@@ -1520,6 +1552,55 @@ impl Ui {
         }
     }
 
+    // (macOS) the rows chosen in the system's menu bar run as from the window's bar; the bar's
+    // menus with the commands' labels, states and keys go to the system (unchanged: nothing)
+    fn sysmenu_publish(&mut self, mb: &'static [Mi]) {
+        for id in plat::sysmenu::sysmenu_take() {
+            self.cmd_run(id, 0);
+        }
+        let items = self.sysmenu_items(mb);
+        plat::sysmenu::sysmenu_set(&items);
+    }
+
+    // menu records -> the system's menu rows (MI_LIST: the rows of menu_list, else its placeholder)
+    fn sysmenu_items(&self, list: &'static [Mi]) -> Vec<plat::sysmenu::SysMenuItem> {
+        use plat::sysmenu::{SysMenuItem, TI_CHECKED, TI_DISABLED, TI_SEPARATOR};
+        let mut v = Vec::new();
+        for rec in list {
+            match *rec {
+                Mi::Menu(l, sub) | Mi::Sub(l, sub) => {
+                    v.push(SysMenuItem { label: strip_amp(l).0, sub: self.sysmenu_items(sub), ..Default::default() })
+                }
+                Mi::Sep => v.push(SysMenuItem { flags: TI_SEPARATOR, ..Default::default() }),
+                Mi::Cmd(id) => {
+                    let Some(c) = self.cmd_find(id) else { continue };
+                    let f = self.cmd_flags(id);
+                    if f & CF_HIDDEN != 0 {
+                        continue;
+                    }
+                    let flags = if f & CF_CHECKED != 0 { TI_CHECKED } else { 0 } | if f & CF_DISABLED != 0 { TI_DISABLED } else { 0 };
+                    let key = sysmenu_key(c.key as u32);
+                    let mods = if key.is_empty() { 0 } else { c.mods as u32 };
+                    v.push(SysMenuItem { id, label: strip_amp(c.label).0, flags, key, mods, sub: Vec::new() });
+                }
+                Mi::Item(id, l, _) => v.push(SysMenuItem { id, label: strip_amp(l).0, ..Default::default() }),
+                Mi::List(base, max, ph) => {
+                    let rows = self.m.popup.lists.iter().find(|e| e.0 == base).map(|e| e.1.clone()).unwrap_or_default();
+                    if rows.is_empty() {
+                        let empty = self.m.popup.list_empty.iter().find(|e| e.0 == base).map_or(String::from(ph), |e| e.1.clone());
+                        if !empty.is_empty() {
+                            v.push(SysMenuItem { label: empty, flags: TI_DISABLED, ..Default::default() });
+                        }
+                    }
+                    for (k, r) in rows.iter().take(max as usize).enumerate() {
+                        v.push(SysMenuItem { id: base + k as u32, label: r.clone(), ..Default::default() });
+                    }
+                }
+            }
+        }
+        v
+    }
+
     /// ui_menubar(menubar) -> EV_OPEN while one of its menus is open (None = the one of
     /// AppDesc::menubar).  WinUI MenuBar: subtle 32 DIP items, a flyout per menu.
     /// Keyboard: Alt (tap) or F10 enter / leave menu bar mode, Alt+mnemonic opens a menu,
@@ -1532,6 +1613,12 @@ impl Ui {
             None => self.desc.menubar,
         };
         if mb.is_empty() {
+            return 0;
+        }
+        // (macOS, a window of the app) the app's menus live in the system's menu bar, as on every
+        // Mac: they go there (plat::sysmenu) and the window draws no bar of its own
+        if menubar.is_none() && !self.headless && self.uiw_cur == 0 && plat::sysmenu::sysmenu_supported() {
+            self.sysmenu_publish(mb);
             return 0;
         }
         let a = (mb.as_ptr() as usize as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);

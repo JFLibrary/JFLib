@@ -17,6 +17,7 @@
 //   rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (the root Cargo.toml, SemVer;
 //            docs/VERSIONING.md), also as plat::VERSION and ui::VERSION
 //   rt::app_version!()  the app's own version (version= of apps/NAME/PACKAGE)
+//   rt::plugin_abi!  the calling convention of plugins and modules: win64 on x86-64, C elsewhere (abi.rs)
 //
 // One of the four crates that may contain `unsafe` (rt, simd, plat, plugin).
 #![no_std]
@@ -209,3 +210,6 @@ pub(crate) fn panic_report(info: &dyn core::fmt::Display) -> ! {
     ci.msg = text.strip_prefix("panic: ").unwrap_or(text);
     crash::report(&ci)
 }
+
+// rt::plugin_abi! (macro_export: at the crate root)
+mod abi;

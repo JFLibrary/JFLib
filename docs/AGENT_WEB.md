@@ -344,7 +344,10 @@ landet es wie Firefox dort).
   Quelle, Zitat, Note, Undo/Redo, DOCX-Speichern/Öffnen und Bildressource.
 - `tools/tests/web_apps.mjs`: Chromium-/Firefox-Prüfungen für gemeinsame Darstellung,
   Eingaben und App-Aktionen für alle fünf GUI-Apps. Ergebnisse und Browserbilder liegen
-  unter `build/office-universal/browser-tests`.
+  unter `build/office-universal/browser-tests`. `--engine=safari` nimmt ein echtes Safari
+  auf einem Mac (`tools/tests/safari.mjs` über WebDriver, `tools/tests/safari_tunnel.py
+  USER@MAC -- node tools/tests/web_apps.mjs BUILD --engine=safari --port=8720`;
+  [APPLE.md](APPLE.md) AP1).
 - `tools/tests/web_frames.mjs BUILD`: echte WASM-/Worker-Prüfung der Reihenfolge von
   Zeichenbewegungen, Stiftdruck, Undo/Redo und Größenänderungen. Stapel und einzeln
   verarbeitete Ereignisse müssen dieselben Pixel ergeben; Teilbildkomposition wird

@@ -5,10 +5,12 @@
 // Written in assembly (global_asm) rather than as #[no_mangle] Rust functions: rustc exports
 // every #[no_mangle] item of every crate from a cdylib, and a module must export exactly its
 // NAME_module.  Assembly symbols are invisible to rustc's export list (Windows: not in the
-// .def file; Linux: local through the version script).  rep movsb / stosb as in rt; the C
-// calling convention of the platform (Windows x64: rcx, rdx, r8; System V: rdi, rsi, rdx).
+// .def file; Linux: local through the version script).  The C calling convention of the
+// platform: on x86-64 rep movsb / stosb as in rt (Windows x64: rcx, rdx, r8; System V: rdi, rsi,
+// rdx); on ARM64 one block for Windows and Linux, which call alike (x0, x1, x2 -> x0), with the
+// steps of rt's aarch64/mem.rs (docs/ARM64.md, ARM4).
 
-#[cfg(windows)]
+#[cfg(all(windows, target_arch = "x86_64"))]
 core::arch::global_asm!(
     ".text",
     // memcpy(dst, src, n) -> dst      (rdi / rsi are callee-saved: kept in r9 / r10)
@@ -114,7 +116,7 @@ core::arch::global_asm!(
     ".text",
 );
 
-#[cfg(not(windows))]
+#[cfg(all(not(windows), target_arch = "x86_64"))]
 core::arch::global_asm!(
     ".text",
     // memcpy(dst, src, n) -> dst
@@ -176,4 +178,184 @@ core::arch::global_asm!(
     "    jmp 4b",
     "5:",
     "    ret",
+);
+
+// ARM64, Windows and Linux: user code may load and store at any alignment, so nothing aligns
+// first.  memcpy and memmove forward 32 bytes per step (two ldp / stp), the rest below 32 by its
+// bits (16, 8, 4, 2, 1); memmove backward the same steps from the end down; memset the byte in
+// all eight bytes of a register.  Each step loads all its bytes before it stores any: right for
+// overlapping ranges, forward when dst <= src, backward when dst > src.  memcmp byte by byte as
+// on x86-64.  Only x0-x7 and x9 change (caller-saved).
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    ".text",
+    // memcpy(dst, src, n) -> dst
+    ".p2align 2",
+    ".globl memcpy",
+    "memcpy:",
+    "    mov x3, x0",
+    "2:",
+    "    cmp x2, #32",
+    "    b.lo 3f",
+    "    ldp x4, x5, [x1]",
+    "    ldp x6, x7, [x1, #16]",
+    "    add x1, x1, #32",
+    "    sub x2, x2, #32",
+    "    stp x4, x5, [x3]",
+    "    stp x6, x7, [x3, #16]",
+    "    add x3, x3, #32",
+    "    b 2b",
+    "3:",
+    "    tbz x2, #4, 4f",
+    "    ldp x4, x5, [x1], #16",
+    "    stp x4, x5, [x3], #16",
+    "4:",
+    "    tbz x2, #3, 5f",
+    "    ldr x4, [x1], #8",
+    "    str x4, [x3], #8",
+    "5:",
+    "    tbz x2, #2, 6f",
+    "    ldr w4, [x1], #4",
+    "    str w4, [x3], #4",
+    "6:",
+    "    tbz x2, #1, 7f",
+    "    ldrh w4, [x1], #2",
+    "    strh w4, [x3], #2",
+    "7:",
+    "    tbz x2, #0, 8f",
+    "    ldrb w4, [x1]",
+    "    strb w4, [x3]",
+    "8:",
+    "    ret",
+    // memmove(dst, src, n) -> dst: forward (memcpy) unless dst starts inside src, i.e. unless
+    // dst - src < n unsigned (dst <= src wraps to a large difference)
+    ".p2align 2",
+    ".globl memmove",
+    "memmove:",
+    "    sub x9, x0, x1",
+    "    cmp x9, x2",
+    "    b.hs memcpy",
+    "    add x1, x1, x2",
+    "    add x3, x0, x2",
+    "2:",
+    "    cmp x2, #32",
+    "    b.lo 3f",
+    "    ldp x4, x5, [x1, #-16]",
+    "    ldp x6, x7, [x1, #-32]!",
+    "    sub x2, x2, #32",
+    "    stp x4, x5, [x3, #-16]",
+    "    stp x6, x7, [x3, #-32]!",
+    "    b 2b",
+    "3:",
+    "    tbz x2, #4, 4f",
+    "    ldp x4, x5, [x1, #-16]!",
+    "    stp x4, x5, [x3, #-16]!",
+    "4:",
+    "    tbz x2, #3, 5f",
+    "    ldr x4, [x1, #-8]!",
+    "    str x4, [x3, #-8]!",
+    "5:",
+    "    tbz x2, #2, 6f",
+    "    ldr w4, [x1, #-4]!",
+    "    str w4, [x3, #-4]!",
+    "6:",
+    "    tbz x2, #1, 7f",
+    "    ldrh w4, [x1, #-2]!",
+    "    strh w4, [x3, #-2]!",
+    "7:",
+    "    tbz x2, #0, 8f",
+    "    ldrb w4, [x1, #-1]",
+    "    strb w4, [x3, #-1]",
+    "8:",
+    "    ret",
+    // memset(dst, c, n) -> dst
+    ".p2align 2",
+    ".globl memset",
+    "memset:",
+    "    and x4, x1, #0xff",
+    "    mov x5, #0x0101010101010101",
+    "    mul x4, x4, x5",
+    "    mov x3, x0",
+    "2:",
+    "    cmp x2, #32",
+    "    b.lo 3f",
+    "    stp x4, x4, [x3]",
+    "    stp x4, x4, [x3, #16]",
+    "    add x3, x3, #32",
+    "    sub x2, x2, #32",
+    "    b 2b",
+    "3:",
+    "    tbz x2, #4, 4f",
+    "    stp x4, x4, [x3], #16",
+    "4:",
+    "    tbz x2, #3, 5f",
+    "    str x4, [x3], #8",
+    "5:",
+    "    tbz x2, #2, 6f",
+    "    str w4, [x3], #4",
+    "6:",
+    "    tbz x2, #1, 7f",
+    "    strh w4, [x3], #2",
+    "7:",
+    "    tbz x2, #0, 8f",
+    "    strb w4, [x3]",
+    "8:",
+    "    ret",
+    // memcmp(a, b, n) -> <0 / 0 / >0 ; bcmp the same
+    ".p2align 2",
+    ".globl memcmp",
+    ".globl bcmp",
+    "memcmp:",
+    "bcmp:",
+    "4:",
+    "    cbz x2, 5f",
+    "    ldrb w3, [x0], #1",
+    "    ldrb w4, [x1], #1",
+    "    sub x2, x2, #1",
+    "    subs w3, w3, w4",
+    "    b.eq 4b",
+    "    mov w0, w3",
+    "    ret",
+    "5:",
+    "    mov w0, #0",
+    "    ret",
+);
+
+// ELF: the symbol types of the block above
+#[cfg(all(not(windows), target_arch = "aarch64"))]
+core::arch::global_asm!(
+    ".type memcpy, %function",
+    ".type memmove, %function",
+    ".type memset, %function",
+    ".type memcmp, %function",
+    ".type bcmp, %function",
+);
+
+// Windows on ARM64 (docs/ARM64.md, ARM5): __chkstk gets the frame size in x15 in units of 16 bytes
+// and touches every page from sp down (only x16, x17 and the flags may change; the caller moves
+// sp itself); __CxxFrameHandler3 and _fltused as on x86-64
+#[cfg(all(windows, target_arch = "aarch64"))]
+core::arch::global_asm!(
+    ".text",
+    ".p2align 2",
+    ".globl __chkstk",
+    "__chkstk:",
+    "    lsl x16, x15, #4",
+    "    mov x17, sp",
+    "6:",
+    "    sub x17, x17, #4096",
+    "    subs x16, x16, #4096",
+    "    ldr xzr, [x17]",
+    "    b.gt 6b",
+    "    ret",
+    ".p2align 2",
+    ".globl __CxxFrameHandler3",
+    "__CxxFrameHandler3:",
+    "    mov w0, #1",
+    "    ret",
+    ".data",
+    ".globl _fltused",
+    "_fltused:",
+    "    .long 0",
+    ".text",
 );

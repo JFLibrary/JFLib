@@ -752,6 +752,11 @@ ui.menubar(None);                        // the menu bar of the AppDesc
 * A chosen menu row, a `cmd_button` and an accelerator all queue `App::command(cmd, 0)`.
   `&` marks the mnemonic (`&&` = a literal `&`). Keys are `VK_*` (Win32 numbering on every OS,
   `ui::keys`), modifiers `MOD_CTRL | MOD_SHIFT | MOD_ALT`.
+* On a Mac the menus of the `AppDesc` go into the menu bar of macOS, between the app menu and
+  the Window menu, as every Mac app has them: `ui.menubar(None)` of the main window draws no row
+  then, a row chosen up there runs as from the window's bar, `MOD_CTRL` is the Command key.
+  Headless runs (scripts) keep the row in the window, `jfgui_SYSMENU=0` too
+  (`plat::sysmenu`).
 * `cmd_state(cmd, CF_DISABLED | CF_CHECKED | CF_HIDDEN)` is persistent; set it every frame from
   your model. Accelerators fire only when no widget consumed the key first (`ui.key(VK_*)`).
   `accel_text(cmd)` gives the shortcut as shown in menus ("Strg+S").

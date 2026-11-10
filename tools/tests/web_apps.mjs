@@ -1,10 +1,13 @@
-// Real-browser acceptance of the common worker/canvas adapter. Needs Playwright (tools/tests/playwright.mjs).
+// Real-browser acceptance of the common worker/canvas adapter. Needs Playwright (tools/tests/playwright.mjs);
+// --engine=safari drives a real Safari through safaridriver instead (tools/tests/safari.mjs, docs/APPLE.md AP1).
 // node tools/tests/web_apps.mjs build/office-universal --engine=chromium --only=template,gallery,jfWord
+// node tools/tests/web_apps.mjs build/safari-web --engine=safari --port=8720   (python tools/tests/safari_tunnel.py)
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFile, mkdir, writeFile} from 'node:fs/promises';
 import {resolve, extname, sep} from 'node:path';
 import {loadPlaywright, chromiumOptions} from './playwright.mjs';
+import {launchSafari} from './safari.mjs';
 
 const root=resolve('.'), build=resolve(process.argv[2] || 'build/office-universal');
 const options=Object.fromEntries(process.argv.slice(3).filter(v=>v.startsWith('--')).map(v=>v.slice(2).split('=')));
@@ -12,7 +15,7 @@ const engines=(options.engine || 'chromium').split(','), apps=(options.only || '
 const artifact=resolve(build,'browser-tests');
 await mkdir(artifact,{recursive:true});
 process.env.PLAYWRIGHT_BROWSERS_PATH ||= resolve(root,'build/browser-engines');
-const playwright=loadPlaywright();
+const playwright=engines.some(e=>e!=='safari') ? loadPlaywright() : null;
 const server=createServer(async (request,response)=>{
   try {
     const url=new URL(request.url,'http://localhost');
@@ -27,7 +30,8 @@ const server=createServer(async (request,response)=>{
     response.writeHead(200,{'content-type':type,'cache-control':'no-store',...(options.isolated==='1'?{'cross-origin-opener-policy':'same-origin','cross-origin-embedder-policy':'require-corp'}:{})}).end(bytes);
   } catch(error) {response.writeHead(404,{'content-type':'text/plain'}).end(String(error));}
 });
-await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+// --port: a fixed port (Safari on a Mac reaches this server through an SSH tunnel to the same port)
+await new Promise(resolve=>server.listen(Number(options.port||0),'127.0.0.1',resolve));
 const base=`http://127.0.0.1:${server.address().port}`;
 const results=[];
 let requestId=0;
@@ -59,7 +63,8 @@ async function pixels(page) {
 }
 async function ready(page,url) {
   await page.goto(url);
-  await page.waitForFunction(()=>window.__jfguiReady,{timeout:45000});
+  // (the loader marks the body when it sends jfgui-ready: Safari's init scripts run too late for the event)
+  await page.waitForFunction(()=>window.__jfguiReady || document.body?.dataset?.compute!==undefined,{timeout:45000});
   const frame=await until(()=>pixels(page),v=>v.width>300 && v.colors>5,'nonempty Rust canvas frame');
   assert.equal(frame.width,Math.round(frame.cssWidth*frame.dpi));
   assert.equal(frame.height,Math.round(frame.cssHeight*frame.dpi));
@@ -327,7 +332,7 @@ async function wordChecks(page,engine) {
 }
 try {
   for(const engine of engines) {
-    const browser=await playwright[engine].launch({headless:true,...(engine==='chromium'?chromiumOptions():{})});
+    const browser=engine==='safari' ? await launchSafari() : await playwright[engine].launch({headless:true,...(engine==='chromium'?chromiumOptions():{})});
     try {
       for(const app of apps) {
         const context=await browser.newContext({locale:'de-DE',viewport:{width:1200,height:800},deviceScaleFactor:1});
@@ -364,7 +369,7 @@ try {
           assert.equal((await rpc(page,'agent/info')).controlEnabled,true,'URL opt-in');
           await page.screenshot({path:resolve(artifact,`${engine}-${app}-dark.png`)});
           assert.deepEqual(errors,[]);
-          results.push({engine,app,ok:true,initial,resized});
+          results.push({engine,app,ok:true,initial,resized,...(context.emulates&&Object.keys(context.emulates).length?{notEmulated:context.emulates}:{})});
           console.log(`${engine} ${app}: passed`);
         } catch(error) {
           await page.screenshot({path:resolve(artifact,`${engine}-${app}-failure.png`)}).catch(()=>{});
@@ -374,6 +379,7 @@ try {
         } finally {await context.close();}
       }
       for(const scale of [1.5,2]) for(const app of [apps[0],...apps.filter(a=>a==='jfWord' && a!==apps[0])]) {
+        if(engine==='safari') {results.push({engine,app,dpi:scale*100,ok:true,skipped:'WebDriver cannot set Safari\'s device scale factor'});continue;}
         const context=await browser.newContext({locale:'de-DE',viewport:{width:1000,height:760},deviceScaleFactor:scale});
         const page=await context.newPage();
         // Firefox may reset Playwright's DPR emulation on COOP process changes.

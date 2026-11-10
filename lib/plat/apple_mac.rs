@@ -77,6 +77,7 @@ mod sysapp;
 pub(crate) mod services;
 pub use services::hotkey::hotkey_test_post;
 pub(crate) use sysapp::print_dialog;
+pub(crate) use sysapp::{sysmenu_set, sysmenu_supported};
 pub use sysapp::print_dialog_autoclose;
 pub(crate) use dnd::os_drag_start;
 pub use dnd::{dnd_test_drop, dnd_test_formats};

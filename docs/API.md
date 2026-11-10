@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -26575,6 +26575,45 @@ TI_SEPARATOR: u32 = 4
   whether the symbol can be shown here (a notification area; Linux: a StatusNotifierWatcher
   runs -- GNOME needs the AppIndicator extension); notifications work without one
 
+### `plat/sysmenu.rs`
+
+Source: [`lib/plat/sysmenu.rs`](../lib/plat/sysmenu.rs)
+
+```text
+sysmenu -- the app's menus in the system's own menu bar (macOS: between the app menu and the Window
+menu, as every Mac app has them; docs/APPLE.md "Menüs in der Menüleiste")
+
+  sysmenu_supported() -> bool        whether this system shows an app's menus in its own bar (macOS
+                                     with a window of the app; elsewhere false: the app draws its menu
+                                     bar in the window)
+  sysmenu_set(&[SysMenuItem])        the app's menus: the top level are the menus of the bar, their
+                                     `sub` the rows; the same list again changes nothing
+  sysmenu_take() -> Vec<u32>         the ids of the rows chosen since the last call (each choice calls
+                                     wake())
+
+A row's key equivalent is a character ("s", or a function key's: "\u{F704}" = F1) with MOD_* bits;
+MOD_CTRL is the Mac's Command key, MOD_ALT its Option key.  A disabled row cannot be chosen, its key
+then reaches the window as a normal key press.
+```
+
+- **`struct SysMenuItem`**
+  one menu or row
+  - `id: u32` -- reported by sysmenu_take (0: a row without action, e.g. a menu or a submenu)
+  - `label: String`
+  - `flags: u32` -- TI_CHECKED, TI_DISABLED, TI_SEPARATOR
+  - `key: String` -- the key equivalent: one character ("" = none)
+  - `mods: u32` -- MOD_SHIFT | MOD_CTRL | MOD_ALT of the key equivalent
+  - `sub: Vec<SysMenuItem>` -- a menu or submenu when not empty
+
+- **`fn sysmenu_take() -> Vec<u32>`**
+  the rows chosen since the last call, oldest first
+
+- **`fn sysmenu_supported() -> bool`**
+  whether the app's menus go into the system's menu bar here
+
+- **`fn sysmenu_set(menus: &[SysMenuItem])`**
+  put the app's menus into the system's menu bar (an unchanged list does nothing)
+
 ### `plat/power.rs`
 
 Source: [`lib/plat/power.rs`](../lib/plat/power.rs)
@@ -30400,10 +30439,6 @@ information: linux_thread.rs; windows: linux_disp.rs (Wayland / X11 backends).
 
 - **`fn sleep_ms(ms: u32)`**
 
-- **`fn current_exe() -> Option<String>`**
-  Absolute path of the running native executable, independent of argv[0] (here for Linux ARM64 until ARM4 of
-  docs/ARM64.md, otherwise in modhost.rs)
-
 ### `plat/linux_disp.rs` (Linux)
 
 Source: [`lib/plat/linux_disp.rs`](../lib/plat/linux_disp.rs)
@@ -31829,6 +31864,9 @@ reaches the system's event stream.
     WT_OPEN_URLS             application:openURLs: with build/plattest_open.txt and an https URL
     WT_NOTE_CLICK [id]       the notification centre's delegate told of a click on notification id
     WT_BUNDLE                1 when the program runs inside an app bundle
+    WT_SYSMENU [k, a, b]     the app's menus in the menu bar (sysmenu): k 0 how many, 1 the rows of menu
+                             a, 2 choose row b of menu a, 3 row b's state (1 enabled | 2 checked | 4 a
+                             key equivalent with Command)
   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms: Cancel, or (saving)
                              OK with name (a full path)
 ```
@@ -31856,6 +31894,7 @@ WT_DOCK: u32 = 40
 WT_OPEN_URLS: u32 = 41
 WT_NOTE_CLICK: u32 = 42
 WT_BUNDLE: u32 = 43
+WT_SYSMENU: u32 = 44
 // WT_SEND / WT_POPUP_SEND kinds
 TS_MOVE: i32 = 1
 TS_DOWN: i32 = 2
@@ -33647,7 +33686,7 @@ plib -- plugin libraries and the crash guard: the portable part
                                          Windows, SIGSEGV / SIGBUS / SIGILL / SIGFPE /
                                          SIGTRAP on Linux; linux_guard.rs)
   guard_call(f, a1, a2, a3, a4, info) -> (rax, rdx)
-       calls the code at address f with the Win64 ABI (on Linux too: the plugin ABI) as
+       calls the code at address f with the plugin ABI (rt::plugin_abi!: Win64 on x86-64) as
        f(a1, a2, a3, a4); a fault inside it on this thread (also in nested host code)
        resumes here with rax = rdx = ERR_FAULT and info (GuardInfo) filled; otherwise
        info.kind = 0 and rax / rdx are those of f.  Nested calls are allowed.  ERR_LIMIT
@@ -33667,7 +33706,7 @@ docs: corrupt state stays corrupt, hangs are not detected).
 
 Safety contract: guard_call runs untrusted machine code at an arbitrary address; it is a
 safe function only in the sense the assembly API is: the caller hands it addresses of
-loaded plugin code (lib_sym) or of its own `extern "win64"` functions.  Pointers a plugin
+loaded plugin code (lib_sym) or of its own `rt::plugin_abi!` functions.  Pointers a plugin
 returns are checked with lib_seg before the host reads through them.
 ```
 
@@ -33677,12 +33716,13 @@ LIBA_R: u32 = 1  // lib_seg flags
 LIBA_W: u32 = 2
 LIBA_X: u32 = 4
 LIBE_IO: u32 = 1  // file missing / unreadable / larger than LIB_FILE_MAX
-LIBE_FORMAT: u32 = 2  // not an x86-64 ELF shared object / PE DLL, or damaged
+LIBE_FORMAT: u32 = 2  // not an ELF shared object / PE DLL, or damaged
 LIBE_DEPS: u32 = 3  // needs other libraries / undefined symbols
 LIBE_RELOC: u32 = 4  // unsupported relocation
 LIBE_NOMEM: u32 = 5
 LIBE_INIT: u32 = 6  // TLS, initialisers or an interpreter (not supported)
 LIBE_MAP: u32 = 7  // mmap / mprotect failed
+LIBE_ARCH: u32 = 8  // built for another processor: x86-64 on ARM64 or ARM64 on x86-64 (docs/ARM64.md)
 LIB_FILE_MAX: u64 = 64 << 20
 LH_SEGMAX: usize = 16
 GK_NONE: u32 = 0
@@ -34021,12 +34061,12 @@ module (the module runtime modules/modrt, which has a copy of this file) exchang
 A module is a no_std cdylib linked against nothing (no imports; built and checked as
 build_rs.py's sections jxl-module and "loader checks" say) that exports exactly one function
 
-    <name>_module(host: *const HostTable) -> *const ModTable          extern "win64"
+    <name>_module(host: *const HostTable) -> *const ModTable          rt::plugin_abi!
 
 (`jxlenc_module` for the JPEG XL writer).  The host keeps the module loaded for the rest of
 the process; the module keeps the HostTable pointer.  Null = the module refuses the host
-(another MOD_VERSION).  Every function pointer is extern "win64" on both systems (as the
-plugin ABI), so the records are the same on Windows and Linux.
+(another MOD_VERSION).  Every function pointer has the plugin ABI (rt::plugin_abi!: win64 on
+x86-64, also on Linux; C elsewhere), so the records are the same on Windows and Linux.
 
 Memory: the module's global allocator is the host's (HostTable::alloc / free = the host's
 GlobalAlloc with the same Layout), so blocks move between both sides as Vec<u8> raw parts
@@ -34056,7 +34096,7 @@ JXT_PANIC: u32 = 1
 JXT_FAULT: u32 = 2
 ```
 
-- **`type ItemFn = extern "win64" fn(ctx: *const c_void, index: usize, job: *const c_void)`**
+- **`type ItemFn = rt::plugin_abi!(fn(ctx: *const c_void, index: usize, job: *const c_void))`**
   one item of a parallel loop: item(ctx, index, job)
 
 - **`struct HostTable`**
@@ -34065,17 +34105,17 @@ JXT_FAULT: u32 = 2
   - `version: u32` -- MOD_VERSION
   - `cpu: u32` -- the host's rt::cpu::features() (--simd sse2: 0, the module then uses SSE2 too)
   - `threads: u32` -- workers of the host's pool
-  - `alloc: extern "win64" fn(size: usize, align: usize, zeroed: u32) -> *mut u8` -- a block of `size` bytes aligned to `align` from the host's allocator (zeroed != 0:
+  - `alloc: rt::plugin_abi!(fn(size: usize, align: usize, zeroed: u32) -> *mut u8)` -- a block of `size` bytes aligned to `align` from the host's allocator (zeroed != 0:
     cleared), null when out of memory
-  - `free: extern "win64" fn(p: *mut u8, size: usize, align: usize)` -- free a block of alloc with its size and alignment
-  - `parallel_for: extern "win64" fn(count: usize, ctx: *const c_void, item: ItemFn) -> u32` -- item(ctx, i, job) for i in 0..count on the pool; 0 = done, 1 = cancelled
-  - `job_cancel: extern "win64" fn(job: *const c_void)` -- job.cancel() of the job an item got
-  - `job_cancelled: extern "win64" fn(job: *const c_void) -> u32` -- job.cancelled()
-  - `thr_count: extern "win64" fn() -> u32` -- the pool's thr_count() / thr_self()
-  - `thr_self: extern "win64" fn() -> usize`
-  - `yield_now: extern "win64" fn()` -- give the time slice away (spin locks)
-  - `log: extern "win64" fn(msg: *const u8, len: usize)` -- one line on stderr ("&lt;module>: msg")
-  - `panic: extern "win64" fn(msg: *const u8, len: usize) -> !` -- a panic of the module (UTF-8 message): the host's crash report, exit code 3
+  - `free: rt::plugin_abi!(fn(p: *mut u8, size: usize, align: usize))` -- free a block of alloc with its size and alignment
+  - `parallel_for: rt::plugin_abi!(fn(count: usize, ctx: *const c_void, item: ItemFn) -> u32)` -- item(ctx, i, job) for i in 0..count on the pool; 0 = done, 1 = cancelled
+  - `job_cancel: rt::plugin_abi!(fn(job: *const c_void))` -- job.cancel() of the job an item got
+  - `job_cancelled: rt::plugin_abi!(fn(job: *const c_void) -> u32)` -- job.cancelled()
+  - `thr_count: rt::plugin_abi!(fn() -> u32)` -- the pool's thr_count() / thr_self()
+  - `thr_self: rt::plugin_abi!(fn() -> usize)`
+  - `yield_now: rt::plugin_abi!(fn())` -- give the time slice away (spin locks)
+  - `log: rt::plugin_abi!(fn(msg: *const u8, len: usize))` -- one line on stderr ("&lt;module>: msg")
+  - `panic: rt::plugin_abi!(fn(msg: *const u8, len: usize) -> !)` -- a panic of the module (UTF-8 message): the host's crash report, exit code 3
 
 - **`struct ModTable`**
   what a module offers
@@ -34083,7 +34123,7 @@ JXT_FAULT: u32 = 2
   - `version: u32` -- MOD_VERSION
   - `magic: u32` -- MOD_MAGIC
   - `kind: u32` -- MOD_JXLENC
-  - `jxl_encode: extern "win64" fn(req: *const JxlReq, res: *mut JxlRes) -> i32` -- the JPEG XL writer: 0 and res filled, or ERR_\* (res empty)
+  - `jxl_encode: rt::plugin_abi!(fn(req: *const JxlReq, res: *mut JxlRes) -> i32)` -- the JPEG XL writer: 0 and res filled, or ERR_\* (res empty)
 
 - **`struct JxlReq`**
   a JPEG XL encode: the samples of img_jxl::writer::image_of and the writer's options
@@ -47951,6 +47991,7 @@ semantics, the minimal OS calls the runtime itself needs, panic handling.
   rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (the root Cargo.toml, SemVer;
            docs/VERSIONING.md), also as plat::VERSION and ui::VERSION
   rt::app_version!()  the app's own version (version= of apps/NAME/PACKAGE)
+  rt::plugin_abi!  the calling convention of plugins and modules: win64 on x86-64, C elsewhere (abi.rs)
 
 One of the four crates that may contain `unsafe` (rt, simd, plat, plugin).
 ```
