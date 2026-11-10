@@ -97,6 +97,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **update:** update::target() names macOS and iOS (macos-aarch64, ios-aarch64); a Mac reported linux-aarch64
 - **update:** lib/update on macOS: an exe update kept the old file's permissions only on Linux, so an updated program on a Mac lost its executable bit; cargo jflib keygen and the update channel's signer build for macOS on a Mac
 - **plat:** Android: the status bar and the navigation bar take the colours at the app's edges with matching icons and no system scrim, instead of a fixed light grey around a dark app
+- **build:** The .dmg of tools/package.py held the program without its execute bit (copied without its mode), so the app did not open ("kann nicht geöffnet werden"); NAME.app's program is always 0755 now and tools/apple.py dmg refuses a bundle whose program cannot run (found by the hand check of AP8c)
 
 ## [0.1.0] - 2026-11-08
 

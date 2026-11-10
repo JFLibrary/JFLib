@@ -240,6 +240,7 @@ def mac_bundle(exe, app=None):
     contents = bundle / "Contents"
     (contents / "MacOS").mkdir(parents=True)
     shutil.copy2(exe, contents / "MacOS" / name)
+    (contents / "MacOS" / name).chmod(0o755)    # whatever copy it came from: macOS starts no program without it
     plist = mac_plist(name, app)
     icns = mac_icns(app)
     if icns:
@@ -332,6 +333,9 @@ def mac_dmg(bundle, out=None, volume=None):
     bundle = Path(bundle)
     if bundle.suffix != ".app" or not (bundle / "Contents" / "Info.plist").exists():
         raise RuntimeError(f"{bundle} is no app bundle")
+    program = bundle / "Contents" / "MacOS" / plistlib.loads((bundle / "Contents" / "Info.plist").read_bytes()).get("CFBundleExecutable", "")
+    if not program.is_file() or not program.stat().st_mode & 0o111:
+        raise RuntimeError(f"{program} is missing or not executable: the app would not start")
     out = Path(out) if out else bundle.with_suffix(".dmg")
     volume = volume or bundle.stem
     notarize = bool(mac_identity() and mac_notary())
