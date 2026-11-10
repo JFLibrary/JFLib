@@ -297,9 +297,56 @@ compressed disk image beside a link to `/Applications`: `<App>-<ver>-<style>-arm
 signature is ad hoc unless `jfgui_MAC_IDENTITY` names a certificate of the keychain ("Developer ID
 Application: NAME (TEAM)"): then the bundle is signed with it, the hardened runtime and a secure time
 stamp, and the image is signed too.  An ad-hoc signed app downloaded from the internet does not start
-on another Mac without the user's consent (Gatekeeper); that needs Developer ID and notarization
-([APPLE.md](APPLE.md) AP8c).  With `--update` the channel gets the bundle (kind `app`) and the image
+on another Mac without the user's consent (Gatekeeper); that needs Developer ID and notarization.
+`jfgui_MAC_NOTARY` names a notarytool profile in the keychain: then the bundle and, after it, the
+image go to Apple's notary service, and both get their ticket stapled (a copy dragged out of the
+image starts offline too).  With `--update` the channel gets the bundle (kind `app`) and the image
 (kind `package`), [UPDATES.md](UPDATES.md) "macOS app bundles".
+
+Setting it up once, on the Mac (a membership of the Apple Developer Program; [APPLE.md](APPLE.md) AP8c):
+
+1. Xcode → Settings → Accounts → the team (not "Personal Team") → Manage Certificates → "+" →
+   Developer ID Application.  (When Xcode refuses with "only the Account Holder": sign out and in
+   again, or request the certificate on developer.apple.com with a signing request of Keychain Access.)
+2. An app-specific password on account.apple.com (Sign-In and Security), then in Terminal:
+   `xcrun notarytool store-credentials PROFILE --apple-id APPLE_ID --team-id TEAM` (it asks for the
+   password; an App Store Connect API key works too: `--key`, `--key-id`, `--issuer`).
+3. `export jfgui_MAC_IDENTITY="Developer ID Application: NAME (TEAM)" jfgui_MAC_NOTARY=PROFILE`, then
+   `tools/package.py APP --formats dmg`.
+
+The keychain is locked in an SSH session: `tools/package.py` (tools/apple.py `keychain_run`) runs
+codesign with the certificate and notarytool in the logged-in session of the Mac then; `cargo jflib`
+expects the session itself.  Each notarization takes a few minutes.
+
+Signing belongs to the app's own repository, not to the library: JFLib's test apps stay ad hoc (the
+Apple workflow of JFLib signs nothing).  An app's workflow on GitHub's Mac runners imports the
+certificate into a keychain of its run, stores the notary profile there and packs:
+
+```yaml
+- name: The certificate and the notary profile in a keychain of this run
+  env:
+    P12: ${{ secrets.MAC_DEVID_P12 }}            # Keychain Access: export the Developer ID Application
+    P12_PASSWORD: ${{ secrets.MAC_DEVID_P12_PASSWORD }}   # certificate as .p12, then base64 -i it
+    NOTARY_APPLE_ID: ${{ secrets.MAC_NOTARY_APPLE_ID }}
+    NOTARY_PASSWORD: ${{ secrets.MAC_NOTARY_PASSWORD }}   # an app-specific password for the CI
+    TEAM_ID: ${{ secrets.MAC_TEAM_ID }}
+  run: |
+    kc="$RUNNER_TEMP/signing.keychain-db"; kcpw=$(openssl rand -hex 24)
+    security create-keychain -p "$kcpw" "$kc"; security set-keychain-settings -lut 21600 "$kc"
+    security unlock-keychain -p "$kcpw" "$kc"
+    echo "$P12" | base64 --decode > "$RUNNER_TEMP/devid.p12"
+    security import "$RUNNER_TEMP/devid.p12" -k "$kc" -P "$P12_PASSWORD" -T /usr/bin/codesign; rm "$RUNNER_TEMP/devid.p12"
+    security set-key-partition-list -S apple-tool:,apple: -s -k "$kcpw" "$kc" > /dev/null
+    security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+    security default-keychain -s "$kc"
+    xcrun notarytool store-credentials ci --apple-id "$NOTARY_APPLE_ID" --team-id "$TEAM_ID" --password "$NOTARY_PASSWORD" --keychain "$kc"
+    echo "jfgui_MAC_IDENTITY=$(security find-identity -v -p codesigning "$kc" | sed -n 's/.*"\(Developer ID Application: .*\)"$/\1/p' | head -1)" >> "$GITHUB_ENV"
+    echo "jfgui_MAC_NOTARY=ci" >> "$GITHUB_ENV"
+- run: cargo jflib package --formats dmg
+```
+
+Keep the secrets in an environment of that repository limited to its main branch, and delete the
+keychain at the end of the job (`security delete-keychain`, also when a step failed).
 
 ### AppImage
 

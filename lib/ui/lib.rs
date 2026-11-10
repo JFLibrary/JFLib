@@ -122,6 +122,7 @@ mod drop;
 mod edit;
 mod filedlg;
 mod fontpick;
+mod form;
 pub use fontpick::{font_language, FontSel};
 mod grid;
 mod hexview;
@@ -636,6 +637,8 @@ pub struct Ui {
     pub(crate) limits: [u32; ctx::LIM_N],
     pub(crate) mods: u32,
     pub(crate) frame: u32,
+    /// the device: FF_DESKTOP / FF_TABLET / FF_PHONE (form.rs)
+    pub(crate) form: u32,
     pub(crate) now_ms: u32,
     pub(crate) repass: bool,
     pub(crate) animating: bool,

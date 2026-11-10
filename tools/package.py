@@ -157,6 +157,7 @@ def build_variants_rs(app, styles, work, targets, rsout, profile):
             src = ROOT / rsout / t / s if len(styles) > 1 else ROOT / rsout / t
             (ROOT / work / s / t).mkdir(parents=True, exist_ok=True)
             shutil.copyfile(src / exe_name(app, t), ROOT / work / s / t / exe_name(app, t))
+            shutil.copymode(src / exe_name(app, t), ROOT / work / s / t / exe_name(app, t))   # executable (mac: NAME.app)
             for m in app_modules(app, t, "rs") + app_bins(app, t, "rs"):
                 shutil.copyfile(ROOT / rsout / t / m, ROOT / work / s / t / m)
 

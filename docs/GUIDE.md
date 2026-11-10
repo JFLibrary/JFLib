@@ -4966,3 +4966,37 @@ touch emulation), `android_touch.py` (emulator or phone: `input motionevent` and
 and XInput 2.2 events on Linux) and JFPainter's `python tools/touchcheck.py` (Windows: a real window and real contacts through
 `InjectTouchInput`, no touch screen needed; it skips with a message when the desktop is locked or the window covered).
 What to try on a real tablet: JFPainter's [`docs/TOUCH.md`](https://github.com/JFLibrary/JFPainter/blob/main/docs/TOUCH.md).
+
+## 38. Phones and tablets
+
+`ui.form_factor()` says what the app runs on: `FF_DESKTOP`, `FF_TABLET` or `FF_PHONE`; `ui.mobile()` is a
+phone or a tablet ([`lib/ui/form.rs`](../lib/ui/form.rs)). The platform decides, never the window alone:
+Windows, Linux, macOS and the browser are `FF_DESKTOP` however small a window is dragged, so a narrow
+desktop window keeps the desktop's behaviour. Android and iOS are `FF_TABLET`, and `FF_PHONE` where the
+main window's shorter side is below 600 DIP (Android's line, `sw600dp`; a turned phone stays a phone, a
+tablet's app in a narrow split screen is laid out like a phone's). `jfgui_FORM=desktop|tablet|phone`
+decides instead, on any platform: for tests and for a look at the phone's layout on the desktop.
+
+What the library does by itself on a phone or a tablet, and only there:
+
+- the title bar has no caption buttons (the system owns the app's window);
+- a menu bar that does not fit its row becomes one menu button (`IC_MENU`, named "Menü"); its menu has the
+  menus as submenus, keys and the light dismiss work as on the bar. The other widgets of the row count
+  as wide as in the last pass; fill widgets give way, but keep 64 DIP (an image list beside the bar
+  stays visible);
+- the status bar's items roll sideways with the finger while they are wider than the bar;
+- a vertical scroll view whose content is wider than the view rolls sideways too;
+- windows are at most as large as the screen, and those of the main window lie inside it; a window or a
+  content dialog cut shorter than its content rolls it, a dialog's footer stays below;
+- Android paints the status bar, the navigation bar and a cut-out's strip in the colours at the app's
+  edges, with dark icons on light colours and light ones on dark (no system scrim); iOS does the same
+  around the safe area. An app with its own theme gets bars in its colours, not the system's.
+
+What only the app knows it decides with `form_factor()`: which panels a phone shows, which rows roll
+(`scroll_begin(id, SC_H | SC_NOBAR | BOX_XCENTER)` around a tool bar row, only when `ui.mobile()`, keeps
+the desktop's row as it was), which hints speak of a mouse.
+
+Test it on the desktop: `system env jfgui_FORM phone` in a script (`apps/gallery/tests/form_factor.uis`),
+or a program started with `jfgui_FORM=phone` in a window of a phone's size. On Android a tablet comes from
+the emulator's `pixel_tablet` profile, a phone from the same emulator with `adb shell wm size 1080x2400`
+and `wm density 420`.

@@ -407,6 +407,7 @@ impl Ui {
             limits: [0; super::ctx::LIM_N],
             mods: 0,
             frame: 0,
+            form: FF_DESKTOP,
             now_ms: 0,
             repass: false,
             animating: false,

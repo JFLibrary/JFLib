@@ -1,5 +1,9 @@
 # Apple-Plan: macOS und iOS nativ
 
+Nachtrag 2026-11-10: AP5 ist auch von Hand auf dem iPhone geprüft, AP8 (Pakete, Updates, CI, Developer ID und
+Notarisierung, Dokumentation und Website) ist fertig, AP1 (Safari auf dem Mac und dem iPhone) ebenso; offen ist AP6
+(Metal, eigene Sitzung).
+
 Stand 2026-11-09, auf Basis von `main` ba9e6d03. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
 und der Kern von `plat`), AP3 (`plat` ohne Fenster), AP4 (Fenster auf macOS), AP7 (Desktop-Dienste) und AP5 (iOS) bis
 auf die Prüfung von Hand auf dem iPhone. Die Aufwände sind geschätzt.
@@ -92,6 +96,26 @@ signiert ad hoc), in einem Simulator ohne Fenster (`simctl boot`, `simctl spawn`
   dem iPhone (Web-Inspektor über den Mac). Das ist heute der Weg für Apple und noch nie getestet.
 
 **Fertig, wenn:** die Browser-Skripte in Safari auf dem Mac laufen und die Abweichungen auf dem iPhone notiert sind.
+
+**AP1 auf dem Mac umgesetzt (2026-11-10):** `tools/tests/web_apps.mjs --engine=safari` fährt dieselben Prüfungen wie
+in Chromium und Firefox in einem echten Safari (27.2) über `safaridriver`. Playwright steuert kein Safari (sein
+„webkit“ ist ein eigener WebKit-Bau); [`tools/tests/safari.mjs`](../tools/tests/safari.mjs) bildet deshalb den Teil
+von Playwrights API nach, den der Test braucht, über W3C WebDriver. [`tools/tests/safari_tunnel.py`](../tools/tests/safari_tunnel.py)
+startet `safaridriver` auf dem Mac und trägt beide Richtungen über eine SSH-Verbindung: Der Test läuft auf dem PC
+(auf dem Mac ist kein Node nötig), Safari lädt die Seiten unter derselben Adresse. `template`, `gallery`, `jfWord`
+und `Kritzel` bestehen, auch die Pixelgleichheit mit Rusts PNG-Renderer, das Speichern in IndexedDB mit den
+Fehlerfällen, Tastenkürzel, IME, das Einfügen-Ereignis und die Dateiauswahl. Nicht nachstellbar: die Sprache
+(Safari nimmt die des Macs, hier Deutsch, wie der Test erwartet) und die Pixeldichten 1,5 und 2 (der Mac mini hat
+1×). Einmalig auf dem Mac: `safaridriver --enable`, in Safari Entwickler → „Entfernte Automatisierung erlauben“,
+danach Safari neu starten (sonst läuft die Sitzung „while connecting to a Safari instance“ in ein Timeout).
+**Fallen:** Das versteckte Texteingabefeld des Hosts nimmt keine Elementeingabe von WebDriver an (der Adapter tippt
+über Tastatur-Aktionen); Init-Skripte laufen erst nach dem Laden, deshalb erkennt der Test „bereit“ auch am
+`data-compute` des Body; ein beendeter Tunnel ließ `safaridriver` auf dem Mac weiterlaufen (ohne Terminal kein
+Hangup), das Skript beendet ihn jetzt über die geschlossene Eingabe.
+
+**AP1 auf dem iPhone geprüft (2026-11-10), damit ist AP1 fertig:** Der Nutzer hat die Galerie von jflib.org in
+Safari auf dem iPhone 14 (iOS 27.2) von Hand ausprobiert (Knöpfe, Schieberegler, Textfeld mit der Tastatur, Scrollen,
+Drehen): Sie funktioniert, Abweichungen gab es keine.
 
 ### AP2: Bau und `rt` (M)
 
@@ -424,7 +448,35 @@ auf dem Mac das Ausführrecht, und `cargo jflib keygen` baute sein Signierprogra
 die Skripte von `gallery` und `updatetest`, `plattest` ohne Fenster (`all`, `cliprich`, `spell`), `androidGallery` im
 Simulator und ein `.dmg` von BackupCraft als Artefakt. Auf dem Mac zu Hause liefen alle Schritte grün; der erste Lauf
 auf GitHub folgt nach dem Push. `build_rs.py` startet Programme mit `ui` auf dem Mac über ihr Bündel (`tools/apple.py
-gui`); updatetest nimmt dann eine Programmdatei außerhalb davon, sonst bekäme es nur `app`-Einträge.
+gui`); updatetest nimmt dann eine Programmdatei außerhalb davon, sonst bekäme es nur `app`-Einträge. Der erste Lauf
+auf GitHub (2026-11-10) lief in 14 Minuten grün durch.
+
+**AP8c umgesetzt (2026-11-10):** Mit `jfgui_MAC_IDENTITY` („Developer ID Application: …“) und `jfgui_MAC_NOTARY`
+(ein Profil von `xcrun notarytool store-credentials`) notarisieren `tools/package.py --formats dmg` und `cargo jflib
+package --formats dmg` erst das Bündel, dann das Image, und heften beiden ihr Ticket an (`stapler`): Eine aus dem
+Image gezogene Kopie startet auch offline. Über SSH ist der Schlüsselbund gesperrt; `tools/apple.py` lässt codesign
+mit Zertifikat und notarytool dann in der angemeldeten Sitzung laufen (`keychain_run` über `gui_run`, ohne Fenster).
+Die Einrichtung (Zertifikat, app-spezifisches Passwort, Profil) steht in [PACKAGING.md](PACKAGING.md) „macOS: .dmg“.
+Abnahme mit BackupCraft auf dem Mac mini: Die `.dmg` mit dem Quarantäne-Attribut eines Downloads, die App darauf
+und eine herauskopierte Kopie nimmt Gatekeeper an (`spctl --assess`: „accepted, source=Notarized Developer ID“),
+`stapler validate` und `syspolicy_check distribution` sind zufrieden; die ad hoc signierte `.dmg` und App lehnt er
+ab. `updatetest --test app` mit `jfgui_MAC_IDENTITY` aktualisiert Bündel mit der Developer ID und lehnt dieselbe
+App ad hoc signiert ab. Die erste Notarisierung des neuen Kontos brauchte rund zwei Stunden, danach dauerten beide
+Einreichungen zusammen gut eine Minute. Dabei gefunden: Das Programm eines Bündels mit Developer ID beendet macOS
+sofort, wenn es außerhalb des Bündels läuft („invalid Info.plist“); updatetest nimmt für seine `exe`-Tests deshalb
+das einfache Programm neben dem Bündel. Die Hand-Probe des Nutzers (die `.dmg` aus „Downloads“ geöffnet, die App
+gestartet) fand einen Fehler, den `spctl` nicht sieht: `tools/package.py` kopierte das Programm ohne Ausführrecht,
+die App öffnete nicht; behoben, `mac_dmg` lehnt ein solches Bündel jetzt ab, danach startete sie mit der üblichen
+Rückfrage. Signieren in der CI gehört in die Repositories der Apps, nicht in JFLib (Entscheidung des Nutzers vom
+2026-11-10): Die Test-Apps der Bibliothek bleiben ad hoc signiert, [PACKAGING.md](PACKAGING.md) „macOS: .dmg“ zeigt
+die Schritte für den Workflow einer App. TestFlight ist gestrichen (Nutzer, 2026-11-10): Es verteilt eine echte App
+an Tester und gehört damit zur iOS-Version einer App in ihrem eigenen Repository, nicht zur Test-Galerie der
+Bibliothek.
+
+**AP8d umgesetzt (2026-11-10), damit ist AP8 fertig:** README, [PACKAGING.md](PACKAGING.md), [UPDATES.md](UPDATES.md)
+und GUIDE nennen macOS und iOS (mit AP8a–AP8c). Die Website jflib.org (Repository jflibWebsite, Inhalt vorher mit dem
+Nutzer abgestimmt) führt beide als native Ziele auf der Startseite, unter Features, im Vergleich und in der Roadmap
+(dort „Fertig“; als Nächstes Metal und VoiceOver), in allen fünf Sprachen; Docs und Galerie kommen aus `8c94d080`.
 
 ## Reihenfolge
 
@@ -520,7 +572,8 @@ Zeiger des Nutzers.
 1. **Mac:** Mac mini M2 (AP0). Offen: Nutzt ihn noch jemand?
 2. **iPhone:** iPhone 14 mit iOS 27.2 (AP0). Offen: Ist es das Alltagsgerät, also Tests nur auf Zuruf wie beim A56?
 3. **Apple Developer Program** (99 € im Jahr) oder die kostenlose Apple-ID? Bis AP7 die kostenlose (AP0): Apps laufen
-   auf dem iPhone nur sieben Tage, ohne TestFlight und ohne Notarisierung. Für AP8 tritt der Nutzer bei (2026-11-09).
+   auf dem iPhone nur sieben Tage, ohne TestFlight und ohne Notarisierung. Für AP8 tritt der Nutzer bei (2026-11-09);
+   Mitglied seit 2026-11-10 (Team 6RBCBNA6DJ), Developer ID und Notarisierung laufen (AP8c).
 4. **Welche Apps zuerst?** Vorschlag: `gallery`, dann JFPainter und `jfWord`; auf dem iPhone die Gallery, dann
    `Kritzel`.
 5. **App Store** als späteres Ziel für iOS? Das ändert Sandbox, Plugins und die Prüfregeln.
