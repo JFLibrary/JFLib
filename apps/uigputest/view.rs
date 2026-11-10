@@ -17,6 +17,9 @@
 //              frame read back; the window's DC shows it
 //   viewoff    jfgui_GPU=0: no device, the content paints
 //   viewbasis  without AF_GPU_3D: the UI's Basis device, the same pictures
+//   viewgate   (G5e3) bound to the display: no frame of the content while the window's last frame is not shown
+//              (Ui::gpu_test_hold), the newest once it is; a frame that is never shown holds the view 100 ms at most;
+//              a view binds to its own window (a second window held, the first goes on)
 //
 //   uigputest --bench view [--n N] [--basis] [--idle] [--timer MS] [--offscreen [--read]]   a window of 1280 x 800, a view of
 //              1200 x 700 of render3dtest's gallery (3000 instances), turning: per frame the CPU of render and present,
@@ -45,6 +48,10 @@ pub const VIEW_ID2: u32 = 801;
 pub const VIEW_ID3: u32 = 802;
 /// what View3d paints without a device
 pub const PAINT: u32 = 0xFF55_2266;
+/// (G5e3) how long a view waits for its window's frame at most (lib/ui/gpu_out.rs VIEW_HOLD_US)
+const VIEW_HOLD_MS: u64 = 100;
+/// (G5e3) the hold may have begun a render before the test switched it on
+const HOLD_SLACK_MS: u64 = 20;
 
 /// the views a test draws (Scene::views)
 #[derive(Default)]
@@ -821,11 +828,14 @@ impl Test {
                 }
             }
             5 => {
-                // a popup over it: its layer holds what lies below, every frame read back
-                if self.view_turn(10) {
-                    let i = self.view_info(ui, 0, VIEW_ID);
-                    let (n, f) = (i.reads - self.mark[0], i.frames - self.mark[1]);
+                // a popup over it: its layer holds what lies below, every frame read back (G5e3: a frame of the view waits
+                // for the window's last one, so it turns until the view has drawn a few: under Linux one per display answer)
+                let _ = self.view_turn(u32::MAX);
+                let i = self.view_info(ui, 0, VIEW_ID);
+                let (n, f) = (i.reads - self.mark[0], i.frames - self.mark[1]);
+                if (f >= 4 && self.passes >= self.since_pass + 10) || self.after(3000) {
                     self.ok(f >= 3 && n + 1 >= f, &format!("a popup over it while it turns: {n} read-backs for {f} frames"));
+                    self.mode = 0;
                     self.next();
                 }
             }
@@ -960,6 +970,169 @@ impl Test {
             _ => {}
         }
     }
+
+    /// (G5e3) the content's last drawn camera is the one of the view's angle now: the newest version is drawn
+    fn view_newest(&self, c: &Rc<RefCell<View3d>>) -> bool {
+        let c = c.borrow();
+        c.cam == Some(orbit(&c.kind, c.angle, c.size.0, c.size.1))
+    }
+
+    /// (G5e3) the gate: no frame of the content while its window's last frame is not on the screen; Ui::gpu_test_hold
+    /// keeps a window's frames from being shown, as a display that does not answer would
+    pub fn t_viewgate(&mut self, ui: &mut Ui) {
+        let r = view_rect(ui.fb().w, ui.fb().h);
+        let o = ui.gpu_output(0);
+        let now = plat::time_us();
+        let draws = |c: &Option<Rc<RefCell<View3d>>>| c.as_ref().map_or(0, |c| c.borrow().draws as u64);
+        match self.pc {
+            0 => {
+                if self.wait_on(ui, 15_000) == Some(true) {
+                    self.sc.views.one = Some(View3d::new(Kind::Small, 0.3));
+                    self.sc.views.ver = 1;
+                    self.next();
+                }
+            }
+            1 => {
+                if self.after(150) {
+                    let i = self.view_info(ui, 0, VIEW_ID);
+                    self.ok(i.apart && i.frames >= 1 && i.held == 0, &format!("the view drawn by the output ({} frames, {} held)", i.frames, i.held));
+                    let c = self.one();
+                    self.view_check(ui, &c, r, true, true, "before");
+                    // the window's frames are held from now on; this turn's frame is drawn (the last one was shown)
+                    ui.gpu_test_hold(0, true);
+                    let _ = self.view_turn(u32::MAX);
+                    self.mode = 0;
+                    self.mark[3] = plat::time_us();
+                    self.next();
+                }
+            }
+            2 => {
+                if self.after(60) {
+                    let i = self.view_info(ui, 0, VIEW_ID);
+                    self.ok(o.pending, &format!("held: the window's frame waits (pending {})", o.pending));
+                    self.mark = [i.frames, i.held, draws(&self.sc.views.one), self.mark[3]];
+                    self.next();
+                }
+            }
+            3 => {
+                // eight new versions while the window's frame is not shown: the content is not asked
+                if self.view_turn(8) {
+                    let i = self.view_info(ui, 0, VIEW_ID);
+                    let ms = (now - self.mark[3]) / 1000;
+                    let (f, h, d) = (i.frames - self.mark[0], i.held - self.mark[1], draws(&self.sc.views.one) - self.mark[2]);
+                    let allowed = (ms + HOLD_SLACK_MS) / VIEW_HOLD_MS;
+                    self.ok(f <= allowed && d == f && h >= 1,
+                            &format!("the window's frame not shown: 8 new versions, {f} frames of the view ({allowed} allowed after {ms} ms), the content asked {d} times, {h} held"));
+                    ui.gpu_test_hold(0, false);
+                    self.mark = [i.frames, i.held, (allowed == 0) as u64, now];
+                    self.next();
+                }
+            }
+            4 => {
+                if self.after(150) {
+                    // the frame arrived: the content is asked again, for the newest version, once
+                    let i = self.view_info(ui, 0, VIEW_ID);
+                    let c = self.one();
+                    let f = i.frames - self.mark[0];
+                    let newest = self.view_newest(&c);
+                    let fine = if self.mark[2] == 1 { f == 1 } else { f <= 1 };
+                    self.ok(fine && newest && !o.pending, &format!("the window's frame shown: {f} frame of the view, the newest version {newest}, pending {}", o.pending));
+                    self.view_check(ui, &c, r, true, true, "after the hold");
+                    self.same_so_far(ui, "after the hold");
+                    // a display that never answers: held again, for longer than the view waits
+                    ui.gpu_test_hold(0, true);
+                    let _ = self.view_turn(u32::MAX);
+                    self.mode = 0;
+                    self.mark[3] = plat::time_us();
+                    self.next();
+                }
+            }
+            5 => {
+                if self.after(60) {
+                    let i = self.view_info(ui, 0, VIEW_ID);
+                    self.mark = [i.frames, i.held, 0, self.mark[3]];
+                    self.next();
+                }
+            }
+            6 => {
+                let _ = self.view_turn(u32::MAX);
+                if now >= self.mark[3] + 4 * VIEW_HOLD_MS * 1000 {
+                    let i = self.view_info(ui, 0, VIEW_ID);
+                    let ms = (now - self.mark[3]) / 1000;
+                    let f = i.frames - self.mark[0];
+                    self.ok(f >= 1 && f <= (ms + HOLD_SLACK_MS) / VIEW_HOLD_MS,
+                            &format!("a frame that is never shown does not stop the view: {f} frames in {ms} ms (one per {VIEW_HOLD_MS} ms at most), {} held", i.held - self.mark[1]));
+                    ui.gpu_test_hold(0, false);
+                    self.mode = 0;
+                    self.next();
+                }
+            }
+            7 => {
+                if self.after(150) {
+                    let c = self.one();
+                    let i = self.view_info(ui, 0, VIEW_ID);
+                    self.ok(self.view_newest(&c) && !o.pending, &format!("shown again: the newest version, pending {} ({} frames)", o.pending, i.frames));
+                    self.view_check(ui, &c, r, true, true, "after the long hold");
+                    // a view in a second window
+                    self.sc.views.win2 = Some(View3d::new(Kind::Small, 4.0));
+                    self.sc.views.ver3 = 1;
+                    self.second.set(1);
+                    self.next();
+                }
+            }
+            8 => {
+                let w2 = ui.gpu_output(1);
+                let c = self.view_info(ui, 1, VIEW_ID3);
+                if w2.on && c.frames >= 1 && c.apart {
+                    if self.after(150) {
+                        // only the second window's frames held
+                        ui.gpu_test_hold(1, true);
+                        let _ = self.view_turn(u32::MAX);
+                        self.mode = 0;
+                        self.mark[3] = plat::time_us();
+                        self.next();
+                    }
+                } else if self.after(8000) {
+                    self.ok(false, &format!("the second window's view: on {}, {} frames, apart {}, {:?}", w2.on, c.frames, c.apart, c.error));
+                    self.finish(ui);
+                }
+            }
+            9 => {
+                if self.after(20) {
+                    let (a, b) = (self.view_info(ui, 0, VIEW_ID), self.view_info(ui, 1, VIEW_ID3));
+                    self.mark = [a.frames, b.frames, b.held, self.mark[3]];
+                    self.next();
+                }
+            }
+            10 => {
+                // a view binds to its own window: the first one goes on, the second one waits (they turn for 75 ms)
+                let _ = self.view_turn(u32::MAX);
+                if now >= self.mark[3] + 75_000 && self.passes >= self.since_pass + 4 {
+                    let (a, b) = (self.view_info(ui, 0, VIEW_ID), self.view_info(ui, 1, VIEW_ID3));
+                    let ms = (now - self.mark[3]) / 1000;
+                    let (fa, fb, hb) = (a.frames - self.mark[0], b.frames - self.mark[1], b.held - self.mark[2]);
+                    let allowed = (ms + HOLD_SLACK_MS) / VIEW_HOLD_MS;
+                    self.ok(fa >= 2 && fb <= allowed && hb >= 1,
+                            &format!("the second window's frame not shown: the first window's view {fa} frames, the second's {fb} ({allowed} allowed after {ms} ms), {hb} held"));
+                    ui.gpu_test_hold(1, false);
+                    self.mode = 0;
+                    self.next();
+                }
+            }
+            11 => {
+                if self.after(150) {
+                    let w2 = ui.gpu_output(1);
+                    let newest = self.sc.views.win2.as_ref().is_some_and(|c| self.view_newest(c));
+                    self.ok(newest && !w2.pending, &format!("the second window's frame shown: its view has the newest version {newest}, pending {}", w2.pending));
+                    self.ok(w2.verified > 0 && w2.verify_bad == 0, &format!("the second window: {} images read back, {} differ", w2.verified, w2.verify_bad));
+                    self.same_so_far(ui, "two windows");
+                    self.second.set(0);
+                    self.finish(ui);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 /// a test's views into its frame (draw_scene): the first in the window's middle (something over its corner), the
@@ -1004,6 +1177,8 @@ struct ViewBench {
     gpu_frames0: u64,
     /// (G5e2) the animation's timer (ms; --timer, 1: as fast as the loop takes it)
     timer: u32,
+    /// (G5e3) the view's frames held back at the first measured frame
+    held0: u64,
 }
 
 impl App for ViewBench {
@@ -1041,6 +1216,7 @@ impl App for ViewBench {
             self.last = now;
             self.seen = i.frames;
             self.gpu_frames0 = o.frames;
+            self.held0 = i.held;
             self.content.borrow_mut().gpu_ms.clear();
             if self.idle {
                 self.started = plat::win_test_usage().0; // (now: the CPU time at the start)
@@ -1080,9 +1256,9 @@ impl App for ViewBench {
             let mode = if !o.wanted { "CPU path (jfgui_GPU_OUTPUT=0)" } else if i.apart { "composed by the output" } else { "read back every frame (jfgui_GPU_VIEWS=0)" };
             out(&format!("view bench, {mode}, {:?}, {} x {}: {} frames in {:.0} ms; per frame: interval {med:.3} ms (median), render {:.1} us, present {:.1} us, the view's draw {:.1} us, \
                           read-back {:.1} us ({:.2} per frame), render3d GPU {gpu:.3} ms (median); {} frames presented ({} through the GPU, on {}, pending {}, switches {}, \
-                          leaves {}); reserved {:.1} MiB, working set {:.1} MiB, private {:.1} MiB",
+                          leaves {}); {} held back; reserved {:.1} MiB, working set {:.1} MiB, private {:.1} MiB",
                          i.level, i.size.0, i.size.1, f as u64, (now - self.t_base) as f64 / 1000.0, per(1), per(2), per(3), per(4), per(5), counters[0] - base[0],
-                         o.frames - self.gpu_frames0, o.on, o.pending, o.switches, o.leaves, o.reserved as f64 / 1048576.0, ws as f64 / 1048576.0, private as f64 / 1048576.0));
+                         o.frames - self.gpu_frames0, o.on, o.pending, o.switches, o.leaves, i.held - self.held0, o.reserved as f64 / 1048576.0, ws as f64 / 1048576.0, private as f64 / 1048576.0));
             self.done = true;
             ui.quit();
             return;
@@ -1196,7 +1372,7 @@ pub fn view_bench(n: usize) -> i32 {
     }
     let content = View3d::new(Kind::Gallery, 0.0);
     content.borrow_mut().stats = true;
-    let mut app = ViewBench { content, ver: 1, n, idle: has("--idle"), started: 0, base: None, t_base: 0, done: false, gaps: Vec::new(), last: 0, seen: 0, gpu_frames0: 0,
+    let mut app = ViewBench { content, ver: 1, n, idle: has("--idle"), started: 0, base: None, t_base: 0, done: false, gaps: Vec::new(), last: 0, seen: 0, gpu_frames0: 0, held0: 0,
                              timer: plat::arg_value("--timer").and_then(|v| v.parse().ok()).filter(|v: &u32| *v > 0).unwrap_or(1) };
     let flags = if has("--basis") { AF_RESIZABLE } else { AF_RESIZABLE | AF_GPU_3D };
     let d = AppDesc { w: 1280, h: 800, flags, ..crate::DESC };

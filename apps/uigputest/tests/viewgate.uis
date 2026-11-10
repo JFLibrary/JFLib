@@ -1,0 +1,3 @@
+#!args --test viewgate
+# (G5e3) a view bound to the display: no frame of the content while its window's last frame is not shown
+# (Ui::gpu_test_hold), the newest once it is; a frame that is never shown holds it 100 ms at most; a second window held
