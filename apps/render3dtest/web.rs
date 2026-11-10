@@ -3,6 +3,8 @@
 // mirrored instances, the glTF scene read from a .glb made here) go out as hex lines, compared with those
 // of the Vulkan path on the same machine by the test; the counts of the lists against the exact test on
 // the CPU.  Nothing can wait here: every frame is submitted at once, the read-backs are looked at per tick.
+// (G5e2) The same gallery in an sRGB target (srgb_NAME, the hardware encodes), with the shader's sRGB in an Rgba8Unorm
+// target (enc_NAME), and the latter against the same image in Rgba32Float encoded on the CPU, here in the browser.
 
 use alloc::boxed::Box;
 use alloc::format;
@@ -11,6 +13,8 @@ use alloc::vec::Vec;
 
 use gpu::*;
 use render3d::{InstanceId, MeshId, Renderer, RendererDesc, Scene};
+
+use crate::cpu::srgb_encode;
 
 use crate::common::*;
 use crate::cpu;
@@ -43,6 +47,14 @@ fn hex_line(name: &str, bytes: &[u8]) -> String {
     s
 }
 
+/// (G5e2) the gallery's images drawn into an sRGB target too (tests/engine_web.mjs: against `--dump --format rgba8srgb`)
+const SRGB_TARGET: [(&str, &str); 8] = [("mix", "srgb_mix"), ("tex", "srgb_tex"), ("gltf", "srgb_gltf"), ("pbr", "srgb_pbr"), ("shadow", "srgb_shadow"),
+                                        ("lights", "srgb_lights"), ("env", "srgb_env"), ("occl", "srgb_occl")];
+/// (G5e2) and with the shader's sRGB in Rgba8Unorm (against `--dump --format rgba8`), with their float images
+const ENCODED: [(&str, &str, &str); 8] = [("mix", "enc_mix", "f_mix"), ("tex", "enc_tex", "f_tex"), ("gltf", "enc_gltf", "f_gltf"), ("pbr", "enc_pbr", "f_pbr"),
+                                         ("shadow", "enc_shadow", "f_shadow"), ("lights", "enc_lights", "f_lights"), ("env", "enc_env", "f_env"),
+                                         ("occl", "enc_occl", "f_occl")];
+
 fn say(s: &str) {
     rt::os::write_stdout(format!("{s}\n").as_bytes());
 }
@@ -60,6 +72,9 @@ struct Probe {
     inst: Option<Instance>,
     dev: Option<Device>,
     keep: Vec<(&'static str, Off)>,
+    /// (G5e2) float images, not sent: compared here with the encoded ones (which `encoded` keeps once read)
+    floats: Vec<(&'static str, &'static str, Off)>,
+    encoded: Vec<(&'static str, Vec<u8>)>,
     scenes: Vec<Scene>,
     renderer: Option<Renderer>,
     more: Vec<Renderer>,
@@ -100,7 +115,7 @@ impl Probe {
     }
 
     fn gallery(&mut self, dev: &Device) -> Result<()> {
-        let mut r = Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm))?;
+        let mut r = Renderer::new(dev, &linear_desc(Format::Rgba8Unorm))?;
         say(&format!("renderer: multi-draw {}, at most {} instances", r.multi_draw(), r.max_instances()));
         self.yes(!r.multi_draw(), "the browser's level Basis: one indirect draw per list");
         let (meshes, materials) = gallery_fill(&mut r)?;
@@ -123,7 +138,7 @@ impl Probe {
         self.renderer = Some(r);
         // G5b: textures of four classes and mirrored instances; the glTF scene
         for name in ["tex", "gltf"] {
-            let mut r = Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm))?;
+            let mut r = Renderer::new(dev, &linear_desc(Format::Rgba8Unorm))?;
             let mut s = if name == "tex" { tex_gallery(&mut r)? } else { gltf_gallery(&mut r)? };
             let mut off = Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm)?;
             off.submit(&mut r, &mut s)?;
@@ -136,15 +151,47 @@ impl Probe {
         }
         // G5c
         for name in LATER {
-            let mut r = Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm))?;
-            let mut s = later_gallery(name, &mut r)?;
+            let mut r = Renderer::new(dev, &linear_desc(Format::Rgba8Unorm))?;
+            let mut s = later_gallery_in(name, &mut r, Format::Rgba8Unorm)?;
             let mut off = Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm)?;
             off.submit(&mut r, &mut s)?;
             self.keep.push((name, off));
             self.scenes.push(s);
             self.more.push(r);
         }
+        // (G5e2) the gallery in an sRGB target, where the hardware encodes: srgb_NAME
+        for (name, tag) in SRGB_TARGET {
+            let off = self.in_format(dev, name, RendererDesc::new(Format::Rgba8Srgb))?;
+            self.keep.push((tag, off));
+        }
+        // (G5e2) the shader's sRGB, and the float image for it
+        for (name, tag, f) in ENCODED {
+            let off = self.in_format(dev, name, RendererDesc::new(Format::Rgba8Unorm))?;
+            self.keep.push((tag, off));
+            let off = self.in_format(dev, name, RendererDesc::new(Format::Rgba32Float))?;
+            self.floats.push((f, tag, off));
+        }
         Ok(())
+    }
+
+    /// one of the gallery's images with a renderer of this description and a target of its format
+    fn in_format(&mut self, dev: &Device, name: &'static str, desc: RendererDesc) -> Result<Off> {
+        let format = desc.color;
+        let mut r = Renderer::new(dev, &desc)?;
+        let mut s = match name {
+            "mix" => {
+                let (meshes, materials) = gallery_fill(&mut r)?;
+                gallery_scene(&r, meshes, materials, [0.0; 3])?.0
+            }
+            "tex" => tex_gallery(&mut r)?,
+            "gltf" => gltf_gallery(&mut r)?,
+            _ => later_gallery_in(name, &mut r, format)?,
+        };
+        let mut off = Off::new(dev, GALLERY_W, GALLERY_H, format)?;
+        off.submit(&mut r, &mut s)?;
+        self.scenes.push(s);
+        self.more.push(r);
+        Ok(off)
     }
 
     fn step(&mut self) -> Result<()> {
@@ -207,7 +254,29 @@ impl Probe {
                         say(&format!("part {i} {text}"));
                     }
                     say("part end");
+                    if name.starts_with("enc_") {
+                        self.encoded.push((name, img));
+                    }
                     self.keep.remove(0);
+                }
+                // (G5e2) the shader's sRGB against the float image encoded here, by the definition
+                while let Some((f, tag, off)) = self.floats.first() {
+                    let img = match off.read() {
+                        Err(GpuError::NotReady) => return Ok(()),
+                        r => r?,
+                    };
+                    let (f, tag) = (*f, *tag);
+                    let enc = self.encoded.iter().find(|e| e.0 == tag).map(|e| e.1.clone()).unwrap_or_default();
+                    let (mut n, mut m) = (0u32, 0u8);
+                    for (p, c) in enc.chunks_exact(4).zip(img.chunks_exact(16)) {
+                        let v = |k: usize| f32::from_le_bytes([c[k * 4], c[k * 4 + 1], c[k * 4 + 2], c[k * 4 + 3]]) as f64;
+                        let d = (0..3).map(|k| p[k].abs_diff(srgb_encode(v(k)))).max().unwrap_or(0);
+                        n += (d > 0) as u32;
+                        m = m.max(d);
+                    }
+                    let fine = m <= 1 && enc.len() * 4 == img.len();
+                    self.yes(fine, &format!("{tag}: the shader's sRGB against {f} (Rgba32Float) encoded on the CPU: {n} pixels differ, largest {m}"));
+                    self.floats.remove(0);
                 }
                 dev.poll()?;
                 self.yes(dev.poll().is_ok(), "the browser found no validation error in all of it");
@@ -245,7 +314,7 @@ impl plat::web::WebApplication for Probe {
 
 pub fn start() -> i32 {
     let t0 = plat::time_us();
-    let p = Probe { step: 0, inst: None, dev: None, keep: Vec::new(), scenes: Vec::new(), renderer: None, more: Vec::new(), counts: Vec::new(), ok: 0, bad: 0, t0 };
+    let p = Probe { step: 0, inst: None, dev: None, keep: Vec::new(), floats: Vec::new(), encoded: Vec::new(), scenes: Vec::new(), renderer: None, more: Vec::new(), counts: Vec::new(), ok: 0, bad: 0, t0 };
     if !plat::web::install(Box::new(p)) {
         return 2;
     }

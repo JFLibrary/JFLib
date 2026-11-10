@@ -12,7 +12,7 @@
   python tools/package.py Kritzel --impl asm [--out build/dist_asm]          (legacy mode)
   python tools/package.py Kritzel [--sign] [--repo build/repo] [--update build/channel
                                   [--update-url https://host/channel] [--update-key FILE]]
-  python tools/package.py Kritzel --formats setup,deb,appimage,rpm,flatpak,msix | all
+  python tools/package.py Kritzel --formats setup,deb,appimage,rpm,flatpak,msix,dmg | all
 
 --formats (default setup,deb) adds the other formats (tools/pkg_linux.py, tools/pkg_msix.py,
 docs/PACKAGING.md):
@@ -27,6 +27,8 @@ docs/PACKAGING.md):
   build/dist/<App>-<ver>-x64.msix     MakeAppx of the default Windows style (AppxManifest.xml:
                                       file types, URL schemes, StartupTask), signed like the setup;
                                       build/dist/<App>.appinstaller with PACKAGE appinstaller_url=
+  build/dist/<App>-<ver>-<style>-arm64.dmg   macOS, per style (on a Mac only): NAME.app (Info.plist,
+                                      icon, signature: tools/apple.py) beside a link to /Applications
 A missing tool skips that package and says what it wrote instead; --no-win / --no-deb drop
 every Windows / Linux format.
 
@@ -147,7 +149,7 @@ def build_variants_rs(app, styles, work, targets, rsout, profile):
     libraries built once, both targets side by side, the style variants linked in parallel:
     <rsout>/<t>/<style>/ for several styles), each exe copied to work/<style>/<target>/ as
     build.py would place it (jxl-module: and the app's modules next to it)"""
-    tgt = "both" if len(targets) == 2 else targets[0]
+    tgt = "both" if set(targets) == {"win", "linux"} else targets[0]
     run([sys.executable, "build_rs.py", "app", app, "--target", tgt, "--style", ",".join(styles),
          *rs_mode(profile), "--out", rsout, *STATIC_ARGS])
     for s in styles:
@@ -161,6 +163,8 @@ def build_variants_rs(app, styles, work, targets, rsout, profile):
 
 def app_modules(app, target, impl):
     """(jxl-module) the module files of the app next to its exe (none for --impl asm)"""
+    if target == "mac":
+        return []           # Apple loads no modules (docs/APPLE.md, decision 6)
     return [module_file(m, target) for m in APP_MODULES.get(app, [])] if impl == "rs" else []
 
 
@@ -461,11 +465,13 @@ def sign_variants(app, styles, work, signing, impl):
     signing.windows([f for f in files if f.exists()])
 
 
-def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signing, impl, appimages=None):
+def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signing, impl, appimages=None, dmgs=None):
     """--update OUT: a signed channel per style (OUT/<style>/update.json + .sig, lib/update):
     Windows the program (kind exe) or, with modules / further programs, a bundle of the program
     folder (kind bundle); Linux the .deb (kind package: the package manager installs it) and the
-    style's AppImage (kind appimage: an AppImage replaces its own file; appimages {style: path})"""
+    style's AppImage (kind appimage: an AppImage replaces its own file; appimages {style: path});
+    macOS the app bundle (kind app, a JFA1 bundle of NAME.app: an installed app replaces its
+    bundle) and the .dmg (kind package; dmgs {style: path})"""
     seed = update_manifest.load_key(key_file)
     if seed is None:
         signing.skip("Update-Kanal: kein Signierschlüssel (--update-key DATEI, jfgui_UPDATE_KEY_FILE oder jfgui_UPDATE_KEY; "
@@ -490,6 +496,12 @@ def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signin
             files.append(("linux-x86_64", "package", deb, Path(deb).name))
         if (appimages or {}).get(s):
             files.append(("linux-x86_64", "appimage", appimages[s], Path(appimages[s]).name))
+        bundle = ROOT / work / s / "mac" / f"{app}.app"
+        if (dmgs or {}).get(s) and bundle.is_dir():
+            tmp = ROOT / work / f"{app}-{version}-{s}-mac.jfa"
+            tmp.write_bytes(assetpack.pack(bundle))
+            files.append(("macos-aarch64", "app", tmp, tmp.name))
+            files.append(("macos-aarch64", "package", dmgs[s], Path(dmgs[s]).name))
         if not files:
             continue
         m = update_manifest.write_channel(ROOT / out / s, app_id, version, files, seed, notes=meta.get("update_notes", ""),
@@ -537,7 +549,9 @@ def main():
     work = dist / a.app
     rsout = dist / f"rs_{a.profile}"    # --impl rs: build_rs.py's output, shared by every app / style
     (ROOT / dist).mkdir(parents=True, exist_ok=True)
-    targets = [t for t in ("win", "linux") if any(FORMATS[f] == t for f in formats)]
+    targets = [t for t in ("win", "linux", "mac") if any(FORMATS[f] == t for f in formats)]
+    if "mac" in targets and (sys.platform != "darwin" or len(targets) > 1):
+        raise SystemExit("dmg builds on a Mac and alone (--formats dmg): Apple's tools (docs/APPLE.md)")
     signing = Signing(a.sign, "win" in targets)
     if a.impl == "rs":
         print(f"[{', '.join(styles)}] build")
@@ -575,15 +589,34 @@ def main():
         pkg_linux.make_rpm(job)
     if "flatpak" in formats:
         pkg_linux.make_flatpak(job)
+    dmgs = {}
+    if "dmg" in formats:
+        for s in styles:
+            dmgs[s] = make_dmg(a.app, meta, s, dist, work, multi=len(styles) > 1)
+            job.done.append(("dmg", dmgs[s]))
     if a.update:
-        update_channel(a.app, meta, styles, work, a.update, deb, a.update_url, a.update_key, signing, a.impl, appimages)
+        update_channel(a.app, meta, styles, work, a.update, deb, a.update_url, a.update_key, signing, a.impl, appimages, dmgs)
     if set(formats) - {"setup", "deb"}:
         job.report()
     signing.report()
 
 
 # the package formats and the target each one packages
-FORMATS = {"setup": "win", "msix": "win", "deb": "linux", "appimage": "linux", "rpm": "linux", "flatpak": "linux"}
+FORMATS = {"setup": "win", "msix": "win", "deb": "linux", "appimage": "linux", "rpm": "linux", "flatpak": "linux",
+           "dmg": "mac"}
+
+
+def make_dmg(app, meta, style, dist, work, multi):
+    """macOS: the style's program as NAME.app, on a disk image -> its path"""
+    sys.path.insert(0, str(ROOT))
+    from tools.apple import mac_bundle, mac_dmg
+    exe = ROOT / work / style / "mac" / app
+    bundle = mac_bundle(exe, app)
+    version = meta.get("version", "0.1.0")
+    out = ROOT / dist / (f"{app}-{version}-{style}-arm64.dmg" if multi else f"{app}-{version}-arm64.dmg")
+    mac_dmg(bundle, out, meta.get("display", app))
+    print(f"[{style}] {out.relative_to(ROOT)}")
+    return out
 
 
 def formats_of(text, no_win=False, no_deb=False):
@@ -592,7 +625,8 @@ def formats_of(text, no_win=False, no_deb=False):
     bad = [f for f in names if f not in FORMATS]
     if bad:
         raise SystemExit(f"--formats: unknown {', '.join(bad)} (known: {', '.join(FORMATS)}, all)")
-    return [f for f in names if not (no_win and FORMATS[f] == "win") and not (no_deb and FORMATS[f] == "linux")]
+    return [f for f in names if not (no_win and FORMATS[f] == "win") and not (no_deb and FORMATS[f] == "linux")
+            and not (text.strip() == "all" and FORMATS[f] == "mac")]   # (all: the PC's formats; dmg on a Mac)
 
 
 def make_job(app, meta, styles, dist, work, impl, rsout, targets):

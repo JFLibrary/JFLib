@@ -18,6 +18,7 @@ pub enum Page {
     Windows,
     Edge,
     Images,
+    View3d,
     Level,
     Attitude,
     Compass,
@@ -33,7 +34,7 @@ pub struct PageInfo {
 }
 
 // i18n: title
-pub const PAGES: [PageInfo; 13] = [
+pub const PAGES: [PageInfo; 14] = [
     PageInfo { page: Page::Buttons, title: "Schaltflächen", icon: IC_POINTER, name: "buttons" },
     PageInfo { page: Page::Menus, title: "Menüs & Auswahl", icon: IC_BULLETED_LIST, name: "menus" },
     PageInfo { page: Page::Texts, title: "Texteingabe", icon: IC_TEXT_BOX, name: "texts" },
@@ -43,17 +44,18 @@ pub const PAGES: [PageInfo; 13] = [
     PageInfo { page: Page::Windows, title: "Fenster & Dialoge", icon: IC_OPEN_IN_NEW_WINDOW, name: "windows" },
     PageInfo { page: Page::Edge, title: "Randfälle", icon: IC_WARNING, name: "edge" },
     PageInfo { page: Page::Images, title: "Bild & Leinwand", icon: IC_VIEW_ALL, name: "images" },
+    PageInfo { page: Page::View3d, title: "3D-Ansicht", icon: IC_SHAPES, name: "view3d" },
     PageInfo { page: Page::Level, title: "Wasserwaage", icon: IC_CIRCLE_RING, name: "level" },
     PageInfo { page: Page::Attitude, title: "Handylage", icon: IC_ROTATE, name: "attitude" },
     PageInfo { page: Page::Compass, title: "Kompass", icon: IC_GLOBE, name: "compass" },
     PageInfo { page: Page::Gps, title: "GPS", icon: IC_HOME, name: "gps" },
 ];
 
-const FIRST_SENSOR_PAGE: usize = 9;
+const FIRST_SENSOR_PAGE: usize = 10;
 const ID_MENU: u32 = 900;
-const ID_MENU_ROW: u32 = 910; // .. 923
+const ID_MENU_ROW: u32 = 910; // .. 924
 const ID_BACK: u32 = 930;
-const ID_CARD_ROW: u32 = 940; // .. 952
+const ID_CARD_ROW: u32 = 940; // .. 953
 
 pub fn title(page: Page) -> &'static str {
     PAGES.iter().find(|p| p.page == page).map_or("", |p| t(p.title))
@@ -61,6 +63,10 @@ pub fn title(page: Page) -> &'static str {
 
 /// jfgui_PAGE: the page a self-test starts on
 pub fn from_env() -> Page {
+    // (G5e2: the 3D view's self-test, pg_view.rs; the browser sets only variables jfgui_GPU_*)
+    if plat::env("jfgui_GPU_VIEWCHECK").is_some_and(|v| v == "1") || plat::env("jfgui_GPU_VIEWBENCH").is_some() {
+        return Page::View3d;
+    }
     let name: String = plat::env("jfgui_PAGE").unwrap_or_default();
     PAGES.iter().find(|p| p.name == name).map_or(Page::Home, |p| p.page)
 }

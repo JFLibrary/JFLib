@@ -43,6 +43,7 @@ import hashlib
 import tempfile
 import json
 import os
+import plistlib
 import shutil
 import socket
 import struct
@@ -284,6 +285,41 @@ def make_appimage_channels(out, t, app, seed, program, runtime):
             g.close()
 
 
+APP_ID = "org.jflib.updatetest.app"
+
+
+def app_channels(out, t, app, seed, exe_path):
+    """macOS: app bundles of PROGRAM, signed ad hoc as APP_ID: DIR/app/running.app (1.0.0, the
+    "installed" one, which the test copies), channels app (2.0.0), app-otherid (another
+    identifier: refused), app-tampered (Info.plist changed after signing: refused), app-notapp (no
+    Contents/Info.plist: refused)"""
+    if sys.platform != "darwin":
+        return
+    d = out / "app"
+    shutil.rmtree(d, ignore_errors=True)
+    d.mkdir(parents=True)
+
+    def make(where, version, ident=APP_ID, tamper=False):
+        b = d / where / "updatetest.app"
+        (b / "Contents" / "MacOS").mkdir(parents=True)
+        shutil.copy2(exe_path, b / "Contents" / "MacOS" / "updatetest")
+        plist = {"CFBundleExecutable": "updatetest", "CFBundleIdentifier": ident, "CFBundlePackageType": "APPL",
+                 "CFBundleShortVersionString": version, "CFBundleVersion": version}
+        (b / "Contents" / "Info.plist").write_bytes(plistlib.dumps(plist, fmt=plistlib.FMT_XML))
+        subprocess.run(["codesign", "-f", "-s", "-", "--timestamp=none", str(b)], check=True, capture_output=True)
+        if tamper:
+            plist["CFBundleShortVersionString"] = version + "x"
+            (b / "Contents" / "Info.plist").write_bytes(plistlib.dumps(plist, fmt=plistlib.FMT_XML))
+        return b
+
+    running = make("running", "1.0.0")
+    shutil.move(str(running), str(d / "running.app"))
+    channel("app", app, "2.0.0", [(t, "app", "updatetest-2.0.0.jfa", assetpack.pack(make("v2", "2.0.0")))], seed)
+    channel("app-otherid", app, "2.0.0", [(t, "app", "updatetest-2.0.0.jfa", assetpack.pack(make("other", "2.0.0", "org.jflib.someoneelse")))], seed)
+    channel("app-tampered", app, "2.0.0", [(t, "app", "updatetest-2.0.0.jfa", assetpack.pack(make("tampered", "2.0.0", tamper=True)))], seed)
+    channel("app-notapp", app, "2.0.0", [(t, "app", "updatetest-2.0.0.jfa", assetpack.pack_files({"README": b"no bundle"}))], seed)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", required=True)
@@ -328,6 +364,7 @@ def main():
     channel("big", app, "2.0.0", [(t, "exe", "big-2.0.0.bin", os.urandom(4 << 20))], seed)
     SPECIAL["/big/big-2.0.0.bin"] = "slow"
     appimage_channels(out, t, app, seed, program, a.runtime)
+    app_channels(out, t, app, seed, a.exe)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     (out / "pubkey.txt").write_text(um.public_key(seed).hex() + "\n", encoding="ascii")
     tmp = out / "port.tmp"

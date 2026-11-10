@@ -40,8 +40,12 @@
 //                    mirrored MASK instances, a change after prepare, against scenes built anew and the ray caster; detail
 //                    levels with MASK (pick per mesh, side and class); a MASK plate switched in the shadows; the occlusion
 //                    test behind a MASK wall (alphatest.rs)
+//        srgb        (G5e2) the fragment shaders encode sRGB for 8-bit targets without sRGB: the gallery against its float
+//                    images encoded on the CPU, Bgra8Unorm, an sRGB target, the linear way; five shapes against the ray
+//                    caster in sRGB codes (srgbtest.rs)
 //        all         all of the above
-//        window      a real window (one, briefly; not in `all`): the presented image = the offscreen image
+//        window      a real window (one, briefly; not in `all`): the presented image = the offscreen image, and (G5e2)
+//                    the float image encoded on the CPU: the shader encodes sRGB for the swapchain's 8-bit format
 //   render3dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--warmup W] [--inflight K] [--basis]
 //                [--moved K] [--meshes M] [--textures T [--tex-size S]] [--mask P] [--verify]    the scene of gputest
 //                --bench over the engine (bench.rs); T textures of S texels on the cubes' materials, P % of them MASK
@@ -49,7 +53,9 @@
 //   render3dtest --bench-gltf [--nodes N | --vertices V]   a generated glTF: load time, memory (bench.rs)
 //   render3dtest --gen-shaders FILE          lib/render3d/shaders_spv.rs from lib/render3d/*.wgsl
 //   render3dtest --gen-dfg FILE              lib/render3d/dfg_table.rs: the split-sum's table (render3d::dfg_table)
-//   render3dtest --dump DIR                  the gallery's images per level, for tests/engine_web.mjs
+//   render3dtest --dump DIR [--format rgba8|bgra8|rgba8srgb|rgba16f|rgba32f [--linear]]   the gallery's images per level,
+//                                            for tests/engine_web.mjs (linear Rgba8Unorm; --format: renderers and targets
+//                                            of that format, as RendererDesc::new has them; --linear: encode_srgb false)
 //   In the browser: the same gallery, step by step as the browser answers (web.rs; tests/engine_web.mjs).
 //
 // Without Vulkan or a usable GPU every test prints SKIP and passes.  Exit code 1 when a check failed.
@@ -85,6 +91,8 @@ mod occl;
 mod lodtest;
 #[cfg(not(target_arch = "wasm32"))]
 mod shadowtest;
+#[cfg(not(target_arch = "wasm32"))]
+mod srgbtest;
 #[cfg(not(target_arch = "wasm32"))]
 mod tests;
 #[cfg(not(target_arch = "wasm32"))]

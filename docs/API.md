@@ -8825,13 +8825,15 @@ The device is the UI output's (one for all windows); without an output in this r
 possible) the views make one of their own on first use.  A new device (generation) detaches the content from
 the old one and attaches it to the new one; its next frame follows.
 
-The browser cannot wait: a read-back there is answered later, the Draw shows the last frame that came back
-(G5e2 tests it).
+The browser cannot wait: a read-back there is answered later, the Draw shows the last frame that came back.  When
+the answer comes (gp_views_tick looks), the next render takes it to the framebuffer as it would a new frame, and at
+rest it is settled again (G5e2: before, a view at rest or under a layer kept an older frame in the framebuffer).
 ```
 
 ```rust
 /// the format of a view's target: what the output samples and what is read back byte for byte into the
-/// framebuffer (B, G, R, x).  The content's colours go in as it writes them, no sRGB encoding
+/// framebuffer (B, G, R, x).  The content's colours go in as it writes them, as sRGB codes like the framebuffer's:
+/// no hardware encodes them (G5e2: render3d's fragment shaders do, RendererDesc::encode_srgb)
 GPU_VIEW_FORMAT: gpu::Format = gpu::Format::Bgra8Unorm
 ```
 
@@ -8866,6 +8868,8 @@ GPU_VIEW_FORMAT: gpu::Format = gpu::Format::Bgra8Unorm
   - `draw_us: u64`
   - `reads: u64` -- frames read back into the CPU's copy, the time that took (us: submit, wait, copy)
   - `read_us: u64`
+  - `read_frame: u64` -- (G5e2) the newest frame read back into the CPU's copy (1, 2, ..; 0: none): the framebuffer can hold the view's
+    newest frame once it equals `frames` (in the browser a read-back comes later)
   - `size: (u32, u32)` -- the size of its target (px)
   - `error: Option<String>` -- what the last failure said
 
@@ -20124,7 +20128,8 @@ ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
 Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
 of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
 units of KHR_lights_punctual, times the scene's exposure, tone mapped in the fragment shader (Khronos PBR
-Neutral, or none), colours linear (an sRGB target encodes them).  Positions are f64 on the CPU and f32 relative to the scene's
+Neutral, or none), colours linear (an sRGB target encodes them; G5e2: for an 8-bit target without sRGB the fragment
+shaders do, RendererDesc::encode_srgb).  Positions are f64 on the CPU and f32 relative to the scene's
 origin on the GPU.
 
 Errors are gpu's: Invalid for ids and values this crate can judge, the rest from the backend.
@@ -20161,13 +20166,19 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 ```
 
 - **`struct RendererDesc`**
-  Renderer::new
+  Renderer::new.  Made with `new` and changed field by field (it may grow)
   - `color: Format` -- the format of the colour targets
   - `frames_in_flight: usize` -- frames the CPU may record ahead of the GPU (1 ..= FRAMES_MAX); G1 measured 2 to be enough
+  - `encode_srgb: bool` -- (G5e2) an 8-bit colour format without sRGB (Rgba8Unorm, Bgra8Unorm, Rg8Unorm, R8Unorm): the fragment shaders
+    encode the colours to sRGB, by the definition, as an sRGB target's hardware does (true, the default: what a
+    window's swapchain or a view of lib/ui shows).  false: the linear light as it is (tests that compare light, an
+    app that encodes later).  sRGB formats are encoded by the hardware and float formats stay linear either way
 
 **`impl RendererDesc`**
 
 - **`const fn new(color: Format) -> RendererDesc`**
+- **`const fn encodes_srgb(&self) -> bool`**
+  the fragment shaders encode sRGB with this description: encode_srgb and an 8-bit format without sRGB
 
 - **`struct MeshData<'a>`**
   a mesh's data: one normal and one uv per position, three indices per triangle, counter-clockwise from
@@ -20241,6 +20252,8 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 
 - **`fn new(dev: &Device, desc: &RendererDesc) -> Result<Renderer>`**
 - **`fn device(&self) -> &Device`**
+- **`fn desc(&self) -> &RendererDesc`**
+  what it was made with (G5e2: desc().encodes_srgb(), whether its fragment shaders encode sRGB)
 - **`fn multi_draw(&self) -> bool`**
   this device draws its lists with one multi-draw (level Voll)
 - **`fn max_instances(&self) -> u32`**
@@ -26544,6 +26557,11 @@ updates (lib/update builds on it; docs/UPDATES.md "Packages")
                                   (the portal's Spawn, LATEST_VERSION) -> its pid
   restart_appimage(args) -> i32   (Linux) the AppImage file started again with args (its
                                   runtime unpacks the image that is now there): 0 / -1
+  app_bundle_follows(old, new)    (macOS) the bundle at new may replace the app bundle at old:
+                                  its signature checks (strict, the whole bundle) against the
+                                  old one's designated requirement, or, the old one signed ad
+                                  hoc, it carries the same identifier (apple_bundle.rs) -> Err(why)
+  app_bundle_swap(a, b) -> bool   (macOS) two folders exchanged in one step (RENAME_SWAP)
 
 Elsewhere (web, Android) packaged() is Plain and the rest answers "not available".
 ```
@@ -26589,6 +26607,16 @@ Elsewhere (web, Android) packaged() is Plain and the rest answers "not available
 - **`fn flatpak_spawn_latest(args: &[&str]) -> Result<u32, String>`**
   start this app's newest installed Flatpak version with args (the portal's Spawn with
   LATEST_VERSION; the same program inside it) -> its pid
+
+- **`fn app_bundle_follows(old: &str, new: &str) -> Result<(), String>`**
+  (macOS) whether the app bundle at `new` may replace the one at `old` (lib/update, kind "app"):
+  its signature checks, strict and for the whole bundle, against the old bundle's designated
+  requirement (a team's signature: the same identifier and team); an old bundle signed ad hoc
+  asks only for a valid signature and the same identifier.  Elsewhere: Err (no app bundles)
+
+- **`fn app_bundle_swap(a: &str, b: &str) -> bool`**
+  (macOS) the folders a and b exchanged in one step (renamex_np, RENAME_SWAP): an app bundle is
+  never missing while an update replaces it -> it worked (elsewhere: false)
 
 - **`fn restart_appimage(args: &[&str]) -> i32`**
   start the running AppImage's file ($APPIMAGE) again with args: its runtime unpacks the
@@ -44859,7 +44887,13 @@ back a version that does not start
   fetch::{get, download, join, Progress}   its HTTP(S) for other downloads of an app (fetch.rs)
   install(&cfg) -> Packaged    how the program is installed (plat::pkg::packaged; cfg.exe
                                set: Plain), which decides what an update is:
-    Plain     exe / bundle / package entries of update.json (below)
+    Plain     exe / bundle / package entries of update.json (below); a program in a macOS
+              app bundle (NAME.app/Contents/MacOS/NAME) takes the "app" entry instead: the
+              bundle is replaced as a whole (unpacked next to it, its signature checked against
+              the installed one's requirement -- plat::pkg::app_bundle_follows --, exchanged in
+              one step, the old bundle the backup; trial and rollback as for an exe); a folder
+              the user cannot write or a bundle macOS moved away (App Translocation):
+              Error::ReadOnly
     AppImage  the "appimage" entry: the .AppImage file ($APPIMAGE) is replaced as a whole
               (copied next to it, checked, renamed over it; the old file is the backup, the
               trial and the rollback as for an exe; restarted through the AppImage); a folder
@@ -45108,6 +45142,11 @@ An AppImage update has one file, the .AppImage itself ($APPIMAGE): copied (and h
 way) from staged/ as NAME.jfupd-new, checked as an AppImage whose signature follows the
 running one's (appimage.rs), renamed over the old file (atomic on Linux); the old file is
 the backup.  Large files are copied in pieces, never read whole.
+An app bundle (kind "app", macOS) is replaced as a whole: its files unpacked as
+NAME.app.jfupd-new, the bundle's signature checked against the installed one's requirement
+(plat::pkg::app_bundle_follows), a copy of the installed bundle in backup/app/ (backup/list:
+"A NAME.app"), the two folders exchanged in one step (plat::pkg::app_bundle_swap) and the old
+one removed; the rollback exchanges the copy back the same way.
 ```
 
 - **`enum Stage`**
@@ -45184,7 +45223,7 @@ compare versions
                                           kind this version does not know are left out)
   Manifest::package_for(target, appimage) the entry for this system and installation
   verify(bytes, sig_text, keys) -> bool   the Base64 Ed25519 signature of update.json.sig
-  target() -> "windows-x86_64" | "linux-x86_64" | "linux-aarch64" | ...
+  target() -> "windows-x86_64" | "linux-x86_64" | "linux-aarch64" | "macos-aarch64" | ...
   newer(a, b) -> bool                     "1.10.0" > "1.9.2", "2.0.0" > "2.0.0-rc1"
 ```
 
@@ -45204,11 +45243,14 @@ MAX_SIG: usize = 4096
     program that runs as an AppImage, which is offered nothing else
   - `Flatpak` -- an update of a Flatpak from its repository, through the Flatpak portal (never in a
     manifest: Offer::kind of a Flatpak)
+  - `App` -- (macOS) a whole app bundle: a JFA1 bundle of the files of NAME.app relative to it, which
+    replaces the bundle the program runs from (its signature covers the bundle, not only the
+    program); only offered to a program in an app bundle, which is offered nothing else
 
 **`impl Kind`**
 
 - **`fn name(self) -> &'static str`**
-  "exe", "bundle", "package", "appimage" or "flatpak"
+  "exe", "bundle", "package", "appimage", "flatpak" or "app"
 - **`fn parse(s: &str) -> Option<Kind>`**
   the kind of a name (name())
 
@@ -45246,7 +45288,7 @@ MAX_SIG: usize = 4096
 
 - **`fn target() -> &'static str`**
   the system this program runs on, as the manifest names it: "windows-x86_64",
-  "linux-x86_64", "linux-aarch64", "android-aarch64", "web-wasm32"
+  "linux-x86_64", "linux-aarch64", "android-aarch64", "macos-aarch64", "ios-aarch64", "web-wasm32"
 
 - **`fn newer(a: &str, b: &str) -> bool`**
   a is newer than b: the numbers before a '-' compared part by part ("1.10" > "1.9",

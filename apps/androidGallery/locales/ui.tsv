@@ -416,3 +416,18 @@ Bildansicht	Image view
 Ziehen verschiebt, das Mausrad zoomt: die Kacheln liegen auf der GPU.	Drag to move, the mouse wheel zooms: the tiles are on the GPU.
 Muster	Pattern
 Großes Bild	Large image
+3D-Ansicht	3D view
+Eine 3D-Szene zwischen den Widgets: Ziehen dreht sie, die GPU zeichnet sie in die Oberfläche.	A 3D scene between the widgets: dragging turns it, the GPU draws it into the interface.
+über der Ansicht	over the view
+Darüber	Over it
+Prüfen	Check
+Gerät verlieren	Lose the device
+eigenes Gerät	own device
+, von der Ausgabe gezeichnet	, drawn by the output
+kein Gerät	no device
+Bilder	frames
+zurückgelesen	read back
+Prüfung	Check
+in Ordnung	fine
+abweichend	different
+Auf diesem System gibt es keine 3D-Ansicht.	There is no 3D view on this system.

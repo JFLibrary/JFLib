@@ -3004,6 +3004,24 @@ fn t_adapter() -> i32 {
                 }
                 let all = inst.adapter().map(|a| a.info().name.clone()).unwrap_or_default();
                 out(&format!("  instance.adapter() keeps its choice: {all}"));
+                // (G5e2) the choice of the UI's device with and without AF_GPU_3D (gpu_out.rs build_device: the first
+                // of the list that can present this window; AF_GPU_3D's list is fast_adapters: discrete before
+                // integrated, no CPU or virtual adapter)
+                match gpu::Surface::new(&inst, w) {
+                    Err(e) => out(&format!("  no surface for the window: {e}")),
+                    Ok(surf) => {
+                        let fast: Vec<gpu::Adapter> = if plat::env("jfgui_GPU_ADAPTER").is_some_and(|s| !s.is_empty()) {
+                            inst.adapter().into_iter().collect()
+                        } else {
+                            inst.adapters().unwrap_or_default().into_iter().filter(|a| a.info().missing.is_none() && r(a.info().kind, false).is_some()).collect()
+                        };
+                        for (what, l) in [("AF_GPU_3D", &fast), ("without AF_GPU_3D", &list)] {
+                            let names: Vec<String> = l.iter().map(|a| format!("{} ({:?}, {:?}, presents: {})", a.info().name, a.info().kind, a.level(), a.can_present(&surf))).collect();
+                            let pick = l.iter().find(|a| a.can_present(&surf)).map_or(String::from("none: the CPU path"), |a| a.info().name.clone());
+                            out(&format!("  {what}: {} -> {pick}", names.join(", ")));
+                        }
+                    }
+                }
             }
         },
     }

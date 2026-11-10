@@ -28,6 +28,13 @@
 // of a depth array by vs_depth (no fragment shader: opaque lists, and MASK lists without their holes) or vs_shadow +
 // fs_shadow (MASK lists' holes), both with a cascade's orthographic view_proj in `view`; the main pass filters them
 // with a comparison sampler (sun_shadow).
+//
+// sRGB (G5e2): an 8-bit target without sRGB (Rgba8Unorm, Bgra8Unorm: a window's swapchain, a view of lib/ui) would
+// show the linear light too dark, so the main pass's fragment shaders encode it here when the pipeline sets
+// ENCODE_SRGB (RendererDesc::encode_srgb); an sRGB target's hardware encodes by itself, a float target stays linear.
+
+// (G5e2) encode the colour to sRGB before it goes to the target (lib.rs sets it for 8-bit targets without sRGB)
+@id(0) override ENCODE_SRGB: bool = false;
 
 struct View {
     view_proj: mat4x4f,
@@ -552,7 +559,17 @@ fn shade(m: Material, c: vec4f, normal: vec3f, uv: vec2f, world: vec3f, dx: vec2
     if lights.sun_color.w != 0.0 {
         out = neutral(out);
     }
+    if ENCODE_SRGB {
+        out = srgb_encode(out);
+    }
     return vec4f(out, 1.0);
+}
+
+// (G5e2) linear light to sRGB's code values by the definition (IEC 61966-2-1, not a gamma of 2.2), after clamping to
+// 0 ..= 1 as the target would
+fn srgb_encode(c: vec3f) -> vec3f {
+    let v = clamp(c, vec3f(0.0), vec3f(1.0));
+    return select(1.055 * pow(v, vec3f(1.0 / 2.4)) - 0.055, v * 12.92, v <= vec3f(0.0031308));
 }
 
 // opaque lists: nothing is dropped, no discard anywhere (alpha_cutoff is not read)

@@ -163,6 +163,15 @@ Emulator: `-gpu host` (Vulkan 1.3); `-gpu swiftshader_indirect` zeigt den Rückf
 Messen: `adb shell am instrument -w -r -e phase bench -e gpu 1 -e res full org.jflib.gallery/.GalleryGpuInstrumentation`
 (`-e res cap`, `-e gpu 0`, `-e page images`, `-e landscape 1`).
 
+**Die 3D-Ansicht** (seit 09.11.2026, G5e2; `pg_view.rs`, Seite „3D-Ansicht“): eine Szene von render3d zwischen den
+Widgets (`ui.gpu_view`). Mit `jfgui_GPU_VIEWCHECK=1` prüft die Seite sich selbst (die Ansicht im Framebuffer gegen
+dasselbe Bild offscreen und gegen den Strahlenwerfer von render3dtest, in Ruhe, unter einem Popup, nach einem verlorenen
+Gerät) und schreibt Zeilen `viewcheck: ...` ins Log (Logcat, Tag `jfgui`; im Browser die Konsole), am Ende
+`viewcheck: done: N checks, M failed; ...`. `android_gpu.py --phases view` liest sie, im Browser
+`node apps/androidGallery/tests/view_web.mjs [build] [--modes=simd]` (`--bench=3`: die Messung). Mit
+`jfgui_GPU_VIEWBENCH=300` misst die Seite stattdessen die Galerie von render3dtest in einer Ansicht von 700 px Höhe
+(eine Zeile `viewcheck: bench ...`). Beide Variablen beginnen mit `jfgui_GPU_`, damit `?gpuenv=` im Browser sie setzt.
+
 ## Grenzen dieses Prototyps
 
 Der Adapter bietet eine einzelne Android-Activity und darin die Library-Oberflächen.

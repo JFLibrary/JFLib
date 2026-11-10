@@ -165,7 +165,7 @@ struct Built {
 }
 
 fn build(t: &mut T, dev: &Device, geos: &[Geo], specs: &[Spec], colors: &[[f32; 3]], cam: &Camera) -> Option<Built> {
-    let mut r = t.res(Renderer::new(dev, &RendererDesc { color: Format::Rgba8Unorm, frames_in_flight: 2 }), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     for g in geos {
         t.res(r.add_mesh(&g.data()), "add_mesh")?;
     }
@@ -336,7 +336,7 @@ fn visibility_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let aspect = w as f64 / h as f64;
     let mut off = t.res(Off::new(dev, w, h, Format::Rgba8Unorm), "target")?;
     let geos = [cube(), prism(7, 0.6), ball(6, 8)];
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     for g in &geos {
         t.res(r.add_mesh(&g.data()), "add_mesh")?;
     }
@@ -490,7 +490,7 @@ fn rebuilt(t: &mut T, r: &Renderer, list: &[Want], cam: &Camera, reverse: bool) 
 fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let (w, h) = (GALLERY_W, GALLERY_H);
     let mut off = t.res(Off::new(dev, w, h, Format::Rgba8Unorm), "target")?;
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     let (meshes, materials) = t.res(gallery_fill(&mut r), "fill")?;
     let cam = gallery_camera([0.0; 3]);
     let mut s = t.res(Scene::new(&r), "Scene::new")?;
@@ -725,25 +725,31 @@ fn many_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
 pub const GALLERY_NAMES: [&str; 5] = ["mix", "changed", "far", "tex", "gltf"];
 
 fn gallery_image(t: &mut T, dev: &Device) -> Option<Vec<Vec<u8>>> {
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    gallery_image_in(t, dev, linear_desc(Format::Rgba8Unorm))
+}
+
+/// the gallery's images with renderers of this description, in targets of its format
+pub fn gallery_image_in(t: &mut T, dev: &Device, desc: RendererDesc) -> Option<Vec<Vec<u8>>> {
+    let format = desc.color;
+    let mut r = t.res(Renderer::new(dev, &desc), "Renderer::new")?;
     let (meshes, materials) = t.res(gallery_fill(&mut r), "fill")?;
-    let mut off = t.res(Off::new(dev, GALLERY_W, GALLERY_H, Format::Rgba8Unorm), "target")?;
+    let mut off = t.res(Off::new(dev, GALLERY_W, GALLERY_H, format), "target")?;
     let (mut s, mut ids) = t.res(gallery_scene(&r, meshes, materials, [0.0; 3]), "gallery")?;
     let a = shot(t, dev, &mut off, &mut r, &mut s, "gallery")?;
     t.res(gallery_change(&mut s, &mut ids, meshes, materials), "gallery change")?;
     let b = shot(t, dev, &mut off, &mut r, &mut s, "gallery, changed")?;
     let (mut far, _) = t.res(gallery_scene(&r, meshes, materials, [1e7, -3e6, 2e7]), "gallery far")?;
     let c = shot(t, dev, &mut off, &mut r, &mut far, "gallery, far")?;
-    let mut rt = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut rt = t.res(Renderer::new(dev, &desc), "Renderer::new")?;
     let mut st = t.res(tex_gallery(&mut rt), "textured gallery")?;
     let d = shot(t, dev, &mut off, &mut rt, &mut st, "gallery, textured")?;
-    let mut rg = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut rg = t.res(Renderer::new(dev, &desc), "Renderer::new")?;
     let mut sg = t.res(gltf_gallery(&mut rg), "glTF gallery")?;
     let e = shot(t, dev, &mut off, &mut rg, &mut sg, "gallery, glTF")?;
     let mut all = vec![a, b, c, d, e];
     for name in LATER {
-        let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
-        let mut s = t.res(later_gallery(name, &mut r), name)?;
+        let mut r = t.res(Renderer::new(dev, &desc), "Renderer::new")?;
+        let mut s = t.res(later_gallery_in(name, &mut r, format), name)?;
         all.push(shot(t, dev, &mut off, &mut r, &mut s, name)?);
     }
     Some(all)
@@ -774,7 +780,7 @@ fn coords(t: &mut T) {
 fn coords_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let (w, h) = (GALLERY_W, GALLERY_H);
     let mut off = t.res(Off::new(dev, w, h, Format::Rgba8Unorm), "target")?;
-    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new")?;
     let (meshes, materials) = t.res(gallery_fill(&mut r), "fill")?;
     let place = |t: &mut T, r: &mut Renderer, off: &mut Off, at: [f64; 3], origin: [f64; 3]| -> Option<Vec<u8>> {
         let mut s = t.res(Scene::new(r), "Scene::new")?;
@@ -835,7 +841,7 @@ fn frames(t: &mut T) {
 
 fn frames_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let (w, h) = (GALLERY_W, GALLERY_H);
-    let mut r = t.res(Renderer::new(dev, &RendererDesc { color: Format::Rgba8Unorm, frames_in_flight: 3 }), "Renderer::new")?;
+    let mut r = t.res(Renderer::new(dev, &frames_desc(3)), "Renderer::new")?;
     let (meshes, materials) = t.res(gallery_fill(&mut r), "fill")?;
     let mut targets = Vec::new();
     for _ in 0..7 {
@@ -910,9 +916,9 @@ fn errors(t: &mut T) {
     let Some(g) = setup(t) else { return };
     let Some(dev) = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device") else { return };
     let inv = |r: gpu::Result<()>| matches!(r, Err(GpuError::Invalid(_)));
-    t.ok(inv(Renderer::new(&dev, &RendererDesc { color: Format::Rgba8Unorm, frames_in_flight: 0 }).map(|_| ())), "0 frames in flight: Invalid");
-    t.ok(inv(Renderer::new(&dev, &RendererDesc { color: Format::Rgba8Unorm, frames_in_flight: 4 }).map(|_| ())), "4 frames in flight: Invalid");
-    let Some(mut r) = t.res(Renderer::new(&dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new") else { return };
+    t.ok(inv(Renderer::new(&dev, &frames_desc(0)).map(|_| ())), "0 frames in flight: Invalid");
+    t.ok(inv(Renderer::new(&dev, &frames_desc(4)).map(|_| ())), "4 frames in flight: Invalid");
+    let Some(mut r) = t.res(Renderer::new(&dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new") else { return };
     let c = cube();
     t.ok(inv(r.add_mesh(&render3d::MeshData { positions: &c.pos, normals: &c.nrm[1..], uvs: &c.uv, indices: &c.idx }).map(|_| ())), "add_mesh: too few normals: Invalid");
     t.ok(inv(r.add_mesh(&render3d::MeshData { positions: &c.pos, normals: &c.nrm, uvs: &c.uv, indices: &c.idx[1..] }).map(|_| ())), "add_mesh: indices not in threes: Invalid");
@@ -967,7 +973,7 @@ fn errors(t: &mut T) {
     t.res(s2.set_mesh(id, later), "set_mesh to a later mesh");
     t.res(s2.set_material(id, later_m), "set_material to a later material");
     // a scene is its renderer's
-    let Some(mut r2) = t.res(Renderer::new(&dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new") else { return };
+    let Some(mut r2) = t.res(Renderer::new(&dev, &linear_desc(Format::Rgba8Unorm)), "Renderer::new") else { return };
     t.ok(inv(s2.prepare(&mut r2)), "prepare with another renderer: Invalid");
     if t.res(s2.prepare(&mut r), "prepare with its own renderer").is_some() {
         if let Some(mut e) = t.res(dev.encoder(), "encoder") {
@@ -1210,23 +1216,63 @@ fn window_checks(t: &mut T, g: &Gpu, dev: &Device, w: i32) -> Option<()> {
     }
     let (n, m) = diff(&got, &want);
     t.ok(n == 0, &format!("the presented image ({sw} x {sh}, {format:?}) against the same frame offscreen: {n} pixels differ (largest {m})"));
+    // (G5e2) the right colours: the same frame in Rgba32Float, encoded on the CPU by the definition
+    if RendererDesc::new(format).encodes_srgb() {
+        let mut rf = t.res(Renderer::new(dev, &RendererDesc::new(Format::Rgba32Float)), "Renderer::new")?;
+        let (meshes, materials) = t.res(gallery_fill(&mut rf), "fill")?;
+        let mut sf = t.res(Scene::new(&rf), "Scene::new")?;
+        sf.set_camera(&cam);
+        for spec in gallery_specs(meshes, materials, GALLERY_N, [0.0; 3]) {
+            t.res(sf.add(spec.instance()), "add")?;
+        }
+        let mut offf = t.res(Off::new(dev, sw, sh, Format::Rgba32Float), "target")?;
+        let f = shot(t, dev, &mut offf, &mut rf, &mut sf, "offscreen, float")?;
+        let bgra = matches!(format, Format::Bgra8Unorm);
+        let (mut n, mut m) = (0u32, 0u8);
+        for (p, c) in got.chunks_exact(4).zip(f.chunks_exact(16)) {
+            let v = |k: usize| f32::from_le_bytes([c[k * 4], c[k * 4 + 1], c[k * 4 + 2], c[k * 4 + 3]]) as f64;
+            let want = [cpu::srgb_encode(v(0)), cpu::srgb_encode(v(1)), cpu::srgb_encode(v(2))];
+            let have = if bgra { [p[2], p[1], p[0]] } else { [p[0], p[1], p[2]] };
+            let d = (0..3).map(|k| have[k].abs_diff(want[k])).max().unwrap_or(0);
+            n += (d > 0) as u32;
+            m = m.max(d);
+        }
+        t.ok(m <= 1, &format!("the presented image in sRGB codes (the shader encodes for {format:?}) against the float frame encoded on the CPU: {n} pixels differ, largest {m}"));
+    } else {
+        out(&format!("  note: the swapchain's format {format:?}: the shader does not encode"));
+    }
     t.res(dev.wait_idle(), "wait_idle")?;
     Some(())
 }
 
 // ---------------------------------------------------------------- the gallery for the browser's test
 
+/// the formats --dump --format knows (the gallery in other targets: sRGB, float; docs/RENDER3D.md "sRGB")
+const DUMP_FORMATS: [(&str, Format); 5] = [("rgba8", Format::Rgba8Unorm), ("bgra8", Format::Bgra8Unorm), ("rgba8srgb", Format::Rgba8Srgb),
+                                           ("rgba16f", Format::Rgba16Float), ("rgba32f", Format::Rgba32Float)];
+
 fn dump(dir: &str) -> i32 {
     let mut t = T { fails: 0, validate: false };
     let Some(g) = setup(&mut t) else { return 0 };
+    let fmt = plat::arg_value("--format");
+    let Some(&(ext, format)) = (match &fmt {
+        None => Some(&("rgba", Format::Rgba8Unorm)),
+        Some(f) => DUMP_FORMATS.iter().find(|x| x.0 == f.as_str()),
+    }) else {
+        out(&format!("FAIL --format: one of {}", DUMP_FORMATS.map(|x| x.0).join(", ")));
+        return 2;
+    };
+    // (the tests' images: linear; --format: as RendererDesc::new has it, --linear: without the shader's sRGB)
+    let mut desc = RendererDesc::new(format);
+    desc.encode_srgb = fmt.is_some() && !plat::args().iter().any(|a| a == "--linear");
     let mut names = Vec::new();
     let voll = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device");
     let basis = t.res(g.adapter.create_device(&DeviceDesc { max_level: Level::Basis }), "Basis device");
     for (level, dev) in [("voll", voll), ("basis", basis)] {
         let Some(dev) = dev else { continue };
-        let Some(imgs) = gallery_image(&mut t, &dev) else { continue };
+        let Some(imgs) = gallery_image_in(&mut t, &dev, desc) else { continue };
         for (i, name) in GALLERY_NAMES.iter().chain(LATER.iter()).enumerate() {
-            let file = format!("{dir}/{level}_{name}.rgba");
+            let file = format!("{dir}/{level}_{name}.{ext}");
             t.ok(plat::write_file(&file, &imgs[i]), &format!("write {file}"));
             names.push(file);
         }
@@ -1264,11 +1310,12 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 19] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
+    let list: [(&str, fn(&mut T)); 20] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
                                           ("levels", levels), ("coords", coords), ("frames", frames), ("errors", errors), ("textures", crate::tex::textures),
                                           ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf), ("pbr", crate::pbr::pbr),
                                           ("shadows", crate::shadowtest::shadows), ("lights", crate::lighttest::lights), ("env", crate::envtest::env),
-                                          ("occlusion", crate::occl::occlusion), ("lods", crate::lodtest::lods), ("alpha", crate::alphatest::alpha)];
+                                          ("occlusion", crate::occl::occlusion), ("lods", crate::lodtest::lods), ("alpha", crate::alphatest::alpha),
+                                          ("srgb", crate::srgbtest::srgb)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {
