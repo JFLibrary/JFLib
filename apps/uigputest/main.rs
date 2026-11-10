@@ -49,7 +49,7 @@
 //     canvasplain  the same without reading back: during a gesture the framebuffer lacks the view,
 //               Ui::gpu_settle gives it; at rest it holds it
 //     canvasoff jfgui_GPU=0: the same canvas on the CPU path: no tiles, the framebuffer in every frame
-//     view, views2, viewsize, viewlose, viewplain, viewcpu, viewoff, viewbasis   (G5e1) a view of GPU content
+//     view, views2, viewsize, viewlose, viewplain, viewcpu, viewoff, viewbasis, viewgate   (G5e1) a view of GPU content
 //               (lib/ui/gpu_view.rs): a render3d scene between widgets, against render3d offscreen and the ray
 //               caster; view.rs says what each does
 //   uigputest --bench view [..]    (G5e1) what a view costs per frame, composed or read back (view.rs)
@@ -2202,6 +2202,7 @@ impl App for Test {
                 "viewcpu" => self.t_viewcpu(ui),
                 "viewoff" => self.t_viewoff(ui),
                 "viewbasis" => self.t_viewbasis(ui),
+                "viewgate" => self.t_viewgate(ui),
                 _ => {
                     self.done = true;
                     ui.quit();

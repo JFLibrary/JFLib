@@ -1281,6 +1281,33 @@ fn dump(dir: &str) -> i32 {
     (t.fails > 0) as i32
 }
 
+/// (G5e3) the shadow gallery on a device limited to Basis, offscreen, sRGB codes: once with Shadows::DEFAULT (4 x 2048,
+/// what Voll takes) and once with Shadows::for_level(Basis) (2 x 1024): what the Basis default looks like.  Writes
+/// DIR/basis_4x2048.rgba and DIR/basis_2x1024.rgba, rows of R, G, B, A; --res WxH (1920 x 1080)
+fn shadow_shots(dir: &str) -> i32 {
+    let mut t = T { fails: 0, validate: false };
+    let Some(g) = setup(&mut t) else { return 0 };
+    let (w, h) = plat::arg_value("--res")
+        .and_then(|r| {
+            let mut p = r.split('x').filter_map(|x| x.parse::<u32>().ok());
+            Some((p.next()?, p.next()?))
+        })
+        .unwrap_or((1920, 1080));
+    let Some(dev) = t.res(g.adapter.create_device(&DeviceDesc { max_level: Level::Basis }), "Basis device") else { return 1 };
+    for (name, sh) in [("basis_4x2048", render3d::Shadows::DEFAULT), ("basis_2x1024", render3d::Shadows::for_level(dev.level()))] {
+        let Some(mut r) = t.res(Renderer::new(&dev, &RendererDesc::new(Format::Rgba8Unorm)), "Renderer::new") else { return 1 };
+        let Some(mut s) = t.res(shadow_gallery_with(&mut r, &sh, w as f64 / h as f64), "the shadow scene") else { return 1 };
+        let Some(mut off) = t.res(Off::new(&dev, w, h, Format::Rgba8Unorm), "target") else { return 1 };
+        let Some(px) = shot(&mut t, &dev, &mut off, &mut r, &mut s, name) else { return 1 };
+        let file = format!("{dir}/{name}.rgba");
+        t.ok(plat::write_file(&file, &px), &format!("write {file}: {w} x {h}, {} cascades of {} up to {}", sh.cascades, sh.size, sh.distance));
+        let cs: Vec<String> = s.cascades().iter().map(|c| format!("{:.2} .. {:.2}: texel {:.4}", c.near, c.far, c.texel)).collect();
+        out(&format!("  cascades (along the view; a texel in world units): {}", cs.join("; ")));
+    }
+    out(&format!("adapter: {}, level {:?}", g.adapter.info().name, dev.level()));
+    (t.fails > 0) as i32
+}
+
 pub fn run() -> i32 {
     let args = plat::args();
     let validate = args.iter().any(|a| a == "--validate");
@@ -1296,6 +1323,9 @@ pub fn run() -> i32 {
     if let Some(d) = plat::arg_value("--dump") {
         return dump(&d);
     }
+    if let Some(d) = plat::arg_value("--shadow-shots") {
+        return shadow_shots(&d);
+    }
     if args.iter().any(|a| a == "--bench-upload") {
         return crate::bench::bench_upload();
     }
@@ -1306,7 +1336,7 @@ pub fn run() -> i32 {
         return crate::bench::bench(n, validate);
     }
     let Some(test) = plat::arg_value("--test") else {
-        plat::write_stderr(b"render3dtest: --test NAME [--validate], --bench N, --gen-shaders FILE, --dump DIR (see apps/render3dtest/main.rs)\n");
+        plat::write_stderr(b"render3dtest: --test NAME [--validate], --bench N, --gen-shaders FILE, --dump DIR, --shadow-shots DIR (see apps/render3dtest/main.rs)\n");
         return 2;
     };
     let mut t = T { fails: 0, validate };
