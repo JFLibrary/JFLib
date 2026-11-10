@@ -384,6 +384,18 @@ Metal-Toolchain (`xcrun metal`: „missing Metal Toolchain“, ein eigener Downl
 - **AP6g, Stufe Voll auf Metal (M, später, eigene Entscheidung):** Bindless über Argument-Puffer, Multi-Draw und
   `draw_indexed_indirect_count` (nachgebildet), Draw-Parameter, Subgroups.
 
+**AP6a umgesetzt (2026-11-10):** [`lib/shader/msl.rs`](../lib/shader/msl.rs) und
+[`msl_fn.rs`](../lib/shader/msl_fn.rs) übersetzen SPIR-V nach MSL ([SHADER.md](SHADER.md), „MSL für Metal“).
+`wgsltest --only msl` übersetzt 805 Module (das Korpus, die Abdeckung, die Benchmark-Shader, die
+WGSL-Shader von `gpu_out` und render3d mit und ohne Robustheit, alle Muster von `lib/shader`, je Basis und
+Voll): 802 übersetzt, 3 erwartete Ausnahmen (Farbort 8, Bindless). Auf dem Mac nahm Metals Übersetzer zur
+Laufzeit (`newLibraryWithSource:`, ohne schnelle Mathematik) alle 802 an. Abweichung vom Prüfkriterium:
+Diese Prüfung lief noch über ein Hilfsprogramm in Swift außerhalb des Repositorys, weil `gputest` auf Apple
+das ganze Backend braucht; `gputest --test msl` kommt mit AP6b. Beim ersten Lauf nahm Metal 650 von 662
+Modulen an; behoben: gepackte Vektoren und Matrizen in Konstanten (globale Konstruktoren), Workgroup-Speicher
+mit Matrizen (kein Konstruktor in `threadgroup`, jetzt roher Speicher), 64-Bit-Atomics (`atomic_max_explicit`
+ohne alten Wert), 1D-Texturen (ohne Mip-Stufe).
+
 **Fallen, schon bekannt.** Metal schaltet beim Übersetzen zur Laufzeit schnelle Mathematik ein (NaN, Unendlich,
 Kontraktion); MSLs `float3` ist 16 Byte groß (in Puffern `packed_float3`); `[[vertex_id]]` und `[[instance_id]]`
 enthalten Basis-Vertex und erste Instanz wie unter Vulkan; Metal hat keine Push-Konstanten; `nextDrawable` wartet;

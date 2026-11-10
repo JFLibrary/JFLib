@@ -15,6 +15,7 @@
 //                             pipeline sets some (OpSpecConstantOp evaluated), workgroup sizes
 //   samples                   small shaders for the tests: specialization constants, textures
 //   spv                       opcodes, enums and their names; parse: words -> instructions
+//   msl::translate(words)     the module in the Metal Shading Language (lib/gpu on Apple)
 //   to_bytes / from_bytes     words <-> the bytes of a .spv file
 #![no_std]
 #![forbid(unsafe_code)]
@@ -25,6 +26,8 @@ pub mod bench;
 pub mod dis;
 pub mod layout;
 mod module;
+pub mod msl;
+mod msl_fn;
 pub mod parse;
 pub mod reflect;
 pub mod samples;
