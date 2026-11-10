@@ -20,6 +20,8 @@ TARGET_CFG = {
     'cfg(target_os = "linux")': "linux",
     'cfg(target_os = "android")': "android",
     'cfg(target_arch = "wasm32")': "web",
+    'cfg(target_os = "macos")': "mac",
+    'cfg(target_os = "ios")': "ios",
     "cfg(not(jflib_module))": None,
 }
 MODULE_CFG = "cfg(jflib_module)"

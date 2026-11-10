@@ -426,6 +426,24 @@ derselben Szene ab, die Tiefe ist bitgleich; mit Metals Shader-Validierung versc
 Helper-Lanes oder die Hidden-Surface-Removal der Apple-GPU) und `pbr` (Normal-Maps: 28 Pixel über der Toleranz,
 deterministisch; vermutet: grobe statt feiner Ableitungen).
 
+**AP6d umgesetzt (2026-11-10):** `lib/ui` nimmt `gpu` auch auf macOS und iOS; `gpu_out.rs` und `gpu_view.rs` laufen auf
+macOS mit `plat::win_gpu_child` ([`apple_mac_gpu.rs`](../lib/plat/apple_mac_gpu.rs)). Der Standard bleibt vorerst aus
+(`DEFAULT_ON_APPLE`, Entscheidung 7), `jfgui_GPU=1` schaltet die Ausgabe ein. Drei Drawables, nicht zwei: Von zweien liegt
+eines auf dem Bildschirm und nur eines kann unterwegs sein, das halbiert den Takt (gemessen 33 ms je Bild bei 60 Hz, mit
+dreien 16,9 ms). `uigputest` in der angemeldeten Sitzung (`tools/apple.py gui`): alle Tests grün, `dpi` und `monitors`
+ohne Ergebnis (ein Bildschirm, eine Skala), `noloader`, `nodmabuf`, `refused`, `hwnd` sind auf Apple `SKIP`; die Prüfung
+gegen den Bildschirm hat dort kein Ergebnis (der Layer ist von hier nicht lesbar), jedes dargestellte Bild wird aber
+zurückgelesen und mit dem Framebuffer verglichen (0 anders). `gpu_output.uis`, `gpu_layers.uis` (Galerie) und
+`render3dtest --test window` (0 Pixel anders) grün.
+
+Zahlen für die Entscheidung über den Standard (M2, 1920 × 1080 bei 60 Hz, Entwicklungsstand, je ein Lauf): Start bis zur
+Swapchain 354 ms beim ersten Lauf (davon 344 ms Pipeline, Metal übersetzt das MSL), 74 ms mit Metals Shader-Cache, ohne
+dass die UI darauf wartet. `uigputest --bench stages` je Bild, CPU des Programms: Schwenken 3,8 ms gegen 6,8 ms auf dem
+CPU-Weg, Popup 6,3 gegen 7,2 ms; Wandzeit beide bei 20 ms. Reserviert 4–9 MiB. `--bench view` (Ansicht 1200 × 700):
+16,9 ms Bildabstand, das Bild der Ansicht 1,5 ms; auf dem CPU-Weg zusätzlich 1,5 ms Zurücklesen je Bild. **Nicht
+gemessen:** die Latenz bis zum Bildschirm und der Vergleich in Ruhe (`--bench idle`/`caret` enden nicht von selbst und
+brauchen einen Messfühler von außen).
+
 **Fallen, schon bekannt.** Metal schaltet beim Übersetzen zur Laufzeit schnelle Mathematik ein (NaN, Unendlich,
 Kontraktion); MSLs `float3` ist 16 Byte groß (in Puffern `packed_float3`); `[[vertex_id]]` und `[[instance_id]]`
 enthalten Basis-Vertex und erste Instanz wie unter Vulkan; Metal hat keine Push-Konstanten; `nextDrawable` wartet;

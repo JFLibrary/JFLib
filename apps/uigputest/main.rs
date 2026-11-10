@@ -2184,7 +2184,7 @@ impl App for Test {
                 "imgplain" => self.t_imgplain(ui),
                 "canvas" => self.t_canvas(ui),
                 "nodmabuf" | "refused" => {
-                    if cfg!(windows) {
+                    if cfg!(windows) || cfg!(target_vendor = "apple") {
                         out("SKIP: Linux only");
                         self.done = true;
                         ui.quit();
@@ -3212,12 +3212,16 @@ fn run() -> i32 {
         "shaders" => return t_shaders(),
         "adapter" => return t_adapter(),
         "hwnd" => return t_hwnd(),
+        "noloader" if cfg!(target_vendor = "apple") => {
+            out("SKIP: no loader to miss here: Metal is part of the system");
+            return 0;
+        }
         _ => {}
     }
     plat::setenv("jfgui_STATE", Some("0"));
     plat::setenv("jfgui_TEST_NOACTIVATE", Some("1"));
     // `switch` without the variable: the swapchain is the default
-    plat::setenv("jfgui_GPU", if test == "off" || test == "canvasoff" || test == "viewoff" { Some("0") } else if test == "switch" { None } else { Some("1") });
+    plat::setenv("jfgui_GPU", if test == "off" || test == "canvasoff" || test == "viewoff" { Some("0") } else if test == "switch" && !cfg!(target_vendor = "apple") { None } else { Some("1") }); // (Apple: off by default so far, gpu_out.rs)
     if !plain {
         plat::setenv("jfgui_GPU_VERIFY", Some("1"));
         plat::setenv("jfgui_GPU_VALIDATE", Some("1"));

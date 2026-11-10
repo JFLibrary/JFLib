@@ -16,9 +16,11 @@
 
 use super::*;
 
-/// a window's GPU layer (a CAMetalLayer, retained: released when this goes)
+/// a window's GPU layer (a CAMetalLayer, retained: released when this goes) and the window's size in
+/// pixels when it was taken (lib/gpu builds swapchains on a worker, where plat's state is out of reach)
 pub struct NativeWindow {
     pub layer: usize,
+    pub size: (i32, i32),
 }
 
 impl Drop for NativeWindow {
@@ -58,7 +60,9 @@ fn gpu_layer(w: i32) -> Option<Id> {
         msg!(l, c"setAutoresizingMask:", 18u32 => u32; ()); // kCALayerWidthSizable | kCALayerHeightSizable
         msg!(l, c"setContentsGravity:", kCAGravityTopLeft => Id; ());
         msg!(l, c"setContentsScale:", scale => f64; ());
-        msg!(l, c"setOpaque:", true => bool; ());
+        // not opaque: without a drawable yet (shown before its first frame arrives) the view's picture
+        // below shows through, the same pixels
+        msg!(l, c"setOpaque:", false => bool; ());
         msg!(l, c"setHidden:", true => bool; ());
         msg!(host, c"addSublayer:", l => Id; ());
         msg!(tx, c"commit"; ());
@@ -68,10 +72,10 @@ fn gpu_layer(w: i32) -> Option<Id> {
     Some(layer)
 }
 
-fn retained(l: Id) -> NativeWindow {
+fn retained(w: i32, l: Id) -> NativeWindow {
     // SAFETY: a live layer; the NativeWindow owns this reference.
     unsafe { msg!(l, c"retain"; Id) };
-    NativeWindow { layer: l as usize }
+    NativeWindow { layer: l as usize, size: win_size(w) }
 }
 
 /// (gpu) the window's GPU layer, shown: the GPU draws the whole window (do not call win_present
@@ -79,12 +83,12 @@ fn retained(l: Id) -> NativeWindow {
 pub fn win_native(w: i32) -> Option<NativeWindow> {
     let l = gpu_layer(w)?;
     show(l, true);
-    Some(retained(l))
+    Some(retained(w, l))
 }
 
 /// (gpu) the UI output's layer of window w, hidden until win_gpu_child_show
 pub fn win_gpu_child(w: i32) -> Option<NativeWindow> {
-    gpu_layer(w).map(retained)
+    gpu_layer(w).map(|l| retained(w, l))
 }
 
 fn show(l: Id, on: bool) {
@@ -94,6 +98,11 @@ fn show(l: Id, on: bool) {
         msg!(tx, c"begin"; ());
         msg!(tx, c"setDisableActions:", true => bool; ());
         msg!(l, c"setHidden:", !on => bool; ());
+        if !on {
+            // the last drawable goes: shown again, the layer shows nothing (the view's picture) until
+            // its next frame, never an old one
+            msg!(l, c"setContents:", NIL => Id; ());
+        }
         msg!(tx, c"commit"; ());
     }
 }
@@ -170,4 +179,62 @@ pub fn win_test_usage() -> (u64, u64, u64) {
         return (cpu, 0, 0);
     }
     (cpu, vm[2], vm[19])
+}
+
+/// (gpu) the view layer's own picture is not needed while the GPU shows the window: it goes (the way
+/// back draws one first, win_present)
+pub fn win_release_kept(w: i32) {
+    let Some((_, view, _)) = ids(w) else { return };
+    // SAFETY: the layer of our view, on the main thread, without animation.
+    unsafe {
+        let layer: Id = msg!(view, c"layer"; Id);
+        if layer.is_null() {
+            return;
+        }
+        let tx = class(c"CATransaction");
+        msg!(tx, c"begin"; ());
+        msg!(tx, c"setDisableActions:", true => bool; ());
+        msg!(layer, c"setContents:", NIL => Id; ());
+        msg!(tx, c"commit"; ());
+    }
+}
+
+/// (gpu) the UI output waits a little for a free image: the window's events go on meanwhile
+pub fn gpu_wait(deadline_us: u64) {
+    super::wait(deadline_us);
+}
+
+/// (gpu) how the output came up (GPU_STATE_*): Android keeps it across runs
+pub fn gpu_out_state(_state: u32) {}
+
+/// (gpu) no live resize loop holds the program's own loop on macOS (AppKit's live resize runs inside
+/// the event loop, the frames are CPU frames)
+pub fn win_in_sizemove() -> bool {
+    false
+}
+
+/// (gpu) a remote session: Screen Sharing shows what the window server composes, the GPU works
+pub fn win_remote_session() -> bool {
+    false
+}
+
+/// (tests) what the window system holds for window w: the view layer's picture is ours (the CPU path)
+/// and the GPU layer's is not readable from here: None
+pub fn win_test_image(_w: i32) -> Option<(i32, i32, Vec<u8>)> {
+    None
+}
+
+/// (tests) a part of the screen: macOS asks the user for that (screen recording): None
+pub fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>> {
+    None
+}
+
+/// (tests) nothing to send to: Windows' messages
+pub fn win_test_send(_w: i32, _msg: u32, _wp: usize, _lp: isize) -> isize {
+    0
+}
+
+/// (bench: Wayland's presentation feedback) nothing here
+pub fn gpu_test_presented() -> Vec<(u64, u64)> {
+    Vec::new()
 }

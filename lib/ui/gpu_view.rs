@@ -53,7 +53,7 @@ use crate::canvas::ViewRec;
 use crate::cmd::{Cmd, Draw, DrawRef, Gfx};
 use crate::{Ui, UiInput};
 
-#[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+#[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
 use gpu::{Access, Buffer, DataLayout, Device, GpuError, Layout, Texture, TextureRegion};
 
 /// the format of a view's target: what the output samples and what is read back byte for byte into the
@@ -127,7 +127,7 @@ pub(crate) fn paint_default(g: &mut Gfx, r: [i32; 4]) {
 }
 
 /// a view's target on its device (gpu_out.rs makes it; the Draw reads it back)
-#[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+#[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
 pub(crate) struct Target {
     pub(crate) dev: Device,
     pub(crate) t: Texture,
@@ -151,14 +151,14 @@ pub(crate) struct Cpu {
     pub(crate) image_frame: u64,
     /// the newest frame the GPU drew into the target (0: none yet)
     pub(crate) frame: u64,
-    #[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+    #[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
     pub(crate) gpu: Option<Target>,
     pub(crate) content: Weak<RefCell<dyn GpuContent>>,
     pub(crate) reads: u64,
     pub(crate) read_us: u64,
-    #[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")), allow(dead_code))]
+    #[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32")), allow(dead_code))]
     pub(crate) error: Option<String>,
-    #[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")), allow(dead_code))]
+    #[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32")), allow(dead_code))]
     raw: Vec<u8>,
 }
 
@@ -168,7 +168,7 @@ impl Cpu {
             image: Surface::default(),
             image_frame: 0,
             frame: 0,
-            #[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+            #[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
             gpu: None,
             content,
             reads: 0,
@@ -180,7 +180,7 @@ impl Cpu {
 
     /// the newest frame into the image (waits for the GPU; the browser cannot: there it comes with a later call)
     /// -> the image holds it now
-    #[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+    #[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
     pub(crate) fn read(&mut self) -> bool {
         if self.image_frame == self.frame {
             return true;
@@ -215,7 +215,7 @@ impl Cpu {
 /// browser).  The target rests in Layout::Sampled between frames (the content's pass ends there): to CopySrc for
 /// the copy (after the shaders that sampled it: the output's pass), back to Sampled (before the next shader reads
 /// it); the copy's writes before the host reads them, which waits for the submission's value
-#[cfg(any(windows, jfgui_glibc, target_os = "android"))]
+#[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos"))]
 fn read_back(g: &mut Target, frame: u64, raw: &mut Vec<u8>) -> gpu::Result<Option<u64>> {
     let rb = &g.rb;
     let mut e = g.dev.encoder()?;
@@ -267,9 +267,9 @@ pub(crate) struct ViewDraw(pub(crate) Rc<Shared>);
 
 impl Draw for ViewDraw {
     fn draw(&self, g: &mut Gfx, r: [i32; 4]) {
-        #[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")), allow(unused_mut))]
+        #[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32")), allow(unused_mut))]
         let mut c = self.0.c.borrow_mut();
-        #[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+        #[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
         c.read();
         if c.image_frame != 0 && (c.image.w, c.image.h) == (r[2], r[3]) {
             g.dc.blit(g.sf, &c.image, r[0], r[1]);
@@ -286,7 +286,7 @@ impl Draw for ViewDraw {
 }
 
 /// a view's target on the device it is drawn with (gpu_out.rs): the texture, the output's bind group for it
-#[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+#[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
 pub(crate) struct ViewTex {
     pub(crate) t: Texture,
     pub(crate) group: Option<gpu::BindGroup>,
@@ -297,7 +297,7 @@ pub(crate) struct ViewTex {
 }
 
 /// a view the UI has seen: (window, id), its content, its Draw; the device side (gpu_out.rs)
-#[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")), allow(dead_code))]
+#[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32")), allow(dead_code))]
 pub(crate) struct Entry {
     pub(crate) win: usize,
     pub(crate) id: u32,
@@ -310,7 +310,7 @@ pub(crate) struct Entry {
     pub(crate) level: Option<gpu::Level>,
     /// a generation whose attach failed: not again on it
     pub(crate) refused: u32,
-    #[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+    #[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
     pub(crate) tex: Option<Rc<ViewTex>>,
     /// ver, size and generation of the last frame tried (another one draws a frame)
     pub(crate) tried: Option<(u32, (u32, u32), u32)>,
@@ -330,7 +330,7 @@ pub(crate) struct Entry {
 }
 
 /// the views' own device: none, made (on first use when there is no output), to be tried again, never
-#[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+#[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
 #[derive(Default)]
 pub(crate) enum Own {
     #[default]
@@ -348,7 +348,7 @@ pub(crate) enum Own {
 #[derive(Default)]
 pub(crate) struct S {
     pub(crate) views: Vec<Entry>,
-    #[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+    #[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
     pub(crate) own: Own,
 }
 
@@ -393,7 +393,7 @@ impl Ui {
             i.error = c.error.clone();
         }
         // (why there is no device: the views' own could not be made)
-        #[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+        #[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
         if let (None, 0, Own::Never(why)) = (&i.error, e.devgen, &self.m.gview.own) {
             i.error = Some(why.clone());
         }
@@ -423,7 +423,7 @@ impl Ui {
                 e.rest_at = 0;
                 e.held_at = 0;
                 e.held_key = None;
-                #[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+                #[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
                 {
                     e.tex = None;
                 }
@@ -447,7 +447,7 @@ impl Ui {
             output: false,
             level: None,
             refused: 0,
-            #[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+            #[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
             tex: None,
             tried: None,
             moved: false,

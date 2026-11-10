@@ -141,22 +141,22 @@ mod hyph;
 pub mod i18n;
 mod ids;
 // the output through a swapchain: Windows and Linux programs against glibc, their windows only
-// (docs/GPU.md "Ausgabe der UI"), Android, the browser (WebGPU: "Ausgabe im Browser"); static Linux
-// programs link nothing of it
-#[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
+// (docs/GPU.md "Ausgabe der UI"), Android, macOS (Metal, AP6), the browser (WebGPU: "Ausgabe im
+// Browser"); static Linux programs link nothing of it
+#[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32"))]
 mod gpu_out;
-#[cfg(not(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")))]
+#[cfg(not(any(windows, jfgui_glibc, target_os = "android", target_os = "macos", target_arch = "wasm32")))]
 #[path = "gpu_out_off.rs"]
 mod gpu_out;
-#[cfg(any(windows, jfgui_glibc, target_os = "android"))]
+#[cfg(any(windows, jfgui_glibc, target_os = "android", target_os = "macos"))]
 pub use gpu_out::{GPU_OUT_FS, GPU_OUT_FS_IMAGE, GPU_OUT_FS_TILE, GPU_OUT_VS, GPU_OUT_WGSL};
 // a canvas whose zoom and pan go through GPU textures (canvas.rs); on every target
 mod canvas;
 pub use canvas::{CanvasContent, CanvasDesc, CanvasGpu, CanvasView};
 // (G5e1) GPU content in a window, a 3D view between widgets (gpu_view.rs): where lib/gpu is there
-#[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+#[cfg(any(windows, target_os = "linux", target_os = "android", target_vendor = "apple", target_arch = "wasm32"))]
 mod gpu_view;
-#[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+#[cfg(any(windows, target_os = "linux", target_os = "android", target_vendor = "apple", target_arch = "wasm32"))]
 pub use gpu_view::{GpuContent, GpuViewInfo, GPU_VIEW_FORMAT};
 // the live inspector: overlay and tool window (--inspect, F12 / Ctrl+Shift+I)
 mod inspect;
@@ -521,7 +521,7 @@ pub(crate) struct Mods {
     /// (G3a) the output through a swapchain (gpu_out.rs)
     pub(crate) gout: gpu_out::S,
     /// (G5e1) the views of GPU content (gpu_view.rs)
-    #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+    #[cfg(any(windows, target_os = "linux", target_os = "android", target_vendor = "apple", target_arch = "wasm32"))]
     pub(crate) gview: gpu_view::S,
 }
 

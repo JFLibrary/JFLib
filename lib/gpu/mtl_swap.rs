@@ -4,7 +4,7 @@
 //   Surface::native(&instance, nw, window) the UI output's layer (plat::win_gpu_child, hidden until
 //                                          the output shows it)
 //   device.create_swapchain(&surface, &desc)   the layer gets the device, the format (BGRA8, sRGB
-//        when asked), framebufferOnly unless copy_src, two or three drawables, the window's size
+//        when asked), framebufferOnly unless copy_src, three drawables, the window's size
 //   try_acquire() never waits: nextDrawable only while fewer drawables are in use than the layer
 //        has (in use: taken and not yet on the screen, plus the one on the screen; the drawables'
 //        presented handlers count what reached it); NotReady otherwise
@@ -110,6 +110,26 @@ fn transaction(f: impl FnOnce()) {
 pub(crate) struct SurfInner {
     pub layer: Obj,
     window: i32,
+    /// the window's size in pixels (w << 32 | h), for swapchains made on another thread than the main one
+    size: core::sync::atomic::AtomicU64,
+}
+
+unsafe extern "C" {
+    fn pthread_main_np() -> i32;
+}
+
+impl SurfInner {
+    /// the window's size: plat's on the main thread, the tracked one elsewhere
+    fn win_size(&self) -> (i32, i32) {
+        // SAFETY: a plain query of libSystem.
+        if unsafe { pthread_main_np() } != 0 {
+            let s = plat::win_size(self.window);
+            self.size.store(((s.0 as u32 as u64) << 32) | s.1 as u32 as u64, Ordering::Relaxed);
+            return s;
+        }
+        let v = self.size.load(Ordering::Relaxed);
+        ((v >> 32) as i32, v as u32 as i32)
+    }
 }
 
 impl Drop for SurfInner {
@@ -124,8 +144,10 @@ impl Drop for SurfInner {
 pub struct Surface(pub(crate) Arc<SurfInner>);
 
 impl Surface {
-    /// (Linux: the window's size for a rebuild on a worker; here plat knows it)
-    pub fn track_size(&self) {}
+    /// the window's size now, for a swapchain made or rebuilt on a worker (call on the main thread)
+    pub fn track_size(&self) {
+        let _ = self.0.win_size();
+    }
 
     /// the surface of plat window `window`: its GPU layer, shown
     pub fn new(instance: &Instance, window: i32) -> Result<Surface> {
@@ -146,8 +168,9 @@ impl Surface {
     #[cfg(target_os = "macos")]
     pub fn native(_instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface> {
         let layer = Obj::retained(nw.layer as Id).ok_or(GpuError::SurfaceLost)?;
+        let size = core::sync::atomic::AtomicU64::new(((nw.size.0 as u32 as u64) << 32) | nw.size.1 as u32 as u64);
         drop(nw);
-        Ok(Surface(Arc::new(SurfInner { layer, window })))
+        Ok(Surface(Arc::new(SurfInner { layer, window, size })))
     }
 }
 
@@ -207,12 +230,14 @@ pub struct Swapchain {
 impl Device {
     pub fn create_swapchain(&self, surface: &Surface, desc: &SwapchainDesc) -> Result<Swapchain> {
         self.sh.check()?;
-        let (w, h) = plat::win_size(surface.0.window);
+        let (w, h) = surface.0.win_size();
         if w <= 0 || h <= 0 {
             return Err(GpuError::NotReady);
         }
         let format = if desc.srgb { Format::Bgra8Srgb } else { Format::Bgra8Unorm };
-        let count = if desc.min_images >= 3 || desc.frames_in_flight >= 3 { 3 } else { 2 };
+        // always three: of two, one is on the screen and only one can be on its way, which halves the
+        // rate (measured: 33 ms per frame at 60 Hz, a presented handler comes a frame after the present)
+        let count = 3;
         let l = surface.0.layer.id();
         let dev = self.sh.dev.id();
         transaction(|| {
@@ -268,7 +293,7 @@ impl Swapchain {
     /// the drawables take the window's size now
     pub fn rebuild(&mut self) -> Result<()> {
         self.dev.sh.check()?;
-        let (w, h) = plat::win_size(self.surf.0.window);
+        let (w, h) = self.surf.0.win_size();
         if w > 0 && h > 0 {
             let l = self.layer();
             transaction(|| {
@@ -283,8 +308,10 @@ impl Swapchain {
 
     fn area(&self) -> Option<(u32, u32)> {
         let w = self.surf.0.window;
-        let (cw, ch) = plat::win_size(w);
-        if cw <= 0 || ch <= 0 || plat::win_state(w) & plat::WST_MINIMIZED != 0 {
+        let (cw, ch) = self.surf.0.win_size();
+        // SAFETY: a plain query of libSystem (plat's window state is the main thread's).
+        let main = unsafe { pthread_main_np() } != 0;
+        if cw <= 0 || ch <= 0 || main && plat::win_state(w) & plat::WST_MINIMIZED != 0 {
             return None;
         }
         Some((cw as u32, ch as u32))
