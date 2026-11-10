@@ -299,6 +299,48 @@ pub(crate) fn sysmenu_set(menus: &[crate::sysmenu::SysMenuItem]) {
     }
 }
 
+/// WT_SYSMENU (apple_mac_test.rs): k 0 the app's menus in the bar, 1 the rows of menu a, 2 choose row b
+/// of menu a, 3 row b's state (1 enabled | 2 checked | 4 a key equivalent with Command); -1: no such
+pub(super) fn test_sysmenu(k: i32, a: i32, b: i32) -> i64 {
+    let n = SYSMENU_N.load(Ordering::SeqCst) as i32;
+    if k == 0 {
+        return n as i64;
+    }
+    let Some(app) = app() else { return -1 };
+    if a < 0 || a >= n {
+        return -1;
+    }
+    // SAFETY: the main menu and the submenus and items sysmenu_set put there.
+    unsafe {
+        let bar: Id = msg!(app, c"mainMenu"; Id);
+        let top: Id = if bar.is_null() { NIL } else { msg!(bar, c"itemAtIndex:", (a + 1) as isize => isize; Id) };
+        let menu: Id = if top.is_null() { NIL } else { msg!(top, c"submenu"; Id) };
+        if menu.is_null() {
+            return -1;
+        }
+        let rows = msg!(menu, c"numberOfItems"; isize) as i32;
+        if k == 1 {
+            return rows as i64;
+        }
+        if b < 0 || b >= rows {
+            return -1;
+        }
+        match k {
+            2 => {
+                msg!(menu, c"performActionForItemAtIndex:", b as isize => isize; ());
+                0
+            }
+            3 => {
+                let it: Id = msg!(menu, c"itemAtIndex:", b as isize => isize; Id);
+                let key = string_of(msg!(it, c"keyEquivalent"; Id));
+                let mask: u64 = msg!(it, c"keyEquivalentModifierMask"; u64);
+                (msg!(it, c"isEnabled"; bool) as i64) | (msg!(it, c"state"; isize) == 1) as i64 * 2 | (!key.is_empty() && mask & COMMAND != 0) as i64 * 4
+            }
+            _ => -1,
+        }
+    }
+}
+
 // ---------------------------------------------------------------- the delegate, the system's events
 
 /// (init) the observer becomes NSApp's delegate and hears NSWorkspace

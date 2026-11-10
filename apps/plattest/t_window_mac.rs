@@ -472,6 +472,39 @@ pub fn t_window(t: &mut T) {
     t.check(plat::hotkey::hotkey_register(8, chord, "plattest") == Err(plat::hotkey::HotkeyError::Conflict), "hotkey: the same chord again -> Conflict");
     t.check(plat::hotkey::hotkey_unregister(7), "hotkey: unregistered");
 
+    // ---- the app's menus in the menu bar (plat::sysmenu: docs/APPLE.md "Menüs in der Menüleiste")
+    {
+        use plat::sysmenu::{SysMenuItem, sysmenu_set, sysmenu_supported, sysmenu_take};
+        let row = |id: u32, label: &str, flags: u32| SysMenuItem { id, label: String::from(label), flags, ..SysMenuItem::default() };
+        let menus = vec![
+            SysMenuItem { label: String::from("Datei"), sub: vec![
+                SysMenuItem { key: String::from("n"), mods: MOD_CTRL as u32, ..row(21, "Neu", 0) },
+                row(0, "", TI_SEPARATOR),
+                row(22, "Raster", TI_CHECKED),
+                row(23, "Gesperrt", TI_DISABLED),
+            ], ..SysMenuItem::default() },
+            SysMenuItem { label: String::from("Ansicht"), sub: vec![
+                SysMenuItem { label: String::from("Zoom"), sub: vec![row(31, "100 %", 0)], ..SysMenuItem::default() },
+            ], ..SysMenuItem::default() },
+        ];
+        t.check(sysmenu_supported(), "sysmenu: with a window the app's menus go into the menu bar");
+        sysmenu_set(&menus);
+        t.check(win_test(WT_SYSMENU, 0, [0; 4]) == 2, "sysmenu: two menus between the app menu and the Window menu");
+        t.check(win_test(WT_SYSMENU, 0, [1, 0, 0, 0]) == 4, "sysmenu: Datei has its four rows");
+        t.check(win_test(WT_SYSMENU, 0, [3, 0, 0, 0]) == 1 | 4, "sysmenu: Neu is enabled, with Command+N");
+        t.check(win_test(WT_SYSMENU, 0, [3, 0, 2, 0]) == 1 | 2, "sysmenu: Raster is checked");
+        t.check(win_test(WT_SYSMENU, 0, [3, 0, 3, 0]) == 0, "sysmenu: Gesperrt is disabled");
+        t.check(win_test(WT_SYSMENU, 0, [1, 1, 0, 0]) == 1, "sysmenu: Ansicht holds the submenu Zoom");
+        sysmenu_take();
+        win_test(WT_SYSMENU, 0, [2, 0, 2, 0]);
+        t.check(sysmenu_take() == [22], "sysmenu: a chosen row -> its id");
+        sysmenu_set(&menus[..1]);
+        t.check(win_test(WT_SYSMENU, 0, [0; 4]) == 1, "sysmenu: a new list replaces the menus");
+        sysmenu_set(&[]);
+        t.check(win_test(WT_SYSMENU, 0, [0; 4]) == 0 && win_test(WT_MENU, 0, [0; 4]) & 0xFF == 2,
+                "sysmenu: none again, the app menu and the Window menu stay");
+    }
+
     // ---- wake from another thread, close, destroy
     evq_clear();
     let th = thread_spawn(0, Box::new(|| {

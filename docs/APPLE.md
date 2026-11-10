@@ -406,6 +406,25 @@ echten Fenster. Dabei behoben:
 Offen für AP8: `.dmg`, Developer-ID-Signatur und Notarisierung (dann mit Hardened Runtime), `SMAppService` für
 Autostart in der Sandbox, eine Bildaufnahme über ImageCaptureCore statt SANE.
 
+#### Menüs in der Menüleiste (2026-11-10)
+
+Die Hand-Probe des Nutzers im Vollbild zeigte: macOS legt dort, sobald der Zeiger den oberen Bildschirmrand
+erreicht, seine Menüleiste und einen Streifen mit der Titelleiste des Fensters über dessen oberen Rand, genau über
+die Menüzeile der App. Zwei Varianten wurden gebaut: A, die Menüs der App in der Menüleiste von macOS, und B, im
+Vollbild rückt die View unter diesen Streifen. Der Nutzer hat A gewählt, wie es auf dem Mac üblich ist.
+
+- [`plat::sysmenu`](../lib/plat/sysmenu.rs) (`sysmenu_supported`, `sysmenu_set`, `sysmenu_take`, `SysMenuItem`):
+  die Menüs einer App in der Menüleiste des Systems. Auf macOS stehen sie zwischen dem App-Menü und dem
+  Fenster-Menü ([`apple_mac_app.rs`](../lib/plat/apple_mac_app.rs)); jede Zeile meldet ihre ID über ein Objekt
+  unserer Klasse `JFSysMenu`, aktiv und Häkchen wie in der Liste, Tastenkürzel mit Command, Option und Shift.
+  Anderswo nicht unterstützt.
+- `ui.menubar(None)` des Hauptfensters gibt auf dem Mac mit Fenster die Menüs des `AppDesc` dorthin weiter (Befehle
+  mit Beschriftung, Zustand und Kürzel, die Zeilen von `Mi::List` oder ihr Platzhalter) und zeichnet im Fenster
+  keine Zeile. Eine dort gewählte Zeile läuft wie ein Klick (`cmd_run`). Läufe ohne Fenster (Skripte) behalten die
+  Zeile im Fenster, `jfgui_SYSMENU=0` ebenso.
+- Geprüft: `plattest --test window` (Menüs, Zeilen, Häkchen, Kürzel, eine gewählte Zeile, Ersetzen, Entfernen)
+  und die Skripte der Gallery auf dem Mac.
+
 ### AP8: Pakete, Updates, CI, Dokumentation (M)
 
 - `.app` als `.dmg`, Signatur mit Developer ID und Notarisierung, Update-Kanal `macos-aarch64`, iOS über TestFlight,

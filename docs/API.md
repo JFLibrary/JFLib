@@ -31591,6 +31591,9 @@ reaches the system's event stream.
     WT_OPEN_URLS             application:openURLs: with build/plattest_open.txt and an https URL
     WT_NOTE_CLICK [id]       the notification centre's delegate told of a click on notification id
     WT_BUNDLE                1 when the program runs inside an app bundle
+    WT_SYSMENU [k, a, b]     the app's menus in the menu bar (sysmenu): k 0 how many, 1 the rows of menu
+                             a, 2 choose row b of menu a, 3 row b's state (1 enabled | 2 checked | 4 a
+                             key equivalent with Command)
   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms: Cancel, or (saving)
                              OK with name (a full path)
 ```
@@ -31618,6 +31621,7 @@ WT_DOCK: u32 = 40
 WT_OPEN_URLS: u32 = 41
 WT_NOTE_CLICK: u32 = 42
 WT_BUNDLE: u32 = 43
+WT_SYSMENU: u32 = 44
 // WT_SEND / WT_POPUP_SEND kinds
 TS_MOVE: i32 = 1
 TS_DOWN: i32 = 2
