@@ -35,6 +35,12 @@
 // The browser cannot wait: a read-back there is answered later, the Draw shows the last frame that came back.  When
 // the answer comes (gp_views_tick looks), the next render takes it to the framebuffer as it would a new frame, and at
 // rest it is settled again (G5e2: before, a view at rest or under a layer kept an older frame in the framebuffer).
+//
+// A view's frame is bound to the display (G5e3): while its window is on its swapchain and the window's last frame has
+// not been shown yet (gpu_out.rs Win::pending: no free image, the display has not answered, less than 4 ms since the
+// last present), a new ver does not ask the content to draw; renders in between take the view's last frame.  Once the
+// window's frame is shown gp_views_wake asks for a render, which draws the newest ver; a frame that is never shown
+// holds the view at most VIEW_HOLD_US, then it draws one anyway.  GpuViewInfo::held counts the frames that waited.
 
 use alloc::rc::{Rc, Weak};
 use alloc::string::String;
@@ -104,6 +110,10 @@ pub struct GpuViewInfo {
     /// (G5e2) the newest frame read back into the CPU's copy (1, 2, ..; 0: none): the framebuffer can hold the view's
     /// newest frame once it equals `frames` (in the browser a read-back comes later)
     pub read_frame: u64,
+    /// (G5e3) frames that had to wait: a new ver (size, device) came while the view's window had not shown its last
+    /// frame yet, so the content was not asked to draw then (each ver counted once; the newest is drawn when the
+    /// window's frame has arrived)
+    pub held: u64,
     /// the size of its target (px)
     pub size: (u32, u32),
     /// what the last failure said
@@ -309,6 +319,11 @@ pub(crate) struct Entry {
     /// (G5e2, the browser) a read-back came after the Draw that asked for it: the next render takes it to the framebuffer
     /// as a new frame (gpu_out.rs gp_views_tick)
     pub(crate) arrived: bool,
+    /// (G5e3) a frame waits for the window's last frame to be shown since then (0: none waits); the ver, size and
+    /// generation counted last in info.held; the render gp_views_wake asked for has not come yet
+    pub(crate) held_at: u64,
+    pub(crate) held_key: Option<(u32, (u32, u32), u32)>,
+    pub(crate) woke: bool,
     pub(crate) rest_at: u64,
     pub(crate) apart: bool,
     pub(crate) info: GpuViewInfo,
@@ -406,6 +421,8 @@ impl Ui {
                 e.tried = None;
                 e.apart = false;
                 e.rest_at = 0;
+                e.held_at = 0;
+                e.held_key = None;
                 #[cfg(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32"))]
                 {
                     e.tex = None;
@@ -435,6 +452,9 @@ impl Ui {
             tried: None,
             moved: false,
             arrived: false,
+            held_at: 0,
+            held_key: None,
+            woke: false,
             rest_at: 0,
             apart: false,
             info: GpuViewInfo::default(),

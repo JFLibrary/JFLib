@@ -559,6 +559,11 @@ pub const SHADOWS: render3d::Shadows = render3d::Shadows { cascades: 4, size: 20
 
 /// (G5c) the shadow scene with the sun's four cascades
 pub fn shadow_gallery(r: &mut Renderer) -> Result<Scene> {
+    shadow_gallery_with(r, &SHADOWS, GALLERY_W as f64 / GALLERY_H as f64)
+}
+
+/// (G5e3) the shadow scene with these shadows, for a target of this aspect (render3dtest --shadow-shots)
+pub fn shadow_gallery_with(r: &mut Renderer, shadows: &render3d::Shadows, aspect: f64) -> Result<Scene> {
     use render3d::TextureData;
     let (geos, pics, items) = shadow_scene([0.0; 3]);
     let mut meshes = Vec::new();
@@ -571,9 +576,9 @@ pub fn shadow_gallery(r: &mut Renderer) -> Result<Scene> {
     let mut sc = Scene::new(r)?;
     sc.set_camera(&shadow_camera([0.0; 3]));
     sc.set_sun(&shadow_sun());
-    sc.set_shadows(Some(&SHADOWS))?;
+    sc.set_shadows(Some(shadows))?;
     let mut cam = shadow_camera([0.0; 3]);
-    cam.aspect = GALLERY_W as f64 / GALLERY_H as f64;
+    cam.aspect = aspect;
     sc.set_camera(&cam);
     for (spec, m) in &items {
         let id = r.add_material(m)?;

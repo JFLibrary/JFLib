@@ -127,10 +127,14 @@
 // whose Draw reads the frame back (the only way the CPU gets it: a copy to a read-back buffer, waited for).
 // VIEW_REST_US after the last frame gp_tick settles the window once: at rest the framebuffer holds the picture.
 // Anywhere else the view's command hashes its frame's number, so each new frame is drawn by the CPU, which reads
-// it back.  AF_GPU_3D makes the device at level Voll on the fastest adapter; without the flag views work on the
-// Basis device of the frugal adapter.  Without an output in this run (not wanted, never possible) views make a
-// device of their own (gp_view_device).  A lost device detaches every content (gp_views_gone) and attaches it to
-// the next one.
+// it back.  A view's frame is bound to the display (G5e3, docs/GPU.md "3D-Ansicht"): while its window is on its
+// swapchain with a frame not shown yet (Win::pending), a new ver waits; gp_views_wake asks for a render once the
+// window's frame has been shown, at the latest VIEW_HOLD_US after the first frame waited (a display that never
+// answers does not stop the view).  Without this a view drawn as fast as the app can starved the compositor on the
+// same GPU (Intel under Linux: no frame presented at all).  AF_GPU_3D makes the device at level Voll on the fastest
+// adapter; without the flag views work on the Basis device of the frugal adapter.  Without an output in this run (not
+// wanted, never possible) views make a device of their own (gp_view_device).  A lost device detaches every content
+// (gp_views_gone) and attaches it to the next one.
 //
 // A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 // frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
@@ -301,6 +305,9 @@ const LEVELS_MAX: usize = 6;
 const SHOW_TRIES: u32 = 300;
 /// (views) this long after a view's last frame the window is settled: its frame read back into the framebuffer (us)
 const VIEW_REST_US: u64 = 180_000;
+/// (views, G5e3) a new frame of a view waits for its window's last frame to be shown at most this long, then it is
+/// drawn anyway (us): a display that never answers costs the view its rate, not its picture
+const VIEW_HOLD_US: u64 = 100_000;
 
 /// the shaders, compiled from gpu_out.wgsl (uigputest --test shaders compares them with what
 /// wgsl::compile makes of it, --gen-shaders writes them again); the browser takes the WGSL itself
@@ -561,6 +568,7 @@ struct Win {
     undef: bool,   // the texture is new (Layout::Undefined)
     pending: bool, // the texture holds pixels that were not presented
     hidden: bool,  // the UI hid it: no swapchain is built or shown for it
+    test_hold: bool, // (Ui::gpu_test_hold) its frames are not shown, as if the display did not answer
     apart_before: bool, // the last frame had layers, images or canvases apart
     last_present: u64,
     job: u32,      // the job in flight
@@ -896,6 +904,12 @@ impl S {
         if self.trace {
             plat::write_stderr(format!("gpu: {:9.2} ms  {what}\n", ms(self.t0, plat::time_us())).as_bytes());
         }
+    }
+
+    /// (views, G5e3) window i is on its swapchain and holds a frame that was not shown yet: a new frame of its views waits
+    /// (what "shown" means per platform: docs/GPU.md "3D-Ansicht", G5e3)
+    fn unshown(&self, i: usize) -> bool {
+        self.wins.get(i).and_then(|w| w.as_ref()).is_some_and(|w| w.stage == Stage::Gpu && w.pending)
     }
 
     fn win(&mut self, i: usize) -> Option<&mut Win> {
@@ -1612,6 +1626,8 @@ fn view_detach(e: &mut Entry) {
     e.apart = false;
     e.moved = false;
     e.rest_at = 0;
+    e.held_at = 0;
+    e.held_key = None;
     e.sh.c.borrow_mut().gpu = None;
 }
 
@@ -1727,7 +1743,7 @@ impl Ui {
         }
         // (a frame drawn layer by layer has uploaded its parts)
         let up = if core::mem::take(&mut w.sp.drawn) { Ok(()) } else { upload(w, core, fb, rects, &mut s.trim_at) };
-        let r = up.and_then(|_| if soon { Ok(Shown::Wait) } else { show(w, core, fb) });
+        let r = up.and_then(|_| if soon || w.test_hold { Ok(Shown::Wait) } else { show(w, core, fb) });
         w.out.present_us += plat::time_us().saturating_sub(t0);
         match r {
             Ok(Shown::Done) | Ok(Shown::Wait) => {}
@@ -1772,6 +1788,7 @@ impl Ui {
             undef: true,
             pending: false,
             hidden: false,
+            test_hold: false,
             apart_before: false,
             last_present: 0,
             job: 0,
@@ -2104,10 +2121,11 @@ impl Ui {
                 Stage::Gpu if unseen(w) => self.gp_leave(i, "hidden"),
                 // (Android: a tool window or popup is composed on the canvas, below the surface)
                 Stage::Gpu if !plat::win_gpu_child_alone(w.pw) => self.gp_leave(i, "something else shows"),
-                Stage::Gpu if w.pending && plat::time_us() >= w.last_present + MIN_PRESENT_US => self.gp_retry(i),
+                Stage::Gpu if w.pending && !w.test_hold && plat::time_us() >= w.last_present + MIN_PRESENT_US => self.gp_retry(i),
                 _ => {}
             }
         }
+        self.gp_views_wake(plat::time_us());
         self.gp_jobs();
         let s = &mut self.m.gout;
         if s.trim_at != 0 && plat::time_us() >= s.trim_at {
@@ -2264,9 +2282,15 @@ impl Ui {
         if s.canvas_free_at != 0 {
             d = d.min(s.canvas_free_at);
         }
-        // (views: the look at rest, once after the last frame)
-        for e in self.m.gview.views.iter().filter(|e| e.rest_at != 0) {
-            d = d.min(e.rest_at);
+        // (views: the look at rest, once after the last frame; G5e3: a frame that waits for its window, at the latest
+        // when it has waited long enough, at once when the window's frame has been shown)
+        for e in self.m.gview.views.iter() {
+            if e.rest_at != 0 {
+                d = d.min(e.rest_at);
+            }
+            if e.held_at != 0 && !e.woke {
+                d = d.min(if s.unshown(e.win) { e.held_at + VIEW_HOLD_US } else { now });
+            }
         }
         let ready = matches!(s.dev, Dev::Ready(_));
         let moving = plat::win_in_sizemove();
@@ -2280,7 +2304,7 @@ impl Ui {
             match w.stage {
                 Stage::Switch if !minimised && !unseen(w) => d = d.min(now + RETRY_US),
                 Stage::Gpu if on_way => d = d.min(now + RETRY_US.min(1000)),
-                Stage::Gpu if w.pending && !minimised => {
+                Stage::Gpu if w.pending && !minimised && !w.test_hold => {
                     let retry = (w.last_present + MIN_PRESENT_US).max(now + RETRY_US.min(1000));
                     d = d.min(w.sc.as_ref().map_or(retry, |sc| sc.next_look(retry)));
                 }
@@ -2474,6 +2498,14 @@ impl Ui {
     pub fn gpu_test_lose(&mut self) {
         if let Dev::Ready(core) = &self.m.gout.dev {
             core.dev.test_lose();
+        }
+    }
+
+    /// (test aid, G5e3) window `win`'s frames are not shown while on (as if the display did not answer): they stay in
+    /// its texture, its views' new frames wait for them; off: the next look shows the newest
+    pub fn gpu_test_hold(&mut self, win: u32, on: bool) {
+        if let Some(w) = self.m.gout.win(win as usize) {
+            w.test_hold = on;
         }
     }
 
@@ -3096,6 +3128,8 @@ impl Ui {
         // (nobody sees a minimised or hidden window: no frame for it, the next one when it is back)
         let unseen = pw >= 0 && plat::win_state(pw) & (plat::WST_MINIMIZED | plat::WST_HIDDEN) != 0;
         let can = self.wp.dirty.split && !self.rtl && self.dc.opac == 255 && self.m.gout.views_on && self.gp_can_split(i);
+        // (G5e3) the window's last frame is not on the screen yet: a new frame of its views waits for it
+        let unshown = self.m.gout.unshown(i);
         let mut failed: Option<(GpuError, bool, u32)> = None;
         let Ui { m, wp, .. } = self;
         let Mods { gout: s, gview, .. } = m;
@@ -3145,7 +3179,24 @@ impl Ui {
             }
             // ---- a frame
             let key = (rec.ver, size, e.devgen);
-            if attached && !unseen && size.0 > 0 && size.1 > 0 && size.0 <= lim && size.1 <= lim && e.tried != Some(key) {
+            let due = attached && !unseen && size.0 > 0 && size.1 > 0 && size.0 <= lim && size.1 <= lim && e.tried != Some(key);
+            // (G5e3) bound to the display: while the window's last frame is not shown, the content is not asked (this
+            // render takes the view's last frame); gp_views_wake asks for a render once it is shown, or after VIEW_HOLD_US
+            e.woke = false;
+            let hold = due && unshown && !(e.held_at != 0 && now >= e.held_at + VIEW_HOLD_US);
+            if hold {
+                if e.held_key != Some(key) {
+                    e.held_key = Some(key);
+                    e.info.held += 1;
+                }
+                if e.held_at == 0 {
+                    e.held_at = now;
+                }
+            } else {
+                e.held_at = 0;
+                e.held_key = None;
+            }
+            if due && !hold {
                 e.tried = Some(key);
                 let (d, _, out) = dev.as_ref().unwrap_or_else(|| unreachable!());
                 let t0 = plat::time_us();
@@ -3352,6 +3403,23 @@ impl Ui {
         }
         for i in rest {
             self.gp_settle(i);
+        }
+    }
+
+    /// (G5e3) the window loop, after the frames still to show: a view whose new frame waited for its window asks for a
+    /// render once the window's frame has been shown (or it went back to the CPU path, or is gone), or when it has
+    /// waited VIEW_HOLD_US; once per wait (woke: the render clears it, gp_views_begin)
+    fn gp_views_wake(&mut self, now: u64) {
+        let Mods { gout, gview, .. } = &mut self.m;
+        let mut wake = false;
+        for e in gview.views.iter_mut().filter(|e| e.held_at != 0 && !e.woke) {
+            if !gout.unshown(e.win) || now >= e.held_at + VIEW_HOLD_US {
+                e.woke = true;
+                wake = true;
+            }
+        }
+        if wake {
+            self.invalidate();
         }
     }
 
