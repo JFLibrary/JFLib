@@ -424,7 +424,24 @@ auf dem Mac das Ausführrecht, und `cargo jflib keygen` baute sein Signierprogra
 die Skripte von `gallery` und `updatetest`, `plattest` ohne Fenster (`all`, `cliprich`, `spell`), `androidGallery` im
 Simulator und ein `.dmg` von BackupCraft als Artefakt. Auf dem Mac zu Hause liefen alle Schritte grün; der erste Lauf
 auf GitHub folgt nach dem Push. `build_rs.py` startet Programme mit `ui` auf dem Mac über ihr Bündel (`tools/apple.py
-gui`); updatetest nimmt dann eine Programmdatei außerhalb davon, sonst bekäme es nur `app`-Einträge.
+gui`); updatetest nimmt dann eine Programmdatei außerhalb davon, sonst bekäme es nur `app`-Einträge. Der erste Lauf
+auf GitHub (2026-11-10) lief in 14 Minuten grün durch.
+
+**AP8c umgesetzt (2026-11-10):** Mit `jfgui_MAC_IDENTITY` („Developer ID Application: …“) und `jfgui_MAC_NOTARY`
+(ein Profil von `xcrun notarytool store-credentials`) notarisieren `tools/package.py --formats dmg` und `cargo jflib
+package --formats dmg` erst das Bündel, dann das Image, und heften beiden ihr Ticket an (`stapler`): Eine aus dem
+Image gezogene Kopie startet auch offline. Über SSH ist der Schlüsselbund gesperrt; `tools/apple.py` lässt codesign
+mit Zertifikat und notarytool dann in der angemeldeten Sitzung laufen (`keychain_run` über `gui_run`, ohne Fenster).
+Die Einrichtung (Zertifikat, app-spezifisches Passwort, Profil) steht in [PACKAGING.md](PACKAGING.md) „macOS: .dmg“.
+Abnahme mit BackupCraft auf dem Mac mini: Die `.dmg` mit dem Quarantäne-Attribut eines Downloads, die App darauf
+und eine herauskopierte Kopie nimmt Gatekeeper an (`spctl --assess`: „accepted, source=Notarized Developer ID“),
+`stapler validate` und `syspolicy_check distribution` sind zufrieden; die ad hoc signierte `.dmg` und App lehnt er
+ab. `updatetest --test app` mit `jfgui_MAC_IDENTITY` aktualisiert Bündel mit der Developer ID und lehnt dieselbe
+App ad hoc signiert ab. Die erste Notarisierung des neuen Kontos brauchte rund zwei Stunden, danach dauerten beide
+Einreichungen zusammen gut eine Minute. Dabei gefunden: Das Programm eines Bündels mit Developer ID beendet macOS
+sofort, wenn es außerhalb des Bündels läuft („invalid Info.plist“); updatetest nimmt für seine `exe`-Tests deshalb
+das einfache Programm neben dem Bündel. Offen: Signieren in der CI (Zertifikat als Geheimnis), TestFlight für
+iOS (falls gewünscht) und eine Hand-Probe auf einem fremden Mac.
 
 ## Reihenfolge
 
@@ -520,7 +537,8 @@ Zeiger des Nutzers.
 1. **Mac:** Mac mini M2 (AP0). Offen: Nutzt ihn noch jemand?
 2. **iPhone:** iPhone 14 mit iOS 27.2 (AP0). Offen: Ist es das Alltagsgerät, also Tests nur auf Zuruf wie beim A56?
 3. **Apple Developer Program** (99 € im Jahr) oder die kostenlose Apple-ID? Bis AP7 die kostenlose (AP0): Apps laufen
-   auf dem iPhone nur sieben Tage, ohne TestFlight und ohne Notarisierung. Für AP8 tritt der Nutzer bei (2026-11-09).
+   auf dem iPhone nur sieben Tage, ohne TestFlight und ohne Notarisierung. Für AP8 tritt der Nutzer bei (2026-11-09);
+   Mitglied seit 2026-11-10 (Team 6RBCBNA6DJ), Developer ID und Notarisierung laufen (AP8c).
 4. **Welche Apps zuerst?** Vorschlag: `gallery`, dann JFPainter und `jfWord`; auf dem iPhone die Gallery, dann
    `Kritzel`.
 5. **App Store** als späteres Ziel für iOS? Das ändert Sandbox, Plugins und die Prüfregeln.
