@@ -30077,10 +30077,6 @@ information: linux_thread.rs; windows: linux_disp.rs (Wayland / X11 backends).
 
 - **`fn sleep_ms(ms: u32)`**
 
-- **`fn current_exe() -> Option<String>`**
-  Absolute path of the running native executable, independent of argv[0] (here for Linux ARM64 until ARM4 of
-  docs/ARM64.md, otherwise in modhost.rs)
-
 ### `plat/linux_disp.rs` (Linux)
 
 Source: [`lib/plat/linux_disp.rs`](../lib/plat/linux_disp.rs)
@@ -33304,7 +33300,7 @@ plib -- plugin libraries and the crash guard: the portable part
                                          Windows, SIGSEGV / SIGBUS / SIGILL / SIGFPE /
                                          SIGTRAP on Linux; linux_guard.rs)
   guard_call(f, a1, a2, a3, a4, info) -> (rax, rdx)
-       calls the code at address f with the Win64 ABI (on Linux too: the plugin ABI) as
+       calls the code at address f with the plugin ABI (rt::plugin_abi!: Win64 on x86-64) as
        f(a1, a2, a3, a4); a fault inside it on this thread (also in nested host code)
        resumes here with rax = rdx = ERR_FAULT and info (GuardInfo) filled; otherwise
        info.kind = 0 and rax / rdx are those of f.  Nested calls are allowed.  ERR_LIMIT
@@ -33324,7 +33320,7 @@ docs: corrupt state stays corrupt, hangs are not detected).
 
 Safety contract: guard_call runs untrusted machine code at an arbitrary address; it is a
 safe function only in the sense the assembly API is: the caller hands it addresses of
-loaded plugin code (lib_sym) or of its own `extern "win64"` functions.  Pointers a plugin
+loaded plugin code (lib_sym) or of its own `rt::plugin_abi!` functions.  Pointers a plugin
 returns are checked with lib_seg before the host reads through them.
 ```
 
@@ -33334,12 +33330,13 @@ LIBA_R: u32 = 1  // lib_seg flags
 LIBA_W: u32 = 2
 LIBA_X: u32 = 4
 LIBE_IO: u32 = 1  // file missing / unreadable / larger than LIB_FILE_MAX
-LIBE_FORMAT: u32 = 2  // not an x86-64 ELF shared object / PE DLL, or damaged
+LIBE_FORMAT: u32 = 2  // not an ELF shared object / PE DLL, or damaged
 LIBE_DEPS: u32 = 3  // needs other libraries / undefined symbols
 LIBE_RELOC: u32 = 4  // unsupported relocation
 LIBE_NOMEM: u32 = 5
 LIBE_INIT: u32 = 6  // TLS, initialisers or an interpreter (not supported)
 LIBE_MAP: u32 = 7  // mmap / mprotect failed
+LIBE_ARCH: u32 = 8  // built for another processor: x86-64 on ARM64 or ARM64 on x86-64 (docs/ARM64.md)
 LIB_FILE_MAX: u64 = 64 << 20
 LH_SEGMAX: usize = 16
 GK_NONE: u32 = 0
@@ -33678,12 +33675,12 @@ module (the module runtime modules/modrt, which has a copy of this file) exchang
 A module is a no_std cdylib linked against nothing (no imports; built and checked as
 build_rs.py's sections jxl-module and "loader checks" say) that exports exactly one function
 
-    <name>_module(host: *const HostTable) -> *const ModTable          extern "win64"
+    <name>_module(host: *const HostTable) -> *const ModTable          rt::plugin_abi!
 
 (`jxlenc_module` for the JPEG XL writer).  The host keeps the module loaded for the rest of
 the process; the module keeps the HostTable pointer.  Null = the module refuses the host
-(another MOD_VERSION).  Every function pointer is extern "win64" on both systems (as the
-plugin ABI), so the records are the same on Windows and Linux.
+(another MOD_VERSION).  Every function pointer has the plugin ABI (rt::plugin_abi!: win64 on
+x86-64, also on Linux; C elsewhere), so the records are the same on Windows and Linux.
 
 Memory: the module's global allocator is the host's (HostTable::alloc / free = the host's
 GlobalAlloc with the same Layout), so blocks move between both sides as Vec<u8> raw parts
@@ -33713,7 +33710,7 @@ JXT_PANIC: u32 = 1
 JXT_FAULT: u32 = 2
 ```
 
-- **`type ItemFn = extern "win64" fn(ctx: *const c_void, index: usize, job: *const c_void)`**
+- **`type ItemFn = rt::plugin_abi!(fn(ctx: *const c_void, index: usize, job: *const c_void))`**
   one item of a parallel loop: item(ctx, index, job)
 
 - **`struct HostTable`**
@@ -33722,17 +33719,17 @@ JXT_FAULT: u32 = 2
   - `version: u32` -- MOD_VERSION
   - `cpu: u32` -- the host's rt::cpu::features() (--simd sse2: 0, the module then uses SSE2 too)
   - `threads: u32` -- workers of the host's pool
-  - `alloc: extern "win64" fn(size: usize, align: usize, zeroed: u32) -> *mut u8` -- a block of `size` bytes aligned to `align` from the host's allocator (zeroed != 0:
+  - `alloc: rt::plugin_abi!(fn(size: usize, align: usize, zeroed: u32) -> *mut u8)` -- a block of `size` bytes aligned to `align` from the host's allocator (zeroed != 0:
     cleared), null when out of memory
-  - `free: extern "win64" fn(p: *mut u8, size: usize, align: usize)` -- free a block of alloc with its size and alignment
-  - `parallel_for: extern "win64" fn(count: usize, ctx: *const c_void, item: ItemFn) -> u32` -- item(ctx, i, job) for i in 0..count on the pool; 0 = done, 1 = cancelled
-  - `job_cancel: extern "win64" fn(job: *const c_void)` -- job.cancel() of the job an item got
-  - `job_cancelled: extern "win64" fn(job: *const c_void) -> u32` -- job.cancelled()
-  - `thr_count: extern "win64" fn() -> u32` -- the pool's thr_count() / thr_self()
-  - `thr_self: extern "win64" fn() -> usize`
-  - `yield_now: extern "win64" fn()` -- give the time slice away (spin locks)
-  - `log: extern "win64" fn(msg: *const u8, len: usize)` -- one line on stderr ("&lt;module>: msg")
-  - `panic: extern "win64" fn(msg: *const u8, len: usize) -> !` -- a panic of the module (UTF-8 message): the host's crash report, exit code 3
+  - `free: rt::plugin_abi!(fn(p: *mut u8, size: usize, align: usize))` -- free a block of alloc with its size and alignment
+  - `parallel_for: rt::plugin_abi!(fn(count: usize, ctx: *const c_void, item: ItemFn) -> u32)` -- item(ctx, i, job) for i in 0..count on the pool; 0 = done, 1 = cancelled
+  - `job_cancel: rt::plugin_abi!(fn(job: *const c_void))` -- job.cancel() of the job an item got
+  - `job_cancelled: rt::plugin_abi!(fn(job: *const c_void) -> u32)` -- job.cancelled()
+  - `thr_count: rt::plugin_abi!(fn() -> u32)` -- the pool's thr_count() / thr_self()
+  - `thr_self: rt::plugin_abi!(fn() -> usize)`
+  - `yield_now: rt::plugin_abi!(fn())` -- give the time slice away (spin locks)
+  - `log: rt::plugin_abi!(fn(msg: *const u8, len: usize))` -- one line on stderr ("&lt;module>: msg")
+  - `panic: rt::plugin_abi!(fn(msg: *const u8, len: usize) -> !)` -- a panic of the module (UTF-8 message): the host's crash report, exit code 3
 
 - **`struct ModTable`**
   what a module offers
@@ -33740,7 +33737,7 @@ JXT_FAULT: u32 = 2
   - `version: u32` -- MOD_VERSION
   - `magic: u32` -- MOD_MAGIC
   - `kind: u32` -- MOD_JXLENC
-  - `jxl_encode: extern "win64" fn(req: *const JxlReq, res: *mut JxlRes) -> i32` -- the JPEG XL writer: 0 and res filled, or ERR_\* (res empty)
+  - `jxl_encode: rt::plugin_abi!(fn(req: *const JxlReq, res: *mut JxlRes) -> i32)` -- the JPEG XL writer: 0 and res filled, or ERR_\* (res empty)
 
 - **`struct JxlReq`**
   a JPEG XL encode: the samples of img_jxl::writer::image_of and the writer's options
@@ -47608,6 +47605,7 @@ semantics, the minimal OS calls the runtime itself needs, panic handling.
   rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (the root Cargo.toml, SemVer;
            docs/VERSIONING.md), also as plat::VERSION and ui::VERSION
   rt::app_version!()  the app's own version (version= of apps/NAME/PACKAGE)
+  rt::plugin_abi!  the calling convention of plugins and modules: win64 on x86-64, C elsewhere (abi.rs)
 
 One of the four crates that may contain `unsafe` (rt, simd, plat, plugin).
 ```

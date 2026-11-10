@@ -55,6 +55,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** StyleList::scrollbar_room: a style whose scroll bars stay visible keeps their room free right of the content of a view that scrolls only vertically, overflowing or not (as CSS scrollbar-gutter: stable), and counts it in the view's natural width; netlab keeps 10 DIP, so content no longer runs under its bar (the other styles keep floating bars)
 - **render3d:** Shadows::BASIS (2 cascades of 1024 texels up to 100, split and reach as DEFAULT) and Shadows::for_level(Level): the shadow default for a device's level, decided for level Basis (the browser, older and weak GPUs, phones); Shadows::DEFAULT stays the default for Voll; render3dtest --shadow-shots DIR draws the shadow gallery on Basis with both (docs/RENDER3D.md)
 - **ui:** Ui::gpu_test_hold(win, on) (test aid): a window's frames are not shown while on, as if the display did not answer; GpuViewInfo::held counts the frames of a view that had to wait for its window
+- **plat:** Linux on ARM64: plugins and loadable modules (docs/ARM64.md, ARM4): rt::plugin_abi!, the calling convention of plugins and modules as a macro (extern "win64" on x86-64 as before, extern "C" on ARM64 and elsewhere; a function pointer type and a function); the crash guard with its AAPCS64 trampoline, the ELF loader for EM_AARCH64 (its relocations, the instruction cache, the kernel's page size) and the module host on Linux ARM64; the module jxlenc for ARM64 (modules/modrt with rt's ARM64 files and its own memcpy and relatives for ARM64); plattest's guard and lib tests and codectest --jxlenc pass under qemu-aarch64 and in an ARM64 VM with 4 and 64 KB pages
+- **plat:** plat::LIBE_ARCH: lib_open refuses a plugin or module built for the other processor (x86-64 on ARM64, ARM64 on x86-64) with its own code instead of LIBE_FORMAT, on Windows too (ERROR_BAD_EXE_FORMAT and the file's Machine); the module host's line says "built for another processor"
+- **build:** build_rs.py builds the loadable modules for --arch aarch64: on Linux with segments aligned to 64 KB (-z max-page-size=65536: they load on kernels with 4, 16 and 64 KB pages) and inline atomics (compiler-rt's outline helpers need a constructor), on Windows as ARM64 DLLs; pe_verify and elf_verify check the architecture and name a library of the other one
 
 ### Changed
 
@@ -88,6 +91,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Fixed
 
+- **Tests:** plattest --test lib matches JFPainter's Rust test plugins (it was written for PaintCraft's assembly plugins and failed 4 checks on x86-64 too): crashq's trap is found by its instruction, crash and crashpf get FXARGS on a test surface, badinfo's list pointer is the one outside the image; a new check: a plugin of the other processor -> LIBE_ARCH
 - **build:** build_rs.py runs with Python 3.11 again, as the README says (tools/gendoc.py needed 3.12)
 - **update:** an update's new file is created with create_new on Apple too (never written through an existing name or link)
 - **plat:** macOS and iOS: the system font folders (/System/Library/Fonts, /Library/Fonts, ~/Library/Fonts) are scanned; the print dialog of macOS opens only when the app has a window (headless runs: ERR_UNSUPPORTED as on Linux)

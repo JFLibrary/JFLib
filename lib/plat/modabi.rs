@@ -5,12 +5,12 @@
 // A module is a no_std cdylib linked against nothing (no imports; built and checked as
 // build_rs.py's sections jxl-module and "loader checks" say) that exports exactly one function
 //
-//     <name>_module(host: *const HostTable) -> *const ModTable          extern "win64"
+//     <name>_module(host: *const HostTable) -> *const ModTable          rt::plugin_abi!
 //
 // (`jxlenc_module` for the JPEG XL writer).  The host keeps the module loaded for the rest of
 // the process; the module keeps the HostTable pointer.  Null = the module refuses the host
-// (another MOD_VERSION).  Every function pointer is extern "win64" on both systems (as the
-// plugin ABI), so the records are the same on Windows and Linux.
+// (another MOD_VERSION).  Every function pointer has the plugin ABI (rt::plugin_abi!: win64 on
+// x86-64, also on Linux; C elsewhere), so the records are the same on Windows and Linux.
 //
 // Memory: the module's global allocator is the host's (HostTable::alloc / free = the host's
 // GlobalAlloc with the same Layout), so blocks move between both sides as Vec<u8> raw parts
@@ -42,7 +42,7 @@ pub const JXT_PANIC: u32 = 1;
 pub const JXT_FAULT: u32 = 2;
 
 /// one item of a parallel loop: item(ctx, index, job)
-pub type ItemFn = extern "win64" fn(ctx: *const c_void, index: usize, job: *const c_void);
+pub type ItemFn = rt::plugin_abi!(fn(ctx: *const c_void, index: usize, job: *const c_void));
 
 /// the host's functions (the module keeps the pointer)
 #[repr(C)]
@@ -53,24 +53,24 @@ pub struct HostTable {
     pub threads: u32, // workers of the host's pool
     /// a block of `size` bytes aligned to `align` from the host's allocator (zeroed != 0:
     /// cleared), null when out of memory
-    pub alloc: extern "win64" fn(size: usize, align: usize, zeroed: u32) -> *mut u8,
+    pub alloc: rt::plugin_abi!(fn(size: usize, align: usize, zeroed: u32) -> *mut u8),
     /// free a block of alloc with its size and alignment
-    pub free: extern "win64" fn(p: *mut u8, size: usize, align: usize),
+    pub free: rt::plugin_abi!(fn(p: *mut u8, size: usize, align: usize)),
     /// item(ctx, i, job) for i in 0..count on the pool; 0 = done, 1 = cancelled
-    pub parallel_for: extern "win64" fn(count: usize, ctx: *const c_void, item: ItemFn) -> u32,
+    pub parallel_for: rt::plugin_abi!(fn(count: usize, ctx: *const c_void, item: ItemFn) -> u32),
     /// job.cancel() of the job an item got
-    pub job_cancel: extern "win64" fn(job: *const c_void),
+    pub job_cancel: rt::plugin_abi!(fn(job: *const c_void)),
     /// job.cancelled()
-    pub job_cancelled: extern "win64" fn(job: *const c_void) -> u32,
+    pub job_cancelled: rt::plugin_abi!(fn(job: *const c_void) -> u32),
     /// the pool's thr_count() / thr_self()
-    pub thr_count: extern "win64" fn() -> u32,
-    pub thr_self: extern "win64" fn() -> usize,
+    pub thr_count: rt::plugin_abi!(fn() -> u32),
+    pub thr_self: rt::plugin_abi!(fn() -> usize),
     /// give the time slice away (spin locks)
-    pub yield_now: extern "win64" fn(),
+    pub yield_now: rt::plugin_abi!(fn()),
     /// one line on stderr ("<module>: msg")
-    pub log: extern "win64" fn(msg: *const u8, len: usize),
+    pub log: rt::plugin_abi!(fn(msg: *const u8, len: usize)),
     /// a panic of the module (UTF-8 message): the host's crash report, exit code 3
-    pub panic: extern "win64" fn(msg: *const u8, len: usize) -> !,
+    pub panic: rt::plugin_abi!(fn(msg: *const u8, len: usize) -> !),
 }
 
 /// what a module offers
@@ -81,7 +81,7 @@ pub struct ModTable {
     pub magic: u32,   // MOD_MAGIC
     pub kind: u32,    // MOD_JXLENC
     /// the JPEG XL writer: 0 and res filled, or ERR_* (res empty)
-    pub jxl_encode: extern "win64" fn(req: *const JxlReq, res: *mut JxlRes) -> i32,
+    pub jxl_encode: rt::plugin_abi!(fn(req: *const JxlReq, res: *mut JxlRes) -> i32),
 }
 
 /// a JPEG XL encode: the samples of img_jxl::writer::image_of and the writer's options

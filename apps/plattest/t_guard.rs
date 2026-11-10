@@ -51,32 +51,32 @@ fn tc(k: u32) -> usize {
     guard_test_code(k)
 }
 
-// host functions (Win64, as plugins call the host)
-extern "win64" fn h_tag(_a: u64) -> u64 {
+// host functions (rt::plugin_abi!, as plugins call the host)
+rt::plugin_abi! { fn h_tag(_a: u64) -> u64 {
     guard_tag()
-}
+}}
 
-/// tag 9 inside: guard_tag there, then ours again -> (inner tag) | (outer tag after) << 32
-extern "win64" fn h_nested_tag(_a: u64) -> u64 {
+// tag 9 inside: guard_tag there, then ours again -> (inner tag) | (outer tag after) << 32
+rt::plugin_abi! { fn h_nested_tag(_a: u64) -> u64 {
     let mut gi = GuardInfo { tag: 9, ..GuardInfo::default() };
     let (inner, _) = guard_call(h_tag as *const () as usize, 0, 0, 0, 0, Some(&mut gi));
     inner | guard_tag() << 32
-}
+}}
 
-/// an inner guard catches a fault; this function then returns normally
-extern "win64" fn h_inner_fault(_a: u64) -> u64 {
+// an inner guard catches a fault; this function then returns normally
+rt::plugin_abi! { fn h_inner_fault(_a: u64) -> u64 {
     let mut gi = GuardInfo::default();
     let (r, _) = guard_call(tc(T_WRITE), 0x10, 0, 0, 0, Some(&mut gi));
     if r == FAULT && gi.kind == GK_ACCESS { 42 } else { 1 }
-}
+}}
 
-/// an inner guard catches ud2, then this host function itself faults (crash_test): the fault
-/// must go to the enclosing guard
-extern "win64" fn h_host_fault(_a: u64) -> u64 {
+// an inner guard catches ud2, then this host function itself faults (crash_test): the fault
+// must go to the enclosing guard
+rt::plugin_abi! { fn h_host_fault(_a: u64) -> u64 {
     let mut gi = GuardInfo::default();
     guard_call(tc(T_UD2), 0, 0, 0, 0, Some(&mut gi));
     plat::crash_test()
-}
+}}
 
 pub fn t_guard(t: &mut T) {
     t.check(guard_init() == 0 && guard_init() == 0, "guard: plat_guard_init (twice)");

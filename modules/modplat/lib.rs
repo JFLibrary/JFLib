@@ -46,12 +46,12 @@ impl JobCtl {
 
 type Body<'a> = &'a (dyn Fn(usize, &JobCtl) + Sync);
 
-extern "win64" fn item(ctx: *const c_void, index: usize, job: *const c_void) {
+rt::plugin_abi! { fn item(ctx: *const c_void, index: usize, job: *const c_void) {
     // SAFETY: ctx is the address of the loop body reference of parallel_for below, which
     // lives until the host's parallel_for returned (after the last item).
     let f: Body = unsafe { *(ctx as *const Body) };
     f(index, &JobCtl { job })
-}
+}}
 
 /// f(index, job) for every index in 0..count on the host's worker pool and this thread
 pub fn parallel_for(count: usize, f: &(dyn Fn(usize, &JobCtl) + Sync)) -> Result<(), Cancelled> {

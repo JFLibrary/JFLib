@@ -353,14 +353,14 @@ pub use evq::*;
 pub use icc::*;
 pub use pwin0::*;
 // plat-shared: printing (print.rs + win_print.rs / linux_print.rs), plugin libraries and the
-// crash guard (plib.rs + win_lib.rs / linux_elfload.rs, linux_guard.rs; Linux ARM64 before ARM4: the stubs)
-#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple", all(target_os = "linux", target_arch = "aarch64")), path = "web_lib.rs")]
+// crash guard (plib.rs + win_lib.rs / linux_elfload.rs, linux_guard.rs; x86-64 and ARM64)
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), path = "web_lib.rs")]
 mod plib;
 mod print;
 pub use plib::*;
 pub use print::*;
 // jxl-module: loadable modules, the host side (the JPEG XL writer jxlenc; modhost.rs, modabi.rs)
-#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple", all(target_os = "linux", target_arch = "aarch64")), path = "web_modhost.rs")]
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), path = "web_modhost.rs")]
 mod modhost;
 pub use modhost::*;
 

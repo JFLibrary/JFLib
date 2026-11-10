@@ -23,7 +23,7 @@ use alloc::vec::Vec;
 
 use crate::{
     GK_ACCESS, GK_ARITH, GK_BREAK, GK_BUS, GK_ILLEGAL, GK_STACK, LH_SEGMAX, LIBA_R, LIBA_W, LIBA_X, LIBE_DEPS,
-    LIBE_FORMAT, LIBE_INIT, LIBE_IO, LIBE_NOMEM, Lib, LibSeg, guard_fault_ip, guard_hit, lib_seg,
+    LIBE_ARCH, LIBE_FORMAT, LIBE_INIT, LIBE_IO, LIBE_NOMEM, Lib, LibSeg, guard_fault_ip, guard_hit, lib_seg,
 };
 
 const DONT_RESOLVE_REFS: u32 = 1; // LoadLibraryExW flag
@@ -172,6 +172,7 @@ pub fn lib_open(path: &str) -> Result<Lib, u32> {
             return Err(match err {
                 2 | 3 | 5 => LIBE_IO, // file / path not found, access denied
                 8 | 14 => LIBE_NOMEM,
+                193 if other_machine(path) => LIBE_ARCH, // ERROR_BAD_EXE_FORMAT: a DLL of the other processor
                 _ => LIBE_FORMAT,
             });
         }
@@ -200,8 +201,8 @@ unsafe fn pe_check(l: &mut Lib) -> u32 {
             return LIBE_FORMAT;
         }
         let nt = b + lfanew;
-        if r32(nt) != 0x0000_4550 || r16(nt + 4) != 0x8664 || r16(nt + 22) & 0x2000 == 0 {
-            return LIBE_FORMAT; // "PE\0\0", AMD64, IMAGE_FILE_DLL
+        if r32(nt) != 0x0000_4550 || r16(nt + 4) != PE_MACHINE || r16(nt + 22) & 0x2000 == 0 {
+            return LIBE_FORMAT; // "PE\0\0", AMD64 (ARM64), IMAGE_FILE_DLL
         }
         let nsec = r16(nt + 6) as usize;
         let ohsize = r16(nt + 20) as usize;
@@ -357,4 +358,21 @@ pub(crate) fn lib_unload(h: &mut Lib) {
         unsafe { FreeLibrary(h.os as isize) };
         h.os = 0;
     }
+}
+
+// ---------------------------------------------------------------- the processor (docs/ARM64.md)
+
+/// IMAGE_FILE_MACHINE of this process: AMD64, ARM64 (ARM5)
+const PE_MACHINE: u32 = if cfg!(target_arch = "aarch64") { 0xAA64 } else { 0x8664 };
+
+/// LoadLibraryExW said ERROR_BAD_EXE_FORMAT: is path a PE image of the other processor (AMD64 /
+/// ARM64)?  Then the loader answers LIBE_ARCH instead of LIBE_FORMAT.  Reads the headers page only.
+fn other_machine(path: &str) -> bool {
+    let Some(f) = crate::OsFile::open_raw(path, crate::FO_READ) else { return false };
+    let mut h = [0u8; 4096];
+    let n = f.read_at(0, &mut h).unwrap_or(0);
+    let u16_at = |o: usize| if o + 2 <= n { u16::from_le_bytes([h[o], h[o + 1]]) as u32 } else { 0 };
+    let nt = u16_at(PE_LFANEW) as usize | (u16_at(PE_LFANEW + 2) as usize) << 16;
+    let m = u16_at(nt + 4);
+    u16_at(0) == 0x5A4D && (64..=4096 - 24).contains(&nt) && h[nt..nt + 4] == *b"PE\0\0" && (m == 0x8664 || m == 0xAA64) && m != PE_MACHINE
 }
