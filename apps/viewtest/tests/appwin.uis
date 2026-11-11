@@ -1,0 +1,16 @@
+# viewtest: an independent app window (E7).  "Neues Fenster" opens a WF_APP window: no title bar
+# of the library, its own from titlebar_begin / titlebar_end with a tab in it; the caption
+# buttons ask the window manager for that window (headless runs record it: expect wm).
+click "Neues Fenster"
+window any
+expect titlebar:"Privates Fenster" exists
+expect "Tab Eins" exists
+click "Tab Eins"
+expect text:"Tab geklickt: 1" exists
+# the caption buttons of its own title bar
+click button:"Minimize"
+expect wm minimize
+click button:"Maximize"
+expect wm maximize
+click button:"Close"
+expect wm close
