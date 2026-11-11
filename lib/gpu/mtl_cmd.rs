@@ -415,6 +415,25 @@ impl<'a> CommandEncoder<'a> {
                         let f: unsafe extern "C" fn(Id, objc::Sel, Id, usize) = core::mem::transmute(objc::objc_msgSend as *const ());
                         f(e, objc::sel(smp), sm.id(), s.index as usize);
                     }
+                    (SlotKind::Buffer, Res::Table(tb)) => {
+                        // a Bindless table: its argument buffer, and what it holds made resident for this encoder
+                        let f: unsafe extern "C" fn(Id, objc::Sel, Id, usize, usize) = core::mem::transmute(objc::objc_msgSend as *const ());
+                        f(e, objc::sel(buf), tb.buf.id(), 0, s.index as usize);
+                        if let Some(x) = sizes.get_mut(s.index as usize) {
+                            *x = tb.len.min(u32::MAX as u64) as u32;
+                        }
+                        if tb.usage != 0 {
+                            let ids: Vec<Id> = tb.keep.lock().iter().flatten().map(|o| o.id()).collect();
+                            if !ids.is_empty() {
+                                if stage == 0 {
+                                    msg!(e, c"useResources:count:usage:", ids.as_ptr() => *const Id, ids.len() => usize, tb.usage => usize; ());
+                                } else {
+                                    msg!(e, c"useResources:count:usage:stages:", ids.as_ptr() => *const Id, ids.len() => usize, tb.usage => usize,
+                                         stage as usize => usize; ()); // MTLRenderStageVertex 1, Fragment 2
+                                }
+                            }
+                        }
+                    }
                     _ => {
                         self.ok(false, "a bound resource's kind differs from the shader's")?;
                     }

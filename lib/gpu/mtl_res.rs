@@ -18,6 +18,8 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::Ordering;
 
+use rt::sync::SpinLock;
+
 use crate::mtl_dev::{Device, Shared};
 use crate::mtl_objc::{self as objc, Id, MTLOrigin, MTLSize, NSRange, Obj, Pool, msg};
 use crate::*;
@@ -523,6 +525,9 @@ impl Device {
             }
             msg!(s, c"setLodMinClamp:", desc.lod_min => f32; ());
             msg!(s, c"setLodMaxClamp:", desc.lod_max => f32; ());
+            if sh.level == Level::Voll {
+                msg!(s, c"setSupportArgumentBuffers:", true => bool; ()); // (a Bindless table may hold it)
+            }
             Obj::new(msg!(sh.dev.id(), c"newSamplerStateWithDescriptor:", s => Id; Id)).ok_or(GpuError::OutOfMemory)?
         };
         Ok(Sampler(Arc::new(SamplerInner { h })))
@@ -563,7 +568,9 @@ pub(crate) fn compile(sh: &Shared, src: &str) -> Result<Obj> {
         } else {
             msg!(o.id(), c"setFastMathEnabled:", false => bool; ());
         }
-        msg!(o.id(), c"setLanguageVersion:", (2usize << 16) | 4 => usize; ()); // MSL 2.4
+        // MSL 2.4; 3.0 on a device at level Voll (Metal 3: bindless tables hold 8-byte resource ids, msl.rs)
+        let version = if sh.level == Level::Voll { 3usize << 16 } else { (2usize << 16) | 4 };
+        msg!(o.id(), c"setLanguageVersion:", version => usize; ());
         let mut err: Id = objc::NIL;
         let lib = msg!(sh.dev.id(), c"newLibraryWithSource:options:error:", s.id() => Id, o.id() => Id, &mut err => *mut Id; Id);
         match Obj::new(lib) {
@@ -760,6 +767,35 @@ pub(crate) enum Res {
     Buf(Obj, u64, u64),
     Tex(Obj),
     Smp(Obj),
+    /// a Bindless table's argument buffer (the resources in it are made resident where it is bound)
+    Table(Arc<TableInner>),
+}
+
+/// a Bindless table's argument buffer (shared memory): per slot 8 bytes (an image's or sampler's MTLResourceID) or 16
+/// (a buffer's GPU address and its size in bytes), as shader::msl declares the elements
+pub(crate) struct TableInner {
+    pub buf: Obj,
+    ptr: usize,
+    stride: usize,
+    pub len: u64,
+    /// MTLResourceUsage of what it holds (0: samplers, nothing to make resident)
+    pub usage: usize,
+    /// per slot what it holds: kept alive, made resident where the table is bound
+    pub keep: SpinLock<Vec<Option<Obj>>>,
+}
+
+impl TableInner {
+    fn write(&self, slot: u32, words: &[u64], keep: Obj) {
+        // SAFETY: slot < the slots of the table (checked by the caller), stride bytes per slot in the buffer's shared
+        // contents; a GPU reading another slot meanwhile reads other bytes.
+        unsafe {
+            let at = (self.ptr + slot as usize * self.stride) as *mut u64;
+            for (k, w) in words.iter().enumerate() {
+                core::ptr::write_volatile(at.add(k), *w);
+            }
+        }
+        self.keep.lock()[slot as usize] = Some(keep);
+    }
 }
 
 pub(crate) struct BgInner {
@@ -849,16 +885,62 @@ impl Device {
         Ok(BindGroup(Arc::new(BgInner { layout: lay.clone(), res })))
     }
 
-    /// (level Voll) a Bindless table: not on Metal yet (AP6g)
-    pub fn create_bindless(&self, _desc: &BindlessDesc) -> Result<Bindless> {
-        Err(GpuError::Unsupported("Bindless tables (level Voll; Metal: AP6g)"))
+    /// (level Voll) a Bindless table: per binding a Metal 3 argument buffer (TableInner), written by the setters
+    pub fn create_bindless(&self, desc: &BindlessDesc) -> Result<Bindless> {
+        let sh = &self.sh;
+        sh.check()?;
+        if !sh.features.bindless {
+            return Err(GpuError::Unsupported("bindless tables (level Voll)"));
+        }
+        let l = &sh.limits;
+        let counts = [desc.textures, desc.samplers, desc.buffers, desc.storage_textures];
+        let maxes = [l.max_bindless_textures, l.max_bindless_samplers, l.max_bindless_buffers, l.max_bindless_storage_textures];
+        if counts.iter().zip(maxes.iter()).any(|(c, m)| c > m) {
+            return Err(GpuError::Invalid("bindless: more slots than Limits::max_bindless_*"));
+        }
+        if counts.iter().all(|&c| c == 0) {
+            return Err(GpuError::Invalid("bindless table without slots"));
+        }
+        const STRIDE: [usize; 4] = [8, 8, 16, 8];
+        const USAGE: [usize; 4] = [1, 0, 3, 3]; // MTLResourceUsageRead / -, Read | Write
+        const KIND: [BindingKind; 4] = [BindingKind::Texture, BindingKind::Sampler, BindingKind::StorageBuffer, BindingKind::StorageTexture];
+        let mut tables: [Option<Arc<TableInner>>; 4] = [None, None, None, None];
+        let mut res = Vec::new();
+        let mut bindings = Vec::new();
+        for i in 0..4 {
+            if counts[i] == 0 {
+                continue;
+            }
+            let len = (counts[i] as usize * STRIDE[i]).max(16);
+            // SAFETY: newBufferWithLength:options: (shared storage) returns a new buffer (+1) or nil; its contents are
+            // len bytes of CPU-visible memory, zeroed here (an empty slot reads as nothing).
+            let (buf, ptr) = unsafe {
+                let b = Obj::new(msg!(sh.dev.id(), c"newBufferWithLength:options:", len => usize, 0usize => usize; Id)).ok_or(GpuError::OutOfMemory)?;
+                let p = msg!(b.id(), c"contents"; *mut u8);
+                core::ptr::write_bytes(p, 0, len);
+                (b, p as usize)
+            };
+            let t = Arc::new(TableInner { buf, ptr, stride: STRIDE[i], len: len as u64, usage: USAGE[i],
+                                          keep: SpinLock::new(alloc::vec![None; counts[i] as usize]) });
+            res.push((i as u32, Res::Table(t.clone())));
+            bindings.push(Binding { binding: i as u32, kind: KIND[i], stages: Stages::ALL });
+            tables[i] = Some(t);
+        }
+        let layout = Arc::new(BglInner { bindings });
+        let group = BindGroup(Arc::new(BgInner { layout: layout.clone(), res }));
+        Ok(Bindless { group, layout: BindGroupLayout(layout), counts, tables, align: l.min_storage_offset_alignment })
     }
 }
 
-/// a large table of textures, samplers and buffers that shaders index (level Voll; not on Metal yet)
+/// a large table of textures, samplers and buffers that shaders index (level Voll): binding 0 sampled textures,
+/// 1 samplers, 2 storage buffers, 3 storage textures, each a Metal 3 argument buffer.  A slot may be changed
+/// while command buffers that use the table are pending, as long as those do not use the slot (as on Vulkan)
 pub struct Bindless {
     group: BindGroup,
     layout: BindGroupLayout,
+    counts: [u32; 4],
+    tables: [Option<Arc<TableInner>>; 4],
+    align: u32,
 }
 
 impl Bindless {
@@ -869,19 +951,56 @@ impl Bindless {
         &self.layout
     }
     pub fn counts(&self) -> [u32; 4] {
-        [0; 4]
+        self.counts
     }
-    pub fn set_texture(&self, _slot: u32, _view: &TextureView) -> Result<()> {
-        Err(GpuError::Unsupported("Bindless tables"))
+
+    fn table(&self, binding: usize, slot: u32) -> Result<&TableInner> {
+        match &self.tables[binding] {
+            Some(t) if slot < self.counts[binding] => Ok(t),
+            _ => Err(GpuError::Invalid("bindless: slot outside the table")),
+        }
     }
-    pub fn set_sampler(&self, _slot: u32, _s: &Sampler) -> Result<()> {
-        Err(GpuError::Unsupported("Bindless tables"))
+
+    pub fn set_texture(&self, slot: u32, view: &TextureView) -> Result<()> {
+        if !view.usage().contains(TextureUsage::SAMPLED) {
+            return Err(GpuError::Invalid("bindless: texture lacks SAMPLED usage"));
+        }
+        let t = self.table(0, slot)?;
+        // SAFETY: gpuResourceID (macOS 13, iOS 16) of a live texture.
+        let id = unsafe { msg!(view.0.h.id(), c"gpuResourceID"; u64) };
+        t.write(slot, &[id], view.0.h.clone());
+        Ok(())
     }
-    pub fn set_buffer(&self, _slot: u32, _buf: &Buffer, _offset: u64, _size: u64) -> Result<()> {
-        Err(GpuError::Unsupported("Bindless tables"))
+
+    pub fn set_sampler(&self, slot: u32, s: &Sampler) -> Result<()> {
+        let t = self.table(1, slot)?;
+        // SAFETY: gpuResourceID of a live sampler made with supportArgumentBuffers (level Voll, create_sampler).
+        let id = unsafe { msg!(s.0.h.id(), c"gpuResourceID"; u64) };
+        t.write(slot, &[id], s.0.h.clone());
+        Ok(())
     }
-    pub fn set_storage_texture(&self, _slot: u32, _view: &TextureView) -> Result<()> {
-        Err(GpuError::Unsupported("Bindless tables"))
+
+    pub fn set_buffer(&self, slot: u32, buf: &Buffer, offset: u64, size: u64) -> Result<()> {
+        let range = if size == 0 { buf.size().saturating_sub(offset) } else { size };
+        if !buf.usage().contains(BufferUsage::STORAGE) || offset % self.align.max(1) as u64 != 0 || range == 0 || offset + range > buf.size() {
+            return Err(GpuError::Invalid("bindless: buffer range or usage"));
+        }
+        let t = self.table(2, slot)?;
+        // SAFETY: gpuAddress (macOS 13, iOS 16) of a live buffer.
+        let addr = unsafe { msg!(buf.0.h.id(), c"gpuAddress"; u64) };
+        t.write(slot, &[addr + offset, range.min(u32::MAX as u64)], buf.0.h.clone());
+        Ok(())
+    }
+
+    pub fn set_storage_texture(&self, slot: u32, view: &TextureView) -> Result<()> {
+        if !view.usage().contains(TextureUsage::STORAGE) {
+            return Err(GpuError::Invalid("bindless: texture lacks STORAGE usage"));
+        }
+        let t = self.table(3, slot)?;
+        // SAFETY: gpuResourceID of a live texture.
+        let id = unsafe { msg!(view.0.h.id(), c"gpuResourceID"; u64) };
+        t.write(slot, &[id], view.0.h.clone());
+        Ok(())
     }
 }
 
@@ -920,7 +1039,7 @@ fn check_slots(info: &StageInfo, layout: &PipelineLayout) -> Result<()> {
         let Some(b) = g.0.bindings.iter().find(|b| b.binding == s.binding) else {
             return Err(GpuError::Invalid("the shader uses a binding the bind group layout lacks"));
         };
-        let fits = match s.kind {
+        let fits = s.table || match s.kind {
             SlotKind::Buffer => matches!(b.kind, BindingKind::UniformBuffer | BindingKind::StorageBuffer | BindingKind::StorageBufferRead),
             SlotKind::Texture => matches!(b.kind, BindingKind::Texture | BindingKind::StorageTexture),
             SlotKind::Sampler => b.kind == BindingKind::Sampler,

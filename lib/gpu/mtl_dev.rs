@@ -271,13 +271,16 @@ fn probe(inst: &Arc<InstShared>, dev: Obj) -> Adapter {
     };
     let apple7 = supports(d, family::APPLE7);
     let voll = metal3 && (apple7 || mac2) && missing.is_none() && voll_ready();
+    // SAFETY: a property of the live device (macOS 10.14, iOS 12).
+    let samplers_max = unsafe { msg!(d, c"maxArgumentBufferSamplerCount"; usize) }.min(u32::MAX as usize) as u32;
     let features = Features {
         timestamps: false,
         multi_draw_indirect: voll,
         draw_indirect_first_instance: true,
         // (a compute pass in a suspended render pass, mtl_cmd.rs draw_indexed_indirect_count)
         draw_indirect_count: voll,
-        bindless: false,
+        // (Metal 3 argument buffers holding resource ids, mtl_res.rs Bindless)
+        bindless: voll,
         subgroups: false,
         subgroups_webgpu: apple || mac2,
         subgroup_stages: subgroup_stage::COMPUTE | subgroup_stage::FRAGMENT,
@@ -337,10 +340,11 @@ fn probe(inst: &Arc<InstShared>, dev: Obj) -> Adapter {
         subgroup_size: 32,
         subgroup_min_size: 32,
         subgroup_max_size: 32,
-        max_bindless_textures: 0,
-        max_bindless_samplers: 0,
-        max_bindless_buffers: 0,
-        max_bindless_storage_textures: 0,
+        // (argument buffers of tier 2: 500 000 resources, samplers as the device says)
+        max_bindless_textures: if voll { 500_000 } else { 0 },
+        max_bindless_samplers: if voll { samplers_max } else { 0 },
+        max_bindless_buffers: if voll { 500_000 } else { 0 },
+        max_bindless_storage_textures: if voll { 500_000 } else { 0 },
         device_memory: working,
     };
     Adapter { inst: inst.clone(), dev, info, features, limits, voll }
