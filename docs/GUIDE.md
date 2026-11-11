@@ -800,6 +800,33 @@ if self.tab == 0 {
 
   Scripts hold keys with `keydown CHORD [scan N] [left|right|numpad]` and let them go with
   `keyup CHORD ...` (`viewtest` `tests/keyraw.uis`).
+
+  **An input method for a field the page draws itself** (a web page's `<input>`, Japanese or
+  Chinese typed into it): while such a field has the focus, `ui.ime_enable(true, IP_TEXT)`
+  (also `IP_URL`, `IP_EMAIL`, `IP_NUMBER`, `IP_PHONE`, `IP_SEARCH`; `IP_PASSWORD` takes the
+  input method away on Windows and tells Wayland) and every frame `ui.ime_pos(x, y, h)` at the
+  field's caret (px of the window: the candidates follow it); `ui.ime_enable(false, 0)` when it
+  loses the focus. The composition is the app's to draw at the caret, underlined:
+  `ui.ime_preedit()` gives its text and caret (a byte offset; empty when none is going on), a
+  change gives a pass. Windows hides the input method's own composition window then (its
+  candidate list stays); IBus and Wayland's text input have none. The committed text comes
+  through `text_take` as typed text does. The library's code and rich-text editors draw the
+  composition inline too; its text boxes leave it to the input method's window.
+
+  ```rust
+  let want = self.page.focus_editable() && inp.ev & EV_FOCUS != 0;
+  if want != self.ime_on { self.ime_on = want; ui.ime_enable(want, IP_TEXT); }
+  if want {
+      let c = self.page.caret_rect();                     // px of the window
+      ui.ime_pos(c[0], c[1], c[3]);
+      self.page.set_composition(&ui.ime_preedit());       // drawn by the page at its caret
+      let typed = ui.text_take(256);                      // commits and typed text
+      self.page.insert_text(&typed);
+  }
+  ```
+
+  Scripts compose with `preedit "text" [CURSOR]` and commit with `commit "text"`
+  (`viewtest` `tests/ime.uis`).
 * Zoom and pan without a re-raster: right after the canvas's command, `ui.canvas_gpu(CanvasDesc {
   id, name, rect, view, ver, content, gpu, exact_pan })` says what it shows. `content` is an
   `Rc<dyn CanvasContent>` whose `draw_view(g, view, rect)` draws the content through any
@@ -1880,6 +1907,7 @@ in DIP):
 | `keys [N] CHORD...` | the chords N times over, queued for ONE pass of the window with the keyboard (more keys than frames, as a tool window hands them on) |
 | `type "text"` | typed text (`"\n"` presses Enter) |
 | `commit "text" [N]` | an input method commits the text (N times over: one long commit, as the platform queues it) |
+| `preedit "text" [CURSOR]` | an input method's composition (`ui.ime_preedit`; CURSOR a byte offset, default the end; `""` ends it) |
 | `focus S` | keyboard focus to a widget (focus ring shown) |
 | `cmd ID [ARG]` | run a command as if a menu row was chosen |
 | `wait MS` | advance the virtual clock (16 ms frames) |

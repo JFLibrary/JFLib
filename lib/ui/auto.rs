@@ -39,6 +39,8 @@
 //                   modifier key -- shift, ctrl, alt -- is held for the following events; once
 //                   more while down: an auto-repeat); keyup CHORD [scan N] [left|right|numpad]
 //                   lets it go; scan N and the location reach ui.key_event_take
+//   preedit "text" [CURSOR]   (E4) an input method's composition (ui.ime_preedit; CURSOR a byte
+//                   offset, default the end; "" ends it); commit "text" commits
 //                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
 //   keys [N] CHORD...   the chords N times over, queued for ONE pass of the window with the
 //                   keyboard (more keys than frames: what a tool window hands on); `key` gives
@@ -715,9 +717,9 @@ impl Ui {
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 56] = [
+        const CMDS: [&str; 57] = [
             "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
-            "key", "keys", "keydown", "keyup", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
+            "key", "keys", "keydown", "keyup", "type", "commit", "preedit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
             "style", "sensor", "location", "tap", "longpress", "swipe", "flick", "finger", "pinch", "pan2", "gpu",
@@ -856,6 +858,7 @@ impl Ui {
             "keys" => self.sc_keys(app, a),
             "type" => self.sc_type(app, a),
             "commit" => self.sc_commit(app, a),
+            "preedit" => self.sc_preedit(app, a),
             "cmd" => {
                 let (id, r) = parse_int(a);
                 let (arg, _) = parse_int(r);
@@ -1856,6 +1859,21 @@ impl Ui {
             at += n;
             self.process_events(app);
         }
+    }
+
+    // (E4) preedit "text" [CURSOR]: an input method's composition in the window with the keyboard
+    // (plat::ime_preedit_set; the caret a byte offset, default its end; "" ends it)
+    fn sc_preedit(&mut self, app: &mut dyn App, a: &[u8]) {
+        let Some((s, r)) = parse_qstring(a, 1024) else {
+            self.fail(b"expected a quoted string");
+            return;
+        };
+        let text = String::from_utf8_lossy(&s).into_owned();
+        let r = skip_ws(r);
+        let cursor = if r.first().is_some_and(|c| c.is_ascii_digit()) { parse_int(r).0.max(0) as usize } else { text.len() };
+        let w = (self.m.win.active & (WIN_MAX as u32 - 1)) as u8;
+        plat::ime_preedit_set(w, &text, cursor);
+        self.process_events(app);
     }
 
     // type "text"

@@ -1293,6 +1293,7 @@ impl Ui {
                 self.draw_color(theme.caret);
                 self.draw_rect(cx_px, cy_px, self.dp(2).max(1), m.lh);
             }
+            plat::ime_inline(true); // (E4) the editor draws the composition itself
             self.ime_pos(cx_px, cy_px, m.lh);
         }
         if copy {

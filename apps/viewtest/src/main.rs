@@ -15,6 +15,10 @@
 //   "Rohe Tasten"        (E2) the page takes the keys as they go down and up (ui.key_event_take):
 //                        "Roh:" lists them (+ down, - up, C- S- A- held modifiers, * repeat, :L :R :N
 //                        location, #scancode)
+//   "Eingabefeld"        (E4) the page has an editable field of its own: ui.ime_enable while it
+//                        has the focus, ui.ime_pos at its caret, the composition from
+//                        ui.ime_preedit drawn by the page ("IME:"), the committed text from
+//                        text_take ("Feld:")
 //   "Zeiger wechseln"    (E3) the page's cursor through ui.cursor_next: not-allowed, grab,
 //                        zoom-in, the north-east corner, a custom cursor of the page's own;
 //                        "Eigener größer" redraws it (ui.cursor_replace), "Eigener frei" frees it
@@ -48,6 +52,7 @@ const ID_CURSOR: u32 = 108; // "Zeiger wechseln"
 const ID_CBIG: u32 = 109; // "Eigener größer"
 const ID_CFREE: u32 = 110; // "Eigener frei"
 const ID_RAW: u32 = 111; // "Rohe Tasten"
+const ID_IME: u32 = 112; // "Eingabefeld"
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 
 const CMD_NEW_TAB: u32 = 1;
@@ -67,7 +72,7 @@ const DESC: AppDesc = AppDesc {
     title: "Ansichtstest",
     flags: AF_RESIZABLE,
     w: 560,
-    h: 720,
+    h: 760,
     min_w: 400,
     min_h: 360,
     cmds: &CMDS,
@@ -107,6 +112,10 @@ struct ViewTest {
     /// (E2) "Rohe Tasten": the page takes KeyEvents; what it took
     raw: i32,
     raw_keys: Vec<String>,
+    /// (E4) "Eingabefeld": the page's own field; whether the input method is on for it, its text
+    ime: i32,
+    ime_on: bool,
+    field: String,
 }
 
 // (E3) the cursors "Zeiger wechseln" walks through (0: the page's arrow / hand)
@@ -145,6 +154,9 @@ impl Default for ViewTest {
             custom: 0,
             raw: 0,
             raw_keys: Vec::new(),
+            ime: 0,
+            ime_on: false,
+            field: String::new(),
         }
     }
 }
@@ -220,6 +232,22 @@ impl ViewTest {
         if now != hover {
             self.hover = now;
             ui.repass();
+        }
+        // (E4) the page's own field: the input method while it has the focus, at its caret
+        let want = self.ime != 0 && inp.ev & EV_FOCUS != 0;
+        if want != self.ime_on {
+            self.ime_on = want;
+            ui.ime_enable(want, IP_TEXT);
+        }
+        if want {
+            let caret = [r[0] + ui.dp(16), r[1] + ui.dp(96), ui.dp(18)];
+            ui.ime_pos(caret[0], caret[1], caret[2]);
+            for c in ui.text_take(256) {
+                if let Some(ch) = char::from_u32(c) {
+                    self.field.push(ch);
+                    ui.repass();
+                }
+            }
         }
         // (E2) the keys as they went down and up
         if self.sink != 0 && self.raw != 0 && inp.ev & EV_FOCUS != 0 {
@@ -305,6 +333,7 @@ impl App for ViewTest {
         ui.box_begin(0, BOX_H, 16);
         ui.checkbox(ID_SINK, "Tastensenke", &mut self.sink);
         ui.checkbox(ID_RAW, "Rohe Tasten", &mut self.raw);
+        ui.checkbox(ID_IME, "Eingabefeld", &mut self.ime);
         ui.box_end();
         ui.text(TS_BODY, &format!("Tasten: {}", self.keys.join(" ")));
         ui.text(TS_BODY, &format!("Befehle: Tab {} Laden {}", self.new_tab, self.reload));
@@ -315,6 +344,10 @@ impl App for ViewTest {
         self.page(ui);
         self.plain(ui);
         ui.text(TS_BODY, &format!("Roh: {}", self.raw_keys.join(" ")));
+        // (E4) what the page's field shows: its text and the composition at its caret
+        let pe = ui.ime_preedit();
+        let pre = if pe.text.is_empty() { String::from("-") } else { format!("{} {}", pe.text, pe.cursor) };
+        ui.text(TS_BODY, &format!("Feld: {} IME: {}", self.field, pre));
         ui.text(TS_BODY, &format!("Menü: Kopieren {} Eintrag {}", self.copy, self.rows));
         ui.text(TS_BODY, &format!("Geklickt: {}", self.clicked));
         if ui.button(ID_TREE, "Baum prüfen") & EV_ACT != 0 {
