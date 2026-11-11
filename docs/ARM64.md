@@ -517,7 +517,7 @@ Kopie von `plugins/` (Stand `abc3551`) liegt in den Übergabenotizen von ARM4, m
 - `plugin/lib.rs`: `trap()` mit `udf #0`; `plugin/mem.rs`: die x86-Blöcke unter `target_arch = "x86_64"`, dazu der ARM64-Block
   aus `modules/modrt/mem.rs`.
 - `crash`: das Schreiben nach 0 als `str`; `crashpf`: auf Linux ARM64 `tgkill(getpid, gettid, SIGFPE)` statt `div`, auf Windows
-  ARM64 `brk #0xF003`.
+  ARM64 `brk #0xF003` (falsch, siehe ARM5: `brk #0xF004`; `#0xF003` ist `__fastfail` und beendet den Prozess).
 - `.cargo/config.toml`: `[target.aarch64-unknown-linux-gnu]` wie x86-64, dazu `-z max-page-size=65536` und
   `-C target-feature=-outline-atomics`; `[target.aarch64-pc-windows-msvc]` wie x86-64. `tools/plugins.py` braucht die Ziele.
 - Der Host (`src/integrations/plugins/native.rs`): die PNAPI-Funktionen über das Makro (`rt::plugin_abi!` aus jflib, sobald eine
@@ -533,7 +533,7 @@ für das Trampolin, `FlushInstructionCache` im PE-Loader; siehe dort), ein Kerne
   (`win_crash.rs`, `win_lib.rs`).
 - `CONTEXT` und `RtlVirtualUnwind` in `win_crash.rs`, Guard-Trampolin mit Unwind-Daten. Das Trampolin für ARM64 steht seit
   ARM3 in `plib.rs` (`target_arch = "aarch64"`, ohne Betriebssystem-Teile); es braucht unter Windows `.pdata`/`.xdata`.
-  `jfgui_gt_code` gibt es nur für Linux: Windows bekommt für die Division durch null `brk #0xF003`
+  `jfgui_gt_code` gibt es nur für Linux: Windows bekommt für die Division durch null `brk #0xF004` (hier stand `#0xF003`)
   (`STATUS_INTEGER_DIVIDE_BY_ZERO`), die Offsets in `t_guard.rs` (`+40`) gelten dann nur für Linux.
 - PE-Loader: Machine `0xAA64`, `FlushInstructionCache`.
 - `native_link_args`: Das Ziel braucht keine eigene Angabe, `lld-link` nimmt die Maschine aus den Objekten
@@ -559,9 +559,10 @@ dem Modul `jxlenc` linken für Windows ARM64.
   `.pdata`/`.xdata`, `llvm-readobj --unwind` zeigt sie im fertigen `plattest.exe`. Damit steigt `RtlVirtualUnwind` durch das
   Trampolin in den Host, etwa bei einem Fehler in einem Plugin außerhalb eines Guards.
 - **Testcode** `jfgui_gt_code` für Windows: `udf` ergibt `STATUS_ILLEGAL_INSTRUCTION`, `brk #0xF000` `STATUS_BREAKPOINT`, die
-  Division durch null prüft wie MSVC den Teiler und springt auf `brk #0xF003` (`STATUS_INTEGER_DIVIDE_BY_ZERO`, bei +20). Linux
+  Division durch null prüft wie MSVC den Teiler und springt auf `brk #0xF004` (`STATUS_INTEGER_DIVIDE_BY_ZERO`, bei +20). Linux
   und Windows teilen sich den Code bis auf diese beiden Fälle (Makro `gt_code_aarch64!`); `t_guard.rs` erwartet +20 auf
-  Windows ARM64 und +40 auf Linux ARM64.
+  Windows ARM64 und +40 auf Linux ARM64. Der Plan nannte `brk #0xF003`: Das ist `__fastfail`, der erste Lauf auf
+  `windows-11-arm` endete dort mit `0xC0000409` (`STATUS_STACK_BUFFER_OVERRUN`), ohne dass ein Handler lief.
 - **Crash-Berichte** (`win_crash.rs`): `CrashInfo::regs` hat `x0` bis `x15` und `pc` wie auf Linux, die Aufrufkette kommt aus
   `.pdata`/`.xdata` über `RtlLookupFunctionEntry` und `RtlVirtualUnwind`. Wie auf x64 wird jeder Schritt vorher geprüft:
   `unwind_reads_ok` will jede Stelle, die die Codes lesen, im Stack des Threads sehen, bei gepackten Daten bis zur
@@ -586,7 +587,13 @@ dem Modul `jxlenc` linken für Windows ARM64.
   `.github/workflows/arm64-windows.yml` baut auf `windows-latest` und prüft auf `windows-11-arm`, per Hand oder nach einem Push
   auf einen Zweig `arm64-test/…` (`workflow_dispatch` braucht die Datei auf `main`).
 
-Ergebnis auf `windows-11-arm`: steht aus.
+Ergebnis auf `windows-11-arm` (Cobalt 100, Python für ARM64), erster Lauf (`38640a75`): 52 von 54 Prüfungen grün. Alle
+Importe sind da, `plattest --test crash`, `guardcrash` und `panic` enden im Crash-Handler mit Exit 3 und allen Prüfungen (darunter
+`access` = Schreiben, `x0` = 16, `pc` an der Schreibstelle, `crash_test_caller` + 4 in der Aufrufkette), `jxlenc` gibt dieselben
+Dateien wie der gelinkte Writer, Panik und Fehler im Modul enden mit Bericht („crash … in jxlenc.dll at offset …“), das x64-Modul
+ergibt `LIBE_ARCH`; `coretest` grün, `gallery/basic.uis` grün und richtig gezeichnet (`gal_script.png`), von `plattest` 40 von 42
+Skripten. Rot: `screen.uis` wie bei ARM0 (die Windows-Einrichtung liegt über dem Bildschirm, `desktop.png`) und `guard.uis`, das
+nach `int3` an `brk #0xF003` endete (siehe oben, jetzt `#0xF004`). Zweiter Lauf: steht aus.
 
 Hier geprüft: `build_rs.py test coretest` und `test plattest` für Windows und Linux auf x86-64 (84 von 84 Skripten), `test
 coretest --target linux --arch aarch64` unter `qemu-aarch64`; `cargo check -p jflib` mit und ohne `std` für Windows, Linux,
@@ -731,7 +738,8 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
   Modul darf aber nichts importieren und keinen Code beim Laden haben: `getauxval` fehlt beim Linken, sonst lehnt der Loader
   `DT_INIT_ARRAY` ab. Sie bauen mit `-C target-feature=-outline-atomics` (LL/SC inline, läuft auf jedem ARMv8.0).
 - **Division durch null:** Die ganzzahlige Division von ARM64 hat keinen Trap. Tests, die `GK_ARITH` erwarten, schicken sich
-  unter Linux `SIGFPE` mit `tgkill`; unter Windows erzeugt `brk #0xF003` `STATUS_INTEGER_DIVIDE_BY_ZERO` (so macht es MSVC).
+  unter Linux `SIGFPE` mit `tgkill`; unter Windows erzeugt `brk #0xF004` `STATUS_INTEGER_DIVIDE_BY_ZERO` (so macht es MSVC).
+  `brk #0xF003` ist dort `__fastfail`: `STATUS_STACK_BUFFER_OVERRUN`, der Prozess endet sofort, kein VEH sieht es (ARM5).
 
 ## Testen
 
