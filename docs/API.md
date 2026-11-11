@@ -165,7 +165,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
-- [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
+- [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_preedit`, `ime_enable`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
 - [Data views: grid, tree, badges, meters](#data-views-grid-tree-badges-meters): `grid_begin`, `grid_row`, `grid_cell`, `grid_text`, `grid_text_ts`, `grid_end`, `tree`, `badge`, `status_dot`, `meter`
@@ -190,6 +190,8 @@ hclip_text_* / open_folder / open_url (ui-edit).
 Source: [`lib/ui/lib.rs`](../lib/ui/lib.rs)
 
 Re-exports: `img_svg::Svg`
+
+Re-exports: `plat::{Preedit, IP_EMAIL, IP_NUMBER, IP_PASSWORD, IP_PHONE, IP_SEARCH, IP_TEXT, IP_URL}`
 
 Re-exports: `rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH}`
 
@@ -1246,6 +1248,18 @@ same; an owner that is never drawn again keeps its old value.
   Uses zero text insets and the supplied font, line metrics and colors. The supplied
   presentation applies only to this call; ordinary textboxes keep their default style.
   `TB_MULTI` is implicit; other capacity and textbox flags retain their usual meaning.
+- **`fn ime_preedit(&self) -> plat::Preedit`**
+  (E4) the input method's composition in the live window (Preedit: its text and the caret
+  as a byte offset in it), empty when none is going on: a canvas that draws an editable
+  field of its own (ime_enable) draws it at its caret, underlined; the committed text comes
+  through text_take
+- **`fn ime_enable(&mut self, on: bool, purpose: u32)`**
+  (E4) an editable field the app draws itself (a web page's input in a canvas) got the focus
+  (on, its purpose IP_\*: IP_TEXT, IP_URL, IP_EMAIL, IP_NUMBER, IP_PHONE, IP_PASSWORD,
+  IP_SEARCH) or lost it (off): with it the input method comes while the app tells its caret
+  every frame (ime_pos), and the app draws the composition itself (ime_preedit: Windows
+  hides the method's composition window, its candidates stay at the caret); IP_PASSWORD
+  takes the input method away (Windows) or says so (Wayland).  Off: the method goes
 - **`fn ime_pos(&mut self, x: i32, y: i32, h: i32)`**
 - **`fn clip_set_many(&mut self, entries: &[(u32, &[u8])]) -> i32`**
   Publish distinct TEXT/HTML/RTF/DOCX representations of one selection (64 MiB total).
@@ -4139,6 +4153,8 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                   modifier key -- shift, ctrl, alt -- is held for the following events; once
                   more while down: an auto-repeat); keyup CHORD [scan N] [left|right|numpad]
                   lets it go; scan N and the location reach ui.key_event_take
+  preedit "text" [CURSOR]   (E4) an input method's composition (ui.ime_preedit; CURSOR a byte
+                  offset, default the end; "" ends it); commit "text" commits
                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
   keys [N] CHORD...   the chords N times over, queued for ONE pass of the window with the
                   keyboard (more keys than frames: what a tool window hands on); `key` gives
@@ -33788,6 +33804,38 @@ Source: [`lib/plat/ime.rs`](../lib/plat/ime.rs)
   Committed text of any length: commits of at most 4096 bytes, split between characters ->
   the bytes queued (fewer: the commit queue or the event ring is full, the rest can follow
   once the app took these).
+
+*(E4) what the text being typed is (ime_purpose): the input method and an on-screen*
+
+```rust
+// keyboard choose their mode by it
+IP_TEXT: u32 = 0
+IP_URL: u32 = 1
+IP_EMAIL: u32 = 2
+IP_NUMBER: u32 = 3
+IP_PHONE: u32 = 4
+/// no input method (Windows: the window's input context is taken away; Wayland: the password
+/// purpose)
+IP_PASSWORD: u32 = 5
+IP_SEARCH: u32 = 6
+```
+
+- **`fn ime_inline(on: bool)`**
+  (E4) the app draws the composition (ime_preedit) at its caret itself: Windows hides the
+  input method's own composition window (its candidates stay; WM_IME_SETCONTEXT without
+  ISC_SHOWUICOMPOSITIONWINDOW, sent again to the window with the keyboard on a change).  IBus
+  and Wayland's text input have no window of their own for it: nothing changes there
+
+- **`fn ime_inline_on() -> bool`**
+  (E4) ime_inline's state
+
+- **`fn ime_purpose(p: u32)`**
+  (E4) the purpose of the text being typed (IP_\*): Windows takes the input method away for
+  IP_PASSWORD and gives it back for the others; Wayland's text input gets it as its content
+  purpose at the next enable; elsewhere it is only kept (ime_purpose_of)
+
+- **`fn ime_purpose_of() -> u32`**
+  (E4) ime_purpose's value
 
 - **`fn ime_commit_take(token:u32) -> Option<String>`**
 

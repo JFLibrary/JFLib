@@ -696,6 +696,7 @@ impl Ui {
                 self.draw_color(c);
                 self.draw_rect(x, top, hair, lh);
             }
+            plat::ime_inline(false); // (E4) the input method's window shows the composition
             self.ime_pos(x, top, lh);
         }
         self.ltr_end();
@@ -978,6 +979,7 @@ impl Ui {
                 self.draw_color(c);
                 self.draw_rect(x, ly, hair, lh);
             }
+            plat::ime_inline(false); // (E4) the input method's window shows the composition
             self.ime_pos(x, ly, lh);
         }
         if copy {
@@ -1255,6 +1257,28 @@ impl Ui {
         let phase = t / blink;
         self.timer(UIT_CARET, blink - t % blink);
         phase & 1 == 0
+    }
+
+    /// (E4) the input method's composition in the live window (Preedit: its text and the caret
+    /// as a byte offset in it), empty when none is going on: a canvas that draws an editable
+    /// field of its own (ime_enable) draws it at its caret, underlined; the committed text comes
+    /// through text_take
+    pub fn ime_preedit(&self) -> plat::Preedit {
+        self.ed_preedit()
+    }
+
+    /// (E4) an editable field the app draws itself (a web page's input in a canvas) got the focus
+    /// (on, its purpose IP_*: IP_TEXT, IP_URL, IP_EMAIL, IP_NUMBER, IP_PHONE, IP_PASSWORD,
+    /// IP_SEARCH) or lost it (off): with it the input method comes while the app tells its caret
+    /// every frame (ime_pos), and the app draws the composition itself (ime_preedit: Windows
+    /// hides the method's composition window, its candidates stay at the caret); IP_PASSWORD
+    /// takes the input method away (Windows) or says so (Wayland).  Off: the method goes
+    pub fn ime_enable(&mut self, on: bool, purpose: u32) {
+        plat::ime_purpose(if on { purpose } else { plat::IP_TEXT });
+        plat::ime_inline(on);
+        if !on {
+            self.ime_pos(0, 0, 0);
+        }
     }
 
     // ime_pos(x, y, h): IME windows follow the caret (Windows, window mode only); so do screen

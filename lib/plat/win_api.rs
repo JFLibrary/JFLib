@@ -1316,6 +1316,12 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             clip::ime_composition(hwnd,s.ev_win.get() as u8,lp as u32); def()
         }
         0x010E => { crate::ime_preedit_set(s.ev_win.get() as u8,"",0); def() } // WM_IME_ENDCOMPOSITION
+        0x0281 => {
+            // WM_IME_SETCONTEXT: (E4) no composition window while the app draws it (ime_inline)
+            let lp = clip::ime_setcontext_flags(wp != 0, lp);
+            // SAFETY: our window, the message with its (adjusted) flags.
+            unsafe { DefWindowProcW(hwnd, msg, wp, lp) }
+        }
         WM_CHAR => {
             let mut c = wp as u16 as u32;
             match c & 0xFC00 {
