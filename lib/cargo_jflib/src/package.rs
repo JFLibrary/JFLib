@@ -29,7 +29,7 @@ use crate::sign::Signing;
 
 pub(crate) const WIN: &str = "x86_64-pc-windows-msvc";
 pub(crate) const LINUX: &str = "x86_64-unknown-linux-gnu";
-const STYLES: [&str; 4] = ["winui", "classic", "kde", "macos"];
+const STYLES: [&str; 5] = ["winui", "classic", "kde", "macos", "netlab"];
 const PREVIEW: &str = "1100x700";
 const THUMB: (usize, usize) = (480, 305);
 /// the formats and the system each one packages

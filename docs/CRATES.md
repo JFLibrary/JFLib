@@ -36,7 +36,7 @@ Runtime, ein Betrieb mit `std`“; das war nie die Entscheidung des Nutzers, sie
 | Namen | Präfix `jflib-`, im Code weiter `rt::`, `ui::` über `[lib] name` |
 | Ordner | kein `crates/`, `lib/` und `styles/` bleiben |
 | Inhalt | alles aus `lib/` außer `script` und `plugin`; `modrt` und `modplat` als eigene Crates |
-| Stile | `winui`, `classic`, `kde`, `macos`; `jfoffice`, `backupcraft` und `netlab` bleiben draußen |
+| Stile | `winui`, `classic`, `kde`, `macos`, `netlab` (seit 2026-11-10, Entscheidung des Nutzers: „der wichtigste Style“; die Fassade zeigt ihn ab dem nächsten Release); `jfoffice` und `backupcraft` bleiben draußen |
 | JFScript | seit 2026-11-09 eigene Repo [JFLibrary/JFScript](https://github.com/JFLibrary/JFScript), Crate `jfscript`, nicht auf crates.io (Git-Abhängigkeit) |
 | Apps | bleiben bis zum Crate-Release im Repo, immer mit `publish = false` |
 | Version | eine für alle Crates, sie steht in der `Cargo.toml` im Wurzelordner; untereinander exakt (`=0.1.0`), weil nur der Weg über `jflib` versprochen ist |
@@ -571,6 +571,13 @@ Braucht eine eigene Zusage. Namen und Versionen lassen sich danach nur noch zur�
    `coretest` (jetzt JFScripts `scripttest`), `tools/academy_index.py`, `academy_e2e.py`, `script_math_check.py`.
    `editortest` nimmt JFScript aus seiner Repo (der Workspace lenkt dessen `jflib-agent-core` auf sich selbst um),
    `symboltest` hat eine Kopie der Symboltabelle von JFNetworker.
+   **`netlab` auf crates.io (2026-11-10, auf Wunsch des Nutzers):** `jflib-style-netlab` 0.1.0 ist einzeln hochgeladen,
+   ohne auf das nächste Release zu warten. Hochgeladen wurde der Stand von `v0.1.0` (Tag `jflib-style-netlab-v0.1.0`),
+   denn `main` implementiert schon `scrollbar_room`, das `ui 0.1.0` nicht kennt. Ein Paket darf nicht aus seinem Ordner
+   greifen: Die Inter-Schriften und `icons.bin` liegen als Kopien in `styles/netlab/assets/`, dazu `LICENSE-icons.txt`.
+   JFNetworker baut damit ohne `[patch.crates-io]`. Die Fassade von 0.1.0 kennt ihn nicht (eine veröffentlichte Version
+   bleibt, wie sie ist); seit 2026-11-10 ist er auf `main` ein offizieller Stil wie die anderen vier: `jflib::style_netlab`,
+   `JFLIB_STYLE=netlab`, `cargo jflib package --styles netlab`. Das nächste Release bringt das mit.
 2. `cargo publish --workspace --dry-run`, dann in Abhängigkeitsreihenfolge hochladen. Vorher die aktuellen Limits von
    crates.io für neue Crates prüfen, bei 57 Stück kann das dauern. Stand 2026-11-08: `cargo publish --workspace
    --dry-run` baut und packt alle 60 Crates in ihrer Reihenfolge (Exit 0, ohne Warnungen); `cargo publish` in einem

@@ -3,7 +3,7 @@
 // The guide for the docs (jflib::guide): docs/GUIDE.md of the package, or of the repository.
 use std::path::Path;
 
-const STYLES: [&str; 4] = ["winui", "classic", "kde", "macos"];
+const STYLES: [&str; 5] = ["winui", "classic", "kde", "macos", "netlab"];
 const REPO: &str = "https://github.com/JFLibrary/JFLib/blob/main/";
 
 fn main() {

@@ -1,0 +1,2 @@
+#!args --bench 20000 --scene cad --res 320x180 --frames 4
+# the town plan (cad.rs) on both levels, small: it runs, its numbers are printed (not judged)

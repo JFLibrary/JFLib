@@ -555,6 +555,7 @@ dependencies = [
  "jflib-style-classic",
  "jflib-style-kde",
  "jflib-style-macos",
+ "jflib-style-netlab",
  "jflib-style-winui",
  "jflib-text",
  "jflib-text-shape",

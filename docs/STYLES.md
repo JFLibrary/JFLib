@@ -299,7 +299,7 @@ Each style embeds its own SGF1 fonts from `styles/NAME/assets/` (format and rend
 | `kde` | DejaVu Sans regular / bold (licence copied to `assets/DejaVu-LICENSE.txt`) | winui's `icons.bin` (licence copied to `assets/`) |
 | `jfoffice` | Inter regular / medium / semibold (TrueType) | own basic icons (`icons.bin`) |
 | `backupcraft` | jfOffice's Inter files (licence copied to `assets/OFL-Inter.txt`) | own vector icons (`icons.rs`, made by `mkicons.py`) through `paint_icon`; the rest from jfOffice's `icons.bin` |
-| `netlab` | jfOffice's Inter files (licence copied to `assets/OFL-Inter.txt`) | own vector icons (`icons.rs`, made by `mkicons.py`) through `paint_icon`; the rest from jfOffice's `icons.bin` |
+| `netlab` | copies of jfOffice's Inter files in `assets/` (with `OFL-Inter.txt`; the crate is published, a package may not reach outside its folder) | own vector icons (`icons.rs`, made by `mkicons.py`) through `paint_icon`; the rest from a copy of jfOffice's `icons.bin` (`LICENSE-icons.txt`) |
 
 The fonts and icons several styles share lie in `lib/style_assets` (`style_assets::ICONS`, ...); a
 style may also use another style's file with `include_bytes!("../OTHER/assets/x")`.

@@ -87,6 +87,11 @@ pub mod style_macos {
     pub use ::style_macos::STYLE;
 }
 
+/// NetLab: sober grey surfaces, a clear frame on every control, compact
+pub mod style_netlab {
+    pub use ::style_netlab::STYLE;
+}
+
 // plat has no fs and net on these two targets
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub use cas;
@@ -109,3 +114,5 @@ pub use self::style_classic as style;
 pub use self::style_kde as style;
 #[cfg(jflib_style = "macos")]
 pub use self::style_macos as style;
+#[cfg(jflib_style = "netlab")]
+pub use self::style_netlab as style;
