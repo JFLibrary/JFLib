@@ -42,8 +42,10 @@ use crate::common::{ball, cube, gallery_fill, gallery_specs, plate, quat, Geo, O
 use crate::cpu::{self, RefCamera, RefScene};
 use crate::{out, pixel_becomes, Test};
 
-/// what AF_GPU_3D gets on this platform: Metal has level Basis only so far (docs/APPLE.md, AP6g)
-const TOP_LEVEL: Level = if cfg!(target_vendor = "apple") { Level::Basis } else { Level::Voll };
+/// what AF_GPU_3D gets: the adapter's highest level (Voll on a GPU that has it; Basis e.g. in the iOS simulator)
+fn top_level() -> Level {
+    gpu::Instance::new().ok().and_then(|i| i.adapter().ok()).map_or(Level::Basis, |a| a.level())
+}
 pub const VIEW_ID: u32 = 800;
 pub const VIEW_ID2: u32 = 801;
 /// the view in the second window
@@ -383,7 +385,7 @@ impl Test {
                     let i = self.view_info(ui, 0, VIEW_ID);
                     out(&format!("  {} ({:?}), view {:?}", o.adapter, i.level, i.size));
                     self.ok(i.device && i.output && i.attaches == 1, &format!("the view on the output's device ({} attach)", i.attaches));
-                    self.ok(i.level == Some(TOP_LEVEL), &format!("AF_GPU_3D: the device at the top level ({:?})", i.level));
+                    self.ok(i.level == Some(top_level()), &format!("AF_GPU_3D: the device at the adapter's top level ({:?})", i.level));
                     self.ok(i.apart && o.view_quads == 1 && i.frames >= 1, &format!("drawn by the output's render pass ({} quad, {} frames)", o.view_quads, i.frames));
                     let c = self.one();
                     self.view_check(ui, &c, r, true, true, "the first frame");
@@ -876,7 +878,7 @@ impl Test {
                     let i = self.view_info(ui, 0, VIEW_ID);
                     out(&format!("  view {:?}, {:?}, {:?}", i.size, i.level, i.error));
                     self.ok(!o.wanted && !o.on && o.frames == 0, "jfgui_GPU_OUTPUT=0: the window on the CPU path");
-                    self.ok(i.device && !i.output && i.level == Some(TOP_LEVEL), &format!("the view on a device of its own ({:?})", i.level));
+                    self.ok(i.device && !i.output && i.level == Some(top_level()), &format!("the view on a device of its own ({:?})", i.level));
                     self.ok(!i.apart && i.frames >= 1 && i.reads >= i.frames, &format!("every frame read back: {} frames, {} read-backs", i.frames, i.reads));
                     let c = self.one();
                     self.view_check(ui, &c, r, false, true, "the CPU path");

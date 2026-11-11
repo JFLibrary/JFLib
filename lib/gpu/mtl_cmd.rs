@@ -10,6 +10,7 @@
 // at SIZES_SLOT).  fill_buffer runs a small kernel of its own (a blit fill takes one byte).
 // The checks are those of the Vulkan backend (vk_cmd.rs); finish() returns the first misuse.
 
+use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use crate::mtl_dev::{Device, Shared};
@@ -29,6 +30,14 @@ struct Pass {
     n: usize,
     depth: Option<Format>,
     size: (u32, u32),
+    // (draw_indexed_indirect_count suspends the pass for a compute pass and resumes it: what that needs)
+    /// the colour views and whether the pass stores them at its end
+    targets: Vec<(Obj, bool)>,
+    /// the depth view, whether it is stored, whether it has stencil
+    depth_target: Option<(Obj, bool, bool)>,
+    viewport: Option<MTLViewport>,
+    scissor: Option<MTLScissorRect>,
+    vertex: [Option<(Id, u64)>; shader::msl::VERTEX_BUFFERS_MAX as usize],
 }
 
 /// records commands; finish() makes a CommandBuffer for Queue::submit
@@ -48,8 +57,16 @@ pub struct CommandEncoder<'a> {
     index: Option<(Id, u64, bool)>,
     /// the fence the last encoder updated when it ended: the next one waits for it
     fence: Option<Obj>,
+    /// the vertex stage's sizes as last set, DRAW_INDEX_AT included (a multi-draw sets it per draw)
+    vsizes: [u32; SIZES_LEN],
     _borrow: PhantomData<&'a ()>,
 }
+
+/// MTLStoreActionUnknown: a render pass's store actions are set when it ends (or is suspended)
+const STORE_UNKNOWN: usize = 4;
+
+/// the sizes buffer: one entry per resource buffer slot, then DrawIndex (shader::msl::DRAW_INDEX_AT)
+const SIZES_LEN: usize = shader::msl::DRAW_INDEX_AT as usize + 1;
 
 /// recorded commands, ready to submit (dropped unsubmitted: discarded)
 pub struct CommandBuffer<'a> {
@@ -80,6 +97,7 @@ impl Device {
             dirty: true,
             index: None,
             fence: None,
+            vsizes: [0; SIZES_LEN],
             _borrow: PhantomData,
         })
     }
@@ -369,7 +387,8 @@ impl<'a> CommandEncoder<'a> {
             1 => (c"setVertexBuffer:offset:atIndex:", c"setVertexTexture:atIndex:", c"setVertexSamplerState:atIndex:", c"setVertexBytes:length:atIndex:"),
             _ => (c"setFragmentBuffer:offset:atIndex:", c"setFragmentTexture:atIndex:", c"setFragmentSamplerState:atIndex:", c"setFragmentBytes:length:atIndex:"),
         };
-        let mut sizes = [0u32; shader::msl::FIRST_VERTEX_SLOT as usize];
+        // (DrawIndex 0: a single draw; a multi-draw sets each draw's own, set_draw_index)
+        let mut sizes = [0u32; SIZES_LEN];
         for s in &info.slots {
             let g = self.groups.get(s.set as usize).copied().flatten();
             let r = g.and_then(|g| g.0.res.iter().find(|r| r.0 == s.binding)).map(|r| r.1.clone());
@@ -396,6 +415,25 @@ impl<'a> CommandEncoder<'a> {
                         let f: unsafe extern "C" fn(Id, objc::Sel, Id, usize) = core::mem::transmute(objc::objc_msgSend as *const ());
                         f(e, objc::sel(smp), sm.id(), s.index as usize);
                     }
+                    (SlotKind::Buffer, Res::Table(tb)) => {
+                        // a Bindless table: its argument buffer, and what it holds made resident for this encoder
+                        let f: unsafe extern "C" fn(Id, objc::Sel, Id, usize, usize) = core::mem::transmute(objc::objc_msgSend as *const ());
+                        f(e, objc::sel(buf), tb.buf.id(), 0, s.index as usize);
+                        if let Some(x) = sizes.get_mut(s.index as usize) {
+                            *x = tb.len.min(u32::MAX as u64) as u32;
+                        }
+                        if tb.usage != 0 {
+                            let ids: Vec<Id> = tb.keep.lock().iter().flatten().map(|o| o.id()).collect();
+                            if !ids.is_empty() {
+                                if stage == 0 {
+                                    msg!(e, c"useResources:count:usage:", ids.as_ptr() => *const Id, ids.len() => usize, tb.usage => usize; ());
+                                } else {
+                                    msg!(e, c"useResources:count:usage:stages:", ids.as_ptr() => *const Id, ids.len() => usize, tb.usage => usize,
+                                         stage as usize => usize; ()); // MTLRenderStageVertex 1, Fragment 2
+                                }
+                            }
+                        }
+                    }
                     _ => {
                         self.ok(false, "a bound resource's kind differs from the shader's")?;
                     }
@@ -415,7 +453,24 @@ impl<'a> CommandEncoder<'a> {
         if info.sizes {
             setb(sizes.as_ptr() as *const u8, core::mem::size_of_val(&sizes), shader::msl::SIZES_SLOT);
         }
+        if stage == 1 {
+            self.vsizes = sizes;
+        }
         Some(())
+    }
+
+    /// (multi-draws) the vertex stage reads DrawIndex: the next draw's index into the sizes buffer
+    fn set_draw_index(&mut self, e: Id, i: u32) {
+        let reads = self.graphics.and_then(|p| p.stages[0].as_ref()).is_some_and(|v| v.draw_index);
+        if !reads || self.vsizes[shader::msl::DRAW_INDEX_AT as usize] == i {
+            return;
+        }
+        self.vsizes[shader::msl::DRAW_INDEX_AT as usize] = i;
+        // SAFETY: the open render encoder; setVertexBytes copies the sizes at once.
+        unsafe {
+            msg!(e, c"setVertexBytes:length:atIndex:", self.vsizes.as_ptr() as *const core::ffi::c_void => *const core::ffi::c_void,
+                 core::mem::size_of_val(&self.vsizes) => usize, shader::msl::SIZES_SLOT as usize => usize; ());
+        }
     }
 
     fn prepare_dispatch(&mut self) -> Option<(Id, [u32; 3])> {
@@ -497,6 +552,29 @@ impl<'a> CommandEncoder<'a> {
             }
         };
         let mut colors = [None; COLOR_TARGETS_MAX];
+        for (i, c) in desc.color.iter().enumerate() {
+            colors[i] = Some(c.view.format());
+        }
+        let targets: Vec<(Obj, bool)> = desc.color.iter().map(|c| (c.view.0.h.clone(), c.store)).collect();
+        let depth_target = desc.depth.map(|d| (d.view.0.h.clone(), d.store, d.view.format().has_stencil()));
+        let color_loads: Vec<(usize, MTLClearColor)> = desc.color.iter()
+            .map(|c| (load(c.load), MTLClearColor { r: c.clear[0] as f64, g: c.clear[1] as f64, b: c.clear[2] as f64, a: c.clear[3] as f64 }))
+            .collect();
+        let depth_load = desc.depth.map(|d| (load(d.load), d.clear as f64, if d.load == Load::Keep { 1usize } else { 2 }));
+        let Some(e) = self.render_encoder(&targets, &depth_target, &color_loads, depth_load) else { return };
+        self.wait_fence(e.id(), Kind::Render);
+        self.enc = Some((e, Kind::Render));
+        self.pass = Some(Pass { colors, n, depth: desc.depth.map(|d| d.view.format()), size: (w, h), targets, depth_target,
+                                viewport: None, scissor: None, vertex: [None; shader::msl::VERTEX_BUFFERS_MAX as usize] });
+        self.graphics = None;
+        self.index = None;
+        self.dirty = true;
+    }
+
+    /// a render encoder on the attachments: color_loads (load action, clear colour) per target, depth_load (load action,
+    /// clear depth, stencil load action); store actions are left open (MTLStoreActionUnknown) for store_actions
+    fn render_encoder(&mut self, targets: &[(Obj, bool)], depth: &Option<(Obj, bool, bool)>, color_loads: &[(usize, MTLClearColor)],
+                      depth_load: Option<(usize, f64, usize)>) -> Option<Obj> {
         let _pool = Pool::new();
         let cb = self.cb();
         // SAFETY: a render pass descriptor (autoreleased, inside the pool) set up with live views;
@@ -504,47 +582,106 @@ impl<'a> CommandEncoder<'a> {
         let e = unsafe {
             let rp: Id = msg!(objc::class(c"MTLRenderPassDescriptor"), c"renderPassDescriptor"; Id);
             let cas: Id = msg!(rp, c"colorAttachments"; Id);
-            for (i, c) in desc.color.iter().enumerate() {
+            for (i, (view, _)) in targets.iter().enumerate() {
                 let ca: Id = msg!(cas, c"objectAtIndexedSubscript:", i => usize; Id);
-                msg!(ca, c"setTexture:", c.view.0.h.id() => Id; ());
-                msg!(ca, c"setLoadAction:", load(c.load) => usize; ());
-                msg!(ca, c"setStoreAction:", if c.store { 1usize } else { 0 } => usize; ());
-                let cc = MTLClearColor { r: c.clear[0] as f64, g: c.clear[1] as f64, b: c.clear[2] as f64, a: c.clear[3] as f64 };
+                msg!(ca, c"setTexture:", view.id() => Id; ());
+                let (l, cc) = color_loads.get(i).copied().unwrap_or((1, MTLClearColor::default()));
+                msg!(ca, c"setLoadAction:", l => usize; ());
+                msg!(ca, c"setStoreAction:", STORE_UNKNOWN => usize; ());
                 msg!(ca, c"setClearColor:", cc => MTLClearColor; ());
-                colors[i] = Some(c.view.format());
             }
-            if let Some(d) = desc.depth {
+            if let Some((view, _, stencil)) = depth {
+                let (l, clear, sl) = depth_load.unwrap_or((1, 1.0, 1));
                 let da: Id = msg!(rp, c"depthAttachment"; Id);
-                msg!(da, c"setTexture:", d.view.0.h.id() => Id; ());
-                msg!(da, c"setLoadAction:", load(d.load) => usize; ());
-                msg!(da, c"setStoreAction:", if d.store { 1usize } else { 0 } => usize; ());
-                msg!(da, c"setClearDepth:", d.clear as f64 => f64; ());
-                if d.view.format().has_stencil() {
+                msg!(da, c"setTexture:", view.id() => Id; ());
+                msg!(da, c"setLoadAction:", l => usize; ());
+                msg!(da, c"setStoreAction:", STORE_UNKNOWN => usize; ());
+                msg!(da, c"setClearDepth:", clear => f64; ());
+                if *stencil {
                     let sa: Id = msg!(rp, c"stencilAttachment"; Id);
-                    msg!(sa, c"setTexture:", d.view.0.h.id() => Id; ());
-                    msg!(sa, c"setLoadAction:", if d.load == Load::Keep { 1usize } else { 2 } => usize; ());
-                    msg!(sa, c"setStoreAction:", if d.store { 1usize } else { 0 } => usize; ());
+                    msg!(sa, c"setTexture:", view.id() => Id; ());
+                    msg!(sa, c"setLoadAction:", sl => usize; ());
+                    msg!(sa, c"setStoreAction:", STORE_UNKNOWN => usize; ());
                 }
             }
             Obj::retained(msg!(cb, c"renderCommandEncoderWithDescriptor:", rp => Id; Id))
         };
-        let Some(e) = e else {
+        if e.is_none() {
             self.err.get_or_insert(GpuError::OutOfMemory);
-            return;
+        }
+        e
+    }
+
+    /// the open render encoder's store actions: the pass's own (end), or all kept (suspended for a compute pass)
+    fn store_actions(&mut self, keep_all: bool) {
+        let e = self.render_enc();
+        let Some(p) = &self.pass else { return };
+        let act = |store: bool| if keep_all || store { 1usize } else { 0 };
+        // SAFETY: the open render encoder, whose store actions were left open (MTLStoreActionUnknown).
+        unsafe {
+            for (i, (_, store)) in p.targets.iter().enumerate() {
+                msg!(e, c"setColorStoreAction:atIndex:", act(*store) => usize, i => usize; ());
+            }
+            if let Some((_, store, stencil)) = &p.depth_target {
+                msg!(e, c"setDepthStoreAction:", act(*store) => usize; ());
+                if *stencil {
+                    msg!(e, c"setStencilStoreAction:", act(*store) => usize; ());
+                }
+            }
+        }
+    }
+
+    /// (draw_indexed_indirect_count) the pass ends with everything stored, to go on after a compute pass
+    fn suspend_render(&mut self) {
+        self.store_actions(true);
+        self.end_encoder();
+    }
+
+    /// the suspended pass goes on: a new render encoder that loads what the last one stored, with the state set again
+    fn resume_render(&mut self) -> Option<Id> {
+        let (targets, depth) = {
+            let p = self.pass.as_ref()?;
+            (p.targets.clone(), p.depth_target.clone())
         };
+        self.end_encoder();
+        let e = self.render_encoder(&targets, &depth, &[], None)?;
         self.wait_fence(e.id(), Kind::Render);
+        let id = e.id();
         self.enc = Some((e, Kind::Render));
-        self.pass = Some(Pass { colors, n, depth: desc.depth.map(|d| d.view.format()), size: (w, h) });
-        self.graphics = None;
-        self.index = None;
+        let p = self.pass.as_ref()?;
+        // SAFETY: the new render encoder; the pipeline's states and the vertex buffers are alive (borrowed for 'a).
+        unsafe {
+            if let Some(g) = self.graphics {
+                msg!(id, c"setRenderPipelineState:", g.state.id() => Id; ());
+                if let Some(ds) = &g.depth_state {
+                    msg!(id, c"setDepthStencilState:", ds.id() => Id; ());
+                }
+                msg!(id, c"setCullMode:", g.cull => usize; ());
+                msg!(id, c"setFrontFacingWinding:", g.winding => usize; ());
+            }
+            if let Some(vp) = p.viewport {
+                msg!(id, c"setViewport:", vp => MTLViewport; ());
+            }
+            if let Some(r) = p.scissor {
+                msg!(id, c"setScissorRect:", r => MTLScissorRect; ());
+            }
+            for (slot, vb) in p.vertex.iter().enumerate() {
+                if let Some((b, off)) = vb {
+                    msg!(id, c"setVertexBuffer:offset:atIndex:", *b => Id, *off as usize => usize, shader::msl::vertex_slot(slot as u32) as usize => usize; ());
+                }
+            }
+        }
         self.dirty = true;
+        Some(id)
     }
 
     pub fn end_render(&mut self) {
-        if self.pass.take().is_none() {
+        if self.pass.is_none() {
             self.ok(false, "end_render without begin_render");
             return;
         }
+        self.store_actions(false);
+        self.pass = None;
         self.end_encoder();
     }
 
@@ -582,6 +719,9 @@ impl<'a> CommandEncoder<'a> {
             return;
         }
         let vp = MTLViewport { x: x as f64, y: y as f64, w: w as f64, h: h as f64, znear: min_depth as f64, zfar: max_depth as f64 };
+        if let Some(p) = &mut self.pass {
+            p.viewport = Some(vp);
+        }
         // SAFETY: the open render encoder.
         unsafe { msg!(self.render_enc(), c"setViewport:", vp => MTLViewport; ()) };
     }
@@ -595,6 +735,9 @@ impl<'a> CommandEncoder<'a> {
         let (x0, y0) = (x.min(tw), y.min(th));
         let (x1, y1) = (x.saturating_add(w).min(tw), y.saturating_add(h).min(th));
         let r = MTLScissorRect { x: x0 as usize, y: y0 as usize, w: (x1 - x0) as usize, h: (y1 - y0) as usize };
+        if let Some(p) = &mut self.pass {
+            p.scissor = Some(r);
+        }
         // SAFETY: the open render encoder.
         unsafe { msg!(self.render_enc(), c"setScissorRect:", r => MTLScissorRect; ()) };
     }
@@ -604,6 +747,9 @@ impl<'a> CommandEncoder<'a> {
             && slot < self.sh.limits.max_vertex_buffers;
         if self.ok(ok, "set_vertex_buffer: outside a pass, VERTEX usage or offset").is_none() {
             return;
+        }
+        if let Some(p) = &mut self.pass {
+            p.vertex[slot as usize] = Some((buf.0.h.id(), offset));
         }
         // SAFETY: the open render encoder; the vertex buffer slots lie above the resources'.
         unsafe {
@@ -701,15 +847,109 @@ impl<'a> CommandEncoder<'a> {
         }
     }
 
-    /// several indexed draws from one buffer (Features::multi_draw_indirect: not at Metal's level Basis)
-    pub fn draw_indexed_indirect_multi(&mut self, _buf: &'a Buffer, _offset: u64, _count: u32, _stride: u32) {
-        self.ok(false, "draw_indexed_indirect_multi: needs multi_draw_indirect, stride >= 20");
+    /// count indexed draws, stride bytes apart (Features::multi_draw_indirect, level Voll): Metal has no
+    /// multi-draw, so a loop of single indirect draws in this encoder; DrawIndex is each one's index
+    pub fn draw_indexed_indirect_multi(&mut self, buf: &'a Buffer, offset: u64, count: u32, stride: u32) {
+        let ok = self.sh.features.multi_draw_indirect && stride >= 20 && stride % 4 == 0 && count > 0
+            && count <= self.sh.limits.max_draw_indirect_count;
+        if self.ok(ok, "draw_indexed_indirect_multi: needs multi_draw_indirect, stride >= 20").is_none()
+            || self.indirect_ok(buf, offset, (count as u64 - 1) * stride as u64 + 20).is_none()
+        {
+            return;
+        }
+        let Some(e) = self.can_draw(true) else { return };
+        let Some((ib, off, wide)) = self.index else { return };
+        for i in 0..count {
+            self.set_draw_index(e, i);
+            // SAFETY: as in draw_indexed_indirect; the range of every draw was checked above.
+            unsafe {
+                msg!(e, c"drawIndexedPrimitives:indexType:indexBuffer:indexBufferOffset:indirectBuffer:indirectBufferOffset:", self.prim() => usize,
+                     wide as usize => usize, ib => Id, off as usize => usize, buf.0.h.id() => Id, (offset + i as u64 * stride as u64) as usize => usize; ());
+            }
+        }
+        self.set_draw_index(e, 0);
     }
 
-    /// (level Voll) not on Metal yet
-    pub fn draw_indexed_indirect_count(&mut self, _buf: &'a Buffer, _offset: u64, _count_buf: &'a Buffer, _count_offset: u64,
-                                       _max_count: u32, _stride: u32) {
-        self.ok(false, "draw_indexed_indirect_count: needs level Voll, stride >= 20");
+    /// up to max_count indexed draws, their number (u32) read from count_buf at count_offset (level Voll:
+    /// Features::draw_indirect_count).  Metal has no such draw: the pass is suspended for a compute pass that copies
+    /// the max_count draws and sets the instances of those at and after the count to 0, then goes on (everything
+    /// stored and loaded again, the state set again) and draws all max_count of them (docs/APPLE.md AP6g)
+    pub fn draw_indexed_indirect_count(&mut self, buf: &'a Buffer, offset: u64, count_buf: &'a Buffer, count_offset: u64,
+                                       max_count: u32, stride: u32) {
+        let ok = self.sh.features.draw_indirect_count && stride >= 20 && stride % 4 == 0 && max_count > 0
+            && max_count <= self.sh.limits.max_draw_indirect_count;
+        if self.ok(ok, "draw_indexed_indirect_count: needs level Voll, stride >= 20").is_none()
+            || self.indirect_ok(buf, offset, (max_count as u64 - 1) * stride as u64 + 20).is_none()
+            || self.indirect_ok(count_buf, count_offset, 4).is_none()
+            || self.can_draw(true).is_none()
+        {
+            return;
+        }
+        let Some(state) = self.count_state() else { return };
+        let bytes = max_count as u64 * 20;
+        // SAFETY: newBufferWithLength:options: returns a new private buffer (+1) or nil; the command buffer keeps
+        // what its encoders use until it finished.
+        let Some(draws) = Obj::new(unsafe { msg!(self.sh.dev.id(), c"newBufferWithLength:options:", bytes as usize => usize, 32usize => usize; Id) }) else {
+            self.err.get_or_insert(GpuError::OutOfMemory);
+            return;
+        };
+        self.suspend_render();
+        let Some(c) = self.encoder(Kind::Compute) else { return };
+        let args = [max_count, stride / 4, 0, 0];
+        // SAFETY: an open compute encoder with the count kernel: thread i < max_count copies draw i (5 words, stride
+        // apart from offset, range checked above) to draws[i] and clears its instance count at or after the count.
+        unsafe {
+            msg!(c, c"setComputePipelineState:", state => Id; ());
+            msg!(c, c"setBuffer:offset:atIndex:", buf.0.h.id() => Id, offset as usize => usize, 0usize => usize; ());
+            msg!(c, c"setBuffer:offset:atIndex:", count_buf.0.h.id() => Id, count_offset as usize => usize, 1usize => usize; ());
+            msg!(c, c"setBuffer:offset:atIndex:", draws.id() => Id, 0usize => usize, 2usize => usize; ());
+            msg!(c, c"setBytes:length:atIndex:", args.as_ptr() as *const core::ffi::c_void => *const core::ffi::c_void, 16usize => usize, 3usize => usize; ());
+            msg!(c, c"dispatchThreadgroups:threadsPerThreadgroup:", MTLSize { w: max_count.div_ceil(64) as usize, h: 1, d: 1 } => MTLSize,
+                 MTLSize { w: 64, h: 1, d: 1 } => MTLSize; ());
+        }
+        let Some(e) = self.resume_render() else { return };
+        let Some(e) = self.can_draw(true).filter(|x| *x == e) else { return };
+        let Some((ib, off, wide)) = self.index else { return };
+        for i in 0..max_count {
+            self.set_draw_index(e, i);
+            // SAFETY: as in draw_indexed_indirect; draws holds max_count draws of 20 bytes.
+            unsafe {
+                msg!(e, c"drawIndexedPrimitives:indexType:indexBuffer:indexBufferOffset:indirectBuffer:indirectBufferOffset:", self.prim() => usize,
+                     wide as usize => usize, ib => Id, off as usize => usize, draws.id() => Id, (i as u64 * 20) as usize => usize; ());
+            }
+        }
+        self.set_draw_index(e, 0);
+    }
+
+    /// the count kernel's pipeline (compiled once per device)
+    fn count_state(&mut self) -> Option<Id> {
+        let mut f = self.sh.count.lock();
+        if f.is_none() {
+            let src = "#include <metal_stdlib>\nusing namespace metal;\n\
+                       kernel void jf_count(device const uint* src [[buffer(0)]], device const uint* cnt [[buffer(1)]],\n\
+                       device uint* dst [[buffer(2)]], constant uint4& a [[buffer(3)]], uint i [[thread_position_in_grid]]) {\n\
+                       if (i >= a.x) { return; }\n\
+                       device const uint* s = src + i * a.y;\n\
+                       for (uint k = 0; k < 5; k++) { dst[i * 5 + k] = s[k]; }\n\
+                       if (i >= cnt[0]) { dst[i * 5 + 1] = 0; }\n}\n";
+            let made = crate::mtl_res::compile(self.sh, src).ok().and_then(|lib| {
+                let _pool = Pool::new();
+                let name = objc::nsstring("jf_count")?;
+                // SAFETY: newFunctionWithName: / newComputePipelineStateWithFunction:error: on live objects (+1 results or nil).
+                unsafe {
+                    let func = Obj::new(msg!(lib.id(), c"newFunctionWithName:", name.id() => Id; Id))?;
+                    let mut err: Id = objc::NIL;
+                    Obj::new(msg!(self.sh.dev.id(), c"newComputePipelineStateWithFunction:error:", func.id() => Id, &mut err => *mut Id; Id))
+                }
+            });
+            *f = made;
+        }
+        let id = f.as_ref().map(|o| o.id());
+        drop(f);
+        if id.is_none() {
+            self.err.get_or_insert(GpuError::Failed(0));
+        }
+        id
     }
 
     // ------------------------------------------------------------ timestamps

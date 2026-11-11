@@ -769,7 +769,12 @@ fn levels(t: &mut T) {
     names.extend_from_slice(&LATER);
     for (i, name) in names.iter().enumerate() {
         let (n, m) = diff(&a[i], &b[i]);
-        t.ok(n == 0, &format!("Voll against Basis, {name}: {n} of {} pixels differ (largest {m})", GALLERY_W * GALLERY_H));
+        // (Apple's GPUs: the textured gallery picks levels and texels from derivatives that vary from run to run,
+        // DERIVATIVES_VARY in common.rs)
+        let loose = DERIVATIVES_VARY && i == 3;
+        let note = if loose { format!(" (Apple's GPUs: at most {DERIVATIVE_PIXELS})") } else { String::new() };
+        t.ok(n == 0 || loose && n <= DERIVATIVE_PIXELS, &format!("Voll against Basis, {name}: {n} of {} pixels differ (largest {m}){note}",
+                                                           GALLERY_W * GALLERY_H));
     }
 }
 

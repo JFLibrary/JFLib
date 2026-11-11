@@ -196,6 +196,8 @@ pub struct Adapter {
     pub(crate) info: AdapterInfo,
     pub(crate) features: Features,
     pub(crate) limits: Limits,
+    /// it can run level Voll (Metal 3 on Apple7 and newer or Mac2, AP6g)
+    voll: bool,
 }
 
 fn supports(dev: Id, f: isize) -> bool {
@@ -263,20 +265,27 @@ fn probe(inst: &Arc<InstShared>, dev: Obj) -> Adapter {
         missing,
     };
     let apple7 = supports(d, family::APPLE7);
+    // level Voll (AP6g): Metal 3 (argument buffers of resource ids) on Apple7 and newer (A14, M1) or Mac2
+    let voll = metal3 && (apple7 || mac2) && missing.is_none();
+    // SAFETY: a property of the live device (macOS 10.14, iOS 12).
+    let samplers_max = unsafe { msg!(d, c"maxArgumentBufferSamplerCount"; usize) }.min(u32::MAX as usize) as u32;
     let features = Features {
         timestamps: false,
-        multi_draw_indirect: false,
+        multi_draw_indirect: voll,
         draw_indirect_first_instance: true,
-        draw_indirect_count: false,
-        bindless: false,
-        subgroups: false,
+        // (a compute pass in a suspended render pass, mtl_cmd.rs draw_indexed_indirect_count)
+        draw_indirect_count: voll,
+        // (Metal 3 argument buffers holding resource ids, mtl_res.rs Bindless)
+        bindless: voll,
+        // (SIMD-group functions: basic, vote, ballot, arithmetic, shuffle in compute shaders, shader::msl)
+        subgroups: apple || mac2,
         subgroups_webgpu: apple || mac2,
         subgroup_stages: subgroup_stage::COMPUTE | subgroup_stage::FRAGMENT,
         subgroup_ops: subgroup_op::BASIC | subgroup_op::VOTE | subgroup_op::ARITHMETIC | subgroup_op::BALLOT | subgroup_op::SHUFFLE
             | subgroup_op::SHUFFLE_RELATIVE | subgroup_op::QUAD,
         subgroup_size_control: false,
         subgroup_extended_types: true,
-        draw_parameters: false,
+        draw_parameters: voll,
         shader_f16: true,
         shader_f64: false,
         shader_i16: true,
@@ -321,19 +330,21 @@ fn probe(inst: &Arc<InstShared>, dev: Obj) -> Adapter {
         max_color_targets: 8,
         max_vertex_buffers: shader::msl::VERTEX_BUFFERS_MAX,
         max_vertex_attributes: 31,
-        max_draw_indirect_count: 1,
+        // (a multi-draw is a loop of single indirect draws, mtl_cmd.rs)
+        max_draw_indirect_count: if voll { 65535 } else { 1 },
         max_anisotropy: 16.0,
         timestamp_period_ns: 1.0,
         subgroup_size: 32,
         subgroup_min_size: 32,
         subgroup_max_size: 32,
-        max_bindless_textures: 0,
-        max_bindless_samplers: 0,
-        max_bindless_buffers: 0,
-        max_bindless_storage_textures: 0,
+        // (argument buffers of tier 2: 500 000 resources, samplers as the device says)
+        max_bindless_textures: if voll { 500_000 } else { 0 },
+        max_bindless_samplers: if voll { samplers_max } else { 0 },
+        max_bindless_buffers: if voll { 500_000 } else { 0 },
+        max_bindless_storage_textures: if voll { 500_000 } else { 0 },
         device_memory: working,
     };
-    Adapter { inst: inst.clone(), dev, info, features, limits }
+    Adapter { inst: inst.clone(), dev, info, features, limits, voll }
 }
 
 impl Adapter {
@@ -346,9 +357,9 @@ impl Adapter {
     pub fn limits(&self) -> &Limits {
         &self.limits
     }
-    /// the highest level the adapter supports (Metal: Basis; Voll is AP6g)
+    /// the highest level the adapter supports (Voll: Metal 3 on Apple7 and newer or Mac2)
     pub fn level(&self) -> Level {
-        Level::Basis
+        if self.voll { Level::Voll } else { Level::Basis }
     }
     /// every Metal device can show in a CAMetalLayer
     pub fn can_present(&self, _surface: &crate::Surface) -> bool {
@@ -360,9 +371,22 @@ impl Adapter {
     }
 
     /// (G5d) DeviceOptions::compute_queue: Metal has one kind of queue; Device::compute_queue is None
-    pub fn create_device_with(&self, _desc: &DeviceDesc, _opts: &DeviceOptions) -> Result<Device> {
+    pub fn create_device_with(&self, desc: &DeviceDesc, _opts: &DeviceOptions) -> Result<Device> {
         if let Some(why) = self.info.missing {
             return Err(GpuError::Unsupported(why));
+        }
+        let level = if self.voll && desc.max_level == Level::Voll { Level::Voll } else { Level::Basis };
+        let (mut features, mut limits) = (self.features, self.limits);
+        if level == Level::Basis {
+            features.bindless = false;
+            features.draw_indirect_count = false;
+            features.multi_draw_indirect = false;
+            features.draw_parameters = false;
+            limits.max_draw_indirect_count = 1;
+            limits.max_bindless_textures = 0;
+            limits.max_bindless_samplers = 0;
+            limits.max_bindless_buffers = 0;
+            limits.max_bindless_storage_textures = 0;
         }
         let d = self.dev.id();
         // SAFETY: newCommandQueue / newSharedEvent return new objects (+1) of a live device.
@@ -375,13 +399,15 @@ impl Adapter {
             queue,
             event,
             info: self.info.clone(),
-            features: self.features,
-            limits: self.limits,
+            features,
+            limits,
+            level,
             lost: AtomicBool::new(false),
             submitted: AtomicU64::new(0),
             reserved: AtomicU64::new(0),
             st: SpinLock::new(State { upload: None, inflight: Vec::new(), ring: Ring::default() }),
             fill: SpinLock::new(None),
+            count: SpinLock::new(None),
         });
         Ok(Device { queue: Queue { sh: sh.clone() }, sh })
     }
@@ -455,6 +481,7 @@ pub(crate) struct Shared {
     pub info: AdapterInfo,
     pub features: Features,
     pub limits: Limits,
+    pub level: Level,
     lost: AtomicBool,
     submitted: AtomicU64,
     /// bytes of the buffers and textures that live
@@ -462,6 +489,8 @@ pub(crate) struct Shared {
     st: SpinLock<State>,
     /// the pipeline of fill_buffer (made at the first use)
     pub fill: SpinLock<Option<Obj>>,
+    /// the pipeline of draw_indexed_indirect_count's compute pass (made at the first use)
+    pub count: SpinLock<Option<Obj>>,
 }
 
 impl Shared {
@@ -746,7 +775,7 @@ impl Device {
         &self.sh.limits
     }
     pub fn level(&self) -> Level {
-        Level::Basis
+        self.sh.level
     }
     pub fn is_lost(&self) -> bool {
         self.sh.check().is_err()

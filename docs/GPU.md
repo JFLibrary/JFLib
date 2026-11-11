@@ -7,8 +7,8 @@ Befehlspuffer, Barrieren) und neutral gegenüber dem Backend: das Backend wird p
 Übersetzen gewählt, es gibt keine dynamische Verteilung.
 
 Stand: Vulkan unter Windows, unter Linux ([Linux](#linux)) und unter Android ([Ausgabe unter Android](#ausgabe-unter-android)),
-WebGPU im Browser ([Ausgabe im Browser](#ausgabe-im-browser)), Metal auf macOS und iOS, Stufe Basis
-([Ausgabe unter macOS und iOS](#ausgabe-unter-macos-und-ios)).
+WebGPU im Browser ([Ausgabe im Browser](#ausgabe-im-browser)), Metal auf macOS und iOS, Stufe Voll mit Metal 3 (A14/M1 und
+neuer), sonst Basis ([Ausgabe unter macOS und iOS](#ausgabe-unter-macos-und-ios)).
 `vulkan-1.dll`, `libvulkan.so.1` bzw. `libvulkan.so` wird zur Laufzeit geladen, das Programm startet also auch auf
 Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Die Oberfläche rastert weiter auf der CPU; unter
 Windows, Linux, Android und im Browser zeigt die GPU das Ergebnis
@@ -878,7 +878,14 @@ Dieselbe Ausgabe wie unter Windows über Metal ([APPLE.md](APPLE.md), AP6). Ein 
 verborgen, bis sein erstes Bild kommt; darunter bleibt das Bild des CPU-Wegs. Standard **aus** (Entscheidung des Nutzers vom
 11.11.2026), `jfgui_GPU=1` schaltet ein (`DEFAULT_ON_APPLE` in [`gpu_out.rs`](../lib/ui/gpu_out.rs); die Zahlen unter AP6d in [APPLE.md](APPLE.md)).
 
-- **Stufe Basis.** Ansichten mit `AF_GPU_3D` bekommen ebenfalls Basis; Voll ist AP6g.
+- **Stufen.** Voll auf Geräten mit Metal 3 (Familie Apple7 und neuer, also A14/M1 und neuer, sowie Mac2), sonst Basis (der
+  iOS-Simulator meldet weder Familie noch Metal 3). Ansichten mit `AF_GPU_3D` bekommen Voll, wo es das gibt (AP6g).
+- **Voll nachgebildet** (Metal hat es nicht): `draw_indexed_indirect_multi` ist eine Schleife einzelner indirekter Aufrufe;
+  `DrawIndex` steht im Puffer der Puffergrößen (`shader::msl::DRAW_INDEX_AT`) und wird je Aufruf gesetzt;
+  `draw_indexed_indirect_count` unterbricht den Render-Pass (alles gespeichert), ein Rechen-Durchgang setzt die Aufrufe ab der
+  Anzahl auf null Instanzen, dann geht der Pass weiter (alles geladen, der Zustand neu gesetzt) und zeichnet alle bis
+  `max_count`. Bindless-Tabellen sind Argument-Puffer von Metal 3, in die die Setter die Ressourcen-IDs und Pufferadressen
+  schreiben; wo die Tabelle gebunden ist, macht `useResources` ihren Inhalt resident. Auf Voll übersetzt Metal das MSL als 3.0.
 - **Darstellung.** Nur Fifo (`Immediate` und `Mailbox` werden zu Fifo: Ein Fenster zeigt ohnehin im Takt des Compositors). Immer drei Drawables, `try_acquire` wartet nie, die Presented-Handler zählen, was angekommen ist.
 - **Farben.** Der Layer hat den Farbraum sRGB wie das `CGImage` des CPU-Wegs: beide zeigen dieselben Pixel.
 - **iOS.** Nur Fenster 0, und nur, solange die Leinwand nichts anderes zeigt. Ohne aktive Szene keine GPU-Arbeit (`win_state` sagt `WST_HIDDEN`, die Ausgabe geht auf den CPU-Weg und kommt zurück).
