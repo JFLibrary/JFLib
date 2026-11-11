@@ -2,7 +2,7 @@
 
 Nachtrag 2026-11-10: AP5 ist auch von Hand auf dem iPhone geprüft, AP8 (Pakete, Updates, CI, Developer ID und
 Notarisierung, Dokumentation und Website) ist fertig, AP1 (Safari auf dem Mac und dem iPhone) ebenso. AP6 (Metal) ist bis AP6f gebaut (Stufe
-Basis, macOS, iOS-Simulator und iPhone; die UI-Ausgabe ist dort standardmäßig aus; Stufe Voll ist AP6g, unter AP6).
+Basis, macOS, iOS-Simulator und iPhone, mit Metal 3 auch Stufe Voll (AP6g); die UI-Ausgabe ist dort standardmäßig aus, unter AP6).
 
 Stand 2026-11-09, auf Basis von `main` ba9e6d03. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
 und der Kern von `plat`), AP3 (`plat` ohne Fenster), AP4 (Fenster auf macOS), AP7 (Desktop-Dienste) und AP5 (iOS) bis
@@ -574,8 +574,13 @@ unterbrechen (der Rechen-Durchgang kann nicht mitten im Pass laufen); so arbeite
 - **AP6g5:** Ergebnisse auf dem M2: `gputest --test all` auf Voll grün (775 Prüfungen, auf Basis 541; `msl` 719 von 721 auch
   als MSL 3.0), `render3dtest` 26 von 26 (in `levels` das Bild „tex“ mit der Apple-Toleranz), `uigputest` alle Ansichten
   grün (`AF_GPU_3D` bekommt Voll), `switch` grün. Im Simulator (Basis) `gputest` und `render3dtest` 26 von 26 unverändert.
-  Unter Windows `gputest --test all` (826) und `wgsltest msl` grün; Linux, Android und Web bauen. **Offen:** das iPhone auf Voll
-  (braucht das Entsperren durch den Nutzer).
+  Unter Windows `gputest --test all` (826) und `wgsltest msl` grün; Linux, Android und Web bauen.
+- **Auf dem iPhone 14 (A15, Voll; 2026-11-11, vom Nutzer entsperrt):** `gputest --test all` grün (733 Prüfungen, Bindless,
+  Multi-Draw und indirekte Anzahl dabei). `render3dtest` je Test einzeln: 17 von 20 grün; `textures`, `occlusion` und `srgb`
+  laufen ihren Voll-Teil vollständig grün (32, 23, 56 Prüfungen) und werden im Basis-Teil danach von iOS beendet (Signal 9,
+  der Speicher eines Programms ohne Szene; der Basis-Teil war in AP6e einzeln grün, auf dem Mac gibt Metal den Speicher des
+  Voll-Teils vollständig frei). `uigputest` unter UIKit: `switch`, `viewplain`, `viewbasis`, `viewlose`, `images`, `lose`,
+  `idle` grün.
 
 **Fallen, schon bekannt.** Metal schaltet beim Übersetzen zur Laufzeit schnelle Mathematik ein (NaN, Unendlich,
 Kontraktion); MSLs `float3` ist 16 Byte groß (in Puffern `packed_float3`); `[[vertex_id]]` und `[[instance_id]]`
