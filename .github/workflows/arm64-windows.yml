@@ -1,0 +1,93 @@
+# ARM5 (docs/ARM64.md): the Windows programs for ARM64 on Windows on ARM. They are built on an x64 runner
+# as on the PC (build_rs.py --arch aarch64) and run on windows-11-arm (Cobalt 100) by tools/winarm_check.py:
+# every script of coretest and plattest, a start of the gallery (with a picture), the crash handler
+# (plattest --test crash, guardcrash, panic) and the module jxlenc against the linked writer. The x64
+# build of the module comes along: the ARM64 program must refuse it (LIBE_ARCH).
+# Started by hand, or by a push to a branch arm64-test/... (workflow_dispatch needs the file on main).
+name: ARM64 Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["arm64-test/**"]
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: 1
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust and LLD
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --no-self-update --target aarch64-pc-windows-msvc
+          rustup default 1.98.1
+          rustc --version
+          "/c/Program Files/LLVM/bin/lld-link.exe" --version
+      - name: Build for ARM64
+        run: |
+          for a in coretest plattest gallery codectest; do
+            python -u build_rs.py app $a --target win --arch aarch64
+          done
+      - name: The module for x64 (the ARM64 programs must refuse it)
+        run: python -u build_rs.py app codectest --target win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arm64-programs
+          retention-days: 7
+          path: |
+            build/win-arm64/**
+            build/win/jxlenc.dll
+            !build/win-arm64/inc/**
+            !build/win-arm64/**/*.rlib
+            !build/win-arm64/**/*.rmeta
+
+  check:
+    needs: build
+    runs-on: windows-11-arm
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          architecture: arm64
+      - uses: actions/download-artifact@v4
+        with:
+          name: arm64-programs
+          path: build
+      - name: The machine
+        run: |
+          Get-CimInstance Win32_Processor | Format-List Name, Architecture, NumberOfLogicalProcessors
+          python -c "import platform; print('python', platform.machine(), platform.python_version())"
+      - name: The desktop before the checks
+        continue-on-error: true
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $s = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          "screen $($s.Width) x $($s.Height), $([System.Drawing.Graphics]::FromHwnd([IntPtr]::Zero).DpiX) dpi"
+          $b = New-Object System.Drawing.Bitmap $s.Width, $s.Height
+          [System.Drawing.Graphics]::FromImage($b).CopyFromScreen($s.Location, [System.Drawing.Point]::Empty, $s.Size)
+          $b.Save("$PWD\build\desktop.png")
+      - name: Every import of the programs exists here (else Windows refuses to start them silently)
+        run: python -u tools/winarm_imports.py build/win-arm64
+      - name: Checks
+        run: |
+          python -u tools/winarm_check.py --other-module build/win/jxlenc.dll *>&1 | Tee-Object build/winarm_check.txt
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arm64-results
+          retention-days: 7
+          path: |
+            build/*.png
+            build/winarm_check.txt

@@ -25124,8 +25124,8 @@ VALUE_OPTS: &[&str] = &[ "--size", "--scale", "--auto-close", "--anim", "--them 
   Deliberate trap through the compatibility caller API.
 
 - **`extern "C" fn crash_test() -> !`**
-  a deliberate crash for tests on ARM64 (Apple, Linux): x0 = 16, then a 4-byte write to address 0x10 -- the
-  faulting instruction is at crash_test + 4
+  a deliberate crash for tests on ARM64 (Apple, Linux, Windows): x0 = 16, then a 4-byte write to address 0x10 --
+  the faulting instruction is at crash_test + 4
 
 - **`extern "C" fn crash_test_caller() -> !`**
   crash_test called from a known place (bl): the return address crash_test_caller + 4 must be
@@ -25891,6 +25891,10 @@ applies `--simd sse2` before the app starts.
 - **`fn cpu_brand() -> String`**
   the processor's name from MIDR_EL1 ("ARM Cortex-A720"; "Qualcomm CPU 0x001" for parts not listed),
   "ARM64" when the kernel does not let user space read it
+
+- **`fn cpu_brand() -> String`**
+  the processor's name (HKLM\\HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0, ProcessorNameString, such as
+  "Snapdragon(R) X Elite - X1E78100 - Qualcomm(R) Oryon(TM) CPU"), "ARM64" when it is missing
 
 ### `plat/capabilities.rs`
 
@@ -30898,13 +30902,13 @@ win_lib -- plugin libraries and the crash guard: the Windows part
   lib_open(path) -> Lib / Err(LIBE_*)   LoadLibraryExW(DONT_RESOLVE_DLL_REFERENCES): the
        image is mapped and relocated, but DllMain / TLS callbacks never run and no import
        is bound -- a plugin with an import, delay-import or TLS directory is rejected
-       (LIBE_DEPS / LIBE_INIT); only x86-64 DLLs (LIBE_FORMAT).  Hard-error dialogs are
+       (LIBE_DEPS / LIBE_INIT); only DLLs of this processor (LIBE_FORMAT; the other: LIBE_ARCH).  Hard-error dialogs are
        suppressed (SetThreadErrorMode).  Segments: headers + every section.
   lib_sym(h, name) -> address | 0       own export-directory lookup (bounds checked against
        SizeOfImage, every table / name inside a readable section -- a section without
        MEM_READ is PAGE_NOACCESS; forwarders -> 0, so no other DLL is ever loaded)
   (crate) lib_unload(h)                 FreeLibrary (lib_close / drop)
-  (crate) plat_tid() -> u64             thread id (TEB ClientId, gs:[0x48])
+  (crate) plat_tid() -> u64             thread id (TEB ClientId, gs:[0x48]; ARM64: x18 + 0x48)
   (crate) guard_thread()                nothing on Windows
   (crate) guard_os_install()            AddVectoredExceptionHandler(first, guard_veh)
 
@@ -30930,7 +30934,7 @@ win_clr -- run a managed program on the CoreCLR another application ships
   clr_run(dir, app, args)        self-contained .NET applications bring coreclr.dll and their
                                  whole framework: load that runtime into this process, trust
                                  every assembly of dir, execute app's Main -> its exit code.
-                                 No installed .NET is involved.  Plugin policy applies.
+                                 No installed .NET is involved.  Plugin policy applies; ARM64 refuses x64.
   machine_reg_string(sub, name)  a string value of HKLM\sub (None: missing or another type)
 ```
 
