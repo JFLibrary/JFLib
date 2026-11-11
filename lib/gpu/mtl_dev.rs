@@ -200,11 +200,6 @@ pub struct Adapter {
     voll: bool,
 }
 
-/// (AP6g, on its branch until every part of level Voll exists) jfgui_GPU_METAL_VOLL=1 lets a Metal 3 device report it
-fn voll_ready() -> bool {
-    plat::env("jfgui_GPU_METAL_VOLL").is_some_and(|v| v == "1")
-}
-
 fn supports(dev: Id, f: isize) -> bool {
     // SAFETY: supportsFamily: (macOS 10.15, iOS 13) on a live device.
     unsafe { msg!(dev, c"supportsFamily:", f => isize; bool) }
@@ -270,7 +265,8 @@ fn probe(inst: &Arc<InstShared>, dev: Obj) -> Adapter {
         missing,
     };
     let apple7 = supports(d, family::APPLE7);
-    let voll = metal3 && (apple7 || mac2) && missing.is_none() && voll_ready();
+    // level Voll (AP6g): Metal 3 (argument buffers of resource ids) on Apple7 and newer (A14, M1) or Mac2
+    let voll = metal3 && (apple7 || mac2) && missing.is_none();
     // SAFETY: a property of the live device (macOS 10.14, iOS 12).
     let samplers_max = unsafe { msg!(d, c"maxArgumentBufferSamplerCount"; usize) }.min(u32::MAX as usize) as u32;
     let features = Features {
@@ -281,7 +277,8 @@ fn probe(inst: &Arc<InstShared>, dev: Obj) -> Adapter {
         draw_indirect_count: voll,
         // (Metal 3 argument buffers holding resource ids, mtl_res.rs Bindless)
         bindless: voll,
-        subgroups: false,
+        // (SIMD-group functions: basic, vote, ballot, arithmetic, shuffle in compute shaders, shader::msl)
+        subgroups: apple || mac2,
         subgroups_webgpu: apple || mac2,
         subgroup_stages: subgroup_stage::COMPUTE | subgroup_stage::FRAGMENT,
         subgroup_ops: subgroup_op::BASIC | subgroup_op::VOTE | subgroup_op::ARITHMETIC | subgroup_op::BALLOT | subgroup_op::SHUFFLE

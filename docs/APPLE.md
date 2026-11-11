@@ -559,6 +559,24 @@ Stufen (je ein Branch und Commits, Merge nach grünen Suiten, Push nach Rückfra
   dort mit derselben Apple-Toleranz), `uigputest` `view` (`AF_GPU_3D` bekommt Voll), Mac und iPhone; Doku (GPU.md, APPLE.md,
   CHANGELOG, API.md).
 
+**AP6g umgesetzt (2026-11-11, Branch `apple/ap6g`).** Zur indirekten Anzahl entschied der Nutzer noch, den Render-Pass zu
+unterbrechen (der Rechen-Durchgang kann nicht mitten im Pass laufen); so arbeitet auch MoltenVK.
+- **AP6g1:** Multi-Draw als Schleife, `DrawIndex` über den Eintrag `DRAW_INDEX_AT` des Puffers der Puffergrößen (alle 31
+  Puffer-Slots von Metal sind belegt), `BaseVertex`/`BaseInstance` nativ; Gerät und Adapter melden die Stufe, ein Basis-Gerät
+  maskiert die Voll-Features wie unter Vulkan.
+- **AP6g2:** `draw_indexed_indirect_count`: Die Store-Aktionen eines Passes bleiben offen (`MTLStoreActionUnknown`) und werden am
+  Ende gesetzt, beim Unterbrechen alle auf Speichern; das Fortsetzen lädt alles und setzt Pipeline, Viewport, Scissor und
+  Vertex-Puffer neu. `gputest` prüft dazu einen Aufruf nach dem gezählten im selben Pass (auch unter Vulkan grün).
+- **AP6g3:** Bindless wie oben (Entscheidung 2); Sampler entstehen auf Voll mit `supportArgumentBuffers`; Limits 500 000
+  Ressourcen, Sampler nach `maxArgumentBufferSamplerCount` (M2: 1024). `shader::msl` übersetzt Arrays von Ressourcen (die
+  erwartete Ausnahme „Bindless“ fällt weg), Slots einer Tabelle tragen `Slot::table`.
+- **AP6g4:** `Features::subgroups` (SIMD-Gruppen-Funktionen, Größe 32); ein Gerät mit Metal 3 meldet Voll von selbst.
+- **AP6g5:** Ergebnisse auf dem M2: `gputest --test all` auf Voll grün (775 Prüfungen, auf Basis 541; `msl` 719 von 721 auch
+  als MSL 3.0), `render3dtest` 26 von 26 (in `levels` das Bild „tex“ mit der Apple-Toleranz), `uigputest` alle Ansichten
+  grün (`AF_GPU_3D` bekommt Voll), `switch` grün. Im Simulator (Basis) `gputest` und `render3dtest` 26 von 26 unverändert.
+  Unter Windows `gputest --test all` (826) und `wgsltest msl` grün; Linux, Android und Web bauen. **Offen:** das iPhone auf Voll
+  (braucht das Entsperren durch den Nutzer).
+
 **Fallen, schon bekannt.** Metal schaltet beim Übersetzen zur Laufzeit schnelle Mathematik ein (NaN, Unendlich,
 Kontraktion); MSLs `float3` ist 16 Byte groß (in Puffern `packed_float3`); `[[vertex_id]]` und `[[instance_id]]`
 enthalten Basis-Vertex und erste Instanz wie unter Vulkan; Metal hat keine Push-Konstanten; `nextDrawable` wartet;

@@ -20227,10 +20227,14 @@ The checks are those of the Vulkan backend (vk_cmd.rs); finish() returns the fir
   one draw: vertex count, instance count, first vertex, first instance (4 x u32)
 - **`fn draw_indexed_indirect(&mut self, buf: &'a Buffer, offset: u64)`**
   one indexed draw: index count, instance count, first index, base vertex (i32), first instance
-- **`fn draw_indexed_indirect_multi(&mut self, _buf: &'a Buffer, _offset: u64, _count: u32, _stride: u32)`**
-  several indexed draws from one buffer (Features::multi_draw_indirect: not at Metal's level Basis)
-- **`fn draw_indexed_indirect_count(&mut self, _buf: &'a Buffer, _offset: u64, _count_buf: &'a Buffer, _count_offset: u64, _max_count: u32, _stride: u32)`**
-  (level Voll) not on Metal yet
+- **`fn draw_indexed_indirect_multi(&mut self, buf: &'a Buffer, offset: u64, count: u32, stride: u32)`**
+  count indexed draws, stride bytes apart (Features::multi_draw_indirect, level Voll): Metal has no
+  multi-draw, so a loop of single indirect draws in this encoder; DrawIndex is each one's index
+- **`fn draw_indexed_indirect_count(&mut self, buf: &'a Buffer, offset: u64, count_buf: &'a Buffer, count_offset: u64, max_count: u32, stride: u32)`**
+  up to max_count indexed draws, their number (u32) read from count_buf at count_offset (level Voll:
+  Features::draw_indirect_count).  Metal has no such draw: the pass is suspended for a compute pass that copies
+  the max_count draws and sets the instances of those at and after the count to 0, then goes on (everything
+  stored and loaded again, the state set again) and draws all max_count of them (docs/APPLE.md AP6g)
 - **`fn reset_timestamps(&mut self, _ts: &'a Timestamps, _first: u32, _n: u32)`**
 - **`fn timestamp(&mut self, _ts: &'a Timestamps, _i: u32)`**
 - **`fn finish(mut self) -> Result<CommandBuffer<'a>>`**
@@ -20294,11 +20298,11 @@ later call gives DeviceLost, as on Vulkan after a driver reset.
 - **`fn features(&self) -> &Features`**
 - **`fn limits(&self) -> &Limits`**
 - **`fn level(&self) -> Level`**
-  the highest level the adapter supports (Metal: Basis; Voll is AP6g)
+  the highest level the adapter supports (Voll: Metal 3 on Apple7 and newer or Mac2)
 - **`fn can_present(&self, _surface: &crate::Surface) -> bool`**
   every Metal device can show in a CAMetalLayer
 - **`fn create_device(&self, desc: &DeviceDesc) -> Result<Device>`**
-- **`fn create_device_with(&self, _desc: &DeviceDesc, _opts: &DeviceOptions) -> Result<Device>`**
+- **`fn create_device_with(&self, desc: &DeviceDesc, _opts: &DeviceOptions) -> Result<Device>`**
   (G5d) DeviceOptions::compute_queue: Metal has one kind of queue; Device::compute_queue is None
 
 - **`struct Device`**
@@ -20468,21 +20472,23 @@ built yet (level Basis; Features says so).
 - **`fn create_bind_group_layout(&self, bindings: &[Binding]) -> Result<BindGroupLayout>`**
 - **`fn create_pipeline_layout(&self, desc: &PipelineLayoutDesc) -> Result<PipelineLayout>`**
 - **`fn create_bind_group(&self, desc: &BindGroupDesc) -> Result<BindGroup>`**
-- **`fn create_bindless(&self, _desc: &BindlessDesc) -> Result<Bindless>`**
-  (level Voll) a Bindless table: not on Metal yet (AP6g)
+- **`fn create_bindless(&self, desc: &BindlessDesc) -> Result<Bindless>`**
+  (level Voll) a Bindless table: per binding a Metal 3 argument buffer (TableInner), written by the setters
 
 - **`struct Bindless`**
-  a large table of textures, samplers and buffers that shaders index (level Voll; not on Metal yet)
+  a large table of textures, samplers and buffers that shaders index (level Voll): binding 0 sampled textures,
+  1 samplers, 2 storage buffers, 3 storage textures, each a Metal 3 argument buffer.  A slot may be changed
+  while command buffers that use the table are pending, as long as those do not use the slot (as on Vulkan)
 
 **`impl Bindless`**
 
 - **`fn group(&self) -> &BindGroup`**
 - **`fn layout(&self) -> &BindGroupLayout`**
 - **`fn counts(&self) -> [u32; 4]`**
-- **`fn set_texture(&self, _slot: u32, _view: &TextureView) -> Result<()>`**
-- **`fn set_sampler(&self, _slot: u32, _s: &Sampler) -> Result<()>`**
-- **`fn set_buffer(&self, _slot: u32, _buf: &Buffer, _offset: u64, _size: u64) -> Result<()>`**
-- **`fn set_storage_texture(&self, _slot: u32, _view: &TextureView) -> Result<()>`**
+- **`fn set_texture(&self, slot: u32, view: &TextureView) -> Result<()>`**
+- **`fn set_sampler(&self, slot: u32, s: &Sampler) -> Result<()>`**
+- **`fn set_buffer(&self, slot: u32, buf: &Buffer, offset: u64, size: u64) -> Result<()>`**
+- **`fn set_storage_texture(&self, slot: u32, view: &TextureView) -> Result<()>`**
 
 - **`struct ComputePipeline(pub(crate) Arc<PipeInner>)`**
   a compute shader with its layout
@@ -22572,6 +22578,13 @@ texture and sampler indices from 0 in (set, binding) order (buffers below
 FIRST_VERTEX_SLOT); push constants are a `constant` block at PUSH_SLOT; the byte sizes of
 the bound buffer ranges a `constant uint*` at SIZES_SLOT, indexed by a buffer's slot (only
 for entry points with arrayLength: Entry::sizes); vertex buffer i is at vertex_slot(i).
+DrawIndex (Metal has none) is entry DRAW_INDEX_AT of that buffer, which the backend sets per draw
+of a multi-draw (Entry::draw_index).
+
+Bindless tables (an array of images, samplers or storage buffers: lib/gpu's Bindless, level Voll)
+are Metal 3 argument buffers in a buffer slot: an array of one-member structs, 8 bytes per image
+or sampler (its MTLResourceID), 16 per buffer (its GPU address and its size in bytes, for
+arrayLength).  The backend writes them; the source needs MSL 3.0.
 
 Specialization constants are substituted (Options::spec, reflect::constant_values): a
 pipeline with constants is a translation of its own.
@@ -22596,6 +22609,8 @@ SIZES_SLOT: u32 = 30
 FIRST_VERTEX_SLOT: u32 = 21
 /// vertex buffer slots a pipeline may use
 VERTEX_BUFFERS_MAX: u32 = 8
+/// the entry of the sizes buffer (SIZES_SLOT) that holds DrawIndex: the draw's index in a multi-draw
+DRAW_INDEX_AT: u32 = FIRST_VERTEX_SLOT
 ```
 
 - **`const fn vertex_slot(i: u32) -> u32`**
@@ -22624,6 +22639,7 @@ VERTEX_BUFFERS_MAX: u32 = 8
   - `binding: u32`
   - `kind: SlotKind`
   - `index: u32`
+  - `table: bool` -- a bindless table: an argument buffer in buffer slot index, whatever kind of resource it holds
 
 - **`struct Entry`**
   an entry point of the translation
@@ -22634,6 +22650,7 @@ VERTEX_BUFFERS_MAX: u32 = 8
   - `slots: Vec<Slot>` -- its resources by (set, binding)
   - `push_constants: bool` -- it reads push constants (PUSH_SLOT)
   - `sizes: bool` -- it reads the buffer sizes (SIZES_SLOT)
+  - `draw_index: bool` -- it reads DrawIndex (entry DRAW_INDEX_AT of the sizes buffer; sizes is set too)
   - `vertex_inputs: Vec<u32>` -- vertex: the locations of its inputs ([[attribute(n)]])
 
 - **`struct Msl`**
