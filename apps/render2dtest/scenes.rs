@@ -438,6 +438,24 @@ fn visibility_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
         let got = part.contains(&place);
         t.ok(got == want, &format!("{level}: a hairline {name} the {edge} edge: {}", if got { "in the list" } else { "culled" }));
     }
+    // a wide arc with square caps: the corner of a cap lies beyond the box around the chord (the tangent at the piece's
+    // end turns up to ARC_STEP / 2 away from the chord).  Placed so that only that corner reaches into the target, at
+    // its top left corner: the arc's start (177 - 377 + 200, 152) = (23 - 120, 152), its cap from y 152 down to 72, from
+    // x -177 + 80 = -97 inwards; the target's corner (-100, 75) lies 3 px inside the cap's corner
+    let mut s = t.res(Scene::new(&r), "Scene::new")?;
+    let l = t.res(s.add_layer(&Layer::new(0)), "add_layer")?;
+    t.res(s.set_camera(&cam), "camera")?;
+    let mut st = Style::new(0xFF00_0000);
+    st.width = 160.0;
+    st.cap = Cap::Square;
+    let sid = t.res(s.add_style(&st), "add_style")?;
+    t.res(s.insert(l, sid, &render2d::Shape::Arc { center: [-377.0, 152.0], radius: 200.0, start: 0.0, sweep: render2d::ARC_STEP }), "insert")?;
+    let a = shot(t, dev, &mut off, &mut r, &mut s, "a square cap's corner, culled")?;
+    s.set_culling(false);
+    let b = shot(t, dev, &mut off, &mut r, &mut s, "a square cap's corner, not culled")?;
+    let ink = b.chunks_exact(4).filter(|p| p[0] < 0x80 && p[1] < 0x80 && p[2] < 0x80).count();
+    let nd = a.chunks_exact(4).zip(b.chunks_exact(4)).filter(|(x, y)| x[..3] != y[..3]).count();
+    t.ok(ink >= 4 && nd == 0, &format!("{level}: a wide arc's square cap reaching into a corner of the target: {ink} dark pixels drawn, culled against not culled: {nd} pixels differ"));
     Some(())
 }
 

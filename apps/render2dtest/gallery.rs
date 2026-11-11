@@ -1240,9 +1240,15 @@ pub fn exact_arc(a: [f64; 2], b: [f64; 2], r: f64, st: &Style, cam: &Camera, siz
     let rp = r / cam.scale;
     let c = 0.5 * sqrt((p1[0] - p0[0]) * (p1[0] - p0[0]) + (p1[1] - p0[1]) * (p1[1] - p0[1]));
     let sag = c * c / (rp + sqrt((rp * rp - c * c).max(0.0)));
+    // (cull.wgsl: a square cap's corner, the tangent at the end turned away from the chord)
+    let wpx = match st.unit {
+        Unit::Drawing => st.width as f64 / cam.scale,
+        _ => st.width as f64,
+    };
+    let cap = if st.cap == Cap::Square { 0.18 * (0.5 * wpx).max(0.5) } else { 0.0 };
     let mut st2 = *st;
     st2.join = Join::Bevel;
-    exact_grown(a, b, &st2, false, sag, cam, size)
+    exact_grown(a, b, &st2, false, sag + cap, cam, size)
 }
 
 /// vs_arc's quads of a circle of radius rp px and half width h in a target of `size`, computed again on the CPU (f64,

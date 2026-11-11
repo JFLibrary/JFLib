@@ -73,6 +73,11 @@ fn shown(i: u32) -> bool {
     var bulge = 0.0;
     if arc {
         bulge = sagitta(0.5 * length(p1 - p0), (bitcast<f32>(r.v.x) + bitcast<f32>(r.v.y)) * view.rest.z);
+        // (a square cap follows the tangent at its end, which turns up to ARC_STEP / 2 away from the chord: its corner
+        // reaches h (cos + sin) of that along and across it, below 1.18 h)
+        if cap_of(st) == CAP_SQUARE {
+            bulge += 0.18 * h;
+        }
     }
     // (f32 holds 24 bits of a point far away: what that may cost, many times over)
     let reach = h * select(1.0, reach_bound(st), joined) + bulge + 1.0 + 1e-3 + 4e-6 * (length(p0) + length(p1));
