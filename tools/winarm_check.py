@@ -2,9 +2,10 @@
 They are built beforehand in build/win-arm64 (on an x64 PC or runner: build_rs.py app NAME --target win --arch
 aarch64), so the machine needs no compiler.  .github/workflows/arm64-windows.yml runs this there.
 
-    python tools/winarm_check.py [--dir DIR] [--other-module FILE] [--only scripts|crash|module]
+    python tools/winarm_check.py [--dir DIR] [--other-module FILE] [--only scripts|crash|module] [--gallery-all]
 
-    scripts  every script of coretest and plattest, and a start of the gallery (basic.uis, with a picture)
+    scripts  every script of coretest and plattest, and a start of the gallery (basic.uis, with a picture;
+             --gallery-all: every script of the gallery)
     crash    what no script runs: plattest --test crash, guardcrash and panic end in the crash handler with
              exit code 3 and no FAIL (the CONTEXT of ARM64, RtlVirtualUnwind, the trampoline's unwind data)
     module   codectest with the module jxlenc: its files equal the linked writer's byte for byte, a panic and
@@ -17,6 +18,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -24,7 +26,7 @@ import build_rs
 from tools import host_exec
 
 ROOT = build_rs.ROOT
-SCRIPTS = {"coretest": None, "plattest": None, "gallery": ["basic.uis"]}   # None: every script
+SCRIPTS = {"coretest": None, "plattest": None, "gallery": ["basic.uis"]}   # None: every script (--gallery-all)
 FIXTURES = ROOT / "apps" / "codectest" / "fixtures"
 
 
@@ -63,12 +65,27 @@ def scripts(t, d):
 
     build_rs.run_exe = run_exe
     for app, only in SCRIPTS.items():
-        for r in build_rs.run_app_tests(app, "win", d / f"{app}.exe"):
-            if r["status"] == "skipped" or (only and r["script"] not in only):
+        exe = d / f"{app}.exe"
+        records = build_rs.run_app_tests(app, "win", exe) if only is None else [one_script(app, exe, s) for s in only]
+        for r in records:
+            if r["status"] == "skipped":
                 continue
             bad = [ln for ln in r.get("output", "").splitlines() if not ln.startswith("PASS")]
             t.check(r["status"] == "passed", f"{app}/{r['script']} ({r['duration']:.1f} s)",
                     "" if r["status"] == "passed" else f"exit {r['exit_code']}\n   " + "\n   ".join(bad[-40:]))
+
+
+def one_script(app, exe, name):
+    """one script of app, as build_rs.run_app_tests runs each (its #!args, its timeout, the folders of its pictures)"""
+    script = ROOT / "apps" / app / "tests" / name
+    for line in script.read_text(encoding="utf-8").splitlines():
+        if line.startswith(("shot ", "dump ")) and len(line.split()) > 1:
+            (ROOT / line.split()[1]).parent.mkdir(parents=True, exist_ok=True)
+    args = build_rs.script_args(script) + ["--script", script.relative_to(ROOT).as_posix()]
+    started = time.monotonic()
+    r = build_rs.run_exe("win", exe, args, timeout=build_rs.script_timeout(script))
+    return dict(script=name, status="passed" if r.returncode == 0 else "failed", exit_code=r.returncode,
+                duration=time.monotonic() - started, output=r.stdout + r.stderr)
 
 
 def crash(t, d):
@@ -109,7 +126,7 @@ def module(t, d, other):
             c, out = run(exe, ["--convert-ex", FIXTURES / "a1_rgba.png", "--to", tmp / "y.jxl", "--jxlenc", other])
             line = next((ln for ln in out.splitlines() if "jfgui" in ln), out.strip()[:300])
             t.check(c == 0 and "another processor" in out and (tmp / "y.jxl").is_file(),
-                    f"jxlenc: the x64 module is refused (LIBE_ARCH), the linked writer saves: exit {c}", line)
+                    f"jxlenc: the other processor's module is refused (LIBE_ARCH), the linked writer saves: exit {c}", line)
 
 
 def main():
@@ -117,7 +134,10 @@ def main():
     ap.add_argument("--dir", default=str(ROOT / "build" / "win-arm64"), help="the built programs")
     ap.add_argument("--other-module", help="jxlenc.dll built for x64 (must be refused)")
     ap.add_argument("--only", choices=("scripts", "crash", "module"))
+    ap.add_argument("--gallery-all", action="store_true", help="every script of the gallery, not only a start")
     a = ap.parse_args()
+    if a.gallery_all:
+        SCRIPTS["gallery"] = None
     d = Path(a.dir)
     print(f"host {host_exec.host_arch()}, programs in {d} for {host_exec.exe_arch(d / 'plattest.exe')}", flush=True)
     t = Tally()
