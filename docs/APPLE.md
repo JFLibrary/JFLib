@@ -2,7 +2,7 @@
 
 Nachtrag 2026-11-10: AP5 ist auch von Hand auf dem iPhone geprüft, AP8 (Pakete, Updates, CI, Developer ID und
 Notarisierung, Dokumentation und Website) ist fertig, AP1 (Safari auf dem Mac und dem iPhone) ebenso. AP6 (Metal) ist bis AP6f gebaut (Stufe
-Basis, macOS und iOS-Simulator; das iPhone und drei offene Bildvergleiche von `render3dtest` stehen aus, unter AP6).
+Basis, macOS, iOS-Simulator und iPhone; drei Bildvergleiche von `render3dtest` und der Standard der UI-Ausgabe sind offen, unter AP6).
 
 Stand 2026-11-09, auf Basis von `main` ba9e6d03. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
 und der Kern von `plat`), AP3 (`plat` ohne Fenster), AP4 (Fenster auf macOS), AP7 (Desktop-Dienste) und AP5 (iOS) bis
@@ -478,8 +478,16 @@ Im Simulator: `gputest --test all` grün (461 Prüfungen, `msl` 718 von 721), `r
 offenen Fällen wie auf dem Mac (unten), `uigputest` unter UIKit (`simapp`): `switch`, `images`, `imgplain`, `viewplain`,
 `viewbasis`, `viewlose`, `lose`, `canvasplain`, `idle` grün; was Fenster eines Desktops braucht (neue Größe, zweites
 Fenster, DC), ist dort `SKIP`, `view` kam bis zur Ruhe nach der Animation grün und wartet danach auf eine neue Größe. Die Mobile Gallery
-zeigt mit `jfgui_GPU=1` im Simulator dasselbe Bild über Metal. **Offen:** das iPhone (braucht die Freigabe und das
-Entsperren durch den Nutzer), Drehen des Geräts (`simctl` kann es nicht).
+zeigt mit `jfgui_GPU=1` im Simulator dasselbe Bild über Metal.
+
+**Auf dem iPhone 14 (A15, Familie Apple8, iOS 27.2; 2026-11-11, vom Nutzer entsperrt):** `gputest --test all` grün (499
+Prüfungen). `uigputest` unter UIKit: `switch`, `images`, `imgplain`, `viewplain`, `viewbasis`, `lose`, `idle` grün (jedes
+dargestellte Bild zurückgelesen, keins anders). `render3dtest`: jeder Test einzeln grün bis auf `pbr` und `srgb`, mit denselben
+Abweichungen wie auf dem M2 (`pbr` 121 Pixel, `srgb` „tex“ 47–48 Pixel). `--test all` in einem Lauf beendet iOS nach
+`textures` mit Signal 9 (vermutlich der Speicher eines Programms ohne Szene, das 90 große Texturen hinter vielen anderen
+Tests anlegt; `textures` allein ist grün). Die Mobile Gallery geht mit `jfgui_GPU=1` nach 482 ms auf die Swapchain und
+zeigt dasselbe Bild. `tools/apple.py device` gibt die `jfgui_*`-Variablen jetzt an das Programm weiter. **Offen:** das Drehen
+des Geräts.
 
 **AP6f umgesetzt (2026-11-10):** [GPU.md](GPU.md), CHANGELOG, API.md, ROADMAP. Stufe Voll (AP6g) bleibt eine eigene Entscheidung.
 

@@ -590,8 +590,11 @@ def device_run(app, args, timeout=600):
     run(["xcrun", "devicectl", "device", "install", "app", "--device", udid, app], timeout=300)
     if devicectl_json(["device", "info", "lockState", "--device", udid]).get("passcodeRequired"):
         raise RuntimeError("the iPhone is locked: unlock it, iOS starts no app before (installed)")
+    # (the caller's jfgui_* settings reach the program too, as in the simulator)
+    env = {k: v for k, v in os.environ.items() if k.startswith("jfgui_")}
+    extra = ["--environment-variables", json.dumps(env)] if env else []
     r = subprocess.run(["xcrun", "devicectl", "device", "process", "launch", "--console", "--terminate-existing",
-                        "--device", udid, bundle_id, *map(str, args)],
+                        *extra, "--device", udid, bundle_id, *map(str, args)],
                        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
     return r.returncode, r.stdout + r.stderr
 
