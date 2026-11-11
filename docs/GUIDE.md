@@ -3764,7 +3764,7 @@ let f = ui.text.load_mem(MONO, 0);
 if f >= 0 { ui.mono_font_set(f as u32); }
 self.code = CodeDoc::from_text(&text);
 self.code.tab_width = 4;               // use_tabs = true indents with tabs
-self.hl = Highlighter::for_name("main.rs");   // rust(), json(), ini(), toml(), markdown(), plain()
+self.hl = Highlighter::for_name("main.rs");   // rust(), json(), ini(), toml(), markdown(), javascript(), css(), html(), wat(), plain()
 
 // in frame: the editor fills its place (ids ID_CODE .. ID_CODE + 15)
 ui.next_size(-1, -1);
@@ -3856,6 +3856,34 @@ if let Some(d) = ui.code_diag(ID_CODE) { self.status = format!("{}:{}: {}", d.li
   so their braces match as a bracket pair). A grammar of one's own gets such strings with
   `Rule::Interp { open, close, start }`. `editortest --test model` compares it token by token
   with `script::tokens`.
+* The web's languages (view-source, developer tools): `Highlighter::javascript()`, `css()`,
+  `html()` and `wat()` (`for_name` of `js` / `mjs` / `cjs`, `css`, `html` / `htm` / `xhtml` /
+  `xml` / `svg`, `wat` / `wast`; the grammars `JAVASCRIPT`, `CSS`, `HTML`, `WAT`):
+  * JavaScript: keywords (a member after `.` never is one: `p.catch(..)` is a call), `true` /
+    `null` / `undefined` / `NaN`, strings with escapes, regular expressions where an expression
+    may start (`SY_STRING`; `a / b` stays a division), template strings over lines whose
+    `${…}` holds highlighted code (delimiters `SY_META`, braces inside count), numbers (`1n`,
+    `0x1F`, `1_000`), calls, capitalised names as types, `//` and `/* */`.
+  * CSS: selectors (`.class` `SY_TYPE`, `#id` `SY_CONST`, `:hover` / `::before` `SY_META`),
+    at-rules (`SY_KEYWORD`), blocks over lines with their properties (`SY_KEY`), numbers with
+    units and `%`, `#fff` colours (`SY_NUMBER`), functions (`calc(`, `url(`), `!important`,
+    nested rules; minified sheets highlight the same.
+  * HTML (also XML and SVG): tags over lines (names `SY_KEYWORD`, attributes `SY_KEY`, values
+    with or without quotes `SY_STRING`), comments, CDATA, `<!DOCTYPE>` / `<?xml?>`
+    (`SY_META`), character references (`SY_ESCAPE`), a lone `<` as text. The content of
+    `<script>` is highlighted as JavaScript and that of `<style>` as CSS up to their end tag,
+    which ends them whatever is open (as a browser does).
+  * WAT: module fields and block keywords, instructions (`SY_FUNC`: `i32.add`, `local.get`,
+    `call`), value and reference types, `$names` (`SY_META`), numbers, strings, `;;` and nested
+    `(; ;)` comments.
+
+  Two rules make such languages: `Rule::Nest { open, close, kind, inner }` highlights the text
+  between two delimiters with another grammar's rules (an HTML tag, a template string and its
+  `${…}`; `close` counts only outside the inner grammar's strings and comments), and
+  `Rule::Element { name, tag, inner }` an element whose content is another language. The line
+  state then holds the inner grammar's state (three levels: a page, its script's template
+  string, the code in its `${…}`). `editortest --test model` checks tokens and states across
+  lines of all four and the long-line checkpoints of a minified page, script and style sheet.
 
 **Language services, breakpoints and folding.** A language plugs into the editor with a
 [`CodeAssist`](../lib/ui/code_assist.rs) (like `Highlighter` for colours): completion items,

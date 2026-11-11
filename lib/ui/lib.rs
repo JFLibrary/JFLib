@@ -112,6 +112,7 @@ pub use highlight::{
     SY_FUNC, SY_HEADING, SY_KEY, SY_KEYWORD, SY_LINK, SY_META, SY_NUMBER, SY_PUNCT, SY_STRING, SY_STRONG, SY_TEXT, SY_TYPE, TOML,
 };
 pub use highlight::JFS; // (L6) the grammar of JFScript's .jfs
+pub use highlight::{CSS, HTML, JAVASCRIPT, WAT}; // (E10) the web's languages: view-source, developer tools
 mod code_edit;
 mod code_long;
 pub use code_edit::{CodeStatus, CE_NO_FIND, CE_NO_FRAME, CE_NO_GUTTER, CE_NO_LINE, CE_READONLY};
