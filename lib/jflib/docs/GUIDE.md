@@ -122,7 +122,14 @@ panic = "unwind"
   thread: its own `std::thread`s, a thread of `plat::thread_spawn`, the UI thread inside
   `App::frame`. JFLib writes nothing for it; `rt::panic_take()` gives its text as the crash report
   would show it, with file and line (`"panicked at src/page.rs:12:5:\nindex out of bounds: ..."`),
-  where the payload holds the message alone.
+  where the payload holds the message alone. On Windows the file in it has backslashes
+  (`"panicked at src\\page.rs:12:5:\n..."`, the path as Cargo hands it to rustc): compare the
+  file with both separators or by its name.
+* Unit tests of a library crate with std (an app's own style crate, `cargo test`): the test binary
+  has the test harness's `main`, but plat's start of a std program asks for the `jfgui_main` a
+  program's `main!` defines, so it does not link (an unresolved `jfgui_main`). One line in the
+  crate's `lib.rs` gives it a stub that is never called: `#[cfg(test)] ui::test_main!();`
+  (`rt::test_main!()` for crates without ui). Tests unwind, the stub has no panic check.
 * A panic nobody catches ends the program as before: JFLib's crash report (stderr, the crash
   hook), exit code 3. That holds when it leaves the program's start (`App::frame`, `command`, the
   tasks of `ui.spawn`), a thread of JFLib's (`plat::thread_spawn`, the jobs of
@@ -3045,7 +3052,9 @@ if self.grid {
   }
   ```
 
-  Tables have no kind of their own yet: their cells are `K_TEXT` records.
+  Tables have no kind of their own yet: their cells are `K_TEXT` records. The canvas's own
+  record (`K_CANVAS`) has no name unless `ui.canvas_label("Webseite")` comes right before
+  `ui.canvas`: then a screen reader says it and a script finds it as `canvas:"Webseite"`.
 
 **Screen magnifiers** follow the focus and the text caret. Text boxes report their caret
 (`ime_pos`, which a text widget of your own calls with its caret's rectangle, like the IME): the

@@ -129,6 +129,8 @@ pub(crate) struct W {
     pub(crate) next_flags: u32,
     /// (E3) cursor_next: the cursor of the next hit box (any CUR_*; 0 = its flags' shape)
     pub(crate) next_cursor: u32,
+    /// (E14) canvas_label: the name of the next canvas's own record ("" = none)
+    pub(crate) next_canvas_label: alloc::string::String,
     pub(crate) next_icon: u32,
     pub(crate) place_auto: u32,
     pub(crate) place_main: i32,

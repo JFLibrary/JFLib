@@ -163,7 +163,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
 - [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `key_event_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
-- [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
+- [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`, `canvas_label`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_preedit`, `ime_enable`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
@@ -223,6 +223,12 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
 
 - **`main!(...)`**
   (see above)
+
+- **`test_main!(...)`**
+  (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
+  std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
+  the tests do not link.  Never called (the test harness has its own main); no panic check
+  (tests unwind).  `#[cfg(test)] ui::test_main!();` in the crate's lib.rs
 
 - **`__ui_panic_check!(...)`**
   ui::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
@@ -937,6 +943,10 @@ Label strings are copied, so they may live in scratch buffers.
   HB_CURSOR_SHIFT), default crosshair (with HB_CURSOR_SET as given: 0 is the arrow).
   next_flags(HB_KEYS): every key is the canvas's while it has the focus (a press gives it
   the focus, so does ui.focus(id)); it takes them with ui.key_take.
+- **`fn canvas_label(&mut self, label: &str)`**
+  (E14) the name of the next canvas's own K_CANVAS record ("Webseite"): what a screen
+  reader says for it and a script's `canvas:"Webseite"` selector; the records the canvas
+  publishes for its content (sem_rect) stay as they are
 
 ### Popups, menus, command table, tooltips
 
@@ -49342,6 +49352,12 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
 
 - **`main!(...)`**
   (see above)
+
+- **`test_main!(...)`**
+  (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
+  std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
+  the tests do not link.  Never called (the test harness has its own main); no panic check
+  (tests unwind).  `#[cfg(test)] rt::test_main!();` in the crate's lib.rs
 
 - **`__rt_panic_check!(...)`**
   rt::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with

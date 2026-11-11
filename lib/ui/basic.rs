@@ -929,7 +929,16 @@ impl Ui {
             inp.ppress.push(self.mprs[i]);
         }
         self.dmg_canvas_seen(id); // (U1) rectangle for canvas_damage
-        self.sem(K_CANVAS, id, None, 0);
+        // (E14) its own record, named by canvas_label
+        let label = core::mem::take(&mut self.wp.lay.next_canvas_label);
+        self.sem(K_CANVAS, id, if label.is_empty() { None } else { Some(&label) }, 0);
         &self.uiinput
+    }
+
+    /// (E14) the name of the next canvas's own K_CANVAS record ("Webseite"): what a screen
+    /// reader says for it and a script's `canvas:"Webseite"` selector; the records the canvas
+    /// publishes for its content (sem_rect) stay as they are
+    pub fn canvas_label(&mut self, label: &str) {
+        self.wp.lay.next_canvas_label = String::from(label);
     }
 }

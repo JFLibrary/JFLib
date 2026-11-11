@@ -109,6 +109,21 @@ macro_rules! main {
     };
 }
 
+/// (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
+/// std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
+/// the tests do not link.  Never called (the test harness has its own main); no panic check
+/// (tests unwind).  `#[cfg(test)] rt::test_main!();` in the crate's lib.rs
+#[macro_export]
+macro_rules! test_main {
+    () => {
+        #[allow(unsafe_code, dead_code)]
+        #[unsafe(no_mangle)]
+        fn jfgui_main() -> i32 {
+            0
+        }
+    };
+}
+
 /// rt::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
 /// std built with the feature `unwind` may unwind as well
 #[cfg(not(feature = "unwind"))]

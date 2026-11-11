@@ -8,6 +8,7 @@
 //   menus at a point     a right click on the page opens its menu one pass later, where the
 //                        click was (ui.menu_popup_at), as when an engine answers; "Menü später"
 //                        opens a flyout of the app's own at a point of the page (ui.popup_open_at)
+//   the page's record    named "Webseite" (ui.canvas_label, E14)
 //   the links            drawn by the page itself, published as K_LINK records without a hit box
 //                        (ui.sem_rect): a script clicks one by its label, the page gets the click
 //   "Dateien öffnen"     the file dialog with FD_MULTI in the folder --files DIR (E8): several
@@ -222,6 +223,7 @@ impl ViewTest {
             ui.cursor_next(own);
             cur = own;
         }
+        ui.canvas_label("Webseite"); // (E14) the name of the page's own record
         let inp = ui.canvas(ID_PAGE, None, 0, 0).clone();
         let r = inp.rect;
         ui.draw_color(0xFFFF_FFFF);
