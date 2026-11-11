@@ -400,6 +400,9 @@ SPIR-V dieser beiden Erzeuger: logische Adressierung, strukturierter Kontrollflu
   Continue-Konstrukt an Ort und Stelle. Ressourcen, Built-ins, private und Workgroup-Variablen sind
   Parameter jeder Funktion, die sie benutzt. Vorzeichenbehaftete Ganzzahl-Arithmetik läuft über
   vorzeichenlose (sie läuft über wie in SPIR-V und WGSL; in MSL wäre ein Überlauf undefiniert).
+- **Texturzugriffe:** `textureLoad` klemmt Stufe, Schicht, Probe und Koordinate in die Textur, ein Speichern
+  außerhalb fällt weg (Metals `read()`/`write()` außerhalb sind undefiniert, WGSL erlaubt beides); Proben mit
+  Gleitkomma-Koordinate runden und klemmen die Schicht.
 - **Grenzen:** Farbausgaben an den Orten 0 bis 7 (Metal), keine Laufzeit-Arrays von Ressourcen
   (Bindless), keine 64-Bit-Gleitkommazahlen, keine nicht konstanten Texel-Offsets, kein Sprung aus
   einer Schleife heraus innerhalb eines `switch`.

@@ -491,12 +491,27 @@ des Geräts.
 
 **AP6f umgesetzt (2026-11-10):** [GPU.md](GPU.md), CHANGELOG, API.md, ROADMAP. Stufe Voll (AP6g) bleibt eine eigene Entscheidung.
 
-**Offen in AP6, zu entscheiden.** (1) `render3dtest`: `srgb`, `validate` und `pbr` weichen auf dem M2 (Mac und Simulator)
-ab: das Bild „tex“ in 20–70 von 57 600 Pixeln, in Quad-Paaren und von Lauf zu Lauf anders, die Tiefe bitgleich;
-`pbr` Normal-Maps 28 bzw. 121 Pixel. Die Vermutung ist ein Verhalten der Hardware (Apple-GPUs setzen Quads aus Fragmenten
-verschiedener Dreiecke zusammen, die Ableitungen an Kanten hängen dann von der Reihenfolge ab), belegt ist sie nicht.
-Mit `MTL_SHADER_VALIDATION=1` verschwindet die Abweichung. (2) Der Standard der UI-Ausgabe auf Apple (`DEFAULT_ON_APPLE`,
-vorerst aus): die Zahlen stehen unter AP6d, die Latenz bis zum Bildschirm fehlt.
+**Untersucht (2026-11-11): die Abweichungen von `render3dtest` auf Apple-GPUs.** Auf M2 (Mac, Simulator) und A15 (iPhone) gleich.
+- **Das Bild „tex“ (`srgb`, `validate`) ist nicht deterministisch, und das liegt an der Hardware.** Dieselbe Szene mit demselben
+  Renderer dreimal hintereinander aufgenommen: jedes Mal 66–115 Bytes anders; die Texturen scheiden damit aus. Gibt `fs` statt
+  der Farbe die interpolierten `uv` und die Position aus, sind zwei Renderings an jedem Pixel bitgleich; gibt es die
+  Ableitungen von `uv` aus (`dpdxFine`/`dpdyFine`, ganz am Anfang des Shaders auf dem Eingang, im MSL ein schlichtes `dfdx`),
+  weichen 62–86 Pixel ab, nur in „tex“. Die Ableitung hängt also von den unsichtbaren Lanes des 2×2-Quads ab, und die belegt
+  die GPU von Lauf zu Lauf verschieden. „tex“ wählt Mip-Stufe und Texel selbst aus den Ableitungen (`floor(lod + 0.5)`, das
+  nächste Texel), dort wird das Rauschen sichtbar (bis 29 Codes in einzelnen Pixeln); der trilineare Sampler der anderen
+  Szenen glättet es unter 1. Ausgeschlossen: mit Null vorbelegte Variablen im MSL (keine Änderung), ein nie greifendes
+  `discard` gegen die Hidden-Surface-Removal (keine Änderung), Warten nach jedem Befehlspuffer (AP6c, keine Änderung).
+  Mit `MTL_SHADER_VALIDATION=1` sind zwei Renderings bitgleich (sie ändert, wie Metal den Shader ausführt).
+- **`pbr` (Normal-Maps, 121 Pixel über der Toleranz von 2, größte 11) ist deterministisch.** Metals Ableitungen sind fein, nicht
+  grob: In 1610 von 14 095 Quads der Kugeln haben die beiden Zeilen verschiedene `dpdx`. Der Rahmen der Normal-Map kommt aus den
+  Ableitungen von Position und `uv`; an Dreieckskanten weicht er dann auf diesen GPUs vom Strahlenwerfer ab.
+- **Nebenbei behoben:** `read()` außerhalb der Textur ist in Metal undefiniert, unter Vulkan und WGSL festgelegt. `shader::msl`
+  klemmt jetzt Stufe, Schicht, Probe und Koordinate von `textureLoad` in die Textur und lässt `textureStore` außerhalb fallen.
+  Die Abweichung von „tex“ blieb danach dieselbe.
+
+**Offen in AP6, zu entscheiden.** (1) `render3dtest` auf Apple: eine Toleranz nur für diese GPUs (in „tex“ einige Pixel je Bild,
+in `pbr` die Normal-Maps), begründet mit dem Befund oben, oder weiter suchen. (2) Der Standard der UI-Ausgabe auf Apple
+(`DEFAULT_ON_APPLE`, vorerst aus): die Zahlen stehen unter AP6d, die Latenz bis zum Bildschirm fehlt.
 
 **Fallen, schon bekannt.** Metal schaltet beim Übersetzen zur Laufzeit schnelle Mathematik ein (NaN, Unendlich,
 Kontraktion); MSLs `float3` ist 16 Byte groß (in Puffern `packed_float3`); `[[vertex_id]]` und `[[instance_id]]`

@@ -827,8 +827,14 @@ impl Fx<'_, '_> {
                 let (c, layer) = self.int_coord(o[1], dim, arrayed)?;
                 let want = format!("{}4", sampled);
                 let texel = self.co_value(o[2], &want)?;
+                // (Metal's write() outside the image is undefined: such a store is dropped, as WGSL allows)
+                let size = self.image_size(&img, dim, "");
+                let mut inside = if Self::base_comps(dim) == 1 { format!("{} < {}", c, size) } else { format!("all({} < {})", c, size) };
+                if let Some(l) = &layer {
+                    inside.push_str(&format!(" && {} < {}.get_array_size()", l, img));
+                }
                 let layer = layer.map(|l| format!(", {}", l)).unwrap_or_default();
-                self.line(&format!("{}.write({}, {}{});", img, texel, c, layer));
+                self.line(&format!("if ({}) {}.write({}, {}{});", inside, img, texel, c, layer));
             }
             op::ConvertFToU | op::ConvertFToS | op::ConvertSToF | op::ConvertUToF | op::UConvert | op::SConvert | op::FConvert => {
                 let src = self.rt(o[0]);
@@ -1286,6 +1292,19 @@ impl Fx<'_, '_> {
     }
 
     /// an integer coordinate as uint(N) and the layer
+    /// the size of an image as the type of its integer coordinate (uint, uint2, uint3) at level lod ("": its first)
+    fn image_size(&self, img: &str, dim: u32, lod: &str) -> String {
+        let n = Self::base_comps(dim);
+        let mut parts = alloc::vec![format!("{}.get_width({})", img, lod)];
+        if n >= 2 {
+            parts.push(format!("{}.get_height({})", img, lod));
+        }
+        if n >= 3 {
+            parts.push(format!("{}.get_depth({})", img, lod));
+        }
+        if n == 1 { parts.remove(0) } else { format!("uint{}({})", n, parts.join(", ")) }
+    }
+
     fn int_coord(&self, c: u32, dim: u32, arrayed: bool) -> Result<(String, Option<String>), String> {
         let e = self.v(c)?;
         let n = Self::base_comps(dim);
@@ -1399,14 +1418,25 @@ impl Fx<'_, '_> {
                 format!("{}.gather_compare({}, {}{}, {}{})", img, s, c, layer, self.v(o[2])?, offset)
             }
             op::ImageFetch | op::ImageRead => {
+                // Metal's read() outside the image is undefined (values that change from run to run, docs/APPLE.md
+                // AP6): level, layer, sample and coordinate are clamped into the image, one of the results WGSL allows
                 let (c, layer) = self.int_coord(o[1], dim, arrayed)?;
-                let layer = layer.map(|l| format!(", {}", l)).unwrap_or_default();
-                let extra = if let Some(v) = ops.get(&spv::img::Sample) {
-                    format!(", uint({})", self.v(v[0])?)
-                } else if let Some(v) = ops.get(&spv::img::Lod) {
-                    if dim == 0 || opc == op::ImageRead { String::new() } else { format!(", uint({})", self.v(v[0])?) }
-                } else {
-                    String::new()
+                let sample = match ops.get(&spv::img::Sample) {
+                    Some(v) => Some(self.v(v[0])?),
+                    None => None,
+                };
+                let lod = match ops.get(&spv::img::Lod) {
+                    Some(v) if sample.is_none() && dim != 0 && opc != op::ImageRead => {
+                        Some(format!("min(uint({}), {}.get_num_mip_levels() - 1u)", self.v(v[0])?, img))
+                    }
+                    _ => None,
+                };
+                let c = format!("min({}, {} - 1u)", c, self.image_size(&img, dim, lod.as_deref().unwrap_or("")));
+                let layer = layer.map(|l| format!(", min({}, {}.get_array_size() - 1u)", l, img)).unwrap_or_default();
+                let extra = match (&sample, &lod) {
+                    (Some(sm), _) => format!(", min(uint({}), {}.get_num_samples() - 1u)", sm, img),
+                    (None, Some(l)) => format!(", {}", l),
+                    _ => String::new(),
                 };
                 let e = depth4(format!("{}.read({}{}{})", img, c, layer, extra));
                 if tn.starts_with("float4") || depth { e } else { format!("{}({})", tn, e) }
