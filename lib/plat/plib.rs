@@ -717,7 +717,8 @@ unsafe extern "C" {
 // STATUS_ILLEGAL_INSTRUCTION), 3 brk (SIGTRAP / STATUS_BREAKPOINT, which Windows raises for brk #0xF000),
 // 4 division by zero: ARM64's integer division does not trap, so on Linux the code sends itself SIGFPE
 // with tgkill (the signal arrives at the instruction after the svc, +40), on Windows it does what MSVC
-// does, brk #0xF003 when the divisor is 0 (STATUS_INTEGER_DIVIDE_BY_ZERO at the brk, +20), 5 endless
+// does, brk #0xF004 when the divisor is 0 (STATUS_INTEGER_DIVIDE_BY_ZERO at the brk, +20; brk #0xF003
+// would be __fastfail: STATUS_STACK_BUFFER_OVERRUN ends the process without any handler), 5 endless
 // recursion in 4 KB frames, 6 clobber x19 .. x29, d8 .. d15 and FPCR (round towards minus infinity), then
 // write to [a1].  jfgui_gt_state -> x0 = FPCR (no x87, no direction flag).  The systems differ in cases 3
 // and 4 only: gt_code_aarch64! takes those lines and the operands they need.
@@ -835,7 +836,7 @@ gt_code_aarch64!(
     "    udiv w0, w9, w10",
     "    ret",
     "9:",
-    "    brk #0xF003",
+    "    brk #0xF004",
 );
 
 #[cfg(target_arch = "aarch64")]
