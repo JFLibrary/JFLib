@@ -25,46 +25,17 @@ use gfx::raster::Raster;
 use gfx::{Dc, Surface, FMT_XRGB, RULE_NONZERO};
 use render2d::{Camera, Cap, Join, Style, Unit};
 
-/// an entity of a test drawing
-#[derive(Clone)]
-pub enum Geo {
-    Line([f64; 2], [f64; 2]),
-    Poly(Vec<[f64; 2]>, bool),
-}
+use crate::gallery::{Drawing, Geo, Item};
 
-#[derive(Clone)]
-pub struct Item {
-    pub layer: usize,
-    pub style: Style,
-    pub geo: Geo,
-}
-
-/// layers (visible, order) and the entities in the order of insertion
-#[derive(Clone, Default)]
-pub struct Drawing {
-    pub layers: Vec<(bool, i32)>,
-    pub items: Vec<Item>,
-}
-
-impl Drawing {
-    pub fn one_layer() -> Drawing {
-        Drawing { layers: alloc::vec![(true, 0)], items: Vec::new() }
+/// the items in draw order: visible layers by order (then as added), within a layer as inserted
+fn draw_order(d: &Drawing) -> Vec<&Item> {
+    let mut ls: Vec<usize> = (0..d.layers.len()).filter(|&l| d.layers[l].0).collect();
+    ls.sort_by_key(|&l| (d.layers[l].1, l));
+    let mut out = Vec::new();
+    for l in ls {
+        out.extend(d.items.iter().filter(|i| i.layer == l));
     }
-
-    pub fn add(&mut self, style: Style, geo: Geo) {
-        self.items.push(Item { layer: 0, style, geo });
-    }
-
-    /// the items in draw order: visible layers by order (then as added), within a layer as inserted
-    pub fn draw_order(&self) -> Vec<&Item> {
-        let mut ls: Vec<usize> = (0..self.layers.len()).filter(|&l| self.layers[l].0).collect();
-        ls.sort_by_key(|&l| (self.layers[l].1, l));
-        let mut out = Vec::new();
-        for l in ls {
-            out.extend(self.items.iter().filter(|i| i.layer == l));
-        }
-        out
-    }
+    out
 }
 
 /// a style's width in pixels as render2d draws it (at least one)
@@ -84,7 +55,7 @@ pub fn draw(d: &Drawing, cam: &Camera, size: (u32, u32), bg: u32) -> Vec<u8> {
     dc.begin(&sf);
     dc.clear(&mut sf, bg);
     let mut ras = Raster::default();
-    for it in d.draw_order() {
+    for it in draw_order(d) {
         let mut p = Path::default();
         let pt = |q: [f64; 2]| {
             let s = cam.to_screen(q, size);

@@ -303,7 +303,7 @@ impl Demo {
         let View2d { dev, r, s, .. } = &mut *v;
         let (dev, r, s) = (dev.clone()?, r.as_mut()?, s.as_mut()?);
         s.set_camera(&cam).ok()?;
-        let mut off = crate::tests::Off::new(&dev, w, h).ok()?;
+        let mut off = crate::gallery::Off::new(&dev, w, h).ok()?;
         off.bg = PAPER;
         let id = off.submit(r, s).ok()?;
         if !dev.wait(id, 10_000_000_000).ok()? {

@@ -6,6 +6,7 @@
 //                    exact-area coverage) on the CPU (refimg.rs: what is compared and the tolerance)
 //        joins       miter (also beyond its limit), bevel and round joins, sharp and blunt, open and closed
 //                    polylines, against lib/gfx
+//        short       many short segments with sharp turns (the labels and details of a plan seen from afar): against lib/gfx
 //        hairlines   width 0 (1 px) at every angle and fractional positions; widths below a pixel drawn as one
 //        units       widths in drawing units and in pixels at several scales and a rotation: the same against lib/gfx
 //        overlap     translucent polylines at sharp corners, a closed one, against lib/gfx's non-zero fill (blended
@@ -14,6 +15,8 @@
 //        changes     insert, update (in place, growing at the end, growing in the middle: the layer laid out anew),
 //                    remove (free places, laid out anew), style changes, many changes at once (the scatter shader):
 //                    the image = that of a scene built anew; only what changed goes up
+//        churn       several random changes of random entities between two frames, fixed seeds (grown twice, grown
+//                    and removed right after, styles): the image = that of a scene built anew, byte for byte
 //        visibility  the visible lists against the exact test on the CPU (random scenes, fixed seeds, rotated
 //                    cameras, records exactly at the target's edges); culled = not culled
 //        coords      the same drawing at the origin and at 1e7: the same image; a deep zoom to 1e-6 units per pixel
@@ -25,6 +28,10 @@
 //                    the view in the framebuffer = the same scene offscreen
 //   render2dtest --bench N [--res 1080p|WxH] [--frames F] [--basis]   N segments (polylines of random lengths), frame
 //                GPU time and what uploads cost (bench.rs)
+//   render2dtest --bench N --scene cad [..]  the same on a town plan of N segments (cad.rs): overview, district, working
+//                zoom, hairlines and the plan's widths
+//   render2dtest --dump DIR                  gallery::shots() of both levels as DIR/voll_NAME.bgra, DIR/basis_NAME.bgra
+//                (rows of B, G, R, A): what tests/engine_web.mjs compares the browser with
 //   render2dtest --demo                      the demo: a drawing in a view, pan by dragging, zoom with the wheel at
 //                                            the pointer (in the browser and on Android the app is this)
 //   render2dtest --gen-shaders FILE          lib/render2d/shaders_spv.rs from lib/render2d/*.wgsl
@@ -39,14 +46,25 @@ extern crate alloc;
 mod demo;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 mod bench;
+#[cfg(not(target_os = "android"))]
+mod cad;
+#[cfg(not(target_os = "android"))]
+mod gallery;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 mod refimg;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 mod scenes;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 mod tests;
+#[cfg(target_arch = "wasm32")]
+mod web;
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 ui::main!(tests::run());
-#[cfg(any(target_arch = "wasm32", target_os = "android"))]
+#[cfg(target_arch = "wasm32")]
+ui::main!(match web::wanted() {
+    Some(probe) => web::start(probe),
+    None => demo::launch(),
+});
+#[cfg(target_os = "android")]
 ui::main!(demo::launch());

@@ -1,15 +1,15 @@
 # RENDER2D -- der Kern des 2D-Renderers für CAD
 
-`lib/render2d` zeichnet Zeichnungen aus sehr vielen Linien über [`lib/gpu`](GPU.md): eine Szene, die bleibt (Entitäten mit festen Ids, Ebenen, Stile), von der nur hochgeht, was sich geändert hat; Striche als Vierecke, deren Deckung der Fragment-Shader aus der Geometrie rechnet (kein MSAA), mit genauen Kappen und Ecken; Koordinaten in `f64`, auf der GPU ein Paar `f32` je Achse, von dem zuerst die Kamera abgezogen wird; Sichtbarkeit in Rechen-Shadern, die die Reihenfolge des Malers halten und die indirekten Zeichenbefehle schreiben. Wie `render3d` ist sie der Inhalt eines `ui.gpu_view`: Das Programm klebt sie mit einem `GpuContent` an, `lib/ui` kennt sie nicht. Dieselben WGSL-Quellen für Vulkan Voll, Vulkan Basis und WebGPU (im Browser noch nicht gelaufen, unten).
+`lib/render2d` zeichnet Zeichnungen aus sehr vielen Linien über [`lib/gpu`](GPU.md): eine Szene, die bleibt (Entitäten mit festen Ids, Ebenen, Stile), von der nur hochgeht, was sich geändert hat; Striche als Vierecke, deren Deckung der Fragment-Shader aus der Geometrie rechnet (kein MSAA), mit genauen Kappen und Ecken; Koordinaten in `f64`, auf der GPU ein Paar `f32` je Achse, von dem zuerst die Kamera abgezogen wird; Sichtbarkeit in Rechen-Shadern, die die Reihenfolge des Malers halten und die indirekten Zeichenbefehle schreiben. Wie `render3d` ist sie der Inhalt eines `ui.gpu_view`: Das Programm klebt sie mit einem `GpuContent` an, `lib/ui` kennt sie nicht. Dieselben WGSL-Quellen für Vulkan Voll, Vulkan Basis und WebGPU (im Browser gelaufen: [Browser](#browser)).
 
-Stand: G6a1, der Kern. Linien und Polylinien (offen, geschlossen), Ebenen, Stile mit Breite in Pixeln oder Zeichnungseinheiten, Kappen (stumpf, rund, quadratisch), Ecken (Gehrung mit Grenze, rund, abgeschrägt), Durchscheinendes ohne doppeltes Mischen an Ecken, Kamera mit Mitte, Maßstab und Drehung, Sichtbarkeit auf der GPU für Basis (ein indirekter Befehl je Ebene) und Voll (ein Multi-Draw). Noch nicht: Bögen, Kreise, Strichmuster (G6a2), Kurven, Flächen, Schraffuren, Blöcke (G6b), Text (G6c), Auswahl (G6d), CPU-Weg, DXF, andere Plattformen (G6e).
+Stand: G6a1, der Kern; G6a2a: Browser, Messszene, schneller Weg für kurze dünne Striche, Intel-Grafik, Tests (unten). G6a1, der Kern: Linien und Polylinien (offen, geschlossen), Ebenen, Stile mit Breite in Pixeln oder Zeichnungseinheiten, Kappen (stumpf, rund, quadratisch), Ecken (Gehrung mit Grenze, rund, abgeschrägt), Durchscheinendes ohne doppeltes Mischen an Ecken, Kamera mit Mitte, Maßstab und Drehung, Sichtbarkeit auf der GPU für Basis (ein indirekter Befehl je Ebene) und Voll (ein Multi-Draw). Noch nicht: Bögen, Kreise, Strichmuster (G6a2b), Kurven, Flächen, Schraffuren, Blöcke (G6b), Text (G6c), Auswahl (G6d), CPU-Weg, DXF, andere Plattformen (G6e).
 
 | Teil | Wo |
 | --- | --- |
 | `Renderer`, Pipelines, Aufzeichnen | [`lib/render2d/lib.rs`](../lib/render2d/lib.rs) |
 | `Scene`, Entitäten, Ebenen, Stile, Kamera, Hochladen | [`lib/render2d/scene.rs`](../lib/render2d/scene.rs) |
 | Shader | [`common.wgsl`](../lib/render2d/common.wgsl) (Ansicht, Records, Koordinaten), [`cull.wgsl`](../lib/render2d/cull.wgsl), [`scatter.wgsl`](../lib/render2d/scatter.wgsl), [`stroke.wgsl`](../lib/render2d/stroke.wgsl), vorübersetzt in [`shaders_spv.rs`](../lib/render2d/shaders_spv.rs) |
-| Tests, Demo, Messung | [`apps/render2dtest`](../apps/render2dtest/main.rs); die Referenz über `lib/gfx`: [`refimg.rs`](../apps/render2dtest/refimg.rs); Szenen: [`scenes.rs`](../apps/render2dtest/scenes.rs); im Fenster: [`demo.rs`](../apps/render2dtest/demo.rs); [`bench.rs`](../apps/render2dtest/bench.rs) |
+| Tests, Demo, Messung | [`apps/render2dtest`](../apps/render2dtest/main.rs); was beide Wege zeichnen und auf der CPU prüfen: [`gallery.rs`](../apps/render2dtest/gallery.rs); die Referenz über `lib/gfx`: [`refimg.rs`](../apps/render2dtest/refimg.rs); Szenen: [`scenes.rs`](../apps/render2dtest/scenes.rs); im Fenster: [`demo.rs`](../apps/render2dtest/demo.rs); im Browser: [`web.rs`](../apps/render2dtest/web.rs), [`tests/engine_web.mjs`](../apps/render2dtest/tests/engine_web.mjs); Messung: [`bench.rs`](../apps/render2dtest/bench.rs), die Messszene [`cad.rs`](../apps/render2dtest/cad.rs); [`tools/gen_area6.py`](../tools/gen_area6.py) schreibt `area6` |
 
 ## Ein Beispiel
 
@@ -86,13 +86,17 @@ Die Barrieren stehen in [`lib.rs`](../lib/render2d/lib.rs) in `Renderer::record`
 
 **Vertex-Shader.** Er legt sein Segment relativ zur Kamera in Pixel ([Koordinaten](#koordinaten)) und schneidet es auf das Ziel plus seine Reichweite zu (Liang-Barsky); ein Ende jenseits davon ist offen: keine Kappe, keine Ecke, davon zeigt sich ohnehin nichts. Das Viereck deckt das Rechteck des Segments, an jedem Ende so weit, wie seine Kappe oder Ecke darüber hinausreicht (stumpf und abgehende Ecke: 0, rund und quadratisch: die halbe Breite, ankommende Gehrung: die halbe Breite mal max(sin φ, tan(φ/2)) bis zur Spitze), und ein Pixel mehr für die geglättete Kante. Die halbe Breite ist `max(Breite / 2, 0,5)` Pixel (Breiten in Zeichnungseinheiten durch den Maßstab).
 
-**Fragment-Shader: Deckung, genau.** Der Anteil des Pixels (ein Quadrat der Seite 1) im Strich ist die Fläche des Quadrats in konvexen Stücken aus Geraden. Eine Kante allein: der Anteil der Halbebene, `cov`, der Kastenfilter einer geraden Kante unter jedem Winkel, in geschlossener Form. Die zwei parallelen Kanten des Streifens allein: `cov(links) + cov(rechts) - 1`, auch für Haarlinien genau. Mehr Kanten: `area6`, die Fläche des Quadrats in bis zu sechs Halbebenen nach dem Satz von Green (die Randstücke des Quadrats und der Geraden, jedes auf alle anderen gekürzt, die Summe der Kreuzprodukte), von einem Skript ausgeschrieben, ohne Schleifen und Felder: Mit Feldern lagen sie im lokalen Speicher, und der Shader war hundertmal langsamer. Ein Kreis wird an der Stelle des Pixels durch seine Tangente ersetzt (der Fehler ist quadratisch in der Pixelgröße über dem Radius). Die meisten Pixel liegen im Rumpf: der Streifen allein, kein Ende nahe, zwei `cov`.
+**Fragment-Shader: Deckung, genau.** Der Anteil des Pixels (ein Quadrat der Seite 1) im Strich ist die Fläche des Quadrats in konvexen Stücken aus Geraden. Eine Kante allein: der Anteil der Halbebene, `cov`, der Kastenfilter einer geraden Kante unter jedem Winkel, in geschlossener Form. Die zwei parallelen Kanten des Streifens allein: `cov(links) + cov(rechts) - 1`, auch für Haarlinien genau. Mehr Kanten: `area6`, die Fläche des Quadrats in bis zu sechs Halbebenen nach dem Satz von Green (die Randstücke des Quadrats und der Geraden, jedes auf alle anderen gekürzt, die Summe der Kreuzprodukte), von [`tools/gen_area6.py`](../tools/gen_area6.py) ausgeschrieben (`--check` vergleicht ihn mit dem Text), ohne Schleifen und Felder: Mit Feldern lagen sie im lokalen Speicher, und der Shader war hundertmal langsamer. Ein Kreis wird an der Stelle des Pixels durch seine Tangente ersetzt (der Fehler ist quadratisch in der Pixelgröße über dem Radius). Die meisten Pixel liegen im Rumpf: der Streifen allein, kein Ende nahe, zwei `cov`.
 
 **Kappen.** Stumpf: die Gerade im rechten Winkel durch das Ende. Quadratisch: dieselbe eine halbe Breite weiter. Rund: das Rechteck endet am Ende, der Halbkreis dahinter ist ein eigenes Stück; beide berühren sich nur an der Geraden, die Anteile addieren sich also genau.
 
 **Ecken: Kacheln.** Nahe einer Ecke wird der Strich an der Winkelhalbierenden zerschnitten: der Streifen dieses Segments auf seiner Seite der Halbierenden, der des Nachbarn auf der anderen; eine Abschrägung schneidet beide mit ihrer Geraden; eine runde Ecke endet in beiden Kacheln an der Geraden im rechten Winkel durch die Ecke, der Kreissektor dahinter ist ein Stück für sich (nur der Sektor außen, wie bei SVG und `lib/gfx`, kein voller Kreis, der hinter stumpfe Enden ragte). Die Kacheln überlappen nicht und füllen den Strich, solange die Sehne der Halbierenden (die halbe Breite mal tan(φ/2) entlang jedes Segments) in beiden Segmenten liegt; dann addieren sich ihre Anteile genau, und außen ergibt sich die Gehrungsspitze, die abgeschrägte Ecke oder der Bogen von selbst. Eine Gehrung über ihrer Grenze wird zur Abschrägung (Grenze wie SVG: Länge der Spitze durch die Breite).
 
 **Scharfe Ecken an kurzen Segmenten.** Ist die Sehne länger als ein Segment, nimmt der Shader die Vereinigung: die zwei Rechtecke, das Stück der Ecke jenseits beider Enden (Gehrungsviereck, Dreieck, Sektor; es berührt keines), `|a| + |w| + |b| - |a ∩ b|`. Liegt ein kurzes Segment nahe an beiden Ecken, sind es beide Vereinigungen; ausgelassen wird dann nur, wo sich die Rechtecke der zwei Nachbarn gegenseitig treffen, und der Schnitt `a ∩ b` ohne die fernen Enden (`area6` hat sechs Halbebenen). Das ist die einzige Näherung; sie trifft Polylinien, die auf wenigen Pixeln zweimal scharf umkehren.
+
+**Der schnelle Weg.** Kurze dünne Striche (Segment bis `TINY_LEN` = 3 Pixel lang, halbe Breite bis `TINY_H` = 0,75: was eine Zeichnung aus der Ferne von ihren Details zeigt) rechnen nahe ihrer Enden nicht die genaue Fläche: Die Besitzregel und die Nähe-Tests bleiben, die Kachel eines Stücks ist das Produkt aus dem Anteil seines Streifens und dem Anteil des Pixels auf seiner Seite der Halbierenden (die Kappe an einem Polylinienende eine Gerade, rund: wo sie die gleiche Fläche hielte). Längere oder breitere Striche und jeder Strich im Rumpf bleiben genau. Das macht das Bild im Dichten der Übersicht schneller (unten), an Stellen kurzer Segmente mit scharfen Knicken aber um einige Codes anders, im Einzelfall um bis 200: [Messung](#messung).
+
+**`discard` hält nicht an.** WGSL (und `OpDemoteToHelperInvocation` auf Vulkan) lässt das Programm nach einem `discard` weiterlaufen; `fs` kehrt deshalb nach jedem `discard` sofort zurück (`discard; return vec4f(0.0);`). Vorher zahlten die Pixel, die ein Nachbar besitzt, den ganzen Weg mit: 25,4 → 21,7 ms auf der RTX bei unveränderten Pixeln.
 
 **Eine Stelle für `area6`.** Die Stücke nahe eines Pixels sind Bits einer Maske (`S_*` in `stroke.wgsl`), und eine Schleife addiert (oder zieht ab) ihre Anteile; `area6` steht im Shader einmal. Vorher stand es, nach dem Einsetzen der Funktionen, an rund vierzig Stellen, und die GPU verbrachte ihre Zeit mit dem Laden von Code: in der kleinen Messung (20 000 Segmente auf 320 × 180) 6,5 ms statt 1,3 ms für Haarlinien und 17 ms statt 2,4 ms für 3 px mit runden Ecken; derselbe Shader nur mit dem Rumpf brauchte 0,05 ms.
 
@@ -109,6 +113,23 @@ Ein Punkt ist auf der CPU `f64` und auf der GPU ein Paar je Achse: `hi = f32(x)`
 Die GPU darf das nicht umstellen: Der NVIDIA-Treiber fasste `(a - (s - bb)) + (b - bb)` zusammen und verlor den `lo`-Teil. Deshalb werden die Vertex- und die Sichtbarkeits-Shader mit `wgsl::CompileOptions { exact: true }` übersetzt (`NoContraction` an jeder Rechnung); den Fragment-Shader braucht das nicht.
 
 **Prüfung** (`coords`, beide Stufen): Dieselbe Zeichnung bei (1e7, 1e7), (-9 999 999,5, π · 1e6) und (9 876 543,210987, -9 999 000) gegen am Ursprung: 0 Pixel anders. Bei 1e-6 Einheiten je Pixel nahe (-9 876 543,21, 6 543 210,987), 24 Verschiebungen um 0,37 Pixel und eine Drehung, sechs Linien bis 2e7 lang: Der Schwerpunkt jeder Bildzeile liegt höchstens 0,0039 Pixel von der Stelle, an die die Linie gehört (Ziel: 1/16 = 0,0625), keine Zeile ohne Linie.
+
+## Browser
+
+`render2dtest` im Browser: `?gpuenv=jfgui_GPU_PROBE=test` (statt der Demo), [`apps/render2dtest/web.rs`](../apps/render2dtest/web.rs); `node apps/render2dtest/tests/engine_web.mjs [build] [--modes=simd,threads,scalar]` startet Chromium kopflos über Playwright, liest die Bilder von der Konsole, vergleicht sie mit `render2dtest --dump` auf derselben Maschine. Ohne WebGPU: SKIP.
+
+Chromium 157 kopflos, RTX 2070 SUPER über D3D12 (Treiber 32.0.16.1088), die drei Bündel scalar, simd, threads:
+
+| Was | Ergebnis |
+| --- | --- |
+| Koordinaten | dieselbe Zeichnung an drei Stellen bis 1e7 gegen am Ursprung: 0 Pixel anders; 1e-6 Einheiten je Pixel nahe 1e7, 24 Pans, sechs Linien bis 2e7 lang: der Schwerpunkt jeder Zeile höchstens 0,0039 Pixel von seinem Platz (wie Vulkan: 0,0039) |
+| Besitzregel (`overlap`) | Durchscheinendes an spitzen Ecken: kein Pixel über ein einmaliges Mischen hinaus (0) |
+| Sichtbarkeit | vier zufällige Szenen gegen die genaue Rechnung auf der CPU: 0 fehlend, 0 zu viel, 0 doppelt, 0 außer der Reihe |
+| Bilder gegen Vulkan (Voll, Basis) | 45 Bilder (Kappen, Ecken, Haarlinien, Einheiten, Überlappung, kurze Segmente): 3 von 3 730 800 Pixeln um 1 Code anders; alle Bilder an allen Bündeln |
+| Validierung des Browsers | keine Meldung |
+| SwiftShader (Chromium, `--use-webgpu-adapter=swiftshader`, Vulkan in Software) | dieselben Prüfungen bestehen, Koordinaten 0,0040 px; die Bilder gegen die GPU von Vulkan 101 067 von 3,7 Mio. Pixeln um 1 oder mehr anders (anderes Runden der CPU; höchstens 3 Codes, in `short_5` ein Pixel 122 Codes): dort meldet der Test FAIL, die CPU-Prüfungen bestehen |
+
+**Damit ist die Rechnung mit den `f32`-Paaren im Browser hier bewiesen: bei Chromium 157 über D3D12 auf dieser NVIDIA-GPU und über SwiftShader; WGSL kennt kein `exact`, die Rechnung geht durch Tint und den Treiber.** Nicht bewiesen: Chromium über Vulkan (Linux, oder Windows mit dem Vulkan-Backend, das sich hier mit Flags nicht wählen ließ: dort ginge SPIR-V aus Tint ohne `NoContraction` an denselben NVIDIA-Treiber, der es auf dem Vulkan-Weg ohne `exact` wegfasste), Metal/Safari, Firefox (kopflos kein `navigator.gpu`), andere GPUs im Browser. Falls ein Ziel die Zwei-Summen wegfasst, zeigen das Bild-Test und Tiefzoom sofort; dann bliebe (nicht gebaut) die Subtraktion der Kamera auf der CPU oder undurchsichtige Null-Operationen in `two_sum` (`bitcast<u32>(s) ^ view.zero`), die kein Übersetzer zusammenfassen darf.
 
 ## Sichtbarkeit
 
@@ -142,6 +163,8 @@ Farben sind sRGB-Codes mit geradem Alpha (`0xAARRGGBB`), gemischt im Code-Raum, 
 | `overlap` | Durchscheinendes an spitzen Ecken | oben |
 | `layers` | Reihenfolge der Ebenen, `set_layer`, unsichtbare Ebenen, `remove_layer` | gegen `lib/gfx`: Tinte auf 0,03 %; `set_layer` schickt keine Records |
 | `changes` | zufällige Änderungen: einfügen, wachsen, entfernen, Stile; Läufe, Scatter, neuer Pool | jede Runde Byte für Byte wie neu gebaut, gegen `lib/gfx` |
+| `churn` | mehrere zufällige Änderungen zufälliger Entitäten zwischen zwei Bildern (festgelegte Saat: einfügen, ändern, zweimal wachsen, wachsen und gleich entfernen, Stile) | jede Runde Byte für Byte wie neu gebaut |
+| `short` | viele kurze Segmente mit scharfen Knicken (Kacheln, Vereinigungen, sich kreuzende Halbierende) gegen `lib/gfx` | Tinte innerhalb 6 % (diese Bilder falten sich: `lib/gfx` summiert Umläufe, `render2d` vereinigt; hier zählt vor allem, dass es läuft und Voll und Basis gleich sind; die Geometrie prüfen die anderen Bilder) |
 | `visibility` | oben | genau |
 | `coords` | oben | 0 Pixel, 0,0039 px |
 | `levels` | Voll gegen Basis | Byte für Byte gleich |
@@ -150,36 +173,53 @@ Farben sind sRGB-Codes mit geradem Alpha (`0xAARRGGBB`), gemischt im Code-Raum, 
 | `window` | die Demo im echten Fenster (ohne Aktivierung, ohne echte Eingabe): erstes Bild, Ziehen, Rad, jedes Mal die Ansicht im Framebuffer gegen `render2d` ohne Fenster | 0 Pixel anders; das Bild verschiebt sich mit dem Ziehen |
 | `demo` | dieselbe Demo ohne Fenster über das Skript: Ziehen und Rad bewegen die Zeichnung | Pixel an den erwarteten Stellen |
 | `bench_smoke` | die Messung, klein | läuft |
+| `bench_cad_smoke` | die Messung mit der Messszene, klein | läuft |
+| Browser (`engine_web.mjs`, kein `.uis`: läuft mit Node, Playwright) | [Browser](#browser) | oben |
 
-16 von 16 Skripten bestehen (213 Prüfungen in `--test all` je Lauf, dazu Validierung und Fenster).
+19 von 19 Skripten bestehen (441 Prüfungen in `--test all` je Lauf, dazu Validierung und Fenster). `--test all` läuft auch unter Linux auf Intel HD 610 (Fedora 44, Mesa 26), Intel Iris Xe und NVIDIA T500 (Kubuntu 26.04, Mesa 26 und Treiber 595): alle bestehen, ohne Pixelabweichung an den Prüfungen (Koordinaten 0 Pixel, 0,0040 px, Überlappung 0, Voll gegen Basis 0): die Besitzregel und die `exact`-Pässe halten auf allen vier GPUs.
 
 **Toleranzen** ([`refimg.rs`](../apps/render2dtest/refimg.rs), `Tol`): beide Seiten rechnen die genaue Fläche des Pixels im Polygon; `lib/gfx` hält sie als Byte und mischt ganzzahlig, die GPU in Gleitkomma: 1 bis 2 Codes (`STRAIGHT`). Kreise: Die GPU schneidet sie an der Tangente, `lib/gfx` zeichnet ein Vieleck, dessen Kanten bis 0,05 Pixel innen liegen: bis 13 Codes entlang jedes Bogens, mehr bei Kreisen von einem halben Pixel Radius (`round`). Innere Ecken: Der Umriss von `lib/gfx` dreht sich durch die Ecke, und seine Nicht-null-Füllung summiert die Umläufe eines Pixels, bevor sie begrenzt; wo der Umriss sich selbst überlappt, kommt ein Anteil zu hoch heraus, bis voll. Die GPU rechnet die Vereinigung; nachgeprüft Pixel für Pixel gegen den genauen Anteil einer überabgetasteten Vereinigung (GPU 0,6026, genau 0,6025, `lib/gfx` 1,0) (`corners`). Zufällige Polylinien, die auf sich zurückfalten, tun das an vielen Stellen, dazu mischen ihre Stücke, die sich fern einer Ecke treffen, auf der GPU zweimal, in `lib/gfx` einmal (`folded`). Je Vergleich also: fast jedes Pixel innerhalb `small` Codes, eine begrenzte Zahl darüber, keines über `max`, die Tinte (Summe der Abstände vom Hintergrund) innerhalb `ink`.
 
 ## Messung
 
-RTX 2070 SUPER, Windows, Vulkan, `render2dtest --bench 1000000 --frames 10`: 1 Mio. Segmente als 60 734 Polylinien aus 2 bis 33 Punkten, ein Zufallsweg mit Schritten bis 12 Pixel je Achse über 1920 × 1080 bei 1 Einheit je Pixel (also eine sehr dichte Zeichnung: jedes Pixel unter Dutzenden Strichen). Mediane über 10 Bilder, jedes Bild abgewartet; GPU-Zeiten aus den Zeitstempeln der Szene.
+Die Messszene ([`cad.rs`](../apps/render2dtest/cad.rs), `render2dtest --bench 1000000 --scene cad`, feste Saat): ein Stadtplan in Metern bei Gauß-Krüger-Koordinaten (500 000 / 5 400 000): Straßen als lange Polylinien, Grundstücke, Gebäude mit doppelten Wänden, Innenwänden, Türen, Fenstern, Treppen, Möbeln, Schraffuren, Bäume, Beschriftung aus kurzen Strichen, lange Leitungen, Höhenlinien; 461 703 Entitäten, genau 1 Mio. Segmente, 3100 × 1720 m. Drei Ansichten bei 1920 × 1080: die Übersicht (fast alles im Bild, 995 737 Segmente), ein Stadtviertel (ein Sechzehntel der Fläche, 67 000), die Arbeitsansicht (10 cm je Pixel, 4400). Hairlines (`styled`=nein) und die Breiten eines Plans (Straßen 3 px, Wände in Metern, Beschriftung rund). GPU-Zeiten aus den Zeitstempeln, Median über die Bilder.
 
-| | Voll | Basis |
-| --- | --- | --- |
-| Haarlinien, alles im Bild (984 000 sichtbar): GPU je Bild | 61,6 ms (Sichtbarkeit 0,20, Zeichnen 61,4) | 61,3 ms |
-| Haarlinien, ein Zehntel im Bild (103 000 sichtbar) | 10,1 ms | 9,8 ms |
-| 3 px, runde Ecken und Kappen, alles im Bild | 118,9 ms | 118,5 ms |
-| 3 px, ein Zehntel im Bild | 19,6 ms | 19,5 ms |
-| erstes Bild: alles hoch (61,1 MB) | `prepare` 260 ms CPU, GPU 5,0 ms | 442 ms CPU, 5,0 ms |
-| 1000 Entitäten je Bild geändert (16 563 Records, 1,26 MB) | `update` + `prepare` 6,0 ms CPU, GPU 0,20 ms | 6,6 ms, 0,20 ms |
-| Einfügen (CPU) | 53 ms | 89 ms |
+GPU je Bild, Haarlinien / Plan-Breiten (ms; Voll und Basis gleich, außer wo genannt):
 
-Die Zeit liegt im Fragment-Shader: Derselbe Durchgang mit einer festen Farbe brauchte in der kleinen Messung 0,05 ms statt 1,3 ms. Diese Szene ist das Schlimmste für ihn: Fast jedes Pixel liegt nahe an Ecken vieler kurzer Segmente. Eine CAD-Zeichnung mit langen Linien bleibt im Rumpf (zwei `cov`); die Messszene dafür kommt in G6a2. Die Sichtbarkeit kostet für 1 Mio. Records 0,2 ms, das Hochladen geänderter Entitäten unter 0,2 ms. `prepare` beim ersten Bild (Records bauen, 61 MB in den Upload-Puffer) ist nicht optimiert; die Streuung zwischen Voll und Basis dort ist CPU-Rauschen.
+| GPU | Übersicht | Stadtviertel | Arbeitsansicht |
+| --- | --- | --- | --- |
+| RTX 2070 SUPER (Windows) | **11,8** / 10,2 | 1,75 / 1,9 | 0,43 / 0,48 |
+| NVIDIA T500 (Kubuntu) | 31,2 / 32,2 | 6,3 / 6,8 | 2,2 / 2,3 |
+| Iris Xe (Kubuntu, Mesa) | 60,7 / 62,3 | 9,2 / 10,2 | 2,4 / 2,6 |
+| HD 610 (Fedora, Mesa) | 348 / 358 | 50,6 / 55,8 | 12,5 / 13,5 |
+| Browser (Chromium 157, D3D12, RTX, Haarlinien / Plan-Breiten; Wanduhr über 30 Bilder, drei voraus) | 11,1 / 11,7 (die Haarlinien an der Grenze des Wartens: ≥ 90 Bilder/s) | 11,1 / 11,1 (dieselbe Grenze) | 11,1 / 11,1 (dieselbe Grenze) |
+
+(Die Sichtbarkeit davon: RTX 0,2 ms, Iris 2 ms, T500 1,5 ms, HD 610 7,5 ms.)
+
+Vorher (G6a1, die Rechnung nur genau): RTX Übersicht 25,4 / 28,8 ms, Stadtviertel 2,0 / 2,5; Iris Xe 185 / 205, 12,5 / 13,8; HD 610 1067 / 1195, 77 / 86; T500 nicht gemessen.
+
+**Messziel (1 Mio. Segmente im Bildtakt auf RTX 2070 SUPER und Iris Xe, mindestens 30 Bilder/s auf der HD 610 und im Browser).** RTX: erreicht (11,8 ms für alle Segmente im Bild, 60 Hz und 120 Hz). Browser auf der RTX: erreicht (86 Bilder/s, die Übersicht). **Iris Xe: bei der Übersicht verfehlt** (60,7 ms, also 3,6-fach über 16,7 ms; aus Sicht einer Arbeitsansicht und eines Stadtviertels erreicht: 9,2 und 2,4 ms). **HD 610: verfehlt** (348 ms = 2,9 Bilder/s, 10,5-fach über 33 ms; ein Stadtviertel 50,6 ms, 1,5-fach; die Arbeitsansicht 12,5 ms und 13,5 erreichen die 30 Bilder/s). Text kommt erst mit G6c dazu.
+
+Woher die Zeit (RTX, Übersicht, Haarlinien, vor den Änderungen 25,5 ms): fester Farbwert im Fragment-Shader 1,3 ms (Vertex-Shader und Rasterung), Rumpf und Besitzregel 1,9 ms: der Fragment-Shader nahe der Enden kostete über 90 %. `discard` ließ das Programm weiterlaufen, 3 ms davon; das Zusammenziehen der Stücke über Polygone statt Halbebenen (`area6`) brachte die RTX auf 16 ms, machte aber Iris Xe langsamer (204 statt 185 ms) und ist deshalb nicht gebaut. Geholfen hat der [schnelle Weg](#der-shader) für kurze dünne Striche (bis 3 Pixel, halbe Breite bis 0,75). Dabei ändern sich Pixel: Die Übersicht (Haarlinien, 1 Mio.) in 541 972 von 2,07 Mio. Pixeln, 8 Codes im Mittel dieser (die Tinte +0,6 %), 30 090 Pixel über 28 Codes, höchstens 200; das Stadtviertel 55 486 Pixel (1,2 %), 2 048 Pixel in der Arbeitsansicht (0,1 %, dort Türen, Beschriftung: kurze Segmente auch nah), `short`-Testbilder 300 von 76 800 bei Linienbreite bis 1 Pixel, höchstens 179 Codes; Bilder mit längeren Segmenten (alle Prüfungen gegen `lib/gfx`, Überlappung, Koordinaten, Sichtbarkeit) unverändert, 0 Codes Unterschied. Ein weiterer Schritt für die HD 610 und die Iris (nicht gebaut): Segmente unterhalb eines Pixels gar nicht erst zeichnen (Detailgrad, Entitäten zu Punkten), und der Vertex-Shader. Ohne Detailstufe bleibt die Übersicht von 1 Mio. Segmenten auf der HD 610 bei 6 Bildern/s in der Regel und die Grenze des Fragment-Shaders der kurzen Striche liegt bei 36 ms für eine einzige feste Farbe (`fs_solid`, Vertex-Shader und Rasterung allein).
+
+Alte Messung (G6a1, dichter Zufallsweg, schlimmster Fall, RTX): 61,6 / 118,9 ms (Haarlinien / 3 px, runde Ecken), jetzt 56,5 / 112,7 ms; ein Zehntel im Bild 6,5 / 18,0 ms. Erstes Bild: `prepare` 260 ms CPU (61 MB in die Upload-Puffer), 1000 Entitäten je Bild geändert: 6 ms CPU, GPU 0,2 ms.
 
 ## Nicht gebaut, nicht geprüft
 
-- **Bögen, Kreise, Strichmuster** (G6a2, ebenso die Messszene mit langen Linien), Kurven, Flächen, Schraffuren, Blöcke (G6b), Text (G6c), Überlagerung und Auswahl (G6d), der CPU-Weg und DXF (G6e).
-- **Nur unter Windows auf der RTX 2070 SUPER gelaufen.** Linux, Android und der Browser sind gebaut (`build_rs.py app render2dtest --target linux|android|web`), aber nicht ausgeführt; der Shader hält sich an WebGPU (keine SPIR-V-eigenen Mittel, höchstens drei Bindungsgruppen, Push-Werte als `var<immediate>`), im Browser gelaufen ist er nicht. Andere GPUs: nicht geprüft; ob andere Treiber die Rechnungen des Fragment-Shaders ebenso Bit für Bit gleich machen, wie die Besitzregel es braucht (die Vertex- und Sichtbarkeits-Shader sind `exact`), ist offen.
+- **Bögen, Kreise, Strichmuster** (G6a2b), Kurven, Flächen, Schraffuren, Blöcke (G6b), Text (G6c), Überlagerung und Auswahl (G6d), der CPU-Weg und DXF (G6e).
+- **Gelaufen** auf RTX 2070 SUPER (Windows, Vulkan), T500, Iris Xe, HD 610 (Linux, Vulkan) und im Browser (Chromium 157, D3D12 und SwiftShader): oben. Nicht geprüft: Android (gebaut, nicht gelaufen), AMD, Mac/iOS (Metal), Safari, Firefox, Browser auf Intel oder über Dawn-Vulkan, Treiber mit NVIDIA unter Linux im Browser. Ob andere Treiber die Rechnungen des Fragment-Shaders ebenso Bit für Bit gleich machen, wie die Besitzregel es braucht, ist nur für die genannten GPUs gezeigt.
 - **Selbstkreuzungen fern einer Ecke** mischen zweimal (oben).
 - **Die Näherung an kurzen Segmenten** zwischen zwei scharfen Ecken (oben).
 - **Sehr viele Ebenen**: höchstens 65 535 sichtbare; jede Ebene belegt mindestens eine Seite (256 Records) im Pool.
 - **Breiten unter 1 Pixel** werden als 1 Pixel gezeichnet, nicht dünner und blasser.
-- **Leistung** bei großer Überdeckung (oben); das Schreiben des Pools beim ersten Bild auf der CPU.
+- **Leistung** bei großer Überdeckung und auf schwachen GPUs (oben); das Schreiben des Pools beim ersten Bild auf der CPU; Detailgrade für sehr kleine Entitäten.
+- **Der schnelle Weg** ändert kurze Stücke nahe ihrer Enden (oben); nicht zuschaltbar (noch: `TINY_LEN`, `TINY_H` im Shader).
+
+## Entscheidungen in G6a2a
+
+- **Kurze dünne Striche nicht auf die genaue Fläche**: bis 3 Pixel Länge und 0,75 Halbbreite ein Produkt von Anteilen (oben); Längere bleiben genau, die Prüfungen gegen `lib/gfx` unverändert. Das Messziel ohne diesen Schritt: Iris Xe 162,7 ms statt 60,7 ms.
+- **`area6` per Polygon-Kantenintegral** gebaut und verworfen: RTX 25,5 → 16 ms bei nahezu gleichen Bildern, Iris Xe 185 → 204 ms (das Programm des Fragment-Shaders wurde länger; dort zählt das zuerst).
+- **Die Grenzen der Messung im Browser** (Zeit zwischen Bildern, drei Bilder voraus, Warten über `is_done`): siehe oben; bis auf die Übersicht nur eine Untergrenze.
 
 ## Entscheidungen in G6a1
 
