@@ -80,6 +80,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** Independent app windows: WF_APP gives a window of its own on Windows (a top-level window with its own taskbar button, not minimized or hidden with the main window) without the library's title bar, so the app draws one with titlebar_begin / titlebar_end (its own widgets, the caption buttons acting on that window); X11, Wayland and macOS give it an owned window for now; viewtest tests/appwin.uis
 - **ui:** A name for a canvas's own record: ui.canvas_label(label) right before ui.canvas names its K_CANVAS record (screen readers, a script's canvas:"Label"); the GUIDE says that rt::panic_take()'s file has backslashes on Windows
 - **ui:** Unit tests of a library crate with std (an app's own style crate): ui::test_main!() and rt::test_main!() define the jfgui_main stub its test binary needs to link (#[cfg(test)] in lib.rs)
+- **build:** cargo jflib package takes a style of the app's own: PACKAGE styles= (or --styles) may name a crate of the app's dependencies with [package.metadata.jflib] style = "NAME" (its INFO file names it in the setup); it is built without JFLIB_STYLE, the library's styles as before
 
 ### Changed
 

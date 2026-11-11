@@ -92,17 +92,27 @@ pub(crate) struct Resolved {
     pub name: String,
     pub version: String,
     pub dir: PathBuf,
+    /// (E15) a style of the app's own: `[package.metadata.jflib] style = "NAME"` in its Cargo.toml
+    pub style: Option<String>,
+}
+
+/// (E15) one package of `cargo metadata`'s JSON
+pub(crate) fn resolved(p: &Value) -> Resolved {
+    let style = p.get("metadata").and_then(|m| m.get("jflib")).and_then(|j| j.get("style")).and_then(Value::str)
+        .filter(|s| !s.is_empty()).map(String::from);
+    Resolved {
+        name: p.s("name").to_string(),
+        version: p.s("version").to_string(),
+        dir: Path::new(p.s("manifest_path")).parent().map(Path::to_path_buf).unwrap_or_default(),
+        style,
+    }
 }
 
 /// every package `manifest` resolves to (cargo metadata with the dependencies, run in `cwd` for
 /// its .cargo/config.toml)
 pub(crate) fn packages(cwd: &Path, manifest: &Path) -> Result<Vec<Resolved>, String> {
     let meta = run_json(command().current_dir(cwd).arg("metadata").arg("--format-version").arg("1").arg("--manifest-path").arg(manifest))?;
-    Ok(meta.get("packages").map(Value::arr).unwrap_or_default().iter().map(|p| Resolved {
-        name: p.s("name").to_string(),
-        version: p.s("version").to_string(),
-        dir: Path::new(p.s("manifest_path")).parent().map(Path::to_path_buf).unwrap_or_default(),
-    }).collect())
+    Ok(meta.get("packages").map(Value::arr).unwrap_or_default().iter().map(resolved).collect())
 }
 
 /// what one build produced
