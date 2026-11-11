@@ -2,7 +2,7 @@
 
 Nachtrag 2026-11-10: AP5 ist auch von Hand auf dem iPhone geprüft, AP8 (Pakete, Updates, CI, Developer ID und
 Notarisierung, Dokumentation und Website) ist fertig, AP1 (Safari auf dem Mac und dem iPhone) ebenso. AP6 (Metal) ist bis AP6f gebaut (Stufe
-Basis, macOS, iOS-Simulator und iPhone; offen ist der Standard der UI-Ausgabe auf Apple, unter AP6).
+Basis, macOS, iOS-Simulator und iPhone; die UI-Ausgabe ist dort standardmäßig aus; Stufe Voll ist AP6g, unter AP6).
 
 Stand 2026-11-09, auf Basis von `main` ba9e6d03. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
 und der Kern von `plat`), AP3 (`plat` ohne Fenster), AP4 (Fenster auf macOS), AP7 (Desktop-Dienste) und AP5 (iOS) bis
@@ -515,8 +515,8 @@ höchstens 0,2 % der Pixel (115 von 57 600) über der üblichen Grenze liegen, b
 Pixel auf den Objekten falsch sein; die Meldungen nennen die Grenze. Alle anderen Bilder und Ziele prüfen wie bisher.
 Danach `render3dtest` 26 von 26 auf dem Mac und im Simulator, auf dem iPhone `srgb` und `pbr` grün.
 
-**Offen in AP6, zu entscheiden.** Der Standard der UI-Ausgabe auf Apple (`DEFAULT_ON_APPLE`, vorerst aus): die Zahlen stehen
-unter AP6d, die Latenz bis zum Bildschirm fehlt.
+**Entschieden (Nutzer, 2026-11-11): die UI-Ausgabe bleibt auf Apple standardmäßig aus** (`DEFAULT_ON_APPLE`; `jfgui_GPU=1`
+und `gpu on` schalten sie ein). Damit ist AP6 bis auf Stufe Voll (AP6g, eine eigene Entscheidung) fertig.
 
 **Fallen, schon bekannt.** Metal schaltet beim Übersetzen zur Laufzeit schnelle Mathematik ein (NaN, Unendlich,
 Kontraktion); MSLs `float3` ist 16 Byte groß (in Puffern `packed_float3`); `[[vertex_id]]` und `[[instance_id]]`

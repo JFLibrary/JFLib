@@ -875,8 +875,8 @@ Was das heißt:
 ### Ausgabe unter macOS und iOS
 
 Dieselbe Ausgabe wie unter Windows über Metal ([APPLE.md](APPLE.md), AP6). Ein `CAMetalLayer` liegt als Unterlayer über dem Layer der View,
-verborgen, bis sein erstes Bild kommt; darunter bleibt das Bild des CPU-Wegs. Standard vorerst **aus**, `jfgui_GPU=1`
-schaltet ein (`DEFAULT_ON_APPLE` in [`gpu_out.rs`](../lib/ui/gpu_out.rs); die Zahlen unter AP6d in [APPLE.md](APPLE.md)).
+verborgen, bis sein erstes Bild kommt; darunter bleibt das Bild des CPU-Wegs. Standard **aus** (Entscheidung des Nutzers vom
+11.11.2026), `jfgui_GPU=1` schaltet ein (`DEFAULT_ON_APPLE` in [`gpu_out.rs`](../lib/ui/gpu_out.rs); die Zahlen unter AP6d in [APPLE.md](APPLE.md)).
 
 - **Stufe Basis.** Ansichten mit `AF_GPU_3D` bekommen ebenfalls Basis; Voll ist AP6g.
 - **Darstellung.** Nur Fifo (`Immediate` und `Mailbox` werden zu Fifo: Ein Fenster zeigt ohnehin im Takt des Compositors). Immer drei Drawables, `try_acquire` wartet nie, die Presented-Handler zählen, was angekommen ist.

@@ -229,8 +229,8 @@ const DEFAULT_ON_LINUX: bool = true;
 /// switch for it.  A run with ?agent=1 stays on the CPU path unless ?gpu=1 asks: such runs read #screen.
 /// Phones and tablets stay there too until one has been tested: web/loader.js sets jfgui_GPU=0
 const DEFAULT_ON_BROWSER: bool = true;
-/// the same on macOS (Metal, AP6): off until the measurements decide (docs/APPLE.md AP6, decision 7);
-/// jfgui_GPU=1 and a script's `gpu on` turn it on
+/// the same on macOS and iOS (Metal, AP6): off, the user's decision of 2026-11-11 after the measurements (docs/APPLE.md
+/// AP6d); jfgui_GPU=1 and a script's `gpu on` turn it on
 const DEFAULT_ON_APPLE: bool = false;
 /// the present mode (FIFO when the surface lacks it; jfgui_GPU_PRESENT overrides it): a burst of
 /// frames shows its newest within a refresh, where FIFO lags 3 .. 5 refreshes behind (docs/GPU.md
