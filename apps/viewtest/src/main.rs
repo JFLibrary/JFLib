@@ -19,6 +19,8 @@
 //                        has the focus, ui.ime_pos at its caret, the composition from
 //                        ui.ime_preedit drawn by the page ("IME:"), the committed text from
 //                        text_take ("Feld:")
+//   "Neues Fenster"      (E7) an independent app window (WF_APP) with a title bar of its own
+//                        (titlebar_begin / titlebar_end: a tab in it, the caption buttons)
 //   "Zeiger wechseln"    (E3) the page's cursor through ui.cursor_next: not-allowed, grab,
 //                        zoom-in, the north-east corner, a custom cursor of the page's own;
 //                        "Eigener größer" redraws it (ui.cursor_replace), "Eigener frei" frees it
@@ -53,6 +55,9 @@ const ID_CBIG: u32 = 109; // "Eigener größer"
 const ID_CFREE: u32 = 110; // "Eigener frei"
 const ID_RAW: u32 = 111; // "Rohe Tasten"
 const ID_IME: u32 = 112; // "Eingabefeld"
+const ID_NEWWIN: u32 = 113; // "Neues Fenster"
+const ID_APPWIN: u32 = 114; // the app window
+const ID_APPTAB: u32 = 115; // its tab in the title bar
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 
 const CMD_NEW_TAB: u32 = 1;
@@ -116,6 +121,10 @@ struct ViewTest {
     ime: i32,
     ime_on: bool,
     field: String,
+    /// (E7) the app window: open, clicks on its tab
+    app_open: Shared<i32>,
+    app_rect: Shared<WinRect>,
+    app_tab: u32,
 }
 
 // (E3) the cursors "Zeiger wechseln" walks through (0: the page's arrow / hand)
@@ -157,6 +166,9 @@ impl Default for ViewTest {
             ime: 0,
             ime_on: false,
             field: String::new(),
+            app_open: Shared::new(0),
+            app_rect: Shared::new(WinRect::new(0, 0, 480, 240, 0)),
+            app_tab: 0,
         }
     }
 }
@@ -358,6 +370,9 @@ impl App for ViewTest {
         if ui.button(ID_LATER, "Menü später") & EV_ACT != 0 {
             self.later = true;
         }
+        if ui.button(ID_NEWWIN, "Neues Fenster") & EV_ACT != 0 {
+            self.app_open.set(1);
+        }
         if ui.button(ID_FILES, "Dateien öffnen") & EV_ACT != 0 {
             // the folder of --files, so the dialog starts there
             let dir = plat::arg_value("--files").unwrap_or_default();
@@ -391,6 +406,19 @@ impl App for ViewTest {
         };
         ui.text(TS_BODY, &format!("Eigener: {own}"));
         ui.box_end();
+        // (E7) an independent app window: its own title bar with a tab and the caption buttons
+        let (open, rect) = (self.app_open.clone(), self.app_rect.clone());
+        if ui.window_begin(ID_APPWIN, "Privates Fenster", Some(&open), WF_APP | WF_RESIZABLE, Some(&rect)) {
+            ui.titlebar_begin("Privates Fenster", 0);
+            if ui.button(ID_APPTAB, "Tab Eins") & EV_ACT != 0 {
+                self.app_tab += 1;
+            }
+            ui.titlebar_end();
+            ui.box_begin(0, BOX_V | pad(12), 8);
+            ui.text(TS_BODY, &format!("Tab geklickt: {}", self.app_tab));
+            ui.box_end();
+        }
+        ui.window_end();
         // (E8) several files: the names the dialog chose, in its order
         if ui.filedlg(ID_FD, FD_OPEN | FD_MULTI, &self.fd_open, &mut self.fd_path, 4096, &["txt=Textdatei"]) & EV_ACT != 0 {
             let all = ui.filedlg_paths();

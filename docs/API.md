@@ -5567,6 +5567,12 @@ WF_NOACTIVATE: u32 = 64
 WF_AUTOHEIGHT: u32 = 128
 WF_KEYS: u32 = 256
 WF_TOUCH_HOLD: u32 = 512  // a finger moves it by the title bar only after resting there (TF_HOLD)
+/// (E7) an independent app window (a browser's second or private window): a top-level window of
+/// its own on Windows (its own taskbar button, not minimized or hidden with the main window),
+/// without the library's title bar -- the app draws one with titlebar_begin / titlebar_end
+/// (its own widgets in it, the caption buttons at its end); X11, Wayland and macOS give it an
+/// owned window for now
+WF_APP: u32 = 1024
 UWS_OPEN: u32 = 1
 UWS_VISIBLE: u32 = 2
 UWS_ACTIVE: u32 = 4
