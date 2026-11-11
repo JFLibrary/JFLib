@@ -177,7 +177,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Values and colours](#values-and-colours): `cmd_track`, `decimal_sep`, `set_decimal_sep`, `fmt_f64`, `parse_f64`, `slider_f`, `track_slider`, `prop_slider`, `prop_slider_f`, `angle`, `pan`, `swatch`, `color_picker`, `color_picker_ex`, `color_wheel`
 - [Windows](#windows): `window_title_height`, `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_snap`, `window_rect`, `window_state`, `window_fullscreen`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
 - [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars): `dialog_begin`, `dialog_buttons`, `dialog_end`, `infobar`, `statusbar_begin`, `statusbar_end`, `titlebar_begin`, `titlebar_begin_opt`, `titlebar_begin_overlay`, `titlebar_end`, `titlebar_open`
-- [File dialog](#file-dialog): `filedlg`
+- [File dialog](#file-dialog): `filedlg`, `filedlg_paths`
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
 - [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `set_theme`, `clear_theme`, `app_theme`, `load_theme`, `styles_add`, `style_names`, `style_name`, `set_style`, `dp_text`, `ts_base`
@@ -3934,7 +3934,12 @@ filedlg -- Open / Save file dialog (ContentDialog with a folder list), both OS
        (modal); Android's picker answers later: nothing is drawn while it is open, the
        chosen document arrives as its content:// name in a later frame.  Otherwise,
        headless or with jfgui_FILEDLG=builtin, the library's own dialog.
+       FD_MULTI (E8, with FD_OPEN): several files -- the system's dialog where it chooses
+       several (Windows, Linux's portal), the own dialog with Ctrl+click / Shift+click (or
+       Shift+arrows) on the rows ("a" "b" in the name box, quoted names typed there too);
+       path gets the first, ui.filedlg_paths() every chosen file.
        Widget ids used: id .. id + 0x3FFF (list rows id + 17 + i).
+  filedlg_paths() -> the files of the last confirmed dialog (one without FD_MULTI)
 
 One file dialog can be open at a time (the state below is shared).
 ```
@@ -3943,6 +3948,9 @@ One file dialog can be open at a time (the state below is shared).
 
 - **`fn filedlg(&mut self, id: u32, flags: u32, open: &Shared<i32>, path: &mut String, cap: u32, exts: &[&str]) -> u32`**
   ui_filedlg(id, flags, open, path, cap, exts) -> EV_ACT when confirmed
+- **`fn filedlg_paths(&self) -> Vec<String>`**
+  (E8) the files the last confirmed file dialog chose: with FD_MULTI every one (the first
+  is the dialog's path), else the one; empty before any
 
 ### Drawing commands
 
@@ -4078,7 +4086,7 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   theme file PATH | none        an app theme from a file (an error is printed and kept for
                                 `expect theme error`; the theme stays) / no app theme
   style NAME                    another style linked into the app (Ui::set_style)
-  move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r]
+  move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r|m] [shift|ctrl|alt]...
   rclick S        dblclick S [shift|ctrl|alt]...
                   drag S1 S2 [steps] [hold MS] [shift|ctrl|alt|right|middle]...
                   drag ... hold MS   the button rests MS ms before the first move (like
@@ -5476,6 +5484,8 @@ CF_HIDDEN: u32 = 4
 FD_OPEN: u32 = 0
 FD_SAVE: u32 = 1
 FD_FOLDER: u32 = 2
+/// (E8) open several files at once (with FD_OPEN): ui.filedlg_paths() has all of them, `path` the first
+FD_MULTI: u32 = 4
 FD_EXT_SHIFT: u32 = 8
 ```
 
@@ -25422,6 +25432,12 @@ FO_RW: u32 = 2  // open or create (contents kept), read + write
   chooses it, and OS paths need nothing.  The name must be readable under the app's
   permissions.
 
+- **`fn file_dialog_paths() -> alloc::vec::Vec<String>`**
+  (E8) the files the last system file dialog with FD_MULTI chose (its first is also in
+  file_dialog's path; Ctrl / Shift in the dialog choose more); one entry after a dialog that
+  chose one file, empty after a cancelled one.  Windows and Linux's portal choose several, the
+  other systems' dialogs one (docs/GUIDE.md section 7)
+
 - **`fn file_dialog_poll() -> Option<(i32, u32, String)>`**
   The answer of a system file dialog that answers later (file_dialog -> FD_PENDING: only
   Android's picker and the browser's, web.rs, and iOS's, apple_ios_services.rs): None while it
@@ -30362,7 +30378,8 @@ win_filedlg -- the system Open / Save dialog (comdlg32 + ole32, loaded at run ti
   file_dialog(flags, path, exts) -> (1 chosen / 0 cancelled / -1 no system dialog, index of
        the chosen extension entry)
        flags: FD_SAVE (bit 0), initial extension index in bits 8..15 (FD_EXT_SHIFT);
-       FD_FOLDER answers -1 (the library's own dialog chooses folders).
+       FD_FOLDER answers -1 (the library's own dialog chooses folders); FD_MULTI (open):
+       OFN_ALLOWMULTISELECT, every chosen file in file_dialog_paths(), path the first.
        path (UTF-8): initial file / folder in, chosen path out ('/' separators).
        exts: ["png=PNG-Bild", "jpg;jpeg=JPEG-Bild"] (extensions separated by ';', the first
        is the default, optional "=description"), empty = all.
@@ -34456,6 +34473,7 @@ PA_POINT: u32 = 4  // at a point (context menus): flips both ways
 FD_OPEN: u32 = 0
 FD_SAVE: u32 = 1
 FD_FOLDER: u32 = 2  // choose a folder (Android: a document tree; Windows: the own dialog)
+FD_MULTI: u32 = 4  // (E8) FD_OPEN: several files; all of them in file_dialog_paths()
 FD_EXT_SHIFT: u32 = 8  // bits 8..15: initially selected extension (index)
 /// file_dialog's answer when the system answers later (Android's picker): file_dialog_poll
 FD_PENDING: i32 = -2

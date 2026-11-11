@@ -10,6 +10,8 @@
 //                        opens a flyout of the app's own at a point of the page (ui.popup_open_at)
 //   the links            drawn by the page itself, published as K_LINK records without a hit box
 //                        (ui.sem_rect): a script clicks one by its label, the page gets the click
+//   "Dateien öffnen"     the file dialog with FD_MULTI in the folder --files DIR (E8): several
+//                        files at once, ui.filedlg_paths() shown as "Dateien: N a b"
 //
 // tests/keys.uis, tests/menus.uis and tests/links.uis drive it; the texts above the page say what
 // it saw.
@@ -33,6 +35,8 @@ const ID_LATER: u32 = 103; // "Menü später"
 const ID_FLYOUT: u32 = 104; // the flyout it opens at a point of the page
 const ID_ROW: u32 = 105; // its row
 const ID_TREE: u32 = 106; // "Baum prüfen": the links of the accessibility tree
+const ID_FILES: u32 = 107; // "Dateien öffnen"
+const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 
 const CMD_NEW_TAB: u32 = 1;
 const CMD_RELOAD: u32 = 2;
@@ -51,7 +55,7 @@ const DESC: AppDesc = AppDesc {
     title: "Ansichtstest",
     flags: AF_RESIZABLE,
     w: 560,
-    h: 560,
+    h: 600,
     min_w: 400,
     min_h: 360,
     cmds: &CMDS,
@@ -81,11 +85,31 @@ struct ViewTest {
     clicked: &'static str,
     /// the names of the links in the accessibility tree ("Baum prüfen")
     tree: String,
+    /// (E8) the file dialog: open, its path, the files it chose
+    fd_open: Shared<i32>,
+    fd_path: String,
+    files: String,
 }
 
 impl Default for ViewTest {
     fn default() -> Self {
-        ViewTest { sink: 1, keys: Vec::new(), new_tab: 0, reload: 0, cursor: u32::MAX, hover: 0, menu_at: None, later: false, copy: 0, rows: 0, clicked: "-", tree: String::new() }
+        ViewTest {
+            sink: 1,
+            keys: Vec::new(),
+            new_tab: 0,
+            reload: 0,
+            cursor: u32::MAX,
+            hover: 0,
+            menu_at: None,
+            later: false,
+            copy: 0,
+            rows: 0,
+            clicked: "-",
+            tree: String::new(),
+            fd_open: Shared::new(0),
+            fd_path: String::new(),
+            files: String::from("-"),
+        }
     }
 }
 
@@ -212,10 +236,25 @@ impl App for ViewTest {
             ui.cmd_run(CMD_TREE, 0);
         }
         ui.text(TS_BODY, &format!("Baum: {}", self.tree));
+        ui.box_begin(0, BOX_H, 8);
         if ui.button(ID_LATER, "Menü später") & EV_ACT != 0 {
             self.later = true;
         }
+        if ui.button(ID_FILES, "Dateien öffnen") & EV_ACT != 0 {
+            // the folder of --files, so the dialog starts there
+            let dir = plat::arg_value("--files").unwrap_or_default();
+            self.fd_path = format!("{}/", dir.trim_end_matches('/'));
+            self.fd_open.set(1);
+        }
         ui.box_end();
+        ui.text(TS_BODY, &format!("Dateien: {}", self.files));
+        ui.box_end();
+        // (E8) several files: the names the dialog chose, in its order
+        if ui.filedlg(ID_FD, FD_OPEN | FD_MULTI, &self.fd_open, &mut self.fd_path, 4096, &["txt=Textdatei"]) & EV_ACT != 0 {
+            let all = ui.filedlg_paths();
+            let names: Vec<&str> = all.iter().map(|p| p.rsplit('/').next().unwrap_or(p)).collect();
+            self.files = format!("{} {}", all.len(), names.join(" "));
+        }
         if ui.flyout_begin(ID_FLYOUT, 0) && ui.menu_item(ID_ROW, "Eintrag A") & EV_ACT != 0 {
             self.rows += 1;
         }

@@ -435,6 +435,8 @@ pub const CF_HIDDEN: u32 = 4;
 pub const FD_OPEN: u32 = 0;
 pub const FD_SAVE: u32 = 1;
 pub const FD_FOLDER: u32 = 2;
+/// (E8) open several files at once (with FD_OPEN): ui.filedlg_paths() has all of them, `path` the first
+pub const FD_MULTI: u32 = 4;
 pub const FD_EXT_SHIFT: u32 = 8;
 
 // ------------------------------------------------------------------ windows (win.rs)
