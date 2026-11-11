@@ -1699,8 +1699,29 @@ fn button(msg: u32, wp: usize) -> u8 {
 
 /// key event from wParam / lParam: VK (8 bits) | previous key state << 31  [push_key]
 fn push_key(typ: u8, wp: usize, lp: isize) {
-    let data = (wp as u32 & 0xFF) | (((lp as u32) >> 30) & 1) << 31;
-    win_push(typ, 0, 0, 0, data);
+    let vk = wp as u32 & 0xFF;
+    let data = vk | (((lp as u32) >> 30) & 1) << 31;
+    // (E2) the scan code (bits 16..23, extended: bit 24) and where the key sits
+    let sc = (lp as u32 >> 16) & 0xFF;
+    let ext = (lp as u32 >> 24) & 1 != 0;
+    let scan = if ext { 0xE000 | sc } else { sc };
+    win_push(typ, 0, scan as i32, key_location(vk, sc, ext) as i32, data);
+}
+
+/// (E2) the KL_* location of a key: the sides of Shift (scan code 0x36 right), Ctrl, Alt
+/// (extended right) and the Windows keys; the number block: VK_NUMPAD*, its operators, its Enter
+/// (extended Return) and its keys without Num Lock (navigation keys that are not extended)
+fn key_location(vk: u32, sc: u32, ext: bool) -> u32 {
+    match vk {
+        0x10 => if sc == 0x36 { crate::KL_RIGHT } else { crate::KL_LEFT },          // VK_SHIFT
+        0x11 | 0x12 => if ext { crate::KL_RIGHT } else { crate::KL_LEFT },          // VK_CONTROL, VK_MENU
+        0x5B => crate::KL_LEFT,                                                      // VK_LWIN
+        0x5C => crate::KL_RIGHT,                                                     // VK_RWIN
+        0x60..=0x6F => crate::KL_NUMPAD,                                             // VK_NUMPAD0 .. VK_DIVIDE
+        0x0D if ext => crate::KL_NUMPAD,                                             // the number block's Enter
+        0x0C | 0x21..=0x28 | 0x2D | 0x2E if !ext => crate::KL_NUMPAD,                // Clear, Page / End / Home / arrows, Ins, Del
+        _ => crate::KL_STANDARD,
+    }
 }
 
 /// wParam is a caption button hit code  [nc_is_button]

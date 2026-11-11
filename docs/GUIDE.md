@@ -777,6 +777,29 @@ if self.tab == 0 {
   ```
 
   `apps/viewtest` is such a page (`tests/keys.uis`).
+
+  A page that passes the keyboard on as it is (a web page's `keydown` / `keyup` with `repeat`,
+  `code` and `location`) takes `ui.key_event_take()` instead of `key_take`: the next
+  `KeyEvent { vk, mods, down, repeat, scancode, location }` of the batch until `None` -- downs
+  and ups, the system's auto-repeat, the key's place on the keyboard whatever the layout
+  (`scancode`: Windows' scan code with 0xE0.. for extended keys, Linux's evdev code; 0 on macOS,
+  Android and in the browser) and `location` (`KL_STANDARD`, `KL_LEFT` / `KL_RIGHT` for the two
+  Shift, Ctrl, Alt and Windows keys, `KL_NUMPAD`). A key's up gives a pass of its own while such
+  a canvas has the focus. A down taken here is taken for `key_take` too; the text still comes
+  through `text_take`:
+
+  ```rust
+  while let Some(k) = ui.key_event_take() {
+      if k.down && reserved(k.vk | k.mods << 16) {
+          ui.accel_run(k.vk | k.mods << 16);
+      } else {
+          self.page.key(k.down, k.vk, k.mods, k.repeat, k.scancode, k.location);
+      }
+  }
+  ```
+
+  Scripts hold keys with `keydown CHORD [scan N] [left|right|numpad]` and let them go with
+  `keyup CHORD ...` (`viewtest` `tests/keyraw.uis`).
 * Zoom and pan without a re-raster: right after the canvas's command, `ui.canvas_gpu(CanvasDesc {
   id, name, rect, view, ver, content, gpu, exact_pan })` says what it shows. `content` is an
   `Rc<dyn CanvasContent>` whose `draw_view(g, view, rect)` draws the content through any
@@ -1853,6 +1876,7 @@ in DIP):
 | `pan2 S DX DY [MS]` | two fingers around S, 80 DIP apart, move by DX, DY (DIP) in MS ms (default 300), then they lift |
 | `wheel S DY [shift] [ctrl] [alt]` | raw wheel units (120 = one notch); the modifiers are held during the wheel event (Ctrl + wheel zoom) |
 | `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... (every key a pass of its own, as the platform delivers them) |
+| `keydown CHORD [scan N] [left\|right\|numpad]`, `keyup CHORD ...` | a key down and held (shift / ctrl / alt stay held for the following events; down again: an auto-repeat) and up again, with a scancode and location for `ui.key_event_take` |
 | `keys [N] CHORD...` | the chords N times over, queued for ONE pass of the window with the keyboard (more keys than frames, as a tool window hands them on) |
 | `type "text"` | typed text (`"\n"` presses Enter) |
 | `commit "text" [N]` | an input method commits the text (N times over: one long commit, as the platform queues it) |

@@ -7,8 +7,8 @@ pub const E_MOVE: u8 = 1;
 pub const E_DOWN: u8 = 2; // btn
 pub const E_UP: u8 = 3; // btn
 pub const E_WHEEL: u8 = 4; // data = (i16 dy) | (i16 dx << 16), 120 per notch, up / right positive
-pub const E_KEY_DOWN: u8 = 5; // data = VK | (repeat << 31)
-pub const E_KEY_UP: u8 = 6; // data = VK
+pub const E_KEY_DOWN: u8 = 5; // data = VK | (repeat << 31); (E2) x = scancode, y = KL_* location
+pub const E_KEY_UP: u8 = 6; // data = VK; (E2) x = scancode, y = KL_* location
 pub const E_TEXT: u8 = 7; // data = Unicode codepoint
 pub const E_RESIZE: u8 = 8; // x = width, y = height (physical pixels)
 pub const E_DPI: u8 = 9; // data = dpi (96 = 100 %)
@@ -54,6 +54,23 @@ pub const MOD_SUPER: u8 = 8;
 pub const MOD_ALTGR: u8 = 16;
 pub const MOD_CAPS: u8 = 32;
 pub const MOD_NUM: u8 = 64;
+
+// ---- (E2) where a key sits (Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:
+// Windows' scan code (0xE0.. for extended keys), Linux's evdev code, 0 where unknown)
+pub const KL_STANDARD: u32 = 0;
+pub const KL_LEFT: u32 = 1; // the left Shift, Ctrl, Alt, Windows key
+pub const KL_RIGHT: u32 = 2;
+pub const KL_NUMPAD: u32 = 3; // the keys of the number block
+
+/// (E2) the KL_* location of a Linux evdev key code (both sides' modifiers, the number block)
+pub const fn evdev_location(code: u32) -> u32 {
+    match code {
+        42 | 29 | 56 | 125 => KL_LEFT,     // Shift, Ctrl, Alt, Meta
+        54 | 97 | 100 | 126 => KL_RIGHT,   // (AltGr is the right Alt)
+        55 | 71..=83 | 96 | 98 | 117 | 121 => KL_NUMPAD, // *, 7 8 9 - 4 5 6 + 1 2 3 0 ., Enter, /, =, ,
+        _ => KL_STANDARD,
+    }
+}
 
 // ---- cursors (CUR_*: system shapes; CUR_USER0.. custom cursors of cursor_create)
 pub const CUR_ARROW: u32 = 0;

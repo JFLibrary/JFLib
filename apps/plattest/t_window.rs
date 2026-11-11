@@ -311,6 +311,20 @@ mod win {
         if got != want {
             t.info(&format!("  (got {got:?})\n"));
         }
+        // (E2) the scan code and the location: the right Shift (0x36), the number block's Enter
+        // (extended Return), the left Ctrl, a number block key without Num Lock (Home, not extended)
+        win_test_send(0, WM_KEYDOWN, 0x10, 1 | 0x36 << 16);
+        win_test_send(0, WM_KEYDOWN, 0x0D, 1 | 0x1C << 16 | 1 << 24);
+        win_test_send(0, WM_KEYDOWN, 0x11, 1 | 0x1D << 16);
+        win_test_send(0, WM_KEYDOWN, 0x24, 1 | 0x47 << 16);
+        let mut keys = Vec::new();
+        while let Some(e) = evq_pop() {
+            if e.typ == E_KEY_DOWN {
+                keys.push((e.data & 0xFF, e.x, e.y as u32));
+            }
+        }
+        let want = [(0x10, 0x36, KL_RIGHT), (0x0D, 0xE01C, KL_NUMPAD), (0x11, 0x1D, KL_LEFT), (0x24, 0x47, KL_NUMPAD)];
+        t.check(keys == want, &format!("input: the scancode and location of keys (E2) {keys:x?}"));
         // a burst of WM_CHAR (a long input method commit): wait() stops short of a full event
         // ring, the rest waits in the thread's queue; every character comes, in order
         let posted = win_test(WT_POST_CHARS, 0, [600, 'a' as i32, 26, 0]);

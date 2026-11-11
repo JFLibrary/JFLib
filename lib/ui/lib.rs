@@ -233,7 +233,7 @@ use text::Text;
 pub use clipimg::{clip_bmp_from_sf, clipimg_parse, clipimg_record};
 pub use cmd::{Cmd, Draw, DrawRef, Gfx, IconHook};
 pub use consts::*;
-pub use ctx::{Sem, Slot, ease};
+pub use ctx::{KeyEvent, Sem, Slot, ease};
 pub use cursor::CursorDraw;
 pub use edit::TextboxPresentation;
 pub use edit::TextSurfaceLine;
