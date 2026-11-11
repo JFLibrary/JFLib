@@ -63,6 +63,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **render2d:** render2d: the core of the 2D renderer for CAD (G6a1): a retained scene of lines and polylines with layers and styles, strokes with analytic coverage and exact caps and joins, f64 coordinates relative to the camera, visibility on the GPU; test app render2dtest
 - **ui:** On macOS the app's menus live in the menu bar of macOS (between the app menu and the Window menu): ui.menubar(None) of the main window publishes the AppDesc's menus there with the commands' labels, states and accelerators (Command for MOD_CTRL) and draws no row in the window; a row chosen up there runs as from the window's bar. plat::sysmenu (sysmenu_supported, sysmenu_set, sysmenu_take, SysMenuItem). Headless runs keep the window's bar, jfgui_SYSMENU=0 too (docs/APPLE.md "Menüs in der Menüleiste", docs/GUIDE.md); before, macOS's full-screen band covered the window's menu bar
 - **Tests:** Safari in the browser tests: tools/tests/web_apps.mjs --engine=safari drives a real Safari on a Mac through safaridriver (tools/tests/safari.mjs, the part of Playwright's API the test uses over W3C WebDriver); tools/tests/safari_tunnel.py starts the driver over SSH and carries both directions, so the test runs on another machine; template, gallery, jfWord and Kritzel pass in Safari 27.2 (docs/APPLE.md AP1)
+- **render2d:** render2dtest: render2d now really runs in the browser (WebGPU; Chromium headless, three bundles) and the images against Vulkan are numbers: apps/render2dtest/tests/engine_web.mjs, a measuring scene (a town plan, --scene cad), --test churn (many random changes between two frames, byte for byte) and tools/gen_area6.py (area6 written by a script, --check)
 
 ### Changed
 
@@ -105,6 +106,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **update:** lib/update on macOS: an exe update kept the old file's permissions only on Linux, so an updated program on a Mac lost its executable bit; cargo jflib keygen and the update channel's signer build for macOS on a Mac
 - **plat:** Android: the status bar and the navigation bar take the colours at the app's edges with matching icons and no system scrim, instead of a fixed light grey around a dark app
 - **build:** The .dmg of tools/package.py held the program without its execute bit (copied without its mode), so the app did not open ("kann nicht geöffnet werden"); NAME.app's program is always 0755 now and tools/apple.py dmg refuses a bundle whose program cannot run (found by the hand check of AP8c)
+- **render2d:** render2d: push constants only where a pass reads them (the browser refused count and write: the demo had never run in a browser); the fragment shader returns after discard (a discard keeps running, WGSL's rules) and takes a fast way near the ends of short thin strokes (segments up to 3 px, half width up to 0.75 px): 1 million segments of the measuring scene at the overview 25.4 -> 11.8 ms (RTX 2070 SUPER), 185 -> 60.7 ms (Iris Xe)
 
 ## [0.1.0] - 2026-11-08
 

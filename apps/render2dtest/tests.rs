@@ -6,9 +6,10 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render2d::{Camera, Cap, Join, Layer, LayerId, Renderer, RendererDesc, Scene, Shape, Style, Unit};
+use render2d::{Camera, Cap, Join, Layer, Renderer, RendererDesc, Scene, Shape, Style};
 
-use crate::refimg::{self, Drawing, Geo, Item, Tol};
+use crate::gallery::*;
+use crate::refimg::{self, Tol};
 
 /// the test state
 pub struct T {
@@ -94,67 +95,6 @@ pub fn on_levels(t: &mut T, f: &mut dyn FnMut(&mut T, &Device, &str)) {
     }
 }
 
-/// the background of the stroke tests (sRGB codes): a light grey
-pub const BG: u32 = 0xFFE8_E4DC;
-
-pub fn bg_clear(bg: u32) -> [f32; 4] {
-    let c = |s: u32| ((bg >> s) & 255) as f32 / 255.0;
-    [c(16), c(8), c(0), 1.0]
-}
-
-/// an offscreen target (Bgra8Unorm, as a ui view) with the read-back of its image
-pub struct Off {
-    pub w: u32,
-    pub h: u32,
-    pub stride: u32,
-    pub color: Texture,
-    pub rb: Buffer,
-    pub bg: u32,
-    used: bool,
-}
-
-impl Off {
-    pub fn new(dev: &Device, w: u32, h: u32) -> Result<Off> {
-        let stride = (w * 4).div_ceil(256) * 256;
-        Ok(Off {
-            w,
-            h,
-            stride,
-            color: dev.create_texture(&TextureDesc::d2(w, h, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET | TextureUsage::COPY_SRC))?,
-            rb: dev.create_buffer(&BufferDesc { size: stride as u64 * h as u64, usage: BufferUsage::NONE, memory: MemoryKind::Readback })?,
-            bg: BG,
-            used: false,
-        })
-    }
-
-    /// one frame of the scene, with the image copied to the read-back
-    pub fn submit(&mut self, r: &mut Renderer, s: &mut Scene) -> Result<SubmitId> {
-        s.prepare(r, (self.w, self.h))?;
-        let dev = r.device().clone();
-        let mut e = dev.encoder()?;
-        let color = ColorAttachment { view: self.color.view(), load: Load::Clear, clear: bg_clear(self.bg), store: true,
-                                      before: if self.used { Layout::CopySrc } else { Layout::Undefined }, after: Layout::CopySrc };
-        r.record(&mut e, s, color)?;
-        e.copy_texture_to_buffer(TextureRegion::mip(&self.color, 0), &self.rb, DataLayout { offset: 0, bytes_per_row: self.stride, rows_per_image: 0 });
-        e.barrier(Access::COPY_WRITE, Access::HOST_READ);
-        let id = dev.queue().submit([e.finish()?])?;
-        s.submitted(id);
-        self.used = true;
-        Ok(id)
-    }
-
-    /// the last image: rows of B, G, R, A
-    pub fn read(&self) -> Result<Vec<u8>> {
-        let mut raw = vec![0u8; self.stride as usize * self.h as usize];
-        self.rb.read(0, &mut raw)?;
-        let mut v = Vec::with_capacity((self.w * self.h * 4) as usize);
-        for y in 0..self.h as usize {
-            v.extend_from_slice(&raw[y * self.stride as usize..y * self.stride as usize + self.w as usize * 4]);
-        }
-        Ok(v)
-    }
-}
-
 /// submit, wait, read the image
 pub fn shot(t: &mut T, dev: &Device, off: &mut Off, r: &mut Renderer, s: &mut Scene, what: &str) -> Option<Vec<u8>> {
     let id = t.res(off.submit(r, s), what)?;
@@ -163,32 +103,6 @@ pub fn shot(t: &mut T, dev: &Device, off: &mut Off, r: &mut Renderer, s: &mut Sc
         return None;
     }
     t.res(off.read(), what)
-}
-
-/// a test drawing in a scene: its layers
-pub struct Built {
-    pub layers: Vec<LayerId>,
-}
-
-pub fn shape_of(g: &Geo) -> Shape<'_> {
-    match g {
-        Geo::Line(a, b) => Shape::Line { a: *a, b: *b },
-        Geo::Poly(v, closed) => Shape::Polyline { points: v, closed: *closed },
-    }
-}
-
-pub fn build(s: &mut Scene, d: &Drawing) -> Result<Built> {
-    let mut layers = Vec::new();
-    for &(visible, order) in &d.layers {
-        let mut l = Layer::new(order);
-        l.visible = visible;
-        layers.push(s.add_layer(&l)?);
-    }
-    for it in &d.items {
-        let st = s.add_style(&it.style)?;
-        s.insert(layers[it.layer], st, &shape_of(&it.geo))?;
-    }
-    Ok(Built { layers })
 }
 
 /// a drawing on the GPU in a new scene: its image
@@ -222,46 +136,6 @@ pub fn against_ref(t: &mut T, dev: &Device, r: &mut Renderer, off: &mut Off, d: 
     Some(c)
 }
 
-pub fn style(color: u32, width: f32, cap: Cap, join: Join) -> Style {
-    let mut s = Style::new(color);
-    s.width = width;
-    s.cap = cap;
-    s.join = join;
-    s
-}
-
-/// a camera with the drawing's units as pixels: (0, 0) at the target's top left, y up (so rows count down from h)
-pub fn pixel_camera(w: u32, h: u32) -> Camera {
-    Camera::new([0.5 * w as f64, 0.5 * h as f64], 1.0)
-}
-
-pub struct Rng(pub u32);
-
-impl Rng {
-    pub fn next(&mut self) -> u32 {
-        self.0 = self.0.wrapping_mul(747_796_405).wrapping_add(2_891_336_453);
-        let w = ((self.0 >> ((self.0 >> 28) + 4)) ^ self.0).wrapping_mul(277_803_737);
-        (w >> 22) ^ w
-    }
-
-    /// in [0, 1), 24 bits
-    pub fn unit(&mut self) -> f64 {
-        (self.next() >> 8) as f64 / 16_777_216.0
-    }
-
-    pub fn range(&mut self, a: f64, b: f64) -> f64 {
-        a + (b - a) * self.unit()
-    }
-
-    pub fn below(&mut self, n: u32) -> u32 {
-        self.next() % n
-    }
-}
-
-const CAPS: [Cap; 3] = [Cap::Butt, Cap::Round, Cap::Square];
-const JOINS: [Join; 3] = [Join::Miter, Join::Bevel, Join::Round];
-const INK: [u32; 4] = [0xFF20_3040, 0xFFB0_3020, 0xFF20_7040, 0xFF30_40C0];
-
 // ---------------------------------------------------------------- strokes against lib/gfx
 
 fn caps(t: &mut T) {
@@ -275,17 +149,7 @@ fn caps_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let cam = pixel_camera(w, h);
     for cap in CAPS {
         for width in [1.0f32, 2.5, 6.0, 15.0] {
-            // a star of 12 segments: every angle a cap meets the pixel grid at
-            let mut d = Drawing::one_layer();
-            let (cx, cy) = (160.3, 120.6);
-            for k in 0..12 {
-                let a = k as f64 * core::f64::consts::TAU / 12.0 + 0.1;
-                let (s, c) = render2d::math::sincos(a);
-                let (r0, r1) = (18.0 + width as f64, 100.0);
-                d.add(style(INK[k % 4], width, cap, Join::Miter), Geo::Line([cx + c * r0, cy + s * r0], [cx + c * r1, cy + s * r1]));
-            }
-            // and points: a dot of a round cap, a square of a square cap, nothing of a butt cap
-            d.add(style(INK[1], width.max(4.0), cap, Join::Miter), Geo::Poly(vec![[20.5, 20.5]], false));
+            let d = caps_drawing(cap, width);
             let tol = if cap == Cap::Round { Tol::round(26) } else { Tol::STRAIGHT };
             against_ref(t, dev, &mut r, &mut off, &d, &cam, &tol, &format!("{level}: {cap:?} caps, width {width}"))?;
         }
@@ -304,49 +168,36 @@ fn joins_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let cam = pixel_camera(w, h);
     for join in JOINS {
         for width in [1.0f32, 3.0, 9.0, 18.0] {
-            let mut d = Drawing::one_layer();
-            // turns from blunt to sharp, both ways (a zigzag), a closed triangle and a closed square
-            d.add(style(INK[0], width, Cap::Butt, join), Geo::Poly(vec![[20.0, 40.0], [80.0, 30.0], [120.0, 70.0], [150.0, 20.0], [175.0, 75.0], [190.0, 22.0]], false));
-            d.add(style(INK[1], width, Cap::Round, join), Geo::Poly(vec![[215.0, 30.0], [340.0, 45.0], [230.0, 60.0], [335.0, 80.0]], false));
-            d.add(style(INK[2], width, Cap::Butt, join), Geo::Poly(vec![[30.0, 120.0], [150.0, 140.0], [60.0, 220.0]], true));
-            d.add(style(INK[3], width, Cap::Square, join), Geo::Poly(vec![[200.0, 120.0], [320.0, 120.3], [320.0, 230.0], [200.5, 230.0]], true));
-            // nearly straight: the joins of a flattened curve
-            let arc: Vec<[f64; 2]> = (0..24).map(|k| {
-                let (s, c) = render2d::math::sincos(k as f64 * 0.05);
-                [180.0 + 140.0 * c - 140.0, 180.0 + 60.0 * s]
-            }).collect();
-            d.add(style(INK[0], width, Cap::Butt, join), Geo::Poly(arc, false));
+            let d = joins_drawing(join, width);
             against_ref(t, dev, &mut r, &mut off, &d, &cam, &Tol::corners(40), &format!("{level}: {join:?} joins, width {width}"))?;
         }
     }
     // the miter limit: a turn whose miter is 3.9 and one whose miter is 4.1 widths long, limits 4 and 10
     for limit in [4.0f32, 10.0] {
-        let mut d = Drawing::one_layer();
-        for (k, ratio) in [3.9f64, 4.1, 8.0, 12.0].iter().enumerate() {
-            // 1 / cos(phi / 2) = ratio: phi the turn
-            let phi = 2.0 * acos(1.0 / ratio);
-            let (s, c) = render2d::math::sincos(core::f64::consts::PI - phi);
-            let x = 40.0 + 80.0 * k as f64;
-            let mut st = style(INK[k % 4], 8.0, Cap::Butt, Join::Miter);
-            st.miter_limit = limit;
-            d.add(st, Geo::Poly(vec![[x - 30.0, 200.0], [x, 200.0], [x + 70.0 * c, 200.0 - 70.0 * s]], false));
-        }
+        let d = miter_drawing(limit);
         against_ref(t, dev, &mut r, &mut off, &d, &cam, &Tol::STRAIGHT, &format!("{level}: miter limit {limit}"))?;
     }
     Some(())
 }
 
-/// acos for the tests (no libm): Newton on cos
-fn acos(x: f64) -> f64 {
-    let mut a = core::f64::consts::FRAC_PI_2 * (1.0 - x);
-    for _ in 0..60 {
-        let (s, c) = render2d::math::sincos(a);
-        if s.abs() < 1e-12 {
-            break;
-        }
-        a += (c - x) / s;
+fn short(t: &mut T) {
+    on_levels(t, &mut |t, dev, level| { let _ = short_on(t, dev, level); });
+}
+
+/// short segments and sharp turns: the near-join pieces of every kind (tiles, unions, chords crossing inside a segment)
+fn short_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
+    let (w, h) = (320u32, 240u32);
+    let mut off = t.res(Off::new(dev, w, h), "target")?;
+    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
+    let cam = pixel_camera(w, h);
+    for (seed, width, join) in [(1u32, 0.0f32, Join::Miter), (2, 1.0, Join::Miter), (3, 3.0, Join::Round), (4, 1.0, Join::Bevel), (5, 2.0, Join::Round), (6, 0.0, Join::Bevel)] {
+        let d = short_drawing(seed, width, join);
+        // (random polylines of sub-pixel-scale turns fold over themselves everywhere: lib/gfx fills them with its winding sums,
+        // render2d's union differs from them by design, RENDER2D.md "Tests"; the join geometry itself is checked by the images
+        // of the browser test against Vulkan and by the other tests here)
+        against_ref(t, dev, &mut r, &mut off, &d, &cam, &Tol { small: 2, over: 2600, max: 255, ink: 0.06 }, &format!("{level}: short segments, {join:?} joins, width {width}"))?;
     }
-    a
+    Some(())
 }
 
 fn hairlines(t: &mut T) {
@@ -359,17 +210,7 @@ fn hairlines_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
     let cam = pixel_camera(w, h);
     for (width, what) in [(0.0f32, "width 0"), (0.4, "width 0.4 (drawn as 1)"), (1.0, "width 1")] {
-        let mut d = Drawing::one_layer();
-        // 36 angles, the start at fractions of a pixel
-        for k in 0..36 {
-            let a = k as f64 * core::f64::consts::TAU / 36.0 + 0.013;
-            let (s, c) = render2d::math::sincos(a);
-            let (cx, cy) = (150.0 + 0.1 * (k % 10) as f64, 150.0 + 0.07 * (k % 7) as f64);
-            d.add(style(INK[k % 4], width, Cap::Butt, Join::Miter), Geo::Line([cx + 20.0 * c, cy + 20.0 * s], [cx + 140.0 * c, cy + 140.0 * s]));
-        }
-        // axis-aligned on pixel centres and on pixel edges
-        d.add(style(INK[1], width, Cap::Butt, Join::Miter), Geo::Line([10.0, 290.5], [290.0, 290.5]));
-        d.add(style(INK[2], width, Cap::Butt, Join::Miter), Geo::Line([10.0, 285.0], [290.0, 285.0]));
+        let d = hairlines_drawing(width);
         against_ref(t, dev, &mut r, &mut off, &d, &cam, &Tol::STRAIGHT, &format!("{level}: hairlines, {what}"))?;
     }
     Some(())
@@ -383,20 +224,9 @@ fn units_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let (w, h) = (320u32, 240u32);
     let mut off = t.res(Off::new(dev, w, h), "target")?;
     let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
-    // a drawing in metres: px widths stay, unit widths follow the zoom
-    let mut d = Drawing::one_layer();
-    let unit = |c: u32, wdt: f32, u: Unit, cap: Cap, join: Join| {
-        let mut s = style(c, wdt, cap, join);
-        s.unit = u;
-        s
-    };
-    d.add(unit(INK[0], 0.5, Unit::Drawing, Cap::Round, Join::Round), Geo::Poly(vec![[-10.0, -5.0], [0.0, 6.0], [8.0, -4.0], [12.0, 3.0]], false));
-    d.add(unit(INK[1], 3.0, Unit::Px, Cap::Square, Join::Miter), Geo::Poly(vec![[-12.0, 4.0], [-2.0, -6.0], [10.0, 7.0]], false));
-    d.add(unit(INK[2], 0.2, Unit::Drawing, Cap::Butt, Join::Bevel), Geo::Poly(vec![[-6.0, -6.0], [6.0, -6.0], [6.0, 6.0], [-6.0, 6.0]], true));
-    d.add(unit(INK[3], 0.0, Unit::Drawing, Cap::Butt, Join::Miter), Geo::Line([-13.0, 0.0], [13.0, 0.5]));
-    for (scale, rot) in [(0.1f64, 0.0f64), (0.05, 0.0), (0.02, 0.4), (0.2, -1.2)] {
-        let mut cam = Camera::new([0.3, -0.2], scale);
-        cam.rotation = rot;
+    let d = units_drawing();
+    for (scale, rot) in UNIT_VIEWS {
+        let cam = units_camera(scale, rot);
         against_ref(t, dev, &mut r, &mut off, &d, &cam, &Tol::corners(24), &format!("{level}: widths in units and pixels, scale {scale}, rotation {rot}"))?;
     }
     Some(())
@@ -413,13 +243,7 @@ fn overlap_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let cam = pixel_camera(w, h);
     for join in JOINS {
         for alpha in [0x80u32, 0x40] {
-            let c = (alpha << 24) | 0x0020_40C0;
-            let mut d = Drawing::one_layer();
-            // a sharp corner (20 degrees), a hairpin, a blunt one, a closed square
-            d.add(style(c, 14.0, Cap::Butt, join), Geo::Poly(vec![[20.0, 40.0], [200.0, 60.0], [30.0, 95.0]], false));
-            d.add(style(c, 10.0, Cap::Round, join), Geo::Poly(vec![[30.0, 140.0], [180.0, 150.0], [40.0, 160.0]], false));
-            d.add(style(c, 12.0, Cap::Square, join), Geo::Poly(vec![[230.0, 30.0], [290.0, 120.0], [230.0, 200.0]], false));
-            d.add(style(c, 9.0, Cap::Butt, join), Geo::Poly(vec![[60.0, 190.0], [180.0, 190.0], [180.0, 230.0], [60.0, 230.0]], true));
+            let d = overlap_drawing(join, alpha);
             let what = format!("{level}: translucent ({alpha:#x}) polylines with {join:?} joins at sharp corners");
             let Some(img) = gpu_image(t, dev, &mut r, &mut off, &d, &cam, &what) else { return None };
             let reference = refimg::draw(&d, &cam, (w, h), BG);
@@ -427,15 +251,7 @@ fn overlap_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
             let cmp = refimg::compare(&img, &reference, w, BG, tol.small);
             t.ok(cmp.fine(&tol), &format!("{what}: against lib/gfx (blended once): {}", cmp.text()));
             // no pixel darker than the colour over the background once: blended twice would be
-            let once = |v: u32, b: u32| (b as f64 + (v as f64 - b as f64) * alpha as f64 / 255.0 + 0.5) as i32;
-            let target = [once(0xC0, BG & 255), once(0x40, (BG >> 8) & 255), once(0x20, (BG >> 16) & 255)];
-            let mut twice = 0u32;
-            for p in img.chunks_exact(4) {
-                // (every channel of the colour lies below the background's: twice pulls it further down)
-                if (0..3).any(|k| (p[k] as i32) < target[k] - 2) {
-                    twice += 1;
-                }
-            }
+            let twice = blended_twice(&img, alpha);
             t.ok(twice == 0, &format!("{what}: no pixel beyond one blend of the colour: {twice}"));
         }
     }
@@ -644,6 +460,27 @@ fn shaders(t: &mut T) {
     }
 }
 
+/// gallery::shots() on both levels into DIR (tests/engine_web.mjs compares the browser's with them)
+fn dump_all(dir: &str) -> i32 {
+    let mut t = T { fails: 0, validate: false };
+    let mut files = 0;
+    on_levels(&mut t, &mut |t, dev, level| {
+        let Some(mut r) = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new") else { return };
+        for shot in shots() {
+            let Some(mut off) = t.res(Off::new(dev, shot.w, shot.h), "target") else { return };
+            let Some(img) = gpu_image(t, dev, &mut r, &mut off, &shot.d, &shot.cam, &shot.name) else { return };
+            let path = format!("{dir}/{}_{}.bgra", level.to_lowercase(), shot.name);
+            if !plat::write_file(&path, &img) {
+                t.ok(false, &format!("cannot write {path}"));
+                return;
+            }
+            files += 1;
+        }
+    });
+    out(&format!("{files} images in {dir}"));
+    if t.fails > 0 { 1 } else { 0 }
+}
+
 pub fn run() -> i32 {
     let args = plat::args();
     let validate = args.iter().any(|a| a == "--validate");
@@ -652,6 +489,9 @@ pub fn run() -> i32 {
     }
     if let Some(p) = plat::arg_value("--gen-shaders") {
         return gen_shaders(&p);
+    }
+    if let Some(dir) = plat::arg_value("--dump") {
+        return dump_all(&dir);
     }
     if args.iter().any(|a| a == "--demo") {
         return crate::demo::launch();
@@ -664,8 +504,8 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 12] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
-                                          ("layers", layers), ("changes", crate::scenes::changes), ("visibility", crate::scenes::visibility),
+    let list: [(&str, fn(&mut T)); 14] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
+                                          ("layers", layers), ("changes", crate::scenes::changes), ("churn", crate::scenes::churn), ("visibility", crate::scenes::visibility),
                                           ("coords", crate::scenes::coords), ("levels", levels), ("errors", errors)];
     let mut ran = false;
     for (name, f) in list {

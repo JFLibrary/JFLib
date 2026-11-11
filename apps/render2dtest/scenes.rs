@@ -5,10 +5,11 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render2d::{Camera, Cap, EntityId, Join, Layer, Renderer, RendererDesc, Scene, Style, Unit};
+use render2d::{Camera, Cap, EntityId, Join, Layer, Renderer, RendererDesc, Scene, Style};
 
-use crate::refimg::{self, Drawing, Geo, Item, Tol};
-use crate::tests::{build, gpu_image, on_levels, shape_of, shot, style, Off, Rng, BG, T};
+use crate::gallery::*;
+use crate::refimg::{self, Tol};
+use crate::tests::{gpu_image, on_levels, shot, T};
 
 // ---------------------------------------------------------------- changes
 
@@ -116,7 +117,7 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let (w, h) = (320u32, 240u32);
     let mut off = t.res(Off::new(dev, w, h), "target")?;
     let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
-    let cam = crate::tests::pixel_camera(w, h);
+    let cam = pixel_camera(w, h);
     let mut rng = Rng(11);
     let mut s = t.res(Scene::new(&r), "Scene::new")?;
     t.res(s.set_camera(&cam), "camera")?;
@@ -234,57 +235,131 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     Some(())
 }
 
-// ---------------------------------------------------------------- visibility
+// ---------------------------------------------------------------- many changes between two frames
 
-/// what the CPU's exact test says of a record
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Seen {
-    Yes,
-    Doubt,
-    No,
+pub fn churn(t: &mut T) {
+    on_levels(t, &mut |t, dev, level| { let _ = churn_on(t, dev, level); });
 }
 
-/// cull.wgsl's test in f64: the box around the segment, grown by the stroke's reach (a miter's bound only where the
-/// record has a neighbour: joined); the GPU adds a margin for f32's rounding, within it a record may go either way
-fn exact(a: [f64; 2], b: [f64; 2], st: &Style, joined: bool, cam: &Camera, size: (u32, u32)) -> Seen {
-    let (s, c) = render2d::math::sincos(cam.rotation);
-    let px = |p: [f64; 2]| {
-        let (x, y) = (p[0] - cam.center[0], p[1] - cam.center[1]);
-        [(c * x - s * y) / cam.scale, -(s * x + c * y) / cam.scale]
-    };
-    let (p0, p1) = (px(a), px(b));
-    let wpx = match st.unit {
-        Unit::Drawing => st.width as f64 / cam.scale,
-        _ => st.width as f64,
-    };
-    let hw = (0.5 * wpx).max(0.5);
-    let bound = if st.join == Join::Miter && joined { render2d::math::sqrt((st.miter_limit as f64 * st.miter_limit as f64 - 1.0).max(0.0)).max(1.0) } else { 1.0 };
-    let reach = hw * bound + 1.0;
-    let len0 = |v: [f64; 2]| render2d::math::sqrt(v[0] * v[0] + v[1] * v[1]);
-    let margin = 1e-3 + 4e-6 * (len0(p0) + len0(p1));
-    let half = [0.5 * size.0 as f64, 0.5 * size.1 as f64];
-    let dv = [p1[0] - p0[0], p1[1] - p0[1]];
-    let len = len0(dv);
-    let d = if len > 0.0 { [dv[0] / len, dv[1] / len] } else { [1.0, 0.0] };
-    let n = [-d[1], d[0]];
-    let cc = [0.5 * (p0[0] + p1[0]), 0.5 * (p0[1] + p1[1])];
-    let e = 0.5 * len + reach;
-    let dot = |u: [f64; 2], v: [f64; 2]| u[0] * v[0] + u[1] * v[1];
-    let sep = [
-        cc[0].abs() - (half[0] + e * d[0].abs() + reach * n[0].abs()),
-        cc[1].abs() - (half[1] + e * d[1].abs() + reach * n[1].abs()),
-        dot(cc, d).abs() - (e + half[0] * d[0].abs() + half[1] * d[1].abs()),
-        dot(cc, n).abs() - (reach + half[0] * n[0].abs() + half[1] * n[1].abs()),
-    ];
-    let m = sep.iter().fold(f64::MIN, |a, &b| a.max(b));
-    if m <= 0.0 {
-        Seen::Yes
-    } else if m > 2.0 * margin + 0.01 {
-        Seen::No
-    } else {
-        Seen::Doubt
+/// a polyline of m points somewhere in a target of w x h
+fn zigzag(rng: &mut Rng, m: usize, w: f64, h: f64) -> Geo {
+    let (mut x, mut y) = (rng.range(5.0, w - 5.0), rng.range(5.0, h - 5.0));
+    let mut p = Vec::with_capacity(m);
+    for _ in 0..m {
+        p.push([x, y]);
+        x = (x + rng.range(-40.0, 40.0)).clamp(2.0, w - 2.0);
+        y = (y + rng.range(-40.0, 40.0)).clamp(2.0, h - 2.0);
+    }
+    Geo::Poly(p, false)
+}
+
+fn churn_style(rng: &mut Rng) -> Style {
+    let mut st = random_style(rng);
+    // (a third translucent: the order of the entities shows)
+    if rng.below(3) == 0 {
+        st.color = (st.color & 0x00FF_FFFF) | 0x8000_0000;
+    }
+    st
+}
+
+/// the records an item has (Geo::Poly open or closed)
+fn records_of(g: &Geo) -> usize {
+    match g {
+        Geo::Line(..) => 1,
+        Geo::Poly(v, c) => if *c { v.len() } else { v.len() - 1 },
     }
 }
+
+fn churn_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
+    let (w, h) = (320u32, 240u32);
+    let (fw, fh) = (w as f64, h as f64);
+    let mut off = t.res(Off::new(dev, w, h), "target")?;
+    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
+    let cam = pixel_camera(w, h);
+    for seed in [101u32, 202, 303, 404, 505, 606] {
+        let mut rng = Rng(seed);
+        let mut s = t.res(Scene::new(&r), "Scene::new")?;
+        t.res(s.set_camera(&cam), "camera")?;
+        let d = Drawing { layers: vec![(true, 1), (true, 0), (true, 2)], items: Vec::new() };
+        let b = t.res(build(&mut s, &d), "build")?;
+        let mut p = Pair { s, d, ents: Vec::new(), layers: b.layers };
+        for k in 0..24 {
+            let (st, g) = (churn_style(&mut rng), random_geo(&mut rng, fw, fh));
+            t.res(p.insert(k % 3, st, g), "insert")?;
+        }
+        judge(t, dev, &mut r, &mut off, &mut p, &cam, &format!("{level}: seed {seed}: the start"), false)?;
+        let (mut grown_twice, mut grown_removed) = (0u32, 0u32);
+        for round in 0..16 {
+            let mut ops = String::new();
+            for _ in 0..3 + rng.below(18) {
+                let n = p.d.items.len() as u32;
+                let k = if n > 0 { rng.below(n) as usize } else { 0 };
+                match if n == 0 { 0 } else { rng.below(8) } {
+                    0 => {
+                        let (st, g) = (churn_style(&mut rng), random_geo(&mut rng, fw, fh));
+                        let layer = rng.below(3) as usize;
+                        t.res(p.insert(layer, st, g), "insert")?;
+                        ops.push('i');
+                    }
+                    1 => {
+                        // no more records than it had: in place
+                        let m = records_of(&p.d.items[k].geo).max(1) as u32;
+                        let pts = 2 + rng.below(m) as usize;
+                        let g = zigzag(&mut rng, pts, fw, fh);
+                        t.res(p.update(k, g), "update")?;
+                        ops.push('u');
+                    }
+                    2 => {
+                        // grows
+                        let m = records_of(&p.d.items[k].geo) + 2 + rng.below(24) as usize;
+                        let g = zigzag(&mut rng, m, fw, fh);
+                        t.res(p.update(k, g), "update")?;
+                        ops.push('g');
+                    }
+                    3 => {
+                        // grows twice before the frame
+                        let m = records_of(&p.d.items[k].geo) + 1 + rng.below(6) as usize;
+                        let g = zigzag(&mut rng, m, fw, fh);
+                        t.res(p.update(k, g), "update")?;
+                        let pts = m + 3 + rng.below(30) as usize;
+                        let g = zigzag(&mut rng, pts, fw, fh);
+                        t.res(p.update(k, g), "update")?;
+                        grown_twice += 1;
+                        ops.push('G');
+                    }
+                    4 => {
+                        // grows, and is gone right after
+                        let m = records_of(&p.d.items[k].geo) + 2 + rng.below(16) as usize;
+                        let g = zigzag(&mut rng, m, fw, fh);
+                        t.res(p.update(k, g), "update")?;
+                        t.res(p.remove(k), "remove")?;
+                        grown_removed += 1;
+                        ops.push('x');
+                    }
+                    5 => {
+                        t.res(p.remove(k), "remove")?;
+                        ops.push('r');
+                    }
+                    6 => {
+                        let st = churn_style(&mut rng);
+                        t.res(p.restyle(k, st), "set_style")?;
+                        ops.push('s');
+                    }
+                    _ => {
+                        let st = churn_style(&mut rng);
+                        t.res(p.swap_style(k, st), "set_entity_style")?;
+                        ops.push('e');
+                    }
+                }
+            }
+            judge(t, dev, &mut r, &mut off, &mut p, &cam, &format!("{level}: seed {seed}, round {round} ({ops})"), false)?;
+        }
+        t.ok(grown_twice > 0 && grown_removed > 0, &format!("{level}: seed {seed}: the cases came up: grown twice {grown_twice}, grown and removed {grown_removed}"));
+    }
+    Some(())
+}
+
+// ---------------------------------------------------------------- visibility
 
 /// the visible lists after a frame: per visible layer (first, count), and the records in them
 fn read_lists(t: &mut T, dev: &Device, s: &Scene) -> Option<(Vec<[u32; 4]>, Vec<u32>)> {
@@ -315,93 +390,18 @@ pub fn visibility(t: &mut T) {
 }
 
 fn visibility_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
-    let size = (200u32, 150u32);
+    let size = VIS_SIZE;
     let mut off = t.res(Off::new(dev, size.0, size.1), "target")?;
     let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
-    for (seed, n, spread) in [(1u32, 5000u32, 600.0f64), (2, 20000, 3000.0), (3, 3000, 250.0), (4, 8000, 1.0e6)] {
-        let mut rng = Rng(seed);
-        let mut s = t.res(Scene::new(&r), "Scene::new")?;
-        let layers: Vec<_> = (0..3).map(|k| s.add_layer(&Layer::new(k as i32))).collect::<gpu::Result<Vec<_>>>().ok()?;
-        let mut cam = Camera::new([rng.range(-100.0, 100.0), rng.range(-100.0, 100.0)], rng.range(0.4, 2.5) * spread / 600.0);
-        cam.rotation = rng.range(-3.0, 3.0);
-        t.res(s.set_camera(&cam), "camera")?;
-        let mut styles = Vec::new();
-        for k in 0..12 {
-            let mut st = style(0xFF00_0000 | rng.next(), rng.range(0.0, 12.0) as f32, [Cap::Butt, Cap::Round, Cap::Square][k % 3], [Join::Miter, Join::Bevel, Join::Round][(k / 3) % 3]);
-            if k % 4 == 3 {
-                st.unit = Unit::Drawing;
-                st.width = (rng.range(0.0, 0.02) * spread) as f32;
-            }
-            st.miter_limit = rng.range(1.0, 12.0) as f32;
-            styles.push((t.res(s.add_style(&st), "add_style")?, st));
-        }
-        let mut ents = Vec::new();
-        for _ in 0..n {
-            let a = [cam.center[0] + rng.range(-spread, spread), cam.center[1] + rng.range(-spread, spread)];
-            let m = 2 + rng.below(4) as usize;
-            let mut pts = vec![a];
-            for _ in 1..m {
-                let q = pts[pts.len() - 1];
-                let step = spread * 0.05;
-                pts.push([q[0] + rng.range(-step, step), q[1] + rng.range(-step, step)]);
-            }
-            let (sid, st) = styles[rng.below(12) as usize];
-            let closed = rng.below(5) == 0;
-            let id = t.res(s.insert(layers[rng.below(3) as usize], sid, &render2d::Shape::Polyline { points: &pts, closed }), "insert")?;
-            ents.push((id, pts, closed, st));
-        }
-        // a few removed: their places must not show up
-        for k in (0..ents.len()).step_by(17) {
-            t.res(s.remove(ents[k].0), "remove")?;
-        }
+    for (seed, n, spread) in VIS_CASES {
+        let (mut s, cam, ents) = t.res(vis_scene(&r, seed, n, spread), "the scene")?;
         let _ = shot(t, dev, &mut off, &mut r, &mut s, "frame")?;
         let (lists, vis) = read_lists(t, dev, &s)?;
-        let mut seen = Vec::new();
-        let mut unordered = 0;
-        for l in &lists {
-            let part = &vis[l[0] as usize..(l[0] + l[1]) as usize];
-            unordered += part.windows(2).filter(|w| w[0] >= w[1]).count();
-            seen.extend_from_slice(part);
-        }
-        seen.sort_unstable();
-        let twice = seen.windows(2).filter(|w| w[0] == w[1]).count();
-        let (mut yes, mut doubt, mut missing, mut extra) = (0u32, 0u32, 0u32, 0u32);
-        let mut known = Vec::new();
-        for (k, (id, pts, closed, st)) in ents.iter().enumerate() {
-            let removed = k % 17 == 0;
-            let Some((first, count)) = s.locate(*id).or(if removed { Some((u32::MAX, 0)) } else { None }) else {
-                t.ok(false, "locate");
-                return None;
-            };
-            if removed {
-                continue;
-            }
-            let m = pts.len();
-            let segs = if *closed { m } else { m - 1 };
-            if segs as u32 != count {
-                t.ok(false, &format!("an entity of {m} points holds {count} records"));
-                return None;
-            }
-            for j in 0..segs {
-                let v = exact(pts[j], pts[(j + 1) % m], st, segs > 1, &cam, size);
-                let place = first + j as u32;
-                known.push(place);
-                let got = seen.binary_search(&place).is_ok();
-                match v {
-                    Seen::Yes => {
-                        yes += 1;
-                        missing += !got as u32;
-                    }
-                    Seen::Doubt => doubt += 1,
-                    Seen::No => extra += got as u32,
-                }
-            }
-        }
-        known.sort_unstable();
-        let foreign = seen.iter().filter(|p| known.binary_search(p).is_err()).count();
-        t.ok(missing == 0 && extra == 0 && twice == 0 && foreign == 0 && unordered == 0,
-             &format!("{level}: seed {seed}: {n} polylines over {spread}, rotation {:.2}: GPU {} visible, CPU {yes} (+{doubt} within a hair of an edge): {missing} missing, {extra} too many, \
-                       {twice} doubled, {foreign} free or unknown, {unordered} out of order", cam.rotation, seen.len()));
+        let Some(res) = vis_judge(&s, &lists, &vis, &ents, &cam, size) else {
+            t.ok(false, "an entity's records");
+            return None;
+        };
+        t.ok(res.fine(), &format!("{level}: seed {seed}: {n} polylines over {spread}, rotation {:.2}: {}", cam.rotation, res.text()));
         if seed == 1 {
             // culled = not culled
             let a = shot(t, dev, &mut off, &mut r, &mut s, "culled")?;
@@ -442,172 +442,36 @@ fn visibility_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
 
 // ---------------------------------------------------------------- large coordinates
 
-/// the share of a pixel inside a half plane whose edge lies s from its centre (outward unit normal m), in f64: what
-/// stroke.wgsl's cov() computes
-fn box_cov(s: f64, m: [f64; 2]) -> f64 {
-    let (a, b) = (m[0].abs().min(m[1].abs()), m[0].abs().max(m[1].abs()));
-    let x = -s;
-    let outer = 0.5 * (a + b);
-    if x >= outer {
-        return 1.0;
-    }
-    if x <= -outer {
-        return 0.0;
-    }
-    if a < 1e-9 {
-        return (0.5 + x / b).clamp(0.0, 1.0);
-    }
-    let inner = 0.5 * (b - a);
-    if x < -inner {
-        let t = x + outer;
-        return t * t / (2.0 * a * b);
-    }
-    if x > inner {
-        let t = outer - x;
-        return 1.0 - t * t / (2.0 * a * b);
-    }
-    0.5 + x / b
-}
-
 pub fn coords(t: &mut T) {
     on_levels(t, &mut |t, dev, level| { let _ = coords_on(t, dev, level); });
 }
 
-/// a drawing of every kind of stroke around a point
-fn sample(at: [f64; 2]) -> Drawing {
-    let mut d = Drawing::one_layer();
-    let p = |x: f64, y: f64| [at[0] + x, at[1] + y];
-    d.add(style(0xFF20_3040, 6.0, Cap::Round, Join::Round), Geo::Poly(vec![p(-80.0, -50.0), p(-20.0, 40.0), p(30.0, -30.0), p(90.0, 45.0)], false));
-    d.add(style(0x9030_8040, 11.0, Cap::Square, Join::Miter), Geo::Poly(vec![p(-90.0, 10.0), p(80.0, 20.0), p(-60.0, 35.0)], false));
-    d.add(style(0xFF80_2020, 0.0, Cap::Butt, Join::Miter), Geo::Line(p(-100.0, -60.0), p(100.0, 55.5)));
-    let mut st = style(0xC020_40C0, 0.8, Cap::Butt, Join::Bevel);
-    st.unit = Unit::Drawing;
-    d.add(st, Geo::Poly(vec![p(-40.0, -40.0), p(40.0, -40.0), p(40.0, 30.0), p(-40.0, 30.0)], true));
-    d
-}
-
 fn coords_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
-    let (w, h) = (240u32, 160u32);
+    let (w, h) = FAR_SIZE;
     let mut off = t.res(Off::new(dev, w, h), "target")?;
     let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
     // the same drawing at the origin and at +-1e7, the camera with it (rotated too)
-    let base = {
-        let mut c = Camera::new([0.25, -0.5], 0.9);
-        c.rotation = 0.3;
-        gpu_image(t, dev, &mut r, &mut off, &sample([0.0, 0.0]), &c, "at the origin")?
-    };
-    for at in [[1.0e7, 1.0e7], [-9_999_999.5, 3_141_592.653_589_793], [9_876_543.210_987, -9_999_000.0]] {
-        let mut c = Camera::new([at[0] + 0.25, at[1] - 0.5], 0.9);
-        c.rotation = 0.3;
-        let img = gpu_image(t, dev, &mut r, &mut off, &sample(at), &c, "far away")?;
+    let base = gpu_image(t, dev, &mut r, &mut off, &sample([0.0, 0.0]), &sample_camera([0.0, 0.0]), "at the origin")?;
+    for at in FAR_POINTS {
+        let img = gpu_image(t, dev, &mut r, &mut off, &sample(at), &sample_camera(at), "far away")?;
         crate::tests::dump(&format!("coords_{}_{level}", at[0] as i64), &img, w, h);
         crate::tests::dump(&format!("coords_origin_{level}"), &base, w, h);
-        let (mut n, mut m) = (0u32, 0u8);
-        for (a, b) in img.chunks_exact(4).zip(base.chunks_exact(4)) {
-            if a[..3] != b[..3] {
-                n += 1;
-                for k in 0..3 {
-                    m = m.max(a[k].abs_diff(b[k]));
-                }
-            }
-        }
+        let (n, m) = differ(&img, &base);
         t.ok(m <= 1 && n <= (w * h) / 1000, &format!("{level}: the drawing at ({}, {}) against at the origin: {n} pixels differ, largest {m}", at[0], at[1]));
     }
     // a deep zoom: 1e-6 units per pixel near (-9 876 543.21, 6 543 210.987), tiny pans; white lines on black, each
     // line's place from the coverage of its rows against where it belongs (f64): within 1/16 px
-    let (dw, dh) = (200u32, 160u32);
-    let mut off = t.res(Off::new(dev, dw, dh), "target")?;
+    let mut off = t.res(Off::new(dev, DEEP_SIZE.0, DEEP_SIZE.1), "target")?;
     off.bg = 0xFF00_0000;
-    let at = [-9_876_543.21, 6_543_210.987];
-    let k = 1e-6;
-    // (a, b, along y): lines through the view, short ones (ends inside), long ones (ends 0.3 and 1e7 units away)
-    let lines: [([f64; 2], [f64; 2]); 6] = [
-        ([at[0] - 40.0 * k, at[1] - 50.0 * k], [at[0] - 35.0 * k, at[1] + 55.0 * k]),
-        ([at[0] + 20.3 * k, at[1] - 0.3], [at[0] + 32.9 * k, at[1] + 0.3]),
-        ([at[0] + 61.0 * k - 1.0e7 * 0.02, at[1] - 1.0e7], [at[0] + 61.0 * k + 1.0e7 * 0.02, at[1] + 1.0e7]),
-        ([at[0] - 0.7, at[1] + 30.25 * k - 0.7 * 0.03], [at[0] + 0.7, at[1] + 30.25 * k + 0.7 * 0.03]),
-        ([at[0] - 1.0e7, at[1] - 41.6 * k - 0.005], [at[0] + 1.0e7, at[1] - 41.6 * k + 0.005]),
-        ([at[0] - 70.0 * k, at[1] + 5.0 * k], [at[0] - 10.0 * k, at[1] + 62.0 * k]),
-    ];
-    let mut d = Drawing::one_layer();
-    for (a, b) in lines {
-        d.add(style(0xFFFF_FFFF, 2.5, Cap::Butt, Join::Miter), Geo::Line(a, b));
-    }
     let mut s = t.res(Scene::new(&r), "Scene::new")?;
-    t.res(build(&mut s, &d), "build")?;
-    let (mut worst, mut checks, mut lost) = (0.0f64, 0u32, 0u32);
-    let mut per_line = [0.0f64; 6];
-    for step in 0..24 {
-        // pans of 0.37 px and of a few pixels, with a rotation now and then
-        let mut c = Camera::new([at[0] + step as f64 * 0.37 * k, at[1] - step as f64 * 0.23 * k], k);
-        c.rotation = if step >= 16 { 0.25 } else { 0.0 };
+    t.res(build(&mut s, &deep_drawing()), "build")?;
+    let mut st = DeepStats::default();
+    for step in 0..DEEP_STEPS {
+        let c = deep_camera(step);
         t.res(s.set_camera(&c), "camera")?;
         let img = shot(t, dev, &mut off, &mut r, &mut s, "deep zoom")?;
-        let cov = |x: usize, y: usize| img[(y * dw as usize + x) * 4 + 1] as f64 / 255.0;
-        for (li, (a, b)) in lines.into_iter().enumerate() {
-            let (sa, sb) = (c.to_screen(a, (dw, dh)), c.to_screen(b, (dw, dh)));
-            let vertical = (sb[1] - sa[1]).abs() > (sb[0] - sa[0]).abs();
-            // rows (or columns) inside the view and away from the ends
-            for j in (12..(if vertical { dh } else { dw }) as usize - 12).step_by(9) {
-                let y = j as f64 + 0.5;
-                let (u0, v0, u1, v1) = if vertical { (sa[0], sa[1], sb[0], sb[1]) } else { (sa[1], sa[0], sb[1], sb[0]) };
-                // (between the ends, 3 px away from them: a butt end crosses its last rows)
-                if (y - v0) * (y - v1) > 0.0 || (y - v0).abs() < 3.0 || (y - v1).abs() < 3.0 {
-                    continue;
-                }
-                let want = u0 + (y - v0) * (u1 - u0) / (v1 - v0);
-                let lim = if vertical { dw } else { dh } as f64;
-                if want < 8.0 || want > lim - 8.0 {
-                    continue;
-                }
-                // (no other line within 3 px of the window: it would pull the centroid)
-                let near = lines.iter().enumerate().any(|(lj, &(oa, ob))| {
-                    if lj == li {
-                        return false;
-                    }
-                    let (pa, pb) = (c.to_screen(oa, (dw, dh)), c.to_screen(ob, (dw, dh)));
-                    let (dx, dy) = (pb[0] - pa[0], pb[1] - pa[1]);
-                    let l = render2d::math::sqrt(dx * dx + dy * dy);
-                    (-6..=6).any(|o| {
-                        let (x, y) = if vertical { (want + o as f64, y) } else { (y, want + o as f64) };
-                        ((x - pa[0]) * dy - (y - pa[1]) * dx).abs() / l < 1.25 + 3.0
-                    })
-                });
-                if near {
-                    continue;
-                }
-                // the centroid of the window's coverage, against that of the exact coverage of the line there (the strip's
-                // share of each pixel in f64, as cov() in stroke.wgsl: binning the coverage biases a centroid by up to
-                // 0.05 px, the same for both)
-                let (dx, dy) = (sb[0] - sa[0], sb[1] - sa[1]);
-                let l = render2d::math::sqrt(dx * dx + dy * dy);
-                let n = [-dy / l, dx / l];
-                let (mut sum, mut mom, mut esum, mut emom) = (0.0, 0.0, 0.0, 0.0);
-                for i in (want as i64 - 6).max(0) as usize..((want as i64 + 7) as usize).min(lim as usize) {
-                    let (px, py) = if vertical { (i, j) } else { (j, i) };
-                    let c = cov(px, py);
-                    sum += c;
-                    mom += c * (i as f64 + 0.5);
-                    let v = (px as f64 + 0.5 - sa[0]) * n[0] + (py as f64 + 0.5 - sa[1]) * n[1];
-                    let e = (box_cov(v - 1.25, n) + box_cov(-v - 1.25, n) - 1.0).max(0.0);
-                    esum += e;
-                    emom += e * (i as f64 + 0.5);
-                }
-                checks += 1;
-                if sum < 1.0 {
-                    lost += 1;
-                    continue;
-                }
-                let want = emom / esum;
-                worst = worst.max((mom / sum - want).abs());
-                per_line[li] = per_line[li].max((mom / sum - want).abs());
-            }
-        }
+        deep_judge(&img, &c, &mut st);
     }
-    t.ok(checks > 300 && lost == 0 && worst <= 1.0 / 16.0,
-         &format!("{level}: 1e-6 units per pixel near ({}, {}), 24 pans of 0.37 px and a rotation, six lines up to 2e7 long: {checks} rows, the largest distance from where the line belongs \
-                   {worst:.4} px (1/16 = 0.0625; per line {}), {lost} rows without the line", at[0], at[1],
-                   per_line.iter().map(|v| format!("{v:.4}")).collect::<Vec<_>>().join(", ")));
+    t.ok(st.fine(), &format!("{level}: {}", st.text()));
     Some(())
 }
-

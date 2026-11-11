@@ -13,7 +13,9 @@ use alloc::vec::Vec;
 use gpu::*;
 use render2d::{Camera, Cap, EntityId, Join, Layer, Renderer, RendererDesc, Scene, Shape, Style};
 
-use crate::tests::{bg_clear, out, Rng, BG};
+use crate::cad;
+use crate::gallery::{bg_clear, Rng, BG};
+use crate::tests::out;
 
 fn median(v: &mut [f64]) -> f64 {
     if v.is_empty() {
@@ -73,7 +75,8 @@ pub fn bench(n: u32) -> i32 {
         out("SKIP: no adapter");
         return 0;
     };
-    out(&format!("render2d bench: {n} segments, {} x {}, {frames} frames each, {}", size.0, size.1, adapter.info().name));
+    let cad_scene = plat::arg_value("--scene").as_deref() == Some("cad");
+    out(&format!("render2d bench: {n} segments, {} x {}, {frames} frames each, {}{}", size.0, size.1, adapter.info().name, if cad_scene { ", the town plan" } else { "" }));
     let mut levels = Vec::new();
     if adapter.level() == Level::Voll && !basis_only {
         levels.push(Level::Voll);
@@ -87,12 +90,55 @@ pub fn bench(n: u32) -> i32 {
                 return 1;
             }
         };
-        if let Err(e) = run(&dev, n, size, frames, level) {
+        let result = if cad_scene { run_cad(&dev, n, size, frames, level) } else { run(&dev, n, size, frames, level) };
+        if let Err(e) = result {
             out(&format!("FAIL {level:?}: {e}"));
             return 1;
         }
     }
     0
+}
+
+/// the town plan (cad.rs): hairlines and the plan's widths, each at the overview, a district and the working zoom
+fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level) -> Result<()> {
+    let mut r = Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm))?;
+    for (wname, styled) in [("hairlines", false), ("styled", true)] {
+        let mut s = Scene::new(&r)?;
+        s.set_stats(true);
+        let t0 = plat::time_us();
+        let c = cad::build(&mut s, n, 5, styled)?;
+        let insert_ms = (plat::time_us() - t0) as f64 / 1000.0;
+        let mut t = Target { color: dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?, used: false };
+        let views = cad::views(&c, size);
+        s.set_camera(&views[0].cam)?;
+        let (prep, st0, vis0) = frame(dev, &mut r, &mut s, &mut t, size)?;
+        let up = s.upload_info();
+        out(&format!("{level:?}, {wname}: {} entities, {} segments, {:.0} x {:.0} m; insert {insert_ms:.1} ms (CPU); first frame: prepare {prep:.1} ms (CPU, {:.1} MB up), GPU uploads {:.3} ms, \
+                      visibility {:.3} ms, draw {:.3} ms ({vis0} visible)", c.entities, c.segments, c.width, c.height, up.bytes as f64 / 1048576.0, st0[0], st0[1], st0[2]));
+        for v in &views {
+            let (mut a, mut b, mut d, mut p) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+            let mut vis = 0;
+            for k in 0..frames + 3 {
+                // (the camera moves a little: a frame of a pan)
+                let mut cam = v.cam;
+                cam.center[0] += k as f64 * 0.37 * cam.scale;
+                s.set_camera(&cam)?;
+                let (prep, st, n) = frame(dev, &mut r, &mut s, &mut t, size)?;
+                if k >= 3 {
+                    a.push(st[0]);
+                    b.push(st[1]);
+                    d.push(st[2]);
+                    p.push(prep);
+                    vis = n;
+                }
+            }
+            let (ma, mb, mc, mp) = (median(&mut a), median(&mut b), median(&mut d), median(&mut p));
+            out(&format!("{level:?}, {wname}, {} (scale {:.3}): GPU per frame {:.3} ms (uploads {ma:.3}, visibility {mb:.3}, draw {mc:.3}); prepare {mp:.3} ms CPU; {vis} visible",
+                         v.name, v.cam.scale, ma + mb + mc));
+        }
+        dev.wait_idle()?;
+    }
+    Ok(())
 }
 
 fn run(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level) -> Result<()> {
