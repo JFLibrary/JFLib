@@ -12,6 +12,10 @@
 //                        (ui.sem_rect): a script clicks one by its label, the page gets the click
 //   "Dateien öffnen"     the file dialog with FD_MULTI in the folder --files DIR (E8): several
 //                        files at once, ui.filedlg_paths() shown as "Dateien: N a b"
+//   "Zeiger wechseln"    (E3) the page's cursor through ui.cursor_next: not-allowed, grab,
+//                        zoom-in, the north-east corner, a custom cursor of the page's own;
+//                        "Eigener größer" redraws it (ui.cursor_replace), "Eigener frei" frees it
+//                        (ui.cursor_free); "Zeiger:" says ui.cursor_at under the pointer
 //
 // tests/keys.uis, tests/menus.uis and tests/links.uis drive it; the texts above the page say what
 // it saw.
@@ -22,6 +26,7 @@
 extern crate alloc;
 
 use alloc::format;
+use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -36,6 +41,9 @@ const ID_FLYOUT: u32 = 104; // the flyout it opens at a point of the page
 const ID_ROW: u32 = 105; // its row
 const ID_TREE: u32 = 106; // "Baum prüfen": the links of the accessibility tree
 const ID_FILES: u32 = 107; // "Dateien öffnen"
+const ID_CURSOR: u32 = 108; // "Zeiger wechseln"
+const ID_CBIG: u32 = 109; // "Eigener größer"
+const ID_CFREE: u32 = 110; // "Eigener frei"
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 
 const CMD_NEW_TAB: u32 = 1;
@@ -55,7 +63,7 @@ const DESC: AppDesc = AppDesc {
     title: "Ansichtstest",
     flags: AF_RESIZABLE,
     w: 560,
-    h: 600,
+    h: 680,
     min_w: 400,
     min_h: 360,
     cmds: &CMDS,
@@ -89,6 +97,23 @@ struct ViewTest {
     fd_open: Shared<i32>,
     fd_path: String,
     files: String,
+    /// (E3) the page's cursor (an index into PAGE_CURSORS) and the custom one (handle, 0 none)
+    page_cur: usize,
+    custom: u32,
+}
+
+// (E3) the cursors "Zeiger wechseln" walks through (0: the page's arrow / hand)
+const PAGE_CURSORS: [u32; 6] = [0, CUR_NOT_ALLOWED, CUR_GRAB, CUR_ZOOM_IN, CUR_SIZE_NE, CUR_CUSTOM];
+
+// a custom cursor of w x w DIP: a filled square with a frame
+fn square(w: u32) -> CursorDraw {
+    Rc::new(move |g: &mut ui::Gfx, dpi: i32| {
+        let p = ((w as i32) * dpi + 95) / 96;
+        g.dc.set_color(0xFF00_0000);
+        g.dc.fill(g.sf, 0, 0, p, p);
+        g.dc.set_color(0xFFFF_C000);
+        g.dc.fill(g.sf, 1, 1, p - 2, p - 2);
+    })
 }
 
 impl Default for ViewTest {
@@ -109,6 +134,8 @@ impl Default for ViewTest {
             fd_open: Shared::new(0),
             fd_path: String::new(),
             files: String::from("-"),
+            page_cur: 0,
+            custom: 0,
         }
     }
 }
@@ -126,6 +153,11 @@ fn cursor_name(c: u32) -> &'static str {
         CUR_ARROW => "Pfeil",
         CUR_HAND => "Hand",
         CUR_CROSS => "Kreuz",
+        CUR_NOT_ALLOWED => "nicht erlaubt",
+        CUR_GRAB => "Greifen",
+        CUR_ZOOM_IN => "Vergrößern",
+        CUR_SIZE_NE => "Größe NO",
+        CUR_CUSTOM => "eigener",
         u32::MAX => "-",
         _ => "anderer",
     }
@@ -136,8 +168,17 @@ impl ViewTest {
     fn page(&mut self, ui: &mut Ui) {
         ui.next_size(360, 120);
         let hover = self.hover;
-        let cur = if hover != 0 { CUR_HAND } else { CUR_ARROW };
+        let mut cur = if hover != 0 { CUR_HAND } else { CUR_ARROW };
         ui.next_flags(HB_CURSOR_SET | cur << HB_CURSOR_SHIFT | if self.sink != 0 { HB_KEYS } else { 0 });
+        // (E3) a cursor of its own: any shape through cursor_next, the custom one through CUR_CUSTOM
+        let own = PAGE_CURSORS[self.page_cur];
+        if own != 0 {
+            if own == CUR_CUSTOM {
+                ui.cursor_custom(self.custom);
+            }
+            ui.cursor_next(own);
+            cur = own;
+        }
         let inp = ui.canvas(ID_PAGE, None, 0, 0).clone();
         let r = inp.rect;
         ui.draw_color(0xFFFF_FFFF);
@@ -193,7 +234,7 @@ impl ViewTest {
         // the cursor of the hit box under the pointer: the last pass's, once more when it is not
         // yet the one this pass asked for
         if inp.ev & EV_HOVER != 0 {
-            let c = (ui.hit_flags_at(r[0] + inp.x, r[1] + inp.y) >> HB_CURSOR_SHIFT) & 15;
+            let c = ui.cursor_at(r[0] + inp.x, r[1] + inp.y);
             if c != self.cursor || c != cur {
                 self.cursor = c;
                 ui.repass();
@@ -209,7 +250,7 @@ impl ViewTest {
         ui.draw_color(0xFFE0_E0E0);
         ui.draw_rect(r[0], r[1], r[2], r[3]);
         if inp.ev & EV_HOVER != 0 {
-            let c = (ui.hit_flags_at(r[0] + inp.x, r[1] + inp.y) >> HB_CURSOR_SHIFT) & 15;
+            let c = ui.cursor_at(r[0] + inp.x, r[1] + inp.y);
             if c != self.cursor {
                 self.cursor = c;
                 ui.repass();
@@ -248,6 +289,30 @@ impl App for ViewTest {
         }
         ui.box_end();
         ui.text(TS_BODY, &format!("Dateien: {}", self.files));
+        // (E3) the page's cursor and the custom one
+        ui.box_begin(0, BOX_H, 8);
+        if ui.button(ID_CURSOR, "Zeiger wechseln") & EV_ACT != 0 {
+            self.page_cur = (self.page_cur + 1) % PAGE_CURSORS.len();
+            if PAGE_CURSORS[self.page_cur] == CUR_CUSTOM && self.custom == 0 {
+                self.custom = ui.cursor_new(square(16), 16, 16, 8 | 8 << 16);
+            }
+        }
+        if ui.button(ID_CBIG, "Eigener größer") & EV_ACT != 0 && self.custom != 0 {
+            ui.cursor_replace(self.custom, square(24), 24, 24, 12 | 12 << 16);
+        }
+        if ui.button(ID_CFREE, "Eigener frei") & EV_ACT != 0 && self.custom != 0 {
+            ui.cursor_free(self.custom);
+            self.custom = 0;
+        }
+        ui.box_end();
+        let own = match ui.cursor_current() {
+            0 => String::from("keiner"),
+            h => match ui.cursor_render(h, 96) {
+                Some(sf) => format!("{} {}x{}", h, sf.w, sf.h),
+                None => format!("{h} frei"),
+            },
+        };
+        ui.text(TS_BODY, &format!("Eigener: {own}"));
         ui.box_end();
         // (E8) several files: the names the dialog chose, in its order
         if ui.filedlg(ID_FD, FD_OPEN | FD_MULTI, &self.fd_open, &mut self.fd_path, 4096, &["txt=Textdatei"]) & EV_ACT != 0 {

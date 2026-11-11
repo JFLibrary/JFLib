@@ -821,6 +821,17 @@ fn cursor_obj(shape: u32) -> Id {
         CUR_SIZE_NS => c"resizeUpDownCursor",
         CUR_SIZE_WE => c"resizeLeftRightCursor",
         CUR_WAIT | CUR_ARROW => c"arrowCursor",
+        // (E3) the shapes beyond: NSCursor's where it has one, else the nearest
+        crate::CUR_NOT_ALLOWED | crate::CUR_NO_DROP => c"operationNotAllowedCursor",
+        crate::CUR_GRAB => c"openHandCursor",
+        crate::CUR_GRABBING | crate::CUR_ALL_SCROLL => c"closedHandCursor",
+        crate::CUR_CONTEXT_MENU => c"contextualMenuCursor",
+        crate::CUR_COPY => c"dragCopyCursor",
+        crate::CUR_ALIAS => c"dragLinkCursor",
+        crate::CUR_VTEXT => c"IBeamCursorForVerticalLayout",
+        crate::CUR_CELL | crate::CUR_ZOOM_IN | crate::CUR_ZOOM_OUT => c"crosshairCursor",
+        crate::CUR_COL_RESIZE | crate::CUR_SIZE_E | crate::CUR_SIZE_W => c"resizeLeftRightCursor",
+        crate::CUR_ROW_RESIZE | crate::CUR_SIZE_N | crate::CUR_SIZE_S => c"resizeUpDownCursor",
         _ => c"arrowCursor",
     };
     // SAFETY: an NSCursor class method (a shared cursor).

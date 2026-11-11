@@ -161,7 +161,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 
 - [App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks): `fb`, `client_size`, `anim_off`, `set_anim_off`, `headless`, `invalidate`, `quit`, `set_title`, `title`, `spawn`, `spawner`, `tasks_live`
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
-- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
+- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
@@ -181,7 +181,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
 - [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `set_theme`, `clear_theme`, `app_theme`, `load_theme`, `styles_add`, `style_names`, `style_name`, `set_style`, `dp_text`, `ts_base`
-- [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_accept`, `drag_over`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
+- [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_next`, `cursor_replace`, `cursor_free`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_accept`, `drag_over`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
 
 ### App, AppDesc, Ui, run, async tasks
 
@@ -678,6 +678,10 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
 - **`fn text_take(&mut self, cap: usize) -> Vec<u32>`**
   ui_text_take(cap): the typed codepoints (at most cap), consumed; when cap leaves some,
   they come in the next pass (nothing typed is lost)
+- **`fn cursor_at(&self, x: i32, y: i32) -> u32`**
+  (E3) the cursor shape at a point (px) of the current window in the previous pass: the
+  topmost hit box's (CUR_\*: ui.cursor_next's, else the shape of its flags; CUR_CUSTOM for
+  the custom cursor), CUR_ARROW where there is none
 - **`fn hit_flags_at(&mut self, x: i32, y: i32) -> u32`**
   ui_hit_flags_at(x, y): HB_\* flags of the topmost hit box at a point of the main
   window (previous pass) -- non-client hit testing of the platform
@@ -4395,6 +4399,14 @@ cursor -- custom pointer cursors drawn by the app, at the dpi of the window
   cursor_render(handle, dpi) -> Some(surface)   the cursor drawn into a new surface
                              (FMT_PARGB; tests, previews)
   cursor_current() -> handle the handle CUR_CUSTOM stands for (0 = none)
+  cursor_replace(handle, f, w, h, hot) -> bool   (E3) a new drawing for a live handle (the
+                             platform's cursor is made again when it is shown next)
+  cursor_free(handle)        (E3) the slot is free again (cursor_new may hand it out); a
+                             hit box showing it gets the crosshair
+  cursor_next(shape)         (E3) the cursor of the next hit box: any CUR_* -- the system
+                             shapes CUR_X0 .. CUR_X_END (not-allowed, grab, the resize
+                             shapes ...) that do not fit into the 4 flag bits, CUR_CUSTOM
+  cursor_at(x, y) -> shape   (ctx.rs) the cursor at a point (tests, an engine's own hover)
 Internal: cursor_resolve(shape) -> the plat shape for a hit box cursor (CUR_CUSTOM: the
 custom cursor made for the current window's dpi with plat::cursor_create, rebuilt when
 that dpi changes; the crosshair when there is none or the platform has no custom
@@ -4412,6 +4424,17 @@ cursors, e.g. headless runs).
   ui_cursor_custom(handle): the cursor of CUR_CUSTOM hit boxes
 - **`fn cursor_current(&self) -> u32`**
   ui_cursor_current -> handle
+- **`fn cursor_next(&mut self, shape: u32)`**
+  (E3) the cursor of the next hit box (canvas, button, hit_rect ...): any CUR_\* shape --
+  also those beyond CUR_CUSTOM's 4 bits (CUR_NOT_ALLOWED, CUR_GRAB, CUR_SIZE_NE ...), a
+  custom cursor through CUR_CUSTOM; it wins over the hit box's flags.  A platform without
+  a shape shows plat::cursor_fallback's
+- **`fn cursor_replace(&mut self, handle: u32, f: CursorDraw, w: u32, h: u32, hot: u32) -> bool`**
+  (E3) a new drawing for a live handle (f, w x h DIP, hot spot x | y &lt;&lt; 16): the platform's
+  cursor is made again at the next show -> false for a handle that is not live
+- **`fn cursor_free(&mut self, handle: u32)`**
+  (E3) free a handle of cursor_new: its platform cursor goes, the slot may be handed out
+  again; when it was the custom cursor, CUR_CUSTOM shows the crosshair until another is set
 - **`fn cursor_render(&mut self, h: u32, dpi: i32) -> Option<Surface>`**
   ui_cursor_render(handle, dpi) -> the cursor drawn at dpi into a new surface
 
@@ -5565,6 +5588,38 @@ CUR_COUNT: u32 = 11
 CUR_CUSTOM: u32 = 15  // hit boxes only: the cursor of cursor_custom
 CUR_USER_MAX: u32 = 32  // fixed handle range; cursor_new answers 0 when it is full
 CUR_MAX_PX: i32 = 256
+```
+
+*(E3) more system shapes: CSS's cursor names, past the custom cursors (CUR_X0 ..*
+
+```rust
+// CUR_X_END); a platform without one shows cursor_fallback's
+CUR_X0: u32 = 64
+CUR_NOT_ALLOWED: u32 = 64  // not-allowed
+CUR_NO_DROP: u32 = 65  // no-drop
+CUR_GRAB: u32 = 66  // grab: an open hand
+CUR_GRABBING: u32 = 67  // grabbing: a closed hand
+CUR_HELP: u32 = 68  // help: the arrow with a question mark
+CUR_PROGRESS: u32 = 69  // progress: the arrow with a busy sign (work in the background)
+CUR_ZOOM_IN: u32 = 70  // zoom-in
+CUR_ZOOM_OUT: u32 = 71  // zoom-out
+CUR_CELL: u32 = 72  // cell: a thick cross (tables)
+CUR_VTEXT: u32 = 73  // vertical-text
+CUR_ALIAS: u32 = 74  // alias: a link will be made
+CUR_COPY: u32 = 75  // copy: a copy will be made
+CUR_CONTEXT_MENU: u32 = 76  // context-menu
+CUR_ALL_SCROLL: u32 = 77  // all-scroll
+CUR_COL_RESIZE: u32 = 78  // col-resize
+CUR_ROW_RESIZE: u32 = 79  // row-resize
+CUR_SIZE_N: u32 = 80  // n-resize: one edge or corner
+CUR_SIZE_S: u32 = 81
+CUR_SIZE_E: u32 = 82
+CUR_SIZE_W: u32 = 83
+CUR_SIZE_NE: u32 = 84
+CUR_SIZE_NW: u32 = 85
+CUR_SIZE_SE: u32 = 86
+CUR_SIZE_SW: u32 = 87
+CUR_X_END: u32 = 88
 // fonts
 FONT_REG: u32 = 0
 FONT_SEMI: u32 = 1
@@ -33433,6 +33488,42 @@ CUR_USER_MAX: u32 = 32
 CUR_TABLE: u32 = CUR_USER0 + CUR_USER_MAX
 CUR_MAX_PX: i32 = 256  // cursor_create: largest width / height
 ```
+
+*(E3) more system shapes: CSS's cursor names, past the custom cursors (CUR_X0 ..*
+
+```rust
+// CUR_X_END); a platform without one shows cursor_fallback's
+CUR_X0: u32 = 64
+CUR_NOT_ALLOWED: u32 = 64  // not-allowed
+CUR_NO_DROP: u32 = 65  // no-drop
+CUR_GRAB: u32 = 66  // grab: an open hand
+CUR_GRABBING: u32 = 67  // grabbing: a closed hand
+CUR_HELP: u32 = 68  // help: the arrow with a question mark
+CUR_PROGRESS: u32 = 69  // progress: the arrow with a busy sign (work in the background)
+CUR_ZOOM_IN: u32 = 70  // zoom-in
+CUR_ZOOM_OUT: u32 = 71  // zoom-out
+CUR_CELL: u32 = 72  // cell: a thick cross (tables)
+CUR_VTEXT: u32 = 73  // vertical-text
+CUR_ALIAS: u32 = 74  // alias: a link will be made
+CUR_COPY: u32 = 75  // copy: a copy will be made
+CUR_CONTEXT_MENU: u32 = 76  // context-menu
+CUR_ALL_SCROLL: u32 = 77  // all-scroll
+CUR_COL_RESIZE: u32 = 78  // col-resize
+CUR_ROW_RESIZE: u32 = 79  // row-resize
+CUR_SIZE_N: u32 = 80  // n-resize: one edge or corner
+CUR_SIZE_S: u32 = 81
+CUR_SIZE_E: u32 = 82
+CUR_SIZE_W: u32 = 83
+CUR_SIZE_NE: u32 = 84
+CUR_SIZE_NW: u32 = 85
+CUR_SIZE_SE: u32 = 86
+CUR_SIZE_SW: u32 = 87
+CUR_X_END: u32 = 88
+```
+
+- **`const fn cursor_fallback(shape: u32) -> u32`**
+  (E3) the nearest of the first shapes (CUR_ARROW .. CUR_NONE) to a shape of CUR_X0 ..
+  CUR_X_END, for the platforms and cursor themes without it; other shapes unchanged
 
 *window edges, commands, states*
 

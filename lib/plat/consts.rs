@@ -74,6 +74,53 @@ pub const CUR_USER_MAX: u32 = 32;
 pub const CUR_TABLE: u32 = CUR_USER0 + CUR_USER_MAX;
 pub const CUR_MAX_PX: i32 = 256; // cursor_create: largest width / height
 
+// ---- (E3) more system shapes: CSS's cursor names, past the custom cursors (CUR_X0 ..
+// CUR_X_END); a platform without one shows cursor_fallback's
+pub const CUR_X0: u32 = 64;
+pub const CUR_NOT_ALLOWED: u32 = 64; // not-allowed
+pub const CUR_NO_DROP: u32 = 65; // no-drop
+pub const CUR_GRAB: u32 = 66; // grab: an open hand
+pub const CUR_GRABBING: u32 = 67; // grabbing: a closed hand
+pub const CUR_HELP: u32 = 68; // help: the arrow with a question mark
+pub const CUR_PROGRESS: u32 = 69; // progress: the arrow with a busy sign (work in the background)
+pub const CUR_ZOOM_IN: u32 = 70; // zoom-in
+pub const CUR_ZOOM_OUT: u32 = 71; // zoom-out
+pub const CUR_CELL: u32 = 72; // cell: a thick cross (tables)
+pub const CUR_VTEXT: u32 = 73; // vertical-text
+pub const CUR_ALIAS: u32 = 74; // alias: a link will be made
+pub const CUR_COPY: u32 = 75; // copy: a copy will be made
+pub const CUR_CONTEXT_MENU: u32 = 76; // context-menu
+pub const CUR_ALL_SCROLL: u32 = 77; // all-scroll
+pub const CUR_COL_RESIZE: u32 = 78; // col-resize
+pub const CUR_ROW_RESIZE: u32 = 79; // row-resize
+pub const CUR_SIZE_N: u32 = 80; // n-resize: one edge or corner
+pub const CUR_SIZE_S: u32 = 81;
+pub const CUR_SIZE_E: u32 = 82;
+pub const CUR_SIZE_W: u32 = 83;
+pub const CUR_SIZE_NE: u32 = 84;
+pub const CUR_SIZE_NW: u32 = 85;
+pub const CUR_SIZE_SE: u32 = 86;
+pub const CUR_SIZE_SW: u32 = 87;
+pub const CUR_X_END: u32 = 88;
+
+/// (E3) the nearest of the first shapes (CUR_ARROW .. CUR_NONE) to a shape of CUR_X0 ..
+/// CUR_X_END, for the platforms and cursor themes without it; other shapes unchanged
+pub const fn cursor_fallback(shape: u32) -> u32 {
+    match shape {
+        CUR_GRAB => CUR_HAND,
+        CUR_GRABBING | CUR_ALL_SCROLL => CUR_MOVE,
+        CUR_PROGRESS => CUR_WAIT,
+        CUR_ZOOM_IN | CUR_ZOOM_OUT | CUR_CELL => CUR_CROSS,
+        CUR_VTEXT => CUR_IBEAM,
+        CUR_COL_RESIZE | CUR_SIZE_E | CUR_SIZE_W => CUR_SIZE_WE,
+        CUR_ROW_RESIZE | CUR_SIZE_N | CUR_SIZE_S => CUR_SIZE_NS,
+        CUR_SIZE_NE | CUR_SIZE_SW => CUR_SIZE_NESW,
+        CUR_SIZE_NW | CUR_SIZE_SE => CUR_SIZE_NWSE,
+        CUR_X0..CUR_X_END => CUR_ARROW,
+        _ => shape,
+    }
+}
+
 // ---- window edges, commands, states
 pub const EDGE_TOP: u32 = 1;
 pub const EDGE_BOTTOM: u32 = 2;

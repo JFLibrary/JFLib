@@ -127,6 +127,8 @@ pub(crate) struct W {
     /// 0 none, 1 next_rect (DIP), 2 next_rect_px
     pub(crate) next_rect_set: u32,
     pub(crate) next_flags: u32,
+    /// (E3) cursor_next: the cursor of the next hit box (any CUR_*; 0 = its flags' shape)
+    pub(crate) next_cursor: u32,
     pub(crate) next_icon: u32,
     pub(crate) place_auto: u32,
     pub(crate) place_main: i32,
@@ -187,6 +189,7 @@ impl Ui {
         l.next_h = 0;
         l.next_rect_set = 0;
         l.next_flags = 0;
+        l.next_cursor = 0;
         l.next_icon = 0;
         l.grid.runs.clear();
         l.grid.span = (1, 1);

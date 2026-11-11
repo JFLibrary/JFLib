@@ -1,5 +1,6 @@
-// linux_wl_cursor -- pointer cursors: wp_cursor_shape_v1 when the compositor has it,
-// otherwise a cursor surface with built-in images (WSLg has no cursor-shape)
+// linux_wl_cursor -- pointer cursors: wp_cursor_shape_v1 when the compositor has it (every
+// CSS shape: E3's CUR_X0 .. CUR_X_END too), otherwise a cursor surface with built-in images
+// (WSLg has no cursor-shape; the shapes beyond them show cursor_fallback's)
 //                                                                 [src/plat/linux/wl_cursor.s]
 //
 //   Wl::win_set_cursor(w, shape)   CUR_* of window w (CUR_NONE hides the pointer); shown
@@ -89,6 +90,10 @@ pub(crate) fn render(dst: &mut [u32], a: &Art, s: u32) {
 
 /// wp_cursor_shape_device_v1 shape of a CUR_* (PN1: tablet tools)  [wl_cursor_shape_of]
 pub(crate) fn shape_of(shape: u32) -> u32 {
+    let x = shape.wrapping_sub(crate::CUR_X0);
+    if x < crate::CUR_X_END - crate::CUR_X0 {
+        return SHAPE_MAP_X[x as usize] as u32;
+    }
     if (shape as usize) < CUR_IMAGES { SHAPE_MAP[shape as usize] as u32 } else { 1 }
 }
 
@@ -101,7 +106,7 @@ pub(crate) fn cursor_dpi(dpi: i32) -> i32 {
 impl Wl {
     /// CUR_* (or a custom cursor) of window w  [wl_plat_win_set_cursor]
     pub(crate) fn win_set_cursor(&mut self, w: i32, shape: u32) {
-        if shape >= CUR_COUNT && shape.wrapping_sub(CUR_USER0) >= CUR_USER_MAX {
+        if shape >= CUR_COUNT && shape.wrapping_sub(CUR_USER0) >= CUR_USER_MAX && !(crate::CUR_X0..crate::CUR_X_END).contains(&shape) {
             return;
         }
         if w as u32 as usize >= PW_MAX || self.win[w as usize].cursor == shape {
@@ -154,6 +159,15 @@ impl Wl {
                 self.w.flush();
                 return;
             }
+        } else if (crate::CUR_X0..crate::CUR_X_END).contains(&shape) {
+            // (E3) cursor-shape knows them all; the built-in images the nearest one
+            if self.inp.csd != 0 {
+                let csd = self.inp.csd;
+                self.w.send(csd, &CSD_SET_SHAPE, &[A::U(serial), A::U(shape_of(shape))]);
+                self.w.flush();
+                return;
+            }
+            shape = crate::cursor_fallback(shape);
         } else if shape as usize >= CUR_IMAGES {
             if shape == CUR_NONE {
                 // CUR_NONE: no cursor surface
@@ -280,6 +294,9 @@ impl Wl {
 
 // CUR_* -> wp_cursor_shape_device_v1.shape
 static SHAPE_MAP: [u8; CUR_IMAGES] = [1, 9, 4, 8, 13, 6, 27, 26, 29, 28];
+// (E3) CUR_X0 .. CUR_X_END -> wp_cursor_shape_device_v1.shape
+static SHAPE_MAP_X: [u8; (crate::CUR_X_END - crate::CUR_X0) as usize] =
+    [15, 14, 16, 17, 3, 5, 33, 34, 7, 10, 11, 12, 2, 32, 30, 31, 19, 22, 18, 25, 20, 21, 23, 24];
 
 static CUR_TABLE: [&Art; CUR_IMAGES] =
     [&CUR_ARROW_A, &CUR_IBEAM_A, &CUR_HAND_A, &CUR_CROSS_A, &CUR_MOVE_A, &CUR_WAIT_A, &CUR_SIZE_NS_A, &CUR_SIZE_WE_A,
