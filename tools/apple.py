@@ -564,7 +564,9 @@ def sign_via_terminal(app, timeout=180):
     work = Path(tempfile.mkdtemp(prefix="jfgui-sign-"))
     log = work / "sign.log"
     cmd = work / "sign.command"
-    cmd.write_text("#!/bin/bash\n"
+    # (the caller's choice of Xcode reaches the Terminal too: xcode-select may name the Command Line Tools)
+    dev_dir = f"export DEVELOPER_DIR={shlex.quote(os.environ['DEVELOPER_DIR'])}\n" if os.environ.get("DEVELOPER_DIR") else ""
+    cmd.write_text("#!/bin/bash\n" + dev_dir +
                    f"cd {shlex.quote(str(ROOT))}\n"
                    f"{shlex.quote(sys.executable)} tools/apple.py sign {shlex.quote(str(app))} > {shlex.quote(str(log))} 2>&1\n"
                    f"echo \"exit $?\" >> {shlex.quote(str(log))}\n", encoding="utf-8")

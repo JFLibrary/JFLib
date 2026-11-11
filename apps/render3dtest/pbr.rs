@@ -377,7 +377,16 @@ fn pbr_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     check(t, &l, &ncam, &off, &plates, 1, &format!("{level}: normal maps, nearest: plates as they are, turned by 90 degrees (scale 0.8), mirrored, with mirrored u"));
     let mut l = build_lit(t, dev, Format::Rgba8Unorm, &sun_side, &ngeos, &[Tex::exact(128, bumps.clone(), false)], &nitems[4..], &ncam)?;
     let balls = shot(t, dev, &mut off, &mut l.r, &mut l.s, "normal maps")?;
-    check(t, &l, &ncam, &off, &balls, 2, &format!("{level}: normal maps, bilinear (within 2: the hardware's weights have 8 bits): balls, turned, mirrored with scale 1.5"));
+    // (Apple's GPUs: the frame of the normal map comes from derivatives that differ from Vulkan's at some pixels,
+    // DERIVATIVES_VARY: at most 2 % of the balls' pixels may be off)
+    if DERIVATIVES_VARY {
+        let c = cpu::compare_tol(&l.rs, &ref_camera(&ncam), off.w, off.h, CLEAR8, &balls, None, 2);
+        let fine = c.solid > 0 && c.bad * 50 <= c.solid_hit && c.slivers * 100 <= c.solid_hit + 200;
+        t.ok(fine, &format!("{level}: normal maps, bilinear (within 2: the hardware's weights have 8 bits): balls, turned, mirrored with scale 1.5: {} \
+                             (Apple's GPUs: at most 2 % of the pixels on objects wrong)", c.text()));
+    } else {
+        check(t, &l, &ncam, &off, &balls, 2, &format!("{level}: normal maps, bilinear (within 2: the hardware's weights have 8 bits): balls, turned, mirrored with scale 1.5"));
+    }
     let mut l = build_lit(t, dev, Format::Rgba8Unorm, &sun_side, &ngeos, &[Tex::exact(128, bumps.clone(), false)], &nitems, &ncam)?;
     let img = shot(t, dev, &mut off, &mut l.r, &mut l.s, "normal maps")?;
     let flat_items: Vec<(Spec, Material)> = nitems.iter().map(|(s, m)| (*s, Material { normal_texture: None, ..*m })).collect();
