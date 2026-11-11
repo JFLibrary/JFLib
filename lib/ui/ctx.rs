@@ -128,6 +128,35 @@ pub(crate) struct Hit {
     pub(crate) y1: i32,
 }
 
+/// (E2) a key as it went down or up, for a canvas that passes the keyboard on (a web page's
+/// keydown / keyup events): ui.key_event_take
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct KeyEvent {
+    /// VK_*
+    pub vk: u32,
+    /// MOD_* at the time
+    pub mods: u32,
+    /// down (true) or up
+    pub down: bool,
+    /// a down of the system's auto-repeat while the key is held
+    pub repeat: bool,
+    /// the key's place on the keyboard, whatever the layout: Windows' scan code (0xE0.. for
+    /// extended keys), Linux's evdev code; 0 where the platform does not tell (macOS, the
+    /// browser, Android)
+    pub scancode: u32,
+    /// KL_STANDARD, KL_LEFT / KL_RIGHT (the two Shift, Ctrl, Alt, Windows keys), KL_NUMPAD
+    pub location: u32,
+}
+
+// (E2) a KeyEvent of the batch: the index of its down in keyq (-1: an up), taken
+#[derive(Clone, Copy)]
+pub(crate) struct RawKey {
+    pub(crate) ev: KeyEvent,
+    pub(crate) kq: i32,
+    pub(crate) taken: bool,
+}
+
 /// semantic record (dump / expect)  [SR_*]
 #[derive(Clone, Default)]
 pub struct Sem {
@@ -212,6 +241,8 @@ pub(crate) struct W {
     pub(crate) pans: [Vec<super::touch::PanView>; 2],
     pub(crate) grabs: [Vec<[i32; 4]>; 2],
     pub(crate) keyq: Vec<u32>,
+    /// (E2) the keys as they went down and up in this batch (key_event_take)
+    pub(crate) rawq: Vec<RawKey>,
     pub(crate) textq: Vec<u32>,
     pub(crate) hit_cur: usize,
     pub(crate) mx: i32,
@@ -258,6 +289,7 @@ impl W {
             pans: [Vec::new(), Vec::new()],
             grabs: [Vec::new(), Vec::new()],
             keyq: Vec::new(),
+            rawq: Vec::new(),
             textq: Vec::new(),
             hit_cur: 0,
             mx: -1,
@@ -457,6 +489,35 @@ impl Ui {
         0
     }
 
+    /// (E2) the next key as it went down or up (KeyEvent: the key, modifiers, down / up, auto-
+    /// repeat, scancode, left / right / number block), consumed; None when none is left.  For a
+    /// canvas with HB_KEYS that passes the keyboard on as it is (a web page's keydown and keyup):
+    /// call it while the canvas has the focus (`ev & EV_FOCUS`) until None, instead of key_take
+    /// (a down taken here is taken for key_take too, and one key_take took is not here).  The
+    /// typed text comes through text_take as before.  None while a popup of the window is open
+    pub fn key_event_take(&mut self) -> Option<KeyEvent> {
+        if self.popup_count() != 0 {
+            return None;
+        }
+        for i in 0..self.wp.ctx.rawq.len() {
+            let r = self.wp.ctx.rawq[i];
+            if r.taken {
+                continue;
+            }
+            self.wp.ctx.rawq[i].taken = true;
+            if r.kq >= 0 {
+                let k = r.kq as usize;
+                // its down: unless taken already or kept by a focused text box
+                if self.wp.ctx.keyq.get(k).is_none_or(|&q| (q as i32) < 0) || self.text_key_filter(Some(k)).is_none() {
+                    continue;
+                }
+                self.wp.ctx.keyq[k] |= 0x8000_0000;
+            }
+            return Some(r.ev);
+        }
+        None
+    }
+
     /// ui_text_take(cap): the typed codepoints (at most cap), consumed; when cap leaves some,
     /// they come in the next pass (nothing typed is lost)
     pub fn text_take(&mut self, cap: usize) -> Vec<u32> {
@@ -547,6 +608,13 @@ impl Ui {
     }
 
     // key_push(k): a key (VK | mods << 16) for the live window's pass
+    // (E2) a key as it went down or up (KEYQ_MAX of them per batch)
+    fn raw_push(&mut self, ev: KeyEvent, kq: i32) {
+        if self.wp.ctx.rawq.len() < KEYQ_MAX {
+            self.wp.ctx.rawq.push(RawKey { ev, kq, taken: false });
+        }
+    }
+
     fn key_push(&mut self, k: u32) {
         if self.wp.ctx.keyq.len() < KEYQ_MAX {
             self.wp.ctx.keyq.push(k);
@@ -635,14 +703,23 @@ impl Ui {
                 }
                 let vk = ev.data & 0xFFFF;
                 self.keydown[(vk & 255) as usize] = 1;
+                let n = self.wp.ctx.keyq.len();
                 self.key_push((vk | self.mods << 16) & 0x7FFF_FFFF);
+                // (E2) as it went down
+                let kq = if self.wp.ctx.keyq.len() > n { n as i32 } else { -1 };
+                let ev = KeyEvent { vk, mods: self.mods, down: true, repeat: ev.data >> 31 != 0, scancode: ev.x as u32, location: ev.y as u32 };
+                self.raw_push(ev, kq);
                 1
             }
             plat::E_KEY_UP => {
                 let k = ev.data & 255;
                 self.keydown[k as usize] = 0;
+                // (E2) as it went up: a pass of its own for a canvas that takes the keyboard
+                let keys = self.focus_has_keys();
+                let ev = KeyEvent { vk: ev.data & 0xFFFF, mods: self.mods, down: false, repeat: false, scancode: ev.x as u32, location: ev.y as u32 };
+                self.raw_push(ev, -1);
                 // (popup agent) Alt release: a pass for the menu bar's Alt tap
-                (k == VK_MENU) as u32
+                (k == VK_MENU || keys) as u32
             }
             plat::E_TEXT => {
                 self.text_push(ev.data);
@@ -708,6 +785,7 @@ impl Ui {
         c.wheel_x = 0;
         c.wheel_y = 0;
         c.keyq.clear();
+        c.rawq.clear();
         c.textq.clear();
         c.moved = false;
         // keep the last pointer position as the start of the next stroke segment

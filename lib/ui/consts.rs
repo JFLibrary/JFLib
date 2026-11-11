@@ -497,6 +497,12 @@ pub const PTR_PEN: u32 = 1;
 pub const PTR_ERASER: u32 = 2;
 pub const PTR_TOUCH: u32 = 3;
 
+// (E2) where a key sits (KeyEvent::location)
+pub const KL_STANDARD: u32 = 0;
+pub const KL_LEFT: u32 = 1;
+pub const KL_RIGHT: u32 = 2;
+pub const KL_NUMPAD: u32 = 3;
+
 // cursors (CUR_*)
 pub const CUR_ARROW: u32 = 0;
 pub const CUR_IBEAM: u32 = 1;

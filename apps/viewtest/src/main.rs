@@ -12,6 +12,9 @@
 //                        (ui.sem_rect): a script clicks one by its label, the page gets the click
 //   "Dateien öffnen"     the file dialog with FD_MULTI in the folder --files DIR (E8): several
 //                        files at once, ui.filedlg_paths() shown as "Dateien: N a b"
+//   "Rohe Tasten"        (E2) the page takes the keys as they go down and up (ui.key_event_take):
+//                        "Roh:" lists them (+ down, - up, C- S- A- held modifiers, * repeat, :L :R :N
+//                        location, #scancode)
 //   "Zeiger wechseln"    (E3) the page's cursor through ui.cursor_next: not-allowed, grab,
 //                        zoom-in, the north-east corner, a custom cursor of the page's own;
 //                        "Eigener größer" redraws it (ui.cursor_replace), "Eigener frei" frees it
@@ -44,6 +47,7 @@ const ID_FILES: u32 = 107; // "Dateien öffnen"
 const ID_CURSOR: u32 = 108; // "Zeiger wechseln"
 const ID_CBIG: u32 = 109; // "Eigener größer"
 const ID_CFREE: u32 = 110; // "Eigener frei"
+const ID_RAW: u32 = 111; // "Rohe Tasten"
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 
 const CMD_NEW_TAB: u32 = 1;
@@ -63,7 +67,7 @@ const DESC: AppDesc = AppDesc {
     title: "Ansichtstest",
     flags: AF_RESIZABLE,
     w: 560,
-    h: 680,
+    h: 720,
     min_w: 400,
     min_h: 360,
     cmds: &CMDS,
@@ -100,6 +104,9 @@ struct ViewTest {
     /// (E3) the page's cursor (an index into PAGE_CURSORS) and the custom one (handle, 0 none)
     page_cur: usize,
     custom: u32,
+    /// (E2) "Rohe Tasten": the page takes KeyEvents; what it took
+    raw: i32,
+    raw_keys: Vec<String>,
 }
 
 // (E3) the cursors "Zeiger wechseln" walks through (0: the page's arrow / hand)
@@ -136,6 +143,8 @@ impl Default for ViewTest {
             files: String::from("-"),
             page_cur: 0,
             custom: 0,
+            raw: 0,
+            raw_keys: Vec::new(),
         }
     }
 }
@@ -146,6 +155,16 @@ fn link_at(ui: &Ui, x: i32, y: i32) -> Option<usize> {
         let (lx, ly, lw, lh) = (ui.dp(r[0]), ui.dp(r[1]), ui.dp(r[2]), ui.dp(r[3]));
         x >= lx && y >= ly && x < lx + lw && y < ly + lh
     })
+}
+
+// (E2) a key's name in "Roh:" (the modifiers by their own names)
+fn raw_name(ui: &Ui, vk: u32) -> String {
+    match vk {
+        VK_SHIFT => String::from("Umschalt"),
+        VK_CONTROL => String::from("Strg"),
+        VK_MENU => String::from("Alt"),
+        _ => ui.key_text(vk, 0),
+    }
 }
 
 fn cursor_name(c: u32) -> &'static str {
@@ -202,8 +221,29 @@ impl ViewTest {
             self.hover = now;
             ui.repass();
         }
+        // (E2) the keys as they went down and up
+        if self.sink != 0 && self.raw != 0 && inp.ev & EV_FOCUS != 0 {
+            while let Some(k) = ui.key_event_take() {
+                let loc = match k.location {
+                    KL_LEFT => ":L",
+                    KL_RIGHT => ":R",
+                    KL_NUMPAD => ":N",
+                    _ => "",
+                };
+                let scan = if k.scancode != 0 { format!("#{}", k.scancode) } else { String::new() };
+                // the modifiers held with another key: C- Ctrl, S- Shift, A- Alt
+                let mut mods = String::new();
+                for (m, vk, t) in [(MOD_CTRL, VK_CONTROL, "C-"), (MOD_SHIFT, VK_SHIFT, "S-"), (MOD_ALT, VK_MENU, "A-")] {
+                    if k.mods & m != 0 && k.vk != vk {
+                        mods.push_str(t);
+                    }
+                }
+                self.raw_keys.push(format!("{}{}{}{}{}{}", if k.down { "+" } else { "-" }, mods, raw_name(ui, k.vk), if k.repeat { "*" } else { "" }, loc, scan));
+                ui.repass();
+            }
+        }
         // the keys: the page takes them all while it has the focus; F5 it hands back
-        if self.sink != 0 && inp.ev & EV_FOCUS != 0 {
+        if self.sink != 0 && self.raw == 0 && inp.ev & EV_FOCUS != 0 {
             loop {
                 let k = ui.key_take();
                 if k == 0 {
@@ -262,7 +302,10 @@ impl ViewTest {
 impl App for ViewTest {
     fn frame(&mut self, ui: &mut Ui) {
         ui.box_begin(0, BOX_V | pad(12), 8);
+        ui.box_begin(0, BOX_H, 16);
         ui.checkbox(ID_SINK, "Tastensenke", &mut self.sink);
+        ui.checkbox(ID_RAW, "Rohe Tasten", &mut self.raw);
+        ui.box_end();
         ui.text(TS_BODY, &format!("Tasten: {}", self.keys.join(" ")));
         ui.text(TS_BODY, &format!("Befehle: Tab {} Laden {}", self.new_tab, self.reload));
         ui.text(TS_BODY, &format!("Zeiger: {}", cursor_name(self.cursor)));
@@ -271,6 +314,7 @@ impl App for ViewTest {
         }
         self.page(ui);
         self.plain(ui);
+        ui.text(TS_BODY, &format!("Roh: {}", self.raw_keys.join(" ")));
         ui.text(TS_BODY, &format!("Menü: Kopieren {} Eintrag {}", self.copy, self.rows));
         ui.text(TS_BODY, &format!("Geklickt: {}", self.clicked));
         if ui.button(ID_TREE, "Baum prüfen") & EV_ACT != 0 {

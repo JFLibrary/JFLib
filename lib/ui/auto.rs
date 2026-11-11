@@ -35,6 +35,10 @@
 //   wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
 //                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
 //   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
+//   keydown CHORD [scan N] [left|right|numpad]   (E2) the key goes down and stays down (a
+//                   modifier key -- shift, ctrl, alt -- is held for the following events; once
+//                   more while down: an auto-repeat); keyup CHORD [scan N] [left|right|numpad]
+//                   lets it go; scan N and the location reach ui.key_event_take
 //                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
 //   keys [N] CHORD...   the chords N times over, queued for ONE pass of the window with the
 //                   keyboard (more keys than frames: what a tool window hands on); `key` gives
@@ -409,6 +413,7 @@ fn key_lookup(p: &[u8]) -> u32 {
         ("backspace", VK_BACK), ("delete", VK_DELETE), ("left", VK_LEFT), ("right", VK_RIGHT),
         ("up", VK_UP), ("down", VK_DOWN), ("home", VK_HOME), ("end", VK_END),
         ("pgup", VK_PRIOR), ("pgdn", VK_NEXT), ("insert", VK_INSERT), ("alt", VK_MENU), ("apps", VK_APPS),
+        ("shift", VK_SHIFT), ("ctrl", VK_CONTROL), // (E2) keydown shift / keyup shift
         ("plus", VK_OEM_PLUS), ("minus", VK_OEM_MINUS),
         // (U1) punctuation (US layout keys) and the numeric keypad
         ("[", VK_OEM_4), ("]", VK_OEM_6), (",", VK_OEM_COMMA), (".", VK_OEM_PERIOD),
@@ -710,9 +715,9 @@ impl Ui {
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 54] = [
+        const CMDS: [&str; 56] = [
             "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
-            "key", "keys", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
+            "key", "keys", "keydown", "keyup", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
             "style", "sensor", "location", "tap", "longpress", "swipe", "flick", "finger", "pinch", "pan2", "gpu",
@@ -846,6 +851,8 @@ impl Ui {
             "pinch" => self.sc_two(app, a, true),
             "pan2" => self.sc_two(app, a, false),
             "key" => self.sc_key(app, a),
+            "keydown" => self.sc_keyraw(app, a, true),
+            "keyup" => self.sc_keyraw(app, a, false),
             "keys" => self.sc_keys(app, a),
             "type" => self.sc_type(app, a),
             "commit" => self.sc_commit(app, a),
@@ -1771,12 +1778,63 @@ impl Ui {
         }
     }
 
-    // a key pressed and released with modifiers
+    // a key pressed and released with modifiers (and those keydown holds)
     fn press(&mut self, app: &mut dyn App, mods: u32, vk: u32) {
-        self.sc.script_mods = mods;
+        let held = self.sc.script_mods;
+        self.sc.script_mods = held | mods;
         self.inject(app, plat::E_KEY_DOWN, 0, 0, 0, vk);
         self.inject(app, plat::E_KEY_UP, 0, 0, 0, vk);
-        self.sc.script_mods = 0;
+        self.sc.script_mods = held;
+    }
+
+    // (E2) keydown / keyup CHORD [scan N] [left|right|numpad]: one key down (an auto-repeat when
+    // it is down already) or up; shift / ctrl / alt stay held between their keydown and keyup
+    fn sc_keyraw(&mut self, app: &mut dyn App, a: &[u8], down: bool) {
+        let Some((mods, vk, rest)) = chord(skip_ws(a)) else {
+            self.fail(b"unknown key");
+            return;
+        };
+        let (mut scan, mut loc) = (0i32, KL_STANDARD);
+        let mut q = skip_ws(rest);
+        while !q.is_empty() {
+            if let Some(r) = word_eq(q, "scan") {
+                let (n, r) = parse_int(skip_ws(r));
+                scan = n;
+                q = skip_ws(r);
+                continue;
+            }
+            loc = if word_eq(q, "left").is_some() {
+                KL_LEFT
+            } else if word_eq(q, "right").is_some() {
+                KL_RIGHT
+            } else if word_eq(q, "numpad").is_some() {
+                KL_NUMPAD
+            } else {
+                let mut d = b"unknown keydown / keyup option ".to_vec();
+                d.extend_from_slice(q);
+                self.fail(&d);
+                return;
+            };
+            q = next_word(q);
+        }
+        let own = match vk {
+            VK_SHIFT => MOD_SHIFT,
+            VK_CONTROL => MOD_CTRL,
+            VK_MENU => MOD_ALT,
+            _ => 0,
+        };
+        let held = self.sc.script_mods;
+        if down {
+            // a modifier's own event carries its new state (as Win32 and Wayland do)
+            let repeat = if self.keydown[(vk & 255) as usize] != 0 { 1 << 31 } else { 0 };
+            self.sc.script_mods = held | own | mods;
+            self.inject(app, plat::E_KEY_DOWN, 0, scan, loc as i32, vk | repeat);
+            self.sc.script_mods = held | own;
+        } else {
+            self.sc.script_mods = (held | mods) & !own;
+            self.inject(app, plat::E_KEY_UP, 0, scan, loc as i32, vk);
+            self.sc.script_mods = held & !own;
+        }
     }
 
     // commit "text" [N]: the commits of an input method (plat::ime_commit_text) to the window

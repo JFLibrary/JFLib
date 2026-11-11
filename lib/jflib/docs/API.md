@@ -161,7 +161,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 
 - [App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks): `fb`, `client_size`, `anim_off`, `set_anim_off`, `headless`, `invalidate`, `quit`, `set_title`, `title`, `spawn`, `spawner`, `tasks_live`
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
-- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
+- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `key_event_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
@@ -606,6 +606,18 @@ Runtime (runtime.rs, win.rs): frame_begin / frame_end (a pass over all windows),
 uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_update.
 ```
 
+- **`struct KeyEvent`**
+  (E2) a key as it went down or up, for a canvas that passes the keyboard on (a web page's
+  keydown / keyup events): ui.key_event_take
+  - `vk: u32` -- VK_\*
+  - `mods: u32` -- MOD_\* at the time
+  - `down: bool` -- down (true) or up
+  - `repeat: bool` -- a down of the system's auto-repeat while the key is held
+  - `scancode: u32` -- the key's place on the keyboard, whatever the layout: Windows' scan code (0xE0.. for
+    extended keys), Linux's evdev code; 0 where the platform does not tell (macOS, the
+    browser, Android)
+  - `location: u32` -- KL_STANDARD, KL_LEFT / KL_RIGHT (the two Shift, Ctrl, Alt, Windows keys), KL_NUMPAD
+
 - **`struct Sem`**
   semantic record (dump / expect)  [SR_\*]
   - `id: u32`
@@ -675,6 +687,13 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   is left.  A canvas with HB_KEYS takes every key with it while it has the focus (\\`ev &
   EV_FOCUS\\`, call it until 0); the keys a focused text box keeps stay with the box, and
   while a popup of the window is open (a menu, a flyout) the keys are its.
+- **`fn key_event_take(&mut self) -> Option<KeyEvent>`**
+  (E2) the next key as it went down or up (KeyEvent: the key, modifiers, down / up, auto-
+  repeat, scancode, left / right / number block), consumed; None when none is left.  For a
+  canvas with HB_KEYS that passes the keyboard on as it is (a web page's keydown and keyup):
+  call it while the canvas has the focus (`ev & EV_FOCUS`) until None, instead of key_take
+  (a down taken here is taken for key_take too, and one key_take took is not here).  The
+  typed text comes through text_take as before.  None while a popup of the window is open
 - **`fn text_take(&mut self, cap: usize) -> Vec<u32>`**
   ui_text_take(cap): the typed codepoints (at most cap), consumed; when cap leaves some,
   they come in the next pass (nothing typed is lost)
@@ -4116,6 +4135,10 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
+  keydown CHORD [scan N] [left|right|numpad]   (E2) the key goes down and stays down (a
+                  modifier key -- shift, ctrl, alt -- is held for the following events; once
+                  more while down: an auto-repeat); keyup CHORD [scan N] [left|right|numpad]
+                  lets it go; scan N and the location reach ui.key_event_take
                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
   keys [N] CHORD...   the chords N times over, queued for ONE pass of the window with the
                   keyboard (more keys than frames: what a tool window hands on); `key` gives
@@ -5572,6 +5595,11 @@ PTR_MOUSE: u32 = 0
 PTR_PEN: u32 = 1
 PTR_ERASER: u32 = 2
 PTR_TOUCH: u32 = 3
+// (E2) where a key sits (KeyEvent::location)
+KL_STANDARD: u32 = 0
+KL_LEFT: u32 = 1
+KL_RIGHT: u32 = 2
+KL_NUMPAD: u32 = 3
 // cursors (CUR_*)
 CUR_ARROW: u32 = 0
 CUR_IBEAM: u32 = 1
@@ -34365,8 +34393,8 @@ E_MOVE: u8 = 1
 E_DOWN: u8 = 2  // btn
 E_UP: u8 = 3  // btn
 E_WHEEL: u8 = 4  // data = (i16 dy) | (i16 dx << 16), 120 per notch, up / right positive
-E_KEY_DOWN: u8 = 5  // data = VK | (repeat << 31)
-E_KEY_UP: u8 = 6  // data = VK
+E_KEY_DOWN: u8 = 5  // data = VK | (repeat << 31); (E2) x = scancode, y = KL_* location
+E_KEY_UP: u8 = 6  // data = VK; (E2) x = scancode, y = KL_* location
 E_TEXT: u8 = 7  // data = Unicode codepoint
 E_RESIZE: u8 = 8  // x = width, y = height (physical pixels)
 E_DPI: u8 = 9  // data = dpi (96 = 100 %)
@@ -34415,6 +34443,19 @@ MOD_ALTGR: u8 = 16
 MOD_CAPS: u8 = 32
 MOD_NUM: u8 = 64
 ```
+
+*(E2) where a key sits (Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:*
+
+```rust
+// Windows' scan code (0xE0.. for extended keys), Linux's evdev code, 0 where unknown)
+KL_STANDARD: u32 = 0
+KL_LEFT: u32 = 1  // the left Shift, Ctrl, Alt, Windows key
+KL_RIGHT: u32 = 2
+KL_NUMPAD: u32 = 3  // the keys of the number block
+```
+
+- **`const fn evdev_location(code: u32) -> u32`**
+  (E2) the KL_\* location of a Linux evdev key code (both sides' modifiers, the number block)
 
 *cursors (CUR_\*: system shapes; CUR_USER0.. custom cursors of cursor_create)*
 

@@ -184,9 +184,10 @@ impl Wl {
             return self.inp.rep_next;
         }
         self.inp.evwin = self.kb_target();
-        let (vk, text) = xkb_key(self.inp.rep_key - 1);
+        let code = self.inp.rep_key - 1;
+        let (vk, text) = xkb_key(code);
         if vk != 0 {
-            self.push(E_KEY_DOWN, 0, 0, 0, vk | 0x8000_0000);
+            self.push(E_KEY_DOWN, 0, code as i32, crate::evdev_location(code) as i32, vk | 0x8000_0000);
         }
         if text != 0 {
             self.push(E_TEXT, 0, 0, 0, text);
@@ -585,7 +586,8 @@ pub(crate) fn wlh_kb_key(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
         let dead = xkb_is_dead(key);
         let (vk, text) = xkb_key_typed(key); // dead keys composed (´ e -> é)
         if vk != 0 {
-            wl.push(E_KEY_DOWN, 0, 0, 0, vk);
+            // (E2) the evdev code and where the key sits
+            wl.push(E_KEY_DOWN, 0, key as i32, crate::evdev_location(key) as i32, vk);
         }
         for t in text.into_iter().filter(|&t| t != 0) {
             wl.push(E_TEXT, 0, 0, 0, t);
@@ -602,7 +604,7 @@ pub(crate) fn wlh_kb_key(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
             wl.inp.rep_key = 0;
         }
         if vk != 0 {
-            wl.push(E_KEY_UP, 0, 0, 0, vk);
+            wl.push(E_KEY_UP, 0, key as i32, crate::evdev_location(key) as i32, vk);
         }
     }
 }
