@@ -75,6 +75,18 @@ default_linux=kde
 styles=winui classic macos kde
 ```
 
+A style of the app's own (`cargo jflib package`, an app outside this repository): `styles=narsil`
+names a crate of its dependencies whose Cargo.toml says
+
+```toml
+[package.metadata.jflib]
+style = "narsil"
+```
+
+and whose `INFO` file holds the name and the description the setup shows. The app uses that
+style itself (`ui::launch(&DESC, app, &narsil_style::STYLE)`), so its variant is built without
+`JFLIB_STYLE`; the library's styles in the same list are built with it as before.
+
 **Icons**: `python tools/mkicon.py NAME --glyph EB7E --color D9822B` renders a glyph of the icon
 font on a gradient square in every icon size (16..256 px), cuts anti-aliased rounded corners
 (`tools/pngutil.py`) and writes `app.ico` and the PNGs. The glyph comes from

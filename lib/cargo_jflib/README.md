@@ -50,7 +50,7 @@ one that has the tool. What it reads from `PACKAGE` next to Cargo.toml:
 | Key | Use |
 | --- | --- |
 | `display`, `version`, `publisher` | the shown name (default: the package's name), the version (default: Cargo.toml's), the publisher in Windows' list of apps |
-| `styles`, `default_win`, `default_linux` | the styles to build in (default `winui`; `--styles` wins) and the one preselected |
+| `styles`, `default_win`, `default_linux` | the styles to build in (default `winui`; `--styles` wins) and the one preselected; besides the library's (winui, classic, kde, macos, netlab) a style of the app's own: a crate of its dependencies with `[package.metadata.jflib] style = "NAME"` (and an `INFO` file: its name and description for the setup), which the app uses itself -- it is built without `JFLIB_STYLE` |
 | `summary`, `description`, `generic`, `categories` | the .desktop entry and the .deb's description |
 | `deb_name`, `section`, `maintainer` | the .deb's name (default: the package's name), its section (`utils`) and maintainer (default: Cargo.toml's first author) |
 | `filetypes`, `schemes` | the file types (`ext[,ext]\|mime/type\|description[\|own]`, `;` between them) and URL schemes the app opens, registered by the setup and the .deb |

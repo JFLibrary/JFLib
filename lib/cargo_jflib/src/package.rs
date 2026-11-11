@@ -131,10 +131,35 @@ fn style_info(styles: &BTreeMap<String, PathBuf>, style: &str) -> (String, Strin
     (lines.next().unwrap_or(style).to_string(), lines.next().unwrap_or("").to_string())
 }
 
-/// the app built for `triple` with `style` -> its program
-fn build(p: &Project, triple: &str, style: &str) -> Result<PathBuf, String> {
+/// (E15) the styles PACKAGE / --styles names: the library's (JFLIB_STYLE) and the app's own
+/// (a crate of its dependencies with `[package.metadata.jflib] style = "NAME"`; the app uses it
+/// itself, so it is built without JFLIB_STYLE) -> those that are its own
+fn styles_check(styles: &[String], own: &BTreeMap<String, PathBuf>) -> Result<Vec<String>, String> {
+    let mut mine = Vec::new();
+    for s in styles {
+        if own.contains_key(s) {
+            mine.push(s.clone());
+        } else if !STYLES.contains(&s.as_str()) {
+            let all: Vec<&str> = STYLES.iter().copied().chain(own.keys().map(String::as_str)).collect();
+            return Err(format!(
+                "style {s}: the styles are {} (a style of the app's own: a crate of its dependencies with \
+                 [package.metadata.jflib] style = \"{s}\")",
+                all.join(", ")
+            ));
+        }
+    }
+    Ok(mine)
+}
+
+/// the app built for `triple` with `style` -> its program (a style of its own: without JFLIB_STYLE)
+fn build(p: &Project, triple: &str, style: &str, own: bool) -> Result<PathBuf, String> {
     let mut cmd = cargo::command();
-    cmd.current_dir(&p.package.dir).env("JFLIB_STYLE", style).args(["build", "--release", "-p", &p.package.name, "--target", triple]);
+    cmd.current_dir(&p.package.dir).args(["build", "--release", "-p", &p.package.name, "--target", triple]);
+    if own {
+        cmd.env_remove("JFLIB_STYLE");
+    } else {
+        cmd.env("JFLIB_STYLE", style);
+    }
     if triple == crate::mac::TRIPLE {
         cmd.env("MACOSX_DEPLOYMENT_TARGET", crate::mac::MAC_MIN);
     }
@@ -529,9 +554,20 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
     let name = p.package.name.clone();
     let styles: Vec<String> = o.styles.as_deref().or(meta.get("styles")).unwrap_or("winui")
         .split([',', ' ']).filter(|s| !s.is_empty()).map(String::from).collect();
-    if let Some(bad) = styles.iter().find(|s| !STYLES.contains(&s.as_str())) {
-        return Err(format!("style {bad}: the styles are {}", STYLES.join(", ")));
+    // the style crates (their INFO): the library's and (E15) the app's own; the version of jflib,
+    // which the stubs' crates must have
+    let (mut infos, mut own, mut jflib) = (BTreeMap::new(), BTreeMap::new(), None);
+    for r in cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))? {
+        if let Some(s) = &r.style {
+            own.insert(s.clone(), r.dir.clone());
+            infos.insert(s.clone(), r.dir);
+        } else if let Some(s) = r.name.strip_prefix("jflib-style-") {
+            infos.insert(s.to_string(), r.dir);
+        } else if r.name == "jflib" {
+            jflib = Some(r.version);
+        }
     }
+    let own_styles = styles_check(&styles, &own)?;
     let wants = |f: &str| o.formats.contains(&f);
     if wants("dmg") && !cfg!(target_os = "macos") {
         return Err("a dmg is made on a Mac (Apple's hdiutil and codesign): there --formats dmg".to_string());
@@ -554,15 +590,6 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
                      with the formats of this system"
                 ));
             }
-        }
-    }
-    // the style crates (their INFO) and the version of jflib, which the stubs' crates must have
-    let (mut infos, mut jflib) = (BTreeMap::new(), None);
-    for r in cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))? {
-        if let Some(s) = r.name.strip_prefix("jflib-style-") {
-            infos.insert(s.to_string(), r.dir);
-        } else if r.name == "jflib" {
-            jflib = Some(r.version);
         }
     }
     let jflib = jflib.ok_or_else(|| format!("{name} does not depend on the crate jflib"))?;
@@ -593,7 +620,7 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
     for s in &app.styles {
         for &t in &targets {
             println!("[{s}] build {t}");
-            let exe = build(&p, if t == "win" { WIN } else { LINUX }, s)?;
+            let exe = build(&p, if t == "win" { WIN } else { LINUX }, s, own_styles.contains(s))?;
             write(&app.exe(s, t), &read(&exe)?)?;
         }
     }
@@ -629,7 +656,7 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
             "dmg" => {
                 for s in &app.styles {
                     println!("[{s}] build mac");
-                    let exe = build(&p, crate::mac::TRIPLE, s)?;
+                    let exe = build(&p, crate::mac::TRIPLE, s, own_styles.contains(s))?;
                     let dir = app.work.join(s).join("mac");
                     fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
                     let bundle = crate::mac::bundle(&p.package.dir, &app.version, &exe, &dir)?;
@@ -674,6 +701,24 @@ mod tests {
         assert_eq!(u64::from_le_bytes(pay[24..32].try_into().unwrap()), 8 + 256);
         assert_eq!(pay[8 + 128 + 32 + 47], 0); // the name cut to 47 bytes
         assert!(!has_interpreter(&[]));
+    }
+
+    // (E15) a style of the app's own from the metadata of its crate; the names PACKAGE may use
+    #[test]
+    fn own_styles() {
+        let pkg = crate::json::parse(r#"{"name": "narsil-style", "version": "0.1.0", "manifest_path": "/x/narsil-style/Cargo.toml",
+            "metadata": {"jflib": {"style": "narsil"}}}"#).unwrap();
+        let r = cargo::resolved(&pkg);
+        assert_eq!((r.name.as_str(), r.style.as_deref(), r.dir.as_path()), ("narsil-style", Some("narsil"), Path::new("/x/narsil-style")));
+        let plain = crate::json::parse(r#"{"name": "x", "version": "1.0.0", "manifest_path": "/x/Cargo.toml", "metadata": null}"#).unwrap();
+        assert_eq!(cargo::resolved(&plain).style, None);
+        let own: BTreeMap<String, PathBuf> = [("narsil".to_string(), PathBuf::from("/x/narsil-style"))].into();
+        let names = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(styles_check(&names(&["narsil"]), &own).unwrap(), names(&["narsil"]));
+        assert_eq!(styles_check(&names(&["winui", "narsil"]), &own).unwrap(), names(&["narsil"]));
+        assert!(styles_check(&names(&["winui", "kde"]), &own).unwrap().is_empty());
+        let e = styles_check(&names(&["other"]), &own).unwrap_err();
+        assert!(e.contains("winui, classic, kde, macos, netlab, narsil") && e.contains("style = \"other\""), "{e}");
     }
 
     #[test]
