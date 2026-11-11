@@ -52,7 +52,7 @@ pub extern "system" fn mainCRTStartup() -> ! {
 
 /// (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
 /// program's own): what mainCRTStartup does without std, with rt's panic hook first and the end
-/// through std::process::exit
+/// through std::process::exit; with the feature unwind a panic that leaves the app ends it there
 #[cfg(feature = "std")]
 pub fn std_start() -> ! {
     rt::panic_hook();
@@ -61,7 +61,7 @@ pub fn std_start() -> ! {
     crate::cpu::simd_override();
     rt::boot::set_handler(crate::boot::start); // rt::main!: name, app://, manifest
     // SAFETY: the app defines jfgui_main (ui::main!, rt::main!).
-    let code = unsafe { jfgui_main() };
+    let code = rt::abort_on_unwind(|| unsafe { jfgui_main() });
     crate::exit(code) // hosted.rs: std::process::exit
 }
 

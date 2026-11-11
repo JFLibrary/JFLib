@@ -81,7 +81,8 @@ jflib = { features = ["std"], version = "0.1" }
 ```
 
 The program then has std's entry point, panic handler and allocator instead of JFLib's own; a
-panic still ends with JFLib's crash report (`rt::panic_hook`). What changes against the template:
+panic still ends with JFLib's crash report (`rt::panic_hook`; with the feature `unwind` only a
+panic nobody catches, below). What changes against the template:
 
 | File | With std |
 | --- | --- |
@@ -100,6 +101,41 @@ panic still ends with JFLib's crash report (`rt::panic_hook`). What changes agai
 `cargo jflib package` makes a std app's packages on their own system: `setup` and `msix` on
 Windows, `deb`, `appimage`, `rpm` and `flatpak` on Linux, `dmg` on a Mac (`cargo jflib mac` builds
 `NAME.app` there; [APPLE.md](APPLE.md)).
+
+**Panics that unwind: the feature `unwind`.** JFLib's runtime needs `panic = "abort"`, and an app
+with std as well, unless it turns on the feature `unwind` (it implies `std`). That is for an app
+that must survive a panic of its own code, a web browser whose engine runs each page on a thread
+of its own and catches a page's panic, say. Both profiles then say `panic = "unwind"`:
+
+```toml
+[dependencies]
+jflib = { features = ["unwind"], version = "0.1" }
+
+[profile.dev]
+panic = "unwind"      # the other lines as in the template
+
+[profile.release]
+panic = "unwind"
+```
+
+* A panic the app catches with `std::panic::catch_unwind` leaves the program running, on any
+  thread: its own `std::thread`s, a thread of `plat::thread_spawn`, the UI thread inside
+  `App::frame`. JFLib writes nothing for it; `rt::panic_take()` gives its text as the crash report
+  would show it, with file and line (`"panicked at src/page.rs:12:5:\nindex out of bounds: ..."`),
+  where the payload holds the message alone.
+* A panic nobody catches ends the program as before: JFLib's crash report (stderr, the crash
+  hook), exit code 3. That holds when it leaves the program's start (`App::frame`, `command`, the
+  tasks of `ui.spawn`), a thread of JFLib's (`plat::thread_spawn`, the jobs of
+  `plat::task::spawn_blocking`, sound) or reaches a callback of the system (a window procedure):
+  JFLib's code is not written to go on after a panic. `rt::abort_on_unwind(f)` does the same for
+  an entry point of the app's own.
+* A thread of `std::thread::spawn` whose panic nobody catches ends quietly: `join()` returns the
+  payload, as in std, without std's line on stderr.
+* Catch around the app's own code, not around calls into `ui`: what a panic leaves halfway done
+  in the UI's state is not repaired. The locks of `plat::sync` are released by a caught panic, not
+  poisoned.
+* In the browser std does not unwind (rustup's std for `wasm32` is built with `panic = "abort"`):
+  every panic ends the program there.
 
 **One window loop, one runtime.** With JFLib an app does not put a window crate, an event loop
 and a UI crate together, as egui apps do with eframe and the crates around it: `ui::launch` is
@@ -682,9 +718,41 @@ if self.tab == 0 {
   (`btn`, `pressed`, `released`, bit `1 << BTN_*`), `wheel_x` / `wheel_y` (120 per notch),
   `mods`, all move points `pts`, the first unconsumed key, and pen data (`pressure`, `ptype`,
   `ppress`, tilt; `legacy/ASMLIB/docs/modules/PEN_INPUT.md`). The cursor shape comes from
-  `next_flags(CUR_* << HB_CURSOR_SHIFT)`. `ui.canvas` returns a borrow of `ui`: clone the
+  `next_flags(CUR_* << HB_CURSOR_SHIFT)`, the crosshair without one; with `HB_CURSOR_SET` the
+  bits count as given, so `CUR_ARROW` (0) is the arrow (a web page's cursor changes with what lies
+  under the pointer: set it every frame). `ui.canvas` returns a borrow of `ui`: clone the
   input before calling more `ui` methods. `canvas_damage(id, x, y, w, h)` redraws a part
   without a version change.
+* **A canvas that takes the keyboard** (a web page, a terminal, an emulator): with
+  `next_flags(HB_KEYS)` every key is the canvas's while it has the focus (a press gives it the
+  focus, `ui.focus(id)` too) and no popup of the window is open (a menu keeps its keys, and
+  `key_take` gives none then): no accelerator of the command table, no Tab, arrow or F6 of the
+  keyboard navigation (section 27), no Enter / Space action and no `ui.undo_keys` takes one. The
+  canvas takes them with `ui.key_take()` (the first unconsumed key, `VK | mods << 16`, consumed;
+  0 when none is left) and typed text with `ui.text_take`; a key it does not use goes back to the
+  command table with `ui.accel_run(key)` (true when a command ran). Unlike `HB_TEXT` there are no
+  text box rules: no reserved keys, no input method, no on-screen keyboard. Keys the app must
+  keep for itself (Ctrl+T, Ctrl+Tab in a browser) it takes before it hands the rest on:
+
+  ```rust
+  ui.next_flags(HB_KEYS | HB_CURSOR_SET | self.cursor << HB_CURSOR_SHIFT);
+  let inp = ui.canvas(ID_PAGE, Some(d), 0, self.ver).clone();
+  if inp.ev & EV_FOCUS != 0 {
+      loop {
+          let k = ui.key_take();
+          if k == 0 {
+              break;
+          }
+          if reserved(k) {
+              ui.accel_run(k);         // the app's own shortcut
+          } else {
+              self.page.key_down(k);   // the engine; one it did not use comes back as accel_run(k)
+          }
+      }
+  }
+  ```
+
+  `apps/viewtest` is such a page (`tests/keys.uis`).
 * Zoom and pan without a re-raster: right after the canvas's command, `ui.canvas_gpu(CanvasDesc {
   id, name, rect, view, ver, content, gpu, exact_pan })` says what it shows. `content` is an
   `Rc<dyn CanvasContent>` whose `draw_view(g, view, rect)` draws the content through any
@@ -832,6 +900,22 @@ ui.menubar(None);                        // the menu bar of the AppDesc
 
   A widget without `context_menu` gets the menu key as a right click (`EV_RCLICK`); a
   `menu_popup` in answer to it opens at the widget (§27).
+  **At a point the app learns later** (a web engine answers a right click with the menu's
+  rows and place a moment after it): `menu_popup_at(menu, x, y)` opens a menu, `popup_open_at(id,
+  x, y)` a flyout of the app's own (drawn with `flyout_begin(id, ..)` as usual) at the point
+  (x, y), px of the window as `last_rect` (a canvas: `UiInput::rect` plus its `x`, `y`), in the
+  frame the answer comes:
+
+  ```rust
+  if inp.ev & EV_RCLICK != 0 {
+      self.page.context_menu(inp.x, inp.y);          // the engine answers later
+  }
+  if let Some(info) = self.page.take_context_menu() { // a later frame
+      ui.menu_popup_at(&M_PAGE, inp.rect[0] + info.x, inp.rect[1] + info.y);
+  }
+  ```
+
+  `apps/viewtest` (`tests/menus.uis`) does both.
   A row whose keys the app handles itself (no command of the table, e.g. inside a pane that
   captures them with `capture_shortcut`) shows them with `menu_item_keys(id, label,
   &ui.key_text(VK_F5, MOD_CTRL))`: `key_text(vk, mods)` writes a key as the accelerator texts
@@ -1771,7 +1855,14 @@ shot build/template.png
 ```sh
 cargo jflib test                    # build it, run every tests/*.uis with --script
 cargo jflib test --release          # ... the release build
+cargo jflib test --features engine --dir tests/engine
+                                    # ... built with the feature engine, the scripts of tests/engine/
+cargo jflib test --no-default-features   # ... without the default features (an app's mock build)
 ```
+
+`--features` takes Cargo's forms (`a,b`, `"a b"`, repeated), `--dir DIR` is relative to the
+package's folder; the scripts run in that folder, so their paths (`shot build/x.png`) stay the
+same.
 
 In this repository:
 
@@ -2786,6 +2877,24 @@ if self.grid {
   `SS_SELECTED`, `SS_OPEN`); a slider-like widget sets `rec.min` / `rec.max` and applies
   `ui.a11y_value(id)` (a text widget `ui.a11y_text(id)`) when a screen reader sets a value.
 * Records without area (hidden probe records) are left out.
+* **Content drawn inside a canvas** (the links, headings and images of a web page an engine
+  draws, the shapes of a diagram): `ui.sem_rect(kind, id, rect, label, value)` after the canvas
+  adds a record at `rect` (px of the window, as `last_rect`) without a hit box of its own and
+  without touching `last_rect`. Screen readers read it with the role of its kind (`K_LINK`,
+  `K_HEADING` with the level as value, `K_IMAGE`, `K_TEXT`, `K_BUTTON`, `K_LIST` /
+  `K_LISTITEM` ...), a script finds it by its label, and a click on it -- the script's
+  `click "Label"`, a screen reader's -- is a press in its middle, so it reaches the canvas as
+  any click does. Publish what is visible, every frame:
+
+  ```rust
+  let inp = ui.canvas(ID_PAGE, Some(d), 0, self.ver).clone();
+  for l in self.page.visible_links() {                     // rectangles relative to the page
+      let r = [inp.rect[0] + l.x, inp.rect[1] + l.y, l.w, l.h];
+      ui.sem_rect(K_LINK, 0, r, Some(&l.text), 0);
+  }
+  ```
+
+  Tables have no kind of their own yet: their cells are `K_TEXT` records.
 
 **Screen magnifiers** follow the focus and the text caret. Text boxes report their caret
 (`ime_pos`, which a text widget of your own calls with its caret's rectangle, like the IME): the
@@ -3548,9 +3657,11 @@ text colour) and appears only after a key was used.
   `HB_FOCUS` (it is a Tab stop and takes the focus on a press), reacts to `EV_ACT` (Space /
   Enter) and calls `ui.focus_ring_draw(ev)` after its painting. `HB_NOTAB`: focusable but no
   Tab stop; `HB_CURRENT`: the member a group is entered at; `HB_SPACE`: Space acts, Enter
-  does not; `HB_OWNKEYS`: Space and Enter are the widget's own; `HB_SPLITTER`: a splitter
-  F8 reaches -- `ui.splitter_keys(ev, along_x)` says how far (DIP) the arrows move it. Give
-  it a `sem` record.
+  does not; `HB_OWNKEYS`: Space and Enter are the widget's own; `HB_KEYS`: every key is the
+  widget's while it has the focus, Tab, F6 and the accelerators too (a canvas that shows a web
+  page, section 5: it takes them with `ui.key_take()` and gives back the focus itself);
+  `HB_SPLITTER`: a splitter F8 reaches -- `ui.splitter_keys(ev, along_x)` says how far (DIP) the
+  arrows move it. Give it a `sem` record.
 * Mark tool bars and button grids as one Tab stop: `ui.focus_group_begin(id)` ..
   `ui.focus_group_end()` (id 0: the current box). A selection that follows the focus (tabs)
   asks `ui.group_arrived(id)`.

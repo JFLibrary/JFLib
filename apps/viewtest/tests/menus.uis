@@ -1,0 +1,26 @@
+# viewtest: menus at a point the app learns later (E5)
+#
+# a right click on the page: its menu opens a pass later, where the click was (menu_popup_at)
+rclick 200,220
+expect "Neu laden" rect 204 224 * *
+expect "Link kopieren" exists
+# the page has HB_KEYS and the focus, but the open menu keeps its keys
+key down down enter
+expect text:"Menü: Kopieren 1 Eintrag 0" exists
+expect text:"Tasten: " exists
+expect "Link kopieren" missing
+# once more at another point, with a click
+rclick 300,150
+expect "Neu laden" rect 304 154 * *
+click "Neu laden"
+expect text:"Befehle: Tab 0 Laden 1" exists
+expect "Neu laden" missing
+# with the menu closed the keys are the page's again
+key ctrl+t
+expect text:"Tasten: Strg+T" exists
+# a flyout of the app's own at a point of the page (popup_open_at), whatever was placed last
+click "Menü später"
+expect "Eintrag A" rect 216 200 * *
+click "Eintrag A"
+expect text:"Menü: Kopieren 1 Eintrag 1" exists
+expect "Eintrag A" missing

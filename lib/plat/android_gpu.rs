@@ -76,7 +76,7 @@ type Start = Box<dyn FnOnce() + Send>;
 extern "C" fn thread_main(arg: *mut c_void) -> *mut c_void {
     // SAFETY: gpu_thread_spawn hands over this box, once.
     let f = unsafe { Box::from_raw(arg as *mut Start) };
-    f();
+    rt::abort_on_unwind(f); // feature unwind: a panic that leaves the thread ends the program
     core::ptr::null_mut()
 }
 
