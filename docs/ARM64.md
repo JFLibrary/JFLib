@@ -1,8 +1,9 @@
 # ARM64-Plan: Windows und Linux auf ARM-Prozessoren
 
-Stand 2026-11-10, auf Basis von `main` 3044b5ac. Umgesetzt sind ARM0 bis ARM4 und ARM6: `rt` und `plat` laufen
+Stand 2026-11-11, auf Basis von `main` d6f5b137. Umgesetzt sind ARM0 bis ARM4 und ARM6: `rt` und `plat` laufen
 auf Linux ARM64, statisch und gegen glibc; `plattest`, `linuxtest`, `lifetest` und `sandboxtest` sind in einer ARM64-VM
-grün, seit ARM4 auch Plugins und das Modul `jxlenc`. Als Nächstes Windows ARM64 (ARM5). Für den Rest gilt: Die Zahlen sind
+grün, seit ARM4 auch Plugins und das Modul `jxlenc`. Für Windows ARM64 (ARM5) bauen Bibliothek und Programme, der Lauf auf
+`windows-11-arm` steht aus. Für den Rest gilt: Die Zahlen sind
 aus dem Code gezählt, die Aufwände
 geschätzt. Syscalls, Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`),
 die Relocations mit ARM3 an einem Test-Plugin. Der Eintrag in der Roadmap steht in
@@ -524,7 +525,7 @@ Kopie von `plugins/` (Stand `abc3551`) liegt in den Übergabenotizen von ARM4, m
   eigener Text unter Einstellungen > Plugins. Native Plugins bleiben auf Apple aus.
 
 Offen: der Befehlscache auf echter Hardware (auf dem A56 ein Lauf grün, keine Stressprobe), Windows ARM64 (ARM5: `__chkstk` in `rt`, `x18`, `CONTEXT`, Unwind-Daten
-für das Trampolin, `FlushInstructionCache` im PE-Loader), ein Kernel mit 16-KB-Seiten.
+für das Trampolin, `FlushInstructionCache` im PE-Loader; siehe dort), ein Kernel mit 16-KB-Seiten.
 
 ### ARM5: Windows ARM64 (M)
 
@@ -541,6 +542,60 @@ für das Trampolin, `FlushInstructionCache` im PE-Loader), ein Kernel mit 16-KB-
   ARM64 ist, bei einer x64-Runtime braucht es eine klare Meldung statt eines Fehlers beim Laden.
 
 **Fertig, wenn:** `coretest`, `plattest` und ein Start der `gallery` auf `windows-11-arm` grün sind.
+
+**Umgesetzt** (2026-11-11). Die x86-Teile tragen ihr `cfg` in derselben Zeile, die ARM64-Teile stehen am Ende der Dateien.
+`build_rs.py lib --target win --arch aarch64` baut die ganze Bibliothek, `coretest`, `plattest`, `gallery` und `codectest` mit
+dem Modul `jxlenc` linken für Windows ARM64.
+
+- **`__chkstk`** (`rt/os.rs`): die Größe in `x15` mal 16, die Seiten von `sp` abwärts mit `ldr xzr` berührt; es ändern sich
+  nur `x16`, `x17` und die Flags, wie der Compiler es von diesem Aufruf annimmt (dieselben Schritte wie compiler-rt und
+  `modrt/mem.rs`). Mit `std` bringt es die C-Laufzeit.
+- **TEB über `x18`:** `plat_tid` liest `[x18, #0x48]` (`win_lib.rs`), der Crash-Handler die Stack-Grenzen aus `[x18, #0x10]` und
+  `[x18, #0x08]` (`win_crash.rs`); die Felder liegen wie auf x64. `x18` wird nur gelesen, auch vom Trampolin nie berührt.
+- **Guard** (`win_lib.rs`): Der VEH-Handler setzt im ARM64-`CONTEXT` `Pc` (0x108), `Sp` (0x100) und `Fp` (0xF0); ein
+  Richtungs-Flag gibt es dort nicht.
+- **Trampolin** (`plib.rs`): eines für Linux und Windows. Die Zeilen `jfseh` sind ein Assembler-Makro, das nur für Windows die
+  SEH-Direktiven ausgibt (`.seh_save_fplr_x`, `.seh_set_fp`, `.seh_save_regp`, Prolog und Epilog); LLVM macht daraus
+  `.pdata`/`.xdata`, `llvm-readobj --unwind` zeigt sie im fertigen `plattest.exe`. Damit steigt `RtlVirtualUnwind` durch das
+  Trampolin in den Host, etwa bei einem Fehler in einem Plugin außerhalb eines Guards.
+- **Testcode** `jfgui_gt_code` für Windows: `udf` ergibt `STATUS_ILLEGAL_INSTRUCTION`, `brk #0xF000` `STATUS_BREAKPOINT`, die
+  Division durch null prüft wie MSVC den Teiler und springt auf `brk #0xF003` (`STATUS_INTEGER_DIVIDE_BY_ZERO`, bei +20). Linux
+  und Windows teilen sich den Code bis auf diese beiden Fälle (Makro `gt_code_aarch64!`); `t_guard.rs` erwartet +20 auf
+  Windows ARM64 und +40 auf Linux ARM64.
+- **Crash-Berichte** (`win_crash.rs`): `CrashInfo::regs` hat `x0` bis `x15` und `pc` wie auf Linux, die Aufrufkette kommt aus
+  `.pdata`/`.xdata` über `RtlLookupFunctionEntry` und `RtlVirtualUnwind`. Wie auf x64 wird jeder Schritt vorher geprüft:
+  `unwind_reads_ok` will jede Stelle, die die Codes lesen, im Stack des Threads sehen, bei gepackten Daten bis zur
+  Rahmengröße über `sp` (und über `x29`, wenn sie einen Rahmenzeiger anlegen), bei `.xdata` von jedem Code an, an dem der
+  Unwinder beginnen kann (Prolog, Epiloge, jede Stelle dazwischen). In `plattest`, `gallery` und `coretest` (13 800
+  Funktionen) kommen nur Codes vor, die er kennt; ein unbekannter beendet die Kette. Code ohne Unwind-Daten hängt am Fehler
+  über `lr` am Aufrufer (`crash_test`, ein Sprung ins Leere), weiter oben über das erste Stack-Wort nach einem `bl` oder
+  `blr` in ihn. Bei einem Stack-Überlauf folgt der Scan der Kette `[x29]`, `[x29 + 8]` wie auf x64 der von `rbp`.
+- **`cpu.rs`, `lib.rs`:** `stack_aligned` und `avx2_probe` wie auf Linux ARM64, `cpu_brand` aus der Registry
+  (`ProcessorNameString`, sonst „ARM64“), `crash_test` und `crash_test_caller` wie auf Linux und Apple.
+- **PE-Loader:** `PE_MACHINE` und `other_machine` gibt es seit ARM4. `FlushInstructionCache` braucht er nicht: `plat` schreibt
+  keinen Code. Abbilden und Relozieren macht Windows' eigener Lader (bei `/DYNAMICBASE`, dem Standard von `lld-link`, schon der
+  Speicher-Manager beim Einlesen der Seiten), derselbe Weg, den jede relozierte DLL jedes ARM64-Prozesses nimmt.
+- **`win_clr.rs`:** Eine CoreCLR der anderen Architektur wird vor dem Laden abgelehnt: „… ist für x64 gebaut, dieses Programm
+  läuft auf ARM64: Die Anwendung braucht ihre ARM64-Fassung“ statt „ließ sich nicht laden (Fehler 193)“.
+- **Werkzeuge:** `tools/host_exec.py` fragt unter Windows `IsWow64Process2` nach dem Prozessor; ein Python unter der
+  x64-Emulation meldet sonst AMD64 und lehnte die ARM64-Programme ab. `tools/winarm_imports.py` prüft jeden Import gegen die DLLs
+  des Rechners oder gegen die Import-Bibliotheken des SDK, denn eine fehlende Funktion verhindert den Start ohne Meldung; für
+  die vier Programme ist hier alles da (`combase.dll` ohne Import-Bibliothek gegen die DLL selbst). `tools/winarm_check.py`
+  lässt auf dem Gerät die Skripte von `coretest` und `plattest`, `gallery/basic.uis`, `plattest --test crash`, `guardcrash`
+  und `panic` und das Modul `jxlenc` gegen den gelinkten Writer laufen (dazu das x64-Modul, das `LIBE_ARCH` ergeben muss).
+  `.github/workflows/arm64-windows.yml` baut auf `windows-latest` und prüft auf `windows-11-arm`, per Hand oder nach einem Push
+  auf einen Zweig `arm64-test/…` (`workflow_dispatch` braucht die Datei auf `main`).
+
+Ergebnis auf `windows-11-arm`: steht aus.
+
+Hier geprüft: `build_rs.py test coretest` und `test plattest` für Windows und Linux auf x86-64 (84 von 84 Skripten), `test
+coretest --target linux --arch aarch64` unter `qemu-aarch64`; `cargo check -p jflib` mit und ohne `std` für Windows, Linux,
+wasm32, Android, Linux ARM64 und Windows ARM64 ohne Meldung. `tools/winarm_check.py` selbst lief auf den x64-Programmen (dort
+muss umgekehrt das ARM64-Modul `LIBE_ARCH` ergeben): Crash-Teil 3 von 3, Modul-Teil 7 von 7.
+
+**x86-64 unverändert:** Release-Bau von `coretest`, `plattest`, `gallery` und `codectest` mit `jxlenc` für Windows und Linux,
+Basis `d6f5b137` und dieser Stand nacheinander aus demselben Verzeichnis: alle 174 Dateien Byte für Byte gleich, auch die
+`.map`, unter Windows bis auf den Zeitstempel des Linkers. Jede geänderte x86-Zeile behält dafür ihre Nummer.
 
 ### ARM6: NEON für `lib/simd` (erledigt 2026-11-03)
 
@@ -654,8 +709,9 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
 - **`dup3`:** Anders als `dup2` lehnt es `old == new` mit `EINVAL` ab. `process::launch` kann dorthin kommen,
   wenn Standardeingabe geschlossen war. `rt::os::dup2` fängt das ab.
 - **Sandbox offen statt zu:** Eine falsche Nummer in der Sperrliste sperrt still den falschen Aufruf.
-- **Befehlscache:** ARM hält ihn nicht von selbst aktuell. Der ELF-Loader leert ihn seit ARM3 (`sync_icache`), der
-  PE-Loader noch nicht (ARM5). Geladene Plugins können sonst zufällig abstürzen; QEMU zeigt das nicht.
+- **Befehlscache:** ARM hält ihn nicht von selbst aktuell. Der ELF-Loader leert ihn seit ARM3 (`sync_icache`); unter Windows
+  schreibt nur Windows' eigener Lader den Code, `plat` braucht dort kein `FlushInstructionCache` (ARM5). Geladene Plugins können
+  sonst zufällig abstürzen; QEMU zeigt das nicht.
 - **Speichermodell:** x86 verzeiht falsche `Relaxed`-Zugriffe. QEMU auf einem x86-Rechner verzeiht sie
   meist genauso, solche Fehler zeigen sich erst auf echter Hardware.
 - **Stack:** Auf ARM64 muss `sp` bei Speicherzugriffen 16-Byte-ausgerichtet sein, das betrifft jeden
@@ -685,7 +741,7 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
 | Signale, Sandbox, Crash, glibc, Fenster, Plugins | `qemu-system-aarch64` in WSL: Ubuntu 24.04 arm64, Kernel mit 4- und 64-KB-Seiten (ARM3; Skripte in den Übergabenotizen von ARM3 und ARM4) | TCG, etwa so schnell wie `qemu-aarch64`, Start 5 Minuten; kein echtes Speichermodell, kein Befehlscache; Weston und Xvfb ohne volles RandR |
 | Echte ARM-CPU unter Linux | `ubuntu-24.04-arm`, statische Programme per `adb` auf dem A56 | Fenster auf dem Runner offen, das Telefon steckt nur auf Zuruf |
 | Plugins | JFPainters Test-Plugins (`plugins/` in dessen Repository) für jede Architektur gebaut, `plattest --test lib --dir DIR`; für ARM64 bis zum Patch in JFPainter eine portierte Kopie (Notizen von ARM4) | JFLib lässt `--test lib` in keinem Skript laufen |
-| Windows ARM64 | `windows-11-arm` | Fenster-Skripte laufen, die Windows-Einrichtung verdeckt aber den Bildschirm (ARM0); lokal keine Möglichkeit |
+| Windows ARM64 | `windows-11-arm`: `.github/workflows/arm64-windows.yml` mit `tools/winarm_check.py` (ARM5); lokal nur bauen und `tools/winarm_imports.py --libs` | Fenster-Skripte laufen, die Windows-Einrichtung verdeckt aber den Bildschirm (ARM0); lokal kein Start möglich |
 | Android und NEON | A56, Emulator | Emulator ist x86-64 |
 | Echte GPU auf ARM | noch kein Gerät | Vulkan sonst nur mit lavapipe |
 
