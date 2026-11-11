@@ -1,0 +1,4 @@
+#!args --test dashes
+# dash patterns in pixels and in drawing units, butt, round and square caps, joins where dashes run through vertices, closed
+# polylines on and off at their first point, dashed arcs and circles, against lib/gfx stroking each dash (cut on the CPU in
+# f64, itself against lib/gfx's own dashes); flat tones of short periods (no change under pans); set_style dashed and solid

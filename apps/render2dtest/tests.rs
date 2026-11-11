@@ -6,7 +6,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render2d::{Camera, Cap, Join, Layer, Renderer, RendererDesc, Scene, Shape, Style};
+use render2d::{Camera, Cap, Join, Layer, Renderer, RendererDesc, Scene, Shape, Style, Unit};
 
 use crate::gallery::*;
 use crate::refimg::{self, Tol};
@@ -258,6 +258,188 @@ fn overlap_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     Some(())
 }
 
+// ---------------------------------------------------------------- arcs and circles
+
+fn arcs(t: &mut T) {
+    on_levels(t, &mut |t, dev, level| { let _ = arcs_on(t, dev, level); });
+}
+
+fn arcs_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
+    let (w, h) = (320u32, 240u32);
+    let mut off = t.res(Off::new(dev, w, h), "target")?;
+    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
+    let cam = pixel_camera(w, h);
+    for cap in CAPS {
+        for width in [1.0f32, 3.0, 9.0] {
+            let d = arcs_drawing(cap, width);
+            against_ref(t, dev, &mut r, &mut off, &d, &cam, &refimg::Tol::ARCS, &format!("{level}: arcs and circles, {cap:?} caps, width {width}"))?;
+        }
+    }
+    // translucent rings and arcs: where two pieces of an arc meet, nothing blends twice
+    for alpha in [0x80u32, 0x40] {
+        let d = arcs_overlap_drawing(alpha);
+        let what = format!("{level}: translucent ({alpha:#x}) rings and arcs");
+        let img = gpu_image(t, dev, &mut r, &mut off, &d, &cam, &what)?;
+        let reference = refimg::draw(&d, &cam, (w, h), BG);
+        let tol = refimg::Tol::ARCS;
+        let cmp = refimg::compare(&img, &reference, w, BG, tol.small);
+        dump(&format!("arcs_overlap_{alpha:x}_{level}_gpu"), &img, w, h);
+        dump(&format!("arcs_overlap_{alpha:x}_{level}_ref"), &reference, w, h);
+        t.ok(cmp.fine(&tol), &format!("{what}: against lib/gfx (blended once): {}", cmp.text()));
+        let twice = blended_twice(&img, alpha);
+        t.ok(twice == 0, &format!("{what}: no pixel beyond one blend of the colour: {twice}"));
+    }
+    // what a circle filling a full-HD target costs the fragment shader: the pixels its pieces' quads cover (vs_arc's
+    // quads, computed again on the CPU) against its ring and against its bounding square
+    for (rp, h) in [(540.0f64, 0.5f64), (540.0, 2.0), (60.0, 0.5), (5000.0, 0.5)] {
+        let (quads, ring, square) = arc_quad_area(rp, h, (1920, 1080));
+        t.ok(quads <= (if rp < 1100.0 { 5.0 } else { 10.0 }) * ring, &format!("a circle of radius {rp} px, half width {h} px in 1920 x 1080: its quads cover {quads:.0} px, its ring and the smoothed edge {ring:.0} px ({:.2} times), \
+                                           its bounding square {square:.0} px", quads / ring));
+    }
+    // a layer with an arc draws with fs_full; without it again with fs: both as a scene built anew
+    let mut s = t.res(Scene::new(&r), "Scene::new")?;
+    let mut d = joins_drawing(Join::Round, 3.0);
+    let b = t.res(build(&mut s, &d), "build")?;
+    t.res(s.set_camera(&cam), "camera")?;
+    let sid = t.res(s.add_style(&style(INK[2], 4.0, Cap::Round, Join::Round)), "add_style")?;
+    let arc = t.res(s.insert(b.layers[0], sid, &Shape::Arc { center: [180.0, 130.0], radius: 50.0, start: 0.5, sweep: 2.5 }), "insert")?;
+    d.add(style(INK[2], 4.0, Cap::Round, Join::Round), Geo::Arc([180.0, 130.0], 50.0, 0.5, 2.5));
+    let img = shot(t, dev, &mut off, &mut r, &mut s, "with an arc")?;
+    let fresh = gpu_image(t, dev, &mut r, &mut off, &d, &cam, "with an arc, anew")?;
+    let (n1, _) = differ(&img, &fresh);
+    t.res(s.remove(arc), "remove")?;
+    d.items.pop();
+    let img = shot(t, dev, &mut off, &mut r, &mut s, "the arc removed")?;
+    let fresh = gpu_image(t, dev, &mut r, &mut off, &d, &cam, "without it, anew")?;
+    let (n2, _) = differ(&img, &fresh);
+    t.ok(n1 == 0 && n2 == 0, &format!("{level}: a layer takes fs_full with an arc and fs without: against scenes built anew {n1} and {n2} pixels differ"));
+    // solid strokes drawn by fs_full (their layer holds an arc, out of view) against fs: near joins the union stands for
+    // the tiles (the same area where the tiles hold: joins and caps the same to a code or two).  Short segments with sharp
+    // turns: both take the union, with other approximations where a short segment is near both its joins (RENDER2D.md
+    // "Nicht gebaut"); there both against lib/gfx with the tolerance of the test short
+    let cases = [
+        ("miter joins, width 3", joins_drawing(Join::Miter, 3.0), false),
+        ("round joins, width 9", joins_drawing(Join::Round, 9.0), false),
+        ("bevel joins, width 1", joins_drawing(Join::Bevel, 1.0), false),
+        ("round caps, width 9", caps_drawing(Cap::Round, 9.0), false),
+        ("short segments, width 1", short_drawing(2, 1.0, Join::Miter), true),
+        ("short segments, width 3", short_drawing(3, 3.0, Join::Round), true),
+    ];
+    for (name, d, short) in cases {
+        let a = gpu_image(t, dev, &mut r, &mut off, &d, &cam, name)?;
+        let reference = refimg::draw(&d, &cam, (w, h), BG);
+        let mut d = d;
+        d.add(style(INK[2], 1.0, Cap::Butt, Join::Miter), Geo::Arc([-1e4, -1e4], 5.0, 0.0, 1.0));
+        let b = gpu_image(t, dev, &mut r, &mut off, &d, &cam, name)?;
+        let (n, m) = differ(&a, &b);
+        let over = a.chunks(4).zip(b.chunks(4)).filter(|(p, q)| p.iter().zip(q.iter()).any(|(x, y)| x.abs_diff(*y) > 2)).count();
+        let what = format!("{level}: solid strokes in a layer of fs_full against fs, {name}: {n} pixels differ, {over} by more than 2 codes, largest {m}");
+        if short {
+            let tol = Tol { small: 2, over: 2600, max: 255, ink: 0.06 };
+            let ca = refimg::compare(&a, &reference, w, BG, tol.small);
+            let cb = refimg::compare(&b, &reference, w, BG, tol.small);
+            t.ok(cb.fine(&tol), &format!("{what}; against lib/gfx fs {}, fs_full {}", ca.text(), cb.text()));
+        } else {
+            t.ok(m <= 2 || over <= 8, &what);
+        }
+    }
+    Some(())
+}
+
+// ---------------------------------------------------------------- dash patterns
+
+fn dashes(t: &mut T) {
+    on_levels(t, &mut |t, dev, level| { let _ = dashes_on(t, dev, level); });
+}
+
+fn dashes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
+    let (w, h) = (360u32, 270u32);
+    let mut off = t.res(Off::new(dev, w, h), "target")?;
+    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
+    let cam = pixel_camera(w, h);
+    for (cap, join, width) in DASH_CASES {
+        let d = dash_drawing(cap, join, width);
+        let tol = if cap == Cap::Round { refimg::Tol::DASH_ROUND } else { refimg::Tol::DASH };
+        against_ref(t, dev, &mut r, &mut off, &d, &cam, &tol, &format!("{level}: dash patterns, {cap:?} caps, {join:?} joins, width {width}"))?;
+        if level == "Voll" {
+            // the reference's own dashes (dash_pieces) against lib/gfx's dash_stroke, on the open lines
+            let mut open = Drawing::one_layer();
+            for it in &d.items {
+                if matches!(it.geo, Geo::Line(..)) || matches!(it.geo, Geo::Poly(_, false)) {
+                    open.add(it.style, it.geo.clone());
+                }
+            }
+            let a = refimg::draw(&open, &cam, (w, h), BG);
+            let b = refimg::draw_with(&open, &cam, (w, h), BG, true);
+            let c = refimg::compare(&a, &b, w, BG, 1);
+            t.ok(c.max <= 2, &format!("the reference's dashes (dash_pieces) against lib/gfx's dash_stroke, {cap:?} caps, width {width}: {}", c.text()));
+        }
+    }
+    // patterns in drawing units
+    let (uw, uh) = (320u32, 240u32);
+    let mut uoff = t.res(Off::new(dev, uw, uh), "target")?;
+    for (scale, rot) in UNIT_VIEWS {
+        let d = units_dash_drawing();
+        against_ref(t, dev, &mut r, &mut uoff, &d, &units_camera(scale, rot), &refimg::Tol::DASH_ROUND, &format!("{level}: dash patterns in drawing units, scale {scale}, rotation {rot}"))?;
+    }
+    // flat tones: the ink of lib/gfx's real dashes; along the lines a pan of 0.37 px changes nothing where the tone is
+    // flat, and the dashes where they are exact
+    let (fw, fh) = (320u32, 200u32);
+    let mut foff = t.res(Off::new(dev, fw, fh), "target")?;
+    for period in FLAT_PERIODS {
+        let d = flat_drawing(period, 2.0, Cap::Butt);
+        let cam0 = pixel_camera(fw, fh);
+        let img = gpu_image(t, dev, &mut r, &mut foff, &d, &cam0, "flat")?;
+        let reference = refimg::draw(&d, &cam0, (fw, fh), BG);
+        dump(&format!("flat_{period}_{level}_gpu"), &img, fw, fh);
+        dump(&format!("flat_{period}_{level}_ref"), &reference, fw, fh);
+        let c = refimg::compare(&img, &reference, fw, BG, 2);
+        let ink = (c.ink[0] - c.ink[1]) / c.ink[1];
+        t.ok(ink.abs() <= 0.01, &format!("{level}: dashes of a period of {period} px: ink against lib/gfx's real dashes {:+.2} %", 100.0 * ink));
+        let mut s = t.res(Scene::new(&r), "Scene::new")?;
+        t.res(build(&mut s, &d), "build")?;
+        let mut moved = 0u32;
+        let mut prev: Option<Vec<u8>> = None;
+        for step in 0..6 {
+            let mut c2 = cam0;
+            c2.pan(0.37 * step as f64, 0.0);
+            t.res(s.set_camera(&c2), "camera")?;
+            let img = shot(t, dev, &mut foff, &mut r, &mut s, "pan")?;
+            if let Some(p) = &prev {
+                // (the lines' middle: 20 px from their ends)
+                for y in 0..fh as usize {
+                    for x in 32..fw as usize - 32 {
+                        let k = (y * fw as usize + x) * 4;
+                        moved += (p[k..k + 3] != img[k..k + 3]) as u32;
+                    }
+                }
+            }
+            prev = Some(img);
+        }
+        if period <= 2.0 {
+            t.ok(moved == 0, &format!("{level}: a period of {period} px is a flat tone: five pans of 0.37 px along the lines change {moved} pixels of their middles"));
+        } else if period >= 4.0 {
+            t.ok(moved > 0, &format!("{level}: a period of {period} px is drawn exactly: the pans move the dashes ({moved} pixels change)"));
+        }
+    }
+    // a style made dashed and solid again (set_style): its layer changes pipeline; each image as a scene built anew
+    let mut s = t.res(Scene::new(&r), "Scene::new")?;
+    let mut d = joins_drawing(Join::Miter, 3.0);
+    t.res(build(&mut s, &d), "build")?;
+    t.res(s.set_camera(&cam), "camera")?;
+    let mut ok = true;
+    for (k, pat) in [&[14.0f32, 5.0][..], &[][..], &[6.0, 3.0, 1.0][..]].into_iter().enumerate() {
+        let st = d.items[0].style.dashed(pat, Unit::Px, 2.0 * k as f32);
+        t.res(s.set_style(render2d::StyleId(0), &st), "set_style")?;
+        d.items[0].style = st;
+        let img = shot(t, dev, &mut off, &mut r, &mut s, "restyled")?;
+        let fresh = gpu_image(t, dev, &mut r, &mut off, &d, &cam, "restyled, anew")?;
+        ok &= differ(&img, &fresh).0 == 0;
+    }
+    t.ok(ok, &format!("{level}: a style dashed, solid and dashed again (set_style): each image as a scene built anew"));
+    Some(())
+}
+
 // ---------------------------------------------------------------- layers and order
 
 fn layers(t: &mut T) {
@@ -405,7 +587,7 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
     let exact = wgsl::CompileOptions { exact: true, ..opt };
     let mut outv = Vec::new();
     for (src, list, o) in [(render2d::CULL_WGSL, &[("COUNT", "count"), ("SCAN", "scan"), ("WRITE", "write")][..], &exact), (render2d::SCATTER_WGSL, &[("SCATTER", "main")][..], &opt),
-                           (render2d::STROKE_WGSL, &[("VS", "vs")][..], &exact), (render2d::STROKE_WGSL, &[("FS", "fs")][..], &opt)] {
+                           (render2d::STROKE_WGSL, &[("VS", "vs"), ("VS_FULL", "vs_full")][..], &exact), (render2d::STROKE_WGSL, &[("FS", "fs"), ("FS_FULL", "fs_full")][..], &opt)] {
         match wgsl::compile(src, o) {
             Ok(o) => {
                 for (name, entry) in list {
@@ -425,7 +607,7 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
 
 fn gen_shaders(path: &str) -> i32 {
     let Some(v) = compile_shaders() else { return 1 };
-    let mut s = String::from("// written by render2dtest --gen-shaders from common.wgsl + cull.wgsl, scatter.wgsl, stroke.wgsl (shader::BASIS, no robustness; COUNT, SCAN, WRITE and VS exact); do not edit\n");
+    let mut s = String::from("// written by render2dtest --gen-shaders from common.wgsl + cull.wgsl, scatter.wgsl, stroke.wgsl (shader::BASIS, no robustness; COUNT, SCAN, WRITE, VS and VS_FULL exact); do not edit\n");
     for (name, w) in &v {
         s.push_str(&format!("pub const {name}: &[u32] = &[\n"));
         for row in w.chunks(10) {
@@ -452,8 +634,8 @@ fn shaders(t: &mut T) {
         t.ok(false, "the WGSL compiles");
         return;
     };
-    let table: [(&str, &[u32]); 6] = [("COUNT", render2d::COUNT_SPV), ("SCAN", render2d::SCAN_SPV), ("WRITE", render2d::WRITE_SPV), ("SCATTER", render2d::SCATTER_SPV),
-                                      ("VS", render2d::VS_SPV), ("FS", render2d::FS_SPV)];
+    let table: [(&str, &[u32]); 8] = [("COUNT", render2d::COUNT_SPV), ("SCAN", render2d::SCAN_SPV), ("WRITE", render2d::WRITE_SPV), ("SCATTER", render2d::SCATTER_SPV),
+                                      ("VS", render2d::VS_SPV), ("VS_FULL", render2d::VS_FULL_SPV), ("FS", render2d::FS_SPV), ("FS_FULL", render2d::FS_FULL_SPV)];
     for (name, embedded) in table {
         let made = v.iter().find(|x| x.0 == name).map_or(&[][..], |x| &x.1[..]);
         t.ok(made == embedded, &format!("{name}: {} words embedded, as wgsl::compile makes them (if not: render2dtest --gen-shaders lib/render2d/shaders_spv.rs)", embedded.len()));
@@ -504,9 +686,10 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 14] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
-                                          ("layers", layers), ("changes", crate::scenes::changes), ("churn", crate::scenes::churn), ("visibility", crate::scenes::visibility),
-                                          ("coords", crate::scenes::coords), ("levels", levels), ("errors", errors)];
+    let list: [(&str, fn(&mut T)); 17] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
+                                          ("arcs", arcs), ("dashes", dashes), ("layers", layers), ("changes", crate::scenes::changes), ("churn", crate::scenes::churn),
+                                          ("visibility", crate::scenes::visibility), ("coords", crate::scenes::coords), ("phase", crate::scenes::phase), ("levels", levels),
+                                          ("errors", errors)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {
@@ -535,4 +718,3 @@ pub fn run() -> i32 {
         0
     }
 }
-

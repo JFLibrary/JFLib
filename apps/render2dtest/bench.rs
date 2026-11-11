@@ -2,7 +2,7 @@
 // over the target at 1 unit per pixel), per level and width: inserting them, the first frame (everything goes up),
 // frames with everything in view and zoomed in (a tenth in view), frames with 1000 entities changed each
 //
-//   render2dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--basis]
+//   render2dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--basis] [--scene cad [--plain]]
 //
 // GPU times are the scene's timestamps (FrameStats): uploads, visibility (the three compute passes), the draw; each
 // frame is waited for before the next (no frames in flight: the times are the frame's own), medians over F frames.
@@ -106,8 +106,13 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level) 
         let mut s = Scene::new(&r)?;
         s.set_stats(true);
         let t0 = plat::time_us();
-        let c = cad::build(&mut s, n, 5, styled)?;
+        let plain = plat::args().iter().any(|a| a == "--plain");
+        let c = cad::build(&mut s, n, 5, styled, plain)?;
         let insert_ms = (plat::time_us() - t0) as f64 / 1000.0;
+        if !plain {
+            out(&format!("{level:?}, {wname}: of them {} arcs and circles ({} pieces), {} dashed entities ({} records); {} records in the pool", c.arcs, c.arc_records, c.dashed,
+                         c.dashed_records, c.segments + c.arcs));
+        }
         let mut t = Target { color: dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?, used: false };
         let views = cad::views(&c, size);
         s.set_camera(&views[0].cam)?;

@@ -1,6 +1,6 @@
 [package]
 name = "jflib-render2d"
-description = "The core of JFLib's 2D renderer for CAD on jflib-gpu: a retained scene of lines and polylines with layers and styles, strokes with analytic coverage, f64 coordinates, visibility on the GPU"
+description = "The core of JFLib's 2D renderer for CAD on jflib-gpu: a retained scene of lines, polylines, arcs and circles with layers and styles, dash patterns, strokes with analytic coverage, f64 coordinates, visibility on the GPU"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

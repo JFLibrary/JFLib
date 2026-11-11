@@ -1,5 +1,7 @@
 // refimg -- the reference on the CPU: the same drawing through lib/gfx (dash_stroke's outline, filled non-zero with
-// its exact-area coverage, blended in sRGB codes), and how two images are compared.
+// its exact-area coverage, blended in sRGB codes), and how two images are compared.  Arcs are flattened within 1/1000
+// px; dash patterns are cut on the CPU in f64 (dash_pieces: SVG's rules, checked against lib/gfx's own dashes on open
+// lines) and each dash stroked by dash_stroke with the style's caps and joins.
 //
 // What may differ, and why (docs/RENDER2D.md "Tests"):
 //   - both sides compute the exact area of a pixel inside a polygon (render2d: the box filter of an edge, the square
@@ -17,12 +19,14 @@
 //   - so: almost every pixel within `small` codes, a bounded number beyond it, none beyond `max`, and the ink (the
 //     sum of every pixel's distance from the background) within `ink` of the reference's
 
+use alloc::vec;
 use alloc::vec::Vec;
 
 use gfx::dash::{dash_stroke, DStyle};
 use gfx::path::Path;
 use gfx::raster::Raster;
 use gfx::{Dc, Surface, FMT_XRGB, RULE_NONZERO};
+use render2d::math::{sincos, sqrt};
 use render2d::{Camera, Cap, Join, Style, Unit};
 
 use crate::gallery::{Drawing, Geo, Item};
@@ -47,8 +51,292 @@ pub fn width_px(s: &Style, cam: &Camera) -> f64 {
     w.max(1.0)
 }
 
-/// the drawing as lib/gfx draws it on a background (rows of B, G, R, x)
+/// an item's centre line in pixels of the target (f64): its points and whether it is closed; an arc flattened so finely
+/// that its chords lie within 1/1000 px of the circle (a circle starts at angle 0, an arc at its start, along its sweep)
+pub fn centre_line(g: &Geo, cam: &Camera, size: (u32, u32)) -> (Vec<[f64; 2]>, bool) {
+    let pt = |q: [f64; 2]| cam.to_screen(q, size);
+    match g {
+        Geo::Line(a, b) => (vec![pt(*a), pt(*b)], false),
+        Geo::Poly(v, closed) => (v.iter().map(|q| pt(*q)).collect(), *closed),
+        Geo::Arc(..) | Geo::Circle(..) => {
+            let (c, r, a0, sweep) = match g {
+                Geo::Arc(c, r, a0, sweep) => (c, r, *a0, *sweep),
+                Geo::Circle(c, r) => (c, r, 0.0, core::f64::consts::TAU),
+                _ => unreachable!(),
+            };
+            let full = sweep.abs() >= core::f64::consts::TAU;
+            let sweep = if full { core::f64::consts::TAU.copysign(sweep) } else { sweep };
+            let rp = r / cam.scale;
+            let step = 2.0 * sqrt(2.0 * 0.001 / rp.max(1e-3));
+            let n = ((sweep.abs() / step) as usize + 1).clamp(8, 200_000);
+            let k_end = if full { n - 1 } else { n };
+            let pts = (0..=k_end).map(|k| {
+                let (s, co) = sincos(a0 + sweep * k as f64 / n as f64);
+                pt([c[0] + r * co, c[1] + r * s])
+            }).collect();
+            (pts, full)
+        }
+    }
+}
+
+/// a style's dash pattern in pixels as lib/gfx and SVG run it (an odd count twice), and its phase; empty: solid
+pub fn pattern_px(s: &Style, cam: &Camera) -> (Vec<f64>, f64) {
+    let k = if s.dash_unit == Unit::Drawing { 1.0 / cam.scale } else { 1.0 };
+    let n = s.dashes as usize;
+    let mut v: Vec<f64> = (0..n).map(|i| s.dash[i] as f64 * k).collect();
+    if n % 2 == 1 {
+        v.extend_from_within(..);
+    }
+    (v, s.dash_phase as f64 * k)
+}
+
+/// the dashes of a centre line (SVG's rules, in f64): the pattern from its start (a closed one's first point) along it;
+/// a closed line whose pattern is on at both ends of its way round: the last dash and the first are one, joined at the
+/// first point (as Chromium's Skia; lib/gfx's dash_stroke caps them there), all of it on: the closed line.  A dash of
+/// length 0 is a single point.  Each piece: its points, closed
+pub fn dash_pieces(pts: &[[f64; 2]], closed: bool, pat: &[f64], phase: f64) -> Vec<(Vec<[f64; 2]>, bool)> {
+    let mut p: Vec<[f64; 2]> = Vec::new();
+    for q in pts {
+        if p.last() != Some(q) {
+            p.push(*q);
+        }
+    }
+    if closed && p.len() >= 2 && p[0] == p[p.len() - 1] {
+        p.pop();
+    }
+    let period: f64 = pat.iter().sum();
+    if p.len() < 2 || !(period > 0.0) {
+        return vec![(p, closed)];
+    }
+    let m = p.len();
+    let segs = if closed { m } else { m - 1 };
+    // the entry the phase stands in, what is left of it
+    let mut x = phase - floor(phase / period) * period;
+    let mut k = 0usize;
+    while x > pat[k] || (x == pat[k] && pat[k] > 0.0) {
+        x -= pat[k];
+        k = (k + 1) % pat.len();
+    }
+    let mut rem = pat[k] - x;
+    let mut on = k % 2 == 0;
+    let start_on = on;
+    let mut out: Vec<(Vec<[f64; 2]>, bool)> = Vec::new();
+    let mut cur: Vec<[f64; 2]> = Vec::new();
+    let push = |v: &mut Vec<[f64; 2]>, q: [f64; 2]| {
+        if v.last() != Some(&q) {
+            v.push(q);
+        }
+    };
+    if on {
+        cur.push(p[0]);
+    }
+    for s in 0..segs {
+        let (a, b) = (p[s], p[(s + 1) % m]);
+        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+        let len = sqrt(dx * dx + dy * dy);
+        let mut t = 0.0;
+        // (the entries that end within this segment)
+        while len - t > rem {
+            t += rem;
+            let q = [a[0] + dx * (t / len), a[1] + dy * (t / len)];
+            if on {
+                push(&mut cur, q);
+                out.push((core::mem::take(&mut cur), false));
+            } else {
+                cur.clear();
+                cur.push(q);
+            }
+            on = !on;
+            k = (k + 1) % pat.len();
+            rem = pat[k];
+        }
+        rem -= len - t;
+        if on {
+            push(&mut cur, b);
+        }
+    }
+    if on && !cur.is_empty() {
+        if closed && start_on {
+            if out.is_empty() {
+                // (on all the way round)
+                cur.pop();
+                return vec![(cur, true)];
+            }
+            // the last dash goes on into the first through the first point
+            let first = out.remove(0).0;
+            for q in first.into_iter().skip(1) {
+                push(&mut cur, q);
+            }
+        }
+        out.push((cur, false));
+    }
+    out
+}
+
+fn floor(x: f64) -> f64 {
+    let t = x as i64 as f64;
+    if t > x { t - 1.0 } else { t }
+}
+
+/// the dashes along a length `len` (px) of an open or closed curve: intervals of the length (SVG's rules as dash_pieces;
+/// a closed curve on at both ends: the last and the first are one, past the end: (a, len + b); all on: (0, len) and true)
+pub fn dash_intervals(len: f64, closed: bool, pat: &[f64], phase: f64) -> (Vec<(f64, f64)>, bool) {
+    let period: f64 = pat.iter().sum();
+    if !(period > 0.0) {
+        return (vec![(0.0, len)], closed);
+    }
+    let mut x = phase - floor(phase / period) * period;
+    let mut k = 0usize;
+    while x > pat[k] || (x == pat[k] && pat[k] > 0.0) {
+        x -= pat[k];
+        k = (k + 1) % pat.len();
+    }
+    // the place along the curve where entry k started
+    let mut at = -x;
+    let start_on = k % 2 == 0;
+    let mut out: Vec<(f64, f64)> = Vec::new();
+    while at <= len {
+        let e = pat[k];
+        if k % 2 == 0 {
+            let (a, b) = (at.max(0.0), (at + e).min(len));
+            if a <= b && (at + e >= 0.0) {
+                out.push((a, b));
+            }
+        }
+        at += e;
+        k = (k + 1) % pat.len();
+    }
+    let end_on = out.last().is_some_and(|v| v.1 >= len);
+    if closed && start_on && end_on && !out.is_empty() {
+        if out.len() == 1 {
+            return (vec![(0.0, len)], true);
+        }
+        let first = out.remove(0);
+        let last = out.pop().unwrap_or((len, len));
+        out.push((last.0, len + first.1));
+    }
+    (out, false)
+}
+
+/// the outline of an arc's stroke, exactly (no stroker's joins): a circle (c, r in px, screen angles) from angle t0 to t1
+/// (either way round), half width hw: the outer arc, the end's cap, the inner arc back, the start's cap; a ring: both
+/// circles (the inner one the other way round), a disk where the inner radius is gone
+fn arc_outline(p: &mut Path, c: [f64; 2], r: f64, t0: f64, t1: f64, hw: f64, cap: Cap, ring: bool) {
+    let at = |t: f64, rad: f64| [c[0] + rad * cos_of(t), c[1] + rad * sin_of(t)];
+    let steps = |rad: f64, sweep: f64| ((sweep.abs() / (2.0 * sqrt(2.0 * 0.0005 / rad.max(1e-3)))) as usize + 2).min(400_000);
+    let mut pts: Vec<[f64; 2]> = Vec::new();
+    let close = |p: &mut Path, pts: &mut Vec<[f64; 2]>| {
+        for (k, q) in pts.iter().enumerate() {
+            if k == 0 {
+                p.move_f(q[0] as f32, q[1] as f32);
+            } else {
+                p.line_f(q[0] as f32, q[1] as f32);
+            }
+        }
+        p.close();
+        pts.clear();
+    };
+    let tau = core::f64::consts::TAU;
+    if ring {
+        for (rad, dir) in [(r + hw, 1.0), (r - hw, -1.0)] {
+            if rad <= 0.0 {
+                continue;
+            }
+            let n = steps(rad, tau);
+            for k in 0..n {
+                pts.push(at(dir * tau * k as f64 / n as f64, rad));
+            }
+            close(p, &mut pts);
+        }
+        return;
+    }
+    let sweep = t1 - t0;
+    let sg = if sweep < 0.0 { -1.0 } else { 1.0 };
+    // the direction of travel at an angle (screen: d/dt of (cos t, sin t), along the sweep)
+    let tan = |t: f64| [-sin_of(t) * sg, cos_of(t) * sg];
+    let n = steps(r + hw, sweep);
+    for k in 0..=n {
+        pts.push(at(t0 + sweep * k as f64 / n as f64, r + hw));
+    }
+    let cap_at = |pts: &mut Vec<[f64; 2]>, t: f64, out: [f64; 2], from: [f64; 2], to: [f64; 2]| {
+        let mid = at(t, r);
+        match cap {
+            Cap::Square => {
+                pts.push([from[0] + hw * out[0], from[1] + hw * out[1]]);
+                pts.push([to[0] + hw * out[0], to[1] + hw * out[1]]);
+            }
+            Cap::Round => {
+                // half a circle around the end, from `from` over `out` to `to`
+                let v = [from[0] - mid[0], from[1] - mid[1]];
+                let cross = out[0] * v[1] - out[1] * v[0];
+                let turn = if cross > 0.0 { -core::f64::consts::PI } else { core::f64::consts::PI };
+                let m = steps(hw, core::f64::consts::PI);
+                for k in 1..m {
+                    let (sa, ca) = sincos(turn * k as f64 / m as f64);
+                    pts.push([mid[0] + v[0] * ca - v[1] * sa, mid[1] + v[0] * sa + v[1] * ca]);
+                }
+            }
+            _ => {}
+        }
+    };
+    let ri = r - hw;
+    cap_at(&mut pts, t1, tan(t1), at(t1, r + hw), at(t1, ri));
+    let n = steps(ri.abs().max(1e-3), sweep);
+    for k in 0..=n {
+        pts.push(at(t1 - sweep * k as f64 / n as f64, ri));
+    }
+    let t = tan(t0);
+    cap_at(&mut pts, t0, [-t[0], -t[1]], at(t0, ri), at(t0, r + hw));
+    close(p, &mut pts);
+}
+
+fn cos_of(t: f64) -> f64 {
+    sincos(t).1
+}
+
+fn sin_of(t: f64) -> f64 {
+    sincos(t).0
+}
+
+/// an arc or circle item (drawing units) as the outlines of its stroke and dashes in pixels of the target
+fn arc_item(p: &mut Path, g: &Geo, s: &Style, cam: &Camera, size: (u32, u32)) {
+    let (c, r, a0, sweep) = match g {
+        Geo::Arc(c, r, a0, sweep) => (*c, *r, *a0, *sweep),
+        Geo::Circle(c, r) => (*c, *r, 0.0, core::f64::consts::TAU),
+        _ => return,
+    };
+    let full = sweep.abs() >= core::f64::consts::TAU;
+    let sweep = if full { core::f64::consts::TAU.copysign(sweep) } else { sweep };
+    let cs = cam.to_screen(c, size);
+    let rp = r / cam.scale;
+    let hw = 0.5 * width_px(s, cam);
+    // a drawing angle t is the screen angle -(t + rotation) (y points down there)
+    let screen = |t: f64| -(t + cam.rotation);
+    let (pat, phase) = pattern_px(s, cam);
+    if pat.is_empty() {
+        arc_outline(p, cs, rp, screen(a0), screen(a0 + sweep), hw, s.cap, full);
+        return;
+    }
+    let len = rp * sweep.abs();
+    let (ivs, ring) = dash_intervals(len, full, &pat, phase);
+    if ring {
+        arc_outline(p, cs, rp, 0.0, 0.0, hw, s.cap, true);
+        return;
+    }
+    let sg = if sweep < 0.0 { -1.0 } else { 1.0 };
+    for (a, b) in ivs {
+        arc_outline(p, cs, rp, screen(a0 + sg * a / rp), screen(a0 + sg * b / rp), hw, s.cap, false);
+    }
+}
+
+/// the drawing as lib/gfx draws it on a background (rows of B, G, R, x): each item's centre line (dashed by dash_pieces)
+/// as subpaths of one path, stroked by dash_stroke (caps, joins) and filled non-zero once
 pub fn draw(d: &Drawing, cam: &Camera, size: (u32, u32), bg: u32) -> Vec<u8> {
+    draw_with(d, cam, size, bg, false)
+}
+
+/// gfx_dash: dashes by lib/gfx's own dash_stroke instead of dash_pieces (open lines only: a check of dash_pieces)
+pub fn draw_with(d: &Drawing, cam: &Camera, size: (u32, u32), bg: u32, gfx_dash: bool) -> Vec<u8> {
     let (w, h) = (size.0 as i32, size.1 as i32);
     let mut sf = Surface::new(w, h, FMT_XRGB);
     let mut dc = Dc::new(w, h);
@@ -57,31 +345,32 @@ pub fn draw(d: &Drawing, cam: &Camera, size: (u32, u32), bg: u32) -> Vec<u8> {
     let mut ras = Raster::default();
     for it in draw_order(d) {
         let mut p = Path::default();
-        let pt = |q: [f64; 2]| {
-            let s = cam.to_screen(q, size);
-            (s[0] as f32, s[1] as f32)
-        };
-        match &it.geo {
-            Geo::Line(a, b) => {
-                let (a, b) = (pt(*a), pt(*b));
-                p.move_f(a.0, a.1);
-                p.line_f(b.0, b.1);
+        let s = &it.style;
+        if matches!(it.geo, Geo::Arc(..) | Geo::Circle(..)) {
+            // (arcs: their outlines exactly, filled; lib/gfx's stroker would pivot the inner side of every vertex of a fine
+            // polygon through it, and its non-zero fill sums those windings: a ring 0.25 px too wide inside at a half width
+            // of 4.5)
+            arc_item(&mut p, &it.geo, s, cam, size);
+            dc.set_color(s.color);
+            p.fill(&mut ras, &dc, &mut sf, RULE_NONZERO);
+            continue;
+        }
+        let (line, closed) = centre_line(&it.geo, cam, size);
+        let (pat, phase) = pattern_px(s, cam);
+        let wpx = width_px(s, cam);
+        let pieces = if pat.is_empty() || gfx_dash { vec![(line, closed)] } else { dash_pieces(&line, closed, &pat, phase) };
+        for (piece, closed) in &pieces {
+            for (k, q) in piece.iter().enumerate() {
+                if k == 0 {
+                    p.move_f(q[0] as f32, q[1] as f32);
+                } else {
+                    p.line_f(q[0] as f32, q[1] as f32);
+                }
             }
-            Geo::Poly(v, closed) => {
-                for (k, q) in v.iter().enumerate() {
-                    let q = pt(*q);
-                    if k == 0 {
-                        p.move_f(q.0, q.1);
-                    } else {
-                        p.line_f(q.0, q.1);
-                    }
-                }
-                if *closed {
-                    p.close();
-                }
+            if *closed {
+                p.close();
             }
         }
-        let s = &it.style;
         let cap = match s.cap {
             Cap::Round => gfx::dash::LCAP_ROUND,
             Cap::Square => gfx::dash::LCAP_SQUARE,
@@ -92,7 +381,9 @@ pub fn draw(d: &Drawing, cam: &Camera, size: (u32, u32), bg: u32) -> Vec<u8> {
             Join::Bevel => gfx::JOIN_BEVEL,
             _ => gfx::JOIN_MITER,
         };
-        let st = DStyle { width: width_px(s, cam), pat: &[], join, cap0: cap, cap1: cap, dcap: cap, offset: 0.0, miter: s.miter_limit as f64 };
+        // (lib/gfx's pattern is in widths)
+        let gpat: Vec<f64> = if gfx_dash { pat.iter().map(|v| v / wpx).collect() } else { Vec::new() };
+        let st = DStyle { width: wpx, pat: &gpat, join, cap0: cap, cap1: cap, dcap: cap, offset: phase / wpx, miter: s.miter_limit as f64 };
         if dash_stroke(&mut p, &st) != 0 {
             continue;
         }
@@ -134,6 +425,13 @@ impl Tol {
     pub const fn folded(n: u32) -> Tol {
         Tol { small: 2, over: 30 + 24 * n, max: 128, ink: 0.01 }
     }
+
+    /// arcs and circles: their rings cut by the tangent at the pixel (see the head)
+    pub const ARCS: Tol = Tol { small: 16, over: 400, max: 64, ink: 0.006 };
+
+    /// dash patterns: the ends of dashes straight lines; near joins and with round caps more (see the head)
+    pub const DASH: Tol = Tol { small: 2, over: 400, max: 96, ink: 0.006 };
+    pub const DASH_ROUND: Tol = Tol { small: 16, over: 600, max: 96, ink: 0.02 };
 }
 
 /// two images side by side

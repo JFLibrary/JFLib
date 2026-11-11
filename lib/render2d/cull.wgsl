@@ -12,9 +12,9 @@
 //
 // The test of a record (shown): the box around its segment, grown by the stroke's reach (half the width times its
 // join's bound, reach_bound, where it has a neighbour, else half the width; and a pixel for the smoothed edge) and by
-// what f32 may round points far away to,
-// against the target's rectangle, by separating axes.  Free records (style 0) never pass; with culling off every
-// live record does.
+// what f32 may round points far away to, against the target's rectangle, by separating axes.  An arc's piece: the
+// box around its chord (its start from the record before it), grown as well by how far the piece bulges beyond the
+// chord (its sagitta).  Free records and arcs' heads (style 0) never pass; with culling off every live record does.
 
 const BATCH: u32 = 16384u;
 
@@ -49,24 +49,33 @@ var<immediate> pc: Push;
 var<workgroup> wmask: array<atomic<u32>, 8>;
 var<workgroup> partial: array<u32, 256>;
 
-// a record is in the frame: live, and its stroke's box meets the target (see above)
-fn shown(r: Record) -> bool {
-    if r.info.x == 0u {
+// record i is in the frame: live, and its stroke's box meets the target (see above)
+fn shown(i: u32) -> bool {
+    let r = pool[i];
+    if r.w.z == 0u {
         return false;
     }
     if view.misc.x != 0.0 {
         return true;
     }
-    let st = styles[r.info.x - 1u];
+    let st = styles[r.w.z - 1u];
     let h = half_width(st, view);
-    let r0 = rel2(r.a, view);
-    let r1 = rel2(r.b, view);
-    let p0 = to_px(r0.xy, view);
-    let p1 = to_px(r1.xy, view);
-    // (f32 holds 24 bits of a point far away: what that may cost, many times over)
+    let arc = kind_of_record(r) == K_ARC;
+    // (an arc piece: from its start, the end of the record before it, to its end)
+    var pa = r.a;
+    if arc {
+        pa = pool[i - 1u].b;
+    }
+    let p0 = to_px(rel2(pa, view).xy, view);
+    let p1 = to_px(rel2(r.b, view).xy, view);
     // (a miter's bound only where the record has a neighbour: a lone segment's caps reach half its width)
-    let joined = any(r.near != vec4f(0.0));
-    let reach = h * select(1.0, reach_bound(st), joined) + 1.0 + 1e-3 + 4e-6 * (length(p0) + length(p1));
+    let joined = (r.w.w & (F_PREV | F_NEXT)) != 0u && !arc;
+    var bulge = 0.0;
+    if arc {
+        bulge = sagitta(0.5 * length(p1 - p0), (bitcast<f32>(r.v.x) + bitcast<f32>(r.v.y)) * view.rest.z);
+    }
+    // (f32 holds 24 bits of a point far away: what that may cost, many times over)
+    let reach = h * select(1.0, reach_bound(st), joined) + bulge + 1.0 + 1e-3 + 4e-6 * (length(p0) + length(p1));
     let half = 0.5 * view.turn.zw;
     let dv = p1 - p0;
     let len = length(dv);
@@ -96,7 +105,7 @@ fn shown(r: Record) -> bool {
 fn count(@builtin(local_invocation_index) li: u32, @builtin(workgroup_id) wid: vec3u) {
     let w = wid.x;
     let i = order[w] * PAGE + li;
-    if shown(pool[i]) {
+    if shown(i) {
         atomicOr(&wmask[li >> 5u], 1u << (li & 31u));
     }
     workgroupBarrier();
