@@ -68,6 +68,8 @@ struct Fx<'m, 'a> {
     /// per block: its phis (result, [(value, predecessor)])
     phis: BTreeMap<u32, Vec<Phi>>,
     depth: u32,
+    /// pointers to a buffer of a bindless table: (table variable, the index expression), for arrayLength
+    tab: BTreeMap<u32, (u32, String)>,
 }
 
 const LETTERS: [&str; 4] = ["x", "y", "z", "w"];
@@ -124,7 +126,7 @@ pub(crate) fn entry_body(m: &M, f: u32, ret: &str, conv: &mut BTreeSet<(u32, u32
 fn body(m: &M, f: u32, ex: BTreeMap<u32, Ex>, ret: String, conv: &mut BTreeSet<(u32, u32)>) -> Result<String, String> {
     let func = &m.funcs[&f];
     let Some(first) = func.blocks.first() else { return err("a function without blocks") };
-    let mut fx = Fx { m, f: func, ex, decl: BTreeMap::new(), out: String::new(), ind: 1, stack: Vec::new(), ret, conv, phis: BTreeMap::new(), depth: 0 };
+    let mut fx = Fx { m, f: func, ex, decl: BTreeMap::new(), out: String::new(), ind: 1, stack: Vec::new(), ret, conv, phis: BTreeMap::new(), depth: 0, tab: BTreeMap::new() };
     for b in &func.blocks {
         for k in b.first..b.end {
             let i = &m.ins[k];
@@ -640,8 +642,40 @@ impl Fx<'_, '_> {
                 self.line(&format!("{} = {};", d, s));
             }
             op::AccessChain | op::InBoundsAccessChain => {
-                let (mut lv, sc, mut cur) = self.p(o[0])?;
-                for &idx in &o[1..] {
+                // a bindless table: its element through the argument buffer (msl.rs Table)
+                let mut rest = &o[1..];
+                let start = match self.m.tables.get(&o[0]).copied() {
+                    Some(tb) => {
+                        let Some((&first, more)) = rest.split_first() else { return err("an access chain to a whole bindless table") };
+                        let i = self.v(first)?;
+                        rest = more;
+                        match tb {
+                            crate::msl::Table::Tex(_) | crate::msl::Table::Smp if !more.is_empty() => {
+                                return err("an access chain into an image or sampler");
+                            }
+                            crate::msl::Table::Tex(it) => {
+                                self.ex.insert(r, Ex::Img(format!("g{}[{}].t", o[0], i), it));
+                                return Ok(());
+                            }
+                            crate::msl::Table::Smp => {
+                                self.ex.insert(r, Ex::Smp(format!("g{}[{}].s", o[0], i)));
+                                return Ok(());
+                            }
+                            crate::msl::Table::Buf(st) => {
+                                if more.is_empty() {
+                                    self.tab.insert(r, (o[0], i.clone()));
+                                }
+                                Some((format!("(*g{}[{}].p)", o[0], i), self.m.vars[&o[0]].sc, st))
+                            }
+                        }
+                    }
+                    None => None,
+                };
+                let (mut lv, sc, mut cur) = match start {
+                    Some(s) => s,
+                    None => self.p(o[0])?,
+                };
+                for &idx in rest {
                     match self.m.ty(cur)?.clone() {
                         Ty::Struct { members } => {
                             let k = self.m.cu32(idx)? as usize;
@@ -668,6 +702,17 @@ impl Fx<'_, '_> {
             }
             op::ArrayLength => {
                 let g = o[0];
+                // (a buffer of a bindless table: its size comes with its address)
+                if let Some((tv, i)) = self.tab.get(&g).cloned() {
+                    let Some(crate::msl::Table::Buf(st)) = self.m.tables.get(&tv).copied() else { return err("arrayLength of no buffer") };
+                    let member = o[1];
+                    let off = self.m.mdeco(st, member, Dec::Offset).and_then(|x| x.first().copied()).unwrap_or(0);
+                    let Ty::Struct { members } = self.m.ty(st)?.clone() else { return err("arrayLength of no struct") };
+                    let at = members.get(member as usize).ok_or("arrayLength of a missing member")?.0;
+                    let stride = self.m.deco(at, Dec::ArrayStride).and_then(|x| x.first().copied()).ok_or("a runtime array without ArrayStride")?;
+                    let n = format!("g{}[{}].n", tv, i);
+                    return self.set(r, t, format!("(({} - min({}, {}u)) / {}u)", n, n, off, stride));
+                }
                 let Some(var) = self.m.vars.get(&g) else { return err("arrayLength of a pointer that is no buffer variable") };
                 let slot = self.m.buffer_slot(g)?;
                 let member = o[1];

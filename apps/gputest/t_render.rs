@@ -226,21 +226,26 @@ pub fn indirect(t: &mut T) {
         out("SKIP: draw_indexed_indirect_multi / _count need level Voll");
         return;
     }
-    for multi in [true, false] {
+    // (mode 2: a draw after the count draw: the pass and its state go on after it; Metal suspends the pass for it)
+    for mode in 0..3 {
         let Some(mut e) = t.res(dev.encoder(), "encoder") else { return };
         tg.begin(&mut e);
         scene.bind(&mut e);
-        if multi {
+        if mode == 0 {
             e.draw_indexed_indirect_multi(&args, 16, 2, 20);
         } else {
             e.draw_indexed_indirect_count(&args, 16, &args, 56, 2, 20);
         }
+        if mode == 2 {
+            e.draw_indexed_indirect(&args, 36);
+        }
         e.end_render();
         tg.read_back(&mut e);
-        let what = if multi { "draw_indexed_indirect_multi (2 draws)" } else { "draw_indexed_indirect_count (count 1 from the GPU, max 2)" };
+        let what = ["draw_indexed_indirect_multi (2 draws)", "draw_indexed_indirect_count (count 1 from the GPU, max 2)",
+                    "draw_indexed_indirect_count, then the second draw on its own in the same pass"][mode];
         if run_wait(t, dev, e.finish(), what).is_some() {
             if let Some(p) = tg.pixels(t) {
-                let want = if multi { [RED, RED, GREEN, BLUE] } else { [RED, RED, BLUE, BLUE] };
+                let want = if mode == 1 { [RED, RED, BLUE, BLUE] } else { [RED, RED, GREEN, BLUE] };
                 probes(t, &p, want, what);
             }
         }

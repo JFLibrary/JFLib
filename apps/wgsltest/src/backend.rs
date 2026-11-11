@@ -579,7 +579,6 @@ pub fn corpus(t: &mut T) {
 /// modules the msl group expects to fail, and why: (name prefix, reason)
 const MSL_KNOWN: &[(&str, &str)] = &[
     ("corpus_entry_pipe_fragment_location_8_wgsl", "colour location 8: Metal has 0 ..= 7"),
-    ("samples_cs_bindless_sample", "a runtime array of textures (Bindless, level Voll): not on Metal yet"),
 ];
 
 /// the WGSL of the repository's libraries (their SPIR-V is pregenerated: *_spv.rs)

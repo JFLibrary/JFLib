@@ -11,6 +11,13 @@
 // FIRST_VERTEX_SLOT); push constants are a `constant` block at PUSH_SLOT; the byte sizes of
 // the bound buffer ranges a `constant uint*` at SIZES_SLOT, indexed by a buffer's slot (only
 // for entry points with arrayLength: Entry::sizes); vertex buffer i is at vertex_slot(i).
+// DrawIndex (Metal has none) is entry DRAW_INDEX_AT of that buffer, which the backend sets per draw
+// of a multi-draw (Entry::draw_index).
+//
+// Bindless tables (an array of images, samplers or storage buffers: lib/gpu's Bindless, level Voll)
+// are Metal 3 argument buffers in a buffer slot: an array of one-member structs, 8 bytes per image
+// or sampler (its MTLResourceID), 16 per buffer (its GPU address and its size in bytes, for
+// arrayLength).  The backend writes them; the source needs MSL 3.0.
 //
 // Specialization constants are substituted (Options::spec, reflect::constant_values): a
 // pipeline with constants is a translation of its own.
@@ -43,6 +50,8 @@ pub const SIZES_SLOT: u32 = 30;
 pub const FIRST_VERTEX_SLOT: u32 = 21;
 /// vertex buffer slots a pipeline may use
 pub const VERTEX_BUFFERS_MAX: u32 = 8;
+/// the entry of the sizes buffer (SIZES_SLOT) that holds DrawIndex: the draw's index in a multi-draw
+pub const DRAW_INDEX_AT: u32 = FIRST_VERTEX_SLOT;
 
 /// the buffer slot of vertex buffer i (i < VERTEX_BUFFERS_MAX)
 pub const fn vertex_slot(i: u32) -> u32 {
@@ -80,6 +89,8 @@ pub struct Slot {
     pub binding: u32,
     pub kind: SlotKind,
     pub index: u32,
+    /// a bindless table: an argument buffer in buffer slot index, whatever kind of resource it holds
+    pub table: bool,
 }
 
 /// an entry point of the translation
@@ -99,6 +110,8 @@ pub struct Entry {
     pub push_constants: bool,
     /// it reads the buffer sizes (SIZES_SLOT)
     pub sizes: bool,
+    /// it reads DrawIndex (entry DRAW_INDEX_AT of the sizes buffer; sizes is set too)
+    pub draw_index: bool,
     /// vertex: the locations of its inputs ([[attribute(n)]])
     pub vertex_inputs: Vec<u32>,
 }
@@ -191,6 +204,16 @@ pub(crate) struct M<'a> {
     pub words: &'a [u32],
     /// every resource variable's slot, numbered over the whole module in (set, binding) order
     pub slot_of: BTreeMap<u32, (SlotKind, u32)>,
+    /// the bindless tables among them (in buffer slots)
+    pub tables: BTreeMap<u32, Table>,
+}
+
+/// a bindless table: an array of images (the image type), samplers or storage buffers (the block)
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Table {
+    Tex(u32),
+    Smp,
+    Buf(u32),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -230,6 +253,7 @@ impl<'a> M<'a> {
             img_access: BTreeMap::new(),
             words,
             slot_of: BTreeMap::new(),
+            tables: BTreeMap::new(),
         };
         let mut cur: Option<(u32, Func)> = None;
         let mut blk: Option<(u32, usize, Merge)> = None;
@@ -399,6 +423,23 @@ impl<'a> M<'a> {
         let (mut nb, mut nt, mut ns) = (0u32, 0u32, 0u32);
         for (_, _, g) in res {
             let v = &self.vars[&g];
+            // (an array of resources: a bindless table, an argument buffer in a buffer slot)
+            let elem = match self.tys.get(&v.ty) {
+                Some(Ty::Array { elem, .. } | Ty::RuntimeArray { elem }) => Some(elem.0),
+                _ => None,
+            };
+            if let Some(e) = elem {
+                let table = match (self.tys.get(&e), v.sc == Sc::UniformConstant as u32) {
+                    (Some(Ty::Image { .. }), true) => Table::Tex(e),
+                    (Some(Ty::Sampler), true) => Table::Smp,
+                    (Some(Ty::Struct { .. }), false) => Table::Buf(e),
+                    _ => return Err(format!("resource %{} of an unsupported type (an array of it)", g)),
+                };
+                self.tables.insert(g, table);
+                nb += 1;
+                self.slot_of.insert(g, (SlotKind::Buffer, nb - 1));
+                continue;
+            }
             let s = if v.sc == Sc::UniformConstant as u32 {
                 match self.tys.get(&v.ty) {
                     Some(Ty::Image { .. }) => {
@@ -926,8 +967,20 @@ impl<'a> M<'a> {
         err("recursive function calls")
     }
 
+    /// the struct name of a bindless table's elements
+    pub fn table_struct(g: u32, t: Table) -> String {
+        match t {
+            Table::Tex(_) => format!("jf_t{}", g),
+            Table::Smp => format!("jf_s{}", g),
+            Table::Buf(_) => format!("jf_b{}", g),
+        }
+    }
+
     /// a global as a parameter of a function other than the entry point
     pub fn global_param(&self, g: u32) -> Result<String, String> {
+        if let Some(&tb) = self.tables.get(&g) {
+            return Ok(format!("constant {}* g{}", Self::table_struct(g, tb), g));
+        }
         let v = &self.vars[&g];
         let t = v.ty;
         Ok(match v.sc {
@@ -969,6 +1022,19 @@ impl<'a> M<'a> {
         for (&id, t) in &self.tys {
             if let Ty::Struct { .. } = t {
                 self.struct_decl(id, &mut out)?;
+            }
+        }
+        // bindless tables: their elements as Metal 3 lays out an argument buffer's (8 bytes per resource id or
+        // address; a buffer's size in bytes after its address)
+        for (&g, &tb) in &self.tables {
+            let name = Self::table_struct(g, tb);
+            match tb {
+                Table::Tex(it) => out.push_str(&format!("struct {} {{ {} t; }};\n", name, self.image_name(it, self.var_access(g))?)),
+                Table::Smp => out.push_str(&format!("struct {} {{ sampler s; }};\n", name)),
+                Table::Buf(st) => {
+                    let space = if self.vars[&g].sc == Sc::Uniform as u32 { "constant" } else { "device" };
+                    out.push_str(&format!("struct {} {{ {} {}* p; uint n; uint pad; }};\n", name, space, self.tname(st)?));
+                }
             }
         }
         // composite constants at program scope
@@ -1139,6 +1205,11 @@ impl<'a> M<'a> {
             let v = &self.vars[&g];
             let t = v.ty;
             let (kind, index) = self.slot_of[&g];
+            if let Some(&tb) = self.tables.get(&g) {
+                slots.push(Slot { set, binding, kind, index, table: true });
+                params.push(format!("constant {}* g{} [[buffer({})]]", Self::table_struct(g, tb), g, index));
+                continue;
+            }
             let p = match kind {
                 SlotKind::Texture => format!("{} g{} [[texture({})]]", self.image_name(t, self.var_access(g))?, g, index),
                 SlotKind::Sampler => format!("sampler g{} [[sampler({})]]", g, index),
@@ -1147,10 +1218,11 @@ impl<'a> M<'a> {
                     format!("{} {}& g{} [[buffer({})]]", space, self.tname(t)?, g, index)
                 }
             };
-            slots.push(Slot { set, binding, kind, index });
+            slots.push(Slot { set, binding, kind, index, table: false });
             params.push(p);
         }
-        let sizes = self.sizes.contains(&e.func);
+        let mut sizes = self.sizes.contains(&e.func);
+        let mut draw_index = false;
         let depth_mode = e.modes.iter().find_map(|(md, _)| {
             if *md == Mode::DepthGreater as u32 {
                 Some("greater")
@@ -1161,6 +1233,9 @@ impl<'a> M<'a> {
             }
         }).unwrap_or("any");
         for &g in &globals {
+            if self.tables.contains_key(&g) {
+                continue; // (a bindless table: a parameter above)
+            }
             let v = &self.vars[&g];
             let t = v.ty;
             let tn = self.tname(t)?;
@@ -1187,6 +1262,13 @@ impl<'a> M<'a> {
                     if let Some(b) = builtin {
                         if b == Bi::HelperInvocation as u32 {
                             continue; // read through simd_is_helper_thread() at each load
+                        }
+                        if b == Bi::DrawIndex as u32 {
+                            // (Metal has no draw index: the backend writes it into the sizes buffer per draw)
+                            sizes = true;
+                            draw_index = true;
+                            prologue.push_str(&format!("    {} g{} = {}(jf_sizes[{}]);\n", tn, g, tn, DRAW_INDEX_AT));
+                            continue;
                         }
                         let (pt, attr) = builtin_in(b, model)?;
                         params.push(format!("{} jf_b{} [[{}]]", pt, g, attr));
@@ -1302,7 +1384,7 @@ impl<'a> M<'a> {
         } else {
             [1, 1, 1]
         };
-        Ok((src, Entry { name: e.name.clone(), function: fname, model, workgroup, slots, push_constants: push, sizes, vertex_inputs }))
+        Ok((src, Entry { name: e.name.clone(), function: fname, model, workgroup, slots, push_constants: push, sizes, draw_index, vertex_inputs }))
     }
 
     /// the element type name of an array type

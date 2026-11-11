@@ -403,9 +403,12 @@ SPIR-V dieser beiden Erzeuger: logische Adressierung, strukturierter Kontrollflu
 - **Texturzugriffe:** `textureLoad` klemmt Stufe, Schicht, Probe und Koordinate in die Textur, ein Speichern
   außerhalb fällt weg (Metals `read()`/`write()` außerhalb sind undefiniert, WGSL erlaubt beides); Proben mit
   Gleitkomma-Koordinate runden und klemmen die Schicht.
-- **Grenzen:** Farbausgaben an den Orten 0 bis 7 (Metal), keine Laufzeit-Arrays von Ressourcen
-  (Bindless), keine 64-Bit-Gleitkommazahlen, keine nicht konstanten Texel-Offsets, kein Sprung aus
-  einer Schleife heraus innerhalb eines `switch`.
+- **Bindless und Draw-Index (Stufe Voll, AP6g):** ein Array von Bildern, Samplern oder Speicherpuffern wird ein
+  Argument-Puffer von Metal 3 in einem Puffer-Slot: ein Array von Structs mit einem Glied, 8 Byte je Bild oder Sampler (die
+  `MTLResourceID`), 16 je Puffer (Adresse und Größe in Bytes, für `arrayLength`); das braucht MSL 3.0. `DrawIndex` liest
+  den Eintrag `DRAW_INDEX_AT` des Puffers der Puffergrößen (`Entry::draw_index`).
+- **Grenzen:** Farbausgaben an den Orten 0 bis 7 (Metal), keine 64-Bit-Gleitkommazahlen, keine nicht konstanten
+  Texel-Offsets, kein Sprung aus einer Schleife heraus innerhalb eines `switch`.
 
 **Geprüft** von `wgsltest --only msl` (Gruppe `msl`): jedes Modul der Gruppe `spirv` (Benchmark,
 Abdeckung, die gültigen Fälle der Prüfregeln, das Korpus), dazu die WGSL-Shader der Bibliotheken

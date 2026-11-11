@@ -3,8 +3,9 @@
 // Nothing can wait here: every frame is submitted at once, the read-backs are looked at per tick.
 //
 //   test    the images of gallery::shots() go out as hex lines (the test compares them with the same images of the
-//           Vulkan path on this machine), the coordinates (the same drawing at the origin and at 1e7, the deep zoom to
-//           1e-6 units per pixel) and the visibility are judged here, by the code of the Vulkan tests
+//           Vulkan path on this machine), the coordinates (the same drawing at the origin and at 1e7, also arcs and
+//           dashes; the deep zoom to 1e-6 units per pixel, lines and rings), the dash pattern's place far away (phase)
+//           and the visibility are judged here, by the code of the Vulkan tests
 //   bench   the CAD scene (cad.rs; jfgui_GPU_PROBE_N segments, 1 million by default) at 1920 x 1080, three frames ahead:
 //           the wall clock from one frame's end to the next's.  WebGPU has no timestamps in lib/gpu: what a frame costs
 //           here includes the browser's own work
@@ -38,9 +39,11 @@ fn hex_line(name: &str, bytes: &[u8]) -> String {
 enum Kind {
     /// sent as hex (and looked at when translucent)
     Send(String, Option<u32>),
-    /// the drawing around a point: index into far, or the origin's
-    Far(Option<usize>),
-    Deep(Camera),
+    /// the drawing around a point: index into far, or the origin's (arcs: the arcs' and dashes' drawing)
+    Far(Option<usize>, bool),
+    Deep(Camera, bool),
+    /// a frame of a phase case: the case, its pan
+    Phase(u32, u32),
 }
 
 struct Job {
@@ -68,9 +71,13 @@ struct Test {
     jobs: Vec<Job>,
     scenes: Vec<Scene>,
     vis: Vec<VisJob>,
-    origin: Option<Vec<u8>>,
-    far: Vec<(usize, Vec<u8>)>,
+    origin: [Option<Vec<u8>>; 2],
+    far: Vec<(usize, bool, Vec<u8>)>,
     deep: DeepStats,
+    deep_arcs: DeepStats,
+    /// per phase case: the largest distance of a dash's end, the pixel lines looked at, its name
+    phase: Vec<(f64, u32, &'static str)>,
+    phase_done: bool,
 }
 
 struct Bench {
@@ -136,7 +143,8 @@ impl Probe {
         let mut r = Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm))?;
         say(&format!("renderer: multi-draw {}, at most {} records", r.multi_draw(), r.max_records()));
         self.yes(!r.multi_draw(), "the browser's level Basis: one indirect draw per layer");
-        let mut t = Test { jobs: Vec::new(), scenes: Vec::new(), vis: Vec::new(), origin: None, far: Vec::new(), deep: DeepStats::default() };
+        let mut t = Test { jobs: Vec::new(), scenes: Vec::new(), vis: Vec::new(), origin: [None, None], far: Vec::new(), deep: DeepStats::default(), deep_arcs: DeepStats::default(),
+                           phase: Vec::new(), phase_done: false };
         for shot in shots() {
             let mut off = Off::new(dev, shot.w, shot.h)?;
             let mut s = Scene::new(&r)?;
@@ -146,29 +154,47 @@ impl Probe {
             t.jobs.push(Job { off, kind: Kind::Send(shot.name, shot.alpha) });
             t.scenes.push(s);
         }
-        // the same drawing at the origin and at +-1e7
-        for k in 0..FAR_POINTS.len() + 1 {
-            let at = if k == 0 { [0.0, 0.0] } else { FAR_POINTS[k - 1] };
-            let mut off = Off::new(dev, FAR_SIZE.0, FAR_SIZE.1)?;
+        // the same drawing at the origin and at +-1e7 (lines; arcs and dashes)
+        for arcs in [false, true] {
+            for k in 0..FAR_POINTS.len() + 1 {
+                let at = if k == 0 { [0.0, 0.0] } else { FAR_POINTS[k - 1] };
+                let mut off = Off::new(dev, FAR_SIZE.0, FAR_SIZE.1)?;
+                let mut s = Scene::new(&r)?;
+                build(&mut s, &if arcs { arc_sample(at) } else { sample(at) })?;
+                s.set_camera(&sample_camera(at))?;
+                off.submit(&mut r, &mut s)?;
+                t.jobs.push(Job { off, kind: Kind::Far(if k == 0 { None } else { Some(k - 1) }, arcs) });
+                t.scenes.push(s);
+            }
+        }
+        // the deep zoom: lines, rings
+        for arcs in [false, true] {
             let mut s = Scene::new(&r)?;
-            build(&mut s, &sample(at))?;
-            s.set_camera(&sample_camera(at))?;
-            off.submit(&mut r, &mut s)?;
-            t.jobs.push(Job { off, kind: Kind::Far(if k == 0 { None } else { Some(k - 1) }) });
+            build(&mut s, &if arcs { deep_arc_drawing() } else { deep_drawing() })?;
+            for step in 0..DEEP_STEPS {
+                let c = deep_camera(step);
+                s.set_camera(&c)?;
+                let mut off = Off::new(dev, DEEP_SIZE.0, DEEP_SIZE.1)?;
+                off.bg = 0xFF00_0000;
+                off.submit(&mut r, &mut s)?;
+                t.jobs.push(Job { off, kind: Kind::Deep(c, arcs) });
+            }
             t.scenes.push(s);
         }
-        // the deep zoom
-        let mut s = Scene::new(&r)?;
-        build(&mut s, &deep_drawing())?;
-        for step in 0..DEEP_STEPS {
-            let c = deep_camera(step);
-            s.set_camera(&c)?;
-            let mut off = Off::new(dev, DEEP_SIZE.0, DEEP_SIZE.1)?;
-            off.bg = 0xFF00_0000;
-            off.submit(&mut r, &mut s)?;
-            t.jobs.push(Job { off, kind: Kind::Deep(c) });
+        // the dash pattern's place far away: each case's 24 pans
+        for k in 0..PHASE_CASES {
+            let mut s = Scene::new(&r)?;
+            build(&mut s, &phase_case(k, 0).d)?;
+            for step in 0..24 {
+                s.set_camera(&phase_case(k, step).cam)?;
+                let mut off = Off::new(dev, PHASE_SIZE.0, PHASE_SIZE.1)?;
+                off.bg = 0xFF00_0000;
+                off.submit(&mut r, &mut s)?;
+                t.jobs.push(Job { off, kind: Kind::Phase(k, step) });
+            }
+            t.phase.push((0.0, 0, phase_case(k, 0).name));
+            t.scenes.push(s);
         }
-        t.scenes.push(s);
         // the visibility: the lists read back and judged by the exact test on the CPU
         for (seed, n, spread) in VIS_CASES {
             let (mut s, cam, ents) = vis_scene(&r, seed, n, spread)?;
@@ -218,22 +244,38 @@ impl Probe {
                         self.yes(twice == 0, &format!("{name}: no pixel beyond one blend of the colour: {twice}"));
                     }
                 }
-                Kind::Far(None) => t.origin = Some(img),
-                Kind::Far(Some(k)) => t.far.push((*k, img)),
-                Kind::Deep(c) => deep_judge(&img, c, &mut t.deep),
+                Kind::Far(None, arcs) => t.origin[*arcs as usize] = Some(img),
+                Kind::Far(Some(k), arcs) => t.far.push((*k, *arcs, img)),
+                Kind::Deep(c, false) => deep_judge(&img, c, &mut t.deep),
+                Kind::Deep(c, true) => deep_arc_judge(&img, c, &mut t.deep_arcs),
+                Kind::Phase(k, step) => {
+                    let case = phase_case(*k, *step);
+                    let e = &mut t.phase[*k as usize];
+                    phase_judge(&img, &case, *k, &mut e.0, &mut e.1);
+                }
             }
             t.jobs.remove(0);
         }
         // the coordinates
-        if let Some(base) = t.origin.take() {
+        if let (Some(base), Some(base_arcs)) = (t.origin[0].take(), t.origin[1].take()) {
             let (w, h) = FAR_SIZE;
-            for (k, img) in core::mem::take(&mut t.far) {
-                let (n, m) = differ(&img, &base);
+            for (k, arcs, img) in core::mem::take(&mut t.far) {
+                let (n, m) = differ(&img, if arcs { &base_arcs } else { &base });
                 let at = FAR_POINTS[k];
-                self.yes(m <= 1 && n <= (w * h) / 1000, &format!("the drawing at ({}, {}) against at the origin: {n} pixels differ, largest {m}", at[0], at[1]));
+                let what = if arcs { "arcs, circles and dash patterns" } else { "the drawing" };
+                self.yes(m <= 1 && n <= (w * h) / 1000, &format!("{what} at ({}, {}) against at the origin: {n} pixels differ, largest {m}", at[0], at[1]));
             }
             let text = t.deep.text();
             self.yes(t.deep.fine(), &text);
+            let text = t.deep_arcs.arc_text();
+            self.yes(t.deep_arcs.fine_arcs(), &text);
+        }
+        if !t.phase_done {
+            t.phase_done = true;
+            for &(worst, checks, name) in &t.phase {
+                self.yes(checks >= 100 && worst <= 1.0 / 16.0, &format!("dashes at 1e-6 units per pixel, {name}: {checks} pixel lines over 24 pans, the largest distance of a dash's end \
+                                                                       from where it belongs {worst:.4} px (1/16 = 0.0625)"));
+            }
         }
         while let Some(v) = t.vis.first() {
             let mut lists = alloc::vec![[0u32; 4]; v.layers];
@@ -275,8 +317,10 @@ impl Probe {
         let r = Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm))?;
         let mut s = Scene::new(&r)?;
         let t0 = plat::time_us();
-        let c = cad::build(&mut s, n, 5, styled)?;
-        say(&format!("bench: {} segments in {} entities, {:.0} x {:.0} m, inserted in {:.0} ms (wasm)", c.segments, c.entities, c.width, c.height, (plat::time_us() - t0) as f64 / 1000.0));
+        let plain = plat::env("jfgui_GPU_PROBE_PLAIN").is_some();
+        let c = cad::build(&mut s, n, 5, styled, plain)?;
+        say(&format!("bench: {} segments in {} entities ({} arcs and circles of {} pieces, {} dashed of {} records), {:.0} x {:.0} m, inserted in {:.0} ms (wasm)", c.segments, c.entities, c.arcs,
+                     c.arc_records, c.dashed, c.dashed_records, c.width, c.height, (plat::time_us() - t0) as f64 / 1000.0));
         let size = (1920, 1080);
         let off = dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?;
         self.mode = Mode::Bench(Box::new(Bench { r, s, off, used: false, size, cads: [c], styled, n, view: 0, sent: 0, done: 0, flight: Vec::new(), t0: 0, cam: Camera::new([0.0, 0.0], 1.0), cpu_ms: Vec::new() }));

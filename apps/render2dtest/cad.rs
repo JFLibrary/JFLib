@@ -1,17 +1,20 @@
 // cad -- the measuring scene: what a CAD drawing looks like, not a random walk.  A town plan in metres at surveyed
 // coordinates (E 500 000, N 5 400 000): blocks in a grid with kerbs and pavements, streets as long polylines, parcels,
 // buildings with double walls, inner walls, doors, windows, stairs, furniture and hatching, trees, labels written with
-// short strokes, long utility lines through the town, contour lines of many short segments.  Deterministic: the same
-// numbers give the same drawing on every machine and in the browser.
+// short strokes, long utility lines through the town, contour lines of many short segments.  With arcs and dashes
+// (G6a2b, not `plain`): doors swing in arcs, trees, columns and manholes are circles, the streets' axes dash-dotted in
+// metres, plot borders and hidden edges dashed in pixels; each of these on layers of its own, as a CAD drawing keeps
+// them (render2d draws such layers with its second pipeline).  Deterministic: the same numbers give the same drawing on
+// every machine and in the browser; plain: the drawing of G6a2a, entity for entity.
 //
-//   build(&mut scene, segments, seed, styled) -> Cad   exactly `segments` records
-//   views(&cad, size)                                  the overview (all of it), a district, the working zoom
+//   build(&mut scene, segments, seed, styled, plain) -> Cad   exactly `segments` drawn records (an arc's head is none)
+//   views(&cad, size)                                         the overview (all of it), a district, the working zoom
 
 use alloc::vec::Vec;
 
 use gpu::Result;
 use render2d::math::sincos;
-use render2d::{Camera, Cap, Join, Layer, LayerId, Scene, Shape, Style, StyleId, Unit};
+use render2d::{Camera, Cap, Join, Layer, LayerId, Scene, Shape, Style, StyleId, Unit, ARC_STEP};
 
 use crate::gallery::Rng;
 
@@ -23,6 +26,11 @@ pub const ORIGIN: [f64; 2] = [500_000.0, 5_400_000.0];
 pub struct Cad {
     pub segments: u32,
     pub entities: u32,
+    /// of them arcs and circles, their pieces; dashed entities, their records
+    pub arcs: u32,
+    pub arc_records: u32,
+    pub dashed: u32,
+    pub dashed_records: u32,
     /// the drawing's size (metres), its lower left corner at ORIGIN
     pub width: f64,
     pub height: f64,
@@ -48,12 +56,26 @@ struct Pens {
     furniture: Pen,
     tree: Pen,
     label: Pen,
+    /// (not plain) doors' swings, trees' crowns, columns, manholes, hidden edges
+    extra: Option<Extra>,
+}
+
+struct Extra {
+    doors: Pen,
+    crowns: Pen,
+    columns: Pen,
+    manholes: Pen,
+    hidden: Pen,
 }
 
 struct Sink<'a> {
     s: &'a mut Scene,
     left: u32,
     ents: u32,
+    arcs: u32,
+    arc_records: u32,
+    dashed: u32,
+    dashed_records: u32,
 }
 
 impl Sink<'_> {
@@ -63,6 +85,7 @@ impl Sink<'_> {
             return Ok(());
         }
         let n = if closed { pts.len() } else { pts.len() - 1 } as u32;
+        let ins = n.min(self.left);
         if n > self.left {
             let keep = self.left as usize + 1;
             self.s.insert(p.l, p.s, &Shape::Polyline { points: &pts[..keep.min(pts.len())], closed: false })?;
@@ -72,6 +95,7 @@ impl Sink<'_> {
             self.left -= n;
         }
         self.ents += 1;
+        self.count_dashed(p, ins);
         Ok(())
     }
 
@@ -82,13 +106,41 @@ impl Sink<'_> {
         self.s.insert(p.l, p.s, &Shape::Line { a, b })?;
         self.left -= 1;
         self.ents += 1;
+        self.count_dashed(p, 1);
+        Ok(())
+    }
+
+    fn count_dashed(&mut self, p: &Pen, n: u32) {
+        if self.s.style(p.s).is_some_and(|st| st.dashes > 0) {
+            self.dashed += 1;
+            self.dashed_records += n;
+        }
+    }
+
+    /// an arc (a circle: sweep TAU), its pieces counted; dropped when they do not fit
+    fn arc(&mut self, p: &Pen, c: [f64; 2], r: f64, a0: f64, sweep: f64) -> Result<()> {
+        let n = ((sweep.abs() / ARC_STEP - 1e-9).max(0.0) as u32 + 1).min(16);
+        if self.left < n {
+            return Ok(());
+        }
+        let shape = if sweep.abs() >= core::f64::consts::TAU { Shape::Circle { center: c, radius: r } } else { Shape::Arc { center: c, radius: r, start: a0, sweep } };
+        self.s.insert(p.l, p.s, &shape)?;
+        self.left -= n;
+        self.ents += 1;
+        self.arcs += 1;
+        self.arc_records += n;
+        if self.s.style(p.s).is_some_and(|st| st.dashes > 0) {
+            self.dashed += 1;
+            self.dashed_records += n;
+        }
         Ok(())
     }
 }
 
-fn pens(s: &mut Scene, styled: bool) -> Result<Pens> {
+fn pens(s: &mut Scene, styled: bool, plain: bool) -> Result<Pens> {
     let mut order = 0;
-    let mut pen = |s: &mut Scene, color: u32, width: f32, unit: Unit, cap: Cap, join: Join| -> Result<Pen> {
+    // (a dash pattern: lengths, its unit, its phase; in the plain drawing none)
+    let mut pen = |s: &mut Scene, color: u32, width: f32, unit: Unit, cap: Cap, join: Join, dash: (&[f32], Unit)| -> Result<Pen> {
         let l = s.add_layer(&Layer::new(order))?;
         order += 1;
         let mut st = Style::new(color);
@@ -98,25 +150,41 @@ fn pens(s: &mut Scene, styled: bool) -> Result<Pens> {
             st.cap = cap;
             st.join = join;
         }
+        if !plain {
+            st = st.dashed(dash.0, dash.1, 0.0);
+        }
         Ok(Pen { l, s: s.add_style(&st)? })
     };
     let (b, r, m) = (Cap::Butt, Cap::Round, Join::Miter);
     let jr = Join::Round;
-    Ok(Pens {
-        contour: pen(s, 0xFF9F_B39A, 0.0, Unit::Px, b, m)?,
-        utility: pen(s, 0xFFC0_6070, 2.0, Unit::Px, b, m)?,
-        street: pen(s, 0xFF55_5555, 3.0, Unit::Px, b, m)?,
-        centre: pen(s, 0xA060_6060, 0.0, Unit::Px, b, m)?,
-        kerb: pen(s, 0xFF70_7070, 1.0, Unit::Px, b, jr)?,
-        parcel: pen(s, 0xFFA8_9070, 0.0, Unit::Px, b, m)?,
-        hatch: pen(s, 0x6030_4050, 0.0, Unit::Px, b, m)?,
-        outer: pen(s, 0xFF20_2830, 0.3, Unit::Drawing, b, m)?,
-        inner: pen(s, 0xFF40_4850, 0.12, Unit::Drawing, b, m)?,
-        detail: pen(s, 0xFF50_60A0, 0.0, Unit::Px, b, m)?,
-        furniture: pen(s, 0xFF90_9090, 0.0, Unit::Px, b, m)?,
-        tree: pen(s, 0xFF30_8040, 0.0, Unit::Px, r, jr)?,
-        label: pen(s, 0xFF20_2020, 1.0, Unit::Px, r, jr)?,
-    })
+    let solid: (&[f32], Unit) = (&[], Unit::Px);
+    let mut p = Pens {
+        contour: pen(s, 0xFF9F_B39A, 0.0, Unit::Px, b, m, solid)?,
+        utility: pen(s, 0xFFC0_6070, 2.0, Unit::Px, b, m, solid)?,
+        street: pen(s, 0xFF55_5555, 3.0, Unit::Px, b, m, solid)?,
+        // (axes dash-dotted in metres, plot borders dashed in pixels)
+        centre: pen(s, 0xA060_6060, 0.0, Unit::Px, b, m, (&[6.0, 1.5, 0.8, 1.5], Unit::Drawing))?,
+        kerb: pen(s, 0xFF70_7070, 1.0, Unit::Px, b, jr, solid)?,
+        parcel: pen(s, 0xFFA8_9070, 0.0, Unit::Px, b, m, (&[9.0, 3.0, 2.0, 3.0], Unit::Px))?,
+        hatch: pen(s, 0x6030_4050, 0.0, Unit::Px, b, m, solid)?,
+        outer: pen(s, 0xFF20_2830, 0.3, Unit::Drawing, b, m, solid)?,
+        inner: pen(s, 0xFF40_4850, 0.12, Unit::Drawing, b, m, solid)?,
+        detail: pen(s, 0xFF50_60A0, 0.0, Unit::Px, b, m, solid)?,
+        furniture: pen(s, 0xFF90_9090, 0.0, Unit::Px, b, m, solid)?,
+        tree: pen(s, 0xFF30_8040, 0.0, Unit::Px, r, jr, solid)?,
+        label: pen(s, 0xFF20_2020, 1.0, Unit::Px, r, jr, solid)?,
+        extra: None,
+    };
+    if !plain {
+        p.extra = Some(Extra {
+            doors: pen(s, 0xFF50_60A0, 0.0, Unit::Px, b, m, solid)?,
+            crowns: pen(s, 0xFF30_8040, 0.0, Unit::Px, r, jr, solid)?,
+            columns: pen(s, 0xFF20_2830, 0.08, Unit::Drawing, b, m, solid)?,
+            manholes: pen(s, 0xFF60_6060, 1.0, Unit::Px, b, m, solid)?,
+            hidden: pen(s, 0xFF60_6878, 0.0, Unit::Px, b, m, (&[5.0, 3.0], Unit::Px))?,
+        });
+    }
+    Ok(p)
 }
 
 fn rect(x: f64, y: f64, w: f64, h: f64) -> [[f64; 2]; 4] {
@@ -167,18 +235,22 @@ fn parcel(k: &mut Sink, rng: &mut Rng, p: &Pens, x: f64, y: f64, w: f64, h: f64)
             k.line(&p.inner, [px, py], [px, (py + l).min(by + bh - 0.3)])?;
         }
     }
-    // doors: the leaf and its swing, six short segments
+    // doors: the leaf and its swing (plain: six short segments; else an arc of a quarter turn)
     for _ in 0..3 + rng.below(4) {
         let (px, py) = (rng.range(bx + 1.0, bx + bw - 1.0), rng.range(by + 1.0, by + bh - 1.0));
         let r = rng.range(0.75, 1.0);
         let a0 = rng.below(4) as f64 * core::f64::consts::FRAC_PI_2;
         let (s, c) = sincos(a0);
         k.line(&p.detail, [px, py], [px + r * c, py + r * s])?;
-        let arc: Vec<[f64; 2]> = (0..7).map(|j| {
-            let (s, c) = sincos(a0 + j as f64 / 6.0 * core::f64::consts::FRAC_PI_2);
-            [px + r * c, py + r * s]
-        }).collect();
-        k.poly(&p.detail, &arc, false)?;
+        if let Some(x) = &p.extra {
+            k.arc(&x.doors, [px, py], r, a0, core::f64::consts::FRAC_PI_2)?;
+        } else {
+            let arc: Vec<[f64; 2]> = (0..7).map(|j| {
+                let (s, c) = sincos(a0 + j as f64 / 6.0 * core::f64::consts::FRAC_PI_2);
+                [px + r * c, py + r * s]
+            }).collect();
+            k.poly(&p.detail, &arc, false)?;
+        }
     }
     // windows on the outer walls: three short lines each
     for _ in 0..8 + rng.below(7) {
@@ -210,6 +282,21 @@ fn parcel(k: &mut Sink, rng: &mut Rng, p: &Pens, x: f64, y: f64, w: f64, h: f64)
         let l = rng.range(2.0, 9.0).min(bw * 0.6).min(bh * 0.6);
         k.line(&p.hatch, [hx + t, hy], [hx + t + l, hy + l])?;
     }
+    if let Some(x) = &p.extra {
+        // columns in a row in one building of four; an edge hidden above (a canopy over the entrance) in every second
+        if rng.below(4) == 0 {
+            let (cy, n) = (by + 0.5 * bh, 3 + rng.below(3));
+            for j in 0..n {
+                let cx = bx + (j as f64 + 0.5) / n as f64 * bw;
+                k.arc(&x.columns, [cx, cy], 0.2, 0.0, core::f64::consts::TAU)?;
+            }
+        }
+        if rng.below(2) == 0 {
+            let (cw, ch) = (rng.range(1.5, 4.0).min(bw - 1.0), rng.range(1.0, 2.5));
+            let cx = rng.range(bx + 0.5, bx + bw - 0.5 - cw);
+            k.poly(&x.hidden, &rect(cx, by - 0.4 * ch, cw, ch), true)?;
+        }
+    }
     Ok(())
 }
 
@@ -239,15 +326,19 @@ fn block(k: &mut Sink, rng: &mut Rng, p: &Pens, x0: f64, y0: f64, w: f64, h: f64
             parcel(k, rng, p, px, py, pw, 0.5 * ih)?;
         }
     }
-    // trees: a twelve-sided crown and its cross, along the pavement
+    // trees: a crown (plain: twelve-sided; else a circle) and its cross, along the pavement
     for _ in 0..8 + rng.below(9) {
         let (tx, ty) = (rng.range(x0 - 4.0, x0 + w + 4.0), if rng.below(2) == 0 { y0 - 3.0 } else { y0 + h + 3.0 });
         let r = rng.range(1.5, 4.0);
-        let crown: Vec<[f64; 2]> = (0..12).map(|j| {
-            let (s, c) = sincos(j as f64 / 12.0 * core::f64::consts::TAU);
-            [tx + r * c, ty + r * s]
-        }).collect();
-        k.poly(&p.tree, &crown, true)?;
+        if let Some(x) = &p.extra {
+            k.arc(&x.crowns, [tx, ty], r, 0.0, core::f64::consts::TAU)?;
+        } else {
+            let crown: Vec<[f64; 2]> = (0..12).map(|j| {
+                let (s, c) = sincos(j as f64 / 12.0 * core::f64::consts::TAU);
+                [tx + r * c, ty + r * s]
+            }).collect();
+            k.poly(&p.tree, &crown, true)?;
+        }
         k.line(&p.tree, [tx - 0.5 * r, ty], [tx + 0.5 * r, ty])?;
         k.line(&p.tree, [tx, ty - 0.5 * r], [tx, ty + 0.5 * r])?;
     }
@@ -279,8 +370,8 @@ fn contour(rng: &mut Rng, x0: f64, x1: f64, y: f64, amp: f64, step: f64, pts: &m
 
 /// a drawing of exactly `n` segments (fewer entities than a random walk has: a CAD drawing has long lines and many small
 /// details).  styled: the widths of a plan (streets 3 px, walls in metres, ...), else every stroke a hairline
-pub fn build(s: &mut Scene, n: u32, seed: u32, styled: bool) -> Result<Cad> {
-    let p = pens(s, styled)?;
+pub fn build(s: &mut Scene, n: u32, seed: u32, styled: bool, plain: bool) -> Result<Cad> {
+    let p = pens(s, styled, plain)?;
     let mut rng = Rng(seed);
     let (pitch_x, pitch_y) = (140.0, 100.0);
     // about 2500 segments a block; contour lines, streets and utilities take the rest
@@ -288,7 +379,7 @@ pub fn build(s: &mut Scene, n: u32, seed: u32, styled: bool) -> Result<Cad> {
     let cols = ((render2d::math::sqrt(1.27 * blocks as f64) + 0.999) as u32).max(1);
     let rows = blocks.div_ceil(cols);
     let (width, height) = (cols as f64 * pitch_x + 20.0, rows as f64 * pitch_y + 20.0);
-    let mut k = Sink { s, left: n, ents: 0 };
+    let mut k = Sink { s, left: n, ents: 0, arcs: 0, arc_records: 0, dashed: 0, dashed_records: 0 };
     let at = |x: f64, y: f64| [ORIGIN[0] + x, ORIGIN[1] + y];
     // streets: both edges and the centre line of each, long polylines with a point per block
     let road = 12.0;
@@ -304,6 +395,14 @@ pub fn build(s: &mut Scene, n: u32, seed: u32, styled: bool) -> Result<Cad> {
         for (dy, pen) in [(0.0, &p.street), (0.5 * road, &p.centre), (road, &p.street)] {
             let pts: Vec<[f64; 2]> = (0..=cols).map(|c| at(10.0 + c as f64 * pitch_x, y + dy + rng.range(-0.2, 0.2))).collect();
             k.poly(pen, &pts, false)?;
+        }
+    }
+    // manholes on the streets (not plain): a circle every 35 m along each street's axis
+    if let Some(x) = &p.extra {
+        for c in 0..=cols {
+            for j in 0..(rows as f64 * pitch_y / 35.0) as u32 {
+                k.arc(&x.manholes, at(10.0 + c as f64 * pitch_x, 12.0 + j as f64 * 35.0), 0.4, 0.0, core::f64::consts::TAU)?;
+            }
         }
     }
     // long utility lines through the town, straight: a few hundred metres to its full size
@@ -338,7 +437,7 @@ pub fn build(s: &mut Scene, n: u32, seed: u32, styled: bool) -> Result<Cad> {
             y -= height;
         }
     }
-    Ok(Cad { segments: n, entities: k.ents, width, height })
+    Ok(Cad { segments: n, entities: k.ents, arcs: k.arcs, arc_records: k.arc_records, dashed: k.dashed, dashed_records: k.dashed_records, width, height })
 }
 
 /// a named view of the drawing in a target of `size`

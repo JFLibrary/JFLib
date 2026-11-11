@@ -64,7 +64,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs) · [mtl_cmd.rs (Apple)](#gpumtl_cmdrs-apple) · [mtl_dev.rs (Apple)](#gpumtl_devrs-apple) · [mtl_res.rs (Apple)](#gpumtl_resrs-apple) · [mtl_swap.rs (Apple)](#gpumtl_swaprs-apple)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
-- [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines and polylines with layers and styles, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
+- [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles with layers and styles, dash patterns, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
   <br>[lib.rs](#render2d-crate-root) · [math.rs](#render2dmathrs) · [scene.rs](#render2dsceners)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
@@ -20227,10 +20227,14 @@ The checks are those of the Vulkan backend (vk_cmd.rs); finish() returns the fir
   one draw: vertex count, instance count, first vertex, first instance (4 x u32)
 - **`fn draw_indexed_indirect(&mut self, buf: &'a Buffer, offset: u64)`**
   one indexed draw: index count, instance count, first index, base vertex (i32), first instance
-- **`fn draw_indexed_indirect_multi(&mut self, _buf: &'a Buffer, _offset: u64, _count: u32, _stride: u32)`**
-  several indexed draws from one buffer (Features::multi_draw_indirect: not at Metal's level Basis)
-- **`fn draw_indexed_indirect_count(&mut self, _buf: &'a Buffer, _offset: u64, _count_buf: &'a Buffer, _count_offset: u64, _max_count: u32, _stride: u32)`**
-  (level Voll) not on Metal yet
+- **`fn draw_indexed_indirect_multi(&mut self, buf: &'a Buffer, offset: u64, count: u32, stride: u32)`**
+  count indexed draws, stride bytes apart (Features::multi_draw_indirect, level Voll): Metal has no
+  multi-draw, so a loop of single indirect draws in this encoder; DrawIndex is each one's index
+- **`fn draw_indexed_indirect_count(&mut self, buf: &'a Buffer, offset: u64, count_buf: &'a Buffer, count_offset: u64, max_count: u32, stride: u32)`**
+  up to max_count indexed draws, their number (u32) read from count_buf at count_offset (level Voll:
+  Features::draw_indirect_count).  Metal has no such draw: the pass is suspended for a compute pass that copies
+  the max_count draws and sets the instances of those at and after the count to 0, then goes on (everything
+  stored and loaded again, the state set again) and draws all max_count of them (docs/APPLE.md AP6g)
 - **`fn reset_timestamps(&mut self, _ts: &'a Timestamps, _first: u32, _n: u32)`**
 - **`fn timestamp(&mut self, _ts: &'a Timestamps, _i: u32)`**
 - **`fn finish(mut self) -> Result<CommandBuffer<'a>>`**
@@ -20294,11 +20298,11 @@ later call gives DeviceLost, as on Vulkan after a driver reset.
 - **`fn features(&self) -> &Features`**
 - **`fn limits(&self) -> &Limits`**
 - **`fn level(&self) -> Level`**
-  the highest level the adapter supports (Metal: Basis; Voll is AP6g)
+  the highest level the adapter supports (Voll: Metal 3 on Apple7 and newer or Mac2)
 - **`fn can_present(&self, _surface: &crate::Surface) -> bool`**
   every Metal device can show in a CAMetalLayer
 - **`fn create_device(&self, desc: &DeviceDesc) -> Result<Device>`**
-- **`fn create_device_with(&self, _desc: &DeviceDesc, _opts: &DeviceOptions) -> Result<Device>`**
+- **`fn create_device_with(&self, desc: &DeviceDesc, _opts: &DeviceOptions) -> Result<Device>`**
   (G5d) DeviceOptions::compute_queue: Metal has one kind of queue; Device::compute_queue is None
 
 - **`struct Device`**
@@ -20468,21 +20472,23 @@ built yet (level Basis; Features says so).
 - **`fn create_bind_group_layout(&self, bindings: &[Binding]) -> Result<BindGroupLayout>`**
 - **`fn create_pipeline_layout(&self, desc: &PipelineLayoutDesc) -> Result<PipelineLayout>`**
 - **`fn create_bind_group(&self, desc: &BindGroupDesc) -> Result<BindGroup>`**
-- **`fn create_bindless(&self, _desc: &BindlessDesc) -> Result<Bindless>`**
-  (level Voll) a Bindless table: not on Metal yet (AP6g)
+- **`fn create_bindless(&self, desc: &BindlessDesc) -> Result<Bindless>`**
+  (level Voll) a Bindless table: per binding a Metal 3 argument buffer (TableInner), written by the setters
 
 - **`struct Bindless`**
-  a large table of textures, samplers and buffers that shaders index (level Voll; not on Metal yet)
+  a large table of textures, samplers and buffers that shaders index (level Voll): binding 0 sampled textures,
+  1 samplers, 2 storage buffers, 3 storage textures, each a Metal 3 argument buffer.  A slot may be changed
+  while command buffers that use the table are pending, as long as those do not use the slot (as on Vulkan)
 
 **`impl Bindless`**
 
 - **`fn group(&self) -> &BindGroup`**
 - **`fn layout(&self) -> &BindGroupLayout`**
 - **`fn counts(&self) -> [u32; 4]`**
-- **`fn set_texture(&self, _slot: u32, _view: &TextureView) -> Result<()>`**
-- **`fn set_sampler(&self, _slot: u32, _s: &Sampler) -> Result<()>`**
-- **`fn set_buffer(&self, _slot: u32, _buf: &Buffer, _offset: u64, _size: u64) -> Result<()>`**
-- **`fn set_storage_texture(&self, _slot: u32, _view: &TextureView) -> Result<()>`**
+- **`fn set_texture(&self, slot: u32, view: &TextureView) -> Result<()>`**
+- **`fn set_sampler(&self, slot: u32, s: &Sampler) -> Result<()>`**
+- **`fn set_buffer(&self, slot: u32, buf: &Buffer, offset: u64, size: u64) -> Result<()>`**
+- **`fn set_storage_texture(&self, slot: u32, view: &TextureView) -> Result<()>`**
 
 - **`struct ComputePipeline(pub(crate) Arc<PipeInner>)`**
   a compute shader with its layout
@@ -21356,16 +21362,16 @@ CLASS_MAX: u32 = CLASS_MIN << (CLASSES - 1)
 
 ## render2d
 
-*the core of the 2D renderer for CAD: a retained scene of lines and polylines with layers and styles, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU* -- crate root [`lib/render2d/lib.rs`](../lib/render2d/lib.rs)
+*the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles with layers and styles, dash patterns, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU* -- crate root [`lib/render2d/lib.rs`](../lib/render2d/lib.rs)
 
 ```text
-render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a1; docs/RENDER2D.md): a retained scene of entities
-with stable ids (lines and polylines now), layers and styles; strokes as quads whose coverage the fragment shader
-computes from the geometry (no MSAA), with exact butt, square and round caps and miter, bevel and round joins; f64
-coordinates, a pair of f32 per axis on the GPU with the camera subtracted first; visibility in compute shaders that
-keep the painter's order and write the indirect draws.  Hosted like render3d as the content of a ui.gpu_view (the
-app glues it with a GpuContent; lib/ui knows nothing of it).  The same WGSL on every path: compiled ahead
-(shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
+render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a; docs/RENDER2D.md): a retained scene of entities
+with stable ids (lines, polylines, arcs and circles), layers and styles; strokes as quads whose coverage the fragment
+shader computes from the geometry (no MSAA), with exact butt, square and round caps and miter, bevel and round joins,
+dash patterns in pixels or drawing units; f64 coordinates, a pair of f32 per axis on the GPU with the camera
+subtracted first; visibility in compute shaders that keep the painter's order and write the indirect draws.  Hosted
+like render3d as the content of a ui.gpu_view (the app glues it with a GpuContent; lib/ui knows nothing of it).  The
+same WGSL on every path: compiled ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
 
   Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines of one colour format
   Scene::new(&renderer) -> Result<Scene>
@@ -21405,7 +21411,9 @@ SCAN_SPV: &[u32] = spv::SCAN
 WRITE_SPV: &[u32] = spv::WRITE
 SCATTER_SPV: &[u32] = spv::SCATTER
 VS_SPV: &[u32] = spv::VS
+VS_FULL_SPV: &[u32] = spv::VS_FULL
 FS_SPV: &[u32] = spv::FS
+FS_FULL_SPV: &[u32] = spv::FS_FULL
 ```
 
 - **`struct RendererDesc`**
@@ -21511,19 +21519,33 @@ that never reached a submission: the next sends everything again.
   - `Round` -- a circle around the vertex
   - `Bevel` -- a straight cut between the outer corners
 
+```rust
+/// the most entries of a dash pattern (Style::dash)
+DASH_MAX: usize = 8
+```
+
 - **`struct Style`**
-  a stroke's look.  Made with `new` and changed field by field (it may grow: dash patterns come)
+  a stroke's look.  Made with `new` and changed field by field (it may grow)
   - `color: u32` -- 0xAARRGGBB: sRGB codes as the target shows them, straight alpha
   - `width: f32` -- in `unit`s; 0 (or anything thinner than a pixel): a hairline, 1 px wide
   - `unit: Unit`
   - `cap: Cap`
   - `join: Join`
   - `miter_limit: f32` -- the longest miter over the width (lib/gfx's and SVG's ratio); at least 1
+  - `dash: [f32; DASH_MAX]` -- a dash pattern: lengths on and off in turn, starting with on, the first `dashes` entries (0: solid).  An odd count
+    runs twice (on, off, on, then off, on, off), as in SVG; every dash ends in `cap`, joins only where a dash runs
+    through a vertex.  The pattern runs along each entity from its start (a closed polyline's first point, an arc's
+    start, a circle's angle 0), across the joins of a polyline
+  - `dashes: u32`
+  - `dash_unit: Unit` -- the unit of the pattern's lengths and of its phase
+  - `dash_phase: f32` -- how far into the pattern an entity starts (in `dash_unit`s)
 
 **`impl Style`**
 
 - **`const fn new(color: u32) -> Style`**
-  a hairline of a colour: width 0, butt caps, miter joins with the limit 4
+  a hairline of a colour: width 0, butt caps, miter joins with the limit 4, solid
+- **`fn dashed(mut self, pattern: &[f32], unit: Unit, phase: f32) -> Style`**
+  the same with a dash pattern (at most DASH_MAX entries; an empty one: solid), its unit and phase
 
 - **`struct StyleId(pub u32)`**
   a style of a Scene
@@ -21546,9 +21568,20 @@ that never reached a submission: the next sends everything again.
   - `slot: u32`
 
 - **`enum Shape<'a>`**
-  what an entity is (more kinds come: arcs, curves, fills, text)
+  what an entity is (more kinds come: curves, fills, text)
   - `Line { a: [f64; 2], b: [f64; 2] }`
   - `Polyline { points: &'a [[f64; 2]], closed: bool }` -- at least one point; closed: a segment from the last back to the first, joined at every point
+  - `Arc { center: [f64; 2], radius: f64, start: f64, sweep: f64 }` -- a circular arc: its centre, radius (above 0), the angle it starts at and how far it turns (radians; positive:
+    counter-clockwise, the drawing's y pointing up; not 0).  A sweep of a full turn or more is a circle whose dash
+    pattern starts at `start`.  Drawn in pieces of at most ARC_STEP, coverage from the circle itself
+  - `Circle { center: [f64; 2], radius: f64 }` -- a circle (its dash pattern starts at angle 0 and runs counter-clockwise)
+
+```rust
+/// the largest angle of one piece of an arc (a record): a full circle is 16 of them.  Its quad covers the piece's ring
+/// between the chord inside and the tangent outside, so that the pixels the fragment shader looks at follow the stroke
+/// (docs/RENDER2D.md "Bögen und Kreise")
+ARC_STEP: f64 = core::f64::consts::PI / 8.0
+```
 
 - **`struct UploadInfo`**
   what prepare sent for this frame
@@ -22572,6 +22605,13 @@ texture and sampler indices from 0 in (set, binding) order (buffers below
 FIRST_VERTEX_SLOT); push constants are a `constant` block at PUSH_SLOT; the byte sizes of
 the bound buffer ranges a `constant uint*` at SIZES_SLOT, indexed by a buffer's slot (only
 for entry points with arrayLength: Entry::sizes); vertex buffer i is at vertex_slot(i).
+DrawIndex (Metal has none) is entry DRAW_INDEX_AT of that buffer, which the backend sets per draw
+of a multi-draw (Entry::draw_index).
+
+Bindless tables (an array of images, samplers or storage buffers: lib/gpu's Bindless, level Voll)
+are Metal 3 argument buffers in a buffer slot: an array of one-member structs, 8 bytes per image
+or sampler (its MTLResourceID), 16 per buffer (its GPU address and its size in bytes, for
+arrayLength).  The backend writes them; the source needs MSL 3.0.
 
 Specialization constants are substituted (Options::spec, reflect::constant_values): a
 pipeline with constants is a translation of its own.
@@ -22596,6 +22636,8 @@ SIZES_SLOT: u32 = 30
 FIRST_VERTEX_SLOT: u32 = 21
 /// vertex buffer slots a pipeline may use
 VERTEX_BUFFERS_MAX: u32 = 8
+/// the entry of the sizes buffer (SIZES_SLOT) that holds DrawIndex: the draw's index in a multi-draw
+DRAW_INDEX_AT: u32 = FIRST_VERTEX_SLOT
 ```
 
 - **`const fn vertex_slot(i: u32) -> u32`**
@@ -22624,6 +22666,7 @@ VERTEX_BUFFERS_MAX: u32 = 8
   - `binding: u32`
   - `kind: SlotKind`
   - `index: u32`
+  - `table: bool` -- a bindless table: an argument buffer in buffer slot index, whatever kind of resource it holds
 
 - **`struct Entry`**
   an entry point of the translation
@@ -22634,6 +22677,7 @@ VERTEX_BUFFERS_MAX: u32 = 8
   - `slots: Vec<Slot>` -- its resources by (set, binding)
   - `push_constants: bool` -- it reads push constants (PUSH_SLOT)
   - `sizes: bool` -- it reads the buffer sizes (SIZES_SLOT)
+  - `draw_index: bool` -- it reads DrawIndex (entry DRAW_INDEX_AT of the sizes buffer; sizes is set too)
   - `vertex_inputs: Vec<u32>` -- vertex: the locations of its inputs ([[attribute(n)]])
 
 - **`struct Msl`**

@@ -25,7 +25,6 @@ const CORPUS: &str = "tools/wgsl_corpus";
 /// what the translation refuses on purpose: (name part, why)
 const EXPECTED: &[(&str, &str)] = &[
     ("fragment_location_8", "colour location 8: Metal has 0 ..= 7"),
-    ("cs_bindless_sample", "a runtime array of textures (Bindless, level Voll)"),
 ];
 
 #[cfg(target_os = "android")]

@@ -138,13 +138,12 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     t.ok(!info.rebuild && info.runs <= 6, &format!("{level}: inserts go up as their records ({} runs, rebuild {})", info.runs, info.rebuild));
     // an update in place (the same records): only its records
     let k = 5;
-    let n = match &p.d.items[k].geo {
-        Geo::Line(..) => 1,
-        Geo::Poly(v, c) => if *c { v.len() } else { v.len() - 1 },
-    };
+    let n = records_of(&p.d.items[k].geo);
     let moved: Geo = match &p.d.items[k].geo {
         Geo::Line(a, b) => Geo::Line([a[0] + 7.0, a[1] - 3.0], [b[0] + 7.0, b[1] - 3.0]),
         Geo::Poly(v, c) => Geo::Poly(v.iter().map(|q| [q[0] + 7.0, q[1] - 3.0]).collect(), *c),
+        Geo::Arc(c, r, a0, sw) => Geo::Arc([c[0] + 7.0, c[1] - 3.0], *r, *a0, *sw),
+        Geo::Circle(c, r) => Geo::Circle([c[0] + 7.0, c[1] - 3.0], *r),
     };
     t.res(p.update(k, moved), "update")?;
     let info = judge(t, dev, &mut r, &mut off, &mut p, &cam, &format!("{level}: an entity moved"), false)?;
@@ -262,11 +261,13 @@ fn churn_style(rng: &mut Rng) -> Style {
     st
 }
 
-/// the records an item has (Geo::Poly open or closed)
+/// the records an item has (Geo::Poly open or closed; an arc: its head and pieces)
 fn records_of(g: &Geo) -> usize {
     match g {
         Geo::Line(..) => 1,
         Geo::Poly(v, c) => if *c { v.len() } else { v.len() - 1 },
+        Geo::Arc(_, _, _, sw) => ((sw.abs() / render2d::ARC_STEP - 1e-9).max(0.0) as usize + 1).min(16) + 1,
+        Geo::Circle(..) => 17,
     }
 }
 
@@ -437,6 +438,24 @@ fn visibility_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
         let got = part.contains(&place);
         t.ok(got == want, &format!("{level}: a hairline {name} the {edge} edge: {}", if got { "in the list" } else { "culled" }));
     }
+    // a wide arc with square caps: the corner of a cap lies beyond the box around the chord (the tangent at the piece's
+    // end turns up to ARC_STEP / 2 away from the chord).  Placed so that only that corner reaches into the target, at
+    // its top left corner: the arc's start (177 - 377 + 200, 152) = (23 - 120, 152), its cap from y 152 down to 72, from
+    // x -177 + 80 = -97 inwards; the target's corner (-100, 75) lies 3 px inside the cap's corner
+    let mut s = t.res(Scene::new(&r), "Scene::new")?;
+    let l = t.res(s.add_layer(&Layer::new(0)), "add_layer")?;
+    t.res(s.set_camera(&cam), "camera")?;
+    let mut st = Style::new(0xFF00_0000);
+    st.width = 160.0;
+    st.cap = Cap::Square;
+    let sid = t.res(s.add_style(&st), "add_style")?;
+    t.res(s.insert(l, sid, &render2d::Shape::Arc { center: [-377.0, 152.0], radius: 200.0, start: 0.0, sweep: render2d::ARC_STEP }), "insert")?;
+    let a = shot(t, dev, &mut off, &mut r, &mut s, "a square cap's corner, culled")?;
+    s.set_culling(false);
+    let b = shot(t, dev, &mut off, &mut r, &mut s, "a square cap's corner, not culled")?;
+    let ink = b.chunks_exact(4).filter(|p| p[0] < 0x80 && p[1] < 0x80 && p[2] < 0x80).count();
+    let nd = a.chunks_exact(4).zip(b.chunks_exact(4)).filter(|(x, y)| x[..3] != y[..3]).count();
+    t.ok(ink >= 4 && nd == 0, &format!("{level}: a wide arc's square cap reaching into a corner of the target: {ink} dark pixels drawn, culled against not culled: {nd} pixels differ"));
     Some(())
 }
 
@@ -459,6 +478,15 @@ fn coords_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
         let (n, m) = differ(&img, &base);
         t.ok(m <= 1 && n <= (w * h) / 1000, &format!("{level}: the drawing at ({}, {}) against at the origin: {n} pixels differ, largest {m}", at[0], at[1]));
     }
+    // arcs, circles and dash patterns: the same
+    let base = gpu_image(t, dev, &mut r, &mut off, &arc_sample([0.0, 0.0]), &sample_camera([0.0, 0.0]), "arcs at the origin")?;
+    for at in FAR_POINTS {
+        let img = gpu_image(t, dev, &mut r, &mut off, &arc_sample(at), &sample_camera(at), "arcs far away")?;
+        crate::tests::dump(&format!("coords_arcs_{}_{level}", at[0] as i64), &img, w, h);
+        crate::tests::dump(&format!("coords_arcs_origin_{level}"), &base, w, h);
+        let (n, m) = differ(&img, &base);
+        t.ok(m <= 1 && n <= (w * h) / 1000, &format!("{level}: arcs, circles and dash patterns at ({}, {}) against at the origin: {n} pixels differ, largest {m}", at[0], at[1]));
+    }
     // a deep zoom: 1e-6 units per pixel near (-9 876 543.21, 6 543 210.987), tiny pans; white lines on black, each
     // line's place from the coverage of its rows against where it belongs (f64): within 1/16 px
     let mut off = t.res(Off::new(dev, DEEP_SIZE.0, DEEP_SIZE.1), "target")?;
@@ -473,5 +501,52 @@ fn coords_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
         deep_judge(&img, &c, &mut st);
     }
     t.ok(st.fine(), &format!("{level}: {}", st.text()));
+    // the same for rings: circles of radius 1e7, 3e5 and 33 px and an arc of 1e7 through the view
+    let mut s = t.res(Scene::new(&r), "Scene::new")?;
+    t.res(build(&mut s, &deep_arc_drawing()), "build")?;
+    let mut st = DeepStats::default();
+    for step in 0..DEEP_STEPS {
+        let c = deep_camera(step);
+        t.res(s.set_camera(&c), "camera")?;
+        let img = shot(t, dev, &mut off, &mut r, &mut s, "deep zoom of arcs")?;
+        if step == 0 {
+            crate::tests::dump(&format!("deep_arcs_{level}"), &img, DEEP_SIZE.0, DEEP_SIZE.1);
+        }
+        deep_arc_judge(&img, &c, &mut st);
+    }
+    t.ok(st.fine_arcs(), &format!("{level}: {}", st.arc_text()));
+    Some(())
+}
+
+// ---------------------------------------------------------------- the dash pattern's place far away
+
+pub fn phase(t: &mut T) {
+    on_levels(t, &mut |t, dev, level| { let _ = phase_on(t, dev, level); });
+}
+
+/// a dashed polyline at 1e7 with segments 1e7 long and a dashed circle of radius 1e7, at 1e-6 units per pixel, the pattern
+/// in pixels and in drawing units: 24 pans of 0.37 px, every dash's end where it belongs within 1/16 px
+fn phase_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
+    let mut off = t.res(Off::new(dev, PHASE_SIZE.0, PHASE_SIZE.1), "target")?;
+    off.bg = 0xFF00_0000;
+    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
+    for k in 0..PHASE_CASES {
+        let mut s = t.res(Scene::new(&r), "Scene::new")?;
+        t.res(build(&mut s, &phase_case(k, 0).d), "build")?;
+        let (mut worst, mut checks) = (0.0f64, 0u32);
+        let mut name = "";
+        for step in 0..24 {
+            let case = phase_case(k, step);
+            name = case.name;
+            t.res(s.set_camera(&case.cam), "camera")?;
+            let img = shot(t, dev, &mut off, &mut r, &mut s, "phase")?;
+            if step == 0 {
+                crate::tests::dump(&format!("phase_{k}_{level}"), &img, PHASE_SIZE.0, PHASE_SIZE.1);
+            }
+            phase_judge(&img, &case, k, &mut worst, &mut checks);
+        }
+        t.ok(checks >= 100 && worst <= 1.0 / 16.0, &format!("{level}: dashes at 1e-6 units per pixel, {name}: {checks} pixel lines over 24 pans, the largest distance of a dash's end from where \
+                                                      it belongs {worst:.4} px (1/16 = 0.0625)"));
+    }
     Some(())
 }
