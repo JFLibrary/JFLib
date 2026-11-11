@@ -401,8 +401,8 @@ Metal-Toolchain (`xcrun metal`: „missing Metal Toolchain“, ein eigener Downl
   App) im Simulator grün sind, auf dem iPhone nach Freigabe des Nutzers.
 - **AP6f, Dokumentation (S):** [GPU.md](GPU.md) (Metal in Stand und Teilen, „Ausgabe unter macOS und iOS“,
   Umgebungsvariablen, Lücken), dieser Plan, CHANGELOG, API.md, README (Plattformtabelle), ROADMAP §8.
-- **AP6g, Stufe Voll auf Metal (M, später, eigene Entscheidung):** Bindless über Argument-Puffer, Multi-Draw und
-  `draw_indexed_indirect_count` (nachgebildet), Draw-Parameter, Subgroups.
+- **AP6g, Stufe Voll auf Metal (M):** Bindless über Argument-Puffer, Multi-Draw und
+  `draw_indexed_indirect_count` (nachgebildet), Draw-Parameter, Subgroups; Stufenplan unten („AP6g“).
 
 **AP6a umgesetzt (2026-11-10):** [`lib/shader/msl.rs`](../lib/shader/msl.rs) und
 [`msl_fn.rs`](../lib/shader/msl_fn.rs) übersetzen SPIR-V nach MSL ([SHADER.md](SHADER.md), „MSL für Metal“).
@@ -517,6 +517,47 @@ Danach `render3dtest` 26 von 26 auf dem Mac und im Simulator, auf dem iPhone `sr
 
 **Entschieden (Nutzer, 2026-11-11): die UI-Ausgabe bleibt auf Apple standardmäßig aus** (`DEFAULT_ON_APPLE`; `jfgui_GPU=1`
 und `gpu on` schalten sie ein). Damit ist AP6 bis auf Stufe Voll (AP6g, eine eigene Entscheidung) fertig.
+
+### AP6g: Stufe Voll auf Metal (Stufenplan, 2026-11-11)
+
+Der Nutzer hat AP6g am 2026-11-11 als Nächstes gewählt. **Was Voll heißt** ([GPU.md](GPU.md) „Feature-Stufen“): zusätzlich zu
+Basis Bindless-Tabellen, mehrere indirekte Aufrufe in einem (`draw_indexed_indirect_multi`), die indirekte Anzahl
+(`draw_indexed_indirect_count`), die erste Instanz in indirekten Aufrufen, Draw-Parameter (`BaseVertex`, `BaseInstance`,
+`DrawIndex`) und Subgruppen im Rechen-Shader. **`render3d`** braucht davon nur Multi-Draw mit erster Instanz (eine Multi-Draw
+je Seite, Alpha-Klasse und Phase statt eines Aufrufs je Liste); `gputest` prüft alles.
+
+**Was Metal hat** (auf dem M2 abgefragt; der A15 des iPhones ist Familie Apple8 wie der M2): Metal 3, Argument-Puffer Stufe 2
+(bis 1024 Sampler in einem), SIMD-Gruppen-Funktionen, `base_vertex`/`base_instance` und die erste Instanz in indirekten
+Aufrufen. Es fehlen Multi-Draw-Indirect, die indirekte Anzahl und ein Draw-Index: Diese drei werden nachgebildet. Der
+Simulator meldet weder Familie noch Metal 3 und bleibt Basis; geprüft wird Voll auf dem Mac und dem iPhone.
+
+Entscheidungen (offen, mit Empfehlung):
+
+1. **Indirekte Anzahl:** (a, empfohlen) ein kleiner Rechen-Durchgang vor dem Zeichnen schreibt die bis zu `max_count`
+   Aufrufe in einen Hilfspuffer und setzt bei allen ab der gelesenen Anzahl die Instanzen auf null; danach zeichnet dieselbe
+   Schleife wie bei Multi-Draw. Einfach, dieselben Bindungen wie jeder Aufruf; kostet `max_count` Aufrufe auf der CPU je Mal.
+   (b) Indirect Command Buffers: Die GPU schreibt die Aufrufe selbst, keine CPU-Schleife, aber jede Pipeline braucht
+   `supportIndirectCommandBuffers`, Bindungen kommen nur geerbt, ein Draw-Index je Aufruf ginge nicht über Bytes. (b) erst,
+   wenn Messungen es verlangen.
+2. **Bindless:** (a, empfohlen) Metal 3: Die Tabelle ist ein Puffer, in den `set_texture`/`set_sampler`/`set_buffer` direkt
+   die Ressourcen-IDs (`gpuResourceID`, `gpuAddress`) schreiben; im MSL ein Argument-Puffer mit Arrays je Art; beim Binden
+   macht `useResources` die Ressourcen der Tabelle resident. Voll nur auf Geräten mit Metal 3 (Apple7 und neuer, also A14/M1
+   und neuer, sowie Mac2). (b) `MTLArgumentEncoder`: auch Apple6 (A13), mehr Code, langsameres Setzen; das A13 bliebe mit (a) auf Basis.
+
+Stufen (je ein Branch und Commits, Merge nach grünen Suiten, Push nach Rückfrage):
+
+- **AP6g1, Multi-Draw und Draw-Parameter (M):** `draw_indexed_indirect_multi`/`draw_indirect_multi` als Schleife über
+  einzelne indirekte Aufrufe mit `stride`, `DrawIndex` als Bytes je Aufruf in einem eigenen Slot (nur wenn der Shader ihn
+  liest), `BaseVertex`/`BaseInstance` nativ. Voll wird noch nicht gemeldet; die Tests laufen bis AP6g4 über einen Schalter nur
+  auf dem Branch.
+- **AP6g2, indirekte Anzahl (S):** nach Entscheidung 1.
+- **AP6g3, Bindless (M–L):** nach Entscheidung 2; `shader::msl` übersetzt die Laufzeit-Arrays von Ressourcen (bisher die
+  erwartete Ausnahme „Bindless“), Limits nach Metal (Sampler 1024); `gputest` `textures`/`compute` Bindless.
+- **AP6g4, Subgruppen und Voll melden (M):** `Features::subgroups` mit Stufen und Operationen, Subgruppengröße 32; `gputest`
+  `wgsl` Subgruppen grün. Danach meldet ein Gerät mit Metal 3 Voll.
+- **AP6g5, `render3d` und UI auf Voll (M):** `render3dtest` auf Voll (darunter `levels`, Voll gegen Basis; das Bild „tex“
+  dort mit derselben Apple-Toleranz), `uigputest` `view` (`AF_GPU_3D` bekommt Voll), Mac und iPhone; Doku (GPU.md, APPLE.md,
+  CHANGELOG, API.md).
 
 **Fallen, schon bekannt.** Metal schaltet beim Übersetzen zur Laufzeit schnelle Mathematik ein (NaN, Unendlich,
 Kontraktion); MSLs `float3` ist 16 Byte groß (in Puffern `packed_float3`); `[[vertex_id]]` und `[[instance_id]]`
