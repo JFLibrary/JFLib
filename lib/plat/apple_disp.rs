@@ -99,6 +99,19 @@ pub fn print(job: &mut crate::PrintJob<'_>) -> i32 {
     crate::ERR_UNSUPPORTED
 }
 
+// (print.rs PrintDoc, E9) macOS and iOS: the test variant (jfgui_PRINT_TO) writes the PDF of the
+// pages; the print panel for jobs of several pages is not there yet (ERR_UNSUPPORTED)
+pub(crate) fn doc_begin(d: &mut crate::PrintDoc) -> i32 {
+    crate::doc_begin_pdf_only(d)
+}
+pub(crate) fn doc_image(_d: &mut crate::PrintDoc, _src: &crate::PrintSrc, _pl: &crate::Place) -> i32 {
+    crate::ERR_UNSUPPORTED
+}
+pub(crate) fn doc_end(d: &mut crate::PrintDoc) -> i32 {
+    crate::doc_end_pdf_file(d)
+}
+pub(crate) fn doc_abort(_d: &mut crate::PrintDoc) {}
+
 // iOS's file dialog: the system's picker, answering later (apple_ios_services.rs); macOS: apple_mac.rs
 #[cfg(target_os = "ios")]
 pub use super::ios::{file_dialog, file_dialog_poll};

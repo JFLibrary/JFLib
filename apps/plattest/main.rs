@@ -377,6 +377,7 @@ fn plattest() -> i32 {
         Some("print") => t_print::t_print,             // plat-shared
         Some("printlayout") => t_print::t_printlayout, // plat-shared
         Some("printjob") => t_print::t_printjob,       // plat-shared
+        Some("printdoc") => t_print::t_printdoc,       // plat-shared: jobs of several pages (E9)
         Some("guard") => t_guard::t_guard,             // plat-shared
         Some("guardcrash") => t_guard::t_guardcrash,   // plat-shared
         Some("guardlimit") => t_guard::t_guardlimit,   // plat-shared
