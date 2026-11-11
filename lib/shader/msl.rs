@@ -11,6 +11,8 @@
 // FIRST_VERTEX_SLOT); push constants are a `constant` block at PUSH_SLOT; the byte sizes of
 // the bound buffer ranges a `constant uint*` at SIZES_SLOT, indexed by a buffer's slot (only
 // for entry points with arrayLength: Entry::sizes); vertex buffer i is at vertex_slot(i).
+// DrawIndex (Metal has none) is entry DRAW_INDEX_AT of that buffer, which the backend sets per draw
+// of a multi-draw (Entry::draw_index).
 //
 // Specialization constants are substituted (Options::spec, reflect::constant_values): a
 // pipeline with constants is a translation of its own.
@@ -43,6 +45,8 @@ pub const SIZES_SLOT: u32 = 30;
 pub const FIRST_VERTEX_SLOT: u32 = 21;
 /// vertex buffer slots a pipeline may use
 pub const VERTEX_BUFFERS_MAX: u32 = 8;
+/// the entry of the sizes buffer (SIZES_SLOT) that holds DrawIndex: the draw's index in a multi-draw
+pub const DRAW_INDEX_AT: u32 = FIRST_VERTEX_SLOT;
 
 /// the buffer slot of vertex buffer i (i < VERTEX_BUFFERS_MAX)
 pub const fn vertex_slot(i: u32) -> u32 {
@@ -99,6 +103,8 @@ pub struct Entry {
     pub push_constants: bool,
     /// it reads the buffer sizes (SIZES_SLOT)
     pub sizes: bool,
+    /// it reads DrawIndex (entry DRAW_INDEX_AT of the sizes buffer; sizes is set too)
+    pub draw_index: bool,
     /// vertex: the locations of its inputs ([[attribute(n)]])
     pub vertex_inputs: Vec<u32>,
 }
@@ -1150,7 +1156,8 @@ impl<'a> M<'a> {
             slots.push(Slot { set, binding, kind, index });
             params.push(p);
         }
-        let sizes = self.sizes.contains(&e.func);
+        let mut sizes = self.sizes.contains(&e.func);
+        let mut draw_index = false;
         let depth_mode = e.modes.iter().find_map(|(md, _)| {
             if *md == Mode::DepthGreater as u32 {
                 Some("greater")
@@ -1187,6 +1194,13 @@ impl<'a> M<'a> {
                     if let Some(b) = builtin {
                         if b == Bi::HelperInvocation as u32 {
                             continue; // read through simd_is_helper_thread() at each load
+                        }
+                        if b == Bi::DrawIndex as u32 {
+                            // (Metal has no draw index: the backend writes it into the sizes buffer per draw)
+                            sizes = true;
+                            draw_index = true;
+                            prologue.push_str(&format!("    {} g{} = {}(jf_sizes[{}]);\n", tn, g, tn, DRAW_INDEX_AT));
+                            continue;
                         }
                         let (pt, attr) = builtin_in(b, model)?;
                         params.push(format!("{} jf_b{} [[{}]]", pt, g, attr));
@@ -1302,7 +1316,7 @@ impl<'a> M<'a> {
         } else {
             [1, 1, 1]
         };
-        Ok((src, Entry { name: e.name.clone(), function: fname, model, workgroup, slots, push_constants: push, sizes, vertex_inputs }))
+        Ok((src, Entry { name: e.name.clone(), function: fname, model, workgroup, slots, push_constants: push, sizes, draw_index, vertex_inputs }))
     }
 
     /// the element type name of an array type

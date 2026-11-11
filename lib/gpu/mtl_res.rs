@@ -692,6 +692,8 @@ pub(crate) struct StageInfo {
     pub slots: Vec<shader::msl::Slot>,
     pub push: bool,
     pub sizes: bool,
+    /// it reads DrawIndex (shader::msl::DRAW_INDEX_AT of the sizes)
+    pub draw_index: bool,
     pub workgroup: [u32; 3],
 }
 
@@ -728,7 +730,7 @@ fn stage_function(st: &ShaderStage, model: shader::Model, point_size: bool) -> R
     // SAFETY: newFunctionWithName: of a live library returns a new function (+1) or nil.
     let f = Obj::new(unsafe { msg!(comp.lib.id(), c"newFunctionWithName:", name.id() => Id; Id) })
         .ok_or(GpuError::Invalid("the translated entry point is missing in the library"))?;
-    let info = StageInfo { slots: e.slots.clone(), push: e.push_constants, sizes: e.sizes, workgroup: e.workgroup };
+    let info = StageInfo { slots: e.slots.clone(), push: e.push_constants, sizes: e.sizes, draw_index: e.draw_index, workgroup: e.workgroup };
     Ok((f, info))
 }
 
