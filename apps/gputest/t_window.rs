@@ -117,6 +117,10 @@ fn near(a: [u8; 4], b: [u8; 4]) -> bool {
 }
 
 pub fn window(t: &mut T) {
+    if cfg!(target_os = "ios") {
+        crate::out("SKIP: a plain program has no window on iOS (UIKit's host: uigputest)");
+        return;
+    }
     let Some(g) = setup(t) else { return };
     let dev = &g.dev;
     if !crate::windows(dev) {

@@ -13,11 +13,13 @@ import io
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -624,6 +626,30 @@ static TIPS: [&str; 2] = [
         rep = i18n_check.check_lib()
         self.assertEqual([x for x in rep.lines if x[0] in ("missing", "untranslated", "error")], [])
         self.assertGreater(rep.texts, 100)
+
+
+class ScriptTimeout(Temp):
+    """build_rs.run_app_tests: a script that does not end has failed, the next one still runs"""
+
+    def test_timeout_fails_only_that_script(self):
+        tests = self.dir / "apps" / "x" / "tests"
+        tests.mkdir(parents=True)
+        (tests / "a.uis").write_text("#!args --a\n", encoding="utf-8")
+        (tests / "b.uis").write_text("#!args --b\n#!timeout 7\n", encoding="utf-8")
+        limits = {}
+
+        def run(_target, _exe, args, timeout):
+            limits[args[0]] = timeout
+            if args[0] == "--a":
+                raise subprocess.TimeoutExpired("x", timeout, output=b"partial\n")
+            return subprocess.CompletedProcess("x", 0, "", "")
+
+        with mock.patch.object(build_rs, "ROOT", self.dir), mock.patch.object(build_rs, "run_exe", run):
+            a, b = build_rs.run_app_tests("x", "linux", "x")
+        self.assertEqual((a["status"], a["exit_code"], b["status"]), ("failed", "timeout", "passed"))
+        self.assertEqual(limits, {"--a": build_rs.SCRIPT_TIMEOUT, "--b": 7})
+        self.assertIn("partial", a["output"])
+        self.assertTrue(a["output"].startswith("FAIL"))
 
 
 class IncrementalCache(Temp):

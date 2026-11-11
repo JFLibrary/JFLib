@@ -19,7 +19,7 @@ and tests); `../legacy`, `../rewrite` and `../booksAndContext` lie next to it.
 | [API.md](API.md) | the API reference, generated from the doc comments (`python tools/gendoc.py`, `--check`) |
 | [AGENT_WEB.md](AGENT_WEB.md) | modular source layout, opt-in CLI/JSON/MCP control, shared browser host, capabilities and measured platform coverage |
 | [jfWord implementation](../apps/jfWord/docs/IMPLEMENTATION.md) | jfOffice, scientific editing, completed checks and remaining Office/Word compatibility work |
-| [STYLES.md](STYLES.md) | the style model (`ui::Style` + sub-traits), the four styles, writing and checking a style |
+| [STYLES.md](STYLES.md) | the style model (`ui::Style` + sub-traits), the styles, writing and checking a style |
 | [PACKAGING.md](PACKAGING.md) | `tools/package.py`: setup.exe with a choice of style, the .deb, AppImage (runtime `apps/appimagert`), RPM .spec, Flatpak, MSIX, icons, `apps/NAME/PACKAGE`, signing (Authenticode, MSIX, apt repository, Android release key), `pkg_check.py` |
 | [VERSIONING.md](VERSIONING.md) | the library's version and the apps' own (`rt::app_version!()`), what the public API is, the SemVer rules, deprecations, `build_rs.py api-diff` / `release`, the [changelog](../CHANGELOG.md) |
 | [UPDATES.md](UPDATES.md) | `lib/update`: signed update channels, background download, putting in place at the next start, health marker, rollback |

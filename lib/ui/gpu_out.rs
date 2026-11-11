@@ -229,6 +229,9 @@ const DEFAULT_ON_LINUX: bool = true;
 /// switch for it.  A run with ?agent=1 stays on the CPU path unless ?gpu=1 asks: such runs read #screen.
 /// Phones and tablets stay there too until one has been tested: web/loader.js sets jfgui_GPU=0
 const DEFAULT_ON_BROWSER: bool = true;
+/// the same on macOS and iOS (Metal, AP6): off, the user's decision of 2026-11-11 after the measurements (docs/APPLE.md
+/// AP6d); jfgui_GPU=1 and a script's `gpu on` turn it on
+const DEFAULT_ON_APPLE: bool = false;
 /// the present mode (FIFO when the surface lacks it; jfgui_GPU_PRESENT overrides it): a burst of
 /// frames shows its newest within a refresh, where FIFO lags 3 .. 5 refreshes behind (docs/GPU.md
 /// "Ausgabe der UI")
@@ -770,6 +773,7 @@ fn wanted() -> bool {
         Some("1") | Some("on") => true,
         // (a run with ?agent=1 reads #screen, as scripts read the framebuffer of the CPU path)
         _ if cfg!(target_arch = "wasm32") => DEFAULT_ON_BROWSER && !plat::args().iter().any(|a| a == "--agent"),
+        _ if cfg!(target_vendor = "apple") => DEFAULT_ON_APPLE,
         _ => if cfg!(windows) { DEFAULT_ON } else { DEFAULT_ON_LINUX }, // (Android: the host says)
     };
     // (jfgui_GPU_OUTPUT=0: the windows through the CPU path, the GPU stays for views)

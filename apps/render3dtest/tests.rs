@@ -1133,6 +1133,10 @@ fn gen_dfg(path: &str) -> i32 {
 
 /// a real window, a few frames with the swapchain's format, the presented image against the offscreen one
 fn window(t: &mut T) {
+    if cfg!(target_os = "ios") {
+        out("SKIP: a plain program has no window on iOS (UIKit's host: uigputest)");
+        return;
+    }
     let Some(g) = setup(t) else { return };
     let Some(dev) = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device") else { return };
     if !dev.features().swapchain {

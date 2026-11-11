@@ -247,6 +247,14 @@ pub fn diff(a: &[u8], b: &[u8]) -> (u32, u8) {
 
 // ---------------------------------------------------------------- the gallery
 
+/// Apple's GPUs (Metal): a derivative depends on the quad's invisible lanes, which the GPU fills differently from run to
+/// run (uv and position bit-identical, dpdx/dpdy not; docs/APPLE.md AP6).  What picks levels and texels from the
+/// derivatives (the textured gallery, normal maps) is held to a looser bound there
+pub const DERIVATIVES_VARY: bool = cfg!(target_vendor = "apple");
+
+/// (DERIVATIVES_VARY) pixels of a 320 x 180 image that may differ by more than the usual bound: 0.2 %
+pub const DERIVATIVE_PIXELS: u32 = 320 * 180 / 500;
+
 pub const GALLERY_W: u32 = 320;
 pub const GALLERY_H: u32 = 180;
 pub const GALLERY_N: u32 = 3000;

@@ -1,0 +1,3 @@
+#!args --test msl
+# (AP6) every shader of the repository through the MSL translation: on Metal translated and compiled by
+# ShaderModule::from_spirv, elsewhere translated (t_msl.rs)

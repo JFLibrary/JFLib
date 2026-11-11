@@ -7,6 +7,7 @@
 //   - which formats encode
 
 use alloc::format;
+use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 
@@ -66,18 +67,24 @@ fn gallery_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let px = GALLERY_W * GALLERY_H;
     let (mut all_enc, mut all_hw, mut all_lin, mut sum_changed) = ([0u32; 3], [0u32; 3], [0u32; 3], 0u64);
     for (i, name) in GALLERY_NAMES.iter().chain(LATER.iter()).enumerate() {
+        // (Apple's GPUs: the textured gallery picks levels and texels from derivatives that vary from run to run, so two
+        // renders of it may differ in a few pixels: DERIVATIVES_VARY)
+        let loose = DERIVATIVES_VARY && *name == "tex";
+        let few = |h: [u32; 3]| loose && h[1] + h[2] <= DERIVATIVE_PIXELS;
+        let note = if loose { format!(" (Apple's GPUs: at most {DERIVATIVE_PIXELS} by more than 1)") } else { String::new() };
         let want = to8(&flt[i], true);
         let (n, m, h) = cmp(&enc[i], &want);
-        t.ok(m <= 1, &format!("{level}, {name}: the shader's sRGB against the float image encoded on the CPU: {n} of {px} pixels differ (by 1 / 2 / more: {} / {} / {}), largest {m}",
-                              h[0], h[1], h[2]));
+        t.ok(m <= 1 || few(h), &format!("{level}, {name}: the shader's sRGB against the float image encoded on the CPU: {n} of {px} pixels differ (by 1 / 2 / more: {} / {} / {}), largest {m}{note}",
+                                        h[0], h[1], h[2]));
         let swapped: Vec<u8> = bgra[i].chunks_exact(4).flat_map(|p| [p[2], p[1], p[0], p[3]]).collect();
         let (nb, mb, _) = cmp(&swapped, &enc[i]);
-        t.ok(nb == 0, &format!("{level}, {name}: Bgra8Unorm = Rgba8Unorm: {nb} pixels differ (largest {mb})"));
+        let bnote = if loose { format!(" (Apple's GPUs: at most {DERIVATIVE_PIXELS})") } else { String::new() };
+        t.ok(nb == 0 || loose && nb <= DERIVATIVE_PIXELS, &format!("{level}, {name}: Bgra8Unorm = Rgba8Unorm: {nb} pixels differ (largest {mb}){bnote}"));
         let (nh, mh, hh) = cmp(&hw[i], &enc[i]);
-        t.ok(mh <= 1, &format!("{level}, {name}: an sRGB target (the hardware encodes) against the shader: {nh} pixels differ (by 1 / 2 / more: {} / {} / {}), largest {mh}",
-                               hh[0], hh[1], hh[2]));
+        t.ok(mh <= 1 || few(hh), &format!("{level}, {name}: an sRGB target (the hardware encodes) against the shader: {nh} pixels differ (by 1 / 2 / more: {} / {} / {}), largest {mh}{note}",
+                                          hh[0], hh[1], hh[2]));
         let (nl, ml, hl) = cmp(&lin[i], &to8(&flt[i], false));
-        t.ok(ml <= 1, &format!("{level}, {name}: encode_srgb false (linear) against the float image rounded: {nl} pixels differ, largest {ml}"));
+        t.ok(ml <= 1 || few(hl), &format!("{level}, {name}: encode_srgb false (linear) against the float image rounded: {nl} pixels differ, largest {ml}{note}"));
         let (nc, _, _) = cmp(&enc[i], &lin[i]);
         t.ok(nc > px / 4, &format!("{level}, {name}: the encoding changes {nc} of {px} pixels against the linear image"));
         sum_changed += nc as u64;

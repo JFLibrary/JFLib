@@ -95,8 +95,8 @@ strip = "symbols"
 | Android | `cargo jflib android` | an APK for `arm64-v8a` (or `--abi x86_64` for the emulator) in `target/jflib-android/`; needs the Android SDK, the NDK, a JDK and `rustup target add aarch64-linux-android`; the app's code in `src/lib.rs` as the template has it |
 
 The style: `jflib::style` is WinUI unless the environment variable `JFLIB_STYLE` names another
-(`classic`, `kde`, `macos`). All four are always there under their own names for the switch at
-run time (`jflib::style_kde::STYLE`).
+(`classic`, `kde`, `macos`, `netlab`). All five are always there under their own names for the
+switch at run time (`jflib::style_kde::STYLE`).
 
 ## Good to know
 

@@ -7,10 +7,10 @@ Befehlspuffer, Barrieren) und neutral gegenüber dem Backend: das Backend wird p
 Übersetzen gewählt, es gibt keine dynamische Verteilung.
 
 Stand: Vulkan unter Windows, unter Linux ([Linux](#linux)) und unter Android ([Ausgabe unter Android](#ausgabe-unter-android)),
-WebGPU im Browser ([Ausgabe im Browser](#ausgabe-im-browser)).
+WebGPU im Browser ([Ausgabe im Browser](#ausgabe-im-browser)), Metal auf macOS und iOS, Stufe Basis
+([Ausgabe unter macOS und iOS](#ausgabe-unter-macos-und-ios)).
 `vulkan-1.dll`, `libvulkan.so.1` bzw. `libvulkan.so` wird zur Laufzeit geladen, das Programm startet also auch auf
-Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Geplant:
-später Metal -- mit denselben Typen und Methoden. Die Oberfläche rastert weiter auf der CPU; unter
+Rechnern ohne Vulkan und bekommt dort einen sauberen Fehler. Die Oberfläche rastert weiter auf der CPU; unter
 Windows, Linux, Android und im Browser zeigt die GPU das Ergebnis
 (G3a, [Ausgabe der UI](#ausgabe-der-ui), unter Linux als dmabuf: G4b, [Ausgabe unter Linux](#ausgabe-unter-linux),
 unter Android auf einem `SurfaceView`: G4c, [Ausgabe unter Android](#ausgabe-unter-android),
@@ -33,6 +33,7 @@ Oberfläche auf dem Gerät der UI (G5e1, [3D-Ansicht](#3d-ansicht-g5e1)).
 | Puffer der GPU am Fenster (Linux) | [`lib/plat/linux_gpuout.rs`](../lib/plat/linux_gpuout.rs), [`linux_wl_gpu.rs`](../lib/plat/linux_wl_gpu.rs) (zwp_linux_dmabuf_v1), [`linux_x11_gpu.rs`](../lib/plat/linux_x11_gpu.rs) (DRI3, Present) |
 | Vulkan-Deklarationen (von Hand, mit Layout-Prüfungen gegen die Header) | [`lib/gpu/vk_ffi.rs`](../lib/gpu/vk_ffi.rs) |
 | WebGPU im Browser | [`lib/gpu/web_dev.rs`](../lib/gpu/web_dev.rs), [`web_res.rs`](../lib/gpu/web_res.rs), [`web_cmd.rs`](../lib/gpu/web_cmd.rs), [`web_swap.rs`](../lib/gpu/web_swap.rs), die Seite des Browsers: [`web/gpu.js`](../web/gpu.js); die Leinwand: [`lib/plat/web_gpu.rs`](../lib/plat/web_gpu.rs), [`web/loader.js`](../web/loader.js) |
+| Metal (macOS, iOS) | [`lib/gpu/mtl_objc.rs`](../lib/gpu/mtl_objc.rs), [`mtl_dev.rs`](../lib/gpu/mtl_dev.rs), [`mtl_res.rs`](../lib/gpu/mtl_res.rs), [`mtl_cmd.rs`](../lib/gpu/mtl_cmd.rs), [`mtl_swap.rs`](../lib/gpu/mtl_swap.rs); Shader: SPIR-V nach MSL in [`lib/shader/msl.rs`](../lib/shader/msl.rs); der Layer: [`lib/plat/apple_mac_gpu.rs`](../lib/plat/apple_mac_gpu.rs), [`apple_ios_gpu.rs`](../lib/plat/apple_ios_gpu.rs) |
 | Fenster-Handles für die GPU | `plat::win_native` ([`lib/plat/win_api.rs`](../lib/plat/win_api.rs)), das Kindfenster der UI-Ausgabe: `plat::win_gpu_child` ([`lib/plat/win_gpuout.rs`](../lib/plat/win_gpuout.rs)) |
 | Ausgabe der UI über die Swapchain | [`lib/ui/gpu_out.rs`](../lib/ui/gpu_out.rs), Shader: [`gpu_out.wgsl`](../lib/ui/gpu_out.wgsl), [`gpu_out_spv.rs`](../lib/ui/gpu_out_spv.rs); 3D-Ansichten (G5e1): [`lib/ui/gpu_view.rs`](../lib/ui/gpu_view.rs), [3D-Ansicht](#3d-ansicht-g5e1) |
 | Tests und Messungen | [`apps/gputest`](../apps/gputest/main.rs), die UI-Ausgabe: [`apps/uigputest`](../apps/uigputest/main.rs), [`apps/gallery/tests/gpu_output.uis`](../apps/gallery/tests/gpu_output.uis), [`gpu_layers.uis`](../apps/gallery/tests/gpu_layers.uis); Android: [`apps/androidGallery/tests/android_gpu.py`](../apps/androidGallery/tests/android_gpu.py), [`apps/gputest/tests/android.py`](../apps/gputest/tests/android.py); Browser: [`apps/gallery/tests/gpu_web.mjs`](../apps/gallery/tests/gpu_web.mjs), [`apps/webgputest`](../apps/webgputest/main.rs), [`tools/tests/web_gpu_bench.mjs`](../tools/tests/web_gpu_bench.mjs) |
@@ -870,6 +871,18 @@ Was das heißt:
 **Nicht getestet:** ein Telefon mit Vulkan 1.1 oder Android 8 und 9, Adreno und Mali, ein echter Treiber-Reset (`test_lose` spielt ihn vor), ein Treiber, der wirklich abstürzt (das Beenden ist nachgestellt), die Pause ohne Stopp für sich, der geteilte Bildschirm und Faltgeräte (der Weg über die neue Größe ist geprüft: Tastatur und Drehen auf dem Telefon, ein freies Fenster mit `am task resize` im Emulator), Bildschirmleser mit echtem TalkBack auf dem GPU-Pfad, ein Lauf ohne die Spiegelung von Android Studio, die Akkulaufzeit.
 
 **Nicht gebaut:** Vorab-Drehen der Bilder (`preTransform`, die Rechtecke und der Shader gedreht; das nähme dem Compositor die GPU-Komposition quer ab), Freigeben des Bitmaps auf dem GPU-Pfad (18 MiB, kostet einen Rückweg, der es erst wieder anlegt), eine Grenze für schwache Telefone (`isLowRamDevice`), GPU-Komposition für Werkzeugfenster.
+
+### Ausgabe unter macOS und iOS
+
+Dieselbe Ausgabe wie unter Windows über Metal ([APPLE.md](APPLE.md), AP6). Ein `CAMetalLayer` liegt als Unterlayer über dem Layer der View,
+verborgen, bis sein erstes Bild kommt; darunter bleibt das Bild des CPU-Wegs. Standard **aus** (Entscheidung des Nutzers vom
+11.11.2026), `jfgui_GPU=1` schaltet ein (`DEFAULT_ON_APPLE` in [`gpu_out.rs`](../lib/ui/gpu_out.rs); die Zahlen unter AP6d in [APPLE.md](APPLE.md)).
+
+- **Stufe Basis.** Ansichten mit `AF_GPU_3D` bekommen ebenfalls Basis; Voll ist AP6g.
+- **Darstellung.** Nur Fifo (`Immediate` und `Mailbox` werden zu Fifo: Ein Fenster zeigt ohnehin im Takt des Compositors). Immer drei Drawables, `try_acquire` wartet nie, die Presented-Handler zählen, was angekommen ist.
+- **Farben.** Der Layer hat den Farbraum sRGB wie das `CGImage` des CPU-Wegs: beide zeigen dieselben Pixel.
+- **iOS.** Nur Fenster 0, und nur, solange die Leinwand nichts anderes zeigt. Ohne aktive Szene keine GPU-Arbeit (`win_state` sagt `WST_HIDDEN`, die Ausgabe geht auf den CPU-Weg und kommt zurück).
+- **Tests.** macOS: `tools/apple.py gui build/mac/uigputest --test NAME` in der angemeldeten Sitzung. iOS: `tools/apple.py simapp build/ios-sim/uigputest --test NAME` (UIKit im Simulator), die Prüfung gegen den Bildschirm hat auf beiden kein Ergebnis, jedes dargestellte Bild wird zurückgelesen und mit dem Framebuffer verglichen.
 
 ### Ausgabe im Browser
 

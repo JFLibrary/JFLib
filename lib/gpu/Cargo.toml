@@ -1,6 +1,6 @@
 [package]
 name = "jflib-gpu"
-description = "GPU access for JFLib: an explicit API over Vulkan and WebGPU"
+description = "GPU access for JFLib: an explicit API over Vulkan, WebGPU and Metal"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

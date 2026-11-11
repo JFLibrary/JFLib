@@ -215,6 +215,7 @@ style_winui = { package = "jflib-style-winui", path = "styles/winui", version = 
 style_classic = { package = "jflib-style-classic", path = "styles/classic", version = "=0.1.0" }
 style_kde = { package = "jflib-style-kde", path = "styles/kde", version = "=0.1.0" }
 style_macos = { package = "jflib-style-macos", path = "styles/macos", version = "=0.1.0" }
+style_netlab = { package = "jflib-style-netlab", path = "styles/netlab", version = "=0.1.0" }
 modrt = { package = "jflib-modrt", path = "modules/modrt", version = "=0.1.0" }
 modplat = { package = "jflib-modplat", path = "modules/modplat", version = "=0.1.0" }
 jflib-build = { path = "lib/jflib_build", version = "=0.1.0" }
@@ -223,7 +224,6 @@ appimagert = { package = "jflib-appimagert", path = "lib/appimagert", version = 
 # the styles of the apps: not published
 style_jfoffice = { package = "jflib-style-jfoffice", path = "styles/jfoffice" }
 style_backupcraft = { package = "jflib-style-backupcraft", path = "styles/backupcraft" }
-style_netlab = { package = "jflib-style-netlab", path = "styles/netlab" }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
@@ -234,7 +234,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(jfgui_package)',   # ui::main!: PACKAGE as a file
     'cfg(jflib_module)',    # inside a loadable module
     'cfg(web_threads)',     # the browser with threads
-    'cfg(jflib_style, values("winui", "classic", "kde", "macos"))',
+    'cfg(jflib_style, values("winui", "classic", "kde", "macos", "netlab"))',
 ] }
 
 # What a project needs as well, Cargo does not take profiles from a dependency (docs/CRATES.md).

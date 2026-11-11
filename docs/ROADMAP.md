@@ -1530,8 +1530,8 @@ Fensterrand hinaus.
 - **P2** · *entschieden* (2026-10-31) · Allgemeiner GPU-Support in der Library für die UI,
   2D-CAD und 3D-Spiele (Entscheidungsvorlage „GPU-Rendering in JFLib“, Fassung vom
   31.10.2026, alle acht Empfehlungen freigegeben).
-  - Grafik-APIs: Vulkan unter Windows, Linux und Android, WebGPU im Browser, Metal später für
-    einen nativen Apple-Port; D3D12 höchstens als späterer Rückfall unter Windows (Remote-Desktop,
+  - Grafik-APIs: Vulkan unter Windows, Linux und Android, WebGPU im Browser, Metal auf macOS und iOS
+    (Stufe Basis seit AP6, [APPLE.md](APPLE.md)); D3D12 höchstens als späterer Rückfall unter Windows (Remote-Desktop,
     VMs, WARP). D3D11, WebGL2 und GLES entfallen.
   - Shader in WGSL mit eigenem Compiler nach SPIR-V (später MSL); der Browser nimmt WGSL direkt.
   - Linux: GUI- und Spielprogramme werden dynamisch gegen glibc gelinkt (sonst nichts),
@@ -1773,7 +1773,7 @@ Fensterrand hinaus.
 - **P2** · *erledigt* (2026-11-10) · G6a1: der Kern von [`lib/render2d`](RENDER2D.md): eine Szene aus Entitäten, Ebenen und Stilen, Strecken und Polylinien mit Breite, Enden und Ecken (Deckung exakt im Fragment-Shader, kein MSAA; durchscheinend ohne doppeltes Mischen an Ecken), f64-Koordinaten als Paare aus zwei f32 relativ zur Kamera, Sichtbarkeit in Compute-Shadern in Zeichenreihenfolge, Stufen Basis und Voll, die Test-App `render2dtest` gegen `lib/gfx`. Bisher nur unter Windows auf der RTX 2070 SUPER gelaufen; Linux, Android und Web sind gebaut. 1 Mio. Haarlinien im schlimmsten Fall (dichter Zufallsweg): 61,6 ms je Bild, das Messziel ist also noch nicht gezeigt.
 - **P2** · *erledigt* (2026-11-11) · G6a2a: `render2d` läuft im Browser (Chromium auf D3D12: große Koordinaten, Besitzregel und Sichtbarkeit wie unter Vulkan) und auf HD 610, Iris Xe und T500 (441 Prüfungen). Messszene Stadtplan mit 1 Mio. Segmenten ([RENDER2D.md](RENDER2D.md#messung)): RTX 2070 SUPER 11,8 ms in der Übersicht, Messziel erreicht, im Browser auf der RTX ebenso; Iris Xe 60,7 ms und HD 610 348 ms in der Übersicht, dort verfehlt. Text ist noch nicht dabei. Kurze dünne Striche rechnen nahe ihrer Enden eine Näherung statt der genauen Fläche.
 - **P2** · *fehlt* · G6a2b: Bögen, Kreise und Strichmuster. Offen zur Entscheidung: eine Detailstufe für schwache GPUs in der Übersicht. Nicht geprüft: Chromium auf Vulkan mit NVIDIA (der riskante Weg für die Rechnung mit den f32-Paaren), der Browser auf Intel, Firefox, Safari.
-- **P3** · *fehlt* · G7: Spiel-Bausteine (Animation, Nachladen großer Welten, Physik, Werkzeuge). Später: Metal, D3D12-Rückfall, GPU-Rasterung der Widgets.
+- **P3** · *fehlt* · G7: Spiel-Bausteine (Animation, Nachladen großer Welten, Physik, Werkzeuge). Später: D3D12-Rückfall, GPU-Rasterung der Widgets.
 - **P2** · *erledigt* (2026-10-22) · Stufe 0 des GPU-Plans, Teil 1: Scroll-Kopie
   (`lib/ui/scrollcopy.rs`). Hat sich in einer Scroll-Ansicht nur der Inhalt verschoben, werden
   die noch sichtbaren Pixel im Framebuffer verschoben (Zeilen per `copy_within`, Reihenfolge

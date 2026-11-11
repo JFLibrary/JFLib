@@ -61,7 +61,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)
-  <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs)
+  <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs) · [mtl_cmd.rs (Apple)](#gpumtl_cmdrs-apple) · [mtl_dev.rs (Apple)](#gpumtl_devrs-apple) · [mtl_res.rs (Apple)](#gpumtl_resrs-apple) · [mtl_swap.rs (Apple)](#gpumtl_swaprs-apple)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles with layers and styles, dash patterns, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
@@ -69,11 +69,11 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
-  <br>[lib.rs](#shader-crate-root) · [bench.rs](#shaderbenchrs) · [dis.rs](#shaderdisrs) · [layout.rs](#shaderlayoutrs) · [module.rs](#shadermodulers) · [parse.rs](#shaderparsers) · [reflect.rs](#shaderreflectrs) · [samples.rs](#shadersamplesrs) · [spv.rs](#shaderspvrs) · [val.rs](#shadervalrs)
+  <br>[lib.rs](#shader-crate-root) · [bench.rs](#shaderbenchrs) · [dis.rs](#shaderdisrs) · [layout.rs](#shaderlayoutrs) · [module.rs](#shadermodulers) · [msl.rs](#shadermslrs) · [parse.rs](#shaderparsers) · [reflect.rs](#shaderreflectrs) · [samples.rs](#shadersamplesrs) · [spv.rs](#shaderspvrs) · [val.rs](#shadervalrs)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -18265,8 +18265,9 @@ gpu -- GPU access for the UI, 2D CAD and 3D games: an explicit API in the manner
 and WebGPU over one backend per target (docs/GPU.md).  Backends now: Vulkan on Windows, on Linux,
 there in programs linked against glibc, and on Android (vulkan-1.dll, libvulkan.so.1, libvulkan.so
 loaded at run time; vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs), WebGPU in the
-browser (web_*.rs, web/gpu.js; WGSL instead of SPIR-V, what it cannot do is said in web_dev.rs).
-Planned: Metal; it provides the same types and methods.
+browser (web_*.rs, web/gpu.js; WGSL instead of SPIR-V, what it cannot do is said in web_dev.rs),
+Metal on macOS and iOS (mtl_*.rs, AP6 in docs/APPLE.md: SPIR-V translated to MSL by shader::msl,
+level Basis; what it lacks is said in mtl_dev.rs).
 
   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
@@ -20162,6 +20163,446 @@ A swapchain cannot be read back into this turn: Buffer::read later (web_res.rs).
   the images' size
 - **`fn image_count(&self) -> usize`**
 
+### `gpu/mtl_cmd.rs` (Apple)
+
+Source: [`lib/gpu/mtl_cmd.rs`](../lib/gpu/mtl_cmd.rs)
+
+```text
+mtl_cmd -- command recording on Metal (AP6, docs/APPLE.md): CommandEncoder -> CommandBuffer
+
+An encoder records into one MTLCommandBuffer through Metal's encoders: copies and fills in a
+blit encoder, dispatches in a compute encoder, a render pass in a render encoder; switching
+kinds ends the current one.  barrier / texture_barrier end the current encoder too: Metal
+orders encoders that touch the same (hazard-tracked) resources itself, and the layouts mean
+nothing here.  Bind groups and push constants are remembered and set before the next dispatch
+or draw, at the slots the pipeline's translation gave each (group, binding) of each stage
+(shader::msl: buffers, textures, samplers; push constants at PUSH_SLOT, the bound buffer sizes
+at SIZES_SLOT).  fill_buffer runs a small kernel of its own (a blit fill takes one byte).
+The checks are those of the Vulkan backend (vk_cmd.rs); finish() returns the first misuse.
+```
+
+- **`struct CommandEncoder<'a>`**
+  records commands; finish() makes a CommandBuffer for Queue::submit
+
+- **`struct CommandBuffer<'a>`**
+  recorded commands, ready to submit (dropped unsubmitted: discarded)
+
+**`impl Device`**
+
+- **`fn encoder(&self) -> Result<CommandEncoder<'_>>`**
+  a command encoder of the device's queue
+
+**`impl<'a> CommandEncoder<'a>`**
+
+- **`fn copy_buffer(&mut self, src: &'a Buffer, src_off: u64, dst: &'a Buffer, dst_off: u64, size: u64)`**
+- **`fn fill_buffer(&mut self, buf: &'a Buffer, offset: u64, size: u64, value: u32)`**
+  fill size bytes at offset with a 32-bit value (both multiples of 4)
+- **`fn copy_buffer_to_texture(&mut self, src: &'a Buffer, layout: DataLayout, dst: TextureRegion<'a>)`**
+  buffer data -> a texture region
+- **`fn copy_texture_to_buffer(&mut self, src: TextureRegion<'a>, dst: &'a Buffer, layout: DataLayout)`**
+  a texture region -> buffer data
+- **`fn barrier(&mut self, _before: Access, _after: Access)`**
+  the accesses `before` finish before the `after` ones: the next command starts a new encoder
+- **`fn texture_barrier(&mut self, tex: &'a Texture, before: Layout, after: Layout)`**
+- **`fn texture_barrier_range(&mut self, tex: &'a Texture, base_mip: u32, mips: u32, base_layer: u32, layers: u32, _before: Layout, after: Layout)`**
+- **`fn set_compute_pipeline(&mut self, p: &'a ComputePipeline)`**
+- **`fn set_bind_group(&mut self, index: u32, group: &'a BindGroup)`**
+  bind group g (= @group(g)) of the current pipeline's layout
+- **`fn push_constants<T: Pod>(&mut self, offset: u32, data: &[T])`**
+  push constants at offset (bytes) for the current pipeline
+- **`fn dispatch(&mut self, x: u32, y: u32, z: u32)`**
+- **`fn dispatch_indirect(&mut self, buf: &'a Buffer, offset: u64)`**
+  workgroup counts (3 x u32) from buf at offset
+- **`fn begin_render(&mut self, desc: &RenderPassDesc<'_, 'a>)`**
+- **`fn end_render(&mut self)`**
+- **`fn set_render_pipeline(&mut self, p: &'a RenderPipeline)`**
+- **`fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32, min_depth: f32, max_depth: f32)`**
+  the viewport in pixels from the top left (depth range min ..= max)
+- **`fn set_scissor(&mut self, x: u32, y: u32, w: u32, h: u32)`**
+- **`fn set_vertex_buffer(&mut self, slot: u32, buf: &'a Buffer, offset: u64)`**
+- **`fn set_index_buffer(&mut self, buf: &'a Buffer, offset: u64, format: IndexFormat)`**
+- **`fn draw(&mut self, vertices: u32, instances: u32, first_vertex: u32, first_instance: u32)`**
+- **`fn draw_indexed(&mut self, indices: u32, instances: u32, first_index: u32, base_vertex: i32, first_instance: u32)`**
+- **`fn draw_indirect(&mut self, buf: &'a Buffer, offset: u64)`**
+  one draw: vertex count, instance count, first vertex, first instance (4 x u32)
+- **`fn draw_indexed_indirect(&mut self, buf: &'a Buffer, offset: u64)`**
+  one indexed draw: index count, instance count, first index, base vertex (i32), first instance
+- **`fn draw_indexed_indirect_multi(&mut self, _buf: &'a Buffer, _offset: u64, _count: u32, _stride: u32)`**
+  several indexed draws from one buffer (Features::multi_draw_indirect: not at Metal's level Basis)
+- **`fn draw_indexed_indirect_count(&mut self, _buf: &'a Buffer, _offset: u64, _count_buf: &'a Buffer, _count_offset: u64, _max_count: u32, _stride: u32)`**
+  (level Voll) not on Metal yet
+- **`fn reset_timestamps(&mut self, _ts: &'a Timestamps, _first: u32, _n: u32)`**
+- **`fn timestamp(&mut self, _ts: &'a Timestamps, _i: u32)`**
+- **`fn finish(mut self) -> Result<CommandBuffer<'a>>`**
+  the recorded commands, or the first misuse
+
+### `gpu/mtl_dev.rs` (Apple)
+
+Source: [`lib/gpu/mtl_dev.rs`](../lib/gpu/mtl_dev.rs)
+
+```text
+mtl_dev -- Metal on macOS and iOS (AP6, docs/APPLE.md): instance, adapters, device and queue
+
+  Instance::new() -> Result<Instance>     Err(Disabled) with jfgui_GPU=0, Err(NoAdapter) without
+       a Metal device; jfgui_GPU_VALIDATE=1 turns Metal's API validation on (MTL_DEBUG_LAYER)
+  instance.adapters()                     macOS: MTLCopyAllDevices, iOS: the system's device
+  adapter.create_device(&DeviceDesc)      a command queue and a timeline (MTLSharedEvent); level
+       Basis (Voll: AP6g)
+  device.queue() -> &Queue                submit([cmd, ..]) -> SubmitId (the event's value),
+       write_buffer / write_texture / write_texture_rects(_at) (staged in shared buffers, copied by
+       a blit encoder before the next submission), read_buffer (submits and waits)
+  device.wait(id, timeout) / is_done / completed / wait_idle   on the event
+
+Lifetimes: command buffers retain what they use (retained references), so a dropped resource
+lives as long as a submission needs it -- no deferred freeing here.  Synchronization: resources
+with Metal's hazard tracking; barriers end the current encoder (mtl_cmd.rs).
+A command buffer that ends in an error (MTLCommandBufferStatusError) loses the device: every
+later call gives DeviceLost, as on Vulkan after a driver reset.
+```
+
+- **`struct Instance`**
+  the system's GPU API (Metal)
+
+**`impl Instance`**
+
+- **`fn new() -> Result<Instance>`**
+- **`fn with(desc: &InstanceDesc) -> Result<Instance>`**
+- **`fn validating(&self) -> bool`**
+  Metal's API validation is on (jfgui_GPU_VALIDATE=1: MTL_DEBUG_LAYER; it stops the process
+  at a misuse instead of counting messages)
+- **`fn adapters(&self) -> Result<Vec<Adapter>>`**
+  every GPU of the system, discrete ones first
+- **`fn prepare(&self) -> Result<bool>`**
+  (the browser: adapter and device come later; here they are there)
+- **`fn adapter(&self) -> Result<Adapter>`**
+  the adapter to use: jfgui_GPU_ADAPTER (index or name part), else the first usable one
+- **`fn adapters_low_power(&self, _display: Option<(u32, u32)>) -> Result<Vec<Adapter>>`**
+  the adapters for showing windows, frugal ones first (integrated before discrete)
+
+- **`fn low_power_rank(kind: AdapterKind, drives_display: bool) -> Option<u32>`**
+  the order of adapters for showing windows, lower first (None: not for this)
+
+- **`fn validation_messages() -> (u32, u32)`**
+  (errors, warnings) of the validation: Metal's validation stops the process instead
+
+- **`struct Adapter`**
+  a GPU
+
+**`impl Adapter`**
+
+- **`fn info(&self) -> &AdapterInfo`**
+- **`fn features(&self) -> &Features`**
+- **`fn limits(&self) -> &Limits`**
+- **`fn level(&self) -> Level`**
+  the highest level the adapter supports (Metal: Basis; Voll is AP6g)
+- **`fn can_present(&self, _surface: &crate::Surface) -> bool`**
+  every Metal device can show in a CAMetalLayer
+- **`fn create_device(&self, desc: &DeviceDesc) -> Result<Device>`**
+- **`fn create_device_with(&self, _desc: &DeviceDesc, _opts: &DeviceOptions) -> Result<Device>`**
+  (G5d) DeviceOptions::compute_queue: Metal has one kind of queue; Device::compute_queue is None
+
+- **`struct Device`**
+  a logical GPU device: creates resources, records commands, owns the queue
+
+- **`struct Queue`**
+  the device's queue
+
+- **`struct ComputeQueue`**
+  (G5d) a queue of its own for compute: Metal has none apart (Device::compute_queue is None)
+
+**`impl ComputeQueue`**
+
+- **`fn encoder(&self) -> Result<crate::CommandEncoder<'_>>`**
+- **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _cmds: I) -> Result<SubmitId>`**
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, _wait: &[SubmitId], _cmds: I) -> Result<SubmitId>`**
+
+**`impl Device`**
+
+- **`fn queue(&self) -> &Queue`**
+- **`fn compute_queue(&self) -> Option<&ComputeQueue>`**
+  (G5d) None: Metal has one kind of queue
+- **`fn info(&self) -> &AdapterInfo`**
+- **`fn features(&self) -> &Features`**
+- **`fn limits(&self) -> &Limits`**
+- **`fn level(&self) -> Level`**
+- **`fn is_lost(&self) -> bool`**
+- **`fn test_lose(&self)`**
+  (test aid) behave as a lost device from now on (the last submission finishes first)
+- **`fn validating(&self) -> bool`**
+- **`fn poll(&self) -> Result<()>`**
+  look at what the GPU finished (also done by submit and wait)
+- **`fn wait(&self, id: SubmitId, timeout_ns: u64) -> Result<bool>`**
+  wait for a submission -> false when timeout_ns passed first
+- **`fn wait_idle(&self) -> Result<()>`**
+  wait for every submission so far
+- **`fn completed(&self) -> SubmitId`**
+- **`fn is_done(&self, id: SubmitId) -> bool`**
+- **`fn memory_reserved(&self) -> u64`**
+  bytes of the buffers and textures the device holds
+
+**`impl Queue`**
+
+- **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId>`**
+  run command buffers in order (after the pending uploads) -> their timeline value
+- **`fn submit_after<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, wait: &[SubmitId], cmds: I) -> Result<SubmitId>`**
+  (G5d) run command buffers after the submissions `wait`: one queue keeps the order anyway
+- **`fn flush(&self) -> Result<SubmitId>`**
+  submit the pending uploads now
+- **`fn write_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, data: &[T]) -> Result<()>`**
+  write data into a buffer at offset before the next submission (staged)
+- **`fn write_texture(&self, dst: &TextureRegion, data: &[u8], layout: DataLayout, _before: Layout, _after: Layout) -> Result<()>`**
+  write texels into a texture region before the next submission (staged)
+- **`fn write_texture_rects(&self, t: &crate::Texture, rects: &[[i32; 4]], data: &[u8], stride: u32, before: Layout, after: Layout) -> Result<()>`**
+  write rectangles (x, y, w, h; clipped, empty ones skipped) of mip 0, layer 0 of a 2D
+  texture from `data`, an image of the texture's size in rows of `stride` bytes
+- **`fn write_texture_rects_at(&self, t: &crate::Texture, rects: &[[i32; 4]], origin: (i32, i32), data: &[u8], stride: u32, _before: Layout, _after: Layout) -> Result<()>`**
+  write_texture_rects from an image of another size: rectangles of `data` go to (x - origin.0,
+  y - origin.1) of the texture; what lies outside the image or the texture is skipped
+- **`fn read_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, out: &mut [T]) -> Result<()>`**
+  read a buffer's contents at offset (through a readback buffer when needed; submits and
+  waits: the slow path, for tools and tests)
+
+### `gpu/mtl_res.rs` (Apple)
+
+Source: [`lib/gpu/mtl_res.rs`](../lib/gpu/mtl_res.rs)
+
+```text
+mtl_res -- Metal resources (AP6, docs/APPLE.md): buffers, textures and views, samplers, shader
+modules (SPIR-V translated to MSL by shader::msl), bind group and pipeline layouts, bind
+groups, compute and render pipelines.
+
+Buffers: MemoryKind::Device private storage, Upload and Readback shared (Apple GPUs have one
+memory; the kinds keep the API's rules: only Upload / Readback are mapped).  Textures: private,
+views are MTLTexture views (newTextureViewWithPixelFormat:textureType:levels:slices:).
+Shader modules: ShaderModule::from_spirv translates every entry point with the module's default
+constants and compiles the MSL once (MTLCompileOptions without fast math): a misuse or a gap of
+the translation shows at once, as on Vulkan; a pipeline with constants (or a point list)
+translates and compiles its own.  Bindings are flat: each pipeline keeps, per stage, which
+(group, binding) goes to which buffer / texture / sampler slot (shader::msl), and the command
+encoder sets them before each dispatch or draw (mtl_cmd.rs).  Bindless and timestamps are not
+built yet (level Basis; Features says so).
+```
+
+- **`struct Buffer(pub(crate) Arc<BufInner>)`**
+  GPU memory for data: vertices, indices, storage, uniforms, indirect arguments
+
+**`impl Buffer`**
+
+- **`fn size(&self) -> u64`**
+- **`fn usage(&self) -> BufferUsage`**
+- **`fn memory(&self) -> MemoryKind`**
+- **`fn write<T: Pod>(&self, offset: u64, data: &[T]) -> Result<()>`**
+  copy data into a mapped buffer (Upload / Readback) at offset; the GPU sees it in the next
+  submission -- do not write what a pending submission still reads
+- **`fn read<T: Pod>(&self, offset: u64, out: &mut [T]) -> Result<()>`**
+  copy a mapped buffer's contents at offset into out (wait for the submission that wrote them)
+
+**`impl Device`**
+
+- **`fn create_buffer(&self, desc: &BufferDesc) -> Result<Buffer>`**
+
+- **`struct TextureView(pub(crate) Arc<ViewInner>)`**
+  a range of a texture's mips and layers as shaders and render passes see it
+
+**`impl TextureView`**
+
+- **`fn format(&self) -> Format`**
+- **`fn size(&self) -> (u32, u32)`**
+  width and height of the view's first mip
+- **`fn usage(&self) -> TextureUsage`**
+- **`fn same(&self, other: &TextureView) -> bool`**
+  the same view (it or a clone of it): a cache's key
+
+- **`struct Texture`**
+  an image on the GPU: 2D, 2D array, cube (array) or 3D, with mips
+
+**`impl Texture`**
+
+- **`fn view(&self) -> &TextureView`**
+- **`fn width(&self) -> u32`**
+- **`fn height(&self) -> u32`**
+- **`fn depth(&self) -> u32`**
+- **`fn layers(&self) -> u32`**
+- **`fn mips(&self) -> u32`**
+- **`fn format(&self) -> Format`**
+- **`fn usage(&self) -> TextureUsage`**
+- **`fn create_view(&self, desc: &ViewDesc) -> Result<TextureView>`**
+  a view of some mips / layers (counts 0: to the end)
+
+**`impl Device`**
+
+- **`fn create_texture(&self, desc: &TextureDesc) -> Result<Texture>`**
+
+- **`struct Sampler(pub(crate) Arc<SamplerInner>)`**
+  how textures are filtered and addressed
+
+**`impl Device`**
+
+- **`fn create_sampler(&self, desc: &SamplerDesc) -> Result<Sampler>`**
+
+- **`struct ShaderModule(pub(crate) Arc<ShaderInner>)`**
+  compiled shader code (SPIR-V, translated to MSL)
+
+**`impl ShaderModule`**
+
+- **`fn from_spirv(device: &Device, code: &[u32]) -> Result<ShaderModule>`**
+  a module from SPIR-V words (1.0 ..= 1.6), translated to MSL and compiled
+- **`fn from_wgsl(_device: &Device, _source: &str) -> Result<ShaderModule>`**
+  (the browser) WGSL text: Metal takes SPIR-V like Vulkan
+- **`fn entry_points(&self) -> Vec<(u32, &str)>`**
+  the entry points: (model as SPIR-V numbers it: 0 vertex, 4 fragment, 5 compute, name)
+- **`fn constants(&self) -> Vec<(u32, shader::reflect::Kind, f64)>`**
+  the pipeline-overridable constants the module declares: (id, kind, default value)
+
+- **`struct BindGroupLayout(pub(crate) Arc<BglInner>)`**
+  the bindings of one bind group (@group)
+
+- **`struct PipelineLayout(pub(crate) Arc<PlInner>)`**
+  the bind group layouts and push constants of pipelines
+
+- **`struct BindGroup(pub(crate) Arc<BgInner>)`**
+  resources bound for shaders
+
+**`impl Device`**
+
+- **`fn create_bind_group_layout(&self, bindings: &[Binding]) -> Result<BindGroupLayout>`**
+- **`fn create_pipeline_layout(&self, desc: &PipelineLayoutDesc) -> Result<PipelineLayout>`**
+- **`fn create_bind_group(&self, desc: &BindGroupDesc) -> Result<BindGroup>`**
+- **`fn create_bindless(&self, _desc: &BindlessDesc) -> Result<Bindless>`**
+  (level Voll) a Bindless table: not on Metal yet (AP6g)
+
+- **`struct Bindless`**
+  a large table of textures, samplers and buffers that shaders index (level Voll; not on Metal yet)
+
+**`impl Bindless`**
+
+- **`fn group(&self) -> &BindGroup`**
+- **`fn layout(&self) -> &BindGroupLayout`**
+- **`fn counts(&self) -> [u32; 4]`**
+- **`fn set_texture(&self, _slot: u32, _view: &TextureView) -> Result<()>`**
+- **`fn set_sampler(&self, _slot: u32, _s: &Sampler) -> Result<()>`**
+- **`fn set_buffer(&self, _slot: u32, _buf: &Buffer, _offset: u64, _size: u64) -> Result<()>`**
+- **`fn set_storage_texture(&self, _slot: u32, _view: &TextureView) -> Result<()>`**
+
+- **`struct ComputePipeline(pub(crate) Arc<PipeInner>)`**
+  a compute shader with its layout
+
+- **`struct RenderPipeline(pub(crate) Arc<PipeInner>)`**
+  vertex + fragment shaders with their fixed state and target formats
+
+**`impl Device`**
+
+- **`fn create_compute_pipeline(&self, desc: &ComputePipelineDesc) -> Result<ComputePipeline>`**
+- **`fn create_compute_pipeline_sized(&self, desc: &ComputePipelineDesc, size: u32) -> Result<ComputePipeline>`**
+  create_compute_pipeline with a required subgroup size: Metal's SIMD groups have one size
+  (32), so only 0 (the driver's choice) and that size work
+- **`fn create_render_pipeline(&self, desc: &RenderPipelineDesc) -> Result<RenderPipeline>`**
+
+- **`struct Timestamps`**
+  GPU timestamps (not on Metal yet: Features::timestamps is false)
+
+**`impl Device`**
+
+- **`fn create_timestamps(&self, _count: u32) -> Result<Timestamps>`**
+
+**`impl Timestamps`**
+
+- **`fn count(&self) -> u32`**
+- **`fn read_ticks(&self, _first: u32, _n: u32) -> Result<Vec<u64>>`**
+- **`fn read_ms(&self, _first: u32, _n: u32) -> Result<Vec<f64>>`**
+
+### `gpu/mtl_swap.rs` (Apple)
+
+Source: [`lib/gpu/mtl_swap.rs`](../lib/gpu/mtl_swap.rs)
+
+```text
+mtl_swap -- swapchains on Metal (AP6c, docs/APPLE.md): a CAMetalLayer on a plat window
+
+  Surface::new(&instance, window)        macOS: the window's GPU layer, shown (plat::win_native)
+  Surface::native(&instance, nw, window) the UI output's layer (plat::win_gpu_child, hidden until
+                                         the output shows it)
+  device.create_swapchain(&surface, &desc)   the layer gets the device, the format (BGRA8, sRGB
+       when asked), framebufferOnly unless copy_src, three drawables, the window's size
+  try_acquire() never waits: nextDrawable only while fewer drawables are in use than the layer
+       has (in use: taken and not yet on the screen, plus the one on the screen; the drawables'
+       presented handlers count what reached it); NotReady otherwise
+  present(frame, cmds)                   the last command buffer presents the drawable
+
+Present modes: Fifo only.  Without displaySyncEnabled a window on macOS still shows at the rate of
+the compositor (measured: 8.3 ms per frame either way at 120 Hz), so Immediate and Mailbox are Fifo
+here, as the API allows for a missing mode.  The layer's colour space is sRGB, as the CGImage of the CPU path (plat's
+apple_mac.rs): both show the same pixels.  Layer properties change inside a Core Animation
+transaction, so a swapchain may live on another thread than the window (the UI's output job).
+```
+
+- **`struct Surface(pub(crate) Arc<SurfInner>)`**
+  a window as a target for swapchains
+
+**`impl Surface`**
+
+- **`fn track_size(&self)`**
+  the window's size now, for a swapchain made or rebuilt on a worker (call on the main thread)
+- **`fn new(instance: &Instance, window: i32) -> Result<Surface>`**
+  the surface of plat window `window`: its GPU layer, shown
+- **`fn native(_instance: &Instance, nw: plat::NativeWindow, window: i32) -> Result<Surface>`**
+  the surface of a window given by its GPU layer (plat::win_gpu_child) whose size and state are
+  those of plat window `window`
+
+- **`struct Frame`**
+  a frame being drawn
+
+- **`enum TryAcquire`**
+  what Swapchain::try_acquire found
+  - `Frame(Frame)`
+  - `NotReady` -- no drawable free yet (try again with the next look)
+  - `Stale` -- the swapchain does not fit the window any more: Swapchain::rebuild first
+  - `NoArea` -- the window has no area (minimised, hidden or gone)
+
+**`impl Frame`**
+
+- **`fn index(&self) -> u32`**
+- **`fn size(&self) -> (u32, u32)`**
+
+- **`struct Swapchain`**
+  images shown in a window through its CAMetalLayer
+
+**`impl Device`**
+
+- **`fn create_swapchain(&self, surface: &Surface, desc: &SwapchainDesc) -> Result<Swapchain>`**
+
+**`impl Swapchain`**
+
+- **`fn rebuild(&mut self) -> Result<()>`**
+  the drawables take the window's size now
+- **`fn try_acquire(&mut self) -> Result<TryAcquire>`**
+  the image to draw into, never waiting
+- **`fn acquire(&mut self) -> Result<Option<Frame>>`**
+  the image to draw into (waits for a drawable); None while the window has no area
+- **`fn view(&self, _frame: &Frame) -> &TextureView`**
+  the frame's image as a render target
+- **`fn texture(&self, _frame: &Frame) -> &Texture`**
+  the frame's image (copies: SwapchainDesc::copy_src)
+- **`fn present<'a, I: IntoIterator<Item = CommandBuffer<'a>>>(&self, mut frame: Frame, cmds: I) -> Result<SubmitId>`**
+  submit the frame's commands; the last command buffer presents its drawable
+- **`fn prepare(&mut self) -> Result<bool>`**
+  (Linux: the display has answered for the images; here nothing to wait for)
+- **`fn flush(&self) -> Result<bool>`**
+  (Linux: a frame reaches the window after the GPU finished it; Metal does that)
+- **`fn busy(&self) -> bool`**
+  a frame is on its way to the screen
+- **`fn next_look(&self, retry: u64) -> u64`**
+  when a frame that found NotReady should try again
+- **`fn damage(&self, _rects: Option<&[[i32; 4]]>)`**
+  (Linux: what the next image changes, for the compositor; here the whole image counts)
+- **`fn resize(&mut self)`**
+  the next acquire takes the window's size
+- **`fn set_present_mode(&mut self, _m: PresentMode)`**
+  (Fifo only: see the top)
+- **`fn present_mode(&self) -> PresentMode`**
+- **`fn format(&self) -> Format`**
+- **`fn size(&self) -> (u32, u32)`**
+- **`fn image_count(&self) -> usize`**
+
 ## render3d
 
 *the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU* -- crate root [`lib/render3d/lib.rs`](../lib/render3d/lib.rs)
@@ -21485,6 +21926,7 @@ here produces or reads words (docs/SHADER.md).
                             pipeline sets some (OpSpecConstantOp evaluated), workgroup sizes
   samples                   small shaders for the tests: specialization constants, textures
   spv                       opcodes, enums and their names; parse: words -> instructions
+  msl::translate(words)     the module in the Metal Shading Language (lib/gpu on Apple)
   to_bytes / from_bytes     words <-> the bytes of a .spv file
 ```
 
@@ -22138,6 +22580,95 @@ types beyond what it needs to infer result types: val::validate does.
 - **`fn from_bytes(b: &[u8]) -> Option<Vec<u32>>`**
   a .spv file's bytes as words (None: not a multiple of 4 bytes or no SPIR-V magic; a
   big-endian file is swapped)
+
+### `shader/msl.rs`
+
+Source: [`lib/shader/msl.rs`](../lib/shader/msl.rs)
+
+```text
+msl -- SPIR-V to the Metal Shading Language (AP6 in docs/APPLE.md): the Metal backend of
+lib/gpu translates every module with it, so a module from lib/wgsl or from this crate's
+builder runs on Metal as on Vulkan.  It reads the SPIR-V those two write: logical
+addressing, structured control flow, the opcodes of spv::OPS and GLSL.std.450.
+
+  translate(words, &Options) -> Result<Msl, String>   MSL source text and, per entry point,
+       its function name, workgroup size, resource slots, push constants and buffer sizes
+
+Slots (lib/gpu binds by them): per entry point and kind, the resources it uses get buffer,
+texture and sampler indices from 0 in (set, binding) order (buffers below
+FIRST_VERTEX_SLOT); push constants are a `constant` block at PUSH_SLOT; the byte sizes of
+the bound buffer ranges a `constant uint*` at SIZES_SLOT, indexed by a buffer's slot (only
+for entry points with arrayLength: Entry::sizes); vertex buffer i is at vertex_slot(i).
+
+Specialization constants are substituted (Options::spec, reflect::constant_values): a
+pipeline with constants is a translation of its own.
+
+The translation: one MSL struct per SPIR-V struct; one with Offset decorations is padded to
+the offsets (3-vectors become packed_ types there), arrays are jf_arr<T, N> (value semantics),
+runtime arrays T m[1].  Every SSA value is a function-scope variable assigned where SPIR-V
+defines it (dominance holds, C scopes need not); pointers, images and samplers stay
+expressions.  Structured control flow becomes if / switch / while (true); a branch to a
+loop's continue target repeats the continue construct there.  Resources, built-ins,
+private and workgroup variables are parameters of every function that uses them.  Signed
+integer arithmetic goes through unsigned (it wraps, as SPIR-V and WGSL define it; MSL would
+leave overflow undefined).
+```
+
+```rust
+/// the buffer slot of the push constants
+PUSH_SLOT: u32 = 29
+/// the buffer slot of the bound buffer sizes (bytes, `constant uint*`, index = buffer slot)
+SIZES_SLOT: u32 = 30
+/// resource buffers take the slots below this one, vertex buffers this one and above
+FIRST_VERTEX_SLOT: u32 = 21
+/// vertex buffer slots a pipeline may use
+VERTEX_BUFFERS_MAX: u32 = 8
+```
+
+- **`const fn vertex_slot(i: u32) -> u32`**
+  the buffer slot of vertex buffer i (i &lt; VERTEX_BUFFERS_MAX)
+
+- **`struct Options<'a>`**
+  what translate does
+  - `spec: &'a [(u32, u64)]` -- the specialization constants a pipeline sets: (SpecId, value bits) as reflect takes them
+  - `entry: Option<&'a str>` -- one entry point (None: all)
+  - `point_size: bool` -- vertex entry points write [[point_size]] = 1 (a point-list pipeline: WGSL points are one
+    pixel, Metal wants the size)
+
+**`impl Options<'_>`**
+
+- **`const DEFAULT: Options<'static> = Options { spec: &[], entry: None, point_size: false }`**
+
+- **`enum SlotKind`**
+  what a slot holds
+  - `Buffer`
+  - `Texture`
+  - `Sampler`
+
+- **`struct Slot`**
+  a resource of an entry point and its index in Metal's argument table
+  - `set: u32`
+  - `binding: u32`
+  - `kind: SlotKind`
+  - `index: u32`
+
+- **`struct Entry`**
+  an entry point of the translation
+  - `name: String` -- the SPIR-V name
+  - `function: String` -- the MSL function's name
+  - `model: u32` -- spv::Model as u32
+  - `workgroup: [u32; 3]` -- compute: the workgroup size with the constants substituted (else 1, 1, 1)
+  - `slots: Vec<Slot>` -- its resources by (set, binding)
+  - `push_constants: bool` -- it reads push constants (PUSH_SLOT)
+  - `sizes: bool` -- it reads the buffer sizes (SIZES_SLOT)
+  - `vertex_inputs: Vec<u32>` -- vertex: the locations of its inputs ([[attribute(n)]])
+
+- **`struct Msl`**
+  the result of translate
+  - `source: String`
+  - `entries: Vec<Entry>`
+
+- **`fn translate(words: &[u32], opt: &Options) -> Result<Msl, String>`**
 
 ### `shader/parse.rs`
 
@@ -31515,6 +32046,10 @@ _NSGetEnviron, so a program with std (whose main is std's) reads the same.
 - **`extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32`**
   the entry libSystem's start calls (a program without std; std brings its own main)
 
+- **`fn win_test_usage() -> (u64, u64, u64)`**
+  (test aid) the process's CPU time (us), resident memory and its own footprint (bytes), as on
+  Windows and Linux (render3dtest and uigputest measure with it)
+
 - **`fn time_us() -> u64`**
   monotonic time in microseconds (CLOCK_MONOTONIC)
 
@@ -31909,6 +32444,15 @@ WT_ENABLED: u32 = 9
 WT_CARET: u32 = 10
 WT_ACTIVE: u32 = 11
 WT_POPUP_SEND: u32 = 13
+/// a[0]: the dpi as if the screen had that scale: -1, a test cannot change a Mac's scale
+WT_DPI: u32 = 4
+/// a[0] = 7 minimised, anything else back again (uigputest)
+WT_SHOW: u32 = 18
+/// no window animations (show, hide, resize): screen checks see the end state at once
+WT_NOANIM: u32 = 16
+/// whose pixel is at client point (a[0], a[1]) on the screen: 1 this window (its GPU layer is part of
+/// it), 0 another one
+WT_FROM_POINT: u32 = 17
 WT_SEND: u32 = 32
 WT_PARENT: u32 = 33
 WT_MIN_SIZE: u32 = 34
@@ -32013,6 +32557,86 @@ tool windows as panels, the print dialog
 
 - **`fn print_dialog_autoclose(ms: u32)`**
   (test aid) the next print panel is cancelled after ms
+
+### `plat/apple_mac_gpu.rs` (Apple)
+
+Source: [`lib/plat/apple_mac_gpu.rs`](../lib/plat/apple_mac_gpu.rs)
+
+```text
+apple_mac_gpu -- the GPU's layer in a window on macOS (AP6, docs/APPLE.md): a CAMetalLayer as a
+sublayer of the view's layer, above the picture the CPU path puts into that layer (win_present).
+lib/gpu's Metal swapchain draws into it; the counterpart of the child window on Windows and the
+SurfaceView on Android.
+
+  win_native(w)          the window's GPU layer, shown (a program that draws the window with the
+                         GPU alone: gputest)
+  win_gpu_child(w)       the same layer for the UI's output, hidden until win_gpu_child_show:
+                         the CPU's picture stays visible below it until the GPU's first frame
+  win_gpu_child_show     show or hide it (hiding brings the CPU path's picture back at once:
+                         it is the view layer's contents under the sublayer)
+
+The layer follows the view's bounds (autoresizing), its contentsScale follows the window's
+backingScaleFactor (size_changed); the drawable size in pixels is lib/gpu's.  Main thread only,
+as all of AppKit; lib/gpu may use the layer on its own thread (nextDrawable, drawableSize).
+```
+
+- **`struct NativeWindow`**
+  a window's GPU layer (a CAMetalLayer, retained: released when this goes) and the window's size in
+  pixels when it was taken (lib/gpu builds swapchains on a worker, where plat's state is out of reach)
+  - `layer: usize`
+  - `size: (i32, i32)`
+
+- **`fn win_native(w: i32) -> Option<NativeWindow>`**
+  (gpu) the window's GPU layer, shown: the GPU draws the whole window (do not call win_present
+  for it; the view layer's own picture stays below, hidden)
+
+- **`fn win_gpu_child(w: i32) -> Option<NativeWindow>`**
+  (gpu) the UI output's layer of window w, hidden until win_gpu_child_show
+
+- **`fn win_gpu_child_show(w: i32, on: bool)`**
+  (gpu) show or hide the UI output's layer of window w
+
+- **`fn win_gpu_child_later(_w: i32) -> bool`**
+  (gpu) the layer comes at once (Android: the surface comes later)
+
+- **`fn win_gpu_child_alone(_w: i32) -> bool`**
+  (gpu) nothing else is composed over the window's layer (popups are windows of their own)
+
+- **`fn win_display_adapter(_w: i32) -> Option<(u32, u32)>`**
+  (gpu) the PCI ids of the GPU that shows the window: none on a Mac (one GPU per screen at most)
+
+- **`fn gpu_thread_spawn(stack: usize, f: alloc::boxed::Box<dyn FnOnce() + Send>) -> Option<crate::Thread>`**
+  (gpu) a thread for the GPU output's job (a plain plat thread)
+
+- **`fn win_release_kept(w: i32)`**
+  (gpu) the view layer's own picture is not needed while the GPU shows the window: it goes (the way
+  back draws one first, win_present)
+
+- **`fn gpu_wait(deadline_us: u64)`**
+  (gpu) the UI output waits a little for a free image: the window's events go on meanwhile
+
+- **`fn gpu_out_state(_state: u32)`**
+  (gpu) how the output came up (GPU_STATE_\*): Android keeps it across runs
+
+- **`fn win_in_sizemove() -> bool`**
+  (gpu) no live resize loop holds the program's own loop on macOS (AppKit's live resize runs inside
+  the event loop, the frames are CPU frames)
+
+- **`fn win_remote_session() -> bool`**
+  (gpu) a remote session: Screen Sharing shows what the window server composes, the GPU works
+
+- **`fn win_test_image(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+  (tests) what the window system holds for window w: the view layer's picture is ours (the CPU path)
+  and the GPU layer's is not readable from here: None
+
+- **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
+  (tests) a part of the screen: macOS asks the user for that (screen recording): None
+
+- **`fn win_test_send(_w: i32, _msg: u32, _wp: usize, _lp: isize) -> isize`**
+  (tests) nothing to send to: Windows' messages
+
+- **`fn gpu_test_presented() -> Vec<(u64, u64)>`**
+  (bench: Wayland's presentation feedback) nothing here
 
 ### `plat/web.rs`
 
@@ -32852,6 +33476,91 @@ WT_FROM_POINT: u32 = 0
 - **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<alloc::vec::Vec<u8>>`**
 
 - **`fn gpu_wait(_deadline_us: u64)`**
+
+### `plat/apple_ios_gpu.rs`
+
+Source: [`lib/plat/apple_ios_gpu.rs`](../lib/plat/apple_ios_gpu.rs)
+
+```text
+apple_ios_gpu -- the GPU's layer of the only window on iOS (AP6e, docs/APPLE.md): a CAMetalLayer as a
+sublayer of JFView's layer (apple_ios.rs makes it and keeps it at the view's bounds and scale), above
+the picture of the CPU path.  The counterpart of android_gpu.rs on Android.
+
+  win_native(w)          the layer, shown (a program that draws its window with the GPU alone)
+  win_gpu_child(w)       the layer for the UI's output, hidden until win_gpu_child_show; only window 0
+                         and only while nothing else shows on the canvas (popups and tool windows are
+                         composed there, below the layer)
+  win_gpu_child_show     the layer shows the window, or the canvas again
+
+A program without UIKit's host (simctl spawn, tests without a window) has no layer: None.  A scene
+that is not active does no GPU work (apple_ios.rs gpu_hold: win_state says WST_HIDDEN, the output goes
+back to the CPU path before iOS would refuse the command buffers of a background app).
+```
+
+- **`struct NativeWindow`**
+  the window's GPU layer (a CAMetalLayer, retained: released when this goes) and the window's size in
+  pixels when it was taken (lib/gpu builds swapchains on a worker)
+  - `layer: usize`
+  - `size: (i32, i32)`
+
+- **`fn win_native(w: i32) -> Option<NativeWindow>`**
+  (gpu) the window's GPU layer, shown: the GPU draws the whole window
+
+- **`fn win_gpu_child(w: i32) -> Option<NativeWindow>`**
+  (gpu) the UI output's layer, hidden until win_gpu_child_show
+
+- **`fn win_gpu_child_later(w: i32) -> bool`**
+  (gpu) no layer for window w now, but it may come: when the canvas shows nothing else
+
+- **`fn win_gpu_child_alone(w: i32) -> bool`**
+  (gpu) the window still shows on the layer alone: nothing else came on the canvas
+
+- **`fn win_gpu_child_show(w: i32, on: bool)`**
+  (gpu) the layer shows the window, or the canvas again (the frame that takes it there is whole)
+
+- **`fn win_release_kept(w: i32)`**
+  (gpu) the frame is on the layer: the canvas's copy of the window goes (it comes back whole)
+
+- **`fn gpu_thread_spawn(stack: usize, f: alloc::boxed::Box<dyn FnOnce() + Send>) -> Option<crate::Thread>`**
+  (gpu) a thread for the GPU output's job
+
+- **`fn gpu_out_state(_state: u32)`**
+  (gpu) how the output came up: Android keeps it across runs
+
+- **`fn gpu_wait(_deadline_us: u64)`**
+  (gpu) UIKit's loop calls the host's tick: nothing waits here
+
+- **`fn win_in_sizemove() -> bool`**
+  (gpu) no live resize loop on iOS
+
+- **`fn win_display_adapter(_w: i32) -> Option<(u32, u32)>`**
+  (gpu) one GPU on an iPhone or iPad
+
+- **`fn win_remote_session() -> bool`**
+  (gpu) no remote sessions on iOS
+
+```rust
+WT_PIXEL: u32 = 1
+WT_POPUP_RECT: u32 = 2
+WT_MOVE: u32 = 3
+WT_SHOW: u32 = 4
+WT_DPI: u32 = 5
+WT_REDRAW: u32 = 6
+WT_NOANIM: u32 = 16
+WT_FROM_POINT: u32 = 17
+```
+
+- **`fn win_test(op: u32, _w: i32, _a: [i32; 4]) -> i64`**
+  -1: nothing to say about the pixel or the scale; 0 for the rest
+
+- **`fn win_test_image(_w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+
+- **`fn win_test_screen(_x: i32, _y: i32, _w: i32, _h: i32) -> Option<Vec<u8>>`**
+
+- **`fn win_test_send(_w: i32, _msg: u32, _wp: usize, _lp: isize) -> isize`**
+
+- **`fn gpu_test_presented() -> Vec<(u64, u64)>`**
+  (bench: Wayland's presentation feedback) nothing here
 
 ### `plat/web_gpu.rs`
 

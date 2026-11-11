@@ -50,6 +50,15 @@ pub const WT_ENABLED: u32 = 9;
 pub const WT_CARET: u32 = 10;
 pub const WT_ACTIVE: u32 = 11;
 pub const WT_POPUP_SEND: u32 = 13;
+/// a[0]: the dpi as if the screen had that scale: -1, a test cannot change a Mac's scale
+pub const WT_DPI: u32 = 4;
+/// a[0] = 7 minimised, anything else back again (uigputest)
+pub const WT_SHOW: u32 = 18;
+/// no window animations (show, hide, resize): screen checks see the end state at once
+pub const WT_NOANIM: u32 = 16;
+/// whose pixel is at client point (a[0], a[1]) on the screen: 1 this window (its GPU layer is part of
+/// it), 0 another one
+pub const WT_FROM_POINT: u32 = 17;
 pub const WT_SEND: u32 = 32;
 pub const WT_PARENT: u32 = 33;
 pub const WT_MIN_SIZE: u32 = 34;
@@ -103,6 +112,29 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
     let pop = || with(|s| s.pops.get(w as usize).copied()).flatten().filter(|_| (w as u32) < PPW_MAX);
     match op {
         WT_PIXEL => ids(w).map_or(-1, |(_, view, _)| layer_pixel(view, a[0], a[1])),
+        WT_DPI => -1,
+        WT_SHOW => {
+            crate::win_cmd(w, if a[0] == 7 { crate::WCMD_MINIMIZE } else { crate::WCMD_RESTORE });
+            1
+        }
+        WT_NOANIM => {
+            let Some((win, _, _)) = ids(w) else { return -1 };
+            // SAFETY: setAnimationBehavior: (NSWindowAnimationBehaviorNone = 2) of our window.
+            unsafe { msg!(win, c"setAnimationBehavior:", 2isize => isize; ()) };
+            1
+        }
+        WT_FROM_POINT => {
+            let Some((win, view, scale)) = ids(w) else { return -1 };
+            // SAFETY: convertPoint:toView: / convertPointToScreen: / windowNumberAtPoint: of our window and view.
+            unsafe {
+                let pv = NSPoint { x: a[0] as f64 / scale, y: a[1] as f64 / scale };
+                let pw: NSPoint = msg!(view, c"convertPoint:toView:", pv => NSPoint, NIL => Id; NSPoint);
+                let ps: NSPoint = msg!(win, c"convertPointToScreen:", pw => NSPoint; NSPoint);
+                let at: isize = msg!(class(c"NSWindow"), c"windowNumberAtPoint:belowWindowWithWindowNumber:", ps => NSPoint, 0isize => isize; isize);
+                let me: isize = msg!(win, c"windowNumber"; isize);
+                (at == me) as i64
+            }
+        }
         WT_MOVE => {
             let Some((win, _, scale)) = ids(w) else { return -1 };
             let (pw, ph) = (a[2].max(1) as f64 / scale, a[3].max(1) as f64 / scale);
