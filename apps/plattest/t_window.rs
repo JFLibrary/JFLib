@@ -8,7 +8,8 @@
 // E_RESIZE), the hit hook (WM_NCHITTEST), mouse / wheel / key / text translation, custom
 // cursors (WM_SETCURSOR), popup windows, an owned tool window (default place, no activation,
 // docked to the owner when it moves), enable, the clipboard round trip (text, PNG, image +
-// DIB), the IME caret, the system file dialog (closed by a timer: Cancel, then a name + OK),
+// DIB), the IME caret, the system file dialog (closed by a timer: Cancel, then a name + OK;
+// FD_MULTI with two quoted names and with one),
 // a WM_DROPFILES of jfgui_TEST_DROPFILES, wake() from a thread, close and destroy.
 // The clipboard's text is saved and put back at the end.  Windows here; macOS: t_window_mac.rs
 // (Linux: linuxtest).
@@ -431,6 +432,20 @@ mod win {
         let r = file_dialog(FD_SAVE | 1 << FD_EXT_SHIFT, &mut path, &["png=PNG-Bild", "jpg;jpeg=JPEG-Bild"]);
         t.info(&format!("  (file dialog: {} {} {path})\n", r.0, r.1));
         t.check(r == (1, 1) && path == full.replace('\\', "/"), "filedlg: a name + OK -> the path ('/'), the type");
+        // (E8) FD_MULTI: two quoted names typed into Explorer's name box -> both files
+        let dir = format!("{}/build", cwd().replace('\\', "/"));
+        let ok = write_file(&format!("{dir}/plattest_m1.txt"), b"1") && write_file(&format!("{dir}/plattest_m2.txt"), b"2");
+        let mut path = format!("{dir}/");
+        file_dialog_autoclose(300, Some("\"plattest_m1.txt\" \"plattest_m2.txt\""));
+        let r = file_dialog(FD_OPEN | FD_MULTI, &mut path, &["txt=Text"]);
+        let all = file_dialog_paths();
+        t.info(&format!("  (file dialog, several: {} {:?})\n", r.0, all));
+        t.check(ok && r.0 == 1 && all == [format!("{dir}/plattest_m1.txt"), format!("{dir}/plattest_m2.txt")] && path == all[0],
+                "filedlg: FD_MULTI, two names + OK -> both paths, path the first");
+        let mut path = format!("{dir}/plattest_m2.txt");
+        file_dialog_autoclose(300, Some(&format!("{dir}/plattest_m2.txt").replace('/', "\\")));
+        let r = file_dialog(FD_OPEN | FD_MULTI, &mut path, &["txt=Text"]);
+        t.check(r.0 == 1 && file_dialog_paths() == [format!("{dir}/plattest_m2.txt")], "filedlg: FD_MULTI with one file -> its path");
 
         // ---- process level: theme, home, drives, pens, the shell (dry run)
         let th = theme();

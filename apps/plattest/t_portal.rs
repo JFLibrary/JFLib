@@ -5,7 +5,7 @@
 //   plattest --test portal --mode url --url U      plat::open_url(U)
 //   plattest --test portal --mode filedlg [--flags F] [--path P] [--exts "png=PNG-Bild|jpg"]
 //        [--expect R]                              plat::file_dialog: prints "filedlg: R
-//        INDEX PATH"
+//        INDEX PATH" and (E8) "filedlg paths: P1|P2.." (file_dialog_paths)
 // Linux only: on Windows these functions open real windows (win_shell.rs / win_filedlg.rs).
 //                                                  [ASMLIB/src/plat/linux/portal.s]
 
@@ -41,6 +41,7 @@ pub fn t_portal(t: &mut T) {
             let expect = arg("--expect").and_then(|v| v.parse::<i32>().ok()).unwrap_or(1);
             let (r, idx) = plat::file_dialog(flags, &mut path, &exts);
             crate::out(&format!("filedlg: {r} {idx} {path}\n"));
+            crate::out(&format!("filedlg paths: {}\n", plat::file_dialog_paths().join("|")));
             t.check(r == expect, "portal: plat_file_dialog");
         }
         _ => {

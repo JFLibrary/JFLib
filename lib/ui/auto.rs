@@ -9,7 +9,7 @@
 //   theme file PATH | none        an app theme from a file (an error is printed and kept for
 //                                 `expect theme error`; the theme stays) / no app theme
 //   style NAME                    another style linked into the app (Ui::set_style)
-//   move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r]
+//   move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r|m] [shift|ctrl|alt]...
 //   rclick S        dblclick S [shift|ctrl|alt]...
 //                   drag S1 S2 [steps] [hold MS] [shift|ctrl|alt|right|middle]...
 //                   drag ... hold MS   the button rests MS ms before the first move (like
@@ -777,10 +777,25 @@ impl Ui {
                 if s.is_none() {
                     self.sel_fail();
                 } else {
+                    // optional words: the button (l / r / m), shift ctrl alt held during the click
+                    let saved_mods = self.sc.script_mods;
+                    let mut mods = saved_mods;
+                    let mut b = BTN_LEFT;
+                    let mut q = skip_ws(rest);
+                    while !q.is_empty() {
+                        let m = mod_word(q);
+                        if m != 0 {
+                            mods |= m;
+                        } else {
+                            b = parse_button(q);
+                        }
+                        q = next_word(q);
+                    }
                     let (x, y) = (self.sc.sel_x, self.sc.sel_y);
                     self.mouse_to(app, x, y);
-                    let b = parse_button(skip_ws(rest));
+                    self.sc.script_mods = mods;
                     self.click_here(app, b);
+                    self.sc.script_mods = saved_mods;
                 }
             }
             "rclick" => {

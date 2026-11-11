@@ -4,7 +4,8 @@
 //   file_dialog(flags, path, exts) -> (1 chosen / 0 cancelled / -1 no system dialog, index of
 //        the chosen extension entry)
 //        flags: FD_SAVE (bit 0), initial extension index in bits 8..15 (FD_EXT_SHIFT);
-//        FD_FOLDER answers -1 (the library's own dialog chooses folders).
+//        FD_FOLDER answers -1 (the library's own dialog chooses folders); FD_MULTI (open):
+//        OFN_ALLOWMULTISELECT, every chosen file in file_dialog_paths(), path the first.
 //        path (UTF-8): initial file / folder in, chosen path out ('/' separators).
 //        exts: ["png=PNG-Bild", "jpg;jpeg=JPEG-Bild"] (extensions separated by ';', the first
 //        is the default, optional "=description"), empty = all.
@@ -20,15 +21,17 @@ use alloc::vec::Vec;
 use core::cell::Cell;
 
 use super::{UiThread, dll_proc, main_hwnd, wide_cap};
-use crate::{FD_EXT_SHIFT, FD_SAVE};
+use crate::{FD_EXT_SHIFT, FD_MULTI, FD_SAVE};
 
 const OFN_OVERWRITEPROMPT: u32 = 0x2;
 const OFN_HIDEREADONLY: u32 = 0x4;
+const OFN_ALLOWMULTISELECT: u32 = 0x200;
 const OFN_NOCHANGEDIR: u32 = 0x8;
 const OFN_PATHMUSTEXIST: u32 = 0x800;
 const OFN_FILEMUSTEXIST: u32 = 0x1000;
 const OFN_EXPLORER: u32 = 0x80000;
 const WPATH: usize = 1040; // wide chars per path buffer
+const WMULTI: usize = 65536; // FD_MULTI: the folder and the names, each ended by a NUL
 const U8CAP: usize = 4096; // the UTF-8 filter text (str_cat capacity)
 const FILTER_W: usize = 2046; // wide chars of the filter (utf8_to_w capacity)
 const DEFEXT_W: usize = 16;
@@ -102,13 +105,19 @@ pub fn file_dialog(flags: u32, path: &mut String, exts: &[&str]) -> (i32, u32) {
         return (-1, 0);
     }
     let save = flags & FD_SAVE != 0;
+    let multi = !save && flags & FD_MULTI != 0;
+    crate::fd_paths_set(Vec::new());
     let (filter, defext) = file_dialog_filter(flags, exts);
     let (wdir, wfile) = fd_split_initial(path);
-    let mut file = alloc::vec![0u16; WPATH];
+    let cap = if multi { WMULTI } else { WPATH };
+    let mut file = alloc::vec![0u16; cap];
     let n = wfile.len().min(WPATH - 1);
     file[..n].copy_from_slice(&wfile[..n]);
     let mut fl = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | OFN_HIDEREADONLY;
     fl |= if save { OFN_OVERWRITEPROMPT } else { OFN_FILEMUSTEXIST };
+    if multi {
+        fl |= OFN_ALLOWMULTISELECT;
+    }
     let wdir0 = if wdir.is_empty() { Vec::new() } else { [&wdir[..], &[0]].concat() };
     let mut ofn = Ofn {
         size: 152,
@@ -119,7 +128,7 @@ pub fn file_dialog(flags: u32, path: &mut String, exts: &[&str]) -> (i32, u32) {
         max_cust_filter: 0,
         filter_index: if save { ((flags >> FD_EXT_SHIFT) & 0xFF) + 1 } else { 1 }, // open: "all supported files"
         file: file.as_mut_ptr(),
-        max_file: WPATH as u32,
+        max_file: cap as u32,
         file_title: core::ptr::null_mut(),
         max_file_title: 0,
         initial_dir: if wdir.is_empty() { core::ptr::null() } else { wdir0.as_ptr() },
@@ -143,10 +152,39 @@ pub fn file_dialog(flags: u32, path: &mut String, exts: &[&str]) -> (i32, u32) {
     if unsafe { f(&mut ofn) } == 0 {
         return (0, 0);
     }
-    // the chosen path -> UTF-8 with '/' separators
-    let len = file.iter().position(|&c| c == 0).unwrap_or(WPATH);
-    *path = super::super::from_wide(&file[..len]).replace('\\', "/");
+    // the chosen path -> UTF-8 with '/' separators; FD_MULTI: "folder\0name\0name\0\0" for
+    // several files, the full path for one
+    let parts = multi_parts(&file);
+    let mut all: Vec<String> = Vec::new();
+    if parts.len() > 1 {
+        let dir = super::super::from_wide(parts[0]).replace('\\', "/");
+        for name in &parts[1..] {
+            let mut p = dir.clone();
+            if !p.ends_with('/') {
+                p.push('/');
+            }
+            p.push_str(&super::super::from_wide(name));
+            all.push(p);
+        }
+    } else {
+        all.push(super::super::from_wide(parts.first().copied().unwrap_or(&[])).replace('\\', "/"));
+    }
+    *path = all[0].clone();
+    crate::fd_paths_set(all);
     (1, ofn.filter_index.saturating_sub(1))
+}
+
+/// the NUL-ended strings of a dialog's buffer up to the empty one (OFN_ALLOWMULTISELECT: the
+/// folder, then the names; one file: its full path)
+fn multi_parts(buf: &[u16]) -> Vec<&[u16]> {
+    let mut v = Vec::new();
+    let mut i = 0;
+    while i < buf.len() && buf[i] != 0 {
+        let e = buf[i..].iter().position(|&c| c == 0).map_or(buf.len(), |k| i + k);
+        v.push(&buf[i..e]);
+        i = e + 1;
+    }
+    v
 }
 
 /// the first extension of "a;b=description" (at most 30 bytes)  [ext_name]

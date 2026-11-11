@@ -1119,6 +1119,22 @@ ui.dialog_end(); // always
   // CMD_OPEN in App::command: self.fd_mode = FD_OPEN; self.fd_open.set(1);
   ```
 
+  **Several files at once** (`FD_OPEN | FD_MULTI`, e.g. an upload field that takes several):
+  `path` gets the first, `ui.filedlg_paths()` every chosen file in the dialog's order (after a
+  dialog without `FD_MULTI` the one file). Windows' dialog (Ctrl / Shift in Explorer) and
+  Linux's portal (`multiple`) choose several; the library's own dialog marks rows with
+  Ctrl+click and Shift+click (or Shift+arrows; marked rows show a check mark, the name box
+  `"a.txt" "c.txt"`) and takes quoted names typed there, each one an existing file of the
+  shown folder or an absolute path. The pickers of macOS, iOS, Android and the browser choose
+  one file for now (`filedlg_paths()` holds that one). `plat::file_dialog_paths()` is the
+  platform's side. Every chosen file is the user's (`fs.user`).
+
+  ```rust
+  if ui.filedlg(ID_FILEDLG, FD_OPEN | FD_MULTI, &open, &mut self.path, 4096, &EXTS) & EV_ACT != 0 {
+      for p in ui.filedlg_paths() { self.upload.push(p); }
+  }
+  ```
+
 * **Drag and drop** ([`ui/dnd.rs`](../lib/ui/dnd.rs), [`plat/dnd.rs`](../lib/plat/dnd.rs)):
   what a drag carries is a `DragData` (`files`, `text`, `urls`, `html`, `image` = a PNG file,
   `bmp`, the app's own `app` kind `DT_USER0 << k` with `bytes`, a `label`, `effects`); its kinds
@@ -1801,7 +1817,7 @@ in DIP):
 
 | Command | Effect |
 |---|---|
-| `click S [l\|r]`, `rclick S`, `dblclick S`, `move S`, `down S [l\|r\|m]`, `up [S] [l\|r\|m]` | pointer |
+| `click S [l\|r\|m] [shift\|ctrl\|alt]...`, `rclick S`, `dblclick S [shift\|ctrl\|alt]...`, `move S`, `down S [l\|r\|m]`, `up [S] [l\|r\|m]` | pointer (the modifier words are held during the click) |
 | `drag S1 S2 [steps] [hold MS] [shift] [ctrl] [alt] [right\|middle]` | drag with modifiers / other buttons; `hold MS`: the button rests MS ms before the first move, on the virtual clock like `wait` (a dock tab asks for it) |
 | `drag ... pen P0 P1`, `drag ... eraser P0 P1` | a pen stroke, pressure P0 -> P1 (%) |
 | `pointer mouse \| pen [P [TX TY]] \| eraser [P ...] \| touch` | pen data of the following pointer events (`touch`: they are a finger, §37) |

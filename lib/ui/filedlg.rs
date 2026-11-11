@@ -16,7 +16,12 @@
 //        (modal); Android's picker answers later: nothing is drawn while it is open, the
 //        chosen document arrives as its content:// name in a later frame.  Otherwise,
 //        headless or with jfgui_FILEDLG=builtin, the library's own dialog.
+//        FD_MULTI (E8, with FD_OPEN): several files -- the system's dialog where it chooses
+//        several (Windows, Linux's portal), the own dialog with Ctrl+click / Shift+click (or
+//        Shift+arrows) on the rows ("a" "b" in the name box, quoted names typed there too);
+//        path gets the first, ui.filedlg_paths() every chosen file.
 //        Widget ids used: id .. id + 0x3FFF (list rows id + 17 + i).
+//   filedlg_paths() -> the files of the last confirmed dialog (one without FD_MULTI)
 //
 // One file dialog can be open at a time (the state below is shared).
 
@@ -55,6 +60,11 @@ pub(crate) struct S {
     dir: String,
     last: String,
     name: String,
+    /// (E8) FD_MULTI in the own dialog: the marked rows, the row a Shift+click counts from
+    marks: Vec<i32>,
+    anchor: i32,
+    /// (E8) the files of the last confirmed dialog
+    paths: Vec<String>,
 }
 
 // str_copy(src, cap): at most cap - 1 bytes, never splitting a UTF-8 sequence
@@ -235,6 +245,47 @@ impl S {
     }
 
     // fd_set_dir(s): dir = s with '/' separators, no trailing separator except roots
+    // (E8) FD_MULTI: row i was selected with the modifiers mods -- Ctrl adds / removes it,
+    // Shift marks the files from the anchor to it, else it alone; the name box shows the
+    // marked names ("a" "b" for several)
+    fn mark(&mut self, i: i32, mods: u32) {
+        if self.entry(i).is_none_or(|(_, dir)| dir) {
+            return;
+        }
+        if mods & MOD_SHIFT != 0 && self.anchor >= 0 {
+            let (a, b) = (self.anchor.min(i), self.anchor.max(i));
+            self.marks = (a..=b).filter(|&k| self.entry(k).is_some_and(|(_, dir)| !dir)).collect();
+        } else if mods & MOD_CTRL != 0 {
+            if let Some(k) = self.marks.iter().position(|&m| m == i) {
+                self.marks.remove(k);
+            } else {
+                self.marks.push(i);
+            }
+            self.anchor = i;
+        } else {
+            self.marks = alloc::vec![i];
+            self.anchor = i;
+        }
+        let names: Vec<String> = self.marks.iter().filter_map(|&k| self.entry(k).map(|(n, _)| String::from(n))).collect();
+        self.name = match names.len() {
+            0 => String::new(),
+            1 => copy_cap(&names[0], FD_NAME_CAP),
+            _ => {
+                let mut s = String::new();
+                for n in &names {
+                    if !s.is_empty() {
+                        s.push(' ');
+                    }
+                    s.push('"');
+                    s.push_str(n);
+                    s.push('"');
+                }
+                s
+            }
+        };
+        self.msg = None;
+    }
+
     fn set_dir(&mut self, s: &str) {
         let mut d;
         if is_abs(s) {
@@ -299,6 +350,15 @@ impl Ui {
         if open.get() != 0 && self.m.filedlg.id != id {
             // the system dialog, when there is one (modal: returns when the user is done)
             let r = self.fd_system(flags, path, cap, exts);
+            if r == 1 {
+                // (E8) every chosen file: the system's dialog may choose several (FD_MULTI)
+                let all = plat::file_dialog_paths();
+                self.m.filedlg.paths = if flags & FD_MULTI != 0 && all.len() > 1 && all[0] == *path {
+                    all.iter().map(|p| copy_cap(p, cap as usize)).collect()
+                } else {
+                    alloc::vec![path.clone()]
+                };
+            }
             if r == plat::FD_PENDING {
                 // the system's picker answers later (Android): wait for it
                 self.m.filedlg.id = id;
@@ -324,7 +384,9 @@ impl Ui {
             }
             self.dialog_end();
             if result == EV_ACT {
-                super::perm::grant_user(path); // the system dialog: the user chose it (fs.user)
+                for p in self.m.filedlg.paths.clone() {
+                    super::perm::grant_user(&p); // the system dialog: the user chose it (fs.user)
+                }
             }
             return result;
         }
@@ -347,8 +409,12 @@ impl Ui {
             }
         } else if ev & EV_ACT != 0 {
             // a file was selected: its name goes into the name box
+            let multi = flags & (FD_MULTI | FD_SAVE | FD_FOLDER) == FD_MULTI;
+            let mods = self.mods;
             let f = &mut self.m.filedlg;
-            if let Some((name, false)) = f.entry(sel) {
+            if multi {
+                f.mark(sel, mods);
+            } else if let Some((name, false)) = f.entry(sel) {
                 f.name = copy_cap(name, FD_NAME_CAP);
                 f.msg = None;
             }
@@ -359,7 +425,8 @@ impl Ui {
             self.text(TS_BODY, tr("Dateiname:"));
             self.next_size(-1, 0);
             let mut name = core::mem::take(&mut self.m.filedlg.name);
-            let ev = self.textbox(id.wrapping_add(12), None, &mut name, FD_NAME_CAP as u32);
+            let ncap = if flags & FD_MULTI != 0 { 4096 } else { FD_NAME_CAP as u32 }; // (E8) several quoted names
+            let ev = self.textbox(id.wrapping_add(12), None, &mut name, ncap);
             self.m.filedlg.name = name;
             if ev & EV_ACT != 0 {
                 self.m.filedlg.msg = None;
@@ -380,9 +447,17 @@ impl Ui {
         }
         self.dialog_end();
         if result == EV_ACT {
-            super::perm::grant_user(path); // the user chose it (fs.user)
+            for p in self.m.filedlg.paths.clone() {
+                super::perm::grant_user(&p); // the user chose it (fs.user)
+            }
         }
         result
+    }
+
+    /// (E8) the files the last confirmed file dialog chose: with FD_MULTI every one (the first
+    /// is the dialog's path), else the one; empty before any
+    pub fn filedlg_paths(&self) -> Vec<String> {
+        self.m.filedlg.paths.clone()
     }
 
     // the system's picker is open (Android): its answer, once it comes
@@ -397,6 +472,7 @@ impl Ui {
             return 0;
         }
         *path = copy_cap(&chosen, cap as usize);
+        self.m.filedlg.paths = alloc::vec![path.clone()];
         super::perm::grant_user(path); // the user chose it (fs.user)
         EV_ACT
     }
@@ -515,7 +591,8 @@ impl Ui {
             Some((n, d)) => (String::from(n), d),
             None => (String::new(), false),
         };
-        self.icon(if dir { IC_FOLDER } else { IC_PAGE }, 16);
+        let marked = self.m.filedlg.marks.len() > 1 && self.m.filedlg.marks.contains(&i);
+        self.icon(if dir { IC_FOLDER } else if marked { IC_CHECK_MARK } else { IC_PAGE }, 16);
         self.next_size(-1, 0);
         self.text(TS_BODY | TX_ELLIPSIS, &name);
         self.list_item_end();
@@ -548,6 +625,9 @@ impl Ui {
             *path = copy_cap(&d, cap as usize);
             f.last = copy_cap(&f.dir, FD_PATH);
             return true;
+        }
+        if flags & (FD_MULTI | FD_SAVE) == FD_MULTI && f.name.contains('"') {
+            return self.fd_confirm_multi(path, cap);
         }
         if f.name.is_empty() {
             // no name: open the selected folder
@@ -606,6 +686,40 @@ impl Ui {
             }
         }
         *path = copy_cap(&tmp, cap as usize);
+        f.paths = alloc::vec![path.clone()];
+        f.last = copy_cap(&f.dir, FD_PATH);
+        true
+    }
+
+    // (E8) FD_MULTI: the quoted names of the name box ("a" "b") -> every one an existing file
+    fn fd_confirm_multi(&mut self, path: &mut String, cap: u32) -> bool {
+        let f = &mut self.m.filedlg;
+        let names: Vec<String> = f.name.split('"').map(|s| s.trim()).filter(|s| !s.is_empty()).map(String::from).collect();
+        let mut all = Vec::new();
+        for n in &names {
+            let mut t = if is_abs(n) {
+                copy_cap(n, FD_PATH)
+            } else {
+                let mut t = copy_cap(&f.dir, FD_PATH);
+                join(&mut t, n);
+                t
+            };
+            if t.len() >= FD_PATH - 16 {
+                f.msg = Some(tr("Der Pfad ist zu lang."));
+                return false;
+            }
+            t = canon(&norm(&t));
+            if super::perm::trusted(|| plat::file_exists(&t)) != 1 {
+                f.msg = Some(tr("Die Datei wurde nicht gefunden."));
+                return false;
+            }
+            all.push(copy_cap(&t, cap as usize));
+        }
+        if all.is_empty() {
+            return false;
+        }
+        *path = all[0].clone();
+        f.paths = all;
         f.last = copy_cap(&f.dir, FD_PATH);
         true
     }
@@ -615,6 +729,8 @@ impl Ui {
         let f = &mut self.m.filedlg;
         f.idx.clear();
         f.store.clear();
+        f.marks.clear();
+        f.anchor = -1;
         f.sel = -1;
         f.msg = None;
         let dir = f.dir.clone();

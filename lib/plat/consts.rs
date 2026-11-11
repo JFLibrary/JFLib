@@ -154,6 +154,7 @@ pub const PA_POINT: u32 = 4; // at a point (context menus): flips both ways
 pub const FD_OPEN: u32 = 0;
 pub const FD_SAVE: u32 = 1;
 pub const FD_FOLDER: u32 = 2; // choose a folder (Android: a document tree; Windows: the own dialog)
+pub const FD_MULTI: u32 = 4; // (E8) FD_OPEN: several files; all of them in file_dialog_paths()
 pub const FD_EXT_SHIFT: u32 = 8; // bits 8..15: initially selected extension (index)
 /// file_dialog's answer when the system answers later (Android's picker): file_dialog_poll
 pub const FD_PENDING: i32 = -2;
