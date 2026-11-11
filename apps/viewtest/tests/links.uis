@@ -14,6 +14,8 @@ move "Link Zwei"
 expect text:"Zeiger: Hand" exists
 # the records leave the page's own record alone: still one canvas, focused
 expect #101 rect 12 136 360 120
+# (E14) the page's own record has a name: what a screen reader says for it
+expect canvas:"Webseite" rect 12 136 360 120
 # a screen reader gets them as links with their names
 click "Baum prüfen"
 expect text:"Baum: Link Eins, Link Zwei" exists
