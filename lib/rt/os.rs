@@ -76,8 +76,8 @@ mod imp {
         exit(4)
     }
 
-    // stack probe: frames over 4 KB touch every page from the top down
-    #[cfg(not(feature = "std"))]
+    // stack probe: frames over 4 KB touch every page from the top down (ARM64: at the end of the file)
+    #[cfg(all(not(feature = "std"), target_arch = "x86_64"))]
     core::arch::global_asm!(
         ".globl __chkstk",
         "__chkstk:",
@@ -381,3 +381,22 @@ mod imp {
         v
     }
 }
+
+// Windows on ARM64 (docs/ARM64.md, ARM5): the stack probe gets the frame size in x15 in units of 16
+// bytes and touches every page from sp down; the caller moves sp itself.  Only x16, x17 and the flags
+// may change (what the compiler assumes of a call to __chkstk); x18 is the TEB and stays untouched.
+// The same steps as compiler-rt and modules/modrt/mem.rs.
+#[cfg(all(windows, target_arch = "aarch64", not(feature = "std")))]
+core::arch::global_asm!(
+    ".globl __chkstk",
+    ".p2align 2",
+    "__chkstk:",
+    "    lsl x16, x15, #4",
+    "    mov x17, sp",
+    "1:",
+    "    sub x17, x17, #4096",
+    "    subs x16, x16, #4096",
+    "    ldr xzr, [x17]",
+    "    b.gt 1b",
+    "    ret",
+);
