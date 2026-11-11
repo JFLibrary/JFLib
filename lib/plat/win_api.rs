@@ -487,6 +487,12 @@ const VK_RMENU: i32 = 0xA5;
 
 // the cursor shapes CUR_ARROW .. CUR_NONE (0: hidden)
 static IDC_TABLE: [u16; CUR_COUNT as usize] = [32512, 32513, 32649, 32515, 32646, 32514, 32645, 32644, 32642, 32643, 0];
+// (E3) CUR_X0 .. CUR_X_END: the system's cursors where Windows has one (IDC_NO, IDC_HELP,
+// IDC_APPSTARTING, IDC_SIZE*); 0: cursor_fallback's shape
+static IDC_X: [u16; (crate::CUR_X_END - crate::CUR_X0) as usize] = [
+    32648, 32648, 32649, 32646, 32651, 32650, 0, 0, 0, 0, 0, 0, 0, 32646, 32644, 32645, 32645, 32645, 32644, 32644, 32643, 32642,
+    32642, 32643,
+];
 // edge bits (top 1, bottom 2, left 4, right 8) -> HT code
 static HT_EDGE: [u8; 16] = [1, 12, 15, 1, 10, 13, 16, 10, 11, 14, 17, 11, 1, 1, 1, 1];
 static W_CLASS: [u16; 6] = [0x4A, 0x46, 0x47, 0x55, 0x49, 0]; // "JFGUI"
@@ -2273,7 +2279,7 @@ pub fn win_test_send(w: i32, msg: u32, wp: usize, lp: isize) -> isize {
 
 /// CUR_* shape while the pointer is over window w
 pub fn win_set_cursor(w: i32, shape: u32) {
-    if shape >= CUR_TABLE {
+    if shape >= CUR_TABLE && !(crate::CUR_X0..crate::CUR_X_END).contains(&shape) {
         return;
     }
     let Some(r) = rec(w) else { return };
@@ -2292,6 +2298,13 @@ pub fn win_set_cursor(w: i32, shape: u32) {
 fn cur_handle(shape: u32) -> isize {
     let c = &st().cursors;
     let arrow = c[CUR_ARROW as usize].get();
+    if (crate::CUR_X0..crate::CUR_X_END).contains(&shape) {
+        // (E3) a system cursor (shared, loaded once by the system), else the nearest shape
+        let idc = IDC_X[(shape - crate::CUR_X0) as usize];
+        // SAFETY: a system cursor id.
+        let h = if idc == 0 { 0 } else { unsafe { LoadCursorW(0, idc as usize) } };
+        return if h != 0 { h } else { c[crate::cursor_fallback(shape) as usize].get() };
+    }
     if shape >= CUR_TABLE {
         return arrow;
     }

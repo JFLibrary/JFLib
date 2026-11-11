@@ -112,6 +112,8 @@ pub(crate) struct Hit {
     pub(crate) flags: u16,
     /// HB_KEYS: every key is the widget's while it has the focus
     pub(crate) keys: bool,
+    /// (E3) the cursor of ui.cursor_next (any CUR_*; 0: the shape in flags)
+    pub(crate) cursor: u8,
     /// the axes along which a finger belongs to the widget (touch.rs, AX_*)
     pub(crate) grab: u8,
     pub(crate) layer: u8,
@@ -294,10 +296,21 @@ impl W {
 /// point: layers from the top down to modal_layer, last record first; HB_BLOCK /
 /// HB_DISABLED boxes answer id 0.  (-1, -1) = outside the window: none.
 pub(crate) fn hit_find_list(list: &[Hit], modal_layer: u32, x: i32, y: i32) -> (u32, u32) {
+    match hit_find(list, modal_layer, x, y) {
+        Some(h) => {
+            let flags = h.flags as u32;
+            (if flags & (HB_BLOCK | HB_DISABLED) != 0 { 0 } else { h.id }, flags)
+        }
+        None => (0, 0),
+    }
+}
+
+// the topmost hit box at the point (see hit_find_list)
+pub(crate) fn hit_find(list: &[Hit], modal_layer: u32, x: i32, y: i32) -> Option<&Hit> {
     // outside the window = (-1, -1) (E_LEAVE); other negative points are real: popups of a
     // secondary window may lie left of / above it
     if x == -1 && y == -1 {
-        return (0, 0);
+        return None;
     }
     let mut layer = L_COUNT as i32 - 1;
     while layer >= modal_layer as i32 {
@@ -305,13 +318,22 @@ pub(crate) fn hit_find_list(list: &[Hit], modal_layer: u32, x: i32, y: i32) -> (
             if h.layer as i32 != layer || x < h.x0 || x >= h.x1 || y < h.y0 || y >= h.y1 {
                 continue;
             }
-            let flags = h.flags as u32;
-            let id = if flags & (HB_BLOCK | HB_DISABLED) != 0 { 0 } else { h.id };
-            return (id, flags);
+            return Some(h);
         }
         layer -= 1;
     }
-    (0, 0)
+    None
+}
+
+// (E3) the cursor a hit box shows: cursor_next's, else the shape of its flags; the arrow over a
+// title bar's drag region
+pub(crate) fn hit_cursor(h: Option<&Hit>) -> u32 {
+    match h {
+        Some(h) if h.flags as u32 & HB_DRAG != 0 => CUR_ARROW,
+        Some(h) if h.cursor != 0 => h.cursor as u32,
+        Some(h) => (h.flags as u32 >> HB_CURSOR_SHIFT) & 15,
+        None => CUR_ARROW,
+    }
 }
 
 impl Ui {
@@ -719,6 +741,14 @@ impl Ui {
         hit_find_list(&c.hits[c.hit_cur ^ 1], c.modal_prev, x, y)
     }
 
+    /// (E3) the cursor shape at a point (px) of the current window in the previous pass: the
+    /// topmost hit box's (CUR_*: ui.cursor_next's, else the shape of its flags; CUR_CUSTOM for
+    /// the custom cursor), CUR_ARROW where there is none
+    pub fn cursor_at(&self, x: i32, y: i32) -> u32 {
+        let c = &self.wp.ctx;
+        hit_cursor(hit_find(&c.hits[c.hit_cur ^ 1], c.modal_prev, x, y))
+    }
+
     /// ui_hit_flags_at(x, y): HB_* flags of the topmost hit box at a point of the main
     /// window (previous pass) -- non-client hit testing of the platform
     pub fn hit_flags_at(&mut self, x: i32, y: i32) -> u32 {
@@ -730,10 +760,7 @@ impl Ui {
         let (id, flags) = self.hot_find(self.wp.ctx.mx, self.wp.ctx.my);
         // cursor: the active widget keeps its cursor
         if self.wp.ctx.active == 0 {
-            let mut shape = (flags >> HB_CURSOR_SHIFT) & 15;
-            if flags & HB_DRAG != 0 {
-                shape = 0;
-            }
+            let shape = if self.uiw_inert_now() { CUR_ARROW } else { self.cursor_at(self.wp.ctx.mx, self.wp.ctx.my) };
             let s = self.cursor_resolve(shape);
             plat::set_cursor(s);
         }
@@ -761,11 +788,13 @@ impl Ui {
         let list = &mut c.hits[c.hit_cur];
         let r = c.last_rect;
         let k = c.uiclip;
+        let cursor = core::mem::take(&mut self.wp.lay.next_cursor).min(255) as u8;
         list.push(Hit {
             id,
             continuation: false,
             flags: (hbflags | notab) as u16,
             keys: hbflags & HB_KEYS != 0,
+            cursor,
             grab: super::touch::hit_grab(hbflags),
             layer: c.cmd_layer_ui as u8,
             kind: 0,

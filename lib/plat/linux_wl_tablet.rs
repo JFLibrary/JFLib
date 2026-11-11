@@ -130,7 +130,7 @@ impl Wl {
         }
         let t = self.tab.tools[k];
         let mut shape = self.win[t.win as usize & (PW_MAX - 1)].cursor;
-        if shape >= CUR_COUNT {
+        if shape >= CUR_COUNT && !(crate::CUR_X0..crate::CUR_X_END).contains(&shape) {
             // a custom cursor: the closest shape
             shape = if shape.wrapping_sub(CUR_USER0) < CUR_USER_MAX { CUR_CROSS } else { CUR_ARROW };
         }
