@@ -2104,11 +2104,14 @@ Source: [`lib/ui/highlight.rs`](../lib/ui/highlight.rs)
 ```text
 highlight -- syntax highlighting for ui.code_editor: a small engine of token rules, the
 built-in grammars (Rust, JSON, INI, TOML, a Markdown subset, JFS: the scripts of
-JFScript) and the colours of the tokens
+JFScript; JavaScript, CSS, HTML with its scripts and styles, WAT: the text format of
+WebAssembly) and the colours of the tokens
 
   Highlighter::rust() / json() / ini() / toml() / markdown() / jfs() / plain()
+  Highlighter::javascript() / css() / html() / wat()   (E10: view-source, developer tools)
   Highlighter::for_name(s)            by name or file extension ("rs", "json", "ini", "cfg",
-                                      "toml", "md", "jfs", a path); plain() for anything else
+                                      "toml", "md", "jfs", "js", "css", "html", "xml", "svg",
+                                      "wat", a path); plain() for anything else
   Highlighter::new(&GRAMMAR)          an app's own grammar (a static Grammar of Rules)
   h.line(text, state, &mut tokens) -> state   the tokens of one line (SY_* kinds, byte
                                       ranges; the plain text between them is SY_TEXT) from
@@ -2124,11 +2127,15 @@ open to close, nested or not, optionally only at a line start: Markdown fences),
 (escapes, multi-line or not), strings with code inside (Interp: the ${..} of JFS, whose
 code the same rules highlight), Rust raw strings, word lists, numbers, punctuation and
 functions of its own (Custom: JSON keys, Rust char literals / lifetimes / attributes, INI
-sections and keys, Markdown headings, lists, emphasis and links).  Where no rule matches,
+sections and keys, Markdown headings, lists, emphasis and links), parts with rules of their
+own (Nest: HTML's tags, JavaScript's template strings and their ${..}) and elements whose
+content is another language (Element: HTML's <script> and <style>).  Where no rule matches,
 an identifier is read whole: before '(' a function (calls), before '!' a macro (macros),
 capitalised a type (caps_types).  A construct still open at a line end is the line's end
 state: rule index + 1, the nesting depth (bits 8..15) and a Rust raw string's '#' count
-(bits 16..31); the editor keeps a state per line and highlights only the visible lines.
+(bits 16..31); inside a Nest or an Element the inner grammar's state in bits 8..31 (so
+three levels: HTML, a script's template string, its ${..}); the editor keeps a state per
+line and highlights only the visible lines.
 ```
 
 ```rust
@@ -2192,6 +2199,15 @@ SY_COUNT: usize = 17
   - `Number` -- number literals: 12, 0x1F, 0b101, 0o17, 1_000, 1.5e-3, suffixes (u8, f32)
   - `Custom(fn(&str, usize, bool) -> Option<(usize, u8)>)` -- a function of its own: (line, position, at the line start after blanks) -> (bytes, kind)
   - `Punct(&'static str)` -- single characters
+  - `Nest { open: &'static str, close: &'static str, kind: u8, inner: &'static Grammar }` -- a part with rules of its own: from open to close (may span lines), the two delimiters
+    `kind`, the text between them highlighted by `inner`'s rules (HTML's tags, the ${..} of
+    JavaScript's template strings); close counts only outside inner's strings and comments,
+    and with close "}" the braces inside count
+  - `Element { name: &'static str, tag: &'static Grammar, inner: &'static Grammar }` -- an element whose content is another language (HTML's script and style): the start tag
+    from '&lt;' and `name` (ASCII case-insensitive, then a blank, '/' or '>') to its '>' on the
+    same line ('&lt;' and '>' SY_PUNCT, the rest by `tag`'s rules), then the content up to
+    "&lt;/" and `name` (case-insensitive, wherever it stands) by `inner`'s rules; may span
+    lines; the end tag is the grammar's own again
 
 - **`struct Grammar`**
   a language (see the module header)
@@ -2228,6 +2244,15 @@ SY_COUNT: usize = 17
   a Markdown subset
 - **`const fn jfs() -> Highlighter`**
   the scripting language of JFScript (.jfs, JFNetworker's scripts)
+- **`const fn javascript() -> Highlighter`**
+  JavaScript (template strings over lines with their ${..}, regular expressions)
+- **`const fn css() -> Highlighter`**
+  CSS (selectors, at-rules, properties, values with units and colours, nested rules)
+- **`const fn html() -> Highlighter`**
+  HTML (also XML and SVG): tags, attributes, comments, entities, doctype; the content of
+  &lt;script> as JavaScript and of &lt;style> as CSS
+- **`const fn wat() -> Highlighter`**
+  WAT, the text format of WebAssembly (modules, instructions, $names, types)
 - **`fn for_name(s: &str) -> Highlighter`**
   by name or extension, also of a path ("rs", "Rust", "x/y.toml"); plain() for others
 - **`fn grammar(&self) -> &'static Grammar`**
@@ -2258,6 +2283,28 @@ SY_COUNT: usize = 17
 - **`static JFS: Grammar`**
   the scripting language of JFScript (.jfs): calls before '(' are functions, the
   delimiters of ${..} in strings SY_META
+
+- **`static JAVASCRIPT: Grammar`**
+  JavaScript: keywords, constants, strings, template strings over lines (their ${..} with
+  SY_META delimiters, code inside), regular expressions (SY_STRING), numbers (also 1n, 0x..,
+  1_000), // and /\* \*/ comments; calls before '(' are functions, capitalised names types, a
+  member after '.' never a keyword
+
+- **`static CSS: Grammar`**
+  CSS: selectors (.class SY_TYPE, #id SY_CONST, :pseudo SY_META), at-rules (SY_KEYWORD),
+  blocks over lines with properties (SY_KEY), numbers with units, #colours (SY_NUMBER),
+  functions, !important, strings, /\* \*/ comments; nested rules
+
+- **`static HTML: Grammar`**
+  HTML (XML and SVG too): tags over lines (names SY_KEYWORD, attributes SY_KEY, values
+  SY_STRING, '&lt;' and '>' SY_PUNCT), comments, CDATA (SY_CODE), &lt;!DOCTYPE> and &lt;?xml?>
+  (SY_META), character references (SY_ESCAPE); the content of &lt;script> highlighted as
+  JavaScript and of &lt;style> as CSS up to its end tag
+
+- **`static WAT: Grammar`**
+  WAT, the text format of WebAssembly: module fields and block keywords (SY_KEYWORD),
+  instructions (SY_FUNC: i32.add, local.get, call ...), value and reference types
+  (SY_TYPE), $names (SY_META), numbers, strings, ;; and nested (; ;) comments
 
 - **`static PLAIN: Grammar`**
   plain text: no tokens
