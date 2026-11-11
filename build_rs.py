@@ -1411,7 +1411,10 @@ def wsl_path(p):
     return "/mnt/" + p[0].lower() + p[2:].replace("\\", "/") if p[1:2] == ":" else p
 
 
-def run_exe(target, exe, args, timeout=600):
+SCRIPT_TIMEOUT = 600
+
+
+def run_exe(target, exe, args, timeout=SCRIPT_TIMEOUT):
     name = Path(exe).name
     gui = target == "mac" and name in apps() and "ui" in app_crates(name)   # windows (tools/apple.py gui_run)
     return run_native(target, exe, args, timeout, gui=gui)
@@ -1431,6 +1434,19 @@ def foreign_start_check(name, targets, arch):
 def script_args(uis):
     first = uis.read_text(encoding="utf-8").splitlines()[:1]
     return shlex.split(first[0][len("#!args"):]) if first and first[0].startswith("#!args") else []
+
+
+def script_timeout(uis):
+    """the seconds a script may take: "#!timeout SECONDS" in its first lines, else SCRIPT_TIMEOUT"""
+    for line in uis.read_text(encoding="utf-8").splitlines()[:5]:
+        if line.startswith("#!timeout"):
+            return int(line[len("#!timeout"):])
+    return SCRIPT_TIMEOUT
+
+
+def timeout_output(e):
+    """what a program had written when subprocess.TimeoutExpired ended it (bytes, text or nothing)"""
+    return "".join(p.decode("utf-8", "replace") if isinstance(p, bytes) else p or "" for p in (e.stdout, e.stderr))
 
 
 def pending_scripts(name):
@@ -1457,10 +1473,14 @@ def run_app_tests(name, target, exe, verify_dirty=False, report=None):
             if verify_dirty:
                 args.append("--verify-dirty")
             started = time.monotonic()
-            result = run_exe(target, exe, args)
-            record = dict(script=script.name, status="passed" if result.returncode == 0 else "failed",
-                          exit_code=result.returncode, duration=time.monotonic() - started,
-                          output=result.stdout + result.stderr)
+            limit = script_timeout(script)
+            try:
+                result = run_exe(target, exe, args, timeout=limit)
+                code, output = result.returncode, result.stdout + result.stderr
+            except subprocess.TimeoutExpired as e:    # this script failed, the others still run
+                code, output = "timeout", f"FAIL no end after {limit} s\n" + timeout_output(e)
+            record = dict(script=script.name, status="passed" if code == 0 else "failed",
+                          exit_code=code, duration=time.monotonic() - started, output=output)
         records.append(record)
         if report:
             report(record)

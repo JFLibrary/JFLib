@@ -164,7 +164,9 @@ impl Renderer {
         let scatter_layout = dev.create_bind_group_layout(&[b(0, read, cs), b(1, rw, cs)])?;
         let draw_layout = dev.create_bind_group_layout(&[b(0, BindingKind::UniformBuffer, vs), b(1, read, vs), b(2, read, vs), b(3, read, vs), b(4, read, vs)])?;
         let pl = |g: &BindGroupLayout, push: u32| dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[g], push_constants: push });
-        let (count_pl, scan_pl, write_pl, scatter_pl, draw_pl) = (pl(&count_layout, 16)?, pl(&scan_layout, 16)?, pl(&write_layout, 16)?, pl(&scatter_layout, 4)?, pl(&draw_layout, 4)?);
+        // (only scan, scatter and the draw read a push constant; a layout that says more than its pass sets is an error in the browser, where the
+        // values are a bind group)
+        let (count_pl, scan_pl, write_pl, scatter_pl, draw_pl) = (pl(&count_layout, 0)?, pl(&scan_layout, 16)?, pl(&write_layout, 0)?, pl(&scatter_layout, 4)?, pl(&draw_layout, 4)?);
         let compute = |layout: &PipelineLayout, m: &ShaderModule, entry: &str| dev.create_compute_pipeline(&ComputePipelineDesc { layout, shader: ShaderStage::new(m, entry) });
         let count = compute(&count_pl, &md.count, "count")?;
         let scan = compute(&scan_pl, &md.scan, "scan")?;

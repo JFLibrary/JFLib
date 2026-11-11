@@ -1,3 +1,6 @@
 #!args --test all --validate
+#!timeout 1800
 # every test but the window once with VK_LAYER_KHRONOS_validation and synchronization validation: a
 # validation error fails; without the layer (no Vulkan SDK) as without --validate
+# (on llvmpipe in WSL 320 s on a quiet machine, about 1000 s while others build: every test on Voll and Basis, in
+# software, under the layer)

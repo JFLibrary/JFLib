@@ -1,0 +1,3 @@
+#!args --test churn
+# several random changes of random entities between two frames (insert, update, grow twice, grow and remove, styles),
+# fixed seeds, Voll and Basis: the image equals that of a scene built anew, byte for byte
