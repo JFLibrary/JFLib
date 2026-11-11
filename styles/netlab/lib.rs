@@ -71,10 +71,10 @@ impl Style for Netlab {
     fn fonts(&self) -> [&'static [u8]; 4] {
         // FONT_SEMI is Inter Medium, FONT_BOLD Inter SemiBold (strong text and titles)
         [
-            include_bytes!("../jfoffice/assets/Inter-Regular.ttf"),
-            include_bytes!("../jfoffice/assets/Inter-Medium.ttf"),
-            include_bytes!("../jfoffice/assets/Inter-SemiBold.ttf"),
-            include_bytes!("../jfoffice/assets/icons.bin"),
+            include_bytes!("assets/Inter-Regular.ttf"),
+            include_bytes!("assets/Inter-Medium.ttf"),
+            include_bytes!("assets/Inter-SemiBold.ttf"),
+            include_bytes!("assets/icons.bin"),
         ]
     }
     fn font_raster(&self) -> [text::FontRaster; 4] {

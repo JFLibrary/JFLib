@@ -47,7 +47,7 @@ Portions of this software are copyright © 1996-2026 The FreeType Project
 | tz database | – | public domain | `lib/datetime/zones.rs` | none needed |
 | DejaVu fonts | 2.37 | Bitstream Vera / Arev license, public domain changes | `lib/doc_view`, `apps/termtest`, styles `kde`, `classic` | `DejaVu-LICENSE.txt` |
 | Inter font | – | SIL Open Font License 1.1 | styles `jfoffice`, `backupcraft`, `netlab`, `apps/officeicontest` | `styles/*/assets/OFL-Inter.txt` |
-| WordCraft icon motifs | 2026 | MIT | style `jfoffice` (`icons.bin`, also used by `backupcraft` and `netlab`) | `styles/jfoffice/LICENSE-icons.txt` |
+| WordCraft icon motifs | 2026 | MIT | style `jfoffice` (`icons.bin`, also used by `backupcraft` and `netlab`) | `styles/jfoffice/LICENSE-icons.txt`, `styles/netlab/LICENSE-icons.txt` |
 | HarfRust and its crates | see notice | MIT, Apache-2.0, Zlib, Unicode-3.0 | `lib/text_shape` | `lib/text_shape/NOTICE.md` |
 
 ## libjxl
@@ -251,8 +251,8 @@ is in the public domain.
   uses the style jfoffice); the license is in each style's `assets/OFL-Inter.txt`.
 - WordCraft icon motifs (MIT, copyright (c) 2026 ArtCraft Team and the WordCraft
   contributors): the office icon artwork of `styles/jfoffice/icon_art.py` and
-  `styles/jfoffice/assets/icons.bin`, which the styles `backupcraft` and `netlab` embed too;
-  `styles/jfoffice/LICENSE-icons.txt`.
+  `styles/jfoffice/assets/icons.bin`, which the styles `backupcraft` and `netlab` embed too
+  (`netlab` from its own copy in `assets/`); `styles/jfoffice/LICENSE-icons.txt`, `styles/netlab/LICENSE-icons.txt`.
 - The fonts and icons of the other styles: see each style's license files in
   `styles/<style>/` and `styles/<style>/assets/` and `styles/NOTICE.md`.
 
