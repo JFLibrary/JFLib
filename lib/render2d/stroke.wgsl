@@ -33,6 +33,11 @@
 // both pieces.  Where a polyline comes back over itself away from a join its pieces blend each, as two entities
 // would.
 //
+// Short thin strokes (TINY_LEN, TINY_H: mostly what a drawing shows of its details from far away) take a fast way near their
+// ends: one segment's tile as the product of the strip's share and the share on its side of the bisector (the
+// neighbour's piece likewise), instead of the exact area (docs/RENDER2D.md "Der schnelle Weg"); longer or wider strokes
+// stay exact.
+//
 // Colours are sRGB codes blended as they are (premultiplied), as lib/gfx blends them.
 
 const BATCH: u32 = 16384u;
@@ -41,6 +46,9 @@ const CAP: u32 = 1u;
 const JOIN: u32 = 2u;
 // beyond this many pixels from the target's middle at both ends, a segment's line is placed by far_foot
 const FAR: f32 = 131072.0;
+// segments up to this long (px) and strokes up to this half width (px) take the fast way near their ends
+const TINY_LEN: f32 = 3.0;
+const TINY_H: f32 = 0.75;
 
 struct Push {
     // the visible layer this draw shows (Basis; 0 on Voll, where first_instance carries it in its high 16 bits)
@@ -252,7 +260,7 @@ fn cov(s: f32, m: vec2f) -> f32 {
     return 0.5 + x / b;
 }
 
-// (written by a script from the description below; unrolled on purpose: loops over planes and arrays of them cost a
+// (written by tools/gen_area6.py from the description below; unrolled on purpose: loops over planes and arrays of them cost a
 // GPU a hundred times more here)
 //
 // the area of the pixel (the unit square around its centre) inside up to six half planes (m, s; unused ones ALL):
@@ -810,12 +818,14 @@ fn fs(i: VsOut) -> @location(0) vec4f {
         dprev = dist_seg(q - s, i.nb.xy);
         if !(dist_seg(q - s, own) < dprev) {
             discard;
+            return vec4f(0.0);
         }
     }
     if ek == JOIN {
         dnext = dist_seg(q - e, i.nb.zw);
         if !(dist_seg(q - e, -own) <= dnext) {
             discard;
+            return vec4f(0.0);
         }
     }
     var d = unit_or_zero(own);
@@ -856,8 +866,50 @@ fn fs(i: VsOut) -> @location(0) vec4f {
         let c0 = max(cov(sl.z, sl.xy) + cov(sr.z, sr.xy) - 1.0, 0.0);
         if !(c0 > 0.0) {
             discard;
+            return vec4f(0.0);
         }
         return vec4f(vec3f(col.z, col.y, col.x) * (col.w * c0), col.w * c0);
+    }
+    // short thin strokes near their ends: the tile of each piece as a product (the strip's share times the share on its side
+    // of the bisector), ownership and the near tests as above
+    if h <= TINY_H && length(own) <= TINY_LEN {
+        var cn = 0.0;
+        var weight = 1.0;
+        if near_s {
+            let sm = dp + d;
+            let ls = length(sm);
+            let m = select(vec2f(-dp.y, dp.x), sm / ls, ls > 1e-6);
+            let b = cov(-dot(q - s, m), m);
+            let np = vec2f(-dp.y, dp.x);
+            let vp = dot(q - s, np);
+            cn += (1.0 - b) * max(cov(vp - h, np) + cov(-vp - h, -np) - 1.0, 0.0);
+            weight *= b;
+        }
+        if near_e {
+            let sm = d + dn;
+            let ls = length(sm);
+            let m = select(vec2f(-d.y, d.x), sm / ls, ls > 1e-6);
+            let b = cov(dot(q - e, m), -m);
+            let nx = vec2f(-dn.y, dn.x);
+            let vn = dot(q - e, nx);
+            cn += (1.0 - b) * max(cov(vn - h, nx) + cov(-vn - h, -nx) - 1.0, 0.0);
+            weight *= b;
+        }
+        var o = max(cov(sl.z, sl.xy) + cov(sr.z, sr.xy) - 1.0, 0.0);
+        // caps: a butt line at the end, a square one half a width on, a round one where a line would keep its area
+        let ext = select(select(0.0, h, cap == CAP_SQUARE), 0.7854 * h, cap == CAP_ROUND);
+        if sk == CAP {
+            o *= cov(-u0 - ext, -d);
+        }
+        if ek == CAP {
+            o *= cov(u1 - ext, d);
+        }
+        let ct = clamp(cn + weight * o, 0.0, 1.0);
+        if !(ct > 0.0) {
+            discard;
+            return vec4f(0.0);
+        }
+        return vec4f(vec3f(col.z, col.y, col.x) * (col.w * ct), col.w * ct);
     }
     // its own ends' lines: a cap's, a join's line at right angles (that join not near), none where open
     let ps = select(select(cap_line(q, s, -d, cap, h), before(q, s, -d), sk == JOIN), ALL, sk == OPEN);
@@ -1053,6 +1105,7 @@ fn fs(i: VsOut) -> @location(0) vec4f {
     c = clamp(c, 0.0, 1.0);
     if !(c > 0.0) {
         discard;
+        return vec4f(0.0);
     }
     let al = col.w * c;
     return vec4f(vec3f(col.z, col.y, col.x) * al, al);
