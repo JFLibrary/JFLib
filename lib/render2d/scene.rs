@@ -22,7 +22,7 @@ use alloc::vec::Vec;
 
 use gpu::*;
 
-use crate::math::{sincos, split};
+use crate::math::{sincos, split, sqrt};
 use crate::{Renderer, Tag, CHANGE_WORDS, DRAW_BYTES, LAYERS_MAX, PAGE, RECORD_BYTES, RECORD_WORDS, STAMPS, STYLE_BYTES, STYLE_WORDS, VIEW_BYTES};
 
 /// what a scene shows: the point of the drawing at the target's middle, drawing units per pixel, and the rotation
@@ -125,7 +125,10 @@ pub enum Join {
     Bevel,
 }
 
-/// a stroke's look.  Made with `new` and changed field by field (it may grow: dash patterns come)
+/// the most entries of a dash pattern (Style::dash)
+pub const DASH_MAX: usize = 8;
+
+/// a stroke's look.  Made with `new` and changed field by field (it may grow)
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Style {
@@ -138,25 +141,59 @@ pub struct Style {
     pub join: Join,
     /// the longest miter over the width (lib/gfx's and SVG's ratio); at least 1
     pub miter_limit: f32,
+    /// a dash pattern: lengths on and off in turn, starting with on, the first `dashes` entries (0: solid).  An odd count
+    /// runs twice (on, off, on, then off, on, off), as in SVG; every dash ends in `cap`, joins only where a dash runs
+    /// through a vertex.  The pattern runs along each entity from its start (a closed polyline's first point, an arc's
+    /// start, a circle's angle 0), across the joins of a polyline
+    pub dash: [f32; DASH_MAX],
+    pub dashes: u32,
+    /// the unit of the pattern's lengths and of its phase
+    pub dash_unit: Unit,
+    /// how far into the pattern an entity starts (in `dash_unit`s)
+    pub dash_phase: f32,
 }
 
 impl Style {
-    /// a hairline of a colour: width 0, butt caps, miter joins with the limit 4
+    /// a hairline of a colour: width 0, butt caps, miter joins with the limit 4, solid
     pub const fn new(color: u32) -> Style {
-        Style { color, width: 0.0, unit: Unit::Px, cap: Cap::Butt, join: Join::Miter, miter_limit: 4.0 }
+        Style { color, width: 0.0, unit: Unit::Px, cap: Cap::Butt, join: Join::Miter, miter_limit: 4.0, dash: [0.0; DASH_MAX], dashes: 0, dash_unit: Unit::Px,
+                dash_phase: 0.0 }
+    }
+
+    /// the same with a dash pattern (at most DASH_MAX entries; an empty one: solid), its unit and phase
+    pub fn dashed(mut self, pattern: &[f32], unit: Unit, phase: f32) -> Style {
+        self.dash = [0.0; DASH_MAX];
+        for (d, p) in self.dash.iter_mut().zip(pattern) {
+            *d = *p;
+        }
+        self.dashes = pattern.len() as u32;
+        self.dash_unit = unit;
+        self.dash_phase = phase;
+        self
     }
 
     fn check(&self) -> Result<()> {
-        if self.width.is_finite() && self.width >= 0.0 && self.miter_limit.is_finite() && self.miter_limit >= 1.0 {
-            Ok(())
-        } else {
-            Err(GpuError::Invalid("Style: a finite width, not negative, and a miter limit of at least 1"))
+        if !(self.width.is_finite() && self.width >= 0.0 && self.miter_limit.is_finite() && self.miter_limit >= 1.0) {
+            return Err(GpuError::Invalid("Style: a finite width, not negative, and a miter limit of at least 1"));
         }
+        if self.dashes as usize > DASH_MAX {
+            return Err(GpuError::Invalid("Style: at most DASH_MAX dash entries"));
+        }
+        let pat = &self.dash[..self.dashes as usize];
+        if pat.iter().any(|v| !(v.is_finite() && *v >= 0.0 && *v < 1e30)) || !self.dash_phase.is_finite() || (!pat.is_empty() && !(pat.iter().map(|&v| v as f64).sum::<f64>() > 0.0)) {
+            return Err(GpuError::Invalid("Style: dash entries finite and not negative, not all 0, a finite phase"));
+        }
+        Ok(())
     }
 
-    /// common.wgsl's Style
-    fn words(&self) -> [u32; STYLE_WORDS] {
-        let unit = match self.unit {
+    /// a dash pattern in pixels: its words change with the scale
+    fn px_dashes(&self) -> bool {
+        self.dashes > 0 && self.dash_unit == Unit::Px
+    }
+
+    /// common.wgsl's Style at a camera's scale
+    fn words(&self, scale: f64) -> [u32; STYLE_WORDS] {
+        let unit = |u: Unit| match u {
             Unit::Px => 0,
             Unit::Drawing => 1,
         };
@@ -170,8 +207,57 @@ impl Style {
             Join::Round => 1,
             Join::Bevel => 2,
         };
-        [self.color, self.width.to_bits(), unit | cap << 4 | join << 8, self.miter_limit.to_bits(), 0, 0, 0, 0]
+        let mut w = [0u32; STYLE_WORDS];
+        let n = if self.dashes % 2 == 1 { 2 * self.dashes } else { self.dashes } as usize;
+        w[0] = self.color;
+        w[1] = self.width.to_bits();
+        w[2] = unit(self.unit) | cap << 4 | join << 8 | (n as u32) << 12 | unit(self.dash_unit) << 20;
+        w[3] = self.miter_limit.to_bits();
+        if n > 0 {
+            // the entries' ends from the period's start, the period, the share on and the dashes per period
+            let (mut sum, mut on, mut ons) = (0.0f64, 0.0f64, 0u32);
+            for k in 0..n {
+                let v = self.dash[k % self.dashes as usize] as f64;
+                sum += v;
+                if k % 2 == 0 {
+                    on += v;
+                    ons += 1;
+                }
+                w[12 + k] = (sum as f32).to_bits();
+            }
+            let period = f32::from_bits(w[12 + n - 1]) as f64;
+            // periods per drawing unit at this scale, as three f32 (stroke.wgsl: the pattern's place from a length along the entity)
+            let k = 1.0 / (period * if self.dash_unit == Unit::Px { scale } else { 1.0 });
+            let (k0, k1, k2) = split3(k);
+            let p = self.dash_phase as f64 / period;
+            w[4] = k0.to_bits();
+            w[5] = k1.to_bits();
+            w[6] = k2.to_bits();
+            w[7] = (frac(p) as f32).to_bits();
+            w[8] = (period as f32).to_bits();
+            w[9] = ((on / period) as f32).to_bits();
+            w[10] = (ons as f32).to_bits();
+        }
+        w
     }
+}
+
+/// x as three f32 whose sum is x (exactly: f64 has 53 bits)
+pub(crate) fn split3(x: f64) -> (f32, f32, f32) {
+    let a = x as f32;
+    let r = x - a as f64;
+    let b = r as f32;
+    (a, b, (r - b as f64) as f32)
+}
+
+/// x - floor(x), in [0, 1) (0 beyond 2^52: every f64 there is whole)
+pub(crate) fn frac(x: f64) -> f64 {
+    if !(x.abs() < 4.5e15) {
+        return 0.0;
+    }
+    let t = x as i64 as f64;
+    let f = x - if t > x { t - 1.0 } else { t };
+    if f >= 1.0 { 0.0 } else { f }
 }
 
 /// a style of a Scene
@@ -207,14 +293,25 @@ pub struct EntityId {
     era: u32,
 }
 
-/// what an entity is (more kinds come: arcs, curves, fills, text)
+/// what an entity is (more kinds come: curves, fills, text)
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug)]
 pub enum Shape<'a> {
     Line { a: [f64; 2], b: [f64; 2] },
     /// at least one point; closed: a segment from the last back to the first, joined at every point
     Polyline { points: &'a [[f64; 2]], closed: bool },
+    /// a circular arc: its centre, radius (above 0), the angle it starts at and how far it turns (radians; positive:
+    /// counter-clockwise, the drawing's y pointing up; not 0).  A sweep of a full turn or more is a circle whose dash
+    /// pattern starts at `start`.  Drawn in pieces of at most ARC_STEP, coverage from the circle itself
+    Arc { center: [f64; 2], radius: f64, start: f64, sweep: f64 },
+    /// a circle (its dash pattern starts at angle 0 and runs counter-clockwise)
+    Circle { center: [f64; 2], radius: f64 },
 }
+
+/// the largest angle of one piece of an arc (a record): a full circle is 16 of them.  Its quad covers the piece's ring
+/// between the chord inside and the tangent outside, so that the pixels the fragment shader looks at follow the stroke
+/// (docs/RENDER2D.md "Bögen und Kreise")
+pub const ARC_STEP: f64 = core::f64::consts::PI / 8.0;
 
 /// what prepare sent for this frame
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -249,6 +346,8 @@ pub struct FrameStats {
 enum Geom {
     Line([[f64; 2]; 2]),
     Poly(Vec<[f64; 2]>, bool),
+    /// centre, radius, start, sweep (a full circle: +-TAU)
+    Arc([f64; 2], f64, f64, f64),
 }
 
 #[derive(Clone)]
@@ -263,6 +362,8 @@ struct Ent {
     count: u32,
     /// its records go up with the next prepare
     dirty: bool,
+    /// an arc or of a dashed style: its layer is drawn by the second pipeline (lib.rs)
+    full: bool,
     geom: Geom,
 }
 
@@ -287,6 +388,8 @@ struct LayerSlot {
     repack: bool,
     /// laid out anew by this prepare: its free places need no zeros
     repacked: bool,
+    /// its live entities that are arcs or of a dashed style (Ent::full): more than none, the layer takes fs_full
+    full: u32,
 }
 
 /// the bind groups of the scene's buffers (made again when one of them is new)
@@ -301,6 +404,7 @@ pub(crate) struct Groups {
 pub(crate) struct FrameSlot {
     pub stage: Buffer,
     changes: Option<Buffer>,
+    styles: Option<Buffer>,
     pub scatter_group: Option<BindGroup>,
     runs: Option<Buffer>,
     pub readback: Option<Buffer>,
@@ -351,6 +455,10 @@ pub struct Scene {
     max_entries: u32,
     styles: Vec<Style>,
     styles_dirty: bool,
+    /// a style has a dash pattern in pixels: the styles go up again when the scale changes (their periods per unit), and
+    /// the scale they last went up with
+    px_dash: bool,
+    styles_scale: f64,
     layers: Vec<LayerSlot>,
     free_layers: Vec<u32>,
     layer_seq: u64,
@@ -389,6 +497,8 @@ pub struct Scene {
     last_order: Vec<u32>,
     last_layers: Vec<[u32; 4]>,
     drawn: Vec<u32>,
+    /// per visible layer in draw order: it takes the second pipeline (Renderer::record)
+    pub(crate) full: Vec<bool>,
     pub(crate) entries: u32,
     pub(crate) vis_layers: u32,
     pub(crate) up: Uploads,
@@ -413,7 +523,7 @@ impl Scene {
         let (entries_cap, layers_cap) = (64u32, 16u32);
         let mut frames = Vec::new();
         for _ in 0..r.desc.frames_in_flight {
-            frames.push(FrameSlot { stage: upload(&dev, VIEW_BYTES)?, changes: None, scatter_group: None, runs: None, readback: None, last: None });
+            frames.push(FrameSlot { stage: upload(&dev, VIEW_BYTES)?, changes: None, styles: None, scatter_group: None, runs: None, readback: None, last: None });
         }
         Ok(Scene {
             tag: r.tag.clone(),
@@ -421,6 +531,8 @@ impl Scene {
             max_entries: r.max_entries,
             styles: Vec::new(),
             styles_dirty: false,
+            px_dash: false,
+            styles_scale: 0.0,
             layers: Vec::new(),
             free_layers: Vec::new(),
             layer_seq: 0,
@@ -456,6 +568,7 @@ impl Scene {
             last_order: Vec::new(),
             last_layers: Vec::new(),
             drawn: Vec::new(),
+            full: Vec::new(),
             entries: 0,
             vis_layers: 0,
             up: Uploads::default(),
@@ -486,6 +599,7 @@ impl Scene {
         self.touch();
         self.styles.push(*s);
         self.styles_dirty = true;
+        self.px_dash |= s.px_dashes();
         Ok(StyleId(self.styles.len() as u32 - 1))
     }
 
@@ -493,8 +607,19 @@ impl Scene {
     pub fn set_style(&mut self, id: StyleId, s: &Style) -> Result<()> {
         s.check()?;
         let Some(old) = self.styles.get_mut(id.0 as usize) else { return Err(GpuError::Invalid("set_style: no such style")) };
+        let was = old.dashes > 0;
         *old = *s;
         self.styles_dirty = true;
+        if was != (s.dashes > 0) {
+            // (dashed or no longer: its entities' layers may take the other pipeline)
+            for i in 0..self.ents.len() {
+                if self.ents[i].live && self.ents[i].style == id.0 {
+                    let full = needs_full(&self.ents[i].geom, s);
+                    self.set_full(i, full);
+                }
+            }
+        }
+        self.px_dash = self.styles.iter().any(|s| s.px_dashes());
         self.touch();
         Ok(())
     }
@@ -510,7 +635,7 @@ impl Scene {
         self.touch();
         let seq = self.layer_seq;
         self.layer_seq += 1;
-        let fresh = LayerSlot { live: true, era: 0, visible: l.visible, order: l.order, seq, base: 0, cap: 0, used: 0, holes: 0, owners: Vec::new(), repack: false, repacked: false };
+        let fresh = LayerSlot { live: true, era: 0, visible: l.visible, order: l.order, seq, base: 0, cap: 0, used: 0, holes: 0, owners: Vec::new(), repack: false, repacked: false, full: 0 };
         let slot = match self.free_layers.pop() {
             Some(s) => {
                 let era = self.layers[s as usize].era;
@@ -599,6 +724,14 @@ impl Scene {
     }
 
     fn geom(s: &Shape) -> Result<Geom> {
+        let arc = |center: [f64; 2], radius: f64, start: f64, sweep: f64| -> Result<Geom> {
+            Scene::check_points(&[center])?;
+            if !(radius.is_finite() && radius > 0.0 && radius < 1e30 && start.is_finite() && start.abs() < 1e15 && sweep.is_finite() && sweep != 0.0) {
+                return Err(GpuError::Invalid("Shape: an arc of a finite radius above 0, a finite start and a sweep not 0"));
+            }
+            let tau = core::f64::consts::TAU;
+            Ok(Geom::Arc(center, radius, start, if sweep.abs() >= tau { tau.copysign(sweep) } else { sweep }))
+        };
         match *s {
             Shape::Line { a, b } => {
                 Scene::check_points(&[a, b])?;
@@ -608,6 +741,8 @@ impl Scene {
                 Scene::check_points(points)?;
                 Ok(Geom::Poly(points.to_vec(), closed))
             }
+            Shape::Arc { center, radius, start, sweep } => arc(center, radius, start, sweep),
+            Shape::Circle { center, radius } => arc(center, radius, 0.0, core::f64::consts::TAU),
         }
     }
 
@@ -631,7 +766,7 @@ impl Scene {
         let slot = match self.free_ents.pop() {
             Some(f) => f,
             None => {
-                self.ents.push(Ent { live: false, era: 0, layer: 0, style: 0, at: 0, alloc: 0, count: 0, dirty: false, geom: Geom::Line([[0.0; 2]; 2]) });
+                self.ents.push(Ent { live: false, era: 0, layer: 0, style: 0, at: 0, alloc: 0, count: 0, dirty: false, full: false, geom: Geom::Line([[0.0; 2]; 2]) });
                 self.ents.len() as u32 - 1
             }
         };
@@ -642,6 +777,8 @@ impl Scene {
         if l.used > l.cap {
             self.layout_dirty = true;
         }
+        let full = needs_full(&geom, &self.styles[style.0 as usize]);
+        l.full += full as u32;
         let e = &mut self.ents[slot as usize];
         e.live = true;
         e.layer = li as u32;
@@ -649,6 +786,7 @@ impl Scene {
         e.at = at;
         e.alloc = count;
         e.count = count;
+        e.full = full;
         e.geom = geom;
         let era = e.era;
         self.live += 1;
@@ -686,11 +824,27 @@ impl Scene {
                 self.ents[i].alloc = count.max(2 * alloc);
             }
         }
+        let full = needs_full(&geom, &self.styles[self.ents[i].style as usize]);
+        self.set_full(i, full);
         let e = &mut self.ents[i];
         e.geom = geom;
         e.count = count;
         self.mark(i as u32);
         Ok(())
+    }
+
+    /// an entity becomes one of the second pipeline or stops being one
+    fn set_full(&mut self, i: usize, full: bool) {
+        let e = &mut self.ents[i];
+        if e.full != full {
+            e.full = full;
+            let l = &mut self.layers[e.layer as usize];
+            if full {
+                l.full += 1;
+            } else {
+                l.full -= 1;
+            }
+        }
     }
 
     /// another style: its records go up again
@@ -701,6 +855,8 @@ impl Scene {
         }
         self.touch();
         self.ents[i].style = style.0;
+        let full = needs_full(&self.ents[i].geom, &self.styles[style.0 as usize]);
+        self.set_full(i, full);
         self.mark(i as u32);
         Ok(())
     }
@@ -709,6 +865,7 @@ impl Scene {
     pub fn remove(&mut self, id: EntityId) -> Result<()> {
         let i = self.get(id)?;
         self.touch();
+        self.set_full(i, false);
         let e = &mut self.ents[i];
         e.live = false;
         e.era = e.era.wrapping_add(1);
@@ -1011,6 +1168,7 @@ impl Scene {
             table.push([first, order.len() as u32 - first, 0, 0]);
         }
         self.drawn = vis.iter().map(|&i| i as u32).collect();
+        self.full = vis.iter().map(|&i| self.layers[i].full > 0).collect();
         (order, table)
     }
 
@@ -1111,12 +1269,19 @@ impl Scene {
         self.vis_layers = self.last_layers.len() as u32;
         let dev = self.dev.clone();
         let mut bytes = VIEW_BYTES;
-        if self.styles_dirty && !self.styles.is_empty() {
-            let words: Vec<[u32; STYLE_WORDS]> = self.styles.iter().map(|s| s.words()).collect();
+        let rescale = self.px_dash && self.camera.scale != self.styles_scale;
+        if (self.styles_dirty || rescale) && !self.styles.is_empty() {
+            let scale = self.camera.scale;
+            let words: Vec<[u32; STYLE_WORDS]> = self.styles.iter().map(|s| s.words(scale)).collect();
             let size = words.len() as u64 * STYLE_BYTES;
-            let up = upload(&dev, size)?;
+            let f = &mut self.frames[slot];
+            if f.styles.as_ref().is_none_or(|b| b.size() < size) {
+                f.styles = Some(upload(&dev, size.next_power_of_two())?);
+            }
+            let Some(up) = &f.styles else { return Err(GpuError::Invalid("Scene::prepare")) };
             up.write(0, &words)?;
-            self.up.styles = Some((up, size));
+            self.up.styles = Some((up.clone(), size));
+            self.styles_scale = scale;
             bytes += size;
         }
         self.styles_dirty = false;
@@ -1208,8 +1373,20 @@ impl Scene {
     }
 }
 
+/// an entity the second pipeline draws: an arc, a dashed style (lib.rs)
+fn needs_full(g: &Geom, st: &Style) -> bool {
+    matches!(g, Geom::Arc(..)) || st.dashes > 0
+}
+
+/// the pieces of an arc of this sweep (at most ARC_STEP each; a full circle 16)
+fn arc_pieces(sweep: f64) -> u32 {
+    let n = (sweep.abs() / ARC_STEP - 1e-9).max(0.0) as u32 + 1;
+    n.min(16)
+}
+
 /// the records an entity's geometry has: a segment between neighbouring points (repeated points count once), a closed
-/// polyline's last back to its first; a single point: one (a dot, drawn by round and square caps)
+/// polyline's last back to its first; a single point: one (a dot, drawn by round and square caps); an arc: a head
+/// (holding its start, never drawn) and its pieces
 fn record_count(g: &Geom) -> u32 {
     match g {
         Geom::Line(_) => 1,
@@ -1220,6 +1397,7 @@ fn record_count(g: &Geom) -> u32 {
             }
             if n <= 1 { 1 } else if *closed { n as u32 } else { n as u32 - 1 }
         }
+        Geom::Arc(_, _, _, sweep) => arc_pieces(*sweep) + 1,
     }
 }
 
@@ -1234,8 +1412,69 @@ fn distinct(p: &[[f64; 2]]) -> usize {
     n
 }
 
+// common.wgsl's Record: the kinds and the flags of its last word
+const K_SEG: u32 = 0;
+const K_ARC: u32 = 1;
+const K_HEAD: u32 = 2;
+/// a segment: its previous point is the polyline's first (a cap there); its next point is the last
+const F_CAP_PREV: u32 = 1;
+const F_CAP_NEXT: u32 = 2;
+/// a segment joined at its start, at its end
+const F_PREV: u32 = 4;
+const F_NEXT: u32 = 8;
+/// the first record of its entity: the length along it starts at 0
+const F_FIRST: u32 = 16;
+/// a closed polyline's first record (its previous one lies `aux` records on) and its last (the next one lies `aux` back)
+const F_WRAP_PREV: u32 = 32;
+const F_WRAP_NEXT: u32 = 64;
+/// an arc piece: its start is the arc's (a cap), its end is the arc's
+const F_CAP_A: u32 = 1;
+const F_CAP_B: u32 = 2;
+/// an arc counter-clockwise (y up)
+const F_CCW: u32 = 4;
+/// a circle's first piece (its start is where the dash pattern starts again; the last piece lies `aux` on) and its last
+const F_RESTART_A: u32 = 32;
+const F_RESTART_B: u32 = 64;
+
 /// common.wgsl's Records of an entity
 fn records(g: &Geom, style: u32, out: &mut Vec<[u32; RECORD_WORDS]>) {
+    let b = |v: f32| v.to_bits();
+    let point = |p: [f64; 2]| -> [u32; 4] {
+        let (x, lx) = split(p[0]);
+        let (y, ly) = split(p[1]);
+        [b(x), b(y), b(lx), b(ly)]
+    };
+    // (the length along the entity at a record's end: three f32 whose sum is exact)
+    let rec = |a: [u32; 4], e: [u32; 4], v: [u32; 2], l: f64, aux: u32, style: u32, flags: u32| -> [u32; RECORD_WORDS] {
+        let (l0, l1, l2) = split3(l);
+        [a[0], a[1], a[2], a[3], e[0], e[1], e[2], e[3], v[0], v[1], b(l0), b(l1), b(l2), aux, style, flags]
+    };
+    if let Geom::Arc(c, r, a0, sweep) = *g {
+        let n = arc_pieces(sweep);
+        let full = sweep.abs() >= core::f64::consts::TAU;
+        let at = |t: f64| {
+            let (s, co) = sincos(t);
+            point([c[0] + r * co, c[1] + r * s])
+        };
+        let start = at(a0);
+        // the head: the arc's start where the pieces have their ends, length 0, no style (never drawn)
+        out.push(rec([0; 4], start, [0; 2], 0.0, 0, 0, K_HEAD << 8));
+        let (rh, rl) = split(r);
+        let ccw = if sweep > 0.0 { F_CCW } else { 0 };
+        let aux = if full { n - 1 } else { 0 };
+        for k in 0..n {
+            // (a circle's last piece ends in its start's very bits: both pieces judge the pixels there alike)
+            let e = if full && k + 1 == n { start } else { at(a0 + sweep * (k + 1) as f64 / n as f64) };
+            let mut f = ccw | K_ARC << 8;
+            if full {
+                f |= (k == 0) as u32 * F_RESTART_A | (k + 1 == n) as u32 * F_RESTART_B;
+            } else {
+                f |= (k == 0) as u32 * F_CAP_A | (k + 1 == n) as u32 * F_CAP_B;
+            }
+            out.push(rec(point(c), e, [b(rh), b(rl)], r * sweep.abs() * (k + 1) as f64 / n as f64, aux, style + 1, f));
+        }
+        return;
+    }
     let mut pts: Vec<[f64; 2]> = Vec::new();
     let closed = match g {
         Geom::Line(p) => {
@@ -1246,37 +1485,43 @@ fn records(g: &Geom, style: u32, out: &mut Vec<[u32; RECORD_WORDS]>) {
             pts.extend_from_slice(p);
             *c
         }
+        Geom::Arc(..) => false,
     };
     pts.dedup();
     if closed && pts.len() >= 2 && pts[0] == pts[pts.len() - 1] {
         pts.pop();
     }
     let n = pts.len();
-    let b = |v: f32| v.to_bits();
-    // ends: 1 the previous point is the polyline's first (a cap there), 2 the next point its last
-    let rec = |a: [f64; 2], e: [f64; 2], prev: Option<[f64; 2]>, next: Option<[f64; 2]>, ends: u32| -> [u32; RECORD_WORDS] {
-        let (ax, alx) = split(a[0]);
-        let (ay, aly) = split(a[1]);
-        let (ex, elx) = split(e[0]);
-        let (ey, ely) = split(e[1]);
-        // (the same differences in f64 rounded once: a segment's own vector is exactly the negated previous vector of
-        // the next one and the next vector of the one before, so both compute their join's bisector bit for bit)
-        let pv = prev.map_or([0.0f32; 2], |p| [(p[0] - a[0]) as f32, (p[1] - a[1]) as f32]);
-        let nv = next.map_or([0.0f32; 2], |p| [(p[0] - e[0]) as f32, (p[1] - e[1]) as f32]);
-        let ov = [(e[0] - a[0]) as f32, (e[1] - a[1]) as f32];
-        [b(ax), b(ay), b(alx), b(aly), b(ex), b(ey), b(elx), b(ely), b(pv[0]), b(pv[1]), b(nv[0]), b(nv[1]), style + 1, b(ov[0]), b(ov[1]), ends]
-    };
+    // (the same differences in f64 rounded once: a segment's own vector is exactly the negated previous vector of the next one
+    // and the next vector of the one before (the vertex shader reads its neighbours' own vectors), so both compute their join's
+    // bisector bit for bit)
+    let own = |a: [f64; 2], e: [f64; 2]| [b((e[0] - a[0]) as f32), b((e[1] - a[1]) as f32)];
     if n == 1 {
-        out.push(rec(pts[0], pts[0], None, None, 0));
+        out.push(rec(point(pts[0]), point(pts[0]), [0; 2], 0.0, 0, style + 1, F_FIRST | K_SEG << 8));
         return;
     }
     let segs = if closed { n } else { n - 1 };
+    let mut len = 0.0f64;
     for k in 0..segs {
         let a = pts[k];
         let e = pts[(k + 1) % n];
-        let prev = if closed || k > 0 { Some(pts[(k + n - 1) % n]) } else { None };
-        let next = if closed || k + 1 < segs { Some(pts[(k + 2) % n]) } else { None };
-        let ends = if closed { 0 } else { (k == 1) as u32 | ((segs >= 2 && k + 2 == segs) as u32) << 1 };
-        out.push(rec(a, e, prev, next, ends));
+        let (dx, dy) = (e[0] - a[0], e[1] - a[1]);
+        len += sqrt(dx * dx + dy * dy);
+        let mut f = K_SEG << 8;
+        if !closed {
+            // the previous point is the polyline's first (a cap there), the next point its last
+            f |= (k == 1) as u32 * F_CAP_PREV | (segs >= 2 && k + 2 == segs) as u32 * F_CAP_NEXT;
+        }
+        f |= (closed || k > 0) as u32 * F_PREV | (closed || k + 1 < segs) as u32 * F_NEXT | (k == 0) as u32 * F_FIRST;
+        let mut aux = 0;
+        if closed && k == 0 {
+            f |= F_WRAP_PREV;
+            aux = segs as u32 - 1;
+        }
+        if closed && k + 1 == segs {
+            f |= F_WRAP_NEXT;
+            aux = segs as u32 - 1;
+        }
+        out.push(rec(point(a), point(e), own(a, e), len, aux, style + 1, f));
     }
 }

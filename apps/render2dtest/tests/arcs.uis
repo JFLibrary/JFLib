@@ -1,0 +1,4 @@
+#!args --test arcs
+# circles and arcs of every radius (under a pixel to beyond the target), sweep and cap against their exact outlines filled
+# by lib/gfx; translucent rings (no pixel where two pieces meet blended twice); what a big circle's quads cover against its
+# ring; a layer takes the second pipeline with an arc and the first without; Voll and Basis

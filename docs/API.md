@@ -64,7 +64,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
-- [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines and polylines with layers and styles, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
+- [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles with layers and styles, dash patterns, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
   <br>[lib.rs](#render2d-crate-root) · [math.rs](#render2dmathrs) · [scene.rs](#render2dsceners)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
@@ -20915,16 +20915,16 @@ CLASS_MAX: u32 = CLASS_MIN << (CLASSES - 1)
 
 ## render2d
 
-*the core of the 2D renderer for CAD: a retained scene of lines and polylines with layers and styles, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU* -- crate root [`lib/render2d/lib.rs`](../lib/render2d/lib.rs)
+*the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles with layers and styles, dash patterns, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU* -- crate root [`lib/render2d/lib.rs`](../lib/render2d/lib.rs)
 
 ```text
-render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a1; docs/RENDER2D.md): a retained scene of entities
-with stable ids (lines and polylines now), layers and styles; strokes as quads whose coverage the fragment shader
-computes from the geometry (no MSAA), with exact butt, square and round caps and miter, bevel and round joins; f64
-coordinates, a pair of f32 per axis on the GPU with the camera subtracted first; visibility in compute shaders that
-keep the painter's order and write the indirect draws.  Hosted like render3d as the content of a ui.gpu_view (the
-app glues it with a GpuContent; lib/ui knows nothing of it).  The same WGSL on every path: compiled ahead
-(shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
+render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a; docs/RENDER2D.md): a retained scene of entities
+with stable ids (lines, polylines, arcs and circles), layers and styles; strokes as quads whose coverage the fragment
+shader computes from the geometry (no MSAA), with exact butt, square and round caps and miter, bevel and round joins,
+dash patterns in pixels or drawing units; f64 coordinates, a pair of f32 per axis on the GPU with the camera
+subtracted first; visibility in compute shaders that keep the painter's order and write the indirect draws.  Hosted
+like render3d as the content of a ui.gpu_view (the app glues it with a GpuContent; lib/ui knows nothing of it).  The
+same WGSL on every path: compiled ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
 
   Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines of one colour format
   Scene::new(&renderer) -> Result<Scene>
@@ -20964,7 +20964,9 @@ SCAN_SPV: &[u32] = spv::SCAN
 WRITE_SPV: &[u32] = spv::WRITE
 SCATTER_SPV: &[u32] = spv::SCATTER
 VS_SPV: &[u32] = spv::VS
+VS_FULL_SPV: &[u32] = spv::VS_FULL
 FS_SPV: &[u32] = spv::FS
+FS_FULL_SPV: &[u32] = spv::FS_FULL
 ```
 
 - **`struct RendererDesc`**
@@ -21070,19 +21072,33 @@ that never reached a submission: the next sends everything again.
   - `Round` -- a circle around the vertex
   - `Bevel` -- a straight cut between the outer corners
 
+```rust
+/// the most entries of a dash pattern (Style::dash)
+DASH_MAX: usize = 8
+```
+
 - **`struct Style`**
-  a stroke's look.  Made with `new` and changed field by field (it may grow: dash patterns come)
+  a stroke's look.  Made with `new` and changed field by field (it may grow)
   - `color: u32` -- 0xAARRGGBB: sRGB codes as the target shows them, straight alpha
   - `width: f32` -- in `unit`s; 0 (or anything thinner than a pixel): a hairline, 1 px wide
   - `unit: Unit`
   - `cap: Cap`
   - `join: Join`
   - `miter_limit: f32` -- the longest miter over the width (lib/gfx's and SVG's ratio); at least 1
+  - `dash: [f32; DASH_MAX]` -- a dash pattern: lengths on and off in turn, starting with on, the first `dashes` entries (0: solid).  An odd count
+    runs twice (on, off, on, then off, on, off), as in SVG; every dash ends in `cap`, joins only where a dash runs
+    through a vertex.  The pattern runs along each entity from its start (a closed polyline's first point, an arc's
+    start, a circle's angle 0), across the joins of a polyline
+  - `dashes: u32`
+  - `dash_unit: Unit` -- the unit of the pattern's lengths and of its phase
+  - `dash_phase: f32` -- how far into the pattern an entity starts (in `dash_unit`s)
 
 **`impl Style`**
 
 - **`const fn new(color: u32) -> Style`**
-  a hairline of a colour: width 0, butt caps, miter joins with the limit 4
+  a hairline of a colour: width 0, butt caps, miter joins with the limit 4, solid
+- **`fn dashed(mut self, pattern: &[f32], unit: Unit, phase: f32) -> Style`**
+  the same with a dash pattern (at most DASH_MAX entries; an empty one: solid), its unit and phase
 
 - **`struct StyleId(pub u32)`**
   a style of a Scene
@@ -21105,9 +21121,20 @@ that never reached a submission: the next sends everything again.
   - `slot: u32`
 
 - **`enum Shape<'a>`**
-  what an entity is (more kinds come: arcs, curves, fills, text)
+  what an entity is (more kinds come: curves, fills, text)
   - `Line { a: [f64; 2], b: [f64; 2] }`
   - `Polyline { points: &'a [[f64; 2]], closed: bool }` -- at least one point; closed: a segment from the last back to the first, joined at every point
+  - `Arc { center: [f64; 2], radius: f64, start: f64, sweep: f64 }` -- a circular arc: its centre, radius (above 0), the angle it starts at and how far it turns (radians; positive:
+    counter-clockwise, the drawing's y pointing up; not 0).  A sweep of a full turn or more is a circle whose dash
+    pattern starts at `start`.  Drawn in pieces of at most ARC_STEP, coverage from the circle itself
+  - `Circle { center: [f64; 2], radius: f64 }` -- a circle (its dash pattern starts at angle 0 and runs counter-clockwise)
+
+```rust
+/// the largest angle of one piece of an arc (a record): a full circle is 16 of them.  Its quad covers the piece's ring
+/// between the chord inside and the tangent outside, so that the pixels the fragment shader looks at follow the stroke
+/// (docs/RENDER2D.md "Bögen und Kreise")
+ARC_STEP: f64 = core::f64::consts::PI / 8.0
+```
 
 - **`struct UploadInfo`**
   what prepare sent for this frame

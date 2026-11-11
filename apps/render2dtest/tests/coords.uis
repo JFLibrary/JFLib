@@ -1,3 +1,4 @@
 #!args --test coords
-# a drawing at the origin and at +-1e7: the same image; 1e-6 units per pixel near 1e7 with tiny pans and a rotation:
-# every line within 1/16 px of where it belongs, lines 2e7 long too; Voll and Basis
+# a drawing at the origin and at +-1e7: the same image (also arcs, circles and dash patterns); 1e-6 units per pixel near 1e7
+# with tiny pans and a rotation: every line within 1/16 px of where it belongs, lines 2e7 long too, and every ring (circles
+# of radius 1e7, 3e5 and 33 px, an arc of 1e7); Voll and Basis
