@@ -531,7 +531,7 @@ je Seite, Alpha-Klasse und Phase statt eines Aufrufs je Liste); `gputest` prüft
 Aufrufen. Es fehlen Multi-Draw-Indirect, die indirekte Anzahl und ein Draw-Index: Diese drei werden nachgebildet. Der
 Simulator meldet weder Familie noch Metal 3 und bleibt Basis; geprüft wird Voll auf dem Mac und dem iPhone.
 
-Entscheidungen (offen, mit Empfehlung):
+Entscheidungen (vom Nutzer am 2026-11-11 beide wie empfohlen getroffen: Rechen-Durchgang, Metal 3 mit IDs):
 
 1. **Indirekte Anzahl:** (a, empfohlen) ein kleiner Rechen-Durchgang vor dem Zeichnen schreibt die bis zu `max_count`
    Aufrufe in einen Hilfspuffer und setzt bei allen ab der gelesenen Anzahl die Instanzen auf null; danach zeichnet dieselbe
