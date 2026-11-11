@@ -1906,14 +1906,15 @@ Fensterrand hinaus.
   AP8, zusammen mit iOS: [APPLE.md](APPLE.md).
 - **P2** · *fehlt* · Native iOS-Version, auf dem Host-Weg von Android ([APPLE.md](APPLE.md) AP5).
 - **P2** · *teilweise* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
-  `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 auf Android und Linux, für Windows ARM64 bauen
-  Bibliothek und Programme. Plan mit den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).
+  `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 auf Android, Linux und Windows (dort auf dem
+  Runner `windows-11-arm` geprüft). Plan mit den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).
   - Erledigt: `build_rs.py --arch aarch64` (ARM0), Syscall-Nummern, Flags und Kernel-Layouts in einer
     Tabelle pro Architektur ([`lib/rt/kernel.rs`](../lib/rt/kernel.rs), ARM1), `rt` (ARM2) und `plat` (ARM3)
     auf Linux ARM64, Plugins und Module mit `rt::plugin_abi!` und `LIBE_ARCH` (ARM4, 2026-11-10), NEON für
-    `lib/simd` (ARM6), das auf Android schon jetzt wirkt; Windows ARM64 gebaut (ARM5, 2026-11-11: `__chkstk`, TEB über
-    `x18`, `CONTEXT`, Unwind-Daten des Trampolins, Workflow `arm64-windows.yml`).
-  - Zu tun: der Lauf von ARM5 auf `windows-11-arm`, Atomics auf echter Hardware (ARM7),
+    `lib/simd` (ARM6), das auf Android schon jetzt wirkt; Windows ARM64 (ARM5, 2026-11-11: `__chkstk`, TEB über `x18`,
+    `CONTEXT`, Unwind-Daten des Trampolins; `coretest`, `plattest` und die `gallery` auf `windows-11-arm` grün bis auf
+    `screen.uis`, Workflow `arm64-windows.yml`).
+  - Zu tun: Atomics auf echter Hardware (ARM7),
     Fenster und GPU (ARM8), Pakete und CI (ARM9). Die Arbeit nützt später auch macOS und iOS auf ARM.
   - Getestet wird mit QEMU in WSL und den ARM-Runnern von GitHub; für das Speichermodell und die GPU
     braucht es echte Hardware.

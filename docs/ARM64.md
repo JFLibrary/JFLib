@@ -2,8 +2,8 @@
 
 Stand 2026-11-11, auf Basis von `main` d6f5b137. Umgesetzt sind ARM0 bis ARM4 und ARM6: `rt` und `plat` laufen
 auf Linux ARM64, statisch und gegen glibc; `plattest`, `linuxtest`, `lifetest` und `sandboxtest` sind in einer ARM64-VM
-grün, seit ARM4 auch Plugins und das Modul `jxlenc`. Für Windows ARM64 (ARM5) bauen Bibliothek und Programme, der Lauf auf
-`windows-11-arm` steht aus. Für den Rest gilt: Die Zahlen sind
+grün, seit ARM4 auch Plugins und das Modul `jxlenc`. Seit ARM5 laufen `coretest`, `plattest` und die `gallery` auf
+`windows-11-arm` (bis auf `screen.uis`, das der Bildschirm des Runners verhindert). Für den Rest gilt: Die Zahlen sind
 aus dem Code gezählt, die Aufwände
 geschätzt. Syscalls, Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`),
 die Relocations mit ARM3 an einem Test-Plugin. Der Eintrag in der Roadmap steht in
@@ -593,7 +593,15 @@ Importe sind da, `plattest --test crash`, `guardcrash` und `panic` enden im Cras
 Dateien wie der gelinkte Writer, Panik und Fehler im Modul enden mit Bericht („crash … in jxlenc.dll at offset …“), das x64-Modul
 ergibt `LIBE_ARCH`; `coretest` grün, `gallery/basic.uis` grün und richtig gezeichnet (`gal_script.png`), von `plattest` 40 von 42
 Skripten. Rot: `screen.uis` wie bei ARM0 (die Windows-Einrichtung liegt über dem Bildschirm, `desktop.png`) und `guard.uis`, das
-nach `int3` an `brk #0xF003` endete (siehe oben, jetzt `#0xF004`). Zweiter Lauf: steht aus.
+nach `int3` an `brk #0xF003` endete (siehe oben, jetzt `#0xF004`).
+
+Zweiter Lauf (`76be8084`, Run 43088592521): 53 von 54. Jetzt ist auch `guard.uis` grün, also die Division durch null als
+`GK_ARITH`, 64 Fehler nach dem Überschreiben von `x19`–`x29`, `d8`–`d15` und `FPCR`, die verschachtelten Guards, die Fehler auf
+den Workern des Pools und der Stack-Überlauf auf einem eigenen Thread (`GK_STACK`). Damit sind `coretest`, `plattest` und der
+Start der `gallery` auf `windows-11-arm` grün bis auf `screen.uis`, das am Runner scheitert, nicht an ARM64: Die Windows-Einrichtung
+(„Choose privacy settings“) liegt über dem ganzen Bildschirm (`desktop.png` beider Läufe), die Aufnahme sieht ihr Grau
+(`8a898a`) statt des Testfensters; unter der x64-Emulation auf demselben Runner scheiterte es bei ARM0 genauso. Offen bleiben ein
+echtes Gerät mit eigener Anzeige (Surface, Modell unbekannt) und mit ARM8 die übrigen Skripte der `gallery`.
 
 Hier geprüft: `build_rs.py test coretest` und `test plattest` für Windows und Linux auf x86-64 (84 von 84 Skripten), `test
 coretest --target linux --arch aarch64` unter `qemu-aarch64`; `cargo check -p jflib` mit und ohne `std` für Windows, Linux,
