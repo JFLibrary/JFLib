@@ -30445,6 +30445,10 @@ win_print -- printing on Windows: PrintDlgExW (comdlg32, loaded at run time) and
        jfgui_PRINT_PRINTER=NAME     (default "Microsoft Print to PDF"), opened with
                                      CreateDCW and a DEVMODE for paper / orientation
        Without a main window (headless) and without jfgui_PRINT_TO: ERR_UNSUPPORTED.
+  doc_begin / doc_image / doc_end / doc_abort   (print.rs PrintDoc, E9) the same dialog (a
+       page range when the job names its pages: PD_PAGENUMS -> DocSys::ranges) and DC,
+       StartDocW once, then per page StartPage, the bands of layout()'s rectangle in a
+       SaveDC / RestoreDC around the clip, EndPage; EndDocW at the end, AbortDoc when dropped.
 The gdi32 functions are imported directly (the assembly took ten of them with
 GetProcAddress only to keep its import library small); PrintDlgExW (comdlg32),
 GetDefaultPrinterW (winspool.drv) and CoInitializeEx (ole32) are loaded at run time.
@@ -31288,6 +31292,10 @@ linux_print -- printing on Linux: xdg-desktop-portal Print with a PDF of the job
        jfgui_PRINT_SMASK=1        (with jfgui_PRINT_TO) alpha as /SMask instead of white
        jfgui_PRINT_PORTAL=1       allow the portal without a window (fake bus tests);
        otherwise a run without a display (headless) returns ERR_UNSUPPORTED.
+  doc_begin / doc_image / doc_end / doc_abort   (print.rs PrintDoc, E9) PreparePrint once
+       (its connection stays open), the pages into one PDF of several pages (or the app's own
+       PDF: pdf_native), at the end the PDF in a memfd to Print; the test variants above
+       (jfgui_PRINT_TO writes the PDF of the pages into FILE).
 ```
 
 - **`fn print(job: &mut PrintJob) -> i32`**
@@ -33920,6 +33928,20 @@ job as a one-page PDF  [src/plat/print.s, src/img/pdfwrite.s; docs/modules/PRINT
                                            -> 96, 1 inch, 2 cm)
   pdf_write_image(src, opt) -> PDF bytes / ERR_*   one image on one PDF page (pdfwrite.s)
   set_print_deflate(f)                     the zlib compressor of the PDF streams
+  PrintDoc (E9): a job of several pages
+       PrintDoc::begin(&job, pages) -> Result<PrintDoc, ERR_*>   the system's print dialog
+           (printer, paper, orientation, copies; a page range when pages > 0) where there
+           is one; job gives the title, paper, PJF_LANDSCAPE, margin, scale, dpi (its src
+           is not used)
+       d.page() -> PPage, d.copies(), d.wants(n)   the chosen page in pt, copies, whether
+           page n (from 1) is in the chosen range
+       d.add_image(&src) -> 0 / ERR_*   one page: the image laid out as layout() places it
+       d.pdf_native(), d.add_pdf(bytes)  the platform prints a PDF as it is (Linux)
+       d.end() -> 0 printed / ERR_*, d.abort()
+       Windows: PrintDlgExW + GDI, a StartPage per page (win_print.rs); Linux: the
+       portal's dialog, the pages as one PDF of several pages for Print (linux_print.rs);
+       test variant everywhere: jfgui_PRINT_TO=FILE (Windows: through the printer
+       jfgui_PRINT_PRINTER; elsewhere our PDF into FILE); else ERR_UNSUPPORTED
 
 Deviation (plat-shared): plat must not depend on the image crates, so pdfwrite.s is ported
 here and the one thing it took from img -- zlib_deflate -- comes through a hook.  An app
@@ -34077,6 +34099,43 @@ PRW_OPAQUE: u32 = 8  // alpha ignored (XRGB)
   one image on one PDF 1.4 page: objects 1 Catalog, 2 Pages, 3 Page, 4 Contents, 5 Image
   (/DeviceRGB 8 bit /FlateDecode, composited over white -- with PJF_SMASK and a straight
   source: straight colours), 6 Info, [7 /SMask alpha]; classic xref  [pdf_write_image]
+
+- **`struct PrintDoc`**
+  a print job of several pages (see the file header; E9)
+
+**`impl PrintDoc`**
+
+- **`fn begin(job: &PrintJob, pages: u32) -> Result<PrintDoc, i32>`**
+  start a job: the system's print dialog where the platform has one (printer, paper,
+  orientation, copies; with pages > 0 a page range of 1..=pages), never one in the test
+  variant (jfgui_PRINT_TO).  job: the title (spooler, PDF /Title; "" = "Dokument"), paper,
+  PJF_LANDSCAPE / PJF_CENTER / PJF_SMASK, margin, scale, percent, dpi -- its src is not
+  used.  Err: ERR_CANCEL (the dialog was cancelled), ERR_UNSUPPORTED (no printing here,
+  no window, the manifest forbids it), ERR_IO
+- **`fn page(&self) -> PPage`**
+  the page the job prints on (pt; the printer's unprintable edges; the orientation the
+  dialog chose in flags): lay the pages out for it
+- **`fn copies(&self) -> u32`**
+  the copies the dialog chose (informative: the printer makes them; 1 in the test variant)
+- **`fn wants(&self, n: u32) -> bool`**
+  page n (from 1) is in the range the dialog chose (always without a range)
+- **`fn added(&self) -> u32`**
+  the pages added so far
+- **`fn pdf_native(&self) -> bool`**
+  the platform prints a PDF document as it is (add_pdf): Linux's portal and the test
+  variant there; Windows and the others: images only
+- **`fn add_image(&mut self, src: &PrintSrc) -> i32`**
+  one page: the image laid out on the page as layout() places it (the job's scale, dpi,
+  margin, PJF_CENTER; clipped to the printable area) -> 0 / ERR_DIMS / ERR_UNSUPPORTED (a
+  format or after add_pdf) / ERR_IO / ERR_NOMEM
+- **`fn add_pdf(&mut self, pdf: &[u8]) -> i32`**
+  the whole job as a PDF of the app's own, printed as it is (only where pdf_native(),
+  before any add_image) -> 0 / ERR_UNSUPPORTED
+- **`fn end(mut self) -> i32`**
+  finish: the job goes to the printer -> 0 printed / ERR_CANCEL (the portal's job was
+  cancelled) / ERR_DIMS (no page) / ERR_IO
+- **`fn abort(mut self)`**
+  drop the job (nothing is printed)
 
 ### `plat/modhost.rs`
 

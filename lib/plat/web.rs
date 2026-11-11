@@ -724,6 +724,22 @@ static DIALOG: SpinLock<Option<u32>> = SpinLock::new(None);
 pub fn print(_job: &mut crate::PrintJob<'_>) -> i32 {
     crate::ERR_UNSUPPORTED
 }
+// (print.rs PrintDoc, E9) no print system here: the test variant (jfgui_PRINT_TO) writes the
+// PDF of the pages, else ERR_UNSUPPORTED
+#[cfg(not(target_os = "ios"))]
+pub(crate) fn doc_begin(d: &mut crate::PrintDoc) -> i32 {
+    crate::doc_begin_pdf_only(d)
+}
+#[cfg(not(target_os = "ios"))]
+pub(crate) fn doc_image(_d: &mut crate::PrintDoc, _src: &crate::PrintSrc, _pl: &crate::Place) -> i32 {
+    crate::ERR_UNSUPPORTED
+}
+#[cfg(not(target_os = "ios"))]
+pub(crate) fn doc_end(d: &mut crate::PrintDoc) -> i32 {
+    crate::doc_end_pdf_file(d)
+}
+#[cfg(not(target_os = "ios"))]
+pub(crate) fn doc_abort(_d: &mut crate::PrintDoc) {}
 /// Operating-system folder launch is unavailable.
 #[cfg(not(target_os = "ios"))]
 pub fn open_folder(_path: &str) -> i32 {

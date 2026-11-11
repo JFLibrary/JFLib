@@ -1378,6 +1378,44 @@ lines and marks the file before the app's crash hook runs; `plat::log_recent(max
 newest lines for an own report. `ui.warn` lines are in the log too. The runtime logs start,
 exit, sleep, session end and settings changes.
 
+**Printing** (`plat::print`, `plat::PrintDoc`): `plat::print(&mut job)` prints one image on one
+page (`PrintJob`: the pixels, title, paper `PAPER_*`, `PJF_LANDSCAPE` / `PJF_CENTER`, scale
+`PJS_FIT` / `PJS_DPI` / `PJS_PERCENT`, margin), with the system's dialog. A document of several
+pages (a web page, a report) is a `PrintDoc`:
+
+```rust
+let mut job = plat::PrintJob::new(None, "Seite");  // title, paper, PJF_*, margin, scale
+job.margin = 1000;                                 // 10 mm (1/100 mm)
+let mut d = match plat::PrintDoc::begin(&job, n) { // the dialog: printer, paper, copies, pages 1..=n
+    Ok(d) => d,
+    Err(_) => return,                              // ERR_CANCEL, ERR_UNSUPPORTED, ERR_IO
+};
+let page = d.page();                               // the chosen paper in pt (72 per inch), edges
+if d.pdf_native() && have_pdf {
+    d.add_pdf(&pdf_bytes);                         // Linux: the app's own PDF as it is
+} else {
+    for k in 1..=n {
+        if d.wants(k) {                            // the range the dialog chose
+            d.add_image(&render_page(k, &page));   // a PrintSrc, laid out as layout() places it
+        }
+    }
+}
+let r = d.end();                                   // 0: on its way to the printer
+```
+
+* Windows: `PrintDlgExW` (with a page range of `1..=n` when `n > 0`) and GDI, one page after
+  the other into the spooler; Linux: the portal's dialog, the pages as one PDF of several pages
+  (or the app's own PDF: `pdf_native()`) handed to the portal's `Print`. macOS, iOS, Android and
+  the browser have no jobs of several pages yet: `begin` answers `ERR_UNSUPPORTED` (outside the
+  test variant).
+* Render each page for `page()` at the printer's resolution or a fixed one (300 dpi: `job.dpi_x
+  = 300.0` with `PJS_DPI`, an image of `page.w / 72 * 300` pixels); `PJS_FIT` scales each image
+  into the printable area. `d.abort()` drops the job, `end()` without a page is `ERR_DIMS`.
+* Tests never see a dialog or paper: `jfgui_PRINT_TO=FILE` prints into a file (Windows through
+  the printer `jfgui_PRINT_PRINTER`, default "Microsoft Print to PDF"; elsewhere the PDF of the
+  pages); without it a run without a window answers `ERR_UNSUPPORTED`
+  (`apps/plattest/tests/printdoc.uis`).
+
 ## 9. Threads
 
 `plat` has a worker pool (`legacy/ASMLIB/docs/modules/THREADS.md` describes the design; the
