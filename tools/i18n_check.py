@@ -11,6 +11,14 @@
     python tools/i18n_check.py [APP | apps/APP [FOLDER ..] | lib] .. [--update] [--check] [--unused]
                                             the same; FOLDER: only these folders of the app
                                             (apps/APP crates)
+    python tools/i18n_check.py PATH [FOLDER ..] [--update]
+                                            an app outside this repository (a cargo app such as
+                                            ../BrowserGUI; its places are shown from the folder
+                                            that holds it, "BrowserGUI/src/main.rs:12")
+
+The folders of an app are its folders and .rs files at the top, except build output (build/,
+target/), hidden folders and git submodules (another project inside the app's folder, such as
+an engine taken by path): neither their sources nor their catalogues count.
 
 Exit code: 1 when anything is reported (--check: only errors, see below).
 
@@ -68,6 +76,30 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# the folders that hold the apps outside this repository named on the command line
+OUTSIDE = []
+# top folders of an app that are no sources of it
+SKIP_DIRS = {"build", "target", "node_modules"}
+
+
+def rel_path(p):
+    """p relative to the repository, else to the folder of an outside app that holds it, as text
+    with '/'"""
+    p = Path(p)
+    for base in [ROOT] + OUTSIDE:
+        try:
+            return p.relative_to(base).as_posix()
+        except ValueError:
+            pass
+    return p.as_posix()
+
+
+def app_folders(app):
+    """the folders and .rs files at the top of an app that are its sources (not build output,
+    hidden folders or git submodules)"""
+    return [d.name for d in sorted(Path(app).iterdir())
+            if (d.is_file() and d.suffix == ".rs")
+            or (d.is_dir() and d.name not in SKIP_DIRS and not d.name.startswith(".") and not (d / ".git").exists())]
 LETTER = re.compile(r"[^\W\d_]")
 LANG = re.compile(r"[a-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*")
 MARK = "# untranslated: rows added by `python build_rs.py i18n --update`; fill in the empty cells"
@@ -293,7 +325,7 @@ class Sources:
         code, strings = lex(text)
         starts = line_starts(text)
         marked = {} if library else marked_lines(text.split("\n"))
-        rel = f.relative_to(ROOT).as_posix()
+        rel = rel_path(f)
         lo, hi = skip(rel, code) if skip else (0, 0)
         tables = set()
         if not library:
@@ -505,7 +537,7 @@ class Catalogue:
 
     def __init__(self, path):
         self.path = path
-        self.rel = path.relative_to(ROOT).as_posix()
+        self.rel = rel_path(path)
         raw = path.read_bytes().decode("utf-8")
         self.crlf = "\r\n" in raw
         self.ends_nl = raw.endswith("\n")
@@ -558,7 +590,7 @@ def lib_catalogue():
     code, strings = lex(text)
     starts = line_starts(text)
     cat = Catalogue.__new__(Catalogue)
-    cat.path, cat.rel, cat.rows, cat.problems = f, f.relative_to(ROOT).as_posix(), {}, []
+    cat.path, cat.rel, cat.rows, cat.problems = f, rel_path(f), {}, []
     m = re.search(r"const LIB_LANGS: \[&str; \d+\] = \[", code)
     end = code.find("]", m.end())
     cat.langs = [s[2] for s in strings if m.end() <= s[0] < end]
@@ -596,6 +628,7 @@ class Report:
         self.texts = 0
         self.catalogues = []
         self.langs = []
+        self.prefix = ""          # the app's folder ("apps/NAME/", "BrowserGUI/")
 
     def add(self, cat, where, what):
         self.lines.append((cat, where, what))
@@ -603,7 +636,11 @@ class Report:
 
 
 def catalogues_of(app):
-    return [p for p in sorted(app.rglob("locales/*.tsv")) if "build" not in p.relative_to(app).parts]
+    found = list(app.glob("locales/*.tsv"))
+    for d in app_folders(app):
+        if (app / d).is_dir():
+            found += [p for p in (app / d).rglob("locales/*.tsv") if not SKIP_DIRS & set(p.relative_to(app).parts)]
+    return sorted(set(found))
 
 
 def check_rows(rep, rows, langs, found):
@@ -629,6 +666,7 @@ def check_rows(rep, rows, langs, found):
 def check_app(app, folders=None):
     """the Report of apps/NAME (folders: only these; default: every folder of the app)"""
     rep = Report(app.name)
+    rep.prefix = rel_path(app) + "/"
     cats = [Catalogue(p) for p in catalogues_of(app)]
     rep.catalogues = cats
     if not cats:
@@ -637,7 +675,7 @@ def check_app(app, folders=None):
     for c in cats[1:]:
         if c.langs != rep.langs:
             rep.add("error", c.rel, f"languages {' '.join(c.langs)}, {cats[0].rel}: {' '.join(rep.langs)}")
-    every = Sources(app, [d.name for d in sorted(app.iterdir()) if d.is_dir() or d.suffix == ".rs"])
+    every = Sources(app, app_folders(app))
     src = every if folders is None else Sources(app, folders)
     rep.texts = len(src.found)
     # ui::i18n::t falls back to the library's texts (an app with Catalog / set_catalog)
@@ -684,7 +722,7 @@ def update(app, cats, src, missing):
     for c in cats:
         for text in c.rows:
             if text in src.found:
-                part = Path(src.found[text][0]).relative_to(app.relative_to(ROOT)).parts[0]
+                part = Path(src.found[text][0]).relative_to(rel_path(app)).parts[0]
                 top.setdefault(c.rel, {}).setdefault(part, 0)
                 top[c.rel][part] += 1
     plan = {}
@@ -692,7 +730,7 @@ def update(app, cats, src, missing):
         if "\t" in text or "\n" in text or "\r" in text:
             out.append(f"{where}\tnot added (a tab or line break cannot be in a catalogue): {text!r}")
             continue
-        part = Path(where).relative_to(app.relative_to(ROOT)).parts[0]
+        part = Path(where).relative_to(rel_path(app)).parts[0]
         best = max(cats, key=lambda c: (top.get(c.rel, {}).get(part, 0), -cats.index(c)))
         plan.setdefault(best.rel, (best, []))[1].append(text)
     for rel, (c, texts) in plan.items():
@@ -736,7 +774,7 @@ def apps_with_catalogues():
 
 def summary(rep):
     c = rep.count
-    cats = ", ".join(x.rel.split("/", 2)[-1] if rep.name != "lib" else "LIB_TEXTS" for x in rep.catalogues)
+    cats = ", ".join("LIB_TEXTS" if rep.name == "lib" else x.rel.removeprefix(rep.prefix) for x in rep.catalogues)
     return (f"{rep.name}: {rep.texts} texts ({cats}; {' '.join(rep.langs)}): {c['missing']} missing, "
             f"{c['untranslated']} untranslated, {c['unused']} unused, {c['error']} errors")
 
@@ -763,11 +801,21 @@ def main(argv=None):
             targets.append(("lib", None, []))
             continue
         p = Path(w)
-        app = p if p.is_absolute() else (ROOT / p if (ROOT / p).is_dir() and len(p.parts) > 1 else ROOT / "apps" / w)
+        if p.is_absolute():
+            app = p
+        elif (ROOT / p).is_dir() and len(p.parts) > 1:
+            app = ROOT / p
+        elif not (ROOT / "apps" / w).is_dir() and p.is_dir():
+            app = p                                     # a folder from here: an app outside
+        else:
+            app = ROOT / "apps" / w
         if not (app / "src").is_dir() and not app.is_dir():
-            print(f"i18n: no app {w} (apps/NAME)")
+            print(f"i18n: no app {w} (apps/NAME or the path of an app)")
             return 2
-        targets.append((app.name, app.resolve(), []))
+        app = app.resolve()
+        if not app.is_relative_to(ROOT) and app.parent not in OUTSIDE:
+            OUTSIDE.append(app.parent)
+        targets.append((app.name, app, []))
     every = not targets
     if every:
         targets = [(a.name, a, []) for a in apps_with_catalogues()] + [("lib", None, [])]

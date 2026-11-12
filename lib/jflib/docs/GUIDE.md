@@ -2382,7 +2382,11 @@ against `LIB_TEXTS`), `--update` adds the missing texts as rows with empty cells
 catalogue (the one whose texts come from the same folder, `src/` or `crates/`), at its end in
 source order; existing rows are never changed, and the app keeps showing German there until
 the cells are filled. A catalogue the app reads itself without `Catalog::from_tsv` names its
-languages in a comment (`# languages: de en fr`). The suite runs
+languages in a comment (`# languages: de en fr`). An app outside this repository (a cargo app
+of its own) is checked by its path, `python tools/i18n_check.py ../BrowserGUI [--update]`: its
+folders count except build output (`build/`, `target/`), hidden folders and git submodules (an
+engine taken by path), and its places read from the folder that holds it
+(`BrowserGUI/src/main.rs:12`). The suite runs
 `i18n --check`: it fails on errors and on gaps in the catalogues that are complete
 (`COMPLETE`: all of them today, the library too) and only counts the others.
 

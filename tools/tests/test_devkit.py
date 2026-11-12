@@ -627,6 +627,38 @@ static TIPS: [&str; 2] = [
         self.assertEqual([x for x in rep.lines if x[0] in ("missing", "untranslated", "error")], [])
         self.assertGreater(rep.texts, 100)
 
+    def test_app_outside(self):
+        """a cargo app outside the repository, given by its path: its places from the folder that
+        holds it; build output (target/), hidden folders and git submodules do not count"""
+        with tempfile.TemporaryDirectory(prefix="i18n-outside-") as tmp:
+            app = Path(tmp) / "Netz"
+            files = {
+                "src/main.rs": 'fn frame() {\n    ui.text(tr("Hallo"));\n    ui.text(tr("Fehlt"));\n}\n',
+                "src/locales/ui.tsv": "de\ten\nHallo\tHello\n",
+                "Cargo.toml": '[package]\nname = "Netz"\n',
+                "target/debug/build/netz-1/out/gen.rs": 'fn x() { tr("Erzeugt"); }\n',
+                "target/package/Netz-0.1.0/src/locales/ui.tsv": "de\ten\nAlt\tOld\n",
+                "engine/.git": "gitdir: ../.git/modules/engine\n",
+                "engine/src/lib.rs": 'fn y() { t("Motor"); }\n',
+                "engine/locales/engine.tsv": "de\ten\nMotor\t\n",
+                ".cargo/x.rs": 'fn z() { t("Versteckt"); }\n',
+            }
+            for rel, text in files.items():
+                (app / rel).parent.mkdir(parents=True, exist_ok=True)
+                (app / rel).write_text(text, encoding="utf-8", newline="\n")
+            self.assertEqual(i18n_check.app_folders(app), ["src"])
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(i18n_check.main([str(app)]), 1)
+            got = out.getvalue()
+            self.assertIn("Netz: 2 texts (src/locales/ui.tsv; de en): 1 missing, 0 untranslated, 0 unused, 0 errors", got)
+            self.assertIn("Netz/src/main.rs:3\tmissing\tFehlt", got)
+            for other in ("Erzeugt", "Motor", "Versteckt", "Alt"):
+                self.assertNotIn(other, got)
+            with contextlib.redirect_stdout(io.StringIO()):
+                i18n_check.main([str(app), "--update"])
+            self.assertTrue((app / "src/locales/ui.tsv").read_text(encoding="utf-8").endswith("Fehlt\t\n"))
+
 
 class ScriptTimeout(Temp):
     """build_rs.run_app_tests: a script that does not end has failed, the next one still runs"""
