@@ -2215,7 +2215,8 @@ self.dock.focus(P_PROPS);
   splitters between the sides and the document area and between the groups keep their sizes
   in the layout. `DockPanel::at(side, group)` is only the first place: panels with the same
   group number start as tabs of one group, the groups in number order; `DP_HIDDEN` starts
-  hidden, `DP_NOCLOSE` has no hide button, `DP_NOFLOAT` never floats. Panel ids must not be 0
+  hidden, `DP_NOCLOSE` has no hide button, `DP_NOFLOAT` never floats, `DP_GROUP` takes its
+  whole group along (below). Panel ids must not be 0
   and should never change (the saved layout names them); panels the app no longer describes
   are kept in the layout but not shown.
 * Each group has a tab strip with a menu (float / dock to a side / collapse / hide), a
@@ -2233,16 +2234,22 @@ self.dock.focus(P_PROPS);
   most). A floating window's tabs drag back onto the markers, its pin button or a double click
   docks it where it came from, its close button hides its panels. Esc cancels a hold and a drag
   (the release is no click then). Painters: `StyleShell::dock_*` (stock ones from the tokens).
+* Panels that belong together (an app's developer tools in one group): with `DP_GROUP` on the
+  shown tab, the group menu's "Links / Rechts / Unten andocken" and "Lösen" and a double click
+  on the strip's empty part move or float the whole group, every tab in its order, the shown
+  one stays shown (without it they take the shown panel alone; a double click on a tab always
+  floats that panel). The app's own commands: `DockState::dock_group_to(id, side)` and
+  `float_group(id, rect)`.
 * `DockState`: `save()` / `load(text)` (a few lines, `dock 1` first; unknown lines and bad
   values are skipped), `reset`, `show` / `hide` / `toggle` / `focus` / `activate`, `float` /
-  `dock_to`, `collapse`, `size` / `set_size`, and for menus and status lines `groups(side)`,
+  `dock_to`, `float_group` / `dock_group_to`, `collapse`, `size` / `set_size`, and for menus and status lines `groups(side)`,
   `floats()`, `hidden_panels()`, `side(id)`, `visible`, `front`, `shown`.
 * Keyboard: a group's tab strip is one focus stop (Left / Right / Home / End switch tabs, the
   menu key or Shift+F10 open the group's menu); Ctrl+PgDn / Ctrl+PgUp switch tabs while the
   focus is anywhere in the group. Mirrored windows (RTL) show the left side at the right with
   its markers; menus and markers name the sides as they show.
 * Tests: `apps/docktest` (`tests/layout.uis`, `drag.uis`, `hold.uis`, `float.uis`, `keys.uis`,
-  `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`). A plain `drag` lasts 128 ms and never gets
+  `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`, `group.uis`). A plain `drag` lasts 128 ms and never gets
   past the hold: `drag tab:"…" X,Y hold 320`, or `wait 320` between `down` and the first `move`
   (a `move` during the hold does not count towards the drag).
   A floating window is `window 501`, and `window any` + `drag tab:"…" X,Y hold 320` drags its

@@ -2893,7 +2893,8 @@ tool windows and docked again, hidden, collapsed to a rail; the layout is the ap
   dock_end(&mut st) -> changed      true when the user changed the layout (save it then)
   DockState                         the layout, kept by the app: save() -> text, load(text),
                                     reset, show / hide / toggle / focus / activate, float /
-                                    dock_to, collapse / collapsed, size / set_size, groups /
+                                    dock_to, float_group / dock_group_to (a whole group),
+                                    collapse / collapsed, size / set_size, groups /
                                     floats / hidden_panels, side / visible / front / shown
 
 Places: a side holds tab groups (left / right: one above the other, bottom: side by side)
@@ -2937,6 +2938,11 @@ DP_NOCLOSE: u32 = 1
 DP_NOFLOAT: u32 = 2
 /// starts hidden (until DockState::show / focus); later the layout remembers it
 DP_HIDDEN: u32 = 4
+/// its group moves as a whole: when it is the shown tab, the group menu's "Links / Rechts /
+/// Unten andocken" and "Lösen" and a double click on the strip's empty part take every tab of
+/// the group (panels that belong together, such as an app's developer tools;
+/// DockState::dock_group_to / float_group)
+DP_GROUP: u32 = 8
 /// floating windows of one dock area at most (fixed: each is a window, WIN_MAX)
 DOCK_FLOAT_MAX: usize = 6
 /// drop marker kinds (StyleShell::dock_marker, sp.value): the part of the place it fills
@@ -3002,6 +3008,14 @@ DOCK_TAB_HOLD: u32 = 1
   floating window of the area is in use
 - **`fn dock_to(&mut self, id: u32, side: u8)`**
   dock the panel to a side, as a new group at its end
+- **`fn dock_group_to(&mut self, id: u32, side: u8)`**
+  dock the whole group of the panel to a side, as a new group at its end: every tab in its
+  order, the shown one stays shown (a floating window's group too; a group already on
+  that side stays where it is)
+- **`fn float_group(&mut self, id: u32, rect: Option<[i32; 4]>) -> bool`**
+  float the whole group of the panel in a tool window (rect as for float; its pin button
+  docks it back on its side) -> false when every floating window of the area is in use or
+  the panel is hidden; a group that floats already only moves to rect
 - **`fn collapse(&mut self, side: u8, on: bool)`**
   collapse a side to a rail of icon buttons, or expand it
 - **`fn collapsed(&self, side: u8) -> bool`**
