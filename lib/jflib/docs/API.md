@@ -25978,7 +25978,8 @@ watch -- changes below folders, as they happen (continuous data protection)
 
 Windows: ReadDirectoryChangesW per root (subtree, overlapped, 64 KiB buffer; an empty
 answer means the buffer overflowed).  Linux: inotify with a watch per folder; new folders
-are added (and reported whole), a full queue or the watch limit reports an overflow.
+are added (and reported whole), a full queue or the watch limit reports an overflow (a full
+queue after the whole tree is watched again: lost events may hide new folders).
 macOS: FSEvents with file events (dropped events report an overflow); iOS: none.
 Paths are absolute, in the form of the platform; the folder of a change is enough for a
 caller that walks the tree again.
