@@ -46,6 +46,9 @@ fn bytes_of_words(w: &[u32]) -> Vec<u8> {
 
 /// a texture with every (mip, layer) written by data(mip, layer) (tightly packed rows), in
 /// Layout::Sampled
+/// the iOS simulator's Metal has no cube arrays
+const NO_CUBE_ARRAYS: bool = cfg!(target_abi = "sim");
+
 fn texture(t: &mut T, dev: &Device, desc: TextureDesc, data: &dyn Fn(u32, u32) -> Vec<u8>, what: &str) -> Option<Texture> {
     let tex = t.res(dev.create_texture(&desc), &format!("{what}: texture"))?;
     let q = dev.queue();
@@ -403,7 +406,9 @@ fn sample(t: &mut T, dev: &Device) {
     let cadata = |_: u32, l: u32| -> Vec<u8> {
         (0..4u32).flat_map(|k| (((l / 6) * 1000 + (l % 6) * 100 + (k / 2) * 10 + k % 2) as f32).to_le_bytes()).collect()
     };
-    if let Some(cubes) = texture(t, dev, ca, &cadata, "cube array") {
+    if NO_CUBE_ARRAYS {
+        out("  SKIP sample cube array: the simulator's Metal has none");
+    } else if let Some(cubes) = texture(t, dev, ca, &cadata, "cube array") {
         let mut pts = Vec::new();
         let mut want = Vec::new();
         for c in 0..2u32 {
@@ -733,6 +738,10 @@ fn compare(t: &mut T, dev: &Device) {
 // ---------------------------------------------------------------- queries
 
 fn queries(t: &mut T, dev: &Device) {
+    if NO_CUBE_ARRAYS {
+        out("  SKIP queries: one of the textures is a cube array");
+        return;
+    }
     let s = TextureUsage::SAMPLED;
     let descs = [
         TextureDesc { mips: 5, ..TextureDesc::d2(16, 8, Format::Rgba8Unorm, s) },

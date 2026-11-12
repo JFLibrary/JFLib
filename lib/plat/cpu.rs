@@ -11,7 +11,7 @@
 use alloc::string::String;
 
 pub use rt::cpu::{CPU_AVX2, CPU_BMI2, CPU_FMA, CPU_POPCNT, CPU_SSE41};
-#[cfg(not(all(target_os = "linux", target_arch = "aarch64")))] use rt::cpu::cpuid;
+#[cfg(not(all(any(target_os = "linux", windows), target_arch = "aarch64")))] use rt::cpu::cpuid;
 
 /// CPU_* bits (cached; rt::cpu)  [cpu_features]
 pub fn cpu_features() -> u32 {
@@ -27,7 +27,7 @@ pub(crate) fn simd_override() {
 
 /// the processor name from CPUID 0x80000002..4 (macOS, iOS: sysctl machdep.cpu.brand_string,
 /// "Apple M2"), blanks trimmed  [cpu_brand]
-#[cfg(not(all(target_os = "linux", target_arch = "aarch64")))] pub fn cpu_brand() -> String {
+#[cfg(not(all(any(target_os = "linux", windows), target_arch = "aarch64")))] pub fn cpu_brand() -> String {
     #[cfg(target_vendor = "apple")]
     {
         let mut b = [0u8; 128];
@@ -82,7 +82,7 @@ pub fn stack_aligned() -> bool {
 }
 
 /// The browser does not advertise or execute native AVX2 instructions.
-#[cfg(any(target_arch = "wasm32", all(target_os = "android", not(target_arch = "x86_64")), target_vendor = "apple", all(target_os = "linux", target_arch = "aarch64")))]
+#[cfg(any(target_arch = "wasm32", all(target_os = "android", not(target_arch = "x86_64")), target_vendor = "apple", all(any(target_os = "linux", windows), target_arch = "aarch64")))]
 pub fn avx2_probe() -> bool { false }
 
 /// WebAssembly's compiler-managed value/call stacks satisfy their platform ABI.
@@ -95,7 +95,7 @@ pub fn stack_aligned() -> bool { true }
 
 /// the stack pointer is 16-byte aligned (ARM64 faults on a memory access through a misaligned sp: a
 /// thread started with one would show here first)  [plattest th_raw]
-#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+#[cfg(all(any(target_os = "linux", windows), target_arch = "aarch64"))]
 pub fn stack_aligned() -> bool {
     let sp: usize;
     // SAFETY: reads sp only.
@@ -163,5 +163,19 @@ pub fn cpu_brand() -> String {
         ("", _) => alloc::format!("ARM64 CPU 0x{imp:02x}/0x{part:03x}"),
         (v, "") => alloc::format!("{v} CPU 0x{part:03x}"),
         (v, c) => alloc::format!("{v} {c}"),
+    }
+}
+
+// ---- Windows on ARM64 (docs/ARM64.md, ARM5): no AVX2 and the stack pointer as on Linux (above); the name
+// from the registry, where Windows keeps the one its own system information shows
+
+/// the processor's name (HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0, ProcessorNameString, such as
+/// "Snapdragon(R) X Elite - X1E78100 - Qualcomm(R) Oryon(TM) CPU"), "ARM64" when it is missing
+#[cfg(all(windows, target_arch = "aarch64"))]
+pub fn cpu_brand() -> String {
+    let name = crate::machine_reg_string("HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", "ProcessorNameString");
+    match name.as_deref().map(|s| s.trim_matches(' ')) {
+        Some(s) if !s.is_empty() => String::from(s),
+        _ => String::from("ARM64"),
     }
 }

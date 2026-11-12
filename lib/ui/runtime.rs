@@ -156,13 +156,13 @@ impl plat::web::WebApplication for HostRuntime {
         }
         let o = ui.gpu_output(0);
         // (G5e2) the first view of GPU content (gpu_view.rs): what it does now
-        #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
+        #[cfg(any(windows, target_os = "linux", target_os = "android", target_vendor = "apple", target_arch = "wasm32"))]
         let v = ui.m.gview.views.first().and_then(|e| ui.gpu_view_info(e.win as u32, e.id)).map(|i| {
             alloc::format!(" view_device={} view_level={} view_gen={} view_apart={} view_attaches={} view_detaches={} view_frames={} view_reads={} view_read_frame={} view_held={} view_size={}x{}",
                            i.device as u8, i.level.map_or("none", |l| if l == gpu::Level::Voll { "Voll" } else { "Basis" }), i.generation, i.apart as u8, i.attaches,
                            i.detaches, i.frames, i.reads, i.read_frame, i.held, i.size.0, i.size.1)
         }).unwrap_or_default();
-        #[cfg(not(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32")))]
+        #[cfg(not(any(windows, target_os = "linux", target_os = "android", target_vendor = "apple", target_arch = "wasm32")))]
         let v = String::new();
         Some(alloc::format!(
             "wanted={} on={} building={} pending={} never={} adapter={} present_mode={} reserved={} frames={} cpu_frames={} upload_bytes={} upload_base={} \

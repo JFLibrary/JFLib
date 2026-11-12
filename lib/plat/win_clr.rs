@@ -3,7 +3,7 @@
 //   clr_run(dir, app, args)        self-contained .NET applications bring coreclr.dll and their
 //                                  whole framework: load that runtime into this process, trust
 //                                  every assembly of dir, execute app's Main -> its exit code.
-//                                  No installed .NET is involved.  Plugin policy applies.
+//                                  No installed .NET is involved.  Plugin policy applies; ARM64 refuses x64.
 //   machine_reg_string(sub, name)  a string value of HKLM\sub (None: missing or another type)
 
 use alloc::format;
@@ -76,7 +76,7 @@ pub fn clr_run(dir: &str, app: &str, args: &[String]) -> Result<i32, String> {
     let runtime = format!("{}\\coreclr.dll", dir.trim_end_matches('\\'));
     if !crate::policy::plugin_allowed(&runtime) {
         return Err(format!("{runtime}: durch eine Richtlinie gesperrt"));
-    }
+    } #[cfg(target_arch = "aarch64")] if crate::other_machine(&runtime) { return Err(other_processor(&runtime)); }
     let app_dir = app.rsplit_once('\\').map_or(".", |v| v.0);
     // the trusted list takes absolute paths with backslashes only
     let mut trusted = String::new();
@@ -159,4 +159,12 @@ pub fn machine_reg_string(sub: &str, name: &str) -> Option<String> {
         let len = buf.iter().position(|c| *c == 0).unwrap_or(buf.len());
         Some(String::from_utf16_lossy(&buf[..len]))
     }
+}
+
+// ---- Windows on ARM64 (docs/ARM64.md, ARM5): a CoreCLR of the other processor does not load into this process
+
+/// the message for a coreclr.dll built for x64 (LoadLibraryExW would only answer ERROR_BAD_EXE_FORMAT)
+#[cfg(target_arch = "aarch64")]
+fn other_processor(runtime: &str) -> String {
+    format!("{runtime} ist für x64 gebaut, dieses Programm läuft auf ARM64: Die Anwendung braucht ihre ARM64-Fassung")
 }

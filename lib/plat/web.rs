@@ -77,6 +77,12 @@ pub use sensors_host::{jfgui_location, jfgui_sensor, jfgui_sensor_state};
 mod android_gpu;
 #[cfg(target_os = "android")]
 pub use android_gpu::*;
+// iOS: the GPU's layer in UIKit's host (AP6e)
+#[cfg(target_os = "ios")]
+#[path = "apple_ios_gpu.rs"]
+mod ios_gpu;
+#[cfg(target_os = "ios")]
+pub use ios_gpu::*;
 // the GPU output in the browser: a canvas above the one of web_windows.rs (docs/GPU.md "Ausgabe im Browser")
 #[cfg(target_arch = "wasm32")]
 #[path = "web_gpu.rs"]

@@ -1,0 +1,3 @@
+#!args --test fills
+# the triangulation on the CPU (random rings, holes, islands, repeated and collinear points, touching rings); fills
+# against lib/gfx (even-odd, exact area), translucent fills blended once, self-intersecting rings approximately; Voll and Basis

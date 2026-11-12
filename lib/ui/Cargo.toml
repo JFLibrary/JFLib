@@ -41,7 +41,7 @@ datetime.workspace = true
 spell.workspace = true
 img_svg.workspace = true
 
-# The UI's output through the GPU: Windows, Linux in the build against glibc, Android and the browser
+# The UI's output through the GPU: Windows, Linux in the build against glibc, Android, macOS and the browser
 # (WebGPU, no Vulkan code in its bundles).  The static Linux build links nothing of it: gpu_out_off.rs.
 # On Linux for every build: a program with std is the glibc build through ui's build script, which
 # Cargo's [target] tables cannot see (only --cfg in rustflags); the facade compiles gpu anyway.
@@ -58,6 +58,15 @@ shader.workspace = true
 gpu.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+shader.workspace = true
+gpu.workspace = true
+
+# macOS and iOS: Metal (docs/APPLE.md AP6); the output on macOS, 3D views on both
+[target.'cfg(target_os = "macos")'.dependencies]
+shader.workspace = true
+gpu.workspace = true
+
+[target.'cfg(target_os = "ios")'.dependencies]
 shader.workspace = true
 gpu.workspace = true
 

@@ -4,7 +4,8 @@
 // translucent stroke drawn before the one under it would blend wrongly.  So no atomic counter per list as in render3d,
 // but a stable compaction:
 //
-//   count   every record of a page against the target: a bit per record (`masks`, 8 words per entry), the page's count
+//   count   every record of a page against the target: a bit per record (`masks`, 8 words per entry), the page's count;
+//           a fill's edge: its segment in pixels to `epx`
 //   scan    one workgroup: the exclusive sum of the counts in entry order (`offsets`), then per visible layer its first
 //           place and its count (`lists`) and its indirect draw (`draws`): 6 indices per quad, at most BATCH quads per
 //           instance (u16 indices), as many instances as that takes; first_instance names the layer on Voll
@@ -12,9 +13,10 @@
 //
 // The test of a record (shown): the box around its segment, grown by the stroke's reach (half the width times its
 // join's bound, reach_bound, where it has a neighbour, else half the width; and a pixel for the smoothed edge) and by
-// what f32 may round points far away to,
-// against the target's rectangle, by separating axes.  Free records (style 0) never pass; with culling off every
-// live record does.
+// what f32 may round points far away to, against the target's rectangle, by separating axes.  An arc's piece: the
+// box around its chord (its start from the record before it), grown as well by how far the piece bulges beyond the
+// chord (its sagitta).  A fill's edge: its box grown by its quad's reach (2 px); a fill's triangle: the box of its three
+// corners and 2 px.  Free records and arcs' heads (style 0) never pass; with culling off every live record does.
 
 const BATCH: u32 = 16384u;
 
@@ -44,29 +46,64 @@ struct Push {
 // per visible layer: VkDrawIndexedIndirectCommand (5 words)
 @group(0) @binding(9) var<storage, read_write> draws: array<u32>;
 @group(0) @binding(10) var<storage, read_write> visible: array<u32>;
+// per record: a fill edge's segment in pixels of the target (fill.wgsl reads it; count writes it for every edge of the
+// visible layers, in view or not)
+@group(0) @binding(11) var<storage, read_write> epx: array<vec4f>;
 var<immediate> pc: Push;
 
 var<workgroup> wmask: array<atomic<u32>, 8>;
 var<workgroup> partial: array<u32, 256>;
 
-// a record is in the frame: live, and its stroke's box meets the target (see above)
-fn shown(r: Record) -> bool {
-    if r.info.x == 0u {
+// record i is in the frame: live, and its stroke's box meets the target (see above)
+fn shown(i: u32) -> bool {
+    let r = pool[i];
+    if r.w.z == 0u {
         return false;
     }
     if view.misc.x != 0.0 {
         return true;
     }
-    let st = styles[r.info.x - 1u];
-    let h = half_width(st, view);
-    let r0 = rel2(r.a, view);
-    let r1 = rel2(r.b, view);
-    let p0 = to_px(r0.xy, view);
-    let p1 = to_px(r1.xy, view);
-    // (f32 holds 24 bits of a point far away: what that may cost, many times over)
+    let st = styles[r.w.z - 1u];
+    let kind = kind_of_record(r);
+    if kind == K_TRI {
+        // a fill's triangle: the box of its corners (the starts of the edge records they name) and 2 px, against the target
+        let base = i - bitcast<u32>(r.a.x);
+        let t0 = to_px(rel2(pool[base + bitcast<u32>(r.a.y)].a, view).xy, view);
+        let t1 = to_px(rel2(pool[base + bitcast<u32>(r.a.z)].a, view).xy, view);
+        let t2 = to_px(rel2(pool[base + bitcast<u32>(r.a.w)].a, view).xy, view);
+        let m = 2.0 + 1e-3 + 4e-6 * (length(t0) + length(t1) + length(t2));
+        let lo = min(min(t0, t1), t2) - vec2f(m);
+        let hi = max(max(t0, t1), t2) + vec2f(m);
+        let hv = 0.5 * view.turn.zw;
+        return all(lo <= hv) && all(hi >= -hv);
+    }
+    let fill_edge = kind == K_EDGE;
+    var h = half_width(st, view);
+    if fill_edge {
+        // (a fill's edge: its smoothed edge reaches FILL_R on either side, its quad a pixel more)
+        h = 1.0;
+    }
+    let arc = kind == K_ARC;
+    // (an arc piece: from its start, the end of the record before it, to its end)
+    var pa = r.a;
+    if arc {
+        pa = pool[i - 1u].b;
+    }
+    let p0 = to_px(rel2(pa, view).xy, view);
+    let p1 = to_px(rel2(r.b, view).xy, view);
     // (a miter's bound only where the record has a neighbour: a lone segment's caps reach half its width)
-    let joined = any(r.near != vec4f(0.0));
-    let reach = h * select(1.0, reach_bound(st), joined) + 1.0 + 1e-3 + 4e-6 * (length(p0) + length(p1));
+    let joined = (r.w.w & (F_PREV | F_NEXT)) != 0u && !arc && !fill_edge;
+    var bulge = 0.0;
+    if arc {
+        bulge = sagitta(0.5 * length(p1 - p0), (bitcast<f32>(r.v.x) + bitcast<f32>(r.v.y)) * view.rest.z);
+        // (a square cap follows the tangent at its end, which turns up to ARC_STEP / 2 away from the chord: its corner
+        // reaches h (cos + sin) of that along and across it, below 1.18 h)
+        if cap_of(st) == CAP_SQUARE {
+            bulge += 0.18 * h;
+        }
+    }
+    // (f32 holds 24 bits of a point far away: what that may cost, many times over)
+    let reach = h * select(1.0, reach_bound(st), joined) + bulge + 1.0 + 1e-3 + 4e-6 * (length(p0) + length(p1));
     let half = 0.5 * view.turn.zw;
     let dv = p1 - p0;
     let len = length(dv);
@@ -96,7 +133,11 @@ fn shown(r: Record) -> bool {
 fn count(@builtin(local_invocation_index) li: u32, @builtin(workgroup_id) wid: vec3u) {
     let w = wid.x;
     let i = order[w] * PAGE + li;
-    if shown(pool[i]) {
+    let r = pool[i];
+    if kind_of_record(r) == K_EDGE && r.w.z != 0u {
+        epx[i] = edge_px(rel2(r.a, view), rel2(r.b, view));
+    }
+    if shown(i) {
         atomicOr(&wmask[li >> 5u], 1u << (li & 31u));
     }
     workgroupBarrier();

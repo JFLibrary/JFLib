@@ -7,7 +7,8 @@
 //   python build_rs.py app render2dtest --target win
 //   python build_rs.py app render2dtest --target web
 //   node apps/render2dtest/tests/engine_web.mjs [build] [--modes=simd,threads,scalar] [--native=FILE] [--gpu=d3d12|vulkan|swiftshader]
-//   node apps/render2dtest/tests/engine_web.mjs --bench [--n=1000000] [--thin] [--modes=simd]    the measuring scene
+//   node apps/render2dtest/tests/engine_web.mjs --bench [--n=1000000] [--thin] [--plain | --g6a2b] [--modes=simd]    the measuring scene (--plain:
+//        without arcs and dashes, the drawing of G6a2a; --g6a2b: with arcs and dashes, without fills, hatches and curves)
 import {createServer} from 'node:http';
 import {mkdtemp, readFile, rm, readdir} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
@@ -90,10 +91,12 @@ try {
       let gpuenv=`jfgui_GPU_PROBE=${benchRun?'bench':'test'}`;
       if(benchRun&&option('n')) gpuenv+=`,jfgui_GPU_PROBE_N=${option('n')}`;
       if(benchRun&&args.includes('--thin')) gpuenv+=',jfgui_GPU_PROBE_THIN=1';
+      if(benchRun&&args.includes('--plain')) gpuenv+=',jfgui_GPU_PROBE_PLAIN=1';
+      if(benchRun&&args.includes('--g6a2b')) gpuenv+=',jfgui_GPU_PROBE_ARCS=1';
       await page.goto(`http://127.0.0.1:${server.address().port}/index.html?compute=${mode}&gpuenv=${gpuenv}`);
       const about=await page.evaluate(async()=>{try {const a=await navigator.gpu?.requestAdapter(); if(!a) return 'no adapter'; const i=a.info; return `${i.vendor} ${i.architecture} ${i.device} ${i.description} backend ${i.backendType} driver ${i.driver}`;} catch(e) {return String(e);}});
       console.log(`${mode}: the page's adapter: ${about}`);
-      const end=await Promise.race([finished,new Promise(ok=>setTimeout(()=>ok('timeout'),benchRun?900000:150000))]);
+      const end=await Promise.race([finished,new Promise(ok=>setTimeout(()=>ok('timeout'),benchRun?900000:150000).unref())]); // unref: the waiting limit must not keep node alive after the run
       const fail=lines.filter(l=>l.startsWith('FAIL')||l.startsWith('pageerror')||l.startsWith('WebGPU'));
       const count=lines.filter(l=>l.startsWith('ok ')).length;
       const compute=await page.evaluate(()=>window.__jfguiCompute?.mode);
@@ -104,7 +107,7 @@ try {
         ran++;
         let good=end.startsWith('render2dtest: ')&&/ 0 failed/.test(end)&&!fail.length&&count>0&&compute===mode;
         console.log(`${good?'PASS':'FAIL'} chromium ${browser.version()} ${compute}: ${end} (${lines.find(l=>l.startsWith('adapter:'))||'no adapter line'})`);
-        for(const l of lines.filter(l=>/^ok .*(the drawing at|1e-6 units|seed |culled|blend)/.test(l))) console.log(`  ${l}`);
+        for(const l of lines.filter(l=>/^ok .*(the drawing at|dash patterns at|1e-6 units|seed |culled|blend)/.test(l))) console.log(`  ${l}`);
         if(!benchRun&&!skipped) {
           let total=0;
           for(const level of ['voll','basis']) {

@@ -4,13 +4,13 @@
 //   lib_open(path) -> Lib / Err(LIBE_*)   LoadLibraryExW(DONT_RESOLVE_DLL_REFERENCES): the
 //        image is mapped and relocated, but DllMain / TLS callbacks never run and no import
 //        is bound -- a plugin with an import, delay-import or TLS directory is rejected
-//        (LIBE_DEPS / LIBE_INIT); only x86-64 DLLs (LIBE_FORMAT).  Hard-error dialogs are
+//        (LIBE_DEPS / LIBE_INIT); only DLLs of this processor (LIBE_FORMAT; the other: LIBE_ARCH).  Hard-error dialogs are
 //        suppressed (SetThreadErrorMode).  Segments: headers + every section.
 //   lib_sym(h, name) -> address | 0       own export-directory lookup (bounds checked against
 //        SizeOfImage, every table / name inside a readable section -- a section without
 //        MEM_READ is PAGE_NOACCESS; forwarders -> 0, so no other DLL is ever loaded)
 //   (crate) lib_unload(h)                 FreeLibrary (lib_close / drop)
-//   (crate) plat_tid() -> u64             thread id (TEB ClientId, gs:[0x48])
+//   (crate) plat_tid() -> u64             thread id (TEB ClientId, gs:[0x48]; ARM64: x18 + 0x48)
 //   (crate) guard_thread()                nothing on Windows
 //   (crate) guard_os_install()            AddVectoredExceptionHandler(first, guard_veh)
 //
@@ -53,11 +53,11 @@ const EXC_FLT_LAST: u32 = 0xC000_0095; // .. int divide by zero, int overflow
 const EXC_STACK: u32 = 0xC000_00FD;
 const EXC_MISALIGN: u32 = 0x8000_0002;
 const EXC_BREAK: u32 = 0x8000_0003;
-// CONTEXT (x64)
-const CTX_EFLAGS: usize = 0x44;
-const CTX_RSP: usize = 0x98;
-const CTX_RBP: usize = 0xA0;
-const CTX_RIP: usize = 0xF8;
+// CONTEXT (x64; ARM64 at the end of the file)
+#[cfg(target_arch = "x86_64")] const CTX_EFLAGS: usize = 0x44;
+#[cfg(target_arch = "x86_64")] const CTX_SP: usize = 0x98; // rsp
+#[cfg(target_arch = "x86_64")] const CTX_FP: usize = 0xA0; // rbp
+#[cfg(target_arch = "x86_64")] const CTX_PC: usize = 0xF8; // rip
 
 #[repr(C)]
 struct ExceptionPointers {
@@ -77,7 +77,7 @@ unsafe extern "system" {
 }
 
 /// the id of the calling thread (TEB ClientId.UniqueThread)  [plat_tid]
-pub(crate) fn plat_tid() -> u64 {
+#[cfg(target_arch = "x86_64")] pub(crate) fn plat_tid() -> u64 {
     let t: u64;
     // SAFETY: gs points to this thread's TEB on x64 Windows.
     unsafe { core::arch::asm!("mov {}, gs:[0x48]", out(reg) t, options(nostack, readonly, preserves_flags)) };
@@ -96,7 +96,7 @@ pub(crate) fn guard_os_install() {
 /// -1 continue at the guard's fault address / 0 not ours  [guard_veh]
 extern "system" fn guard_veh(ep: *const ExceptionPointers) -> i32 {
     // SAFETY: the system passes valid exception pointers; the record / context are read and
-    // the context written at their documented x64 offsets.
+    // the context written at their documented offsets (x64 / ARM64).
     unsafe {
         let rec = (*ep).record;
         let ctx = (*ep).context;
@@ -114,10 +114,10 @@ extern "system" fn guard_veh(ep: *const ExceptionPointers) -> i32 {
         let nparams = *(rec.add(0x18) as *const u32);
         let addr = if nparams >= 2 && kind == GK_ACCESS { *(rec.add(0x28) as *const u64) } else { 0 };
         let Some((rsp, rbp)) = guard_hit(plat_tid(), kind, code, pc, addr) else { return 0 };
-        *(ctx.add(CTX_RIP) as *mut u64) = guard_fault_ip() as u64;
-        *(ctx.add(CTX_RSP) as *mut u64) = rsp;
-        *(ctx.add(CTX_RBP) as *mut u64) = rbp;
-        *(ctx.add(CTX_EFLAGS) as *mut u32) &= !0x400; // DF = 0
+        *(ctx.add(CTX_PC) as *mut u64) = guard_fault_ip() as u64;
+        *(ctx.add(CTX_SP) as *mut u64) = rsp;
+        *(ctx.add(CTX_FP) as *mut u64) = rbp; // the trampoline's rbp / x29
+        #[cfg(target_arch = "x86_64")] { *(ctx.add(CTX_EFLAGS) as *mut u32) &= !0x400; } // DF = 0
     }
     -1 // EXCEPTION_CONTINUE_EXECUTION
 }
@@ -188,7 +188,7 @@ pub fn lib_open(path: &str) -> Result<Lib, u32> {
     }
 }
 
-/// the mapped image: x86-64 DLL (PE32+), no imports / delay imports / TLS; fills the
+/// the mapped image: DLL (PE32+) of this processor, no imports / delay imports / TLS; fills the
 /// segments (headers, then the sections) -> 0 / LIBE_*  [pe_check]
 unsafe fn pe_check(l: &mut Lib) -> u32 {
     let b = l.base;
@@ -367,7 +367,7 @@ const PE_MACHINE: u32 = if cfg!(target_arch = "aarch64") { 0xAA64 } else { 0x866
 
 /// LoadLibraryExW said ERROR_BAD_EXE_FORMAT: is path a PE image of the other processor (AMD64 /
 /// ARM64)?  Then the loader answers LIBE_ARCH instead of LIBE_FORMAT.  Reads the headers page only.
-fn other_machine(path: &str) -> bool {
+pub(crate) fn other_machine(path: &str) -> bool {
     let Some(f) = crate::OsFile::open_raw(path, crate::FO_READ) else { return false };
     let mut h = [0u8; 4096];
     let n = f.read_at(0, &mut h).unwrap_or(0);
@@ -376,3 +376,18 @@ fn other_machine(path: &str) -> bool {
     let m = u16_at(nt + 4);
     u16_at(0) == 0x5A4D && (64..=4096 - 24).contains(&nt) && h[nt..nt + 4] == *b"PE\0\0" && (m == 0x8664 || m == 0xAA64) && m != PE_MACHINE
 }
+
+/// the id of the calling thread (TEB ClientId.UniqueThread; on ARM64 Windows x18 holds the TEB, ClientId lies
+/// at the offset of x64)  [plat_tid]
+#[cfg(target_arch = "aarch64")]
+pub(crate) fn plat_tid() -> u64 {
+    let t: u64;
+    // SAFETY: x18 points to this thread's TEB on ARM64 Windows (only read, never changed).
+    unsafe { core::arch::asm!("ldr {}, [x18, #0x48]", out(reg) t, options(nostack, readonly, preserves_flags)) };
+    t
+}
+
+// CONTEXT (ARM64): Fp = x29, Sp, Pc; no direction flag (guard_veh)
+#[cfg(target_arch = "aarch64")] const CTX_FP: usize = 0xF0;
+#[cfg(target_arch = "aarch64")] const CTX_SP: usize = 0x100;
+#[cfg(target_arch = "aarch64")] const CTX_PC: usize = 0x108;

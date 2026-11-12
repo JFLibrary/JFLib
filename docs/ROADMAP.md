@@ -1530,8 +1530,8 @@ Fensterrand hinaus.
 - **P2** · *entschieden* (2026-10-31) · Allgemeiner GPU-Support in der Library für die UI,
   2D-CAD und 3D-Spiele (Entscheidungsvorlage „GPU-Rendering in JFLib“, Fassung vom
   31.10.2026, alle acht Empfehlungen freigegeben).
-  - Grafik-APIs: Vulkan unter Windows, Linux und Android, WebGPU im Browser, Metal später für
-    einen nativen Apple-Port; D3D12 höchstens als späterer Rückfall unter Windows (Remote-Desktop,
+  - Grafik-APIs: Vulkan unter Windows, Linux und Android, WebGPU im Browser, Metal auf macOS und iOS
+    (Stufe Basis seit AP6, [APPLE.md](APPLE.md)); D3D12 höchstens als späterer Rückfall unter Windows (Remote-Desktop,
     VMs, WARP). D3D11, WebGL2 und GLES entfallen.
   - Shader in WGSL mit eigenem Compiler nach SPIR-V (später MSL); der Browser nimmt WGSL direkt.
   - Linux: GUI- und Spielprogramme werden dynamisch gegen glibc gelinkt (sonst nichts),
@@ -1772,8 +1772,10 @@ Fensterrand hinaus.
 - **P2** · *entschieden* (2026-11-10) · G6: 2D-Renderer für CAD (Linien mit Breite und Muster, Kurven, Füllungen, Schraffuren, Text, Auswahl und Fang, große Koordinaten). Entscheidungen des Nutzers vom 10.11.2026, alle wie vorgeschlagen: eine eigene Bibliothek `lib/render2d` (`jflib-render2d`) als Inhalt einer `gpu_view` mit einer Test-App, echte Apps später; eine Szene mit IDs, Ebenen und Stilen, dazu eine Überlagerung je Bild; Strecken und Bögen analytisch im Shader (Deckung aus dem Abstand, kein MSAA), Kurven je Zoomstufe auf der CPU zerlegt, Breiten und Strichmuster in Pixeln oder Einheiten; Füllungen auf der CPU in Dreiecke zerlegt (f64, mit Löchern) mit geglättetem Umriss, Schraffuren im Fragment-Shader, weit draußen als Flächenton; Text aus einem MSDF-Atlas aus den Umrissen von `lib/text`; Koordinaten in f64, auf der GPU als Paar aus zwei f32 relativ zur Kamera; ohne GPU zeichnet ein CPU-Weg mit `lib/gfx` dieselbe Szene (auch die Referenz der Tests); Auswahl und Fang auf der CPU über einen R-Baum; ein DXF-Leser als eigene Bibliothek. Stufen: G6a Kern (G6a1 Szene, Strecken und Polylinien, große Koordinaten, Sichtbarkeit, Test-App unter Windows; G6a2 Bögen und Kreise, Strichmuster, Browser, Messszene), G6b Flächen (Kurven, Füllungen, Schraffuren, Transparenz, Blöcke), G6c Text, G6d Auswahl und Fang, G6e CPU-Weg, DXF, andere Ziele. Messziel: 1 Mio. Strecken und 100 000 Zeichen Text im Bildtakt auf RTX 2070 SUPER und Iris Xe, mindestens 30 Bilder/s auf der HD 610 und im Browser; bis ±10⁷ Einheiten ruhig bis 10⁻⁶ Einheiten je Pixel.
 - **P2** · *erledigt* (2026-11-10) · G6a1: der Kern von [`lib/render2d`](RENDER2D.md): eine Szene aus Entitäten, Ebenen und Stilen, Strecken und Polylinien mit Breite, Enden und Ecken (Deckung exakt im Fragment-Shader, kein MSAA; durchscheinend ohne doppeltes Mischen an Ecken), f64-Koordinaten als Paare aus zwei f32 relativ zur Kamera, Sichtbarkeit in Compute-Shadern in Zeichenreihenfolge, Stufen Basis und Voll, die Test-App `render2dtest` gegen `lib/gfx`. Bisher nur unter Windows auf der RTX 2070 SUPER gelaufen; Linux, Android und Web sind gebaut. 1 Mio. Haarlinien im schlimmsten Fall (dichter Zufallsweg): 61,6 ms je Bild, das Messziel ist also noch nicht gezeigt.
 - **P2** · *erledigt* (2026-11-11) · G6a2a: `render2d` läuft im Browser (Chromium auf D3D12: große Koordinaten, Besitzregel und Sichtbarkeit wie unter Vulkan) und auf HD 610, Iris Xe und T500 (441 Prüfungen). Messszene Stadtplan mit 1 Mio. Segmenten ([RENDER2D.md](RENDER2D.md#messung)): RTX 2070 SUPER 11,8 ms in der Übersicht, Messziel erreicht, im Browser auf der RTX ebenso; Iris Xe 60,7 ms und HD 610 348 ms in der Übersicht, dort verfehlt. Text ist noch nicht dabei. Kurze dünne Striche rechnen nahe ihrer Enden eine Näherung statt der genauen Fläche.
-- **P2** · *fehlt* · G6a2b: Bögen, Kreise und Strichmuster. Offen zur Entscheidung: eine Detailstufe für schwache GPUs in der Übersicht. Nicht geprüft: Chromium auf Vulkan mit NVIDIA (der riskante Weg für die Rechnung mit den f32-Paaren), der Browser auf Intel, Firefox, Safari.
-- **P3** · *fehlt* · G7: Spiel-Bausteine (Animation, Nachladen großer Welten, Physik, Werkzeuge). Später: Metal, D3D12-Rückfall, GPU-Rasterung der Widgets.
+- **P2** · *erledigt* (2026-11-11) · G6a2b: Bögen und Kreise (Stücke von höchstens π/8, der Abstand vom Kreis bei jedem Radius genau in `f32`) und Strichmuster in Pixeln oder Einheiten (über die Ecken einer Polylinie weiter, ab einer Periode unter 2 Pixeln eine Fläche) in [`lib/render2d`](RENDER2D.md); Ebenen mit Bögen oder Strichmustern zeichnen über eine zweite Pipeline. Genau bis 0,0073 px bei Radius 10⁷ und 10⁻⁶ Einheiten je Pixel, Strich-Enden bis 0,045 px. Messszene mit Bögen und Strichmustern auf der RTX 12,9 ms in der Übersicht. In der Durchsicht ein Fehler der Sichtbarkeit behoben (eckige Enden breiter Bögen). Damit ist G6a fertig. Nicht geprüft: die Intel-GPUs (nicht erreichbar), eine verlässliche Messung im Browser.
+- **P2** · *erledigt* (2026-11-12) · G6b1: Kurven (Bézier, Ellipsen, Splines bis Grad 3 auch rational, je Zoomstufe auf der CPU in Strecken zerlegt, bei tiefem Zoom nur ein Fenster um die Ansicht), Füllungen mit Löchern (Earcut in `f64`, Rand exakt geglättet, durchscheinend einmal gemischt) und Schraffuren (bis vier Linienscharen im Fragment-Shader, weit draußen ein Flächenton) in [`lib/render2d`](RENDER2D.md). Kurven bis 0,0048 px bei 10⁻⁶ Einheiten je Pixel. Stadtplan mit Flächen auf der RTX 16,0 ms in der Übersicht. Nicht geprüft: die Intel-GPUs (nicht erreichbar), Android.
+- **P2** · *fehlt* · G6b2: Blöcke (eine Teilzeichnung, vielfach eingesetzt) und Transparenz. Offen zur Entscheidung: eine Detailstufe für schwache GPUs in der Übersicht. Nicht geprüft: G6a2b und G6b1 auf den Intel-GPUs, Chromium auf Vulkan mit NVIDIA, der Browser auf Intel, Firefox, Safari.
+- **P3** · *fehlt* · G7: Spiel-Bausteine (Animation, Nachladen großer Welten, Physik, Werkzeuge). Später: D3D12-Rückfall, GPU-Rasterung der Widgets.
 - **P2** · *erledigt* (2026-10-22) · Stufe 0 des GPU-Plans, Teil 1: Scroll-Kopie
   (`lib/ui/scrollcopy.rs`). Hat sich in einer Scroll-Ansicht nur der Inhalt verschoben, werden
   die noch sichtbaren Pixel im Framebuffer verschoben (Zeilen per `copy_within`, Reihenfolge
@@ -1906,13 +1908,15 @@ Fensterrand hinaus.
   AP8, zusammen mit iOS: [APPLE.md](APPLE.md).
 - **P2** · *fehlt* · Native iOS-Version, auf dem Host-Weg von Android ([APPLE.md](APPLE.md) AP5).
 - **P2** · *teilweise* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
-  `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 auf Android und Linux, Windows ARM64 noch nicht. Plan mit
-  den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).
+  `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 auf Android, Linux und Windows (dort auf dem
+  Runner `windows-11-arm` geprüft). Plan mit den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).
   - Erledigt: `build_rs.py --arch aarch64` (ARM0), Syscall-Nummern, Flags und Kernel-Layouts in einer
     Tabelle pro Architektur ([`lib/rt/kernel.rs`](../lib/rt/kernel.rs), ARM1), `rt` (ARM2) und `plat` (ARM3)
     auf Linux ARM64, Plugins und Module mit `rt::plugin_abi!` und `LIBE_ARCH` (ARM4, 2026-11-10), NEON für
-    `lib/simd` (ARM6), das auf Android schon jetzt wirkt.
-  - Zu tun: Windows ARM64 (ARM5: `__chkstk`, `CONTEXT`, Unwind-Daten), Atomics auf echter Hardware (ARM7),
+    `lib/simd` (ARM6), das auf Android schon jetzt wirkt; Windows ARM64 (ARM5, 2026-11-11: `__chkstk`, TEB über `x18`,
+    `CONTEXT`, Unwind-Daten des Trampolins; `coretest`, `plattest` und die `gallery` auf `windows-11-arm` grün bis auf
+    `screen.uis`, Workflow `arm64-windows.yml`).
+  - Zu tun: Atomics auf echter Hardware (ARM7),
     Fenster und GPU (ARM8), Pakete und CI (ARM9). Die Arbeit nützt später auch macOS und iOS auf ARM.
   - Getestet wird mit QEMU in WSL und den ARM-Runnern von GitHub; für das Speichermodell und die GPU
     braucht es echte Hardware.

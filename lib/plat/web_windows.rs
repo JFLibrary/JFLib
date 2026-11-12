@@ -255,7 +255,12 @@ pub fn win_set_title(id: i32, title: &str) {
 pub fn win_state(id: i32) -> u32 {
     let display = DISPLAY.lock();
     window(&display, id).map_or(0, |w| {
-        w.state | if display.active == id { WST_ACTIVE } else { 0 }
+        // (iOS: a scene that is not active does no GPU work, apple_ios.rs gpu_hold)
+        #[cfg(target_os = "ios")]
+        let hold = if crate::apple::ios::gpu_hold() { crate::WST_HIDDEN } else { 0 };
+        #[cfg(not(target_os = "ios"))]
+        let hold = 0;
+        w.state | hold | if display.active == id { WST_ACTIVE } else { 0 }
     })
 }
 /// Apply library-window commands; close is delivered to the normal app close workflow.

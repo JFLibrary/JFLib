@@ -14,6 +14,8 @@
 //            it, a file we reject and Tint accepts fails unless KNOWN_REJECT lists it; on the
 //            unif and diag files our warnings and infos must match Tint's (type and line); the
 //            position of the first error is compared with Tint's on every error file
+//   msl      every module of the spirv group translated to MSL (shader::msl, AP6): no error;
+//            --msl-out DIR writes DIR/<name>.<entry>.1x.metal (the Mac compiles them)
 //   --spv FILE [--out DIR]   compile one file at both levels, write DIR/<file>.<entry>.1x.spv,
 //            print lib/shader's verdict (a tool for the development)
 
@@ -572,4 +574,124 @@ pub fn corpus(t: &mut T) {
                   pipeline errors only Tint finds {}, other {}\n", files.len(), agree, accept_reject, reject_accept, pipe_valid, pipe_err));
     out(&format!("   corpus: first error at Tint's place in {} of {} files; warnings and infos like Tint's in {} of {} unif / diag files\n", pos_same, pos_all, warn_same, warn_all));
     t.check("the first error is at Tint's place in at least 435 files", pos_same >= 435);
+}
+
+/// modules the msl group expects to fail, and why: (name prefix, reason)
+const MSL_KNOWN: &[(&str, &str)] = &[
+    ("corpus_entry_pipe_fragment_location_8_wgsl", "colour location 8: Metal has 0 ..= 7"),
+];
+
+/// the WGSL of the repository's libraries (their SPIR-V is pregenerated: *_spv.rs)
+const LIB_WGSL: &[(&str, &str)] = &[
+    ("lib_gpu_out", include_str!("../../../lib/ui/gpu_out.wgsl")),
+    ("lib_render3d_cull", include_str!("../../../lib/render3d/cull.wgsl")),
+    ("lib_render3d_draw", include_str!("../../../lib/render3d/draw.wgsl")),
+    ("lib_render3d_hiz", include_str!("../../../lib/render3d/hiz.wgsl")),
+    ("lib_render3d_scatter", include_str!("../../../lib/render3d/scatter.wgsl")),
+];
+
+/// SPIR-V written by lib/shader itself: the samples gputest runs and the benchmark shaders
+fn builder_modules() -> Vec<(String, Vec<u32>)> {
+    use shader::samples::{self as s, SampleDim, Texel};
+    use shader::Fmt;
+    let mut v: Vec<(String, Vec<u32>)> = Vec::new();
+    for minor in [shader::BASIS, shader::VOLL] {
+        v.push((format!("samples_spec_fill.1{}", minor), s::spec_fill(minor)));
+        v.push((format!("samples_vs_fullscreen.1{}", minor), s::vs_fullscreen(minor)));
+        v.push((format!("samples_fs_sample.1{}", minor), s::fs_sample(minor)));
+        v.push((format!("samples_fs_compare.1{}", minor), s::fs_compare(minor)));
+        v.push((format!("samples_cs_query.1{}", minor), s::cs_query(minor)));
+        for (k, kn) in [(Texel::Float, "f"), (Texel::Uint, "u"), (Texel::Sint, "i")] {
+            for arrayed in [false, true] {
+                v.push((format!("samples_cs_fetch_{}{}.1{}", kn, arrayed as u32, minor), s::cs_fetch(minor, k, arrayed, false)));
+            }
+        }
+        v.push((format!("samples_cs_fetch_depth.1{}", minor), s::cs_fetch(minor, Texel::Float, false, true)));
+        for (d, dn) in [(SampleDim::D2, "2d"), (SampleDim::D2Array, "2da"), (SampleDim::Cube, "cube"), (SampleDim::CubeArray, "cubea")] {
+            v.push((format!("samples_cs_sample_{}.1{}", dn, minor), s::cs_sample(minor, d)));
+        }
+        for (f, fname) in [(Fmt::Rgba8, "rgba8"), (Fmt::Rgba16f, "rgba16f"), (Fmt::R32f, "r32f"), (Fmt::Rgba32f, "rgba32f"),
+                           (Fmt::R32ui, "r32ui"), (Fmt::Rgba32ui, "rgba32ui"), (Fmt::R32i, "r32i")] {
+            v.push((format!("samples_cs_storage_write_{}.1{}", fname, minor), s::cs_storage_write(minor, f)));
+            v.push((format!("samples_cs_storage_read_{}.1{}", fname, minor), s::cs_storage_read(minor, f)));
+        }
+        for (f, fname) in [(Fmt::R32f, "r32f"), (Fmt::R32ui, "r32ui"), (Fmt::R32i, "r32i")] {
+            v.push((format!("samples_cs_storage_rw_{}.1{}", fname, minor), s::cs_storage_rw(minor, f)));
+        }
+        v.push((format!("bench_spv_move.1{}", minor), shader::bench::move_spv(minor)));
+        v.push((format!("bench_spv_cull.1{}", minor), shader::bench::cull_spv(minor)));
+        v.push((format!("bench_spv_cull_reset.1{}", minor), shader::bench::cull_reset_spv(minor)));
+        v.push((format!("bench_spv_vs_instanced.1{}", minor), shader::bench::vs_instanced_spv(minor)));
+        v.push((format!("bench_spv_vs_single.1{}", minor), shader::bench::vs_single_spv(minor)));
+        v.push((format!("bench_spv_fs_lambert.1{}", minor), shader::bench::fs_lambert_spv(minor)));
+    }
+    v.push((String::from("samples_cs_bindless_sample.16"), s::cs_bindless_sample()));
+    v
+}
+
+/// the msl group: every module of the spirv group, the libraries' WGSL (robust and not) and
+/// lib/shader's own modules through shader::msl at both levels
+pub fn msl(t: &mut T) {
+    let mut srcs = sources();
+    for (n, s) in LIB_WGSL {
+        srcs.push((String::from(*n), String::from(*s)));
+    }
+    let dir = plat::arg_value("--msl-out");
+    if let Some(d) = &dir {
+        plat::mkdir(d);
+    }
+    let mut modules: Vec<(String, Vec<u32>)> = Vec::new();
+    for (name, src) in &srcs {
+        for minor in [shader::BASIS, shader::VOLL] {
+            for robust in [true, false] {
+                if !robust && !name.starts_with("lib_") {
+                    continue;
+                }
+                let mut opt = wgsl::CompileOptions::new(minor);
+                opt.robust = robust;
+                let o = match wgsl::compile(src, &opt) {
+                    Ok(o) if !o.entries.is_empty() => o,
+                    _ => continue,
+                };
+                let tag = if robust { "" } else { "_plain" };
+                for e in o.entries {
+                    modules.push((format!("{}{}.{}.1{}", name, tag, e.name, minor), e.words));
+                }
+            }
+        }
+    }
+    modules.extend(builder_modules());
+    let (mut ok, mut known, mut lines) = (0u32, 0u32, 0usize);
+    let mut firsts: Vec<String> = Vec::new();
+    for (name, words) in &modules {
+        match shader::msl::translate(words, &shader::msl::Options::DEFAULT) {
+            Ok(m) => {
+                ok += 1;
+                t.ok += 1;
+                lines += m.source.lines().count();
+                if let Some(d) = &dir {
+                    let f = plat::fs::join(d, &format!("{}.metal", name));
+                    plat::write_file(&f, m.source.as_bytes());
+                }
+            }
+            Err(msg) => {
+                if let Some((_, why)) = MSL_KNOWN.iter().find(|(k, _)| name.starts_with(k)) {
+                    known += 1;
+                    t.ok += 1;
+                    if t.verbose {
+                        out(&format!("    {}: expected: {} ({})\n", name, why, msg));
+                    }
+                    continue;
+                }
+                if firsts.len() < 40 {
+                    firsts.push(format!("    {}: {}\n", name, msg));
+                }
+                t.failed += 1;
+            }
+        }
+    }
+    for f in &firsts {
+        out(f);
+    }
+    out(&format!("   msl: {} modules, {} translated, {} known exceptions ({} lines of MSL)\n", modules.len(), ok, known, lines));
 }

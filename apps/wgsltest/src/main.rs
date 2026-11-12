@@ -216,7 +216,7 @@ fn run() -> i32 {
     }
     let only = plat::arg_value("--only").map(String::from);
     let verbose = plat::args().iter().any(|a| a == "--verbose");
-    let groups: [(&'static str, fn(&mut T)); 14] = [
+    let groups: [(&'static str, fn(&mut T)); 15] = [
         ("lex", lexparse::lex),
         ("parse", lexparse::parse),
         ("print", lexparse::print),
@@ -231,6 +231,7 @@ fn run() -> i32 {
         ("corpus", backend::corpus),
         ("backend", backend_api::run),
         ("perf_backend", backend_api::perf_backend),
+        ("msl", backend::msl),
     ];
     let mut failed = 0;
     let mut total = 0;

@@ -1,10 +1,12 @@
-// render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a1; docs/RENDER2D.md): a retained scene of entities
-// with stable ids (lines and polylines now), layers and styles; strokes as quads whose coverage the fragment shader
-// computes from the geometry (no MSAA), with exact butt, square and round caps and miter, bevel and round joins; f64
-// coordinates, a pair of f32 per axis on the GPU with the camera subtracted first; visibility in compute shaders that
-// keep the painter's order and write the indirect draws.  Hosted like render3d as the content of a ui.gpu_view (the
-// app glues it with a GpuContent; lib/ui knows nothing of it).  The same WGSL on every path: compiled ahead
-// (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
+// render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a, G6b1; docs/RENDER2D.md): a retained scene of
+// entities with stable ids (lines, polylines, arcs and circles; Bézier curves, ellipses and splines flattened per zoom
+// band on the CPU, curve.rs; fills of rings, triangulated on the CPU, fill.rs), layers and styles; strokes as quads whose
+// coverage the fragment shader computes from the geometry (no MSAA), with exact butt, square and round caps and miter,
+// bevel and round joins, dash patterns in pixels or drawing units; fills with their edge's exact coverage, every pixel
+// blended once, and hatches from the camera's place in f64; f64 coordinates, a pair of f32 per axis on the GPU with the
+// camera subtracted first; visibility in compute shaders that keep the painter's order and write the indirect draws.  Hosted
+// like render3d as the content of a ui.gpu_view (the app glues it with a GpuContent; lib/ui knows nothing of it).  The
+// same WGSL on every path: compiled ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
 //
 //   Renderer::new(&device, &RendererDesc) -> Result<Renderer>   the pipelines of one colour format
 //   Scene::new(&renderer) -> Result<Scene>
@@ -30,10 +32,12 @@ use alloc::sync::Arc;
 
 use gpu::*;
 
+pub mod curve;
+pub mod fill;
 pub mod math;
 mod scene;
 
-pub use scene::{Camera, Cap, EntityId, FrameStats, Join, Layer, LayerId, Scene, Shape, Style, StyleId, Unit, UploadInfo};
+pub use scene::{Camera, Cap, EntityId, FrameStats, HatchLine, Join, Layer, LayerId, Scene, Shape, Style, StyleId, Unit, UploadInfo, ARC_STEP, DASH_MAX, HATCH_DASH_MAX, HATCH_MAX};
 
 /// the most frames the CPU may record ahead of the GPU
 pub const FRAMES_MAX: usize = 3;
@@ -46,11 +50,14 @@ pub const LAYERS_MAX: u32 = 65535;
 
 pub(crate) const RECORD_WORDS: usize = 16;
 pub(crate) const RECORD_BYTES: u64 = 64;
-pub(crate) const STYLE_WORDS: usize = 8;
-pub(crate) const STYLE_BYTES: u64 = 32;
+pub(crate) const STYLE_WORDS: usize = 32;
+pub(crate) const STYLE_BYTES: u64 = 128;
 /// a row of the scatter shader: the place, 3 words of padding, the record
 pub(crate) const CHANGE_WORDS: usize = 20;
 pub(crate) const VIEW_BYTES: u64 = 64;
+/// a hatched style's entry of the hatch table (fill.wgsl Hatch): 32 vec4f
+pub(crate) const HATCH_WORDS: usize = 128;
+pub(crate) const HATCH_BYTES: u64 = 512;
 pub(crate) const DRAW_BYTES: u64 = 20;
 /// timestamps per frame: start, after the uploads, after the visibility, after the draw
 pub(crate) const STAMPS: u32 = 4;
@@ -63,11 +70,13 @@ mod spv {
     include!("shaders_spv.rs");
 }
 
-/// the WGSL sources as the device gets them (common.wgsl in front of each)
+/// the WGSL sources as the device gets them (common.wgsl in front of each; stroke.wgsl with fs_full from full_body.wgsl, the same body
+/// as the function full_body, and fill.wgsl)
 pub const COMMON_WGSL: &str = include_str!("common.wgsl");
 pub const CULL_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("cull.wgsl"));
 pub const SCATTER_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("scatter.wgsl"));
-pub const STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("stroke.wgsl"));
+pub const STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("stroke.wgsl"), "\n@fragment\nfn fs_full(i: VsOut) -> @location(0) vec4f {\n", include_str!("full_body.wgsl"),
+                                      "}\n\nfn full_body(i: VsOut) -> vec4f {\n", include_str!("full_body.wgsl"), "}\n", include_str!("fill.wgsl"));
 #[cfg(not(target_arch = "wasm32"))]
 pub const COUNT_SPV: &[u32] = spv::COUNT;
 #[cfg(not(target_arch = "wasm32"))]
@@ -79,7 +88,15 @@ pub const SCATTER_SPV: &[u32] = spv::SCATTER;
 #[cfg(not(target_arch = "wasm32"))]
 pub const VS_SPV: &[u32] = spv::VS;
 #[cfg(not(target_arch = "wasm32"))]
+pub const VS_FULL_SPV: &[u32] = spv::VS_FULL;
+#[cfg(not(target_arch = "wasm32"))]
 pub const FS_SPV: &[u32] = spv::FS;
+#[cfg(not(target_arch = "wasm32"))]
+pub const FS_FULL_SPV: &[u32] = spv::FS_FULL;
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_FILL_SPV: &[u32] = spv::VS_FILL;
+#[cfg(not(target_arch = "wasm32"))]
+pub const FS_FILL_SPV: &[u32] = spv::FS_FILL;
 
 /// Renderer::new.  Made with `new` and changed field by field (it may grow)
 #[derive(Clone, Copy, Debug)]
@@ -113,7 +130,12 @@ pub struct Renderer {
     scan: ComputePipeline,
     write: ComputePipeline,
     scatter: ComputePipeline,
+    /// solid segments (stroke.wgsl fs), and everything (fs_full: arcs, dash patterns) for the layers that hold arcs or
+    /// dashed strokes; fills and hatches too (fs_fill) for the layers that hold a fill
     stroke: RenderPipeline,
+    stroke_full: RenderPipeline,
+    /// fills, hatches and everything fs_full draws, for the layers that hold a fill
+    stroke_fill: RenderPipeline,
     pub(crate) count_layout: BindGroupLayout,
     pub(crate) scan_layout: BindGroupLayout,
     pub(crate) write_layout: BindGroupLayout,
@@ -129,20 +151,26 @@ struct Modules {
     write: ShaderModule,
     scatter: ShaderModule,
     vs: ShaderModule,
+    vs_full: ShaderModule,
     fs: ShaderModule,
+    fs_full: ShaderModule,
+    vs_fill: ShaderModule,
+    fs_fill: ShaderModule,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 fn modules(dev: &Device) -> Result<Modules> {
     let m = |w: &[u32]| ShaderModule::from_spirv(dev, w);
-    Ok(Modules { count: m(COUNT_SPV)?, scan: m(SCAN_SPV)?, write: m(WRITE_SPV)?, scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, fs: m(FS_SPV)? })
+    Ok(Modules { count: m(COUNT_SPV)?, scan: m(SCAN_SPV)?, write: m(WRITE_SPV)?, scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, vs_full: m(VS_FULL_SPV)?, fs: m(FS_SPV)?, fs_full: m(FS_FULL_SPV)?,
+                 vs_fill: m(VS_FILL_SPV)?, fs_fill: m(FS_FILL_SPV)? })
 }
 
 #[cfg(target_arch = "wasm32")]
 fn modules(dev: &Device) -> Result<Modules> {
     let c = ShaderModule::from_wgsl(dev, CULL_WGSL)?;
     let s = ShaderModule::from_wgsl(dev, STROKE_WGSL)?;
-    Ok(Modules { count: c.clone(), scan: c.clone(), write: c, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: s.clone(), fs: s })
+    Ok(Modules { count: c.clone(), scan: c.clone(), write: c, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: s.clone(), vs_full: s.clone(), fs: s.clone(), fs_full: s.clone(),
+                 vs_fill: s.clone(), fs_fill: s })
 }
 
 impl Renderer {
@@ -156,13 +184,18 @@ impl Renderer {
         let md = modules(dev)?;
         let b = |binding, kind, stages| Binding { binding, kind, stages };
         let (cs, vs) = (Stages::COMPUTE, Stages::VERTEX);
+        // (the fragment shader reads the view and the styles: the dash patterns)
+        let vfs = Stages::VERTEX | Stages::FRAGMENT;
         let (read, rw) = (BindingKind::StorageBufferRead, BindingKind::StorageBuffer);
         // (cull.wgsl's bindings: each pass names those it uses, none more than 5 storage buffers)
-        let count_layout = dev.create_bind_group_layout(&[b(0, BindingKind::UniformBuffer, cs), b(1, read, cs), b(2, read, cs), b(3, read, cs), b(4, rw, cs), b(5, rw, cs)])?;
+        // (11: the fill edges' segments in pixels, written by count)
+        let count_layout = dev.create_bind_group_layout(&[b(0, BindingKind::UniformBuffer, cs), b(1, read, cs), b(2, read, cs), b(3, read, cs), b(4, rw, cs), b(5, rw, cs), b(11, rw, cs)])?;
         let scan_layout = dev.create_bind_group_layout(&[b(5, rw, cs), b(6, read, cs), b(7, rw, cs), b(8, rw, cs), b(9, rw, cs)])?;
         let write_layout = dev.create_bind_group_layout(&[b(3, read, cs), b(4, rw, cs), b(7, rw, cs), b(10, rw, cs)])?;
         let scatter_layout = dev.create_bind_group_layout(&[b(0, read, cs), b(1, rw, cs)])?;
-        let draw_layout = dev.create_bind_group_layout(&[b(0, BindingKind::UniformBuffer, vs), b(1, read, vs), b(2, read, vs), b(3, read, vs), b(4, read, vs)])?;
+        // (5: the hatch table, 6: the fill edges' segments in pixels; fs_fill reads the pool too)
+        let draw_layout = dev.create_bind_group_layout(&[b(0, BindingKind::UniformBuffer, vfs), b(1, read, vfs), b(2, read, vfs), b(3, read, vs), b(4, read, vs), b(5, read, Stages::FRAGMENT),
+                                                         b(6, read, vfs)])?;
         let pl = |g: &BindGroupLayout, push: u32| dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[g], push_constants: push });
         // (only scan, scatter and the draw read a push constant; a layout that says more than its pass sets is an error in the browser, where the
         // values are a bind group)
@@ -173,17 +206,22 @@ impl Renderer {
         let write = compute(&write_pl, &md.write, "write")?;
         let scatter = compute(&scatter_pl, &md.scatter, "main")?;
         // premultiplied blending of sRGB codes; no depth (the overlap at joins: stroke.wgsl)
-        let stroke = dev.create_render_pipeline(&RenderPipelineDesc {
-            layout: &draw_pl,
-            vertex: ShaderStage::new(&md.vs, "vs"),
-            fragment: Some(ShaderStage::new(&md.fs, "fs")),
-            buffers: &[],
-            topology: Topology::Triangles,
-            cull: Cull::None,
-            front_cw: false,
-            targets: &[ColorTarget { format: desc.color, blend: Some(Blend::PREMULTIPLIED), write_mask: 0xF }],
-            depth: None,
-        })?;
+        let stroke_with = |vs: &ShaderModule, ventry: &str, fs: &ShaderModule, fentry: &str| {
+            dev.create_render_pipeline(&RenderPipelineDesc {
+                layout: &draw_pl,
+                vertex: ShaderStage::new(vs, ventry),
+                fragment: Some(ShaderStage::new(fs, fentry)),
+                buffers: &[],
+                topology: Topology::Triangles,
+                cull: Cull::None,
+                front_cw: false,
+                targets: &[ColorTarget { format: desc.color, blend: Some(Blend::PREMULTIPLIED), write_mask: 0xF }],
+                depth: None,
+            })
+        };
+        let stroke = stroke_with(&md.vs, "vs", &md.fs, "fs")?;
+        let stroke_full = stroke_with(&md.vs_full, "vs_full", &md.fs_full, "fs_full")?;
+        let stroke_fill = stroke_with(&md.vs_fill, "vs_fill", &md.fs_fill, "fs_fill")?;
         let mut idx = alloc::vec::Vec::with_capacity(BATCH as usize * 6);
         for q in 0..BATCH {
             let v = (q * 4) as u16;
@@ -210,6 +248,8 @@ impl Renderer {
             write,
             scatter,
             stroke,
+            stroke_full,
+            stroke_fill,
             count_layout,
             scan_layout,
             write_layout,
@@ -286,6 +326,11 @@ impl Renderer {
         if let Some((up, size)) = &s.up.styles {
             e.copy_buffer(up, 0, &s.styles_buf, 0, *size);
         }
+        // (the hatch table: covered by the same barriers as the styles, the one above against the frame before's fragment
+        // reads, the one below before this frame's)
+        if let Some((up, size)) = &s.up.hatch {
+            e.copy_buffer(up, 0, &s.hatch_buf, 0, *size);
+        }
         if let Some((up, order, layers)) = &s.up.tables {
             if *order > 0 {
                 e.copy_buffer(up, 0, &s.order_buf, 0, *order);
@@ -342,18 +387,33 @@ impl Renderer {
         }
         e.begin_render(&RenderPassDesc { color: &[color], depth: None });
         if layers > 0 {
-            e.set_render_pipeline(&self.stroke);
-            e.set_bind_group(0, &g.draw);
-            e.set_index_buffer(&self.quads, 0, IndexFormat::U16);
-            if self.multi {
-                e.push_constants(0, &[0u32]);
-                e.draw_indexed_indirect_multi(&s.draws_buf, 0, layers, DRAW_BYTES as u32);
-            } else {
-                // WebGPU and Vulkan 1.1: no first instance is sure to work; the layer comes as a push constant
-                for k in 0..layers {
-                    e.push_constants(0, &[k]);
-                    e.draw_indexed_indirect(&s.draws_buf, k as u64 * DRAW_BYTES);
+            // runs of visible layers that take the same pipeline: those with fills fs_fill, with arcs or dash patterns
+            // fs_full, the others fs
+            let class = |k: u32| s.full.get(k as usize).copied().unwrap_or(scene::CLASS_PLAIN);
+            let mut k = 0;
+            while k < layers {
+                let mut n = 1;
+                while k + n < layers && class(k + n) == class(k) {
+                    n += 1;
                 }
+                e.set_render_pipeline(match class(k) {
+                    scene::CLASS_FILL => &self.stroke_fill,
+                    scene::CLASS_FULL => &self.stroke_full,
+                    _ => &self.stroke,
+                });
+                e.set_bind_group(0, &g.draw);
+                e.set_index_buffer(&self.quads, 0, IndexFormat::U16);
+                if self.multi {
+                    e.push_constants(0, &[0u32]);
+                    e.draw_indexed_indirect_multi(&s.draws_buf, k as u64 * DRAW_BYTES, n, DRAW_BYTES as u32);
+                } else {
+                    // WebGPU and Vulkan 1.1: no first instance is sure to work; the layer comes as a push constant
+                    for j in k..k + n {
+                        e.push_constants(0, &[j]);
+                        e.draw_indexed_indirect(&s.draws_buf, j as u64 * DRAW_BYTES);
+                    }
+                }
+                k += n;
             }
         }
         e.end_render();

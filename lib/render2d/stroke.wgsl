@@ -1,5 +1,5 @@
-// stroke: segments as quads with analytic coverage (decision 25; docs/RENDER2D.md "Der Shader").  No vertex buffer:
-// a draw of the visible list of one layer, BATCH quads (four corners, u16 indices 0 1 2 2 1 3) per instance.
+// stroke: segments and arcs as quads with analytic coverage (decision 25; docs/RENDER2D.md "Der Shader").  No vertex
+// buffer: a draw of the visible list of one layer, BATCH quads (four corners, u16 indices 0 1 2 2 1 3) per instance.
 //
 // The vertex shader places a segment relative to the camera (common.wgsl: rel2), in pixels, and clips it to the
 // target grown by its reach: an end beyond that is open (no cap, no join, nothing of it shows).  Points far from the
@@ -23,20 +23,37 @@
 // ends, |a| + |w| + |b| - |a and b| (a short segment near both its joins: both unions, the neighbours' rectangles
 // meeting each other left out).  Caps: the rectangle grown by half a width (square), the half circle beyond its end
 // (round).  The pieces near the pixel are bits of a mask, and one loop adds their shares, so that area6 sits in the
-// shader once: inlined at forty places it made the shader so long that the GPU spent its time loading code.
+// solid path once: inlined at forty places it made the shader so long that the GPU spent its time loading code.
 //
 // Overlap (docs/RENDER2D.md, "Überlappung"): every pixel near a join lies in both segments' quads, and a translucent
 // polyline must not blend twice there.  No depth and no stencil: a pixel near a join belongs to the nearer of the two
 // segments (their centre lines; near the vertex that is the bisector, beyond a short neighbour's end the longer
 // one), and the other discards it.  Both compute the two distances from the same bits (the vertex from the same
-// hi/lo, the segments as vectors the CPU rounded once: Record.info), so exactly one of them draws, with the union of
+// hi/lo, the segments as vectors the CPU rounded once: Record.v), so exactly one of them draws, with the union of
 // both pieces.  Where a polyline comes back over itself away from a join its pieces blend each, as two entities
 // would.
 //
-// Short thin strokes (TINY_LEN, TINY_H: mostly what a drawing shows of its details from far away) take a fast way near their
-// ends: one segment's tile as the product of the strip's share and the share on its side of the bisector (the
+// Short thin strokes (TINY_LEN, TINY_H: mostly what a drawing shows of its details from far away) take a fast way near
+// their ends: one segment's tile as the product of the strip's share and the share on its side of the bisector (the
 // neighbour's piece likewise), instead of the exact area (docs/RENDER2D.md "Der schnelle Weg"); longer or wider strokes
 // stay exact.
+//
+// Arcs (vs_arc, fs_arc; docs/RENDER2D.md "Bögen und Kreise"): an arc is a head and pieces of at most 22.5 degrees, each
+// a record with its circle's centre and its end, its start the end of the record before.  The circle near the camera
+// comes from |v|^2 - r^2 in double-f32 (v the camera minus the centre): F, the point of the circle nearest the camera's
+// centre, its outward unit u, the radius in pixels; the fragment shader measures from F, (|q|^2 + 2 r q.u) / (|q + r u|
+// + r) for q = pixel - F, which stays exact in f32 for any radius.  The quad of a piece lies between the chord at the
+// inner radius and the tangent at the outer one (over a circle much larger than the target: only the part over it),
+// so the pixels it shades follow the stroke.  A pixel near a joint of two pieces is the one's on whose side of the
+// joint's radial line its centre lies (both from the same bits), and that one takes the whole ring there.
+//
+// Dash patterns (common.wgsl's head): the vertex shader finds the pattern's place at a reference point (a segment: the
+// camera centre's foot on its line, kept within it; an arc: F kept within the piece) from the nearer end, in
+// double-f32; the fragment shader walks the pattern from there, in dash units relative to that place (so that a period
+// of a million pixels keeps 1/16 px), and adds each dash that meets the pixel as a piece: the strip between its two ends
+// (a square cap half a width further, a round one a half circle), at a join the neighbour's dashes and the join's piece
+// where a dash runs through the vertex.  Patterns whose period comes near a pixel turn into a flat tone of their duty
+// (DASH_FLAT, DASH_EXACT).
 //
 // Colours are sRGB codes blended as they are (premultiplied), as lib/gfx blends them.
 
@@ -44,11 +61,22 @@ const BATCH: u32 = 16384u;
 const OPEN: u32 = 0u;
 const CAP: u32 = 1u;
 const JOIN: u32 = 2u;
-// beyond this many pixels from the target's middle at both ends, a segment's line is placed by far_foot
-const FAR: f32 = 131072.0;
 // segments up to this long (px) and strokes up to this half width (px) take the fast way near their ends
 const TINY_LEN: f32 = 3.0;
 const TINY_H: f32 = 0.75;
+// a dash pattern of a period up to DASH_FLAT pixels is drawn as a flat tone of its duty, from DASH_EXACT on exactly,
+// mixed in between
+const DASH_FLAT: f32 = 2.0;
+const DASH_EXACT: f32 = 4.0;
+// beyond this many pixels of arc from a piece's nearer end, the pattern's place at the reference point is computed from
+// the chord in double-f32
+const ARC_FAR: f32 = 100000.0;
+// misc.x of VsOut: start kind | end kind << 2 | cap << 4 | join << 8 | the polyline's ends << 12 (an arc: its own
+// ends), and these
+const M_DASHED: u32 = 16384u;
+const M_RESTART_S: u32 = 32768u;
+const M_RESTART_E: u32 = 65536u;
+const M_ARC: u32 = 131072u;
 
 struct Push {
     // the visible layer this draw shows (Basis; 0 on Voll, where first_instance carries it in its high 16 bits)
@@ -64,14 +92,21 @@ var<immediate> pc: Push;
 
 struct VsOut {
     @builtin(position) pos: vec4f,
-    // the segment's ends in pixels of the target (clipped where they lay beyond it)
+    // a segment: its ends in pixels of the target (clipped where they lay beyond it); an arc's piece: F (px of the
+    // target) and the outward unit there
     @location(0) @interpolate(flat) seg: vec4f,
-    // in pixels: the previous point minus the start, the next point minus the end
+    // a segment, in pixels: the previous point minus the start, the next point minus the end; an arc's piece: its start
+    // and end (px of the target)
     @location(1) @interpolate(flat) nb: vec4f,
-    // half width (px), miter limit, the end minus the start in pixels (from Record.info, as the neighbours have it)
+    // half width (px); a segment: the miter limit, the end minus the start in pixels (from Record.v, as the neighbours
+    // have it); an arc's piece: the radius (px), the turn's sign in pixels, the dash reference's angle from F
     @location(2) @interpolate(flat) par: vec4f,
-    // start kind | end kind << 2 | cap << 4 | join << 8 | the polyline's ends << 12 (Record.info.w), colour
-    @location(3) @interpolate(flat) misc: vec2u,
+    // flags (see M_*), colour, style
+    @location(3) @interpolate(flat) misc: vec4u,
+    // a dashed stroke: the pattern's place at the reference point (dash units, hi and lo); a segment: where that point
+    // lies (px along it from its drawn start); the place of the other side where the pattern starts again (a closed
+    // polyline's first point, a circle's start; dash units)
+    @location(4) @interpolate(flat) dash: vec4f,
 }
 
 fn unit_or_zero(v: vec2f) -> vec2f {
@@ -107,42 +142,89 @@ fn end_reach(dir: vec2f, nbdir: vec2f, joined: bool, incoming: bool, h: f32, st:
     return h * sn;
 }
 
-// a * b exactly as p + e (the fused multiply-add keeps what the product rounded away)
-fn two_prod(a: f32, b: f32) -> vec2f {
-    let p = a * b;
-    return vec2f(p, fma(a, b, -p));
+// a dashed segment: the pattern's place at its reference point (the camera centre's foot on its line, kept within the
+// segment) from the nearer end, in double-f32 (dash units); where that point lies along the segment from its drawn
+// start q0 (px); the place of the other side at a closed polyline's first point.  r0, r1: rel2 of its ends, d its
+// direction in pixels
+fn seg_dash(idx: u32, r: Record, st: Style, r0: vec4f, r1: vec4f, q0: vec2f, d: vec2f) -> vec4f {
+    let ownu = bitcast<vec2f>(r.v.xy);
+    let le = length_of(r);
+    var ls = vec3f(0.0);
+    if (r.w.w & F_FIRST) == 0u {
+        ls = length_of(pool[idx - 1u]);
+    }
+    let lu = length(ownu);
+    var du = vec2f(1.0, 0.0);
+    if lu > 0.0 {
+        du = ownu / lu;
+    }
+    // the foot's distance from the start along the segment (drawing units): (camera - start) . du
+    let ta = dd_add(dd_mul_f(vec2f(-r0.x, -r0.z), du.x), dd_mul_f(vec2f(-r0.y, -r0.w), du.y));
+    var base = ls;
+    var t = vec2f(0.0);
+    var rp = to_px(r0.xy, view);
+    if ta.x >= lu {
+        base = le;
+        rp = to_px(r1.xy, view);
+    } else if ta.x > 0.0 {
+        // (the foot itself: near the camera, a small number out of large ones)
+        let fx = dd_add(vec2f(r0.x, r0.z), dd_mul_f(ta, du.x));
+        let fy = dd_add(vec2f(r0.y, r0.w), dd_mul_f(ta, du.y));
+        rp = to_px(vec2f(fx.x + fx.y, fy.x + fy.y), view);
+        if ta.x <= 0.5 * lu {
+            t = ta;
+        } else {
+            base = le;
+            t = dd_add(dd_mul_f(vec2f(-r1.x, -r1.z), du.x), dd_mul_f(vec2f(-r1.y, -r1.w), du.y));
+        }
+    }
+    let ph = dd_mul_f(periods(base, t, st.kappa, st.phase0), st.period);
+    // the other side of a closed polyline's first point: its last record ends there, the length all around
+    var other = 0.0;
+    if (r.w.w & F_WRAP_PREV) != 0u {
+        other = periods(length_of(pool[idx + r.w.y]), vec2f(0.0), st.kappa, st.phase0).x * st.period;
+    } else if (r.w.w & F_WRAP_NEXT) != 0u {
+        other = st.phase0 * st.period;
+    }
+    return vec4f(ph.x, ph.y, dot(rp - q0, d), other);
 }
 
-// the foot of the camera's centre on the line through two points far from it (r0, r1: rel2's pairs): their cross
-// product in double-f32 over their distance is the line's signed distance from the centre (px from the middle)
-fn far_foot(r0: vec4f, r1: vec4f) -> vec2f {
-    let a = two_prod(r0.x, r1.y);
-    let b = two_prod(r0.y, r1.x);
-    let s = two_sum(a.x, -b.x);
-    let rest = (a.y - b.y) + ((r0.x * r1.w + r0.z * r1.y) - (r0.y * r1.z + r0.w * r1.x));
-    let cr = s.x + (s.y + rest);
-    let dv = vec2f(r1.x - r0.x, r1.y - r0.y);
-    let lu = length(dv);
-    let du = dv / lu;
-    return to_px(-(cr / lu) * vec2f(-du.y, du.x), view);
+// the vertex shaders of both pipelines (lib.rs): vs for solid segments only, vs_full also for arcs and dash patterns
+// (apart, so that their code weighs nothing on the many solid segments)
+@vertex
+fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VsOut {
+    return vertex(vi, ii, false);
 }
 
 @vertex
-fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VsOut {
+fn vs_full(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VsOut {
+    return vertex(vi, ii, true);
+}
+
+fn vertex(vi: u32, ii: u32, full: bool) -> VsOut {
     var o: VsOut;
     // a quad of nothing: all four corners in one point
     o.pos = vec4f(2.0, 2.0, 0.5, 1.0);
     o.seg = vec4f(0.0);
     o.nb = vec4f(0.0);
     o.par = vec4f(0.0);
-    o.misc = vec2u(0u);
+    o.misc = vec4u(0u);
+    o.dash = vec4f(0.0);
     let l = lists[pc.layer + (ii >> 16u)];
     let j = (ii & 0xffffu) * BATCH + (vi >> 2u);
     if j >= l.y {
         return o;
     }
-    let r = pool[visible[l.x + j]];
-    let st = styles[r.info.x - 1u];
+    let idx = visible[l.x + j];
+    let r = pool[idx];
+    let st = styles[r.w.z - 1u];
+    if kind_of_record(r) == K_ARC {
+        // (a layer with arcs takes vs_full)
+        if full {
+            return vs_arc(vi, idx, r, st);
+        }
+        return o;
+    }
     let h = half_width(st, view);
     let half = 0.5 * view.turn.zw;
     let r0 = rel2(r.a, view);
@@ -151,11 +233,21 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VsOut
     let p0 = to_px(r0.xy, view);
     let p1 = to_px(r1.xy, view);
     let cap = cap_of(st);
-    var sk = select(CAP, JOIN, any(r.near.xy != vec2f(0.0)));
-    var ek = select(CAP, JOIN, any(r.near.zw != vec2f(0.0)));
-    let va = to_px(r.near.xy, view);
-    let vb = to_px(r.near.zw, view);
-    let own = to_px(bitcast<vec2f>(r.info.yz), view);
+    let info = r.w.w;
+    // the neighbours' own vectors: the previous point minus the start, the next point minus the end (scene.rs: the bits
+    // of this record's own vector where they meet)
+    var nu = vec4f(0.0);
+    if (info & F_PREV) != 0u {
+        nu = vec4f(-bitcast<vec2f>(pool[select(idx - 1u, idx + r.w.y, (info & F_WRAP_PREV) != 0u)].v.xy), 0.0, 0.0);
+    }
+    if (info & F_NEXT) != 0u {
+        nu = vec4f(nu.xy, bitcast<vec2f>(pool[select(idx + 1u, idx - r.w.y, (info & F_WRAP_NEXT) != 0u)].v.xy));
+    }
+    var sk = select(CAP, JOIN, (info & F_PREV) != 0u);
+    var ek = select(CAP, JOIN, (info & F_NEXT) != 0u);
+    let va = to_px(nu.xy, view);
+    let vb = to_px(nu.zw, view);
+    let own = to_px(bitcast<vec2f>(r.v.xy), view);
     let len0 = length(p1 - p0);
     var d = unit_or_zero(own);
     if !any(d != vec2f(0.0)) {
@@ -165,8 +257,15 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VsOut
     if len0 == 0.0 && cap == CAP_BUTT && sk == CAP && ek == CAP {
         return o;
     }
-    let e0 = end_reach(-d, unit_or_zero(va), sk == JOIN, false, h, st);
-    let e1 = end_reach(d, unit_or_zero(vb), ek == JOIN, true, h, st);
+    let dashed = full && dash_count(st) > 0u;
+    var e0 = end_reach(-d, unit_or_zero(va), sk == JOIN, false, h, st);
+    var e1 = end_reach(d, unit_or_zero(vb), ek == JOIN, true, h, st);
+    if dashed {
+        // (a dash's cap near a vertex reaches into the neighbour's room; the pixel's owner draws it, its quad holds it)
+        let ce = select(h, 0.0, cap == CAP_BUTT);
+        e0 = max(e0, ce);
+        e1 = max(e1, ce);
+    }
     let m = max(h, max(e0, e1)) + 2.0;
     let lo = -half - vec2f(m);
     let hi = half + vec2f(m);
@@ -227,7 +326,191 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VsOut
     o.seg = vec4f(q0 + half, q1 + half);
     o.nb = vec4f(va, vb);
     o.par = vec4f(h, st.miter, own);
-    o.misc = vec2u(sk | (ek << 2u) | (cap << 4u) | (join_of(st) << 8u) | ((r.info.w & 3u) << 12u), st.color);
+    o.misc = vec4u(sk | (ek << 2u) | (cap << 4u) | (join_of(st) << 8u) | ((info & 3u) << 12u), st.color, r.w.z - 1u, 0u);
+    if dashed {
+        o.misc.x |= M_DASHED | select(0u, M_RESTART_S, (info & F_WRAP_PREV) != 0u) | select(0u, M_RESTART_E, (info & F_WRAP_NEXT) != 0u);
+        o.dash = seg_dash(idx, r, st, r0, r1, q0, d);
+    }
+    return o;
+}
+
+// the arc length (drawing units, double-f32) from a point x of the circle (rel2) to F (relative to the camera's
+// centre, drawing units), along a circle of radius rr (hi, lo): 2 r asin(c / 2r) of the chord c, asin by one Newton
+// step from f32 with the sine in double-f32 (the half angle stays below 0.1: a piece's half)
+fn arc_from(x: vec4f, fu: vec2f, rr: vec2f) -> vec2f {
+    let cx = dd_add_f(vec2f(-x.x, -x.z), fu.x);
+    let cy = dd_add_f(vec2f(-x.y, -x.w), fu.y);
+    let c = dd_sqrt(dd_add(dd_mul(cx, cx), dd_mul(cy, cy)));
+    let y = dd_div(c, dd_mul_f(rr, 2.0));
+    // (asin by its series: the GPU's own asin and cos need not be exact, Vulkan allows 4096 ulp and 2^-11)
+    let y2 = y.x * y.x;
+    let t0 = y.x * (1.0 + y2 * (1.0 / 6.0 + y2 * (3.0 / 40.0 + y2 * (5.0 / 112.0))));
+    let t2 = two_prod(t0, t0);
+    let t3 = dd_mul_f(t2, t0);
+    let t5 = dd_mul(t3, t2);
+    var s = dd_add(dd_mul(t3, vec2f(-0.1666666716337204, 4.967053879312289e-09)), dd_mul(t5, vec2f(0.008333333767950535, -4.34617203337595e-10)));
+    s = dd_add_f(s, t5.x * t2.x * (-1.0 / 5040.0 + t2.x / 362880.0));
+    s = dd_add_f(s, t0);
+    let th = dd_add_f(vec2f(t0, 0.0), ((y.x - s.x) + (y.y - s.y)) / cos_p(t0));
+    return dd_mul(dd_mul_f(th, 2.0), rr);
+}
+
+// sine and cosine exact also for small angles, which a huge circle's are (the GPU's own may be off by 2^-11 absolute,
+// Vulkan's bound, a million pixels at a radius of 1e13 px): their series below 0.5, beyond the GPU's
+fn sin_p(x: f32) -> f32 {
+    if abs(x) < 0.5 {
+        let x2 = x * x;
+        return x * (1.0 - x2 / 6.0 * (1.0 - x2 / 20.0 * (1.0 - x2 / 42.0 * (1.0 - x2 / 72.0))));
+    }
+    return sin(x);
+}
+
+// atan2 exact also for the small angles of a huge circle (the GPU's own may be 4096 ulp off): the series of y / x below
+// a tenth
+fn atan2_p(y: f32, x: f32) -> f32 {
+    if x > 0.0 && abs(y) < 0.1 * x {
+        let z = y / x;
+        let z2 = z * z;
+        return z * (1.0 - z2 * (1.0 / 3.0 - z2 * (1.0 / 5.0 - z2 * (1.0 / 7.0 - z2 / 9.0))));
+    }
+    return atan2(y, x);
+}
+
+fn cos_p(x: f32) -> f32 {
+    if abs(x) < 0.5 {
+        let x2 = x * x;
+        return 1.0 - x2 / 2.0 * (1.0 - x2 / 12.0 * (1.0 - x2 / 30.0 * (1.0 - x2 / 56.0)));
+    }
+    return cos(x);
+}
+
+// an arc's piece (the head above): its quad, F and the radius, its ends, its dash pattern's place
+fn vs_arc(vi: u32, idx: u32, r: Record, st: Style) -> VsOut {
+    var o: VsOut;
+    o.pos = vec4f(2.0, 2.0, 0.5, 1.0);
+    o.seg = vec4f(0.0);
+    o.nb = vec4f(0.0);
+    o.par = vec4f(0.0);
+    o.misc = vec4u(0u);
+    o.dash = vec4f(0.0);
+    let h = half_width(st, view);
+    let half = 0.5 * view.turn.zw;
+    let cap = cap_of(st);
+    let info = r.w.w;
+    let pa = pool[idx - 1u];
+    let rr = vec2f(bitcast<f32>(r.v.x), bitcast<f32>(r.v.y));
+    let rc = rel2(r.a, view);
+    // the camera's distance from the circle: (|v|^2 - r^2) / (|v| + r) for v = camera - centre, the difference of the
+    // squares in double-f32 (both may be 1e14 and more, the distance a thousandth)
+    let vx = vec2f(-rc.x, -rc.z);
+    let vy = vec2f(-rc.y, -rc.w);
+    let v2 = dd_add(dd_mul(vx, vx), dd_mul(vy, vy));
+    let num = dd_add(v2, -dd_mul(rr, rr));
+    let vl = sqrt(v2.x);
+    let d0 = (num.x + num.y) / (vl + rr.x);
+    var uu = vec2f(1.0, 0.0);
+    if vl > 0.0 {
+        uu = vec2f(vx.x, vy.x) / vl;
+    }
+    // in pixels: F, the outward unit there, the radius; the turn's sign (y points down here: a counter-clockwise arc
+    // turns the other way), the arc's direction at F
+    let up = unit_or_zero(to_px(uu, view));
+    let fu = -d0 * uu;
+    let f = to_px(fu, view);
+    let rp = (rr.x + rr.y) * view.rest.z;
+    let orient = select(1.0, -1.0, (info & F_CCW) != 0u);
+    let tf = orient * vec2f(-up.y, up.x);
+    let ra = rel2(pa.b, view);
+    let ap = to_px(ra.xy, view);
+    let bp = to_px(rel2(r.b, view).xy, view);
+    // the piece's ends as angles from F along the arc
+    let wa = ap - f;
+    let wb = bp - f;
+    let ba = atan2_p(dot(wa, tf), rp + dot(wa, up));
+    var bb = atan2_p(dot(wb, tf), rp + dot(wb, up));
+    if bb < ba {
+        bb += 6.2831853;
+    }
+    // a cap's reach beyond the arc's own ends
+    let ce = select(h, 0.0, cap == CAP_BUTT);
+    var b0 = ba;
+    var b1 = bb;
+    let mg = half + vec2f(h + ce + 3.0);
+    if rp > length(mg) + h + 1.0 {
+        // a circle larger than the target and its margin: only the angles at which its ring can meet them (whatever of it
+        // lies there is within a quarter turn of F, the point nearest the target's middle: asin of the projection along
+        // the arc's direction at F)
+        var xmin = 3.4e38;
+        var xmax = -3.4e38;
+        for (var k = 0u; k < 4u; k++) {
+            let x = dot(vec2f(select(-mg.x, mg.x, (k & 1u) != 0u), select(-mg.y, mg.y, (k & 2u) != 0u)) - f, tf);
+            xmin = min(xmin, x);
+            xmax = max(xmax, x);
+        }
+        let ri = max(rp - h - 1.0, 1.0);
+        let ro = rp + h + 1.0;
+        b0 = max(b0, min(asin(clamp(xmin / ri, -1.0, 1.0)), asin(clamp(xmin / ro, -1.0, 1.0))));
+        b1 = min(b1, max(asin(clamp(xmax / ri, -1.0, 1.0)), asin(clamp(xmax / ro, -1.0, 1.0))));
+        if b0 > b1 {
+            return o;
+        }
+    }
+    // the quad: from the chord at the inner radius to the tangent at the outer one, pushed out along the arc by a pixel
+    // at its ends (by a cap's reach at the arc's own ends): radial offsets from the circle, exact for any radius
+    let al = 0.5 * (b1 - b0);
+    let sal = sin_p(0.5 * al);
+    let dout = ((h + 1.0) + 2.0 * rp * sal * sal) / cos_p(al);
+    let din = -min(h + 1.0, rp);
+    let e0 = select(1.0, 1.0 + ce, (info & F_CAP_A) != 0u && b0 == ba);
+    let e1 = select(1.0, 1.0 + ce, (info & F_CAP_B) != 0u && b1 == bb);
+    let be = select(b0, b1, (vi & 1u) != 0u);
+    let dr = select(din, dout, (vi & 2u) != 0u);
+    let sb = sin_p(be);
+    let cb = cos_p(be);
+    let sh = sin_p(0.5 * be);
+    // a point at angle be and radius rp + dr, relative to F; then along the arc's direction there
+    var p = f + (dr * cb - 2.0 * rp * sh * sh) * up + (rp + dr) * sb * tf;
+    p += select(-e0, e1, (vi & 1u) != 0u) * (cb * tf - sb * up);
+    o.pos = vec4f(p.x / half.x, -p.y / half.y, 0.5, 1.0);
+    o.seg = vec4f(f + half, up);
+    o.nb = vec4f(ap + half, bp + half);
+    o.par = vec4f(h, rp, orient, 0.0);
+    o.misc = vec4u(M_ARC | (cap << 4u) | ((info & 3u) << 12u), st.color, r.w.z - 1u, 0u);
+    if dash_count(st) > 0u {
+        o.misc.x |= M_DASHED | select(0u, M_RESTART_S, (info & F_RESTART_A) != 0u) | select(0u, M_RESTART_E, (info & F_RESTART_B) != 0u);
+        // the reference point: F kept within the piece; the pattern's place there from the nearer end
+        let br = clamp(0.0, ba, bb);
+        let la = length_of(pa);
+        let lb = length_of(r);
+        var base = la;
+        var t = vec2f(0.0);
+        if br >= bb {
+            base = lb;
+        } else if br > ba {
+            // (beyond ARC_FAR pixels f32's angle is too coarse: the chord in double-f32)
+            let ru = rr.x + rr.y;
+            let near_a = -ba <= bb;
+            let ang = select(bb, -ba, near_a);
+            if rp * ang > ARC_FAR {
+                t = arc_from(select(rel2(r.b, view), ra, near_a), fu, rr);
+            } else {
+                t = vec2f(ru * ang, 0.0);
+            }
+            if !near_a {
+                base = lb;
+                t = -t;
+            }
+        }
+        let ph = dd_mul_f(periods(base, t, st.kappa, st.phase0), st.period);
+        var other = 0.0;
+        if (info & F_RESTART_A) != 0u {
+            other = periods(length_of(pool[idx + r.w.y]), vec2f(0.0), st.kappa, st.phase0).x * st.period;
+        } else if (info & F_RESTART_B) != 0u {
+            other = st.phase0 * st.period;
+        }
+        o.par.w = br;
+        o.dash = vec4f(ph.x, ph.y, 0.0, other);
+    }
     return o;
 }
 
@@ -799,6 +1082,522 @@ const S_HD_E: u32 = 4096u;
 const S_HD_A: u32 = 8192u;
 const S_HD_B: u32 = 16384u;
 
+// how a dash side's end ends (pieces): open (clipped by the target: no cut), cut (a join where the dash runs on), with
+// the style's cap (a dash's end, the polyline's or arc's own end)
+const E_OPEN: u32 = 0u;
+const E_CUT: u32 = 1u;
+const E_CAP: u32 = 2u;
+
+// the dashes of a pattern near a point
+struct Ivals {
+    n: u32,
+    i0: vec2f,
+    i1: vec2f,
+    i2: vec2f,
+}
+
+// where entry j of a style's dash pattern ends, from the period's start (dash units)
+// (the fragment shader reads a style's fields from the buffer, by its index: a copy of the struct with its array of
+// ends indexed at run time would lie in local memory, and every pixel would pay for it)
+fn dash_end(si: u32, j: u32) -> f32 {
+    return styles[si].ends[j >> 2u][j & 3u];
+}
+
+fn dash_len(si: u32, j: u32) -> f32 {
+    if j == 0u {
+        return dash_end(si, 0u);
+    }
+    return dash_end(si, j) - dash_end(si, j - 1u);
+}
+
+fn dash_n(si: u32) -> u32 {
+    return (styles[si].flags >> 12u) & 31u;
+}
+
+// the dashes (on entries) of a style's pattern within w px of a point at its place xh + xl (dash units), as px along
+// the stroke from the point (sc dash units per px), at most three.  Relative to the point, so that the ends near it are
+// exact also when the period is a million pixels (xh a place in the period, xl a small offset)
+fn ivals(si: u32, xh: f32, xl: f32, sc: f32, w: f32) -> Ivals {
+    var o: Ivals;
+    o.n = 0u;
+    o.i0 = vec2f(0.0);
+    o.i1 = vec2f(0.0);
+    o.i2 = vec2f(0.0);
+    let n = dash_n(si);
+    let p = styles[si].period;
+    let kp = floor((xh + xl) / p);
+    let x0 = xh - kp * p;
+    let x = x0 + xl;
+    var j = 0u;
+    var c0 = 0.0;
+    loop {
+        if j + 1u >= n {
+            break;
+        }
+        let c1 = dash_end(si, j);
+        if x < c1 {
+            break;
+        }
+        c0 = c1;
+        j += 1u;
+    }
+    var start = (c0 - x0) - xl;
+    let wd = w * sc;
+    var g = 0u;
+    loop {
+        if start <= -wd || g >= 16u {
+            break;
+        }
+        j = select(j - 1u, n - 1u, j == 0u);
+        start -= dash_len(si, j);
+        g += 1u;
+    }
+    g = 0u;
+    loop {
+        if start > wd || g >= 32u || o.n >= 3u {
+            break;
+        }
+        let e = dash_len(si, j);
+        if (j & 1u) == 0u && start + e >= -wd {
+            let v = vec2f(start, start + e) / sc;
+            if o.n == 0u {
+                o.i0 = v;
+            } else if o.n == 1u {
+                o.i1 = v;
+            } else {
+                o.i2 = v;
+            }
+            o.n += 1u;
+        }
+        start += e;
+        j = select(j + 1u, 0u, j + 1u >= n);
+        g += 1u;
+    }
+    return o;
+}
+
+// the pattern's entry that holds its place xh + xl: how far it reaches back and forward from there (px; sc dash units
+// per px), exact near its ends as in ivals
+fn entry_span(si: u32, xh: f32, xl: f32, sc: f32) -> vec2f {
+    let n = dash_n(si);
+    let p = styles[si].period;
+    let kp = floor((xh + xl) / p);
+    let x0 = xh - kp * p;
+    let x = x0 + xl;
+    var j = 0u;
+    var c0 = 0.0;
+    var c1 = dash_end(si, 0u);
+    loop {
+        if j + 1u >= n || x < c1 {
+            break;
+        }
+        j += 1u;
+        c0 = c1;
+        c1 = dash_end(si, j);
+    }
+    return vec2f(-((c0 - x0) - xl), (c1 - x0) - xl) / sc;
+}
+
+// the pattern is on at its place xh + xl
+fn on_at(si: u32, xh: f32, xl: f32) -> bool {
+    let n = dash_n(si);
+    let p = styles[si].period;
+    let kp = floor((xh + xl) / p);
+    let x = (xh - kp * p) + xl;
+    var j = 0u;
+    loop {
+        if j + 1u >= n {
+            break;
+        }
+        if x < dash_end(si, j) {
+            break;
+        }
+        j += 1u;
+    }
+    return (j & 1u) == 0u;
+}
+
+// no dash (clip_iv): its start beyond its end
+const IV_NONE: vec4f = vec4f(1e30, -1e30, 0.0, 0.0);
+
+// a dash (px along its side, relative to the side's origin) clipped to the side's extent lim (ends k: E_*): (z0, z1, how
+// each end ends: 0 open, 1 cut, 2 the style's cap; an end within 1/1000 px of the extent's: there); none: IV_NONE
+fn clip_iv(v: vec2f, uq: f32, lim: vec2f, k: vec2u) -> vec4f {
+    var z0 = v.x + uq;
+    var z1 = v.y + uq;
+    if z1 < lim.x || z0 > lim.y {
+        return IV_NONE;
+    }
+    var a = 2.0;
+    var b = 2.0;
+    if z0 <= lim.x + 1e-3 {
+        z0 = select(lim.x, z0, k.x == E_OPEN);
+        a = select(select(1.0, 2.0, k.x == E_CAP), 0.0, k.x == E_OPEN);
+    }
+    if z1 >= lim.y - 1e-3 {
+        z1 = select(lim.y, z1, k.y == E_OPEN);
+        b = select(select(1.0, 2.0, k.y == E_CAP), 0.0, k.y == E_OPEN);
+    }
+    return vec4f(z0, z1, a, b);
+}
+
+// the geometry a dashed stroke's pieces are cut from, at the pixel q: a segment side (origin o, direction dd) or the ring
+// of an arc (at the pixel: its outward unit m, its direction t, the pixel's distance from the circle, the radius)
+struct Ring {
+    m: vec2f,
+    t: vec2f,
+    dist: f32,
+    r: f32,
+}
+
+// a point of a side at z px along it (relative to its origin; an arc: arc length from the pixel's own place) and the
+// side's direction there (x, y: the point; z, w: the direction)
+fn side_at(q: vec2f, arc: bool, o: vec2f, dd: vec2f, g: Ring, z: f32) -> vec4f {
+    if !arc {
+        return vec4f(o + z * dd, dd);
+    }
+    let a = z / g.r;
+    let sa = sin_p(a);
+    let sh = sin_p(0.5 * a);
+    let ca = cos_p(a);
+    return vec4f(q + (-2.0 * g.r * sh * sh - g.dist) * g.m + g.r * sa * g.t, ca * g.t - sa * g.m);
+}
+
+// a dashed segment's or an arc's coverage of the pixel q, its owner decided (fs): the dashes of each side that meet the
+// pixel as pieces (the strip between the dash's ends, cut by a square cap half a width further, a round cap's half
+// circle a piece of its own, round caps of neighbouring dashes that meet taken once: |a| + |b| - |a and b|), near a join
+// the neighbour's dashes and the join's piece where a dash runs through the vertex, the rectangles meeting there taken
+// away (the union of docs/RENDER2D.md).  Sides: 0 this segment or the arc, 1 the previous segment (an arc: the other side
+// where the pattern starts again at its start), 2 the next one (at its end), 3 the joins.  solid: one dash all along
+// (an arc's own caps; the flat tone)
+fn pieces(i: VsOut, q: vec2f, arc: bool, solid: bool, si: u32, sc: f32, d: vec2f, dp: vec2f, dn: vec2f, near_s: bool, near_e: bool, g: Ring) -> f32 {
+    let fl = i.misc.x;
+    let h = i.par.x;
+    let cap = (fl >> 4u) & 15u;
+    let sk = fl & 3u;
+    let ek = (fl >> 2u) & 3u;
+    let jk = (fl >> 8u) & 15u;
+    let cp = (fl & 4096u) != 0u;
+    let cn = (fl & 8192u) != 0u;
+    let rs = (fl & M_RESTART_S) != 0u;
+    let re = (fl & M_RESTART_E) != 0u;
+    let w = 0.71 + select(h, 0.0, cap == CAP_BUTT);
+    // this side's own extent and the pattern along it: a segment from s (its place at s: xh + xl), an arc from the pixel's
+    // own place on it (z = 0) to its ends A and B
+    var s = i.seg.xy;
+    var e = i.seg.zw;
+    var lens = length(e - s);
+    var xh = i.dash.x;
+    var xl = i.dash.y - i.dash.z * sc;
+    var za = 0.0;
+    var zb = lens;
+    var ka = select(select(E_CAP, E_CUT, sk == JOIN), E_OPEN, sk == OPEN);
+    var kb = select(select(E_CAP, E_CUT, ek == JOIN), E_OPEN, ek == OPEN);
+    if arc {
+        let f = i.seg.xy;
+        let up = i.seg.zw;
+        let rp = i.par.y;
+        let orient = i.par.z;
+        let wv = (q - f) + rp * up;
+        let da = unit_or_zero((i.nb.xy - f) + rp * up);
+        let db = unit_or_zero((i.nb.zw - f) + rp * up);
+        let ta = orient * vec2f(-da.y, da.x);
+        let tb = orient * vec2f(-db.y, db.x);
+        // the arc lengths from the pixel's place to A and to B, and from the dash reference to the pixel's place
+        za = -rp * atan2_p(dot(wv, ta), dot(wv, da));
+        zb = -rp * atan2_p(dot(wv, tb), dot(wv, db));
+        let br = i.par.w;
+        let cr = cos_p(br);
+        let sr = sin_p(br);
+        let tf = orient * vec2f(-up.y, up.x);
+        let dr = cr * up + sr * tf;
+        let tr = cr * tf - sr * up;
+        let srp = rp * atan2_p(dot(q - f, tr) - rp * sr, dot(q - f, dr) + rp * cr);
+        xh = i.dash.x;
+        xl = i.dash.y + srp * sc;
+        let capa = cp;
+        let capb = cn;
+        ka = select(select(E_OPEN, E_CUT, rs), E_CAP, capa);
+        kb = select(select(E_OPEN, E_CUT, re), E_CAP, capb);
+        s = q;
+    }
+    // on at the ends: this side's place, the other side's (the same unless the pattern starts again there); a cut end
+    // whose other side is off takes a cap
+    let on_s = solid || on_at(si, xh, xl + za * sc);
+    let on_e = solid || on_at(si, xh, xl + zb * sc);
+    let ps_h = select(xh, i.dash.w, rs);
+    let ps_l = select(xl + za * sc, 0.0, rs);
+    let ne_h = select(xh, i.dash.w, re);
+    let ne_l = select(xl + zb * sc, 0.0, re);
+    let pon_s = solid || on_at(si, ps_h, ps_l);
+    let non_e = solid || on_at(si, ne_h, ne_l);
+    if ka == E_CUT && !pon_s {
+        ka = E_CAP;
+    }
+    if kb == E_CUT && !non_e {
+        kb = E_CAP;
+    }
+    let lp = length(i.nb.xy);
+    let ln = length(i.nb.zw);
+    let joins_s = !arc && near_s && sk == JOIN && on_s && pon_s;
+    let joins_e = !arc && near_e && ek == JOIN && on_e && non_e;
+    // the sides that may hold pieces, as bits (loops over bits, not over a count the compiler could unroll)
+    var sides = 1u;
+    if arc {
+        sides |= select(0u, 2u, rs && !solid) | select(0u, 4u, re && !solid);
+    } else {
+        sides |= select(0u, 2u, near_s && sk == JOIN) | select(0u, 4u, near_e && ek == JOIN) | select(0u, 8u, joins_s || joins_e);
+    }
+    var c = 0.0;
+    // how far the dashes that run through a join reach from the vertex, within their segments (the joins' overlap is cut
+    // there): this segment's from S and to E, the previous one's to S, the next one's from E; solid: the segments (the
+    // neighbours' far ends open as above)
+    var ls_own = lens;
+    var le_own = lens;
+    var ls_nb = select(1e30, lp, cp || near_e);
+    var le_nb = select(1e30, ln, cn || near_s);
+    if !solid && !arc {
+        let sq = select(0.0, h, cap == CAP_SQUARE);
+        if joins_s {
+            ls_own = min(entry_span(si, xh, xl, sc).y + sq, lens);
+            ls_nb = min(entry_span(si, ps_h, ps_l, sc).x + sq, lp);
+        }
+        if joins_e {
+            le_own = min(entry_span(si, xh, xl + zb * sc, sc).x + sq, lens);
+            le_nb = min(entry_span(si, ne_h, ne_l, sc).y + sq, ln);
+        }
+    }
+    loop {
+        if sides == 0u {
+            break;
+        }
+        let side = firstTrailingBit(sides);
+        sides &= sides - 1u;
+        // the side: origin, direction, the pattern's place at the origin, its extent and how its ends end
+        var o = s;
+        var dd = d;
+        var ph = xh;
+        var pl = xl;
+        var lim = vec2f(select(za, -1e30, ka == E_OPEN), select(zb, 1e30, kb == E_OPEN));
+        var k = vec2u(ka, kb);
+        if side == 1u {
+            if arc {
+                // the other side at A where the pattern starts again: it runs up to A
+                ph = ps_h;
+                pl = ps_l - za * sc;
+                lim = vec2f(-1e30, za);
+                k = vec2u(E_OPEN, select(E_CAP, E_CUT, on_s));
+            } else {
+                dd = dp;
+                ph = ps_h;
+                pl = ps_l;
+                lim = vec2f(-lp, 0.0);
+                k = vec2u(select(select(E_OPEN, E_CUT, near_e), E_CAP, cp), select(E_CAP, E_CUT, on_s));
+                lim.x = select(-lp, -1e30, k.x == E_OPEN);
+            }
+        } else if side == 2u {
+            if arc {
+                ph = ne_h;
+                pl = ne_l - zb * sc;
+                lim = vec2f(zb, 1e30);
+                k = vec2u(select(E_CAP, E_CUT, on_e), E_OPEN);
+            } else {
+                o = e;
+                dd = dn;
+                ph = ne_h;
+                pl = ne_l;
+                lim = vec2f(0.0, ln);
+                k = vec2u(select(E_CAP, E_CUT, on_e), select(select(E_OPEN, E_CUT, near_s), E_CAP, cn));
+                lim.y = select(ln, 1e30, k.y == E_OPEN);
+            }
+        }
+        // the side's dashes near the pixel, clipped to its extent; square caps lengthen them and dashes that then meet
+        // become one
+        let uq = select(dot(q - o, dd), 0.0, arc);
+        var iv: Ivals;
+        if solid {
+            iv.n = 1u;
+            iv.i0 = vec2f(-1e30, 1e30);
+        } else if side < 3u {
+            iv = ivals(si, ph, pl + uq * sc, sc, w);
+        }
+        var v0 = clip_iv(iv.i0, uq, lim, k);
+        var v1 = clip_iv(iv.i1, uq, lim, k);
+        var v2 = clip_iv(iv.i2, uq, lim, k);
+        let nv = select(iv.n, 0u, side == 3u);
+        if nv < 3u {
+            v2 = IV_NONE;
+        }
+        if nv < 2u {
+            v1 = IV_NONE;
+        }
+        if nv < 1u {
+            v0 = IV_NONE;
+        }
+        // (a segment's square caps lengthen its strip; an arc's are rectangles along its direction at the dash's end: pieces
+        // of their own, as round caps)
+        if cap == CAP_SQUARE && !arc {
+            v0 = select(v0, vec4f(v0.x - h * f32(v0.z == 2.0), v0.y + h * f32(v0.w == 2.0), min(v0.z, 1.0), min(v0.w, 1.0)), v0.x <= v0.y);
+            v1 = select(v1, vec4f(v1.x - h * f32(v1.z == 2.0), v1.y + h * f32(v1.w == 2.0), min(v1.z, 1.0), min(v1.w, 1.0)), v1.x <= v1.y);
+            v2 = select(v2, vec4f(v2.x - h * f32(v2.z == 2.0), v2.y + h * f32(v2.w == 2.0), min(v2.z, 1.0), min(v2.w, 1.0)), v2.x <= v2.y);
+            if v1.x <= v1.y && v2.x <= v2.y && v1.y >= v2.x {
+                v1 = vec4f(v1.x, v2.y, v1.z, v2.w);
+                v2 = IV_NONE;
+            }
+            if v0.x <= v0.y && v1.x <= v1.y && v0.y >= v1.x {
+                v0 = vec4f(v0.x, v1.y, v0.z, v1.w);
+                v1 = v2;
+                v2 = IV_NONE;
+            }
+        }
+        let round = cap == CAP_ROUND || (cap == CAP_SQUARE && arc);
+        let square = cap == CAP_SQUARE;
+        // the pieces as bits: per dash j bits 3j (its strip), 3j + 1 and 3j + 2 (its caps as pieces: round, an arc's square);
+        // per pair of neighbouring dashes whose caps meet bits 9 + 3j (the caps), 10 + 3j and 11 + 3j (a cap and the other
+        // dash: taken away); side 3: the join's piece and the rectangles meeting at the start (bits 0, 1) and at the end (2, 3)
+        var pm = 0u;
+        if side == 3u {
+            pm = select(0u, 3u, joins_s) | select(0u, 12u, joins_e);
+        } else {
+            pm = select(0u, 1u, v0.x <= v0.y) | select(0u, 8u, v1.x <= v1.y) | select(0u, 64u, v2.x <= v2.y);
+            if round {
+                pm |= select(0u, 2u, v0.x <= v0.y && v0.z == 2.0) | select(0u, 4u, v0.x <= v0.y && v0.w == 2.0);
+                pm |= select(0u, 16u, v1.x <= v1.y && v1.z == 2.0) | select(0u, 32u, v1.x <= v1.y && v1.w == 2.0);
+                pm |= select(0u, 128u, v2.x <= v2.y && v2.z == 2.0) | select(0u, 256u, v2.x <= v2.y && v2.w == 2.0);
+                let g01 = v1.x - v0.y;
+                if v0.x <= v0.y && v1.x <= v1.y && v0.w == 2.0 && v1.z == 2.0 && g01 < 2.0 * h {
+                    pm |= select(512u, 3584u, g01 < h);
+                }
+                let g12 = v2.x - v1.y;
+                if v1.x <= v1.y && v2.x <= v2.y && v1.w == 2.0 && v2.z == 2.0 && g12 < 2.0 * h {
+                    pm |= select(4096u, 28672u, g12 < h);
+                }
+            }
+        }
+        var stl = strip_l(q, o, dd, h);
+        var str = strip_r(q, o, dd, h);
+        if arc {
+            stl = vec3f(g.m, g.dist - h);
+            str = select(ALL, vec3f(-g.m, -g.dist - h), g.r > h);
+        }
+        loop {
+            if pm == 0u {
+                break;
+            }
+            let kk = firstTrailingBit(pm);
+            pm &= pm - 1u;
+            var x0 = ALL;
+            var x1 = ALL;
+            var x2 = ALL;
+            var x3 = ALL;
+            var x4 = ALL;
+            var x5 = ALL;
+            var wt = 1.0;
+            if side == 3u {
+                let at_s = kk < 2u;
+                var jj: Join;
+                if at_s {
+                    jj = make_join(s, dp, d, jk, i.par.y, h);
+                } else {
+                    jj = make_join(e, d, dn, jk, i.par.y, h);
+                }
+                if (kk & 1u) == 0u {
+                    let wd = wedge(q, jj, h);
+                    x0 = wd.a;
+                    x1 = wd.b;
+                    x2 = wd.c;
+                    x3 = wd.d;
+                } else {
+                    // the rectangles meeting on the inner side of the turn: between the two strips' inner lines and the lines at
+                    // right angles through the vertex, cut where the dashes through it end (their outer lines lie beyond)
+                    let nbd = select(dn, dp, at_s);
+                    let vtx = select(e, s, at_s);
+                    let din = select(d, dp, at_s);
+                    let dout = select(dn, d, at_s);
+                    let left = din.x * dout.y - din.y * dout.x >= 0.0;
+                    x0 = select(strip_r(q, s, d, h), strip_l(q, s, d, h), left);
+                    x1 = select(strip_r(q, vtx, nbd, h), strip_l(q, vtx, nbd, h), left);
+                    x2 = before(q, vtx, din);
+                    x3 = before(q, vtx, -dout);
+                    let lin = select(le_own, ls_nb, at_s);
+                    let lout = select(le_nb, ls_own, at_s);
+                    x4 = select(before(q, vtx - lin * din, -din), ALL, lin > 1e29);
+                    x5 = select(before(q, vtx + lout * dout, dout), ALL, lout > 1e29);
+                    wt = -1.0;
+                }
+            } else if kk < 9u {
+                let iv_k = kk / 3u;
+                let v = select(select(v2, v1, iv_k == 1u), v0, iv_k == 0u);
+                let sub = kk % 3u;
+                if sub == 0u {
+                    let pa = side_at(q, arc, o, dd, g, v.x);
+                    let pb = side_at(q, arc, o, dd, g, v.y);
+                    x0 = stl;
+                    x1 = str;
+                    x2 = select(ALL, before(q, pa.xy, -pa.zw), v.z > 0.5);
+                    x3 = select(ALL, before(q, pb.xy, pb.zw), v.w > 0.5);
+                } else {
+                    // (a cap beyond the dash's end, outward along ot: a half circle, or a rectangle half a width long)
+                    let pc = side_at(q, arc, o, dd, g, select(v.y, v.x, sub == 1u));
+                    let ot = select(pc.zw, -pc.zw, sub == 1u);
+                    x0 = tangent(q, pc.xy, h);
+                    x1 = before(q, pc.xy, -ot);
+                    if square {
+                        x0 = strip_l(q, pc.xy, ot, h);
+                        x2 = strip_r(q, pc.xy, ot, h);
+                        x3 = vec3f(ot, dot(q - pc.xy, ot) - h);
+                    }
+                }
+            } else {
+                // dashes j and j + 1 whose caps meet: |caps|, |cap of j and dash j + 1|, |dash j and cap of j + 1| (an arc's square
+                // caps: their rectangles, both cut by one of their strips, the near cap's: six planes)
+                let pj = (kk - 9u) / 3u;
+                let va = select(v1, v0, pj == 0u);
+                let vb = select(v2, v1, pj == 0u);
+                let ea = side_at(q, arc, o, dd, g, va.y);
+                let eb = side_at(q, arc, o, dd, g, vb.x);
+                let sub = (kk - 9u) % 3u;
+                wt = -1.0;
+                // (cap j beyond ea along ea.zw, cap j + 1 before eb, against eb.zw)
+                let ha0 = select(tangent(q, ea.xy, h), strip_l(q, ea.xy, ea.zw, h), square);
+                let ha1 = select(ALL, strip_r(q, ea.xy, ea.zw, h), square);
+                let ha2 = before(q, ea.xy, -ea.zw);
+                let ha3 = select(ALL, vec3f(ea.zw, dot(q - ea.xy, ea.zw) - h), square);
+                let hb0 = select(tangent(q, eb.xy, h), strip_l(q, eb.xy, eb.zw, h), square);
+                let hb1 = select(ALL, strip_r(q, eb.xy, eb.zw, h), square);
+                let hb2 = before(q, eb.xy, eb.zw);
+                let hb3 = select(ALL, vec3f(-eb.zw, dot(q - eb.xy, -eb.zw) - h), square);
+                if sub == 0u {
+                    x0 = ha0;
+                    x1 = ha1;
+                    x2 = ha2;
+                    x3 = ha3;
+                    x4 = select(hb0, hb2, square);
+                    x5 = select(hb2, hb3, square);
+                } else if sub == 1u {
+                    let s_b = side_at(q, arc, o, dd, g, vb.y);
+                    x0 = ha0;
+                    x1 = ha2;
+                    x2 = select(stl, ha1, square);
+                    x3 = select(str, ha3, square);
+                    x4 = before(q, eb.xy, -eb.zw);
+                    x5 = select(ALL, before(q, s_b.xy, s_b.zw), vb.w > 0.5);
+                } else {
+                    let s_a = side_at(q, arc, o, dd, g, va.x);
+                    x0 = select(stl, hb1, square);
+                    x1 = select(str, hb3, square);
+                    x2 = select(ALL, before(q, s_a.xy, -s_a.zw), va.z > 0.5);
+                    x3 = before(q, ea.xy, ea.zw);
+                    x4 = hb0;
+                    x5 = hb2;
+                }
+            }
+            c += wt * area6(x0, x1, x2, x3, x4, x5);
+        }
+    }
+    return clamp(c, 0.0, 1.0);
+}
+
 @fragment
 fn fs(i: VsOut) -> @location(0) vec4f {
     let q = i.pos.xy;
@@ -1110,3 +1909,12 @@ fn fs(i: VsOut) -> @location(0) vec4f {
     let al = col.w * c;
     return vec4f(vec3f(col.z, col.y, col.x) * al, al);
 }
+
+// the fragment shader of layers that hold arcs or dashed strokes (lib.rs: the second pipeline; fs draws the others): a
+// pixel's owner decided as in fs (an arc's pieces at their joints: by the side of the joint's radial line), the
+// coverage from pieces(): the pattern exactly, the solid stroke near its ends (the union at joins: area6 has one call
+// in this shader, a second one made the driver call it as a function, and every pixel three times slower), mixed where
+// the pattern's period nears a pixel.  Solid segments here as in fs except that near their joins the union stands for
+// the tiles.  Its body is in full_body.wgsl: lib.rs puts it into the entry fs_full here and once more into the function
+// full_body, with which fs_fill draws the strokes of its layers (a discard there, and the caller returns at once).  As a
+// function called from fs_full too, the NVIDIA driver made every pixel of the second pipeline 20 % slower

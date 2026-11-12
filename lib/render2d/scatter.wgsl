@@ -15,6 +15,8 @@ struct Push {
 
 @group(0) @binding(0) var<storage, read> changes: array<Change>;
 @group(0) @binding(1) var<storage, read_write> pool: array<Record>;
+// (common.wgsl's functions name it; this pass uses none of them, so it is no binding of its layout)
+@group(0) @binding(2) var<uniform> view: View;
 var<immediate> pc: Push;
 
 @compute @workgroup_size(64)

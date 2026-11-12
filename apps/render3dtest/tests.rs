@@ -769,7 +769,12 @@ fn levels(t: &mut T) {
     names.extend_from_slice(&LATER);
     for (i, name) in names.iter().enumerate() {
         let (n, m) = diff(&a[i], &b[i]);
-        t.ok(n == 0, &format!("Voll against Basis, {name}: {n} of {} pixels differ (largest {m})", GALLERY_W * GALLERY_H));
+        // (Apple's GPUs: the textured gallery picks levels and texels from derivatives that vary from run to run,
+        // DERIVATIVES_VARY in common.rs)
+        let loose = DERIVATIVES_VARY && i == 3;
+        let note = if loose { format!(" (Apple's GPUs: at most {DERIVATIVE_PIXELS})") } else { String::new() };
+        t.ok(n == 0 || loose && n <= DERIVATIVE_PIXELS, &format!("Voll against Basis, {name}: {n} of {} pixels differ (largest {m}){note}",
+                                                           GALLERY_W * GALLERY_H));
     }
 }
 
@@ -1133,6 +1138,10 @@ fn gen_dfg(path: &str) -> i32 {
 
 /// a real window, a few frames with the swapchain's format, the presented image against the offscreen one
 fn window(t: &mut T) {
+    if cfg!(target_os = "ios") {
+        out("SKIP: a plain program has no window on iOS (UIKit's host: uigputest)");
+        return;
+    }
     let Some(g) = setup(t) else { return };
     let Some(dev) = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device") else { return };
     if !dev.features().swapchain {

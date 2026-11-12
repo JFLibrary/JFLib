@@ -602,28 +602,44 @@ pub fn guard_test_state() -> (u32, u32, bool) {
 
 // ---------------------------------------------------------------- ARM64 (docs/ARM64.md)
 //
-// The trampoline in AAPCS64 (the plugin ABI of ARM64, decision 4 of the plan): jfgui_guard_run(rec = x0,
-// f = x1, args = x2) -> x0: 0 returned / 1 faulted.  Its frame: x29 / x30 at [sp], x19 .. x28 at
-// [sp + 16 .. 96], the record pointer at [sp + 96] (the fault path finds it there: only sp and x29 are
-// restored), 112 bytes, sp 16-aligned.  The record's fields keep their offsets and change their
-// meaning: rsp / rbp = sp / x29 of the body, mxcsr = FPCR, xmm = d8 .. d15 (80 .. 143; AAPCS64 keeps
-// only their low halves), rax / rdx = x0 / x1 of the call.  The fault path (linux_guard.rs: pc, sp,
-// x29 in the signal frame) restores FPCR and d8 .. d15 from the record; the epilogue restores x19 ..
-// x28, x29 and x30 from the frame; sp comes from x29.  Linux on ARM64 runs this since ARM4; Windows
-// on ARM64 needs unwind data for it (ARM5).
+// The trampoline in AAPCS64 (the plugin ABI of ARM64, decision 4 of the plan; Windows on ARM64 passes these
+// arguments alike): jfgui_guard_run(rec = x0, f = x1, args = x2) -> x0: 0 returned / 1 faulted.  Its frame:
+// x29 / x30 at [sp], x19 .. x28 at [sp + 16 .. 96], the record pointer at [sp + 96] (the fault path finds it
+// there: only sp and x29 are restored), 112 bytes, sp 16-aligned.  The record's fields keep their offsets
+// and change their meaning: rsp / rbp = sp / x29 of the body, mxcsr = FPCR, xmm = d8 .. d15 (80 .. 143;
+// AAPCS64 keeps only their low halves), rax / rdx = x0 / x1 of the call.  The fault path (linux_guard.rs:
+// pc, sp, x29 in the signal frame; win_lib.rs: Pc, Sp, Fp in the CONTEXT) restores FPCR and d8 .. d15 from
+// the record; the epilogue restores x19 .. x28, x29 and x30 from the frame; sp comes from x29.  x18 (the
+// TEB on Windows) is never touched.  The jfseh lines are the unwind data of Windows (.pdata / .xdata, ARM5):
+// with them RtlVirtualUnwind steps through the trampoline into the host, as the crash handler does for a
+// fault in a plugin outside a guard; on Linux they assemble to nothing.
 #[cfg(target_arch = "aarch64")]
 core::arch::global_asm!(
+    ".macro jfseh d:vararg",
+    ".if {win}",
+    r"\d",
+    ".endif",
+    ".endm",
     ".globl jfgui_guard_run",
     ".globl jfgui_guard_fault_ip",
     ".p2align 2",
     "jfgui_guard_run:",
+    "    jfseh .seh_proc jfgui_guard_run",
     "    stp x29, x30, [sp, #-112]!",
+    "    jfseh .seh_save_fplr_x 112",
     "    mov x29, sp",
+    "    jfseh .seh_set_fp",
     "    stp x19, x20, [sp, #16]",
+    "    jfseh .seh_save_regp x19, 16",
     "    stp x21, x22, [sp, #32]",
+    "    jfseh .seh_save_regp x21, 32",
     "    stp x23, x24, [sp, #48]",
+    "    jfseh .seh_save_regp x23, 48",
     "    stp x25, x26, [sp, #64]",
+    "    jfseh .seh_save_regp x25, 64",
     "    stp x27, x28, [sp, #80]",
+    "    jfseh .seh_save_regp x27, 80",
+    "    jfseh .seh_endprologue",
     "    str x0, [sp, #96]",
     "    mov x19, x0",
     "    mov x20, x1",
@@ -661,13 +677,22 @@ core::arch::global_asm!(
     "    bl 2f",
     "    mov x0, #1",
     "3:",
+    "    jfseh .seh_startepilogue",
     "    mov sp, x29",
+    "    jfseh .seh_set_fp",
     "    ldp x19, x20, [sp, #16]",
+    "    jfseh .seh_save_regp x19, 16",
     "    ldp x21, x22, [sp, #32]",
+    "    jfseh .seh_save_regp x21, 32",
     "    ldp x23, x24, [sp, #48]",
+    "    jfseh .seh_save_regp x23, 48",
     "    ldp x25, x26, [sp, #64]",
+    "    jfseh .seh_save_regp x25, 64",
     "    ldp x27, x28, [sp, #80]",
+    "    jfseh .seh_save_regp x27, 80",
     "    ldp x29, x30, [sp], #112",
+    "    jfseh .seh_save_fplr_x 112",
+    "    jfseh .seh_endepilogue",
     "    ret",
     // d8 .. d15 from the record at x9; leaf
     "2:",
@@ -676,6 +701,9 @@ core::arch::global_asm!(
     "    ldp d12, d13, [x9, #112]",
     "    ldp d14, d15, [x9, #128]",
     "    ret",
+    "    jfseh .seh_endproc",
+    ".purgem jfseh",
+    win = const cfg!(windows) as u8,
 );
 
 #[cfg(target_arch = "aarch64")]
@@ -684,39 +712,107 @@ unsafe extern "C" {
     fn jfgui_guard_fault_ip();
 }
 
-// Test aids for Linux on ARM64, the cases of the x86-64 code above in AAPCS64: 0 sum (x0 = a1 + 2 a2 +
-// 3 a3 + 4 a4, x1 = a1 ^ a4), 1 write to [a1] (the store first: the fault at the function's start),
-// 2 udf (SIGILL), 3 brk (SIGTRAP), 4 SIGFPE: ARM64's integer division does not trap, so the code sends
-// itself SIGFPE with tgkill (the signal arrives at the instruction after the svc, +40), 5 endless
-// recursion in 4 KB frames, 6 clobber x19 .. x29, d8 .. d15 and FPCR (round towards minus infinity),
-// then write to [a1].  jfgui_gt_state -> x0 = FPCR (no x87, no direction flag).
+// Test aids for ARM64, the cases of the x86-64 code above in AAPCS64: 0 sum (x0 = a1 + 2 a2 + 3 a3 + 4 a4,
+// x1 = a1 ^ a4), 1 write to [a1] (the store first: the fault at the function's start), 2 udf (SIGILL /
+// STATUS_ILLEGAL_INSTRUCTION), 3 brk (SIGTRAP / STATUS_BREAKPOINT, which Windows raises for brk #0xF000),
+// 4 division by zero: ARM64's integer division does not trap, so on Linux the code sends itself SIGFPE
+// with tgkill (the signal arrives at the instruction after the svc, +40), on Windows it does what MSVC
+// does, brk #0xF004 when the divisor is 0 (STATUS_INTEGER_DIVIDE_BY_ZERO at the brk, +20; brk #0xF003
+// would be __fastfail: STATUS_STACK_BUFFER_OVERRUN ends the process without any handler), 5 endless
+// recursion in 4 KB frames, 6 clobber x19 .. x29, d8 .. d15 and FPCR (round towards minus infinity), then
+// write to [a1].  jfgui_gt_state -> x0 = FPCR (no x87, no direction flag).  The systems differ in cases 3
+// and 4 only: gt_code_aarch64! takes those lines and the operands they need.
+#[cfg(target_arch = "aarch64")]
+macro_rules! gt_code_aarch64 {
+    ($brk:literal, $($div0:literal,)+ $(; $($operands:tt)+)?) => { core::arch::global_asm!(
+        ".globl jfgui_gt_code",
+        ".p2align 4",
+        "jfgui_gt_code:",
+        "0:",
+        "    add x9, x0, x1, lsl #1",
+        "    add x10, x2, x2, lsl #1",
+        "    add x9, x9, x10",
+        "    add x9, x9, x3, lsl #2",
+        "    eor x1, x0, x3",
+        "    mov x0, x9",
+        "    ret",
+        ".p2align 4",
+        "1:",
+        "    str w0, [x0]",
+        "    ret",
+        ".p2align 4",
+        "2:",
+        "    udf #0",
+        "    ret",
+        ".p2align 4",
+        "3:",
+        $brk,
+        "    ret",
+        ".p2align 4",
+        "4:",
+        $($div0,)+
+        ".p2align 4",
+        "5:",
+        "    sub sp, sp, #4096",
+        "    str x0, [sp]",
+        "    bl 5b",
+        "    add sp, sp, #4096",
+        "    ret",
+        ".p2align 4",
+        "6:",
+        "    mov x9, #0x5A5A",
+        "    movk x9, #0x5A5A, lsl #16",
+        "    movk x9, #0x5A5A, lsl #32",
+        "    movk x9, #0x5A5A, lsl #48",
+        "    mov x19, x9",
+        "    mov x20, x9",
+        "    mov x21, x9",
+        "    mov x22, x9",
+        "    mov x23, x9",
+        "    mov x24, x9",
+        "    mov x25, x9",
+        "    mov x26, x9",
+        "    mov x27, x9",
+        "    mov x28, x9",
+        "    mov x29, x9",
+        "    fmov d8, x9",
+        "    fmov d9, x9",
+        "    fmov d10, x9",
+        "    fmov d11, x9",
+        "    fmov d12, x9",
+        "    fmov d13, x9",
+        "    fmov d14, x9",
+        "    fmov d15, x9",
+        "    mov x10, #0x800000",
+        "    msr fpcr, x10",
+        "    str w9, [x0]",
+        "    ret",
+        ".p2align 4",
+        ".globl jfgui_gt_table",
+        "jfgui_gt_table:",
+        "    adr x9, 0b",
+        "    adr x10, 1b",
+        "    stp x9, x10, [x0]",
+        "    adr x9, 2b",
+        "    adr x10, 3b",
+        "    stp x9, x10, [x0, #16]",
+        "    adr x9, 4b",
+        "    adr x10, 5b",
+        "    stp x9, x10, [x0, #32]",
+        "    adr x9, 6b",
+        "    str x9, [x0, #48]",
+        "    ret",
+        ".globl jfgui_gt_state",
+        "jfgui_gt_state:",
+        "    mrs x0, fpcr",
+        "    mov w0, w0",
+        "    ret" $(, $($operands)+)?
+    ); };
+}
+
 #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-core::arch::global_asm!(
-    ".globl jfgui_gt_code",
-    ".p2align 4",
-    "jfgui_gt_code:",
-    "0:",
-    "    add x9, x0, x1, lsl #1",
-    "    add x10, x2, x2, lsl #1",
-    "    add x9, x9, x10",
-    "    add x9, x9, x3, lsl #2",
-    "    eor x1, x0, x3",
-    "    mov x0, x9",
-    "    ret",
-    ".p2align 4",
-    "1:",
-    "    str w0, [x0]",
-    "    ret",
-    ".p2align 4",
-    "2:",
-    "    udf #0",
-    "    ret",
-    ".p2align 4",
-    "3:",
+gt_code_aarch64!(
     "    brk #0",
-    "    ret",
-    ".p2align 4",
-    "4:",
     "    mov x8, #{getpid}",
     "    svc 0",
     "    mov x9, x0",
@@ -728,68 +824,22 @@ core::arch::global_asm!(
     "    mov x8, #{tgkill}",
     "    svc 0",
     "    ret",
-    ".p2align 4",
-    "5:",
-    "    sub sp, sp, #4096",
-    "    str x0, [sp]",
-    "    bl 5b",
-    "    add sp, sp, #4096",
-    "    ret",
-    ".p2align 4",
-    "6:",
-    "    mov x9, #0x5A5A",
-    "    movk x9, #0x5A5A, lsl #16",
-    "    movk x9, #0x5A5A, lsl #32",
-    "    movk x9, #0x5A5A, lsl #48",
-    "    mov x19, x9",
-    "    mov x20, x9",
-    "    mov x21, x9",
-    "    mov x22, x9",
-    "    mov x23, x9",
-    "    mov x24, x9",
-    "    mov x25, x9",
-    "    mov x26, x9",
-    "    mov x27, x9",
-    "    mov x28, x9",
-    "    mov x29, x9",
-    "    fmov d8, x9",
-    "    fmov d9, x9",
-    "    fmov d10, x9",
-    "    fmov d11, x9",
-    "    fmov d12, x9",
-    "    fmov d13, x9",
-    "    fmov d14, x9",
-    "    fmov d15, x9",
-    "    mov x10, #0x800000",
-    "    msr fpcr, x10",
-    "    str w9, [x0]",
-    "    ret",
-    ".p2align 4",
-    ".globl jfgui_gt_table",
-    "jfgui_gt_table:",
-    "    adr x9, 0b",
-    "    adr x10, 1b",
-    "    stp x9, x10, [x0]",
-    "    adr x9, 2b",
-    "    adr x10, 3b",
-    "    stp x9, x10, [x0, #16]",
-    "    adr x9, 4b",
-    "    adr x10, 5b",
-    "    stp x9, x10, [x0, #32]",
-    "    adr x9, 6b",
-    "    str x9, [x0, #48]",
-    "    ret",
-    ".globl jfgui_gt_state",
-    "jfgui_gt_state:",
-    "    mrs x0, fpcr",
-    "    mov w0, w0",
-    "    ret",
-    getpid = const rt::os::SYS_GETPID,
-    gettid = const rt::os::SYS_GETTID,
-    tgkill = const rt::os::SYS_TGKILL,
+    ; getpid = const rt::os::SYS_GETPID, gettid = const rt::os::SYS_GETTID, tgkill = const rt::os::SYS_TGKILL
 );
 
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+#[cfg(all(target_arch = "aarch64", windows))]
+gt_code_aarch64!(
+    "    brk #0xF000",
+    "    mov w9, #1",
+    "    mov w10, #0",
+    "    cbz w10, 9f",
+    "    udiv w0, w9, w10",
+    "    ret",
+    "9:",
+    "    brk #0xF004",
+);
+
+#[cfg(target_arch = "aarch64")]
 unsafe extern "C" {
     fn jfgui_gt_table(t: *mut [usize; 7]);
     fn jfgui_gt_state() -> u64;

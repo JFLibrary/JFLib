@@ -1,8 +1,8 @@
 # Apple-Plan: macOS und iOS nativ
 
 Nachtrag 2026-11-10: AP5 ist auch von Hand auf dem iPhone geprüft, AP8 (Pakete, Updates, CI, Developer ID und
-Notarisierung, Dokumentation und Website) ist fertig, AP1 (Safari auf dem Mac und dem iPhone) ebenso; offen ist AP6
-(Metal, eigene Sitzung).
+Notarisierung, Dokumentation und Website) ist fertig, AP1 (Safari auf dem Mac und dem iPhone) ebenso. AP6 (Metal) ist bis AP6f gebaut (Stufe
+Basis, macOS, iOS-Simulator und iPhone, mit Metal 3 auch Stufe Voll (AP6g); die UI-Ausgabe ist dort standardmäßig aus, unter AP6).
 
 Stand 2026-11-09, auf Basis von `main` ba9e6d03. Umgesetzt sind AP0 (Mac und iPhone bereit), AP2 (Bau, `rt`
 und der Kern von `plat`), AP3 (`plat` ohne Fenster), AP4 (Fenster auf macOS), AP7 (Desktop-Dienste) und AP5 (iOS) bis
@@ -314,7 +314,279 @@ Nord (mit Magnetometer, sonst beliebig), der Standort „beim Verwenden“ (`NSL
 - `lib/gpu` mit einem Metal-Backend neben Vulkan und WebGPU, `CAMetalLayer` zum Anzeigen.
 - `lib/wgsl` erzeugt MSL.
 
-**Fertig, wenn:** `gputest` und `uigputest` auf dem Mac und dem iPhone grün sind.
+**Fertig, wenn:** `gputest`, `uigputest` und `render3dtest` auf dem Mac grün sind, ebenso im iOS-Simulator und nach
+Freigabe auf dem iPhone; Windows, Linux, Android und Web ändern sich nicht (`cargo check` auf allen vier Zielen, die
+kurze Suite unter Windows).
+
+**Ausgangslage (2026-11-10).** `lib/gpu` wählt sein Backend beim Übersetzen: Vulkan überall außer wasm32, WebGPU im
+Browser. Auf Apple nimmt `lib/ui` `gpu` gar nicht als Abhängigkeit, es gilt `gpu_out_off.rs`: Die Fenster zeigen ihr
+Bild als `CGImage` im Layer, `ui.gpu_view` gibt es dort nicht. Die Bibliotheken mit Shadern wählen ebenfalls nach dem
+Ziel: `ShaderModule::from_spirv` mit vorübersetzten Wörtern (`gpu_out_spv.rs`, `render3d/shaders_spv.rs`), im Browser
+`from_wgsl` mit dem Text; `render2d` (G6, in Arbeit) wird es genauso halten. `gputest` prüft Texturen und
+Pipeline-Konstanten mit SPIR-V, das `lib/shader` von Hand baut (`shader::samples`), nicht mit WGSL. Auf dem Mac fehlt die
+Metal-Toolchain (`xcrun metal`: „missing Metal Toolchain“, ein eigener Download von Apple); den Übersetzer zur Laufzeit
+(`MTLDevice newLibraryWithSource:`) hat jedes macOS und iOS.
+
+**Entscheidungen (Vorschläge, 2026-11-10).**
+
+1. **Shaderweg: SPIR-V nach MSL in `lib/shader`, nicht WGSL nach MSL in `lib/wgsl`** (entschieden vom Nutzer am
+   2026-11-10). Das
+   Metal-Backend nimmt `ShaderModule::from_spirv` wie Vulkan und übersetzt die Wörter beim Anlegen einer Pipeline nach
+   MSL, mit den Pipeline-Konstanten eingesetzt; Metal übersetzt das MSL. Dann ändert sich kein Aufrufer: `gpu_out`,
+   `render3d`, `render2d` und jede App mit eigenem SPIR-V laufen ohne Eingriff, `gputest` prüft auf Metal dieselben
+   handgebauten Module wie unter Vulkan, und `lib/gpu` bekommt keine neue API. Die Shader bleiben WGSL; nur der Weg nach
+   MSL führt über das SPIR-V, das `lib/wgsl` ohnehin schreibt. Der Preis: Der Übersetzer liegt in jedem Apple-Programm mit
+   GPU (geschätzt 150–300 KB), er muss den strukturierten Kontrollfluss des SPIR-V zurück in Schleifen und Verzweigungen
+   bringen (die beiden eigenen Erzeuger schreiben nur strukturierten Fluss), und jedes neue SPIR-V-Konstrukt von
+   `lib/wgsl` braucht dort eine Zeile. Die Alternative laut Auftrag: `lib/wgsl` erzeugt MSL aus seiner IR,
+   vorübersetzte `*_msl.rs` neben den `*_spv.rs` und ein neues `ShaderModule::from_msl` (nur Apple). Das ist schlanker im
+   Programm, kostet aber eine API-Ergänzung, in `gpu_out`, `render3d` und später `render2d` je einen dritten Zweig und
+   eine Datei, und `gputest` braucht WGSL-Fassungen seiner handgebauten Tests. Beide Wege brauchen dieselbe Arbeit für
+   Layouts (MSLs `float3` hat 16 Byte), Robustheit, Pufferlängen und eingebaute Funktionen.
+2. **Erst Stufe Basis** (Empfehlung, vom Nutzer am 2026-11-10 nicht beanstandet), wie im Browser: Rechnen, Speicherpuffer, einzelne indirekte
+   Aufrufe, Textur-Arrays, Zeitstempel. render3d und die 3D-Ansicht laufen auf Basis (Test `viewbasis`); `uigputest
+   view` und `viewcpu` verlangen bei `AF_GPU_3D` heute Voll und prüfen dann die höchste Stufe des Adapters. Voll
+   (Bindless über Argument-Puffer, `draw_indexed_indirect_count` nachgebildet, Subgroups als SIMD-Gruppen) folgt als
+   eigene Stufe AP6g.
+3. **MSL prüft der Übersetzer zur Laufzeit** (Empfehlung, vom Nutzer am 2026-11-10 nicht beanstandet): `gputest --test msl` übersetzt auf dem Mac
+   jedes Modul mit `newLibraryWithSource:`, also auf dem Weg, den die Bibliothek nimmt. Die Metal-Toolchain
+   (`xcodebuild -downloadComponent MetalToolchain`) bräuchte es nur für `xcrun metal` und vorübersetzte `.metallib`.
+4. **Bindungen flach:** Jede Pipeline legt fest, an welchem Platz (`[[buffer(n)]]`, `[[texture(n)]]`, `[[sampler(n)]]`)
+   eine Bindung jeder Stufe liegt; `set_bind_group` merkt sich die Gruppe, gesetzt wird beim nächsten Dispatch oder
+   Draw. Push-Konstanten gehen über `setBytes` an einen festen Platz, die Längen der Puffer (für `arrayLength` und die
+   Robustheit) ebenso. Keine Argument-Puffer auf Basis: Das geht auf jeder Metal-GPU, auch im Simulator, und braucht
+   keine Residenz-Aufrufe.
+5. **Synchronisation:** Ressourcen mit Metals Gefahrenverfolgung (der Standard); `barrier`, `texture_barrier` und die
+   Layouts sind wirkungslos wie im Browser, die Aufrufe bleiben für denselben Code. Die Zeitleiste eines Geräts ist ein
+   `MTLSharedEvent` (Wert je Übergabe, `waitUntilSignaledValue:timeoutMS:`). Shader mit sicherer Mathematik
+   (`MTLCompileOptions`: keine schnelle Mathematik, die Metal sonst einschaltet).
+6. **Anzeige wie unter Windows und Android:** Die Swapchain liegt auf einem `CAMetalLayer`, einem Unterlayer der View
+   über dem CPU-Bild (das Gegenstück zum Kindfenster und zum `SurfaceView`). Der CPU-Pfad bleibt der Inhalt des Layers
+   der View; Wechsel und Rückweg geschehen in einer Core-Animation-Transaktion, also ohne Lücke. Koordinaten wie WebGPU
+   (y oben, Tiefe 0 bis 1, Ursprung oben links): Metal kippt nichts.
+7. **Vorgabe:** Bis zu den Messungen bleibt die UI-Ausgabe auf Apple aus (`jfgui_GPU=1` und `gpu on` schalten sie
+   ein); an oder aus entscheidet der Nutzer mit den Zahlen aus AP6d und AP6e.
+
+**Stufen.** Je Stufe ein Branch; gemergt wird nach grünen Suiten auf dem Mac und unter Windows (`test --quick`,
+`cargo check` für Windows, Linux, wasm32 und Android).
+
+- **AP6a, MSL aus SPIR-V (L):** `lib/shader/msl*.rs` übersetzt das SPIR-V von `lib/wgsl` (Basis 1.3, Voll 1.6) und der
+  Muster von `lib/shader`: Typen mit Layout (gepackte Vektoren, Polster), Puffer, Texturen, Sampler, Push-Konstanten,
+  Spezialisierungskonstanten (eingesetzt), Ein- und Ausgaben der Stufen, strukturierter Kontrollfluss, `GLSL.std.450`
+  nach `metal::`, Atomics, Barrieren, Ableitungen, `discard`, Subgroups als SIMD-Gruppen. Dazu das erste Stück
+  `lib/gpu` für Apple (`mtl_*.rs`): Instanz, Adapter, Gerät, `ShaderModule::from_spirv`.
+  **Fertig, wenn:** jedes SPIR-V-Modul des Repositorys (jeder WGSL-Shader in `lib/` und in den Testprogrammen über
+  `lib/wgsl` auf beiden Stufen, die vorübersetzten `*_spv.rs`, alle Muster von `lib/shader`) übersetzt und auf dem Mac
+  von Metal ohne Fehler angenommen wird (`gputest --test msl`).
+- **AP6b, Rechnen (M):** Adapter (Name, Familie, Limits, Features), Puffer (`Device` privat, `Upload` und `Readback`
+  geteilt), Texturen, Sampler, Bindungsgruppen, Rechen-Pipelines, Kodierer (Blit- und Compute-Encoder), Zeitleiste,
+  verzögertes Freigeben, Uploads, `read_buffer`, Zeitstempel (Apple-GPUs messen nur an Grenzen der Encoder), Gerät
+  verloren und `test_lose`, Validierung (`jfgui_GPU_VALIDATE=1`: Metals API- und Shader-Validierung).
+  **Fertig, wenn:** `gputest` `info`, `compute`, `copies`, `upload` (ohne Fenster), `timestamps`, `spec`, `textures`
+  (Rechen-Teile), `wgsl`, `errors` und `queues` (ohne zweite Warteschlange) auf dem Mac grün sind.
+- **AP6c, Rendern und Swapchain (M):** Render-Pipelines (Vertex-Deskriptor, Tiefe, Mischen, Culling, Windung),
+  Durchgänge, Draws und indirekte Draws, `Surface` und `Swapchain` über einen `CAMetalLayer` an einem plat-Fenster,
+  Darstellungsmodi (`displaySyncEnabled`, Zahl der Bilder), `try_acquire` ohne Warten (`nextDrawable` wartet sonst bis zu
+  einer Sekunde). **Fertig, wenn:** dazu `graphics`, `indirect`, `window`, `scene`, `bench_smoke`, `textures` ganz und
+  `validate` grün sind und `render3dtest` auf dem Mac grün ist.
+- **AP6d, UI-Ausgabe auf macOS (M–L):** `lib/ui` nimmt `gpu` auch auf Apple, `gpu_out.rs` mit dem Weg aus Entscheidung
+  6 (`plat::win_gpu_child` in `apple_mac.rs`), neue Größe, Retina-Skala, verborgene und minimierte Fenster, Popups
+  (`NSPanel`, bleiben CPU); Ebenen, Bilder, Leinwände, `ui.gpu_view` mit render3d. **Fertig, wenn:** `uigputest` (ohne
+  die Tests, die es nur unter Windows oder Linux gibt) in echten Fenstern über `tools/apple.py gui`, die Skripte
+  `gpu_output.uis` und `gpu_layers.uis` der Gallery und `render3dtest --test window` grün sind; dazu Messungen wie
+  unter Windows (Start, Latenz, Leerlauf, Speicher, Größe).
+- **AP6e, iOS (M):** Metal im Simulator und auf dem iPhone; im UIKit-Host ein `CAMetalLayer` über dem Layer der View,
+  der `CADisplayLink` als Takt, kein GPU-Befehl im Hintergrund (iOS beendet die App sonst), Drehen, Auflösung.
+  **Fertig, wenn:** `gputest`, `render3dtest` (beide mit `simctl spawn`) und die 3D-Ansicht der Taschen-Galerie (als
+  App) im Simulator grün sind, auf dem iPhone nach Freigabe des Nutzers.
+- **AP6f, Dokumentation (S):** [GPU.md](GPU.md) (Metal in Stand und Teilen, „Ausgabe unter macOS und iOS“,
+  Umgebungsvariablen, Lücken), dieser Plan, CHANGELOG, API.md, README (Plattformtabelle), ROADMAP §8.
+- **AP6g, Stufe Voll auf Metal (M):** Bindless über Argument-Puffer, Multi-Draw und
+  `draw_indexed_indirect_count` (nachgebildet), Draw-Parameter, Subgroups; Stufenplan unten („AP6g“).
+
+**AP6a umgesetzt (2026-11-10):** [`lib/shader/msl.rs`](../lib/shader/msl.rs) und
+[`msl_fn.rs`](../lib/shader/msl_fn.rs) übersetzen SPIR-V nach MSL ([SHADER.md](SHADER.md), „MSL für Metal“).
+`wgsltest --only msl` übersetzt 805 Module (das Korpus, die Abdeckung, die Benchmark-Shader, die
+WGSL-Shader von `gpu_out` und render3d mit und ohne Robustheit, alle Muster von `lib/shader`, je Basis und
+Voll): 802 übersetzt, 3 erwartete Ausnahmen (Farbort 8, Bindless). Auf dem Mac nahm Metals Übersetzer zur
+Laufzeit (`newLibraryWithSource:`, ohne schnelle Mathematik) alle 802 an. Abweichung vom Prüfkriterium:
+Diese Prüfung lief noch über ein Hilfsprogramm in Swift außerhalb des Repositorys, weil `gputest` auf Apple
+das ganze Backend braucht; `gputest --test msl` kommt mit AP6b. Beim ersten Lauf nahm Metal 650 von 662
+Modulen an; behoben: gepackte Vektoren und Matrizen in Konstanten (globale Konstruktoren), Workgroup-Speicher
+mit Matrizen (kein Konstruktor in `threadgroup`, jetzt roher Speicher), 64-Bit-Atomics (`atomic_max_explicit`
+ohne alten Wert), 1D-Texturen (ohne Mip-Stufe).
+
+**AP6b umgesetzt (2026-11-10):** `lib/gpu` hat auf Apple das Metal-Backend (`mtl_objc.rs`, `mtl_dev.rs`, `mtl_res.rs`,
+`mtl_cmd.rs`; `mtl_swap.rs` folgt mit AP6c): Instanz und Adapter (`MTLCopyAllDevices`, Familie, Limits), Gerät mit
+Warteschlange und Zeitleiste (`MTLSharedEvent`), Puffer (privat / geteilt), Texturen und Ansichten, Sampler,
+`ShaderModule::from_spirv` (übersetzt mit `shader::msl` und kompiliert beim Anlegen; Pipelines mit Konstanten oder einer
+Punktliste übersetzen eigens), Bindungsgruppen flach an den Plätzen der Übersetzung, Rechen- und Render-Pipelines,
+Kodierer (Blit, Compute, Render; Barrieren beenden den Encoder), Uploads über einen Staging-Ring wie unter Vulkan
+(Stücke von 256 KiB, große Uploads mit eigenem Puffer, der eine Sekunde nach der letzten Nutzung geht), `read_buffer`.
+`fill_buffer` mit einem Muster aus vier verschiedenen Bytes läuft über einen kleinen eigenen Kernel. Noch nicht:
+Zeitstempel, Bindless, Multi-Draw und indirekte Anzahl (Stufe Voll), Fenster. `gputest --test all` auf dem Mac mini:
+520 Prüfungen grün, die einzigen Fehler sind die Fenstertests (AP6c); `msl` 718 von 721 Modulen (3 erwartete Ausnahmen),
+`wgsl` 228 (jeder Operator und jede eingebaute Funktion gegen den Konstantenauswerter, die Subgroup- und Quad-Funktionen
+über SIMD-Gruppen), `scene` 117 (die Messszene bitgleich, WGSL-Bilder = SPIR-V-Bilder), `textures` 46, `spec` 46,
+`upload` 12. Gefunden und behoben: Metals `atan2(1, -0)` gibt −π/2 und `asinh` verliert bei negativen Zahlen Stellen
+(eigene Hilfsfunktionen in der Übersetzung); ein Vertex-Shader mit `PointSize` lässt Metal eine Pipeline für Dreiecke
+ablehnen (die Übersetzung gibt die Punktgröße nur noch für Punktlisten aus); offene Upload-Encoder beim Abbau des Geräts.
+
+**AP6c umgesetzt (2026-11-10):** Swapchains über einen `CAMetalLayer` ([`mtl_swap.rs`](../lib/gpu/mtl_swap.rs)): plat legt
+ihn als Unterlayer des Layers der View an ([`apple_mac_gpu.rs`](../lib/plat/apple_mac_gpu.rs): `win_native` gezeigt,
+`win_gpu_child` verborgen bis `win_gpu_child_show`; er folgt den Grenzen der View und ihrer Skala), BGRA8 (sRGB auf
+Wunsch), Farbraum sRGB wie das `CGImage` des CPU-Pfads. `try_acquire` wartet nie: `nextDrawable` nur, solange weniger
+Drawables in Gebrauch sind, als der Layer hat (die Presented-Handler der Drawables zählen, was den Bildschirm erreicht
+hat). Darstellungsmodus nur Fifo: Ohne `displaySyncEnabled` zeigt ein Fenster auf macOS trotzdem im Takt des
+Compositors (gemessen 8,3 ms je Bild in beiden Fällen). Zwischen allen Encodern eines Befehlspuffers steht ein
+`MTLFence` (der Nachfolger wartet), denn Metals Verfolgung sieht nicht durch Textur-Ansichten. `gputest --test all` in
+der angemeldeten Sitzung (`tools/apple.py gui`): 541 Prüfungen grün, keine Fehler; `render3dtest` 23 von 26 Skripten.
+**Offen:** `srgb`/`validate` (das texturierte Bild „tex“: 20–70 Pixel, Paare in Quads, weichen zwischen zwei Renderings
+derselben Szene ab, die Tiefe ist bitgleich; mit Metals Shader-Validierung verschwindet es; vermutet: Ableitungen und
+Helper-Lanes oder die Hidden-Surface-Removal der Apple-GPU) und `pbr` (Normal-Maps: 28 Pixel über der Toleranz,
+deterministisch; vermutet: grobe statt feiner Ableitungen).
+
+**AP6d umgesetzt (2026-11-10):** `lib/ui` nimmt `gpu` auch auf macOS und iOS; `gpu_out.rs` und `gpu_view.rs` laufen auf
+macOS mit `plat::win_gpu_child` ([`apple_mac_gpu.rs`](../lib/plat/apple_mac_gpu.rs)). Der Standard bleibt vorerst aus
+(`DEFAULT_ON_APPLE`, Entscheidung 7), `jfgui_GPU=1` schaltet die Ausgabe ein. Drei Drawables, nicht zwei: Von zweien liegt
+eines auf dem Bildschirm und nur eines kann unterwegs sein, das halbiert den Takt (gemessen 33 ms je Bild bei 60 Hz, mit
+dreien 16,9 ms). `uigputest` in der angemeldeten Sitzung (`tools/apple.py gui`): alle Tests grün, `dpi` und `monitors`
+ohne Ergebnis (ein Bildschirm, eine Skala), `noloader`, `nodmabuf`, `refused`, `hwnd` sind auf Apple `SKIP`; die Prüfung
+gegen den Bildschirm hat dort kein Ergebnis (der Layer ist von hier nicht lesbar), jedes dargestellte Bild wird aber
+zurückgelesen und mit dem Framebuffer verglichen (0 anders). `gpu_output.uis`, `gpu_layers.uis` (Galerie) und
+`render3dtest --test window` (0 Pixel anders) grün.
+
+Zahlen für die Entscheidung über den Standard (M2, 1920 × 1080 bei 60 Hz, Entwicklungsstand, je ein Lauf): Start bis zur
+Swapchain 354 ms beim ersten Lauf (davon 344 ms Pipeline, Metal übersetzt das MSL), 74 ms mit Metals Shader-Cache, ohne
+dass die UI darauf wartet. `uigputest --bench stages` je Bild, CPU des Programms: Schwenken 3,8 ms gegen 6,8 ms auf dem
+CPU-Weg, Popup 6,3 gegen 7,2 ms; Wandzeit beide bei 20 ms. Reserviert 4–9 MiB. `--bench view` (Ansicht 1200 × 700):
+16,9 ms Bildabstand, das Bild der Ansicht 1,5 ms; auf dem CPU-Weg zusätzlich 1,5 ms Zurücklesen je Bild. **Nicht
+gemessen:** die Latenz bis zum Bildschirm und der Vergleich in Ruhe (`--bench idle`/`caret` enden nicht von selbst und
+brauchen einen Messfühler von außen).
+
+**AP6e umgesetzt (2026-11-10):** iOS. `lib/plat/apple_ios_gpu.rs` ist das Gegenstück zu `android_gpu.rs`, der
+`CAMetalLayer` ein Unterlayer des Layers von `JFView` (`apple_ios.rs`, in `view_layout` an Grenzen und Skala); nur Fenster 0
+und nur, solange die Leinwand nichts anderes zeigt (Popups und Werkzeugfenster liegen darauf). Eine Szene, die nicht aktiv
+ist, tut keine GPU-Arbeit: Ab `sceneWillResignActive` sagt `win_state` `WST_HIDDEN`, die Ausgabe geht im selben Tick auf den
+CPU-Weg zurück, beim Aktivieren wieder auf die Swapchain (im Simulator geprüft: Einstellungen davor, 1,4 ms zurück, 4 ms hin).
+Simulator: Sein Gerät meldet keine GPU-Familie (`missing` gilt dort nicht), keine Cube-Arrays (`create_texture`:
+`Unsupported`, sonst bricht Metal ab), keine Presented-Handler (ein Present gilt sofort als gezeigt), und seine
+API-Validierung bricht bei indirekten Aufrufen ab, die sein Metal korrekt ausführt (`--validate` ohne Wirkung).
+Ein schlichtes Programm (`simctl spawn`) hat kein Fenster: `Surface::new` sagt `Unsupported`, die Fenstertests von `gputest` und
+`render3dtest` sind dort `SKIP`. `tools/apple.py simapp` startet das Bündel unter UIKit mit der Konsole.
+Im Simulator: `gputest --test all` grün (461 Prüfungen, `msl` 718 von 721), `render3dtest` 23 von 26 mit denselben drei
+offenen Fällen wie auf dem Mac (unten), `uigputest` unter UIKit (`simapp`): `switch`, `images`, `imgplain`, `viewplain`,
+`viewbasis`, `viewlose`, `lose`, `canvasplain`, `idle` grün; was Fenster eines Desktops braucht (neue Größe, zweites
+Fenster, DC), ist dort `SKIP`, `view` kam bis zur Ruhe nach der Animation grün und wartet danach auf eine neue Größe. Die Mobile Gallery
+zeigt mit `jfgui_GPU=1` im Simulator dasselbe Bild über Metal.
+
+**Auf dem iPhone 14 (A15, Familie Apple8, iOS 27.2; 2026-11-11, vom Nutzer entsperrt):** `gputest --test all` grün (499
+Prüfungen). `uigputest` unter UIKit: `switch`, `images`, `imgplain`, `viewplain`, `viewbasis`, `lose`, `idle` grün (jedes
+dargestellte Bild zurückgelesen, keins anders). `render3dtest`: jeder Test einzeln grün bis auf `pbr` und `srgb`, mit denselben
+Abweichungen wie auf dem M2 (`pbr` 121 Pixel, `srgb` „tex“ 47–48 Pixel). `--test all` in einem Lauf beendet iOS nach
+`textures` mit Signal 9 (vermutlich der Speicher eines Programms ohne Szene, das 90 große Texturen hinter vielen anderen
+Tests anlegt; `textures` allein ist grün). Die Mobile Gallery geht mit `jfgui_GPU=1` nach 482 ms auf die Swapchain und
+zeigt dasselbe Bild. `tools/apple.py device` gibt die `jfgui_*`-Variablen jetzt an das Programm weiter. **Offen:** das Drehen
+des Geräts.
+
+**AP6f umgesetzt (2026-11-10):** [GPU.md](GPU.md), CHANGELOG, API.md, ROADMAP. Stufe Voll (AP6g) bleibt eine eigene Entscheidung.
+
+**Untersucht (2026-11-11): die Abweichungen von `render3dtest` auf Apple-GPUs.** Auf M2 (Mac, Simulator) und A15 (iPhone) gleich.
+- **Das Bild „tex“ (`srgb`, `validate`) ist nicht deterministisch, und das liegt an der Hardware.** Dieselbe Szene mit demselben
+  Renderer dreimal hintereinander aufgenommen: jedes Mal 66–115 Bytes anders; die Texturen scheiden damit aus. Gibt `fs` statt
+  der Farbe die interpolierten `uv` und die Position aus, sind zwei Renderings an jedem Pixel bitgleich; gibt es die
+  Ableitungen von `uv` aus (`dpdxFine`/`dpdyFine`, ganz am Anfang des Shaders auf dem Eingang, im MSL ein schlichtes `dfdx`),
+  weichen 62–86 Pixel ab, nur in „tex“. Die Ableitung hängt also von den unsichtbaren Lanes des 2×2-Quads ab, und die belegt
+  die GPU von Lauf zu Lauf verschieden. „tex“ wählt Mip-Stufe und Texel selbst aus den Ableitungen (`floor(lod + 0.5)`, das
+  nächste Texel), dort wird das Rauschen sichtbar (bis 29 Codes in einzelnen Pixeln); der trilineare Sampler der anderen
+  Szenen glättet es unter 1. Ausgeschlossen: mit Null vorbelegte Variablen im MSL (keine Änderung), ein nie greifendes
+  `discard` gegen die Hidden-Surface-Removal (keine Änderung), Warten nach jedem Befehlspuffer (AP6c, keine Änderung).
+  Mit `MTL_SHADER_VALIDATION=1` sind zwei Renderings bitgleich (sie ändert, wie Metal den Shader ausführt).
+- **`pbr` (Normal-Maps, 121 Pixel über der Toleranz von 2, größte 11) ist deterministisch.** Metals Ableitungen sind fein, nicht
+  grob: In 1610 von 14 095 Quads der Kugeln haben die beiden Zeilen verschiedene `dpdx`. Der Rahmen der Normal-Map kommt aus den
+  Ableitungen von Position und `uv`; an Dreieckskanten weicht er dann auf diesen GPUs vom Strahlenwerfer ab.
+- **Nebenbei behoben:** `read()` außerhalb der Textur ist in Metal undefiniert, unter Vulkan und WGSL festgelegt. `shader::msl`
+  klemmt jetzt Stufe, Schicht, Probe und Koordinate von `textureLoad` in die Textur und lässt `textureStore` außerhalb fallen.
+  Die Abweichung von „tex“ blieb danach dieselbe.
+
+**Entschieden (Nutzer, 2026-11-11): eine Toleranz nur für Apple-GPUs.** `DERIVATIVES_VARY` in
+[`apps/render3dtest/common.rs`](../apps/render3dtest/common.rs) (`cfg!(target_vendor = "apple")`): im Bild „tex“ dürfen
+höchstens 0,2 % der Pixel (115 von 57 600) über der üblichen Grenze liegen, bei den Normal-Maps von `pbr` höchstens 2 % der
+Pixel auf den Objekten falsch sein; die Meldungen nennen die Grenze. Alle anderen Bilder und Ziele prüfen wie bisher.
+Danach `render3dtest` 26 von 26 auf dem Mac und im Simulator, auf dem iPhone `srgb` und `pbr` grün.
+
+**Entschieden (Nutzer, 2026-11-11): die UI-Ausgabe bleibt auf Apple standardmäßig aus** (`DEFAULT_ON_APPLE`; `jfgui_GPU=1`
+und `gpu on` schalten sie ein). Damit ist AP6 bis auf Stufe Voll (AP6g, eine eigene Entscheidung) fertig.
+
+### AP6g: Stufe Voll auf Metal (Stufenplan, 2026-11-11)
+
+Der Nutzer hat AP6g am 2026-11-11 als Nächstes gewählt. **Was Voll heißt** ([GPU.md](GPU.md) „Feature-Stufen“): zusätzlich zu
+Basis Bindless-Tabellen, mehrere indirekte Aufrufe in einem (`draw_indexed_indirect_multi`), die indirekte Anzahl
+(`draw_indexed_indirect_count`), die erste Instanz in indirekten Aufrufen, Draw-Parameter (`BaseVertex`, `BaseInstance`,
+`DrawIndex`) und Subgruppen im Rechen-Shader. **`render3d`** braucht davon nur Multi-Draw mit erster Instanz (eine Multi-Draw
+je Seite, Alpha-Klasse und Phase statt eines Aufrufs je Liste); `gputest` prüft alles.
+
+**Was Metal hat** (auf dem M2 abgefragt; der A15 des iPhones ist Familie Apple8 wie der M2): Metal 3, Argument-Puffer Stufe 2
+(bis 1024 Sampler in einem), SIMD-Gruppen-Funktionen, `base_vertex`/`base_instance` und die erste Instanz in indirekten
+Aufrufen. Es fehlen Multi-Draw-Indirect, die indirekte Anzahl und ein Draw-Index: Diese drei werden nachgebildet. Der
+Simulator meldet weder Familie noch Metal 3 und bleibt Basis; geprüft wird Voll auf dem Mac und dem iPhone.
+
+Entscheidungen (vom Nutzer am 2026-11-11 beide wie empfohlen getroffen: Rechen-Durchgang, Metal 3 mit IDs):
+
+1. **Indirekte Anzahl:** (a, empfohlen) ein kleiner Rechen-Durchgang vor dem Zeichnen schreibt die bis zu `max_count`
+   Aufrufe in einen Hilfspuffer und setzt bei allen ab der gelesenen Anzahl die Instanzen auf null; danach zeichnet dieselbe
+   Schleife wie bei Multi-Draw. Einfach, dieselben Bindungen wie jeder Aufruf; kostet `max_count` Aufrufe auf der CPU je Mal.
+   (b) Indirect Command Buffers: Die GPU schreibt die Aufrufe selbst, keine CPU-Schleife, aber jede Pipeline braucht
+   `supportIndirectCommandBuffers`, Bindungen kommen nur geerbt, ein Draw-Index je Aufruf ginge nicht über Bytes. (b) erst,
+   wenn Messungen es verlangen.
+2. **Bindless:** (a, empfohlen) Metal 3: Die Tabelle ist ein Puffer, in den `set_texture`/`set_sampler`/`set_buffer` direkt
+   die Ressourcen-IDs (`gpuResourceID`, `gpuAddress`) schreiben; im MSL ein Argument-Puffer mit Arrays je Art; beim Binden
+   macht `useResources` die Ressourcen der Tabelle resident. Voll nur auf Geräten mit Metal 3 (Apple7 und neuer, also A14/M1
+   und neuer, sowie Mac2). (b) `MTLArgumentEncoder`: auch Apple6 (A13), mehr Code, langsameres Setzen; das A13 bliebe mit (a) auf Basis.
+
+Stufen (je ein Branch und Commits, Merge nach grünen Suiten, Push nach Rückfrage):
+
+- **AP6g1, Multi-Draw und Draw-Parameter (M):** `draw_indexed_indirect_multi`/`draw_indirect_multi` als Schleife über
+  einzelne indirekte Aufrufe mit `stride`, `DrawIndex` als Bytes je Aufruf in einem eigenen Slot (nur wenn der Shader ihn
+  liest), `BaseVertex`/`BaseInstance` nativ. Voll wird noch nicht gemeldet; die Tests laufen bis AP6g4 über einen Schalter nur
+  auf dem Branch.
+- **AP6g2, indirekte Anzahl (S):** nach Entscheidung 1.
+- **AP6g3, Bindless (M–L):** nach Entscheidung 2; `shader::msl` übersetzt die Laufzeit-Arrays von Ressourcen (bisher die
+  erwartete Ausnahme „Bindless“), Limits nach Metal (Sampler 1024); `gputest` `textures`/`compute` Bindless.
+- **AP6g4, Subgruppen und Voll melden (M):** `Features::subgroups` mit Stufen und Operationen, Subgruppengröße 32; `gputest`
+  `wgsl` Subgruppen grün. Danach meldet ein Gerät mit Metal 3 Voll.
+- **AP6g5, `render3d` und UI auf Voll (M):** `render3dtest` auf Voll (darunter `levels`, Voll gegen Basis; das Bild „tex“
+  dort mit derselben Apple-Toleranz), `uigputest` `view` (`AF_GPU_3D` bekommt Voll), Mac und iPhone; Doku (GPU.md, APPLE.md,
+  CHANGELOG, API.md).
+
+**AP6g umgesetzt (2026-11-11, Branch `apple/ap6g`).** Zur indirekten Anzahl entschied der Nutzer noch, den Render-Pass zu
+unterbrechen (der Rechen-Durchgang kann nicht mitten im Pass laufen); so arbeitet auch MoltenVK.
+- **AP6g1:** Multi-Draw als Schleife, `DrawIndex` über den Eintrag `DRAW_INDEX_AT` des Puffers der Puffergrößen (alle 31
+  Puffer-Slots von Metal sind belegt), `BaseVertex`/`BaseInstance` nativ; Gerät und Adapter melden die Stufe, ein Basis-Gerät
+  maskiert die Voll-Features wie unter Vulkan.
+- **AP6g2:** `draw_indexed_indirect_count`: Die Store-Aktionen eines Passes bleiben offen (`MTLStoreActionUnknown`) und werden am
+  Ende gesetzt, beim Unterbrechen alle auf Speichern; das Fortsetzen lädt alles und setzt Pipeline, Viewport, Scissor und
+  Vertex-Puffer neu. `gputest` prüft dazu einen Aufruf nach dem gezählten im selben Pass (auch unter Vulkan grün).
+- **AP6g3:** Bindless wie oben (Entscheidung 2); Sampler entstehen auf Voll mit `supportArgumentBuffers`; Limits 500 000
+  Ressourcen, Sampler nach `maxArgumentBufferSamplerCount` (M2: 1024). `shader::msl` übersetzt Arrays von Ressourcen (die
+  erwartete Ausnahme „Bindless“ fällt weg), Slots einer Tabelle tragen `Slot::table`.
+- **AP6g4:** `Features::subgroups` (SIMD-Gruppen-Funktionen, Größe 32); ein Gerät mit Metal 3 meldet Voll von selbst.
+- **AP6g5:** Ergebnisse auf dem M2: `gputest --test all` auf Voll grün (775 Prüfungen, auf Basis 541; `msl` 719 von 721 auch
+  als MSL 3.0), `render3dtest` 26 von 26 (in `levels` das Bild „tex“ mit der Apple-Toleranz), `uigputest` alle Ansichten
+  grün (`AF_GPU_3D` bekommt Voll), `switch` grün. Im Simulator (Basis) `gputest` und `render3dtest` 26 von 26 unverändert.
+  Unter Windows `gputest --test all` (826) und `wgsltest msl` grün; Linux, Android und Web bauen.
+- **Auf dem iPhone 14 (A15, Voll; 2026-11-11, vom Nutzer entsperrt):** `gputest --test all` grün (733 Prüfungen, Bindless,
+  Multi-Draw und indirekte Anzahl dabei). `render3dtest` je Test einzeln: 17 von 20 grün; `textures`, `occlusion` und `srgb`
+  laufen ihren Voll-Teil vollständig grün (32, 23, 56 Prüfungen) und werden im Basis-Teil danach von iOS beendet (Signal 9,
+  der Speicher eines Programms ohne Szene; der Basis-Teil war in AP6e einzeln grün, auf dem Mac gibt Metal den Speicher des
+  Voll-Teils vollständig frei). `uigputest` unter UIKit: `switch`, `viewplain`, `viewbasis`, `viewlose`, `images`, `lose`,
+  `idle` grün.
+
+**Fallen, schon bekannt.** Metal schaltet beim Übersetzen zur Laufzeit schnelle Mathematik ein (NaN, Unendlich,
+Kontraktion); MSLs `float3` ist 16 Byte groß (in Puffern `packed_float3`); `[[vertex_id]]` und `[[instance_id]]`
+enthalten Basis-Vertex und erste Instanz wie unter Vulkan; Metal hat keine Push-Konstanten; `nextDrawable` wartet;
+GPU-Arbeit im Hintergrund beendet eine iOS-App; der Simulator hat nicht alle Fähigkeiten einer echten Apple-GPU;
+Apple-GPUs schreiben Zeitstempel nur an Grenzen eines Encoders.
 
 ### AP7: Desktop-Dienste auf macOS (M)
 

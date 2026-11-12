@@ -65,7 +65,7 @@ pub(crate) const TOP_BLOCKED: u8 = 255;
 /// a big image of the base layer in this frame: its record, the part of it the clips leave
 /// (x0, y0, x1, y1)
 #[derive(Clone, Copy)]
-#[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")), allow(dead_code))] // (read by gpu_out.rs)
+#[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32")), allow(dead_code))] // (read by gpu_out.rs)
 pub(crate) struct ImgSeen {
     pub(crate) index: u32,
     pub(crate) vis: [i32; 4],
@@ -111,7 +111,7 @@ pub(crate) struct W {
 impl W {
     /// (after dirty_compute, whose swap made cells_prev this frame's) the hashes through layer l
     /// of this frame or of the last one
-    #[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")), allow(dead_code))] // (read by gpu_out.rs)
+    #[cfg_attr(not(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32")), allow(dead_code))] // (read by gpu_out.rs)
     pub(crate) fn through(&self, now: bool, l: usize) -> &[u64] {
         let (pre, all) = if now { (&self.pre_prev, &self.cells_prev) } else { (&self.pre, &self.cells) };
         match pre[l.min(L_COUNT - 1)..].iter().find(|k| !k.is_empty()) {
@@ -349,7 +349,7 @@ impl Ui {
         {
             let Ui { wp, .. } = self;
             let d = &mut wp.dirty;
-            let split = cfg!(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")) && d.split; // (only there: nothing of it in other targets)
+            let split = cfg!(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32")) && d.split; // (only there: nothing of it in other targets)
             let cells = d.cells.as_mut().unwrap();
             cells.fill(0);
             let grids = sc.on();
@@ -449,7 +449,7 @@ impl Ui {
         let pending = self.dmg.iter().any(|d| d.win == self.uiw_cur);
         // the GPU output's images of this frame; scroll copies move pixels of the framebuffer, which
         // keeps no separate layers and may lack an image's pixels
-        let split = cfg!(any(windows, jfgui_glibc, target_os = "android", target_arch = "wasm32")) && self.wp.dirty.split;
+        let split = cfg!(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32")) && self.wp.dirty.split;
         let apart = split && {
             let views = self.wp.canv.views.iter().any(|v| v.apart);
             let quads = (!self.wp.dirty.imgs.is_empty() || self.wp.dirty.busy || views) && {

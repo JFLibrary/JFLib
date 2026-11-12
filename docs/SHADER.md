@@ -374,6 +374,49 @@ ganzer Zahlen unter 2²⁴ und Ganzzahl-Operationen, jedes Gleitkommaergebnis tr
 Reihenfolge der Atomics – zum Vergleich sortieren; `instance_count` = Länge von `cull_ref`.
 Der Vertex- und der Fragment-Shader sind nicht exakt (Matrixprodukte, `Normalize`).
 
+## MSL für Metal (`msl`, AP6)
+
+`msl::translate(words, &Options)` übersetzt ein SPIR-V-Modul in die Metal Shading Language, für das
+Metal-Backend von `lib/gpu` auf macOS und iOS ([APPLE.md](APPLE.md), AP6). So läuft jedes Modul, das
+`lib/wgsl` oder dieser Builder schreibt, ohne Änderung des Aufrufers auch auf Metal. Gelesen wird das
+SPIR-V dieser beiden Erzeuger: logische Adressierung, strukturierter Kontrollfluss, die Opcodes von
+`spv::OPS` und `GLSL.std.450`.
+
+- **Ergebnis:** der MSL-Text und je Entry Point der Name der MSL-Funktion, die Workgroup-Größe (mit
+  eingesetzten Konstanten), die Plätze der Ressourcen, ob Push-Konstanten und Pufferlängen gelesen
+  werden, die Orte der Vertex-Eingaben.
+- **Plätze:** Puffer, Texturen und Sampler des Moduls je ab 0 in der Reihenfolge (Set, Binding), Puffer
+  unter `FIRST_VERTEX_SLOT` (21); Push-Konstanten als `constant`-Block an `PUSH_SLOT` (29), die Längen der
+  gebundenen Pufferbereiche in Byte als `constant uint*` an `SIZES_SLOT` (30, Index = Platz des Puffers;
+  `arrayLength` und die Robustheit lesen sie); Vertex-Puffer i an `vertex_slot(i)` (28 − i).
+- **Spezialisierungskonstanten** werden eingesetzt (`Options::spec`, `reflect::constant_values`): eine
+  Pipeline mit Konstanten ist eine eigene Übersetzung.
+- **Typen:** ein MSL-Struct je SPIR-V-Struct; mit `Offset`-Dekorationen bis zu den Offsets aufgefüllt,
+  Dreiervektoren dort als `packed_`-Typen; Arrays als `jf_arr<T, N>` (Wertsemantik), Laufzeit-Arrays als
+  `T m[1]`. Strides von Arrays und Matrizen müssen die von MSL sein (sonst ein Fehler).
+- **Werte und Kontrollfluss:** jeder SSA-Wert ist eine Variable der Funktion, zugewiesen, wo SPIR-V ihn
+  definiert; Zeiger, Texturen und Sampler bleiben Ausdrücke. Strukturierter Kontrollfluss wird `if`,
+  `switch` und `while (true)`; ein Sprung zum Continue-Ziel einer Schleife wiederholt das
+  Continue-Konstrukt an Ort und Stelle. Ressourcen, Built-ins, private und Workgroup-Variablen sind
+  Parameter jeder Funktion, die sie benutzt. Vorzeichenbehaftete Ganzzahl-Arithmetik läuft über
+  vorzeichenlose (sie läuft über wie in SPIR-V und WGSL; in MSL wäre ein Überlauf undefiniert).
+- **Texturzugriffe:** `textureLoad` klemmt Stufe, Schicht, Probe und Koordinate in die Textur, ein Speichern
+  außerhalb fällt weg (Metals `read()`/`write()` außerhalb sind undefiniert, WGSL erlaubt beides); Proben mit
+  Gleitkomma-Koordinate runden und klemmen die Schicht.
+- **Bindless und Draw-Index (Stufe Voll, AP6g):** ein Array von Bildern, Samplern oder Speicherpuffern wird ein
+  Argument-Puffer von Metal 3 in einem Puffer-Slot: ein Array von Structs mit einem Glied, 8 Byte je Bild oder Sampler (die
+  `MTLResourceID`), 16 je Puffer (Adresse und Größe in Bytes, für `arrayLength`); das braucht MSL 3.0. `DrawIndex` liest
+  den Eintrag `DRAW_INDEX_AT` des Puffers der Puffergrößen (`Entry::draw_index`).
+- **Grenzen:** Farbausgaben an den Orten 0 bis 7 (Metal), keine 64-Bit-Gleitkommazahlen, keine nicht konstanten
+  Texel-Offsets, kein Sprung aus einer Schleife heraus innerhalb eines `switch`.
+
+**Geprüft** von `wgsltest --only msl` (Gruppe `msl`): jedes Modul der Gruppe `spirv` (Benchmark,
+Abdeckung, die gültigen Fälle der Prüfregeln, das Korpus), dazu die WGSL-Shader der Bibliotheken
+(`gpu_out.wgsl`, render3d) mit und ohne Robustheit und alle Module, die dieser Builder schreibt
+(`samples`, `bench`), je auf beiden Stufen: 805 Module, 802 übersetzt, 3 erwartete Ausnahmen
+(Farbort 8, Bindless). `--msl-out DIR` schreibt die MSL-Dateien; auf dem Mac nahm Metals Übersetzer zur
+Laufzeit alle 802 an (2026-11-10). Ob sie auch richtig rechnen, prüft `gputest` auf Metal (AP6b).
+
 ## Tests: `apps/shadertest`
 
 `python -u build_rs.py test shadertest` (Windows und Linux) bzw.

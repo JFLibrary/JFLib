@@ -1,0 +1,4 @@
+#!args --test phase
+# dash patterns at 1e-6 units per pixel: a polyline at 1e7 with segments 1e7 long (its vertex, a segment's middle; pattern
+# in pixels, in units, a period of a million pixels) and a circle of radius 1e7 (a joint, a piece's middle): every dash's
+# end within 1/16 px of its place over 24 pans; Voll and Basis
