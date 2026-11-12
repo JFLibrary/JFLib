@@ -122,6 +122,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Fixed
 
+- **rt:** Programs without std link with Rust 1.99 (LLVM 23) again: LLVM turns a loop that counts wide characters up to the NUL into a call to wcslen, which rt now has next to strlen (wchar_t of 16 bits on Windows, 32 bits on Linux and in the browser); with 0.1.0 every program on Windows failed with "unresolved external symbol wcslen" (until then: rustflags `-C llvm-args=-disable-loop-idiom-wcslen`)
+- **build:** cargo jflib package builds the setup stub and the AppImage runtime of an app in JFLib's workspace from the workspace's crates (it took them from crates.io), and takes only the app's [profile.release] for them (JFLib's [profile.dev.package.X] of crates a stub has not were a Cargo warning each)
 - **Tests:** plattest --test lib matches JFPainter's Rust test plugins (it was written for PaintCraft's assembly plugins and failed 4 checks on x86-64 too): crashq's trap is found by its instruction, crash and crashpf get FXARGS on a test surface, badinfo's list pointer is the one outside the image; a new check: a plugin of the other processor -> LIBE_ARCH
 - **build:** build_rs.py runs with Python 3.11 again, as the README says (tools/gendoc.py needed 3.12)
 - **update:** an update's new file is created with create_new on Apple too (never written through an existing name or link)
