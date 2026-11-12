@@ -137,6 +137,7 @@ fn span<S: Simd>(s: S, k: GradK) {
     let dx = g.ex - g.sx;
     let dy = g.ey - g.sy;
     let l2 = dx * dx + dy * dy;
+    #[allow(clippy::eq_op)] // l2 - l2 is NaN for an infinite l2
     let degenerate = !(l2 > 0.0) || (l2 - l2).is_nan();
     let vy = (y as f64 + 0.5) - g.sy;
     let (vdx, vdy, vsx) = (s.splatd(dx), s.splatd(dy), s.splatd(g.sx));

@@ -11,6 +11,14 @@
 //   cursor_render(handle, dpi) -> Some(surface)   the cursor drawn into a new surface
 //                              (FMT_PARGB; tests, previews)
 //   cursor_current() -> handle the handle CUR_CUSTOM stands for (0 = none)
+//   cursor_replace(handle, f, w, h, hot) -> bool   (E3) a new drawing for a live handle (the
+//                              platform's cursor is made again when it is shown next)
+//   cursor_free(handle)        (E3) the slot is free again (cursor_new may hand it out); a
+//                              hit box showing it gets the crosshair
+//   cursor_next(shape)         (E3) the cursor of the next hit box: any CUR_* -- the system
+//                              shapes CUR_X0 .. CUR_X_END (not-allowed, grab, the resize
+//                              shapes ...) that do not fit into the 4 flag bits, CUR_CUSTOM
+//   cursor_at(x, y) -> shape   (ctx.rs) the cursor at a point (tests, an engine's own hover)
 // Internal: cursor_resolve(shape) -> the plat shape for a hit box cursor (CUR_CUSTOM: the
 // custom cursor made for the current window's dpi with plat::cursor_create, rebuilt when
 // that dpi changes; the crosshair when there is none or the platform has no custom
@@ -71,6 +79,45 @@ impl Ui {
     /// ui_cursor_current -> handle
     pub fn cursor_current(&self) -> u32 {
         self.ucur.cur
+    }
+
+    /// (E3) the cursor of the next hit box (canvas, button, hit_rect ...): any CUR_* shape --
+    /// also those beyond CUR_CUSTOM's 4 bits (CUR_NOT_ALLOWED, CUR_GRAB, CUR_SIZE_NE ...), a
+    /// custom cursor through CUR_CUSTOM; it wins over the hit box's flags.  A platform without
+    /// a shape shows plat::cursor_fallback's
+    pub fn cursor_next(&mut self, shape: u32) {
+        self.wp.lay.next_cursor = shape;
+    }
+
+    /// (E3) a new drawing for a live handle (f, w x h DIP, hot spot x | y << 16): the platform's
+    /// cursor is made again at the next show -> false for a handle that is not live
+    pub fn cursor_replace(&mut self, handle: u32, f: CursorDraw, w: u32, h: u32, hot: u32) -> bool {
+        let i = handle.wrapping_sub(1);
+        let Some(Some(s)) = self.ucur.slots.get_mut(i as usize).filter(|_| i < CUR_USER_MAX) else { return false };
+        if s.plat >= 0 {
+            plat::cursor_destroy(s.plat);
+        }
+        *s = UCur { f, w, h, hot, plat: -1, dpi: 0 };
+        true
+    }
+
+    /// (E3) free a handle of cursor_new: its platform cursor goes, the slot may be handed out
+    /// again; when it was the custom cursor, CUR_CUSTOM shows the crosshair until another is set
+    pub fn cursor_free(&mut self, handle: u32) {
+        let i = handle.wrapping_sub(1);
+        if i >= CUR_USER_MAX {
+            return;
+        }
+        if let Some(slot) = self.ucur.slots.get_mut(i as usize) {
+            if let Some(s) = slot.take() {
+                if s.plat >= 0 {
+                    plat::cursor_destroy(s.plat);
+                }
+            }
+        }
+        if self.ucur.cur == handle {
+            self.ucur.cur = 0;
+        }
     }
 
     // uc_rec(handle): the slot of a live handle

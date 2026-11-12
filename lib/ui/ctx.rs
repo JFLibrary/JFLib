@@ -110,6 +110,10 @@ pub(crate) struct Hit {
     pub(crate) continuation: bool,
     /// HB_* (cursor in bits 12..15)
     pub(crate) flags: u16,
+    /// HB_KEYS: every key is the widget's while it has the focus
+    pub(crate) keys: bool,
+    /// (E3) the cursor of ui.cursor_next (any CUR_*; 0: the shape in flags)
+    pub(crate) cursor: u8,
     /// the axes along which a finger belongs to the widget (touch.rs, AX_*)
     pub(crate) grab: u8,
     pub(crate) layer: u8,
@@ -122,6 +126,35 @@ pub(crate) struct Hit {
     pub(crate) y0: i32,
     pub(crate) x1: i32,
     pub(crate) y1: i32,
+}
+
+/// (E2) a key as it went down or up, for a canvas that passes the keyboard on (a web page's
+/// keydown / keyup events): ui.key_event_take
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct KeyEvent {
+    /// VK_*
+    pub vk: u32,
+    /// MOD_* at the time
+    pub mods: u32,
+    /// down (true) or up
+    pub down: bool,
+    /// a down of the system's auto-repeat while the key is held
+    pub repeat: bool,
+    /// the key's place on the keyboard, whatever the layout: Windows' scan code (0xE0.. for
+    /// extended keys), Linux's evdev code; 0 where the platform does not tell (macOS, the
+    /// browser, Android)
+    pub scancode: u32,
+    /// KL_STANDARD, KL_LEFT / KL_RIGHT (the two Shift, Ctrl, Alt, Windows keys), KL_NUMPAD
+    pub location: u32,
+}
+
+// (E2) a KeyEvent of the batch: the index of its down in keyq (-1: an up), taken
+#[derive(Clone, Copy)]
+pub(crate) struct RawKey {
+    pub(crate) ev: KeyEvent,
+    pub(crate) kq: i32,
+    pub(crate) taken: bool,
 }
 
 /// semantic record (dump / expect)  [SR_*]
@@ -208,6 +241,8 @@ pub(crate) struct W {
     pub(crate) pans: [Vec<super::touch::PanView>; 2],
     pub(crate) grabs: [Vec<[i32; 4]>; 2],
     pub(crate) keyq: Vec<u32>,
+    /// (E2) the keys as they went down and up in this batch (key_event_take)
+    pub(crate) rawq: Vec<RawKey>,
     pub(crate) textq: Vec<u32>,
     pub(crate) hit_cur: usize,
     pub(crate) mx: i32,
@@ -254,6 +289,7 @@ impl W {
             pans: [Vec::new(), Vec::new()],
             grabs: [Vec::new(), Vec::new()],
             keyq: Vec::new(),
+            rawq: Vec::new(),
             textq: Vec::new(),
             hit_cur: 0,
             mx: -1,
@@ -292,10 +328,21 @@ impl W {
 /// point: layers from the top down to modal_layer, last record first; HB_BLOCK /
 /// HB_DISABLED boxes answer id 0.  (-1, -1) = outside the window: none.
 pub(crate) fn hit_find_list(list: &[Hit], modal_layer: u32, x: i32, y: i32) -> (u32, u32) {
+    match hit_find(list, modal_layer, x, y) {
+        Some(h) => {
+            let flags = h.flags as u32;
+            (if flags & (HB_BLOCK | HB_DISABLED) != 0 { 0 } else { h.id }, flags)
+        }
+        None => (0, 0),
+    }
+}
+
+// the topmost hit box at the point (see hit_find_list)
+pub(crate) fn hit_find(list: &[Hit], modal_layer: u32, x: i32, y: i32) -> Option<&Hit> {
     // outside the window = (-1, -1) (E_LEAVE); other negative points are real: popups of a
     // secondary window may lie left of / above it
     if x == -1 && y == -1 {
-        return (0, 0);
+        return None;
     }
     let mut layer = L_COUNT as i32 - 1;
     while layer >= modal_layer as i32 {
@@ -303,13 +350,22 @@ pub(crate) fn hit_find_list(list: &[Hit], modal_layer: u32, x: i32, y: i32) -> (
             if h.layer as i32 != layer || x < h.x0 || x >= h.x1 || y < h.y0 || y >= h.y1 {
                 continue;
             }
-            let flags = h.flags as u32;
-            let id = if flags & (HB_BLOCK | HB_DISABLED) != 0 { 0 } else { h.id };
-            return (id, flags);
+            return Some(h);
         }
         layer -= 1;
     }
-    (0, 0)
+    None
+}
+
+// (E3) the cursor a hit box shows: cursor_next's, else the shape of its flags; the arrow over a
+// title bar's drag region
+pub(crate) fn hit_cursor(h: Option<&Hit>) -> u32 {
+    match h {
+        Some(h) if h.flags as u32 & HB_DRAG != 0 => CUR_ARROW,
+        Some(h) if h.cursor != 0 => h.cursor as u32,
+        Some(h) => (h.flags as u32 >> HB_CURSOR_SHIFT) & 15,
+        None => CUR_ARROW,
+    }
 }
 
 impl Ui {
@@ -415,6 +471,53 @@ impl Ui {
         self.wp.ctx.keyq.iter().copied().find(|&k| (k as i32) >= 0).unwrap_or(0)
     }
 
+    /// key_take -> the first unconsumed key this frame (VK | mods << 16), consumed; 0 when none
+    /// is left.  A canvas with HB_KEYS takes every key with it while it has the focus (`ev &
+    /// EV_FOCUS`, call it until 0); the keys a focused text box keeps stay with the box, and
+    /// while a popup of the window is open (a menu, a flyout) the keys are its.
+    pub fn key_take(&mut self) -> u32 {
+        if self.popup_count() != 0 {
+            return 0;
+        }
+        for i in 0..self.wp.ctx.keyq.len() {
+            let k = self.wp.ctx.keyq[i];
+            if (k as i32) >= 0 && self.text_key_filter(Some(i)).is_some() {
+                self.wp.ctx.keyq[i] |= 0x8000_0000;
+                return k;
+            }
+        }
+        0
+    }
+
+    /// (E2) the next key as it went down or up (KeyEvent: the key, modifiers, down / up, auto-
+    /// repeat, scancode, left / right / number block), consumed; None when none is left.  For a
+    /// canvas with HB_KEYS that passes the keyboard on as it is (a web page's keydown and keyup):
+    /// call it while the canvas has the focus (`ev & EV_FOCUS`) until None, instead of key_take
+    /// (a down taken here is taken for key_take too, and one key_take took is not here).  The
+    /// typed text comes through text_take as before.  None while a popup of the window is open
+    pub fn key_event_take(&mut self) -> Option<KeyEvent> {
+        if self.popup_count() != 0 {
+            return None;
+        }
+        for i in 0..self.wp.ctx.rawq.len() {
+            let r = self.wp.ctx.rawq[i];
+            if r.taken {
+                continue;
+            }
+            self.wp.ctx.rawq[i].taken = true;
+            if r.kq >= 0 {
+                let k = r.kq as usize;
+                // its down: unless taken already or kept by a focused text box
+                if self.wp.ctx.keyq.get(k).is_none_or(|&q| (q as i32) < 0) || self.text_key_filter(Some(k)).is_none() {
+                    continue;
+                }
+                self.wp.ctx.keyq[k] |= 0x8000_0000;
+            }
+            return Some(r.ev);
+        }
+        None
+    }
+
     /// ui_text_take(cap): the typed codepoints (at most cap), consumed; when cap leaves some,
     /// they come in the next pass (nothing typed is lost)
     pub fn text_take(&mut self, cap: usize) -> Vec<u32> {
@@ -505,6 +608,13 @@ impl Ui {
     }
 
     // key_push(k): a key (VK | mods << 16) for the live window's pass
+    // (E2) a key as it went down or up (KEYQ_MAX of them per batch)
+    fn raw_push(&mut self, ev: KeyEvent, kq: i32) {
+        if self.wp.ctx.rawq.len() < KEYQ_MAX {
+            self.wp.ctx.rawq.push(RawKey { ev, kq, taken: false });
+        }
+    }
+
     fn key_push(&mut self, k: u32) {
         if self.wp.ctx.keyq.len() < KEYQ_MAX {
             self.wp.ctx.keyq.push(k);
@@ -593,14 +703,23 @@ impl Ui {
                 }
                 let vk = ev.data & 0xFFFF;
                 self.keydown[(vk & 255) as usize] = 1;
+                let n = self.wp.ctx.keyq.len();
                 self.key_push((vk | self.mods << 16) & 0x7FFF_FFFF);
+                // (E2) as it went down
+                let kq = if self.wp.ctx.keyq.len() > n { n as i32 } else { -1 };
+                let ev = KeyEvent { vk, mods: self.mods, down: true, repeat: ev.data >> 31 != 0, scancode: ev.x as u32, location: ev.y as u32 };
+                self.raw_push(ev, kq);
                 1
             }
             plat::E_KEY_UP => {
                 let k = ev.data & 255;
                 self.keydown[k as usize] = 0;
+                // (E2) as it went up: a pass of its own for a canvas that takes the keyboard
+                let keys = self.focus_has_keys();
+                let ev = KeyEvent { vk: ev.data & 0xFFFF, mods: self.mods, down: false, repeat: false, scancode: ev.x as u32, location: ev.y as u32 };
+                self.raw_push(ev, -1);
                 // (popup agent) Alt release: a pass for the menu bar's Alt tap
-                (k == VK_MENU) as u32
+                (k == VK_MENU || keys) as u32
             }
             plat::E_TEXT => {
                 self.text_push(ev.data);
@@ -666,6 +785,7 @@ impl Ui {
         c.wheel_x = 0;
         c.wheel_y = 0;
         c.keyq.clear();
+        c.rawq.clear();
         c.textq.clear();
         c.moved = false;
         // keep the last pointer position as the start of the next stroke segment
@@ -699,6 +819,14 @@ impl Ui {
         hit_find_list(&c.hits[c.hit_cur ^ 1], c.modal_prev, x, y)
     }
 
+    /// (E3) the cursor shape at a point (px) of the current window in the previous pass: the
+    /// topmost hit box's (CUR_*: ui.cursor_next's, else the shape of its flags; CUR_CUSTOM for
+    /// the custom cursor), CUR_ARROW where there is none
+    pub fn cursor_at(&self, x: i32, y: i32) -> u32 {
+        let c = &self.wp.ctx;
+        hit_cursor(hit_find(&c.hits[c.hit_cur ^ 1], c.modal_prev, x, y))
+    }
+
     /// ui_hit_flags_at(x, y): HB_* flags of the topmost hit box at a point of the main
     /// window (previous pass) -- non-client hit testing of the platform
     pub fn hit_flags_at(&mut self, x: i32, y: i32) -> u32 {
@@ -710,10 +838,7 @@ impl Ui {
         let (id, flags) = self.hot_find(self.wp.ctx.mx, self.wp.ctx.my);
         // cursor: the active widget keeps its cursor
         if self.wp.ctx.active == 0 {
-            let mut shape = (flags >> HB_CURSOR_SHIFT) & 15;
-            if flags & HB_DRAG != 0 {
-                shape = 0;
-            }
+            let shape = if self.uiw_inert_now() { CUR_ARROW } else { self.cursor_at(self.wp.ctx.mx, self.wp.ctx.my) };
             let s = self.cursor_resolve(shape);
             plat::set_cursor(s);
         }
@@ -741,10 +866,13 @@ impl Ui {
         let list = &mut c.hits[c.hit_cur];
         let r = c.last_rect;
         let k = c.uiclip;
+        let cursor = core::mem::take(&mut self.wp.lay.next_cursor).min(255) as u8;
         list.push(Hit {
             id,
             continuation: false,
             flags: (hbflags | notab) as u16,
+            keys: hbflags & HB_KEYS != 0,
+            cursor,
             grab: super::touch::hit_grab(hbflags),
             layer: c.cmd_layer_ui as u8,
             kind: 0,
@@ -830,7 +958,7 @@ impl Ui {
         }
         if c.focus == id {
             ev |= EV_FOCUS;
-            if flags & (HB_TEXT | HB_OWNKEYS) == 0 && flags & HB_FOCUS != 0 && (self.key(VK_SPACE) || flags & HB_SPACE == 0 && self.key(VK_RETURN)) {
+            if flags & (HB_TEXT | HB_OWNKEYS | HB_KEYS) == 0 && flags & HB_FOCUS != 0 && (self.key(VK_SPACE) || flags & HB_SPACE == 0 && self.key(VK_RETURN)) {
                 ev |= EV_ACT;
                 self.wp.ctx.focus_visible = true;
             }
@@ -1106,6 +1234,28 @@ impl Ui {
         let n = self.sems.len();
         self.src_sem(n - 1); // the inspector's source of the record (inspect_src.rs)
         &mut self.sems[n - 1]
+    }
+
+    /// sem_rect(kind, id, rect, label, value) -> the record: a semantic record of content the app
+    /// draws itself (a link or heading of a web page inside a canvas) at rect (px of the window, as
+    /// last_rect), without a hit box of its own and without a state; last_rect and the state of
+    /// the last widget stay.  Scripts find it by its label (`click "Label"` presses at its middle,
+    /// on the hit box that lies there: the canvas), screen readers read it (section 19 of the
+    /// guide).  Publish the records of what is visible, after the canvas.
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn sem_rect(&mut self, kind: u16, id: u32, rect: [i32; 4], label: Option<&str>, value: i32) -> &mut Sem {
+        let (lr, ls) = (self.wp.ctx.last_rect, self.wp.ctx.last_state);
+        self.wp.ctx.last_rect = rect;
+        self.wp.ctx.last_state = 0;
+        let n = self.sems.len();
+        self.sem(kind, id, label, value);
+        self.wp.ctx.last_rect = lr;
+        self.wp.ctx.last_state = ls;
+        if self.sems.len() > n {
+            &mut self.sems[n]
+        } else {
+            &mut self.sem_dummy
+        }
     }
 
     // ------------------------------------------------------------------ clipping, layers

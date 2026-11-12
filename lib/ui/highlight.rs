@@ -1,10 +1,13 @@
 // highlight -- syntax highlighting for ui.code_editor: a small engine of token rules, the
 // built-in grammars (Rust, JSON, INI, TOML, a Markdown subset, JFS: the scripts of
-// JFScript) and the colours of the tokens
+// JFScript; JavaScript, CSS, HTML with its scripts and styles, WAT: the text format of
+// WebAssembly) and the colours of the tokens
 //
 //   Highlighter::rust() / json() / ini() / toml() / markdown() / jfs() / plain()
+//   Highlighter::javascript() / css() / html() / wat()   (E10: view-source, developer tools)
 //   Highlighter::for_name(s)            by name or file extension ("rs", "json", "ini", "cfg",
-//                                       "toml", "md", "jfs", a path); plain() for anything else
+//                                       "toml", "md", "jfs", "js", "css", "html", "xml", "svg",
+//                                       "wat", a path); plain() for anything else
 //   Highlighter::new(&GRAMMAR)          an app's own grammar (a static Grammar of Rules)
 //   h.line(text, state, &mut tokens) -> state   the tokens of one line (SY_* kinds, byte
 //                                       ranges; the plain text between them is SY_TEXT) from
@@ -20,11 +23,15 @@
 // (escapes, multi-line or not), strings with code inside (Interp: the ${..} of JFS, whose
 // code the same rules highlight), Rust raw strings, word lists, numbers, punctuation and
 // functions of its own (Custom: JSON keys, Rust char literals / lifetimes / attributes, INI
-// sections and keys, Markdown headings, lists, emphasis and links).  Where no rule matches,
+// sections and keys, Markdown headings, lists, emphasis and links), parts with rules of their
+// own (Nest: HTML's tags, JavaScript's template strings and their ${..}) and elements whose
+// content is another language (Element: HTML's <script> and <style>).  Where no rule matches,
 // an identifier is read whole: before '(' a function (calls), before '!' a macro (macros),
 // capitalised a type (caps_types).  A construct still open at a line end is the line's end
 // state: rule index + 1, the nesting depth (bits 8..15) and a Rust raw string's '#' count
-// (bits 16..31); the editor keeps a state per line and highlights only the visible lines.
+// (bits 16..31); inside a Nest or an Element the inner grammar's state in bits 8..31 (so
+// three levels: HTML, a script's template string, its ${..}); the editor keeps a state per
+// line and highlights only the visible lines.
 
 use alloc::vec::Vec;
 
@@ -99,6 +106,17 @@ pub enum Rule {
     Custom(fn(&str, usize, bool) -> Option<(usize, u8)>),
     /// single characters
     Punct(&'static str),
+    /// a part with rules of its own: from open to close (may span lines), the two delimiters
+    /// `kind`, the text between them highlighted by `inner`'s rules (HTML's tags, the ${..} of
+    /// JavaScript's template strings); close counts only outside inner's strings and comments,
+    /// and with close "}" the braces inside count
+    Nest { open: &'static str, close: &'static str, kind: u8, inner: &'static Grammar },
+    /// an element whose content is another language (HTML's script and style): the start tag
+    /// from '<' and `name` (ASCII case-insensitive, then a blank, '/' or '>') to its '>' on the
+    /// same line ('<' and '>' SY_PUNCT, the rest by `tag`'s rules), then the content up to
+    /// "</" and `name` (case-insensitive, wherever it stands) by `inner`'s rules; may span
+    /// lines; the end tag is the grammar's own again
+    Element { name: &'static str, tag: &'static Grammar, inner: &'static Grammar },
 }
 
 /// a language (see the module header)
@@ -148,6 +166,40 @@ fn enc(rule: usize, depth: u32, extra: u32) -> u32 {
     (rule as u32 + 1) & 0xFF | (depth.min(255) << 8) | (extra.min(0xFFFF) << 16)
 }
 
+// a Nest / Element open at the line end: its rule and the inner grammar's state above it
+// (bits 8..31; what does not fit is lost)
+fn enc_in(rule: usize, inner: u32) -> u32 {
+    (rule as u32 + 1) & 0xFF | inner << 8
+}
+
+// the place of "</" + name (ASCII case-insensitive) from i on
+fn find_end_tag(t: &str, i: usize, name: &str) -> Option<usize> {
+    let b = t.as_bytes();
+    let n = name.as_bytes();
+    let mut j = i;
+    while j + 2 + n.len() <= b.len() {
+        if b[j] == b'<' && b[j + 1] == b'/' && b[j + 2..j + 2 + n.len()].eq_ignore_ascii_case(n) {
+            return Some(j);
+        }
+        j += 1;
+    }
+    None
+}
+
+// an element's start tag at i ("<name" then a blank, '/' or '>'): the place of its '>'
+fn element_start(t: &str, i: usize, name: &str) -> Option<usize> {
+    let b = t.as_bytes();
+    let n = name.as_bytes();
+    if b[i] != b'<' || b.len() < i + 1 + n.len() || !b[i + 1..i + 1 + n.len()].eq_ignore_ascii_case(n) {
+        return None;
+    }
+    let e = i + 1 + n.len();
+    if !matches!(b.get(e), Some(b' ' | b'\t' | b'/' | b'>')) {
+        return None;
+    }
+    t[e..].find('>').map(|k| e + k)
+}
+
 fn utf8_len(b: u8) -> usize {
     match b {
         0..=0x7F => 1,
@@ -191,13 +243,30 @@ impl Highlighter {
     pub const fn jfs() -> Highlighter {
         Highlighter { g: &JFS }
     }
+    /// JavaScript (template strings over lines with their ${..}, regular expressions)
+    pub const fn javascript() -> Highlighter {
+        Highlighter { g: &JAVASCRIPT }
+    }
+    /// CSS (selectors, at-rules, properties, values with units and colours, nested rules)
+    pub const fn css() -> Highlighter {
+        Highlighter { g: &CSS }
+    }
+    /// HTML (also XML and SVG): tags, attributes, comments, entities, doctype; the content of
+    /// <script> as JavaScript and of <style> as CSS
+    pub const fn html() -> Highlighter {
+        Highlighter { g: &HTML }
+    }
+    /// WAT, the text format of WebAssembly (modules, instructions, $names, types)
+    pub const fn wat() -> Highlighter {
+        Highlighter { g: &WAT }
+    }
 
     /// by name or extension, also of a path ("rs", "Rust", "x/y.toml"); plain() for others
     pub fn for_name(s: &str) -> Highlighter {
         let s = s.trim();
         let ext = s.rsplit(['/', '\\']).next().unwrap_or(s);
         let ext = ext.rsplit('.').next().unwrap_or(ext).to_ascii_lowercase();
-        for g in [&RUST, &JSON, &INI, &TOML, &MARKDOWN, &JFS] {
+        for g in [&RUST, &JSON, &INI, &TOML, &MARKDOWN, &JFS, &JAVASCRIPT, &CSS, &HTML, &WAT] {
             if g.name.eq_ignore_ascii_case(s) || g.exts.contains(&ext.as_str()) {
                 return Highlighter { g };
             }
@@ -381,6 +450,33 @@ impl Highlighter {
                             continue 'outer;
                         }
                     }
+                    Rule::Nest { open, close, kind, inner } => {
+                        if t[i..].starts_with(open) && !(prev && open.starts_with(|c: char| c.is_alphanumeric())) {
+                            push(out, i, i + open.len(), *kind);
+                            match Highlighter::new(*inner).nest_run(t, i + open.len(), 0, bol, close, out) {
+                                Ok(e) => {
+                                    push(out, e, e + close.len(), *kind);
+                                    i = e + close.len();
+                                    continue 'outer;
+                                }
+                                Err(st) => return (n, Some(enc_in(ri, st))),
+                            }
+                        }
+                    }
+                    Rule::Element { name, tag, inner } => {
+                        if let Some(gt) = element_start(t, i, name) {
+                            push(out, i, i + 1, SY_PUNCT);
+                            Highlighter::new(*tag).scan(&t[..gt], i + 1, bol, false, out, &mut |_, _| false);
+                            push(out, gt, gt + 1, SY_PUNCT);
+                            match Highlighter::new(*inner).element_run(t, gt + 1, 0, bol, name, out) {
+                                Ok(e) => {
+                                    i = e;
+                                    continue 'outer;
+                                }
+                                Err(st) => return (n, Some(enc_in(ri, st))),
+                            }
+                        }
+                    }
                 }
             }
             // no rule: an identifier whole, else one character
@@ -483,6 +579,17 @@ impl Highlighter {
                 let (e, done) = scan_str(t, 0, 0, close, *escape, *kind, out);
                 if done { (e, 0) } else { (n, state) }
             }
+            Rule::Nest { close, kind, inner, .. } => match Highlighter::new(*inner).nest_run(t, 0, state >> 8, bol, close, out) {
+                Ok(e) => {
+                    push(out, e, e + close.len(), *kind);
+                    (e + close.len(), 0)
+                }
+                Err(st) => (n, enc_in(ri, st)),
+            },
+            Rule::Element { name, inner, .. } => match Highlighter::new(*inner).element_run(t, 0, state >> 8, bol, name, out) {
+                Ok(e) => (e, 0),
+                Err(st) => (n, enc_in(ri, st)),
+            },
             Rule::RawStr => {
                 let hashes = (state >> 16) as usize;
                 match raw_close(t, 0, hashes) {
@@ -498,6 +605,57 @@ impl Highlighter {
             }
             _ => (0, 0),
         }
+    }
+
+    // inside a Nest (self: its inner grammar): the tokens from i (from the state st open at the
+    // line start when st != 0) up to `close` outside every construct of the inner grammar
+    // (close "}": the braces inside count) -> Ok(where close starts) / Err(the state at the end)
+    fn nest_run(&self, t: &str, i: usize, st: u32, bol: usize, close: &str, out: &mut Vec<Token>) -> Result<usize, u32> {
+        let mut i = i;
+        if st != 0 {
+            let (e, s) = self.resume(t, st, bol, out);
+            if s != 0 {
+                return Err(s);
+            }
+            i = e;
+        }
+        // close "}": the braces inside count, unless a rule of the inner grammar nests them
+        let braces = close == "}" && !self.g.rules.iter().any(|r| matches!(r, Rule::Nest { open, .. } if open.starts_with('{')));
+        let mut depth = 0u32;
+        let (e, s) = self.scan(t, i, bol, false, out, &mut |p, _| {
+            let r = &t[p..];
+            if braces && r.starts_with('{') {
+                depth += 1;
+            } else if r.starts_with(close) {
+                if depth == 0 {
+                    return true;
+                }
+                depth -= 1;
+            }
+            false
+        });
+        match s {
+            None => Ok(e),
+            Some(s) => Err(s),
+        }
+    }
+
+    // inside an Element (self: the language of its content): the tokens from i (from the state
+    // st open at the line start when st != 0) up to "</name" -> Ok(where it starts; the content's
+    // state ends there whatever it was) / Err(the state at the line end)
+    fn element_run(&self, t: &str, i: usize, st: u32, bol: usize, name: &str, out: &mut Vec<Token>) -> Result<usize, u32> {
+        let end = find_end_tag(t, i, name);
+        let part = &t[..end.unwrap_or(t.len())];
+        let mut i = i;
+        if st != 0 {
+            let (e, s) = self.resume(part, st, bol, out);
+            if s != 0 {
+                return end.ok_or(s);
+            }
+            i = e;
+        }
+        let (_, s) = self.scan(part, i, bol, false, out, &mut |_, _| false);
+        end.ok_or(s.unwrap_or(0))
     }
 
     /// the tokens of every line of a text (tests)
@@ -1053,6 +1211,508 @@ pub static JFS: Grammar = Grammar {
     openers: "{[(",
     closers: "}])",
     pairs: "()[]{}",
+};
+
+// ------------------------------------------------------------------ the web's languages (E10)
+
+// JavaScript: a regular expression literal where an expression may start (the line start, an
+// operator, an opening bracket, a keyword like return), its class [..] and flags; on one line
+fn js_regex(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let b = t.as_bytes();
+    if b[i] != b'/' || matches!(b.get(i + 1), Some(b'/' | b'*')) {
+        return None;
+    }
+    let before = t[..i].trim_end();
+    let ok = match before.as_bytes().last() {
+        None => true,
+        Some(b')' | b']' | b'}' | b'"' | b'\'' | b'`' | b'.') => false,
+        Some(&c) if c.is_ascii_alphanumeric() || c == b'_' || c == b'$' || c >= 0x80 => {
+            let w = before.rsplit(|c: char| !(c.is_alphanumeric() || c == '_' || c == '$')).next().unwrap_or("");
+            matches!(w, "return" | "typeof" | "instanceof" | "in" | "of" | "new" | "delete" | "void" | "throw" | "case" | "do" | "else" | "yield" | "await")
+        }
+        Some(_) => true,
+    };
+    if !ok {
+        return None;
+    }
+    let mut j = i + 1;
+    let mut class = false;
+    while j < b.len() {
+        match b[j] {
+            b'\\' => j += 2,
+            b'[' => {
+                class = true;
+                j += 1;
+            }
+            b']' => {
+                class = false;
+                j += 1;
+            }
+            b'/' if !class => {
+                j += 1;
+                while j < b.len() && b[j].is_ascii_alphabetic() {
+                    j += 1;
+                }
+                return Some((j - i, SY_STRING));
+            }
+            _ => j += 1,
+        }
+    }
+    None
+}
+
+// the length of an identifier of JavaScript at i (letters, digits, '_', '$'; not a digit first)
+fn js_ident_len(t: &str, i: usize) -> usize {
+    let mut e = i;
+    for (k, c) in t[i..].char_indices() {
+        if !(c.is_alphanumeric() || c == '_' || c == '$') || (k == 0 && c.is_ascii_digit()) {
+            break;
+        }
+        e = i + k + c.len_utf8();
+    }
+    e - i
+}
+
+// JavaScript: a member after '.' (not "...") is no keyword: before '(' a function, else plain
+// text; identifiers that start with '$' the same way
+fn js_member(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let member = t[..i].ends_with('.') && !t[..i].ends_with("..");
+    let dollar = t.as_bytes()[i] == b'$' && !t[..i].chars().next_back().is_some_and(|c| c.is_alphanumeric() || c == '_' || c == '$');
+    if !member && !dollar {
+        return None;
+    }
+    let n = js_ident_len(t, i);
+    if n == 0 {
+        return None;
+    }
+    let call = t[i + n..].trim_start_matches(' ').starts_with('(');
+    Some((n, if call { SY_FUNC } else { SY_TEXT }))
+}
+
+// a template string's text: up to '`', a backslash or "${"
+fn js_tpl_text(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let r = &t.as_bytes()[i..];
+    let mut j = 0;
+    while j < r.len() && r[j] != b'`' && r[j] != b'\\' && !(r[j] == b'$' && r.get(j + 1) == Some(&b'{')) {
+        j += 1;
+    }
+    (j > 0).then_some((j, SY_STRING))
+}
+
+// a template string's escape: the backslash and the next character
+fn js_tpl_escape(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    (t.as_bytes()[i] == b'\\').then(|| (1 + t[i + 1..].chars().next().map_or(0, |c| c.len_utf8()), SY_ESCAPE))
+}
+
+const JS_KEYWORDS: &[&str] = &[
+    "async", "await", "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "export", "extends",
+    "finally", "for", "from", "function", "if", "import", "in", "instanceof", "let", "new", "of", "return", "static", "super", "switch", "this",
+    "throw", "try", "typeof", "var", "void", "while", "with", "yield",
+];
+const JS_CONSTS: &[&str] = &["true", "false", "null", "undefined", "NaN", "Infinity"];
+
+static JS_TEMPLATE_RULES: [Rule; 3] = [
+    Rule::Custom(js_tpl_escape),
+    Rule::Nest { open: "${", close: "}", kind: SY_META, inner: &JAVASCRIPT },
+    Rule::Custom(js_tpl_text),
+];
+
+// the inside of a template string `..` (Nest of JAVASCRIPT)
+static JS_TEMPLATE: Grammar = Grammar {
+    name: "JavaScript template",
+    exts: &[],
+    rules: &JS_TEMPLATE_RULES,
+    ident: "",
+    calls: false,
+    macros: false,
+    caps_types: false,
+    comment: "",
+    openers: "",
+    closers: "",
+    pairs: "{}",
+};
+
+static JS_RULES: [Rule; 11] = [
+    Rule::LineComment("//"),
+    Rule::Block { open: "/*", close: "*/", kind: SY_COMMENT, nested: false, bol: false },
+    Rule::Str { open: "\"", close: "\"", escape: true, multi: false, kind: SY_STRING },
+    Rule::Str { open: "'", close: "'", escape: true, multi: false, kind: SY_STRING },
+    Rule::Nest { open: "`", close: "`", kind: SY_STRING, inner: &JS_TEMPLATE },
+    Rule::Custom(js_regex),
+    Rule::Custom(js_member),
+    Rule::Words(JS_KEYWORDS, SY_KEYWORD),
+    Rule::Words(JS_CONSTS, SY_CONST),
+    Rule::Number,
+    Rule::Punct("+-*/%=<>!&|^~?:;,.()[]{}@#"),
+];
+
+/// JavaScript: keywords, constants, strings, template strings over lines (their ${..} with
+/// SY_META delimiters, code inside), regular expressions (SY_STRING), numbers (also 1n, 0x..,
+/// 1_000), // and /* */ comments; calls before '(' are functions, capitalised names types, a
+/// member after '.' never a keyword
+pub static JAVASCRIPT: Grammar = Grammar {
+    name: "JavaScript",
+    exts: &["js", "mjs", "cjs"],
+    rules: &JS_RULES,
+    ident: "$",
+    calls: true,
+    macros: false,
+    caps_types: true,
+    comment: "//",
+    openers: "{[(",
+    closers: "}])",
+    pairs: "()[]{}",
+};
+
+// CSS: the text after i up to the next '{', ';' or '}' ends with '{': a selector (of a nested
+// rule), not a declaration
+fn css_in_selector(t: &str, i: usize) -> bool {
+    t[i..].find(['{', ';', '}']).is_some_and(|k| t.as_bytes()[i + k] == b'{')
+}
+
+fn css_name_len(b: &[u8], i: usize) -> usize {
+    b[i..].iter().take_while(|&&c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_' || c >= 0x80).count()
+}
+
+// CSS: a property's name (also --custom) after a line start, '{' or ';' and before ':'
+fn css_prop(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let b = t.as_bytes();
+    if !(b[i].is_ascii_alphabetic() || b[i] == b'-' || b[i] == b'_') {
+        return None;
+    }
+    let before = t[..i].trim_end_matches([' ', '\t']);
+    if !(before.is_empty() || before.ends_with(['{', ';'])) {
+        return None;
+    }
+    let e = i + css_name_len(b, i);
+    if !t[e..].trim_start_matches([' ', '\t']).starts_with(':') || css_in_selector(t, e) {
+        return None;
+    }
+    Some((e - i, SY_KEY))
+}
+
+// CSS: at-rules (@media, @import ..)
+fn css_at(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let b = t.as_bytes();
+    if b[i] != b'@' {
+        return None;
+    }
+    let n = css_name_len(b, i + 1);
+    (n > 0).then_some((n + 1, SY_KEYWORD))
+}
+
+// CSS: selectors -- .class (SY_TYPE), #id (SY_CONST), :pseudo and ::pseudo (SY_META); in a
+// declaration block a pseudo only in the selector of a nested rule, and #hex a colour
+fn css_sel(t: &str, i: usize, block: bool) -> Option<(usize, u8)> {
+    let b = t.as_bytes();
+    let start = |k: usize| b.get(k).is_some_and(|&x| x.is_ascii_alphabetic() || x == b'-' || x == b'_' || x >= 0x80);
+    match b[i] {
+        b'.' if start(i + 1) && !t[..i].chars().next_back().is_some_and(|p| p.is_ascii_digit()) => Some((1 + css_name_len(b, i + 1), SY_TYPE)),
+        b'#' => {
+            let n = css_name_len(b, i + 1);
+            if n == 0 {
+                return None;
+            }
+            let hex = matches!(n, 3 | 4 | 6 | 8) && b[i + 1..i + 1 + n].iter().all(|x| x.is_ascii_hexdigit());
+            Some((1 + n, if block && hex && !css_in_selector(t, i) { SY_NUMBER } else { SY_CONST }))
+        }
+        b':' => {
+            let k = if b.get(i + 1) == Some(&b':') { i + 2 } else { i + 1 };
+            if !start(k) || (block && !css_in_selector(t, i)) {
+                return None;
+            }
+            Some((k - i + css_name_len(b, k), SY_META))
+        }
+        _ => None,
+    }
+}
+
+fn css_sel_top(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    css_sel(t, i, false)
+}
+
+fn css_sel_block(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    css_sel(t, i, true)
+}
+
+// CSS: numbers with their unit or '%' (also -1.5em, .5s); !important
+fn css_value(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let b = t.as_bytes();
+    if b[i] == b'!' {
+        let r = t[i + 1..].trim_start_matches(' ');
+        let k = t.len() - r.len();
+        return (r.len() >= 9 && r.as_bytes()[..9].eq_ignore_ascii_case(b"important")).then_some((k + 9 - i, SY_KEYWORD));
+    }
+    if t[..i].chars().next_back().is_some_and(|p| p.is_alphanumeric() || p == '_' || p == '-' || p == '.') {
+        return None;
+    }
+    let mut j = i;
+    if matches!(b[j], b'-' | b'+') {
+        j += 1;
+    }
+    let digit = |k: usize| b.get(k).is_some_and(|x| x.is_ascii_digit());
+    if !(digit(j) || (b.get(j) == Some(&b'.') && digit(j + 1))) {
+        return None;
+    }
+    while j < b.len() && (b[j].is_ascii_digit() || b[j] == b'.') {
+        j += 1;
+    }
+    if matches!(b.get(j), Some(b'e' | b'E')) && (digit(j + 1) || (matches!(b.get(j + 1), Some(b'-' | b'+')) && digit(j + 2))) {
+        j += 2;
+        while j < b.len() && b[j].is_ascii_digit() {
+            j += 1;
+        }
+    }
+    if b.get(j) == Some(&b'%') {
+        j += 1;
+    } else {
+        while j < b.len() && b[j].is_ascii_alphabetic() {
+            j += 1;
+        }
+    }
+    Some((j - i, SY_NUMBER))
+}
+
+static CSS_RULES: [Rule; 8] = [
+    Rule::Block { open: "/*", close: "*/", kind: SY_COMMENT, nested: false, bol: false },
+    Rule::Str { open: "\"", close: "\"", escape: true, multi: false, kind: SY_STRING },
+    Rule::Str { open: "'", close: "'", escape: true, multi: false, kind: SY_STRING },
+    Rule::Custom(css_at),
+    Rule::Nest { open: "{", close: "}", kind: SY_PUNCT, inner: &CSS_BLOCK },
+    Rule::Custom(css_sel_top),
+    Rule::Custom(css_value),
+    Rule::Punct("{}()[],:;>+~*=|^$!/"),
+];
+
+static CSS_BLOCK_RULES: [Rule; 9] = [
+    Rule::Block { open: "/*", close: "*/", kind: SY_COMMENT, nested: false, bol: false },
+    Rule::Str { open: "\"", close: "\"", escape: true, multi: false, kind: SY_STRING },
+    Rule::Str { open: "'", close: "'", escape: true, multi: false, kind: SY_STRING },
+    Rule::Custom(css_at),
+    Rule::Nest { open: "{", close: "}", kind: SY_PUNCT, inner: &CSS_BLOCK },
+    Rule::Custom(css_prop),
+    Rule::Custom(css_sel_block),
+    Rule::Custom(css_value),
+    Rule::Punct("{}()[],:;>+~*=|^$!/"),
+];
+
+// the inside of a CSS block { .. }: declarations and nested rules (Nest of CSS)
+static CSS_BLOCK: Grammar = Grammar {
+    name: "CSS block",
+    exts: &[],
+    rules: &CSS_BLOCK_RULES,
+    ident: "-",
+    calls: true,
+    macros: false,
+    caps_types: false,
+    comment: "",
+    openers: "{",
+    closers: "}",
+    pairs: "()[]{}",
+};
+
+/// CSS: selectors (.class SY_TYPE, #id SY_CONST, :pseudo SY_META), at-rules (SY_KEYWORD),
+/// blocks over lines with properties (SY_KEY), numbers with units, #colours (SY_NUMBER),
+/// functions, !important, strings, /* */ comments; nested rules
+pub static CSS: Grammar = Grammar {
+    name: "CSS",
+    exts: &["css"],
+    rules: &CSS_RULES,
+    ident: "-",
+    calls: true,
+    macros: false,
+    caps_types: false,
+    comment: "",
+    openers: "{",
+    closers: "}",
+    pairs: "()[]{}",
+};
+
+fn html_name_char(c: u8) -> bool {
+    c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b':' | b'.') || c >= 0x80
+}
+
+// HTML: a tag's name right after '<' or "</"
+fn html_tag_name(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let b = t.as_bytes();
+    if !(t[..i].ends_with('<') || t[..i].ends_with("</")) || !b[i].is_ascii_alphabetic() {
+        return None;
+    }
+    Some((b[i..].iter().take_while(|&&c| html_name_char(c)).count(), SY_KEYWORD))
+}
+
+// HTML: an attribute's value without quotes after '='
+fn html_bare_value(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let b = t.as_bytes();
+    if !t[..i].trim_end_matches([' ', '\t']).ends_with('=') || matches!(b[i], b'"' | b'\'' | b'>' | b' ' | b'\t') {
+        return None;
+    }
+    Some((b[i..].iter().take_while(|&&c| !matches!(c, b' ' | b'\t' | b'>')).count(), SY_STRING))
+}
+
+// HTML: an attribute's name
+fn html_attr(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let b = t.as_bytes();
+    let n = b[i..].iter().take_while(|&&c| !matches!(c, b' ' | b'\t' | b'"' | b'\'' | b'>' | b'/' | b'=' | b'<')).count();
+    (n > 0).then_some((n, SY_KEY))
+}
+
+// HTML: <!DOCTYPE ..>, <?xml ..?> to their '>' (on one line)
+fn html_decl(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let r = &t[i..];
+    if !(r.starts_with("<!") || r.starts_with("<?")) || r.starts_with("<!--") || r.starts_with("<![CDATA[") {
+        return None;
+    }
+    Some((r.find('>').map_or(r.len(), |k| k + 1), SY_META))
+}
+
+// HTML: a '<' that opens no tag (a blank or a digit after it) is text
+fn html_lone_lt(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let b = t.as_bytes();
+    if b[i] != b'<' {
+        return None;
+    }
+    let next = b.get(i + 1).copied();
+    let tag = next.is_some_and(|c| c.is_ascii_alphabetic()) || (next == Some(b'/') && b.get(i + 2).is_some_and(|c| c.is_ascii_alphabetic()));
+    (!tag).then_some((1, SY_TEXT))
+}
+
+// HTML: character references &amp; &#169; &#xA9;
+fn html_entity(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let b = t.as_bytes();
+    if b[i] != b'&' {
+        return None;
+    }
+    let (s, kind) = match (b.get(i + 1), b.get(i + 2)) {
+        (Some(b'#'), Some(b'x' | b'X')) => (i + 3, 2),
+        (Some(b'#'), _) => (i + 2, 1),
+        _ => (i + 1, 0),
+    };
+    let ok = |c: &u8| match kind {
+        2 => c.is_ascii_hexdigit(),
+        1 => c.is_ascii_digit(),
+        _ => c.is_ascii_alphanumeric(),
+    };
+    let n = b[s..].iter().take(32).take_while(|c| ok(c)).count();
+    (n > 0 && b.get(s + n) == Some(&b';')).then_some((s + n + 1 - i, SY_ESCAPE))
+}
+
+static HTML_TAG_RULES: [Rule; 5] = [
+    Rule::Custom(html_tag_name),
+    Rule::Str { open: "\"", close: "\"", escape: false, multi: true, kind: SY_STRING },
+    Rule::Str { open: "'", close: "'", escape: false, multi: true, kind: SY_STRING },
+    Rule::Custom(html_bare_value),
+    Rule::Custom(html_attr),
+];
+
+// the inside of a tag < .. >: its name, attributes and values (Nest of HTML)
+static HTML_TAG: Grammar = Grammar {
+    name: "HTML tag",
+    exts: &[],
+    rules: &HTML_TAG_RULES,
+    ident: "-:.",
+    calls: false,
+    macros: false,
+    caps_types: false,
+    comment: "",
+    openers: "",
+    closers: "",
+    pairs: "",
+};
+
+static HTML_RULES: [Rule; 8] = [
+    Rule::Block { open: "<!--", close: "-->", kind: SY_COMMENT, nested: false, bol: false },
+    Rule::Block { open: "<![CDATA[", close: "]]>", kind: SY_CODE, nested: false, bol: false },
+    Rule::Custom(html_decl),
+    Rule::Element { name: "script", tag: &HTML_TAG, inner: &JAVASCRIPT },
+    Rule::Element { name: "style", tag: &HTML_TAG, inner: &CSS },
+    Rule::Custom(html_lone_lt),
+    Rule::Nest { open: "<", close: ">", kind: SY_PUNCT, inner: &HTML_TAG },
+    Rule::Custom(html_entity),
+];
+
+/// HTML (XML and SVG too): tags over lines (names SY_KEYWORD, attributes SY_KEY, values
+/// SY_STRING, '<' and '>' SY_PUNCT), comments, CDATA (SY_CODE), <!DOCTYPE> and <?xml?>
+/// (SY_META), character references (SY_ESCAPE); the content of <script> highlighted as
+/// JavaScript and of <style> as CSS up to its end tag
+pub static HTML: Grammar = Grammar {
+    name: "HTML",
+    exts: &["html", "htm", "xhtml", "xml", "svg"],
+    rules: &HTML_RULES,
+    ident: "",
+    calls: false,
+    macros: false,
+    caps_types: false,
+    comment: "",
+    openers: "",
+    closers: "",
+    pairs: "<>",
+};
+
+// WAT: $names (identifiers of functions, locals, labels, types)
+fn wat_id(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let b = t.as_bytes();
+    if b[i] != b'$' {
+        return None;
+    }
+    let n = b[i + 1..].iter().take_while(|&&c| c.is_ascii_alphanumeric() || b"!#$%&'*+-./:<=>?@\\^_`|~".contains(&c)).count();
+    (n > 0).then_some((n + 1, SY_META))
+}
+
+// WAT: an instruction with a '.' (i32.add, local.get, memory.grow, v128.load8x8_s)
+fn wat_instr(t: &str, i: usize, _: bool) -> Option<(usize, u8)> {
+    let b = t.as_bytes();
+    if !b[i].is_ascii_lowercase() || t[..i].chars().next_back().is_some_and(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == '$') {
+        return None;
+    }
+    let n = b[i..].iter().take_while(|&&c| c.is_ascii_alphanumeric() || c == b'_' || c == b'.').count();
+    t[i..i + n].contains('.').then_some((n, SY_FUNC))
+}
+
+const WAT_KEYWORDS: &[&str] = &[
+    "module", "func", "param", "result", "local", "global", "memory", "table", "type", "import", "export", "start", "elem", "data", "offset",
+    "align", "mut", "block", "loop", "if", "then", "else", "end", "declare", "item", "rec", "sub", "final", "struct", "array", "field", "tag",
+    "shared", "binary", "quote",
+];
+const WAT_INSTR: &[&str] = &[
+    "unreachable", "nop", "br", "br_if", "br_table", "br_on_null", "br_on_non_null", "br_on_cast", "br_on_cast_fail", "return", "call",
+    "call_indirect", "call_ref", "return_call", "return_call_indirect", "return_call_ref", "drop", "select", "try", "try_table", "catch",
+    "catch_ref", "catch_all", "catch_all_ref", "throw", "throw_ref", "rethrow", "delegate",
+];
+const WAT_TYPES: &[&str] = &[
+    "i32", "i64", "f32", "f64", "v128", "i8", "i16", "funcref", "externref", "anyref", "eqref", "i31ref", "structref", "arrayref", "nullref",
+    "nullfuncref", "nullexternref", "exnref", "ref", "null", "extern", "any", "eq", "i31", "none", "noextern", "nofunc",
+];
+
+static WAT_RULES: [Rule; 11] = [
+    Rule::LineComment(";;"),
+    Rule::Block { open: "(;", close: ";)", kind: SY_COMMENT, nested: true, bol: false },
+    Rule::Str { open: "\"", close: "\"", escape: true, multi: false, kind: SY_STRING },
+    Rule::Custom(wat_id),
+    Rule::Custom(wat_instr),
+    Rule::Words(WAT_KEYWORDS, SY_KEYWORD),
+    Rule::Words(WAT_INSTR, SY_FUNC),
+    Rule::Words(WAT_TYPES, SY_TYPE),
+    Rule::Words(&["nan", "inf"], SY_CONST),
+    Rule::Number,
+    Rule::Punct("()="),
+];
+
+/// WAT, the text format of WebAssembly: module fields and block keywords (SY_KEYWORD),
+/// instructions (SY_FUNC: i32.add, local.get, call ...), value and reference types
+/// (SY_TYPE), $names (SY_META), numbers, strings, ;; and nested (; ;) comments
+pub static WAT: Grammar = Grammar {
+    name: "WAT",
+    exts: &["wat", "wast"],
+    rules: &WAT_RULES,
+    ident: "_",
+    calls: false,
+    macros: false,
+    caps_types: false,
+    comment: ";;",
+    openers: "(",
+    closers: ")",
+    pairs: "()",
 };
 
 static PLAIN_RULES: [Rule; 0] = [];

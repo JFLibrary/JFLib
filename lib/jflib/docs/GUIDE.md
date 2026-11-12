@@ -22,7 +22,7 @@ The examples below were compiled and run against the library (R13); identifiers 
 
 * **`#![no_std]`, no foreign crates.** Only `core` and `alloc` may be `extern crate`d. Every
   crate and app is a Cargo package of the workspace in the root `Cargo.toml`; `build_rs.py`
-  checks the sources (`python build_rs.py check` runs the lint alone), refuses `std` or a
+  checks the sources (`python build_rs.py check --quick` runs the lint alone), refuses `std` or a
   foreign dependency, and builds through Cargo. Edition 2024, so `gen` is a keyword.
 * **An app of your own** is best `#![no_std]` too: JFLib's runtime brings the entry point, the
   panic handler and the allocator, and other `no_std` crates are allowed there. An app that needs
@@ -81,7 +81,8 @@ jflib = { features = ["std"], version = "0.1" }
 ```
 
 The program then has std's entry point, panic handler and allocator instead of JFLib's own; a
-panic still ends with JFLib's crash report (`rt::panic_hook`). What changes against the template:
+panic still ends with JFLib's crash report (`rt::panic_hook`; with the feature `unwind` only a
+panic nobody catches, below). What changes against the template:
 
 | File | With std |
 | --- | --- |
@@ -100,6 +101,50 @@ panic still ends with JFLib's crash report (`rt::panic_hook`). What changes agai
 `cargo jflib package` makes a std app's packages on their own system: `setup` and `msix` on
 Windows, `deb`, `appimage`, `rpm` and `flatpak` on Linux, `dmg` on a Mac (`cargo jflib mac` builds
 `NAME.app` there; [APPLE.md](APPLE.md)).
+
+**Panics that unwind: the feature `unwind`.** JFLib's runtime needs `panic = "abort"`, and an app
+with std as well, unless it turns on the feature `unwind` (it implies `std`). That is for an app
+that must survive a panic of its own code, a web browser whose engine runs each page on a thread
+of its own and catches a page's panic, say. Both profiles then say `panic = "unwind"`:
+
+```toml
+[dependencies]
+jflib = { features = ["unwind"], version = "0.1" }
+
+[profile.dev]
+panic = "unwind"      # the other lines as in the template
+
+[profile.release]
+panic = "unwind"
+```
+
+* A panic the app catches with `std::panic::catch_unwind` leaves the program running, on any
+  thread: its own `std::thread`s, a thread of `plat::thread_spawn`, the UI thread inside
+  `App::frame`. JFLib writes nothing for it; `rt::panic_take()` gives its text as the crash report
+  would show it, with file and line (`"panicked at src/page.rs:12:5:\nindex out of bounds: ..."`),
+  where the payload holds the message alone. On Windows the file in it has backslashes
+  (`"panicked at src\\page.rs:12:5:\n..."`, the path as Cargo hands it to rustc): compare the
+  file with both separators or by its name.
+* Unit tests of a library crate with std (an app's own style crate, `cargo test`): the test binary
+  has the test harness's `main`, but plat's start of a std program asks for the `jfgui_main` a
+  program's `main!` defines, so it does not link (an unresolved `jfgui_main`). One line in the
+  crate's `lib.rs` gives it a stub that is never called: `#[cfg(test)] ui::test_main!();`
+  (`rt::test_main!()` for crates without ui). Tests unwind, the stub has no panic check. The
+  crate may keep `#![forbid(unsafe_code)]` (as the library's styles do): the stub's unsafe
+  attribute comes from the macro, the crate allows nothing for it.
+* A panic nobody catches ends the program as before: JFLib's crash report (stderr, the crash
+  hook), exit code 3. That holds when it leaves the program's start (`App::frame`, `command`, the
+  tasks of `ui.spawn`), a thread of JFLib's (`plat::thread_spawn`, the jobs of
+  `plat::task::spawn_blocking`, sound) or reaches a callback of the system (a window procedure):
+  JFLib's code is not written to go on after a panic. `rt::abort_on_unwind(f)` does the same for
+  an entry point of the app's own.
+* A thread of `std::thread::spawn` whose panic nobody catches ends quietly: `join()` returns the
+  payload, as in std, without std's line on stderr.
+* Catch around the app's own code, not around calls into `ui`: what a panic leaves halfway done
+  in the UI's state is not repaired. The locks of `plat::sync` are released by a caught panic, not
+  poisoned.
+* In the browser std does not unwind (rustup's std for `wasm32` is built with `panic = "abort"`):
+  every panic ends the program there.
 
 **One window loop, one runtime.** With JFLib an app does not put a window crate, an event loop
 and a UI crate together, as egui apps do with eframe and the crates around it: `ui::launch` is
@@ -214,7 +259,9 @@ ui::main!(ui::launch(&DESC, Template::default(), &style::STYLE));
   headless (`--shot`, `--script`) or open a window; web targets retain it in the shared worker
   runtime. `ui::run` remains available for existing borrowed native apps. `style::STYLE` is
   whatever style crate the build linked as `style` (section 11).
-* `ui::main!` expands to the `jfgui_main` symbol the platform entry point calls.
+* `ui::main!` expands to the `jfgui_main` symbol the platform entry point calls. Its unsafe
+  parts (the symbol, std's `fn main`) come from the macro, which the `unsafe_code` lint does not
+  look into: an app crate may `#![forbid(unsafe_code)]`, the macro needs no `allow`.
 
 **Where an app's files live:**
 
@@ -305,7 +352,11 @@ title bar follows GNOME's settings like GTK (section 7, "Title bar").
 * Heavy or structural work (file I/O, opening dialogs, big edits) goes through
   `ui.cmd_run(cmd, arg)`; it reaches `App::command(ui, id, arg)` between frames, in the order
   queued (the queue grows as needed; only beyond 65536 waiting commands does it drop new ones,
-  with a `UIWARN`). Return `true` when you handled it. The library also delivers:
+  with a `UIWARN`). After the commands the frame is built again (up to three rounds of frame
+  and commands in one go; when the third round's commands changed something, the next frame
+  follows at once). Commands queued by every frame, or `ui.invalidate()` in every
+  `App::frame`, would ask for frames without end: after 8 such frames in a row without an event
+  they wait for the next event, with a `UIWARN`. Return `true` when you handled it. The library also delivers:
 
   | Id | When |
   |---|---|
@@ -682,9 +733,115 @@ if self.tab == 0 {
   (`btn`, `pressed`, `released`, bit `1 << BTN_*`), `wheel_x` / `wheel_y` (120 per notch),
   `mods`, all move points `pts`, the first unconsumed key, and pen data (`pressure`, `ptype`,
   `ppress`, tilt; `legacy/ASMLIB/docs/modules/PEN_INPUT.md`). The cursor shape comes from
-  `next_flags(CUR_* << HB_CURSOR_SHIFT)`. `ui.canvas` returns a borrow of `ui`: clone the
+  `next_flags(CUR_* << HB_CURSOR_SHIFT)`, the crosshair without one; with `HB_CURSOR_SET` the
+  bits count as given, so `CUR_ARROW` (0) is the arrow (a web page's cursor changes with what lies
+  under the pointer: set it every frame). `ui.canvas` returns a borrow of `ui`: clone the
   input before calling more `ui` methods. `canvas_damage(id, x, y, w, h)` redraws a part
   without a version change.
+* **More cursors** (a web page's CSS `cursor`): the 4 flag bits hold the first shapes
+  (`CUR_ARROW` .. `CUR_NONE`, `CUR_CUSTOM`); `ui.cursor_next(shape)` gives the next hit box (a
+  canvas, a button, `hit_rect`) any shape and wins over its flags -- `CUR_NOT_ALLOWED`,
+  `CUR_NO_DROP`, `CUR_GRAB`, `CUR_GRABBING`, `CUR_HELP`, `CUR_PROGRESS`, `CUR_ZOOM_IN`,
+  `CUR_ZOOM_OUT`, `CUR_CELL`, `CUR_VTEXT`, `CUR_ALIAS`, `CUR_COPY`, `CUR_CONTEXT_MENU`,
+  `CUR_ALL_SCROLL`, `CUR_COL_RESIZE`, `CUR_ROW_RESIZE` and the edges and corners `CUR_SIZE_N` /
+  `_S` / `_E` / `_W` / `_NE` / `_NW` / `_SE` / `_SW` (`CUR_X0` .. `CUR_X_END`), `CUR_CUSTOM` too.
+  Where a system has no such cursor it shows `plat::cursor_fallback(shape)`'s (grab: the hand,
+  zoom: the crosshair, an edge: its double arrow): Wayland with cursor-shape, the browser and
+  macOS (most) have all of them; Windows has not-allowed, help, progress and the resize shapes,
+  X11's cursor font a few more. `ui.cursor_at(x, y)` is the cursor at a point (px) in the last
+  pass. A page's own pictures (`cursor: url(..)`) are custom cursors: `ui.cursor_new(draw, w, h,
+  hot)` -> a handle, `ui.cursor_custom(handle)` + `cursor_next(CUR_CUSTOM)` shows it,
+  `ui.cursor_replace(handle, draw, w, h, hot)` draws it anew under the same handle,
+  `ui.cursor_free(handle)` gives the slot back (32 at most):
+
+  ```rust
+  let shape = match css { Css::NotAllowed => CUR_NOT_ALLOWED, Css::Grab => CUR_GRAB, Css::Url(k) => {
+      ui.cursor_custom(self.page_cursors[k]); CUR_CUSTOM }, .. };
+  ui.cursor_next(shape);
+  let inp = ui.canvas(ID_PAGE, Some(d), 0, self.ver).clone();
+  ```
+
+  `apps/viewtest` `tests/cursors.uis`.
+* **A canvas that takes the keyboard** (a web page, a terminal, an emulator): with
+  `next_flags(HB_KEYS)` every key is the canvas's while it has the focus (a press gives it the
+  focus, `ui.focus(id)` too) and no popup of the window is open (a menu keeps its keys, and
+  `key_take` gives none then): no accelerator of the command table, no Tab, arrow or F6 of the
+  keyboard navigation (section 27), no Enter / Space action and no `ui.undo_keys` takes one. The
+  canvas takes them with `ui.key_take()` (the first unconsumed key, `VK | mods << 16`, consumed;
+  0 when none is left) and typed text with `ui.text_take`; a key it does not use goes back to the
+  command table with `ui.accel_run(key)` (true when a command ran). Unlike `HB_TEXT` there are no
+  text box rules: no reserved keys, no input method, no on-screen keyboard. Keys the app must
+  keep for itself (Ctrl+T, Ctrl+Tab in a browser) it takes before it hands the rest on:
+
+  ```rust
+  ui.next_flags(HB_KEYS | HB_CURSOR_SET | self.cursor << HB_CURSOR_SHIFT);
+  let inp = ui.canvas(ID_PAGE, Some(d), 0, self.ver).clone();
+  if inp.ev & EV_FOCUS != 0 {
+      loop {
+          let k = ui.key_take();
+          if k == 0 {
+              break;
+          }
+          if reserved(k) {
+              ui.accel_run(k);         // the app's own shortcut
+          } else {
+              self.page.key_down(k);   // the engine; one it did not use comes back as accel_run(k)
+          }
+      }
+  }
+  ```
+
+  `apps/viewtest` is such a page (`tests/keys.uis`).
+
+  A page that passes the keyboard on as it is (a web page's `keydown` / `keyup` with `repeat`,
+  `code` and `location`) takes `ui.key_event_take()` instead of `key_take`: the next
+  `KeyEvent { vk, mods, down, repeat, scancode, location }` of the batch until `None` -- downs
+  and ups, the system's auto-repeat, the key's place on the keyboard whatever the layout
+  (`scancode`: Windows' scan code with 0xE0.. for extended keys, Linux's evdev code; 0 on macOS,
+  Android and in the browser) and `location` (`KL_STANDARD`, `KL_LEFT` / `KL_RIGHT` for the two
+  Shift, Ctrl, Alt and Windows keys, `KL_NUMPAD`). A key's up gives a pass of its own while such
+  a canvas has the focus. A down taken here is taken for `key_take` too; the text still comes
+  through `text_take`:
+
+  ```rust
+  while let Some(k) = ui.key_event_take() {
+      if k.down && reserved(k.vk | k.mods << 16) {
+          ui.accel_run(k.vk | k.mods << 16);
+      } else {
+          self.page.key(k.down, k.vk, k.mods, k.repeat, k.scancode, k.location);
+      }
+  }
+  ```
+
+  Scripts hold keys with `keydown CHORD [scan N] [left|right|numpad]` and let them go with
+  `keyup CHORD ...` (`viewtest` `tests/keyraw.uis`).
+
+  **An input method for a field the page draws itself** (a web page's `<input>`, Japanese or
+  Chinese typed into it): while such a field has the focus, `ui.ime_enable(true, IP_TEXT)`
+  (also `IP_URL`, `IP_EMAIL`, `IP_NUMBER`, `IP_PHONE`, `IP_SEARCH`; `IP_PASSWORD` takes the
+  input method away on Windows and tells Wayland) and every frame `ui.ime_pos(x, y, h)` at the
+  field's caret (px of the window: the candidates follow it); `ui.ime_enable(false, 0)` when it
+  loses the focus. The composition is the app's to draw at the caret, underlined:
+  `ui.ime_preedit()` gives its text and caret (a byte offset; empty when none is going on), a
+  change gives a pass. Windows hides the input method's own composition window then (its
+  candidate list stays); IBus and Wayland's text input have none. The committed text comes
+  through `text_take` as typed text does. The library's code and rich-text editors draw the
+  composition inline too; its text boxes leave it to the input method's window.
+
+  ```rust
+  let want = self.page.focus_editable() && inp.ev & EV_FOCUS != 0;
+  if want != self.ime_on { self.ime_on = want; ui.ime_enable(want, IP_TEXT); }
+  if want {
+      let c = self.page.caret_rect();                     // px of the window
+      ui.ime_pos(c[0], c[1], c[3]);
+      self.page.set_composition(&ui.ime_preedit());       // drawn by the page at its caret
+      let typed = ui.text_take(256);                      // commits and typed text
+      self.page.insert_text(&typed);
+  }
+  ```
+
+  Scripts compose with `preedit "text" [CURSOR]` and commit with `commit "text"`
+  (`viewtest` `tests/ime.uis`).
 * Zoom and pan without a re-raster: right after the canvas's command, `ui.canvas_gpu(CanvasDesc {
   id, name, rect, view, ver, content, gpu, exact_pan })` says what it shows. `content` is an
   `Rc<dyn CanvasContent>` whose `draw_view(g, view, rect)` draws the content through any
@@ -832,6 +989,22 @@ ui.menubar(None);                        // the menu bar of the AppDesc
 
   A widget without `context_menu` gets the menu key as a right click (`EV_RCLICK`); a
   `menu_popup` in answer to it opens at the widget (§27).
+  **At a point the app learns later** (a web engine answers a right click with the menu's
+  rows and place a moment after it): `menu_popup_at(menu, x, y)` opens a menu, `popup_open_at(id,
+  x, y)` a flyout of the app's own (drawn with `flyout_begin(id, ..)` as usual) at the point
+  (x, y), px of the window as `last_rect` (a canvas: `UiInput::rect` plus its `x`, `y`), in the
+  frame the answer comes:
+
+  ```rust
+  if inp.ev & EV_RCLICK != 0 {
+      self.page.context_menu(inp.x, inp.y);          // the engine answers later
+  }
+  if let Some(info) = self.page.take_context_menu() { // a later frame
+      ui.menu_popup_at(&M_PAGE, inp.rect[0] + info.x, inp.rect[1] + info.y);
+  }
+  ```
+
+  `apps/viewtest` (`tests/menus.uis`) does both.
   A row whose keys the app handles itself (no command of the table, e.g. inside a pane that
   captures them with `capture_shortcut`) shows them with `menu_item_keys(id, label,
   &ui.key_text(VK_F5, MOD_CTRL))`: `key_text(vk, mods)` writes a key as the accelerator texts
@@ -930,6 +1103,31 @@ ui.dialog_end(); // always
   goes to one only after a click on a text box or `window_activate` -- as on Windows
   (`plat::WST_CHILD`; `jfgui_WL_TOOLWIN=toplevel` keeps separate toplevels). Dialogs stay
   toplevels and are centred by the compositor.
+* **Independent app windows** (`WF_APP`: a browser's second or private window): on Windows a
+  top-level window of its own -- its own taskbar button, not minimized, hidden or kept above the
+  main window as owned windows are -- and without the library's title bar: the app draws its own
+  with `titlebar_begin` / `titlebar_end` (its widgets in it, a tab strip, the caption buttons at
+  its end acting on that window), as in the main window. X11 and Wayland give it a top-level
+  window as well (no `WM_TRANSIENT_FOR`, type normal / an `xdg_toplevel` without a parent; the
+  window manager places it, Wayland tells no position). macOS has one top-level window per app
+  in the window layer yet: it gives it an owned window (the same code works, the window has no
+  taskbar button of its own). Give it a `WinRect` with its size; closing the main window still
+  ends the app.
+
+  ```rust
+  let (open, rect) = (self.private_open.clone(), self.private_rect.clone());
+  if ui.window_begin(ID_PRIVATE, "Privates Fenster", Some(&open), WF_APP | WF_RESIZABLE, Some(&rect)) {
+      ui.titlebar_begin("Privates Fenster", IC_PRIVATE);
+      self.tabs(ui);                  // the title bar's own widgets
+      ui.titlebar_end();              // minimize, maximize, close of this window
+      self.page(ui);
+  }
+  ui.window_end();
+  ```
+
+  `apps/viewtest` `tests/appwin.uis`; real windows on X11 and Wayland:
+  `python tools/x11check.py appwin --backend x11|wayland` (`viewtest --app-window` opens it at the
+  start).
 * **One instance**: with `AF_SINGLE_INSTANCE` in the `AppDesc`, a later start of the app hands its
   working folder and command line to the running window and ends (`plat::instance`: a pipe /
   an abstract socket per user and app; only for real windows, not for `--shot` / `--script`).
@@ -1033,6 +1231,22 @@ ui.dialog_end(); // always
       ui.cmd_run(CMD_FILE_DONE, self.fd_mode); // load / save in App::command
   }
   // CMD_OPEN in App::command: self.fd_mode = FD_OPEN; self.fd_open.set(1);
+  ```
+
+  **Several files at once** (`FD_OPEN | FD_MULTI`, e.g. an upload field that takes several):
+  `path` gets the first, `ui.filedlg_paths()` every chosen file in the dialog's order (after a
+  dialog without `FD_MULTI` the one file, after an `FD_FOLDER` dialog the folder). Windows' dialog (Ctrl / Shift in Explorer) and
+  Linux's portal (`multiple`) choose several; the library's own dialog marks rows with
+  Ctrl+click and Shift+click (or Shift+arrows; marked rows show a check mark, the name box
+  `"a.txt" "c.txt"`) and takes quoted names typed there, each one an existing file of the
+  shown folder or an absolute path. The pickers of macOS, iOS, Android and the browser choose
+  one file for now (`filedlg_paths()` holds that one). `plat::file_dialog_paths()` is the
+  platform's side. Every chosen file is the user's (`fs.user`).
+
+  ```rust
+  if ui.filedlg(ID_FILEDLG, FD_OPEN | FD_MULTI, &open, &mut self.path, 4096, &EXTS) & EV_ACT != 0 {
+      for p in ui.filedlg_paths() { self.upload.push(p); }
+  }
   ```
 
 * **Drag and drop** ([`ui/dnd.rs`](../lib/ui/dnd.rs), [`plat/dnd.rs`](../lib/plat/dnd.rs)):
@@ -1293,6 +1507,44 @@ sets the levels, `jfgui_LOG_FILE=PATH|1|0` the file. A crash or panic prints the
 lines and marks the file before the app's crash hook runs; `plat::log_recent(max)` gives the
 newest lines for an own report. `ui.warn` lines are in the log too. The runtime logs start,
 exit, sleep, session end and settings changes.
+
+**Printing** (`plat::print`, `plat::PrintDoc`): `plat::print(&mut job)` prints one image on one
+page (`PrintJob`: the pixels, title, paper `PAPER_*`, `PJF_LANDSCAPE` / `PJF_CENTER`, scale
+`PJS_FIT` / `PJS_DPI` / `PJS_PERCENT`, margin), with the system's dialog. A document of several
+pages (a web page, a report) is a `PrintDoc`:
+
+```rust
+let mut job = plat::PrintJob::new(None, "Seite");  // title, paper, PJF_*, margin, scale
+job.margin = 1000;                                 // 10 mm (1/100 mm)
+let mut d = match plat::PrintDoc::begin(&job, n) { // the dialog: printer, paper, copies, pages 1..=n
+    Ok(d) => d,
+    Err(_) => return,                              // ERR_CANCEL, ERR_UNSUPPORTED, ERR_IO
+};
+let page = d.page();                               // the chosen paper in pt (72 per inch), edges
+if d.pdf_native() && have_pdf {
+    d.add_pdf(&pdf_bytes);                         // Linux: the app's own PDF as it is
+} else {
+    for k in 1..=n {
+        if d.wants(k) {                            // the range the dialog chose
+            d.add_image(&render_page(k, &page));   // a PrintSrc, laid out as layout() places it
+        }
+    }
+}
+let r = d.end();                                   // 0: on its way to the printer
+```
+
+* Windows: `PrintDlgExW` (with a page range of `1..=n` when `n > 0`) and GDI, one page after
+  the other into the spooler; Linux: the portal's dialog, the pages as one PDF of several pages
+  (or the app's own PDF: `pdf_native()`) handed to the portal's `Print`. macOS, iOS, Android and
+  the browser have no jobs of several pages yet: `begin` answers `ERR_UNSUPPORTED` (outside the
+  test variant).
+* Render each page for `page()` at the printer's resolution or a fixed one (300 dpi: `job.dpi_x
+  = 300.0` with `PJS_DPI`, an image of `page.w / 72 * 300` pixels); `PJS_FIT` scales each image
+  into the printable area. `d.abort()` drops the job, `end()` without a page is `ERR_DIMS`.
+* Tests never see a dialog or paper: `jfgui_PRINT_TO=FILE` prints into a file (Windows through
+  the printer `jfgui_PRINT_PRINTER`, default "Microsoft Print to PDF"; elsewhere the PDF of the
+  pages); without it a run without a window answers `ERR_UNSUPPORTED`
+  (`apps/plattest/tests/printdoc.uis`).
 
 ## 9. Threads
 
@@ -1572,7 +1824,10 @@ if (desc.render)(&args, &mut dst) == 0 {
   on every machine). The system list (Segoe UI Symbol / Emoji, YaHei, ... on Windows; DejaVu,
   Noto, WenQuanYi, ... on Linux) is found by scanning the font folders once (cached in
   `cache://fontdb.fdb`). Environment: `jfgui_FONT_FALLBACK=0` turns system fonts off (`=1`
-  turns them on headless), `jfgui_FALLBACK_FONTS="Family;Family"` puts families first. The
+  turns them on headless; a script turns them on from where it says
+  `system env jfgui_FONT_FALLBACK 1`), `jfgui_FALLBACK_FONTS="Family;Family"` puts families
+  first. A headless shot of text the app's fonts lack (CJK in a style with Latin fonts) shows
+  the font's `?` for each missing character unless one of these turns them on. The
   fonts of the UI language come before the list, so Han characters take the forms of ja,
   zh-Hans or zh-Hant.
 * System fonts for your own text: a `FontSel` names a family (also a generic one:
@@ -1679,7 +1934,7 @@ in DIP):
 
 | Command | Effect |
 |---|---|
-| `click S [l\|r]`, `rclick S`, `dblclick S`, `move S`, `down S [l\|r\|m]`, `up [S] [l\|r\|m]` | pointer |
+| `click S [l\|r\|m] [shift\|ctrl\|alt]...`, `rclick S`, `dblclick S [shift\|ctrl\|alt]...`, `move S`, `down S [l\|r\|m]`, `up [S] [l\|r\|m]` | pointer (the modifier words are held during the click) |
 | `drag S1 S2 [steps] [hold MS] [shift] [ctrl] [alt] [right\|middle]` | drag with modifiers / other buttons; `hold MS`: the button rests MS ms before the first move, on the virtual clock like `wait` (a dock tab asks for it) |
 | `drag ... pen P0 P1`, `drag ... eraser P0 P1` | a pen stroke, pressure P0 -> P1 (%) |
 | `pointer mouse \| pen [P [TX TY]] \| eraser [P ...] \| touch` | pen data of the following pointer events (`touch`: they are a finger, §37) |
@@ -1691,12 +1946,14 @@ in DIP):
 | `pan2 S DX DY [MS]` | two fingers around S, 80 DIP apart, move by DX, DY (DIP) in MS ms (default 300), then they lift |
 | `wheel S DY [shift] [ctrl] [alt]` | raw wheel units (120 = one notch); the modifiers are held during the wheel event (Ctrl + wheel zoom) |
 | `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... (every key a pass of its own, as the platform delivers them) |
+| `keydown CHORD [scan N] [left\|right\|numpad]`, `keyup CHORD ...` | a key down and held (shift / ctrl / alt stay held for the following events; down again: an auto-repeat) and up again, with a scancode and location for `ui.key_event_take` |
 | `keys [N] CHORD...` | the chords N times over, queued for ONE pass of the window with the keyboard (more keys than frames, as a tool window hands them on) |
 | `type "text"` | typed text (`"\n"` presses Enter) |
 | `commit "text" [N]` | an input method commits the text (N times over: one long commit, as the platform queues it) |
+| `preedit "text" [CURSOR]` | an input method's composition (`ui.ime_preedit`; CURSOR a byte offset, default the end; `""` ends it) |
 | `focus S` | keyboard focus to a widget (focus ring shown) |
 | `cmd ID [ARG]` | run a command as if a menu row was chosen |
-| `wait MS` | advance the virtual clock (16 ms frames) |
+| `wait MS` | advance the virtual clock (16 ms frames; a frame the app or the library asked for comes with the next one, as in the window loop) |
 | `size W H`, `theme dark\|light\|contrast`, `scale P [window ID]` | window size, theme, dpi |
 | `theme file PATH`, `theme none`, `style NAME` | an app theme from a file (an error is printed and remembered, the theme stays), none, another linked style (§34) |
 | `expect theme "NAME"\|none`, `expect theme error "TEXT"\|none`, `expect style NAME` | the app theme, the error of the last `theme file` (contains TEXT), the style in use |
@@ -1718,7 +1975,7 @@ in DIP):
 | `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
 | `system focus in\|out`, `system suspend\|resume`, `system background\|foreground`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|other\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...; background / foreground: a hidden tab, Android's `onStop` / `onStart`) |
-| `system env NAME VALUE\|-` | set (`-` removes) a `jfgui_*` environment variable of the run: the overrides of the system settings (then `system settings ...`), `jfgui_CSD` (the library title bar and its resize band from the next pass) |
+| `system env NAME VALUE\|-` | set (`-` removes) a `jfgui_*` environment variable of the run: the overrides of the system settings (then `system settings ...`), `jfgui_CSD` (the library title bar and its resize band from the next pass), `jfgui_FONT_FALLBACK 1` (system fonts for missing characters from here, section 11) |
 | `sensor accel\|gravity\|gyro\|magnet X Y Z [ACCURACY]`, `sensor rot X Y Z W [abs\|rel]`, `sensor none NAME\|all`, `sensor expect NAME off\|waiting\|running\|paused\|denied\|unavailable` | a reading of `plat::sensors` as the host would deliver it (the sensor exists from now on; a stopped one delivers nothing), a sensor gone, its state (§36) |
 | `location LAT LON [ACC ALT SPEED BEARING]` (`-`: the provider does not say), `location age MS`, `location searching\|denied\|off\|none`, `location expect off\|searching\|fix\|paused\|denied\|disabled\|unavailable` | a fix of `plat::sensors`, how old it is, the host's answer (`off`: the system's switch; `none`: no location service, as at the start), the state (§36) |
 | `expect wm none\|move\|menu\|minimize\|maximize\|restore\|close\|lower\|resize EDGE` | what the title bar or the resize band asked the window manager for since the last check (headless runs only record it; EDGE `n`, `s`, `w`, `e`, `nw`, `ne`, `sw`, `se`, physical) |
@@ -1771,7 +2028,14 @@ shot build/template.png
 ```sh
 cargo jflib test                    # build it, run every tests/*.uis with --script
 cargo jflib test --release          # ... the release build
+cargo jflib test --features engine --dir tests/engine
+                                    # ... built with the feature engine, the scripts of tests/engine/
+cargo jflib test --no-default-features   # ... without the default features (an app's mock build)
 ```
+
+`--features` takes Cargo's forms (`a,b`, `"a b"`, repeated), `--dir DIR` is relative to the
+package's folder; the scripts run in that folder, so their paths (`shot build/x.png`) stay the
+same.
 
 In this repository:
 
@@ -1779,12 +2043,19 @@ In this repository:
 python build_rs.py test --quick     # lint, build every app (both targets), every .uis script
 python build_rs.py test             # ... plus parity with the assembly reference
 python build_rs.py test NAME        # one app: build it, run its tests/*.uis
-python build_rs.py check            # the rules lint alone
+python build_rs.py check            # the rules lint, then Clippy over the library (below)
+python build_rs.py check --quick    # the rules lint alone
 python tools/gendoc.py --check      # docs/API.md matches the doc comments
 python build_rs.py api-diff         # the public API since the last release (VERSIONING.md)
 python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unused texts ("Languages")
 ```
 
+* **Clippy**: `check` runs `cargo clippy` over the library crates of each target (`--target`,
+  default both on Windows and the machine's own elsewhere; Linux in both its builds), with only
+  the groups `correctness` and `suspicious` on, as errors. Three lints that name an idiom of this
+  code are off everywhere (`CLIPPY_OFF` in `build_rs.py`, each with its reason). A place that is
+  right as it stands carries `#[allow(clippy::NAME)]` and a comment that says why. No build and
+  no `test` runs it: the first run takes minutes per target, a later one seconds.
 * Run new scripts with `--verify-dirty` too (`build_rs.py test` does not add it): it reports
   missed pixels with their bounding box. Checked frames also take every scroll copy they can
   (§5), so a script that scrolls tests those; it renders after each input event (a view copies
@@ -1840,6 +2111,8 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   clicks seem to get lost, or a click on one acts on the other (a text box below a segmented
   control whose segments take `id + 1 ..`). Scripts (and `jfgui_DEBUG=1`) print a `UIWARN`
   for an id two widgets of one pass share, with both positions; `expect_nowarn` fails on it.
+  Ids are per window: windows may use the same ids (a text box of one id in two app windows
+  keeps its own caret, selection and undo in each).
 * `ui.canvas(...)` records the version *before* you react to its input. When handling the
   returned `UiInput` changes the content, bump the version and call `ui.repass()`; otherwise
   the dirty-region renderer shows the change one frame late (`--verify-dirty` reports it).
@@ -1918,7 +2191,7 @@ row_h)` reports opened and closed nodes (load children lazily) and toggled check
 | `action_card(id, name, &CardDesc)` | a card or list row that does one thing when chosen (a template on a start page, a recent file): title with icon and badge, a text wrapped or cut, a caption at the far end, a picture area with the app's drawing; `next_size` its width, `ST_SUBTLE` a list row, `ST_CHECKED`, `ST_DISABLED`; one Tab stop, a button record named `name`; in a row of cards all take the row's height ([`ui/action_card.rs`](../lib/ui/action_card.rs)) |
 | `segmented(id, &mut sel, items)` | segmented control (filters, schedule kinds) |
 | `wizard_steps(id, steps, current, states)` | the step list of a full-page wizard |
-| `toast(kind, title, msg, ms)`, `toast_host()` | notifications; call `toast_host` once per frame, last |
+| `toast(kind, title, msg, ms)`, `toast_host()` | notifications; call `toast_host` once per frame, last; screen readers and scripts see the card (its title), its message (`text:"…"`) and its close button |
 | `spinner(id, size)`, `progress_indeterminate(id)` | waiting |
 | `date_picker`, `time_box`, `weekday_toggles` | dates, times, weekday masks (schedules) |
 
@@ -1956,7 +2229,8 @@ self.dock.focus(P_PROPS);
   splitters between the sides and the document area and between the groups keep their sizes
   in the layout. `DockPanel::at(side, group)` is only the first place: panels with the same
   group number start as tabs of one group, the groups in number order; `DP_HIDDEN` starts
-  hidden, `DP_NOCLOSE` has no hide button, `DP_NOFLOAT` never floats. Panel ids must not be 0
+  hidden, `DP_NOCLOSE` has no hide button, `DP_NOFLOAT` never floats, `DP_GROUP` takes its
+  whole group along (below). Panel ids must not be 0
   and should never change (the saved layout names them); panels the app no longer describes
   are kept in the layout but not shown.
 * Each group has a tab strip with a menu (float / dock to a side / collapse / hide), a
@@ -1974,16 +2248,22 @@ self.dock.focus(P_PROPS);
   most). A floating window's tabs drag back onto the markers, its pin button or a double click
   docks it where it came from, its close button hides its panels. Esc cancels a hold and a drag
   (the release is no click then). Painters: `StyleShell::dock_*` (stock ones from the tokens).
+* Panels that belong together (an app's developer tools in one group): with `DP_GROUP` on the
+  shown tab, the group menu's "Links / Rechts / Unten andocken" and "Lösen" and a double click
+  on the strip's empty part move or float the whole group, every tab in its order, the shown
+  one stays shown (without it they take the shown panel alone; a double click on a tab always
+  floats that panel). The app's own commands: `DockState::dock_group_to(id, side)` and
+  `float_group(id, rect)`.
 * `DockState`: `save()` / `load(text)` (a few lines, `dock 1` first; unknown lines and bad
   values are skipped), `reset`, `show` / `hide` / `toggle` / `focus` / `activate`, `float` /
-  `dock_to`, `collapse`, `size` / `set_size`, and for menus and status lines `groups(side)`,
+  `dock_to`, `float_group` / `dock_group_to`, `collapse`, `size` / `set_size`, and for menus and status lines `groups(side)`,
   `floats()`, `hidden_panels()`, `side(id)`, `visible`, `front`, `shown`.
 * Keyboard: a group's tab strip is one focus stop (Left / Right / Home / End switch tabs, the
   menu key or Shift+F10 open the group's menu); Ctrl+PgDn / Ctrl+PgUp switch tabs while the
   focus is anywhere in the group. Mirrored windows (RTL) show the left side at the right with
   its markers; menus and markers name the sides as they show.
 * Tests: `apps/docktest` (`tests/layout.uis`, `drag.uis`, `hold.uis`, `float.uis`, `keys.uis`,
-  `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`). A plain `drag` lasts 128 ms and never gets
+  `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`, `group.uis`). A plain `drag` lasts 128 ms and never gets
   past the hold: `drag tab:"…" X,Y hold 320`, or `wait 320` between `down` and the first `move`
   (a `move` during the hold does not count towards the drag).
   A floating window is `window 501`, and `window any` + `drag tab:"…" X,Y hold 320` drags its
@@ -2786,6 +3066,26 @@ if self.grid {
   `SS_SELECTED`, `SS_OPEN`); a slider-like widget sets `rec.min` / `rec.max` and applies
   `ui.a11y_value(id)` (a text widget `ui.a11y_text(id)`) when a screen reader sets a value.
 * Records without area (hidden probe records) are left out.
+* **Content drawn inside a canvas** (the links, headings and images of a web page an engine
+  draws, the shapes of a diagram): `ui.sem_rect(kind, id, rect, label, value)` after the canvas
+  adds a record at `rect` (px of the window, as `last_rect`) without a hit box of its own and
+  without touching `last_rect`. Screen readers read it with the role of its kind (`K_LINK`,
+  `K_HEADING` with the level as value, `K_IMAGE`, `K_TEXT`, `K_BUTTON`, `K_LIST` /
+  `K_LISTITEM` ...), a script finds it by its label, and a click on it -- the script's
+  `click "Label"`, a screen reader's -- is a press in its middle, so it reaches the canvas as
+  any click does. Publish what is visible, every frame:
+
+  ```rust
+  let inp = ui.canvas(ID_PAGE, Some(d), 0, self.ver).clone();
+  for l in self.page.visible_links() {                     // rectangles relative to the page
+      let r = [inp.rect[0] + l.x, inp.rect[1] + l.y, l.w, l.h];
+      ui.sem_rect(K_LINK, 0, r, Some(&l.text), 0);
+  }
+  ```
+
+  Tables have no kind of their own yet: their cells are `K_TEXT` records. The canvas's own
+  record (`K_CANVAS`) has no name unless `ui.canvas_label("Webseite")` comes right before
+  `ui.canvas`: then a screen reader says it and a script finds it as `canvas:"Webseite"`.
 
 **Screen magnifiers** follow the focus and the text caret. Text boxes report their caret
 (`ime_pos`, which a text widget of your own calls with its caret's rectangle, like the IME): the
@@ -3548,9 +3848,11 @@ text colour) and appears only after a key was used.
   `HB_FOCUS` (it is a Tab stop and takes the focus on a press), reacts to `EV_ACT` (Space /
   Enter) and calls `ui.focus_ring_draw(ev)` after its painting. `HB_NOTAB`: focusable but no
   Tab stop; `HB_CURRENT`: the member a group is entered at; `HB_SPACE`: Space acts, Enter
-  does not; `HB_OWNKEYS`: Space and Enter are the widget's own; `HB_SPLITTER`: a splitter
-  F8 reaches -- `ui.splitter_keys(ev, along_x)` says how far (DIP) the arrows move it. Give
-  it a `sem` record.
+  does not; `HB_OWNKEYS`: Space and Enter are the widget's own; `HB_KEYS`: every key is the
+  widget's while it has the focus, Tab, F6 and the accelerators too (a canvas that shows a web
+  page, section 5: it takes them with `ui.key_take()` and gives back the focus itself);
+  `HB_SPLITTER`: a splitter F8 reaches -- `ui.splitter_keys(ev, along_x)` says how far (DIP) the
+  arrows move it. Give it a `sem` record.
 * Mark tool bars and button grids as one Tab stop: `ui.focus_group_begin(id)` ..
   `ui.focus_group_end()` (id 0: the current box). A selection that follows the focus (tabs)
   asks `ui.group_arrived(id)`.
@@ -3653,7 +3955,7 @@ let f = ui.text.load_mem(MONO, 0);
 if f >= 0 { ui.mono_font_set(f as u32); }
 self.code = CodeDoc::from_text(&text);
 self.code.tab_width = 4;               // use_tabs = true indents with tabs
-self.hl = Highlighter::for_name("main.rs");   // rust(), json(), ini(), toml(), markdown(), plain()
+self.hl = Highlighter::for_name("main.rs");   // rust(), json(), ini(), toml(), markdown(), javascript(), css(), html(), wat(), plain()
 
 // in frame: the editor fills its place (ids ID_CODE .. ID_CODE + 15)
 ui.next_size(-1, -1);
@@ -3745,6 +4047,34 @@ if let Some(d) = ui.code_diag(ID_CODE) { self.status = format!("{}:{}: {}", d.li
   so their braces match as a bracket pair). A grammar of one's own gets such strings with
   `Rule::Interp { open, close, start }`. `editortest --test model` compares it token by token
   with `script::tokens`.
+* The web's languages (view-source, developer tools): `Highlighter::javascript()`, `css()`,
+  `html()` and `wat()` (`for_name` of `js` / `mjs` / `cjs`, `css`, `html` / `htm` / `xhtml` /
+  `xml` / `svg`, `wat` / `wast`; the grammars `JAVASCRIPT`, `CSS`, `HTML`, `WAT`):
+  * JavaScript: keywords (a member after `.` never is one: `p.catch(..)` is a call), `true` /
+    `null` / `undefined` / `NaN`, strings with escapes, regular expressions where an expression
+    may start (`SY_STRING`; `a / b` stays a division), template strings over lines whose
+    `${…}` holds highlighted code (delimiters `SY_META`, braces inside count), numbers (`1n`,
+    `0x1F`, `1_000`), calls, capitalised names as types, `//` and `/* */`.
+  * CSS: selectors (`.class` `SY_TYPE`, `#id` `SY_CONST`, `:hover` / `::before` `SY_META`),
+    at-rules (`SY_KEYWORD`), blocks over lines with their properties (`SY_KEY`), numbers with
+    units and `%`, `#fff` colours (`SY_NUMBER`), functions (`calc(`, `url(`), `!important`,
+    nested rules; minified sheets highlight the same.
+  * HTML (also XML and SVG): tags over lines (names `SY_KEYWORD`, attributes `SY_KEY`, values
+    with or without quotes `SY_STRING`), comments, CDATA, `<!DOCTYPE>` / `<?xml?>`
+    (`SY_META`), character references (`SY_ESCAPE`), a lone `<` as text. The content of
+    `<script>` is highlighted as JavaScript and that of `<style>` as CSS up to their end tag,
+    which ends them whatever is open (as a browser does).
+  * WAT: module fields and block keywords, instructions (`SY_FUNC`: `i32.add`, `local.get`,
+    `call`), value and reference types, `$names` (`SY_META`), numbers, strings, `;;` and nested
+    `(; ;)` comments.
+
+  Two rules make such languages: `Rule::Nest { open, close, kind, inner }` highlights the text
+  between two delimiters with another grammar's rules (an HTML tag, a template string and its
+  `${…}`; `close` counts only outside the inner grammar's strings and comments), and
+  `Rule::Element { name, tag, inner }` an element whose content is another language. The line
+  state then holds the inner grammar's state (three levels: a page, its script's template
+  string, the code in its `${…}`). `editortest --test model` checks tokens and states across
+  lines of all four and the long-line checkpoints of a minified page, script and style sheet.
 
 **Language services, breakpoints and folding.** A language plugs into the editor with a
 [`CodeAssist`](../lib/ui/code_assist.rs) (like `Highlighter` for colours): completion items,

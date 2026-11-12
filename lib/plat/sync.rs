@@ -6,7 +6,8 @@
 // One primitive per OS: wait on a 32-bit word while it holds a value, wake one / all waiters
 // (Windows WaitOnAddress, Linux private futexes).  Mutex and Condvar are the futex algorithms
 // of Rust's std; RwLock and the channel are built on them.  A lock is not poisoned by a panic
-// (panics abort the process here).
+// (panics abort the process here; with jflib's feature unwind a panic the app catches releases
+// the locks its guards held).
 // Not here: rt::SpinLock (rt keeps spin locks for the allocator and for modules, where plat is
 // replaced).
 

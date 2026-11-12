@@ -21,7 +21,8 @@ org.freedesktop.portal.Desktop.  Every message a client sends is recorded raw.
            (handle_token, modal, current_name, current_folder), filters, current_filter; the
            Response's uri (host, %XX) and current_filter -> path + index, the extension added
            when saving, cancel (1), no portal (error reply), no bus; canonical marshalling;
-           FD_FOLDER (OpenFile with "directory", the folder as current_folder, no filters)
+           FD_FOLDER (OpenFile with "directory", the folder as current_folder, no filters);
+           FD_MULTI (E8: OpenFile with "multiple", every URI of the Response a path)
 (The print cases ran PaintCraft, which moved to its own repository, JFLibrary/JFPainter, in
 2026-11; the other bus tools in this folder import the marshalling below.)
 Exit code 0 = passed.
@@ -334,7 +335,7 @@ def serve(path, mode, log, raw):
             if mode == "cancel":
                 c.sendall(response(handle, 1, {}))
                 continue
-            res = {"uris": ("as", [FD_URI[0]])}
+            res = {"uris": ("as", FD_URI[0] if isinstance(FD_URI[0], list) else [FD_URI[0]])}
             if FD_FILTER[0] is not None:
                 res["current_filter"] = ("(sa(us))", FD_FILTER[0])
             c.sendall(response(handle, 0, res))
@@ -550,6 +551,23 @@ def suite_filedlg(rs):
     FD_URI[0] = "https://example.org/x"
     rr, lr, _, out = run(rust(0, "/tmp/q.png", expect=0), "ok")
     check("filedlg: a non-file URI -> 0", rr == 0 and result(out) == (0, 0, "/tmp/q.png"), out)
+    # (E8) FD_MULTI: OpenFile with "multiple", every URI a path, the first in path
+    FD_URI[0] = ["file://" + folder + "/a.png", "file://" + (folder + "/b c.jpg").replace(" ", "%20"), "file:///tmp/d.bmp"]
+    FD_FILTER[0] = None
+    rr, lr, _, out = run(rust(4, folder + "/"), "ok")
+    got = args_of(lr, "OpenFile")
+    opts = dict(got[0][2][2]) if got else {}
+    paths = [l[15:] for l in out.splitlines() if l.startswith("filedlg paths: ")]
+    check("filedlg multi: OpenFile with \"multiple\"", opts.get("multiple") == ("b", 1), opts)
+    check("filedlg multi: the first in path, every one in file_dialog_paths",
+          rr == 0 and result(out) == (1, 0, folder + "/a.png") and paths == ["|".join([folder + "/a.png", folder + "/b c.jpg", "/tmp/d.bmp"])],
+          (out, paths))
+    FD_URI[0] = "file:///tmp/one.png"
+    rr, lr, _, out = run(rust(0, "/tmp/q.png"), "ok")
+    got = args_of(lr, "OpenFile")
+    paths = [l[15:] for l in out.splitlines() if l.startswith("filedlg paths: ")]
+    check("filedlg: without FD_MULTI no \"multiple\", one path", got and "multiple" not in dict(got[0][2][2]) and paths == ["/tmp/one.png"],
+          (got, paths))
 
 
 # ------------------------------------------------------------------ print: asm vs Rust

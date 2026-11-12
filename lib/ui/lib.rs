@@ -112,6 +112,7 @@ pub use highlight::{
     SY_FUNC, SY_HEADING, SY_KEY, SY_KEYWORD, SY_LINK, SY_META, SY_NUMBER, SY_PUNCT, SY_STRING, SY_STRONG, SY_TEXT, SY_TYPE, TOML,
 };
 pub use highlight::JFS; // (L6) the grammar of JFScript's .jfs
+pub use highlight::{CSS, HTML, JAVASCRIPT, WAT}; // (E10) the web's languages: view-source, developer tools
 mod code_edit;
 mod code_long;
 pub use code_edit::{CodeStatus, CE_NO_FIND, CE_NO_FRAME, CE_NO_GUTTER, CE_NO_LINE, CE_READONLY};
@@ -232,7 +233,8 @@ use text::Text;
 pub use clipimg::{clip_bmp_from_sf, clipimg_parse, clipimg_record};
 pub use cmd::{Cmd, Draw, DrawRef, Gfx, IconHook};
 pub use consts::*;
-pub use ctx::{Sem, Slot, ease};
+pub use ctx::{KeyEvent, Sem, Slot, ease};
+pub use plat::{Preedit, IP_EMAIL, IP_NUMBER, IP_PASSWORD, IP_PHONE, IP_SEARCH, IP_TEXT, IP_URL}; // (E4) ui.ime_preedit, ui.ime_enable
 pub use cursor::CursorDraw;
 pub use edit::TextboxPresentation;
 pub use edit::TextSurfaceLine;
@@ -260,7 +262,7 @@ pub use shell::{CmdItem, NavState};
 // docking (dock.rs): the panels, the layout, the sides and flags
 pub use dock::{
     DockPanel, DockState, DOCK_BOTTOM, DOCK_CENTER, DOCK_FLOAT, DOCK_FLOAT_MAX, DOCK_LEFT, DOCK_MK_BOTTOM, DOCK_MK_CENTER, DOCK_MK_LEFT,
-    DOCK_MK_RIGHT, DOCK_MK_TOP, DOCK_RIGHT, DP_HIDDEN, DP_NOCLOSE, DP_NOFLOAT, DOCK_HOLD_MS, DOCK_TAB_HOLD,
+    DOCK_MK_RIGHT, DOCK_MK_TOP, DOCK_RIGHT, DP_GROUP, DP_HIDDEN, DP_NOCLOSE, DP_NOFLOAT, DOCK_HOLD_MS, DOCK_TAB_HOLD,
 };
 // the taskbar button's progress and jump list tasks (ui.taskbar_progress / taskbar_tasks)
 pub use plat::taskbar::{JumpTask, TaskbarProgress};
@@ -279,8 +281,9 @@ pub use color::{hsv_to_rgb, rgb_to_hsv};
 pub use value::{cvtd, deg_atan2, deg_sincos, grad_at, part_id, px_mix, RangeF, Track, NO_DEFAULT};
 
 /// the app's entry point: `ui::main!(ui::run(&DESC, &mut MyApp::default(), &style::STYLE));`
-/// (expands to the `jfgui_main` symbol the platform entry calls; the app crate denies
-/// unsafe code, this one item is the exception).  It first sets up what build_rs.py built in
+/// (expands to the `jfgui_main` symbol the platform entry calls; its unsafe attribute comes from
+/// this crate's macro, which the unsafe_code lint does not look into, so the app crate may deny or
+/// forbid unsafe code without an allow).  It first sets up what build_rs.py built in
 /// (perm.rs): the app's name for its folders (JFGUI_APP), its assets as app://
 /// (apps/NAME/assets, packed to JFGUI_ASSETS with --cfg jfgui_assets) and its permissions
 /// (apps/NAME/PERMISSIONS as JFGUI_PERMISSIONS), then its file types and URL schemes
@@ -308,7 +311,7 @@ macro_rules! main {
 macro_rules! main {
     ($body:expr) => {
         $crate::__jfgui_main!($body);
-        #[allow(unsafe_code, dead_code)]
+        #[allow(dead_code)]
         fn main() {
             unsafe extern "Rust" {
                 fn jfgui_std_start() -> !;
@@ -319,14 +322,49 @@ macro_rules! main {
     };
 }
 
+/// (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
+/// std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
+/// the tests do not link.  Never called (the test harness has its own main); no panic check
+/// (tests unwind).  `#[cfg(test)] ui::test_main!();` in the crate's lib.rs, also under
+/// `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros)
+#[macro_export]
+macro_rules! test_main {
+    () => {
+        #[allow(dead_code)]
+        #[unsafe(no_mangle)]
+        fn jfgui_main() -> i32 {
+            0
+        }
+    };
+}
+
+/// ui::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
+/// std built with the feature `unwind` may unwind as well
+#[cfg(not(feature = "unwind"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __ui_panic_check {
+    () => {
+        #[cfg(panic = "unwind")]
+        compile_error!("JFLib needs panic = \"abort\": add [profile.dev] and [profile.release] with panic = \"abort\" to this project's Cargo.toml (a program with std may turn on jflib's feature unwind instead)");
+    };
+}
+
+/// (see above)
+#[cfg(feature = "unwind")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __ui_panic_check {
+    () => {};
+}
+
 /// ui::main!'s `jfgui_main`, without and with std
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __jfgui_main {
     ($body:expr) => {
-        #[cfg(panic = "unwind")]
-        compile_error!("JFLib needs panic = \"abort\": add [profile.dev] and [profile.release] with panic = \"abort\" to this project's Cargo.toml");
-        #[allow(unsafe_code, unexpected_cfgs)]
+        $crate::__ui_panic_check!();
+        #[allow(unexpected_cfgs)]
         #[unsafe(no_mangle)]
         fn jfgui_main() -> i32 {
             #[cfg(jfgui_manifest)]
@@ -705,6 +743,10 @@ pub struct Ui {
     pub(crate) autoclose_ms: u32,
     pub(crate) accent_raw: u32,
     pub(crate) settle_warned: bool,
+    /// run_passes in a row whose end asked for another frame by itself (need from inside the
+    /// passes, commands of the last round no frame saw), the warning when they kept asking
+    pub(crate) self_frames: u32,
+    pub(crate) self_warned: bool,
     pub(crate) verify_dirty: bool,
     pub(crate) frames_rendered: u32,
     pub(crate) close_at: u32,

@@ -206,3 +206,17 @@ pub unsafe extern "C" fn strlen(s: *const core::ffi::c_char) -> usize {
     }
     n
 }
+/// C ABI NUL-terminated wide string length (wchar_t: 32 bits on wasm32). LLVM 23 (Rust 1.99)
+/// turns a loop that counts wide characters up to the NUL into a call to it, as with strlen; an
+/// unresolved wcslen would be an import the browser cannot satisfy.
+/// # Safety
+/// The pointer must reference a readable NUL-terminated wide string.
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
+pub unsafe extern "C" fn wcslen(s: *const u32) -> usize {
+    let mut n = 0;
+    // SAFETY: the caller guarantees a terminating NUL.
+    while unsafe { s.add(n).read_volatile() } != 0 {
+        n += 1;
+    }
+    n
+}

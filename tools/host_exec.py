@@ -30,7 +30,20 @@ def exe_arch(exe):
 
 
 def host_arch():
-    """the processor of this machine (and so of its WSL)"""
+    """the processor of this machine (and so of its WSL); on Windows the native one, also for a Python that runs
+    under the x64 emulation of Windows on ARM (platform.machine() answers AMD64 there)"""
+    if os.name == 'nt':
+        import ctypes
+        process, native = ctypes.c_ushort(), ctypes.c_ushort()
+        try:
+            k32 = ctypes.windll.kernel32
+            k32.GetCurrentProcess.restype = ctypes.c_void_p
+            k32.IsWow64Process2.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ushort), ctypes.POINTER(ctypes.c_ushort)]
+            if k32.IsWow64Process2(k32.GetCurrentProcess(), ctypes.byref(process), ctypes.byref(native)):
+                if native.value in PE_MACHINE:
+                    return PE_MACHINE[native.value]
+        except (AttributeError, OSError):    # before Windows 10 1709
+            pass
     m = platform.machine().lower()
     return {'amd64': 'x86_64', 'x64': 'x86_64', 'arm64': 'aarch64'}.get(m, m)
 

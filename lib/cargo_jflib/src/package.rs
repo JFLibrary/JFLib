@@ -131,10 +131,35 @@ fn style_info(styles: &BTreeMap<String, PathBuf>, style: &str) -> (String, Strin
     (lines.next().unwrap_or(style).to_string(), lines.next().unwrap_or("").to_string())
 }
 
-/// the app built for `triple` with `style` -> its program
-fn build(p: &Project, triple: &str, style: &str) -> Result<PathBuf, String> {
+/// (E15) the styles PACKAGE / --styles names: the library's (JFLIB_STYLE) and the app's own
+/// (a crate of its dependencies with `[package.metadata.jflib] style = "NAME"`; the app uses it
+/// itself, so it is built without JFLIB_STYLE) -> those that are its own
+fn styles_check(styles: &[String], own: &BTreeMap<String, PathBuf>) -> Result<Vec<String>, String> {
+    let mut mine = Vec::new();
+    for s in styles {
+        if own.contains_key(s) {
+            mine.push(s.clone());
+        } else if !STYLES.contains(&s.as_str()) {
+            let all: Vec<&str> = STYLES.iter().copied().chain(own.keys().map(String::as_str)).collect();
+            return Err(format!(
+                "style {s}: the styles are {} (a style of the app's own: a crate of its dependencies with \
+                 [package.metadata.jflib] style = \"{s}\")",
+                all.join(", ")
+            ));
+        }
+    }
+    Ok(mine)
+}
+
+/// the app built for `triple` with `style` -> its program (a style of its own: without JFLIB_STYLE)
+fn build(p: &Project, triple: &str, style: &str, own: bool) -> Result<PathBuf, String> {
     let mut cmd = cargo::command();
-    cmd.current_dir(&p.package.dir).env("JFLIB_STYLE", style).args(["build", "--release", "-p", &p.package.name, "--target", triple]);
+    cmd.current_dir(&p.package.dir).args(["build", "--release", "-p", &p.package.name, "--target", triple]);
+    if own {
+        cmd.env_remove("JFLIB_STYLE");
+    } else {
+        cmd.env("JFLIB_STYLE", style);
+    }
     if triple == crate::mac::TRIPLE {
         cmd.env("MACOSX_DEPLOYMENT_TARGET", crate::mac::MAC_MIN);
     }
@@ -159,21 +184,47 @@ fn preview(exe: &Path, work: &Path, style: &str) -> Result<Vec<u8>, String> {
 
 /// the [profile.*] sections of the workspace's Cargo.toml (a stub is built like the app)
 fn profiles(root: &Path) -> String {
-    let text = fs::read_to_string(root.join("Cargo.toml")).unwrap_or_default();
+    stub_profiles(&fs::read_to_string(root.join("Cargo.toml")).unwrap_or_default())
+}
+
+/// the [profile.release] sections of an app's Cargo.toml for a stub: built with --release like the
+/// app, so the crates compiled for it are taken again ([profile.dev] and the others play no part,
+/// and a [profile.dev.package.X] of a crate the stub does not have was a warning of Cargo's), but
+/// always with panic = "abort" -- the stubs are programs without std, while an app with jflib's
+/// feature unwind has panic = "unwind" (or none, Cargo's default): [profile.release] (not
+/// .package.X / .build-override) gets panic = "abort" in place of its panic line, and there is one
+fn stub_profiles(text: &str) -> String {
     let mut out = String::new();
     let mut inside = false;
+    let mut any = false;
+    let mut release = false;
     for line in text.lines() {
         let t = line.trim_start();
         if t.starts_with('[') {
-            inside = t.starts_with("[profile.");
+            let name = t.strip_prefix("[profile.").map(|r| r.split(']').next().unwrap_or("").trim());
+            any |= name.is_some();
+            inside = name.is_some_and(|n| n == "release" || n.starts_with("release."));
+            if inside {
+                out += line;
+                out.push('\n');
+                if name == Some("release") {
+                    out += "panic = \"abort\"\n";
+                    release = true;
+                }
+                continue;
+            }
         }
-        if inside {
+        // the app's own panic line (the stub's is above)
+        let panic_key = t.strip_prefix("panic").is_some_and(|r| r.trim_start().starts_with('='));
+        if inside && !panic_key {
             out += line;
             out.push('\n');
         }
     }
-    if out.is_empty() {
+    if !any {
         out = "[profile.release]\npanic = \"abort\"\nopt-level = 2\ncodegen-units = 1\nlto = \"fat\"\ndebug = 0\nstrip = \"symbols\"\n".to_string();
+    } else if !release {
+        out += "[profile.release]\npanic = \"abort\"\n";
     }
     out
 }
@@ -204,17 +255,30 @@ pub(crate) const SIGNER: Stub = Stub { name: "jflib-sign", deps: &["jflib-rt", "
                                        console: true, triple: if cfg!(windows) { WIN } else if cfg!(target_os = "macos") { crate::mac::TRIPLE } else { LINUX },
                                        linux_static: false };
 
+/// a stub's dependency on `name`: from the folder where the app's project has the crate from a path
+/// at `version` (an app in JFLib's workspace: the stub is built from the same sources, a version
+/// not published yet included), else from crates.io
+fn stub_dep(name: &str, version: &str, local: &BTreeMap<String, PathBuf>) -> String {
+    match local.get(name) {
+        Some(dir) => format!("{name} = {{ path = \"{}\", version = \"={version}\" }}\n", dir.display().to_string().replace('\\', "/")),
+        None => format!("{name} = \"={version}\"\n"),
+    }
+}
+
 /// a stub: its crates in a project of its own below the target folder, built like the app (its
-/// profiles, its Cargo.lock, its .cargo/config.toml) -> the program
+/// profiles, its Cargo.lock, its .cargo/config.toml, its crates from paths) -> the program
 pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, String> {
     let dir = p.target_dir.join("jflib-package").join(format!("{}-stub", s.name));
     let manifest = dir.join("Cargo.toml");
-    let deps: String = s.deps.iter().map(|d| format!("{d} = \"={version}\"\n")).collect();
+    let local: BTreeMap<String, PathBuf> = cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))?.into_iter()
+        .filter(|r| r.local && r.version == version && r.name.starts_with("jflib-")).map(|r| (r.name, r.dir)).collect();
+    let deps: String = s.deps.iter().map(|d| stub_dep(d, version, &local)).collect();
     write_changed(&manifest, format!(
         "# made by cargo jflib: {} ({})\n\
          [package]\nname = \"{}\"\nversion = \"{version}\"\nedition = \"2024\"\npublish = false\n\n\
-         [dependencies]\n{deps}\n[build-dependencies]\njflib-build = \"={version}\"\n\n{}\n\
-         # its own workspace, inside the app's folder or not\n[workspace]\n", s.name, s.deps.join(", "), s.name, profiles(&p.workspace_root)).as_bytes())?;
+         [dependencies]\n{deps}\n[build-dependencies]\n{}\n{}\n\
+         # its own workspace, inside the app's folder or not\n[workspace]\n", s.name, s.deps.join(", "), s.name,
+        stub_dep("jflib-build", version, &local), profiles(&p.workspace_root)).as_bytes())?;
     write_changed(&dir.join("build.rs"), format!("fn main() {{\n    jflib_build::{}();\n}}\n", if s.console { "console" } else { "app" }).as_bytes())?;
     write_changed(&dir.join("src/main.rs"), s.source.as_bytes())?;
     // the versions the app was built with, on every run: the crates compiled for it are taken
@@ -233,6 +297,8 @@ pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, Stri
     }
     let mut cmd = cargo::command();
     cmd.current_dir(&p.package.dir).arg("build").arg("--release").args(["--target", s.triple]).arg("--manifest-path").arg(&manifest);
+    // panic = "abort" also over a [profile.release] of the app's .cargo/config.toml (stub_profiles)
+    cmd.env("CARGO_PROFILE_RELEASE_PANIC", "abort");
     if s.triple == crate::mac::TRIPLE {
         cmd.env("MACOSX_DEPLOYMENT_TARGET", crate::mac::MAC_MIN);
     }
@@ -529,9 +595,20 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
     let name = p.package.name.clone();
     let styles: Vec<String> = o.styles.as_deref().or(meta.get("styles")).unwrap_or("winui")
         .split([',', ' ']).filter(|s| !s.is_empty()).map(String::from).collect();
-    if let Some(bad) = styles.iter().find(|s| !STYLES.contains(&s.as_str())) {
-        return Err(format!("style {bad}: the styles are {}", STYLES.join(", ")));
+    // the style crates (their INFO): the library's and (E15) the app's own; the version of jflib,
+    // which the stubs' crates must have
+    let (mut infos, mut own, mut jflib) = (BTreeMap::new(), BTreeMap::new(), None);
+    for r in cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))? {
+        if let Some(s) = &r.style {
+            own.insert(s.clone(), r.dir.clone());
+            infos.insert(s.clone(), r.dir);
+        } else if let Some(s) = r.name.strip_prefix("jflib-style-") {
+            infos.insert(s.to_string(), r.dir);
+        } else if r.name == "jflib" {
+            jflib = Some(r.version);
+        }
     }
+    let own_styles = styles_check(&styles, &own)?;
     let wants = |f: &str| o.formats.contains(&f);
     if wants("dmg") && !cfg!(target_os = "macos") {
         return Err("a dmg is made on a Mac (Apple's hdiutil and codesign): there --formats dmg".to_string());
@@ -554,15 +631,6 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
                      with the formats of this system"
                 ));
             }
-        }
-    }
-    // the style crates (their INFO) and the version of jflib, which the stubs' crates must have
-    let (mut infos, mut jflib) = (BTreeMap::new(), None);
-    for r in cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))? {
-        if let Some(s) = r.name.strip_prefix("jflib-style-") {
-            infos.insert(s.to_string(), r.dir);
-        } else if r.name == "jflib" {
-            jflib = Some(r.version);
         }
     }
     let jflib = jflib.ok_or_else(|| format!("{name} does not depend on the crate jflib"))?;
@@ -593,7 +661,7 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
     for s in &app.styles {
         for &t in &targets {
             println!("[{s}] build {t}");
-            let exe = build(&p, if t == "win" { WIN } else { LINUX }, s)?;
+            let exe = build(&p, if t == "win" { WIN } else { LINUX }, s, own_styles.contains(s))?;
             write(&app.exe(s, t), &read(&exe)?)?;
         }
     }
@@ -629,7 +697,7 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
             "dmg" => {
                 for s in &app.styles {
                     println!("[{s}] build mac");
-                    let exe = build(&p, crate::mac::TRIPLE, s)?;
+                    let exe = build(&p, crate::mac::TRIPLE, s, own_styles.contains(s))?;
                     let dir = app.work.join(s).join("mac");
                     fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
                     let bundle = crate::mac::bundle(&p.package.dir, &app.version, &exe, &dir)?;
@@ -674,6 +742,53 @@ mod tests {
         assert_eq!(u64::from_le_bytes(pay[24..32].try_into().unwrap()), 8 + 256);
         assert_eq!(pay[8 + 128 + 32 + 47], 0); // the name cut to 47 bytes
         assert!(!has_interpreter(&[]));
+    }
+
+    // (E15) a style of the app's own from the metadata of its crate; the names PACKAGE may use
+    #[test]
+    fn own_styles() {
+        let pkg = crate::json::parse(r#"{"name": "narsil-style", "version": "0.1.0", "manifest_path": "/x/narsil-style/Cargo.toml",
+            "metadata": {"jflib": {"style": "narsil"}}}"#).unwrap();
+        let r = cargo::resolved(&pkg);
+        assert_eq!((r.name.as_str(), r.style.as_deref(), r.dir.as_path()), ("narsil-style", Some("narsil"), Path::new("/x/narsil-style")));
+        let plain = crate::json::parse(r#"{"name": "x", "version": "1.0.0", "manifest_path": "/x/Cargo.toml", "metadata": null}"#).unwrap();
+        assert_eq!(cargo::resolved(&plain).style, None);
+        let own: BTreeMap<String, PathBuf> = [("narsil".to_string(), PathBuf::from("/x/narsil-style"))].into();
+        let names = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(styles_check(&names(&["narsil"]), &own).unwrap(), names(&["narsil"]));
+        assert_eq!(styles_check(&names(&["winui", "narsil"]), &own).unwrap(), names(&["narsil"]));
+        assert!(styles_check(&names(&["winui", "kde"]), &own).unwrap().is_empty());
+        let e = styles_check(&names(&["other"]), &own).unwrap_err();
+        assert!(e.contains("winui, classic, kde, macos, netlab, narsil") && e.contains("style = \"other\""), "{e}");
+    }
+
+    // the stubs are built with panic = "abort" whatever the app's profiles say (feature unwind)
+    #[test]
+    fn stub_profiles_abort() {
+        let app = "[package]\nname = \"narsil\"\n\n[profile.dev]\npanic = \"unwind\"\nopt-level = 1\n\n\
+                   [profile.dev.package.narsil-net]\nopt-level = 3\n\n[profile.release]\nlto = \"fat\"\npanic=\"unwind\" # catch_unwind\n\n\
+                   [profile.dev.build-override]\nopt-level = 2\n\n[dependencies]\npanic = \"x\"\n";
+        assert_eq!(stub_profiles(app), "[profile.release]\npanic = \"abort\"\nlto = \"fat\"\n\n");
+        // [profile.release.*] stays as it is (Cargo allows no panic there), the dev profile's
+        // crates (JFLib's workspace names some the stubs do not have) go
+        assert_eq!(stub_profiles("[profile.dev.package.jflib-cas]\nopt-level = 2\n\n[profile.release]\nlto = true\n\n\
+                                  [profile.release.package.\"*\"]\nopt-level = 3\n\n[profile.release.build-override]\nopt-level = 0\n"),
+                   "[profile.release]\npanic = \"abort\"\nlto = true\n\n[profile.release.package.\"*\"]\nopt-level = 3\n\n\
+                    [profile.release.build-override]\nopt-level = 0\n");
+        // no panic at all (Cargo's default unwind) and no [profile.release]: one with abort
+        assert_eq!(stub_profiles("[profile.dev]\nopt-level = 1\n"), "[profile.release]\npanic = \"abort\"\n");
+        // no profiles: the release profile of the template
+        assert!(stub_profiles("[package]\nname = \"x\"\n").starts_with("[profile.release]\npanic = \"abort\"\n"));
+        // a key that only starts with panic stays
+        assert!(stub_profiles("[profile.release]\npanicky = 1\n").contains("panicky = 1\n"));
+    }
+
+    // a stub's crates from the folders where the app has them from paths (JFLib's workspace), else from crates.io
+    #[test]
+    fn stub_dep_path() {
+        let local: BTreeMap<String, PathBuf> = [("jflib-installer".to_string(), PathBuf::from(r"C:\src\JFLib\lib\installer"))].into();
+        assert_eq!(stub_dep("jflib-installer", "0.1.0", &local), "jflib-installer = { path = \"C:/src/JFLib/lib/installer\", version = \"=0.1.0\" }\n");
+        assert_eq!(stub_dep("jflib-build", "0.1.0", &local), "jflib-build = \"=0.1.0\"\n");
     }
 
     #[test]

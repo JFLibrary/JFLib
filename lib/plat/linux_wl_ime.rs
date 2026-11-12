@@ -43,7 +43,9 @@ impl Wl {
         if moved && self.ime.pre_win>=0 && self.ime.pre_win!=t { self.ime_preedit_clear(); }
         self.ime.at=[t,ox,oy];
         if !self.ime.active {
-            self.w.send(id,&ENABLE,&[]); self.w.send(id,&CONTENT,&[A::U(0),A::U(0)]); self.ime.active=true;
+            // (E4) ime_purpose as the content purpose (hint none): normal, url, email, number, phone, password
+            let purpose=match crate::ime_purpose_of() { crate::IP_URL=>5, crate::IP_EMAIL=>6, crate::IP_NUMBER=>3, crate::IP_PHONE=>4, crate::IP_PASSWORD=>8, _=>0 };
+            self.w.send(id,&ENABLE,&[]); self.w.send(id,&CONTENT,&[A::U(0),A::U(purpose)]); self.ime.active=true;
         } else if !changed && !moved { return; }
         let scale=self.win[self.ime.focus as usize].s120.max(120);
         self.w.send(id,&RECT,&[A::I((x+ox)*120/scale),A::I((y+oy)*120/scale),A::I(2),A::I((h*120/scale).max(1))]); self.ime_commit();

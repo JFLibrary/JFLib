@@ -50,6 +50,7 @@ const MB_CAP: usize = 32768; // body builder (file filters: every letter as [xX]
 const MM_CAP: usize = MB_CAP + 4096; // whole message
 const RB_CAP: usize = 65536; // receive buffer
 const URI_CAP: usize = 2048;
+const URIS_MAX: usize = 4096; // (E8) files of one OpenFile with "multiple"
 const UID_CAP: usize = 16;
 const HDR_CAP: usize = MM_CAP - MB_CAP - 32; // header fields end below this
 const T_HELLO: i32 = 2000; // ms
@@ -130,6 +131,7 @@ struct Bus {
     req_path: Vec<u8>,
     handle: Vec<u8>,
     uri: Vec<u8>,
+    uris: Vec<Vec<u8>>,
     filter: Vec<u8>,
     name: Vec<u8>,
     folder: Vec<u8>,
@@ -228,6 +230,7 @@ impl Bus {
             req_path: Vec::new(),
             handle: Vec::new(),
             uri: Vec::new(),
+            uris: Vec::new(),
             filter: Vec::new(),
             name: Vec::new(),
             folder: Vec::new(),
@@ -1002,6 +1005,20 @@ impl Bus {
         // a file: path from the URI, extension index from the chosen filter
         let Some(p) = self.uri_to_path(PATH_CAP) else { return (0, 0) };
         let mut p = p;
+        // (E8) FD_MULTI: every chosen file
+        let mut all = Vec::new();
+        let first = self.uri.clone();
+        for u in core::mem::take(&mut self.uris) {
+            self.uri = u;
+            if let Some(q) = self.uri_to_path(PATH_CAP) {
+                all.push(String::from_utf8_lossy(&q).into_owned());
+            }
+        }
+        self.uri = first;
+        if all.is_empty() {
+            all.push(String::from_utf8_lossy(&p).into_owned());
+        }
+        crate::fd_paths_set(all);
         let index = if flags & FD_FOLDER != 0 { 0 } else { self.filter_index(exts) };
         if flags & (FD_SAVE | FD_FOLDER) == FD_SAVE {
             add_ext(&mut p, PATH_CAP, exts, index);
@@ -1029,6 +1046,11 @@ impl Bus {
         self.b_str(&tok);
         self.b_dict_key(b"modal", b"b");
         self.b_u32(1);
+        if !folder && !save && flags & crate::FD_MULTI != 0 {
+            // (E8) several files
+            self.b_dict_key(b"multiple", b"b");
+            self.b_u32(1);
+        }
         if folder {
             // FD_FOLDER: OpenFile with "directory" (portal version 3), starting in path itself
             self.b_dict_key(b"directory", b"b");
@@ -1237,6 +1259,7 @@ impl Bus {
     /// -> 1 file chosen, 0 cancelled  [parse_response]
     fn parse_response(&mut self) -> i32 {
         self.uri.clear();
+        self.uris.clear();
         self.filter.clear();
         self.rd_body_begin();
         if self.rd_u32() != 0 {
@@ -1259,6 +1282,16 @@ impl Bus {
                     if n != 0 {
                         if let Some(s) = self.rd_str() {
                             self.uri = copy_cap(&s, URI_CAP); // the first URI
+                        }
+                        // (E8) every URI (OpenFile with "multiple")
+                        let end = start + n as usize;
+                        self.uris.push(self.uri.clone());
+                        while self.rp < end && self.uris.len() < URIS_MAX {
+                            self.rd_align(4);
+                            match self.rd_str() {
+                                Some(s) => self.uris.push(copy_cap(&s, URI_CAP)),
+                                None => break,
+                            }
                         }
                     }
                     self.rp = start; // back to the array start, then skip it

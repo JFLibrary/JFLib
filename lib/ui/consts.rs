@@ -42,6 +42,16 @@ pub const HB_OWNKEYS: u32 = 0x20000;
 // around it (touch.rs; the cursors of splitters, text and crosshairs say so by themselves)
 pub const HB_GRAB_H: u32 = 0x40000;
 pub const HB_GRAB_V: u32 = 0x80000;
+// every key is the widget's while it has the focus and no popup of the window is open (a menu
+// keeps its keys), Ctrl + letter, Tab and the arrows too: no accelerator, no keyboard
+// navigation, no Enter / Space action and no ui.undo_keys takes one (a canvas that shows a web
+// page takes them with ui.key_take; ui.accel_run hands one back to the command table).  Unlike
+// HB_TEXT no text box rules: no reserved keys, no input method, no on-screen keyboard.  A
+// canvas takes it from next_flags.
+pub const HB_KEYS: u32 = 0x10_0000;
+// canvas only (next_flags): its cursor bits as given, CUR_ARROW (0) included; without it 0 is the
+// crosshair
+pub const HB_CURSOR_SET: u32 = 0x20_0000;
 
 // ------------------------------------------------------------------ the finger (touch.rs)
 // ui.touch_take(flags) after a widget, instead of what its hit box says by itself: TF_V / TF_H a
@@ -425,6 +435,8 @@ pub const CF_HIDDEN: u32 = 4;
 pub const FD_OPEN: u32 = 0;
 pub const FD_SAVE: u32 = 1;
 pub const FD_FOLDER: u32 = 2;
+/// (E8) open several files at once (with FD_OPEN): ui.filedlg_paths() has all of them, `path` the first
+pub const FD_MULTI: u32 = 4;
 pub const FD_EXT_SHIFT: u32 = 8;
 
 // ------------------------------------------------------------------ windows (win.rs)
@@ -441,6 +453,13 @@ pub const WF_NOACTIVATE: u32 = 64;
 pub const WF_AUTOHEIGHT: u32 = 128;
 pub const WF_KEYS: u32 = 256;
 pub const WF_TOUCH_HOLD: u32 = 512; // a finger moves it by the title bar only after resting there (TF_HOLD)
+/// (E7) an independent app window (a browser's second or private window): a top-level window of
+/// its own on Windows (its own taskbar button, not minimized or hidden with the main window),
+/// without the library's title bar -- the app draws one with titlebar_begin / titlebar_end
+/// (its own widgets in it, the caption buttons at its end); X11 and Wayland too (a top-level
+/// window without WM_TRANSIENT_FOR / an xdg_toplevel without a parent); macOS gives it an owned
+/// window for now
+pub const WF_APP: u32 = 1024;
 pub const UWS_OPEN: u32 = 1;
 pub const UWS_VISIBLE: u32 = 2;
 pub const UWS_ACTIVE: u32 = 4;
@@ -485,6 +504,12 @@ pub const PTR_PEN: u32 = 1;
 pub const PTR_ERASER: u32 = 2;
 pub const PTR_TOUCH: u32 = 3;
 
+// (E2) where a key sits (KeyEvent::location)
+pub const KL_STANDARD: u32 = 0;
+pub const KL_LEFT: u32 = 1;
+pub const KL_RIGHT: u32 = 2;
+pub const KL_NUMPAD: u32 = 3;
+
 // cursors (CUR_*)
 pub const CUR_ARROW: u32 = 0;
 pub const CUR_IBEAM: u32 = 1;
@@ -501,6 +526,35 @@ pub const CUR_COUNT: u32 = 11;
 pub const CUR_CUSTOM: u32 = 15; // hit boxes only: the cursor of cursor_custom
 pub const CUR_USER_MAX: u32 = 32; // fixed handle range; cursor_new answers 0 when it is full
 pub const CUR_MAX_PX: i32 = 256;
+
+// ---- (E3) more system shapes: CSS's cursor names, past the custom cursors (CUR_X0 ..
+// CUR_X_END); a platform without one shows cursor_fallback's
+pub const CUR_X0: u32 = 64;
+pub const CUR_NOT_ALLOWED: u32 = 64; // not-allowed
+pub const CUR_NO_DROP: u32 = 65; // no-drop
+pub const CUR_GRAB: u32 = 66; // grab: an open hand
+pub const CUR_GRABBING: u32 = 67; // grabbing: a closed hand
+pub const CUR_HELP: u32 = 68; // help: the arrow with a question mark
+pub const CUR_PROGRESS: u32 = 69; // progress: the arrow with a busy sign (work in the background)
+pub const CUR_ZOOM_IN: u32 = 70; // zoom-in
+pub const CUR_ZOOM_OUT: u32 = 71; // zoom-out
+pub const CUR_CELL: u32 = 72; // cell: a thick cross (tables)
+pub const CUR_VTEXT: u32 = 73; // vertical-text
+pub const CUR_ALIAS: u32 = 74; // alias: a link will be made
+pub const CUR_COPY: u32 = 75; // copy: a copy will be made
+pub const CUR_CONTEXT_MENU: u32 = 76; // context-menu
+pub const CUR_ALL_SCROLL: u32 = 77; // all-scroll
+pub const CUR_COL_RESIZE: u32 = 78; // col-resize
+pub const CUR_ROW_RESIZE: u32 = 79; // row-resize
+pub const CUR_SIZE_N: u32 = 80; // n-resize: one edge or corner
+pub const CUR_SIZE_S: u32 = 81;
+pub const CUR_SIZE_E: u32 = 82;
+pub const CUR_SIZE_W: u32 = 83;
+pub const CUR_SIZE_NE: u32 = 84;
+pub const CUR_SIZE_NW: u32 = 85;
+pub const CUR_SIZE_SE: u32 = 86;
+pub const CUR_SIZE_SW: u32 = 87;
+pub const CUR_X_END: u32 = 88;
 
 // fonts
 pub const FONT_REG: u32 = 0;

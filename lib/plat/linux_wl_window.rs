@@ -2,7 +2,8 @@
 // scaling, window commands and the event loop                    [src/plat/linux/wl_window.s]
 //
 //   win_create(title, w_dip, h_dip, flags, owner, x, y) -> index / -1
-//        owner -1: the main window (registry, globals; its first configure is awaited).
+//        owner -1: the main window (registry, globals; its first configure is awaited);
+//        (E7) after it another toplevel without a parent (WF_APP), shown like an owned one.
 //        Else a toplevel owned by `owner`: xdg_toplevel.set_parent(owner), client-side frame
 //        unless PWF_SYSFRAME gets a server-side one (xdg-decoration), xdg_dialog_v1.set_modal
 //        for PWF_MODAL when the compositor has xdg_wm_dialog_v1.  Created unmapped; x, y are
@@ -252,7 +253,14 @@ impl Wl {
     pub(crate) fn win_create(&mut self, title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, _x: i32,
                              _y: i32) -> i32 {
         let idx;
-        if owner == PW_NOOWNER {
+        if owner == PW_NOOWNER && self.win[0].flags & WLWF_USED != 0 {
+            // (E7) a second top-level window of the app (WF_APP): an xdg_toplevel without a
+            // parent, its objects made when it is shown (as an owned window's)
+            match (1..PW_MAX).find(|&i| self.win[i].flags & WLWF_USED == 0) {
+                Some(i) => idx = i,
+                None => return -1,
+            }
+        } else if owner == PW_NOOWNER {
             if self.win[0].surf != 0 {
                 return -1;
             }
@@ -305,9 +313,9 @@ impl Wl {
         r.dpi = 96;
         // the title is kept: the objects are made again each time the window is shown
         self.win_set_title(idx as i32, title.as_bytes());
-        if owner != PW_NOOWNER {
-            // until it is on an output: the owner's scale
-            let o = self.win[slot(owner)];
+        if idx != 0 {
+            // until it is on an output: the owner's scale (a second top-level: the main window's)
+            let o = self.win[if owner == PW_NOOWNER { 0 } else { slot(owner) }];
             let r = &mut self.win[idx];
             r.s120 = o.s120;
             r.frac = o.frac;
@@ -318,7 +326,7 @@ impl Wl {
             let ph = self.phys(lh, idx);
             self.win[idx].pw = pw;
             self.win[idx].ph = ph;
-            return idx as i32; // owned windows: objects when shown
+            return idx as i32; // owned windows (and a second top-level): objects when shown
         }
         self.objects_create(0);
         self.update_scale(0);

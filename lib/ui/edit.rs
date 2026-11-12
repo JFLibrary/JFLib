@@ -135,9 +135,12 @@ pub(crate) struct S {
     surface_start: Option<usize>,
     surface_change: Option<(usize, usize, String)>,
     ime_frame: Option<u32>, // the frame of the last caret told to the platform (ime_pos)
-    // ---- the focused editor (g_ed_*)
+    // ---- the focused editor (g_ed_*): box ed_id of window ed_win (two windows may have boxes
+    // of the same id; the edit state is the one box's of the window with the keyboard)
     ed_id: u32, // 0 = none
-    ed_blur: u32, // box that lost the focus before it was drawn
+    ed_win: u32,
+    ed_blur: u32, // box that lost the focus before it was drawn (of window ed_blur_win)
+    ed_blur_win: u32,
     ed_caret: usize,
     ed_anchor: usize,
     ed_t0: u32, // blink start
@@ -154,9 +157,11 @@ pub(crate) struct S {
     ud_hdr: [[usize; 3]; UD_N], // len, caret, anchor
     ud_data: [Vec<u8>; UD_N],
     // ---- number boxes
-    nb_id: u32, // box owning nb_buf
+    nb_id: u32, // box owning nb_buf (of window nb_win)
+    nb_win: u32,
     nb_seen: u32,
-    nb_pend: u32,
+    nb_pend: u32, // (of window nb_pend_win)
+    nb_pend_win: u32,
     nb_pend_ev: u32,
     nb_kind: u32, // owner of nb_buf: 0 i32 (Range), 1 f64 (RangeF)
     nb_rg: Range, // the owner's range (g_nb_rg)
@@ -165,7 +170,7 @@ pub(crate) struct S {
     nb_buf: Vec<u8>,
     nb_view: Vec<u8>,
     nb_orig: Vec<u8>, // (U2) text as formatted from the value (unedited when equal)
-    pend_text: Option<(u32, u32, Vec<u8>)>, // (port) id, kind, text of a released owner
+    pend_text: Option<(u32, u32, u32, Vec<u8>)>, // (port) window, id, kind, text of a released owner
     // ---- the multi-line layout of the box being built (g_ml_*)
     ml_start: Vec<usize>, // start of every visual line
     ml_hyph: Vec<bool>, // the visual line ends hyphenated (a hyphen drawn after it)
@@ -201,7 +206,9 @@ impl Default for S {
             surface_change: None,
             ime_frame: None,
             ed_id: 0,
+            ed_win: 0,
             ed_blur: 0,
+            ed_blur_win: 0,
             ed_caret: 0,
             ed_anchor: 0,
             ed_t0: 0,
@@ -217,8 +224,10 @@ impl Default for S {
             ud_hdr: [[0; 3]; UD_N],
             ud_data: core::array::from_fn(|_| Vec::new()),
             nb_id: 0,
+            nb_win: 0,
             nb_seen: 0,
             nb_pend: 0,
+            nb_pend_win: 0,
             nb_pend_ev: 0,
             nb_kind: 0,
             nb_rg: Range::default(),
@@ -456,10 +465,22 @@ fn rg_clamp(v: i64, rg: &Range) -> i32 {
 impl Ui {
     // ------------------------------------------------------------------ text box
 
+    // box id of the live window holds the edit state (two windows may have boxes of one id)
+    pub(crate) fn ed_is(&self, id: u32) -> bool {
+        let e = &self.m.edit;
+        e.ed_id == id && e.ed_win == self.uiw_cur
+    }
+
+    // box id of the live window owns the number box text nb_buf
+    fn nb_is(&self, id: u32) -> bool {
+        let e = &self.m.edit;
+        e.nb_id == id && e.nb_win == self.uiw_cur
+    }
+
     /// Read the focused textbox's UTF-8 byte selection (anchor, caret), after drawing it.
     /// Opt-in API for document editors; ordinary textbox behavior is unchanged.
     pub fn textbox_selection(&self, id: u32) -> Option<(usize, usize)> {
-        if self.m.edit.ed_id == id && self.focused() == id {
+        if self.ed_is(id) && self.focused() == id {
             Some((self.m.edit.ed_anchor, self.m.edit.ed_caret))
         } else { None }
     }
@@ -467,7 +488,7 @@ impl Ui {
     /// Select valid UTF-8 byte boundaries in an already focused/drawn textbox. Pass the
     /// same current text used by textbox(); returns false without changes for invalid ranges.
     pub fn textbox_select(&mut self, id: u32, text: &str, anchor: usize, caret: usize) -> bool {
-        if self.m.edit.ed_id != id || self.focused() != id || !text.is_char_boundary(anchor) || !text.is_char_boundary(caret) {
+        if !self.ed_is(id) || self.focused() != id || !text.is_char_boundary(anchor) || !text.is_char_boundary(caret) {
             return false;
         }
         self.m.edit.ed_anchor = anchor;
@@ -530,9 +551,10 @@ impl Ui {
             while !t.is_char_boundary(n) {
                 n -= 1;
             }
+            let held = self.ed_is(id);
             let e = &mut self.m.edit;
             e.buf = t.as_bytes()[..n].to_vec();
-            if e.ed_id == id {
+            if held {
                 e.ed_caret = n;
                 e.ed_anchor = n;
             }
@@ -600,7 +622,7 @@ impl Ui {
                 self.repass();
                 self.tb_build_disp();
             }
-            if self.m.edit.ed_id != id {
+            if !self.ed_is(id) {
                 editing = false; // Esc dropped the focus
                 self.ime_off();
             }
@@ -696,6 +718,7 @@ impl Ui {
                 self.draw_color(c);
                 self.draw_rect(x, top, hair, lh);
             }
+            plat::ime_inline(false); // (E4) the input method's window shows the composition
             self.ime_pos(x, top, lh);
         }
         self.ltr_end();
@@ -820,7 +843,7 @@ impl Ui {
                 self.tb_build_disp();
             }
             self.tbm_layout();
-            if self.m.edit.ed_id != id {
+            if !self.ed_is(id) {
                 editing = false; // Esc dropped the focus
                 self.ime_off();
             }
@@ -978,6 +1001,7 @@ impl Ui {
                 self.draw_color(c);
                 self.draw_rect(x, ly, hair, lh);
             }
+            plat::ime_inline(false); // (E4) the input method's window shows the composition
             self.ime_pos(x, ly, lh);
         }
         if copy {
@@ -1257,6 +1281,28 @@ impl Ui {
         phase & 1 == 0
     }
 
+    /// (E4) the input method's composition in the live window (Preedit: its text and the caret
+    /// as a byte offset in it), empty when none is going on: a canvas that draws an editable
+    /// field of its own (ime_enable) draws it at its caret, underlined; the committed text comes
+    /// through text_take
+    pub fn ime_preedit(&self) -> plat::Preedit {
+        self.ed_preedit()
+    }
+
+    /// (E4) an editable field the app draws itself (a web page's input in a canvas) got the focus
+    /// (on, its purpose IP_*: IP_TEXT, IP_URL, IP_EMAIL, IP_NUMBER, IP_PHONE, IP_PASSWORD,
+    /// IP_SEARCH) or lost it (off): with it the input method comes while the app tells its caret
+    /// every frame (ime_pos), and the app draws the composition itself (ime_preedit: Windows
+    /// hides the method's composition window, its candidates stay at the caret); IP_PASSWORD
+    /// takes the input method away (Windows) or says so (Wayland).  Off: the method goes
+    pub fn ime_enable(&mut self, on: bool, purpose: u32) {
+        plat::ime_purpose(if on { purpose } else { plat::IP_TEXT });
+        plat::ime_inline(on);
+        if !on {
+            self.ime_pos(0, 0, 0);
+        }
+    }
+
     // ime_pos(x, y, h): IME windows follow the caret (Windows, window mode only); so do screen
     // magnifiers (the hidden system caret, the accessibility tree: a11y_caret)
     pub fn ime_pos(&mut self, x: i32, y: i32, h: i32) {
@@ -1289,34 +1335,39 @@ impl Ui {
     // (md_view.rs) a text box got another widget id (a field of a changed document): its edit
     // state (caret, selection) goes with it
     pub(crate) fn tb_rekey(&mut self, old: u32, new: u32) {
+        let w = self.uiw_cur;
         let e = &mut self.m.edit;
-        if e.ed_id == old {
+        if e.ed_id == old && e.ed_win == w {
             e.ed_id = new;
         }
-        if e.ed_blur == old {
+        if e.ed_blur == old && e.ed_blur_win == w {
             e.ed_blur = new;
         }
     }
 
     // tb_focus() -> this box (tb_id) is the focused editor.  Loads the edit state when the
-    // focus arrives, reports EV_COMMIT when it leaves.
+    // focus arrives, reports EV_COMMIT when it leaves.  The state is keyed by window and id:
+    // a box of the same id in another window neither takes nor drops it.
     fn tb_focus(&mut self) -> bool {
         let id = self.m.edit.tb_id;
-        if self.m.edit.ed_blur == id {
+        let w = self.uiw_cur;
+        if self.m.edit.ed_blur == id && self.m.edit.ed_blur_win == w {
             self.m.edit.ed_blur = 0;
             self.m.edit.tb_ev |= EV_COMMIT;
         }
         // (multi-window) only the window with the keyboard edits; the others show their
         // focused text box unfocused
-        if self.wp.ctx.focus == id && self.wp.ctx.last_state != SS_DISABLED as u32 && self.uiw_cur == self.m.win.active {
+        if self.wp.ctx.focus == id && self.wp.ctx.last_state != SS_DISABLED as u32 && w == self.m.win.active {
             let fv = self.wp.ctx.focus_visible;
             let e = &mut self.m.edit;
-            if e.ed_id != id {
+            if e.ed_id != id || e.ed_win != w {
                 // a box that still holds the edit state commits when it is drawn
                 if e.ed_id != 0 {
                     e.ed_blur = e.ed_id;
+                    e.ed_blur_win = e.ed_win;
                 }
                 e.ed_id = id;
+                e.ed_win = w;
                 e.ed_caret = e.buf.len();
                 e.ed_anchor = e.buf.len();
                 if fv {
@@ -1333,7 +1384,7 @@ impl Ui {
             e.ed_anchor = Self::tb_fix_index(&e.buf, e.ed_anchor);
             return true;
         }
-        if self.m.edit.ed_id == id {
+        if self.ed_is(id) {
             self.m.edit.ed_id = 0;
             self.m.edit.tb_ev |= EV_COMMIT;
             self.ime_off();
@@ -1689,8 +1740,8 @@ impl Ui {
         if e.ed_self {
             return k; // the text box itself asks
         }
-        if e.ed_id == 0 || e.ed_id != self.wp.ctx.focus {
-            return k;
+        if e.ed_id == 0 || e.ed_id != self.wp.ctx.focus || e.ed_win != self.uiw_cur {
+            return k; // (the box of the same id in another window holds it)
         }
         if self.frame.wrapping_sub(e.ed_seen) > 2 {
             return k; // the box is no longer drawn
@@ -2157,17 +2208,19 @@ impl Ui {
             flags |= TB_SIGNED;
         }
         // committed earlier in this frame by a box that took over the edit buffer
-        if self.m.edit.nb_pend == id {
+        if self.nb_pend_is(id) {
             self.m.edit.nb_pend = 0;
             deferred = self.m.edit.nb_pend_ev;
         }
         let view;
         // (multi-window) only the keyboard window edits
         if self.wp.ctx.focus == id && self.uiw_cur == self.m.win.active {
-            if self.m.edit.nb_id != id {
+            if !self.nb_is(id) {
                 self.nb_release(); // the previous owner commits its text
+                let w = self.uiw_cur;
                 let e = &mut self.m.edit;
                 e.nb_id = id;
+                e.nb_win = w;
                 e.nb_kind = 0;
                 e.nb_buf = nb_format(*v);
                 self.nb_sync(*v as u32 as u64); // (U2) the text as shown for v
@@ -2176,7 +2229,7 @@ impl Ui {
             self.m.edit.nb_seen = self.frame;
             self.nb_follow(*v as u32 as u64, 0); // (U2) v changed elsewhere, text not edited
             // Up / Down step the value while the editor is active
-            if self.m.edit.ed_id == id {
+            if self.ed_is(id) {
                 let n = self.nb_step_keys(); // +1 / -1 (arrows), +10 / -10 (pages)
                 if n != 0 {
                     let d = n.wrapping_mul(step);
@@ -2186,7 +2239,7 @@ impl Ui {
                 }
             }
             view = false;
-        } else if self.m.edit.nb_id == id {
+        } else if self.nb_is(id) {
             self.m.edit.nb_rg = *rg;
             view = false; // losing the focus: committed below
         } else {
@@ -2195,7 +2248,7 @@ impl Ui {
         }
         let ev = self.nb_core(id, flags, view);
         // Enter / focus loss: take the typed number (U2: only when the user edited the text)
-        if ev & EV_COMMIT != 0 && self.m.edit.nb_id == id {
+        if ev & EV_COMMIT != 0 && self.nb_is(id) {
             if self.nb_edited() {
                 let p = nb_parse_text(&self.m.edit.nb_buf, *v);
                 self.nb_store(p, v);
@@ -2245,18 +2298,20 @@ impl Ui {
         if 0.0 > rf.min {
             flags |= TB_SIGNED;
         }
-        if self.m.edit.nb_pend == id {
+        if self.nb_pend_is(id) {
             self.m.edit.nb_pend = 0;
             deferred = self.m.edit.nb_pend_ev;
         }
         let view;
         if self.wp.ctx.focus == id && self.uiw_cur == self.m.win.active {
             // only the keyboard window edits
-            if self.m.edit.nb_id != id {
+            if !self.nb_is(id) {
                 self.nb_release();
                 let t = self.nbf_format(*v, rf.dec);
+                let w = self.uiw_cur;
                 let e = &mut self.m.edit;
                 e.nb_id = id;
+                e.nb_win = w;
                 e.nb_kind = 1;
                 e.nb_buf = t;
                 self.nb_sync(v.to_bits()); // (U2)
@@ -2264,7 +2319,7 @@ impl Ui {
             self.m.edit.nb_rf = *rf;
             self.m.edit.nb_seen = self.frame;
             self.nb_follow(v.to_bits(), rf.dec); // (U2)
-            if self.m.edit.ed_id == id {
+            if self.ed_is(id) {
                 let n = self.nb_step_keys();
                 if n != 0 {
                     let x = self.nbf_parse(*v);
@@ -2278,7 +2333,7 @@ impl Ui {
                 }
             }
             view = false;
-        } else if self.m.edit.nb_id == id {
+        } else if self.nb_is(id) {
             self.m.edit.nb_rf = *rf;
             view = false; // losing the focus: committed below
         } else {
@@ -2287,7 +2342,7 @@ impl Ui {
             view = true;
         }
         let ev = self.nb_core(id, flags, view);
-        if ev & EV_COMMIT != 0 && self.m.edit.nb_id == id {
+        if ev & EV_COMMIT != 0 && self.nb_is(id) {
             if self.nb_edited() {
                 // (U2) only an edited text is taken
                 let x = self.nbf_parse(*v);
@@ -2314,10 +2369,10 @@ impl Ui {
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn nb_live(&mut self, id: u32, v: &mut i32) -> bool {
         let _src = self.src_scope();
-        let e = &self.m.edit;
-        if id == 0 || e.nb_id != id || e.ed_id != id || e.nb_kind != 0 {
+        if id == 0 || !self.nb_is(id) || !self.ed_is(id) || self.m.edit.nb_kind != 0 {
             return false;
         }
+        let e = &self.m.edit;
         let x = rg_clamp(nb_parse_text(&e.nb_buf, *v), &e.nb_rg); // (no digits: the value)
         if x == *v {
             return false;
@@ -2330,10 +2385,10 @@ impl Ui {
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn nb_live_f(&mut self, id: u32, v: &mut f64) -> bool {
         let _src = self.src_scope();
-        let e = &self.m.edit;
-        if id == 0 || e.nb_id != id || e.ed_id != id || e.nb_kind != 1 {
+        if id == 0 || !self.nb_is(id) || !self.ed_is(id) || self.m.edit.nb_kind != 1 {
             return false;
         }
+        let e = &self.m.edit;
         let Some(x) = parse_f64_sep(&e.nb_buf, self.m.value.decimal_sep) else { return false };
         let x = rf_fix(&e.nb_rf, x);
         if x.to_bits() == v.to_bits() {
@@ -2374,7 +2429,7 @@ impl Ui {
     // the caret after the new text (when the owner is the editor)
     fn nb_caret_end(&mut self) {
         let e = &mut self.m.edit;
-        if e.nb_id != 0 && e.ed_id == e.nb_id {
+        if e.nb_id != 0 && e.ed_id == e.nb_id && e.ed_win == e.nb_win {
             e.ed_caret = e.nb_buf.len();
             e.ed_anchor = e.nb_buf.len();
         }
@@ -2410,7 +2465,7 @@ impl Ui {
         self.m.edit.nb_buf = t;
         self.nb_sync(cur);
         let e = &mut self.m.edit;
-        if e.ed_id == e.nb_id {
+        if e.ed_id == e.nb_id && e.ed_win == e.nb_win {
             e.ed_caret = e.nb_buf.len();
             e.ed_anchor = e.nb_buf.len();
             if all {
@@ -2433,21 +2488,28 @@ impl Ui {
         if self.nb_edited() {
             // (U2) not edited: nothing is stored
             let e = &mut self.m.edit;
-            e.pend_text = Some((old, e.nb_kind, e.nb_buf.clone()));
+            e.pend_text = Some((e.nb_win, old, e.nb_kind, e.nb_buf.clone()));
             self.repass();
         }
         self.m.edit.nb_pend = old;
+        self.m.edit.nb_pend_win = self.m.edit.nb_win;
         self.m.edit.nb_pend_ev = EV_COMMIT;
+    }
+
+    // a box of the live window released the number box text earlier in this frame (nb_release)
+    fn nb_pend_is(&self, id: u32) -> bool {
+        let e = &self.m.edit;
+        e.nb_pend == id && e.nb_pend_win == self.uiw_cur
     }
 
     // (port) the store nb_release left for the box (its next call, before it reads v):
     // parse, clamp / fix, store; EV_ACT joins the pending events when the value changed
     fn nb_pend_store(&mut self, id: u32, vi: Option<&mut i32>, vf: Option<&mut f64>, rg: Option<&Range>, rf: Option<&RangeF>) {
         match &self.m.edit.pend_text {
-            Some((pid, _, _)) if *pid == id => {}
+            Some((w, pid, _, _)) if *pid == id && *w == self.uiw_cur => {}
             _ => return,
         }
-        let Some((_, kind, t)) = self.m.edit.pend_text.take() else { return };
+        let Some((_, _, kind, t)) = self.m.edit.pend_text.take() else { return };
         let changed = match (kind, vi, vf, rg, rf) {
             (0, Some(v), _, Some(rg), _) => {
                 let old = *v;
@@ -2462,7 +2524,7 @@ impl Ui {
             }
             _ => false,
         };
-        if changed && self.m.edit.nb_pend == id {
+        if changed && self.nb_pend_is(id) {
             self.m.edit.nb_pend_ev |= EV_ACT;
         }
     }
@@ -2477,18 +2539,21 @@ impl Ui {
     /// filter of app-level key(), textbox_selection / textbox_select and a screen reader's
     /// selection then work as for a text box; a text box that held the state commits.
     pub(crate) fn ed_hold(&mut self, id: u32, anchor: usize, caret: usize) {
+        let w = self.uiw_cur;
         let e = &mut self.m.edit;
-        if e.ed_id != id {
+        if e.ed_id != id || e.ed_win != w {
             if e.ed_id != 0 {
                 e.ed_blur = e.ed_id;
+                e.ed_blur_win = e.ed_win;
             }
             e.ed_id = id;
+            e.ed_win = w;
             e.ed_drag = false;
             self.ud_reset();
         }
         let frame = self.frame;
         let e = &mut self.m.edit;
-        if e.ed_blur == id {
+        if e.ed_blur == id && e.ed_blur_win == w {
             e.ed_blur = 0;
         }
         e.ed_anchor = anchor;
@@ -2501,7 +2566,7 @@ impl Ui {
     /// the editor lost the focus: it gives the edit state back (the IME and magnifiers lose
     /// its caret)
     pub(crate) fn ed_drop(&mut self, id: u32) {
-        if self.m.edit.ed_id == id {
+        if self.ed_is(id) {
             self.m.edit.ed_id = 0;
             self.ime_off();
         }

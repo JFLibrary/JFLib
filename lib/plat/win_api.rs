@@ -487,6 +487,12 @@ const VK_RMENU: i32 = 0xA5;
 
 // the cursor shapes CUR_ARROW .. CUR_NONE (0: hidden)
 static IDC_TABLE: [u16; CUR_COUNT as usize] = [32512, 32513, 32649, 32515, 32646, 32514, 32645, 32644, 32642, 32643, 0];
+// (E3) CUR_X0 .. CUR_X_END: the system's cursors where Windows has one (IDC_NO, IDC_HELP,
+// IDC_APPSTARTING, IDC_SIZE*); 0: cursor_fallback's shape
+static IDC_X: [u16; (crate::CUR_X_END - crate::CUR_X0) as usize] = [
+    32648, 32648, 32649, 32646, 32651, 32650, 0, 0, 0, 0, 0, 0, 0, 32646, 32644, 32645, 32645, 32645, 32644, 32644, 32643, 32642,
+    32642, 32643,
+];
 // edge bits (top 1, bottom 2, left 4, right 8) -> HT code
 static HT_EDGE: [u8; 16] = [1, 12, 15, 1, 10, 13, 16, 10, 11, 14, 17, 11, 1, 1, 1, 1];
 static W_CLASS: [u16; 6] = [0x4A, 0x46, 0x47, 0x55, 0x49, 0]; // "JFGUI"
@@ -1310,6 +1316,12 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             clip::ime_composition(hwnd,s.ev_win.get() as u8,lp as u32); def()
         }
         0x010E => { crate::ime_preedit_set(s.ev_win.get() as u8,"",0); def() } // WM_IME_ENDCOMPOSITION
+        0x0281 => {
+            // WM_IME_SETCONTEXT: (E4) no composition window while the app draws it (ime_inline)
+            let lp = clip::ime_setcontext_flags(wp != 0, lp);
+            // SAFETY: our window, the message with its (adjusted) flags.
+            unsafe { DefWindowProcW(hwnd, msg, wp, lp) }
+        }
         WM_CHAR => {
             let mut c = wp as u16 as u32;
             match c & 0xFC00 {
@@ -1693,8 +1705,29 @@ fn button(msg: u32, wp: usize) -> u8 {
 
 /// key event from wParam / lParam: VK (8 bits) | previous key state << 31  [push_key]
 fn push_key(typ: u8, wp: usize, lp: isize) {
-    let data = (wp as u32 & 0xFF) | (((lp as u32) >> 30) & 1) << 31;
-    win_push(typ, 0, 0, 0, data);
+    let vk = wp as u32 & 0xFF;
+    let data = vk | (((lp as u32) >> 30) & 1) << 31;
+    // (E2) the scan code (bits 16..23, extended: bit 24) and where the key sits
+    let sc = (lp as u32 >> 16) & 0xFF;
+    let ext = (lp as u32 >> 24) & 1 != 0;
+    let scan = if ext { 0xE000 | sc } else { sc };
+    win_push(typ, 0, scan as i32, key_location(vk, sc, ext) as i32, data);
+}
+
+/// (E2) the KL_* location of a key: the sides of Shift (scan code 0x36 right), Ctrl, Alt
+/// (extended right) and the Windows keys; the number block: VK_NUMPAD*, its operators, its Enter
+/// (extended Return) and its keys without Num Lock (navigation keys that are not extended)
+fn key_location(vk: u32, sc: u32, ext: bool) -> u32 {
+    match vk {
+        0x10 => if sc == 0x36 { crate::KL_RIGHT } else { crate::KL_LEFT },          // VK_SHIFT
+        0x11 | 0x12 => if ext { crate::KL_RIGHT } else { crate::KL_LEFT },          // VK_CONTROL, VK_MENU
+        0x5B => crate::KL_LEFT,                                                      // VK_LWIN
+        0x5C => crate::KL_RIGHT,                                                     // VK_RWIN
+        0x60..=0x6F => crate::KL_NUMPAD,                                             // VK_NUMPAD0 .. VK_DIVIDE
+        0x0D if ext => crate::KL_NUMPAD,                                             // the number block's Enter
+        0x0C | 0x21..=0x28 | 0x2D | 0x2E if !ext => crate::KL_NUMPAD,                // Clear, Page / End / Home / arrows, Ins, Del
+        _ => crate::KL_STANDARD,
+    }
 }
 
 /// wParam is a caption button hit code  [nc_is_button]
@@ -2273,7 +2306,7 @@ pub fn win_test_send(w: i32, msg: u32, wp: usize, lp: isize) -> isize {
 
 /// CUR_* shape while the pointer is over window w
 pub fn win_set_cursor(w: i32, shape: u32) {
-    if shape >= CUR_TABLE {
+    if shape >= CUR_TABLE && !(crate::CUR_X0..crate::CUR_X_END).contains(&shape) {
         return;
     }
     let Some(r) = rec(w) else { return };
@@ -2292,6 +2325,13 @@ pub fn win_set_cursor(w: i32, shape: u32) {
 fn cur_handle(shape: u32) -> isize {
     let c = &st().cursors;
     let arrow = c[CUR_ARROW as usize].get();
+    if (crate::CUR_X0..crate::CUR_X_END).contains(&shape) {
+        // (E3) a system cursor (shared, loaded once by the system), else the nearest shape
+        let idc = IDC_X[(shape - crate::CUR_X0) as usize];
+        // SAFETY: a system cursor id.
+        let h = if idc == 0 { 0 } else { unsafe { LoadCursorW(0, idc as usize) } };
+        return if h != 0 { h } else { c[crate::cursor_fallback(shape) as usize].get() };
+    }
     if shape >= CUR_TABLE {
         return arrow;
     }

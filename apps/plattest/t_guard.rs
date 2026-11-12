@@ -1,5 +1,5 @@
 // t_guard -- (plat-shared) plattest --test guard: the crash guard (plat::guard_*) without a
-// plugin: Win64 test functions of plat (sum, write to 0x10, ud2, int3, division by zero,
+// plugin: plugin-ABI test functions of plat (sum, write to 0x10, ud2, int3, division by zero,
 // stack overflow, a register clobber) under guard_call on this thread, nested guards and
 // tags, a fault of host code inside a guard (it goes to the enclosing guard), faults on the
 // pool's workers, a stack overflow on a thread of its own.
@@ -105,7 +105,7 @@ pub fn t_guard(t: &mut T) {
             "guard: int3 -> GK_BREAK");
     let k = tc(T_DIV0);
     let r = guard_call(k, 0, 0, 0, 0, Some(&mut gi));
-    t.check(r.0 == FAULT && gi.kind == GK_ARITH && gi.code == code::DIV0 && gi.pc == k as u64 + if cfg!(target_arch = "aarch64") { 40 } else { 9 },
+    t.check(r.0 == FAULT && gi.kind == GK_ARITH && gi.code == code::DIV0 && gi.pc == k as u64 + if cfg!(all(target_arch = "aarch64", windows)) { 20 } else if cfg!(target_arch = "aarch64") { 40 } else { 9 },
             "guard: division by zero -> GK_ARITH at the div");
     let r = guard_call(tc(T_SUM), 1, 1, 1, 1, Some(&mut gi));
     t.check(r == (10, 0) && gi.kind == 0, "guard: the next call after faults runs normally (info cleared)");

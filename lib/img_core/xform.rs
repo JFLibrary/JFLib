@@ -92,6 +92,7 @@ pub fn mul(a: &Matrix, b: &Matrix) -> Matrix {
 }
 
 /// the inverse of m; None when the determinant is 0 or not finite  [xf_invert]
+#[allow(clippy::eq_op)] // det - det is 0 for a finite determinant only
 pub fn invert(m: &Matrix) -> Option<Matrix> {
     let det = m.a * m.e - m.b * m.d;
     if !(det - det == 0.0) || det == 0.0 {
