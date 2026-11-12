@@ -352,7 +352,11 @@ title bar follows GNOME's settings like GTK (section 7, "Title bar").
 * Heavy or structural work (file I/O, opening dialogs, big edits) goes through
   `ui.cmd_run(cmd, arg)`; it reaches `App::command(ui, id, arg)` between frames, in the order
   queued (the queue grows as needed; only beyond 65536 waiting commands does it drop new ones,
-  with a `UIWARN`). Return `true` when you handled it. The library also delivers:
+  with a `UIWARN`). After the commands the frame is built again (up to three rounds of frame
+  and commands in one go; when the third round's commands changed something, the next frame
+  follows at once). Commands queued by every frame, or `ui.invalidate()` in every
+  `App::frame`, would ask for frames without end: after 8 such frames in a row without an event
+  they wait for the next event, with a `UIWARN`. Return `true` when you handled it. The library also delivers:
 
   | Id | When |
   |---|---|
@@ -1942,7 +1946,7 @@ in DIP):
 | `preedit "text" [CURSOR]` | an input method's composition (`ui.ime_preedit`; CURSOR a byte offset, default the end; `""` ends it) |
 | `focus S` | keyboard focus to a widget (focus ring shown) |
 | `cmd ID [ARG]` | run a command as if a menu row was chosen |
-| `wait MS` | advance the virtual clock (16 ms frames) |
+| `wait MS` | advance the virtual clock (16 ms frames; a frame the app or the library asked for comes with the next one, as in the window loop) |
 | `size W H`, `theme dark\|light\|contrast`, `scale P [window ID]` | window size, theme, dpi |
 | `theme file PATH`, `theme none`, `style NAME` | an app theme from a file (an error is printed and remembered, the theme stays), none, another linked style (§34) |
 | `expect theme "NAME"\|none`, `expect theme error "TEXT"\|none`, `expect style NAME` | the app theme, the error of the last `theme file` (contains TEXT), the style in use |

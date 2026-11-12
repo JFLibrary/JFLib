@@ -1918,7 +1918,9 @@ impl Ui {
                 self.cmd_run(UIC_TIMER, id);
                 fired = true;
             }
-            if self.animating || fired {
+            // a frame asked for (need) comes with the next step, as in the window loop
+            if self.animating || fired || self.need {
+                self.need = false;
                 self.run_passes(app);
             }
         }
