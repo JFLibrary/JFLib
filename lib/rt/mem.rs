@@ -313,7 +313,7 @@ unsafe impl GlobalAlloc for Alloc {
 
 // ---- memory intrinsics (no C runtime), per architecture: memcpy, memmove, memset and load8 here
 // for x86-64 (rep movsb / stosb, so the compiler cannot turn them back into calls to themselves),
-// in aarch64/mem.rs for ARM64; memcmp, bcmp and strlen below are the same for both
+// in aarch64/mem.rs for ARM64; memcmp, bcmp, strlen and wcslen below are the same for both
 #[cfg(target_arch = "aarch64")]
 #[path = "aarch64/mem.rs"]
 mod arch;
@@ -411,6 +411,25 @@ pub unsafe extern "C" fn strlen(s: *const core::ffi::c_char) -> usize {
     let s = s as *const u8;
     let mut n = 0;
     // SAFETY: the caller passes a NUL-terminated string; volatile reads keep the loop a loop.
+    while unsafe { s.add(n).read_volatile() } != 0 {
+        n += 1;
+    }
+    n
+}
+
+/// C's wchar_t: 16 bits on Windows, 32 bits on Linux
+#[cfg(windows)]
+type WChar = u16;
+#[cfg(not(windows))]
+type WChar = u32;
+
+/// LLVM 23 (Rust 1.99) turns a loop that counts wide characters up to the NUL into a call to
+/// wcslen, as it does with strlen (GetCommandLineW's length in plat::win::args): without std no C
+/// runtime brings it
+#[cfg_attr(not(feature = "std"), unsafe(no_mangle))]
+pub unsafe extern "C" fn wcslen(s: *const WChar) -> usize {
+    let mut n = 0;
+    // SAFETY: the caller passes a NUL-terminated wide string; volatile reads keep the loop a loop.
     while unsafe { s.add(n).read_volatile() } != 0 {
         n += 1;
     }

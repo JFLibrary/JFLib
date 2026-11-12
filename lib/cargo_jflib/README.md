@@ -33,8 +33,9 @@ below the SDK or `ANDROID_NDK_HOME`. The manifest comes from `PACKAGE` (`app_id`
 `package` builds the app with `--release` once per style (`JFLIB_STYLE`) for Windows and for
 Linux, both from any machine: the Linux program links without a Linux machine, the setup stub
 (the crate `jflib-installer`) and the AppImage runtime (`jflib-appimagert`, one static file) are
-built next to the app with its profiles and Cargo.lock, always with `panic = "abort"` (they are
-programs without std, also for an app with the feature `unwind`). The previews are screenshots of the
+built next to the app with its `[profile.release]` and Cargo.lock, always with `panic = "abort"` (they are
+programs without std, also for an app with the feature `unwind`); where the app has JFLib's crates
+from paths (an app in JFLib's workspace), the stubs take them from there too. The previews are screenshots of the
 program this machine runs (`--shot`).
 
 | Format | Made by | Needs |

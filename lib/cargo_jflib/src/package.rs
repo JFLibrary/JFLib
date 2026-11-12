@@ -187,26 +187,29 @@ fn profiles(root: &Path) -> String {
     stub_profiles(&fs::read_to_string(root.join("Cargo.toml")).unwrap_or_default())
 }
 
-/// the [profile.*] sections of an app's Cargo.toml for a stub: built like the app, so the crates
-/// compiled for it are taken again, but always with panic = "abort" -- the stubs are programs
-/// without std, while an app with jflib's feature unwind has panic = "unwind" (or none, Cargo's
-/// default): every profile of its own ([profile.NAME], not .package.X / .build-override) gets
-/// panic = "abort" in place of its panic line, and there is a [profile.release] (--release)
+/// the [profile.release] sections of an app's Cargo.toml for a stub: built with --release like the
+/// app, so the crates compiled for it are taken again ([profile.dev] and the others play no part,
+/// and a [profile.dev.package.X] of a crate the stub does not have was a warning of Cargo's), but
+/// always with panic = "abort" -- the stubs are programs without std, while an app with jflib's
+/// feature unwind has panic = "unwind" (or none, Cargo's default): [profile.release] (not
+/// .package.X / .build-override) gets panic = "abort" in place of its panic line, and there is one
 fn stub_profiles(text: &str) -> String {
     let mut out = String::new();
     let mut inside = false;
+    let mut any = false;
     let mut release = false;
     for line in text.lines() {
         let t = line.trim_start();
         if t.starts_with('[') {
-            inside = t.starts_with("[profile.");
+            let name = t.strip_prefix("[profile.").map(|r| r.split(']').next().unwrap_or("").trim());
+            any |= name.is_some();
+            inside = name.is_some_and(|n| n == "release" || n.starts_with("release."));
             if inside {
                 out += line;
                 out.push('\n');
-                let name = t["[profile.".len()..].split(']').next().unwrap_or("").trim();
-                if !name.contains('.') {
+                if name == Some("release") {
                     out += "panic = \"abort\"\n";
-                    release |= name == "release";
+                    release = true;
                 }
                 continue;
             }
@@ -218,7 +221,7 @@ fn stub_profiles(text: &str) -> String {
             out.push('\n');
         }
     }
-    if out.is_empty() {
+    if !any {
         out = "[profile.release]\npanic = \"abort\"\nopt-level = 2\ncodegen-units = 1\nlto = \"fat\"\ndebug = 0\nstrip = \"symbols\"\n".to_string();
     } else if !release {
         out += "[profile.release]\npanic = \"abort\"\n";
@@ -252,17 +255,30 @@ pub(crate) const SIGNER: Stub = Stub { name: "jflib-sign", deps: &["jflib-rt", "
                                        console: true, triple: if cfg!(windows) { WIN } else if cfg!(target_os = "macos") { crate::mac::TRIPLE } else { LINUX },
                                        linux_static: false };
 
+/// a stub's dependency on `name`: from the folder where the app's project has the crate from a path
+/// at `version` (an app in JFLib's workspace: the stub is built from the same sources, a version
+/// not published yet included), else from crates.io
+fn stub_dep(name: &str, version: &str, local: &BTreeMap<String, PathBuf>) -> String {
+    match local.get(name) {
+        Some(dir) => format!("{name} = {{ path = \"{}\", version = \"={version}\" }}\n", dir.display().to_string().replace('\\', "/")),
+        None => format!("{name} = \"={version}\"\n"),
+    }
+}
+
 /// a stub: its crates in a project of its own below the target folder, built like the app (its
-/// profiles, its Cargo.lock, its .cargo/config.toml) -> the program
+/// profiles, its Cargo.lock, its .cargo/config.toml, its crates from paths) -> the program
 pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, String> {
     let dir = p.target_dir.join("jflib-package").join(format!("{}-stub", s.name));
     let manifest = dir.join("Cargo.toml");
-    let deps: String = s.deps.iter().map(|d| format!("{d} = \"={version}\"\n")).collect();
+    let local: BTreeMap<String, PathBuf> = cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))?.into_iter()
+        .filter(|r| r.local && r.version == version && r.name.starts_with("jflib-")).map(|r| (r.name, r.dir)).collect();
+    let deps: String = s.deps.iter().map(|d| stub_dep(d, version, &local)).collect();
     write_changed(&manifest, format!(
         "# made by cargo jflib: {} ({})\n\
          [package]\nname = \"{}\"\nversion = \"{version}\"\nedition = \"2024\"\npublish = false\n\n\
-         [dependencies]\n{deps}\n[build-dependencies]\njflib-build = \"={version}\"\n\n{}\n\
-         # its own workspace, inside the app's folder or not\n[workspace]\n", s.name, s.deps.join(", "), s.name, profiles(&p.workspace_root)).as_bytes())?;
+         [dependencies]\n{deps}\n[build-dependencies]\n{}\n{}\n\
+         # its own workspace, inside the app's folder or not\n[workspace]\n", s.name, s.deps.join(", "), s.name,
+        stub_dep("jflib-build", version, &local), profiles(&p.workspace_root)).as_bytes())?;
     write_changed(&dir.join("build.rs"), format!("fn main() {{\n    jflib_build::{}();\n}}\n", if s.console { "console" } else { "app" }).as_bytes())?;
     write_changed(&dir.join("src/main.rs"), s.source.as_bytes())?;
     // the versions the app was built with, on every run: the crates compiled for it are taken
@@ -752,15 +768,27 @@ mod tests {
         let app = "[package]\nname = \"narsil\"\n\n[profile.dev]\npanic = \"unwind\"\nopt-level = 1\n\n\
                    [profile.dev.package.narsil-net]\nopt-level = 3\n\n[profile.release]\nlto = \"fat\"\npanic=\"unwind\" # catch_unwind\n\n\
                    [profile.dev.build-override]\nopt-level = 2\n\n[dependencies]\npanic = \"x\"\n";
-        assert_eq!(stub_profiles(app), "[profile.dev]\npanic = \"abort\"\nopt-level = 1\n\n\
-                                        [profile.dev.package.narsil-net]\nopt-level = 3\n\n[profile.release]\npanic = \"abort\"\nlto = \"fat\"\n\n\
-                                        [profile.dev.build-override]\nopt-level = 2\n\n");
+        assert_eq!(stub_profiles(app), "[profile.release]\npanic = \"abort\"\nlto = \"fat\"\n\n");
+        // [profile.release.*] stays as it is (Cargo allows no panic there), the dev profile's
+        // crates (JFLib's workspace names some the stubs do not have) go
+        assert_eq!(stub_profiles("[profile.dev.package.jflib-cas]\nopt-level = 2\n\n[profile.release]\nlto = true\n\n\
+                                  [profile.release.package.\"*\"]\nopt-level = 3\n\n[profile.release.build-override]\nopt-level = 0\n"),
+                   "[profile.release]\npanic = \"abort\"\nlto = true\n\n[profile.release.package.\"*\"]\nopt-level = 3\n\n\
+                    [profile.release.build-override]\nopt-level = 0\n");
         // no panic at all (Cargo's default unwind) and no [profile.release]: one with abort
-        assert_eq!(stub_profiles("[profile.dev]\nopt-level = 1\n"), "[profile.dev]\npanic = \"abort\"\nopt-level = 1\n[profile.release]\npanic = \"abort\"\n");
+        assert_eq!(stub_profiles("[profile.dev]\nopt-level = 1\n"), "[profile.release]\npanic = \"abort\"\n");
         // no profiles: the release profile of the template
         assert!(stub_profiles("[package]\nname = \"x\"\n").starts_with("[profile.release]\npanic = \"abort\"\n"));
         // a key that only starts with panic stays
         assert!(stub_profiles("[profile.release]\npanicky = 1\n").contains("panicky = 1\n"));
+    }
+
+    // a stub's crates from the folders where the app has them from paths (JFLib's workspace), else from crates.io
+    #[test]
+    fn stub_dep_path() {
+        let local: BTreeMap<String, PathBuf> = [("jflib-installer".to_string(), PathBuf::from(r"C:\src\JFLib\lib\installer"))].into();
+        assert_eq!(stub_dep("jflib-installer", "0.1.0", &local), "jflib-installer = { path = \"C:/src/JFLib/lib/installer\", version = \"=0.1.0\" }\n");
+        assert_eq!(stub_dep("jflib-build", "0.1.0", &local), "jflib-build = \"=0.1.0\"\n");
     }
 
     #[test]

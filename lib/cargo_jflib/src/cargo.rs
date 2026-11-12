@@ -94,6 +94,8 @@ pub(crate) struct Resolved {
     pub dir: PathBuf,
     /// (E15) a style of the app's own: `[package.metadata.jflib] style = "NAME"` in its Cargo.toml
     pub style: Option<String>,
+    /// from a path, not from a registry or git (cargo metadata: no source)
+    pub local: bool,
 }
 
 /// (E15) one package of `cargo metadata`'s JSON
@@ -105,6 +107,7 @@ pub(crate) fn resolved(p: &Value) -> Resolved {
         version: p.s("version").to_string(),
         dir: Path::new(p.s("manifest_path")).parent().map(Path::to_path_buf).unwrap_or_default(),
         style,
+        local: p.s("source").is_empty(),
     }
 }
 
