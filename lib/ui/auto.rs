@@ -89,7 +89,9 @@
 //                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...;
 //                       background / foreground: a hidden tab, Android's onStop / onStart)
 //   system browser default|other|unknown   (E13) what ui.default_browser answers from here (a
-//                       headless run never asks the system; at first other)
+//                       headless run never asks the system; at first other), then the app
+//                       loses the keyboard (when it had it) and gets it back, as after the
+//                       system's settings: UIC_ACTIVE 0 and 1 (only 1 when it was not active)
 //   system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
 //                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
 //   system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
@@ -1312,6 +1314,22 @@ impl Ui {
                 return;
             };
             super::assoc::browser_script_set(s);
+            // the user chose in the system's settings and came back: the app loses the keyboard
+            // (when it had it) and gets it again, UIC_ACTIVE 0 and 1 -- an app that keeps the
+            // status (GUIDE section 21) asks again, as after a real change
+            let had = self.app_focus;
+            let back = if had != 0 { had.trailing_zeros() } else { self.sc.sc_win };
+            let mut f = had;
+            while f != 0 {
+                let w = f.trailing_zeros();
+                f &= f - 1;
+                self.push_window_event(plat::E_FOCUS_OUT, w);
+            }
+            if had != 0 {
+                self.process_events(app);
+            }
+            self.push_window_event(plat::E_FOCUS_IN, back);
+            self.process_events(app);
             self.run_passes(app);
             return;
         }
@@ -1380,6 +1398,12 @@ impl Ui {
             return;
         };
         self.inject(app, typ, 0, 0, 0, data);
+    }
+
+    // queue an event of window w without a position (focus in / out), processed by the caller
+    fn push_window_event(&mut self, typ: u8, w: u32) {
+        let ev = Event { typ, btn: 0, mods: self.sc.script_mods as u8, win: (w & (WIN_MAX as u32 - 1)) as u8, x: 0, y: 0, data: 0 };
+        plat::evq_push(ev);
     }
 
     fn inject(&mut self, app: &mut dyn App, typ: u8, btn: u32, x: i32, y: i32, data: u32) {

@@ -22,7 +22,8 @@
 //
 // (E13) A web browser (PACKAGE browser=1):
 //   ui.default_browser() -> BrowserStatus   plat::default_browser_status; headless runs: what the
-//                         script said (`system browser default|other|unknown`, at first other)
+//                         script said (`system browser default|other|unknown`, at first other;
+//                         the command then sends UIC_ACTIVE 0 and 1 as a real change would)
 //   ui.default_browser_request() -> Result<(), AssocError>   plat::default_browser_request (the
 //                         system's page or question); headless runs open nothing: they print
 //                         "ui_default_browser_request" and answer Ok
@@ -53,9 +54,10 @@ pub(crate) fn browser_script_set(s: BrowserStatus) {
 
 impl Ui {
     /// (PACKAGE browser=1) is this app the system's web browser (plat::default_browser_status:
-    /// Default, NotDefault, Unknown).  Ask again when the window is active again (UIC_ACTIVE):
-    /// the user may have chosen in the system's settings.  Headless runs answer what the script
-    /// said (`system browser default|other|unknown`, at first NotDefault)
+    /// Default, NotDefault, Unknown).  Keep the answer and ask again when the app is active
+    /// again (UIC_ACTIVE 1): the user may have chosen in the system's settings.  Headless runs
+    /// answer what the script said (`system browser default|other|unknown`, at first
+    /// NotDefault; the command is followed by UIC_ACTIVE 0 and 1, as a real change would be)
     pub fn default_browser(&self) -> BrowserStatus {
         if self.headless {
             return match HEADLESS_BROWSER.load(Ordering::Relaxed) {

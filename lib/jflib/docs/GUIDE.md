@@ -1982,7 +1982,7 @@ in DIP):
 | `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
 | `system focus in\|out`, `system suspend\|resume`, `system background\|foreground`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|other\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...; background / foreground: a hidden tab, Android's `onStop` / `onStart`) |
-| `system browser default\|other\|unknown` | (E13) what `ui.default_browser()` answers from here (headless runs never ask the system; at first `other`, section 21) |
+| `system browser default\|other\|unknown` | (E13) what `ui.default_browser()` answers from here (headless runs never ask the system; at first `other`, section 21); then the app loses the keyboard and gets it back as after the system's settings (`UIC_ACTIVE` 0 and 1; only 1 when it was not active), so an app that keeps the status reads it again |
 | `system env NAME VALUE\|-` | set (`-` removes) a `jfgui_*` environment variable of the run: the overrides of the system settings (then `system settings ...`), `jfgui_CSD` (the library title bar and its resize band from the next pass), `jfgui_FONT_FALLBACK 1` (system fonts for missing characters from here, section 11) |
 | `sensor accel\|gravity\|gyro\|magnet X Y Z [ACCURACY]`, `sensor rot X Y Z W [abs\|rel]`, `sensor none NAME\|all`, `sensor expect NAME off\|waiting\|running\|paused\|denied\|unavailable` | a reading of `plat::sensors` as the host would deliver it (the sensor exists from now on; a stopped one delivers nothing), a sensor gone, its state (§36) |
 | `location LAT LON [ACC ALT SPEED BEARING]` (`-`: the provider does not say), `location age MS`, `location searching\|denied\|off\|none`, `location expect off\|searching\|fix\|paused\|denied\|disabled\|unavailable` | a fix of `plat::sensors`, how old it is, the host's answer (`off`: the system's switch; `none`: no location service, as at the start), the state (§36) |
@@ -3340,19 +3340,28 @@ setup, the packages and `--register` register it as a web browser; becoming the 
 user's choice, which the app offers on its settings page:
 
 ```rust
+// the app keeps the answer: browser: Option<BrowserStatus> (None: ask again)
 // the settings page
-match ui.default_browser() {                            // plat::default_browser_status()
+let status = *self.browser.get_or_insert_with(|| ui.default_browser()); // plat::default_browser_status()
+match status {
     BrowserStatus::Default => ui.text(TS_BODY, "Narsil ist der Standardbrowser."),
     _ => {
         if ui.button(ID_DEFAULT, "Als Standardbrowser festlegen") & EV_ACT != 0 {
-            if let Err(e) = ui.default_browser_request() { // plat::default_browser_request()
-                self.note = format!("{e}");                // NotRegistered: --register first
+            match ui.default_browser_request() {      // plat::default_browser_request()
+                Ok(()) => self.browser = None,        // Linux sets it at once: ask again
+                Err(e) => self.note = format!("{e}"), // NotRegistered: --register first
             }
         }
     }
 }
-// in command(): UIC_ACTIVE => ui.invalidate(),         // back from the system's settings: ask again
+// in command(): back from the system's settings (Windows and macOS ask the user there)
+UIC_ACTIVE if arg != 0 => self.browser = None,       // ask again in the next frame
 ```
+
+* Keep the answer instead of asking every frame (the status reads the registry or the
+  `mimeapps.list` files) and ask again when the app is active again (`UIC_ACTIVE` with 1): the
+  user chooses in the system's settings, outside the app. In a script, `system browser
+  default|other|unknown` sends that round trip itself.
 
 * Windows: the request opens Settings at the app's page of the default apps (Windows 10 and later
   let no program take the default itself; the user picks there); the status is the user's choice

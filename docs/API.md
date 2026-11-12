@@ -4237,7 +4237,9 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...;
                       background / foreground: a hidden tab, Android's onStop / onStart)
   system browser default|other|unknown   (E13) what ui.default_browser answers from here (a
-                      headless run never asks the system; at first other)
+                      headless run never asks the system; at first other), then the app
+                      loses the keyboard (when it had it) and gets it back, as after the
+                      system's settings: UIC_ACTIVE 0 and 1 (only 1 when it was not active)
   system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
   system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
@@ -6740,7 +6742,8 @@ the program: exit code 0 done, 1 failed, 2 not possible here or nothing declared
 
 (E13) A web browser (PACKAGE browser=1):
   ui.default_browser() -> BrowserStatus   plat::default_browser_status; headless runs: what the
-                        script said (`system browser default|other|unknown`, at first other)
+                        script said (`system browser default|other|unknown`, at first other;
+                        the command then sends UIC_ACTIVE 0 and 1 as a real change would)
   ui.default_browser_request() -> Result<(), AssocError>   plat::default_browser_request (the
                         system's page or question); headless runs open nothing: they print
                         "ui_default_browser_request" and answer Ok
@@ -6750,9 +6753,10 @@ the program: exit code 0 done, 1 failed, 2 not possible here or nothing declared
 
 - **`fn default_browser(&self) -> BrowserStatus`**
   (PACKAGE browser=1) is this app the system's web browser (plat::default_browser_status:
-  Default, NotDefault, Unknown).  Ask again when the window is active again (UIC_ACTIVE):
-  the user may have chosen in the system's settings.  Headless runs answer what the script
-  said (`system browser default|other|unknown`, at first NotDefault)
+  Default, NotDefault, Unknown).  Keep the answer and ask again when the app is active
+  again (UIC_ACTIVE 1): the user may have chosen in the system's settings.  Headless runs
+  answer what the script said (`system browser default|other|unknown`, at first
+  NotDefault; the command is followed by UIC_ACTIVE 0 and 1, as a real change would be)
 - **`fn default_browser_request(&mut self) -> Result<(), AssocError>`**
   (PACKAGE browser=1) let the user make this app the web browser, from the user's click
   (plat::default_browser_request: Windows' Settings at the app's page of the default apps,
