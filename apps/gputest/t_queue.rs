@@ -267,10 +267,10 @@ fn with_queue(t: &mut T, dev: &Device, cq: &ComputeQueue) -> Option<()> {
         e.push_constants(0, &[1u32 << 18, 1]);
         e.dispatch(1 << 12, 1, 1);
         e.dispatch(1 << 12, 1, 1); // no barrier: write after write, in the shader
+        t.provoked(e0, "a missing barrier between two dispatches on the compute queue");
         let cmd = t.res(e.finish(), "finish")?;
         let id = t.res(cq.submit([cmd]), "compute submit")?;
         t.res(dev.wait(id, 10_000_000_000), "wait")?;
-        t.provoked(e0, "a missing barrier between two dispatches on the compute queue");
     }
     let (sbgl, spin) = pipeline(t, dev, SRC, "spin", &[BindingKind::StorageBuffer], 8)?;
     let n = 1u32 << 20;

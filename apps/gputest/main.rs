@@ -155,7 +155,10 @@ impl T {
         gpu::validation_messages().0
     }
 
-    /// after it: exactly one error came and counts as provoked; any other in between fails here and at the end
+    /// right after recording it, before the submission: exactly one error came and counts as provoked.  The layer
+    /// reports a hazard inside a command buffer while it is recorded (vkCmd*), one between submissions at
+    /// vkQueueSubmit: those are never provoked and fail at the end (a layer that misses the hazard but reports one
+    /// at the submission does not pass by chance); another one in between fails here and at the end
     pub fn provoked(&mut self, e0: u32, what: &str) {
         let n = gpu::validation_messages().0 - e0;
         self.expected += n.min(1);
@@ -494,8 +497,8 @@ fn syncval(t: &mut T) {
     let Some(mut e) = t.res(dev.encoder(), "encoder") else { return };
     e.copy_buffer(&src, 0, &dst, 0, 1024);
     e.fill_buffer(&dst, 0, 1024, 7); // no barrier: write after write
-    run_wait(t, dev, e.finish(), "hazard");
     t.provoked(e0, "a missing barrier");
+    run_wait(t, dev, e.finish(), "hazard");
     // the same between two dispatches: only what the shaders access through their bindings shows it
     let Some(fp) = t_compute::Fill::new(t, dev) else { return };
     let Some(bg) = fp.group(t, dev, &dst) else { return };
@@ -506,8 +509,8 @@ fn syncval(t: &mut T) {
     e.push_constants(0, &[256u32, 1, 0]);
     e.dispatch(4, 1, 1);
     e.dispatch(4, 1, 1); // no barrier: write after write, in the shader
-    run_wait(t, dev, e.finish(), "hazard between shaders");
     t.provoked(e1, "a missing barrier between two shaders");
+    run_wait(t, dev, e.finish(), "hazard between shaders");
 }
 
 fn run() -> i32 {
