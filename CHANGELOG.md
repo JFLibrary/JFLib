@@ -127,6 +127,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** The library's own folder dialog (FD_FOLDER; headless runs, jfgui_FILEDLG=builtin) sets ui.filedlg_paths() to the chosen folder; it still held the files of the dialog before, and the folder was not granted to the app as the user's (fs.user); viewtest tests/folder.uis
 - **ui:** Text and number boxes of the same id in two windows no longer share their edit state: caret, selection and undo of the focused box are keyed by window and id (the inactive window's box dropped them every pass, so typing there reset the caret or replaced a keyboard selection); viewtest tests/twowin.uis
 - **ui:** ui::test_main!, ui::main! and rt's macros expand without #[allow(unsafe_code)]: a crate with #![forbid(unsafe_code)] (a style crate's unit tests, an app) uses them (it was error E0453; the unsafe_code lint does not look into another crate's macros); crates_accept's hallo3 forbids unsafe code and runs a unit test through ui::test_main!
+- **build:** cargo jflib package builds its stubs (the setup's installer, the AppImage runtime, the signer) with panic = "abort" whatever the app's profiles say: the setup of an app with jflib's feature unwind and panic = "unwind" failed ("JFLib needs panic = abort"); crates_accept packages hallo3 with unwind as a setup
 
 ## [0.1.0] - 2026-11-08
 

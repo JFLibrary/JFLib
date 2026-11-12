@@ -184,21 +184,44 @@ fn preview(exe: &Path, work: &Path, style: &str) -> Result<Vec<u8>, String> {
 
 /// the [profile.*] sections of the workspace's Cargo.toml (a stub is built like the app)
 fn profiles(root: &Path) -> String {
-    let text = fs::read_to_string(root.join("Cargo.toml")).unwrap_or_default();
+    stub_profiles(&fs::read_to_string(root.join("Cargo.toml")).unwrap_or_default())
+}
+
+/// the [profile.*] sections of an app's Cargo.toml for a stub: built like the app, so the crates
+/// compiled for it are taken again, but always with panic = "abort" -- the stubs are programs
+/// without std, while an app with jflib's feature unwind has panic = "unwind" (or none, Cargo's
+/// default): every profile of its own ([profile.NAME], not .package.X / .build-override) gets
+/// panic = "abort" in place of its panic line, and there is a [profile.release] (--release)
+fn stub_profiles(text: &str) -> String {
     let mut out = String::new();
     let mut inside = false;
+    let mut release = false;
     for line in text.lines() {
         let t = line.trim_start();
         if t.starts_with('[') {
             inside = t.starts_with("[profile.");
+            if inside {
+                out += line;
+                out.push('\n');
+                let name = t["[profile.".len()..].split(']').next().unwrap_or("").trim();
+                if !name.contains('.') {
+                    out += "panic = \"abort\"\n";
+                    release |= name == "release";
+                }
+                continue;
+            }
         }
-        if inside {
+        // the app's own panic line (the stub's is above)
+        let panic_key = t.strip_prefix("panic").is_some_and(|r| r.trim_start().starts_with('='));
+        if inside && !panic_key {
             out += line;
             out.push('\n');
         }
     }
     if out.is_empty() {
         out = "[profile.release]\npanic = \"abort\"\nopt-level = 2\ncodegen-units = 1\nlto = \"fat\"\ndebug = 0\nstrip = \"symbols\"\n".to_string();
+    } else if !release {
+        out += "[profile.release]\npanic = \"abort\"\n";
     }
     out
 }
@@ -258,6 +281,8 @@ pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, Stri
     }
     let mut cmd = cargo::command();
     cmd.current_dir(&p.package.dir).arg("build").arg("--release").args(["--target", s.triple]).arg("--manifest-path").arg(&manifest);
+    // panic = "abort" also over a [profile.release] of the app's .cargo/config.toml (stub_profiles)
+    cmd.env("CARGO_PROFILE_RELEASE_PANIC", "abort");
     if s.triple == crate::mac::TRIPLE {
         cmd.env("MACOSX_DEPLOYMENT_TARGET", crate::mac::MAC_MIN);
     }
@@ -719,6 +744,23 @@ mod tests {
         assert!(styles_check(&names(&["winui", "kde"]), &own).unwrap().is_empty());
         let e = styles_check(&names(&["other"]), &own).unwrap_err();
         assert!(e.contains("winui, classic, kde, macos, netlab, narsil") && e.contains("style = \"other\""), "{e}");
+    }
+
+    // the stubs are built with panic = "abort" whatever the app's profiles say (feature unwind)
+    #[test]
+    fn stub_profiles_abort() {
+        let app = "[package]\nname = \"narsil\"\n\n[profile.dev]\npanic = \"unwind\"\nopt-level = 1\n\n\
+                   [profile.dev.package.narsil-net]\nopt-level = 3\n\n[profile.release]\nlto = \"fat\"\npanic=\"unwind\" # catch_unwind\n\n\
+                   [profile.dev.build-override]\nopt-level = 2\n\n[dependencies]\npanic = \"x\"\n";
+        assert_eq!(stub_profiles(app), "[profile.dev]\npanic = \"abort\"\nopt-level = 1\n\n\
+                                        [profile.dev.package.narsil-net]\nopt-level = 3\n\n[profile.release]\npanic = \"abort\"\nlto = \"fat\"\n\n\
+                                        [profile.dev.build-override]\nopt-level = 2\n\n");
+        // no panic at all (Cargo's default unwind) and no [profile.release]: one with abort
+        assert_eq!(stub_profiles("[profile.dev]\nopt-level = 1\n"), "[profile.dev]\npanic = \"abort\"\nopt-level = 1\n[profile.release]\npanic = \"abort\"\n");
+        // no profiles: the release profile of the template
+        assert!(stub_profiles("[package]\nname = \"x\"\n").starts_with("[profile.release]\npanic = \"abort\"\n"));
+        // a key that only starts with panic stays
+        assert!(stub_profiles("[profile.release]\npanicky = 1\n").contains("panicky = 1\n"));
     }
 
     #[test]
