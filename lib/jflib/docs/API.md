@@ -5601,8 +5601,9 @@ WF_TOUCH_HOLD: u32 = 512  // a finger moves it by the title bar only after resti
 /// (E7) an independent app window (a browser's second or private window): a top-level window of
 /// its own on Windows (its own taskbar button, not minimized or hidden with the main window),
 /// without the library's title bar -- the app draws one with titlebar_begin / titlebar_end
-/// (its own widgets in it, the caption buttons at its end); X11, Wayland and macOS give it an
-/// owned window for now
+/// (its own widgets in it, the caption buttons at its end); X11 and Wayland too (a top-level
+/// window without WM_TRANSIENT_FOR / an xdg_toplevel without a parent); macOS gives it an owned
+/// window for now
 WF_APP: u32 = 1024
 UWS_OPEN: u32 = 1
 UWS_VISIBLE: u32 = 2

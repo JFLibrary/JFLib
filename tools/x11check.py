@@ -54,8 +54,12 @@ real mouse and keyboard stay untouched), captures it and measures idle CPU time.
       edge beside the buttons resizes, the top row of the maximize button maximizes and
       restores, the corner pixel of the close button ends the app; the style's layout and
       GNOME's close,minimize,maximize: (jfgui_BUTTON_LAYOUT)
+  python tools/x11check.py appwin [--backend x11|wayland] [--exe build/linux/viewtest]
+      (E7) an independent app window (WF_APP, viewtest --app-window): a top-level window of
+      its own -- X11: no WM_TRANSIENT_FOR, type NORMAL, not SKIP_TASKBAR; Wayland: no
+      xdg_toplevel.set_parent; its own RAIL window; no input, the run ends by itself
   python tools/x11check.py all [--bindir build/linux] [--out-dir build]
-      every check on X11, kritzel + keys + grab + windows + popups + edges + csd on Wayland
+      every check on X11, kritzel + keys + grab + windows + popups + edges + csd + appwin on Wayland
 
 WSLg shows undecorated X11 windows with a 32 px transparent margin (Weston XWM
 shadow); the margin is measured from the capture.  Exit code 0 = all checks passed.
@@ -1693,13 +1697,51 @@ def check_edges(a):
         app.kill()
 
 
+def check_appwin(a):
+    """(E7) WF_APP on X11 / Wayland: viewtest --app-window opens its app window "Privates Fenster"
+    at the start (no input): a top-level window of its own next to the main window -- X11: no
+    WM_TRANSIENT_FOR, type NORMAL, not SKIP_TASKBAR; Wayland: no xdg_toplevel.set_parent in the
+    jfgui_WLDEBUG trace; both: a RAIL window of its own.  The run ends by itself (--auto-close)."""
+    backend = a.backend
+    print(f"--- app window (WF_APP) on {backend}")
+    exe = a.exe if a.exe and "viewtest" in a.exe else a.bindir + "/viewtest"
+    env = {"jfgui_WLDEBUG": "1"} if backend == "wayland" else {}
+    old = {w[0] for w in wslcap.windows_with_title("Privates Fenster")}
+    app = App(exe, ["--app-window", "--auto-close", "8000"], backend, "Ansichtstest", env, log=f"build/x11check_appwin_{backend}.log")
+    hwnd = app.window()
+    if not check(hwnd is not None, f"{backend}: the main window appears"):
+        app.kill()
+        return
+    second = rail_by_title("Privates Fenster", old)
+    check(second is not None and second != hwnd, f"{backend}: the app window is a RAIL window of its own")
+    avoid_cursor(hwnd, "Ansichtstest", backend)          # (no input is sent; X11 moves them away)
+    if second:
+        avoid_cursor(second, "Privates Fenster", backend)
+    if backend == "x11":
+        p = xprops("Ansichtstest", "Privates Fenster")
+        m, t = p.get("Ansichtstest"), p.get("Privates Fenster")
+        check(bool(m and t), "x11: both windows found", str(list(p)))
+        if m and t:
+            check(t["transient_for"] == [], "x11: the app window has no WM_TRANSIENT_FOR", str(t["transient_for"]))
+            check(t["type"] == ["_NET_WM_WINDOW_TYPE_NORMAL"], "x11: _NET_WM_WINDOW_TYPE_NORMAL", str(t["type"]))
+            check("_NET_WM_STATE_SKIP_TASKBAR" not in t["state"], "x11: not SKIP_TASKBAR", str(t["state"]))
+    if app.wait(20) is None:
+        app.kill()
+    if backend == "wayland":
+        out = app.output()
+        sp = [ln for ln in out.splitlines() if "set_parent" in ln]
+        check(not sp, "wayland: no xdg_toplevel.set_parent (two toplevels)", sp[0].strip()[:100] if sp else "")
+        tops = [ln for ln in out.splitlines() if "get_toplevel" in ln]
+        check(len(tops) >= 2, "wayland: two xdg_toplevels", f"{len(tops)} get_toplevel")
+
+
 def main():
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["kritzel", "keys", "clip", "present", "grab", "dpi", "conn", "windows", "popups", "edges", "csd", "all"])
+    ap.add_argument("what", choices=["kritzel", "keys", "clip", "present", "grab", "dpi", "conn", "windows", "popups", "edges", "csd", "appwin", "all"])
     ap.add_argument("--backend", default="x11", choices=["x11", "wayland"])
     ap.add_argument("--exe", help="the app of a single check")
     ap.add_argument("--bindir", default="build/linux", help="where Kritzel / linuxtest are (default build/linux)")
@@ -1728,6 +1770,8 @@ def main():
         check_edges(a)
     if a.what in ("csd", "all"):
         check_csd(a)
+    if a.what in ("appwin", "all"):
+        check_appwin(a)
     if a.what == "all":
         a.backend = "wayland"
         check_kritzel(a)
@@ -1737,6 +1781,7 @@ def main():
         check_popups(a)
         check_edges(a)
         check_csd(a)
+        check_appwin(a)
     print(f"x11check: {len(FAILS)} failure(s)")
     return 1 if FAILS else 0
 

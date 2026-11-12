@@ -3,7 +3,9 @@
 //
 //   connect_main() -> bool          jfgui_SCALE, the connection, our atoms, the DPI
 //   win_create(title, w_dip, h_dip, flags, owner, x, y) -> index / -1
-//        owner -1: the main window; else a window owned by `owner`: WM_TRANSIENT_FOR,
+//        owner -1: the main window; after it (E7) another top-level window (WF_APP): type
+//        NORMAL, no WM_TRANSIENT_FOR, in the main window's group.  Else a window owned by
+//        `owner`: WM_TRANSIENT_FOR,
 //        _NET_WM_WINDOW_TYPE_UTILITY (PWF_TOOL; DIALOG under Weston's XWM, which never
 //        shows UTILITY windows) or _DIALOG, _NET_WM_STATE {SKIP_TASKBAR, SKIP_PAGER,
 //        (MODAL)}, WM_NORMAL_HINTS (USPosition | PPosition | PMinSize, PMaxSize when not
@@ -131,10 +133,19 @@ impl X11 {
     pub(super) fn win_create(&mut self, title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x: i32, y: i32) -> i32 {
         let idx: usize;
         if owner == PW_NOOWNER {
-            if self.xw[0].win != 0 || self.fd < 0 {
+            if self.fd < 0 {
                 return -1;
             }
-            idx = 0;
+            if self.xw[0].win == 0 {
+                idx = 0;
+            } else {
+                // (E7) a second top-level window of the app (WF_APP): a record of its own
+                // without an owner -- no WM_TRANSIENT_FOR, not hidden with the main window
+                match (1..PW_MAX).find(|&i| self.xw[i].flags & XWF_USED == 0) {
+                    Some(i) => idx = i,
+                    None => return -1,
+                }
+            }
         } else {
             if self.xw[0].win == 0 || self.rec(owner).is_none() {
                 return -1; // no connection / no owner
@@ -253,7 +264,7 @@ impl X11 {
             }
         }
         self.change_prop32(win, self.atoms[A_NET_WM_WINDOW_TYPE], XA_ATOM, &[typ]);
-        if idx != 0 {
+        if owner != PW_NOOWNER {
             // owned: WM_TRANSIENT_FOR, _NET_WM_STATE
             let ow = self.xw[owner as usize].win;
             self.change_prop32(win, XA_WM_TRANSIENT_FOR, XA_WINDOW, &[ow]);
