@@ -2103,6 +2103,11 @@ fn norm(path: &str, win: bool, glob: bool, cwd: &dyn Fn() -> String) -> Option<S
         return None;
     }
     if !win {
+        // the browser's and Android's file stores take '\' for a separator as well (path() in
+        // web_files.rs and android_files.rs): a rule must see the folders they open, else
+        // "/allowed/..\secret" would pass as a name inside /allowed and open /secret
+        #[cfg(any(target_arch = "wasm32", target_os = "android"))]
+        let path = &path.replace('\\', "/");
         let full = if path.starts_with('/') {
             String::from(path)
         } else {

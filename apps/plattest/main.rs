@@ -797,6 +797,36 @@ fn th_jobs(t: &mut T) {
     }
     t.check(NEST.load(SeqCst) == NJ_ROUNDS * NJ_LOOPS * NJ_ITEMS as u64,
             "jobs: nested loops inside a background job while the owner waits");
+    // one job shared by several threads that all start and wait on it: each successful start
+    // runs the items exactly once (two starts must never both reset and queue the record)
+    static RACE_ITEMS: AtomicU64 = AtomicU64::new(0);
+    static RACE_STARTS: AtomicU64 = AtomicU64::new(0);
+    RACE_ITEMS.store(0, SeqCst);
+    RACE_STARTS.store(0, SeqCst);
+    let mut shared = Job::new();
+    shared.set(32, |_, _| {
+        RACE_ITEMS.fetch_add(1, SeqCst);
+    });
+    let shared = Arc::new(shared);
+    let mut hs = Vec::new();
+    for _ in 0..4 {
+        let job = shared.clone();
+        hs.push(plat::thread_spawn(0, Box::new(move || {
+            for _ in 0..300 {
+                if job.start() {
+                    RACE_STARTS.fetch_add(1, SeqCst);
+                }
+                let _ = job.wait();
+            }
+        })));
+    }
+    for h in hs.into_iter().flatten() {
+        h.join();
+    }
+    let (items, starts) = (RACE_ITEMS.load(SeqCst), RACE_STARTS.load(SeqCst));
+    t.check(starts > 0 && items == starts * 32 && shared.done(),
+            "jobs: concurrent starts of one shared job: one start at a time, each runs every item once");
+    t.info(&format!("  ({starts} starts, {items} items)\n"));
 }
 
 /// wake from another thread ends wait(forever); bursts coalesce

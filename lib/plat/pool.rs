@@ -46,6 +46,7 @@ const TS_INIT: u32 = 1;
 const TS_READY: u32 = 2;
 const JS_RUNNING: u32 = 1;
 const JS_DONE: u32 = 2;
+const JS_STARTING: u32 = 3; // one Job::start owns the record and resets it (not yet visible)
 
 /// a loop or job ended through cancel()
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -559,27 +560,37 @@ impl Job {
     /// run it in the background; false: it is still running  [thr_job_start]
     pub fn start(&self) -> bool {
         let j: &JobCtl = &self.rec;
-        if self.running() {
-            return false;
+        // claim the record first: a Job is Sync, so two threads may call start at once, and
+        // only one of them may reset the cells and queue the record
+        let mut s = j.state.load(SeqCst);
+        loop {
+            if s == JS_RUNNING || s == JS_STARTING {
+                return false;
+            }
+            match j.state.compare_exchange(s, JS_STARTING, SeqCst, SeqCst) {
+                Ok(_) => break,
+                Err(x) => s = x,
+            }
         }
         let n = thr_count();
+        let empty = j.count() == 0 || self.f.is_none();
+        let here = !empty && n == 0; // no workers: run it right here
         j.next.store(0, SeqCst);
         j.done.store(0, SeqCst);
         j.cancel.store(0, SeqCst);
-        // SAFETY: not running: nobody else sees the cells.
+        // SAFETY: STARTING belongs to this call alone; cancel, wait and the workers look at the
+        // cells only while the job is RUNNING (and queued), which the store below publishes.
         unsafe {
             *j.link.get() = core::ptr::null();
-            *j.active.get() = 0;
+            *j.active.get() = here as u32;
             *j.flags.get() = JF_ASYNC;
         }
         j.state.store(JS_RUNNING, SeqCst);
-        if j.count() == 0 || self.f.is_none() {
+        if empty {
             finish(j);
             return true;
         }
-        if n == 0 {
-            // SAFETY: not shared.
-            unsafe { *j.active.get() = 1 }; // no workers: run it right here
+        if here {
             run_items(j);
             finish(j);
             return true;
