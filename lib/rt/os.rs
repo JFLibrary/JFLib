@@ -205,6 +205,7 @@ mod imp {
     pub fn exit(code: i32) -> ! {
         // SAFETY: ends the process.
         unsafe { syscall3(SYS_EXIT_GROUP, code as usize, 0, 0) };
+        #[allow(clippy::empty_loop)] // not reached: exit_group does not return
         loop {}
     }
 

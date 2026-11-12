@@ -1016,6 +1016,7 @@ impl Ui {
                 self.draw_color(tcol);
                 self.draw_rect(crx, cry, hair.max(1), crow_h);
             }
+            plat::ime_inline(true); // (E4) the editor draws the composition itself
             self.ime_pos(crx, cry, crow_h);
         }
         self.ltr_end();

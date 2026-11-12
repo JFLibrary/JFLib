@@ -11,6 +11,8 @@ click "Wöchentlich"
 click "Toast zeigen"
 wait 20
 expect "Job gestartet" exists
+# the toast's message is a record of its own (screen readers, scripts)
+expect text:"„Dateiserver – täglich“ läuft jetzt (Vorgang 7f3a)." exists
 click "Weiter"
 shot build/shots/datagallery_smoke.png
 expect_nowarn

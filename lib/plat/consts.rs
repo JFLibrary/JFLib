@@ -7,8 +7,8 @@ pub const E_MOVE: u8 = 1;
 pub const E_DOWN: u8 = 2; // btn
 pub const E_UP: u8 = 3; // btn
 pub const E_WHEEL: u8 = 4; // data = (i16 dy) | (i16 dx << 16), 120 per notch, up / right positive
-pub const E_KEY_DOWN: u8 = 5; // data = VK | (repeat << 31)
-pub const E_KEY_UP: u8 = 6; // data = VK
+pub const E_KEY_DOWN: u8 = 5; // data = VK | (repeat << 31); (E2) x = scancode, y = KL_* location
+pub const E_KEY_UP: u8 = 6; // data = VK; (E2) x = scancode, y = KL_* location
 pub const E_TEXT: u8 = 7; // data = Unicode codepoint
 pub const E_RESIZE: u8 = 8; // x = width, y = height (physical pixels)
 pub const E_DPI: u8 = 9; // data = dpi (96 = 100 %)
@@ -55,6 +55,23 @@ pub const MOD_ALTGR: u8 = 16;
 pub const MOD_CAPS: u8 = 32;
 pub const MOD_NUM: u8 = 64;
 
+// ---- (E2) where a key sits (Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:
+// Windows' scan code (0xE0.. for extended keys), Linux's evdev code, 0 where unknown)
+pub const KL_STANDARD: u32 = 0;
+pub const KL_LEFT: u32 = 1; // the left Shift, Ctrl, Alt, Windows key
+pub const KL_RIGHT: u32 = 2;
+pub const KL_NUMPAD: u32 = 3; // the keys of the number block
+
+/// (E2) the KL_* location of a Linux evdev key code (both sides' modifiers, the number block)
+pub const fn evdev_location(code: u32) -> u32 {
+    match code {
+        42 | 29 | 56 | 125 => KL_LEFT,     // Shift, Ctrl, Alt, Meta
+        54 | 97 | 100 | 126 => KL_RIGHT,   // (AltGr is the right Alt)
+        55 | 71..=83 | 96 | 98 | 117 | 121 => KL_NUMPAD, // *, 7 8 9 - 4 5 6 + 1 2 3 0 ., Enter, /, =, ,
+        _ => KL_STANDARD,
+    }
+}
+
 // ---- cursors (CUR_*: system shapes; CUR_USER0.. custom cursors of cursor_create)
 pub const CUR_ARROW: u32 = 0;
 pub const CUR_IBEAM: u32 = 1;
@@ -73,6 +90,53 @@ pub const CUR_USER0: u32 = 16;
 pub const CUR_USER_MAX: u32 = 32;
 pub const CUR_TABLE: u32 = CUR_USER0 + CUR_USER_MAX;
 pub const CUR_MAX_PX: i32 = 256; // cursor_create: largest width / height
+
+// ---- (E3) more system shapes: CSS's cursor names, past the custom cursors (CUR_X0 ..
+// CUR_X_END); a platform without one shows cursor_fallback's
+pub const CUR_X0: u32 = 64;
+pub const CUR_NOT_ALLOWED: u32 = 64; // not-allowed
+pub const CUR_NO_DROP: u32 = 65; // no-drop
+pub const CUR_GRAB: u32 = 66; // grab: an open hand
+pub const CUR_GRABBING: u32 = 67; // grabbing: a closed hand
+pub const CUR_HELP: u32 = 68; // help: the arrow with a question mark
+pub const CUR_PROGRESS: u32 = 69; // progress: the arrow with a busy sign (work in the background)
+pub const CUR_ZOOM_IN: u32 = 70; // zoom-in
+pub const CUR_ZOOM_OUT: u32 = 71; // zoom-out
+pub const CUR_CELL: u32 = 72; // cell: a thick cross (tables)
+pub const CUR_VTEXT: u32 = 73; // vertical-text
+pub const CUR_ALIAS: u32 = 74; // alias: a link will be made
+pub const CUR_COPY: u32 = 75; // copy: a copy will be made
+pub const CUR_CONTEXT_MENU: u32 = 76; // context-menu
+pub const CUR_ALL_SCROLL: u32 = 77; // all-scroll
+pub const CUR_COL_RESIZE: u32 = 78; // col-resize
+pub const CUR_ROW_RESIZE: u32 = 79; // row-resize
+pub const CUR_SIZE_N: u32 = 80; // n-resize: one edge or corner
+pub const CUR_SIZE_S: u32 = 81;
+pub const CUR_SIZE_E: u32 = 82;
+pub const CUR_SIZE_W: u32 = 83;
+pub const CUR_SIZE_NE: u32 = 84;
+pub const CUR_SIZE_NW: u32 = 85;
+pub const CUR_SIZE_SE: u32 = 86;
+pub const CUR_SIZE_SW: u32 = 87;
+pub const CUR_X_END: u32 = 88;
+
+/// (E3) the nearest of the first shapes (CUR_ARROW .. CUR_NONE) to a shape of CUR_X0 ..
+/// CUR_X_END, for the platforms and cursor themes without it; other shapes unchanged
+pub const fn cursor_fallback(shape: u32) -> u32 {
+    match shape {
+        CUR_GRAB => CUR_HAND,
+        CUR_GRABBING | CUR_ALL_SCROLL => CUR_MOVE,
+        CUR_PROGRESS => CUR_WAIT,
+        CUR_ZOOM_IN | CUR_ZOOM_OUT | CUR_CELL => CUR_CROSS,
+        CUR_VTEXT => CUR_IBEAM,
+        CUR_COL_RESIZE | CUR_SIZE_E | CUR_SIZE_W => CUR_SIZE_WE,
+        CUR_ROW_RESIZE | CUR_SIZE_N | CUR_SIZE_S => CUR_SIZE_NS,
+        CUR_SIZE_NE | CUR_SIZE_SW => CUR_SIZE_NESW,
+        CUR_SIZE_NW | CUR_SIZE_SE => CUR_SIZE_NWSE,
+        CUR_X0..CUR_X_END => CUR_ARROW,
+        _ => shape,
+    }
+}
 
 // ---- window edges, commands, states
 pub const EDGE_TOP: u32 = 1;
@@ -154,6 +218,7 @@ pub const PA_POINT: u32 = 4; // at a point (context menus): flips both ways
 pub const FD_OPEN: u32 = 0;
 pub const FD_SAVE: u32 = 1;
 pub const FD_FOLDER: u32 = 2; // choose a folder (Android: a document tree; Windows: the own dialog)
+pub const FD_MULTI: u32 = 4; // (E8) FD_OPEN: several files; all of them in file_dialog_paths()
 pub const FD_EXT_SHIFT: u32 = 8; // bits 8..15: initially selected extension (index)
 /// file_dialog's answer when the system answers later (Android's picker): file_dialog_poll
 pub const FD_PENDING: i32 = -2;

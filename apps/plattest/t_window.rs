@@ -8,7 +8,8 @@
 // E_RESIZE), the hit hook (WM_NCHITTEST), mouse / wheel / key / text translation, custom
 // cursors (WM_SETCURSOR), popup windows, an owned tool window (default place, no activation,
 // docked to the owner when it moves), enable, the clipboard round trip (text, PNG, image +
-// DIB), the IME caret, the system file dialog (closed by a timer: Cancel, then a name + OK),
+// DIB), the IME caret, the system file dialog (closed by a timer: Cancel, then a name + OK;
+// FD_MULTI with two quoted names and with one),
 // a WM_DROPFILES of jfgui_TEST_DROPFILES, wake() from a thread, close and destroy.
 // The clipboard's text is saved and put back at the end.  Windows here; macOS: t_window_mac.rs
 // (Linux: linuxtest).
@@ -310,6 +311,20 @@ mod win {
         if got != want {
             t.info(&format!("  (got {got:?})\n"));
         }
+        // (E2) the scan code and the location: the right Shift (0x36), the number block's Enter
+        // (extended Return), the left Ctrl, a number block key without Num Lock (Home, not extended)
+        win_test_send(0, WM_KEYDOWN, 0x10, 1 | 0x36 << 16);
+        win_test_send(0, WM_KEYDOWN, 0x0D, 1 | 0x1C << 16 | 1 << 24);
+        win_test_send(0, WM_KEYDOWN, 0x11, 1 | 0x1D << 16);
+        win_test_send(0, WM_KEYDOWN, 0x24, 1 | 0x47 << 16);
+        let mut keys = Vec::new();
+        while let Some(e) = evq_pop() {
+            if e.typ == E_KEY_DOWN {
+                keys.push((e.data & 0xFF, e.x, e.y as u32));
+            }
+        }
+        let want = [(0x10, 0x36, KL_RIGHT), (0x0D, 0xE01C, KL_NUMPAD), (0x11, 0x1D, KL_LEFT), (0x24, 0x47, KL_NUMPAD)];
+        t.check(keys == want, &format!("input: the scancode and location of keys (E2) {keys:x?}"));
         // a burst of WM_CHAR (a long input method commit): wait() stops short of a full event
         // ring, the rest waits in the thread's queue; every character comes, in order
         let posted = win_test(WT_POST_CHARS, 0, [600, 'a' as i32, 26, 0]);
@@ -431,6 +446,20 @@ mod win {
         let r = file_dialog(FD_SAVE | 1 << FD_EXT_SHIFT, &mut path, &["png=PNG-Bild", "jpg;jpeg=JPEG-Bild"]);
         t.info(&format!("  (file dialog: {} {} {path})\n", r.0, r.1));
         t.check(r == (1, 1) && path == full.replace('\\', "/"), "filedlg: a name + OK -> the path ('/'), the type");
+        // (E8) FD_MULTI: two quoted names typed into Explorer's name box -> both files
+        let dir = format!("{}/build", cwd().replace('\\', "/"));
+        let ok = write_file(&format!("{dir}/plattest_m1.txt"), b"1") && write_file(&format!("{dir}/plattest_m2.txt"), b"2");
+        let mut path = format!("{dir}/");
+        file_dialog_autoclose(300, Some("\"plattest_m1.txt\" \"plattest_m2.txt\""));
+        let r = file_dialog(FD_OPEN | FD_MULTI, &mut path, &["txt=Text"]);
+        let all = file_dialog_paths();
+        t.info(&format!("  (file dialog, several: {} {:?})\n", r.0, all));
+        t.check(ok && r.0 == 1 && all == [format!("{dir}/plattest_m1.txt"), format!("{dir}/plattest_m2.txt")] && path == all[0],
+                "filedlg: FD_MULTI, two names + OK -> both paths, path the first");
+        let mut path = format!("{dir}/plattest_m2.txt");
+        file_dialog_autoclose(300, Some(&format!("{dir}/plattest_m2.txt").replace('/', "\\")));
+        let r = file_dialog(FD_OPEN | FD_MULTI, &mut path, &["txt=Text"]);
+        t.check(r.0 == 1 && file_dialog_paths() == [format!("{dir}/plattest_m2.txt")], "filedlg: FD_MULTI with one file -> its path");
 
         // ---- process level: theme, home, drives, pens, the shell (dry run)
         let th = theme();

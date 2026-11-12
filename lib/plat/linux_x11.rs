@@ -517,6 +517,8 @@ struct X11 {
     // ---- popups, cursors, monitors
     xq: [Xq; PPW_MAX as usize],
     cursors: [u32; CUR_COUNT as usize],
+    // (E3) the glyph cursors of CUR_X0 .. CUR_X_END (0: not made yet)
+    cursors_x: [u32; (crate::CUR_X_END - crate::CUR_X0) as usize],
     cur_font: u32,
     xcust: [u32; CUR_USER_MAX as usize],
     xr_state: u32,
@@ -694,6 +696,7 @@ impl X11 {
                 ph: 0,
             }),
             cursors: [0; CUR_COUNT as usize],
+            cursors_x: [0; (crate::CUR_X_END - crate::CUR_X0) as usize],
             cur_font: 0,
             xcust: [0; CUR_USER_MAX as usize],
             xr_state: 0,

@@ -1,0 +1,21 @@
+# viewtest: records of content the page draws itself, without hit boxes of their own (E6)
+#
+# the page publishes its links with ui.sem_rect: kind, label, rectangle
+expect link:"Link Eins" rect 28 152 140 24
+expect link:"Link Zwei" rect 28 192 140 24
+# a click by label presses in the record's middle: the page gets it and finds the link there
+click "Link Zwei"
+expect text:"Geklickt: Link Zwei" exists
+expect #101 focused
+click "Link Eins"
+expect text:"Geklickt: Link Eins" exists
+# the pointer over a link (found through its record): the hand the page asks for
+move "Link Zwei"
+expect text:"Zeiger: Hand" exists
+# the records leave the page's own record alone: still one canvas, focused
+expect #101 rect 12 136 360 120
+# (E14) the page's own record has a name: what a screen reader says for it
+expect canvas:"Webseite" rect 12 136 360 120
+# a screen reader gets them as links with their names
+click "Baum prüfen"
+expect text:"Baum: Link Eins, Link Zwei" exists

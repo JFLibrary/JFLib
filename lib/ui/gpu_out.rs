@@ -714,6 +714,8 @@ impl Default for S {
             skip: false,
             dev: Dev::None,
             wins: Vec::new(),
+            // (the browser: one thread, S::spawn runs a job where it is called; the Arc is the other targets')
+            #[allow(clippy::arc_with_non_send_sync)]
             jobs: Arc::new(Jobs { done: SpinLock::new(Vec::new()), running: AtomicU32::new(0) }),
             threads: Vec::new(),
             next_job: 1,
@@ -2246,6 +2248,7 @@ impl Ui {
             };
             w.stage = Stage::Job;
             w.job = job;
+            #[allow(clippy::redundant_locals)] // each window's job takes a copy
             let desc = desc;
             let (d2, b2) = (dev.clone(), bgl.clone());
             s.note(&format!("window {i}: swapchain on a worker"));

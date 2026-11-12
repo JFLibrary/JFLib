@@ -41,12 +41,18 @@ only `jflib = "0.1"`, offline, with nothing of this repository on their paths:
           its session, a saved change builds and starts it again, a broken source keeps the
           old build and fills build.txt, Ctrl+Break ends watch.
   hallo3  made by `cargo jflib new --std` (docs/CRATES.md, CR6) with a std crate from a path:
-          `cargo jflib test`; a release program whose std::thread, std::fs and print! work next to
+          `cargo jflib test`; its crate forbids unsafe code and has a unit test (`cargo test --lib`
+          through ui::test_main!); a release program whose std::thread, std::fs and print! work next to
           JFLib, whose std crate's thread_local! counts on a thread of plat, whose panic ends as
           JFLib's crash report (exit 3), and which imports no C runtime DLL (+crt-static); the
           browser (scalar and SIMD), the APK; watch as for hallo2; package refuses the other
           system's formats.  Linux
-          only on a Linux machine (a program with std is built there).
+          only on a Linux machine (a program with std is built there).  Last, with jflib's feature
+          unwind and panic = "unwind" (Windows): panics caught on a std thread, a thread of plat
+          and the main thread leave it running (rt::panic_take has the text), an uncaught one on a
+          std thread ends that thread, on a thread of plat or the main thread JFLib's crash report
+          (exit 3); with package, `cargo jflib package --formats setup` of it (the stub is built
+          with panic = "abort").
 
 Then `cargo test -p jflib-build` and `-p cargo-jflib`.  Output below build/crates_accept; exit 1 when something failed.
 
@@ -672,6 +678,48 @@ STD_CHECK = """    if jflib::plat::args().iter().any(|a| a == "--std-panic") {
 """
 STD_WANT = "std words=2 calls=1 tls=1,2 fs=true"
 
+# at the end of hallo3's src/lib.rs, whose crate forbids unsafe code: a unit test of a library crate
+# with std links through ui::test_main! (E16), and neither macro needs an allow there
+STD_UNIT_TEST = """
+#[cfg(test)]
+ui::test_main!();
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn std_next_to_jflib() {
+        assert_eq!(stdcrate::count_words("a b a").0, 2);
+    }
+}
+"""
+
+# hallo3 at the end, with jflib's feature unwind and panic = "unwind" (docs/GUIDE.md, "An app with
+# std"): what the app catches leaves it running, on any thread; what nobody catches ends it as before
+UNWIND_CHECK = """    if jflib::plat::args().iter().any(|a| a == "--unwind-check") {
+        let std_thread = std::thread::spawn(|| std::panic::catch_unwind(|| panic!("caught on std::thread")).is_err()).join().unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let th = jflib::plat::thread_spawn(0, Box::new(move || {
+            let _ = tx.send(std::panic::catch_unwind(|| panic!("caught on plat")).is_err());
+        }));
+        let plat_thread = th.is_some_and(|t| {
+            t.join();
+            rx.recv().unwrap_or(false)
+        });
+        let here = std::panic::catch_unwind(|| panic!("caught here")).is_err();
+        let take = jflib::rt::panic_take().is_some_and(|t| t.starts_with("panicked at ") && t.ends_with("caught here"));
+        let std_uncaught = std::thread::spawn(|| panic!("uncaught on std::thread")).join().is_err();
+        print!("unwind std={std_thread} plat={plat_thread} here={here} take={take} std_uncaught={std_uncaught}");
+        return 0;
+    }
+    if jflib::plat::args().iter().any(|a| a == "--unwind-thread") {
+        if let Some(t) = jflib::plat::thread_spawn(0, Box::new(|| panic!("unwind thread check"))) {
+            t.join();
+        }
+        return 0;
+    }
+"""
+UNWIND_WANT = "unwind std=true plat=true here=true take=true std_uncaught=true"
+
 
 def pe_imports(exe):
     """the DLLs a PE program imports"""
@@ -711,11 +759,13 @@ def check_std(run, made, vendor, targets, jenv, target_dir):
                     encoding="utf-8")
     lib = app / "src" / "lib.rs"
     text = lib.read_text(encoding="utf-8")
-    run.check("ui::main!({\n" in text, "hallo3's src/lib.rs has ui::main!")
+    run.check("ui::main!({\n" in text and "#![deny(unsafe_code)]\n" in text, "hallo3's src/lib.rs has ui::main! and denies unsafe code")
+    text = text.replace("#![deny(unsafe_code)]\n", "#![forbid(unsafe_code)]\n", 1) + STD_UNIT_TEST
     lib.write_text(text.replace("ui::main!({\n", "ui::main!({\n" + STD_CHECK, 1), encoding="utf-8")
     (app / "target").mkdir(exist_ok=True)
     if "win" in targets:
         run.cmd("hallo3-test", ["cargo", "jflib", "test"], app, jenv)
+        run.cmd("hallo3-unit-test", ["cargo", "test", "--lib", "--target", WIN], app, jenv)
         if run.cmd("hallo3-win-release", ["cargo", "build", "--release", "--target", WIN], app, jenv):
             exe = target_dir / WIN / "release" / "hallo3.exe"
             r = subprocess.run([exe, "--std-check"], cwd=app, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
@@ -747,6 +797,39 @@ def check_std(run, made, vendor, targets, jenv, target_dir):
         r = subprocess.run(["cargo", "jflib", "package", "--formats", "deb" if os.name == "nt" else "setup"], cwd=app,
                            env=dict(os.environ, **jenv), capture_output=True, text=True, timeout=600)
         run.check(r.returncode != 0 and "made on" in r.stderr, "cargo jflib package refuses the other system's formats for an app with std")
+    if "win" in targets:
+        check_unwind(run, app, jenv, target_dir, "package" in targets)
+
+
+def check_unwind(run, app, jenv, target_dir, package=False):
+    """hallo3 with jflib's feature unwind and panic = "unwind" (it changes the app: the last check of
+    it): caught panics leave it running on every kind of thread, uncaught ones end as before"""
+    toml = app / "Cargo.toml"
+    text = toml.read_text(encoding="utf-8")
+    # (the note above the profiles names panic = "abort" too: the profiles' lines start with it)
+    run.check('features = ["std"]' in text and text.count('\npanic = "abort"') == 2 and 'feature "unwind"' in text,
+              "hallo3's Cargo.toml: the feature std, panic = \"abort\" twice, a note on the feature unwind")
+    toml.write_text(text.replace('features = ["std"]', 'features = ["unwind"]', 1).replace('\npanic = "abort"', '\npanic = "unwind"'), encoding="utf-8")
+    lib = app / "src" / "lib.rs"
+    lib.write_text(lib.read_text(encoding="utf-8").replace("ui::main!({\n", "ui::main!({\n" + UNWIND_CHECK, 1), encoding="utf-8")
+    if not run.cmd("hallo3-unwind", ["cargo", "build", "--target", WIN], app, jenv):
+        return
+    exe = target_dir / WIN / "debug" / "hallo3.exe"
+    r = subprocess.run([exe, "--unwind-check"], cwd=app, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+    run.check(r.returncode == 0 and r.stdout == UNWIND_WANT and not r.stderr.strip(),
+              f"hallo3 --unwind-check: caught panics leave it running ({r.stdout!r}, exit {r.returncode}, {r.stderr.strip()[-200:]!r})")
+    for arg, msg in (("--std-panic", "std panic check"), ("--unwind-thread", "unwind thread check")):
+        r = subprocess.run([exe, arg], cwd=app, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+        run.check(r.returncode == 3 and "panic: panicked at" in r.stderr and msg in r.stderr,
+                  f"hallo3 {arg} with unwind: JFLib's crash report, exit 3 (exit {r.returncode}: {r.stderr.strip()[-200:]})")
+    # the setup of an app with panic = "unwind": its stub (no std) is built with panic = "abort"
+    if package and os.name == "nt":
+        setup = target_dir / "jflib-package" / "hallo3_Setup.exe"
+        setup.unlink(missing_ok=True)
+        if run.cmd("hallo3-unwind-package", ["cargo", "jflib", "package", "--formats", "setup"], app, jenv):
+            stub = (target_dir / "jflib-package" / "installer-stub" / "Cargo.toml").read_text(encoding="utf-8")
+            run.check(setup.is_file() and 'panic = "unwind"' not in stub and stub.count('panic = "abort"') >= 2,
+                      "cargo jflib package of an app with panic = \"unwind\": the setup, its stub with panic = \"abort\"")
 
 # ---------------------------------------------------------------- the docs as docs.rs builds them (CR7)
 # what docs.rs builds without [package.metadata.docs.rs] targets (docs.rs/about/metadata)

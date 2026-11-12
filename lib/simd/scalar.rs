@@ -1123,6 +1123,7 @@ macro_rules! backend {
                 out
             }
             #[inline(always)]
+            #[allow(clippy::out_of_bounds_indexing)] // 16 lanes never take the branch
             fn store_raw_lanes(self, a: &mut [u8], b: &mut [u8], v: Self::V) -> () {
                 a[..8].copy_from_slice(&v[..8]);
                 if $n > 16 {

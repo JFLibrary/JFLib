@@ -111,7 +111,7 @@ impl Ui {
                 self.m.edit.tb_ev |= EV_ACT;
                 self.repass();
             }
-            editing = self.m.edit.ed_id == id;
+            editing = self.ed_is(id);
         }
         if editing && !self.m.edit.tb_chg {
             let (a, b) = self.tb_sel();

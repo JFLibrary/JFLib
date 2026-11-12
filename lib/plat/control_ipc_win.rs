@@ -269,6 +269,7 @@ fn advapi() -> Result<Advapi, i32> {
         return Err(127);
     }
     // SAFETY: each non-null address was resolved from the documented export with this exact ABI.
+    #[allow(clippy::missing_transmute_annotations)] // the tuple's type names the four signatures
     let (open, info, sid_text, descriptor): (OpenToken, TokenInfo, SidText, Descriptor) = unsafe {
         (
             core::mem::transmute(pointers[0]),

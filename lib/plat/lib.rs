@@ -426,6 +426,23 @@ pub fn persistent_name(name: &str) -> String {
     String::from(name)
 }
 
+// (E8) the files of the last file_dialog with FD_MULTI
+static FD_PATHS: rt::sync::SpinLock<alloc::vec::Vec<String>> = rt::sync::SpinLock::new(alloc::vec::Vec::new());
+
+/// (E8) the files the last system file dialog with FD_MULTI chose (its first is also in
+/// file_dialog's path; Ctrl / Shift in the dialog choose more); one entry after a dialog that
+/// chose one file, empty after a cancelled one.  Windows and Linux's portal choose several, the
+/// other systems' dialogs one (docs/GUIDE.md section 7)
+pub fn file_dialog_paths() -> alloc::vec::Vec<String> {
+    FD_PATHS.lock().clone()
+}
+
+// (backends) the answer of a dialog: every chosen file
+#[allow(dead_code)]
+pub(crate) fn fd_paths_set(v: alloc::vec::Vec<String>) {
+    *FD_PATHS.lock() = v;
+}
+
 /// The answer of a system file dialog that answers later (file_dialog -> FD_PENDING: only
 /// Android's picker and the browser's, web.rs, and iOS's, apple_ios_services.rs): None while it
 /// is open, then once (1 chosen / 0 not, index, path).

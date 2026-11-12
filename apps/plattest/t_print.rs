@@ -10,6 +10,9 @@
 //        the resolution chain of JFPainter (then PaintCraft) for a PNG pHYs): with jfgui_PRINT_TO / _PRINTER /
 //        _SMASK / _PORTAL set by the caller.  The zlib hook is img_core's deflate (the PDF is
 //        byte-identical to PaintCraft's, now JFPainter's).  Prints "print: result R, copies C, page W x H".
+//   plattest --test printdoc   (E9) PrintDoc in the test variant: a PDF of three pages (Kids,
+//        objects, xref, title, a page's pixels), add_pdf as it is, refusals, a job without pages;
+//        Windows: the pages through GDI into "Microsoft Print to PDF" (skipped without it)
 //                     [ASMLIB/src/plat/print.s, img/pdfwrite.s; tools/print_check.py]
 
 use alloc::format;
@@ -211,4 +214,114 @@ pub fn t_printjob(t: &mut T) {
     let r = plat::print(&mut job);
     crate::out(&format!("print: result {r}, copies {}, page {:.3} x {:.3}\n", job.copies, job.page_w, job.page_h));
     t.check(r == expect, &format!("printjob: case {c} -> {expect}"));
+}
+
+/// (E9) jobs of several pages through PrintDoc in the test variant (jfgui_PRINT_TO; never a
+/// dialog, never paper): the PDF of three pages (their count, objects and offsets, the title,
+/// a page's pixels inflated again), add_pdf as it is, the refusals; Windows: the same pages
+/// through GDI into "Microsoft Print to PDF" (skipped without that printer)
+pub fn t_printdoc(t: &mut T) {
+    plat::set_print_deflate(Some(img_core::deflate::zlib_deflate));
+    let px = make_pixels();
+    let big: Vec<u8> = (0..60 * 40).flat_map(|i| [(i % 251) as u8, (i % 7 * 30) as u8, 200, 255]).collect();
+    let srcs = [
+        PrintSrc { px: &px, w: IMG_W, h: IMG_H, stride: IMG_W * 4, fmt: PRINT_ARGB },
+        PrintSrc { px: &big, w: 60, h: 40, stride: 240, fmt: PRINT_XRGB },
+        PrintSrc { px: &px, w: IMG_W, h: IMG_H, stride: IMG_W * 4, fmt: PRINT_PARGB },
+    ];
+    let mut job = job_of(&px, 0);
+    job.title = "Seiten";
+    // ---- headless without the test variant: never a dialog
+    plat::setenv("jfgui_PRINT_TO", None);
+    let r = plat::PrintDoc::begin(&job, 3).err();
+    t.check(r == Some(ERR_UNSUPPORTED), &format!("printdoc: headless without jfgui_PRINT_TO -> ERR_UNSUPPORTED ({r:?})"));
+    let dir = plat::temp_dir().unwrap_or_else(|| String::from("."));
+    let file = format!("{dir}/jfgui_printdoc_{}.pdf", plat::time_us() % 1_000_000);
+    plat::setenv("jfgui_PRINT_TO", Some(&file));
+    let gdi = cfg!(windows);
+    if gdi {
+        plat::setenv("jfgui_PRINT_PRINTER", Some("Microsoft Print to PDF"));
+    }
+    let mut d = match plat::PrintDoc::begin(&job, 3) {
+        Ok(d) => d,
+        Err(e) if gdi && e == plat::ERR_IO => {
+            t.info("  (printdoc: no printer \"Microsoft Print to PDF\": the GDI part is skipped)\n");
+            plat::setenv("jfgui_PRINT_TO", None);
+            return;
+        }
+        Err(e) => {
+            t.check(false, &format!("printdoc: begin in the test variant -> {e}"));
+            return;
+        }
+    };
+    let page = d.page();
+    t.check(page.w > 500.0 && page.h > 700.0 && d.copies() == 1 && d.wants(1) && d.wants(3),
+            &format!("printdoc: the page ({:.1} x {:.1} pt), one copy, every page wanted", page.w, page.h));
+    t.check(d.pdf_native() != gdi, "printdoc: pdf_native (Windows: images only, elsewhere the PDF)");
+    let mut ok = true;
+    for s in &srcs {
+        ok &= d.add_image(s) == 0;
+    }
+    let bad = PrintSrc { px: &px, w: IMG_W, h: IMG_H, stride: IMG_W * 4, fmt: 2 };
+    t.check(ok && d.added() == 3, "printdoc: three pages added");
+    t.check(d.add_image(&bad) == ERR_UNSUPPORTED && d.add_pdf(b"%PDF-1.4\n") == ERR_UNSUPPORTED && d.added() == 3,
+            "printdoc: an A8 page and a PDF after pages are refused");
+    let r = d.end();
+    t.check(r == 0, &format!("printdoc: end -> {r}"));
+    // the spooler writes the file a moment later (Windows)
+    let mut pdf = Vec::new();
+    for _ in 0..150 {
+        pdf = plat::read_file(&file).unwrap_or_default();
+        if pdf.ends_with(b"%%EOF\n") || pdf.ends_with(b"%%EOF\r\n") || pdf.ends_with(b"%%EOF") {
+            break;
+        }
+        plat::sleep_ms(100);
+    }
+    let count = |pat: &[u8]| pdf.windows(pat.len()).filter(|w| *w == pat).count();
+    if gdi {
+        let pages = count(b"/Type /Page\n") + count(b"/Type /Page ") + count(b"/Type/Page/") + count(b"/Type/Page>") + count(b"/Type /Page/")
+            + count(b"/Type/Page ") + count(b"/Type/Page\n") + count(b"/Type /Page>");
+        t.check(pdf.starts_with(b"%PDF-") && pages == 3, &format!("printdoc: GDI -> Microsoft Print to PDF: {} bytes, {pages} pages", pdf.len()));
+    } else {
+        t.check(pdf.starts_with(b"%PDF-1.4\n") && pdf.ends_with(b"%%EOF\n"), "printdoc: a PDF file");
+        t.check(count(b"/Type /Pages /Kids [4 0 R 7 0 R 10 0 R] /Count 3") == 1 && count(b"/Type /Page /Parent 2 0 R") == 3,
+                "printdoc: three pages (Kids, Count)");
+        t.check(count(b"/SMask") == 0 && count(b"/Subtype /Image") == 3, "printdoc: three images over white");
+        t.check(count(b"/Title <FEFF00530065006900740065006E>") == 1, "printdoc: the title");
+        // every xref offset points at its object
+        let text = String::from_utf8_lossy(&pdf);
+        let xref = text.rfind("\nxref\n").map_or(0, |k| k + 1); // (not startxref)
+        let offs: Vec<usize> = text[xref..].lines().skip(3).take_while(|l| l.ends_with(" n ")).filter_map(|l| l[..10].parse().ok()).collect();
+        let good = offs.iter().enumerate().all(|(k, &o)| pdf.get(o..).is_some_and(|r| r.starts_with(format!("{} 0 obj", k + 1).as_bytes())));
+        t.check(offs.len() == 12 && good, &format!("printdoc: the xref ({} objects, offsets right: {good})", offs.len()));
+        // the second page's image inflates to its pixels
+        let raw = pdf_stream(&pdf, b"9 0 obj").and_then(|s| {
+            let mut out = vec![0u8; 60 * 40 * 3];
+            let n = img_core::inflate::zlib_inflate(s, &mut out).ok()?;
+            out.truncate(n);
+            Some(out)
+        });
+        let want: Vec<u8> = big.chunks(4).flat_map(|p| [p[2], p[1], p[0]]).collect();
+        t.check(raw.as_deref() == Some(&want[..]), "printdoc: page 2's image inflates to its pixels");
+        // ---- the app's own PDF as it is
+        let mut d = match plat::PrintDoc::begin(&job, 0) {
+            Ok(d) => d,
+            Err(e) => {
+                t.check(false, &format!("printdoc: begin again -> {e}"));
+                return;
+            }
+        };
+        t.check(d.add_pdf(b"not a pdf") == ERR_UNSUPPORTED, "printdoc: add_pdf wants a PDF");
+        t.check(d.add_pdf(&pdf) == 0 && d.add_image(&srcs[0]) == ERR_UNSUPPORTED, "printdoc: add_pdf, then no image");
+        t.check(d.end() == 0 && plat::read_file(&file).as_deref() == Some(&pdf[..]), "printdoc: the PDF printed as it is");
+    }
+    // ---- no page
+    let d = plat::PrintDoc::begin(&job, 0);
+    t.check(d.is_ok_and(|d| d.end() == ERR_DIMS), "printdoc: a job without pages -> ERR_DIMS");
+    if let Ok(d) = plat::PrintDoc::begin(&job, 0) {
+        d.abort();
+    }
+    plat::delete(&file);
+    plat::setenv("jfgui_PRINT_TO", None);
+    plat::setenv("jfgui_PRINT_PRINTER", None);
 }

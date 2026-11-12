@@ -1,0 +1,14 @@
+# The apps of JFLib's repository built with Cargo itself, started in their folder (`cd apps/gallery`):
+# what lib/jflib/template/.cargo/config.toml gives a project of its own.  build_rs.py sets its own
+# flags (CARGO_ENCODED_RUSTFLAGS, over these); the root of the repository has none, so that Cargo
+# in lib/ (cargo-jflib, the CI's checks and tests) builds as for any crate.
+#
+# Linux: a program with a window links against glibc (the GPU drivers are glibc libraries).  Always
+# build with --target x86_64-unknown-linux-gnu, also on Linux (`cargo run --target
+# x86_64-unknown-linux-gnu`): these flags then reach only the program, not the build scripts and
+# proc macros (linked by cc).  rust-lld comes with rustup.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "linker=rust-lld", "-C", "linker-flavor=ld.lld", "-C", "relocation-model=static", "--cfg", "jfgui_glibc"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "linker=rust-lld", "-C", "linker-flavor=ld.lld", "-C", "relocation-model=static", "--cfg", "jfgui_glibc"]
