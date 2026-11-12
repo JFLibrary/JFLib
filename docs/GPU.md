@@ -1342,7 +1342,24 @@ build\win\gputest.exe --test all          (oder: gputest --test all --validate)
 `tests/validate.uis` lässt jeden Test einmal mit Validierung laufen; ein Validierungsfehler
 lässt ihn scheitern. Der Test `syncval` baut absichtlich zwei fehlende Barrieren ein, eine zwischen
 Kopien und eine zwischen zwei Dispatches, und erwartet, dass die Synchronisationsprüfung sie meldet
--- so ist sicher, dass sie wirklich an ist.
+-- so ist sicher, dass sie wirklich an ist. Eine dritte baut `queues` ein (zwei Dispatches auf der
+Rechen-Warteschlange). Jede dieser Lücken muss genau einen Fehler bringen, der als provoziert zählt; jeder
+andere Fehler lässt den Lauf scheitern (Exit 1), auch einer, der zwischen den Befehlen einer Lücke kommt (bis
+2026-11-12 zählte dort jeder Fehler als erwartet).
+
+Die Meldungen der Schicht gehen auf stderr, und `build_rs.py run` und `test` geben stderr erst nach stdout aus.
+Die drei absichtlichen Meldungen stehen deshalb am Ende der Ausgabe, hinter `all checks passed`, jede nach
+einer Zeile `gputest: the next validation error is provoked on purpose: …`. Fehlende Barrieren sind das nicht.
+Gegenprobe (2026-11-12, danach zurückgenommen): ein zweites Füllen in der ersten Lücke und eine unangekündigte
+dritte Lücke, `--test syncval --validate`: `FAIL … 2 error(s) on stderr, 1 provoked`, `FAIL validation layer:
+2 errors`, Exit 1.
+
+Einmal endete `validate.uis` in einer vollen Suite unter Last mit Exit 3 (Absturz, 2026-11-12), ohne Bericht in
+der Ausgabe: `build_rs.py test` zeigte von einem gescheiterten Skript nur Zeilen, die mit FAIL, error, panic oder
+UIWARN beginnen. Seitdem zeigt es auch `jfgui: crash …` (Code und Offset). Nicht nachgestellt: Alle sechs Läufe
+danach endeten mit Exit 0, auch einer neben fünf `cargo check`. Ob das der Absturz aus „Rechen-Warteschlange“ oben
+ist, ist offen.
+
 Die selbst geschriebenen SPIR-V-Module von gputest sind mit `spirv-val --target-env vulkan1.1`
 und `vulkan1.3` geprüft.
 

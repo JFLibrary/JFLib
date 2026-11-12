@@ -7,9 +7,11 @@
 // it, barriers with graphics stages on the compute queue, timestamps there.  What is refused: command buffers of the
 // other family, a render pass on the compute queue, waiting for a submission not made.  The queue only when asked
 // for (Adapter::create_device_with, DeviceOptions::compute_queue): create_device has none; jfgui_GPU_COMPUTE=0: none
-// even when asked for (the fallback).  With --validate: the same rounds without the wait between two of them must be
-// reported by synchronization validation (a hazard between the queues).  A rough look at whether the two queues run
-// at once on this GPU (two long dispatches, apart and together).
+// even when asked for (the fallback).  With --validate and the layer: two dispatches on one buffer without a barrier in
+// a command buffer of the compute queue must be reported by synchronization validation (exactly one error, provoked
+// on purpose); a missing wait between the queues it does not see, so the values tell (a long dispatch, then the other
+// queue on its buffer, with and without submit_after).  A rough look at whether the two queues run at once on this GPU
+// (two long dispatches, apart and together).
 
 use alloc::format;
 use alloc::vec;
@@ -255,10 +257,10 @@ fn with_queue(t: &mut T, dev: &Device, cq: &ComputeQueue) -> Option<()> {
     // queue, which synchronization validation must report; (2) a missing wait between the queues: a long dispatch on
     // the device queue, then the compute queue on its buffer, with and without submit_after -- the layer (1.4.363)
     // reports no hazard between submissions (not even on one queue), so the values tell: sampled against the CPU
-    if t.validate {
-        let (e0, _) = gpu::validation_messages();
+    if t.validate && dev.validating() {
         let big = storage(t, dev, 1 << 20, BufferUsage::NONE)?;
         let gb = group(t, dev, &bgl, &[Resource::Buffer { buffer: &big, offset: 0, size: 0 }])?;
+        let e0 = t.provoke("queues: two dispatches writing one buffer on the compute queue, no barrier between them");
         let mut e = t.res(cq.encoder(), "compute encoder")?;
         e.set_compute_pipeline(&step);
         e.set_bind_group(0, &gb);
@@ -268,10 +270,7 @@ fn with_queue(t: &mut T, dev: &Device, cq: &ComputeQueue) -> Option<()> {
         let cmd = t.res(e.finish(), "finish")?;
         let id = t.res(cq.submit([cmd]), "compute submit")?;
         t.res(dev.wait(id, 10_000_000_000), "wait")?;
-        let (e1, _) = gpu::validation_messages();
-        t.expected += e1 - e0;
-        out(&format!("  (the {} validation error(s) above are expected)", e1 - e0));
-        t.ok(e1 > e0, "synchronization validation reports a missing barrier between two dispatches on the compute queue");
+        t.provoked(e0, "a missing barrier between two dispatches on the compute queue");
     }
     let (sbgl, spin) = pipeline(t, dev, SRC, "spin", &[BindingKind::StorageBuffer], 8)?;
     let n = 1u32 << 20;

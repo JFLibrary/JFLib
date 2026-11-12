@@ -31,8 +31,9 @@
 //                    read on the device queue; waits, ids, a dropped buffer, refused uses; only when asked
 //                    for (create_device_with), the fallback (jfgui_GPU_COMPUTE=0); a missing wait between the
 //                    queues is found by the values (the validation layer does not report it)
-//        syncval     (--validate only) two copies into one buffer without a barrier: the
-//                    validation layer must report the hazard (synchronization validation on)
+//        syncval     (--validate only) a copy and a fill into one buffer without a barrier, then two
+//                    dispatches writing one buffer without one: the validation layer must report each
+//                    hazard with exactly one error (synchronization validation on)
 //        spec        pipeline constants (t_spec.rs): lib/shader's spec_fill as SPIR-V 1.3
 //                    (WorkgroupSize built-in) and 1.6 (LocalSizeId) with its defaults and with
 //                    constants for every override (workgroup sizes 1 .. the limit) = its CPU
@@ -61,7 +62,11 @@
 //        all         every test above
 //   --validate      with VK_LAYER_KHRONOS_validation (jfgui_GPU_VALIDATE, synchronization
 //                   validation); a validation error fails the test.  Without the layer: a note,
-//                   the test runs as without --validate.
+//                   the test runs as without --validate.  The layer's messages go to stderr, which
+//                   build_rs.py run and test print after stdout: the three hazards provoked on
+//                   purpose (syncval twice, queues once) stand at the end there, each after a line
+//                   "gputest: the next validation error is provoked on purpose: ..."; each must
+//                   bring exactly one error, any other error fails (the check at the end)
 //   gputest --bench                 instance / device / swapchain creation, FIFO / MAILBOX /
 //                                   IMMEDIATE frame times of a clear-and-present loop, the 1M
 //                                   compute round trip
@@ -140,6 +145,21 @@ impl T {
 
     pub fn fail(&mut self, what: &str) {
         self.ok(false, what);
+    }
+
+    /// before a hazard a test provokes on purpose (the layer on): a note on stderr, right before the layer's
+    /// message (build_rs.py run and test print stderr after stdout, so a note on stdout stands far from it);
+    /// -> the errors so far, for provoked()
+    pub fn provoke(&self, what: &str) -> u32 {
+        plat::write_stderr(format!("gputest: the next validation error is provoked on purpose: {what}\n").as_bytes());
+        gpu::validation_messages().0
+    }
+
+    /// after it: exactly one error came and counts as provoked; any other in between fails here and at the end
+    pub fn provoked(&mut self, e0: u32, what: &str) {
+        let n = gpu::validation_messages().0 - e0;
+        self.expected += n.min(1);
+        self.ok(n == 1, &format!("synchronization validation reports {what}: {n} error(s) on stderr, 1 provoked"));
     }
 
     /// Some(value), or a failure with the error
@@ -470,18 +490,16 @@ fn syncval(t: &mut T) {
     let dev = &g.dev;
     let Some(src) = t_compute::storage(t, dev, 1024, BufferUsage::NONE) else { return };
     let Some(dst) = t_compute::storage(t, dev, 1024, BufferUsage::NONE) else { return };
-    let (e0, _) = gpu::validation_messages();
+    let e0 = t.provoke("syncval: a fill after a copy into one buffer, no barrier between them");
     let Some(mut e) = t.res(dev.encoder(), "encoder") else { return };
     e.copy_buffer(&src, 0, &dst, 0, 1024);
     e.fill_buffer(&dst, 0, 1024, 7); // no barrier: write after write
     run_wait(t, dev, e.finish(), "hazard");
-    let (e1, _) = gpu::validation_messages();
-    t.expected += e1 - e0;
-    out(&format!("  (the {} validation error(s) above are expected)", e1 - e0));
-    t.ok(e1 > e0, "synchronization validation reports a missing barrier");
+    t.provoked(e0, "a missing barrier");
     // the same between two dispatches: only what the shaders access through their bindings shows it
     let Some(fp) = t_compute::Fill::new(t, dev) else { return };
     let Some(bg) = fp.group(t, dev, &dst) else { return };
+    let e1 = t.provoke("syncval: two dispatches writing one buffer, no barrier between them");
     let Some(mut e) = t.res(dev.encoder(), "encoder") else { return };
     e.set_compute_pipeline(&fp.pipe);
     e.set_bind_group(0, &bg);
@@ -489,10 +507,7 @@ fn syncval(t: &mut T) {
     e.dispatch(4, 1, 1);
     e.dispatch(4, 1, 1); // no barrier: write after write, in the shader
     run_wait(t, dev, e.finish(), "hazard between shaders");
-    let (e2, _) = gpu::validation_messages();
-    t.expected += e2 - e1;
-    out(&format!("  (the {} validation error(s) above are expected)", e2 - e1));
-    t.ok(e2 > e1, "synchronization validation reports a missing barrier between two shaders");
+    t.provoked(e1, "a missing barrier between two shaders");
 }
 
 fn run() -> i32 {
@@ -555,7 +570,7 @@ fn run() -> i32 {
     if validate {
         let (e, w) = gpu::validation_messages();
         let e = e - t.expected;
-        t.ok(e == 0, &format!("validation layer: {e} errors (besides the {} provoked), {w} warnings", t.expected));
+        t.ok(e == 0, &format!("validation layer: {e} errors (besides the {} provoked, announced on stderr), {w} warnings", t.expected));
     }
     if t.fails > 0 {
         out(&format!("{} check(s) failed", t.fails));
