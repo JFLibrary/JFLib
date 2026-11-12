@@ -4195,7 +4195,13 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   commit "text" [N]   an input method commits the text (N times over: one long commit)
   cmd ID [ARG]    run a command as if a menu item was chosen
   wait MS         advance the virtual clock (16 ms frames; timers, animations and the
-                  sleep()s of async tasks)
+                  sleep()s of async tasks); nothing else happens meanwhile: the same run
+                  every time
+  wait real MS    MS of real time pass while the app's own threads work: their wake-ups
+                  (plat::wake) reach App::command (UIC_WAKE) as they come, and the virtual
+                  clock follows the real one (timers, animations, frames asked for); for apps
+                  whose engine runs on threads of its own (not deterministic: expect what
+                  holds however long the threads took)
   shot FILE.png   render and save a screenshot
   dump [FILE]     print / save the widget tree
   expect S exists | missing | hover | nohover | focused | checked | unchecked | disabled |
@@ -4265,9 +4271,11 @@ Windows (ID = the app's window id, 0 / main = the main window):
                                 main window's client area): popups of every window may leave
                                 it up to there and flip at its edges; off (the default): the
                                 main window's client area holds all popups
-  sync [MS]                     wait until no background job is pending: the app's sync hook,
+  sync [MS] [soft]              wait until no background job is pending: the app's sync hook,
                                 the async tasks' work (blocking jobs, wake-ups) and the spell
-                                checker's workers (suggestions, edit_spell.rs)
+                                checker's workers (suggestions, edit_spell.rs); real time, at
+                                most MS (default 10 s): reaching it fails the script, with soft
+                                it does not (a note is printed; the expects that follow decide)
   expect sound KIND|none        the last sound ui.beep / ui.dialog_sound asked for since the
                                 last check (default, information, warning, error, question,
                                 notify; headless runs play none)

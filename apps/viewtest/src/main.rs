@@ -31,6 +31,11 @@
 //                        zoom-in, the north-east corner, a custom cursor of the page's own;
 //                        "Eigener größer" redraws it (ui.cursor_replace), "Eigener frei" frees it
 //                        (ui.cursor_free); "Zeiger:" says ui.cursor_at under the pointer
+//   "Hintergrund"        a thread of the app's own works 300 ms of real time, then plat::wake
+//                        (an engine's thread): UIC_WAKE shows it ("Hintergrund: N"); meanwhile a
+//                        timer polls every 100 ms ("Abfrage: läuft / fertig", an extension
+//                        page's poll); tests/realwait.uis with `wait real`
+//   "Hängt"              the sync hook says a job is running (`sync MS soft`)
 //
 // tests/keys.uis, tests/menus.uis and tests/links.uis drive it; the texts above the page say what
 // it saw.
@@ -41,10 +46,12 @@
 
 extern crate alloc;
 
+use alloc::boxed::Box;
 use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use plat::a11y::Role;
 use ui::*;
@@ -69,6 +76,8 @@ const ID_DIRS: u32 = 116; // "Ordner wählen"
 const ID_NOTE: u32 = 117; // "Notiz": a text box of this id in the main window and in the app window
 const ID_CHAIN: u32 = 118; // "Kette"
 const ID_AGAIN: u32 = 119; // "Immer neu"
+const ID_WORK: u32 = 120; // "Hintergrund"
+const ID_HANG: u32 = 121; // "Hängt"
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 const ID_FD_DIR: u32 = 0x11_0000; // the folder dialog (FD_FOLDER)
 
@@ -77,6 +86,17 @@ const CMD_RELOAD: u32 = 2;
 const CMD_COPY: u32 = 3; // a row of the page's menu (Mi::Item)
 const CMD_TREE: u32 = 4; // after the frame: the tree is complete
 const CMD_CHAIN: u32 = 5; // "Kette": one link of the chain
+
+const T_POLL: u32 = 1; // "Hintergrund": the timer that polls the thread's result
+
+// "Hintergrund": the work the app's thread finished (it counts up, then plat::wake)
+static WORK_DONE: AtomicU32 = AtomicU32::new(0);
+// "Hängt": the sync hook reports a job that never ends
+static HANG: AtomicBool = AtomicBool::new(false);
+
+fn sync_pending() -> bool {
+    HANG.load(Ordering::Relaxed)
+}
 
 // the page's context menu
 static PAGE_MENU: [Mi; 3] = [Mi::Cmd(CMD_RELOAD), Mi::Sep, Mi::Item(CMD_COPY, "Link kopieren", 0)];
@@ -149,6 +169,10 @@ struct ViewTest {
     app_open: Shared<i32>,
     app_rect: Shared<WinRect>,
     app_tab: u32,
+    /// "Hintergrund": the thread's work UIC_WAKE saw, the poll timer's state; "Hängt"
+    work_seen: u32,
+    polled: &'static str,
+    hang: i32,
 }
 
 // (E3) the cursors "Zeiger wechseln" walks through (0: the page's arrow / hand)
@@ -200,6 +224,9 @@ impl Default for ViewTest {
             app_open: Shared::new(0),
             app_rect: Shared::new(WinRect::new(0, 0, 480, 240, 0)),
             app_tab: 0,
+            work_seen: 0,
+            polled: "-",
+            hang: 0,
         }
     }
 }
@@ -372,12 +399,13 @@ impl ViewTest {
 }
 
 impl App for ViewTest {
-    fn init(&mut self, _ui: &mut Ui) -> bool {
+    fn init(&mut self, ui: &mut Ui) -> bool {
         // --app-window: the app window is open from the start (real-window checks without input,
         // tools/x11check.py appwin)
         if plat::args().iter().any(|a| a == "--app-window") {
             self.app_open.set(1);
         }
+        ui.sync_hook_set(Some(sync_pending));
         true
     }
 
@@ -473,6 +501,22 @@ impl App for ViewTest {
             ui.invalidate();
         }
         ui.box_end();
+        // a thread of the app's own (an engine's): real time, then plat::wake; a timer polls
+        ui.box_begin(0, BOX_H, 8);
+        if ui.button(ID_WORK, "Hintergrund") & EV_ACT != 0 {
+            plat::thread_spawn(0, Box::new(|| {
+                plat::sleep_ms(300);
+                WORK_DONE.fetch_add(1, Ordering::Relaxed);
+                plat::wake();
+            }));
+            self.polled = "läuft";
+            ui.timer(T_POLL, 100);
+        }
+        if ui.checkbox(ID_HANG, "Hängt", &mut self.hang) & EV_ACT != 0 {
+            HANG.store(self.hang != 0, Ordering::Relaxed);
+        }
+        ui.text(TS_BODY, &format!("Hintergrund: {} Abfrage: {}", self.work_seen, self.polled));
+        ui.box_end();
         ui.box_end();
         // (E7) an independent app window: its own title bar with a tab and the caption buttons
         let (open, rect) = (self.app_open.clone(), self.app_rect.clone());
@@ -507,7 +551,7 @@ impl App for ViewTest {
         ui.flyout_end();
     }
 
-    fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
+    fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
         match id {
             CMD_TREE => {
                 // what a screen reader gets: the page's links as links with their names
@@ -519,6 +563,15 @@ impl App for ViewTest {
             CMD_RELOAD => self.reload += 1,
             CMD_COPY => self.copy += 1,
             CMD_CHAIN => self.chain += 1,
+            // "Hintergrund": the thread's wake-up, the poll timer
+            UIC_WAKE => self.work_seen = WORK_DONE.load(Ordering::Relaxed),
+            UIC_TIMER if arg == T_POLL => {
+                if WORK_DONE.load(Ordering::Relaxed) > 0 {
+                    self.polled = "fertig";
+                } else {
+                    ui.timer(T_POLL, 100);
+                }
+            }
             _ => return false,
         }
         true

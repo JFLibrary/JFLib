@@ -50,7 +50,13 @@
 //   commit "text" [N]   an input method commits the text (N times over: one long commit)
 //   cmd ID [ARG]    run a command as if a menu item was chosen
 //   wait MS         advance the virtual clock (16 ms frames; timers, animations and the
-//                   sleep()s of async tasks)
+//                   sleep()s of async tasks); nothing else happens meanwhile: the same run
+//                   every time
+//   wait real MS    MS of real time pass while the app's own threads work: their wake-ups
+//                   (plat::wake) reach App::command (UIC_WAKE) as they come, and the virtual
+//                   clock follows the real one (timers, animations, frames asked for); for apps
+//                   whose engine runs on threads of its own (not deterministic: expect what
+//                   holds however long the threads took)
 //   shot FILE.png   render and save a screenshot
 //   dump [FILE]     print / save the widget tree
 //   expect S exists | missing | hover | nohover | focused | checked | unchecked | disabled |
@@ -120,9 +126,11 @@
 //                                 main window's client area): popups of every window may leave
 //                                 it up to there and flip at its edges; off (the default): the
 //                                 main window's client area holds all popups
-//   sync [MS]                     wait until no background job is pending: the app's sync hook,
+//   sync [MS] [soft]              wait until no background job is pending: the app's sync hook,
 //                                 the async tasks' work (blocking jobs, wake-ups) and the spell
-//                                 checker's workers (suggestions, edit_spell.rs)
+//                                 checker's workers (suggestions, edit_spell.rs); real time, at
+//                                 most MS (default 10 s): reaching it fails the script, with soft
+//                                 it does not (a note is printed; the expects that follow decide)
 //   expect sound KIND|none        the last sound ui.beep / ui.dialog_sound asked for since the
 //                                 last check (default, information, warning, error, question,
 //                                 notify; headless runs play none)
@@ -870,8 +878,13 @@ impl Ui {
                 self.run_passes(app);
             }
             "wait" => {
-                let (ms, _) = parse_int(a);
-                self.advance_time(app, ms);
+                if let Some(r) = word_eq(a, "real") {
+                    let (ms, _) = parse_int(r);
+                    self.wait_real(app, ms);
+                } else {
+                    let (ms, _) = parse_int(a);
+                    self.advance_time(app, ms);
+                }
             }
             "shot" => self.sc_shot(app, a),
             "dump" => self.dump(if a.is_empty() { None } else { Some(a) }),
@@ -2460,10 +2473,41 @@ impl Ui {
         self.run_passes(app);
     }
 
-    // sync [MS]: wait (real time, default 10 s) until no background job is pending (the app's
-    // hook, async tasks: tasks.rs)
+    // wait real MS: real time passes while the app's own threads work; their wake-ups reach
+    // App::command as they come (E_WAKE -> UIC_WAKE, tasks, ...), and the virtual clock follows
+    // the real one in steps of at most 16 ms (timers fire, frames asked for come)
+    fn wait_real(&mut self, app: &mut dyn App, ms: i32) {
+        let end = plat::time_us() + ms.max(0) as u64 * 1000;
+        let mut clock = plat::time_us(); // the real time the virtual clock has caught up with
+        loop {
+            let now = plat::time_us();
+            let gone = ((now - clock) / 1000) as i32;
+            if gone > 0 {
+                clock += gone as u64 * 1000;
+                self.advance_time(app, gone);
+            }
+            self.process_events(app); // the wake-ups that came (E_WAKE)
+            if self.need {
+                self.need = false;
+                self.run_passes(app);
+            }
+            if now >= end {
+                break;
+            }
+            // headless: plat::wake() from other threads arrives through the wait object
+            plat::wait_events((now + 16_000).min(end), &mut |e| {
+                plat::evq_push(*e);
+            });
+        }
+        self.process_events(app);
+        self.run_passes(app);
+    }
+
+    // sync [MS] [soft]: wait (real time, default 10 s) until no background job is pending (the
+    // app's hook, async tasks: tasks.rs); reaching MS fails, with soft it is only noted
     fn sc_sync(&mut self, app: &mut dyn App, a: &[u8]) {
-        let (ms, _) = parse_int(a);
+        let (ms, r) = parse_int(a);
+        let soft = word_eq(skip_ws(a), "soft").is_some() || word_eq(skip_ws(r), "soft").is_some();
         let ms = if ms > 0 { ms } else { 10000 };
         let deadline = plat::time_us() + ms as u64 * 1000;
         while self.uiw_sync_pending() || self.tasks_busy() || self.spell_busy() {
@@ -2475,7 +2519,11 @@ impl Ui {
             self.process_events(app);
             self.run_passes(app);
             if plat::time_us() >= deadline {
-                self.fail(b"background jobs still running");
+                if soft {
+                    plat::write_stdout(alloc::format!("sync: background jobs still running after {ms} ms (soft: no failure)\n").as_bytes());
+                } else {
+                    self.fail(b"background jobs still running");
+                }
                 break;
             }
         }

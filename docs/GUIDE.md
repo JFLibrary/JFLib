@@ -1684,7 +1684,8 @@ impl App for Copier {
   `netio::Client::request_async` and `download(url, headers, name, &ctl)` do the same for HTTP.
 * Test scripts stay deterministic: `sync` waits until no task work is in flight (pool jobs and
   the wake-ups they send), `wait MS` moves the task clock (`sleep` follows the virtual clock in
-  headless runs); wake-ups from other threads reach headless tasks only at `sync`.
+  headless runs); wake-ups from other threads reach headless tasks only at `sync` and in
+  `wait real MS` (real time for an app's own threads, section 12).
   [`apps/asynctest`](../apps/asynctest/main.rs) shows a copy with a progress bar and a cancel
   button and the scripts that step through it.
 * A panic in a task or a blocking job ends the process like any panic (exit code 3). In the
@@ -1953,7 +1954,8 @@ in DIP):
 | `preedit "text" [CURSOR]` | an input method's composition (`ui.ime_preedit`; CURSOR a byte offset, default the end; `""` ends it) |
 | `focus S` | keyboard focus to a widget (focus ring shown) |
 | `cmd ID [ARG]` | run a command as if a menu row was chosen |
-| `wait MS` | advance the virtual clock (16 ms frames; a frame the app or the library asked for comes with the next one, as in the window loop) |
+| `wait MS` | advance the virtual clock (16 ms frames; a frame the app or the library asked for comes with the next one, as in the window loop); nothing else happens meanwhile, so the run is the same every time |
+| `wait real MS` | MS of real time pass while the app's own threads work (an engine with threads of its own): their wake-ups (`plat::wake`) reach `App::command` (`UIC_WAKE`) as they come, and the virtual clock follows the real one (timers fire, frames asked for come). Not deterministic: expect what holds however long the threads took, or `sync` on a hook first |
 | `size W H`, `theme dark\|light\|contrast`, `scale P [window ID]` | window size, theme, dpi |
 | `theme file PATH`, `theme none`, `style NAME` | an app theme from a file (an error is printed and remembered, the theme stays), none, another linked style (§34) |
 | `expect theme "NAME"\|none`, `expect theme error "TEXT"\|none`, `expect style NAME` | the app theme, the error of the last `theme file` (contains TEXT), the style in use |
@@ -1965,7 +1967,7 @@ in DIP):
 | `window ID\|main\|any` | selectors only look into that window |
 | `expect window ID open\|closed\|visible\|active\|modal\|keys`, `expect window ID rect X Y W H` | secondary windows (`keys`: the window the keys go to now -- a tool window borrows them after F6 / Ctrl+F6, §27) |
 | `close window ID`, `movewin ID X Y`, `resizewin ID W H`, `activate ID` | the user moves / closes windows |
-| `sync [MS]` | wait until no background job is pending (`sync_hook_set`) |
+| `sync [MS] [soft]` | wait (real time, at most MS, default 10 s) until no background job is pending (`sync_hook_set`, async tasks, the spell checker); reaching MS fails the script, with `soft` it does not (a note is printed, the expects after it decide). The virtual clock stands still meanwhile: timers of the app fire in `wait real`, not in `sync` |
 | `expect_warn`, `expect_nowarn` | a `UIWARN` was / was not printed since the last check |
 | `gpu on [fast]\|off`, `gpu wait [MS]`, `gpu hold MS`, `gpu lose`, `gpu print`, `gpu budget BYTES`, `gpu tilebudget BYTES`, `gpu settle`, `gpu shot FILE`, `gpu expect gpu\|cpu\|same\|window\|screen\|upload N\|base N\|raster N\|layers N\|images N\|apart N\|tiles N\|fills N\|nodiff` | (Windows, Linux with the GPU; else a SKIP once; GPU.md "Ausgabe der UI") `gpu on`: real windows through the swapchain, shown without activation, every presented image read back and compared with the framebuffer (`fast`: not read back, for measurements), a render after every input edge; a canvas stays on its tiles until `settle` or `same`. `wait`: until the windows are on the swapchain again. `hold`: real time passes, the windows stay as they are (a look from outside). `lose`: the device behaves as lost. `budget`: what image textures may take, `tilebudget`: what canvas tiles may take. `settle`: every canvas back to the CPU's picture. `shot`: the image the window presents now, also a gesture's tiles (`shot` writes the framebuffer). `same`: every canvas settled, every window presents once more, byte for byte; `window`: the window's DC = the framebuffer (the CPU path); `screen`: the composed screen = the framebuffer (a covered window is a note; X11: what the server holds; Wayland: a note, no client can read a window); `upload N`: at most N bytes uploaded since the last check; `base N`: at most N of them to the base texture; `raster N`: at most N pixels of the base layer drawn; `layers N`: N layers above the base have a texture now; `images N`: N image textures exist; `apart N`: N canvases come from tiles now; `tiles N`: N tiles exist; `fills N`: at most N tiles drawn since the last check; `nodiff`: no pixel of a canvas's tiles differed from the CPU's since the last `same` or `nodiff` |
 | `expect scrollcopy [N]\|none` | at least N (default 1) / no rendered frames moved pixels by a scroll copy since the last check (§5; frames checked by `--verify-dirty` copy whenever they can, `jfgui_DEBUG=1` prints each copy) |
