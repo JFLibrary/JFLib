@@ -44,6 +44,7 @@ const JF_ASYNC: u32 = 2;
 const TS_NONE: u32 = 0;
 const TS_INIT: u32 = 1;
 const TS_READY: u32 = 2;
+const TS_STOP: u32 = 3; // one thr_shutdown owns the pool and takes it down
 const JS_RUNNING: u32 = 1;
 const JS_DONE: u32 = 2;
 const JS_STARTING: u32 = 3; // one Job::start owns the record and resets it (not yet visible)
@@ -165,7 +166,7 @@ pub fn thr_init(n: u32) -> u32 {
         if POOL.state.compare_exchange(TS_NONE, TS_INIT, SeqCst, SeqCst).is_ok() {
             break;
         }
-        thread_yield(); // another thread is starting the pool
+        thread_yield(); // another thread is starting or stopping the pool
     }
     let mut want = n as usize;
     if let Some(v) = crate::arg_value("--threads").and_then(|v| v.parse::<i32>().ok()) {
@@ -210,15 +211,22 @@ pub fn thr_count() -> u32 {
 
 /// stop the workers once the queue is empty, join them; a later call starts a new pool
 pub fn thr_shutdown() {
-    if POOL.state.load(SeqCst) != TS_READY {
-        return;
+    // take the pool over first: two shutdowns at once must not both take the threads and drop
+    // the semaphores a worker may still wait on; the second waits until the first is through
+    loop {
+        match POOL.state.compare_exchange(TS_READY, TS_STOP, SeqCst, SeqCst) {
+            Ok(_) => break,
+            Err(TS_NONE) => return,
+            Err(_) => thread_yield(), // another thread starts or stops the pool
+        }
     }
     POOL.quit.store(1, SeqCst);
     let n = POOL.n.load(SeqCst);
     if let Some(s) = work_sem() {
         s.post(n);
     }
-    // SAFETY: no job runs (the caller's promise); the workers only read the cells.
+    // SAFETY: TS_STOP belongs to this call alone; no job runs (the caller's promise); the
+    // workers only read the cells.
     unsafe {
         let threads = &mut *POOL.threads.get();
         for t in threads.iter_mut().take(n as usize) {
