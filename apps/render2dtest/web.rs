@@ -79,6 +79,8 @@ struct Test {
     deep: DeepStats,
     deep_arcs: DeepStats,
     deep_curves: DeepStats,
+    /// (G6b2) the deep zoom's lines as an insert moved there and as one scaled by 1e5
+    deep_ins: [DeepStats; 2],
     fine: Vec<Vec<[f64; 2]>>,
     /// the deep hatch: a hatched frame waiting for its solid one; the lines' and the outline's stats
     hatched: Option<Vec<u8>>,
@@ -154,12 +156,13 @@ impl Probe {
         self.yes(!r.multi_draw(), "the browser's level Basis: one indirect draw per layer");
         let (dc, fine) = deep_curves();
         let mut t = Test { jobs: Vec::new(), scenes: Vec::new(), vis: Vec::new(), origin: [None, None, None], far: Vec::new(), deep: DeepStats::default(), deep_arcs: DeepStats::default(),
-                           deep_curves: DeepStats::default(), fine, hatched: None, hatch_lines: DeepStats::default(), hatch_edge: DeepStats::default(), phase: Vec::new(), phase_done: false };
+                           deep_curves: DeepStats::default(), fine, hatched: None, hatch_lines: DeepStats::default(), hatch_edge: DeepStats::default(), phase: Vec::new(), phase_done: false,
+                           deep_ins: [DeepStats::default(); 2] };
         for shot in shots() {
             let mut off = Off::new(dev, shot.w, shot.h)?;
             let mut s = Scene::new(&r)?;
             s.set_camera(&shot.cam)?;
-            build(&mut s, &shot.d)?;
+            shot.build(&mut s)?;
             off.submit(&mut r, &mut s)?;
             t.jobs.push(Job { off, kind: Kind::Send(shot.name, shot.alpha) });
             t.scenes.push(s);
@@ -181,15 +184,19 @@ impl Probe {
                 t.scenes.push(s);
             }
         }
-        // the deep zoom: lines, rings, curves
-        for which in 0..3u8 {
+        // the deep zoom: lines, rings, curves; the lines as a block moved there and scaled by 1e5 (G6b2)
+        for which in 0..5u8 {
             let mut s = Scene::new(&r)?;
             s.set_camera(&deep_camera(0))?;
-            build(&mut s, &match which {
-                0 => deep_drawing(),
-                1 => deep_arc_drawing(),
-                _ => dc.clone(),
-            })?;
+            match which {
+                3 => build_blocks(&mut s, &deep_insert_drawing(1.0, 0.0, false)).map(|_| ())?,
+                4 => build_blocks(&mut s, &deep_insert_drawing(1.0e5, -1.1, true)).map(|_| ())?,
+                _ => build(&mut s, &match which {
+                    0 => deep_drawing(),
+                    1 => deep_arc_drawing(),
+                    _ => dc.clone(),
+                }).map(|_| ())?,
+            }
             for step in 0..DEEP_STEPS {
                 let c = deep_camera(step);
                 s.set_camera(&c)?;
@@ -285,6 +292,8 @@ impl Probe {
                 Kind::Far(Some(k), which) => t.far.push((*k, *which, img)),
                 Kind::Deep(c, 0) => deep_judge(&img, c, &mut t.deep),
                 Kind::Deep(c, 1) => deep_arc_judge(&img, c, &mut t.deep_arcs),
+                Kind::Deep(c, 3) => deep_judge(&img, c, &mut t.deep_ins[0]),
+                Kind::Deep(c, 4) => deep_judge(&img, c, &mut t.deep_ins[1]),
                 Kind::Deep(c, _) => deep_curve_judge(&img, c, &t.fine, &mut t.deep_curves),
                 Kind::DeepHatch(_, false) => t.hatched = Some(img),
                 Kind::DeepHatch(c, true) => {
@@ -313,6 +322,10 @@ impl Probe {
             self.yes(t.deep.fine(), &text);
             let text = t.deep_arcs.arc_text();
             self.yes(t.deep_arcs.fine_arcs(), &text);
+            for (k, name) in ["moved there", "scaled by 1e5, turned, mirrored"].into_iter().enumerate() {
+                let text = format!("an insert {name}: {}", t.deep_ins[k].text());
+                self.yes(t.deep_ins[k].fine(), &text);
+            }
             let d = &t.deep_curves;
             self.yes(d.checks > 100 && d.lost == 0 && d.worst <= 1.0 / 16.0, &format!("curves at 1e-6 units per pixel near 1e7 (an ellipse of radii 1e7 and 6e6, a Bézier with controls 1e6 away), 24 pans: {} crossings, \
                                                                                   the largest distance from where the curve belongs {:.4} px, {} without it", d.checks, d.worst, d.lost));
@@ -371,12 +384,19 @@ impl Probe {
             cad::Mode::Plain
         } else if plat::env("jfgui_GPU_PROBE_ARCS").is_some() {
             cad::Mode::Arcs
-        } else {
+        } else if plat::env("jfgui_GPU_PROBE_FILLS").is_some() {
             cad::Mode::Fills
+        } else {
+            cad::Mode::Blocks
         };
-        let c = cad::build(&mut s, n, 5, styled, mode)?;
-        say(&format!("bench: {} records in {} entities ({} arcs and circles of {} pieces, {} dashed of {} records, {} fills ({} hatched) of {} records, {} curves of {} records), {:.0} x {:.0} m, inserted in {:.0} ms (wasm)",
-                     c.segments, c.entities, c.arcs, c.arc_records, c.dashed, c.dashed_records, c.fills, c.hatched, c.fill_records, c.curves, c.curve_records, c.width, c.height, (plat::time_us() - t0) as f64 / 1000.0));
+        // (the estate: a block of about n records inserted jfgui_GPU_PROBE_INSERTS times, G6b2)
+        let c = match plat::env("jfgui_GPU_PROBE_ESTATE") {
+            Some(_) => cad::estate(&mut s, plat::env("jfgui_GPU_PROBE_INSERTS").and_then(|v| v.parse().ok()).unwrap_or(10_000), styled)?,
+            None => cad::build(&mut s, n, 5, styled, mode)?,
+        };
+        say(&format!("bench: {} records in {} entities ({} arcs and circles of {} pieces, {} dashed of {} records, {} fills ({} hatched) of {} records, {} curves of {} records, {} blocks inserted {} times: {} records),                       {:.0} x {:.0} m, inserted in {:.0} ms (wasm)",
+                     c.segments, c.entities, c.arcs, c.arc_records, c.dashed, c.dashed_records, c.fills, c.hatched, c.fill_records, c.curves, c.curve_records, c.blocks, c.inserts, c.insert_records, c.width, c.height,
+                     (plat::time_us() - t0) as f64 / 1000.0));
         let size = (1920, 1080);
         let off = dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?;
         self.mode = Mode::Bench(Box::new(Bench { r, s, off, used: false, size, cads: [c], styled, n, view: 0, sent: 0, done: 0, flight: Vec::new(), t0: 0, cam: Camera::new([0.0, 0.0], 1.0), cpu_ms: Vec::new() }));

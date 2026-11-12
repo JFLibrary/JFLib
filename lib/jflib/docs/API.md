@@ -64,7 +64,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs) · [mtl_cmd.rs (Apple)](#gpumtl_cmdrs-apple) · [mtl_dev.rs (Apple)](#gpumtl_devrs-apple) · [mtl_res.rs (Apple)](#gpumtl_resrs-apple) · [mtl_swap.rs (Apple)](#gpumtl_swaprs-apple)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
-- [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles with layers and styles, dash patterns, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
+- [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
   <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [scene.rs](#render2dsceners)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
@@ -21362,12 +21362,14 @@ CLASS_MAX: u32 = CLASS_MIN << (CLASSES - 1)
 
 ## render2d
 
-*the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles with layers and styles, dash patterns, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU* -- crate root [`lib/render2d/lib.rs`](../lib/render2d/lib.rs)
+*the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU* -- crate root [`lib/render2d/lib.rs`](../lib/render2d/lib.rs)
 
 ```text
-render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a, G6b1; docs/RENDER2D.md): a retained scene of
+render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a, G6b; docs/RENDER2D.md): a retained scene of
 entities with stable ids (lines, polylines, arcs and circles; Bézier curves, ellipses and splines flattened per zoom
-band on the CPU, curve.rs; fills of rings, triangulated on the CPU, fill.rs), layers and styles; strokes as quads whose
+band on the CPU, curve.rs; fills of rings, triangulated on the CPU, fill.rs; blocks inserted many times, their records
+once on the GPU and each insert an instance with its transform, G6b2), layers and styles (transparency per layer and
+entity, by block); strokes as quads whose
 coverage the fragment shader computes from the geometry (no MSAA), with exact butt, square and round caps and miter,
 bevel and round joins, dash patterns in pixels or drawing units; fills with their edge's exact coverage, every pixel
 blended once, and hatches from the camera's place in f64; f64 coordinates, a pair of f32 per axis on the GPU with the
@@ -21379,6 +21381,8 @@ same WGSL on every path: compiled ahead (shaders_spv.rs) on Vulkan, handed to th
   Scene::new(&renderer) -> Result<Scene>
   scene.add_style(&Style) -> StyleId, set_style; add_layer(&Layer) -> LayerId, set_layer, remove_layer
   scene.insert(layer, style, &Shape) -> EntityId, update(id, &Shape), set_entity_style(id, style), remove(id)
+  scene.add_block(&Block) -> BlockId, insert_in(block, style, &Shape); Shape::Insert(Insert) places a block on a
+       layer or in another block (moved by update, arrays as DXF's MINSERT)
   scene.set_camera(&Camera)                                   centre (f64), scale (units per pixel), rotation
   a frame:
        scene.prepare(&mut renderer, (w, h))?;         waits for this slot's last frame, uploads what changed
@@ -21403,15 +21407,17 @@ PAGE: u32 = 256
 BATCH: u32 = 16384
 /// the most visible layers (stroke.wgsl: first_instance = layer << 16 on Voll)
 LAYERS_MAX: u32 = 65535
-/// the WGSL sources as the device gets them (common.wgsl in front of each; stroke.wgsl with fs_full from full_body.wgsl, the same body
-/// as the function full_body, and fill.wgsl)
+/// the WGSL sources as the device gets them (common.wgsl in front of each, block.wgsl behind it in those that place records;
+/// stroke.wgsl with fs_full from full_body.wgsl, the same body as the function full_body, and fill.wgsl)
 COMMON_WGSL: &str = include_str!("common.wgsl")
-CULL_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("cull.w ...
+BLOCK_WGSL: &str = include_str!("block.wgsl")
+CULL_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block. ...
 SCATTER_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("scatte ...
-STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("stroke ...
+STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block. ...
 COUNT_SPV: &[u32] = spv::COUNT
 SCAN_SPV: &[u32] = spv::SCAN
 WRITE_SPV: &[u32] = spv::WRITE
+INSTANCES_SPV: &[u32] = spv::INSTANCES
 SCATTER_SPV: &[u32] = spv::SCATTER
 VS_SPV: &[u32] = spv::VS
 VS_FULL_SPV: &[u32] = spv::VS_FULL
@@ -21623,9 +21629,16 @@ pool, the GPU copies what stays across (no copy within one buffer: WebGPU forbid
 records come from the CPU.
 
 What a frame sends (prepare, then Renderer::record copies it inside the frame's commands, behind the barrier
-against the frame before): the view; the styles when they changed; the visible layers' pages and table when they
-changed; the changed records, in runs (few runs: a copy each) or through the scatter shader (many).  A prepare
-that never reached a submission: the next sends everything again.
+against the frame before): the view; the styles when they changed; the visible layers' entries and table when they
+changed; the changed records, in runs (few runs: a copy each) or through the scatter shader (many); the changed
+instances.  A prepare that never reached a submission: the next sends everything again.
+
+Blocks (G6b2, docs/RENDER2D.md "Blöcke"): a block's entities are Ents of no layer, in its list; its records lie once
+in the pool, in variants (one per zoom band its instances need where it holds curves or fills, one with its arcs as
+curves for uneven scales) whose regions follow the layers'.  An insert on a layer holds one record of zeros there (its
+place in the order).  The instances (each copy of an insert on a layer, each copy of a nested insert per instance of
+its block, depth first) are laid out anew when inserts or blocks change, else only moved inserts' transforms go up;
+the visibility's entries name a page, an instance, a range of the page (several small instances in one entry).
 ```
 
 - **`struct Camera`**
@@ -21712,6 +21725,28 @@ HATCH_DASH_MAX: usize = 6
     `hatch_width` px wide (0, or thinner than a pixel: 1 px); strokes ignore it
   - `hatches: u32`
   - `hatch_width: f32`
+  - `transparency: Transparency` -- AutoCAD's transparency of what the style draws: its layer's (the default), its block insert's, or its own; the
+    colour's alpha times 1 - percent / 100 (G6b2)
+  - `by_block: u32` -- inside a block, what an entity of this style takes from its insert's style instead of its own (BY_BLOCK_COLOR,
+    BY_BLOCK_WIDTH, BY_BLOCK_DASH; DXF's ByBlock); outside a block the style's own (G6b2)
+
+- **`enum Transparency`**
+  AutoCAD's transparency of an entity (Style::transparency): 0 to TRANSPARENCY_MAX percent, multiplied into the colour's
+  alpha (alpha (100 - percent) / 100, rounded); not group compositing: overlapping entities blend each (docs/RENDER2D.md
+  "Transparenz")
+  - `ByLayer` -- its layer's (Layer::transparency)
+  - `ByBlock` -- inside a block its insert's style's (that one's ByLayer: the insert's layer); outside a block none
+  - `Percent(u32)` -- its own, in percent
+
+```rust
+/// the most transparency AutoCAD has (percent)
+TRANSPARENCY_MAX: u32 = 90
+/// Style::by_block: inside a block the colour, the width (and its unit), the dash pattern (entries, unit, phase) come from
+/// the insert's style
+BY_BLOCK_COLOR: u32 = 1
+BY_BLOCK_WIDTH: u32 = 2
+BY_BLOCK_DASH: u32 = 4
+```
 
 **`impl Style`**
 
@@ -21729,10 +21764,62 @@ HATCH_DASH_MAX: usize = 6
   a layer's settings.  Made with `new` and changed field by field (it may grow)
   - `visible: bool`
   - `order: i32` -- layers are drawn by this, lowest first; equal ones in the order they were added
+  - `transparency: u32` -- AutoCAD's transparency of the entities whose style says Transparency::ByLayer (percent, 0 to TRANSPARENCY_MAX; G6b2):
+    changing it sends no records
 
 **`impl Layer`**
 
 - **`const fn new(order: i32) -> Layer`**
+
+- **`struct BlockId`**
+  a block of a Scene: entities defined once (Scene::insert_in, in the block's units) and inserted many times
+  (Shape::Insert); dead after remove_block
+  - `slot: u32`
+
+- **`struct Block`**
+  a block's settings.  Made with `new` and changed field by field (it may grow)
+  - `base: [f64; 2]` -- the point of the block that lands on an insert's `at` (DXF's base point)
+
+**`impl Block`**
+
+- **`const fn new() -> Block`**
+
+```rust
+/// the most levels of blocks inside blocks below an insert on a layer (nested inserts; a cycle is refused anyway)
+BLOCK_DEPTH: u32 = 16
+```
+
+- **`struct Insert`**
+  a block placed by an entity (Shape::Insert): its base point to `at`, scaled (each axis; a negative scale mirrors, unequal
+  magnitudes scale unevenly: circles become ellipses), turned by `rotation` (radians, counter-clockwise); an array of
+  `columns` by `rows` copies `spacing` apart along the insert's turned x and y (drawing units, not scaled: DXF's MINSERT).
+  Made with `new` and changed field by field (it may grow)
+  - `block: BlockId`
+  - `at: [f64; 2]`
+  - `rotation: f64`
+  - `scale: [f64; 2]`
+  - `columns: u32`
+  - `rows: u32`
+  - `spacing: [f64; 2]`
+
+**`impl Insert`**
+
+- **`const fn new(block: BlockId, at: [f64; 2]) -> Insert`**
+  the block at a point, unscaled, unturned, one copy
+
+- **`struct InstanceInfo`**
+  what the blocks of a scene hold and what the last prepare sent of them (Scene::instance_info).  It may grow
+  - `blocks: u32` -- live blocks; their variants in the pool (a block with curves or fills one per zoom band its inserts need, one with
+    arcs another for inserts that scale unevenly) and those variants' records
+  - `variants: u32`
+  - `block_records: u32`
+  - `instances: u32` -- instances (an insert's copies, nested inserts each once per instance of their block) and the entries of the
+    visibility
+  - `entries: u32`
+  - `rebuilt: bool` -- the instances laid out anew (an insert added or removed, a block changed, a variant came or went)
+  - `sent_instances: u32` -- instances whose transforms went up, their bytes; block records that went up (in UploadInfo's records too)
+  - `sent_bytes: u64`
+  - `sent_block_records: u32`
 
 - **`struct LayerId`**
   a layer of a Scene; dead after remove_layer
@@ -21765,6 +21852,8 @@ HATCH_DASH_MAX: usize = 6
     ended: a straight segment between them; the last back to the first), even-odd between rings (a ring inside a hole is
     an island).  Triangulated on the CPU, its edge smoothed as strokes are; the style's colour, or its hatch
     (docs/RENDER2D.md "Flächen")
+  - `Insert(Insert)` -- a block (G6b2): on a layer in its place in the order, or inside another block; its entities in their order, each with
+    its style or by block the insert's (docs/RENDER2D.md "Blöcke")
 
 ```rust
 /// the largest angle of one piece of an arc (a record): a full circle is 16 of them.  Its quad covers the piece's ring
@@ -21804,26 +21893,44 @@ ARC_STEP: f64 = core::f64::consts::PI / 8.0
 - **`fn add_layer(&mut self, l: &Layer) -> Result<LayerId>`**
   a new layer, empty, on top of those of its order
 - **`fn set_layer(&mut self, id: LayerId, l: &Layer) -> Result<()>`**
-  shown or hidden, its place in the draw order (nothing of its entities goes up)
+  shown or hidden, its place in the draw order, its transparency (nothing of its entities goes up: the layer table)
 - **`fn layer(&self, id: LayerId) -> Result<Layer>`**
 - **`fn remove_layer(&mut self, id: LayerId) -> Result<()>`**
   the layer goes, with every entity on it
 - **`fn drawn_layers(&self) -> Vec<LayerId>`**
   the visible layers in the order the last prepare drew them (the lists' order: lists_buffer)
 - **`fn insert(&mut self, layer: LayerId, style: StyleId, s: &Shape) -> Result<EntityId>`**
-  a new entity at the end of its layer (drawn over everything there)
+  a new entity at the end of its layer (drawn over everything there); an insert of a block (Shape::Insert) sits there
+  with its block's entities
 - **`fn update(&mut self, id: EntityId, s: &Shape) -> Result<()>`**
-  new geometry; the entity keeps its place in the draw order
+  new geometry; the entity keeps its place in the draw order (in its layer or its block).  An insert on a layer that
+  stays an insert of the same block with as many copies only moves: its instances' transforms go up, nothing else
 - **`fn set_entity_style(&mut self, id: EntityId, style: StyleId) -> Result<()>`**
-  another style: its records go up again
+  another style: its records go up again (a block's entity: its block's, once for all its inserts; an insert: what its
+  block's entities take by block)
 - **`fn remove(&mut self, id: EntityId) -> Result<()>`**
-  the entity goes; its records become free places (and its id dead)
+  the entity goes; its records become free places (and its id dead); a block's entity leaves its block (its records
+  go up once for all its inserts)
 - **`fn len(&self) -> u32`**
-  entities alive
+  entities alive (a block's entities and inserts each once)
 - **`fn is_empty(&self) -> bool`**
 - **`fn locate(&self, id: EntityId) -> Option<(u32, u32)>`**
   (tests, tools) an entity's records as the last prepare laid them out: its first record's place in the pool
-  and the records of its geometry (a polyline of n points: n - 1, closed n; a point: 1)
+  and the records of its geometry (a polyline of n points: n - 1, closed n; a point: 1; an insert on a layer: its one
+  record of zeros); None for a block's entity (its records lie in its block's variants)
+- **`fn add_block(&mut self, b: &Block) -> Result<BlockId>`**
+  a new block, empty: entities go into it with insert_in, Shape::Insert places it
+- **`fn block(&self, id: BlockId) -> Result<Block>`**
+- **`fn set_block(&mut self, id: BlockId, b: &Block) -> Result<()>`**
+  a block's base point changed: every insert shows it (its records go up once)
+- **`fn remove_block(&mut self, id: BlockId) -> Result<()>`**
+  the block goes with its entities; refused while an insert places it
+- **`fn insert_in(&mut self, block: BlockId, style: StyleId, s: &Shape) -> Result<EntityId>`**
+  a new entity at the end of a block (its units: the block's base lands on an insert's point); a Shape::Insert of
+  another block nests it (no cycles, at most BLOCK_DEPTH levels).  Every insert of the block shows it with the next
+  frame, the block's records going up once
+- **`fn instance_info(&self) -> InstanceInfo`**
+  what the blocks hold and what the last prepare sent of them
 - **`fn set_camera(&mut self, c: &Camera) -> Result<()>`**
 - **`fn camera(&self) -> &Camera`**
 - **`fn set_culling(&mut self, on: bool)`**

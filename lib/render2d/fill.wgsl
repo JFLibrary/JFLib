@@ -20,6 +20,11 @@
 // knows every edge through the pixel: everywhere but where more edges than its list holds come that near (details far
 // below a pixel); a triangle's pixel farther than FILL_R from its edges is simply covered.
 //
+// Inside an insert of a block (G6b2, block.wgsl) a fill's records are placed through the insert's space, its edges' bits
+// in epx lie at their place plus the entry's offset (ix.w; each instance its own), a mirrored insert's edges turned around
+// (cull.wgsl count) and their neighbours swapped, so that the inside stays on their right in pixels; its hatch is a row of
+// the table for that instance (scene.rs: the hatch's lines through the insert's transform).
+//
 // Hatches (the style's place in the hatch table + 1 in misc.w): per family the pixel's distance from the nearest line
 // and its place along it, from what scene.rs computed at the camera in f64, so that the numbers here stay small (no
 // drift at 1e7 and 1e-6 units per pixel): the line's strip by cov, its dashes along it by cov, the families together
@@ -61,7 +66,7 @@ struct VsFill {
     @location(5) @interpolate(flat) l0: vec4f,
     @location(6) @interpolate(flat) l1: vec4f,
     @location(7) @interpolate(flat) l2: vec4f,
-    // the record, an edge's previous and next one
+    // the record, an edge's previous and next one, what is added to a record's place for its edge in epx
     @location(8) @interpolate(flat) ix: vec4u,
 }
 
@@ -101,17 +106,17 @@ fn rec_u16(r: Record, j0: u32, k: u32) -> u32 {
 
 // the line of a triangle's edge from r0 to r1 (rel2's pairs) in pixels of the target: its unit normal and offset
 // (dot(q, n) = offset on it), precise near the camera (far_foot's foot where both ends lie far); the triangles at a
-// diagonal call it with the same corners in the same order
-fn tri_line(r0: vec4f, r1: vec4f) -> vec3f {
-    let half = 0.5 * view.turn.zw;
-    let p0 = to_px(r0.xy, view);
-    let p1 = to_px(r1.xy, view);
+// diagonal call it with the same corners in the same order; vw: the view or the insert's space
+fn tri_line(r0: vec4f, r1: vec4f, vw: View) -> vec3f {
+    let half = 0.5 * vw.turn.zw;
+    let p0 = to_px(r0.xy, vw);
+    let p1 = to_px(r1.xy, vw);
     let dd = vec2f((r1.x - r0.x) + (r1.z - r0.z), (r1.y - r0.y) + (r1.w - r0.w));
-    let dp = to_px(dd, view);
+    let dp = to_px(dd, vw);
     let n = unit_or_zero(vec2f(-dp.y, dp.x));
     var foot = p0;
     if min(max(abs(p0.x), abs(p0.y)), max(abs(p1.x), abs(p1.y))) > FAR && length(r1.xy - r0.xy) > 0.0 {
-        foot = far_foot(r0, r1);
+        foot = far_foot(r0, r1, vw);
     }
     return vec3f(n, dot(foot + half, n));
 }
@@ -129,14 +134,28 @@ fn in_line(l: vec4f, q: vec2f) -> bool {
 }
 
 // a fill's record: an edge's quad (its segment and FILL_R + 1 px around), a triangle's (its box along its longest side
-// and a pixel, or near a far corner the box of its corners within the target), its lines
-fn fill_vertex(vi: u32, idx: u32, r: Record, st: Style) -> VsFill {
+// and a pixel, or near a far corner the box of its corners within the target), its lines; it: the record (an insert's
+// through its space), layer_t: its layer's transparency
+fn fill_vertex(vi: u32, it: Item, r: Record, st: Style, layer_t: u32) -> VsFill {
     var o = fill_out();
-    let half = 0.5 * view.turn.zw;
+    let idx = it.idx;
+    let vw = it.vw;
+    let half = 0.5 * vw.turn.zw;
+    // (the colour with its transparency; the hatch: an insert's fill its instance's row of the table, the block's own
+    // place of the style + 1 in the record's top byte)
+    let color = ink(st.color, st.r1.x, layer_t);
+    let local = r.w.w >> 24u;
+    let hatch = select(st.hatch, it.hb + local, it.blk && local != 0u);
     if kind_of_record(r) == K_EDGE {
-        let ip = select(idx - 1u, idx + r.w.y, (r.w.w & F_WRAP_PREV) != 0u);
-        let inx = select(idx + 1u, idx - r.w.y, (r.w.w & F_WRAP_NEXT) != 0u);
-        let e1 = epx[idx];
+        var ip = select(idx - 1u, idx + r.w.y, (r.w.w & F_WRAP_PREV) != 0u);
+        var inx = select(idx + 1u, idx - r.w.y, (r.w.w & F_WRAP_NEXT) != 0u);
+        if it.mir {
+            // (a mirrored insert's ring runs the other way in pixels: count turned its edges around)
+            let t = ip;
+            ip = inx;
+            inx = t;
+        }
+        let e1 = epx[idx + it.eoff];
         if e1.x == -1e6 && e1.z == -1e6 {
             return o;
         }
@@ -151,8 +170,8 @@ fn fill_vertex(vi: u32, idx: u32, r: Record, st: Style) -> VsFill {
         let w = FILL_R + 1.0;
         let p = a + select(-w, l + w, (vi & 1u) != 0u) * d + select(-w, w, (vi & 2u) != 0u) * n;
         o.pos = vec4f(p.x / half.x, -p.y / half.y, 0.5, 1.0);
-        o.misc = vec4u(M_FILL, st.color, r.w.z - 1u, st.hatch);
-        o.ix = vec4u(idx, ip, inx, 0u);
+        o.misc = vec4u(M_FILL, color, r.w.z - 1u, hatch);
+        o.ix = vec4u(idx, ip, inx, it.eoff);
         return o;
     }
     // a triangle: its corners are the starts of edge records (a.yzw from the fill's first record, a.x back)
@@ -160,30 +179,30 @@ fn fill_vertex(vi: u32, idx: u32, r: Record, st: Style) -> VsFill {
     let ia = base + bitcast<u32>(r.a.y);
     let ib = base + bitcast<u32>(r.a.z);
     let ic = base + bitcast<u32>(r.a.w);
-    let ra = rel2(pool[ia].a, view);
-    let rb = rel2(pool[ib].a, view);
-    let rc = rel2(pool[ic].a, view);
-    let qa = to_px(ra.xy, view);
-    let qb = to_px(rb.xy, view);
-    let qc = to_px(rc.xy, view);
+    let ra = rel2(pool[ia].a, vw);
+    let rb = rel2(pool[ib].a, vw);
+    let rc = rel2(pool[ic].a, vw);
+    let qa = to_px(ra.xy, vw);
+    let qb = to_px(rb.xy, vw);
+    let qc = to_px(rc.xy, vw);
     // the lines, each from its corners in the order of their records
-    var lab = tri_line(ra, rb);
+    var lab = tri_line(ra, rb, vw);
     if ib < ia {
-        lab = tri_line(rb, ra);
+        lab = tri_line(rb, ra, vw);
     }
-    var lbc = tri_line(rb, rc);
+    var lbc = tri_line(rb, rc, vw);
     if ic < ib {
-        lbc = tri_line(rc, rb);
+        lbc = tri_line(rc, rb, vw);
     }
-    var lca = tri_line(rc, ra);
+    var lca = tri_line(rc, ra, vw);
     if ia < ic {
-        lca = tri_line(ra, rc);
+        lca = tri_line(ra, rc, vw);
     }
     o.l0 = tri_side(lab, qc + half);
     o.l1 = tri_side(lbc, qa + half);
     o.l2 = tri_side(lca, qb + half);
-    o.misc = vec4u(M_FILL | M_TRI, st.color, r.w.z - 1u, st.hatch);
-    o.ix = vec4u(idx, 0u, 0u, 0u);
+    o.misc = vec4u(M_FILL | M_TRI, color, r.w.z - 1u, hatch);
+    o.ix = vec4u(idx, 0u, 0u, it.eoff);
     var p: vec2f;
     if max(max(max(abs(qa.x), abs(qa.y)), max(abs(qb.x), abs(qb.y))), max(abs(qc.x), abs(qc.y))) < 4096.0 {
         // the box along its longest side, a pixel around
@@ -231,15 +250,17 @@ fn fill_vertex(vi: u32, idx: u32, r: Record, st: Style) -> VsFill {
 fn vs_fill(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VsFill {
     let l = lists[pc.layer + (ii >> 16u)];
     let j = (ii & 0xffffu) * BATCH + (vi >> 2u);
-    if j < l.y {
-        let idx = visible[l.x + j];
-        let r = pool[idx];
-        let k = kind_of_record(r);
-        if k == K_EDGE || k == K_TRI {
-            return fill_vertex(vi, idx, r, styles[r.w.z - 1u]);
-        }
+    if j >= l.y {
+        return fill_out();
     }
-    let s = vertex(vi, ii, true);
+    // (decoded once: a fill's record here, any other as vs_full draws it)
+    let it = item_of(visible[l.x + j], l.x + j);
+    let r = pool[it.idx];
+    let k = kind_of_record(r);
+    if k == K_EDGE || k == K_TRI {
+        return fill_vertex(vi, it, r, style_in(r.w.z - 1u, it.ins, it.blk), l.z);
+    }
+    let s = vertex(vi, it, l.z, true);
     var o = fill_out();
     o.pos = s.pos;
     o.seg = s.seg;
@@ -397,10 +418,10 @@ fn fill_body(i: VsFill) -> vec4f {
             return vec4f(0.0);
         }
         base = idx - bitcast<u32>(rec.a.x);
-        n = rec.w.w >> 16u;
+        n = (rec.w.w >> 16u) & 255u;
     } else {
         base = idx - rec.v.z;
-        n = 3u + (rec.w.w >> 16u);
+        n = 3u + ((rec.w.w >> 16u) & 255u);
     }
     // the squared distances from the edges, at one place for every owner (both sides of each comparison compute them alike)
     var dm = 3.4e38;
@@ -410,7 +431,7 @@ fn fill_body(i: VsFill) -> vec4f {
     var beaten = false;
     for (var k = 0u; k < n; k++) {
         let e = fill_cand(tri, rec, i.ix, base, k);
-        let s = epx[e];
+        let s = epx[e + i.ix.w];
         let d = dist_seg(q - s.xy, s.zw - s.xy);
         dm = min(dm, d);
         if k == 0u {
@@ -443,7 +464,7 @@ fn fill_body(i: VsFill) -> vec4f {
             return vec4f(0.0);
         }
         // outside: by the side of the edge, at its end by the sum of both edges' outer normals (the inside on the right)
-        let s1 = epx[idx];
+        let s1 = epx[idx + i.ix.w];
         let a = s1.xy;
         let ab = s1.zw - a;
         let ll = dot(ab, ab);
@@ -454,7 +475,7 @@ fn fill_body(i: VsFill) -> vec4f {
         var nrm = vec2f(-ab.y, ab.x);
         var o = q - a;
         if t >= 1.0 {
-            let s2 = epx[i.ix.z];
+            let s2 = epx[i.ix.z + i.ix.w];
             let bn = s2.zw - s2.xy;
             nrm = unit_or_zero(nrm) + unit_or_zero(vec2f(-bn.y, bn.x));
             o = q - s1.zw;
@@ -473,7 +494,7 @@ fn fill_body(i: VsFill) -> vec4f {
     }
     var c = w;
     for (var k = 0u; k < m; k++) {
-        let s = epx[fill_cand(tri, rec, i.ix, base, k)];
+        let s = epx[fill_cand(tri, rec, i.ix, base, k) + i.ix.w];
         c += fill_contrib(r, s.xy - q, s.zw - q);
     }
     c = clamp(c, 0.0, 1.0);

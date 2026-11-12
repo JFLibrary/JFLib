@@ -5,7 +5,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render2d::{Camera, Cap, EntityId, Join, Layer, Renderer, RendererDesc, Scene, Shape, Style};
+use render2d::{Camera, Cap, EntityId, Join, Layer, Renderer, RendererDesc, Scene, Shape, Style, Unit};
 
 use crate::gallery::*;
 use crate::refimg::{self, Tol};
@@ -247,7 +247,7 @@ fn changes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     judge(t, dev, &mut r, &mut off, &mut p, &cam, &format!("{level}: a hatched fill removed"), false)?;
     // nothing changed: the view only
     let info = judge(t, dev, &mut r, &mut off, &mut p, &cam, &format!("{level}: nothing changed"), false)?;
-    t.ok(info.records == 0 && !info.rebuild && !info.tables && info.bytes == 64, &format!("{level}: a frame without changes sends the view only ({} bytes)", info.bytes));
+    t.ok(info.records == 0 && !info.rebuild && !info.tables && info.bytes == 80, &format!("{level}: a frame without changes sends the view only ({} bytes)", info.bytes));
     Some(())
 }
 
@@ -505,7 +505,7 @@ fn visibility_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let (n1, n2, n3, n4) = (at(&a, 0, 2, 50, 100), at(&a, 196, 200, 146, 150), at(&a, 50, 150, 0, 3), at(&a, 50, 150, 147, 150));
     t.ok(nd == 0 && n1 > 10 && n2 >= 1 && n3 > 10 && n4 > 3,
          &format!("{level}: only extreme parts in the target: a fill's smoothed edge {n1} pixels, a triangle's tip {n2}, a curve's bulge {n3}, a hatched fill's edge {n4}; culled against not culled: {nd} pixels differ"));
-    Some(())
+    visibility_blocks(t, dev, &mut r, level)
 }
 
 // ---------------------------------------------------------------- large coordinates
@@ -564,7 +564,8 @@ fn coords_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
         deep_arc_judge(&img, &c, &mut st);
     }
     t.ok(st.fine_arcs(), &format!("{level}: {}", st.arc_text()));
-    coords_curves(t, dev, &mut r, level)
+    coords_curves(t, dev, &mut r, level)?;
+    coords_blocks(t, dev, &mut r, level)
 }
 
 /// curves, fills and hatches far away (G6b1): the same image at +-1e7 as at the origin; at 1e-6 units per pixel an ellipse of
@@ -680,6 +681,133 @@ fn phase_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
         }
         t.ok(checks >= 100 && worst <= 1.0 / 16.0, &format!("{level}: dashes at 1e-6 units per pixel, {name}: {checks} pixel lines over 24 pans, the largest distance of a dash's end from where \
                                                       it belongs {worst:.4} px (1/16 = 0.0625)"));
+    }
+    Some(())
+}
+
+// ---------------------------------------------------------------- blocks: culling of inserts, large coordinates (G6b2)
+
+/// inserts with only an extreme part in the target (cull.wgsl: an instance by its block's box grown by its strokes' reach,
+/// then its records as any): a turned and scaled insert whose miter's tip alone reaches in, a fill's smoothed edge alone
+/// 0.3 px inside, a nested insert's ring alone touching the top, a mirrored insert's curve bulging a pixel into the bottom;
+/// culled against not culled; an insert far away puts nothing in the visible list
+pub fn visibility_blocks(t: &mut T, dev: &Device, r: &mut Renderer, level: &str) -> Option<()> {
+    let size = VIS_SIZE;
+    let (w, _) = size;
+    let mut off = t.res(Off::new(dev, size.0, size.1), "target")?;
+    let cam = Camera::new([0.0, 0.0], 1.0);
+    let mut bd = BlockDrawing { layers: vec![(true, 0, 0)], blocks: Vec::new(), items: Vec::new() };
+    // 0: a sharp turn pointing to +x at (0, 0), 6 units wide, miter limit 10: its interior angle 28.07 degrees, its miter's
+    // tip 3 / sin(14.04 deg) = 12.37 units beyond the vertex
+    let mut mst = style(0xFF00_0000, 6.0, Cap::Butt, Join::Miter);
+    mst.unit = Unit::Drawing;
+    mst.miter_limit = 10.0;
+    bd.blocks.push(BDef { base: [0.0, 0.0], items: vec![(mst, BGeo::G(Geo::Poly(vec![[-40.0, 10.0], [0.0, 0.0], [-40.0, -10.0]], false)))] });
+    // 1: a fill 20 by 12
+    bd.blocks.push(BDef { base: [0.0, 0.0], items: vec![(style(0xFF00_0000, 0.0, Cap::Butt, Join::Miter), BGeo::G(Geo::Fill(vec![vec![Geo::Poly(vec![[0.0, 0.0], [20.0, 0.0], [20.0, 12.0], [0.0, 12.0]], true)]])))] });
+    // 2: a ring of radius 10, 8 px wide; 3: block 2 nested (its base on the ring's centre)
+    bd.blocks.push(BDef { base: [0.0, 0.0], items: vec![(style(0xFF00_0000, 8.0, Cap::Butt, Join::Miter), BGeo::G(Geo::Circle([0.0, 0.0], 10.0)))] });
+    bd.blocks.push(BDef { base: [5.0, 5.0], items: vec![(style(0xFF00_0000, 1.0, Cap::Butt, Join::Miter), BGeo::Ins(BIns::new(2, [5.0, 5.0])))] });
+    // 4: a cubic 2 px wide whose bulge reaches 16.5 units above its ends
+    bd.blocks.push(BDef { base: [0.0, 0.0], items: vec![(style(0xFF00_0000, 2.0, Cap::Butt, Join::Miter), BGeo::G(Geo::Bez(vec![[-50.0, 0.0], [-20.0, 22.0], [20.0, 22.0], [50.0, 0.0]], 3, false)))] });
+    let one = style(0xFF00_0000, 1.0, Cap::Butt, Join::Miter);
+    // (the turn scaled 2.5 and turned half round: its tip at 129.4 - 30.9 = 98.47, 1.5 px inside the right edge, the rest outside)
+    bd.items.push((0, one, BGeo::Ins(BIns::new(0, [129.4, 20.0]).turned(core::f64::consts::PI, [2.5, 2.5]))));
+    // (the fill turned a quarter and scaled 2.5: x from -129.7 to -99.7, its edge 0.3 px inside the left edge)
+    bd.items.push((0, one, BGeo::Ins(BIns::new(1, [-99.7, -20.0]).turned(core::f64::consts::FRAC_PI_2, [2.5, 2.5]))));
+    // (the ring scaled 3 through the nested insert: radius 30, half width 4: its lowest point 0.8 px below the top edge)
+    bd.items.push((0, one, BGeo::Ins(BIns::new(3, [-40.0, 108.2]).turned(0.0, [3.0, 3.0]))));
+    // (the cubic mirrored left to right (turned half round, y scaled by -1): its ends 15.5 px below the bottom edge, its
+    // bulge a pixel above it)
+    bd.items.push((0, one, BGeo::Ins(BIns::new(4, [30.0, -75.0 - 15.5]).turned(core::f64::consts::PI, [1.0, -1.0]))));
+    let mut s = t.res(Scene::new(r), "Scene::new")?;
+    t.res(s.set_camera(&cam), "camera")?;
+    t.res(build_blocks(&mut s, &bd), "build")?;
+    let a = shot(t, dev, &mut off, r, &mut s, "inserts' extreme parts, culled")?;
+    s.set_culling(false);
+    let b = shot(t, dev, &mut off, r, &mut s, "inserts' extreme parts, not culled")?;
+    crate::tests::dump(&format!("vis_inserts_{level}"), &a, size.0, size.1);
+    let at = |img: &[u8], x0: usize, x1: usize, y0: usize, y1: usize| (y0..y1).flat_map(|y| (x0..x1).map(move |x| (x, y))).filter(|&(x, y)| img[(y * w as usize + x) * 4] < 0xD0).count();
+    let nd = differ(&a, &b).0;
+    let (n1, n2, n3, n4) = (at(&a, 196, 200, 40, 70), at(&a, 0, 2, 40, 120), at(&a, 40, 120, 0, 2), at(&a, 0, 200, 147, 150));
+    t.ok(nd == 0 && n1 >= 1 && n2 > 10 && n3 >= 4 && n4 > 3,
+         &format!("{level}: inserts with only extreme parts in the target: a miter's tip {n1} pixels, a fill's smoothed edge {n2}, a nested ring {n3}, a mirrored curve's bulge {n4}; culled against not culled: {nd} pixels differ"));
+    // an insert far away: none of its records in the visible list (the instance is culled before its records)
+    let mut s = t.res(Scene::new(r), "Scene::new")?;
+    t.res(s.set_camera(&cam), "camera")?;
+    s.set_stats(true);
+    let mut far = bd.clone();
+    far.items = vec![(0, one, BGeo::Ins(BIns::new(2, [0.0, 0.0]))), (0, one, BGeo::Ins(BIns::new(2, [1000.0, 0.0]).array(50, 50, [30.0, 30.0])))];
+    t.res(build_blocks(&mut s, &far), "build")?;
+    let _ = shot(t, dev, &mut off, r, &mut s, "far inserts")?;
+    t.res(dev.wait_idle(), "wait_idle")?;
+    s.collect_stats();
+    let vis = s.take_stats().last().map_or(0, |f| f.visible);
+    t.ok(vis == 16, &format!("{level}: a circle inserted in view and 2500 copies far away: {vis} records visible (the circle's 16 pieces)"));
+    Some(())
+}
+
+/// a block inserted far away, and at 1e-6 units per pixel near 1e7: its lines and rings where they belong within 1/16 px,
+/// for an insert that moves them there and for one that scales a block of small units by 1e5 (turned, mirrored)
+pub fn coords_blocks(t: &mut T, dev: &Device, r: &mut Renderer, level: &str) -> Option<()> {
+    let (w, h) = FAR_SIZE;
+    let mut off = t.res(Off::new(dev, w, h), "target")?;
+    // the sample drawing as a block, inserted at the origin and at +-1e7 (its base at its own origin)
+    let base = gpu_image(t, dev, r, &mut off, &sample([0.0, 0.0]), &sample_camera([0.0, 0.0]), "at the origin")?;
+    let def = BDef { base: [0.0, 0.0], items: sample([0.0, 0.0]).items.into_iter().map(|it| (it.style, BGeo::G(it.geo))).collect() };
+    for at in FAR_POINTS {
+        let bd = BlockDrawing { layers: vec![(true, 0, 0)], blocks: vec![def.clone()], items: vec![(0, style(0xFF00_0000, 1.0, Cap::Butt, Join::Miter), BGeo::Ins(BIns::new(0, at)))] };
+        let img = crate::blocks::block_image(t, dev, r, &mut off, &bd, &sample_camera(at), "far away")?;
+        let (n, m) = differ(&img, &base);
+        t.ok(m <= 1 && n <= (w * h) / 1000, &format!("{level}: the sample inserted at ({}, {}) against drawn at the origin: {n} pixels differ, largest {m}", at[0], at[1]));
+    }
+    // the deep zoom: the lines and rings of the deep tests as blocks
+    let mut off = t.res(Off::new(dev, DEEP_SIZE.0, DEEP_SIZE.1), "target")?;
+    off.bg = 0xFF00_0000;
+    let t0 = [-9_876_543.0, 6_543_211.0];
+    for (name, scale, rot, mirror) in [("moved there", 1.0f64, 0.0f64, false), ("scaled by 1e5, turned", 1.0e5, 0.3, false), ("scaled by 1e5, turned, mirrored", 1.0e5, -1.1, true)] {
+        // local = M^-1 (world - t), M = R(rot) diag(scale, +-scale)
+        let (sn, cs) = render2d::math::sincos(rot);
+        let sy = if mirror { -scale } else { scale };
+        let local = |p: [f64; 2]| {
+            let (dx, dy) = (p[0] - t0[0], p[1] - t0[1]);
+            [(cs * dx + sn * dy) / scale, (-sn * dx + cs * dy) / sy]
+        };
+        let ins = BIns::new(0, t0).turned(rot, [scale, sy]);
+        let bd = deep_insert_drawing(scale, rot, mirror);
+        let mut s = t.res(Scene::new(r), "Scene::new")?;
+        t.res(s.set_camera(&deep_camera(0)), "camera")?;
+        t.res(build_blocks(&mut s, &bd), "build")?;
+        let mut st = DeepStats::default();
+        for step in 0..DEEP_STEPS {
+            let c = deep_camera(step);
+            t.res(s.set_camera(&c), "camera")?;
+            let img = shot(t, dev, &mut off, r, &mut s, "deep zoom of an insert")?;
+            deep_judge(&img, &c, &mut st);
+        }
+        t.ok(st.fine(), &format!("{level}: an insert {name}: {}", st.text()));
+        // the rings (circles keep their angle 0 where the turn takes it; a mirror reverses them: not here)
+        if mirror {
+            continue;
+        }
+        let mut rings = BDef { base: [0.0, 0.0], items: Vec::new() };
+        for (k, (c, rr)) in deep_circles().into_iter().enumerate() {
+            let st = style(0xFFFF_FFFF, 2.5, Cap::Butt, Join::Miter);
+            let geo = if k == 4 { Geo::Arc(local(c), rr / scale, core::f64::consts::FRAC_PI_2 - 0.1 - rot, 0.2) } else { Geo::Circle(local(c), rr / scale) };
+            rings.items.push((st, BGeo::G(geo)));
+        }
+        let bd = BlockDrawing { layers: vec![(true, 0, 0)], blocks: vec![rings], items: vec![(0, style(0xFF00_0000, 1.0, Cap::Butt, Join::Miter), BGeo::Ins(ins))] };
+        let mut s = t.res(Scene::new(r), "Scene::new")?;
+        t.res(s.set_camera(&deep_camera(0)), "camera")?;
+        t.res(build_blocks(&mut s, &bd), "build")?;
+        let mut st = DeepStats::default();
+        for step in 0..DEEP_STEPS {
+            let c = deep_camera(step);
+            t.res(s.set_camera(&c), "camera")?;
+            let img = shot(t, dev, &mut off, r, &mut s, "deep zoom of an insert's rings")?;
+            deep_arc_judge(&img, &c, &mut st);
+        }
+        t.ok(st.fine_arcs(), &format!("{level}: an insert {name}: {}", st.arc_text()));
     }
     Some(())
 }

@@ -13,7 +13,8 @@
     var tf = 1.0;
     var duty = 1.0;
     if dashed {
-        sc = select(1.0, view.rest.w, ((styles[si].flags >> 20u) & 15u) == UNIT_DRAWING);
+        // (dash units per pixel: the vertex shader's, the block's units inside an insert)
+        sc = select(1.0, bitcast<f32>(i.misc.w), ((styles[si].flags >> 20u) & 15u) == UNIT_DRAWING);
         let period = styles[si].period;
         tf = clamp((DASH_EXACT - period / sc) / (DASH_EXACT - DASH_FLAT), 0.0, 1.0);
         let capl = select(select(0.0, 2.0 * h, cap == CAP_SQUARE), 1.5707963 * h, cap == CAP_ROUND) * sc;

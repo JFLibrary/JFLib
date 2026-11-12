@@ -54,6 +54,8 @@
 
 extern crate alloc;
 
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+mod blocks;
 mod demo;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 mod bench;
