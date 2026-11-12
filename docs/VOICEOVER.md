@@ -1,6 +1,7 @@
 # VoiceOver-Plan: der Screenreader auf Mac und iPhone
 
-Stand 2026-11-12, auf Basis von `main` dccfab42. Noch nichts umgesetzt; die Entscheidungen unten sind offen.
+Stand 2026-11-12, auf Basis von `main` dccfab42. Noch nichts umgesetzt; die vier Entscheidungen unten hat der Nutzer
+am 2026-11-12 alle wie empfohlen getroffen.
 
 ## Ziel
 
@@ -156,6 +157,8 @@ Aufwand zusammen L. Die Arbeit liegt fast ganz in `lib/plat` (zwei neue Dateien,
   Client-Pixeln der Knoten und der Skala des Fensters.
 
 ## Entscheidungen
+
+Entschieden (Nutzer, 2026-11-12): alle wie empfohlen, also 1a, 2a, 3a und 4a.
 
 1. **Reihenfolge:** (a, empfohlen) erst macOS (VO0–VO3), dann iOS; (b) beide gleichzeitig.
 2. **Wann der Baum gebaut wird:** (a, empfohlen) sobald ein Hilfsmittel fragt, wie unter Windows (`WM_GETOBJECT`),
