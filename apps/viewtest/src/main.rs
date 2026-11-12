@@ -25,7 +25,8 @@
 //                        ui.ime_preedit drawn by the page ("IME:"), the committed text from
 //                        text_take ("Feld:")
 //   "Neues Fenster"      (E7) an independent app window (WF_APP) with a title bar of its own
-//                        (titlebar_begin / titlebar_end: a tab in it, the caption buttons)
+//                        (titlebar_begin / titlebar_end: a tab in it, the caption buttons);
+//                        --app-window opens it at the start
 //   "Zeiger wechseln"    (E3) the page's cursor through ui.cursor_next: not-allowed, grab,
 //                        zoom-in, the north-east corner, a custom cursor of the page's own;
 //                        "Eigener größer" redraws it (ui.cursor_replace), "Eigener frei" frees it
@@ -371,6 +372,15 @@ impl ViewTest {
 }
 
 impl App for ViewTest {
+    fn init(&mut self, _ui: &mut Ui) -> bool {
+        // --app-window: the app window is open from the start (real-window checks without input,
+        // tools/x11check.py appwin)
+        if plat::args().iter().any(|a| a == "--app-window") {
+            self.app_open.set(1);
+        }
+        true
+    }
+
     fn frame(&mut self, ui: &mut Ui) {
         ui.box_begin(0, BOX_V | pad(12), 8);
         ui.box_begin(0, BOX_H, 16);

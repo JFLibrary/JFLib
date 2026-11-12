@@ -1107,10 +1107,12 @@ ui.dialog_end(); // always
   top-level window of its own -- its own taskbar button, not minimized, hidden or kept above the
   main window as owned windows are -- and without the library's title bar: the app draws its own
   with `titlebar_begin` / `titlebar_end` (its widgets in it, a tab strip, the caption buttons at
-  its end acting on that window), as in the main window. X11, Wayland and macOS have one
-  top-level window per app in the window layer yet: they give it an owned window (the same
-  code works, the window has no taskbar button of its own). Give it a `WinRect` with its size;
-  closing the main window still ends the app.
+  its end acting on that window), as in the main window. X11 and Wayland give it a top-level
+  window as well (no `WM_TRANSIENT_FOR`, type normal / an `xdg_toplevel` without a parent; the
+  window manager places it, Wayland tells no position). macOS has one top-level window per app
+  in the window layer yet: it gives it an owned window (the same code works, the window has no
+  taskbar button of its own). Give it a `WinRect` with its size; closing the main window still
+  ends the app.
 
   ```rust
   let (open, rect) = (self.private_open.clone(), self.private_rect.clone());
@@ -1123,7 +1125,9 @@ ui.dialog_end(); // always
   ui.window_end();
   ```
 
-  `apps/viewtest` `tests/appwin.uis`.
+  `apps/viewtest` `tests/appwin.uis`; real windows on X11 and Wayland:
+  `python tools/x11check.py appwin --backend x11|wayland` (`viewtest --app-window` opens it at the
+  start).
 * **One instance**: with `AF_SINGLE_INSTANCE` in the `AppDesc`, a later start of the app hands its
   working folder and command line to the running window and ends (`plat::instance`: a pipe /
   an abstract socket per user and app; only for real windows, not for `--shot` / `--script`).

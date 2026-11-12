@@ -2288,7 +2288,7 @@ impl Ui {
         let (w, h) = (px2dip_at(fb.w, dpi), px2dip_at(fb.h, dpi));
         let title = self.m.win.recs[i as usize].title.clone();
         // (E7) an app window: a top-level window of its own where the platform has more than one
-        // (Windows), else an owned one
+        // (Windows, X11, Wayland), else an owned one (macOS)
         let mut pw = -1;
         if flags & WF_APP != 0 && !cfg!(any(target_arch = "wasm32", target_os = "android", target_os = "ios")) {
             pw = plat::win_create(&title, w, h, flags & plat::PWF_MASK, plat::PW_NOOWNER, plat::PW_DEFAULT, plat::PW_DEFAULT);
