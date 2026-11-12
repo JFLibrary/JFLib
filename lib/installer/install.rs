@@ -10,7 +10,7 @@
 //
 // install.ini (key=value): app, display, style, desktop, start (shortcut paths or empty),
 // reg (1 / 0), files (further files relative to the folder, ';'-separated, '\'), assoc (what
-// the file types and URL schemes added, assoc.rs), app_id (the program's AppUserModelID: the
+// the file types, URL schemes and a browser's registration added, assoc.rs), app_id (the program's AppUserModelID: the
 // shortcuts, the pins and the ProgIDs carry it, and the program runs under it when it finds
 // this line beside itself, lib/plat/assoc.rs app_id_boot)
 
@@ -123,10 +123,17 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     if st.opt_reg != 0 {
         in_regentry(st);
     }
-    // file types and URL schemes (PACKAGE filetypes= / schemes=)
-    let types = crate::assoc::parse_types(&st.types);
-    let schemes = crate::assoc::parse_schemes(&st.schemes);
-    let plan = crate::assoc::plan(&st.app, &st.disp, &st.exepath, &types, &schemes, &st.appid);
+    // file types and URL schemes (PACKAGE filetypes= / schemes=), a web browser (browser=1)
+    let pkg = crate::assoc::Package {
+        app: st.app.clone(),
+        display: st.disp.clone(),
+        app_id: st.appid.clone(),
+        types: crate::assoc::parse_types(&st.types),
+        schemes: crate::assoc::parse_schemes(&st.schemes),
+        browser: st.browser,
+        ..crate::assoc::Package::default()
+    };
+    let plan = crate::assoc::plan(&pkg, &st.exepath);
     sh_assoc_set(&plan.set);
     in_ini(&mut initxt, "app", &st.app);
     in_ini(&mut initxt, "display", &st.disp);

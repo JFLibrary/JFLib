@@ -242,6 +242,7 @@ pub use keys::*;
 pub use layout::{dp_at, px2dip_at};
 pub use perm::boot;
 pub use assoc::{assoc_switch, desk_boot};
+pub use plat::BrowserStatus; // (E13) ui.default_browser
 pub use recent::{RECENT_KEEP, RecentOpen};
 // the library's version (the root Cargo.toml, docs/VERSIONING.md) and the app's own (apps/NAME/PACKAGE)
 pub use rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH};

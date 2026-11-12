@@ -18,6 +18,15 @@
 //                             mimeapps.list, another program as implicit / explicit default
 //                             (kept, taken, the file byte for byte back), a .desktop file of the
 //                             same name of another program (Declined, moved aside and back)
+//                             (E13) a web browser (browser=1, package_entries): Windows -- the
+//                             ProgID plattestURL, Software\Clients\StartMenuInternet\plattest with
+//                             its Capabilities and RegisteredApplications\plattest in the real HKCU
+//                             (test names, removed again), no key of http / https, the status
+//                             (never the user's default), the request as a dry run
+//                             (jfgui_OPEN_DRYRUN: Settings is not opened), another copy's key as a
+//                             conflict; Linux -- WebBrowser in the .desktop file, the status from
+//                             mimeapps.list (Unknown, NotDefault with another browser, Default),
+//                             the request writing http / https / text/html and KDE's kdeglobals
 
 use alloc::format;
 use alloc::string::String;
@@ -25,8 +34,8 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use plat::assoc::{
-    AssocError, Conflict, Package, assoc_conflicts, assoc_register, assoc_registered, assoc_unregister, file_uri_path,
-    parse_schemes, parse_types, reg_entries,
+    AssocError, BrowserStatus, Conflict, Package, assoc_conflicts, assoc_register, assoc_registered, assoc_unregister, browser_request,
+    browser_status, file_uri_path, package_entries, parse_schemes, parse_types, reg_entries,
 };
 
 use crate::T;
@@ -34,6 +43,10 @@ use crate::T;
 const PKG: &str = "display=JFLib Assoc Test\napp_id=org.jflib.AssocTest\ncategories=Utility;\n\
 filetypes=jfltest|application/x-jflib-test|JFLib-Testdokument|own; jfltest2,jfltest3|text/x-jflib-test2|JFLib-Testtext\n\
 schemes=jflibtest\n";
+
+// (E13) a web browser: a test type (no real extension of the system), http and https
+const PKG_WEB: &str = "display=JFLib Web Test\napp_id=org.jflib.WebTest\ncategories=Utility;\n\
+filetypes=jflweb,jflweb2|text/x-jflib-web|JFLib-Webseite\nschemes=http https\nbrowser=1\n";
 
 fn scratch(t: &mut T, tag: &str) -> String {
     let cwd = plat::cwd().replace('\\', "/");
@@ -115,8 +128,10 @@ pub fn t_assoc(t: &mut T) {
     let pkg = Package::parse(PKG);
     if cfg!(windows) {
         windows(t, &pkg);
+        windows_browser(t);
     } else {
         linux(t, &pkg, &base);
+        linux_browser(t, &base);
     }
     plat::setenv(cfg_var, saved_cfg.as_deref());
     crate::rm_tree(&base);
@@ -155,6 +170,31 @@ fn parts(t: &mut T) {
     t.check(r.paths() == [String::from(abs_out), String::from("https://a/b")], "assoc: Request::paths takes file:// URIs as paths");
     t.check(assoc_register(&none, &mut |_| true) == Err(AssocError::Empty) && assoc_conflicts(&none) == Err(AssocError::Empty),
         "assoc: a package without types and schemes -> Empty");
+
+    // (E13) a web browser's values: http and https through <app>URL, Default Programs
+    let web = Package::parse("display=Netz\napp_id=org.jflib.Netz\nfiletypes=html,htm|text/html|HTML-Dokument\nschemes=http https netz\nbrowser=1\n");
+    t.check(web.browser && !p.browser && !Package::parse("schemes=http https\nbrowser=0\n").browser, "assoc: Package::parse browser=1");
+    let e = package_entries(&web, "C:\\n\\Netz.exe");
+    let find = |k: &str, n: &str| e.iter().find(|v| v.key == k && v.name == n).map(|v| v.value.as_str());
+    let smi = "Software\\Clients\\StartMenuInternet\\plattest";
+    t.check(find("Software\\Classes\\plattestURL\\shell\\open\\command", "") == Some("\"C:\\n\\Netz.exe\" \"%1\"")
+        && find("Software\\Classes\\plattestURL", "URL Protocol") == Some("")
+        && find("Software\\Classes\\plattestURL\\Application", "ApplicationName") == Some("Netz")
+        && find("Software\\Classes\\plattestURL", "AppUserModelID") == Some("org.jflib.Netz")
+        && find(&format!("{smi}\\shell\\open\\command"), "") == Some("\"C:\\n\\Netz.exe\"")
+        && find(&format!("{smi}\\Capabilities"), "ApplicationName") == Some("Netz")
+        && find(&format!("{smi}\\Capabilities\\StartMenu"), "StartMenuInternet") == Some("plattest")
+        && find(&format!("{smi}\\Capabilities\\URLAssociations"), "http") == Some("plattestURL")
+        && find(&format!("{smi}\\Capabilities\\URLAssociations"), "https") == Some("plattestURL")
+        && find(&format!("{smi}\\Capabilities\\FileAssociations"), ".htm") == Some("plattest.html")
+        && find("Software\\RegisteredApplications", "plattest") == Some(&format!("{smi}\\Capabilities") as &str)
+        && find("Software\\Classes\\netz", "URL Protocol") == Some("")
+        && !e.iter().any(|v| v.key.starts_with("Software\\Classes\\http")),
+        "assoc: package_entries of a browser: <app>URL, StartMenuInternet with Capabilities, RegisteredApplications, no key of http / https");
+    t.check(package_entries(&p, "C:\\a.exe") == reg_entries("plattest", &p.display, "C:\\a.exe", &p.types, &p.schemes, &p.app_id),
+        "assoc: package_entries without browser=1 = reg_entries");
+    t.check(browser_status(&p) == BrowserStatus::NotDefault && browser_request(&p) == Err(AssocError::NotRegistered),
+        "assoc: no browser=1: NotDefault, the request NotRegistered");
 }
 
 fn switches(t: &mut T) {
@@ -287,8 +327,135 @@ fn windows(t: &mut T, pkg: &Package) {
     gone(t, "assoc: test keys removed at the end");
 }
 
+#[cfg(not(windows))]
+fn windows_browser(_: &mut T) {}
+
+/// (E13) the browser's test keys away
+#[cfg(windows)]
+fn win_browser_cleanup() {
+    let _ = assoc_unregister();
+    for k in ["Software\\Classes\\plattestURL", "Software\\Classes\\plattest.jflweb", "Software\\Classes\\.jflweb", "Software\\Classes\\.jflweb2",
+              "Software\\Clients\\StartMenuInternet\\plattest"] {
+        plat::inst::reg_delete_tree(k);
+        plat::inst::reg_delete(k);
+    }
+    plat::inst::reg_delete_value("Software\\RegisteredApplications", "plattest");
+}
+
+#[cfg(windows)]
+fn windows_browser(t: &mut T) {
+    use plat::assoc::hkcu_get;
+    let pkg = Package::parse(PKG_WEB);
+    let get = |k: &str, n: &str| hkcu_get(k, Some(n));
+    let has = |k: &str| hkcu_get(k, None).is_some();
+    let smi = "Software\\Clients\\StartMenuInternet\\plattest";
+    win_browser_cleanup();
+    let clients_before = has("Software\\Clients\\StartMenuInternet");
+    let exe = plat::current_exe().unwrap_or_default().replace('/', "\\");
+    let cmd = format!("\"{exe}\" \"%1\"");
+    let http_before = get("Software\\Classes\\http\\shell\\open\\command", "");
+    t.check(browser_request(&pkg) == Err(AssocError::NotRegistered), "assoc: browser: the request before registering -> NotRegistered");
+    t.check(assoc_conflicts(&pkg) == Ok(Vec::new()), "assoc: browser: no conflicts in a clean HKCU");
+    let r = assoc_register(&pkg, &mut |_| false);
+    t.check(r.as_ref().is_ok_and(|r| r.types == 1 && r.schemes == 2 && r.kept.is_empty()), "assoc: browser registered (1 file type, http and https)");
+    t.check(get("Software\\Classes\\plattestURL", "").as_deref() == Some("JFLib Web Test URL")
+        && get("Software\\Classes\\plattestURL", "URL Protocol").as_deref() == Some("")
+        && get("Software\\Classes\\plattestURL\\shell\\open\\command", "").as_deref() == Some(cmd.as_str())
+        && get(&format!("{smi}\\shell\\open\\command"), "").as_deref() == Some(format!("\"{exe}\"").as_str())
+        && get(&format!("{smi}\\Capabilities"), "ApplicationName").as_deref() == Some("JFLib Web Test")
+        && get(&format!("{smi}\\Capabilities\\URLAssociations"), "https").as_deref() == Some("plattestURL")
+        && get(&format!("{smi}\\Capabilities\\FileAssociations"), ".jflweb2").as_deref() == Some("plattest.jflweb")
+        && get("Software\\RegisteredApplications", "plattest").as_deref() == Some(&format!("{smi}\\Capabilities") as &str)
+        && get("Software\\Classes\\.jflweb\\OpenWithProgids", "plattest.jflweb").as_deref() == Some(""),
+        "assoc: browser: HKCU: plattestURL, StartMenuInternet\\plattest with Capabilities, RegisteredApplications, Open with");
+    t.check(get("Software\\Classes\\http\\shell\\open\\command", "") == http_before, "assoc: browser: no key of http written");
+    t.check(browser_status(&pkg) == BrowserStatus::NotDefault, "assoc: browser: the status (the user's choice is another program)");
+    let saved = plat::env("jfgui_OPEN_DRYRUN");
+    plat::setenv("jfgui_OPEN_DRYRUN", Some("1"));
+    t.check(browser_request(&pkg) == Ok(()), "assoc: browser: the request (dry run: Settings at registeredAppUser=plattest, printed)");
+    plat::setenv("jfgui_OPEN_DRYRUN", saved.as_deref());
+    let (code, text) = ui::assoc_switch(&pkg, "--register").unwrap_or_default();
+    t.check(code == 0 && text.contains(": 1 file type, 2 URL schemes, as a web browser"), "assoc: browser: --register says so");
+    t.check(assoc_unregister() == Ok(true), "assoc: browser unregistered");
+    t.check(!has("Software\\Classes\\plattestURL") && !has(smi) && get("Software\\RegisteredApplications", "plattest").is_none()
+        && !has("Software\\Classes\\.jflweb") && has("Software\\Clients\\StartMenuInternet") == clients_before,
+        "assoc: browser: every key and the RegisteredApplications value removed");
+    t.check(browser_request(&pkg) == Err(AssocError::NotRegistered), "assoc: browser: the request after unregistering -> NotRegistered");
+
+    // another copy of the app holds the browser's key
+    let other = "\"C:\\Other\\plattest.exe\"";
+    if let Some(k) = plat::inst::reg_create(&format!("{smi}\\shell\\open\\command")) {
+        k.set_sz("", other);
+    }
+    let c = Conflict { what: String::from("StartMenuInternet\\plattest"), holder: String::from(other), fixed: false };
+    t.check(assoc_conflicts(&pkg).is_ok_and(|v| v.contains(&c)), "assoc: browser: another copy's StartMenuInternet key -> conflict");
+    let r = assoc_register(&pkg, &mut |x| x != &c);
+    t.check(r.as_ref().is_ok_and(|r| r.kept == [c.clone()]) && get("Software\\RegisteredApplications", "plattest").is_none()
+        && get(&format!("{smi}\\shell\\open\\command"), "").as_deref() == Some(other), "assoc: browser: kept: the other key and no RegisteredApplications value");
+    t.check(assoc_unregister() == Ok(true), "assoc: browser unregistered");
+    win_browser_cleanup();
+    t.check(!has(smi) && !has("Software\\Classes\\plattestURL"), "assoc: browser: test keys removed at the end");
+}
+
 #[cfg(windows)]
 fn linux(_: &mut T, _: &Package, _: &str) {}
+
+#[cfg(windows)]
+fn linux_browser(_: &mut T, _: &str) {}
+
+#[cfg(not(windows))]
+fn linux_browser(t: &mut T, base: &str) {
+    const VARS: [&str; 5] = ["XDG_DATA_HOME", "XDG_DATA_DIRS", "XDG_CONFIG_DIRS", "XDG_CURRENT_DESKTOP", "APPIMAGE"];
+    let saved: Vec<Option<String>> = VARS.iter().map(|v| plat::env(v)).collect();
+    let b = format!("{base}/web");
+    plat::setenv("XDG_DATA_HOME", Some(&format!("{b}/data")));
+    plat::setenv("XDG_DATA_DIRS", Some(&format!("{b}/sys")));
+    plat::setenv("XDG_CONFIG_DIRS", Some(&format!("{b}/etc")));
+    plat::setenv("XDG_CURRENT_DESKTOP", None);
+    plat::setenv("APPIMAGE", None);
+    let cfg = plat::env(crate::CFGVAR).unwrap_or_default();
+    let list = format!("{cfg}/mimeapps.list");
+    let kde = format!("{cfg}/kdeglobals");
+    let desk = format!("{b}/data/applications/org.jflib.WebTest.desktop");
+    let pkg = Package::parse(PKG_WEB);
+    plat::delete(&list);
+    t.check(browser_status(&pkg) == BrowserStatus::Unknown, "assoc: browser: Unknown without any default");
+    t.check(browser_request(&pkg) == Err(AssocError::NotRegistered), "assoc: browser: the request without a .desktop file -> NotRegistered");
+    // another browser is the default
+    plat::mkdir(&format!("{b}/sys/applications"));
+    plat::write_file(&format!("{b}/sys/applications/other.desktop"),
+        b"[Desktop Entry]\nType=Application\nName=Other\nExec=other %u\nMimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;\n");
+    let before = "[Default Applications]\nx-scheme-handler/http=other.desktop;\nx-scheme-handler/https=other.desktop;\ntext/html=other.desktop;\n";
+    plat::mkdir(&cfg);
+    plat::write_file(&list, before.as_bytes());
+    t.check(browser_status(&pkg) == BrowserStatus::NotDefault, "assoc: browser: NotDefault (another browser in mimeapps.list)");
+    let r = assoc_register(&pkg, &mut |_| false);
+    t.check(r.as_ref().is_ok_and(|r| r.kept.len() == 2), "assoc: browser registered, the other browser's http and https kept");
+    let text = read(&desk);
+    t.check(text.contains("\nCategories=Utility;Network;WebBrowser;\n") && text.contains("\nMimeType=text/x-jflib-web;x-scheme-handler/http;x-scheme-handler/https;\n")
+        && text.contains(" %U\n"), "assoc: browser: the .desktop file (Network;WebBrowser;, the web schemes, %U)");
+    match run("desktop-file-validate", &[&desk]) {
+        Some((code, out)) => t.check(code == 0 && !out.contains("error:"), "assoc: browser: desktop-file-validate accepts it"),
+        None => t.info("  SKIP desktop-file-validate: not installed\n"),
+    }
+    t.check(browser_status(&pkg) == BrowserStatus::NotDefault, "assoc: browser: still NotDefault after registering");
+    plat::setenv("XDG_CURRENT_DESKTOP", Some("KDE"));
+    t.check(browser_request(&pkg) == Ok(()), "assoc: browser: the request");
+    let now = read(&list);
+    t.check(now.contains("x-scheme-handler/http=org.jflib.WebTest.desktop;other.desktop;\n")
+        && now.contains("x-scheme-handler/https=org.jflib.WebTest.desktop;other.desktop;\n")
+        && now.contains("text/html=org.jflib.WebTest.desktop;other.desktop;\n"), "assoc: browser: mimeapps.list: ours first for http, https, text/html");
+    t.check(read(&kde).contains("[General]\nBrowserApplication=org.jflib.WebTest.desktop\n"), "assoc: browser: KDE: kdeglobals BrowserApplication");
+    t.check(browser_status(&pkg) == BrowserStatus::Default, "assoc: browser: Default after the request");
+    t.check(assoc_unregister() == Ok(true) && plat::file_exists(&desk) == 0, "assoc: browser unregistered (the .desktop file gone)");
+    t.check(browser_status(&pkg) == BrowserStatus::NotDefault, "assoc: browser: NotDefault again (our id is no longer installed)");
+    plat::delete(&list);
+    plat::delete(&kde);
+    crate::rm_tree(&b);
+    for (v, s) in VARS.iter().zip(saved) {
+        plat::setenv(v, s.as_deref());
+    }
+}
 
 #[cfg(not(windows))]
 fn linux(t: &mut T, pkg: &Package, base: &str) {

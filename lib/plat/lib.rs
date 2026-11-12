@@ -47,7 +47,8 @@
 //            / set_app_user_model_id (Windows: the app's explicit id)        (taskbar.rs)
 //   assoc:   assoc_register / assoc_conflicts / assoc_unregister: the app's PACKAGE file types
 //            and URL schemes for this program without a setup (HKCU\Software\Classes; .desktop,
-//            shared-mime-info, mimeapps.list), file_uri_path                    (assoc.rs)
+//            shared-mime-info, mimeapps.list), file_uri_path; default_browser_status /
+//            default_browser_request (PACKAGE browser=1)                        (assoc.rs)
 //   recent:  recent_add / recent_list / recent_remove / recent_clear: the system's recent files
 //            (SHAddToRecentDocs and the jump list; recently-used.xbel)          (recent.rs)
 //   audio:   Stream (open / open_fill, write, start / pause / stop, volume, latency, the default
@@ -247,8 +248,10 @@ mod win_winrt;
 pub use autostart::{AUTOSTART_WAIT_MS, AutostartError, autostart_entry, autostart_get, autostart_set};
 /// The app's taskbar / dock button: progress, a badge, the jump list's tasks.
 pub mod taskbar;
-/// The app's file types and URL schemes registered without a setup (developer builds).
+/// The app's file types and URL schemes registered without a setup (developer builds); a web
+/// browser's default (default_browser_status / default_browser_request).
 pub mod assoc;
+pub use assoc::{BrowserStatus, default_browser_request, default_browser_status};
 /// The system's list of recently used files (jump lists, recently-used.xbel).
 pub mod recent;
 pub use recent::{recent_add, recent_clear, recent_list, recent_remove};

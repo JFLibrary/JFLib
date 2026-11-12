@@ -52,7 +52,7 @@ the same .deb layout.
 
 | File | Content |
 |---|---|
-| `apps/NAME/PACKAGE` | `key=value` lines: `display` (shown name), `version` (the app's own `MAJOR.MINOR.PATCH`: the build checks it and every program of the app reads it as `rt::app_version!()`, [VERSIONING.md](VERSIONING.md)), `publisher`, `summary` (one line, .deb / .desktop comment), `description` (one line), `generic` (.desktop GenericName), `categories` (.desktop), `deb_name`, `default_win` / `default_linux` (preselected style), `styles` (the variants, in order); optional `filetypes` and `schemes` (the file types and URL schemes the app opens, below); for `--update`: `update_app` (the manifest's app id, default the folder name), `update_notes`, `update_expires_days`; for the other formats (below): `app_id` (reverse DNS, default `org.jflib.<App>`: the library's own demo, test and template apps keep it; the author's apps set `org.jfreund.<App>`, e.g. Kritzel and BackupCraft; an app of someone else sets a domain of its own), `homepage` (AppStream; Flathub wants it), `license` (SPDX, default `LicenseRef-proprietary`), `appimage_update`, `flatpak_runtime`, `flatpak_args`, `flatpak_repo_url` (the address of the Flatpak repository an installation updates from), `msix_name`, `msix_publisher`, `msix_alias` (an execution alias, `name.exe`), `appinstaller_url` (the folder the `.appinstaller` and the `.msix` are published in), `appinstaller_hours` (App Installer's `HoursBetweenUpdateChecks`, default 0: every start), `language` |
+| `apps/NAME/PACKAGE` | `key=value` lines: `display` (shown name), `version` (the app's own `MAJOR.MINOR.PATCH`: the build checks it and every program of the app reads it as `rt::app_version!()`, [VERSIONING.md](VERSIONING.md)), `publisher`, `summary` (one line, .deb / .desktop comment), `description` (one line), `generic` (.desktop GenericName), `categories` (.desktop), `deb_name`, `default_win` / `default_linux` (preselected style), `styles` (the variants, in order); optional `filetypes` and `schemes` (the file types and URL schemes the app opens, below), `browser=1` (the app is a web browser: `schemes=` must list `http` and `https`; "Web browsers" below); for `--update`: `update_app` (the manifest's app id, default the folder name), `update_notes`, `update_expires_days`; for the other formats (below): `app_id` (reverse DNS, default `org.jflib.<App>`: the library's own demo, test and template apps keep it; the author's apps set `org.jfreund.<App>`, e.g. Kritzel and BackupCraft; an app of someone else sets a domain of its own), `homepage` (AppStream; Flathub wants it), `license` (SPDX, default `LicenseRef-proprietary`), `appimage_update`, `flatpak_runtime`, `flatpak_args`, `flatpak_repo_url` (the address of the Flatpak repository an installation updates from), `msix_name`, `msix_publisher`, `msix_alias` (an execution alias, `name.exe`), `appinstaller_url` (the folder the `.appinstaller` and the `.msix` are published in), `appinstaller_hours` (App Installer's `HoursBetweenUpdateChecks`, default 0: every start), `language` |
 | `apps/NAME/PERMISSIONS` | the app's permissions ([PERMISSIONS.md](PERMISSIONS.md)): the Flatpak finish-args, the MSIX capabilities and StartupTask follow them |
 | `apps/NAME/res/app.ico` | icon resource 1 of the Windows exe (`build_rs.py` compiles it with `llvm-rc` and links it: window, taskbar, Explorer, shortcuts) |
 | `apps/NAME/res/app_{48,128,256}.png` | Linux icons (hicolor theme); the MSIX logos are scaled from them. Missing sizes are scaled down from the largest; an app without any gets a plain placeholder (and a note) |
@@ -129,6 +129,10 @@ packaged setup is that exe with a payload and a trailer appended.
   Explorer. `install.ini` `assoc=` lists what was added (`T:` key trees, `V:` values), and
   `uninstall.exe` removes exactly that. In test mode the values go to
   `<ASMINST_SHELL_DIR>\assoc.txt` (`subkey|name=value` lines).
+* **A web browser** (`browser=1`, "Web browsers" below): `http` and `https` get no keys of their
+  own; the setup writes the ProgID `<app>URL`, `HKCU\Software\Clients\StartMenuInternet\<app>`
+  with its `Capabilities` and the value `<app>` in `HKCU\Software\RegisteredApplications`, and
+  `uninstall.exe` removes them with the rest (`install.ini` `assoc=`).
 * **Test mode**: with `ASMINST_SHELL_DIR=DIR` the desktop, the start menu and the taskbar pins
   are `DIR\Desktop`, `DIR\Programs` and `DIR\Pinned`, and the registry values go to
   `DIR\registry.txt` -- a test never touches
@@ -188,7 +192,8 @@ hicolor icons. Text files are written with LF line ends (maintainer scripts).
 With `filetypes=` / `schemes=` the `.desktop` file lists the MIME types and
 `x-scheme-handler/<scheme>` in `MimeType=`, and `Exec` passes `%U` (schemes) or `%F`. `own` types
 get a shared-mime-info package `/usr/share/mime/packages/<deb>.xml` (glob patterns,
-description), and `postinst` runs `update-mime-database`.
+description), and `postinst` runs `update-mime-database`.  A web browser's (`browser=1`)
+`Categories` get `Network;WebBrowser;`.
 
 ```
 # an image editor's PACKAGE
@@ -298,6 +303,27 @@ What each format can and cannot do, compared with the setup and the .deb:
 | `lib/update` ([UPDATES.md](UPDATES.md) "Packages") | exe, bundle, package | the channel's `appimage` entry replaces the `.AppImage` file (trial, rollback; the GPG signature must follow the running file's key); also the update information for AppImageUpdate | the channel lists only the .deb | through the Flatpak portal (check, `Update`, `Spawn` of the new version) from the bundle's repository; without the portal "managed by Flatpak" | `Check::Managed`: App Installer (`.appinstaller`, at the next start) or the Store |
 | further programs (BINS) | next to the program, linked into `/usr/bin` | inside, AppRun starts the main program | `/usr/bin` links | in `/app/lib/<deb>/`, not in PATH | next to the program |
 | signing | Authenticode, apt repository | GPG in `.sha256_sig` / `.sig_key` (appimagetool's layout) | not signed (rpmsign missing) | GPG: repository and bundle | signtool (below) |
+
+### Web browsers (`browser=1`)
+
+An app that shows web pages (BrowserGUI's Narsil) declares itself as one:
+
+```
+schemes=http https
+filetypes=html,htm|text/html|HTML-Dokument; svg|image/svg+xml|SVG-Bild; pdf|application/pdf|PDF-Dokument
+browser=1
+```
+
+The packages register it as a web browser; which browser opens links stays the user's choice, and
+the app asks for it at run time with `plat::default_browser_status()` and
+`plat::default_browser_request()` ([GUIDE.md](GUIDE.md) section 21).
+
+| | registration | the user's choice |
+| --- | --- | --- |
+| setup, `--register` (Windows) | ProgID `<app>URL` (URL Protocol, the open command, `Application` with name and icon, the AppUserModelID); `Software\Clients\StartMenuInternet\<app>` (name, icon, the command, `Capabilities`: ApplicationName / Description / Icon, `StartMenu`, `URLAssociations` http / https -> `<app>URL`, `FileAssociations` .ext -> the file types' ProgIDs `<app>.<ext>`); `Software\RegisteredApplications\<app>`; all below HKCU, removed by `uninstall.exe` / `--unregister`. `http` and `https` get no `Software\Classes\<scheme>` key (it would stand in for the system's handler) | Windows 10 and later let no program take the default itself: the request opens Settings at the app's page of the default apps (`ms-settings:defaultapps?registeredAppUser=<app>`); the status reads `UserChoiceLatest` / `UserChoice` of http and https |
+| .deb, RPM, AppImage, Flatpak, `--register` (Linux) | the `.desktop` file with `Categories=...;Network;WebBrowser;`, `x-scheme-handler/http` / `https` and the file types in `MimeType=`, `Exec=... %U` | the request writes the app's `.desktop` id as the user's default of `x-scheme-handler/http`, `https` and `text/html` in `~/.config/mimeapps.list` (and `BrowserApplication` in KDE's `kdeglobals`), as `xdg-settings set default-web-browser` does; the status reads the defaults from the mimeapps.list files. In a Flatpak: Unknown, the request is `Unavailable` (the host's settings are out of sight) |
+| `.dmg` (macOS) | Info.plist: `http` and `https` as a URL type of their own ("Web site URL", role Viewer); the file types as viewers with their system types (`public.html` and `public.xhtml` with `LSHandlerRank` Default, `public.svg-image`, `com.adobe.pdf` Alternate) | the request sets Launch Services' handler of http and https (`LSSetDefaultHandlerForURLScheme`): macOS asks the user itself; the status asks Launch Services |
+| MSIX | refused: Windows reserves `http` and `https` for packages (take the setup) | -- |
 
 ### macOS: .dmg
 

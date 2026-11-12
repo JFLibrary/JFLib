@@ -216,6 +216,7 @@ fn pl_parse(st: &mut Inst) -> Result<(), ()> {
     st.defsty = kv_get(&man, "default", 48).unwrap_or_default();
     st.types = kv_get(&man, "filetypes", 4096).unwrap_or_default();
     st.schemes = kv_get(&man, "schemes", 512).unwrap_or_default();
+    st.browser = kv_get(&man, "browser", 8).is_some_and(|b| b == "1");
     st.appid = kv_get(&man, "app_id", 128).filter(|a| a.bytes().all(|c| c.is_ascii_alphanumeric() || b"._".contains(&c))).unwrap_or_default();
     // descriptions: desc_<style id>
     for k in 0..st.sty.len() {

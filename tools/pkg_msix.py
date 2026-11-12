@@ -28,7 +28,7 @@ import zipfile
 from pathlib import Path
 from xml.sax.saxutils import escape, quoteattr
 
-from pkgmeta import app_id, filetypes, icon, lf, logo, schemes
+from pkgmeta import app_id, browser, filetypes, icon, lf, logo, schemes
 
 ROOT = Path(__file__).resolve().parent.parent
 # the StartupTask's id: lib/plat/win_autostart.rs asks StartupTask.GetAsync for it
@@ -140,6 +140,9 @@ def appx_manifest(job, style):
                    + "            </uap:SupportedFileTypes>\n"
                    "          </uap:FileTypeAssociation>\n"
                    "        </uap:Extension>\n")
+    if browser(meta):
+        raise SystemExit("MSIX: a web browser (PACKAGE browser=1) cannot be one: Windows reserves http and https for "
+                         "packages; take the setup (--formats setup)")
     for s in schemes(meta):
         if s in RESERVED_SCHEMES or len(s) < 2 or len(s) > 39:
             raise SystemExit(f"MSIX: URL scheme {s!r} is reserved by Windows or has a bad length (2..39)")

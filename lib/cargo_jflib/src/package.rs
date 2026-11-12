@@ -467,6 +467,9 @@ impl App<'_> {
         if !schemes.is_empty() {
             man.push(format!("schemes={}", schemes.join(" ")));
         }
+        if pkgmeta::browser(&self.meta)? {
+            man.push("browser=1".to_string()); // the setup registers the app as a web browser
+        }
         man.push(format!("app_id={}", pkgmeta::app_id(&self.meta, &self.name)?));
         let mtext = (man.join("\n") + "\n").into_bytes();
         let mut entries = vec![(PK_MANIFEST, PF_ZLIB, "manifest".to_string(), String::new(), deflate::zlib(&mtext), mtext.len())];

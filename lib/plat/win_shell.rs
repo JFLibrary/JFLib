@@ -11,6 +11,7 @@
 //        the call is printed to stdout and 0 returned (tests).
 //   open_url(url) -> 0 / -1   a web page (http / https / mailto ...) in the default
 //        application (ShellExecuteW "open" on the URL); the same dry run
+//   settings_open(page) -> bool   (assoc.rs) a page of Settings (ms-settings:...); the same dry run
 //   theme() -> 0 light, 1 dark, -1 unknown (HKCU ... Personalize\AppsUseLightTheme)
 //   home() -> %USERPROFILE% (or "C:/")       drives() -> "C:/", "D:/", ...
 //   spawn_self(args) -> 0 / -1   this executable again: "exe" "arg1" "arg2" ... (every
@@ -101,6 +102,15 @@ pub fn open_url(url: &str) -> i32 {
         return 0;
     }
     if shell_exec(&wide_cap(url, SH_WURL), None) { 0 } else { -1 }
+}
+
+/// (assoc.rs) a page of Windows' Settings (ms-settings:...) -> started; the same dry run
+pub(crate) fn settings_open(page: &str) -> bool {
+    if dry_run() {
+        crate::write_stdout(format!("plat_settings_open: ShellExecuteW open {page}\n").as_bytes());
+        return true;
+    }
+    shell_exec(&wide_cap(page, SH_WURL), None)
 }
 
 /// show a folder (or a file selected in its folder) in the file manager -> 0 / -1

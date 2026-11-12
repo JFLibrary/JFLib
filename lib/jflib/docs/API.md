@@ -193,6 +193,8 @@ Re-exports: `img_svg::Svg`
 
 Re-exports: `plat::{Preedit, IP_EMAIL, IP_NUMBER, IP_PASSWORD, IP_PHONE, IP_SEARCH, IP_TEXT, IP_URL}`
 
+Re-exports: `plat::BrowserStatus`
+
 Re-exports: `rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH}`
 
 Re-exports: `plat::{DE_ALL, DE_COPY, DE_LINK, DE_MOVE, DT_FILES, DT_HTML, DT_IMAGE, DT_STD, DT_TEXT, DT_URL, DT_USER0, DragData}`
@@ -4225,6 +4227,8 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
          settings theme|locale|contrast|fonts|other|N
                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...;
                       background / foreground: a hidden tab, Android's onStop / onStart)
+  system browser default|other|unknown   (E13) what ui.default_browser answers from here (a
+                      headless run never asks the system; at first other)
   system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
   system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
@@ -6706,7 +6710,8 @@ app gets through ui::main!
 
   --register            register this program for PACKAGE filetypes= / schemes= (Windows:
                         HKCU\Software\Classes; Linux: a .desktop file, the own MIME types,
-                        mimeapps.list); defaults of other programs stay and are listed
+                        mimeapps.list); defaults of other programs stay and are listed; with
+                        browser=1 also as a web browser (Windows: Default Programs)
   --register-replace    the same, and those defaults go to this app too (the user's own pick
                         in Windows' dialog always stays)
   --unregister          remove exactly what the registration added, put back what it replaced
@@ -6721,7 +6726,27 @@ the program: exit code 0 done, 1 failed, 2 not possible here or nothing declared
                         once the setup installed the program or --register registered it
                         (plat::assoc::app_id_boot), before the first window
   assoc_switch(pkg, switch) -> Option<(exit code, text)>   one switch for pkg (None: no switch)
+
+(E13) A web browser (PACKAGE browser=1):
+  ui.default_browser() -> BrowserStatus   plat::default_browser_status; headless runs: what the
+                        script said (`system browser default|other|unknown`, at first other)
+  ui.default_browser_request() -> Result<(), AssocError>   plat::default_browser_request (the
+                        system's page or question); headless runs open nothing: they print
+                        "ui_default_browser_request" and answer Ok
 ```
+
+**`impl Ui`**
+
+- **`fn default_browser(&self) -> BrowserStatus`**
+  (PACKAGE browser=1) is this app the system's web browser (plat::default_browser_status:
+  Default, NotDefault, Unknown).  Ask again when the window is active again (UIC_ACTIVE):
+  the user may have chosen in the system's settings.  Headless runs answer what the script
+  said (`system browser default|other|unknown`, at first NotDefault)
+- **`fn default_browser_request(&mut self) -> Result<(), AssocError>`**
+  (PACKAGE browser=1) let the user make this app the web browser, from the user's click
+  (plat::default_browser_request: Windows' Settings at the app's page of the default apps,
+  Linux sets it, macOS asks).  Headless runs open nothing: they print
+  "ui_default_browser_request" and answer Ok
 
 - **`fn desk_boot(package: Option<&str>) -> Option<i32>`**
   (main!) PACKAGE, then the switches -> Some(exit code) when one of them ran
@@ -25435,7 +25460,8 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            / set_app_user_model_id (Windows: the app's explicit id)        (taskbar.rs)
   assoc:   assoc_register / assoc_conflicts / assoc_unregister: the app's PACKAGE file types
            and URL schemes for this program without a setup (HKCU\Software\Classes; .desktop,
-           shared-mime-info, mimeapps.list), file_uri_path                    (assoc.rs)
+           shared-mime-info, mimeapps.list), file_uri_path; default_browser_status /
+           default_browser_request (PACKAGE browser=1)                        (assoc.rs)
   recent:  recent_add / recent_list / recent_remove / recent_clear: the system's recent files
            (SHAddToRecentDocs and the jump list; recently-used.xbel)          (recent.rs)
   audio:   Stream (open / open_fill, write, start / pause / stop, volume, latency, the default
@@ -28189,6 +28215,8 @@ setup (apps/installer), the .deb, MSIX and Flatpak declare them themselves (docs
                                       HKCU\Software\Classes the setup and assoc_register write
                                       (app_id: the program's AppUserModelID in its ProgIDs,
                                       "" = none)
+  package_entries(&Package, exe) -> [RegValue]   all of a package's values: reg_entries and,
+                                      with browser=1, the web browser's registration (below)
   app_id_boot() -> Option<id>         (ui::main!, Windows) PACKAGE's app id as the process's
                                       explicit AppUserModelID (taskbar.rs) once the setup
                                       installed this program (install.ini beside it names the
@@ -28204,6 +28232,10 @@ setup (apps/installer), the .deb, MSIX and Flatpak declare them themselves (docs
   assoc_unregister() -> Result<bool, AssocError>   undo exactly what the record lists (false:
                                       nothing was registered)
   assoc_registered() -> Option<String>   the program the record names
+  default_browser_status() -> BrowserStatus   (PACKAGE browser=1) is this app the system's web
+                                      browser: Default, NotDefault, Unknown (browser_status(pkg))
+  default_browser_request() -> Result<(), AssocError>   let the user make it the default: the
+                                      system's own page or question (browser_request(pkg))
   file_uri_path(arg) -> Option<String>   a local file:// URI as a path (Linux desktops hand
                                       files over as URIs for Exec=... %U)
   console_print(text)                 stdout, else the console the program was started from
@@ -28231,6 +28263,25 @@ Android: Unavailable.
 
 Not a permission of the manifest: only what PACKAGE declares is written, in the user's own
 part of the system (HKCU, $XDG_*_HOME).
+
+A web browser (PACKAGE browser=1, schemes= with http and https).  Windows: http and https get no
+keys of their own (HKCU\Software\Classes\http would stand in for the system's handler); the
+ProgID <app>URL opens web addresses (URL Protocol, the open command, Application with the
+name and icon), Software\Clients\StartMenuInternet\<app> is the browser of Default Programs
+(name, icon, the command, Capabilities: ApplicationName / Description / Icon, StartMenu,
+URLAssociations http / https -> <app>URL, FileAssociations .<ext> -> the file types' ProgIDs)
+and Software\RegisteredApplications\<app> names its Capabilities.  Windows 10 and later never
+let a program take the default itself: browser_request opens Settings at the app's page of the
+default apps (ms-settings:defaultapps?registeredAppUser=<app>), the user decides there;
+browser_status reads the user's choice of http and https (UserChoiceLatest, else UserChoice).
+Linux: the .desktop file says Network;WebBrowser; besides the MIME types; browser_status reads
+the defaults of x-scheme-handler/http and https from the mimeapps.list files (as xdg-mime and
+xdg-settings do), browser_request writes the app as the user's default of those and of
+text/html (and KDE's BrowserApplication in kdeglobals): the user asked for it with the call, and
+the desktops offer no question of their own.  macOS: browser_status asks Launch Services for
+http's handler, browser_request sets it for http and https -- macOS asks the user itself ("Do you
+want to change your default web browser?").  In a Flatpak, an MSIX package, the browser and on
+Android / iOS: Unknown and Unavailable.
 ```
 
 - **`struct FileType`**
@@ -28248,6 +28299,8 @@ part of the system (HKCU, $XDG_*_HOME).
   - `categories: String` -- PACKAGE categories= (the .desktop file)
   - `types: Vec<FileType>`
   - `schemes: Vec<String>`
+  - `browser: bool` -- PACKAGE browser=1: the app is a web browser (registered as one; default_browser_status,
+    default_browser_request)
 
 - **`struct Conflict`**
   a default of another program that a registration would replace
@@ -28270,6 +28323,8 @@ part of the system (HKCU, $XDG_*_HOME).
   - `Empty` -- PACKAGE has no filetypes= and no schemes=
   - `Declined(Conflict)` -- a file of another program is in the way and take said no (Linux: the .desktop file)
   - `Failed(String)` -- the system refused or failed: what it said
+  - `NotRegistered` -- (default_browser_request) the app is not registered as a web browser here: PACKAGE
+    without browser=1, or neither the package nor --register registered this program
 
 - **`fn package_set(text: Option<&str>)`**
   (ui::main!) keep the built-in PACKAGE text (JFGUI_PACKAGE)
@@ -28280,7 +28335,7 @@ part of the system (HKCU, $XDG_*_HOME).
 **`impl Package`**
 
 - **`fn parse(text: &str) -> Package`**
-  "key=value" lines: display, app_id, categories, filetypes, schemes (the app is
+  "key=value" lines: display, app_id, categories, filetypes, schemes, browser (the app is
   vfs::app_id; missing values get the defaults of tools/pkgmeta.py)
 - **`fn mime_of(&self, path: &str) -> Option<String>`**
   the MIME type of a file name by its extension (own file types first), None when unknown
@@ -28313,6 +28368,46 @@ RV_DEFAULT: u8 = 2
   and assoc_register's.  app_id: the AppUserModelID the program runs under ("" = none, Windows
   derives one): each ProgID names it (AppUserModelID), as Windows wants for the recent files
   of an explicit id
+
+- **`fn package_entries(pkg: &Package, exe: &str) -> Vec<RegValue>`**
+  every HKCU value of pkg for the program exe: reg_entries of its file types and schemes and,
+  with browser=1, the web browser's registration in place of http's and https's own keys (the
+  ProgID &lt;app>URL, Software\\Clients\\StartMenuInternet\\&lt;app> with its Capabilities, the value
+  &lt;app> in Software\\RegisteredApplications) -- what the setup and assoc_register write
+
+- **`enum BrowserStatus`**
+  (default_browser_status) is the app the system's web browser
+  - `Default` -- web addresses (http and https) open with this app
+  - `NotDefault` -- with another program (or the app is no browser: PACKAGE without browser=1)
+  - `Unknown` -- the system does not say: no default set (Linux), or not to be found out here (a
+    Flatpak, the browser, Android, iOS)
+
+- **`fn default_browser_status() -> BrowserStatus`**
+  (PACKAGE browser=1) is this app the system's web browser (the built-in PACKAGE:
+  browser_status(&package())).  Ask again when the app's window is active again (UIC_ACTIVE):
+  the user may have changed it in the system's settings meanwhile
+
+- **`fn browser_status(pkg: &Package) -> BrowserStatus`**
+  is the app of pkg the system's web browser: Windows -- the user's choice of http and https
+  (UserChoiceLatest, else UserChoice) is its ProgID &lt;app>URL; Linux -- the mimeapps.list files'
+  defaults of x-scheme-handler/http and https name one of its .desktop files (none named:
+  Unknown); macOS -- Launch Services' handler of http and https is its bundle
+
+- **`fn default_browser_request() -> Result<(), AssocError>`**
+  (PACKAGE browser=1) let the user make this app the system's web browser (the built-in
+  PACKAGE: browser_request(&package())); call it from the user's click
+
+- **`fn browser_request(pkg: &Package) -> Result<(), AssocError>`**
+  let the user make the app of pkg the web browser: Windows 10 and later -- Settings opens at
+  the app's page of the default apps (ms-settings:defaultapps?registeredAppUser=&lt;app>; Windows
+  lets no program take the default itself), the user picks there; Linux -- the app's installed
+  .desktop file becomes the user's default of x-scheme-handler/http, https and text/html in
+  mimeapps.list (and KDE's BrowserApplication), as xdg-settings set default-web-browser does;
+  macOS -- Launch Services' handler of http and https, macOS asks the user.  Ok: asked or set
+  (read browser_status again later); NotRegistered: no browser=1, or this program is not
+  registered as a browser (install the package or run --register first); Unavailable: a
+  Flatpak, an MSIX package, the browser, Android, iOS.  jfgui_OPEN_DRYRUN=1 (Windows): the
+  page is printed, not opened
 
 - **`fn assoc_conflicts(pkg: &Package) -> Result<Vec<Conflict>, AssocError>`**
   the defaults of other programs a registration of pkg would replace (nothing is written)
@@ -30792,6 +30887,7 @@ folder, the drives, start this program again
        the call is printed to stdout and 0 returned (tests).
   open_url(url) -> 0 / -1   a web page (http / https / mailto ...) in the default
        application (ShellExecuteW "open" on the URL); the same dry run
+  settings_open(page) -> bool   (assoc.rs) a page of Settings (ms-settings:...); the same dry run
   theme() -> 0 light, 1 dark, -1 unknown (HKCU ... Personalize\AppsUseLightTheme)
   home() -> %USERPROFILE% (or "C:/")       drives() -> "C:/", "D:/", ...
   spawn_self(args) -> 0 / -1   this executable again: "exe" "arg1" "arg2" ... (every

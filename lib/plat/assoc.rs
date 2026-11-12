@@ -15,6 +15,8 @@
 //                                       HKCU\Software\Classes the setup and assoc_register write
 //                                       (app_id: the program's AppUserModelID in its ProgIDs,
 //                                       "" = none)
+//   package_entries(&Package, exe) -> [RegValue]   all of a package's values: reg_entries and,
+//                                       with browser=1, the web browser's registration (below)
 //   app_id_boot() -> Option<id>         (ui::main!, Windows) PACKAGE's app id as the process's
 //                                       explicit AppUserModelID (taskbar.rs) once the setup
 //                                       installed this program (install.ini beside it names the
@@ -30,6 +32,10 @@
 //   assoc_unregister() -> Result<bool, AssocError>   undo exactly what the record lists (false:
 //                                       nothing was registered)
 //   assoc_registered() -> Option<String>   the program the record names
+//   default_browser_status() -> BrowserStatus   (PACKAGE browser=1) is this app the system's web
+//                                       browser: Default, NotDefault, Unknown (browser_status(pkg))
+//   default_browser_request() -> Result<(), AssocError>   let the user make it the default: the
+//                                       system's own page or question (browser_request(pkg))
 //   file_uri_path(arg) -> Option<String>   a local file:// URI as a path (Linux desktops hand
 //                                       files over as URIs for Exec=... %U)
 //   console_print(text)                 stdout, else the console the program was started from
@@ -57,6 +63,25 @@
 //
 // Not a permission of the manifest: only what PACKAGE declares is written, in the user's own
 // part of the system (HKCU, $XDG_*_HOME).
+//
+// A web browser (PACKAGE browser=1, schemes= with http and https).  Windows: http and https get no
+// keys of their own (HKCU\Software\Classes\http would stand in for the system's handler); the
+// ProgID <app>URL opens web addresses (URL Protocol, the open command, Application with the
+// name and icon), Software\Clients\StartMenuInternet\<app> is the browser of Default Programs
+// (name, icon, the command, Capabilities: ApplicationName / Description / Icon, StartMenu,
+// URLAssociations http / https -> <app>URL, FileAssociations .<ext> -> the file types' ProgIDs)
+// and Software\RegisteredApplications\<app> names its Capabilities.  Windows 10 and later never
+// let a program take the default itself: browser_request opens Settings at the app's page of the
+// default apps (ms-settings:defaultapps?registeredAppUser=<app>), the user decides there;
+// browser_status reads the user's choice of http and https (UserChoiceLatest, else UserChoice).
+// Linux: the .desktop file says Network;WebBrowser; besides the MIME types; browser_status reads
+// the defaults of x-scheme-handler/http and https from the mimeapps.list files (as xdg-mime and
+// xdg-settings do), browser_request writes the app as the user's default of those and of
+// text/html (and KDE's BrowserApplication in kdeglobals): the user asked for it with the call, and
+// the desktops offer no question of their own.  macOS: browser_status asks Launch Services for
+// http's handler, browser_request sets it for http and https -- macOS asks the user itself ("Do you
+// want to change your default web browser?").  In a Flatpak, an MSIX package, the browser and on
+// Android / iOS: Unknown and Unavailable.
 
 use alloc::format;
 use alloc::string::String;
@@ -88,6 +113,9 @@ pub struct Package {
     pub categories: String,
     pub types: Vec<FileType>,
     pub schemes: Vec<String>,
+    /// PACKAGE browser=1: the app is a web browser (registered as one; default_browser_status,
+    /// default_browser_request)
+    pub browser: bool,
 }
 
 /// a default of another program that a registration would replace
@@ -128,6 +156,9 @@ pub enum AssocError {
     Declined(Conflict),
     /// the system refused or failed: what it said
     Failed(String),
+    /// (default_browser_request) the app is not registered as a web browser here: PACKAGE
+    /// without browser=1, or neither the package nor --register registered this program
+    NotRegistered,
 }
 
 impl core::fmt::Display for AssocError {
@@ -137,6 +168,7 @@ impl core::fmt::Display for AssocError {
             AssocError::Empty => f.write_str("PACKAGE declares no filetypes= and no schemes="),
             AssocError::Declined(c) => write!(f, "{} belongs to {} and was kept", c.what, c.holder),
             AssocError::Failed(s) => write!(f, "file associations: {s}"),
+            AssocError::NotRegistered => f.write_str("the app is not registered as a web browser (PACKAGE browser=1, the package or --register)"),
         }
     }
 }
@@ -158,7 +190,7 @@ pub fn package() -> Package {
 }
 
 impl Package {
-    /// "key=value" lines: display, app_id, categories, filetypes, schemes (the app is
+    /// "key=value" lines: display, app_id, categories, filetypes, schemes, browser (the app is
     /// vfs::app_id; missing values get the defaults of tools/pkgmeta.py)
     pub fn parse(text: &str) -> Package {
         let app = crate::vfs::app_id();
@@ -172,6 +204,7 @@ impl Package {
                 "categories" => p.categories = String::from(v),
                 "filetypes" => p.types = parse_types(v),
                 "schemes" => p.schemes = parse_schemes(v),
+                "browser" => p.browser = v == "1",
                 _ => {}
             }
         }
@@ -278,6 +311,128 @@ pub fn reg_entries(app: &str, display: &str, exe: &str, types: &[FileType], sche
         put(&format!("{key}\\shell\\open\\command"), "", &cmd, &key, RV_TREE);
     }
     out
+}
+
+/// the schemes a web browser opens through its ProgID <app>URL (Windows: no keys of their own)
+const WEB_SCHEMES: [&str; 2] = ["http", "https"];
+
+/// HKCU\Software\Clients\StartMenuInternet: the web browsers of Windows' Default Programs
+#[cfg_attr(not(windows), allow(dead_code))]
+pub(crate) const BROWSER_CLIENTS: &str = "Software\\Clients\\StartMenuInternet";
+/// HKCU\Software\RegisteredApplications: an app's name -> the key of its Capabilities
+#[cfg_attr(not(windows), allow(dead_code))]
+pub(crate) const REGISTERED_APPS: &str = "Software\\RegisteredApplications";
+
+/// a web browser's scheme (http, https): opened through <app>URL, no key of its own
+pub(crate) fn web_scheme(pkg: &Package, s: &str) -> bool {
+    pkg.browser && WEB_SCHEMES.contains(&s)
+}
+
+/// every HKCU value of pkg for the program exe: reg_entries of its file types and schemes and,
+/// with browser=1, the web browser's registration in place of http's and https's own keys (the
+/// ProgID <app>URL, Software\Clients\StartMenuInternet\<app> with its Capabilities, the value
+/// <app> in Software\RegisteredApplications) -- what the setup and assoc_register write
+pub fn package_entries(pkg: &Package, exe: &str) -> Vec<RegValue> {
+    let schemes: Vec<String> = pkg.schemes.iter().filter(|s| !web_scheme(pkg, s)).cloned().collect();
+    let mut out = reg_entries(&pkg.app, &pkg.display, exe, &pkg.types, &schemes, &pkg.app_id);
+    if !pkg.browser {
+        return out;
+    }
+    let mut put = |key: &str, name: &str, value: &str, root: &str, kind: u8| {
+        out.push(RegValue { key: String::from(key), name: String::from(name), value: String::from(value), root: String::from(root), kind });
+    };
+    let (app, display) = (pkg.app.as_str(), pkg.display.as_str());
+    let icon = format!("{exe},0");
+    // the ProgID of web addresses
+    let progid = format!("{app}URL");
+    let url = format!("Software\\Classes\\{progid}");
+    put(&url, "", &format!("{display} URL"), &url, RV_TREE);
+    put(&url, "URL Protocol", "", &url, RV_TREE);
+    put(&format!("{url}\\DefaultIcon"), "", &icon, &url, RV_TREE);
+    put(&format!("{url}\\shell\\open\\command"), "", &format!("\"{exe}\" \"%1\""), &url, RV_TREE);
+    let app_key = format!("{url}\\Application");
+    put(&app_key, "ApplicationName", display, &url, RV_TREE);
+    put(&app_key, "ApplicationIcon", &icon, &url, RV_TREE);
+    if !pkg.app_id.is_empty() {
+        put(&url, "AppUserModelID", &pkg.app_id, &url, RV_TREE);
+        put(&app_key, "AppUserModelID", &pkg.app_id, &url, RV_TREE);
+    }
+    // the browser of Default Programs
+    let smi = format!("{BROWSER_CLIENTS}\\{app}");
+    let caps = format!("{smi}\\Capabilities");
+    put(&smi, "", display, &smi, RV_TREE);
+    put(&format!("{smi}\\DefaultIcon"), "", &icon, &smi, RV_TREE);
+    put(&format!("{smi}\\shell\\open\\command"), "", &format!("\"{exe}\""), &smi, RV_TREE);
+    put(&caps, "ApplicationName", display, &smi, RV_TREE);
+    put(&caps, "ApplicationDescription", display, &smi, RV_TREE);
+    put(&caps, "ApplicationIcon", &icon, &smi, RV_TREE);
+    put(&format!("{caps}\\StartMenu"), "StartMenuInternet", app, &smi, RV_TREE);
+    for s in pkg.schemes.iter().filter(|s| web_scheme(pkg, s)) {
+        put(&format!("{caps}\\URLAssociations"), s, &progid, &smi, RV_TREE);
+    }
+    for t in &pkg.types {
+        for e in &t.exts {
+            put(&format!("{caps}\\FileAssociations"), &format!(".{e}"), &format!("{app}.{}", t.exts[0]), &smi, RV_TREE);
+        }
+    }
+    put(REGISTERED_APPS, app, &caps, "", RV_SHARED);
+    out
+}
+
+// ---------------------------------------------------------------- the web browser
+
+/// (default_browser_status) is the app the system's web browser
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum BrowserStatus {
+    /// web addresses (http and https) open with this app
+    Default,
+    /// with another program (or the app is no browser: PACKAGE without browser=1)
+    NotDefault,
+    /// the system does not say: no default set (Linux), or not to be found out here (a
+    /// Flatpak, the browser, Android, iOS)
+    Unknown,
+}
+
+/// (PACKAGE browser=1) is this app the system's web browser (the built-in PACKAGE:
+/// browser_status(&package())).  Ask again when the app's window is active again (UIC_ACTIVE):
+/// the user may have changed it in the system's settings meanwhile
+pub fn default_browser_status() -> BrowserStatus {
+    browser_status(&package())
+}
+
+/// is the app of pkg the system's web browser: Windows -- the user's choice of http and https
+/// (UserChoiceLatest, else UserChoice) is its ProgID <app>URL; Linux -- the mimeapps.list files'
+/// defaults of x-scheme-handler/http and https name one of its .desktop files (none named:
+/// Unknown); macOS -- Launch Services' handler of http and https is its bundle
+pub fn browser_status(pkg: &Package) -> BrowserStatus {
+    if !pkg.browser {
+        return BrowserStatus::NotDefault;
+    }
+    native::browser_status(pkg)
+}
+
+/// (PACKAGE browser=1) let the user make this app the system's web browser (the built-in
+/// PACKAGE: browser_request(&package())); call it from the user's click
+pub fn default_browser_request() -> Result<(), AssocError> {
+    browser_request(&package())
+}
+
+/// let the user make the app of pkg the web browser: Windows 10 and later -- Settings opens at
+/// the app's page of the default apps (ms-settings:defaultapps?registeredAppUser=<app>; Windows
+/// lets no program take the default itself), the user picks there; Linux -- the app's installed
+/// .desktop file becomes the user's default of x-scheme-handler/http, https and text/html in
+/// mimeapps.list (and KDE's BrowserApplication), as xdg-settings set default-web-browser does;
+/// macOS -- Launch Services' handler of http and https, macOS asks the user.  Ok: asked or set
+/// (read browser_status again later); NotRegistered: no browser=1, or this program is not
+/// registered as a browser (install the package or run --register first); Unavailable: a
+/// Flatpak, an MSIX package, the browser, Android, iOS.  jfgui_OPEN_DRYRUN=1 (Windows): the
+/// page is printed, not opened
+pub fn browser_request(pkg: &Package) -> Result<(), AssocError> {
+    if !pkg.browser {
+        return Err(AssocError::NotRegistered);
+    }
+    native::browser_request(pkg)
 }
 
 // ---------------------------------------------------------------- the record
@@ -576,4 +731,19 @@ mod native {
     }
     pub fn undo(_: &[Line]) {}
     pub fn changed(_: &mut Vec<String>) {}
+    #[cfg(target_os = "macos")]
+    pub use super::mac_browser::{browser_request, browser_status};
+    #[cfg(not(target_os = "macos"))]
+    pub fn browser_status(_: &Package) -> super::BrowserStatus {
+        super::BrowserStatus::Unknown
+    }
+    #[cfg(not(target_os = "macos"))]
+    pub fn browser_request(_: &Package) -> Result<(), AssocError> {
+        Err(AssocError::Unavailable)
+    }
 }
+
+// macOS: the default web browser through Launch Services
+#[cfg(target_os = "macos")]
+#[path = "apple_assoc.rs"]
+mod mac_browser;

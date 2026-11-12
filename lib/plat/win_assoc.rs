@@ -13,19 +13,23 @@
 //                                               after its replacement is removed)
 //   undo(lines)           the lines backwards
 //   changed(notes)        SHChangeNotify(SHCNE_ASSOCCHANGED)
+//   browser_status(pkg)   (browser=1) the user's choice of http and https is <app>URL
+//   browser_request(pkg)  Settings at the app's page of the default apps (registered first)
 //   console_print(text)   no stdout: AttachConsole(ATTACH_PARENT_PROCESS) + WriteConsoleW
 //
-// A key of the app's own (ProgID <app>.<ext>, a scheme) is the program's when its
-// shell\open\command is the command written here; with another command (in HKCU or HKLM) it
-// belongs to another program (another copy of the app too).  The default of an extension
-// belongs to another program when HKCR's (HKCU over HKLM) names another ProgID; a UserChoice
-// (the user's pick in Windows' dialog, hashed) stays as it is.
+// A key of the app's own (ProgID <app>.<ext>, a scheme, a browser's <app>URL and
+// Software\Clients\StartMenuInternet\<app>) is the program's when its shell\open\command is
+// the command written here; with another command (in HKCU or HKLM) it belongs to another program
+// (another copy of the app too).  The default of an extension belongs to another program when
+// HKCR's (HKCU over HKLM) names another ProgID; a UserChoice (the user's pick in Windows' dialog,
+// hashed) stays as it is.
 
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use super::{AssocError, Conflict, Line, Package, Registered, RegValue, RV_DEFAULT, RV_SHARED, RV_TREE, reg_entries};
+use super::{AssocError, BROWSER_CLIENTS, BrowserStatus, Conflict, Line, Package, REGISTERED_APPS, Registered, RegValue, RV_DEFAULT,
+            RV_SHARED, RV_TREE, package_entries, web_scheme};
 
 #[link(name = "advapi32", kind = "raw-dylib")]
 unsafe extern "system" {
@@ -180,11 +184,24 @@ fn del_value(sub: &str, name: &str) -> bool {
     r == 0 || r == ERROR_FILE_NOT_FOUND
 }
 
-fn del_tree(sub: &str) -> bool {
-    // only below Software\Classes: a damaged record line (an empty key name would clear HKCU
-    // itself) must not reach further
+/// sub is below base (base\..., at least one more name)
+fn below(sub: &str, base: &str) -> bool {
     let b = sub.as_bytes();
-    if b.len() <= CLASSES.len() + 1 || !b[..CLASSES.len()].eq_ignore_ascii_case(CLASSES.as_bytes()) || b[CLASSES.len()] != b'\\' {
+    b.len() > base.len() + 1 && b[..base.len()].eq_ignore_ascii_case(base.as_bytes()) && b[base.len()] == b'\\'
+}
+
+/// a key a registration may create (and remove again): below Software\Classes, Software\Clients
+/// and the folders above a browser's key, Software\RegisteredApplications itself
+fn removable(sub: &str) -> bool {
+    below(sub, CLASSES) || below(sub, "Software\\Clients") || sub.eq_ignore_ascii_case("Software\\Clients")
+        || sub.eq_ignore_ascii_case(REGISTERED_APPS)
+}
+
+fn del_tree(sub: &str) -> bool {
+    // a key with everything below it only below Software\Classes or a browser's below
+    // Software\Clients\StartMenuInternet, the other places of removable only when empty: a
+    // damaged record line (an empty key name would clear HKCU itself) must not reach further
+    if !(below(sub, CLASSES) || below(sub, BROWSER_CLIENTS) || removable(sub) && counts(sub) == Some((0, 0))) {
         return false;
     }
     let w = wide(sub);
@@ -332,22 +349,37 @@ fn command(exe: &str) -> String {
     format!("\"{exe}\" \"%1\"")
 }
 
+/// a key of the app's own as a conflict names it: below Software\Classes its name (a ProgID, a
+/// scheme), a browser's key StartMenuInternet\<app>
+fn rel(root: &str) -> &str {
+    if below(root, CLASSES) {
+        &root[CLASSES.len() + 1..]
+    } else {
+        root.get("Software\\Clients\\".len()..).unwrap_or(root)
+    }
+}
+
 fn label(root: &str) -> String {
-    let name = &root[CLASSES.len() + 1..];
-    name.to_ascii_lowercase()
+    rel(root).to_ascii_lowercase()
+}
+
+/// the command entries write into root\shell\open\command (a browser's StartMenuInternet key:
+/// the program without "%1"), else the usual one
+fn command_of(entries: &[RegValue], root: &str, exe: &str) -> String {
+    let key = format!("{root}\\shell\\open\\command");
+    entries.iter().find(|e| e.key.eq_ignore_ascii_case(&key) && e.name.is_empty()).map_or_else(|| command(exe), |e| e.value.clone())
 }
 
 /// the decisions of a registration: (root, Some(conflict) | None) and (.ext key, conflict)
 fn plan(pkg: &Package, exe: &str, v: &View) -> (Vec<RegValue>, Vec<(String, Option<Conflict>)>, Vec<(String, Conflict)>) {
-    let entries = reg_entries(&pkg.app, &pkg.display, exe, &pkg.types, &pkg.schemes, &pkg.app_id);
-    let cmd = command(exe);
+    let entries = package_entries(pkg, exe);
     let mut roots: Vec<(String, Option<Conflict>)> = Vec::new();
     let mut defaults: Vec<(String, Conflict)> = Vec::new();
     for e in &entries {
         if e.kind == RV_TREE && !roots.iter().any(|(r, _)| *r == e.root) {
             let is_scheme = pkg.schemes.iter().any(|s| e.root.eq_ignore_ascii_case(&format!("{CLASSES}\\{s}")));
-            let what = if is_scheme { format!("{}:", label(&e.root)) } else { String::from(&e.root[CLASSES.len() + 1..]) };
-            let c = match tree_state(v, &e.root, &cmd) {
+            let what = if is_scheme { format!("{}:", label(&e.root)) } else { String::from(rel(&e.root)) };
+            let c = match tree_state(v, &e.root, &command_of(&entries, &e.root, exe)) {
                 Tree::Other(holder, _) => Some(Conflict { what: what.clone(), holder, fixed: false }),
                 _ => None,
             };
@@ -381,11 +413,12 @@ pub fn conflicts(pkg: &Package, exe: &str, mine: &[Line]) -> Vec<Conflict> {
     roots.into_iter().filter_map(|(_, c)| c).chain(defaults.into_iter().map(|(_, c)| c)).collect()
 }
 
-/// the keys of sub below Software\Classes that do not exist yet, outermost first
+/// the keys of sub that do not exist yet, outermost first: below Software\Classes, and from
+/// Software\Clients and Software\RegisteredApplications down (never Software itself)
 fn missing_keys(sub: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut k = String::from(sub);
-    while k.len() > CLASSES.len() && !exists(HKCU, &k) {
+    while removable(&k) && !exists(HKCU, &k) {
         out.push(k.clone());
         match k.rfind('\\') {
             Some(p) => k.truncate(p),
@@ -418,7 +451,6 @@ fn put(e: &RegValue, lines: &mut Vec<Line>) -> Result<(), AssocError> {
 pub fn register(pkg: &Package, exe: &str, take: &mut dyn FnMut(&Conflict) -> bool, lines: &mut Vec<Line>, done: &mut Registered) -> Result<(), AssocError> {
     let v = View { mine: &[] };
     let (entries, roots, defaults) = plan(pkg, exe, &v);
-    let cmd = command(exe);
     // the decisions: keys of the app's own and extension defaults left to other programs
     let mut skip: Vec<String> = Vec::new();
     for (root, c) in &roots {
@@ -441,7 +473,7 @@ pub fn register(pkg: &Package, exe: &str, take: &mut dyn FnMut(&Conflict) -> boo
     // the keys of the app's own: created (another program's in HKCU saved and removed first)
     let mut fresh: Vec<String> = Vec::new();
     for (root, _) in roots.iter().filter(|(r, _)| !skipped(r)) {
-        match tree_state(&v, root, &cmd) {
+        match tree_state(&v, root, &command_of(&entries, root, exe)) {
             Tree::Mine => continue,
             Tree::Other(_, true) => {
                 dump(root, lines);
@@ -451,14 +483,24 @@ pub fn register(pkg: &Package, exe: &str, take: &mut dyn FnMut(&Conflict) -> boo
             }
             _ => {}
         }
+        // the keys above it that are new (Software\Clients\StartMenuInternet): removed again
+        // when empty
+        if let Some(k) = root.rfind('\\') {
+            for m in missing_keys(&root[..k]) {
+                lines.push(alloc::vec![String::from("mkkey"), m]);
+            }
+        }
         lines.push(alloc::vec![String::from("key"), root.clone()]);
         fresh.push(root.clone());
     }
     // the ProgID an extension's default names
     let progid_of = |key: &str| entries.iter().find(|x| x.kind == RV_DEFAULT && x.key == key && x.name.is_empty()).map(|x| x.value.clone());
+    let browser_key = format!("{BROWSER_CLIENTS}\\{}", pkg.app);
     for e in &entries {
         let owner = match e.kind {
             RV_TREE => e.root.clone(),
+            // a browser's name in RegisteredApplications belongs to its StartMenuInternet key
+            RV_SHARED if e.key.eq_ignore_ascii_case(REGISTERED_APPS) => browser_key.clone(),
             RV_SHARED => format!("{CLASSES}\\{}", e.name),
             _ => format!("{CLASSES}\\{}", progid_of(&e.key).unwrap_or_default()),
         };
@@ -474,7 +516,9 @@ pub fn register(pkg: &Package, exe: &str, take: &mut dyn FnMut(&Conflict) -> boo
         }
     }
     done.types = pkg.types.iter().filter(|t| !skipped(&format!("{CLASSES}\\{}.{}", pkg.app, t.exts[0]))).count();
-    done.schemes = pkg.schemes.iter().filter(|s| !skipped(&format!("{CLASSES}\\{s}"))).count();
+    // a browser's http and https: its ProgID <app>URL
+    let url = format!("{CLASSES}\\{}URL", pkg.app);
+    done.schemes = pkg.schemes.iter().filter(|s| !skipped(&if web_scheme(pkg, s) { url.clone() } else { format!("{CLASSES}\\{s}") })).count();
     Ok(())
 }
 
@@ -516,6 +560,46 @@ pub fn undo(lines: &[Line]) {
 
 pub fn changed(_notes: &mut Vec<String>) {
     crate::inst::assoc_changed();
+}
+
+/// the user's choice of a scheme: UserChoiceLatest (Windows 11's newer record), else UserChoice
+fn scheme_choice(scheme: &str) -> Option<String> {
+    get_sz(HKCU, &format!("{URL_ASSOC}\\{scheme}\\UserChoiceLatest\\ProgId"), "ProgId")
+        .or_else(|| get_sz(HKCU, &format!("{URL_ASSOC}\\{scheme}\\UserChoice"), "ProgId"))
+        .filter(|p| !p.is_empty())
+}
+
+/// http and https open with <app>URL (none chosen: Windows' own pick, never this app)
+pub fn browser_status(pkg: &Package) -> BrowserStatus {
+    let ours = format!("{}URL", pkg.app);
+    if ["http", "https"].iter().all(|s| scheme_choice(s).is_some_and(|p| p.eq_ignore_ascii_case(&ours))) {
+        BrowserStatus::Default
+    } else {
+        BrowserStatus::NotDefault
+    }
+}
+
+/// %XX for everything but letters, digits and -._~
+fn query_escape(s: &str) -> String {
+    let mut out = String::new();
+    for &c in s.as_bytes() {
+        if c.is_ascii_alphanumeric() || b"-._~".contains(&c) {
+            out.push(c as char);
+        } else {
+            out.push_str(&format!("%{c:02X}"));
+        }
+    }
+    out
+}
+
+/// Settings at the app's page of the default apps; the app must be in RegisteredApplications
+pub fn browser_request(pkg: &Package) -> Result<(), AssocError> {
+    available()?;
+    if get_sz(HKCU, REGISTERED_APPS, &pkg.app).is_none() {
+        return Err(AssocError::NotRegistered);
+    }
+    let page = format!("ms-settings:defaultapps?registeredAppUser={}", query_escape(&pkg.app));
+    if crate::settings_open(&page) { Ok(()) } else { Err(AssocError::Failed(format!("{page} did not open"))) }
 }
 
 /// no stdout (a GUI program in a console): the parent's console -> true when written there

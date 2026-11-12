@@ -1975,6 +1975,7 @@ in DIP):
 | `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
 | `system focus in\|out`, `system suspend\|resume`, `system background\|foreground`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|other\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...; background / foreground: a hidden tab, Android's `onStop` / `onStart`) |
+| `system browser default\|other\|unknown` | (E13) what `ui.default_browser()` answers from here (headless runs never ask the system; at first `other`, section 21) |
 | `system env NAME VALUE\|-` | set (`-` removes) a `jfgui_*` environment variable of the run: the overrides of the system settings (then `system settings ...`), `jfgui_CSD` (the library title bar and its resize band from the next pass), `jfgui_FONT_FALLBACK 1` (system fonts for missing characters from here, section 11) |
 | `sensor accel\|gravity\|gyro\|magnet X Y Z [ACCURACY]`, `sensor rot X Y Z W [abs\|rel]`, `sensor none NAME\|all`, `sensor expect NAME off\|waiting\|running\|paused\|denied\|unavailable` | a reading of `plat::sensors` as the host would deliver it (the sensor exists from now on; a stopped one delivers nothing), a sensor gone, its state (§36) |
 | `location LAT LON [ACC ALT SPEED BEARING]` (`-`: the provider does not say), `location age MS`, `location searching\|denied\|off\|none`, `location expect off\|searching\|fix\|paused\|denied\|disabled\|unavailable` | a fix of `plat::sensors`, how old it is, the host's answer (`off`: the system's switch; `none`: no location service, as at the start), the state (§36) |
@@ -3323,6 +3324,42 @@ let done = plat::assoc::assoc_register(&pkg, &mut |c| self.user_said_yes(&c.what
   the `fs.user` grant of the command line and `plat::assoc::file_uri_path(arg)` turn local
   ones into paths. An app that reads `plat::args()` itself uses `file_uri_path` too.
 
+**A web browser.** An app that shows web pages says so in its `PACKAGE`: `browser=1` with
+`schemes=http https` (and its file types, [PACKAGING.md](PACKAGING.md) "Web browsers"). The
+setup, the packages and `--register` register it as a web browser; becoming the default is the
+user's choice, which the app offers on its settings page:
+
+```rust
+// the settings page
+match ui.default_browser() {                            // plat::default_browser_status()
+    BrowserStatus::Default => ui.text(TS_BODY, "Narsil ist der Standardbrowser."),
+    _ => {
+        if ui.button(ID_DEFAULT, "Als Standardbrowser festlegen") & EV_ACT != 0 {
+            if let Err(e) = ui.default_browser_request() { // plat::default_browser_request()
+                self.note = format!("{e}");                // NotRegistered: --register first
+            }
+        }
+    }
+}
+// in command(): UIC_ACTIVE => ui.invalidate(),         // back from the system's settings: ask again
+```
+
+* Windows: the request opens Settings at the app's page of the default apps (Windows 10 and later
+  let no program take the default itself; the user picks there); the status is the user's choice
+  of http and https. Linux: the request makes the app's installed `.desktop` file the user's
+  default of `x-scheme-handler/http`, `https` and `text/html` in `mimeapps.list` (and KDE's
+  `BrowserApplication`), as `xdg-settings set default-web-browser` does -- call it only from the
+  user's click; the status reads the defaults (`Unknown` when none is set). macOS: the request
+  asks Launch Services, and macOS asks the user ("Do you want to change your default web
+  browser?"). Flatpak, MSIX, the browser, Android and iOS: `Unknown`, `AssocError::Unavailable`.
+* `AssocError::NotRegistered`: the program is not registered as a browser (a build from `build/`
+  without `--register`); `plat::assoc::assoc_register` registers it first.
+* Headless runs never ask the system: `ui.default_browser()` answers what the script says
+  (`system browser default|other|unknown`, at first `NotDefault`), and
+  `ui.default_browser_request()` prints `ui_default_browser_request`. `plat::default_browser_*`
+  are the real calls (Windows: `jfgui_OPEN_DRYRUN=1` prints the Settings page instead of opening
+  it).
+
 **Recent files.** `ui.recent_add(path)` after opening or saving a file keeps the app's own
 list (`ui.recent_files()`, newest first, at most `ui::RECENT_KEEP`, in `config://recent.list`;
 `recent_remove`, `recent_clear`) and tells the system. To open an entry, call
@@ -3380,7 +3417,9 @@ run), `--test taskbar-win` (by hand: a window with every state), and
 `tools/platshared/desktop_bus.py` in WSL (the Inhibit and Background portals and the
 LauncherEntry signals on a fake bus). `apps/traydemo` has buttons for all of it.
 `plattest --test assoc` registers a test package (Windows: test names in the real HKCU,
-removed again; Linux: scratch XDG folders, `desktop-file-validate`), `--test recent` the xbel
+removed again; Linux: scratch XDG folders, `desktop-file-validate`) and a web browser (the
+registration, the status, the request: a dry run on Windows, mimeapps.list and kdeglobals on
+Linux), `--test recent` the xbel
 list through `jfgui_RECENT` and, on Windows, the explicit id (shortcuts and pins in a scratch
 folder), `--test recent-win` (by hand, no window) the real shell and jump list with the
 derived and the explicit id. `apps/androidGallery/tests/files_web.mjs` checks the browser's
