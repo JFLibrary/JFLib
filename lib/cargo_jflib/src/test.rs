@@ -13,7 +13,12 @@ use std::process::Command;
 use crate::cargo;
 
 pub(crate) fn run(args: &[String]) -> Result<(), String> {
-    let o = crate::opts(args)?;
+    let mut o = crate::opts(args)?;
+    // on Linux always with --target: the template's rustflags (rust-lld, relocation-model=static)
+    // must reach the program only, without --target Cargo gives them to the build scripts too
+    if o.target.is_none() && cfg!(target_os = "linux") {
+        o.target = Some(format!("{}-unknown-linux-gnu", std::env::consts::ARCH));
+    }
     let p = cargo::project(o.package.as_deref())?;
     let mut cmd = cargo::command();
     cmd.args(["build", "-p", &p.package.name]);
