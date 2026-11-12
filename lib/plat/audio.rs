@@ -927,17 +927,27 @@ pub fn resample(samples: &[f32], channels: usize, from: u32, to: u32) -> Vec<f32
 
 /// (tests) the ring of a push stream: n samples written in pieces of `piece` and read in
 /// pieces of `take`, by turns or (threaded, Windows / Linux) by a writer thread while this one
-/// reads -> whether every sample arrived once and in order
+/// reads -> whether every sample arrived once and in order.  The reader gives up after 20 s
+/// (a loaded machine): then it tells the writer to stop, which may wait at a full ring, and
+/// the check fails instead of waiting for it forever
 #[doc(hidden)]
 pub fn ring_check(n: usize, piece: usize, take: usize, threaded: bool) -> bool {
+    ring_check_within(n, piece, take, threaded, 20_000_000)
+}
+
+/// (tests) ring_check with the reader's time limit in µs (a short one: the writer must stop)
+#[doc(hidden)]
+pub fn ring_check_within(n: usize, piece: usize, take: usize, threaded: bool, limit_us: u64) -> bool {
     let ring = Arc::new(Ring::new(1000));
     let piece = piece.max(1);
+    // the reader is done (all read, or its time ran out): the writer stops writing
+    let stop = Arc::new(AtomicBool::new(false));
     #[cfg(any(windows, target_os = "linux"))]
     let writer = if threaded {
-        let r = ring.clone();
+        let (r, stop) = (ring.clone(), stop.clone());
         crate::thread_spawn(64 * 1024, Box::new(move || {
             let mut next = 0usize;
-            while next < n {
+            while next < n && !stop.load(Ordering::Acquire) {
                 let (k, start) = (piece.min(n - next), next);
                 let put = r.push_with(k, |i| (start + i) as f32);
                 next += put;
@@ -958,7 +968,7 @@ pub fn ring_check(n: usize, piece: usize, take: usize, threaded: bool) -> bool {
     let mut next = 0usize;
     let mut buf = alloc::vec![0.0f32; take.max(1)];
     let start = crate::time_us();
-    while got.len() < n && crate::time_us() - start < 20_000_000 {
+    while got.len() < n && crate::time_us() - start < limit_us {
         if writer.is_none() && next < n {
             let (k, at) = (piece.min(n - next), next);
             next += ring.push_with(k, |i| (at + i) as f32);
@@ -966,6 +976,7 @@ pub fn ring_check(n: usize, piece: usize, take: usize, threaded: bool) -> bool {
         let m = ring.pop(&mut buf);
         got.extend_from_slice(&buf[..m]);
     }
+    stop.store(true, Ordering::Release);
     #[cfg(any(windows, target_os = "linux"))]
     if let Some(w) = writer {
         w.join();

@@ -146,6 +146,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** A toast's message has a record of its own (K_TEXT below the card's K_BOX with the title): screen readers read it, scripts find it as text:"…"; datagallery tests/smoke.uis
 - **ui:** A frame is no longer lost when the last command round of run_passes changes something (a command such as UIC_WAKE, a window, a task): run_passes asks for the next frame (need accumulates instead of being overwritten); an app that asks for a frame after every frame by itself gets 8 more, then a UIWARN; a script's wait gives the frame asked for, as the window loop does; viewtest tests/chain.uis
 - **ui:** Docking: a hidden panel comes back between the neighbours it had in its group (DockState::show, toggle, focus; also after save / load): panels hidden one by one and shown again in any order keep their tab order -- they came back at the index each had when it left, so BrowserGUI's developer tools were shuffled after hiding every panel and F12; docktest tests/order.uis
+- **plat:** plat::audio::ring_check (plattest --test audio): when the reader's 20 s ran out the writer thread waited at the full ring and join() never returned; the writer stops now and the check fails (ring_check_within with a limit of its own)
 
 ## [0.1.0] - 2026-11-08
 

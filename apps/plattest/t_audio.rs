@@ -147,6 +147,11 @@ fn t_ring(t: &mut T) {
     for (piece, take) in [(3, 5), (480, 256), (1024, 7)] {
         t.check(audio::ring_check(2_000_000, piece, take, true), &format!("audio ring: 2000000 samples from a writer thread in pieces of {piece}, read by {take}"));
     }
+    // the reader's time runs out (1 ms for 2000000 samples read one by one): the writer, waiting
+    // at the full ring, stops -- the check fails and returns instead of hanging in join
+    let t0 = plat::time_us();
+    let r = audio::ring_check_within(2_000_000, 1, 1, true, 1_000);
+    t.check(!r && plat::time_us() - t0 < 10_000_000, "audio ring: the reader's limit runs out -> false, the writer thread stops");
 }
 
 // no sound server (Linux): every stream is Unavailable, nothing hangs

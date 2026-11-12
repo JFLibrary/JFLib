@@ -28757,7 +28757,12 @@ SOUND_NOTIFY: u32 = 5
 - **`fn ring_check(n: usize, piece: usize, take: usize, threaded: bool) -> bool`**
   (tests) the ring of a push stream: n samples written in pieces of `piece` and read in
   pieces of `take`, by turns or (threaded, Windows / Linux) by a writer thread while this one
-  reads -> whether every sample arrived once and in order
+  reads -> whether every sample arrived once and in order.  The reader gives up after 20 s
+  (a loaded machine): then it tells the writer to stop, which may wait at a full ring, and
+  the check fails instead of waiting for it forever
+
+- **`fn ring_check_within(n: usize, piece: usize, take: usize, threaded: bool, limit_us: u64) -> bool`**
+  (tests) ring_check with the reader's time limit in µs (a short one: the writer must stop)
 
 - **`fn theme_path(kind: u32) -> Option<String>`** *(Linux)*
   (tests, Linux) the sound theme's file for a SOUND_\* kind (".disabled": switched off)
