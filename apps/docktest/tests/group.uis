@@ -1,0 +1,37 @@
+#!args --verify-dirty
+# a group that moves as a whole (DP_GROUP): "Gruppe" gives Dateien and Gliederung the flag; the
+# group menu's side rows and "Lösen" take both tabs, the shown one stays shown
+theme light
+# without the flag the menu moves the shown panel alone
+click button:"Weitere Optionen: Dateien"
+click menuitem:"Rechts andocken"
+expect text:"L: [Gliederung] | R: [Eigenschaften], [Dateien] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+click button:"Zurücksetzen"
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# with it: the whole group, in its tab order
+click button:"Gruppe"
+click tab:"Gliederung"
+click button:"Weitere Optionen: Gliederung"
+click menuitem:"Rechts andocken"
+expect text:"L: - | R: [Eigenschaften], Dateien+[Gliederung] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+click button:"Weitere Optionen: Gliederung"
+expect menuitem:"Rechts andocken" missing
+click menuitem:"Unten andocken"
+expect text:"L: - | R: [Eigenschaften] | U: [Ausgabe], [Suche], Dateien+[Gliederung] | F: - | V: Verlauf" exists
+# Lösen floats the group in one window; its pin docks both back
+click button:"Weitere Optionen: Gliederung"
+click menuitem:"Lösen"
+expect text:"L: - | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: Dateien+[Gliederung] | V: Verlauf" exists
+window any
+click button:"Andocken: Gliederung"
+window main
+expect text:"L: - | R: [Eigenschaften] | U: [Ausgabe], [Suche], Dateien+[Gliederung] | F: - | V: Verlauf" exists
+# a floating group docks as a whole from its menu too
+click button:"Weitere Optionen: Gliederung"
+click menuitem:"Lösen"
+window any
+click button:"Weitere Optionen: Gliederung"
+click menuitem:"Links andocken"
+window main
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+expect_nowarn

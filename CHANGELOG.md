@@ -81,6 +81,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** A name for a canvas's own record: ui.canvas_label(label) right before ui.canvas names its K_CANVAS record (screen readers, a script's canvas:"Label"); the GUIDE says that rt::panic_take()'s file has backslashes on Windows
 - **ui:** Unit tests of a library crate with std (an app's own style crate): ui::test_main!() and rt::test_main!() define the jfgui_main stub its test binary needs to link (#[cfg(test)] in lib.rs)
 - **build:** cargo jflib package takes a style of the app's own: PACKAGE styles= (or --styles) may name a crate of the app's dependencies with [package.metadata.jflib] style = "NAME" (its INFO file names it in the setup); it is built without JFLIB_STYLE, the library's styles as before
+- **ui:** Dock groups that move as a whole: a panel with DP_GROUP takes its whole group along when it is the shown tab -- the group menu's "Links / Rechts / Unten andocken" and "Lösen" and a double click on the strip's empty part move or float every tab, the shown one stays shown (an app's developer tools); DockState::dock_group_to(id, side) and float_group(id, rect) for the app's own commands; docktest "Gruppe", tests/group.uis
 
 ### Changed
 
