@@ -39,9 +39,12 @@ fn hex_line(name: &str, bytes: &[u8]) -> String {
 enum Kind {
     /// sent as hex (and looked at when translucent)
     Send(String, Option<u32>),
-    /// the drawing around a point: index into far, or the origin's (arcs: the arcs' and dashes' drawing)
-    Far(Option<usize>, bool),
-    Deep(Camera, bool),
+    /// the drawing around a point: index into far, or the origin's (0 lines, 1 arcs and dashes, 2 curves, fills, hatches)
+    Far(Option<usize>, u8),
+    /// a frame of the deep zoom: lines, rings (arcs) or curves
+    Deep(Camera, u8),
+    /// a frame of the deep hatch: hatched or solid
+    DeepHatch(Camera, bool),
     /// a frame of a phase case: the case, its pan
     Phase(u32, u32),
 }
@@ -71,10 +74,16 @@ struct Test {
     jobs: Vec<Job>,
     scenes: Vec<Scene>,
     vis: Vec<VisJob>,
-    origin: [Option<Vec<u8>>; 2],
-    far: Vec<(usize, bool, Vec<u8>)>,
+    origin: [Option<Vec<u8>>; 3],
+    far: Vec<(usize, u8, Vec<u8>)>,
     deep: DeepStats,
     deep_arcs: DeepStats,
+    deep_curves: DeepStats,
+    fine: Vec<Vec<[f64; 2]>>,
+    /// the deep hatch: a hatched frame waiting for its solid one; the lines' and the outline's stats
+    hatched: Option<Vec<u8>>,
+    hatch_lines: DeepStats,
+    hatch_edge: DeepStats,
     /// per phase case: the largest distance of a dash's end, the pixel lines looked at, its name
     phase: Vec<(f64, u32, &'static str)>,
     phase_done: bool,
@@ -143,44 +152,72 @@ impl Probe {
         let mut r = Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm))?;
         say(&format!("renderer: multi-draw {}, at most {} records", r.multi_draw(), r.max_records()));
         self.yes(!r.multi_draw(), "the browser's level Basis: one indirect draw per layer");
-        let mut t = Test { jobs: Vec::new(), scenes: Vec::new(), vis: Vec::new(), origin: [None, None], far: Vec::new(), deep: DeepStats::default(), deep_arcs: DeepStats::default(),
-                           phase: Vec::new(), phase_done: false };
+        let (dc, fine) = deep_curves();
+        let mut t = Test { jobs: Vec::new(), scenes: Vec::new(), vis: Vec::new(), origin: [None, None, None], far: Vec::new(), deep: DeepStats::default(), deep_arcs: DeepStats::default(),
+                           deep_curves: DeepStats::default(), fine, hatched: None, hatch_lines: DeepStats::default(), hatch_edge: DeepStats::default(), phase: Vec::new(), phase_done: false };
         for shot in shots() {
             let mut off = Off::new(dev, shot.w, shot.h)?;
             let mut s = Scene::new(&r)?;
-            build(&mut s, &shot.d)?;
             s.set_camera(&shot.cam)?;
+            build(&mut s, &shot.d)?;
             off.submit(&mut r, &mut s)?;
             t.jobs.push(Job { off, kind: Kind::Send(shot.name, shot.alpha) });
             t.scenes.push(s);
         }
-        // the same drawing at the origin and at +-1e7 (lines; arcs and dashes)
-        for arcs in [false, true] {
+        // the same drawing at the origin and at +-1e7 (lines; arcs and dashes; curves, fills, hatches)
+        for which in 0..3u8 {
             for k in 0..FAR_POINTS.len() + 1 {
                 let at = if k == 0 { [0.0, 0.0] } else { FAR_POINTS[k - 1] };
                 let mut off = Off::new(dev, FAR_SIZE.0, FAR_SIZE.1)?;
                 let mut s = Scene::new(&r)?;
-                build(&mut s, &if arcs { arc_sample(at) } else { sample(at) })?;
                 s.set_camera(&sample_camera(at))?;
+                build(&mut s, &match which {
+                    0 => sample(at),
+                    1 => arc_sample(at),
+                    _ => curve_sample(at),
+                })?;
                 off.submit(&mut r, &mut s)?;
-                t.jobs.push(Job { off, kind: Kind::Far(if k == 0 { None } else { Some(k - 1) }, arcs) });
+                t.jobs.push(Job { off, kind: Kind::Far(if k == 0 { None } else { Some(k - 1) }, which) });
                 t.scenes.push(s);
             }
         }
-        // the deep zoom: lines, rings
-        for arcs in [false, true] {
+        // the deep zoom: lines, rings, curves
+        for which in 0..3u8 {
             let mut s = Scene::new(&r)?;
-            build(&mut s, &if arcs { deep_arc_drawing() } else { deep_drawing() })?;
+            s.set_camera(&deep_camera(0))?;
+            build(&mut s, &match which {
+                0 => deep_drawing(),
+                1 => deep_arc_drawing(),
+                _ => dc.clone(),
+            })?;
             for step in 0..DEEP_STEPS {
                 let c = deep_camera(step);
                 s.set_camera(&c)?;
                 let mut off = Off::new(dev, DEEP_SIZE.0, DEEP_SIZE.1)?;
                 off.bg = 0xFF00_0000;
                 off.submit(&mut r, &mut s)?;
-                t.jobs.push(Job { off, kind: Kind::Deep(c, arcs) });
+                t.jobs.push(Job { off, kind: Kind::Deep(c, which) });
             }
             t.scenes.push(s);
         }
+        // the deep hatch: hatched and solid, frame by frame
+        let (mut sh, mut ss) = (Scene::new(&r)?, Scene::new(&r)?);
+        sh.set_camera(&deep_camera(0))?;
+        ss.set_camera(&deep_camera(0))?;
+        build(&mut sh, &deep_hatch(false))?;
+        build(&mut ss, &deep_hatch(true))?;
+        for step in 0..DEEP_STEPS {
+            let c = deep_camera(step);
+            for (solid, s) in [(false, &mut sh), (true, &mut ss)] {
+                s.set_camera(&c)?;
+                let mut off = Off::new(dev, DEEP_SIZE.0, DEEP_SIZE.1)?;
+                off.bg = 0xFF00_0000;
+                off.submit(&mut r, s)?;
+                t.jobs.push(Job { off, kind: Kind::DeepHatch(c, solid) });
+            }
+        }
+        t.scenes.push(sh);
+        t.scenes.push(ss);
         // the dash pattern's place far away: each case's 24 pans
         for k in 0..PHASE_CASES {
             let mut s = Scene::new(&r)?;
@@ -244,10 +281,17 @@ impl Probe {
                         self.yes(twice == 0, &format!("{name}: no pixel beyond one blend of the colour: {twice}"));
                     }
                 }
-                Kind::Far(None, arcs) => t.origin[*arcs as usize] = Some(img),
-                Kind::Far(Some(k), arcs) => t.far.push((*k, *arcs, img)),
-                Kind::Deep(c, false) => deep_judge(&img, c, &mut t.deep),
-                Kind::Deep(c, true) => deep_arc_judge(&img, c, &mut t.deep_arcs),
+                Kind::Far(None, which) => t.origin[*which as usize] = Some(img),
+                Kind::Far(Some(k), which) => t.far.push((*k, *which, img)),
+                Kind::Deep(c, 0) => deep_judge(&img, c, &mut t.deep),
+                Kind::Deep(c, 1) => deep_arc_judge(&img, c, &mut t.deep_arcs),
+                Kind::Deep(c, _) => deep_curve_judge(&img, c, &t.fine, &mut t.deep_curves),
+                Kind::DeepHatch(_, false) => t.hatched = Some(img),
+                Kind::DeepHatch(c, true) => {
+                    if let Some(a) = t.hatched.take() {
+                        deep_hatch_judge(&a, &img, c, &mut t.hatch_lines, &mut t.hatch_edge);
+                    }
+                }
                 Kind::Phase(k, step) => {
                     let case = phase_case(*k, *step);
                     let e = &mut t.phase[*k as usize];
@@ -257,18 +301,24 @@ impl Probe {
             t.jobs.remove(0);
         }
         // the coordinates
-        if let (Some(base), Some(base_arcs)) = (t.origin[0].take(), t.origin[1].take()) {
+        if let (Some(base), Some(base_arcs), Some(base_curves)) = (t.origin[0].take(), t.origin[1].take(), t.origin[2].take()) {
             let (w, h) = FAR_SIZE;
-            for (k, arcs, img) in core::mem::take(&mut t.far) {
-                let (n, m) = differ(&img, if arcs { &base_arcs } else { &base });
+            for (k, which, img) in core::mem::take(&mut t.far) {
+                let (n, m) = differ(&img, [&base, &base_arcs, &base_curves][which as usize]);
                 let at = FAR_POINTS[k];
-                let what = if arcs { "arcs, circles and dash patterns" } else { "the drawing" };
+                let what = ["the drawing", "arcs, circles and dash patterns", "curves, a fill with a hole and a hatched fill"][which as usize];
                 self.yes(m <= 1 && n <= (w * h) / 1000, &format!("{what} at ({}, {}) against at the origin: {n} pixels differ, largest {m}", at[0], at[1]));
             }
             let text = t.deep.text();
             self.yes(t.deep.fine(), &text);
             let text = t.deep_arcs.arc_text();
             self.yes(t.deep_arcs.fine_arcs(), &text);
+            let d = &t.deep_curves;
+            self.yes(d.checks > 100 && d.lost == 0 && d.worst <= 1.0 / 16.0, &format!("curves at 1e-6 units per pixel near 1e7 (an ellipse of radii 1e7 and 6e6, a Bézier with controls 1e6 away), 24 pans: {} crossings, \
+                                                                                  the largest distance from where the curve belongs {:.4} px, {} without it", d.checks, d.worst, d.lost));
+            let (l, e) = (&t.hatch_lines, &t.hatch_edge);
+            self.yes(l.checks > 100 && l.lost == 0 && l.worst <= 1.0 / 16.0 && e.checks > 100 && e.worst <= 1.0 / 16.0,
+                     &format!("a hatch at 1e-6 units per pixel near 1e7, 24 pans: the lines' centroids at most {:.4} px from where they belong, the outline's edge at most {:.4} px", l.worst, e.worst));
         }
         if !t.phase_done {
             t.phase_done = true;
@@ -317,10 +367,16 @@ impl Probe {
         let r = Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm))?;
         let mut s = Scene::new(&r)?;
         let t0 = plat::time_us();
-        let plain = plat::env("jfgui_GPU_PROBE_PLAIN").is_some();
-        let c = cad::build(&mut s, n, 5, styled, plain)?;
-        say(&format!("bench: {} segments in {} entities ({} arcs and circles of {} pieces, {} dashed of {} records), {:.0} x {:.0} m, inserted in {:.0} ms (wasm)", c.segments, c.entities, c.arcs,
-                     c.arc_records, c.dashed, c.dashed_records, c.width, c.height, (plat::time_us() - t0) as f64 / 1000.0));
+        let mode = if plat::env("jfgui_GPU_PROBE_PLAIN").is_some() {
+            cad::Mode::Plain
+        } else if plat::env("jfgui_GPU_PROBE_ARCS").is_some() {
+            cad::Mode::Arcs
+        } else {
+            cad::Mode::Fills
+        };
+        let c = cad::build(&mut s, n, 5, styled, mode)?;
+        say(&format!("bench: {} records in {} entities ({} arcs and circles of {} pieces, {} dashed of {} records, {} fills ({} hatched) of {} records, {} curves of {} records), {:.0} x {:.0} m, inserted in {:.0} ms (wasm)",
+                     c.segments, c.entities, c.arcs, c.arc_records, c.dashed, c.dashed_records, c.fills, c.hatched, c.fill_records, c.curves, c.curve_records, c.width, c.height, (plat::time_us() - t0) as f64 / 1000.0));
         let size = (1920, 1080);
         let off = dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?;
         self.mode = Mode::Bench(Box::new(Bench { r, s, off, used: false, size, cads: [c], styled, n, view: 0, sent: 0, done: 0, flight: Vec::new(), t0: 0, cam: Camera::new([0.0, 0.0], 1.0), cpu_ms: Vec::new() }));

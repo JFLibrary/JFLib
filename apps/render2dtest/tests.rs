@@ -6,6 +6,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::*;
+use render2d::math::sincos;
 use render2d::{Camera, Cap, Join, Layer, Renderer, RendererDesc, Scene, Shape, Style, Unit};
 
 use crate::gallery::*;
@@ -108,8 +109,9 @@ pub fn shot(t: &mut T, dev: &Device, off: &mut Off, r: &mut Renderer, s: &mut Sc
 /// a drawing on the GPU in a new scene: its image
 pub fn gpu_image(t: &mut T, dev: &Device, r: &mut Renderer, off: &mut Off, d: &Drawing, cam: &Camera, what: &str) -> Option<Vec<u8>> {
     let mut s = t.res(Scene::new(r), "Scene::new")?;
-    t.res(build(&mut s, d), what)?;
+    // (the camera first: curves are flattened for it as they come)
     t.res(s.set_camera(cam), what)?;
+    t.res(build(&mut s, d), what)?;
     shot(t, dev, off, r, &mut s, what)
 }
 
@@ -440,6 +442,197 @@ fn dashes_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     Some(())
 }
 
+// ---------------------------------------------------------------- curves (G6b1)
+
+fn curves(t: &mut T) {
+    on_levels(t, &mut |t, dev, level| { let _ = curves_on(t, dev, level); });
+}
+
+/// the curve test's tolerances: chords within 1/32 px of the curve (up to 8 codes along every edge), round caps and joins
+/// against lib/gfx's polygons, the joins between flattened pieces (nearly straight)
+pub const TOL_CURVES: Tol = Tol { small: 12, over: 60, max: 64, ink: 0.003 };
+pub const TOL_CURVES_DASH: Tol = Tol { small: 16, over: 100, max: 160, ink: 0.012 };
+
+fn curves_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
+    let (w, h) = (360u32, 270u32);
+    let mut off = t.res(Off::new(dev, w, h), "target")?;
+    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
+    let cam = pixel_camera(w, h);
+    for (cap, join, width, pat) in CURVE_CASES {
+        let d = curves_drawing(cap, join, width, pat);
+        let tol = if pat.is_empty() { TOL_CURVES } else { TOL_CURVES_DASH };
+        against_ref(t, dev, &mut r, &mut off, &d, &cam, &tol, &format!("{level}: Bézier curves, ellipses, splines, {cap:?} caps, {join:?} joins, width {width}{}",
+                                                                      if pat.is_empty() { String::new() } else { format!(", dashes {pat:?}") }))?;
+    }
+    // zoom bands: within its band a curve stays as it is (nothing goes up), across one it is flattened again (only the
+    // curves go up), and each image is that of a scene built anew at that zoom
+    let mut d = curves_drawing(Cap::Round, Join::Round, 3.0, &[]);
+    d.add(style(INK[1], 2.0, Cap::Butt, Join::Miter), Geo::Poly(vec![[10.0, 10.0], [350.0, 12.0], [348.0, 265.0]], false));
+    let curves = d.items.len() as u32 - 1;
+    let mut s = t.res(Scene::new(&r), "Scene::new")?;
+    t.res(s.set_camera(&cam), "camera")?;
+    t.res(build(&mut s, &d), "build")?;
+    let _ = shot(t, dev, &mut off, &mut r, &mut s, "bands")?;
+    // (scales: within band 0 and its hysteresis, band -2, band 1, within band 1, band 3)
+    for (scale, across) in [(0.95f64, false), (0.38, true), (2.6, true), (3.3, false), (9.0, true)] {
+        let c = Camera::new(cam.center, scale);
+        t.res(s.set_camera(&c), "camera")?;
+        let img = shot(t, dev, &mut off, &mut r, &mut s, "zoomed")?;
+        let (info, re) = (s.upload_info(), s.reflattened());
+        let what = format!("{level}: scale {scale}: {re} of {curves} curves flattened again, {} records sent ({} runs{})", info.records, info.runs, if info.rebuild { ", a new pool" } else { "" });
+        if across {
+            let fresh = gpu_image(t, dev, &mut r, &mut off, &d, &c, "zoomed, anew")?;
+            let (n, _) = differ(&img, &fresh);
+            t.ok(n == 0 && re > 0 && re <= curves, &format!("{what}; against the scene built anew {n} pixels differ"));
+        } else {
+            let reference = refimg::draw(&d, &c, (w, h), BG);
+            let cmp = refimg::compare(&img, &reference, w, BG, TOL_CURVES.small);
+            t.ok(re == 0 && info.records == 0 && cmp.fine(&TOL_CURVES), &format!("{what}; against lib/gfx: {}", cmp.text()));
+        }
+    }
+    Some(())
+}
+
+// ---------------------------------------------------------------- fills (G6b1)
+
+fn fills(t: &mut T) {
+    fill_cpu(t);
+    on_levels(t, &mut |t, dev, level| { let _ = fills_on(t, dev, level); });
+}
+
+/// the fill test's tolerances: both sides compute the exact area (1 to 2 codes), curved rings flattened within 1/32 px
+/// (up to 8 codes along them)
+pub const TOL_FILLS: Tol = Tol { small: 2, over: 900, max: 12, ink: 0.002 };
+
+/// the triangulation on the CPU: the triangles' area against the rings' even-odd area, random rings with holes and
+/// islands, collinear and repeated points, rings that touch
+fn fill_cpu(t: &mut T) {
+    let mut rng = Rng(77);
+    let (mut worst, mut cases) = (0.0f64, 0u32);
+    for k in 0..400 {
+        // (at least six points outside, five in a hole: the rings never cross, edges stay outside the radii within)
+        let n = 6 + rng.below(40) as usize;
+        let (cx, cy) = (rng.range(-1e3, 1e3) + 5e5, rng.range(-1e3, 1e3) + 5.4e6);
+        // a star-shaped outer ring (angles a step apart), holes inside it, an island in the first hole
+        let star = |rng: &mut Rng, n: usize, r0: f64, r1: f64, x: f64, y: f64| -> Vec<[f64; 2]> {
+            (0..n).map(|j| {
+                let a = (j as f64 + rng.range(0.0, 0.9)) * core::f64::consts::TAU / n as f64;
+                let rr = rng.range(r0, r1);
+                let (s, c) = sincos(a);
+                [x + rr * c, y + rr * s]
+            }).collect()
+        };
+        let mut rings = vec![star(&mut rng, n, 80.0, 100.0, cx, cy)];
+        if k % 3 != 0 {
+            let m = 5 + rng.below(9) as usize;
+            rings.push(star(&mut rng, m, 20.0, 40.0, cx, cy));
+            if k % 3 == 2 && k % 7 != 0 {
+                let m = 3 + rng.below(5) as usize;
+                rings.push(star(&mut rng, m, 5.0, 12.0, cx, cy));
+            }
+        }
+        if k % 5 == 0 {
+            // repeated and collinear points
+            let r0 = &mut rings[0];
+            let p = r0[1];
+            r0.insert(1, p);
+            let (a, b) = (r0[2], r0[3]);
+            r0.insert(3, [0.5 * (a[0] + b[0]), 0.5 * (a[1] + b[1])]);
+        }
+        if k % 7 == 0 && rings.len() > 1 {
+            // a hole touching the outer ring at one of its points
+            let v = rings[0][0];
+            rings[1][0] = v;
+        }
+        let p = render2d::fill::prepare(&rings);
+        let (tri, ring) = render2d::fill::areas(&p);
+        let e = (tri - ring).abs() / ring.abs().max(1e-30);
+        if e > 1e-9 && plat::env("R2D_FILLDBG").is_some() {
+            out(&format!("case {k}: rings {:?}, prepared {:?}, triangles {}, area {tri} against {ring}", rings.iter().map(|r| r.len()).collect::<Vec<_>>(),
+                         p.rings.iter().map(|r| r.len()).collect::<Vec<_>>(), p.tris.len()));
+        }
+        worst = worst.max(e);
+        cases += 1;
+    }
+    t.ok(worst <= 1e-9, &format!("triangulation: {cases} random fills (holes, islands, repeated and collinear points, touching rings) near (5e5, 5.4e6): the triangles' area against the rings' \
+                                  even-odd area, the largest difference {worst:.2e} of it"));
+}
+
+fn fills_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
+    let (w, h) = (360u32, 270u32);
+    let mut off = t.res(Off::new(dev, w, h), "target")?;
+    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
+    let cam = pixel_camera(w, h);
+    against_ref(t, dev, &mut r, &mut off, &fills_drawing(0xFF), &cam, &TOL_FILLS, &format!("{level}: fills (holes, islands, touching rings, collinear and repeated points, curved rings)"))?;
+    for alpha in [0x80u32, 0x40] {
+        let d = fills_drawing(alpha);
+        let what = format!("{level}: translucent ({alpha:#x}) fills");
+        let c = against_ref(t, dev, &mut r, &mut off, &d, &cam, &TOL_FILLS, &what)?;
+        let _ = c;
+        let img = gpu_image(t, dev, &mut r, &mut off, &d, &cam, &what)?;
+        let twice = blended_twice(&img, alpha);
+        t.ok(twice == 0, &format!("{what}: no pixel beyond one blend of the colour: {twice}"));
+    }
+    // self-intersecting rings: approximately (decision 26)
+    // (where the traced cycles touch, at the crossings, an owner may not know every edge: a few pixels)
+    against_ref(t, dev, &mut r, &mut off, &fills_crossing_drawing(), &cam, &Tol { small: 2, over: 24, max: 96, ink: 0.002 }, &format!("{level}: a self-intersecting star and crossing rings (even-odd)"))?;
+    Some(())
+}
+
+// ---------------------------------------------------------------- hatches (G6b1)
+
+fn hatches(t: &mut T) {
+    on_levels(t, &mut |t, dev, level| { let _ = hatches_on(t, dev, level); });
+}
+
+fn hatches_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
+    let (w, h) = (360u32, 270u32);
+    let mut off = t.res(Off::new(dev, w, h), "target")?;
+    let mut r = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new")?;
+    let cam = pixel_camera(w, h);
+    for sp in HATCH_SPACINGS {
+        let d = hatch_drawing(sp);
+        let what = format!("{level}: hatches {sp} px apart (one family, crossed, dashed with dots; widths 1 and 2 px)");
+        if sp >= 4.0 {
+            against_ref(t, dev, &mut r, &mut off, &d, &cam, &Tol { small: 12, over: 300, max: 32, ink: 0.003 }, &what)?;
+        } else {
+            // (a tone, or mixed: the ink of the real lines)
+            let img = gpu_image(t, dev, &mut r, &mut off, &d, &cam, &what)?;
+            let reference = refimg::draw(&d, &cam, (w, h), BG);
+            let c = refimg::compare(&img, &reference, w, BG, 2);
+            let ink = (c.ink[0] - c.ink[1]) / c.ink[1];
+            dump(&format!("hatch_{sp}_{level}_gpu"), &img, w, h);
+            dump(&format!("hatch_{sp}_{level}_ref"), &reference, w, h);
+            t.ok(ink.abs() <= 0.01, &format!("{what}: ink against the real lines {:+.2} %", 100.0 * ink));
+        }
+    }
+    // the flat tone: pans of 0.37 px change no pixel inside the fills
+    let d = hatch_drawing(1.5);
+    let mut s = t.res(Scene::new(&r), "Scene::new")?;
+    t.res(s.set_camera(&cam), "camera")?;
+    t.res(build(&mut s, &d), "build")?;
+    let mut prev: Option<Vec<u8>> = None;
+    let mut moved = 0u32;
+    for step in 0..5 {
+        let mut c = cam;
+        c.pan(0.37 * step as f64, 0.21 * step as f64);
+        t.res(s.set_camera(&c), "camera")?;
+        let img = shot(t, dev, &mut off, &mut r, &mut s, "pan")?;
+        if let Some(p) = &prev {
+            // (inside the first fill, away from its edges and its hole: drawing y 25 to 45)
+            for y in 225..245usize {
+                for x in 30..150usize {
+                    let k = (y * w as usize + x) * 4;
+                    moved += (p[k..k + 3] != img[k..k + 3]) as u32;
+                }
+            }
+        }
+        prev = Some(img);
+    }
+    t.ok(moved == 0, &format!("{level}: hatch lines 1.5 px apart are a flat tone: four pans of 0.37 px change {moved} pixels inside the fill"));
+    Some(())
+}
+
 // ---------------------------------------------------------------- layers and order
 
 fn layers(t: &mut T) {
@@ -540,6 +733,29 @@ fn errors(t: &mut T) {
     t.ok(matches!(s.insert(l, render2d::StyleId(9), &Shape::Line { a: [0.0; 2], b: [1.0; 2] }), Err(GpuError::Invalid(_))), "a style the scene does not have is refused");
     t.ok(matches!(s.insert(l, sid, &Shape::Line { a: [f64::NAN, 0.0], b: [1.0; 2] }), Err(GpuError::Invalid(_))), "a point that is not finite is refused");
     t.ok(matches!(s.insert(l, sid, &Shape::Polyline { points: &[], closed: false }), Err(GpuError::Invalid(_))), "a polyline without points is refused");
+    // curves, fills, hatches (G6b1)
+    let p4 = [[0.0, 0.0], [1.0, 1.0], [2.0, 0.0], [3.0, 1.0]];
+    let p5 = [[0.0, 0.0], [1.0, 1.0], [2.0, 0.0], [3.0, 1.0], [4.0, 0.0]];
+    let refused = |s: &mut Scene, sh: &Shape| matches!(s.insert(l, sid, sh), Err(GpuError::Invalid(_)));
+    t.ok(refused(&mut s, &Shape::Quadratic { points: &p4, closed: false }) && refused(&mut s, &Shape::Cubic { points: &p5, closed: false }) && refused(&mut s, &Shape::Cubic { points: &p4[..1], closed: false }),
+         "Bézier pieces of the wrong number of points are refused");
+    t.ok(refused(&mut s, &Shape::Ellipse { center: [0.0; 2], radii: [1.0, 0.0], rotation: 0.0, start: 0.0, sweep: 1.0 }) && refused(&mut s, &Shape::Ellipse { center: [0.0; 2], radii: [1.0, 2.0], rotation: 0.0, start: 0.0, sweep: 0.0 }),
+         "an ellipse of radius 0 or of sweep 0 is refused");
+    t.ok(refused(&mut s, &Shape::Spline { degree: 4, points: &p5, weights: &[], knots: &[], closed: false }) && refused(&mut s, &Shape::Spline { degree: 3, points: &p4[..3], weights: &[], knots: &[], closed: false })
+         && refused(&mut s, &Shape::Spline { degree: 2, points: &p4, weights: &[1.0, 1.0], knots: &[], closed: false })
+         && refused(&mut s, &Shape::Spline { degree: 2, points: &p4, weights: &[1.0, -1.0, 1.0, 1.0], knots: &[], closed: false })
+         && refused(&mut s, &Shape::Spline { degree: 2, points: &p4, weights: &[], knots: &[0.0, 0.0, 0.0, 2.0, 1.0, 1.0, 1.0], closed: false }),
+         "splines of degree 4, too few points, wrong weights or knots are refused");
+    let inner = [Shape::Circle { center: [0.0; 2], radius: 1.0 }];
+    let nested = [Shape::Fill { rings: &[&inner] }];
+    t.ok(refused(&mut s, &Shape::Fill { rings: &[&nested] }), "a fill's ring made of a fill is refused");
+    let mut hs = Style::new(0xFF00_0000).hatched(&[render2d::HatchLine::new(0.0, 0.0)], 1.0);
+    t.ok(matches!(s.add_style(&hs), Err(GpuError::Invalid(_))), "a hatch of spacing 0 is refused");
+    hs = Style::new(0xFF00_0000).hatched(&[render2d::HatchLine::new(0.0, 1.0).dashed(&[0.0, 0.0])], 1.0);
+    t.ok(matches!(s.add_style(&hs), Err(GpuError::Invalid(_))), "a hatch's dash pattern of zeros is refused");
+    hs = Style::new(0xFF00_0000);
+    hs.hatches = 5;
+    t.ok(matches!(s.add_style(&hs), Err(GpuError::Invalid(_))), "more than HATCH_MAX hatch families are refused");
     let Some(e) = t.res(s.insert(l, sid, &Shape::Line { a: [0.0; 2], b: [1.0; 2] }), "insert") else { return };
     t.ok(s.remove(e).is_ok() && bad(s.remove(e)), "a removed entity's id is dead");
     let Some(e2) = t.res(s.insert(l, sid, &Shape::Line { a: [0.0; 2], b: [1.0; 2] }), "insert") else { return };
@@ -587,7 +803,8 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
     let exact = wgsl::CompileOptions { exact: true, ..opt };
     let mut outv = Vec::new();
     for (src, list, o) in [(render2d::CULL_WGSL, &[("COUNT", "count"), ("SCAN", "scan"), ("WRITE", "write")][..], &exact), (render2d::SCATTER_WGSL, &[("SCATTER", "main")][..], &opt),
-                           (render2d::STROKE_WGSL, &[("VS", "vs"), ("VS_FULL", "vs_full")][..], &exact), (render2d::STROKE_WGSL, &[("FS", "fs"), ("FS_FULL", "fs_full")][..], &opt)] {
+                           (render2d::STROKE_WGSL, &[("VS", "vs"), ("VS_FULL", "vs_full"), ("VS_FILL", "vs_fill")][..], &exact),
+                           (render2d::STROKE_WGSL, &[("FS", "fs"), ("FS_FULL", "fs_full"), ("FS_FILL", "fs_fill")][..], &opt)] {
         match wgsl::compile(src, o) {
             Ok(o) => {
                 for (name, entry) in list {
@@ -607,7 +824,7 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
 
 fn gen_shaders(path: &str) -> i32 {
     let Some(v) = compile_shaders() else { return 1 };
-    let mut s = String::from("// written by render2dtest --gen-shaders from common.wgsl + cull.wgsl, scatter.wgsl, stroke.wgsl (shader::BASIS, no robustness; COUNT, SCAN, WRITE, VS and VS_FULL exact); do not edit\n");
+    let mut s = String::from("// written by render2dtest --gen-shaders from common.wgsl + cull.wgsl, scatter.wgsl, stroke.wgsl + fill.wgsl (shader::BASIS, no robustness; COUNT, SCAN, WRITE, VS, VS_FULL and VS_FILL exact); do not edit\n");
     for (name, w) in &v {
         s.push_str(&format!("pub const {name}: &[u32] = &[\n"));
         for row in w.chunks(10) {
@@ -634,8 +851,9 @@ fn shaders(t: &mut T) {
         t.ok(false, "the WGSL compiles");
         return;
     };
-    let table: [(&str, &[u32]); 8] = [("COUNT", render2d::COUNT_SPV), ("SCAN", render2d::SCAN_SPV), ("WRITE", render2d::WRITE_SPV), ("SCATTER", render2d::SCATTER_SPV),
-                                      ("VS", render2d::VS_SPV), ("VS_FULL", render2d::VS_FULL_SPV), ("FS", render2d::FS_SPV), ("FS_FULL", render2d::FS_FULL_SPV)];
+    let table: [(&str, &[u32]); 10] = [("COUNT", render2d::COUNT_SPV), ("SCAN", render2d::SCAN_SPV), ("WRITE", render2d::WRITE_SPV), ("SCATTER", render2d::SCATTER_SPV),
+                                       ("VS", render2d::VS_SPV), ("VS_FULL", render2d::VS_FULL_SPV), ("FS", render2d::FS_SPV), ("FS_FULL", render2d::FS_FULL_SPV),
+                                       ("VS_FILL", render2d::VS_FILL_SPV), ("FS_FILL", render2d::FS_FILL_SPV)];
     for (name, embedded) in table {
         let made = v.iter().find(|x| x.0 == name).map_or(&[][..], |x| &x.1[..]);
         t.ok(made == embedded, &format!("{name}: {} words embedded, as wgsl::compile makes them (if not: render2dtest --gen-shaders lib/render2d/shaders_spv.rs)", embedded.len()));
@@ -686,10 +904,10 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 17] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
-                                          ("arcs", arcs), ("dashes", dashes), ("layers", layers), ("changes", crate::scenes::changes), ("churn", crate::scenes::churn),
-                                          ("visibility", crate::scenes::visibility), ("coords", crate::scenes::coords), ("phase", crate::scenes::phase), ("levels", levels),
-                                          ("errors", errors)];
+    let list: [(&str, fn(&mut T)); 20] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
+                                          ("arcs", arcs), ("dashes", dashes), ("curves", curves), ("fills", fills), ("hatches", hatches), ("layers", layers),
+                                          ("changes", crate::scenes::changes), ("churn", crate::scenes::churn), ("visibility", crate::scenes::visibility), ("coords", crate::scenes::coords),
+                                          ("phase", crate::scenes::phase), ("levels", levels), ("errors", errors)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {
