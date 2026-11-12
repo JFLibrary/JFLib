@@ -968,6 +968,21 @@ mod mac {
         RESULTS.lock().push((ok, String::from(name)));
     }
 
+    // the demo's window has the keyboard (not while the Mac shows its lock screen: no app can
+    // become active then)
+    fn key_window() -> bool {
+        plat::win_test(plat::WT_ACTIVE, PW, [0; 4]) == 1
+    }
+
+    // a check of the keyboard focus: only in the key window
+    fn record_focus(ok: bool, name: &str) {
+        if key_window() {
+            record(ok, name);
+        } else {
+            plat::write_stdout(alloc::format!("  SKIP {name} (the window is not the key window: is the Mac locked?)\n").as_bytes());
+        }
+    }
+
     // (App::init, UI thread) the window exists: the client starts
     fn start() {
         if plat::thread_spawn(0, Box::new(client)).is_none() {
@@ -1096,7 +1111,7 @@ mod mac {
         text_steps();
         record(ax_test_act(PW, "AXRadioButton", "Zweite", A::Select) && wait_st(TAB, 1), "a11y-mac: AXSelected of a tab");
         record(ax_test_act(PW, "AXStaticText", "Kirsche", A::Select) && wait_st(LIST, 2), "a11y-mac: AXSelected of a list row");
-        record(
+        record_focus(
             ax_test_act(PW, "AXCheckBox", "Option", A::Focus) && wait_tree(|t| find(t, "AXCheckBox", "Option").is_some_and(|e| e.focused)),
             "a11y-mac: AXFocused of the check box",
         );
@@ -1125,6 +1140,10 @@ mod mac {
         ax_test_listen(false);
         for w in want {
             let ok = ev.iter().any(|e| e == w);
+            if w.starts_with("AXFocused") {
+                record_focus(ok, &alloc::format!("a11y-mac: notification {w}"));
+                continue;
+            }
             record(ok, &alloc::format!("a11y-mac: notification {w}"));
             if !ok {
                 plat::write_stdout(alloc::format!("  notifications: {ev:?}\n").as_bytes());
@@ -1152,7 +1171,7 @@ mod mac {
     fn text_steps() {
         let q = |x: Q| ax_test_text(PW, "AXTextField", "Name", x).unwrap_or_default();
         let sel = || range(&q(Q::SelRange));
-        record(
+        record_focus(
             ax_test_act(PW, "AXTextField", "Name", A::Focus) && wait_tree(|t| find(t, "AXTextField", "Name").is_some_and(|e| e.focused)),
             "a11y-mac: AXFocused of the text field",
         );
