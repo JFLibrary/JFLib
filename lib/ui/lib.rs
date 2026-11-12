@@ -281,8 +281,9 @@ pub use color::{hsv_to_rgb, rgb_to_hsv};
 pub use value::{cvtd, deg_atan2, deg_sincos, grad_at, part_id, px_mix, RangeF, Track, NO_DEFAULT};
 
 /// the app's entry point: `ui::main!(ui::run(&DESC, &mut MyApp::default(), &style::STYLE));`
-/// (expands to the `jfgui_main` symbol the platform entry calls; the app crate denies
-/// unsafe code, this one item is the exception).  It first sets up what build_rs.py built in
+/// (expands to the `jfgui_main` symbol the platform entry calls; its unsafe attribute comes from
+/// this crate's macro, which the unsafe_code lint does not look into, so the app crate may deny or
+/// forbid unsafe code without an allow).  It first sets up what build_rs.py built in
 /// (perm.rs): the app's name for its folders (JFGUI_APP), its assets as app://
 /// (apps/NAME/assets, packed to JFGUI_ASSETS with --cfg jfgui_assets) and its permissions
 /// (apps/NAME/PERMISSIONS as JFGUI_PERMISSIONS), then its file types and URL schemes
@@ -310,7 +311,7 @@ macro_rules! main {
 macro_rules! main {
     ($body:expr) => {
         $crate::__jfgui_main!($body);
-        #[allow(unsafe_code, dead_code)]
+        #[allow(dead_code)]
         fn main() {
             unsafe extern "Rust" {
                 fn jfgui_std_start() -> !;
@@ -324,11 +325,12 @@ macro_rules! main {
 /// (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
 /// std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
 /// the tests do not link.  Never called (the test harness has its own main); no panic check
-/// (tests unwind).  `#[cfg(test)] ui::test_main!();` in the crate's lib.rs
+/// (tests unwind).  `#[cfg(test)] ui::test_main!();` in the crate's lib.rs, also under
+/// `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros)
 #[macro_export]
 macro_rules! test_main {
     () => {
-        #[allow(unsafe_code, dead_code)]
+        #[allow(dead_code)]
         #[unsafe(no_mangle)]
         fn jfgui_main() -> i32 {
             0
@@ -362,7 +364,7 @@ macro_rules! __ui_panic_check {
 macro_rules! __jfgui_main {
     ($body:expr) => {
         $crate::__ui_panic_check!();
-        #[allow(unsafe_code, unexpected_cfgs)]
+        #[allow(unexpected_cfgs)]
         #[unsafe(no_mangle)]
         fn jfgui_main() -> i32 {
             #[cfg(jfgui_manifest)]

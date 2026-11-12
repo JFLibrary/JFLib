@@ -33,7 +33,8 @@
 // it saw.
 #![no_std]
 #![no_main]
-#![deny(unsafe_code)]
+// forbid, not deny: ui::main! needs no allow (the library's styles forbid unsafe code as well)
+#![forbid(unsafe_code)]
 
 extern crate alloc;
 

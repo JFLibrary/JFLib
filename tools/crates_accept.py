@@ -41,7 +41,8 @@ only `jflib = "0.1"`, offline, with nothing of this repository on their paths:
           its session, a saved change builds and starts it again, a broken source keeps the
           old build and fills build.txt, Ctrl+Break ends watch.
   hallo3  made by `cargo jflib new --std` (docs/CRATES.md, CR6) with a std crate from a path:
-          `cargo jflib test`; a release program whose std::thread, std::fs and print! work next to
+          `cargo jflib test`; its crate forbids unsafe code and has a unit test (`cargo test --lib`
+          through ui::test_main!); a release program whose std::thread, std::fs and print! work next to
           JFLib, whose std crate's thread_local! counts on a thread of plat, whose panic ends as
           JFLib's crash report (exit 3), and which imports no C runtime DLL (+crt-static); the
           browser (scalar and SIMD), the APK; watch as for hallo2; package refuses the other
@@ -676,6 +677,21 @@ STD_CHECK = """    if jflib::plat::args().iter().any(|a| a == "--std-panic") {
 """
 STD_WANT = "std words=2 calls=1 tls=1,2 fs=true"
 
+# at the end of hallo3's src/lib.rs, whose crate forbids unsafe code: a unit test of a library crate
+# with std links through ui::test_main! (E16), and neither macro needs an allow there
+STD_UNIT_TEST = """
+#[cfg(test)]
+ui::test_main!();
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn std_next_to_jflib() {
+        assert_eq!(stdcrate::count_words("a b a").0, 2);
+    }
+}
+"""
+
 # hallo3 at the end, with jflib's feature unwind and panic = "unwind" (docs/GUIDE.md, "An app with
 # std"): what the app catches leaves it running, on any thread; what nobody catches ends it as before
 UNWIND_CHECK = """    if jflib::plat::args().iter().any(|a| a == "--unwind-check") {
@@ -742,11 +758,13 @@ def check_std(run, made, vendor, targets, jenv, target_dir):
                     encoding="utf-8")
     lib = app / "src" / "lib.rs"
     text = lib.read_text(encoding="utf-8")
-    run.check("ui::main!({\n" in text, "hallo3's src/lib.rs has ui::main!")
+    run.check("ui::main!({\n" in text and "#![deny(unsafe_code)]\n" in text, "hallo3's src/lib.rs has ui::main! and denies unsafe code")
+    text = text.replace("#![deny(unsafe_code)]\n", "#![forbid(unsafe_code)]\n", 1) + STD_UNIT_TEST
     lib.write_text(text.replace("ui::main!({\n", "ui::main!({\n" + STD_CHECK, 1), encoding="utf-8")
     (app / "target").mkdir(exist_ok=True)
     if "win" in targets:
         run.cmd("hallo3-test", ["cargo", "jflib", "test"], app, jenv)
+        run.cmd("hallo3-unit-test", ["cargo", "test", "--lib", "--target", WIN], app, jenv)
         if run.cmd("hallo3-win-release", ["cargo", "build", "--release", "--target", WIN], app, jenv):
             exe = target_dir / WIN / "release" / "hallo3.exe"
             r = subprocess.run([exe, "--std-check"], cwd=app, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)

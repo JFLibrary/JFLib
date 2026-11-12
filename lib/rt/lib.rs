@@ -112,11 +112,12 @@ macro_rules! main {
 /// (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
 /// std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
 /// the tests do not link.  Never called (the test harness has its own main); no panic check
-/// (tests unwind).  `#[cfg(test)] rt::test_main!();` in the crate's lib.rs
+/// (tests unwind).  `#[cfg(test)] rt::test_main!();` in the crate's lib.rs, also under
+/// `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros)
 #[macro_export]
 macro_rules! test_main {
     () => {
-        #[allow(unsafe_code, dead_code)]
+        #[allow(dead_code)]
         #[unsafe(no_mangle)]
         fn jfgui_main() -> i32 {
             0
@@ -150,7 +151,7 @@ macro_rules! __rt_panic_check {
 macro_rules! __jfgui_main {
     ($body:expr) => {
         $crate::__rt_panic_check!();
-        #[allow(unsafe_code, unexpected_cfgs)]
+        #[allow(unexpected_cfgs)]
         #[unsafe(no_mangle)]
         fn jfgui_main() -> i32 {
             #[cfg(jfgui_manifest)]
@@ -177,7 +178,7 @@ macro_rules! __jfgui_main {
 #[macro_export]
 macro_rules! __std_main {
     () => {
-        #[allow(unsafe_code, dead_code)]
+        #[allow(dead_code)]
         fn main() {
             unsafe extern "Rust" {
                 fn jfgui_std_start() -> !;
