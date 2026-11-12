@@ -1,0 +1,4 @@
+#!args --test blocks
+# blocks inserted moved, turned, scaled evenly and unevenly, mirrored, as arrays, nested, styles by block: against the same
+# drawing expanded (plain entities) and against lib/gfx; translucent inserts blend each, a polyline in one once; a block's
+# change goes up once for 1000 inserts, 1000 moved inserts send their transforms only; cycles, depth and the rest refused

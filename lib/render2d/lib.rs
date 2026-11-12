@@ -1,6 +1,8 @@
-// render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a, G6b1; docs/RENDER2D.md): a retained scene of
+// render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a, G6b; docs/RENDER2D.md): a retained scene of
 // entities with stable ids (lines, polylines, arcs and circles; Bézier curves, ellipses and splines flattened per zoom
-// band on the CPU, curve.rs; fills of rings, triangulated on the CPU, fill.rs), layers and styles; strokes as quads whose
+// band on the CPU, curve.rs; fills of rings, triangulated on the CPU, fill.rs; blocks inserted many times, their records
+// once on the GPU and each insert an instance with its transform, G6b2), layers and styles (transparency per layer and
+// entity, by block); strokes as quads whose
 // coverage the fragment shader computes from the geometry (no MSAA), with exact butt, square and round caps and miter,
 // bevel and round joins, dash patterns in pixels or drawing units; fills with their edge's exact coverage, every pixel
 // blended once, and hatches from the camera's place in f64; f64 coordinates, a pair of f32 per axis on the GPU with the
@@ -12,6 +14,8 @@
 //   Scene::new(&renderer) -> Result<Scene>
 //   scene.add_style(&Style) -> StyleId, set_style; add_layer(&Layer) -> LayerId, set_layer, remove_layer
 //   scene.insert(layer, style, &Shape) -> EntityId, update(id, &Shape), set_entity_style(id, style), remove(id)
+//   scene.add_block(&Block) -> BlockId, insert_in(block, style, &Shape); Shape::Insert(Insert) places a block on a
+//        layer or in another block (moved by update, arrays as DXF's MINSERT)
 //   scene.set_camera(&Camera)                                   centre (f64), scale (units per pixel), rotation
 //   a frame:
 //        scene.prepare(&mut renderer, (w, h))?;         waits for this slot's last frame, uploads what changed
@@ -32,12 +36,14 @@ use alloc::sync::Arc;
 
 use gpu::*;
 
+mod block;
 pub mod curve;
 pub mod fill;
 pub mod math;
 mod scene;
 
-pub use scene::{Camera, Cap, EntityId, FrameStats, HatchLine, Join, Layer, LayerId, Scene, Shape, Style, StyleId, Unit, UploadInfo, ARC_STEP, DASH_MAX, HATCH_DASH_MAX, HATCH_MAX};
+pub use scene::{Block, BlockId, Camera, Cap, EntityId, FrameStats, HatchLine, Insert, InstanceInfo, Join, Layer, LayerId, Scene, Shape, Style, StyleId, Transparency, Unit, UploadInfo, ARC_STEP,
+                BLOCK_DEPTH, BY_BLOCK_COLOR, BY_BLOCK_DASH, BY_BLOCK_WIDTH, DASH_MAX, HATCH_DASH_MAX, HATCH_MAX, TRANSPARENCY_MAX};
 
 /// the most frames the CPU may record ahead of the GPU
 pub const FRAMES_MAX: usize = 3;
@@ -54,7 +60,14 @@ pub(crate) const STYLE_WORDS: usize = 32;
 pub(crate) const STYLE_BYTES: u64 = 128;
 /// a row of the scatter shader: the place, 3 words of padding, the record
 pub(crate) const CHANGE_WORDS: usize = 20;
-pub(crate) const VIEW_BYTES: u64 = 64;
+pub(crate) const VIEW_BYTES: u64 = 80;
+/// an instance of a block (cull.wgsl Inst, scene.rs inst_words) and its space of a frame (block.wgsl Space)
+pub(crate) const INST_WORDS: usize = 40;
+pub(crate) const INST_BYTES: u64 = 160;
+pub(crate) const SPACE_BYTES: u64 = 80;
+/// an entry of the visibility (cull.wgsl einfo): page, instance + 1, first | count << 16, epx offset
+pub(crate) const ENTRY_BYTES: u64 = 16;
+pub(crate) const WG_INST: u32 = 64;
 /// a hatched style's entry of the hatch table (fill.wgsl Hatch): 32 vec4f
 pub(crate) const HATCH_WORDS: usize = 128;
 pub(crate) const HATCH_BYTES: u64 = 512;
@@ -70,19 +83,22 @@ mod spv {
     include!("shaders_spv.rs");
 }
 
-/// the WGSL sources as the device gets them (common.wgsl in front of each; stroke.wgsl with fs_full from full_body.wgsl, the same body
-/// as the function full_body, and fill.wgsl)
+/// the WGSL sources as the device gets them (common.wgsl in front of each, block.wgsl behind it in those that place records;
+/// stroke.wgsl with fs_full from full_body.wgsl, the same body as the function full_body, and fill.wgsl)
 pub const COMMON_WGSL: &str = include_str!("common.wgsl");
-pub const CULL_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("cull.wgsl"));
+pub const BLOCK_WGSL: &str = include_str!("block.wgsl");
+pub const CULL_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block.wgsl"), include_str!("cull.wgsl"));
 pub const SCATTER_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("scatter.wgsl"));
-pub const STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("stroke.wgsl"), "\n@fragment\nfn fs_full(i: VsOut) -> @location(0) vec4f {\n", include_str!("full_body.wgsl"),
-                                      "}\n\nfn full_body(i: VsOut) -> vec4f {\n", include_str!("full_body.wgsl"), "}\n", include_str!("fill.wgsl"));
+pub const STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block.wgsl"), include_str!("stroke.wgsl"), "\n@fragment\nfn fs_full(i: VsOut) -> @location(0) vec4f {\n",
+                                      include_str!("full_body.wgsl"), "}\n\nfn full_body(i: VsOut) -> vec4f {\n", include_str!("full_body.wgsl"), "}\n", include_str!("fill.wgsl"));
 #[cfg(not(target_arch = "wasm32"))]
 pub const COUNT_SPV: &[u32] = spv::COUNT;
 #[cfg(not(target_arch = "wasm32"))]
 pub const SCAN_SPV: &[u32] = spv::SCAN;
 #[cfg(not(target_arch = "wasm32"))]
 pub const WRITE_SPV: &[u32] = spv::WRITE;
+#[cfg(not(target_arch = "wasm32"))]
+pub const INSTANCES_SPV: &[u32] = spv::INSTANCES;
 #[cfg(not(target_arch = "wasm32"))]
 pub const SCATTER_SPV: &[u32] = spv::SCATTER;
 #[cfg(not(target_arch = "wasm32"))]
@@ -130,6 +146,8 @@ pub struct Renderer {
     scan: ComputePipeline,
     write: ComputePipeline,
     scatter: ComputePipeline,
+    /// the spaces of a frame's instances of blocks (cull.wgsl instances)
+    instances: ComputePipeline,
     /// solid segments (stroke.wgsl fs), and everything (fs_full: arcs, dash patterns) for the layers that hold arcs or
     /// dashed strokes; fills and hatches too (fs_fill) for the layers that hold a fill
     stroke: RenderPipeline,
@@ -140,6 +158,7 @@ pub struct Renderer {
     pub(crate) scan_layout: BindGroupLayout,
     pub(crate) write_layout: BindGroupLayout,
     pub(crate) scatter_layout: BindGroupLayout,
+    pub(crate) inst_layout: BindGroupLayout,
     pub(crate) draw_layout: BindGroupLayout,
     /// u16, 0 1 2 2 1 3 per quad, BATCH quads (written once, with the first submission)
     quads: Buffer,
@@ -149,6 +168,7 @@ struct Modules {
     count: ShaderModule,
     scan: ShaderModule,
     write: ShaderModule,
+    instances: ShaderModule,
     scatter: ShaderModule,
     vs: ShaderModule,
     vs_full: ShaderModule,
@@ -161,16 +181,16 @@ struct Modules {
 #[cfg(not(target_arch = "wasm32"))]
 fn modules(dev: &Device) -> Result<Modules> {
     let m = |w: &[u32]| ShaderModule::from_spirv(dev, w);
-    Ok(Modules { count: m(COUNT_SPV)?, scan: m(SCAN_SPV)?, write: m(WRITE_SPV)?, scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, vs_full: m(VS_FULL_SPV)?, fs: m(FS_SPV)?, fs_full: m(FS_FULL_SPV)?,
-                 vs_fill: m(VS_FILL_SPV)?, fs_fill: m(FS_FILL_SPV)? })
+    Ok(Modules { count: m(COUNT_SPV)?, scan: m(SCAN_SPV)?, write: m(WRITE_SPV)?, instances: m(INSTANCES_SPV)?, scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, vs_full: m(VS_FULL_SPV)?, fs: m(FS_SPV)?,
+                 fs_full: m(FS_FULL_SPV)?, vs_fill: m(VS_FILL_SPV)?, fs_fill: m(FS_FILL_SPV)? })
 }
 
 #[cfg(target_arch = "wasm32")]
 fn modules(dev: &Device) -> Result<Modules> {
     let c = ShaderModule::from_wgsl(dev, CULL_WGSL)?;
     let s = ShaderModule::from_wgsl(dev, STROKE_WGSL)?;
-    Ok(Modules { count: c.clone(), scan: c.clone(), write: c, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: s.clone(), vs_full: s.clone(), fs: s.clone(), fs_full: s.clone(),
-                 vs_fill: s.clone(), fs_fill: s })
+    Ok(Modules { count: c.clone(), scan: c.clone(), write: c.clone(), instances: c, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: s.clone(), vs_full: s.clone(), fs: s.clone(),
+                 fs_full: s.clone(), vs_fill: s.clone(), fs_fill: s })
 }
 
 impl Renderer {
@@ -187,24 +207,30 @@ impl Renderer {
         // (the fragment shader reads the view and the styles: the dash patterns)
         let vfs = Stages::VERTEX | Stages::FRAGMENT;
         let (read, rw) = (BindingKind::StorageBufferRead, BindingKind::StorageBuffer);
-        // (cull.wgsl's bindings: each pass names those it uses, none more than 5 storage buffers)
-        // (11: the fill edges' segments in pixels, written by count)
-        let count_layout = dev.create_bind_group_layout(&[b(0, BindingKind::UniformBuffer, cs), b(1, read, cs), b(2, read, cs), b(3, read, cs), b(4, rw, cs), b(5, rw, cs), b(11, rw, cs)])?;
+        // (cull.wgsl's bindings: each pass names those it uses, none more than 7 storage buffers: WebGPU's least is 8 a stage)
+        // (11: the fill edges' segments in pixels, written by count; 12: the instances' spaces, written by instances, read
+        // by count; 13: the instances' transforms)
+        let count_layout = dev.create_bind_group_layout(&[b(0, BindingKind::UniformBuffer, cs), b(1, read, cs), b(2, read, cs), b(3, read, cs), b(4, rw, cs), b(5, rw, cs), b(11, rw, cs),
+                                                          b(12, rw, cs)])?;
         let scan_layout = dev.create_bind_group_layout(&[b(5, rw, cs), b(6, read, cs), b(7, rw, cs), b(8, rw, cs), b(9, rw, cs)])?;
-        let write_layout = dev.create_bind_group_layout(&[b(3, read, cs), b(4, rw, cs), b(7, rw, cs), b(10, rw, cs)])?;
+        let write_layout = dev.create_bind_group_layout(&[b(3, read, cs), b(4, rw, cs), b(7, rw, cs), b(10, rw, cs), b(14, rw, cs)])?;
+        let inst_layout = dev.create_bind_group_layout(&[b(0, BindingKind::UniformBuffer, cs), b(12, rw, cs), b(13, read, cs)])?;
         let scatter_layout = dev.create_bind_group_layout(&[b(0, read, cs), b(1, rw, cs)])?;
-        // (5: the hatch table, 6: the fill edges' segments in pixels; fs_fill reads the pool too)
+        // (5: the hatch table, 6: the fill edges' segments in pixels; fs_fill reads the pool too; 7: the instance of each visible
+        // record of an insert, 8: the instances' spaces)
         let draw_layout = dev.create_bind_group_layout(&[b(0, BindingKind::UniformBuffer, vfs), b(1, read, vfs), b(2, read, vfs), b(3, read, vs), b(4, read, vs), b(5, read, Stages::FRAGMENT),
-                                                         b(6, read, vfs)])?;
+                                                         b(6, read, vfs), b(7, read, vs), b(8, read, vs)])?;
         let pl = |g: &BindGroupLayout, push: u32| dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[g], push_constants: push });
         // (only scan, scatter and the draw read a push constant; a layout that says more than its pass sets is an error in the browser, where the
         // values are a bind group)
         let (count_pl, scan_pl, write_pl, scatter_pl, draw_pl) = (pl(&count_layout, 0)?, pl(&scan_layout, 16)?, pl(&write_layout, 0)?, pl(&scatter_layout, 4)?, pl(&draw_layout, 4)?);
+        let inst_pl = pl(&inst_layout, 16)?;
         let compute = |layout: &PipelineLayout, m: &ShaderModule, entry: &str| dev.create_compute_pipeline(&ComputePipelineDesc { layout, shader: ShaderStage::new(m, entry) });
         let count = compute(&count_pl, &md.count, "count")?;
         let scan = compute(&scan_pl, &md.scan, "scan")?;
         let write = compute(&write_pl, &md.write, "write")?;
         let scatter = compute(&scatter_pl, &md.scatter, "main")?;
+        let instances = compute(&inst_pl, &md.instances, "instances")?;
         // premultiplied blending of sRGB codes; no depth (the overlap at joins: stroke.wgsl)
         let stroke_with = |vs: &ShaderModule, ventry: &str, fs: &ShaderModule, fentry: &str| {
             dev.create_render_pipeline(&RenderPipelineDesc {
@@ -247,6 +273,7 @@ impl Renderer {
             scan,
             write,
             scatter,
+            instances,
             stroke,
             stroke_full,
             stroke_fill,
@@ -254,6 +281,7 @@ impl Renderer {
             scan_layout,
             write_layout,
             scatter_layout,
+            inst_layout,
             draw_layout,
             quads,
         })
@@ -333,7 +361,7 @@ impl Renderer {
         }
         if let Some((up, order, layers)) = &s.up.tables {
             if *order > 0 {
-                e.copy_buffer(up, 0, &s.order_buf, 0, *order);
+                e.copy_buffer(up, 0, &s.einfo_buf, 0, *order);
             }
             if *layers > 0 {
                 e.copy_buffer(up, *order, &s.layers_buf, 0, *layers);
@@ -342,6 +370,13 @@ impl Renderer {
         if let Some((up, runs)) = &s.up.runs {
             for &(src, dst, size) in runs {
                 e.copy_buffer(up, src, &s.pool, dst, size);
+            }
+        }
+        // (the instances' transforms: under the same two barriers as the records, the one above against the frame before's
+        // instance pass, the one below before this frame's)
+        if let Some((up, runs)) = &s.up.insts {
+            for &(src, dst, size) in runs {
+                e.copy_buffer(up, src, &s.inst_buf, dst, size);
             }
         }
         if s.up.scatter > 0 {
@@ -358,6 +393,15 @@ impl Renderer {
         }
         let layers = s.vis_layers;
         if layers > 0 {
+            if s.inst_count > 0 {
+                // the instances' spaces of this frame (G6b2), before count reads them (the vertex shader reads them behind
+                // the barrier after write, which takes every compute write before it)
+                e.set_compute_pipeline(&self.instances);
+                e.set_bind_group(0, &g.inst);
+                e.push_constants(0, &[s.inst_count, 0, 0, 0]);
+                e.dispatch(s.inst_count.div_ceil(WG_INST), 1, 1);
+                e.barrier(Access::COMPUTE_WRITE, Access::COMPUTE_READ);
+            }
             if s.entries > 0 {
                 e.set_compute_pipeline(&self.count);
                 e.set_bind_group(0, &g.count);

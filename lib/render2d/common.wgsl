@@ -23,6 +23,9 @@ struct View {
     turn: vec4f,
     // x: 1 when culling is off; y: 0, the opaque zero of opq; the rest unused
     misc: vec4f,
+    // the linear map to pixels before rest.z and y down: (lin.x x + lin.y y, lin.z x + lin.w y); the camera's rotation
+    // (cos, -sin, sin, cos), in an insert's space the insert's own map with the camera's (G6b2: block.wgsl space_view)
+    lin: vec4f,
 }
 
 // a record, 64 bytes (scene.rs records()).  A segment of a polyline: its start and end; an arc's piece: its circle's
@@ -198,11 +201,10 @@ fn rel2(p: vec4f, view: View) -> vec4f {
 }
 
 // drawing units relative to the centre -> pixels relative to the target's middle, y down (the drawing turns
-// counter-clockwise by the rotation)
+// counter-clockwise by the rotation).  (The camera's lin is (cos, -sin, sin, cos): c x + (-s) y is c x - s y bit for bit,
+// the images of G6b1 stay as they were; an insert's space maps its block's units, mirrored or scaled unevenly too)
 fn to_px(v: vec2f, view: View) -> vec2f {
-    let c = view.turn.x;
-    let s = view.turn.y;
-    let r = vec2f(c * v.x - s * v.y, s * v.x + c * v.y) * view.rest.z;
+    let r = vec2f(view.lin.x * v.x + view.lin.y * v.y, view.lin.z * v.x + view.lin.w * v.y) * view.rest.z;
     return vec2f(r.x, -r.y);
 }
 
@@ -306,8 +308,9 @@ fn periods(l: vec3f, t: vec2f, k: vec3f, p0: f32) -> vec2f {
 const FAR: f32 = 131072.0;
 
 // the foot of the camera's centre on the line through two points far from it (r0, r1: rel2's pairs): their cross
-// product in double-f32 over their distance is the line's signed distance from the centre (px from the middle)
-fn far_foot(r0: vec4f, r1: vec4f) -> vec2f {
+// product in double-f32 over their distance is the line's signed distance from the centre (px from the middle).  In an
+// insert's space (vw: block.wgsl) the foot is that of its units, mapped: a point of the line near the centre all the same
+fn far_foot(r0: vec4f, r1: vec4f, vw: View) -> vec2f {
     let a = two_prod(r0.x, r1.y);
     let b = two_prod(r0.y, r1.x);
     let s = two_sum(a.x, -b.x);
@@ -316,16 +319,17 @@ fn far_foot(r0: vec4f, r1: vec4f) -> vec2f {
     let dv = vec2f(r1.x - r0.x, r1.y - r0.y);
     let lu = length(dv);
     let du = dv / lu;
-    return to_px(-(cr / lu) * vec2f(-du.y, du.x), view);
+    return to_px(-(cr / lu) * vec2f(-du.y, du.x), vw);
 }
 
 // a fill's edge from r0 to r1 (rel2's pairs) in pixels of the target (from its top left corner), clipped to the target
 // and 8 px around it; both ends beyond FAR: its line placed by far_foot (as strokes); clipped away: far outside.  The count
-// pass writes it per edge record (cull.wgsl), and every record of the fill reads those bits
-fn edge_px(r0: vec4f, r1: vec4f) -> vec4f {
-    let half = 0.5 * view.turn.zw;
-    let p0 = to_px(r0.xy, view);
-    let p1 = to_px(r1.xy, view);
+// pass writes it per edge record (cull.wgsl), and every record of the fill reads those bits; vw: the view, or an insert's
+// space (block.wgsl)
+fn edge_px(r0: vec4f, r1: vec4f, vw: View) -> vec4f {
+    let half = 0.5 * vw.turn.zw;
+    let p0 = to_px(r0.xy, vw);
+    let p1 = to_px(r1.xy, vw);
     let lo = -half - vec2f(8.0);
     let hi = half + vec2f(8.0);
     // (wholly beside the target on one side, with what f32 may round far points to: far outside at once)
@@ -352,7 +356,7 @@ fn edge_px(r0: vec4f, r1: vec4f) -> vec4f {
         if !(length(r1.xy - r0.xy) > 0.0) {
             return vec4f(-1e6);
         }
-        base = far_foot(r0, r1);
+        base = far_foot(r0, r1, vw);
         s0 = dot(p0 - base, d);
         s1 = dot(p1 - base, d);
     }

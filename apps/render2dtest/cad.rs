@@ -7,34 +7,55 @@
 // them (render2d draws such layers with its second pipeline).  With fills (G6b1, Mode::Fills): buildings filled, their
 // walls (the band between the outer and the inner outline) hatched, every fourth street edge a spline, every fifth plot
 // border a closed Bézier with rounded corners, an elliptic island at every crossing (filled, its outline an ellipse), every
-// third tree crown an ellipse; the loose hatching lines go.  Deterministic: the same numbers give the same drawing on every
-// machine and in the browser; Mode::Plain: the drawing of G6a2a, Mode::Arcs that of G6a2b, entity for entity.
+// third tree crown an ellipse; the loose hatching lines go.  With blocks (G6b2, Mode::Blocks, the default): doors, windows
+// (scaled unevenly to their length), stairs, furniture (unevenly to its size), trees (oval ones: an ellipse, flattened per
+// zoom band), manholes (a ring and a filled cover), columns, lamps along the streets and the labels' characters (twenty
+// glyphs) are blocks, each inserted wherever the drawing had its strokes; the rest as in Mode::Fills.  Deterministic: the
+// same numbers give the same drawing on every machine and in the browser; Mode::Plain: the drawing of G6a2a, Mode::Arcs
+// that of G6a2b, Mode::Fills that of G6b1, entity for entity.
 //
 //   build(&mut scene, records, seed, styled, mode) -> Cad   about `records` drawn records in the overview (an arc's head is
-//                                                           none; a fill's and a curve's as flattened for the overview)
+//                                                           none; a fill's and a curve's as flattened for the overview; an
+//                                                           insert's its block's)
 //   views(&cad, size)                                       the overview (all of it), a district, the working zoom
+//   estate(&mut scene, inserts, styled) -> Cad              a block of about 1000 records (a house) inserted many times
 
+use alloc::vec;
 use alloc::vec::Vec;
 
 use gpu::Result;
 use render2d::math::sincos;
-use render2d::{Camera, Cap, HatchLine, Join, Layer, LayerId, Scene, Shape, Style, StyleId, Unit, ARC_STEP};
+use render2d::{BlockId, Camera, Cap, EntityId, HatchLine, Insert, Join, Layer, LayerId, Scene, Shape, Style, StyleId, Unit, ARC_STEP};
 
 use crate::gallery::Rng;
 
 /// where the drawing lies (metres): a surveyed coordinate, so the hi / lo pairs are in use
 pub const ORIGIN: [f64; 2] = [500_000.0, 5_400_000.0];
 
-/// the drawing of a G6 stage: G6a2a (lines only), G6a2b (arcs and dashes), G6b1 (fills, hatches, curves too)
+/// the drawing of a G6 stage: G6a2a (lines only), G6a2b (arcs and dashes), G6b1 (fills, hatches, curves too), G6b2 (blocks;
+/// Expanded: the same drawing, every insert's entities as entities of their own: what instancing costs)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     Plain,
     Arcs,
     Fills,
+    Blocks,
+    Expanded,
+}
+
+/// an entity of a block as the CPU keeps it (Mode::Expanded draws inserts as entities of their own)
+#[derive(Clone)]
+enum Part {
+    Line([f64; 2], [f64; 2]),
+    Poly(Vec<[f64; 2]>, bool),
+    Arc([f64; 2], f64, f64, f64),
+    Circle([f64; 2], f64),
+    Ellipse([f64; 2], [f64; 2], f64),
+    Disc([f64; 2], f64),
 }
 
 /// what build made
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Cad {
     pub segments: u32,
     pub entities: u32,
@@ -52,6 +73,12 @@ pub struct Cad {
     /// the drawing's size (metres), its lower left corner at ORIGIN
     pub width: f64,
     pub height: f64,
+    /// (Mode::Blocks) blocks, inserts and their drawn records; the trees' inserts (moved by the measurement)
+    pub blocks: u32,
+    pub inserts: u32,
+    pub insert_records: u32,
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub trees: Vec<(EntityId, Insert)>,
 }
 
 struct Pen {
@@ -80,6 +107,33 @@ struct Pens {
     extra: Option<Extra>,
     /// (Mode::Fills) buildings' fills, hatched walls, islands' fills and outlines
     g6b: Option<G6b>,
+    /// (Mode::Blocks) the blocks and the lamps' layer
+    blocks: Option<Blocks>,
+}
+
+/// a block of the drawing, the records an insert of it draws in the overview, its entities (Part, style)
+#[derive(Clone, Copy)]
+struct Blk {
+    id: BlockId,
+    records: u32,
+    def: usize,
+}
+
+struct Blocks {
+    door: Blk,
+    window: Blk,
+    stair: Blk,
+    table: Blk,
+    tree: Blk,
+    oval: Blk,
+    manhole: Blk,
+    column: Blk,
+    lamp: Blk,
+    glyphs: Vec<Blk>,
+    lamps: Pen,
+    /// any style: an insert's style gives nothing by block here
+    any: StyleId,
+    defs: Vec<Vec<(StyleId, Part)>>,
 }
 
 struct G6b {
@@ -110,9 +164,50 @@ struct Sink<'a> {
     fill_records: u32,
     curves: u32,
     curve_records: u32,
+    inserts: u32,
+    insert_records: u32,
+    trees: Vec<(EntityId, Insert)>,
+    /// (Mode::Expanded) the blocks' entities: each insert's as entities of their own
+    expand: Option<Vec<Vec<(StyleId, Part)>>>,
 }
 
 impl Sink<'_> {
+    /// an insert of a block (its records counted as an insert draws them); dropped when they do not fit
+    fn ins(&mut self, l: LayerId, st: StyleId, b: Blk, ins: Insert) -> Result<Option<EntityId>> {
+        let n = b.records * ins.columns * ins.rows;
+        if self.left < n {
+            return Ok(None);
+        }
+        self.left -= n;
+        self.ents += 1;
+        self.inserts += 1;
+        self.insert_records += n;
+        if let Some(defs) = &self.expand {
+            // (its entities through its transform: the inserts of this drawing turn, move and scale evenly but for windows
+            // and tables, which hold lines only)
+            let (sn, cs) = sincos(ins.rotation);
+            let (sx, sy) = (ins.scale[0], ins.scale[1]);
+            let at = |p: [f64; 2]| [ins.at[0] + cs * sx * p[0] - sn * sy * p[1], ins.at[1] + sn * sx * p[0] + cs * sy * p[1]];
+            for (ps, part) in &defs[b.def] {
+                match part {
+                    Part::Line(a, e) => self.s.insert(l, *ps, &Shape::Line { a: at(*a), b: at(*e) })?,
+                    Part::Poly(v, c) => self.s.insert(l, *ps, &Shape::Polyline { points: &v.iter().map(|q| at(*q)).collect::<Vec<_>>(), closed: *c })?,
+                    Part::Arc(c, r, a0, sw) => self.s.insert(l, *ps, &Shape::Arc { center: at(*c), radius: r * sx, start: ins.rotation + a0, sweep: *sw })?,
+                    Part::Circle(c, r) => self.s.insert(l, *ps, &Shape::Circle { center: at(*c), radius: r * sx })?,
+                    Part::Ellipse(c, rr, a0) => self.s.insert(l, *ps, &Shape::Ellipse { center: at(*c), radii: [rr[0] * sx, rr[1] * sx], rotation: ins.rotation + a0, start: 0.0,
+                                                                                         sweep: core::f64::consts::TAU })?,
+                    Part::Disc(c, r) => {
+                        let ring = [Shape::Circle { center: at(*c), radius: r * sx }];
+                        self.s.insert(l, *ps, &Shape::Fill { rings: &[&ring] })?
+                    }
+                };
+            }
+            return Ok(None);
+        }
+        let id = self.s.insert(l, st, &Shape::Insert(ins))?;
+        Ok(Some(id))
+    }
+
     /// a fill or a curve: its records as flattened for the camera (the overview's, set before); dropped when they do not fit
     fn flat(&mut self, p: &Pen, sh: &Shape, fill: bool) -> Result<()> {
         if self.left == 0 {
@@ -196,7 +291,7 @@ impl Sink<'_> {
 
 fn pens(s: &mut Scene, styled: bool, mode: Mode) -> Result<Pens> {
     let plain = mode == Mode::Plain;
-    let fills = mode == Mode::Fills;
+    let fills = mode == Mode::Fills || mode == Mode::Blocks || mode == Mode::Expanded;
     let mut order = 0;
     // (a dash pattern: lengths, its unit, its phase; in the plain drawing none)
     let mut pen = |s: &mut Scene, color: u32, width: f32, unit: Unit, cap: Cap, join: Join, dash: (&[f32], Unit)| -> Result<Pen> {
@@ -245,6 +340,7 @@ fn pens(s: &mut Scene, styled: bool, mode: Mode) -> Result<Pens> {
         label: pen(s, 0xFF20_2020, 1.0, Unit::Px, r, jr, solid)?,
         extra: None,
         g6b: None,
+        blocks: None,
     };
     if !plain {
         p.extra = Some(Extra {
@@ -271,7 +367,90 @@ fn pens(s: &mut Scene, styled: bool, mode: Mode) -> Result<Pens> {
         s.set_layer(walls.l, &l)?;
         p.g6b = Some(G6b { building, walls, island, isle_edge });
     }
+    if mode == Mode::Blocks || mode == Mode::Expanded {
+        p.blocks = Some(blocks(s, &p, styled, &mut order)?);
+    }
     Ok(p)
+}
+
+/// the blocks of Mode::Blocks: each in its own units (a door of radius 1, a window and a table of 1 by 1, a tree of radius
+/// 1, ...), its entities with the styles their strokes had on their layers
+fn blocks(s: &mut Scene, p: &Pens, styled: bool, order: &mut i32) -> Result<Blocks> {
+    let x = p.extra.as_ref().ok_or(gpu::GpuError::Invalid("cad: blocks come with arcs"))?;
+    let h = core::f64::consts::FRAC_PI_2;
+    let cover = s.add_style(&Style::new(0xFF80_8080))?;
+    let mut ls = Style::new(0xFF90_7020);
+    if styled {
+        ls.width = 1.0;
+    }
+    let ls = s.add_style(&ls)?;
+    let (d, f, cr, tr) = (p.detail.s, p.furniture.s, x.crowns.s, p.tree.s);
+    let cross = |v: &mut Vec<(StyleId, Part)>| {
+        v.push((tr, Part::Line([-0.5, 0.0], [0.5, 0.0])));
+        v.push((tr, Part::Line([0.0, -0.5], [0.0, 0.5])));
+    };
+    let mut defs: Vec<Vec<(StyleId, Part)>> = Vec::new();
+    // a door: its leaf and its swing (5 drawn records)
+    defs.push(vec![(d, Part::Line([0.0, 0.0], [1.0, 0.0])), (x.doors.s, Part::Arc([0.0, 0.0], 1.0, 0.0, h))]);
+    // a window: three lines 1 long, 0.1 apart (scaled to its length along x only)
+    defs.push((0..3).map(|j| (d, Part::Line([-0.5, j as f64 * 0.1 - 0.1], [0.5, j as f64 * 0.1 - 0.1]))).collect());
+    // a stair: eleven steps
+    defs.push((0..11).map(|j| (d, Part::Line([j as f64 * 0.26, 0.0], [j as f64 * 0.26, 1.1]))).collect());
+    // a table: a square of 1 (scaled to its size)
+    defs.push(vec![(f, Part::Poly(vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], true))]);
+    // trees: a crown of radius 1 and its cross; an oval one (an ellipse: flattened per zoom band)
+    let mut tree = vec![(cr, Part::Circle([0.0, 0.0], 1.0))];
+    cross(&mut tree);
+    defs.push(tree);
+    let mut oval = vec![(cr, Part::Ellipse([0.0, 0.0], [1.0, 0.7], 0.0))];
+    cross(&mut oval);
+    defs.push(oval);
+    // a manhole: its ring and its cover (a fill); a column
+    defs.push(vec![(x.manholes.s, Part::Circle([0.0, 0.0], 0.4)), (cover, Part::Disc([0.0, 0.0], 0.25))]);
+    defs.push(vec![(x.columns.s, Part::Circle([0.0, 0.0], 0.2))]);
+    // a lamp: a ring and four rays
+    let mut lamp = vec![(ls, Part::Circle([0.0, 0.0], 0.3))];
+    for k in 0..4 {
+        let (sn, cs) = sincos(k as f64 * h + 0.25 * h);
+        lamp.push((ls, Part::Line([0.4 * cs, 0.4 * sn], [0.7 * cs, 0.7 * sn])));
+    }
+    defs.push(lamp);
+    // twenty glyphs: a stroke of four to six pieces in a box of 1 by 1.6 (the labels' characters)
+    let mut rng = Rng(77);
+    for _ in 0..20 {
+        let n = 4 + rng.below(3) as usize;
+        defs.push(vec![(p.label.s, Part::Poly((0..n).map(|_| [rng.range(0.0, 1.0), rng.range(0.0, 1.6)]).collect(), false))]);
+    }
+    let mut ids = Vec::with_capacity(defs.len());
+    for def in &defs {
+        let b = s.add_block(&render2d::Block::new())?;
+        for (st, part) in def {
+            with_part(part, |sh| s.insert_in(b, *st, sh))?;
+        }
+        ids.push(b);
+    }
+    let b = |k: usize, records| Blk { id: ids[k], records, def: k };
+    let glyphs = (9..29).map(|k| b(k, match &defs[k][0].1 { Part::Poly(v, _) => v.len() as u32 - 1, _ => 1 })).collect();
+    let lamps = Pen { l: s.add_layer(&Layer::new(*order))?, s: ls, dashed: false };
+    *order += 1;
+    Ok(Blocks { door: b(0, 5), window: b(1, 3), stair: b(2, 11), table: b(3, 4), tree: b(4, 18), oval: b(5, 26), manhole: b(6, 26), column: b(7, 16), lamp: b(8, 20), glyphs, lamps, any: p.detail.s,
+                defs })
+}
+
+/// f with the shape of a block's entity
+fn with_part<R>(part: &Part, f: impl FnOnce(&Shape) -> R) -> R {
+    let tau = core::f64::consts::TAU;
+    match part {
+        Part::Line(a, b) => f(&Shape::Line { a: *a, b: *b }),
+        Part::Poly(v, c) => f(&Shape::Polyline { points: v, closed: *c }),
+        Part::Arc(c, r, a0, sw) => f(&Shape::Arc { center: *c, radius: *r, start: *a0, sweep: *sw }),
+        Part::Circle(c, r) => f(&Shape::Circle { center: *c, radius: *r }),
+        Part::Ellipse(c, rr, rot) => f(&Shape::Ellipse { center: *c, radii: *rr, rotation: *rot, start: 0.0, sweep: tau }),
+        Part::Disc(c, r) => {
+            let ring = [Shape::Circle { center: *c, radius: *r }];
+            f(&Shape::Fill { rings: &[&ring] })
+        }
+    }
 }
 
 fn rect(x: f64, y: f64, w: f64, h: f64) -> [[f64; 2]; 4] {
@@ -333,6 +512,13 @@ fn parcel(k: &mut Sink, rng: &mut Rng, p: &Pens, x: f64, y: f64, w: f64, h: f64)
         let (px, py) = (rng.range(bx + 1.0, bx + bw - 1.0), rng.range(by + 1.0, by + bh - 1.0));
         let r = rng.range(0.75, 1.0);
         let a0 = rng.below(4) as f64 * core::f64::consts::FRAC_PI_2;
+        if let (Some(b), Some(x)) = (&p.blocks, &p.extra) {
+            let mut ins = Insert::new(b.door.id, [px, py]);
+            ins.rotation = a0;
+            ins.scale = [r, r];
+            k.ins(x.doors.l, b.any, b.door, ins)?;
+            continue;
+        }
         let (s, c) = sincos(a0);
         k.line(&p.detail, [px, py], [px + r * c, py + r * s])?;
         if let Some(x) = &p.extra {
@@ -350,6 +536,13 @@ fn parcel(k: &mut Sink, rng: &mut Rng, p: &Pens, x: f64, y: f64, w: f64, h: f64)
         let t = rng.range(0.1, 0.9);
         let (px, py) = if rng.below(2) == 0 { (bx + t * bw, if rng.below(2) == 0 { by } else { by + bh }) } else { (if rng.below(2) == 0 { bx } else { bx + bw }, by + t * bh) };
         let l = rng.range(0.6, 1.4);
+        if let Some(b) = &p.blocks {
+            // (a window scaled to its length, along x only)
+            let mut ins = Insert::new(b.window.id, [px, py]);
+            ins.scale = [l, 1.0];
+            k.ins(p.detail.l, b.any, b.window, ins)?;
+            continue;
+        }
         for j in 0..3 {
             let off = j as f64 * 0.1 - 0.1;
             k.line(&p.detail, [px - 0.5 * l, py + off], [px + 0.5 * l, py + off])?;
@@ -358,14 +551,26 @@ fn parcel(k: &mut Sink, rng: &mut Rng, p: &Pens, x: f64, y: f64, w: f64, h: f64)
     // a stair
     if rng.below(3) == 0 {
         let (px, py) = (rng.range(bx + 1.0, bx + bw - 3.5), rng.range(by + 1.0, by + bh - 2.5));
-        for j in 0..11 {
-            k.line(&p.detail, [px + j as f64 * 0.26, py], [px + j as f64 * 0.26, py + 1.1])?;
+        if let Some(b) = &p.blocks {
+            k.ins(p.detail.l, b.any, b.stair, Insert::new(b.stair.id, [px, py]))?;
+        } else {
+            for j in 0..11 {
+                k.line(&p.detail, [px + j as f64 * 0.26, py], [px + j as f64 * 0.26, py + 1.1])?;
+            }
         }
     }
     // furniture
     for _ in 0..3 + rng.below(6) {
         let (fw, fh) = (rng.range(0.5, 2.0), rng.range(0.5, 1.2));
-        let r = rect(rng.range(bx + 0.5, bx + bw - 2.5), rng.range(by + 0.5, by + bh - 1.5), fw, fh);
+        let (fx, fy) = (rng.range(bx + 0.5, bx + bw - 2.5), rng.range(by + 0.5, by + bh - 1.5));
+        if let Some(b) = &p.blocks {
+            // (a table scaled to its size, unevenly)
+            let mut ins = Insert::new(b.table.id, [fx, fy]);
+            ins.scale = [fw, fh];
+            k.ins(p.furniture.l, b.any, b.table, ins)?;
+            continue;
+        }
+        let r = rect(fx, fy, fw, fh);
         k.poly(&p.furniture, &r, true)?;
     }
     // hatching over part of it: diagonal lines of a few metres (G6b1: the walls are hatched instead)
@@ -383,7 +588,11 @@ fn parcel(k: &mut Sink, rng: &mut Rng, p: &Pens, x: f64, y: f64, w: f64, h: f64)
             let (cy, n) = (by + 0.5 * bh, 3 + rng.below(3));
             for j in 0..n {
                 let cx = bx + (j as f64 + 0.5) / n as f64 * bw;
-                k.arc(&x.columns, [cx, cy], 0.2, 0.0, core::f64::consts::TAU)?;
+                if let Some(b) = &p.blocks {
+                    k.ins(x.columns.l, b.any, b.column, Insert::new(b.column.id, [cx, cy]))?;
+                } else {
+                    k.arc(&x.columns, [cx, cy], 0.2, 0.0, core::f64::consts::TAU)?;
+                }
             }
         }
         if rng.below(2) == 0 {
@@ -443,6 +652,19 @@ fn block(k: &mut Sink, rng: &mut Rng, p: &Pens, x0: f64, y0: f64, w: f64, h: f64
         let (tx, ty) = (rng.range(x0 - 4.0, x0 + w + 4.0), if rng.below(2) == 0 { y0 - 3.0 } else { y0 + h + 3.0 });
         let r = rng.range(1.5, 4.0);
         let oval = p.g6b.is_some() && rng.below(3) == 0;
+        if let (Some(b), Some(x)) = (&p.blocks, &p.extra) {
+            // (a tree scaled to its crown, an oval one turned too)
+            let blk = if oval { b.oval } else { b.tree };
+            let mut ins = Insert::new(blk.id, [tx, ty]);
+            ins.scale = [r, r];
+            if oval {
+                ins.rotation = rng.range(0.0, 3.0);
+            }
+            if let Some(id) = k.ins(x.crowns.l, b.any, blk, ins)? {
+                k.trees.push((id, ins));
+            }
+            continue;
+        }
         if let (Some(x), true) = (&p.extra, oval) {
             // (an oval crown)
             let rot = rng.range(0.0, 3.0);
@@ -463,6 +685,13 @@ fn block(k: &mut Sink, rng: &mut Rng, p: &Pens, x0: f64, y0: f64, w: f64, h: f64
     for _ in 0..6 + rng.below(5) {
         let (mut lx, ly) = (rng.range(x0 + 4.0, x0 + w - 12.0), rng.range(y0 + 4.0, y0 + h - 4.0));
         for _ in 0..4 + rng.below(5) {
+            if let Some(b) = &p.blocks {
+                // (a character: one of the twenty glyphs)
+                let g = b.glyphs[rng.below(b.glyphs.len() as u32) as usize];
+                k.ins(p.label.l, b.any, g, Insert::new(g.id, [lx, ly]))?;
+                lx += 1.4;
+                continue;
+            }
             let n = 4 + rng.below(3) as usize;
             let ch: Vec<[f64; 2]> = (0..n).map(|_| [lx + rng.range(0.0, 1.0), ly + rng.range(0.0, 1.6)]).collect();
             k.poly(&p.label, &ch, false)?;
@@ -497,11 +726,14 @@ pub fn build(s: &mut Scene, n: u32, seed: u32, styled: bool, mode: Mode) -> Resu
     let rows = blocks.div_ceil(cols);
     let (width, height) = (cols as f64 * pitch_x + 20.0, rows as f64 * pitch_y + 20.0);
     // (fills and curves are flattened for the camera they come with: the overview's at full HD)
-    if mode == Mode::Fills {
-        s.set_camera(&views(&Cad { segments: n, entities: 0, fills: 0, hatched: 0, fill_records: 0, curves: 0, curve_records: 0, arcs: 0, arc_records: 0, dashed: 0, dashed_records: 0, width, height },
+    if mode == Mode::Fills || mode == Mode::Blocks || mode == Mode::Expanded {
+        s.set_camera(&views(&Cad { segments: n, entities: 0, fills: 0, hatched: 0, fill_records: 0, curves: 0, curve_records: 0, arcs: 0, arc_records: 0, dashed: 0, dashed_records: 0, width, height,
+                                   blocks: 0, inserts: 0, insert_records: 0, trees: Vec::new() },
                             (1920, 1080))[0].cam)?;
     }
-    let mut k = Sink { s, left: n, ents: 0, arcs: 0, arc_records: 0, dashed: 0, dashed_records: 0, fills: 0, hatched: 0, fill_records: 0, curves: 0, curve_records: 0 };
+    let expand = if mode == Mode::Expanded { p.blocks.as_ref().map(|b| b.defs.clone()) } else { None };
+    let mut k = Sink { s, left: n, ents: 0, arcs: 0, arc_records: 0, dashed: 0, dashed_records: 0, fills: 0, hatched: 0, fill_records: 0, curves: 0, curve_records: 0, inserts: 0, insert_records: 0,
+                       trees: Vec::new(), expand };
     let at = |x: f64, y: f64| [ORIGIN[0] + x, ORIGIN[1] + y];
     // streets: both edges and the centre line of each, long polylines with a point per block
     let road = 12.0;
@@ -536,11 +768,23 @@ pub fn build(s: &mut Scene, n: u32, seed: u32, styled: bool, mode: Mode) -> Resu
             }
         }
     }
-    // manholes on the streets (not plain): a circle every 35 m along each street's axis
+    // manholes on the streets (not plain): a circle every 35 m along each street's axis (blocks: a ring and its cover; a
+    // lamp every 25 m beside the street)
     if let Some(x) = &p.extra {
         for c in 0..=cols {
             for j in 0..(rows as f64 * pitch_y / 35.0) as u32 {
-                k.arc(&x.manholes, at(10.0 + c as f64 * pitch_x, 12.0 + j as f64 * 35.0), 0.4, 0.0, core::f64::consts::TAU)?;
+                let m = at(10.0 + c as f64 * pitch_x, 12.0 + j as f64 * 35.0);
+                if let Some(b) = &p.blocks {
+                    k.ins(x.manholes.l, b.any, b.manhole, Insert::new(b.manhole.id, m))?;
+                } else {
+                    k.arc(&x.manholes, m, 0.4, 0.0, core::f64::consts::TAU)?;
+                }
+            }
+            if let Some(b) = &p.blocks {
+                for j in 0..(rows as f64 * pitch_y / 25.0) as u32 {
+                    let l = at(10.0 + c as f64 * pitch_x + 0.5 * road + 1.0, 20.0 + j as f64 * 25.0);
+                    k.ins(b.lamps.l, b.any, b.lamp, Insert::new(b.lamp.id, l))?;
+                }
             }
         }
     }
@@ -576,8 +820,92 @@ pub fn build(s: &mut Scene, n: u32, seed: u32, styled: bool, mode: Mode) -> Resu
             y -= height;
         }
     }
+    let blocks = p.blocks.as_ref().map_or(0, |b| 9 + b.glyphs.len() as u32);
     Ok(Cad { segments: n, entities: k.ents, fills: k.fills, hatched: k.hatched, fill_records: k.fill_records, curves: k.curves, curve_records: k.curve_records, arcs: k.arcs, arc_records: k.arc_records,
-             dashed: k.dashed, dashed_records: k.dashed_records, width, height })
+             dashed: k.dashed, dashed_records: k.dashed_records, width, height, blocks, inserts: k.inserts, insert_records: k.insert_records, trees: k.trees })
+}
+
+/// a housing estate: one block of about 1000 records (a house: its outline, walls, doors swinging in arcs, windows,
+/// furniture, a stair) inserted `inserts` times in a grid, each turned a little; far more records than the pool would hold
+/// as plain records (G6b2's measurement of a large block inserted many times)
+pub fn estate(s: &mut Scene, inserts: u32, styled: bool) -> Result<Cad> {
+    let mut st = |c: u32, w: f32, u: Unit| -> Result<StyleId> {
+        let mut x = Style::new(c);
+        if styled {
+            x.width = w;
+            x.unit = u;
+        }
+        s.add_style(&x)
+    };
+    let (outer, inner, detail, furn, ist) = (st(0xFF20_2830, 0.3, Unit::Drawing)?, st(0xFF40_4850, 0.12, Unit::Drawing)?, st(0xFF50_60A0, 0.0, Unit::Px)?, st(0xFF90_9090, 0.0, Unit::Px)?,
+                                             st(0xFF00_0000, 0.0, Unit::Px)?);
+    let house = s.add_block(&render2d::Block::new())?;
+    let mut rng = Rng(42);
+    let mut records = 0u32;
+    // the outline and its inset, 18 by 12 m
+    let o = [[0.0, 0.0], [18.0, 0.0], [18.0, 12.0], [0.0, 12.0]];
+    let i = [[0.3, 0.3], [17.7, 0.3], [17.7, 11.7], [0.3, 11.7]];
+    s.insert_in(house, outer, &Shape::Polyline { points: &o, closed: true })?;
+    s.insert_in(house, inner, &Shape::Polyline { points: &i, closed: true })?;
+    records += 8;
+    while records < 1000 {
+        match rng.below(6) {
+            0 => {
+                // an inner wall
+                let (x, y, l) = (rng.range(1.0, 17.0), rng.range(1.0, 11.0), rng.range(1.0, 5.0));
+                let b = if rng.below(2) == 0 { [(x + l).min(17.7), y] } else { [x, (y + l).min(11.7)] };
+                s.insert_in(house, inner, &Shape::Line { a: [x, y], b })?;
+                records += 1;
+            }
+            1 => {
+                // a door: its leaf and its swing
+                let (x, y, r) = (rng.range(1.0, 17.0), rng.range(1.0, 11.0), rng.range(0.75, 1.0));
+                let a0 = rng.below(4) as f64 * core::f64::consts::FRAC_PI_2;
+                let (sn, cs) = sincos(a0);
+                s.insert_in(house, detail, &Shape::Line { a: [x, y], b: [x + r * cs, y + r * sn] })?;
+                s.insert_in(house, detail, &Shape::Arc { center: [x, y], radius: r, start: a0, sweep: core::f64::consts::FRAC_PI_2 })?;
+                records += 5;
+            }
+            2 | 3 => {
+                // furniture
+                let (x, y, w, h) = (rng.range(0.5, 16.0), rng.range(0.5, 10.5), rng.range(0.5, 2.0), rng.range(0.5, 1.2));
+                s.insert_in(house, furn, &Shape::Polyline { points: &rect(x, y, w, h), closed: true })?;
+                records += 4;
+            }
+            4 => {
+                // a window on the outline
+                let t = rng.range(0.1, 0.9);
+                let (x, y, horiz) = if rng.below(2) == 0 { (t * 18.0, if rng.below(2) == 0 { 0.0 } else { 12.0 }, true) } else { (if rng.below(2) == 0 { 0.0 } else { 18.0 }, t * 12.0, false) };
+                for j in 0..3 {
+                    let off = j as f64 * 0.1 - 0.1;
+                    let (a, b) = if horiz { ([x - 0.6, y + off], [x + 0.6, y + off]) } else { ([x + off, y - 0.6], [x + off, y + 0.6]) };
+                    s.insert_in(house, detail, &Shape::Line { a, b })?;
+                }
+                records += 3;
+            }
+            _ => {
+                // a stair's steps
+                let (x, y) = (rng.range(1.0, 14.0), rng.range(1.0, 9.0));
+                for j in 0..11 {
+                    s.insert_in(house, detail, &Shape::Line { a: [x + j as f64 * 0.26, y], b: [x + j as f64 * 0.26, y + 1.1] })?;
+                }
+                records += 11;
+            }
+        }
+    }
+    let l = s.add_layer(&Layer::new(0))?;
+    let side = (render2d::math::sqrt(inserts as f64) + 0.999) as u32;
+    let mut trees = Vec::new();
+    for k in 0..inserts {
+        let (c, r) = (k % side, k / side);
+        let mut ins = Insert::new(house, [ORIGIN[0] + c as f64 * 25.0 + rng.range(0.0, 2.0), ORIGIN[1] + r as f64 * 20.0 + rng.range(0.0, 2.0)]);
+        ins.rotation = rng.range(-0.1, 0.1);
+        let id = s.insert(l, ist, &Shape::Insert(ins))?;
+        trees.push((id, ins));
+    }
+    let (width, height) = (side as f64 * 25.0 + 20.0, side as f64 * 20.0 + 20.0);
+    Ok(Cad { segments: records * inserts, entities: inserts, fills: 0, hatched: 0, fill_records: 0, curves: 0, curve_records: 0, arcs: 0, arc_records: 0, dashed: 0, dashed_records: 0, width, height,
+             blocks: 1, inserts, insert_records: records * inserts, trees })
 }
 
 /// a named view of the drawing in a target of `size`

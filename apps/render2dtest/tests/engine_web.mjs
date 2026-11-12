@@ -6,11 +6,12 @@
 // browser without a working WebGPU it says SKIP.  Playwright: tools/tests/playwright.mjs.
 //   python build_rs.py app render2dtest --target win
 //   python build_rs.py app render2dtest --target web
-//   node apps/render2dtest/tests/engine_web.mjs [build] [--modes=simd,threads,scalar] [--native=FILE] [--gpu=d3d12|vulkan|swiftshader]
-//   node apps/render2dtest/tests/engine_web.mjs --bench [--n=1000000] [--thin] [--plain | --g6a2b] [--modes=simd]    the measuring scene (--plain:
-//        without arcs and dashes, the drawing of G6a2a; --g6a2b: with arcs and dashes, without fills, hatches and curves)
+//   node apps/render2dtest/tests/engine_web.mjs [build] [--modes=simd,threads,scalar] [--native=FILE] [--gpu=d3d12|vulkan|swiftshader] [--save=DIR]
+//   node apps/render2dtest/tests/engine_web.mjs --bench [--n=1000000] [--thin] [--plain | --g6a2b | --g6b1 | --estate [--inserts=K]] [--modes=simd]    the
+//        measuring scene (--plain: without arcs and dashes, the drawing of G6a2a; --g6a2b: with arcs and dashes, without fills, hatches and
+//        curves; --g6b1: with them, without blocks; --estate: a block of about n records inserted K times, 10 000)
 import {createServer} from 'node:http';
-import {mkdtemp, readFile, rm, readdir} from 'node:fs/promises';
+import {mkdtemp, readFile, rm, readdir, writeFile} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import {join, resolve, extname, sep} from 'node:path';
@@ -93,6 +94,9 @@ try {
       if(benchRun&&args.includes('--thin')) gpuenv+=',jfgui_GPU_PROBE_THIN=1';
       if(benchRun&&args.includes('--plain')) gpuenv+=',jfgui_GPU_PROBE_PLAIN=1';
       if(benchRun&&args.includes('--g6a2b')) gpuenv+=',jfgui_GPU_PROBE_ARCS=1';
+      if(benchRun&&args.includes('--g6b1')) gpuenv+=',jfgui_GPU_PROBE_FILLS=1';
+      if(benchRun&&args.includes('--estate')) gpuenv+=',jfgui_GPU_PROBE_ESTATE=1';
+      if(benchRun&&option('inserts')) gpuenv+=`,jfgui_GPU_PROBE_INSERTS=${option('inserts')}`;
       await page.goto(`http://127.0.0.1:${server.address().port}/index.html?compute=${mode}&gpuenv=${gpuenv}`);
       const about=await page.evaluate(async()=>{try {const a=await navigator.gpu?.requestAdapter(); if(!a) return 'no adapter'; const i=a.info; return `${i.vendor} ${i.architecture} ${i.device} ${i.description} backend ${i.backendType} driver ${i.driver}`;} catch(e) {return String(e);}});
       console.log(`${mode}: the page's adapter: ${about}`);
@@ -121,6 +125,11 @@ try {
                 continue;
               }
               const c=compare(images[name],reference[key]);
+              // (--save=DIR: both images of each that differs, rows of B, G, R, A, for a person to look at)
+              if(option('save')&&c.pixels) {
+                await writeFile(join(option('save'),`web_${mode}_${name}.bgra`),images[name]);
+                await writeFile(join(option('save'),`${level}_${name}.bgra`),reference[key]);
+              }
               const allowed=(images[name].length/4)*MAX_SHARE;
               const fine=c.largest<=MAX_DELTA||c.pixels<=allowed;
               pixels+=images[name].length/4;
