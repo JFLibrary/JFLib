@@ -1,0 +1,3 @@
+#!args --test curves
+# Bézier curves, ellipses and splines (rational ones too) with every cap, join and dash pattern against lib/gfx; zoom
+# bands: flattened again only across one, only the curves go up, each image as a scene built anew; Voll and Basis

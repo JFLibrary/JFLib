@@ -51,10 +51,186 @@ pub fn width_px(s: &Style, cam: &Camera) -> f64 {
     w.max(1.0)
 }
 
+/// a parametric curve sampled in pixels until every chord lies within 1/2000 px of it (at least 8 pieces per call)
+fn sample(f: &dyn Fn(f64) -> [f64; 2], t0: f64, t1: f64, out: &mut Vec<[f64; 2]>) {
+    fn rec(f: &dyn Fn(f64) -> [f64; 2], t0: f64, t1: f64, p0: [f64; 2], p1: [f64; 2], depth: u32, out: &mut Vec<[f64; 2]>) {
+        let tm = 0.5 * (t0 + t1);
+        let pm = f(tm);
+        let (dx, dy) = (p1[0] - p0[0], p1[1] - p0[1]);
+        let l = sqrt(dx * dx + dy * dy);
+        let dist = if l > 0.0 { ((pm[0] - p0[0]) * dy - (pm[1] - p0[1]) * dx).abs() / l } else { sqrt((pm[0] - p0[0]) * (pm[0] - p0[0]) + (pm[1] - p0[1]) * (pm[1] - p0[1])) };
+        if depth >= 3 && (dist <= 0.0005 || depth >= 26) {
+            out.push(p1);
+            return;
+        }
+        rec(f, t0, tm, p0, pm, depth + 1, out);
+        rec(f, tm, t1, pm, p1, depth + 1, out);
+    }
+    let p0 = f(t0);
+    if out.last() != Some(&p0) {
+        out.push(p0);
+    }
+    rec(f, t0, t1, p0, f(t1), 0, out);
+}
+
+/// B-spline knots as the API describes them when none are given: clamped and uniform, or (closed) periodic with the
+/// points wrapped
+pub fn spline_knots(deg: usize, pts: &[[f64; 2]], weights: &[f64], knots: &[f64], closed: bool) -> (Vec<[f64; 3]>, Vec<f64>, bool) {
+    let w = |k: usize| if weights.is_empty() { 1.0 } else { weights[k] };
+    let mut cp: Vec<[f64; 3]> = (0..pts.len()).map(|k| [pts[k][0] * w(k), pts[k][1] * w(k), w(k)]).collect();
+    if !knots.is_empty() {
+        return (cp, knots.to_vec(), false);
+    }
+    if closed {
+        for k in 0..deg {
+            cp.push(cp[k]);
+        }
+        let u = (0..cp.len() + deg + 1).map(|k| k as f64).collect();
+        return (cp, u, true);
+    }
+    let n = cp.len();
+    let mut u = vec![0.0; deg + 1];
+    u.extend((1..n - deg).map(|k| k as f64));
+    u.extend(core::iter::repeat_n((n - deg) as f64, deg + 1));
+    (cp, u, false)
+}
+
+/// de Boor's algorithm in homogeneous coordinates: the spline's point at t (independent of render2d's knot insertion)
+pub fn de_boor(deg: usize, u: &[f64], cp: &[[f64; 3]], t: f64) -> [f64; 2] {
+    let n = cp.len();
+    let mut k = deg;
+    while k + 1 < n && u[k + 1] <= t {
+        k += 1;
+    }
+    let mut d: Vec<[f64; 3]> = (0..=deg).map(|j| cp[j + k - deg]).collect();
+    for r in 1..=deg {
+        for j in (r..=deg).rev() {
+            let i = j + k - deg;
+            let den = u[i + deg + 1 - r] - u[i];
+            let a = if den > 0.0 { (t - u[i]) / den } else { 0.0 };
+            for c in 0..3 {
+                d[j][c] = (1.0 - a) * d[j - 1][c] + a * d[j][c];
+            }
+        }
+    }
+    [d[deg][0] / d[deg][2], d[deg][1] / d[deg][2]]
+}
+
+/// a curve's points in drawing units as a parametric function per piece: (f, t0, t1) pieces and closed
+#[allow(clippy::type_complexity)]
+fn pieces_of(g: &Geo) -> (Vec<(alloc::boxed::Box<dyn Fn(f64) -> [f64; 2] + '_>, f64, f64)>, bool) {
+    use alloc::boxed::Box;
+    let mut v: Vec<(Box<dyn Fn(f64) -> [f64; 2] + '_>, f64, f64)> = Vec::new();
+    match g {
+        Geo::Bez(p, deg, closed) => {
+            let deg = *deg as usize;
+            let mut k = 0;
+            while k + deg < p.len() {
+                let c = &p[k..k + deg + 1];
+                v.push((Box::new(move |t: f64| {
+                    let s = 1.0 - t;
+                    if c.len() == 3 {
+                        [s * s * c[0][0] + 2.0 * s * t * c[1][0] + t * t * c[2][0], s * s * c[0][1] + 2.0 * s * t * c[1][1] + t * t * c[2][1]]
+                    } else {
+                        let (a, b, cc, d) = (s * s * s, 3.0 * s * s * t, 3.0 * s * t * t, t * t * t);
+                        [a * c[0][0] + b * c[1][0] + cc * c[2][0] + d * c[3][0], a * c[0][1] + b * c[1][1] + cc * c[2][1] + d * c[3][1]]
+                    }
+                }), 0.0, 1.0));
+                k += deg;
+            }
+            let (a, b) = (p[0], p[p.len() - 1]);
+            if *closed && a != b {
+                v.push((Box::new(move |t: f64| [b[0] + (a[0] - b[0]) * t, b[1] + (a[1] - b[1]) * t]), 0.0, 1.0));
+            }
+            (v, *closed)
+        }
+        Geo::Ellipse(c, r, rot, a0, sweep) => {
+            let full = sweep.abs() >= core::f64::consts::TAU;
+            let sw = if full { core::f64::consts::TAU.copysign(*sweep) } else { *sweep };
+            let (sr, cr) = sincos(*rot);
+            let (c, r) = (*c, *r);
+            v.push((Box::new(move |t: f64| {
+                let (s, co) = sincos(t);
+                let (x, y) = (r[0] * co, r[1] * s);
+                [c[0] + cr * x - sr * y, c[1] + sr * x + cr * y]
+            }), *a0, *a0 + sw));
+            (v, full)
+        }
+        Geo::Spline(deg, p, w, k, closed) => {
+            let deg = *deg as usize;
+            let (cp, u, periodic) = spline_knots(deg, p, w, k, *closed);
+            let n = cp.len();
+            let cp: alloc::rc::Rc<Vec<[f64; 3]>> = alloc::rc::Rc::new(cp);
+            let u: alloc::rc::Rc<Vec<f64>> = alloc::rc::Rc::new(u);
+            for s in deg..n {
+                if u[s] < u[s + 1] {
+                    let (cp, uu) = (cp.clone(), u.clone());
+                    let (t0, t1) = (u[s], u[s + 1]);
+                    v.push((Box::new(move |t: f64| de_boor(deg, &uu, &cp, t.min(t1 - (t1 - t0) * 1e-15).max(t0))), t0, t1));
+                }
+            }
+            // (the end: exactly at the domain's end)
+            let (cpe, ue) = (cp.clone(), u.clone());
+            let end = de_boor(deg, &ue, &cpe, u[n] - (u[n] - u[n - 1]) * 1e-15);
+            let start = de_boor(deg, &u, &cp, u[deg]);
+            if *closed && !periodic && start != end {
+                v.push((Box::new(move |t: f64| [end[0] + (start[0] - end[0]) * t, end[1] + (start[1] - end[1]) * t]), 0.0, 1.0));
+            }
+            (v, *closed)
+        }
+        Geo::Arc(c, r, a0, sweep) => {
+            let (c, r) = (*c, *r);
+            v.push((Box::new(move |t: f64| {
+                let (s, co) = sincos(t);
+                [c[0] + r * co, c[1] + r * s]
+            }), *a0, *a0 + *sweep));
+            (v, false)
+        }
+        Geo::Circle(c, r) => {
+            let (c, r) = (*c, *r);
+            v.push((Box::new(move |t: f64| {
+                let (s, co) = sincos(t);
+                [c[0] + r * co, c[1] + r * s]
+            }), 0.0, core::f64::consts::TAU));
+            (v, true)
+        }
+        Geo::Line(a, b) => {
+            let (a, b) = (*a, *b);
+            v.push((Box::new(move |t: f64| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]), 0.0, 1.0));
+            (v, false)
+        }
+        Geo::Poly(p, _) => {
+            for w in p.windows(2) {
+                let (a, b) = (w[0], w[1]);
+                v.push((Box::new(move |t: f64| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]), 0.0, 1.0));
+            }
+            (v, false)
+        }
+        Geo::Fill(_) => (v, false),
+    }
+}
+
+/// a curve (or a fill's ring piece) in pixels of the target, sampled within 1/2000 px; closed
+pub fn curve_px(g: &Geo, cam: &Camera, size: (u32, u32)) -> (Vec<[f64; 2]>, bool) {
+    let (ps, closed) = pieces_of(g);
+    let mut out = Vec::new();
+    for (f, t0, t1) in &ps {
+        let fp = |t: f64| cam.to_screen(f(t), size);
+        sample(&fp, *t0, *t1, &mut out);
+    }
+    if closed && out.len() >= 2 && out[0] == out[out.len() - 1] {
+        out.pop();
+    }
+    (out, closed)
+}
+
 /// an item's centre line in pixels of the target (f64): its points and whether it is closed; an arc flattened so finely
 /// that its chords lie within 1/1000 px of the circle (a circle starts at angle 0, an arc at its start, along its sweep)
 pub fn centre_line(g: &Geo, cam: &Camera, size: (u32, u32)) -> (Vec<[f64; 2]>, bool) {
     let pt = |q: [f64; 2]| cam.to_screen(q, size);
+    if matches!(g, Geo::Bez(..) | Geo::Ellipse(..) | Geo::Spline(..)) {
+        return curve_px(g, cam, size);
+    }
     match g {
         Geo::Line(a, b) => (vec![pt(*a), pt(*b)], false),
         Geo::Poly(v, closed) => (v.iter().map(|q| pt(*q)).collect(), *closed),
@@ -76,6 +252,7 @@ pub fn centre_line(g: &Geo, cam: &Camera, size: (u32, u32)) -> (Vec<[f64; 2]>, b
             }).collect();
             (pts, full)
         }
+        _ => (Vec::new(), false),
     }
 }
 
@@ -346,6 +523,37 @@ pub fn draw_with(d: &Drawing, cam: &Camera, size: (u32, u32), bg: u32, gfx_dash:
     for it in draw_order(d) {
         let mut p = Path::default();
         let s = &it.style;
+        if let Geo::Fill(rings) = &it.geo {
+            fill_item(&mut p, rings, cam, size);
+            if s.hatches == 0 {
+                dc.set_color(s.color);
+                p.fill(&mut ras, &dc, &mut sf, gfx::RULE_EVENODD);
+            } else {
+                // a hatch: the fill's coverage times the lines' (each line stroked by dash_stroke, the union filled), blended
+                // as the GPU does
+                let mf = mask_of(&mut ras, &p, gfx::RULE_EVENODD, w, h);
+                // (the lines' union exactly: crossing lines would add up in lib/gfx's non-zero fill)
+                let mut lines = Vec::new();
+                hatch_lines(&mut lines, rings, s, cam, size);
+                let mh: Vec<u8> = union_mask(&lines, w, h).iter().map(|v| (v * 255.0 + 0.5) as u8).collect();
+                let a = (s.color >> 24) as f64 / 255.0;
+                let col = [(s.color & 255) as f64, ((s.color >> 8) & 255) as f64, ((s.color >> 16) & 255) as f64];
+                for y in 0..h as usize {
+                    for x in 0..w as usize {
+                        let k = y * w as usize + x;
+                        let al = a * mf[k] as f64 / 255.0 * mh[k] as f64 / 255.0;
+                        if al > 0.0 {
+                            let o = y * sf.stride as usize + x * 4;
+                            for c in 0..3 {
+                                let v = sf.px[o + c] as f64;
+                                sf.px[o + c] = (v + (col[c] - v) * al + 0.5) as u8;
+                            }
+                        }
+                    }
+                }
+            }
+            continue;
+        }
         if matches!(it.geo, Geo::Arc(..) | Geo::Circle(..)) {
             // (arcs: their outlines exactly, filled; lib/gfx's stroker would pivot the inner side of every vertex of a fine
             // polygon through it, and its non-zero fill sums those windings: a ring 0.25 px too wide inside at a half width
@@ -358,6 +566,17 @@ pub fn draw_with(d: &Drawing, cam: &Camera, size: (u32, u32), bg: u32, gfx_dash:
         let (line, closed) = centre_line(&it.geo, cam, size);
         let (pat, phase) = pattern_px(s, cam);
         let wpx = width_px(s, cam);
+        if matches!(it.geo, Geo::Bez(..) | Geo::Ellipse(..) | Geo::Spline(..)) {
+            // curves: the exact union (stroke_union), their dashes cut along the fine line as for polylines
+            let pieces = if pat.is_empty() { vec![(line, closed)] } else { dash_pieces(&line, closed, &pat, phase) };
+            let mut parts = Vec::new();
+            for (piece, closed) in &pieces {
+                stroke_union(&mut parts, piece, *closed, 0.5 * wpx, s.cap, s.join, s.miter_limit as f64);
+            }
+            let m = union_mask(&parts, w, h);
+            blend_mask(&mut sf, &m, s.color, w, h);
+            continue;
+        }
         let pieces = if pat.is_empty() || gfx_dash { vec![(line, closed)] } else { dash_pieces(&line, closed, &pat, phase) };
         for (piece, closed) in &pieces {
             for (k, q) in piece.iter().enumerate() {
@@ -396,6 +615,297 @@ pub fn draw_with(d: &Drawing, cam: &Camera, size: (u32, u32), bg: u32, gfx_dash:
         out.extend_from_slice(&sf.px[at..at + w as usize * 4]);
     }
     out
+}
+
+/// a convex piece of a union: a polygon (either way round) or a disk
+pub enum Part {
+    Poly(Vec<[f64; 2]>),
+    Disk([f64; 2], f64),
+}
+
+fn piece(p: &mut Vec<Part>, v: &[[f64; 2]]) {
+    p.push(Part::Poly(v.to_vec()));
+}
+
+fn disk(p: &mut Vec<Part>, c: [f64; 2], h: f64) {
+    p.push(Part::Disk(c, h));
+}
+
+/// the union of convex parts as each pixel's share (rows of w), 16 x 16 samples per pixel (1/256: a code at most); a pixel
+/// whose corners all lie in one part is wholly inside
+pub fn union_mask(parts: &[Part], w: i32, h: i32) -> Vec<f32> {
+    let (wu, hu) = (w as usize, h as usize);
+    let mut bits = vec![[0u64; 4]; wu * hu];
+    let mut full = vec![false; wu * hu];
+    for part in parts {
+        // (the part's test and box)
+        let (poly, c, r) = match part {
+            Part::Disk(c, r) => (None, *c, *r),
+            Part::Poly(v) => (Some(v), [0.0; 2], 0.0),
+        };
+        let mut b = [c[0] - r, c[1] - r, c[0] + r, c[1] + r];
+        let mut sg = 1.0;
+        if let Some(v) = poly {
+            let mut a = 0.0;
+            for i in 0..v.len() {
+                let (q, s) = (v[i], v[(i + 1) % v.len()]);
+                a += q[0] * s[1] - s[0] * q[1];
+            }
+            if a == 0.0 {
+                continue;
+            }
+            sg = if a > 0.0 { 1.0 } else { -1.0 };
+            b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
+            for q in v {
+                b = [b[0].min(q[0]), b[1].min(q[1]), b[2].max(q[0]), b[3].max(q[1])];
+            }
+        }
+        let inside = |x: f64, y: f64| -> bool {
+            match poly {
+                None => (x - c[0]) * (x - c[0]) + (y - c[1]) * (y - c[1]) <= r * r,
+                Some(v) => (0..v.len()).all(|i| {
+                    let (q, s) = (v[i], v[(i + 1) % v.len()]);
+                    sg * ((s[0] - q[0]) * (y - q[1]) - (s[1] - q[1]) * (x - q[0])) >= 0.0
+                }),
+            }
+        };
+        let x0 = (floor(b[0]) as i64).max(0) as usize;
+        let y0 = (floor(b[1]) as i64).max(0) as usize;
+        let x1 = (floor(b[2]) as i64).min(w as i64 - 1);
+        let y1 = (floor(b[3]) as i64).min(h as i64 - 1);
+        if x1 < 0 || y1 < 0 {
+            continue;
+        }
+        for y in y0..=y1 as usize {
+            for x in x0..=x1 as usize {
+                let k = y * wu + x;
+                if full[k] {
+                    continue;
+                }
+                let (fx, fy) = (x as f64, y as f64);
+                if inside(fx, fy) && inside(fx + 1.0, fy) && inside(fx, fy + 1.0) && inside(fx + 1.0, fy + 1.0) {
+                    full[k] = true;
+                    continue;
+                }
+                for j in 0..16 {
+                    for i in 0..16 {
+                        if inside(fx + (i as f64 + 0.5) / 16.0, fy + (j as f64 + 0.5) / 16.0) {
+                            let n = j * 16 + i;
+                            bits[k][n / 64] |= 1 << (n % 64);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    (0..wu * hu).map(|k| if full[k] { 1.0 } else { bits[k].iter().map(|v| v.count_ones()).sum::<u32>() as f32 / 256.0 }).collect()
+}
+
+/// a colour blended over the surface by a mask of shares
+fn blend_mask(sf: &mut Surface, m: &[f32], color: u32, w: i32, h: i32) {
+    let a = (color >> 24) as f64 / 255.0;
+    let col = [(color & 255) as f64, ((color >> 8) & 255) as f64, ((color >> 16) & 255) as f64];
+    for y in 0..h as usize {
+        for x in 0..w as usize {
+            let al = a * m[y * w as usize + x] as f64;
+            if al > 0.0 {
+                let o = y * sf.stride as usize + x * 4;
+                for c in 0..3 {
+                    let v = sf.px[o + c] as f64;
+                    sf.px[o + c] = (v + (col[c] - v) * al + 0.5) as u8;
+                }
+            }
+        }
+    }
+}
+
+/// a stroke of a centre line (px) exactly as the union of its pieces (union_mask): per segment its rectangle, per vertex
+/// where it turns its join's piece (miter within the limit, else bevel; round: a disk), per open end its cap (square: half a
+/// width more of the rectangle, round: a disk).  For curves: lib/gfx's stroker pivots the inner side of every vertex of a
+/// fine polygon, and its non-zero fill sums the windings of a pixel before it clamps (the arcs' reason, see the head), so
+/// overlapping pieces cannot go through it either
+pub fn stroke_union(p: &mut Vec<Part>, pts: &[[f64; 2]], closed: bool, hw: f64, cap: Cap, join: Join, miter: f64) {
+    let n = pts.len();
+    if n == 0 {
+        return;
+    }
+    if n == 1 {
+        match cap {
+            Cap::Round => disk(p, pts[0], hw),
+            Cap::Square => piece(p, &[[pts[0][0] - hw, pts[0][1] - hw], [pts[0][0] + hw, pts[0][1] - hw], [pts[0][0] + hw, pts[0][1] + hw], [pts[0][0] - hw, pts[0][1] + hw]]),
+            _ => {}
+        }
+        return;
+    }
+    let segs = if closed { n } else { n - 1 };
+    let dir = |k: usize| {
+        let (a, b) = (pts[k % n], pts[(k + 1) % n]);
+        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+        let l = sqrt(dx * dx + dy * dy);
+        if l > 0.0 { [dx / l, dy / l] } else { [1.0, 0.0] }
+    };
+    for k in 0..segs {
+        let (a, b) = (pts[k], pts[(k + 1) % n]);
+        let d = dir(k);
+        let nn = [-d[1] * hw, d[0] * hw];
+        let (mut a2, mut b2) = (a, b);
+        if !closed && cap == Cap::Square {
+            if k == 0 {
+                a2 = [a[0] - d[0] * hw, a[1] - d[1] * hw];
+            }
+            if k + 1 == segs {
+                b2 = [b[0] + d[0] * hw, b[1] + d[1] * hw];
+            }
+        }
+        piece(p, &[[a2[0] + nn[0], a2[1] + nn[1]], [b2[0] + nn[0], b2[1] + nn[1]], [b2[0] - nn[0], b2[1] - nn[1]], [a2[0] - nn[0], a2[1] - nn[1]]]);
+    }
+    // the joins
+    let joints: Vec<usize> = if closed { (0..n).collect() } else { (1..n - 1).collect() };
+    for v in joints {
+        let (d1, d2) = (dir((v + n - 1) % n), dir(v));
+        let cr = d1[0] * d2[1] - d1[1] * d2[0];
+        let c = d1[0] * d2[0] + d1[1] * d2[1];
+        if cr == 0.0 && c > 0.0 {
+            continue;
+        }
+        let q = pts[v];
+        if join == Join::Round && !(cr.abs() < 0.05 && c > 0.0) {
+            disk(p, q, hw);
+            continue;
+        }
+        // (a round join turning by less than 0.05 rad: its bevel, h (1 - cos(phi / 2)) below 4e-4 h from the arc)
+        let s = if cr > 0.0 { -1.0 } else { 1.0 };
+        let n1 = [-d1[1] * s, d1[0] * s];
+        let n2 = [-d2[1] * s, d2[0] * s];
+        let (o1, o2) = ([q[0] + n1[0] * hw, q[1] + n1[1] * hw], [q[0] + n2[0] * hw, q[1] + n2[1] * hw]);
+        let cos_half = sqrt(((1.0 + c) * 0.5).max(0.0));
+        if join == Join::Miter && cos_half > 0.0 && 1.0 / cos_half <= miter {
+            let (mx, my) = (n1[0] + n2[0], n1[1] + n2[1]);
+            let ml = sqrt(mx * mx + my * my);
+            let tip = [q[0] + mx / ml * hw / cos_half, q[1] + my / ml * hw / cos_half];
+            piece(p, &[q, o1, tip, o2]);
+        } else {
+            piece(p, &[q, o1, o2]);
+        }
+    }
+    if !closed && cap == Cap::Round {
+        disk(p, pts[0], hw);
+        disk(p, pts[n - 1], hw);
+    }
+}
+
+/// a fill's rings in pixels as the subpaths of a path (each piece sampled within 1/2000 px, end to end, closed)
+fn fill_item(p: &mut Path, rings: &[Vec<Geo>], cam: &Camera, size: (u32, u32)) {
+    for ring in rings {
+        let mut pts: Vec<[f64; 2]> = Vec::new();
+        for piece in ring {
+            let (v, _) = curve_px(piece, cam, size);
+            for q in v {
+                if pts.last() != Some(&q) {
+                    pts.push(q);
+                }
+            }
+        }
+        for (k, q) in pts.iter().enumerate() {
+            if k == 0 {
+                p.move_f(q[0] as f32, q[1] as f32);
+            } else {
+                p.line_f(q[0] as f32, q[1] as f32);
+            }
+        }
+        p.close();
+    }
+}
+
+/// a path's exact-area coverage per pixel (rows of w bytes)
+fn mask_of(ras: &mut Raster, p: &Path, rule: u32, w: i32, h: i32) -> Vec<u8> {
+    let mut m = vec![0u8; (w * h) as usize];
+    p.fill_lines(ras);
+    ras.fill_rows([0, 0, w, h], rule, &mut |y, x, cov| {
+        let o = y as usize * w as usize + x as usize;
+        for (k, c) in cov.iter().enumerate() {
+            if o + k < m.len() {
+                m[o + k] = m[o + k].max(*c);
+            }
+        }
+    });
+    m
+}
+
+/// a style's hatch lines over the fill's box as rectangles in pixels (render2d's model: line k through base + k (shift
+/// dir + spacing n), its pattern from s = (p - base) . dir - k shift, a dash shorter than the line's width as long as it)
+pub fn hatch_lines(p: &mut Vec<Part>, rings: &[Vec<Geo>], s: &render2d::Style, cam: &Camera, size: (u32, u32)) {
+    let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
+    for ring in rings {
+        for piece in ring {
+            let (v, _) = curve_px(piece, cam, size);
+            for q in v {
+                let d = cam.to_drawing(q, size);
+                b = [b[0].min(d[0]), b[1].min(d[1]), b[2].max(d[0]), b[3].max(d[1])];
+            }
+        }
+    }
+    let hw = (0.5 * s.hatch_width as f64).max(0.5);
+    let corners = [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]];
+    for h in &s.hatch[..s.hatches as usize] {
+        let (sa, ca) = sincos(h.angle);
+        let (dir, n) = ([ca, sa], [-sa, ca]);
+        let proj = |q: [f64; 2], v: [f64; 2]| (q[0] - h.base[0]) * v[0] + (q[1] - h.base[1]) * v[1];
+        let (mut u0, mut u1, mut s0, mut s1) = (f64::MAX, f64::MIN, f64::MAX, f64::MIN);
+        for c in corners {
+            u0 = u0.min(proj(c, n));
+            u1 = u1.max(proj(c, n));
+            s0 = s0.min(proj(c, dir));
+            s1 = s1.max(proj(c, dir));
+        }
+        let m = h.dashes as usize;
+        let pat: Vec<f64> = (0..if m % 2 == 1 { 2 * m } else { m }).map(|k| h.dash[k % m]).collect();
+        let period: f64 = pat.iter().sum();
+        let k0 = floor(u0 / h.spacing) as i64 - 1;
+        let k1 = floor(u1 / h.spacing) as i64 + 1;
+        for k in k0..=k1 {
+            let kf = k as f64;
+            let at = |sv: f64| {
+                let q = [h.base[0] + kf * h.spacing * n[0] + (sv + kf * h.shift) * dir[0], h.base[1] + kf * h.spacing * n[1] + (sv + kf * h.shift) * dir[1]];
+                cam.to_screen(q, size)
+            };
+            // (the along coordinate of this line runs from s0 - k shift - margin)
+            let (a, e) = (s0 - kf * h.shift - 2.0 * h.spacing - period, s1 - kf * h.shift + 2.0 * h.spacing + period);
+            let mut seg = |x0: f64, x1: f64| {
+                // (the dash as its rectangle, hw on either side)
+                let (q0, q1) = (at(x0), at(x1));
+                let (dx, dy) = (q1[0] - q0[0], q1[1] - q0[1]);
+                let l = sqrt(dx * dx + dy * dy);
+                if l > 0.0 {
+                    let n = [-dy / l * hw, dx / l * hw];
+                    p.push(Part::Poly(vec![[q0[0] + n[0], q0[1] + n[1]], [q1[0] + n[0], q1[1] + n[1]], [q1[0] - n[0], q1[1] - n[1]], [q0[0] - n[0], q0[1] - n[1]]]));
+                }
+            };
+            if period <= 0.0 {
+                seg(a, e);
+                continue;
+            }
+            let mut m0 = floor(a / period) * period;
+            while m0 < e {
+                let mut c0 = 0.0;
+                for (i, v) in pat.iter().enumerate() {
+                    let c1 = c0 + v;
+                    if i % 2 == 0 {
+                        let (mut x0, mut x1) = (m0 + c0, m0 + c1);
+                        let wu = 2.0 * hw * cam.scale;
+                        if x1 - x0 < wu {
+                            let mid = 0.5 * (x0 + x1);
+                            x0 = mid - 0.5 * wu;
+                            x1 = mid + 0.5 * wu;
+                        }
+                        seg(x0, x1);
+                    }
+                    c0 = c1;
+                }
+                m0 += period;
+            }
+        }
+    }
 }
 
 /// what may differ (see the file's head)

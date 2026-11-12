@@ -44,6 +44,10 @@ struct Record {
 
 const K_SEG: u32 = 0u;
 const K_ARC: u32 = 1u;
+// a fill's boundary edge (a ring: a closed polyline of them, a start, an end) and triangle (a.xyz: how far back the
+// edge records of its corners lie, as u32)
+const K_EDGE: u32 = 3u;
+const K_TRI: u32 = 4u;
 // a segment: its previous point is the polyline's first (a cap there); its next point is the last
 const F_CAP_PREV: u32 = 1u;
 const F_CAP_NEXT: u32 = 2u;
@@ -89,7 +93,8 @@ struct Style {
     period: f32,
     duty: f32,
     ons: f32,
-    r0: f32,
+    // the style's place in the hatch table + 1 (fill.wgsl; 0: no hatch)
+    hatch: u32,
     // the entries' ends from the period's start (dash units), 16
     ends: array<vec4f, 4>,
     r1: vec4u,
@@ -295,4 +300,88 @@ fn periods(l: vec3f, t: vec2f, k: vec3f, p0: f32) -> vec2f {
         r = dd_add_f(r, -1.0);
     }
     return r;
+}
+
+// beyond this many pixels from the target's middle at both ends, a segment's line is placed by far_foot
+const FAR: f32 = 131072.0;
+
+// the foot of the camera's centre on the line through two points far from it (r0, r1: rel2's pairs): their cross
+// product in double-f32 over their distance is the line's signed distance from the centre (px from the middle)
+fn far_foot(r0: vec4f, r1: vec4f) -> vec2f {
+    let a = two_prod(r0.x, r1.y);
+    let b = two_prod(r0.y, r1.x);
+    let s = two_sum(a.x, -b.x);
+    let rest = (a.y - b.y) + ((r0.x * r1.w + r0.z * r1.y) - (r0.y * r1.z + r0.w * r1.x));
+    let cr = s.x + (s.y + rest);
+    let dv = vec2f(r1.x - r0.x, r1.y - r0.y);
+    let lu = length(dv);
+    let du = dv / lu;
+    return to_px(-(cr / lu) * vec2f(-du.y, du.x), view);
+}
+
+// a fill's edge from r0 to r1 (rel2's pairs) in pixels of the target (from its top left corner), clipped to the target
+// and 8 px around it; both ends beyond FAR: its line placed by far_foot (as strokes); clipped away: far outside.  The count
+// pass writes it per edge record (cull.wgsl), and every record of the fill reads those bits
+fn edge_px(r0: vec4f, r1: vec4f) -> vec4f {
+    let half = 0.5 * view.turn.zw;
+    let p0 = to_px(r0.xy, view);
+    let p1 = to_px(r1.xy, view);
+    let lo = -half - vec2f(8.0);
+    let hi = half + vec2f(8.0);
+    // (wholly beside the target on one side, with what f32 may round far points to: far outside at once)
+    let mg = 1.0 + 4e-6 * (length(p0) + length(p1));
+    if max(p0.x, p1.x) < lo.x - mg || min(p0.x, p1.x) > hi.x + mg || max(p0.y, p1.y) < lo.y - mg || min(p0.y, p1.y) > hi.y + mg {
+        return vec4f(-1e6);
+    }
+    let dv = p1 - p0;
+    let len0 = length(dv);
+    var d = vec2f(1.0, 0.0);
+    if len0 > 0.0 {
+        d = dv / len0;
+    }
+    var base = p0;
+    var s0 = 0.0;
+    var s1 = len0;
+    if max(abs(p1.x), abs(p1.y)) < max(abs(p0.x), abs(p0.y)) {
+        base = p1;
+        s0 = -len0;
+        s1 = 0.0;
+    }
+    let far = min(max(abs(p0.x), abs(p0.y)), max(abs(p1.x), abs(p1.y))) > FAR;
+    if far {
+        if !(length(r1.xy - r0.xy) > 0.0) {
+            return vec4f(-1e6);
+        }
+        base = far_foot(r0, r1);
+        s0 = dot(p0 - base, d);
+        s1 = dot(p1 - base, d);
+    }
+    var sa = s0;
+    var sb = s1;
+    for (var k = 0u; k < 2u; k++) {
+        let b = base[k];
+        let dk = d[k];
+        if abs(dk) < 1e-12 {
+            if b < lo[k] || b > hi[k] {
+                return vec4f(-1e6);
+            }
+        } else {
+            let ta = (lo[k] - b) / dk;
+            let tb = (hi[k] - b) / dk;
+            sa = max(sa, min(ta, tb));
+            sb = min(sb, max(ta, tb));
+        }
+    }
+    if sa > sb {
+        return vec4f(-1e6);
+    }
+    var q0 = p0;
+    var q1 = p1;
+    if sa > s0 || far {
+        q0 = base + sa * d;
+    }
+    if sb < s1 || far {
+        q1 = base + sb * d;
+    }
+    return vec4f(q0 + half, q1 + half);
 }

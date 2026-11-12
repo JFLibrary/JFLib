@@ -22,6 +22,14 @@ pub enum Geo {
     Arc([f64; 2], f64, f64, f64),
     /// centre, radius (Shape::Circle)
     Circle([f64; 2], f64),
+    /// Bézier pieces (Shape::Quadratic, Shape::Cubic): points, degree (2 or 3), closed
+    Bez(Vec<[f64; 2]>, u32, bool),
+    /// Shape::Ellipse: centre, radii, rotation, start, sweep
+    Ellipse([f64; 2], [f64; 2], f64, f64, f64),
+    /// Shape::Spline: degree, points, weights, knots, closed
+    Spline(u32, Vec<[f64; 2]>, Vec<f64>, Vec<f64>, bool),
+    /// Shape::Fill: its rings, each of pieces end to end
+    Fill(Vec<Vec<Geo>>),
 }
 
 #[derive(Clone)]
@@ -48,13 +56,29 @@ impl Drawing {
     }
 }
 
+/// the shape of a geometry other than a fill (with_shape takes fills too)
 pub fn shape_of(g: &Geo) -> Shape<'_> {
     match g {
         Geo::Line(a, b) => Shape::Line { a: *a, b: *b },
         Geo::Poly(v, closed) => Shape::Polyline { points: v, closed: *closed },
         Geo::Arc(c, r, a0, sweep) => Shape::Arc { center: *c, radius: *r, start: *a0, sweep: *sweep },
         Geo::Circle(c, r) => Shape::Circle { center: *c, radius: *r },
+        Geo::Bez(v, 2, closed) => Shape::Quadratic { points: v, closed: *closed },
+        Geo::Bez(v, _, closed) => Shape::Cubic { points: v, closed: *closed },
+        Geo::Ellipse(c, r, rot, a0, sweep) => Shape::Ellipse { center: *c, radii: *r, rotation: *rot, start: *a0, sweep: *sweep },
+        Geo::Spline(d, v, w, k, closed) => Shape::Spline { degree: *d, points: v, weights: w, knots: k, closed: *closed },
+        Geo::Fill(_) => Shape::Polyline { points: &[], closed: false },
     }
+}
+
+/// f with the geometry's shape (a fill's rings borrowed from here)
+pub fn with_shape<R>(g: &Geo, f: impl FnOnce(&Shape) -> R) -> R {
+    if let Geo::Fill(rings) = g {
+        let shapes: Vec<Vec<Shape>> = rings.iter().map(|r| r.iter().map(shape_of).collect()).collect();
+        let refs: Vec<&[Shape]> = shapes.iter().map(|v| &v[..]).collect();
+        return f(&Shape::Fill { rings: &refs });
+    }
+    f(&shape_of(g))
 }
 
 /// a test drawing in a scene: its layers
@@ -72,7 +96,7 @@ pub fn build(s: &mut Scene, d: &Drawing) -> Result<Built> {
     }
     for it in &d.items {
         let st = s.add_style(&it.style)?;
-        s.insert(layers[it.layer], st, &shape_of(&it.geo))?;
+        with_shape(&it.geo, |sh| s.insert(layers[it.layer], st, sh))?;
     }
     Ok(Built { layers })
 }
@@ -397,6 +421,95 @@ pub fn units_dash_drawing() -> Drawing {
     d
 }
 
+// ---------------------------------------------------------------- curves, fills, hatches (G6b1)
+
+/// curves of every kind in 360 x 270 px (units = px): cubic pieces (an S, a loop, a sharp turn), quadratic pieces closed,
+/// ellipses (rotated, a full one, an arc), splines (clamped degree 2 and 3, periodic and closed, a rational circle of degree
+/// 2, explicit knots not clamped); a dash pattern when pat is not empty
+pub fn curves_drawing(cap: Cap, join: Join, width: f32, pat: &[f32]) -> Drawing {
+    let mut d = Drawing::one_layer();
+    let st = |k: usize| style(INK[k % 4], width, cap, join).dashed(pat, Unit::Px, 1.3 * k as f32);
+    d.add(st(0), Geo::Bez(vec![[20.0, 60.0], [60.0, 10.0], [90.0, 110.0], [130.0, 40.0], [150.0, 10.0], [170.0, 90.0], [200.0, 50.0]], 3, false));
+    d.add(st(1), Geo::Bez(vec![[220.0, 30.0], [360.0, 120.0], [200.0, 120.0], [330.0, 20.0]], 3, false));
+    d.add(st(2), Geo::Bez(vec![[20.0, 140.0], [120.0, 200.0], [20.0, 200.0], [110.0, 140.5]], 3, false));
+    d.add(st(3), Geo::Bez(vec![[150.0, 140.0], [190.0, 120.0], [230.0, 150.0], [250.0, 200.0], [190.0, 210.0], [140.0, 190.0], [150.0, 140.0]], 2, true));
+    d.add(st(0), Geo::Ellipse([300.0, 185.0], [45.0, 18.0], 0.5, 0.0, core::f64::consts::TAU));
+    d.add(st(1), Geo::Ellipse([300.0, 185.0], [30.0, 12.0], -0.3, 0.4, 3.9));
+    d.add(st(2), Geo::Spline(2, vec![[20.0, 250.0], [40.0, 215.0], [70.0, 260.0], [100.0, 220.0], [120.0, 255.0]], vec![], vec![], false));
+    d.add(st(3), Geo::Spline(3, vec![[140.0, 230.0], [160.0, 260.0], [190.0, 220.0], [210.0, 262.0], [230.0, 225.0], [245.0, 250.0]], vec![], vec![], false));
+    d.add(st(0), Geo::Spline(3, vec![[262.0, 235.0], [290.0, 225.0], [300.0, 250.0], [280.0, 265.0], [258.0, 255.0]], vec![], vec![], true));
+    // (a rational quadratic spline: a circle of radius 14, nine points, weights 1 and 1 / sqrt 2)
+    let s2 = core::f64::consts::FRAC_1_SQRT_2;
+    let (cx, cy, rr) = (334.0, 246.0, 14.0);
+    let ring: Vec<[f64; 2]> = [[1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [-1.0, 1.0], [-1.0, 0.0], [-1.0, -1.0], [0.0, -1.0], [1.0, -1.0], [1.0, 0.0]].iter().map(|p| [cx + rr * p[0], cy + rr * p[1]]).collect();
+    d.add(st(1), Geo::Spline(2, ring, vec![1.0, s2, 1.0, s2, 1.0, s2, 1.0, s2, 1.0], vec![0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 4.0], false));
+    d.add(st(2), Geo::Spline(3, vec![[255.0, 130.0], [275.0, 155.0], [300.0, 125.0], [325.0, 158.0], [345.0, 128.0], [355.0, 150.0]], vec![], vec![0.0, 0.5, 1.0, 2.0, 3.5, 4.0, 5.0, 6.0, 6.5, 8.0], false));
+    d
+}
+
+/// the curve cases: caps, joins, widths, dash patterns
+pub const CURVE_CASES: [(Cap, Join, f32, &[f32]); 5] = [(Cap::Butt, Join::Miter, 1.0, &[]), (Cap::Round, Join::Round, 3.0, &[]), (Cap::Square, Join::Bevel, 7.0, &[]), (Cap::Butt, Join::Miter, 2.0, &[12.0, 5.0]),
+                                                       (Cap::Round, Join::Round, 3.0, &[9.0, 4.0, 1.0, 4.0])];
+
+fn ring(v: &[[f64; 2]]) -> Vec<Geo> {
+    vec![Geo::Poly(v.to_vec(), true)]
+}
+
+/// fills in 360 x 270 px: a square with a hole and an island in it, two triangles touching at a corner, a hole touching its
+/// outer ring, collinear and repeated points with a notch, a circle with an elliptic hole, a ring of a Bézier piece and an
+/// arc, a polygon with many points (a flattened wave); of the colour's alpha
+pub fn fills_drawing(alpha: u32) -> Drawing {
+    let mut d = Drawing::one_layer();
+    // (translucent: the colour of blended_twice; the fills do not overlap)
+    let st = |k: usize| style((alpha << 24) | if alpha < 0xFF { 0x0020_40C0 } else { INK[k % 4] & 0x00FF_FFFF }, 0.0, Cap::Butt, Join::Miter);
+    d.add(st(0), Geo::Fill(vec![ring(&[[20.5, 20.3], [140.2, 20.3], [140.2, 120.7], [20.5, 120.7]]), ring(&[[45.0, 45.0], [115.0, 45.0], [115.0, 100.0], [45.0, 100.0]]),
+                                ring(&[[65.3, 60.2], [95.0, 60.2], [80.1, 85.6]])]));
+    d.add(st(1), Geo::Fill(vec![ring(&[[160.0, 20.0], [230.0, 20.0], [195.0, 75.0]]), ring(&[[195.0, 75.0], [240.0, 120.0], [150.0, 120.0]])]));
+    d.add(st(2), Geo::Fill(vec![ring(&[[250.0, 20.0], [345.0, 20.0], [345.0, 110.0], [250.0, 110.0]]), ring(&[[297.5, 20.0], [330.0, 60.0], [270.0, 60.0]])]));
+    d.add(st(3), Geo::Fill(vec![ring(&[[20.0, 140.0], [50.0, 140.0], [50.0, 140.0], [80.0, 140.0], [110.0, 140.0], [110.0, 200.0], [80.3, 200.0], [65.0, 150.0], [50.0, 200.0], [20.0, 200.0],
+                                       [20.0, 170.0]])]));
+    d.add(st(0), Geo::Fill(vec![vec![Geo::Circle([175.0, 185.0], 48.0)], vec![Geo::Ellipse([180.0, 183.0], [25.0, 12.0], 0.6, 0.0, core::f64::consts::TAU)]]));
+    d.add(st(1), Geo::Fill(vec![vec![Geo::Bez(vec![[240.0, 140.0], [300.0, 115.0], [345.0, 195.0]], 2, false), Geo::Arc([305.0, 210.0], 40.0, 0.0, core::f64::consts::PI)]]));
+    let wave: Vec<[f64; 2]> = (0..=60).map(|k| [20.0 + 1.5 * k as f64, 230.0 + 9.0 * sincos(k as f64 * 0.37).0]).chain([[110.0, 262.0], [20.0, 262.0]]).collect();
+    d.add(st(2), Geo::Fill(vec![ring(&wave)]));
+    d
+}
+
+/// a self-intersecting star and a ring crossing another: even-odd, approximately (decision 26)
+pub fn fills_crossing_drawing() -> Drawing {
+    let mut d = Drawing::one_layer();
+    let star: Vec<[f64; 2]> = (0..5).map(|k| {
+        let (s, c) = sincos(-core::f64::consts::FRAC_PI_2 + k as f64 * 4.0 * core::f64::consts::PI / 5.0);
+        [90.3 + 70.0 * c, 120.6 + 70.0 * s]
+    }).collect();
+    d.add(style(0xFF20_4080, 0.0, Cap::Butt, Join::Miter), Geo::Fill(vec![ring(&star)]));
+    d.add(style(0xFF80_4020, 0.0, Cap::Butt, Join::Miter), Geo::Fill(vec![ring(&[[200.0, 60.0], [300.0, 60.0], [300.0, 160.0], [200.0, 160.0]]), ring(&[[250.0, 110.0], [330.0, 110.0], [330.0, 200.0], [250.0, 200.0]])]));
+    d
+}
+
+/// hatched fills in 360 x 270 px, the lines `spacing` px apart: one family at 45 degrees, crossed lines, a dashed family
+/// (shifted line to line) with dots; widths 1 and 2 px
+pub fn hatch_drawing(spacing: f64) -> Drawing {
+    let mut d = Drawing::one_layer();
+    let st = |k: usize, fam: &[render2d::HatchLine], w: f32| style(INK[k % 4], 0.0, Cap::Butt, Join::Miter).hatched(fam, w);
+    let q = core::f64::consts::FRAC_PI_4;
+    let mut a = render2d::HatchLine::new(q, spacing);
+    a.base = [3.3, 1.7];
+    d.add(st(0, &[a], 1.0), Geo::Fill(vec![ring(&[[20.5, 20.3], [160.2, 20.3], [160.2, 120.7], [20.5, 120.7]]), ring(&[[60.0, 50.0], [120.0, 50.0], [90.0, 100.0]])]));
+    let b0 = render2d::HatchLine::new(0.1, spacing * 1.3);
+    let b1 = render2d::HatchLine::new(0.1 + core::f64::consts::FRAC_PI_2, spacing * 1.7);
+    d.add(st(1, &[b0, b1], 1.0), Geo::Fill(vec![vec![Geo::Circle([265.0, 75.0], 55.0)]]));
+    let mut c = render2d::HatchLine::new(-0.5, spacing * 1.5).dashed(&[4.0 * spacing, 1.5 * spacing, 0.0, 1.5 * spacing]);
+    c.shift = 2.1 * spacing;
+    c.base = [100.0, 200.0];
+    d.add(st(2, &[c], 2.0), Geo::Fill(vec![vec![Geo::Ellipse([110.0, 200.0], [90.0, 50.0], 0.2, 0.0, core::f64::consts::TAU)]]));
+    d.add(st(3, &[a, b1], 1.0), Geo::Fill(vec![ring(&[[230.0, 150.0], [345.0, 165.0], [320.0, 255.0], [215.0, 240.0]])]));
+    d
+}
+
+/// spacings of the hatch tests (px): exact, mixed, flat
+pub const HATCH_SPACINGS: [f64; 3] = [7.0, 3.0, 1.5];
+
 /// one image both paths draw
 pub struct Shot {
     pub name: String,
@@ -459,6 +572,17 @@ pub fn shots() -> Vec<Shot> {
     for period in FLAT_PERIODS {
         add(format!("flat_{period}"), 320, 200, flat_drawing(period, 2.0, Cap::Butt), pixel_camera(320, 200), None);
     }
+    // curves, fills (translucent: blended once), hatches (G6b1)
+    for (k, (cap, join, width, pat)) in CURVE_CASES.into_iter().enumerate() {
+        add(format!("curves_{k}"), 360, 270, curves_drawing(cap, join, width, pat), pixel_camera(360, 270), None);
+    }
+    for alpha in [0xFFu32, 0x80] {
+        add(format!("fills_{alpha:x}"), 360, 270, fills_drawing(alpha), pixel_camera(360, 270), if alpha < 0xFF { Some(alpha) } else { None });
+    }
+    add("fills_crossing".into(), 360, 270, fills_crossing_drawing(), pixel_camera(360, 270), None);
+    for sp in HATCH_SPACINGS {
+        add(format!("hatch_{sp}"), 360, 270, hatch_drawing(sp), pixel_camera(360, 270), None);
+    }
     v
 }
 
@@ -509,8 +633,8 @@ pub fn differ(a: &[u8], b: &[u8]) -> (u32, u8) {
 
 pub const DEEP_SIZE: (u32, u32) = (200, 160);
 pub const DEEP_STEPS: u32 = 24;
-const DEEP_AT: [f64; 2] = [-9_876_543.21, 6_543_210.987];
-const DEEP_K: f64 = 1e-6;
+pub const DEEP_AT: [f64; 2] = [-9_876_543.21, 6_543_210.987];
+pub const DEEP_K: f64 = 1e-6;
 
 /// (a, b): lines through the view, short ones (ends inside), long ones (ends 0.3 and 1e7 units away)
 pub fn deep_lines() -> [([f64; 2], [f64; 2]); 6] {
@@ -1038,6 +1162,224 @@ impl DeepStats {
 
     pub fn fine_arcs(&self) -> bool {
         self.checks > 200 && self.lost == 0 && self.worst <= 1.0 / 16.0
+    }
+}
+
+// ---------------------------------------------------------------- curves, fills and hatches far away (G6b1)
+
+/// curves, a fill with a hole and a hatched fill around a point (coords: the same at the origin and far away)
+pub fn curve_sample(at: [f64; 2]) -> Drawing {
+    let mut d = Drawing::one_layer();
+    let p = |x: f64, y: f64| [at[0] + x, at[1] + y];
+    d.add(style(0xFF20_3040, 3.0, Cap::Round, Join::Round), Geo::Bez(vec![p(-90.0, -40.0), p(-40.0, 50.0), p(10.0, -60.0), p(80.0, 30.0)], 3, false));
+    d.add(dashed(0xFF80_2020, 2.0, Cap::Butt, Join::Miter, &[8.0, 3.0], Unit::Px, 1.0), Geo::Ellipse(p(20.0, 10.0), [60.0, 25.0], 0.4, 0.0, core::f64::consts::TAU));
+    d.add(style(0xC020_40C0, 1.5, Cap::Square, Join::Bevel), Geo::Spline(3, vec![p(-80.0, 40.0), p(-50.0, 70.0), p(-10.0, 30.0), p(30.0, 65.0), p(70.0, 45.0)], vec![], vec![], false));
+    d.add(style(0x9030_8040, 0.0, Cap::Butt, Join::Miter), Geo::Fill(vec![ring(&[p(-100.0, -70.0), p(-20.0, -70.0), p(-20.0, -5.0), p(-100.0, -5.0)]), vec![Geo::Circle(p(-60.0, -38.0), 18.0)]]));
+    let mut h = render2d::HatchLine::new(0.7, 6.0);
+    h.base = p(1.3, -2.1);
+    d.add(style(0xFF40_2080, 0.0, Cap::Butt, Join::Miter).hatched(&[h], 1.0), Geo::Fill(vec![vec![Geo::Ellipse(p(55.0, -40.0), [40.0, 22.0], -0.2, 0.0, core::f64::consts::TAU)]]));
+    d
+}
+
+/// a curve near DEEP_AT at 1e-6 units per pixel, the curve's true points near the view (drawing units, fine): an ellipse of
+/// radii 1e7 and 6e6, turned, its point at the angle 0.9 at DEEP_AT; a cubic Bézier whose controls lie 1e6 away, through
+/// the view
+pub fn deep_curves() -> (Drawing, Vec<Vec<[f64; 2]>>) {
+    let (at, k) = (DEEP_AT, DEEP_K);
+    let mut d = Drawing::one_layer();
+    let st = style(0xFFFF_FFFF, 2.5, Cap::Butt, Join::Miter);
+    // the ellipse: centre such that its point at t0 = 0.9 lies at DEEP_AT + (5, 12) px
+    let (rx, ry, rot, t0) = (1.0e7, 6.0e6, 0.3, 0.9);
+    let (sr, cr) = sincos(rot);
+    let ell = |c: [f64; 2], t: f64| {
+        let (s, co) = sincos(t);
+        let (x, y) = (rx * co, ry * s);
+        [c[0] + cr * x - sr * y, c[1] + sr * x + cr * y]
+    };
+    let o = ell([0.0, 0.0], t0);
+    let c = [at[0] + 5.0 * k - o[0], at[1] + 12.0 * k - o[1]];
+    d.add(st, Geo::Ellipse(c, [rx, ry], rot, 0.0, core::f64::consts::TAU));
+    // (the true points: the angle within +-0.5e-10 of t0, in f64)
+    let fine_e: Vec<[f64; 2]> = (0..=400).map(|j| ell(c, t0 + (j as f64 - 200.0) * 2.5e-13)).collect();
+    // the Bézier: through DEEP_AT - (30, 20) px at t = 0.5 (its controls 1e6 away), a cubic in x
+    let q = [at[0] - 30.0 * k, at[1] - 20.0 * k];
+    let ctl = [[q[0] - 1.0e6, q[1] - 3.0e5], [q[0] - 2.0e5, q[1] + 6.0e5], [q[0] + 4.0e5, q[1] - 5.0e5], [q[0] + 1.2e6, q[1] + 2.0e5]];
+    // (the curve at 0.5 is the controls' (1, 3, 3, 1) / 8: moved so that it passes through q)
+    let mid = [(ctl[0][0] + 3.0 * ctl[1][0] + 3.0 * ctl[2][0] + ctl[3][0]) / 8.0, (ctl[0][1] + 3.0 * ctl[1][1] + 3.0 * ctl[2][1] + ctl[3][1]) / 8.0];
+    let ctl: Vec<[f64; 2]> = ctl.iter().map(|p| [p[0] + q[0] - mid[0], p[1] + q[1] - mid[1]]).collect();
+    d.add(st, Geo::Bez(ctl.clone(), 3, false));
+    let bez = |t: f64| {
+        let s = 1.0 - t;
+        let (a, b, cc, dd) = (s * s * s, 3.0 * s * s * t, 3.0 * s * t * t, t * t * t);
+        [a * ctl[0][0] + b * ctl[1][0] + cc * ctl[2][0] + dd * ctl[3][0], a * ctl[0][1] + b * ctl[1][1] + cc * ctl[2][1] + dd * ctl[3][1]]
+    };
+    let fine_b: Vec<[f64; 2]> = (0..=400).map(|j| bez(0.5 + (j as f64 - 200.0) * 1.0e-12)).collect();
+    (d, vec![fine_e, fine_b])
+}
+
+/// the signed distance (px) of a screen point from a fine polyline of drawing points
+fn fine_dist(q: [f64; 2], line: &[[f64; 2]], cam: &Camera, size: (u32, u32)) -> f64 {
+    let p = cam.to_drawing(q, size);
+    let mut best = (f64::MAX, 1.0);
+    for w in line.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+        let ll = dx * dx + dy * dy;
+        let t = if ll > 0.0 { (((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / ll).clamp(0.0, 1.0) } else { 0.0 };
+        let (ex, ey) = (p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+        let dd = ex * ex + ey * ey;
+        if dd < best.0 {
+            best = (dd, if dx * (p[1] - a[1]) - dy * (p[0] - a[0]) > 0.0 { 1.0 } else { -1.0 });
+        }
+    }
+    best.1 * sqrt(best.0) / cam.scale
+}
+
+/// one frame of the deep zoom of curves: each curve's place from rows and columns that cross it (at right angles within
+/// 45 degrees) against where its true points put it (the centroid of the exact strip coverage in f64), as deep_arc_judge
+pub fn deep_curve_judge(img: &[u8], cam: &Camera, fine: &[Vec<[f64; 2]>], st: &mut DeepStats) {
+    let (dw, dh) = DEEP_SIZE;
+    let h = 1.25;
+    let cov = |x: usize, y: usize| img[(y * dw as usize + x) * 4 + 1] as f64 / 255.0;
+    for (ci, line) in fine.iter().enumerate() {
+        let dist = |q: [f64; 2]| fine_dist(q, line, cam, (dw, dh));
+        for rows in [true, false] {
+            let (n_lines, n_along) = if rows { (dh, dw) } else { (dw, dh) };
+            for j in (12..n_lines as usize - 12).step_by(9) {
+                let at = |i: f64| if rows { [i, j as f64 + 0.5] } else { [j as f64 + 0.5, i] };
+                let mut prev = dist(at(0.5));
+                for i in 1..n_along as usize {
+                    let x1 = i as f64 + 0.5;
+                    let cur = dist(at(x1));
+                    if (prev < 0.0) == (cur < 0.0) || (prev.abs() > 4.0 && cur.abs() > 4.0) {
+                        prev = cur;
+                        continue;
+                    }
+                    let (mut lo, mut hi) = (x1 - 1.0, x1);
+                    for _ in 0..50 {
+                        let mid = 0.5 * (lo + hi);
+                        if (dist(at(mid)) < 0.0) == (prev < 0.0) {
+                            lo = mid;
+                        } else {
+                            hi = mid;
+                        }
+                    }
+                    prev = cur;
+                    let want = 0.5 * (lo + hi);
+                    if want < 10.0 || want > n_along as f64 - 10.0 {
+                        continue;
+                    }
+                    let slope = (dist(at(want + 0.01)) - dist(at(want - 0.01))) / 0.02;
+                    if slope.abs() < 0.707 {
+                        continue;
+                    }
+                    let crowded = fine.iter().enumerate().any(|(cj, l2)| cj != ci && (-7..=7).any(|o| fine_dist(at(want + o as f64), l2, cam, (dw, dh)).abs() < h + 4.0));
+                    if crowded {
+                        continue;
+                    }
+                    let (mut sum, mut mom, mut esum, mut emom) = (0.0, 0.0, 0.0, 0.0);
+                    for i in (want as i64 - 6).max(0) as usize..((want as i64 + 7) as usize).min(n_along as usize) {
+                        let (px, py) = if rows { (i, j) } else { (j, i) };
+                        let g = cov(px, py);
+                        sum += g;
+                        mom += g * (i as f64 + 0.5);
+                        // (the exact strip at the pixel: its distance and the line's normal there in pixels)
+                        let q = at(i as f64 + 0.5);
+                        let dd = dist(q);
+                        let (gx, gy) = ((dist([q[0] + 0.01, q[1]]) - dist([q[0] - 0.01, q[1]])) / 0.02, (dist([q[0], q[1] + 0.01]) - dist([q[0], q[1] - 0.01])) / 0.02);
+                        let gl = sqrt(gx * gx + gy * gy).max(1e-12);
+                        let m = [gx / gl, gy / gl];
+                        let e = (box_cov(dd - h, m) + box_cov(-dd - h, [-m[0], -m[1]]) - 1.0).max(0.0);
+                        esum += e;
+                        emom += e * (i as f64 + 0.5);
+                    }
+                    st.checks += 1;
+                    if sum < 1.0 {
+                        st.lost += 1;
+                        continue;
+                    }
+                    let err = (mom / sum - emom / esum).abs();
+                    st.worst = st.worst.max(err);
+                    st.per_line[ci] = st.per_line[ci].max(err);
+                }
+            }
+        }
+    }
+}
+
+/// the hatch at 1e-6 units per pixel near DEEP_AT: a fill of 2e7 by 2e7 units hatched with horizontal lines 25 px apart
+/// (base 1e7 away), and its outline's right edge (x = DEEP_AT.x + 31.3 px) in the view, solid or hatched
+pub fn deep_hatch(solid: bool) -> Drawing {
+    let (at, k) = (DEEP_AT, DEEP_K);
+    let mut d = Drawing::one_layer();
+    let x1 = at[0] + 31.3 * k;
+    let sq = ring(&[[x1 - 2.0e7, at[1] - 1.0e7], [x1, at[1] - 1.0e7], [x1, at[1] + 1.0e7], [x1 - 2.0e7, at[1] + 1.0e7]]);
+    let mut h = render2d::HatchLine::new(0.0, 25.0 * k);
+    h.base = [at[0] - 1.0e7, at[1] + 3.3 * k];
+    let st = if solid { style(0xFFFF_FFFF, 0.0, Cap::Butt, Join::Miter) } else { style(0xFFFF_FFFF, 0.0, Cap::Butt, Join::Miter).hatched(&[h], 2.5) };
+    d.add(st, Geo::Fill(vec![sq]));
+    d
+}
+
+/// one frame of the deep hatch: the lines' places (their centroids per column, left of the edge) and, in the solid frame,
+/// the edge's place (per row: the left of a window plus its coverage summed), against f64
+pub fn deep_hatch_judge(hatched: &[u8], solid: &[u8], cam: &Camera, lines: &mut DeepStats, edge: &mut DeepStats) {
+    let (dw, dh) = DEEP_SIZE;
+    let (at, k) = (DEEP_AT, DEEP_K);
+    let g = |img: &[u8], x: usize, y: usize| img[(y * dw as usize + x) * 4 + 1] as f64 / 255.0;
+    // (a line of the drawing on the screen: where it crosses a column or a row, the camera turned or not)
+    let cross = |a: [f64; 2], b: [f64; 2], along: f64, rows: bool| {
+        let (sa, sb) = (cam.to_screen(a, (dw, dh)), cam.to_screen(b, (dw, dh)));
+        let (i, o) = if rows { (1, 0) } else { (0, 1) };
+        sa[o] + (along - sa[i]) * (sb[o] - sa[o]) / (sb[i] - sa[i])
+    };
+    let xe = at[0] + 31.3 * k;
+    let ex = cross([xe, at[1] - 50.0 * k], [xe, at[1] + 50.0 * k], 0.5 * dh as f64, true);
+    // the lines: y of line j where base.y + j 25 k crosses the view
+    for col in (10..(ex as usize).saturating_sub(12)).step_by(7) {
+        for j in -10i64..=10 {
+            let yl = at[1] + 3.3 * k + j as f64 * 25.0 * k;
+            let want = cross([at[0] - 50.0 * k, yl], [at[0] + 50.0 * k, yl], col as f64 + 0.5, false);
+            // (away from the outline, which the camera's turn tilts)
+            if !(want > 8.0 && want < dh as f64 - 8.0) || col as f64 + 0.5 > cross([xe, at[1] - 50.0 * k], [xe, at[1] + 50.0 * k], want, true) - 8.0 {
+                continue;
+            }
+            // (the line's strip, 2.5 px wide, on the screen: its normal; the exact share of each pixel, as deep_judge)
+            let (sa, sb) = (cam.to_screen([at[0] - 50.0 * k, yl], (dw, dh)), cam.to_screen([at[0] + 50.0 * k, yl], (dw, dh)));
+            let (dx, dy) = (sb[0] - sa[0], sb[1] - sa[1]);
+            let l = sqrt(dx * dx + dy * dy);
+            let m = [-dy / l, dx / l];
+            let (mut sum, mut mom, mut esum, mut emom) = (0.0, 0.0, 0.0, 0.0);
+            for y in (want as i64 - 5).max(0) as usize..((want as i64 + 6) as usize).min(dh as usize) {
+                let c = g(hatched, col, y);
+                sum += c;
+                mom += c * (y as f64 + 0.5);
+                let v = (col as f64 + 0.5 - sa[0]) * m[0] + (y as f64 + 0.5 - sa[1]) * m[1];
+                let e = (box_cov(v - 1.25, m) + box_cov(-v - 1.25, [-m[0], -m[1]]) - 1.0).max(0.0);
+                esum += e;
+                emom += e * (y as f64 + 0.5);
+            }
+            lines.checks += 1;
+            if sum < 1.0 {
+                lines.lost += 1;
+                continue;
+            }
+            let e = (mom / sum - emom / esum).abs();
+            lines.worst = lines.worst.max(e);
+            lines.per_line[0] = lines.per_line[0].max(e);
+        }
+    }
+    // the edge: per row, the left of a window of 16 px around it plus the window's coverage
+    if ex > 20.0 && ex < dw as f64 - 20.0 {
+        for row in (8..dh as usize - 8).step_by(5) {
+            let exr = cross([xe, at[1] - 50.0 * k], [xe, at[1] + 50.0 * k], row as f64 + 0.5, true);
+            let x0 = exr as usize - 8;
+            let s: f64 = (x0..x0 + 16).map(|x| g(solid, x, row)).sum();
+            edge.checks += 1;
+            let e = (x0 as f64 + s - exr).abs();
+            edge.worst = edge.worst.max(e);
+            edge.per_line[1] = edge.per_line[1].max(e);
+        }
     }
 }
 

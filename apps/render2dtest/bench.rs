@@ -2,7 +2,7 @@
 // over the target at 1 unit per pixel), per level and width: inserting them, the first frame (everything goes up),
 // frames with everything in view and zoomed in (a tenth in view), frames with 1000 entities changed each
 //
-//   render2dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--basis] [--scene cad [--plain]]
+//   render2dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--basis] [--scene cad [--plain | --g6a2b]]
 //
 // GPU times are the scene's timestamps (FrameStats): uploads, visibility (the three compute passes), the draw; each
 // frame is waited for before the next (no frames in flight: the times are the frame's own), medians over F frames.
@@ -99,6 +99,18 @@ pub fn bench(n: u32) -> i32 {
     0
 }
 
+/// the measuring scene's stage: --plain the drawing of G6a2a, --g6a2b that of G6a2b, else with fills, hatches, curves (G6b1)
+pub fn cad_mode() -> cad::Mode {
+    let args = plat::args();
+    if args.iter().any(|a| a == "--plain") {
+        cad::Mode::Plain
+    } else if args.iter().any(|a| a == "--g6a2b") {
+        cad::Mode::Arcs
+    } else {
+        cad::Mode::Fills
+    }
+}
+
 /// the town plan (cad.rs): hairlines and the plan's widths, each at the overview, a district and the working zoom
 fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level) -> Result<()> {
     let mut r = Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm))?;
@@ -106,12 +118,12 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level) 
         let mut s = Scene::new(&r)?;
         s.set_stats(true);
         let t0 = plat::time_us();
-        let plain = plat::args().iter().any(|a| a == "--plain");
-        let c = cad::build(&mut s, n, 5, styled, plain)?;
+        let mode = cad_mode();
+        let c = cad::build(&mut s, n, 5, styled, mode)?;
         let insert_ms = (plat::time_us() - t0) as f64 / 1000.0;
-        if !plain {
-            out(&format!("{level:?}, {wname}: of them {} arcs and circles ({} pieces), {} dashed entities ({} records); {} records in the pool", c.arcs, c.arc_records, c.dashed,
-                         c.dashed_records, c.segments + c.arcs));
+        if mode != cad::Mode::Plain {
+            out(&format!("{level:?}, {wname}: of them {} arcs and circles ({} pieces), {} dashed entities ({} records), {} fills ({} hatched; {} records), {} curves ({} records); {} records in the pool",
+                         c.arcs, c.arc_records, c.dashed, c.dashed_records, c.fills, c.hatched, c.fill_records, c.curves, c.curve_records, c.segments + c.arcs));
         }
         let mut t = Target { color: dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?, used: false };
         let views = cad::views(&c, size);
@@ -120,6 +132,21 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level) 
         let up = s.upload_info();
         out(&format!("{level:?}, {wname}: {} entities, {} segments, {:.0} x {:.0} m; insert {insert_ms:.1} ms (CPU); first frame: prepare {prep:.1} ms (CPU, {:.1} MB up), GPU uploads {:.3} ms, \
                       visibility {:.3} ms, draw {:.3} ms ({vis0} visible)", c.entities, c.segments, c.width, c.height, up.bytes as f64 / 1048576.0, st0[0], st0[1], st0[2]));
+        if let Some(dir) = plat::arg_value("--shot") {
+            // (each view once as an image: DIR/cad_LEVEL_WIDTHS_VIEW.bgra, as tests::dump writes them)
+            let mut off = crate::gallery::Off::new(dev, size.0, size.1)?;
+            for (k, v) in views.iter().enumerate() {
+                s.set_camera(&v.cam)?;
+                let id = off.submit(&mut r, &mut s)?;
+                dev.wait(id, 30_000_000_000)?;
+                let img = off.read()?;
+                let mut f = Vec::with_capacity(img.len() + 8);
+                f.extend_from_slice(&size.0.to_le_bytes());
+                f.extend_from_slice(&size.1.to_le_bytes());
+                f.extend_from_slice(&img);
+                let _ = plat::write_file(&format!("{dir}/cad_{level:?}_{wname}_{k}.bgra"), &f);
+            }
+        }
         for v in &views {
             let (mut a, mut b, mut d, mut p) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
             let mut vis = 0;

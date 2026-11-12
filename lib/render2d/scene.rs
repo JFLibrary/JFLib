@@ -22,8 +22,12 @@ use alloc::vec::Vec;
 
 use gpu::*;
 
+use alloc::boxed::Box;
+
+use crate::curve::{self, Curve, Flat};
+use crate::fill;
 use crate::math::{sincos, split, sqrt};
-use crate::{Renderer, Tag, CHANGE_WORDS, DRAW_BYTES, LAYERS_MAX, PAGE, RECORD_BYTES, RECORD_WORDS, STAMPS, STYLE_BYTES, STYLE_WORDS, VIEW_BYTES};
+use crate::{Renderer, Tag, CHANGE_WORDS, DRAW_BYTES, HATCH_BYTES, HATCH_WORDS, LAYERS_MAX, PAGE, RECORD_BYTES, RECORD_WORDS, STAMPS, STYLE_BYTES, STYLE_WORDS, VIEW_BYTES};
 
 /// what a scene shows: the point of the drawing at the target's middle, drawing units per pixel, and the rotation
 /// (radians, counter-clockwise: the drawing turns that way on the screen).  The y axis points up on the screen
@@ -127,6 +131,49 @@ pub enum Join {
 
 /// the most entries of a dash pattern (Style::dash)
 pub const DASH_MAX: usize = 8;
+/// the most line families of a hatch (Style::hatch)
+pub const HATCH_MAX: usize = 4;
+/// the most entries of a hatch family's dash pattern (HatchLine::dash)
+pub const HATCH_DASH_MAX: usize = 6;
+
+/// a family of a hatch's parallel lines, as DXF has them: their angle (radians, counter-clockwise from the x axis), the
+/// base point one of them runs through, the spacing between neighbouring lines (at right angles to them) and how far each
+/// line's pattern is shifted along against the one before; a dash pattern (on, off, ... in drawing units; none: solid
+/// lines; an entry of 0 is a dot).  Made with `new` and changed field by field (it may grow)
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HatchLine {
+    pub angle: f64,
+    pub base: [f64; 2],
+    pub spacing: f64,
+    pub shift: f64,
+    pub dash: [f64; HATCH_DASH_MAX],
+    pub dashes: u32,
+}
+
+impl HatchLine {
+    /// solid lines at an angle, `spacing` apart, through the origin
+    pub const fn new(angle: f64, spacing: f64) -> HatchLine {
+        HatchLine { angle, base: [0.0, 0.0], spacing, shift: 0.0, dash: [0.0; HATCH_DASH_MAX], dashes: 0 }
+    }
+
+    /// the same with a dash pattern (at most HATCH_DASH_MAX entries, drawing units)
+    pub fn dashed(mut self, pattern: &[f64]) -> HatchLine {
+        self.dash = [0.0; HATCH_DASH_MAX];
+        for (d, p) in self.dash.iter_mut().zip(pattern) {
+            *d = *p;
+        }
+        self.dashes = pattern.len() as u32;
+        self
+    }
+
+    fn check(&self) -> bool {
+        let fine = |v: f64| v.is_finite() && v.abs() < 1e30;
+        let pat = &self.dash[..(self.dashes as usize).min(HATCH_DASH_MAX)];
+        fine(self.angle) && fine(self.base[0]) && fine(self.base[1]) && fine(self.shift) && self.spacing.is_finite() && self.spacing > 0.0 && self.spacing < 1e30
+            && self.dashes as usize <= HATCH_DASH_MAX && pat.iter().all(|&v| fine(v) && v >= 0.0) && (pat.is_empty() || pat.iter().sum::<f64>() > 0.0)
+    }
+}
 
 /// a stroke's look.  Made with `new` and changed field by field (it may grow)
 #[non_exhaustive]
@@ -151,13 +198,29 @@ pub struct Style {
     pub dash_unit: Unit,
     /// how far into the pattern an entity starts (in `dash_unit`s)
     pub dash_phase: f32,
+    /// a fill's hatch: the first `hatches` line families (0: the fill is solid), drawn in `color` over nothing, the lines
+    /// `hatch_width` px wide (0, or thinner than a pixel: 1 px); strokes ignore it
+    pub hatch: [HatchLine; HATCH_MAX],
+    pub hatches: u32,
+    pub hatch_width: f32,
 }
 
 impl Style {
     /// a hairline of a colour: width 0, butt caps, miter joins with the limit 4, solid
     pub const fn new(color: u32) -> Style {
         Style { color, width: 0.0, unit: Unit::Px, cap: Cap::Butt, join: Join::Miter, miter_limit: 4.0, dash: [0.0; DASH_MAX], dashes: 0, dash_unit: Unit::Px,
-                dash_phase: 0.0 }
+                dash_phase: 0.0, hatch: [HatchLine::new(0.0, 1.0); HATCH_MAX], hatches: 0, hatch_width: 0.0 }
+    }
+
+    /// the same with a hatch (at most HATCH_MAX families; none: a solid fill) of lines `width` px wide
+    pub fn hatched(mut self, families: &[HatchLine], width: f32) -> Style {
+        self.hatch = [HatchLine::new(0.0, 1.0); HATCH_MAX];
+        for (d, f) in self.hatch.iter_mut().zip(families) {
+            *d = *f;
+        }
+        self.hatches = families.len() as u32;
+        self.hatch_width = width;
+        self
     }
 
     /// the same with a dash pattern (at most DASH_MAX entries; an empty one: solid), its unit and phase
@@ -183,6 +246,9 @@ impl Style {
         if pat.iter().any(|v| !(v.is_finite() && *v >= 0.0 && *v < 1e30)) || !self.dash_phase.is_finite() || (!pat.is_empty() && !(pat.iter().map(|&v| v as f64).sum::<f64>() > 0.0)) {
             return Err(GpuError::Invalid("Style: dash entries finite and not negative, not all 0, a finite phase"));
         }
+        if self.hatches as usize > HATCH_MAX || !(self.hatch_width.is_finite() && self.hatch_width >= 0.0) || !self.hatch[..self.hatches as usize].iter().all(|h| h.check()) {
+            return Err(GpuError::Invalid("Style: at most HATCH_MAX hatch families of a spacing above 0, finite numbers, dash entries not negative and not all 0, a width not negative"));
+        }
         Ok(())
     }
 
@@ -191,8 +257,68 @@ impl Style {
         self.dashes > 0 && self.dash_unit == Unit::Px
     }
 
-    /// common.wgsl's Style at a camera's scale
-    fn words(&self, scale: f64) -> [u32; STYLE_WORDS] {
+    /// fill.wgsl's Hatch of this style for a camera and a target (scene.rs computes the lines' places at the camera in f64,
+    /// the shader goes on from there in pixels: docs/RENDER2D.md "Schraffuren")
+    fn hatch_words(&self, cam: &Camera, size: (u32, u32)) -> [f32; HATCH_WORDS] {
+        let mut w = [0.0f32; HATCH_WORDS];
+        let n = (self.hatches as usize).min(HATCH_MAX);
+        w[0] = n as f32;
+        w[1] = (0.5 * self.hatch_width).max(0.5);
+        let (sr, cr) = sincos(cam.rotation);
+        // a direction of the drawing in pixels: turned, y down
+        let px = |v: [f64; 2]| [cr * v[0] - sr * v[1], -(sr * v[0] + cr * v[1])];
+        let _ = size;
+        let hw = w[1] as f64;
+        for (f, h) in self.hatch[..n].iter().enumerate() {
+            let (sa, ca) = sincos(h.angle);
+            let dir = [ca, sa];
+            let nrm = [-sa, ca];
+            let (cx, cy) = (cam.center[0] - h.base[0], cam.center[1] - h.base[1]);
+            // the line nearest the camera's centre, k0, and the centre's distance from it
+            let u = (cx * nrm[0] + cy * nrm[1]) / h.spacing;
+            let k0 = round(u);
+            let d0 = (cx * nrm[0] + cy * nrm[1]) - k0 * h.spacing;
+            let (np, dp) = (px(nrm), px(dir));
+            let o = 4 + 24 * f;
+            w[o] = np[0] as f32;
+            w[o + 1] = np[1] as f32;
+            w[o + 2] = (d0 / cam.scale) as f32;
+            w[o + 3] = (h.spacing / cam.scale) as f32;
+            w[o + 4] = dp[0] as f32;
+            w[o + 5] = dp[1] as f32;
+            let m = (h.dashes as usize).min(HATCH_DASH_MAX);
+            let m2 = if m % 2 == 1 { 2 * m } else { m };
+            let period: f64 = (0..m2).map(|k| h.dash[k % m]).sum();
+            let mut duty = 1.0;
+            if m2 > 0 && period > 0.0 {
+                // the place along line k0 at the centre's foot and the shift between lines, within a period, the pattern's
+                // ends (drawing units: as precise as a stroke's pattern, docs/RENDER2D.md "Schraffuren")
+                let t0 = (cx * dir[0] + cy * dir[1]) - k0 * h.shift;
+                w[o + 6] = (t0 - (t0 / period).floor_f() * period) as f32;
+                w[o + 7] = period as f32;
+                w[o + 8] = (h.shift - (h.shift / period).floor_f() * period) as f32;
+                let (mut sum, mut on) = (0.0f64, 0.0f64);
+                for k in 0..m2 {
+                    let v = h.dash[k % m];
+                    sum += v;
+                    if k % 2 == 0 {
+                        // (a dot as long as the line is wide)
+                        on += v.max(2.0 * hw * cam.scale);
+                    }
+                    if k < 12 {
+                        w[o + 12 + k] = sum as f32;
+                    }
+                }
+                duty = (on / period).min(1.0);
+                w[o + 10] = m2.min(12) as f32;
+            }
+            w[o + 9] = duty as f32;
+        }
+        w
+    }
+
+    /// common.wgsl's Style at a camera's scale; hatch: its place in the hatch table + 1 (0: none)
+    fn words(&self, scale: f64, hatch: u32) -> [u32; STYLE_WORDS] {
         let unit = |u: Unit| match u {
             Unit::Px => 0,
             Unit::Drawing => 1,
@@ -238,7 +364,31 @@ impl Style {
             w[9] = ((on / period) as f32).to_bits();
             w[10] = (ons as f32).to_bits();
         }
+        w[11] = hatch;
         w
+    }
+}
+
+/// x rounded to the nearest whole number (halves away from 0; beyond 2^52 x itself)
+fn round(x: f64) -> f64 {
+    if !(x.abs() < 4.5e15) {
+        return x;
+    }
+    (x + 0.5).floor_f()
+}
+
+trait FloorF {
+    fn floor_f(self) -> f64;
+}
+
+impl FloorF for f64 {
+    /// floor without libm
+    fn floor_f(self) -> f64 {
+        if !(self.abs() < 4.5e15) {
+            return self;
+        }
+        let t = self as i64 as f64;
+        if t > self { t - 1.0 } else { t }
     }
 }
 
@@ -293,7 +443,7 @@ pub struct EntityId {
     era: u32,
 }
 
-/// what an entity is (more kinds come: curves, fills, text)
+/// what an entity is (more kinds come: text)
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug)]
 pub enum Shape<'a> {
@@ -306,6 +456,26 @@ pub enum Shape<'a> {
     Arc { center: [f64; 2], radius: f64, start: f64, sweep: f64 },
     /// a circle (its dash pattern starts at angle 0 and runs counter-clockwise)
     Circle { center: [f64; 2], radius: f64 },
+    /// quadratic Bézier pieces end to end: the start, then per piece its control point and its end (1 + 2k points, k at
+    /// least 1); closed: the end joins the start (a straight segment where they differ).  Curves are flattened into
+    /// segments per zoom band within curve::FLAT_TOL px (docs/RENDER2D.md "Kurven"); the joins between pieces are the
+    /// style's, the dash pattern runs along the curve's length
+    Quadratic { points: &'a [[f64; 2]], closed: bool },
+    /// cubic Bézier pieces: per piece its two control points and its end (1 + 3k points)
+    Cubic { points: &'a [[f64; 2]], closed: bool },
+    /// an elliptic arc: the point at the parameter t is center + R(rotation) (radii[0] cos t, radii[1] sin t), from t =
+    /// start over `sweep` (radians, not 0; a full turn or more: the closed ellipse, starting at `start`); radii above 0
+    Ellipse { center: [f64; 2], radii: [f64; 2], rotation: f64, start: f64, sweep: f64 },
+    /// a B-spline of degree 1 to 3 (at least degree + 1 points), rational where `weights` has one positive weight per
+    /// point (empty: all 1), on `knots` (empty: clamped and uniform, through the first and last point; else points +
+    /// degree + 1 non-decreasing values, the curve from knots[degree] to knots[points]); closed with empty knots: periodic
+    /// (smooth all round), else the end joins the start.  As DXF's SPLINE
+    Spline { degree: u32, points: &'a [[f64; 2]], weights: &'a [f64], knots: &'a [f64], closed: bool },
+    /// a filled area: its rings, each the shapes of the list end to end (a shape that does not start where the one before
+    /// ended: a straight segment between them; the last back to the first), even-odd between rings (a ring inside a hole is
+    /// an island).  Triangulated on the CPU, its edge smoothed as strokes are; the style's colour, or its hatch
+    /// (docs/RENDER2D.md "Flächen")
+    Fill { rings: &'a [&'a [Shape<'a>]] },
 }
 
 /// the largest angle of one piece of an arc (a record): a full circle is 16 of them.  Its quad covers the piece's ring
@@ -348,7 +518,133 @@ enum Geom {
     Poly(Vec<[f64; 2]>, bool),
     /// centre, radius, start, sweep (a full circle: +-TAU)
     Arc([f64; 2], f64, f64, f64),
+    /// a curve and its flattening at the zoom band it was made for
+    Curve(Box<CurveG>),
+    /// a fill: its rings and their flattening, triangulated
+    Fill(Box<FillG>),
 }
+
+/// how a curve or fill was last flattened: its zoom band, the tolerance's coarsening (times 4 each), the window (None:
+/// all of it)
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct FlatState {
+    band: i32,
+    coarse: i32,
+    window: Option<[f64; 4]>,
+}
+
+#[derive(Clone)]
+struct CurveG {
+    c: Curve,
+    flat: Flat,
+    st: FlatState,
+    /// the curve's box (its control hulls)
+    bounds: [f64; 4],
+}
+
+#[derive(Clone)]
+struct FillG {
+    rings: Vec<Curve>,
+    prep: fill::Prepared,
+    st: FlatState,
+    bounds: [f64; 4],
+}
+
+/// a curve's or fill's flattening state and box
+fn flat_meta(g: &Geom) -> Option<(FlatState, [f64; 4])> {
+    match g {
+        Geom::Curve(c) => Some((c.st, c.bounds)),
+        Geom::Fill(f) => Some((f.st, f.bounds)),
+        _ => None,
+    }
+}
+
+/// the box of curves' boxes
+fn bounds_of<'a>(cs: impl Iterator<Item = &'a Curve>) -> [f64; 4] {
+    let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
+    for c in cs {
+        let o = c.bounds();
+        b = [b[0].min(o[0]), b[1].min(o[1]), b[2].max(o[2]), b[3].max(o[3])];
+    }
+    b
+}
+
+/// the camera as the flattening sees it: its scale, the target's box in the drawing (axis-aligned), the target's larger
+/// side (px)
+struct FlatCtx {
+    scale: f64,
+    view: [f64; 4],
+    side: f64,
+}
+
+impl FlatCtx {
+    fn new(cam: &Camera, size: (u32, u32)) -> FlatCtx {
+        let size = if size.0 == 0 || size.1 == 0 { (1920, 1080) } else { size };
+        // (the target's corners in the drawing: Camera::to_drawing with one sincos)
+        let (sn, cs) = sincos(cam.rotation);
+        let mut v = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
+        for q in [[0.0, 0.0], [size.0 as f64, 0.0], [0.0, size.1 as f64], [size.0 as f64, size.1 as f64]] {
+            let (rx, ry) = ((q[0] - 0.5 * size.0 as f64) * cam.scale, (0.5 * size.1 as f64 - q[1]) * cam.scale);
+            let p = [cam.center[0] + cs * rx + sn * ry, cam.center[1] - sn * rx + cs * ry];
+            v = [v[0].min(p[0]), v[1].min(p[1]), v[2].max(p[0]), v[3].max(p[1])];
+        }
+        FlatCtx { scale: cam.scale, view: v, side: size.0.max(size.1) as f64 }
+    }
+
+    /// a flattening made for st no longer holds: the scale left its band (and the hysteresis), or the view (grown by
+    /// reach px) left its window
+    fn stale(&self, st: &FlatState, reach: f64) -> bool {
+        if self.scale < curve::pow2(st.band) / curve::HYST || self.scale >= curve::pow2(st.band + 1) * curve::HYST {
+            return true;
+        }
+        if let Some(w) = st.window {
+            let m = reach * self.scale;
+            let v = self.view;
+            return v[0] - m < w[0] || v[1] - m < w[1] || v[2] + m > w[2] || v[3] + m > w[3];
+        }
+        false
+    }
+
+    /// a box (drawing units) meets the view grown by half the target's side and reach px: a curve outside keeps the
+    /// flattening it has (whatever its band: nothing of it shows) until it comes that near
+    fn near(&self, b: &[f64; 4], reach: f64) -> bool {
+        let m = (0.5 * self.side + reach) * self.scale;
+        let v = self.view;
+        !(b[2] < v[0] - m || b[0] > v[2] + m || b[3] < v[1] - m || b[1] > v[3] + m)
+    }
+
+    /// a curve flattened for this camera: all of it within the band's tolerance, or (too many segments) finely in a window
+    /// of the view and half the target's side around it, plus reach px
+    fn flatten(&self, c: &Curve, reach: f64) -> (Flat, FlatState) {
+        let band = curve::band_of(self.scale);
+        let tol = curve::FLAT_TOL * curve::pow2(band);
+        if let Some(f) = curve::flatten(c, tol, None, 0.0, curve::FULL_MAX + 1) {
+            return (f, FlatState { band, coarse: 0, window: None });
+        }
+        let m = (0.5 * self.side + reach) * self.scale;
+        let w = [self.view[0] - m, self.view[1] - m, self.view[2] + m, self.view[3] + m];
+        let (mut t, mut leaf) = (tol, 0.25 * self.side * self.scale);
+        for coarse in 0..40 {
+            if let Some(f) = curve::flatten(c, t, Some(w), leaf, curve::CURVE_MAX + 1) {
+                return (f, FlatState { band, coarse, window: Some(w) });
+            }
+            t *= 4.0;
+            leaf *= 4.0;
+        }
+        // (never: a chord per span is far below the bound)
+        let f = curve::flatten(c, f64::MAX, Some(w), f64::MAX, usize::MAX).unwrap_or_default();
+        (f, FlatState { band, coarse: 40, window: Some(w) })
+    }
+}
+
+/// a stroke's curve flattened for a camera: what reaches beyond its centre line (px) for the window
+fn stroke_reach(st: &Style, scale: f64) -> f64 {
+    let w = if st.unit == Unit::Drawing { st.width as f64 / scale } else { st.width as f64 };
+    16.0 + w
+}
+
+/// a fill's reach beyond its outline (px): its smoothed edge
+const FILL_REACH: f64 = 4.0;
 
 #[derive(Clone)]
 struct Ent {
@@ -362,10 +658,15 @@ struct Ent {
     count: u32,
     /// its records go up with the next prepare
     dirty: bool,
-    /// an arc or of a dashed style: its layer is drawn by the second pipeline (lib.rs)
-    full: bool,
+    /// which pipeline its layer needs (CLASS_*: an arc or a dashed style the second, a fill the third: lib.rs)
+    class: u8,
     geom: Geom,
 }
+
+/// the pipelines a layer can take: solid segments only, arcs or dash patterns too, fills too (lib.rs)
+pub(crate) const CLASS_PLAIN: u8 = 0;
+pub(crate) const CLASS_FULL: u8 = 1;
+pub(crate) const CLASS_FILL: u8 = 2;
 
 /// a place of the layer region nobody holds
 const NONE: u32 = u32::MAX;
@@ -388,8 +689,9 @@ struct LayerSlot {
     repack: bool,
     /// laid out anew by this prepare: its free places need no zeros
     repacked: bool,
-    /// its live entities that are arcs or of a dashed style (Ent::full): more than none, the layer takes fs_full
+    /// its live entities of CLASS_FULL and of CLASS_FILL: more than none, the layer takes fs_full or fs_fill
     full: u32,
+    fills: u32,
 }
 
 /// the bind groups of the scene's buffers (made again when one of them is new)
@@ -405,6 +707,7 @@ pub(crate) struct FrameSlot {
     pub stage: Buffer,
     changes: Option<Buffer>,
     styles: Option<Buffer>,
+    hatch: Option<Buffer>,
     pub scatter_group: Option<BindGroup>,
     runs: Option<Buffer>,
     pub readback: Option<Buffer>,
@@ -419,6 +722,8 @@ pub(crate) struct Uploads {
     pub styles: Option<(Buffer, u64)>,
     /// the pages (bytes) and the layer table (bytes) behind them
     pub tables: Option<(Buffer, u64, u64)>,
+    /// the hatch table (bytes)
+    pub hatch: Option<(Buffer, u64)>,
     /// record runs: (source, destination, bytes)
     pub runs: Option<(Buffer, Vec<(u64, u64, u64)>)>,
     /// rows in the frame slot's change buffer
@@ -459,6 +764,22 @@ pub struct Scene {
     /// the scale they last went up with
     px_dash: bool,
     styles_scale: f64,
+    /// per style its place in the hatch table + 1 (0: no hatch), and the hatched styles in table order; the camera and
+    /// target the table last went up for
+    hatch_of: Vec<u32>,
+    hatched: Vec<u32>,
+    hatch_for: Option<(Camera, (u32, u32))>,
+    pub(crate) hatch_buf: Buffer,
+    hatch_cap: u32,
+    /// per record of the pool: a fill edge's segment in pixels (cull.wgsl count writes it, fill.wgsl reads it); one record's
+    /// worth while no layer holds a fill
+    epx: Buffer,
+    epx_cap: u32,
+    /// the entities that are curves or fills (flattened per zoom band: prepare looks at them; dead or reused slots are
+    /// skipped and dropped), and how many prepare flattened again
+    curves: Vec<(u32, FlatState, [f64; 4], u32)>,
+    curves_dirty: bool,
+    reflat: u32,
     layers: Vec<LayerSlot>,
     free_layers: Vec<u32>,
     layer_seq: u64,
@@ -497,8 +818,8 @@ pub struct Scene {
     last_order: Vec<u32>,
     last_layers: Vec<[u32; 4]>,
     drawn: Vec<u32>,
-    /// per visible layer in draw order: it takes the second pipeline (Renderer::record)
-    pub(crate) full: Vec<bool>,
+    /// per visible layer in draw order: the pipeline it takes (CLASS_*, Renderer::record)
+    pub(crate) full: Vec<u8>,
     pub(crate) entries: u32,
     pub(crate) vis_layers: u32,
     pub(crate) up: Uploads,
@@ -523,7 +844,7 @@ impl Scene {
         let (entries_cap, layers_cap) = (64u32, 16u32);
         let mut frames = Vec::new();
         for _ in 0..r.desc.frames_in_flight {
-            frames.push(FrameSlot { stage: upload(&dev, VIEW_BYTES)?, changes: None, styles: None, scatter_group: None, runs: None, readback: None, last: None });
+            frames.push(FrameSlot { stage: upload(&dev, VIEW_BYTES)?, changes: None, styles: None, hatch: None, scatter_group: None, runs: None, readback: None, last: None });
         }
         Ok(Scene {
             tag: r.tag.clone(),
@@ -533,6 +854,16 @@ impl Scene {
             styles_dirty: false,
             px_dash: false,
             styles_scale: 0.0,
+            hatch_of: Vec::new(),
+            hatched: Vec::new(),
+            hatch_for: None,
+            hatch_buf: storage(&dev, HATCH_BYTES, none)?,
+            hatch_cap: 1,
+            epx: storage(&dev, 16, none)?,
+            epx_cap: 1,
+            curves: Vec::new(),
+            curves_dirty: false,
+            reflat: 0,
             layers: Vec::new(),
             free_layers: Vec::new(),
             layer_seq: 0,
@@ -600,7 +931,23 @@ impl Scene {
         self.styles.push(*s);
         self.styles_dirty = true;
         self.px_dash |= s.px_dashes();
+        self.rehatch();
         Ok(StyleId(self.styles.len() as u32 - 1))
+    }
+
+    /// the hatch table's places of the styles
+    fn rehatch(&mut self) {
+        self.hatched.clear();
+        self.hatch_of.clear();
+        for (k, s) in self.styles.iter().enumerate() {
+            if s.hatches > 0 {
+                self.hatched.push(k as u32);
+                self.hatch_of.push(self.hatched.len() as u32);
+            } else {
+                self.hatch_of.push(0);
+            }
+        }
+        self.hatch_for = None;
     }
 
     /// a style changed: every entity of it shows the change with the next frame (nothing else goes up)
@@ -614,12 +961,13 @@ impl Scene {
             // (dashed or no longer: its entities' layers may take the other pipeline)
             for i in 0..self.ents.len() {
                 if self.ents[i].live && self.ents[i].style == id.0 {
-                    let full = needs_full(&self.ents[i].geom, s);
-                    self.set_full(i, full);
+                    let class = class_of(&self.ents[i].geom, s);
+                    self.set_class(i, class);
                 }
             }
         }
         self.px_dash = self.styles.iter().any(|s| s.px_dashes());
+        self.rehatch();
         self.touch();
         Ok(())
     }
@@ -635,7 +983,7 @@ impl Scene {
         self.touch();
         let seq = self.layer_seq;
         self.layer_seq += 1;
-        let fresh = LayerSlot { live: true, era: 0, visible: l.visible, order: l.order, seq, base: 0, cap: 0, used: 0, holes: 0, owners: Vec::new(), repack: false, repacked: false, full: 0 };
+        let fresh = LayerSlot { live: true, era: 0, visible: l.visible, order: l.order, seq, base: 0, cap: 0, used: 0, holes: 0, owners: Vec::new(), repack: false, repacked: false, full: 0, fills: 0 };
         let slot = match self.free_layers.pop() {
             Some(s) => {
                 let era = self.layers[s as usize].era;
@@ -723,15 +1071,75 @@ impl Scene {
         }
     }
 
-    fn geom(s: &Shape) -> Result<Geom> {
-        let arc = |center: [f64; 2], radius: f64, start: f64, sweep: f64| -> Result<Geom> {
-            Scene::check_points(&[center])?;
-            if !(radius.is_finite() && radius > 0.0 && radius < 1e30 && start.is_finite() && start.abs() < 1e15 && sweep.is_finite() && sweep != 0.0) {
-                return Err(GpuError::Invalid("Shape: an arc of a finite radius above 0, a finite start and a sweep not 0"));
+    fn check_arc(center: [f64; 2], radius: f64, start: f64, sweep: f64) -> Result<()> {
+        Scene::check_points(&[center])?;
+        if !(radius.is_finite() && radius > 0.0 && radius < 1e30 && start.is_finite() && start.abs() < 1e15 && sweep.is_finite() && sweep != 0.0) {
+            return Err(GpuError::Invalid("Shape: an arc of a finite radius above 0, a finite start and a sweep not 0"));
+        }
+        Ok(())
+    }
+
+    /// a curve shape (or one of a fill's ring) as a Curve; None: not a curve (lines, polylines, arcs, fills)
+    fn curve(s: &Shape, ring: bool) -> Result<Option<Curve>> {
+        let bad = |what: &'static str| Err(GpuError::Invalid(what));
+        Ok(Some(match *s {
+            Shape::Quadratic { points, closed } | Shape::Cubic { points, closed } => {
+                let deg = if matches!(s, Shape::Quadratic { .. }) { 2 } else { 3 };
+                Scene::check_points(points)?;
+                if points.len() < deg + 1 || (points.len() - 1) % deg != 0 {
+                    return bad("Shape: Bézier pieces of 1 + 2k (quadratic) or 1 + 3k (cubic) points, k at least 1");
+                }
+                Curve::bezier(points, deg, closed && !ring)
             }
-            let tau = core::f64::consts::TAU;
-            Ok(Geom::Arc(center, radius, start, if sweep.abs() >= tau { tau.copysign(sweep) } else { sweep }))
-        };
+            Shape::Ellipse { center, radii, rotation, start, sweep } => {
+                Scene::check_points(&[center])?;
+                let r = |v: f64| v.is_finite() && v > 0.0 && v < 1e30;
+                if !(r(radii[0]) && r(radii[1]) && rotation.is_finite() && rotation.abs() < 1e15 && start.is_finite() && start.abs() < 1e15 && sweep.is_finite() && sweep != 0.0) {
+                    return bad("Shape: an ellipse of finite radii above 0, a finite rotation and start, a sweep not 0");
+                }
+                Curve::ellipse(center, radii, rotation, start, sweep)
+            }
+            Shape::Spline { degree, points, weights, knots, closed } => {
+                Scene::check_points(points)?;
+                let p = degree as usize;
+                let n = points.len();
+                let w_ok = weights.is_empty() || (weights.len() == n && weights.iter().all(|w| w.is_finite() && *w > 0.0 && *w < 1e30));
+                let k_ok = knots.is_empty() || (knots.len() == n + p + 1 && knots.iter().all(|k| k.is_finite() && k.abs() < 1e30) && knots.windows(2).all(|w| w[0] <= w[1]) && knots[p] < knots[n]);
+                if !(1..=3).contains(&p) || n < p + 1 || !w_ok || !k_ok {
+                    return bad("Shape: a spline of degree 1 to 3, at least degree + 1 points, a weight above 0 per point or none, points + degree + 1 knots not decreasing or none");
+                }
+                Curve::spline(p, points, weights, knots, closed && !(ring && !knots.is_empty()))
+            }
+            Shape::Line { a, b } if ring => {
+                Scene::check_points(&[a, b])?;
+                Curve::polyline(&[a, b], false)
+            }
+            Shape::Polyline { points, .. } if ring => {
+                Scene::check_points(points)?;
+                Curve::polyline(points, false)
+            }
+            Shape::Arc { center, radius, start, sweep } if ring => {
+                Scene::check_arc(center, radius, start, sweep)?;
+                Curve::ellipse(center, [radius, radius], 0.0, start, sweep)
+            }
+            Shape::Circle { center, radius } if ring => {
+                Scene::check_arc(center, radius, 0.0, 1.0)?;
+                Curve::ellipse(center, [radius, radius], 0.0, 0.0, core::f64::consts::TAU)
+            }
+            Shape::Fill { .. } if ring => return bad("Shape: a fill's ring is made of lines, polylines, arcs, circles and curves, not of fills"),
+            _ => return Ok(None),
+        }))
+    }
+
+    /// a shape's geometry; curves and fills flattened for this camera and target (the flattening's view only for them:
+    /// it costs four sincos, a third of a plain insert)
+    fn geom(s: &Shape, cam: &Camera, size: (u32, u32), st: &Style) -> Result<Geom> {
+        if let Some(c) = Scene::curve(s, false)? {
+            let ctx = FlatCtx::new(cam, size);
+            let (flat, fs) = ctx.flatten(&c, stroke_reach(st, ctx.scale));
+            let bounds = c.bounds();
+            return Ok(Geom::Curve(Box::new(CurveG { c, flat, st: fs, bounds })));
+        }
         match *s {
             Shape::Line { a, b } => {
                 Scene::check_points(&[a, b])?;
@@ -741,8 +1149,35 @@ impl Scene {
                 Scene::check_points(points)?;
                 Ok(Geom::Poly(points.to_vec(), closed))
             }
-            Shape::Arc { center, radius, start, sweep } => arc(center, radius, start, sweep),
-            Shape::Circle { center, radius } => arc(center, radius, 0.0, core::f64::consts::TAU),
+            Shape::Arc { center, radius, start, sweep } => {
+                Scene::check_arc(center, radius, start, sweep)?;
+                let tau = core::f64::consts::TAU;
+                Ok(Geom::Arc(center, radius, start, if sweep.abs() >= tau { tau.copysign(sweep) } else { sweep }))
+            }
+            Shape::Circle { center, radius } => {
+                Scene::check_arc(center, radius, 0.0, 1.0)?;
+                Ok(Geom::Arc(center, radius, 0.0, core::f64::consts::TAU))
+            }
+            Shape::Fill { rings } => {
+                let mut cs = Vec::with_capacity(rings.len());
+                for ring in rings {
+                    let mut c: Option<Curve> = None;
+                    for piece in ring.iter() {
+                        let Some(pc) = Scene::curve(piece, true)? else { return Err(GpuError::Invalid("Shape: a fill's ring is made of shapes")) };
+                        match &mut c {
+                            Some(c) => c.append(&pc),
+                            None => c = Some(pc),
+                        }
+                    }
+                    if let Some(c) = c {
+                        cs.push(c.ring());
+                    }
+                }
+                let (prep, fs) = flatten_fill(&cs, &FlatCtx::new(cam, size));
+                let bounds = bounds_of(cs.iter());
+                Ok(Geom::Fill(Box::new(FillG { rings: cs, prep, st: fs, bounds })))
+            }
+            _ => Err(GpuError::Invalid("Shape: a kind this scene does not know")),
         }
     }
 
@@ -760,16 +1195,20 @@ impl Scene {
         if style.0 as usize >= self.styles.len() {
             return Err(GpuError::Invalid("Scene: a style it does not have"));
         }
-        let geom = Scene::geom(s)?;
+        let geom = Scene::geom(s, &self.camera, self.size, &self.styles[style.0 as usize])?;
         let count = record_count(&geom);
         self.touch();
         let slot = match self.free_ents.pop() {
             Some(f) => f,
             None => {
-                self.ents.push(Ent { live: false, era: 0, layer: 0, style: 0, at: 0, alloc: 0, count: 0, dirty: false, full: false, geom: Geom::Line([[0.0; 2]; 2]) });
+                self.ents.push(Ent { live: false, era: 0, layer: 0, style: 0, at: 0, alloc: 0, count: 0, dirty: false, class: CLASS_PLAIN, geom: Geom::Line([[0.0; 2]; 2]) });
                 self.ents.len() as u32 - 1
             }
         };
+        if let Some(m) = flat_meta(&geom) {
+            self.curves.push((slot, m.0, m.1, if matches!(geom, Geom::Fill(_)) { u32::MAX } else { style.0 }));
+            self.curves_dirty = true;
+        }
         let l = &mut self.layers[li];
         let at = l.used;
         l.used += count;
@@ -777,8 +1216,9 @@ impl Scene {
         if l.used > l.cap {
             self.layout_dirty = true;
         }
-        let full = needs_full(&geom, &self.styles[style.0 as usize]);
-        l.full += full as u32;
+        let class = class_of(&geom, &self.styles[style.0 as usize]);
+        l.full += (class == CLASS_FULL) as u32;
+        l.fills += (class == CLASS_FILL) as u32;
         let e = &mut self.ents[slot as usize];
         e.live = true;
         e.layer = li as u32;
@@ -786,7 +1226,7 @@ impl Scene {
         e.at = at;
         e.alloc = count;
         e.count = count;
-        e.full = full;
+        e.class = class;
         e.geom = geom;
         let era = e.era;
         self.live += 1;
@@ -804,9 +1244,20 @@ impl Scene {
     /// new geometry; the entity keeps its place in the draw order
     pub fn update(&mut self, id: EntityId, s: &Shape) -> Result<()> {
         let i = self.get(id)?;
-        let geom = Scene::geom(s)?;
-        let count = record_count(&geom);
+        let geom = Scene::geom(s, &self.camera, self.size, &self.styles[self.ents[i].style as usize])?;
+        if let Some(m) = flat_meta(&geom) {
+            // (the later entry of a slot counts)
+            self.curves.push((i as u32, m.0, m.1, if matches!(geom, Geom::Fill(_)) { u32::MAX } else { self.ents[i].style }));
+            self.curves_dirty = true;
+        }
         self.touch();
+        self.regeom(i, geom);
+        Ok(())
+    }
+
+    /// an entity's new geometry (update, a curve flattened again): in place when its records fit, else room for them
+    fn regeom(&mut self, i: usize, geom: Geom) {
+        let count = record_count(&geom);
         let (li, at, alloc) = (self.ents[i].layer as usize, self.ents[i].at, self.ents[i].alloc);
         if count > alloc {
             let l = &mut self.layers[li];
@@ -824,26 +1275,24 @@ impl Scene {
                 self.ents[i].alloc = count.max(2 * alloc);
             }
         }
-        let full = needs_full(&geom, &self.styles[self.ents[i].style as usize]);
-        self.set_full(i, full);
+        let class = class_of(&geom, &self.styles[self.ents[i].style as usize]);
+        self.set_class(i, class);
         let e = &mut self.ents[i];
         e.geom = geom;
         e.count = count;
         self.mark(i as u32);
-        Ok(())
     }
 
-    /// an entity becomes one of the second pipeline or stops being one
-    fn set_full(&mut self, i: usize, full: bool) {
+    /// an entity needs another pipeline for its layer (CLASS_*)
+    fn set_class(&mut self, i: usize, class: u8) {
         let e = &mut self.ents[i];
-        if e.full != full {
-            e.full = full;
+        if e.class != class {
             let l = &mut self.layers[e.layer as usize];
-            if full {
-                l.full += 1;
-            } else {
-                l.full -= 1;
-            }
+            l.full -= (e.class == CLASS_FULL) as u32;
+            l.fills -= (e.class == CLASS_FILL) as u32;
+            l.full += (class == CLASS_FULL) as u32;
+            l.fills += (class == CLASS_FILL) as u32;
+            e.class = class;
         }
     }
 
@@ -855,8 +1304,10 @@ impl Scene {
         }
         self.touch();
         self.ents[i].style = style.0;
-        let full = needs_full(&self.ents[i].geom, &self.styles[style.0 as usize]);
-        self.set_full(i, full);
+        // (a curve's reach for its window follows the style)
+        self.curves_dirty |= matches!(self.ents[i].geom, Geom::Curve(_));
+        let class = class_of(&self.ents[i].geom, &self.styles[style.0 as usize]);
+        self.set_class(i, class);
         self.mark(i as u32);
         Ok(())
     }
@@ -865,7 +1316,7 @@ impl Scene {
     pub fn remove(&mut self, id: EntityId) -> Result<()> {
         let i = self.get(id)?;
         self.touch();
-        self.set_full(i, false);
+        self.set_class(i, CLASS_PLAIN);
         let e = &mut self.ents[i];
         e.live = false;
         e.era = e.era.wrapping_add(1);
@@ -1126,6 +1577,18 @@ impl Scene {
             self.visible = storage(&dev, self.visible_cap as u64 * 4, none)?;
             self.groups = None;
         }
+        let epx = if self.layers.iter().any(|l| l.live && l.fills > 0) { self.pool_cap } else { 1 };
+        if epx > self.epx_cap {
+            self.epx_cap = epx;
+            self.epx = storage(&dev, epx as u64 * 16, none)?;
+            self.groups = None;
+        }
+        if self.hatched.len() as u32 > self.hatch_cap {
+            self.hatch_cap = (self.hatched.len() as u32).max(self.hatch_cap * 2);
+            self.hatch_buf = storage(&dev, self.hatch_cap as u64 * HATCH_BYTES, none)?;
+            self.hatch_for = None;
+            self.groups = None;
+        }
         if self.styles.len() as u32 > self.styles_cap {
             self.styles_cap = (self.styles.len() as u32).max(self.styles_cap * 2);
             self.styles_buf = storage(&dev, self.styles_cap as u64 * STYLE_BYTES, none)?;
@@ -1143,10 +1606,10 @@ impl Scene {
         let g = |layout: &BindGroupLayout, entries: &[BindEntry]| dev.create_bind_group(&BindGroupDesc { layout, entries });
         self.groups = Some(Groups {
             count: g(&r.count_layout, &[entry(0, &self.view_ubo), entry(1, &self.pool), entry(2, &self.styles_buf), entry(3, &self.order_buf), entry(4, &self.masks),
-                                         entry(5, &self.counts)])?,
+                                         entry(5, &self.counts), entry(11, &self.epx)])?,
             scan: g(&r.scan_layout, &[entry(5, &self.counts), entry(6, &self.layers_buf), entry(7, &self.offsets), entry(8, &self.lists_buf), entry(9, &self.draws_buf)])?,
             write: g(&r.write_layout, &[entry(3, &self.order_buf), entry(4, &self.masks), entry(7, &self.offsets), entry(10, &self.visible)])?,
-            draw: g(&r.draw_layout, &[entry(0, &self.view_ubo), entry(1, &self.pool), entry(2, &self.styles_buf), entry(3, &self.visible), entry(4, &self.lists_buf)])?,
+            draw: g(&r.draw_layout, &[entry(0, &self.view_ubo), entry(1, &self.pool), entry(2, &self.styles_buf), entry(3, &self.visible), entry(4, &self.lists_buf), entry(5, &self.hatch_buf), entry(6, &self.epx)])?,
         });
         for f in &mut self.frames {
             f.scatter_group = None;
@@ -1168,7 +1631,7 @@ impl Scene {
             table.push([first, order.len() as u32 - first, 0, 0]);
         }
         self.drawn = vis.iter().map(|&i| i as u32).collect();
-        self.full = vis.iter().map(|&i| self.layers[i].full > 0).collect();
+        self.full = vis.iter().map(|&i| if self.layers[i].fills > 0 { CLASS_FILL } else if self.layers[i].full > 0 { CLASS_FULL } else { CLASS_PLAIN }).collect();
         (order, table)
     }
 
@@ -1226,9 +1689,89 @@ impl Scene {
             }
         }
         self.styles_dirty = true;
+        self.hatch_for = None;
         self.last_order.clear();
         self.last_layers.clear();
         self.last_layers.push([u32::MAX; 4]);
+    }
+
+    /// curves and fills whose flattening no longer holds for the camera (another zoom band, or the view left a window)
+    /// are flattened again; those whose points changed go up (docs/RENDER2D.md "Kurven")
+    fn reflatten(&mut self) {
+        self.reflat = 0;
+        if self.curves.is_empty() {
+            return;
+        }
+        if self.curves_dirty {
+            // (a slot can come twice: removed, then taken by another curve, the later one counts; dead ones and others go)
+            self.curves.sort_by_key(|c| c.0);
+            self.curves.dedup_by(|b, a| {
+                if a.0 == b.0 {
+                    *a = *b;
+                    true
+                } else {
+                    false
+                }
+            });
+            let ents = &self.ents;
+            self.curves.retain(|c| ents[c.0 as usize].live && matches!(ents[c.0 as usize].geom, Geom::Curve(_) | Geom::Fill(_)));
+            // (the styles as they are now)
+            for c in &mut self.curves {
+                if c.3 != u32::MAX {
+                    c.3 = ents[c.0 as usize].style;
+                }
+            }
+            self.curves_dirty = false;
+        }
+        let ctx = FlatCtx::new(&self.camera, self.size);
+        for n in 0..self.curves.len() {
+            // (what decides lies here, beside the list: the geometry is looked at only when it must be flattened again)
+            let (slot, st0, bounds, style) = self.curves[n];
+            let i = slot as usize;
+            let reach = if style == u32::MAX { FILL_REACH } else { stroke_reach(&self.styles[style as usize], ctx.scale) };
+            if !ctx.stale(&st0, reach) || !ctx.near(&bounds, reach) {
+                continue;
+            }
+            let e = &self.ents[i];
+            if !e.live || !matches!(e.geom, Geom::Curve(_) | Geom::Fill(_)) || (style != u32::MAX && e.style != style) {
+                // (gone, or another style since: the list is made again)
+                self.curves_dirty = true;
+                continue;
+            }
+            let fresh = match &self.ents[i].geom {
+                Geom::Curve(g) => {
+                    let (flat, fs) = ctx.flatten(&g.c, reach);
+                    self.curves[n].1 = fs;
+                    if flat == g.flat {
+                        // (the same points: nothing goes up)
+                        if let Geom::Curve(g) = &mut self.ents[i].geom {
+                            g.st = fs;
+                        }
+                        continue;
+                    }
+                    Geom::Curve(Box::new(CurveG { c: g.c.clone(), flat, st: fs, bounds: g.bounds }))
+                }
+                Geom::Fill(g) => {
+                    let (prep, fs) = flatten_fill(&g.rings, &ctx);
+                    self.curves[n].1 = fs;
+                    if prep == g.prep {
+                        if let Geom::Fill(g) = &mut self.ents[i].geom {
+                            g.st = fs;
+                        }
+                        continue;
+                    }
+                    Geom::Fill(Box::new(FillG { rings: g.rings.clone(), prep, st: fs, bounds: g.bounds }))
+                }
+                _ => continue,
+            };
+            self.reflat += 1;
+            self.regeom(i, fresh);
+        }
+    }
+
+    /// curves and fills the last prepare flattened again (their zoom band changed, or the view left their window)
+    pub fn reflattened(&self) -> u32 {
+        self.reflat
     }
 
     /// the frame's data for Renderer::record: waits for this slot's last frame, sends what changed.  size: the
@@ -1253,6 +1796,7 @@ impl Scene {
         self.size = size;
         self.up = Uploads::default();
         self.upload_info = UploadInfo::default();
+        self.reflatten();
         self.layout(full)?;
         let (order, table) = self.tables();
         if table.len() as u32 > LAYERS_MAX {
@@ -1272,7 +1816,7 @@ impl Scene {
         let rescale = self.px_dash && self.camera.scale != self.styles_scale;
         if (self.styles_dirty || rescale) && !self.styles.is_empty() {
             let scale = self.camera.scale;
-            let words: Vec<[u32; STYLE_WORDS]> = self.styles.iter().map(|s| s.words(scale)).collect();
+            let words: Vec<[u32; STYLE_WORDS]> = self.styles.iter().enumerate().map(|(k, s)| s.words(scale, self.hatch_of[k])).collect();
             let size = words.len() as u64 * STYLE_BYTES;
             let f = &mut self.frames[slot];
             if f.styles.as_ref().is_none_or(|b| b.size() < size) {
@@ -1285,6 +1829,24 @@ impl Scene {
             bytes += size;
         }
         self.styles_dirty = false;
+        // the hatch table: the lines' places at the camera (in f64 here, so that the shader's numbers stay small), whenever
+        // the camera, the target or a hatched style changed
+        if !self.hatched.is_empty() && self.hatch_for != Some((self.camera, size)) {
+            let mut words: Vec<[f32; HATCH_WORDS]> = Vec::with_capacity(self.hatched.len());
+            for &k in &self.hatched {
+                words.push(self.styles[k as usize].hatch_words(&self.camera, size));
+            }
+            let hb = words.len() as u64 * HATCH_BYTES;
+            let f = &mut self.frames[slot];
+            if f.hatch.as_ref().is_none_or(|b| b.size() < hb) {
+                f.hatch = Some(upload(&dev, hb.next_power_of_two())?);
+            }
+            let Some(up) = &f.hatch else { return Err(GpuError::Invalid("Scene::prepare")) };
+            up.write(0, &words)?;
+            self.up.hatch = Some((up.clone(), hb));
+            self.hatch_for = Some((self.camera, size));
+            bytes += hb;
+        }
         if tables_new || self.upload_info.rebuild {
             let (ob, lb) = (self.last_order.len() as u64 * 4, self.last_layers.len() as u64 * 16);
             let up = upload(&dev, ob + lb)?;
@@ -1373,9 +1935,33 @@ impl Scene {
     }
 }
 
-/// an entity the second pipeline draws: an arc, a dashed style (lib.rs)
-fn needs_full(g: &Geom, st: &Style) -> bool {
-    matches!(g, Geom::Arc(..)) || st.dashes > 0
+/// the pipeline an entity's layer needs: a fill the third, an arc or a dashed style the second (lib.rs)
+fn class_of(g: &Geom, st: &Style) -> u8 {
+    if matches!(g, Geom::Fill(..)) {
+        CLASS_FILL
+    } else if matches!(g, Geom::Arc(..)) || st.dashes > 0 {
+        CLASS_FULL
+    } else {
+        CLASS_PLAIN
+    }
+}
+
+/// a fill's rings flattened for a camera, triangulated
+fn flatten_fill(rings: &[Curve], ctx: &FlatCtx) -> (fill::Prepared, FlatState) {
+    let mut pts = Vec::with_capacity(rings.len());
+    let mut st = FlatState { band: curve::band_of(ctx.scale), coarse: 0, window: None };
+    for c in rings {
+        let (f, s) = ctx.flatten(c, FILL_REACH);
+        if s.window.is_some() {
+            st.window = s.window;
+        }
+        st.coarse = st.coarse.max(s.coarse);
+        pts.push(f.pts);
+    }
+    let mut p = fill::prepare(&pts);
+    // (the edges near each triangle and edge: within a pixel at the coarse end of the band)
+    p.near(curve::pow2(st.band + 1) * curve::HYST);
+    (p, st)
 }
 
 /// the pieces of an arc of this sweep (at most ARC_STEP each; a full circle 16)
@@ -1398,6 +1984,14 @@ fn record_count(g: &Geom) -> u32 {
             if n <= 1 { 1 } else if *closed { n as u32 } else { n as u32 - 1 }
         }
         Geom::Arc(_, _, _, sweep) => arc_pieces(*sweep) + 1,
+        Geom::Curve(g) => {
+            let n = g.flat.pts.len();
+            if n <= 1 { 1 } else if g.flat.closed { n as u32 } else { n as u32 - 1 }
+        }
+        Geom::Fill(g) => {
+            let e: usize = g.prep.rings.iter().map(|r| r.len()).sum();
+            (e + g.prep.tris.len()).max(1) as u32
+        }
     }
 }
 
@@ -1416,6 +2010,9 @@ fn distinct(p: &[[f64; 2]]) -> usize {
 const K_SEG: u32 = 0;
 const K_ARC: u32 = 1;
 const K_HEAD: u32 = 2;
+/// a fill's boundary edge (a ring is a closed polyline of them) and triangle (its corners: the edges that start there)
+const K_EDGE: u32 = 3;
+const K_TRI: u32 = 4;
 /// a segment: its previous point is the polyline's first (a cap there); its next point is the last
 const F_CAP_PREV: u32 = 1;
 const F_CAP_NEXT: u32 = 2;
@@ -1449,6 +2046,105 @@ fn records(g: &Geom, style: u32, out: &mut Vec<[u32; RECORD_WORDS]>) {
         let (l0, l1, l2) = split3(l);
         [a[0], a[1], a[2], a[3], e[0], e[1], e[2], e[3], v[0], v[1], b(l0), b(l1), b(l2), aux, style, flags]
     };
+    let own = |a: [f64; 2], e: [f64; 2]| [b((e[0] - a[0]) as f32), b((e[1] - a[1]) as f32)];
+    if let Geom::Curve(cg) = g {
+        // a polyline of the flattened points, the length at each the curve's (Flat::lens)
+        let f = &cg.flat;
+        let n = f.pts.len();
+        if n <= 1 {
+            let p = f.pts.first().copied().unwrap_or(cg.c.origin);
+            out.push(rec(point(p), point(p), [0; 2], 0.0, 0, style + 1, F_FIRST | K_SEG << 8));
+            return;
+        }
+        let closed = f.closed;
+        let segs = if closed { n } else { n - 1 };
+        for k in 0..segs {
+            let (a, e) = (f.pts[k], f.pts[(k + 1) % n]);
+            let len = if k + 1 < n { f.lens[k + 1] } else { f.total };
+            let mut fl = K_SEG << 8;
+            if !closed {
+                fl |= (k == 1) as u32 * F_CAP_PREV | (segs >= 2 && k + 2 == segs) as u32 * F_CAP_NEXT;
+            }
+            fl |= (closed || k > 0) as u32 * F_PREV | (closed || k + 1 < segs) as u32 * F_NEXT | (k == 0) as u32 * F_FIRST;
+            let mut aux = 0;
+            if closed && k == 0 {
+                fl |= F_WRAP_PREV;
+                aux = segs as u32 - 1;
+            }
+            if closed && k + 1 == segs {
+                fl |= F_WRAP_NEXT;
+                aux = segs as u32 - 1;
+            }
+            out.push(rec(point(a), point(e), own(a, e), len, aux, style + 1, fl));
+        }
+        return;
+    }
+    if let Geom::Fill(fg) = g {
+        // the rings' edges as closed polylines, then the triangles (fill.wgsl's layouts): an edge holds how far back the
+        // fill's first record lies (v.z) and up to 4 edges near it (u16 from there, words 11, 12; their number from bit 16
+        // of w.w); a triangle that distance (a.x), its corners' edges (a.yzw) and up to 20 edges near it (words 4 to 13)
+        let p = &fg.prep;
+        let at = |q: [f64; 2]| [p.origin[0] + q[0], p.origin[1] + q[1]];
+        let first = out.len();
+        let mut base = Vec::with_capacity(p.rings.len());
+        let put16 = |w: &mut [u32; RECORD_WORDS], j0: usize, list: &[u32]| -> u32 {
+            let mut n = 0u32;
+            for &e in list {
+                if e > 0xffff {
+                    continue;
+                }
+                let (j, sh) = (j0 + n as usize / 2, 16 * (n % 2));
+                w[j] |= e << sh;
+                n += 1;
+            }
+            n
+        };
+        let mut gi = 0usize;
+        for r in &p.rings {
+            base.push((out.len() - first) as u32);
+            let n = r.len();
+            for k in 0..n {
+                let (a, e) = (at(r[k]), at(r[(k + 1) % n]));
+                let mut fl = K_EDGE << 8 | F_PREV | F_NEXT;
+                let mut aux = 0;
+                if k == 0 {
+                    fl |= F_WRAP_PREV;
+                    aux = n as u32 - 1;
+                }
+                if k + 1 == n {
+                    fl |= F_WRAP_NEXT;
+                    aux = n as u32 - 1;
+                }
+                let mut w = rec(point(a), point(e), own(a, e), 0.0, aux, style + 1, fl);
+                w[10] = (out.len() - first) as u32;
+                w[11] = 0;
+                w[12] = 0;
+                let near = p.edge_near.get(gi).map_or(&[][..], |v| &v[..]);
+                let cnt = put16(&mut w, 11, near);
+                w[15] |= cnt << 16;
+                out.push(w);
+                gi += 1;
+            }
+        }
+        for (ti, t) in p.tris.iter().enumerate() {
+            let me = (out.len() - first) as u32;
+            let at = |(r, k): (u32, u32)| base[r as usize] + k;
+            let mut w = [0u32; RECORD_WORDS];
+            w[0] = me;
+            w[1] = at(t[0]);
+            w[2] = at(t[1]);
+            w[3] = at(t[2]);
+            let near = p.tri_near.get(ti).map_or(&[][..], |v| &v[..]);
+            let cnt = put16(&mut w, 4, near);
+            w[14] = style + 1;
+            w[15] = K_TRI << 8 | cnt << 16;
+            out.push(w);
+        }
+        if out.len() == first {
+            out.push([0; RECORD_WORDS]);
+        }
+        return;
+    }
     if let Geom::Arc(c, r, a0, sweep) = *g {
         let n = arc_pieces(sweep);
         let full = sweep.abs() >= core::f64::consts::TAU;
@@ -1485,17 +2181,16 @@ fn records(g: &Geom, style: u32, out: &mut Vec<[u32; RECORD_WORDS]>) {
             pts.extend_from_slice(p);
             *c
         }
-        Geom::Arc(..) => false,
+        _ => false,
     };
     pts.dedup();
     if closed && pts.len() >= 2 && pts[0] == pts[pts.len() - 1] {
         pts.pop();
     }
     let n = pts.len();
-    // (the same differences in f64 rounded once: a segment's own vector is exactly the negated previous vector of the next one
-    // and the next vector of the one before (the vertex shader reads its neighbours' own vectors), so both compute their join's
-    // bisector bit for bit)
-    let own = |a: [f64; 2], e: [f64; 2]| [b((e[0] - a[0]) as f32), b((e[1] - a[1]) as f32)];
+    // (own(): the same differences in f64 rounded once: a segment's own vector is exactly the negated previous vector of the
+    // next one and the next vector of the one before (the vertex shader reads its neighbours' own vectors), so both compute
+    // their join's bisector bit for bit)
     if n == 1 {
         out.push(rec(point(pts[0]), point(pts[0]), [0; 2], 0.0, 0, style + 1, F_FIRST | K_SEG << 8));
         return;
