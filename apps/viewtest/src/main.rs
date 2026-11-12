@@ -14,6 +14,7 @@
 //   "Dateien öffnen"     the file dialog with FD_MULTI in the folder --files DIR (E8): several
 //                        files at once, ui.filedlg_paths() shown as "Dateien: N a b"
 //   "Ordner wählen"      a folder dialog (FD_FOLDER) in --files DIR: filedlg_paths() is the folder
+//   "Notiz"              a text box; the app window has one of the same id (each keeps its caret)
 //   "Rohe Tasten"        (E2) the page takes the keys as they go down and up (ui.key_event_take):
 //                        "Roh:" lists them (+ down, - up, C- S- A- held modifiers, * repeat, :L :R :N
 //                        location, #scancode)
@@ -61,6 +62,7 @@ const ID_NEWWIN: u32 = 113; // "Neues Fenster"
 const ID_APPWIN: u32 = 114; // the app window
 const ID_APPTAB: u32 = 115; // its tab in the title bar
 const ID_DIRS: u32 = 116; // "Ordner wählen"
+const ID_NOTE: u32 = 117; // "Notiz": a text box of this id in the main window and in the app window
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 const ID_FD_DIR: u32 = 0x11_0000; // the folder dialog (FD_FOLDER)
 
@@ -118,6 +120,9 @@ struct ViewTest {
     /// the folder dialog (FD_FOLDER): open, its path
     dir_open: Shared<i32>,
     dir_path: String,
+    /// "Notiz" in the main window and in the app window (text boxes of the same id)
+    note: String,
+    app_note: String,
     /// (E3) the page's cursor (an index into PAGE_CURSORS) and the custom one (handle, 0 none)
     page_cur: usize,
     custom: u32,
@@ -168,6 +173,8 @@ impl Default for ViewTest {
             files: String::from("-"),
             dir_open: Shared::new(0),
             dir_path: String::new(),
+            note: String::new(),
+            app_note: String::new(),
             page_cur: 0,
             custom: 0,
             raw: 0,
@@ -421,6 +428,8 @@ impl App for ViewTest {
             },
         };
         ui.text(TS_BODY, &format!("Eigener: {own}"));
+        ui.next_size(240, 0);
+        ui.textbox(ID_NOTE, Some("Notiz"), &mut self.note, 256);
         ui.box_end();
         // (E7) an independent app window: its own title bar with a tab and the caption buttons
         let (open, rect) = (self.app_open.clone(), self.app_rect.clone());
@@ -432,6 +441,9 @@ impl App for ViewTest {
             ui.titlebar_end();
             ui.box_begin(0, BOX_V | pad(12), 8);
             ui.text(TS_BODY, &format!("Tab geklickt: {}", self.app_tab));
+            // the same id as the main window's "Notiz": each box keeps its own caret
+            ui.next_size(240, 0);
+            ui.textbox(ID_NOTE, Some("Notiz"), &mut self.app_note, 256);
             ui.box_end();
         }
         ui.window_end();
