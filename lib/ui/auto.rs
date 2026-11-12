@@ -86,7 +86,9 @@
 //                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
 //   system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
 //                       overrides of the system settings (follow with `system settings ...`),
-//                       jfgui_CSD (the library title bar and its resize band, next pass)
+//                       jfgui_CSD (the library title bar and its resize band, next pass),
+//                       jfgui_FONT_FALLBACK 1 / - (the system fonts for missing characters on /
+//                       off from here)
 //   sensor accel|gravity|gyro|magnet X Y Z [ACCURACY]   (sensors.rs) a reading of plat::sensors:
 //                       the sensor exists from now on; a stopped sensor delivers nothing
 //   sensor rot X Y Z W [abs|rel]   the rotation estimate (a quaternion; default abs)
@@ -1272,6 +1274,12 @@ impl Ui {
                 return;
             }
             plat::setenv(&name, if value == "-" { None } else { Some(&value) });
+            if name == "jfgui_FONT_FALLBACK" {
+                // the system fonts for missing characters from here on (a run reads the variable
+                // at its start: headless runs start without them, so shots match everywhere)
+                self.text.set_system_fallback(value.starts_with('1'));
+                self.dirty_force_full();
+            }
             self.run_passes(app);
             return;
         }

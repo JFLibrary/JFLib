@@ -15,6 +15,8 @@ impl Text {
     /// Enable OpenType shaping for measure, draw, hit testing and carets. Returns
     /// the previous state so callers can scope this to a document's text tool.
     pub fn set_shaping(&mut self, enabled: bool) -> bool { core::mem::replace(&mut self.shaping.enabled,enabled) }
+    // (fallback.rs) the line shaped last is shaped again: the fonts for its missing characters changed
+    pub(crate) fn shaping_forget(&mut self) { self.shaping.size=0; }
     pub fn set_fallback_fonts(&mut self, fonts: &[u32]) {
         if self.fb.app != fonts { self.fallback_app(fonts); }
         let ids:Vec<_>=self.shaping.fallbacks.iter().map(|v|v.0).collect();

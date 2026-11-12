@@ -1820,7 +1820,10 @@ if (desc.render)(&args, &mut dst) == 0 {
   on every machine). The system list (Segoe UI Symbol / Emoji, YaHei, ... on Windows; DejaVu,
   Noto, WenQuanYi, ... on Linux) is found by scanning the font folders once (cached in
   `cache://fontdb.fdb`). Environment: `jfgui_FONT_FALLBACK=0` turns system fonts off (`=1`
-  turns them on headless), `jfgui_FALLBACK_FONTS="Family;Family"` puts families first. The
+  turns them on headless; a script turns them on from where it says
+  `system env jfgui_FONT_FALLBACK 1`), `jfgui_FALLBACK_FONTS="Family;Family"` puts families
+  first. A headless shot of text the app's fonts lack (CJK in a style with Latin fonts) shows
+  the font's `?` for each missing character unless one of these turns them on. The
   fonts of the UI language come before the list, so Han characters take the forms of ja,
   zh-Hans or zh-Hant.
 * System fonts for your own text: a `FontSel` names a family (also a generic one:
@@ -1968,7 +1971,7 @@ in DIP):
 | `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
 | `system focus in\|out`, `system suspend\|resume`, `system background\|foreground`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|other\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...; background / foreground: a hidden tab, Android's `onStop` / `onStart`) |
-| `system env NAME VALUE\|-` | set (`-` removes) a `jfgui_*` environment variable of the run: the overrides of the system settings (then `system settings ...`), `jfgui_CSD` (the library title bar and its resize band from the next pass) |
+| `system env NAME VALUE\|-` | set (`-` removes) a `jfgui_*` environment variable of the run: the overrides of the system settings (then `system settings ...`), `jfgui_CSD` (the library title bar and its resize band from the next pass), `jfgui_FONT_FALLBACK 1` (system fonts for missing characters from here, section 11) |
 | `sensor accel\|gravity\|gyro\|magnet X Y Z [ACCURACY]`, `sensor rot X Y Z W [abs\|rel]`, `sensor none NAME\|all`, `sensor expect NAME off\|waiting\|running\|paused\|denied\|unavailable` | a reading of `plat::sensors` as the host would deliver it (the sensor exists from now on; a stopped one delivers nothing), a sensor gone, its state (§36) |
 | `location LAT LON [ACC ALT SPEED BEARING]` (`-`: the provider does not say), `location age MS`, `location searching\|denied\|off\|none`, `location expect off\|searching\|fix\|paused\|denied\|disabled\|unavailable` | a fix of `plat::sensors`, how old it is, the host's answer (`off`: the system's switch; `none`: no location service, as at the start), the state (§36) |
 | `expect wm none\|move\|menu\|minimize\|maximize\|restore\|close\|lower\|resize EDGE` | what the title bar or the resize band asked the window manager for since the last check (headless runs only record it; EDGE `n`, `s`, `w`, `e`, `nw`, `ne`, `sw`, `se`, physical) |
