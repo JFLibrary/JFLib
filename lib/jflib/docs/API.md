@@ -3986,7 +3986,8 @@ filedlg -- Open / Save file dialog (ContentDialog with a folder list), both OS
        Shift+arrows) on the rows ("a" "b" in the name box, quoted names typed there too);
        path gets the first, ui.filedlg_paths() every chosen file.
        Widget ids used: id .. id + 0x3FFF (list rows id + 17 + i).
-  filedlg_paths() -> the files of the last confirmed dialog (one without FD_MULTI)
+  filedlg_paths() -> the files of the last confirmed dialog (one without FD_MULTI, the folder
+       of an FD_FOLDER dialog)
 
 One file dialog can be open at a time (the state below is shared).
 ```
@@ -3997,7 +3998,7 @@ One file dialog can be open at a time (the state below is shared).
   ui_filedlg(id, flags, open, path, cap, exts) -> EV_ACT when confirmed
 - **`fn filedlg_paths(&self) -> Vec<String>`**
   (E8) the files the last confirmed file dialog chose: with FD_MULTI every one (the first
-  is the dialog's path), else the one; empty before any
+  is the dialog's path), else the one (FD_FOLDER: the folder); empty before any
 
 ### Drawing commands
 

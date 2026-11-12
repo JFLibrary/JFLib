@@ -1223,7 +1223,7 @@ ui.dialog_end(); // always
 
   **Several files at once** (`FD_OPEN | FD_MULTI`, e.g. an upload field that takes several):
   `path` gets the first, `ui.filedlg_paths()` every chosen file in the dialog's order (after a
-  dialog without `FD_MULTI` the one file). Windows' dialog (Ctrl / Shift in Explorer) and
+  dialog without `FD_MULTI` the one file, after an `FD_FOLDER` dialog the folder). Windows' dialog (Ctrl / Shift in Explorer) and
   Linux's portal (`multiple`) choose several; the library's own dialog marks rows with
   Ctrl+click and Shift+click (or Shift+arrows; marked rows show a check mark, the name box
   `"a.txt" "c.txt"`) and takes quoted names typed there, each one an existing file of the
