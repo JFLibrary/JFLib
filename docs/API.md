@@ -1173,6 +1173,8 @@ widgets                                                             [src/ui/ui_e
        WinUI TextBox (32 DIP high).  buf: the app's UTF-8 text; cap_flags = the size of
        the asm's buffer in bytes incl. the NUL (bits 0..22: the text holds at most cap - 1
        bytes) | TB_PASSWORD | TB_READONLY | TB_DIGITS | TB_SIGNED.  placeholder (or None)
+       TB_PASSWORD: while it has the keyboard the input method's purpose is IP_PASSWORD (set
+       by the box itself, the purpose of before put back after; no plat::ime_purpose needed).
        shows while the text is empty (cut with "…" where the box is narrower).
        ST_DISABLED via next_flags.
        EV_ACT: the text changed this frame; EV_COMMIT: Enter, Esc or focus lost; EV_FOCUS
@@ -5561,7 +5563,7 @@ DLG_CLOSE: u32 = 3
 ```rust
 TB_CAP_MASK: u32 = 0x007F_FFFF  // the capacity in bytes (at most 8 MB)
 TB_HYPHENATE: u32 = 0x0080_0000  // with TB_MULTI | TB_WRAP: hyphenate words that do not fit (hyph.rs)
-TB_PASSWORD: u32 = 0x0100_0000  // a dot per character; no copy / cut
+TB_PASSWORD: u32 = 0x0100_0000  // a dot per character; no copy / cut; the input method's purpose IP_PASSWORD while it has the keyboard
 TB_READONLY: u32 = 0x0200_0000  // selectable and copyable, not editable
 TB_DIGITS: u32 = 0x0400_0000  // accept only 0-9
 TB_MULTI: u32 = 0x0800_0000  // multi-line
@@ -34905,8 +34907,8 @@ IP_URL: u32 = 1
 IP_EMAIL: u32 = 2
 IP_NUMBER: u32 = 3
 IP_PHONE: u32 = 4
-/// no input method (Windows: the window's input context is taken away; Wayland: the password
-/// purpose)
+/// no input method (Windows: the window's input context is taken away; X11: no IBus; Wayland:
+/// the password purpose); ui's TB_PASSWORD boxes set it themselves
 IP_PASSWORD: u32 = 5
 IP_SEARCH: u32 = 6
 ```
@@ -34922,8 +34924,10 @@ IP_SEARCH: u32 = 6
 
 - **`fn ime_purpose(p: u32)`**
   (E4) the purpose of the text being typed (IP_\*): Windows takes the input method away for
-  IP_PASSWORD and gives it back for the others; Wayland's text input gets it as its content
-  purpose at the next enable; elsewhere it is only kept (ime_purpose_of)
+  IP_PASSWORD and gives it back for the others (also when a window gets the keyboard); X11 keeps
+  the keys of an IP_PASSWORD field from IBus; Wayland's text input gets it as its content
+  purpose (again when it changes while enabled); elsewhere it is only kept (ime_purpose_of).
+  ui's TB_PASSWORD boxes set IP_PASSWORD themselves while they have the keyboard
 
 - **`fn ime_purpose_of() -> u32`**
   (E4) ime_purpose's value

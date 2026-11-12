@@ -545,6 +545,10 @@ with `const RG_SIZE: Range = Range::new(1, 100, 1, 0);` (min, max, step, `RG_*` 
   `TB_READONLY`, `TB_DIGITS` (+ `TB_SIGNED`, `TB_DECIMAL`), `TB_MULTI` (+ `TB_WRAP`; give it a
   height with `next_size`; + `TB_HYPHENATE`: hyphenation, section 11), `TB_SPELL` (spell
   checking, below). The capacity takes bits 0..22 (at most 8 MB).
+* A `TB_PASSWORD` box sets the input method's purpose itself: `IP_PASSWORD` while it has the
+  keyboard (Windows takes the input method away, X11 keeps the keys from IBus as GTK does,
+  Wayland tells the compositor), the purpose of before once it lost the keyboard or went away
+  with its window -- no `plat::ime_purpose` call in the app (`viewtest` `tests/password.uis`).
 * Formatted text (bold, lists, links ...) and source code with highlighting: the editors
   `ui.richtext` and `ui.code_editor` (section 28).
 * `number_box(id, &mut i32, &Range)`, `number_box_f(id, &mut f64, &RangeF)` with
@@ -819,7 +823,8 @@ if self.tab == 0 {
   **An input method for a field the page draws itself** (a web page's `<input>`, Japanese or
   Chinese typed into it): while such a field has the focus, `ui.ime_enable(true, IP_TEXT)`
   (also `IP_URL`, `IP_EMAIL`, `IP_NUMBER`, `IP_PHONE`, `IP_SEARCH`; `IP_PASSWORD` takes the
-  input method away on Windows and tells Wayland) and every frame `ui.ime_pos(x, y, h)` at the
+  input method away on Windows, keeps the keys from IBus on X11 and tells Wayland, also when
+  the purpose changes from one field to the next) and every frame `ui.ime_pos(x, y, h)` at the
   field's caret (px of the window: the candidates follow it); `ui.ime_enable(false, 0)` when it
   loses the focus. The composition is the app's to draw at the caret, underlined:
   `ui.ime_preedit()` gives its text and caret (a byte offset; empty when none is going on), a

@@ -1478,6 +1478,7 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             0
         }
         WM_SETFOCUS => {
+            clip::ime_context_focus(hwnd); // a password field keeps the input method away here too
             win_push(E_FOCUS_IN, 0, 0, 0, 0);
             0
         }

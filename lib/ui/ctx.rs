@@ -1336,6 +1336,7 @@ impl Ui {
         self.uiw_frame_end();
         #[cfg(target_os = "android")]
         self.ime_frame_end();
+        self.pw_frame_end(); // a password box's IP_PASSWORD ends with it
         self.repass
     }
 
