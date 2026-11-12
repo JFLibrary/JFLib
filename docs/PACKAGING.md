@@ -103,8 +103,8 @@ packaged setup is that exe with a payload and a trailer appended.
 
 * **Pages**: style (list with the INFO names and descriptions, preview of the selection) ->
   options (folder, default `%LOCALAPPDATA%\Programs\<display>` -- per user, no administrator
-  rights; desktop shortcut, start menu entry, "installed apps" entry, start after installing)
-  -> progress -> done (an error page on failures).
+  rights; desktop shortcut, start menu entry, "installed apps" entry, start after installing;
+  a web browser: make it the default browser) -> progress -> done (an error page on failures).
 * **Installs** `<app>.exe` (the chosen variant), `uninstall.exe` (the setup without its
   payload), `install.ini` (what was created), `.lnk` files through COM `IShellLinkW`, and
   `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\<app>` (DisplayName, DisplayIcon,
@@ -132,7 +132,14 @@ packaged setup is that exe with a payload and a trailer appended.
 * **A web browser** (`browser=1`, "Web browsers" below): `http` and `https` get no keys of their
   own; the setup writes the ProgID `<app>URL`, `HKCU\Software\Clients\StartMenuInternet\<app>`
   with its `Capabilities` and the value `<app>` in `HKCU\Software\RegisteredApplications`, and
-  `uninstall.exe` removes them with the rest (`install.ini` `assoc=`).
+  `uninstall.exe` removes them with the rest (`install.ini` `assoc=`). The options page offers
+  "Als Standardbrowser festlegen" (in another language than German "Make <App> my default
+  browser"), checked as in Firefox's setup: "Fertigstellen" then opens Settings at the app's page
+  of the default apps (`ms-settings:defaultapps?registeredAppUser=<app>`, through
+  `plat::assoc::browser_request`: the same page as the app's `plat::default_browser_request()`),
+  after starting the program when that is chosen too. Windows lets no program take the default
+  itself; the user picks there. Test mode and script runs never open Settings: they print
+  `setup_default_browser: ms-settings:...` (the setup has no silent mode).
 * **Test mode**: with `ASMINST_SHELL_DIR=DIR` the desktop, the start menu and the taskbar pins
   are `DIR\Desktop`, `DIR\Programs` and `DIR\Pinned`, and the registry values go to
   `DIR\registry.txt` -- a test never touches
@@ -316,7 +323,10 @@ browser=1
 
 The packages register it as a web browser; which browser opens links stays the user's choice, and
 the app asks for it at run time with `plat::default_browser_status()` and
-`plat::default_browser_request()` ([GUIDE.md](GUIDE.md) section 21).
+`plat::default_browser_request()` ([GUIDE.md](GUIDE.md) section 21). The Windows setup also asks
+once, at its end (its option "Als Standardbrowser festlegen", above); the .deb, RPM, AppImage,
+Flatpak and `.dmg` have no pages of their own (the system's package tools install them), so on
+Linux and macOS only the app offers it.
 
 | | registration | the user's choice |
 | --- | --- | --- |

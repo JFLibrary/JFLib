@@ -3382,6 +3382,10 @@ UIC_ACTIVE if arg != 0 => self.browser = None,       // ask again in the next fr
   `ui.default_browser_request()` prints `ui_default_browser_request`. `plat::default_browser_*`
   are the real calls (Windows: `jfgui_OPEN_DRYRUN=1` prints the Settings page instead of opening
   it).
+* The Windows setup of a browser asks once itself: its options page has "Als Standardbrowser
+  festlegen" ("Make <App> my default browser" in other languages), checked as in Firefox's
+  setup, and its last button opens the same Settings page ([PACKAGING.md](PACKAGING.md)). The
+  Linux and macOS packages have no pages: there only the app offers it.
 
 **Recent files.** `ui.recent_add(path)` after opening or saving a file keeps the app's own
 list (`ui.recent_files()`, newest first, at most `ui::RECENT_KEEP`, in `config://recent.list`;

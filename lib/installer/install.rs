@@ -4,6 +4,8 @@
 //
 //   inst_run(st) -> Ok / Err (st.err)   install into st.dir (style st.sel, options st.opt_*)
 //   inst_launch(st) -> bool             start the installed program
+//   inst_default_browser(st, headless)  (browser=1) Settings at the program's page of the
+//                                       default apps (test mode, script runs: printed only)
 //   un_load(st) -> Ok / Err             uninstaller: read install.ini next to the own exe
 //   un_run(st)                          remove files, shortcuts, uninstall entry, then let cmd
 //                                       delete uninstall.exe and the folder after the exit
@@ -18,7 +20,7 @@ use alloc::format;
 use alloc::string::String;
 
 use crate::payload::{PK_FILE, STY_MAX, kv_get, parent_dir, path_cap, pl_inflate};
-use crate::shell::{Reg, sh_assoc_remove, sh_assoc_set, sh_folder, sh_link, sh_pins, sh_reg_delete, sh_run};
+use crate::shell::{Reg, sh_assoc_remove, sh_assoc_set, sh_browser_request, sh_folder, sh_link, sh_pins, sh_reg_delete, sh_run};
 use crate::{Inst, PATH_CAP, str_cap};
 
 const IN_FILES_CAP: usize = 4096; // in_files: "a;b;c" of the uninstaller
@@ -124,16 +126,7 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
         in_regentry(st);
     }
     // file types and URL schemes (PACKAGE filetypes= / schemes=), a web browser (browser=1)
-    let pkg = crate::assoc::Package {
-        app: st.app.clone(),
-        display: st.disp.clone(),
-        app_id: st.appid.clone(),
-        types: crate::assoc::parse_types(&st.types),
-        schemes: crate::assoc::parse_schemes(&st.schemes),
-        browser: st.browser,
-        ..crate::assoc::Package::default()
-    };
-    let plan = crate::assoc::plan(&pkg, &st.exepath);
+    let plan = crate::assoc::plan(&package(st), &st.exepath);
     sh_assoc_set(&plan.set);
     in_ini(&mut initxt, "app", &st.app);
     in_ini(&mut initxt, "display", &st.disp);
@@ -179,6 +172,28 @@ fn in_regentry(st: &Inst) {
 pub(crate) fn inst_launch(st: &Inst) -> bool {
     let cmd = path_cap(&format!("\"{}\"", st.exepath));
     sh_run(&cmd, Some(&st.dir), false)
+}
+
+/// the manifest's app as plat::assoc sees it: name, display name, app id, file types, URL
+/// schemes, browser=1
+fn package(st: &Inst) -> crate::assoc::Package {
+    crate::assoc::Package {
+        app: st.app.clone(),
+        display: st.disp.clone(),
+        app_id: st.appid.clone(),
+        types: crate::assoc::parse_types(&st.types),
+        schemes: crate::assoc::parse_schemes(&st.schemes),
+        browser: st.browser,
+        ..crate::assoc::Package::default()
+    }
+}
+
+/// (browser=1, the option checked) let the user make the installed program the default web
+/// browser: Settings at its page of the default apps, as the program's own
+/// plat::default_browser_request (Windows lets no program take it itself); test mode and
+/// script runs (headless) print the page instead -> whether it opened (or was printed)
+pub(crate) fn inst_default_browser(st: &Inst, headless: bool) -> bool {
+    sh_browser_request(&package(st), headless)
 }
 
 // ------------------------------------------------------------------ uninstall
