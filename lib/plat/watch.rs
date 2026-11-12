@@ -8,7 +8,8 @@
 //
 // Windows: ReadDirectoryChangesW per root (subtree, overlapped, 64 KiB buffer; an empty
 // answer means the buffer overflowed).  Linux: inotify with a watch per folder; new folders
-// are added (and reported whole), a full queue or the watch limit reports an overflow.
+// are added (and reported whole), a full queue or the watch limit reports an overflow (a full
+// queue after the whole tree is watched again: lost events may hide new folders).
 // macOS: FSEvents with file events (dropped events report an overflow); iOS: none.
 // Paths are absolute, in the form of the platform; the folder of a change is enough for a
 // caller that walks the tree again.
@@ -274,6 +275,7 @@ mod imp {
 
     struct State {
         fd: usize,
+        roots: Vec<String>,
         dirs: BTreeMap<i32, String>,
     }
 
@@ -298,13 +300,28 @@ mod imp {
         }
     }
 
+    // after a queue overflow: the creates of new folders may be among the lost events, so
+    // watch the whole tree again.  inotify_add_watch hands back the existing watch of a folder
+    // it already watches (under its current path, so renamed folders get their new name);
+    // watches the walk no longer reaches (moved out, deleted) end.
+    fn rescan(st: &mut State, sh: &Shared) {
+        let old = core::mem::take(&mut st.dirs);
+        for r in st.roots.clone() {
+            add(st, &r, sh);
+        }
+        for w in old.keys().filter(|w| !st.dirs.contains_key(w)) {
+            // SAFETY: our inotify descriptor and one of its watches (gone already: EINVAL).
+            unsafe { syscall3(SYS_INOTIFY_RM_WATCH, st.fd, *w as usize, 0) };
+        }
+    }
+
     pub fn start(roots: &[String], shared: &Arc<Shared>) -> Result<Vec<crate::Thread>, String> {
         // SAFETY: no pointers.
         let fd = unsafe { syscall3(SYS_INOTIFY_INIT1, IN_NONBLOCK | IN_CLOEXEC, 0, 0) };
         if fd < 0 {
             return Err(String::from("inotify ist nicht verfügbar"));
         }
-        let mut st = State { fd: fd as usize, dirs: BTreeMap::new() };
+        let mut st = State { fd: fd as usize, roots: roots.to_vec(), dirs: BTreeMap::new() };
         for r in roots {
             if !crate::fs::lstat(r).is_some_and(|m| m.is_dir()) {
                 // SAFETY: our descriptor.
@@ -349,6 +366,9 @@ mod imp {
                 let name = String::from_utf8_lossy(&name_b[..end]).into_owned();
                 off += 16 + len;
                 if mask & IN_Q_OVERFLOW != 0 {
+                    // the watches first, then the report: the caller's rescan starts when
+                    // every folder is watched again, so nothing falls between the two
+                    rescan(&mut st, sh);
                     sh.overflow();
                     continue;
                 }
