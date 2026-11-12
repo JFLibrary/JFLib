@@ -129,6 +129,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** ui::test_main!, ui::main! and rt's macros expand without #[allow(unsafe_code)]: a crate with #![forbid(unsafe_code)] (a style crate's unit tests, an app) uses them (it was error E0453; the unsafe_code lint does not look into another crate's macros); crates_accept's hallo3 forbids unsafe code and runs a unit test through ui::test_main!
 - **build:** cargo jflib package builds its stubs (the setup's installer, the AppImage runtime, the signer) with panic = "abort" whatever the app's profiles say: the setup of an app with jflib's feature unwind and panic = "unwind" failed ("JFLib needs panic = abort"); crates_accept packages hallo3 with unwind as a setup
 - **ui:** A toast's message has a record of its own (K_TEXT below the card's K_BOX with the title): screen readers read it, scripts find it as text:"…"; datagallery tests/smoke.uis
+- **ui:** A frame is no longer lost when the last command round of run_passes changes something (a command such as UIC_WAKE, a window, a task): run_passes asks for the next frame (need accumulates instead of being overwritten); an app that asks for a frame after every frame by itself gets 8 more, then a UIWARN; a script's wait gives the frame asked for, as the window loop does; viewtest tests/chain.uis
 
 ## [0.1.0] - 2026-11-08
 

@@ -743,6 +743,10 @@ pub struct Ui {
     pub(crate) autoclose_ms: u32,
     pub(crate) accent_raw: u32,
     pub(crate) settle_warned: bool,
+    /// run_passes in a row whose end asked for another frame by itself (need from inside the
+    /// passes, commands of the last round no frame saw), the warning when they kept asking
+    pub(crate) self_frames: u32,
+    pub(crate) self_warned: bool,
     pub(crate) verify_dirty: bool,
     pub(crate) frames_rendered: u32,
     pub(crate) close_at: u32,

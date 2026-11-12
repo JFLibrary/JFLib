@@ -15,6 +15,8 @@
 //                        files at once, ui.filedlg_paths() shown as "Dateien: N a b"
 //   "Ordner wählen"      a folder dialog (FD_FOLDER) in --files DIR: filedlg_paths() is the folder
 //   "Notiz"              a text box; the app window has one of the same id (each keeps its caret)
+//   "Kette"              three commands, each queued by the frame that saw the one before (the
+//                        three command rounds of a frame; the frame after them shows "Kette: 3")
 //   "Rohe Tasten"        (E2) the page takes the keys as they go down and up (ui.key_event_take):
 //                        "Roh:" lists them (+ down, - up, C- S- A- held modifiers, * repeat, :L :R :N
 //                        location, #scancode)
@@ -64,6 +66,8 @@ const ID_APPWIN: u32 = 114; // the app window
 const ID_APPTAB: u32 = 115; // its tab in the title bar
 const ID_DIRS: u32 = 116; // "Ordner wählen"
 const ID_NOTE: u32 = 117; // "Notiz": a text box of this id in the main window and in the app window
+const ID_CHAIN: u32 = 118; // "Kette"
+const ID_AGAIN: u32 = 119; // "Immer neu"
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 const ID_FD_DIR: u32 = 0x11_0000; // the folder dialog (FD_FOLDER)
 
@@ -71,6 +75,7 @@ const CMD_NEW_TAB: u32 = 1;
 const CMD_RELOAD: u32 = 2;
 const CMD_COPY: u32 = 3; // a row of the page's menu (Mi::Item)
 const CMD_TREE: u32 = 4; // after the frame: the tree is complete
+const CMD_CHAIN: u32 = 5; // "Kette": one link of the chain
 
 // the page's context menu
 static PAGE_MENU: [Mi; 3] = [Mi::Cmd(CMD_RELOAD), Mi::Sep, Mi::Item(CMD_COPY, "Link kopieren", 0)];
@@ -124,6 +129,11 @@ struct ViewTest {
     /// "Notiz" in the main window and in the app window (text boxes of the same id)
     note: String,
     app_note: String,
+    /// "Kette": the links the commands counted, the link the frame last queued a command for
+    chain: u32,
+    chain_seen: u32,
+    /// "Immer neu": every frame asks for another one (ui.invalidate in App::frame)
+    again: i32,
     /// (E3) the page's cursor (an index into PAGE_CURSORS) and the custom one (handle, 0 none)
     page_cur: usize,
     custom: u32,
@@ -176,6 +186,9 @@ impl Default for ViewTest {
             dir_path: String::new(),
             note: String::new(),
             app_note: String::new(),
+            chain: 0,
+            chain_seen: 0,
+            again: 0,
             page_cur: 0,
             custom: 0,
             raw: 0,
@@ -431,6 +444,25 @@ impl App for ViewTest {
         ui.text(TS_BODY, &format!("Eigener: {own}"));
         ui.next_size(240, 0);
         ui.textbox(ID_NOTE, Some("Notiz"), &mut self.note, 256);
+        // a chain of commands, each queued by the frame that saw the one before: the click's
+        // frame and the next two use the three command rounds of a frame, the third link's
+        // change needs the frame after them
+        ui.box_begin(0, BOX_H, 8);
+        if ui.button(ID_CHAIN, "Kette") & EV_ACT != 0 {
+            self.chain_seen = 0;
+            self.chain = 0;
+            ui.cmd_run(CMD_CHAIN, 0);
+        } else if self.chain > 0 && self.chain < 3 && self.chain_seen != self.chain {
+            self.chain_seen = self.chain;
+            ui.cmd_run(CMD_CHAIN, 0);
+        }
+        ui.text(TS_BODY, &format!("Kette: {}", self.chain));
+        // an app that asks for a frame in every frame: the library stops after 8 (a UIWARN)
+        ui.checkbox(ID_AGAIN, "Immer neu", &mut self.again);
+        if self.again != 0 {
+            ui.invalidate();
+        }
+        ui.box_end();
         ui.box_end();
         // (E7) an independent app window: its own title bar with a tab and the caption buttons
         let (open, rect) = (self.app_open.clone(), self.app_rect.clone());
@@ -476,6 +508,7 @@ impl App for ViewTest {
             CMD_NEW_TAB => self.new_tab += 1,
             CMD_RELOAD => self.reload += 1,
             CMD_COPY => self.copy += 1,
+            CMD_CHAIN => self.chain += 1,
             _ => return false,
         }
         true
