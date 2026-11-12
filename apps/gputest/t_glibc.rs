@@ -203,6 +203,26 @@ mod imp {
             th.join();
         }
         t.ok(done.load(SeqCst), "a thread of 256 KiB has about that much stack (235 KiB used)");
+        // a thread that joins itself: pthread_join says EDEADLK, and the stack it still runs on
+        // stays mapped (it used to be unmapped under it)
+        let (tx, rx) = plat::sync::channel::<plat::Thread>(1);
+        let alive = Arc::new(AtomicBool::new(false));
+        let a2 = alive.clone();
+        let th = plat::thread_spawn(256 << 10, Box::new(move || {
+            if let Some(me) = rx.recv() {
+                me.join();
+            }
+            core::hint::black_box(burn(100));
+            a2.store(true, SeqCst);
+        }));
+        if let Some(th) = th {
+            let _ = tx.send(th);
+            let t0 = plat::time_us();
+            while !alive.load(SeqCst) && plat::time_us() - t0 < 5_000_000 {
+                plat::sleep_ms(1);
+            }
+        }
+        t.ok(alive.load(SeqCst), "a thread that joins itself goes on running on its stack");
         // nothing stays behind
         let before = maps();
         let mut started = 0;
