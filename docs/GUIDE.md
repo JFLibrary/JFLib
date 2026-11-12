@@ -129,7 +129,9 @@ panic = "unwind"
   has the test harness's `main`, but plat's start of a std program asks for the `jfgui_main` a
   program's `main!` defines, so it does not link (an unresolved `jfgui_main`). One line in the
   crate's `lib.rs` gives it a stub that is never called: `#[cfg(test)] ui::test_main!();`
-  (`rt::test_main!()` for crates without ui). Tests unwind, the stub has no panic check.
+  (`rt::test_main!()` for crates without ui). Tests unwind, the stub has no panic check. The
+  crate may keep `#![forbid(unsafe_code)]` (as the library's styles do): the stub's unsafe
+  attribute comes from the macro, the crate allows nothing for it.
 * A panic nobody catches ends the program as before: JFLib's crash report (stderr, the crash
   hook), exit code 3. That holds when it leaves the program's start (`App::frame`, `command`, the
   tasks of `ui.spawn`), a thread of JFLib's (`plat::thread_spawn`, the jobs of
@@ -257,7 +259,9 @@ ui::main!(ui::launch(&DESC, Template::default(), &style::STYLE));
   headless (`--shot`, `--script`) or open a window; web targets retain it in the shared worker
   runtime. `ui::run` remains available for existing borrowed native apps. `style::STYLE` is
   whatever style crate the build linked as `style` (section 11).
-* `ui::main!` expands to the `jfgui_main` symbol the platform entry point calls.
+* `ui::main!` expands to the `jfgui_main` symbol the platform entry point calls. Its unsafe
+  parts (the symbol, std's `fn main`) come from the macro, which the `unsafe_code` lint does not
+  look into: an app crate may `#![forbid(unsafe_code)]`, the macro needs no `allow`.
 
 **Where an app's files live:**
 
