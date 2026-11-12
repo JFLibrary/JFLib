@@ -22,7 +22,7 @@ The examples below were compiled and run against the library (R13); identifiers 
 
 * **`#![no_std]`, no foreign crates.** Only `core` and `alloc` may be `extern crate`d. Every
   crate and app is a Cargo package of the workspace in the root `Cargo.toml`; `build_rs.py`
-  checks the sources (`python build_rs.py check` runs the lint alone), refuses `std` or a
+  checks the sources (`python build_rs.py check --quick` runs the lint alone), refuses `std` or a
   foreign dependency, and builds through Cargo. Edition 2024, so `gen` is a keyword.
 * **An app of your own** is best `#![no_std]` too: JFLib's runtime brings the entry point, the
   panic handler and the allocator, and other `no_std` crates are allowed there. An app that needs
@@ -2043,12 +2043,19 @@ In this repository:
 python build_rs.py test --quick     # lint, build every app (both targets), every .uis script
 python build_rs.py test             # ... plus parity with the assembly reference
 python build_rs.py test NAME        # one app: build it, run its tests/*.uis
-python build_rs.py check            # the rules lint alone
+python build_rs.py check            # the rules lint, then Clippy over the library (below)
+python build_rs.py check --quick    # the rules lint alone
 python tools/gendoc.py --check      # docs/API.md matches the doc comments
 python build_rs.py api-diff         # the public API since the last release (VERSIONING.md)
 python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unused texts ("Languages")
 ```
 
+* **Clippy**: `check` runs `cargo clippy` over the library crates of each target (`--target`,
+  default both on Windows and the machine's own elsewhere; Linux in both its builds), with only
+  the groups `correctness` and `suspicious` on, as errors. Three lints that name an idiom of this
+  code are off everywhere (`CLIPPY_OFF` in `build_rs.py`, each with its reason). A place that is
+  right as it stands carries `#[allow(clippy::NAME)]` and a comment that says why. No build and
+  no `test` runs it: the first run takes minutes per target, a later one seconds.
 * Run new scripts with `--verify-dirty` too (`build_rs.py test` does not add it): it reports
   missed pixels with their bounding box. Checked frames also take every scroll copy they can
   (§5), so a script that scrolls tests those; it renders after each input event (a view copies

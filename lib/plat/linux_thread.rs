@@ -82,6 +82,7 @@ struct ThreadRec {
     rt::abort_on_unwind(f); // feature unwind: a panic that leaves the thread ends the program
     // SAFETY: ends this thread only (the kernel clears and wakes rec.tid).
     unsafe { syscall3(SYS_EXIT, 0, 0, 0) };
+    #[allow(clippy::empty_loop)] // not reached: exit does not return
     loop {}
 }
 

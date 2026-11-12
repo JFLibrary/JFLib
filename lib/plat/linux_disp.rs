@@ -514,6 +514,7 @@ fn spawn_exe(exe: &[u8], args: &[&str]) -> i32 {
         if pid == 0 {
             rt::os::syscall3(rt::os::SYS_EXECVE, exe.as_ptr() as usize, argv.as_ptr() as usize, envp.as_ptr() as usize);
             rt::os::syscall3(rt::os::SYS_EXIT_GROUP, 127, 0, 0);
+            #[allow(clippy::empty_loop)] // not reached: exit_group does not return
             loop {}
         }
     }

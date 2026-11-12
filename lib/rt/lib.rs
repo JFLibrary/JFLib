@@ -212,6 +212,7 @@ pub use mem::Alloc;
 pub mod os;
 pub mod sync;
 #[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple", target_arch = "aarch64"), path = "portable/math.rs")]
+#[allow(clippy::duplicate_mod)] // where x87 is the portable arithmetic, `portable` below names the same file
 pub mod x87;
 
 /// Portable arithmetic, available on native targets for exact backend comparisons.

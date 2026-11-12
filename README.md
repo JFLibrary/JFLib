@@ -642,7 +642,8 @@ python build_rs.py check
 python build_rs.py test --quick --target win
 ```
 
-`check` validates the source-code rules. `test --quick` starts the broader test suite
+`check` validates the source-code rules and then runs Clippy over the library (its groups
+`correctness` and `suspicious`; `check --quick`: the rules alone). `test --quick` starts the broader test suite
 and skips the historical assembly parity checks; `test NAME` builds one app and runs only its
 scripts. `python build_rs.py api-diff` lists the changes of the public API since the last
 release ([versions](docs/VERSIONING.md)). The full parity run also requires the separate assembly reference.
