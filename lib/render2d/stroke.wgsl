@@ -58,8 +58,8 @@
 // Colours are sRGB codes blended as they are (premultiplied), as lib/gfx blends them; a transparency (the entity's, its
 // layer's or its insert's, G6b2) is multiplied into the colour's alpha here (block.wgsl ink).
 //
-// Blocks (G6b2, block.wgsl): a visible record of an insert comes as ITEM_BLOCK | entry << 8 | its place in its page; it
-// is placed through its instance's space (a View of the block's units) by the same code as every record, so that both
+// Blocks (G6b2, block.wgsl): a visible record of an insert comes as ITEM_BLOCK | its place in the pool, its instance
+// beside it in vinst; it is placed through its instance's space (a View of the block's units) by the same code as every record, so that both
 // owners of a pixel compute it from the same bits.
 
 const BATCH: u32 = 16384u;

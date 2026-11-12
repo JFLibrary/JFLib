@@ -11,9 +11,8 @@
 // An entry of the visibility (einfo, cull.wgsl) names a page, its instance + 1 (0: the page of a layer), the records of
 // the page it covers (first | (count - 1) << 8 | (pack - 1) << 16: `pack` instances one after the other, each of `count`
 // records from `first`: many small inserts of one block share a workgroup) and what is added to a record's place to find
-// its fill edge in epx; a visible record of an insert is ITEM_BLOCK | entry << 8 | its place among the entry's records,
-// any other its place in the pool.  A visible record of an insert is ITEM_BLOCK | its place in the pool, and beside it in
-// vinst its instance (cull.wgsl write).
+// its fill edge in epx.  A visible record of an insert is ITEM_BLOCK | its place in the pool, and beside it in vinst its
+// instance (cull.wgsl write); any other is its place in the pool.
 
 struct Space {
     // the camera's centre in the block's units: hi.x, hi.y, lo.x, lo.y; rest.xy what hi + lo leaves of it, rest.z pixels
