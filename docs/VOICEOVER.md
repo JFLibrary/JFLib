@@ -1,6 +1,7 @@
 # VoiceOver-Plan: der Screenreader auf Mac und iPhone
 
-Stand 2026-11-12, auf Basis von `main` dccfab42. Noch nichts umgesetzt; die vier Entscheidungen unten hat der Nutzer
+Stand 2026-11-12, auf Basis von `main` ce54de4c. Umgesetzt ist VO0 (die Brücke für macOS mit Rollen, Werten,
+Aktionen und dem Test im Prozess; die Hand-Probe des Nutzers steht aus). Die vier Entscheidungen unten hat der Nutzer
 am 2026-11-12 alle wie empfohlen getroffen.
 
 ## Ziel
@@ -54,27 +55,28 @@ Schieberegler `accessibilityIncrement`/`…Decrement`. Mitteilungen über `UIAcc
 Bildschirmtastatur (der Weg aus AP5); damit VoiceOver im Text navigieren kann, braucht die View `UITextInput` statt
 nur `UIKeyInput` (siehe Entscheidung 4).
 
-**Rollen** (VO0 legt die Tabelle fest und prüft jede Zeile mit VoiceOver):
+**Rollen** (VO0 hat die Spalte macOS festgelegt; T: der Name ist der Titel, B: die Beschreibung `AXDescription`,
+W: der Wert):
 
-| Rolle | macOS (Rolle / Untrolle) | iOS (Traits) |
+| Rolle | macOS (Rolle / Untrolle, Name, Wert) | iOS (Traits) |
 |---|---|---|
-| Label | AXStaticText | staticText |
-| Heading | AXHeading mit Ebene (zu prüfen: der Rotor außerhalb von Web-Inhalten) | header |
-| Button | AXButton | button |
-| CheckBox | AXCheckBox (Wert 0/1/2) | button, Wert „ausgewählt“ |
-| Radio | AXRadioButton | button, selected |
-| Switch | AXCheckBox / AXSwitch | toggleButton (iOS 17) |
-| Slider | AXSlider | adjustable |
-| Progress | AXProgressIndicator | updatesFrequently, Wert |
-| TextBox | AXTextField / AXTextArea (mehrzeilig) | über `UITextInput` |
-| Link | AXLink | link |
-| List / ListItem | AXList / AXStaticText mit Auswahl | –, selected |
-| Menu / MenuItem (Popups) | AXMenu / AXMenuItem | button |
-| TabList / Tab | AXTabGroup / AXRadioButton (AXTabButton) | tabBar / button, selected |
-| Combo | AXPopUpButton | button, Wert |
-| Dialog | AXWindow / AXDialog | modale Gruppe (`accessibilityViewIsModal`) |
-| Image | AXImage | image |
-| Group, Canvas | AXGroup | Gruppe (`accessibilityContainerType`) |
+| Label | AXStaticText, W | staticText |
+| Heading | AXHeading, T, Wert die Ebene, Rollenbeschreibung „Überschrift“ in der UI-Sprache (zu prüfen: der Rotor außerhalb von Web-Inhalten) | header |
+| Button | AXButton, T | button |
+| CheckBox | AXCheckBox, T, Wert 0/1/2 (gemischt) | button, Wert „ausgewählt“ |
+| Radio | AXRadioButton, T, Wert 0/1 | button, selected |
+| Switch | AXCheckBox / AXSwitch, T, Wert 0/1 | toggleButton (iOS 17) |
+| Slider | AXSlider, B, Wert, Min, Max, Erhöhen/Verringern um 5 % des Bereichs (wie Android) | adjustable |
+| Progress | AXProgressIndicator, B, Wert (keiner, solange unbekannt), Min, Max | updatesFrequently, Wert |
+| TextBox | AXTextField / AXTextArea (mehrzeilig) / AXSecureTextField (Passwort), B, Wert der Text | über `UITextInput` |
+| Link | AXLink, T | link |
+| List / ListItem | AXList, B / AXStaticText, W, ausgewählt | –, selected |
+| MenuBar / Menu / MenuItem | AXMenuBar / ein Eintrag der Leiste AXMenuBarItem, ein Popup-Menü AXMenu / AXMenuItem, T | button |
+| TabList / Tab | AXTabGroup, B / AXRadioButton (AXTabButton), T, Wert 0/1 | tabBar / button, selected |
+| Combo | AXPopUpButton, B, Wert die Wahl, aufgeklappt | button, Wert |
+| Dialog | AXGroup, T, Rollenbeschreibung „Dialog“ (ein Dialog im Fenster; ein Dialogfenster ist ein eigenes NSWindow) | modale Gruppe (`accessibilityViewIsModal`) |
+| Image | AXImage, B | image |
+| Group, Canvas | AXGroup, B | Gruppe (`accessibilityContainerType`) |
 
 ## Stufen
 
@@ -85,6 +87,30 @@ nur `UIKeyInput` (siehe Entscheidung 4).
   Nutzers), dazu die offenen Punkte der Tabelle (Überschriften, Schalter).
 
 **Fertig, wenn:** VoiceOver auf dem Mac die Knöpfe eines Fensters mit Rolle und Namen vorliest und klicken kann.
+
+**Umgesetzt (2026-11-12), Hand-Probe ausstehend:** [`apple_mac_a11y.rs`](../lib/plat/apple_mac_a11y.rs) mit der
+Klasse `JFAXElement` (Unterklasse von `NSAccessibilityElement`): ein Objekt je Knoten, beim ersten Fragen gemacht und
+behalten, solange der Knoten lebt; die Instanzvariable nennt einen Platz in einer Tabelle (Plattformfenster,
+Schlüssel). `JFView` bleibt selbst ignoriert und meldet als Kinder die obersten Knoten, so hängen sie direkt am
+Fenster; dazu das fokussierte Element und der Treffertest. Rollen, Namen, Werte, Zustände, Rahmen, Drücken,
+Erhöhen/Verringern, Werte setzen, Fokus und Auswahl setzen, die Mitteilungen für Fokus, Werte, Titel, Auswahl und
+Layout, „zerstört“ für weggefallene Knoten. Die erste Frage eines Hilfsmittels an eine View schaltet
+`a11y::active()` ein (Entscheidung 2). `plattest --test a11y-mac` (46 Prüfungen) liest und bedient die Demo im
+echten Fenster; `plattest --test a11y-show` zeigt die Demo für Hand-Proben.
+
+- **`NSAccessibilityElement` antwortet aus einem eigenen Speicher.** Sein `accessibilityAttributeValue:` liest nur
+  diesen Speicher (für unser Element: keine Rolle), Aktionsnamen und Setzer kennt es gar nicht. VoiceOver bekommt die
+  Antworten über die Methoden des Protokolls, gefiltert mit `isAccessibilitySelectorAllowed:`. Deshalb überschreibt
+  die Klasse auch Methoden, die sonst still aus dem leeren Speicher antworten würden (Kinder in
+  Navigationsreihenfolge, sichtbare Kinder, Registerkarten, der Aktivierungspunkt), und lässt je Rolle nur die
+  passenden Attribute und Aktionen zu (eine Taste hat keinen Wert, kein Element „Menü zeigen“).
+- **Der Test im Prozess** liest das Fenster über AppKits `accessibilityAttributeValue:` (dort hängt die ignorierte
+  View ihre Knoten ein) und die Elemente über dieselben Protokoll-Methoden nach derselben Regel (`respondsToSelector:`
+  und `isAccessibilitySelectorAllowed:`), aus einem Test-Thread per `dispatch_sync` auf dem Hauptthread. Ein
+  `AXUIElement` auf den eigenen Prozess geht zwar ohne die Freigabe „Bedienungshilfen“, liefert aber für jedes
+  Element nur die App zurück; als Test taugt das nicht.
+- **Popups** (Menüs, Listen) bleiben im Baum ihres Besitzers, wie unter Windows; ihr Panel beantwortet nur den
+  Treffertest. Ob VoiceOver damit gut zurechtkommt, zeigt die Hand-Probe.
 
 ### VO1: Der Baum auf macOS (M)
 

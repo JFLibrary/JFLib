@@ -18,7 +18,8 @@
 //                                ui itself); without one they stay German
 //
 // Linux: AT-SPI2 on the accessibility bus (linux_atspi.rs).  Windows: UI Automation providers
-// answering WM_GETOBJECT (win_uia.rs).  The browser and Android (web_a11y.rs): the host keeps
+// answering WM_GETOBJECT (win_uia.rs).  macOS: NSAccessibility elements under each window's view,
+// turned on by the first question of an assistive technology (apple_mac_a11y.rs, VoiceOver).  The browser and Android (web_a11y.rs): the host keeps
 // a mirror of the tree -- an ARIA shadow tree in the DOM (web/a11y.js), virtual views of an
 // AccessibilityNodeProvider (android/GalleryAccessibility.java) -- fed with the differences
 // of every published tree (a11y_wire.rs: Mirror, the wire format); the host turns the mirror
@@ -522,8 +523,9 @@ static STARTED: AtomicBool = AtomicBool::new(false);
 
 /// start the platform bridge (once): Linux connects to the accessibility bus when assistive
 /// technology is enabled (jfgui_A11Y=1 forces it, jfgui_A11Y=0 or NO_AT_BRIDGE=1 turn it off);
-/// Windows answers WM_GETOBJECT from now on; the browser and Android hosts turn their mirror
-/// on themselves (jfgui_a11y), jfgui_A11Y=0 keeps it off there too
+/// Windows answers WM_GETOBJECT from now on, macOS the accessibility questions of its views; the
+/// browser and Android hosts turn their mirror on themselves (jfgui_a11y), jfgui_A11Y=0 keeps it
+/// off there too
 pub fn start(app: &str) {
     if STARTED.swap(true, Ordering::AcqRel) {
         return;
@@ -662,7 +664,10 @@ use crate::win_uia as native;
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
 use crate::web::a11y_host as native;
 
-#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android")))]
+#[cfg(target_os = "macos")]
+use crate::apple::mac::a11y_mac as native;
+
+#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android", target_os = "macos")))]
 mod native {
     use super::{Change, Snapshot};
     use alloc::vec::Vec;
