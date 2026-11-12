@@ -36,6 +36,10 @@
 //                        timer polls every 100 ms ("Abfrage: läuft / fertig", an extension
 //                        page's poll); tests/realwait.uis with `wait real`
 //   "Hängt"              the sync hook says a job is running (`sync MS soft`)
+//   "Kennwort"           a TB_PASSWORD box: the input method's purpose ("Zweck: N",
+//                        plat::ime_purpose_of) is IP_PASSWORD while it has the keyboard, set by
+//                        the box itself; command 6 takes the box away while it has it
+//                        (tests/password.uis)
 //
 // tests/keys.uis, tests/menus.uis and tests/links.uis drive it; the texts above the page say what
 // it saw.
@@ -78,6 +82,7 @@ const ID_CHAIN: u32 = 118; // "Kette"
 const ID_AGAIN: u32 = 119; // "Immer neu"
 const ID_WORK: u32 = 120; // "Hintergrund"
 const ID_HANG: u32 = 121; // "Hängt"
+const ID_PW: u32 = 122; // "Kennwort" (TB_PASSWORD)
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 const ID_FD_DIR: u32 = 0x11_0000; // the folder dialog (FD_FOLDER)
 
@@ -86,6 +91,7 @@ const CMD_RELOAD: u32 = 2;
 const CMD_COPY: u32 = 3; // a row of the page's menu (Mi::Item)
 const CMD_TREE: u32 = 4; // after the frame: the tree is complete
 const CMD_CHAIN: u32 = 5; // "Kette": one link of the chain
+const CMD_PW_AWAY: u32 = 6; // the password box goes away (and comes back), as with a closed window
 
 const T_POLL: u32 = 1; // "Hintergrund": the timer that polls the thread's result
 
@@ -173,6 +179,9 @@ struct ViewTest {
     work_seen: u32,
     polled: &'static str,
     hang: i32,
+    /// "Kennwort": its text, taken away (CMD_PW_AWAY)
+    pw: String,
+    pw_away: bool,
 }
 
 // (E3) the cursors "Zeiger wechseln" walks through (0: the page's arrow / hand)
@@ -227,6 +236,8 @@ impl Default for ViewTest {
             work_seen: 0,
             polled: "-",
             hang: 0,
+            pw: String::new(),
+            pw_away: false,
         }
     }
 }
@@ -480,8 +491,16 @@ impl App for ViewTest {
             },
         };
         ui.text(TS_BODY, &format!("Eigener: {own}"));
+        ui.box_begin(0, BOX_H, 8);
         ui.next_size(240, 0);
         ui.textbox(ID_NOTE, Some("Notiz"), &mut self.note, 256);
+        // a password box sets the input method's purpose itself (shown after it: this pass's)
+        if !self.pw_away {
+            ui.next_size(160, 0);
+            ui.textbox(ID_PW, Some("Kennwort"), &mut self.pw, 64 | TB_PASSWORD);
+        }
+        ui.text(TS_BODY, &format!("Zweck: {}", plat::ime_purpose_of()));
+        ui.box_end();
         // a chain of commands, each queued by the frame that saw the one before: the click's
         // frame and the next two use the three command rounds of a frame, the third link's
         // change needs the frame after them
@@ -563,6 +582,7 @@ impl App for ViewTest {
             CMD_RELOAD => self.reload += 1,
             CMD_COPY => self.copy += 1,
             CMD_CHAIN => self.chain += 1,
+            CMD_PW_AWAY => self.pw_away = !self.pw_away,
             // "Hintergrund": the thread's wake-up, the poll timer
             UIC_WAKE => self.work_seen = WORK_DONE.load(Ordering::Relaxed),
             UIC_TIMER if arg == T_POLL => {

@@ -18,6 +18,7 @@ keyboard"). Made with `python build_rs.py new viewtest --title "Ansichtstest"` o
 | `tests/appwin.uis` | (E7) "Neues Fenster": an independent app window (`WF_APP`) without the library's title bar, its own one from `titlebar_begin` / `titlebar_end` with a tab in it and the caption buttons acting on that window |
 | `tests/cursors.uis` | (E3) `ui.cursor_next` on the page: not-allowed, grab, zoom-in, the north-east corner (shapes beyond the 4 flag bits), a custom cursor through `CUR_CUSTOM`; `ui.cursor_at`; `ui.cursor_replace` redraws it (24 x 24), `ui.cursor_free` frees the handle and `cursor_new` hands it out again |
 | `tests/realwait.uis` | `wait real`: "Hintergrund" starts a thread of the app's own that works 300 ms of real time and wakes the UI (`plat::wake`, `UIC_WAKE`), while a timer polls its result every 100 ms; both arrive in real time; `sync 200 soft` with "Hängt" (the sync hook never done) reaches its deadline without failing |
+| `tests/password.uis` | a `TB_PASSWORD` box sets the input method's purpose itself: `IP_PASSWORD` while it has the keyboard ("Zweck: 5", `plat::ime_purpose_of`), the purpose of before after it -- another text box, the page's own field (`ui.ime_enable`), or the box gone while it had the keyboard (command 6) |
 | `tests/links.uis` | links the page draws itself, published with `ui.sem_rect` (no hit box of their own): their kind and place, a click by label reaching the page at the link, the hand over one, the links in the accessibility tree; (E14) the page's own record named by `ui.canvas_label` |
 
 ## Build, run, test

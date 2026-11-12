@@ -410,7 +410,7 @@ pub const DLG_CLOSE: u32 = 3;
 // ------------------------------------------------------------------ text input
 pub const TB_CAP_MASK: u32 = 0x007F_FFFF; // the capacity in bytes (at most 8 MB)
 pub const TB_HYPHENATE: u32 = 0x0080_0000; // with TB_MULTI | TB_WRAP: hyphenate words that do not fit (hyph.rs)
-pub const TB_PASSWORD: u32 = 0x0100_0000; // a dot per character; no copy / cut
+pub const TB_PASSWORD: u32 = 0x0100_0000; // a dot per character; no copy / cut; the input method's purpose IP_PASSWORD while it has the keyboard
 pub const TB_READONLY: u32 = 0x0200_0000; // selectable and copyable, not editable
 pub const TB_DIGITS: u32 = 0x0400_0000; // accept only 0-9
 pub const TB_MULTI: u32 = 0x0800_0000; // multi-line
