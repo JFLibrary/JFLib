@@ -1,0 +1,28 @@
+#!args --verify-dirty
+# hidden panels come back between the neighbours they had: the left group's tabs hidden from the
+# front one by one (each one's place counted in the group as it was then), then every panel shown
+# in the app's order (DockState::show) -- the tabs in their order of before, also through a saved
+# layout (BrowserGUI: its developer tools after "hide every panel" and F12 were shuffled)
+theme light
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+click button:"Ausblenden: Dateien"
+click button:"Ausblenden: Gliederung"
+expect text:"L: - | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf+Dateien+Gliederung" exists
+click button:"Alle zeigen"
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften], [Verlauf] | U: [Ausgabe], [Suche] | F: - | V: -" exists
+# the other way round: the back one first
+click tab:"Gliederung"
+click button:"Ausblenden: Gliederung"
+click button:"Ausblenden: Dateien"
+click button:"Alle zeigen"
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften], [Verlauf] | U: [Ausgabe], [Suche] | F: - | V: -" exists
+# through a saved layout: the order goes with the hidden panels
+click button:"Ausblenden: Gliederung"
+click button:"Ausblenden: Dateien"
+click button:"Speichern"
+click button:"Zurücksetzen"
+click button:"Laden"
+expect text:"L: - | R: [Eigenschaften], [Verlauf] | U: [Ausgabe], [Suche] | F: - | V: Gliederung+Dateien" exists
+click button:"Alle zeigen"
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften], [Verlauf] | U: [Ausgabe], [Suche] | F: - | V: -" exists
+expect_nowarn

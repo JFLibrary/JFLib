@@ -145,6 +145,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** cargo jflib package builds its stubs (the setup's installer, the AppImage runtime, the signer) with panic = "abort" whatever the app's profiles say: the setup of an app with jflib's feature unwind and panic = "unwind" failed ("JFLib needs panic = abort"); crates_accept packages hallo3 with unwind as a setup
 - **ui:** A toast's message has a record of its own (K_TEXT below the card's K_BOX with the title): screen readers read it, scripts find it as text:"…"; datagallery tests/smoke.uis
 - **ui:** A frame is no longer lost when the last command round of run_passes changes something (a command such as UIC_WAKE, a window, a task): run_passes asks for the next frame (need accumulates instead of being overwritten); an app that asks for a frame after every frame by itself gets 8 more, then a UIWARN; a script's wait gives the frame asked for, as the window loop does; viewtest tests/chain.uis
+- **ui:** Docking: a hidden panel comes back between the neighbours it had in its group (DockState::show, toggle, focus; also after save / load): panels hidden one by one and shown again in any order keep their tab order -- they came back at the index each had when it left, so BrowserGUI's developer tools were shuffled after hiding every panel and F12; docktest tests/order.uis
 
 ## [0.1.0] - 2026-11-08
 
