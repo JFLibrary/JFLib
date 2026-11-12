@@ -6,6 +6,8 @@
 //                                       bottom, above dialogs); call it once per frame after
 //                                       the content.  Hovering keeps a toast; its close button
 //                                       removes it; expiry wakes the loop (timer UIT_TOAST).
+//                                       Records: the card (K_BOX, the title), its message
+//                                       (K_TEXT) and the close button (K_BUTTON "Schließen").
 //   toast_dismiss(id) / toast_clear()
 //   toasts() -> [(id, kind, title, msg)]   the queued toasts (a notification history)
 //   spinner(id, size_dip)               a turning ring while something loads
@@ -130,6 +132,12 @@ impl Ui {
             self.wp.ctx.last_rect = r;
             self.wp.ctx.last_state = 0;
             self.sem(K_BOX, tid, Some(&t.title), t.kind as i32);
+            // the message: a text record of its own below the title (screen readers, scripts)
+            if !t.msg.is_empty() {
+                let mx = r[0] + self.dp(44);
+                self.wp.ctx.last_rect = [mx, r[1] + self.dp(32), (cx - mx - self.dp(4)).max(0), self.dp(20)];
+                self.sem(K_TEXT, 0, Some(&t.msg), 0);
+            }
             if cev & EV_ACT != 0 {
                 let id = t.id;
                 self.m.notify.toasts.retain(|x| x.id != id);

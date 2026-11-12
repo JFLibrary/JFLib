@@ -3353,6 +3353,8 @@ notify -- transient feedback: toasts, spinner, indeterminate progress
                                       bottom, above dialogs); call it once per frame after
                                       the content.  Hovering keeps a toast; its close button
                                       removes it; expiry wakes the loop (timer UIT_TOAST).
+                                      Records: the card (K_BOX, the title), its message
+                                      (K_TEXT) and the close button (K_BUTTON "Schließen").
   toast_dismiss(id) / toast_clear()
   toasts() -> [(id, kind, title, msg)]   the queued toasts (a notification history)
   spinner(id, size_dip)               a turning ring while something loads
