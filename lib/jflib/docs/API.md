@@ -11635,8 +11635,9 @@ blend -- pixel row kernels (premultiplied 0xAARRGGBB, bytes B G R A)   [src/gfx/
   mask_over(row, mask, pcol)       the colour through an 8-bit coverage row
   blit_over(dst, src, opacity)     premultiplied src over dst (x opacity 0..255)
   a8_over(dst, cov, alpha)         8-bit target: c = cov * alpha / 255, dst = c + dst * (255 - c) / 255
-  copy_stream(dst, src) / stream_fence()   a row copy past the caches (simd; row bands
-                                   drawn on worker threads go back to the framebuffer so)
+  copy_stream(dst, src) / copy_stream_rows(...)   a row copy, or a block of rows, past the
+                                   caches (simd; row bands drawn on worker threads go back to
+                                   the framebuffer so); stream_fence() is in them
 
 "over": dst = src + dst * (255 - src_alpha) / 255 with exact rounding (div255) and the
 saturation of the SSE2 kernels (packuswb).  fill_over, mask_over and a8_over are SIMD
@@ -11645,7 +11646,7 @@ blit_over is the assembly's SSE2 loop on pixel pairs, because its pair skip (bot
 transparent: dst kept) is visible for invalid premultiplied input.
 ```
 
-Re-exports: `simd::{copy_stream, stream_fence}`
+Re-exports: `simd::{copy_stream, copy_stream_rows, stream_fence}`
 
 - **`fn fill_solid(row: &mut [u8], c: u32)`**
   k_fill_solid: store one colour into every pixel of the row
@@ -32399,6 +32400,7 @@ socket, wait_events polls it alone (headless).
 
 - **`fn join(self)`**
   wait until the thread has ended, then free its stack  [plat_thread_join]
+  (a thread joining itself returns at once and keeps its stack: it still runs on it)
 
 ### `plat/linux_print.rs` (Linux)
 
@@ -32514,11 +32516,19 @@ a driver's getenv reads the start environment.
   open a library through the system's dynamic linker (a name, searched as ld.so does, or a path)
   and run its initialisers -> its handle
 
-- **`fn dl_sym(handle: usize, name: &[u8]) -> usize`**
+- **`unsafe fn dl_sym(handle: usize, name: &[u8]) -> usize`**
   the address of a symbol of a library from dl_open (0: none); name ends in NUL
 
-- **`fn dl_close(handle: usize)`**
+  # Safety
+  `handle` came from dl_open and has not been closed: the dynamic linker reads its structures
+  before it could tell a wrong handle.
+
+- **`unsafe fn dl_close(handle: usize)`**
   close a library from dl_open
+
+  # Safety
+  `handle` came from dl_open and is closed once; nothing uses what dl_sym found in it any more
+  (the library may be unloaded).
 
 - **`fn dl_error() -> String`**
   why the calling thread's last dl_open / dl_sym failed ("": it did not, or it was already asked)
@@ -34104,11 +34114,19 @@ not a dangling pointer.
 - **`fn dl_open(name: &str) -> Option<usize>`**
   open a shared library (a name as the linker searches it, or a path) -> its handle
 
-- **`fn dl_sym(handle: usize, name: &[u8]) -> usize`**
+- **`unsafe fn dl_sym(handle: usize, name: &[u8]) -> usize`**
   a symbol of the library (name NUL-terminated) -> its address, 0 when missing
 
-- **`fn dl_close(handle: usize)`**
+  # Safety
+  `handle` came from dl_open and has not been closed: the dynamic linker reads its structures
+  before it could tell a wrong handle.
+
+- **`unsafe fn dl_close(handle: usize)`**
   give the library back
+
+  # Safety
+  `handle` came from dl_open and is closed once; nothing uses what dl_sym found in it any more
+  (the library may be unloaded).
 
 - **`fn gpu_thread_spawn(stack: usize, f: Start) -> Option<super::Thread>`**
   a real thread with stack bytes of stack (the output's jobs) -> its handle
