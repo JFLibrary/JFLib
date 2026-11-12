@@ -2987,7 +2987,8 @@ DOCK_TAB_HOLD: u32 = 1
   the layout of a dock area: kept by the app and passed to dock_begin / dock_next /
   dock_end.  save() / load() turn it into a few lines of text: \\`dock 1\\`, then \\`side S SIZE
   COLLAPSED`, `group S TAG SIZE ACTIVE PANEL...`, `float SLOT X Y W H HOME HOMETAG ACTIVE
-  PANEL...\\`, \\`hidden PANEL S TAG POS X Y W H HOME HOMETAG\\` (unknown lines are skipped).
+  PANEL...\\`, \\`hidden PANEL S TAG POS X Y W H HOME HOMETAG [ORDER...]\\` (ORDER: its group's tab
+  order when it left; unknown lines are skipped).
 
 **`impl DockState`**
 

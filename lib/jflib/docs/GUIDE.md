@@ -2258,13 +2258,16 @@ self.dock.focus(P_PROPS);
 * `DockState`: `save()` / `load(text)` (a few lines, `dock 1` first; unknown lines and bad
   values are skipped), `reset`, `show` / `hide` / `toggle` / `focus` / `activate`, `float` /
   `dock_to`, `float_group` / `dock_group_to`, `collapse`, `size` / `set_size`, and for menus and status lines `groups(side)`,
-  `floats()`, `hidden_panels()`, `side(id)`, `visible`, `front`, `shown`.
+  `floats()`, `hidden_panels()`, `side(id)`, `visible`, `front`, `shown`. `show` brings a hidden
+  panel back between the neighbours it had in its group, whichever of them are back already:
+  panels hidden one by one and shown again in any order keep their tab order (the order goes
+  with `save` / `load`; `tests/order.uis`).
 * Keyboard: a group's tab strip is one focus stop (Left / Right / Home / End switch tabs, the
   menu key or Shift+F10 open the group's menu); Ctrl+PgDn / Ctrl+PgUp switch tabs while the
   focus is anywhere in the group. Mirrored windows (RTL) show the left side at the right with
   its markers; menus and markers name the sides as they show.
 * Tests: `apps/docktest` (`tests/layout.uis`, `drag.uis`, `hold.uis`, `float.uis`, `keys.uis`,
-  `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`, `group.uis`). A plain `drag` lasts 128 ms and never gets
+  `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`, `group.uis`, `order.uis`). A plain `drag` lasts 128 ms and never gets
   past the hold: `drag tab:"…" X,Y hold 320`, or `wait 320` between `down` and the first `move`
   (a `move` during the hold does not count towards the drag).
   A floating window is `window 501`, and `window any` + `drag tab:"…" X,Y hold 320` drags its
