@@ -110,7 +110,7 @@ pub(super) fn release_pixels(id: i32) {
     }
 }
 /// The window typed text goes to (as keys do): the active one while it is shown and enabled.
-pub(super) fn text_target() -> Option<u8> {
+pub(crate) fn text_target() -> Option<u8> {
     let d = DISPLAY.lock();
     window(&d, d.active).is_some_and(|w| w.shown && w.enabled).then_some(d.active as u8)
 }

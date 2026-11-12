@@ -71,13 +71,14 @@
 //                                          last lines after a crash (a child)
 //   plattest --test life-bus               (t_life.rs, Linux) sleep, settings and SIGTERM against
 //                                          fake buses (tools/platshared/life_bus.py)
-//   plattest --test a11y / a11y-bus / uia / caret / a11y-mac / a11y-show   (t_a11y.rs) the
+//   plattest --test a11y / a11y-bus / uia / caret / a11y-mac / a11y-ios / a11y-show   (t_a11y.rs) the
 //                                          accessibility tree for screen readers: headless model
 //                                          and actions;
 //                                          Linux against a fake AT-SPI2 bus (tools/platshared/
 //                                          atspi_bus.py); Windows through IUIAutomation (by
 //                                          hand); caret: the caret for screen magnifiers; macOS
-//                                          through AppKit's accessibility entry points (a window);
+//                                          through AppKit's accessibility entry points (a window),
+//                                          iOS through UIAccessibility under UIKit (simapp);
 //                                          a11y-show: the demo by hand, for a screen reader
 //   plattest --test settings / settings-bus / settings-bus-files   (t_settings.rs) the system
 //                                          settings: the jfgui_* overrides, the title bar's
@@ -417,6 +418,7 @@ fn plattest() -> i32 {
         Some("caret") => t_a11y::t_caret,              // Windows, by hand: the caret for magnifiers
         Some("a11y-mac") => t_a11y::t_a11y_mac,        // macOS, a real window: NSAccessibility (VoiceOver)
         Some("a11y-show") => t_a11y::t_a11y_show,      // by hand: the demo for a screen reader
+        Some("a11y-ios") => t_a11y::t_a11y_ios,        // iOS under UIKit (simapp): UIAccessibility (VoiceOver)
         Some("secret") => t_secret::t_secret,          // the system's secret store (not in "all")
         Some("secret-bus") => t_secret::t_secret_bus,  // Linux: against tools/platshared/secret_bus.py
         Some("power") => t_power::t_power,             // plat::inhibit (Windows: real power requests)

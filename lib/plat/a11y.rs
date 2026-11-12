@@ -19,7 +19,8 @@
 //
 // Linux: AT-SPI2 on the accessibility bus (linux_atspi.rs).  Windows: UI Automation providers
 // answering WM_GETOBJECT (win_uia.rs).  macOS: NSAccessibility elements under each window's view,
-// turned on by the first question of an assistive technology (apple_mac_a11y.rs, VoiceOver).  The browser and Android (web_a11y.rs): the host keeps
+// turned on by the first question of an assistive technology (apple_mac_a11y.rs, VoiceOver).  iOS:
+// UIAccessibility elements under the host's view while VoiceOver runs (apple_ios_a11y.rs).  The browser and Android (web_a11y.rs): the host keeps
 // a mirror of the tree -- an ARIA shadow tree in the DOM (web/a11y.js), virtual views of an
 // AccessibilityNodeProvider (android/GalleryAccessibility.java) -- fed with the differences
 // of every published tree (a11y_wire.rs: Mirror, the wire format); the host turns the mirror
@@ -667,7 +668,10 @@ use crate::web::a11y_host as native;
 #[cfg(target_os = "macos")]
 use crate::apple::mac::a11y_mac as native;
 
-#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android", target_os = "macos")))]
+#[cfg(target_os = "ios")]
+use crate::apple::ios::a11y_ios as native;
+
+#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android", target_vendor = "apple")))]
 mod native {
     use super::{Change, Snapshot};
     use alloc::vec::Vec;

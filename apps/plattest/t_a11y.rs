@@ -30,6 +30,11 @@
 //                              the caret steps of tools/platshared/atspi_bus.py (a11y-bus)
 //   plattest --test a11y-show  (by hand) the demo in a real window until it is closed: probes with
 //                              a screen reader; --lang CODE in that UI language
+//   plattest --test a11y-ios   (iOS, under UIKit: tools/apple.py simapp) the demo with the
+//                              UIAccessibility elements, read and driven as VoiceOver does from a
+//                              thread of the test (plat::ios_ax_*): traits, values, containers,
+//                              double taps and swipes with their result at once, the text field
+//                              through UITextInput, the layout change of the focus
 //   plattest --test a11y-mac   (macOS, a real window for a few seconds: tools/apple.py gui) the
 //                              demo with the NSAccessibility elements; a thread of the test reads
 //                              the tree through AppKit's own entry points on the main thread
@@ -649,6 +654,14 @@ pub fn t_a11y_mac(t: &mut T) {
 #[cfg(target_os = "macos")]
 pub use mac::t_a11y_mac;
 
+#[cfg(not(target_os = "ios"))]
+pub fn t_a11y_ios(t: &mut T) {
+    t.info("  (a11y-ios: UIAccessibility is the iOS bridge; tools/apple.py simapp runs it)\n");
+}
+
+#[cfg(target_os = "ios")]
+pub use ios::t_a11y_ios;
+
 /// (Windows) the demo with the UI Automation providers, read and driven through IUIAutomation
 /// from a thread of the test (plat::uia_test_*)
 #[cfg(windows)]
@@ -1207,5 +1220,193 @@ mod mac {
         }
         t.expect_i(code as i64, 0, "a11y-mac: the window ran");
         t.expect_s(Some(&app.text), Some("Bert"), "a11y-mac: the text field's text in the app");
+    }
+}
+
+/// (iOS) the demo under UIKit's host with the UIAccessibility elements, read and driven as
+/// VoiceOver does from a thread of the test (plat::ios_ax_*); the host runs the app after main
+/// returned, so the client prints its checks itself and ends with "Beenden"
+#[cfg(target_os = "ios")]
+mod ios {
+    use alloc::boxed::Box;
+    use alloc::string::String;
+    use alloc::vec::Vec;
+    use core::sync::atomic::{AtomicI32, Ordering::SeqCst};
+
+    use plat::{IosAxAct as A, IosAxElem, IosAxText as Q, ios_ax_act, ios_ax_events, ios_ax_listen, ios_ax_select, ios_ax_text, ios_ax_tree, ios_ax_type};
+
+    use super::*;
+
+    static CHECKS: AtomicI32 = AtomicI32::new(0);
+    static FAILS: AtomicI32 = AtomicI32::new(0);
+
+    fn record(ok: bool, name: &str) {
+        CHECKS.fetch_add(1, SeqCst);
+        if !ok {
+            FAILS.fetch_add(1, SeqCst);
+        }
+        plat::write_stdout(alloc::format!("{} {name}\n", if ok { "PASS" } else { "FAIL" }).as_bytes());
+    }
+
+    fn start() {
+        if plat::thread_spawn(0, Box::new(client)).is_none() {
+            record(false, "a11y-ios: the client thread starts");
+        }
+    }
+
+    fn wait(mut ok: impl FnMut() -> bool) -> bool {
+        for _ in 0..60 {
+            if ok() {
+                return true;
+            }
+            plat::sleep_ms(50);
+        }
+        false
+    }
+
+    fn find<'a>(t: &'a [IosAxElem], label: &str) -> Option<&'a IosAxElem> {
+        t.iter().find(|e| e.element && e.label == label)
+    }
+
+    // the element with this label and trait (a slider after the text that names it)
+    fn find_tr<'a>(t: &'a [IosAxElem], label: &str, tr: &str) -> Option<&'a IosAxElem> {
+        t.iter().find(|e| e.element && e.label == label && e.traits.contains(&tr))
+    }
+
+    fn field(t: &[IosAxElem]) -> Option<&IosAxElem> {
+        t.iter().find(|e| e.element && e.label == "Name" && e.text_input)
+    }
+
+    fn has(e: &IosAxElem, tr: &str) -> bool {
+        e.traits.contains(&tr)
+    }
+
+    fn tree() -> Vec<IosAxElem> {
+        ios_ax_tree().unwrap_or_default()
+    }
+
+    fn client() {
+        steps();
+        let (n, f) = (CHECKS.load(SeqCst), FAILS.load(SeqCst));
+        plat::write_stdout(alloc::format!("a11y-ios: {n} checks, {f} failed{}\n", if f != 0 { " (check(s) failed)" } else { "" }).as_bytes());
+        if !ios_ax_act("Beenden", "", A::Activate) {
+            plat::evq_push(plat::Event { typ: plat::E_CLOSE, ..Default::default() });
+            plat::wake();
+        }
+    }
+
+    fn steps() {
+        // the first question turns the bridge on; the tree comes with the next frame
+        let mut t = Vec::new();
+        for _ in 0..100 {
+            t = tree();
+            if find(&t, "Drücken").is_some() {
+                break;
+            }
+            plat::sleep_ms(100);
+        }
+        record(find(&t, "Drücken").is_some(), "a11y-ios: the view's accessibilityElements hold the demo");
+        if find(&t, "Drücken").is_none() {
+            plat::write_stdout(alloc::format!("  elements: {t:?}\n").as_bytes());
+            return;
+        }
+        let t = &t;
+        record(plat::a11y::active(), "a11y-ios: the question turned the bridge on");
+        record(find(t, "Einstellungen").is_some_and(|e| has(e, "header")), "a11y-ios: a heading is a header");
+        record(find(t, "Klicks: 0").is_some_and(|e| has(e, "static")), "a11y-ios: a label is static text");
+        let btn = find(t, "Drücken");
+        record(btn.is_some_and(|e| has(e, "button") && !has(e, "disabled")), "a11y-ios: a button");
+        record(find(t, "Gesperrt").is_some_and(|e| has(e, "button") && has(e, "disabled")), "a11y-ios: a disabled button: not enabled");
+        record(find(t, "Option").is_some_and(|e| has(e, "button") && !has(e, "selected")), "a11y-ios: a check box: a button, not selected");
+        record(
+            find(t, "Eins").is_some_and(|e| has(e, "selected")) && find(t, "Zwei").is_some_and(|e| !has(e, "selected")),
+            "a11y-ios: radio buttons: the first one selected",
+        );
+        record(find(t, "Schalter").is_some_and(|e| has(e, "toggle") && e.value == "0"), "a11y-ios: a switch: a toggle button, value 0");
+        record(find_tr(t, "Lautstärke", "adjustable").is_some_and(|e| e.value == "30"), "a11y-ios: a slider: adjustable, value 30");
+        record(field(t).is_some_and(|e| e.value == "Anna" && has(e, "keyboard")), "a11y-ios: a text field: UITextInput, its text");
+        record(t.iter().any(|e| e.element && e.value == "40 %" && has(e, "frequent")), "a11y-ios: a progress bar: 40 %, updates frequently");
+        let tab = t.iter().position(|e| !e.element && e.traits.contains(&"tabbar"));
+        record(
+            tab.is_some_and(|k| {
+                let d = t[k].depth;
+                find(t, "Erste").is_some_and(|e| e.depth == d + 1 && has(e, "button") && has(e, "selected"))
+                    && find(t, "Zweite").is_some_and(|e| e.depth == d + 1 && !has(e, "selected"))
+            }),
+            "a11y-ios: the tab strip is a tab bar holding its tabs, the first selected",
+        );
+        let list = t.iter().position(|e| !e.element && e.container == 2);
+        record(
+            list.is_some_and(|k| FRUIT.iter().all(|n| find(t, n).is_some_and(|e| e.depth == t[k].depth + 1))),
+            "a11y-ios: the list is a list container holding its rows",
+        );
+        record(find(t, "Apfel").is_some_and(|e| has(e, "selected")), "a11y-ios: the first row is selected");
+        let f = btn.map_or([0.0; 4], |e| e.frame);
+        record(f[2] > 10.0 && f[3] > 10.0 && f[0] >= 0.0 && f[1] >= 0.0, &alloc::format!("a11y-ios: the button's frame on the screen ({f:?})"));
+
+        // actions as VoiceOver takes them: the new state is there right after the action
+        ios_ax_listen(true);
+        let now = |label: &str, ok: &dyn Fn(&IosAxElem) -> bool| find(&tree(), label).is_some_and(ok);
+        let slider = |v: &str| find_tr(&tree(), "Lautstärke", "adjustable").is_some_and(|e| e.value == v);
+        record(ios_ax_act("Drücken", "", A::Activate) && st(CLICKS) == 1, "a11y-ios: a double tap presses the button at once");
+        record(now("Klicks: 1", &|_| true), "a11y-ios: the label's new text at once");
+        record(ios_ax_act("Option", "", A::Activate) && now("Option", &|e| has(e, "selected")), "a11y-ios: the check box is selected right after its double tap");
+        record(ios_ax_act("Schalter", "", A::Activate) && now("Schalter", &|e| e.value == "1"), "a11y-ios: the switch's value 1 right after");
+        record(ios_ax_act("Zwei", "", A::Activate) && st(RADIO) == 1, "a11y-ios: the second radio button");
+        record(ios_ax_act("Lautstärke", "adjustable", A::Increment) && slider("35"), "a11y-ios: swipe up: the slider at 35 right after");
+        record(ios_ax_act("Lautstärke", "adjustable", A::Decrement) && slider("30"), "a11y-ios: swipe down: back to 30");
+        record(!ios_ax_act("Klicks: 1", "", A::Increment), "a11y-ios: a label is not adjustable");
+        record(ios_ax_act("Zweite", "", A::Activate) && st(TAB) == 1, "a11y-ios: the second tab");
+        record(ios_ax_act("Kirsche", "", A::Activate) && st(LIST) == 2, "a11y-ios: the third list row");
+        let clicks = st(CLICKS);
+        record(!ios_ax_act("Gesperrt", "", A::Activate) && st(CLICKS) == clicks, "a11y-ios: a disabled button refuses the double tap");
+        record(ios_ax_act("Eigen", "", A::Activate) && wait(|| st(OWN) == 1), "a11y-ios: a widget of its own (a pointer click)");
+
+        // the text field: a double tap focuses it (the keyboard follows), UITextInput reads and moves
+        let q = |x: Q| ios_ax_text("Name", x).unwrap_or_default();
+        let range = |s: String| -> (i64, i64) {
+            let mut it = s.split(',').map(|x| x.parse::<i64>().unwrap_or(-1));
+            (it.next().unwrap_or(-1), it.next().unwrap_or(-1))
+        };
+        record(ios_ax_act("Name", "keyboard", A::Activate), "a11y-ios: a double tap on the text field");
+        record(
+            wait(|| {
+                let (a, n) = range(q(Q::Selected));
+                a >= 0 && a + n == 4
+            }),
+            &alloc::format!("a11y-ios: the focused field: the selection ends after 'Anna' ({})", q(Q::Selected)),
+        );
+        record(q(Q::Text(1, 2)) == "nn", "a11y-ios: textInRange: of the field");
+        record(ios_ax_type("Bert") && wait(|| field(&tree()).is_some_and(|e| e.value == "Bert")), "a11y-ios: the keyboard types 'Bert' over the selection");
+        record(ios_ax_select("Name", 1, 0) && wait(|| q(Q::Selected) == "1,0"), "a11y-ios: setSelectedTextRange: moves the caret");
+        let frame = field(&tree()).map_or([0.0; 4], |e| e.frame);
+        let c = {
+            let mut r = [0.0; 4];
+            for (k, x) in q(Q::Caret(1)).split(',').take(4).enumerate() {
+                r[k] = x.parse::<f64>().unwrap_or(0.0);
+            }
+            r
+        };
+        record(
+            c[3] > 0.0 && c[0] >= frame[0] - 0.5 && c[0] <= frame[0] + frame[2] && c[1] >= frame[1] - 0.5 && c[1] + c[3] <= frame[1] + frame[3] + 0.5,
+            &alloc::format!("a11y-ios: the caret's rectangle lies in the field ({c:?} in {frame:?})"),
+        );
+        record(q(Q::Text(0, 4)) == "Bert", "a11y-ios: the field's text through UITextInput");
+        let mut ev: Vec<String> = Vec::new();
+        record(
+            wait(|| {
+                ev.extend(ios_ax_events());
+                ev.iter().any(|e| e == "LayoutChanged:Name")
+            }),
+            &alloc::format!("a11y-ios: the focus on the text field: a layout change pointing at it ({ev:?})"),
+        );
+        ios_ax_listen(false);
+    }
+
+    pub fn t_a11y_ios(t: &mut T) {
+        let mut app = Demo::new();
+        app.on_init = Some(start);
+        let code = ui::launch(&DESC, app, &style::STYLE);
+        t.expect_i(code as i64, 0, "a11y-ios: UIKit's host takes the demo");
     }
 }

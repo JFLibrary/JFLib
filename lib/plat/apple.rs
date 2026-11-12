@@ -33,6 +33,9 @@ pub(crate) mod block;
 #[cfg(target_os = "ios")]
 #[path = "apple_ios.rs"]
 pub(crate) mod ios;
+// (tests) VoiceOver's view of the elements (apple_ios_a11y.rs)
+#[cfg(target_os = "ios")]
+pub use ios::{IosAxAct, IosAxElem, IosAxText, ios_ax_act, ios_ax_escape, ios_ax_events, ios_ax_listen, ios_ax_select, ios_ax_text, ios_ax_tree, ios_ax_type};
 // macOS's windows: AppKit (AP4)
 #[cfg(target_os = "macos")]
 #[path = "apple_mac.rs"]
