@@ -62,6 +62,16 @@ fn schemes(meta: &HashMap<String, String>) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
+/// browser= -> the app is a web browser (1; 0 or missing: not): it needs http and https in schemes=
+fn browser(meta: &HashMap<String, String>, schemes: &[String]) -> Result<bool, String> {
+    match meta.get("browser").map(String::as_str) {
+        None | Some("0") => Ok(false),
+        Some("1") if ["http", "https"].iter().all(|w| schemes.iter().any(|s| s == w)) => Ok(true),
+        Some("1") => Err(String::from("PACKAGE browser=1: schemes= must list http and https")),
+        Some(v) => Err(format!("PACKAGE browser: '{v}' is neither 1 nor 0")),
+    }
+}
+
 /// app_id=, else org.jflib.<name>: three or more parts of letters, digits and '_', none starting
 /// with a digit (the Flatpak and D-Bus rules)
 fn app_id(meta: &HashMap<String, String>, name: &str) -> Result<String, String> {
@@ -91,14 +101,16 @@ pub(crate) fn boot_text(text: &str, name: &str, version: &str) -> Result<String,
     }
     let types = filetypes(&meta)?;
     let schemes = schemes(&meta)?;
+    let browser = browser(&meta, &schemes)?;
     let aid = app_id(&meta, name)?;
     let get = |k: &str, d: &str| meta.get(k).cloned().unwrap_or_else(|| d.to_string());
     Ok(format!(
-        "display={}\napp_id={aid}\ncategories={}\nfiletypes={}\nschemes={}\n",
+        "display={}\napp_id={aid}\ncategories={}\nfiletypes={}\nschemes={}\n{}",
         get("display", name),
         get("categories", "Utility;"),
         types.join("; "),
-        schemes.join(" ")
+        schemes.join(" "),
+        if browser { "browser=1\n" } else { "" }
     ))
 }
 
@@ -118,5 +130,14 @@ mod tests {
         assert!(boot_text("schemes=1x", "a", "1.0.0").unwrap_err().contains("bad scheme '1x'"));
         assert!(boot_text("app_id=org.x", "a", "1.0.0").unwrap_err().contains("no reverse-DNS id"));
         assert!(boot_text("app_id=org.example.App", "a", "1.0.0").unwrap().contains("app_id=org.example.App\n"));
+    }
+
+    #[test]
+    fn a_browser() {
+        let pkg = "display=Netz\nschemes=http https\nfiletypes=html,htm|text/html|HTML-Dokument\nbrowser=1\n";
+        assert!(boot_text(pkg, "netz", "1.0.0").unwrap().ends_with("schemes=http https\nbrowser=1\n"));
+        assert!(!boot_text("schemes=http https\nbrowser=0", "netz", "1.0.0").unwrap().contains("browser"));
+        assert!(boot_text("schemes=http\nbrowser=1", "netz", "1.0.0").unwrap_err().contains("must list http and https"));
+        assert!(boot_text("schemes=http https\nbrowser=yes", "netz", "1.0.0").unwrap_err().contains("neither 1 nor 0"));
     }
 }

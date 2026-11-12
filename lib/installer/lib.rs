@@ -136,6 +136,8 @@ pub(crate) struct Inst {
     /// the manifest's file types and URL schemes (PACKAGE filetypes= / schemes=)
     pub(crate) types: String,
     pub(crate) schemes: String,
+    /// the manifest's browser=1: registered as a web browser too (Default Programs)
+    pub(crate) browser: bool,
     /// uninstall: install.ini assoc= (what the file types and schemes added)
     pub(crate) assoc: String,
     /// the manifest's app_id (PACKAGE, tools/pkgmeta.py): the program's AppUserModelID on its

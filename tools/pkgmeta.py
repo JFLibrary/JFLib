@@ -4,6 +4,8 @@ the AppStream metainfo and the icons.
 
   kv_file(path)                     PACKAGE: key=value lines ('#' comments)
   filetypes(meta) / schemes(meta)   the file types and URL schemes the app opens
+  browser(meta)                     PACKAGE browser=1: a web browser (needs schemes= http https)
+  categories(meta)                  the .desktop Categories (a browser's with Network;WebBrowser;)
   mime_package(types)               shared-mime-info XML of the app's own types
   app_id(meta, app)                 the reverse-DNS id (PACKAGE app_id=; default org.jflib.<App>)
   permissions(app)                  apps/NAME/PERMISSIONS as [(key, [args])], None without one
@@ -79,6 +81,28 @@ def schemes(meta):
     return out
 
 
+def browser(meta):
+    """PACKAGE browser= -> the app is a web browser (1; 0 or missing: not); it needs http and https
+    in schemes= (lib/jflib_build, cargo-jflib check the same)"""
+    v = meta.get("browser", "0")
+    if v not in ("0", "1"):
+        raise SystemExit(f"PACKAGE browser: {v!r} is neither 1 nor 0")
+    if v == "1" and not {"http", "https"} <= set(schemes(meta)):
+        raise SystemExit("PACKAGE browser=1: schemes= must list http and https")
+    return v == "1"
+
+
+def categories(meta):
+    """PACKAGE categories= (default Utility;), a browser's with Network;WebBrowser; (the desktops
+    list their web browsers by them)"""
+    c = meta.get("categories", "Utility;")
+    if browser(meta):
+        for need in ("Network", "WebBrowser"):
+            if need not in [x.strip() for x in c.split(";")]:
+                c += ("" if not c or c.endswith(";") else ";") + need + ";"
+    return c
+
+
 def app_id(meta, app):
     """the reverse-DNS id of Flatpak, AppStream and the MSIX identity: PACKAGE app_id=, else
     org.jflib.<App>.  At least three parts of letters, digits and '_', none starting with a
@@ -119,7 +143,7 @@ def desktop_entry(meta, app, exe, icon, wm_class=None):
     mimes = list(dict.fromkeys([m for _, m, _, _ in types] + [f"x-scheme-handler/{s}" for s in urls]))
     return ("[Desktop Entry]\nType=Application\n"
             f"Name={display}\nGenericName={meta.get('generic', display)}\nComment={meta.get('summary', '')}\n"
-            f"Exec={exe} {'%U' if urls else '%F'}\nIcon={icon}\nTerminal=false\nCategories={meta.get('categories', 'Utility;')}\n"
+            f"Exec={exe} {'%U' if urls else '%F'}\nIcon={icon}\nTerminal=false\nCategories={categories(meta)}\n"
             + (f"MimeType={';'.join(mimes)};\n" if mimes else "")
             + (f"StartupWMClass={wm_class}\n" if wm_class else ""))
 

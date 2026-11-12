@@ -27,7 +27,8 @@ gives notifications only to bundled programs).
 
 build_rs.py packs every program it builds for mac into NAME.app too (mac_bundle, docs/APPLE.md AP7c):
 Info.plist from apps/APP/PACKAGE (display, version, app_id, filetypes= as document types -- "own"
-ones also exported as types of the app --, schemes= as URL types), the icon as NAME.icns from
+ones also exported as types of the app --, schemes= as URL types; browser=1: http and https as the
+web URL type, the web documents with their system types), the icon as NAME.icns from
 res/app_*.png (none without), signed ad hoc; PERMISSIONS with `sandbox` turns on the App Sandbox with
 the entitlements its rules need (mac_entitlements).  The signature is ad hoc unless jfgui_MAC_IDENTITY names a
 certificate of the keychain ("Developer ID Application: NAME (TEAM)"): then with the hardened runtime and a
@@ -59,6 +60,10 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 IOS_MIN = "16.0"          # docs/APPLE.md, decision 7 (build_rs.py APPLE_MIN)
 MAC_MIN = "13.0"
+# a web browser's documents (PACKAGE browser=1) by MIME type: the system's type, a browser is its
+# Default viewer (html; the others stay Alternate) -- cargo-jflib's mac.rs web_uti
+WEB_UTI = {"text/html": ("public.html", True), "application/xhtml+xml": ("public.xhtml", True),
+           "image/svg+xml": ("public.svg-image", False), "application/pdf": ("com.adobe.pdf", False)}
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pkgmeta  # noqa: E402  (PACKAGE, PERMISSIONS, the icon)
 import struct  # noqa: E402
@@ -212,11 +217,19 @@ def mac_plist(exe_name, app):
     if meta.get("publisher"):
         p["NSHumanReadableCopyright"] = meta["publisher"]
     types = pkgmeta.filetypes(meta)
+    browser = pkgmeta.browser(meta)
+
+    def web(mime, own):
+        """a browser's web document: its system type and whether a browser is its Default viewer"""
+        return None if own or not browser else WEB_UTI.get(mime)
+
     if types:
         p["CFBundleDocumentTypes"] = [
-            {"CFBundleTypeName": desc, "CFBundleTypeRole": "Editor", "CFBundleTypeExtensions": exts, "CFBundleTypeMIMETypes": [mime],
-             "LSHandlerRank": "Owner" if own else "Alternate",
-             **({"LSItemContentTypes": [f"{aid}.{exts[0]}"]} if own else {})}
+            {"CFBundleTypeName": desc, "CFBundleTypeRole": "Viewer" if browser else "Editor", "CFBundleTypeExtensions": exts,
+             "CFBundleTypeMIMETypes": [mime],
+             "LSHandlerRank": "Owner" if own else "Default" if (web(mime, own) or ("", False))[1] else "Alternate",
+             **({"LSItemContentTypes": [f"{aid}.{exts[0]}"]} if own else
+                {"LSItemContentTypes": [web(mime, own)[0]]} if web(mime, own) else {})}
             for exts, mime, desc, own in types]
         exported = [{"UTTypeIdentifier": f"{aid}.{exts[0]}", "UTTypeDescription": desc, "UTTypeConformsTo": ["public.data"],
                      "UTTypeTagSpecification": {"public.filename-extension": exts, "public.mime-type": [mime]}}
@@ -225,7 +238,11 @@ def mac_plist(exe_name, app):
             p["UTExportedTypeDeclarations"] = exported
     schemes = pkgmeta.schemes(meta)
     if schemes:
-        p["CFBundleURLTypes"] = [{"CFBundleURLName": aid, "CFBundleURLSchemes": schemes}]
+        # a browser's http and https: a URL type of their own, which macOS's list of web browsers reads
+        webs = [s for s in schemes if browser and s in ("http", "https")]
+        rest = [s for s in schemes if s not in webs]
+        p["CFBundleURLTypes"] = ([{"CFBundleURLName": "Web site URL", "CFBundleTypeRole": "Viewer", "CFBundleURLSchemes": webs}] if webs else []) \
+            + ([{"CFBundleURLName": aid, "CFBundleURLSchemes": rest}] if rest else [])
     return p
 
 

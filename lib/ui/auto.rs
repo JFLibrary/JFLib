@@ -82,6 +82,8 @@
 //          settings theme|locale|contrast|fonts|other|N
 //                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...;
 //                       background / foreground: a hidden tab, Android's onStop / onStart)
+//   system browser default|other|unknown   (E13) what ui.default_browser answers from here (a
+//                       headless run never asks the system; at first other)
 //   system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
 //                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
 //   system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
@@ -1280,6 +1282,23 @@ impl Ui {
                 self.text.set_system_fallback(value.starts_with('1'));
                 self.dirty_force_full();
             }
+            self.run_passes(app);
+            return;
+        }
+        if w("browser") {
+            // (E13) what ui.default_browser answers (the user chose in the system's settings)
+            let r = next_word(a);
+            let s = if word_eq(r, "default").is_some() {
+                plat::BrowserStatus::Default
+            } else if word_eq(r, "other").is_some() {
+                plat::BrowserStatus::NotDefault
+            } else if word_eq(r, "unknown").is_some() {
+                plat::BrowserStatus::Unknown
+            } else {
+                self.fail(b"system browser: default, other or unknown");
+                return;
+            };
+            super::assoc::browser_script_set(s);
             self.run_passes(app);
             return;
         }

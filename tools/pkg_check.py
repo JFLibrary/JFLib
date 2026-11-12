@@ -572,6 +572,18 @@ def meta_checks(d):
         except SystemExit:
             pass
     check(pkgmeta.app_id({}, "Paint Craft") == "org.jflib.Paint_Craft", "meta: app_id default org.jflib.<App>, bad app ids refused")
+    # (E13) a web browser: Network;WebBrowser; in the .desktop file, http and https needed
+    web = {"schemes": "http https", "filetypes": "html,htm|text/html|HTML-Dokument", "categories": "Network;", "browser": "1"}
+    wdesk = pkgmeta.desktop_entry(web, "Netz", "netz", "netz")
+    check(pkgmeta.browser(web) and "\nCategories=Network;WebBrowser;\n" in wdesk
+          and "MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;\n" in wdesk and not pkgmeta.browser({}),
+          "meta: browser=1: Network;WebBrowser; and the web MIME types in the .desktop file")
+    for bad in ({"schemes": "https", "browser": "1"}, {"browser": "ja"}):
+        try:
+            pkgmeta.browser(bad)
+            check(False, f"meta: browser {bad!r} is refused")
+        except SystemExit:
+            pass
 
     # Flatpak
     args, notes = pkg_linux.finish_args(FIX_PERMS, ["--talk-name=org.kde.StatusNotifierWatcher"])
@@ -661,6 +673,7 @@ def meta_checks(d):
     check(caps == [] and any(n.startswith("location") for n in cnotes) and any(n.startswith("sensors") for n in cnotes),
           "msix: location, sensors: nothing declared while plat has no Windows version (noted)")
     for bad_meta, what in (({"schemes": "https"}, "a reserved scheme"), ({"version": "70000.1"}, "a version part > 65535"),
+                           ({"schemes": "http https", "browser": "1"}, "a web browser"),
                            ({"msix_name": "x"}, "a short identity name"),
                            ({"filetypes": "fxd|application/x-jf-fixture|Fixture|own; png,fxd|image/png|PNG"}, "an extension in two file types")):
         try:
