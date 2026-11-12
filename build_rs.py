@@ -1412,6 +1412,9 @@ def wsl_path(p):
 
 
 SCRIPT_TIMEOUT = 600
+# the lines of a failed script's output that test shows: checks, errors, panics and crash reports (exit code 3:
+# "jfgui: crash 0x... at offset ...", lib/plat/*_crash.rs)
+FAIL_LINES = ("FAIL", "error", "panic", "UIWARN", "jfgui: crash")
 
 
 def run_exe(target, exe, args, timeout=SCRIPT_TIMEOUT):
@@ -1507,7 +1510,7 @@ def run_tests(builders, out, quick):
                     fails.append(tag)
                     print(f"FAIL {tag} (exit {record['exit_code']})")
                     for ln in record['output'].splitlines():
-                        if ln.startswith(("FAIL", "error", "panic", "UIWARN")):
+                        if ln.startswith(FAIL_LINES):
                             print("   " + ln)
     print(f"{total - len(fails)} of {total} scripts passed" + (f" ({skipped} pending)" if skipped else ""))
     # what only runs on a device (G4c): the serial of a device or emulator in jfgui_TEST_ANDROID, its builds
@@ -1606,7 +1609,7 @@ def run_app_suite(builders, name):
                 fails.append(tag)
                 print(f"FAIL {tag} (exit {record['exit_code']})")
                 for ln in record["output"].splitlines():
-                    if ln.startswith(("FAIL", "error", "panic", "UIWARN")):
+                    if ln.startswith(FAIL_LINES):
                         print("   " + ln)
             else:
                 print(f"ok   {tag} ({record['duration']:.1f} s)")
