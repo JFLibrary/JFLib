@@ -346,6 +346,10 @@ pub use dnd::*;
 mod cliprich;
 pub use cliprich::*;
 mod consts;
+// (E3) drawn cursors for the shapes Windows and X11 have none of (Wayland's own images, macOS'
+// zoom and cell)
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+mod cursor_art;
 mod evq;
 mod ime;
 pub use ime::*;

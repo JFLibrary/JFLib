@@ -30557,6 +30557,10 @@ callbacks (refresh, hit hook) never hold a reference across a Win32 call.
 - **`fn win_set_cursor(w: i32, shape: u32)`**
   CUR_\* shape while the pointer is over window w
 
+- **`fn cursor_probe(shape: u32, dpi: i32) -> (u64, i32)`**
+  (tests) the cursor Windows shows for shape in a window of this dpi: its HCURSOR and, for a
+  drawn one, its width in px (0: a system cursor or cursor_fallback's)
+
 - **`fn cursor_create(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, _dpi: i32) -> i32`**
   a cursor from w x h premultiplied 0xAARRGGBB pixels (rows of w \* 4 bytes), hot spot in px:
   a 32-bit top-down DIB section with straight alpha + an empty AND mask -> CreateIconIndirect;
@@ -31652,6 +31656,8 @@ BK_X11: u32 = 2
   - `fn cursor_create(&mut self, px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, dpi: i32) -> i32`
   - `fn cursor_destroy(&mut self, id: i32)`
   - `fn cursor_dpi(&mut self, dpi: i32) -> i32`
+  - `fn cursor_probe(&mut self, _shape: u32, _dpi: i32) -> (u64, i32)`
+    (tests) the cursor shown for shape at dpi and the width of a drawn one
   - `fn clip_set(&mut self, fmt: u32, data: &[u8]) -> bool`
   - `fn clip_set_many(&mut self, entries: &[(u32, &[u8])]) -> bool`
   - `fn clip_get(&mut self, fmt: u32) -> Option<Vec<u8>>`
@@ -31746,6 +31752,11 @@ BK_X11: u32 = 2
 
 - **`fn cursor_dpi(dpi: i32) -> i32`**
   the dpi to draw a cursor for a window of this dpi (no display yet: the dpi itself)
+
+- **`fn cursor_probe(shape: u32, dpi: i32) -> (u64, i32)`**
+  (tests, E3) the cursor shown for shape (CUR_\*) in a window of this dpi: its id (X11: the
+  Cursor; 0 without a display or on Wayland) and, for a drawn one (cursor_art), its width in
+  px (0: a system cursor or cursor_fallback's)
 
 - **`fn clip_set(fmt: u32, data: &[u8]) -> bool`**
 
@@ -32959,6 +32970,10 @@ that never span a call into AppKit (AppKit calls back into the view and the dele
 - **`fn cursor_dpi(dpi: i32) -> i32`**
   the dpi to draw a cursor for a window of this dpi (the window's own)
 
+- **`fn cursor_probe(_shape: u32, _dpi: i32) -> (u64, i32)`**
+  (tests, E3) the cursor shown for shape at dpi and the width of a drawn one: not probed on
+  macOS (NSCursor has the shapes but zoom-in, zoom-out and cell, which drawn_cursor makes)
+
 - **`fn file_dialog(flags: u32, path: &mut String, exts: &[&str]) -> (i32, u32)`**
   the system's Open / Save panel (modal) -> (1 chosen / 0 cancelled / -1 none, index of the chosen
   extension entry).  flags: FD_SAVE, FD_FOLDER (an Open panel for folders), the selected entry in
@@ -33827,6 +33842,10 @@ REQUEST_FULLSCREEN: u32 = 23
 
 - **`fn cursor_dpi(dpi: i32) -> i32`**
   Cursor scale follows the canvas DPI.
+
+- **`fn cursor_probe(_shape: u32, _dpi: i32) -> (u64, i32)`**
+  (tests, E3) the cursor shown for shape at dpi and the width of a drawn one: none here (the
+  system has the shapes, cursor_fallback's for the rest)
 
 - **`fn popup_anchor(_slot: u32, _anchor: [i32; 4], _kind: u32, _nat: [i32; 2])`**
   The canvas shows popups where the library put them (inside the canvas).

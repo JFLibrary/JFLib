@@ -167,7 +167,7 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
         }
         WT_CURSOR_IS => {
             // SAFETY: no arguments.
-            (unsafe { GetCursor() } == cur_handle(a[0] as u32)) as i64
+            (unsafe { GetCursor() } == cur_handle(a[0] as u32, rec(w).map_or(96, |r| r.dpi.get()))) as i64
         }
         _ => {
             let Some(r) = rec(w) else { return -1 };

@@ -488,7 +488,8 @@ const VK_RMENU: i32 = 0xA5;
 // the cursor shapes CUR_ARROW .. CUR_NONE (0: hidden)
 static IDC_TABLE: [u16; CUR_COUNT as usize] = [32512, 32513, 32649, 32515, 32646, 32514, 32645, 32644, 32642, 32643, 0];
 // (E3) CUR_X0 .. CUR_X_END: the system's cursors where Windows has one (IDC_NO, IDC_HELP,
-// IDC_APPSTARTING, IDC_SIZE*); 0: cursor_fallback's shape
+// IDC_APPSTARTING, IDC_SIZE*); the shapes of cursor_art (grab, grabbing, zoom, cell, vertical
+// text, alias, copy, context menu) are drawn (drawn_handle); 0: cursor_fallback's shape
 static IDC_X: [u16; (crate::CUR_X_END - crate::CUR_X0) as usize] = [
     32648, 32648, 32649, 32646, 32651, 32650, 0, 0, 0, 0, 0, 0, 0, 32646, 32644, 32645, 32645, 32645, 32644, 32644, 32643, 32642,
     32642, 32643,
@@ -624,8 +625,15 @@ struct St {
     in_refresh: Cell<bool>,
     ptr_win: Cell<i32>, // window under the pointer (-1 = none)
     get_dpi: Cell<usize>, // GetDpiForWindow
+    sm_dpi: Cell<usize>,  // GetSystemMetricsForDpi
     hinst: Cell<isize>,
+    /// (E3) the drawn cursors made so far: (shape << 16 | size px, HCURSOR); DRAWN_SIZES sizes
+    /// per shape (the windows' dpis), kept for the process
+    drawn: [Cell<(u32, isize)>; DRAWN_SLOTS],
 }
+
+const DRAWN_SIZES: usize = 4;
+const DRAWN_SLOTS: usize = crate::cursor_art::DRAWN_N * DRAWN_SIZES;
 
 static S: UiThread<St> = UiThread(St {
     ww: [const { Ww::new() }; PW_MAX],
@@ -647,7 +655,9 @@ static S: UiThread<St> = UiThread(St {
     in_refresh: Cell::new(false),
     ptr_win: Cell::new(-1),
     get_dpi: Cell::new(0),
+    sm_dpi: Cell::new(0),
     hinst: Cell::new(0),
+    drawn: [const { Cell::new((0, 0)) }; DRAWN_SLOTS],
 });
 
 fn st() -> &'static St {
@@ -786,6 +796,7 @@ fn win_dyn_init() {
     }
     s.dyn_done.set(true);
     s.get_dpi.set(dll_proc(b"user32.dll\0", b"GetDpiForWindow\0"));
+    s.sm_dpi.set(dll_proc(b"user32.dll\0", b"GetSystemMetricsForDpi\0"));
     let p = dll_proc(b"user32.dll\0", b"SetProcessDpiAwarenessContext\0");
     let mut ok = false;
     if p != 0 {
@@ -1350,7 +1361,7 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
                 return def();
             }
             // SAFETY: a cursor handle (0 hides the cursor).
-            unsafe { SetCursor(cur_handle(r.cursor.get())) };
+            unsafe { SetCursor(cur_handle(r.cursor.get(), r.dpi.get())) };
             1
         }
         WM_SIZE => {
@@ -2317,17 +2328,22 @@ pub fn win_set_cursor(w: i32, shape: u32) {
     r.cursor.set(shape);
     if st().ptr_win.get() == w {
         // SAFETY: a cursor handle (0 hides it).
-        unsafe { SetCursor(cur_handle(shape)) };
+        unsafe { SetCursor(cur_handle(shape, r.dpi.get())) };
     }
 }
 
 /// HCURSOR: the built-in shapes (CUR_NONE = 0: hidden), a custom cursor, the arrow for empty /
-/// unknown slots  [cur_handle]
-fn cur_handle(shape: u32) -> isize {
+/// unknown slots; a drawn one at the size of a window of this dpi  [cur_handle]
+fn cur_handle(shape: u32, dpi: i32) -> isize {
     let c = &st().cursors;
     let arrow = c[CUR_ARROW as usize].get();
     if (crate::CUR_X0..crate::CUR_X_END).contains(&shape) {
-        // (E3) a system cursor (shared, loaded once by the system), else the nearest shape
+        // (E3) a drawn one, a system cursor (shared, loaded once by the system), else the
+        // nearest shape
+        let d = drawn_handle(shape, dpi);
+        if d != 0 {
+            return d;
+        }
         let idc = IDC_X[(shape - crate::CUR_X0) as usize];
         // SAFETY: a system cursor id.
         let h = if idc == 0 { 0 } else { unsafe { LoadCursorW(0, idc as usize) } };
@@ -2348,6 +2364,58 @@ fn cur_handle(shape: u32) -> isize {
     }
 }
 
+/// (E3) the size of a cursor in a window of this dpi (px): the system's (GetSystemMetricsForDpi
+/// SM_CXCURSOR: 32 at 96 dpi), else 32 * dpi / 96
+fn cursor_px(dpi: i32) -> i32 {
+    let dpi = if dpi > 0 { dpi } else { 96 };
+    let p = st().sm_dpi.get();
+    if p != 0 {
+        // SAFETY: GetSystemMetricsForDpi(int, UINT) -> int; SM_CXCURSOR = 13.
+        let f: unsafe extern "system" fn(i32, u32) -> i32 = unsafe { core::mem::transmute(p) };
+        let v = unsafe { f(13, dpi as u32) };
+        if (16..=CUR_MAX_PX).contains(&v) {
+            return v;
+        }
+    }
+    dip(32, dpi).clamp(16, CUR_MAX_PX)
+}
+
+/// (E3) the drawn cursor of shape (cursor_art) at the size of a window of this dpi, made on
+/// first use and kept -> HCURSOR, 0 when the shape has no bitmap (or it failed)
+fn drawn_handle(shape: u32, dpi: i32) -> isize {
+    let Some(k) = crate::cursor_art::drawn_index(shape) else { return 0 };
+    let size = cursor_px(dpi) as u32;
+    let key = shape << 16 | size;
+    let slots = &st().drawn[k * DRAWN_SIZES..(k + 1) * DRAWN_SIZES];
+    if let Some(c) = slots.iter().find(|c| c.get().0 == key) {
+        return c.get().1;
+    }
+    let Some(free) = slots.iter().find(|c| c.get().1 == 0) else {
+        // more sizes than slots (windows on many monitors): the first size made
+        return slots[0].get().1;
+    };
+    let img = crate::cursor_art::pixels(crate::cursor_art::DRAWN[k], size, 32, false);
+    let h = make_cursor(&img.px, img.w, img.h, img.hx, img.hy);
+    if h != 0 {
+        free.set((key, h));
+    }
+    h
+}
+
+/// (tests) the cursor Windows shows for shape in a window of this dpi: its HCURSOR and, for a
+/// drawn one, its width in px (0: a system cursor or cursor_fallback's)
+#[doc(hidden)]
+pub fn cursor_probe(shape: u32, dpi: i32) -> (u64, i32) {
+    if !win_setup() {
+        return (0, 0);
+    }
+    let w = match crate::cursor_art::drawn(shape) {
+        Some(a) if drawn_handle(shape, dpi) != 0 => (a.w as u32 * cursor_px(dpi) as u32).div_ceil(32) as i32,
+        _ => 0,
+    };
+    (cur_handle(shape, dpi) as u64, w)
+}
+
 /// a cursor from w x h premultiplied 0xAARRGGBB pixels (rows of w * 4 bytes), hot spot in px:
 /// a 32-bit top-down DIB section with straight alpha + an empty AND mask -> CreateIconIndirect;
 /// Windows shows it at its size (dpi is not needed here) -> CUR_USER0 + k / -1
@@ -2361,6 +2429,17 @@ pub fn cursor_create(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, _dpi: i3
     }
     let s = st();
     let Some(slot) = (CUR_USER0..CUR_TABLE).find(|&k| s.cursors[k as usize].get() == 0) else { return -1 };
+    let cur = make_cursor(px, w, h, hot_x, hot_y);
+    if cur == 0 {
+        return -1;
+    }
+    s.cursors[slot as usize].set(cur);
+    slot as i32
+}
+
+/// HCURSOR of w x h premultiplied pixels (sizes checked by the caller) -> 0 on failure
+fn make_cursor(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32) -> isize {
+    let n = (w * h) as usize;
     let bmi = BitmapInfoHeader { size: 40, w, h: -h, planes: 1, bits: 32, ..Default::default() };
     let mut bits: *mut u8 = core::ptr::null_mut();
     // SAFETY: a screen DC, released again; a valid BITMAPINFOHEADER (BI_RGB, no colour table).
@@ -2371,12 +2450,12 @@ pub fn cursor_create(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, _dpi: i3
         c
     };
     if color == 0 {
-        return -1;
+        return 0;
     }
     if bits.is_null() {
         // SAFETY: the bitmap from above.
         unsafe { DeleteObject(color) };
-        return -1;
+        return 0;
     }
     // SAFETY: the DIB section holds w * h 32-bit pixels.
     let dst = unsafe { core::slice::from_raw_parts_mut(bits as *mut u32, n) };
@@ -2402,7 +2481,7 @@ pub fn cursor_create(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, _dpi: i3
     if mask == 0 {
         // SAFETY: the bitmap from above.
         unsafe { DeleteObject(color) };
-        return -1;
+        return 0;
     }
     let ii = IconInfo { icon: 0, hot_x: hot_x as u32 & 0xFFFF, hot_y: hot_y as u32 & 0xFFFF, mask, color };
     // SAFETY: a valid ICONINFO (fIcon FALSE: a cursor); the bitmaps are copied, then freed.
@@ -2412,11 +2491,7 @@ pub fn cursor_create(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, _dpi: i3
         DeleteObject(color);
         c
     };
-    if cur == 0 {
-        return -1;
-    }
-    s.cursors[slot as usize].set(cur);
-    slot as i32
+    cur
 }
 
 fn vec_zero(n: usize) -> Vec<u8> {

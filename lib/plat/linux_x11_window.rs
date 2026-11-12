@@ -717,23 +717,33 @@ impl X11 {
         if self.scale_ovr != 0 {
             return self.scale_ovr * 96;
         }
+        match self.resource_int(b"Xft.dpi:") {
+            Some(v) if (48..=960).contains(&v) => v,
+            _ => 96,
+        }
+    }
+
+    /// the number of a line "key value" of the root window's RESOURCE_MANAGER (key with its
+    /// ':', "Xft.dpi:", "Xcursor.size:"), None when it has none
+    pub(super) fn resource_int(&mut self, key: &[u8]) -> Option<i32> {
         let root = self.root;
-        let Some(r) = self.get_property(root, XA_RESOURCE_MANAGER, XA_STRING, 0, 65536, false) else { return 96 };
+        let r = self.get_property(root, XA_RESOURCE_MANAGER, XA_STRING, 0, 65536, false)?;
         if r[1] != 8 {
-            return 96;
+            return None;
         }
         let end = (32 + rd32(&r, 16) as usize).min(r.len());
+        let k = key.len();
         let mut p = 32;
         loop {
-            if p + 8 > end {
-                return 96;
+            if p + k > end {
+                return None;
             }
-            if &r[p..p + 8] == b"Xft.dpi:" {
+            if &r[p..p + k] == key {
                 break;
             }
             loop {
                 if p >= end {
-                    return 96;
+                    return None;
                 }
                 let c = r[p];
                 p += 1;
@@ -742,7 +752,7 @@ impl X11 {
                 }
             }
         }
-        p += 8;
+        p += k;
         while p < end && (r[p] == b' ' || r[p] == 9) {
             p += 1;
         }
@@ -751,10 +761,9 @@ impl X11 {
             n += 1;
         }
         if n == 0 {
-            return 96;
+            return None;
         }
-        let v = parse_int(&r[p..p + n]).0;
-        if (48..=960).contains(&v) { v } else { 96 }
+        Some(parse_int(&r[p..p + n]).0)
     }
 
     /// x11_read_state(w): WST_MAXIMIZED / FULLSCREEN / TILED / MINIMIZED of window w from

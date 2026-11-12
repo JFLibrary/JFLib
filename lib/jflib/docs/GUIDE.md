@@ -749,10 +749,15 @@ if self.tab == 0 {
   `CUR_ZOOM_OUT`, `CUR_CELL`, `CUR_VTEXT`, `CUR_ALIAS`, `CUR_COPY`, `CUR_CONTEXT_MENU`,
   `CUR_ALL_SCROLL`, `CUR_COL_RESIZE`, `CUR_ROW_RESIZE` and the edges and corners `CUR_SIZE_N` /
   `_S` / `_E` / `_W` / `_NE` / `_NW` / `_SE` / `_SW` (`CUR_X0` .. `CUR_X_END`), `CUR_CUSTOM` too.
-  Where a system has no such cursor it shows `plat::cursor_fallback(shape)`'s (grab: the hand,
-  zoom: the crosshair, an edge: its double arrow): Wayland with cursor-shape, the browser and
-  macOS (most) have all of them; Windows has not-allowed, help, progress and the resize shapes,
-  X11's cursor font a few more. `ui.cursor_at(x, y)` is the cursor at a point (px) in the last
+  Wayland with cursor-shape, the browser and macOS (most) have all of them; Windows has
+  not-allowed, help, progress and the resize shapes, X11's cursor font a few more. Grab,
+  grabbing, zoom-in / -out, cell, vertical text, alias, copy and context menu are drawn on
+  Windows, X11 and Wayland without cursor-shape (`lib/plat/cursor_art.rs`: small bitmaps at the
+  size of the system's cursors for the window's dpi, made once per size; white with a black
+  outline as Windows' own, on X11 black with a white outline as the Adwaita and Breeze themes;
+  without RENDER X11 keeps its cursor font's shapes). Where a system
+  still has no such cursor it shows `plat::cursor_fallback(shape)`'s (macOS: zoom and cell the
+  crosshair; an edge: its double arrow). `ui.cursor_at(x, y)` is the cursor at a point (px) in the last
   pass. A page's own pictures (`cursor: url(..)`) are custom cursors: `ui.cursor_new(draw, w, h,
   hot)` -> a handle, `ui.cursor_custom(handle)` + `cursor_next(CUR_CUSTOM)` shows it,
   `ui.cursor_replace(handle, draw, w, h, hot)` draws it anew under the same handle,

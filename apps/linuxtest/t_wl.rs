@@ -54,16 +54,18 @@ pub fn test_activate(t: &mut Lt) {
     t.check(plat::win_state(0) & plat::WST_MINIMIZED == 0, "win_activate: no longer minimized");
 }
 
-/// every fallback cursor at S = 2 into a sheet PNG (--out FILE); red pixel = hot spot
+/// every fallback cursor at S = 2 into a sheet PNG (--out FILE); red pixel = hot spot: the first
+/// shapes, then (E3) the drawn ones of CUR_X0 .. CUR_X_END (grab, grabbing, zoom, ...)
 pub fn test_cursors(t: &mut Lt) {
-    let mut sheet = Surface::new(10 * 56 + 8, 64, FMT_XRGB);
+    let shapes: alloc::vec::Vec<u32> = (0..10u32).chain(plat::CUR_X0..plat::CUR_X_END).filter(|&s| plat::wl_cursor_image(s).is_some()).collect();
+    let mut sheet = Surface::new(shapes.len() as i32 * 56 + 8, 64, FMT_XRGB);
     let mut dc = Dc::new(sheet.w, sheet.h);
     dc.begin(&sheet);
     dc.clear(&mut sheet, 0xFF808080);
     dc.end();
     let stride = sheet.stride as usize;
     let mut x0 = 8usize;
-    for shape in 0..10u32 {
+    for &shape in &shapes {
         let Some((w, h, hx, hy, _)) = plat::wl_cursor_image(shape) else { break };
         let (w, h) = (w as usize, h as usize);
         let mut px = vec![0u32; w * h * 4];
