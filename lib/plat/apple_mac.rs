@@ -463,6 +463,13 @@ pub fn win_create(title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x
             msg!(win, c"setHidesOnDeactivate:", false => bool; ());
         }
         msg!(win, c"setReleasedWhenClosed:", false => bool; ());
+        if flags & PWF_DIALOG != 0 {
+            // VoiceOver: a modal dialog (the UI keeps the input from its owner)
+            let dialog = nsstring("AXDialog");
+            msg!(win, c"setAccessibilitySubrole:", dialog => Id; ());
+            release(dialog);
+            msg!(win, c"setAccessibilityModal:", true => bool; ());
+        }
         let t = nsstring(title);
         msg!(win, c"setTitle:", t => Id; ());
         release(t);

@@ -65,8 +65,18 @@ unsafe extern "C" {
     fn pthread_main_np() -> i32;
 }
 
-/// synthetic nodes of the UI (ui/a11y.rs: a popup menu, the menu bar): bit 63 of the key
+/// synthetic nodes of the UI (ui/a11y.rs: a popup menu, the menu bar): bit 63 of the key, the
+/// kind in bits 40.. (2: the menu or list of a popup)
 const SYN: u64 = 1 << 63;
+const SYN_POPUP: u64 = 2;
+
+/// the key of a popup's menu (ui/a11y.rs: synthetic, kind popup; a drop-down's list is one too,
+/// but only a menu is announced as opened)
+fn popup_menu(key: u64) -> bool {
+    key & SYN != 0 && (key >> 40) & 0xFF == SYN_POPUP && ax::current().is_none_or(|s| {
+        s.wins.iter().all(|w| w.find(key).is_none_or(|k| w.nodes[k].role == Role::Menu))
+    })
+}
 
 // ---------------------------------------------------------------- the registry
 
@@ -724,10 +734,18 @@ pub fn changed(s: &Snapshot, c: Vec<Change>) {
             Change::Focus(w, k) | Change::State(w, k, ..) | Change::Name(w, k) | Change::Value(w, k) | Change::Text(w, k, _) | Change::Caret(w, k, _) => {
                 (*w, *k)
             }
-            Change::Added(w, ..) | Change::Removed(w, ..) => {
+            Change::Added(w, _, key) | Change::Removed(w, _, key, _) => {
                 if let Some(t) = s.win(*w) {
                     if !layout.contains(&t.pw) {
                         layout.push(t.pw);
+                    }
+                    // a popup menu opened or closed (VoiceOver says so and moves into it)
+                    if popup_menu(*key) && ids(t.pw).is_some() {
+                        if matches!(ch, Change::Added(..)) {
+                            post(elem(t.pw, *key), "AXMenuOpened", "");
+                        } else if let Some(e) = reg(|r| r.map.get(&(t.pw, *key)).and_then(|&k| r.slots[k].as_ref()).map(|s| s.obj)) {
+                            post(e, "AXMenuClosed", "");
+                        }
                     }
                 }
                 continue;
