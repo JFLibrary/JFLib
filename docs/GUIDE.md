@@ -2705,14 +2705,16 @@ ui::main!({
 
 Every semantic record of a frame (`sem()`, section 12's `dump`) becomes a node of the
 accessibility tree that screen readers read: AT-SPI2 on Linux (Orca), UI Automation on Windows
-(Narrator, NVDA), an ARIA shadow tree in the DOM in the browser (NVDA / JAWS / VoiceOver with the
-browser), an `AccessibilityNodeProvider` on Android (TalkBack). Nothing has to be switched on:
-the first window frame starts the bridge. Linux connects to the accessibility bus only when
-assistive technology is enabled (`org.a11y.Status`; `jfgui_A11Y=1` forces it), Windows answers
-`WM_GETOBJECT`, Android follows the system's accessibility switch, the browser cannot tell and
-always keeps the shadow tree (`?a11y=0` in the page address leaves it out); everywhere the UI
-builds the tree only while a client listens. `jfgui_A11Y=0` (or `NO_AT_BRIDGE=1`) turns it
-off. Headless runs have no bridge.
+(Narrator, NVDA), NSAccessibility on macOS and UIAccessibility on iOS (VoiceOver), an ARIA
+shadow tree in the DOM in the browser (NVDA / JAWS / VoiceOver with the browser), an
+`AccessibilityNodeProvider` on Android (TalkBack). Nothing has to be switched on: the first
+window frame starts the bridge. Linux connects to the accessibility bus only when assistive
+technology is enabled (`org.a11y.Status`; `jfgui_A11Y=1` forces it), Windows answers
+`WM_GETOBJECT`, macOS the first question an assistive technology asks a window, iOS follows
+VoiceOver's and Switch Control's switches (and a question to its view), Android follows the
+system's accessibility switch, the browser cannot tell and always keeps the shadow tree
+(`?a11y=0` in the page address leaves it out); everywhere the UI builds the tree only while a
+client listens. `jfgui_A11Y=0` (or `NO_AT_BRIDGE=1`) turns it off. Headless runs have no bridge.
 
 What the built-in widgets report (role on AT-SPI / UI Automation, the name, state and value,
 the actions a screen reader can take):
@@ -2798,6 +2800,25 @@ its ranges, `GetCaretRange` and the selection (NVDA, Narrator, Magnifier); a mov
 `object:text-caret-moved` -- also when a text box gets the focus -- for Orca and GNOME's zoom;
 `SetCaretOffset` / `SetSelection` move the caret.
 
+**VoiceOver on the Mac and the iPhone** reads the tree in the app's own process
+(`lib/plat/apple_mac_a11y.rs`, `apple_ios_a11y.rs`): every node is an accessibility element of its
+own that stays the same while its widget does. On macOS the window's view is no element itself, so
+the nodes hang directly on the window: roles and subroles (a switch is a check box with the subrole
+`AXSwitch`, a tab a radio button with `AXTabButton`, a heading `AXHeading` with its level as value,
+a password box `AXSecureTextField`), names as title, description or value as AppKit's own controls
+have them, values, the focus, frames, press, increment / decrement (5 % of a slider's range, as on
+Android), setting values, the focus and a selection; text boxes answer the text attributes
+(characters, lines, the insertion point, the selection, the rectangle of a range: VoiceOver reads by
+character and word and follows the caret). Notifications: focus, values, titles, a list's
+selection, layout, popup menus opening and closing; dialog windows are `AXDialog`. On iOS the nodes
+are the elements of the host's view: lists, tab strips (a tab bar), dialogs, menus and titled boxes
+are containers, everything else an element with its traits (header, button, selected, adjustable,
+not enabled, toggle button for a switch from iOS 17); a double tap clicks, swiping up or down on a
+slider sets it, VoiceOver's Escape gesture presses Escape, and each of them runs a frame at once so
+that VoiceOver reads the new state. Text boxes and the view are `UITextInput`: VoiceOver reads and
+moves in the text, the keyboard sees the text around the caret and composes into the preedit. The
+app menus in the macOS menu bar are real `NSMenu`s, which VoiceOver reads without the tree.
+
 **The browser and Android** keep a mirror of the tree: after every frame the library sends the
 differences to the tree the host has (`plat::a11y::wire`: new and changed nodes, the order when
 nodes came or went, the events) -- in the browser from the WASM worker to the page, on Android
@@ -2835,7 +2856,12 @@ Testing: `ui.a11y_tree()` returns the tree as the bridges serve it (headless, e.
 browser's / Android's update format, `tools/platshared/atspi_bus.py` the AT-SPI2 bridge in WSL
 (a fake bus, and with `--real` at-spi2-core through libatspi; both follow the caret),
 `plattest --test uia` the UI Automation providers through IUIAutomation and `plattest --test
-caret` the caret alone: system caret and TextPattern2 (Windows, a window for a few seconds).
+caret` the caret alone: system caret and TextPattern2 (Windows, a window for a few seconds),
+`plattest --test a11y-mac` the NSAccessibility elements as AppKit serves them to VoiceOver (a
+real window: `python3 tools/apple.py gui build/mac/plattest --test a11y-mac`), `plattest --test
+a11y-ios` the UIAccessibility elements and UITextInput under UIKit in the simulator (`tools/apple.py
+simapp build/ios-sim/plattest --test a11y-ios`), and `plattest --test a11y-show` shows the demo for
+a probe by hand with a screen reader.
 `node apps/androidGallery/tests/a11y_web.mjs build` checks the shadow tree of the androidGallery
 web build in Chromium (Chromium's own accessibility tree through the DevTools protocol, clicks,
 values, Tab, typing, selections; Playwright through `tools/tests/playwright.mjs`), and the

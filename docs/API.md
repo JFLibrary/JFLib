@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -28805,8 +28805,11 @@ assistive technology back to the UI thread:
                                ui itself); without one they stay German
 
 Linux: AT-SPI2 on the accessibility bus (linux_atspi.rs).  Windows: UI Automation providers
-answering WM_GETOBJECT (win_uia.rs).  The browser and Android (web_a11y.rs): the host keeps
-a mirror of the tree -- an ARIA shadow tree in the DOM (web/a11y.js), virtual views of an
+answering WM_GETOBJECT (win_uia.rs).  macOS: NSAccessibility elements under each window's view,
+turned on by the first question of an assistive technology (apple_mac_a11y.rs, VoiceOver).  iOS:
+UIAccessibility elements under the host's view while VoiceOver runs (apple_ios_a11y.rs).  The
+browser and Android (web_a11y.rs): the host keeps a mirror of the tree -- an ARIA shadow tree
+in the DOM (web/a11y.js), virtual views of an
 AccessibilityNodeProvider (android/GalleryAccessibility.java) -- fed with the differences
 of every published tree (a11y_wire.rs: Mirror, the wire format); the host turns the mirror
 on (active() follows it) and sends the actions back.
@@ -29001,8 +29004,9 @@ A_TEXT: u32 = 8
 - **`fn start(app: &str)`**
   start the platform bridge (once): Linux connects to the accessibility bus when assistive
   technology is enabled (jfgui_A11Y=1 forces it, jfgui_A11Y=0 or NO_AT_BRIDGE=1 turn it off);
-  Windows answers WM_GETOBJECT from now on; the browser and Android hosts turn their mirror
-  on themselves (jfgui_a11y), jfgui_A11Y=0 keeps it off there too
+  Windows answers WM_GETOBJECT from now on, macOS the accessibility questions of its views; the
+  browser and Android hosts turn their mirror on themselves (jfgui_a11y), jfgui_A11Y=0 keeps it
+  off there too
 
 - **`fn active() -> bool`**
   assistive technology may be listening (the UI publishes snapshots only then)
@@ -32461,6 +32465,93 @@ pasteboard has does not.
 - **`fn file_dialog_poll() -> Option<(i32, u32, String)>`**
   the picker's answer (see the module header)
 
+### `plat/apple_ios_a11y.rs` (Apple)
+
+Source: [`lib/plat/apple_ios_a11y.rs`](../lib/plat/apple_ios_a11y.rs)
+
+```text
+apple_ios_a11y -- (a11y.rs) the accessibility tree as UIAccessibility elements (VoiceOver on the
+iPhone, docs/VOICEOVER.md VO4)
+
+  start(app)                 VoiceOver (or Switch Control) running turns a11y::active() on, its
+                             notification follows it; a question to the view turns it on too
+  view_methods()             (apple_ios.rs) JFView's accessibility: not an element itself, its
+                             elements are the nodes of the shown windows; the Escape gesture
+  changed(snapshot, changes) the UI published a new tree: layout / screen changed notifications
+  ios_ax_tree / ios_ax_act   (tests, any thread) read and drive the elements as VoiceOver does,
+                             on the main thread
+
+Every node is an object of our class JFAXIosElement (a subclass of UIAccessibilityElement), made
+on demand and kept while its node exists; text boxes are JFAXIosText, which adds UITextInput
+(apple_ios_text.rs).  The canvas holds all windows (web_windows.rs): a node's frame is its
+window's place in the canvas plus its rectangle, in points of JFView (px / the host's scale),
+converted to the screen.  Lists, tab strips, dialogs, menus and titled boxes are containers
+(not elements themselves; their nodes are their elements); every other node is an element, and
+what hangs below it (the popup of a drop-down) follows it in its container.  A modal dialog
+window shows alone (accessibilityViewIsModal).  Actions become a11y::request and run a frame at
+once, so that VoiceOver reads the new value right after it asked for it.
+
+Traits: Label static text; Heading header; Button, MenuItem, a menu bar entry, Combo button
+(pressed: selected); CheckBox, Radio button, selected when on; Switch toggle button (iOS 17, else
+button) with the value 1 / 0; Slider adjustable (5 % of the range per swipe, as Android);
+Progress updates frequently, the value in percent; Link link; ListItem, Tab button, selected;
+Image image; disabled: not enabled.  Containers: a list a list, a tab strip a tab bar, the rest
+semantic groups with their names.
+```
+
+- **`struct IosAxElem`**
+  an element as VoiceOver reads it (UIAccessibility)
+  - `depth: u32` -- containers above it
+  - `element: bool` -- isAccessibilityElement (false: a container)
+  - `label: String`
+  - `value: String`
+  - `ident: String`
+  - `traits: Vec<&'static str>` -- the traits by name: button, link, header, image, selected, static, disabled, frequent,
+    adjustable, tabbar, keyboard, toggle
+  - `container: isize` -- UIAccessibilityContainerType
+  - `modal: bool`
+  - `frame: [f64; 4]` -- screen points
+  - `text_input: bool` -- it conforms to UITextInput (a text field to VoiceOver)
+
+- **`enum IosAxAct`**
+  an action of a test
+  - `Activate` -- a double tap (accessibilityActivate)
+  - `Increment`
+  - `Decrement`
+
+- **`fn ios_ax_tree() -> Option<Vec<IosAxElem>>`**
+  (tests, any thread) the accessibility objects of the view as VoiceOver reads them (None: no
+  view yet)
+
+- **`fn ios_ax_act(label: &str, tr: &str, a: IosAxAct) -> bool`**
+  (tests, any thread) the element with this label (and trait `tr`, IosAxElem::traits; "": any): an
+  action as VoiceOver takes it -> the element's answer (accessibilityActivate) / whether it is
+  adjustable
+
+- **`fn ios_ax_escape() -> bool`**
+  (tests, any thread) VoiceOver's Escape gesture on the view
+
+- **`fn ios_ax_listen(on: bool)`**
+  (tests) note the notifications the bridge posts from now on (false: stop)
+
+- **`fn ios_ax_events() -> Vec<String>`**
+  (tests) the notifications noted since the last call: "LayoutChanged:Name"
+
+- **`enum IosAxText`**
+  a question of a test about a text field's text (UITextInput of its element)
+  - `Selected` -- the selected range: "location,length" (UTF-16)
+  - `Text(usize, usize)` -- the text of a UTF-16 range
+  - `Caret(usize)` -- the caret's rectangle at an offset, screen points "x,y,w,h"
+
+- **`fn ios_ax_text(label: &str, q: IosAxText) -> Option<String>`**
+  (tests, any thread) ask the text field with this label as VoiceOver does
+
+- **`fn ios_ax_select(label: &str, a: usize, n: usize) -> bool`**
+  (tests, any thread) select UTF-16 a .. a + n in the text field with this label (UITextInput)
+
+- **`fn ios_ax_type(t: &str) -> bool`**
+  (tests, any thread) the keyboard's view types text (UIKeyInput / UITextInput of JFView)
+
 ### `plat/apple_mac.rs` (Apple)
 
 Source: [`lib/plat/apple_mac.rs`](../lib/plat/apple_mac.rs)
@@ -32499,6 +32590,8 @@ The view and the delegate never act: they push events into the ring (evq.rs), as
             E_POWER / E_SESSION_END (NSWorkspace, SIGTERM), tool windows as panels, printing
   services  apple_mac_services.rs: the status item and notifications, the Dock tile, files the
             system opens with the app, global shortcuts
+  a11y      apple_mac_a11y.rs: the accessibility tree as NSAccessibility elements under each view
+            (VoiceOver), its notifications
   tests     apple_mac_test.rs: win_test, file_dialog_autoclose (events to our own windows only)
 
 Everything runs on the main thread (AppKit's rule); the state is reached through short borrows
@@ -32850,6 +32943,124 @@ as all of AppKit; lib/gpu may use the layer on its own thread (nextDrawable, dra
 
 - **`fn gpu_test_presented() -> Vec<(u64, u64)>`**
   (bench: Wayland's presentation feedback) nothing here
+
+### `plat/apple_mac_a11y.rs` (Apple)
+
+Source: [`lib/plat/apple_mac_a11y.rs`](../lib/plat/apple_mac_a11y.rs)
+
+```text
+apple_mac_a11y -- (a11y.rs) the accessibility tree as NSAccessibility elements (VoiceOver on the
+Mac, docs/VOICEOVER.md)
+
+  start(app)                 the bridge may turn on (a11y::start): the first question of an
+                             assistive technology makes a11y::active() true
+  view_methods()             (apple_mac.rs) JFView's accessibility: its children (the top-level
+                             nodes of its window), the focused element, the hit test; a view
+                             itself stays ignored, so the window holds the nodes
+  changed(snapshot, changes) the UI published a new tree: notifications (NSAccessibilityPost-
+                             Notification), the elements of nodes that went away are destroyed
+  forget(pw)                 (win_destroy) the elements of a window go
+  ax_test_tree / ax_test_act / ax_test_listen / ax_test_events   (tests) read and drive the
+                             tree through AppKit's own entry points on the main thread
+                             (accessibilityAttributeValue: and friends, which serve VoiceOver's
+                             requests), from any thread
+
+Every node is an object of our class JFAXElement (a subclass of NSAccessibilityElement), made on
+demand and kept while its node exists, so that VoiceOver sees the same element from frame to
+frame; its instance variable is a slot of the registry, which names (platform window, node key).
+The methods answer from a11y::current() on the main thread, where AppKit asks them and the UI
+runs (never from a frame being built); a node that is gone answers nothing.  Which attributes
+and actions an element has follows its role (isAccessibilitySelectorAllowed:).  Rectangles are
+the node's client pixels / the window's scale, converted to screen points by the view.  Actions
+become a11y::request.  Popups (menus, lists) are panels of their own whose nodes stay in their
+owner's tree (their rectangles lie over the panel); a popup's view answers hit tests with them.
+
+Roles (role / subrole; where the name goes: T title, L label (AXDescription), V value):
+  Label AXStaticText V; Heading AXHeading T, value its level; Button AXButton T; CheckBox
+  AXCheckBox T, value 0 / 1 / 2 (mixed); Radio AXRadioButton T, value 0 / 1; Switch AXCheckBox /
+  AXSwitch T, value 0 / 1; Slider AXSlider L, value, min, max, increment / decrement (5 % of the
+  range, as Android's scrolling); Progress AXProgressIndicator L, value, min, max; TextBox
+  AXTextField / AXTextArea (multi-line) / AXSecureTextField (password) L, value the text; Link
+  AXLink T; List AXList L; ListItem AXStaticText V, selected; MenuBar AXMenuBar; Menu a menu bar
+  entry AXMenuBarItem T, a popup menu AXMenu; MenuItem AXMenuItem T; TabList AXTabGroup L; Tab
+  AXRadioButton / AXTabButton T, value 0 / 1; Combo AXPopUpButton L, value the choice, expanded;
+  Image AXImage L; Group, Canvas AXGroup L; Dialog AXGroup T with the role description "Dialog"
+  (a::role_name, the UI language; a dialog window is an NSWindow of its own anyway).
+```
+
+- **`struct AxTestElem`**
+  an element as VoiceOver reads it (AppKit's attributes)
+  - `depth: u32`
+  - `role: String`
+  - `subrole: String`
+  - `role_desc: String`
+  - `title: String`
+  - `label: String` -- AXDescription
+  - `value: String` -- AXValue as text (numbers: their description, "1", "75")
+  - `ident: String`
+  - `enabled: bool`
+  - `focused: bool`
+  - `selected: bool`
+  - `expanded: bool`
+  - `frame: [f64; 4]` -- AXPosition (top left of the primary screen) and AXSize, points
+  - `actions: Vec<String>`
+  - `attrs: Vec<String>`
+  - `value_settable: bool`
+
+**`impl AxTestElem`**
+
+- **`fn name(&self) -> &str`**
+  the name VoiceOver reads: title, else description, else value
+
+- **`enum AxTestAct`**
+  an action of a test
+  - `Press`
+  - `Increment`
+  - `Decrement`
+  - `Number(f64)` -- AXValue := a number (sliders)
+  - `Text(String)` -- AXValue := a text (text boxes)
+  - `Focus` -- AXFocused := YES
+  - `Select` -- AXSelected := YES
+  - `Range(usize, usize)` -- AXSelectedTextRange := location, length (UTF-16)
+
+- **`enum AxTestText`**
+  a question of a test about a text box's text (the answers: numbers as text, ranges
+  "location,length", rectangles "x,y,w,h" in points from the top left of the primary screen)
+  - `Count` -- AXNumberOfCharacters
+  - `Selected` -- AXSelectedText
+  - `SelRange` -- AXSelectedTextRange
+  - `Line` -- AXInsertionPointLineNumber
+  - `StringFor(usize, usize)` -- AXStringForRange (location, length)
+  - `AttrFor(usize, usize)` -- AXAttributedStringForRange: its string
+  - `FrameFor(usize, usize)` -- AXBoundsForRange
+  - `RangeAt(f64, f64)` -- AXRangeForPosition (a point as AXPosition)
+  - `RangeFor(usize)` -- AXRangeForIndex
+  - `LineFor(usize)` -- AXLineForIndex
+  - `RangeForLine(usize)` -- AXRangeForLine
+
+- **`fn ax_test_tree(pw: i32) -> Option<Vec<AxTestElem>>`**
+  (tests, any thread) the elements of platform window pw as VoiceOver reads them
+
+- **`fn ax_test_act(pw: i32, role: &str, name: &str, a: AxTestAct) -> bool`**
+  (tests, any thread) act on the element with this role and name (AxTestElem::name) as VoiceOver
+  does: false when there is none or AppKit does not offer the action (disabled, not settable)
+
+- **`fn ax_test_text(pw: i32, role: &str, name: &str, q: AxTestText) -> Option<String>`**
+  (tests, any thread) ask the element with this role and name about its text as VoiceOver does
+  (None: no such element, or it does not offer the attribute)
+
+- **`fn ax_test_focused() -> Option<(String, String)>`**
+  (tests, any thread) the focused element of the application as VoiceOver asks it (role, name)
+
+- **`fn ax_test_hit(x: f64, y: f64) -> Option<(String, String)>`**
+  (tests, any thread) the element at screen point x, y (points from the top left of the primary
+  screen, as AXPosition) as VoiceOver's pointer finds it: role, name
+
+- **`fn ax_test_listen(on: bool)`**
+  (tests) note the notifications the bridge posts from now on (false: stop)
+
+- **`fn ax_test_events() -> Vec<String>`**
+  (tests) the notifications noted since the last call: "AXValueChanged:Name"
 
 ### `plat/web.rs`
 

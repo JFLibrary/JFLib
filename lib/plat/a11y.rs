@@ -20,8 +20,9 @@
 // Linux: AT-SPI2 on the accessibility bus (linux_atspi.rs).  Windows: UI Automation providers
 // answering WM_GETOBJECT (win_uia.rs).  macOS: NSAccessibility elements under each window's view,
 // turned on by the first question of an assistive technology (apple_mac_a11y.rs, VoiceOver).  iOS:
-// UIAccessibility elements under the host's view while VoiceOver runs (apple_ios_a11y.rs).  The browser and Android (web_a11y.rs): the host keeps
-// a mirror of the tree -- an ARIA shadow tree in the DOM (web/a11y.js), virtual views of an
+// UIAccessibility elements under the host's view while VoiceOver runs (apple_ios_a11y.rs).  The
+// browser and Android (web_a11y.rs): the host keeps a mirror of the tree -- an ARIA shadow tree
+// in the DOM (web/a11y.js), virtual views of an
 // AccessibilityNodeProvider (android/GalleryAccessibility.java) -- fed with the differences
 // of every published tree (a11y_wire.rs: Mirror, the wire format); the host turns the mirror
 // on (active() follows it) and sends the actions back.

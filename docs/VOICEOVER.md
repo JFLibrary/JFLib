@@ -1,8 +1,9 @@
 # VoiceOver-Plan: der Screenreader auf Mac und iPhone
 
-Stand 2026-11-12, auf Basis von `main` ce54de4c. Umgesetzt ist VO0 (die Brücke für macOS mit Rollen, Werten,
-Aktionen und dem Test im Prozess; die Hand-Probe des Nutzers steht aus). Die vier Entscheidungen unten hat der Nutzer
-am 2026-11-12 alle wie empfohlen getroffen.
+Stand 2026-11-12, auf Basis von `main` ce54de4c. Umgesetzt sind VO0, VO1 und VO2 (macOS: die Brücke mit Rollen,
+Werten, Aktionen, Mitteilungen und Text, `plattest --test a11y-mac`) und VO4 (iOS: Elemente, Traits, UITextInput,
+`plattest --test a11y-ios` im Simulator). Die Hand-Proben des Nutzers auf Mac und iPhone (VO3, VO5) stehen aus. Die
+vier Entscheidungen unten hat der Nutzer am 2026-11-12 alle wie empfohlen getroffen.
 
 ## Ziel
 
@@ -119,6 +120,14 @@ echten Fenster; `plattest --test a11y-show` zeigt die Demo für Hand-Proben.
 
 **Fertig, wenn:** `plattest --test a11y-mac` (Entscheidung 3) den Baum der Demo so liest, wie VoiceOver ihn fragt.
 
+**Umgesetzt (2026-11-12):** `plattest --test a11y-mac` liest den Baum der Demo im echten Fenster: Rollen, Untrollen,
+Namen, Werte, Zustände, die Registerkarten in ihrer Gruppe, die Zeilen in ihrer Liste, Rahmen in Bildschirmpunkten, der
+Treffertest und das fokussierte Element der App. Mitteilungen: Fokus, Wert (auch der Text eines Labels), Titel,
+Auswahl einer Liste oder Registerleiste, aufgeklappt, Layout bei neuen oder weggefallenen Knoten, ein Popup-Menü
+geöffnet / geschlossen (`AXMenuOpened` / `AXMenuClosed`), „zerstört“ für weggefallene Elemente. Dialogfenster sind
+`AXDialog` und modal. Prüfungen des Tastaturfokus setzt der Test aus, solange das Fenster nicht das Schlüsselfenster
+werden kann (der Mac zeigt seinen Sperrbildschirm).
+
 ### VO2: Aktionen und Text auf macOS (M)
 
 - Drücken, Umschalten, Auswählen, Werte setzen, Aufklappen, Fokus; Textfelder mit Wert, Auswahl, Einfügepunkt,
@@ -126,6 +135,12 @@ echten Fenster; `plattest --test a11y-show` zeigt die Demo für Hand-Proben.
 
 **Fertig, wenn:** der Test jede Aktion der Demo auslöst und ihr Ergebnis im nächsten Baum findet, und VoiceOver in der
 Gallery einen Text Zeichen für Zeichen liest (Hand-Probe).
+
+**Umgesetzt (2026-11-12), Hand-Probe ausstehend:** Drücken, Erhöhen/Verringern, Werte und Texte setzen, Fokus und
+Auswahl setzen; Textfelder mit Zeichenzahl, Auswahl und Einfügepunkt (UTF-16 wie `NSString`, ein Emoji zählt zwei),
+der Zeile des Einfügepunkts, Text und attributiertem Text eines Bereichs, Zeilen, dem Bereich eines Zeichens, dem
+Zeichen an einem Punkt, dem Rechteck eines Bereichs (`Node::char_rect`); eine gesetzte Auswahl verschiebt den Cursor.
+`plattest --test a11y-mac` prüft jede Aktion und ihr Ergebnis im nächsten Baum (62 Prüfungen).
 
 ### VO3: macOS fertig (S)
 
@@ -141,6 +156,29 @@ Gallery einen Text Zeichen für Zeichen liest (Hand-Probe).
 - Textfelder: Fokus und Tastatur über VoiceOver; Navigation im Text über `UITextInput` (Entscheidung 4).
 
 **Fertig, wenn:** der Test im Simulator den Baum der Demo über `accessibilityElements` liest und Aktionen auslöst.
+
+**Umgesetzt (2026-11-12):** [`apple_ios_a11y.rs`](../lib/plat/apple_ios_a11y.rs): je Knoten ein `JFAXIosElement`
+(Unterklasse von `UIAccessibilityElement`) unter `JFView`; Listen, Registerleisten, Dialoge, Menüs und betitelte
+Kästen sind Container (eine Liste `list`, eine Registerleiste mit dem Trait `tabBar`, sonst `semanticGroup` mit dem
+Namen), alles andere Elemente; was unter einem Element hängt (das Popup einer Klappliste), folgt ihm. Ein modales
+Dialogfenster steht allein (`accessibilityViewIsModal`). Traits wie in der Tabelle, Fortschritt als Prozent, ein
+Schalter mit `toggleButton` (iOS 17, per `dlsym`) und Wert 1/0. Doppeltippen, Wischen am Schieberegler (5 %) und
+die Escape-Geste (zwei Finger im Z: Escape) werden zu Wünschen an die UI **und laufen sofort einen Frame**, damit
+VoiceOver gleich danach den neuen Zustand liest (es fragt den Wert direkt nach `accessibilityIncrement`). Mitteilungen:
+„Layout geändert“ mit dem fokussierten Element, wenn der Fokus wandert, ohne Ziel bei neuen oder weggefallenen
+Knoten, „Bildschirm geändert“ bei einem neuen Dialog oder Popup-Menü.
+
+- **Ein und aus (Entscheidung 2):** Der Baum entsteht, solange VoiceOver oder die Schaltersteuerung läuft (ihre
+  Mitteilungen schalten ihn ein und aus), und sobald etwas die View nach ihren Elementen fragt (andere Hilfsmittel,
+  der Test).
+- **Text (Entscheidung 4):** [`apple_ios_text.rs`](../lib/plat/apple_ios_text.rs): `UITextInput` auf dem Element eines
+  Textfelds (VoiceOver liest, bewegt den Cursor und wählt aus; mit dem Trait `keyboardKey` gilt es VoiceOver als
+  Textfeld, wie bei Flutter) und auf `JFView` statt nur `UIKeyInput` (die Tastatur sieht den Text um den Cursor;
+  markierter Text einer Komposition wird zum Preedit der UI und am Ende zum Commit, wie auf dem Mac). Das Dokument ist
+  der Text des Felds aus dem Baum; ohne Baum (kein Hilfsmittel) bleibt es leer und Tippen geht wie bisher über
+  `insertText` / `deleteBackward`.
+- `plattest --test a11y-ios` läuft unter UIKit im Simulator (`tools/apple.py simapp`): 36 Prüfungen, darunter, dass
+  der neue Zustand direkt nach Doppeltippen und Wischen da ist, und das Tippen über die Tastatur-View.
 
 ### VO5: iPhone fertig (S)
 
