@@ -65,7 +65,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles with layers and styles, dash patterns, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
-  <br>[lib.rs](#render2d-crate-root) · [math.rs](#render2dmathrs) · [scene.rs](#render2dsceners)
+  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [scene.rs](#render2dsceners)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -21365,11 +21365,13 @@ CLASS_MAX: u32 = CLASS_MIN << (CLASSES - 1)
 *the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles with layers and styles, dash patterns, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU* -- crate root [`lib/render2d/lib.rs`](../lib/render2d/lib.rs)
 
 ```text
-render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a; docs/RENDER2D.md): a retained scene of entities
-with stable ids (lines, polylines, arcs and circles), layers and styles; strokes as quads whose coverage the fragment
-shader computes from the geometry (no MSAA), with exact butt, square and round caps and miter, bevel and round joins,
-dash patterns in pixels or drawing units; f64 coordinates, a pair of f32 per axis on the GPU with the camera
-subtracted first; visibility in compute shaders that keep the painter's order and write the indirect draws.  Hosted
+render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a, G6b1; docs/RENDER2D.md): a retained scene of
+entities with stable ids (lines, polylines, arcs and circles; Bézier curves, ellipses and splines flattened per zoom
+band on the CPU, curve.rs; fills of rings, triangulated on the CPU, fill.rs), layers and styles; strokes as quads whose
+coverage the fragment shader computes from the geometry (no MSAA), with exact butt, square and round caps and miter,
+bevel and round joins, dash patterns in pixels or drawing units; fills with their edge's exact coverage, every pixel
+blended once, and hatches from the camera's place in f64; f64 coordinates, a pair of f32 per axis on the GPU with the
+camera subtracted first; visibility in compute shaders that keep the painter's order and write the indirect draws.  Hosted
 like render3d as the content of a ui.gpu_view (the app glues it with a GpuContent; lib/ui knows nothing of it).  The
 same WGSL on every path: compiled ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
 
@@ -21401,7 +21403,8 @@ PAGE: u32 = 256
 BATCH: u32 = 16384
 /// the most visible layers (stroke.wgsl: first_instance = layer << 16 on Voll)
 LAYERS_MAX: u32 = 65535
-/// the WGSL sources as the device gets them (common.wgsl in front of each)
+/// the WGSL sources as the device gets them (common.wgsl in front of each; stroke.wgsl with fs_full from full_body.wgsl, the same body
+/// as the function full_body, and fill.wgsl)
 COMMON_WGSL: &str = include_str!("common.wgsl")
 CULL_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("cull.w ...
 SCATTER_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("scatte ...
@@ -21414,6 +21417,8 @@ VS_SPV: &[u32] = spv::VS
 VS_FULL_SPV: &[u32] = spv::VS_FULL
 FS_SPV: &[u32] = spv::FS
 FS_FULL_SPV: &[u32] = spv::FS_FULL
+VS_FILL_SPV: &[u32] = spv::VS_FILL
+FS_FILL_SPV: &[u32] = spv::FS_FILL
 ```
 
 - **`struct RendererDesc`**
@@ -21440,6 +21445,147 @@ FS_FULL_SPV: &[u32] = spv::FS_FULL
 - **`fn record<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, color: ColorAttachment<'a>) -> Result<()>`**
   one frame of a prepared scene into e: its uploads, its visibility, its render pass (the colour attachment's load
   and clear as it says, sRGB codes)
+
+### `render2d/curve.rs`
+
+Source: [`lib/render2d/curve.rs`](../lib/render2d/curve.rs)
+
+```text
+curve -- curves on the CPU (decision 25; docs/RENDER2D.md "Kurven"): Bézier chains, ellipses and splines (B-splines up
+to degree 3, rational ones included) as rational Bézier spans in f64, flattened into segments per zoom band within
+FLAT_TOL px; where the whole curve would take too many segments, only what lies in view plus a margin is flattened
+finely, the rest as the chords of whole sub-spans (they lie in their control hulls, which lie outside the window).
+
+  Curve::bezier / ellipse / spline / polyline, ring    the spans (homogeneous control points relative to an origin)
+  flatten(&curve, tol, window, max_leaf, budget)         the points, each with its length along the curve (for dashes)
+
+A span is subdivided at t = 1/2 until its control polygon lies within the tolerance of its chord (the factor of the
+bound: a quadratic's curve keeps half its control point's distance, a cubic's three quarters, a rational quadratic
+w / (1 + w) in standard form, any other rational one the whole hull); the subdivision depends on the curve and the
+tolerance only, so a window keeps the vertices a full flattening would have.  A vertex is evaluated from the span
+itself at its dyadic parameter (repeated halving would add its roundings up).  The length at a vertex (for dash
+patterns) is the length along the chords, as for a polyline; where a windowed curve's fine part begins, the curve's
+arc length there (adaptive Gauss-Legendre on the spans), so that the pattern stays put when the window moves.
+```
+
+```rust
+/// the flattening's tolerance at the finest scale of a zoom band (px): a chord lies at most this far inside its curve
+/// (2/3 of it on average); within a band and its hysteresis at most HYST times it (docs/RENDER2D.md "Kurven")
+FLAT_TOL: f64 = 1.0 / 32.0
+/// a curve is flattened again when the scale leaves its band [2^b, 2^(b+1)) by more than this factor
+HYST: f64 = 1.189_207_115_002_721
+/// a curve whose whole flattening takes more segments than this is flattened in view plus a margin only
+FULL_MAX: usize = 4096
+/// the most segments of one curve (beyond: a coarser tolerance)
+CURVE_MAX: usize = 16384
+```
+
+- **`struct Span`**
+  a rational Bézier span of degree 1 to 3: homogeneous control points (w x, w y, w) relative to the curve's origin
+  - `deg: u8`
+  - `p: [[f64; 3]; 4]`
+
+- **`struct Curve`**
+  a curve: its origin (a point of it, so that the spans' numbers stay small), its spans end to end, closed (its end
+  joins its start)
+  - `origin: [f64; 2]`
+  - `spans: Vec<Span>`
+  - `closed: bool`
+
+- **`struct Flat`**
+  the flattened curve: points (absolute), the arc length at each from the curve's start, and for a closed one the
+  length all around (where the closing segment ends)
+  - `pts: Vec<[f64; 2]>`
+  - `lens: Vec<f64>`
+  - `total: f64`
+  - `closed: bool`
+
+**`impl Span`**
+
+- **`fn line(a: [f64; 2], b: [f64; 2]) -> Span`**
+- **`fn eval(&self, t: f64) -> [f64; 2]`**
+
+**`impl Curve`**
+
+- **`fn bezier(points: &[[f64; 2]], deg: usize, closed: bool) -> Curve`**
+  a chain of Bézier pieces: the start, then per piece its control points and its end (degree 2 or 3)
+- **`fn polyline(points: &[[f64; 2]], closed: bool) -> Curve`**
+  straight segments through the points (fills' rings; repeated points count once)
+- **`fn ellipse(center: [f64; 2], radii: [f64; 2], rotation: f64, start: f64, sweep: f64) -> Curve`**
+  an elliptic arc: the point at the parameter t is centre + R(rotation) (rx cos t, ry sin t); a sweep of a full turn
+  or more is closed.  Rational quadratic spans of at most a quarter turn: exact
+- **`fn spline(deg: usize, points: &[[f64; 2]], weights: &[f64], knots: &[f64], closed: bool) -> Curve`**
+  a B-spline of degree 1 to 3, rational with weights (empty: all 1), knots (empty: clamped uniform, or periodic
+  uniform when closed), as Bézier spans by knot insertion (Boehm).  closed: its end joins its start (a straight segment
+  where they differ).  The caller has checked the numbers (Scene::geom)
+- **`fn ring(mut self) -> Curve`**
+  a fill's ring: closed, a straight segment from the end back to the start where they differ
+- **`fn bounds(&self) -> [f64; 4]`**
+  the curve's box (its control hulls), absolute
+- **`fn append(&mut self, o: &Curve)`**
+  appends another curve's spans (a ring of a fill made of pieces): moved to this origin, joined by a straight segment
+  where the other does not start at this one's end
+
+- **`fn flatten(c: &Curve, tol: f64, window: Option<[f64; 4]>, max_leaf: f64, budget: usize) -> Option<Flat>`**
+  the curve's points within tol (drawing units) of it; window (absolute, None: all of it): finely only where the spans
+  meet it, max_leaf the longest chord there; None when it takes more than budget points
+
+- **`fn band_of(x: f64) -> i32`**
+  floor(log2(x)) for x > 0 (normal numbers), from its exponent
+
+- **`fn pow2(b: i32) -> f64`**
+  2^b
+
+### `render2d/fill.rs`
+
+Source: [`lib/render2d/fill.rs`](../lib/render2d/fill.rs)
+
+```text
+fill -- a fill's rings on the CPU (decision 26; docs/RENDER2D.md "Flächen"): cleaned, nested (even-odd: a ring inside
+an odd number of others is a hole), oriented (the inside on the left in drawing coordinates: outer rings
+counter-clockwise, holes clockwise), and each outer ring with its holes cut into triangles in f64.
+
+  prepare(rings) -> Prepared   the rings as they go up (their points), the triangles as indices into them
+
+The triangulation is ear clipping after earcut (Mapbox, ISC; written anew here): holes bridged into their outer ring
+left to right (Eberly's bridge), ears found through a z-order hash for larger rings, collinear and repeated points
+filtered, and where no ear is left, small self-intersections cured locally and as a last resort the polygon split by
+a valid diagonal.  It only takes the rings' points, never new ones, so every triangle's corner is a ring's point (the
+shader finds a corner's two boundary edges through it).  Robust against collinear and repeated points and rings
+that touch; self-intersecting rings come out approximately (decision 26).  The numbers are relative to the fill's
+first point (small differences, exact orientation tests where the points allow).
+```
+
+- **`struct Prepared`**
+  the rings ready for the records: their points (relative to `origin`), oriented; triangles as (ring, point) pairs; per
+  triangle and per edge the edges near it (near: numbered ring after ring, nearest first)
+  - `origin: [f64; 2]`
+  - `rings: Vec<Vec<[f64; 2]>>`
+  - `tris: Vec<[(u32, u32); 3]>`
+  - `tri_near: Vec<Vec<u32>>`
+  - `edge_near: Vec<Vec<u32>>`
+
+```rust
+/// the most edges a triangle's record names (the fragment shader computes its pixels from them)
+TRI_NEAR: usize = 20
+/// the most edges besides its two neighbours an edge's record names
+EDGE_NEAR: usize = 4
+```
+
+**`impl Prepared`**
+
+- **`fn near(&mut self, d: f64)`**
+  the edges within d (drawing units) of each triangle and of each edge (other than itself and its neighbours),
+  nearest first, at most TRI_NEAR and EDGE_NEAR (beyond: the nearest ones; the shader is then approximate there)
+
+- **`fn prepare(input: &[Vec<[f64; 2]>]) -> Prepared`**
+  the rings (absolute f64 points, implicitly closed): cleaned, nested, oriented, triangulated
+
+- **`fn earcut(data: &[[f64; 2]], starts: &[usize], out: &mut Vec<usize>)`**
+  triangles of the polygon `data` (the outer ring, then the holes from `starts` on) as indices into it
+
+- **`fn areas(p: &Prepared) -> (f64, f64)`**
+  (tests) the triangles' area against the rings' even-odd area, both in units squared
 
 ### `render2d/math.rs`
 
@@ -21522,7 +21668,30 @@ that never reached a submission: the next sends everything again.
 ```rust
 /// the most entries of a dash pattern (Style::dash)
 DASH_MAX: usize = 8
+/// the most line families of a hatch (Style::hatch)
+HATCH_MAX: usize = 4
+/// the most entries of a hatch family's dash pattern (HatchLine::dash)
+HATCH_DASH_MAX: usize = 6
 ```
+
+- **`struct HatchLine`**
+  a family of a hatch's parallel lines, as DXF has them: their angle (radians, counter-clockwise from the x axis), the
+  base point one of them runs through, the spacing between neighbouring lines (at right angles to them) and how far each
+  line's pattern is shifted along against the one before; a dash pattern (on, off, ... in drawing units; none: solid
+  lines; an entry of 0 is a dot).  Made with `new` and changed field by field (it may grow)
+  - `angle: f64`
+  - `base: [f64; 2]`
+  - `spacing: f64`
+  - `shift: f64`
+  - `dash: [f64; HATCH_DASH_MAX]`
+  - `dashes: u32`
+
+**`impl HatchLine`**
+
+- **`const fn new(angle: f64, spacing: f64) -> HatchLine`**
+  solid lines at an angle, `spacing` apart, through the origin
+- **`fn dashed(mut self, pattern: &[f64]) -> HatchLine`**
+  the same with a dash pattern (at most HATCH_DASH_MAX entries, drawing units)
 
 - **`struct Style`**
   a stroke's look.  Made with `new` and changed field by field (it may grow)
@@ -21539,11 +21708,17 @@ DASH_MAX: usize = 8
   - `dashes: u32`
   - `dash_unit: Unit` -- the unit of the pattern's lengths and of its phase
   - `dash_phase: f32` -- how far into the pattern an entity starts (in `dash_unit`s)
+  - `hatch: [HatchLine; HATCH_MAX]` -- a fill's hatch: the first `hatches` line families (0: the fill is solid), drawn in `color` over nothing, the lines
+    `hatch_width` px wide (0, or thinner than a pixel: 1 px); strokes ignore it
+  - `hatches: u32`
+  - `hatch_width: f32`
 
 **`impl Style`**
 
 - **`const fn new(color: u32) -> Style`**
   a hairline of a colour: width 0, butt caps, miter joins with the limit 4, solid
+- **`fn hatched(mut self, families: &[HatchLine], width: f32) -> Style`**
+  the same with a hatch (at most HATCH_MAX families; none: a solid fill) of lines `width` px wide
 - **`fn dashed(mut self, pattern: &[f32], unit: Unit, phase: f32) -> Style`**
   the same with a dash pattern (at most DASH_MAX entries; an empty one: solid), its unit and phase
 
@@ -21568,13 +21743,28 @@ DASH_MAX: usize = 8
   - `slot: u32`
 
 - **`enum Shape<'a>`**
-  what an entity is (more kinds come: curves, fills, text)
+  what an entity is (more kinds come: text)
   - `Line { a: [f64; 2], b: [f64; 2] }`
   - `Polyline { points: &'a [[f64; 2]], closed: bool }` -- at least one point; closed: a segment from the last back to the first, joined at every point
   - `Arc { center: [f64; 2], radius: f64, start: f64, sweep: f64 }` -- a circular arc: its centre, radius (above 0), the angle it starts at and how far it turns (radians; positive:
     counter-clockwise, the drawing's y pointing up; not 0).  A sweep of a full turn or more is a circle whose dash
     pattern starts at `start`.  Drawn in pieces of at most ARC_STEP, coverage from the circle itself
   - `Circle { center: [f64; 2], radius: f64 }` -- a circle (its dash pattern starts at angle 0 and runs counter-clockwise)
+  - `Quadratic { points: &'a [[f64; 2]], closed: bool }` -- quadratic Bézier pieces end to end: the start, then per piece its control point and its end (1 + 2k points, k at
+    least 1); closed: the end joins the start (a straight segment where they differ).  Curves are flattened into
+    segments per zoom band within curve::FLAT_TOL px (docs/RENDER2D.md "Kurven"); the joins between pieces are the
+    style's, the dash pattern runs along the curve's length
+  - `Cubic { points: &'a [[f64; 2]], closed: bool }` -- cubic Bézier pieces: per piece its two control points and its end (1 + 3k points)
+  - `Ellipse { center: [f64; 2], radii: [f64; 2], rotation: f64, start: f64, sweep: f64 }` -- an elliptic arc: the point at the parameter t is center + R(rotation) (radii[0] cos t, radii[1] sin t), from t =
+    start over `sweep` (radians, not 0; a full turn or more: the closed ellipse, starting at `start`); radii above 0
+  - `Spline { degree: u32, points: &'a [[f64; 2]], weights: &'a [f64], knots: &'a [f64], closed: bool }` -- a B-spline of degree 1 to 3 (at least degree + 1 points), rational where `weights` has one positive weight per
+    point (empty: all 1), on `knots` (empty: clamped and uniform, through the first and last point; else points +
+    degree + 1 non-decreasing values, the curve from knots[degree] to knots[points]); closed with empty knots: periodic
+    (smooth all round), else the end joins the start.  As DXF's SPLINE
+  - `Fill { rings: &'a [&'a [Shape<'a>]] }` -- a filled area: its rings, each the shapes of the list end to end (a shape that does not start where the one before
+    ended: a straight segment between them; the last back to the first), even-odd between rings (a ring inside a hole is
+    an island).  Triangulated on the CPU, its edge smoothed as strokes are; the style's colour, or its hatch
+    (docs/RENDER2D.md "Flächen")
 
 ```rust
 /// the largest angle of one piece of an arc (a record): a full circle is 16 of them.  Its quad covers the piece's ring
@@ -21656,6 +21846,8 @@ ARC_STEP: f64 = core::f64::consts::PI / 8.0
   the finished frames' stats since the last call
 - **`fn collect_stats(&mut self)`**
   after Device::wait_idle: the stats of what was still in flight
+- **`fn reflattened(&self) -> u32`**
+  curves and fills the last prepare flattened again (their zoom band changed, or the view left their window)
 - **`fn prepare(&mut self, r: &mut Renderer, size: (u32, u32)) -> Result<()>`**
   the frame's data for Renderer::record: waits for this slot's last frame, sends what changed.  size: the
   target's in pixels
