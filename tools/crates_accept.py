@@ -51,7 +51,8 @@ only `jflib = "0.1"`, offline, with nothing of this repository on their paths:
           unwind and panic = "unwind" (Windows): panics caught on a std thread, a thread of plat
           and the main thread leave it running (rt::panic_take has the text), an uncaught one on a
           std thread ends that thread, on a thread of plat or the main thread JFLib's crash report
-          (exit 3).
+          (exit 3); with package, `cargo jflib package --formats setup` of it (the stub is built
+          with panic = "abort").
 
 Then `cargo test -p jflib-build` and `-p cargo-jflib`.  Output below build/crates_accept; exit 1 when something failed.
 
@@ -797,17 +798,18 @@ def check_std(run, made, vendor, targets, jenv, target_dir):
                            env=dict(os.environ, **jenv), capture_output=True, text=True, timeout=600)
         run.check(r.returncode != 0 and "made on" in r.stderr, "cargo jflib package refuses the other system's formats for an app with std")
     if "win" in targets:
-        check_unwind(run, app, jenv, target_dir)
+        check_unwind(run, app, jenv, target_dir, "package" in targets)
 
 
-def check_unwind(run, app, jenv, target_dir):
+def check_unwind(run, app, jenv, target_dir, package=False):
     """hallo3 with jflib's feature unwind and panic = "unwind" (it changes the app: the last check of
     it): caught panics leave it running on every kind of thread, uncaught ones end as before"""
     toml = app / "Cargo.toml"
     text = toml.read_text(encoding="utf-8")
-    run.check('features = ["std"]' in text and text.count('panic = "abort"') == 2 and 'feature "unwind"' in text,
+    # (the note above the profiles names panic = "abort" too: the profiles' lines start with it)
+    run.check('features = ["std"]' in text and text.count('\npanic = "abort"') == 2 and 'feature "unwind"' in text,
               "hallo3's Cargo.toml: the feature std, panic = \"abort\" twice, a note on the feature unwind")
-    toml.write_text(text.replace('features = ["std"]', 'features = ["unwind"]', 1).replace('panic = "abort"', 'panic = "unwind"'), encoding="utf-8")
+    toml.write_text(text.replace('features = ["std"]', 'features = ["unwind"]', 1).replace('\npanic = "abort"', '\npanic = "unwind"'), encoding="utf-8")
     lib = app / "src" / "lib.rs"
     lib.write_text(lib.read_text(encoding="utf-8").replace("ui::main!({\n", "ui::main!({\n" + UNWIND_CHECK, 1), encoding="utf-8")
     if not run.cmd("hallo3-unwind", ["cargo", "build", "--target", WIN], app, jenv):
@@ -820,6 +822,14 @@ def check_unwind(run, app, jenv, target_dir):
         r = subprocess.run([exe, arg], cwd=app, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
         run.check(r.returncode == 3 and "panic: panicked at" in r.stderr and msg in r.stderr,
                   f"hallo3 {arg} with unwind: JFLib's crash report, exit 3 (exit {r.returncode}: {r.stderr.strip()[-200:]})")
+    # the setup of an app with panic = "unwind": its stub (no std) is built with panic = "abort"
+    if package and os.name == "nt":
+        setup = target_dir / "jflib-package" / "hallo3_Setup.exe"
+        setup.unlink(missing_ok=True)
+        if run.cmd("hallo3-unwind-package", ["cargo", "jflib", "package", "--formats", "setup"], app, jenv):
+            stub = (target_dir / "jflib-package" / "installer-stub" / "Cargo.toml").read_text(encoding="utf-8")
+            run.check(setup.is_file() and 'panic = "unwind"' not in stub and stub.count('panic = "abort"') >= 2,
+                      "cargo jflib package of an app with panic = \"unwind\": the setup, its stub with panic = \"abort\"")
 
 # ---------------------------------------------------------------- the docs as docs.rs builds them (CR7)
 # what docs.rs builds without [package.metadata.docs.rs] targets (docs.rs/about/metadata)
