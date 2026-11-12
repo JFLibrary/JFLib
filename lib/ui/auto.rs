@@ -9,7 +9,7 @@
 //   theme file PATH | none        an app theme from a file (an error is printed and kept for
 //                                 `expect theme error`; the theme stays) / no app theme
 //   style NAME                    another style linked into the app (Ui::set_style)
-//   move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r]
+//   move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r|m] [shift|ctrl|alt]...
 //   rclick S        dblclick S [shift|ctrl|alt]...
 //                   drag S1 S2 [steps] [hold MS] [shift|ctrl|alt|right|middle]...
 //                   drag ... hold MS   the button rests MS ms before the first move (like
@@ -35,6 +35,12 @@
 //   wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
 //                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
 //   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
+//   keydown CHORD [scan N] [left|right|numpad]   (E2) the key goes down and stays down (a
+//                   modifier key -- shift, ctrl, alt -- is held for the following events; once
+//                   more while down: an auto-repeat); keyup CHORD [scan N] [left|right|numpad]
+//                   lets it go; scan N and the location reach ui.key_event_take
+//   preedit "text" [CURSOR]   (E4) an input method's composition (ui.ime_preedit; CURSOR a byte
+//                   offset, default the end; "" ends it); commit "text" commits
 //                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
 //   keys [N] CHORD...   the chords N times over, queued for ONE pass of the window with the
 //                   keyboard (more keys than frames: what a tool window hands on); `key` gives
@@ -80,7 +86,9 @@
 //                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
 //   system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
 //                       overrides of the system settings (follow with `system settings ...`),
-//                       jfgui_CSD (the library title bar and its resize band, next pass)
+//                       jfgui_CSD (the library title bar and its resize band, next pass),
+//                       jfgui_FONT_FALLBACK 1 / - (the system fonts for missing characters on /
+//                       off from here)
 //   sensor accel|gravity|gyro|magnet X Y Z [ACCURACY]   (sensors.rs) a reading of plat::sensors:
 //                       the sensor exists from now on; a stopped sensor delivers nothing
 //   sensor rot X Y Z W [abs|rel]   the rotation estimate (a quaternion; default abs)
@@ -409,6 +417,7 @@ fn key_lookup(p: &[u8]) -> u32 {
         ("backspace", VK_BACK), ("delete", VK_DELETE), ("left", VK_LEFT), ("right", VK_RIGHT),
         ("up", VK_UP), ("down", VK_DOWN), ("home", VK_HOME), ("end", VK_END),
         ("pgup", VK_PRIOR), ("pgdn", VK_NEXT), ("insert", VK_INSERT), ("alt", VK_MENU), ("apps", VK_APPS),
+        ("shift", VK_SHIFT), ("ctrl", VK_CONTROL), // (E2) keydown shift / keyup shift
         ("plus", VK_OEM_PLUS), ("minus", VK_OEM_MINUS),
         // (U1) punctuation (US layout keys) and the numeric keypad
         ("[", VK_OEM_4), ("]", VK_OEM_6), (",", VK_OEM_COMMA), (".", VK_OEM_PERIOD),
@@ -710,9 +719,9 @@ impl Ui {
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 54] = [
+        const CMDS: [&str; 57] = [
             "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
-            "key", "keys", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
+            "key", "keys", "keydown", "keyup", "type", "commit", "preedit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
             "style", "sensor", "location", "tap", "longpress", "swipe", "flick", "finger", "pinch", "pan2", "gpu",
@@ -777,10 +786,25 @@ impl Ui {
                 if s.is_none() {
                     self.sel_fail();
                 } else {
+                    // optional words: the button (l / r / m), shift ctrl alt held during the click
+                    let saved_mods = self.sc.script_mods;
+                    let mut mods = saved_mods;
+                    let mut b = BTN_LEFT;
+                    let mut q = skip_ws(rest);
+                    while !q.is_empty() {
+                        let m = mod_word(q);
+                        if m != 0 {
+                            mods |= m;
+                        } else {
+                            b = parse_button(q);
+                        }
+                        q = next_word(q);
+                    }
                     let (x, y) = (self.sc.sel_x, self.sc.sel_y);
                     self.mouse_to(app, x, y);
-                    let b = parse_button(skip_ws(rest));
+                    self.sc.script_mods = mods;
                     self.click_here(app, b);
+                    self.sc.script_mods = saved_mods;
                 }
             }
             "rclick" => {
@@ -831,9 +855,12 @@ impl Ui {
             "pinch" => self.sc_two(app, a, true),
             "pan2" => self.sc_two(app, a, false),
             "key" => self.sc_key(app, a),
+            "keydown" => self.sc_keyraw(app, a, true),
+            "keyup" => self.sc_keyraw(app, a, false),
             "keys" => self.sc_keys(app, a),
             "type" => self.sc_type(app, a),
             "commit" => self.sc_commit(app, a),
+            "preedit" => self.sc_preedit(app, a),
             "cmd" => {
                 let (id, r) = parse_int(a);
                 let (arg, _) = parse_int(r);
@@ -1247,6 +1274,12 @@ impl Ui {
                 return;
             }
             plat::setenv(&name, if value == "-" { None } else { Some(&value) });
+            if name == "jfgui_FONT_FALLBACK" {
+                // the system fonts for missing characters from here on (a run reads the variable
+                // at its start: headless runs start without them, so shots match everywhere)
+                self.text.set_system_fallback(value.starts_with('1'));
+                self.dirty_force_full();
+            }
             self.run_passes(app);
             return;
         }
@@ -1756,12 +1789,63 @@ impl Ui {
         }
     }
 
-    // a key pressed and released with modifiers
+    // a key pressed and released with modifiers (and those keydown holds)
     fn press(&mut self, app: &mut dyn App, mods: u32, vk: u32) {
-        self.sc.script_mods = mods;
+        let held = self.sc.script_mods;
+        self.sc.script_mods = held | mods;
         self.inject(app, plat::E_KEY_DOWN, 0, 0, 0, vk);
         self.inject(app, plat::E_KEY_UP, 0, 0, 0, vk);
-        self.sc.script_mods = 0;
+        self.sc.script_mods = held;
+    }
+
+    // (E2) keydown / keyup CHORD [scan N] [left|right|numpad]: one key down (an auto-repeat when
+    // it is down already) or up; shift / ctrl / alt stay held between their keydown and keyup
+    fn sc_keyraw(&mut self, app: &mut dyn App, a: &[u8], down: bool) {
+        let Some((mods, vk, rest)) = chord(skip_ws(a)) else {
+            self.fail(b"unknown key");
+            return;
+        };
+        let (mut scan, mut loc) = (0i32, KL_STANDARD);
+        let mut q = skip_ws(rest);
+        while !q.is_empty() {
+            if let Some(r) = word_eq(q, "scan") {
+                let (n, r) = parse_int(skip_ws(r));
+                scan = n;
+                q = skip_ws(r);
+                continue;
+            }
+            loc = if word_eq(q, "left").is_some() {
+                KL_LEFT
+            } else if word_eq(q, "right").is_some() {
+                KL_RIGHT
+            } else if word_eq(q, "numpad").is_some() {
+                KL_NUMPAD
+            } else {
+                let mut d = b"unknown keydown / keyup option ".to_vec();
+                d.extend_from_slice(q);
+                self.fail(&d);
+                return;
+            };
+            q = next_word(q);
+        }
+        let own = match vk {
+            VK_SHIFT => MOD_SHIFT,
+            VK_CONTROL => MOD_CTRL,
+            VK_MENU => MOD_ALT,
+            _ => 0,
+        };
+        let held = self.sc.script_mods;
+        if down {
+            // a modifier's own event carries its new state (as Win32 and Wayland do)
+            let repeat = if self.keydown[(vk & 255) as usize] != 0 { 1 << 31 } else { 0 };
+            self.sc.script_mods = held | own | mods;
+            self.inject(app, plat::E_KEY_DOWN, 0, scan, loc as i32, vk | repeat);
+            self.sc.script_mods = held | own;
+        } else {
+            self.sc.script_mods = (held | mods) & !own;
+            self.inject(app, plat::E_KEY_UP, 0, scan, loc as i32, vk);
+            self.sc.script_mods = held & !own;
+        }
     }
 
     // commit "text" [N]: the commits of an input method (plat::ime_commit_text) to the window
@@ -1783,6 +1867,21 @@ impl Ui {
             at += n;
             self.process_events(app);
         }
+    }
+
+    // (E4) preedit "text" [CURSOR]: an input method's composition in the window with the keyboard
+    // (plat::ime_preedit_set; the caret a byte offset, default its end; "" ends it)
+    fn sc_preedit(&mut self, app: &mut dyn App, a: &[u8]) {
+        let Some((s, r)) = parse_qstring(a, 1024) else {
+            self.fail(b"expected a quoted string");
+            return;
+        };
+        let text = String::from_utf8_lossy(&s).into_owned();
+        let r = skip_ws(r);
+        let cursor = if r.first().is_some_and(|c| c.is_ascii_digit()) { parse_int(r).0.max(0) as usize } else { text.len() };
+        let w = (self.m.win.active & (WIN_MAX as u32 - 1)) as u8;
+        plat::ime_preedit_set(w, &text, cursor);
+        self.process_events(app);
     }
 
     // type "text"
@@ -1827,7 +1926,9 @@ impl Ui {
                 self.cmd_run(UIC_TIMER, id);
                 fired = true;
             }
-            if self.animating || fired {
+            // a frame asked for (need) comes with the next step, as in the window loop
+            if self.animating || fired || self.need {
+                self.need = false;
                 self.run_passes(app);
             }
         }

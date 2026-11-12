@@ -1,0 +1,46 @@
+# viewtest: more cursors (E3).  "Zeiger wechseln" gives the page the next cursor through
+# ui.cursor_next; "Zeiger:" is ui.cursor_at under the pointer.
+#
+# the defaults: the arrow on the page
+move #101
+expect text:"Zeiger: Pfeil" exists
+# shapes beyond the 4 flag bits of a hit box
+click "Zeiger wechseln"
+move #101
+expect text:"Zeiger: nicht erlaubt" exists
+click "Zeiger wechseln"
+move #101
+expect text:"Zeiger: Greifen" exists
+click "Zeiger wechseln"
+move #101
+expect text:"Zeiger: Vergrößern" exists
+click "Zeiger wechseln"
+move #101
+expect text:"Zeiger: Größe NO" exists
+# the plain canvas next to it keeps its crosshair
+move #102
+expect text:"Zeiger: Kreuz" exists
+# a custom cursor: made when it is first needed (16 x 16 DIP, handle 1)
+click "Zeiger wechseln"
+move #101
+expect text:"Zeiger: eigener" exists
+expect text:"Eigener: 1 16x16" exists
+# drawn anew (24 x 24) under the same handle
+click "Eigener größer"
+expect text:"Eigener: 1 24x24" exists
+# freed: no custom cursor; the next one gets the same handle again
+click "Eigener frei"
+expect text:"Eigener: keiner" exists
+click "Zeiger wechseln"
+click "Zeiger wechseln"
+click "Zeiger wechseln"
+click "Zeiger wechseln"
+click "Zeiger wechseln"
+click "Zeiger wechseln"
+move #101
+expect text:"Zeiger: eigener" exists
+expect text:"Eigener: 1 16x16" exists
+# round to the start
+click "Zeiger wechseln"
+move #101
+expect text:"Zeiger: Pfeil" exists

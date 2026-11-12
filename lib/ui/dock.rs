@@ -12,7 +12,8 @@
 //   dock_end(&mut st) -> changed      true when the user changed the layout (save it then)
 //   DockState                         the layout, kept by the app: save() -> text, load(text),
 //                                     reset, show / hide / toggle / focus / activate, float /
-//                                     dock_to, collapse / collapsed, size / set_size, groups /
+//                                     dock_to, float_group / dock_group_to (a whole group),
+//                                     collapse / collapsed, size / set_size, groups /
 //                                     floats / hidden_panels, side / visible / front / shown
 //
 // Places: a side holds tab groups (left / right: one above the other, bottom: side by side)
@@ -63,6 +64,11 @@ pub const DP_NOCLOSE: u32 = 1;
 pub const DP_NOFLOAT: u32 = 2;
 /// starts hidden (until DockState::show / focus); later the layout remembers it
 pub const DP_HIDDEN: u32 = 4;
+/// its group moves as a whole: when it is the shown tab, the group menu's "Links / Rechts /
+/// Unten andocken" and "Lösen" and a double click on the strip's empty part take every tab of
+/// the group (panels that belong together, such as an app's developer tools;
+/// DockState::dock_group_to / float_group)
+pub const DP_GROUP: u32 = 8;
 /// floating windows of one dock area at most (fixed: each is a window, WIN_MAX)
 pub const DOCK_FLOAT_MAX: usize = 6;
 /// drop marker kinds (StyleShell::dock_marker, sp.value): the part of the place it fills
@@ -478,6 +484,51 @@ impl DockState {
         }
     }
 
+    // the panels of the group or floating window of panel id and its shown tab, taken out of
+    // the layout (None: hidden or unknown; a group already on side `keep` stays)
+    fn take_group(&mut self, id: u32, keep: usize) -> Option<(Vec<u32>, u32)> {
+        match self.loc(id) {
+            Loc::Side(s, g, _) if s != keep => {
+                let gr = self.sides[s].groups.remove(g);
+                Some((gr.panels, gr.active))
+            }
+            Loc::Float(f, _) => {
+                let fl = self.floats.remove(f);
+                Some((fl.group.panels, fl.group.active))
+            }
+            _ => None,
+        }
+    }
+
+    /// dock the whole group of the panel to a side, as a new group at its end: every tab in its
+    /// order, the shown one stays shown (a floating window's group too; a group already on
+    /// that side stays where it is)
+    pub fn dock_group_to(&mut self, id: u32, side: u8) {
+        let s = side.min(DOCK_BOTTOM) as usize;
+        if let Some((panels, active)) = self.take_group(id, s) {
+            self.put_group(s, None, &panels, active);
+        }
+    }
+
+    /// float the whole group of the panel in a tool window (rect as for float; its pin button
+    /// docks it back on its side) -> false when every floating window of the area is in use or
+    /// the panel is hidden; a group that floats already only moves to rect
+    pub fn float_group(&mut self, id: u32, rect: Option<[i32; 4]>) -> bool {
+        if let Loc::Float(f, _) = self.loc(id) {
+            if let Some(r) = rect {
+                self.floats[f].rect = r;
+            }
+            return true;
+        }
+        let Loc::Side(s, g, _) = self.loc(id) else { return false };
+        if self.floats.len() >= DOCK_FLOAT_MAX {
+            return false;
+        }
+        let r = rect.unwrap_or_else(|| self.cascade());
+        let gr = self.sides[s].groups.remove(g);
+        self.put_float(r, s as u8, gr.tag, &gr.panels, gr.active)
+    }
+
     // every panel of floating window `slot` back to where it came from
     fn dock_home(&mut self, slot: u8) {
         let Some(f) = self.floats.iter().position(|f| f.slot == slot) else { return };
@@ -746,8 +797,11 @@ struct Drag {
 enum Act {
     Drop(Drag),
     Float(u32, [i32; 4]),
+    /// (DP_GROUP) the whole group of the panel
+    FloatGroup(u32, [i32; 4]),
     Home(u8),
     ToSide(u32, u8),
+    GroupToSide(u32, u8),
     Hide(u32),
     Collapse(u8, bool),
     Activate(u32),
@@ -1335,8 +1389,10 @@ impl Ui {
         let strip = pid(id, P_STRIP, key);
         // the strip: one focus stop; its empty part drags the whole group
         let sev = self.hit_rect(strip, tx, hdr[1], tw, hdr[3], HB_FOCUS);
+        let whole = rt.flags(active) & DP_GROUP != 0; // the group moves as a whole
         if !self.dk_drag(rt, sev, strip, (side, tag), panels, active, hdr, size) && sev & EV_DOUBLE != 0 {
-            rt.acts.push(if float { Act::Home(tag as u8) } else { Act::Float(active, self.dk_float_near(rect, 24, 24)) });
+            let r = self.dk_float_near(rect, 24, 24);
+            rt.acts.push(if float { Act::Home(tag as u8) } else if whole { Act::FloatGroup(active, r) } else { Act::Float(active, r) });
         }
         let strip_hold = self.dk_held(sev);
         if st.focus_req != 0 && st.focus_req == active {
@@ -1440,12 +1496,13 @@ impl Ui {
                     rt.acts.push(Act::Home(tag as u8));
                 }
             } else if row(self, 0, tr("Lösen"), flags & DP_NOFLOAT == 0) {
-                rt.acts.push(Act::Float(active, self.dk_float_near(rect, 24, 24)));
+                let r = self.dk_float_near(rect, 24, 24);
+                rt.acts.push(if whole { Act::FloatGroup(active, r) } else { Act::Float(active, r) });
             }
             for s in 0..3u8 {
                 let l = self.dk_side_label(s);
                 if row(self, 1 + s as u32, l, s != side) {
-                    rt.acts.push(Act::ToSide(active, s));
+                    rt.acts.push(if whole { Act::GroupToSide(active, s) } else { Act::ToSide(active, s) });
                 }
             }
             self.menu_sep();
@@ -1804,8 +1861,12 @@ impl Ui {
             Act::Collapse(s, on) => st.collapse(s, on),
             Act::Home(slot) => st.dock_home(slot),
             Act::ToSide(p, s) => st.dock_to(p, s),
+            Act::GroupToSide(p, s) => st.dock_group_to(p, s),
             Act::Float(p, r) => {
                 st.float(p, Some(r));
+            }
+            Act::FloatGroup(p, r) => {
+                st.float_group(p, Some(r));
             }
             Act::Drop(d) => {
                 let to = self.dk_target(rt, &d);

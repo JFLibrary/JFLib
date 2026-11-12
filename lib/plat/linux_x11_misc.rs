@@ -15,7 +15,10 @@
 //        cursors (black on white) of the core "cursor" font, made on first use: xterm 152,
 //        hand2 60, crosshair 34, fleur 52, watch 150, sb_v_double_arrow 116,
 //        sb_h_double_arrow 108, bottom_right_corner 14 (NW-SE), bottom_left_corner 12
-//        (NE-SW).  CUR_NONE is an empty 1x1 bitmap cursor.
+//        (NE-SW).  CUR_NONE is an empty 1x1 bitmap cursor.  (E3) CUR_X0 .. CUR_X_END: circle
+//        (not-allowed, no-drop), hand1 (grab), fleur (grabbing, all-scroll), question_arrow,
+//        watch, plus (cell), the double arrows and the sides / corners of the resize shapes;
+//        the others (zoom, vertical text, alias, copy, context menu) cursor_fallback's glyph.
 //   cursor_create(px, w, h, hot_x, hot_y) -> CUR_USER0 + k / -1   an ARGB cursor through
 //        RENDER >= 0.5: a depth-32 pixmap (PutImage in bands of <= 64 KB), a picture of the
 //        direct A24 R16 G8 B0 format, RenderCreateCursor; picture / GC / pixmap freed at once
@@ -49,6 +52,9 @@ const RR_QUERY_VERSION: u32 = 0;
 const RR_GET_MONITORS: u32 = 42;
 // CUR_* -> cursor font glyph (CUR_ARROW: None)
 static CURSOR_GLYPH: [u8; 11] = [68, 152, 60, 34, 52, 150, 116, 108, 14, 12, 0];
+// (E3) CUR_X0 .. CUR_X_END -> cursor font glyph (0: cursor_fallback's shape)
+static CURSOR_GLYPH_X: [u8; (crate::CUR_X_END - crate::CUR_X0) as usize] =
+    [24, 24, 58, 52, 92, 150, 0, 0, 90, 0, 0, 0, 0, 52, 108, 116, 138, 16, 96, 70, 136, 134, 14, 12];
 
 impl X11 {
     // ------------------------------------------------------------------ popups  [x11_popup.s]
@@ -242,7 +248,7 @@ impl X11 {
 
     /// x11_plat_win_set_cursor(w, shape): the cursor of window w (its CWCursor attribute)
     pub(super) fn win_set_cursor(&mut self, w: i32, shape: u32) {
-        if shape >= CUR_COUNT && shape.wrapping_sub(CUR_USER0) >= CUR_USER_MAX {
+        if shape >= CUR_COUNT && shape.wrapping_sub(CUR_USER0) >= CUR_USER_MAX && !(crate::CUR_X0..crate::CUR_X_END).contains(&shape) {
             return;
         }
         let Some(i) = self.rec(w) else { return };
@@ -264,6 +270,19 @@ impl X11 {
         let k = shape.wrapping_sub(CUR_USER0);
         if k < CUR_USER_MAX {
             return self.xcust[k as usize];
+        }
+        let x = shape.wrapping_sub(crate::CUR_X0);
+        if x < crate::CUR_X_END - crate::CUR_X0 {
+            // (E3) a glyph of its own, else the nearest shape's
+            let g = CURSOR_GLYPH_X[x as usize];
+            if g == 0 {
+                return self.cursor_get(crate::cursor_fallback(shape));
+            }
+            if self.cursors_x[x as usize] == 0 {
+                let c = self.glyph_cursor(g as u32);
+                self.cursors_x[x as usize] = c;
+            }
+            return self.cursors_x[x as usize];
         }
         if shape >= CUR_COUNT {
             return 0;
@@ -298,30 +317,35 @@ impl X11 {
             wr32(&mut self.out, o + 4, pm); // source
             wr32(&mut self.out, o + 8, pm); // mask (colours and hot spot stay 0)
         } else {
-            if self.cur_font == 0 {
-                self.cur_font = self.new_id();
-                let (o, _) = self.req(XR_OPEN_FONT, 12 + 8); // "cursor" padded to 8
-                let font = self.cur_font;
-                wr32(&mut self.out, o, font);
-                wr16(&mut self.out, o + 4, 6);
-                self.out[o + 8..o + 14].copy_from_slice(b"cursor");
-            }
-            cid = self.new_id();
-            let (o, _) = self.req(XR_CREATE_GLYPH_CURSOR, 32);
-            let font = self.cur_font;
-            let g = CURSOR_GLYPH[shape as usize] as u32;
-            let b = &mut self.out;
-            wr32(b, o, cid);
-            wr32(b, o + 4, font); // source font
-            wr32(b, o + 8, font); // mask font
-            wr16(b, o + 12, g); // source char
-            wr16(b, o + 14, g + 1); // mask char
-            wr32(b, o + 16, 0); // foreground black
-            wr16(b, o + 20, 0);
-            wr32(b, o + 22, 0xFFFFFFFF); // background white
-            wr16(b, o + 26, 0xFFFF);
+            cid = self.glyph_cursor(CURSOR_GLYPH[shape as usize] as u32);
         }
         self.cursors[shape as usize] = cid;
+        cid
+    }
+
+    // a glyph cursor of the core "cursor" font (black on white; the font opened on first use)
+    fn glyph_cursor(&mut self, g: u32) -> u32 {
+        if self.cur_font == 0 {
+            self.cur_font = self.new_id();
+            let (o, _) = self.req(XR_OPEN_FONT, 12 + 8); // "cursor" padded to 8
+            let font = self.cur_font;
+            wr32(&mut self.out, o, font);
+            wr16(&mut self.out, o + 4, 6);
+            self.out[o + 8..o + 14].copy_from_slice(b"cursor");
+        }
+        let cid = self.new_id();
+        let (o, _) = self.req(XR_CREATE_GLYPH_CURSOR, 32);
+        let font = self.cur_font;
+        let b = &mut self.out;
+        wr32(b, o, cid);
+        wr32(b, o + 4, font); // source font
+        wr32(b, o + 8, font); // mask font
+        wr16(b, o + 12, g); // source char
+        wr16(b, o + 14, g + 1); // mask char
+        wr32(b, o + 16, 0); // foreground black
+        wr16(b, o + 20, 0);
+        wr32(b, o + 22, 0xFFFFFFFF); // background white
+        wr16(b, o + 26, 0xFFFF);
         cid
     }
 

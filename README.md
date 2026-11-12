@@ -230,7 +230,7 @@ An app outside this repository needs one dependency, the crate `jflib`, and the 
 cargo install cargo-jflib
 cargo jflib new hello        # a window app with its test and the settings for Windows and Linux
 cd hello
-cargo run
+cargo run                    # on Linux: cargo run --target x86_64-unknown-linux-gnu (.cargo/config.toml says why)
 cargo jflib test             # run tests/*.uis
 cargo jflib watch            # hot reload while you edit
 cargo jflib package          # a setup for Windows and a .deb (--formats all: also MSIX, AppImage, RPM, Flatpak)
@@ -240,6 +240,11 @@ Both are on crates.io ([`jflib`](https://crates.io/crates/jflib), [`cargo-jflib`
 the documentation of the library on docs.rs ([docs.rs/jflib](https://docs.rs/jflib)). The README of the
 crate [`jflib`](lib/jflib/README.md) and of [`cargo-jflib`](lib/cargo_jflib/README.md) describe both;
 [docs/VERSIONING.md](docs/VERSIONING.md) says what the crates promise.
+
+The apps of this repository build the same way, with Cargo started in their folder: `cd apps/gallery`,
+then `cargo run` (on Linux `cargo run --target x86_64-unknown-linux-gnu`); `apps/.cargo/config.toml`
+has the template's settings. `cargo jflib` is then the one of this repository, not the one from
+crates.io: `cargo install --path lib/cargo_jflib`.
 
 ## Building apps with Python
 
@@ -642,7 +647,8 @@ python build_rs.py check
 python build_rs.py test --quick --target win
 ```
 
-`check` validates the source-code rules. `test --quick` starts the broader test suite
+`check` validates the source-code rules and then runs Clippy over the library (its groups
+`correctness` and `suspicious`; `check --quick`: the rules alone). `test --quick` starts the broader test suite
 and skips the historical assembly parity checks; `test NAME` builds one app and runs only its
 scripts. `python build_rs.py api-diff` lists the changes of the public API since the last
 release ([versions](docs/VERSIONING.md)). The full parity run also requires the separate assembly reference.

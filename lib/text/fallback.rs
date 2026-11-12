@@ -82,6 +82,7 @@ impl Text {
         if self.fb.system != on {
             self.fb.system = on;
             self.fb.cache.clear();
+            self.shaping_forget(); // the line shaped last is shaped again (its fallbacks)
         }
     }
 

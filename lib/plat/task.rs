@@ -39,7 +39,8 @@
 // its own.  Blocking jobs run on up to BLOCKING_MAX threads of their own (not the compute pool:
 // a job waiting for a disk must not starve parallel_for); where no thread can start (the
 // browser without shared memory, Android) the executors run them inline, one per run.  A panic
-// in a task or job ends the process like any panic (rt's handler: crash hook, exit code 3).
+// in a task or job ends the process like any panic (rt's handler: crash hook, exit code 3), with
+// jflib's feature unwind too unless the task's own code catches it (rt::abort_on_unwind).
 
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;

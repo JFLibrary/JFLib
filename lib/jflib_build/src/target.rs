@@ -124,7 +124,9 @@ impl Target {
         if !self.flag("relocation-model=static") {
             return Err(format!(
                 "{triple}: JFLib's programs start without a C runtime and need -C relocation-model=static: \
-                 [target.{triple}] rustflags in .cargo/config.toml (the template of the crate jflib has it)"
+                 [target.{triple}] rustflags in .cargo/config.toml (the template of the crate jflib has it; JFLib's \
+                 repository in apps/.cargo/config.toml, Cargo started in the app's folder), and cargo run --target {triple}, \
+                 also on Linux (the flags must not reach the build scripts)"
             ));
         }
         let crt_static = self.features.iter().any(|f| f == "crt-static");

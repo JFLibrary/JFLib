@@ -22,7 +22,8 @@ The crates, their dependencies and the library's version come from the Cargo man
                                                                 then the crates' acceptance test (tools/crates_accept.py)
                                                                 and parity with asm (both not with --quick)
   python build_rs.py test NAME                               build one app and run its tests/*.uis
-  python build_rs.py check                                   lint only
+  python build_rs.py check [--quick] [--target T]            lint only: the rules, then Clippy over the library
+                                                                (section "clippy"; --quick: the rules alone)
   python build_rs.py new NAME [--kind window|console|tool|service] [--style S] [--title T]
                                                              a new app apps/NAME that builds and passes its
                                                                 test as it is (tools/scaffold.py)
@@ -92,6 +93,16 @@ Rules checked before every build (`check`):
   * system call numbers only in lib/rt/kernel.rs, the same names for every architecture: no const
     SYS_* elsewhere, no number as the first argument of syscall* (a wrong number compiles and
     calls something else on another architecture, docs/ARM64.md)
+
+Clippy (section "clippy"): `check` then runs `cargo clippy` over the library of each target (the
+packages of `lib` and every crate of the workspace they need; Linux: the static build and the one
+against glibc).  Only Clippy's groups correctness and suspicious are on, as errors; its other
+groups are off, and so are the lints of CLIPPY_OFF, each an idiom of this code.  A single place
+that is right as it stands carries #[allow(clippy::NAME)] and the reason.  Targets: --target
+(default: both on Windows, the host's own elsewhere), --arch; the browser as its SIMD build unless
+--web-mode names another.  No build and no `test` runs it: a first run takes minutes per target,
+a later one seconds.  Not covered: the build helpers with std (lib/jflib_build, lib/cargo_jflib),
+lib/installer, lib/appimagert and the modules.
 
 Styles: an app is linked with its style (apps/NAME/STYLE or --style) as the crate `style`, and
 with every further style crate its sources name (`style_kde::STYLE`, app_styles) under that
@@ -801,6 +812,46 @@ def lint():
     return bad + module_lint() + perm_lint() + manifest_lint()   # jxl-module: modules/*; manifests
 
 
+# ---------------------------------------------------------------- clippy
+# `check` after the rules (the module docstring).  Of Clippy's groups only correctness and suspicious
+# are on; the first run found 1800 places in the others (style, complexity, perf).
+# CLIPPY_OFF: lints of the two groups that are off everywhere, each with the idiom of this code it
+# would report.  The rest of the two groups is on; a place that is right as it stands says so
+# where it is.
+CLIPPY_OFF = {
+    "approx_constant": "ported arithmetic writes its constants out digit for digit, also as a high and a low part "
+                       "(rt/portable/math.rs, fx, gfx, img_jxl)",
+    "possible_missing_else": "`}if` on one line in compact code (doc_core, doc_io)",
+    "suspicious_assignment_formatting": "`a=-b`, `a=*b`, `a=!b` in compact code (doc_core, doc_io, plat/linux_wl_ime.rs)",
+}
+CLIPPY_LINTS = ["-A", "clippy::all", "-D", "clippy::correctness", "-D", "clippy::suspicious"] + \
+    [x for name in CLIPPY_OFF for x in ("-A", f"clippy::{name}")]
+
+
+def clippy_gate(builders):
+    """section "clippy": Clippy over each Builder's library (Linux: the glibc twin's too), side by
+    side as `lib` builds them -> True when none of them reports a place"""
+    try:
+        missing = subprocess.run(["cargo", "clippy", "--version"], capture_output=True).returncode != 0
+    except OSError:
+        missing = True
+    if missing:
+        print("Clippy is missing: rustup component add clippy  (the rules alone: python build_rs.py check --quick)")
+        return False
+    runs = [x for b in builders for x in ([b, b.glibc_twin()] if b.target == "linux" else [b])]
+    ok = True
+    with ThreadPoolExecutor(len(runs)) as ex:
+        for b, f in [(b, ex.submit(b.cargo_clippy)) for b in runs]:
+            name = b.folder + (" glibc" if b.glibc else f" {b.web_mode}" if b.target == "web" else "")
+            try:
+                f.result()
+                print(f"[{name}] clippy ok")
+            except BuildError as e:
+                ok = False
+                print(f"{e}\n[{name}] clippy: FAILED")
+    return ok
+
+
 # ---------------------------------------------------------------- r13-measure: build profiles
 # --profile NAME (implies --release): other settings than the default release (opt-level 2
 # everywhere, fat LTO), measured in rewrite/REPORT.md (R13, size experiment; the numbers below
@@ -1047,12 +1098,21 @@ class Builder:
             shutil.copyfile(mapf, dest.with_suffix(".map") if self.target == "win" else dest.with_name(dest.name + ".map"))
         return dest
 
+    def lib_packages(self):
+        """every library crate of the target (the crate jflib names them all) and the styles the apps use"""
+        return ["jflib"] + ([f"jflib-style-{s}" for s in ("jfoffice", "backupcraft")] if self.target != "web" else [])
+
     def cargo_libs(self):
-        """`build_rs.py lib`: every library crate of the target (the crate jflib names them all) and the
-        styles the apps use -> the packages"""
-        pkgs = ["jflib"] + ([f"jflib-style-{s}" for s in ("jfoffice", "backupcraft")] if self.target != "web" else [])
+        """`build_rs.py lib`: the packages of lib_packages -> their names"""
+        pkgs = self.lib_packages()
         self.cargo(["cargo", "build", "--locked"] + [x for p in pkgs for x in ("-p", p)])
         return pkgs
+
+    def cargo_clippy(self):
+        """section "clippy": `cargo clippy` with CLIPPY_LINTS over the packages of lib_packages (Clippy
+        looks at every crate of the workspace they need as well); BuildError with its report when it
+        finds something"""
+        self.cargo(["cargo", "clippy", "--locked"] + [x for p in self.lib_packages() for x in ("-p", p)] + ["--"] + CLIPPY_LINTS)
 
     def cargo_rlibs(self, crates):
         """the rlibs of these library crates (and what they need) for a probe that rustc builds against
@@ -2004,7 +2064,8 @@ def main():
     ap.add_argument("--out", help="output folder (default build; --release: build/release; --profile P: build/P)")
     ap.add_argument("-j", type=int, default=os.cpu_count() or 8,
                     help="Cargo's jobs (default: the logical CPUs)")
-    ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--quick", action="store_true",
+                    help="test: without the crates' acceptance test and parity with asm; check: the rules alone, no Clippy")
     ap.add_argument("--bin", help="run: one of the app's further executables (apps/NAME/BINS)")
     # new, api-diff, changelog, release (dev_command)
     ap.add_argument("--kind", choices=["window", "console", "tool", "service"], help="new: the kind of app")
@@ -2058,21 +2119,25 @@ def main():
         return 1
     if a.cmd == "check":
         print("lint ok")
-        return 0
+        if a.quick:
+            return 0
     check_toolchain()
-    tgt = a.target or ("win" if a.cmd == "run" else "both")
+    # check (section "clippy"): Clippy needs each target's standard library only; a Linux or Apple
+    # machine has its own
+    host = "both" if os.name == "nt" else "mac" if sys.platform == "darwin" else "linux"
+    tgt = a.target or ("win" if a.cmd == "run" else host if a.cmd == "check" else "both")
     targets = ["win", "linux"] if tgt == "both" else ["win", "linux", "web"] if tgt == "all" else [tgt]
     if a.arch != "x86_64" and not set(targets) <= set(ARM64_TRIPLE):
         raise BuildError(f"--arch {a.arch} is for win and linux (Android: --android-abi).")
     if a.cmd in ("run", "test") and a.arch != host_arch() and not set(targets) & set(APPLE):   # (--arch: win, linux)
         foreign_start_check(a.name, targets, a.arch)
-    if "android" in targets and a.cmd not in ("app", "lib"):
+    if "android" in targets and a.cmd not in ("app", "lib", "check"):
         raise BuildError("Android supports app/lib builds; install the resulting APK with adb install -r FILE.apk.")
     if set(targets) & set(APPLE):                   # docs/APPLE.md: Apple's SDK and tools are on a Mac only
         if sys.platform != "darwin":
             raise BuildError("mac and ios build on a Mac (Apple's SDK; docs/APPLE.md).")
-        if a.cmd not in ("app", "lib", "run") and not (a.cmd == "test" and a.name and (targets == ["mac"] or (targets == ["ios"] and a.sim))):
-            raise BuildError("mac and ios support app, lib and run (mac and ios --sim also test NAME); the iPhone itself: "
+        if a.cmd not in ("app", "lib", "run", "check") and not (a.cmd == "test" and a.name and (targets == ["mac"] or (targets == ["ios"] and a.sim))):
+            raise BuildError("mac and ios support app, lib, run and check (mac and ios --sim also test NAME); the iPhone itself: "
                              "python tools/apple.py device APP.app")
         if a.cmd == "run" and targets == ["ios"] and not a.sim:
             raise BuildError("run --target ios starts the simulator's build (--sim); the iPhone: python tools/apple.py device APP.app")
@@ -2080,9 +2145,14 @@ def main():
         raise BuildError("Use app/all --target web to build browser bundles; serve their index.html for browser tests. Native run/test requires win/linux/both.")
     out = ((ROOT / a.out).resolve() if a.out else ROOT / "build" / a.profile if a.profile
            else ROOT / "build" / "release" if a.release else ROOT / "build")
-    builders = make_builders(targets, out, a.release, a.j, a.profile, a.web_mode, a.android_abi, a.arch, a.sim)
+    web_mode = "simd" if a.cmd == "check" and a.web_mode == "auto" else a.web_mode    # check: one browser build
+    builders = make_builders(targets, out, a.release, a.j, a.profile, web_mode, a.android_abi, a.arch, a.sim)
     t0 = time.perf_counter()
     try:
+        if a.cmd == "check":
+            ok = clippy_gate(builders)
+            print(f"check: {'ok' if ok else 'FAILED'} ({time.perf_counter() - t0:.1f} s)")
+            return 0 if ok else 1
         if a.cmd == "lib":
             with ThreadPoolExecutor(len(builders)) as ex:
                 res = [(b, ex.submit(b.cargo_libs)) for b in builders]

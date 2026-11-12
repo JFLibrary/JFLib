@@ -7,9 +7,9 @@
 // replace_all; 100 000 lines), breakpoints, the execution line and folding ranges (how they
 // follow edits, rows and lines, edits inside unfold), several edits and a whole new text as
 // one undo step (group ide), what the code editor keeps of long lines through edits
-// (ui::code_long_check) and the grammars (Rust, JSON, INI, TOML, Markdown, JFS: tokens
-// and the states across lines; JFS also token by token against JFScript's tokens() on two
-// samples) plus a timing of 100 000 lines.  Prints FAIL lines and a summary; the exit code is
+// (ui::code_long_check) and the grammars (Rust, JSON, INI, TOML, Markdown, JFS, JavaScript,
+// CSS, HTML with scripts and styles, WAT: tokens and the states across lines; JFS also token
+// by token against JFScript's tokens() on two samples) plus a timing of 100 000 lines.  Prints FAIL lines and a summary; the exit code is
 // the number of failures.
 
 use alloc::format;
@@ -714,6 +714,100 @@ fn jfs(t: &mut T) {
     t.eq((h.grammar().comment, h.grammar().pairs), ("//", "()[]{}"), "comment, pairs");
 }
 
+// (E10) the web's languages: JavaScript, CSS, HTML with its scripts and styles, WAT -- tokens,
+// states across lines (template strings, comments, tags, script elements), names
+fn web(t: &mut T) {
+    t.group = "web";
+    let s = |a: &[&str]| a.iter().map(|x| String::from(*x)).collect::<Vec<_>>();
+    // JavaScript
+    let js = Highlighter::javascript();
+    let (v, st) = toks(&js, "const re = /a[/]b\\/c/gi; let s = 'x\\n' + \"y\";", 0);
+    t.eq(v, s(&["kw:const", "str:/a[/]b\\/c/gi", "kw:let", "str:'x", "esc:\\n", "str:'", "str:\"y\""]), "js regex, strings, escapes");
+    t.eq(st, 0, "js: nothing open");
+    let (v, _) = toks(&js, "x = a / b / c; return /re/.test(s)", 0);
+    t.eq(v, s(&["kw:return", "str:/re/", "fn:test"]), "js: division is no regex, after return it is");
+    let (v, _) = toks(&js, "p.catch(e => e).finally(); function f() { return this.default }", 0);
+    t.eq(v, s(&["fn:catch", "fn:finally", "kw:function", "fn:f", "kw:return", "kw:this", "text:default"]), "js: members are no keywords");
+    let (v, _) = toks(&js, "$('#id').hide(); new Promise(r); x instanceof Map; null undefined true NaN 0x1F 1_000n 1.5e-3", 0);
+    let want = ["fn:$", "str:'#id'", "fn:hide", "kw:new", "fn:Promise", "kw:instanceof", "type:Map", "const:null", "const:undefined", "const:true", "const:NaN", "num:0x1F", "num:1_000n", "num:1.5e-3"];
+    t.eq(v, s(&want), "js: $, calls, types, constants, numbers");
+    let (v, st) = toks(&js, "let t = `a ${b + `c ${d}`} e`;", 0);
+    t.eq(v, s(&["kw:let", "str:`a ", "meta:${", "str:`c ", "meta:${", "meta:}", "str:`", "meta:}", "str: e`"]), "js: template strings nested");
+    t.eq(st, 0, "js: template closed");
+    let (v, _) = toks(&js, "f(`${ {a: 1}.a }`)", 0);
+    t.eq(v, s(&["fn:f", "str:`", "meta:${", "num:1", "text:a", "meta:}", "str:`"]), "js: braces inside ${..} count");
+    let (v, st) = toks(&js, "let h = `<div class=\"x\">", 0);
+    t.check(has(&v, "str:`<div class=\"x\">") && st != 0, &format!("js: a template string stays open ({:?}, {})", v, st));
+    let (v, st2) = toks(&js, "  ${x}</div>`; f()", st);
+    t.eq(v, s(&["str:  ", "meta:${", "meta:}", "str:</div>`", "fn:f"]), "js: and goes on in the next line");
+    t.eq(st2, 0, "js: closed there");
+    let (_, st) = toks(&js, "a = `x ${y + /* open", 0);
+    let (v, st2) = toks(&js, "  still */ 1} z`", st);
+    t.eq(v, s(&["com:  still */", "num:1", "meta:}", "str: z`"]), "js: a comment in ${..} over lines");
+    t.eq(st2, 0, "js: three levels closed");
+    let (v, st) = toks(&js, "/* a", 0);
+    let (v2, st2) = toks(&js, "b */ let x // c", st);
+    t.check(has(&v, "com:/* a") && st != 0 && v2 == s(&["com:b */", "kw:let", "com:// c"]) && st2 == 0, &format!("js: block comment over lines ({:?})", v2));
+    // CSS
+    let css = Highlighter::css();
+    let (v, st) = toks(&css, "@media (max-width: 600px) {", 0);
+    t.check(v == s(&["kw:@media", "num:600px"]) && st != 0, &format!("css: at-rule, a block stays open ({:?})", v));
+    let (v, st) = toks(&css, "  a.btn:hover > .x, #main::before { color: #fff; margin: -1.5em 0 !important; }", st);
+    let want = ["type:.btn", "meta::hover", "type:.x", "const:#main", "meta:::before", "key:color", "num:#fff", "key:margin", "num:-1.5em", "num:0", "kw:!important"];
+    t.eq(v, s(&want), "css: a nested rule's selector and declarations");
+    t.check(st != 0, "css: the outer block still open");
+    let (_, st) = toks(&css, "}", st);
+    t.eq(st, 0, "css: closed");
+    let (v, _) = toks(&css, "a{color:red;background:url(\"x.png\")}b:hover{top:0}", 0);
+    t.eq(v, s(&["key:color", "key:background", "fn:url", "str:\"x.png\"", "meta::hover", "key:top", "num:0"]), "css: minified");
+    let (v, _) = toks(&css, "/* c */ .card { & .title { font-size: 2rem; width: calc(100% - 4px) } }", 0);
+    t.eq(v, s(&["com:/* c */", "type:.card", "type:.title", "key:font-size", "num:2rem", "key:width", "fn:calc", "num:100%", "num:4px"]), "css: nesting, functions, %");
+    // HTML
+    let html = Highlighter::html();
+    t.eq(toks(&html, "<!DOCTYPE html>", 0).0, s(&["meta:<!DOCTYPE html>"]), "html doctype");
+    let (v, st) = toks(&html, "<a href=\"x.html\" class=big data-x='1'>Tom &amp; Jerry &#169; &#xA9; & co</a>", 0);
+    let want = ["kw:a", "key:href", "str:\"x.html\"", "key:class", "str:big", "key:data-x", "str:'1'", "esc:&amp;", "esc:&#169;", "esc:&#xA9;", "kw:a"];
+    t.eq(v, s(&want), "html: tags, attributes, values, entities");
+    t.eq(st, 0, "html: nothing open");
+    let (v, st) = toks(&html, "<!-- a", 0);
+    let (v2, st2) = toks(&html, "b --> <br/>", st);
+    t.check(v == s(&["com:<!-- a"]) && st != 0 && v2 == s(&["com:b -->", "kw:br"]) && st2 == 0, &format!("html: comment over lines ({:?})", v2));
+    let (v, st) = toks(&html, "<img src=\"a.png\"", 0);
+    let (v2, st2) = toks(&html, "     alt=\"x\">text", st);
+    t.check(v == s(&["kw:img", "key:src", "str:\"a.png\""]) && st != 0 && v2 == s(&["key:alt", "str:\"x\""]) && st2 == 0, &format!("html: a tag over lines ({:?})", v2));
+    let (v, st) = toks(&html, "<script type=\"module\">let a = `x`; if (a < b) {</script><p>", 0);
+    t.eq(v, s(&["kw:script", "key:type", "str:\"module\"", "kw:let", "str:`x`", "kw:if", "kw:script", "kw:p"]), "html: a script's content is JavaScript");
+    t.eq(st, 0, "html: script closed");
+    let (_, st) = toks(&html, "<SCRIPT>", 0);
+    t.check(st != 0, "html: a script element stays open (case-insensitive)");
+    let (v, st) = toks(&html, "const s = \"</div>\"; /* c", st);
+    t.check(v == s(&["kw:const", "str:\"</div>\"", "com:/* c"]) && st != 0, &format!("html: script lines with a comment open ({:?})", v));
+    let (v, st) = toks(&html, "*/ x() // y</Script> <b>", st);
+    t.eq(v, s(&["com:*/", "fn:x", "com:// y", "kw:Script", "kw:b"]), "html: the end tag ends the script whatever is open");
+    t.eq(st, 0, "html: closed");
+    let (v, _) = toks(&html, "<style>body { color: red }</style> a < b", 0);
+    t.eq(v, s(&["kw:style", "key:color", "kw:style", "text:<"]), "html: a style's content is CSS; a lone '<' is text");
+    // WAT
+    let wat = Highlighter::wat();
+    let (v, _) = toks(&wat, "(module (func $add (param $a i32) (result i32) local.get $a i32.const 1 i32.add)) ;; done", 0);
+    let want = ["kw:module", "kw:func", "meta:$add", "kw:param", "meta:$a", "type:i32", "kw:result", "type:i32", "fn:local.get", "meta:$a", "fn:i32.const", "num:1", "fn:i32.add", "com:;; done"];
+    t.eq(v, s(&want), "wat: module, instructions, names, types");
+    let (v, _) = toks(&wat, "(; block (; nested ;) still ;) call $f (memory 1) \"a\\n\"", 0);
+    t.eq(v, s(&["com:(; block (; nested ;) still ;)", "fn:call", "meta:$f", "kw:memory", "num:1", "str:\"a", "esc:\\n", "str:\""]), "wat: nested comments, call, strings");
+    let (_, st) = toks(&wat, "(; open", 0);
+    let (v, st2) = toks(&wat, ";) nop", st);
+    t.check(st != 0 && v == s(&["com:;)", "fn:nop"]) && st2 == 0, &format!("wat: comment over lines ({:?})", v));
+    // names
+    for (n, g) in [("app.js", "JavaScript"), ("x.mjs", "JavaScript"), ("javascript", "JavaScript"), ("site/style.css", "CSS"), ("index.HTML", "HTML"), ("a.svg", "HTML"), ("feed.xml", "HTML"), ("m.wat", "WAT")] {
+        t.eq(Highlighter::for_name(n).name(), g, &format!("for_name {n}"));
+    }
+    t.eq((js.grammar().comment, wat.grammar().comment, html.grammar().pairs), ("//", ";;", "<>"), "comment prefixes, pairs");
+    // a long minified page: every line highlighted the same from its state, at any split
+    let page = "<p class=\"a\">x &amp; y</p><script>let s = `a ${b} c`; /* k */ f(1)</script><style>a{color:#fff}</style>".repeat(50);
+    let whole = html.tokens(&page);
+    t.check(whole.len() == 1 && whole[0].len() > 1000, &format!("html: a long line ({} tokens)", whole[0].len()));
+}
+
 /// --test model -> failures
 // ------------------------------------------------------------------ long lines
 
@@ -739,7 +833,12 @@ fn long(t: &mut T) {
     }
     // at the start, near it, at the end
     edits.extend([(0, 0, "\""), (0, 1, ""), (usize::MAX, usize::MAX, "/*"), (5, 9, "\t\t"), (100, 100, "*/ \"")]);
-    for (name, text, h) in [("json", &json, Highlighter::json()), ("rust", &rust, Highlighter::rust()), ("jfs", &jfs, Highlighter::jfs()), ("plain", &rust, Highlighter::plain())] {
+    // (E10) a minified page with scripts, template strings and styles; a script; a style sheet
+    let html = "<p class=\"a\">x &amp; y</p><script>let s = `a ${b + {c: 1}.c} d`; /* k */ f(\"q\")</script><style>a{color:#fff}</style>".repeat(250);
+    let js = "let s = `a ${x + f(1)} b`; r = /re[/]x/g.test(\"q\"); ".repeat(700);
+    let css = ".a:hover{color:#fff;margin:-1em}@media (x:1px){b{top:0}}".repeat(600);
+    let web = [("html", &html, Highlighter::html()), ("javascript", &js, Highlighter::javascript()), ("css", &css, Highlighter::css())];
+    for (name, text, h) in [("json", &json, Highlighter::json()), ("rust", &rust, Highlighter::rust()), ("jfs", &jfs, Highlighter::jfs()), ("plain", &rust, Highlighter::plain())].into_iter().chain(web) {
         for tw in [4u8, 8] {
             let d = code_long_check(text, &h, tw, &edits);
             t.check(d.is_empty(), &format!("{name}, tab width {tw}: kept like a fresh look ({:?})", d.first()));
@@ -830,6 +929,7 @@ pub fn run() -> i32 {
     diags(&mut t);
     grammars(&mut t);
     jfs(&mut t);
+    web(&mut t);
     ide(&mut t);
     out(&format!("model: {} checks, {} failed\n", t.ok + t.failed, t.failed));
     t.failed as i32
