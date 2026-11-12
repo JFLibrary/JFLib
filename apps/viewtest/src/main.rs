@@ -13,6 +13,7 @@
 //                        (ui.sem_rect): a script clicks one by its label, the page gets the click
 //   "Dateien öffnen"     the file dialog with FD_MULTI in the folder --files DIR (E8): several
 //                        files at once, ui.filedlg_paths() shown as "Dateien: N a b"
+//   "Ordner wählen"      a folder dialog (FD_FOLDER) in --files DIR: filedlg_paths() is the folder
 //   "Rohe Tasten"        (E2) the page takes the keys as they go down and up (ui.key_event_take):
 //                        "Roh:" lists them (+ down, - up, C- S- A- held modifiers, * repeat, :L :R :N
 //                        location, #scancode)
@@ -59,7 +60,9 @@ const ID_IME: u32 = 112; // "Eingabefeld"
 const ID_NEWWIN: u32 = 113; // "Neues Fenster"
 const ID_APPWIN: u32 = 114; // the app window
 const ID_APPTAB: u32 = 115; // its tab in the title bar
+const ID_DIRS: u32 = 116; // "Ordner wählen"
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
+const ID_FD_DIR: u32 = 0x11_0000; // the folder dialog (FD_FOLDER)
 
 const CMD_NEW_TAB: u32 = 1;
 const CMD_RELOAD: u32 = 2;
@@ -112,6 +115,9 @@ struct ViewTest {
     fd_open: Shared<i32>,
     fd_path: String,
     files: String,
+    /// the folder dialog (FD_FOLDER): open, its path
+    dir_open: Shared<i32>,
+    dir_path: String,
     /// (E3) the page's cursor (an index into PAGE_CURSORS) and the custom one (handle, 0 none)
     page_cur: usize,
     custom: u32,
@@ -160,6 +166,8 @@ impl Default for ViewTest {
             fd_open: Shared::new(0),
             fd_path: String::new(),
             files: String::from("-"),
+            dir_open: Shared::new(0),
+            dir_path: String::new(),
             page_cur: 0,
             custom: 0,
             raw: 0,
@@ -381,6 +389,12 @@ impl App for ViewTest {
             self.fd_path = format!("{}/", dir.trim_end_matches('/'));
             self.fd_open.set(1);
         }
+        if ui.button(ID_DIRS, "Ordner wählen") & EV_ACT != 0 {
+            // a folder dialog after a file dialog: filedlg_paths is the folder alone
+            let dir = plat::arg_value("--files").unwrap_or_default();
+            self.dir_path = String::from(dir.trim_end_matches('/'));
+            self.dir_open.set(1);
+        }
         ui.box_end();
         ui.text(TS_BODY, &format!("Dateien: {}", self.files));
         // (E3) the page's cursor and the custom one
@@ -423,6 +437,11 @@ impl App for ViewTest {
         ui.window_end();
         // (E8) several files: the names the dialog chose, in its order
         if ui.filedlg(ID_FD, FD_OPEN | FD_MULTI, &self.fd_open, &mut self.fd_path, 4096, &["txt=Textdatei"]) & EV_ACT != 0 {
+            let all = ui.filedlg_paths();
+            let names: Vec<&str> = all.iter().map(|p| p.rsplit('/').next().unwrap_or(p)).collect();
+            self.files = format!("{} {}", all.len(), names.join(" "));
+        }
+        if ui.filedlg(ID_FD_DIR, FD_FOLDER, &self.dir_open, &mut self.dir_path, 4096, &[]) & EV_ACT != 0 {
             let all = ui.filedlg_paths();
             let names: Vec<&str> = all.iter().map(|p| p.rsplit('/').next().unwrap_or(p)).collect();
             self.files = format!("{} {}", all.len(), names.join(" "));

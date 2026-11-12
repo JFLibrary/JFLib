@@ -1,0 +1,16 @@
+#!args --files apps/viewtest/tests/files
+# viewtest: a folder dialog (FD_FOLDER) after a file dialog: ui.filedlg_paths() is the chosen
+# folder alone, not the files of the dialog before.  Headless runs show the library's own
+# dialog; the file dialog's rows are #1048593.. (id + 17 + i).
+click "Dateien öffnen"
+wait 600
+click #1048593
+click button:"Öffnen"
+expect text:"Dateien: 1 a.txt" exists
+# the folder dialog starts in the folder of --files and lists its folders (none): confirming
+# chooses the folder shown
+click "Ordner wählen"
+expect dialog:"Ordner auswählen" exists
+click button:"Ordner auswählen"
+expect dialog:"Ordner auswählen" missing
+expect text:"Dateien: 1 files" exists
