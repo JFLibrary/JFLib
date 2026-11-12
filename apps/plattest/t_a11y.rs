@@ -36,7 +36,8 @@
 //                              (accessibilityAttributeValue: and the actions, which serve VoiceOver's
 //                              requests: plat::ax_test_*): roles, subroles, names, values, frames,
 //                              the hit test and the focused element, then it presses, sets values,
-//                              selects and focuses, checks the notifications, presses "Beenden"
+//                              selects and focuses, reads the text box by character and line and
+//                              moves its caret, checks the notifications, presses "Beenden"
 
 use alloc::format;
 use alloc::string::String;
@@ -942,7 +943,7 @@ mod mac {
     use alloc::vec::Vec;
 
     use plat::sync::Mutex;
-    use plat::{AxTestAct as A, AxTestElem, ax_test_act, ax_test_events, ax_test_focused, ax_test_hit, ax_test_listen, ax_test_tree};
+    use plat::{AxTestAct as A, AxTestElem, AxTestText as Q, ax_test_act, ax_test_events, ax_test_focused, ax_test_hit, ax_test_listen, ax_test_text, ax_test_tree};
 
     use super::*;
 
@@ -1079,6 +1080,7 @@ mod mac {
                 && wait_tree(|t| find(t, "AXTextField", "Name").is_some_and(|e| e.value == "Bert")),
             "a11y-mac: AXValue of the text field := 'Bert'",
         );
+        text_steps();
         record(ax_test_act(PW, "AXRadioButton", "Zweite", A::Select) && wait_st(TAB, 1), "a11y-mac: AXSelected of a tab");
         record(ax_test_act(PW, "AXStaticText", "Kirsche", A::Select) && wait_st(LIST, 2), "a11y-mac: AXSelected of a list row");
         record(
@@ -1101,6 +1103,7 @@ mod mac {
             "AXValueChanged:Name",
             "AXValueChanged:Zweite",
             "AXFocusedUIElementChanged:Option",
+            "AXSelectedTextChanged:Name",
         ];
         wait(|| {
             ev.extend(ax_test_events());
@@ -1114,6 +1117,83 @@ mod mac {
                 plat::write_stdout(alloc::format!("  notifications: {ev:?}\n").as_bytes());
             }
         }
+    }
+
+    // "location,length" -> (location, length) (-1, -1: none)
+    fn range(s: &str) -> (i64, i64) {
+        let mut it = s.split(',').map(|x| x.trim().parse::<i64>().unwrap_or(-1));
+        (it.next().unwrap_or(-1), it.next().unwrap_or(-1))
+    }
+
+    // "x,y,w,h" -> the rectangle
+    fn rect(s: &str) -> [f64; 4] {
+        let mut r = [0.0; 4];
+        for (k, x) in s.split(',').take(4).enumerate() {
+            r[k] = x.trim().parse::<f64>().unwrap_or(0.0);
+        }
+        r
+    }
+
+    // the text field as VoiceOver reads it: characters, lines, the caret and the selection
+    // (UTF-16 offsets), the rectangles of characters, a point back to its character
+    fn text_steps() {
+        let q = |x: Q| ax_test_text(PW, "AXTextField", "Name", x).unwrap_or_default();
+        let sel = || range(&q(Q::SelRange));
+        record(
+            ax_test_act(PW, "AXTextField", "Name", A::Focus) && wait_tree(|t| find(t, "AXTextField", "Name").is_some_and(|e| e.focused)),
+            "a11y-mac: AXFocused of the text field",
+        );
+        record(q(Q::Count) == "4", "a11y-mac: text: AXNumberOfCharacters 4");
+        record(
+            wait(|| {
+                let (a, n) = sel();
+                a >= 0 && a + n == 4
+            }),
+            &alloc::format!("a11y-mac: text: the selection ends at the caret after 'Bert' ({:?})", sel()),
+        );
+        record(q(Q::Line) == "0", "a11y-mac: text: AXInsertionPointLineNumber 0");
+        record(q(Q::StringFor(1, 2)) == "er" && q(Q::AttrFor(0, 4)) == "Bert", "a11y-mac: text: AXStringForRange, AXAttributedStringForRange");
+        record(q(Q::LineFor(3)) == "0" && q(Q::RangeForLine(0)) == "0,4", "a11y-mac: text: one line of four characters");
+        record(q(Q::RangeFor(2)) == "2,1", "a11y-mac: text: AXRangeForIndex");
+        record(
+            ax_test_act(PW, "AXTextField", "Name", A::Range(1, 0)) && wait(|| sel() == (1, 0)),
+            "a11y-mac: text: AXSelectedTextRange := 1,0 moves the caret",
+        );
+        // the rectangles of characters: in the field, from left to right; a point finds its
+        // character again
+        let field = ax_test_tree(PW).and_then(|t| find(&t, "AXTextField", "Name").map(|e| e.frame)).unwrap_or([0.0; 4]);
+        let (r1, r2) = (rect(&q(Q::FrameFor(1, 1))), rect(&q(Q::FrameFor(2, 1))));
+        let inside = |r: [f64; 4]| {
+            r[2] > 0.0 && r[3] > 0.0 && r[0] >= field[0] - 0.5 && r[0] + r[2] <= field[0] + field[2] + 0.5 && r[1] >= field[1] - 0.5
+                && r[1] + r[3] <= field[1] + field[3] + 0.5
+        };
+        record(
+            inside(r1) && inside(r2) && r1[0] < r2[0],
+            &alloc::format!("a11y-mac: text: AXBoundsForRange in the field, left to right ({r1:?}, {r2:?} in {field:?})"),
+        );
+        let at = q(Q::RangeAt(r2[0] + r2[2] / 4.0, r2[1] + r2[3] / 2.0));
+        record(at == "2,1", &alloc::format!("a11y-mac: text: AXRangeForPosition finds the character again ({at})"));
+        record(
+            ax_test_act(PW, "AXTextField", "Name", A::Range(0, 3)) && wait(|| q(Q::Selected) == "Ber"),
+            "a11y-mac: text: AXSelectedTextRange := 0,3 selects 'Ber'",
+        );
+        // characters outside the basic plane: two UTF-16 units each
+        record(
+            ax_test_act(PW, "AXTextField", "Name", A::Text(String::from("\u{1F600}\u{1F600}abc"))) && wait(|| q(Q::Count) == "7"),
+            "a11y-mac: text: two emoji and three letters are 7 UTF-16 units",
+        );
+        record(
+            q(Q::StringFor(4, 1)) == "a" && q(Q::RangeFor(1)) == "0,2" && q(Q::StringFor(2, 2)) == "\u{1F600}",
+            "a11y-mac: text: a character outside the basic plane is one range of two units",
+        );
+        record(
+            ax_test_act(PW, "AXTextField", "Name", A::Range(5, 0)) && wait(|| sel() == (5, 0)),
+            &alloc::format!("a11y-mac: text: the caret after 'a' at unit 5 ({:?})", sel()),
+        );
+        record(
+            ax_test_act(PW, "AXTextField", "Name", A::Text(String::from("Bert"))) && wait(|| q(Q::Count) == "4"),
+            "a11y-mac: text: back to 'Bert'",
+        );
     }
 
     pub fn t_a11y_mac(t: &mut T) {

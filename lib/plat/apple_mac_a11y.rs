@@ -46,7 +46,7 @@ use core::ffi::{CStr, c_void};
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use super::super::objc::{
-    Id, NIL, NSPoint, NSRect, Sel, class, ivar_get, ivar_set, msg, nsstring, objc_autoreleasePoolPop, objc_autoreleasePoolPush, release, sel,
+    Id, NIL, NOT_FOUND, NSPoint, NSRange, NSRect, Sel, class, ivar_get, ivar_set, msg, nsstring, objc_autoreleasePoolPop, objc_autoreleasePoolPush, release, sel,
     string_of, subclass,
 };
 use super::{POP_BASE, VIEW_OFF, ids, with};
@@ -614,13 +614,236 @@ extern "C" fn e_hit_test(this: Id, _cmd: Sel, p: NSPoint) -> Id {
     }
 }
 
+// ---------------------------------------------------------------- text (text boxes)
+//
+// VoiceOver reads a text box by character, word and line and follows its caret through these:
+// offsets are UTF-16 units of the text (NSString's), the node's caret and anchor characters.
+// Rectangles come from Node::char_rect (exact at the caret, estimated elsewhere).
+
+/// the UTF-16 offset of character k of s (past the end: the length)
+fn u16_at(s: &str, k: i32) -> usize {
+    s.chars().take(k.max(0) as usize).map(char::len_utf16).sum()
+}
+
+/// the character at UTF-16 offset u of s (inside a pair: the character it belongs to; past the
+/// end: the number of characters)
+fn char_at(s: &str, u: usize) -> i32 {
+    let mut n = 0;
+    for (k, c) in s.chars().enumerate() {
+        if n + c.len_utf16() > u {
+            return k as i32;
+        }
+        n += c.len_utf16();
+    }
+    s.chars().count() as i32
+}
+
+/// characters a .. b of s as a UTF-16 range
+fn range_of(s: &str, a: i32, b: i32) -> NSRange {
+    let x = u16_at(s, a);
+    NSRange { location: x, length: u16_at(s, b.max(a)) - x }
+}
+
+/// a UTF-16 range of s as characters a .. b
+fn chars_of(s: &str, r: NSRange) -> (i32, i32) {
+    let end = if r.length == 0 { r.location } else { r.location.saturating_add(r.length) };
+    let a = char_at(s, r.location);
+    let b = if end == r.location { a } else { char_at(s, end - 1) + 1 };
+    (a, b.max(a))
+}
+
+/// the line of character k (lines end after a '\n')
+fn line_of(s: &str, k: i32) -> isize {
+    s.chars().take(k.max(0) as usize).filter(|&c| c == '\n').count() as isize
+}
+
+/// the characters of line l, its '\n' included
+fn line_chars(s: &str, l: isize) -> Option<(i32, i32)> {
+    let (mut line, mut start) = (0, 0);
+    for (k, c) in s.chars().enumerate() {
+        if c == '\n' {
+            if line == l {
+                return Some((start, k as i32 + 1));
+            }
+            line += 1;
+            start = k as i32 + 1;
+        }
+    }
+    (line == l).then(|| (start, s.chars().count() as i32))
+}
+
+fn with_text<R>(this: Id, f: impl FnOnce(&Node, &str, i32) -> R) -> Option<R> {
+    with_node(this, |_, n, pw| f(n, n.text_str(), pw))
+}
+
+fn nsvalue_range(r: NSRange) -> Id {
+    // SAFETY: an autoreleased NSValue of a range.
+    unsafe { msg!(class(c"NSValue"), c"valueWithRange:", r => NSRange; Id) }
+}
+
+extern "C" fn t_count(this: Id, _cmd: Sel) -> isize {
+    with_text(this, |_, s, _| s.encode_utf16().count() as isize).unwrap_or(0)
+}
+
+extern "C" fn t_selected_text(this: Id, _cmd: Sel) -> Id {
+    with_text(this, |n, s, _| {
+        let (a, b) = n.selection();
+        text(&s.chars().skip(a as usize).take((b - a) as usize).collect::<String>())
+    })
+    .unwrap_or(NIL)
+}
+
+fn selected_range(this: Id) -> NSRange {
+    with_text(this, |n, s, _| {
+        let (a, b) = n.selection();
+        range_of(s, a, b)
+    })
+    .unwrap_or_default()
+}
+
+extern "C" fn t_selected_range(this: Id, _cmd: Sel) -> NSRange {
+    selected_range(this)
+}
+
+extern "C" fn t_selected_ranges(this: Id, _cmd: Sel) -> Id {
+    array(&[nsvalue_range(selected_range(this))])
+}
+
+extern "C" fn t_set_selected_range(this: Id, _cmd: Sel, r: NSRange) {
+    let Some((a, b)) = with_text(this, |_, s, _| chars_of(s, r)) else { return };
+    // the caret at the end of the range (VoiceOver moves it there when it sets one)
+    act(this, ax::A_FOCUS, Act::Select(a, b));
+}
+
+extern "C" fn t_insertion_line(this: Id, _cmd: Sel) -> isize {
+    with_text(this, |n, s, _| line_of(s, n.caret)).unwrap_or(0)
+}
+
+extern "C" fn t_visible_range(this: Id, _cmd: Sel) -> NSRange {
+    with_text(this, |_, s, _| NSRange { location: 0, length: s.encode_utf16().count() }).unwrap_or_default()
+}
+
+extern "C" fn t_string_for_range(this: Id, _cmd: Sel, r: NSRange) -> Id {
+    with_text(this, |_, s, _| {
+        let (a, b) = chars_of(s, r);
+        text(&s.chars().skip(a as usize).take((b - a) as usize).collect::<String>())
+    })
+    .unwrap_or(NIL)
+}
+
+extern "C" fn t_attributed_for_range(this: Id, cmd: Sel, r: NSRange) -> Id {
+    let plain = t_string_for_range(this, cmd, r);
+    if plain.is_null() {
+        return NIL;
+    }
+    // SAFETY: an autoreleased NSAttributedString of the plain text.
+    unsafe {
+        let a: Id = msg!(class(c"NSAttributedString"), c"alloc"; Id);
+        let a: Id = msg!(a, c"initWithString:", plain => Id; Id);
+        msg!(a, c"autorelease"; Id)
+    }
+}
+
+extern "C" fn t_range_for_line(this: Id, _cmd: Sel, l: isize) -> NSRange {
+    with_text(this, |_, s, _| line_chars(s, l).map_or(NSRange { location: NOT_FOUND, length: 0 }, |(a, b)| range_of(s, a, b)))
+        .unwrap_or(NSRange { location: NOT_FOUND, length: 0 })
+}
+
+extern "C" fn t_line_for_index(this: Id, _cmd: Sel, i: isize) -> isize {
+    with_text(this, |_, s, _| line_of(s, char_at(s, i.max(0) as usize))).unwrap_or(0)
+}
+
+/// the range of the (composed) character at character k: one character, nothing at the end
+fn char_range(s: &str, k: i32) -> NSRange {
+    let n = s.chars().count() as i32;
+    range_of(s, k.min(n), (k + 1).min(n))
+}
+
+extern "C" fn t_range_for_index(this: Id, _cmd: Sel, i: isize) -> NSRange {
+    with_text(this, |_, s, _| char_range(s, char_at(s, i.max(0) as usize))).unwrap_or_default()
+}
+
+extern "C" fn t_range_for_position(this: Id, _cmd: Sel, p: NSPoint) -> NSRange {
+    with_text(this, |n, s, pw| {
+        let (x, y) = from_screen(pw, p)?;
+        let k = n.offset_at(x, y);
+        (k >= 0).then(|| char_range(s, k))
+    })
+    .flatten()
+    .unwrap_or(NSRange { location: NOT_FOUND, length: 0 })
+}
+
+extern "C" fn t_frame_for_range(this: Id, _cmd: Sel, r: NSRange) -> NSRect {
+    let Some((pw, rect)) = with_text(this, |n, s, pw| {
+        let (a, b) = chars_of(s, r);
+        let mut u = n.char_rect(a);
+        for k in a + 1..b {
+            let q = n.char_rect(k);
+            let (x0, y0) = (u[0].min(q[0]), u[1].min(q[1]));
+            let (x1, y1) = ((u[0] + u[2]).max(q[0] + q[2]), (u[1] + u[3]).max(q[1] + q[3]));
+            u = [x0, y0, x1 - x0, y1 - y0];
+        }
+        (pw, u)
+    }) else {
+        return NSRect::default();
+    };
+    to_screen(pw, rect)
+}
+
+extern "C" fn t_style_range(this: Id, cmd: Sel, _i: isize) -> NSRange {
+    t_visible_range(this, cmd) // one style for the whole text
+}
+
+/// the text selectors (only text boxes have them)
+const TEXT_SELS: [&CStr; 13] = [
+    c"accessibilityNumberOfCharacters",
+    c"accessibilitySelectedText",
+    c"accessibilitySelectedTextRange",
+    c"accessibilitySelectedTextRanges",
+    c"accessibilityInsertionPointLineNumber",
+    c"accessibilityVisibleCharacterRange",
+    c"accessibilityStringForRange:",
+    c"accessibilityAttributedStringForRange:",
+    c"accessibilityRangeForLine:",
+    c"accessibilityLineForIndex:",
+    c"accessibilityRangeForIndex:",
+    c"accessibilityRangeForPosition:",
+    c"accessibilityFrameForRange:",
+];
+
+fn text_methods() -> Vec<(&'static CStr, *const c_void, &'static CStr)> {
+    let range = c"{_NSRange=QQ}@:";
+    let range_q = c"{_NSRange=QQ}@:q";
+    alloc::vec![
+        (c"accessibilityNumberOfCharacters", t_count as *const c_void, c"q@:"),
+        (c"accessibilitySelectedText", t_selected_text as *const c_void, c"@@:"),
+        (c"accessibilitySelectedTextRange", t_selected_range as *const c_void, range),
+        (c"accessibilitySelectedTextRanges", t_selected_ranges as *const c_void, c"@@:"),
+        (c"setAccessibilitySelectedTextRange:", t_set_selected_range as *const c_void, c"v@:{_NSRange=QQ}"),
+        (c"accessibilityInsertionPointLineNumber", t_insertion_line as *const c_void, c"q@:"),
+        (c"accessibilityVisibleCharacterRange", t_visible_range as *const c_void, range),
+        (c"accessibilityStringForRange:", t_string_for_range as *const c_void, c"@@:{_NSRange=QQ}"),
+        (c"accessibilityAttributedStringForRange:", t_attributed_for_range as *const c_void, c"@@:{_NSRange=QQ}"),
+        (c"accessibilityRangeForLine:", t_range_for_line as *const c_void, range_q),
+        (c"accessibilityLineForIndex:", t_line_for_index as *const c_void, c"q@:q"),
+        (c"accessibilityRangeForIndex:", t_range_for_index as *const c_void, range_q),
+        (c"accessibilityRangeForPosition:", t_range_for_position as *const c_void, c"{_NSRange=QQ}@:{CGPoint=dd}"),
+        (c"accessibilityFrameForRange:", t_frame_for_range as *const c_void, c"{CGRect={CGPoint=dd}{CGSize=dd}}@:{_NSRange=QQ}"),
+        (c"accessibilityStyleRangeForIndex:", t_style_range as *const c_void, range_q),
+    ]
+}
+
 // the selectors whose answer depends on the role (all others: every element)
 extern "C" fn e_allowed(this: Id, _cmd: Sel, s: Sel) -> bool {
     let Some((role, state, actions, slot, value)) = with_node(this, |_, n, _| (n.role, n.state, n.actions, name_slot(n), has_value(n))) else {
         return true;
     };
     let is = |name: &CStr| s == sel(name);
-    if is(c"accessibilityTitle") {
+    if TEXT_SELS.iter().any(|t| is(t)) || is(c"accessibilityStyleRangeForIndex:") {
+        role == Role::TextBox
+    } else if is(c"setAccessibilitySelectedTextRange:") {
+        role == Role::TextBox && actions & ax::A_FOCUS != 0
+    } else if is(c"accessibilityTitle") {
         slot == Name::Title
     } else if is(c"accessibilityLabel") {
         slot == Name::Label
@@ -663,7 +886,7 @@ unsafe extern "C" {
 fn elem_methods() -> Vec<(&'static CStr, *const c_void, &'static CStr)> {
     let id = c"@@:";
     let b = c"B@:";
-    alloc::vec![
+    let mut v = alloc::vec![
         (c"accessibilityRole", e_role as *const c_void, id),
         (c"accessibilitySubrole", e_subrole as *const c_void, id),
         (c"accessibilityRoleDescription", e_role_description as *const c_void, id),
@@ -699,7 +922,9 @@ fn elem_methods() -> Vec<(&'static CStr, *const c_void, &'static CStr)> {
         (c"accessibilityPerformDecrement", e_decrement as *const c_void, b),
         (c"accessibilityHitTest:", e_hit_test as *const c_void, c"@@:{CGPoint=dd}"),
         (c"isAccessibilitySelectorAllowed:", e_allowed as *const c_void, c"B@::"),
-    ]
+    ];
+    v.extend(text_methods());
+    v
 }
 
 // ---------------------------------------------------------------- the bridge
@@ -876,6 +1101,36 @@ pub enum AxTestAct {
     Focus,
     /// AXSelected := YES
     Select,
+    /// AXSelectedTextRange := location, length (UTF-16)
+    Range(usize, usize),
+}
+
+/// a question of a test about a text box's text (the answers: numbers as text, ranges
+/// "location,length", rectangles "x,y,w,h" in points from the top left of the primary screen)
+#[derive(Clone, Debug)]
+pub enum AxTestText {
+    /// AXNumberOfCharacters
+    Count,
+    /// AXSelectedText
+    Selected,
+    /// AXSelectedTextRange
+    SelRange,
+    /// AXInsertionPointLineNumber
+    Line,
+    /// AXStringForRange (location, length)
+    StringFor(usize, usize),
+    /// AXAttributedStringForRange: its string
+    AttrFor(usize, usize),
+    /// AXBoundsForRange
+    FrameFor(usize, usize),
+    /// AXRangeForPosition (a point as AXPosition)
+    RangeAt(f64, f64),
+    /// AXRangeForIndex
+    RangeFor(usize),
+    /// AXLineForIndex
+    LineFor(usize),
+    /// AXRangeForLine
+    RangeForLine(usize),
 }
 
 /// f on the main thread (where AppKit serves the assistive technology), inside a pool
@@ -1101,7 +1356,77 @@ pub fn ax_test_act(pw: i32, role: &str, name: &str, a: AxTestAct) -> bool {
             AxTestAct::Text(t) => set_value(text(&t)),
             AxTestAct::Focus => set_bool(c"setAccessibilityFocused:"),
             AxTestAct::Select => set_bool(c"setAccessibilitySelected:"),
+            AxTestAct::Range(loc, len) => {
+                if !offers(found, c"setAccessibilitySelectedTextRange:") {
+                    return false;
+                }
+                unsafe { msg!(found, c"setAccessibilitySelectedTextRange:", NSRange { location: loc, length: len } => NSRange; ()) };
+                true
+            }
         }
+    })
+}
+
+/// (tests, any thread) ask the element with this role and name about its text as VoiceOver does
+/// (None: no such element, or it does not offer the attribute)
+pub fn ax_test_text(pw: i32, role: &str, name: &str, q: AxTestText) -> Option<String> {
+    on_main(|| {
+        let mut found = NIL;
+        walk(pw, &mut |e, depth| {
+            let d = describe(e, depth);
+            if d.role == role && d.name() == name {
+                found = e;
+                return false;
+            }
+            true
+        });
+        if found.is_null() {
+            return None;
+        }
+        let e = found;
+        let r = |loc: usize, len: usize| NSRange { location: loc, length: len };
+        let fmt_range = |x: NSRange| format!("{},{}", x.location as isize, x.length);
+        let fmt_rect = |f: NSRect| {
+            let top = super::primary_height() - f.origin.y - f.size.h;
+            format!("{},{},{},{}", f.origin.x, top, f.size.w, f.size.h)
+        };
+        let has = |m: &CStr| offers(e, m);
+        // SAFETY (below): the protocol's text methods of an element that offers them.
+        Some(match q {
+            AxTestText::Count if has(c"accessibilityNumberOfCharacters") => {
+                format!("{}", unsafe { msg!(e, c"accessibilityNumberOfCharacters"; isize) })
+            }
+            AxTestText::Selected if has(c"accessibilitySelectedText") => describe_obj(unsafe { msg!(e, c"accessibilitySelectedText"; Id) }),
+            AxTestText::SelRange if has(c"accessibilitySelectedTextRange") => {
+                fmt_range(unsafe { msg!(e, c"accessibilitySelectedTextRange"; NSRange) })
+            }
+            AxTestText::Line if has(c"accessibilityInsertionPointLineNumber") => {
+                format!("{}", unsafe { msg!(e, c"accessibilityInsertionPointLineNumber"; isize) })
+            }
+            AxTestText::StringFor(a, n) if has(c"accessibilityStringForRange:") => {
+                describe_obj(unsafe { msg!(e, c"accessibilityStringForRange:", r(a, n) => NSRange; Id) })
+            }
+            AxTestText::AttrFor(a, n) if has(c"accessibilityAttributedStringForRange:") => {
+                describe_obj(unsafe { msg!(msg!(e, c"accessibilityAttributedStringForRange:", r(a, n) => NSRange; Id), c"string"; Id) })
+            }
+            AxTestText::FrameFor(a, n) if has(c"accessibilityFrameForRange:") => {
+                fmt_rect(unsafe { msg!(e, c"accessibilityFrameForRange:", r(a, n) => NSRange; NSRect) })
+            }
+            AxTestText::RangeAt(x, y) if has(c"accessibilityRangeForPosition:") => {
+                let p = NSPoint { x, y: super::primary_height() - y };
+                fmt_range(unsafe { msg!(e, c"accessibilityRangeForPosition:", p => NSPoint; NSRange) })
+            }
+            AxTestText::RangeFor(i) if has(c"accessibilityRangeForIndex:") => {
+                fmt_range(unsafe { msg!(e, c"accessibilityRangeForIndex:", i as isize => isize; NSRange) })
+            }
+            AxTestText::LineFor(i) if has(c"accessibilityLineForIndex:") => {
+                format!("{}", unsafe { msg!(e, c"accessibilityLineForIndex:", i as isize => isize; isize) })
+            }
+            AxTestText::RangeForLine(l) if has(c"accessibilityRangeForLine:") => {
+                fmt_range(unsafe { msg!(e, c"accessibilityRangeForLine:", l as isize => isize; NSRange) })
+            }
+            _ => return None,
+        })
     })
 }
 
