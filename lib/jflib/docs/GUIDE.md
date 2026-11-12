@@ -2089,6 +2089,8 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   clicks seem to get lost, or a click on one acts on the other (a text box below a segmented
   control whose segments take `id + 1 ..`). Scripts (and `jfgui_DEBUG=1`) print a `UIWARN`
   for an id two widgets of one pass share, with both positions; `expect_nowarn` fails on it.
+  Ids are per window: windows may use the same ids (a text box of one id in two app windows
+  keeps its own caret, selection and undo in each).
 * `ui.canvas(...)` records the version *before* you react to its input. When handling the
   returned `UiInput` changes the content, bump the version and call `ui.repass()`; otherwise
   the dirty-region renderer shows the change one frame late (`--verify-dirty` reports it).

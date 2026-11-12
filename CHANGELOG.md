@@ -125,6 +125,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** The .dmg of tools/package.py held the program without its execute bit (copied without its mode), so the app did not open ("kann nicht geöffnet werden"); NAME.app's program is always 0755 now and tools/apple.py dmg refuses a bundle whose program cannot run (found by the hand check of AP8c)
 - **render2d:** render2d: push constants only where a pass reads them (the browser refused count and write: the demo had never run in a browser); the fragment shader returns after discard (a discard keeps running, WGSL's rules) and takes a fast way near the ends of short thin strokes (segments up to 3 px, half width up to 0.75 px): 1 million segments of the measuring scene at the overview 25.4 -> 11.8 ms (RTX 2070 SUPER), 185 -> 60.7 ms (Iris Xe)
 - **ui:** The library's own folder dialog (FD_FOLDER; headless runs, jfgui_FILEDLG=builtin) sets ui.filedlg_paths() to the chosen folder; it still held the files of the dialog before, and the folder was not granted to the app as the user's (fs.user); viewtest tests/folder.uis
+- **ui:** Text and number boxes of the same id in two windows no longer share their edit state: caret, selection and undo of the focused box are keyed by window and id (the inactive window's box dropped them every pass, so typing there reset the caret or replaced a keyboard selection); viewtest tests/twowin.uis
 
 ## [0.1.0] - 2026-11-08
 

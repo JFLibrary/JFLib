@@ -468,7 +468,7 @@ impl Ui {
         };
         let pid = self.spell_pid(id);
         let e = &self.m.edit;
-        let caret = (e.ed_id == id && self.wp.ctx.focus == id).then_some((e.ed_caret, e.ed_anchor));
+        let caret = (self.ed_is(id) && self.wp.ctx.focus == id).then_some((e.ed_caret, e.ed_anchor));
         let rect = self.wp.ctx.last_rect;
         self.m.edit.spell.menu = Some(Menu { id, pid, start: a, end: z, word, sugs, wait, add_row: 0, kbd, rect, caret });
         self.popup_open(pid);
@@ -544,13 +544,15 @@ impl Ui {
     // the menu closed: a box that gets the focus back keeps its caret (instead of starting
     // the edit again with everything selected)
     fn spell_closed(&mut self, id: u32, caret: Option<(usize, usize)>) {
-        if self.wp.ctx.focus != id || self.m.edit.ed_id == id {
+        if self.wp.ctx.focus != id || self.ed_is(id) {
             return;
         }
         let Some((c, a)) = caret else { return };
         let frame = self.frame;
+        let w = self.uiw_cur;
         let e = &mut self.m.edit;
         e.ed_id = id;
+        e.ed_win = w;
         e.ed_caret = Self::tb_fix_index(&e.buf, c);
         e.ed_anchor = Self::tb_fix_index(&e.buf, a);
         e.ed_seen = frame;
@@ -644,7 +646,7 @@ impl Ui {
         if e.tb_max > 0 && e.buf.len() - (m.end - m.start) + with.len() > e.tb_max {
             return; // it would not fit
         }
-        let focused = e.ed_id == id && self.wp.ctx.focus == id;
+        let focused = self.ed_is(id) && self.wp.ctx.focus == id;
         if focused {
             self.ud_push();
         }
