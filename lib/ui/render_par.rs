@@ -35,7 +35,7 @@
 
 use alloc::vec::Vec;
 
-use gfx::blend::{copy_stream, stream_fence};
+use gfx::blend::copy_stream_rows;
 use gfx::path::Path;
 use gfx::raster::Raster;
 use gfx::shapes::Shapes;
@@ -352,17 +352,17 @@ impl Ui {
                 // the band then, and the framebuffer is not read first)
                 for (c, _) in parts {
                     let (x0, x1) = (c[0] as usize * 4, c[2] as usize * 4);
-                    for y in (c[1] - y0) as usize..(c[3] - y0) as usize {
-                        let (d, s) = (&mut chunk[y * stride + x0..y * stride + x1], &sf.px[y * bs + x0..y * bs + x1]);
-                        if stream {
-                            copy_stream(d, s);
-                        } else {
-                            d.copy_from_slice(s);
+                    let (r0, r1) = ((c[1] - y0) as usize, (c[3] - y0) as usize);
+                    if stream {
+                        // one fence per part (inside copy_stream_rows)
+                        if r1 > r0 {
+                            copy_stream_rows(&mut chunk[r0 * stride + x0..], stride, &sf.px[r0 * bs + x0..], bs, x1 - x0, r1 - r0);
+                        }
+                    } else {
+                        for y in r0..r1 {
+                            chunk[y * stride + x0..y * stride + x1].copy_from_slice(&sf.px[y * bs + x0..y * bs + x1]);
                         }
                     }
-                }
-                if stream {
-                    stream_fence();
                 }
                 pool.lock().push(b);
             };
