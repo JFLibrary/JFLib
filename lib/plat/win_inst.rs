@@ -24,7 +24,9 @@
 //   reg_create(subkey) -> Some(RegKey)   HKCU\subkey opened for writing (created when missing);
 //                                   RegKey::set_sz / set_dword, closed when dropped
 //   reg_delete(subkey) -> bool      RegDeleteKeyW(HKCU, subkey)
-//   reg_delete_tree(subkey) -> bool RegDeleteTreeW: the key and everything below it
+//   reg_delete_tree(subkey) -> bool RegDeleteTreeW: the key and everything below it (only a
+//                                   key below Software\Classes or a browser's below
+//                                   Software\Clients\StartMenuInternet; other names are refused)
 //   reg_delete_value(subkey, name) -> bool   RegDeleteKeyValueW (name "" = the default value)
 //   assoc_changed()                 SHChangeNotify(SHCNE_ASSOCCHANGED): Explorer re-reads the
 //                                   file types and URL schemes
@@ -513,8 +515,30 @@ pub fn reg_delete(subkey: &str) -> bool {
     unsafe { f(HKCU, w_key.as_ptr()) == 0 }
 }
 
-/// HKCU\subkey with all its keys and values  (RegDeleteTreeW, then RegDeleteKeyW)
+// subkey names a key an app's registration owns as a whole: "Software\Classes\<name>[\..]" or
+// "Software\Clients\StartMenuInternet\<name>[\..]" with a name, no empty segment (a trailing or
+// doubled '\') and short enough to reach the call uncut (the places of plat::assoc's del_tree)
+fn own_tree(subkey: &str) -> bool {
+    let b = subkey.as_bytes();
+    !b.contains(&0) // (a NUL would end the name early: "Software\Classes\")
+        && subkey.encode_utf16().count() < PATH_CAP
+        && ["Software\\Classes", crate::assoc::BROWSER_CLIENTS].iter().any(|base| {
+            b.len() > base.len() + 1
+                && b[..base.len()].eq_ignore_ascii_case(base.as_bytes())
+                && b[base.len()] == b'\\'
+                && subkey[base.len() + 1..].split('\\').all(|s| !s.is_empty())
+        })
+}
+
+/// HKCU\subkey with all its keys and values  (RegDeleteTreeW, then RegDeleteKeyW).  Only a
+/// key below Software\Classes (a ProgID, a URL scheme: what file types and schemes add) or
+/// below Software\Clients\StartMenuInternet (a web browser's key) -- any other name is
+/// refused: an empty one would clear HKCU itself, "Software" every program's settings, and
+/// such a name is what a damaged or cut list of an uninstaller holds
 pub fn reg_delete_tree(subkey: &str) -> bool {
+    if !own_tree(subkey) {
+        return false;
+    }
     let p = proc_(P_REGTREE);
     if p == 0 {
         return false;

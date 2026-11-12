@@ -186,6 +186,9 @@ fn arg(s: &[char], p: &mut usize, cx: &Cx, seq: &mut usize, out: &mut String) ->
         }
         return Some(());
     }
+    if s.get(*p) != Some(&',') {
+        return None; // the text ends inside "{name": broken, the rest stays as written
+    }
     *p += 1; // ','
     let typ = word(s, p, &[',', '}']);
     let style = if s.get(*p) == Some(&',') {

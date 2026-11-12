@@ -813,7 +813,8 @@ impl Ui {
         let floor = exact.map_or(c.modal_prev as i32, |i| list[i].layer as i32).max(c.modal_prev as i32);
         let mut best: Option<(i32, [i32; 2])> = None;
         for (i, h) in list.iter().enumerate() {
-            if !usable(h) || (h.layer as i32) < floor {
+            // (a box clipped away -- scrolled out of its view -- or reported empty has no nearest point)
+            if !usable(h) || (h.layer as i32) < floor || h.x1 <= h.x0 || h.y1 <= h.y0 {
                 continue;
             }
             let (ex, ey) = (((t - (h.x1 - h.x0)) / 2).max(0), ((t - (h.y1 - h.y0)) / 2).max(0));

@@ -100,6 +100,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** ui.code_reveal(id, line): the code editor scrolls a line into view in its next pass (into the middle when it was not in view, its folds opened) without the keyboard focus or the caret moving: a debugger's execution line while the page or the DevTools toolbar keeps the keyboard
 - **ui:** ui.drop_pos_px() and ui.drag_over_px(): a drop's and a drag's place in px of the window, exact (logical like last_rect; minus a canvas's UiInput::rect the pixel of the canvas); drop_pos and drag_over stay DIP, rounded (at 150 % three pixels share two DIP)
 - **simd:** simd::copy_stream_rows (also gfx::blend::copy_stream_rows): copy_stream for a block of rows with one fence at the end
+- **cas:** Writer::finish_unsaved -> (WriteStats, Unsaved) and Unsaved::save_snapshot: finish a writer and save its snapshot with gc kept out in between
+- **base:** xml::Limits (bytes, elements, nesting; the default is parse's) and xml::parse_with(text, limits)
 
 ### Changed
 
@@ -125,6 +127,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** The script command system browser default|other|unknown is followed by UIC_ACTIVE 0 and 1 (only 1 when the app was not active), as after the user's choice in the system's settings: an app that keeps the status (GUIDE section 21, whose example now does) reads it again without system focus out / in
 - **plat:** Linux: default_browser_status reads KDE's [General] BrowserApplication of kdeglobals when no mimeapps.list names a default of http and https (on KDE)
 - **plat:** plat::dl_sym and plat::dl_close (Linux with glibc, Android) are unsafe fn: the dynamic linker reads a wrong handle's structures before it could tell
+- **plat:** plat::inst::reg_delete_tree deletes only keys below Software\Classes (a ProgID, a URL scheme) and below Software\Clients\StartMenuInternet (a web browser's key) and returns false for any other name; it took every name, an empty one meant all of HKEY_CURRENT_USER
 
 ### Removed
 
@@ -174,6 +177,12 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** In the browser and on Android the PERMISSIONS policy treats `\` as a folder separator, as their file stores do (a path with `\..\` could pass the rule of one file and open another)
 - **plat:** Android: host calls on several threads at once no longer share one answer buffer (a call on another thread, the audio thread too, could free it while the bridge copied into it)
 - **simd:** copy_stream ends with the fence its non-temporal stores need (sfence) before anything reads or writes the copy again, as Rust's memory model requires; ui's parallel rendering copies its bands back with copy_stream_rows (one fence per block)
+- **installer:** A setup that cannot write install.ini fails instead of ending without it (the uninstaller found nothing to remove then); an assoc= entry of install.ini names no key outside the app's own any more (reg_delete_tree refuses them: a list cut by an older setup inside an entry named Software for Software\Classes\App.ext, which went with everything below it)
+- **cas:** A backup's chunks are safe between the end of its writer and its snapshot. A gc of another thread that waited for the writer ran in exactly that gap, removed the new chunks as unreferenced, and the snapshot was stored without its data. Writer::finish_unsaved keeps gc out until the snapshot is saved through the returned Unsaved; Repo::save_snapshot waits for a running gc and refuses (NotFound) a snapshot whose chunks a gc has removed. gc rebuilds lost index files from the packs' trailers first, as repair_index does: a pack whose index file was lost went as one nobody uses, with the chunks of its snapshots; it refuses (Corrupt) while a referenced chunk is missing and a pack without an index and a readable trailer is left
+- **doc_io:** A long formatted document is saved again: encode_docx reads its own output back, and the XML reader stopped at 30000 elements and 4 MiB a part, which some dozen pages of formatted text reach (Error::Xml). The parts of a native document that grow with its content (text, notes, sources, table identities) are written and read up to 250000 elements and 8 MiB, the size a package holds in one part
+- **plat:** X11: a finger that drags a window no longer ends the program with "nested reply wait": the monitor list is not asked for again while a reply is awaited (the move then uses the list as it is)
+- **ui:** Code editor: undo and redo of "replace all" keep the selection inside the text (it came from the text before the step, and the next edit cut a line past its end or inside a character); moving the last lines down leaves the selection on the last line; toggling a comment cuts the shared indentation at blanks and tabs only (a line indented with a no-break or ideographic space was cut inside the character)
+- **ui:** No more panics on these inputs: a finger tap near a hit box that is empty or clipped away (touch aiming), a style sheet whose last rule lacks its closing brace and ends in a non-ASCII character (rich text from HTML), a catalogue text that ends inside a placeholder (i18n messages). A bar chart with an infinite or huge value no longer hangs in the axis scale (the bar fills the plot)
 
 ## [0.1.0] - 2026-11-08
 

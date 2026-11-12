@@ -71,5 +71,19 @@ pub(crate) fn run() -> (usize, usize) {
     adjacent.paragraphs[0].content = vec![Inline::Text(String::from("A")), Inline::with_format(String::from("B"), TextFormat { bold: Some(true), ..Default::default() })];
     check!(adjacent.story_character_format(1, 1, 2).unwrap().bold == Some(true), "nonempty selection samples following run at boundary");
     check!(adjacent.story_character_format(1, 1, 1).unwrap().bold == Some(false), "collapsed selection retains caret affinity");
+
+    // A long formatted document has more XML elements than the general reader's 30000 (here
+    // about 39000): it is saved -- the save reads its own output -- and read back as it is.
+    let mut long = Document::default();
+    long.paragraphs = (1..=1000).map(|id| Paragraph {
+        id, style: ParagraphStyle::Normal, format: Default::default(),
+        content: (0..4).map(|k| Inline::with_format(format!("Wort {k} "), TextFormat {
+            bold: Some(k % 2 == 0), italic: Some(true), strike: Some(false), underline: Some(k % 2 == 1),
+            size_half_points: Some(22), color: Some(TextColor::Rgb(0x203040)), ..Default::default()
+        })).collect(),
+    }).collect();
+    check!(long.validate().is_ok(), "long formatted document is within the model's budgets");
+    check!(doc_io::encode_docx(&long).is_ok_and(|b| doc_io::decode_docx(&b).is_ok_and(|d| d.paragraphs == long.paragraphs)),
+        "long formatted document saves and reads back");
     (passed, failed)
 }

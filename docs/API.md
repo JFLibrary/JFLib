@@ -31245,7 +31245,9 @@ apps" entry, starting a command line             (r12-inst)  [apps/installer/src
   reg_create(subkey) -> Some(RegKey)   HKCU\subkey opened for writing (created when missing);
                                   RegKey::set_sz / set_dword, closed when dropped
   reg_delete(subkey) -> bool      RegDeleteKeyW(HKCU, subkey)
-  reg_delete_tree(subkey) -> bool RegDeleteTreeW: the key and everything below it
+  reg_delete_tree(subkey) -> bool RegDeleteTreeW: the key and everything below it (only a
+                                  key below Software\Classes or a browser's below
+                                  Software\Clients\StartMenuInternet; other names are refused)
   reg_delete_value(subkey, name) -> bool   RegDeleteKeyValueW (name "" = the default value)
   assoc_changed()                 SHChangeNotify(SHCNE_ASSOCCHANGED): Explorer re-reads the
                                   file types and URL schemes
@@ -31308,7 +31310,11 @@ PATH_CAP: usize = 520
   RegDeleteKeyW(HKCU, subkey)  [sh_reg_delete, real mode]
 
 - **`fn reg_delete_tree(subkey: &str) -> bool`**
-  HKCU\\subkey with all its keys and values  (RegDeleteTreeW, then RegDeleteKeyW)
+  HKCU\\subkey with all its keys and values  (RegDeleteTreeW, then RegDeleteKeyW).  Only a
+  key below Software\\Classes (a ProgID, a URL scheme: what file types and schemes add) or
+  below Software\\Clients\\StartMenuInternet (a web browser's key) -- any other name is
+  refused: an empty one would clear HKCU itself, "Software" every program's settings, and
+  such a name is what a damaged or cut list of an uninstaller holds
 
 - **`fn reg_delete_value(subkey: &str, name: &str) -> bool`**
   one value of HKCU\\subkey ("" = its default value)  (RegDeleteKeyValueW)
@@ -36022,6 +36028,14 @@ New native functionality; deliberately rejects constructs it cannot represent lo
   - `Limit`
   - `Unsupported`
 
+- **`struct Limits`**
+  What one parse may take: the text's bytes, its elements, their nesting. The default
+  (4 MiB, 30000 elements, 48 levels) is `parse`'s; a reader whose own model bounds its
+  documents otherwise names what that model can expand to (`parse_with`).
+  - `bytes: usize`
+  - `nodes: usize`
+  - `depth: usize`
+
 - **`fn valid_char(c: char) -> bool`**
   XML 1.0 character validity (also used before emitting document text).
 
@@ -36031,6 +36045,9 @@ New native functionality; deliberately rejects constructs it cannot represent lo
 - **`fn parse(s: &str) -> Result<Node, Error>`**
   Parse a bounded XML subset. DTDs, processing instructions, comments, CDATA and mixed
   content are explicitly rejected. No resources are ever resolved or fetched.
+
+- **`fn parse_with(s: &str, lim: Limits) -> Result<Node, Error>`**
+  `parse` within other limits than the default ones.
 
 ### `base/num.rs`
 
@@ -46592,6 +46609,9 @@ format "bcrepo-1")
        Recovery})                       one process holds a repository at a time (LOCK)
   repo.writer() -> Writer               put(kind, bytes) / put_stream(reader) -> chunk ids,
                                         finish() (packs and indexes are durable);
+                                        finish_unsaved() -> (stats, Unsaved): the same, and
+                                        gc stays out until unsaved.save_snapshot(..) -- the
+                                        way of a backup where a gc can run beside it;
                                         .codec(c, level): this writer's compression
                                         (the repository's own is the default)
   repo.read_chunk(id) / read_tree(id)   repo.save_snapshot / load_snapshot / snapshot_ids /
@@ -46607,7 +46627,9 @@ Keys:    one random repository key, wrapped in repo.json for the server's master
 Chunks:  id = BLAKE3-keyed(id key, plain) -> identical data is stored once, the ids reveal
          nothing without the key.  Commit order of a backup: packs (fsync) -> indexes
          (fsync) -> snapshot (atomic rename, directory sync); a crash leaves at most
-         unreferenced packs, which gc removes.
+         unreferenced packs, which gc removes.  Until its snapshot is there a backup's chunks
+         are such packs too: gc waits for open writers and for an Unsaved, and a snapshot
+         saved the plain way after a gc took chunks of it is refused (save_snapshot).
 ```
 
 ### `cas` crate root
@@ -46733,7 +46755,15 @@ KIND_TREE: u8 = 1
   the plain content of a chunk
 - **`fn read_tree(&self, id: &ChunkId) -> CasResult<Tree>`**
 - **`fn save_snapshot(&self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()>`**
-  store a snapshot (after its writer finished); signed by `signer`
+  store a snapshot (after its writer finished); signed by `signer`.
+
+  Between the writer's finish and this call the new chunks belong to no snapshot, and a
+  gc of another thread -- one that waited for the writer runs at that very moment --
+  removes them.  Where a gc can run beside the backup, finish the writer with
+  `finish_unsaved` and save through the `Unsaved` it returns: gc waits for it.  This call
+  cannot keep a gc out afterwards; it refuses the snapshot instead (NotFound) when chunks
+  of it are gone -- looked up once a gc of this process has removed anything.  It waits
+  for a running gc: not to be called while the same thread holds a Writer or an Unsaved.
 - **`fn snapshot_ids(&self) -> Vec<String>`**
 - **`fn load_snapshot(&self, id: &str) -> CasResult<Snapshot>`**
   a snapshot, checked (signature by a trusted key, authentic encryption)
@@ -46746,7 +46776,11 @@ KIND_TREE: u8 = 1
   indexed; with `read_data` every blob is read, decrypted and compared with its id
 - **`fn gc(&self, progress: Progress) -> CasResult<GcReport>`**
   remove what no snapshot references: empty packs are deleted, sparse packs (less than
-  60 % in use) are rewritten with their live blobs
+  60 % in use) are rewritten with their live blobs.  Waits for open writers and for what
+  finish_unsaved left of them.  Lost index files are rebuilt from the packs' trailers
+  first (repair_index).  Refused (Corrupt), nothing removed, while a snapshot does not
+  open, or while a chunk it references is not in the index and a pack without an index
+  (and without a readable trailer) is left: the chunk may be in that pack
 - **`fn repair_index(&self) -> CasResult<u64>`**
   rebuild missing index files from the packs' trailers
 
@@ -46757,7 +46791,7 @@ KIND_TREE: u8 = 1
   writes new chunks into packs
   - `stats: WriteStats`
 
-**`impl Writer<'_>`**
+**`impl<'a> Writer<'a>`**
 
 - **`fn codec(mut self, codec: Codec, level: i32) -> Self`**
   compress this writer's data chunks with `codec` (`level`: zstd's level); trees stay LZ4
@@ -46767,7 +46801,22 @@ KIND_TREE: u8 = 1
   chunk a stream and store it -> (chunk ids, size); `read` fills the buffer, Ok(0) = end
 - **`fn put_tree(&mut self, t: &Tree) -> CasResult<ChunkId>`**
 - **`fn finish(mut self) -> CasResult<WriteStats>`**
-  write the last pack; every chunk put so far is durable afterwards
+  write the last pack; every chunk put so far is durable afterwards.  gc may run from
+  here on, and it removes chunks no snapshot holds: a backup whose snapshot follows uses
+  `finish_unsaved` where a gc of another thread is possible (Repo::save_snapshot)
+- **`fn finish_unsaved(mut self) -> CasResult<(WriteStats, Unsaved<'a>)>`**
+  `finish`, and gc stays out until the snapshot of these chunks is saved through the
+  returned `Unsaved` (or that is dropped: a backup given up)
+
+- **`struct Unsaved<'a>`**
+  what a writer finished with `finish_unsaved` leaves: its chunks -- new ones and those it
+  found stored already -- before a snapshot holds them.  gc waits while this lives, so the
+  thread that holds it starts no gc, check or further writer before it is saved or dropped.
+
+**`impl Unsaved<'_>`**
+
+- **`fn save_snapshot(self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()>`**
+  store the snapshot of these chunks (signed by `signer`); gc may run again afterwards
 
 ### `cas/chunker.rs`
 

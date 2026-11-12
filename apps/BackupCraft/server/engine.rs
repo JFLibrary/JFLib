@@ -823,7 +823,9 @@ fn backup(o: &OpCtl, ctx: &Arc<Ctx>, job: &Job, host: &Host, r: &Repository, ful
     }
     let mut stats = walk.stats;
     let walk_changed = walk.changed;
-    let ws = walk.w.finish().map_err(cas_err)?;
+    // (unsaved: a clean-up -- another job's retention, waiting for this writer -- stays out
+    // until the restore point is saved; its chunks belong to no snapshot before)
+    let (ws, unsaved) = walk.w.finish_unsaved().map_err(cas_err)?;
     stats.new_bytes = ws.new_stored;
     stats.new_chunks = ws.new_chunks;
     stats.new_raw = ws.new_raw;
@@ -862,7 +864,7 @@ fn backup(o: &OpCtl, ctx: &Arc<Ctx>, job: &Job, host: &Host, r: &Repository, ful
         immutable_until: if imm > 0 { t + imm as i64 * DAY } else { 0 },
         meta: bc_proto::j::obj([("session", Value::string(s.id.as_str())), ("created_ns", Value::i64(plat::unix_time_ns()))]),
     };
-    repo.save_snapshot(&snap, &ctx.keys.signing).map_err(cas_err)?;
+    unsaved.save_snapshot(&snap, &ctx.keys.signing).map_err(cas_err)?;
     let point = point_of(&snap, &r.id, job.encrypted);
     let _ = ctx.db.put(C_POINTS, &point.id, point.to_json());
     s.point_id = point.id.clone();

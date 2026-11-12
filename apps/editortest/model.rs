@@ -217,6 +217,9 @@ fn rich(t: &mut T) {
         <ul><li>a</li><li>b<ul><li>c</li></ul></li></ul><h2 style=\"text-align: center\">Titel</h2>\
         <p><span style=\"color: rgb(0, 128, 0); font-size: 18px; font-weight: 700\">grün</span><br>zweite Zeile</p>\
         <script>alert(1)</script><ol><li>eins</li></ol><p><a href=\"https://x.example/?a=1&amp;b=2\">x</a></p></body></html>";
+    // a style sheet cut off inside its last rule, after a character of two bytes
+    let cut = RichDoc::from_html("<style>p{color:red} b{font-family:Gr\u{fc}n\u{e4}</style><p>ganz</p>");
+    t.eq(crate::markup(&cut), String::from("ganz"), "from_html: a style rule without its closing brace");
     let w = RichDoc::from_html(web);
     t.eq(
         crate::markup(&w),
@@ -295,6 +298,14 @@ fn code(t: &mut T) {
     t.eq(d.text(), String::from("  // a\n\n  //   b"), "comment on at the least indentation");
     d.toggle_comment("//");
     t.eq(d.text(), String::from("  a\n\n    b"), "comment off");
+    // a line indented with no-break spaces (2 bytes each) beside one with a blank: the shared
+    // indentation is none, the comment starts both lines
+    let mut d = CodeDoc::from_text("\u{a0}\u{a0}a\n b");
+    d.set_selection(sel(p(0, 0), p(1, 2)));
+    d.toggle_comment("//");
+    t.check(d.text().lines().all(|l| l.starts_with("//")), "comment on beside a no-break space");
+    d.toggle_comment("//");
+    t.eq(d.text(), String::from("\u{a0}\u{a0}a\n b"), "and off again");
     // moving lines
     let mut d = CodeDoc::from_text("1\n2\n3");
     d.set_selection(TextSel::at(p(0, 0)));
@@ -303,6 +314,14 @@ fn code(t: &mut T) {
     t.eq(d.selection().caret.line, 1, "the caret moves with the line");
     d.move_lines(-1);
     t.eq(d.text(), String::from("1\n2\n3"), "Alt+Up");
+    // whole lines selected (the selection ends at the start of the line below them) and moved
+    // to the end of the text: there is no line below any more
+    d.set_selection(sel(p(0, 0), p(2, 0)));
+    d.move_lines(1);
+    t.eq(d.text(), String::from("3\n1\n2"), "Alt+Down with whole lines selected");
+    t.eq(d.selection(), sel(p(1, 0), p(2, 1)), "the selection ends with the text, not below it");
+    d.insert("x");
+    t.eq(d.text(), String::from("3\nx"), "typing over it");
     // find and replace
     let d0 = CodeDoc::from_text("Foo foo food\nfoo_bar FOO");
     t.eq(d0.find_all("foo", 0).len(), 5, "find: case insensitive");
@@ -320,6 +339,15 @@ fn code(t: &mut T) {
     t.eq(d.text(), String::from("X X\nab"), "replace_all");
     d.undo();
     t.eq(d.text(), String::from("a.b a.b\nab"), "replace_all is one undo step");
+    // the caret of a redone replace_all is one of the new text (it was measured in the old)
+    let mut d2 = CodeDoc::from_text("abcabcabc x");
+    d2.set_selection(TextSel::at(p(0, 11)));
+    d2.replace_all("abc", "", 0);
+    d2.undo();
+    d2.redo();
+    t.eq(d2.selection(), TextSel::at(p(0, 2)), "replace_all redone: the caret inside the shorter line");
+    d2.insert("!");
+    t.eq(d2.text(), String::from(" x!"), "typing after it");
     d.set_selection(TextSel::at(p(0, 0)));
     d.replace_next("a.b", "Y", 0);
     t.eq(d.selection(), sel(p(0, 0), p(0, 3)), "replace_next first selects the match");

@@ -105,7 +105,8 @@ fn run_backup(o: &OpCtl, ctx: &Ctx, job: &Job, r: &Repository, s: &mut Session) 
             }
         }
     }
-    let ws = w.finish().map_err(engine::err_text)?;
+    // (unsaved: a clean-up stays out until the restore point is saved, engine.rs)
+    let (ws, unsaved) = w.finish_unsaved().map_err(engine::err_text)?;
     if roots.is_empty() {
         return Err(String::from("Kein Volume wurde gesichert"));
     }
@@ -134,7 +135,7 @@ fn run_backup(o: &OpCtl, ctx: &Ctx, job: &Job, r: &Repository, s: &mut Session) 
         immutable_until: if imm > 0 { t + imm as i64 * DAY } else { 0 },
         meta: j::obj([("session", Value::string(s.id.as_str())), ("created_ns", Value::i64(plat::unix_time_ns())), ("kind", Value::string("volume"))]),
     };
-    repo.save_snapshot(&snap, &ctx.keys.signing).map_err(engine::err_text)?;
+    unsaved.save_snapshot(&snap, &ctx.keys.signing).map_err(engine::err_text)?;
     let point = engine::point_record(&snap, &r.id, job.encrypted);
     let _ = ctx.db.put(C_POINTS, &point.id, point.to_json());
     s.point_id = point.id.clone();

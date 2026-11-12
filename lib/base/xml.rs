@@ -37,6 +37,20 @@ pub enum Error {
     Limit,
     Unsupported,
 }
+/// What one parse may take: the text's bytes, its elements, their nesting. The default
+/// (4 MiB, 30000 elements, 48 levels) is `parse`'s; a reader whose own model bounds its
+/// documents otherwise names what that model can expand to (`parse_with`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Limits {
+    pub bytes: usize,
+    pub nodes: usize,
+    pub depth: usize,
+}
+impl Default for Limits {
+    fn default() -> Self {
+        Self { bytes: 4 * 1024 * 1024, nodes: 30000, depth: 48 }
+    }
+}
 /// XML 1.0 character validity (also used before emitting document text).
 pub fn valid_char(c: char) -> bool {
     matches!(c as u32, 9 | 10 | 13 | 0x20..=0xd7ff | 0xe000..=0xfffd | 0x10000..=0x10ffff)
@@ -137,6 +151,7 @@ struct Parser<'a> {
     s: &'a str,
     pos: usize,
     nodes: usize,
+    lim: Limits,
 }
 impl<'a> Parser<'a> {
     fn rest(&self) -> &'a str {
@@ -182,7 +197,7 @@ impl<'a> Parser<'a> {
     }
     fn node(&mut self, ns: &Namespaces, depth: usize) -> Result<Node, Error> {
         self.nodes += 1;
-        if depth > 48 || self.nodes > 30000 {
+        if depth > self.lim.depth || self.nodes > self.lim.nodes {
             return Err(Error::Limit);
         }
         if !self.eat("<") {
@@ -294,7 +309,11 @@ impl<'a> Parser<'a> {
 /// Parse a bounded XML subset. DTDs, processing instructions, comments, CDATA and mixed
 /// content are explicitly rejected. No resources are ever resolved or fetched.
 pub fn parse(s: &str) -> Result<Node, Error> {
-    if s.len() > 4 * 1024 * 1024 {
+    parse_with(s, Limits::default())
+}
+/// `parse` within other limits than the default ones.
+pub fn parse_with(s: &str, lim: Limits) -> Result<Node, Error> {
+    if s.len() > lim.bytes {
         return Err(Error::Limit);
     }
     if !s.chars().all(valid_char) {
@@ -309,6 +328,7 @@ pub fn parse(s: &str) -> Result<Node, Error> {
         s: &normalized,
         pos: 0,
         nodes: 0,
+        lim,
     };
     if p.eat("<?xml ") {
         let end = p.rest().find("?>").ok_or(Error::Syntax)?;
@@ -318,6 +338,7 @@ pub fn parse(s: &str) -> Result<Node, Error> {
             s: &declaration,
             pos: 0,
             nodes: 0,
+            lim,
         };
         let dn = dp.node(&Vec::new(), 0)?;
         if dn.attrs.is_empty()
