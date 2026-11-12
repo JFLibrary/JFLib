@@ -421,6 +421,18 @@ fn linux_browser(t: &mut T, base: &str) {
     plat::delete(&list);
     t.check(browser_status(&pkg) == BrowserStatus::Unknown, "assoc: browser: Unknown without any default");
     t.check(browser_request(&pkg) == Err(AssocError::NotRegistered), "assoc: browser: the request without a .desktop file -> NotRegistered");
+    // mimeapps.list says nothing: on KDE its own setting (kdeglobals [General] BrowserApplication)
+    plat::mkdir(&cfg);
+    plat::setenv("XDG_CURRENT_DESKTOP", Some("KDE"));
+    plat::write_file(&kde, b"[General]\nBrowserApplication=other.desktop\n");
+    t.check(browser_status(&pkg) == BrowserStatus::NotDefault, "assoc: browser: KDE's BrowserApplication names another browser -> NotDefault");
+    plat::write_file(&kde, b"[General]\nBrowserApplication[$e]=!/usr/bin/other\n");
+    t.check(browser_status(&pkg) == BrowserStatus::NotDefault, "assoc: browser: KDE's BrowserApplication is a command -> NotDefault");
+    plat::write_file(&kde, b"[General]\nBrowserApplication=org.jflib.WebTest.desktop\n");
+    t.check(browser_status(&pkg) == BrowserStatus::NotDefault, "assoc: browser: KDE names ours, not installed -> NotDefault");
+    plat::setenv("XDG_CURRENT_DESKTOP", None);
+    t.check(browser_status(&pkg) == BrowserStatus::Unknown, "assoc: browser: not on KDE: kdeglobals is not asked -> Unknown");
+    plat::delete(&kde);
     // another browser is the default
     plat::mkdir(&format!("{b}/sys/applications"));
     plat::write_file(&format!("{b}/sys/applications/other.desktop"),
@@ -439,6 +451,15 @@ fn linux_browser(t: &mut T, base: &str) {
         None => t.info("  SKIP desktop-file-validate: not installed\n"),
     }
     t.check(browser_status(&pkg) == BrowserStatus::NotDefault, "assoc: browser: still NotDefault after registering");
+    // registered, mimeapps.list without http / https, KDE names ours (without ".desktop")
+    plat::write_file(&list, b"[Default Applications]\ntext/html=other.desktop;\n");
+    plat::setenv("XDG_CURRENT_DESKTOP", Some("KDE"));
+    plat::write_file(&kde, b"[General]\nBrowserApplication=org.jflib.WebTest\n");
+    t.check(browser_status(&pkg) == BrowserStatus::Default, "assoc: browser: KDE's BrowserApplication names ours -> Default (mimeapps.list says nothing)");
+    plat::delete(&kde);
+    t.check(browser_status(&pkg) == BrowserStatus::Unknown, "assoc: browser: KDE without BrowserApplication -> Unknown");
+    plat::setenv("XDG_CURRENT_DESKTOP", None);
+    plat::write_file(&list, before.as_bytes());
     plat::setenv("XDG_CURRENT_DESKTOP", Some("KDE"));
     t.check(browser_request(&pkg) == Ok(()), "assoc: browser: the request");
     let now = read(&list);

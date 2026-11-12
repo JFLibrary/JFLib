@@ -117,6 +117,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Independent app windows (WF_APP) are top-level windows on X11 and Wayland too: no WM_TRANSIENT_FOR, type normal, not hidden with the main window / an xdg_toplevel without a parent (they were owned windows there); viewtest --app-window, tools/x11check.py appwin
 - **ui:** TB_PASSWORD boxes set the input method's purpose themselves: IP_PASSWORD while they have the keyboard, the purpose of before after it (another field, ui.ime_enable, the box gone with its window); apps no longer call plat::ime_purpose. With it: X11 keeps the keys of an IP_PASSWORD field from IBus (as GTK does), Wayland sends the content type again when the purpose changes while enabled, Windows applies the purpose's input context when a window gets the keyboard; viewtest tests/password.uis
 - **ui:** The script command system browser default|other|unknown is followed by UIC_ACTIVE 0 and 1 (only 1 when the app was not active), as after the user's choice in the system's settings: an app that keeps the status (GUIDE section 21, whose example now does) reads it again without system focus out / in
+- **plat:** Linux: default_browser_status reads KDE's [General] BrowserApplication of kdeglobals when no mimeapps.list names a default of http and https (on KDE)
 
 ### Removed
 

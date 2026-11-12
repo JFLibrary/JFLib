@@ -18,7 +18,8 @@
 //                         has a mimeinfo.cache); a missing tool is a note
 //   browser_status(pkg)   (browser=1) the defaults of x-scheme-handler/http and https: the first
 //                         installed id of the first mimeapps.list that names the type is one of
-//                         the app's .desktop ids (browser_ids); none named: Unknown
+//                         the app's .desktop ids (browser_ids); none named: on KDE [General]
+//                         BrowserApplication of $XDG_CONFIG_HOME/kdeglobals, else Unknown
 //   browser_request(pkg)  the app's first installed .desktop id as the user's default of
 //                         x-scheme-handler/http, https and text/html (xdg-settings set
 //                         default-web-browser does the same through xdg-mime), on KDE also
@@ -540,6 +541,15 @@ fn default_of(mime: &str) -> Option<String> {
     None
 }
 
+/// KDE's own choice of the web browser ([General] BrowserApplication in the user's kdeglobals,
+/// which KDE's programs ask): a .desktop id ("firefox.desktop", also without ".desktop") or
+/// "!command"; None when it is not set
+fn kde_browser() -> Option<String> {
+    let text = read_text(&format!("{}/kdeglobals", crate::config_dir()?))?;
+    let v = group_get_in(&text, "[General]", "BrowserApplication").or_else(|| group_get_in(&text, "[General]", "BrowserApplication[$e]"))?;
+    (!v.is_empty()).then_some(v)
+}
+
 pub fn browser_status(pkg: &Package) -> BrowserStatus {
     if in_flatpak() {
         return BrowserStatus::Unknown; // the host's mimeapps.list is out of sight
@@ -553,7 +563,21 @@ pub fn browser_status(pkg: &Package) -> BrowserStatus {
             None => unknown = true,
         }
     }
-    if unknown { BrowserStatus::Unknown } else { BrowserStatus::Default }
+    if !unknown {
+        return BrowserStatus::Default;
+    }
+    // mimeapps.list does not say: KDE's own setting (a command "!..." is another program)
+    if !desktops().iter().any(|d| d == "kde") {
+        return BrowserStatus::Unknown;
+    }
+    match kde_browser() {
+        None => BrowserStatus::Unknown,
+        Some(v) if v.starts_with('!') => BrowserStatus::NotDefault,
+        Some(v) => {
+            let id = if v.ends_with(".desktop") { v } else { format!("{v}.desktop") };
+            if ours.contains(&id) && installed(&id) { BrowserStatus::Default } else { BrowserStatus::NotDefault }
+        }
+    }
 }
 
 pub fn browser_request(pkg: &Package) -> Result<(), AssocError> {
