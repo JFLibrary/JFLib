@@ -1335,6 +1335,10 @@ ui.dialog_end(); // always
     as before) and it arrives as `UIC_DROP` with `drop_list()` / `drop_data()`. Files are never
     moved (their source would delete them): Shift gives a copy. Dropped files may be read and
     written (`fs.user`).
+  * Positions: `drop_pos()` and `drag_over()` are DIP of the window, rounded; at 150 % three
+    pixels share two DIP. A canvas that draws at the display's resolution (a web page) takes
+    `drop_pos_px()` / `drag_over_px()`: px of the window like `last_rect`, so `(x - inp.rect[0],
+    y - inp.rect[1])` is the pixel of the canvas (`UiInput`'s own `x`, `y` are px too).
   * Mirrored windows (RTL): targets and positions stay logical, as every pointer event.
   * Tests: `drag S1 S2` and `down` / `move` / `key esc` / `up` for widget drags; `dragover`,
     `dragleave` and `drop X Y text "s" html "s" url U image F files F...` for other programs;

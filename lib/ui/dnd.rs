@@ -20,7 +20,8 @@
 //   drop_accept(types)               what the windows take outside every drop target (default
 //                                    DT_FILES); such drops come as UIC_DROP (drop.rs, as before)
 //   drag_over() -> (types, x, y)     the drag over the live window: its kinds and position (DIP);
-//                                    (0, 0, 0) when none
+//                                    (0, 0, 0) when none; drag_over_px() the position in px of
+//                                    the window, exact (as drop_pos_px, drop.rs)
 //
 // An internal drag stays in the app while the pointer stays in its window: the drop target under
 // the pointer is highlighted, a label follows the pointer, Esc cancels, a release over a matching
@@ -334,16 +335,28 @@ impl Ui {
 
     /// drag_over() -> (DT_* kinds, x, y DIP): the drag over the live window, (0, 0, 0) = none
     pub fn drag_over(&self) -> (u32, i32, i32) {
+        self.dnd_over().map_or((0, 0, 0), |(types, x, y)| (types, self.px2dip(x), self.px2dip(y)))
+    }
+
+    /// drag_over_px() -> (DT_* kinds, x, y px): drag_over with the position in px of the live
+    /// window, exact (logical like `last_rect`; minus a canvas's `UiInput::rect`: the point in
+    /// the canvas's own pixels); (0, 0, 0) = none
+    pub fn drag_over_px(&self) -> (u32, i32, i32) {
+        self.dnd_over().unwrap_or((0, 0, 0))
+    }
+
+    // the drag over the live window: its kinds and position (px)
+    fn dnd_over(&self) -> Option<(u32, i32, i32)> {
         let win = self.uiw_cur;
         let d = &self.dnd;
         if d.phase == PH_IN && d.src_win == win {
             let c = &self.wp.ctx;
-            return (d.data.types(), self.px2dip(c.mx), self.px2dip(c.my));
+            return Some((d.data.types(), c.mx, c.my));
         }
         if d.ext && d.ext_win == win {
-            return (d.ext_types, self.px2dip(d.ext_x), self.px2dip(d.ext_y));
+            return Some((d.ext_types, d.ext_x, d.ext_y));
         }
-        (0, 0, 0)
+        None
     }
 
     /// the effect of the last drop (DE_*)
@@ -527,6 +540,7 @@ impl Ui {
         let files = data.files.clone();
         self.dr.list = files;
         self.dr.win = self.uiw_rec_id(win);
+        self.dr.px = (x, y);
         self.dr.x = self.px2dip_win(win, x);
         self.dr.y = self.px2dip_win(win, y);
         let d = &mut self.dnd;

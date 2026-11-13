@@ -181,7 +181,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
 - [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `set_theme`, `clear_theme`, `app_theme`, `load_theme`, `styles_add`, `style_names`, `style_name`, `set_style`, `dp_text`, `ts_base`
-- [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_next`, `cursor_replace`, `cursor_free`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_accept`, `drag_over`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
+- [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_next`, `cursor_replace`, `cursor_free`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_pos_px`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_accept`, `drag_over`, `drag_over_px`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
 
 ### App, AppDesc, Ui, run, async tasks
 
@@ -4606,6 +4606,8 @@ headless image clipboard; the command lines of later starts (AF_SINGLE_INSTANCE)
                                   an image file (PNG, or BMP from a DIB), the app's own kind
                                   and bytes; drop_types() -> its DT_* kinds, drop_text()
   drop_pos() -> (x, y)            drop position in DIP of the window it happened in
+  drop_pos_px() -> (x, y)         the same in px of that window, exact (as last_rect and a
+                                  canvas's UiInput: x - rect[0] is the point in the canvas)
   drop_window() -> id             that window's app id (0 = main window)
   clip_has(fmt) -> bool           the clipboard offers CLIP_TEXT / CLIP_PNG / CLIP_IMAGE
                                   (headless runs: the in-process clipboard)
@@ -4632,7 +4634,13 @@ Internal:
 - **`fn drop_list(&self) -> &[String]`**
   ui_drop_list: every path of the last drop
 - **`fn drop_pos(&self) -> (i32, i32)`**
-  ui_drop_pos: drop position in DIP of the window it happened in
+  ui_drop_pos: drop position in DIP of the window it happened in (rounded to whole DIP:
+  at 150 % three pixels share two DIP; drop_pos_px is exact)
+- **`fn drop_pos_px(&self) -> (i32, i32)`**
+  drop position in px of the window it happened in, exact: logical like `last_rect` and a
+  canvas's \\`UiInput::rect\\` (mirrored in a right-to-left window), so \\`(x - rect[0], y -
+  rect[1])\\` is the point in a canvas, in the canvas's own pixels -- a drop onto a page an
+  engine draws at the display's resolution
 - **`fn drop_window(&self) -> u32`**
   ui_drop_window: the app id of the window of the last drop (0 = main window)
 - **`fn drop_data(&self) -> &DragData`**
@@ -4672,7 +4680,8 @@ Targets:
   drop_accept(types)               what the windows take outside every drop target (default
                                    DT_FILES); such drops come as UIC_DROP (drop.rs, as before)
   drag_over() -> (types, x, y)     the drag over the live window: its kinds and position (DIP);
-                                   (0, 0, 0) when none
+                                   (0, 0, 0) when none; drag_over_px() the position in px of
+                                   the window, exact (as drop_pos_px, drop.rs)
 
 An internal drag stays in the app while the pointer stays in its window: the drop target under
 the pointer is highlighted, a label follows the pointer, Esc cancels, a release over a matching
@@ -4713,6 +4722,10 @@ way in like every pointer event; the label next to the pointer is drawn through 
   DT_FILES); those drops arrive as UIC_DROP
 - **`fn drag_over(&self) -> (u32, i32, i32)`**
   drag_over() -> (DT_\* kinds, x, y DIP): the drag over the live window, (0, 0, 0) = none
+- **`fn drag_over_px(&self) -> (u32, i32, i32)`**
+  drag_over_px() -> (DT_\* kinds, x, y px): drag_over with the position in px of the live
+  window, exact (logical like `last_rect`; minus a canvas's `UiInput::rect`: the point in
+  the canvas's own pixels); (0, 0, 0) = none
 - **`fn drop_effect(&self) -> u32`**
   the effect of the last drop (DE_\*)
 

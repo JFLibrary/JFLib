@@ -98,6 +98,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** ui.popup_close_id(id): closes popup id and the popups opened inside it, the flyouts it sits in stay open
 - **datetime:** datetime::iso_week(y, m, d) -> (year, week), iso_weeks_in_year(y), iso_week_monday(year, week): ISO 8601 weeks (the civil helpers days_in_month, weekday, days_from_civil were already public there)
 - **ui:** ui.code_reveal(id, line): the code editor scrolls a line into view in its next pass (into the middle when it was not in view, its folds opened) without the keyboard focus or the caret moving: a debugger's execution line while the page or the DevTools toolbar keeps the keyboard
+- **ui:** ui.drop_pos_px() and ui.drag_over_px(): a drop's and a drag's place in px of the window, exact (logical like last_rect; minus a canvas's UiInput::rect the pixel of the canvas); drop_pos and drag_over stay DIP, rounded (at 150 % three pixels share two DIP)
 
 ### Changed
 
