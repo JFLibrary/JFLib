@@ -2128,7 +2128,12 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   whole frame that knows where it is stale (the segment of the last put first), then
   ShmPutImage of the rectangles; Expose reads the segment of the last put. Wayland: into a free
   wl_shm buffer that waits for its commit (the frame callback). Only with every segment / buffer
-  busy does the damage wait in a staging image. Browser and Android: the B, G, R, x of the
+  busy does the damage wait in a staging image. On these three a copy from 1 MB on runs in row
+  bands on the worker pool, from 12 MB on (a 4K frame, 32 MB) with streaming stores past the
+  caches (`lib/plat/present_copy.rs`, the thresholds of `gfx::COPY_PAR_MIN` / `COPY_STREAM_MIN`);
+  smaller ones stay plain row copies on the UI thread. `plattest --test present-bench [--size WxH]`
+  measures a 4K frame's presents in a real window (the whole frame, a caret, a line of text, 20
+  blocks, a band) and the copy alone. Browser and Android: the B, G, R, x of the
   frame becomes the window's R, G, B, A copy while it is copied in; one window over the whole
   canvas without popups is the canvas itself (no composition), and the host copies rows into
   one buffer per frame (the page's ImageData, Android's Bitmap). Pixels outside the rectangles

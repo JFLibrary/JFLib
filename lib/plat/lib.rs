@@ -272,6 +272,12 @@ mod linux_desk;
 // the damage regions of the X11 / Wayland presents
 #[cfg(target_os = "linux")]
 mod linux_damage;
+// the copy of a present's dirty rectangles into the window's pixels (Windows, X11, Wayland): in
+// row bands on the pool when large, past the caches at 4K
+#[cfg(any(windows, target_os = "linux"))]
+mod present_copy;
+#[cfg(any(windows, target_os = "linux"))]
+pub use present_copy::present_copy_bench;
 // the log: levels, a ring for crash reports, stderr, a rotating file
 mod log;
 pub use log::*;

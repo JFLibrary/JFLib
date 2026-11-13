@@ -7,7 +7,8 @@
 //   clip_box(r, w, h)          x, y, w, h -> the box clipped to w x h (None: empty)
 //   copy_boxes(dst, ds, src, ss, boxes, w, h)   the boxes' pixel rows (4 bytes a pixel) from
 //                              src (rows of ss bytes) into dst (rows of ds bytes), clipped
-//                              to w x h
+//                              to w x h (present_copy.rs: large copies in row bands on the
+//                              pool, a 4K frame past the caches)
 //
 // A window's buffers (X11: two MIT-SHM segments, Wayland: three wl_shm buffers) each remember
 // where they differ from the latest frame (the damage of the frames presented since they were
@@ -106,19 +107,5 @@ pub(crate) fn clip_box(r: &[i32; 4], w: i32, h: i32) -> Option<[i32; 4]> {
 }
 
 /// copy the pixel rows of the boxes (clipped to w x h) from src (rows of ss bytes) into dst
-/// (rows of ds bytes); rows outside either slice are skipped
-pub(crate) fn copy_boxes(dst: &mut [u8], ds: usize, src: &[u8], ss: usize, boxes: &[[i32; 4]], w: i32, h: i32) {
-    for b in boxes {
-        let (x0, y0, x1, y1) = (b[0].max(0), b[1].max(0), b[2].min(w), b[3].min(h));
-        if x0 >= x1 || y0 >= y1 {
-            continue;
-        }
-        let (o, n) = (x0 as usize * 4, (x1 - x0) as usize * 4);
-        for y in y0 as usize..y1 as usize {
-            let (s, d) = (y * ss + o, y * ds + o);
-            if let (Some(sr), Some(dr)) = (src.get(s..s + n), dst.get_mut(d..d + n)) {
-                dr.copy_from_slice(sr);
-            }
-        }
-    }
-}
+/// (rows of ds bytes); rows outside either slice are skipped (present_copy.rs)
+pub(crate) use crate::present_copy::copy_boxes;

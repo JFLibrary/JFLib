@@ -1981,21 +1981,17 @@ impl Ww {
         let mut buf = self.kbuf.take();
         let dst: &mut [u8] = if self.kdc.get() != 0 {
             // SAFETY: the section holds kw * kh 32-bit pixels until kept_free; only this thread
-            // touches it, and no GDI call runs while this slice lives.
+            // touches it (copy_boxes lends row bands of the slice to the pool's workers and
+            // returns when they are done), and no GDI call runs while this slice lives.
             unsafe { core::slice::from_raw_parts_mut(self.kbits.get() as *mut u8, row * kh as usize) }
         } else {
             &mut buf[..]
         };
         if dst.len() >= row * kh as usize {
-            for q in rs {
-                let Some((x, y, w, h)) = clip_rect(q, kw.min(f.w), kh.min(f.h)) else { continue };
-                let (x0, n) = (x as usize * 4, w as usize * 4);
-                for yy in y as usize..(y + h) as usize {
-                    let s = yy * f.stride as usize + x0;
-                    let d = yy * row + x0;
-                    dst[d..d + n].copy_from_slice(&f.px[s..s + n]);
-                }
-            }
+            // (present_copy: a large copy in row bands on the pool, a 4K frame past the caches)
+            let (cw, ch) = (kw.min(f.w), kh.min(f.h));
+            let boxes: Vec<[i32; 4]> = rs.iter().filter_map(|q| clip_rect(q, cw, ch)).map(|(x, y, w, h)| [x, y, x + w, y + h]).collect();
+            crate::present_copy::copy_boxes(dst, row, f.px, f.stride as usize, &boxes, cw, ch);
         }
         self.kbuf.set(buf);
     }
