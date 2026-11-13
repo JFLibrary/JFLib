@@ -28,6 +28,9 @@
 //        ui.code_popup_item(id) the completion item the list has chosen (None: closed)
 //   ui.code_find(id, query, replace)   open the find bar (replace: with the replace row) with
 //        a query; the editor selects the first match from the caret on
+//   ui.code_reveal(id, line)   scroll line (from 0) into view in the editor's next pass, in the
+//        middle when it was not in view, the folds hiding it opened -- without the keyboard
+//        focus, the caret or the selection (a debugger's execution line)
 //   ui.code_status(id) -> CodeStatus   line and column of the caret (from 1), the matches
 //        and the current one, the lines tokenized in the last frame, the document's
 //        diagnostics per severity and the severity of the one at the caret, the completion
@@ -231,6 +234,8 @@ pub(crate) struct S {
     size_pt: f32,
     // a find request: id, query, replace row
     find_req: Option<(u32, String, bool)>,
+    // code_reveal: the line each editor shows in its next pass
+    reveal_req: BTreeMap<u32, usize>,
     // the drawings of wavy underlines: colour, size key (the same object every frame)
     waves: Vec<(u32, u32, DrawRef)>,
 }
@@ -348,6 +353,16 @@ impl Ui {
     /// editor selects the first match from its caret on
     pub fn code_find(&mut self, id: u32, query: &str, replace: bool) {
         self.m.code.find_req = Some((id, String::from(query), replace));
+        self.repass();
+    }
+
+    /// scroll code editor id so that line (from 0) is in view in its next pass: in the middle
+    /// of the view when it was not in it (no scroll when it was), the folded ranges that hide it
+    /// unfolded.  The keyboard focus, the caret and the selection stay as they are: a debugger
+    /// shows the execution line while the page or its toolbar keeps the keyboard
+    /// (CodeDoc::set_exec_line marks it).  A later request for the same editor replaces it.
+    pub fn code_reveal(&mut self, id: u32, line: usize) {
+        self.m.code.reveal_req.insert(id, line);
         self.repass();
     }
 
@@ -648,6 +663,11 @@ impl Ui {
             } else {
                 self.m.code.find_req = Some((rid, q, rep));
             }
+        }
+        // a line to show (code_reveal): out of its folds before the rows are counted
+        let reveal = self.m.code.reveal_req.remove(&id).map(|l| l.min(doc.line_count().saturating_sub(1)));
+        if let Some(l) = reveal {
+            doc.reveal(l);
         }
         // ---- geometry
         let sbw = st.scrollbar_thickness(self);
@@ -973,6 +993,13 @@ impl Ui {
             }
             if cxp > v.sx + tw_px - m.cw * 2 {
                 v.sx = cxp - tw_px + m.cw * 4;
+            }
+        }
+        // code_reveal: the line in the middle unless it is in view (after the caret: asked for)
+        if let Some(l) = reveal {
+            let ly = doc.row_of_line(l) as i32 * m.lh;
+            if ly < v.sy || ly + m.lh > v.sy + th {
+                v.sy = ly + m.lh / 2 - th / 2;
             }
         }
         v.last_sel = doc.selection();

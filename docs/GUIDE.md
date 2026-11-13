@@ -4244,6 +4244,10 @@ doc.apply_edits(&edits, "Umbenennen");
   `CodeEv::Breakpoint(line)`, `doc.set_breakpoints(&[(line, BP_ON | BP_DISABLED | BP_COND)])`
   draws them (a filled circle, a ring, a bar across), `doc.set_exec_line(Some(line))` marks a
   debugger's line (an arrow and `CodeTheme::exec_line`); both follow edits like diagnostics.
+  `ui.code_reveal(id, line)` scrolls the line into view in the editor's next pass (into the
+  middle when it was not in view; the folds hiding it open) without taking the keyboard focus
+  or moving the caret: a debugger shows where it stopped while the page or its toolbar keeps
+  the keyboard (`apps/editortest`, `tests/code_reveal.uis`).
 * Folding: ranges from the language (`set_fold_ranges`; one that starts where a folded one did
   stays folded), a chevron per range in a column after the numbers (`CE_FOLDS` keeps it), a
   click or Ctrl+Shift+[ / ] folds and unfolds, `fold_all`. Folded lines are out of the view,

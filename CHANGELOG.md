@@ -97,6 +97,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** ui.calendar(id, &mut y, &mut m, &mut d, &DateRange): date_picker's month calendar in place, without a popup, for a panel or a flyout of the app's own; DateRange::new(mode, min, max) with CAL_DAY (DateRange::DAYS), CAL_WEEK (ISO weeks: rows from Monday with their number, the date becomes the Monday) and CAL_MONTH (a year's twelve months, the 1st); dates outside min .. max and the arrows beyond them are disabled
 - **ui:** ui.popup_close_id(id): closes popup id and the popups opened inside it, the flyouts it sits in stay open
 - **datetime:** datetime::iso_week(y, m, d) -> (year, week), iso_weeks_in_year(y), iso_week_monday(year, week): ISO 8601 weeks (the civil helpers days_in_month, weekday, days_from_civil were already public there)
+- **ui:** ui.code_reveal(id, line): the code editor scrolls a line into view in its next pass (into the middle when it was not in view, its folds opened) without the keyboard focus or the caret moving: a debugger's execution line while the page or the DevTools toolbar keeps the keyboard
 
 ### Changed
 

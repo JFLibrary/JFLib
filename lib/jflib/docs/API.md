@@ -166,7 +166,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`, `canvas_label`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `popup_close_id`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_preedit`, `ime_enable`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
-- [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
+- [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_reveal`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
 - [Data views: grid, tree, badges, meters](#data-views-grid-tree-badges-meters): `grid_begin`, `grid_row`, `grid_cell`, `grid_text`, `grid_text_ts`, `grid_end`, `tree`, `badge`, `status_dot`, `meter`
 - [Shell parts: navigation, command bar, splitter, breadcrumb, wizard steps](#shell-parts-navigation-command-bar-splitter-breadcrumb-wizard-steps): `nav_begin`, `nav_toggle`, `nav_section`, `nav_item`, `nav_footer`, `nav_end`, `command_bar`, `split_begin`, `split_next`, `split_end`, `breadcrumb`, `segmented`, `wizard_steps`, `page_header`, `key_value`, `empty_state`
@@ -2447,6 +2447,9 @@ highlighting (highlight.rs)
        ui.code_popup_item(id) the completion item the list has chosen (None: closed)
   ui.code_find(id, query, replace)   open the find bar (replace: with the replace row) with
        a query; the editor selects the first match from the caret on
+  ui.code_reveal(id, line)   scroll line (from 0) into view in the editor's next pass, in the
+       middle when it was not in view, the folds hiding it opened -- without the keyboard
+       focus, the caret or the selection (a debugger's execution line)
   ui.code_status(id) -> CodeStatus   line and column of the caret (from 1), the matches
        and the current one, the lines tokenized in the last frame, the document's
        diagnostics per severity and the severity of the one at the caret, the completion
@@ -2542,6 +2545,12 @@ CE_FOLDS: u32 = 128
 - **`fn code_find(&mut self, id: u32, query: &str, replace: bool)`**
   open the find bar of code editor id with a query (replace: with the replace row); the
   editor selects the first match from its caret on
+- **`fn code_reveal(&mut self, id: u32, line: usize)`**
+  scroll code editor id so that line (from 0) is in view in its next pass: in the middle
+  of the view when it was not in it (no scroll when it was), the folded ranges that hide it
+  unfolded.  The keyboard focus, the caret and the selection stay as they are: a debugger
+  shows the execution line while the page or its toolbar keeps the keyboard
+  (CodeDoc::set_exec_line marks it).  A later request for the same editor replaces it.
 - **`fn code_status(&self, id: u32) -> CodeStatus`**
   the caret, the find matches, the lines tokenized and the diagnostics in code editor
   id's last frame

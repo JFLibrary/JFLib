@@ -31,7 +31,8 @@
 // completion list's items and the chosen one), `step: label` (the undo step).
 // `cmd 907 L` / `cmd 908 L` toggle the disabled / conditional look of the breakpoint on line L
 // (from 1), `cmd 909 L` the execution line (0: none), `cmd 910` / `cmd 911` fold / unfold all,
-// `cmd 912 N` a JFS file of N functions (folding and completion on a long file).
+// `cmd 912 N` a JFS file of N functions (folding and completion on a long file), `cmd 913 L` a
+// debugger's stop at line L: the execution line, shown with ui.code_reveal (the focus stays).
 // Fonts: DejaVu Sans Mono (the code editor, mono_font_set; also registered as a family) and
 // DejaVu Serif (registered for the rich text) from lib/doc_view/assets (licence:
 // DejaVu-LICENSE.txt there).
@@ -89,6 +90,7 @@ const CMD_EXEC: u32 = 909;
 const CMD_FOLD_ALL: u32 = 910;
 const CMD_UNFOLD_ALL: u32 = 911;
 const CMD_BIG_JFS: u32 = 912;
+const CMD_REVEAL: u32 = 913; // a debugger stops at line ARG: the execution line, shown without the focus
 
 const TABS: [&str; 2] = ["Rich-Text", "Code"];
 const LANGS: [&str; 7] = ["Rust", "JSON", "INI", "TOML", "Markdown", "Text", "JFS"];
@@ -913,6 +915,12 @@ impl App for EdTest {
             CMD_FOLD_ALL | CMD_UNFOLD_ALL => {
                 self.code.fold_all(id == CMD_FOLD_ALL);
                 ui.repass();
+                true
+            }
+            CMD_REVEAL => {
+                let l = (arg as usize).saturating_sub(1);
+                self.code.set_exec_line(Some(l));
+                ui.code_reveal(ID_CODE, l);
                 true
             }
             CMD_BIG_JFS => {
