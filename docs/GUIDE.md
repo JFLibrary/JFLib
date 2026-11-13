@@ -3140,8 +3140,9 @@ if self.grid {
   }
   ```
 
-  Tables have no kind of their own yet: their cells are `K_TEXT` records. The canvas's own
-  record (`K_CANVAS`) has no name unless `ui.canvas_label("Webseite")` comes right before
+  Tables, landmarks, trees and the rest of a web page's tree have kinds of their own, and a
+  record can say much more than kind, label and value: "A web page's tree" below. The canvas's
+  own record (`K_CANVAS`) has no name unless `ui.canvas_label("Webseite")` comes right before
   `ui.canvas`: then a screen reader says it and a script finds it as `canvas:"Webseite"`.
 
 **Screen magnifiers** follow the focus and the text caret. Text boxes report their caret
@@ -3200,6 +3201,125 @@ debug APK's `GalleryA11yInstrumentation` the Android provider through UiAutomati
 side TalkBack uses (`adb shell am instrument -w -r org.jflib.gallery/.GalleryA11yInstrumentation`).
 Each of them also checks a heading and its level (the demo's `heading(2, ..)`, the gallery's
 section titles).
+
+### A web page's tree (rich records)
+
+A browser engine (or any content an app draws itself) has an accessibility tree of its own:
+tables, landmarks, trees, live regions, descriptions, form states, content out of view. The app
+publishes it with `sem_rect` as above and says the rest through **setters on the returned
+record**; each returns the record, so they chain:
+
+```rust
+let page = ID_PAGE as u64; // the canvas's widget id: the page's top nodes hang under it
+for n in tree.nodes.iter().filter(|n| ui.a11y_active() || !n.offscreen) {
+    let r = [view[0] + n.rect.x, view[1] + n.rect.y, n.rect.width, n.rect.height];
+    let rec = ui.sem_rect(kind_of(n.role), 0, r, Some(n.label()), value_of(n));
+    rec.id64(n.id.get()).parent(n.parent.map_or(page, |p| p.get()));
+    if !n.description.is_empty() { rec.desc(&n.description); }
+    if let Some(c) = n.cell { rec.cell(c.row, c.column).span(c.row_span, c.column_span); }
+    if let Some((pos, size)) = n.set { rec.set_pos(pos, size); }
+    if n.offscreen { rec.states(AS_OFFSCREEN); }
+    if n.states.contains(AxStates::REQUIRED) { rec.states(AS_REQUIRED); }
+    // ... name (a text box's), url, level, live, range, value_text, text_sel
+}
+while let Some(q) = ui.a11y_request_take() {     // a screen reader acts on a node
+    engine.act(AxNodeId::from_raw(q.id), action_of(q.action));
+}
+```
+
+**Kinds.** Beside the kinds of section 12 (`K_LINK`, `K_HEADING`, `K_TEXTBOX`, `K_LIST` ...):
+
+| Kind (value) | UI Automation | AT-SPI2 | Browser (ARIA) | Bridges without it (Apple until the VoiceOver bridge maps them, Android) |
+|---|---|---|---|---|
+| `K_TABLE` (grid: `.grid(rows, cols)`) | Table + Grid, Table, Selection | table + Table | `table` (`aria-rowcount` / `colcount`) | group |
+| `K_ROW` | DataItem | table row | `row` | group |
+| `K_CELL` (`.cell(row, col)`, `.span`) | DataItem + GridItem, TableItem | table cell + TableCell | `cell` (`aria-rowindex` / `colindex`, spans) | label |
+| `K_COLHEADER`, `K_ROWHEADER` | HeaderItem + GridItem, TableItem | column header, row header + TableCell | `columnheader`, `rowheader` | label |
+| `K_LANDMARK` (value `LM_BANNER`, `LM_MAIN`, `LM_NAVIGATION`, `LM_COMPLEMENTARY`, `LM_CONTENTINFO`, `LM_SEARCH`, `LM_FORM`, `LM_REGION`) | Group with LandmarkType Main, Navigation, Search, Form, else Custom with LocalizedLandmarkType | landmark (form: form), attribute `xml-roles` | `banner`, `main`, `navigation`, `complementary`, `contentinfo`, `search`, `form`, `region` | group |
+| `K_TREE`, `K_TREEITEM` (`.level(n)`, `AS_COLLAPSED` / `SS_OPEN`) | Tree, TreeItem + ExpandCollapse, SelectionItem | tree, tree item (attribute `level`) | `tree`, `treeitem` (`aria-level`, `aria-expanded`) | list, list item |
+| `K_RADIOGROUP` | Group ("radio group") | panel, `xml-roles` radiogroup | `radiogroup` | group |
+| `K_TOOLBAR`, `K_TOOLTIP`, `K_SEPARATOR` | ToolBar, ToolTip, Separator | tool bar, tool tip, separator | `toolbar`, `tooltip`, `separator` | group, label, group |
+| `K_ALERT`, `K_STATUS`, `K_LOG` (live regions) | Text or Group ("alert", "log"), StatusBar; LiveSetting; SystemAlert when an alert appears | notification, status bar, log; attribute `live` | `alert`, `status`, `log` (`aria-live`) | label |
+| `K_METER` | ProgressBar ("meter") | level bar + Value | `meter` | progress bar |
+| `K_SPIN`, `K_SCROLLBAR` | Spinner, ScrollBar + RangeValue | spin button, scroll bar + Value | `<input type=number>`, `scrollbar` | slider |
+| `K_ARTICLE`, `K_FIGURE` | Group ("article", "figure") | article, panel (`xml-roles` figure) | `article`, `figure` | group |
+
+Every one of them names itself in the UI language where the platform has no name of its own
+(`plat::a11y::SUB_TEXTS`, `sub_name`); scripts select them as `table:"Preise"`, `cell:"12,50 €"`
+... (`kind_name`). The platforms tell no more apart: a grid is a table with selectable rows or
+cells (`AS_SELECTABLE`, `AS_MULTISELECT`), a tree grid a table, a search box a text box, a
+timer or marquee a status, a group or row group a `K_BOX` with a label (without one it is left
+out and passes its children on to its parent).
+
+**Setters** (`Sem`; the record's `SemAx`, only allocated for records that use them):
+
+| Setter | What it says | UIA / AT-SPI2 / ARIA |
+|---|---|---|
+| `id64(id)` | its own id (below 2^62): its node keeps it, parents name it, its requests come back to the app | AutomationId / object path / `data-key` |
+| `parent(id)` | it hangs under the record of that id64 (else that widget id) in the same frame and window, whatever the rectangles say | the tree |
+| `name("Suche")` | the name beside the label (a text box's or drop-down's label is its text) | Name |
+| `desc("..")` | a description | FullDescription, HelpText / Description / `aria-description` |
+| `url("https://..")` | a link's address | Value / Hyperlink / -- |
+| `value_text("Montag")`, `range(v, min, max, step)` | a value's text, a value with fractions | -- , RangeValue / Value / `aria-valuetext`, `aria-valuenow` |
+| `states(AS_*)` | required, invalid, busy, has a popup, visited, modal, multi-select, collapsed, off screen, focusable, clickable, selectable, read-only, multi-line, password | IsRequiredForForm, IsDataValidForForm, AriaProperties ... / the states / `aria-required` ... |
+| `set_pos(pos, size)`, `level(n)` | its place in a set, its level | PositionInSet, SizeOfSet, Level / `posinset`, `setsize`, `level` / `aria-posinset` ... |
+| `cell(row, col)`, `span(rows, cols)`, `grid(rows, cols)` | a cell's place, a table's size | Grid, GridItem, Table, TableItem / Table, TableCell / `aria-rowindex` ... |
+| `live(LIVE_*)`, `text_sel(anchor, caret)` | how a live region speaks (`LIVE_OFF`: not at all); a page field's selection | LiveSetting / `live` / `aria-live`; the text patterns |
+
+**Parents.** Without `parent` a record hangs by its rectangle (the smallest container around
+its centre), which nests positioned and overlapping web content wrongly. With it the tree
+follows the engine's: a parent that is not published passes its children on to its own parent
+(left-out records with an id64), an unknown id or a loop leaves the record to its rectangle.
+
+**Out of view.** Records of content outside the view (`AS_OFFSCREEN`, their rectangle where the
+content lies, outside the canvas) are nodes like the others: browse modes (Narrator's scan mode,
+the virtual buffers of NVDA and JAWS, Orca) reach them, the pointer and `GetAccessibleAtPoint` do
+not, UIA reports IsOffscreen and AT-SPI2 no "showing". They cost what any record costs: a record
+of at most 4 KB text per field (`SEMS_MAX` 65 536 records a frame), the tree is built only while
+a client listens. Publish them only while `ui.a11y_active()` says one does (it turns true with a
+frame of its own; on Windows false again 10 s after the last question of a UI Automation client
+when none listens for events).
+
+**Requests.** A screen reader's actions on a record with an id64 come back to the app, not to a
+widget: `ui.a11y_request_take() -> Option<A11yRequest { win, id, action }>` in every frame
+(`win`: the window's id, 0 the main window; at most 64 wait). `A11yAction` is `Focus`, `Click`,
+`ScrollIntoView`, `Expand`, `Collapse`, `Increment`, `Decrement`, `SetValue(f64)`,
+`SetText(String)`, `SelectText(anchor, caret)`, `Select`, `AddToSelection`,
+`RemoveFromSelection`; a disabled record or one behind a modal dialog gets only
+`ScrollIntoView`. Where they come from: UI Automation SetFocus, Invoke, Toggle, ScrollItem,
+ExpandCollapse, Value / RangeValue, the text patterns, SelectionItem (Select / AddToSelection /
+RemoveFromSelection); AT-SPI2 GrabFocus, the actions click / expand / collapse / increment /
+decrement, Component.ScrollTo, Value, EditableText, Text's caret and selection, Selection on the
+container; the browser the DOM's click, focus (a node out of view is scrolled in first), the
+input of a range or number field, text and selection edits. Records without an id64 keep the
+widget paths (`EV_ACT`, `a11y_value`, `a11y_text`).
+
+**Announcements and live regions.** `ui.announce("Gespeichert", LIVE_POLITE)` (or
+`LIVE_ASSERTIVE`) is said with this frame's tree: UI Automation's notification event (Windows 10
+1709 and later), AT-SPI2's `Announcement` (Orca 45 and later), the shadow tree's live region in
+the browser. A record of `K_ALERT` (assertive), `K_STATUS` or `K_LOG` (polite), or one with
+`.live(..)`, is a live region: a changed name, text or value inside it, or a node that comes or
+goes, raises LiveRegionChanged (UIA), an `Announcement` with its text (AT-SPI2) or is the
+browser's own `aria-live`; nothing while it is `AS_BUSY`, and a polite region says nothing of
+its first content. An app that gets the announcements from elsewhere (a web engine's) calls
+`ui.announce` with them and gives its region records `.live(LIVE_OFF)`, so nothing is said twice.
+
+**Scripts** act and look as a screen reader does: `a11y click|focus|scroll|expand|collapse|
+increment|decrement|select|add|remove S`, `a11y value S N`, `a11y text S "s"`, `a11y selecttext S
+A C`; `a11y expect S role cell` (the Sub's ARIA name or the role's), `name "s"`, `desc "s"`,
+`url "s"`, `level N`, `set POS SIZE`, `cell ROW COL`, `grid ROWS COLS`, `live polite`, `is
+offscreen`, `not collapsed`, `can expand`, `parent S2`, `children N`, `missing`; `a11y expect
+announced "s"` (headless runs keep what `ui.announce` said); `a11y dump` prints the tree. `expect
+S unfocused | unselected | closed` complete the states.
+
+Testing: `apps/a11ytest` shows such a page (its `src/page.rs`: landmarks, a table with headers, a
+tree, a form, live regions, a meter, a spin button, a scroll bar, an article and a figure out of
+view); `plattest --test a11y-rich` reads it headless (kinds, fields, parents, out of view,
+requests, live changes, the rich update format), `plattest --test uia-rich` through
+IUIAutomation (Windows), `python3 tools/platshared/atspi_bus.py --rich` through AT-SPI2 (WSL), and
+`node apps/a11ytest/tests/a11y_web.mjs build` in Chromium after `build_rs.py app a11ytest --target
+web`. The browser's host reads the rich update format (`a11y_wire::VERSION2`, `jfgui_a11y(2)`);
+Android's host reads the first one and shows the basic roles.
 
 ## 20. Secrets (passwords, tokens, keys)
 
