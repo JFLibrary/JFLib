@@ -11,6 +11,10 @@
 //               dropped handle cancels, detach runs on; CancelToken::run; a dropped executor
 //   timers      sleeps end in deadline order, never early; the virtual clock (clock_set)
 //   progress    permille, changed() woken by another thread
+//   drops       values dropped outside the locks: a receiver dropped with a sender of its own
+//               channel queued, a cancelled() future whose waker cancels the token when it goes
+//               (dropped, replaced); Executor::ui().block_on takes another thread's wake-up
+//               (each on a thread of its own: the old code hung there)
 //   files       aio read / write / copy (OS files, mem://, a DirFs mount) with progress;
 //               cancelled between chunks through a gated mount (gated://: reads and writes past
 //               the first chunk wait at a gate; the test cancels once the job waits there), the
@@ -50,6 +54,7 @@ pub fn t_async(t: &mut T) {
     cancellation(t);
     timers(t);
     progress(t);
+    drops(t);
     t.scratch_init();
     files(t);
     gated(t);
@@ -59,6 +64,139 @@ pub fn t_async(t: &mut T) {
 
 fn time() -> u64 {
     plat::time_us()
+}
+
+// f on a thread of its own -> Some(its answer) when it returned within ms, None when it is still
+// stuck (a deadlock: the thread is left behind, the process ends anyway)
+fn returns_within(ms: u64, f: impl FnOnce() -> bool + Send + 'static) -> Option<bool> {
+    let done = Arc::new(AtomicU32::new(0)); // 0 running, 1 false, 2 true
+    let d = done.clone();
+    let h = plat::thread_spawn(0, Box::new(move || d.store(1 + f() as u32, SeqCst)))?;
+    let dl = time() + ms * 1000;
+    while done.load(SeqCst) == 0 && time() < dl {
+        plat::sleep_ms(1);
+    }
+    match done.load(SeqCst) {
+        0 => {
+            core::mem::forget(h); // never joined
+            None
+        }
+        v => {
+            h.join();
+            Some(v == 2)
+        }
+    }
+}
+
+// a value that holds a sender of the channel it travels in
+struct Carried(#[allow(dead_code)] plat::sync::Sender<Carried>);
+
+// cancels its token when dropped
+struct CancelOnDrop(CancelToken);
+
+impl Drop for CancelOnDrop {
+    fn drop(&mut self) {
+        self.0.cancel();
+    }
+}
+
+// a waker that does nothing but cancel the token when its last reference goes
+struct CancelWaker(#[allow(dead_code)] CancelOnDrop);
+
+impl alloc::task::Wake for CancelWaker {
+    fn wake(self: Arc<Self>) {}
+}
+
+// a waker that holds a timer (dropped with the waker's last reference)
+struct SleepWaker(#[allow(dead_code)] core::pin::Pin<Box<task::Sleep>>);
+
+impl alloc::task::Wake for SleepWaker {
+    fn wake(self: Arc<Self>) {}
+}
+
+fn noop_waker() -> core::task::Waker {
+    struct Noop;
+    impl alloc::task::Wake for Noop {
+        fn wake(self: Arc<Self>) {}
+    }
+    core::task::Waker::from(Arc::new(Noop))
+}
+
+fn drops(t: &mut T) {
+    // the receiver goes while a sender of the same channel waits in its queue: the queued value
+    // (and the sender in it) is dropped after the lock is released
+    let r = returns_within(3000, || {
+        let (tx, rx) = plat::sync::channel::<Carried>(1);
+        let queued = tx.send(Carried(tx.clone())).is_ok();
+        drop(rx);
+        queued && tx.send(Carried(tx.clone())).is_err()
+    });
+    t.check(r == Some(true), "drops: a receiver dropped with a sender of its channel queued returns; send fails afterwards");
+    // a cancelled() future goes while its waker is the last one of a waker that cancels the
+    // token when dropped
+    let r = returns_within(3000, || {
+        let tok = CancelToken::new();
+        let mut f = Box::pin(tok.cancelled());
+        {
+            let w = core::task::Waker::from(Arc::new(CancelWaker(CancelOnDrop(tok.clone()))));
+            if f.as_mut().poll(&mut core::task::Context::from_waker(&w)).is_ready() {
+                return false;
+            }
+        }
+        drop(f);
+        tok.is_cancelled()
+    });
+    t.check(r == Some(true), "drops: a cancelled() future whose waker cancels the token is dropped (the token cancelled)");
+    // ... the same waker replaced by another one at the next poll
+    let r = returns_within(3000, || {
+        let tok = CancelToken::new();
+        let mut f = Box::pin(tok.cancelled());
+        {
+            let w = core::task::Waker::from(Arc::new(CancelWaker(CancelOnDrop(tok.clone()))));
+            if f.as_mut().poll(&mut core::task::Context::from_waker(&w)).is_ready() {
+                return false;
+            }
+        }
+        let w2 = noop_waker();
+        f.as_mut().poll(&mut core::task::Context::from_waker(&w2)).is_ready()
+    });
+    t.check(r == Some(true), "drops: ... replaced by another waker at the next poll: ready, cancelled");
+    // a timer whose waker holds another (registered) timer: the waker replaced, and dropped with
+    // its timer -- the other timer's drop takes the timers' lock again
+    let r = returns_within(3000, || {
+        let held = || {
+            let mut b = Box::pin(sleep(60_000));
+            let _ = b.as_mut().poll(&mut core::task::Context::from_waker(&noop_waker()));
+            core::task::Waker::from(Arc::new(SleepWaker(b)))
+        };
+        let mut a = Box::pin(sleep(60_000));
+        let _ = a.as_mut().poll(&mut core::task::Context::from_waker(&held()));
+        let pending = a.as_mut().poll(&mut core::task::Context::from_waker(&noop_waker())).is_pending();
+        let _ = a.as_mut().poll(&mut core::task::Context::from_waker(&held()));
+        drop(a);
+        pending
+    });
+    t.check(r == Some(true), "drops: a timer's waker holding another timer: replaced, then dropped with its timer");
+    // Executor::ui().block_on: a task that waits for a blocking job (another thread's wake-up)
+    let r = returns_within(5000, || {
+        let mut ex = Executor::ui();
+        let gate = Arc::new(AtomicBool::new(false));
+        let g = gate.clone();
+        let h = ex.spawn(async move {
+            spawn_blocking(move || {
+                while !g.load(SeqCst) {
+                    plat::sleep_ms(1);
+                }
+                41u32
+            })
+            .await
+                + 1
+        });
+        ex.run(); // the task waits for its job now
+        gate.store(true, SeqCst);
+        ex.block_on(h) == Ok(42)
+    });
+    t.check(r == Some(true), "drops: Executor::ui().block_on finishes a task woken by a blocking job");
 }
 
 // until no blocking job is in flight (at most 10 s)
