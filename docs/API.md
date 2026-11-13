@@ -25668,7 +25668,9 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            XGrabKey, the GlobalShortcuts portal)                             (hotkey.rs)
   threads: thread_spawn(stack, f) -> Thread (join), thread_yield(), Sem (post / wait),
            wake() (any thread: E_WAKE on the UI thread), wait_events(deadline, on_event)
-           (headless), cpu_count(), mem_total()
+           (headless), cpu_count(), mem_total(); the windows, the clipboard, the dialogs and
+           the portals belong to the UI thread, the first one that uses them: other threads
+           panic                                                          (ui_only.rs)
   pool:    thr_init / thr_count / thr_shutdown / thr_self, parallel_for, Job   (pool.rs)
   task:    async execution: Executor (ui() in the event loop, new() / block_on), Task,
            spawn_blocking (a pool for blocking work), sleep, CancelToken, Progress, join /

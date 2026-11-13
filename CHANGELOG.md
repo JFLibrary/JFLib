@@ -183,6 +183,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** X11: a finger that drags a window no longer ends the program with "nested reply wait": the monitor list is not asked for again while a reply is awaited (the move then uses the list as it is)
 - **ui:** Code editor: undo and redo of "replace all" keep the selection inside the text (it came from the text before the step, and the next edit cut a line past its end or inside a character); moving the last lines down leaves the selection on the last line; toggling a comment cuts the shared indentation at blanks and tabs only (a line indented with a no-break or ideographic space was cut inside the character)
 - **ui:** No more panics on these inputs: a finger tap near a hit box that is empty or clipped away (touch aiming), a style sheet whose last rule lacks its closing brace and ends in a non-ASCII character (rich text from HTML), a catalogue text that ends inside a placeholder (i18n messages). A bar chart with an infinite or huge value no longer hangs in the axis scale (the bar fills the plot)
+- **plat:** The UI thread's state of plat (windows, clipboard, file and print dialogs, pen and touch, Linux's X11 connection and portals, AppKit's and UIKit's objects) belongs to the UI thread, the first thread that uses it: a call on another thread panics before it touches anything (it raced on unsynchronized Cells and RefCells before, undefined behaviour from safe code)
 
 ## [0.1.0] - 2026-11-08
 

@@ -1621,6 +1621,10 @@ fn brighten(sf: &mut gfx::Surface, add: u8) {
 
 * `parallel_for(count, &f)` runs `f(index, job)` on the workers and the calling thread; nested
   loops are fine; `job.cancel()` skips the remaining items -> `Err(Cancelled)`.
+* The windows, the clipboard, the dialogs and the portals of `plat` belong to the UI thread: the
+  first thread that uses them (the one `ui::launch` runs on). On any other thread such a call
+  panics before it touches anything (Windows, Linux with X11 and the portals, macOS, iOS); hand
+  the work to the UI thread instead (a channel and `plat::wake()`).
 * The renderer uses the pool too: a redraw of about 3 million pixels or more (1.5 times
   1920 x 1080), in a framebuffer of more than 16 MB (4K, 8K) of 750 000 pixels or more, is
   cut into row bands that the workers draw into buffers of their own (`ui/render_par.rs`),
