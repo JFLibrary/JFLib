@@ -3,6 +3,8 @@
 //   Timestamp { secs, nanos }          seconds since 1970-01-01 00:00 UTC
 //   Civil { year .. second, nanos }    a calendar date and wall time (no zone)
 //   days_from_civil / civil_from_days / days_in_month / is_leap / weekday (0 = Monday)
+//   iso_week / iso_weeks_in_year / iso_week_monday   ISO 8601 weeks (Monday to Sunday, week 1
+//                                      holds the year's first Thursday)
 //   rfc3339(ts) / rfc3339_offset(ts, offset) / parse_rfc3339(s)
 //   format_date_time(ts, &zone, en) / format_date / format_time / format_duration(secs, en)
 //   tz::Zone                           IANA zones with their current DST rule (zones.rs from
@@ -150,6 +152,31 @@ pub fn civil_from_days(z: i64) -> (i32, u8, u8) {
 /// weekday of a date: 0 = Monday .. 6 = Sunday
 pub fn weekday(y: i32, m: u8, d: u8) -> u8 {
     (days_from_civil(y, m, d) + 3).rem_euclid(7) as u8
+}
+
+/// the ISO 8601 weeks of week-numbering year y: 53 when the year starts on a Thursday, or on a
+/// Wednesday in a leap year, else 52
+pub fn iso_weeks_in_year(y: i32) -> u8 {
+    let jan1 = weekday(y, 1, 1);
+    if jan1 == 3 || (jan1 == 2 && is_leap(y)) { 53 } else { 52 }
+}
+
+/// the ISO 8601 week of a date -> (its week-numbering year, the week 1 ..= 53): the days of
+/// 29 December to 3 January may lie in the week of the other year (2026-12-31 is 2026-W53,
+/// 2027-01-01 too)
+pub fn iso_week(y: i32, m: u8, d: u8) -> (i32, u8) {
+    // the week's Thursday decides its year
+    let thu = days_from_civil(y, m, d) - weekday(y, m, d) as i64 + 3;
+    let (ty, _, _) = civil_from_days(thu);
+    (ty, ((thu - days_from_civil(ty, 1, 1)) / 7 + 1) as u8)
+}
+
+/// the Monday of ISO 8601 week `week` of week-numbering year y -> (year, month, day); a week
+/// beyond the year's last counts on into the next year
+pub fn iso_week_monday(y: i32, week: u8) -> (i32, u8, u8) {
+    // week 1 holds 4 January
+    let jan4 = days_from_civil(y, 1, 4);
+    civil_from_days(jan4 - weekday(y, 1, 4) as i64 + (week as i64 - 1) * 7)
 }
 
 fn two(s: &[u8], i: usize) -> Option<u32> {

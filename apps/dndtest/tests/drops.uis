@@ -42,4 +42,14 @@ expect text:"UIC_DROP: Text \"lose\" bei 600,470 (Fenster 0)" exists
 drop 82 229 build/dnd/d.txt build/dnd/e.txt
 expect text:"UIC_DROP: 2 Datei(en) bei 82,229 (Fenster 0)" exists
 expect text:"Text: Hallo Welt" exists
+# the exact places in px of the window (drag_over_px, drop_pos_px): at 100 % the DIP, at 150 %
+# DIP 601 is pixel 902 (drop_pos rounds back to 601)
+expect text:"Pixel: - / 82,229" exists
+scale 150
+dragover 601 481 text
+expect text:"Pixel: 902,722 / 82,229" exists
+drop 601 481 text "genau"
+expect text:"UIC_DROP: Text \"genau\" bei 601,481 (Fenster 0)" exists
+expect text:"Pixel: - / 902,722" exists
+scale 100
 expect_nowarn

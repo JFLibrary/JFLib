@@ -42,6 +42,7 @@ const PK_PREVIEW: u32 = 3;
 const PK_FILE: u32 = 5;
 const PF_ZLIB: u32 = 1;
 const NAME_MAX: usize = 47; // the payload's names and labels (lib/installer/payload.rs)
+const PAY_MAX_ENT: usize = 65536; // the payload's entries (lib/installer/payload.rs)
 
 pub(crate) fn read(p: &Path) -> Result<Vec<u8>, String> {
     fs::read(p).map_err(|e| format!("{}: {e}", p.display()))
@@ -265,13 +266,33 @@ fn stub_dep(name: &str, version: &str, local: &BTreeMap<String, PathBuf>) -> Str
     }
 }
 
+/// the JFLib crates a stub takes from paths (stub_dep): those the app's project has from a path at
+/// `version`, and -- when its jflib itself comes from a path (an app in JFLib's workspace, or one
+/// that patches jflib to a checkout with [patch.crates-io]) -- every crate of the workspace that
+/// holds that jflib, so the stubs come from the checkout the app is built with, also the crates the
+/// app does not depend on (jflib-installer, jflib-appimagert); a crate the app has from a path of
+/// its own keeps that path
+fn stub_paths(p: &Project, version: &str) -> Result<BTreeMap<String, PathBuf>, String> {
+    let app = cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))?;
+    let checkout = match app.iter().find(|r| r.local && r.name == "jflib" && r.version == version) {
+        Some(jflib) => cargo::members(&jflib.dir)?,
+        None => Vec::new(),
+    };
+    Ok(local_crates(&app, &checkout, version))
+}
+
+/// (stub_paths) the crates from paths: the checkout's, the app's own over them
+fn local_crates(app: &[cargo::Resolved], checkout: &[cargo::Resolved], version: &str) -> BTreeMap<String, PathBuf> {
+    checkout.iter().chain(app).filter(|r| r.local && r.version == version && r.name.starts_with("jflib-"))
+        .map(|r| (r.name.clone(), r.dir.clone())).collect()
+}
+
 /// a stub: its crates in a project of its own below the target folder, built like the app (its
 /// profiles, its Cargo.lock, its .cargo/config.toml, its crates from paths) -> the program
 pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, String> {
     let dir = p.target_dir.join("jflib-package").join(format!("{}-stub", s.name));
     let manifest = dir.join("Cargo.toml");
-    let local: BTreeMap<String, PathBuf> = cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))?.into_iter()
-        .filter(|r| r.local && r.version == version && r.name.starts_with("jflib-")).map(|r| (r.name, r.dir)).collect();
+    let local = stub_paths(p, version)?;
     let deps: String = s.deps.iter().map(|d| stub_dep(d, version, &local)).collect();
     write_changed(&manifest, format!(
         "# made by cargo jflib: {} ({})\n\
@@ -467,6 +488,9 @@ impl App<'_> {
         if !schemes.is_empty() {
             man.push(format!("schemes={}", schemes.join(" ")));
         }
+        if pkgmeta::browser(&self.meta)? {
+            man.push("browser=1".to_string()); // the setup registers the app as a web browser
+        }
         man.push(format!("app_id={}", pkgmeta::app_id(&self.meta, &self.name)?));
         let mtext = (man.join("\n") + "\n").into_bytes();
         let mut entries = vec![(PK_MANIFEST, PF_ZLIB, "manifest".to_string(), String::new(), deflate::zlib(&mtext), mtext.len())];
@@ -496,6 +520,9 @@ impl App<'_> {
         }
         for (name, data) in combined {
             entries.push((PK_FILE, PF_ZLIB, name, String::new(), deflate::zlib(&data), data.len()));
+        }
+        if entries.len() > PAY_MAX_ENT {
+            return Err(format!("the setup's payload would hold {} entries, at most {PAY_MAX_ENT}", entries.len()));
         }
         let pay = payload(&entries);
         let mut out = stub.clone();
@@ -789,6 +816,43 @@ mod tests {
         let local: BTreeMap<String, PathBuf> = [("jflib-installer".to_string(), PathBuf::from(r"C:\src\JFLib\lib\installer"))].into();
         assert_eq!(stub_dep("jflib-installer", "0.1.0", &local), "jflib-installer = { path = \"C:/src/JFLib/lib/installer\", version = \"=0.1.0\" }\n");
         assert_eq!(stub_dep("jflib-build", "0.1.0", &local), "jflib-build = \"=0.1.0\"\n");
+    }
+
+    // an app that patches only jflib (and jflib-build) to a checkout gets the stubs' other crates
+    // from the same checkout; a crate the app has from a path of its own keeps it
+    #[test]
+    fn stub_crates_of_a_patched_checkout() {
+        let r = |name: &str, version: &str, dir: &str, local: bool| cargo::Resolved {
+            name: name.into(), version: version.into(), dir: PathBuf::from(dir), style: None, local };
+        let app = [r("Narsil", "0.1.0", "/b", true), r("jflib", "0.1.0", "/j/lib/jflib", true), r("jflib-ui", "0.1.0", "/j/lib/ui", true),
+                   r("jflib-installer", "0.1.0", "/reg/jflib-installer-0.1.0", false), r("jflib-gfx", "0.1.0", "/own/gfx", true)];
+        let checkout = [r("jflib", "0.1.0", "/j/lib/jflib", true), r("jflib-installer", "0.1.0", "/j/lib/installer", true),
+                        r("jflib-gfx", "0.1.0", "/j/lib/gfx", true), r("jflib-appimagert", "0.2.0", "/j/lib/appimagert", true)];
+        let local = local_crates(&app, &checkout, "0.1.0");
+        assert_eq!(local.get("jflib-installer").map(PathBuf::as_path), Some(Path::new("/j/lib/installer")));
+        assert_eq!(local.get("jflib-ui").map(PathBuf::as_path), Some(Path::new("/j/lib/ui")));
+        assert_eq!(local.get("jflib-gfx").map(PathBuf::as_path), Some(Path::new("/own/gfx")));
+        // another version, the facade itself and the app are no stub crates
+        assert!(!local.contains_key("jflib-appimagert") && !local.contains_key("jflib") && !local.contains_key("Narsil"));
+        // jflib from crates.io: only what the app has from paths
+        assert_eq!(local_crates(&app[3..], &[], "0.1.0").keys().collect::<Vec<_>>(), ["jflib-gfx"]);
+    }
+
+    // the members of this repository's workspace, found from the facade's folder as stub_paths
+    // does for a checkout an app patches jflib to
+    #[test]
+    fn members_of_the_checkout() {
+        let jflib = Path::new(env!("CARGO_MANIFEST_DIR")).join("../jflib");
+        if !jflib.join("Cargo.toml").is_file() {
+            return; // the published crate alone
+        }
+        let members = cargo::members(&jflib).unwrap();
+        let version = members.iter().find(|m| m.name == "jflib").map(|m| m.version.clone()).unwrap();
+        let local = local_crates(&[], &members, &version);
+        for (name, dir) in [("jflib-installer", "installer"), ("jflib-appimagert", "appimagert"), ("jflib-build", "jflib_build")] {
+            let found = local.get(name).unwrap_or_else(|| panic!("{name} missing"));
+            assert_eq!(found.canonicalize().unwrap(), jflib.join("..").join(dir).canonicalize().unwrap());
+        }
     }
 
     #[test]

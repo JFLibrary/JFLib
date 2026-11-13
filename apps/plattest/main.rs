@@ -565,7 +565,43 @@ fn t_threads(t: &mut T) {
     th_pool(t);
     th_jobs(t);
     th_wake(t);
+    th_stop(t);
     plat::thr_shutdown();
+}
+
+static STOP_GO: AtomicU32 = AtomicU32::new(0);
+
+/// thread: wait until all 8 are there, then stop the pool
+fn w_stop(_: u32) {
+    STOP_GO.fetch_add(1, SeqCst);
+    while STOP_GO.load(SeqCst) < 8 {
+        core::hint::spin_loop();
+    }
+    plat::thr_shutdown();
+}
+
+/// eight threads stop the pool at once (one takes it down, the others wait for it), 20 times;
+/// the pool starts again afterwards each time
+fn th_stop(t: &mut T) {
+    let (mut started, mut sums) = (0u32, 0u32);
+    for _ in 0..20 {
+        plat::thr_init(0);
+        STOP_GO.store(0, SeqCst);
+        let (n, v) = spawn8(w_stop);
+        if n < 8 {
+            // a missing thread would leave the others spinning: let them through
+            STOP_GO.fetch_add(8 - n, SeqCst);
+        }
+        join_all(v);
+        started += n;
+        let sum = AtomicU32::new(0);
+        let _ = plat::parallel_for(100, &|i, _| {
+            sum.fetch_add(i as u32, SeqCst);
+        });
+        sums += (sum.load(SeqCst) == 4950) as u32;
+    }
+    t.check(started == 160 && sums == 20, "pool: 8 shutdowns at once, 20 times; each restart runs every item");
+    t.info(&format!("  ({started} threads, {sums} of 20 restarts complete)\n"));
 }
 
 /// 8 threads running f(index)
@@ -797,6 +833,36 @@ fn th_jobs(t: &mut T) {
     }
     t.check(NEST.load(SeqCst) == NJ_ROUNDS * NJ_LOOPS * NJ_ITEMS as u64,
             "jobs: nested loops inside a background job while the owner waits");
+    // one job shared by several threads that all start and wait on it: each successful start
+    // runs the items exactly once (two starts must never both reset and queue the record)
+    static RACE_ITEMS: AtomicU64 = AtomicU64::new(0);
+    static RACE_STARTS: AtomicU64 = AtomicU64::new(0);
+    RACE_ITEMS.store(0, SeqCst);
+    RACE_STARTS.store(0, SeqCst);
+    let mut shared = Job::new();
+    shared.set(32, |_, _| {
+        RACE_ITEMS.fetch_add(1, SeqCst);
+    });
+    let shared = Arc::new(shared);
+    let mut hs = Vec::new();
+    for _ in 0..4 {
+        let job = shared.clone();
+        hs.push(plat::thread_spawn(0, Box::new(move || {
+            for _ in 0..300 {
+                if job.start() {
+                    RACE_STARTS.fetch_add(1, SeqCst);
+                }
+                let _ = job.wait();
+            }
+        })));
+    }
+    for h in hs.into_iter().flatten() {
+        h.join();
+    }
+    let (items, starts) = (RACE_ITEMS.load(SeqCst), RACE_STARTS.load(SeqCst));
+    t.check(starts > 0 && items == starts * 32 && shared.done(),
+            "jobs: concurrent starts of one shared job: one start at a time, each runs every item once");
+    t.info(&format!("  ({starts} starts, {items} items)\n"));
 }
 
 /// wake from another thread ends wait(forever); bursts coalesce

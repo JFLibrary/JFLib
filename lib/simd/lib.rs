@@ -10,9 +10,12 @@
 //   dispatch(k)      runs k with Avx2 when rt::cpu reports CPU_AVX2, else with Sse2
 //   dispatch_sse2(k) always Sse2 (tests)
 //   has_avx2()
-//   copy_stream(dst, src) / stream_fence()   a copy whose stores bypass the caches (x86-64:
-//                    movntdq), for big results another thread reads later; the fence makes
-//                    them visible (the copying thread calls it before handing dst on)
+//   copy_stream(dst, src)   a copy whose stores bypass the caches (x86-64: movntdq), for big
+//                    results another thread reads later; it ends with the fence (sfence) the
+//                    stores need before anyone, the copying thread too, touches dst again
+//   copy_stream_rows(dst, dst_stride, src, src_stride, width, rows)   the same for a block of
+//                    rows with one fence at the end
+//   stream_fence()   sfence on its own (the copies above no longer need it)
 //
 // Pixel helpers work on "pixel lanes": the 4 bytes of a pixel zero-extended to 4 u16 lanes,
 // PX = 2 (SSE2) / 4 (AVX2) pixels per register, pixels 2k and 2k + 1 in 128-bit lane k.
@@ -56,16 +59,47 @@ pub fn has_avx2() -> bool {
 
 /// copy src into dst (the shorter length) with non-temporal stores where the target has them
 /// (x86-64: the 16-byte aligned part of dst): dst is neither read first nor pulled into the
-/// caches, which keep what the thread works on.  stream_fence() before dst is handed on.
-#[cfg(target_arch = "x86_64")]
+/// caches, which keep what the thread works on.  Ends with the fence the stores need (sfence)
+/// before anything touches dst again; copy_stream_rows fences a block of rows once.
 pub fn copy_stream(dst: &mut [u8], src: &[u8]) {
+    // SAFETY: the fence follows at once.
+    if unsafe { copy_nt(dst, src) } {
+        stream_fence();
+    }
+}
+
+/// copy_stream for `rows` rows of `width` bytes: row y of src starts at y * src_stride, of dst
+/// at y * dst_stride; one fence at the end.  Panics when a row lies outside its slice.
+pub fn copy_stream_rows(dst: &mut [u8], dst_stride: usize, src: &[u8], src_stride: usize, width: usize, rows: usize) {
+    // checked before the first store: a panic between the stores and the fence would leave
+    // them unfenced while the unwinding goes on
+    let fits = |len: usize, stride: usize| rows == 0 || (rows - 1).checked_mul(stride).and_then(|o| o.checked_add(width)).is_some_and(|end| end <= len);
+    assert!(fits(dst.len(), dst_stride) && fits(src.len(), src_stride), "copy_stream_rows: a row lies outside its slice");
+    let mut streamed = false;
+    for y in 0..rows {
+        let (d, s) = (y * dst_stride, y * src_stride);
+        // SAFETY: the fence follows after the last row, before this function returns.
+        streamed |= unsafe { copy_nt(&mut dst[d..d + width], &src[s..s + width]) };
+    }
+    if streamed {
+        stream_fence();
+    }
+}
+
+/// copy_stream without its fence -> whether non-temporal stores were used
+///
+/// # Safety
+/// When it returns true, stream_fence() must run on this thread before anything (this thread
+/// included) reads or writes dst again: Rust's memory model does not cover the stores before it.
+#[cfg(target_arch = "x86_64")]
+unsafe fn copy_nt(dst: &mut [u8], src: &[u8]) -> bool {
     use core::arch::x86_64::{__m128i, _mm_loadu_si128, _mm_stream_si128};
     let n = dst.len().min(src.len());
     let (dst, src) = (&mut dst[..n], &src[..n]);
     let head = (dst.as_ptr() as usize).wrapping_neg() & 15;
     if n < head + 64 {
         dst.copy_from_slice(src);
-        return;
+        return false;
     }
     dst[..head].copy_from_slice(&src[..head]);
     let body = (n - head) & !63;
@@ -85,19 +119,25 @@ pub fn copy_stream(dst: &mut [u8], src: &[u8]) {
         i += 64;
     }
     dst[head + body..].copy_from_slice(&src[head + body..]);
+    true
 }
 
 /// copy_stream without streaming stores (other targets).  ARM64 needs nothing of its own: stnp
 /// is only a hint and its loose ordering would want a barrier, while a copy like this one
 /// writes whole lines in a row, which ARM cores notice and then stop allocating in their caches.
+///
+/// # Safety
+/// None here (it is unsafe for the x86-64 version's sake).
 #[cfg(not(target_arch = "x86_64"))]
-pub fn copy_stream(dst: &mut [u8], src: &[u8]) {
+unsafe fn copy_nt(dst: &mut [u8], src: &[u8]) -> bool {
     let n = dst.len().min(src.len());
     dst[..n].copy_from_slice(&src[..n]);
+    false
 }
 
-/// the streaming stores of this thread become visible to others (sfence); nothing to do on other
-/// targets: without such stores the release of whatever hands dst on is enough
+/// the streaming stores of this thread become visible to others (sfence); copy_stream and
+/// copy_stream_rows run it themselves.  Nothing to do on other targets: without such stores the
+/// release of whatever hands dst on is enough
 #[inline]
 pub fn stream_fence() {
     // SAFETY: sfence is part of the x86-64 baseline (SSE); it only orders stores.

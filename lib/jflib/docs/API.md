@@ -164,16 +164,16 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `key_event_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`, `canvas_label`
-- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
+- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `popup_close_id`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_preedit`, `ime_enable`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
-- [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
+- [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_reveal`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
 - [Data views: grid, tree, badges, meters](#data-views-grid-tree-badges-meters): `grid_begin`, `grid_row`, `grid_cell`, `grid_text`, `grid_text_ts`, `grid_end`, `tree`, `badge`, `status_dot`, `meter`
 - [Shell parts: navigation, command bar, splitter, breadcrumb, wizard steps](#shell-parts-navigation-command-bar-splitter-breadcrumb-wizard-steps): `nav_begin`, `nav_toggle`, `nav_section`, `nav_item`, `nav_footer`, `nav_end`, `command_bar`, `split_begin`, `split_next`, `split_end`, `breadcrumb`, `segmented`, `wizard_steps`, `page_header`, `key_value`, `empty_state`
 - [Docking: panels at the sides, tab groups, floating tool windows](#docking-panels-at-the-sides-tab-groups-floating-tool-windows): `dock_begin`, `dock_next`, `dock_end`
 - [Charts](#charts): `sparkline`, `bar_chart`, `donut`, `legend`, `line_chart`
 - [Toasts, spinners, progress](#toasts-spinners-progress): `toast`, `toast_dismiss`, `toast_clear`, `toasts`, `toast_host`, `spinner`, `progress_indeterminate`
-- [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`
+- [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`, `calendar`
 - [Values and colours](#values-and-colours): `cmd_track`, `decimal_sep`, `set_decimal_sep`, `fmt_f64`, `parse_f64`, `slider_f`, `track_slider`, `prop_slider`, `prop_slider_f`, `angle`, `pan`, `swatch`, `color_picker`, `color_picker_ex`, `color_wheel`
 - [Windows](#windows): `window_title_height`, `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_snap`, `window_rect`, `window_state`, `window_fullscreen`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
 - [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars): `dialog_begin`, `dialog_buttons`, `dialog_end`, `infobar`, `statusbar_begin`, `statusbar_end`, `titlebar_begin`, `titlebar_begin_opt`, `titlebar_begin_overlay`, `titlebar_end`, `titlebar_open`
@@ -181,7 +181,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
 - [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `set_theme`, `clear_theme`, `app_theme`, `load_theme`, `styles_add`, `style_names`, `style_name`, `set_style`, `dp_text`, `ts_base`
-- [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_next`, `cursor_replace`, `cursor_free`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_accept`, `drag_over`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
+- [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_next`, `cursor_replace`, `cursor_free`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_pos_px`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_accept`, `drag_over`, `drag_over_px`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
 
 ### App, AppDesc, Ui, run, async tasks
 
@@ -192,6 +192,8 @@ Source: [`lib/ui/lib.rs`](../lib/ui/lib.rs)
 Re-exports: `img_svg::Svg`
 
 Re-exports: `plat::{Preedit, IP_EMAIL, IP_NUMBER, IP_PASSWORD, IP_PHONE, IP_SEARCH, IP_TEXT, IP_URL}`
+
+Re-exports: `plat::BrowserStatus`
 
 Re-exports: `rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH}`
 
@@ -961,6 +963,8 @@ popup -- popups, flyouts, menus, menu bar, command table and accelerators, drop-
 Popups (a stack of up to 6 levels per window, drawn on L_POPUP):
   popup_open(id)                      open popup `id` (inside a flyout: as its child)
   popup_close()                       close every popup; the focus returns to the opener
+  popup_close_id(id)                  close popup `id` and the popups inside it; the
+                                      flyouts it sits in stay open
   popup_is_open(id) -> bool   popup_count() -> n
   flyout_begin(id, FL_*) -> bool      draw popup `id` when it is open: a flyout surface
                                       anchored to the last widget, content box BOX_V|PAD_4
@@ -1058,6 +1062,11 @@ numbers for them.
   than the click (a web engine's context menu); the app draws flyout_begin(id, ..) as usual.
 - **`fn popup_close(&mut self)`**
   ui_popup_close: close every popup (the focus returns to where it was)
+- **`fn popup_close_id(&mut self, id: u32)`**
+  popup_close_id(id): close popup `id` and the popups opened inside it; the popups it was
+  opened in stay open (a date_picker inside a flyout of the app's own closes its calendar,
+  not the flyout).  The focus returns to where it was when `id` opened; nothing happens
+  when `id` is not open.
 - **`fn flyout_begin(&mut self, id: u32, flags: u32) -> bool`**
   ui_flyout_begin(id, FL_\*) -> popup `id` is open: then its content follows (a vertical
   box with 4 DIP padding) until flyout_end, which is called in any case.  The flyout is
@@ -1171,6 +1180,8 @@ widgets                                                             [src/ui/ui_e
        WinUI TextBox (32 DIP high).  buf: the app's UTF-8 text; cap_flags = the size of
        the asm's buffer in bytes incl. the NUL (bits 0..22: the text holds at most cap - 1
        bytes) | TB_PASSWORD | TB_READONLY | TB_DIGITS | TB_SIGNED.  placeholder (or None)
+       TB_PASSWORD: while it has the keyboard the input method's purpose is IP_PASSWORD (set
+       by the box itself, the purpose of before put back after; no plat::ime_purpose needed).
        shows while the text is empty (cut with "…" where the box is narrower).
        ST_DISABLED via next_flags.
        EV_ACT: the text changed this frame; EV_COMMIT: Enter, Esc or focus lost; EV_FOCUS
@@ -2436,6 +2447,9 @@ highlighting (highlight.rs)
        ui.code_popup_item(id) the completion item the list has chosen (None: closed)
   ui.code_find(id, query, replace)   open the find bar (replace: with the replace row) with
        a query; the editor selects the first match from the caret on
+  ui.code_reveal(id, line)   scroll line (from 0) into view in the editor's next pass, in the
+       middle when it was not in view, the folds hiding it opened -- without the keyboard
+       focus, the caret or the selection (a debugger's execution line)
   ui.code_status(id) -> CodeStatus   line and column of the caret (from 1), the matches
        and the current one, the lines tokenized in the last frame, the document's
        diagnostics per severity and the severity of the one at the caret, the completion
@@ -2531,6 +2545,12 @@ CE_FOLDS: u32 = 128
 - **`fn code_find(&mut self, id: u32, query: &str, replace: bool)`**
   open the find bar of code editor id with a query (replace: with the replace row); the
   editor selects the first match from its caret on
+- **`fn code_reveal(&mut self, id: u32, line: usize)`**
+  scroll code editor id so that line (from 0) is in view in its next pass: in the middle
+  of the view when it was not in it (no scroll when it was), the folded ranges that hide it
+  unfolded.  The keyboard focus, the caret and the selection stay as they are: a debugger
+  shows the execution line while the page or its toolbar keeps the keyboard
+  (CodeDoc::set_exec_line marks it).  A later request for the same editor replaces it.
 - **`fn code_status(&self, id: u32) -> CodeStatus`**
   the caret, the find matches, the lines tokenized and the diagnostics in code editor
   id's last frame
@@ -2983,7 +3003,8 @@ DOCK_TAB_HOLD: u32 = 1
   the layout of a dock area: kept by the app and passed to dock_begin / dock_next /
   dock_end.  save() / load() turn it into a few lines of text: \\`dock 1\\`, then \\`side S SIZE
   COLLAPSED`, `group S TAG SIZE ACTIVE PANEL...`, `float SLOT X Y W H HOME HOMETAG ACTIVE
-  PANEL...\\`, \\`hidden PANEL S TAG POS X Y W H HOME HOMETAG\\` (unknown lines are skipped).
+  PANEL...\\`, \\`hidden PANEL S TAG POS X Y W H HOME HOMETAG [ORDER...]\\` (ORDER: its group's tab
+  order when it left; unknown lines are skipped).
 
 **`impl DockState`**
 
@@ -3407,11 +3428,44 @@ datepick -- date and time input
   date_picker(id, &mut y, &mut m, &mut d) -> EV a button with the date (the user's format,
                                                 i18n::fmt_date) that opens a month calendar
                                                 starting on the locale's first weekday
-                                                (EV_ACT when a day was picked)
-  civil helpers: days_in_month(y, m), weekday(y, m, d) (0 = Monday)
+                                                (EV_ACT when a day was picked; it closes the
+                                                calendar only, a flyout around it stays)
+  calendar(id, &mut y, &mut m, &mut d, &DateRange) -> EV
+                                                the calendar in place, for any panel or flyout:
+                                                a month of days (CAL_DAY), of ISO weeks
+                                                (CAL_WEEK: a row is a week, the date its
+                                                Monday) or a year of months (CAL_MONTH: the 1st);
+                                                only dates between min and max can be picked
+                                                (EV_ACT when the user picked)
+  The civil helpers (days in a month, weekday, ISO weeks) are jflib::datetime's.
 
-Ids: parts (id << 3 | k) | 0x80000000; calendar days ((id ^ 0x3C3C) << 6 | cell) | 0x80000000.
+Ids: parts (id << 3 | k) | 0x80000000; calendar cells ((id ^ 0x3C3C) << 6 | cell) | 0x80000000
+(a day 0 .. 41, a week row 0 .. 5, a month 0 .. 11).
 ```
+
+```rust
+/// what a calendar picks (DateRange::mode): a day
+CAL_DAY: u32 = 0
+/// an ISO 8601 week (Monday to Sunday): the date is its Monday, the rows start on Monday and show
+/// the week's number (datetime::iso_week)
+CAL_WEEK: u32 = 1
+/// a month: the date is its 1st, the calendar shows the twelve months of a year
+CAL_MONTH: u32 = 2
+```
+
+- **`struct DateRange`**
+  what a calendar picks and between which dates (calendar): `mode` CAL_DAY, CAL_WEEK or
+  CAL_MONTH; min and max (year, month, day) inclusive -- in CAL_WEEK the weeks that hold them, in
+  CAL_MONTH their months
+  - `mode: u32`
+  - `min: (i32, u32, u32)`
+  - `max: (i32, u32, u32)`
+
+**`impl DateRange`**
+
+- **`const DAYS: DateRange = DateRange::new(CAL_DAY, (1, 1, 1), (9999, 12, 31))`**
+  days of the years 1 to 9999
+- **`const fn new(mode: u32, min: (i32, u32, u32), max: (i32, u32, u32)) -> DateRange`**
 
 **`impl Ui`**
 
@@ -3421,7 +3475,17 @@ Ids: parts (id << 3 | k) | 0x80000000; calendar days ((id ^ 0x3C3C) << 6 | cell)
   ui_weekday_toggles(id, &mut mask) -> EV_\* (EV_ACT changed); bit 0 = Monday.  The
   buttons wrap where the row has less room than the seven of them (a narrow card)
 - **`fn date_picker(&mut self, id: u32, y: &mut i32, m: &mut u32, d: &mut u32) -> u32`**
-  ui_date_picker(id, &mut y, &mut m, &mut d) -> EV_\* (EV_ACT when a day was picked)
+  ui_date_picker(id, &mut y, &mut m, &mut d) -> EV_\* (EV_ACT when a day was picked).  A
+  pick closes the calendar's popup and the popups inside it, not a flyout the picker sits
+  in (popup_close_id)
+- **`fn calendar(&mut self, id: u32, y: &mut i32, m: &mut u32, d: &mut u32, range: &DateRange) -> u32`**
+  ui_calendar(id, &mut y, &mut m, &mut d, &range) -> EV_\* (EV_ACT when the user picked):
+  a month calendar in place, no popup -- a panel's, or the content of a flyout of the app's
+  own.  range.mode picks a day (CAL_DAY: the weeks start on the locale's first weekday), an
+  ISO week (CAL_WEEK: rows from Monday with the week's number; y, m, d become its Monday) or
+  a month (CAL_MONTH: a year of months; y, m, d become its 1st); what lies outside
+  range.min .. range.max is drawn disabled.  The arrows show the month (the year) before and
+  after; the calendar shows the month of y, m, d again when the app changes the date.
 
 ### Languages
 
@@ -4193,7 +4257,13 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   commit "text" [N]   an input method commits the text (N times over: one long commit)
   cmd ID [ARG]    run a command as if a menu item was chosen
   wait MS         advance the virtual clock (16 ms frames; timers, animations and the
-                  sleep()s of async tasks)
+                  sleep()s of async tasks); nothing else happens meanwhile: the same run
+                  every time
+  wait real MS    MS of real time pass while the app's own threads work: their wake-ups
+                  (plat::wake) reach App::command (UIC_WAKE) as they come, and the virtual
+                  clock follows the real one (timers, animations, frames asked for); for apps
+                  whose engine runs on threads of its own (not deterministic: expect what
+                  holds however long the threads took)
   shot FILE.png   render and save a screenshot
   dump [FILE]     print / save the widget tree
   expect S exists | missing | hover | nohover | focused | checked | unchecked | disabled |
@@ -4225,6 +4295,10 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
          settings theme|locale|contrast|fonts|other|N
                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...;
                       background / foreground: a hidden tab, Android's onStop / onStart)
+  system browser default|other|unknown   (E13) what ui.default_browser answers from here (a
+                      headless run never asks the system; at first other), then the app
+                      loses the keyboard (when it had it) and gets it back, as after the
+                      system's settings: UIC_ACTIVE 0 and 1 (only 1 when it was not active)
   system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
   system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
@@ -4261,9 +4335,11 @@ Windows (ID = the app's window id, 0 / main = the main window):
                                 main window's client area): popups of every window may leave
                                 it up to there and flip at its edges; off (the default): the
                                 main window's client area holds all popups
-  sync [MS]                     wait until no background job is pending: the app's sync hook,
+  sync [MS] [soft]              wait until no background job is pending: the app's sync hook,
                                 the async tasks' work (blocking jobs, wake-ups) and the spell
-                                checker's workers (suggestions, edit_spell.rs)
+                                checker's workers (suggestions, edit_spell.rs); real time, at
+                                most MS (default 10 s): reaching it fails the script, with soft
+                                it does not (a note is printed; the expects that follow decide)
   expect sound KIND|none        the last sound ui.beep / ui.dialog_sound asked for since the
                                 last check (default, information, warning, error, question,
                                 notify; headless runs play none)
@@ -4530,6 +4606,8 @@ headless image clipboard; the command lines of later starts (AF_SINGLE_INSTANCE)
                                   an image file (PNG, or BMP from a DIB), the app's own kind
                                   and bytes; drop_types() -> its DT_* kinds, drop_text()
   drop_pos() -> (x, y)            drop position in DIP of the window it happened in
+  drop_pos_px() -> (x, y)         the same in px of that window, exact (as last_rect and a
+                                  canvas's UiInput: x - rect[0] is the point in the canvas)
   drop_window() -> id             that window's app id (0 = main window)
   clip_has(fmt) -> bool           the clipboard offers CLIP_TEXT / CLIP_PNG / CLIP_IMAGE
                                   (headless runs: the in-process clipboard)
@@ -4556,7 +4634,13 @@ Internal:
 - **`fn drop_list(&self) -> &[String]`**
   ui_drop_list: every path of the last drop
 - **`fn drop_pos(&self) -> (i32, i32)`**
-  ui_drop_pos: drop position in DIP of the window it happened in
+  ui_drop_pos: drop position in DIP of the window it happened in (rounded to whole DIP:
+  at 150 % three pixels share two DIP; drop_pos_px is exact)
+- **`fn drop_pos_px(&self) -> (i32, i32)`**
+  drop position in px of the window it happened in, exact: logical like `last_rect` and a
+  canvas's \\`UiInput::rect\\` (mirrored in a right-to-left window), so \\`(x - rect[0], y -
+  rect[1])\\` is the point in a canvas, in the canvas's own pixels -- a drop onto a page an
+  engine draws at the display's resolution
 - **`fn drop_window(&self) -> u32`**
   ui_drop_window: the app id of the window of the last drop (0 = main window)
 - **`fn drop_data(&self) -> &DragData`**
@@ -4596,7 +4680,8 @@ Targets:
   drop_accept(types)               what the windows take outside every drop target (default
                                    DT_FILES); such drops come as UIC_DROP (drop.rs, as before)
   drag_over() -> (types, x, y)     the drag over the live window: its kinds and position (DIP);
-                                   (0, 0, 0) when none
+                                   (0, 0, 0) when none; drag_over_px() the position in px of
+                                   the window, exact (as drop_pos_px, drop.rs)
 
 An internal drag stays in the app while the pointer stays in its window: the drop target under
 the pointer is highlighted, a label follows the pointer, Esc cancels, a release over a matching
@@ -4637,6 +4722,10 @@ way in like every pointer event; the label next to the pointer is drawn through 
   DT_FILES); those drops arrive as UIC_DROP
 - **`fn drag_over(&self) -> (u32, i32, i32)`**
   drag_over() -> (DT_\* kinds, x, y DIP): the drag over the live window, (0, 0, 0) = none
+- **`fn drag_over_px(&self) -> (u32, i32, i32)`**
+  drag_over_px() -> (DT_\* kinds, x, y px): drag_over with the position in px of the live
+  window, exact (logical like `last_rect`; minus a canvas's `UiInput::rect`: the point in
+  the canvas's own pixels); (0, 0, 0) = none
 - **`fn drop_effect(&self) -> u32`**
   the effect of the last drop (DE_\*)
 
@@ -5549,7 +5638,7 @@ DLG_CLOSE: u32 = 3
 ```rust
 TB_CAP_MASK: u32 = 0x007F_FFFF  // the capacity in bytes (at most 8 MB)
 TB_HYPHENATE: u32 = 0x0080_0000  // with TB_MULTI | TB_WRAP: hyphenate words that do not fit (hyph.rs)
-TB_PASSWORD: u32 = 0x0100_0000  // a dot per character; no copy / cut
+TB_PASSWORD: u32 = 0x0100_0000  // a dot per character; no copy / cut; the input method's purpose IP_PASSWORD while it has the keyboard
 TB_READONLY: u32 = 0x0200_0000  // selectable and copyable, not editable
 TB_DIGITS: u32 = 0x0400_0000  // accept only 0-9
 TB_MULTI: u32 = 0x0800_0000  // multi-line
@@ -6706,7 +6795,8 @@ app gets through ui::main!
 
   --register            register this program for PACKAGE filetypes= / schemes= (Windows:
                         HKCU\Software\Classes; Linux: a .desktop file, the own MIME types,
-                        mimeapps.list); defaults of other programs stay and are listed
+                        mimeapps.list); defaults of other programs stay and are listed; with
+                        browser=1 also as a web browser (Windows: Default Programs)
   --register-replace    the same, and those defaults go to this app too (the user's own pick
                         in Windows' dialog always stays)
   --unregister          remove exactly what the registration added, put back what it replaced
@@ -6721,7 +6811,29 @@ the program: exit code 0 done, 1 failed, 2 not possible here or nothing declared
                         once the setup installed the program or --register registered it
                         (plat::assoc::app_id_boot), before the first window
   assoc_switch(pkg, switch) -> Option<(exit code, text)>   one switch for pkg (None: no switch)
+
+(E13) A web browser (PACKAGE browser=1):
+  ui.default_browser() -> BrowserStatus   plat::default_browser_status; headless runs: what the
+                        script said (`system browser default|other|unknown`, at first other;
+                        the command then sends UIC_ACTIVE 0 and 1 as a real change would)
+  ui.default_browser_request() -> Result<(), AssocError>   plat::default_browser_request (the
+                        system's page or question); headless runs open nothing: they print
+                        "ui_default_browser_request" and answer Ok
 ```
+
+**`impl Ui`**
+
+- **`fn default_browser(&self) -> BrowserStatus`**
+  (PACKAGE browser=1) is this app the system's web browser (plat::default_browser_status:
+  Default, NotDefault, Unknown).  Keep the answer and ask again when the app is active
+  again (UIC_ACTIVE 1): the user may have chosen in the system's settings.  Headless runs
+  answer what the script said (`system browser default|other|unknown`, at first
+  NotDefault; the command is followed by UIC_ACTIVE 0 and 1, as a real change would be)
+- **`fn default_browser_request(&mut self) -> Result<(), AssocError>`**
+  (PACKAGE browser=1) let the user make this app the web browser, from the user's click
+  (plat::default_browser_request: Windows' Settings at the app's page of the default apps,
+  Linux sets it, macOS asks).  Headless runs open nothing: they print
+  "ui_default_browser_request" and answer Ok
 
 - **`fn desk_boot(package: Option<&str>) -> Option<i32>`**
   (main!) PACKAGE, then the switches -> Some(exit code) when one of them ran
@@ -11523,8 +11635,9 @@ blend -- pixel row kernels (premultiplied 0xAARRGGBB, bytes B G R A)   [src/gfx/
   mask_over(row, mask, pcol)       the colour through an 8-bit coverage row
   blit_over(dst, src, opacity)     premultiplied src over dst (x opacity 0..255)
   a8_over(dst, cov, alpha)         8-bit target: c = cov * alpha / 255, dst = c + dst * (255 - c) / 255
-  copy_stream(dst, src) / stream_fence()   a row copy past the caches (simd; row bands
-                                   drawn on worker threads go back to the framebuffer so)
+  copy_stream(dst, src) / copy_stream_rows(...)   a row copy, or a block of rows, past the
+                                   caches (simd; row bands drawn on worker threads go back to
+                                   the framebuffer so); stream_fence() is in them
 
 "over": dst = src + dst * (255 - src_alpha) / 255 with exact rounding (div255) and the
 saturation of the SSE2 kernels (packuswb).  fill_over, mask_over and a8_over are SIMD
@@ -11533,7 +11646,7 @@ blit_over is the assembly's SSE2 loop on pixel pairs, because its pair skip (bot
 transparent: dst kept) is visible for invalid premultiplied input.
 ```
 
-Re-exports: `simd::{copy_stream, stream_fence}`
+Re-exports: `simd::{copy_stream, copy_stream_rows, stream_fence}`
 
 - **`fn fill_solid(row: &mut [u8], c: u32)`**
   k_fill_solid: store one colour into every pixel of the row
@@ -25435,7 +25548,8 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            / set_app_user_model_id (Windows: the app's explicit id)        (taskbar.rs)
   assoc:   assoc_register / assoc_conflicts / assoc_unregister: the app's PACKAGE file types
            and URL schemes for this program without a setup (HKCU\Software\Classes; .desktop,
-           shared-mime-info, mimeapps.list), file_uri_path                    (assoc.rs)
+           shared-mime-info, mimeapps.list), file_uri_path; default_browser_status /
+           default_browser_request (PACKAGE browser=1)                        (assoc.rs)
   recent:  recent_add / recent_list / recent_remove / recent_clear: the system's recent files
            (SHAddToRecentDocs and the jump list; recently-used.xbel)          (recent.rs)
   audio:   Stream (open / open_fill, write, start / pause / stop, volume, latency, the default
@@ -26227,7 +26341,8 @@ watch -- changes below folders, as they happen (continuous data protection)
 
 Windows: ReadDirectoryChangesW per root (subtree, overlapped, 64 KiB buffer; an empty
 answer means the buffer overflowed).  Linux: inotify with a watch per folder; new folders
-are added (and reported whole), a full queue or the watch limit reports an overflow.
+are added (and reported whole), a full queue or the watch limit reports an overflow (a full
+queue after the whole tree is watched again: lost events may hide new folders).
 macOS: FSEvents with file events (dropped events report an overflow); iOS: none.
 Paths are absolute, in the form of the platform; the folder of a change is enough for a
 caller that walks the tree again.
@@ -26313,7 +26428,7 @@ Source: [`lib/plat/hosted.rs`](../lib/plat/hosted.rs)
 hosted -- a program with the standard library (feature std, docs/CRATES.md CR6); the only file
 of plat that names std, compiled only with that feature.  Its start is std's (the C runtime's
 entry, std's main), so plat has no entry point of its own: the program's fn main calls
-std_start (win.rs, linux_glibc.rs), which sets up what plat's entry sets up without std.
+std_start (win.rs, linux_glibc.rs, apple.rs), which sets up what plat's entry sets up without std.
 rt::main! and ui::main! write that fn main.
 
   exit(code)          plat::exit: std::process::exit, which writes out what std's stdout holds
@@ -28188,6 +28303,8 @@ setup (apps/installer), the .deb, MSIX and Flatpak declare them themselves (docs
                                       HKCU\Software\Classes the setup and assoc_register write
                                       (app_id: the program's AppUserModelID in its ProgIDs,
                                       "" = none)
+  package_entries(&Package, exe) -> [RegValue]   all of a package's values: reg_entries and,
+                                      with browser=1, the web browser's registration (below)
   app_id_boot() -> Option<id>         (ui::main!, Windows) PACKAGE's app id as the process's
                                       explicit AppUserModelID (taskbar.rs) once the setup
                                       installed this program (install.ini beside it names the
@@ -28203,6 +28320,10 @@ setup (apps/installer), the .deb, MSIX and Flatpak declare them themselves (docs
   assoc_unregister() -> Result<bool, AssocError>   undo exactly what the record lists (false:
                                       nothing was registered)
   assoc_registered() -> Option<String>   the program the record names
+  default_browser_status() -> BrowserStatus   (PACKAGE browser=1) is this app the system's web
+                                      browser: Default, NotDefault, Unknown (browser_status(pkg))
+  default_browser_request() -> Result<(), AssocError>   let the user make it the default: the
+                                      system's own page or question (browser_request(pkg))
   file_uri_path(arg) -> Option<String>   a local file:// URI as a path (Linux desktops hand
                                       files over as URIs for Exec=... %U)
   console_print(text)                 stdout, else the console the program was started from
@@ -28230,6 +28351,25 @@ Android: Unavailable.
 
 Not a permission of the manifest: only what PACKAGE declares is written, in the user's own
 part of the system (HKCU, $XDG_*_HOME).
+
+A web browser (PACKAGE browser=1, schemes= with http and https).  Windows: http and https get no
+keys of their own (HKCU\Software\Classes\http would stand in for the system's handler); the
+ProgID <app>URL opens web addresses (URL Protocol, the open command, Application with the
+name and icon), Software\Clients\StartMenuInternet\<app> is the browser of Default Programs
+(name, icon, the command, Capabilities: ApplicationName / Description / Icon, StartMenu,
+URLAssociations http / https -> <app>URL, FileAssociations .<ext> -> the file types' ProgIDs)
+and Software\RegisteredApplications\<app> names its Capabilities.  Windows 10 and later never
+let a program take the default itself: browser_request opens Settings at the app's page of the
+default apps (ms-settings:defaultapps?registeredAppUser=<app>), the user decides there;
+browser_status reads the user's choice of http and https (UserChoiceLatest, else UserChoice).
+Linux: the .desktop file says Network;WebBrowser; besides the MIME types; browser_status reads
+the defaults of x-scheme-handler/http and https from the mimeapps.list files (as xdg-mime and
+xdg-settings do), browser_request writes the app as the user's default of those and of
+text/html (and KDE's BrowserApplication in kdeglobals): the user asked for it with the call, and
+the desktops offer no question of their own.  macOS: browser_status asks Launch Services for
+http's handler, browser_request sets it for http and https -- macOS asks the user itself ("Do you
+want to change your default web browser?").  In a Flatpak, an MSIX package, the browser and on
+Android / iOS: Unknown and Unavailable.
 ```
 
 - **`struct FileType`**
@@ -28247,6 +28387,8 @@ part of the system (HKCU, $XDG_*_HOME).
   - `categories: String` -- PACKAGE categories= (the .desktop file)
   - `types: Vec<FileType>`
   - `schemes: Vec<String>`
+  - `browser: bool` -- PACKAGE browser=1: the app is a web browser (registered as one; default_browser_status,
+    default_browser_request)
 
 - **`struct Conflict`**
   a default of another program that a registration would replace
@@ -28269,6 +28411,8 @@ part of the system (HKCU, $XDG_*_HOME).
   - `Empty` -- PACKAGE has no filetypes= and no schemes=
   - `Declined(Conflict)` -- a file of another program is in the way and take said no (Linux: the .desktop file)
   - `Failed(String)` -- the system refused or failed: what it said
+  - `NotRegistered` -- (default_browser_request) the app is not registered as a web browser here: PACKAGE
+    without browser=1, or neither the package nor --register registered this program
 
 - **`fn package_set(text: Option<&str>)`**
   (ui::main!) keep the built-in PACKAGE text (JFGUI_PACKAGE)
@@ -28279,7 +28423,7 @@ part of the system (HKCU, $XDG_*_HOME).
 **`impl Package`**
 
 - **`fn parse(text: &str) -> Package`**
-  "key=value" lines: display, app_id, categories, filetypes, schemes (the app is
+  "key=value" lines: display, app_id, categories, filetypes, schemes, browser (the app is
   vfs::app_id; missing values get the defaults of tools/pkgmeta.py)
 - **`fn mime_of(&self, path: &str) -> Option<String>`**
   the MIME type of a file name by its extension (own file types first), None when unknown
@@ -28312,6 +28456,46 @@ RV_DEFAULT: u8 = 2
   and assoc_register's.  app_id: the AppUserModelID the program runs under ("" = none, Windows
   derives one): each ProgID names it (AppUserModelID), as Windows wants for the recent files
   of an explicit id
+
+- **`fn package_entries(pkg: &Package, exe: &str) -> Vec<RegValue>`**
+  every HKCU value of pkg for the program exe: reg_entries of its file types and schemes and,
+  with browser=1, the web browser's registration in place of http's and https's own keys (the
+  ProgID &lt;app>URL, Software\\Clients\\StartMenuInternet\\&lt;app> with its Capabilities, the value
+  &lt;app> in Software\\RegisteredApplications) -- what the setup and assoc_register write
+
+- **`enum BrowserStatus`**
+  (default_browser_status) is the app the system's web browser
+  - `Default` -- web addresses (http and https) open with this app
+  - `NotDefault` -- with another program (or the app is no browser: PACKAGE without browser=1)
+  - `Unknown` -- the system does not say: no default set (Linux), or not to be found out here (a
+    Flatpak, the browser, Android, iOS)
+
+- **`fn default_browser_status() -> BrowserStatus`**
+  (PACKAGE browser=1) is this app the system's web browser (the built-in PACKAGE:
+  browser_status(&package())).  Ask again when the app's window is active again (UIC_ACTIVE):
+  the user may have changed it in the system's settings meanwhile
+
+- **`fn browser_status(pkg: &Package) -> BrowserStatus`**
+  is the app of pkg the system's web browser: Windows -- the user's choice of http and https
+  (UserChoiceLatest, else UserChoice) is its ProgID &lt;app>URL; Linux -- the mimeapps.list files'
+  defaults of x-scheme-handler/http and https name one of its .desktop files (none named:
+  Unknown); macOS -- Launch Services' handler of http and https is its bundle
+
+- **`fn default_browser_request() -> Result<(), AssocError>`**
+  (PACKAGE browser=1) let the user make this app the system's web browser (the built-in
+  PACKAGE: browser_request(&package())); call it from the user's click
+
+- **`fn browser_request(pkg: &Package) -> Result<(), AssocError>`**
+  let the user make the app of pkg the web browser: Windows 10 and later -- Settings opens at
+  the app's page of the default apps (ms-settings:defaultapps?registeredAppUser=&lt;app>; Windows
+  lets no program take the default itself), the user picks there; Linux -- the app's installed
+  .desktop file becomes the user's default of x-scheme-handler/http, https and text/html in
+  mimeapps.list (and KDE's BrowserApplication), as xdg-settings set default-web-browser does;
+  macOS -- Launch Services' handler of http and https, macOS asks the user.  Ok: asked or set
+  (read browser_status again later); NotRegistered: no browser=1, or this program is not
+  registered as a browser (install the package or run --register first); Unavailable: a
+  Flatpak, an MSIX package, the browser, Android, iOS.  jfgui_OPEN_DRYRUN=1 (Windows): the
+  page is printed, not opened
 
 - **`fn assoc_conflicts(pkg: &Package) -> Result<Vec<Conflict>, AssocError>`**
   the defaults of other programs a registration of pkg would replace (nothing is written)
@@ -28650,7 +28834,12 @@ SOUND_NOTIFY: u32 = 5
 - **`fn ring_check(n: usize, piece: usize, take: usize, threaded: bool) -> bool`**
   (tests) the ring of a push stream: n samples written in pieces of `piece` and read in
   pieces of `take`, by turns or (threaded, Windows / Linux) by a writer thread while this one
-  reads -> whether every sample arrived once and in order
+  reads -> whether every sample arrived once and in order.  The reader gives up after 20 s
+  (a loaded machine): then it tells the writer to stop, which may wait at a full ring, and
+  the check fails instead of waiting for it forever
+
+- **`fn ring_check_within(n: usize, piece: usize, take: usize, threaded: bool, limit_us: u64) -> bool`**
+  (tests) ring_check with the reader's time limit in µs (a short one: the writer must stop)
 
 - **`fn theme_path(kind: u32) -> Option<String>`** *(Linux)*
   (tests, Linux) the sound theme's file for a SOUND_\* kind (".disabled": switched off)
@@ -30441,6 +30630,10 @@ callbacks (refresh, hit hook) never hold a reference across a Win32 call.
 - **`fn win_set_cursor(w: i32, shape: u32)`**
   CUR_\* shape while the pointer is over window w
 
+- **`fn cursor_probe(shape: u32, dpi: i32) -> (u64, i32)`**
+  (tests) the cursor Windows shows for shape in a window of this dpi: its HCURSOR and, for a
+  drawn one, its width in px (0: a system cursor or cursor_fallback's)
+
 - **`fn cursor_create(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, _dpi: i32) -> i32`**
   a cursor from w x h premultiplied 0xAARRGGBB pixels (rows of w \* 4 bytes), hot spot in px:
   a 32-bit top-down DIB section with straight alpha + an empty AND mask -> CreateIconIndirect;
@@ -30791,6 +30984,7 @@ folder, the drives, start this program again
        the call is printed to stdout and 0 returned (tests).
   open_url(url) -> 0 / -1   a web page (http / https / mailto ...) in the default
        application (ShellExecuteW "open" on the URL); the same dry run
+  settings_open(page) -> bool   (assoc.rs) a page of Settings (ms-settings:...); the same dry run
   theme() -> 0 light, 1 dark, -1 unknown (HKCU ... Personalize\AppsUseLightTheme)
   home() -> %USERPROFILE% (or "C:/")       drives() -> "C:/", "D:/", ...
   spawn_self(args) -> 0 / -1   this executable again: "exe" "arg1" "arg2" ... (every
@@ -31535,6 +31729,8 @@ BK_X11: u32 = 2
   - `fn cursor_create(&mut self, px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, dpi: i32) -> i32`
   - `fn cursor_destroy(&mut self, id: i32)`
   - `fn cursor_dpi(&mut self, dpi: i32) -> i32`
+  - `fn cursor_probe(&mut self, _shape: u32, _dpi: i32) -> (u64, i32)`
+    (tests) the cursor shown for shape at dpi and the width of a drawn one
   - `fn clip_set(&mut self, fmt: u32, data: &[u8]) -> bool`
   - `fn clip_set_many(&mut self, entries: &[(u32, &[u8])]) -> bool`
   - `fn clip_get(&mut self, fmt: u32) -> Option<Vec<u8>>`
@@ -31629,6 +31825,11 @@ BK_X11: u32 = 2
 
 - **`fn cursor_dpi(dpi: i32) -> i32`**
   the dpi to draw a cursor for a window of this dpi (no display yet: the dpi itself)
+
+- **`fn cursor_probe(shape: u32, dpi: i32) -> (u64, i32)`**
+  (tests, E3) the cursor shown for shape (CUR_\*) in a window of this dpi: its id (X11: the
+  Cursor; 0 without a display or on Wayland) and, for a drawn one (cursor_art), its width in
+  px (0: a system cursor or cursor_fallback's)
 
 - **`fn clip_set(fmt: u32, data: &[u8]) -> bool`**
 
@@ -32199,6 +32400,7 @@ socket, wait_events polls it alone (headless).
 
 - **`fn join(self)`**
   wait until the thread has ended, then free its stack  [plat_thread_join]
+  (a thread joining itself returns at once and keeps its stack: it still runs on it)
 
 ### `plat/linux_print.rs` (Linux)
 
@@ -32314,11 +32516,19 @@ a driver's getenv reads the start environment.
   open a library through the system's dynamic linker (a name, searched as ld.so does, or a path)
   and run its initialisers -> its handle
 
-- **`fn dl_sym(handle: usize, name: &[u8]) -> usize`**
+- **`unsafe fn dl_sym(handle: usize, name: &[u8]) -> usize`**
   the address of a symbol of a library from dl_open (0: none); name ends in NUL
 
-- **`fn dl_close(handle: usize)`**
+  # Safety
+  `handle` came from dl_open and has not been closed: the dynamic linker reads its structures
+  before it could tell a wrong handle.
+
+- **`unsafe fn dl_close(handle: usize)`**
   close a library from dl_open
+
+  # Safety
+  `handle` came from dl_open and is closed once; nothing uses what dl_sym found in it any more
+  (the library may be unloaded).
 
 - **`fn dl_error() -> String`**
   why the calling thread's last dl_open / dl_sym failed ("": it did not, or it was already asked)
@@ -32512,12 +32722,18 @@ environment, time, files (apple_sys.rs), threads, semaphores, the wake-up, syste
 (apple_disp.rs) until AP4.
 
 main(): libSystem's start calls it (a program without std); it calls the app's jfgui_main and ends
-the process with its result.  The arguments and the environment come from _NSGetArgv and
-_NSGetEnviron, so a program with std (whose main is std's) reads the same.
+the process with its result.  std_start() (feature std) does the same from the program's own fn
+main, whose main is std's.  The arguments and the environment come from _NSGetArgv and
+_NSGetEnviron, so a program with std reads the same.
 ```
 
 - **`extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32`**
   the entry libSystem's start calls (a program without std; std brings its own main)
+
+- **`fn std_start() -> !`**
+  (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
+  program's own): what main does without std, with rt's panic hook first and the end through
+  std::process::exit; with the feature unwind a panic that leaves the app ends it there
 
 - **`fn win_test_usage() -> (u64, u64, u64)`**
   (test aid) the process's CPU time (us), resident memory and its own footprint (bytes), as on
@@ -32841,6 +33057,10 @@ that never span a call into AppKit (AppKit calls back into the view and the dele
 
 - **`fn cursor_dpi(dpi: i32) -> i32`**
   the dpi to draw a cursor for a window of this dpi (the window's own)
+
+- **`fn cursor_probe(_shape: u32, _dpi: i32) -> (u64, i32)`**
+  (tests, E3) the cursor shown for shape at dpi and the width of a drawn one: not probed on
+  macOS (NSCursor has the shapes but zoom-in, zoom-out and cell, which drawn_cursor makes)
 
 - **`fn file_dialog(flags: u32, path: &mut String, exts: &[&str]) -> (i32, u32)`**
   the system's Open / Save panel (modal) -> (1 chosen / 0 cancelled / -1 none, index of the chosen
@@ -33711,6 +33931,10 @@ REQUEST_FULLSCREEN: u32 = 23
 - **`fn cursor_dpi(dpi: i32) -> i32`**
   Cursor scale follows the canvas DPI.
 
+- **`fn cursor_probe(_shape: u32, _dpi: i32) -> (u64, i32)`**
+  (tests, E3) the cursor shown for shape at dpi and the width of a drawn one: none here (the
+  system has the shapes, cursor_fallback's for the rest)
+
 - **`fn popup_anchor(_slot: u32, _anchor: [i32; 4], _kind: u32, _nat: [i32; 2])`**
   The canvas shows popups where the library put them (inside the canvas).
 
@@ -33890,11 +34114,19 @@ not a dangling pointer.
 - **`fn dl_open(name: &str) -> Option<usize>`**
   open a shared library (a name as the linker searches it, or a path) -> its handle
 
-- **`fn dl_sym(handle: usize, name: &[u8]) -> usize`**
+- **`unsafe fn dl_sym(handle: usize, name: &[u8]) -> usize`**
   a symbol of the library (name NUL-terminated) -> its address, 0 when missing
 
-- **`fn dl_close(handle: usize)`**
+  # Safety
+  `handle` came from dl_open and has not been closed: the dynamic linker reads its structures
+  before it could tell a wrong handle.
+
+- **`unsafe fn dl_close(handle: usize)`**
   give the library back
+
+  # Safety
+  `handle` came from dl_open and is closed once; nothing uses what dl_sym found in it any more
+  (the library may be unloaded).
 
 - **`fn gpu_thread_spawn(stack: usize, f: Start) -> Option<super::Thread>`**
   a real thread with stack bytes of stack (the output's jobs) -> its handle
@@ -34801,8 +35033,8 @@ IP_URL: u32 = 1
 IP_EMAIL: u32 = 2
 IP_NUMBER: u32 = 3
 IP_PHONE: u32 = 4
-/// no input method (Windows: the window's input context is taken away; Wayland: the password
-/// purpose)
+/// no input method (Windows: the window's input context is taken away; X11: no IBus; Wayland:
+/// the password purpose); ui's TB_PASSWORD boxes set it themselves
 IP_PASSWORD: u32 = 5
 IP_SEARCH: u32 = 6
 ```
@@ -34818,8 +35050,10 @@ IP_SEARCH: u32 = 6
 
 - **`fn ime_purpose(p: u32)`**
   (E4) the purpose of the text being typed (IP_\*): Windows takes the input method away for
-  IP_PASSWORD and gives it back for the others; Wayland's text input gets it as its content
-  purpose at the next enable; elsewhere it is only kept (ime_purpose_of)
+  IP_PASSWORD and gives it back for the others (also when a window gets the keyboard); X11 keeps
+  the keys of an IP_PASSWORD field from IBus; Wayland's text input gets it as its content
+  purpose (again when it changes while enabled); elsewhere it is only kept (ime_purpose_of).
+  ui's TB_PASSWORD boxes set IP_PASSWORD themselves while they have the keyboard
 
 - **`fn ime_purpose_of() -> u32`**
   (E4) ime_purpose's value
@@ -36511,6 +36745,8 @@ datetime -- calendar time: timestamps, civil dates, RFC 3339, time zones, cron s
   Timestamp { secs, nanos }          seconds since 1970-01-01 00:00 UTC
   Civil { year .. second, nanos }    a calendar date and wall time (no zone)
   days_from_civil / civil_from_days / days_in_month / is_leap / weekday (0 = Monday)
+  iso_week / iso_weeks_in_year / iso_week_monday   ISO 8601 weeks (Monday to Sunday, week 1
+                                     holds the year's first Thursday)
   rfc3339(ts) / rfc3339_offset(ts, offset) / parse_rfc3339(s)
   format_date_time(ts, &zone, en) / format_date / format_time / format_duration(secs, en)
   tz::Zone                           IANA zones with their current DST rule (zones.rs from
@@ -36577,6 +36813,19 @@ No clock here: plat::unix_time_ns gives "now"; datetime only computes.
 
 - **`fn weekday(y: i32, m: u8, d: u8) -> u8`**
   weekday of a date: 0 = Monday .. 6 = Sunday
+
+- **`fn iso_weeks_in_year(y: i32) -> u8`**
+  the ISO 8601 weeks of week-numbering year y: 53 when the year starts on a Thursday, or on a
+  Wednesday in a leap year, else 52
+
+- **`fn iso_week(y: i32, m: u8, d: u8) -> (i32, u8)`**
+  the ISO 8601 week of a date -> (its week-numbering year, the week 1 ..= 53): the days of
+  29 December to 3 January may lie in the week of the other year (2026-12-31 is 2026-W53,
+  2027-01-01 too)
+
+- **`fn iso_week_monday(y: i32, week: u8) -> (i32, u8, u8)`**
+  the Monday of ISO 8601 week `week` of week-numbering year y -> (year, month, day); a week
+  beyond the year's last counts on into the next year
 
 - **`fn rfc3339(ts: Timestamp) -> String`**
   "2026-10-12T19:58:00Z" (with ".123" milliseconds when the timestamp has them)

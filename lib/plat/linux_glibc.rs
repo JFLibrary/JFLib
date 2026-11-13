@@ -149,17 +149,25 @@ pub fn dl_open(name: &str) -> Option<usize> {
 }
 
 /// the address of a symbol of a library from dl_open (0: none); name ends in NUL
-pub fn dl_sym(handle: usize, name: &[u8]) -> usize {
+///
+/// # Safety
+/// `handle` came from dl_open and has not been closed: the dynamic linker reads its structures
+/// before it could tell a wrong handle.
+pub unsafe fn dl_sym(handle: usize, name: &[u8]) -> usize {
     if name.last() != Some(&0) {
         return 0;
     }
-    // SAFETY: a handle of dl_open, a NUL-terminated name.
+    // SAFETY: a handle of dl_open (the caller's promise), a NUL-terminated name.
     unsafe { dlsym(handle as *mut c_void, name.as_ptr()) as usize }
 }
 
 /// close a library from dl_open
-pub fn dl_close(handle: usize) {
-    // SAFETY: a handle of dl_open; the caller no longer uses what it got from it.
+///
+/// # Safety
+/// `handle` came from dl_open and is closed once; nothing uses what dl_sym found in it any more
+/// (the library may be unloaded).
+pub unsafe fn dl_close(handle: usize) {
+    // SAFETY: the caller's promise.
     unsafe { dlclose(handle as *mut c_void) };
 }
 

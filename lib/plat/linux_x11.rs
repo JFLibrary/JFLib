@@ -520,6 +520,10 @@ struct X11 {
     // (E3) the glyph cursors of CUR_X0 .. CUR_X_END (0: not made yet)
     cursors_x: [u32; (crate::CUR_X_END - crate::CUR_X0) as usize],
     cur_font: u32,
+    // (E3) the drawn cursors made so far (shape, size px, cursor id) and the desktop's cursor
+    // size with the dpi it was found out for (misc::cursor_px)
+    drawn: Vec<(u32, u32, u32)>,
+    cur_px: (i32, i32),
     xcust: [u32; CUR_USER_MAX as usize],
     xr_state: u32,
     xr_op: u32,
@@ -698,6 +702,8 @@ impl X11 {
             cursors: [0; CUR_COUNT as usize],
             cursors_x: [0; (crate::CUR_X_END - crate::CUR_X0) as usize],
             cur_font: 0,
+            drawn: Vec::new(),
+            cur_px: (0, 0),
             xcust: [0; CUR_USER_MAX as usize],
             xr_state: 0,
             xr_op: 0,
@@ -889,6 +895,9 @@ impl Display for Backend {
     }
     fn cursor_dpi(&mut self, dpi: i32) -> i32 {
         dpi // X11: the window's
+    }
+    fn cursor_probe(&mut self, shape: u32, dpi: i32) -> (u64, i32) {
+        with_x(|s| s.cursor_probe(shape, dpi))
     }
     fn clip_set(&mut self, fmt: u32, data: &[u8]) -> bool {
         with_x(|s| s.clip_set(fmt, data))

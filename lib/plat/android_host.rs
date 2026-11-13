@@ -75,20 +75,48 @@ unsafe extern "C" {
     fn lseek(fd: i32, off: i64, whence: i32) -> i64;
     fn fsync(fd: i32) -> i32;
     fn ftruncate(fd: i32, len: i64) -> i32;
+    fn gettid() -> i32;
 }
 
-static REPLY: SpinLock<Vec<u8>> = SpinLock::new(Vec::new());
+// the answers of host calls, one buffer per calling thread (its tid): the bridge copies into
+// a buffer after jfgui_reply returned, so no call on another thread may free it in between
+// (jfgui_reply is public, and the audio thread may ask the host too); call() takes its own back
+static REPLY: SpinLock<Vec<(i32, Vec<u8>)>> = SpinLock::new(Vec::new());
+
+fn tid() -> i32 {
+    // SAFETY: gettid has no preconditions.
+    unsafe { gettid() }
+}
 
 /// (bridge.c) a buffer of len bytes for the answer of a host call; 0 = no memory
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_reply(len: u32) -> usize {
+    let t = tid();
     let mut r = REPLY.lock();
-    r.clear();
-    if r.try_reserve_exact(len as usize).is_err() {
+    let k = match r.iter().position(|s| s.0 == t) {
+        Some(k) => k,
+        None => {
+            if r.try_reserve(1).is_err() {
+                return 0;
+            }
+            r.push((t, Vec::new()));
+            r.len() - 1
+        }
+    };
+    let b = &mut r[k].1;
+    b.clear();
+    if b.try_reserve_exact(len as usize).is_err() {
         return 0;
     }
-    r.resize(len as usize, 0);
-    r.as_mut_ptr() as usize
+    b.resize(len as usize, 0);
+    b.as_mut_ptr() as usize
+}
+
+/// the calling thread's answer buffer, taken out of REPLY (empty: none)
+fn take_reply() -> Vec<u8> {
+    let t = tid();
+    let mut r = REPLY.lock();
+    r.iter().position(|s| s.0 == t).map_or(Vec::new(), |k| r.swap_remove(k).1)
 }
 
 // one synchronous question to the Java host (the documents: only with fs.user, policy.rs)
@@ -99,11 +127,11 @@ pub(crate) fn call(kind: u32, payload: &[u8]) -> Option<Vec<u8>> {
             return None;
         }
     }
-    REPLY.lock().clear();
+    drop(take_reply()); // a buffer left on this thread (jfgui_reply called on its own)
     // SAFETY: payload is copied by the host before it returns; the answer arrives through
     // jfgui_reply on this thread (no lock is held across the call).
     let n = unsafe { jfgui_host_call(kind, payload.as_ptr(), payload.len()) };
-    let mut r = core::mem::take(&mut *REPLY.lock());
+    let mut r = take_reply();
     let n = usize::try_from(n).ok()?;
     r.truncate(n);
     (r.len() == n).then_some(r)

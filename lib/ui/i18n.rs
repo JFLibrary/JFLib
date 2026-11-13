@@ -275,6 +275,8 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Heute", "Today", "Aujourd’hui", "Hoy", "Oggi", "Vandaag", "Dzisiaj", "اليوم", "היום"],
     ["Vorheriger Monat", "Previous month", "Mois précédent", "Mes anterior", "Mese precedente", "Vorige maand", "Poprzedni miesiąc", "الشهر السابق", "החודש הקודם"],
     ["Nächster Monat", "Next month", "Mois suivant", "Mes siguiente", "Mese successivo", "Volgende maand", "Następny miesiąc", "الشهر التالي", "החודש הבא"],
+    ["Vorheriges Jahr", "Previous year", "Année précédente", "Año anterior", "Anno precedente", "Vorig jaar", "Poprzedni rok", "السنة السابقة", "השנה הקודמת"],
+    ["Nächstes Jahr", "Next year", "Année suivante", "Año siguiente", "Anno successivo", "Volgend jaar", "Następny rok", "السنة التالية", "השנה הבאה"],
     // key names of the shortcuts (Arabic and Hebrew keyboards print the English ones)
     ["Strg", "Ctrl", "Ctrl", "Ctrl", "Ctrl", "Ctrl", "Ctrl", "Ctrl", "Ctrl"],
     ["Umschalt", "Shift", "Maj", "Mayús", "Maiusc", "Shift", "Shift", "Shift", "Shift"],

@@ -88,6 +88,14 @@ pub(crate) fn ime_context_refresh() {
     }
 }
 
+/// (wndproc WM_SETFOCUS) the window that gets the keyboard follows ime_purpose (the purpose may
+/// have changed while another window had it): no input context for IP_PASSWORD, else its default
+pub(super) fn ime_context_focus(hwnd: isize) {
+    let pw = crate::ime_purpose_of() == crate::IP_PASSWORD;
+    // SAFETY: our window that just got the keyboard; IACE_DEFAULT (0x10) or no context.
+    unsafe { ImmAssociateContextEx(hwnd, 0, if pw { 0 } else { 0x10 }) };
+}
+
 /// (E4, wndproc) WM_IME_SETCONTEXT's flags: without the composition window while the app draws
 /// the composition itself (ime_inline)
 pub(super) fn ime_setcontext_flags(active: bool, lp: isize) -> isize {

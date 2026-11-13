@@ -64,6 +64,7 @@ mod ctx;
 mod cursor;
 mod data;
 mod datepick;
+pub use datepick::{DateRange, CAL_DAY, CAL_MONTH, CAL_WEEK}; // ui.calendar
 mod diagram; // node / edge canvas (diagram.rs)
 pub use diagram::{
     dg_edge_points, dg_hairline, dg_length, dg_paint_grid, dg_point_at, dg_stroke_edge, DEdge, DEv, DHit, DModel, DNode, DPort, DgFrame, DgGeo,
@@ -242,6 +243,7 @@ pub use keys::*;
 pub use layout::{dp_at, px2dip_at};
 pub use perm::boot;
 pub use assoc::{assoc_switch, desk_boot};
+pub use plat::BrowserStatus; // (E13) ui.default_browser
 pub use recent::{RECENT_KEEP, RecentOpen};
 // the library's version (the root Cargo.toml, docs/VERSIONING.md) and the app's own (apps/NAME/PACKAGE)
 pub use rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH};

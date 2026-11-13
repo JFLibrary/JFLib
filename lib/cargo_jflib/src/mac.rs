@@ -1,7 +1,9 @@
 // `cargo jflib mac [-p PKG] [--release] [--run [-- ARGS]]` -- the app as NAME.app for macOS
 // (docs/APPLE.md AP7c): the program for aarch64-apple-darwin, Info.plist from PACKAGE (display,
 // version, app_id, filetypes= as document types -- "own" ones exported as the app's types --,
-// schemes= as URL types), the icon as NAME.icns from res/app_*.png, signed ad hoc; with `sandbox`
+// schemes= as URL types; browser=1: http and https as the web URL type and the web documents with
+// their system types, so macOS lists the app as a web browser), the icon as NAME.icns from
+// res/app_*.png, signed ad hoc; with `sandbox`
 // in PERMISSIONS the App Sandbox and the entitlements its rules need.  The same bundle as the JFLib
 // repository's tools/apple.py mac_bundle.  On a Mac only (Apple's SDK, codesign).  --run starts it
 // through `open` (in the logged-in session, also from SSH) and waits for it.  jfgui_MAC_IDENTITY
@@ -252,8 +254,21 @@ fn array(items: &[String]) -> String {
     s + "</array>"
 }
 
+/// the system's type (UTI) of a web browser's document by its MIME type, and whether a browser
+/// is its Default viewer (LSHandlerRank; the others stay Alternate)
+fn web_uti(mime: &str) -> Option<(&'static str, bool)> {
+    match mime {
+        "text/html" => Some(("public.html", true)),
+        "application/xhtml+xml" => Some(("public.xhtml", true)),
+        "image/svg+xml" => Some(("public.svg-image", false)),
+        "application/pdf" => Some(("com.adobe.pdf", false)),
+        _ => None,
+    }
+}
+
 /// Info.plist from PACKAGE (see the file header)
 fn info_plist(meta: &Meta, name: &str, version: &str, icon: bool) -> Result<String, String> {
+    let browser = pkgmeta::browser(meta)?;
     let aid = pkgmeta::app_id(meta, name)?;
     let display = meta.or("display", name);
     let version = meta.or("version", version);
@@ -276,11 +291,22 @@ fn info_plist(meta: &Meta, name: &str, version: &str, icon: bool) -> Result<Stri
     if !types.is_empty() {
         d.push_str("\t<key>CFBundleDocumentTypes</key>\n\t<array>\n");
         for t in &types {
+            // a browser views the web documents (their system types; html: the Default viewer)
+            let web = if browser && !t.own { web_uti(&t.mime) } else { None };
+            let rank = match web {
+                _ if t.own => "Owner",
+                Some((_, true)) => "Default",
+                _ => "Alternate",
+            };
+            let content = match web {
+                _ if t.own => format!("<key>LSItemContentTypes</key>{}", array(&[format!("{aid}.{}", t.exts[0])])),
+                Some((uti, _)) => format!("<key>LSItemContentTypes</key>{}", array(&[uti.to_string()])),
+                None => String::new(),
+            };
             d.push_str(&format!(
-                "\t\t<dict><key>CFBundleTypeName</key><string>{}</string><key>CFBundleTypeRole</key><string>Editor</string>\
-                 <key>CFBundleTypeExtensions</key>{}<key>CFBundleTypeMIMETypes</key>{}<key>LSHandlerRank</key><string>{}</string>{}</dict>\n",
-                xml(&t.desc), array(&t.exts), array(std::slice::from_ref(&t.mime)), if t.own { "Owner" } else { "Alternate" },
-                if t.own { format!("<key>LSItemContentTypes</key>{}", array(&[format!("{aid}.{}", t.exts[0])])) } else { String::new() }));
+                "\t\t<dict><key>CFBundleTypeName</key><string>{}</string><key>CFBundleTypeRole</key><string>{}</string>\
+                 <key>CFBundleTypeExtensions</key>{}<key>CFBundleTypeMIMETypes</key>{}<key>LSHandlerRank</key><string>{rank}</string>{content}</dict>\n",
+                xml(&t.desc), if browser { "Viewer" } else { "Editor" }, array(&t.exts), array(std::slice::from_ref(&t.mime))));
         }
         d.push_str("\t</array>\n");
         let own: Vec<_> = types.iter().filter(|t| t.own).collect();
@@ -298,8 +324,17 @@ fn info_plist(meta: &Meta, name: &str, version: &str, icon: bool) -> Result<Stri
     }
     let schemes = pkgmeta::schemes(meta)?;
     if !schemes.is_empty() {
-        d.push_str(&format!("\t<key>CFBundleURLTypes</key>\n\t<array><dict><key>CFBundleURLName</key><string>{}</string>\
-                             <key>CFBundleURLSchemes</key>{}</dict></array>\n", xml(&aid), array(&schemes)));
+        // a browser's http and https: a URL type of their own, which macOS's list of web browsers reads
+        let (web, rest): (Vec<String>, Vec<String>) = schemes.into_iter().partition(|s| browser && (s == "http" || s == "https"));
+        d.push_str("\t<key>CFBundleURLTypes</key>\n\t<array>");
+        if !web.is_empty() {
+            d.push_str(&format!("<dict><key>CFBundleURLName</key><string>Web site URL</string><key>CFBundleTypeRole</key><string>Viewer</string>\
+                                 <key>CFBundleURLSchemes</key>{}</dict>", array(&web)));
+        }
+        if !rest.is_empty() {
+            d.push_str(&format!("<dict><key>CFBundleURLName</key><string>{}</string><key>CFBundleURLSchemes</key>{}</dict>", xml(&aid), array(&rest)));
+        }
+        d.push_str("</array>\n");
     }
     Ok(format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \
                 \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n{d}</dict>\n</plist>\n"))
@@ -386,5 +421,23 @@ mod tests {
         assert!(e.contains("com.apple.security.app-sandbox") && e.contains("network.client") && e.contains("files.downloads.read-write"));
         assert!(e.contains("home-relative-path.read-only</key>\n\t<array><string>/Projekte/</string></array>") && !e.contains("$TEMP"));
         assert!(entitlements(Some(&[("net.connect".into(), vec![])])).is_none() && entitlements(None).is_none());
+    }
+
+    #[test]
+    fn a_browser_plist() {
+        let types = "html,htm|text/html|HTML-Dokument; pdf|application/pdf|PDF-Dokument";
+        let m = Meta(vec![("schemes".into(), "http https narsil".into()), ("filetypes".into(), types.into()), ("browser".into(), "1".into())]);
+        let p = info_plist(&m, "netz", "1.0.0", false).unwrap();
+        assert!(p.contains("<dict><key>CFBundleURLName</key><string>Web site URL</string><key>CFBundleTypeRole</key><string>Viewer</string>\
+                            <key>CFBundleURLSchemes</key><array><string>http</string><string>https</string></array></dict>"), "{p}");
+        assert!(p.contains("<key>CFBundleURLSchemes</key><array><string>narsil</string></array>"), "{p}");
+        assert!(p.contains("<string>Viewer</string><key>CFBundleTypeExtensions</key><array><string>html</string><string>htm</string></array>\
+                            <key>CFBundleTypeMIMETypes</key><array><string>text/html</string></array><key>LSHandlerRank</key><string>Default</string>\
+                            <key>LSItemContentTypes</key><array><string>public.html</string></array>"), "{p}");
+        assert!(p.contains("<key>LSHandlerRank</key><string>Alternate</string><key>LSItemContentTypes</key><array><string>com.adobe.pdf</string></array>"), "{p}");
+        // without browser=1: one URL type, editors, no system types
+        let m = Meta(vec![("schemes".into(), "http https".into()), ("filetypes".into(), types.into())]);
+        let p = info_plist(&m, "netz", "1.0.0", false).unwrap();
+        assert!(!p.contains("Web site URL") && !p.contains("public.html") && p.contains("<string>Editor</string>"), "{p}");
     }
 }

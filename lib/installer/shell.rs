@@ -14,11 +14,14 @@
 //   sh_run(cmdline, dir, hidden) -> bool
 //   sh_assoc_set(entries) / sh_assoc_remove(list)   the file types and URL schemes (assoc.rs):
 //                                       registry values under HKCU, then SHChangeNotify
+//   sh_browser_request(pkg, headless) -> bool   (browser=1) Settings at the app's page of the
+//                                       default apps (plat::assoc::browser_request)
 //
 // Test mode: with the environment variable ASMINST_SHELL_DIR set, the desktop and the start
 // menu are <dir>\Desktop and <dir>\Programs, the pins <dir>\Pinned, and registry values go to
 // <dir>\registry.txt (the file types and schemes to <dir>\assoc.txt, "subkey|name=value"
-// lines) -- a test never touches the user's shell or registry.
+// lines) -- a test never touches the user's shell or registry; Settings never opens (the
+// default browser's page is printed).
 
 use alloc::format;
 use alloc::string::String;
@@ -162,6 +165,27 @@ pub(crate) fn sh_assoc_remove(list: &str) {
         }
     }
     plat::inst::assoc_changed();
+}
+
+/// (browser=1) Settings at the app's page of the default apps, the user picks there
+/// (plat::assoc::browser_request: the app must be registered, which the setup just did;
+/// jfgui_OPEN_DRYRUN=1 prints the page).  Test mode and script runs (headless) never open it:
+/// they print "setup_default_browser: <page>" -> opened / printed
+pub(crate) fn sh_browser_request(pkg: &plat::assoc::Package, headless: bool) -> bool {
+    if sh_testdir().is_some() || headless {
+        let mut app = String::new();
+        for &c in pkg.app.as_bytes() {
+            if c.is_ascii_alphanumeric() || b"-._~".contains(&c) {
+                app.push(c as char);
+            } else {
+                app.push_str(&format!("%{c:02X}"));
+            }
+        }
+        let line = format!("setup_default_browser: ms-settings:defaultapps?registeredAppUser={app}\n");
+        plat::write_stdout(line.as_bytes());
+        return true;
+    }
+    plat::assoc::browser_request(pkg).is_ok()
 }
 
 /// start a process (cmdline and dir UTF-8; dir None = the current one), hidden =

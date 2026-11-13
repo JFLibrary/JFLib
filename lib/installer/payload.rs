@@ -29,7 +29,9 @@ pub(crate) const PK_STYLE: u32 = 2;
 pub(crate) const PK_PREVIEW: u32 = 3;
 pub(crate) const PK_FILE: u32 = 5;
 const PF_ZLIB: u32 = 1;
-const PAY_MAX_ENT: u32 = 256;
+// entries: the table is checked against the payload's size, so more cost nothing (the asm's 256
+// were fewer than an app with std has licence files: about 2 per crate)
+const PAY_MAX_ENT: u32 = 65536;
 const PAY_MAX_USIZE: u32 = 0x1000_0000;
 pub(crate) const STY_MAX: usize = 8;
 
@@ -216,6 +218,7 @@ fn pl_parse(st: &mut Inst) -> Result<(), ()> {
     st.defsty = kv_get(&man, "default", 48).unwrap_or_default();
     st.types = kv_get(&man, "filetypes", 4096).unwrap_or_default();
     st.schemes = kv_get(&man, "schemes", 512).unwrap_or_default();
+    st.browser = kv_get(&man, "browser", 8).is_some_and(|b| b == "1");
     st.appid = kv_get(&man, "app_id", 128).filter(|a| a.bytes().all(|c| c.is_ascii_alphanumeric() || b"._".contains(&c))).unwrap_or_default();
     // descriptions: desc_<style id>
     for k in 0..st.sty.len() {

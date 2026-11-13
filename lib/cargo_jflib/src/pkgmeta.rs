@@ -7,7 +7,7 @@ use std::path::Path;
 
 use crate::png;
 
-pub(crate) struct Meta(Vec<(String, String)>);
+pub(crate) struct Meta(pub(crate) Vec<(String, String)>);
 
 impl Meta {
     /// PACKAGE in `dir` (none: empty)
@@ -82,6 +82,41 @@ pub(crate) fn schemes(meta: &Meta) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
+/// PACKAGE browser=: the app is a web browser (1; 0 or missing: not) -- it needs http and https
+/// in schemes=
+pub(crate) fn browser(meta: &Meta) -> Result<bool, String> {
+    match meta.get("browser") {
+        None | Some("0") => Ok(false),
+        Some("1") => {
+            let s = schemes(meta)?;
+            if ["http", "https"].iter().all(|w| s.iter().any(|x| x == w)) {
+                Ok(true)
+            } else {
+                Err("PACKAGE browser=1: schemes= must list http and https".to_string())
+            }
+        }
+        Some(v) => Err(format!("PACKAGE browser: {v:?} is neither 1 nor 0")),
+    }
+}
+
+/// PACKAGE categories= (default Utility;), a browser's with Network;WebBrowser; (the desktops
+/// list their web browsers by them)
+pub(crate) fn categories(meta: &Meta) -> Result<String, String> {
+    let mut c = meta.or("categories", "Utility;").to_string();
+    if browser(meta)? {
+        for need in ["Network", "WebBrowser"] {
+            if !c.split(';').any(|x| x.trim() == need) {
+                if !c.is_empty() && !c.ends_with(';') {
+                    c.push(';');
+                }
+                c += need;
+                c.push(';');
+            }
+        }
+    }
+    Ok(c)
+}
+
 /// the shared-mime-info XML of the app's own file types
 pub(crate) fn mime_package(types: &[&FileType]) -> String {
     let mut s = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<mime-info xmlns=\"http://www.freedesktop.org/standards/shared-mime-info\">\n");
@@ -107,7 +142,7 @@ pub(crate) fn desktop_entry(meta: &Meta, display: &str, exe: &str, icon: &str, w
     }
     Ok(format!("[Desktop Entry]\nType=Application\nName={display}\nGenericName={}\nComment={}\nExec={exe} {}\nIcon={icon}\nTerminal=false\n\
                 Categories={}\n{}",
-               meta.or("generic", display), meta.or("summary", ""), if urls.is_empty() { "%F" } else { "%U" }, meta.or("categories", "Utility;"),
+               meta.or("generic", display), meta.or("summary", ""), if urls.is_empty() { "%F" } else { "%U" }, categories(meta)?,
                if mimes.is_empty() { String::new() } else { format!("MimeType={};\n", mimes.join(";")) })
         + &wm_class.map(|w| format!("StartupWMClass={w}\n")).unwrap_or_default())
 }
@@ -226,5 +261,18 @@ mod tests {
         assert_eq!(app_id(&m, "hallo-2").unwrap(), "org.example.hallo_2");
         assert!(filetypes(&Meta(vec![("filetypes".into(), "x|bad|y".into())])).is_err());
         assert!(app_id(&Meta(vec![("app_id".into(), "org.9x.y".into())]), "a").is_err());
+    }
+
+    #[test]
+    fn a_browser() {
+        let m = Meta(vec![("schemes".into(), "http https".into()), ("filetypes".into(), "html,htm|text/html|HTML-Dokument".into()),
+                          ("categories".into(), "Network".into()), ("browser".into(), "1".into())]);
+        assert!(browser(&m).unwrap());
+        let d = desktop_entry(&m, "Netz", "netz", "netz", None).unwrap();
+        assert!(d.contains("\nCategories=Network;WebBrowser;\n") && d.contains("MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;\n")
+            && d.contains("Exec=netz %U\n"), "{d}");
+        assert!(!browser(&Meta(vec![])).unwrap() && categories(&Meta(vec![])).unwrap() == "Utility;");
+        assert!(browser(&Meta(vec![("schemes".into(), "https".into()), ("browser".into(), "1".into())])).unwrap_err().contains("http and https"));
+        assert!(browser(&Meta(vec![("browser".into(), "ja".into())])).is_err());
     }
 }

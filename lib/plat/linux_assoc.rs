@@ -16,9 +16,18 @@
 //   changed(notes)        update-mime-database $XDG_DATA_HOME/mime (when packages/ is there),
 //                         update-desktop-database $XDG_DATA_HOME/applications (when that folder
 //                         has a mimeinfo.cache); a missing tool is a note
+//   browser_status(pkg)   (browser=1) the defaults of x-scheme-handler/http and https: the first
+//                         installed id of the first mimeapps.list that names the type is one of
+//                         the app's .desktop ids (browser_ids); none named: on KDE [General]
+//                         BrowserApplication of $XDG_CONFIG_HOME/kdeglobals, else Unknown
+//   browser_request(pkg)  the app's first installed .desktop id as the user's default of
+//                         x-scheme-handler/http, https and text/html (xdg-settings set
+//                         default-web-browser does the same through xdg-mime), on KDE also
+//                         [General] BrowserApplication in $XDG_CONFIG_HOME/kdeglobals
 //
 // Files: $XDG_DATA_HOME/applications/<app_id>.desktop (Exec = the program, %U with schemes,
-// else %F; MimeType = the file types and x-scheme-handler/<scheme>), own types in
+// else %F; MimeType = the file types and x-scheme-handler/<scheme>; a browser's Categories with
+// Network;WebBrowser;), own types in
 // $XDG_DATA_HOME/mime/packages/<app_id>.xml.  The defaults of own types and schemes go to the
 // user's mimeapps.list that already names one for the type ($XDG_CONFIG_HOME/<desktop>-mimeapps.list,
 // mimeapps.list), else $XDG_CONFIG_HOME/mimeapps.list, as "<app_id>.desktop;" before the
@@ -30,7 +39,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use super::{AssocError, Conflict, Line, Package, Registered};
+use super::{AssocError, BrowserStatus, Conflict, Line, Package, Registered};
 use crate::linux_desk::in_flatpak;
 
 const SAVED: &str = ".jflib-saved";
@@ -122,11 +131,16 @@ fn installed(id: &str) -> bool {
 
 /// the value of key in the [Default Applications] group
 fn group_get(text: &str, key: &str) -> Option<String> {
+    group_get_in(text, GROUP, key)
+}
+
+/// the value of key in the group ("[Name]")
+fn group_get_in(text: &str, group: &str, key: &str) -> Option<String> {
     let mut inside = false;
     for line in text.lines() {
         let t = line.trim();
         if t.starts_with('[') {
-            inside = t == GROUP;
+            inside = t == group;
             continue;
         }
         if inside {
@@ -144,10 +158,15 @@ fn group_get(text: &str, key: &str) -> Option<String> {
 /// is replaced where it is, a new one goes after the group's last entry (a new group at the
 /// end); every other byte stays
 fn group_set(text: &str, key: &str, value: Option<&str>) -> String {
+    group_set_in(text, GROUP, key, value)
+}
+
+/// group_set for the group ("[Name]")
+fn group_set_in(text: &str, group: &str, key: &str, value: Option<&str>) -> String {
     let mut lines: Vec<String> = text.lines().map(String::from).collect();
     let newline = text.is_empty() || text.ends_with('\n');
     let entry = |l: &str| l.trim().split_once('=').is_some_and(|(k, _)| k.trim() == key);
-    match lines.iter().position(|l| l.trim() == GROUP) {
+    match lines.iter().position(|l| l.trim() == group) {
         Some(g) => {
             let end = lines[g + 1..].iter().position(|l| l.trim().starts_with('[')).map_or(lines.len(), |e| g + 1 + e);
             match (lines[g + 1..end].iter().position(|l| entry(l)).map(|p| g + 1 + p), value) {
@@ -167,7 +186,7 @@ fn group_set(text: &str, key: &str, value: Option<&str>) -> String {
             if lines.last().is_some_and(|l| !l.trim().is_empty()) {
                 lines.push(String::new());
             }
-            lines.push(String::from(GROUP));
+            lines.push(String::from(group));
             lines.push(format!("{key}={v}"));
         }
     }
@@ -257,7 +276,7 @@ fn desktop_text(pkg: &Package, exe: &str) -> String {
         }
     }
     let exec = crate::autostart::native::exec_line(exe, &[]);
-    let mut s = format!("[Desktop Entry]\nType=Application\nName={}\nExec={exec} {code}\nTerminal=false\nCategories={}\n", pkg.display, pkg.categories);
+    let mut s = format!("[Desktop Entry]\nType=Application\nName={}\nExec={exec} {code}\nTerminal=false\nCategories={}\n", pkg.display, categories(pkg));
     if !mimes.is_empty() {
         s.push_str(&format!("MimeType={};\n", mimes.join(";")));
     }
@@ -269,6 +288,24 @@ fn desktop_text(pkg: &Package, exe: &str) -> String {
         }
     }
     s
+}
+
+/// PACKAGE categories=, a browser's with Network;WebBrowser; (the desktops list the web browsers
+/// by them)
+fn categories(pkg: &Package) -> String {
+    let mut c = String::from(pkg.categories.as_str());
+    if pkg.browser {
+        for need in ["Network", "WebBrowser"] {
+            if !c.split(';').any(|x| x.trim() == need) {
+                if !c.is_empty() && !c.ends_with(';') {
+                    c.push(';');
+                }
+                c.push_str(need);
+                c.push(';');
+            }
+        }
+    }
+    c
 }
 
 fn mime_text(pkg: &Package) -> Option<String> {
@@ -400,33 +437,41 @@ pub fn register(pkg: &Package, exe: &str, take: &mut dyn FnMut(&Conflict) -> boo
                 continue;
             }
         }
-        let file = default_file(&m).ok_or_else(|| AssocError::Failed(String::from("no $XDG_CONFIG_HOME / $HOME")))?;
-        let existing = read_text(&file);
-        let made = match &existing {
-            None => "file",
-            Some(t) if !t.lines().any(|l| l.trim() == GROUP) => "group",
-            _ => "",
-        };
-        let before = existing.unwrap_or_default();
-        let old = group_get(&before, &m);
-        let mut value = format!("{ours};");
-        for id in old.as_deref().map(ids).into_iter().flatten().filter(|id| *id != ours) {
-            value.push_str(id);
-            value.push(';');
+        if let Some(l) = put_default(&m, &ours)? {
+            lines.push(l);
         }
-        if old.as_deref() == Some(value.as_str()) {
-            continue;
-        }
-        let dir = &file[..file.rfind('/').unwrap_or(0)];
-        if !crate::mkdir_raw(dir) || !crate::write_file_raw(&file, group_set(&before, &m, Some(&value)).as_bytes()) {
-            return Err(AssocError::Failed(format!("{file} was not written")));
-        }
-        let had = String::from(if old.is_some() { "1" } else { "0" });
-        lines.push(alloc::vec![String::from("default"), file, m, had, old.unwrap_or_default(), value, String::from(made)]);
     }
     done.types = if own_ok { pkg.types.len() } else { pkg.types.iter().filter(|t| !t.own).count() };
     done.schemes = pkg.schemes.len();
     Ok(())
+}
+
+/// ours first in the user's default of mime (the others after it) -> the record line ("default
+/// <list> <mime> <had> <old> <ours> <made>"), None when it was so already
+fn put_default(mime: &str, ours: &str) -> Result<Option<Line>, AssocError> {
+    let file = default_file(mime).ok_or_else(|| AssocError::Failed(String::from("no $XDG_CONFIG_HOME / $HOME")))?;
+    let existing = read_text(&file);
+    let made = match &existing {
+        None => "file",
+        Some(t) if !t.lines().any(|l| l.trim() == GROUP) => "group",
+        _ => "",
+    };
+    let before = existing.unwrap_or_default();
+    let old = group_get(&before, mime);
+    let mut value = format!("{ours};");
+    for id in old.as_deref().map(ids).into_iter().flatten().filter(|id| *id != ours) {
+        value.push_str(id);
+        value.push(';');
+    }
+    if old.as_deref() == Some(value.as_str()) {
+        return Ok(None);
+    }
+    let dir = &file[..file.rfind('/').unwrap_or(0)];
+    if !crate::mkdir_raw(dir) || !crate::write_file_raw(&file, group_set(&before, mime, Some(&value)).as_bytes()) {
+        return Err(AssocError::Failed(format!("{file} was not written")));
+    }
+    let had = String::from(if old.is_some() { "1" } else { "0" });
+    Ok(Some(alloc::vec![String::from("default"), file, String::from(mime), had, old.unwrap_or_default(), value, String::from(made)]))
 }
 
 pub fn undo(lines: &[Line]) {
@@ -466,6 +511,91 @@ pub fn undo(lines: &[Line]) {
             _ => {}
         }
     }
+}
+
+// ---------------------------------------------------------------- the web browser
+
+/// the .desktop ids the app may be installed under: this process's (linux_desk::desktop_id), the
+/// app id (--register, Flatpak, AppImage integration), the app's name and its lower case (the
+/// .deb's)
+fn browser_ids(pkg: &Package) -> Vec<String> {
+    let mut v: Vec<String> = Vec::new();
+    for id in [crate::linux_desk::desktop_id(), pkg.app_id.clone(), pkg.app.clone(), pkg.app.to_ascii_lowercase()] {
+        let id = format!("{id}.desktop");
+        if !v.contains(&id) {
+            v.push(id);
+        }
+    }
+    v
+}
+
+/// the program that opens mime: the first installed id of the first mimeapps.list naming it
+fn default_of(mime: &str) -> Option<String> {
+    let (files, _) = mimeapps_files();
+    for f in &files {
+        let Some(v) = read_text(f).and_then(|t| group_get(&t, mime)) else { continue };
+        if let Some(id) = ids(&v).find(|id| installed(id)) {
+            return Some(String::from(id));
+        }
+    }
+    None
+}
+
+/// KDE's own choice of the web browser ([General] BrowserApplication in the user's kdeglobals,
+/// which KDE's programs ask): a .desktop id ("firefox.desktop", also without ".desktop") or
+/// "!command"; None when it is not set
+fn kde_browser() -> Option<String> {
+    let text = read_text(&format!("{}/kdeglobals", crate::config_dir()?))?;
+    let v = group_get_in(&text, "[General]", "BrowserApplication").or_else(|| group_get_in(&text, "[General]", "BrowserApplication[$e]"))?;
+    (!v.is_empty()).then_some(v)
+}
+
+pub fn browser_status(pkg: &Package) -> BrowserStatus {
+    if in_flatpak() {
+        return BrowserStatus::Unknown; // the host's mimeapps.list is out of sight
+    }
+    let ours = browser_ids(pkg);
+    let mut unknown = false;
+    for m in ["x-scheme-handler/http", "x-scheme-handler/https"] {
+        match default_of(m) {
+            Some(id) if ours.contains(&id) => {}
+            Some(_) => return BrowserStatus::NotDefault,
+            None => unknown = true,
+        }
+    }
+    if !unknown {
+        return BrowserStatus::Default;
+    }
+    // mimeapps.list does not say: KDE's own setting (a command "!..." is another program)
+    if !desktops().iter().any(|d| d == "kde") {
+        return BrowserStatus::Unknown;
+    }
+    match kde_browser() {
+        None => BrowserStatus::Unknown,
+        Some(v) if v.starts_with('!') => BrowserStatus::NotDefault,
+        Some(v) => {
+            let id = if v.ends_with(".desktop") { v } else { format!("{v}.desktop") };
+            if ours.contains(&id) && installed(&id) { BrowserStatus::Default } else { BrowserStatus::NotDefault }
+        }
+    }
+}
+
+pub fn browser_request(pkg: &Package) -> Result<(), AssocError> {
+    available()?;
+    let id = browser_ids(pkg).into_iter().find(|id| installed(id)).ok_or(AssocError::NotRegistered)?;
+    for m in ["x-scheme-handler/http", "x-scheme-handler/https", "text/html"] {
+        put_default(m, &id)?;
+    }
+    // KDE asks kdeglobals for the browser of its own programs (xdg-settings writes it there too)
+    if desktops().iter().any(|d| d == "kde") {
+        let file = crate::config_dir().map(|c| format!("{c}/kdeglobals")).ok_or_else(|| AssocError::Failed(String::from("no $XDG_CONFIG_HOME / $HOME")))?;
+        let before = read_text(&file).unwrap_or_default();
+        let after = group_set_in(&before, "[General]", "BrowserApplication", Some(&id));
+        if after != before && !crate::write_file_raw(&file, after.as_bytes()) {
+            return Err(AssocError::Failed(format!("{file} was not written")));
+        }
+    }
+    Ok(())
 }
 
 /// run a tool of the desktop (from PATH) with args, at most 30 s -> its exit code, None when

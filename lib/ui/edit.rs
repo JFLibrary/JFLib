@@ -5,6 +5,8 @@
 //        WinUI TextBox (32 DIP high).  buf: the app's UTF-8 text; cap_flags = the size of
 //        the asm's buffer in bytes incl. the NUL (bits 0..22: the text holds at most cap - 1
 //        bytes) | TB_PASSWORD | TB_READONLY | TB_DIGITS | TB_SIGNED.  placeholder (or None)
+//        TB_PASSWORD: while it has the keyboard the input method's purpose is IP_PASSWORD (set
+//        by the box itself, the purpose of before put back after; no plat::ime_purpose needed).
 //        shows while the text is empty (cut with "…" where the box is narrower).
 //        ST_DISABLED via next_flags.
 //        EV_ACT: the text changed this frame; EV_COMMIT: Enter, Esc or focus lost; EV_FOCUS
@@ -135,6 +137,8 @@ pub(crate) struct S {
     surface_start: Option<usize>,
     surface_change: Option<(usize, usize, String)>,
     ime_frame: Option<u32>, // the frame of the last caret told to the platform (ime_pos)
+    pw_purpose: Option<u32>, // a TB_PASSWORD box set IP_PASSWORD: the purpose before it (put back after)
+    pw_frame: u32,           // the frame it last had the keyboard in
     // ---- the focused editor (g_ed_*): box ed_id of window ed_win (two windows may have boxes
     // of the same id; the edit state is the one box's of the window with the keyboard)
     ed_id: u32, // 0 = none
@@ -205,6 +209,8 @@ impl Default for S {
             surface_start: None,
             surface_change: None,
             ime_frame: None,
+            pw_purpose: None,
+            pw_frame: 0,
             ed_id: 0,
             ed_win: 0,
             ed_blur: 0,
@@ -719,6 +725,8 @@ impl Ui {
                 self.draw_rect(x, top, hair, lh);
             }
             plat::ime_inline(false); // (E4) the input method's window shows the composition
+            let pw = self.m.edit.tb_flags & TB_PASSWORD != 0;
+            self.tb_purpose(pw);
             self.ime_pos(x, top, lh);
         }
         self.ltr_end();
@@ -1002,6 +1010,7 @@ impl Ui {
                 self.draw_rect(x, ly, hair, lh);
             }
             plat::ime_inline(false); // (E4) the input method's window shows the composition
+            self.tb_purpose(false);
             self.ime_pos(x, ly, lh);
         }
         if copy {
@@ -1296,6 +1305,7 @@ impl Ui {
     /// hides the method's composition window, its candidates stay at the caret); IP_PASSWORD
     /// takes the input method away (Windows) or says so (Wayland).  Off: the method goes
     pub fn ime_enable(&mut self, on: bool, purpose: u32) {
+        self.m.edit.pw_purpose = None; // the app's own field says its purpose itself
         plat::ime_purpose(if on { purpose } else { plat::IP_TEXT });
         plat::ime_inline(on);
         if !on {
@@ -1327,7 +1337,33 @@ impl Ui {
     fn ime_off(&mut self) {
         #[cfg(target_os = "android")]
         plat::android_ime_clear();
+        self.tb_purpose(false);
         self.ime_pos(0, 0, 0);
+    }
+
+    // tb_purpose(pw): a TB_PASSWORD box with the keyboard sets the input method's purpose to
+    // IP_PASSWORD itself (Windows takes the input method away, X11 keeps the keys from IBus,
+    // Wayland tells the compositor; the app calls no plat::ime_purpose); any other text box with
+    // the keyboard, and the password box losing it, put back the purpose of before
+    fn tb_purpose(&mut self, pw: bool) {
+        if pw {
+            if self.m.edit.pw_purpose.is_none() {
+                self.m.edit.pw_purpose = Some(plat::ime_purpose_of());
+            }
+            self.m.edit.pw_frame = self.frame;
+            plat::ime_purpose(plat::IP_PASSWORD);
+        } else if let Some(p) = self.m.edit.pw_purpose.take() {
+            plat::ime_purpose(p);
+        }
+    }
+
+    // (frame_end) the password box that set IP_PASSWORD did not have the keyboard in this frame
+    // (it went away with its window, or another editor took the keyboard): the purpose of
+    // before comes back
+    pub(crate) fn pw_frame_end(&mut self) {
+        if self.m.edit.pw_purpose.is_some() && self.m.edit.pw_frame != self.frame {
+            self.tb_purpose(false);
+        }
     }
 
     // ------------------------------------------------------------------ focus and edit state

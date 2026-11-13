@@ -205,7 +205,7 @@ struct Float {
 }
 
 // a hidden panel and where it comes back (also: where a panel was before it moved)
-#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
 struct Hidden {
     panel: u32,
     /// DOCK_* (DOCK_FLOAT: a floating window at rect)
@@ -215,6 +215,25 @@ struct Hidden {
     rect: [i32; 4],
     home: u8,
     home_tag: u32,
+    /// the tab order of its group when it left, the group's panels hidden before it included
+    /// (a panel comes back between the neighbours it had, whichever of them are back already;
+    /// empty: pos counts)
+    order: Vec<u32>,
+}
+
+// the visible tabs of a group in their order, with the panels of an order of before (a hidden
+// one's) put between them where that order had them
+fn merge_order(visible: &[u32], before: &[u32]) -> Vec<u32> {
+    let mut out: Vec<u32> = visible.to_vec();
+    for (i, &m) in before.iter().enumerate() {
+        if out.contains(&m) {
+            continue;
+        }
+        // after the nearest panel before it there that is placed already, else at the front
+        let at = before[..i].iter().rev().find_map(|q| out.iter().position(|x| x == q)).map_or(0, |k| k + 1);
+        out.insert(at, m);
+    }
+    out
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -228,7 +247,8 @@ enum Loc {
 /// the layout of a dock area: kept by the app and passed to dock_begin / dock_next /
 /// dock_end.  save() / load() turn it into a few lines of text: `dock 1`, then `side S SIZE
 /// COLLAPSED`, `group S TAG SIZE ACTIVE PANEL...`, `float SLOT X Y W H HOME HOMETAG ACTIVE
-/// PANEL...`, `hidden PANEL S TAG POS X Y W H HOME HOMETAG` (unknown lines are skipped).
+/// PANEL...`, `hidden PANEL S TAG POS X Y W H HOME HOMETAG [ORDER...]` (ORDER: its group's tab
+/// order when it left; unknown lines are skipped).
 #[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub struct DockState {
     sides: [Side; 3],
@@ -275,18 +295,21 @@ impl DockState {
         }
         match self.loc(id) {
             Loc::Side(s, g, t) => {
+                let tag = self.sides[s].groups[g].tag;
+                // the group's order with the panels hidden from it before (the latest one knows it)
+                let earlier = self.hidden.iter().rev().find(|h| h.side == s as u8 && h.tag == tag && !h.order.is_empty());
+                let order = merge_order(&self.sides[s].groups[g].panels, earlier.map_or(&[][..], |h| &h.order));
                 let gr = &mut self.sides[s].groups[g];
-                let tag = gr.tag;
                 unlink(gr, t, id);
                 if gr.panels.is_empty() {
                     self.sides[s].groups.remove(g);
                 }
-                Some(Hidden { panel: id, side: s as u8, tag, pos: t as u32, rect: [0; 4], home: s as u8, home_tag: tag })
+                Some(Hidden { panel: id, side: s as u8, tag, pos: t as u32, rect: [0; 4], home: s as u8, home_tag: tag, order })
             }
             Loc::Float(f, t) => {
                 let fl = &mut self.floats[f];
                 unlink(&mut fl.group, t, id);
-                let h = Hidden { panel: id, side: DOCK_FLOAT, tag: 0, pos: t as u32, rect: fl.rect, home: fl.home, home_tag: fl.home_tag };
+                let h = Hidden { panel: id, side: DOCK_FLOAT, tag: 0, pos: t as u32, rect: fl.rect, home: fl.home, home_tag: fl.home_tag, order: Vec::new() };
                 if fl.group.panels.is_empty() {
                     self.floats.remove(f);
                 }
@@ -351,11 +374,21 @@ impl DockState {
         true
     }
 
-    // a place taken with take: the panel goes back there
+    // where panel id goes back into group (s, tag): before the first tab of the group that came
+    // after it in order, else after the last one that came before it (None: order says nothing)
+    fn order_pos(&self, s: usize, tag: u32, order: &[u32], id: u32) -> Option<usize> {
+        let gr = self.sides[s].groups.iter().find(|g| g.tag == tag)?;
+        let at = order.iter().position(|&p| p == id)?;
+        let pos = |q: &u32| gr.panels.iter().position(|p| p == q);
+        order[at + 1..].iter().find_map(pos).or_else(|| order[..at].iter().rev().find_map(pos).map(|k| k + 1))
+    }
+
+    // a place taken with take: the panel goes back there (between the neighbours it had)
     fn restore(&mut self, h: Hidden) {
         let id = h.panel;
         if h.side < DOCK_FLOAT {
-            self.put_tabs(h.side as usize, h.tag, h.pos as usize, &[id], id);
+            let pos = self.order_pos(h.side as usize, h.tag, &h.order, id).unwrap_or(h.pos as usize);
+            self.put_tabs(h.side as usize, h.tag, pos, &[id], id);
         } else if !self.put_float(h.rect, h.home, h.home_tag, &[id], id) {
             self.put_tabs(h.home.min(DOCK_BOTTOM) as usize, h.home_tag, usize::MAX, &[id], id);
         }
@@ -378,7 +411,7 @@ impl DockState {
             let rect = self.cascade();
             if p.flags & DP_HIDDEN != 0 {
                 let side = if float { DOCK_FLOAT } else { home };
-                self.hidden.push(Hidden { panel: p.id, side, tag, pos: u32::MAX, rect, home, home_tag: tag });
+                self.hidden.push(Hidden { panel: p.id, side, tag, pos: u32::MAX, rect, home, home_tag: tag, order: Vec::new() });
                 continue;
             }
             if float && self.put_float(rect, home, tag, &[p.id], p.id) {
@@ -642,7 +675,8 @@ impl DockState {
         }
         for h in &self.hidden {
             let r = h.rect;
-            let _ = writeln!(o, "hidden {} {} {} {} {} {} {} {} {} {}", h.panel, h.side, h.tag, h.pos, r[0], r[1], r[2], r[3], h.home, h.home_tag);
+            let _ = write!(o, "hidden {} {} {} {} {} {} {} {} {} {}", h.panel, h.side, h.tag, h.pos, r[0], r[1], r[2], r[3], h.home, h.home_tag);
+            list(&mut o, &h.order);
         }
         o
     }
@@ -722,6 +756,7 @@ impl DockState {
                         rect,
                         home: num(8).clamp(0, 2) as u8,
                         home_tag: id(9) & 0x00FF_FFFF,
+                        order: (10..v.len()).map(id).filter(|&p| p != 0).collect(),
                     });
                 }
                 _ => {}

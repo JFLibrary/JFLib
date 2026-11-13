@@ -1,7 +1,7 @@
 // hosted -- a program with the standard library (feature std, docs/CRATES.md CR6); the only file
 // of plat that names std, compiled only with that feature.  Its start is std's (the C runtime's
 // entry, std's main), so plat has no entry point of its own: the program's fn main calls
-// std_start (win.rs, linux_glibc.rs), which sets up what plat's entry sets up without std.
+// std_start (win.rs, linux_glibc.rs, apple.rs), which sets up what plat's entry sets up without std.
 // rt::main! and ui::main! write that fn main.
 //
 //   exit(code)          plat::exit: std::process::exit, which writes out what std's stdout holds

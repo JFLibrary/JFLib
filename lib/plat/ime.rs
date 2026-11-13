@@ -37,8 +37,8 @@ pub const IP_URL: u32 = 1;
 pub const IP_EMAIL: u32 = 2;
 pub const IP_NUMBER: u32 = 3;
 pub const IP_PHONE: u32 = 4;
-/// no input method (Windows: the window's input context is taken away; Wayland: the password
-/// purpose)
+/// no input method (Windows: the window's input context is taken away; X11: no IBus; Wayland:
+/// the password purpose); ui's TB_PASSWORD boxes set it themselves
 pub const IP_PASSWORD: u32 = 5;
 pub const IP_SEARCH: u32 = 6;
 
@@ -62,8 +62,10 @@ pub fn ime_inline_on() -> bool {
 }
 
 /// (E4) the purpose of the text being typed (IP_*): Windows takes the input method away for
-/// IP_PASSWORD and gives it back for the others; Wayland's text input gets it as its content
-/// purpose at the next enable; elsewhere it is only kept (ime_purpose_of)
+/// IP_PASSWORD and gives it back for the others (also when a window gets the keyboard); X11 keeps
+/// the keys of an IP_PASSWORD field from IBus; Wayland's text input gets it as its content
+/// purpose (again when it changes while enabled); elsewhere it is only kept (ime_purpose_of).
+/// ui's TB_PASSWORD boxes set IP_PASSWORD themselves while they have the keyboard
 pub fn ime_purpose(p: u32) {
     if PURPOSE.swap(p, core::sync::atomic::Ordering::Relaxed) != p {
         #[cfg(windows)]

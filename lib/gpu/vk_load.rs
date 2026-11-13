@@ -110,9 +110,11 @@ impl Drop for Lib {
 impl Lib {
     pub fn open(name: &str) -> Result<Lib> {
         let module = plat::dl_open(name).ok_or(GpuError::NoLoader)?;
-        let p = plat::dl_sym(module, b"vkGetInstanceProcAddr\0");
+        // SAFETY: module is the open handle of the line above.
+        let p = unsafe { plat::dl_sym(module, b"vkGetInstanceProcAddr\0") };
         if p == 0 {
-            plat::dl_close(module);
+            // SAFETY: as above; nothing of it was used.
+            unsafe { plat::dl_close(module) };
             return Err(GpuError::NoLoader);
         }
         // SAFETY: vkGetInstanceProcAddr has this prototype (vulkan_core.h).
@@ -125,7 +127,8 @@ impl Lib {
 impl Drop for Lib {
     fn drop(&mut self) {
         // the instance that used the loader is destroyed before (InstShared field order)
-        plat::dl_close(self.module as usize);
+        // SAFETY: the handle of Lib::open, closed here once; nothing calls into the loader any more.
+        unsafe { plat::dl_close(self.module as usize) };
     }
 }
 

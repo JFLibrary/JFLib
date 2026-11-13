@@ -541,7 +541,8 @@ In addition:
 - **Android.** The APK installs the manifest like a desktop program, but `plat` runs on the
   host adapter of the browser there (`web.rs`, `web_files.rs`): the files are the adapter's
   virtual files (`/config`, `/data`, `/cache`, `/tmp`, `/documents`, `/imports`), checked with
-  the Linux rules. `$TEMP` is `/tmp`, `$HOME` and `$DOCUMENTS` are `/documents`, the app's
+  the Linux rules, except that `\` separates folders like `/`, as the virtual files do (in the
+  browser as well). `$TEMP` is `/tmp`, `$HOME` and `$DOCUMENTS` are `/documents`, the app's
   own folders lie below `/config`, `/data` and `/cache`; `$EXE` has no value (the pattern is
   dropped), and the other user folders do not exist. `plat` has no processes, sockets or
   native plugins on Android, so `process`, `net.*` and `plugins` have nothing to allow;

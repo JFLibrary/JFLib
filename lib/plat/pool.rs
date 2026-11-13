@@ -44,8 +44,10 @@ const JF_ASYNC: u32 = 2;
 const TS_NONE: u32 = 0;
 const TS_INIT: u32 = 1;
 const TS_READY: u32 = 2;
+const TS_STOP: u32 = 3; // one thr_shutdown owns the pool and takes it down
 const JS_RUNNING: u32 = 1;
 const JS_DONE: u32 = 2;
+const JS_STARTING: u32 = 3; // one Job::start owns the record and resets it (not yet visible)
 
 /// a loop or job ended through cancel()
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -164,7 +166,7 @@ pub fn thr_init(n: u32) -> u32 {
         if POOL.state.compare_exchange(TS_NONE, TS_INIT, SeqCst, SeqCst).is_ok() {
             break;
         }
-        thread_yield(); // another thread is starting the pool
+        thread_yield(); // another thread is starting or stopping the pool
     }
     let mut want = n as usize;
     if let Some(v) = crate::arg_value("--threads").and_then(|v| v.parse::<i32>().ok()) {
@@ -209,15 +211,22 @@ pub fn thr_count() -> u32 {
 
 /// stop the workers once the queue is empty, join them; a later call starts a new pool
 pub fn thr_shutdown() {
-    if POOL.state.load(SeqCst) != TS_READY {
-        return;
+    // take the pool over first: two shutdowns at once must not both take the threads and drop
+    // the semaphores a worker may still wait on; the second waits until the first is through
+    loop {
+        match POOL.state.compare_exchange(TS_READY, TS_STOP, SeqCst, SeqCst) {
+            Ok(_) => break,
+            Err(TS_NONE) => return,
+            Err(_) => thread_yield(), // another thread starts or stops the pool
+        }
     }
     POOL.quit.store(1, SeqCst);
     let n = POOL.n.load(SeqCst);
     if let Some(s) = work_sem() {
         s.post(n);
     }
-    // SAFETY: no job runs (the caller's promise); the workers only read the cells.
+    // SAFETY: TS_STOP belongs to this call alone; no job runs (the caller's promise); the
+    // workers only read the cells.
     unsafe {
         let threads = &mut *POOL.threads.get();
         for t in threads.iter_mut().take(n as usize) {
@@ -559,27 +568,37 @@ impl Job {
     /// run it in the background; false: it is still running  [thr_job_start]
     pub fn start(&self) -> bool {
         let j: &JobCtl = &self.rec;
-        if self.running() {
-            return false;
+        // claim the record first: a Job is Sync, so two threads may call start at once, and
+        // only one of them may reset the cells and queue the record
+        let mut s = j.state.load(SeqCst);
+        loop {
+            if s == JS_RUNNING || s == JS_STARTING {
+                return false;
+            }
+            match j.state.compare_exchange(s, JS_STARTING, SeqCst, SeqCst) {
+                Ok(_) => break,
+                Err(x) => s = x,
+            }
         }
         let n = thr_count();
+        let empty = j.count() == 0 || self.f.is_none();
+        let here = !empty && n == 0; // no workers: run it right here
         j.next.store(0, SeqCst);
         j.done.store(0, SeqCst);
         j.cancel.store(0, SeqCst);
-        // SAFETY: not running: nobody else sees the cells.
+        // SAFETY: STARTING belongs to this call alone; cancel, wait and the workers look at the
+        // cells only while the job is RUNNING (and queued), which the store below publishes.
         unsafe {
             *j.link.get() = core::ptr::null();
-            *j.active.get() = 0;
+            *j.active.get() = here as u32;
             *j.flags.get() = JF_ASYNC;
         }
         j.state.store(JS_RUNNING, SeqCst);
-        if j.count() == 0 || self.f.is_none() {
+        if empty {
             finish(j);
             return true;
         }
-        if n == 0 {
-            // SAFETY: not shared.
-            unsafe { *j.active.get() = 1 }; // no workers: run it right here
+        if here {
             run_items(j);
             finish(j);
             return true;

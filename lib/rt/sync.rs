@@ -8,6 +8,7 @@
 // queue); long waits belong on a semaphore (plat::Sem).
 
 use core::cell::UnsafeCell;
+use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, Ordering};
 
@@ -22,6 +23,9 @@ unsafe impl<T: Send> Send for SpinLock<T> {}
 
 pub struct Guard<'a, T> {
     lock: &'a SpinLock<T>,
+    // a shared guard hands out &T on every thread that holds a reference to it, so the guard
+    // may be Sync only when T is (as with &mut T); Send stays as it was (T: Send)
+    _t: PhantomData<&'a mut T>,
 }
 
 impl<T> SpinLock<T> {
@@ -39,12 +43,17 @@ impl<T> SpinLock<T> {
                 crate::os::yield_now();
             }
         }
-        Guard { lock: self }
+        Guard { lock: self, _t: PhantomData }
     }
 
     /// the guard when the lock is free now, else None (never waits)
     pub fn try_lock(&self) -> Option<Guard<'_, T>> {
-        self.locked.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok().then_some(Guard { lock: self })
+        // the guard only after the exchange succeeded: a guard built for a failed attempt
+        // (then_some evaluates its argument) would unlock the holder's lock when it drops
+        match self.locked.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed) {
+            Ok(_) => Some(Guard { lock: self, _t: PhantomData }),
+            Err(_) => None,
+        }
     }
 }
 
