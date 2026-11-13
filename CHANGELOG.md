@@ -13,6 +13,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-13
+
 ### Added
 
 - **Style netlab** is an official style: `jflib::style_netlab`, `JFLIB_STYLE=netlab`, `cargo jflib package --styles netlab`. The crate jflib-style-netlab is on crates.io (0.1.0, published on its own on 2026-11-10 from the state of v0.1.0, for JFNetworker); the style brings its copies of the Inter fonts and `icons.bin` in `assets/`
@@ -147,6 +149,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** plat::a11y: set_active wakes the UI thread when the flag goes off too (an idle app never noticed a client left). Windows: UiaClientsAreListening alone (the touch keyboard's host TextInputHost, TabTip or a vendor's tool always listen on Windows 11) no longer keeps the tree on: 10 s after the last question of a UI Automation client it is off unless a screen reader (SPI_GETSCREENREADER: Narrator, NVDA, JAWS) or Magnifier runs and listens
 - **plat:** The present step copies a large frame's dirty rectangles in row bands on the worker pool (from 1 MB on), from 12 MB on with streaming stores (the same bytes; plat's present_copy.rs, gfx's thresholds): Windows' kept DIB section, X11's MIT-SHM segments and images, Wayland's wl_shm buffers. A 4K frame (3840 x 2160) takes 2.0-2.5 ms in win_present instead of 3.6-4.0 ms (Windows 2.2 / 2.5 ms best / median instead of 3.4 / 4.0, X11 1.9 / 2.0 instead of 3.3 / 4.0, Wayland 2.0 / 2.1 instead of 3.1 / 3.6); copies below 1 MB stay plain row copies on the UI thread
 - **plat:** Wayland: wl_data_offer.set_actions names the effects the drop target under the drag takes (drop_effect_set) instead of every effect the source allows; X11: a drop takes the effect of the last XdndStatus (it picked copy whatever action the source asked for)
+- **ui:** GpuOutput is #[non_exhaustive]: apps read its fields but no longer build it with a struct literal
+- **build:** The template of a new app (cargo jflib new) and the GUIDE name jflib 0.2
 
 ### Removed
 

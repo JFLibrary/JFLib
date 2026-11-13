@@ -49,7 +49,7 @@ where you can, and look in `docs/API.md` before adding a crate. An app that need
 `std` turns on the feature `std` (`cargo jflib new --std` writes such an app):
 
 ```toml
-jflib = { features = ["std"], version = "0.1" }
+jflib = { features = ["std"], version = "0.2" }
 ```
 
 Then `src/lib.rs` has no `#![no_std]`, `src/main.rs` is `extern crate hallo; fn main() {
