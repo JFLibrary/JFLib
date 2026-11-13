@@ -118,7 +118,7 @@ CRATES = [
      "full"),                                                                              # svg
     ("fx", "effects and adjustments", "full"),
     ("gpu", "the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, "
-     "swapchains (Vulkan on Windows)", "full"),
+     "swapchains (Vulkan, Metal, WebGPU)", "full"),
     ("render3d", "the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), "
      "visibility on the GPU, glTF scenes on the GPU", "full"),
     ("render2d", "the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills "

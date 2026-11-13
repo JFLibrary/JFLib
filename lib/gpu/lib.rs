@@ -4,7 +4,8 @@
 // loaded at run time; vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs), WebGPU in the
 // browser (web_*.rs, web/gpu.js; WGSL instead of SPIR-V, what it cannot do is said in web_dev.rs),
 // Metal on macOS and iOS (mtl_*.rs, AP6 in docs/APPLE.md: SPIR-V translated to MSL by shader::msl,
-// level Basis; what it lacks is said in mtl_dev.rs).
+// level Voll on Metal 3 devices of the Apple7 or Mac2 family (A14, M1 and newer), else Basis; what it
+// lacks is said in mtl_dev.rs).
 //
 //   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
 //                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader

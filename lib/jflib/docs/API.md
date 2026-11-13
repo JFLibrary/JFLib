@@ -60,7 +60,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#img_svg-crate-root) · [doc.rs](#img_svgdocrs) · [render.rs](#img_svgrenderrs)
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
-- [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)
+- [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan, Metal, WebGPU)
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs) · [mtl_cmd.rs (Apple)](#gpumtl_cmdrs-apple) · [mtl_dev.rs (Apple)](#gpumtl_devrs-apple) · [mtl_res.rs (Apple)](#gpumtl_resrs-apple) · [mtl_swap.rs (Apple)](#gpumtl_swaprs-apple)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
@@ -18912,7 +18912,7 @@ FXW_NEDGE: i32 = 7
 
 ## gpu
 
-*the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)* -- crate root [`lib/gpu/lib.rs`](../lib/gpu/lib.rs)
+*the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan, Metal, WebGPU)* -- crate root [`lib/gpu/lib.rs`](../lib/gpu/lib.rs)
 
 ```text
 gpu -- GPU access for the UI, 2D CAD and 3D games: an explicit API in the manner of Vulkan
@@ -18921,7 +18921,8 @@ there in programs linked against glibc, and on Android (vulkan-1.dll, libvulkan.
 loaded at run time; vk_*.rs; on Linux the windows go through dma-bufs, vk_dmabuf.rs), WebGPU in the
 browser (web_*.rs, web/gpu.js; WGSL instead of SPIR-V, what it cannot do is said in web_dev.rs),
 Metal on macOS and iOS (mtl_*.rs, AP6 in docs/APPLE.md: SPIR-V translated to MSL by shader::msl,
-level Basis; what it lacks is said in mtl_dev.rs).
+level Voll on Metal 3 devices of the Apple7 or Mac2 family (A14, M1 and newer), else Basis; what it
+lacks is said in mtl_dev.rs).
 
   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
@@ -20905,7 +20906,7 @@ mtl_dev -- Metal on macOS and iOS (AP6, docs/APPLE.md): instance, adapters, devi
        a Metal device; jfgui_GPU_VALIDATE=1 turns Metal's API validation on (MTL_DEBUG_LAYER)
   instance.adapters()                     macOS: MTLCopyAllDevices, iOS: the system's device
   adapter.create_device(&DeviceDesc)      a command queue and a timeline (MTLSharedEvent); level
-       Basis (Voll: AP6g)
+       Voll on Metal 3 devices of the Apple7 or Mac2 family (A14, M1 and newer), else Basis
   device.queue() -> &Queue                submit([cmd, ..]) -> SubmitId (the event's value),
        write_buffer / write_texture / write_texture_rects(_at) (staged in shared buffers, copied by
        a blit encoder before the next submission), read_buffer (submits and waits)
