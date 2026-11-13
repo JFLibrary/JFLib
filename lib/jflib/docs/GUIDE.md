@@ -3277,8 +3277,14 @@ the virtual buffers of NVDA and JAWS, Orca) reach them, the pointer and `GetAcce
 not, UIA reports IsOffscreen and AT-SPI2 no "showing". They cost what any record costs: a record
 of at most 4 KB text per field (`SEMS_MAX` 65 536 records a frame), the tree is built only while
 a client listens. Publish them only while `ui.a11y_active()` says one does (it turns true with a
-frame of its own; on Windows false again 10 s after the last question of a UI Automation client
-when none listens for events).
+frame of its own; on Windows false again 10 s after the last question of a UI Automation client,
+unless a screen reader -- one that says it runs, `SPI_GETSCREENREADER`: Narrator, NVDA, JAWS -- or
+Magnifier listens for events: a client that only listens, as the touch keyboard's host
+TextInputHost always does on Windows 11, keeps nothing on). The app gets the command `UIC_A11Y`
+when it flips (arg 1: a client came, 0: it left), also while it is idle: the window loop looks by
+itself. A frame whose records, windows and carets equal those of the tree published last
+publishes nothing (the key of its inputs is compared, not the tree built): a page that does not
+move costs its records, not the tree.
 
 **Requests.** A screen reader's actions on a record with an id64 come back to the app, not to a
 widget: `ui.a11y_request_take() -> Option<A11yRequest { win, id, action }>` in every frame
@@ -3292,7 +3298,8 @@ RemoveFromSelection); AT-SPI2 GrabFocus, the actions click / expand / collapse /
 decrement, Component.ScrollTo, Value, EditableText, Text's caret and selection, Selection on the
 container; the browser the DOM's click, focus (a node out of view is scrolled in first), the
 input of a range or number field, text and selection edits. Records without an id64 keep the
-widget paths (`EV_ACT`, `a11y_value`, `a11y_text`).
+widget paths (`EV_ACT`, `a11y_value`, `a11y_text`). An app's own tests build requests with
+`A11yRequest::new(win, id, action)`.
 
 **Announcements and live regions.** `ui.announce("Gespeichert", LIVE_POLITE)` (or
 `LIVE_ASSERTIVE`) is said with this frame's tree: UI Automation's notification event (Windows 10
@@ -3309,7 +3316,9 @@ increment|decrement|select|add|remove S`, `a11y value S N`, `a11y text S "s"`, `
 A C`; `a11y expect S role cell` (the Sub's ARIA name or the role's), `name "s"`, `desc "s"`,
 `url "s"`, `level N`, `set POS SIZE`, `cell ROW COL`, `grid ROWS COLS`, `live polite`, `is
 offscreen`, `not collapsed`, `can expand`, `parent S2`, `children N`, `missing`; `a11y expect
-announced "s"` (headless runs keep what `ui.announce` said); `a11y dump` prints the tree. `expect
+announced "s"` (headless runs keep what `ui.announce` said); `a11y dump` prints the tree (a node per
+line: role, name, text, description, address, a value with its range and text, states, set, cell,
+live). `expect
 S unfocused | unselected | closed` complete the states.
 
 Testing: `apps/a11ytest` shows such a page (its `src/page.rs`: landmarks, a table with headers, a

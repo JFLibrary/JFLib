@@ -359,6 +359,7 @@ pub const UIC_SCREENSHOT: u32 = 0x7FFF_0018; // arg 1: the picture is there (scr
 pub const UIC_RECENT: u32 = 0x7FFF_0019; // arg 1: the file of recent_open is readable now (recent_reopened), 0: refused or gone
 pub const UIC_SENSOR: u32 = 0x7FFF_001B; // arg = plat::sensors::SENSOR_* bits: new readings or another state (plat::sensors::read, state)
 pub const UIC_LOCATION: u32 = 0x7FFF_001C; // arg = plat::sensors::LocationState: a new fix or another state (location_fix)
+pub const UIC_A11Y: u32 = 0x7FFF_001D; // arg 1: a screen reader (an accessibility client) came, 0: it left (ui.a11y_active), also while the app is idle
 pub const TRAY_ACTIVATE: u32 = 1; // UIC_TRAY: the symbol was clicked
 pub const TRAY_SECONDARY: u32 = 2; // UIC_TRAY: double click (Windows) / middle click (Linux)
 

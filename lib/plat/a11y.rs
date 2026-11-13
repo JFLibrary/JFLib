@@ -44,7 +44,7 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use rt::sync::SpinLock;
 
@@ -871,6 +871,7 @@ static OPS: SpinLock<Vec<OpRequest>> = SpinLock::new(Vec::new());
 static ANNOUNCED: SpinLock<Vec<(u8, String, u8)>> = SpinLock::new(Vec::new());
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 static STARTED: AtomicBool = AtomicBool::new(false);
+static EPOCH: AtomicU32 = AtomicU32::new(0);
 
 /// start the platform bridge (once): Linux connects to the accessibility bus when assistive
 /// technology is enabled (jfgui_A11Y=1 forces it, jfgui_A11Y=0 or NO_AT_BRIDGE=1 turn it off);
@@ -887,8 +888,9 @@ pub fn start(app: &str) {
 }
 
 /// assistive technology may be listening (the UI publishes snapshots only then); on Windows it
-/// turns false again 10 s after the last question of a UI Automation client when none listens for
-/// events, and true with the next question
+/// turns false again 10 s after the last question of a UI Automation client unless a screen
+/// reader (SPI_GETSCREENREADER) or Magnifier listens for events, and true with the next question
+/// (win_uia.rs idle)
 pub fn active() -> bool {
     #[cfg(windows)]
     if ACTIVE.load(Ordering::Relaxed) {
@@ -897,13 +899,33 @@ pub fn active() -> bool {
     ACTIVE.load(Ordering::Acquire)
 }
 
-/// (bridges) assistive technology is there (true) or gone; true wakes the UI thread so that it
-/// publishes
+/// when (time_us) active() wants to be asked again although nothing happens: the platform's
+/// fallback that notices a client is gone (Windows: at most every 2 s while active); None: never.
+/// The UI's window loop waits at most until then and asks, so an idle app learns it too
+/// (UIC_A11Y)
+pub fn check_due() -> Option<u64> {
+    #[cfg(windows)]
+    if ACTIVE.load(Ordering::Relaxed) {
+        return crate::win_uia::idle_due();
+    }
+    None
+}
+
+/// (bridges) assistive technology is there (true) or gone; a change wakes the UI thread (it
+/// publishes, and the app hears of it: UIC_A11Y).  Every call is a new epoch: a host that turned
+/// its mirror on again needs the whole tree, even an unchanged one
 #[allow(dead_code)]
 pub(crate) fn set_active(on: bool) {
-    if ACTIVE.swap(on, Ordering::AcqRel) != on && on {
+    EPOCH.fetch_add(1, Ordering::AcqRel);
+    if ACTIVE.swap(on, Ordering::AcqRel) != on {
         crate::wake();
     }
+}
+
+/// a number that changes whenever a bridge turned on or off (set_active): the UI publishes a tree
+/// equal to the last one again only after it changed (an unchanged frame publishes nothing)
+pub fn epoch() -> u32 {
+    EPOCH.load(Ordering::Acquire)
 }
 
 /// the tree last published

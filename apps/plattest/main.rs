@@ -73,7 +73,7 @@
 //                                          last lines after a crash (a child)
 //   plattest --test life-bus               (t_life.rs, Linux) sleep, settings and SIGTERM against
 //                                          fake buses (tools/platshared/life_bus.py)
-//   plattest --test a11y / a11y-bus / uia / caret   (t_a11y.rs) the accessibility tree for
+//   plattest --test a11y / a11y-bus / uia / uia-idle / caret   (t_a11y.rs) the accessibility tree for
 //                                          screen readers: headless model and actions; Linux
 //                                          against a fake AT-SPI2 bus (tools/platshared/
 //                                          atspi_bus.py); Windows through IUIAutomation (by
@@ -87,6 +87,9 @@
 //                                          model, requests, live regions, the rich update format;
 //                                          Windows through IUIAutomation (by hand); Linux against
 //                                          atspi_bus.py --rich
+//   plattest --test a11y-cost [--records N]   (t_a11y_cost.rs) what a web page's tree of N rich
+//                                          records costs per frame: the records, the tree, its
+//                                          publish (not in "all": timings; a release build)
 //   plattest --test secret / secret-bus    (t_secret.rs) the system's secret store: the real
 //                                          one (Credential Manager + DPAPI, Secret Service; the
 //                                          test entries are removed again); Linux against a
@@ -184,6 +187,8 @@ use base::{Args, Ini, f64_format, f64_parse};
 mod t_a11y;
 // a web page's accessibility tree (apps/a11ytest's page)
 mod t_a11y_rich;
+// what that tree costs per frame
+mod t_a11y_cost;
 mod t_async;
 // plat-win: the R4 tests of the Windows platform layer
 mod t_cursor;
@@ -419,11 +424,13 @@ fn plattest() -> i32 {
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
         Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
         Some("a11y-rich") => t_a11y_rich::t_a11y_rich, // a web page's accessibility tree, headless
+        Some("a11y-cost") => t_a11y_cost::t_a11y_cost, // what that tree costs per frame (not in "all": timings)
         Some("a11y-rich-bus") => t_a11y_rich::t_a11y_rich_bus, // Linux: against atspi_bus.py --rich
         Some("uia-rich") => t_a11y_rich::t_uia_rich,   // Windows, by hand: the page through UI Automation
         Some("a11y") => t_a11y::t_a11y,                // the accessibility tree, headless
         Some("a11y-bus") => t_a11y::t_a11y_bus,        // Linux: against tools/platshared/atspi_bus.py
         Some("uia") => t_a11y::t_uia,                  // Windows, by hand: UI Automation
+        Some("uia-idle") => t_a11y::t_uia_idle,        // Windows, by hand: a client comes and goes (10 .. 30 s)
         Some("caret") => t_a11y::t_caret,              // Windows, by hand: the caret for magnifiers
         Some("secret") => t_secret::t_secret,          // the system's secret store (not in "all")
         Some("secret-bus") => t_secret::t_secret_bus,  // Linux: against tools/platshared/secret_bus.py

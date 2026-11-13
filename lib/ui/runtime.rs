@@ -1448,8 +1448,13 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
         if let Some(t) = ui.gp_deadline() {
             deadline = deadline.min(t.max(1)); // the GPU output's jobs and frames still to show
         }
+        if let Some(t) = plat::a11y::check_due() {
+            deadline = deadline.min(t.max(1)); // whether a screen reader left (UIC_A11Y)
+        }
         // the live redraw inside the Win32 modal size / move loop (ui_refresh)
         plat::wait_refresh(deadline, &mut || ui.refresh(app));
+        // (Windows) the fallback that notices a client left looks now; a change wakes the loop
+        let _ = plat::a11y::active();
         ui.clock_update();
         if ui.close_at != 0 && ui.close_at <= ui.now_ms {
             break;
