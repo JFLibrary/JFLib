@@ -149,6 +149,15 @@ Zeichen an einem Punkt, dem Rechteck eines Bereichs (`Node::char_rect`); eine ge
 
 **Fertig, wenn:** die Hand-Probe auf dem Mac nichts Wichtiges mehr findet.
 
+**Hand-Probe 1 (2026-11-13):** Baum, Aktionen und Text gehen. VoiceOver las aber den Inhalt jeder JFLib-App mit
+einer englischen Stimme, seine eigenen Wörter deutsch. Ursache: Das Info.plist nannte keine Sprachen
+(`CFBundleLocalizations`), also hielt macOS die App für englisch, und VoiceOver liest den Inhalt einer App in deren
+Sprache. Jetzt schreiben `tools/apple.py` (Mac und iOS) und `cargo jflib mac` die Spalten des App-Katalogs
+(`locales/ui.tsv`, ohne Katalog Deutsch und Englisch) als `CFBundleLocalizations` und Englisch als
+`CFBundleDevelopmentRegion`, wie die UI zurückfällt (`ui::i18n`). Damit sind auch AppKits eigene Texte (Dialoge der
+Ablage, Dienste-Menü) deutsch. Grenze: Wählt eine App ihre Sprache selbst (`--lang`, `set_language`) abweichend vom
+System, bleibt die Stimme die des Systems.
+
 ### VO4: iOS (M–L)
 
 - Die Elemente unter `JFView`, Traits, Aktivieren und Einstellen, Mitteilungen; `a11y::active()` folgt dem Schalter

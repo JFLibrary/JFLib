@@ -91,6 +91,23 @@ def ios_location(name):
     return any(ln.split("#")[0].split()[:1] == ["location"] for ln in f.read_text(encoding="utf-8").splitlines())
 
 
+def languages(name):
+    """the bundle's languages: CFBundleLocalizations from the header of the app's catalogue
+    (locales/ui.tsv or src/locales/ui.tsv; without one the library's German and English),
+    CFBundleDevelopmentRegion English where the app has it, as the UI falls back (ui::i18n). Without
+    them the system takes every JFLib app for an English one: VoiceOver reads its German texts with
+    an English voice, AppKit's own texts (panels, the services menu) stay English"""
+    langs = ["de", "en"]
+    for f in (ROOT / "apps" / name / "locales" / "ui.tsv", ROOT / "apps" / name / "src" / "locales" / "ui.tsv"):
+        if f.exists():
+            head = f.read_text(encoding="utf-8").splitlines()[:1]
+            found = [c.strip() for c in head[0].split("\t") if c.strip()] if head else []
+            if found:
+                langs = found
+            break
+    return {"CFBundleDevelopmentRegion": "en" if "en" in langs else langs[0], "CFBundleLocalizations": langs}
+
+
 def bundle(exe, sim=False):
     """the program exe as exe.app beside it (Info.plist, the program inside); the simulator's build
     signed ad hoc -> the bundle's path"""
@@ -118,6 +135,7 @@ def bundle(exe, sim=False):
                                              "UIInterfaceOrientationLandscapeRight"],
         "UISupportedInterfaceOrientations~ipad": ["UIInterfaceOrientationPortrait", "UIInterfaceOrientationPortraitUpsideDown",
                                                   "UIInterfaceOrientationLandscapeLeft", "UIInterfaceOrientationLandscapeRight"],
+        **languages(exe.name),
     }
     if ios_location(exe.name):          # without the text iOS never asks (plat::sensors::location_watch)
         plist["NSLocationWhenInUseUsageDescription"] = "Die App zeigt den Standort, solange er in ihr eingeschaltet ist."
@@ -208,6 +226,7 @@ def mac_plist(exe_name, app):
         "CFBundleDisplayName": meta.get("display", app), "CFBundlePackageType": "APPL", "CFBundleInfoDictionaryVersion": "6.0",
         "CFBundleShortVersionString": version, "CFBundleVersion": version, "LSMinimumSystemVersion": MAC_MIN,
         "NSHighResolutionCapable": True, "NSPrincipalClass": "NSApplication", "CFBundleSupportedPlatforms": ["MacOSX"],
+        **languages(app),
     }
     if meta.get("publisher"):
         p["NSHumanReadableCopyright"] = meta["publisher"]

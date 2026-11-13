@@ -115,6 +115,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Android: the status bar and the navigation bar take the colours at the app's edges with matching icons and no system scrim, instead of a fixed light grey around a dark app
 - **build:** The .dmg of tools/package.py held the program without its execute bit (copied without its mode), so the app did not open ("kann nicht geöffnet werden"); NAME.app's program is always 0755 now and tools/apple.py dmg refuses a bundle whose program cannot run (found by the hand check of AP8c)
 - **render2d:** render2d: push constants only where a pass reads them (the browser refused count and write: the demo had never run in a browser); the fragment shader returns after discard (a discard keeps running, WGSL's rules) and takes a fast way near the ends of short thin strokes (segments up to 3 px, half width up to 0.75 px): 1 million segments of the measuring scene at the overview 25.4 -> 11.8 ms (RTX 2070 SUPER), 185 -> 60.7 ms (Iris Xe)
+- **build:** Mac and iOS bundles name the app's languages: tools/apple.py and cargo jflib mac write the columns of the app's catalogue (locales/ui.tsv, else German and English) as CFBundleLocalizations and English as CFBundleDevelopmentRegion; before, macOS took every JFLib app for an English one, VoiceOver read its German texts with an English voice and AppKit's own texts stayed English
 
 ## [0.1.0] - 2026-11-08
 
