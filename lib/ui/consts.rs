@@ -42,6 +42,16 @@ pub const HB_OWNKEYS: u32 = 0x20000;
 // around it (touch.rs; the cursors of splitters, text and crosshairs say so by themselves)
 pub const HB_GRAB_H: u32 = 0x40000;
 pub const HB_GRAB_V: u32 = 0x80000;
+// every key is the widget's while it has the focus and no popup of the window is open (a menu
+// keeps its keys), Ctrl + letter, Tab and the arrows too: no accelerator, no keyboard
+// navigation, no Enter / Space action and no ui.undo_keys takes one (a canvas that shows a web
+// page takes them with ui.key_take; ui.accel_run hands one back to the command table).  Unlike
+// HB_TEXT no text box rules: no reserved keys, no input method, no on-screen keyboard.  A
+// canvas takes it from next_flags.
+pub const HB_KEYS: u32 = 0x10_0000;
+// canvas only (next_flags): its cursor bits as given, CUR_ARROW (0) included; without it 0 is the
+// crosshair
+pub const HB_CURSOR_SET: u32 = 0x20_0000;
 
 // ------------------------------------------------------------------ the finger (touch.rs)
 // ui.touch_take(flags) after a widget, instead of what its hit box says by itself: TF_V / TF_H a
@@ -94,7 +104,43 @@ pub const K_SWATCH: u16 = 20;
 pub const K_LINK: u16 = 21;
 /// a heading of a document or section (value: its level, 1 the top; md_view.rs, Ui::heading)
 pub const K_HEADING: u16 = 22;
+/// the number of KIND_NAMES (the kinds K_BOX ..= K_HEADING); the kinds of web content K_TABLE ..=
+/// K_FIGURE follow it (KIND_NAMES_MORE, kind_name names them all)
 pub const K_KIND_COUNT: u16 = 23;
+// (section 19 of the guide) the kinds of a web page's accessibility tree; a screen reader gets
+// each with a role of its own where the platform has one (UI Automation, AT-SPI2, the browser)
+/// a table or grid (Sem::grid: its rows and columns) and a row of it
+pub const K_TABLE: u16 = 23;
+pub const K_ROW: u16 = 24;
+/// a cell (label: what it says; Sem::cell: its row and column), a column header, a row header
+pub const K_CELL: u16 = 25;
+pub const K_COLHEADER: u16 = 26;
+pub const K_ROWHEADER: u16 = 27;
+/// a landmark of a page (value: LM_*; label: its name)
+pub const K_LANDMARK: u16 = 28;
+/// a tree and one of its items (Sem::level: its depth; AS_COLLAPSED / SS_OPEN: closed / open)
+pub const K_TREE: u16 = 29;
+pub const K_TREEITEM: u16 = 30;
+/// a group of radio buttons, a tool bar, a tooltip (label: its text), a separator
+pub const K_RADIOGROUP: u16 = 31;
+pub const K_TOOLBAR: u16 = 32;
+pub const K_TOOLTIP: u16 = 33;
+pub const K_SEPARATOR: u16 = 34;
+/// live regions: an alert (said at once), a status line and a log (said when the person is
+/// idle); label: their text (Sem::live changes how they speak)
+pub const K_ALERT: u16 = 35;
+pub const K_STATUS: u16 = 36;
+pub const K_LOG: u16 = 37;
+/// a meter (value of min ..= max, as a progress bar), a spin button and a scroll bar (value, min,
+/// max as a slider; Sem::range for fractions)
+pub const K_METER: u16 = 38;
+pub const K_SPIN: u16 = 39;
+pub const K_SCROLLBAR: u16 = 40;
+/// an article, a figure (label: their names)
+pub const K_ARTICLE: u16 = 41;
+pub const K_FIGURE: u16 = 42;
+/// the end of the K_* kinds (one past K_FIGURE)
+pub const K_KIND_END: u16 = 43;
 pub const SS_HOVER: u16 = 1;
 pub const SS_PRESSED: u16 = 2;
 pub const SS_FOCUSED: u16 = 4;
@@ -109,8 +155,77 @@ pub const KIND_NAMES: [&str; 23] = [
     "menu", "menuitem", "list", "listitem", "tab", "canvas", "icon", "image", "combo", "dialog",
     "titlebar", "swatch", "link", "heading",
 ];
+/// names of the kinds K_TABLE ..= K_FIGURE (dump, selectors kind:"Label")
+pub const KIND_NAMES_MORE: [&str; 20] = [
+    "table", "row", "cell", "colheader", "rowheader", "landmark", "tree", "treeitem", "radiogroup",
+    "toolbar", "tooltip", "separator", "alert", "status", "log", "meter", "spin", "scrollbar",
+    "article", "figure",
+];
+
+/// the name of a K_* kind (dump, selectors kind:"Label"); "box" for an unknown one
+pub fn kind_name(kind: u16) -> &'static str {
+    if kind < K_KIND_COUNT {
+        KIND_NAMES[kind as usize]
+    } else if kind < K_KIND_END {
+        KIND_NAMES_MORE[(kind - K_KIND_COUNT) as usize]
+    } else {
+        KIND_NAMES[0]
+    }
+}
+
 /// names of the SS_* state bits (dump)
 pub const STATE_NAMES: [&str; 7] = ["hover", "pressed", "focused", "checked", "disabled", "selected", "open"];
+
+// K_LANDMARK's value: the kind of landmark (0: a named region)
+pub const LM_REGION: i32 = 0;
+pub const LM_BANNER: i32 = 1;
+pub const LM_MAIN: i32 = 2;
+pub const LM_NAVIGATION: i32 = 3;
+pub const LM_COMPLEMENTARY: i32 = 4;
+/// the content information (a page's footer)
+pub const LM_CONTENTINFO: i32 = 5;
+pub const LM_SEARCH: i32 = 6;
+pub const LM_FORM: i32 = 7;
+
+// Sem::states: what a record is beyond its kind and SS_* state (section 19 of the guide)
+/// a field that must be filled in
+pub const AS_REQUIRED: u32 = 1;
+/// a field whose content is not valid
+pub const AS_INVALID: u32 = 2;
+/// its content is being changed (a live region says nothing meanwhile)
+pub const AS_BUSY: u32 = 4;
+/// it opens a popup (a menu, a list, a dialog)
+pub const AS_HASPOPUP: u32 = 8;
+/// a link to an address that was visited
+pub const AS_VISITED: u32 = 16;
+/// a modal dialog
+pub const AS_MODAL: u32 = 32;
+/// a list, tree or table that allows several selected items
+pub const AS_MULTISELECT: u32 = 64;
+/// it can be expanded and is closed now (SS_OPEN: it is open)
+pub const AS_COLLAPSED: u32 = 128;
+/// outside the visible area (scrolled away, clipped by its scroll box): a screen reader's
+/// browse mode reaches it, the pointer does not
+pub const AS_OFFSCREEN: u32 = 256;
+/// it takes the keyboard focus (a kind that does not anyway: a cell of a grid, an element with a
+/// tabindex)
+pub const AS_FOCUSABLE: u32 = 512;
+/// a click does something (a kind that does not say so: a cell, a row, an element with a click
+/// handler)
+pub const AS_CLICKABLE: u32 = 1024;
+/// it can be selected (rows and cells of a grid; list rows, tree items and tabs are anyway)
+pub const AS_SELECTABLE: u32 = 2048;
+/// a text box: read-only / with several lines / a password (as TB_* of a built-in box)
+pub const AS_READONLY: u32 = 4096;
+pub const AS_MULTILINE: u32 = 8192;
+pub const AS_PASSWORD: u32 = 16384;
+
+// Sem::live and ui.announce: how a live region / an announcement is said (0 for Sem::live: as
+// its kind says -- K_ALERT assertive, K_STATUS and K_LOG polite, the others not at all)
+pub const LIVE_POLITE: u32 = 1;
+pub const LIVE_ASSERTIVE: u32 = 2;
+/// (Sem::live) not a live region (an app that announces its changes itself, ui.announce)
+pub const LIVE_OFF: u32 = 3;
 
 // ------------------------------------------------------------------ layers
 pub const L_BASE: u32 = 0;
@@ -244,6 +359,7 @@ pub const UIC_SCREENSHOT: u32 = 0x7FFF_0018; // arg 1: the picture is there (scr
 pub const UIC_RECENT: u32 = 0x7FFF_0019; // arg 1: the file of recent_open is readable now (recent_reopened), 0: refused or gone
 pub const UIC_SENSOR: u32 = 0x7FFF_001B; // arg = plat::sensors::SENSOR_* bits: new readings or another state (plat::sensors::read, state)
 pub const UIC_LOCATION: u32 = 0x7FFF_001C; // arg = plat::sensors::LocationState: a new fix or another state (location_fix)
+pub const UIC_A11Y: u32 = 0x7FFF_001D; // arg 1: a screen reader (an accessibility client) came, 0: it left (ui.a11y_active), also while the app is idle
 pub const TRAY_ACTIVATE: u32 = 1; // UIC_TRAY: the symbol was clicked
 pub const TRAY_SECONDARY: u32 = 2; // UIC_TRAY: double click (Windows) / middle click (Linux)
 
@@ -400,7 +516,7 @@ pub const DLG_CLOSE: u32 = 3;
 // ------------------------------------------------------------------ text input
 pub const TB_CAP_MASK: u32 = 0x007F_FFFF; // the capacity in bytes (at most 8 MB)
 pub const TB_HYPHENATE: u32 = 0x0080_0000; // with TB_MULTI | TB_WRAP: hyphenate words that do not fit (hyph.rs)
-pub const TB_PASSWORD: u32 = 0x0100_0000; // a dot per character; no copy / cut
+pub const TB_PASSWORD: u32 = 0x0100_0000; // a dot per character; no copy / cut; the input method's purpose IP_PASSWORD while it has the keyboard
 pub const TB_READONLY: u32 = 0x0200_0000; // selectable and copyable, not editable
 pub const TB_DIGITS: u32 = 0x0400_0000; // accept only 0-9
 pub const TB_MULTI: u32 = 0x0800_0000; // multi-line
@@ -425,6 +541,8 @@ pub const CF_HIDDEN: u32 = 4;
 pub const FD_OPEN: u32 = 0;
 pub const FD_SAVE: u32 = 1;
 pub const FD_FOLDER: u32 = 2;
+/// (E8) open several files at once (with FD_OPEN): ui.filedlg_paths() has all of them, `path` the first
+pub const FD_MULTI: u32 = 4;
 pub const FD_EXT_SHIFT: u32 = 8;
 
 // ------------------------------------------------------------------ windows (win.rs)
@@ -441,6 +559,13 @@ pub const WF_NOACTIVATE: u32 = 64;
 pub const WF_AUTOHEIGHT: u32 = 128;
 pub const WF_KEYS: u32 = 256;
 pub const WF_TOUCH_HOLD: u32 = 512; // a finger moves it by the title bar only after resting there (TF_HOLD)
+/// (E7) an independent app window (a browser's second or private window): a top-level window of
+/// its own on Windows (its own taskbar button, not minimized or hidden with the main window),
+/// without the library's title bar -- the app draws one with titlebar_begin / titlebar_end
+/// (its own widgets in it, the caption buttons at its end); X11 and Wayland too (a top-level
+/// window without WM_TRANSIENT_FOR / an xdg_toplevel without a parent); macOS gives it an owned
+/// window for now
+pub const WF_APP: u32 = 1024;
 pub const UWS_OPEN: u32 = 1;
 pub const UWS_VISIBLE: u32 = 2;
 pub const UWS_ACTIVE: u32 = 4;
@@ -485,6 +610,12 @@ pub const PTR_PEN: u32 = 1;
 pub const PTR_ERASER: u32 = 2;
 pub const PTR_TOUCH: u32 = 3;
 
+// (E2) where a key sits (KeyEvent::location)
+pub const KL_STANDARD: u32 = 0;
+pub const KL_LEFT: u32 = 1;
+pub const KL_RIGHT: u32 = 2;
+pub const KL_NUMPAD: u32 = 3;
+
 // cursors (CUR_*)
 pub const CUR_ARROW: u32 = 0;
 pub const CUR_IBEAM: u32 = 1;
@@ -501,6 +632,35 @@ pub const CUR_COUNT: u32 = 11;
 pub const CUR_CUSTOM: u32 = 15; // hit boxes only: the cursor of cursor_custom
 pub const CUR_USER_MAX: u32 = 32; // fixed handle range; cursor_new answers 0 when it is full
 pub const CUR_MAX_PX: i32 = 256;
+
+// ---- (E3) more system shapes: CSS's cursor names, past the custom cursors (CUR_X0 ..
+// CUR_X_END); a platform without one shows cursor_fallback's
+pub const CUR_X0: u32 = 64;
+pub const CUR_NOT_ALLOWED: u32 = 64; // not-allowed
+pub const CUR_NO_DROP: u32 = 65; // no-drop
+pub const CUR_GRAB: u32 = 66; // grab: an open hand
+pub const CUR_GRABBING: u32 = 67; // grabbing: a closed hand
+pub const CUR_HELP: u32 = 68; // help: the arrow with a question mark
+pub const CUR_PROGRESS: u32 = 69; // progress: the arrow with a busy sign (work in the background)
+pub const CUR_ZOOM_IN: u32 = 70; // zoom-in
+pub const CUR_ZOOM_OUT: u32 = 71; // zoom-out
+pub const CUR_CELL: u32 = 72; // cell: a thick cross (tables)
+pub const CUR_VTEXT: u32 = 73; // vertical-text
+pub const CUR_ALIAS: u32 = 74; // alias: a link will be made
+pub const CUR_COPY: u32 = 75; // copy: a copy will be made
+pub const CUR_CONTEXT_MENU: u32 = 76; // context-menu
+pub const CUR_ALL_SCROLL: u32 = 77; // all-scroll
+pub const CUR_COL_RESIZE: u32 = 78; // col-resize
+pub const CUR_ROW_RESIZE: u32 = 79; // row-resize
+pub const CUR_SIZE_N: u32 = 80; // n-resize: one edge or corner
+pub const CUR_SIZE_S: u32 = 81;
+pub const CUR_SIZE_E: u32 = 82;
+pub const CUR_SIZE_W: u32 = 83;
+pub const CUR_SIZE_NE: u32 = 84;
+pub const CUR_SIZE_NW: u32 = 85;
+pub const CUR_SIZE_SE: u32 = 86;
+pub const CUR_SIZE_SW: u32 = 87;
+pub const CUR_X_END: u32 = 88;
 
 // fonts
 pub const FONT_REG: u32 = 0;

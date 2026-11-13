@@ -229,14 +229,13 @@ struct St {
     own: bool,                            // win_set_rect is moving / sizing: not reported back
     cursors: [Id; CUR_USER_MAX as usize], // cursor_create's NSCursors (CUR_USER0 + k)
     blank: Id,                            // CUR_NONE: an empty cursor
+    drawn: [Id; crate::cursor_art::DRAWN_N], // (E3) cursor_art's NSCursors, made on first use
     autoclose: Option<(u32, Option<String>)>, // (test aid) the next file dialog: Cancel / OK after ms
 }
 
-struct Main(UnsafeCell<Option<St>>);
-// SAFETY: only the main thread touches the state (AppKit's thread); other threads only signal the
-// run loop source (SOURCE, MAIN_RL).
-unsafe impl Sync for Main {}
-static ST: Main = Main(UnsafeCell::new(None));
+// only the main thread touches the state (AppKit's thread; UiOnly refuses other threads); other
+// threads only signal the run loop source (SOURCE, MAIN_RL)
+static ST: crate::ui_only::UiOnly<UnsafeCell<Option<St>>> = crate::ui_only::UiOnly::new(UnsafeCell::new(None));
 static VIEW_OFF: AtomicIsize = AtomicIsize::new(0);
 static DEL_OFF: AtomicIsize = AtomicIsize::new(0);
 static SOURCE: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
@@ -246,7 +245,7 @@ static OBS: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
 /// a short borrow of the state (never across a call into AppKit)
 fn with<R>(f: impl FnOnce(&mut St) -> R) -> Option<R> {
     // SAFETY: main thread only; every borrow ends before AppKit can call back (see the top).
-    unsafe { (*ST.0.get()).as_mut().map(f) }
+    unsafe { (*ST.get().get()).as_mut().map(f) }
 }
 
 fn rec<R>(w: i32, f: impl FnOnce(&mut Win) -> R) -> Option<R> {
@@ -316,9 +315,10 @@ fn init() -> bool {
         SOURCE.store(src as *mut c_void, Ordering::SeqCst);
         let obs = observe(del_cls, doff);
         sysapp::observe(app, obs);
-        *ST.0.get() = Some(St { app, view_cls, del_cls, wins: Default::default(), pops: [Pop::NONE; PPW_MAX as usize], hit: None, mv: None, refresh: None, in_refresh: false,
+        *ST.get().get() = Some(St { app, view_cls, del_cls, wins: Default::default(), pops: [Pop::NONE; PPW_MAX as usize], hit: None, mv: None, refresh: None, in_refresh: false,
                                 min0: (0, 0), flags: 0, marked: String::new(), cs, wheel: [0.0; 2], zoom: 0.0, own: false,
-                                cursors: [NIL; CUR_USER_MAX as usize], blank: NIL, autoclose: None });
+                                cursors: [NIL; CUR_USER_MAX as usize], blank: NIL, drawn: [NIL; crate::cursor_art::DRAWN_N],
+                                autoclose: None });
     }
     true
 }
@@ -833,6 +833,13 @@ fn cursor_obj(shape: u32) -> Id {
             return c;
         }
     }
+    if matches!(shape, crate::CUR_ZOOM_IN | crate::CUR_ZOOM_OUT | crate::CUR_CELL) {
+        // (E3) NSCursor has none of these: drawn (else the crosshair below)
+        let c = drawn_cursor(shape);
+        if !c.is_null() {
+            return c;
+        }
+    }
     let name: &core::ffi::CStr = match shape {
         CUR_IBEAM => c"IBeamCursor",
         CUR_HAND => c"pointingHandCursor",
@@ -841,10 +848,36 @@ fn cursor_obj(shape: u32) -> Id {
         CUR_SIZE_NS => c"resizeUpDownCursor",
         CUR_SIZE_WE => c"resizeLeftRightCursor",
         CUR_WAIT | CUR_ARROW => c"arrowCursor",
+        // (E3) the shapes beyond: NSCursor's where it has one, else the nearest
+        crate::CUR_NOT_ALLOWED | crate::CUR_NO_DROP => c"operationNotAllowedCursor",
+        crate::CUR_GRAB => c"openHandCursor",
+        crate::CUR_GRABBING | crate::CUR_ALL_SCROLL => c"closedHandCursor",
+        crate::CUR_CONTEXT_MENU => c"contextualMenuCursor",
+        crate::CUR_COPY => c"dragCopyCursor",
+        crate::CUR_ALIAS => c"dragLinkCursor",
+        crate::CUR_VTEXT => c"IBeamCursorForVerticalLayout",
+        crate::CUR_CELL | crate::CUR_ZOOM_IN | crate::CUR_ZOOM_OUT => c"crosshairCursor", // (when drawing failed)
+        crate::CUR_COL_RESIZE | crate::CUR_SIZE_E | crate::CUR_SIZE_W => c"resizeLeftRightCursor",
+        crate::CUR_ROW_RESIZE | crate::CUR_SIZE_N | crate::CUR_SIZE_S => c"resizeUpDownCursor",
         _ => c"arrowCursor",
     };
     // SAFETY: an NSCursor class method (a shared cursor).
     unsafe { msg!(class(c"NSCursor"), name; Id) }
+}
+
+/// (E3) the drawn cursor of shape (cursor_art: dark, as macOS' own cursors) at 2 px per point
+/// (sharp on Retina displays), made once -> NIL when it has none or it failed
+fn drawn_cursor(shape: u32) -> Id {
+    let Some(k) = crate::cursor_art::drawn_index(shape) else { return NIL };
+    if let Some(c) = with(|s| s.drawn[k]).filter(|c| !c.is_null()) {
+        return c;
+    }
+    let img = crate::cursor_art::pixels(crate::cursor_art::DRAWN[k], 2, 1, true);
+    let c = ns_cursor(&img.px, img.w, img.h, img.hx, img.hy, 2.0);
+    if !c.is_null() {
+        with(|s| s.drawn[k] = c);
+    }
+    c
 }
 
 /// CUR_NONE: a cursor of an empty image (made once)
@@ -1102,9 +1135,21 @@ pub fn cursor_create(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, dpi: i32
     }
     let Some(k) = with(|s| s.cursors.iter().position(|c| c.is_null())).flatten() else { return -1 };
     let scale = if dpi > 0 { dpi as f64 / 96.0 } else { 1.0 };
+    let cur = ns_cursor(px, w, h, hot_x, hot_y, scale);
+    if cur.is_null() {
+        return -1;
+    }
+    with(|s| s.cursors[k] = cur);
+    (CUR_USER0 as usize + k) as i32
+}
+
+/// an NSCursor of w x h premultiplied 0xAARRGGBB pixels (sizes checked by the caller) shown at
+/// scale px per point, hot spot in px -> NIL on failure
+fn ns_cursor(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, scale: f64) -> Id {
+    let n = (w.max(0) * h.max(0)) as usize;
     // SAFETY: a bitmap of our own (it allocates its pixels, w * h * 4 bytes, filled here), an image
     // and a cursor of it; what is not kept is released.
-    let cur = unsafe {
+    unsafe {
         let cs = nsstring("NSDeviceRGBColorSpace");
         let rep: Id = msg!(class(c"NSBitmapImageRep"), c"alloc"; Id);
         let rep: Id = msg!(rep, c"initWithBitmapDataPlanes:pixelsWide:pixelsHigh:bitsPerSample:samplesPerPixel:hasAlpha:isPlanar:colorSpaceName:bitmapFormat:bytesPerRow:bitsPerPixel:",
@@ -1112,12 +1157,12 @@ pub fn cursor_create(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, dpi: i32
                            4isize => isize, true => bool, false => bool, cs => Id, 0u64 => u64, (w * 4) as isize => isize, 32isize => isize; Id);
         release(cs);
         if rep.is_null() {
-            return -1;
+            return NIL;
         }
         let dst: *mut u8 = msg!(rep, c"bitmapData"; *mut u8);
         if dst.is_null() {
             release(rep);
-            return -1;
+            return NIL;
         }
         // premultiplied R, G, B, A bytes (the bitmap's default format)
         let out = core::slice::from_raw_parts_mut(dst, n * 4);
@@ -1132,12 +1177,7 @@ pub fn cursor_create(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, dpi: i32
         let c: Id = msg!(c, c"initWithImage:hotSpot:", img => Id, NSPoint { x: hot_x as f64 / scale, y: hot_y as f64 / scale } => NSPoint; Id);
         release(img);
         c
-    };
-    if cur.is_null() {
-        return -1;
     }
-    with(|s| s.cursors[k] = cur);
-    (CUR_USER0 as usize + k) as i32
 }
 
 /// free a custom cursor; windows showing it fall back to the arrow
@@ -1164,6 +1204,13 @@ pub fn cursor_destroy(id: i32) {
 /// the dpi to draw a cursor for a window of this dpi (the window's own)
 pub fn cursor_dpi(dpi: i32) -> i32 {
     dpi
+}
+
+/// (tests, E3) the cursor shown for shape at dpi and the width of a drawn one: not probed on
+/// macOS (NSCursor has the shapes but zoom-in, zoom-out and cell, which drawn_cursor makes)
+#[doc(hidden)]
+pub fn cursor_probe(_shape: u32, _dpi: i32) -> (u64, i32) {
+    (0, 0)
 }
 
 // ---------------------------------------------------------------- the file dialog

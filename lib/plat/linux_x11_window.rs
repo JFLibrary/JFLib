@@ -3,7 +3,9 @@
 //
 //   connect_main() -> bool          jfgui_SCALE, the connection, our atoms, the DPI
 //   win_create(title, w_dip, h_dip, flags, owner, x, y) -> index / -1
-//        owner -1: the main window; else a window owned by `owner`: WM_TRANSIENT_FOR,
+//        owner -1: the main window; after it (E7) another top-level window (WF_APP): type
+//        NORMAL, no WM_TRANSIENT_FOR, in the main window's group.  Else a window owned by
+//        `owner`: WM_TRANSIENT_FOR,
 //        _NET_WM_WINDOW_TYPE_UTILITY (PWF_TOOL; DIALOG under Weston's XWM, which never
 //        shows UTILITY windows) or _DIALOG, _NET_WM_STATE {SKIP_TASKBAR, SKIP_PAGER,
 //        (MODAL)}, WM_NORMAL_HINTS (USPosition | PPosition | PMinSize, PMaxSize when not
@@ -131,10 +133,19 @@ impl X11 {
     pub(super) fn win_create(&mut self, title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x: i32, y: i32) -> i32 {
         let idx: usize;
         if owner == PW_NOOWNER {
-            if self.xw[0].win != 0 || self.fd < 0 {
+            if self.fd < 0 {
                 return -1;
             }
-            idx = 0;
+            if self.xw[0].win == 0 {
+                idx = 0;
+            } else {
+                // (E7) a second top-level window of the app (WF_APP): a record of its own
+                // without an owner -- no WM_TRANSIENT_FOR, not hidden with the main window
+                match (1..PW_MAX).find(|&i| self.xw[i].flags & XWF_USED == 0) {
+                    Some(i) => idx = i,
+                    None => return -1,
+                }
+            }
         } else {
             if self.xw[0].win == 0 || self.rec(owner).is_none() {
                 return -1; // no connection / no owner
@@ -253,7 +264,7 @@ impl X11 {
             }
         }
         self.change_prop32(win, self.atoms[A_NET_WM_WINDOW_TYPE], XA_ATOM, &[typ]);
-        if idx != 0 {
+        if owner != PW_NOOWNER {
             // owned: WM_TRANSIENT_FOR, _NET_WM_STATE
             let ow = self.xw[owner as usize].win;
             self.change_prop32(win, XA_WM_TRANSIENT_FOR, XA_WINDOW, &[ow]);
@@ -706,23 +717,33 @@ impl X11 {
         if self.scale_ovr != 0 {
             return self.scale_ovr * 96;
         }
+        match self.resource_int(b"Xft.dpi:") {
+            Some(v) if (48..=960).contains(&v) => v,
+            _ => 96,
+        }
+    }
+
+    /// the number of a line "key value" of the root window's RESOURCE_MANAGER (key with its
+    /// ':', "Xft.dpi:", "Xcursor.size:"), None when it has none
+    pub(super) fn resource_int(&mut self, key: &[u8]) -> Option<i32> {
         let root = self.root;
-        let Some(r) = self.get_property(root, XA_RESOURCE_MANAGER, XA_STRING, 0, 65536, false) else { return 96 };
+        let r = self.get_property(root, XA_RESOURCE_MANAGER, XA_STRING, 0, 65536, false)?;
         if r[1] != 8 {
-            return 96;
+            return None;
         }
         let end = (32 + rd32(&r, 16) as usize).min(r.len());
+        let k = key.len();
         let mut p = 32;
         loop {
-            if p + 8 > end {
-                return 96;
+            if p + k > end {
+                return None;
             }
-            if &r[p..p + 8] == b"Xft.dpi:" {
+            if &r[p..p + k] == key {
                 break;
             }
             loop {
                 if p >= end {
-                    return 96;
+                    return None;
                 }
                 let c = r[p];
                 p += 1;
@@ -731,7 +752,7 @@ impl X11 {
                 }
             }
         }
-        p += 8;
+        p += k;
         while p < end && (r[p] == b' ' || r[p] == 9) {
             p += 1;
         }
@@ -740,10 +761,9 @@ impl X11 {
             n += 1;
         }
         if n == 0 {
-            return 96;
+            return None;
         }
-        let v = parse_int(&r[p..p + n]).0;
-        if (48..=960).contains(&v) { v } else { 96 }
+        Some(parse_int(&r[p..p + n]).0)
     }
 
     /// x11_read_state(w): WST_MAXIMIZED / FULLSCREEN / TILED / MINIMIZED of window w from
@@ -855,7 +875,7 @@ impl X11 {
     }
 
     /// x11_dpi_check: re-read the DPI; on a change E_DPI for every window, which keep their
-    /// DIP size
+    /// DIP size, and a drawn cursor (grab, zoom ...) is made again at the new size
     fn dpi_check(&mut self) {
         let new = self.read_dpi();
         let old = self.dpi;
@@ -877,6 +897,13 @@ impl X11 {
                 self.configure(j as i32, 12, 0, 0, nw as i32, nh as i32);
             }
             self.update_hints(j as i32);
+            // (E3) a drawn cursor at the size of the new dpi (cursor_px), not only after the
+            // next change of the shape
+            let shape = self.xw[j].cursor;
+            if shape >= 0 && crate::cursor_art::drawn(shape as u32).is_some() {
+                self.xw[j].cursor = -1;
+                self.win_set_cursor(j as i32, shape as u32);
+            }
         }
         self.evwin = ev;
         self.flush();

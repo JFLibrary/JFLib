@@ -1,0 +1,51 @@
+#!args --files apps/viewtest/tests/files
+# viewtest: several files at once through the file dialog (E8).  Headless runs show the
+# library's own dialog: the folder lists a.txt, b.txt, c.txt (d.dat is not of the filter "txt");
+# rows #1048593.. (id + 17 + i), the name box #1048588 (id + 12).
+#
+# Ctrl+click adds a row: both names quoted in the name box, both files come back
+click "Dateien öffnen"
+expect dialog:"Öffnen" exists
+expect #1048596 missing
+wait 600
+click #1048593
+expect #1048588 text "a.txt"
+wait 600
+click #1048595 ctrl
+expect #1048588 text "\"a.txt\" \"c.txt\""
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect text:"Dateien: 2 a.txt c.txt" exists
+# Shift+click marks the rows from the anchor
+click "Dateien öffnen"
+wait 600
+click #1048595
+wait 600
+click #1048593 shift
+expect #1048588 text "\"a.txt\" \"b.txt\" \"c.txt\""
+# Ctrl+click on a marked row takes it out again
+wait 600
+click #1048594 ctrl
+expect #1048588 text "\"a.txt\" \"c.txt\""
+click button:"Öffnen"
+expect text:"Dateien: 2 a.txt c.txt" exists
+# quoted names typed into the name box; a missing one keeps the dialog open
+click "Dateien öffnen"
+click #1048588
+key ctrl+a
+type "\"b.txt\" \"x.txt\""
+click button:"Öffnen"
+expect dialog:"Öffnen" exists
+expect text:"Die Datei wurde nicht gefunden." exists
+click #1048588
+key ctrl+a
+type "\"c.txt\" \"b.txt\""
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect text:"Dateien: 2 c.txt b.txt" exists
+# a click without a modifier: one file
+click "Dateien öffnen"
+wait 600
+click #1048594
+click button:"Öffnen"
+expect text:"Dateien: 1 b.txt" exists

@@ -51,7 +51,7 @@ pub(super) fn read_identities(
     let Some(part) = entries.iter().find(|p| p.name == PATH) else {
         return Ok(Vec::new());
     };
-    let root = parse(&part.data)?;
+    let root = parse_body(&part.data)?;
     container(&root, NS, "tables")?;
     if root.children.len() > 128 {
         return Err(Error::Limit);

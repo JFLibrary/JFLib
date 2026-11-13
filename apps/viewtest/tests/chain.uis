@@ -1,0 +1,20 @@
+# viewtest: a frame asked for after the last command round is not lost.  "Kette" queues a
+# command; each frame that sees a new link queues the next one, so the click's frame and the next
+# two use the three command rounds of run_passes and the third link's change is seen by no frame
+# of them: run_passes asks for the next frame (need), which the window loop -- and `wait` -- give.
+click "Kette"
+wait 16
+expect text:"Kette: 3" exists
+# again: the same three links, no frame lost the second time either
+click "Kette"
+wait 16
+expect text:"Kette: 3" exists
+expect_nowarn
+# an app that asks for another frame in every frame (ui.invalidate in App::frame) gets 8 in a
+# row, then the frames wait for the next event, with a UIWARN
+click "Immer neu"
+wait 400
+expect_warn
+click "Immer neu"
+wait 100
+expect_nowarn

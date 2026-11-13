@@ -4,6 +4,8 @@
 // Popups (a stack of up to 6 levels per window, drawn on L_POPUP):
 //   popup_open(id)                      open popup `id` (inside a flyout: as its child)
 //   popup_close()                       close every popup; the focus returns to the opener
+//   popup_close_id(id)                  close popup `id` and the popups inside it; the
+//                                       flyouts it sits in stay open
 //   popup_is_open(id) -> bool   popup_count() -> n
 //   flyout_begin(id, FL_*) -> bool      draw popup `id` when it is open: a flyout surface
 //                                       anchored to the last widget, content box BOX_V|PAD_4
@@ -485,6 +487,20 @@ impl Ui {
         yes
     }
 
+    /// accel_run(key) -> true when key (VK | mods << 16, as ui.key_take gives it) is the
+    /// accelerator of an enabled, visible command of the table: it runs (cmd_run(id, 0), after the
+    /// frame) as if the key had reached the table, open popups close.  For a widget with HB_KEYS
+    /// that hands a key back (one a web page did not use, say).
+    pub fn accel_run(&mut self, key: u32) -> bool {
+        let Some(c) = self.accel_find(key & 0xFFFF, (key >> 16) & MOD3) else { return false };
+        if self.cmd_flags(c.id) & (CF_DISABLED | CF_HIDDEN) != 0 {
+            return false;
+        }
+        self.pp_dismiss_all();
+        self.cmd_run(c.id, 0);
+        true
+    }
+
     // accel_find(vk, mods) -> the command whose accelerator is vk + mods
     pub(crate) fn accel_find(&self, vk: u32, mods: u32) -> Option<&'static Command> {
         let t: &'static [Command] = self.desc.cmds;
@@ -511,6 +527,15 @@ impl Ui {
     pub(crate) fn focus_was_text(&self) -> bool {
         let c = &self.wp.ctx;
         c.focus != 0 && c.hits[c.hit_cur ^ 1].iter().rev().find(|h| h.id == c.focus).is_some_and(|h| h.flags as u32 & HB_TEXT != 0)
+    }
+
+    // focus_has_keys: the focused widget keeps every key (HB_KEYS): as this pass drew it, else
+    // (not drawn yet: ui.undo_keys at the start of a frame) as the last one did; not while a
+    // popup of the window is open (its keys, ui.key_take gives none)
+    pub(crate) fn focus_has_keys(&self) -> bool {
+        let c = &self.wp.ctx;
+        let find = |n: usize| c.hits[n].iter().rev().find(|h| h.id == c.focus);
+        c.focus != 0 && self.wp.popup.pp_n == 0 && find(c.hit_cur).or_else(|| find(c.hit_cur ^ 1)).is_some_and(|h| h.keys)
     }
 
     // uiw_popup_area (ui_win.s): the area the live window's popups may use when they may
@@ -575,9 +600,35 @@ impl Ui {
         self.pp_push(id, l);
     }
 
+    /// popup_open_at(id, x, y): open popup `id` as popup_open does, its flyout hanging at the
+    /// point (x, y) (px of the window, as last_rect: a canvas's UiInput::rect plus its x, y)
+    /// instead of at the last widget; an open one moves there.  For a place the app learns later
+    /// than the click (a web engine's context menu); the app draws flyout_begin(id, ..) as usual.
+    pub fn popup_open_at(&mut self, id: u32, x: i32, y: i32) {
+        self.popup_open(id);
+        let i = self.pp_find(id);
+        if i >= 0 {
+            let e = &mut self.wp.popup.pp[i as usize];
+            e.flags |= PPF_POINT;
+            e.anchor = [x, y, 0, 0];
+        }
+    }
+
     /// ui_popup_close: close every popup (the focus returns to where it was)
     pub fn popup_close(&mut self) {
         self.pp_dismiss_all();
+    }
+
+    /// popup_close_id(id): close popup `id` and the popups opened inside it; the popups it was
+    /// opened in stay open (a date_picker inside a flyout of the app's own closes its calendar,
+    /// not the flyout).  The focus returns to where it was when `id` opened; nothing happens
+    /// when `id` is not open.
+    pub fn popup_close_id(&mut self, id: u32) {
+        match self.pp_find(id) {
+            0 => self.pp_dismiss_all(),
+            i if i > 0 => self.pp_close_to(i as u32),
+            _ => {}
+        }
     }
 
     // popup_catcher -> a press outside every popup dismissed them.  Once per pass (while
@@ -1937,6 +1988,18 @@ impl Ui {
         self.ctx_open(menu, x, y, false);
     }
 
+    /// menu_popup_at(menu, x, y): open a menu at the point (x, y) (px of the window, as
+    /// last_rect; a canvas: UiInput::rect plus its x, y), the runtime draws it as menu_popup's.
+    /// For a context menu whose place the app learns after the right click (a web engine
+    /// answers later): open it in the frame the answer comes; rows that change with the answer:
+    /// a flyout of the app's own through popup_open_at.
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn menu_popup_at(&mut self, menu: &'static [Mi], x: i32, y: i32) {
+        let _src = self.src_scope();
+        self.wp.popup.ctx_target = 0;
+        self.ctx_open(menu, x, y, false);
+    }
+
     /// ui_context_menu(menu) -> EV_OPEN while `menu` is open for the last widget.  Opens on a
     /// right click (released over the widget), or with the menu key / Shift+F10 while the
     /// widget has the focus -- a list row: while the list has it and the row is selected --
@@ -2400,8 +2463,8 @@ impl Ui {
         if t != 0 && t != self.wp.ctx.hot {
             self.tip_reset();
         }
-        // accelerators (not in dialog windows)
-        if self.pp_noaccel() {
+        // accelerators (not in dialog windows, not while a widget with HB_KEYS has the focus)
+        if self.pp_noaccel() || self.focus_has_keys() {
             return;
         }
         let k = self.key_first();

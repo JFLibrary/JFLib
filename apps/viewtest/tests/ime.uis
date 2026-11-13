@@ -1,0 +1,19 @@
+# viewtest: an input method for a field the page draws itself (E4).  With "Eingabefeld" the
+# page turns the input method on while it has the focus (ui.ime_enable, ui.ime_pos at its
+# caret) and shows the composition (ui.ime_preedit) and the committed text (text_take):
+# "Feld: TEXT IME: COMPOSITION CURSOR".
+click "Eingabefeld"
+click #101
+expect text:"Feld:  IME: -" exists
+# a composition: its text and caret (a byte offset) as the input method has them
+preedit "にほん" 3
+expect text:"Feld:  IME: にほん 3" exists
+preedit "日本"
+expect text:"Feld:  IME: 日本 6" exists
+# committed: the composition ends, the text reaches the field
+preedit ""
+commit "日本"
+expect text:"Feld: 日本 IME: -" exists
+# typed text too
+type "ab"
+expect text:"Feld: 日本ab IME: -" exists

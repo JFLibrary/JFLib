@@ -15,11 +15,14 @@ const RECT:Req=Req{op:6,sig:"set_cursor_rectangle:iiii",destroy:false};
 const COMMIT:Req=Req{op:7,sig:"commit:",destroy:false};
 pub(crate) struct Ime {
     pub manager:u32, id:u32, focus:i32, active:bool, wanted:bool, rect:[i32;3], serial:u32,
+    purpose:u32, // the content purpose sent with the last enable / set_content_type
     preedit:Option<(String,usize)>, commit:String,
     at:[i32;3], // the window the caret rectangle was sent for and its offset in the focus
     pre_win:i32, // the window that shows preedit text (-1 = none)
 }
-impl Default for Ime { fn default()->Self { Self{manager:0,id:0,focus:-1,active:false,wanted:false,rect:[0;3],serial:0,preedit:None,commit:String::new(),at:[-1,0,0],pre_win:-1} } }
+impl Default for Ime { fn default()->Self { Self{manager:0,id:0,focus:-1,active:false,wanted:false,rect:[0;3],serial:0,purpose:0,preedit:None,commit:String::new(),at:[-1,0,0],pre_win:-1} } }
+/// (E4) ime_purpose as text-input-v3's content purpose (hint none): normal, url, email, number, phone, password
+fn purpose()->u32 { match crate::ime_purpose_of() { crate::IP_URL=>5, crate::IP_EMAIL=>6, crate::IP_NUMBER=>3, crate::IP_PHONE=>4, crate::IP_PASSWORD=>8, _=>0 } }
 impl Wl {
     pub(crate) fn ime_setup(&mut self) {
         if self.ime.id==0 && self.ime.manager!=0 && self.g.seat!=0 {
@@ -42,8 +45,12 @@ impl Wl {
         let moved=self.ime.at!=[t,ox,oy];
         if moved && self.ime.pre_win>=0 && self.ime.pre_win!=t { self.ime_preedit_clear(); }
         self.ime.at=[t,ox,oy];
+        let p=purpose();
         if !self.ime.active {
-            self.w.send(id,&ENABLE,&[]); self.w.send(id,&CONTENT,&[A::U(0),A::U(0)]); self.ime.active=true;
+            self.w.send(id,&ENABLE,&[]); self.w.send(id,&CONTENT,&[A::U(0),A::U(p)]); self.ime.active=true; self.ime.purpose=p;
+        } else if p!=self.ime.purpose {
+            // another field with another purpose (a password box after a text box): double-buffered, applied by the commit below
+            self.w.send(id,&CONTENT,&[A::U(0),A::U(p)]); self.ime.purpose=p;
         } else if !changed && !moved { return; }
         let scale=self.win[self.ime.focus as usize].s120.max(120);
         self.w.send(id,&RECT,&[A::I((x+ox)*120/scale),A::I((y+oy)*120/scale),A::I(2),A::I((h*120/scale).max(1))]); self.ime_commit();

@@ -1342,7 +1342,37 @@ build\win\gputest.exe --test all          (oder: gputest --test all --validate)
 `tests/validate.uis` lässt jeden Test einmal mit Validierung laufen; ein Validierungsfehler
 lässt ihn scheitern. Der Test `syncval` baut absichtlich zwei fehlende Barrieren ein, eine zwischen
 Kopien und eine zwischen zwei Dispatches, und erwartet, dass die Synchronisationsprüfung sie meldet
--- so ist sicher, dass sie wirklich an ist.
+-- so ist sicher, dass sie wirklich an ist. Eine dritte baut `queues` ein (zwei Dispatches auf der
+Rechen-Warteschlange). Jede dieser Lücken muss genau einen Fehler bringen, der als provoziert zählt; jeder
+andere Fehler lässt den Lauf scheitern (Exit 1), auch einer, der zwischen den Befehlen einer Lücke kommt (bis
+2026-11-12 zählte dort jeder Fehler als erwartet). Gezählt wird gleich nach dem Aufzeichnen: Einen Hazard in einem
+Befehlspuffer meldet die Schicht schon im `vkCmd…`-Aufruf, einen zwischen Übergaben erst bei `vkQueueSubmit`, und
+der zählt nie als provoziert. So besteht keine Schicht zufällig, die die Lücke übersieht, aber bei der Übergabe
+etwas meldet (so geschehen mit der alten Schicht unter Linux, unten).
+
+Die Meldungen der Schicht gehen auf stderr, und `build_rs.py run` und `test` geben stderr erst nach stdout aus.
+Die drei absichtlichen Meldungen stehen deshalb am Ende der Ausgabe, hinter `all checks passed`, jede nach
+einer Zeile `gputest: the next validation error is provoked on purpose: …`. Fehlende Barrieren sind das nicht.
+Gegenprobe (2026-11-12, danach zurückgenommen): ein zweites Füllen in der ersten Lücke und eine unangekündigte
+dritte Lücke, `--test syncval --validate`: `FAIL … 2 error(s) on stderr, 1 provoked`, `FAIL validation layer:
+2 errors`, Exit 1.
+
+Einmal endete `validate.uis` in einer vollen Suite unter Last mit Exit 3 (Absturz, 2026-11-12), ohne Bericht in
+der Ausgabe: `build_rs.py test` zeigte von einem gescheiterten Skript nur Zeilen, die mit FAIL, error, panic oder
+UIWARN beginnen. Seitdem zeigt es auch `jfgui: crash …` (Code und Offset). Nicht nachgestellt: Alle sechs Läufe
+danach endeten mit Exit 0, auch einer neben fünf `cargo check`. Ob das der Absturz aus „Rechen-Warteschlange“ oben
+ist, ist offen.
+
+**Linux mit der Schicht aus Ubuntu 24.04 taugt nicht** (2026-11-12, `vulkan-validationlayers` 1.3.275, ausgepackt
+statt installiert, über `VK_ADD_LAYER_PATH` und `LD_LIBRARY_PATH`; WSL, llvmpipe). `validate.uis` endete mit 654
+Fehlern außer den provozierten, alle bei `vkQueueSubmit`, also zwischen Übergaben, fast alle Kopien in einen Puffer,
+den eine frühere, schon abgewartete Übergabe beschrieben hatte. Diese Schicht kennt das Warten der CPU auf eine
+Timeline-Semaphore (`vkWaitSemaphores`, so wartet `lib/gpu`) noch nicht: Wartet `Device::wait_idle` zur Probe
+zusätzlich mit `vkQueueWaitIdle`, verschwindet der Hazard im Test `syncval`. Die Lücke zwischen zwei Dispatches
+übersieht sie (sie führt das Schreiben des Fill-Shaders als Lesen). Mit der Zählung nach der Übergabe war `syncval`
+trotzdem grün, weil ein Übergabe-Hazard genau in seine Lücke fiel; seit dem Zählen nach dem Aufzeichnen scheitert
+er dort. Zum Prüfen unter Linux braucht es eine neuere Schicht (Fedora 44, Kubuntu 26.04, das Linux-SDK von LunarG).
+
 Die selbst geschriebenen SPIR-V-Module von gputest sind mit `spirv-val --target-env vulkan1.1`
 und `vulkan1.3` geprüft.
 
@@ -1720,7 +1750,8 @@ Arbeits-Threads von `gpu_out`. Einmal von Hand in WSL: Das Programm in einem `bw
 | WSL mit `GALLIUM_OVERRIDE_CPU_CAPS=sse4.1 LP_NATIVE_VECTOR_WIDTH=128` | llvmpipe, Mesa 25.2.8, LLVM 20.1.2, 128 Bit | alles bis in `wgsl`, dort nach `modf` ein Absturz in `libLLVM` (`InstCombine`) |
 
 Die Validierungsschicht ist auf beiden Rechnern nicht installiert, unter Linux lief also noch keine
-Validierung (`validate.uis` läuft dort ohne sie).
+brauchbare Validierung (`validate.uis` läuft dort ohne sie; die alte Schicht aus Ubuntu 24.04 in WSL taugt nicht,
+siehe [Validierung](#validierung)).
 
 **Was die erste fremde GPU und llvmpipe gefunden haben:**
 
@@ -1782,8 +1813,8 @@ zurücklesen 2,8 ms; Instanz 29–37 ms, Gerät 3 ms (RTX: 23–32 ms, 65–70 m
 
 ## Bekannte Lücken
 
-- Unter Android keine Validierung (die Schicht liegt keiner APK bei). Unter Linux lief noch keine Validierung und
-  noch keine ältere glibc als 2.39 ([Linux](#linux)); nur Intel und KWin als Treiber und Compositor ([Ausgabe unter Linux](#ausgabe-unter-linux)).
+- Unter Android keine Validierung (die Schicht liegt keiner APK bei). Unter Linux lief noch keine brauchbare Validierung
+  (die Schicht aus Ubuntu 24.04 ist zu alt, [Validierung](#validierung)) und noch keine ältere glibc als 2.39 ([Linux](#linux)); nur Intel und KWin als Treiber und Compositor ([Ausgabe unter Linux](#ausgabe-unter-linux)).
 - Keine eigene Kopierwarteschlange; die Rechen-Warteschlange (G5d) wartet an allen Befehlen (keine feineren
   Wartestufen), und die Validierungsschicht meldet fehlende Synchronisation zwischen Übergaben nicht.
 - Keine Pipeline-Statistik-Abfragen (Vertex-, Primitiv-, Fragment-Zähler); nur Zeitstempel.

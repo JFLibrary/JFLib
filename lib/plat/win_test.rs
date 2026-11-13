@@ -42,7 +42,7 @@
 use alloc::string::String;
 use core::cell::RefCell;
 
-use super::{GetDC, Point, ReleaseDC, Rect, SendMessageW, SetWindowPos, UiThread, cur_handle, rec, wide_cap, win_insets};
+use super::{GetDC, Point, ReleaseDC, Rect, SendMessageW, SetWindowPos, UiOnly, cur_handle, rec, wide_cap, win_insets};
 
 #[link(name = "user32", kind = "raw-dylib")]
 unsafe extern "system" {
@@ -167,7 +167,7 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
         }
         WT_CURSOR_IS => {
             // SAFETY: no arguments.
-            (unsafe { GetCursor() } == cur_handle(a[0] as u32)) as i64
+            (unsafe { GetCursor() } == cur_handle(a[0] as u32, rec(w).map_or(96, |r| r.dpi.get()))) as i64
         }
         _ => {
             let Some(r) = rec(w) else { return -1 };
@@ -366,7 +366,7 @@ struct Ac {
     found: core::cell::Cell<isize>,
 }
 
-static AC: UiThread<Ac> = UiThread(Ac {
+static AC: UiOnly<Ac> = UiOnly::new(Ac {
     ms: core::cell::Cell::new(0),
     name: RefCell::new(None),
     tries: core::cell::Cell::new(0),
@@ -375,7 +375,7 @@ static AC: UiThread<Ac> = UiThread(Ac {
 
 /// (test aid) close the next file_dialog after ms: Cancel (name None) or name + OK
 pub fn file_dialog_autoclose(ms: u32, name: Option<&str>) {
-    let a = &AC.0;
+    let a = AC.get();
     a.ms.set(ms.max(1));
     *a.name.borrow_mut() = name.map(String::from);
     a.tries.set(0);
@@ -383,7 +383,7 @@ pub fn file_dialog_autoclose(ms: u32, name: Option<&str>) {
 
 /// file_dialog calls this right before the modal call: arm the timer
 pub(super) fn autoclose_arm() {
-    let a = &AC.0;
+    let a = AC.get();
     let ms = a.ms.get();
     if ms == 0 {
         return;
@@ -403,7 +403,7 @@ fn is_class(h: isize, want: &str) -> bool {
 unsafe extern "system" fn find_dlg(h: isize, _lp: isize) -> i32 {
     // SAFETY: a window of this thread.
     if is_class(h, "#32770") && unsafe { IsWindowVisible(h) } != 0 {
-        AC.0.found.set(h);
+        AC.get().found.set(h);
         return 0;
     }
     1
@@ -415,14 +415,14 @@ unsafe extern "system" fn find_name(h: isize, _lp: isize) -> i32 {
     // SAFETY: a child window of the dialog.
     let id = unsafe { GetDlgCtrlID(h) };
     if (id == 1001 && is_class(h, "Edit")) || id == 1148 || id == 1152 {
-        AC.0.found.set(h);
+        AC.get().found.set(h);
         return 0;
     }
     1
 }
 
 unsafe extern "system" fn ac_timer(_h: isize, _m: u32, id: usize, _t: u32) {
-    let a = &AC.0;
+    let a = AC.get();
     a.found.set(0);
     // SAFETY: our own thread's windows; messages only to the dialog of our process.
     unsafe {

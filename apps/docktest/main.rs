@@ -9,7 +9,9 @@
 // Panels: Dateien and Gliederung (left, one group), Eigenschaften (right), Ausgabe and Suche
 // (bottom, two groups), Verlauf (right, second group, starts hidden).  The tool row saves the
 // layout into memory (Speichern), loads it again (Laden), resets it and shows / hides the
-// Verlauf; Ctrl+1 .. Ctrl+6 focus a panel (DockState::focus).  The status line describes the
+// Verlauf; "Gruppe" gives Dateien and Gliederung DP_GROUP (their group moves as a whole from
+// its menu); "Alle zeigen" shows every panel in the order of PANELS (DockState::show, as an app
+// brings its hidden tools back); Ctrl+1 .. Ctrl+6 focus a panel (DockState::focus).  The status line describes the
 // layout: per side its groups ("[shown]+other"), "(zu)" for a collapsed side, the floating
 // windows, the hidden panels, the side sizes and how often dock_end reported a change.  The
 // document shows the saved text.  Floating windows have the window ids 501 .. 506.
@@ -31,6 +33,8 @@ const ID_SAVE: u32 = 101;
 const ID_LOAD: u32 = 102;
 const ID_RESET: u32 = 103;
 const ID_HISTORY: u32 = 104;
+const ID_GROUP: u32 = 105; // "Gruppe": DP_GROUP for the left group
+const ID_SHOWALL: u32 = 106; // "Alle zeigen": every panel shown, in the order of PANELS
 const ID_FILE0: u32 = 201; // .. 203: buttons in the Dateien panel
 const ID_PROP: u32 = 210;
 const ID_SEARCH_GO: u32 = 220;
@@ -80,6 +84,8 @@ struct Dock {
     saved: String,
     changes: u32,
     clicked: String,
+    /// "Gruppe": Dateien and Gliederung move as one group (DP_GROUP)
+    group: i32,
     /// --layout FILE: loaded at the start, written by Speichern
     file: Option<String>,
 }
@@ -191,10 +197,17 @@ impl App for Dock {
         if ui.toggle_button(ID_HISTORY, t("Verlauf"), &mut on) & EV_ACT != 0 {
             self.dock.toggle(P_HISTORY);
         }
+        ui.toggle_button(ID_GROUP, t("Gruppe"), &mut self.group);
+        if ui.button(ID_SHOWALL, t("Alle zeigen")) & EV_ACT != 0 {
+            for p in PANELS {
+                self.dock.show(p);
+            }
+        }
         ui.box_end();
+        let grp = if self.group != 0 { DP_GROUP } else { 0 };
         let panels = [
-            DockPanel::new(P_FILES, title(P_FILES), IC_FOLDER).at(DOCK_LEFT, 0),
-            DockPanel::new(P_OUTLINE, title(P_OUTLINE), IC_BULLETED_LIST).at(DOCK_LEFT, 0),
+            DockPanel::new(P_FILES, title(P_FILES), IC_FOLDER).at(DOCK_LEFT, 0).flags(grp),
+            DockPanel::new(P_OUTLINE, title(P_OUTLINE), IC_BULLETED_LIST).at(DOCK_LEFT, 0).flags(grp),
             DockPanel::new(P_PROPS, title(P_PROPS), IC_SETTINGS).at(DOCK_RIGHT, 0),
             DockPanel::new(P_OUTPUT, title(P_OUTPUT), IC_DOCUMENT).at(DOCK_BOTTOM, 0).flags(DP_NOCLOSE),
             DockPanel::new(P_SEARCH, title(P_SEARCH), IC_SEARCH).at(DOCK_BOTTOM, 1),

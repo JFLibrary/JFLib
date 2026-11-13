@@ -15,6 +15,8 @@
 //                                   an image file (PNG, or BMP from a DIB), the app's own kind
 //                                   and bytes; drop_types() -> its DT_* kinds, drop_text()
 //   drop_pos() -> (x, y)            drop position in DIP of the window it happened in
+//   drop_pos_px() -> (x, y)         the same in px of that window, exact (as last_rect and a
+//                                   canvas's UiInput: x - rect[0] is the point in the canvas)
 //   drop_window() -> id             that window's app id (0 = main window)
 //   clip_has(fmt) -> bool           the clipboard offers CLIP_TEXT / CLIP_PNG / CLIP_IMAGE
 //                                   (headless runs: the in-process clipboard)
@@ -44,6 +46,8 @@ pub(crate) struct S {
     pub(crate) hi_bmp: Option<Vec<u8>>,
     pub(crate) x: i32,
     pub(crate) y: i32,
+    /// drop_pos_px: the drop's place in px of its window (logical)
+    pub(crate) px: (i32, i32),
     pub(crate) win: u32,
 }
 
@@ -85,9 +89,18 @@ impl Ui {
         &self.dr.list
     }
 
-    /// ui_drop_pos: drop position in DIP of the window it happened in
+    /// ui_drop_pos: drop position in DIP of the window it happened in (rounded to whole DIP:
+    /// at 150 % three pixels share two DIP; drop_pos_px is exact)
     pub fn drop_pos(&self) -> (i32, i32) {
         (self.dr.x, self.dr.y)
+    }
+
+    /// drop position in px of the window it happened in, exact: logical like `last_rect` and a
+    /// canvas's `UiInput::rect` (mirrored in a right-to-left window), so `(x - rect[0], y -
+    /// rect[1])` is the point in a canvas, in the canvas's own pixels -- a drop onto a page an
+    /// engine draws at the display's resolution
+    pub fn drop_pos_px(&self) -> (i32, i32) {
+        self.dr.px
     }
 
     /// ui_drop_window: the app id of the window of the last drop (0 = main window)
@@ -117,6 +130,7 @@ impl Ui {
         self.dr.win = self.uiw_rec_id(win);
         self.uiw_use(win); // DIP in that window
         let x = if self.rtl { self.wp.rt.fb.w - 1 - x } else { x }; // logical (right-to-left)
+        self.dr.px = (x, y);
         self.dr.x = self.px2dip(x);
         self.dr.y = self.px2dip(y);
         self.uiw_use(0);

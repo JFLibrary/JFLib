@@ -11,6 +11,10 @@
 //! `#![no_main]` crate whose build script is jflib-build's (apps/installer here; the stub
 //! `cargo jflib package` makes).
 //! Pages: style -> options -> work -> done (error page on failures); uninstall: ask -> done.
+//! A web browser (manifest browser=1) gets the option "Als Standardbrowser festlegen" on the
+//! options page, checked as in Firefox's setup: "Fertigstellen" then opens Windows' Settings at
+//! the program's page of the default apps (plat::assoc::browser_request; Windows lets no
+//! program take the default itself).  Test mode and script runs only print it.
 //! Tests: ASMINST_SHELL_DIR redirects desktop / start menu / registry (shell.rs).
 //! Windows only (apps/installer/TARGETS).
 //
@@ -50,6 +54,7 @@ const ID_START: u32 = 142;
 const ID_REG: u32 = 143;
 const ID_LAUNCH: u32 = 144;
 const ID_PROG: u32 = 145;
+const ID_BROWSER: u32 = 146;
 const ID_CANCEL: u32 = 150;
 const ID_BACK: u32 = 151;
 const ID_NEXT: u32 = 152;
@@ -128,6 +133,8 @@ pub(crate) struct Inst {
     pub(crate) opt_start: i32,
     pub(crate) opt_reg: i32,
     pub(crate) opt_launch: i32,
+    /// (browser=1) make it the default browser after installing (Settings opens on Finish)
+    pub(crate) opt_browser: i32,
     /// the shortcuts made (in_lnk_desk, in_lnk_start; uninstall: from install.ini)
     pub(crate) lnk_desk: String,
     pub(crate) lnk_start: String,
@@ -136,6 +143,8 @@ pub(crate) struct Inst {
     /// the manifest's file types and URL schemes (PACKAGE filetypes= / schemes=)
     pub(crate) types: String,
     pub(crate) schemes: String,
+    /// the manifest's browser=1: registered as a web browser too (Default Programs)
+    pub(crate) browser: bool,
     /// uninstall: install.ini assoc= (what the file types and schemes added)
     pub(crate) assoc: String,
     /// the manifest's app_id (PACKAGE, tools/pkgmeta.py): the program's AppUserModelID on its
@@ -160,6 +169,7 @@ impl App for Inst {
         self.opt_start = 1;
         self.opt_reg = 1;
         self.opt_launch = 0;
+        self.opt_browser = 1;
         self.uninst = arg_flag("--uninstall");
         if self.uninst {
             self.page = if install::un_load(self).is_ok() { PG_UASK } else { PG_ERR };
@@ -228,6 +238,10 @@ impl App for Inst {
             CMD_FINISH => {
                 if self.opt_launch != 0 {
                     install::inst_launch(self);
+                }
+                // after the program, so that Settings comes to the front
+                if self.browser && self.opt_browser != 0 {
+                    install::inst_default_browser(self, ui.headless());
                 }
                 ui.quit();
             }
@@ -310,6 +324,10 @@ impl Inst {
         ui.checkbox(ID_REG, "In „Installierte Apps“ eintragen (zum Deinstallieren)", &mut self.opt_reg);
         let t = fmt1("%s nach der Installation starten", &self.disp);
         ui.checkbox(ID_LAUNCH, &t, &mut self.opt_launch);
+        if self.browser {
+            ui.spacer(8); // not a shortcut: a group of its own
+            ui.checkbox(ID_BROWSER, &browser_label(&self.disp), &mut self.opt_browser);
+        }
     }
 
     /// finished  [fr_done]
@@ -377,6 +395,16 @@ fn ui_spacer_h(ui: &mut Ui, dip: i32) {
     ui.box_begin(0, BOX_H, 0);
     ui.spacer(dip);
     ui.next_size(-1, 0);
+}
+
+/// the option of a web browser in the user's language (the setup's other texts are German):
+/// German, else English
+fn browser_label(disp: &str) -> String {
+    if i18n::negotiate(&["de", "en"], &i18n::user_languages()) == Some(0) {
+        String::from("Als Standardbrowser festlegen")
+    } else {
+        fmt1("Make %s my default browser", disp)
+    }
 }
 
 /// progress while installing  [fr_work]

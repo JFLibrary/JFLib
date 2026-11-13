@@ -520,12 +520,25 @@ pub struct Shot {
     /// the translucent images: the alpha of their colour (blended_twice)
     #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
     pub alpha: Option<u32>,
+    /// (G6b2) a drawing of blocks instead of `d`
+    pub b: Option<BlockDrawing>,
+}
+
+impl Shot {
+    /// its drawing in a scene
+    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+    pub fn build(&self, s: &mut Scene) -> Result<()> {
+        match &self.b {
+            Some(b) => build_blocks(s, b).map(|_| ()),
+            None => build(s, &self.d).map(|_| ()),
+        }
+    }
 }
 
 /// the images the browser is compared with Vulkan on: caps, joins, hairlines, units, overlap, every case of the tests
 pub fn shots() -> Vec<Shot> {
     let mut v = Vec::new();
-    let mut add = |name: String, w: u32, h: u32, d: Drawing, cam: Camera, alpha: Option<u32>| v.push(Shot { name, w, h, d, cam, alpha });
+    let mut add = |name: String, w: u32, h: u32, d: Drawing, cam: Camera, alpha: Option<u32>| v.push(Shot { name, w, h, d, cam, alpha, b: None });
     for cap in CAPS {
         for width in [1.0f32, 2.5, 6.0, 15.0] {
             add(format!("caps_{cap:?}_{width}"), 320, 240, caps_drawing(cap, width), pixel_camera(320, 240), None);
@@ -582,6 +595,10 @@ pub fn shots() -> Vec<Shot> {
     add("fills_crossing".into(), 360, 270, fills_crossing_drawing(), pixel_camera(360, 270), None);
     for sp in HATCH_SPACINGS {
         add(format!("hatch_{sp}"), 360, 270, hatch_drawing(sp), pixel_camera(360, 270), None);
+    }
+    // blocks inserted in every way, transparency (G6b2)
+    for (name, b) in [("blocks", blocks_drawing(false)), ("blocks_uneven", blocks_drawing(true)), ("transparency", transparency_drawing([0, 40, 90]))] {
+        v.push(Shot { name: name.into(), w: 360, h: 270, d: Drawing::default(), cam: pixel_camera(360, 270), alpha: None, b: Some(b) });
     }
     v
 }
@@ -1686,4 +1703,523 @@ pub fn arc_quad_area(rp: f64, h: f64, size: (u32, u32)) -> (f64, f64, f64) {
     };
     let side = 2.0 * (rp + h + 1.0);
     (count, ring, side * side)
+}
+
+// ---------------------------------------------------------------- blocks (G6b2)
+
+/// an insert of a test drawing: a block (its place in BlockDrawing::blocks, an earlier one when nested) and the insert's
+/// numbers (render2d::Insert)
+#[derive(Clone, Copy, Debug)]
+pub struct BIns {
+    pub block: usize,
+    pub at: [f64; 2],
+    pub rotation: f64,
+    pub scale: [f64; 2],
+    pub columns: u32,
+    pub rows: u32,
+    pub spacing: [f64; 2],
+}
+
+impl BIns {
+    pub fn new(block: usize, at: [f64; 2]) -> BIns {
+        BIns { block, at, rotation: 0.0, scale: [1.0, 1.0], columns: 1, rows: 1, spacing: [0.0, 0.0] }
+    }
+
+    pub fn turned(mut self, rotation: f64, scale: [f64; 2]) -> BIns {
+        self.rotation = rotation;
+        self.scale = scale;
+        self
+    }
+
+    pub fn array(mut self, columns: u32, rows: u32, spacing: [f64; 2]) -> BIns {
+        self.columns = columns;
+        self.rows = rows;
+        self.spacing = spacing;
+        self
+    }
+
+    /// its copies' transforms (render2d's order: rows, then columns), from its block's units (less its base) to where it
+    /// sits (less `origin`): (t, m) with world = t + m local
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub fn xfs(&self, origin: [f64; 2]) -> Vec<Aff> {
+        let (s, c) = sincos(self.rotation);
+        let m = [[c * self.scale[0], -s * self.scale[1]], [s * self.scale[0], c * self.scale[1]]];
+        let mut v = Vec::new();
+        for row in 0..self.rows {
+            for col in 0..self.columns {
+                let (dx, dy) = (col as f64 * self.spacing[0], row as f64 * self.spacing[1]);
+                v.push(Aff { t: [self.at[0] - origin[0] + (c * dx - s * dy), self.at[1] - origin[1] + (s * dx + c * dy)], m });
+            }
+        }
+        v
+    }
+}
+
+/// an affine map of the tests: world = t + m p
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub struct Aff {
+    pub t: [f64; 2],
+    pub m: [[f64; 2]; 2],
+}
+
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+impl Aff {
+    pub fn lin(&self, v: [f64; 2]) -> [f64; 2] {
+        [self.m[0][0] * v[0] + self.m[0][1] * v[1], self.m[1][0] * v[0] + self.m[1][1] * v[1]]
+    }
+
+    pub fn apply(&self, p: [f64; 2]) -> [f64; 2] {
+        let v = self.lin(p);
+        [self.t[0] + v[0], self.t[1] + v[1]]
+    }
+
+    pub fn then(&self, o: &Aff) -> Aff {
+        let (a, b) = (&self.m, &o.m);
+        Aff { t: self.apply(o.t), m: [[a[0][0] * b[0][0] + a[0][1] * b[1][0], a[0][0] * b[0][1] + a[0][1] * b[1][1]], [a[1][0] * b[0][0] + a[1][1] * b[1][0], a[1][0] * b[0][1] + a[1][1] * b[1][1]]] }
+    }
+
+    pub fn det(&self) -> f64 {
+        self.m[0][0] * self.m[1][1] - self.m[0][1] * self.m[1][0]
+    }
+
+    /// a rotation, mirrored or not, times an even scale: (scale, angle, mirrored)
+    pub fn similar(&self) -> Option<(f64, f64, bool)> {
+        let m = &self.m;
+        let n = m[0][0].abs() + m[0][1].abs() + m[1][0].abs() + m[1][1].abs();
+        let mir = self.det() < 0.0;
+        let off = if mir { (m[0][0] + m[1][1]).abs() + (m[0][1] - m[1][0]).abs() } else { (m[0][0] - m[1][1]).abs() + (m[0][1] + m[1][0]).abs() };
+        if off > 1e-9 * n {
+            return None;
+        }
+        Some((sqrt(m[0][0] * m[0][0] + m[1][0] * m[1][0]), atan2(m[1][0], m[0][0]), mir))
+    }
+}
+
+/// atan2 in f64 for the tests (no libm): an octant, then the half-angle step twice and the series
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub fn atan2(y: f64, x: f64) -> f64 {
+    if x == 0.0 && y == 0.0 {
+        return 0.0;
+    }
+    let pi = core::f64::consts::PI;
+    let (ax, ay) = (x.abs(), y.abs());
+    let (z, swap) = if ay > ax { (ax / ay, true) } else { (ay / ax, false) };
+    let mut t = z;
+    for _ in 0..2 {
+        t /= 1.0 + sqrt(1.0 + t * t);
+    }
+    let t2 = t * t;
+    let (mut term, mut sum) = (t, 0.0);
+    for k in 0..30 {
+        sum += term / (2 * k + 1) as f64;
+        term *= -t2;
+    }
+    let mut a = 4.0 * sum;
+    if swap {
+        a = 0.5 * pi - a;
+    }
+    if x < 0.0 {
+        a = pi - a;
+    }
+    if y < 0.0 { -a } else { a }
+}
+
+/// a block's entity or an entity on a layer: a geometry, or an insert
+#[derive(Clone)]
+pub enum BGeo {
+    G(Geo),
+    Ins(BIns),
+}
+
+/// a block of a test drawing: its base point, its entities in their order
+#[derive(Clone)]
+pub struct BDef {
+    pub base: [f64; 2],
+    pub items: Vec<(Style, BGeo)>,
+}
+
+/// layers (visible, order, transparency), blocks, the entities on the layers (layer, style, what)
+#[derive(Clone, Default)]
+pub struct BlockDrawing {
+    pub layers: Vec<(bool, i32, u32)>,
+    pub blocks: Vec<BDef>,
+    pub items: Vec<(usize, Style, BGeo)>,
+}
+
+/// what build_blocks made
+pub struct BuiltBlocks {
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub layers: Vec<LayerId>,
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub blocks: Vec<render2d::BlockId>,
+    /// per item on a layer its entity
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub items: Vec<EntityId>,
+    /// per block per item its entity
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    pub block_items: Vec<Vec<EntityId>>,
+}
+
+fn insert_of(b: &BIns, blocks: &[render2d::BlockId]) -> render2d::Insert {
+    let mut i = render2d::Insert::new(blocks[b.block], b.at);
+    i.rotation = b.rotation;
+    i.scale = b.scale;
+    i.columns = b.columns;
+    i.rows = b.rows;
+    i.spacing = b.spacing;
+    i
+}
+
+pub fn with_bshape<R>(g: &BGeo, blocks: &[render2d::BlockId], f: impl FnOnce(&Shape) -> R) -> R {
+    match g {
+        BGeo::G(g) => with_shape(g, f),
+        BGeo::Ins(b) => f(&Shape::Insert(insert_of(b, blocks))),
+    }
+}
+
+/// a block drawing in a scene: its layers, its blocks (in order: a nested insert names an earlier one), its entities
+pub fn build_blocks(s: &mut Scene, d: &BlockDrawing) -> Result<BuiltBlocks> {
+    let mut layers = Vec::new();
+    for &(visible, order, transparency) in &d.layers {
+        let mut l = Layer::new(order);
+        l.visible = visible;
+        l.transparency = transparency;
+        layers.push(s.add_layer(&l)?);
+    }
+    let mut blocks = Vec::new();
+    let mut block_items = Vec::new();
+    for b in &d.blocks {
+        let mut def = render2d::Block::new();
+        def.base = b.base;
+        let id = s.add_block(&def)?;
+        blocks.push(id);
+        let mut ids = Vec::new();
+        for (st, g) in &b.items {
+            let sid = s.add_style(st)?;
+            ids.push(with_bshape(g, &blocks, |sh| s.insert_in(id, sid, sh))?);
+        }
+        block_items.push(ids);
+    }
+    let mut items = Vec::new();
+    for (l, st, g) in &d.items {
+        let sid = s.add_style(st)?;
+        items.push(with_bshape(g, &blocks, |sh| s.insert(layers[*l], sid, sh))?);
+    }
+    Ok(BuiltBlocks { layers, blocks, items, block_items })
+}
+
+/// a colour's alpha times (100 - p) / 100 as the GPU does it (block.wgsl ink)
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub fn ink(color: u32, p: u32) -> u32 {
+    if p == 0 {
+        return color;
+    }
+    let a = color >> 24;
+    (color & 0x00FF_FFFF) | (((a * (100 - p) + 50) / 100) << 24)
+}
+
+/// an entity's style inside an insert whose style by block is `ins`: what it takes by block, its transparency into its
+/// alpha (by layer: `layer_t`), its widths and patterns in units scaled with the insert (sqrt |det|), its hatch through
+/// the transform
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+fn style_in(own: &Style, ins: Option<&Style>, xf: &Aff, base: [f64; 2], layer_t: u32) -> Style {
+    let mut s = *own;
+    if let Some(b) = ins {
+        if own.by_block & render2d::BY_BLOCK_COLOR != 0 {
+            s.color = b.color;
+        }
+        if own.by_block & render2d::BY_BLOCK_WIDTH != 0 {
+            s.width = b.width;
+            s.unit = b.unit;
+        }
+        if own.by_block & render2d::BY_BLOCK_DASH != 0 {
+            s.dash = b.dash;
+            s.dashes = b.dashes;
+            s.dash_unit = b.dash_unit;
+            s.dash_phase = b.dash_phase;
+        }
+        if own.transparency == render2d::Transparency::ByBlock {
+            s.transparency = b.transparency;
+        }
+    }
+    s.by_block = 0;
+    let p = match s.transparency {
+        render2d::Transparency::Percent(p) => p,
+        render2d::Transparency::ByLayer => layer_t,
+        _ => 0,
+    };
+    s.color = ink(s.color, p);
+    s.transparency = render2d::Transparency::Percent(0);
+    let sw = sqrt(xf.det().abs());
+    if s.unit == Unit::Drawing {
+        s.width = (s.width as f64 * sw) as f32;
+    }
+    if s.dash_unit == Unit::Drawing {
+        for k in 0..s.dashes as usize {
+            s.dash[k] = (s.dash[k] as f64 * sw) as f32;
+        }
+        s.dash_phase = (s.dash_phase as f64 * sw) as f32;
+    }
+    for k in 0..s.hatches as usize {
+        let h = s.hatch[k];
+        let (sa, ca) = sincos(h.angle);
+        let d = xf.lin([ca, sa]);
+        let l = sqrt(d[0] * d[0] + d[1] * d[1]);
+        let du = [d[0] / l, d[1] / l];
+        let nn = [-du[1], du[0]];
+        let v = xf.lin([-sa * h.spacing, ca * h.spacing]);
+        let (a, c) = (v[0] * nn[0] + v[1] * nn[1], v[0] * du[0] + v[1] * du[1]);
+        let mut nh = render2d::HatchLine::new(atan2(du[1], du[0]), a.abs());
+        nh.base = xf.apply([h.base[0] - base[0], h.base[1] - base[1]]);
+        nh.shift = a.signum() * (c + l * h.shift);
+        nh.dash = h.dash;
+        for x in &mut nh.dash {
+            *x *= l;
+        }
+        nh.dashes = h.dashes;
+        s.hatch[k] = nh;
+    }
+    s
+}
+
+/// a circular or elliptic arc (centre, the map of the unit circle to it, start, sweep) as a rational quadratic spline:
+/// spans of at most a quarter turn, the control points through `xf`
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+fn conic_spline(c: [f64; 2], a: [[f64; 2]; 2], start: f64, sweep: f64, xf: &Aff) -> Geo {
+    let n = ((sweep.abs() / core::f64::consts::FRAC_PI_2 - 1e-9) as usize + 1).max(1);
+    let d = sweep / n as f64;
+    let w = sincos(0.5 * d).1;
+    let at = |u: [f64; 2]| xf.apply([c[0] + a[0][0] * u[0] + a[0][1] * u[1], c[1] + a[1][0] * u[0] + a[1][1] * u[1]]);
+    let mut pts = Vec::new();
+    let mut ws = Vec::new();
+    let mut knots = vec![0.0, 0.0, 0.0];
+    for k in 0..n {
+        let t0 = start + d * k as f64;
+        let (s0, c0) = sincos(t0);
+        let (sm, cm) = sincos(t0 + 0.5 * d);
+        if k == 0 {
+            pts.push(at([c0, s0]));
+            ws.push(1.0);
+        }
+        // (the middle control point: where the tangents at both ends meet, 1 / cos(d / 2) out)
+        pts.push(at([cm / w, sm / w]));
+        ws.push(w);
+        let (s1, c1) = sincos(t0 + d);
+        pts.push(at([c1, s1]));
+        ws.push(1.0);
+        let kk = (k + 1) as f64;
+        if k + 1 < n {
+            knots.extend_from_slice(&[kk, kk]);
+        } else {
+            knots.extend_from_slice(&[kk, kk, kk]);
+        }
+    }
+    let closed = sweep.abs() >= core::f64::consts::TAU - 1e-12;
+    Geo::Spline(2, pts, ws, knots, closed)
+}
+
+/// a geometry of a block (in its units, less its base) through a transform
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub fn geo_through(g: &Geo, xf: &Aff, base: [f64; 2]) -> Geo {
+    let p = |q: &[f64; 2]| xf.apply([q[0] - base[0], q[1] - base[1]]);
+    let local = |q: &[f64; 2]| [q[0] - base[0], q[1] - base[1]];
+    match g {
+        Geo::Line(a, b) => Geo::Line(p(a), p(b)),
+        Geo::Poly(v, c) => Geo::Poly(v.iter().map(p).collect(), *c),
+        Geo::Arc(c, r, a0, sw) => match xf.similar() {
+            Some((s, th, mir)) => {
+                let sg = if mir { -1.0 } else { 1.0 };
+                Geo::Arc(p(c), r * s, th + sg * a0, sg * sw)
+            }
+            None => conic_spline(local(c), [[*r, 0.0], [0.0, *r]], *a0, *sw, xf),
+        },
+        Geo::Circle(c, r) => match xf.similar() {
+            // (a full turn starting where the circle's angle 0 went: its dash pattern starts there)
+            Some((s, th, mir)) => Geo::Arc(p(c), r * s, th, if mir { -core::f64::consts::TAU } else { core::f64::consts::TAU }),
+            None => conic_spline(local(c), [[*r, 0.0], [0.0, *r]], 0.0, core::f64::consts::TAU, xf),
+        },
+        Geo::Ellipse(c, r, rot, a0, sw) => match xf.similar() {
+            Some((s, th, mir)) => {
+                let sg = if mir { -1.0 } else { 1.0 };
+                Geo::Ellipse(p(c), [r[0] * s, r[1] * s], th + sg * rot, sg * a0, sg * sw)
+            }
+            None => {
+                let (sr, cr) = sincos(*rot);
+                conic_spline(local(c), [[cr * r[0], -sr * r[1]], [sr * r[0], cr * r[1]]], *a0, *sw, xf)
+            }
+        },
+        Geo::Bez(v, d, c) => Geo::Bez(v.iter().map(p).collect(), *d, *c),
+        Geo::Spline(d, v, w, k, c) => Geo::Spline(*d, v.iter().map(p).collect(), w.clone(), k.clone(), *c),
+        Geo::Fill(rings) => Geo::Fill(rings.iter().map(|r| r.iter().map(|g| geo_through(g, xf, base)).collect()).collect()),
+    }
+}
+
+/// the drawing a block drawing shows: every insert's entities through its transforms (depth first, in their order), their
+/// styles as the GPU resolves them (by block, transparency into the alpha, widths in units scaled), on the insert's layer
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub fn expand_blocks(d: &BlockDrawing) -> Drawing {
+    let mut out = Drawing { layers: d.layers.iter().map(|l| (l.0, l.1)).collect(), items: Vec::new() };
+    fn walk(d: &BlockDrawing, b: usize, xf: &Aff, ins: &Style, layer: usize, out: &mut Drawing) {
+        let def = &d.blocks[b];
+        let lt = d.layers[layer].2;
+        for (st, g) in &def.items {
+            match g {
+                BGeo::G(g) => out.items.push(Item { layer, style: style_in(st, Some(ins), xf, def.base, lt), geo: geo_through(g, xf, def.base) }),
+                BGeo::Ins(n) => {
+                    // (a nested insert's style takes what it takes by block from its parent's)
+                    let mut s2 = *st;
+                    if st.by_block != 0 || st.transparency == render2d::Transparency::ByBlock {
+                        let mut t = *st;
+                        if st.by_block & render2d::BY_BLOCK_COLOR != 0 {
+                            t.color = ins.color;
+                        }
+                        if st.by_block & render2d::BY_BLOCK_WIDTH != 0 {
+                            t.width = ins.width;
+                            t.unit = ins.unit;
+                        }
+                        if st.by_block & render2d::BY_BLOCK_DASH != 0 {
+                            t.dash = ins.dash;
+                            t.dashes = ins.dashes;
+                            t.dash_unit = ins.dash_unit;
+                            t.dash_phase = ins.dash_phase;
+                        }
+                        if st.transparency == render2d::Transparency::ByBlock {
+                            t.transparency = ins.transparency;
+                        }
+                        s2 = t;
+                    }
+                    for x2 in n.xfs(def.base) {
+                        walk(d, n.block, &xf.then(&x2), &s2, layer, out);
+                    }
+                }
+            }
+        }
+    }
+    for (l, st, g) in &d.items {
+        match g {
+            BGeo::G(g) => {
+                let ident = Aff { t: [0.0, 0.0], m: [[1.0, 0.0], [0.0, 1.0]] };
+                out.items.push(Item { layer: *l, style: style_in(st, None, &ident, [0.0, 0.0], d.layers[*l].2), geo: g.clone() });
+            }
+            BGeo::Ins(b) => {
+                for xf in b.xfs([0.0, 0.0]) {
+                    walk(d, b.block, &xf, st, *l, &mut out);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// a style by block: everything taken from the insert's
+pub fn by_block(mut st: Style) -> Style {
+    st.by_block = render2d::BY_BLOCK_COLOR | render2d::BY_BLOCK_WIDTH | render2d::BY_BLOCK_DASH;
+    st.transparency = render2d::Transparency::ByBlock;
+    st
+}
+
+/// the block test's drawing: three blocks (strokes, arcs and dash patterns; curves, fills and a hatch; one nesting both),
+/// inserted moved, turned, scaled evenly and unevenly, mirrored, as arrays, nested; styles by block.  uneven: with the
+/// inserts that scale unevenly (their dash patterns follow the block's own lengths, which the expanded drawing cannot show:
+/// none in them)
+pub fn blocks_drawing(uneven: bool) -> BlockDrawing {
+    let mut d = BlockDrawing { layers: vec![(true, 0, 0), (true, 1, 0)], blocks: Vec::new(), items: Vec::new() };
+    let g = BGeo::G;
+    // A: strokes and arcs, a dash pattern in pixels and one in units, a width in units, by block colour and width
+    let mut wide = style(INK[0], 0.6, Cap::Round, Join::Round);
+    wide.unit = Unit::Drawing;
+    let mut a = BDef { base: [10.0, 5.0], items: Vec::new() };
+    a.items.push((wide, g(Geo::Poly(vec![[0.0, 0.0], [24.0, 4.0], [12.0, 20.0], [30.0, 26.0]], false))));
+    a.items.push((style(INK[1], 3.0, Cap::Butt, Join::Miter), g(Geo::Arc([18.0, 12.0], 9.0, 0.3, 2.4))));
+    a.items.push((style(INK[2], 1.0, Cap::Square, Join::Bevel), g(Geo::Circle([6.0, 18.0], 5.5))));
+    let mut bb = style(0xFF00_0000, 1.0, Cap::Butt, Join::Miter);
+    bb.by_block = render2d::BY_BLOCK_COLOR | render2d::BY_BLOCK_WIDTH;
+    a.items.push((bb, g(Geo::Poly(vec![[2.0, 28.0], [28.0, 30.0], [26.0, 8.0]], false))));
+    if !uneven {
+        a.items.push((dashed(INK[3], 2.0, Cap::Butt, Join::Miter, &[7.0, 3.0], Unit::Px, 1.0), g(Geo::Poly(vec![[0.0, 34.0], [30.0, 34.0], [30.0, 40.0]], false))));
+        a.items.push((dashed(0xFF60_3080, 1.5, Cap::Round, Join::Round, &[3.0, 1.5], Unit::Drawing, 0.5), g(Geo::Circle([36.0, 20.0], 4.0))));
+    }
+    d.blocks.push(a);
+    // B: curves, a fill with a hole, a hatched fill, an ellipse
+    let mut b = BDef { base: [0.0, 0.0], items: Vec::new() };
+    b.items.push((style(INK[1], 2.0, Cap::Round, Join::Round), g(Geo::Bez(vec![[0.0, 0.0], [10.0, 25.0], [25.0, -10.0], [35.0, 15.0]], 3, false))));
+    b.items.push((style(INK[0], 1.0, Cap::Butt, Join::Miter), g(Geo::Ellipse([18.0, 30.0], [14.0, 6.0], 0.4, 0.0, core::f64::consts::TAU))));
+    let sq = |x: f64, y: f64, s: f64| vec![Geo::Poly(vec![[x, y], [x + s, y], [x + s, y + s], [x, y + s]], true)];
+    b.items.push((style(0xFF70_A060, 0.0, Cap::Butt, Join::Miter), g(Geo::Fill(vec![sq(2.0, 40.0, 22.0), vec![Geo::Circle([13.0, 51.0], 6.0)]]))));
+    let hst = style(0xFF30_3060, 0.0, Cap::Butt, Join::Miter).hatched(&[render2d::HatchLine::new(0.5, 2.5), render2d::HatchLine::new(-0.9, 4.0).dashed(&[3.0, 1.5])], 1.0);
+    b.items.push((hst, g(Geo::Fill(vec![vec![Geo::Ellipse([40.0, 50.0], [10.0, 7.0], 0.2, 0.0, core::f64::consts::TAU)]]))));
+    d.blocks.push(b);
+    // C: A and B nested (A turned and by block, B as an array), a line of its own between them
+    let mut c = BDef { base: [5.0, 5.0], items: Vec::new() };
+    c.items.push((by_block(style(0xFF00_0000, 1.0, Cap::Butt, Join::Miter)), BGeo::Ins(BIns::new(0, [5.0, 5.0]).turned(0.5, [0.8, 0.8]))));
+    c.items.push((style(INK[3], 2.0, Cap::Round, Join::Round), g(Geo::Line([0.0, 0.0], [60.0, 10.0]))));
+    c.items.push((style(INK[2], 0.0, Cap::Butt, Join::Miter), BGeo::Ins(BIns::new(1, [40.0, 0.0]).turned(0.0, [0.5, 0.5]).array(2, 1, [30.0, 0.0]))));
+    d.blocks.push(c);
+    // the inserts
+    let ins = |c: u32| {
+        let mut s = style(c, 2.5, Cap::Butt, Join::Miter);
+        s.transparency = render2d::Transparency::Percent(0);
+        s
+    };
+    d.items.push((0, style(0xFF90_9090, 1.0, Cap::Butt, Join::Miter), g(Geo::Line([5.0, 5.0], [355.0, 265.0]))));
+    d.items.push((0, ins(0xFFC0_2020), BGeo::Ins(BIns::new(0, [20.0, 20.0]))));
+    d.items.push((0, ins(0xFF20_A020), BGeo::Ins(BIns::new(0, [120.0, 30.0]).turned(0.7, [1.0, 1.0]))));
+    d.items.push((1, ins(0xFF2020C0), BGeo::Ins(BIns::new(0, [230.0, 20.0]).turned(-0.3, [1.6, 1.6]))));
+    d.items.push((1, ins(0xFFA0_6000), BGeo::Ins(BIns::new(0, [120.0, 90.0]).turned(0.0, [-1.0, 1.0]))));
+    d.items.push((1, ins(0xFF00_8080), BGeo::Ins(BIns::new(0, [175.0, 90.0]).turned(2.2, [1.2, -1.2]))));
+    d.items.push((0, ins(0xFF80_0080), BGeo::Ins(BIns::new(1, [200.0, 110.0]).turned(0.25, [1.1, 1.1]))));
+    d.items.push((0, ins(0xFF40_4040), BGeo::Ins(BIns::new(1, [300.0, 190.0]).turned(3.0, [-0.9, 0.9]))));
+    d.items.push((1, ins(0xFF80_8000), BGeo::Ins(BIns::new(2, [10.0, 150.0]).turned(0.15, [1.3, 1.3]))));
+    d.items.push((0, ins(0xFF60_6060), BGeo::Ins(BIns::new(0, [10.0, 225.0]).turned(0.0, [0.5, 0.5]).array(4, 2, [24.0, 22.0]))));
+    if uneven {
+        d.items.push((0, ins(0xFFB0_4000), BGeo::Ins(BIns::new(0, [230.0, 170.0]).turned(0.4, [2.0, 0.7]))));
+        d.items.push((1, ins(0xFF00_6090), BGeo::Ins(BIns::new(1, [290.0, 40.0]).turned(-0.5, [0.6, 1.4]))));
+        d.items.push((1, ins(0xFF90_0040), BGeo::Ins(BIns::new(2, [150.0, 200.0]).turned(0.0, [1.0, -0.6]))));
+    }
+    d
+}
+
+/// layers of 0, 40 and 90 % transparency; entities by layer, of their own 30 % and 0 %, opaque and translucent colours,
+/// strokes, arcs, dash patterns, fills and a hatch; an insert whose entities take theirs by block from its style (60 %, and
+/// by layer); the expected image is the same drawing with the transparency multiplied into each colour's alpha
+pub fn transparency_drawing(layer_t: [u32; 3]) -> BlockDrawing {
+    let mut d = BlockDrawing { layers: vec![(true, 0, layer_t[0]), (true, 1, layer_t[1]), (true, 2, layer_t[2])], blocks: Vec::new(), items: Vec::new() };
+    let tr = |mut s: Style, t: render2d::Transparency| {
+        s.transparency = t;
+        s
+    };
+    let g = BGeo::G;
+    let mut b = BDef { base: [0.0, 0.0], items: Vec::new() };
+    b.items.push((tr(style(0xFF20_3080, 6.0, Cap::Round, Join::Round), render2d::Transparency::ByBlock), g(Geo::Poly(vec![[0.0, 0.0], [40.0, 30.0], [0.0, 50.0]], false))));
+    b.items.push((tr(style(0xC080_2020, 0.0, Cap::Butt, Join::Miter), render2d::Transparency::ByBlock), g(Geo::Fill(vec![vec![Geo::Circle([50.0, 20.0], 15.0)]]))));
+    b.items.push((tr(style(0xFF20_8020, 3.0, Cap::Butt, Join::Miter), render2d::Transparency::Percent(20)), g(Geo::Line([0.0, 60.0], [60.0, 60.0]))));
+    d.blocks.push(b);
+    for (l, y) in [(0usize, 20.0f64), (1, 100.0), (2, 180.0)] {
+        d.items.push((l, tr(style(0xFF20_3040, 8.0, Cap::Butt, Join::Miter), render2d::Transparency::ByLayer), g(Geo::Poly(vec![[10.0, y], [150.0, y + 50.0], [20.0, y + 60.0]], false))));
+        d.items.push((l, tr(style(0x9030_8040, 5.0, Cap::Square, Join::Bevel), render2d::Transparency::ByLayer), g(Geo::Line([5.0, y + 40.0], [170.0, y]))));
+        d.items.push((l, tr(style(0xFF80_2020, 3.0, Cap::Butt, Join::Miter), render2d::Transparency::Percent(30)), g(Geo::Arc([90.0, y + 25.0], 30.0, 0.2, 4.5))));
+        d.items.push((l, tr(dashed(0xFF20_2080, 2.0, Cap::Round, Join::Round, &[8.0, 4.0], Unit::Px, 0.0), render2d::Transparency::Percent(0)), g(Geo::Line([10.0, y + 70.0], [170.0, y + 72.0]))));
+        d.items.push((l, tr(style(0xFFE0_A040, 0.0, Cap::Butt, Join::Miter), render2d::Transparency::ByLayer), g(Geo::Fill(vec![vec![Geo::Poly(vec![[180.0, y], [260.0, y + 10.0], [230.0, y + 60.0]], true)]]))));
+        let hs = style(0xFF20_4060, 0.0, Cap::Butt, Join::Miter).hatched(&[render2d::HatchLine::new(0.7, 4.0)], 1.0);
+        d.items.push((l, tr(hs, render2d::Transparency::ByLayer), g(Geo::Fill(vec![vec![Geo::Circle([200.0, y + 30.0], 22.0)]]))));
+        // the insert: its entities by block 60 %, and (the second) by its style's layer
+        d.items.push((l, tr(style(0xFF00_0000, 1.0, Cap::Butt, Join::Miter), render2d::Transparency::Percent(60)), BGeo::Ins(BIns::new(0, [270.0, y]))));
+        d.items.push((l, tr(style(0xFF00_0000, 1.0, Cap::Butt, Join::Miter), render2d::Transparency::ByLayer), BGeo::Ins(BIns::new(0, [300.0, y + 10.0]).turned(0.3, [0.8, 0.8]))));
+    }
+    d
+}
+
+/// the deep zoom's lines as a block (G6b2): moved there (scale 1), or in units 1e5 smaller, the insert scaling them up
+/// (turned by rot, mirrored); the lines land where deep_lines puts them
+pub fn deep_insert_drawing(scale: f64, rot: f64, mirror: bool) -> BlockDrawing {
+    let t0 = [-9_876_543.0, 6_543_211.0];
+    let (sn, cs) = sincos(rot);
+    let sy = if mirror { -scale } else { scale };
+    let local = |p: [f64; 2]| {
+        let (dx, dy) = (p[0] - t0[0], p[1] - t0[1]);
+        [(cs * dx + sn * dy) / scale, (-sn * dx + cs * dy) / sy]
+    };
+    let lines = BDef { base: [0.0, 0.0], items: deep_lines().iter().map(|&(a, b)| (style(0xFFFF_FFFF, 2.5, Cap::Butt, Join::Miter), BGeo::G(Geo::Line(local(a), local(b))))).collect() };
+    BlockDrawing { layers: vec![(true, 0, 0)], blocks: vec![lines], items: vec![(0, style(0xFF00_0000, 1.0, Cap::Butt, Join::Miter), BGeo::Ins(BIns::new(0, t0).turned(rot, [scale, sy])))] }
 }

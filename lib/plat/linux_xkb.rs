@@ -171,6 +171,7 @@ impl<'a> Tok<'a> {
         let e = t.len();
         let mut p = self.p;
         let typ;
+        #[allow(clippy::never_loop)] // a block to leave early: the end of the text breaks out of it
         'scan: loop {
             // white space and comments
             loop {

@@ -1,6 +1,6 @@
 // Shared Word bibliography XML codec: used by DOCX and standalone source lists.
 use crate::package::{B, DECL};
-use crate::{Error, Node, container, esc, leaf, parse, source_id, unsupported};
+use crate::{Error, Node, container, esc, leaf, parse, parse_body, source_id, unsupported};
 use alloc::{collections::BTreeSet, format, string::String, vec::Vec};
 use doc_core::{Person, Source, SourceKind};
 
@@ -82,7 +82,7 @@ pub fn encode_sources(sources: &[Source]) -> Result<Vec<u8>, Error> {
     }
     out.push_str("</b:Sources>");
     // Escaping and many authors can exceed XML limits even within the model budget.
-    parse(out.as_bytes())?;
+    parse_body(out.as_bytes())?;
     Ok(out.into_bytes())
 }
 fn validate_list(sources: &[Source]) -> Result<(), Error> {

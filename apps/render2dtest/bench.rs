@@ -2,12 +2,14 @@
 // over the target at 1 unit per pixel), per level and width: inserting them, the first frame (everything goes up),
 // frames with everything in view and zoomed in (a tenth in view), frames with 1000 entities changed each
 //
-//   render2dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--basis] [--scene cad [--plain | --g6a2b]]
+//   render2dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--basis] [--scene cad [--plain | --g6a2b | --g6b1 | --expand]]
+//   render2dtest --bench N --scene estate [--inserts K]   a block of about N records (a house) inserted K times (10 000)
 //
 // GPU times are the scene's timestamps (FrameStats): uploads, visibility (the three compute passes), the draw; each
 // frame is waited for before the next (no frames in flight: the times are the frame's own), medians over F frames.
 
 use alloc::format;
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use gpu::*;
@@ -76,6 +78,7 @@ pub fn bench(n: u32) -> i32 {
         return 0;
     };
     let cad_scene = plat::arg_value("--scene").as_deref() == Some("cad");
+    let estate = plat::arg_value("--scene").as_deref() == Some("estate");
     out(&format!("render2d bench: {n} segments, {} x {}, {frames} frames each, {}{}", size.0, size.1, adapter.info().name, if cad_scene { ", the town plan" } else { "" }));
     let mut levels = Vec::new();
     if adapter.level() == Level::Voll && !basis_only {
@@ -90,7 +93,7 @@ pub fn bench(n: u32) -> i32 {
                 return 1;
             }
         };
-        let result = if cad_scene { run_cad(&dev, n, size, frames, level) } else { run(&dev, n, size, frames, level) };
+        let result = if cad_scene || estate { run_cad(&dev, n, size, frames, level, estate) } else { run(&dev, n, size, frames, level) };
         if let Err(e) = result {
             out(&format!("FAIL {level:?}: {e}"));
             return 1;
@@ -99,31 +102,50 @@ pub fn bench(n: u32) -> i32 {
     0
 }
 
-/// the measuring scene's stage: --plain the drawing of G6a2a, --g6a2b that of G6a2b, else with fills, hatches, curves (G6b1)
+/// the measuring scene's stage: --plain the drawing of G6a2a, --g6a2b that of G6a2b, --g6b1 that of G6b1 (fills, hatches,
+/// curves), else with blocks (G6b2)
 pub fn cad_mode() -> cad::Mode {
     let args = plat::args();
     if args.iter().any(|a| a == "--plain") {
         cad::Mode::Plain
     } else if args.iter().any(|a| a == "--g6a2b") {
         cad::Mode::Arcs
-    } else {
+    } else if args.iter().any(|a| a == "--g6b1") {
         cad::Mode::Fills
+    } else if args.iter().any(|a| a == "--expand") {
+        cad::Mode::Expanded
+    } else {
+        cad::Mode::Blocks
     }
 }
 
-/// the town plan (cad.rs): hairlines and the plan's widths, each at the overview, a district and the working zoom
-fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level) -> Result<()> {
+/// what a scene's buffers hold (MB): the pool, the visible list, the instances (their words and spaces); the instance
+/// numbers
+fn memory(s: &Scene) -> String {
+    let ii = s.instance_info();
+    let mb = |b: u64| b as f64 / 1048576.0;
+    format!("pool {:.1} MB ({} records; of blocks {} in {} variants of {} blocks), visible list {:.1} MB, instances {} ({:.2} MB), entries {}", mb(s.pool_buffer().size()),
+            s.pool_buffer().size() / 64, ii.block_records, ii.variants, ii.blocks, mb(s.visible_buffer().size()), ii.instances, mb(ii.instances as u64 * 240), ii.entries)
+}
+
+/// the town plan (cad.rs): hairlines and the plan's widths, each at the overview, a district and the working zoom; estate: a
+/// block of about n records inserted --inserts times (cad::estate)
+fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level, estate: bool) -> Result<()> {
     let mut r = Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm))?;
+    let inserts: u32 = plat::arg_value("--inserts").and_then(|v| v.parse().ok()).unwrap_or(10_000);
     for (wname, styled) in [("hairlines", false), ("styled", true)] {
         let mut s = Scene::new(&r)?;
         s.set_stats(true);
         let t0 = plat::time_us();
         let mode = cad_mode();
-        let c = cad::build(&mut s, n, 5, styled, mode)?;
+        let c = if estate { cad::estate(&mut s, inserts, styled)? } else { cad::build(&mut s, n, 5, styled, mode)? };
         let insert_ms = (plat::time_us() - t0) as f64 / 1000.0;
-        if mode != cad::Mode::Plain {
-            out(&format!("{level:?}, {wname}: of them {} arcs and circles ({} pieces), {} dashed entities ({} records), {} fills ({} hatched; {} records), {} curves ({} records); {} records in the pool",
-                         c.arcs, c.arc_records, c.dashed, c.dashed_records, c.fills, c.hatched, c.fill_records, c.curves, c.curve_records, c.segments + c.arcs));
+        if estate {
+            out(&format!("{level:?}, {wname}: a block of {} records inserted {} times: {} records drawn in all", c.insert_records / c.inserts.max(1), c.inserts, c.insert_records));
+        } else if mode != cad::Mode::Plain {
+            out(&format!("{level:?}, {wname}: of them {} arcs and circles ({} pieces), {} dashed entities ({} records), {} fills ({} hatched; {} records), {} curves ({} records); {} blocks inserted {} times \
+                          ({} records drawn); {} records in the pool",
+                         c.arcs, c.arc_records, c.dashed, c.dashed_records, c.fills, c.hatched, c.fill_records, c.curves, c.curve_records, c.blocks, c.inserts, c.insert_records, c.segments + c.arcs));
         }
         let mut t = Target { color: dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?, used: false };
         let views = cad::views(&c, size);
@@ -132,6 +154,7 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level) 
         let up = s.upload_info();
         out(&format!("{level:?}, {wname}: {} entities, {} segments, {:.0} x {:.0} m; insert {insert_ms:.1} ms (CPU); first frame: prepare {prep:.1} ms (CPU, {:.1} MB up), GPU uploads {:.3} ms, \
                       visibility {:.3} ms, draw {:.3} ms ({vis0} visible)", c.entities, c.segments, c.width, c.height, up.bytes as f64 / 1048576.0, st0[0], st0[1], st0[2]));
+        out(&format!("{level:?}, {wname}: {}", memory(&s)));
         if let Some(dir) = plat::arg_value("--shot") {
             // (each view once as an image: DIR/cad_LEVEL_WIDTHS_VIEW.bgra, as tests::dump writes them)
             let mut off = crate::gallery::Off::new(dev, size.0, size.1)?;
@@ -167,6 +190,35 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level) 
             let (ma, mb, mc, mp) = (median(&mut a), median(&mut b), median(&mut d), median(&mut p));
             out(&format!("{level:?}, {wname}, {} (scale {:.3}): GPU per frame {:.3} ms (uploads {ma:.3}, visibility {mb:.3}, draw {mc:.3}); prepare {mp:.3} ms CPU; {vis} visible",
                          v.name, v.cam.scale, ma + mb + mc));
+        }
+        // (blocks) 1000 inserts moved per frame, at the district: their transforms alone go up
+        if c.trees.len() >= 1000 {
+            s.set_camera(&views[1].cam)?;
+            let mut ids = c.trees.clone();
+            let (mut a, mut p, mut g, mut bytes, mut sent, mut rec) = (Vec::new(), Vec::new(), Vec::new(), 0u64, 0u32, 0u32);
+            for k in 0..frames + 3 {
+                let t0 = plat::time_us();
+                for j in 0..1000usize {
+                    let i = (k * 7919 + j * 104_729) % ids.len();
+                    let (id, ref mut ins) = ids[i];
+                    ins.at[0] += 0.05;
+                    ins.rotation += 0.01;
+                    s.update(id, &render2d::Shape::Insert(*ins))?;
+                }
+                let upd = (plat::time_us() - t0) as f64 / 1000.0;
+                let (prep, st, _) = frame(dev, &mut r, &mut s, &mut t, size)?;
+                if k >= 3 {
+                    let (info, ii) = (s.upload_info(), s.instance_info());
+                    bytes = ii.sent_bytes;
+                    sent = ii.sent_instances;
+                    rec = info.records;
+                    a.push(st[0]);
+                    p.push(prep + upd);
+                    g.push(st[0] + st[1] + st[2]);
+                }
+            }
+            out(&format!("{level:?}, {wname}, 1000 inserts moved per frame at the district ({sent} instances, {:.3} MB, {rec} records): update + prepare {:.3} ms CPU, GPU uploads {:.3} ms, frame {:.3} ms",
+                         bytes as f64 / 1048576.0, median(&mut p), median(&mut a), median(&mut g)));
         }
         dev.wait_idle()?;
     }

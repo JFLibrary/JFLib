@@ -64,7 +64,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs) · [mtl_cmd.rs (Apple)](#gpumtl_cmdrs-apple) · [mtl_dev.rs (Apple)](#gpumtl_devrs-apple) · [mtl_res.rs (Apple)](#gpumtl_resrs-apple) · [mtl_swap.rs (Apple)](#gpumtl_swaprs-apple)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
-- [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles with layers and styles, dash patterns, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
+- [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
   <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [scene.rs](#render2dsceners)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
@@ -161,27 +161,27 @@ hclip_text_* / open_folder / open_url (ui-edit).
 
 - [App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks): `fb`, `client_size`, `anim_off`, `set_anim_off`, `headless`, `invalidate`, `quit`, `set_title`, `title`, `spawn`, `spawner`, `tasks_live`
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
-- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
+- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `key_event_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
-- [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
-- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
-- [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
-- [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
+- [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`, `canvas_label`
+- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `popup_close_id`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
+- [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_preedit`, `ime_enable`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
+- [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_reveal`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
 - [Data views: grid, tree, badges, meters](#data-views-grid-tree-badges-meters): `grid_begin`, `grid_row`, `grid_cell`, `grid_text`, `grid_text_ts`, `grid_end`, `tree`, `badge`, `status_dot`, `meter`
 - [Shell parts: navigation, command bar, splitter, breadcrumb, wizard steps](#shell-parts-navigation-command-bar-splitter-breadcrumb-wizard-steps): `nav_begin`, `nav_toggle`, `nav_section`, `nav_item`, `nav_footer`, `nav_end`, `command_bar`, `split_begin`, `split_next`, `split_end`, `breadcrumb`, `segmented`, `wizard_steps`, `page_header`, `key_value`, `empty_state`
 - [Docking: panels at the sides, tab groups, floating tool windows](#docking-panels-at-the-sides-tab-groups-floating-tool-windows): `dock_begin`, `dock_next`, `dock_end`
 - [Charts](#charts): `sparkline`, `bar_chart`, `donut`, `legend`, `line_chart`
 - [Toasts, spinners, progress](#toasts-spinners-progress): `toast`, `toast_dismiss`, `toast_clear`, `toasts`, `toast_host`, `spinner`, `progress_indeterminate`
-- [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`
+- [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`, `calendar`
 - [Values and colours](#values-and-colours): `cmd_track`, `decimal_sep`, `set_decimal_sep`, `fmt_f64`, `parse_f64`, `slider_f`, `track_slider`, `prop_slider`, `prop_slider_f`, `angle`, `pan`, `swatch`, `color_picker`, `color_picker_ex`, `color_wheel`
 - [Windows](#windows): `window_title_height`, `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_snap`, `window_rect`, `window_state`, `window_fullscreen`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
 - [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars): `dialog_begin`, `dialog_buttons`, `dialog_end`, `infobar`, `statusbar_begin`, `statusbar_end`, `titlebar_begin`, `titlebar_begin_opt`, `titlebar_begin_overlay`, `titlebar_end`, `titlebar_open`
-- [File dialog](#file-dialog): `filedlg`
+- [File dialog](#file-dialog): `filedlg`, `filedlg_paths`
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
 - [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `set_theme`, `clear_theme`, `app_theme`, `load_theme`, `styles_add`, `style_names`, `style_name`, `set_style`, `dp_text`, `ts_base`
-- [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_accept`, `drag_over`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
+- [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_next`, `cursor_replace`, `cursor_free`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_pos_px`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_accept`, `drag_over`, `drag_over_px`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
 
 ### App, AppDesc, Ui, run, async tasks
 
@@ -190,6 +190,10 @@ hclip_text_* / open_folder / open_url (ui-edit).
 Source: [`lib/ui/lib.rs`](../lib/ui/lib.rs)
 
 Re-exports: `img_svg::Svg`
+
+Re-exports: `plat::{Preedit, IP_EMAIL, IP_NUMBER, IP_PASSWORD, IP_PHONE, IP_SEARCH, IP_TEXT, IP_URL}`
+
+Re-exports: `plat::BrowserStatus`
 
 Re-exports: `rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH}`
 
@@ -203,8 +207,9 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
 
 - **`main!(...)`**
   the app's entry point: `ui::main!(ui::run(&DESC, &mut MyApp::default(), &style::STYLE));`
-  (expands to the `jfgui_main` symbol the platform entry calls; the app crate denies
-  unsafe code, this one item is the exception).  It first sets up what build_rs.py built in
+  (expands to the `jfgui_main` symbol the platform entry calls; its unsafe attribute comes from
+  this crate's macro, which the unsafe_code lint does not look into, so the app crate may deny or
+  forbid unsafe code without an allow).  It first sets up what build_rs.py built in
   (perm.rs): the app's name for its folders (JFGUI_APP), its assets as app://
   (apps/NAME/assets, packed to JFGUI_ASSETS with --cfg jfgui_assets) and its permissions
   (apps/NAME/PERMISSIONS as JFGUI_PERMISSIONS), then its file types and URL schemes
@@ -220,6 +225,20 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   the program's own calls `jflib::plat::std_start()`.
 
 - **`main!(...)`**
+  (see above)
+
+- **`test_main!(...)`**
+  (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
+  std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
+  the tests do not link.  Never called (the test harness has its own main); no panic check
+  (tests unwind).  `#[cfg(test)] ui::test_main!();` in the crate's lib.rs, also under
+  `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros)
+
+- **`__ui_panic_check!(...)`**
+  ui::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
+  std built with the feature `unwind` may unwind as well
+
+- **`__ui_panic_check!(...)`**
   (see above)
 
 - **`__jfgui_main!(...)`**
@@ -498,7 +517,10 @@ Internal: place(iw, ih), take_flags(), take_icon(), layout_root(), layout_end_ro
 A box lays its children out along its main axis (BOX_H: x, BOX_V: y).  Fill children
 share the space left by the others; because that is only known after all children were
 placed, the previous pass's totals are used and a pass is repeated when they change (the
-runtime caps this at 4 passes).
+runtime caps this at 4 passes).  A box whose fill children the previous pass did not see (a
+new one) gives its first fill child the room left after the children before it (first_fill):
+new boxes inside new fill boxes get about their size in their first pass and settle in the
+next one, however deep.
 
 BOX_WRAP (horizontal boxes): a child that does not fit after the others of its row starts
 a new row (a row's first child stays, however wide).  Each row is as tall as its tallest
@@ -599,6 +621,18 @@ Runtime (runtime.rs, win.rs): frame_begin / frame_end (a pass over all windows),
 uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_update.
 ```
 
+- **`struct KeyEvent`**
+  (E2) a key as it went down or up, for a canvas that passes the keyboard on (a web page's
+  keydown / keyup events): ui.key_event_take
+  - `vk: u32` -- VK_\*
+  - `mods: u32` -- MOD_\* at the time
+  - `down: bool` -- down (true) or up
+  - `repeat: bool` -- a down of the system's auto-repeat while the key is held
+  - `scancode: u32` -- the key's place on the keyboard, whatever the layout: Windows' scan code (0xE0.. for
+    extended keys), Linux's evdev code; 0 where the platform does not tell (macOS, the
+    browser, Android)
+  - `location: u32` -- KL_STANDARD, KL_LEFT / KL_RIGHT (the two Shift, Ctrl, Alt, Windows keys), KL_NUMPAD
+
 - **`struct Sem`**
   semantic record (dump / expect)  [SR_\*]
   - `id: u32`
@@ -612,6 +646,31 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   - `layer: u8`
   - `depth: u8`
   - `win: u8` -- window index (0 = the main window)
+  - `ax: Option<alloc::boxed::Box<SemAx>>` -- what the record says beyond kind, label and value (its own 64-bit id, a parent, a
+    description, cells, states ...): set through the record's setters (id64, parent, desc ...;
+    section 19 of the guide); None for the records of the built-in widgets
+
+- **`struct SemAx`**
+  What a semantic record says beyond its kind, label and value (Sem::ax): its setters fill it
+  (`ui.sem_rect(..).id64(7).parent(3).desc("..")`); a web page's accessibility tree needs it.
+  - `id: u64` -- the record's own id (below 2^62): a screen reader's requests for it come back with it
+    (ui.a11y_request_take); 0: none
+  - `parent: u64` -- the record it hangs under in the accessibility tree: one with this id64 (or, without one,
+    this widget id) published in the same frame and window; 0: by its rectangle
+  - `name: Option<String>` -- its name when the label is something else (a text box's or drop-down's label is its text)
+  - `desc: Option<String>` -- a description beside the name (a hint, a page's aria-describedby)
+  - `url: Option<String>` -- a link's address
+  - `value_text: Option<String>` -- the text a screen reader says for a value (a slider's "Monday", a page's aria-valuetext)
+  - `states: u32` -- AS_\*
+  - `set: [u32; 2]` -- its position in its set (1-based) and the set's size (0: unknown)
+  - `level: u32` -- the level of a heading, tree item, list item or row (1 the top; 0: none / the value)
+  - `cell: [u32; 4]` -- a cell's row, column (0-based), row span, column span (spans 0: no place)
+  - `grid: [u32; 2]` -- a table's rows and columns (0: unknown)
+  - `live: u32` -- LIVE_\* (0: as its kind says)
+  - `range: Option<[f64; 4]>` -- value, minimum, maximum, step with fractions (a meter at 0.4 of 1); None: Sem::value / min
+    / max
+  - `sel: Option<[u32; 2]>` -- a focused text box's selection: anchor, caret in characters (a page's field; the built-in
+    boxes report theirs themselves)
 
 - **`struct Slot`**
   persistent per-id state (slot)  [SL_\*]
@@ -663,9 +722,25 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   ui_key_down(vk): held (mods: VK_SHIFT / VK_CONTROL / VK_MENU)
 - **`fn key_first(&self) -> u32`**
   ui_key_first: the first unconsumed key this frame (VK | mods &lt;&lt; 16) or 0
+- **`fn key_take(&mut self) -> u32`**
+  key_take -> the first unconsumed key this frame (VK | mods &lt;&lt; 16), consumed; 0 when none
+  is left.  A canvas with HB_KEYS takes every key with it while it has the focus (\\`ev &
+  EV_FOCUS\\`, call it until 0); the keys a focused text box keeps stay with the box, and
+  while a popup of the window is open (a menu, a flyout) the keys are its.
+- **`fn key_event_take(&mut self) -> Option<KeyEvent>`**
+  (E2) the next key as it went down or up (KeyEvent: the key, modifiers, down / up, auto-
+  repeat, scancode, left / right / number block), consumed; None when none is left.  For a
+  canvas with HB_KEYS that passes the keyboard on as it is (a web page's keydown and keyup):
+  call it while the canvas has the focus (`ev & EV_FOCUS`) until None, instead of key_take
+  (a down taken here is taken for key_take too, and one key_take took is not here).  The
+  typed text comes through text_take as before.  None while a popup of the window is open
 - **`fn text_take(&mut self, cap: usize) -> Vec<u32>`**
   ui_text_take(cap): the typed codepoints (at most cap), consumed; when cap leaves some,
   they come in the next pass (nothing typed is lost)
+- **`fn cursor_at(&self, x: i32, y: i32) -> u32`**
+  (E3) the cursor shape at a point (px) of the current window in the previous pass: the
+  topmost hit box's (CUR_\*: ui.cursor_next's, else the shape of its flags; CUR_CUSTOM for
+  the custom cursor), CUR_ARROW where there is none
 - **`fn hit_flags_at(&mut self, x: i32, y: i32) -> u32`**
   ui_hit_flags_at(x, y): HB_\* flags of the topmost hit box at a point of the main
   window (previous pass) -- non-client hit testing of the platform
@@ -711,6 +786,13 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
 - **`fn sem(&mut self, kind: u16, id: u32, label: Option<&str>, value: i32) -> &mut Sem`**
   ui_sem(kind, id, label, value) -> the record (rect = last_rect, state from the last
   behave); the label is copied
+- **`fn sem_rect(&mut self, kind: u16, id: u32, rect: [i32; 4], label: Option<&str>, value: i32) -> &mut Sem`**
+  sem_rect(kind, id, rect, label, value) -> the record: a semantic record of content the app
+  draws itself (a link or heading of a web page inside a canvas) at rect (px of the window, as
+  last_rect), without a hit box of its own and without a state; last_rect and the state of
+  the last widget stay.  Scripts find it by its label (`click "Label"` presses at its middle,
+  on the hit box that lies there: the canvas), screen readers read it (section 19 of the
+  guide).  Publish the records of what is visible, after the canvas.
 - **`fn clip_push(&mut self, x: i32, y: i32, w: i32, h: i32)`**
   ui_clip_push(x, y, w, h): px; intersects drawing and hit clipping
 - **`fn clip_pop(&mut self)`**
@@ -890,7 +972,13 @@ Label strings are copied, so they may live in scratch buffers.
 - **`fn canvas(&mut self, id: u32, draw: Option<DrawRef>, user: usize, version: u32) -> &UiInput`**
   ui_canvas(id, draw, user, version) -> &UiInput: a custom area.  The hit box wants
   every pointer move; the cursor comes from next_flags bits 12..15 (CUR_\* &lt;&lt;
-  HB_CURSOR_SHIFT), default crosshair.
+  HB_CURSOR_SHIFT), default crosshair (with HB_CURSOR_SET as given: 0 is the arrow).
+  next_flags(HB_KEYS): every key is the canvas's while it has the focus (a press gives it
+  the focus, so does ui.focus(id)); it takes them with ui.key_take.
+- **`fn canvas_label(&mut self, label: &str)`**
+  (E14) the name of the next canvas's own K_CANVAS record ("Webseite"): what a screen
+  reader says for it and a script's `canvas:"Webseite"` selector; the records the canvas
+  publishes for its content (sem_rect) stay as they are
 
 ### Popups, menus, command table, tooltips
 
@@ -903,6 +991,8 @@ popup -- popups, flyouts, menus, menu bar, command table and accelerators, drop-
 Popups (a stack of up to 6 levels per window, drawn on L_POPUP):
   popup_open(id)                      open popup `id` (inside a flyout: as its child)
   popup_close()                       close every popup; the focus returns to the opener
+  popup_close_id(id)                  close popup `id` and the popups inside it; the
+                                      flyouts it sits in stay open
   popup_is_open(id) -> bool   popup_count() -> n
   flyout_begin(id, FL_*) -> bool      draw popup `id` when it is open: a flyout surface
                                       anchored to the last widget, content box BOX_V|PAD_4
@@ -981,6 +1071,11 @@ numbers for them.
 
 **`impl Ui`**
 
+- **`fn accel_run(&mut self, key: u32) -> bool`**
+  accel_run(key) -> true when key (VK | mods &lt;&lt; 16, as ui.key_take gives it) is the
+  accelerator of an enabled, visible command of the table: it runs (cmd_run(id, 0), after the
+  frame) as if the key had reached the table, open popups close.  For a widget with HB_KEYS
+  that hands a key back (one a web page did not use, say).
 - **`fn popup_is_open(&self, id: u32) -> bool`**
   ui_popup_is_open(id): popup `id` is open
 - **`fn popup_count(&self) -> u32`**
@@ -988,8 +1083,18 @@ numbers for them.
 - **`fn popup_open(&mut self, id: u32)`**
   ui_popup_open(id): open popup `id` (inside a flyout: as a child of that flyout,
   otherwise it replaces every open popup); an open popup only loses its children
+- **`fn popup_open_at(&mut self, id: u32, x: i32, y: i32)`**
+  popup_open_at(id, x, y): open popup `id` as popup_open does, its flyout hanging at the
+  point (x, y) (px of the window, as last_rect: a canvas's UiInput::rect plus its x, y)
+  instead of at the last widget; an open one moves there.  For a place the app learns later
+  than the click (a web engine's context menu); the app draws flyout_begin(id, ..) as usual.
 - **`fn popup_close(&mut self)`**
   ui_popup_close: close every popup (the focus returns to where it was)
+- **`fn popup_close_id(&mut self, id: u32)`**
+  popup_close_id(id): close popup `id` and the popups opened inside it; the popups it was
+  opened in stay open (a date_picker inside a flyout of the app's own closes its calendar,
+  not the flyout).  The focus returns to where it was when `id` opened; nothing happens
+  when `id` is not open.
 - **`fn flyout_begin(&mut self, id: u32, flags: u32) -> bool`**
   ui_flyout_begin(id, FL_\*) -> popup `id` is open: then its content follows (a vertical
   box with 4 DIP padding) until flyout_end, which is called in any case.  The flyout is
@@ -1051,6 +1156,12 @@ numbers for them.
   ui_menu_popup(menu): open a menu at the pointer (the runtime draws it); for the
   menu key / Shift+F10 (an EV_RCLICK kbnav.rs gave the focused widget in this pass) at
   the widget's lower left corner with its first row focused
+- **`fn menu_popup_at(&mut self, menu: &'static [Mi], x: i32, y: i32)`**
+  menu_popup_at(menu, x, y): open a menu at the point (x, y) (px of the window, as
+  last_rect; a canvas: UiInput::rect plus its x, y), the runtime draws it as menu_popup's.
+  For a context menu whose place the app learns after the right click (a web engine
+  answers later): open it in the frame the answer comes; rows that change with the answer:
+  a flyout of the app's own through popup_open_at.
 - **`fn context_menu(&mut self, menu: &'static [Mi]) -> u32`**
   ui_context_menu(menu) -> EV_OPEN while `menu` is open for the last widget.  Opens on a
   right click (released over the widget), or with the menu key / Shift+F10 while the
@@ -1097,6 +1208,8 @@ widgets                                                             [src/ui/ui_e
        WinUI TextBox (32 DIP high).  buf: the app's UTF-8 text; cap_flags = the size of
        the asm's buffer in bytes incl. the NUL (bits 0..22: the text holds at most cap - 1
        bytes) | TB_PASSWORD | TB_READONLY | TB_DIGITS | TB_SIGNED.  placeholder (or None)
+       TB_PASSWORD: while it has the keyboard the input method's purpose is IP_PASSWORD (set
+       by the box itself, the purpose of before put back after; no plat::ime_purpose needed).
        shows while the text is empty (cut with "…" where the box is narrower).
        ST_DISABLED via next_flags.
        EV_ACT: the text changed this frame; EV_COMMIT: Enter, Esc or focus lost; EV_FOCUS
@@ -1186,6 +1299,18 @@ same; an owner that is never drawn again keeps its old value.
   Uses zero text insets and the supplied font, line metrics and colors. The supplied
   presentation applies only to this call; ordinary textboxes keep their default style.
   `TB_MULTI` is implicit; other capacity and textbox flags retain their usual meaning.
+- **`fn ime_preedit(&self) -> plat::Preedit`**
+  (E4) the input method's composition in the live window (Preedit: its text and the caret
+  as a byte offset in it), empty when none is going on: a canvas that draws an editable
+  field of its own (ime_enable) draws it at its caret, underlined; the committed text comes
+  through text_take
+- **`fn ime_enable(&mut self, on: bool, purpose: u32)`**
+  (E4) an editable field the app draws itself (a web page's input in a canvas) got the focus
+  (on, its purpose IP_\*: IP_TEXT, IP_URL, IP_EMAIL, IP_NUMBER, IP_PHONE, IP_PASSWORD,
+  IP_SEARCH) or lost it (off): with it the input method comes while the app tells its caret
+  every frame (ime_pos), and the app draws the composition itself (ime_preedit: Windows
+  hides the method's composition window, its candidates stay at the caret); IP_PASSWORD
+  takes the input method away (Windows) or says so (Wayland).  Off: the method goes
 - **`fn ime_pos(&mut self, x: i32, y: i32, h: i32)`**
 - **`fn clip_set_many(&mut self, entries: &[(u32, &[u8])]) -> i32`**
   Publish distinct TEXT/HTML/RTF/DOCX representations of one selection (64 MiB total).
@@ -1684,7 +1809,8 @@ rich_edit -- ui.richtext: a rich-text editor over a RichDoc (rich_doc.rs), and i
        EV_ACT: the content changed this frame; EV_FOCUS while focused; EV_COMMIT: the focus
        left.  Ids id .. id + 5 (id + 1 the scroll bar, id + 2 .. 5 the link flyout).
        RT_READONLY: select and copy only (a click opens a link); RT_NO_FRAME: no box;
-       RT_OPEN_LINKS: the editor opens an activated link with open_url itself; RT_TAB: Tab
+       RT_OPEN_LINKS: the editor opens an activated http, https or mailto link with open_url
+       itself (other links only reach the app); RT_TAB: Tab
        outside a list inserts a tab (else Tab moves the focus on); RT_PLAIN_PASTE: paste
        only text.
   ui.richtext_toolbar(id, editor, &mut doc, RTB_*) -> EV_ACT when it changed doc
@@ -1722,7 +1848,7 @@ visible paragraphs are drawn.
 RT_READONLY: u32 = 1
 /// no text box frame
 RT_NO_FRAME: u32 = 2
-/// the editor opens activated links itself (open_url)
+/// the editor opens activated http, https and mailto links itself (open_url)
 RT_OPEN_LINKS: u32 = 4
 /// Tab outside a list inserts a tab
 RT_TAB: u32 = 8
@@ -2067,11 +2193,14 @@ Source: [`lib/ui/highlight.rs`](../lib/ui/highlight.rs)
 ```text
 highlight -- syntax highlighting for ui.code_editor: a small engine of token rules, the
 built-in grammars (Rust, JSON, INI, TOML, a Markdown subset, JFS: the scripts of
-JFScript) and the colours of the tokens
+JFScript; JavaScript, CSS, HTML with its scripts and styles, WAT: the text format of
+WebAssembly) and the colours of the tokens
 
   Highlighter::rust() / json() / ini() / toml() / markdown() / jfs() / plain()
+  Highlighter::javascript() / css() / html() / wat()   (E10: view-source, developer tools)
   Highlighter::for_name(s)            by name or file extension ("rs", "json", "ini", "cfg",
-                                      "toml", "md", "jfs", a path); plain() for anything else
+                                      "toml", "md", "jfs", "js", "css", "html", "xml", "svg",
+                                      "wat", a path); plain() for anything else
   Highlighter::new(&GRAMMAR)          an app's own grammar (a static Grammar of Rules)
   h.line(text, state, &mut tokens) -> state   the tokens of one line (SY_* kinds, byte
                                       ranges; the plain text between them is SY_TEXT) from
@@ -2087,11 +2216,15 @@ open to close, nested or not, optionally only at a line start: Markdown fences),
 (escapes, multi-line or not), strings with code inside (Interp: the ${..} of JFS, whose
 code the same rules highlight), Rust raw strings, word lists, numbers, punctuation and
 functions of its own (Custom: JSON keys, Rust char literals / lifetimes / attributes, INI
-sections and keys, Markdown headings, lists, emphasis and links).  Where no rule matches,
+sections and keys, Markdown headings, lists, emphasis and links), parts with rules of their
+own (Nest: HTML's tags, JavaScript's template strings and their ${..}) and elements whose
+content is another language (Element: HTML's <script> and <style>).  Where no rule matches,
 an identifier is read whole: before '(' a function (calls), before '!' a macro (macros),
 capitalised a type (caps_types).  A construct still open at a line end is the line's end
 state: rule index + 1, the nesting depth (bits 8..15) and a Rust raw string's '#' count
-(bits 16..31); the editor keeps a state per line and highlights only the visible lines.
+(bits 16..31); inside a Nest or an Element the inner grammar's state in bits 8..31 (so
+three levels: HTML, a script's template string, its ${..}); the editor keeps a state per
+line and highlights only the visible lines.
 ```
 
 ```rust
@@ -2155,6 +2288,15 @@ SY_COUNT: usize = 17
   - `Number` -- number literals: 12, 0x1F, 0b101, 0o17, 1_000, 1.5e-3, suffixes (u8, f32)
   - `Custom(fn(&str, usize, bool) -> Option<(usize, u8)>)` -- a function of its own: (line, position, at the line start after blanks) -> (bytes, kind)
   - `Punct(&'static str)` -- single characters
+  - `Nest { open: &'static str, close: &'static str, kind: u8, inner: &'static Grammar }` -- a part with rules of its own: from open to close (may span lines), the two delimiters
+    `kind`, the text between them highlighted by `inner`'s rules (HTML's tags, the ${..} of
+    JavaScript's template strings); close counts only outside inner's strings and comments,
+    and with close "}" the braces inside count
+  - `Element { name: &'static str, tag: &'static Grammar, inner: &'static Grammar }` -- an element whose content is another language (HTML's script and style): the start tag
+    from '&lt;' and `name` (ASCII case-insensitive, then a blank, '/' or '>') to its '>' on the
+    same line ('&lt;' and '>' SY_PUNCT, the rest by `tag`'s rules), then the content up to
+    "&lt;/" and `name` (case-insensitive, wherever it stands) by `inner`'s rules; may span
+    lines; the end tag is the grammar's own again
 
 - **`struct Grammar`**
   a language (see the module header)
@@ -2191,6 +2333,15 @@ SY_COUNT: usize = 17
   a Markdown subset
 - **`const fn jfs() -> Highlighter`**
   the scripting language of JFScript (.jfs, JFNetworker's scripts)
+- **`const fn javascript() -> Highlighter`**
+  JavaScript (template strings over lines with their ${..}, regular expressions)
+- **`const fn css() -> Highlighter`**
+  CSS (selectors, at-rules, properties, values with units and colours, nested rules)
+- **`const fn html() -> Highlighter`**
+  HTML (also XML and SVG): tags, attributes, comments, entities, doctype; the content of
+  &lt;script> as JavaScript and of &lt;style> as CSS
+- **`const fn wat() -> Highlighter`**
+  WAT, the text format of WebAssembly (modules, instructions, $names, types)
 - **`fn for_name(s: &str) -> Highlighter`**
   by name or extension, also of a path ("rs", "Rust", "x/y.toml"); plain() for others
 - **`fn grammar(&self) -> &'static Grammar`**
@@ -2221,6 +2372,28 @@ SY_COUNT: usize = 17
 - **`static JFS: Grammar`**
   the scripting language of JFScript (.jfs): calls before '(' are functions, the
   delimiters of ${..} in strings SY_META
+
+- **`static JAVASCRIPT: Grammar`**
+  JavaScript: keywords, constants, strings, template strings over lines (their ${..} with
+  SY_META delimiters, code inside), regular expressions (SY_STRING), numbers (also 1n, 0x..,
+  1_000), // and /\* \*/ comments; calls before '(' are functions, capitalised names types, a
+  member after '.' never a keyword
+
+- **`static CSS: Grammar`**
+  CSS: selectors (.class SY_TYPE, #id SY_CONST, :pseudo SY_META), at-rules (SY_KEYWORD),
+  blocks over lines with properties (SY_KEY), numbers with units, #colours (SY_NUMBER),
+  functions, !important, strings, /\* \*/ comments; nested rules
+
+- **`static HTML: Grammar`**
+  HTML (XML and SVG too): tags over lines (names SY_KEYWORD, attributes SY_KEY, values
+  SY_STRING, '&lt;' and '>' SY_PUNCT), comments, CDATA (SY_CODE), &lt;!DOCTYPE> and &lt;?xml?>
+  (SY_META), character references (SY_ESCAPE); the content of &lt;script> highlighted as
+  JavaScript and of &lt;style> as CSS up to its end tag
+
+- **`static WAT: Grammar`**
+  WAT, the text format of WebAssembly: module fields and block keywords (SY_KEYWORD),
+  instructions (SY_FUNC: i32.add, local.get, call ...), value and reference types
+  (SY_TYPE), $names (SY_META), numbers, strings, ;; and nested (; ;) comments
 
 - **`static PLAIN: Grammar`**
   plain text: no tokens
@@ -2303,6 +2476,9 @@ highlighting (highlight.rs)
        ui.code_popup_item(id) the completion item the list has chosen (None: closed)
   ui.code_find(id, query, replace)   open the find bar (replace: with the replace row) with
        a query; the editor selects the first match from the caret on
+  ui.code_reveal(id, line)   scroll line (from 0) into view in the editor's next pass, in the
+       middle when it was not in view, the folds hiding it opened -- without the keyboard
+       focus, the caret or the selection (a debugger's execution line)
   ui.code_status(id) -> CodeStatus   line and column of the caret (from 1), the matches
        and the current one, the lines tokenized in the last frame, the document's
        diagnostics per severity and the severity of the one at the caret, the completion
@@ -2398,6 +2574,12 @@ CE_FOLDS: u32 = 128
 - **`fn code_find(&mut self, id: u32, query: &str, replace: bool)`**
   open the find bar of code editor id with a query (replace: with the replace row); the
   editor selects the first match from its caret on
+- **`fn code_reveal(&mut self, id: u32, line: usize)`**
+  scroll code editor id so that line (from 0) is in view in its next pass: in the middle
+  of the view when it was not in it (no scroll when it was), the folded ranges that hide it
+  unfolded.  The keyboard focus, the caret and the selection stay as they are: a debugger
+  shows the execution line while the page or its toolbar keeps the keyboard
+  (CodeDoc::set_exec_line marks it).  A later request for the same editor replaces it.
 - **`fn code_status(&self, id: u32) -> CodeStatus`**
   the caret, the find matches, the lines tokenized and the diagnostics in code editor
   id's last frame
@@ -2760,7 +2942,8 @@ tool windows and docked again, hidden, collapsed to a rail; the layout is the ap
   dock_end(&mut st) -> changed      true when the user changed the layout (save it then)
   DockState                         the layout, kept by the app: save() -> text, load(text),
                                     reset, show / hide / toggle / focus / activate, float /
-                                    dock_to, collapse / collapsed, size / set_size, groups /
+                                    dock_to, float_group / dock_group_to (a whole group),
+                                    collapse / collapsed, size / set_size, groups /
                                     floats / hidden_panels, side / visible / front / shown
 
 Places: a side holds tab groups (left / right: one above the other, bottom: side by side)
@@ -2804,6 +2987,11 @@ DP_NOCLOSE: u32 = 1
 DP_NOFLOAT: u32 = 2
 /// starts hidden (until DockState::show / focus); later the layout remembers it
 DP_HIDDEN: u32 = 4
+/// its group moves as a whole: when it is the shown tab, the group menu's "Links / Rechts /
+/// Unten andocken" and "Lösen" and a double click on the strip's empty part take every tab of
+/// the group (panels that belong together, such as an app's developer tools;
+/// DockState::dock_group_to / float_group)
+DP_GROUP: u32 = 8
 /// floating windows of one dock area at most (fixed: each is a window, WIN_MAX)
 DOCK_FLOAT_MAX: usize = 6
 /// drop marker kinds (StyleShell::dock_marker, sp.value): the part of the place it fills
@@ -2844,7 +3032,8 @@ DOCK_TAB_HOLD: u32 = 1
   the layout of a dock area: kept by the app and passed to dock_begin / dock_next /
   dock_end.  save() / load() turn it into a few lines of text: \\`dock 1\\`, then \\`side S SIZE
   COLLAPSED`, `group S TAG SIZE ACTIVE PANEL...`, `float SLOT X Y W H HOME HOMETAG ACTIVE
-  PANEL...\\`, \\`hidden PANEL S TAG POS X Y W H HOME HOMETAG\\` (unknown lines are skipped).
+  PANEL...\\`, \\`hidden PANEL S TAG POS X Y W H HOME HOMETAG [ORDER...]\\` (ORDER: its group's tab
+  order when it left; unknown lines are skipped).
 
 **`impl DockState`**
 
@@ -2869,6 +3058,14 @@ DOCK_TAB_HOLD: u32 = 1
   floating window of the area is in use
 - **`fn dock_to(&mut self, id: u32, side: u8)`**
   dock the panel to a side, as a new group at its end
+- **`fn dock_group_to(&mut self, id: u32, side: u8)`**
+  dock the whole group of the panel to a side, as a new group at its end: every tab in its
+  order, the shown one stays shown (a floating window's group too; a group already on
+  that side stays where it is)
+- **`fn float_group(&mut self, id: u32, rect: Option<[i32; 4]>) -> bool`**
+  float the whole group of the panel in a tool window (rect as for float; its pin button
+  docks it back on its side) -> false when every floating window of the area is in use or
+  the panel is hidden; a group that floats already only moves to rect
 - **`fn collapse(&mut self, side: u8, on: bool)`**
   collapse a side to a rail of icon buttons, or expand it
 - **`fn collapsed(&self, side: u8) -> bool`**
@@ -3220,6 +3417,8 @@ notify -- transient feedback: toasts, spinner, indeterminate progress
                                       bottom, above dialogs); call it once per frame after
                                       the content.  Hovering keeps a toast; its close button
                                       removes it; expiry wakes the loop (timer UIT_TOAST).
+                                      Records: the card (K_BOX, the title), its message
+                                      (K_TEXT) and the close button (K_BUTTON "Schließen").
   toast_dismiss(id) / toast_clear()
   toasts() -> [(id, kind, title, msg)]   the queued toasts (a notification history)
   spinner(id, size_dip)               a turning ring while something loads
@@ -3258,11 +3457,44 @@ datepick -- date and time input
   date_picker(id, &mut y, &mut m, &mut d) -> EV a button with the date (the user's format,
                                                 i18n::fmt_date) that opens a month calendar
                                                 starting on the locale's first weekday
-                                                (EV_ACT when a day was picked)
-  civil helpers: days_in_month(y, m), weekday(y, m, d) (0 = Monday)
+                                                (EV_ACT when a day was picked; it closes the
+                                                calendar only, a flyout around it stays)
+  calendar(id, &mut y, &mut m, &mut d, &DateRange) -> EV
+                                                the calendar in place, for any panel or flyout:
+                                                a month of days (CAL_DAY), of ISO weeks
+                                                (CAL_WEEK: a row is a week, the date its
+                                                Monday) or a year of months (CAL_MONTH: the 1st);
+                                                only dates between min and max can be picked
+                                                (EV_ACT when the user picked)
+  The civil helpers (days in a month, weekday, ISO weeks) are jflib::datetime's.
 
-Ids: parts (id << 3 | k) | 0x80000000; calendar days ((id ^ 0x3C3C) << 6 | cell) | 0x80000000.
+Ids: parts (id << 3 | k) | 0x80000000; calendar cells ((id ^ 0x3C3C) << 6 | cell) | 0x80000000
+(a day 0 .. 41, a week row 0 .. 5, a month 0 .. 11).
 ```
+
+```rust
+/// what a calendar picks (DateRange::mode): a day
+CAL_DAY: u32 = 0
+/// an ISO 8601 week (Monday to Sunday): the date is its Monday, the rows start on Monday and show
+/// the week's number (datetime::iso_week)
+CAL_WEEK: u32 = 1
+/// a month: the date is its 1st, the calendar shows the twelve months of a year
+CAL_MONTH: u32 = 2
+```
+
+- **`struct DateRange`**
+  what a calendar picks and between which dates (calendar): `mode` CAL_DAY, CAL_WEEK or
+  CAL_MONTH; min and max (year, month, day) inclusive -- in CAL_WEEK the weeks that hold them, in
+  CAL_MONTH their months
+  - `mode: u32`
+  - `min: (i32, u32, u32)`
+  - `max: (i32, u32, u32)`
+
+**`impl DateRange`**
+
+- **`const DAYS: DateRange = DateRange::new(CAL_DAY, (1, 1, 1), (9999, 12, 31))`**
+  days of the years 1 to 9999
+- **`const fn new(mode: u32, min: (i32, u32, u32), max: (i32, u32, u32)) -> DateRange`**
 
 **`impl Ui`**
 
@@ -3272,7 +3504,17 @@ Ids: parts (id << 3 | k) | 0x80000000; calendar days ((id ^ 0x3C3C) << 6 | cell)
   ui_weekday_toggles(id, &mut mask) -> EV_\* (EV_ACT changed); bit 0 = Monday.  The
   buttons wrap where the row has less room than the seven of them (a narrow card)
 - **`fn date_picker(&mut self, id: u32, y: &mut i32, m: &mut u32, d: &mut u32) -> u32`**
-  ui_date_picker(id, &mut y, &mut m, &mut d) -> EV_\* (EV_ACT when a day was picked)
+  ui_date_picker(id, &mut y, &mut m, &mut d) -> EV_\* (EV_ACT when a day was picked).  A
+  pick closes the calendar's popup and the popups inside it, not a flyout the picker sits
+  in (popup_close_id)
+- **`fn calendar(&mut self, id: u32, y: &mut i32, m: &mut u32, d: &mut u32, range: &DateRange) -> u32`**
+  ui_calendar(id, &mut y, &mut m, &mut d, &range) -> EV_\* (EV_ACT when the user picked):
+  a month calendar in place, no popup -- a panel's, or the content of a flyout of the app's
+  own.  range.mode picks a day (CAL_DAY: the weeks start on the locale's first weekday), an
+  ISO week (CAL_WEEK: rows from Monday with the week's number; y, m, d become its Monday) or
+  a month (CAL_MONTH: a year of months; y, m, d become its 1st); what lies outside
+  range.min .. range.max is drawn disabled.  The arrows show the month (the year) before and
+  after; the calendar shows the month of y, m, d again when the app changes the date.
 
 ### Languages
 
@@ -3850,7 +4092,13 @@ filedlg -- Open / Save file dialog (ContentDialog with a folder list), both OS
        (modal); Android's picker answers later: nothing is drawn while it is open, the
        chosen document arrives as its content:// name in a later frame.  Otherwise,
        headless or with jfgui_FILEDLG=builtin, the library's own dialog.
+       FD_MULTI (E8, with FD_OPEN): several files -- the system's dialog where it chooses
+       several (Windows, Linux's portal), the own dialog with Ctrl+click / Shift+click (or
+       Shift+arrows) on the rows ("a" "b" in the name box, quoted names typed there too);
+       path gets the first, ui.filedlg_paths() every chosen file.
        Widget ids used: id .. id + 0x3FFF (list rows id + 17 + i).
+  filedlg_paths() -> the files of the last confirmed dialog (one without FD_MULTI, the folder
+       of an FD_FOLDER dialog)
 
 One file dialog can be open at a time (the state below is shared).
 ```
@@ -3859,6 +4107,9 @@ One file dialog can be open at a time (the state below is shared).
 
 - **`fn filedlg(&mut self, id: u32, flags: u32, open: &Shared<i32>, path: &mut String, cap: u32, exts: &[&str]) -> u32`**
   ui_filedlg(id, flags, open, path, cap, exts) -> EV_ACT when confirmed
+- **`fn filedlg_paths(&self) -> Vec<String>`**
+  (E8) the files the last confirmed file dialog chose: with FD_MULTI every one (the first
+  is the dialog's path), else the one (FD_FOLDER: the folder); empty before any
 
 ### Drawing commands
 
@@ -3994,7 +4245,7 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   theme file PATH | none        an app theme from a file (an error is printed and kept for
                                 `expect theme error`; the theme stays) / no app theme
   style NAME                    another style linked into the app (Ui::set_style)
-  move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r]
+  move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r|m] [shift|ctrl|alt]...
   rclick S        dblclick S [shift|ctrl|alt]...
                   drag S1 S2 [steps] [hold MS] [shift|ctrl|alt|right|middle]...
                   drag ... hold MS   the button rests MS ms before the first move (like
@@ -4020,6 +4271,12 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
+  keydown CHORD [scan N] [left|right|numpad]   (E2) the key goes down and stays down (a
+                  modifier key -- shift, ctrl, alt -- is held for the following events; once
+                  more while down: an auto-repeat); keyup CHORD [scan N] [left|right|numpad]
+                  lets it go; scan N and the location reach ui.key_event_take
+  preedit "text" [CURSOR]   (E4) an input method's composition (ui.ime_preedit; CURSOR a byte
+                  offset, default the end; "" ends it); commit "text" commits
                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
   keys [N] CHORD...   the chords N times over, queued for ONE pass of the window with the
                   keyboard (more keys than frames: what a tool window hands on); `key` gives
@@ -4029,13 +4286,28 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   commit "text" [N]   an input method commits the text (N times over: one long commit)
   cmd ID [ARG]    run a command as if a menu item was chosen
   wait MS         advance the virtual clock (16 ms frames; timers, animations and the
-                  sleep()s of async tasks)
+                  sleep()s of async tasks); nothing else happens meanwhile: the same run
+                  every time
+  wait real MS    MS of real time pass while the app's own threads work: their wake-ups
+                  (plat::wake) reach App::command (UIC_WAKE) as they come, and the virtual
+                  clock follows the real one (timers, animations, frames asked for); for apps
+                  whose engine runs on threads of its own (not deterministic: expect what
+                  holds however long the threads took)
   shot FILE.png   render and save a screenshot
   dump [FILE]     print / save the widget tree
-  expect S exists | missing | hover | nohover | focused | checked | unchecked | disabled |
-           enabled | selected | open | pressed | unpressed | value N | value MIN..MAX | max N |
-           text "s" |
+  expect S exists | missing | hover | nohover | focused | unfocused | checked | unchecked |
+           disabled | enabled | selected | unselected | open | closed | pressed | unpressed |
+           value N | value MIN..MAX | max N | text "s" |
            rect X Y W H   (rect: '*' takes any value)
+  a11y ACTION S [ARG]   (a11y_auto.rs, section 19) a screen reader's request for the node of
+                record S, as a bridge sends it: click, focus, scroll, expand, collapse,
+                increment, decrement, select, add, remove, value N, text "s", selecttext A C
+  a11y expect S role R | name "s" | desc "s" | url "s" | text "s" | level N | set POS SIZE |
+                cell ROW COL [RSPAN CSPAN] | grid ROWS COLS | live polite|assertive|off |
+                is STATE | not STATE | can ACTION | cannot ACTION | parent S2 | top |
+                children N | missing          (its node in the accessibility tree)
+  a11y expect announced "s" | none   the last text ui.announce said since the last check
+  a11y dump [FILE]      the accessibility tree as text
   expect theme "NAME" | none    the app theme;  expect theme error "TEXT" | none  the error
                                 of the last `theme file` contains TEXT
   expect style NAME   expect token NAME #RRGGBB|#AARRGGBB (a colour token now)
@@ -4061,11 +4333,17 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
          settings theme|locale|contrast|fonts|other|N
                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...;
                       background / foreground: a hidden tab, Android's onStop / onStart)
+  system browser default|other|unknown   (E13) what ui.default_browser answers from here (a
+                      headless run never asks the system; at first other), then the app
+                      loses the keyboard (when it had it) and gets it back, as after the
+                      system's settings: UIC_ACTIVE 0 and 1 (only 1 when it was not active)
   system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
   system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
                       overrides of the system settings (follow with `system settings ...`),
-                      jfgui_CSD (the library title bar and its resize band, next pass)
+                      jfgui_CSD (the library title bar and its resize band, next pass),
+                      jfgui_FONT_FALLBACK 1 / - (the system fonts for missing characters on /
+                      off from here)
   sensor accel|gravity|gyro|magnet X Y Z [ACCURACY]   (sensors.rs) a reading of plat::sensors:
                       the sensor exists from now on; a stopped sensor delivers nothing
   sensor rot X Y Z W [abs|rel]   the rotation estimate (a quaternion; default abs)
@@ -4095,9 +4373,11 @@ Windows (ID = the app's window id, 0 / main = the main window):
                                 main window's client area): popups of every window may leave
                                 it up to there and flip at its edges; off (the default): the
                                 main window's client area holds all popups
-  sync [MS]                     wait until no background job is pending: the app's sync hook,
+  sync [MS] [soft]              wait until no background job is pending: the app's sync hook,
                                 the async tasks' work (blocking jobs, wake-ups) and the spell
-                                checker's workers (suggestions, edit_spell.rs)
+                                checker's workers (suggestions, edit_spell.rs); real time, at
+                                most MS (default 10 s): reaching it fails the script, with soft
+                                it does not (a note is printed; the expects that follow decide)
   expect sound KIND|none        the last sound ui.beep / ui.dialog_sound asked for since the
                                 last check (default, information, warning, error, question,
                                 notify; headless runs play none)
@@ -4303,6 +4583,14 @@ cursor -- custom pointer cursors drawn by the app, at the dpi of the window
   cursor_render(handle, dpi) -> Some(surface)   the cursor drawn into a new surface
                              (FMT_PARGB; tests, previews)
   cursor_current() -> handle the handle CUR_CUSTOM stands for (0 = none)
+  cursor_replace(handle, f, w, h, hot) -> bool   (E3) a new drawing for a live handle (the
+                             platform's cursor is made again when it is shown next)
+  cursor_free(handle)        (E3) the slot is free again (cursor_new may hand it out); a
+                             hit box showing it gets the crosshair
+  cursor_next(shape)         (E3) the cursor of the next hit box: any CUR_* -- the system
+                             shapes CUR_X0 .. CUR_X_END (not-allowed, grab, the resize
+                             shapes ...) that do not fit into the 4 flag bits, CUR_CUSTOM
+  cursor_at(x, y) -> shape   (ctx.rs) the cursor at a point (tests, an engine's own hover)
 Internal: cursor_resolve(shape) -> the plat shape for a hit box cursor (CUR_CUSTOM: the
 custom cursor made for the current window's dpi with plat::cursor_create, rebuilt when
 that dpi changes; the crosshair when there is none or the platform has no custom
@@ -4320,6 +4608,17 @@ cursors, e.g. headless runs).
   ui_cursor_custom(handle): the cursor of CUR_CUSTOM hit boxes
 - **`fn cursor_current(&self) -> u32`**
   ui_cursor_current -> handle
+- **`fn cursor_next(&mut self, shape: u32)`**
+  (E3) the cursor of the next hit box (canvas, button, hit_rect ...): any CUR_\* shape --
+  also those beyond CUR_CUSTOM's 4 bits (CUR_NOT_ALLOWED, CUR_GRAB, CUR_SIZE_NE ...), a
+  custom cursor through CUR_CUSTOM; it wins over the hit box's flags.  A platform without
+  a shape shows plat::cursor_fallback's
+- **`fn cursor_replace(&mut self, handle: u32, f: CursorDraw, w: u32, h: u32, hot: u32) -> bool`**
+  (E3) a new drawing for a live handle (f, w x h DIP, hot spot x | y &lt;&lt; 16): the platform's
+  cursor is made again at the next show -> false for a handle that is not live
+- **`fn cursor_free(&mut self, handle: u32)`**
+  (E3) free a handle of cursor_new: its platform cursor goes, the slot may be handed out
+  again; when it was the custom cursor, CUR_CUSTOM shows the crosshair until another is set
 - **`fn cursor_render(&mut self, h: u32, dpi: i32) -> Option<Surface>`**
   ui_cursor_render(handle, dpi) -> the cursor drawn at dpi into a new surface
 
@@ -4345,6 +4644,8 @@ headless image clipboard; the command lines of later starts (AF_SINGLE_INSTANCE)
                                   an image file (PNG, or BMP from a DIB), the app's own kind
                                   and bytes; drop_types() -> its DT_* kinds, drop_text()
   drop_pos() -> (x, y)            drop position in DIP of the window it happened in
+  drop_pos_px() -> (x, y)         the same in px of that window, exact (as last_rect and a
+                                  canvas's UiInput: x - rect[0] is the point in the canvas)
   drop_window() -> id             that window's app id (0 = main window)
   clip_has(fmt) -> bool           the clipboard offers CLIP_TEXT / CLIP_PNG / CLIP_IMAGE
                                   (headless runs: the in-process clipboard)
@@ -4371,7 +4672,13 @@ Internal:
 - **`fn drop_list(&self) -> &[String]`**
   ui_drop_list: every path of the last drop
 - **`fn drop_pos(&self) -> (i32, i32)`**
-  ui_drop_pos: drop position in DIP of the window it happened in
+  ui_drop_pos: drop position in DIP of the window it happened in (rounded to whole DIP:
+  at 150 % three pixels share two DIP; drop_pos_px is exact)
+- **`fn drop_pos_px(&self) -> (i32, i32)`**
+  drop position in px of the window it happened in, exact: logical like `last_rect` and a
+  canvas's \\`UiInput::rect\\` (mirrored in a right-to-left window), so \\`(x - rect[0], y -
+  rect[1])\\` is the point in a canvas, in the canvas's own pixels -- a drop onto a page an
+  engine draws at the display's resolution
 - **`fn drop_window(&self) -> u32`**
   ui_drop_window: the app id of the window of the last drop (0 = main window)
 - **`fn drop_data(&self) -> &DragData`**
@@ -4411,7 +4718,8 @@ Targets:
   drop_accept(types)               what the windows take outside every drop target (default
                                    DT_FILES); such drops come as UIC_DROP (drop.rs, as before)
   drag_over() -> (types, x, y)     the drag over the live window: its kinds and position (DIP);
-                                   (0, 0, 0) when none
+                                   (0, 0, 0) when none; drag_over_px() the position in px of
+                                   the window, exact (as drop_pos_px, drop.rs)
 
 An internal drag stays in the app while the pointer stays in its window: the drop target under
 the pointer is highlighted, a label follows the pointer, Esc cancels, a release over a matching
@@ -4452,6 +4760,10 @@ way in like every pointer event; the label next to the pointer is drawn through 
   DT_FILES); those drops arrive as UIC_DROP
 - **`fn drag_over(&self) -> (u32, i32, i32)`**
   drag_over() -> (DT_\* kinds, x, y DIP): the drag over the live window, (0, 0, 0) = none
+- **`fn drag_over_px(&self) -> (u32, i32, i32)`**
+  drag_over_px() -> (DT_\* kinds, x, y px): drag_over with the position in px of the live
+  window, exact (logical like `last_rect`; minus a canvas's `UiInput::rect`: the point in
+  the canvas's own pixels); (0, 0, 0) = none
 - **`fn drop_effect(&self) -> u32`**
   the effect of the last drop (DE_\*)
 
@@ -4967,6 +5279,16 @@ HB_OWNKEYS: u32 = 0x20000
 // around it (touch.rs; the cursors of splitters, text and crosshairs say so by themselves)
 HB_GRAB_H: u32 = 0x40000
 HB_GRAB_V: u32 = 0x80000
+// every key is the widget's while it has the focus and no popup of the window is open (a menu
+// keeps its keys), Ctrl + letter, Tab and the arrows too: no accelerator, no keyboard
+// navigation, no Enter / Space action and no ui.undo_keys takes one (a canvas that shows a web
+// page takes them with ui.key_take; ui.accel_run hands one back to the command table).  Unlike
+// HB_TEXT no text box rules: no reserved keys, no input method, no on-screen keyboard.  A
+// canvas takes it from next_flags.
+HB_KEYS: u32 = 0x10_0000
+// canvas only (next_flags): its cursor bits as given, CUR_ARROW (0) included; without it 0 is the
+// crosshair
+HB_CURSOR_SET: u32 = 0x20_0000
 ```
 
 *the finger (touch.rs)*
@@ -5028,7 +5350,43 @@ K_SWATCH: u16 = 20
 K_LINK: u16 = 21
 /// a heading of a document or section (value: its level, 1 the top; md_view.rs, Ui::heading)
 K_HEADING: u16 = 22
+/// the number of KIND_NAMES (the kinds K_BOX ..= K_HEADING); the kinds of web content K_TABLE ..=
+/// K_FIGURE follow it (KIND_NAMES_MORE, kind_name names them all)
 K_KIND_COUNT: u16 = 23
+// (section 19 of the guide) the kinds of a web page's accessibility tree; a screen reader gets
+// each with a role of its own where the platform has one (UI Automation, AT-SPI2, the browser)
+/// a table or grid (Sem::grid: its rows and columns) and a row of it
+K_TABLE: u16 = 23
+K_ROW: u16 = 24
+/// a cell (label: what it says; Sem::cell: its row and column), a column header, a row header
+K_CELL: u16 = 25
+K_COLHEADER: u16 = 26
+K_ROWHEADER: u16 = 27
+/// a landmark of a page (value: LM_*; label: its name)
+K_LANDMARK: u16 = 28
+/// a tree and one of its items (Sem::level: its depth; AS_COLLAPSED / SS_OPEN: closed / open)
+K_TREE: u16 = 29
+K_TREEITEM: u16 = 30
+/// a group of radio buttons, a tool bar, a tooltip (label: its text), a separator
+K_RADIOGROUP: u16 = 31
+K_TOOLBAR: u16 = 32
+K_TOOLTIP: u16 = 33
+K_SEPARATOR: u16 = 34
+/// live regions: an alert (said at once), a status line and a log (said when the person is
+/// idle); label: their text (Sem::live changes how they speak)
+K_ALERT: u16 = 35
+K_STATUS: u16 = 36
+K_LOG: u16 = 37
+/// a meter (value of min ..= max, as a progress bar), a spin button and a scroll bar (value, min,
+/// max as a slider; Sem::range for fractions)
+K_METER: u16 = 38
+K_SPIN: u16 = 39
+K_SCROLLBAR: u16 = 40
+/// an article, a figure (label: their names)
+K_ARTICLE: u16 = 41
+K_FIGURE: u16 = 42
+/// the end of the K_* kinds (one past K_FIGURE)
+K_KIND_END: u16 = 43
 SS_HOVER: u16 = 1
 SS_PRESSED: u16 = 2
 SS_FOCUSED: u16 = 4
@@ -5038,8 +5396,64 @@ SS_SELECTED: u16 = 32
 SS_OPEN: u16 = 64
 /// names of the K_* kinds (dump, selectors kind:"Label")
 KIND_NAMES: [&str; 23] = [ "box", "text", "button", "checkbox", "radio", "switch", ...
+/// names of the kinds K_TABLE ..= K_FIGURE (dump, selectors kind:"Label")
+KIND_NAMES_MORE: [&str; 20] = [ "table", "row", "cell", "colheader", "rowheader", "land ...
+```
+
+- **`fn kind_name(kind: u16) -> &'static str`**
+  the name of a K_\* kind (dump, selectors kind:"Label"); "box" for an unknown one
+
+```rust
 /// names of the SS_* state bits (dump)
 STATE_NAMES: [&str; 7] = ["hover", "pressed", "focused", "checked", "disabled", "s ...
+// K_LANDMARK's value: the kind of landmark (0: a named region)
+LM_REGION: i32 = 0
+LM_BANNER: i32 = 1
+LM_MAIN: i32 = 2
+LM_NAVIGATION: i32 = 3
+LM_COMPLEMENTARY: i32 = 4
+/// the content information (a page's footer)
+LM_CONTENTINFO: i32 = 5
+LM_SEARCH: i32 = 6
+LM_FORM: i32 = 7
+// Sem::states: what a record is beyond its kind and SS_* state (section 19 of the guide)
+/// a field that must be filled in
+AS_REQUIRED: u32 = 1
+/// a field whose content is not valid
+AS_INVALID: u32 = 2
+/// its content is being changed (a live region says nothing meanwhile)
+AS_BUSY: u32 = 4
+/// it opens a popup (a menu, a list, a dialog)
+AS_HASPOPUP: u32 = 8
+/// a link to an address that was visited
+AS_VISITED: u32 = 16
+/// a modal dialog
+AS_MODAL: u32 = 32
+/// a list, tree or table that allows several selected items
+AS_MULTISELECT: u32 = 64
+/// it can be expanded and is closed now (SS_OPEN: it is open)
+AS_COLLAPSED: u32 = 128
+/// outside the visible area (scrolled away, clipped by its scroll box): a screen reader's
+/// browse mode reaches it, the pointer does not
+AS_OFFSCREEN: u32 = 256
+/// it takes the keyboard focus (a kind that does not anyway: a cell of a grid, an element with a
+/// tabindex)
+AS_FOCUSABLE: u32 = 512
+/// a click does something (a kind that does not say so: a cell, a row, an element with a click
+/// handler)
+AS_CLICKABLE: u32 = 1024
+/// it can be selected (rows and cells of a grid; list rows, tree items and tabs are anyway)
+AS_SELECTABLE: u32 = 2048
+/// a text box: read-only / with several lines / a password (as TB_* of a built-in box)
+AS_READONLY: u32 = 4096
+AS_MULTILINE: u32 = 8192
+AS_PASSWORD: u32 = 16384
+// Sem::live and ui.announce: how a live region / an announcement is said (0 for Sem::live: as
+// its kind says -- K_ALERT assertive, K_STATUS and K_LOG polite, the others not at all)
+LIVE_POLITE: u32 = 1
+LIVE_ASSERTIVE: u32 = 2
+/// (Sem::live) not a live region (an app that announces its changes itself, ui.announce)
+LIVE_OFF: u32 = 3
 ```
 
 *layers*
@@ -5187,6 +5601,7 @@ UIC_SCREENSHOT: u32 = 0x7FFF_0018  // arg 1: the picture is there (screenshot_ta
 UIC_RECENT: u32 = 0x7FFF_0019  // arg 1: the file of recent_open is readable now (recent_reopened), 0: refused or gone
 UIC_SENSOR: u32 = 0x7FFF_001B  // arg = plat::sensors::SENSOR_* bits: new readings or another state (plat::sensors::read, state)
 UIC_LOCATION: u32 = 0x7FFF_001C  // arg = plat::sensors::LocationState: a new fix or another state (location_fix)
+UIC_A11Y: u32 = 0x7FFF_001D  // arg 1: a screen reader (an accessibility client) came, 0: it left (ui.a11y_active), also while the app is idle
 TRAY_ACTIVATE: u32 = 1  // UIC_TRAY: the symbol was clicked
 TRAY_SECONDARY: u32 = 2  // UIC_TRAY: double click (Windows) / middle click (Linux)
 ```
@@ -5354,7 +5769,7 @@ DLG_CLOSE: u32 = 3
 ```rust
 TB_CAP_MASK: u32 = 0x007F_FFFF  // the capacity in bytes (at most 8 MB)
 TB_HYPHENATE: u32 = 0x0080_0000  // with TB_MULTI | TB_WRAP: hyphenate words that do not fit (hyph.rs)
-TB_PASSWORD: u32 = 0x0100_0000  // a dot per character; no copy / cut
+TB_PASSWORD: u32 = 0x0100_0000  // a dot per character; no copy / cut; the input method's purpose IP_PASSWORD while it has the keyboard
 TB_READONLY: u32 = 0x0200_0000  // selectable and copyable, not editable
 TB_DIGITS: u32 = 0x0400_0000  // accept only 0-9
 TB_MULTI: u32 = 0x0800_0000  // multi-line
@@ -5382,6 +5797,8 @@ CF_HIDDEN: u32 = 4
 FD_OPEN: u32 = 0
 FD_SAVE: u32 = 1
 FD_FOLDER: u32 = 2
+/// (E8) open several files at once (with FD_OPEN): ui.filedlg_paths() has all of them, `path` the first
+FD_MULTI: u32 = 4
 FD_EXT_SHIFT: u32 = 8
 ```
 
@@ -5401,6 +5818,13 @@ WF_NOACTIVATE: u32 = 64
 WF_AUTOHEIGHT: u32 = 128
 WF_KEYS: u32 = 256
 WF_TOUCH_HOLD: u32 = 512  // a finger moves it by the title bar only after resting there (TF_HOLD)
+/// (E7) an independent app window (a browser's second or private window): a top-level window of
+/// its own on Windows (its own taskbar button, not minimized or hidden with the main window),
+/// without the library's title bar -- the app draws one with titlebar_begin / titlebar_end
+/// (its own widgets in it, the caption buttons at its end); X11 and Wayland too (a top-level
+/// window without WM_TRANSIENT_FOR / an xdg_toplevel without a parent); macOS gives it an owned
+/// window for now
+WF_APP: u32 = 1024
 UWS_OPEN: u32 = 1
 UWS_VISIBLE: u32 = 2
 UWS_ACTIVE: u32 = 4
@@ -5445,6 +5869,11 @@ PTR_MOUSE: u32 = 0
 PTR_PEN: u32 = 1
 PTR_ERASER: u32 = 2
 PTR_TOUCH: u32 = 3
+// (E2) where a key sits (KeyEvent::location)
+KL_STANDARD: u32 = 0
+KL_LEFT: u32 = 1
+KL_RIGHT: u32 = 2
+KL_NUMPAD: u32 = 3
 // cursors (CUR_*)
 CUR_ARROW: u32 = 0
 CUR_IBEAM: u32 = 1
@@ -5461,6 +5890,38 @@ CUR_COUNT: u32 = 11
 CUR_CUSTOM: u32 = 15  // hit boxes only: the cursor of cursor_custom
 CUR_USER_MAX: u32 = 32  // fixed handle range; cursor_new answers 0 when it is full
 CUR_MAX_PX: i32 = 256
+```
+
+*(E3) more system shapes: CSS's cursor names, past the custom cursors (CUR_X0 ..*
+
+```rust
+// CUR_X_END); a platform without one shows cursor_fallback's
+CUR_X0: u32 = 64
+CUR_NOT_ALLOWED: u32 = 64  // not-allowed
+CUR_NO_DROP: u32 = 65  // no-drop
+CUR_GRAB: u32 = 66  // grab: an open hand
+CUR_GRABBING: u32 = 67  // grabbing: a closed hand
+CUR_HELP: u32 = 68  // help: the arrow with a question mark
+CUR_PROGRESS: u32 = 69  // progress: the arrow with a busy sign (work in the background)
+CUR_ZOOM_IN: u32 = 70  // zoom-in
+CUR_ZOOM_OUT: u32 = 71  // zoom-out
+CUR_CELL: u32 = 72  // cell: a thick cross (tables)
+CUR_VTEXT: u32 = 73  // vertical-text
+CUR_ALIAS: u32 = 74  // alias: a link will be made
+CUR_COPY: u32 = 75  // copy: a copy will be made
+CUR_CONTEXT_MENU: u32 = 76  // context-menu
+CUR_ALL_SCROLL: u32 = 77  // all-scroll
+CUR_COL_RESIZE: u32 = 78  // col-resize
+CUR_ROW_RESIZE: u32 = 79  // row-resize
+CUR_SIZE_N: u32 = 80  // n-resize: one edge or corner
+CUR_SIZE_S: u32 = 81
+CUR_SIZE_E: u32 = 82
+CUR_SIZE_W: u32 = 83
+CUR_SIZE_NE: u32 = 84
+CUR_SIZE_NW: u32 = 85
+CUR_SIZE_SE: u32 = 86
+CUR_SIZE_SW: u32 = 87
+CUR_X_END: u32 = 88
 // fonts
 FONT_REG: u32 = 0
 FONT_SEMI: u32 = 1
@@ -6414,7 +6875,50 @@ hangs below the open record that opened it.  Names: the label; text boxes, drop-
 is the text / the choice), sliders, progress bars and lists without one take the text or
 heading record right before them (to the left, or above and aligned).  The focus of a list
 or tab strip is passed on to its selected row / tab.
+
+Rich records (section 19 of the guide; a web page's accessibility tree): the kinds K_TABLE ..=
+K_FIGURE become nodes with a Sub (Node::role their nearest basic role); a record's SemAx (its
+setters: id64, parent, name, desc, url, value_text, states, set_pos, level, cell, span, grid,
+live, range) fills the further fields of its node.  A record with an id64 is keyed by it
+(RICH | id), takes its name from nothing but its label / name, and every request for it --
+focus, click, value, text, selection, scroll into view, expand / collapse, increment /
+decrement, select items -- goes to the app (ui.a11y_request_take) instead of the widgets.  A
+record with a parent hangs under the record of that id64 (else that widget id) of its window
+in the same frame; a left out record passes its children on to its own parent, an unknown
+parent or a loop leaves the record to its rectangle.
+
+  ui.announce(text, LIVE_*)       a text for the screen reader (the next frame publishes it)
+  ui.a11y_request_take()          the next request for a record with an id64
+  ui.a11y_active()                a client listens: publish what only it needs then
 ```
+
+- **`struct A11yRequest`**
+  A screen reader's request for a record with an id64 (`ui.a11y_request_take`).
+  - `win: u32` -- the id of the record's window: 0 the main window, else the id its window_begin got
+  - `id: u64` -- the record's id64
+  - `action: A11yAction`
+
+**`impl A11yRequest`**
+
+- **`fn new(win: u32, id: u64, action: A11yAction) -> A11yRequest`**
+  A request as `ui.a11y_request_take` hands it out (window id, the record's id64, the
+  action): for an app's tests of its own handling, the struct being `non_exhaustive`.
+
+- **`enum A11yAction`**
+  What a screen reader asks of a record (`A11yRequest::action`).
+  - `Focus` -- give it the keyboard focus
+  - `Click` -- its default action: press, follow, toggle, select, open
+  - `ScrollIntoView` -- scroll it into view
+  - `Expand` -- open / close it (AS_COLLAPSED, SS_OPEN)
+  - `Collapse`
+  - `Increment` -- one step up / down (spin buttons, sliders, scroll bars)
+  - `Decrement`
+  - `SetValue(f64)` -- a new number (sliders, spin buttons, scroll bars)
+  - `SetText(String)` -- a new text (text boxes)
+  - `SelectText(u32, u32)` -- the selection of a text box: anchor, caret in characters (equal: the caret alone)
+  - `Select` -- select it alone (a row, a tab, a tree item)
+  - `AddToSelection` -- add it to / take it out of the selection (AS_MULTISELECT containers)
+  - `RemoveFromSelection`
 
 **`impl Ui`**
 
@@ -6422,6 +6926,28 @@ or tab strip is passed on to its selected row / tab.
   The accessibility tree of the last pass as assistive technology gets it (screen
   readers through AT-SPI2 / UI Automation): every shown window with its nodes (roles,
   names, states, values, rectangles), built from the semantic records (see sem()).
+- **`fn a11y_tree_key(&self) -> u64`**
+  (benchmarks: plattest --test a11y-cost) the key a11y_frame compares with the tree published
+  last: equal keys, equal trees
+- **`fn a11y_request_take(&mut self) -> Option<A11yRequest>`**
+  The next request of a screen reader for a record with an id64 (`Sem::id64`), oldest first:
+  focus, click, scroll into view, expand / collapse, increment / decrement, a value, a text,
+  a text selection, select items.  Take them in every frame and carry them out (a web view
+  hands them to its engine); at most 64 wait.  Requests for the other records go to their
+  widgets as before (EV_ACT, `a11y_value`, `a11y_text`).
+- **`fn announce(&mut self, text: &str, politeness: u32)`**
+  Have the screen reader say `text`: `LIVE_POLITE` when the person is idle, `LIVE_ASSERTIVE`
+  at once (a web page's live region announcement, "Saved").  It goes out with this frame's
+  tree: UI Automation's notification event, AT-SPI2's announcement, the browser's live
+  region.  Nothing is said (or kept) while no assistive technology listens; at most 16 per
+  frame.
+- **`fn a11y_active(&self) -> bool`**
+  A screen reader (or another client of the accessibility tree) listens: the library builds
+  the tree from the records only then.  Records that only it needs -- the content of a page
+  out of view (`AS_OFFSCREEN`) -- are best published only while this is true; it turns true
+  with a frame of its own when a client comes, and the app gets the command `UIC_A11Y` (arg
+  1) then and when it leaves (arg 0; Windows: 10 s after its last question unless a screen
+  reader listens), also while nothing else happens.  Always false in headless runs.
 - **`fn a11y_value(&mut self, id: u32) -> Option<i32>`**
   A value a screen reader set for slider-like widget `id` (its record's value scale),
   taken once: the built-in sliders apply it themselves; a widget of its own applies it
@@ -6429,6 +6955,51 @@ or tab strip is passed on to its selected row / tab.
 - **`fn a11y_text(&mut self, id: u32) -> Option<String>`**
   A text a screen reader set for text widget `id`, taken once (the built-in text boxes
   apply it themselves).
+
+**`impl Sem`**
+
+- **`fn id64(&mut self, id: u64) -> &mut Sem`**
+  Its own 64-bit id (below 2^62; a web page's node id).  The node keeps it from frame to
+  frame, other records name it as their parent, and every request of a screen reader for it
+  comes back to the app (`ui.a11y_request_take`) instead of going to a widget.
+- **`fn parent(&mut self, id: u64) -> &mut Sem`**
+  The record it hangs under: the one with this id64 (else this widget id) in the same frame
+  and window -- the tree follows it, not the rectangles.  A parent that is left out (a box
+  without a label) passes it on to its own parent; an unknown one leaves it to its rectangle.
+- **`fn name(&mut self, name: &str) -> &mut Sem`**
+  Its name when the label is something else: a text box's or drop-down's label is its text,
+  so `.name("Suche")` names it.
+- **`fn desc(&mut self, text: &str) -> &mut Sem`**
+  A description beside the name (a hint; a page's aria-describedby).
+- **`fn url(&mut self, url: &str) -> &mut Sem`**
+  A link's address.
+- **`fn value_text(&mut self, text: &str) -> &mut Sem`**
+  The text a screen reader says for a slider's, meter's or spin button's value ("Montag").
+- **`fn states(&mut self, states: u32) -> &mut Sem`**
+  Further states (`AS_*`: required, invalid, busy, has a popup, visited, modal,
+  multi-select, collapsed, off screen, focusable, clickable, selectable, read-only,
+  multi-line, password), added to those it has.
+- **`fn set_pos(&mut self, pos: u32, size: u32) -> &mut Sem`**
+  Its position in its set (1-based) and the set's size: list and tree items, tabs, rows.
+- **`fn level(&mut self, level: u32) -> &mut Sem`**
+  The level of a heading (1 ..= 9, in place of the value), a tree item, list item or row
+  (1 the top).
+- **`fn cell(&mut self, row: u32, col: u32) -> &mut Sem`**
+  A cell's or header's place in its table: row, column (0-based).
+- **`fn span(&mut self, rows: u32, cols: u32) -> &mut Sem`**
+  The rows and columns a cell spans (1, 1 without).
+- **`fn grid(&mut self, rows: u32, cols: u32) -> &mut Sem`**
+  A table's number of rows and columns (without: counted from its cells).
+- **`fn live(&mut self, live: u32) -> &mut Sem`**
+  How it speaks as a live region: `LIVE_POLITE`, `LIVE_ASSERTIVE`, `LIVE_OFF` (0: as its kind
+  says -- K_ALERT assertive, K_STATUS and K_LOG polite).
+- **`fn range(&mut self, value: f64, min: f64, max: f64, step: f64) -> &mut Sem`**
+  A value with fractions in place of `value` / `min` / `max` (sliders, meters, spin buttons,
+  scroll bars, progress bars; a value below min: unknown progress), and the step of a
+  screen reader's increment.
+- **`fn text_sel(&mut self, anchor: u32, caret: u32) -> &mut Sem`**
+  A focused text box's selection in characters: anchor, caret (equal: the caret alone) -- a
+  page's own field; the built-in text boxes report theirs themselves.
 
 #### `ui/agent.rs`
 
@@ -6465,7 +7036,8 @@ app gets through ui::main!
 
   --register            register this program for PACKAGE filetypes= / schemes= (Windows:
                         HKCU\Software\Classes; Linux: a .desktop file, the own MIME types,
-                        mimeapps.list); defaults of other programs stay and are listed
+                        mimeapps.list); defaults of other programs stay and are listed; with
+                        browser=1 also as a web browser (Windows: Default Programs)
   --register-replace    the same, and those defaults go to this app too (the user's own pick
                         in Windows' dialog always stays)
   --unregister          remove exactly what the registration added, put back what it replaced
@@ -6480,7 +7052,29 @@ the program: exit code 0 done, 1 failed, 2 not possible here or nothing declared
                         once the setup installed the program or --register registered it
                         (plat::assoc::app_id_boot), before the first window
   assoc_switch(pkg, switch) -> Option<(exit code, text)>   one switch for pkg (None: no switch)
+
+(E13) A web browser (PACKAGE browser=1):
+  ui.default_browser() -> BrowserStatus   plat::default_browser_status; headless runs: what the
+                        script said (`system browser default|other|unknown`, at first other;
+                        the command then sends UIC_ACTIVE 0 and 1 as a real change would)
+  ui.default_browser_request() -> Result<(), AssocError>   plat::default_browser_request (the
+                        system's page or question); headless runs open nothing: they print
+                        "ui_default_browser_request" and answer Ok
 ```
+
+**`impl Ui`**
+
+- **`fn default_browser(&self) -> BrowserStatus`**
+  (PACKAGE browser=1) is this app the system's web browser (plat::default_browser_status:
+  Default, NotDefault, Unknown).  Keep the answer and ask again when the app is active
+  again (UIC_ACTIVE 1): the user may have chosen in the system's settings.  Headless runs
+  answer what the script said (`system browser default|other|unknown`, at first
+  NotDefault; the command is followed by UIC_ACTIVE 0 and 1, as a real change would be)
+- **`fn default_browser_request(&mut self) -> Result<(), AssocError>`**
+  (PACKAGE browser=1) let the user make this app the web browser, from the user's click
+  (plat::default_browser_request: Windows' Settings at the app's page of the default apps,
+  Linux sets it, macOS asks).  Headless runs open nothing: they print
+  "ui_default_browser_request" and answer Ok
 
 - **`fn desk_boot(package: Option<&str>) -> Option<i32>`**
   (main!) PACKAGE, then the switches -> Some(exit code) when one of them ran
@@ -7357,9 +7951,10 @@ md_view -- ui.markdown_view / ui.html_view: a read-only document view over an Md
        view, PgUp / PgDn that a field does not take scroll the view.  The fields follow the
        window's mirroring (as every widget), not the direction of their paragraph.  A
        document without fields reads as before.
-  Flags: MV_NO_FRAME (no card, a smaller padding), MV_OPEN_LINKS (an activated link is also
-       opened with open_url: its scheme rules and the app's policy apply; never without the
-       user's click or Enter), MV_RTL / MV_LTR (the document's direction; default: that of
+  Flags: MV_NO_FRAME (no card, a smaller padding), MV_OPEN_LINKS (an activated http, https
+       or mailto link is also opened with open_url: the app's policy applies; never without
+       the user's click or Enter; links of other schemes and relative ones only reach the
+       app), MV_RTL / MV_LTR (the document's direction; default: that of
        its first strong character, else the window's)
 
 Layout: the blocks in a column; block quotes indent with a bar, lists with their markers in
@@ -7389,11 +7984,15 @@ into view; past the last one the focus moves on), Enter activates the focused li
 drops it, Ctrl+A selects all,
 Ctrl+C / Ctrl+Insert copy the selection as text (list markers, cells by tabs) and HTML.
 Images: names of the VFS ("app://", "data://" ...) and paths (relative ones after base) are
-read on first view and kept in the state; http(s) addresses are never fetched by the view
-(MI_LOCAL: the alt text shows in a frame instead; MI_ASK / MI_APP: the app fetches them).
+read on first view and kept in the state -- of the OS's files only regular ones up to 32 MB,
+never a network or device path ("//server/share", "\\.\..."); http(s) addresses are never
+fetched by the view (MI_LOCAL: the alt text shows in a frame instead; MI_ASK / MI_APP: the
+app fetches them).
 Records: K_BOX id (label: the label, value: the scroll position in DIP); per visible block
-K_HEADING (value: the level), K_TEXT (paragraphs, code, table cells), K_LISTITEM (the first
-block of a list item, value: its number), K_CHECKBOX (a task's box, checked), K_LINK per
+K_HEADING (value: the level), K_TEXT (paragraphs, code), K_LISTITEM (the first block of a list
+item, value: its number), K_CHECKBOX (a task's box, checked); a table's rows in view: K_TABLE
+around them (grid: the table's rows and columns), per row K_ROW (label: its cells' texts) and
+per cell K_CELL (a header row's: K_COLHEADER; cell: row and column); K_LINK per
 link, K_IMAGE (label: the alt text) per image; per visible field the widget's record
 (K_TEXTBOX, K_CHECKBOX, K_RADIO, K_COMBO, K_BUTTON: label the field's name -- its <label>,
 aria-label, title, placeholder -- or a button's caption; text boxes and lists take it from a
@@ -7404,7 +8003,7 @@ the scroll bar, md_field_id(id, i) the fields.
 ```rust
 /// markdown_view flags: no card around the document
 MV_NO_FRAME: u32 = 1
-/// an activated link is also opened (open_url)
+/// an activated link is also opened (open_url) when it is http, https or mailto
 MV_OPEN_LINKS: u32 = 2
 /// the document runs right to left (indents and markers on the right)
 MV_RTL: u32 = 4
@@ -8125,7 +8724,8 @@ all back.  Text fields keep their own undo; the edits here are the app's.
 
 - **`fn undo_keys(&mut self) -> Option<bool>`**
   undo_keys() -> Some(true) for Ctrl+Z, Some(false) for Ctrl+Y / Ctrl+Shift+Z, when no
-  text field has the keyboard (they keep their own undo); the key is consumed
+  text field (they keep their own undo) or widget with HB_KEYS has the keyboard; the key is
+  consumed
 
 #### `ui/hyph.rs`
 
@@ -11148,6 +11748,10 @@ gfx -- surfaces and the draw context (clip, origin, colour), fills, blits  [src/
                                      coordinates stay the target's, only the pixel rows move
   dc: set_color(argb), set_opacity(op), clip_push(x, y, w, h) / clip_pop(), origin(x, y),
       translate(dx, dy), fill / clear / hline / vline / frame / blit / blit_scaled (sf, ...)
+  set_parallel(f) / parallel()       the loop large copies run on (the UI runtime passes the
+                                     worker pool's): a blit that copies XRGB rows from
+                                     COPY_PAR_MIN bytes on is cut into row bands on it, from
+                                     COPY_STREAM_MIN bytes on past the caches (a 4K canvas)
   path (Path, 24.8 and float API), raster (Raster), stroke (Path::stroke), shapes (Shapes),
   blend (row kernels), straight (straight-alpha rows), blendmode (paint.net blend modes),
   tmask (tiled masks), flood (flood fill), gradient, pathdata (SVG path data), dash
@@ -11179,7 +11783,26 @@ CAP_SQUARE: u32 = 2
 ERR_FAIL: i32 = -1
 ERR_NOMEM: i32 = -8
 ERR_LIMIT: i32 = -15
+/// a blit's plain copy (XRGB source) from this many bytes on runs in row bands on the loop of
+/// set_parallel (gfxtest --bench-blit: a 1 MB copy takes about a fifth on 12 workers)
+COPY_PAR_MIN: usize = 1 << 20
+/// ... and from this many on with streaming stores (gfx::blend::copy_stream): source and target
+/// together no longer fit the caches, the target is not read first.  A 4K frame (32 MB): 1.9 ms on
+/// 12 workers and the calling thread, 2.7 ms with plain stores, 5 ms on one thread (Ryzen 5 3600,
+/// DDR4-3200, a loaded machine; the memory's limit for such a copy is about 1.7 ms there)
+COPY_STREAM_MIN: usize = 12 << 20
 ```
+
+- **`type ParallelFor = fn(usize, &(dyn Fn(usize) + Sync))`**
+  runs f(i) for every i in 0..n, possibly on several threads (img_core::ParallelFor)
+
+- **`fn set_parallel(f: ParallelFor)`**
+  the loop large copies run on (Dc::blit, COPY_PAR_MIN); the UI runtime passes a wrapper of
+  plat::parallel_for -- gfx does not depend on plat.  Without it they run on the calling thread
+  (the same bytes)
+
+- **`fn parallel() -> Option<ParallelFor>`**
+  the loop set by set_parallel
 
 - **`struct Surface`**
   pixels of one image: rows of `stride` bytes (4 per pixel, A8: 1)
@@ -11265,7 +11888,8 @@ ERR_LIMIT: i32 = -15
 - **`fn frame(&self, sf: &mut Surface, x: i32, y: i32, w: i32, h: i32)`**
   1-pixel outline inside the rectangle  [gfx_frame]
 - **`fn blit(&self, sf: &mut Surface, src: &Surface, x: i32, y: i32)`**
-  draw a surface at x, y: premultiplied over (x opacity), XRGB sources are copied  [gfx_blit]
+  draw a surface at x, y: premultiplied over (x opacity), XRGB sources are copied (a large
+  copy in row bands on the loop of set_parallel, COPY_PAR_MIN)  [gfx_blit]
 - **`fn blit_scaled(&self, sf: &mut Surface, src: &Surface, x: i32, y: i32, w: i32, h: i32)`**
   nearest-neighbour blit scaled to w x h (over)  [gfx_blit_scaled]
 
@@ -11281,8 +11905,9 @@ blend -- pixel row kernels (premultiplied 0xAARRGGBB, bytes B G R A)   [src/gfx/
   mask_over(row, mask, pcol)       the colour through an 8-bit coverage row
   blit_over(dst, src, opacity)     premultiplied src over dst (x opacity 0..255)
   a8_over(dst, cov, alpha)         8-bit target: c = cov * alpha / 255, dst = c + dst * (255 - c) / 255
-  copy_stream(dst, src) / stream_fence()   a row copy past the caches (simd; row bands
-                                   drawn on worker threads go back to the framebuffer so)
+  copy_stream(dst, src) / copy_stream_rows(...)   a row copy, or a block of rows, past the
+                                   caches (simd; row bands drawn on worker threads go back to
+                                   the framebuffer so); stream_fence() is in them
 
 "over": dst = src + dst * (255 - src_alpha) / 255 with exact rounding (div255) and the
 saturation of the SSE2 kernels (packuswb).  fill_over, mask_over and a8_over are SIMD
@@ -11291,7 +11916,7 @@ blit_over is the assembly's SSE2 loop on pixel pairs, because its pair skip (bot
 transparent: dst kept) is visible for invalid premultiplied input.
 ```
 
-Re-exports: `simd::{copy_stream, stream_fence}`
+Re-exports: `simd::{copy_stream, copy_stream_rows, stream_fence}`
 
 - **`fn fill_solid(row: &mut [u8], c: u32)`**
   k_fill_solid: store one colour into every pixel of the row
@@ -17024,7 +17649,9 @@ CSS pseudo-classes, @media, animation, scripts.
 
 Robustness: malformed input never panics.  The reader is forgiving (xml.rs); limits:
 MAX_INPUT bytes (also after inflating), 250 000 elements, 256 levels, 4096 CSS rules, a
-step budget for selector matching, 1 000 000 element visits per render, 64 levels of
+step budget for selector matching, 128 MB of declarations copied by the cascade (beyond:
+ERR_LIMIT), 1 000 000 element visits and a work budget (pixels painted, layers and masks,
+path points, children walked: 64 per pixel drawn, at least 2^26) per render, 64 levels of
 nesting while drawing, use cycles cut, 8 layers alive at once.
 ```
 
@@ -17104,7 +17731,10 @@ both are drawn into a layer (the bounds of the content, inside the clip) and com
 Text needs a TextHook (the app's font engine): one line per text chunk, tspans with their
 own style and x / y / dx / dy (first values), text-anchor; without a hook text is skipped.
 Limits: MAX_DRAWS element visits per render, MAX_NEST nesting (groups, use), MAX_LAYERS
-layers alive at once (deeper opacity is applied to the paints), use cycles are cut.
+layers alive at once (deeper opacity is applied to the paints), use cycles are cut; the work
+of a render (pixels painted, layers, masks and images allocated, path points filled and
+walked, children and text walked) is bounded by WORK_PER_PX per pixel of the drawn area, at
+least MIN_WORK: a use DAG multiplies visits, each may cover the whole surface.
 ```
 
 - **`trait TextHook`**
@@ -21362,12 +21992,14 @@ CLASS_MAX: u32 = CLASS_MIN << (CLASSES - 1)
 
 ## render2d
 
-*the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles with layers and styles, dash patterns, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU* -- crate root [`lib/render2d/lib.rs`](../lib/render2d/lib.rs)
+*the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU* -- crate root [`lib/render2d/lib.rs`](../lib/render2d/lib.rs)
 
 ```text
-render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a, G6b1; docs/RENDER2D.md): a retained scene of
+render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a, G6b; docs/RENDER2D.md): a retained scene of
 entities with stable ids (lines, polylines, arcs and circles; Bézier curves, ellipses and splines flattened per zoom
-band on the CPU, curve.rs; fills of rings, triangulated on the CPU, fill.rs), layers and styles; strokes as quads whose
+band on the CPU, curve.rs; fills of rings, triangulated on the CPU, fill.rs; blocks inserted many times, their records
+once on the GPU and each insert an instance with its transform, G6b2), layers and styles (transparency per layer and
+entity, by block); strokes as quads whose
 coverage the fragment shader computes from the geometry (no MSAA), with exact butt, square and round caps and miter,
 bevel and round joins, dash patterns in pixels or drawing units; fills with their edge's exact coverage, every pixel
 blended once, and hatches from the camera's place in f64; f64 coordinates, a pair of f32 per axis on the GPU with the
@@ -21379,6 +22011,8 @@ same WGSL on every path: compiled ahead (shaders_spv.rs) on Vulkan, handed to th
   Scene::new(&renderer) -> Result<Scene>
   scene.add_style(&Style) -> StyleId, set_style; add_layer(&Layer) -> LayerId, set_layer, remove_layer
   scene.insert(layer, style, &Shape) -> EntityId, update(id, &Shape), set_entity_style(id, style), remove(id)
+  scene.add_block(&Block) -> BlockId, insert_in(block, style, &Shape); Shape::Insert(Insert) places a block on a
+       layer or in another block (moved by update, arrays as DXF's MINSERT)
   scene.set_camera(&Camera)                                   centre (f64), scale (units per pixel), rotation
   a frame:
        scene.prepare(&mut renderer, (w, h))?;         waits for this slot's last frame, uploads what changed
@@ -21403,15 +22037,17 @@ PAGE: u32 = 256
 BATCH: u32 = 16384
 /// the most visible layers (stroke.wgsl: first_instance = layer << 16 on Voll)
 LAYERS_MAX: u32 = 65535
-/// the WGSL sources as the device gets them (common.wgsl in front of each; stroke.wgsl with fs_full from full_body.wgsl, the same body
-/// as the function full_body, and fill.wgsl)
+/// the WGSL sources as the device gets them (common.wgsl in front of each, block.wgsl behind it in those that place records;
+/// stroke.wgsl with fs_full from full_body.wgsl, the same body as the function full_body, and fill.wgsl)
 COMMON_WGSL: &str = include_str!("common.wgsl")
-CULL_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("cull.w ...
+BLOCK_WGSL: &str = include_str!("block.wgsl")
+CULL_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block. ...
 SCATTER_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("scatte ...
-STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("stroke ...
+STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block. ...
 COUNT_SPV: &[u32] = spv::COUNT
 SCAN_SPV: &[u32] = spv::SCAN
 WRITE_SPV: &[u32] = spv::WRITE
+INSTANCES_SPV: &[u32] = spv::INSTANCES
 SCATTER_SPV: &[u32] = spv::SCATTER
 VS_SPV: &[u32] = spv::VS
 VS_FULL_SPV: &[u32] = spv::VS_FULL
@@ -21623,9 +22259,16 @@ pool, the GPU copies what stays across (no copy within one buffer: WebGPU forbid
 records come from the CPU.
 
 What a frame sends (prepare, then Renderer::record copies it inside the frame's commands, behind the barrier
-against the frame before): the view; the styles when they changed; the visible layers' pages and table when they
-changed; the changed records, in runs (few runs: a copy each) or through the scatter shader (many).  A prepare
-that never reached a submission: the next sends everything again.
+against the frame before): the view; the styles when they changed; the visible layers' entries and table when they
+changed; the changed records, in runs (few runs: a copy each) or through the scatter shader (many); the changed
+instances.  A prepare that never reached a submission: the next sends everything again.
+
+Blocks (G6b2, docs/RENDER2D.md "Blöcke"): a block's entities are Ents of no layer, in its list; its records lie once
+in the pool, in variants (one per zoom band its instances need where it holds curves or fills, one with its arcs as
+curves for uneven scales) whose regions follow the layers'.  An insert on a layer holds one record of zeros there (its
+place in the order).  The instances (each copy of an insert on a layer, each copy of a nested insert per instance of
+its block, depth first) are laid out anew when inserts or blocks change, else only moved inserts' transforms go up;
+the visibility's entries name a page, an instance, a range of the page (several small instances in one entry).
 ```
 
 - **`struct Camera`**
@@ -21712,6 +22355,28 @@ HATCH_DASH_MAX: usize = 6
     `hatch_width` px wide (0, or thinner than a pixel: 1 px); strokes ignore it
   - `hatches: u32`
   - `hatch_width: f32`
+  - `transparency: Transparency` -- AutoCAD's transparency of what the style draws: its layer's (the default), its block insert's, or its own; the
+    colour's alpha times 1 - percent / 100 (G6b2)
+  - `by_block: u32` -- inside a block, what an entity of this style takes from its insert's style instead of its own (BY_BLOCK_COLOR,
+    BY_BLOCK_WIDTH, BY_BLOCK_DASH; DXF's ByBlock); outside a block the style's own (G6b2)
+
+- **`enum Transparency`**
+  AutoCAD's transparency of an entity (Style::transparency): 0 to TRANSPARENCY_MAX percent, multiplied into the colour's
+  alpha (alpha (100 - percent) / 100, rounded); not group compositing: overlapping entities blend each (docs/RENDER2D.md
+  "Transparenz")
+  - `ByLayer` -- its layer's (Layer::transparency)
+  - `ByBlock` -- inside a block its insert's style's (that one's ByLayer: the insert's layer); outside a block none
+  - `Percent(u32)` -- its own, in percent
+
+```rust
+/// the most transparency AutoCAD has (percent)
+TRANSPARENCY_MAX: u32 = 90
+/// Style::by_block: inside a block the colour, the width (and its unit), the dash pattern (entries, unit, phase) come from
+/// the insert's style
+BY_BLOCK_COLOR: u32 = 1
+BY_BLOCK_WIDTH: u32 = 2
+BY_BLOCK_DASH: u32 = 4
+```
 
 **`impl Style`**
 
@@ -21729,10 +22394,62 @@ HATCH_DASH_MAX: usize = 6
   a layer's settings.  Made with `new` and changed field by field (it may grow)
   - `visible: bool`
   - `order: i32` -- layers are drawn by this, lowest first; equal ones in the order they were added
+  - `transparency: u32` -- AutoCAD's transparency of the entities whose style says Transparency::ByLayer (percent, 0 to TRANSPARENCY_MAX; G6b2):
+    changing it sends no records
 
 **`impl Layer`**
 
 - **`const fn new(order: i32) -> Layer`**
+
+- **`struct BlockId`**
+  a block of a Scene: entities defined once (Scene::insert_in, in the block's units) and inserted many times
+  (Shape::Insert); dead after remove_block
+  - `slot: u32`
+
+- **`struct Block`**
+  a block's settings.  Made with `new` and changed field by field (it may grow)
+  - `base: [f64; 2]` -- the point of the block that lands on an insert's `at` (DXF's base point)
+
+**`impl Block`**
+
+- **`const fn new() -> Block`**
+
+```rust
+/// the most levels of blocks inside blocks below an insert on a layer (nested inserts; a cycle is refused anyway)
+BLOCK_DEPTH: u32 = 16
+```
+
+- **`struct Insert`**
+  a block placed by an entity (Shape::Insert): its base point to `at`, scaled (each axis; a negative scale mirrors, unequal
+  magnitudes scale unevenly: circles become ellipses), turned by `rotation` (radians, counter-clockwise); an array of
+  `columns` by `rows` copies `spacing` apart along the insert's turned x and y (drawing units, not scaled: DXF's MINSERT).
+  Made with `new` and changed field by field (it may grow)
+  - `block: BlockId`
+  - `at: [f64; 2]`
+  - `rotation: f64`
+  - `scale: [f64; 2]`
+  - `columns: u32`
+  - `rows: u32`
+  - `spacing: [f64; 2]`
+
+**`impl Insert`**
+
+- **`const fn new(block: BlockId, at: [f64; 2]) -> Insert`**
+  the block at a point, unscaled, unturned, one copy
+
+- **`struct InstanceInfo`**
+  what the blocks of a scene hold and what the last prepare sent of them (Scene::instance_info).  It may grow
+  - `blocks: u32` -- live blocks; their variants in the pool (a block with curves or fills one per zoom band its inserts need, one with
+    arcs another for inserts that scale unevenly) and those variants' records
+  - `variants: u32`
+  - `block_records: u32`
+  - `instances: u32` -- instances (an insert's copies, nested inserts each once per instance of their block) and the entries of the
+    visibility
+  - `entries: u32`
+  - `rebuilt: bool` -- the instances laid out anew (an insert added or removed, a block changed, a variant came or went)
+  - `sent_instances: u32` -- instances whose transforms went up, their bytes; block records that went up (in UploadInfo's records too)
+  - `sent_bytes: u64`
+  - `sent_block_records: u32`
 
 - **`struct LayerId`**
   a layer of a Scene; dead after remove_layer
@@ -21765,6 +22482,8 @@ HATCH_DASH_MAX: usize = 6
     ended: a straight segment between them; the last back to the first), even-odd between rings (a ring inside a hole is
     an island).  Triangulated on the CPU, its edge smoothed as strokes are; the style's colour, or its hatch
     (docs/RENDER2D.md "Flächen")
+  - `Insert(Insert)` -- a block (G6b2): on a layer in its place in the order, or inside another block; its entities in their order, each with
+    its style or by block the insert's (docs/RENDER2D.md "Blöcke")
 
 ```rust
 /// the largest angle of one piece of an arc (a record): a full circle is 16 of them.  Its quad covers the piece's ring
@@ -21804,26 +22523,44 @@ ARC_STEP: f64 = core::f64::consts::PI / 8.0
 - **`fn add_layer(&mut self, l: &Layer) -> Result<LayerId>`**
   a new layer, empty, on top of those of its order
 - **`fn set_layer(&mut self, id: LayerId, l: &Layer) -> Result<()>`**
-  shown or hidden, its place in the draw order (nothing of its entities goes up)
+  shown or hidden, its place in the draw order, its transparency (nothing of its entities goes up: the layer table)
 - **`fn layer(&self, id: LayerId) -> Result<Layer>`**
 - **`fn remove_layer(&mut self, id: LayerId) -> Result<()>`**
   the layer goes, with every entity on it
 - **`fn drawn_layers(&self) -> Vec<LayerId>`**
   the visible layers in the order the last prepare drew them (the lists' order: lists_buffer)
 - **`fn insert(&mut self, layer: LayerId, style: StyleId, s: &Shape) -> Result<EntityId>`**
-  a new entity at the end of its layer (drawn over everything there)
+  a new entity at the end of its layer (drawn over everything there); an insert of a block (Shape::Insert) sits there
+  with its block's entities
 - **`fn update(&mut self, id: EntityId, s: &Shape) -> Result<()>`**
-  new geometry; the entity keeps its place in the draw order
+  new geometry; the entity keeps its place in the draw order (in its layer or its block).  An insert on a layer that
+  stays an insert of the same block with as many copies only moves: its instances' transforms go up, nothing else
 - **`fn set_entity_style(&mut self, id: EntityId, style: StyleId) -> Result<()>`**
-  another style: its records go up again
+  another style: its records go up again (a block's entity: its block's, once for all its inserts; an insert: what its
+  block's entities take by block)
 - **`fn remove(&mut self, id: EntityId) -> Result<()>`**
-  the entity goes; its records become free places (and its id dead)
+  the entity goes; its records become free places (and its id dead); a block's entity leaves its block (its records
+  go up once for all its inserts)
 - **`fn len(&self) -> u32`**
-  entities alive
+  entities alive (a block's entities and inserts each once)
 - **`fn is_empty(&self) -> bool`**
 - **`fn locate(&self, id: EntityId) -> Option<(u32, u32)>`**
   (tests, tools) an entity's records as the last prepare laid them out: its first record's place in the pool
-  and the records of its geometry (a polyline of n points: n - 1, closed n; a point: 1)
+  and the records of its geometry (a polyline of n points: n - 1, closed n; a point: 1; an insert on a layer: its one
+  record of zeros); None for a block's entity (its records lie in its block's variants)
+- **`fn add_block(&mut self, b: &Block) -> Result<BlockId>`**
+  a new block, empty: entities go into it with insert_in, Shape::Insert places it
+- **`fn block(&self, id: BlockId) -> Result<Block>`**
+- **`fn set_block(&mut self, id: BlockId, b: &Block) -> Result<()>`**
+  a block's base point changed: every insert shows it (its records go up once)
+- **`fn remove_block(&mut self, id: BlockId) -> Result<()>`**
+  the block goes with its entities; refused while an insert places it
+- **`fn insert_in(&mut self, block: BlockId, style: StyleId, s: &Shape) -> Result<EntityId>`**
+  a new entity at the end of a block (its units: the block's base lands on an insert's point); a Shape::Insert of
+  another block nests it (no cycles, at most BLOCK_DEPTH levels).  Every insert of the block shows it with the next
+  frame, the block's records going up once
+- **`fn instance_info(&self) -> InstanceInfo`**
+  what the blocks hold and what the last prepare sent of them
 - **`fn set_camera(&mut self, c: &Camera) -> Result<()>`**
 - **`fn camera(&self) -> &Camera`**
 - **`fn set_culling(&mut self, on: bool)`**
@@ -21897,7 +22634,8 @@ folder (absolute paths, "..", a scheme) are refused before the closure sees them
   - `file_bytes: u64` -- bytes of the .glb / .gltf and of each file it names
   - `json_bytes: usize` -- bytes of the JSON part, and the values in it (objects, arrays, numbers, ...)
   - `json_values: usize`
-  - `buffer_bytes: u64` -- bytes of all buffers together
+  - `buffer_bytes: u64` -- bytes of all buffers together, as given (a file two buffers name counts twice), and the zeros of
+    accessors without a buffer view
   - `vertices: u64` -- vertices and indices of all primitives together, as the model holds them (flat normals split vertices)
   - `indices: u64`
   - `nodes: usize` -- nodes, and how deep they nest
@@ -25193,7 +25931,8 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            / set_app_user_model_id (Windows: the app's explicit id)        (taskbar.rs)
   assoc:   assoc_register / assoc_conflicts / assoc_unregister: the app's PACKAGE file types
            and URL schemes for this program without a setup (HKCU\Software\Classes; .desktop,
-           shared-mime-info, mimeapps.list), file_uri_path                    (assoc.rs)
+           shared-mime-info, mimeapps.list), file_uri_path; default_browser_status /
+           default_browser_request (PACKAGE browser=1)                        (assoc.rs)
   recent:  recent_add / recent_list / recent_remove / recent_clear: the system's recent files
            (SHAddToRecentDocs and the jump list; recently-used.xbel)          (recent.rs)
   audio:   Stream (open / open_fill, write, start / pause / stop, volume, latency, the default
@@ -25205,7 +25944,9 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            XGrabKey, the GlobalShortcuts portal)                             (hotkey.rs)
   threads: thread_spawn(stack, f) -> Thread (join), thread_yield(), Sem (post / wait),
            wake() (any thread: E_WAKE on the UI thread), wait_events(deadline, on_event)
-           (headless), cpu_count(), mem_total()
+           (headless), cpu_count(), mem_total(); the windows, the clipboard, the dialogs and
+           the portals belong to the UI thread, the first one that uses them: other threads
+           panic                                                          (ui_only.rs)
   pool:    thr_init / thr_count / thr_shutdown / thr_self, parallel_for, Job   (pool.rs)
   task:    async execution: Executor (ui() in the event loop, new() / block_on), Task,
            spawn_blocking (a pool for blocking work), sleep, CancelToken, Progress, join /
@@ -25326,6 +26067,12 @@ FO_RW: u32 = 2  // open or create (contents kept), read + write
   `content://` document and the browser the handle of a `/handles/` file when the user
   chooses it, and OS paths need nothing.  The name must be readable under the app's
   permissions.
+
+- **`fn file_dialog_paths() -> alloc::vec::Vec<String>`**
+  (E8) the files the last system file dialog with FD_MULTI chose (its first is also in
+  file_dialog's path; Ctrl / Shift in the dialog choose more); one entry after a dialog that
+  chose one file, empty after a cancelled one.  Windows and Linux's portal choose several, the
+  other systems' dialogs one (docs/GUIDE.md section 7)
 
 - **`fn file_dialog_poll() -> Option<(i32, u32, String)>`**
   The answer of a system file dialog that answers later (file_dialog -> FD_PENDING: only
@@ -25522,7 +26269,8 @@ sync -- blocking primitives for worker threads (servers, background jobs)
 One primitive per OS: wait on a 32-bit word while it holds a value, wake one / all waiters
 (Windows WaitOnAddress, Linux private futexes).  Mutex and Condvar are the futex algorithms
 of Rust's std; RwLock and the channel are built on them.  A lock is not poisoned by a panic
-(panics abort the process here).
+(panics abort the process here; with jflib's feature unwind a panic the app catches releases
+the locks its guards held).
 Not here: rt::SpinLock (rt keeps spin locks for the allocator and for modules, where plat is
 replaced).
 ```
@@ -25978,7 +26726,8 @@ watch -- changes below folders, as they happen (continuous data protection)
 
 Windows: ReadDirectoryChangesW per root (subtree, overlapped, 64 KiB buffer; an empty
 answer means the buffer overflowed).  Linux: inotify with a watch per folder; new folders
-are added (and reported whole), a full queue or the watch limit reports an overflow.
+are added (and reported whole), a full queue or the watch limit reports an overflow (a full
+queue after the whole tree is watched again: lost events may hide new folders).
 macOS: FSEvents with file events (dropped events report an overflow); iOS: none.
 Paths are absolute, in the form of the platform; the folder of a change is enough for a
 caller that walks the tree again.
@@ -26064,7 +26813,7 @@ Source: [`lib/plat/hosted.rs`](../lib/plat/hosted.rs)
 hosted -- a program with the standard library (feature std, docs/CRATES.md CR6); the only file
 of plat that names std, compiled only with that feature.  Its start is std's (the C runtime's
 entry, std's main), so plat has no entry point of its own: the program's fn main calls
-std_start (win.rs, linux_glibc.rs), which sets up what plat's entry sets up without std.
+std_start (win.rs, linux_glibc.rs, apple.rs), which sets up what plat's entry sets up without std.
 rt::main! and ui::main! write that fn main.
 
   exit(code)          plat::exit: std::process::exit, which writes out what std's stdout holds
@@ -26400,7 +27149,8 @@ STORE: &str = "config://permission-decisions.txt"
   whether Command::spawn / run_elevated may start program (a path, or a name found in PATH)
 
 - **`fn url_allowed(url: &str) -> bool`**
-  whether open_url may open url (its scheme)
+  whether open_url may open url (its scheme); false for anything but an absolute URL (a path, a
+  drive letter), with or without a manifest
 
 - **`fn plugin_allowed(path: &str) -> bool`**
   whether lib_open may load the native library at path
@@ -27939,6 +28689,8 @@ setup (apps/installer), the .deb, MSIX and Flatpak declare them themselves (docs
                                       HKCU\Software\Classes the setup and assoc_register write
                                       (app_id: the program's AppUserModelID in its ProgIDs,
                                       "" = none)
+  package_entries(&Package, exe) -> [RegValue]   all of a package's values: reg_entries and,
+                                      with browser=1, the web browser's registration (below)
   app_id_boot() -> Option<id>         (ui::main!, Windows) PACKAGE's app id as the process's
                                       explicit AppUserModelID (taskbar.rs) once the setup
                                       installed this program (install.ini beside it names the
@@ -27954,6 +28706,10 @@ setup (apps/installer), the .deb, MSIX and Flatpak declare them themselves (docs
   assoc_unregister() -> Result<bool, AssocError>   undo exactly what the record lists (false:
                                       nothing was registered)
   assoc_registered() -> Option<String>   the program the record names
+  default_browser_status() -> BrowserStatus   (PACKAGE browser=1) is this app the system's web
+                                      browser: Default, NotDefault, Unknown (browser_status(pkg))
+  default_browser_request() -> Result<(), AssocError>   let the user make it the default: the
+                                      system's own page or question (browser_request(pkg))
   file_uri_path(arg) -> Option<String>   a local file:// URI as a path (Linux desktops hand
                                       files over as URIs for Exec=... %U)
   console_print(text)                 stdout, else the console the program was started from
@@ -27981,6 +28737,25 @@ Android: Unavailable.
 
 Not a permission of the manifest: only what PACKAGE declares is written, in the user's own
 part of the system (HKCU, $XDG_*_HOME).
+
+A web browser (PACKAGE browser=1, schemes= with http and https).  Windows: http and https get no
+keys of their own (HKCU\Software\Classes\http would stand in for the system's handler); the
+ProgID <app>URL opens web addresses (URL Protocol, the open command, Application with the
+name and icon), Software\Clients\StartMenuInternet\<app> is the browser of Default Programs
+(name, icon, the command, Capabilities: ApplicationName / Description / Icon, StartMenu,
+URLAssociations http / https -> <app>URL, FileAssociations .<ext> -> the file types' ProgIDs)
+and Software\RegisteredApplications\<app> names its Capabilities.  Windows 10 and later never
+let a program take the default itself: browser_request opens Settings at the app's page of the
+default apps (ms-settings:defaultapps?registeredAppUser=<app>), the user decides there;
+browser_status reads the user's choice of http and https (UserChoiceLatest, else UserChoice).
+Linux: the .desktop file says Network;WebBrowser; besides the MIME types; browser_status reads
+the defaults of x-scheme-handler/http and https from the mimeapps.list files (as xdg-mime and
+xdg-settings do), browser_request writes the app as the user's default of those and of
+text/html (and KDE's BrowserApplication in kdeglobals): the user asked for it with the call, and
+the desktops offer no question of their own.  macOS: browser_status asks Launch Services for
+http's handler, browser_request sets it for http and https -- macOS asks the user itself ("Do you
+want to change your default web browser?").  In a Flatpak, an MSIX package, the browser and on
+Android / iOS: Unknown and Unavailable.
 ```
 
 - **`struct FileType`**
@@ -27998,6 +28773,8 @@ part of the system (HKCU, $XDG_*_HOME).
   - `categories: String` -- PACKAGE categories= (the .desktop file)
   - `types: Vec<FileType>`
   - `schemes: Vec<String>`
+  - `browser: bool` -- PACKAGE browser=1: the app is a web browser (registered as one; default_browser_status,
+    default_browser_request)
 
 - **`struct Conflict`**
   a default of another program that a registration would replace
@@ -28020,6 +28797,8 @@ part of the system (HKCU, $XDG_*_HOME).
   - `Empty` -- PACKAGE has no filetypes= and no schemes=
   - `Declined(Conflict)` -- a file of another program is in the way and take said no (Linux: the .desktop file)
   - `Failed(String)` -- the system refused or failed: what it said
+  - `NotRegistered` -- (default_browser_request) the app is not registered as a web browser here: PACKAGE
+    without browser=1, or neither the package nor --register registered this program
 
 - **`fn package_set(text: Option<&str>)`**
   (ui::main!) keep the built-in PACKAGE text (JFGUI_PACKAGE)
@@ -28030,7 +28809,7 @@ part of the system (HKCU, $XDG_*_HOME).
 **`impl Package`**
 
 - **`fn parse(text: &str) -> Package`**
-  "key=value" lines: display, app_id, categories, filetypes, schemes (the app is
+  "key=value" lines: display, app_id, categories, filetypes, schemes, browser (the app is
   vfs::app_id; missing values get the defaults of tools/pkgmeta.py)
 - **`fn mime_of(&self, path: &str) -> Option<String>`**
   the MIME type of a file name by its extension (own file types first), None when unknown
@@ -28063,6 +28842,46 @@ RV_DEFAULT: u8 = 2
   and assoc_register's.  app_id: the AppUserModelID the program runs under ("" = none, Windows
   derives one): each ProgID names it (AppUserModelID), as Windows wants for the recent files
   of an explicit id
+
+- **`fn package_entries(pkg: &Package, exe: &str) -> Vec<RegValue>`**
+  every HKCU value of pkg for the program exe: reg_entries of its file types and schemes and,
+  with browser=1, the web browser's registration in place of http's and https's own keys (the
+  ProgID &lt;app>URL, Software\\Clients\\StartMenuInternet\\&lt;app> with its Capabilities, the value
+  &lt;app> in Software\\RegisteredApplications) -- what the setup and assoc_register write
+
+- **`enum BrowserStatus`**
+  (default_browser_status) is the app the system's web browser
+  - `Default` -- web addresses (http and https) open with this app
+  - `NotDefault` -- with another program (or the app is no browser: PACKAGE without browser=1)
+  - `Unknown` -- the system does not say: no default set (Linux), or not to be found out here (a
+    Flatpak, the browser, Android, iOS)
+
+- **`fn default_browser_status() -> BrowserStatus`**
+  (PACKAGE browser=1) is this app the system's web browser (the built-in PACKAGE:
+  browser_status(&package())).  Ask again when the app's window is active again (UIC_ACTIVE):
+  the user may have changed it in the system's settings meanwhile
+
+- **`fn browser_status(pkg: &Package) -> BrowserStatus`**
+  is the app of pkg the system's web browser: Windows -- the user's choice of http and https
+  (UserChoiceLatest, else UserChoice) is its ProgID &lt;app>URL; Linux -- the mimeapps.list files'
+  defaults of x-scheme-handler/http and https name one of its .desktop files (none named:
+  Unknown); macOS -- Launch Services' handler of http and https is its bundle
+
+- **`fn default_browser_request() -> Result<(), AssocError>`**
+  (PACKAGE browser=1) let the user make this app the system's web browser (the built-in
+  PACKAGE: browser_request(&package())); call it from the user's click
+
+- **`fn browser_request(pkg: &Package) -> Result<(), AssocError>`**
+  let the user make the app of pkg the web browser: Windows 10 and later -- Settings opens at
+  the app's page of the default apps (ms-settings:defaultapps?registeredAppUser=&lt;app>; Windows
+  lets no program take the default itself), the user picks there; Linux -- the app's installed
+  .desktop file becomes the user's default of x-scheme-handler/http, https and text/html in
+  mimeapps.list (and KDE's BrowserApplication), as xdg-settings set default-web-browser does;
+  macOS -- Launch Services' handler of http and https, macOS asks the user.  Ok: asked or set
+  (read browser_status again later); NotRegistered: no browser=1, or this program is not
+  registered as a browser (install the package or run --register first); Unavailable: a
+  Flatpak, an MSIX package, the browser, Android, iOS.  jfgui_OPEN_DRYRUN=1 (Windows): the
+  page is printed, not opened
 
 - **`fn assoc_conflicts(pkg: &Package) -> Result<Vec<Conflict>, AssocError>`**
   the defaults of other programs a registration of pkg would replace (nothing is written)
@@ -28401,7 +29220,12 @@ SOUND_NOTIFY: u32 = 5
 - **`fn ring_check(n: usize, piece: usize, take: usize, threaded: bool) -> bool`**
   (tests) the ring of a push stream: n samples written in pieces of `piece` and read in
   pieces of `take`, by turns or (threaded, Windows / Linux) by a writer thread while this one
-  reads -> whether every sample arrived once and in order
+  reads -> whether every sample arrived once and in order.  The reader gives up after 20 s
+  (a loaded machine): then it tells the writer to stop, which may wait at a full ring, and
+  the check fails instead of waiting for it forever
+
+- **`fn ring_check_within(n: usize, piece: usize, take: usize, threaded: bool, limit_us: u64) -> bool`**
+  (tests) ring_check with the reader's time limit in µs (a short one: the writer must stop)
 
 - **`fn theme_path(kind: u32) -> Option<String>`** *(Linux)*
   (tests, Linux) the sound theme's file for a SOUND_\* kind (".disabled": switched off)
@@ -28797,6 +29621,10 @@ assistive technology back to the UI thread:
                                (focus, states, names, values, text, children, windows)
   take() -> Vec<Request>       the actions asked for since the last call (UI thread)
   request(Request)             (bridges, tests) queue an action and wake the UI thread
+  take_ops() / request_op(OpRequest)   the same for the further actions (Op: scroll into
+                               view, expand / collapse, increment / decrement, select items)
+  announce(win, text, politeness)   (UI thread) a text for the screen reader to say; the next
+                               publish hands it to the bridge (Change::Announce)
   current() -> Option<Arc<Snapshot>>   (bridges) the tree last published
   set_translator(f) / role_name(role) / role_text(k)   the names of the roles the bridges
                                give (UIA LocalizedControlType, AT-SPI GetLocalizedRoleName) in
@@ -28818,6 +29646,14 @@ A Snapshot holds every shown window (WinTree) with its nodes in the order of the
 records; Node::parent gives the hierarchy (NONE: a top-level node of the window), link()
 adds the sibling links and the key index the bridges navigate with.  A node's key stays the
 same from frame to frame while its widget does (the UI derives it from the widget id).
+
+Rich nodes (the records of a web page's tree, ui's Sem setters): Node::sub says what a node
+is more exactly than its role (a table, a cell, a landmark, a tree item ...); a bridge that
+knows Sub maps it to a role of its own, one that does not (yet) shows Node::role, the nearest
+basic role -- so a new Sub never breaks a bridge.  Further fields: a description, a link's
+address, the place in a set, a level, a cell's place and a table's size, a live region's
+politeness; states S_REQUIRED .. S_SELECTABLE; actions A_EXPAND .. A_SELECT, which come back
+as Op requests (take_ops).
 ```
 
 ```rust
@@ -28850,6 +29686,54 @@ NONE: u32 = u32::MAX
   - `Dialog`
   - `Heading` -- a heading of a document or section (Node::value: its level, level())
 
+- **`enum Sub`**
+  What a node is more exactly than its role (Node::sub; the wire format sends it as its number in
+  declaration order).  A bridge that knows it maps it to a role of its own; the others show
+  Node::role, the nearest basic role, which `role()` gives.
+  - `None` -- nothing more than the role
+  - `Table` -- a table or grid (role Group; Node::grid: its rows and columns), one of its rows (Group)
+  - `Row`
+  - `Cell` -- a cell (role Label; Node::cell: its place), a column header, a row header (Label)
+  - `ColumnHeader`
+  - `RowHeader`
+  - `Banner` -- the landmarks of a page (role Group): its banner, its main content, a navigation,
+    complementary content, the content information (a footer), a search, a form, a named region
+  - `Main`
+  - `Navigation`
+  - `Complementary`
+  - `ContentInfo`
+  - `Search`
+  - `Form`
+  - `Region`
+  - `Tree` -- a tree (role List) and its items (ListItem; Node::level(): its depth, 1 the top)
+  - `TreeItem`
+  - `RadioGroup` -- a group of radio buttons, a tool bar (Group), a tooltip (Label), a separator (Group)
+  - `Toolbar`
+  - `Tooltip`
+  - `Separator`
+  - `Alert` -- live regions (role Label): an alert (assertive), a status line and a log (polite)
+  - `Status`
+  - `Log`
+  - `Meter` -- a meter (role Progress), a spin button and a scroll bar (Slider)
+  - `SpinButton`
+  - `ScrollBar`
+  - `Article` -- an article, a figure (Group)
+  - `Figure`
+
+```rust
+/// the number of Sub values (SUB_TEXTS)
+SUB_COUNT: usize = 28
+```
+
+**`impl Sub`**
+
+- **`fn role(self) -> Option<Role>`**
+  the nearest basic role (what a bridge that does not know Sub shows; None: no rule)
+- **`fn landmark(self) -> bool`**
+  a landmark (Banner ..= Region)
+- **`fn aria(self) -> &'static str`**
+  its WAI-ARIA role ("" for None)
+
 ```rust
 /// Node::state: the keyboard focus is on the node
 S_FOCUSED: u32 = 1
@@ -28873,6 +29757,26 @@ S_MULTILINE: u32 = 256
 S_PROTECTED: u32 = 512
 /// a text box that can be read and selected but not edited
 S_READONLY: u32 = 1024
+/// a field that must be filled in
+S_REQUIRED: u32 = 1 << 11
+/// a field whose content is not valid
+S_INVALID: u32 = 1 << 12
+/// its content is being changed (a live region says nothing meanwhile)
+S_BUSY: u32 = 1 << 13
+/// it opens a popup (a menu, a list, a dialog)
+S_HASPOPUP: u32 = 1 << 14
+/// a link to an address that was visited
+S_VISITED: u32 = 1 << 15
+/// a modal dialog (nothing else of the window takes input)
+S_MODAL: u32 = 1 << 16
+/// a list, tree or table that allows several selected items
+S_MULTISELECT: u32 = 1 << 17
+/// it can be expanded and is closed now (S_EXPANDED: open)
+S_COLLAPSED: u32 = 1 << 18
+/// outside the visible area (scrolled away, clipped): browse modes reach it, the pointer does not
+S_OFFSCREEN: u32 = 1 << 19
+/// it can be selected (rows and cells of a grid; list rows and tabs are anyway)
+S_SELECTABLE: u32 = 1 << 20
 /// Node::actions: press, toggle, select, open / close -- what a click on the widget does
 A_CLICK: u32 = 1
 /// give it the keyboard focus
@@ -28881,6 +29785,19 @@ A_FOCUS: u32 = 2
 A_VALUE: u32 = 4
 /// set the text (text boxes)
 A_TEXT: u32 = 8
+/// expand and collapse it (Op::Expand / Op::Collapse)
+A_EXPAND: u32 = 16
+/// one step up or down (Op::Increment / Op::Decrement)
+A_STEP: u32 = 32
+/// scroll it into view (Op::ScrollIntoView)
+A_SCROLL: u32 = 64
+/// select it (Op::SelectItem; in a S_MULTISELECT container also Op::AddToSelection /
+/// Op::RemoveFromSelection)
+A_SELECT: u32 = 128
+/// Node::live, Change::Announce: said when the person is idle
+LIVE_POLITE: u8 = 1
+/// at once, interrupting
+LIVE_ASSERTIVE: u8 = 2
 ```
 
 - **`struct Node`**
@@ -28908,6 +29825,16 @@ A_TEXT: u32 = 8
   - `prev: u32`
   - `count: u32`
   - `index: u32`
+  - `sub: Sub` -- what it is more exactly than its role (Sub::None: the role says it)
+  - `desc: String` -- a description beside the name (a hint, a page's aria-describedby); empty: none
+  - `url: String` -- a link's address; empty: none
+  - `set: [u32; 2]` -- its position in its set (1-based) and the set's size: list and tree items, tabs, radio
+    buttons, rows (0: unknown)
+  - `item_level: u32` -- the level of a tree item, list item or row (1 the top; 0: none); a heading's is its value
+    (level() gives both)
+  - `cell: [u32; 4]` -- cells and headers: row, column (0-based), row span, column span (spans 0: no place)
+  - `grid: [u32; 2]` -- tables and grids: the number of rows and columns (0: unknown)
+  - `live: u8` -- a live region's root: LIVE_POLITE / LIVE_ASSERTIVE (0: none) -- changes inside it are said
 
 - **`struct WinTree`**
   one shown window
@@ -28934,7 +29861,11 @@ A_TEXT: u32 = 8
 - **`fn text_str(&self) -> &str`**
   the text the text interfaces see: text boxes and drop-downs their text, labels their name
 - **`fn level(&self) -> u32`**
-  a heading's level 1 ..= 9 (0: not a heading)
+  a heading's level 1 ..= 9; a tree item's, list item's or row's level (item_level; 0: none)
+- **`fn cell_place(&self) -> Option<[u32; 4]>`**
+  a cell's place: row, column (0-based), row span, column span (None: no place)
+- **`fn role_text(&self) -> &'static str`**
+  what the bridges call the node, in the UI language: its Sub's name, else its role's
 - **`fn selection(&self) -> (i32, i32)`**
   the selection of a text box: (start, end) in characters, start == end at the caret
 - **`fn char_rect(&self, k: i32) -> [i32; 4]`**
@@ -28955,9 +29886,30 @@ A_TEXT: u32 = 8
 - **`fn child(&self, parent: u32, k: usize) -> Option<usize>`**
   the child number k of a node (NONE: of the window)
 - **`fn at_point(&self, x: i32, y: i32) -> Option<usize>`**
-  the deepest node at a client point (px): among siblings the last one wins (drawn on top)
+  the deepest node at a client point (px): among siblings the last one wins (drawn on top);
+  nodes outside the visible area (S_OFFSCREEN) are not hit
 - **`fn on_screen(&self, n: &Node) -> bool`**
-  the node lies (partly) inside the window's client area (else it is scrolled away)
+  the node lies (partly) inside the window's client area (else it is scrolled away) and is
+  not marked S_OFFSCREEN
+- **`fn live_root(&self, k: usize) -> Option<usize>`**
+  the nearest ancestor of node k (or k itself) that is a live region's root (Node::live)
+- **`fn subtree_end(&self, k: usize) -> usize`**
+  the nodes below node k (its subtree without itself) are k + 1 .. the returned index (the
+  nodes are in tree order: parents first, a subtree in one piece)
+- **`fn ancestor(&self, a: usize, b: usize) -> bool`**
+  node a is an ancestor of node b
+- **`fn up_to(&self, k: usize, sub: Sub) -> Option<usize>`**
+  the nearest ancestor of node k with this Sub (a cell's table)
+- **`fn grid_size(&self, table: usize) -> (u32, u32)`**
+  a table's number of rows and columns: Node::grid, else counted from its cells' places (and
+  its rows)
+- **`fn cell_at(&self, table: usize, row: u32, col: u32) -> Option<usize>`**
+  the cell of a table at row, column (one that spans it too)
+- **`fn headers_of(&self, cell: usize, rows: bool) -> Vec<usize>`**
+  the headers of a cell: column headers over its columns (rows false), or row headers in its
+  rows (rows true), of the same table
+- **`fn headers(&self, table: usize, rows: bool) -> Vec<usize>`**
+  the headers of a table: its column headers (rows false) or row headers
 - **`fn focus_key(&self) -> u64`**
   the focused node's key (0: the window itself)
 
@@ -28982,6 +29934,9 @@ A_TEXT: u32 = 8
     of the new tree, so its index there is right when the event arrives
   - `Removed(u8, u64, u64, u32)` -- a node (with its subtree) went away: parent key (0: the window), its key, its index
     there before; the last index of a parent first
+  - `Live(u8, u64)` -- something inside a live region changed (a name, a text, a value, nodes that came or went):
+    the region's root (Node::live says how urgently)
+  - `Announce(u8, String, u8)` -- a text for the screen reader to say (announce): window, text, LIVE_POLITE / LIVE_ASSERTIVE
 
 - **`fn diff(old: &Snapshot, new: &Snapshot) -> Vec<Change>`**
   the changes from old to new
@@ -29001,6 +29956,23 @@ A_TEXT: u32 = 8
   - `key: u64`
   - `act: Act`
 
+- **`enum Op`**
+  a further action of the assistive technology (OpRequest; the node's Node::actions allow it)
+  - `ScrollIntoView` -- scroll the node into view (A_SCROLL)
+  - `Expand` -- open / close it (A_EXPAND)
+  - `Collapse`
+  - `Increment` -- one step up / down (A_STEP)
+  - `Decrement`
+  - `SelectItem` -- select it alone; add it to / take it out of the selection (A_SELECT)
+  - `AddToSelection`
+  - `RemoveFromSelection`
+
+- **`struct OpRequest`**
+  a further action for a node (request_op)
+  - `win: u8` -- the UI's window index
+  - `key: u64`
+  - `op: Op`
+
 - **`fn start(app: &str)`**
   start the platform bridge (once): Linux connects to the accessibility bus when assistive
   technology is enabled (jfgui_A11Y=1 forces it, jfgui_A11Y=0 or NO_AT_BRIDGE=1 turn it off);
@@ -29009,7 +29981,20 @@ A_TEXT: u32 = 8
   off there too
 
 - **`fn active() -> bool`**
-  assistive technology may be listening (the UI publishes snapshots only then)
+  assistive technology may be listening (the UI publishes snapshots only then); on Windows it
+  turns false again 10 s after the last question of a UI Automation client unless a screen
+  reader (SPI_GETSCREENREADER) or Magnifier listens for events, and true with the next question
+  (win_uia.rs idle)
+
+- **`fn check_due() -> Option<u64>`**
+  when (time_us) active() wants to be asked again although nothing happens: the platform's
+  fallback that notices a client is gone (Windows: at most every 2 s while active); None: never.
+  The UI's window loop waits at most until then and asks, so an idle app learns it too
+  (UIC_A11Y)
+
+- **`fn epoch() -> u32`**
+  a number that changes whenever a bridge turned on or off (set_active): the UI publishes a tree
+  equal to the last one again only after it changed (an unchanged frame publishes nothing)
 
 - **`fn current() -> Option<Arc<Snapshot>>`**
   the tree last published
@@ -29022,6 +30007,19 @@ A_TEXT: u32 = 8
 
 - **`fn take() -> Vec<Request>`**
   the actions asked for since the last call, oldest first (UI thread)
+
+- **`fn request_op(r: OpRequest)`**
+  (bridges, tests) queue a further action (Op) and wake the UI thread (the oldest is dropped
+  when 64 wait)
+
+- **`fn take_ops() -> Vec<OpRequest>`**
+  the further actions asked for since the last call, oldest first (UI thread)
+
+- **`fn announce(win: u8, text: &str, politeness: u8)`**
+  (UI thread) a text for the screen reader to say in window win: LIVE_POLITE when the person is
+  idle, LIVE_ASSERTIVE at once.  The next publish hands it to the bridge (Change::Announce:
+  UI Automation's notification event, AT-SPI2's announcement, the browser's live region);
+  nothing is kept while no assistive technology listens, at most 16 wait.
 
 *the texts of the bridges*
 
@@ -29049,6 +30047,16 @@ ROLE_UNKNOWN: usize = 24
 - **`fn role_name(r: Role) -> &'static str`**
   what the bridges call a role, in the UI language
 
+```rust
+/// what the bridges call the Sub values (UIA LocalizedControlType and LocalizedLandmarkType,
+/// AT-SPI GetLocalizedRoleName) in Sub order, in German: the keys of their translations as for
+/// ROLE_TEXTS (Sub::None has none)
+SUB_TEXTS: [&str; SUB_COUNT] = [ "", "Tabelle", "Tabellenzeile", "Tabellenzelle", "Spalt ...
+```
+
+- **`fn sub_name(s: Sub) -> &'static str`**
+  what the bridges call a Sub, in the UI language ("" for Sub::None)
+
 ### `plat/a11y_wire.rs`
 
 Source: [`lib/plat/a11y_wire.rs`](../lib/plat/a11y_wire.rs)
@@ -29064,9 +30072,11 @@ android/GalleryAccessibility.java read.  Compiled on every target (plattest chec
                          the update for the host (None: nothing it shows changed); place
                          gives a window's client area in host px (x, y, w, h)
   Mirror::reset()        the host lost its mirror: the next update is a full one
+  Mirror::set_version(v) the format the host reads: VERSION (1, the default) or VERSION2 (the
+                         rich node data and announcements; web/a11y.js); a full update follows
 
 The format: integers little-endian, str = u32 byte count + UTF-8, key = u64 (Node::key)
-  u8 VERSION, u8 flags (F_FULL: the host drops its mirror first), u8 number of windows
+  u8 VERSION (or VERSION2), u8 flags (F_FULL: the host drops its mirror first), u8 number of windows
   every shown window in the order of the snapshot (later ones lie on top):
     u8 window index, u8 flags (W_DIALOG, W_ACTIVE), i32 x, y, w, h (place),
     key of the focused node (0: none), str title,
@@ -29076,16 +30086,22 @@ The format: integers little-endian, str = u32 byte count + UTF-8, key = u64 (Nod
     u32 node count, then the nodes that are new or changed: key, u8 role (Role in
         declaration order: Group 0 .. Dialog 20, Heading 21), u32 state (S_*), u32 actions
         (A_*), i32 x, y, w, h, str name, str text, i32 caret, i32 anchor, i32 caret x, y, w,
-        h, f64 value (headings: the level), min, max, step
+        h, f64 value (headings: the level), min, max, step;
+        VERSION2 adds: u8 sub (Sub in declaration order: None 0, Table 1 .. Figure 27),
+        str desc, str url, u32 position in set, set size, u32 item level, u32 cell row,
+        column, row span, column span, u32 grid rows, columns, u8 live
   windows that are not listed are gone
   u32 number of events, each: u8 kind (E_*), u8 window, key, i32 a, i32 b, and for E_TEXT
-    str old text -- the events of plat::a11y::diff without Added / Removed (the order
-    tells those)
+    str old text, for E_ANNOUNCE (VERSION2 only; a: the politeness) str the text -- the events
+    of plat::a11y::diff without Added / Removed (the order tells those) and Live (the host's
+    own live regions say those)
 ```
 
 ```rust
 /// the first byte of an update
 VERSION: u8 = 1
+/// the first byte of an update with the rich node data (Mirror::set_version)
+VERSION2: u8 = 2
 /// update flag: a full update (the host drops what it has)
 F_FULL: u8 = 1
 /// window flags
@@ -29107,6 +30123,8 @@ E_VALUE: u8 = 6
 E_TEXT: u8 = 7
 /// the caret moved to character a
 E_CARET: u8 = 8
+/// (VERSION2) a text to say: a the politeness (LIVE_*), the text follows
+E_ANNOUNCE: u8 = 9
 ```
 
 - **`struct Mirror`**
@@ -29117,6 +30135,11 @@ E_CARET: u8 = 8
 - **`const fn new() -> Self`**
 - **`fn reset(&mut self)`**
   the host lost its mirror (or turned it off): the next update is a full one
+- **`fn set_version(&mut self, v: u8)`**
+  the format the host reads: VERSION2 for the rich node data and announcements, anything
+  else VERSION; the next update is a full one
+- **`fn version(&self) -> u8`**
+  the format of the updates (VERSION or VERSION2)
 - **`fn update(&mut self, s: &Arc<Snapshot>, changes: &[Change], place: &dyn Fn(&WinTree) -> [i32; 4]) -> Option<Vec<u8>>`**
   the update that brings the host from the last tree sent to s (changes: plat::a11y::diff
   of the two); None when nothing the host shows changed
@@ -29713,7 +30736,8 @@ E_WAKE.  Timers live in one list with the thread that registered them; each exec
 its own.  Blocking jobs run on up to BLOCKING_MAX threads of their own (not the compute pool:
 a job waiting for a disk must not starve parallel_for); where no thread can start (the
 browser without shared memory, Android) the executors run them inline, one per run.  A panic
-in a task or job ends the process like any panic (rt's handler: crash hook, exit code 3).
+in a task or job ends the process like any panic (rt's handler: crash hook, exit code 3), with
+jflib's feature unwind too unless the task's own code catches it (rt::abort_on_unwind).
 ```
 
 ```rust
@@ -29757,7 +30781,8 @@ PROGRESS_WAKE_MS: u64 = 30
   tasks alive (spawned, not finished)
 - **`fn block_on<F: Future>(&mut self, fut: F) -> F::Output`**
   run until fut is done; the executor's other tasks run alongside.  The thread sleeps on a
-  semaphore between wake-ups (Executor::ui: it only yields)
+  semaphore between wake-ups (Executor::ui: it only yields, and takes other threads'
+  wake-ups itself: no event loop runs meanwhile)
 
 - **`fn block_on<F: Future>(fut: F) -> F::Output`**
   run fut to its end on this thread (a parking executor; console programs, tests)
@@ -30022,7 +31047,7 @@ threads, wake-up: win_thread.rs; the user32/gdi32 windows: win_api.rs)
 - **`fn std_start() -> !`**
   (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
   program's own): what mainCRTStartup does without std, with rt's panic hook first and the end
-  through std::process::exit
+  through std::process::exit; with the feature unwind a panic that leaves the app ends it there
 
 - **`fn time_us() -> u64`**
 
@@ -30195,6 +31220,10 @@ callbacks (refresh, hit hook) never hold a reference across a Win32 call.
 - **`fn win_set_cursor(w: i32, shape: u32)`**
   CUR_\* shape while the pointer is over window w
 
+- **`fn cursor_probe(shape: u32, dpi: i32) -> (u64, i32)`**
+  (tests) the cursor Windows shows for shape in a window of this dpi: its HCURSOR and, for a
+  drawn one, its width in px (0: a system cursor or cursor_fallback's)
+
 - **`fn cursor_create(px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, _dpi: i32) -> i32`**
   a cursor from w x h premultiplied 0xAARRGGBB pixels (rows of w \* 4 bytes), hot spot in px:
   a 32-bit top-down DIB section with straight alpha + an empty AND mask -> CreateIconIndirect;
@@ -30269,7 +31298,8 @@ win_filedlg -- the system Open / Save dialog (comdlg32 + ole32, loaded at run ti
   file_dialog(flags, path, exts) -> (1 chosen / 0 cancelled / -1 no system dialog, index of
        the chosen extension entry)
        flags: FD_SAVE (bit 0), initial extension index in bits 8..15 (FD_EXT_SHIFT);
-       FD_FOLDER answers -1 (the library's own dialog chooses folders).
+       FD_FOLDER answers -1 (the library's own dialog chooses folders); FD_MULTI (open):
+       OFN_ALLOWMULTISELECT, every chosen file in file_dialog_paths(), path the first.
        path (UTF-8): initial file / folder in, chosen path out ('/' separators).
        exts: ["png=PNG-Bild", "jpg;jpeg=JPEG-Bild"] (extensions separated by ';', the first
        is the default, optional "=description"), empty = all.
@@ -30544,6 +31574,7 @@ folder, the drives, start this program again
        the call is printed to stdout and 0 returned (tests).
   open_url(url) -> 0 / -1   a web page (http / https / mailto ...) in the default
        application (ShellExecuteW "open" on the URL); the same dry run
+  settings_open(page) -> bool   (assoc.rs) a page of Settings (ms-settings:...); the same dry run
   theme() -> 0 light, 1 dark, -1 unknown (HKCU ... Personalize\AppsUseLightTheme)
   home() -> %USERPROFILE% (or "C:/")       drives() -> "C:/", "D:/", ...
   spawn_self(args) -> 0 / -1   this executable again: "exe" "arg1" "arg2" ... (every
@@ -30697,7 +31728,9 @@ apps" entry, starting a command line             (r12-inst)  [apps/installer/src
   reg_create(subkey) -> Some(RegKey)   HKCU\subkey opened for writing (created when missing);
                                   RegKey::set_sz / set_dword, closed when dropped
   reg_delete(subkey) -> bool      RegDeleteKeyW(HKCU, subkey)
-  reg_delete_tree(subkey) -> bool RegDeleteTreeW: the key and everything below it
+  reg_delete_tree(subkey) -> bool RegDeleteTreeW: the key and everything below it (only a
+                                  key below Software\Classes or a browser's below
+                                  Software\Clients\StartMenuInternet; other names are refused)
   reg_delete_value(subkey, name) -> bool   RegDeleteKeyValueW (name "" = the default value)
   assoc_changed()                 SHChangeNotify(SHCNE_ASSOCCHANGED): Explorer re-reads the
                                   file types and URL schemes
@@ -30760,7 +31793,11 @@ PATH_CAP: usize = 520
   RegDeleteKeyW(HKCU, subkey)  [sh_reg_delete, real mode]
 
 - **`fn reg_delete_tree(subkey: &str) -> bool`**
-  HKCU\\subkey with all its keys and values  (RegDeleteTreeW, then RegDeleteKeyW)
+  HKCU\\subkey with all its keys and values  (RegDeleteTreeW, then RegDeleteKeyW).  Only a
+  key below Software\\Classes (a ProgID, a URL scheme: what file types and schemes add) or
+  below Software\\Clients\\StartMenuInternet (a web browser's key) -- any other name is
+  refused: an empty one would clear HKCU itself, "Software" every program's settings, and
+  such a name is what a damaged or cut list of an uninstaller holds
 
 - **`fn reg_delete_value(subkey: &str, name: &str) -> bool`**
   one value of HKCU\\subkey ("" = its default value)  (RegDeleteKeyValueW)
@@ -30880,6 +31917,19 @@ changed, property changes (toggle state, selected, expand state, enabled, name, 
 value, heading level), text selection changed (the caret moved: screen readers and Magnifier
 follow it), text changed, structure changed (children invalidated).  UIAutomationCore.dll
 and oleaut32.dll are loaded on the first WM_GETOBJECT.
+
+Rich nodes (Node::sub and the further fields): control types of their own (Table, DataItem
+rows and cells, HeaderItem headers, Tree / TreeItem, ToolBar, ToolTip, Separator, StatusBar,
+Spinner, ScrollBar; landmarks are Groups with LandmarkType / LocalizedLandmarkType, the rest
+name their type themselves), AriaRole / AriaProperties, FullDescription and HelpText,
+IsRequiredForForm, IsDataValidForForm, PositionInSet / SizeOfSet / Level, LiveSetting,
+IsDialog; the patterns Grid + Table (tables), GridItem + TableItem (cells and headers with a
+place), ScrollItem (A_SCROLL), Selection (lists, tab strips, trees, multi-select containers),
+ExpandCollapse (A_EXPAND), SelectionItem (A_SELECT: Select, AddToSelection,
+RemoveFromSelection), Invoke (any other A_CLICK node), Value (a link: its address).  The further
+actions become a11y::request_op.  Events: LiveRegionChanged (Change::Live), SystemAlert (an
+alert appears), the notification event (UiaRaiseNotificationEvent, Windows 10 1709 and later)
+for a11y::announce.
 ```
 
 - **`struct UiaTestElem`**
@@ -30897,6 +31947,23 @@ and oleaut32.dll are loaded on the first WM_GETOBJECT.
   - `expand: i32` -- ExpandCollapse state (-1: no pattern)
   - `heading: i32` -- HeadingLevel 1 ..= 9 (0: HeadingLevel_None)
   - `rect: [i32; 4]` -- the bounding rectangle: x, y, w, h (screen px)
+  - `aria_role: String` -- AriaRole, AriaProperties ("" without)
+  - `aria_properties: String`
+  - `landmark: i32` -- LandmarkType (0: none), LocalizedLandmarkType
+  - `landmark_name: String`
+  - `desc: String` -- FullDescription
+  - `pos_in_set: i32` -- PositionInSet, SizeOfSet, Level (0: none)
+  - `size_of_set: i32`
+  - `level: i32`
+  - `live: i32` -- LiveSetting (0: off), IsRequiredForForm, IsDataValidForForm, IsOffscreen
+  - `required: bool`
+  - `valid: bool`
+  - `offscreen: bool`
+  - `cell: Option<[i32; 4]>` -- GridItem: row, column, row span, column span (None: no GridItem pattern)
+  - `grid: Option<(i32, i32)>` -- Grid: rows, columns (None: no Grid pattern)
+  - `col_headers: Vec<String>` -- TableItem: the names of its column headers
+  - `scroll_item: bool` -- the ScrollItem pattern is there; Selection: CanSelectMultiple (None: no pattern)
+  - `multiple: Option<bool>`
 
 - **`enum UiaTestAct`**
   (tests) what uia_test_act does to an element
@@ -30908,6 +31975,9 @@ and oleaut32.dll are loaded on the first WM_GETOBJECT.
   - `Focus`
   - `SetValue(String)`
   - `SetRange(f64)`
+  - `ScrollIntoView` -- ScrollItem.ScrollIntoView
+  - `AddToSelection` -- SelectionItem.AddToSelection / RemoveFromSelection
+  - `RemoveFromSelection`
 
 - **`fn uia_test_hwnd(pw: i32) -> isize`**
   (tests; UI thread) the HWND of platform window pw
@@ -30948,7 +32018,7 @@ and oleaut32.dll are loaded on the first WM_GETOBJECT.
 
 - **`fn uia_test_events() -> Vec<String>`**
   (tests) the events since the last call: "focus:&lt;name>", "prop:&lt;id>:&lt;name>=&lt;value>",
-  "event:&lt;id>:&lt;name>"
+  "event:&lt;id>:&lt;name>", "notify:&lt;text>:&lt;processing>"
 
 - **`fn uia_test_unlisten()`**
   (tests; the thread of uia_test_listen) remove the handlers
@@ -31123,6 +32193,10 @@ win_print -- printing on Windows: PrintDlgExW (comdlg32, loaded at run time) and
        jfgui_PRINT_PRINTER=NAME     (default "Microsoft Print to PDF"), opened with
                                      CreateDCW and a DEVMODE for paper / orientation
        Without a main window (headless) and without jfgui_PRINT_TO: ERR_UNSUPPORTED.
+  doc_begin / doc_image / doc_end / doc_abort   (print.rs PrintDoc, E9) the same dialog (a
+       page range when the job names its pages: PD_PAGENUMS -> DocSys::ranges) and DC,
+       StartDocW once, then per page StartPage, the bands of layout()'s rectangle in a
+       SaveDC / RestoreDC around the clip, EndPage; EndDocW at the end, AbortDoc when dropped.
 The gdi32 functions are imported directly (the assembly took ten of them with
 GetProcAddress only to keep its import library small); PrintDlgExW (comdlg32),
 GetDefaultPrinterW (winspool.drv) and CoInitializeEx (ole32) are loaded at run time.
@@ -31284,6 +32358,8 @@ BK_X11: u32 = 2
   - `fn cursor_create(&mut self, px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, dpi: i32) -> i32`
   - `fn cursor_destroy(&mut self, id: i32)`
   - `fn cursor_dpi(&mut self, dpi: i32) -> i32`
+  - `fn cursor_probe(&mut self, _shape: u32, _dpi: i32) -> (u64, i32)`
+    (tests) the cursor shown for shape at dpi and the width of a drawn one
   - `fn clip_set(&mut self, fmt: u32, data: &[u8]) -> bool`
   - `fn clip_set_many(&mut self, entries: &[(u32, &[u8])]) -> bool`
   - `fn clip_get(&mut self, fmt: u32) -> Option<Vec<u8>>`
@@ -31378,6 +32454,11 @@ BK_X11: u32 = 2
 
 - **`fn cursor_dpi(dpi: i32) -> i32`**
   the dpi to draw a cursor for a window of this dpi (no display yet: the dpi itself)
+
+- **`fn cursor_probe(shape: u32, dpi: i32) -> (u64, i32)`**
+  (tests, E3) the cursor shown for shape (CUR_\*) in a window of this dpi: its id (X11: the
+  Cursor; 0 without a display or on Wayland) and, for a drawn one (cursor_art), its width in
+  px (0: a system cursor or cursor_fallback's)
 
 - **`fn clip_set(fmt: u32, data: &[u8]) -> bool`**
 
@@ -31948,6 +33029,7 @@ socket, wait_events polls it alone (headless).
 
 - **`fn join(self)`**
   wait until the thread has ended, then free its stack  [plat_thread_join]
+  (a thread joining itself returns at once and keeps its stack: it still runs on it)
 
 ### `plat/linux_print.rs` (Linux)
 
@@ -31966,6 +33048,10 @@ linux_print -- printing on Linux: xdg-desktop-portal Print with a PDF of the job
        jfgui_PRINT_SMASK=1        (with jfgui_PRINT_TO) alpha as /SMask instead of white
        jfgui_PRINT_PORTAL=1       allow the portal without a window (fake bus tests);
        otherwise a run without a display (headless) returns ERR_UNSUPPORTED.
+  doc_begin / doc_image / doc_end / doc_abort   (print.rs PrintDoc, E9) PreparePrint once
+       (its connection stays open), the pages into one PDF of several pages (or the app's own
+       PDF: pdf_native), at the end the PDF in a memfd to Print; the test variants above
+       (jfgui_PRINT_TO writes the PDF of the pages into FILE).
 ```
 
 - **`fn print(job: &mut PrintJob) -> i32`**
@@ -32044,7 +33130,8 @@ a driver's getenv reads the start environment.
 - **`fn std_start() -> !`**
   (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
   program's own): std's arguments and environment as a block like the initial stack, then what
-  glibc_main does, with rt's panic hook first; the end through std::process::exit
+  glibc_main does, with rt's panic hook first; the end through std::process::exit.  With the
+  feature unwind a panic that leaves the app ends it there.
 
 - **`fn exit(code: i32) -> !`**
   end the process: glibc's exit (at_exit handlers, the destructors of the loaded libraries);
@@ -32058,11 +33145,19 @@ a driver's getenv reads the start environment.
   open a library through the system's dynamic linker (a name, searched as ld.so does, or a path)
   and run its initialisers -> its handle
 
-- **`fn dl_sym(handle: usize, name: &[u8]) -> usize`**
+- **`unsafe fn dl_sym(handle: usize, name: &[u8]) -> usize`**
   the address of a symbol of a library from dl_open (0: none); name ends in NUL
 
-- **`fn dl_close(handle: usize)`**
+  # Safety
+  `handle` came from dl_open and has not been closed: the dynamic linker reads its structures
+  before it could tell a wrong handle.
+
+- **`unsafe fn dl_close(handle: usize)`**
   close a library from dl_open
+
+  # Safety
+  `handle` came from dl_open and is closed once; nothing uses what dl_sym found in it any more
+  (the library may be unloaded).
 
 - **`fn dl_error() -> String`**
   why the calling thread's last dl_open / dl_sym failed ("": it did not, or it was already asked)
@@ -32256,12 +33351,18 @@ environment, time, files (apple_sys.rs), threads, semaphores, the wake-up, syste
 (apple_disp.rs) until AP4.
 
 main(): libSystem's start calls it (a program without std); it calls the app's jfgui_main and ends
-the process with its result.  The arguments and the environment come from _NSGetArgv and
-_NSGetEnviron, so a program with std (whose main is std's) reads the same.
+the process with its result.  std_start() (feature std) does the same from the program's own fn
+main, whose main is std's.  The arguments and the environment come from _NSGetArgv and
+_NSGetEnviron, so a program with std reads the same.
 ```
 
 - **`extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32`**
   the entry libSystem's start calls (a program without std; std brings its own main)
+
+- **`fn std_start() -> !`**
+  (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
+  program's own): what main does without std, with rt's panic hook first and the end through
+  std::process::exit; with the feature unwind a panic that leaves the app ends it there
 
 - **`fn win_test_usage() -> (u64, u64, u64)`**
   (test aid) the process's CPU time (us), resident memory and its own footprint (bytes), as on
@@ -32674,6 +33775,10 @@ that never span a call into AppKit (AppKit calls back into the view and the dele
 
 - **`fn cursor_dpi(dpi: i32) -> i32`**
   the dpi to draw a cursor for a window of this dpi (the window's own)
+
+- **`fn cursor_probe(_shape: u32, _dpi: i32) -> (u64, i32)`**
+  (tests, E3) the cursor shown for shape at dpi and the width of a drawn one: not probed on
+  macOS (NSCursor has the shapes but zoom-in, zoom-out and cell, which drawn_cursor makes)
 
 - **`fn file_dialog(flags: u32, path: &mut String, exts: &[&str]) -> (i32, u32)`**
   the system's Open / Save panel (modal) -> (1 chosen / 0 cancelled / -1 none, index of the chosen
@@ -33662,6 +34767,10 @@ REQUEST_FULLSCREEN: u32 = 23
 - **`fn cursor_dpi(dpi: i32) -> i32`**
   Cursor scale follows the canvas DPI.
 
+- **`fn cursor_probe(_shape: u32, _dpi: i32) -> (u64, i32)`**
+  (tests, E3) the cursor shown for shape at dpi and the width of a drawn one: none here (the
+  system has the shapes, cursor_fallback's for the rest)
+
 - **`fn popup_anchor(_slot: u32, _anchor: [i32; 4], _kind: u32, _nat: [i32; 2])`**
   The canvas shows popups where the library put them (inside the canvas).
 
@@ -33841,11 +34950,19 @@ not a dangling pointer.
 - **`fn dl_open(name: &str) -> Option<usize>`**
   open a shared library (a name as the linker searches it, or a path) -> its handle
 
-- **`fn dl_sym(handle: usize, name: &[u8]) -> usize`**
+- **`unsafe fn dl_sym(handle: usize, name: &[u8]) -> usize`**
   a symbol of the library (name NUL-terminated) -> its address, 0 when missing
 
-- **`fn dl_close(handle: usize)`**
+  # Safety
+  `handle` came from dl_open and has not been closed: the dynamic linker reads its structures
+  before it could tell a wrong handle.
+
+- **`unsafe fn dl_close(handle: usize)`**
   give the library back
+
+  # Safety
+  `handle` came from dl_open and is closed once; nothing uses what dl_sym found in it any more
+  (the library may be unloaded).
 
 - **`fn gpu_thread_spawn(stack: usize, f: Start) -> Option<super::Thread>`**
   a real thread with stack bytes of stack (the output's jobs) -> its handle
@@ -34398,8 +35515,8 @@ E_MOVE: u8 = 1
 E_DOWN: u8 = 2  // btn
 E_UP: u8 = 3  // btn
 E_WHEEL: u8 = 4  // data = (i16 dy) | (i16 dx << 16), 120 per notch, up / right positive
-E_KEY_DOWN: u8 = 5  // data = VK | (repeat << 31)
-E_KEY_UP: u8 = 6  // data = VK
+E_KEY_DOWN: u8 = 5  // data = VK | (repeat << 31); (E2) x = scancode, y = KL_* location
+E_KEY_UP: u8 = 6  // data = VK; (E2) x = scancode, y = KL_* location
 E_TEXT: u8 = 7  // data = Unicode codepoint
 E_RESIZE: u8 = 8  // x = width, y = height (physical pixels)
 E_DPI: u8 = 9  // data = dpi (96 = 100 %)
@@ -34449,6 +35566,19 @@ MOD_CAPS: u8 = 32
 MOD_NUM: u8 = 64
 ```
 
+*(E2) where a key sits (Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:*
+
+```rust
+// Windows' scan code (0xE0.. for extended keys), Linux's evdev code, 0 where unknown)
+KL_STANDARD: u32 = 0
+KL_LEFT: u32 = 1  // the left Shift, Ctrl, Alt, Windows key
+KL_RIGHT: u32 = 2
+KL_NUMPAD: u32 = 3  // the keys of the number block
+```
+
+- **`const fn evdev_location(code: u32) -> u32`**
+  (E2) the KL_\* location of a Linux evdev key code (both sides' modifiers, the number block)
+
 *cursors (CUR_\*: system shapes; CUR_USER0.. custom cursors of cursor_create)*
 
 ```rust
@@ -34470,6 +35600,42 @@ CUR_USER_MAX: u32 = 32
 CUR_TABLE: u32 = CUR_USER0 + CUR_USER_MAX
 CUR_MAX_PX: i32 = 256  // cursor_create: largest width / height
 ```
+
+*(E3) more system shapes: CSS's cursor names, past the custom cursors (CUR_X0 ..*
+
+```rust
+// CUR_X_END); a platform without one shows cursor_fallback's
+CUR_X0: u32 = 64
+CUR_NOT_ALLOWED: u32 = 64  // not-allowed
+CUR_NO_DROP: u32 = 65  // no-drop
+CUR_GRAB: u32 = 66  // grab: an open hand
+CUR_GRABBING: u32 = 67  // grabbing: a closed hand
+CUR_HELP: u32 = 68  // help: the arrow with a question mark
+CUR_PROGRESS: u32 = 69  // progress: the arrow with a busy sign (work in the background)
+CUR_ZOOM_IN: u32 = 70  // zoom-in
+CUR_ZOOM_OUT: u32 = 71  // zoom-out
+CUR_CELL: u32 = 72  // cell: a thick cross (tables)
+CUR_VTEXT: u32 = 73  // vertical-text
+CUR_ALIAS: u32 = 74  // alias: a link will be made
+CUR_COPY: u32 = 75  // copy: a copy will be made
+CUR_CONTEXT_MENU: u32 = 76  // context-menu
+CUR_ALL_SCROLL: u32 = 77  // all-scroll
+CUR_COL_RESIZE: u32 = 78  // col-resize
+CUR_ROW_RESIZE: u32 = 79  // row-resize
+CUR_SIZE_N: u32 = 80  // n-resize: one edge or corner
+CUR_SIZE_S: u32 = 81
+CUR_SIZE_E: u32 = 82
+CUR_SIZE_W: u32 = 83
+CUR_SIZE_NE: u32 = 84
+CUR_SIZE_NW: u32 = 85
+CUR_SIZE_SE: u32 = 86
+CUR_SIZE_SW: u32 = 87
+CUR_X_END: u32 = 88
+```
+
+- **`const fn cursor_fallback(shape: u32) -> u32`**
+  (E3) the nearest of the first shapes (CUR_ARROW .. CUR_NONE) to a shape of CUR_X0 ..
+  CUR_X_END, for the platforms and cursor themes without it; other shapes unchanged
 
 *window edges, commands, states*
 
@@ -34561,6 +35727,7 @@ PA_POINT: u32 = 4  // at a point (context menus): flips both ways
 FD_OPEN: u32 = 0
 FD_SAVE: u32 = 1
 FD_FOLDER: u32 = 2  // choose a folder (Android: a document tree; Windows: the own dialog)
+FD_MULTI: u32 = 4  // (E8) FD_OPEN: several files; all of them in file_dialog_paths()
 FD_EXT_SHIFT: u32 = 8  // bits 8..15: initially selected extension (index)
 /// file_dialog's answer when the system answers later (Android's picker): file_dialog_poll
 FD_PENDING: i32 = -2
@@ -34692,6 +35859,40 @@ Source: [`lib/plat/ime.rs`](../lib/plat/ime.rs)
   Committed text of any length: commits of at most 4096 bytes, split between characters ->
   the bytes queued (fewer: the commit queue or the event ring is full, the rest can follow
   once the app took these).
+
+*(E4) what the text being typed is (ime_purpose): the input method and an on-screen*
+
+```rust
+// keyboard choose their mode by it
+IP_TEXT: u32 = 0
+IP_URL: u32 = 1
+IP_EMAIL: u32 = 2
+IP_NUMBER: u32 = 3
+IP_PHONE: u32 = 4
+/// no input method (Windows: the window's input context is taken away; X11: no IBus; Wayland:
+/// the password purpose); ui's TB_PASSWORD boxes set it themselves
+IP_PASSWORD: u32 = 5
+IP_SEARCH: u32 = 6
+```
+
+- **`fn ime_inline(on: bool)`**
+  (E4) the app draws the composition (ime_preedit) at its caret itself: Windows hides the
+  input method's own composition window (its candidates stay; WM_IME_SETCONTEXT without
+  ISC_SHOWUICOMPOSITIONWINDOW, sent again to the window with the keyboard on a change).  IBus
+  and Wayland's text input have no window of their own for it: nothing changes there
+
+- **`fn ime_inline_on() -> bool`**
+  (E4) ime_inline's state
+
+- **`fn ime_purpose(p: u32)`**
+  (E4) the purpose of the text being typed (IP_\*): Windows takes the input method away for
+  IP_PASSWORD and gives it back for the others (also when a window gets the keyboard); X11 keeps
+  the keys of an IP_PASSWORD field from IBus; Wayland's text input gets it as its content
+  purpose (again when it changes while enabled); elsewhere it is only kept (ime_purpose_of).
+  ui's TB_PASSWORD boxes set IP_PASSWORD themselves while they have the keyboard
+
+- **`fn ime_purpose_of() -> u32`**
+  (E4) ime_purpose's value
 
 - **`fn ime_commit_take(token:u32) -> Option<String>`**
 
@@ -34982,6 +36183,20 @@ job as a one-page PDF  [src/plat/print.s, src/img/pdfwrite.s; docs/modules/PRINT
                                            -> 96, 1 inch, 2 cm)
   pdf_write_image(src, opt) -> PDF bytes / ERR_*   one image on one PDF page (pdfwrite.s)
   set_print_deflate(f)                     the zlib compressor of the PDF streams
+  PrintDoc (E9): a job of several pages
+       PrintDoc::begin(&job, pages) -> Result<PrintDoc, ERR_*>   the system's print dialog
+           (printer, paper, orientation, copies; a page range when pages > 0) where there
+           is one; job gives the title, paper, PJF_LANDSCAPE, margin, scale, dpi (its src
+           is not used)
+       d.page() -> PPage, d.copies(), d.wants(n)   the chosen page in pt, copies, whether
+           page n (from 1) is in the chosen range
+       d.add_image(&src) -> 0 / ERR_*   one page: the image laid out as layout() places it
+       d.pdf_native(), d.add_pdf(bytes)  the platform prints a PDF as it is (Linux)
+       d.end() -> 0 printed / ERR_*, d.abort()
+       Windows: PrintDlgExW + GDI, a StartPage per page (win_print.rs); Linux: the
+       portal's dialog, the pages as one PDF of several pages for Print (linux_print.rs);
+       test variant everywhere: jfgui_PRINT_TO=FILE (Windows: through the printer
+       jfgui_PRINT_PRINTER; elsewhere our PDF into FILE); else ERR_UNSUPPORTED
 
 Deviation (plat-shared): plat must not depend on the image crates, so pdfwrite.s is ported
 here and the one thing it took from img -- zlib_deflate -- comes through a hook.  An app
@@ -35139,6 +36354,43 @@ PRW_OPAQUE: u32 = 8  // alpha ignored (XRGB)
   one image on one PDF 1.4 page: objects 1 Catalog, 2 Pages, 3 Page, 4 Contents, 5 Image
   (/DeviceRGB 8 bit /FlateDecode, composited over white -- with PJF_SMASK and a straight
   source: straight colours), 6 Info, [7 /SMask alpha]; classic xref  [pdf_write_image]
+
+- **`struct PrintDoc`**
+  a print job of several pages (see the file header; E9)
+
+**`impl PrintDoc`**
+
+- **`fn begin(job: &PrintJob, pages: u32) -> Result<PrintDoc, i32>`**
+  start a job: the system's print dialog where the platform has one (printer, paper,
+  orientation, copies; with pages > 0 a page range of 1..=pages), never one in the test
+  variant (jfgui_PRINT_TO).  job: the title (spooler, PDF /Title; "" = "Dokument"), paper,
+  PJF_LANDSCAPE / PJF_CENTER / PJF_SMASK, margin, scale, percent, dpi -- its src is not
+  used.  Err: ERR_CANCEL (the dialog was cancelled), ERR_UNSUPPORTED (no printing here,
+  no window, the manifest forbids it), ERR_IO
+- **`fn page(&self) -> PPage`**
+  the page the job prints on (pt; the printer's unprintable edges; the orientation the
+  dialog chose in flags): lay the pages out for it
+- **`fn copies(&self) -> u32`**
+  the copies the dialog chose (informative: the printer makes them; 1 in the test variant)
+- **`fn wants(&self, n: u32) -> bool`**
+  page n (from 1) is in the range the dialog chose (always without a range)
+- **`fn added(&self) -> u32`**
+  the pages added so far
+- **`fn pdf_native(&self) -> bool`**
+  the platform prints a PDF document as it is (add_pdf): Linux's portal and the test
+  variant there; Windows and the others: images only
+- **`fn add_image(&mut self, src: &PrintSrc) -> i32`**
+  one page: the image laid out on the page as layout() places it (the job's scale, dpi,
+  margin, PJF_CENTER; clipped to the printable area) -> 0 / ERR_DIMS / ERR_UNSUPPORTED (a
+  format or after add_pdf) / ERR_IO / ERR_NOMEM
+- **`fn add_pdf(&mut self, pdf: &[u8]) -> i32`**
+  the whole job as a PDF of the app's own, printed as it is (only where pdf_native(),
+  before any add_image) -> 0 / ERR_UNSUPPORTED
+- **`fn end(mut self) -> i32`**
+  finish: the job goes to the printer -> 0 printed / ERR_CANCEL (the portal's job was
+  cancelled) / ERR_DIMS (no page) / ERR_IO
+- **`fn abort(mut self)`**
+  drop the job (nothing is printed)
 
 ### `plat/modhost.rs`
 
@@ -35499,6 +36751,14 @@ New native functionality; deliberately rejects constructs it cannot represent lo
   - `Limit`
   - `Unsupported`
 
+- **`struct Limits`**
+  What one parse may take: the text's bytes, its elements, their nesting. The default
+  (4 MiB, 30000 elements, 48 levels) is `parse`'s; a reader whose own model bounds its
+  documents otherwise names what that model can expand to (`parse_with`).
+  - `bytes: usize`
+  - `nodes: usize`
+  - `depth: usize`
+
 - **`fn valid_char(c: char) -> bool`**
   XML 1.0 character validity (also used before emitting document text).
 
@@ -35508,6 +36768,9 @@ New native functionality; deliberately rejects constructs it cannot represent lo
 - **`fn parse(s: &str) -> Result<Node, Error>`**
   Parse a bounded XML subset. DTDs, processing instructions, comments, CDATA and mixed
   content are explicitly rejected. No resources are ever resolved or fetched.
+
+- **`fn parse_with(s: &str, lim: Limits) -> Result<Node, Error>`**
+  `parse` within other limits than the default ones.
 
 ### `base/num.rs`
 
@@ -36329,6 +37592,8 @@ datetime -- calendar time: timestamps, civil dates, RFC 3339, time zones, cron s
   Timestamp { secs, nanos }          seconds since 1970-01-01 00:00 UTC
   Civil { year .. second, nanos }    a calendar date and wall time (no zone)
   days_from_civil / civil_from_days / days_in_month / is_leap / weekday (0 = Monday)
+  iso_week / iso_weeks_in_year / iso_week_monday   ISO 8601 weeks (Monday to Sunday, week 1
+                                     holds the year's first Thursday)
   rfc3339(ts) / rfc3339_offset(ts, offset) / parse_rfc3339(s)
   format_date_time(ts, &zone, en) / format_date / format_time / format_duration(secs, en)
   tz::Zone                           IANA zones with their current DST rule (zones.rs from
@@ -36395,6 +37660,19 @@ No clock here: plat::unix_time_ns gives "now"; datetime only computes.
 
 - **`fn weekday(y: i32, m: u8, d: u8) -> u8`**
   weekday of a date: 0 = Monday .. 6 = Sunday
+
+- **`fn iso_weeks_in_year(y: i32) -> u8`**
+  the ISO 8601 weeks of week-numbering year y: 53 when the year starts on a Thursday, or on a
+  Wednesday in a leap year, else 52
+
+- **`fn iso_week(y: i32, m: u8, d: u8) -> (i32, u8)`**
+  the ISO 8601 week of a date -> (its week-numbering year, the week 1 ..= 53): the days of
+  29 December to 3 January may lie in the week of the other year (2026-12-31 is 2026-W53,
+  2027-01-01 too)
+
+- **`fn iso_week_monday(y: i32, week: u8) -> (i32, u8, u8)`**
+  the Monday of ISO 8601 week `week` of week-numbering year y -> (year, month, day); a week
+  beyond the year's last counts on into the next year
 
 - **`fn rfc3339(ts: Timestamp) -> String`**
   "2026-10-12T19:58:00Z" (with ".123" milliseconds when the timestamp has them)
@@ -46054,6 +47332,9 @@ format "bcrepo-1")
        Recovery})                       one process holds a repository at a time (LOCK)
   repo.writer() -> Writer               put(kind, bytes) / put_stream(reader) -> chunk ids,
                                         finish() (packs and indexes are durable);
+                                        finish_unsaved() -> (stats, Unsaved): the same, and
+                                        gc stays out until unsaved.save_snapshot(..) -- the
+                                        way of a backup where a gc can run beside it;
                                         .codec(c, level): this writer's compression
                                         (the repository's own is the default)
   repo.read_chunk(id) / read_tree(id)   repo.save_snapshot / load_snapshot / snapshot_ids /
@@ -46069,7 +47350,9 @@ Keys:    one random repository key, wrapped in repo.json for the server's master
 Chunks:  id = BLAKE3-keyed(id key, plain) -> identical data is stored once, the ids reveal
          nothing without the key.  Commit order of a backup: packs (fsync) -> indexes
          (fsync) -> snapshot (atomic rename, directory sync); a crash leaves at most
-         unreferenced packs, which gc removes.
+         unreferenced packs, which gc removes.  Until its snapshot is there a backup's chunks
+         are such packs too: gc waits for open writers and for an Unsaved, and a snapshot
+         saved the plain way after a gc took chunks of it is refused (save_snapshot).
 ```
 
 ### `cas` crate root
@@ -46195,7 +47478,15 @@ KIND_TREE: u8 = 1
   the plain content of a chunk
 - **`fn read_tree(&self, id: &ChunkId) -> CasResult<Tree>`**
 - **`fn save_snapshot(&self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()>`**
-  store a snapshot (after its writer finished); signed by `signer`
+  store a snapshot (after its writer finished); signed by `signer`.
+
+  Between the writer's finish and this call the new chunks belong to no snapshot, and a
+  gc of another thread -- one that waited for the writer runs at that very moment --
+  removes them.  Where a gc can run beside the backup, finish the writer with
+  `finish_unsaved` and save through the `Unsaved` it returns: gc waits for it.  This call
+  cannot keep a gc out afterwards; it refuses the snapshot instead (NotFound) when chunks
+  of it are gone -- looked up once a gc of this process has removed anything.  It waits
+  for a running gc: not to be called while the same thread holds a Writer or an Unsaved.
 - **`fn snapshot_ids(&self) -> Vec<String>`**
 - **`fn load_snapshot(&self, id: &str) -> CasResult<Snapshot>`**
   a snapshot, checked (signature by a trusted key, authentic encryption)
@@ -46208,7 +47499,11 @@ KIND_TREE: u8 = 1
   indexed; with `read_data` every blob is read, decrypted and compared with its id
 - **`fn gc(&self, progress: Progress) -> CasResult<GcReport>`**
   remove what no snapshot references: empty packs are deleted, sparse packs (less than
-  60 % in use) are rewritten with their live blobs
+  60 % in use) are rewritten with their live blobs.  Waits for open writers and for what
+  finish_unsaved left of them.  Lost index files are rebuilt from the packs' trailers
+  first (repair_index).  Refused (Corrupt), nothing removed, while a snapshot does not
+  open, or while a chunk it references is not in the index and a pack without an index
+  (and without a readable trailer) is left: the chunk may be in that pack
 - **`fn repair_index(&self) -> CasResult<u64>`**
   rebuild missing index files from the packs' trailers
 
@@ -46219,7 +47514,7 @@ KIND_TREE: u8 = 1
   writes new chunks into packs
   - `stats: WriteStats`
 
-**`impl Writer<'_>`**
+**`impl<'a> Writer<'a>`**
 
 - **`fn codec(mut self, codec: Codec, level: i32) -> Self`**
   compress this writer's data chunks with `codec` (`level`: zstd's level); trees stay LZ4
@@ -46229,7 +47524,22 @@ KIND_TREE: u8 = 1
   chunk a stream and store it -> (chunk ids, size); `read` fills the buffer, Ok(0) = end
 - **`fn put_tree(&mut self, t: &Tree) -> CasResult<ChunkId>`**
 - **`fn finish(mut self) -> CasResult<WriteStats>`**
-  write the last pack; every chunk put so far is durable afterwards
+  write the last pack; every chunk put so far is durable afterwards.  gc may run from
+  here on, and it removes chunks no snapshot holds: a backup whose snapshot follows uses
+  `finish_unsaved` where a gc of another thread is possible (Repo::save_snapshot)
+- **`fn finish_unsaved(mut self) -> CasResult<(WriteStats, Unsaved<'a>)>`**
+  `finish`, and gc stays out until the snapshot of these chunks is saved through the
+  returned `Unsaved` (or that is dropped: a backup given up)
+
+- **`struct Unsaved<'a>`**
+  what a writer finished with `finish_unsaved` leaves: its chunks -- new ones and those it
+  found stored already -- before a snapshot holds them.  gc waits while this lives, so the
+  thread that holds it starts no gc, check or further writer before it is saved or dropped.
+
+**`impl Unsaved<'_>`**
+
+- **`fn save_snapshot(self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()>`**
+  store the snapshot of these chunks (signed by `signer`); gc may run again afterwards
 
 ### `cas/chunker.rs`
 
@@ -49147,6 +50457,8 @@ semantics, the minimal OS calls the runtime itself needs, panic handling.
   rt::main!(body)  the entry symbol of console programs (boot first, then body); with the
            feature std also their fn main
   rt::panic_hook()  (feature std) std's panics take the crash report of rt's panic handler
+  rt::abort_on_unwind(f)  a panic that leaves f ends the program (feature unwind; else f())
+  rt::panic_take()  (feature unwind) the last panic of the calling thread, as text
   rt::Alloc  (feature std, Windows and Linux) rt's allocator for a program with std that wants it
   rt::VERSION, VERSION_MAJOR / _MINOR / _PATCH   the library's version (the root Cargo.toml, SemVer;
            docs/VERSIONING.md), also as plat::VERSION and ui::VERSION
@@ -49191,6 +50503,20 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
 - **`main!(...)`**
   (see above)
 
+- **`test_main!(...)`**
+  (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
+  std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
+  the tests do not link.  Never called (the test harness has its own main); no panic check
+  (tests unwind).  `#[cfg(test)] rt::test_main!();` in the crate's lib.rs, also under
+  `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros)
+
+- **`__rt_panic_check!(...)`**
+  rt::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
+  std built with the feature `unwind` may unwind as well
+
+- **`__rt_panic_check!(...)`**
+  (see above)
+
 - **`__jfgui_main!(...)`**
   rt::main!'s `jfgui_main`, without and with std
 
@@ -49198,6 +50524,12 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
   the `fn main` of a program with std: plat's start (jfgui_std_start), which calls jfgui_main.  In
   a library crate (an app whose program only links it, like the template) it is not the entry
   point and stays unused: the program's own main calls `plat::std_start()`.
+
+- **`fn abort_on_unwind<R>(f: impl FnOnce() -> R) -> R`**
+  run `f`; with the feature `unwind` (a program with std built with `panic = "unwind"`) a panic
+  that leaves it ends the program as an uncaught panic: JFLib's crash report, exit code 3.  plat
+  runs its threads and the program's start through it.  Without that feature a panic never
+  unwinds, and this is `f()`.
 
 **`mod portable`**
 
@@ -49626,10 +50958,31 @@ hosted -- what rt has for a program with the standard library (feature std, docs
 CR6); the only file of rt that names std, compiled only with that feature.  std brings the panic
 handler, the allocator and the memory functions then (lib.rs, mem.rs and os.rs leave theirs out).
 
-  panic_hook()   std's panics end as rt's panic handler ends them without std
+  panic_hook()          std's panics end as rt's panic handler ends them without std
+  abort_on_unwind(f)    (feature unwind) a panic that leaves f ends the program as an uncaught one
+  panic_take()          (feature unwind) the last panic of the calling thread, as text
+
+With the feature unwind and panic = "unwind" a panic unwinds: the hook only keeps its text (LAST)
+and reports nothing, since the app may catch it.  It is reported where it leaves JFLib's threads
+and the program's start (abort_on_unwind) or reaches a function that cannot unwind (an extern
+callback such as a window procedure: core panics once more there, with one of NOUNWIND's texts).
 ```
 
 - **`fn panic_hook()`**
   (feature std) std's panics end as rt's panic handler ends them without std: one line on stderr,
   the crash hook, exit code 3.  plat's start of a std program installs it; replacing it with
-  `std::panic::set_hook` gives up JFLib's crash report for panics.
+  `std::panic::set_hook` gives up JFLib's crash report for panics.  With the feature `unwind` and
+  `panic = "unwind"` it reports only a panic nobody catches: one that leaves the program's start or
+  a thread of JFLib's, or reaches a callback of the system ([`abort_on_unwind`]).
+
+- **`fn abort_on_unwind<R>(f: impl FnOnce() -> R) -> R`**
+  (feature `unwind`) run `f`; a panic that leaves it ends the program as an uncaught panic:
+  JFLib's crash report (the panic's text on stderr, the crash hook), exit code 3.  plat runs its
+  threads and the program's start through it, so only the app's own `std::panic::catch_unwind`
+  (on any thread) keeps a panic from ending the program.  With `panic = "abort"` it is `f()`.
+
+- **`fn panic_take() -> Option<String>`**
+  (feature `unwind`) the last panic on the calling thread as JFLib's crash report shows it
+  (`"panicked at FILE:LINE:COL:\nMESSAGE"`), taken: for a panic the app caught with
+  `std::panic::catch_unwind`, whose payload holds the message alone.  None when no panic came
+  since the last call (or the program is built with `panic = "abort"`).

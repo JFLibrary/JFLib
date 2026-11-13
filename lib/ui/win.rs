@@ -819,8 +819,8 @@ impl Ui {
         if flags & WF_SYSFRAME != 0 && !self.uiw_sysframe_ok() {
             flags &= !WF_SYSFRAME;
         }
-        // title bar height (the style's, DIP)
-        let tbh = if flags & WF_SYSFRAME != 0 || self.m.win.recs[iu].fs {
+        // title bar height (the style's, DIP; (E7) an app window draws its own)
+        let tbh = if flags & (WF_SYSFRAME | WF_APP) != 0 || self.m.win.recs[iu].fs {
             0
         } else {
             self.window_title_height(flags)
@@ -1626,7 +1626,8 @@ impl Ui {
         }
     }
 
-    // uiw_focus_is_text(i): the focused widget of window i was a text input in the last pass
+    // uiw_focus_is_text(i): the focused widget of window i was a text input (or kept every key,
+    // HB_KEYS) in the last pass
     fn uiw_focus_is_text(&self, i: u32) -> bool {
         let Some(p) = self.uiw_parts(i) else { return false };
         let f = p.ctx.focus;
@@ -1635,7 +1636,7 @@ impl Ui {
         }
         let list = &p.ctx.hits[p.ctx.hit_cur ^ 1];
         match list.iter().rev().find(|h| h.id == f) {
-            Some(h) => h.flags as u32 & HB_TEXT != 0,
+            Some(h) => h.flags as u32 & HB_TEXT != 0 || h.keys,
             None => false,
         }
     }
@@ -2286,7 +2287,15 @@ impl Ui {
         let fb = self.win_fb(i);
         let (w, h) = (px2dip_at(fb.w, dpi), px2dip_at(fb.h, dpi));
         let title = self.m.win.recs[i as usize].title.clone();
-        let pw = plat::win_create(&title, w, h, flags & plat::PWF_MASK, opw, plat::PW_DEFAULT, plat::PW_DEFAULT);
+        // (E7) an app window: a top-level window of its own where the platform has more than one
+        // (Windows, X11, Wayland), else an owned one (macOS)
+        let mut pw = -1;
+        if flags & WF_APP != 0 && !cfg!(any(target_arch = "wasm32", target_os = "android", target_os = "ios")) {
+            pw = plat::win_create(&title, w, h, flags & plat::PWF_MASK, plat::PW_NOOWNER, plat::PW_DEFAULT, plat::PW_DEFAULT);
+        }
+        if pw < 0 {
+            pw = plat::win_create(&title, w, h, flags & plat::PWF_MASK, opw, plat::PW_DEFAULT, plat::PW_DEFAULT);
+        }
         if pw < 0 || pw as usize >= WIN_MAX {
             return false;
         }

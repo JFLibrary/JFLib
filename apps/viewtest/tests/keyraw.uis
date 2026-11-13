@@ -1,0 +1,29 @@
+# viewtest: raw key events (E2).  With "Rohe Tasten" the page takes every key as it goes down
+# and up (ui.key_event_take); "Roh:" lists them: + down, - up, C- S- A- the modifiers held with
+# another key, * an auto-repeat, :L / :R / :N left, right, number block, #N the scancode.
+# keydown / keyup of the script.
+click "Rohe Tasten"
+expect "Rohe Tasten" checked
+click #101
+# a held Shift, a letter going down twice (the second an auto-repeat) and up
+keydown shift left scan 42
+keydown a scan 30
+keydown a scan 30
+keyup a scan 30
+keyup shift left scan 42
+expect text:"Roh: +Umschalt:L#42 +S-A#30 +S-A*#30 -S-A#30 -Umschalt:L#42" exists
+# the right Shift, the number block's Enter
+keydown shift right scan 54
+keyup shift right scan 54
+keydown enter numpad scan 96
+keyup enter numpad scan 96
+expect text:"Roh: +Umschalt:L#42 +S-A#30 +S-A*#30 -S-A#30 -Umschalt:L#42 +Umschalt:R#54 -Umschalt:R#54 +Eingabe:N#96 -Eingabe:N#96" exists
+# Ctrl+T reaches the page as it is (a down and an up), no command runs
+key ctrl+t
+expect text:"Roh: +Umschalt:L#42 +S-A#30 +S-A*#30 -S-A#30 -Umschalt:L#42 +Umschalt:R#54 -Umschalt:R#54 +Eingabe:N#96 -Eingabe:N#96 +C-T -C-T" exists
+expect text:"Befehle: Tab 0 Laden 0" exists
+# without it the page takes the pressed keys as before
+click "Rohe Tasten"
+click #101
+key ctrl+t
+expect text:"Tasten: Strg+T" exists

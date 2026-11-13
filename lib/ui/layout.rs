@@ -19,7 +19,10 @@
 // A box lays its children out along its main axis (BOX_H: x, BOX_V: y).  Fill children
 // share the space left by the others; because that is only known after all children were
 // placed, the previous pass's totals are used and a pass is repeated when they change (the
-// runtime caps this at 4 passes).
+// runtime caps this at 4 passes).  A box whose fill children the previous pass did not see (a
+// new one) gives its first fill child the room left after the children before it (first_fill):
+// new boxes inside new fill boxes get about their size in their first pass and settle in the
+// next one, however deep.
 //
 // BOX_WRAP (horizontal boxes): a child that does not fit after the others of its row starts
 // a new row (a row's first child stays, however wide).  Each row is as tall as its tallest
@@ -94,6 +97,19 @@ pub(crate) struct Wrap {
     prev: Vec<Row>,
 }
 
+// the main size of a fill child in a box whose fill children the previous pass did not see (a new
+// box, or its first fill child; wsump 0): the room left after the children placed so far, at most
+// what the previous pass's other children left.  Exact for the last child (a split's second pane,
+// the content under a tool bar), so the boxes inside get their size in this pass already; with 0
+// they were laid out at 0 first and settled one pass per nesting level (and an app that decides
+// from a box's size decided from 0).  The pass is repeated with the real weights either way
+fn first_fill(b: &BoxFrame) -> i32 {
+    let a = (b.flags & BOX_V) as usize;
+    let gap = if b.n != 0 { b.gap } else { 0 };
+    let rest = b.pos[a].wrapping_add(b.len[a]).wrapping_sub(b.cur).wrapping_sub(gap);
+    rest.min(b.len[a].wrapping_sub(b.fixedp)).max(0)
+}
+
 // a box whose children wrap: horizontal with BOX_WRAP
 fn wraps(flags: u32) -> bool {
     flags & (BOX_WRAP | BOX_V) == BOX_WRAP
@@ -127,6 +143,10 @@ pub(crate) struct W {
     /// 0 none, 1 next_rect (DIP), 2 next_rect_px
     pub(crate) next_rect_set: u32,
     pub(crate) next_flags: u32,
+    /// (E3) cursor_next: the cursor of the next hit box (any CUR_*; 0 = its flags' shape)
+    pub(crate) next_cursor: u32,
+    /// (E14) canvas_label: the name of the next canvas's own record ("" = none)
+    pub(crate) next_canvas_label: alloc::string::String,
     pub(crate) next_icon: u32,
     pub(crate) place_auto: u32,
     pub(crate) place_main: i32,
@@ -187,6 +207,7 @@ impl Ui {
         l.next_h = 0;
         l.next_rect_set = 0;
         l.next_flags = 0;
+        l.next_cursor = 0;
         l.next_icon = 0;
         l.grid.runs.clear();
         l.grid.span = (1, 1);
@@ -342,8 +363,11 @@ impl Ui {
                 weight = rmain.wrapping_neg();
                 let spare = (b.len[a].wrapping_sub(b.fixedp)).max(0);
                 if b.wsump == 0 {
+                    // the box's fill children are not known yet (a new box, or its first fill
+                    // child): this one gets the room the box has left (first_fill), so what lies
+                    // inside it is laid out at about its size in this pass already
                     repass = true;
-                    if wr.is_some() { nat_main } else { 0 }
+                    if wr.is_some() { nat_main } else { first_fill(b) }
                 } else if wr.is_some() && spare == 0 {
                     nat_main
                 } else {
@@ -497,9 +521,10 @@ impl Ui {
         let wrap = wraps(b.flags);
         let spare = b.len[0].wrapping_sub(b.fixedp).max(0);
         if w < 0 && !(wrap && (b.wsump == 0 || spare == 0)) {
-            // fill weight: its share of what the fixed children left (previous pass)
+            // fill weight: its share of what the fixed children left (previous pass); the first
+            // fill child of a box gets what place gives it
             if b.wsump == 0 {
-                return (0, 1);
+                return (first_fill(&b), 1);
             }
             return (spare.wrapping_mul(w.wrapping_neg()) / b.wsump, 1);
         }

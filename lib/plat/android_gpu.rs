@@ -59,15 +59,25 @@ pub fn dl_open(name: &str) -> Option<usize> {
 }
 
 /// a symbol of the library (name NUL-terminated) -> its address, 0 when missing
-pub fn dl_sym(handle: usize, name: &[u8]) -> usize {
-    debug_assert!(name.last() == Some(&0));
-    // SAFETY: a handle of dl_open; name is NUL-terminated.
+///
+/// # Safety
+/// `handle` came from dl_open and has not been closed: the dynamic linker reads its structures
+/// before it could tell a wrong handle.
+pub unsafe fn dl_sym(handle: usize, name: &[u8]) -> usize {
+    if name.last() != Some(&0) {
+        return 0;
+    }
+    // SAFETY: a handle of dl_open (the caller's promise); name is NUL-terminated.
     unsafe { dlsym(handle as *mut c_void, name.as_ptr()) as usize }
 }
 
 /// give the library back
-pub fn dl_close(handle: usize) {
-    // SAFETY: a handle of dl_open, closed once.
+///
+/// # Safety
+/// `handle` came from dl_open and is closed once; nothing uses what dl_sym found in it any more
+/// (the library may be unloaded).
+pub unsafe fn dl_close(handle: usize) {
+    // SAFETY: the caller's promise.
     unsafe { dlclose(handle as *mut c_void) };
 }
 
@@ -76,7 +86,7 @@ type Start = Box<dyn FnOnce() + Send>;
 extern "C" fn thread_main(arg: *mut c_void) -> *mut c_void {
     // SAFETY: gpu_thread_spawn hands over this box, once.
     let f = unsafe { Box::from_raw(arg as *mut Start) };
-    f();
+    rt::abort_on_unwind(f); // feature unwind: a panic that leaves the thread ends the program
     core::ptr::null_mut()
 }
 

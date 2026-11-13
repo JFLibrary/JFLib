@@ -22,6 +22,10 @@ pub fn t_policy(t: &mut T) {
     normalize_rules(t);
     patterns(t);
     refused_manifests(t);
+    // before the manifest (all is allowed): a path is no URL, the system's opener would start it
+    t.check(!policy::url_allowed("C:\\Windows\\notepad.exe") && !policy::url_allowed("\\\\server\\share\\x.exe")
+            && !policy::url_allowed("x.exe") && !policy::url_allowed("1x:y") && policy::url_allowed("https://example.org"),
+            "policy: a path is no URL (without a manifest too)");
     installed(t);
 }
 

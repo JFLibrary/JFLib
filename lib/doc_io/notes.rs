@@ -1,6 +1,6 @@
 // Bounded footnote/endnote OPC profile and global-ID mapping. New native library code.
 use crate::{
-    Error, Node, container, find, format, package::*, parse, read_paragraph, unsupported,
+    Error, Node, container, find, format, package::*, parse_body, read_paragraph, unsupported,
     write_paragraph,
 };
 use alloc::{collections::BTreeSet, string::String, vec::Vec};
@@ -97,7 +97,7 @@ pub(crate) fn write(d: &Document, kind: NoteKind) -> Result<Vec<u8>, Error> {
         out.push_str(&format!("</w:{tag}>"));
     }
     out.push_str(&format!("</w:{tag}s>"));
-    parse(out.as_bytes())?;
+    parse_body(out.as_bytes())?;
     Ok(out.into_bytes())
 }
 
@@ -195,7 +195,7 @@ pub(crate) fn read(
     let mut raw_notes = Vec::new();
     for kind in KINDS {
         if entries.iter().any(|e| e.name == path(kind)) {
-            raw_notes.extend(read_part(&parse(find(entries, path(kind))?)?, kind)?);
+            raw_notes.extend(read_part(&parse_body(find(entries, path(kind))?)?, kind)?);
         }
     }
     if raw_notes.iter().any(|n| n.order.is_some()) {

@@ -79,9 +79,10 @@ struct ThreadRec {
         syscall3(SYS_SIGALTSTACK, ss.as_ptr() as usize, 0, 0);
         Box::from_raw((*rec).start)
     };
-    f();
+    rt::abort_on_unwind(f); // feature unwind: a panic that leaves the thread ends the program
     // SAFETY: ends this thread only (the kernel clears and wakes rec.tid).
     unsafe { syscall3(SYS_EXIT, 0, 0, 0) };
+    #[allow(clippy::empty_loop)] // not reached: exit does not return
     loop {}
 }
 
@@ -372,7 +373,7 @@ extern "C" fn thread_main(rec: *mut u8) -> *mut u8 {
         syscall3(SYS_SIGALTSTACK, ss.as_ptr() as usize, 0, 0);
         Box::from_raw((*rec).start)
     };
-    f();
+    rt::abort_on_unwind(f); // feature unwind: a panic that leaves the thread ends the program
     core::ptr::null_mut()
 }
 
@@ -399,12 +400,16 @@ unsafe fn jfgui_rs_clone(_flags: usize, rec: *mut u8) -> isize {
 #[cfg(jfgui_glibc)]
 impl Thread {
     /// wait until the thread has ended, then free its stack  [plat_thread_join]
+    /// (a thread joining itself returns at once and keeps its stack: it still runs on it)
     pub fn join(self) {
-        // SAFETY: the thread was created joinable and only this call joins it; after that nothing
-        // uses its mapping any more.
+        // SAFETY: the thread was created joinable and only this call joins it; after a join that
+        // succeeded nothing uses its mapping any more.  Any error (EDEADLK: the thread joins
+        // itself) leaves the mapping alone, since the thread may still run on it.
         unsafe {
             let rec = &*self.0;
-            super::glibc::pthread_join(rec._rsv[0], core::ptr::null_mut());
+            if super::glibc::pthread_join(rec._rsv[0], core::ptr::null_mut()) != 0 {
+                return;
+            }
             let (base, size) = (rec.base, rec.size);
             syscall3(SYS_MUNMAP, base, size, 0);
         }

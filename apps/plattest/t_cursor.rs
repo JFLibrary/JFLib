@@ -1,12 +1,18 @@
 // t_cursor -- (plat-win) plattest --test cursor: custom cursors (plat::cursor_*): a 32 x 32
 // premultiplied disc, set on window 0, a second one, slot reuse after destroy, refused sizes,
-// the dpi rule of the backend (needs the display; the window is never shown)
+// the dpi rule of the backend (needs the display; the window is never shown); (E3) the drawn
+// cursors of the shapes Windows and X11 have none of: a cursor of their own (not
+// cursor_fallback's), made once per size, larger at 192 dpi (plat::cursor_probe)
 //                                                  [apps/plattest/src/main.s t_cursor]
 
 use alloc::format;
 use alloc::vec;
 
-use plat::{CUR_ARROW, CUR_CROSS, CUR_MAX_PX, CUR_USER0, CUR_USER_MAX, cursor_create, cursor_destroy, cursor_dpi, win_set_cursor};
+use plat::{
+    CUR_ALIAS, CUR_ARROW, CUR_CELL, CUR_CONTEXT_MENU, CUR_COPY, CUR_CROSS, CUR_GRAB, CUR_GRABBING, CUR_MAX_PX, CUR_USER0,
+    CUR_USER_MAX, CUR_VTEXT, CUR_ZOOM_IN, CUR_ZOOM_OUT, cursor_create, cursor_destroy, cursor_dpi, cursor_fallback,
+    cursor_probe, win_set_cursor,
+};
 
 use crate::T;
 
@@ -16,6 +22,14 @@ fn custom(id: i32) -> bool {
 }
 
 pub fn t_cursor(t: &mut T) {
+    // Linux: the backend comes with the first window; with jfgui_BACKEND=x11 one is made (hidden,
+    // never shown) so that the X11 cursors can be made and probed
+    #[cfg(target_os = "linux")]
+    let hidden = if plat::disp_backend() == plat::BK_NONE && plat::env("jfgui_BACKEND").is_some_and(|v| v.starts_with('x')) {
+        plat::win_create("plattest cursor", 64, 64, 0, plat::PW_NOOWNER, plat::PW_DEFAULT, plat::PW_DEFAULT)
+    } else {
+        -1
+    };
     // the image: a red disc (alpha 255 inside radius 12, 128 on the ring 12..14)
     let mut px = vec![0u8; 32 * 32 * 4];
     for y in 0..32i32 {
@@ -66,4 +80,45 @@ pub fn t_cursor(t: &mut T) {
     win_set_cursor(0, e as u32);
     win_set_cursor(0, CUR_CROSS);
     cursor_destroy(e);
+    drawn(t);
+    #[cfg(target_os = "linux")]
+    if hidden >= 0 {
+        plat::win_destroy(hidden);
+    }
+}
+
+// (E3) the drawn cursors (lib/plat/cursor_art.rs): Windows and X11 (Wayland and the others: the
+// system's shapes, nothing to probe)
+fn drawn(t: &mut T) {
+    const SHAPES: [(u32, &str); 9] = [
+        (CUR_GRAB, "grab"),
+        (CUR_GRABBING, "grabbing"),
+        (CUR_ZOOM_IN, "zoom-in"),
+        (CUR_ZOOM_OUT, "zoom-out"),
+        (CUR_CELL, "cell"),
+        (CUR_VTEXT, "vertical-text"),
+        (CUR_ALIAS, "alias"),
+        (CUR_COPY, "copy"),
+        (CUR_CONTEXT_MENU, "context-menu"),
+    ];
+    if cursor_probe(CUR_GRAB, 96) == (0, 0) {
+        t.info("  SKIP drawn cursors: none here (Wayland, no X11 display, or not Windows / Linux)\n");
+        return;
+    }
+    let mut handles = alloc::vec::Vec::new();
+    for (shape, name) in SHAPES {
+        let (h, w) = cursor_probe(shape, 96);
+        let (fb, _) = cursor_probe(cursor_fallback(shape), 96);
+        t.check(h != 0 && w > 0 && h != fb, &format!("cursor: {name} is drawn (not the fallback's), {w} px wide at 96 dpi"));
+        t.check(cursor_probe(shape, 96).0 == h, &format!("cursor: {name} made once per size"));
+        let (h2, w2) = cursor_probe(shape, 192);
+        t.check(h2 != 0 && h2 != h && w2 > w, &format!("cursor: {name} at 192 dpi: a cursor of its own, {w2} px wide"));
+        handles.push(h);
+    }
+    handles.sort_unstable();
+    handles.dedup();
+    t.check(handles.len() == SHAPES.len(), "cursor: the nine drawn shapes are nine cursors");
+    // a window takes one (Windows: SetCursor while the pointer is over it; X11: its attribute)
+    win_set_cursor(0, CUR_GRAB);
+    win_set_cursor(0, CUR_ARROW);
 }

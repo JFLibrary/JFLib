@@ -6,21 +6,36 @@
 // follows the app's focus once the keyboard or assistive technology drives it (a pointer on
 // the canvas gives it back to the hidden #input); clicks, focus, value and text edits and
 // selections of assistive technology go back as actions (worker: jfgui_a11y_act).
-// Mirror and decode need no DOM (node tests: apps/androidGallery/tests/a11y.mjs).
+// Mirror and decode need no DOM. Tests in Chromium: apps/androidGallery/tests/a11y_web.mjs,
+// apps/a11ytest/tests/a11y_web.mjs (the rich format).
+//
+// The host asks for the rich format (VERSION2, the loader turns the mirror on with on: 2): what a
+// node is more exactly (Node::sub: tables, rows, cells, headers, landmarks, trees, live regions
+// ...), descriptions, the place in a set, levels, cells, live regions and announcements -- ARIA
+// roles and attributes of their own, two live regions of the shadow tree for the announcements;
+// a node of the first format (VERSION) reads as Sub "none".
 
-export const VERSION=1;
+export const VERSION=1, VERSION2=2;
 /** Node::role in plat::a11y::Role declaration order */
 export const ROLES=["group","label","button","checkbox","radio","switch","slider","progress","textbox","link",
   "list","listitem","menubar","menu","menuitem","tablist","tab","combo","image","canvas","dialog","heading"];
+/** Node::sub in plat::a11y::Sub declaration order: their ARIA roles ("" none) */
+export const SUBS=["","table","row","cell","columnheader","rowheader","banner","main","navigation","complementary",
+  "contentinfo","search","form","region","tree","treeitem","radiogroup","toolbar","tooltip","separator","alert","status",
+  "log","meter","spinbutton","scrollbar","article","figure"];
 /** Node::state bits (plat::a11y::S_*) */
 export const S={FOCUSED:1,FOCUSABLE:2,DISABLED:4,CHECKED:8,MIXED:16,SELECTED:32,EXPANDED:64,PRESSED:128,
-  MULTILINE:256,PROTECTED:512,READONLY:1024};
+  MULTILINE:256,PROTECTED:512,READONLY:1024,REQUIRED:1<<11,INVALID:1<<12,BUSY:1<<13,HASPOPUP:1<<14,VISITED:1<<15,
+  MODAL:1<<16,MULTISELECT:1<<17,COLLAPSED:1<<18,OFFSCREEN:1<<19,SELECTABLE:1<<20};
 /** Node::actions bits (plat::a11y::A_*) */
-export const A={CLICK:1,FOCUS:2,VALUE:4,TEXT:8};
-/** jfgui_a11y_act kinds */
-export const ACT={CLICK:1,FOCUS:2,VALUE:3,TEXT:4,SELECT:5};
+export const A={CLICK:1,FOCUS:2,VALUE:4,TEXT:8,EXPAND:16,STEP:32,SCROLL:64,SELECT:128};
+/** jfgui_a11y_act kinds (6 ..: plat::a11y::Op) */
+export const ACT={CLICK:1,FOCUS:2,VALUE:3,TEXT:4,SELECT:5,SCROLL:6,EXPAND:7,COLLAPSE:8,INCREMENT:9,DECREMENT:10,
+  SELECT_ITEM:11,ADD_ITEM:12,REMOVE_ITEM:13};
 /** update events (a11y_wire.rs E_*) */
-export const EV={WINDOW:1,ACTIVE:2,FOCUS:3,STATE:4,NAME:5,VALUE:6,TEXT:7,CARET:8};
+export const EV={WINDOW:1,ACTIVE:2,FOCUS:3,STATE:4,NAME:5,VALUE:6,TEXT:7,CARET:8,ANNOUNCE:9};
+/** Node::live, announcements */
+export const LIVE={POLITE:1,ASSERTIVE:2};
 const NONE=0xFFFFFFFF, utf8=new TextDecoder();
 
 /** One update (ArrayBuffer or typed array) -> {full, wins:[...], events:[...]}; keys are
@@ -36,7 +51,9 @@ export function decode(data) {
   const str=()=>{const n=u32();if(p+n>view.byteLength)throw new RangeError("a11y: string beyond the update");
     const s=utf8.decode(new Uint8Array(view.buffer,view.byteOffset+p,n));p+=n;return s;};
   const rect=()=>[i32(),i32(),i32(),i32()];
-  if(u8()!==VERSION) throw new Error("a11y: unknown update version");
+  const version=u8();
+  if(version!==VERSION && version!==VERSION2) throw new Error("a11y: unknown update version");
+  const rich=version===VERSION2;
   const full=(u8()&1)!==0, wins=[];
   for(let w=u8();w>0;w--) {
     const win=u8(), flags=u8(), place=rect(), focus=key(), title=str();
@@ -44,17 +61,23 @@ export function decode(data) {
     const count=u32();
     if(count!==NONE) {order=[];for(let i=0;i<count;i++){const k=key();order.push({key:k,parent:u32()});}}
     const nodes=[];
-    for(let n=u32();n>0;n--) nodes.push({key:key(),role:u8(),state:u32(),actions:u32(),rect:rect(),name:str(),text:str(),
-      caret:i32(),anchor:i32(),caretRect:rect(),value:f64(),min:f64(),max:f64(),step:f64()});
+    for(let n=u32();n>0;n--) {
+      const nd={key:key(),role:u8(),state:u32(),actions:u32(),rect:rect(),name:str(),text:str(),
+        caret:i32(),anchor:i32(),caretRect:rect(),value:f64(),min:f64(),max:f64(),step:f64(),
+        sub:0,desc:"",url:"",set:[0,0],level:0,cell:[0,0,0,0],grid:[0,0],live:0};
+      if(rich) Object.assign(nd,{sub:u8(),desc:str(),url:str(),set:[u32(),u32()],level:u32(),cell:[u32(),u32(),u32(),u32()],
+        grid:[u32(),u32()],live:u8()});
+      nodes.push(nd);
+    }
     wins.push({win,dialog:(flags&1)!==0,active:(flags&2)!==0,place,focus,title,order,nodes});
   }
   const events=[];
   for(let n=u32();n>0;n--) {
     const kind=u8(),win=u8(),k=key(),a=i32(),b=i32();
-    events.push({kind,win,key:k,a,b,old:kind===EV.TEXT?str():undefined});
+    events.push({kind,win,key:k,a,b,old:kind===EV.TEXT?str():undefined,text:kind===EV.ANNOUNCE?str():undefined});
   }
   if(p!==view.byteLength) throw new Error("a11y: bytes after the update");
-  return {full,wins,events};
+  return {version,full,wins,events};
 }
 
 /** The tree as the host has it: wins (Map window index -> {win, dialog, active, place,
@@ -110,10 +133,22 @@ export function unitsToChars(text,units) {
 // roles whose element holds other elements; the children of all others (a popup below the
 // drop-down or menu entry that opened it) go to the nearest holder, the opener points at them
 const HOLDERS=new Set(["group","list","menubar","tablist","dialog"]);
+// the Subs whose elements hold their children (a tree item's go on to its tree: aria-level says
+// the depth; a separator, tooltip, meter, spin button, scroll bar holds nothing)
+const SUB_HOLDERS=new Set(["table","row","cell","columnheader","rowheader","banner","main","navigation","complementary",
+  "contentinfo","search","form","region","tree","radiogroup","toolbar","alert","status","log","article","figure"]);
 const isSyn=n=>(n.key.hi&0x80000000)!==0;
-const holds=n=>HOLDERS.has(ROLES[n.role]) || (ROLES[n.role]==="menu" && isSyn(n));
+const sub=n=>SUBS[n.sub] || "";
+const holds=n=>HOLDERS.has(ROLES[n.role]) || (ROLES[n.role]==="menu" && isSyn(n)) || SUB_HOLDERS.has(sub(n));
+// Subs that say their name as text (an alert's and a status line's text is what they say; a
+// log's label names it)
+const TEXTS=new Set(["cell","columnheader","rowheader","tooltip","alert","status"]);
 
 function ariaRole(n) {
+  const s=sub(n);
+  // (a spin button: a native number field; a table with several selected rows: a grid, as ARIA
+  // knows multi-select only there)
+  if(s) return s==="spinbutton" ? null : s==="table" && n.state&S.MULTISELECT ? "grid" : s;
   switch(ROLES[n.role]) {
     case "group": return "group";
     case "button": return "button";
@@ -138,12 +173,21 @@ function ariaRole(n) {
 }
 // the element a node needs (a node whose kind changes gets a new one)
 function kindOf(n) {
-  const r=ROLES[n.role];
+  const r=ROLES[n.role], s=sub(n);
   if(r==="textbox") return n.state&S.MULTILINE ? "textarea" : n.state&S.PROTECTED ? "password" : "text";
-  if(r==="slider") return "range";
+  if(s==="spinbutton") return "number";
+  if(r==="slider" && !s) return "range";
   return "div";
 }
-const isField=el=>el.tagName==="TEXTAREA" || (el.tagName==="INPUT" && el.type!=="range");
+// a range element: a slider's <input type=range>, a spin button's <input type=number>
+const isRange=el=>el.tagName==="INPUT" && (el.type==="range" || el.type==="number");
+const isField=el=>el.tagName==="TEXTAREA" || (el.tagName==="INPUT" && !isRange(el));
+// the text of an element that may hold others: its first child, a text node
+function setText(el,s) {
+  const t=el.firstChild && el.firstChild.nodeType===3 ? el.firstChild : null;
+  if(t) {if(t.data!==s) t.data=s;}
+  else if(s) el.insertBefore(document.createTextNode(s),el.firstChild);
+}
 const set=(el,name,value)=>{if(value===null || value===undefined) {if(el.hasAttribute(name)) el.removeAttribute(name);} else if(el.getAttribute(name)!==String(value)) el.setAttribute(name,String(value));};
 
 /** The ARIA shadow tree in root (a positioned element over the canvas, transparent and
@@ -166,6 +210,22 @@ export class Shadow {
     root.addEventListener("compositionend",()=>{this.composing=null;});
     document.addEventListener("selectionchange",()=>this.selected());
     root.addEventListener("scroll",()=>{root.scrollTop=0;root.scrollLeft=0;});
+    // the announcements (a11y::announce): two live regions that are there from the start
+    this.said={};
+    for(const [p,role,live] of [[LIVE.POLITE,"status","polite"],[LIVE.ASSERTIVE,"alert","assertive"]]) {
+      const el=document.createElement("div");
+      el.setAttribute("role",role); el.setAttribute("aria-live",live); el.setAttribute("aria-atomic","true");
+      el.dataset.announce=live;
+      Object.assign(el.style,{position:"absolute",left:"0",top:"0",width:"1px",height:"1px",overflow:"hidden"});
+      root.appendChild(el);
+      this.said[p]=el;
+    }
+  }
+  // a text to say: its live region's new text (the same text again with a mark the reader skips)
+  announce(text,politeness) {
+    const el=this.said[politeness===LIVE.ASSERTIVE ? LIVE.ASSERTIVE : LIVE.POLITE];
+    if(!el || !text) return;
+    el.textContent=el.textContent===text ? text+" " : text;
   }
   /** apply a decoded update */
   apply(u) {
@@ -190,6 +250,7 @@ export class Shadow {
     for(const win of structure) if(this.mirror.wins.has(win)) this.arrange(this.mirror.wins.get(win));
     this.place(); // (also when only a window moved)
     this.focus(had && !this.root.contains(document.activeElement));
+    for(const e of u.events) if(e.kind===EV.ANNOUNCE) this.announce(e.text,e.a);
   }
   // the window's element
   window(t,v) {
@@ -204,29 +265,56 @@ export class Shadow {
     let el=v.els.get(n.id);
     if(el && el.dataset.kind!==kind) {const old=el;el=null;old.replaceWith(this.make(t,n,kind,v));el=v.els.get(n.id);}
     if(!el) el=this.make(t,n,kind,v);
-    const r=ROLES[n.role], st=n.state;
+    const r=ROLES[n.role], st=n.state, s=sub(n);
     set(el,"role",ariaRole(n));
-    if(r==="label" || r==="heading") {if(el.textContent!==n.name) el.textContent=n.name; set(el,"aria-label",null);}
+    if(TEXTS.has(s)) {setText(el,n.name); set(el,"aria-label",null);}
+    else if((r==="label" && !s) || r==="heading") {if(el.textContent!==n.name) el.textContent=n.name; set(el,"aria-label",null);}
     else if(r==="combo") {if(el.textContent!==n.text) el.textContent=n.text; set(el,"aria-label",n.name || null);}
     else set(el,"aria-label",n.name || null);
-    set(el,"aria-level",r==="heading" ? Math.min(9,Math.max(1,Math.round(n.value) || 1)) : null);
+    set(el,"aria-level",r==="heading" ? Math.min(9,Math.max(1,Math.round(n.value) || 1)) : n.level>0 ? n.level : null);
+    // the rich fields: description, place in a set, a cell's place, a table's size, form states,
+    // live regions
+    set(el,"aria-description",n.desc || null);
+    set(el,"aria-posinset",n.set[0] || null);
+    set(el,"aria-setsize",n.set[1] || null);
+    const cell=n.cell[2]>0 && n.cell[3]>0;
+    set(el,"aria-rowindex",cell ? n.cell[0]+1 : null);
+    set(el,"aria-colindex",cell ? n.cell[1]+1 : null);
+    set(el,"aria-rowspan",cell && n.cell[2]>1 ? n.cell[2] : null);
+    set(el,"aria-colspan",cell && n.cell[3]>1 ? n.cell[3] : null);
+    set(el,"aria-rowcount",n.grid[0] || null);
+    set(el,"aria-colcount",n.grid[1] || null);
+    set(el,"aria-required",st&S.REQUIRED ? "true" : null);
+    set(el,"aria-invalid",st&S.INVALID ? "true" : null);
+    set(el,"aria-busy",st&S.BUSY ? "true" : null);
+    set(el,"aria-multiselectable",st&S.MULTISELECT ? "true" : null);
+    set(el,"aria-live",n.live ? (n.live===LIVE.ASSERTIVE ? "assertive" : "polite") : ["alert","status","log"].includes(s) ? "off" : null);
+    if(s==="scrollbar") set(el,"aria-orientation",n.rect[3]>n.rect[2] ? "vertical" : "horizontal");
+    if(["meter","scrollbar"].includes(s)) {
+      set(el,"aria-valuemin",n.min); set(el,"aria-valuemax",n.max);
+      set(el,"aria-valuenow",n.value<n.min ? null : n.value);
+    }
+    if(["meter","scrollbar","spinbutton"].includes(s) || r==="slider" || r==="progress") set(el,"aria-valuetext",n.text || null);
     set(el,"aria-disabled",st&S.DISABLED ? "true" : null);
     set(el,"tabindex",st&S.FOCUSABLE ? (el===this.tabbed ? "0" : "-1") : null);
     const checks=["checkbox","radio","switch"].includes(r) || (r==="menuitem" && st&S.CHECKED);
     set(el,"aria-checked",checks ? (st&S.MIXED ? "mixed" : st&S.CHECKED ? "true" : "false") : null);
     set(el,"aria-pressed",r==="button" && (st&S.PRESSED || el.hasAttribute("aria-pressed")) ? String(!!(st&S.PRESSED)) : null);
-    set(el,"aria-selected",r==="tab" || r==="listitem" ? String(!!(st&S.SELECTED)) : null);
+    const selectable=r==="tab" || r==="listitem" || n.actions&A.SELECT || st&S.SELECTABLE;
+    set(el,"aria-selected",selectable ? String(!!(st&S.SELECTED)) : null);
     const opener=r==="combo" || (r==="menu" && !isSyn(n));
-    set(el,"aria-haspopup",r==="combo" ? "listbox" : opener ? "menu" : null);
-    set(el,"aria-expanded",opener ? String(!!(st&S.EXPANDED)) : !holds(n) && st&S.EXPANDED ? "true" : null);
+    set(el,"aria-haspopup",r==="combo" ? "listbox" : opener ? "menu" : st&S.HASPOPUP ? "true" : null);
+    set(el,"aria-expanded",opener ? String(!!(st&S.EXPANDED)) : st&S.COLLAPSED ? "false"
+      : st&S.EXPANDED && (!holds(n) || n.actions&A.EXPAND) ? "true" : null);
+    set(el,"aria-modal",r==="dialog" && st&S.MODAL ? "true" : null);
     if(r==="progress") {
       set(el,"aria-valuemin",n.min); set(el,"aria-valuemax",n.max);
       set(el,"aria-valuenow",n.value<n.min ? null : n.value);
     }
-    if(kind==="range") {
+    if(kind==="range" || kind==="number") {
       for(const [k,x] of [["min",n.min],["max",n.max],["step",n.step || 1]]) if(el[k]!==String(x)) el[k]=String(x);
       if(el.value!==String(n.value)) el.value=String(n.value);
-      set(el,"aria-valuetext",null);
+      set(el,"aria-valuetext",n.text || null);
     }
     if(isField(el)) this.field(el,n);
   }
@@ -275,16 +363,18 @@ export class Shadow {
       const el=v.els.get(id);
       if(!el) continue;
       const box=this.holder(t,id), parent=box ? v.els.get(box) : v.el, prev=last.get(parent) || null;
-      if(el.parentNode!==parent || el.previousElementSibling!==prev) parent.insertBefore(el,prev?prev.nextSibling:parent.firstChild);
+      // (after the text a cell says itself)
+      const first=parent.firstChild && parent.firstChild.nodeType===3 ? parent.firstChild.nextSibling : parent.firstChild;
+      if(el.parentNode!==parent || el.previousElementSibling!==prev) parent.insertBefore(el,prev?prev.nextSibling:first);
       last.set(parent,el);
     }
-    // openers point at what they opened
+    // openers point at what they opened (a tree item's items are no popup)
     const opened=new Map();
     for(const id of t.order) {
       let p=t.parent.get(id);
       if(p===null || p===undefined) continue;
       const pn=t.nodes.get(p);
-      if(pn && !holds(pn) && !opened.has(p)) opened.set(p,v.els.get(id)?.id);
+      if(pn && !holds(pn) && sub(pn)!=="treeitem" && !opened.has(p)) opened.set(p,v.els.get(id)?.id);
     }
     for(const [id,el] of v.els) set(el,"aria-controls",opened.get(id) || null);
   }
@@ -346,16 +436,22 @@ export class Shadow {
     if(!f) return;
     e.preventDefault();
     if(isField(f.el)) return;
-    if(f.n.actions&A.CLICK && !(f.n.state&S.DISABLED)) this.act(f.n,ACT.CLICK);
-    else if(f.n.actions&A.FOCUS) this.act(f.n,ACT.FOCUS);
+    const n=f.n;
+    if(n.actions&A.CLICK && !(n.state&S.DISABLED)) this.act(n,ACT.CLICK);
+    // (a rich node without a click: open / close it, select it)
+    else if(n.actions&A.EXPAND) this.act(n,n.state&S.EXPANDED ? ACT.COLLAPSE : ACT.EXPAND);
+    else if(n.actions&A.SELECT) this.act(n,ACT.SELECT_ITEM);
+    else if(n.actions&A.FOCUS) this.act(n,ACT.FOCUS);
   }
-  // the DOM focus came to an element (Tab, a screen reader): the app's focus follows
+  // the DOM focus came to an element (Tab, a screen reader): the app's focus follows; a node out
+  // of view is scrolled into it first
   focused(e) {
     if(this.own) return;
     this.follow=true;
     const f=this.nodeOf(e.target);
     if(!f) return;
     const t=this.mirror.wins.get(f.n.win);
+    if(f.n.state&S.OFFSCREEN && f.n.actions&A.SCROLL) this.act(f.n,ACT.SCROLL);
     if(f.n.actions&A.FOCUS && !(t.active && t.focus===f.n.id)) this.act(f.n,ACT.FOCUS);
   }
   /** (loader: keys and text for a shadow element) the app's focus goes there first when it is
@@ -373,8 +469,8 @@ export class Shadow {
     const f=this.nodeOf(el);
     if(!f) return;
     const n=f.n;
-    if(f.el.type==="range") {
-      if(n.state&S.DISABLED || !(n.actions&A.VALUE)) {f.el.value=String(n.value);return;}
+    if(isRange(f.el)) {
+      if(n.state&S.DISABLED || !(n.actions&A.VALUE) || !Number.isFinite(Number(f.el.value))) {f.el.value=String(n.value);return;}
       this.act(n,ACT.VALUE,0,0,Number(f.el.value));
       return;
     }

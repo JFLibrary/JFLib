@@ -27,16 +27,29 @@
 // value, heading level), text selection changed (the caret moved: screen readers and Magnifier
 // follow it), text changed, structure changed (children invalidated).  UIAutomationCore.dll
 // and oleaut32.dll are loaded on the first WM_GETOBJECT.
+//
+// Rich nodes (Node::sub and the further fields): control types of their own (Table, DataItem
+// rows and cells, HeaderItem headers, Tree / TreeItem, ToolBar, ToolTip, Separator, StatusBar,
+// Spinner, ScrollBar; landmarks are Groups with LandmarkType / LocalizedLandmarkType, the rest
+// name their type themselves), AriaRole / AriaProperties, FullDescription and HelpText,
+// IsRequiredForForm, IsDataValidForForm, PositionInSet / SizeOfSet / Level, LiveSetting,
+// IsDialog; the patterns Grid + Table (tables), GridItem + TableItem (cells and headers with a
+// place), ScrollItem (A_SCROLL), Selection (lists, tab strips, trees, multi-select containers),
+// ExpandCollapse (A_EXPAND), SelectionItem (A_SELECT: Select, AddToSelection,
+// RemoveFromSelection), Invoke (any other A_CLICK node), Value (a link: its address).  The further
+// actions become a11y::request_op.  Events: LiveRegionChanged (Change::Live), SystemAlert (an
+// alert appears), the notification event (UiaRaiseNotificationEvent, Windows 10 1709 and later)
+// for a11y::announce.
 
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use rt::sync::SpinLock;
 
-use crate::a11y::{self as ax, Act, Change, Node, Request, Role, Snapshot, WinTree, NONE};
+use crate::a11y::{self as ax, Act, Change, Node, Op, OpRequest, Request, Role, Snapshot, Sub, WinTree, NONE};
 
 use super::{ClientToScreen, GetClientRect, Point, Rect, dll_proc, win_hwnd};
 
@@ -59,14 +72,21 @@ const VT_I4: u16 = 3;
 const VT_R8: u16 = 5;
 const VT_BSTR: u16 = 8;
 const VT_BOOL: u16 = 11;
+const VT_UNKNOWN: u16 = 13;
 
 // patterns
 const P_INVOKE: i32 = 10000;
+const P_SELECTION: i32 = 10001;
 const P_VALUE: i32 = 10002;
 const P_RANGE: i32 = 10003;
 const P_EXPAND: i32 = 10005;
+const P_GRID: i32 = 10006;
+const P_GRIDITEM: i32 = 10007;
 const P_SELITEM: i32 = 10010;
+const P_TABLE: i32 = 10012;
+const P_TABLEITEM: i32 = 10013;
 const P_TOGGLE: i32 = 10015;
+const P_SCROLLITEM: i32 = 10017;
 
 // properties
 const PR_CONTROL_TYPE: i32 = 30003;
@@ -94,10 +114,36 @@ const PR_ARIA_PROPERTIES: i32 = 30102;
 const PR_HEADING_LEVEL: i32 = 30173;
 // HeadingLevel_None; HeadingLevel1 .. 9 follow it
 const HEADING_LEVEL_NONE: i32 = 80050;
+const PR_HELP_TEXT: i32 = 30013;
+const PR_REQUIRED: i32 = 30025;
+const PR_DATA_VALID: i32 = 30103;
+const PR_LIVE_SETTING: i32 = 30135;
+const PR_POS_IN_SET: i32 = 30152;
+const PR_SIZE_OF_SET: i32 = 30153;
+const PR_LEVEL: i32 = 30154;
+const PR_LANDMARK: i32 = 30157;
+const PR_LANDMARK_NAME: i32 = 30158;
+const PR_FULL_DESC: i32 = 30159;
+const PR_IS_DIALOG: i32 = 30174;
+const PR_GRID_ROWS: i32 = 30062;
+const PR_GRID_COLS: i32 = 30063;
+const PR_GRID_ROW: i32 = 30064;
+const PR_GRID_COL: i32 = 30065;
+const PR_GRID_ROW_SPAN: i32 = 30066;
+const PR_GRID_COL_SPAN: i32 = 30067;
+const PR_CAN_SELECT_MULTIPLE: i32 = 30060;
+// LandmarkType: custom (with LocalizedLandmarkType), form, main, navigation, search
+const LM_CUSTOM: i32 = 80000;
+const LM_FORM: i32 = 80001;
+const LM_MAIN: i32 = 80002;
+const LM_NAVIGATION: i32 = 80003;
+const LM_SEARCH: i32 = 80004;
 
 // events
 const EV_FOCUS: i32 = 20005;
 const EV_SELECTED: i32 = 20012;
+const EV_SYSTEM_ALERT: i32 = 20023;
+const EV_LIVE: i32 = 20024;
 
 // control types
 const CT_BUTTON: i32 = 50000;
@@ -120,6 +166,17 @@ const CT_TEXT: i32 = 50020;
 const CT_CUSTOM: i32 = 50025;
 const CT_GROUP: i32 = 50026;
 const CT_PANE: i32 = 50033;
+const CT_SCROLLBAR: i32 = 50014;
+const CT_SPINNER: i32 = 50016;
+const CT_STATUSBAR: i32 = 50017;
+const CT_TOOLBAR: i32 = 50021;
+const CT_TOOLTIP: i32 = 50022;
+const CT_TREE: i32 = 50023;
+const CT_TREEITEM: i32 = 50024;
+const CT_DATAITEM: i32 = 50029;
+const CT_HEADERITEM: i32 = 50035;
+const CT_TABLE: i32 = 50036;
+const CT_SEPARATOR: i32 = 50038;
 
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -138,7 +195,14 @@ const IID_TOGGLE: Guid = guid(0x56d00bd0, 0xc4f4, 0x433c, [0xa8, 0x36, 0x1a, 0x5
 const IID_VALUE: Guid = guid(0xc7935180, 0x6fb3, 0x4201, [0xb1, 0x74, 0x7d, 0xf7, 0x3a, 0xdb, 0xf6, 0x4a]);
 const IID_RANGE: Guid = guid(0x36dc7aef, 0x33e6, 0x4691, [0xaf, 0xe1, 0x2b, 0xe7, 0x27, 0x4b, 0x3d, 0x33]);
 const IID_SELITEM: Guid = guid(0x2acad808, 0xb2d4, 0x452d, [0xa4, 0x07, 0x91, 0xff, 0x1a, 0xd1, 0x67, 0xb2]);
-const IID_EXPAND: Guid = guid(0xd847d3a5, 0xcab0, 0x4a98, [0x8e, 0xcb, 0xec, 0xb4, 0x5c, 0x59, 0xad, 0x24]);
+// (the IID was wrong before charge 7: no client got ExpandCollapse, also not of drop-downs and menus)
+const IID_EXPAND: Guid = guid(0xd847d3a5, 0xcab0, 0x4a98, [0x8c, 0x32, 0xec, 0xb4, 0x5c, 0x59, 0xad, 0x24]);
+const IID_SCROLLITEM: Guid = guid(0x2360c714, 0x4bf1, 0x4b26, [0xba, 0x65, 0x9b, 0x21, 0x31, 0x61, 0x27, 0xeb]);
+const IID_GRID: Guid = guid(0xb17d6187, 0x0907, 0x464b, [0xa1, 0x68, 0x0e, 0xf1, 0x7a, 0x15, 0x72, 0xb1]);
+const IID_GRIDITEM: Guid = guid(0xd02541f1, 0xfb81, 0x4d64, [0xae, 0x32, 0xf5, 0x20, 0xf8, 0xa6, 0xdb, 0xd1]);
+const IID_TABLE: Guid = guid(0x9c860395, 0x97b3, 0x490a, [0xb5, 0x2a, 0x85, 0x8c, 0xc2, 0x2a, 0xf1, 0x66]);
+const IID_TABLEITEM: Guid = guid(0xb9734fa6, 0x771f, 0x4d78, [0x9c, 0x90, 0x25, 0x17, 0x99, 0x93, 0x49, 0xcd]);
+const IID_SELECTION: Guid = guid(0xfb8b03af, 0x3bdf, 0x48d4, [0xbd, 0x36, 0x1a, 0x65, 0x79, 0x3b, 0xe1, 0x68]);
 
 /// a VARIANT (x64: 24 bytes)
 #[repr(C)]
@@ -190,7 +254,10 @@ const F_COINIT: usize = 12;
 const F_COCREATE: usize = 13;
 const F_NOTSUP: usize = 14;
 const F_SA_DESTROY: usize = 15;
-const F_N: usize = 16;
+const F_NOTIFY: usize = 16;
+const F_SPI: usize = 17;
+const F_FINDWIN: usize = 18;
+const F_N: usize = 19;
 static FNS: [AtomicUsize; F_N] = [const { AtomicUsize::new(0) }; F_N];
 static LOADED: AtomicU32 = AtomicU32::new(0);
 
@@ -215,6 +282,9 @@ fn load() {
         (b"ole32.dll\0", b"CoCreateInstance\0"),
         (b"UIAutomationCore.dll\0", b"UiaGetReservedNotSupportedValue\0"),
         (b"oleaut32.dll\0", b"SafeArrayDestroy\0"),
+        (b"UIAutomationCore.dll\0", b"UiaRaiseNotificationEvent\0"),
+        (b"user32.dll\0", b"SystemParametersInfoW\0"),
+        (b"user32.dll\0", b"FindWindowW\0"),
     ];
     for (k, (dll, name)) in names.iter().enumerate() {
         FNS[k].store(dll_proc(dll, name), Ordering::Release);
@@ -286,6 +356,34 @@ fn int_array(v: &[i32]) -> *mut u8 {
         let mut d: *mut i32 = core::ptr::null_mut();
         if access(sa, &mut d) >= 0 && !d.is_null() {
             core::ptr::copy_nonoverlapping(v.as_ptr(), d, v.len());
+            unaccess(sa);
+        }
+        sa
+    }
+}
+
+// a SAFEARRAY of VT_UNKNOWN: the IRawElementProviderSimple of these nodes of e's window (the
+// array holds their references; null when oleaut32 is missing)
+fn elem_array(e: &Elem, keys: &[u64]) -> *mut u8 {
+    let (c, acc, un) = (f(F_SA_CREATE), f(F_SA_ACCESS), f(F_SA_UNACCESS));
+    if c == 0 || acc == 0 || un == 0 {
+        return core::ptr::null_mut();
+    }
+    // SAFETY: SafeArrayCreateVector(VT_UNKNOWN, 0, n) -> SAFEARRAY* of n IUnknown* (null each);
+    // its data is written between Access and Unaccess with pointers whose reference it takes.
+    unsafe {
+        let create: unsafe extern "system" fn(u16, i32, u32) -> *mut u8 = core::mem::transmute(c);
+        let access: unsafe extern "system" fn(*mut u8, *mut *mut usize) -> Hr = core::mem::transmute(acc);
+        let unaccess: unsafe extern "system" fn(*mut u8) -> Hr = core::mem::transmute(un);
+        let sa = create(VT_UNKNOWN, 0, keys.len() as u32);
+        if sa.is_null() {
+            return sa;
+        }
+        let mut d: *mut usize = core::ptr::null_mut();
+        if access(sa, &mut d) >= 0 && !d.is_null() {
+            for (k, &key) in keys.iter().enumerate() {
+                *d.add(k) = out_elem(e, key, O_SIMPLE) as usize;
+            }
             unaccess(sa);
         }
         sa
@@ -397,6 +495,65 @@ struct VtExpand {
     state: MI32,
 }
 
+#[repr(C)]
+struct VtScrollItem {
+    qi: Qi,
+    add: Ref,
+    rel: Ref,
+    scroll: M0,
+}
+
+#[repr(C)]
+struct VtGrid {
+    qi: Qi,
+    add: Ref,
+    rel: Ref,
+    item: unsafe extern "system" fn(This, i32, i32, *mut This) -> Hr,
+    rows: MI32,
+    cols: MI32,
+}
+
+#[repr(C)]
+struct VtGridItem {
+    qi: Qi,
+    add: Ref,
+    rel: Ref,
+    row: MI32,
+    col: MI32,
+    row_span: MI32,
+    col_span: MI32,
+    grid: MOut,
+}
+
+#[repr(C)]
+struct VtTable {
+    qi: Qi,
+    add: Ref,
+    rel: Ref,
+    row_headers: MOut,
+    col_headers: MOut,
+    major: MI32,
+}
+
+#[repr(C)]
+struct VtTableItem {
+    qi: Qi,
+    add: Ref,
+    rel: Ref,
+    row_headers: MOut,
+    col_headers: MOut,
+}
+
+#[repr(C)]
+struct VtSelection {
+    qi: Qi,
+    add: Ref,
+    rel: Ref,
+    get: MOut,
+    multiple: MI32,
+    required: MI32,
+}
+
 // the interface slots of an Elem
 const O_SIMPLE: usize = 0;
 const O_FRAG: usize = 1;
@@ -408,12 +565,19 @@ const O_RANGE: usize = 6;
 const O_SELITEM: usize = 7;
 const O_EXPAND: usize = 8;
 const O_TEXT: usize = 9;
+const O_SCROLLITEM: usize = 10;
+const O_GRID: usize = 11;
+const O_GRIDITEM: usize = 12;
+const O_TABLE: usize = 13;
+const O_TABLEITEM: usize = 14;
+const O_SELECTION: usize = 15;
+const O_N: usize = 16;
 
-/// one element: ten interface pointers (each to its vtable), the reference count, which
+/// one element: sixteen interface pointers (each to its vtable), the reference count, which
 /// window and node it is (key 0: the window's root)
 #[repr(C)]
 struct Elem {
-    vt: [*const u8; 10],
+    vt: [*const u8; O_N],
     refs: AtomicU32,
     hwnd: isize,
     pw: i32,
@@ -462,13 +626,31 @@ static VT_SELITEM: VtSelItem = VtSelItem {
     add: add::<O_SELITEM>,
     rel: rel::<O_SELITEM>,
     select: si_select,
-    add_to: si_select,
+    add_to: si_add_to,
     remove: si_remove,
     selected: si_selected,
     container: si_container,
 };
 static VT_EXPAND: VtExpand =
     VtExpand { qi: qi::<O_EXPAND>, add: add::<O_EXPAND>, rel: rel::<O_EXPAND>, expand: e_expand, collapse: e_collapse, state: e_state };
+static VT_SCROLLITEM: VtScrollItem = VtScrollItem { qi: qi::<O_SCROLLITEM>, add: add::<O_SCROLLITEM>, rel: rel::<O_SCROLLITEM>, scroll: sc_scroll };
+static VT_GRID: VtGrid = VtGrid { qi: qi::<O_GRID>, add: add::<O_GRID>, rel: rel::<O_GRID>, item: g_item, rows: g_rows, cols: g_cols };
+static VT_GRIDITEM: VtGridItem = VtGridItem {
+    qi: qi::<O_GRIDITEM>,
+    add: add::<O_GRIDITEM>,
+    rel: rel::<O_GRIDITEM>,
+    row: gi_row,
+    col: gi_col,
+    row_span: gi_row_span,
+    col_span: gi_col_span,
+    grid: gi_grid,
+};
+static VT_TABLE: VtTable =
+    VtTable { qi: qi::<O_TABLE>, add: add::<O_TABLE>, rel: rel::<O_TABLE>, row_headers: tb_row_headers, col_headers: tb_col_headers, major: tb_major };
+static VT_TABLEITEM: VtTableItem =
+    VtTableItem { qi: qi::<O_TABLEITEM>, add: add::<O_TABLEITEM>, rel: rel::<O_TABLEITEM>, row_headers: ti_row_headers, col_headers: ti_col_headers };
+static VT_SELECTION: VtSelection =
+    VtSelection { qi: qi::<O_SELECTION>, add: add::<O_SELECTION>, rel: rel::<O_SELECTION>, get: sel_get, multiple: sel_multiple, required: sel_required };
 
 fn new_elem(hwnd: isize, pw: i32, key: u64) -> *mut Elem {
     let vt = [
@@ -482,6 +664,12 @@ fn new_elem(hwnd: isize, pw: i32, key: u64) -> *mut Elem {
         &VT_SELITEM as *const VtSelItem as *const u8,
         &VT_EXPAND as *const VtExpand as *const u8,
         &VT_TEXT as *const text::VtText as *const u8,
+        &VT_SCROLLITEM as *const VtScrollItem as *const u8,
+        &VT_GRID as *const VtGrid as *const u8,
+        &VT_GRIDITEM as *const VtGridItem as *const u8,
+        &VT_TABLE as *const VtTable as *const u8,
+        &VT_TABLEITEM as *const VtTableItem as *const u8,
+        &VT_SELECTION as *const VtSelection as *const u8,
     ];
     Box::into_raw(Box::new(Elem { vt, refs: AtomicU32::new(1), hwnd, pw, key }))
 }
@@ -506,7 +694,7 @@ fn release(e: *mut Elem) {
 
 // the patterns of a node (bit = slot)
 fn patterns(n: &Node) -> u32 {
-    match n.role {
+    let mut p = match n.role {
         Role::Button | Role::Link | Role::MenuItem => 1 << O_INVOKE,
         Role::CheckBox | Role::Switch => 1 << O_TOGGLE,
         Role::TextBox => 1 << O_VALUE | 1 << O_TEXT,
@@ -514,11 +702,113 @@ fn patterns(n: &Node) -> u32 {
         Role::Slider | Role::Progress => 1 << O_RANGE,
         Role::Radio | Role::Tab | Role::ListItem => 1 << O_SELITEM,
         Role::Menu if n.key & 1 << 63 == 0 => 1 << O_EXPAND,
+        Role::List | Role::TabList => 1 << O_SELECTION,
+        _ => 0,
+    };
+    // rich nodes: the patterns their actions and places ask for
+    if n.actions & ax::A_EXPAND != 0 {
+        p |= 1 << O_EXPAND;
+    }
+    if n.actions & ax::A_SELECT != 0 {
+        p |= 1 << O_SELITEM;
+    }
+    if n.actions & ax::A_SCROLL != 0 {
+        p |= 1 << O_SCROLLITEM;
+    }
+    if n.actions & ax::A_CLICK != 0 && p & (1 << O_INVOKE | 1 << O_TOGGLE | 1 << O_SELITEM | 1 << O_EXPAND) == 0 {
+        p |= 1 << O_INVOKE;
+    }
+    if n.sub == Sub::Table {
+        p |= 1 << O_GRID | 1 << O_TABLE;
+    }
+    if matches!(n.sub, Sub::Cell | Sub::ColumnHeader | Sub::RowHeader) && n.cell_place().is_some() {
+        p |= 1 << O_GRIDITEM | 1 << O_TABLEITEM;
+    }
+    if n.state & ax::S_MULTISELECT != 0 {
+        p |= 1 << O_SELECTION;
+    }
+    if n.role == Role::Link && !n.url.is_empty() {
+        p |= 1 << O_VALUE; // the address (read-only)
+    }
+    p
+}
+
+// the control type of a rich node's Sub (None: the role's)
+fn sub_type(n: &Node) -> Option<i32> {
+    Some(match n.sub {
+        Sub::None => return None,
+        Sub::Table => CT_TABLE,
+        Sub::Row | Sub::Cell => CT_DATAITEM,
+        Sub::ColumnHeader | Sub::RowHeader => CT_HEADERITEM,
+        Sub::Tree => CT_TREE,
+        Sub::TreeItem => CT_TREEITEM,
+        Sub::Toolbar => CT_TOOLBAR,
+        Sub::Tooltip => CT_TOOLTIP,
+        Sub::Separator => CT_SEPARATOR,
+        Sub::Status => CT_STATUSBAR,
+        Sub::Alert | Sub::Log if n.first == NONE => CT_TEXT,
+        Sub::Meter => CT_PROGRESS,
+        Sub::SpinButton => CT_SPINNER,
+        Sub::ScrollBar => CT_SCROLLBAR,
+        _ => CT_GROUP, // landmarks (LandmarkType), radio groups, articles, figures, live regions
+    })
+}
+
+// a rich node names its control type itself (UIA has none of that name)
+fn own_type(n: &Node) -> bool {
+    matches!(
+        n.sub,
+        Sub::Row | Sub::Cell | Sub::ColumnHeader | Sub::RowHeader | Sub::RadioGroup | Sub::Alert | Sub::Log | Sub::Meter | Sub::Article | Sub::Figure
+    )
+}
+
+// the landmark type of a node (0: none)
+fn landmark(n: &Node) -> i32 {
+    match n.sub {
+        Sub::Main => LM_MAIN,
+        Sub::Navigation => LM_NAVIGATION,
+        Sub::Search => LM_SEARCH,
+        Sub::Form => LM_FORM,
+        s if s.landmark() => LM_CUSTOM,
         _ => 0,
     }
 }
 
+// the ARIA properties of a node ("level=2;required=true"; empty: none)
+fn aria_properties(n: &Node) -> String {
+    let mut out: Vec<String> = Vec::new();
+    if n.level() > 0 {
+        out.push(alloc::format!("level={}", n.level()));
+    }
+    for (bit, name) in [
+        (ax::S_REQUIRED, "required=true"),
+        (ax::S_INVALID, "invalid=true"),
+        (ax::S_BUSY, "busy=true"),
+        (ax::S_HASPOPUP, "haspopup=true"),
+        (ax::S_MODAL, "modal=true"),
+        (ax::S_MULTISELECT, "multiselectable=true"),
+        (ax::S_COLLAPSED, "expanded=false"),
+    ] {
+        if n.state & bit != 0 {
+            out.push(String::from(name));
+        }
+    }
+    if n.state & ax::S_EXPANDED != 0 && n.actions & ax::A_EXPAND != 0 {
+        out.push(String::from("expanded=true"));
+    }
+    if n.set[0] > 0 {
+        out.push(alloc::format!("posinset={}", n.set[0]));
+    }
+    if n.set[1] > 0 {
+        out.push(alloc::format!("setsize={}", n.set[1]));
+    }
+    out.join(";")
+}
+
 fn control_type(n: &Node) -> i32 {
+    if let Some(ct) = sub_type(n) {
+        return ct;
+    }
     match n.role {
         Role::Group => CT_GROUP,
         Role::Label | Role::Heading => CT_TEXT,
@@ -549,8 +839,10 @@ fn look(e: &Elem) -> Option<(Arc<Snapshot>, usize, u32)> {
     look_key(e.pw, e.key)
 }
 
-// the window tree of platform window pw and its node with this key (NONE: key 0, the root)
+// the window tree of platform window pw and its node with this key (NONE: key 0, the root); a
+// client is there (asleep: the UI publishes again)
 fn look_key(pw: i32, key: u64) -> Option<(Arc<Snapshot>, usize, u32)> {
+    client_seen();
     let s = ax::current()?;
     let wi = s.wins.iter().position(|w| w.pw == pw)?;
     let k = if key == 0 { NONE } else { s.wins[wi].find(key)? as u32 };
@@ -599,6 +891,18 @@ unsafe extern "system" fn qi<const K: usize>(this: This, riid: *const Guid, out:
         Some(O_EXPAND)
     } else if (id == IID_TEXT || id == IID_TEXT2) && want(O_TEXT) {
         Some(O_TEXT)
+    } else if id == IID_SCROLLITEM && want(O_SCROLLITEM) {
+        Some(O_SCROLLITEM)
+    } else if id == IID_GRID && want(O_GRID) {
+        Some(O_GRID)
+    } else if id == IID_GRIDITEM && want(O_GRIDITEM) {
+        Some(O_GRIDITEM)
+    } else if id == IID_TABLE && want(O_TABLE) {
+        Some(O_TABLE)
+    } else if id == IID_TABLEITEM && want(O_TABLEITEM) {
+        Some(O_TABLEITEM)
+    } else if id == IID_SELECTION && want(O_SELECTION) {
+        Some(O_SELECTION)
     } else {
         None
     };
@@ -647,6 +951,12 @@ unsafe extern "system" fn s_pattern(this: This, id: i32, out: *mut This) -> Hr {
         P_SELITEM => O_SELITEM,
         P_EXPAND => O_EXPAND,
         P_TEXT | P_TEXT2 => O_TEXT,
+        P_SCROLLITEM => O_SCROLLITEM,
+        P_GRID => O_GRID,
+        P_GRIDITEM => O_GRIDITEM,
+        P_TABLE => O_TABLE,
+        P_TABLEITEM => O_TABLEITEM,
+        P_SELECTION => O_SELECTION,
         _ => return S_OK,
     };
     if with_node(e, |_, n| patterns(n) & 1 << slot != 0).unwrap_or(false) {
@@ -679,12 +989,31 @@ fn prop(t: &WinTree, n: &Node, id: i32) -> Variant {
     match id {
         PR_CONTROL_TYPE => Variant::i4(control_type(n)),
         // (the other control types: UIA's own names, in the system's language)
-        PR_LOCALIZED_TYPE if matches!(n.role, Role::Dialog | Role::Switch | Role::Heading) => Variant::bstr(ax::role_name(n.role)),
+        PR_LOCALIZED_TYPE if n.sub == Sub::None && matches!(n.role, Role::Dialog | Role::Switch | Role::Heading) => {
+            Variant::bstr(ax::role_name(n.role))
+        }
+        PR_LOCALIZED_TYPE if own_type(n) => Variant::bstr(n.role_text()),
         // headings: Text elements with their level (Narrator, NVDA: heading navigation), the
         // ARIA role and level for clients that read those
         PR_HEADING_LEVEL if n.role == Role::Heading => Variant::i4(HEADING_LEVEL_NONE + n.level() as i32),
         PR_ARIA_ROLE if n.role == Role::Heading => Variant::bstr("heading"),
-        PR_ARIA_PROPERTIES if n.role == Role::Heading => Variant::bstr(&alloc::format!("level={}", n.level())),
+        PR_ARIA_ROLE if n.sub != Sub::None => Variant::bstr(n.sub.aria()),
+        PR_ARIA_PROPERTIES => match aria_properties(n) {
+            p if p.is_empty() => Variant::default(),
+            p => Variant::bstr(&p),
+        },
+        // rich nodes: description, form states, the place in a set, the level, landmarks, live
+        // regions, dialogs
+        PR_FULL_DESC | PR_HELP_TEXT if !n.desc.is_empty() => Variant::bstr(&n.desc),
+        PR_REQUIRED => Variant::bool(n.state & ax::S_REQUIRED != 0),
+        PR_DATA_VALID => Variant::bool(n.state & ax::S_INVALID == 0),
+        PR_POS_IN_SET if n.set[0] > 0 => Variant::i4(n.set[0] as i32),
+        PR_SIZE_OF_SET if n.set[1] > 0 => Variant::i4(n.set[1] as i32),
+        PR_LEVEL if n.role != Role::Heading && n.item_level > 0 => Variant::i4(n.item_level as i32),
+        PR_LANDMARK if landmark(n) != 0 => Variant::i4(landmark(n)),
+        PR_LANDMARK_NAME if landmark(n) == LM_CUSTOM => Variant::bstr(n.role_text()),
+        PR_LIVE_SETTING if n.live != 0 => Variant::i4(n.live as i32),
+        PR_IS_DIALOG => Variant::bool(n.role == Role::Dialog || n.state & ax::S_MODAL != 0),
         PR_NAME => Variant::bstr(&n.name),
         PR_AUTOMATION_ID => Variant::bstr(&alloc::format!("{:x}", n.key)),
         PR_ENABLED => Variant::bool(n.state & ax::S_DISABLED == 0),
@@ -694,7 +1023,10 @@ fn prop(t: &WinTree, n: &Node, id: i32) -> Variant {
         PR_OFFSCREEN => Variant::bool(!t.on_screen(n)), // scrolled out of the window
         PR_PASSWORD => Variant::bool(false),
         PR_FRAMEWORK => Variant::bstr("JFLib"),
-        PR_ORIENTATION if matches!(n.role, Role::Slider | Role::Progress) => Variant::i4(1), // horizontal
+        // horizontal (a scroll bar or spin button taller than wide: vertical)
+        PR_ORIENTATION if matches!(n.role, Role::Slider | Role::Progress) => {
+            Variant::i4(if matches!(n.sub, Sub::ScrollBar | Sub::SpinButton) && n.rect[3] > n.rect[2] { 2 } else { 1 })
+        }
         _ => Variant::default(),
     }
 }
@@ -797,6 +1129,18 @@ fn act(e: &Elem, need: u32, a: Act) -> Hr {
     S_OK
 }
 
+// a further action for this element's node (UIA_E_ELEMENTNOTENABLED when it does not allow it)
+fn act_op(e: &Elem, need: u32, op: Op) -> Hr {
+    let Some((s, wi, k)) = look(e) else { return UIA_E_ELEMENTNOTAVAILABLE };
+    let t = &s.wins[wi];
+    let Some(n) = t.nodes.get(k as usize) else { return UIA_E_INVALIDOPERATION };
+    if n.actions & need == 0 {
+        return UIA_E_ELEMENTNOTENABLED;
+    }
+    ax::request_op(OpRequest { win: t.win, key: n.key, op });
+    S_OK
+}
+
 unsafe extern "system" fn f_set_focus(this: This) -> Hr {
     let e = unsafe { elem::<O_FRAG>(this) };
     if e.key == 0 {
@@ -872,7 +1216,8 @@ unsafe extern "system" fn v_set(this: This, s: *const u16) -> Hr {
 }
 
 unsafe extern "system" fn v_get(this: This, out: *mut usize) -> Hr {
-    match with_node(unsafe { elem::<O_VALUE>(this) }, |_, n| bstr(&n.text)) {
+    // (a link: its address)
+    match with_node(unsafe { elem::<O_VALUE>(this) }, |_, n| bstr(if n.role == Role::Link { &n.url } else { &n.text })) {
         Some(b) => {
             unsafe { *out = b };
             S_OK
@@ -941,13 +1286,28 @@ fn selected(n: &Node) -> bool {
 
 unsafe extern "system" fn si_select(this: This) -> Hr {
     let e = unsafe { elem::<O_SELITEM>(this) };
+    if with_node(e, |_, n| n.actions & ax::A_SELECT != 0) == Some(true) {
+        return act_op(e, ax::A_SELECT, Op::SelectItem);
+    }
     if with_node(e, |_, n| selected(n)) == Some(true) {
         return S_OK;
     }
     act(e, ax::A_CLICK, Act::Click)
 }
 
-unsafe extern "system" fn si_remove(_this: This) -> Hr {
+unsafe extern "system" fn si_add_to(this: This) -> Hr {
+    let e = unsafe { elem::<O_SELITEM>(this) };
+    if with_node(e, |_, n| n.actions & ax::A_SELECT != 0) == Some(true) {
+        return act_op(e, ax::A_SELECT, Op::AddToSelection);
+    }
+    unsafe { si_select(this) }
+}
+
+unsafe extern "system" fn si_remove(this: This) -> Hr {
+    let e = unsafe { elem::<O_SELITEM>(this) };
+    if with_node(e, |_, n| n.actions & ax::A_SELECT != 0) == Some(true) {
+        return act_op(e, ax::A_SELECT, Op::RemoveFromSelection);
+    }
     UIA_E_INVALIDOPERATION // single selection: a row cannot be taken out
 }
 
@@ -964,7 +1324,18 @@ unsafe extern "system" fn si_selected(this: This, out: *mut i32) -> Hr {
 unsafe extern "system" fn si_container(this: This, out: *mut This) -> Hr {
     let e = unsafe { elem::<O_SELITEM>(this) };
     unsafe { *out = core::ptr::null_mut() };
-    let p = with_node(e, |t, n| t.nodes.get(n.parent as usize).filter(|p| matches!(p.role, Role::List | Role::TabList)).map(|p| p.key));
+    // the nearest ancestor with the Selection pattern (a rich tree item's tree, a grid's table)
+    let p = with_node(e, |t, n| {
+        let mut p = n.parent;
+        for _ in 0..t.nodes.len() {
+            let q = t.nodes.get(p as usize)?;
+            if patterns(q) & 1 << O_SELECTION != 0 {
+                return Some(q.key);
+            }
+            p = q.parent;
+        }
+        None
+    });
     if let Some(Some(key)) = p {
         unsafe { *out = out_elem(e, key, O_SIMPLE) };
     }
@@ -975,6 +1346,9 @@ fn expand(this: This, open: bool) -> Hr {
     let e = unsafe { elem::<O_EXPAND>(this) };
     if with_node(e, |_, n| n.state & ax::S_EXPANDED != 0) == Some(open) {
         return S_OK;
+    }
+    if with_node(e, |_, n| n.actions & ax::A_EXPAND != 0) == Some(true) {
+        return act_op(e, ax::A_EXPAND, if open { Op::Expand } else { Op::Collapse });
     }
     act(e, ax::A_CLICK, Act::Click)
 }
@@ -997,9 +1371,190 @@ unsafe extern "system" fn e_state(this: This, out: *mut i32) -> Hr {
     }
 }
 
+// f(tree, node index) for this element's node, or UIA_E_ELEMENTNOTAVAILABLE
+fn with_index(e: &Elem, out: *mut i32, f: impl FnOnce(&WinTree, usize) -> i32) -> Hr {
+    let Some((s, wi, k)) = look(e) else { return UIA_E_ELEMENTNOTAVAILABLE };
+    let t = &s.wins[wi];
+    if k as usize >= t.nodes.len() {
+        return UIA_E_ELEMENTNOTAVAILABLE;
+    }
+    unsafe { *out = f(t, k as usize) };
+    S_OK
+}
+
+// an element of e's window for the node with index f(tree, node) (null: none)
+fn out_node(e: &Elem, out: *mut This, f: impl FnOnce(&WinTree, usize) -> Option<usize>) -> Hr {
+    unsafe { *out = core::ptr::null_mut() };
+    let Some((s, wi, k)) = look(e) else { return UIA_E_ELEMENTNOTAVAILABLE };
+    let t = &s.wins[wi];
+    if k as usize >= t.nodes.len() {
+        return UIA_E_ELEMENTNOTAVAILABLE;
+    }
+    if let Some(j) = f(t, k as usize) {
+        unsafe { *out = out_elem(e, t.nodes[j].key, O_SIMPLE) };
+    }
+    S_OK
+}
+
+// a SAFEARRAY of the elements of the nodes f(tree, node) gives
+fn out_nodes(e: &Elem, out: *mut This, f: impl FnOnce(&WinTree, usize) -> Vec<usize>) -> Hr {
+    unsafe { *out = core::ptr::null_mut() };
+    let Some((s, wi, k)) = look(e) else { return UIA_E_ELEMENTNOTAVAILABLE };
+    let t = &s.wins[wi];
+    if k as usize >= t.nodes.len() {
+        return UIA_E_ELEMENTNOTAVAILABLE;
+    }
+    let keys: Vec<u64> = f(t, k as usize).into_iter().map(|j| t.nodes[j].key).collect();
+    unsafe { *out = elem_array(e, &keys) };
+    S_OK
+}
+
+// ---- ScrollItem
+
+unsafe extern "system" fn sc_scroll(this: This) -> Hr {
+    act_op(unsafe { elem::<O_SCROLLITEM>(this) }, ax::A_SCROLL, Op::ScrollIntoView)
+}
+
+// ---- Grid (tables)
+
+unsafe extern "system" fn g_item(this: This, row: i32, col: i32, out: *mut This) -> Hr {
+    if row < 0 || col < 0 {
+        return E_INVALIDARG;
+    }
+    out_node(unsafe { elem::<O_GRID>(this) }, out, |t, k| t.cell_at(k, row as u32, col as u32))
+}
+
+unsafe extern "system" fn g_rows(this: This, out: *mut i32) -> Hr {
+    with_index(unsafe { elem::<O_GRID>(this) }, out, |t, k| t.grid_size(k).0 as i32)
+}
+
+unsafe extern "system" fn g_cols(this: This, out: *mut i32) -> Hr {
+    with_index(unsafe { elem::<O_GRID>(this) }, out, |t, k| t.grid_size(k).1 as i32)
+}
+
+// ---- GridItem (cells and headers with a place)
+
+fn cell_of(this: This, out: *mut i32, part: usize) -> Hr {
+    with_index(unsafe { elem::<O_GRIDITEM>(this) }, out, |t, k| t.nodes[k].cell[part] as i32)
+}
+
+unsafe extern "system" fn gi_row(this: This, out: *mut i32) -> Hr {
+    cell_of(this, out, 0)
+}
+
+unsafe extern "system" fn gi_col(this: This, out: *mut i32) -> Hr {
+    cell_of(this, out, 1)
+}
+
+unsafe extern "system" fn gi_row_span(this: This, out: *mut i32) -> Hr {
+    cell_of(this, out, 2)
+}
+
+unsafe extern "system" fn gi_col_span(this: This, out: *mut i32) -> Hr {
+    cell_of(this, out, 3)
+}
+
+unsafe extern "system" fn gi_grid(this: This, out: *mut This) -> Hr {
+    out_node(unsafe { elem::<O_GRIDITEM>(this) }, out, |t, k| t.up_to(k, Sub::Table))
+}
+
+// ---- Table, TableItem (the headers)
+
+unsafe extern "system" fn tb_row_headers(this: This, out: *mut This) -> Hr {
+    out_nodes(unsafe { elem::<O_TABLE>(this) }, out, |t, k| t.headers(k, true))
+}
+
+unsafe extern "system" fn tb_col_headers(this: This, out: *mut This) -> Hr {
+    out_nodes(unsafe { elem::<O_TABLE>(this) }, out, |t, k| t.headers(k, false))
+}
+
+unsafe extern "system" fn tb_major(_this: This, out: *mut i32) -> Hr {
+    unsafe { *out = 0 }; // RowOrColumnMajor_RowMajor
+    S_OK
+}
+
+unsafe extern "system" fn ti_row_headers(this: This, out: *mut This) -> Hr {
+    out_nodes(unsafe { elem::<O_TABLEITEM>(this) }, out, |t, k| t.headers_of(k, true))
+}
+
+unsafe extern "system" fn ti_col_headers(this: This, out: *mut This) -> Hr {
+    out_nodes(unsafe { elem::<O_TABLEITEM>(this) }, out, |t, k| t.headers_of(k, false))
+}
+
+// ---- Selection (lists, tab strips, trees, multi-select containers): the selected items below
+
+unsafe extern "system" fn sel_get(this: This, out: *mut This) -> Hr {
+    out_nodes(unsafe { elem::<O_SELECTION>(this) }, out, |t, k| {
+        (k + 1..t.subtree_end(k)).filter(|&j| t.nodes[j].state & ax::S_SELECTED != 0 && patterns(&t.nodes[j]) & 1 << O_SELITEM != 0).collect()
+    })
+}
+
+unsafe extern "system" fn sel_multiple(this: This, out: *mut i32) -> Hr {
+    with_index(unsafe { elem::<O_SELECTION>(this) }, out, |t, k| (t.nodes[k].state & ax::S_MULTISELECT != 0) as i32)
+}
+
+unsafe extern "system" fn sel_required(_this: This, out: *mut i32) -> Hr {
+    unsafe { *out = 0 };
+    S_OK
+}
+
 // ---------------------------------------------------------------- the window procedure, events
 
 pub fn start(_app: &str) {}
+
+// when a client last asked something (time_us); when idle() last looked
+static LAST_CALL: AtomicU64 = AtomicU64::new(0);
+static LAST_CHECK: AtomicU64 = AtomicU64::new(0);
+// a client that neither asks nor listens for this long is gone (us)
+const IDLE_US: u64 = 10_000_000;
+// idle() looks at most this often (us); check_due asks for a look at most this often
+const CHECK_US: u64 = 1_000_000;
+const DUE_US: u64 = 2_000_000;
+
+// a client asked: the tree is needed (again)
+fn client_seen() {
+    LAST_CALL.store(crate::time_us(), Ordering::Relaxed);
+    if !ax::active() {
+        ax::set_active(true);
+    }
+}
+
+/// (a11y::active, at most once a second) no client asked for 10 s, and no screen reader (nor
+/// Magnifier) listens for events: assistive technology is gone, the UI stops building the tree
+/// until the next question (any UIA client -- the touch keyboard, a tool -- turns it on for a
+/// while).  UiaClientsAreListening alone is no sign: it is true for any client on the desktop that
+/// subscribed to any event, and on Windows 11 the touch keyboard's host (TextInputHost), TabTip or
+/// a vendor's tool always do -- the tree was built in every frame then.  Screen readers say they
+/// run (SPI_SETSCREENREADER: Narrator, NVDA, JAWS) and keep the tree while they listen, however
+/// long the user does nothing (their events -- a focus that moves -- must not get lost); a client
+/// that only listens (the touch keyboard: JFLib shows that itself, win_touch.rs) keeps it for 10 s
+/// after its last question
+pub(crate) fn idle() {
+    let now = crate::time_us();
+    if now.wrapping_sub(LAST_CHECK.load(Ordering::Relaxed)) < CHECK_US || LOADED.load(Ordering::Acquire) != 2 {
+        return;
+    }
+    LAST_CHECK.store(now, Ordering::Relaxed);
+    if now.wrapping_sub(LAST_CALL.load(Ordering::Relaxed)) > IDLE_US && !(listening() && at_present()) {
+        ax::set_active(false);
+    }
+}
+
+// assistive technology says it runs: a screen reader set SPI_SETSCREENREADER (Narrator, NVDA and
+// JAWS do; the flag goes with them), or Windows' Magnifier runs (its window, class MagUIClass:
+// it follows the keyboard focus by UIA's events and sets no flag)
+fn at_present() -> bool {
+    let spi = f(F_SPI);
+    let mut on = 0i32;
+    // SAFETY: SystemParametersInfoW(SPI_GETSCREENREADER = 0x46, 0, BOOL*, 0) -> BOOL.
+    if spi != 0 && unsafe { core::mem::transmute::<usize, unsafe extern "system" fn(u32, u32, *mut i32, u32) -> i32>(spi)(0x46, 0, &mut on, 0) } != 0 && on != 0 {
+        return true;
+    }
+    let find = f(F_FINDWIN);
+    let class: [u16; 11] = [b'M' as u16, b'a' as u16, b'g' as u16, b'U' as u16, b'I' as u16, b'C' as u16, b'l' as u16, b'a' as u16, b's' as u16, b's' as u16, 0];
+    // SAFETY: FindWindowW(LPCWSTR class, LPCWSTR title = NULL) -> HWND; a NUL-terminated class.
+    find != 0 && unsafe { core::mem::transmute::<usize, unsafe extern "system" fn(*const u16, *const u16) -> isize>(find)(class.as_ptr(), core::ptr::null()) } != 0
+}
 
 /// (wndproc, WM_GETOBJECT) the root provider of platform window pw for UiaRootObjectId; None:
 /// another object id (DefWindowProc answers)
@@ -1011,7 +1566,7 @@ pub(crate) fn get_object(hwnd: isize, pw: i32, wp: usize, lp: isize) -> Option<i
     if p == 0 {
         return None;
     }
-    ax::set_active(true);
+    client_seen();
     let e = new_elem(hwnd, pw, 0);
     // SAFETY: UiaReturnRawElementProvider(HWND, WPARAM, LPARAM, IRawElementProviderSimple*) ->
     // LRESULT; UIA takes its own references.
@@ -1019,6 +1574,17 @@ pub(crate) fn get_object(hwnd: isize, pw: i32, wp: usize, lp: isize) -> Option<i
     let r = unsafe { ret(hwnd, wp, lp, iface(e, O_SIMPLE)) };
     release(e);
     Some(r)
+}
+
+/// (a11y::check_due, while active) when idle() wants to look again: 10 s after the last question,
+/// at least 2 s after its last look (a client that keeps listening: every 2 s); None before UIA
+/// was loaded (nothing turns it off then)
+pub(crate) fn idle_due() -> Option<u64> {
+    if LOADED.load(Ordering::Acquire) != 2 {
+        return None;
+    }
+    let call = LAST_CALL.load(Ordering::Relaxed).saturating_add(IDLE_US + 20_000); // (just past it)
+    Some(call.max(LAST_CHECK.load(Ordering::Relaxed).saturating_add(DUE_US)))
 }
 
 /// (wndproc, WM_DESTROY) UIA lets go of the window's providers
@@ -1065,6 +1631,29 @@ fn raise_prop(e: *mut Elem, id: i32, new: Variant) {
     }
 }
 
+// a11y::announce: the notification event on the root element of window w (Narrator and NVDA
+// say it; polite ones queue, assertive ones interrupt)
+fn notify(s: &Snapshot, w: u8, text: &str, politeness: u8) {
+    let p = f(F_NOTIFY);
+    let Some(t) = s.win(w).or_else(|| s.wins.iter().find(|t| t.active)) else { return };
+    let hwnd = win_hwnd(t.pw);
+    if p == 0 || hwnd == 0 {
+        return;
+    }
+    let e = new_elem(hwnd, t.pw, 0);
+    let (msg, activity) = (bstr(text), bstr("JFLib.announce"));
+    // NotificationProcessing: ImportantAll (0) for assertive, All (2) for polite
+    let processing = if politeness == ax::LIVE_ASSERTIVE { 0 } else { 2 };
+    // SAFETY: UiaRaiseNotificationEvent(IRawElementProviderSimple*, NotificationKind,
+    // NotificationProcessing, BSTR, BSTR) -> HRESULT; NotificationKind_Other (4); the BSTRs stay
+    // ours.
+    let r: unsafe extern "system" fn(This, i32, i32, usize, usize) -> Hr = unsafe { core::mem::transmute(p) };
+    unsafe { r(iface(e, O_SIMPLE), 4, processing, msg, activity) };
+    bstr_free(msg);
+    bstr_free(activity);
+    release(e);
+}
+
 pub fn changed(s: &Snapshot, c: Vec<Change>) {
     if !listening() {
         return;
@@ -1077,9 +1666,27 @@ pub fn changed(s: &Snapshot, c: Vec<Change>) {
             | Change::Name(w, k)
             | Change::Value(w, k)
             | Change::Text(w, k, _)
-            | Change::Caret(w, k, _) => (*w, *k),
-            Change::Added(w, p, _) | Change::Removed(w, p, ..) => {
+            | Change::Caret(w, k, _)
+            | Change::Live(w, k) => (*w, *k),
+            Change::Added(w, p, k) => {
                 parents.push((*w, *p));
+                // an alert that appears: SystemAlert (Narrator, NVDA say it)
+                if s.win(*w).and_then(|t| t.find(*k).map(|i| t.nodes[i].sub == Sub::Alert)) == Some(true) {
+                    let hwnd = s.win(*w).map_or(0, |t| win_hwnd(t.pw));
+                    if hwnd != 0 {
+                        let e = new_elem(hwnd, s.win(*w).map_or(-1, |t| t.pw), *k);
+                        raise(e, EV_SYSTEM_ALERT);
+                        release(e);
+                    }
+                }
+                continue;
+            }
+            Change::Removed(w, p, ..) => {
+                parents.push((*w, *p));
+                continue;
+            }
+            Change::Announce(w, text, p) => {
+                notify(s, *w, text, *p);
                 continue;
             }
             _ => continue,
@@ -1109,8 +1716,12 @@ pub fn changed(s: &Snapshot, c: Vec<Change>) {
                 }
                 ax::S_EXPANDED => raise_prop(e, PR_EXPAND_STATE, Variant::i4(on as i32)),
                 ax::S_DISABLED => raise_prop(e, PR_ENABLED, Variant::bool(!on)),
+                ax::S_REQUIRED => raise_prop(e, PR_REQUIRED, Variant::bool(on)),
+                ax::S_INVALID => raise_prop(e, PR_DATA_VALID, Variant::bool(!on)),
                 _ => {}
             },
+            // something inside a live region changed: the region says it (its name)
+            Change::Live(..) => raise(e, EV_LIVE),
             Change::Name(..) => raise_prop(e, PR_NAME, Variant::bstr(&n.name)),
             Change::Value(..) if n.role == Role::Heading => raise_prop(e, PR_HEADING_LEVEL, Variant::i4(HEADING_LEVEL_NONE + n.level() as i32)),
             Change::Value(..) => raise_prop(e, PR_RANGE_VALUE, Variant::r8(n.value)),
@@ -1176,6 +1787,32 @@ pub struct UiaTestElem {
     pub heading: i32,
     /// the bounding rectangle: x, y, w, h (screen px)
     pub rect: [i32; 4],
+    /// AriaRole, AriaProperties ("" without)
+    pub aria_role: String,
+    pub aria_properties: String,
+    /// LandmarkType (0: none), LocalizedLandmarkType
+    pub landmark: i32,
+    pub landmark_name: String,
+    /// FullDescription
+    pub desc: String,
+    /// PositionInSet, SizeOfSet, Level (0: none)
+    pub pos_in_set: i32,
+    pub size_of_set: i32,
+    pub level: i32,
+    /// LiveSetting (0: off), IsRequiredForForm, IsDataValidForForm, IsOffscreen
+    pub live: i32,
+    pub required: bool,
+    pub valid: bool,
+    pub offscreen: bool,
+    /// GridItem: row, column, row span, column span (None: no GridItem pattern)
+    pub cell: Option<[i32; 4]>,
+    /// Grid: rows, columns (None: no Grid pattern)
+    pub grid: Option<(i32, i32)>,
+    /// TableItem: the names of its column headers
+    pub col_headers: Vec<String>,
+    /// the ScrollItem pattern is there; Selection: CanSelectMultiple (None: no pattern)
+    pub scroll_item: bool,
+    pub multiple: Option<bool>,
 }
 
 /// (tests) what uia_test_act does to an element
@@ -1190,6 +1827,11 @@ pub enum UiaTestAct {
     Focus,
     SetValue(String),
     SetRange(f64),
+    /// ScrollItem.ScrollIntoView
+    ScrollIntoView,
+    /// SelectionItem.AddToSelection / RemoveFromSelection
+    AddToSelection,
+    RemoveFromSelection,
 }
 
 /// (tests; UI thread) the HWND of platform window pw
@@ -1314,7 +1956,69 @@ fn describe(el: usize, depth: u32) -> UiaTestElem {
             unsafe { core::mem::transmute::<usize, unsafe extern "system" fn(usize, *mut Rect) -> Hr>(vf(el, 43))(el, &mut r) };
             [r.l, r.t, r.r - r.l, r.b - r.t]
         },
+        aria_role: prop_str(el, PR_ARIA_ROLE).unwrap_or_default(),
+        aria_properties: prop_str(el, PR_ARIA_PROPERTIES).unwrap_or_default(),
+        landmark: prop_i(el, PR_LANDMARK).unwrap_or(0),
+        landmark_name: prop_str(el, PR_LANDMARK_NAME).unwrap_or_default(),
+        desc: prop_str(el, PR_FULL_DESC).unwrap_or_default(),
+        pos_in_set: prop_i(el, PR_POS_IN_SET).unwrap_or(0),
+        size_of_set: prop_i(el, PR_SIZE_OF_SET).unwrap_or(0),
+        level: prop_i(el, PR_LEVEL).unwrap_or(0),
+        live: prop_i(el, PR_LIVE_SETTING).unwrap_or(0),
+        required: has(PR_REQUIRED),
+        valid: has(PR_DATA_VALID),
+        offscreen: has(PR_OFFSCREEN),
+        // IsGridItemPatternAvailable 30029, IsGridPatternAvailable 30030, IsScrollItemPatternAvailable
+        // 30035, IsSelectionPatternAvailable 30037, IsTableItemPatternAvailable 30039
+        cell: if has(30029) {
+            Some([PR_GRID_ROW, PR_GRID_COL, PR_GRID_ROW_SPAN, PR_GRID_COL_SPAN].map(|p| prop_i(el, p).unwrap_or(-1)))
+        } else {
+            None
+        },
+        grid: if has(30030) { Some((prop_i(el, PR_GRID_ROWS).unwrap_or(-1), prop_i(el, PR_GRID_COLS).unwrap_or(-1))) } else { None },
+        col_headers: if has(30039) { col_headers(el) } else { Vec::new() },
+        scroll_item: has(30035),
+        multiple: if has(30037) { Some(has(PR_CAN_SELECT_MULTIPLE)) } else { None },
     }
+}
+
+const IID_TABLEITEM_PATTERN: Guid = guid(0x0b964eb3, 0xef2e, 0x4464, [0x9c, 0x79, 0x61, 0xd6, 0x17, 0x37, 0xa2, 0x7e]);
+
+// the names of a cell's column headers through IUIAutomationTableItemPattern
+fn col_headers(el: usize) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut tp = 0usize;
+    // SAFETY: IUIAutomationElement::GetCurrentPatternAs (slot 14); IUIAutomationTableItemPattern::
+    // GetCurrentColumnHeaderItems(IUIAutomationElementArray**) (slot 4); the array's get_Length
+    // (slot 3) and GetElement(int, IUIAutomationElement**) (slot 4).
+    unsafe {
+        core::mem::transmute::<usize, unsafe extern "system" fn(usize, i32, *const Guid, *mut usize) -> Hr>(vf(el, 14))(
+            el,
+            P_TABLEITEM,
+            &IID_TABLEITEM_PATTERN,
+            &mut tp,
+        );
+        if tp == 0 {
+            return out;
+        }
+        let mut arr = 0usize;
+        core::mem::transmute::<usize, unsafe extern "system" fn(usize, *mut usize) -> Hr>(vf(tp, 4))(tp, &mut arr);
+        if arr != 0 {
+            let mut n = 0i32;
+            core::mem::transmute::<usize, unsafe extern "system" fn(usize, *mut i32) -> Hr>(vf(arr, 3))(arr, &mut n);
+            for k in 0..n {
+                let mut h = 0usize;
+                core::mem::transmute::<usize, unsafe extern "system" fn(usize, i32, *mut usize) -> Hr>(vf(arr, 4))(arr, k, &mut h);
+                if h != 0 {
+                    out.push(prop_str(h, PR_NAME).unwrap_or_default());
+                    com_release(h);
+                }
+            }
+            com_release(arr);
+        }
+        com_release(tp);
+    }
+    out
 }
 
 // f(elements) with the elements below the window's element (released afterwards)
@@ -1364,10 +2068,11 @@ pub fn uia_test_act(hwnd: isize, name: &str, control_type: i32, a: UiaTestAct) -
         let pid = match a {
             UiaTestAct::Invoke => P_INVOKE,
             UiaTestAct::Toggle => P_TOGGLE,
-            UiaTestAct::Select => P_SELITEM,
+            UiaTestAct::Select | UiaTestAct::AddToSelection | UiaTestAct::RemoveFromSelection => P_SELITEM,
             UiaTestAct::Expand | UiaTestAct::Collapse => P_EXPAND,
             UiaTestAct::SetValue(_) => P_VALUE,
             UiaTestAct::SetRange(_) => P_RANGE,
+            UiaTestAct::ScrollIntoView => P_SCROLLITEM,
             UiaTestAct::Focus => 0,
         };
         let mut p = 0usize;
@@ -1387,7 +2092,9 @@ pub fn uia_test_act(hwnd: isize, name: &str, control_type: i32, a: UiaTestAct) -
                     hr
                 }
                 UiaTestAct::SetRange(v) => core::mem::transmute::<usize, unsafe extern "system" fn(usize, f64) -> Hr>(vf(p, 3))(p, *v),
-                UiaTestAct::Collapse => core::mem::transmute::<usize, unsafe extern "system" fn(usize) -> Hr>(vf(p, 4))(p),
+                // (IUIAutomationSelectionItemPattern: Select 3, AddToSelection 4, RemoveFromSelection 5)
+                UiaTestAct::Collapse | UiaTestAct::AddToSelection => core::mem::transmute::<usize, unsafe extern "system" fn(usize) -> Hr>(vf(p, 4))(p),
+                UiaTestAct::RemoveFromSelection => core::mem::transmute::<usize, unsafe extern "system" fn(usize) -> Hr>(vf(p, 5))(p),
                 _ => core::mem::transmute::<usize, unsafe extern "system" fn(usize) -> Hr>(vf(p, 3))(p),
             };
             com_release(p);
@@ -1636,7 +2343,12 @@ const IID_AGILE: Guid = guid(0x94ea2b94, 0xe9cc, 0x49e0, [0xc0, 0xff, 0xee, 0x64
 unsafe extern "system" fn h_qi(this: This, riid: *const Guid, out: *mut This) -> Hr {
     let id = unsafe { *riid };
     // IUnknown, the handler interface, IAgileObject (free-threaded)
-    let ok = id == IID_UNKNOWN || id == IID_AGILE || id == IID_FOCUS_HANDLER || id == IID_PROP_HANDLER || id == IID_EVENT_HANDLER;
+    let ok = id == IID_UNKNOWN
+        || id == IID_AGILE
+        || id == IID_FOCUS_HANDLER
+        || id == IID_PROP_HANDLER
+        || id == IID_EVENT_HANDLER
+        || id == IID_NOTIFY_HANDLER;
     unsafe { *out = if ok { this } else { core::ptr::null_mut() } };
     if ok { S_OK } else { E_NOINTERFACE }
 }
@@ -1701,7 +2413,7 @@ pub fn uia_test_listen(hwnd: isize) -> bool {
         // AddAutomationEventHandler(EVENTID, IUIAutomationElement*, TreeScope,
         // IUIAutomationCacheRequest*, IUIAutomationEventHandler*) (slot 32)
         let mut c = 0;
-        for ev in [EV_TEXT_SELECTION, EV_TEXT_CHANGED] {
+        for ev in [EV_TEXT_SELECTION, EV_TEXT_CHANGED, EV_LIVE, EV_SYSTEM_ALERT] {
             c |= core::mem::transmute::<usize, unsafe extern "system" fn(usize, i32, usize, i32, usize, *const Handler) -> Hr>(vf(ua, 32))(
                 ua,
                 ev,
@@ -1719,21 +2431,75 @@ pub fn uia_test_listen(hwnd: isize) -> bool {
     };
     com_release(win);
     LISTENER.store(ua, Ordering::Release);
+    listen_notifications(hwnd);
     ok
 }
 
+const CLSID_CUIAUTOMATION8: Guid = guid(0xe22ad333, 0xb25f, 0x460c, [0x83, 0xd0, 0x05, 0x81, 0x10, 0x73, 0x95, 0xc9]);
+const IID_IUIAUTOMATION5: Guid = guid(0x25f700c8, 0xd816, 0x4057, [0xa9, 0xdc, 0x3c, 0xbd, 0xee, 0x77, 0xe2, 0x56]);
+const IID_NOTIFY_HANDLER: Guid = guid(0xc7cb2637, 0xe6c2, 0x4d0c, [0x85, 0xde, 0x49, 0x48, 0xc0, 0x21, 0x75, 0xc7]);
+// the IUIAutomation5 the notification handler is registered with
+static LISTENER5: AtomicUsize = AtomicUsize::new(0);
+
+#[repr(C)]
+struct VtNotifyHandler {
+    qi: Qi,
+    add: Ref,
+    rel: Ref,
+    handle: unsafe extern "system" fn(This, usize, i32, i32, usize, usize) -> Hr,
+}
+static VT_NOTIFY_HANDLER: VtNotifyHandler = VtNotifyHandler { qi: h_qi, add: h_ref, rel: h_ref, handle: h_notify };
+static NOTIFY_HANDLER: Handler = Handler(&VT_NOTIFY_HANDLER as *const VtNotifyHandler as *const u8);
+
+unsafe extern "system" fn h_notify(_this: This, _sender: usize, _kind: i32, processing: i32, text: usize, _activity: usize) -> Hr {
+    // SAFETY: a BSTR (NUL-terminated) or null.
+    let t = unsafe { wide_str(text as *const u16) };
+    EVENTS.lock().push(alloc::format!("notify:{t}:{processing}"));
+    S_OK
+}
+
+// the notification events (Windows 10 1709 and later) below window hwnd: IUIAutomation5 of a
+// CUIAutomation8 (the plain CUIAutomation has no IUIAutomation5)
+fn listen_notifications(hwnd: isize) {
+    let (ci, cc) = (f(F_COINIT), f(F_COCREATE));
+    if ci == 0 || cc == 0 {
+        return;
+    }
+    let mut ua = 0usize;
+    // SAFETY: CoCreateInstance(CLSID_CUIAutomation8, .., IID_IUIAutomation5) (the apartment is the
+    // caller's, see automation()); IUIAutomation::ElementFromHandle (slot 6);
+    // IUIAutomation5::AddNotificationEventHandler(IUIAutomationElement*, TreeScope,
+    // IUIAutomationCacheRequest*, IUIAutomationNotificationEventHandler*) (slot 68).
+    unsafe {
+        core::mem::transmute::<usize, unsafe extern "system" fn(usize, u32) -> Hr>(ci)(0, 0);
+        let create: unsafe extern "system" fn(*const Guid, usize, u32, *const Guid, *mut usize) -> Hr = core::mem::transmute(cc);
+        if create(&CLSID_CUIAUTOMATION8, 0, 1, &IID_IUIAUTOMATION5, &mut ua) < 0 || ua == 0 {
+            return;
+        }
+        let mut win = 0usize;
+        core::mem::transmute::<usize, unsafe extern "system" fn(usize, isize, *mut usize) -> Hr>(vf(ua, 6))(ua, hwnd, &mut win);
+        if win != 0 {
+            core::mem::transmute::<usize, unsafe extern "system" fn(usize, usize, i32, usize, *const Handler) -> Hr>(vf(ua, 68))(ua, win, 7, 0, &NOTIFY_HANDLER);
+            com_release(win);
+        }
+    }
+    LISTENER5.store(ua, Ordering::Release);
+}
+
 /// (tests) the events since the last call: "focus:<name>", "prop:<id>:<name>=<value>",
-/// "event:<id>:<name>"
+/// "event:<id>:<name>", "notify:<text>:<processing>"
 pub fn uia_test_events() -> Vec<String> {
     core::mem::take(&mut *EVENTS.lock())
 }
 
 /// (tests; the thread of uia_test_listen) remove the handlers
 pub fn uia_test_unlisten() {
-    let ua = LISTENER.swap(0, Ordering::AcqRel);
-    if ua != 0 {
-        // SAFETY: IUIAutomation::RemoveAllEventHandlers (slot 41).
-        unsafe { core::mem::transmute::<usize, unsafe extern "system" fn(usize) -> Hr>(vf(ua, 41))(ua) };
-        com_release(ua);
+    for l in [&LISTENER, &LISTENER5] {
+        let ua = l.swap(0, Ordering::AcqRel);
+        if ua != 0 {
+            // SAFETY: IUIAutomation::RemoveAllEventHandlers (slot 41).
+            unsafe { core::mem::transmute::<usize, unsafe extern "system" fn(usize) -> Hr>(vf(ua, 41))(ua) };
+            com_release(ua);
+        }
     }
 }

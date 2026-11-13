@@ -29,6 +29,8 @@ pub const JM_MAXPIX: u64 = 0x7FFF_FFFF;
 /// total samples of all channels of one image (large channels are summed up when they are inserted)
 pub const JM_MAXTOT: u64 = 1 << 32;
 pub const JM_MAXCH: u32 = 1 << 16;
+/// samples the palette channels of one image may take beyond the image's own (jm_decode)
+const PAL_ROOM: u64 = 1 << 20;
 pub const MTR_RCT: u32 = 0;
 pub const MTR_PALETTE: u32 = 1;
 pub const MTR_SQUEEZE: u32 = 2;
@@ -368,8 +370,8 @@ fn jm_defsqueeze(mi: &Mi, mt: &mut Mt) -> i32 {
     0
 }
 
-/// jm_meta: MetaApply
-fn jm_meta(mi: &mut Mi, mt: &mut Mt) -> i32 {
+/// jm_meta: MetaApply; room = the samples the palette channels may still take
+fn jm_meta(mi: &mut Mi, mt: &mut Mt, room: &mut u64) -> i32 {
     match mt.id {
         MTR_RCT => mi.checkeq(mt.begin, mt.begin.wrapping_add(2)),
         MTR_PALETTE => {
@@ -383,6 +385,12 @@ fn jm_meta(mi: &mut Mi, mt: &mut Mt) -> i32 {
             if r != 0 {
                 return r;
             }
+            // the palette channel's size comes from the stream alone, small channels included
+            let n = (mt.nbcol as u64 + mt.nbdelta as u64) * nc as u64;
+            if n > *room {
+                return ERR_LIMIT;
+            }
+            *room -= n;
             if bc < mi.nbmeta {
                 if ec >= mi.nbmeta {
                     return ERR_HDR;
@@ -497,9 +505,12 @@ pub fn jm_decode(
     if jb.err != 0 {
         return jb.err;
     }
+    // squeeze keeps the number of samples, palettes add theirs: all palette channels together
+    // at most as many samples as the image has before the transforms, plus PAL_ROOM
+    let mut room = mi.ch.iter().map(|c| c.d.len() as u64).sum::<u64>() + PAL_ROOM;
     for i in 0..nt as usize {
         let mut mt = core::mem::take(&mut mi.tr[i]);
-        let r = jm_meta(mi, &mut mt);
+        let r = jm_meta(mi, &mut mt, &mut room);
         mi.tr[i] = mt;
         if r != 0 {
             return r;

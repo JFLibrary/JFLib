@@ -57,9 +57,10 @@
 //        view, PgUp / PgDn that a field does not take scroll the view.  The fields follow the
 //        window's mirroring (as every widget), not the direction of their paragraph.  A
 //        document without fields reads as before.
-//   Flags: MV_NO_FRAME (no card, a smaller padding), MV_OPEN_LINKS (an activated link is also
-//        opened with open_url: its scheme rules and the app's policy apply; never without the
-//        user's click or Enter), MV_RTL / MV_LTR (the document's direction; default: that of
+//   Flags: MV_NO_FRAME (no card, a smaller padding), MV_OPEN_LINKS (an activated http, https
+//        or mailto link is also opened with open_url: the app's policy applies; never without
+//        the user's click or Enter; links of other schemes and relative ones only reach the
+//        app), MV_RTL / MV_LTR (the document's direction; default: that of
 //        its first strong character, else the window's)
 //
 // Layout: the blocks in a column; block quotes indent with a bar, lists with their markers in
@@ -89,11 +90,15 @@
 // drops it, Ctrl+A selects all,
 // Ctrl+C / Ctrl+Insert copy the selection as text (list markers, cells by tabs) and HTML.
 // Images: names of the VFS ("app://", "data://" ...) and paths (relative ones after base) are
-// read on first view and kept in the state; http(s) addresses are never fetched by the view
-// (MI_LOCAL: the alt text shows in a frame instead; MI_ASK / MI_APP: the app fetches them).
+// read on first view and kept in the state -- of the OS's files only regular ones up to 32 MB,
+// never a network or device path ("//server/share", "\\.\..."); http(s) addresses are never
+// fetched by the view (MI_LOCAL: the alt text shows in a frame instead; MI_ASK / MI_APP: the
+// app fetches them).
 // Records: K_BOX id (label: the label, value: the scroll position in DIP); per visible block
-// K_HEADING (value: the level), K_TEXT (paragraphs, code, table cells), K_LISTITEM (the first
-// block of a list item, value: its number), K_CHECKBOX (a task's box, checked), K_LINK per
+// K_HEADING (value: the level), K_TEXT (paragraphs, code), K_LISTITEM (the first block of a list
+// item, value: its number), K_CHECKBOX (a task's box, checked); a table's rows in view: K_TABLE
+// around them (grid: the table's rows and columns), per row K_ROW (label: its cells' texts) and
+// per cell K_CELL (a header row's: K_COLHEADER; cell: row and column); K_LINK per
 // link, K_IMAGE (label: the alt text) per image; per visible field the widget's record
 // (K_TEXTBOX, K_CHECKBOX, K_RADIO, K_COMBO, K_BUTTON: label the field's name -- its <label>,
 // aria-label, title, placeholder -- or a button's caption; text boxes and lists take it from a
@@ -128,7 +133,7 @@ use crate::{Sp, Ui};
 
 /// markdown_view flags: no card around the document
 pub const MV_NO_FRAME: u32 = 1;
-/// an activated link is also opened (open_url)
+/// an activated link is also opened (open_url) when it is http, https or mailto
 pub const MV_OPEN_LINKS: u32 = 2;
 /// the document runs right to left (indents and markers on the right)
 pub const MV_RTL: u32 = 4;
@@ -286,6 +291,21 @@ fn img_at(src: &str, base: &str, mode: u8) -> (Option<String>, Option<String>) {
         _ if remote => (None, None),
         _ => (Some(path), None),
     }
+}
+
+// whether the view reads path for an image: never a network or device path ("//server/share",
+// "\\server\share", "\\.\COM1": Windows connects to the server just to show the picture), and
+// of the OS's files only a regular one of at most IMG_BYTES (not /dev/zero, a pipe, a terminal)
+fn img_file_ok(path: &str) -> bool {
+    let b = path.as_bytes();
+    if b.len() >= 2 && matches!(b[0], b'/' | b'\\') && matches!(b[1], b'/' | b'\\') {
+        return false;
+    }
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+    if matches!(plat::vfs::route(path), plat::vfs::Route::Os) {
+        return plat::fs::stat(path).is_some_and(|m| m.is_file() && m.size <= IMG_BYTES as u64);
+    }
+    true
 }
 
 // a picture from its bytes (an SVG by its name or its first character, else what img_core
@@ -1187,7 +1207,7 @@ impl Ui {
         if let Some(Img::Unread) = lc.imgs.get(i) {
             let src = doc.images().get(i).map_or("", |m| m.src.as_str()).trim();
             let img = match img_at(src, base, lc.mode) {
-                (Some(path), _) => match plat::read_file(&path) {
+                (Some(path), _) => match img_file_ok(&path).then(|| plat::read_file(&path)).flatten() {
                     Some(d) => img_decode(&d, src),
                     None => Img::Failed,
                 },
@@ -2121,7 +2141,7 @@ impl Ui {
             if let Some(sp) = st.doc.link_spots().get(k).copied() {
                 let url = String::from(st.doc.link(sp.link));
                 if flags & MV_OPEN_LINKS != 0 {
-                    self.open_url(&url);
+                    self.open_doc_link(&url);
                 }
                 out.link = Some(url);
                 out.ev |= EV_ACT;
@@ -2155,10 +2175,11 @@ impl Ui {
         let mut links: Vec<Link> = Vec::new();
         let mut fields: Vec<(usize, [i32; 4], u32)> = Vec::new();
         let mut hover: Option<usize> = None;
+        let mut tab = None;
         for &(k, y) in &vis {
             let lay = st.lc.lays.get(&k).cloned();
             if let Some(lay) = lay {
-                self.md_draw_block(&st.doc, &mut st.lc, st.sel, k, &lay, cx, vy + y, cw, drtl, focused, bgc, (vy, vy + view_h), &mut links, &mut fields);
+                self.md_draw_block(&st.doc, &mut st.lc, st.sel, k, &lay, cx, vy + y, cw, drtl, focused, bgc, (vy, vy + view_h), &mut links, &mut fields, &mut tab);
             }
         }
         // the focused link: a frame around its pieces
@@ -2826,7 +2847,8 @@ impl Ui {
     #[allow(clippy::too_many_arguments)]
     // (rows outside vis: y0 .. y1 are skipped -- a block may be far taller than the view; the
     // fields go to `fields` with their logical rectangles: md_fields builds their widgets)
-    fn md_draw_block(&mut self, doc: &MdDoc, lc: &mut Cache, sel: TextSel, k: usize, lay: &BLay, cx: i32, top: i32, cw: i32, drtl: bool, focused: bool, bgc: u32, vis: (i32, i32), links: &mut Vec<Link>, fields: &mut Vec<(usize, [i32; 4], u32)>) {
+    // (tab: the table whose record the rows in view so far grow, the record's index in sems)
+    fn md_draw_block(&mut self, doc: &MdDoc, lc: &mut Cache, sel: TextSel, k: usize, lay: &BLay, cx: i32, top: i32, cw: i32, drtl: bool, focused: bool, bgc: u32, vis: (i32, i32), links: &mut Vec<Link>, fields: &mut Vec<(usize, [i32; 4], u32)>, tab: &mut Option<(u32, usize)>) {
         let hc = self.high_contrast;
         let bl = &doc.blocks()[k];
         let ctop = top + lay.gap;
@@ -3138,12 +3160,34 @@ impl Ui {
                 self.sem(K_HEADING, 0, Some(&label), bl.level as i32);
             }
             MB_ROW => {
+                // the table: one record around its rows in view (the first one makes it with the
+                // table's size, the others grow it), a record per row and per cell (a header row's
+                // cells column headers) with their place: a screen reader's table navigation
+                let rows = lc.rows_of.get(&bl.table);
+                let ri = rows.and_then(|v| v.binary_search(&k).ok()).unwrap_or(0) as u32;
+                let texts: Vec<String> = bl.cells.iter().map(|&(a, b)| doc.plain_range(TextPos::new(k, a as usize), TextPos::new(k, b as usize))).collect();
+                match *tab {
+                    Some((t, i)) if t == bl.table && i < self.sems.len() => {
+                        let (a, b) = (self.sems[i].rect, self.phys_rect(self.wp.ctx.last_rect));
+                        let (x0, y0) = (a[0].min(b[0]), a[1].min(b[1]));
+                        let (x1, y1) = ((a[0] + a[2]).max(b[0] + b[2]), (a[1] + a[3]).max(b[1] + b[3]));
+                        self.sems[i].rect = [x0, y0, x1 - x0, y1 - y0];
+                    }
+                    _ => {
+                        let nrows = rows.map_or(1, |v| v.len()) as u32;
+                        let ncols = doc.tables().get(bl.table as usize).map_or(0, |t| t.aligns.len()).max(bl.cells.len()) as u32;
+                        // (no name, as a table without a caption; "" lets scripts find it as table:"")
+                        self.sem(K_TABLE, 0, Some(""), 0).grid(nrows, ncols);
+                        *tab = Some((bl.table, self.sems.len() - 1));
+                    }
+                }
+                self.sem(K_ROW, 0, Some(&texts.join(" ")), 0);
+                let kind = if bl.head { K_COLHEADER } else { K_CELL };
                 for (c, fb) in lay.boxes.iter().enumerate() {
-                    let Some(&(a, b)) = bl.cells.get(c) else { continue };
-                    let t: String = doc.plain_range(TextPos::new(k, a as usize), TextPos::new(k, b as usize));
+                    let Some(t) = texts.get(c) else { continue };
                     let px = self.dp_text(CELL_PX);
                     self.wp.ctx.last_rect = self.ltr_rect([box_x(cx, cw, fb.x - px, fb.w + px * 2, drtl), ctop, fb.w + px * 2, lay.ch]);
-                    self.sem(K_TEXT, 0, Some(&t), 0);
+                    self.sem(kind, 0, Some(t), 0).cell(ri, c as u32);
                 }
             }
             MB_RULE => {}

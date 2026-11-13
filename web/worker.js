@@ -171,8 +171,9 @@ function dispatch(m) {
       else wasm.jfgui_complete(m.id,m.status===2?-3:m.status);
       input();break;
     }
-    // the accessibility mirror on / off (a11y.js), an action of assistive technology
-    case "a11y": if(wasm.jfgui_a11y) {wasm.jfgui_a11y(+!!m.on);input();} break;
+    // the accessibility mirror on / off (a11y.js; on 2: the rich format, a11y_wire VERSION2), an
+    // action of assistive technology
+    case "a11y": if(wasm.jfgui_a11y) {wasm.jfgui_a11y(m.on===true ? 1 : Number(m.on)>>>0);input();} break;
     case "a11y-act": {
       if(!wasm.jfgui_a11y_act) break;
       const text=encode.encode(String(m.text||""));

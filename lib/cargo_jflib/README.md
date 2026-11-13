@@ -8,11 +8,11 @@ cargo install cargo-jflib
 
 | Command | What it does |
 | --- | --- |
-| `cargo jflib new [--std] NAME` | a new app from the template of the crate `jflib`: a window, its tests, the settings for Windows and Linux; `--std`: the same app with the standard library (`jflib`'s feature `std`), so it may use `std` crates |
-| `cargo jflib test` | builds the app, then runs every `tests/*.uis` with `--script`; a line `#!only windows linux ..` among a script's first lines runs it on these systems only (`target_os` of `--target`, else of this machine) |
+| `cargo jflib new [--std] NAME` | a new app from the template of the crate `jflib`: a window, its tests, the settings for Windows and Linux; `--std`: the same app with the standard library (`jflib`'s feature `std`), so it may use `std` crates; its `Cargo.toml` says how it catches panics instead (the feature `unwind`, `panic = "unwind"`) |
+| `cargo jflib test [--features F,..] [--no-default-features] [--dir DIR]` | builds the app (on Linux always with `--target`, this machine's when none is given: the template's flags must not reach the build scripts), then runs every `tests/*.uis` with `--script`; a line `#!only windows linux ..` among a script's first lines runs it on these systems only (`target_os` of `--target`, else of this machine); `--features` and `--no-default-features` go to the build, `--dir DIR` runs `DIR/*.uis` instead (relative to the package's folder) |
 | `cargo jflib watch [-- ARGS]` | hot reload: each save of the project's files builds the app again and restarts it in its session, the input replayed so it comes back where it was; a failed build keeps the running version and shows the error in its inspector |
 | `cargo jflib web [--serve]` | the app for the browser in `target/jflib-web/NAME/`: scalar, SIMD and threads, the host page, the licences; `--serve` serves it with the headers threads need |
-| `cargo jflib package [--styles winui,kde] [--formats setup,deb,..\|all] [--sign] [--repo DIR] [--update DIR]` | the app with every style built in, in `target/jflib-package/`: by default `NAME_Setup.exe` for Windows (a preview of each style to pick from, folder, shortcuts, file types, an uninstaller) and `DEB_VERSION_amd64.deb` for Linux (debconf asks for the look); with `--formats` also `msix`, `appimage` (one per style), `rpm` and `flatpak`; the licences of every crate inside |
+| `cargo jflib package [--styles winui,kde] [--formats setup,deb,..\|all] [--sign] [--repo DIR] [--update DIR]` | the app with every style built in, in `target/jflib-package/`: by default `NAME_Setup.exe` for Windows (a preview of each style to pick from, folder, shortcuts, file types, an uninstaller) and `DEB_VERSION_amd64.deb` for Linux (debconf asks for the look), an app with jflib's feature `std` only the one of the system it is made on; with `--formats` also `msix`, `appimage` (one per style), `rpm` and `flatpak`; the licences of every crate inside |
 | `cargo jflib keygen FILE` | a key for the signed update channel (`package --update`) and its public key for the app |
 | `cargo jflib android [--abi arm64-v8a\|x86_64] [--release] [--install]` | the app as an APK in `target/jflib-android/NAME-ABI-debug.apk`: the code for one ABI, its Java and C bridge, the licences; signed with a debug key it makes itself, `--release` with yours; `--install` hands it to `adb` |
 | `cargo jflib mac [--release] [--run [-- ARGS]]` | on a Mac: the app as `target/jflib-mac/NAME.app` for Apple Silicon: `Info.plist` from `PACKAGE` (`display`, `version`, `app_id`, `filetypes` as document types, `schemes` as URL types, the languages of `src/locales/ui.tsv` as localizations), the icon from `res/app_*.png` as `NAME.icns`, signed ad hoc; with `sandbox` in `PERMISSIONS` the App Sandbox and the entitlements its rules need; `--run` starts it |
@@ -33,7 +33,11 @@ below the SDK or `ANDROID_NDK_HOME`. The manifest comes from `PACKAGE` (`app_id`
 `package` builds the app with `--release` once per style (`JFLIB_STYLE`) for Windows and for
 Linux, both from any machine: the Linux program links without a Linux machine, the setup stub
 (the crate `jflib-installer`) and the AppImage runtime (`jflib-appimagert`, one static file) are
-built next to the app with its profiles and Cargo.lock. The previews are screenshots of the
+built next to the app with its `[profile.release]` and Cargo.lock, always with `panic = "abort"` (they are
+programs without std, also for an app with the feature `unwind`); where the app has JFLib's crates
+from paths (an app in JFLib's workspace), the stubs take them from there too, and when its `jflib` comes
+from a path (a checkout under `[patch.crates-io]`), the stubs take all their crates from that checkout's
+workspace, `jflib-installer` included, which the app itself does not depend on. The previews are screenshots of the
 program this machine runs (`--shot`).
 
 | Format | Made by | Needs |
@@ -50,7 +54,7 @@ one that has the tool. What it reads from `PACKAGE` next to Cargo.toml:
 | Key | Use |
 | --- | --- |
 | `display`, `version`, `publisher` | the shown name (default: the package's name), the version (default: Cargo.toml's), the publisher in Windows' list of apps |
-| `styles`, `default_win`, `default_linux` | the styles to build in (default `winui`; `--styles` wins) and the one preselected |
+| `styles`, `default_win`, `default_linux` | the styles to build in (default `winui`; `--styles` wins) and the one preselected; besides the library's (winui, classic, kde, macos, netlab) a style of the app's own: a crate of its dependencies with `[package.metadata.jflib] style = "NAME"` (and an `INFO` file: its name and description for the setup), which the app uses itself -- it is built without `JFLIB_STYLE` |
 | `summary`, `description`, `generic`, `categories` | the .desktop entry and the .deb's description |
 | `deb_name`, `section`, `maintainer` | the .deb's name (default: the package's name), its section (`utils`) and maintainer (default: Cargo.toml's first author) |
 | `filetypes`, `schemes` | the file types (`ext[,ext]\|mime/type\|description[\|own]`, `;` between them) and URL schemes the app opens, registered by the setup and the .deb |

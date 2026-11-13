@@ -72,6 +72,11 @@ pub trait Display: Send {
     fn cursor_create(&mut self, px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32, dpi: i32) -> i32;
     fn cursor_destroy(&mut self, id: i32);
     fn cursor_dpi(&mut self, dpi: i32) -> i32;
+    /// (tests) the cursor shown for shape at dpi and the width of a drawn one
+    #[doc(hidden)]
+    fn cursor_probe(&mut self, _shape: u32, _dpi: i32) -> (u64, i32) {
+        (0, 0)
+    }
     fn clip_set(&mut self, fmt: u32, data: &[u8]) -> bool;
     fn clip_set_many(&mut self, entries: &[(u32, &[u8])]) -> bool;
     fn clip_get(&mut self, fmt: u32) -> Option<Vec<u8>>;
@@ -378,6 +383,14 @@ pub fn cursor_dpi(dpi: i32) -> i32 {
     with(|b| b.cursor_dpi(dpi)).unwrap_or(dpi)
 }
 
+/// (tests, E3) the cursor shown for shape (CUR_*) in a window of this dpi: its id (X11: the
+/// Cursor; 0 without a display or on Wayland) and, for a drawn one (cursor_art), its width in
+/// px (0: a system cursor or cursor_fallback's)
+#[doc(hidden)]
+pub fn cursor_probe(shape: u32, dpi: i32) -> (u64, i32) {
+    with(|b| b.cursor_probe(shape, dpi)).unwrap_or((0, 0))
+}
+
 pub fn clip_set(fmt: u32, data: &[u8]) -> bool {
     with(|b| b.clip_set(fmt, data)).unwrap_or(false)
 }
@@ -514,6 +527,7 @@ fn spawn_exe(exe: &[u8], args: &[&str]) -> i32 {
         if pid == 0 {
             rt::os::syscall3(rt::os::SYS_EXECVE, exe.as_ptr() as usize, argv.as_ptr() as usize, envp.as_ptr() as usize);
             rt::os::syscall3(rt::os::SYS_EXIT_GROUP, 127, 0, 0);
+            #[allow(clippy::empty_loop)] // not reached: exit_group does not return
             loop {}
         }
     }

@@ -31,7 +31,7 @@ use alloc::vec::Vec;
 use core::cell::Cell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use super::{PostMessageW, UiThread, dll_proc, main_hwnd, wide_cap, win_hwnd};
+use super::{PostMessageW, SendMessageW, UiOnly, dll_proc, main_hwnd, wide_cap, win_hwnd};
 use crate::{CLIP_DOCX, CLIP_HTML, CLIP_RTF, CLIP_IMAGE, CLIP_PNG, CLIP_TEXT, clip_dib_to_bmp, clipimg_split, drop_add, drop_reset};
 
 #[link(name = "user32", kind = "raw-dylib")]
@@ -66,6 +66,40 @@ unsafe extern "system" {
     fn ImmGetContext(hwnd: isize) -> isize;
     fn ImmReleaseContext(hwnd: isize, context: isize) -> i32;
     fn ImmGetCompositionStringW(context: isize, index: u32, buffer: *mut u16, bytes: u32) -> i32;
+    fn ImmAssociateContextEx(hwnd: isize, context: isize, flags: u32) -> i32;
+}
+
+/// (E4) the input method of the window with the keyboard follows ime_purpose (IP_PASSWORD: no
+/// input context; else the default one) and ime_inline (WM_IME_SETCONTEXT once more, so the
+/// composition window goes or comes)
+pub(crate) fn ime_context_refresh() {
+    // SAFETY: no arguments: the focus window of this (the UI) thread.
+    let f = unsafe { GetFocus() };
+    if f == 0 || !(0..crate::PW_MAX as i32).any(|w| win_hwnd(w) == f) {
+        return;
+    }
+    let pw = crate::ime_purpose_of() == crate::IP_PASSWORD;
+    // SAFETY: our window; IACE_DEFAULT (0x10) gives the default context back, 0 with no context
+    // takes it away.
+    unsafe { ImmAssociateContextEx(f, 0, if pw { 0 } else { 0x10 }) };
+    if !pw {
+        // SAFETY: our window; wndproc adjusts the flags (ime_setcontext_flags) and passes it on.
+        unsafe { SendMessageW(f, 0x0281, 1, 0xC000_000F_u32 as isize) }; // WM_IME_SETCONTEXT, ISC_SHOWUIALL
+    }
+}
+
+/// (wndproc WM_SETFOCUS) the window that gets the keyboard follows ime_purpose (the purpose may
+/// have changed while another window had it): no input context for IP_PASSWORD, else its default
+pub(super) fn ime_context_focus(hwnd: isize) {
+    let pw = crate::ime_purpose_of() == crate::IP_PASSWORD;
+    // SAFETY: our window that just got the keyboard; IACE_DEFAULT (0x10) or no context.
+    unsafe { ImmAssociateContextEx(hwnd, 0, if pw { 0 } else { 0x10 }) };
+}
+
+/// (E4, wndproc) WM_IME_SETCONTEXT's flags: without the composition window while the app draws
+/// the composition itself (ime_inline)
+pub(super) fn ime_setcontext_flags(active: bool, lp: isize) -> isize {
+    if active && crate::ime_inline_on() { ((lp as u32) & !0x8000_0000) as i32 as isize } else { lp }
 }
 pub(super) fn ime_composition(hwnd: isize, win: u8, flags: u32) {
     // Attribute-only notifications retain the existing composition. Cursor-only
@@ -118,7 +152,7 @@ struct Clip {
     ime_w: Cell<isize>,
 }
 
-static CLIP: UiThread<Clip> = UiThread(Clip {
+static CLIP: UiOnly<Clip> = UiOnly::new(Clip {
     cf_png: Cell::new(0),
     cf_impng: Cell::new(0),
     ime_h: Cell::new(0),
@@ -134,7 +168,7 @@ static P_DFIN: AtomicUsize = AtomicUsize::new(0);
 static SHELL_TRIED: AtomicUsize = AtomicUsize::new(0);
 
 fn clip() -> &'static Clip {
-    &CLIP.0
+    CLIP.get()
 }
 
 /// the clipboard is open (retried while another program holds it)  [clip_open]

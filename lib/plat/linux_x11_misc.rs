@@ -15,7 +15,14 @@
 //        cursors (black on white) of the core "cursor" font, made on first use: xterm 152,
 //        hand2 60, crosshair 34, fleur 52, watch 150, sb_v_double_arrow 116,
 //        sb_h_double_arrow 108, bottom_right_corner 14 (NW-SE), bottom_left_corner 12
-//        (NE-SW).  CUR_NONE is an empty 1x1 bitmap cursor.
+//        (NE-SW).  CUR_NONE is an empty 1x1 bitmap cursor.  (E3) CUR_X0 .. CUR_X_END: circle
+//        (not-allowed, no-drop), fleur (all-scroll), question_arrow, watch, the double arrows
+//        and the sides / corners of the resize shapes.  Grab, grabbing, zoom-in / -out, cell,
+//        vertical text, alias, copy and context menu are drawn ARGB cursors (cursor_art, dark
+//        as the Adwaita and Breeze themes) at the size of the desktop's cursors (cursor_px:
+//        XCURSOR_SIZE, else Xcursor.size, else 24 * dpi / 96), made once per size; without
+//        RENDER the glyph of the table (hand1, fleur, plus) or cursor_fallback's.
+//   cursor_probe(shape, dpi) -> (cursor id, width of a drawn one)   (tests)
 //   cursor_create(px, w, h, hot_x, hot_y) -> CUR_USER0 + k / -1   an ARGB cursor through
 //        RENDER >= 0.5: a depth-32 pixmap (PutImage in bands of <= 64 KB), a picture of the
 //        direct A24 R16 G8 B0 format, RenderCreateCursor; picture / GC / pixmap freed at once
@@ -29,7 +36,7 @@ use alloc::format;
 use alloc::vec::Vec;
 
 use super::*;
-use crate::{CUR_ARROW, CUR_MAX_PX, CUR_NONE, CUR_USER0};
+use crate::{CUR_ARROW, CUR_MAX_PX, CUR_NONE, CUR_USER0, cursor_art};
 
 const XQ_EVENTS: u32 = XM_BUTTON_PRESS | XM_BUTTON_RELEASE | XM_ENTER | XM_LEAVE | XM_POINTER_MOTION | XM_EXPOSURE;
 const CFG_XYWH_STACK: u32 = 0x4F; // ConfigureWindow: x, y, width, height, stack-mode
@@ -49,6 +56,9 @@ const RR_QUERY_VERSION: u32 = 0;
 const RR_GET_MONITORS: u32 = 42;
 // CUR_* -> cursor font glyph (CUR_ARROW: None)
 static CURSOR_GLYPH: [u8; 11] = [68, 152, 60, 34, 52, 150, 116, 108, 14, 12, 0];
+// (E3) CUR_X0 .. CUR_X_END -> cursor font glyph (0: cursor_fallback's shape)
+static CURSOR_GLYPH_X: [u8; (crate::CUR_X_END - crate::CUR_X0) as usize] =
+    [24, 24, 58, 52, 92, 150, 0, 0, 90, 0, 0, 0, 0, 52, 108, 116, 138, 16, 96, 70, 136, 134, 14, 12];
 
 impl X11 {
     // ------------------------------------------------------------------ popups  [x11_popup.s]
@@ -242,7 +252,7 @@ impl X11 {
 
     /// x11_plat_win_set_cursor(w, shape): the cursor of window w (its CWCursor attribute)
     pub(super) fn win_set_cursor(&mut self, w: i32, shape: u32) {
-        if shape >= CUR_COUNT && shape.wrapping_sub(CUR_USER0) >= CUR_USER_MAX {
+        if shape >= CUR_COUNT && shape.wrapping_sub(CUR_USER0) >= CUR_USER_MAX && !(crate::CUR_X0..crate::CUR_X_END).contains(&shape) {
             return;
         }
         let Some(i) = self.rec(w) else { return };
@@ -264,6 +274,24 @@ impl X11 {
         let k = shape.wrapping_sub(CUR_USER0);
         if k < CUR_USER_MAX {
             return self.xcust[k as usize];
+        }
+        let x = shape.wrapping_sub(crate::CUR_X0);
+        if x < crate::CUR_X_END - crate::CUR_X0 {
+            // (E3) a drawn one, a glyph of its own, else the nearest shape's
+            let dpi = if self.dpi != 0 { self.dpi } else { 96 };
+            let d = self.drawn_cursor(shape, dpi);
+            if d != 0 {
+                return d;
+            }
+            let g = CURSOR_GLYPH_X[x as usize];
+            if g == 0 {
+                return self.cursor_get(crate::cursor_fallback(shape));
+            }
+            if self.cursors_x[x as usize] == 0 {
+                let c = self.glyph_cursor(g as u32);
+                self.cursors_x[x as usize] = c;
+            }
+            return self.cursors_x[x as usize];
         }
         if shape >= CUR_COUNT {
             return 0;
@@ -298,30 +326,80 @@ impl X11 {
             wr32(&mut self.out, o + 4, pm); // source
             wr32(&mut self.out, o + 8, pm); // mask (colours and hot spot stay 0)
         } else {
-            if self.cur_font == 0 {
-                self.cur_font = self.new_id();
-                let (o, _) = self.req(XR_OPEN_FONT, 12 + 8); // "cursor" padded to 8
-                let font = self.cur_font;
-                wr32(&mut self.out, o, font);
-                wr16(&mut self.out, o + 4, 6);
-                self.out[o + 8..o + 14].copy_from_slice(b"cursor");
-            }
-            cid = self.new_id();
-            let (o, _) = self.req(XR_CREATE_GLYPH_CURSOR, 32);
-            let font = self.cur_font;
-            let g = CURSOR_GLYPH[shape as usize] as u32;
-            let b = &mut self.out;
-            wr32(b, o, cid);
-            wr32(b, o + 4, font); // source font
-            wr32(b, o + 8, font); // mask font
-            wr16(b, o + 12, g); // source char
-            wr16(b, o + 14, g + 1); // mask char
-            wr32(b, o + 16, 0); // foreground black
-            wr16(b, o + 20, 0);
-            wr32(b, o + 22, 0xFFFFFFFF); // background white
-            wr16(b, o + 26, 0xFFFF);
+            cid = self.glyph_cursor(CURSOR_GLYPH[shape as usize] as u32);
         }
         self.cursors[shape as usize] = cid;
+        cid
+    }
+
+    /// (E3) the size of a cursor (px) at this dpi: the desktop's at its dpi (Xft.dpi) is
+    /// XCURSOR_SIZE, else Xcursor.size (both as libXcursor reads them, already scaled by the
+    /// desktop), else 24 * dpi / 96; another dpi scales it (asked again when Xft.dpi changed)
+    fn cursor_px(&mut self, dpi: i32) -> i32 {
+        let cur = if self.dpi != 0 { self.dpi } else { 96 };
+        if self.cur_px.0 != cur || self.cur_px.1 == 0 {
+            let ok = |v: &i32| (8..=CUR_MAX_PX).contains(v);
+            let set = crate::env("XCURSOR_SIZE").and_then(|v| v.trim().parse::<i32>().ok()).filter(ok);
+            let base = set.or_else(|| self.resource_int(b"Xcursor.size:").filter(ok)).unwrap_or((24 * cur + 48) / 96);
+            self.cur_px = (cur, base.clamp(8, CUR_MAX_PX));
+        }
+        ((self.cur_px.1 * dpi + cur / 2) / cur).clamp(8, CUR_MAX_PX)
+    }
+
+    /// (E3) the drawn cursor of shape at the cursor size of this dpi, made on first use (an
+    /// ARGB cursor through RENDER) -> its id, 0 when the shape has no bitmap or RENDER is
+    /// missing
+    fn drawn_cursor(&mut self, shape: u32, dpi: i32) -> u32 {
+        let Some(a) = cursor_art::drawn(shape) else { return 0 };
+        let size = self.cursor_px(dpi) as u32;
+        if let Some(&(_, _, c)) = self.drawn.iter().find(|d| d.0 == shape && d.1 == size) {
+            return c;
+        }
+        if self.fd <= 0 || !self.xr_init() {
+            return 0;
+        }
+        let img = cursor_art::pixels(a, size, 24, true);
+        let c = self.argb_cursor(&img.px, img.w, img.h, img.hx, img.hy);
+        if c != 0 {
+            self.drawn.push((shape, size, c));
+        }
+        c
+    }
+
+    /// (tests) the cursor X11 shows for shape at this dpi: its id and, for a drawn one, its
+    /// width in px (0: a glyph or cursor_fallback's)
+    pub(super) fn cursor_probe(&mut self, shape: u32, dpi: i32) -> (u64, i32) {
+        let d = self.drawn_cursor(shape, dpi);
+        if d != 0 {
+            let w = cursor_art::drawn(shape).map_or(0, |a| (a.w as u32 * self.cursor_px(dpi) as u32).div_ceil(24));
+            return (d as u64, w as i32);
+        }
+        (self.cursor_get(shape) as u64, 0)
+    }
+
+    // a glyph cursor of the core "cursor" font (black on white; the font opened on first use)
+    fn glyph_cursor(&mut self, g: u32) -> u32 {
+        if self.cur_font == 0 {
+            self.cur_font = self.new_id();
+            let (o, _) = self.req(XR_OPEN_FONT, 12 + 8); // "cursor" padded to 8
+            let font = self.cur_font;
+            wr32(&mut self.out, o, font);
+            wr16(&mut self.out, o + 4, 6);
+            self.out[o + 8..o + 14].copy_from_slice(b"cursor");
+        }
+        let cid = self.new_id();
+        let (o, _) = self.req(XR_CREATE_GLYPH_CURSOR, 32);
+        let font = self.cur_font;
+        let b = &mut self.out;
+        wr32(b, o, cid);
+        wr32(b, o + 4, font); // source font
+        wr32(b, o + 8, font); // mask font
+        wr16(b, o + 12, g); // source char
+        wr16(b, o + 14, g + 1); // mask char
+        wr32(b, o + 16, 0); // foreground black
+        wr16(b, o + 20, 0);
+        wr32(b, o + 22, 0xFFFFFFFF); // background white
+        wr16(b, o + 26, 0xFFFF);
         cid
     }
 
@@ -337,6 +415,16 @@ impl X11 {
         if !self.xr_init() {
             return -1;
         }
+        let cid = self.argb_cursor(px, w, h, hot_x, hot_y);
+        if cid == 0 {
+            return -1;
+        }
+        self.xcust[k] = cid;
+        (CUR_USER0 + k as u32) as i32
+    }
+
+    /// an ARGB cursor of w x h premultiplied pixels (RENDER ready, sizes checked) -> its id
+    fn argb_cursor(&mut self, px: &[u8], w: i32, h: i32, hot_x: i32, hot_y: i32) -> u32 {
         // depth-32 pixmap + a GC for it
         let pm = self.new_id();
         let (o, _) = self.req(XR_CREATE_PIXMAP | 32 << 8, 16);
@@ -392,8 +480,7 @@ impl X11 {
         let (o, _) = self.req(XR_FREE_PIXMAP, 8);
         wr32(&mut self.out, o, pm);
         self.flush();
-        self.xcust[k] = cid;
-        (CUR_USER0 + k as u32) as i32
+        cid
     }
 
     /// x11_plat_cursor_destroy(id): FreeCursor; windows showing it get None (the arrow) and
@@ -478,6 +565,12 @@ impl X11 {
     /// xm_refresh: the monitor list (xm_n; -1 = RandR 1.5 missing)
     fn xm_refresh(&mut self) {
         if self.xm_n == -1 {
+            return;
+        }
+        // (an event handled while a reply is awaited -- a finger's move during a window drag,
+        // xi_drag_to -- cannot ask the server: a second wait inside the first is fatal.  The
+        // list stays as it is, the next call outside a wait reads it)
+        if self.await_on {
             return;
         }
         let now = crate::time_us();

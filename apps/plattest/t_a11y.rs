@@ -23,6 +23,12 @@
 //                              types of a switch and a heading in German, then English and
 //                              French after it changes the UI language), invokes, toggles,
 //                              sets values, follows the caret, then presses "Beenden"
+//   plattest --test uia-idle   (Windows, by hand: a window for 10 .. 30 s; no screen reader
+//                              running) a client reads the tree once and asks nothing more: the
+//                              idle app hears UIC_A11Y 1, and 10 s later UIC_A11Y 0 without a
+//                              frame or an event of its own (the window loop asks
+//                              plat::a11y::check_due); UiaClientsAreListening alone (the touch
+//                              keyboard's host) keeps nothing on
 //   plattest --test caret      (Windows, by hand) only the caret as screen magnifiers see it:
 //                              the hidden system caret (GetGUIThreadInfo) and TextPattern2's
 //                              caret range of the focused text box agree and follow a
@@ -74,7 +80,7 @@ const FRUIT: [&str; 3] = ["Apfel", "Birne", "Kirsche"];
 
 /// the demo's state, readable from other threads: clicks, check, radio, switch, slider, tab,
 /// list row, clicks of the own widget, frames
-pub(crate) static STATE: [AtomicI32; 9] = [const { AtomicI32::new(0) }; 9];
+pub(crate) static STATE: [AtomicI32; 10] = [const { AtomicI32::new(0) }; 10];
 pub(crate) const CLICKS: usize = 0;
 pub(crate) const CHECK: usize = 1;
 pub(crate) const RADIO: usize = 2;
@@ -84,6 +90,8 @@ pub(crate) const TAB: usize = 5;
 pub(crate) const LIST: usize = 6;
 pub(crate) const OWN: usize = 7;
 pub(crate) const FRAMES: usize = 8;
+/// the last UIC_A11Y the app got: its arg + 1 (0: none yet)
+pub(crate) const HEARD: usize = 9;
 
 pub(crate) fn st(k: usize) -> i32 {
     STATE[k].load(SeqCst)
@@ -161,6 +169,14 @@ impl App for Demo {
             STATE[k].store(v, SeqCst);
         }
         STATE[FRAMES].fetch_add(1, SeqCst);
+    }
+
+    fn command(&mut self, _ui: &mut Ui, id: u32, arg: u32) -> bool {
+        if id == ui::UIC_A11Y {
+            STATE[HEARD].store(arg as i32 + 1, SeqCst);
+            return true;
+        }
+        false
     }
 }
 
@@ -630,12 +646,17 @@ pub fn t_uia(t: &mut T) {
 }
 
 #[cfg(not(windows))]
+pub fn t_uia_idle(t: &mut T) {
+    t.info("  (uia-idle: the idle rule of UI Automation is Windows' own)\n");
+}
+
+#[cfg(not(windows))]
 pub fn t_caret(t: &mut T) {
     t.info("  (caret: Linux checks the caret on AT-SPI2 with tools/platshared/atspi_bus.py)\n");
 }
 
 #[cfg(windows)]
-pub use uia::{t_caret, t_uia};
+pub use uia::{t_caret, t_uia, t_uia_idle};
 
 /// (by hand) the demo in a real window until it is closed or "Beenden" is pressed: for probes
 /// with a screen reader (VoiceOver, Narrator, Orca); --lang CODE: the UI language
@@ -931,6 +952,47 @@ mod uia {
             t.check(ok, &name);
         }
         t.expect_i(code as i64, 0, "caret: the window ran");
+    }
+
+    // --test uia-idle: one look at the tree, then nothing: the app hears the client come and go
+    fn idle_client() {
+        let hwnd = HWND.load(SeqCst);
+        record(wait_tree(hwnd, |t| find(t, "Beenden", CT_BUTTON).is_some()), "uia-idle: IUIAutomation reads the tree");
+        record(wait_st(HEARD, 2), "uia-idle: the app hears a client came (UIC_A11Y 1)");
+        let t0 = plat::time_us();
+        // no question for 10 s: the window loop looks by itself (check_due) and the bridge lets go
+        // (another client's question -- the touch keyboard's host when the window got the
+        // keyboard -- starts the 10 s again: up to 30 s)
+        let mut gone = false;
+        for _ in 0..600 {
+            if st(HEARD) == 1 {
+                gone = true;
+                break;
+            }
+            plat::sleep_ms(50);
+        }
+        let s = (plat::time_us() - t0) / 100_000;
+        record(gone, &alloc::format!("uia-idle: the idle app hears it left (UIC_A11Y 0) after {}.{} s", s / 10, s % 10));
+        record(!ax::active(), "uia-idle: plat::a11y::active() is false");
+        plat::evq_push(plat::Event { typ: plat::E_CLOSE, ..Default::default() });
+        plat::wake();
+    }
+
+    pub fn t_uia_idle(t: &mut T) {
+        let mut app = Demo::new();
+        app.on_init = Some(|| {
+            HWND.store(plat::uia_test_hwnd(0), SeqCst);
+            if plat::thread_spawn(0, Box::new(idle_client)).is_none() {
+                record(false, "uia-idle: the client thread starts");
+            }
+        });
+        let code = ui::run(&DESC, &mut app, &style::STYLE);
+        let results = core::mem::take(&mut *RESULTS.lock());
+        t.check(!results.is_empty(), "uia-idle: the client ran");
+        for (ok, name) in results {
+            t.check(ok, &name);
+        }
+        t.expect_i(code as i64, 0, "uia-idle: the window ran");
     }
 
     pub fn t_uia(t: &mut T) {

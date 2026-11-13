@@ -55,7 +55,12 @@
 // where a dash runs through the vertex.  Patterns whose period comes near a pixel turn into a flat tone of their duty
 // (DASH_FLAT, DASH_EXACT).
 //
-// Colours are sRGB codes blended as they are (premultiplied), as lib/gfx blends them.
+// Colours are sRGB codes blended as they are (premultiplied), as lib/gfx blends them; a transparency (the entity's, its
+// layer's or its insert's, G6b2) is multiplied into the colour's alpha here (block.wgsl ink).
+//
+// Blocks (G6b2, block.wgsl): a visible record of an insert comes as ITEM_BLOCK | its place in the pool, its instance
+// beside it in vinst; it is placed through its instance's space (a View of the block's units) by the same code as every record, so that both
+// owners of a pixel compute it from the same bits.
 
 const BATCH: u32 = 16384u;
 const OPEN: u32 = 0u;
@@ -88,6 +93,9 @@ struct Push {
 @group(0) @binding(2) var<storage, read> styles: array<Style>;
 @group(0) @binding(3) var<storage, read> visible: array<u32>;
 @group(0) @binding(4) var<storage, read> lists: array<vec4u>;
+// per visible record of an insert its instance (cull.wgsl write); per instance its space this frame
+@group(0) @binding(7) var<storage, read> vinst: array<u32>;
+@group(0) @binding(8) var<storage, read> spaces: array<Space>;
 var<immediate> pc: Push;
 
 struct VsOut {
@@ -107,6 +115,50 @@ struct VsOut {
     // lies (px along it from its drawn start); the place of the other side where the pattern starts again (a closed
     // polyline's first point, a circle's start; dash units)
     @location(4) @interpolate(flat) dash: vec4f,
+}
+
+// a visible record (cull.wgsl write): its place in the pool, the view or its insert's space (block.wgsl), whether it is an
+// insert's, the style its entities take by block, mirrored, its entry's epx offset, its first hatch row
+struct Item {
+    idx: u32,
+    vw: View,
+    blk: bool,
+    ins: u32,
+    mir: bool,
+    eoff: u32,
+    hb: u32,
+}
+
+// the visible record at place j of the visible list: v its word there (an insert's instance beside it in vinst)
+fn item_of(v: u32, j: u32) -> Item {
+    var it: Item;
+    it.idx = v;
+    it.vw = view;
+    it.blk = false;
+    it.ins = 0u;
+    it.mir = false;
+    it.eoff = 0u;
+    it.hb = 0u;
+    if (v & ITEM_BLOCK) != 0u {
+        let sp = spaces[vinst[j]];
+        it.idx = v & 0x7fffffffu;
+        it.vw = space_view(sp);
+        it.blk = true;
+        it.ins = sp.u.y;
+        it.mir = (sp.u.x & SP_MIRROR) != 0u;
+        it.eoff = sp.u.w;
+        it.hb = sp.u.z;
+    }
+    return it;
+}
+
+// a record's style (block.wgsl style_in); a pattern in pixels inside an insert: its periods per block unit
+fn item_style(r: Record, it: Item) -> Style {
+    var st = style_in(r.w.z - 1u, it.ins, it.blk);
+    if it.blk && dash_count(st) > 0u && ((st.flags >> 20u) & 15u) != UNIT_DRAWING {
+        st.kappa = kappa_scaled(st.kappa, it.vw.turn.xy);
+    }
+    return st;
 }
 
 fn unit_or_zero(v: vec2f) -> vec2f {
@@ -145,8 +197,8 @@ fn end_reach(dir: vec2f, nbdir: vec2f, joined: bool, incoming: bool, h: f32, st:
 // a dashed segment: the pattern's place at its reference point (the camera centre's foot on its line, kept within the
 // segment) from the nearer end, in double-f32 (dash units); where that point lies along the segment from its drawn
 // start q0 (px); the place of the other side at a closed polyline's first point.  r0, r1: rel2 of its ends, d its
-// direction in pixels
-fn seg_dash(idx: u32, r: Record, st: Style, r0: vec4f, r1: vec4f, q0: vec2f, d: vec2f) -> vec4f {
+// direction in pixels; vw: the view or the insert's space (an insert's lengths and its pattern's periods are its block's units)
+fn seg_dash(idx: u32, r: Record, st: Style, r0: vec4f, r1: vec4f, q0: vec2f, d: vec2f, vw: View) -> vec4f {
     let ownu = bitcast<vec2f>(r.v.xy);
     let le = length_of(r);
     var ls = vec3f(0.0);
@@ -162,15 +214,15 @@ fn seg_dash(idx: u32, r: Record, st: Style, r0: vec4f, r1: vec4f, q0: vec2f, d: 
     let ta = dd_add(dd_mul_f(vec2f(-r0.x, -r0.z), du.x), dd_mul_f(vec2f(-r0.y, -r0.w), du.y));
     var base = ls;
     var t = vec2f(0.0);
-    var rp = to_px(r0.xy, view);
+    var rp = to_px(r0.xy, vw);
     if ta.x >= lu {
         base = le;
-        rp = to_px(r1.xy, view);
+        rp = to_px(r1.xy, vw);
     } else if ta.x > 0.0 {
         // (the foot itself: near the camera, a small number out of large ones)
         let fx = dd_add(vec2f(r0.x, r0.z), dd_mul_f(ta, du.x));
         let fy = dd_add(vec2f(r0.y, r0.w), dd_mul_f(ta, du.y));
-        rp = to_px(vec2f(fx.x + fx.y, fy.x + fy.y), view);
+        rp = to_px(vec2f(fx.x + fx.y, fy.x + fy.y), vw);
         if ta.x <= 0.5 * lu {
             t = ta;
         } else {
@@ -193,45 +245,57 @@ fn seg_dash(idx: u32, r: Record, st: Style, r0: vec4f, r1: vec4f, q0: vec2f, d: 
 // (apart, so that their code weighs nothing on the many solid segments)
 @vertex
 fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VsOut {
-    return vertex(vi, ii, false);
+    let l = lists[pc.layer + (ii >> 16u)];
+    let j = (ii & 0xffffu) * BATCH + (vi >> 2u);
+    if j >= l.y {
+        return empty_out();
+    }
+    return vertex(vi, item_of(visible[l.x + j], l.x + j), l.z, false);
 }
 
 @vertex
 fn vs_full(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VsOut {
-    return vertex(vi, ii, true);
+    let l = lists[pc.layer + (ii >> 16u)];
+    let j = (ii & 0xffffu) * BATCH + (vi >> 2u);
+    if j >= l.y {
+        return empty_out();
+    }
+    return vertex(vi, item_of(visible[l.x + j], l.x + j), l.z, true);
 }
 
-fn vertex(vi: u32, ii: u32, full: bool) -> VsOut {
+// a quad of nothing: all four corners in one point
+fn empty_out() -> VsOut {
     var o: VsOut;
-    // a quad of nothing: all four corners in one point
     o.pos = vec4f(2.0, 2.0, 0.5, 1.0);
     o.seg = vec4f(0.0);
     o.nb = vec4f(0.0);
     o.par = vec4f(0.0);
     o.misc = vec4u(0u);
     o.dash = vec4f(0.0);
-    let l = lists[pc.layer + (ii >> 16u)];
-    let j = (ii & 0xffffu) * BATCH + (vi >> 2u);
-    if j >= l.y {
-        return o;
-    }
-    let idx = visible[l.x + j];
+    return o;
+}
+
+// a visible record's quad (it: the record, an insert's through its space; layer_t: its layer's transparency)
+fn vertex(vi: u32, it: Item, layer_t: u32, full: bool) -> VsOut {
+    var o = empty_out();
+    let idx = it.idx;
+    let vw = it.vw;
     let r = pool[idx];
-    let st = styles[r.w.z - 1u];
+    let st = item_style(r, it);
     if kind_of_record(r) == K_ARC {
         // (a layer with arcs takes vs_full)
         if full {
-            return vs_arc(vi, idx, r, st);
+            return vs_arc(vi, r, st, it, layer_t);
         }
         return o;
     }
-    let h = half_width(st, view);
-    let half = 0.5 * view.turn.zw;
-    let r0 = rel2(r.a, view);
-    let r1 = rel2(r.b, view);
+    let h = half_width(st, vw);
+    let half = 0.5 * vw.turn.zw;
+    let r0 = rel2(r.a, vw);
+    let r1 = rel2(r.b, vw);
     // pixels from the target's middle
-    let p0 = to_px(r0.xy, view);
-    let p1 = to_px(r1.xy, view);
+    let p0 = to_px(r0.xy, vw);
+    let p1 = to_px(r1.xy, vw);
     let cap = cap_of(st);
     let info = r.w.w;
     // the neighbours' own vectors: the previous point minus the start, the next point minus the end (scene.rs: the bits
@@ -245,9 +309,9 @@ fn vertex(vi: u32, ii: u32, full: bool) -> VsOut {
     }
     var sk = select(CAP, JOIN, (info & F_PREV) != 0u);
     var ek = select(CAP, JOIN, (info & F_NEXT) != 0u);
-    let va = to_px(nu.xy, view);
-    let vb = to_px(nu.zw, view);
-    let own = to_px(bitcast<vec2f>(r.v.xy), view);
+    let va = to_px(nu.xy, vw);
+    let vb = to_px(nu.zw, vw);
+    let own = to_px(bitcast<vec2f>(r.v.xy), vw);
     let len0 = length(p1 - p0);
     var d = unit_or_zero(own);
     if !any(d != vec2f(0.0)) {
@@ -280,7 +344,7 @@ fn vertex(vi: u32, ii: u32, full: bool) -> VsOut {
     }
     let far = min(max(abs(p0.x), abs(p0.y)), max(abs(p1.x), abs(p1.y))) > FAR && max(hi.x, hi.y) < 0.25 * FAR;
     if far {
-        base = far_foot(r0, r1);
+        base = far_foot(r0, r1, vw);
         s0 = dot(p0 - base, d);
         s1 = dot(p1 - base, d);
     }
@@ -326,10 +390,13 @@ fn vertex(vi: u32, ii: u32, full: bool) -> VsOut {
     o.seg = vec4f(q0 + half, q1 + half);
     o.nb = vec4f(va, vb);
     o.par = vec4f(h, st.miter, own);
-    o.misc = vec4u(sk | (ek << 2u) | (cap << 4u) | (join_of(st) << 8u) | ((info & 3u) << 12u), st.color, r.w.z - 1u, 0u);
+    // (misc.z: the style whose pattern the fragment shader walks; misc.w: dash units per pixel of a pattern in units, the
+    // block's inside an insert)
+    o.misc = vec4u(sk | (ek << 2u) | (cap << 4u) | (join_of(st) << 8u) | ((info & 3u) << 12u), ink(st.color, st.r1.x, layer_t), dash_style(r.w.z - 1u, it.ins, it.blk),
+                   bitcast<u32>(vw.rest.w));
     if dashed {
         o.misc.x |= M_DASHED | select(0u, M_RESTART_S, (info & F_WRAP_PREV) != 0u) | select(0u, M_RESTART_E, (info & F_WRAP_NEXT) != 0u);
-        o.dash = seg_dash(idx, r, st, r0, r1, q0, d);
+        o.dash = seg_dash(idx, r, st, r0, r1, q0, d, vw);
     }
     return o;
 }
@@ -384,8 +451,11 @@ fn cos_p(x: f32) -> f32 {
     return cos(x);
 }
 
-// an arc's piece (the head above): its quad, F and the radius, its ends, its dash pattern's place
-fn vs_arc(vi: u32, idx: u32, r: Record, st: Style) -> VsOut {
+// an arc's piece (the head above): its quad, F and the radius, its ends, its dash pattern's place; it: the record (an
+// insert's through its space: a mirrored one turns the other way), layer_t: its layer's transparency
+fn vs_arc(vi: u32, r: Record, st: Style, it: Item, layer_t: u32) -> VsOut {
+    let idx = it.idx;
+    let vw = it.vw;
     var o: VsOut;
     o.pos = vec4f(2.0, 2.0, 0.5, 1.0);
     o.seg = vec4f(0.0);
@@ -393,13 +463,13 @@ fn vs_arc(vi: u32, idx: u32, r: Record, st: Style) -> VsOut {
     o.par = vec4f(0.0);
     o.misc = vec4u(0u);
     o.dash = vec4f(0.0);
-    let h = half_width(st, view);
-    let half = 0.5 * view.turn.zw;
+    let h = half_width(st, vw);
+    let half = 0.5 * vw.turn.zw;
     let cap = cap_of(st);
     let info = r.w.w;
     let pa = pool[idx - 1u];
     let rr = vec2f(bitcast<f32>(r.v.x), bitcast<f32>(r.v.y));
-    let rc = rel2(r.a, view);
+    let rc = rel2(r.a, vw);
     // the camera's distance from the circle: (|v|^2 - r^2) / (|v| + r) for v = camera - centre, the difference of the
     // squares in double-f32 (both may be 1e14 and more, the distance a thousandth)
     let vx = vec2f(-rc.x, -rc.z);
@@ -414,15 +484,15 @@ fn vs_arc(vi: u32, idx: u32, r: Record, st: Style) -> VsOut {
     }
     // in pixels: F, the outward unit there, the radius; the turn's sign (y points down here: a counter-clockwise arc
     // turns the other way), the arc's direction at F
-    let up = unit_or_zero(to_px(uu, view));
+    let up = unit_or_zero(to_px(uu, vw));
     let fu = -d0 * uu;
-    let f = to_px(fu, view);
-    let rp = (rr.x + rr.y) * view.rest.z;
-    let orient = select(1.0, -1.0, (info & F_CCW) != 0u);
+    let f = to_px(fu, vw);
+    let rp = (rr.x + rr.y) * vw.rest.z;
+    let orient = select(1.0, -1.0, (info & F_CCW) != 0u) * select(1.0, -1.0, it.mir);
     let tf = orient * vec2f(-up.y, up.x);
-    let ra = rel2(pa.b, view);
-    let ap = to_px(ra.xy, view);
-    let bp = to_px(rel2(r.b, view).xy, view);
+    let ra = rel2(pa.b, vw);
+    let ap = to_px(ra.xy, vw);
+    let bp = to_px(rel2(r.b, vw).xy, vw);
     // the piece's ends as angles from F along the arc
     let wa = ap - f;
     let wb = bp - f;
@@ -475,7 +545,7 @@ fn vs_arc(vi: u32, idx: u32, r: Record, st: Style) -> VsOut {
     o.seg = vec4f(f + half, up);
     o.nb = vec4f(ap + half, bp + half);
     o.par = vec4f(h, rp, orient, 0.0);
-    o.misc = vec4u(M_ARC | (cap << 4u) | ((info & 3u) << 12u), st.color, r.w.z - 1u, 0u);
+    o.misc = vec4u(M_ARC | (cap << 4u) | ((info & 3u) << 12u), ink(st.color, st.r1.x, layer_t), dash_style(r.w.z - 1u, it.ins, it.blk), bitcast<u32>(vw.rest.w));
     if dash_count(st) > 0u {
         o.misc.x |= M_DASHED | select(0u, M_RESTART_S, (info & F_RESTART_A) != 0u) | select(0u, M_RESTART_E, (info & F_RESTART_B) != 0u);
         // the reference point: F kept within the piece; the pattern's place there from the nearer end
@@ -492,7 +562,7 @@ fn vs_arc(vi: u32, idx: u32, r: Record, st: Style) -> VsOut {
             let near_a = -ba <= bb;
             let ang = select(bb, -ba, near_a);
             if rp * ang > ARC_FAR {
-                t = arc_from(select(rel2(r.b, view), ra, near_a), fu, rr);
+                t = arc_from(select(rel2(r.b, vw), ra, near_a), fu, rr);
             } else {
                 t = vec2f(ru * ang, 0.0);
             }
@@ -1103,20 +1173,17 @@ fn dash_end(si: u32, j: u32) -> f32 {
     return styles[si].ends[j >> 2u][j & 3u];
 }
 
-fn dash_len(si: u32, j: u32) -> f32 {
-    if j == 0u {
-        return dash_end(si, 0u);
-    }
-    return dash_end(si, j) - dash_end(si, j - 1u);
-}
-
 fn dash_n(si: u32) -> u32 {
     return (styles[si].flags >> 12u) & 31u;
 }
 
 // the dashes (on entries) of a style's pattern within w px of a point at its place xh + xl (dash units), as px along
 // the stroke from the point (sc dash units per px), at most three.  Relative to the point, so that the ends near it are
-// exact also when the period is a million pixels (xh a place in the period, xl a small offset)
+// exact also when the period is a million pixels (xh a place in the period, xl a small offset).  From the entry that
+// holds the place w px before the point, forward, each entry's start carried along: no index j - 1 and no step back.
+// (Stepping back from the point's entry as j = select(j - 1u, n - 1u, j == 0u), then reading the entry's length with a
+// test j == 0, Mesa's Intel compiler (26.0, HD 610 and Iris Xe) took that test for the step's own j == 0: a dash
+// shorter than its gap lost the pixels it covers whole, docs/RENDER2D.md)
 fn ivals(si: u32, xh: f32, xl: f32, sc: f32, w: f32) -> Ivals {
     var o: Ivals;
     o.n = 0u;
@@ -1127,37 +1194,35 @@ fn ivals(si: u32, xh: f32, xl: f32, sc: f32, w: f32) -> Ivals {
     let p = styles[si].period;
     let kp = floor((xh + xl) / p);
     let x0 = xh - kp * p;
-    let x = x0 + xl;
+    let wd = w * sc;
+    // the entry that holds the place wd before the point: the first whose end lies beyond it, in the period before when
+    // the period starts after it; compared relative to the point (the place x0 + xl itself is rounded to the period's
+    // size), and where that entry starts in the period
+    var back = 0.0;
+    if (0.0 - x0) - xl > -wd {
+        back = p;
+    }
     var j = 0u;
-    var c0 = 0.0;
+    var cs = 0.0;
     loop {
         if j + 1u >= n {
             break;
         }
         let c1 = dash_end(si, j);
-        if x < c1 {
+        if ((c1 - back) - x0) - xl > -wd {
             break;
         }
-        c0 = c1;
+        cs = c1;
         j += 1u;
     }
-    var start = (c0 - x0) - xl;
-    let wd = w * sc;
+    var start = ((cs - back) - x0) - xl;
     var g = 0u;
-    loop {
-        if start <= -wd || g >= 16u {
-            break;
-        }
-        j = select(j - 1u, n - 1u, j == 0u);
-        start -= dash_len(si, j);
-        g += 1u;
-    }
-    g = 0u;
     loop {
         if start > wd || g >= 32u || o.n >= 3u {
             break;
         }
-        let e = dash_len(si, j);
+        let ce = dash_end(si, j);
+        let e = ce - cs;
         if (j & 1u) == 0u && start + e >= -wd {
             let v = vec2f(start, start + e) / sc;
             if o.n == 0u {
@@ -1170,7 +1235,12 @@ fn ivals(si: u32, xh: f32, xl: f32, sc: f32, w: f32) -> Ivals {
             o.n += 1u;
         }
         start += e;
-        j = select(j + 1u, 0u, j + 1u >= n);
+        cs = ce;
+        j += 1u;
+        if j >= n {
+            j = 0u;
+            cs = 0.0;
+        }
         g += 1u;
     }
     return o;
@@ -1631,7 +1701,6 @@ fn fs(i: VsOut) -> @location(0) vec4f {
     if !any(d != vec2f(0.0)) {
         d = vec2f(1.0, 0.0);
     }
-    let col = unpack4x8unorm(i.misc.y);
     let dp = unit_or_zero(-i.nb.xy);
     let dn = unit_or_zero(i.nb.zw);
     // which pieces may touch the pixel: a neighbour's rectangle (a square cap too) lies within h sqrt(2) of its segment,
@@ -1667,6 +1736,7 @@ fn fs(i: VsOut) -> @location(0) vec4f {
             discard;
             return vec4f(0.0);
         }
+        let col = unpack4x8unorm(i.misc.y);
         return vec4f(vec3f(col.z, col.y, col.x) * (col.w * c0), col.w * c0);
     }
     // short thin strokes near their ends: the tile of each piece as a product (the strip's share times the share on its side
@@ -1708,6 +1778,7 @@ fn fs(i: VsOut) -> @location(0) vec4f {
             discard;
             return vec4f(0.0);
         }
+        let col = unpack4x8unorm(i.misc.y);
         return vec4f(vec3f(col.z, col.y, col.x) * (col.w * ct), col.w * ct);
     }
     // its own ends' lines: a cap's, a join's line at right angles (that join not near), none where open
@@ -1906,6 +1977,8 @@ fn fs(i: VsOut) -> @location(0) vec4f {
         discard;
         return vec4f(0.0);
     }
+    // (the colour unpacked where it is returned, as in full_body)
+    let col = unpack4x8unorm(i.misc.y);
     let al = col.w * c;
     return vec4f(vec3f(col.z, col.y, col.x) * al, al);
 }

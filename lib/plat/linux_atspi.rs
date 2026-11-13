@@ -26,6 +26,18 @@
 // insert), Object:TextCaretMoved (also when a text box gets the focus), Object:ChildrenChanged
 // (add / remove with the child), Window:Create / Destroy / Activate / Deactivate.  The UI
 // thread hands its changes over in a queue and wakes the thread with an eventfd.
+//
+// Rich nodes (Node::sub and the further fields): roles of their own (table, table row, table
+// cell, column / row header, landmark -- form for a form --, tree, tree item, tool bar, tool tip,
+// separator, notification for an alert, status bar, log, level bar, spin button, scroll bar,
+// article; radio groups and figures are panels), the attributes xml-roles, level, posinset,
+// setsize, live / container-live, rowindex / colindex, the Description, the states required,
+// invalid-entry, busy, has-popup, visited, modal, multiselectable, expandable / collapsed,
+// selectable, read-only, multi-line; the interfaces Table (tables: size, the cell at a place,
+// headers), TableCell (cells and headers with a place), Hyperlink (links with an address),
+// Selection (lists, tab strips, trees and tables whose items take A_SELECT), the actions
+// expand / collapse / increment / decrement and Component.ScrollTo (Op requests).  Events:
+// Object:Announcement for a11y::announce and for a live region that changed (its text).
 
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -36,7 +48,7 @@ use core::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 use rt::os::{syscall6, SYS_EVENTFD2, SYS_READ, SYS_WRITE};
 use rt::sync::SpinLock;
 
-use crate::a11y::{self as ax, Act, Change, Node, Request, Role, Snapshot, WinTree, NONE};
+use crate::a11y::{self as ax, Act, Change, Node, Op, OpRequest, Request, Role, Snapshot, Sub, WinTree, NONE};
 use crate::linux_dbus::{Conn, Msg, T_CALL, T_RETURN, T_SIGNAL, Value, session_available};
 
 const ROOT: &str = "/org/a11y/atspi/accessible/root";
@@ -50,6 +62,10 @@ const I_ACTION: &str = "org.a11y.atspi.Action";
 const I_VALUE: &str = "org.a11y.atspi.Value";
 const I_TEXT: &str = "org.a11y.atspi.Text";
 const I_EDIT: &str = "org.a11y.atspi.EditableText";
+const I_TABLE: &str = "org.a11y.atspi.Table";
+const I_CELL: &str = "org.a11y.atspi.TableCell";
+const I_LINK: &str = "org.a11y.atspi.Hyperlink";
+const I_SELECTION: &str = "org.a11y.atspi.Selection";
 const I_PROPS: &str = "org.freedesktop.DBus.Properties";
 const EV_OBJECT: &str = "org.a11y.atspi.Event.Object";
 const EV_WINDOW: &str = "org.a11y.atspi.Event.Window";
@@ -81,9 +97,36 @@ const R_ENTRY: u32 = 79;
 const R_HEADING: u32 = 83;
 const R_LINK: u32 = 88;
 const R_LIST_BOX: u32 = 98;
+const R_COLUMN_HEADER: u32 = 10;
+const R_ROW_HEADER: u32 = 47;
+const R_SCROLL_BAR: u32 = 48;
+const R_SEPARATOR: u32 = 50;
+const R_SPIN_BUTTON: u32 = 52;
+const R_STATUS_BAR: u32 = 54;
+const R_TABLE: u32 = 55;
+const R_TABLE_CELL: u32 = 56;
+const R_TOOL_BAR: u32 = 63;
+const R_TOOL_TIP: u32 = 64;
+const R_TREE: u32 = 65;
+const R_FORM: u32 = 87;
+const R_TABLE_ROW: u32 = 90;
+const R_TREE_ITEM: u32 = 91;
+const R_NOTIFICATION: u32 = 101;
+const R_LEVEL_BAR: u32 = 103;
+const R_ARTICLE: u32 = 109;
+const R_LANDMARK: u32 = 110;
+const R_LOG: u32 = 111;
 
 // AtspiStateType
 const ST_ACTIVE: u32 = 1;
+const ST_BUSY: u32 = 3;
+const ST_MULTI_LINE: u32 = 17;
+const ST_MULTISELECTABLE: u32 = 18;
+const ST_VERTICAL: u32 = 29;
+const ST_REQUIRED: u32 = 33;
+const ST_INVALID_ENTRY: u32 = 36;
+const ST_VISITED: u32 = 40;
+const ST_READ_ONLY: u32 = 43;
 const ST_CHECKED: u32 = 4;
 const ST_COLLAPSED: u32 = 5;
 const ST_EDITABLE: u32 = 7;
@@ -272,6 +315,33 @@ fn path_of(o: Obj) -> String {
     }
 }
 
+// the AT-SPI role of a node: its Sub's, else its role's
+fn node_role(n: &Node) -> u32 {
+    match n.sub {
+        Sub::None => role_of(n.role),
+        Sub::Table => R_TABLE,
+        Sub::Row => R_TABLE_ROW,
+        Sub::Cell => R_TABLE_CELL,
+        Sub::ColumnHeader => R_COLUMN_HEADER,
+        Sub::RowHeader => R_ROW_HEADER,
+        Sub::Form => R_FORM,
+        s if s.landmark() => R_LANDMARK,
+        Sub::Tree => R_TREE,
+        Sub::TreeItem => R_TREE_ITEM,
+        Sub::Toolbar => R_TOOL_BAR,
+        Sub::Tooltip => R_TOOL_TIP,
+        Sub::Separator => R_SEPARATOR,
+        Sub::Alert => R_NOTIFICATION,
+        Sub::Status => R_STATUS_BAR,
+        Sub::Log => R_LOG,
+        Sub::Meter => R_LEVEL_BAR,
+        Sub::SpinButton => R_SPIN_BUTTON,
+        Sub::ScrollBar => R_SCROLL_BAR,
+        Sub::Article => R_ARTICLE,
+        _ => R_PANEL, // radio groups, figures (xml-roles says which)
+    }
+}
+
 fn role_of(r: Role) -> u32 {
     match r {
         Role::Group => R_PANEL,
@@ -325,6 +395,25 @@ fn role_name(r: u32) -> &'static str {
         R_HEADING => "heading",
         R_LINK => "link",
         R_LIST_BOX => "list box",
+        R_COLUMN_HEADER => "column header",
+        R_ROW_HEADER => "row header",
+        R_SCROLL_BAR => "scroll bar",
+        R_SEPARATOR => "separator",
+        R_SPIN_BUTTON => "spin button",
+        R_STATUS_BAR => "status bar",
+        R_TABLE => "table",
+        R_TABLE_CELL => "table cell",
+        R_TOOL_BAR => "tool bar",
+        R_TOOL_TIP => "tool tip",
+        R_TREE => "tree",
+        R_FORM => "form",
+        R_TABLE_ROW => "table row",
+        R_TREE_ITEM => "tree item",
+        R_NOTIFICATION => "notification",
+        R_LEVEL_BAR => "level bar",
+        R_ARTICLE => "article",
+        R_LANDMARK => "landmark",
+        R_LOG => "log",
         _ => "unknown",
     }
 }
@@ -369,15 +458,45 @@ fn node_states(t: &WinTree, n: &Node) -> u64 {
             on(if n.state & ax::S_EXPANDED != 0 { ST_EXPANDED } else { ST_COLLAPSED });
         }
         Role::TextBox => {
-            on(ST_EDITABLE);
-            on(ST_SINGLE_LINE);
+            if n.state & ax::S_READONLY == 0 {
+                on(ST_EDITABLE);
+            } else {
+                on(ST_READ_ONLY);
+            }
+            on(if n.state & ax::S_MULTILINE != 0 { ST_MULTI_LINE } else { ST_SINGLE_LINE });
             on(ST_SELECTABLE_TEXT);
         }
+        // (a scroll bar or spin button taller than wide: vertical)
+        Role::Slider | Role::Progress if matches!(n.sub, Sub::ScrollBar | Sub::SpinButton) && n.rect[3] > n.rect[2] => on(ST_VERTICAL),
         Role::Slider | Role::Progress => on(ST_HORIZONTAL),
         _ => {}
     }
     if n.state & ax::S_EXPANDED != 0 && !matches!(n.role, Role::Combo | Role::Menu) {
         on(ST_EXPANDED);
+    }
+    // rich nodes
+    if n.state & ax::S_COLLAPSED != 0 {
+        on(ST_COLLAPSED);
+    }
+    if n.actions & ax::A_EXPAND != 0 {
+        on(ST_EXPANDABLE);
+    }
+    for (bit, st) in [
+        (ax::S_REQUIRED, ST_REQUIRED),
+        (ax::S_INVALID, ST_INVALID_ENTRY),
+        (ax::S_BUSY, ST_BUSY),
+        (ax::S_HASPOPUP, ST_HAS_POPUP),
+        (ax::S_VISITED, ST_VISITED),
+        (ax::S_MODAL, ST_MODAL),
+        (ax::S_MULTISELECT, ST_MULTISELECTABLE),
+        (ax::S_SELECTABLE, ST_SELECTABLE),
+    ] {
+        if n.state & bit != 0 {
+            on(st);
+        }
+    }
+    if n.actions & ax::A_SELECT != 0 {
+        on(ST_SELECTABLE);
     }
     s
 }
@@ -401,8 +520,103 @@ fn state_name(bit: u32) -> &'static str {
         ax::S_EXPANDED => "expanded",
         ax::S_PRESSED => "pressed",
         ax::S_DISABLED => "enabled",
+        ax::S_REQUIRED => "required",
+        ax::S_INVALID => "invalid-entry",
+        ax::S_BUSY => "busy",
+        ax::S_VISITED => "visited",
+        ax::S_COLLAPSED => "collapsed",
         _ => "",
     }
+}
+
+// the object attributes of a node: a heading's level, a rich node's ARIA role, level, place in
+// its set, a live region's politeness (also on what lies inside it), a cell's place
+fn node_attributes(t: &WinTree, k: usize) -> Vec<(&'static str, String)> {
+    let n = &t.nodes[k];
+    let mut a: Vec<(&'static str, String)> = Vec::new();
+    if n.level() > 0 {
+        a.push(("level", alloc::format!("{}", n.level())));
+    }
+    if n.sub != Sub::None {
+        a.push(("xml-roles", String::from(n.sub.aria())));
+    }
+    if n.set[0] > 0 {
+        a.push(("posinset", alloc::format!("{}", n.set[0])));
+    }
+    if n.set[1] > 0 {
+        a.push(("setsize", alloc::format!("{}", n.set[1])));
+    }
+    if let Some(p) = n.cell_place() {
+        // (ARIA counts from 1)
+        a.push(("rowindex", alloc::format!("{}", p[0] + 1)));
+        a.push(("colindex", alloc::format!("{}", p[1] + 1)));
+    }
+    if n.state & ax::S_HASPOPUP != 0 {
+        a.push(("haspopup", String::from("true")));
+    }
+    let politeness = |l: u8| if l == ax::LIVE_ASSERTIVE { "assertive" } else { "polite" };
+    if n.live != 0 {
+        a.push(("live", String::from(politeness(n.live))));
+    }
+    if let Some(r) = t.live_root(k) {
+        a.push(("container-live", String::from(politeness(t.nodes[r].live))));
+        if t.nodes[r].state & ax::S_BUSY != 0 {
+            a.push(("container-busy", String::from("true")));
+        }
+    }
+    a
+}
+
+// what a live region says: its name, else the names and texts below it (at most 1000 bytes)
+fn region_text(t: &WinTree, k: usize) -> String {
+    let n = &t.nodes[k];
+    let mut out = String::new();
+    let mut add = |s: &str| {
+        if !s.is_empty() && out.len() < 1000 {
+            if !out.is_empty() {
+                out.push(' ');
+            }
+            out.push_str(s);
+        }
+    };
+    add(&n.name);
+    if n.name.is_empty() {
+        for j in k + 1..t.subtree_end(k) {
+            let c = &t.nodes[j];
+            add(&c.name);
+            if matches!(c.role, Role::TextBox | Role::Combo) {
+                add(&c.text);
+            }
+        }
+    }
+    out
+}
+
+// the actions of a node, in order: (name, the request)
+fn node_actions(n: &Node) -> Vec<(&'static str, Result<Act, Op>)> {
+    let mut l: Vec<(&'static str, Result<Act, Op>)> = Vec::new();
+    if n.actions & ax::A_CLICK != 0 {
+        l.push(("click", Ok(Act::Click)));
+    }
+    if n.actions & ax::A_EXPAND != 0 {
+        l.push(if n.state & ax::S_EXPANDED != 0 { ("collapse", Err(Op::Collapse)) } else { ("expand", Err(Op::Expand)) });
+    }
+    if n.actions & ax::A_STEP != 0 {
+        l.push(("increment", Err(Op::Increment)));
+        l.push(("decrement", Err(Op::Decrement)));
+    }
+    l
+}
+
+// the children of node k (NONE: the window) whose selection a Selection interface serves
+fn selectable_kids(t: &WinTree, k: u32) -> Vec<usize> {
+    let all: Vec<usize> = if k != NONE && t.nodes.get(k as usize).is_some_and(|n| matches!(n.sub, Sub::Tree | Sub::Table)) {
+        // a tree's items and a table's rows and cells lie deeper
+        (k as usize + 1..t.subtree_end(k as usize)).collect()
+    } else {
+        t.children(k).collect()
+    };
+    all.into_iter().filter(|&j| t.nodes[j].actions & ax::A_SELECT != 0 || matches!(t.nodes[j].role, Role::ListItem | Role::Tab)).collect()
 }
 
 // the text interfaces' text of a node (labels: their name)
@@ -610,6 +824,20 @@ impl Bridge {
                 let r = self.obj_ref(obj(w, key));
                 self.emit(c, obj(w, parent), EV_OBJECT, "ChildrenChanged", "remove", index as i32, 0, r);
             }
+            // a live region changed: Orca says its text (Object:Announcement, AT-SPI 2.46 and later)
+            Change::Live(w, key) => {
+                let Some(t) = s.win(w) else { return };
+                let Some(k) = t.find(key) else { return };
+                let text = region_text(t, k);
+                if !text.is_empty() {
+                    self.emit(c, obj(w, key), EV_OBJECT, "Announcement", "", t.nodes[k].live as i32, 0, Value::S(text));
+                }
+            }
+            // a11y::announce: on the window (else the application)
+            Change::Announce(w, text, politeness) => {
+                let o = if s.win(w).is_some() { Obj::Win(w) } else { Obj::App };
+                self.emit(c, o, EV_OBJECT, "Announcement", "", politeness as i32, 0, Value::S(text));
+            }
         }
     }
 
@@ -663,6 +891,10 @@ impl Bridge {
                         I_ACTION => &["NActions"],
                         I_VALUE => &["MinimumValue", "MaximumValue", "MinimumIncrement", "CurrentValue", "Text"],
                         I_TEXT => &["CharacterCount", "CaretOffset"],
+                        I_TABLE => &["NRows", "NColumns", "Caption", "Summary", "NSelectedRows", "NSelectedColumns"],
+                        I_CELL => &["ColumnSpan", "RowSpan", "Position", "Table"],
+                        I_LINK => &["NAnchors", "StartIndex", "EndIndex"],
+                        I_SELECTION => &["NSelectedChildren"],
                         _ => &[],
                     };
                     let v = names.iter().filter_map(|n| self.property(s, o, w, node, iface, n).map(|v| (*n, v))).collect();
@@ -717,7 +949,7 @@ impl Bridge {
                 (Obj::App, ..) => ax::role_text(ax::ROLE_APP),
                 (Obj::Win(_), Some(t), _) if t.dialog => ax::role_name(Role::Dialog),
                 (Obj::Win(_), Some(_), _) => ax::role_text(ax::ROLE_WINDOW),
-                (Obj::Node(..), _, Some(n)) => ax::role_name(n.role),
+                (Obj::Node(..), _, Some(n)) => n.role_text(),
                 _ => ax::role_text(ax::ROLE_UNKNOWN),
             })]),
             (I_ACC, "GetState") => {
@@ -728,12 +960,13 @@ impl Bridge {
                 };
                 Ok(alloc::vec![Value::A(String::from("u"), alloc::vec![Value::U(st as u32), Value::U((st >> 32) as u32)])])
             }
-            (I_ACC, "GetAttributes") => Ok(alloc::vec![match (o, node) {
+            (I_ACC, "GetAttributes") => Ok(alloc::vec![match (o, w) {
                 (Obj::App, _) => Value::A(String::from("{ss}"), alloc::vec![Value::E(Box::new(Value::str("toolkit")), Box::new(Value::str("JFLib")))]),
-                // a heading's level (Orca: "heading level 2", heading navigation by level)
-                (Obj::Node(..), Some(n)) if n.role == Role::Heading => Value::A(
+                // a heading's level (Orca: "heading level 2", heading navigation by level), the
+                // ARIA role, level and set of rich nodes, live regions
+                (Obj::Node(..), Some(t)) if node.is_some() => Value::A(
                     String::from("{ss}"),
-                    alloc::vec![Value::E(Box::new(Value::str("level")), Box::new(Value::S(alloc::format!("{}", n.level()))))],
+                    node_attributes(t, k as usize).into_iter().map(|(n, v)| Value::E(Box::new(Value::str(n)), Box::new(Value::S(v)))).collect(),
                 ),
                 _ => empty_ss(),
             }]),
@@ -746,7 +979,7 @@ impl Bridge {
                     (Obj::Win(_), _) => l.push(I_COMP),
                     (Obj::Node(..), Some(n)) => {
                         l.push(I_COMP);
-                        if n.actions & ax::A_CLICK != 0 {
+                        if !node_actions(n).is_empty() {
                             l.push(I_ACTION);
                         }
                         if matches!(n.role, Role::Slider | Role::Progress) {
@@ -757,6 +990,18 @@ impl Bridge {
                         }
                         if n.role == Role::TextBox {
                             l.push(I_EDIT);
+                        }
+                        if n.sub == Sub::Table {
+                            l.push(I_TABLE);
+                        }
+                        if n.cell_place().is_some() {
+                            l.push(I_CELL);
+                        }
+                        if n.role == Role::Link && !n.url.is_empty() {
+                            l.push(I_LINK);
+                        }
+                        if w.is_some_and(|t| !selectable_kids(t, k).is_empty()) {
+                            l.push(I_SELECTION);
                         }
                     }
                     _ => {}
@@ -810,23 +1055,137 @@ impl Bridge {
                 b(ok)
             }
             (I_COMP, "GetAlpha") => Ok(alloc::vec![Value::D(1.0)]),
-            (I_COMP, "SetExtents" | "SetPosition" | "SetSize" | "ScrollTo" | "ScrollToPoint") => b(false),
+            // (a rich node: the app scrolls it into view)
+            (I_COMP, "ScrollTo" | "ScrollToPoint") => {
+                let ok = node.is_some_and(|n| n.actions & ax::A_SCROLL != 0);
+                if let (true, Obj::Node(win, key)) = (ok, o) {
+                    ax::request_op(OpRequest { win, key, op: Op::ScrollIntoView });
+                }
+                b(ok)
+            }
+            (I_COMP, "SetExtents" | "SetPosition" | "SetSize") => b(false),
             // Action
             (I_ACTION, "GetActions") => {
-                let n = if node.is_some_and(|n| n.actions & ax::A_CLICK != 0) { 1 } else { 0 };
-                let l = (0..n).map(|_| Value::R(alloc::vec![Value::str("click"), Value::str("click"), Value::str("")])).collect();
+                let l = node.map(node_actions).unwrap_or_default();
+                let l = l.into_iter().map(|(a, _)| Value::R(alloc::vec![Value::str(a), Value::str(a), Value::str("")])).collect();
                 Ok(alloc::vec![Value::A(String::from("(sss)"), l)])
             }
             (I_ACTION, "GetName" | "GetLocalizedName" | "GetDescription") => {
-                Ok(alloc::vec![Value::str(if arg_i(m, 0) == 0 && node.is_some_and(|n| n.actions & ax::A_CLICK != 0) { "click" } else { "" })])
+                let l = node.map(node_actions).unwrap_or_default();
+                Ok(alloc::vec![Value::str(usize::try_from(arg_i(m, 0)).ok().and_then(|i| l.get(i)).map_or("", |a| a.0))])
             }
             (I_ACTION, "GetKeyBinding") => Ok(alloc::vec![Value::str("")]),
             (I_ACTION, "DoAction") => {
-                let ok = arg_i(m, 0) == 0 && node.is_some_and(|n| n.actions & ax::A_CLICK != 0);
-                if let (true, Obj::Node(win, key)) = (ok, o) {
-                    ax::request(Request { win, key, act: Act::Click });
+                let l = node.map(node_actions).unwrap_or_default();
+                let a = usize::try_from(arg_i(m, 0)).ok().and_then(|i| l.get(i).cloned());
+                match (a, o) {
+                    (Some((_, Ok(act))), Obj::Node(win, key)) => ax::request(Request { win, key, act }),
+                    (Some((_, Err(op))), Obj::Node(win, key)) => ax::request_op(OpRequest { win, key, op }),
+                    _ => return b(false),
                 }
-                b(ok)
+                b(true)
+            }
+            // Table (rich tables)
+            (I_TABLE, member) => {
+                let t = w.ok_or(GONE)?;
+                if node.is_none_or(|n| n.sub != Sub::Table) {
+                    return Err(UNKNOWN);
+                }
+                let tk = k as usize;
+                let cols = t.grid_size(tk).1;
+                let (r, cl) = (arg_i(m, 0), arg_i(m, 1));
+                let at = |r: i32, c: i32| if r < 0 || c < 0 { None } else { t.cell_at(tk, r as u32, c as u32) };
+                let cell_ref = |j: Option<usize>| self.obj_ref(j.map_or(Obj::Null, |j| Obj::Node(t.win, t.nodes[j].key)));
+                match member {
+                    "GetAccessibleAt" => Ok(alloc::vec![cell_ref(at(r, cl))]),
+                    "GetIndexAt" => Ok(alloc::vec![Value::I(if r < 0 || cl < 0 { -1 } else { r * cols as i32 + cl })]),
+                    "GetRowAtIndex" | "GetColumnAtIndex" => {
+                        let i = arg_i(m, 0);
+                        let v = if i < 0 || cols == 0 { -1 } else if member == "GetRowAtIndex" { i / cols as i32 } else { i % cols as i32 };
+                        Ok(alloc::vec![Value::I(v)])
+                    }
+                    "GetRowExtentAt" | "GetColumnExtentAt" => {
+                        let p = at(r, cl).and_then(|j| t.nodes[j].cell_place());
+                        Ok(alloc::vec![Value::I(p.map_or(0, |p| if member == "GetRowExtentAt" { p[2] } else { p[3] }) as i32)])
+                    }
+                    "GetRowColumnExtentsAtIndex" => {
+                        let i = arg_i(m, 0);
+                        let p = (cols > 0 && i >= 0).then(|| at(i / cols as i32, i % cols as i32)).flatten().and_then(|j| t.nodes[j].cell_place());
+                        let p = p.map_or([0; 4], |p| p.map(|v| v as i32));
+                        Ok(alloc::vec![Value::B(p[2] > 0), Value::I(p[0]), Value::I(p[1]), Value::I(p[2]), Value::I(p[3]), Value::B(false)])
+                    }
+                    "GetRowHeader" | "GetColumnHeader" => {
+                        let rows_h = member == "GetRowHeader";
+                        let i = arg_i(m, 0).max(0) as u32;
+                        let h = t.headers(tk, rows_h).into_iter().find(|&j| {
+                            t.nodes[j].cell_place().is_some_and(|p| if rows_h { i >= p[0] && i < p[0] + p[2] } else { i >= p[1] && i < p[1] + p[3] })
+                        });
+                        Ok(alloc::vec![cell_ref(h)])
+                    }
+                    "GetRowDescription" | "GetColumnDescription" => {
+                        let rows_h = member == "GetRowDescription";
+                        let i = arg_i(m, 0).max(0) as u32;
+                        let h = t.headers(tk, rows_h).into_iter().find(|&j| {
+                            t.nodes[j].cell_place().is_some_and(|p| if rows_h { i >= p[0] && i < p[0] + p[2] } else { i >= p[1] && i < p[1] + p[3] })
+                        });
+                        Ok(alloc::vec![Value::S(h.map_or(String::new(), |j| t.nodes[j].name.clone()))])
+                    }
+                    "GetSelectedRows" | "GetSelectedColumns" => Ok(alloc::vec![Value::A(String::from("i"), Vec::new())]),
+                    "IsRowSelected" | "IsColumnSelected" | "IsSelected" | "AddRowSelection" | "AddColumnSelection" | "RemoveRowSelection"
+                    | "RemoveColumnSelection" => b(false),
+                    _ => Err(UNKNOWN),
+                }
+            }
+            // TableCell (cells and headers with a place)
+            (I_CELL, "GetRowColumnSpan") => {
+                let p = node.and_then(|n| n.cell_place()).ok_or(UNKNOWN)?;
+                Ok(alloc::vec![Value::B(true), Value::I(p[0] as i32), Value::I(p[1] as i32), Value::I(p[2] as i32), Value::I(p[3] as i32)])
+            }
+            (I_CELL, "GetColumnHeaderCells" | "GetRowHeaderCells") => {
+                let t = w.ok_or(GONE)?;
+                let hs = t.headers_of(k as usize, m.member == "GetRowHeaderCells");
+                let l = hs.into_iter().map(|j| self.obj_ref(Obj::Node(t.win, t.nodes[j].key))).collect();
+                Ok(alloc::vec![Value::A(String::from("(so)"), l)])
+            }
+            // Hyperlink (a link's address)
+            (I_LINK, "GetURI") => Ok(alloc::vec![Value::S(node.map_or(String::new(), |n| n.url.clone()))]),
+            (I_LINK, "GetObject") => Ok(alloc::vec![self.obj_ref(o)]),
+            (I_LINK, "IsValid") => b(node.is_some()),
+            // Selection (the items of a list, tab strip, tree or table)
+            (I_SELECTION, member) => {
+                let t = w.ok_or(GONE)?;
+                let kids = selectable_kids(t, k);
+                let selected: Vec<usize> = kids.iter().copied().filter(|&j| t.nodes[j].state & ax::S_SELECTED != 0).collect();
+                let i = usize::try_from(arg_i(m, 0)).ok();
+                let multi = node.is_some_and(|n| n.state & ax::S_MULTISELECT != 0);
+                // a request for item j: a rich item's Op, a widget's click (when it is not selected yet)
+                let ask = |j: usize, op: Op| {
+                    let n = &t.nodes[j];
+                    if n.actions & ax::A_SELECT != 0 {
+                        ax::request_op(OpRequest { win: t.win, key: n.key, op });
+                        true
+                    } else if op == Op::SelectItem && n.actions & ax::A_CLICK != 0 {
+                        if n.state & ax::S_SELECTED == 0 {
+                            ax::request(Request { win: t.win, key: n.key, act: Act::Click });
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                };
+                match member {
+                    "GetSelectedChild" => {
+                        let j = i.and_then(|i| selected.get(i).copied());
+                        Ok(alloc::vec![self.obj_ref(j.map_or(Obj::Null, |j| Obj::Node(t.win, t.nodes[j].key)))])
+                    }
+                    "SelectChild" => b(i.and_then(|i| kids.get(i).copied()).is_some_and(|j| ask(j, if multi { Op::AddToSelection } else { Op::SelectItem }))),
+                    "DeselectChild" => b(i.and_then(|i| kids.get(i).copied()).is_some_and(|j| ask(j, Op::RemoveFromSelection))),
+                    "DeselectSelectedChild" => b(i.and_then(|i| selected.get(i).copied()).is_some_and(|j| ask(j, Op::RemoveFromSelection))),
+                    "IsChildSelected" => b(i.and_then(|i| kids.get(i)).is_some_and(|&j| t.nodes[j].state & ax::S_SELECTED != 0)),
+                    "SelectAll" => b(multi && kids.iter().all(|&j| ask(j, Op::AddToSelection))),
+                    "ClearSelection" => b(selected.iter().all(|&j| ask(j, Op::RemoveFromSelection))),
+                    _ => Err(UNKNOWN),
+                }
             }
             // Text (the basic queries)
             (I_TEXT, member) => {
@@ -959,7 +1318,7 @@ impl Bridge {
                     R_FRAME
                 }
             }
-            (Obj::Node(..), _, Some(n)) => role_of(n.role),
+            (Obj::Node(..), _, Some(n)) => node_role(n),
             _ => 0,
         }
     }
@@ -1005,7 +1364,8 @@ impl Bridge {
                 (_, _, Some(n)) => n.name.clone(),
                 _ => String::new(),
             }),
-            (I_ACC, "Description" | "Locale" | "HelpText") => Value::str(""),
+            (I_ACC, "Description" | "HelpText") => Value::S(node.map_or(String::new(), |n| n.desc.clone())),
+            (I_ACC, "Locale") => Value::str(""),
             (I_ACC, "AccessibleId") => Value::S(match (o, node) {
                 (Obj::Node(..), Some(n)) => alloc::format!("{:x}", n.key),
                 _ => String::new(),
@@ -1026,7 +1386,7 @@ impl Bridge {
             (I_APP, "Version") if o == Obj::App => Value::str("1.0"),
             (I_APP, "AtspiVersion") if o == Obj::App => Value::str("2.1"),
             (I_APP, "Id") if o == Obj::App => Value::I(self.app_id),
-            (I_ACTION, "NActions") => Value::I(node.is_some_and(|n| n.actions & ax::A_CLICK != 0) as i32),
+            (I_ACTION, "NActions") => Value::I(node.map_or(0, |n| node_actions(n).len()) as i32),
             (I_VALUE, _) => {
                 let n = node.filter(|n| matches!(n.role, Role::Slider | Role::Progress))?;
                 match name {
@@ -1034,9 +1394,50 @@ impl Bridge {
                     "MaximumValue" => Value::D(n.max),
                     "MinimumIncrement" => Value::D(n.step),
                     "CurrentValue" => Value::D(n.value.max(n.min)),
+                    // (the text a rich node gives for its value)
+                    "Text" if !n.text.is_empty() => Value::S(n.text.clone()),
                     "Text" => Value::S(if n.value < n.min { String::new() } else { alloc::format!("{}", n.value) }),
                     _ => return None,
                 }
+            }
+            (I_TABLE, _) => {
+                let (t, n) = (w?, node.filter(|n| n.sub == Sub::Table)?);
+                let (rows, cols) = t.grid_size(t.find(n.key)?);
+                match name {
+                    "NRows" => Value::I(rows as i32),
+                    "NColumns" => Value::I(cols as i32),
+                    "Caption" | "Summary" => self.obj_ref(Obj::Null),
+                    "NSelectedRows" | "NSelectedColumns" => Value::I(0),
+                    _ => return None,
+                }
+            }
+            (I_CELL, _) => {
+                let (t, n) = (w?, node?);
+                let p = n.cell_place()?;
+                match name {
+                    "RowSpan" => Value::I(p[2] as i32),
+                    "ColumnSpan" => Value::I(p[3] as i32),
+                    "Position" => Value::R(alloc::vec![Value::I(p[0] as i32), Value::I(p[1] as i32)]),
+                    "Table" => {
+                        let tab = t.find(n.key).and_then(|k| t.up_to(k, Sub::Table));
+                        self.obj_ref(tab.map_or(Obj::Null, |j| Obj::Node(t.win, t.nodes[j].key)))
+                    }
+                    _ => return None,
+                }
+            }
+            (I_LINK, _) => {
+                let n = node.filter(|n| n.role == Role::Link)?;
+                match name {
+                    "NAnchors" => Value::I(1),
+                    "StartIndex" => Value::I(0),
+                    "EndIndex" => Value::I(n.name.chars().count() as i32),
+                    _ => return None,
+                }
+            }
+            (I_SELECTION, "NSelectedChildren") => {
+                let t = w?;
+                let k = node.map_or(Some(NONE), |n| t.find(n.key).map(|k| k as u32))?;
+                Value::I(selectable_kids(t, k).into_iter().filter(|&j| t.nodes[j].state & ax::S_SELECTED != 0).count() as i32)
             }
             (I_TEXT, "CharacterCount") => Value::I(node.and_then(text_of)?.chars().count() as i32),
             (I_TEXT, "CaretOffset") => {

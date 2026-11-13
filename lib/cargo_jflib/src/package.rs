@@ -42,6 +42,7 @@ const PK_PREVIEW: u32 = 3;
 const PK_FILE: u32 = 5;
 const PF_ZLIB: u32 = 1;
 const NAME_MAX: usize = 47; // the payload's names and labels (lib/installer/payload.rs)
+const PAY_MAX_ENT: usize = 65536; // the payload's entries (lib/installer/payload.rs)
 
 pub(crate) fn read(p: &Path) -> Result<Vec<u8>, String> {
     fs::read(p).map_err(|e| format!("{}: {e}", p.display()))
@@ -71,6 +72,8 @@ struct Opts {
     package: Option<String>,
     styles: Option<String>,
     formats: Vec<&'static str>,
+    /// no --formats: the default (setup and deb; an app with std: the formats of this system)
+    formats_default: bool,
     /// every signature required (--sign)
     sign: bool,
     /// --repo DIR: a flat apt repository with the .deb
@@ -83,6 +86,7 @@ struct Opts {
 
 fn options(args: &[String]) -> Result<Opts, String> {
     let (mut styles, mut formats, mut no_win, mut no_deb, mut rest) = (None, "setup,deb".to_string(), false, false, Vec::new());
+    let mut formats_default = true;
     let (mut sign, mut repo, mut update, mut update_url, mut update_key) = (false, None, None, String::new(), None);
     let mut i = 0;
     while i < args.len() {
@@ -91,7 +95,10 @@ fn options(args: &[String]) -> Result<Opts, String> {
                 let v = args.get(i + 1).cloned().ok_or_else(|| format!("{flag} needs a value"))?;
                 match flag {
                     "--styles" => styles = Some(v),
-                    "--formats" => formats = v,
+                    "--formats" => {
+                        formats = v;
+                        formats_default = false;
+                    }
                     "--repo" => repo = Some(PathBuf::from(v)),
                     "--update" => update = Some(PathBuf::from(v)),
                     "--update-url" => update_url = v,
@@ -121,7 +128,7 @@ fn options(args: &[String]) -> Result<Opts, String> {
     // in the order they are made; --no-win / --no-deb drop every Windows / Linux format
     let formats = FORMATS.iter().filter(|(f, sys)| wanted.iter().any(|w| w == f) && !(no_win && *sys == "win" || no_deb && *sys == "linux"))
         .map(|f| f.0).collect();
-    Ok(Opts { package: o.package, styles, formats, sign, repo, update, update_url, update_key })
+    Ok(Opts { package: o.package, styles, formats, formats_default, sign, repo, update, update_url, update_key })
 }
 
 /// a style's shown name and description (INFO of its crate)
@@ -131,10 +138,35 @@ fn style_info(styles: &BTreeMap<String, PathBuf>, style: &str) -> (String, Strin
     (lines.next().unwrap_or(style).to_string(), lines.next().unwrap_or("").to_string())
 }
 
-/// the app built for `triple` with `style` -> its program
-fn build(p: &Project, triple: &str, style: &str) -> Result<PathBuf, String> {
+/// (E15) the styles PACKAGE / --styles names: the library's (JFLIB_STYLE) and the app's own
+/// (a crate of its dependencies with `[package.metadata.jflib] style = "NAME"`; the app uses it
+/// itself, so it is built without JFLIB_STYLE) -> those that are its own
+fn styles_check(styles: &[String], own: &BTreeMap<String, PathBuf>) -> Result<Vec<String>, String> {
+    let mut mine = Vec::new();
+    for s in styles {
+        if own.contains_key(s) {
+            mine.push(s.clone());
+        } else if !STYLES.contains(&s.as_str()) {
+            let all: Vec<&str> = STYLES.iter().copied().chain(own.keys().map(String::as_str)).collect();
+            return Err(format!(
+                "style {s}: the styles are {} (a style of the app's own: a crate of its dependencies with \
+                 [package.metadata.jflib] style = \"{s}\")",
+                all.join(", ")
+            ));
+        }
+    }
+    Ok(mine)
+}
+
+/// the app built for `triple` with `style` -> its program (a style of its own: without JFLIB_STYLE)
+fn build(p: &Project, triple: &str, style: &str, own: bool) -> Result<PathBuf, String> {
     let mut cmd = cargo::command();
-    cmd.current_dir(&p.package.dir).env("JFLIB_STYLE", style).args(["build", "--release", "-p", &p.package.name, "--target", triple]);
+    cmd.current_dir(&p.package.dir).args(["build", "--release", "-p", &p.package.name, "--target", triple]);
+    if own {
+        cmd.env_remove("JFLIB_STYLE");
+    } else {
+        cmd.env("JFLIB_STYLE", style);
+    }
     if triple == crate::mac::TRIPLE {
         cmd.env("MACOSX_DEPLOYMENT_TARGET", crate::mac::MAC_MIN);
     }
@@ -159,21 +191,49 @@ fn preview(exe: &Path, work: &Path, style: &str) -> Result<Vec<u8>, String> {
 
 /// the [profile.*] sections of the workspace's Cargo.toml (a stub is built like the app)
 fn profiles(root: &Path) -> String {
-    let text = fs::read_to_string(root.join("Cargo.toml")).unwrap_or_default();
+    stub_profiles(&fs::read_to_string(root.join("Cargo.toml")).unwrap_or_default())
+}
+
+/// the [profile.release] sections of an app's Cargo.toml for a stub: built with --release like the
+/// app, so the crates compiled for it are taken again ([profile.dev] and the others play no part,
+/// and a [profile.dev.package.X] of a crate the stub does not have was a warning of Cargo's), but
+/// always with panic = "abort" -- the stubs are programs without std, while an app with jflib's
+/// feature unwind has panic = "unwind" (or none, Cargo's default): [profile.release] (not
+/// .package.X / .build-override) gets panic = "abort" in place of its panic line, and there is one.
+/// Only the tables: the comment lines in them are left out (a comment above the next table, which
+/// belongs to that one, came along before)
+fn stub_profiles(text: &str) -> String {
     let mut out = String::new();
     let mut inside = false;
+    let mut any = false;
+    let mut release = false;
     for line in text.lines() {
         let t = line.trim_start();
         if t.starts_with('[') {
-            inside = t.starts_with("[profile.");
+            let name = t.strip_prefix("[profile.").map(|r| r.split(']').next().unwrap_or("").trim());
+            any |= name.is_some();
+            inside = name.is_some_and(|n| n == "release" || n.starts_with("release."));
+            if inside {
+                out += line;
+                out.push('\n');
+                if name == Some("release") {
+                    out += "panic = \"abort\"\n";
+                    release = true;
+                }
+                continue;
+            }
         }
-        if inside {
+        // the app's own panic line (the stub's is above); comments are no part of the table
+        let panic_key = t.strip_prefix("panic").is_some_and(|r| r.trim_start().starts_with('='));
+        if inside && !panic_key && !t.starts_with('#') {
             out += line;
             out.push('\n');
         }
     }
-    if out.is_empty() {
+    if !any {
         out = "[profile.release]\npanic = \"abort\"\nopt-level = 2\ncodegen-units = 1\nlto = \"fat\"\ndebug = 0\nstrip = \"symbols\"\n".to_string();
+    } else if !release {
+        out += "[profile.release]\npanic = \"abort\"\n";
     }
     out
 }
@@ -204,17 +264,50 @@ pub(crate) const SIGNER: Stub = Stub { name: "jflib-sign", deps: &["jflib-rt", "
                                        console: true, triple: if cfg!(windows) { WIN } else if cfg!(target_os = "macos") { crate::mac::TRIPLE } else { LINUX },
                                        linux_static: false };
 
+/// a stub's dependency on `name`: from the folder where the app's project has the crate from a path
+/// at `version` (an app in JFLib's workspace: the stub is built from the same sources, a version
+/// not published yet included), else from crates.io
+fn stub_dep(name: &str, version: &str, local: &BTreeMap<String, PathBuf>) -> String {
+    match local.get(name) {
+        Some(dir) => format!("{name} = {{ path = \"{}\", version = \"={version}\" }}\n", dir.display().to_string().replace('\\', "/")),
+        None => format!("{name} = \"={version}\"\n"),
+    }
+}
+
+/// the JFLib crates a stub takes from paths (stub_dep): those the app's project has from a path at
+/// `version`, and -- when its jflib itself comes from a path (an app in JFLib's workspace, or one
+/// that patches jflib to a checkout with [patch.crates-io]) -- every crate of the workspace that
+/// holds that jflib, so the stubs come from the checkout the app is built with, also the crates the
+/// app does not depend on (jflib-installer, jflib-appimagert); a crate the app has from a path of
+/// its own keeps that path
+fn stub_paths(p: &Project, version: &str) -> Result<BTreeMap<String, PathBuf>, String> {
+    let app = cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))?;
+    let checkout = match app.iter().find(|r| r.local && r.name == "jflib" && r.version == version) {
+        Some(jflib) => cargo::members(&jflib.dir)?,
+        None => Vec::new(),
+    };
+    Ok(local_crates(&app, &checkout, version))
+}
+
+/// (stub_paths) the crates from paths: the checkout's, the app's own over them
+fn local_crates(app: &[cargo::Resolved], checkout: &[cargo::Resolved], version: &str) -> BTreeMap<String, PathBuf> {
+    checkout.iter().chain(app).filter(|r| r.local && r.version == version && r.name.starts_with("jflib-"))
+        .map(|r| (r.name.clone(), r.dir.clone())).collect()
+}
+
 /// a stub: its crates in a project of its own below the target folder, built like the app (its
-/// profiles, its Cargo.lock, its .cargo/config.toml) -> the program
+/// profiles, its Cargo.lock, its .cargo/config.toml, its crates from paths) -> the program
 pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, String> {
     let dir = p.target_dir.join("jflib-package").join(format!("{}-stub", s.name));
     let manifest = dir.join("Cargo.toml");
-    let deps: String = s.deps.iter().map(|d| format!("{d} = \"={version}\"\n")).collect();
+    let local = stub_paths(p, version)?;
+    let deps: String = s.deps.iter().map(|d| stub_dep(d, version, &local)).collect();
     write_changed(&manifest, format!(
         "# made by cargo jflib: {} ({})\n\
          [package]\nname = \"{}\"\nversion = \"{version}\"\nedition = \"2024\"\npublish = false\n\n\
-         [dependencies]\n{deps}\n[build-dependencies]\njflib-build = \"={version}\"\n\n{}\n\
-         # its own workspace, inside the app's folder or not\n[workspace]\n", s.name, s.deps.join(", "), s.name, profiles(&p.workspace_root)).as_bytes())?;
+         [dependencies]\n{deps}\n[build-dependencies]\n{}\n{}\n\
+         # its own workspace, inside the app's folder or not\n[workspace]\n", s.name, s.deps.join(", "), s.name,
+        stub_dep("jflib-build", version, &local), profiles(&p.workspace_root)).as_bytes())?;
     write_changed(&dir.join("build.rs"), format!("fn main() {{\n    jflib_build::{}();\n}}\n", if s.console { "console" } else { "app" }).as_bytes())?;
     write_changed(&dir.join("src/main.rs"), s.source.as_bytes())?;
     // the versions the app was built with, on every run: the crates compiled for it are taken
@@ -233,6 +326,8 @@ pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, Stri
     }
     let mut cmd = cargo::command();
     cmd.current_dir(&p.package.dir).arg("build").arg("--release").args(["--target", s.triple]).arg("--manifest-path").arg(&manifest);
+    // panic = "abort" also over a [profile.release] of the app's .cargo/config.toml (stub_profiles)
+    cmd.env("CARGO_PROFILE_RELEASE_PANIC", "abort");
     if s.triple == crate::mac::TRIPLE {
         cmd.env("MACOSX_DEPLOYMENT_TARGET", crate::mac::MAC_MIN);
     }
@@ -401,6 +496,9 @@ impl App<'_> {
         if !schemes.is_empty() {
             man.push(format!("schemes={}", schemes.join(" ")));
         }
+        if pkgmeta::browser(&self.meta)? {
+            man.push("browser=1".to_string()); // the setup registers the app as a web browser
+        }
         man.push(format!("app_id={}", pkgmeta::app_id(&self.meta, &self.name)?));
         let mtext = (man.join("\n") + "\n").into_bytes();
         let mut entries = vec![(PK_MANIFEST, PF_ZLIB, "manifest".to_string(), String::new(), deflate::zlib(&mtext), mtext.len())];
@@ -430,6 +528,9 @@ impl App<'_> {
         }
         for (name, data) in combined {
             entries.push((PK_FILE, PF_ZLIB, name, String::new(), deflate::zlib(&data), data.len()));
+        }
+        if entries.len() > PAY_MAX_ENT {
+            return Err(format!("the setup's payload would hold {} entries, at most {PAY_MAX_ENT}", entries.len()));
         }
         let pay = payload(&entries);
         let mut out = stub.clone();
@@ -519,8 +620,29 @@ fn has_interpreter(elf: &[u8]) -> bool {
     elf.starts_with(b"\x7fELF") && (0..count).any(|k| elf.get(phoff + k * size..phoff + k * size + 4) == Some(&3u32.to_le_bytes()[..]))
 }
 
+/// the formats of this system (std_formats: an app with std packages only these here)
+fn host_formats(host: Option<&str>) -> Vec<&'static str> {
+    FORMATS.iter().filter(|f| Some(f.1) == host).map(|f| f.0).collect()
+}
+
+/// an app with std is built on the system it runs on: without --formats it gets the default's
+/// formats of this system (Windows: the setup, Linux: the .deb); none left -> what to pass
+fn std_formats(formats: &mut Vec<&'static str>, host: Option<&str>, name: &str) -> Result<(), String> {
+    let here = host_formats(host);
+    formats.retain(|f| here.contains(f));
+    if formats.is_empty() {
+        return Err(if here.is_empty() {
+            format!("{name} has std (jflib's feature std): its packages are made on the system they are for; on a Mac --formats dmg")
+        } else {
+            format!("{name} has std (jflib's feature std): its packages are made on the system they are for; here --formats {}",
+                    here.join(","))
+        });
+    }
+    Ok(())
+}
+
 pub(crate) fn run(args: &[String]) -> Result<(), String> {
-    let o = options(args)?;
+    let mut o = options(args)?;
     if o.formats.is_empty() {
         return Err("nothing to package: --formats, --no-win and --no-deb leave no format".to_string());
     }
@@ -529,14 +651,28 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
     let name = p.package.name.clone();
     let styles: Vec<String> = o.styles.as_deref().or(meta.get("styles")).unwrap_or("winui")
         .split([',', ' ']).filter(|s| !s.is_empty()).map(String::from).collect();
-    if let Some(bad) = styles.iter().find(|s| !STYLES.contains(&s.as_str())) {
-        return Err(format!("style {bad}: the styles are {}", STYLES.join(", ")));
+    // the style crates (their INFO): the library's and (E15) the app's own; the version of jflib,
+    // which the stubs' crates must have
+    let (mut infos, mut own, mut jflib) = (BTreeMap::new(), BTreeMap::new(), None);
+    for r in cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))? {
+        if let Some(s) = &r.style {
+            own.insert(s.clone(), r.dir.clone());
+            infos.insert(s.clone(), r.dir);
+        } else if let Some(s) = r.name.strip_prefix("jflib-style-") {
+            infos.insert(s.to_string(), r.dir);
+        } else if r.name == "jflib" {
+            jflib = Some(r.version);
+        }
+    }
+    let own_styles = styles_check(&styles, &own)?;
+    let host = if cfg!(windows) { Some("win") } else if cfg!(target_os = "linux") { Some("linux") } else { None };
+    if p.package.std && o.formats_default {
+        std_formats(&mut o.formats, host, &name)?;
     }
     let wants = |f: &str| o.formats.contains(&f);
     if wants("dmg") && !cfg!(target_os = "macos") {
         return Err("a dmg is made on a Mac (Apple's hdiutil and codesign): there --formats dmg".to_string());
     }
-    let host = if cfg!(windows) { Some("win") } else if cfg!(target_os = "linux") { Some("linux") } else { None };
     let mut targets: Vec<&str> = Vec::new();
     if wants("setup") || wants("msix") {
         targets.push("win");
@@ -549,20 +685,13 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
     if p.package.std {
         for (system, formats, shown) in [("win", "setup, msix", "Windows"), ("linux", "deb, appimage, rpm, flatpak", "Linux")] {
             if targets.contains(&system) && host != Some(system) {
+                let here = host_formats(host);
+                let pass = if here.is_empty() { "dmg".to_string() } else { here.join(",") };
                 return Err(format!(
-                    "{name} has std (jflib's feature std): its {formats} are made on {shown} itself; here --formats \
-                     with the formats of this system"
+                    "{name} has std (jflib's feature std): its {formats} are made on {shown} itself; here --formats {pass} \
+                     (without --formats: those of this system)"
                 ));
             }
-        }
-    }
-    // the style crates (their INFO) and the version of jflib, which the stubs' crates must have
-    let (mut infos, mut jflib) = (BTreeMap::new(), None);
-    for r in cargo::packages(&p.package.dir, &p.package.dir.join("Cargo.toml"))? {
-        if let Some(s) = r.name.strip_prefix("jflib-style-") {
-            infos.insert(s.to_string(), r.dir);
-        } else if r.name == "jflib" {
-            jflib = Some(r.version);
         }
     }
     let jflib = jflib.ok_or_else(|| format!("{name} does not depend on the crate jflib"))?;
@@ -593,7 +722,7 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
     for s in &app.styles {
         for &t in &targets {
             println!("[{s}] build {t}");
-            let exe = build(&p, if t == "win" { WIN } else { LINUX }, s)?;
+            let exe = build(&p, if t == "win" { WIN } else { LINUX }, s, own_styles.contains(s))?;
             write(&app.exe(s, t), &read(&exe)?)?;
         }
     }
@@ -629,7 +758,7 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
             "dmg" => {
                 for s in &app.styles {
                     println!("[{s}] build mac");
-                    let exe = build(&p, crate::mac::TRIPLE, s)?;
+                    let exe = build(&p, crate::mac::TRIPLE, s, own_styles.contains(s))?;
                     let dir = app.work.join(s).join("mac");
                     fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
                     let bundle = crate::mac::bundle(&p.package.dir, &app.version, &exe, &dir)?;
@@ -676,6 +805,95 @@ mod tests {
         assert!(!has_interpreter(&[]));
     }
 
+    // (E15) a style of the app's own from the metadata of its crate; the names PACKAGE may use
+    #[test]
+    fn own_styles() {
+        let pkg = crate::json::parse(r#"{"name": "narsil-style", "version": "0.1.0", "manifest_path": "/x/narsil-style/Cargo.toml",
+            "metadata": {"jflib": {"style": "narsil"}}}"#).unwrap();
+        let r = cargo::resolved(&pkg);
+        assert_eq!((r.name.as_str(), r.style.as_deref(), r.dir.as_path()), ("narsil-style", Some("narsil"), Path::new("/x/narsil-style")));
+        let plain = crate::json::parse(r#"{"name": "x", "version": "1.0.0", "manifest_path": "/x/Cargo.toml", "metadata": null}"#).unwrap();
+        assert_eq!(cargo::resolved(&plain).style, None);
+        let own: BTreeMap<String, PathBuf> = [("narsil".to_string(), PathBuf::from("/x/narsil-style"))].into();
+        let names = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(styles_check(&names(&["narsil"]), &own).unwrap(), names(&["narsil"]));
+        assert_eq!(styles_check(&names(&["winui", "narsil"]), &own).unwrap(), names(&["narsil"]));
+        assert!(styles_check(&names(&["winui", "kde"]), &own).unwrap().is_empty());
+        let e = styles_check(&names(&["other"]), &own).unwrap_err();
+        assert!(e.contains("winui, classic, kde, macos, netlab, narsil") && e.contains("style = \"other\""), "{e}");
+    }
+
+    // the stubs are built with panic = "abort" whatever the app's profiles say (feature unwind)
+    #[test]
+    fn stub_profiles_abort() {
+        let app = "[package]\nname = \"narsil\"\n\n[profile.dev]\npanic = \"unwind\"\nopt-level = 1\n\n\
+                   [profile.dev.package.narsil-net]\nopt-level = 3\n\n[profile.release]\nlto = \"fat\"\npanic=\"unwind\" # catch_unwind\n\n\
+                   [profile.dev.build-override]\nopt-level = 2\n\n[dependencies]\npanic = \"x\"\n";
+        assert_eq!(stub_profiles(app), "[profile.release]\npanic = \"abort\"\nlto = \"fat\"\n\n");
+        // [profile.release.*] stays as it is (Cargo allows no panic there), the dev profile's
+        // crates (JFLib's workspace names some the stubs do not have) go
+        assert_eq!(stub_profiles("[profile.dev.package.jflib-cas]\nopt-level = 2\n\n[profile.release]\nlto = true\n\n\
+                                  [profile.release.package.\"*\"]\nopt-level = 3\n\n[profile.release.build-override]\nopt-level = 0\n"),
+                   "[profile.release]\npanic = \"abort\"\nlto = true\n\n[profile.release.package.\"*\"]\nopt-level = 3\n\n\
+                    [profile.release.build-override]\nopt-level = 0\n");
+        // no panic at all (Cargo's default unwind) and no [profile.release]: one with abort
+        assert_eq!(stub_profiles("[profile.dev]\nopt-level = 1\n"), "[profile.release]\npanic = \"abort\"\n");
+        // no profiles: the release profile of the template
+        assert!(stub_profiles("[package]\nname = \"x\"\n").starts_with("[profile.release]\npanic = \"abort\"\n"));
+        // a key that only starts with panic stays
+        assert!(stub_profiles("[profile.release]\npanicky = 1\n").contains("panicky = 1\n"));
+        // only the tables: the comments of the next one (BrowserGUI's engine crates) and those inside stay out
+        let app = "[profile.release]\n# the app's own\nlto = \"fat\"\n\n# The engine's crates as narsil/Cargo.toml builds them\n\
+                   # in development builds.\n[profile.dev.package.narsil-tls]\nopt-level = 3\n";
+        assert_eq!(stub_profiles(app), "[profile.release]\npanic = \"abort\"\nlto = \"fat\"\n\n");
+        assert!(!stub_profiles(app).contains('#'));
+    }
+
+    // a stub's crates from the folders where the app has them from paths (JFLib's workspace), else from crates.io
+    #[test]
+    fn stub_dep_path() {
+        let local: BTreeMap<String, PathBuf> = [("jflib-installer".to_string(), PathBuf::from(r"C:\src\JFLib\lib\installer"))].into();
+        assert_eq!(stub_dep("jflib-installer", "0.1.0", &local), "jflib-installer = { path = \"C:/src/JFLib/lib/installer\", version = \"=0.1.0\" }\n");
+        assert_eq!(stub_dep("jflib-build", "0.1.0", &local), "jflib-build = \"=0.1.0\"\n");
+    }
+
+    // an app that patches only jflib (and jflib-build) to a checkout gets the stubs' other crates
+    // from the same checkout; a crate the app has from a path of its own keeps it
+    #[test]
+    fn stub_crates_of_a_patched_checkout() {
+        let r = |name: &str, version: &str, dir: &str, local: bool| cargo::Resolved {
+            name: name.into(), version: version.into(), dir: PathBuf::from(dir), style: None, local };
+        let app = [r("Narsil", "0.1.0", "/b", true), r("jflib", "0.1.0", "/j/lib/jflib", true), r("jflib-ui", "0.1.0", "/j/lib/ui", true),
+                   r("jflib-installer", "0.1.0", "/reg/jflib-installer-0.1.0", false), r("jflib-gfx", "0.1.0", "/own/gfx", true)];
+        let checkout = [r("jflib", "0.1.0", "/j/lib/jflib", true), r("jflib-installer", "0.1.0", "/j/lib/installer", true),
+                        r("jflib-gfx", "0.1.0", "/j/lib/gfx", true), r("jflib-appimagert", "0.2.0", "/j/lib/appimagert", true)];
+        let local = local_crates(&app, &checkout, "0.1.0");
+        assert_eq!(local.get("jflib-installer").map(PathBuf::as_path), Some(Path::new("/j/lib/installer")));
+        assert_eq!(local.get("jflib-ui").map(PathBuf::as_path), Some(Path::new("/j/lib/ui")));
+        assert_eq!(local.get("jflib-gfx").map(PathBuf::as_path), Some(Path::new("/own/gfx")));
+        // another version, the facade itself and the app are no stub crates
+        assert!(!local.contains_key("jflib-appimagert") && !local.contains_key("jflib") && !local.contains_key("Narsil"));
+        // jflib from crates.io: only what the app has from paths
+        assert_eq!(local_crates(&app[3..], &[], "0.1.0").keys().collect::<Vec<_>>(), ["jflib-gfx"]);
+    }
+
+    // the members of this repository's workspace, found from the facade's folder as stub_paths
+    // does for a checkout an app patches jflib to
+    #[test]
+    fn members_of_the_checkout() {
+        let jflib = Path::new(env!("CARGO_MANIFEST_DIR")).join("../jflib");
+        if !jflib.join("Cargo.toml").is_file() {
+            return; // the published crate alone
+        }
+        let members = cargo::members(&jflib).unwrap();
+        let version = members.iter().find(|m| m.name == "jflib").map(|m| m.version.clone()).unwrap();
+        let local = local_crates(&[], &members, &version);
+        for (name, dir) in [("jflib-installer", "installer"), ("jflib-appimagert", "appimagert"), ("jflib-build", "jflib_build")] {
+            let found = local.get(name).unwrap_or_else(|| panic!("{name} missing"));
+            assert_eq!(found.canonicalize().unwrap(), jflib.join("..").join(dir).canonicalize().unwrap());
+        }
+    }
+
     #[test]
     fn formats() {
         let o = options(&["--formats".into(), "all".into(), "--no-deb".into()]).unwrap();
@@ -683,5 +901,27 @@ mod tests {
         let o = options(&["--formats".into(), "flatpak,setup".into()]).unwrap();
         assert_eq!(o.formats, ["setup", "flatpak"]);
         assert!(options(&["--formats".into(), "snap".into()]).is_err());
+        // the default: setup and deb, noted as the default
+        let o = options(&[]).unwrap();
+        assert_eq!((o.formats.as_slice(), o.formats_default), (&["setup", "deb"][..], true));
+        assert!(!options(&["--formats".into(), "setup,deb".into()]).unwrap().formats_default);
+    }
+
+    // an app with std without --formats: the default's formats of the system it is packaged on
+    #[test]
+    fn std_default_formats() {
+        let mut f = vec!["setup", "deb"];
+        std_formats(&mut f, Some("win"), "Narsil").unwrap();
+        assert_eq!(f, ["setup"]);
+        let mut f = vec!["setup", "deb"];
+        std_formats(&mut f, Some("linux"), "Narsil").unwrap();
+        assert_eq!(f, ["deb"]);
+        // --no-win on Windows leaves nothing: the error says what to pass
+        let mut f = vec!["deb"];
+        let e = std_formats(&mut f, Some("win"), "Narsil").unwrap_err();
+        assert!(e.contains("Narsil has std") && e.contains("--formats setup,msix"), "{e}");
+        let mut f = vec!["setup", "deb"];
+        assert!(std_formats(&mut f, None, "Narsil").unwrap_err().contains("--formats dmg"));
+        assert_eq!(host_formats(Some("linux")), ["deb", "appimage", "rpm", "flatpak"]);
     }
 }

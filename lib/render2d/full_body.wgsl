@@ -2,7 +2,6 @@
     let q = i.pos.xy;
     let h = i.par.x;
     let fl = i.misc.x;
-    let col = unpack4x8unorm(i.misc.y);
     let cap = (fl >> 4u) & 15u;
     let dashed = (fl & M_DASHED) != 0u;
     let arc = (fl & M_ARC) != 0u;
@@ -13,7 +12,8 @@
     var tf = 1.0;
     var duty = 1.0;
     if dashed {
-        sc = select(1.0, view.rest.w, ((styles[si].flags >> 20u) & 15u) == UNIT_DRAWING);
+        // (dash units per pixel: the vertex shader's, the block's units inside an insert)
+        sc = select(1.0, bitcast<f32>(i.misc.w), ((styles[si].flags >> 20u) & 15u) == UNIT_DRAWING);
         let period = styles[si].period;
         tf = clamp((DASH_EXACT - period / sc) / (DASH_EXACT - DASH_FLAT), 0.0, 1.0);
         let capl = select(select(0.0, 2.0 * h, cap == CAP_SQUARE), 1.5707963 * h, cap == CAP_ROUND) * sc;
@@ -176,5 +176,8 @@
         discard;
         return vec4f(0.0);
     }
+    // (the colour unpacked here, not at the top: alive through the whole body, Mesa's Intel compiler (26.0) gave one of
+    // its parts to another value in some pixels, in fs_fill: a channel or the pixel wrong at random, docs/RENDER2D.md)
+    let col = unpack4x8unorm(i.misc.y);
     let al = col.w * c;
     return vec4f(vec3f(col.z, col.y, col.x) * al, al);

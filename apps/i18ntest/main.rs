@@ -346,6 +346,7 @@ fn messages(t: &mut T) {
     t.eq("dates", msg("{d, date} | {d, date, long} | {d, time} | {d, datetime}", &[("d", c.into())]),
         s("17.10.2026 | 17. Oktober 2026 | 19:58 | 17.10.2026, 19:58"));
     t.eq("missing", msg("{x} da", &[]), s("{x} da"));
+    t.eq("ends inside a placeholder", msg("da {n", &[("n", 5.into())]), s("da {n"));
     t.eq("broken", msg("a {n, plural, one {x", &[("n", 1.into())]), s("a {n, plural, one {x"));
     t.eq("stray brace", msg("a } b", &[]), s("a } b"));
     // the UI language decides the plural rules, the format the numbers

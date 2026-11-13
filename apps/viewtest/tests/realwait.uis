@@ -1,0 +1,12 @@
+# wait real: a thread of the app's own (an engine's) works in real time; its wake-up reaches
+# App::command and the timer that polls its result fires as the virtual clock follows the real
+# one.  sync MS soft: a job that does not end in MS is no failure.
+click "Hintergrund"
+expect text:"Hintergrund: 0 Abfrage: läuft" exists
+wait real 1200
+expect text:"Hintergrund: 1 Abfrage: fertig" exists
+click "Hängt"
+sync 200 soft
+expect text:"Hintergrund: 1 Abfrage: fertig" exists
+click "Hängt"
+sync 200

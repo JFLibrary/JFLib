@@ -43,7 +43,7 @@ static JNIEnv *target_env;
 static jobject target_bitmap;
 static AndroidBitmapInfo target_info;
 static int started, last_width, last_height, last_dpi, ime_visible, presented;
-static int a11y_wanted = -1; /* the accessibility mirror asked for before the app started */
+static int a11y_wanted = -1; /* the accessibility mirror asked for before the app started (2: on) */
 static uint64_t epoch_ms;
 /* GalleryHost: call(int, byte[]) -> byte[], request(int, int, byte[]) -> boolean */
 static JavaVM *java_vm;
@@ -322,9 +322,9 @@ JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryActivity_nativeText(
  * off, the updates since the last call (each: u32 length + update), an action for a node. */
 JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryActivity_nativeA11y(JNIEnv *env, jclass cls, jboolean on) {
     (void)env; (void)cls;
-    a11y_wanted = on ? 1 : 0;
+    a11y_wanted = on ? 2 : 0; /* 2: the rich format (a11y_wire VERSION2) */
     if (!started) return;
-    (void)jfgui_a11y(on ? 1 : 0);
+    (void)jfgui_a11y((uint32_t)a11y_wanted);
     jfgui_input(time_ms());
 }
 JNIEXPORT jbyteArray JNICALL Java_org_jflib_gallery_GalleryActivity_nativeA11yTake(JNIEnv *env, jclass cls) {

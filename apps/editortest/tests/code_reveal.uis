@@ -1,0 +1,33 @@
+# the code editor shows a line without the keyboard focus (a debugger's execution line while the
+# page or the DevTools toolbar keeps the keyboard): cmd 913 L sets the execution line L and asks
+# ui.code_reveal for it.  JFS with its services (cmd 906, folding), 200 functions of 8 lines
+# (cmd 912 200); lines of 20 px, the vertical scroll bar #3001 has the scroll position in px.
+size 1000 680
+theme light
+click tab:"Code"
+click tab:"JFS"
+cmd 906
+cmd 912 200
+wait 300
+focus "Hoher Kontrast"
+expect #3001 value 0
+# line 1000 (y 19980) comes into the middle of the view; the focus and the caret stay
+cmd 913 1000
+expect text:"exec: 1000" exists
+expect #3001 value 19600..19900
+expect "Hoher Kontrast" focused
+expect text:"pos: 1:1" exists
+# a line in view: no scroll (in the middle it would be about 19935)
+cmd 913 1010
+expect text:"exec: 1010" exists
+expect #3001 value 19600..19900
+# a line inside folded functions: the folds around it open (200 x 5 lines hidden, then 995)
+cmd 910
+expect text:"hidden: 1000" exists
+cmd 913 1206
+expect text:"exec: 1206" exists
+expect text:"hidden: 995" exists
+expect "Hoher Kontrast" focused
+expect text:"pos: 1:1" exists
+cmd 911
+cmd 906

@@ -5,6 +5,9 @@
 //        Recovery})                       one process holds a repository at a time (LOCK)
 //   repo.writer() -> Writer               put(kind, bytes) / put_stream(reader) -> chunk ids,
 //                                         finish() (packs and indexes are durable);
+//                                         finish_unsaved() -> (stats, Unsaved): the same, and
+//                                         gc stays out until unsaved.save_snapshot(..) -- the
+//                                         way of a backup where a gc can run beside it;
 //                                         .codec(c, level): this writer's compression
 //                                         (the repository's own is the default)
 //   repo.read_chunk(id) / read_tree(id)   repo.save_snapshot / load_snapshot / snapshot_ids /
@@ -20,7 +23,9 @@
 // Chunks:  id = BLAKE3-keyed(id key, plain) -> identical data is stored once, the ids reveal
 //          nothing without the key.  Commit order of a backup: packs (fsync) -> indexes
 //          (fsync) -> snapshot (atomic rename, directory sync); a crash leaves at most
-//          unreferenced packs, which gc removes.
+//          unreferenced packs, which gc removes.  Until its snapshot is there a backup's chunks
+//          are such packs too: gc waits for open writers and for an Unsaved, and a snapshot
+//          saved the plain way after a gc took chunks of it is refused (save_snapshot).
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -260,8 +265,10 @@ pub struct Repo {
     chunker: Chunker,
     codec: Codec,
     index: Mutex<BTreeMap<ChunkId, Loc>>,
-    /// writers share, gc is exclusive
+    /// writers (and what finish_unsaved leaves of them) share, gc is exclusive
     gc_lock: RwLock<()>,
+    /// a gc of this process has removed chunks: save_snapshot looks its chunks up
+    swept: Mutex<bool>,
     files: Mutex<Vec<(PackId, Arc<plat::File>)>>,
     _lock: plat::FileLock,
 }
@@ -366,7 +373,7 @@ impl Repo {
         let avg = cfg.get("chunk_avg").and_then(|x| x.as_u64()).unwrap_or(1 << 20).clamp(MIN_CHUNK_AVG as u64, MAX_CHUNK_AVG as u64) as usize;
         let codec = Codec::from_name(str_of(&cfg, "compression")).unwrap_or(Codec::Lz4);
         let chunker = Chunker::new(&keys.gear, avg);
-        let repo = Repo { path: String::from(path), cfg: Mutex::new(cfg), keys, chunker, codec, index: Mutex::new(BTreeMap::new()), gc_lock: RwLock::new(()), files: Mutex::new(Vec::new()), _lock: lock };
+        let repo = Repo { path: String::from(path), cfg: Mutex::new(cfg), keys, chunker, codec, index: Mutex::new(BTreeMap::new()), gc_lock: RwLock::new(()), swept: Mutex::new(false), files: Mutex::new(Vec::new()), _lock: lock };
         repo.load_index()?;
         Ok(repo)
     }
@@ -607,8 +614,30 @@ impl Repo {
         join(&join(&self.path, "snapshots"), &format!("{}.snap", id))
     }
 
-    /// store a snapshot (after its writer finished); signed by `signer`
+    /// store a snapshot (after its writer finished); signed by `signer`.
+    ///
+    /// Between the writer's finish and this call the new chunks belong to no snapshot, and a
+    /// gc of another thread -- one that waited for the writer runs at that very moment --
+    /// removes them.  Where a gc can run beside the backup, finish the writer with
+    /// `finish_unsaved` and save through the `Unsaved` it returns: gc waits for it.  This call
+    /// cannot keep a gc out afterwards; it refuses the snapshot instead (NotFound) when chunks
+    /// of it are gone -- looked up once a gc of this process has removed anything.  It waits
+    /// for a running gc: not to be called while the same thread holds a Writer or an Unsaved.
     pub fn save_snapshot(&self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()> {
+        let _g = self.gc_lock.read();
+        if *self.swept.lock() {
+            let mut refs = BTreeSet::new();
+            self.referenced(snap, &mut refs)?;
+            let idx = self.index.lock();
+            if let Some(c) = refs.iter().find(|c| !idx.contains_key(*c)) {
+                return Err(CasError::NotFound(format!("chunk {} of snapshot {} (removed by a gc before the snapshot was saved)", crypto::hex(&c[..8]), snap.id)));
+            }
+        }
+        self.write_snapshot(snap, signer)
+    }
+
+    // (the caller keeps gc out: gc_lock shared, or the Unsaved of the snapshot's writer)
+    fn write_snapshot(&self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()> {
         if !self.trusted(&signer.public) {
             self.trust_signer(&signer.public)?;
         }
@@ -741,14 +770,28 @@ impl Repo {
     }
 
     /// remove what no snapshot references: empty packs are deleted, sparse packs (less than
-    /// 60 % in use) are rewritten with their live blobs
+    /// 60 % in use) are rewritten with their live blobs.  Waits for open writers and for what
+    /// finish_unsaved left of them.  Lost index files are rebuilt from the packs' trailers
+    /// first (repair_index).  Refused (Corrupt), nothing removed, while a snapshot does not
+    /// open, or while a chunk it references is not in the index and a pack without an index
+    /// (and without a readable trailer) is left: the chunk may be in that pack
     pub fn gc(&self, progress: Progress) -> CasResult<GcReport> {
         let _g = self.gc_lock.write();
+        // a pack whose index file is lost holds chunks the index does not know: swept as it is
+        // it would go as one nobody uses, with the chunks of its snapshots
+        let (_, unindexed) = self.repair_missing()?;
         let mut live = BTreeSet::new();
         for id in self.snapshot_ids() {
             // a snapshot that does not open stops gc: its chunks must not be lost
             let s = self.load_snapshot(&id)?;
             self.referenced(&s, &mut live)?;
+        }
+        if unindexed > 0 {
+            let idx = self.index.lock();
+            let missing = live.iter().filter(|c| !idx.contains_key(*c)).count();
+            if missing > 0 {
+                return Err(CasError::Corrupt(format!("{} referenced chunks are not in the index, {} packs have no index and no readable trailer", missing, unindexed)));
+            }
         }
         let mut rep = GcReport::default();
         let packs = self.pack_files();
@@ -796,6 +839,9 @@ impl Repo {
         if !out.is_empty() {
             self.store_repacked(&mut out)?;
         }
+        if !to_delete.is_empty() {
+            *self.swept.lock() = true; // (save_snapshot: chunks may be gone from here on)
+        }
         // the moved chunks now live in the new packs
         {
             let mut idx = self.index.lock();
@@ -831,13 +877,22 @@ impl Repo {
     /// rebuild missing index files from the packs' trailers
     pub fn repair_index(&self) -> CasResult<u64> {
         let _g = self.gc_lock.write();
+        self.repair_missing().map(|(fixed, _)| fixed)
+    }
+
+    // the index files of packs that have none, from their trailers -> (rebuilt, packs left
+    // without one: no readable trailer, an interrupted write); the caller holds gc_lock
+    // exclusively
+    fn repair_missing(&self) -> CasResult<(u64, u64)> {
         let mut fixed = 0;
+        let mut left = 0;
         for (pid, path) in self.pack_files() {
             if plat::file_exists(&self.index_path(&pid)) == 1 {
                 continue;
             }
             let b = plat::read_file(&path).ok_or_else(|| io("cannot read", &path))?;
             let Ok(entries) = pack::trailer_index(&self.keys, &pid, &b) else {
+                left += 1;
                 continue; // no trailer: an interrupted write, gc removes it
             };
             if !plat::fs::write_file_private(&self.index_path(&pid), &pack::seal_index(&self.keys, &pid, &entries)) {
@@ -849,7 +904,7 @@ impl Repo {
             }
             fixed += 1;
         }
-        Ok(fixed)
+        Ok((fixed, left))
     }
 }
 
@@ -902,7 +957,7 @@ pub struct Writer<'a> {
     level: i32,
 }
 
-impl Writer<'_> {
+impl<'a> Writer<'a> {
     /// compress this writer's data chunks with `codec` (`level`: zstd's level); trees stay LZ4
     pub fn codec(mut self, codec: Codec, level: i32) -> Self {
         self.codec = codec;
@@ -981,9 +1036,33 @@ impl Writer<'_> {
         Ok(())
     }
 
-    /// write the last pack; every chunk put so far is durable afterwards
+    /// write the last pack; every chunk put so far is durable afterwards.  gc may run from
+    /// here on, and it removes chunks no snapshot holds: a backup whose snapshot follows uses
+    /// `finish_unsaved` where a gc of another thread is possible (Repo::save_snapshot)
     pub fn finish(mut self) -> CasResult<WriteStats> {
         self.flush()?;
         Ok(self.stats)
+    }
+
+    /// `finish`, and gc stays out until the snapshot of these chunks is saved through the
+    /// returned `Unsaved` (or that is dropped: a backup given up)
+    pub fn finish_unsaved(mut self) -> CasResult<(WriteStats, Unsaved<'a>)> {
+        self.flush()?;
+        Ok((self.stats, Unsaved { repo: self.repo, _g: self._g }))
+    }
+}
+
+/// what a writer finished with `finish_unsaved` leaves: its chunks -- new ones and those it
+/// found stored already -- before a snapshot holds them.  gc waits while this lives, so the
+/// thread that holds it starts no gc, check or further writer before it is saved or dropped.
+pub struct Unsaved<'a> {
+    repo: &'a Repo,
+    _g: plat::sync::RwReadGuard<'a, ()>,
+}
+
+impl Unsaved<'_> {
+    /// store the snapshot of these chunks (signed by `signer`); gc may run again afterwards
+    pub fn save_snapshot(self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()> {
+        self.repo.write_snapshot(snap, signer)
     }
 }

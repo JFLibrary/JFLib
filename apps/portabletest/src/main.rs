@@ -289,6 +289,26 @@ fn math_checks(hash: &mut u64) {
     assert_eq!(math::exp2(-1074.0).to_bits(), 1);
 }
 
+/// copy_stream and copy_stream_rows (non-temporal stores and their fence on x86-64): odd starts
+/// and lengths around the streaming threshold; nothing outside the target changes
+fn stream_checks() {
+    let src: Vec<u8> = (0..4096u32).map(|i| (i * 7 + 3) as u8).collect();
+    for off in [0usize, 1, 7, 15, 16] {
+        for len in [0usize, 63, 64, 79, 80, 200, 1000] {
+            let mut dst = alloc::vec![0u8; len + off + 8];
+            simd::copy_stream(&mut dst[off..off + len], &src[..len]);
+            assert!(dst[off..off + len] == src[..len], "copy_stream: the copy");
+            assert!(dst[..off].iter().chain(&dst[off + len..]).all(|&v| v == 0), "copy_stream: around the copy");
+        }
+    }
+    let (mut dst, mut want) = (alloc::vec![0u8; 300 * 40], alloc::vec![0u8; 300 * 40]);
+    simd::copy_stream_rows(&mut dst[13..], 300, &src, 100, 97, 40);
+    for y in 0..40 {
+        want[13 + y * 300..13 + y * 300 + 97].copy_from_slice(&src[y * 100..y * 100 + 97]);
+    }
+    assert!(dst == want, "copy_stream_rows");
+}
+
 fn allocation_checks(hash: &mut u64) {
     for round in 0..6 {
         let mut blocks: Vec<Vec<u8>> = Vec::new();
@@ -571,6 +591,7 @@ fn main() -> i32 {
     float_checks(&mut hash);
     decimal_checks(&mut hash);
     math_checks(&mut hash);
+    stream_checks();
     allocation_checks(&mut hash);
     #[cfg(target_arch = "wasm32")]
     {

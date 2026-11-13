@@ -402,7 +402,8 @@ pub fn process_allowed(program: &str) -> bool {
     decide("process", program, &req, false) == Verdict::Allow
 }
 
-/// whether open_url may open url (its scheme)
+/// whether open_url may open url (its scheme); false for anything but an absolute URL (a path, a
+/// drive letter), with or without a manifest
 pub fn url_allowed(url: &str) -> bool {
     // control characters and over-long URLs (the shell buffer would truncate them) are refused
     if url.chars().any(|c| c < ' ' || c == '\x7f') || url.encode_utf16().count() >= 2048 {
@@ -412,6 +413,13 @@ pub fn url_allowed(url: &str) -> bool {
         Some(k) if k > 0 => url[..k].to_ascii_lowercase(),
         _ => String::new(),
     };
+    // only an absolute URL: a scheme of two or more characters (RFC 3986: a letter, then
+    // letters, digits, '+', '-', '.') -- a path ("C:\x.exe", "\\server\share\x", "x.exe") is
+    // none, and the system's opener (ShellExecuteW, Launch Services) starts it as a program
+    let b = scheme.as_bytes();
+    if b.len() < 2 || !b[0].is_ascii_alphabetic() || !b.iter().all(|&c| c.is_ascii_alphanumeric() || b"+-.".contains(&c)) {
+        return false;
+    }
     decide("url", url, &Req::Url(&scheme), false) == Verdict::Allow
 }
 
@@ -2103,6 +2111,11 @@ fn norm(path: &str, win: bool, glob: bool, cwd: &dyn Fn() -> String) -> Option<S
         return None;
     }
     if !win {
+        // the browser's and Android's file stores take '\' for a separator as well (path() in
+        // web_files.rs and android_files.rs): a rule must see the folders they open, else
+        // "/allowed/..\secret" would pass as a name inside /allowed and open /secret
+        #[cfg(any(target_arch = "wasm32", target_os = "android"))]
+        let path = &path.replace('\\', "/");
         let full = if path.starts_with('/') {
             String::from(path)
         } else {

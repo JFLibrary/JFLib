@@ -1,0 +1,7 @@
+#!args --test printdoc
+# (Rust only, plat-shared, E9) plattest --test printdoc: jobs of several pages through
+# plat::PrintDoc in the test variant (jfgui_PRINT_TO, set by the test itself): a PDF of three
+# pages (Kids, Count, xref offsets, the title, a page's pixels), the app's own PDF printed as it
+# is, refusals, a job without pages; Windows: the pages through GDI into "Microsoft Print to
+# PDF" (skipped when the printer is missing).  The whole test runs in on_init and ends the
+# process with the number of failures; nothing below is executed.

@@ -47,7 +47,8 @@
 //            / set_app_user_model_id (Windows: the app's explicit id)        (taskbar.rs)
 //   assoc:   assoc_register / assoc_conflicts / assoc_unregister: the app's PACKAGE file types
 //            and URL schemes for this program without a setup (HKCU\Software\Classes; .desktop,
-//            shared-mime-info, mimeapps.list), file_uri_path                    (assoc.rs)
+//            shared-mime-info, mimeapps.list), file_uri_path; default_browser_status /
+//            default_browser_request (PACKAGE browser=1)                        (assoc.rs)
 //   recent:  recent_add / recent_list / recent_remove / recent_clear: the system's recent files
 //            (SHAddToRecentDocs and the jump list; recently-used.xbel)          (recent.rs)
 //   audio:   Stream (open / open_fill, write, start / pause / stop, volume, latency, the default
@@ -59,7 +60,9 @@
 //            XGrabKey, the GlobalShortcuts portal)                             (hotkey.rs)
 //   threads: thread_spawn(stack, f) -> Thread (join), thread_yield(), Sem (post / wait),
 //            wake() (any thread: E_WAKE on the UI thread), wait_events(deadline, on_event)
-//            (headless), cpu_count(), mem_total()
+//            (headless), cpu_count(), mem_total(); the windows, the clipboard, the dialogs and
+//            the portals belong to the UI thread, the first one that uses them: other threads
+//            panic                                                          (ui_only.rs)
 //   pool:    thr_init / thr_count / thr_shutdown / thr_self, parallel_for, Job   (pool.rs)
 //   task:    async execution: Executor (ui() in the event loop, new() / block_on), Task,
 //            spawn_blocking (a pool for blocking work), sleep, CancelToken, Progress, join /
@@ -247,8 +250,10 @@ mod win_winrt;
 pub use autostart::{AUTOSTART_WAIT_MS, AutostartError, autostart_entry, autostart_get, autostart_set};
 /// The app's taskbar / dock button: progress, a badge, the jump list's tasks.
 pub mod taskbar;
-/// The app's file types and URL schemes registered without a setup (developer builds).
+/// The app's file types and URL schemes registered without a setup (developer builds); a web
+/// browser's default (default_browser_status / default_browser_request).
 pub mod assoc;
+pub use assoc::{BrowserStatus, default_browser_request, default_browser_status};
 /// The system's list of recently used files (jump lists, recently-used.xbel).
 pub mod recent;
 pub use recent::{recent_add, recent_clear, recent_list, recent_remove};
@@ -343,6 +348,14 @@ pub use dnd::*;
 mod cliprich;
 pub use cliprich::*;
 mod consts;
+// the UI thread's own state: UiOnly<T> lets only the UI thread at it (a safe call on another
+// thread panics instead of racing)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+mod ui_only;
+// (E3) drawn cursors for the shapes Windows and X11 have none of (Wayland's own images, macOS'
+// zoom and cell)
+#[cfg(any(windows, target_os = "linux", target_os = "macos"))]
+mod cursor_art;
 mod evq;
 mod ime;
 pub use ime::*;
@@ -424,6 +437,23 @@ pub fn persistent_name(name: &str) -> String {
         }
     }
     String::from(name)
+}
+
+// (E8) the files of the last file_dialog with FD_MULTI
+static FD_PATHS: rt::sync::SpinLock<alloc::vec::Vec<String>> = rt::sync::SpinLock::new(alloc::vec::Vec::new());
+
+/// (E8) the files the last system file dialog with FD_MULTI chose (its first is also in
+/// file_dialog's path; Ctrl / Shift in the dialog choose more); one entry after a dialog that
+/// chose one file, empty after a cancelled one.  Windows and Linux's portal choose several, the
+/// other systems' dialogs one (docs/GUIDE.md section 7)
+pub fn file_dialog_paths() -> alloc::vec::Vec<String> {
+    FD_PATHS.lock().clone()
+}
+
+// (backends) the answer of a dialog: every chosen file
+#[allow(dead_code)]
+pub(crate) fn fd_paths_set(v: alloc::vec::Vec<String>) {
+    *FD_PATHS.lock() = v;
 }
 
 /// The answer of a system file dialog that answers later (file_dialog -> FD_PENDING: only

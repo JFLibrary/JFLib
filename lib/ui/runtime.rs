@@ -455,6 +455,8 @@ impl Ui {
             autoclose_ms: 0,
             accent_raw: 0,
             settle_warned: false,
+            self_frames: 0,
+            self_warned: false,
             verify_dirty: false,
             frames_rendered: 0,
             close_at: 0,
@@ -569,6 +571,7 @@ impl Ui {
             let made = self.touch_next();
             let synth = made.is_some();
             let Some(mut ev) = made.or_else(plat::evq_pop) else { break };
+            self.self_frames = 0; // an event: the frames after it are not ones the app asked for alone
             if !synth && self.hr_on() {
                 self.hr_popped(&ev); // (hotreload.rs) replayed or recorded
             }
@@ -831,19 +834,19 @@ impl Ui {
     pub(crate) fn run_passes(&mut self, app: &mut dyn App) {
         let (mut passes, mut build_us) = (0u32, 0u64); // (inspect.rs) statistics
         self.touch_apply(); // the way of the finger and of a fling, into the views (touch.rs)
-        let mut tasks_ran = self.settle(app, &mut passes, &mut build_us);
+        let mut unseen = self.settle(app, &mut passes, &mut build_us);
         // typed text beyond a pass's queue (ctx.rs): part by part, each with passes of its own
         while self.text_refill() {
-            tasks_ran = self.settle(app, &mut passes, &mut build_us);
+            unseen = self.settle(app, &mut passes, &mut build_us);
         }
         if self.a11y_reveal() {
-            tasks_ran = self.settle(app, &mut passes, &mut build_us);
+            unseen = self.settle(app, &mut passes, &mut build_us);
             self.agent.reveal = None;
         }
         self.touch_after_passes();
         self.dnd_after_passes(); // a DS_START without drag_set is no drag
         self.focus_req_expire();
-        self.need = tasks_ran; // tasks ran in the last round: the frame did not see it yet
+        self.need_after_passes(unseen);
         self.a11y_frame(); // the accessibility tree for screen readers (a11y.rs)
         if self.m.ins.on {
             self.ins_passes(passes, build_us);
@@ -852,12 +855,37 @@ impl Ui {
         }
     }
 
-    // settle -> async tasks ran in the last round: passes until the layout settles, the
-    // queued commands, at most three rounds
-    fn settle(&mut self, app: &mut dyn App, passes: &mut u32, build_us: &mut u64) -> bool {
+    // need_after_passes(unseen): need accumulates over the passes -- what asked for a frame after
+    // the last round's frame (invalidate in its App::frame or a command, a window activated) and
+    // what the last round's commands, windows or tasks changed when the rounds ran out (unseen: no
+    // frame saw it) get the next frame (it was `need = tasks_ran`, which lost the frame of a
+    // command such as UIC_WAKE in the last round).  An app that asks again after every frame by
+    // itself gets SELF_FRAMES of them in a row without an event between them, then the frames
+    // wait for the next event (a UIWARN once); tasks keep theirs as before.
+    fn need_after_passes(&mut self, unseen: (bool, bool)) {
+        const SELF_FRAMES: u32 = 8;
+        let (tasks_ran, unseen) = unseen;
+        let asked = self.need || unseen;
+        self.self_frames = if asked { self.self_frames.saturating_add(1) } else { 0 };
+        if asked && self.self_frames > SELF_FRAMES && !tasks_ran {
+            if !self.self_warned {
+                self.self_warned = true;
+                self.warn("every frame asked for another one (ui.invalidate in App::frame, a command queued in every frame): the frames wait for the next event");
+            }
+            self.need = false;
+        } else {
+            self.need = asked;
+        }
+    }
+
+    // settle -> (async tasks ran in the last round, the last round changed something no frame
+    // saw: the rounds ran out): passes until the layout settles, the queued commands, at most
+    // three rounds.  Each round's frame answers what asked for a frame before it (need).
+    fn settle(&mut self, app: &mut dyn App, passes: &mut u32, build_us: &mut u64) -> (bool, bool) {
         let mut rounds = 3;
         let mut tasks_ran;
         loop {
+            self.need = false;
             let mut pass = 0;
             let mut keys_fwd = false; // (U3) keys handed on for the next pass
             loop {
@@ -931,14 +959,13 @@ impl Ui {
             // async tasks woken meanwhile (tasks.rs): what they changed shows in the next pass
             tasks_ran = self.tasks_pump();
             if !(ran || changed || tasks_ran) {
-                break;
+                return (false, false);
             }
             rounds -= 1;
             if rounds == 0 {
-                break;
+                return (tasks_ran, true);
             }
         }
-        tasks_ran
     }
 
     // csd_begin -> true when the library draws the title bar for the app: the window has no
@@ -1159,6 +1186,7 @@ fn prepare(desc: &AppDesc, style: &'static dyn Style) -> (Ui, i32, i32) {
     img_svg::register(); // (svg) .svg / .svgz through img_core::io::load / load_ex
     plat::set_print_deflate(Some(img_core::deflate::zlib_deflate)); // PDFs of plat::print as the asm's
     img_core::set_parallel(icc_par); // the codecs' parallel parts (YUV bands, ICC grids) on the pool
+    gfx::set_parallel(icc_par); // large blits (a canvas's frame at 4K) in row bands on the pool
     let args = Args(plat::args());
     let mut ui = Ui::new(desc, style);
     // the decimal sign of number boxes: the user's format (headless: German)
@@ -1420,8 +1448,13 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
         if let Some(t) = ui.gp_deadline() {
             deadline = deadline.min(t.max(1)); // the GPU output's jobs and frames still to show
         }
+        if let Some(t) = plat::a11y::check_due() {
+            deadline = deadline.min(t.max(1)); // whether a screen reader left (UIC_A11Y)
+        }
         // the live redraw inside the Win32 modal size / move loop (ui_refresh)
         plat::wait_refresh(deadline, &mut || ui.refresh(app));
+        // (Windows) the fallback that notices a client left looks now; a change wakes the loop
+        let _ = plat::a11y::active();
         ui.clock_update();
         if ui.close_at != 0 && ui.close_at <= ui.now_ms {
             break;
@@ -1482,7 +1515,7 @@ fn log_start(ui: &Ui) {
     plat::log!(plat::LOG_INFO, "app", "start {} ({}, {})", ui.desc.title, crate::i18n::locale_tag(), crate::i18n::language_code());
 }
 
-/// plat::parallel_for for img_core (which does not depend on plat)
+/// plat::parallel_for for img_core and gfx (which do not depend on plat)
 fn icc_par(n: usize, f: &(dyn Fn(usize) + Sync)) {
     let _ = plat::parallel_for(n, &|i, _| f(i));
 }

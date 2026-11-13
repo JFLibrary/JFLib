@@ -98,7 +98,8 @@ extern "C" fn glibc_main(_argc: i32, argv: *const usize, _envp: *const usize) ->
 
 /// (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
 /// program's own): std's arguments and environment as a block like the initial stack, then what
-/// glibc_main does, with rt's panic hook first; the end through std::process::exit
+/// glibc_main does, with rt's panic hook first; the end through std::process::exit.  With the
+/// feature unwind a panic that leaves the app ends it there.
 #[cfg(feature = "std")]
 pub fn std_start() -> ! {
     // SAFETY: written once, first thing in the program's main, before anything reads it.
@@ -109,7 +110,7 @@ pub fn std_start() -> ! {
     crate::cpu::simd_override();
     rt::boot::set_handler(crate::boot::start); // rt::main!: name, app://, manifest
     // SAFETY: the program's entry symbol (ui::main!, rt::main!).
-    let code = unsafe { super::jfgui_main() };
+    let code = rt::abort_on_unwind(|| unsafe { super::jfgui_main() });
     crate::exit(code) // hosted.rs: std::process::exit
 }
 
@@ -148,17 +149,25 @@ pub fn dl_open(name: &str) -> Option<usize> {
 }
 
 /// the address of a symbol of a library from dl_open (0: none); name ends in NUL
-pub fn dl_sym(handle: usize, name: &[u8]) -> usize {
+///
+/// # Safety
+/// `handle` came from dl_open and has not been closed: the dynamic linker reads its structures
+/// before it could tell a wrong handle.
+pub unsafe fn dl_sym(handle: usize, name: &[u8]) -> usize {
     if name.last() != Some(&0) {
         return 0;
     }
-    // SAFETY: a handle of dl_open, a NUL-terminated name.
+    // SAFETY: a handle of dl_open (the caller's promise), a NUL-terminated name.
     unsafe { dlsym(handle as *mut c_void, name.as_ptr()) as usize }
 }
 
 /// close a library from dl_open
-pub fn dl_close(handle: usize) {
-    // SAFETY: a handle of dl_open; the caller no longer uses what it got from it.
+///
+/// # Safety
+/// `handle` came from dl_open and is closed once; nothing uses what dl_sym found in it any more
+/// (the library may be unloaded).
+pub unsafe fn dl_close(handle: usize) {
+    // SAFETY: the caller's promise.
     unsafe { dlclose(handle as *mut c_void) };
 }
 

@@ -512,7 +512,9 @@ impl X11 {
                 return; // its text comes as E_IME_COMMIT / E_PREEDIT
             }
             if vk != 0 {
-                self.push(E_KEY_DOWN, 0, 0, 0, vk | rep);
+                // (E2) the evdev code (X keycode - 8) and where the key sits
+                let code = kc.wrapping_sub(8);
+                self.push(E_KEY_DOWN, 0, code as i32, crate::evdev_location(code) as i32, vk | rep);
             }
             // dead keys composed (´ e -> é); a repeating dead key gives nothing
             let typed = if rep != 0 && dead { [0, 0] } else { crate::xkb_key_typed(ev).1 };
@@ -537,17 +539,20 @@ impl X11 {
             crate::ibus_key(keyval, ev, xstate | crate::IBUS_RELEASE);
         }
         if vk != 0 {
-            self.push(E_KEY_UP, 0, 0, 0, vk);
+            let code = kc.wrapping_sub(8);
+            self.push(E_KEY_UP, 0, code as i32, crate::evdev_location(code) as i32, vk);
         }
     }
 
     /// ime_pos(x, y, h): the caret of the focused text field in window px (h 0: none) ->
-    /// IBus focus / cursor location on the root
+    /// IBus focus / cursor location on the root; a password field (ime_purpose IP_PASSWORD) gets
+    /// no input method, its keys go past IBus (as GTK's input module does)
     pub(super) fn ime_pos(&mut self, x: i32, y: i32, h: i32) {
         // only while a window of ours has the keyboard (the UI calls this on every frame)
         let win = (0..PW_MAX).find(|&k| self.xw[k].win != 0 && self.xw[k].focus);
+        let pw = crate::ime_purpose_of() == crate::IP_PASSWORD;
         match win {
-            Some(i) if h > 0 => {
+            Some(i) if h > 0 && !pw => {
                 let (rx, ry) = if self.xw[i].posok { (self.xw[i].rx, self.xw[i].ry) } else { (0, 0) };
                 let rect = [rx + x, ry + y, h];
                 if !self.ime_on || self.ime_rect != rect || self.ime_win != i as u8 {

@@ -9,3 +9,6 @@
 # deletes, points, block indent, comments, moved lines, undo / redo, replace_all, 100 000 lines;
 # the JFS grammar token by token against JFScript's tokens() on two samples, interpolation,
 # numbers, comments over lines.
+# (E10) JavaScript (regular expressions, template strings over lines and their ${..}), CSS
+# (selectors, blocks, nested rules, minified), HTML (tags over lines, entities, <script> as
+# JavaScript and <style> as CSS up to their end tag), WAT; long minified lines of each.

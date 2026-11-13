@@ -4,25 +4,30 @@
 //
 //   inst_run(st) -> Ok / Err (st.err)   install into st.dir (style st.sel, options st.opt_*)
 //   inst_launch(st) -> bool             start the installed program
+//   inst_default_browser(st, headless)  (browser=1) Settings at the program's page of the
+//                                       default apps (test mode, script runs: printed only)
 //   un_load(st) -> Ok / Err             uninstaller: read install.ini next to the own exe
 //   un_run(st)                          remove files, shortcuts, uninstall entry, then let cmd
 //                                       delete uninstall.exe and the folder after the exit
 //
 // install.ini (key=value): app, display, style, desktop, start (shortcut paths or empty),
-// reg (1 / 0), files (further files relative to the folder, ';'-separated, '\'), assoc (what
-// the file types and URL schemes added, assoc.rs), app_id (the program's AppUserModelID: the
+// reg (1 / 0), files (further files relative to the folder, ';'-separated, '\'; one line of any
+// length, an older setup cut it at 4096 bytes), assoc (what
+// the file types, URL schemes and a browser's registration added, assoc.rs), app_id (the program's AppUserModelID: the
 // shortcuts, the pins and the ProgIDs carry it, and the program runs under it when it finds
 // this line beside itself, lib/plat/assoc.rs app_id_boot)
 
 use alloc::format;
 use alloc::string::String;
+use alloc::vec::Vec;
 
 use crate::payload::{PK_FILE, STY_MAX, kv_get, parent_dir, path_cap, pl_inflate};
-use crate::shell::{Reg, sh_assoc_remove, sh_assoc_set, sh_folder, sh_link, sh_pins, sh_reg_delete, sh_run};
+use crate::shell::{Reg, sh_assoc_remove, sh_assoc_set, sh_browser_request, sh_folder, sh_link, sh_pins, sh_reg_delete, sh_run};
 use crate::{Inst, PATH_CAP, str_cap};
 
-const IN_FILES_CAP: usize = 4096; // in_files: "a;b;c" of the uninstaller
-const INITXT_CAP: usize = 8192;
+/// install.ini's lists (files=, assoc=) have no limit: the asm's buffers of 4096 and 8192 bytes
+/// cut a long files= (licences of many crates), and the uninstaller left the rest behind
+const NO_CAP: usize = usize::MAX;
 
 /// st.dir + "\" + name  [in_path]
 fn in_path(st: &Inst, name: &str) -> String {
@@ -56,10 +61,12 @@ fn in_write_entry(st: &Inst, i: usize, path: &str) -> bool {
 }
 
 /// append "key=value\r\n" to the install.ini text  [in_ini]
+// (never cut to a fixed size, as the asm's 8192-byte buffer was: the lists of the files and of
+// what the file types added stand last, and a list cut inside an entry hands the uninstaller
+// another name -- "T:Software" for "T:Software\Classes\App.ext")
 fn in_ini(txt: &mut String, key: &str, value: &str) {
     for s in [key, "=", value, "\r\n"] {
-        let t = str_cap(&(core::mem::take(txt) + s), INITXT_CAP);
-        *txt = t;
+        txt.push_str(s);
     }
 }
 
@@ -100,10 +107,12 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
         if !in_write_entry(st, i, &path) {
             return in_fail(st, "„%s“ konnte nicht geschrieben werden.", &path);
         }
+        // (the whole list: a name cut short is another file for the uninstaller, a name left
+        // out a file it leaves behind)
         if !files.is_empty() {
-            files = str_cap(&(files + ";"), IN_FILES_CAP);
+            files.push(';');
         }
-        files = str_cap(&(files + &st.ents[i].name), IN_FILES_CAP);
+        files.push_str(&st.ents[i].name);
     }
     // the uninstaller: the setup without its payload (and without a signature of the setup)
     let un = in_path(st, "uninstall.exe");
@@ -123,10 +132,8 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     if st.opt_reg != 0 {
         in_regentry(st);
     }
-    // file types and URL schemes (PACKAGE filetypes= / schemes=)
-    let types = crate::assoc::parse_types(&st.types);
-    let schemes = crate::assoc::parse_schemes(&st.schemes);
-    let plan = crate::assoc::plan(&st.app, &st.disp, &st.exepath, &types, &schemes, &st.appid);
+    // file types and URL schemes (PACKAGE filetypes= / schemes=), a web browser (browser=1)
+    let plan = crate::assoc::plan(&package(st), &st.exepath);
     sh_assoc_set(&plan.set);
     in_ini(&mut initxt, "app", &st.app);
     in_ini(&mut initxt, "display", &st.disp);
@@ -140,7 +147,11 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     if !st.appid.is_empty() {
         in_ini(&mut initxt, "app_id", &st.appid);
     }
-    plat::write_file(&in_path(st, "install.ini"), initxt.as_bytes());
+    // (without it the uninstaller of "installed apps" finds nothing to remove)
+    let ini = in_path(st, "install.ini");
+    if !plat::write_file(&ini, initxt.as_bytes()) {
+        return in_fail(st, "„%s“ konnte nicht geschrieben werden.", &ini);
+    }
     Ok(())
 }
 
@@ -174,6 +185,28 @@ pub(crate) fn inst_launch(st: &Inst) -> bool {
     sh_run(&cmd, Some(&st.dir), false)
 }
 
+/// the manifest's app as plat::assoc sees it: name, display name, app id, file types, URL
+/// schemes, browser=1
+fn package(st: &Inst) -> crate::assoc::Package {
+    crate::assoc::Package {
+        app: st.app.clone(),
+        display: st.disp.clone(),
+        app_id: st.appid.clone(),
+        types: crate::assoc::parse_types(&st.types),
+        schemes: crate::assoc::parse_schemes(&st.schemes),
+        browser: st.browser,
+        ..crate::assoc::Package::default()
+    }
+}
+
+/// (browser=1, the option checked) let the user make the installed program the default web
+/// browser: Settings at its page of the default apps, as the program's own
+/// plat::default_browser_request (Windows lets no program take it itself); test mode and
+/// script runs (headless) print the page instead -> whether it opened (or was printed)
+pub(crate) fn inst_default_browser(st: &Inst, headless: bool) -> bool {
+    sh_browser_request(&package(st), headless)
+}
+
 // ------------------------------------------------------------------ uninstall
 
 const ERR_NOINI: &str = "Die Installationsdaten (install.ini) wurden nicht gefunden.";
@@ -195,11 +228,37 @@ fn un_load_ini(st: &mut Inst) -> Result<(), ()> {
     st.disp = kv_get(&ini, "display", 128).unwrap_or_default();
     st.lnk_desk = kv_get(&ini, "desktop", PATH_CAP).unwrap_or_default();
     st.lnk_start = kv_get(&ini, "start", PATH_CAP).unwrap_or_default();
-    st.files = kv_get(&ini, "files", IN_FILES_CAP).unwrap_or_default();
-    st.assoc = kv_get(&ini, "assoc", INITXT_CAP).unwrap_or_default();
+    st.files = kv_get(&ini, "files", NO_CAP).unwrap_or_default();
+    st.assoc = kv_get(&ini, "assoc", NO_CAP).unwrap_or_default();
     let reg = kv_get(&ini, "reg", 8).unwrap_or_default();
     st.opt_reg = reg.as_bytes().first().is_some_and(|&c| c == b'1') as i32;
     Ok(())
+}
+
+/// install.ini's files= -> the names in it: relative paths inside the program's folder (empty
+/// names, absolute paths and ".." are no files the setup wrote: skipped, so an edited list never
+/// deletes outside the folder)
+fn un_names(files: &str) -> Vec<String> {
+    files.split(';').filter(|f| !f.is_empty() && !f.contains(':') && !f.starts_with(['\\', '/'])
+                                && !f.split(['\\', '/']).any(|p| p == ".." || p == "." || p.is_empty()))
+        .map(in_slash).collect()
+}
+
+/// the folders below the program's folder that hold the files, each once, the deepest first
+/// ("a\b\c.txt" -> "a\b", "a")
+fn un_folders(names: &[String]) -> Vec<String> {
+    let mut dirs: Vec<String> = Vec::new();
+    for f in names {
+        let mut d = parent_dir(f);
+        while let Some(p) = d {
+            d = parent_dir(&p);
+            dirs.push(p);
+        }
+    }
+    // more separators first: a folder before the one that holds it
+    dirs.sort_unstable_by(|a, b| b.matches('\\').count().cmp(&a.matches('\\').count()).then_with(|| a.cmp(b)));
+    dirs.dedup();
+    dirs
 }
 
 /// remove the installation; cmd deletes uninstall.exe and the folder once this process has
@@ -208,19 +267,14 @@ pub(crate) fn un_run(st: &mut Inst) {
     // the program
     let name = str_cap(&(str_cap(&st.app, 64) + ".exe"), 64);
     plat::delete(&in_path(st, &name));
-    // further files (and their folders, when empty)
-    // (as the asm walks the list: an empty list or a trailing ';' adds no name, an empty name
-    // between two ';' is the folder itself, whose delete fails)
-    let mut names: alloc::vec::Vec<&str> = st.files.split(';').collect();
-    if names.last() == Some(&"") {
-        names.pop();
+    // further files, then the folders that held them, deepest first (a delete fails while the
+    // folder is not empty: what the user put there stays)
+    let names = un_names(&st.files);
+    for f in &names {
+        plat::delete(&in_path(st, f));
     }
-    for f in names {
-        let path = in_path(st, f);
-        plat::delete(&path);
-        if let Some(d) = parent_dir(&path) {
-            plat::delete(&d); // the folder (fails while not empty)
-        }
+    for d in un_folders(&names) {
+        plat::delete(&in_path(st, &d));
     }
     if !st.lnk_desk.is_empty() {
         plat::delete(&st.lnk_desk);

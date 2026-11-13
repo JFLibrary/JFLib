@@ -13,6 +13,10 @@
 //        jfgui_PRINT_PRINTER=NAME     (default "Microsoft Print to PDF"), opened with
 //                                      CreateDCW and a DEVMODE for paper / orientation
 //        Without a main window (headless) and without jfgui_PRINT_TO: ERR_UNSUPPORTED.
+//   doc_begin / doc_image / doc_end / doc_abort   (print.rs PrintDoc, E9) the same dialog (a
+//        page range when the job names its pages: PD_PAGENUMS -> DocSys::ranges) and DC,
+//        StartDocW once, then per page StartPage, the bands of layout()'s rectangle in a
+//        SaveDC / RestoreDC around the clip, EndPage; EndDocW at the end, AbortDoc when dropped.
 // The gdi32 functions are imported directly (the assembly took ten of them with
 // GetProcAddress only to keep its import library small); PrintDlgExW (comdlg32),
 // GetDefaultPrinterW (winspool.drv) and CoInitializeEx (ole32) are loaded at run time.
@@ -26,7 +30,7 @@ use rt::fx::cvtd;
 
 use crate::{
     ERR_CANCEL, ERR_DIMS, ERR_IO, ERR_NOMEM, ERR_UNSUPPORTED, PAPER_N, PJF_LANDSCAPE, PPage, PRINT_ARGB, PRINT_PARGB,
-    PRINT_XRGB, PRW_BGR, PRW_OPAQUE, PRW_PREMUL, PrintJob, layout, row_white,
+    PRINT_XRGB, PRW_BGR, PRW_OPAQUE, PRW_PREMUL, Place, PrintDoc, PrintJob, PrintSrc, layout, row_white,
 };
 
 const BAND_BYTES: u32 = 4 << 20;
@@ -41,6 +45,13 @@ const PDX_DEVMODE: usize = 16;
 const PDX_DEVNAMES: usize = 24;
 const PDX_DC: usize = 32;
 const PDX_FLAGS: usize = 40;
+const PDX_NRANGES: usize = 52;
+const PDX_MAXRANGES: usize = 56;
+const PDX_RANGES: usize = 64;
+const PDX_MINPAGE: usize = 72;
+const PDX_MAXPAGE: usize = 76;
+const PD_PAGENUMS: u32 = 0x2;
+const MAX_RANGES: usize = 16;
 const PDX_COPIES: usize = 80;
 const PDX_START: usize = 128;
 const PDX_RESULT: usize = 132;
@@ -85,6 +96,8 @@ unsafe extern "system" {
     fn EndPage(hdc: isize) -> i32;
     fn EndDoc(hdc: isize) -> i32;
     fn AbortDoc(hdc: isize) -> i32;
+    fn SaveDC(hdc: isize) -> i32;
+    fn RestoreDC(hdc: isize, n: i32) -> i32;
     fn SetStretchBltMode(hdc: isize, mode: i32) -> i32;
     fn SetBrushOrgEx(hdc: isize, x: i32, y: i32, old: *mut i32) -> i32;
     fn IntersectClipRect(hdc: isize, l: i32, t: i32, r: i32, b: i32) -> i32;
@@ -109,10 +122,8 @@ struct Wp {
     defprn: Cell<usize>,
 }
 
-struct UiOnly(Wp);
-// SAFETY: print runs on the UI thread only (as in the assembly: plain globals).
-unsafe impl Sync for UiOnly {}
-static WP: UiOnly = UiOnly(Wp { state: Cell::new(0), dlg: Cell::new(0), defprn: Cell::new(0) });
+// print runs on the UI thread only (UiOnly refuses other threads)
+static WP: crate::ui_only::UiOnly<Wp> = crate::ui_only::UiOnly::new(Wp { state: Cell::new(0), dlg: Cell::new(0), defprn: Cell::new(0) });
 
 /// a function of a system DLL (0 = missing)
 fn dll_proc(dll: &[u8], name: &[u8]) -> usize {
@@ -126,7 +137,7 @@ fn dll_proc(dll: &[u8], name: &[u8]) -> usize {
 /// COM for the dialog, PrintDlgExW and GetDefaultPrinterW (both optional: the test variant
 /// works without)  [wp_load]
 fn wp_load() {
-    let w = &WP.0;
+    let w = WP.get();
     if w.state.get() != 0 {
         return;
     }
@@ -202,7 +213,7 @@ fn clip_cap(s: &str, cap: usize) -> usize {
 
 /// dmDeviceName = the default printer (GetDefaultPrinterW) -> true when found  [wp_default_name]
 fn wp_default_name(dm: &mut [u8]) -> bool {
-    let f = WP.0.defprn.get();
+    let f = WP.get().defprn.get();
     if f == 0 {
         return false;
     }
@@ -265,56 +276,97 @@ pub fn print(job: &mut PrintJob) -> i32 {
         Some(s) if !s.px.is_empty() && s.w > 0 && s.h > 0 => s,
         _ => return ERR_DIMS,
     };
-    let mode = match src.fmt {
-        PRINT_ARGB => PRW_BGR,
-        PRINT_PARGB => PRW_BGR | PRW_PREMUL,
-        PRINT_XRGB => PRW_BGR | PRW_OPAQUE,
-        _ => return ERR_UNSUPPORTED,
+    let mode = match src_mode(&src) {
+        Some(m) => m,
+        None => return ERR_UNSUPPORTED,
     };
     wp_load();
     let wtitle = wide_cap(if job.title.is_empty() || job.title.starts_with('\0') { "Bild" } else { job.title }, WTITLE_CAP);
+    let mut docinfo = [0u8; 40];
+    let dc = match open_dc(job.paper, job.flags, 0) {
+        Ok(d) => d,
+        Err(e) => return e,
+    };
+    job.copies = dc.copies;
+    if !dc.wpath.is_empty() {
+        wr64(&mut docinfo, 16, dc.wpath.as_ptr() as isize); // lpszOutput
+    }
+    let r = print_dc(job, &src, mode, dc.hdc, &wtitle, &mut docinfo); // (lpszOutput points into dc.wpath)
+    close_dc(dc.hdc);
+    r
+}
+
+// the row_white mode of a source format (B, G, R rows for GDI)
+fn src_mode(src: &PrintSrc) -> Option<u32> {
+    match src.fmt {
+        PRINT_ARGB => Some(PRW_BGR),
+        PRINT_PARGB => Some(PRW_BGR | PRW_PREMUL),
+        PRINT_XRGB => Some(PRW_BGR | PRW_OPAQUE),
+        _ => None,
+    }
+}
+
+// a printer DC: the copies, the test variant's output path (lpszOutput; empty: the printer),
+// the page ranges of the dialog
+struct Dc {
+    hdc: isize,
+    copies: u32,
+    wpath: Vec<u16>,
+    ranges: Vec<(u32, u32)>,
+}
+
+// the printer DC of a job: the test variant (jfgui_PRINT_TO, no dialog) or the system dialog
+// (needs the main window); pages > 0 offers a range of 1..=pages
+fn open_dc(paper: u32, flags: u32, pages: u32) -> Result<Dc, i32> {
     // DEVMODE with the job's paper / orientation
     let mut dm = [0u8; 224];
     dm[DM_SPEC..DM_SPEC + 2].copy_from_slice(&DM_SPECVERSION.to_le_bytes());
     dm[DM_SIZEF..DM_SIZEF + 2].copy_from_slice(&(DM_BYTES as u16).to_le_bytes());
     wr32(&mut dm, DM_FIELDS, DMF_ORIENT | DMF_PAPER);
-    let orient: u16 = if job.flags & PJF_LANDSCAPE != 0 { 2 } else { 1 };
+    let orient: u16 = if flags & PJF_LANDSCAPE != 0 { 2 } else { 1 };
     dm[DM_ORIENT..DM_ORIENT + 2].copy_from_slice(&orient.to_le_bytes());
-    let paper = WP_DMPAPER[if job.paper >= PAPER_N { 0 } else { job.paper as usize }];
+    let paper = WP_DMPAPER[if paper >= PAPER_N { 0 } else { paper as usize }];
     dm[DM_PAPER..DM_PAPER + 2].copy_from_slice(&paper.to_le_bytes());
-    let mut docinfo = [0u8; 40];
-    let mut wpath: Vec<u16> = Vec::new();
-    let hdc: isize;
     match crate::env("jfgui_PRINT_TO").filter(|v| !v.is_empty()) {
         Some(to) => {
             // ---- test variant: a named printer into a file, no dialog
-            wpath = wp_outpath(&to);
+            let wpath = wp_outpath(&to);
             let pname = crate::env("jfgui_PRINT_PRINTER").filter(|v| !v.is_empty());
             let wprn = wide_cap(pname.as_deref().unwrap_or("Microsoft Print to PDF"), WPRN_CAP);
             set_device_name(&mut dm, &wprn);
             let drv = wide_cap("WINSPOOL", 16);
             // SAFETY: NUL-terminated driver / device names, a DEVMODEW of DM_BYTES bytes.
-            hdc = unsafe { CreateDCW(drv.as_ptr(), wprn.as_ptr(), core::ptr::null(), dm.as_ptr()) };
+            let hdc = unsafe { CreateDCW(drv.as_ptr(), wprn.as_ptr(), core::ptr::null(), dm.as_ptr()) };
             if hdc == 0 {
-                return ERR_IO;
+                return Err(ERR_IO);
             }
-            wr64(&mut docinfo, 16, wpath.as_ptr() as isize); // lpszOutput
-            job.copies = 1;
+            Ok(Dc { hdc, copies: 1, wpath, ranges: Vec::new() })
         }
         None => {
             // ---- the system dialog (needs the main window: never headless)
             let owner = super::hwnd_main();
-            let dlg = WP.0.dlg.get();
+            let dlg = WP.get().dlg.get();
             if owner == 0 || dlg == 0 {
-                return ERR_UNSUPPORTED;
+                return Err(ERR_UNSUPPORTED);
             }
             // SAFETY: PrintDlgExW(PRINTDLGEXW*).
             let dlg: unsafe extern "system" fn(*mut u8) -> i32 = unsafe { core::mem::transmute(dlg) };
             let mut pdx = [0u8; PDX_SIZE];
+            // PRINTPAGERANGE { nFromPage, nToPage } entries the dialog fills
+            let mut rng = [0u32; MAX_RANGES * 2];
             wr32(&mut pdx, 0, PDX_SIZE as u32);
             wr64(&mut pdx, PDX_OWNER, owner);
-            wr32(&mut pdx, PDX_FLAGS, PD_RETURNDC | PD_NOPAGENUMS | PD_NOSELECTION | PD_NOCURRENTPAGE
-                 | PD_USEDEVMODECOPIESANDCOLLATE);
+            let nums = if pages > 0 { 0 } else { PD_NOPAGENUMS };
+            wr32(&mut pdx, PDX_FLAGS, PD_RETURNDC | nums | PD_NOSELECTION | PD_NOCURRENTPAGE | PD_USEDEVMODECOPIESANDCOLLATE);
+            if pages > 0 {
+                rng[0] = 1;
+                rng[1] = pages;
+                wr32(&mut pdx, PDX_NRANGES, 1);
+                wr32(&mut pdx, PDX_MAXRANGES, MAX_RANGES as u32);
+                wr64(&mut pdx, PDX_RANGES, rng.as_mut_ptr() as isize);
+                wr32(&mut pdx, PDX_MINPAGE, 1);
+                wr32(&mut pdx, PDX_MAXPAGE, pages);
+            }
             wr32(&mut pdx, PDX_START, START_PAGE_GENERAL);
             wr32(&mut pdx, PDX_COPIES, 1);
             if wp_default_name(&mut dm) {
@@ -331,7 +383,8 @@ pub fn print(job: &mut PrintJob) -> i32 {
                     }
                 }
             }
-            // SAFETY: a valid PRINTDLGEXW; the dialog is modal over our window.
+            // SAFETY: a valid PRINTDLGEXW (its page ranges point into rng, alive until the end
+            // of this block); the dialog is modal over our window.
             if unsafe { dlg(pdx.as_mut_ptr()) } != 0 {
                 // rejected (e.g. the DEVMODE): once more with the defaults
                 wp_dlg_free(&mut pdx);
@@ -339,26 +392,31 @@ pub fn print(job: &mut PrintJob) -> i32 {
                 // SAFETY: as above.
                 if unsafe { dlg(pdx.as_mut_ptr()) } != 0 {
                     wp_dlg_free(&mut pdx);
-                    return ERR_IO;
+                    return Err(ERR_IO);
                 }
             }
-            hdc = rd64(&pdx, PDX_DC);
+            let hdc = rd64(&pdx, PDX_DC);
             if rd32(&pdx, PDX_RESULT) != PD_RESULT_PRINT {
                 wp_dlg_free(&mut pdx);
                 close_dc(hdc);
-                return ERR_CANCEL;
+                return Err(ERR_CANCEL);
             }
-            job.copies = rd32(&pdx, PDX_COPIES);
+            let copies = rd32(&pdx, PDX_COPIES);
+            let mut ranges = Vec::new();
+            if pages > 0 && rd32(&pdx, PDX_FLAGS) & PD_PAGENUMS != 0 {
+                let n = (rd32(&pdx, PDX_NRANGES) as usize).min(MAX_RANGES);
+                for k in 0..n {
+                    let (a, b) = (rng[k * 2], rng[k * 2 + 1]);
+                    ranges.push((a.min(b), a.max(b)));
+                }
+            }
             wp_dlg_free(&mut pdx);
             if hdc == 0 {
-                return ERR_IO;
+                return Err(ERR_IO);
             }
+            Ok(Dc { hdc, copies, wpath: Vec::new(), ranges })
         }
     }
-    let r = print_dc(job, &src, mode, hdc, &wtitle, &mut docinfo); // (lpszOutput points into wpath)
-    close_dc(hdc);
-    drop(wpath);
-    r
 }
 
 fn close_dc(hdc: isize) {
@@ -368,24 +426,23 @@ fn close_dc(hdc: isize) {
     }
 }
 
-// the page geometry, the document and the bands on the printer DC  [plat_print .wp_have_dc]
-fn print_dc(job: &mut PrintJob, src: &crate::PrintSrc, mode: u32, hdc: isize, wtitle: &[u16], docinfo: &mut [u8; 40]) -> i32 {
-    // SAFETY (whole function): hdc is a valid printer DC; every pointer handed to GDI points
-    // into live buffers of this frame.
+// the page geometry of a printer DC: the page in pt, dpi x / y, the printable area's offset
+fn dc_page(hdc: isize) -> Result<(PPage, f64, f64, i32, i32), i32> {
+    // SAFETY: hdc is a valid printer DC.
     let caps = |i: i32| unsafe { GetDeviceCaps(hdc, i) };
     let lx = caps(DC_LOGPIXELSX);
     if lx <= 0 {
-        return ERR_IO;
+        return Err(ERR_IO);
     }
     let ly = caps(DC_LOGPIXELSY);
     if ly <= 0 {
-        return ERR_IO;
+        return Err(ERR_IO);
     }
     let (dpix, dpiy) = (lx as f64, ly as f64);
     let hres = caps(DC_HORZRES);
     let vres = caps(DC_VERTRES);
     if hres <= 0 || vres <= 0 {
-        return ERR_IO;
+        return Err(ERR_IO);
     }
     let mut physw = caps(DC_PHYSW);
     let mut physh = caps(DC_PHYSH);
@@ -411,11 +468,43 @@ fn print_dc(job: &mut PrintJob, src: &crate::PrintSrc, mode: u32, hdc: isize, wt
         r: physw.wrapping_sub(offx).wrapping_sub(hres) as f64 * px,
         b: physh.wrapping_sub(offy).wrapping_sub(vres) as f64 * py,
         token: 0,
-        flags: 0,
+        flags: if physw > physh { PJF_LANDSCAPE } else { 0 },
     };
+    Ok((page, dpix, dpiy, offx, offy))
+}
+
+// the page geometry, the document and the bands on the printer DC  [plat_print .wp_have_dc]
+fn print_dc(job: &mut PrintJob, src: &crate::PrintSrc, mode: u32, hdc: isize, wtitle: &[u16], docinfo: &mut [u8; 40]) -> i32 {
+    let (mut page, dpix, dpiy, offx, offy) = match dc_page(hdc) {
+        Ok(g) => g,
+        Err(e) => return e,
+    };
+    page.flags = 0;
     job.page_w = page.w;
     job.page_h = page.h;
     let pl = layout(job, &page);
+    // ---- the document
+    wr32(docinfo, 0, 40);
+    wr64(docinfo, 8, wtitle.as_ptr() as isize);
+    // SAFETY (the GDI calls below): hdc is a valid printer DC; every pointer handed to GDI points
+    // into live buffers of this frame.
+    if unsafe { StartDocW(hdc, docinfo.as_ptr()) } <= 0 {
+        return ERR_IO;
+    }
+    let r = dc_draw_page(hdc, src, mode, &pl, dpix, dpiy, offx, offy);
+    if r != 0 {
+        return r; // (aborted)
+    }
+    if unsafe { EndDoc(hdc) } <= 0 {
+        return ERR_IO;
+    }
+    0
+}
+
+// one page of a started document: StartPage, the image in bands into layout()'s rectangle
+// clipped to the printable area, EndPage -> 0 / ERR_* (the document aborted)
+#[allow(clippy::too_many_arguments)]
+fn dc_draw_page(hdc: isize, src: &crate::PrintSrc, mode: u32, pl: &Place, dpix: f64, dpiy: f64, offx: i32, offy: i32) -> i32 {
     // device rectangles (printable-area origin): v * dpi / 72 - offset; sizes = the far edge
     // minus the near one (bands abut exactly)
     let dx = wp_dev(pl.x, dpix, offx);
@@ -433,19 +522,18 @@ fn print_dc(job: &mut PrintJob, src: &crate::PrintSrc, mode: u32, hdc: isize, wt
     let rowb = rowb as usize;
     let mut buf: Vec<u8> = Vec::new();
     if buf.try_reserve_exact(rowb * band).is_err() {
+        // SAFETY: a started document of hdc.
+        unsafe { AbortDoc(hdc) };
         return ERR_NOMEM;
     }
     buf.resize(rowb * band, 0);
-    // ---- the document
-    wr32(docinfo, 0, 40);
-    wr64(docinfo, 8, wtitle.as_ptr() as isize);
-    if unsafe { StartDocW(hdc, docinfo.as_ptr()) } <= 0 {
-        return ERR_IO;
-    }
+    // SAFETY (whole function): hdc is a valid printer DC with a started document; every pointer
+    // handed to GDI points into live buffers of this frame.
     if unsafe { StartPage(hdc) } <= 0 {
         unsafe { AbortDoc(hdc) };
         return ERR_IO;
     }
+    let saved = unsafe { SaveDC(hdc) };
     unsafe {
         SetStretchBltMode(hdc, HALFTONE_MODE);
         SetBrushOrgEx(hdc, 0, 0, core::ptr::null_mut());
@@ -487,12 +575,89 @@ fn print_dc(job: &mut PrintJob, src: &crate::PrintSrc, mode: u32, hdc: isize, wt
             return ERR_IO;
         }
     }
+    if saved != 0 {
+        unsafe { RestoreDC(hdc, saved) };
+    }
     if unsafe { EndPage(hdc) } <= 0 {
         unsafe { AbortDoc(hdc) };
         return ERR_IO;
     }
-    if unsafe { EndDoc(hdc) } <= 0 {
+    0
+}
+
+// ---------------------------------------------------------------- PrintDoc (E9)
+
+/// (print.rs) PrintDoc::begin: the dialog or the test variant's printer, the page geometry,
+/// StartDocW  -> 0 / ERR_*
+pub(crate) fn doc_begin(d: &mut PrintDoc) -> i32 {
+    wp_load();
+    let dc = match open_dc(d.paper, d.flags, d.pages) {
+        Ok(dc) => dc,
+        Err(e) => return e,
+    };
+    let (page, dpix, dpiy, offx, offy) = match dc_page(dc.hdc) {
+        Ok(g) => g,
+        Err(e) => {
+            close_dc(dc.hdc);
+            return e;
+        }
+    };
+    d.page = page;
+    d.copies = dc.copies;
+    d.sys.hdc = dc.hdc;
+    d.sys.dpi = [dpix, dpiy];
+    d.sys.off = [offx, offy];
+    d.sys.ranges = dc.ranges;
+    let wtitle = wide_cap(&d.title, WTITLE_CAP);
+    let mut docinfo = [0u8; 40];
+    wr32(&mut docinfo, 0, 40);
+    wr64(&mut docinfo, 8, wtitle.as_ptr() as isize);
+    if !dc.wpath.is_empty() {
+        wr64(&mut docinfo, 16, dc.wpath.as_ptr() as isize); // lpszOutput
+    }
+    // SAFETY: a printer DC; the DOCINFOW's strings live until the call returns.
+    if unsafe { StartDocW(dc.hdc, docinfo.as_ptr()) } <= 0 {
+        close_dc(dc.hdc);
+        d.sys.hdc = 0;
         return ERR_IO;
     }
+    d.sys.started = true;
     0
+}
+
+/// (print.rs) PrintDoc::add_image: one page of the document -> 0 / ERR_*
+pub(crate) fn doc_image(d: &mut PrintDoc, src: &PrintSrc, pl: &Place) -> i32 {
+    if !d.sys.started {
+        return ERR_IO;
+    }
+    let Some(mode) = src_mode(src) else { return ERR_UNSUPPORTED };
+    let r = dc_draw_page(d.sys.hdc, src, mode, pl, d.sys.dpi[0], d.sys.dpi[1], d.sys.off[0], d.sys.off[1]);
+    if r != 0 {
+        d.sys.started = false; // (aborted)
+    }
+    r
+}
+
+/// (print.rs) PrintDoc::end: EndDoc -> 0 / ERR_IO
+pub(crate) fn doc_end(d: &mut PrintDoc) -> i32 {
+    let mut r = ERR_IO;
+    if d.sys.started {
+        // SAFETY: the started document of our DC.
+        r = if unsafe { EndDoc(d.sys.hdc) } > 0 { 0 } else { ERR_IO };
+        d.sys.started = false;
+    }
+    close_dc(d.sys.hdc);
+    d.sys.hdc = 0;
+    r
+}
+
+/// (print.rs) PrintDoc::abort and a job without pages: AbortDoc
+pub(crate) fn doc_abort(d: &mut PrintDoc) {
+    if d.sys.started {
+        // SAFETY: the started document of our DC.
+        unsafe { AbortDoc(d.sys.hdc) };
+        d.sys.started = false;
+    }
+    close_dc(d.sys.hdc);
+    d.sys.hdc = 0;
 }

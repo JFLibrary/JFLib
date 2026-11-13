@@ -517,7 +517,13 @@ struct X11 {
     // ---- popups, cursors, monitors
     xq: [Xq; PPW_MAX as usize],
     cursors: [u32; CUR_COUNT as usize],
+    // (E3) the glyph cursors of CUR_X0 .. CUR_X_END (0: not made yet)
+    cursors_x: [u32; (crate::CUR_X_END - crate::CUR_X0) as usize],
     cur_font: u32,
+    // (E3) the drawn cursors made so far (shape, size px, cursor id) and the desktop's cursor
+    // size with the dpi it was found out for (misc::cursor_px)
+    drawn: Vec<(u32, u32, u32)>,
+    cur_px: (i32, i32),
     xcust: [u32; CUR_USER_MAX as usize],
     xr_state: u32,
     xr_op: u32,
@@ -694,7 +700,10 @@ impl X11 {
                 ph: 0,
             }),
             cursors: [0; CUR_COUNT as usize],
+            cursors_x: [0; (crate::CUR_X_END - crate::CUR_X0) as usize],
             cur_font: 0,
+            drawn: Vec::new(),
+            cur_px: (0, 0),
             xcust: [0; CUR_USER_MAX as usize],
             xr_state: 0,
             xr_op: 0,
@@ -722,15 +731,13 @@ impl X11 {
 
 // ------------------------------------------------------------------ the module state
 
-struct Global(RefCell<Option<Box<X11>>>);
-// SAFETY: the X11 state is used by the UI thread only (wake() and the pool never touch it);
-// RefCell checks the (non-reentrant) borrows at run time.
-unsafe impl Sync for Global {}
-static XG: Global = Global(RefCell::new(None));
+// the X11 state is used by the UI thread only (wake() and the pool never touch it; UiOnly refuses
+// other threads); RefCell checks the (non-reentrant) borrows at run time
+static XG: crate::ui_only::UiOnly<RefCell<Option<Box<X11>>>> = crate::ui_only::UiOnly::new(RefCell::new(None));
 
 /// run f on the X11 state (created on first use: the synthetic tests need no connection)
 fn with_x<R>(f: impl FnOnce(&mut X11) -> R) -> R {
-    let mut g = XG.0.borrow_mut();
+    let mut g = XG.get().borrow_mut();
     let x = g.get_or_insert_with(|| Box::new(X11::new()));
     f(x)
 }
@@ -886,6 +893,9 @@ impl Display for Backend {
     }
     fn cursor_dpi(&mut self, dpi: i32) -> i32 {
         dpi // X11: the window's
+    }
+    fn cursor_probe(&mut self, shape: u32, dpi: i32) -> (u64, i32) {
+        with_x(|s| s.cursor_probe(shape, dpi))
     }
     fn clip_set(&mut self, fmt: u32, data: &[u8]) -> bool {
         with_x(|s| s.clip_set(fmt, data))

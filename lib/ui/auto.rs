@@ -9,7 +9,7 @@
 //   theme file PATH | none        an app theme from a file (an error is printed and kept for
 //                                 `expect theme error`; the theme stays) / no app theme
 //   style NAME                    another style linked into the app (Ui::set_style)
-//   move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r]
+//   move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r|m] [shift|ctrl|alt]...
 //   rclick S        dblclick S [shift|ctrl|alt]...
 //                   drag S1 S2 [steps] [hold MS] [shift|ctrl|alt|right|middle]...
 //                   drag ... hold MS   the button rests MS ms before the first move (like
@@ -35,6 +35,12 @@
 //   wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
 //                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
 //   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
+//   keydown CHORD [scan N] [left|right|numpad]   (E2) the key goes down and stays down (a
+//                   modifier key -- shift, ctrl, alt -- is held for the following events; once
+//                   more while down: an auto-repeat); keyup CHORD [scan N] [left|right|numpad]
+//                   lets it go; scan N and the location reach ui.key_event_take
+//   preedit "text" [CURSOR]   (E4) an input method's composition (ui.ime_preedit; CURSOR a byte
+//                   offset, default the end; "" ends it); commit "text" commits
 //                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
 //   keys [N] CHORD...   the chords N times over, queued for ONE pass of the window with the
 //                   keyboard (more keys than frames: what a tool window hands on); `key` gives
@@ -44,13 +50,28 @@
 //   commit "text" [N]   an input method commits the text (N times over: one long commit)
 //   cmd ID [ARG]    run a command as if a menu item was chosen
 //   wait MS         advance the virtual clock (16 ms frames; timers, animations and the
-//                   sleep()s of async tasks)
+//                   sleep()s of async tasks); nothing else happens meanwhile: the same run
+//                   every time
+//   wait real MS    MS of real time pass while the app's own threads work: their wake-ups
+//                   (plat::wake) reach App::command (UIC_WAKE) as they come, and the virtual
+//                   clock follows the real one (timers, animations, frames asked for); for apps
+//                   whose engine runs on threads of its own (not deterministic: expect what
+//                   holds however long the threads took)
 //   shot FILE.png   render and save a screenshot
 //   dump [FILE]     print / save the widget tree
-//   expect S exists | missing | hover | nohover | focused | checked | unchecked | disabled |
-//            enabled | selected | open | pressed | unpressed | value N | value MIN..MAX | max N |
-//            text "s" |
+//   expect S exists | missing | hover | nohover | focused | unfocused | checked | unchecked |
+//            disabled | enabled | selected | unselected | open | closed | pressed | unpressed |
+//            value N | value MIN..MAX | max N | text "s" |
 //            rect X Y W H   (rect: '*' takes any value)
+//   a11y ACTION S [ARG]   (a11y_auto.rs, section 19) a screen reader's request for the node of
+//                 record S, as a bridge sends it: click, focus, scroll, expand, collapse,
+//                 increment, decrement, select, add, remove, value N, text "s", selecttext A C
+//   a11y expect S role R | name "s" | desc "s" | url "s" | text "s" | level N | set POS SIZE |
+//                 cell ROW COL [RSPAN CSPAN] | grid ROWS COLS | live polite|assertive|off |
+//                 is STATE | not STATE | can ACTION | cannot ACTION | parent S2 | top |
+//                 children N | missing          (its node in the accessibility tree)
+//   a11y expect announced "s" | none   the last text ui.announce said since the last check
+//   a11y dump [FILE]      the accessibility tree as text
 //   expect theme "NAME" | none    the app theme;  expect theme error "TEXT" | none  the error
 //                                 of the last `theme file` contains TEXT
 //   expect style NAME   expect token NAME #RRGGBB|#AARRGGBB (a colour token now)
@@ -76,11 +97,17 @@
 //          settings theme|locale|contrast|fonts|other|N
 //                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...;
 //                       background / foreground: a hidden tab, Android's onStop / onStart)
+//   system browser default|other|unknown   (E13) what ui.default_browser answers from here (a
+//                       headless run never asks the system; at first other), then the app
+//                       loses the keyboard (when it had it) and gets it back, as after the
+//                       system's settings: UIC_ACTIVE 0 and 1 (only 1 when it was not active)
 //   system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
 //                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
 //   system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
 //                       overrides of the system settings (follow with `system settings ...`),
-//                       jfgui_CSD (the library title bar and its resize band, next pass)
+//                       jfgui_CSD (the library title bar and its resize band, next pass),
+//                       jfgui_FONT_FALLBACK 1 / - (the system fonts for missing characters on /
+//                       off from here)
 //   sensor accel|gravity|gyro|magnet X Y Z [ACCURACY]   (sensors.rs) a reading of plat::sensors:
 //                       the sensor exists from now on; a stopped sensor delivers nothing
 //   sensor rot X Y Z W [abs|rel]   the rotation estimate (a quaternion; default abs)
@@ -110,9 +137,11 @@
 //                                 main window's client area): popups of every window may leave
 //                                 it up to there and flip at its edges; off (the default): the
 //                                 main window's client area holds all popups
-//   sync [MS]                     wait until no background job is pending: the app's sync hook,
+//   sync [MS] [soft]              wait until no background job is pending: the app's sync hook,
 //                                 the async tasks' work (blocking jobs, wake-ups) and the spell
-//                                 checker's workers (suggestions, edit_spell.rs)
+//                                 checker's workers (suggestions, edit_spell.rs); real time, at
+//                                 most MS (default 10 s): reaching it fails the script, with soft
+//                                 it does not (a note is printed; the expects that follow decide)
 //   expect sound KIND|none        the last sound ui.beep / ui.dialog_sound asked for since the
 //                                 last check (default, information, warning, error, question,
 //                                 notify; headless runs play none)
@@ -409,6 +438,7 @@ fn key_lookup(p: &[u8]) -> u32 {
         ("backspace", VK_BACK), ("delete", VK_DELETE), ("left", VK_LEFT), ("right", VK_RIGHT),
         ("up", VK_UP), ("down", VK_DOWN), ("home", VK_HOME), ("end", VK_END),
         ("pgup", VK_PRIOR), ("pgdn", VK_NEXT), ("insert", VK_INSERT), ("alt", VK_MENU), ("apps", VK_APPS),
+        ("shift", VK_SHIFT), ("ctrl", VK_CONTROL), // (E2) keydown shift / keyup shift
         ("plus", VK_OEM_PLUS), ("minus", VK_OEM_MINUS),
         // (U1) punctuation (US layout keys) and the numeric keypad
         ("[", VK_OEM_4), ("]", VK_OEM_6), (",", VK_OEM_COMMA), (".", VK_OEM_PERIOD),
@@ -608,7 +638,7 @@ impl Ui {
         json_escape(&mut lab, r.label.as_deref().unwrap_or("").as_bytes(), 180);
         // rect in DIP (at the dpi of the record's window)
         let dpi = self.win_dpi(r.win as u32);
-        let kind = if r.kind < K_KIND_COUNT { KIND_NAMES[r.kind as usize] } else { KIND_NAMES[0] };
+        let kind = kind_name(r.kind);
         out.extend_from_slice(
             alloc::format!("{{\"l\":{},\"d\":{},\"id\":{},\"k\":\"{}\",\"t\":\"", r.layer, r.depth, r.id, kind).as_bytes(),
         );
@@ -710,9 +740,9 @@ impl Ui {
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 54] = [
-            "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
-            "key", "keys", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
+        const CMDS: [&str; 58] = [
+            "a11y", "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
+            "key", "keys", "keydown", "keyup", "type", "commit", "preedit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
             "style", "sensor", "location", "tap", "longpress", "swipe", "flick", "finger", "pinch", "pan2", "gpu",
@@ -728,6 +758,7 @@ impl Ui {
         let a = next_word(l);
         match c {
             "quit" => return true,
+            "a11y" => self.sc_a11y(app, a), // a11y_auto.rs
             "system" => self.sc_system(app, a),
             "sensor" => self.sc_sensor(app, a),
             "location" => self.sc_location(app, a),
@@ -777,10 +808,25 @@ impl Ui {
                 if s.is_none() {
                     self.sel_fail();
                 } else {
+                    // optional words: the button (l / r / m), shift ctrl alt held during the click
+                    let saved_mods = self.sc.script_mods;
+                    let mut mods = saved_mods;
+                    let mut b = BTN_LEFT;
+                    let mut q = skip_ws(rest);
+                    while !q.is_empty() {
+                        let m = mod_word(q);
+                        if m != 0 {
+                            mods |= m;
+                        } else {
+                            b = parse_button(q);
+                        }
+                        q = next_word(q);
+                    }
                     let (x, y) = (self.sc.sel_x, self.sc.sel_y);
                     self.mouse_to(app, x, y);
-                    let b = parse_button(skip_ws(rest));
+                    self.sc.script_mods = mods;
                     self.click_here(app, b);
+                    self.sc.script_mods = saved_mods;
                 }
             }
             "rclick" => {
@@ -831,9 +877,12 @@ impl Ui {
             "pinch" => self.sc_two(app, a, true),
             "pan2" => self.sc_two(app, a, false),
             "key" => self.sc_key(app, a),
+            "keydown" => self.sc_keyraw(app, a, true),
+            "keyup" => self.sc_keyraw(app, a, false),
             "keys" => self.sc_keys(app, a),
             "type" => self.sc_type(app, a),
             "commit" => self.sc_commit(app, a),
+            "preedit" => self.sc_preedit(app, a),
             "cmd" => {
                 let (id, r) = parse_int(a);
                 let (arg, _) = parse_int(r);
@@ -841,8 +890,13 @@ impl Ui {
                 self.run_passes(app);
             }
             "wait" => {
-                let (ms, _) = parse_int(a);
-                self.advance_time(app, ms);
+                if let Some(r) = word_eq(a, "real") {
+                    let (ms, _) = parse_int(r);
+                    self.wait_real(app, ms);
+                } else {
+                    let (ms, _) = parse_int(a);
+                    self.advance_time(app, ms);
+                }
             }
             "shot" => self.sc_shot(app, a),
             "dump" => self.dump(if a.is_empty() { None } else { Some(a) }),
@@ -993,7 +1047,8 @@ impl Ui {
             }
             // kind:"Label"
             let mut found = false;
-            for (k, n) in KIND_NAMES.iter().enumerate() {
+            for k in 0..K_KIND_END {
+                let n = kind_name(k);
                 if p.starts_with(n.as_bytes()) && p.get(n.len()) == Some(&b':') {
                     self.sc.sel_kind = k as i32;
                     q = &p[n.len() + 1..];
@@ -1247,6 +1302,45 @@ impl Ui {
                 return;
             }
             plat::setenv(&name, if value == "-" { None } else { Some(&value) });
+            if name == "jfgui_FONT_FALLBACK" {
+                // the system fonts for missing characters from here on (a run reads the variable
+                // at its start: headless runs start without them, so shots match everywhere)
+                self.text.set_system_fallback(value.starts_with('1'));
+                self.dirty_force_full();
+            }
+            self.run_passes(app);
+            return;
+        }
+        if w("browser") {
+            // (E13) what ui.default_browser answers (the user chose in the system's settings)
+            let r = next_word(a);
+            let s = if word_eq(r, "default").is_some() {
+                plat::BrowserStatus::Default
+            } else if word_eq(r, "other").is_some() {
+                plat::BrowserStatus::NotDefault
+            } else if word_eq(r, "unknown").is_some() {
+                plat::BrowserStatus::Unknown
+            } else {
+                self.fail(b"system browser: default, other or unknown");
+                return;
+            };
+            super::assoc::browser_script_set(s);
+            // the user chose in the system's settings and came back: the app loses the keyboard
+            // (when it had it) and gets it again, UIC_ACTIVE 0 and 1 -- an app that keeps the
+            // status (GUIDE section 21) asks again, as after a real change
+            let had = self.app_focus;
+            let back = if had != 0 { had.trailing_zeros() } else { self.sc.sc_win };
+            let mut f = had;
+            while f != 0 {
+                let w = f.trailing_zeros();
+                f &= f - 1;
+                self.push_window_event(plat::E_FOCUS_OUT, w);
+            }
+            if had != 0 {
+                self.process_events(app);
+            }
+            self.push_window_event(plat::E_FOCUS_IN, back);
+            self.process_events(app);
             self.run_passes(app);
             return;
         }
@@ -1315,6 +1409,12 @@ impl Ui {
             return;
         };
         self.inject(app, typ, 0, 0, 0, data);
+    }
+
+    // queue an event of window w without a position (focus in / out), processed by the caller
+    fn push_window_event(&mut self, typ: u8, w: u32) {
+        let ev = Event { typ, btn: 0, mods: self.sc.script_mods as u8, win: (w & (WIN_MAX as u32 - 1)) as u8, x: 0, y: 0, data: 0 };
+        plat::evq_push(ev);
     }
 
     fn inject(&mut self, app: &mut dyn App, typ: u8, btn: u32, x: i32, y: i32, data: u32) {
@@ -1756,12 +1856,63 @@ impl Ui {
         }
     }
 
-    // a key pressed and released with modifiers
+    // a key pressed and released with modifiers (and those keydown holds)
     fn press(&mut self, app: &mut dyn App, mods: u32, vk: u32) {
-        self.sc.script_mods = mods;
+        let held = self.sc.script_mods;
+        self.sc.script_mods = held | mods;
         self.inject(app, plat::E_KEY_DOWN, 0, 0, 0, vk);
         self.inject(app, plat::E_KEY_UP, 0, 0, 0, vk);
-        self.sc.script_mods = 0;
+        self.sc.script_mods = held;
+    }
+
+    // (E2) keydown / keyup CHORD [scan N] [left|right|numpad]: one key down (an auto-repeat when
+    // it is down already) or up; shift / ctrl / alt stay held between their keydown and keyup
+    fn sc_keyraw(&mut self, app: &mut dyn App, a: &[u8], down: bool) {
+        let Some((mods, vk, rest)) = chord(skip_ws(a)) else {
+            self.fail(b"unknown key");
+            return;
+        };
+        let (mut scan, mut loc) = (0i32, KL_STANDARD);
+        let mut q = skip_ws(rest);
+        while !q.is_empty() {
+            if let Some(r) = word_eq(q, "scan") {
+                let (n, r) = parse_int(skip_ws(r));
+                scan = n;
+                q = skip_ws(r);
+                continue;
+            }
+            loc = if word_eq(q, "left").is_some() {
+                KL_LEFT
+            } else if word_eq(q, "right").is_some() {
+                KL_RIGHT
+            } else if word_eq(q, "numpad").is_some() {
+                KL_NUMPAD
+            } else {
+                let mut d = b"unknown keydown / keyup option ".to_vec();
+                d.extend_from_slice(q);
+                self.fail(&d);
+                return;
+            };
+            q = next_word(q);
+        }
+        let own = match vk {
+            VK_SHIFT => MOD_SHIFT,
+            VK_CONTROL => MOD_CTRL,
+            VK_MENU => MOD_ALT,
+            _ => 0,
+        };
+        let held = self.sc.script_mods;
+        if down {
+            // a modifier's own event carries its new state (as Win32 and Wayland do)
+            let repeat = if self.keydown[(vk & 255) as usize] != 0 { 1 << 31 } else { 0 };
+            self.sc.script_mods = held | own | mods;
+            self.inject(app, plat::E_KEY_DOWN, 0, scan, loc as i32, vk | repeat);
+            self.sc.script_mods = held | own;
+        } else {
+            self.sc.script_mods = (held | mods) & !own;
+            self.inject(app, plat::E_KEY_UP, 0, scan, loc as i32, vk);
+            self.sc.script_mods = held & !own;
+        }
     }
 
     // commit "text" [N]: the commits of an input method (plat::ime_commit_text) to the window
@@ -1783,6 +1934,21 @@ impl Ui {
             at += n;
             self.process_events(app);
         }
+    }
+
+    // (E4) preedit "text" [CURSOR]: an input method's composition in the window with the keyboard
+    // (plat::ime_preedit_set; the caret a byte offset, default its end; "" ends it)
+    fn sc_preedit(&mut self, app: &mut dyn App, a: &[u8]) {
+        let Some((s, r)) = parse_qstring(a, 1024) else {
+            self.fail(b"expected a quoted string");
+            return;
+        };
+        let text = String::from_utf8_lossy(&s).into_owned();
+        let r = skip_ws(r);
+        let cursor = if r.first().is_some_and(|c| c.is_ascii_digit()) { parse_int(r).0.max(0) as usize } else { text.len() };
+        let w = (self.m.win.active & (WIN_MAX as u32 - 1)) as u8;
+        plat::ime_preedit_set(w, &text, cursor);
+        self.process_events(app);
     }
 
     // type "text"
@@ -1827,7 +1993,9 @@ impl Ui {
                 self.cmd_run(UIC_TIMER, id);
                 fired = true;
             }
-            if self.animating || fired {
+            // a frame asked for (need) comes with the next step, as in the window loop
+            if self.animating || fired || self.need {
+                self.need = false;
                 self.run_passes(app);
             }
         }
@@ -2047,11 +2215,14 @@ impl Ui {
             return;
         };
         let rec = self.sel_rec(s);
-        const STATES: [(&str, u16, bool); 11] = [
+        const STATES: [(&str, u16, bool); 14] = [
             ("hover", SS_HOVER, true),
             ("nohover", SS_HOVER, false),
             ("unpressed", SS_PRESSED, false),
             ("focused", SS_FOCUSED, true),
+            ("unfocused", SS_FOCUSED, false),
+            ("unselected", SS_SELECTED, false),
+            ("closed", SS_OPEN, false),
             ("checked", SS_CHECKED, true),
             ("unchecked", SS_CHECKED, false),
             ("disabled", SS_DISABLED, true),
@@ -2340,10 +2511,41 @@ impl Ui {
         self.run_passes(app);
     }
 
-    // sync [MS]: wait (real time, default 10 s) until no background job is pending (the app's
-    // hook, async tasks: tasks.rs)
+    // wait real MS: real time passes while the app's own threads work; their wake-ups reach
+    // App::command as they come (E_WAKE -> UIC_WAKE, tasks, ...), and the virtual clock follows
+    // the real one in steps of at most 16 ms (timers fire, frames asked for come)
+    fn wait_real(&mut self, app: &mut dyn App, ms: i32) {
+        let end = plat::time_us() + ms.max(0) as u64 * 1000;
+        let mut clock = plat::time_us(); // the real time the virtual clock has caught up with
+        loop {
+            let now = plat::time_us();
+            let gone = ((now - clock) / 1000) as i32;
+            if gone > 0 {
+                clock += gone as u64 * 1000;
+                self.advance_time(app, gone);
+            }
+            self.process_events(app); // the wake-ups that came (E_WAKE)
+            if self.need {
+                self.need = false;
+                self.run_passes(app);
+            }
+            if now >= end {
+                break;
+            }
+            // headless: plat::wake() from other threads arrives through the wait object
+            plat::wait_events((now + 16_000).min(end), &mut |e| {
+                plat::evq_push(*e);
+            });
+        }
+        self.process_events(app);
+        self.run_passes(app);
+    }
+
+    // sync [MS] [soft]: wait (real time, default 10 s) until no background job is pending (the
+    // app's hook, async tasks: tasks.rs); reaching MS fails, with soft it is only noted
     fn sc_sync(&mut self, app: &mut dyn App, a: &[u8]) {
-        let (ms, _) = parse_int(a);
+        let (ms, r) = parse_int(a);
+        let soft = word_eq(skip_ws(a), "soft").is_some() || word_eq(skip_ws(r), "soft").is_some();
         let ms = if ms > 0 { ms } else { 10000 };
         let deadline = plat::time_us() + ms as u64 * 1000;
         while self.uiw_sync_pending() || self.tasks_busy() || self.spell_busy() {
@@ -2355,7 +2557,11 @@ impl Ui {
             self.process_events(app);
             self.run_passes(app);
             if plat::time_us() >= deadline {
-                self.fail(b"background jobs still running");
+                if soft {
+                    plat::write_stdout(alloc::format!("sync: background jobs still running after {ms} ms (soft: no failure)\n").as_bytes());
+                } else {
+                    self.fail(b"background jobs still running");
+                }
                 break;
             }
         }

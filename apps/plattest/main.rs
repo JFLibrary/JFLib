@@ -4,7 +4,9 @@
 //                                          post from another thread), the worker pool
 //                                          (parallel_for, nested, cancel), background jobs
 //                                          (wait, restart, cancel, E_WAKE when finished),
-//                                          wake latency and coalescing (headless wait)
+//                                          wake latency and coalescing (headless wait), the
+//                                          UI thread's state refused to a second thread (a
+//                                          child: plattest --test uithread-child, exit code 3)
 //   plattest --test files                  mkdir / delete / rename, the streaming file API
 //                                          (also from 64 parallel items), temp files, the
 //                                          temp and config dirs, environment overrides
@@ -71,10 +73,10 @@
 //                                          last lines after a crash (a child)
 //   plattest --test life-bus               (t_life.rs, Linux) sleep, settings and SIGTERM against
 //                                          fake buses (tools/platshared/life_bus.py)
-//   plattest --test a11y / a11y-bus / uia / caret / a11y-mac / a11y-ios / a11y-show   (t_a11y.rs) the
-//                                          accessibility tree for screen readers: headless model
-//                                          and actions;
-//                                          Linux against a fake AT-SPI2 bus (tools/platshared/
+//   plattest --test a11y / a11y-bus / uia / uia-idle / caret / a11y-mac / a11y-ios / a11y-show
+//                                          (t_a11y.rs) the accessibility tree for screen readers:
+//                                          headless model and actions; Linux against a fake AT-SPI2
+//                                          bus (tools/platshared/
 //                                          atspi_bus.py); Windows through IUIAutomation (by
 //                                          hand); caret: the caret for screen magnifiers; macOS
 //                                          through AppKit's accessibility entry points (a window),
@@ -84,6 +86,14 @@
 //                                          settings: the jfgui_* overrides, the title bar's
 //                                          layout; Linux: GTK's / KDE's files, against a fake
 //                                          settings portal (with and without appearance keys)
+//   plattest --test a11y-rich / uia-rich / a11y-rich-bus   (t_a11y_rich.rs) a web page's
+//                                          accessibility tree (apps/a11ytest's page): headless
+//                                          model, requests, live regions, the rich update format;
+//                                          Windows through IUIAutomation (by hand); Linux against
+//                                          atspi_bus.py --rich
+//   plattest --test a11y-cost [--records N]   (t_a11y_cost.rs) what a web page's tree of N rich
+//                                          records costs per frame: the records, the tree, its
+//                                          publish (not in "all": timings; a release build)
 //   plattest --test secret / secret-bus    (t_secret.rs) the system's secret store: the real
 //                                          one (Credential Manager + DPAPI, Secret Service; the
 //                                          test entries are removed again); Linux against a
@@ -179,6 +189,10 @@ use base::{Args, Ini, f64_format, f64_parse};
 
 // the accessibility tree (screen readers)
 mod t_a11y;
+// a web page's accessibility tree (apps/a11ytest's page)
+mod t_a11y_rich;
+// what that tree costs per frame
+mod t_a11y_cost;
 mod t_async;
 // plat-win: the R4 tests of the Windows platform layer
 mod t_cursor;
@@ -381,6 +395,7 @@ fn plattest() -> i32 {
         Some("print") => t_print::t_print,             // plat-shared
         Some("printlayout") => t_print::t_printlayout, // plat-shared
         Some("printjob") => t_print::t_printjob,       // plat-shared
+        Some("printdoc") => t_print::t_printdoc,       // plat-shared: jobs of several pages (E9)
         Some("guard") => t_guard::t_guard,             // plat-shared
         Some("guardcrash") => t_guard::t_guardcrash,   // plat-shared
         Some("guardlimit") => t_guard::t_guardlimit,   // plat-shared
@@ -412,9 +427,14 @@ fn plattest() -> i32 {
         Some("settings") => t_settings::t_settings,    // the system settings: overrides, defaults
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
         Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
+        Some("a11y-rich") => t_a11y_rich::t_a11y_rich, // a web page's accessibility tree, headless
+        Some("a11y-cost") => t_a11y_cost::t_a11y_cost, // what that tree costs per frame (not in "all": timings)
+        Some("a11y-rich-bus") => t_a11y_rich::t_a11y_rich_bus, // Linux: against atspi_bus.py --rich
+        Some("uia-rich") => t_a11y_rich::t_uia_rich,   // Windows, by hand: the page through UI Automation
         Some("a11y") => t_a11y::t_a11y,                // the accessibility tree, headless
         Some("a11y-bus") => t_a11y::t_a11y_bus,        // Linux: against tools/platshared/atspi_bus.py
         Some("uia") => t_a11y::t_uia,                  // Windows, by hand: UI Automation
+        Some("uia-idle") => t_a11y::t_uia_idle,        // Windows, by hand: a client comes and goes (10 .. 30 s)
         Some("caret") => t_a11y::t_caret,              // Windows, by hand: the caret for magnifiers
         Some("a11y-mac") => t_a11y::t_a11y_mac,        // macOS, a real window: NSAccessibility (VoiceOver)
         Some("a11y-show") => t_a11y::t_a11y_show,      // by hand: the demo for a screen reader
@@ -446,6 +466,7 @@ fn plattest() -> i32 {
         Some("async-panic") => t_async::t_async_panic, // its children: a panic in a task,
         Some("async-panic-job") => t_async::t_async_panic_job, // in a blocking job,
         Some("async-policy") => t_async::t_async_policy, // aio under a manifest
+        Some("uithread-child") => t_uithread_child,    // (threads) its child: UI state on a second thread
         _ => {
             plat::write_stderr(b"usage: plattest --test threads|files|ini|cpu|pen|cursor|all [--repeat N]\n");
             return 2;
@@ -571,7 +592,80 @@ fn t_threads(t: &mut T) {
     th_pool(t);
     th_jobs(t);
     th_wake(t);
+    th_stop(t);
+    th_ui_gate(t);
     plat::thr_shutdown();
+}
+
+static STOP_GO: AtomicU32 = AtomicU32::new(0);
+
+/// thread: wait until all 8 are there, then stop the pool
+fn w_stop(_: u32) {
+    STOP_GO.fetch_add(1, SeqCst);
+    while STOP_GO.load(SeqCst) < 8 {
+        core::hint::spin_loop();
+    }
+    plat::thr_shutdown();
+}
+
+/// eight threads stop the pool at once (one takes it down, the others wait for it), 20 times;
+/// the pool starts again afterwards each time
+fn th_stop(t: &mut T) {
+    let (mut started, mut sums) = (0u32, 0u32);
+    for _ in 0..20 {
+        plat::thr_init(0);
+        STOP_GO.store(0, SeqCst);
+        let (n, v) = spawn8(w_stop);
+        if n < 8 {
+            // a missing thread would leave the others spinning: let them through
+            STOP_GO.fetch_add(8 - n, SeqCst);
+        }
+        join_all(v);
+        started += n;
+        let sum = AtomicU32::new(0);
+        let _ = plat::parallel_for(100, &|i, _| {
+            sum.fetch_add(i as u32, SeqCst);
+        });
+        sums += (sum.load(SeqCst) == 4950) as u32;
+    }
+    t.check(started == 160 && sums == 20, "pool: 8 shutdowns at once, 20 times; each restart runs every item");
+    t.info(&format!("  ({started} threads, {sums} of 20 restarts complete)\n"));
+}
+
+/// the UI thread's state: the first thread that touches it owns it, another thread panics before
+/// it reaches it (exit code 3) -- in a child process
+fn th_ui_gate(t: &mut T) {
+    let (code, text) = t_async::child(&["--test", "uithread-child"]);
+    t.check(text.contains("uithread: the UI thread twice"), "ui thread: the first thread reaches the UI state, twice");
+    let refused = code == Some(3) && text.contains("the UI thread's state used on thread") && !text.contains("second thread got through");
+    t.check(refused, "ui thread: a second thread panics before it reaches the UI state (exit code 3)");
+    if !refused {
+        out(&format!("  (exit {code:?})\n{text}\n"));
+    }
+}
+
+/// (the child) the main thread reaches UI-thread state twice, then a second thread tries
+fn t_uithread_child(_: &mut T) {
+    plat::setenv("jfgui_OPEN_DRYRUN", Some("1")); // Linux: the portal only prints the address
+    ui_touch();
+    ui_touch();
+    out("uithread: the UI thread twice\n");
+    let h = plat::thread_spawn(0, Box::new(|| {
+        ui_touch();
+        out("uithread: the second thread got through\n");
+    }));
+    if let Some(h) = h {
+        h.join();
+    }
+}
+
+/// a call that reaches UI-thread state without a window: the portal's connection (Linux), the
+/// minimum size of the first window (Windows, macOS)
+fn ui_touch() {
+    #[cfg(target_os = "linux")]
+    let _ = plat::open_url("https://example.org/");
+    #[cfg(not(target_os = "linux"))]
+    plat::win_set_min_size(0, 100, 100);
 }
 
 /// 8 threads running f(index)
@@ -803,6 +897,36 @@ fn th_jobs(t: &mut T) {
     }
     t.check(NEST.load(SeqCst) == NJ_ROUNDS * NJ_LOOPS * NJ_ITEMS as u64,
             "jobs: nested loops inside a background job while the owner waits");
+    // one job shared by several threads that all start and wait on it: each successful start
+    // runs the items exactly once (two starts must never both reset and queue the record)
+    static RACE_ITEMS: AtomicU64 = AtomicU64::new(0);
+    static RACE_STARTS: AtomicU64 = AtomicU64::new(0);
+    RACE_ITEMS.store(0, SeqCst);
+    RACE_STARTS.store(0, SeqCst);
+    let mut shared = Job::new();
+    shared.set(32, |_, _| {
+        RACE_ITEMS.fetch_add(1, SeqCst);
+    });
+    let shared = Arc::new(shared);
+    let mut hs = Vec::new();
+    for _ in 0..4 {
+        let job = shared.clone();
+        hs.push(plat::thread_spawn(0, Box::new(move || {
+            for _ in 0..300 {
+                if job.start() {
+                    RACE_STARTS.fetch_add(1, SeqCst);
+                }
+                let _ = job.wait();
+            }
+        })));
+    }
+    for h in hs.into_iter().flatten() {
+        h.join();
+    }
+    let (items, starts) = (RACE_ITEMS.load(SeqCst), RACE_STARTS.load(SeqCst));
+    t.check(starts > 0 && items == starts * 32 && shared.done(),
+            "jobs: concurrent starts of one shared job: one start at a time, each runs every item once");
+    t.info(&format!("  ({starts} starts, {items} items)\n"));
 }
 
 /// wake from another thread ends wait(forever); bursts coalesce

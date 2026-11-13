@@ -527,6 +527,13 @@ pub fn cursor_destroy(_id: i32) {}
 pub fn cursor_dpi(dpi: i32) -> i32 {
     dpi.clamp(48, 480)
 }
+
+/// (tests, E3) the cursor shown for shape at dpi and the width of a drawn one: none here (the
+/// system has the shapes, cursor_fallback's for the rest)
+#[doc(hidden)]
+pub fn cursor_probe(_shape: u32, _dpi: i32) -> (u64, i32) {
+    (0, 0)
+}
 /// The canvas shows popups where the library put them (inside the canvas).
 pub fn popup_anchor(_slot: u32, _anchor: [i32; 4], _kind: u32, _nat: [i32; 2]) {}
 /// Popups stay where the library put them.

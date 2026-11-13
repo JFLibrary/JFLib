@@ -1,0 +1,26 @@
+# viewtest: text boxes of the same id in two windows.  The main window's "Notiz" (#117) and the
+# app window's (also #117) each keep their own caret: the edit state belongs to a box of one
+# window, the other window's box of that id neither takes nor drops it.
+click #117
+type "a"
+expect #117 text "a"
+click "Neues Fenster"
+window 114
+click #117
+expect window 114 active
+type "mo"
+key left
+type "x"
+expect #117 text "mxo"
+# a selection made with the keys stays one while the main window draws its box
+key shift+home
+type "z"
+expect #117 text "zo"
+# the main window's box kept its text; typing there again goes on at its end
+window main
+expect #117 text "a"
+click #117
+type "b"
+expect #117 text "ab"
+window 114
+expect #117 text "zo"

@@ -1,0 +1,3 @@
+#!args --test transparency
+# transparency per layer, per entity and by block (AutoCAD's 0 to 90 %) against the same drawing with it multiplied into the
+# colours' alpha; a layer's transparency changed sends no records; Voll and Basis
