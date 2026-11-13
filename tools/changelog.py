@@ -47,6 +47,8 @@ NO_CHANGES = "No changes in this crate"            # the text of an [Unreleased]
 WHATS_NEW = re.compile(r"^## What's new in (\S+)[ \t]*$", re.M)
 PLACEHOLDER = "<!-- write this README by hand"     # build_rs.py new --lib
 LINK = re.compile(r"\]\(\s*<?([^)\s>]+)")
+# a version a README names in an example: jflib = "0.2", jflib-build = { version = "=0.2.0" }, jflib-0.2.*
+VERSION_USE = re.compile(r'\bjflib[a-z0-9_-]*\s*=\s*(?:\{[^}\n]*?version\s*=\s*)?"=?(\d+\.\d+)|\bjflib[a-z0-9-]*-(\d+\.\d+)\.\*')
 FENCE = re.compile(r"^```.*?^```", re.M | re.S)
 
 
@@ -178,7 +180,8 @@ def crate_doc_problems(root=ROOT, release=None, cut=False):
     """every published crate's README.md and CHANGELOG.md -> problems: both there and in its package,
     the README's first line `# PACKAGE`, no placeholder of build_rs.py new --lib, only absolute links
     (crates.io and docs.rs show the text away from the repository), one "## What's new in X.Y.Z" not
-    older than the library's version (with `release`: that version), a CHANGELOG with [Unreleased]
+    older than the library's version (with `release`: that version) and examples that name X.Y
+    (`jflib = "X.Y"`, `jflib-X.Y.*`), a CHANGELOG with [Unreleased]
     and only releases this file has (with `cut`: a section [release])"""
     import apidiff
     import manifests
@@ -212,6 +215,10 @@ def crate_doc_problems(root=ROOT, release=None, cut=False):
                 bad.append(f"{member}/README.md: \"What's new in {new[0]}\", the release is {release}")
             elif release is None and apidiff.parse_version(new[0]) < apidiff.parse_version(lib_version):
                 bad.append(f"{member}/README.md: \"What's new in {new[0]}\" is older than the library's version {lib_version}")
+            if len(new) == 1:                       # the examples name the version the README is for
+                want = ".".join(new[0].split(".")[:2])
+                for v in sorted({m.group(1) or m.group(2) for m in VERSION_USE.finditer(text)} - {want}):
+                    bad.append(f"{member}/README.md: an example names version {v}, the README is for {new[0]}")
         if (folder / "CHANGELOG.md").is_file():
             text = read(folder / "CHANGELOG.md")[0]
             if not UNRELEASED.search(text):

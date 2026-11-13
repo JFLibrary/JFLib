@@ -164,7 +164,7 @@ describes the format and the rules in detail.
 2. `python build_rs.py changelog` shows `[Unreleased]`; add what is missing, here and in the
    crates' changelogs (below). Rewrite the section "What's new in X.Y.Z" of every crate's
    `README.md` for the new version: a few sentences about its changelog, or that it has no
-   changes of its own.
+   changes of its own; examples that name a version (`jflib = "X.Y"`) follow.
 3. `python build_rs.py release X.Y.Z` renames `[Unreleased]` to `[X.Y.Z] - DATE` (a new empty
    `[Unreleased]` above it) here and in every crate's `CHANGELOG.md`, writes the version to `Cargo.toml` and `Cargo.lock` and the snapshot `docs/api/X.Y.Z.txt`. It
    refuses a version that is not newer than the last release or too small for the API changes,
@@ -210,6 +210,7 @@ python build_rs.py changelog --crate ui                             # show [Unre
 `--crate` takes a folder (`lib/ui`), a package (`jflib-ui`) or a lib name (`ui`) and writes the
 same text into the crates' files; reword it there where the crate's side reads better.
 `build_rs.py check` reports a crate without these files, a README that is still the frame
-`build_rs.py new --lib` writes, a relative link, a missing or outdated "What's new", and a
+`build_rs.py new --lib` writes, a relative link, a missing or outdated "What's new", an
+example that names another version than the README is for (`jflib = "0.1"`, `jflib-0.1.*`), and a
 changelog section that is no release of the library; `tools/publish.py` also wants every
 crate's changelog cut for the version it uploads.

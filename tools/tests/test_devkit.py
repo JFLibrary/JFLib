@@ -590,6 +590,12 @@ class CrateDocsTest(Temp):
         self.assertEqual(changelog.crate_doc_problems(self.dir, release="0.2.0", cut=True), [
             "lib/a/CHANGELOG.md has no [0.2.0]: python build_rs.py release 0.2.0",
             "lib/b/CHANGELOG.md has no [0.2.0]: python build_rs.py release 0.2.0"])
+        readme = ('# jflib-b\n\n```toml\njflib = "0.2"\njflib-build = { version = "=0.1.0" }\n```\n\n'
+                  "cp -r jflib-0.3.*/template .\n\n## What's new in 0.2.0\n")
+        self.write("lib/b/README.md", readme)
+        self.assertEqual(changelog.crate_doc_problems(self.dir), [
+            "lib/b/README.md: an example names version 0.1, the README is for 0.2.0",
+            "lib/b/README.md: an example names version 0.3, the README is for 0.2.0"])
         self.assertEqual(changelog.crate_of("b", self.dir), ("lib/b", "jflib-b", "jflib_b"))
         self.assertEqual(changelog.crate_of("jflib-a", self.dir)[0], "lib/a")
         with self.assertRaises(changelog.ChangelogError):
