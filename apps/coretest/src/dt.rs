@@ -1,7 +1,8 @@
 // dt -- checks of lib/datetime: civil calendar, RFC 3339, zones and DST, cron
 
 use datetime::cron::{self, Cron};
-use datetime::{civil_from_days, days_from_civil, parse_rfc3339, rfc3339, rfc3339_offset, weekday, Civil, LocalResult,
+use datetime::{civil_from_days, days_from_civil, iso_week, iso_week_monday, iso_weeks_in_year, parse_rfc3339, rfc3339, rfc3339_offset,
+               weekday, Civil, LocalResult,
                Timestamp, Zone};
 
 use crate::T;
@@ -23,6 +24,22 @@ pub fn run(t: &mut T) {
     t.check("civil round trip", round);
     t.eq("weekday 2026-10-12 (Monday)", weekday(2026, 10, 12), 0);
     t.eq("weekday 2000-01-01 (Saturday)", weekday(2000, 1, 1), 5);
+    // ISO 8601 weeks: the Thursday decides the year
+    t.eq("iso week 2026-11-13", iso_week(2026, 11, 13), (2026, 46));
+    t.eq("iso week 2027-01-01 (2026's 53rd)", iso_week(2027, 1, 1), (2026, 53));
+    t.eq("iso week 2024-12-30 (2025's first)", iso_week(2024, 12, 30), (2025, 1));
+    t.eq("iso week 2021-01-03 (2020's 53rd)", iso_week(2021, 1, 3), (2020, 53));
+    t.eq("iso weeks 2026 / 2025 / 2020 / 2015", [2026, 2025, 2020, 2015].map(iso_weeks_in_year), [53, 52, 53, 53]);
+    t.eq("monday of 2026-W46", iso_week_monday(2026, 46), (2026, 11, 9));
+    t.eq("monday of 2026-W01", iso_week_monday(2026, 1), (2025, 12, 29));
+    let mut weeks = true;
+    for d in (-200_000i64..200_000).step_by(13) {
+        let (y, m, dd) = civil_from_days(d);
+        let (wy, w) = iso_week(y, m, dd);
+        let (my, mm, md) = iso_week_monday(wy, w);
+        weeks &= days_from_civil(my, mm, md) == d - weekday(y, m, dd) as i64 && w >= 1 && w <= iso_weeks_in_year(wy);
+    }
+    t.check("iso week round trip", weeks);
     t.eq("leap 2024-02-29", Civil::date(2024, 2, 29).is_valid(), true);
     t.eq("no 2026-02-29", Civil::date(2026, 2, 29).is_valid(), false);
 

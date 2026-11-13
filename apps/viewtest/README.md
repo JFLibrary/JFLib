@@ -20,6 +20,7 @@ keyboard"). Made with `python build_rs.py new viewtest --title "Ansichtstest"` o
 | `tests/realwait.uis` | `wait real`: "Hintergrund" starts a thread of the app's own that works 300 ms of real time and wakes the UI (`plat::wake`, `UIC_WAKE`), while a timer polls its result every 100 ms; both arrive in real time; `sync 200 soft` with "Hängt" (the sync hook never done) reaches its deadline without failing |
 | `tests/password.uis` | a `TB_PASSWORD` box sets the input method's purpose itself: `IP_PASSWORD` while it has the keyboard ("Zweck: 5", `plat::ime_purpose_of`), the purpose of before after it -- another text box, the page's own field (`ui.ime_enable`), or the box gone while it had the keyboard (command 6) |
 | `tests/links.uis` | links the page draws itself, published with `ui.sem_rect` (no hit box of their own): their kind and place, a click by label reaching the page at the link, the hand over one, the links in the accessibility tree; (E14) the page's own record named by `ui.canvas_label` |
+| `tests/calendar.uis` | "Datum": a flyout of the app's own at a point of the page (a web page's date input) with `ui.calendar` in place -- days, ISO weeks (rows from Monday, the date their Monday) and months between 2026-11-05 and 2027-02-10: disabled days, weeks, months and arrows beyond them -- and a `date_picker`, whose day and "Heute" close its calendar only (`popup_close_id`), the flyout stays |
 
 ## Build, run, test
 

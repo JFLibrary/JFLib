@@ -1017,6 +1017,31 @@ ui.menubar(None);                        // the menu bar of the AppDesc
   ```
 
   `apps/viewtest` (`tests/menus.uis`) does both.
+  `popup_close()` closes every popup; `popup_close_id(id)` only popup `id` and the popups
+  opened inside it, the flyout around it stays (a `date_picker` in a flyout of the app's own
+  closes its calendar this way when a day is picked). A popup opened inside a flyout is drawn
+  where its `flyout_begin` stands: put a drop-down (a `date_picker`, a `combobox`) last in the
+  flyout, or its list lies under the flyout's later widgets.
+  **A calendar in place** (a web page's date input, a panel): `calendar(id, &mut y, &mut m,
+  &mut d, &DateRange::new(mode, min, max))` draws the month of `date_picker`'s popup without a
+  popup and returns `EV_ACT` when the user picked. `CAL_DAY` picks a day (`DateRange::DAYS`:
+  any day of the years 1 to 9999), `CAL_WEEK` an ISO week (rows from Monday with the week's
+  number; the date becomes its Monday), `CAL_MONTH` a month of a year's twelve (the 1st);
+  what lies before `min` or after `max` (in weeks: their weeks, in months: their months) is
+  disabled, and so are the arrows beyond them. The calendar shows the date's month again when
+  the app changes the date. The civil helpers are `jflib::datetime`'s: `days_in_month`,
+  `weekday` (0 = Monday), `iso_week(y, m, d) -> (year, week)`, `iso_weeks_in_year`,
+  `iso_week_monday(year, week)`:
+
+  ```rust
+  let range = DateRange::new(CAL_WEEK, (2026, 11, 5), (2027, 2, 10));
+  if ui.calendar(ID_WEEK, &mut self.y, &mut self.m, &mut self.d, &range) & EV_ACT != 0 {
+      let (year, week) = datetime::iso_week(self.y, self.m as u8, self.d as u8); // "2026-W48"
+      self.page.set_value(&format!("{year}-W{week:02}"));
+  }
+  ```
+
+  `apps/viewtest` (`tests/calendar.uis`) has both in a flyout at a point of its page.
   A row whose keys the app handles itself (no command of the table, e.g. inside a pane that
   captures them with `capture_shortcut`) shows them with `menu_item_keys(id, label,
   &ui.key_text(VK_F5, MOD_CTRL))`: `key_text(vk, mods)` writes a key as the accelerator texts
@@ -2209,6 +2234,7 @@ row_h)` reports opened and closed nodes (load children lazily) and toggled check
 | `toast(kind, title, msg, ms)`, `toast_host()` | notifications; call `toast_host` once per frame, last; screen readers and scripts see the card (its title), its message (`text:"…"`) and its close button |
 | `spinner(id, size)`, `progress_indeterminate(id)` | waiting |
 | `date_picker`, `time_box`, `weekday_toggles` | dates, times, weekday masks (schedules) |
+| `calendar(id, &mut y, &mut m, &mut d, &DateRange)` | the month calendar of `date_picker` in place, for a panel or a flyout of the app's own (below) |
 
 **Docking** ([`ui/dock.rs`](../lib/ui/dock.rs)): panels at the left, right and bottom of a
 document area, in tab groups with splitters; the user drags tabs onto drop markers, floats

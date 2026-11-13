@@ -64,6 +64,7 @@ mod ctx;
 mod cursor;
 mod data;
 mod datepick;
+pub use datepick::{DateRange, CAL_DAY, CAL_MONTH, CAL_WEEK}; // ui.calendar
 mod diagram; // node / edge canvas (diagram.rs)
 pub use diagram::{
     dg_edge_points, dg_hairline, dg_length, dg_paint_grid, dg_point_at, dg_stroke_edge, DEdge, DEv, DHit, DModel, DNode, DPort, DgFrame, DgGeo,

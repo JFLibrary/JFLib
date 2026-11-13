@@ -164,7 +164,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `key_event_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`, `canvas_label`
-- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
+- [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `popup_close_id`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_preedit`, `ime_enable`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
@@ -173,7 +173,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Docking: panels at the sides, tab groups, floating tool windows](#docking-panels-at-the-sides-tab-groups-floating-tool-windows): `dock_begin`, `dock_next`, `dock_end`
 - [Charts](#charts): `sparkline`, `bar_chart`, `donut`, `legend`, `line_chart`
 - [Toasts, spinners, progress](#toasts-spinners-progress): `toast`, `toast_dismiss`, `toast_clear`, `toasts`, `toast_host`, `spinner`, `progress_indeterminate`
-- [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`
+- [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`, `calendar`
 - [Values and colours](#values-and-colours): `cmd_track`, `decimal_sep`, `set_decimal_sep`, `fmt_f64`, `parse_f64`, `slider_f`, `track_slider`, `prop_slider`, `prop_slider_f`, `angle`, `pan`, `swatch`, `color_picker`, `color_picker_ex`, `color_wheel`
 - [Windows](#windows): `window_title_height`, `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_snap`, `window_rect`, `window_state`, `window_fullscreen`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
 - [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars): `dialog_begin`, `dialog_buttons`, `dialog_end`, `infobar`, `statusbar_begin`, `statusbar_end`, `titlebar_begin`, `titlebar_begin_opt`, `titlebar_begin_overlay`, `titlebar_end`, `titlebar_open`
@@ -963,6 +963,8 @@ popup -- popups, flyouts, menus, menu bar, command table and accelerators, drop-
 Popups (a stack of up to 6 levels per window, drawn on L_POPUP):
   popup_open(id)                      open popup `id` (inside a flyout: as its child)
   popup_close()                       close every popup; the focus returns to the opener
+  popup_close_id(id)                  close popup `id` and the popups inside it; the
+                                      flyouts it sits in stay open
   popup_is_open(id) -> bool   popup_count() -> n
   flyout_begin(id, FL_*) -> bool      draw popup `id` when it is open: a flyout surface
                                       anchored to the last widget, content box BOX_V|PAD_4
@@ -1060,6 +1062,11 @@ numbers for them.
   than the click (a web engine's context menu); the app draws flyout_begin(id, ..) as usual.
 - **`fn popup_close(&mut self)`**
   ui_popup_close: close every popup (the focus returns to where it was)
+- **`fn popup_close_id(&mut self, id: u32)`**
+  popup_close_id(id): close popup `id` and the popups opened inside it; the popups it was
+  opened in stay open (a date_picker inside a flyout of the app's own closes its calendar,
+  not the flyout).  The focus returns to where it was when `id` opened; nothing happens
+  when `id` is not open.
 - **`fn flyout_begin(&mut self, id: u32, flags: u32) -> bool`**
   ui_flyout_begin(id, FL_\*) -> popup `id` is open: then its content follows (a vertical
   box with 4 DIP padding) until flyout_end, which is called in any case.  The flyout is
@@ -3412,11 +3419,44 @@ datepick -- date and time input
   date_picker(id, &mut y, &mut m, &mut d) -> EV a button with the date (the user's format,
                                                 i18n::fmt_date) that opens a month calendar
                                                 starting on the locale's first weekday
-                                                (EV_ACT when a day was picked)
-  civil helpers: days_in_month(y, m), weekday(y, m, d) (0 = Monday)
+                                                (EV_ACT when a day was picked; it closes the
+                                                calendar only, a flyout around it stays)
+  calendar(id, &mut y, &mut m, &mut d, &DateRange) -> EV
+                                                the calendar in place, for any panel or flyout:
+                                                a month of days (CAL_DAY), of ISO weeks
+                                                (CAL_WEEK: a row is a week, the date its
+                                                Monday) or a year of months (CAL_MONTH: the 1st);
+                                                only dates between min and max can be picked
+                                                (EV_ACT when the user picked)
+  The civil helpers (days in a month, weekday, ISO weeks) are jflib::datetime's.
 
-Ids: parts (id << 3 | k) | 0x80000000; calendar days ((id ^ 0x3C3C) << 6 | cell) | 0x80000000.
+Ids: parts (id << 3 | k) | 0x80000000; calendar cells ((id ^ 0x3C3C) << 6 | cell) | 0x80000000
+(a day 0 .. 41, a week row 0 .. 5, a month 0 .. 11).
 ```
+
+```rust
+/// what a calendar picks (DateRange::mode): a day
+CAL_DAY: u32 = 0
+/// an ISO 8601 week (Monday to Sunday): the date is its Monday, the rows start on Monday and show
+/// the week's number (datetime::iso_week)
+CAL_WEEK: u32 = 1
+/// a month: the date is its 1st, the calendar shows the twelve months of a year
+CAL_MONTH: u32 = 2
+```
+
+- **`struct DateRange`**
+  what a calendar picks and between which dates (calendar): `mode` CAL_DAY, CAL_WEEK or
+  CAL_MONTH; min and max (year, month, day) inclusive -- in CAL_WEEK the weeks that hold them, in
+  CAL_MONTH their months
+  - `mode: u32`
+  - `min: (i32, u32, u32)`
+  - `max: (i32, u32, u32)`
+
+**`impl DateRange`**
+
+- **`const DAYS: DateRange = DateRange::new(CAL_DAY, (1, 1, 1), (9999, 12, 31))`**
+  days of the years 1 to 9999
+- **`const fn new(mode: u32, min: (i32, u32, u32), max: (i32, u32, u32)) -> DateRange`**
 
 **`impl Ui`**
 
@@ -3426,7 +3466,17 @@ Ids: parts (id << 3 | k) | 0x80000000; calendar days ((id ^ 0x3C3C) << 6 | cell)
   ui_weekday_toggles(id, &mut mask) -> EV_\* (EV_ACT changed); bit 0 = Monday.  The
   buttons wrap where the row has less room than the seven of them (a narrow card)
 - **`fn date_picker(&mut self, id: u32, y: &mut i32, m: &mut u32, d: &mut u32) -> u32`**
-  ui_date_picker(id, &mut y, &mut m, &mut d) -> EV_\* (EV_ACT when a day was picked)
+  ui_date_picker(id, &mut y, &mut m, &mut d) -> EV_\* (EV_ACT when a day was picked).  A
+  pick closes the calendar's popup and the popups inside it, not a flyout the picker sits
+  in (popup_close_id)
+- **`fn calendar(&mut self, id: u32, y: &mut i32, m: &mut u32, d: &mut u32, range: &DateRange) -> u32`**
+  ui_calendar(id, &mut y, &mut m, &mut d, &range) -> EV_\* (EV_ACT when the user picked):
+  a month calendar in place, no popup -- a panel's, or the content of a flyout of the app's
+  own.  range.mode picks a day (CAL_DAY: the weeks start on the locale's first weekday), an
+  ISO week (CAL_WEEK: rows from Monday with the week's number; y, m, d become its Monday) or
+  a month (CAL_MONTH: a year of months; y, m, d become its 1st); what lies outside
+  range.min .. range.max is drawn disabled.  The arrows show the month (the year) before and
+  after; the calendar shows the month of y, m, d again when the app changes the date.
 
 ### Languages
 
@@ -26355,7 +26405,7 @@ Source: [`lib/plat/hosted.rs`](../lib/plat/hosted.rs)
 hosted -- a program with the standard library (feature std, docs/CRATES.md CR6); the only file
 of plat that names std, compiled only with that feature.  Its start is std's (the C runtime's
 entry, std's main), so plat has no entry point of its own: the program's fn main calls
-std_start (win.rs, linux_glibc.rs), which sets up what plat's entry sets up without std.
+std_start (win.rs, linux_glibc.rs, apple.rs), which sets up what plat's entry sets up without std.
 rt::main! and ui::main! write that fn main.
 
   exit(code)          plat::exit: std::process::exit, which writes out what std's stdout holds
@@ -32640,12 +32690,18 @@ environment, time, files (apple_sys.rs), threads, semaphores, the wake-up, syste
 (apple_disp.rs) until AP4.
 
 main(): libSystem's start calls it (a program without std); it calls the app's jfgui_main and ends
-the process with its result.  The arguments and the environment come from _NSGetArgv and
-_NSGetEnviron, so a program with std (whose main is std's) reads the same.
+the process with its result.  std_start() (feature std) does the same from the program's own fn
+main, whose main is std's.  The arguments and the environment come from _NSGetArgv and
+_NSGetEnviron, so a program with std reads the same.
 ```
 
 - **`extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32`**
   the entry libSystem's start calls (a program without std; std brings its own main)
+
+- **`fn std_start() -> !`**
+  (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
+  program's own): what main does without std, with rt's panic hook first and the end through
+  std::process::exit; with the feature unwind a panic that leaves the app ends it there
 
 - **`fn win_test_usage() -> (u64, u64, u64)`**
   (test aid) the process's CPU time (us), resident memory and its own footprint (bytes), as on
@@ -36649,6 +36705,8 @@ datetime -- calendar time: timestamps, civil dates, RFC 3339, time zones, cron s
   Timestamp { secs, nanos }          seconds since 1970-01-01 00:00 UTC
   Civil { year .. second, nanos }    a calendar date and wall time (no zone)
   days_from_civil / civil_from_days / days_in_month / is_leap / weekday (0 = Monday)
+  iso_week / iso_weeks_in_year / iso_week_monday   ISO 8601 weeks (Monday to Sunday, week 1
+                                     holds the year's first Thursday)
   rfc3339(ts) / rfc3339_offset(ts, offset) / parse_rfc3339(s)
   format_date_time(ts, &zone, en) / format_date / format_time / format_duration(secs, en)
   tz::Zone                           IANA zones with their current DST rule (zones.rs from
@@ -36715,6 +36773,19 @@ No clock here: plat::unix_time_ns gives "now"; datetime only computes.
 
 - **`fn weekday(y: i32, m: u8, d: u8) -> u8`**
   weekday of a date: 0 = Monday .. 6 = Sunday
+
+- **`fn iso_weeks_in_year(y: i32) -> u8`**
+  the ISO 8601 weeks of week-numbering year y: 53 when the year starts on a Thursday, or on a
+  Wednesday in a leap year, else 52
+
+- **`fn iso_week(y: i32, m: u8, d: u8) -> (i32, u8)`**
+  the ISO 8601 week of a date -> (its week-numbering year, the week 1 ..= 53): the days of
+  29 December to 3 January may lie in the week of the other year (2026-12-31 is 2026-W53,
+  2027-01-01 too)
+
+- **`fn iso_week_monday(y: i32, week: u8) -> (i32, u8, u8)`**
+  the Monday of ISO 8601 week `week` of week-numbering year y -> (year, month, day); a week
+  beyond the year's last counts on into the next year
 
 - **`fn rfc3339(ts: Timestamp) -> String`**
   "2026-10-12T19:58:00Z" (with ".123" milliseconds when the timestamp has them)

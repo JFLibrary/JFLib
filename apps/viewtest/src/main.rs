@@ -40,6 +40,10 @@
 //                        plat::ime_purpose_of) is IP_PASSWORD while it has the keyboard, set by
 //                        the box itself; command 6 takes the box away while it has it
 //                        (tests/password.uis)
+//   "Datum"              a flyout of the app's own at a point of the page (BrowserGUI's picker
+//                        of an <input type=date>) with a date_picker in it, whose day closes its
+//                        calendar only, and ui.calendar in place: days, ISO weeks or months
+//                        between 2026-11-05 and 2027-02-10 (tests/calendar.uis)
 //
 // tests/keys.uis, tests/menus.uis and tests/links.uis drive it; the texts above the page say what
 // it saw.
@@ -83,6 +87,11 @@ const ID_AGAIN: u32 = 119; // "Immer neu"
 const ID_WORK: u32 = 120; // "Hintergrund"
 const ID_HANG: u32 = 121; // "Hängt"
 const ID_PW: u32 = 122; // "Kennwort" (TB_PASSWORD)
+const ID_DATEBTN: u32 = 123; // "Datum": opens ID_DATEPOP at a point of the page
+const ID_DATEPOP: u32 = 124; // that flyout
+const ID_DATE: u32 = 125; // the date_picker in it (its calendar's days: #0x800F1040 + cell)
+const ID_CALMODE: u32 = 126; // "Tag" / "Woche" / "Monat"
+const ID_CAL: u32 = 127; // the calendar in place (cells: #0x800F10C0 + day, week row or month)
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 const ID_FD_DIR: u32 = 0x11_0000; // the folder dialog (FD_FOLDER)
 
@@ -116,7 +125,7 @@ const DESC: AppDesc = AppDesc {
     title: "Ansichtstest",
     flags: AF_RESIZABLE,
     w: 560,
-    h: 760,
+    h: 820,
     min_w: 400,
     min_h: 360,
     cmds: &CMDS,
@@ -182,6 +191,13 @@ struct ViewTest {
     /// "Kennwort": its text, taken away (CMD_PW_AWAY)
     pw: String,
     pw_away: bool,
+    /// "Datum": the flyout opens in the next pass; the date picker's date, the calendar's mode,
+    /// date and picks
+    date_later: bool,
+    date: (i32, u32, u32),
+    cal_mode: i32,
+    cal: (i32, u32, u32),
+    cal_picks: u32,
 }
 
 // (E3) the cursors "Zeiger wechseln" walks through (0: the page's arrow / hand)
@@ -238,8 +254,18 @@ impl Default for ViewTest {
             hang: 0,
             pw: String::new(),
             pw_away: false,
+            date_later: false,
+            date: (2026, 11, 13),
+            cal_mode: 0,
+            cal: (2026, 11, 13),
+            cal_picks: 0,
         }
     }
+}
+
+// "2026-11-13"
+fn ymd((y, m, d): (i32, u32, u32)) -> String {
+    format!("{y}-{m:02}-{d:02}")
 }
 
 // the link of the page at (x, y) px relative to the page
@@ -381,6 +407,11 @@ impl ViewTest {
             self.later = false;
             ui.popup_open_at(ID_FLYOUT, r[0] + ui.dp(200), r[1] + ui.dp(60));
         }
+        // "Datum": the picker's flyout below a field of the page (an <input type=date>)
+        if self.date_later {
+            self.date_later = false;
+            ui.popup_open_at(ID_DATEPOP, r[0] + ui.dp(16), r[1] + ui.dp(24));
+        }
         // the cursor of the hit box under the pointer: the last pass's, once more when it is not
         // yet the one this pass asked for
         if inp.ev & EV_HOVER != 0 {
@@ -390,6 +421,31 @@ impl ViewTest {
                 ui.repass();
             }
         }
+    }
+
+    // "Datum": a flyout of the app's own (a web page's date input) with a calendar in place --
+    // days, ISO weeks or months between 2026-11-05 and 2027-02-10 -- and a date picker, whose day
+    // closes only the picker's calendar.  The picker comes last: a popup opened inside a flyout
+    // is drawn where its flyout_begin is, so the flyout's later widgets would lie over it
+    fn date_flyout(&mut self, ui: &mut Ui) {
+        if ui.flyout_begin(ID_DATEPOP, 0) {
+            ui.segmented(ID_CALMODE, &mut self.cal_mode, &["Tag", "Woche", "Monat"]);
+            let mode = [CAL_DAY, CAL_WEEK, CAL_MONTH][self.cal_mode.clamp(0, 2) as usize];
+            let range = DateRange::new(mode, (2026, 11, 5), (2027, 2, 10));
+            let (mut y, mut m, mut d) = self.cal;
+            if ui.calendar(ID_CAL, &mut y, &mut m, &mut d, &range) & EV_ACT != 0 {
+                self.cal = (y, m, d);
+                self.cal_picks += 1;
+            }
+            ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
+            ui.text(TS_BODY, "Termin");
+            let (mut y, mut m, mut d) = self.date;
+            if ui.date_picker(ID_DATE, &mut y, &mut m, &mut d) & EV_ACT != 0 {
+                self.date = (y, m, d);
+            }
+            ui.box_end();
+        }
+        ui.flyout_end();
     }
 
     // a canvas with the defaults
@@ -536,6 +592,16 @@ impl App for ViewTest {
         }
         ui.text(TS_BODY, &format!("Hintergrund: {} Abfrage: {}", self.work_seen, self.polled));
         ui.box_end();
+        // "Datum": the flyout below (date_flyout); what its date picker and calendar hold
+        ui.box_begin(0, BOX_H, 8);
+        if ui.button(ID_DATEBTN, "Datum") & EV_ACT != 0 {
+            self.date_later = true;
+        }
+        let (y, m, d) = self.cal;
+        let (wy, w) = datetime::iso_week(y, m as u8, d as u8);
+        ui.text(TS_BODY, &format!("Datum: {}", ymd(self.date)));
+        ui.text(TS_BODY, &format!("Kalender: {} {wy}-W{w:02} Wahl: {}", ymd(self.cal), self.cal_picks));
+        ui.box_end();
         ui.box_end();
         // (E7) an independent app window: its own title bar with a tab and the caption buttons
         let (open, rect) = (self.app_open.clone(), self.app_rect.clone());
@@ -568,6 +634,7 @@ impl App for ViewTest {
             self.rows += 1;
         }
         ui.flyout_end();
+        self.date_flyout(ui);
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {

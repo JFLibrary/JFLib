@@ -4,6 +4,8 @@
 // Popups (a stack of up to 6 levels per window, drawn on L_POPUP):
 //   popup_open(id)                      open popup `id` (inside a flyout: as its child)
 //   popup_close()                       close every popup; the focus returns to the opener
+//   popup_close_id(id)                  close popup `id` and the popups inside it; the
+//                                       flyouts it sits in stay open
 //   popup_is_open(id) -> bool   popup_count() -> n
 //   flyout_begin(id, FL_*) -> bool      draw popup `id` when it is open: a flyout surface
 //                                       anchored to the last widget, content box BOX_V|PAD_4
@@ -615,6 +617,18 @@ impl Ui {
     /// ui_popup_close: close every popup (the focus returns to where it was)
     pub fn popup_close(&mut self) {
         self.pp_dismiss_all();
+    }
+
+    /// popup_close_id(id): close popup `id` and the popups opened inside it; the popups it was
+    /// opened in stay open (a date_picker inside a flyout of the app's own closes its calendar,
+    /// not the flyout).  The focus returns to where it was when `id` opened; nothing happens
+    /// when `id` is not open.
+    pub fn popup_close_id(&mut self, id: u32) {
+        match self.pp_find(id) {
+            0 => self.pp_dismiss_all(),
+            i if i > 0 => self.pp_close_to(i as u32),
+            _ => {}
+        }
     }
 
     // popup_catcher -> a press outside every popup dismissed them.  Once per pass (while
