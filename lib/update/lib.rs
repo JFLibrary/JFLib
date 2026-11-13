@@ -184,7 +184,8 @@ pub enum Error {
     Unsupported(String),
     /// files could not be read or written
     Io(String),
-    /// the AppImage lies in a folder the user cannot write (the folder): it is not replaced
+    /// the AppImage or the macOS app bundle lies in a folder the user cannot write (the folder):
+    /// it is not replaced
     ReadOnly(String),
     /// the downloaded package is not taken: not an AppImage, or its signature does not follow
     /// the running one's (why)

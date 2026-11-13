@@ -23,7 +23,9 @@
 // from the user's gesture), NotificationManager with POST_NOTIFICATIONS; no symbol.  macOS
 // (apple_mac_services.rs): an NSStatusItem in the menu bar (with a menu a click opens it, the Mac's
 // way; without one a click is Activate), UNUserNotificationCenter in an app bundle (a program
-// without a bundle identifier gets no notifications: 0).  Elsewhere nothing is shown.  jfgui_TRAY_DRYRUN=1 prints what would be shown instead (tests).
+// without a bundle identifier gets no notifications: 0).  iOS (apple_ios_services.rs): notifications
+// only, through UNUserNotificationCenter (asked the first time); no symbol.  Elsewhere nothing
+// is shown.  jfgui_TRAY_DRYRUN=1 prints what would be shown instead (tests).
 
 use alloc::string::String;
 use alloc::vec::Vec;

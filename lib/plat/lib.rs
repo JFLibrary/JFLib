@@ -31,7 +31,8 @@
 //   instance: claim(app) -> Primary / Forwarded / Alone, take() -> requests of later starts
 //            (the app's single instance; pipe / abstract socket per user)  (instance.rs)
 //   spell:   sys_spell_find / sys_spell_languages, SysSpeller (check, suggest): the system's
-//            spell checker (Windows ISpellChecker; elsewhere none)          (spell.rs)
+//            spell checker (Windows ISpellChecker, macOS NSSpellChecker, iOS UITextChecker;
+//            elsewhere none)                                                (spell.rs)
 //   tray:    tray_set / tray_remove (the symbol in the notification area, its menu), notify /
 //            notify_close (system notifications), tray_take() -> events   (tray.rs)
 //   power:   inhibit(reason, INHIBIT_SUSPEND | INHIBIT_IDLE) -> Option<Inhibit> (no standby /
@@ -90,7 +91,8 @@
 //            jxlenc_encode (modhost.rs; the records in modabi.rs)
 //
 // The layer knows events, pixel rows, files and threads only -- no UI, no gfx.  One of the
-// four crates that may contain `unsafe` (rt, simd, plat, plugin); nothing unsafe leaves it.
+// four library crates that may contain `unsafe` (rt, simd, plat, gpu); nothing unsafe leaves it
+// but dl_sym and dl_close (a symbol of a library loaded at run time is the caller's to trust).
 #![no_std]
 #[cfg(feature = "std")]
 extern crate std;
@@ -161,7 +163,8 @@ pub mod content;
 pub mod secret;
 /// One running instance per app and user; later starts hand over their arguments.
 pub mod instance;
-/// The system's spell checker (Windows ISpellChecker); Hunspell files are the spell crate's.
+/// The system's spell checker (Windows ISpellChecker, macOS NSSpellChecker, iOS UITextChecker);
+/// Hunspell files are the spell crate's.
 pub mod spell;
 /// The app's symbol in the notification area and system notifications.
 pub mod tray;

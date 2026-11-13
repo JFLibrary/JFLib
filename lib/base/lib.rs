@@ -1,6 +1,6 @@
 // base -- portable basics above the runtime and the platform     [src/core/str.s, args.s, ini.s]
 //
-//   utf8_decode(s, i) -> (codepoint, next)    invalid bytes decode as themselves
+//   utf8_decode(s, i) -> (codepoint, next)    an invalid sequence decodes as U+FFFD, next = i + 1
 //   Args: value(name) / flag(name) / int(name, default) over the command line
 //   num:  f64_parse / f64_format (bit-identical to ASMLIB), parse_i64
 //   ini:  Ini -- settings files (load / parse / save / get* / set* / remove)

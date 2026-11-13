@@ -130,11 +130,11 @@ CRATES = [
      "full"),
     ("wgsl", "the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the "
      "SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL", "full"),
-    ("plat", "the platform layer: process, files, threads, windows (Windows and Linux)", "full"),
+    ("plat", "the platform layer: windows, input, files, threads, network, processes, desktop services", "full"),
     ("base", "UTF-8, command line, settings files, numbers and text", "full"),
     ("datetime", "timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules", "full"),
     ("crypto", "hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)", "full"),
-    ("compress", "LZ4 block and frame, xxHash32, codec ids", "full"),
+    ("compress", "LZ4 block and frame, Zstandard, xxHash32 and xxHash64, codec ids", "full"),
     ("datastore", "an embedded journal database: JSON collections, transactions, snapshots, crash recovery",
      "full"),
     ("netio", "HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS", "full"),
@@ -1059,7 +1059,7 @@ def generate():
         "A name in a description such as `ui_box_begin` or `[img_save]` is the assembly routine the "
         "function was ported from; the algorithm specs in `legacy/ASMLIB/docs/modules/*.md` describe "
         "both versions.", "",
-        "Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, \"SIMD kernels\"), "
+        "Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`), "
         "the style crates (docs/STYLES.md), plugins (`plugins/README.md`).", "")
     toc_at = len(w.md) + 2
     w.heading(2, "Contents")

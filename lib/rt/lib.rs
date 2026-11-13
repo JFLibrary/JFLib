@@ -22,7 +22,8 @@
 //   rt::app_version!()  the app's own version (version= of apps/NAME/PACKAGE)
 //   rt::plugin_abi!  the calling convention of plugins and modules: win64 on x86-64, C elsewhere (abi.rs)
 //
-// One of the four crates that may contain `unsafe` (rt, simd, plat, plugin).
+// One of the four library crates that may contain `unsafe` (rt, simd, plat, gpu; and the module
+// runtimes modrt and modplat).
 #![no_std]
 
 extern crate alloc;

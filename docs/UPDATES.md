@@ -368,7 +368,7 @@ switch its StartupTask and see `Check::Managed` ([PACKAGING.md](PACKAGING.md), "
 * Delta updates are not supported: the whole file is downloaded.
 * A version that crashes before `startup()` runs, or hangs instead of crashing, is not rolled
   back automatically (no watchdog process).
-* `exe` and `bundle` updates need a writable program folder; `package` updates leave the
+* `exe`, `bundle` and `app` updates need a writable program folder; `package` updates leave the
   installation to the user (no elevation, no `apt` call).
 * An AppImage is replaced as a whole (no zsync deltas, no AppImageUpdate); its signature is
   checked against the running file's key block, not against a key built into the app (the

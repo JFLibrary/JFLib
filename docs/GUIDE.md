@@ -32,7 +32,7 @@ The examples below were compiled and run against the library (R13); identifiers 
   see it: only the `sandbox` line confines it, as far as the operating system enforces the
   manifest ([PERMISSIONS.md](PERMISSIONS.md), "OS sandbox"). The rules below are this
   repository's; an app of your own may follow them as it likes.
-* **`unsafe` only in `rt`, `simd`, `plat` and `plugin`.** Every other library and style crate
+* **`unsafe` only in `rt`, `simd`, `plat` and `gpu`.** Every other library and style crate
   has `#![forbid(unsafe_code)]`; apps have `#![deny(unsafe_code)]`, whose only exception is
   the `ui::main!` entry point. The safe interfaces of those four crates are all an app needs.
 * **No system libraries** beyond kernel32 / user32 / gdi32 on Windows (other DLLs only through
@@ -587,7 +587,8 @@ let bad = ui.spell_errors(ID_BODY);           // misspelled byte ranges, as last
 if let Some(sp) = ui.speller() { sp.add("JFLib"); } // spell::Speller: check, suggest, add, ignore
 ```
 
-* The checker (crate `spell`): Windows' own (`ISpellChecker`) when it knows the language, else
+* The checker (crate `spell`): the system's own when it knows the language (Windows'
+  `ISpellChecker`, macOS' `NSSpellChecker` with `~/Library/Spelling`, iOS' `UITextChecker`), else
   Hunspell dictionaries the library reads itself -- Linux `/usr/share/hunspell`, `myspell`,
   `~/.local/share/hunspell`, `DICPATH`; then `config://hunspell` and the app's own in
   `apps/NAME/assets/hunspell` (`de_DE.aff` + `de_DE.dic`; Web and Android only these).
@@ -1801,8 +1802,10 @@ if (desc.render)(&args, &mut dst) == 0 {
 ## 11. Styles, theme, fonts
 
 * The look comes from one style crate linked at build time: `winui` (default), `classic`,
-  `macos`, `kde`. `apps/NAME/STYLE` sets an app's style, `build_rs.py ... --style S` overrides
-  it. Only the linked style is in the executable. [STYLES.md](STYLES.md) has the model and how
+  `macos`, `kde`, `netlab`. In an app of your own, `jflib::style` is the style the environment
+  variable `JFLIB_STYLE` names at build time (`winui` without it; §2), and `cargo jflib package
+  --styles` builds the packages of several; in this repository `apps/NAME/STYLE` sets an app's
+  style and `build_rs.py ... --style S` overrides it. Only the linked style is in the executable. [STYLES.md](STYLES.md) has the model and how
   to write one. Your own colours, corners, spacing, control heights and type without a style
   crate: an app theme; several styles in one app, switched at run time: §34.
 * Colours of your own drawing come from the theme tokens: `ui.color(T_TEXT)`, `T_ACCENT`,
@@ -5059,7 +5062,8 @@ sheet: `css_shots.uis` (light, dark, high contrast, mirrored), `css_scale.uis` (
 
 ## 33. Sound: streams, short sounds, the system's sounds
 
-[`plat::audio`](../lib/plat/audio.rs) plays sound on all four targets: **streams** the app fills
+[`plat::audio`](../lib/plat/audio.rs) plays sound on Windows, Linux, Android and in the browser
+(macOS and iOS have no backend yet: `AudioError::Unavailable`): **streams** the app fills
 (a synthesizer, a decoder, a tone generator), **short sounds** from memory or files mixed
 together (`play`, `play_file`), and **the system's own sounds** for events (`sound`). The UI
 side is `ui.beep(kind)` and `ui.dialog_sound(kind)` ([`ui/sound.rs`](../lib/ui/sound.rs)).
@@ -5104,7 +5108,7 @@ if ui.dialog_begin(ID_ASK, "Datei überschreiben?", &open) {
 
 * **One model: the ring.** A stream has a ring the app writes into and the platform's audio
   thread drains; `open_fill` is the same stream without a ring, its `fill` called on that
-  thread. This works on all four targets alike: the browser's sound runs in an AudioWorklet
+  thread. This works on every target with sound alike: the browser's sound runs in an AudioWorklet
   that cannot call into the app's WASM instance, so it is fed from a buffer anyway, and the
   ring keeps the app's code (allocation, locks, the UI's pace) off the real-time thread.
   `fill` runs on Windows / Linux / Android on the audio thread and in the browser in the

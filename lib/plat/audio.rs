@@ -39,7 +39,8 @@
 // default device itself (linux_audio.rs); the browser WebAudio, an AudioWorklet fed from a
 // SharedArrayBuffer ring or posted buffers, started after a user gesture (State::Blocked
 // before; web_audio.rs, web/audio.js); Android AAudio through the JNI host (android_audio.rs,
-// android/bridge.c).  No device or service: AudioError::Unavailable.
+// android/bridge.c).  macOS and iOS have no backend yet.  No device or service:
+// AudioError::Unavailable.
 //
 // play() mixes into one stream of 48 kHz stereo that opens on demand and ends after 2 s of
 // silence (each sound converted to 48 kHz once, while it plays).  System sounds: Windows the

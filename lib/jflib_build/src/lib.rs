@@ -14,7 +14,7 @@
 //! | File | What the program gets |
 //! | --- | --- |
 //! | `PERMISSIONS` | what it may do (JFLib's docs/PERMISSIONS.md), without the file everything; an error names the line |
-//! | `PACKAGE` | `display=`, `app_id=`, `categories=`, `filetypes=`, `schemes=` for `--register`; a `version=` must be Cargo's |
+//! | `PACKAGE` | `display=`, `app_id=`, `categories=`, `filetypes=`, `schemes=`, `browser=` for `--register`; a `version=` must be Cargo's |
 //! | `assets/` | the files of `app://`, packed as JFA1 with LZ4 |
 //! | `res/app.ico` | the program's icon on Windows |
 //!

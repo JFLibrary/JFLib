@@ -61,7 +61,7 @@ gpu.workspace = true
 shader.workspace = true
 gpu.workspace = true
 
-# macOS and iOS: Metal (docs/APPLE.md AP6); the output on macOS, 3D views on both
+# macOS and iOS: Metal (docs/APPLE.md AP6); the output on both (off by default), 3D views on both
 [target.'cfg(target_os = "macos")'.dependencies]
 shader.workspace = true
 gpu.workspace = true
