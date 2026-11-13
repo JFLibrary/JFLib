@@ -14,7 +14,7 @@ use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use img_core::{ERR_CODE, ERR_HDR, ERR_UNSUPPORTED};
+use img_core::{ERR_CODE, ERR_HDR, ERR_LIMIT, ERR_UNSUPPORTED};
 use rt::fx::{maxss, minss};
 
 use crate::bits::Jb;
@@ -313,7 +313,10 @@ pub fn jx_patches(jx: &Jx, jf: &mut Jf, jb: &mut Jb) -> i32 {
     let nec = jx.nec;
     // libjxl's memory bounds: patches 4 per reference limit, blending infos 4 per patch limit
     let maxp = (((jf.xb as u64 * jf.yb as u64) << 4) + 1024) * 4;
-    let mut total = 0u64;
+    // the work of blending them: all patch rectangles together at most 4 x the frame's pixels,
+    // plus 2^20
+    let maxa = ((jf.xb as u64 * jf.yb as u64) << 8) + (1 << 20);
+    let (mut total, mut area) = (0u64, 0u64);
     for _ in 0..nref {
         let rf = jr.read(jb, 1);
         if rf >= 4 {
@@ -343,6 +346,10 @@ pub fn jx_patches(jx: &Jx, jf: &mut Jf, jb: &mut Jb) -> i32 {
         total += cnt as u64;
         if total > maxp || total * (nec as u64 + 1) > maxp * 4 {
             return ERR_HDR;
+        }
+        area = area.saturating_add((rw as u64 * rh as u64).saturating_mul(cnt as u64));
+        if area > maxa {
+            return ERR_LIMIT;
         }
         let (mut x, mut y) = (0i64, 0i64);
         for k in 0..cnt {

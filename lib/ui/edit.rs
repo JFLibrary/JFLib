@@ -2122,6 +2122,16 @@ impl Ui {
         0
     }
 
+    /// (MV_OPEN_LINKS, RT_OPEN_LINKS) a link of a document the library opens by itself: a web page
+    /// or a mail address only (http, https, mailto) -- a document's file:, ms-msdt: or search-ms:
+    /// link would start a program; the app gets every link and decides about the others
+    pub(crate) fn open_doc_link(&mut self, url: &str) {
+        let scheme = url.split_once(':').map_or("", |(s, _)| s);
+        if ["http", "https", "mailto"].iter().any(|w| scheme.eq_ignore_ascii_case(w)) {
+            self.open_url(url);
+        }
+    }
+
     /// hclip_text_has: the headless clipboard holds text
     pub(crate) fn hclip_text_has(&self) -> bool {
         self.m.edit.hclip.is_some()

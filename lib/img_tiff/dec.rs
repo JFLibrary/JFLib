@@ -20,9 +20,9 @@
 // a standalone EXIF block).  Sample depth -> 8 bits: RGB-type 16-bit samples v >> 8, 16-bit
 // grey round(v / 257), other integer depths round(v * 255 / (2^n - 1)), palette entries
 // trunc(v / 257), floats linear -> sRGB (alpha linear), CMYK (255 - c) * (255 - k) / 255.
-// Limits: BitsPerSample 1..32, spp <= 16, tiles <= 65536 x 65536, decompressed sizes from the
-// dimensions (never from the byte counts), chunk buffers <= 4 GB and dec.maxmem, the cancel
-// flag polled per strip / tile.
+// Limits: BitsPerSample 1..32, spp <= 16, tiles <= 65536 x 65536 and all tiles together <= 16
+// times the image's pixels + 2^20, decompressed sizes from the dimensions (never from the byte
+// counts), chunk buffers <= 4 GB and dec.maxmem, the cancel flag polled per strip / tile.
 //
 // Images of 1 MP and more with several strips / tiles are decoded in parallel
 // (plat::parallel_for over the strip / tile groups, one Slot -- the per-worker buffers --
@@ -759,6 +759,12 @@ impl<'a> Tc<'a> {
             self.ch = self.th;
             self.ncx = (self.w + self.cw - 1) / self.cw;
             self.ncy = (self.h + self.ch - 1) / self.ch;
+            // the tiles must not dwarf the image: their pixels at most 16 times the image's
+            // plus 2^20 (a 1 x 1 image with 65536 x 65520 tiles asked for 4 GB)
+            let tpx = self.ncx as u64 * self.cw as u64 * (self.ncy as u64 * self.ch as u64);
+            if tpx > 16 * self.w as u64 * self.h as u64 + (1 << 20) {
+                return Err(ERR_LIMIT);
+            }
         }
         if self.planar == 2 {
             self.npl = spp;

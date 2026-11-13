@@ -9,7 +9,8 @@
 //        EV_ACT: the content changed this frame; EV_FOCUS while focused; EV_COMMIT: the focus
 //        left.  Ids id .. id + 5 (id + 1 the scroll bar, id + 2 .. 5 the link flyout).
 //        RT_READONLY: select and copy only (a click opens a link); RT_NO_FRAME: no box;
-//        RT_OPEN_LINKS: the editor opens an activated link with open_url itself; RT_TAB: Tab
+//        RT_OPEN_LINKS: the editor opens an activated http, https or mailto link with open_url
+//        itself (other links only reach the app); RT_TAB: Tab
 //        outside a list inserts a tab (else Tab moves the focus on); RT_PLAIN_PASTE: paste
 //        only text.
 //   ui.richtext_toolbar(id, editor, &mut doc, RTB_*) -> EV_ACT when it changed doc
@@ -63,7 +64,7 @@ use crate::{FontSel, Sp, Ui};
 pub const RT_READONLY: u32 = 1;
 /// no text box frame
 pub const RT_NO_FRAME: u32 = 2;
-/// the editor opens activated links itself (open_url)
+/// the editor opens activated http, https and mailto links itself (open_url)
 pub const RT_OPEN_LINKS: u32 = 4;
 /// Tab outside a list inserts a tab
 pub const RT_TAB: u32 = 8;
@@ -1216,7 +1217,7 @@ impl Ui {
     fn rt_link_activate(&mut self, id: u32, url: &str, flags: u32) {
         self.m.rich.link = Some((id, String::from(url)));
         if flags & RT_OPEN_LINKS != 0 {
-            self.open_url(url);
+            self.open_doc_link(url);
         }
         self.repass();
     }

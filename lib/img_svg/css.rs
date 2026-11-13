@@ -9,8 +9,10 @@
 // Selectors: lists (a, b) of compound selectors -- `*`, a type, `.class`, `#id`, `[attr]`,
 // `[attr=value]` -- joined by descendant (blank) and child (`>`) combinators.  A selector
 // with anything else (pseudo-classes, `+`, `~`) never matches.  Specificity: ids, classes /
-// attributes, types; equal ones in sheet order.
+// attributes, types; equal ones in sheet order.  The selectors of a list share one copy of
+// their block's declarations.
 
+use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -39,7 +41,7 @@ pub(crate) struct Sel {
 pub(crate) struct Rule {
     pub sel: Sel,
     pub order: u32,
-    pub decls: Vec<(String, String)>,
+    pub decls: Rc<[(String, String)]>,
 }
 
 fn strip_comments(t: &str) -> String {
@@ -266,13 +268,14 @@ pub(crate) fn sheet(text: &str, order: &mut u32, rules: &mut Vec<Rule>) {
         if ds.is_empty() {
             continue;
         }
+        let ds: Rc<[(String, String)]> = Rc::from(ds);
         for one in prelude.split(',') {
             if rules.len() >= MAX_RULES {
                 return;
             }
             if let Some(sel) = selector(one) {
                 *order += 1;
-                rules.push(Rule { sel, order: *order, decls: ds.clone() });
+                rules.push(Rule { sel, order: *order, decls: Rc::clone(&ds) });
             }
         }
     }
