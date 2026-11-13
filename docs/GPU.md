@@ -1408,6 +1408,11 @@ jfgui: called from nvoglv64.dll+0xa3d2a8, KERNEL32.DLL+0x2dda7, ntdll.dll+0x7ee4
 - **Nicht JFLib:** `nvoglv64.dll` bleibt die ganze Zeit geladen (Protokoll über `LdrRegisterDllNotification`),
   ein Gerät wird erst nach `vkDeviceWaitIdle` und nach allen seinen Objekten zerstört, kein Thread von JFLib ist
   beteiligt.
+- **Mit Debugger bestätigt** (eine zweite Session, unabhängig, am selben Tag): derselbe Erzeuger
+  (`CreateThread` bei `nvoglv64.dll+0xa3b4d4`, Start `+0xa3d280`, Parameter das Objekt), ein Thread aus dem
+  `vkCreateDevice` des vorigen Tests lief 817 ms nicht an und stürzte erst nach dem Abbau von Gerät und Instanz
+  ab. Solche Threads entstehen auch beim Anlegen von Pipelines, 180 bis 230 je `--test all`; das passt zu
+  [RENDER2D.md](RENDER2D.md) (der Absturz in G6b2 nur, wenn der Renderer die Pipeline des Instanzdurchgangs anlegt).
 - **Auslöser:** viele Instanzen mit je einem Gerät nacheinander, mit Validierungsschicht. Bis zum 2026-11-13
   legte jeder Test von gputest seine eigene Instanz an. Jede validierte Instanz lädt und entlädt `vulkan-1.dll`, die
   Validierungsschicht (21 MB) mit `MSVCP140` und `PSAPI` und, über den impliziten Vulkan-Hook von OBS Studio
@@ -1433,7 +1438,10 @@ stürzte vorher in 5 von 24 Läufen ab (beim Abbau von `upload`, `copies`, `scen
 **Abhilfe:** Die Tests von gputest teilen sich eine Instanz (`setup`); eigene legen nur `info`, `errors` (mit
 `noloader`) und `churn` an. `gputest --test churn --validate` zeigt den Fehler weiter; nach einem neuen Treiber so
 nachprüfen. Mit einer Instanz trat er nicht auf (0 von 10 Läufen mit je 200 Geräten); wer unter Validierung
-Instanzen in schneller Folge anlegt und abbaut, kann ihn treffen. Der Fehler gehört an NVIDIA gemeldet.
+Instanzen in schneller Folge anlegt und abbaut, kann ihn treffen. Danach lief die Testfolge ohne Fenster 10-mal ohne
+Absturz und `validate.uis` in der Suite grün; Abstürze über die Threads der Pipelines sind damit nicht
+ausgeschlossen. `render2dtest` und `render3dtest` legen noch je Test eine Instanz an. Der Fehler gehört an NVIDIA
+gemeldet.
 
 ## Tests
 

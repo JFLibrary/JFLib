@@ -112,9 +112,10 @@ struct Chain {
 }
 
 /// the stderr lines of a crash outside our image: the module, the offset in it, the thread,
-/// the faulting access, then the call chain as module+offset
+/// the faulting access, then the call chain as module+offset (one write: two threads crashing at
+/// once do not mix their lines)
 fn foreign_lines(ci: &CrashInfo, tid: usize, chain: &Chain) {
-    let mut line = StackText::<240>::new();
+    let mut line = StackText::<{ 264 + CHAIN_MAX * 48 }>::new();
     let _ = write!(line, "jfgui: crash 0x{:X} ", ci.code);
     let mut name = StackText::<80>::new();
     match module_of(ci.ip, &mut name) {
@@ -136,17 +137,15 @@ fn foreign_lines(ci: &CrashInfo, tid: usize, chain: &Chain) {
         let _ = write!(line, ", {how} 0x{:x}", ci.addr);
     }
     let _ = writeln!(line, ")");
-    rt::os::write_stderr(line.bytes());
     if chain.n > 0 {
-        let mut line = StackText::<{ 24 + CHAIN_MAX * 48 }>::new();
         let _ = write!(line, "jfgui: called from ");
         for (i, &a) in chain.at[..chain.n].iter().enumerate() {
             let _ = write!(line, "{}", if i > 0 { ", " } else { "" });
             write_place(&mut line, a);
         }
         let _ = writeln!(line);
-        rt::os::write_stderr(line.bytes());
     }
+    rt::os::write_stderr(line.bytes());
 }
 
 /// "<file>+0x<offset>" for an address inside a loaded module, else "0x<address>"
