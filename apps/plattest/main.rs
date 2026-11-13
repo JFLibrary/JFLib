@@ -44,6 +44,9 @@
 //                                          missing program
 //   plattest --test window                (Rust only, t_window.rs, Windows) a real-window smoke
 //                                          test of the platform layer; the window closes itself
+//   plattest --test present-bench [--frames N] [--size WxH]   (t_present.rs) what presenting a
+//                                          W x H frame (default 3840 x 2160) costs in a real window:
+//                                          the whole frame, damage only (not in "all": timings)
 //   plattest --test policy                 (t_policy.rs) the app's permissions: path rules,
 //                                          patterns, then a manifest installed in this
 //                                          process (files, grants, processes, URLs, plugins,
@@ -209,6 +212,8 @@ mod t_pen;
 mod t_touch;
 mod t_spawn;
 mod t_window;
+// what a present costs in a real window (4K frames)
+mod t_present;
 // plat-shared: printing, the crash guard, the plugin loader, the portal
 #[cfg(not(target_vendor = "apple"))]
 mod t_guard;
@@ -379,6 +384,7 @@ fn plattest() -> i32 {
         Some("crash") => t_crash,
         Some("panic") => t_panic,
         Some("window") => t_window::t_window, // plat-win
+        Some("present-bench") => t_present::t_present_bench, // a real window, 4K presents (not in "all": timings)
         Some("pen") => t_pen::t_pen,             // plat-win
         Some("touch") => t_touch::t_touch,
         Some("cursor") => t_cursor::t_cursor,    // plat-win
