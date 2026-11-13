@@ -517,7 +517,10 @@ Internal: place(iw, ih), take_flags(), take_icon(), layout_root(), layout_end_ro
 A box lays its children out along its main axis (BOX_H: x, BOX_V: y).  Fill children
 share the space left by the others; because that is only known after all children were
 placed, the previous pass's totals are used and a pass is repeated when they change (the
-runtime caps this at 4 passes).
+runtime caps this at 4 passes).  A box whose fill children the previous pass did not see (a
+new one) gives its first fill child the room left after the children before it (first_fill):
+new boxes inside new fill boxes get about their size in their first pass and settle in the
+next one, however deep.
 
 BOX_WRAP (horizontal boxes): a child that does not fit after the others of its row starts
 a new row (a row's first child stays, however wide).  Each row is as tall as its tallest
@@ -5598,6 +5601,7 @@ UIC_SCREENSHOT: u32 = 0x7FFF_0018  // arg 1: the picture is there (screenshot_ta
 UIC_RECENT: u32 = 0x7FFF_0019  // arg 1: the file of recent_open is readable now (recent_reopened), 0: refused or gone
 UIC_SENSOR: u32 = 0x7FFF_001B  // arg = plat::sensors::SENSOR_* bits: new readings or another state (plat::sensors::read, state)
 UIC_LOCATION: u32 = 0x7FFF_001C  // arg = plat::sensors::LocationState: a new fix or another state (location_fix)
+UIC_A11Y: u32 = 0x7FFF_001D  // arg 1: a screen reader (an accessibility client) came, 0: it left (ui.a11y_active), also while the app is idle
 TRAY_ACTIVATE: u32 = 1  // UIC_TRAY: the symbol was clicked
 TRAY_SECONDARY: u32 = 2  // UIC_TRAY: double click (Windows) / middle click (Linux)
 ```
@@ -6894,6 +6898,12 @@ parent or a loop leaves the record to its rectangle.
   - `id: u64` -- the record's id64
   - `action: A11yAction`
 
+**`impl A11yRequest`**
+
+- **`fn new(win: u32, id: u64, action: A11yAction) -> A11yRequest`**
+  A request as `ui.a11y_request_take` hands it out (window id, the record's id64, the
+  action): for an app's tests of its own handling, the struct being `non_exhaustive`.
+
 - **`enum A11yAction`**
   What a screen reader asks of a record (`A11yRequest::action`).
   - `Focus` -- give it the keyboard focus
@@ -6916,6 +6926,9 @@ parent or a loop leaves the record to its rectangle.
   The accessibility tree of the last pass as assistive technology gets it (screen
   readers through AT-SPI2 / UI Automation): every shown window with its nodes (roles,
   names, states, values, rectangles), built from the semantic records (see sem()).
+- **`fn a11y_tree_key(&self) -> u64`**
+  (benchmarks: plattest --test a11y-cost) the key a11y_frame compares with the tree published
+  last: equal keys, equal trees
 - **`fn a11y_request_take(&mut self) -> Option<A11yRequest>`**
   The next request of a screen reader for a record with an id64 (`Sem::id64`), oldest first:
   focus, click, scroll into view, expand / collapse, increment / decrement, a value, a text,
@@ -6932,7 +6945,9 @@ parent or a loop leaves the record to its rectangle.
   A screen reader (or another client of the accessibility tree) listens: the library builds
   the tree from the records only then.  Records that only it needs -- the content of a page
   out of view (`AS_OFFSCREEN`) -- are best published only while this is true; it turns true
-  with a frame of its own when a client comes.  Always false in headless runs.
+  with a frame of its own when a client comes, and the app gets the command `UIC_A11Y` (arg
+  1) then and when it leaves (arg 0; Windows: 10 s after its last question unless a screen
+  reader listens), also while nothing else happens.  Always false in headless runs.
 - **`fn a11y_value(&mut self, id: u32) -> Option<i32>`**
   A value a screen reader set for slider-like widget `id` (its record's value scale),
   taken once: the built-in sliders apply it themselves; a widget of its own applies it
@@ -7974,8 +7989,10 @@ never a network or device path ("//server/share", "\\.\..."); http(s) addresses 
 fetched by the view (MI_LOCAL: the alt text shows in a frame instead; MI_ASK / MI_APP: the
 app fetches them).
 Records: K_BOX id (label: the label, value: the scroll position in DIP); per visible block
-K_HEADING (value: the level), K_TEXT (paragraphs, code, table cells), K_LISTITEM (the first
-block of a list item, value: its number), K_CHECKBOX (a task's box, checked), K_LINK per
+K_HEADING (value: the level), K_TEXT (paragraphs, code), K_LISTITEM (the first block of a list
+item, value: its number), K_CHECKBOX (a task's box, checked); a table's rows in view: K_TABLE
+around them (grid: the table's rows and columns), per row K_ROW (label: its cells' texts) and
+per cell K_CELL (a header row's: K_COLHEADER; cell: row and column); K_LINK per
 link, K_IMAGE (label: the alt text) per image; per visible field the widget's record
 (K_TEXTBOX, K_CHECKBOX, K_RADIO, K_COMBO, K_BUTTON: label the field's name -- its <label>,
 aria-label, title, placeholder -- or a button's caption; text boxes and lists take it from a
@@ -11731,6 +11748,10 @@ gfx -- surfaces and the draw context (clip, origin, colour), fills, blits  [src/
                                      coordinates stay the target's, only the pixel rows move
   dc: set_color(argb), set_opacity(op), clip_push(x, y, w, h) / clip_pop(), origin(x, y),
       translate(dx, dy), fill / clear / hline / vline / frame / blit / blit_scaled (sf, ...)
+  set_parallel(f) / parallel()       the loop large copies run on (the UI runtime passes the
+                                     worker pool's): a blit that copies XRGB rows from
+                                     COPY_PAR_MIN bytes on is cut into row bands on it, from
+                                     COPY_STREAM_MIN bytes on past the caches (a 4K canvas)
   path (Path, 24.8 and float API), raster (Raster), stroke (Path::stroke), shapes (Shapes),
   blend (row kernels), straight (straight-alpha rows), blendmode (paint.net blend modes),
   tmask (tiled masks), flood (flood fill), gradient, pathdata (SVG path data), dash
@@ -11762,7 +11783,26 @@ CAP_SQUARE: u32 = 2
 ERR_FAIL: i32 = -1
 ERR_NOMEM: i32 = -8
 ERR_LIMIT: i32 = -15
+/// a blit's plain copy (XRGB source) from this many bytes on runs in row bands on the loop of
+/// set_parallel (gfxtest --bench-blit: a 1 MB copy takes about a fifth on 12 workers)
+COPY_PAR_MIN: usize = 1 << 20
+/// ... and from this many on with streaming stores (gfx::blend::copy_stream): source and target
+/// together no longer fit the caches, the target is not read first.  A 4K frame (32 MB): 1.9 ms on
+/// 12 workers and the calling thread, 2.7 ms with plain stores, 5 ms on one thread (Ryzen 5 3600,
+/// DDR4-3200, a loaded machine; the memory's limit for such a copy is about 1.7 ms there)
+COPY_STREAM_MIN: usize = 12 << 20
 ```
+
+- **`type ParallelFor = fn(usize, &(dyn Fn(usize) + Sync))`**
+  runs f(i) for every i in 0..n, possibly on several threads (img_core::ParallelFor)
+
+- **`fn set_parallel(f: ParallelFor)`**
+  the loop large copies run on (Dc::blit, COPY_PAR_MIN); the UI runtime passes a wrapper of
+  plat::parallel_for -- gfx does not depend on plat.  Without it they run on the calling thread
+  (the same bytes)
+
+- **`fn parallel() -> Option<ParallelFor>`**
+  the loop set by set_parallel
 
 - **`struct Surface`**
   pixels of one image: rows of `stride` bytes (4 per pixel, A8: 1)
@@ -11848,7 +11888,8 @@ ERR_LIMIT: i32 = -15
 - **`fn frame(&self, sf: &mut Surface, x: i32, y: i32, w: i32, h: i32)`**
   1-pixel outline inside the rectangle  [gfx_frame]
 - **`fn blit(&self, sf: &mut Surface, src: &Surface, x: i32, y: i32)`**
-  draw a surface at x, y: premultiplied over (x opacity), XRGB sources are copied  [gfx_blit]
+  draw a surface at x, y: premultiplied over (x opacity), XRGB sources are copied (a large
+  copy in row bands on the loop of set_parallel, COPY_PAR_MIN)  [gfx_blit]
 - **`fn blit_scaled(&self, sf: &mut Surface, src: &Surface, x: i32, y: i32, w: i32, h: i32)`**
   nearest-neighbour blit scaled to w x h (over)  [gfx_blit_scaled]
 
@@ -29937,8 +29978,19 @@ LIVE_ASSERTIVE: u8 = 2
 
 - **`fn active() -> bool`**
   assistive technology may be listening (the UI publishes snapshots only then); on Windows it
-  turns false again 10 s after the last question of a UI Automation client when none listens for
-  events, and true with the next question
+  turns false again 10 s after the last question of a UI Automation client unless a screen
+  reader (SPI_GETSCREENREADER) or Magnifier listens for events, and true with the next question
+  (win_uia.rs idle)
+
+- **`fn check_due() -> Option<u64>`**
+  when (time_us) active() wants to be asked again although nothing happens: the platform's
+  fallback that notices a client is gone (Windows: at most every 2 s while active); None: never.
+  The UI's window loop waits at most until then and asks, so an idle app learns it too
+  (UIC_A11Y)
+
+- **`fn epoch() -> u32`**
+  a number that changes whenever a bridge turned on or off (set_active): the UI publishes a tree
+  equal to the last one again only after it changed (an unchanged frame publishes nothing)
 
 - **`fn current() -> Option<Arc<Snapshot>>`**
   the tree last published
