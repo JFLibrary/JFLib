@@ -1,4 +1,5 @@
 #!args --test play
+#!serial the stream's latency must stay under 250 ms, which fails beside the other scripts
 #!lock audio
 # audiotest --test play (src/tests.rs): a push stream, a fill stream, pause / start / stop, volume,
 # play() and play_file(app://klang.wav) with the real output; Windows: the default device's mix

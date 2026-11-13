@@ -1,4 +1,5 @@
 #!args --test upload
+#!serial try_acquire's p99 must stay under 3 ms, which fails beside the other scripts
 #!lock desktop
 # the staging ring: small uploads stay in it, a whole frame's buffer goes back after a second;
 # write_texture_rects; try_acquire (never waits) and rebuild on a child window
