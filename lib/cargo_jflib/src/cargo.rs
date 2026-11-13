@@ -118,6 +118,13 @@ pub(crate) fn packages(cwd: &Path, manifest: &Path) -> Result<Vec<Resolved>, Str
     Ok(meta.get("packages").map(Value::arr).unwrap_or_default().iter().map(resolved).collect())
 }
 
+/// the members of the workspace that holds the package in `dir` (cargo metadata --no-deps: nothing
+/// resolved, nothing fetched)
+pub(crate) fn members(dir: &Path) -> Result<Vec<Resolved>, String> {
+    let meta = run_json(command().current_dir(dir).args(["metadata", "--format-version", "1", "--no-deps", "--manifest-path"]).arg(dir.join("Cargo.toml")))?;
+    Ok(meta.get("packages").map(Value::arr).unwrap_or_default().iter().map(resolved).collect())
+}
+
 /// what one build produced
 pub(crate) struct Artifact {
     pub package_id: String,

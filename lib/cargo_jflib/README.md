@@ -35,7 +35,9 @@ Linux, both from any machine: the Linux program links without a Linux machine, t
 (the crate `jflib-installer`) and the AppImage runtime (`jflib-appimagert`, one static file) are
 built next to the app with its `[profile.release]` and Cargo.lock, always with `panic = "abort"` (they are
 programs without std, also for an app with the feature `unwind`); where the app has JFLib's crates
-from paths (an app in JFLib's workspace), the stubs take them from there too. The previews are screenshots of the
+from paths (an app in JFLib's workspace), the stubs take them from there too, and when its `jflib` comes
+from a path (a checkout under `[patch.crates-io]`), the stubs take all their crates from that checkout's
+workspace, `jflib-installer` included, which the app itself does not depend on. The previews are screenshots of the
 program this machine runs (`--shot`).
 
 | Format | Made by | Needs |
