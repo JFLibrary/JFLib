@@ -658,6 +658,22 @@ static TIPS: [&str; 2] = [
             with contextlib.redirect_stdout(io.StringIO()):
                 i18n_check.main([str(app), "--update"])
             self.assertTrue((app / "src/locales/ui.tsv").read_text(encoding="utf-8").endswith("Fehlt\t\n"))
+            # relative paths from the current folder ("." inside the app, "Netz" and "./Netz"
+            # beside it); a bare name of the repository's apps stays apps/NAME
+            old = os.getcwd()
+            try:
+                for cwd, word in ((app, "."), (app / "src", ".."), (Path(tmp), "Netz"), (Path(tmp), "./Netz")):
+                    os.chdir(cwd)
+                    self.assertEqual(i18n_check.app_path(Path(word)).resolve(), app.resolve(), (cwd, word))
+                    out = io.StringIO()
+                    with contextlib.redirect_stdout(out):
+                        self.assertNotEqual(i18n_check.main([word]), 2, (cwd, word))
+                    self.assertIn("Netz: 2 texts (src/locales/ui.tsv; de en): 0 missing", out.getvalue())
+                os.chdir(Path(tmp))
+                self.assertEqual(i18n_check.app_path(Path("gallery")), i18n_check.ROOT / "apps" / "gallery")
+                self.assertEqual(i18n_check.app_path(Path("apps/gallery")), i18n_check.ROOT / "apps" / "gallery")
+            finally:
+                os.chdir(old)
 
 
 class ScriptTimeout(Temp):

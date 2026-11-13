@@ -154,6 +154,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** plat::audio::ring_check (plattest --test audio): when the reader's 20 s ran out the writer thread waited at the full ring and join() never returned; the writer stops now and the check fails (ring_check_within with a limit of its own)
 - **build:** cargo jflib package takes the stubs' crates (jflib-installer, jflib-appimagert, jflib-build, the signer's) from the JFLib checkout when the app's jflib comes from a path, also when the app does not depend on them itself: an app that patches only jflib and jflib-build to a checkout ([patch.crates-io]) got jflib-installer from crates.io, and its setup lacked the checkout's installer; a crate the app has from a path of its own keeps that path
 - **build:** The Windows setup keeps the whole list of its extra files: install.ini's files= was cut at 4096 bytes (and the file at 8192), so uninstall.exe left the rest behind (139 licence files of Narsil in 65 folders); uninstall removes every listed file and then the folders below the program folder that held them, deepest first, when they are empty (it removed only the file's own folder), and skips names outside the folder (absolute, ..); a payload holds up to 65536 entries (256: an app with std and many crates' licences did not fit)
+- **tools:** tools/i18n_check.py takes a relative path of an app from the current folder first ("." inside the app: it took the repository's apps/. before), a bare name stays apps/NAME first
 
 ## [0.1.0] - 2026-11-08
 

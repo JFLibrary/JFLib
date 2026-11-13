@@ -14,7 +14,10 @@
     python tools/i18n_check.py PATH [FOLDER ..] [--update]
                                             an app outside this repository (a cargo app such as
                                             ../BrowserGUI; its places are shown from the folder
-                                            that holds it, "BrowserGUI/src/main.rs:12")
+                                            that holds it, "BrowserGUI/src/main.rs:12"); a
+                                            relative PATH is taken from the current folder
+                                            first ("." inside the app), a bare NAME is apps/NAME
+                                            first
 
 The folders of an app are its folders and .rs files at the top, except build output (build/,
 target/), hidden folders and git submodules (another project inside the app's folder, such as
@@ -779,6 +782,20 @@ def summary(rep):
             f"{c['untranslated']} untranslated, {c['unused']} unused, {c['error']} errors")
 
 
+def app_path(p):
+    """the folder an app's word names: an absolute path as it is; a path (".", "..\\BrowserGUI",
+    "apps/kritzel") from the current folder first, else from the repository; a bare name the
+    repository's apps/NAME first (the short name), else a folder of that name here"""
+    here = Path.cwd()
+    if p.is_absolute():
+        return p
+    if len(p.parts) != 1 or p.parts[0] == "..":     # "." has no parts
+        return here / p if (here / p).is_dir() or not (ROOT / p).is_dir() else ROOT / p
+    if (ROOT / "apps" / p).is_dir() or not (here / p).is_dir():
+        return ROOT / "apps" / p
+    return here / p                                 # a folder from here: an app outside
+
+
 def main(argv=None):
     for s in (sys.stdout, sys.stderr):
         try:
@@ -794,21 +811,15 @@ def main(argv=None):
         return 2
     targets = []                                        # (name, app dir or None, folders)
     for w in words:
-        if targets and targets[-1][1] is not None and (targets[-1][1] / w).exists() and "/" not in w.strip("/"):
+        p = Path(w)
+        if (targets and targets[-1][1] is not None and len(p.parts) == 1 and p.parts[0] != ".."
+                and not p.is_absolute() and (targets[-1][1] / w).exists()):
             targets[-1][2].append(w)                    # apps/APP crates
             continue
         if w == "lib":
             targets.append(("lib", None, []))
             continue
-        p = Path(w)
-        if p.is_absolute():
-            app = p
-        elif (ROOT / p).is_dir() and len(p.parts) > 1:
-            app = ROOT / p
-        elif not (ROOT / "apps" / w).is_dir() and p.is_dir():
-            app = p                                     # a folder from here: an app outside
-        else:
-            app = ROOT / "apps" / w
+        app = app_path(p)
         if not (app / "src").is_dir() and not app.is_dir():
             print(f"i18n: no app {w} (apps/NAME or the path of an app)")
             return 2

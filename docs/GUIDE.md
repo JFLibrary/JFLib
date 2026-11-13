@@ -2388,7 +2388,8 @@ catalogue (the one whose texts come from the same folder, `src/` or `crates/`), 
 source order; existing rows are never changed, and the app keeps showing German there until
 the cells are filled. A catalogue the app reads itself without `Catalog::from_tsv` names its
 languages in a comment (`# languages: de en fr`). An app outside this repository (a cargo app
-of its own) is checked by its path, `python tools/i18n_check.py ../BrowserGUI [--update]`: its
+of its own) is checked by its path, `python tools/i18n_check.py ../BrowserGUI [--update]` (a relative
+path from the current folder, `.` inside the app; a bare name is the repository's `apps/NAME` first): its
 folders count except build output (`build/`, `target/`), hidden folders and git submodules (an
 engine taken by path), and its places read from the folder that holds it
 (`BrowserGUI/src/main.rs:12`). The suite runs
