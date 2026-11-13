@@ -73,7 +73,9 @@
 //                                          against a fake bus (tools/platshared/ibus_bus.py);
 //                                          without one; its X11 glue (synthetic X events)
 //   plattest --test log / log-crash        (t_log.rs) the log: levels, ring, file rotation, the
-//                                          last lines after a crash (a child)
+//                                          last lines after a crash (a child); the crash
+//                                          pre-hook at a file's limit, under the mount table,
+//                                          with a stuck stderr (log-crash-full / -mount / -stderr)
 //   plattest --test life-bus               (t_life.rs, Linux) sleep, settings and SIGTERM against
 //                                          fake buses (tools/platshared/life_bus.py)
 //   plattest --test a11y / a11y-bus / uia / uia-idle / caret / a11y-mac / a11y-ios / a11y-show
@@ -429,6 +431,10 @@ fn plattest() -> i32 {
         Some("ibus-x11") => t_ibus::t_ibus_x11,        // Linux: the X11 glue (synthetic X events)
         Some("log") => t_log::t_log,                   // the log: levels, ring, file, crash
         Some("log-crash") => t_log::t_log_crash,       // its child: logs and panics
+        Some("log-crash-full") => t_log::t_log_crash_full, // children: the pre-hook's crash paths
+        Some("log-crash-mount") => t_log::t_log_crash_mount,
+        #[cfg(target_os = "linux")]
+        Some("log-crash-stderr") => t_log::t_log_crash_stderr,
         Some("life-bus") => t_life::t_life_bus,        // Linux: against tools/platshared/life_bus.py
         Some("settings") => t_settings::t_settings,    // the system settings: overrides, defaults
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py

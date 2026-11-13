@@ -345,7 +345,7 @@ rt::plugin_abi! { fn h_panic(msg: *const u8, len: usize) -> ! {
     }
     let mut s = rt::crash::StackText::<1100>::new(); // no allocation on the crash path
     let _ = writeln!(s, "panic: jxlenc: {}", text(msg, len));
-    crate::write_stderr(s.bytes());
+    rt::os::write_stderr_crash(s.bytes());
     let line = s.as_str().trim_end();
     let mut ci = rt::crash::CrashInfo::empty();
     ci.kind = rt::crash::CK_PANIC;

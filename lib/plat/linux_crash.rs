@@ -99,7 +99,7 @@ pub(crate) fn crash_init() {
     let mut line = StackText::<160>::new();
     let _ = writeln!(line, "jfgui: crash signal {sig} at rip 0x{:x}, address 0x{si_addr:x} (look it up in the .map file)",
                      ci.ip);
-    rt::os::write_stderr(line.bytes());
+    rt::os::write_stderr_crash(line.bytes());
     rt::crash::report(&ci)
 }
 
@@ -936,7 +936,7 @@ extern "C" fn handler(sig: i32, si: *const u8, uc: *const u8) -> ! {
     let mut line = StackText::<160>::new();
     let _ = writeln!(line, "jfgui: crash signal {sig} at pc 0x{:x}, address 0x{si_addr:x} (look it up in the .map file)",
                      ci.ip);
-    rt::os::write_stderr(line.bytes());
+    rt::os::write_stderr_crash(line.bytes());
     rt::crash::report(&ci)
 }
 

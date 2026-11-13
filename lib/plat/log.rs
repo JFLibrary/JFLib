@@ -19,9 +19,11 @@
 //
 // Lines: "2026-10-17 19:58:07.123 WARN  net: text" (Windows local time, elsewhere UTC with a
 // Z); line breaks inside the text become " | ".  The ring holds 64 KiB.  A crash or panic
-// writes the ring to stderr and to the log file before the app's crash hook runs (rt::crash
-// pre-hook, installed with the first line); it takes the locks only if they are free, so a
-// thread that crashed while logging cannot stop the report.
+// writes the ring to stderr and a crash line to the log file before the app's crash hook runs
+// (rt::crash pre-hook, installed with the first line); it takes the locks only if they are
+// free, so a thread that crashed while logging cannot stop the report, and it neither
+// allocates nor waits: a stuck stderr is given up, the line goes to an OS file only (not a
+// mount's stream) and does not rotate it.
 
 use alloc::string::String;
 use core::fmt::Write as _;
@@ -300,11 +302,13 @@ fn rotate(s: &mut Sink) {
 }
 
 // rt::crash pre-hook: the ring to stderr, the crash to the log file; no allocation, no
-// waiting
+// waiting: rt::os::write_stderr_crash gives a stuck stderr up, the line goes to an OS file only
+// (write_at_crash: a mount's stream may lock and allocate) and never rotates it (rotate
+// allocates names and opens files; the next line written there rotates a file over its size)
 fn crash_dump(info: &rt::crash::CrashInfo) {
     if let Some(r) = RINGBUF.try_lock() {
-        crate::write_stderr(b"--- the last log lines ---\n");
-        ring_read(&r, RING, &mut |p| crate::write_stderr(p));
+        rt::os::write_stderr_crash(b"--- the last log lines ---\n");
+        ring_read(&r, RING, &mut |p| rt::os::write_stderr_crash(p));
     }
     if let Some(mut s) = FILE.try_lock() {
         let mut t = rt::crash::StackText::<512>::new();
@@ -313,9 +317,8 @@ fn crash_dump(info: &rt::crash::CrashInfo) {
             let _ = write!(t, ": {}", info.msg);
         }
         let _ = t.write_str("\n");
-        let n = t.bytes().len();
-        let mut line = [0u8; 512];
-        line[..n].copy_from_slice(t.bytes());
-        write_file(&mut s, &line[..n]);
+        if s.file.as_ref().is_some_and(|f| f.write_at_crash(s.size, t.bytes()).is_some()) {
+            s.size += t.bytes().len() as u64;
+        }
     }
 }

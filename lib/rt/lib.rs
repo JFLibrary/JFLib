@@ -2,7 +2,8 @@
 // semantics, the minimal OS calls the runtime itself needs, panic handling.
 //
 //   rt::os::{pages_alloc, pages_free, write_stdout, write_stderr, exit, yield_now}   (and on
-//   Linux the raw syscall helpers plat builds on)
+//   Linux the raw syscall helpers plat builds on); write_stderr_crash: stderr for crash paths,
+//   which gives up a stuck non-blocking stderr instead of waiting for it (Linux)
 //   rt::kernel the Linux kernel ABI per architecture: SYS_*, O_*, Stat, clone_args (also as rt::os::*)
 //   rt::fx   cvtt / cvt / sqrt / minss / maxss / floor_i / ceil_i / div255
 //   rt::x87  the extended-precision steps of f64 <-> decimal text (ini.s), fpatan
@@ -253,7 +254,7 @@ pub(crate) fn panic_report(info: &dyn core::fmt::Display) -> ! {
     }
     let mut s = crash::StackText::<1024>::new(); // no allocation on the crash path
     let _ = writeln!(s, "panic: {info}");
-    os::write_stderr(s.bytes());
+    os::write_stderr_crash(s.bytes());
     let text = s.as_str().trim_end();
     let mut ci = crash::CrashInfo::empty();
     ci.kind = crash::CK_PANIC;
