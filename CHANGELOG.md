@@ -174,6 +174,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** In the browser and on Android the PERMISSIONS policy treats `\` as a folder separator, as their file stores do (a path with `\..\` could pass the rule of one file and open another)
 - **plat:** Android: host calls on several threads at once no longer share one answer buffer (a call on another thread, the audio thread too, could free it while the bridge copied into it)
 - **simd:** copy_stream ends with the fence its non-temporal stores need (sfence) before anything reads or writes the copy again, as Rust's memory model requires; ui's parallel rendering copies its bands back with copy_stream_rows (one fence per block)
+- **render2d:** render2d: dash patterns on Intel under Linux (Mesa 26.0, HD 610 and Iris Xe): a dash shorter than its gap lost the pixels it covers whole (ink -13 to -16 % at periods of 3 and 6 px, dashed curves, six checks of phase) -- the fragment shader stepped back from the pixel's entry of the pattern and Mesa's Intel compiler read the new entry's length with the step's own test; ivals now starts at the entry that holds the place w px before the pixel and only runs forward, each entry's start carried along (the 166 images of --dump unchanged on NVIDIA)
 
 ## [0.1.0] - 2026-11-08
 

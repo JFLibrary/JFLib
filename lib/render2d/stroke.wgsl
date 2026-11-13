@@ -1173,20 +1173,17 @@ fn dash_end(si: u32, j: u32) -> f32 {
     return styles[si].ends[j >> 2u][j & 3u];
 }
 
-fn dash_len(si: u32, j: u32) -> f32 {
-    if j == 0u {
-        return dash_end(si, 0u);
-    }
-    return dash_end(si, j) - dash_end(si, j - 1u);
-}
-
 fn dash_n(si: u32) -> u32 {
     return (styles[si].flags >> 12u) & 31u;
 }
 
 // the dashes (on entries) of a style's pattern within w px of a point at its place xh + xl (dash units), as px along
 // the stroke from the point (sc dash units per px), at most three.  Relative to the point, so that the ends near it are
-// exact also when the period is a million pixels (xh a place in the period, xl a small offset)
+// exact also when the period is a million pixels (xh a place in the period, xl a small offset).  From the entry that
+// holds the place w px before the point, forward, each entry's start carried along: no index j - 1 and no step back.
+// (Stepping back from the point's entry as j = select(j - 1u, n - 1u, j == 0u), then reading the entry's length with a
+// test j == 0, Mesa's Intel compiler (26.0, HD 610 and Iris Xe) took that test for the step's own j == 0: a dash
+// shorter than its gap lost the pixels it covers whole, docs/RENDER2D.md)
 fn ivals(si: u32, xh: f32, xl: f32, sc: f32, w: f32) -> Ivals {
     var o: Ivals;
     o.n = 0u;
@@ -1197,37 +1194,35 @@ fn ivals(si: u32, xh: f32, xl: f32, sc: f32, w: f32) -> Ivals {
     let p = styles[si].period;
     let kp = floor((xh + xl) / p);
     let x0 = xh - kp * p;
-    let x = x0 + xl;
+    let wd = w * sc;
+    // the entry that holds the place wd before the point: the first whose end lies beyond it, in the period before when
+    // the period starts after it; compared relative to the point (the place x0 + xl itself is rounded to the period's
+    // size), and where that entry starts in the period
+    var back = 0.0;
+    if (0.0 - x0) - xl > -wd {
+        back = p;
+    }
     var j = 0u;
-    var c0 = 0.0;
+    var cs = 0.0;
     loop {
         if j + 1u >= n {
             break;
         }
         let c1 = dash_end(si, j);
-        if x < c1 {
+        if ((c1 - back) - x0) - xl > -wd {
             break;
         }
-        c0 = c1;
+        cs = c1;
         j += 1u;
     }
-    var start = (c0 - x0) - xl;
-    let wd = w * sc;
+    var start = ((cs - back) - x0) - xl;
     var g = 0u;
-    loop {
-        if start <= -wd || g >= 16u {
-            break;
-        }
-        j = select(j - 1u, n - 1u, j == 0u);
-        start -= dash_len(si, j);
-        g += 1u;
-    }
-    g = 0u;
     loop {
         if start > wd || g >= 32u || o.n >= 3u {
             break;
         }
-        let e = dash_len(si, j);
+        let ce = dash_end(si, j);
+        let e = ce - cs;
         if (j & 1u) == 0u && start + e >= -wd {
             let v = vec2f(start, start + e) / sc;
             if o.n == 0u {
@@ -1240,7 +1235,12 @@ fn ivals(si: u32, xh: f32, xl: f32, sc: f32, w: f32) -> Ivals {
             o.n += 1u;
         }
         start += e;
-        j = select(j + 1u, 0u, j + 1u >= n);
+        cs = ce;
+        j += 1u;
+        if j >= n {
+            j = 0u;
+            cs = 0.0;
+        }
         g += 1u;
     }
     return o;
