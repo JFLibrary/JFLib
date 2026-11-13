@@ -1355,21 +1355,32 @@ pub fn run() -> i32 {
                                           ("shadows", crate::shadowtest::shadows), ("lights", crate::lighttest::lights), ("env", crate::envtest::env),
                                           ("occlusion", crate::occl::occlusion), ("lods", crate::lodtest::lods), ("alpha", crate::alphatest::alpha),
                                           ("srgb", crate::srgbtest::srgb)];
+    // --test A,B,...: those tests in the list's order; --except A,B,...: not those (for `all`: the suite runs the
+    // validation in parts side by side, the rest of `all` in one, so a new test is in it by itself)
+    let names: Vec<&str> = test.split(',').collect();
+    let except_arg = plat::arg_value("--except").unwrap_or_default();
+    let except: Vec<&str> = except_arg.split(',').filter(|n| !n.is_empty()).collect();
+    let known = |n: &str| n == "window" || list.iter().any(|(m, _)| *m == n);
+    if let Some(bad) = names.iter().chain(except.iter()).find(|n| !(known(n) || **n == "all")) {
+        plat::write_stderr(format!("render3dtest: no test {bad}\n").as_bytes());
+        return 2;
+    }
+    let chosen = |n: &str| (names.contains(&n) || (n != "window" && names.contains(&"all"))) && !except.contains(&n);
     let mut ran = false;
     for (name, f) in list {
-        if test == "all" || test == name {
+        if chosen(name) {
             out(&format!("== {name}{}", if validate { " (validation)" } else { "" }));
             f(&mut t);
             ran = true;
         }
     }
-    if test == "window" {
+    if chosen("window") {
         out(&format!("== window{}", if validate { " (validation)" } else { "" }));
         window(&mut t);
         ran = true;
     }
     if !ran {
-        plat::write_stderr(format!("render3dtest: no test {test}\n").as_bytes());
+        plat::write_stderr(format!("render3dtest: no test in {test}\n").as_bytes());
         return 2;
     }
     if validate {

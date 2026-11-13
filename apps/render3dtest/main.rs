@@ -46,6 +46,8 @@
 //        all         all of the above
 //        window      a real window (one, briefly; not in `all`): the presented image = the offscreen image, and (G5e2)
 //                    the float image encoded on the CPU: the shader encodes sRGB for the swapchain's 8-bit format
+//   render3dtest --test A,B,... [--except C,D,...] [--validate]   several tests in the list's order, `all` without some
+//                    (tests/validate*.uis: the validation in four parts that the suite runs side by side)
 //   render3dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--warmup W] [--inflight K] [--basis]
 //                [--moved K] [--meshes M] [--textures T [--tex-size S]] [--mask P] [--verify]    the scene of gputest
 //                --bench over the engine (bench.rs); T textures of S texels on the cubes' materials, P % of them MASK

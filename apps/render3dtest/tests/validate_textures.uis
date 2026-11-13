@@ -1,0 +1,4 @@
+#!args --test textures --validate
+#!timeout 1200
+# a part of the validation (validate.uis): textures under VK_LAYER_KHRONOS_validation and synchronization
+# validation; a validation error fails
