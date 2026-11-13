@@ -86,6 +86,19 @@ fn parse(b: &[u8]) -> Result<Node, Error> {
     let (s, _) = encoding::decode(b, 4 << 20).map_err(|_| Error::Invalid)?;
     Ok(xml::parse(&s)?)
 }
+// The parts of a native document whose size follows its content (the text, the notes, the
+// sources, the tables' identities). The model bounds a document by its own budgets (2048
+// paragraphs, 2 MiB of content at 64 bytes or more an inline, a paragraph, a cell), not by
+// XML elements: formatted text takes a handful of elements a run, and the general reader's
+// 30000 were reached by documents of some dozen formatted pages -- which then could not be
+// saved (encode_docx reads its own output). So these parts are read up to what a package
+// holds in one part (archive::Limits::part_bytes) and to 250000 elements: about seven for
+// each of the 32768 inlines the model's budget has room for.
+const BODY: xml::Limits = xml::Limits { bytes: 8 << 20, nodes: 250_000, depth: 48 };
+fn parse_body(b: &[u8]) -> Result<Node, Error> {
+    let (s, _) = encoding::decode(b, BODY.bytes).map_err(|_| Error::Invalid)?;
+    Ok(xml::parse_with(&s, BODY)?)
+}
 fn container(n: &Node, ns: &str, name: &str) -> Result<(), Error> {
     if !n.is(ns, name) || !n.attrs.is_empty() || !n.text.is_empty() {
         return Err(unsupported(&n.name.local));
@@ -220,7 +233,7 @@ pub fn encode_docx(d: &Document) -> Result<Vec<u8>, Error> {
     document.push_str(&notes::write_section(d));
     document.push_str("</w:body></w:document>");
     // Never save a model whose expanded fields exceed the matching XML reader's limits.
-    parse(document.as_bytes())?;
+    parse_body(document.as_bytes())?;
     let sources = encode_sources(&d.sources)?;
     let has_notes = notes::KINDS.map(|kind| notes::present(d, kind));
     let mut entries: Vec<Entry> = FIXED
@@ -435,8 +448,8 @@ pub fn decode_docx(b: &[u8]) -> Result<Document, Error> {
         }
     }
     let source_list =
-        bibliography::read_sources(&parse(find(&entries, "customXml/item1.xml")?)?, true)?;
-    let root = parse(find(&entries, "word/document.xml")?)?;
+        bibliography::read_sources(&parse_body(find(&entries, "customXml/item1.xml")?)?, true)?;
+    let root = parse_body(find(&entries, "word/document.xml")?)?;
     if !root.is(W, "document")
         || !root.text.is_empty()
         || root.children.len() != 1

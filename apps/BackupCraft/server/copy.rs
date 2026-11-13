@@ -194,7 +194,8 @@ fn copy(o: &OpCtl, ctx: &Arc<Ctx>, job: &Job, r: &Repository, s: &mut Session) -
         }
         trees = core::mem::take(&mut c.trees);
         let files = c.files;
-        let ws = c.w.finish().map_err(engine::err_text)?;
+        // (unsaved: a clean-up stays out until the copy is saved, engine.rs)
+        let (ws, unsaved) = c.w.finish_unsaved().map_err(engine::err_text)?;
         let imm = dst.immutable_days();
         let t = now();
         let parent = all::<RestorePoint>(&ctx.db, C_POINTS).into_iter().filter(|x| x.job_id == job.id && x.repository_id == r.id).max_by_key(|x| x.order()).map_or(String::new(), |x| x.id);
@@ -221,7 +222,7 @@ fn copy(o: &OpCtl, ctx: &Arc<Ctx>, job: &Job, r: &Repository, s: &mut Session) -
                 ("session", Value::string(s.id.as_str())),
             ]),
         };
-        dst.save_snapshot(&copy, &ctx.keys.signing).map_err(engine::err_text)?;
+        unsaved.save_snapshot(&copy, &ctx.keys.signing).map_err(engine::err_text)?;
         let point = engine::point_record(&copy, &r.id, job.encrypted);
         let _ = ctx.db.put(C_POINTS, &point.id, point.to_json());
         s.point_id = point.id.clone();

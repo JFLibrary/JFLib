@@ -567,6 +567,12 @@ impl X11 {
         if self.xm_n == -1 {
             return;
         }
+        // (an event handled while a reply is awaited -- a finger's move during a window drag,
+        // xi_drag_to -- cannot ask the server: a second wait inside the first is fatal.  The
+        // list stays as it is, the next call outside a wait reads it)
+        if self.await_on {
+            return;
+        }
         let now = crate::time_us();
         if self.xm_valid && now.wrapping_sub(self.xm_t) < XM_REFRESH_US {
             return;

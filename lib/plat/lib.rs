@@ -60,7 +60,9 @@
 //            XGrabKey, the GlobalShortcuts portal)                             (hotkey.rs)
 //   threads: thread_spawn(stack, f) -> Thread (join), thread_yield(), Sem (post / wait),
 //            wake() (any thread: E_WAKE on the UI thread), wait_events(deadline, on_event)
-//            (headless), cpu_count(), mem_total()
+//            (headless), cpu_count(), mem_total(); the windows, the clipboard, the dialogs and
+//            the portals belong to the UI thread, the first one that uses them: other threads
+//            panic                                                          (ui_only.rs)
 //   pool:    thr_init / thr_count / thr_shutdown / thr_self, parallel_for, Job   (pool.rs)
 //   task:    async execution: Executor (ui() in the event loop, new() / block_on), Task,
 //            spawn_blocking (a pool for blocking work), sleep, CancelToken, Progress, join /
@@ -346,6 +348,10 @@ pub use dnd::*;
 mod cliprich;
 pub use cliprich::*;
 mod consts;
+// the UI thread's own state: UiOnly<T> lets only the UI thread at it (a safe call on another
+// thread panics instead of racing)
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+mod ui_only;
 // (E3) drawn cursors for the shapes Windows and X11 have none of (Wayland's own images, macOS'
 // zoom and cell)
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]

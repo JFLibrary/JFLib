@@ -1,10 +1,14 @@
 // cast -- lib/cas: chunk boundaries survive an insertion, deduplication, trees and signed
-// snapshots, the three ways to unlock, locking, immutability, gc, a flipped bit found by the
-// check, an index rebuilt from a pack's trailer
+// snapshots, the three ways to unlock, locking, immutability, gc (and a backup between its
+// writer's end and its snapshot), a flipped bit found by the check, an index rebuilt from a
+// pack's trailer
 
+use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicU32, Ordering};
 
 use cas::{CasError, CreateOptions, Node, NodeKind, Repo, Snapshot, Tree, Unlock, KIND_DATA};
 use compress::Codec;
@@ -179,6 +183,39 @@ fn store(t: &mut T) {
     t.check("delete s1", repo.delete_snapshot("s1", 1_900_000_000).is_ok());
     let g = repo.gc(&mut |_, _| true);
     t.check("gc frees everything", g.is_ok() && repo.chunk_count() == 0 && repo.stored_bytes() == 0);
+    // between a writer's end and its snapshot the chunks belong to no snapshot.  The plain
+    // order (finish, a gc, save_snapshot): the snapshot is refused, not stored without its data
+    let repo = Arc::new(repo);
+    let dir_of = |tid: cas::ChunkId| Node { name: String::from("/x"), kind: NodeKind::Dir, tree: Some(tid), ..Node::default() };
+    let mut w = repo.writer();
+    let ids = put(&mut w, &r.bytes(200_000));
+    let tid = w.put_tree(&Tree { nodes: alloc::vec![file("l.bin", &ids, 200_000)] }).unwrap_or([0; 32]);
+    let _ = w.finish();
+    let _ = repo.gc(&mut |_, _| true);
+    t.check("a snapshot whose chunks a gc took is refused", matches!(repo.save_snapshot(&snap("s5", alloc::vec![dir_of(tid)], 0), &signer), Err(CasError::NotFound(_))) && repo.snapshot_ids().is_empty());
+    // finish_unsaved: a gc of another thread waits until the snapshot is saved, and keeps it
+    let mut w = repo.writer();
+    let ids = put(&mut w, &r.bytes(200_000));
+    let tid = w.put_tree(&Tree { nodes: alloc::vec![file("l.bin", &ids, 200_000)] }).unwrap_or([0; 32]);
+    let unsaved = w.finish_unsaved().ok().map(|(_, u)| u);
+    let done = Arc::new(AtomicU32::new(0)); // 1: the gc removed nothing, 2: it did (or failed)
+    let gc_of = |repo: Arc<Repo>, done: Arc<AtomicU32>| {
+        let kept = repo.gc(&mut |_, _| true).is_ok_and(|g| g.chunks_removed == 0);
+        done.store(if kept { 1 } else { 2 }, Ordering::SeqCst);
+    };
+    let (r2, d2) = (repo.clone(), done.clone());
+    let h = plat::thread_spawn(0, Box::new(move || gc_of(r2, d2)));
+    plat::sleep_ms(150);
+    t.check("gc waits for an unsaved writer", done.load(Ordering::SeqCst) == 0);
+    let saved = unsaved.is_some_and(|u| u.save_snapshot(&snap("s6", alloc::vec![dir_of(tid)], 0), &signer).is_ok());
+    match h {
+        Some(h) => h.join(),
+        None => gc_of(repo.clone(), done.clone()), // (no threads here: the gc after the save)
+    }
+    t.check("the gc after it keeps the snapshot's chunks", saved && done.load(Ordering::SeqCst) == 1 && content(&repo, &ids).len() == 200_000);
+    t.check("a snapshot after a gc that took none of it", repo.save_snapshot(&snap("s7", alloc::vec![dir_of(tid)], 0), &signer).is_ok());
+    let gone = repo.delete_snapshot("s6", 1_900_000_000).is_ok() && repo.delete_snapshot("s7", 1_900_000_000).is_ok();
+    t.check("the two snapshots deleted, gc frees everything again", gone && repo.gc(&mut |_, _| true).is_ok() && repo.chunk_count() == 0);
     // a flipped bit is found by the check
     let mut w = repo.writer();
     let ids = put(&mut w, &a);
@@ -215,6 +252,16 @@ fn store(t: &mut T) {
     let fixed = repo.repair_index();
     t.check("index rebuilt", fixed.is_ok_and(|n| n >= 1) && repo.chunk_count() > 0);
     t.check("snapshot readable again", repo.load_snapshot("s4").is_ok_and(|s| repo.read_tree(&s.roots[0].tree.unwrap_or([0; 32])).is_ok()));
+    // lost once more, and a gc comes first: it rebuilds the index too, the packs stay
+    drop(repo);
+    for e in plat::fs::read_dir(&idx_dir).unwrap_or_default() {
+        plat::delete(&plat::fs::join(&idx_dir, &e.name));
+    }
+    let Ok(repo) = Repo::open(&dir, Unlock::Master(&master)) else { return };
+    let packed = repo.stored_bytes();
+    let g = repo.gc(&mut |_, _| true);
+    t.check("gc after a lost index keeps the snapshot's packs", g.is_ok_and(|g| g.packs_deleted == 0) && packed > 0 && repo.stored_bytes() == packed);
+    t.check("and the snapshot readable", repo.chunk_count() > 0 && repo.load_snapshot("s4").is_ok_and(|s| repo.read_tree(&s.roots[0].tree.unwrap_or([0; 32])).is_ok()));
     drop(repo);
     rm(&dir);
 }

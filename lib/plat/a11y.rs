@@ -10,6 +10,10 @@
 //                                (focus, states, names, values, text, children, windows)
 //   take() -> Vec<Request>       the actions asked for since the last call (UI thread)
 //   request(Request)             (bridges, tests) queue an action and wake the UI thread
+//   take_ops() / request_op(OpRequest)   the same for the further actions (Op: scroll into
+//                                view, expand / collapse, increment / decrement, select items)
+//   announce(win, text, politeness)   (UI thread) a text for the screen reader to say; the next
+//                                publish hands it to the bridge (Change::Announce)
 //   current() -> Option<Arc<Snapshot>>   (bridges) the tree last published
 //   set_translator(f) / role_name(role) / role_text(k)   the names of the roles the bridges
 //                                give (UIA LocalizedControlType, AT-SPI GetLocalizedRoleName) in
@@ -28,6 +32,14 @@
 // records; Node::parent gives the hierarchy (NONE: a top-level node of the window), link()
 // adds the sibling links and the key index the bridges navigate with.  A node's key stays the
 // same from frame to frame while its widget does (the UI derives it from the widget id).
+//
+// Rich nodes (the records of a web page's tree, ui's Sem setters): Node::sub says what a node
+// is more exactly than its role (a table, a cell, a landmark, a tree item ...); a bridge that
+// knows Sub maps it to a role of its own, one that does not (yet) shows Node::role, the nearest
+// basic role -- so a new Sub never breaks a bridge.  Further fields: a description, a link's
+// address, the place in a set, a level, a cell's place and a table's size, a live region's
+// politeness; states S_REQUIRED .. S_SELECTABLE; actions A_EXPAND .. A_SELECT, which come back
+// as Op requests (take_ops).
 
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -76,6 +88,110 @@ pub enum Role {
     Heading,
 }
 
+/// What a node is more exactly than its role (Node::sub; the wire format sends it as its number in
+/// declaration order).  A bridge that knows it maps it to a role of its own; the others show
+/// Node::role, the nearest basic role, which `role()` gives.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Sub {
+    /// nothing more than the role
+    #[default]
+    None,
+    /// a table or grid (role Group; Node::grid: its rows and columns), one of its rows (Group)
+    Table,
+    Row,
+    /// a cell (role Label; Node::cell: its place), a column header, a row header (Label)
+    Cell,
+    ColumnHeader,
+    RowHeader,
+    /// the landmarks of a page (role Group): its banner, its main content, a navigation,
+    /// complementary content, the content information (a footer), a search, a form, a named region
+    Banner,
+    Main,
+    Navigation,
+    Complementary,
+    ContentInfo,
+    Search,
+    Form,
+    Region,
+    /// a tree (role List) and its items (ListItem; Node::level(): its depth, 1 the top)
+    Tree,
+    TreeItem,
+    /// a group of radio buttons, a tool bar (Group), a tooltip (Label), a separator (Group)
+    RadioGroup,
+    Toolbar,
+    Tooltip,
+    Separator,
+    /// live regions (role Label): an alert (assertive), a status line and a log (polite)
+    Alert,
+    Status,
+    Log,
+    /// a meter (role Progress), a spin button and a scroll bar (Slider)
+    Meter,
+    SpinButton,
+    ScrollBar,
+    /// an article, a figure (Group)
+    Article,
+    Figure,
+}
+
+/// the number of Sub values (SUB_TEXTS)
+pub const SUB_COUNT: usize = 28;
+
+impl Sub {
+    /// the nearest basic role (what a bridge that does not know Sub shows; None: no rule)
+    pub fn role(self) -> Option<Role> {
+        Some(match self {
+            Sub::None => return None,
+            Sub::Cell | Sub::ColumnHeader | Sub::RowHeader | Sub::Tooltip | Sub::Alert | Sub::Status | Sub::Log => Role::Label,
+            Sub::Tree => Role::List,
+            Sub::TreeItem => Role::ListItem,
+            Sub::Meter => Role::Progress,
+            Sub::SpinButton | Sub::ScrollBar => Role::Slider,
+            _ => Role::Group,
+        })
+    }
+
+    /// a landmark (Banner ..= Region)
+    pub fn landmark(self) -> bool {
+        matches!(self, Sub::Banner | Sub::Main | Sub::Navigation | Sub::Complementary | Sub::ContentInfo | Sub::Search | Sub::Form | Sub::Region)
+    }
+
+    /// its WAI-ARIA role ("" for None)
+    pub fn aria(self) -> &'static str {
+        match self {
+            Sub::None => "",
+            Sub::Table => "table",
+            Sub::Row => "row",
+            Sub::Cell => "cell",
+            Sub::ColumnHeader => "columnheader",
+            Sub::RowHeader => "rowheader",
+            Sub::Banner => "banner",
+            Sub::Main => "main",
+            Sub::Navigation => "navigation",
+            Sub::Complementary => "complementary",
+            Sub::ContentInfo => "contentinfo",
+            Sub::Search => "search",
+            Sub::Form => "form",
+            Sub::Region => "region",
+            Sub::Tree => "tree",
+            Sub::TreeItem => "treeitem",
+            Sub::RadioGroup => "radiogroup",
+            Sub::Toolbar => "toolbar",
+            Sub::Tooltip => "tooltip",
+            Sub::Separator => "separator",
+            Sub::Alert => "alert",
+            Sub::Status => "status",
+            Sub::Log => "log",
+            Sub::Meter => "meter",
+            Sub::SpinButton => "spinbutton",
+            Sub::ScrollBar => "scrollbar",
+            Sub::Article => "article",
+            Sub::Figure => "figure",
+        }
+    }
+}
+
 /// Node::state: the keyboard focus is on the node
 pub const S_FOCUSED: u32 = 1;
 /// it can take the keyboard focus
@@ -98,6 +214,26 @@ pub const S_MULTILINE: u32 = 256;
 pub const S_PROTECTED: u32 = 512;
 /// a text box that can be read and selected but not edited
 pub const S_READONLY: u32 = 1024;
+/// a field that must be filled in
+pub const S_REQUIRED: u32 = 1 << 11;
+/// a field whose content is not valid
+pub const S_INVALID: u32 = 1 << 12;
+/// its content is being changed (a live region says nothing meanwhile)
+pub const S_BUSY: u32 = 1 << 13;
+/// it opens a popup (a menu, a list, a dialog)
+pub const S_HASPOPUP: u32 = 1 << 14;
+/// a link to an address that was visited
+pub const S_VISITED: u32 = 1 << 15;
+/// a modal dialog (nothing else of the window takes input)
+pub const S_MODAL: u32 = 1 << 16;
+/// a list, tree or table that allows several selected items
+pub const S_MULTISELECT: u32 = 1 << 17;
+/// it can be expanded and is closed now (S_EXPANDED: open)
+pub const S_COLLAPSED: u32 = 1 << 18;
+/// outside the visible area (scrolled away, clipped): browse modes reach it, the pointer does not
+pub const S_OFFSCREEN: u32 = 1 << 19;
+/// it can be selected (rows and cells of a grid; list rows and tabs are anyway)
+pub const S_SELECTABLE: u32 = 1 << 20;
 
 /// Node::actions: press, toggle, select, open / close -- what a click on the widget does
 pub const A_CLICK: u32 = 1;
@@ -107,6 +243,20 @@ pub const A_FOCUS: u32 = 2;
 pub const A_VALUE: u32 = 4;
 /// set the text (text boxes)
 pub const A_TEXT: u32 = 8;
+/// expand and collapse it (Op::Expand / Op::Collapse)
+pub const A_EXPAND: u32 = 16;
+/// one step up or down (Op::Increment / Op::Decrement)
+pub const A_STEP: u32 = 32;
+/// scroll it into view (Op::ScrollIntoView)
+pub const A_SCROLL: u32 = 64;
+/// select it (Op::SelectItem; in a S_MULTISELECT container also Op::AddToSelection /
+/// Op::RemoveFromSelection)
+pub const A_SELECT: u32 = 128;
+
+/// Node::live, Change::Announce: said when the person is idle
+pub const LIVE_POLITE: u8 = 1;
+/// at once, interrupting
+pub const LIVE_ASSERTIVE: u8 = 2;
 
 /// one element of a window
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -145,6 +295,24 @@ pub struct Node {
     pub prev: u32,
     pub count: u32,
     pub index: u32,
+    /// what it is more exactly than its role (Sub::None: the role says it)
+    pub sub: Sub,
+    /// a description beside the name (a hint, a page's aria-describedby); empty: none
+    pub desc: String,
+    /// a link's address; empty: none
+    pub url: String,
+    /// its position in its set (1-based) and the set's size: list and tree items, tabs, radio
+    /// buttons, rows (0: unknown)
+    pub set: [u32; 2],
+    /// the level of a tree item, list item or row (1 the top; 0: none); a heading's is its value
+    /// (level() gives both)
+    pub item_level: u32,
+    /// cells and headers: row, column (0-based), row span, column span (spans 0: no place)
+    pub cell: [u32; 4],
+    /// tables and grids: the number of rows and columns (0: unknown)
+    pub grid: [u32; 2],
+    /// a live region's root: LIVE_POLITE / LIVE_ASSERTIVE (0: none) -- changes inside it are said
+    pub live: u8,
 }
 
 /// one shown window
@@ -190,9 +358,19 @@ impl Node {
         }
     }
 
-    /// a heading's level 1 ..= 9 (0: not a heading)
+    /// a heading's level 1 ..= 9; a tree item's, list item's or row's level (item_level; 0: none)
     pub fn level(&self) -> u32 {
-        if self.role == Role::Heading { (self.value as u32).clamp(1, 9) } else { 0 }
+        if self.role == Role::Heading { (self.value as u32).clamp(1, 9) } else { self.item_level }
+    }
+
+    /// a cell's place: row, column (0-based), row span, column span (None: no place)
+    pub fn cell_place(&self) -> Option<[u32; 4]> {
+        (self.cell[2] > 0 && self.cell[3] > 0).then_some(self.cell)
+    }
+
+    /// what the bridges call the node, in the UI language: its Sub's name, else its role's
+    pub fn role_text(&self) -> &'static str {
+        if self.sub == Sub::None { role_name(self.role) } else { sub_name(self.sub) }
     }
 
     /// the selection of a text box: (start, end) in characters, start == end at the caret
@@ -325,13 +503,17 @@ impl WinTree {
         self.children(parent).nth(k)
     }
 
-    /// the deepest node at a client point (px): among siblings the last one wins (drawn on top)
+    /// the deepest node at a client point (px): among siblings the last one wins (drawn on top);
+    /// nodes outside the visible area (S_OFFSCREEN) are not hit
     pub fn at_point(&self, x: i32, y: i32) -> Option<usize> {
-        let inside = |r: &[i32; 4]| x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3];
+        let inside = |n: &Node| {
+            let r = &n.rect;
+            n.state & S_OFFSCREEN == 0 && x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3]
+        };
         let mut found = None;
         let mut parent = NONE;
         loop {
-            let hit = self.children(parent).filter(|&k| inside(&self.nodes[k].rect)).last();
+            let hit = self.children(parent).filter(|&k| inside(&self.nodes[k])).last();
             match hit {
                 Some(k) => {
                     found = Some(k);
@@ -342,10 +524,118 @@ impl WinTree {
         }
     }
 
-    /// the node lies (partly) inside the window's client area (else it is scrolled away)
+    /// the node lies (partly) inside the window's client area (else it is scrolled away) and is
+    /// not marked S_OFFSCREEN
     pub fn on_screen(&self, n: &Node) -> bool {
         let r = n.rect;
-        r[2] > 0 && r[3] > 0 && r[0] < self.size[0] && r[1] < self.size[1] && r[0] + r[2] > 0 && r[1] + r[3] > 0
+        n.state & S_OFFSCREEN == 0 && r[2] > 0 && r[3] > 0 && r[0] < self.size[0] && r[1] < self.size[1] && r[0] + r[2] > 0 && r[1] + r[3] > 0
+    }
+
+    /// the nearest ancestor of node k (or k itself) that is a live region's root (Node::live)
+    pub fn live_root(&self, k: usize) -> Option<usize> {
+        let mut i = k as u32;
+        for _ in 0..self.nodes.len() {
+            let n = self.nodes.get(i as usize)?;
+            if n.live != 0 {
+                return Some(i as usize);
+            }
+            i = n.parent;
+        }
+        None
+    }
+
+    /// the nodes below node k (its subtree without itself) are k + 1 .. the returned index (the
+    /// nodes are in tree order: parents first, a subtree in one piece)
+    pub fn subtree_end(&self, k: usize) -> usize {
+        let mut j = k + 1;
+        while j < self.nodes.len() && self.ancestor(k, j) {
+            j += 1;
+        }
+        j
+    }
+
+    /// node a is an ancestor of node b
+    pub fn ancestor(&self, a: usize, b: usize) -> bool {
+        let mut p = self.nodes.get(b).map_or(NONE, |n| n.parent);
+        for _ in 0..self.nodes.len() {
+            if p == NONE {
+                return false;
+            }
+            if p as usize == a {
+                return true;
+            }
+            p = self.nodes[p as usize].parent;
+        }
+        false
+    }
+
+    /// the nearest ancestor of node k with this Sub (a cell's table)
+    pub fn up_to(&self, k: usize, sub: Sub) -> Option<usize> {
+        let mut p = self.nodes.get(k)?.parent;
+        for _ in 0..self.nodes.len() {
+            let n = self.nodes.get(p as usize)?;
+            if n.sub == sub {
+                return Some(p as usize);
+            }
+            p = n.parent;
+        }
+        None
+    }
+
+    /// a table's number of rows and columns: Node::grid, else counted from its cells' places (and
+    /// its rows)
+    pub fn grid_size(&self, table: usize) -> (u32, u32) {
+        let Some(t) = self.nodes.get(table) else { return (0, 0) };
+        let (mut rows, mut cols, mut row_nodes) = (t.grid[0], t.grid[1], 0u32);
+        if rows == 0 || cols == 0 {
+            let (mut r, mut c) = (0, 0);
+            for j in table + 1..self.subtree_end(table) {
+                let n = &self.nodes[j];
+                if let Some(p) = n.cell_place() {
+                    r = r.max(p[0] + p[2]);
+                    c = c.max(p[1] + p[3]);
+                }
+                if n.sub == Sub::Row {
+                    row_nodes += 1;
+                }
+            }
+            if rows == 0 {
+                rows = r.max(row_nodes);
+            }
+            if cols == 0 {
+                cols = c;
+            }
+        }
+        (rows, cols)
+    }
+
+    /// the cell of a table at row, column (one that spans it too)
+    pub fn cell_at(&self, table: usize, row: u32, col: u32) -> Option<usize> {
+        (table + 1..self.subtree_end(table)).find(|&j| {
+            self.nodes[j].cell_place().is_some_and(|p| row >= p[0] && row < p[0] + p[2] && col >= p[1] && col < p[1] + p[3])
+                && self.up_to(j, Sub::Table) == Some(table)
+        })
+    }
+
+    /// the headers of a cell: column headers over its columns (rows false), or row headers in its
+    /// rows (rows true), of the same table
+    pub fn headers_of(&self, cell: usize, rows: bool) -> Vec<usize> {
+        let (Some(p), Some(table)) = (self.nodes.get(cell).and_then(|n| n.cell_place()), self.up_to(cell, Sub::Table)) else { return Vec::new() };
+        let want = if rows { Sub::RowHeader } else { Sub::ColumnHeader };
+        (table + 1..self.subtree_end(table))
+            .filter(|&j| j != cell && self.nodes[j].sub == want)
+            .filter(|&j| {
+                self.nodes[j].cell_place().is_some_and(|h| {
+                    if rows { h[0] < p[0] + p[2] && p[0] < h[0] + h[2] } else { h[1] < p[1] + p[3] && p[1] < h[1] + h[3] }
+                })
+            })
+            .collect()
+    }
+
+    /// the headers of a table: its column headers (rows false) or row headers
+    pub fn headers(&self, table: usize, rows: bool) -> Vec<usize> {
+        let want = if rows { Sub::RowHeader } else { Sub::ColumnHeader };
+        (table + 1..self.subtree_end(table)).filter(|&j| self.nodes[j].sub == want && self.up_to(j, Sub::Table) == Some(table)).collect()
     }
 
     /// the focused node's key (0: the window itself)
@@ -393,9 +683,15 @@ pub enum Change {
     /// a node (with its subtree) went away: parent key (0: the window), its key, its index
     /// there before; the last index of a parent first
     Removed(u8, u64, u64, u32),
+    /// something inside a live region changed (a name, a text, a value, nodes that came or went):
+    /// the region's root (Node::live says how urgently)
+    Live(u8, u64),
+    /// a text for the screen reader to say (announce): window, text, LIVE_POLITE / LIVE_ASSERTIVE
+    Announce(u8, String, u8),
 }
 
-const STATE_EVENTS: u32 = S_CHECKED | S_MIXED | S_SELECTED | S_EXPANDED | S_DISABLED | S_PRESSED;
+const STATE_EVENTS: u32 =
+    S_CHECKED | S_MIXED | S_SELECTED | S_EXPANDED | S_DISABLED | S_PRESSED | S_REQUIRED | S_INVALID | S_BUSY | S_VISITED | S_COLLAPSED;
 
 /// the changes from old to new
 pub fn diff(old: &Snapshot, new: &Snapshot) -> Vec<Change> {
@@ -430,16 +726,31 @@ pub fn diff(old: &Snapshot, new: &Snapshot) -> Vec<Change> {
             }
         }
         removed.sort_unstable_by(|a, b| b.cmp(a));
+        // the live regions something changed in (their roots' keys, in order)
+        let mut live: Vec<u64> = Vec::new();
+        // (a polite region that appears says nothing of its first content; an alert does)
+        let live_at = |t: &WinTree, k: usize, new: bool, live: &mut Vec<u64>| {
+            if let Some(r) = t.live_root(k) {
+                let key = t.nodes[r].key;
+                if !live.contains(&key) && !(new && r == k && t.nodes[r].live != LIVE_ASSERTIVE) {
+                    live.push(key);
+                }
+            }
+        };
         for (p, index, key) in removed {
+            if let Some(k) = o.find(key) {
+                live_at(o, k, false, &mut live);
+            }
             out.push(Change::Removed(w.win, p, key, index));
         }
-        for nd in &w.nodes {
+        for (k, nd) in w.nodes.iter().enumerate() {
             let p = key_of(w, nd.parent);
             if gone(w, nd, o) && (p == 0 || o.find(p).is_some_and(|k| !gone(o, &o.nodes[k], w))) {
+                live_at(w, k, true, &mut live);
                 out.push(Change::Added(w.win, p, nd.key));
             }
         }
-        for nd in &w.nodes {
+        for (i, nd) in w.nodes.iter().enumerate() {
             match o.find(nd.key) {
                 None => {}
                 Some(k) => {
@@ -450,6 +761,7 @@ pub fn diff(old: &Snapshot, new: &Snapshot) -> Vec<Change> {
                             out.push(Change::State(w.win, nd.key, 1 << b, nd.state & (1 << b) != 0));
                         }
                     }
+                    let said = od.name != nd.name || od.value != nd.value || od.text != nd.text;
                     if od.name != nd.name {
                         out.push(Change::Name(w.win, nd.key));
                     }
@@ -462,7 +774,17 @@ pub fn diff(old: &Snapshot, new: &Snapshot) -> Vec<Change> {
                     if od.caret != nd.caret && nd.caret >= 0 && nd.state & S_FOCUSED != 0 {
                         out.push(Change::Caret(w.win, nd.key, nd.caret));
                     }
+                    // (a region that just became live, or one that is busy, says nothing)
+                    if said && od.live == nd.live {
+                        live_at(w, i, false, &mut live);
+                    }
                 }
+            }
+        }
+        for key in live {
+            let busy = w.find(key).is_some_and(|k| w.nodes[k].state & S_BUSY != 0);
+            if !busy {
+                out.push(Change::Live(w.win, key));
             }
         }
         if o.active != w.active {
@@ -513,10 +835,40 @@ pub struct Request {
     pub act: Act,
 }
 
+/// a further action of the assistive technology (OpRequest; the node's Node::actions allow it)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Op {
+    /// scroll the node into view (A_SCROLL)
+    ScrollIntoView,
+    /// open / close it (A_EXPAND)
+    Expand,
+    Collapse,
+    /// one step up / down (A_STEP)
+    Increment,
+    Decrement,
+    /// select it alone; add it to / take it out of the selection (A_SELECT)
+    SelectItem,
+    AddToSelection,
+    RemoveFromSelection,
+}
+
+/// a further action for a node (request_op)
+#[derive(Clone, Debug, PartialEq)]
+pub struct OpRequest {
+    /// the UI's window index
+    pub win: u8,
+    pub key: u64,
+    pub op: Op,
+}
+
 const REQ_MAX: usize = 64;
+const ANNOUNCE_MAX: usize = 16;
 
 static CUR: SpinLock<Option<Arc<Snapshot>>> = SpinLock::new(None);
 static REQ: SpinLock<Vec<Request>> = SpinLock::new(Vec::new());
+static OPS: SpinLock<Vec<OpRequest>> = SpinLock::new(Vec::new());
+static ANNOUNCED: SpinLock<Vec<(u8, String, u8)>> = SpinLock::new(Vec::new());
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 static STARTED: AtomicBool = AtomicBool::new(false);
 
@@ -534,8 +886,14 @@ pub fn start(app: &str) {
     native::start(app);
 }
 
-/// assistive technology may be listening (the UI publishes snapshots only then)
+/// assistive technology may be listening (the UI publishes snapshots only then); on Windows it
+/// turns false again 10 s after the last question of a UI Automation client when none listens for
+/// events, and true with the next question
 pub fn active() -> bool {
+    #[cfg(windows)]
+    if ACTIVE.load(Ordering::Relaxed) {
+        crate::win_uia::idle();
+    }
     ACTIVE.load(Ordering::Acquire)
 }
 
@@ -560,10 +918,13 @@ pub fn publish(mut s: Snapshot) {
     }
     let s = Arc::new(s);
     let old = CUR.lock().replace(s.clone());
-    let changes = match &old {
+    let mut changes = match &old {
         Some(o) => diff(o, &s),
         None => s.wins.iter().flat_map(|w| [Change::Window(w.win, true), Change::Activate(w.win, w.active)]).collect(),
     };
+    for (w, text, p) in core::mem::take(&mut *ANNOUNCED.lock()) {
+        changes.push(Change::Announce(w, text, p));
+    }
     if (!changes.is_empty() || MIRROR) && active() {
         native::changed(&s, changes);
     }
@@ -591,6 +952,39 @@ pub fn request(r: Request) {
 /// the actions asked for since the last call, oldest first (UI thread)
 pub fn take() -> Vec<Request> {
     core::mem::take(&mut *REQ.lock())
+}
+
+/// (bridges, tests) queue a further action (Op) and wake the UI thread (the oldest is dropped
+/// when 64 wait)
+pub fn request_op(r: OpRequest) {
+    {
+        let mut q = OPS.lock();
+        if q.len() >= REQ_MAX {
+            q.remove(0);
+        }
+        q.push(r);
+    }
+    crate::wake();
+}
+
+/// the further actions asked for since the last call, oldest first (UI thread)
+pub fn take_ops() -> Vec<OpRequest> {
+    core::mem::take(&mut *OPS.lock())
+}
+
+/// (UI thread) a text for the screen reader to say in window win: LIVE_POLITE when the person is
+/// idle, LIVE_ASSERTIVE at once.  The next publish hands it to the bridge (Change::Announce:
+/// UI Automation's notification event, AT-SPI2's announcement, the browser's live region);
+/// nothing is kept while no assistive technology listens, at most 16 wait.
+pub fn announce(win: u8, text: &str, politeness: u8) {
+    if !active() || text.is_empty() {
+        return;
+    }
+    let mut q = ANNOUNCED.lock();
+    if q.len() < ANNOUNCE_MAX {
+        let p = if politeness == LIVE_ASSERTIVE { LIVE_ASSERTIVE } else { LIVE_POLITE };
+        q.push((win, String::from(text), p));
+    }
 }
 
 // ---------------------------------------------------------------- the texts of the bridges
@@ -651,6 +1045,50 @@ pub fn role_text(k: usize) -> &'static str {
 /// what the bridges call a role, in the UI language
 pub fn role_name(r: Role) -> &'static str {
     role_text(r as usize)
+}
+
+/// what the bridges call the Sub values (UIA LocalizedControlType and LocalizedLandmarkType,
+/// AT-SPI GetLocalizedRoleName) in Sub order, in German: the keys of their translations as for
+/// ROLE_TEXTS (Sub::None has none)
+pub const SUB_TEXTS: [&str; SUB_COUNT] = [
+    "",
+    "Tabelle",
+    "Tabellenzeile",
+    "Tabellenzelle",
+    "Spaltenkopf",
+    "Zeilenkopf",
+    "Banner",
+    "Hauptinhalt",
+    "Navigation",
+    "Ergänzung",
+    "Inhaltsinformation",
+    "Suche",
+    "Formular",
+    "Region",
+    "Baumansicht",
+    "Baumelement",
+    "Optionsgruppe",
+    "Symbolleiste",
+    "Kurzinfo",
+    "Trennlinie",
+    "Meldung",
+    "Status",
+    "Protokoll",
+    "Messanzeige",
+    "Drehfeld",
+    "Bildlaufleiste",
+    "Artikel",
+    "Abbildung",
+];
+
+/// what the bridges call a Sub, in the UI language ("" for Sub::None)
+pub fn sub_name(s: Sub) -> &'static str {
+    let de = SUB_TEXTS[(s as usize).min(SUB_COUNT - 1)];
+    if de.is_empty() {
+        return de;
+    }
+    let f = *TR.lock();
+    f.map_or(de, |f| f(de))
 }
 
 #[cfg(target_os = "linux")]

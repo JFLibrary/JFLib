@@ -264,6 +264,9 @@ fn nice_max(m: f32, maxn: i32) -> (f32, i32) {
     if m <= 0.0 {
         return (4.0, 4.min(maxn));
     }
+    // (an infinite value -- a division by zero in the app's data -- would never end the loop
+    // below, and one near f32::MAX would give an infinite step)
+    let m = if m > 1e30 { 1e30 } else { m };
     let mut p = 1.0f32;
     while p * 10.0 <= m {
         p *= 10.0;
@@ -1515,7 +1518,8 @@ impl Ui {
             let x0 = cx + ((cw - gw) >> 1);
             let mut base = plot[1] + plot[3];
             for (si, s) in series.iter().enumerate() {
-                let v = s.values.get(i).copied().unwrap_or(0.0).max(0.0);
+                // (at most the axis: a value beyond what nice_max takes fills the plot)
+                let v = s.values.get(i).copied().unwrap_or(0.0).max(0.0).min(top);
                 let h = ((v / top) * plot[3] as f32) as i32;
                 let c = self.chart_color(s.color, si);
                 if stacked {

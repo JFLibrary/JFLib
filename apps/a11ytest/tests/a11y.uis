@@ -1,0 +1,58 @@
+# a11ytest: the page's accessibility tree and a screen reader's requests (the script command a11y)
+a11y expect table:"Preise" role table
+a11y expect table:"Preise" grid 3 2
+a11y expect table:"Preise" is multiselect
+a11y expect cell:"1,20 €" role cell
+a11y expect cell:"1,20 €" cell 1 1
+a11y expect cell:"1,20 €" parent row:"Apfel 1,20 €"
+a11y expect row:"Apfel 1,20 €" parent table:"Preise"
+a11y expect row:"Apfel 1,20 €" set 1 2
+a11y expect colheader:"Preis" role columnheader
+a11y expect landmark:"Hauptmenü" role navigation
+a11y expect landmark:"Kopf" role banner
+a11y expect landmark:"Kopf" parent canvas:"Beispielseite"
+a11y expect link:"Start" url "https://example.org/"
+a11y expect link:"Start" is visited
+a11y expect link:"Start" set 1 2
+a11y expect link:"Start" can scroll
+a11y expect treeitem:"Dokumente" role treeitem
+a11y expect treeitem:"Dokumente" is collapsed
+a11y expect treeitem:"Dokumente" level 1
+a11y expect treeitem:"Dokumente" can expand
+a11y expect article:"Neuigkeiten" is offscreen
+a11y expect status:"Bereit" live polite
+a11y expect log:"Verlauf" live polite
+a11y expect meter:"Speicher" role meter
+a11y expect image:"Balkendiagramm" desc "Drei Balken, der letzte am höchsten"
+a11y expect tooltip:"Pflichtfeld: Vor- und Nachname" role tooltip
+# requests reach the page (ui.a11y_request_take) and change it
+a11y expand treeitem:"Dokumente"
+expect treeitem:"Briefe" exists
+a11y expect treeitem:"Briefe" level 2
+a11y expect treeitem:"Briefe" parent treeitem:"Dokumente"
+a11y expect treeitem:"Dokumente" not collapsed
+a11y collapse treeitem:"Dokumente"
+expect treeitem:"Briefe" missing
+a11y scroll article:"Neuigkeiten"
+a11y expect article:"Neuigkeiten" not offscreen
+a11y expect landmark:"Kopf" is offscreen
+# (the app's own buttons are not held by the page's records scrolled over them)
+a11y expect "Ansage" top
+a11y select row:"Birne 0,90 €"
+a11y add row:"Apfel 1,20 €"
+a11y expect row:"Apfel 1,20 €" is selected
+a11y remove row:"Birne 0,90 €"
+a11y expect row:"Birne 0,90 €" not selected
+a11y increment spin:"Menge"
+expect spin:"Menge" value 2
+a11y value spin:"Menge" 7
+expect spin:"Menge" value 7
+a11y click link:"Hilfe"
+expect text:"Geklickt: Hilfe Zeilen: 10 Baum: 0" exists
+# an announcement (headless runs keep it for the script) and a live region
+click "Ansage"
+a11y expect announced "Gespeichert"
+a11y expect announced none
+click "Status"
+a11y expect status:"Gespeichert" live polite
+a11y dump build/a11ytest-tree.txt

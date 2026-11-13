@@ -227,11 +227,9 @@ struct St {
     autoclose: Option<(u32, Option<String>)>, // (test aid) the next file dialog: Cancel / OK after ms
 }
 
-struct Main(UnsafeCell<Option<St>>);
-// SAFETY: only the main thread touches the state (AppKit's thread); other threads only signal the
-// run loop source (SOURCE, MAIN_RL).
-unsafe impl Sync for Main {}
-static ST: Main = Main(UnsafeCell::new(None));
+// only the main thread touches the state (AppKit's thread; UiOnly refuses other threads); other
+// threads only signal the run loop source (SOURCE, MAIN_RL)
+static ST: crate::ui_only::UiOnly<UnsafeCell<Option<St>>> = crate::ui_only::UiOnly::new(UnsafeCell::new(None));
 static VIEW_OFF: AtomicIsize = AtomicIsize::new(0);
 static DEL_OFF: AtomicIsize = AtomicIsize::new(0);
 static SOURCE: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
@@ -241,7 +239,7 @@ static OBS: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
 /// a short borrow of the state (never across a call into AppKit)
 fn with<R>(f: impl FnOnce(&mut St) -> R) -> Option<R> {
     // SAFETY: main thread only; every borrow ends before AppKit can call back (see the top).
-    unsafe { (*ST.0.get()).as_mut().map(f) }
+    unsafe { (*ST.get().get()).as_mut().map(f) }
 }
 
 fn rec<R>(w: i32, f: impl FnOnce(&mut Win) -> R) -> Option<R> {
@@ -311,7 +309,7 @@ fn init() -> bool {
         SOURCE.store(src as *mut c_void, Ordering::SeqCst);
         let obs = observe(del_cls, doff);
         sysapp::observe(app, obs);
-        *ST.0.get() = Some(St { app, view_cls, del_cls, wins: Default::default(), pops: [Pop::NONE; PPW_MAX as usize], hit: None, mv: None, refresh: None, in_refresh: false,
+        *ST.get().get() = Some(St { app, view_cls, del_cls, wins: Default::default(), pops: [Pop::NONE; PPW_MAX as usize], hit: None, mv: None, refresh: None, in_refresh: false,
                                 min0: (0, 0), flags: 0, marked: String::new(), cs, wheel: [0.0; 2], zoom: 0.0, own: false,
                                 cursors: [NIL; CUR_USER_MAX as usize], blank: NIL, drawn: [NIL; crate::cursor_art::DRAWN_N],
                                 autoclose: None });

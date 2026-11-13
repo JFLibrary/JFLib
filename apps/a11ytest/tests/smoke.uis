@@ -1,0 +1,32 @@
+# a11ytest: the page publishes its records with the kinds of a web page's tree (section 19)
+expect canvas:"Beispielseite" exists
+expect landmark:"Kopf" exists
+expect landmark:"Hauptmenü" exists
+expect heading:"Beispielseite" exists
+expect link:"Start" exists
+expect table:"Preise" exists
+expect colheader:"Preis" exists
+expect rowheader:"Apfel" exists
+expect cell:"1,20 €" exists
+expect tree:"Ordner" exists
+expect treeitem:"Dokumente" exists
+expect treeitem:"Briefe" missing
+expect radiogroup:"Versand" exists
+expect toolbar:"Werkzeuge" exists
+expect tooltip:"Pflichtfeld: Vor- und Nachname" exists
+expect meter:"Speicher" exists
+expect spin:"Menge" exists
+expect scrollbar:"Seite" exists
+expect log:"Verlauf" exists
+# below the view: records all the same (a screen reader's browse mode reads them)
+expect article:"Neuigkeiten" exists
+expect figure:"Umsatz 2026" exists
+expect landmark:"Fußzeile" exists
+# a live region changes its text
+expect status:"Bereit" exists
+click "Status"
+expect status:"Gespeichert" exists
+# the page scrolls: the scroll bar's value follows
+click "Nach unten"
+expect scrollbar:"Seite" value 460
+shot build/a11ytest.png

@@ -4,7 +4,9 @@
 //                                          post from another thread), the worker pool
 //                                          (parallel_for, nested, cancel), background jobs
 //                                          (wait, restart, cancel, E_WAKE when finished),
-//                                          wake latency and coalescing (headless wait)
+//                                          wake latency and coalescing (headless wait), the
+//                                          UI thread's state refused to a second thread (a
+//                                          child: plattest --test uithread-child, exit code 3)
 //   plattest --test files                  mkdir / delete / rename, the streaming file API
 //                                          (also from 64 parallel items), temp files, the
 //                                          temp and config dirs, environment overrides
@@ -80,6 +82,11 @@
 //                                          settings: the jfgui_* overrides, the title bar's
 //                                          layout; Linux: GTK's / KDE's files, against a fake
 //                                          settings portal (with and without appearance keys)
+//   plattest --test a11y-rich / uia-rich / a11y-rich-bus   (t_a11y_rich.rs) a web page's
+//                                          accessibility tree (apps/a11ytest's page): headless
+//                                          model, requests, live regions, the rich update format;
+//                                          Windows through IUIAutomation (by hand); Linux against
+//                                          atspi_bus.py --rich
 //   plattest --test secret / secret-bus    (t_secret.rs) the system's secret store: the real
 //                                          one (Credential Manager + DPAPI, Secret Service; the
 //                                          test entries are removed again); Linux against a
@@ -175,6 +182,8 @@ use base::{Args, Ini, f64_format, f64_parse};
 
 // the accessibility tree (screen readers)
 mod t_a11y;
+// a web page's accessibility tree (apps/a11ytest's page)
+mod t_a11y_rich;
 mod t_async;
 // plat-win: the R4 tests of the Windows platform layer
 mod t_cursor;
@@ -409,6 +418,9 @@ fn plattest() -> i32 {
         Some("settings") => t_settings::t_settings,    // the system settings: overrides, defaults
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
         Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
+        Some("a11y-rich") => t_a11y_rich::t_a11y_rich, // a web page's accessibility tree, headless
+        Some("a11y-rich-bus") => t_a11y_rich::t_a11y_rich_bus, // Linux: against atspi_bus.py --rich
+        Some("uia-rich") => t_a11y_rich::t_uia_rich,   // Windows, by hand: the page through UI Automation
         Some("a11y") => t_a11y::t_a11y,                // the accessibility tree, headless
         Some("a11y-bus") => t_a11y::t_a11y_bus,        // Linux: against tools/platshared/atspi_bus.py
         Some("uia") => t_a11y::t_uia,                  // Windows, by hand: UI Automation
@@ -440,6 +452,7 @@ fn plattest() -> i32 {
         Some("async-panic") => t_async::t_async_panic, // its children: a panic in a task,
         Some("async-panic-job") => t_async::t_async_panic_job, // in a blocking job,
         Some("async-policy") => t_async::t_async_policy, // aio under a manifest
+        Some("uithread-child") => t_uithread_child,    // (threads) its child: UI state on a second thread
         _ => {
             plat::write_stderr(b"usage: plattest --test threads|files|ini|cpu|pen|cursor|all [--repeat N]\n");
             return 2;
@@ -566,6 +579,7 @@ fn t_threads(t: &mut T) {
     th_jobs(t);
     th_wake(t);
     th_stop(t);
+    th_ui_gate(t);
     plat::thr_shutdown();
 }
 
@@ -602,6 +616,42 @@ fn th_stop(t: &mut T) {
     }
     t.check(started == 160 && sums == 20, "pool: 8 shutdowns at once, 20 times; each restart runs every item");
     t.info(&format!("  ({started} threads, {sums} of 20 restarts complete)\n"));
+}
+
+/// the UI thread's state: the first thread that touches it owns it, another thread panics before
+/// it reaches it (exit code 3) -- in a child process
+fn th_ui_gate(t: &mut T) {
+    let (code, text) = t_async::child(&["--test", "uithread-child"]);
+    t.check(text.contains("uithread: the UI thread twice"), "ui thread: the first thread reaches the UI state, twice");
+    let refused = code == Some(3) && text.contains("the UI thread's state used on thread") && !text.contains("second thread got through");
+    t.check(refused, "ui thread: a second thread panics before it reaches the UI state (exit code 3)");
+    if !refused {
+        out(&format!("  (exit {code:?})\n{text}\n"));
+    }
+}
+
+/// (the child) the main thread reaches UI-thread state twice, then a second thread tries
+fn t_uithread_child(_: &mut T) {
+    plat::setenv("jfgui_OPEN_DRYRUN", Some("1")); // Linux: the portal only prints the address
+    ui_touch();
+    ui_touch();
+    out("uithread: the UI thread twice\n");
+    let h = plat::thread_spawn(0, Box::new(|| {
+        ui_touch();
+        out("uithread: the second thread got through\n");
+    }));
+    if let Some(h) = h {
+        h.join();
+    }
+}
+
+/// a call that reaches UI-thread state without a window: the portal's connection (Linux), the
+/// minimum size of the first window (Windows, macOS)
+fn ui_touch() {
+    #[cfg(target_os = "linux")]
+    let _ = plat::open_url("https://example.org/");
+    #[cfg(not(target_os = "linux"))]
+    plat::win_set_min_size(0, 100, 100);
 }
 
 /// 8 threads running f(index)

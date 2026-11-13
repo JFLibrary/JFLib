@@ -636,7 +636,7 @@ fn gated(t: &mut T) {
 // ---------------------------------------------------------------- children
 
 // run plattest with args -> (exit code, stdout + stderr)
-fn child(args: &[&str]) -> (Option<i32>, String) {
+pub(crate) fn child(args: &[&str]) -> (Option<i32>, String) {
     let exe = plat::current_exe().unwrap_or_default();
     let cmd = plat::process::Command { program: &exe, args, cwd: None, env: &[] };
     let Ok(mut c) = cmd.spawn() else { return (None, String::new()) };

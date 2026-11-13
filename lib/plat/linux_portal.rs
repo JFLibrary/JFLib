@@ -144,14 +144,12 @@ struct Bus {
     prn_uniq: Vec<u8>,
 }
 
-struct Global(RefCell<Option<Bus>>);
-// SAFETY: the portal is used from the UI thread only (as the assembly's plain globals);
-// RefCell checks the (non-reentrant) borrows at run time.
-unsafe impl Sync for Global {}
-static BUS: Global = Global(RefCell::new(None));
+// the portal is used from the UI thread only (as the assembly's plain globals; UiOnly refuses
+// other threads); RefCell checks the (non-reentrant) borrows at run time
+static BUS: crate::ui_only::UiOnly<RefCell<Option<Bus>>> = crate::ui_only::UiOnly::new(RefCell::new(None));
 
 fn with_bus<R>(f: impl FnOnce(&mut Bus) -> R) -> R {
-    let mut g = BUS.0.borrow_mut();
+    let mut g = BUS.get().borrow_mut();
     let b = g.get_or_insert_with(Bus::new);
     f(b)
 }

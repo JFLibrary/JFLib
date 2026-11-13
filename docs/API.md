@@ -643,6 +643,31 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   - `layer: u8`
   - `depth: u8`
   - `win: u8` -- window index (0 = the main window)
+  - `ax: Option<alloc::boxed::Box<SemAx>>` -- what the record says beyond kind, label and value (its own 64-bit id, a parent, a
+    description, cells, states ...): set through the record's setters (id64, parent, desc ...;
+    section 19 of the guide); None for the records of the built-in widgets
+
+- **`struct SemAx`**
+  What a semantic record says beyond its kind, label and value (Sem::ax): its setters fill it
+  (`ui.sem_rect(..).id64(7).parent(3).desc("..")`); a web page's accessibility tree needs it.
+  - `id: u64` -- the record's own id (below 2^62): a screen reader's requests for it come back with it
+    (ui.a11y_request_take); 0: none
+  - `parent: u64` -- the record it hangs under in the accessibility tree: one with this id64 (or, without one,
+    this widget id) published in the same frame and window; 0: by its rectangle
+  - `name: Option<String>` -- its name when the label is something else (a text box's or drop-down's label is its text)
+  - `desc: Option<String>` -- a description beside the name (a hint, a page's aria-describedby)
+  - `url: Option<String>` -- a link's address
+  - `value_text: Option<String>` -- the text a screen reader says for a value (a slider's "Monday", a page's aria-valuetext)
+  - `states: u32` -- AS_\*
+  - `set: [u32; 2]` -- its position in its set (1-based) and the set's size (0: unknown)
+  - `level: u32` -- the level of a heading, tree item, list item or row (1 the top; 0: none / the value)
+  - `cell: [u32; 4]` -- a cell's row, column (0-based), row span, column span (spans 0: no place)
+  - `grid: [u32; 2]` -- a table's rows and columns (0: unknown)
+  - `live: u32` -- LIVE_\* (0: as its kind says)
+  - `range: Option<[f64; 4]>` -- value, minimum, maximum, step with fractions (a meter at 0.4 of 1); None: Sem::value / min
+    / max
+  - `sel: Option<[u32; 2]>` -- a focused text box's selection: anchor, caret in characters (a page's field; the built-in
+    boxes report theirs themselves)
 
 - **`struct Slot`**
   persistent per-id state (slot)  [SL_\*]
@@ -4266,10 +4291,19 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                   holds however long the threads took)
   shot FILE.png   render and save a screenshot
   dump [FILE]     print / save the widget tree
-  expect S exists | missing | hover | nohover | focused | checked | unchecked | disabled |
-           enabled | selected | open | pressed | unpressed | value N | value MIN..MAX | max N |
-           text "s" |
+  expect S exists | missing | hover | nohover | focused | unfocused | checked | unchecked |
+           disabled | enabled | selected | unselected | open | closed | pressed | unpressed |
+           value N | value MIN..MAX | max N | text "s" |
            rect X Y W H   (rect: '*' takes any value)
+  a11y ACTION S [ARG]   (a11y_auto.rs, section 19) a screen reader's request for the node of
+                record S, as a bridge sends it: click, focus, scroll, expand, collapse,
+                increment, decrement, select, add, remove, value N, text "s", selecttext A C
+  a11y expect S role R | name "s" | desc "s" | url "s" | text "s" | level N | set POS SIZE |
+                cell ROW COL [RSPAN CSPAN] | grid ROWS COLS | live polite|assertive|off |
+                is STATE | not STATE | can ACTION | cannot ACTION | parent S2 | top |
+                children N | missing          (its node in the accessibility tree)
+  a11y expect announced "s" | none   the last text ui.announce said since the last check
+  a11y dump [FILE]      the accessibility tree as text
   expect theme "NAME" | none    the app theme;  expect theme error "TEXT" | none  the error
                                 of the last `theme file` contains TEXT
   expect style NAME   expect token NAME #RRGGBB|#AARRGGBB (a colour token now)
@@ -5312,7 +5346,43 @@ K_SWATCH: u16 = 20
 K_LINK: u16 = 21
 /// a heading of a document or section (value: its level, 1 the top; md_view.rs, Ui::heading)
 K_HEADING: u16 = 22
+/// the number of KIND_NAMES (the kinds K_BOX ..= K_HEADING); the kinds of web content K_TABLE ..=
+/// K_FIGURE follow it (KIND_NAMES_MORE, kind_name names them all)
 K_KIND_COUNT: u16 = 23
+// (section 19 of the guide) the kinds of a web page's accessibility tree; a screen reader gets
+// each with a role of its own where the platform has one (UI Automation, AT-SPI2, the browser)
+/// a table or grid (Sem::grid: its rows and columns) and a row of it
+K_TABLE: u16 = 23
+K_ROW: u16 = 24
+/// a cell (label: what it says; Sem::cell: its row and column), a column header, a row header
+K_CELL: u16 = 25
+K_COLHEADER: u16 = 26
+K_ROWHEADER: u16 = 27
+/// a landmark of a page (value: LM_*; label: its name)
+K_LANDMARK: u16 = 28
+/// a tree and one of its items (Sem::level: its depth; AS_COLLAPSED / SS_OPEN: closed / open)
+K_TREE: u16 = 29
+K_TREEITEM: u16 = 30
+/// a group of radio buttons, a tool bar, a tooltip (label: its text), a separator
+K_RADIOGROUP: u16 = 31
+K_TOOLBAR: u16 = 32
+K_TOOLTIP: u16 = 33
+K_SEPARATOR: u16 = 34
+/// live regions: an alert (said at once), a status line and a log (said when the person is
+/// idle); label: their text (Sem::live changes how they speak)
+K_ALERT: u16 = 35
+K_STATUS: u16 = 36
+K_LOG: u16 = 37
+/// a meter (value of min ..= max, as a progress bar), a spin button and a scroll bar (value, min,
+/// max as a slider; Sem::range for fractions)
+K_METER: u16 = 38
+K_SPIN: u16 = 39
+K_SCROLLBAR: u16 = 40
+/// an article, a figure (label: their names)
+K_ARTICLE: u16 = 41
+K_FIGURE: u16 = 42
+/// the end of the K_* kinds (one past K_FIGURE)
+K_KIND_END: u16 = 43
 SS_HOVER: u16 = 1
 SS_PRESSED: u16 = 2
 SS_FOCUSED: u16 = 4
@@ -5322,8 +5392,64 @@ SS_SELECTED: u16 = 32
 SS_OPEN: u16 = 64
 /// names of the K_* kinds (dump, selectors kind:"Label")
 KIND_NAMES: [&str; 23] = [ "box", "text", "button", "checkbox", "radio", "switch", ...
+/// names of the kinds K_TABLE ..= K_FIGURE (dump, selectors kind:"Label")
+KIND_NAMES_MORE: [&str; 20] = [ "table", "row", "cell", "colheader", "rowheader", "land ...
+```
+
+- **`fn kind_name(kind: u16) -> &'static str`**
+  the name of a K_\* kind (dump, selectors kind:"Label"); "box" for an unknown one
+
+```rust
 /// names of the SS_* state bits (dump)
 STATE_NAMES: [&str; 7] = ["hover", "pressed", "focused", "checked", "disabled", "s ...
+// K_LANDMARK's value: the kind of landmark (0: a named region)
+LM_REGION: i32 = 0
+LM_BANNER: i32 = 1
+LM_MAIN: i32 = 2
+LM_NAVIGATION: i32 = 3
+LM_COMPLEMENTARY: i32 = 4
+/// the content information (a page's footer)
+LM_CONTENTINFO: i32 = 5
+LM_SEARCH: i32 = 6
+LM_FORM: i32 = 7
+// Sem::states: what a record is beyond its kind and SS_* state (section 19 of the guide)
+/// a field that must be filled in
+AS_REQUIRED: u32 = 1
+/// a field whose content is not valid
+AS_INVALID: u32 = 2
+/// its content is being changed (a live region says nothing meanwhile)
+AS_BUSY: u32 = 4
+/// it opens a popup (a menu, a list, a dialog)
+AS_HASPOPUP: u32 = 8
+/// a link to an address that was visited
+AS_VISITED: u32 = 16
+/// a modal dialog
+AS_MODAL: u32 = 32
+/// a list, tree or table that allows several selected items
+AS_MULTISELECT: u32 = 64
+/// it can be expanded and is closed now (SS_OPEN: it is open)
+AS_COLLAPSED: u32 = 128
+/// outside the visible area (scrolled away, clipped by its scroll box): a screen reader's
+/// browse mode reaches it, the pointer does not
+AS_OFFSCREEN: u32 = 256
+/// it takes the keyboard focus (a kind that does not anyway: a cell of a grid, an element with a
+/// tabindex)
+AS_FOCUSABLE: u32 = 512
+/// a click does something (a kind that does not say so: a cell, a row, an element with a click
+/// handler)
+AS_CLICKABLE: u32 = 1024
+/// it can be selected (rows and cells of a grid; list rows, tree items and tabs are anyway)
+AS_SELECTABLE: u32 = 2048
+/// a text box: read-only / with several lines / a password (as TB_* of a built-in box)
+AS_READONLY: u32 = 4096
+AS_MULTILINE: u32 = 8192
+AS_PASSWORD: u32 = 16384
+// Sem::live and ui.announce: how a live region / an announcement is said (0 for Sem::live: as
+// its kind says -- K_ALERT assertive, K_STATUS and K_LOG polite, the others not at all)
+LIVE_POLITE: u32 = 1
+LIVE_ASSERTIVE: u32 = 2
+/// (Sem::live) not a live region (an app that announces its changes itself, ui.announce)
+LIVE_OFF: u32 = 3
 ```
 
 *layers*
@@ -6744,7 +6870,44 @@ hangs below the open record that opened it.  Names: the label; text boxes, drop-
 is the text / the choice), sliders, progress bars and lists without one take the text or
 heading record right before them (to the left, or above and aligned).  The focus of a list
 or tab strip is passed on to its selected row / tab.
+
+Rich records (section 19 of the guide; a web page's accessibility tree): the kinds K_TABLE ..=
+K_FIGURE become nodes with a Sub (Node::role their nearest basic role); a record's SemAx (its
+setters: id64, parent, name, desc, url, value_text, states, set_pos, level, cell, span, grid,
+live, range) fills the further fields of its node.  A record with an id64 is keyed by it
+(RICH | id), takes its name from nothing but its label / name, and every request for it --
+focus, click, value, text, selection, scroll into view, expand / collapse, increment /
+decrement, select items -- goes to the app (ui.a11y_request_take) instead of the widgets.  A
+record with a parent hangs under the record of that id64 (else that widget id) of its window
+in the same frame; a left out record passes its children on to its own parent, an unknown
+parent or a loop leaves the record to its rectangle.
+
+  ui.announce(text, LIVE_*)       a text for the screen reader (the next frame publishes it)
+  ui.a11y_request_take()          the next request for a record with an id64
+  ui.a11y_active()                a client listens: publish what only it needs then
 ```
+
+- **`struct A11yRequest`**
+  A screen reader's request for a record with an id64 (`ui.a11y_request_take`).
+  - `win: u32` -- the id of the record's window: 0 the main window, else the id its window_begin got
+  - `id: u64` -- the record's id64
+  - `action: A11yAction`
+
+- **`enum A11yAction`**
+  What a screen reader asks of a record (`A11yRequest::action`).
+  - `Focus` -- give it the keyboard focus
+  - `Click` -- its default action: press, follow, toggle, select, open
+  - `ScrollIntoView` -- scroll it into view
+  - `Expand` -- open / close it (AS_COLLAPSED, SS_OPEN)
+  - `Collapse`
+  - `Increment` -- one step up / down (spin buttons, sliders, scroll bars)
+  - `Decrement`
+  - `SetValue(f64)` -- a new number (sliders, spin buttons, scroll bars)
+  - `SetText(String)` -- a new text (text boxes)
+  - `SelectText(u32, u32)` -- the selection of a text box: anchor, caret in characters (equal: the caret alone)
+  - `Select` -- select it alone (a row, a tab, a tree item)
+  - `AddToSelection` -- add it to / take it out of the selection (AS_MULTISELECT containers)
+  - `RemoveFromSelection`
 
 **`impl Ui`**
 
@@ -6752,6 +6915,23 @@ or tab strip is passed on to its selected row / tab.
   The accessibility tree of the last pass as assistive technology gets it (screen
   readers through AT-SPI2 / UI Automation): every shown window with its nodes (roles,
   names, states, values, rectangles), built from the semantic records (see sem()).
+- **`fn a11y_request_take(&mut self) -> Option<A11yRequest>`**
+  The next request of a screen reader for a record with an id64 (`Sem::id64`), oldest first:
+  focus, click, scroll into view, expand / collapse, increment / decrement, a value, a text,
+  a text selection, select items.  Take them in every frame and carry them out (a web view
+  hands them to its engine); at most 64 wait.  Requests for the other records go to their
+  widgets as before (EV_ACT, `a11y_value`, `a11y_text`).
+- **`fn announce(&mut self, text: &str, politeness: u32)`**
+  Have the screen reader say `text`: `LIVE_POLITE` when the person is idle, `LIVE_ASSERTIVE`
+  at once (a web page's live region announcement, "Saved").  It goes out with this frame's
+  tree: UI Automation's notification event, AT-SPI2's announcement, the browser's live
+  region.  Nothing is said (or kept) while no assistive technology listens; at most 16 per
+  frame.
+- **`fn a11y_active(&self) -> bool`**
+  A screen reader (or another client of the accessibility tree) listens: the library builds
+  the tree from the records only then.  Records that only it needs -- the content of a page
+  out of view (`AS_OFFSCREEN`) -- are best published only while this is true; it turns true
+  with a frame of its own when a client comes.  Always false in headless runs.
 - **`fn a11y_value(&mut self, id: u32) -> Option<i32>`**
   A value a screen reader set for slider-like widget `id` (its record's value scale),
   taken once: the built-in sliders apply it themselves; a widget of its own applies it
@@ -6759,6 +6939,51 @@ or tab strip is passed on to its selected row / tab.
 - **`fn a11y_text(&mut self, id: u32) -> Option<String>`**
   A text a screen reader set for text widget `id`, taken once (the built-in text boxes
   apply it themselves).
+
+**`impl Sem`**
+
+- **`fn id64(&mut self, id: u64) -> &mut Sem`**
+  Its own 64-bit id (below 2^62; a web page's node id).  The node keeps it from frame to
+  frame, other records name it as their parent, and every request of a screen reader for it
+  comes back to the app (`ui.a11y_request_take`) instead of going to a widget.
+- **`fn parent(&mut self, id: u64) -> &mut Sem`**
+  The record it hangs under: the one with this id64 (else this widget id) in the same frame
+  and window -- the tree follows it, not the rectangles.  A parent that is left out (a box
+  without a label) passes it on to its own parent; an unknown one leaves it to its rectangle.
+- **`fn name(&mut self, name: &str) -> &mut Sem`**
+  Its name when the label is something else: a text box's or drop-down's label is its text,
+  so `.name("Suche")` names it.
+- **`fn desc(&mut self, text: &str) -> &mut Sem`**
+  A description beside the name (a hint; a page's aria-describedby).
+- **`fn url(&mut self, url: &str) -> &mut Sem`**
+  A link's address.
+- **`fn value_text(&mut self, text: &str) -> &mut Sem`**
+  The text a screen reader says for a slider's, meter's or spin button's value ("Montag").
+- **`fn states(&mut self, states: u32) -> &mut Sem`**
+  Further states (`AS_*`: required, invalid, busy, has a popup, visited, modal,
+  multi-select, collapsed, off screen, focusable, clickable, selectable, read-only,
+  multi-line, password), added to those it has.
+- **`fn set_pos(&mut self, pos: u32, size: u32) -> &mut Sem`**
+  Its position in its set (1-based) and the set's size: list and tree items, tabs, rows.
+- **`fn level(&mut self, level: u32) -> &mut Sem`**
+  The level of a heading (1 ..= 9, in place of the value), a tree item, list item or row
+  (1 the top).
+- **`fn cell(&mut self, row: u32, col: u32) -> &mut Sem`**
+  A cell's or header's place in its table: row, column (0-based).
+- **`fn span(&mut self, rows: u32, cols: u32) -> &mut Sem`**
+  The rows and columns a cell spans (1, 1 without).
+- **`fn grid(&mut self, rows: u32, cols: u32) -> &mut Sem`**
+  A table's number of rows and columns (without: counted from its cells).
+- **`fn live(&mut self, live: u32) -> &mut Sem`**
+  How it speaks as a live region: `LIVE_POLITE`, `LIVE_ASSERTIVE`, `LIVE_OFF` (0: as its kind
+  says -- K_ALERT assertive, K_STATUS and K_LOG polite).
+- **`fn range(&mut self, value: f64, min: f64, max: f64, step: f64) -> &mut Sem`**
+  A value with fractions in place of `value` / `min` / `max` (sliders, meters, spin buttons,
+  scroll bars, progress bars; a value below min: unknown progress), and the step of a
+  screen reader's increment.
+- **`fn text_sel(&mut self, anchor: u32, caret: u32) -> &mut Sem`**
+  A focused text box's selection in characters: anchor, caret (equal: the caret alone) -- a
+  page's own field; the built-in text boxes report theirs themselves.
 
 #### `ui/agent.rs`
 
@@ -25668,7 +25893,9 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            XGrabKey, the GlobalShortcuts portal)                             (hotkey.rs)
   threads: thread_spawn(stack, f) -> Thread (join), thread_yield(), Sem (post / wait),
            wake() (any thread: E_WAKE on the UI thread), wait_events(deadline, on_event)
-           (headless), cpu_count(), mem_total()
+           (headless), cpu_count(), mem_total(); the windows, the clipboard, the dialogs and
+           the portals belong to the UI thread, the first one that uses them: other threads
+           panic                                                          (ui_only.rs)
   pool:    thr_init / thr_count / thr_shutdown / thr_self, parallel_for, Job   (pool.rs)
   task:    async execution: Executor (ui() in the event loop, new() / block_on), Task,
            spawn_blocking (a pool for blocking work), sleep, CancelToken, Progress, join /
@@ -29342,6 +29569,10 @@ assistive technology back to the UI thread:
                                (focus, states, names, values, text, children, windows)
   take() -> Vec<Request>       the actions asked for since the last call (UI thread)
   request(Request)             (bridges, tests) queue an action and wake the UI thread
+  take_ops() / request_op(OpRequest)   the same for the further actions (Op: scroll into
+                               view, expand / collapse, increment / decrement, select items)
+  announce(win, text, politeness)   (UI thread) a text for the screen reader to say; the next
+                               publish hands it to the bridge (Change::Announce)
   current() -> Option<Arc<Snapshot>>   (bridges) the tree last published
   set_translator(f) / role_name(role) / role_text(k)   the names of the roles the bridges
                                give (UIA LocalizedControlType, AT-SPI GetLocalizedRoleName) in
@@ -29360,6 +29591,14 @@ A Snapshot holds every shown window (WinTree) with its nodes in the order of the
 records; Node::parent gives the hierarchy (NONE: a top-level node of the window), link()
 adds the sibling links and the key index the bridges navigate with.  A node's key stays the
 same from frame to frame while its widget does (the UI derives it from the widget id).
+
+Rich nodes (the records of a web page's tree, ui's Sem setters): Node::sub says what a node
+is more exactly than its role (a table, a cell, a landmark, a tree item ...); a bridge that
+knows Sub maps it to a role of its own, one that does not (yet) shows Node::role, the nearest
+basic role -- so a new Sub never breaks a bridge.  Further fields: a description, a link's
+address, the place in a set, a level, a cell's place and a table's size, a live region's
+politeness; states S_REQUIRED .. S_SELECTABLE; actions A_EXPAND .. A_SELECT, which come back
+as Op requests (take_ops).
 ```
 
 ```rust
@@ -29392,6 +29631,54 @@ NONE: u32 = u32::MAX
   - `Dialog`
   - `Heading` -- a heading of a document or section (Node::value: its level, level())
 
+- **`enum Sub`**
+  What a node is more exactly than its role (Node::sub; the wire format sends it as its number in
+  declaration order).  A bridge that knows it maps it to a role of its own; the others show
+  Node::role, the nearest basic role, which `role()` gives.
+  - `None` -- nothing more than the role
+  - `Table` -- a table or grid (role Group; Node::grid: its rows and columns), one of its rows (Group)
+  - `Row`
+  - `Cell` -- a cell (role Label; Node::cell: its place), a column header, a row header (Label)
+  - `ColumnHeader`
+  - `RowHeader`
+  - `Banner` -- the landmarks of a page (role Group): its banner, its main content, a navigation,
+    complementary content, the content information (a footer), a search, a form, a named region
+  - `Main`
+  - `Navigation`
+  - `Complementary`
+  - `ContentInfo`
+  - `Search`
+  - `Form`
+  - `Region`
+  - `Tree` -- a tree (role List) and its items (ListItem; Node::level(): its depth, 1 the top)
+  - `TreeItem`
+  - `RadioGroup` -- a group of radio buttons, a tool bar (Group), a tooltip (Label), a separator (Group)
+  - `Toolbar`
+  - `Tooltip`
+  - `Separator`
+  - `Alert` -- live regions (role Label): an alert (assertive), a status line and a log (polite)
+  - `Status`
+  - `Log`
+  - `Meter` -- a meter (role Progress), a spin button and a scroll bar (Slider)
+  - `SpinButton`
+  - `ScrollBar`
+  - `Article` -- an article, a figure (Group)
+  - `Figure`
+
+```rust
+/// the number of Sub values (SUB_TEXTS)
+SUB_COUNT: usize = 28
+```
+
+**`impl Sub`**
+
+- **`fn role(self) -> Option<Role>`**
+  the nearest basic role (what a bridge that does not know Sub shows; None: no rule)
+- **`fn landmark(self) -> bool`**
+  a landmark (Banner ..= Region)
+- **`fn aria(self) -> &'static str`**
+  its WAI-ARIA role ("" for None)
+
 ```rust
 /// Node::state: the keyboard focus is on the node
 S_FOCUSED: u32 = 1
@@ -29415,6 +29702,26 @@ S_MULTILINE: u32 = 256
 S_PROTECTED: u32 = 512
 /// a text box that can be read and selected but not edited
 S_READONLY: u32 = 1024
+/// a field that must be filled in
+S_REQUIRED: u32 = 1 << 11
+/// a field whose content is not valid
+S_INVALID: u32 = 1 << 12
+/// its content is being changed (a live region says nothing meanwhile)
+S_BUSY: u32 = 1 << 13
+/// it opens a popup (a menu, a list, a dialog)
+S_HASPOPUP: u32 = 1 << 14
+/// a link to an address that was visited
+S_VISITED: u32 = 1 << 15
+/// a modal dialog (nothing else of the window takes input)
+S_MODAL: u32 = 1 << 16
+/// a list, tree or table that allows several selected items
+S_MULTISELECT: u32 = 1 << 17
+/// it can be expanded and is closed now (S_EXPANDED: open)
+S_COLLAPSED: u32 = 1 << 18
+/// outside the visible area (scrolled away, clipped): browse modes reach it, the pointer does not
+S_OFFSCREEN: u32 = 1 << 19
+/// it can be selected (rows and cells of a grid; list rows and tabs are anyway)
+S_SELECTABLE: u32 = 1 << 20
 /// Node::actions: press, toggle, select, open / close -- what a click on the widget does
 A_CLICK: u32 = 1
 /// give it the keyboard focus
@@ -29423,6 +29730,19 @@ A_FOCUS: u32 = 2
 A_VALUE: u32 = 4
 /// set the text (text boxes)
 A_TEXT: u32 = 8
+/// expand and collapse it (Op::Expand / Op::Collapse)
+A_EXPAND: u32 = 16
+/// one step up or down (Op::Increment / Op::Decrement)
+A_STEP: u32 = 32
+/// scroll it into view (Op::ScrollIntoView)
+A_SCROLL: u32 = 64
+/// select it (Op::SelectItem; in a S_MULTISELECT container also Op::AddToSelection /
+/// Op::RemoveFromSelection)
+A_SELECT: u32 = 128
+/// Node::live, Change::Announce: said when the person is idle
+LIVE_POLITE: u8 = 1
+/// at once, interrupting
+LIVE_ASSERTIVE: u8 = 2
 ```
 
 - **`struct Node`**
@@ -29450,6 +29770,16 @@ A_TEXT: u32 = 8
   - `prev: u32`
   - `count: u32`
   - `index: u32`
+  - `sub: Sub` -- what it is more exactly than its role (Sub::None: the role says it)
+  - `desc: String` -- a description beside the name (a hint, a page's aria-describedby); empty: none
+  - `url: String` -- a link's address; empty: none
+  - `set: [u32; 2]` -- its position in its set (1-based) and the set's size: list and tree items, tabs, radio
+    buttons, rows (0: unknown)
+  - `item_level: u32` -- the level of a tree item, list item or row (1 the top; 0: none); a heading's is its value
+    (level() gives both)
+  - `cell: [u32; 4]` -- cells and headers: row, column (0-based), row span, column span (spans 0: no place)
+  - `grid: [u32; 2]` -- tables and grids: the number of rows and columns (0: unknown)
+  - `live: u8` -- a live region's root: LIVE_POLITE / LIVE_ASSERTIVE (0: none) -- changes inside it are said
 
 - **`struct WinTree`**
   one shown window
@@ -29476,7 +29806,11 @@ A_TEXT: u32 = 8
 - **`fn text_str(&self) -> &str`**
   the text the text interfaces see: text boxes and drop-downs their text, labels their name
 - **`fn level(&self) -> u32`**
-  a heading's level 1 ..= 9 (0: not a heading)
+  a heading's level 1 ..= 9; a tree item's, list item's or row's level (item_level; 0: none)
+- **`fn cell_place(&self) -> Option<[u32; 4]>`**
+  a cell's place: row, column (0-based), row span, column span (None: no place)
+- **`fn role_text(&self) -> &'static str`**
+  what the bridges call the node, in the UI language: its Sub's name, else its role's
 - **`fn selection(&self) -> (i32, i32)`**
   the selection of a text box: (start, end) in characters, start == end at the caret
 - **`fn char_rect(&self, k: i32) -> [i32; 4]`**
@@ -29497,9 +29831,30 @@ A_TEXT: u32 = 8
 - **`fn child(&self, parent: u32, k: usize) -> Option<usize>`**
   the child number k of a node (NONE: of the window)
 - **`fn at_point(&self, x: i32, y: i32) -> Option<usize>`**
-  the deepest node at a client point (px): among siblings the last one wins (drawn on top)
+  the deepest node at a client point (px): among siblings the last one wins (drawn on top);
+  nodes outside the visible area (S_OFFSCREEN) are not hit
 - **`fn on_screen(&self, n: &Node) -> bool`**
-  the node lies (partly) inside the window's client area (else it is scrolled away)
+  the node lies (partly) inside the window's client area (else it is scrolled away) and is
+  not marked S_OFFSCREEN
+- **`fn live_root(&self, k: usize) -> Option<usize>`**
+  the nearest ancestor of node k (or k itself) that is a live region's root (Node::live)
+- **`fn subtree_end(&self, k: usize) -> usize`**
+  the nodes below node k (its subtree without itself) are k + 1 .. the returned index (the
+  nodes are in tree order: parents first, a subtree in one piece)
+- **`fn ancestor(&self, a: usize, b: usize) -> bool`**
+  node a is an ancestor of node b
+- **`fn up_to(&self, k: usize, sub: Sub) -> Option<usize>`**
+  the nearest ancestor of node k with this Sub (a cell's table)
+- **`fn grid_size(&self, table: usize) -> (u32, u32)`**
+  a table's number of rows and columns: Node::grid, else counted from its cells' places (and
+  its rows)
+- **`fn cell_at(&self, table: usize, row: u32, col: u32) -> Option<usize>`**
+  the cell of a table at row, column (one that spans it too)
+- **`fn headers_of(&self, cell: usize, rows: bool) -> Vec<usize>`**
+  the headers of a cell: column headers over its columns (rows false), or row headers in its
+  rows (rows true), of the same table
+- **`fn headers(&self, table: usize, rows: bool) -> Vec<usize>`**
+  the headers of a table: its column headers (rows false) or row headers
 - **`fn focus_key(&self) -> u64`**
   the focused node's key (0: the window itself)
 
@@ -29524,6 +29879,9 @@ A_TEXT: u32 = 8
     of the new tree, so its index there is right when the event arrives
   - `Removed(u8, u64, u64, u32)` -- a node (with its subtree) went away: parent key (0: the window), its key, its index
     there before; the last index of a parent first
+  - `Live(u8, u64)` -- something inside a live region changed (a name, a text, a value, nodes that came or went):
+    the region's root (Node::live says how urgently)
+  - `Announce(u8, String, u8)` -- a text for the screen reader to say (announce): window, text, LIVE_POLITE / LIVE_ASSERTIVE
 
 - **`fn diff(old: &Snapshot, new: &Snapshot) -> Vec<Change>`**
   the changes from old to new
@@ -29543,6 +29901,23 @@ A_TEXT: u32 = 8
   - `key: u64`
   - `act: Act`
 
+- **`enum Op`**
+  a further action of the assistive technology (OpRequest; the node's Node::actions allow it)
+  - `ScrollIntoView` -- scroll the node into view (A_SCROLL)
+  - `Expand` -- open / close it (A_EXPAND)
+  - `Collapse`
+  - `Increment` -- one step up / down (A_STEP)
+  - `Decrement`
+  - `SelectItem` -- select it alone; add it to / take it out of the selection (A_SELECT)
+  - `AddToSelection`
+  - `RemoveFromSelection`
+
+- **`struct OpRequest`**
+  a further action for a node (request_op)
+  - `win: u8` -- the UI's window index
+  - `key: u64`
+  - `op: Op`
+
 - **`fn start(app: &str)`**
   start the platform bridge (once): Linux connects to the accessibility bus when assistive
   technology is enabled (jfgui_A11Y=1 forces it, jfgui_A11Y=0 or NO_AT_BRIDGE=1 turn it off);
@@ -29550,7 +29925,9 @@ A_TEXT: u32 = 8
   on themselves (jfgui_a11y), jfgui_A11Y=0 keeps it off there too
 
 - **`fn active() -> bool`**
-  assistive technology may be listening (the UI publishes snapshots only then)
+  assistive technology may be listening (the UI publishes snapshots only then); on Windows it
+  turns false again 10 s after the last question of a UI Automation client when none listens for
+  events, and true with the next question
 
 - **`fn current() -> Option<Arc<Snapshot>>`**
   the tree last published
@@ -29563,6 +29940,19 @@ A_TEXT: u32 = 8
 
 - **`fn take() -> Vec<Request>`**
   the actions asked for since the last call, oldest first (UI thread)
+
+- **`fn request_op(r: OpRequest)`**
+  (bridges, tests) queue a further action (Op) and wake the UI thread (the oldest is dropped
+  when 64 wait)
+
+- **`fn take_ops() -> Vec<OpRequest>`**
+  the further actions asked for since the last call, oldest first (UI thread)
+
+- **`fn announce(win: u8, text: &str, politeness: u8)`**
+  (UI thread) a text for the screen reader to say in window win: LIVE_POLITE when the person is
+  idle, LIVE_ASSERTIVE at once.  The next publish hands it to the bridge (Change::Announce:
+  UI Automation's notification event, AT-SPI2's announcement, the browser's live region);
+  nothing is kept while no assistive technology listens, at most 16 wait.
 
 *the texts of the bridges*
 
@@ -29590,6 +29980,16 @@ ROLE_UNKNOWN: usize = 24
 - **`fn role_name(r: Role) -> &'static str`**
   what the bridges call a role, in the UI language
 
+```rust
+/// what the bridges call the Sub values (UIA LocalizedControlType and LocalizedLandmarkType,
+/// AT-SPI GetLocalizedRoleName) in Sub order, in German: the keys of their translations as for
+/// ROLE_TEXTS (Sub::None has none)
+SUB_TEXTS: [&str; SUB_COUNT] = [ "", "Tabelle", "Tabellenzeile", "Tabellenzelle", "Spalt ...
+```
+
+- **`fn sub_name(s: Sub) -> &'static str`**
+  what the bridges call a Sub, in the UI language ("" for Sub::None)
+
 ### `plat/a11y_wire.rs`
 
 Source: [`lib/plat/a11y_wire.rs`](../lib/plat/a11y_wire.rs)
@@ -29605,9 +30005,11 @@ android/GalleryAccessibility.java read.  Compiled on every target (plattest chec
                          the update for the host (None: nothing it shows changed); place
                          gives a window's client area in host px (x, y, w, h)
   Mirror::reset()        the host lost its mirror: the next update is a full one
+  Mirror::set_version(v) the format the host reads: VERSION (1, the default) or VERSION2 (the
+                         rich node data and announcements; web/a11y.js); a full update follows
 
 The format: integers little-endian, str = u32 byte count + UTF-8, key = u64 (Node::key)
-  u8 VERSION, u8 flags (F_FULL: the host drops its mirror first), u8 number of windows
+  u8 VERSION (or VERSION2), u8 flags (F_FULL: the host drops its mirror first), u8 number of windows
   every shown window in the order of the snapshot (later ones lie on top):
     u8 window index, u8 flags (W_DIALOG, W_ACTIVE), i32 x, y, w, h (place),
     key of the focused node (0: none), str title,
@@ -29617,16 +30019,22 @@ The format: integers little-endian, str = u32 byte count + UTF-8, key = u64 (Nod
     u32 node count, then the nodes that are new or changed: key, u8 role (Role in
         declaration order: Group 0 .. Dialog 20, Heading 21), u32 state (S_*), u32 actions
         (A_*), i32 x, y, w, h, str name, str text, i32 caret, i32 anchor, i32 caret x, y, w,
-        h, f64 value (headings: the level), min, max, step
+        h, f64 value (headings: the level), min, max, step;
+        VERSION2 adds: u8 sub (Sub in declaration order: None 0, Table 1 .. Figure 27),
+        str desc, str url, u32 position in set, set size, u32 item level, u32 cell row,
+        column, row span, column span, u32 grid rows, columns, u8 live
   windows that are not listed are gone
   u32 number of events, each: u8 kind (E_*), u8 window, key, i32 a, i32 b, and for E_TEXT
-    str old text -- the events of plat::a11y::diff without Added / Removed (the order
-    tells those)
+    str old text, for E_ANNOUNCE (VERSION2 only; a: the politeness) str the text -- the events
+    of plat::a11y::diff without Added / Removed (the order tells those) and Live (the host's
+    own live regions say those)
 ```
 
 ```rust
 /// the first byte of an update
 VERSION: u8 = 1
+/// the first byte of an update with the rich node data (Mirror::set_version)
+VERSION2: u8 = 2
 /// update flag: a full update (the host drops what it has)
 F_FULL: u8 = 1
 /// window flags
@@ -29648,6 +30056,8 @@ E_VALUE: u8 = 6
 E_TEXT: u8 = 7
 /// the caret moved to character a
 E_CARET: u8 = 8
+/// (VERSION2) a text to say: a the politeness (LIVE_*), the text follows
+E_ANNOUNCE: u8 = 9
 ```
 
 - **`struct Mirror`**
@@ -29658,6 +30068,11 @@ E_CARET: u8 = 8
 - **`const fn new() -> Self`**
 - **`fn reset(&mut self)`**
   the host lost its mirror (or turned it off): the next update is a full one
+- **`fn set_version(&mut self, v: u8)`**
+  the format the host reads: VERSION2 for the rich node data and announcements, anything
+  else VERSION; the next update is a full one
+- **`fn version(&self) -> u8`**
+  the format of the updates (VERSION or VERSION2)
 - **`fn update(&mut self, s: &Arc<Snapshot>, changes: &[Change], place: &dyn Fn(&WinTree) -> [i32; 4]) -> Option<Vec<u8>>`**
   the update that brings the host from the last tree sent to s (changes: plat::a11y::diff
   of the two); None when nothing the host shows changed
@@ -31245,7 +31660,9 @@ apps" entry, starting a command line             (r12-inst)  [apps/installer/src
   reg_create(subkey) -> Some(RegKey)   HKCU\subkey opened for writing (created when missing);
                                   RegKey::set_sz / set_dword, closed when dropped
   reg_delete(subkey) -> bool      RegDeleteKeyW(HKCU, subkey)
-  reg_delete_tree(subkey) -> bool RegDeleteTreeW: the key and everything below it
+  reg_delete_tree(subkey) -> bool RegDeleteTreeW: the key and everything below it (only a
+                                  key below Software\Classes or a browser's below
+                                  Software\Clients\StartMenuInternet; other names are refused)
   reg_delete_value(subkey, name) -> bool   RegDeleteKeyValueW (name "" = the default value)
   assoc_changed()                 SHChangeNotify(SHCNE_ASSOCCHANGED): Explorer re-reads the
                                   file types and URL schemes
@@ -31308,7 +31725,11 @@ PATH_CAP: usize = 520
   RegDeleteKeyW(HKCU, subkey)  [sh_reg_delete, real mode]
 
 - **`fn reg_delete_tree(subkey: &str) -> bool`**
-  HKCU\\subkey with all its keys and values  (RegDeleteTreeW, then RegDeleteKeyW)
+  HKCU\\subkey with all its keys and values  (RegDeleteTreeW, then RegDeleteKeyW).  Only a
+  key below Software\\Classes (a ProgID, a URL scheme: what file types and schemes add) or
+  below Software\\Clients\\StartMenuInternet (a web browser's key) -- any other name is
+  refused: an empty one would clear HKCU itself, "Software" every program's settings, and
+  such a name is what a damaged or cut list of an uninstaller holds
 
 - **`fn reg_delete_value(subkey: &str, name: &str) -> bool`**
   one value of HKCU\\subkey ("" = its default value)  (RegDeleteKeyValueW)
@@ -31428,6 +31849,19 @@ changed, property changes (toggle state, selected, expand state, enabled, name, 
 value, heading level), text selection changed (the caret moved: screen readers and Magnifier
 follow it), text changed, structure changed (children invalidated).  UIAutomationCore.dll
 and oleaut32.dll are loaded on the first WM_GETOBJECT.
+
+Rich nodes (Node::sub and the further fields): control types of their own (Table, DataItem
+rows and cells, HeaderItem headers, Tree / TreeItem, ToolBar, ToolTip, Separator, StatusBar,
+Spinner, ScrollBar; landmarks are Groups with LandmarkType / LocalizedLandmarkType, the rest
+name their type themselves), AriaRole / AriaProperties, FullDescription and HelpText,
+IsRequiredForForm, IsDataValidForForm, PositionInSet / SizeOfSet / Level, LiveSetting,
+IsDialog; the patterns Grid + Table (tables), GridItem + TableItem (cells and headers with a
+place), ScrollItem (A_SCROLL), Selection (lists, tab strips, trees, multi-select containers),
+ExpandCollapse (A_EXPAND), SelectionItem (A_SELECT: Select, AddToSelection,
+RemoveFromSelection), Invoke (any other A_CLICK node), Value (a link: its address).  The further
+actions become a11y::request_op.  Events: LiveRegionChanged (Change::Live), SystemAlert (an
+alert appears), the notification event (UiaRaiseNotificationEvent, Windows 10 1709 and later)
+for a11y::announce.
 ```
 
 - **`struct UiaTestElem`**
@@ -31445,6 +31879,23 @@ and oleaut32.dll are loaded on the first WM_GETOBJECT.
   - `expand: i32` -- ExpandCollapse state (-1: no pattern)
   - `heading: i32` -- HeadingLevel 1 ..= 9 (0: HeadingLevel_None)
   - `rect: [i32; 4]` -- the bounding rectangle: x, y, w, h (screen px)
+  - `aria_role: String` -- AriaRole, AriaProperties ("" without)
+  - `aria_properties: String`
+  - `landmark: i32` -- LandmarkType (0: none), LocalizedLandmarkType
+  - `landmark_name: String`
+  - `desc: String` -- FullDescription
+  - `pos_in_set: i32` -- PositionInSet, SizeOfSet, Level (0: none)
+  - `size_of_set: i32`
+  - `level: i32`
+  - `live: i32` -- LiveSetting (0: off), IsRequiredForForm, IsDataValidForForm, IsOffscreen
+  - `required: bool`
+  - `valid: bool`
+  - `offscreen: bool`
+  - `cell: Option<[i32; 4]>` -- GridItem: row, column, row span, column span (None: no GridItem pattern)
+  - `grid: Option<(i32, i32)>` -- Grid: rows, columns (None: no Grid pattern)
+  - `col_headers: Vec<String>` -- TableItem: the names of its column headers
+  - `scroll_item: bool` -- the ScrollItem pattern is there; Selection: CanSelectMultiple (None: no pattern)
+  - `multiple: Option<bool>`
 
 - **`enum UiaTestAct`**
   (tests) what uia_test_act does to an element
@@ -31456,6 +31907,9 @@ and oleaut32.dll are loaded on the first WM_GETOBJECT.
   - `Focus`
   - `SetValue(String)`
   - `SetRange(f64)`
+  - `ScrollIntoView` -- ScrollItem.ScrollIntoView
+  - `AddToSelection` -- SelectionItem.AddToSelection / RemoveFromSelection
+  - `RemoveFromSelection`
 
 - **`fn uia_test_hwnd(pw: i32) -> isize`**
   (tests; UI thread) the HWND of platform window pw
@@ -31496,7 +31950,7 @@ and oleaut32.dll are loaded on the first WM_GETOBJECT.
 
 - **`fn uia_test_events() -> Vec<String>`**
   (tests) the events since the last call: "focus:&lt;name>", "prop:&lt;id>:&lt;name>=&lt;value>",
-  "event:&lt;id>:&lt;name>"
+  "event:&lt;id>:&lt;name>", "notify:&lt;text>:&lt;processing>"
 
 - **`fn uia_test_unlisten()`**
   (tests; the thread of uia_test_listen) remove the handlers
@@ -36022,6 +36476,14 @@ New native functionality; deliberately rejects constructs it cannot represent lo
   - `Limit`
   - `Unsupported`
 
+- **`struct Limits`**
+  What one parse may take: the text's bytes, its elements, their nesting. The default
+  (4 MiB, 30000 elements, 48 levels) is `parse`'s; a reader whose own model bounds its
+  documents otherwise names what that model can expand to (`parse_with`).
+  - `bytes: usize`
+  - `nodes: usize`
+  - `depth: usize`
+
 - **`fn valid_char(c: char) -> bool`**
   XML 1.0 character validity (also used before emitting document text).
 
@@ -36031,6 +36493,9 @@ New native functionality; deliberately rejects constructs it cannot represent lo
 - **`fn parse(s: &str) -> Result<Node, Error>`**
   Parse a bounded XML subset. DTDs, processing instructions, comments, CDATA and mixed
   content are explicitly rejected. No resources are ever resolved or fetched.
+
+- **`fn parse_with(s: &str, lim: Limits) -> Result<Node, Error>`**
+  `parse` within other limits than the default ones.
 
 ### `base/num.rs`
 
@@ -46592,6 +47057,9 @@ format "bcrepo-1")
        Recovery})                       one process holds a repository at a time (LOCK)
   repo.writer() -> Writer               put(kind, bytes) / put_stream(reader) -> chunk ids,
                                         finish() (packs and indexes are durable);
+                                        finish_unsaved() -> (stats, Unsaved): the same, and
+                                        gc stays out until unsaved.save_snapshot(..) -- the
+                                        way of a backup where a gc can run beside it;
                                         .codec(c, level): this writer's compression
                                         (the repository's own is the default)
   repo.read_chunk(id) / read_tree(id)   repo.save_snapshot / load_snapshot / snapshot_ids /
@@ -46607,7 +47075,9 @@ Keys:    one random repository key, wrapped in repo.json for the server's master
 Chunks:  id = BLAKE3-keyed(id key, plain) -> identical data is stored once, the ids reveal
          nothing without the key.  Commit order of a backup: packs (fsync) -> indexes
          (fsync) -> snapshot (atomic rename, directory sync); a crash leaves at most
-         unreferenced packs, which gc removes.
+         unreferenced packs, which gc removes.  Until its snapshot is there a backup's chunks
+         are such packs too: gc waits for open writers and for an Unsaved, and a snapshot
+         saved the plain way after a gc took chunks of it is refused (save_snapshot).
 ```
 
 ### `cas` crate root
@@ -46733,7 +47203,15 @@ KIND_TREE: u8 = 1
   the plain content of a chunk
 - **`fn read_tree(&self, id: &ChunkId) -> CasResult<Tree>`**
 - **`fn save_snapshot(&self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()>`**
-  store a snapshot (after its writer finished); signed by `signer`
+  store a snapshot (after its writer finished); signed by `signer`.
+
+  Between the writer's finish and this call the new chunks belong to no snapshot, and a
+  gc of another thread -- one that waited for the writer runs at that very moment --
+  removes them.  Where a gc can run beside the backup, finish the writer with
+  `finish_unsaved` and save through the `Unsaved` it returns: gc waits for it.  This call
+  cannot keep a gc out afterwards; it refuses the snapshot instead (NotFound) when chunks
+  of it are gone -- looked up once a gc of this process has removed anything.  It waits
+  for a running gc: not to be called while the same thread holds a Writer or an Unsaved.
 - **`fn snapshot_ids(&self) -> Vec<String>`**
 - **`fn load_snapshot(&self, id: &str) -> CasResult<Snapshot>`**
   a snapshot, checked (signature by a trusted key, authentic encryption)
@@ -46746,7 +47224,11 @@ KIND_TREE: u8 = 1
   indexed; with `read_data` every blob is read, decrypted and compared with its id
 - **`fn gc(&self, progress: Progress) -> CasResult<GcReport>`**
   remove what no snapshot references: empty packs are deleted, sparse packs (less than
-  60 % in use) are rewritten with their live blobs
+  60 % in use) are rewritten with their live blobs.  Waits for open writers and for what
+  finish_unsaved left of them.  Lost index files are rebuilt from the packs' trailers
+  first (repair_index).  Refused (Corrupt), nothing removed, while a snapshot does not
+  open, or while a chunk it references is not in the index and a pack without an index
+  (and without a readable trailer) is left: the chunk may be in that pack
 - **`fn repair_index(&self) -> CasResult<u64>`**
   rebuild missing index files from the packs' trailers
 
@@ -46757,7 +47239,7 @@ KIND_TREE: u8 = 1
   writes new chunks into packs
   - `stats: WriteStats`
 
-**`impl Writer<'_>`**
+**`impl<'a> Writer<'a>`**
 
 - **`fn codec(mut self, codec: Codec, level: i32) -> Self`**
   compress this writer's data chunks with `codec` (`level`: zstd's level); trees stay LZ4
@@ -46767,7 +47249,22 @@ KIND_TREE: u8 = 1
   chunk a stream and store it -> (chunk ids, size); `read` fills the buffer, Ok(0) = end
 - **`fn put_tree(&mut self, t: &Tree) -> CasResult<ChunkId>`**
 - **`fn finish(mut self) -> CasResult<WriteStats>`**
-  write the last pack; every chunk put so far is durable afterwards
+  write the last pack; every chunk put so far is durable afterwards.  gc may run from
+  here on, and it removes chunks no snapshot holds: a backup whose snapshot follows uses
+  `finish_unsaved` where a gc of another thread is possible (Repo::save_snapshot)
+- **`fn finish_unsaved(mut self) -> CasResult<(WriteStats, Unsaved<'a>)>`**
+  `finish`, and gc stays out until the snapshot of these chunks is saved through the
+  returned `Unsaved` (or that is dropped: a backup given up)
+
+- **`struct Unsaved<'a>`**
+  what a writer finished with `finish_unsaved` leaves: its chunks -- new ones and those it
+  found stored already -- before a snapshot holds them.  gc waits while this lives, so the
+  thread that holds it starts no gc, check or further writer before it is saved or dropped.
+
+**`impl Unsaved<'_>`**
+
+- **`fn save_snapshot(self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()>`**
+  store the snapshot of these chunks (signed by `signer`); gc may run again afterwards
 
 ### `cas/chunker.rs`
 

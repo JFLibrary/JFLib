@@ -49,6 +49,8 @@ extern crate alloc;
 pub mod consts;
 pub mod keys;
 mod a11y;
+pub use a11y::{A11yAction, A11yRequest}; // ui.a11y_request_take (section 19)
+mod a11y_auto; // the scripts' command a11y
 mod auto;
 mod auto_perm;
 mod agent;
@@ -234,7 +236,7 @@ use text::Text;
 pub use clipimg::{clip_bmp_from_sf, clipimg_parse, clipimg_record};
 pub use cmd::{Cmd, Draw, DrawRef, Gfx, IconHook};
 pub use consts::*;
-pub use ctx::{KeyEvent, Sem, Slot, ease};
+pub use ctx::{KeyEvent, Sem, SemAx, Slot, ease};
 pub use plat::{Preedit, IP_EMAIL, IP_NUMBER, IP_PASSWORD, IP_PHONE, IP_SEARCH, IP_TEXT, IP_URL}; // (E4) ui.ime_preedit, ui.ime_enable
 pub use cursor::CursorDraw;
 pub use edit::TextboxPresentation;

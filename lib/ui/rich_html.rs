@@ -1701,7 +1701,9 @@ impl Sheet {
             let Some(open) = s[i..].find('{').map(|k| i + k) else { break };
             let end = skip_rule(b, open, false);
             let sel = s[i..open].trim();
-            let body = &s[open + 1..end.saturating_sub(1).max(open + 1)];
+            // (a rule whose '}' is missing runs to the end of the text: nothing to leave out there)
+            let close = if end > open + 1 && b[end - 1] == b'}' { end - 1 } else { end };
+            let body = &s[open + 1..close];
             i = end;
             let Some(sels) = parse_sels(sel) else { continue };
             let decls = parse_decls(body);

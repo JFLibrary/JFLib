@@ -122,10 +122,8 @@ struct Wp {
     defprn: Cell<usize>,
 }
 
-struct UiOnly(Wp);
-// SAFETY: print runs on the UI thread only (as in the assembly: plain globals).
-unsafe impl Sync for UiOnly {}
-static WP: UiOnly = UiOnly(Wp { state: Cell::new(0), dlg: Cell::new(0), defprn: Cell::new(0) });
+// print runs on the UI thread only (UiOnly refuses other threads)
+static WP: crate::ui_only::UiOnly<Wp> = crate::ui_only::UiOnly::new(Wp { state: Cell::new(0), dlg: Cell::new(0), defprn: Cell::new(0) });
 
 /// a function of a system DLL (0 = missing)
 fn dll_proc(dll: &[u8], name: &[u8]) -> usize {
@@ -139,7 +137,7 @@ fn dll_proc(dll: &[u8], name: &[u8]) -> usize {
 /// COM for the dialog, PrintDlgExW and GetDefaultPrinterW (both optional: the test variant
 /// works without)  [wp_load]
 fn wp_load() {
-    let w = &WP.0;
+    let w = WP.get();
     if w.state.get() != 0 {
         return;
     }
@@ -215,7 +213,7 @@ fn clip_cap(s: &str, cap: usize) -> usize {
 
 /// dmDeviceName = the default printer (GetDefaultPrinterW) -> true when found  [wp_default_name]
 fn wp_default_name(dm: &mut [u8]) -> bool {
-    let f = WP.0.defprn.get();
+    let f = WP.get().defprn.get();
     if f == 0 {
         return false;
     }
@@ -347,7 +345,7 @@ fn open_dc(paper: u32, flags: u32, pages: u32) -> Result<Dc, i32> {
         None => {
             // ---- the system dialog (needs the main window: never headless)
             let owner = super::hwnd_main();
-            let dlg = WP.0.dlg.get();
+            let dlg = WP.get().dlg.get();
             if owner == 0 || dlg == 0 {
                 return Err(ERR_UNSUPPORTED);
             }

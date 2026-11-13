@@ -424,6 +424,23 @@ fn byte_of_char(t: &str, c: usize) -> usize {
     t.char_indices().nth(c).map_or(t.len(), |(i, _)| i)
 }
 
+// p as a position of lines: on a line there is, at most at its end and at a character boundary
+fn pos_in(lines: &[String], p: TextPos) -> TextPos {
+    let Some(last) = lines.len().checked_sub(1) else { return TextPos::new(0, 0) };
+    let line = p.line.min(last);
+    let t = &lines[line];
+    let mut b = p.byte.min(t.len());
+    while !t.is_char_boundary(b) {
+        b -= 1;
+    }
+    TextPos::new(line, b)
+}
+
+// a selection of lines (pos_in for both ends)
+fn sel_in(lines: &[String], s: TextSel) -> TextSel {
+    TextSel::new(pos_in(lines, s.anchor), pos_in(lines, s.caret))
+}
+
 struct LineEdit {
     first: usize,
     old: Vec<String>,
@@ -435,12 +452,17 @@ struct LineEdit {
 }
 
 impl Edit<CodeBody> for LineEdit {
+    // (the selection a step leaves is one of the text it leaves: a caller that measured it in
+    // the text before the step would otherwise hand redo a position past a line's end or
+    // inside a character, and the next edit slices there)
     fn apply(&mut self, s: &mut CodeBody) {
         s.splice(self.first, self.old.len(), &self.new);
+        self.sel1 = sel_in(&s.lines, self.sel1);
         s.sel = self.sel1;
     }
     fn revert(&mut self, s: &mut CodeBody) {
         s.splice(self.first, self.new.len(), &self.old);
+        self.sel0 = sel_in(&s.lines, self.sel0);
         s.sel = self.sel0;
     }
     fn label(&self) -> &str {
@@ -714,7 +736,7 @@ impl CodeDoc {
             new.push(String::new());
         }
         if self.body.lines[first..first + n] == new[..] {
-            self.body.sel = sel;
+            self.body.sel = sel_in(&self.body.lines, sel);
             return false;
         }
         let old = self.body.lines[first..first + n].to_vec();
@@ -934,7 +956,11 @@ impl CodeDoc {
         let last = if b.line > a.line && b.byte == 0 { b.line - 1 } else { b.line };
         let lines = &self.body.lines[a.line..=last];
         let all = lines.iter().filter(|t| !t.trim().is_empty()).all(|t| t.trim_start().starts_with(prefix));
-        let min_ind = lines.iter().filter(|t| !t.trim().is_empty()).map(|t| t.len() - t.trim_start().len()).min().unwrap_or(0);
+        // the indentation the lines share: blanks and tabs only (one byte each, so the cut below
+        // is at a character boundary of every line; a no-break space is 2 bytes, an ideographic
+        // space 3, and the smallest count of another line can end inside one)
+        let ind = |t: &str| t.bytes().take_while(|&c| c == b' ' || c == b'\t').count();
+        let min_ind = lines.iter().filter(|t| !t.trim().is_empty()).map(|t| ind(t)).min().unwrap_or(0);
         let mut new = Vec::new();
         let mut shift = Vec::new();
         for t in lines {
@@ -993,7 +1019,12 @@ impl CodeDoc {
             new.rotate_right(1);
         }
         let d = if delta < 0 { -1isize } else { 1 };
-        let mv = |p: TextPos| TextPos::new((p.line as isize + d) as usize, p.byte);
+        // (a selection of whole lines ends at the start of the line below them; moved down to
+        // the end of the text there is no such line: it ends at the end of the last one)
+        let mv = |p: TextPos| {
+            let l = (p.line as isize + d) as usize;
+            if l >= n { TextPos::new(n - 1, new[cnt - 1].len()) } else { TextPos::new(l, p.byte) }
+        };
         let to = TextSel::new(mv(sel.anchor), mv(sel.caret));
         self.edit(first, cnt, new, to, tr("Zeilen verschieben"), CK_NONE)
     }

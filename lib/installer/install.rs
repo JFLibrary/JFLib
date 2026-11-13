@@ -61,6 +61,9 @@ fn in_write_entry(st: &Inst, i: usize, path: &str) -> bool {
 }
 
 /// append "key=value\r\n" to the install.ini text  [in_ini]
+// (never cut to a fixed size, as the asm's 8192-byte buffer was: the lists of the files and of
+// what the file types added stand last, and a list cut inside an entry hands the uninstaller
+// another name -- "T:Software" for "T:Software\Classes\App.ext")
 fn in_ini(txt: &mut String, key: &str, value: &str) {
     for s in [key, "=", value, "\r\n"] {
         txt.push_str(s);
@@ -104,6 +107,8 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
         if !in_write_entry(st, i, &path) {
             return in_fail(st, "„%s“ konnte nicht geschrieben werden.", &path);
         }
+        // (the whole list: a name cut short is another file for the uninstaller, a name left
+        // out a file it leaves behind)
         if !files.is_empty() {
             files.push(';');
         }
@@ -142,7 +147,11 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     if !st.appid.is_empty() {
         in_ini(&mut initxt, "app_id", &st.appid);
     }
-    plat::write_file(&in_path(st, "install.ini"), initxt.as_bytes());
+    // (without it the uninstaller of "installed apps" finds nothing to remove)
+    let ini = in_path(st, "install.ini");
+    if !plat::write_file(&ini, initxt.as_bytes()) {
+        return in_fail(st, "„%s“ konnte nicht geschrieben werden.", &ini);
+    }
     Ok(())
 }
 

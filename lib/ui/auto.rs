@@ -59,10 +59,19 @@
 //                   holds however long the threads took)
 //   shot FILE.png   render and save a screenshot
 //   dump [FILE]     print / save the widget tree
-//   expect S exists | missing | hover | nohover | focused | checked | unchecked | disabled |
-//            enabled | selected | open | pressed | unpressed | value N | value MIN..MAX | max N |
-//            text "s" |
+//   expect S exists | missing | hover | nohover | focused | unfocused | checked | unchecked |
+//            disabled | enabled | selected | unselected | open | closed | pressed | unpressed |
+//            value N | value MIN..MAX | max N | text "s" |
 //            rect X Y W H   (rect: '*' takes any value)
+//   a11y ACTION S [ARG]   (a11y_auto.rs, section 19) a screen reader's request for the node of
+//                 record S, as a bridge sends it: click, focus, scroll, expand, collapse,
+//                 increment, decrement, select, add, remove, value N, text "s", selecttext A C
+//   a11y expect S role R | name "s" | desc "s" | url "s" | text "s" | level N | set POS SIZE |
+//                 cell ROW COL [RSPAN CSPAN] | grid ROWS COLS | live polite|assertive|off |
+//                 is STATE | not STATE | can ACTION | cannot ACTION | parent S2 | top |
+//                 children N | missing          (its node in the accessibility tree)
+//   a11y expect announced "s" | none   the last text ui.announce said since the last check
+//   a11y dump [FILE]      the accessibility tree as text
 //   expect theme "NAME" | none    the app theme;  expect theme error "TEXT" | none  the error
 //                                 of the last `theme file` contains TEXT
 //   expect style NAME   expect token NAME #RRGGBB|#AARRGGBB (a colour token now)
@@ -629,7 +638,7 @@ impl Ui {
         json_escape(&mut lab, r.label.as_deref().unwrap_or("").as_bytes(), 180);
         // rect in DIP (at the dpi of the record's window)
         let dpi = self.win_dpi(r.win as u32);
-        let kind = if r.kind < K_KIND_COUNT { KIND_NAMES[r.kind as usize] } else { KIND_NAMES[0] };
+        let kind = kind_name(r.kind);
         out.extend_from_slice(
             alloc::format!("{{\"l\":{},\"d\":{},\"id\":{},\"k\":\"{}\",\"t\":\"", r.layer, r.depth, r.id, kind).as_bytes(),
         );
@@ -731,8 +740,8 @@ impl Ui {
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 57] = [
-            "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
+        const CMDS: [&str; 58] = [
+            "a11y", "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
             "key", "keys", "keydown", "keyup", "type", "commit", "preedit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
@@ -749,6 +758,7 @@ impl Ui {
         let a = next_word(l);
         match c {
             "quit" => return true,
+            "a11y" => self.sc_a11y(app, a), // a11y_auto.rs
             "system" => self.sc_system(app, a),
             "sensor" => self.sc_sensor(app, a),
             "location" => self.sc_location(app, a),
@@ -1037,7 +1047,8 @@ impl Ui {
             }
             // kind:"Label"
             let mut found = false;
-            for (k, n) in KIND_NAMES.iter().enumerate() {
+            for k in 0..K_KIND_END {
+                let n = kind_name(k);
                 if p.starts_with(n.as_bytes()) && p.get(n.len()) == Some(&b':') {
                     self.sc.sel_kind = k as i32;
                     q = &p[n.len() + 1..];
@@ -2204,11 +2215,14 @@ impl Ui {
             return;
         };
         let rec = self.sel_rec(s);
-        const STATES: [(&str, u16, bool); 11] = [
+        const STATES: [(&str, u16, bool); 14] = [
             ("hover", SS_HOVER, true),
             ("nohover", SS_HOVER, false),
             ("unpressed", SS_PRESSED, false),
             ("focused", SS_FOCUSED, true),
+            ("unfocused", SS_FOCUSED, false),
+            ("unselected", SS_SELECTED, false),
+            ("closed", SS_OPEN, false),
             ("checked", SS_CHECKED, true),
             ("unchecked", SS_CHECKED, false),
             ("disabled", SS_DISABLED, true),

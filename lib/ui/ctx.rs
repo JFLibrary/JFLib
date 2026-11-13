@@ -175,6 +175,49 @@ pub struct Sem {
     pub depth: u8,
     /// window index (0 = the main window)
     pub win: u8,
+    /// what the record says beyond kind, label and value (its own 64-bit id, a parent, a
+    /// description, cells, states ...): set through the record's setters (id64, parent, desc ...;
+    /// section 19 of the guide); None for the records of the built-in widgets
+    pub ax: Option<alloc::boxed::Box<SemAx>>,
+}
+
+/// What a semantic record says beyond its kind, label and value (Sem::ax): its setters fill it
+/// (`ui.sem_rect(..).id64(7).parent(3).desc("..")`); a web page's accessibility tree needs it.
+#[derive(Clone, Debug, Default, PartialEq)]
+#[non_exhaustive]
+pub struct SemAx {
+    /// the record's own id (below 2^62): a screen reader's requests for it come back with it
+    /// (ui.a11y_request_take); 0: none
+    pub id: u64,
+    /// the record it hangs under in the accessibility tree: one with this id64 (or, without one,
+    /// this widget id) published in the same frame and window; 0: by its rectangle
+    pub parent: u64,
+    /// its name when the label is something else (a text box's or drop-down's label is its text)
+    pub name: Option<String>,
+    /// a description beside the name (a hint, a page's aria-describedby)
+    pub desc: Option<String>,
+    /// a link's address
+    pub url: Option<String>,
+    /// the text a screen reader says for a value (a slider's "Monday", a page's aria-valuetext)
+    pub value_text: Option<String>,
+    /// AS_*
+    pub states: u32,
+    /// its position in its set (1-based) and the set's size (0: unknown)
+    pub set: [u32; 2],
+    /// the level of a heading, tree item, list item or row (1 the top; 0: none / the value)
+    pub level: u32,
+    /// a cell's row, column (0-based), row span, column span (spans 0: no place)
+    pub cell: [u32; 4],
+    /// a table's rows and columns (0: unknown)
+    pub grid: [u32; 2],
+    /// LIVE_* (0: as its kind says)
+    pub live: u32,
+    /// value, minimum, maximum, step with fractions (a meter at 0.4 of 1); None: Sem::value / min
+    /// / max
+    pub range: Option<[f64; 4]>,
+    /// a focused text box's selection: anchor, caret in characters (a page's field; the built-in
+    /// boxes report theirs themselves)
+    pub sel: Option<[u32; 2]>,
 }
 
 /// persistent per-id state (slot)  [SL_*]
@@ -1218,6 +1261,7 @@ impl Ui {
             layer: c.cmd_layer_ui as u8,
             depth: self.wp.lay.boxes.len() as u8,
             win: self.uiw_cur as u8,
+            ax: None,
         };
         if let Some(l) = label {
             // copy the label into the frame text arena (it may live in a scratch buffer)
