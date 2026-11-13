@@ -34154,6 +34154,10 @@ Roles (role / subrole; where the name goes: T title, L label (AXDescription), V 
   (tests, any thread) ask the element with this role and name about its text as VoiceOver does
   (None: no such element, or it does not offer the attribute)
 
+- **`fn ax_test_window(pw: i32) -> ([i32; 4], i32, bool)`**
+  (tests, any thread) window pw on the main thread, where its state lives (UiOnly): its client
+  area in px of the screen, its dpi and whether it is the key window
+
 - **`fn ax_test_focused() -> Option<(String, String)>`**
   (tests, any thread) the focused element of the application as VoiceOver asks it (role, name)
 
