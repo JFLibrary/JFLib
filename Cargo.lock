@@ -35,6 +35,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "a11ytest"
+version = "0.1.0"
+dependencies = [
+ "jflib-build",
+ "jflib-rt",
+ "jflib-style-winui",
+ "jflib-ui",
+]
+
+[[package]]
 name = "agenttest"
 version = "0.0.0"
 dependencies = [

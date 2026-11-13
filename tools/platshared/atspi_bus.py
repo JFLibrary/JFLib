@@ -250,7 +250,8 @@ def walk(bus, path, depth=0, out=None):
     return out
 
 
-def fake(exe, lang=None):
+def fake(exe, lang=None, test="a11y-bus", reader=None):
+    reader = reader or screen_reader
     with tempfile.TemporaryDirectory() as d:
         sess, a11y = os.path.join(d, "session"), os.path.join(d, "a11y")
         srec = {}
@@ -258,10 +259,10 @@ def fake(exe, lang=None):
         bus = A11yBus(a11y)
         env = {k: v for k, v in os.environ.items() if k not in ("jfgui_A11Y", "NO_AT_BRIDGE")}
         env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={sess}"
-        p = subprocess.Popen([str(exe), "--test", "a11y-bus", "--auto-close", "60000"] + (["--lang", lang] if lang else []),
+        p = subprocess.Popen([str(exe), "--test", test, "--auto-close", "60000"] + (["--lang", lang] if lang else []),
                              env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
-            screen_reader(bus, srec, lang or "de")
+            reader(bus, srec, lang or "de")
         except Exception as e:  # noqa: BLE001
             check("the screen reader ran through", False, repr(e))
             p.kill()
@@ -271,7 +272,7 @@ def fake(exe, lang=None):
             p.kill()
             out, err = p.communicate()
     print(out.strip())
-    check(f"plattest --test a11y-bus passed ({lang or 'de'})", p.returncode == 0, (p.returncode, err.strip()[-800:]))
+    check(f"plattest --test {test} passed ({lang or 'de'})", p.returncode == 0, (p.returncode, err.strip()[-800:]))
 
 
 # GetLocalizedRoleName of the heading, a push button, the switch, the window and the application
@@ -403,6 +404,149 @@ def screen_reader(bus, srec, lang="de"):
     check("the window was announced", any(s[2] in ("Create", "Activate") or (s[2] == "ChildrenChanged" and s[0] == ROOT)
                                           for s in bus.signals), [s[2] for s in bus.signals[:8]])
     bus.call(quit_["path"], "org.a11y.atspi.Action", "DoAction", "i", [0])
+
+
+# (--rich) the roles of a web page's nodes (apps/a11ytest's page, plattest --test a11y-rich-bus)
+RICH_ROLE = {"table": 55, "table row": 90, "table cell": 56, "column header": 10, "row header": 47, "landmark": 110,
+             "form": 87, "tree": 65, "tree item": 91, "panel": 39, "tool bar": 63, "tool tip": 64, "separator": 50,
+             "notification": 101, "status bar": 54, "log": 111, "level bar": 103, "spin button": 52, "scroll bar": 48,
+             "article": 109, "link": 88, "entry": 79, "push button": 43, "heading": 83, "label": 29, "canvas": 6}
+RICH_ST = {"busy": 3, "collapsed": 5, "editable": 7, "expandable": 9, "expanded": 10, "multiselectable": 18,
+           "selectable": 22, "selected": 23, "showing": 25, "required": 33, "invalid-entry": 36, "visited": 40}
+
+
+def rich_states(bits):
+    v = bits[0] | bits[1] << 32
+    return {n for n, b in RICH_ST.items() if v >> b & 1}
+
+
+def rich_reader(bus, srec, lang="de"):
+    """the page as Orca meets it: roles of their own, attributes, Table / TableCell, Hyperlink,
+    Description, states; actions that become requests to the app (expand, ScrollTo, SelectChild,
+    SetTextContents), announcements (a11y::announce, a live region), then "Beenden" """
+    check("rich: embedded in the registry", bus.wait(lambda: bus.embedded is not None, 20), srec)
+    if not bus.embedded:
+        return
+    wins = []
+    end = time.time() + 15
+    while time.time() < end and not wins:
+        wins = bus.call(ROOT, ACC, "GetChildren")[0]
+        time.sleep(0.1)
+    check("rich: one window", len(wins) == 1, wins)
+    if not wins:
+        return
+    w = wins[0][1]
+    # the page comes with a frame of its own: wait for it
+    t = []
+    for _ in range(50):
+        t = walk(bus, w)
+        if any(o["name"] == "Preise" for o in t):
+            break
+        time.sleep(0.1)
+
+    def find(role, name, tr=None):
+        return next((o for o in (tr or t) if o["role"] == RICH_ROLE[role] and o["name"] == name), None)
+
+    def attrs(o):
+        return bus.call(o["path"], ACC, "GetAttributes")[0]
+
+    def st(o):
+        return rich_states(bus.call(o["path"], ACC, "GetState")[0])
+    for role, name in [("table", "Preise"), ("table row", "Apfel 1,20 €"), ("table cell", "1,20 €"), ("column header", "Preis"),
+                       ("row header", "Apfel"), ("landmark", "Hauptmenü"), ("landmark", "Kopf"), ("form", "Bestellung"),
+                       ("tree", "Ordner"), ("tree item", "Dokumente"), ("panel", "Versand"), ("tool bar", "Werkzeuge"),
+                       ("tool tip", "Pflichtfeld: Vor- und Nachname"), ("status bar", "Bereit"), ("log", "Verlauf"),
+                       ("level bar", "Speicher"), ("spin button", "Menge"), ("scroll bar", "Seite"), ("article", "Neuigkeiten")]:
+        check(f"rich: {name!r} has the role {role}", find(role, name) is not None, [(o["role"], o["name"]) for o in t][:80])
+    check("rich: a separator", any(o["role"] == RICH_ROLE["separator"] for o in t))
+    nav, banner = find("landmark", "Hauptmenü"), find("landmark", "Kopf")
+    if nav and banner:
+        check("rich: xml-roles of landmarks", attrs(nav).get("xml-roles") == "navigation" and attrs(banner).get("xml-roles") == "banner",
+              (attrs(nav), attrs(banner)))
+        check("rich: GetLocalizedRoleName of a landmark (its Sub)", bus.call(nav["path"], ACC, "GetLocalizedRoleName")[0] == "Navigation")
+    docs = find("tree item", "Dokumente")
+    if docs:
+        a = attrs(docs)
+        check("rich: a tree item's level and place", (a.get("level"), a.get("posinset"), a.get("setsize")) == ("1", "1", "2"), a)
+        check("rich: collapsed, expandable", {"collapsed", "expandable"} <= st(docs), st(docs))
+    table, cell = find("table", "Preise"), find("table cell", "0,90 €")
+    ti, ci = "org.a11y.atspi.Table", "org.a11y.atspi.TableCell"
+    if table and cell:
+        check("rich: Table: 3 rows, 2 columns", (bus.prop(table["path"], ti, "NRows"), bus.prop(table["path"], ti, "NColumns")) == (3, 2))
+        at = bus.call(table["path"], ti, "GetAccessibleAt", "ii", [2, 1])[0]
+        check("rich: Table.GetAccessibleAt(2, 1) is the cell", at == (APP, cell["path"]), at)
+        span = bus.call(cell["path"], ci, "GetRowColumnSpan")
+        check("rich: TableCell.GetRowColumnSpan", span == [1, 2, 1, 1, 1], span)
+        hs = bus.call(cell["path"], ci, "GetColumnHeaderCells")[0]
+        check("rich: TableCell.GetColumnHeaderCells: 'Preis'", [bus.prop(p, ACC, "Name") for _, p in hs] == ["Preis"], hs)
+        check("rich: the cell's rowindex / colindex", (attrs(cell).get("rowindex"), attrs(cell).get("colindex")) == ("3", "2"), attrs(cell))
+        check("rich: the table is multi-selectable", "multiselectable" in st(table), st(table))
+    link, name = find("link", "Start"), find("entry", "Name")
+    if link:
+        check("rich: Hyperlink.GetURI", bus.call(link["path"], "org.a11y.atspi.Hyperlink", "GetURI", "i", [0])[0] == "https://example.org/")
+        check("rich: a visited link", "visited" in st(link), st(link))
+    if name:
+        check("rich: a text box's Description", bus.prop(name["path"], ACC, "Description") == "Vor- und Nachname")
+        check("rich: required, invalid-entry", {"required", "invalid-entry"} <= st(name), st(name))
+    status = find("status bar", "Bereit")
+    if status:
+        check("rich: a status line is a polite live region", attrs(status).get("live") == "polite", attrs(status))
+    art = find("article", "Neuigkeiten")
+    if art:
+        check("rich: the article out of view is not showing", "showing" not in st(art), st(art))
+
+    # actions: requests to the app; their results come back in the tree
+    act = "org.a11y.atspi.Action"
+    if docs:
+        names = [a[0] for a in bus.call(docs["path"], act, "GetActions")[0]]
+        check("rich: a tree item's actions click, expand", names == ["click", "expand"], names)
+        n = len(bus.signals)
+        if "expand" in names:
+            bus.call(docs["path"], act, "DoAction", "i", [names.index("expand")])
+        ev = bus.signal("ChildrenChanged", None, "add", n)
+        check("rich: expand: an item appears (ChildrenChanged add)", ev is not None, ev)
+        t2 = walk(bus, w)
+        check("rich: 'Briefe' under 'Dokumente', level 2",
+              any(o["name"] == "Briefe" and o["up"] == docs["path"] and attrs(o).get("level") == "2" for o in t2))
+    if art:
+        check("rich: Component.ScrollTo", bus.call(art["path"], "org.a11y.atspi.Component", "ScrollTo", "u", [0])[0] == 1)
+        ok = False
+        for _ in range(40):
+            if "showing" in st(art):
+                ok = True
+                break
+            time.sleep(0.1)
+        check("rich: the article in view (showing)", ok)
+    if table:
+        si = "org.a11y.atspi.Selection"
+        check("rich: Selection on the table", si in bus.call(table["path"], ACC, "GetInterfaces")[0])
+        # the selectable items of the table: its two rows; several at once: add the second
+        check("rich: Selection.SelectChild(1) (the second row)", bus.call(table["path"], si, "SelectChild", "i", [1])[0] == 1)
+        ok = False
+        for _ in range(40):
+            if bus.prop(table["path"], si, "NSelectedChildren") == 1:
+                ok = True
+                break
+            time.sleep(0.1)
+        check("rich: one row selected", ok)
+    if name:
+        check("rich: EditableText.SetTextContents",
+              bus.call(name["path"], "org.a11y.atspi.EditableText", "SetTextContents", "s", ["Bert"])[0] == 1)
+    # announcements: ui.announce, a live region that changes
+    t3 = walk(bus, w)
+    say, stat, quit_ = find("push button", "Ansage", t3), find("push button", "Status", t3), find("push button", "Beenden", t3)
+    check("rich: the buttons Ansage, Status, Beenden", all([say, stat, quit_]))
+    if say and stat:
+        n = len(bus.signals)
+        bus.call(say["path"], act, "DoAction", "i", [0])
+        ev = bus.signal("Announcement", None, None, n)
+        check("rich: Announcement 'Gespeichert', polite", ev is not None and ev[3] == ("s", "Gespeichert") and ev[1] == 1, ev)
+        n = len(bus.signals)
+        bus.call(stat["path"], act, "DoAction", "i", [0])
+        ev = bus.signal("Announcement", status["path"] if status else None, None, n)
+        check("rich: the status line's change is announced", ev is not None and ev[3] == ("s", "Gespeichert"), ev)
+    if quit_:
+        bus.call(quit_["path"], act, "DoAction", "i", [0])
 
 
 def caret(bus, txt, ti):
@@ -593,10 +737,13 @@ def main():
     ap.add_argument("--rs", default="build")
     ap.add_argument("--real", action="store_true")
     ap.add_argument("--real-inner", action="store_true")
+    ap.add_argument("--rich", action="store_true")
     a = ap.parse_args()
     exe = Path(a.rs).resolve() / "linux" / "plattest"
     if a.real_inner:
         real_inner(exe)
+    elif a.rich:
+        fake(exe, None, "a11y-rich-bus", rich_reader)
     else:
         fake(exe)
         fake(exe, "en")

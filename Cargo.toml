@@ -147,6 +147,7 @@ members = [
     "apps/webgputest",
     "apps/wgsltest",
     "apps/viewtest",
+    "apps/a11ytest",
 ]
 
 # The one version of the library (rt::VERSION; `build_rs.py release` writes it, docs/VERSIONING.md)

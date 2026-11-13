@@ -82,6 +82,11 @@
 //                                          settings: the jfgui_* overrides, the title bar's
 //                                          layout; Linux: GTK's / KDE's files, against a fake
 //                                          settings portal (with and without appearance keys)
+//   plattest --test a11y-rich / uia-rich / a11y-rich-bus   (t_a11y_rich.rs) a web page's
+//                                          accessibility tree (apps/a11ytest's page): headless
+//                                          model, requests, live regions, the rich update format;
+//                                          Windows through IUIAutomation (by hand); Linux against
+//                                          atspi_bus.py --rich
 //   plattest --test secret / secret-bus    (t_secret.rs) the system's secret store: the real
 //                                          one (Credential Manager + DPAPI, Secret Service; the
 //                                          test entries are removed again); Linux against a
@@ -177,6 +182,8 @@ use base::{Args, Ini, f64_format, f64_parse};
 
 // the accessibility tree (screen readers)
 mod t_a11y;
+// a web page's accessibility tree (apps/a11ytest's page)
+mod t_a11y_rich;
 mod t_async;
 // plat-win: the R4 tests of the Windows platform layer
 mod t_cursor;
@@ -411,6 +418,9 @@ fn plattest() -> i32 {
         Some("settings") => t_settings::t_settings,    // the system settings: overrides, defaults
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
         Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
+        Some("a11y-rich") => t_a11y_rich::t_a11y_rich, // a web page's accessibility tree, headless
+        Some("a11y-rich-bus") => t_a11y_rich::t_a11y_rich_bus, // Linux: against atspi_bus.py --rich
+        Some("uia-rich") => t_a11y_rich::t_uia_rich,   // Windows, by hand: the page through UI Automation
         Some("a11y") => t_a11y::t_a11y,                // the accessibility tree, headless
         Some("a11y-bus") => t_a11y::t_a11y_bus,        // Linux: against tools/platshared/atspi_bus.py
         Some("uia") => t_a11y::t_uia,                  // Windows, by hand: UI Automation
