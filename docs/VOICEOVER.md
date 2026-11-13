@@ -1,8 +1,8 @@
 # VoiceOver-Plan: der Screenreader auf Mac und iPhone
 
-Stand 2026-11-13, auf Basis von `main` ce54de4c. Umgesetzt sind VO0 bis VO3 (macOS: die Brücke mit Rollen, Werten,
-Aktionen, Mitteilungen und Text, `plattest --test a11y-mac`; die Hand-Probe auf dem Mac ist bestanden) und VO4 (iOS:
-Elemente, Traits, UITextInput, `plattest --test a11y-ios` im Simulator). Die Hand-Probe auf dem iPhone (VO5) steht aus.
+Stand 2026-11-13: alle Stufen umgesetzt. macOS (VO0 bis VO3): die Brücke mit Rollen, Werten, Aktionen, Mitteilungen
+und Text, `plattest --test a11y-mac`; iOS (VO4, VO5): Elemente, Traits, UITextInput, `plattest --test a11y-ios` im
+Simulator. Die Hand-Proben des Nutzers auf dem Mac und dem iPhone 14 sind bestanden. Offen ist nur der Text der Website.
 Die vier Entscheidungen unten hat der Nutzer am 2026-11-12 alle wie empfohlen getroffen.
 
 ## Ziel
@@ -197,6 +197,10 @@ Knoten, „Bildschirm geändert“ bei einem neuen Dialog oder Popup-Menü.
 - Doku und Website (Roadmap: VoiceOver erledigt, Vergleich ohne die Lücke).
 
 **Fertig, wenn:** die Hand-Probe auf dem iPhone nichts Wichtiges mehr findet.
+
+**Hand-Probe (2026-11-13):** Pocket Gallery auf dem iPhone 14 mit VoiceOver, deutsch (das Info.plist nennt die
+Sprachen, siehe VO3): Wischen, Doppeltippen, Schalter, Schieberegler, Textfeld, Menüs und die Escape-Geste ohne
+Befund. **VO5 fertig.**
 
 ## Reihenfolge
 
