@@ -98,6 +98,11 @@ pub trait Stream: Send + Sync {
     fn sync(&self) -> bool {
         true
     }
+    /// whether written bytes reach the provider only by sync or drop (a whole-file buffer: File
+    /// on a provider without streams or OS files); plat::log refuses such files
+    fn deferred(&self) -> bool {
+        false
+    }
 }
 
 /// A file tree behind a scheme.  Paths are relative ("" is the root), '/' separated and
@@ -156,6 +161,14 @@ pub trait Provider: Send + Sync {
     /// truncate, FO_RW: open or create).  The default, Generic, lets File::open use os_path,
     /// else read and write the whole file (written back on sync and when the File is dropped)
     fn open(&self, _path: &str, _mode: u32) -> Opened {
+        Opened::Generic
+    }
+    /// a new file where nothing is (File::create_new, AtomicFile's sibling): the check and the
+    /// creation in one step, so that no other writer's entry of that name is ever opened or
+    /// emptied -> a stream for writing; Refused when the name is taken.  The default, Generic:
+    /// the OS's exclusive create of os_path; without os_path the provider has no
+    /// File::create_new (AtomicFile then checks and opens, with a name of its own)
+    fn create_new(&self, _path: &str) -> Opened {
         Opened::Generic
     }
     /// the name to show the user for path (None: its last segment; content:// documents:
@@ -599,6 +612,17 @@ impl Provider for MemFs {
             None => Opened::Refused,
         }
     }
+
+    fn create_new(&self, path: &str) -> Opened {
+        let mut t = self.t.lock(); // the lock of every write: the check and the new file at once
+        if t.kind(path) != 0 || !t.can_create(path) {
+            return Opened::Refused;
+        }
+        t.add_dirs(parent(path));
+        let f: Shared = Arc::new(SpinLock::new(MemFile { bytes: Vec::new(), t: now() }));
+        t.files.insert(String::from(path), f.clone());
+        Opened::File(Box::new(MemStream { f, writable: true }))
+    }
 }
 
 impl MemFs {
@@ -1033,6 +1057,22 @@ impl Provider for Overlay {
     fn open(&self, path: &str, mode: u32) -> Opened {
         Opened::of(self.open_top(path, mode))
     }
+
+    // in the top layer, where no layer shows path
+    fn create_new(&self, path: &str) -> Opened {
+        let Some(top) = self.layers.first() else { return Opened::Refused };
+        if is_marker(path) || self.kind(path) != 0 || !self.reopen_above(path) || !top.mkdir(parent(path)) {
+            return Opened::Refused;
+        }
+        match crate::create_new_in(top, path) {
+            crate::Created::New(f) => {
+                self.clear_whiteout(path, false);
+                Opened::File(Box::new(f))
+            }
+            crate::Created::Unsupported => Opened::Generic, // the top layer has no such step
+            crate::Created::Refused => Opened::Refused,
+        }
+    }
 }
 
 /// one folder of another provider as a root (a theme folder of app://)
@@ -1089,6 +1129,13 @@ impl Provider for Sub {
     }
     fn open(&self, path: &str, mode: u32) -> Opened {
         Opened::of(crate::open_in(&self.inner, &self.full(path), mode).filter(|_| !path.is_empty()))
+    }
+    fn create_new(&self, path: &str) -> Opened {
+        match crate::create_new_in(&self.inner, &self.full(path)) {
+            crate::Created::New(f) if !path.is_empty() => Opened::File(Box::new(f)),
+            crate::Created::Unsupported => Opened::Generic,
+            _ => Opened::Refused,
+        }
     }
     fn display_name(&self, path: &str) -> Option<String> {
         self.inner.display_name(&self.full(path))

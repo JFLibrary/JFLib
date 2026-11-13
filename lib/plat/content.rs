@@ -51,7 +51,10 @@
 // The document keeps its URI (grants stay valid).  What remains: between the truncation and the
 // end of the write other readers see a part; without a journal (none set) a crash leaves that
 // part; File streams (File::open) write in place without any of this; opening a document for
-// writing, deleting or renaming it drops its pending journal copy.
+// writing, deleting or renaming it drops its pending journal copy -- once the host did it (a
+// refused open or rename keeps the copy for recover).  Writes of one document with a journal
+// run one after the other (also recover and the removal of a copy), so a write that succeeds
+// never removes the copy of another that failed.
 
 use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
@@ -179,6 +182,38 @@ fn key(base: &str, names: &[&str]) -> String {
 
 fn fnv(b: &[u8]) -> u64 {
     b.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, &c| (h ^ c as u64).wrapping_mul(0x0100_0000_01b3))
+}
+
+// the journal files in use (FNV-1a of their path): a write, recover and the removal of a copy
+// take their document's file in turn -- also across ContentFs values on the same folder -- so
+// a write never removes the copy of a later write that failed
+static BUSY: SpinLock<Vec<u64>> = SpinLock::new(Vec::new());
+
+struct Claim(u64);
+
+impl Claim {
+    fn take(journal_file: &str) -> Claim {
+        let k = fnv(journal_file.as_bytes());
+        loop {
+            {
+                let mut b = BUSY.lock();
+                if !b.contains(&k) {
+                    b.push(k);
+                    return Claim(k);
+                }
+            }
+            crate::sleep_ms(1);
+        }
+    }
+}
+
+impl Drop for Claim {
+    fn drop(&mut self) {
+        let mut b = BUSY.lock();
+        if let Some(i) = b.iter().position(|k| *k == self.0) {
+            b.swap_remove(i);
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -415,18 +450,18 @@ impl<H: DocHost> ContentFs<H> {
         Some(format!("{}/{:016x}.jw", self.journal.as_ref()?, fnv(uri.as_bytes())))
     }
 
-    // a pending journal copy of a document goes (the app writes it some other way now)
-    fn drop_journal(&self, uri: &str) {
-        if let Some(j) = self.journal_file(uri) {
-            if crate::file_exists(&j) == 1 {
-                crate::delete(&j);
-            }
-        }
+    // a pending journal copy of a document goes (the app writes it some other way now) ->
+    // false: the copy is still there
+    fn drop_journal(&self, uri: &str) -> bool {
+        let Some(j) = self.journal_file(uri) else { return true };
+        let _c = Claim::take(&j);
+        crate::file_exists(&j) != 1 || crate::delete(&j)
     }
 
     // the document replaced by data, as safely as SAF allows (see the file header)
     fn put(&self, uri: &str, data: &[u8]) -> bool {
         let journal = self.journal_file(uri);
+        let _c = journal.as_deref().map(Claim::take);
         if let (Some(j), Some(dir)) = (&journal, &self.journal) {
             let mut rec = Vec::new();
             if rec.try_reserve(data.len() + uri.len() + 24).is_err() {
@@ -475,6 +510,7 @@ impl<H: DocHost> ContentFs<H> {
         let mut done = 0;
         for f in files {
             let path = format!("{dir}/{f}");
+            let _c = Claim::take(&path);
             let Some(rec) = crate::read_file(&path) else { continue };
             let parsed = (|| {
                 let rest = rec.strip_prefix(JOURNAL)?;
@@ -608,6 +644,10 @@ impl<H: DocHost> Provider for ContentFs<H> {
         if old == new {
             return true;
         }
+        // a folder moves only inside its folder: refused before anything changes
+        if src.dir && ua != ub {
+            return false;
+        }
         let (ko, kn) = (ContentFs::<H>::key_of(old).unwrap_or_default(), ContentFs::<H>::key_of(new).unwrap_or_default());
         // SAF renames to a free name when the new one is taken: the target goes first
         if let Some(t) = self.lookup(new) {
@@ -617,10 +657,13 @@ impl<H: DocHost> Provider for ContentFs<H> {
             self.drop_journal(&t.uri);
         }
         self.forget(&kn);
-        self.drop_journal(&src.uri);
+        // the source's pending journal copy goes only once the source has moved
         if ua == ub {
             let r = self.host.rename(&src.uri, nb);
             self.forget(&ko);
+            if r.is_some() {
+                self.drop_journal(&src.uri);
+            }
             return match r {
                 Some(d) if d.name == nb => {
                     self.remember(kn, &d);
@@ -630,12 +673,12 @@ impl<H: DocHost> Provider for ContentFs<H> {
             };
         }
         // to another folder: a copy, then the old one goes (files only)
-        if src.dir {
-            return false;
-        }
         let Some(data) = self.read_all(&src.uri) else { return false };
         let ok = self.write(new, &data) && self.host.delete(&src.uri);
         self.forget(&ko);
+        if ok {
+            self.drop_journal(&src.uri);
+        }
         ok
     }
 
@@ -657,10 +700,28 @@ impl<H: DocHost> Provider for ContentFs<H> {
                 None => return Opened::Refused,
             },
         };
-        if mode != FO_READ {
-            self.drop_journal(&d.uri);
-        }
+        // a writing stream drops the pending journal copy -- once the host gave one (refused,
+        // the copy stays for recover); a copy that cannot be removed refuses the stream
         match self.host.open(&d.uri, mode) {
+            Some(s) if mode == FO_READ || self.drop_journal(&d.uri) => Opened::File(s),
+            _ => Opened::Refused,
+        }
+    }
+
+    // the host creates the document; a name taken meanwhile gets "name (1)" from SAF: that
+    // document goes again and the name counts as taken
+    fn create_new(&self, path: &str) -> Opened {
+        let Some(Name::Tree(_, _, names)) = parse(path) else { return Opened::Refused };
+        let Some(name) = names.last().map(|n| String::from(*n)) else { return Opened::Refused };
+        if self.lookup(path).is_some() {
+            return Opened::Refused;
+        }
+        let Some(d) = self.create_at(path, false) else { return Opened::Refused };
+        if d.name != name {
+            self.host.delete(&d.uri);
+            return Opened::Refused;
+        }
+        match self.host.open(&d.uri, FO_WRITE) {
             Some(s) => Opened::File(s),
             None => Opened::Refused,
         }

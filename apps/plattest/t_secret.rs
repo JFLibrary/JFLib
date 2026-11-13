@@ -5,8 +5,10 @@
 //                                Service of the session bus.  set, get, overwrite, a second and
 //                                an empty account, binary values, names that differ in a '/',
 //                                another app's prefix (set_app_id), large values up to
-//                                SECRET_MAX, a changed DPAPI file, invalid names, delete; the
-//                                test entries are removed at the end.  Without a store (WSL has
+//                                SECRET_MAX, a changed DPAPI file, two threads writing one
+//                                large entry at once (Windows: no write sweeps the file of a
+//                                newer one), invalid names, delete; the test entries are
+//                                removed at the end.  Without a store (WSL has
 //                                no keyring): Unavailable everywhere, and no file instead.
 //   plattest --test secret-bus --mode M
 //                                (Linux; tools/platshared/secret_bus.py starts it against its
@@ -22,6 +24,7 @@
 // data:// is mounted on the scratch folder first: the DPAPI files land there, and the checks
 // can see that nothing else was written.
 
+use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -40,10 +43,14 @@ fn scratch_data(t: &mut T) -> String {
     dir
 }
 
-// the files below data://secrets
+// the DPAPI files below data://secrets (not the entries' lock files)
 fn dpapi_files() -> Vec<String> {
     let mut v = Vec::new();
-    plat::dir_list("data://secrets", &mut |name, _, _| v.push(String::from(name)));
+    plat::dir_list("data://secrets", &mut |name, _, _| {
+        if name.ends_with(".bin") {
+            v.push(String::from(name));
+        }
+    });
     v
 }
 
@@ -154,6 +161,25 @@ fn round_trip(t: &mut T, svc: &str, large: bool) {
         t.check(secret_set(svc, "big", &max).is_ok() && is(secret_get(svc, "big"), &max), "secret: SECRET_MAX bytes");
         t.check(secret_set(svc, "big", &big(5, SECRET_MAX + 1)) == Err(SecretError::Invalid), "secret: SECRET_MAX + 1 bytes -> Invalid");
         t.check(is(secret_get(svc, "big"), &max), "secret: ... the stored value is unchanged");
+        // two threads write one entry at once, round after round (both large; one small, one
+        // large): the stored value must always be readable
+        let (va, vb) = (big(6, 9_000), big(7, 9_000));
+        let mut broken = 0;
+        for round in 0..16 {
+            let a = if round % 2 == 0 { va.clone() } else { b"small".to_vec() };
+            let (b, s1, s2) = (vb.clone(), String::from(svc), String::from(svc));
+            let h1 = plat::thread_spawn(0, Box::new(move || drop(secret_set(&s1, "race", &a))));
+            let h2 = plat::thread_spawn(0, Box::new(move || drop(secret_set(&s2, "race", &b))));
+            for h in [h1, h2].into_iter().flatten() {
+                h.join();
+            }
+            match secret_get_checked(svc, "race") {
+                Ok(Some(v)) if v == va || v == vb || v == b"small" => {}
+                _ => broken += 1,
+            }
+        }
+        t.expect_i(broken, 0, "secret: two threads writing one entry at once: the stored value stays readable (16 rounds)");
+        t.check(secret_delete(svc, "race") == Ok(true), "secret: ... deleted");
         t.check(secret_delete(svc, "big") == Ok(true) && secret_delete(svc, "edge") == Ok(true), "secret: delete the large entries");
         if win {
             t.expect_i(dpapi_files().len() as i64, 0, "secret: ... and their DPAPI files");
@@ -180,7 +206,7 @@ fn round_trip(t: &mut T, svc: &str, large: bool) {
             left += 1;
         }
     }
-    for (s, a) in [(svc, "big"), (svc, "edge"), (svc, "alice")] {
+    for (s, a) in [(svc, "big"), (svc, "edge"), (svc, "alice"), (svc, "race")] {
         let _ = secret_delete(s, a);
     }
     t.expect_i(left, 0, "secret: every test entry removed");

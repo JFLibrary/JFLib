@@ -9,6 +9,9 @@
 // mount (Provider::open: MemFs, Bundle, ZipFs, Overlay, Sub; other providers: the whole file,
 // read at the start and written back by sync and drop); a FileLock on a mount without OS
 // files holds inside this process only.
+// File::create_new and AtomicFile's sibling on a mount: Provider::create_new (the check and the
+// creation in one step: MemFs, Overlay, Sub, content://), else the OS's exclusive create of
+// os_path; a provider with neither has no File::create_new.
 // AtomicFile is write_file in pieces: a sibling (OS: OsAtomic of win_sys / linux_sys /
 // web_files / android_files; mounts: "NAME.tmp-.." in the mount) put in place by commit,
 // removed when dropped; content:// (no rename over a document): the bytes in memory, written
@@ -147,6 +150,36 @@ pub(crate) fn open_in(p: &Arc<dyn Provider>, path: &str, mode: u32) -> Option<Fi
     }
 }
 
+// what create_new_in made of a name
+pub(crate) enum Created {
+    New(File),
+    // taken or refused
+    Refused,
+    // no step that checks and creates at once: neither Provider::create_new nor the OS's
+    // exclusive create (no os_path, or a system without one: Android, the browser)
+    Unsupported,
+}
+
+/// (vfs) a file created on a provider where nothing was, in one step: the provider's own
+/// create_new, else the OS's exclusive create of its os_path
+pub(crate) fn create_new_in(p: &Arc<dyn Provider>, path: &str) -> Created {
+    if path.is_empty() {
+        return Created::Refused;
+    }
+    match p.create_new(path) {
+        Opened::File(s) => Created::New(File(Inner::Vfs(s))),
+        Opened::Refused => Created::Refused,
+        Opened::Generic => match p.os_path(path) {
+            #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+            Some(o) => match fs_allowed(&o, FS_WRITE).then(|| OsFile::create_new_raw(&o)).flatten() {
+                Some(f) => Created::New(File(Inner::Os(f))),
+                None => Created::Refused,
+            },
+            _ => Created::Unsupported,
+        },
+    }
+}
+
 // a provider without streams: the file read at the start, written back by sync and drop
 fn whole(p: &Arc<dyn Provider>, path: &str, mode: u32) -> Option<File> {
     let data = match (mode, p.kind(path)) {
@@ -180,6 +213,10 @@ impl Whole {
 }
 
 impl Stream for Whole {
+    fn deferred(&self) -> bool {
+        true
+    }
+
     fn read_at(&self, off: u64, buf: &mut [u8]) -> Option<usize> {
         let g = self.st.lock();
         let off = usize::try_from(off).unwrap_or(usize::MAX).min(g.0.len());
@@ -240,21 +277,18 @@ impl File {
         }
     }
 
-    /// Create a named file exclusively; never open an existing path (a mount without OS
-    /// files: exclusive inside this process).
+    /// Create a named file exclusively; never open an existing path.  A mount: the
+    /// provider's own check-and-create (Provider::create_new: mem://, content://, overlays) or
+    /// the OS's of a folder mount; None on a provider with neither.
     #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
     pub fn create_new(path: &str) -> Option<File> {
-        let new_os = |o: &str| if fs_allowed(o, FS_WRITE) { OsFile::create_new_raw(o).map(|f| File(Inner::Os(f))) } else { None };
         match vfs::route(path) {
-            Route::Os => new_os(path),
-            Route::Vfs(p, rest) => match p.os_path(&rest) {
-                Some(o) => new_os(&o),
-                None => {
-                    let _g = NEW_LOCK.lock();
-                    if rest.is_empty() || p.kind(&rest) != 0 { None } else { open_in(&p, &rest, FO_WRITE) }
-                }
+            Route::Os if fs_allowed(path, FS_WRITE) => OsFile::create_new_raw(path).map(|f| File(Inner::Os(f))),
+            Route::Vfs(p, rest) => match create_new_in(&p, &rest) {
+                Created::New(f) => Some(f),
+                _ => None,
             },
-            Route::Bad => None,
+            _ => None,
         }
     }
 
@@ -344,6 +378,12 @@ impl Stream for File {
     fn sync(&self) -> bool {
         File::sync(self)
     }
+    fn deferred(&self) -> bool {
+        match &self.0 {
+            Inner::Vfs(s) => s.deferred(),
+            _ => false,
+        }
+    }
 }
 
 // ---------------------------------------------------------------- atomic streaming writes
@@ -391,10 +431,16 @@ impl AtomicFile {
                 for _ in 0..16 {
                     let seq = ATOMIC_SEQ.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
                     let tmp = alloc::format!("{rest}.tmp-{seq:x}-{:x}", crate::time_us() as u32);
-                    if p.kind(&tmp) != 0 {
-                        continue;
-                    }
-                    let f = open_in(&p, &tmp, FO_WRITE)?;
+                    // the sibling is created where nothing was, in one step: an entry another
+                    // writer made under that name is never taken over (or removed by drop)
+                    let f = match create_new_in(&p, &tmp) {
+                        Created::New(f) => f,
+                        Created::Refused if p.kind(&tmp) != 0 => continue,
+                        Created::Refused => return None,
+                        // no such step: the name is this process's own (sequence and time)
+                        Created::Unsupported if p.kind(&tmp) != 0 => continue,
+                        Created::Unsupported => open_in(&p, &tmp, FO_WRITE)?,
+                    };
                     return Some(AtomicFile(Some(AtomicInner::Vfs { p, tmp, dst: rest, f: Some(f) })));
                 }
                 None
@@ -439,10 +485,6 @@ impl Drop for AtomicFile {
         }
     }
 }
-
-// create_new on mounts without OS files: one check-and-create at a time
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
-static NEW_LOCK: SpinLock<()> = SpinLock::new(());
 
 // the FileLocks of mounts without OS files: provider (address) and path
 static VFS_LOCKS: SpinLock<Vec<(usize, String)>> = SpinLock::new(Vec::new());

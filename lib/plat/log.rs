@@ -13,7 +13,10 @@
 //   log_file(Some(path), max_bytes, keep) -> bool   append the lines to path (a vfs name like
 //                                        logs://app.log or an OS path); when it grows
 //                                        beyond max_bytes it moves to path.1 (path.1 to path.2,
-//                                        ... up to keep files) and a new one starts; None stops
+//                                        ... up to keep files) and a new one starts; None stops.
+//                                        false: it cannot be opened, or it is a file of a
+//                                        provider without streams or OS files (its bytes would
+//                                        reach the provider only when the log stops)
 //   log_recent(max_bytes) -> String      the newest whole lines of the ring (a crash report,
 //                                        a "copy log" button)
 //
@@ -31,7 +34,7 @@ use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use rt::sync::SpinLock;
 
-use crate::{File, FO_RW};
+use crate::{vfs, File, FO_RW};
 
 pub const LOG_OFF: u32 = 0;
 pub const LOG_ERROR: u32 = 1;
@@ -251,7 +254,9 @@ pub fn log_recent(max_bytes: usize) -> String {
 }
 
 /// write the lines to path (rotated at max_bytes, keep older files path.1 .. path.keep);
-/// None stops -> false when the file cannot be opened
+/// None stops -> false when the file cannot be opened, or when its bytes would reach the
+/// provider only at the end (a mount without streams or OS files: nothing of the last segment
+/// or a crash line would arrive before the log stops)
 pub fn log_file(path: Option<&str>, max_bytes: u64, keep: u32) -> bool {
     let mut s = FILE.lock();
     s.file = None;
@@ -261,6 +266,9 @@ pub fn log_file(path: Option<&str>, max_bytes: u64, keep: u32) -> bool {
         crate::mkdir(&p[..k]);
     }
     let Some(f) = File::open(p, FO_RW) else { return false };
+    if vfs::Stream::deferred(&f) {
+        return false; // its lines would reach the provider only when the log stops
+    }
     s.size = f.size().unwrap_or(0);
     s.file = Some(f);
     s.path = String::from(p);

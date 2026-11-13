@@ -6,8 +6,9 @@
 // rename / move, mkdir / delete, stat and display names; the name cache (no listing for a
 // known name, checked against the document, emptied when the host reports a change) and the
 // journal of writes (a copy first, read back and compared, an interrupted write finished by
-// recover() in a new provider, as after a restart); plus vfs::display_name for other names and
-// the file dialog's desktop answers (no picker that answers later, FD_FOLDER).
+// recover() in a new provider, as after a restart; a refused stream or rename keeps the copy,
+// two writes of one document at once keep the failed one's copy); plus vfs::display_name for
+// other names and the file dialog's desktop answers (no picker that answers later, FD_FOLDER).
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -15,7 +16,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use plat::content::{self, ContentFs, DocHost, DocInfo, DOC_CREATE, DOC_WRITE};
 use plat::vfs::{self, Stream};
@@ -31,6 +32,12 @@ type Data = Arc<SpinLock<Vec<u8>>>;
 // the host's change counter (DocHost::generation); a provider that keeps only half of each write
 static GEN: AtomicU64 = AtomicU64::new(0);
 static LOSSY: AtomicBool = AtomicBool::new(false);
+// a host that refuses streams for writing / renames; writes of "BBBB.." fail; a write of
+// "AAAA.." waits while GATE is 1 (2: it is waiting)
+static REFUSE_OPEN: AtomicBool = AtomicBool::new(false);
+static REFUSE_RENAME: AtomicBool = AtomicBool::new(false);
+static FAIL_B: AtomicBool = AtomicBool::new(false);
+static GATE: AtomicU32 = AtomicU32::new(0);
 
 // a storage provider in memory: documents by path ("Docs/a.txt"), IDs "root:" + path
 struct Fake {
@@ -120,8 +127,15 @@ impl Stream for MemStream {
         Some(n)
     }
     fn write_at(&self, off: u64, buf: &[u8]) -> Option<usize> {
-        if !self.writable {
+        if !self.writable || (FAIL_B.load(Ordering::SeqCst) && buf.starts_with(b"BBBB")) {
             return None;
+        }
+        if buf.starts_with(b"AAAA") && GATE.load(Ordering::SeqCst) != 0 {
+            GATE.store(2, Ordering::SeqCst);
+            let dl = plat::time_us() + 10_000_000;
+            while GATE.load(Ordering::SeqCst) == 2 && plat::time_us() < dl {
+                plat::sleep_ms(1);
+            }
         }
         let mut g = self.d.lock();
         let n = buf.len();
@@ -187,6 +201,9 @@ impl DocHost for Host {
         n != self.files.lock().len() + self.dirs.lock().len()
     }
     fn rename(&self, uri: &str, name: &str) -> Option<DocInfo> {
+        if REFUSE_RENAME.load(Ordering::SeqCst) {
+            return None;
+        }
         let (t, p) = self.parse(uri)?;
         let dir = p.rsplit_once('/').map_or("", |(d, _)| d);
         let to = self.free(dir, name);
@@ -207,6 +224,9 @@ impl DocHost for Host {
         self.info(&t, &to)
     }
     fn open(&self, uri: &str, mode: u32) -> Option<Box<dyn Stream>> {
+        if mode != FO_READ && REFUSE_OPEN.load(Ordering::SeqCst) {
+            return None;
+        }
         let (_, p) = self.parse(uri)?;
         let d = self.files.lock().get(&p)?.clone();
         if mode == FO_WRITE {
@@ -288,6 +308,11 @@ fn tree_streams(t: &mut T, at: &dyn Fn(&str) -> String) {
     t.check(f.is_some_and(|f| f.write_at(2, b"ab") == Some(2) && f.size() == Some(4)), "content: File FO_WRITE creates the document");
     t.check(plat::read_file(&at("neu/strom.bin")).as_deref() == Some(&b"\0\0ab"[..]), "content: its bytes");
     t.check(File::open(&at("neu/fehlt.bin"), FO_READ).is_none() && File::open(&at("neu"), FO_RW).is_none(), "content: no stream on a missing name or a folder");
+    // File::create_new: the host creates the document; a taken name is refused
+    t.check(File::create_new(&at("neu/strom.bin")).is_none() && text(&at("neu/strom.bin")).is_some_and(|s| s.len() == 4), "content: File::create_new on a taken name is refused (the file kept)");
+    let f = File::create_new(&at("neu/exklusiv.txt"));
+    t.check(f.is_some_and(|f| f.write_at(0, b"neu") == Some(3)) && text(&at("neu/exklusiv.txt")).as_deref() == Some("neu"), "content: File::create_new creates a document");
+    t.check(plat::delete(&at("neu/exklusiv.txt")), "content: ... deleted again");
 }
 
 fn tree_renames(t: &mut T, tree: &str, at: &dyn Fn(&str) -> String) {
@@ -299,6 +324,11 @@ fn tree_renames(t: &mut T, tree: &str, at: &dyn Fn(&str) -> String) {
     t.check(text(&at("verschoben.txt")).as_deref() == Some("ganz neu!") && plat::file_exists(&at("neu/frisch.txt")) == 0, "content: moved");
     t.check(!plat::rename(&at("verschoben.txt"), &format!("content://{AUTH}/tree/{}/x.txt", enc("root:Other"))), "content: no rename across trees");
     t.check(!plat::rename(&at("neu"), &at("hello.txt/x")), "content: no folder move");
+    // a folder move to another folder is refused before the file in its way is deleted
+    t.check(plat::mkdir(&at("ma/dir")) && plat::write_file(&at("mb/keep.txt"), b"bleibt"), "content: a folder and a file in other folders");
+    t.check(!plat::rename(&at("ma/dir"), &at("mb/keep.txt")), "content: no folder move onto a file in another folder");
+    t.check(plat::file_exists(&at("ma/dir")) == 2 && text(&at("mb/keep.txt")).as_deref() == Some("bleibt"), "content: ... the folder and the file stay as they were");
+    t.check(plat::delete(&at("ma/dir")) && plat::delete(&at("ma")) && plat::delete(&at("mb/keep.txt")) && plat::delete(&at("mb")), "content: cleaned up");
     let _ = tree;
 }
 
@@ -399,6 +429,19 @@ fn journal(t: &mut T, fake: &Arc<Fake>, tree: &str, at: &dyn Fn(&str) -> String)
     t.check(journal_files().len() == 1, "journal: pending again");
     drop(File::open(&at("j.txt"), FO_RW));
     t.check(journal_files().is_empty() && fresh().recover() == 0, "journal: a stream opened for writing drops the copy");
+    // a stream or a rename the host refuses keeps the pending copy for recover()
+    content::interrupt_next_write(3);
+    plat::write_file(&at("j.txt"), b"ganz neu");
+    REFUSE_OPEN.store(true, Ordering::SeqCst);
+    let refused = File::open(&at("j.txt"), FO_RW).is_none() && File::open(&at("j.txt"), FO_WRITE).is_none();
+    REFUSE_OPEN.store(false, Ordering::SeqCst);
+    t.check(refused && journal_files().len() == 1, "journal: a stream the host refuses keeps the pending copy");
+    REFUSE_RENAME.store(true, Ordering::SeqCst);
+    let refused = !plat::rename(&at("j.txt"), &at("j2.txt"));
+    REFUSE_RENAME.store(false, Ordering::SeqCst);
+    t.check(refused && journal_files().len() == 1, "journal: a rename the host refuses keeps it too");
+    t.check(fresh().recover() == 1 && text(&at("j.txt")).as_deref() == Some("ganz neu"), "journal: ... and recover() finishes that write");
+    parallel(t, &at("j.txt"), &fresh);
     // copies of a document that is gone, damaged copies: dropped
     content::interrupt_next_write(0);
     plat::write_file(&at("k.txt"), b"weg");
@@ -409,6 +452,34 @@ fn journal(t: &mut T, fake: &Arc<Fake>, tree: &str, at: &dyn Fn(&str) -> String)
     let ok = AtomicFile::create(&at("j.txt")).is_some_and(|a| a.write_at(0, b"atomar") == Some(6) && a.commit());
     t.check(ok && text(&at("j.txt")).as_deref() == Some("atomar") && journal_files().is_empty(), "journal: AtomicFile's commit");
     t.check(plat::delete(&at("j.txt")) && names(tree) == ["hello.txt=15"], "journal: cleaned up");
+}
+
+// two writes of one document at once: A waits in the host's write while B's write fails; the
+// write that succeeds must not remove the copy of the one that failed (the journal's writes of
+// one document run one after the other)
+fn parallel(t: &mut T, path: &str, fresh: &dyn Fn() -> ContentFs<Host>) {
+    GATE.store(1, Ordering::SeqCst);
+    let pa = String::from(path);
+    let ta = plat::thread_spawn(0, Box::new(move || {
+        plat::write_file(&pa, b"AAAA erster Schreiber");
+    }));
+    let dl = plat::time_us() + 5_000_000;
+    while GATE.load(Ordering::SeqCst) != 2 && plat::time_us() < dl {
+        plat::sleep_ms(1);
+    }
+    let waiting = GATE.load(Ordering::SeqCst) == 2;
+    FAIL_B.store(true, Ordering::SeqCst);
+    let (pb, b_ok) = (String::from(path), Arc::new(AtomicU32::new(0)));
+    let b2 = b_ok.clone();
+    let tb = plat::thread_spawn(0, Box::new(move || b2.store(1 + plat::write_file(&pb, b"BBBB zweiter Schreiber") as u32, Ordering::SeqCst)));
+    plat::sleep_ms(300); // without the order B has failed by now, its copy written
+    GATE.store(0, Ordering::SeqCst);
+    for th in [ta, tb].into_iter().flatten() {
+        th.join();
+    }
+    FAIL_B.store(false, Ordering::SeqCst);
+    t.check(waiting && b_ok.load(Ordering::SeqCst) == 1 && journal_files().len() == 1, "journal: two writes of a document at once: the failed one's copy stays");
+    t.check(fresh().recover() == 1 && text(path).as_deref() == Some("BBBB zweiter Schreiber"), "journal: ... and recover() writes it");
 }
 
 fn names_and_dialogs(t: &mut T) {

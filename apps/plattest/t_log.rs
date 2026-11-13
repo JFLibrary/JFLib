@@ -3,7 +3,8 @@
 //   plattest --test log        levels and log! (formats only when a sink wants the level),
 //                              the ring (whole lines, folded line breaks, at most 64 KiB, the
 //                              newest kept), the file (rotation at 4 KiB into .1 / .2, never a
-//                              .3, stopping); a child (--test log-crash) logs and panics: exit
+//                              .3, stopping; on mem:// at once, a mount without streams
+//                              refused); a child (--test log-crash) logs and panics: exit
 //                              code 3, its stderr ends with the last log lines, its file with
 //                              the crash; three more children crash where the pre-hook must
 //                              neither allocate nor wait (a file at its limit, a panic under
@@ -79,6 +80,17 @@ pub fn t_log(t: &mut T) {
     let before = size(&p);
     log_info("file", "after the stop");
     t.check(size(&p) == before, "log: no lines after the stop");
+    // a mount's own stream gets each line at once; a provider without streams or OS files
+    // would get them only when the log stops: refused
+    t.check(log_file(Some("mem://logs/m.log"), 4096, 0), "log: log_file on mem://");
+    log_info("file", "on mem");
+    let m = String::from_utf8_lossy(&plat::read_file("mem://logs/m.log").unwrap_or_default()).into_owned();
+    t.check(m.contains("INFO  file: on mem\n"), "log: ... the line is there at once");
+    vfs::mount("nostream", Arc::new(NoStreams(Arc::new(vfs::MemFs::new()))));
+    t.check(!log_file(Some("nostream://app.log"), 4096, 0), "log: log_file on a provider without streams or OS files is refused");
+    t.check(log_file(None, 0, 0), "log: ... stopped");
+    vfs::unmount("nostream");
+    plat::delete("mem://logs/m.log");
 
     // a crash: the last lines on stderr, the crash in the file
     let cp = t.subp("logs/crash.log");
@@ -92,6 +104,24 @@ pub fn t_log(t: &mut T) {
     }
     crash_paths(t);
     t.scratch_done();
+}
+
+// a provider with read and write only (no streams, no OS files)
+struct NoStreams(Arc<vfs::MemFs>);
+
+impl vfs::Provider for NoStreams {
+    fn kind(&self, p: &str) -> u32 {
+        self.0.kind(p)
+    }
+    fn read(&self, p: &str) -> Option<Vec<u8>> {
+        self.0.read(p)
+    }
+    fn list(&self, p: &str, f: &mut dyn FnMut(&str, bool, u64)) -> bool {
+        self.0.list(p, f)
+    }
+    fn write(&self, p: &str, d: &[u8]) -> bool {
+        self.0.write(p, d)
+    }
 }
 
 // the crash pre-hook neither allocates nor waits (Codex A013-C003, V054-C001): each child
