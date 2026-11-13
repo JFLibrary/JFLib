@@ -15,8 +15,9 @@
 // 4K frame is 32 MB, source and target together no longer fit the caches, and the target is read
 // by someone else next (GDI's BitBlt, the X server, the compositor).  plat has its own streaming
 // copy (stream_copy, simd::copy_stream's loop): plat comes before simd in the build order (the
-// workspace's members, which the publication follows), and simd builds over modrt inside the
-// loadable modules -- a dependency for 30 lines would turn both around.
+// workspace's members, which build_rs.py's LIBS and the publication follow), so depending on
+// simd would move simd below plat and give the published jflib-plat a new dependency, with
+// simd's kernels and its compute-crate build, for one loop of 30 lines.
 
 use alloc::vec::Vec;
 

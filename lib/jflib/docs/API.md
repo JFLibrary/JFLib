@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -181,7 +181,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
 - [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `set_theme`, `clear_theme`, `app_theme`, `load_theme`, `styles_add`, `style_names`, `style_name`, `set_style`, `dp_text`, `ts_base`
-- [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_next`, `cursor_replace`, `cursor_free`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_pos_px`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_accept`, `drag_over`, `drag_over_px`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
+- [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_next`, `cursor_replace`, `cursor_free`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_pos_px`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_effect_set`, `drop_accept`, `drag_over`, `drag_over_px`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
 
 ### App, AppDesc, Ui, run, async tasks
 
@@ -4395,6 +4395,8 @@ Windows (ID = the app's window id, 0 / main = the main window):
                                 drag that left the window comes back
   dragover X Y [files] [text] [url] [html] [image] [copy|move|link]   another program's
                                 drag hovers there (default files);  dragleave: it left
+  dragover expect copy|move|link|none [ctrl] [shift]   the platform's answer to that drag
+                                now (the target's drop_effect_set; the system's pointer)
   dragout expect none | text "s" | html "s" | url "s" | files N | image | kinds N
                                 what the app's drag handed over when it left the window
   dragout end copy|move|link|none   the platform ended that drag (E_DRAG_END)
@@ -4715,6 +4717,11 @@ Targets:
   drop_target(id, types) -> DS_*   the widget at last_rect takes drags of these DT_* kinds:
                                    DS_HOVER while one is over it (the style highlights it),
                                    DS_DROP in the pass of the drop (drop_data(), drop_effect())
+  drop_effect_set(effects)         the DE_* effects the target of the last drop_target call
+                                   takes in this pass (default DE_ALL): the platform answers a
+                                   drag over it with one of them (the system's pointer shows
+                                   copy, move or link), 0 refuses the drag there (no drop, no
+                                   highlight); a drag of the app picks from them too
   drop_accept(types)               what the windows take outside every drop target (default
                                    DT_FILES); such drops come as UIC_DROP (drop.rs, as before)
   drag_over() -> (types, x, y)     the drag over the live window: its kinds and position (DIP);
@@ -4731,7 +4738,11 @@ the app the drop carries the app's own content again (its kind and bytes).  Head
 what would have left the app for the scripts (`dragout expect`, `dragout end`).
 Other programs' drags: E_DRAG (hover: the targets highlight), E_DROP (onto the drop target at
 the point, else UIC_DROP when drop_accept takes it).  The platform asks the published targets
-synchronously (uiw_drag_pw, win.rs) to answer the source with an effect.
+synchronously (uiw_drag_pw, win.rs) to answer the source with an effect: the effects the target
+under the point took in the last pass (drop_effect_set), DE_ALL for drop_accept's window --
+IDropTarget::DragOver's pdwEffect, XdndStatus' action, wl_data_offer.set_actions, macOS'
+NSDragOperation (plat::drag_query).  The answer follows the app's pass: an effect set for the
+drag's point in one pass answers the moves until the next pass.
 Positions stay logical in mirrored (RTL) windows: E_DRAG / E_DROP points are mirrored on the
 way in like every pointer event; the label next to the pointer is drawn through the mirror.
 ```
@@ -4755,6 +4766,18 @@ way in like every pointer event; the label next to the pointer is drawn through 
   drop_target(id, types) -> DS_HOVER / DS_DROP / 0: the widget at last_rect takes drags
   of these DT_\* kinds (DT_USER0 &lt;&lt; k: the app's own).  DS_HOVER while such a drag is over
   it (the style draws the highlight), DS_DROP in the pass of the drop (drop_data())
+- **`fn drop_effect_set(&mut self, effects: u32)`**
+  drop_effect_set(effects): the DE_\* effects (DE_COPY | DE_MOVE | DE_LINK) the drop target
+  of the last drop_target call takes in this pass; DE_ALL until it is called.  The platform
+  answers a drag of another program over the target with one of them (the modifier keys
+  choose, else copy, move, link in this order; files are never moved): the system's pointer
+  shows that effect and the drop carries it (drop_effect()).  0 refuses the drag there: no
+  drop, no highlight, the pointer shows "no" -- a page that takes drops only in some places;
+  so is a drag that allows none of them (a link target, a source that only copies or moves).
+  A drag of the app inside its window picks from them the same way (a plain drag moves when
+  both allow it).  Call it after drop_target in every pass the effect should hold, typically
+  while drop_target says DS_HOVER, for the point of drag_over_px: the platform's answers
+  follow the passes, one pass late while the drag moves
 - **`fn drop_accept(&mut self, types: u32)`**
   drop_accept(types): the DT_\* kinds a window takes outside every drop target (default
   DT_FILES); those drops arrive as UIC_DROP
@@ -29527,6 +29550,37 @@ Unavailable.
   (test aid) a press of the registered shortcut id, as the system would report it -> false
   when id is not registered
 
+### `plat/present_copy.rs`
+
+Source: [`lib/plat/present_copy.rs`](../lib/plat/present_copy.rs)
+
+```text
+present_copy -- the copy of a present's dirty rectangles into the window's own pixels:
+Windows' kept DIB section (win_api.rs), X11's MIT-SHM segments, shadow and staging images,
+Wayland's wl_shm buffers and staging image (linux_damage.rs)
+
+  copy_boxes(dst, ds, src, ss, boxes, w, h)   the boxes x0, y0, x1, y1 (exclusive; clipped to
+                    w x h, they may overlap) of src (rows of ss bytes) into dst (rows of ds
+                    bytes), 4 bytes a pixel; rows outside either slice are skipped.  Below
+                    PAR_MIN bytes plain row copies on this thread (no pool round trip); from
+                    PAR_MIN on in row bands on the worker pool (parallel_for; a band is a run of
+                    the target's rows, so no two threads write one row, overlapping boxes
+                    included); from STREAM_MIN on with streaming stores (x86-64: movntdq), fenced
+                    on every thread before the loop returns.  The same bytes either way.
+
+The thresholds are those of gfx's blit (gfx::COPY_PAR_MIN / COPY_STREAM_MIN, measured there): a
+4K frame is 32 MB, source and target together no longer fit the caches, and the target is read
+by someone else next (GDI's BitBlt, the X server, the compositor).  plat has its own streaming
+copy (stream_copy, simd::copy_stream's loop): plat comes before simd in the build order (the
+workspace's members, which build_rs.py's LIBS and the publication follow), so depending on
+simd would move simd below plat and give the published jflib-plat a new dependency, with
+simd's kernels and its compute-crate build, for one loop of 30 lines.
+```
+
+- **`fn present_copy_bench(dst: &mut [u8], ds: usize, src: &[u8], ss: usize, boxes: &[[i32; 4]], w: i32, h: i32)`**
+  (benchmarks: plattest --test present-bench) copy_boxes for a bench outside plat: the boxes
+  (x0, y0, x1, y1) of src into dst as a present copies them
+
 ### `plat/log.rs`
 
 Source: [`lib/plat/log.rs`](../lib/plat/log.rs)
@@ -35355,7 +35409,14 @@ drop and the app's own outgoing drag (the parts every OS shares)       (docs/GUI
   drag_query(pw, x, y, types, allowed, mods) -> (types, effect)   (OS layers) the hook's answer
                                with one effect picked; without a hook: files, copy (as before).
                                Files are never moved: a source deletes what it moved, and
-                               the app gets only the paths (copy or link instead)
+                               the app gets only the paths (copy or link instead).  The hook
+                               answers per drop target (ui: drop_effect_set): a target that
+                               takes no effect refuses the drag there (the system's pointer
+                               shows it)
+  drag_query_all(...) -> (types, effect, effects)   drag_query and every effect the target
+                               takes there (Wayland's set_actions names them all)
+  drag_decide(types, effects, offered, allowed, mods) -> (types, effect, effects)   what
+                               drag_query makes of a hook's answer (tests ask it headless)
   drag_effect_pick(allowed, mods) -> effect   Ctrl copy, Shift move, Ctrl+Shift link; else
                                the first of copy / move / link the mask allows
   drop_data_take() -> DragData the pending drop of E_DROP: the paths of drop_take and the rest
@@ -35440,6 +35501,17 @@ DE_ALL: u32 = 7  // every effect
 - **`fn drag_query(pw: i32, x: i32, y: i32, types: u32, allowed: u32, mods: u8) -> (u32, u32)`**
   (OS layers) what platform window pw takes at (x, y) px of a drag offering `types` with the
   effects `allowed` (0 = copy | move) -> (accepted types, the effect); (0, 0) = refused
+
+- **`fn drag_query_all(pw: i32, x: i32, y: i32, types: u32, allowed: u32, mods: u8) -> (u32, u32, u32)`**
+  (OS layers) drag_query and every DE_\* effect the target there takes of the allowed ones
+  (Wayland's wl_data_offer.set_actions) -> (accepted types, the effect, the effects); (0, 0, 0)
+  = refused
+
+- **`fn drag_decide(t: u32, e: u32, types: u32, allowed: u32, mods: u8) -> (u32, u32, u32)`**
+  what drag_query makes of the hook's answer (accepted types t, effects e) to a drag offering
+  `types` with the effects `allowed` (0 = copy | move) and the modifier keys `mods` -> (accepted
+  types, the effect, every effect taken); (0, 0, 0) = refused (no kind or no effect in common).
+  Files are never moved.  For the OS layers and headless tests (ui's `dragover expect`)
 
 - **`fn drop_set_text(bytes: &[u8]) -> bool`**
   (OS layers) the pending drop's text (UTF-8 bytes; cut at a NUL) -> false when too large
