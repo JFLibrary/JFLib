@@ -3229,7 +3229,7 @@ while let Some(q) = ui.a11y_request_take() {     // a screen reader acts on a no
 
 **Kinds.** Beside the kinds of section 12 (`K_LINK`, `K_HEADING`, `K_TEXTBOX`, `K_LIST` ...):
 
-| Kind (value) | UI Automation | AT-SPI2 | Browser (ARIA) | Bridges without it (Apple until the VoiceOver bridge maps them, Android) |
+| Kind (value) | UI Automation | AT-SPI2 | Browser (ARIA) | Bridges without it (Apple until the VoiceOver bridge maps them; Android's class, with the extras below) |
 |---|---|---|---|---|
 | `K_TABLE` (grid: `.grid(rows, cols)`) | Table + Grid, Table, Selection | table + Table | `table` (`aria-rowcount` / `colcount`) | group |
 | `K_ROW` | DataItem | table row | `row` | group |
@@ -3318,8 +3318,13 @@ view); `plattest --test a11y-rich` reads it headless (kinds, fields, parents, ou
 requests, live changes, the rich update format), `plattest --test uia-rich` through
 IUIAutomation (Windows), `python3 tools/platshared/atspi_bus.py --rich` through AT-SPI2 (WSL), and
 `node apps/a11ytest/tests/a11y_web.mjs build` in Chromium after `build_rs.py app a11ytest --target
-web`. The browser's host reads the rich update format (`a11y_wire::VERSION2`, `jfgui_a11y(2)`);
-Android's host reads the first one and shows the basic roles.
+web`. The browser's host and Android's read the rich update format (`a11y_wire::VERSION2`,
+`jfgui_a11y(2)`). Android shows tables as collections (their cells and headers with their place,
+TalkBack's table navigation), trees as hierarchical collections with expand / collapse, the place in a
+set, descriptions (hint text), a link's address, invalid fields, live regions (`setLiveRegion`; a change
+inside one is reported on the region) and announcements (`announceForAccessibility`), and takes the
+further actions (show on screen, expand / collapse, increment / decrement, select); landmarks, tool
+bars, articles and the other kinds without an Android class stay groups.
 
 ## 20. Secrets (passwords, tokens, keys)
 
