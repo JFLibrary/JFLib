@@ -698,6 +698,7 @@ fn levels(t: &mut T) {
         d.items.push(Item { layer: k % 3, style: style(c, rng.range(0.0, 9.0) as f32, CAPS[k % 3], JOINS[(k / 3) % 3]), geo: Geo::Poly(pts, k % 5 == 0) });
     }
     let mut imgs = Vec::new();
+    let mut blocks = Vec::new();
     for max_level in [Level::Voll, Level::Basis] {
         let Some(dev) = t.res(g.adapter.create_device(&DeviceDesc { max_level }), "device") else { return };
         let Some(mut off) = t.res(Off::new(&dev, w, h), "target") else { return };
@@ -705,9 +706,15 @@ fn levels(t: &mut T) {
         out(&format!("  ({max_level:?}: multi-draw {})", r.multi_draw()));
         let Some(img) = gpu_image(t, &dev, &mut r, &mut off, &d, &cam, "levels") else { return };
         imgs.push(img);
+        // (G6b2: blocks, inserts of every kind, transparency)
+        let Some(mut boff) = t.res(Off::new(&dev, 360, 270), "target") else { return };
+        let Some(img) = crate::blocks::block_image(t, &dev, &mut r, &mut boff, &blocks_drawing(true), &pixel_camera(360, 270), "levels, blocks") else { return };
+        blocks.push(img);
     }
     let n = imgs[0].chunks_exact(4).zip(imgs[1].chunks_exact(4)).filter(|(a, b)| a[..3] != b[..3]).count();
     t.ok(n == 0, &format!("Voll and Basis: 300 entities on three layers, {n} pixels differ"));
+    let n = blocks[0].chunks_exact(4).zip(blocks[1].chunks_exact(4)).filter(|(a, b)| a[..3] != b[..3]).count();
+    t.ok(n == 0, &format!("Voll and Basis: blocks inserted in every way (the test blocks' drawing), {n} pixels differ"));
 }
 
 // ---------------------------------------------------------------- errors
@@ -802,7 +809,7 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
     let opt = wgsl::CompileOptions { robust: false, ..wgsl::CompileOptions::new(shader::BASIS) };
     let exact = wgsl::CompileOptions { exact: true, ..opt };
     let mut outv = Vec::new();
-    for (src, list, o) in [(render2d::CULL_WGSL, &[("COUNT", "count"), ("SCAN", "scan"), ("WRITE", "write")][..], &exact), (render2d::SCATTER_WGSL, &[("SCATTER", "main")][..], &opt),
+    for (src, list, o) in [(render2d::CULL_WGSL, &[("COUNT", "count"), ("SCAN", "scan"), ("WRITE", "write"), ("INSTANCES", "instances")][..], &exact), (render2d::SCATTER_WGSL, &[("SCATTER", "main")][..], &opt),
                            (render2d::STROKE_WGSL, &[("VS", "vs"), ("VS_FULL", "vs_full"), ("VS_FILL", "vs_fill")][..], &exact),
                            (render2d::STROKE_WGSL, &[("FS", "fs"), ("FS_FULL", "fs_full"), ("FS_FILL", "fs_fill")][..], &opt)] {
         match wgsl::compile(src, o) {
@@ -824,7 +831,7 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
 
 fn gen_shaders(path: &str) -> i32 {
     let Some(v) = compile_shaders() else { return 1 };
-    let mut s = String::from("// written by render2dtest --gen-shaders from common.wgsl + cull.wgsl, scatter.wgsl, stroke.wgsl + fill.wgsl (shader::BASIS, no robustness; COUNT, SCAN, WRITE, VS, VS_FULL and VS_FILL exact); do not edit\n");
+    let mut s = String::from("// written by render2dtest --gen-shaders from common.wgsl + block.wgsl + cull.wgsl, scatter.wgsl, common.wgsl + block.wgsl + stroke.wgsl + fill.wgsl (shader::BASIS, no robustness; COUNT, SCAN, WRITE, INSTANCES, VS, VS_FULL and VS_FILL exact); do not edit\n");
     for (name, w) in &v {
         s.push_str(&format!("pub const {name}: &[u32] = &[\n"));
         for row in w.chunks(10) {
@@ -851,7 +858,7 @@ fn shaders(t: &mut T) {
         t.ok(false, "the WGSL compiles");
         return;
     };
-    let table: [(&str, &[u32]); 10] = [("COUNT", render2d::COUNT_SPV), ("SCAN", render2d::SCAN_SPV), ("WRITE", render2d::WRITE_SPV), ("SCATTER", render2d::SCATTER_SPV),
+    let table: [(&str, &[u32]); 11] = [("COUNT", render2d::COUNT_SPV), ("SCAN", render2d::SCAN_SPV), ("WRITE", render2d::WRITE_SPV), ("INSTANCES", render2d::INSTANCES_SPV), ("SCATTER", render2d::SCATTER_SPV),
                                        ("VS", render2d::VS_SPV), ("VS_FULL", render2d::VS_FULL_SPV), ("FS", render2d::FS_SPV), ("FS_FULL", render2d::FS_FULL_SPV),
                                        ("VS_FILL", render2d::VS_FILL_SPV), ("FS_FILL", render2d::FS_FILL_SPV)];
     for (name, embedded) in table {
@@ -868,7 +875,11 @@ fn dump_all(dir: &str) -> i32 {
         let Some(mut r) = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new") else { return };
         for shot in shots() {
             let Some(mut off) = t.res(Off::new(dev, shot.w, shot.h), "target") else { return };
-            let Some(img) = gpu_image(t, dev, &mut r, &mut off, &shot.d, &shot.cam, &shot.name) else { return };
+            let img = match &shot.b {
+                Some(b) => crate::blocks::block_image(t, dev, &mut r, &mut off, b, &shot.cam, &shot.name),
+                None => gpu_image(t, dev, &mut r, &mut off, &shot.d, &shot.cam, &shot.name),
+            };
+            let Some(img) = img else { return };
             let path = format!("{dir}/{}_{}.bgra", level.to_lowercase(), shot.name);
             if !plat::write_file(&path, &img) {
                 t.ok(false, &format!("cannot write {path}"));
@@ -904,10 +915,10 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 20] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
+    let list: [(&str, fn(&mut T)); 22] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
                                           ("arcs", arcs), ("dashes", dashes), ("curves", curves), ("fills", fills), ("hatches", hatches), ("layers", layers),
                                           ("changes", crate::scenes::changes), ("churn", crate::scenes::churn), ("visibility", crate::scenes::visibility), ("coords", crate::scenes::coords),
-                                          ("phase", crate::scenes::phase), ("levels", levels), ("errors", errors)];
+                                          ("phase", crate::scenes::phase), ("blocks", crate::blocks::blocks), ("transparency", crate::blocks::transparency), ("levels", levels), ("errors", errors)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {
