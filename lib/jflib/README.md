@@ -1,12 +1,14 @@
 # jflib
 
-A GUI library and everything it stands on, without the standard library: windows and controls,
-text, images in many formats, the GPU, files, the network, documents, and a runtime of its own.
-This one dependency brings all of it; a program links only what it uses.
+[JFLib](https://jflib.org) is a GUI library and everything it stands on, without the standard
+library: windows and controls, text, images in many formats, the GPU, files, the network,
+documents, and a runtime of its own. This one dependency brings all of it; a program links only
+what it uses. The same app runs on Windows, Linux, macOS, iOS, Android and in the browser.
 
 `docs/GUIDE.md` in this package explains how an app is written, `docs/API.md` lists every public
 item. Both lie below `~/.cargo/registry/src/` once Cargo has downloaded the crate; the guide is
-also on docs.rs as [`jflib::guide`](https://docs.rs/jflib/latest/jflib/guide/index.html).
+also on docs.rs as [`jflib::guide`](https://docs.rs/jflib/latest/jflib/guide/index.html), the
+API reference [on GitHub](https://github.com/JFLibrary/JFLib/blob/main/docs/API.md).
 
 ## Quick start
 
@@ -19,12 +21,14 @@ cargo jflib test              # runs tests/*.uis
 cargo jflib watch             # hot reload while you edit
 cargo jflib web --serve       # the app in the browser
 cargo jflib android --install # the app on a phone (Android SDK and NDK)
+cargo jflib mac --run         # on a Mac: the app as NAME.app
 cargo jflib package           # a setup for Windows and a .deb, every style inside
-                              #   (--formats all: also MSIX, AppImage, RPM, Flatpak)
+                              #   (--formats all: also MSIX, AppImage, RPM, Flatpak;
+                              #   on a Mac --formats dmg)
 ```
 
 `cargo jflib new` writes the template that lies in this package as `template/`. Without the tool,
-copy it (`cp -r ~/.cargo/registry/src/*/jflib-0.1.*/template hallo`, then rename `Cargo.toml.in`
+copy it (`cp -r ~/.cargo/registry/src/*/jflib-0.2.*/template hallo`, then rename `Cargo.toml.in`
 to `Cargo.toml`).
 
 | File | What it is for |
@@ -49,14 +53,15 @@ where you can, and look in `docs/API.md` before adding a crate. An app that need
 `std` turns on the feature `std` (`cargo jflib new --std` writes such an app):
 
 ```toml
-jflib = { features = ["std"], version = "0.1" }
+jflib = { features = ["std"], version = "0.2" }
 ```
 
 Then `src/lib.rs` has no `#![no_std]`, `src/main.rs` is `extern crate hallo; fn main() {
 jflib::plat::std_start() }`, `.cargo/config.toml` only links the C runtime in on Windows
 (`+crt-static`) and `PERMISSIONS` covers JFLib's own calls only. Linux programs with std are built
-on Linux (cc, glibc); in the browser std has no clock, files or threads and there is no threads
-mode; on Android `std::fs` needs the app's real folder (`docs/GUIDE.md`, "An app with std").
+on Linux (cc, glibc), macOS and iOS ones on a Mac; in the browser std has no clock, files or
+threads and there is no threads mode; on Android `std::fs` needs the app's real folder
+(`docs/GUIDE.md`, "An app with std").
 
 Don't add a second window loop or UI crate (winit, eframe, egui, SDL): `ui::launch` is the whole
 stack, not one crate of several as with egui and eframe. Don't run an async runtime (tokio) on the
@@ -93,8 +98,10 @@ strip = "symbols"
 
 | Target | Build | Notes |
 | --- | --- | --- |
-| Windows | `cargo build` | rust-lld; the program links without import libraries, the build scripts need what Rust's msvc toolchain always needs (the Visual Studio Build Tools) |
-| Linux | `cargo build --target x86_64-unknown-linux-gnu` | a window links against glibc (the GPU); a command-line program can be one static file (`.cargo/config.toml`) |
+| Windows | `cargo build`; ARM64: `--target aarch64-pc-windows-msvc` | rust-lld; the program links without import libraries, the build scripts need what Rust's msvc toolchain always needs (the Visual Studio Build Tools) |
+| Linux | `cargo build --target x86_64-unknown-linux-gnu`; ARM64: `--target aarch64-unknown-linux-gnu` | a window links against glibc (the GPU); a command-line program can be one static file (`.cargo/config.toml`) |
+| macOS | `cargo build` on a Mac; `cargo jflib mac` makes `NAME.app` | Apple silicon; Apple's linker needs nothing in `.cargo/config.toml` |
+| iOS | `cargo build --target aarch64-apple-ios` (or `aarch64-apple-ios-sim`) on a Mac | devices and the simulator; `cargo jflib` makes no iOS app yet |
 | Browser | `cargo jflib web` | scalar, SIMD and with threads, the page around them and the licences in `target/jflib-web/NAME/`; threads need `rustup component add rust-src` |
 | Android | `cargo jflib android` | an APK for `arm64-v8a` (or `--abi x86_64` for the emulator) in `target/jflib-android/`; needs the Android SDK, the NDK, a JDK and `rustup target add aarch64-linux-android`; the app's code in `src/lib.rs` as the template has it |
 
@@ -120,6 +127,22 @@ switch at run time (`jflib::style_kde::STYLE`).
   its `PERMISSIONS` in its platform layer. A crate that calls the system itself goes around it;
   only the `sandbox` line confines it, as far as the operating system enforces the manifest
   (docs/PERMISSIONS.md, "OS sandbox").
+
+## What's new in 0.2.0
+
+JFLib runs natively on macOS and iOS now, with windows through AppKit and UIKit, VoiceOver, the
+app's menus in the Mac's menu bar and a Metal backend for the GPU, and `cargo jflib` makes a Mac
+app and its disk image. Windows and Linux run on ARM64 as well. Three crates join the facade:
+`jflib::render3d`, a 3D engine on the GPU layer, `jflib::gltf`, which imports glTF 2.0 models,
+and `jflib::render2d`, a 2D renderer for CAD drawings. NetLab is an official style
+(`jflib::style_netlab`, `JFLIB_STYLE=netlab`), and the feature `unwind` lets an app with std
+survive the panics it catches. The UI learned what phones and tablets and apps that host web
+content need, and shows GPU content beside its widgets. Programs link again with Rust 1.99, which
+failed on Windows with 0.1.0, and a round of fixes closes holes against hostile documents, images
+and packets and removes deadlocks and races. `plat::dl_sym` and `plat::dl_close` are `unsafe fn`
+now. Every crate has a README and a changelog of its own; the
+[library's changelog](https://docs.rs/crate/jflib/latest/source/CHANGELOG.md) sums them up and
+links to each.
 
 ## License
 
