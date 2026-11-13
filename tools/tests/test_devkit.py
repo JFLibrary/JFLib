@@ -810,8 +810,8 @@ class TestJobs(Temp):
             t = self.dir / "apps" / "x" / "tests"
             self.assertEqual(build_rs.script_markers(t / "a.uis"), (True, set()))
             self.assertEqual(build_rs.script_markers(t / "b.uis"), (False, {"desktop", "audio"}))     # line 6: no marker
-            self.assertEqual(build_rs.app_test_rules("x"), dict(independent=True, serial=False, locks={"audio"}))
-            self.assertEqual(build_rs.app_test_rules("y"), dict(independent=False, serial=True, locks=set()))
+            self.assertEqual(build_rs.app_test_rules("x"), dict(independent=True, targets=False, serial=False, locks={"audio"}))
+            self.assertEqual(build_rs.app_test_rules("y"), dict(independent=False, targets=False, serial=True, locks=set()))
             self.assertRaises(build_rs.BuildError, build_rs.app_test_rules, "z")
             bad = build_rs.test_marker_lint()
         self.assertEqual(len(bad), 3, bad)
@@ -821,26 +821,40 @@ class TestJobs(Temp):
 
     def run_pool(self, jobs, times=None):
         """apps c (in order), i (independent), d1 / d2 (one script each holding the desktop lock), s (one serial
-        script in the middle of its app's order) on win and linux -> [(tag, start, end)] in the order they started"""
+        script in the middle of its app's order), t (independent targets) on win and linux -> [(tag, start, end)] in
+        the order they started"""
         self.app("c", {f"{n}.uis": "" for n in "abc"})
         self.app("i", {f"{n}.uis": "" for n in "abcd"}, "independent\n")
         self.app("d1", {"a.uis": "#!lock desktop\n"})
-        self.app("d2", {"a.uis": "#!lock desktop\n"})
+        self.app("d2", {"a.uis": "#!lock desktop audio\n"})
         self.app("s", {"a.uis": "", "b.uis": "#!serial under load\n", "c.uis": ""})
-        spans, lock = [], build_rs.threading.Lock()
+        self.app("t", {"a.uis": "#!lock audio\n", "b.uis": ""}, "independent targets\n")
+        spans, lock, runners = [], build_rs.threading.Lock(), []
 
-        def run(target, exe, script):
+        class Runner:           # stands in for host_exec.LinuxRunner: one per thread that runs Linux scripts
+            def __init__(self):
+                self.p, self.closed = mock.Mock(poll=lambda: None), False
+                runners.append(self)
+
+            def close(self):
+                self.closed = True
+
+        def run(target, exe, script, runner=None):
             start = time.monotonic()
             time.sleep(0.15)
             with lock:
                 spans.append((f"{target} {script.parent.parent.name}/{script.name}", start, time.monotonic()))
+            self.assertEqual(runner is not None, target == "linux" and os.name == "nt")
             return dict(script=script.name, status="passed", exit_code=0, start=start, duration=0.15, output="")
 
-        runs = [(t, t, n, "exe") for t in ("win", "linux") for n in ("c", "d1", "d2", "i", "s")]
-        with mock.patch.object(build_rs, "ROOT", self.dir), mock.patch.object(build_rs, "run_script", run):
+        runs = [(t, t, n, "exe") for t in ("win", "linux") for n in ("c", "d1", "d2", "i", "s", "t")]
+        with mock.patch.object(build_rs, "ROOT", self.dir), mock.patch.object(build_rs, "run_script", run), \
+                mock.patch.object(build_rs, "LinuxRunner", Runner):
             units, skipped = build_rs.test_units(runs, jobs)
             records = build_rs.run_test_units(build_rs.order_test_units(units, times or {}, jobs), jobs, lambda u, r: None)
-        self.assertEqual((len(units), skipped, len(records)), (24, 0, 24))
+        self.assertEqual((len(units), skipped, len(records)), (28, 0, 28))
+        self.assertTrue(all(r.closed for r in runners))
+        self.assertLessEqual(len(runners), jobs + 1 if os.name == "nt" else 0)    # the workers' and the serial part's
         return sorted(spans, key=lambda s: s[1])
 
     @staticmethod
@@ -848,7 +862,7 @@ class TestJobs(Temp):
         return a[1] < b[2] and b[1] < a[2]
 
     def test_pool_rules(self):
-        spans = self.run_pool(4)
+        spans = self.run_pool(4, times={"win/t/b.uis": 50.0, "linux/t/b.uis": 50.0})    # those two first, together
         by = {s[0]: s for s in spans}
         order = [s[0] for s in spans]
         for t in ("win", "linux"):                          # an app's order on each target
@@ -858,12 +872,16 @@ class TestJobs(Temp):
         for app in ("c", "s"):                              # never two scripts of an app at once, on any target
             mine = [s for s in spans if s[0].split()[1].startswith(app + "/") and not s[0].endswith("s/b.uis")]
             self.assertFalse([(a[0], b[0]) for a in mine for b in mine if a is not b and self.overlap(a, b)])
-        desk = [s for s in spans if s[0].split()[1].startswith("d")]
-        self.assertFalse([(a[0], b[0]) for a in desk for b in desk if a is not b and self.overlap(a, b)])
+        for t in ("win", "linux"):                          # desktop: one at a time per target
+            desk = [s for s in spans if s[0].startswith(t + " d")]
+            self.assertFalse([(a[0], b[0]) for a in desk for b in desk if a is not b and self.overlap(a, b)])
+        audio = [by[k] for k in ("win d2/a.uis", "linux d2/a.uis", "win t/a.uis", "linux t/a.uis")]    # audio: on both
+        self.assertFalse([(a[0], b[0]) for a in audio for b in audio if a is not b and self.overlap(a, b)])
         ind = [s for s in spans if " i/" in s[0]]           # independent: side by side, but never one script twice
         self.assertTrue(any(self.overlap(a, b) for a in ind for b in ind if a is not b))
         for n in "abcd":
             self.assertFalse(self.overlap(by[f"win i/{n}.uis"], by[f"linux i/{n}.uis"]))
+        self.assertTrue(self.overlap(by["win t/b.uis"], by["linux t/b.uis"]))     # independent targets: that too
         serial = [by["win s/b.uis"], by["linux s/b.uis"]]   # alone, after the rest, in the suite's order
         self.assertEqual(order[-2:], ["win s/b.uis", "linux s/b.uis"])
         self.assertTrue(all(s[1] >= max(o[2] for o in spans if o not in serial) for s in serial))
@@ -872,8 +890,43 @@ class TestJobs(Temp):
         order = [s[0] for s in self.run_pool(1, times={"win/i/a.uis": 99.0})]
         expect = [f"{t} {n}" for t in ("win", "linux") for n in
                   ("c/a.uis", "c/b.uis", "c/c.uis", "d1/a.uis", "d2/a.uis", "i/a.uis", "i/b.uis", "i/c.uis", "i/d.uis",
-                   "s/a.uis", "s/b.uis", "s/c.uis")]
+                   "s/a.uis", "s/b.uis", "s/c.uis", "t/a.uis", "t/b.uis")]
         self.assertEqual(order, expect)
+
+    def test_linux_runner_answers(self):
+        """host_exec.LinuxRunner: its answers, a timeout, and what is not its answer (wsl.exe's own UTF-16 message, the
+        end of the process): RuntimeError, and run_script runs the script once more the old way"""
+        import host_exec
+
+        class P:
+            def __init__(self, out):
+                self.stdin, self.stdout = io.BytesIO(), io.BytesIO(out)
+
+            def poll(self):
+                return None
+
+            def wait(self, timeout=None):
+                return 0
+
+        def runner(out):
+            with mock.patch.object(host_exec.subprocess, "Popen", lambda *a, **k: P(out)):
+                return host_exec.LinuxRunner()
+
+        r = runner(b'{"code": 3, "out": "a\\n", "err": "", "timeout": false}\n'
+                   b'{"code": 0, "out": "b", "err": "c", "timeout": true}\n')
+        self.assertEqual(r.run(["x"]).stdout, "a\n")
+        with self.assertRaises(subprocess.TimeoutExpired) as e:
+            r.run(["x"], timeout=5)
+        self.assertEqual((e.exception.output, e.exception.stderr), ("b", "c"))
+        self.assertRaises(RuntimeError, r.run, ["x"])                                      # the end of the process
+        self.assertRaises(RuntimeError, runner("Dieser Vorgang wurde abgebrochen\r\n".encode("utf-16-le")).run, ["x"])
+        uis = self.write("apps/x/tests/a.uis", "#!args --a\n")
+        broken = mock.Mock(run=mock.Mock(side_effect=RuntimeError("gone")))
+        old = mock.Mock(return_value=subprocess.CompletedProcess("x", 0, "ok", ""))
+        with mock.patch.object(build_rs, "ROOT", self.dir), mock.patch.object(build_rs, "run_exe", old), \
+                mock.patch.object(build_rs, "exe_arch", lambda exe: None):
+            rec = build_rs.run_script("linux", "x", uis, runner=broken)
+        self.assertEqual((rec["status"], broken.run.call_count, old.call_count), ("passed", 1, 1))
 
     def test_longest_work_first(self):
         units = [build_rs.TestUnit("win", "win", app, Path(f"{n}.uis"), "x", False, {f"app:{app}"}, i)

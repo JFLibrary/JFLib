@@ -2084,17 +2084,21 @@ shot build/template.png
   logical CPUs, or `jfgui_TEST_JOBS`; `--test-jobs 1` runs them one after the other in the old
   order), Windows and Linux together. An app's scripts keep their order and run one at a time,
   never while the same app runs on the other target (they share `build/`). Among a script's first
-  five lines, `#!lock desktop` (real windows: `gpu on`, a swapchain, a window on the screen) or
-  `#!lock audio` (the real output device) keeps it from running beside another script with the
-  same lock, on either target; `#!serial WHY` runs it alone after the others (for what fails
-  under their load; it leaves its app's order). `apps/NAME/tests/jobs.txt` holds the same for
-  every script of an app (`lock desktop`, `serial WHY`) and `independent` for an app whose scripts
-  share nothing: they run beside each other too. The checks after the scripts (`gendoc`,
-  `test_devkit`, `pkg_check`, `i18n_check`, `site`) run beside them. At the end the suite prints
-  the times of the build, the scripts and the checks and the slowest scripts and apps;
-  `build/test-report.json` keeps every result with its start and end (which scripts ran
-  together), `build/test-times.json` each script's last duration, from which the next run starts
-  the longest work first. A new script that opens a real window or plays sound needs its lock.
+  five lines, `#!lock desktop` (real windows: `gpu on`, a swapchain, a window on the screen; one
+  such script at a time per target) or `#!lock audio` (the real output device; one at a time on
+  both targets, WSLg plays into Windows' mix) keeps it from running beside another script with
+  the same lock; `#!serial WHY` runs it alone after the others (for what fails under their load,
+  such as a time limit in ms; it leaves its app's order). `apps/NAME/tests/jobs.txt` holds the
+  same for every script of an app (`lock desktop`, `serial WHY`), and `independent` for an app
+  whose scripts share nothing: they run beside each other too, the same script on the two targets
+  one after the other (its pictures); `independent targets` when they write no files at all (the
+  GPU tests' `--test` runs). The checks after the scripts (`gendoc`, `test_devkit`, `pkg_check`,
+  `i18n_check`, `site`) run beside them, and each job starts its Linux programs through one WSL
+  process of its own (`linux_task.py serve`). At the end the suite prints the times of the build, the
+  scripts and the checks and the slowest scripts and apps; `build/test-report.json` keeps every
+  result with its start and end (which scripts ran together) and the end of a failed script's
+  output, `build/test-times.json` each script's last duration, from which the next run starts the
+  longest work first. A new script that opens a real window or plays sound needs its lock.
 * `--dump` / `dump` print the widget tree (kind, id, label, rect in DIP, states, value): use it
   to find ids and positions without looking at pixels. Prefer `#id` and labels over coordinates.
 * Popups may leave their window (§6): their dump rectangles can be negative or beyond the
@@ -2127,9 +2131,10 @@ same.
 In this repository:
 
 ```sh
-python build_rs.py test --quick     # lint, build every app (both targets), every .uis script
+python build_rs.py test --quick     # lint, build every app (both targets), every .uis script (side by side)
 python build_rs.py test             # ... plus parity with the assembly reference
 python build_rs.py test NAME        # one app: build it, run its tests/*.uis
+python build_rs.py test --quick --test-jobs 1   # the scripts one after the other (section 12)
 python build_rs.py check            # the rules lint, then Clippy over the library (below)
 python build_rs.py check --quick    # the rules lint alone
 python tools/gendoc.py --check      # docs/API.md matches the doc comments

@@ -137,7 +137,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tools.project_sources import SourceError, entrypoint, project_sources, resolve_root
-from tools.host_exec import host_arch, run_native
+from tools.host_exec import LinuxRunner, exe_arch, host_arch, run_native
 from tools import manifests
 
 ROOT = Path(__file__).resolve().parent              # RustLib/
@@ -1524,16 +1524,23 @@ def script_timeout(uis):
 #  * an app's scripts run in their order, one at a time, and never while one of the app's scripts runs on the
 #    other target: they share build/ (pictures, scratch folders) and what the app keeps of its own (lock app:NAME)
 #  * apps/NAME/tests/jobs.txt "independent": its scripts share nothing, each runs on its own beside the others; the same
-#    script on the two targets still one after the other (its pictures; lock script:NAME/FILE.uis)
+#    script on the two targets still one after the other (its pictures; lock script:NAME/FILE.uis).  "independent
+#    targets": not even that (scripts that write no files, such as the GPU tests' --test runs)
 #  * "#!lock NAME..." among a script's first five lines (or "lock NAME..." in apps/NAME/tests/jobs.txt for each script):
-#    scripts with a lock in common never run at the same time, on any target -- desktop: real windows on the
-#    desktop (WSLg shows Linux windows there too), audio: the real output device
+#    scripts with a lock in common never run at the same time -- desktop: real windows on the screen, one at a time
+#    per target (Windows' desktop and WSLg's; a test sees the other's windows as it sees anybody's), audio: the real
+#    output device, one at a time on both targets (WSLg plays into Windows' mix)
 #  * "#!serial WHY" (or "serial WHY" in apps/NAME/tests/jobs.txt): alone, after the parallel part (it leaves its app's
 #    order): what fails under the load of the others
 #  * the order: the most work behind a lock first, after the times of the last run (<out>/test-times.json; a
-#    script without one counts 5 s); <out>/test-report.json keeps every result of the last run with its times
+#    script without one counts as the median); <out>/test-report.json keeps every result of the last run with its
+#    times
+#  * Linux scripts from Windows: each thread keeps one WSL process that starts its programs (tools/host_exec.py
+#    LinuxRunner, linux_task.py serve) instead of a wsl.exe and two Pythons per script (0.4 s on a quiet machine,
+#    2-3 s on a busy one)
 TEST_MARKERS = ("#!args", "#!timeout", "#!serial", "#!lock")
 TEST_LOCKS = ("desktop", "audio")
+TEST_TARGET_LOCKS = ("desktop",)        # one per target
 TEST_DEFAULT_S = 5.0
 SUITE_CHECKS_JOBS = 2       # the checks after the scripts run beside them in this many processes
 
@@ -1556,9 +1563,9 @@ def script_markers(uis):
 
 
 def app_test_rules(name):
-    """apps/NAME/tests/jobs.txt (section "test-jobs") -> dict(independent, serial, locks).  Lines: "independent",
-    "serial WHY", "lock NAME..."; "#" starts a comment"""
-    rules = dict(independent=False, serial=False, locks=set())
+    """apps/NAME/tests/jobs.txt (section "test-jobs") -> dict(independent, targets, serial, locks).  Lines:
+    "independent [targets]", "serial WHY", "lock NAME..."; "#" starts a comment"""
+    rules = dict(independent=False, targets=False, serial=False, locks=set())
     f = ROOT / "apps" / name / "tests" / "jobs.txt"
     if not f.exists():
         return rules
@@ -1566,14 +1573,15 @@ def app_test_rules(name):
         w = ln.split("#")[0].split()
         if not w:
             continue
-        if w == ["independent"]:
-            rules["independent"] = True
+        if w in (["independent"], ["independent", "targets"]):
+            rules["independent"], rules["targets"] = True, len(w) == 2
         elif w[0] == "serial":
             rules["serial"] = True
         elif w[0] == "lock" and len(w) > 1:
             rules["locks"].update(w[1:])
         else:
-            raise BuildError(f"apps/{name}/tests/jobs.txt:{i}: {ln.strip()!r}: independent, serial WHY or lock NAME... (section test-jobs)")
+            raise BuildError(f"apps/{name}/tests/jobs.txt:{i}: {ln.strip()!r}: independent [targets], serial WHY or lock NAME... "
+                             "(section test-jobs)")
     return rules
 
 
@@ -1628,7 +1636,9 @@ def test_units(runs, jobs):
                 continue
             serial, locks = script_markers(script)
             serial = (serial or rules["serial"]) and jobs > 1
-            locks |= rules["locks"] | {f"script:{name}/{script.name}" if rules["independent"] else f"app:{name}"}
+            locks = {f"{lk}:{folder}" if lk in TEST_TARGET_LOCKS else lk for lk in locks | rules["locks"]}
+            locks.add(f"script:{folder}/{name}/{script.name}" if rules["targets"] else
+                      f"script:{name}/{script.name}" if rules["independent"] else f"app:{name}")
             u = TestUnit(folder, target, name, script, exe, serial, locks, len(units))
             if not serial and not rules["independent"]:
                 u.prev, prev = prev, u
@@ -1645,7 +1655,8 @@ def load_test_times(out):
 
 def save_test_report(out, units, records, times, started):
     """<out>/test-times.json (each script's last duration, for the order of the next run) and
-    <out>/test-report.json (this run: status, exit code, start and end in seconds since the scripts began)"""
+    <out>/test-report.json (this run: status, exit code, start and end in seconds since the scripts began, the
+    end of a failed script's output)"""
     times = dict(times)
     rows = []
     for u in units:
@@ -1656,6 +1667,8 @@ def save_test_report(out, units, records, times, started):
         rows.append(dict(target=u.folder, app=u.app, script=u.script.name, status=r["status"], exit_code=r["exit_code"],
                          start=round(r["start"] - started, 2), end=round(r["start"] - started + r["duration"], 2),
                          serial=u.serial, locks=sorted(u.locks)))
+        if r["status"] == "failed":     # the end of what it wrote, for a look afterwards
+            rows[-1]["output"] = r["output"][-6000:]
     out.mkdir(parents=True, exist_ok=True)
     for name, data in (("test-times.json", dict(sorted(times.items()))), ("test-report.json", rows)):
         tmp = out / f"{name}.{os.getpid()}.tmp"
@@ -1679,8 +1692,10 @@ def order_test_units(units, times, jobs):
     return sorted(units, key=lambda u: (-u.rank, u.index))
 
 
-def run_script(target, exe, script, verify_dirty=False):
-    """one script on an already-built program -> its record (script, status, exit_code, start, duration, output)"""
+def run_script(target, exe, script, verify_dirty=False, runner=None):
+    """one script on an already-built program -> its record (script, status, exit_code, start, duration, output).
+    runner: a LinuxRunner (tools/host_exec.py) for a Linux program of this machine's processor run from Windows:
+    one WSL process for many scripts instead of a wsl.exe each (section "test-jobs"); gone -> as without it"""
     for line in script.read_text(encoding="utf-8").splitlines():
         if line.startswith(("shot ", "dump ")) and len(line.split()) > 1:
             (ROOT / line.split()[1]).parent.mkdir(parents=True, exist_ok=True)
@@ -1690,7 +1705,14 @@ def run_script(target, exe, script, verify_dirty=False):
     started = time.monotonic()
     limit = script_timeout(script)
     try:
-        result = run_exe(target, exe, args, timeout=limit)
+        result = None
+        if runner is not None and target == "linux" and exe_arch(exe) in (None, host_arch()):
+            try:
+                result = runner.run([wsl_path(exe), *args], timeout=limit)
+            except RuntimeError:            # its WSL process is gone: the script once more as before
+                started = time.monotonic()
+        if result is None:
+            result = run_exe(target, exe, args, timeout=limit)
         code, output = result.returncode, result.stdout + result.stderr
     except subprocess.TimeoutExpired as e:    # this script failed, the others still run
         code, output = "timeout", f"FAIL no end after {limit} s\n" + timeout_output(e)
@@ -1710,10 +1732,22 @@ def run_test_units(units, jobs, report):
     cv = threading.Condition()
     waiting, held, done, records = list(pool), set(), set(), {}
     running = [0]
+    local = threading.local()       # each thread's LinuxRunner, started with its first Linux script
+
+    def runner(u):
+        if u.target != "linux" or os.name != "nt":
+            return None
+        r = getattr(local, "runner", None)
+        if r is None or r.p.poll() is not None:
+            try:
+                r = local.runner = LinuxRunner()
+            except OSError:
+                return None
+        return r
 
     def run(u):
         try:
-            rec = run_script(u.target, u.exe, u.script)
+            rec = run_script(u.target, u.exe, u.script, runner=runner(u))
         except Exception as e:      # noqa: BLE001 -- the runner itself failed: this script failed, the others go on
             rec = dict(script=u.script.name, status="failed", exit_code="error", start=time.monotonic(), duration=0.0,
                        output=f"FAIL the runner: {e!r}")
@@ -1724,26 +1758,34 @@ def run_test_units(units, jobs, report):
     def ready():
         return next((u for u in waiting if (u.prev is None or u.prev in done) and not u.locks & held), None)
 
+    def close_runner():
+        r = getattr(local, "runner", None)
+        if r is not None:
+            r.close()
+
     def worker():
-        while True:
-            with cv:
-                u = ready()
-                while u is None and waiting and running[0]:
-                    cv.wait()
-                    u = ready()
-                if u is None:       # all taken (none can wait forever: a unit waits only for units of the pool)
-                    return
-                waiting.remove(u)
-                held.update(u.locks)
-                running[0] += 1
-            try:
-                run(u)
-            finally:
+        try:
+            while True:
                 with cv:
-                    held.difference_update(u.locks)
-                    done.add(u)
-                    running[0] -= 1
-                    cv.notify_all()
+                    u = ready()
+                    while u is None and waiting and running[0]:
+                        cv.wait()
+                        u = ready()
+                    if u is None:       # all taken (none can wait forever: a unit waits only for units of the pool)
+                        return
+                    waiting.remove(u)
+                    held.update(u.locks)
+                    running[0] += 1
+                try:
+                    run(u)
+                finally:
+                    with cv:
+                        held.difference_update(u.locks)
+                        done.add(u)
+                        running[0] -= 1
+                        cv.notify_all()
+        finally:
+            close_runner()
 
     threads = [threading.Thread(target=worker, daemon=True) for _ in range(max(1, min(jobs, len(pool))))]
     for t in threads:
@@ -1755,8 +1797,11 @@ def run_test_units(units, jobs, report):
         records[u] = dict(script=u.script.name, status="failed", exit_code="not run", start=time.monotonic(), duration=0.0,
                           output="FAIL not run: it waited for a unit that never ran")
         report(u, records[u])
-    for u in serial:
-        run(u)
+    try:
+        for u in serial:
+            run(u)
+    finally:
+        close_runner()
     return records
 
 

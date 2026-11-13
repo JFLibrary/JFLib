@@ -16,11 +16,13 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('--watch-stdin', action='store_true')
     p.add_argument('--cwd')
-    p.add_argument('action', choices=['run', 'deb', 'repo', 'probe', 'appimage', 'rpm', 'flatpak', 'gpgsign'])
+    p.add_argument('action', choices=['run', 'deb', 'repo', 'probe', 'appimage', 'rpm', 'flatpak', 'gpgsign', 'serve'])
     p.add_argument('args', nargs=argparse.REMAINDER)
     a = p.parse_args()
     if a.cwd:
         os.chdir(a.cwd)
+    if a.action == 'serve':
+        return serve()
     if a.watch_stdin:
         child = subprocess.Popen([sys.executable, __file__, a.action, *a.args],
                                  stdin=subprocess.DEVNULL, start_new_session=True)
@@ -66,6 +68,58 @@ def main():
         subprocess.run(['dpkg-deb', '--root-owner-group', '-Zxz', '--build', str(package), str(output)], check=True)
         shutil.copyfile(output, destination)
     return 0
+
+
+def serve():
+    """programs one after the other for one owner (tools/host_exec.py LinuxRunner; build_rs.py test, section
+    "test-jobs"): saves a wsl.exe and two Pythons per program.  A request is a JSON line on stdin, {"args": [...],
+    "timeout": S}; the program runs as `run --watch-stdin` runs it (a session of its own, stdin /dev/null, the
+    output in files); the answer is a JSON line on stdout, {"code": N, "out": TEXT, "err": TEXT, "timeout": BOOL}
+    (timeout: killed after S seconds, with what it had written).  The end of stdin (the owner is gone) kills what
+    runs and ends this"""
+    import queue
+    requests = queue.Queue()
+    running = []
+
+    def read():
+        for line in iter(sys.stdin.readline, ''):
+            requests.put(line)
+        for child in running:       # the owner is gone
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        os._exit(0)
+    threading.Thread(target=read, daemon=True).start()
+    while True:
+        req = json.loads(requests.get())
+        with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+            try:
+                child = subprocess.Popen(req['args'], stdin=subprocess.DEVNULL, stdout=out, stderr=err,
+                                         start_new_session=True)
+            except OSError as e:        # (`run` ends with a traceback and exit code 1)
+                answer = {'code': 1, 'out': '', 'err': f'linux_task serve: {e}\n', 'timeout': False}
+            else:
+                running[:] = [child]
+                timed_out = False
+                try:
+                    child.wait(timeout=req.get('timeout'))
+                except subprocess.TimeoutExpired:
+                    timed_out = True
+                    try:
+                        os.killpg(child.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    child.wait()
+                running.clear()
+                out.seek(0)
+                err.seek(0)
+                # a signal as `run` reports it (sys.exit(-N) -> 256 - N)
+                code = child.returncode & 0xFF if child.returncode < 0 else child.returncode
+                answer = {'code': code, 'out': out.read().decode('utf-8', 'replace'),
+                          'err': err.read().decode('utf-8', 'replace'), 'timeout': timed_out}
+        sys.stdout.write(json.dumps(answer) + '\n')
+        sys.stdout.flush()
 
 
 TOOLS = ('mksquashfs', 'unsquashfs', 'appimagetool', 'rpmbuild', 'rpm', 'flatpak', 'flatpak-builder',
