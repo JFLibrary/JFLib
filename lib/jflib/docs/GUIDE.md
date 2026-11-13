@@ -95,6 +95,8 @@ panic nobody catches, below). What changes against the template:
 | --- | --- |
 | Windows | `cargo build`; the Visual Studio Build Tools, which Rust's msvc toolchain needs anyway |
 | Linux | `cargo build` on Linux, through cc against glibc; not from Windows, and not with musl |
+| macOS | `cargo build` on a Mac (`cargo jflib mac` makes `NAME.app`) |
+| iOS | `cargo build --target aarch64-apple-ios` (or `aarch64-apple-ios-sim`) on a Mac; `cargo jflib` makes no iOS app yet |
 | Browser | `cargo jflib web`, the modes scalar and SIMD (no threads mode: rustup ships no std with atomics). std has no clock, files, threads or network there: they panic or fail. JFLib's own (`plat::time_us`, `ui.spawn`, `plat::read_file`) work |
 | Android | `cargo jflib android`; `std::fs` needs real paths (the app's folder). JFLib's paths (`/tmp`, `/documents`) are names that only `plat` resolves |
 

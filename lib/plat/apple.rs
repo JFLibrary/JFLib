@@ -7,8 +7,9 @@
 // (apple_disp.rs) until AP4.
 //
 // main(): libSystem's start calls it (a program without std); it calls the app's jfgui_main and ends
-// the process with its result.  The arguments and the environment come from _NSGetArgv and
-// _NSGetEnviron, so a program with std (whose main is std's) reads the same.
+// the process with its result.  std_start() (feature std) does the same from the program's own fn
+// main, whose main is std's.  The arguments and the environment come from _NSGetArgv and
+// _NSGetEnviron, so a program with std reads the same.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -207,6 +208,28 @@ unsafe extern "Rust" {
 #[cfg(not(feature = "std"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
+    before_app();
+    // SAFETY: the app defines jfgui_main (rt::main! / ui::main!); it takes no arguments.
+    let code = unsafe { jfgui_main() };
+    after_app(code);
+    rt::os::exit(code)
+}
+
+/// (feature std) the start of a program with std, from its `fn main` (rt::main!, ui::main! or the
+/// program's own): what main does without std, with rt's panic hook first and the end through
+/// std::process::exit; with the feature unwind a panic that leaves the app ends it there
+#[cfg(feature = "std")]
+pub fn std_start() -> ! {
+    rt::panic_hook();
+    before_app();
+    // SAFETY: the app defines jfgui_main (rt::main! / ui::main!); it takes no arguments.
+    let code = rt::abort_on_unwind(|| unsafe { jfgui_main() });
+    after_app(code);
+    crate::exit(code) // hosted.rs: std::process::exit
+}
+
+/// what the start does before the app's jfgui_main (both starts)
+fn before_app() {
     // SIGPIPE ignored, as plat's start does it on Linux: a write to a closed pipe is an error, not the
     // end of the process (sockets have SO_NOSIGPIPE as well); child processes get it back at default
     // SAFETY: a constant handler (SIG_IGN = 1) for SIGPIPE (13).
@@ -227,14 +250,16 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
     // iOS: the canvas the app's windows start in; the host's view sends its real size
     #[cfg(target_os = "ios")]
     ios::before_main();
-    // SAFETY: the app defines jfgui_main (rt::main! / ui::main!); it takes no arguments.
-    let code = unsafe { jfgui_main() };
+}
+
+/// what the start does after the app's jfgui_main returned `code` (both starts)
+#[cfg_attr(not(target_os = "ios"), allow(unused_variables))]
+fn after_app(code: i32) {
     // iOS: an app installed its runtime (ui::launch): UIKit takes the main thread, never returns
     #[cfg(target_os = "ios")]
     if code == 0 && crate::web::installed() {
         ios::run();
     }
-    rt::os::exit(code)
 }
 
 /// (test aid) the process's CPU time (us), resident memory and its own footprint (bytes), as on
