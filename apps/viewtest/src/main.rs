@@ -44,6 +44,12 @@
 //                        of an <input type=date>) with a date_picker in it, whose day closes its
 //                        calendar only, and ui.calendar in place: days, ISO weeks or months
 //                        between 2026-11-05 and 2027-02-10 (tests/calendar.uis)
+//   Ctrl+N               a window of its own ("Teiler", as a browser's new window); its "Teilen"
+//                        shows four splits inside each other at once, each taking its
+//                        orientation and first position from the room it gets (as developer
+//                        tools dock), the innermost pane a wrapping text over a box that fills the
+//                        rest: new boxes inside new fill boxes get their size in their first pass
+//                        and settle without "layout did not settle" (tests/nested.uis)
 //
 // tests/keys.uis, tests/menus.uis and tests/links.uis drive it; the texts above the page say what
 // it saw.
@@ -92,6 +98,12 @@ const ID_DATEPOP: u32 = 124; // that flyout
 const ID_DATE: u32 = 125; // the date_picker in it (its calendar's days: #0x800F1040 + cell)
 const ID_CALMODE: u32 = 126; // "Tag" / "Woche" / "Monat"
 const ID_CAL: u32 = 127; // the calendar in place (cells: #0x800F10C0 + day, week row or month)
+const ID_NESTWIN: u32 = 128; // "Teiler" (Ctrl+N)
+const ID_NESTBTN: u32 = 129; // its "Teilen"
+const ID_SPLIT: u32 = 136; // its four splits: 136 .. 139
+const ID_NESTIN: u32 = 133; // the innermost pane's column: the wrapping text, then ID_NESTFILL
+const ID_NESTFILL: u32 = 134; // the box that fills the rest of it
+const ID_NESTAREA: u32 = 135; // the area of "Teiler" the splits fill
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 const ID_FD_DIR: u32 = 0x11_0000; // the folder dialog (FD_FOLDER)
 
@@ -101,6 +113,7 @@ const CMD_COPY: u32 = 3; // a row of the page's menu (Mi::Item)
 const CMD_TREE: u32 = 4; // after the frame: the tree is complete
 const CMD_CHAIN: u32 = 5; // "Kette": one link of the chain
 const CMD_PW_AWAY: u32 = 6; // the password box goes away (and comes back), as with a closed window
+const CMD_NESTED: u32 = 7; // Ctrl+N: the window "Teiler"
 
 const T_POLL: u32 = 1; // "Hintergrund": the timer that polls the thread's result
 
@@ -116,10 +129,14 @@ fn sync_pending() -> bool {
 // the page's context menu
 static PAGE_MENU: [Mi; 3] = [Mi::Cmd(CMD_RELOAD), Mi::Sep, Mi::Item(CMD_COPY, "Link kopieren", 0)];
 
-static CMDS: [Command; 2] = [
+static CMDS: [Command; 3] = [
     Command::new(CMD_NEW_TAB, "Neuer Tab", 0, MOD_CTRL, VK_T, 0),
     Command::new(CMD_RELOAD, "Neu laden", 0, 0, VK_F5, 0),
+    Command::new(CMD_NESTED, "Neues Fenster mit Teilern", 0, MOD_CTRL, VK_N, 0),
 ];
+
+// the innermost pane's text of "Teiler": long enough to wrap there
+const NEST_TEXT: &str = "Ein Text, der hier umbricht: seine Höhe hängt von der Breite ab, die vier neue Teiler ihm lassen.";
 
 const DESC: AppDesc = AppDesc {
     title: "Ansichtstest",
@@ -198,6 +215,11 @@ struct ViewTest {
     cal_mode: i32,
     cal: (i32, u32, u32),
     cal_picks: u32,
+    /// Ctrl+N: the window "Teiler", its splits shown ("Teilen"), their positions once moved
+    nest_open: Shared<i32>,
+    nest_rect: Shared<WinRect>,
+    nested: bool,
+    split: [Option<i32>; 4],
 }
 
 // (E3) the cursors "Zeiger wechseln" walks through (0: the page's arrow / hand)
@@ -259,6 +281,10 @@ impl Default for ViewTest {
             cal_mode: 0,
             cal: (2026, 11, 13),
             cal_picks: 0,
+            nest_open: Shared::new(0),
+            nest_rect: Shared::new(WinRect::new(40, 40, 800, 600, 0)),
+            nested: false,
+            split: [None; 4],
         }
     }
 }
@@ -448,6 +474,61 @@ impl ViewTest {
         ui.flyout_end();
     }
 
+    // Ctrl+N: "Teiler", a window of its own.  "Teilen" (below the area, so the splits come a pass
+    // after the click) shows four splits inside each other, each one new in the filling pane of
+    // the one before; as a browser's developer tools dock by the room they have, each split takes
+    // its orientation and first position from the size of the box it goes into (wider than twice
+    // its height: side by side, else one above the other; half of it).  The innermost pane is a
+    // column of a wrapping text and a box that fills the rest
+    fn nested_window(&mut self, ui: &mut Ui) {
+        let (open, rect) = (self.nest_open.clone(), self.nest_rect.clone());
+        if ui.window_begin(ID_NESTWIN, "Teiler", Some(&open), WF_APP | WF_RESIZABLE, Some(&rect)) {
+            ui.next_size(-1, -1);
+            ui.box_begin(0, BOX_V | pad(8), 8);
+            ui.next_size(-1, -1);
+            ui.box_begin(ID_NESTAREA, BOX_V, 0);
+            if self.nested {
+                self.splits(ui);
+            }
+            ui.box_end();
+            if ui.button(ID_NESTBTN, "Teilen") & EV_ACT != 0 {
+                self.nested = !self.nested;
+                ui.repass();
+            }
+            ui.box_end();
+        }
+        ui.window_end();
+    }
+
+    // the four splits of "Teiler" and the innermost column
+    fn splits(&mut self, ui: &mut Ui) {
+        let names = ["Links", "Oben", "Mitte", "Innen"];
+        for (i, name) in names.iter().enumerate() {
+            let r = ui.box_rect();
+            let (w, h) = (ui.px2dip(r[2]), ui.px2dip(r[3]));
+            let vertical = w < 2 * h;
+            let pos = self.split[i].unwrap_or(if vertical { h } else { w } / 2);
+            ui.next_size(-1, -1);
+            ui.split_begin(ID_SPLIT + i as u32, pos, vertical);
+            ui.text(TS_BODY, name);
+            ui.split_next();
+        }
+        ui.next_size(-1, -1);
+        ui.box_begin(ID_NESTIN, BOX_V | pad(4), 4);
+        ui.text(TS_BODY | TX_WRAP, NEST_TEXT);
+        ui.next_size(-1, -1);
+        ui.box_begin(ID_NESTFILL, BOX_V | BOX_BG, 0);
+        ui.text(TS_BODY, "Rest");
+        ui.box_end();
+        ui.box_end();
+        for i in (0..names.len()).rev() {
+            let mut p = self.split[i].unwrap_or(0);
+            if ui.split_end(&mut p) {
+                self.split[i] = Some(p);
+            }
+        }
+    }
+
     // a canvas with the defaults
     fn plain(&mut self, ui: &mut Ui) {
         ui.next_size(360, 60);
@@ -619,6 +700,7 @@ impl App for ViewTest {
             ui.box_end();
         }
         ui.window_end();
+        self.nested_window(ui);
         // (E8) several files: the names the dialog chose, in its order
         if ui.filedlg(ID_FD, FD_OPEN | FD_MULTI, &self.fd_open, &mut self.fd_path, 4096, &["txt=Textdatei"]) & EV_ACT != 0 {
             let all = ui.filedlg_paths();
@@ -650,6 +732,7 @@ impl App for ViewTest {
             CMD_COPY => self.copy += 1,
             CMD_CHAIN => self.chain += 1,
             CMD_PW_AWAY => self.pw_away = !self.pw_away,
+            CMD_NESTED => self.nest_open.set(1),
             // "Hintergrund": the thread's wake-up, the poll timer
             UIC_WAKE => self.work_seen = WORK_DONE.load(Ordering::Relaxed),
             UIC_TIMER if arg == T_POLL => {
