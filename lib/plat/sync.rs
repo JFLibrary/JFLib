@@ -568,8 +568,10 @@ impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         let mut s = self.c.st.lock();
         s.receiver = false;
-        s.items.clear();
+        let items = core::mem::take(&mut s.items);
         drop(s);
         self.c.not_full.notify_all();
+        // dropped without the lock: a queued value may hold a sender of this channel
+        drop(items);
     }
 }
