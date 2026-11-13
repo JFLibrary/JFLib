@@ -1430,6 +1430,12 @@ pub fn ax_test_text(pw: i32, role: &str, name: &str, q: AxTestText) -> Option<St
     })
 }
 
+/// (tests, any thread) window pw on the main thread, where its state lives (UiOnly): its client
+/// area in px of the screen, its dpi and whether it is the key window
+pub fn ax_test_window(pw: i32) -> ([i32; 4], i32, bool) {
+    on_main(|| (crate::win_get_rect(pw).unwrap_or([0; 4]), crate::win_dpi(pw), crate::win_test(crate::WT_ACTIVE, pw, [0; 4]) == 1))
+}
+
 /// (tests, any thread) the focused element of the application as VoiceOver asks it (role, name)
 pub fn ax_test_focused() -> Option<(String, String)> {
     on_main(|| {

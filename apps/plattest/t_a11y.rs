@@ -1033,7 +1033,7 @@ mod mac {
     // the demo's window has the keyboard (not while the Mac shows its lock screen: no app can
     // become active then)
     fn key_window() -> bool {
-        plat::win_test(plat::WT_ACTIVE, PW, [0; 4]) == 1
+        plat::ax_test_window(PW).2
     }
 
     // a check of the keyboard focus: only in the key window
@@ -1141,8 +1141,9 @@ mod mac {
         );
         record(find(t, "AXStaticText", "Apfel").is_some_and(|e| e.selected), "a11y-mac: the first row is selected");
         // the frame: inside the window's client area (points from the top left of the screen)
-        let client = plat::win_get_rect(PW).unwrap_or([0; 4]);
-        let scale = plat::win_dpi(PW) as f64 / 96.0;
+        // (the window's state lives on the main thread: UiOnly)
+        let (client, dpi, _) = plat::ax_test_window(PW);
+        let scale = dpi as f64 / 96.0;
         let c = [client[0] as f64 / scale, client[1] as f64 / scale, client[2] as f64 / scale, client[3] as f64 / scale];
         let f = btn.map_or([0.0; 4], |e| e.frame);
         record(

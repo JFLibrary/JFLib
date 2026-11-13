@@ -84,7 +84,7 @@ pub use gpu::*;
 // the accessibility tree for VoiceOver (a11y.rs, docs/VOICEOVER.md)
 #[path = "apple_mac_a11y.rs"]
 pub(crate) mod a11y_mac;
-pub use a11y_mac::{AxTestAct, AxTestElem, AxTestText, ax_test_act, ax_test_events, ax_test_focused, ax_test_hit, ax_test_listen, ax_test_text, ax_test_tree};
+pub use a11y_mac::{AxTestAct, AxTestElem, AxTestText, ax_test_act, ax_test_events, ax_test_focused, ax_test_hit, ax_test_listen, ax_test_text, ax_test_tree, ax_test_window};
 pub use services::hotkey::hotkey_test_post;
 pub(crate) use sysapp::print_dialog;
 pub(crate) use sysapp::{sysmenu_set, sysmenu_supported};
