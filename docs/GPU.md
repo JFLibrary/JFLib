@@ -1339,7 +1339,7 @@ set jfgui_GPU_VALIDATE=1
 build\win\gputest.exe --test all          (oder: gputest --test all --validate)
 ```
 
-`tests/validate.uis` lässt jeden Test einmal mit Validierung laufen; ein Validierungsfehler
+`tests/validate.uis` und `tests/validate_window.uis` lassen jeden Test einmal mit Validierung laufen; ein Validierungsfehler
 lässt ihn scheitern. Der Test `syncval` baut absichtlich zwei fehlende Barrieren ein, eine zwischen
 Kopien und eine zwischen zwei Dispatches, und erwartet, dass die Synchronisationsprüfung sie meldet
 -- so ist sicher, dass sie wirklich an ist. Eine dritte baut `queues` ein (zwei Dispatches auf der
@@ -1405,7 +1405,7 @@ für Messungen den Configurator ausschalten.
 | `spec.uis` | Pipeline-Konstanten: `shader::samples::spec_fill` als SPIR-V 1.3 (`WorkgroupSize`-Built-in) und 1.6 (`LocalSizeId`) mit den Standardwerten und mit Konstanten für alle fünf Overrides, Workgroup-Größen 1, 32, 256 und das Gerätelimit (1024; sie bemisst auch ein Workgroup-Array) = `spec_fill_ref` Wort für Wort; `constants()`; die Umwandlungen wie WebGPU (u32 1,9 = 1, bool 0,5 = wahr, i32 −2,7 = −2); `Invalid` für fremde und doppelte Nummern, Werte außerhalb des Typs, NaN, unendlich, Workgroup-Größe 0 und über dem Limit, einen fehlenden Entry Point |
 | `textures.uis` | Texturen in Shadern aus `lib/shader` gegen CPU-Referenzen (unten) |
 | `queues.uis` | (G5d) die Rechen-Warteschlange: Runden auf einem Puffer abwechselnd auf beiden Warteschlangen mit Warten über die Zeitleiste (= CPU), eine Speichertextur von der einen zur anderen, Warten und Ids beider, ein Puffer, der fällt, während er noch benutzt wird, was verweigert wird, ohne Rechen-Warteschlange (`jfgui_GPU_COMPUTE=0`); mit `--validate` eine fehlende Barriere auf der Rechen-Warteschlange |
-| `validate.uis` | alles einmal mit Validierungsschicht (siehe oben), auch `scene`, `bench_smoke`, `spec`, `textures` und `wgsl` (ohne Meldung) |
+| `validate.uis`, `validate_window.uis` | alles einmal mit Validierungsschicht (siehe oben), auch `scene`, `bench_smoke`, `spec`, `textures` und `wgsl` (ohne Meldung); seit 2026-11-13 in zwei Skripten: `validate_window` mit den drei Tests mit echtem Fenster und Zeitgrenzen (`upload`, `window`, `bench_smoke`) allein nach den anderen, `validate` mit dem Rest (`--test all --except ...`, ein neuer Test landet dort) neben den anderen (`build_rs.py`, Abschnitt „test-jobs“) |
 | `glibc.uis` | (Linux, gegen glibc gelinkt; sonst `SKIP`) Argumente und Umgebung; Hauptthread und jeder `plat`-Thread mit eigenem Kontrollblock und TLS (FS-Basis = `pthread_self`, eigenes `errno`, eigener `dlerror`-Text); der verlangte Stapel; 300 Threads hinterlassen keine Abbildung; Vulkan auf einem `plat`-Thread von 2 MiB. In Kindprozessen: `exit` von glibc aus `main` und von einem Thread, auch mit laufenden Threads und einem noch offenen Gerät; Absturz auf dem Haupt- und einem `plat`-Thread, Stapelüberlauf und Panik mit Bericht, Code 3 und ohne `at_exit` |
 | `noloader.uis` | `jfgui_GPU_DLL` nennt eine fehlende Datei (Name, Pfad) oder eine Bibliothek, die kein Vulkan-Loader ist: `Err(NoLoader)`; ein Programm ohne Loader startet, `--info` meldet `SKIP`, Code 0 |
 

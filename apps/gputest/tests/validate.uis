@@ -1,5 +1,6 @@
-#!args --test all --validate
-#!lock desktop
+#!args --test all --except upload,window,bench_smoke --validate
 # every test once with VK_LAYER_KHRONOS_validation and synchronization validation: a validation
 # error fails (syncval provokes one hazard on purpose and expects it); without the layer (no
-# Vulkan SDK) the tests run as without --validate
+# Vulkan SDK) the tests run as without --validate.  The three with a real window and time limits
+# (try_acquire, IMMEDIATE against FIFO) in validate_window.uis, alone after the others (build_rs.py,
+# section "test-jobs"); this one has the rest of `all` (a new test lands here)
