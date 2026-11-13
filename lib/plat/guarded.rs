@@ -292,6 +292,8 @@ impl File {
     /// (crash paths: plat::log) write_at without allocating or taking a lock: an OS file's write
     /// call; a mount's stream and the browser's files (memory under a lock) -> None
     pub(crate) fn write_at_crash(&self, off: u64, buf: &[u8]) -> Option<usize> {
+        #[cfg(target_arch = "wasm32")]
+        let _ = (off, buf);
         match &self.0 {
             #[cfg(not(target_arch = "wasm32"))]
             Inner::Os(f) => f.write_at(off, buf),
