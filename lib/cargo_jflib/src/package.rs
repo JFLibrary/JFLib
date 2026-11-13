@@ -42,6 +42,7 @@ const PK_PREVIEW: u32 = 3;
 const PK_FILE: u32 = 5;
 const PF_ZLIB: u32 = 1;
 const NAME_MAX: usize = 47; // the payload's names and labels (lib/installer/payload.rs)
+const PAY_MAX_ENT: usize = 65536; // the payload's entries (lib/installer/payload.rs)
 
 pub(crate) fn read(p: &Path) -> Result<Vec<u8>, String> {
     fs::read(p).map_err(|e| format!("{}: {e}", p.display()))
@@ -519,6 +520,9 @@ impl App<'_> {
         }
         for (name, data) in combined {
             entries.push((PK_FILE, PF_ZLIB, name, String::new(), deflate::zlib(&data), data.len()));
+        }
+        if entries.len() > PAY_MAX_ENT {
+            return Err(format!("the setup's payload would hold {} entries, at most {PAY_MAX_ENT}", entries.len()));
         }
         let pay = payload(&entries);
         let mut out = stub.clone();

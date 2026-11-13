@@ -116,8 +116,11 @@ packaged setup is that exe with a payload and a trailer appended.
   ([GUIDE.md](GUIDE.md) section 21). The user's taskbar pins of the program without an id (made
   with an earlier version) get it too (`User Pinned`; test mode: `DIR\Pinned`). A payload of an
   older `package.py` has no `app_id`: then nothing changes.
-* `uninstall.exe --uninstall` removes everything listed in `install.ini`; a hidden `cmd`
-  deletes `uninstall.exe` and the folder after the process ended.
+* `uninstall.exe --uninstall` removes everything listed in `install.ini` (`files=`: the extra
+  files, one line of any length; the folders below the program folder that held them go too,
+  deepest first, when nothing else is left in them); a hidden `cmd` deletes `uninstall.exe` and
+  the folder after the process ended. (An older setup cut `files=` at 4096 bytes and left the
+  rest behind; installing over it with a newer setup writes the whole list.)
 * Running the setup again installs another style over the old one (the app's settings stay).
 * Options: `--dir PATH`, `--style ID`.
 * **File types and URL schemes** (`PACKAGE` `filetypes=` / `schemes=`, carried in the
@@ -177,7 +180,7 @@ little endian, offsets relative to the payload start):
 
 | Part | Layout |
 |---|---|
-| header | `"AIPK"`, u32 entry count (at most 256) |
+| header | `"AIPK"`, u32 entry count (at most 65536; a setup of jflib 0.1.0 reads at most 256) |
 | entry (128 bytes each) | u32 kind, u32 stored size, u32 unpacked size, u32 flags (1 = zlib), u64 offset, u64 0, name[48], label[48] (UTF-8, NUL-padded) |
 | kinds | 1 manifest (`key=value` lines: `app`, `display`, `version`, `publisher`, `default`, `desc_<style>`), 2 a style variant (the exe; name = style id, label = INFO name), 3 its preview PNG, 5 an extra file (name = its path in the program folder; e.g. codectest's `jxlenc.dll` or `licenses/...`) |
 | trailer | `"ASMINST1"`, u64 stub size, u64 payload size (the last 24 bytes of the file; in a signed setup the last 24 bytes before the Authenticode certificate table and its padding to 8 bytes) |

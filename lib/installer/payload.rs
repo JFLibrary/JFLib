@@ -29,7 +29,9 @@ pub(crate) const PK_STYLE: u32 = 2;
 pub(crate) const PK_PREVIEW: u32 = 3;
 pub(crate) const PK_FILE: u32 = 5;
 const PF_ZLIB: u32 = 1;
-const PAY_MAX_ENT: u32 = 256;
+// entries: the table is checked against the payload's size, so more cost nothing (the asm's 256
+// were fewer than an app with std has licence files: about 2 per crate)
+const PAY_MAX_ENT: u32 = 65536;
 const PAY_MAX_USIZE: u32 = 0x1000_0000;
 pub(crate) const STY_MAX: usize = 8;
 
