@@ -104,7 +104,43 @@ pub const K_SWATCH: u16 = 20;
 pub const K_LINK: u16 = 21;
 /// a heading of a document or section (value: its level, 1 the top; md_view.rs, Ui::heading)
 pub const K_HEADING: u16 = 22;
+/// the number of KIND_NAMES (the kinds K_BOX ..= K_HEADING); the kinds of web content K_TABLE ..=
+/// K_FIGURE follow it (KIND_NAMES_MORE, kind_name names them all)
 pub const K_KIND_COUNT: u16 = 23;
+// (section 19 of the guide) the kinds of a web page's accessibility tree; a screen reader gets
+// each with a role of its own where the platform has one (UI Automation, AT-SPI2, the browser)
+/// a table or grid (Sem::grid: its rows and columns) and a row of it
+pub const K_TABLE: u16 = 23;
+pub const K_ROW: u16 = 24;
+/// a cell (label: what it says; Sem::cell: its row and column), a column header, a row header
+pub const K_CELL: u16 = 25;
+pub const K_COLHEADER: u16 = 26;
+pub const K_ROWHEADER: u16 = 27;
+/// a landmark of a page (value: LM_*; label: its name)
+pub const K_LANDMARK: u16 = 28;
+/// a tree and one of its items (Sem::level: its depth; AS_COLLAPSED / SS_OPEN: closed / open)
+pub const K_TREE: u16 = 29;
+pub const K_TREEITEM: u16 = 30;
+/// a group of radio buttons, a tool bar, a tooltip (label: its text), a separator
+pub const K_RADIOGROUP: u16 = 31;
+pub const K_TOOLBAR: u16 = 32;
+pub const K_TOOLTIP: u16 = 33;
+pub const K_SEPARATOR: u16 = 34;
+/// live regions: an alert (said at once), a status line and a log (said when the person is
+/// idle); label: their text (Sem::live changes how they speak)
+pub const K_ALERT: u16 = 35;
+pub const K_STATUS: u16 = 36;
+pub const K_LOG: u16 = 37;
+/// a meter (value of min ..= max, as a progress bar), a spin button and a scroll bar (value, min,
+/// max as a slider; Sem::range for fractions)
+pub const K_METER: u16 = 38;
+pub const K_SPIN: u16 = 39;
+pub const K_SCROLLBAR: u16 = 40;
+/// an article, a figure (label: their names)
+pub const K_ARTICLE: u16 = 41;
+pub const K_FIGURE: u16 = 42;
+/// the end of the K_* kinds (one past K_FIGURE)
+pub const K_KIND_END: u16 = 43;
 pub const SS_HOVER: u16 = 1;
 pub const SS_PRESSED: u16 = 2;
 pub const SS_FOCUSED: u16 = 4;
@@ -119,8 +155,77 @@ pub const KIND_NAMES: [&str; 23] = [
     "menu", "menuitem", "list", "listitem", "tab", "canvas", "icon", "image", "combo", "dialog",
     "titlebar", "swatch", "link", "heading",
 ];
+/// names of the kinds K_TABLE ..= K_FIGURE (dump, selectors kind:"Label")
+pub const KIND_NAMES_MORE: [&str; 20] = [
+    "table", "row", "cell", "colheader", "rowheader", "landmark", "tree", "treeitem", "radiogroup",
+    "toolbar", "tooltip", "separator", "alert", "status", "log", "meter", "spin", "scrollbar",
+    "article", "figure",
+];
+
+/// the name of a K_* kind (dump, selectors kind:"Label"); "box" for an unknown one
+pub fn kind_name(kind: u16) -> &'static str {
+    if kind < K_KIND_COUNT {
+        KIND_NAMES[kind as usize]
+    } else if kind < K_KIND_END {
+        KIND_NAMES_MORE[(kind - K_KIND_COUNT) as usize]
+    } else {
+        KIND_NAMES[0]
+    }
+}
+
 /// names of the SS_* state bits (dump)
 pub const STATE_NAMES: [&str; 7] = ["hover", "pressed", "focused", "checked", "disabled", "selected", "open"];
+
+// K_LANDMARK's value: the kind of landmark (0: a named region)
+pub const LM_REGION: i32 = 0;
+pub const LM_BANNER: i32 = 1;
+pub const LM_MAIN: i32 = 2;
+pub const LM_NAVIGATION: i32 = 3;
+pub const LM_COMPLEMENTARY: i32 = 4;
+/// the content information (a page's footer)
+pub const LM_CONTENTINFO: i32 = 5;
+pub const LM_SEARCH: i32 = 6;
+pub const LM_FORM: i32 = 7;
+
+// Sem::states: what a record is beyond its kind and SS_* state (section 19 of the guide)
+/// a field that must be filled in
+pub const AS_REQUIRED: u32 = 1;
+/// a field whose content is not valid
+pub const AS_INVALID: u32 = 2;
+/// its content is being changed (a live region says nothing meanwhile)
+pub const AS_BUSY: u32 = 4;
+/// it opens a popup (a menu, a list, a dialog)
+pub const AS_HASPOPUP: u32 = 8;
+/// a link to an address that was visited
+pub const AS_VISITED: u32 = 16;
+/// a modal dialog
+pub const AS_MODAL: u32 = 32;
+/// a list, tree or table that allows several selected items
+pub const AS_MULTISELECT: u32 = 64;
+/// it can be expanded and is closed now (SS_OPEN: it is open)
+pub const AS_COLLAPSED: u32 = 128;
+/// outside the visible area (scrolled away, clipped by its scroll box): a screen reader's
+/// browse mode reaches it, the pointer does not
+pub const AS_OFFSCREEN: u32 = 256;
+/// it takes the keyboard focus (a kind that does not anyway: a cell of a grid, an element with a
+/// tabindex)
+pub const AS_FOCUSABLE: u32 = 512;
+/// a click does something (a kind that does not say so: a cell, a row, an element with a click
+/// handler)
+pub const AS_CLICKABLE: u32 = 1024;
+/// it can be selected (rows and cells of a grid; list rows, tree items and tabs are anyway)
+pub const AS_SELECTABLE: u32 = 2048;
+/// a text box: read-only / with several lines / a password (as TB_* of a built-in box)
+pub const AS_READONLY: u32 = 4096;
+pub const AS_MULTILINE: u32 = 8192;
+pub const AS_PASSWORD: u32 = 16384;
+
+// Sem::live and ui.announce: how a live region / an announcement is said (0 for Sem::live: as
+// its kind says -- K_ALERT assertive, K_STATUS and K_LOG polite, the others not at all)
+pub const LIVE_POLITE: u32 = 1;
+pub const LIVE_ASSERTIVE: u32 = 2;
+/// (Sem::live) not a live region (an app that announces its changes itself, ui.announce)
+pub const LIVE_OFF: u32 = 3;
 
 // ------------------------------------------------------------------ layers
 pub const L_BASE: u32 = 0;

@@ -4,11 +4,16 @@
 // gets the differences of every published tree (a11y_wire.rs: the format).
 //
 //   jfgui_a11y(on) -> 1      (host) the mirror on / off (plat::a11y::active() follows it); on
-//                            again: everything anew with the next frame.  jfgui_A11Y=0 refuses.
+//                            again: everything anew with the next frame.  on 2: the host reads
+//                            the rich format (a11y_wire VERSION2: Sub, descriptions, cells,
+//                            announcements ...; web/a11y.js), 1 the first one (Android's host).
+//                            jfgui_A11Y=0 refuses.
 //   jfgui_a11y_act(win, key_lo, key_hi, act, a, b, value, len) -> 1 queued / 0 refused
 //                            an action for node key of window win (plat::a11y::Act): 1 click,
 //                            2 focus, 3 value (value), 4 text (the input buffer's len UTF-8
-//                            bytes), 5 select (anchor a, caret b in characters)
+//                            bytes), 5 select (anchor a, caret b in characters); plat::a11y::Op:
+//                            6 scroll into view, 7 expand, 8 collapse, 9 increment, 10 decrement,
+//                            11 select the item, 12 add it to the selection, 13 take it out
 // The browser gets every update as a request (REQUEST_A11Y, no completion) in frame order.
 // Android takes them on its UI thread after a frame:
 //   jfgui_a11y_take() -> byte count   the updates since the last call (each: u32 byte count
@@ -20,7 +25,7 @@ use alloc::vec::Vec;
 
 use rt::sync::SpinLock;
 
-use crate::a11y::{self, wire::Mirror, Act, Change, Request, Snapshot, WinTree};
+use crate::a11y::{self, wire::Mirror, Act, Change, Op, OpRequest, Request, Snapshot, WinTree};
 
 static MIRROR: SpinLock<Mirror> = SpinLock::new(Mirror::new());
 #[cfg(target_os = "android")]
@@ -67,7 +72,7 @@ pub extern "C" fn jfgui_a11y(on: u32) -> u32 {
     if crate::env("jfgui_A11Y").is_some_and(|v| v.starts_with('0')) {
         return 0;
     }
-    MIRROR.lock().reset();
+    MIRROR.lock().set_version(on as u8);
     #[cfg(target_os = "android")]
     OUT.lock().clear();
     a11y::set_active(on != 0);
@@ -83,6 +88,22 @@ pub extern "C" fn jfgui_a11y_act(win: u32, key_lo: u32, key_hi: u32, act: u32, a
     if win > 255 || !a11y::active() {
         return 0;
     }
+    let key = (key_hi as u64) << 32 | key_lo as u64;
+    let op = match act {
+        6 => Some(Op::ScrollIntoView),
+        7 => Some(Op::Expand),
+        8 => Some(Op::Collapse),
+        9 => Some(Op::Increment),
+        10 => Some(Op::Decrement),
+        11 => Some(Op::SelectItem),
+        12 => Some(Op::AddToSelection),
+        13 => Some(Op::RemoveFromSelection),
+        _ => None,
+    };
+    if let Some(op) = op {
+        a11y::request_op(OpRequest { win: win as u8, key, op });
+        return 1;
+    }
     let act = match act {
         1 => Act::Click,
         2 => Act::Focus,
@@ -94,7 +115,7 @@ pub extern "C" fn jfgui_a11y_act(win: u32, key_lo: u32, key_hi: u32, act: u32, a
         5 => Act::Select(a, b),
         _ => return 0,
     };
-    a11y::request(Request { win: win as u8, key: (key_hi as u64) << 32 | key_lo as u64, act });
+    a11y::request(Request { win: win as u8, key, act });
     1
 }
 
