@@ -2887,11 +2887,12 @@ fn ftp_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
         let line = String::from_utf8_lossy(&b[p..e]).into_owned();
         if response {
             l.f("Response", off + p, end - p, line.clone());
-            let d = line.as_bytes();
+            // (from the bytes: byte 4 of the text may lie inside a character)
+            let d = &b[p..e];
             if d.len() >= 3 && d[..3].iter().all(|c| c.is_ascii_digit()) {
                 l.f("Response code", off + p, 3, String::from(&line[..3]));
-                if line.len() > 4 {
-                    l.f("Response arg", off + p + 4, e - p - 4, String::from(&line[4..]));
+                if d.len() > 4 {
+                    l.f("Response arg", off + p + 4, e - p - 4, String::from_utf8_lossy(&d[4..]).into_owned());
                 }
             }
         } else {
@@ -2901,7 +2902,9 @@ fn ftp_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
                 let lead = line.len() - line.trim_start().len();
                 l.f("Request command", off + p + lead, vl, c.verb.clone());
                 if !c.arg.is_empty() {
-                    l.f("Request arg", off + p + lead + vl + 1, e - (p + lead + vl + 1), c.arg.clone());
+                    // (the text's lengths: a byte that is no UTF-8 grew to three, kept inside the line)
+                    let at = (lead + vl + 1).min(e - p);
+                    l.f("Request arg", off + p + at, e - p - at, c.arg.clone());
                 }
                 if !ftp::verb_known(&c.verb) {
                     l.bad(format!("a command FTP does not define: {}", c.verb));
@@ -2999,8 +3002,9 @@ fn imap_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
             l.f("Tag", off + s, c.tag.len(), c.tag.clone());
             l.f("Command", off + s + c.tag.len() + 1, c.verb.len(), c.verb.clone());
             let at = c.tag.len() + c.verb.len() + 2;
-            if line.len() > at {
-                l.f("Arguments", off + s + at, e - s - at, String::from(&line[at..]));
+            if let Some(args) = line.get(at..).filter(|a| !a.is_empty()) {
+                let at = at.min(e - s);
+                l.f("Arguments", off + s + at, e - s - at, String::from(args));
             }
         } else {
             l.f("Message data", off + s, end - s, line.clone());
@@ -3045,8 +3049,9 @@ fn smtp_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
                     l.f("Enhanced status code", off + s + 4, st.len(), String::from(st));
                     at += st.len() + 1;
                 }
-                if line.len() > at {
-                    l.f("Response parameter", off + s + at, e - s - at, String::from(&line[at..]));
+                if let Some(rest) = line.get(at..).filter(|r| !r.is_empty()) {
+                    let at = at.min(e - s);
+                    l.f("Response parameter", off + s + at, e - s - at, String::from(rest));
                 }
             } else {
                 l.bad(String::from("a reply line without its code"));
@@ -3058,7 +3063,8 @@ fn smtp_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
             let lead = line.len() - line.trim_start().len();
             l.f("Command", off + s + lead, vl, verb);
             if line.len() > at {
-                l.f("Request parameter", off + s + at, e - s - at, String::from(&line[at..]));
+                let a = at.min(e - s);
+                l.f("Request parameter", off + s + a, e - s - a, String::from(&line[at..]));
             }
         } else {
             l.f("Message line", off + s, end - s, line.clone());
@@ -3097,8 +3103,11 @@ fn pop3_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
                 Some(i) => {
                     l.f("Response", off + s, end - s, line.clone());
                     l.f("Response indicator", off + s, i.len(), String::from(i));
-                    if line.len() > i.len() + 1 {
-                        l.f("Response description", off + s + i.len() + 1, e - s - i.len() - 1, String::from(&line[i.len() + 1..]));
+                    // (from the bytes: the text's byte after "+OK " may lie inside a character)
+                    let d = &b[s..e];
+                    if d.len() > i.len() + 1 {
+                        l.f("Response description", off + s + i.len() + 1, e - s - i.len() - 1,
+                            String::from_utf8_lossy(&d[i.len() + 1..]).into_owned());
                     }
                 }
                 None if line == "." => l.f("End of data", off + s, end - s, String::from(".")),
@@ -3111,7 +3120,8 @@ fn pop3_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
                     let lead = line.len() - line.trim_start().len();
                     l.f("Request command", off + s + lead, vl, verb);
                     if line.len() > at {
-                        l.f("Request parameter", off + s + at, e - s - at, String::from(&line[at..]));
+                        let a = at.min(e - s);
+                        l.f("Request parameter", off + s + a, e - s - a, String::from(&line[at..]));
                     }
                 }
                 None => {
@@ -3543,7 +3553,8 @@ fn tls_hello(l: &mut B, m: &[u8], at: usize, client: bool) -> Option<()> {
     }
     let total = be16(m.get(p..p + 2)?, 0) as usize;
     p += 2;
-    let end = p + total;
+    // (a record split across segments holds less than the extensions' length says)
+    let end = (p + total).min(m.len());
     while p + 4 <= end {
         let e = be16(m, p);
         let k = be16(m, p + 2) as usize;
@@ -3657,7 +3668,7 @@ fn tls_sni(m: &[u8]) -> Option<String> {
     let mut p = 35 + n;
     p += 2 + be16(m.get(p..p + 2)?, 0) as usize;
     p += 1 + *m.get(p)? as usize;
-    let end = p + 2 + be16(m.get(p..p + 2)?, 0) as usize;
+    let end = (p + 2 + be16(m.get(p..p + 2)?, 0) as usize).min(m.len());
     p += 2;
     while p + 4 <= end {
         let (e, k) = (be16(m, p), be16(m, p + 2) as usize);

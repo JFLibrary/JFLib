@@ -57,9 +57,10 @@
 //        view, PgUp / PgDn that a field does not take scroll the view.  The fields follow the
 //        window's mirroring (as every widget), not the direction of their paragraph.  A
 //        document without fields reads as before.
-//   Flags: MV_NO_FRAME (no card, a smaller padding), MV_OPEN_LINKS (an activated link is also
-//        opened with open_url: its scheme rules and the app's policy apply; never without the
-//        user's click or Enter), MV_RTL / MV_LTR (the document's direction; default: that of
+//   Flags: MV_NO_FRAME (no card, a smaller padding), MV_OPEN_LINKS (an activated http, https
+//        or mailto link is also opened with open_url: the app's policy applies; never without
+//        the user's click or Enter; links of other schemes and relative ones only reach the
+//        app), MV_RTL / MV_LTR (the document's direction; default: that of
 //        its first strong character, else the window's)
 //
 // Layout: the blocks in a column; block quotes indent with a bar, lists with their markers in
@@ -89,8 +90,10 @@
 // drops it, Ctrl+A selects all,
 // Ctrl+C / Ctrl+Insert copy the selection as text (list markers, cells by tabs) and HTML.
 // Images: names of the VFS ("app://", "data://" ...) and paths (relative ones after base) are
-// read on first view and kept in the state; http(s) addresses are never fetched by the view
-// (MI_LOCAL: the alt text shows in a frame instead; MI_ASK / MI_APP: the app fetches them).
+// read on first view and kept in the state -- of the OS's files only regular ones up to 32 MB,
+// never a network or device path ("//server/share", "\\.\..."); http(s) addresses are never
+// fetched by the view (MI_LOCAL: the alt text shows in a frame instead; MI_ASK / MI_APP: the
+// app fetches them).
 // Records: K_BOX id (label: the label, value: the scroll position in DIP); per visible block
 // K_HEADING (value: the level), K_TEXT (paragraphs, code, table cells), K_LISTITEM (the first
 // block of a list item, value: its number), K_CHECKBOX (a task's box, checked), K_LINK per
@@ -128,7 +131,7 @@ use crate::{Sp, Ui};
 
 /// markdown_view flags: no card around the document
 pub const MV_NO_FRAME: u32 = 1;
-/// an activated link is also opened (open_url)
+/// an activated link is also opened (open_url) when it is http, https or mailto
 pub const MV_OPEN_LINKS: u32 = 2;
 /// the document runs right to left (indents and markers on the right)
 pub const MV_RTL: u32 = 4;
@@ -286,6 +289,21 @@ fn img_at(src: &str, base: &str, mode: u8) -> (Option<String>, Option<String>) {
         _ if remote => (None, None),
         _ => (Some(path), None),
     }
+}
+
+// whether the view reads path for an image: never a network or device path ("//server/share",
+// "\\server\share", "\\.\COM1": Windows connects to the server just to show the picture), and
+// of the OS's files only a regular one of at most IMG_BYTES (not /dev/zero, a pipe, a terminal)
+fn img_file_ok(path: &str) -> bool {
+    let b = path.as_bytes();
+    if b.len() >= 2 && matches!(b[0], b'/' | b'\\') && matches!(b[1], b'/' | b'\\') {
+        return false;
+    }
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+    if matches!(plat::vfs::route(path), plat::vfs::Route::Os) {
+        return plat::fs::stat(path).is_some_and(|m| m.is_file() && m.size <= IMG_BYTES as u64);
+    }
+    true
 }
 
 // a picture from its bytes (an SVG by its name or its first character, else what img_core
@@ -1187,7 +1205,7 @@ impl Ui {
         if let Some(Img::Unread) = lc.imgs.get(i) {
             let src = doc.images().get(i).map_or("", |m| m.src.as_str()).trim();
             let img = match img_at(src, base, lc.mode) {
-                (Some(path), _) => match plat::read_file(&path) {
+                (Some(path), _) => match img_file_ok(&path).then(|| plat::read_file(&path)).flatten() {
                     Some(d) => img_decode(&d, src),
                     None => Img::Failed,
                 },
@@ -2121,7 +2139,7 @@ impl Ui {
             if let Some(sp) = st.doc.link_spots().get(k).copied() {
                 let url = String::from(st.doc.link(sp.link));
                 if flags & MV_OPEN_LINKS != 0 {
-                    self.open_url(&url);
+                    self.open_doc_link(&url);
                 }
                 out.link = Some(url);
                 out.ev |= EV_ACT;

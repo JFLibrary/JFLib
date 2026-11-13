@@ -542,6 +542,15 @@ fn dissector(t: &mut T) {
     let ls = decode::layers(&frame(cut));
     t.check("it says so", ls.iter().any(|l| l.proto == decode::Proto::Tls && field(l, "Continuation").is_some()));
     t.eq("bytes that start no record", tls::dissect(&[1, 2, 3, 4, 5, 6]), alloc::vec![Part::Rest { at: 0, len: 6 }]);
+    // a ClientHello split across segments, cut after every byte: the extensions' length says
+    // more than the segment holds (it was read past the end)
+    let mut tls_layers = 0;
+    for k in 6..hello.len() {
+        let f = frame(&hello[..k]);
+        let _ = decode::info(&f);
+        tls_layers += decode::layers(&f).iter().filter(|l| l.proto == decode::Proto::Tls).count();
+    }
+    t.eq("every cut ClientHello dissects", tls_layers, hello.len() - 6);
     // an alert in the clear
     let mut c2 = Core::client(cfg("web.lab", &root), &seed(1));
     c2.push(b"HTTP/1.1 400 Bad Request\r\n\r\n");
