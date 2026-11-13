@@ -1,9 +1,9 @@
 # VoiceOver-Plan: der Screenreader auf Mac und iPhone
 
-Stand 2026-11-12, auf Basis von `main` ce54de4c. Umgesetzt sind VO0, VO1 und VO2 (macOS: die Brücke mit Rollen,
-Werten, Aktionen, Mitteilungen und Text, `plattest --test a11y-mac`) und VO4 (iOS: Elemente, Traits, UITextInput,
-`plattest --test a11y-ios` im Simulator). Die Hand-Proben des Nutzers auf Mac und iPhone (VO3, VO5) stehen aus. Die
-vier Entscheidungen unten hat der Nutzer am 2026-11-12 alle wie empfohlen getroffen.
+Stand 2026-11-13, auf Basis von `main` ce54de4c. Umgesetzt sind VO0 bis VO3 (macOS: die Brücke mit Rollen, Werten,
+Aktionen, Mitteilungen und Text, `plattest --test a11y-mac`; die Hand-Probe auf dem Mac ist bestanden) und VO4 (iOS:
+Elemente, Traits, UITextInput, `plattest --test a11y-ios` im Simulator). Die Hand-Probe auf dem iPhone (VO5) steht aus.
+Die vier Entscheidungen unten hat der Nutzer am 2026-11-12 alle wie empfohlen getroffen.
 
 ## Ziel
 
@@ -157,6 +157,7 @@ Sprache. Jetzt schreiben `tools/apple.py` (Mac und iOS) und `cargo jflib mac` di
 `CFBundleDevelopmentRegion`, wie die UI zurückfällt (`ui::i18n`). Damit sind auch AppKits eigene Texte (Dialoge der
 Ablage, Dienste-Menü) deutsch. Grenze: Wählt eine App ihre Sprache selbst (`--lang`, `set_language`) abweichend vom
 System, bleibt die Stimme die des Systems.
+Nachprüfung (2026-11-13): VoiceOver liest die Apps deutsch. **VO3 fertig.**
 
 ### VO4: iOS (M–L)
 
