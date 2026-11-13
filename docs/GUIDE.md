@@ -1526,7 +1526,7 @@ ui.dialog_end(); // always
 * **Images** (`img_core::io`): the runtime registers PNG, JPEG, BMP, GIF and SVG (`.svg`,
   `.svgz`: drawn at their intrinsic size, section 31) at start-up and connects the file
   functions. For every other format call `img_all::use_all_codecs()` once in `App::init`
-  (TIFF, TGA, WebP, AVIF, HEIC, JPEG XL, JPEG XR, DDS, PDN).
+  (TIFF, TGA, WebP, AVIF, HEIC, JPEG XL, JPEG XR, DDS, PDN, PSD).
 
   ```rust
   match img_core::io::load_ex(path, None, None) {   // any registered format -> FMT_PARGB
@@ -4771,8 +4771,10 @@ let sf = doc.rasterize(256, 256, &mut img_svg::Opts::default())?;
 * Robustness: malformed files never panic; the reader is forgiving (unclosed tags, unquoted
   attributes, a broken path draws up to the error, `svg.truncated()` tells). Limits: 32 MB
   per file (also inflated), 250 000 elements, 256 levels, entity references expand once (no
-  exponential growth), `use` cycles are cut, 1 000 000 element visits and 64 levels of
-  nesting per render, a step budget for CSS selectors.
+  exponential growth), `use` cycles are cut, a step budget for CSS selectors and 128 MB of
+  declarations the cascade copies (beyond: `ERR_LIMIT`), and per render 1 000 000 element
+  visits, a work budget (pixels painted, layers and masks, path points: 64 per pixel drawn, at
+  least 2^26) and 64 levels of nesting.
 
 **The image viewer** shows a bitmap or an SVG in a zoomable, scrollable view; the app keeps an
 `ImageViewState`:

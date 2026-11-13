@@ -39,7 +39,7 @@ use rt::sync::SpinLock;
 pub const IOF_JXL_COMPAT: u32 = 0x10_0000;
 /// IO_FLAGS bit: no worker threads (the output is the same either way)
 pub const IOF_JXL_1THREAD: u32 = 0x20_0000;
-/// IO_FLAGS bit: progressive (VarDCT: DC + 2 AC passes; lossless: squeeze, responsive)
+/// IO_FLAGS bit: progressive (VarDCT: a DC frame + 3 AC passes; lossless: squeeze, responsive)
 pub const IOF_JXL_PROGRESSIVE: u32 = 0x40_0000;
 /// IO_FLAGS bit (jxl-tools): no patches (libjxl's patches = 0; for comparisons)
 pub const IOF_JXL_NOPATCHES: u32 = 0x80_0000;

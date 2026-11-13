@@ -99,7 +99,7 @@ CRATES = [
     ("img_all", "registration of every codec", "full"),
     ("img_png", "PNG", "codec"),
     ("img_jpeg", "JPEG", "codec"),
-    ("img_bmp", "BMP, ICO, CUR", "codec"),
+    ("img_bmp", "BMP", "codec"),
     ("img_gif", "GIF", "codec"),
     ("img_tga", "TGA", "codec"),
     ("img_tiff", "TIFF", "codec"),

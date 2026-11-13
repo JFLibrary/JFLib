@@ -28,7 +28,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[API](#img_png-api) · [modules](#img_png-modules)
 - [img_jpeg](#img_jpeg) -- JPEG
   <br>[API](#img_jpeg-api) · [modules](#img_jpeg-modules)
-- [img_bmp](#img_bmp) -- BMP, ICO, CUR
+- [img_bmp](#img_bmp) -- BMP
   <br>[API](#img_bmp-api)
 - [img_gif](#img_gif) -- GIF
   <br>[API](#img_gif-api)
@@ -16263,7 +16263,7 @@ The codec's building blocks (public for the codec test app `codectest`; see thei
 
 ## img_bmp
 
-*BMP, ICO, CUR* -- crate root [`lib/img_bmp/lib.rs`](../lib/img_bmp/lib.rs)
+*BMP* -- crate root [`lib/img_bmp/lib.rs`](../lib/img_bmp/lib.rs)
 
 ```text
 img_bmp -- Windows bitmap (BMP) decoder and encoder, and the BMP parts of the core-format
@@ -16770,7 +16770,7 @@ The codec's building blocks (public for the codec test app `codectest`; see thei
 *AV1 intra coding* -- crate root [`lib/img_av1/lib.rs`](../lib/img_av1/lib.rs)
 
 ```text
-img_av1 -- AV1 intra decoder for AVIF still images (AV1 bitstream specification; model:
+img_av1 -- AV1 intra decoder and encoder for AVIF still images (AV1 bitstream specification; model:
 tools/av1_ref.py, bit-exact)                                  [src/img/av1*.s]
 
   Av1Dec::new() -> decoder                  av1_new (av1_free = drop)
@@ -17092,7 +17092,7 @@ From [`lib/img_jxl/writer.rs`](../lib/img_jxl/writer.rs) (`img_jxl::writer`):
 IOF_JXL_COMPAT: u32 = 0x10_0000
 /// IO_FLAGS bit: no worker threads (the output is the same either way)
 IOF_JXL_1THREAD: u32 = 0x20_0000
-/// IO_FLAGS bit: progressive (VarDCT: DC + 2 AC passes; lossless: squeeze, responsive)
+/// IO_FLAGS bit: progressive (VarDCT: a DC frame + 3 AC passes; lossless: squeeze, responsive)
 IOF_JXL_PROGRESSIVE: u32 = 0x40_0000
 /// IO_FLAGS bit (jxl-tools): no patches (libjxl's patches = 0; for comparisons)
 IOF_JXL_NOPATCHES: u32 = 0x80_0000
