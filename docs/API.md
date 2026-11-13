@@ -30714,7 +30714,8 @@ PROGRESS_WAKE_MS: u64 = 30
   tasks alive (spawned, not finished)
 - **`fn block_on<F: Future>(&mut self, fut: F) -> F::Output`**
   run until fut is done; the executor's other tasks run alongside.  The thread sleeps on a
-  semaphore between wake-ups (Executor::ui: it only yields)
+  semaphore between wake-ups (Executor::ui: it only yields, and takes other threads'
+  wake-ups itself: no event loop runs meanwhile)
 
 - **`fn block_on<F: Future>(fut: F) -> F::Output`**
   run fut to its end on this thread (a parking executor; console programs, tests)
