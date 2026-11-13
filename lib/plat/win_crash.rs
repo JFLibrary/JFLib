@@ -5,6 +5,10 @@
 // print "jfgui: crash 0x<code> at image offset 0x<offset> (look it up in the .map file)" and
 // end in rt::crash::report (the app's hook, exit code 3).  Exceptions of system DLLs go on to
 // their own handlers (print dialogs and the shell raise and catch some themselves).
+// A crash outside our image (a driver, a Vulkan layer) names the module and the thread:
+//   jfgui: crash 0x<code> in <file>.dll at offset 0x<offset> (thread <id>, reading 0x<address>)
+//   jfgui: called from <file>.dll+0x<offset>, ..., <exe>+0x<offset>
+// the second line is the unwound call chain through every module (CHAIN_MAX return addresses).
 // CrashInfo::frames: the call chain, exact from the PE unwind data (RtlVirtualUnwind,
 // crash-check); the stack scan of crash_fill (plat_win.s, plat-win) when that finds nothing
 // and for a stack overflow.  ARM64 (docs/ARM64.md, ARM5): its CONTEXT, unwind data and calls at the end.
@@ -27,7 +31,13 @@ unsafe extern "system" {
     fn AddVectoredExceptionHandler(first: u32, h: Handler) -> usize;
     fn SetUnhandledExceptionFilter(f: Handler) -> usize;
     fn GetModuleHandleW(name: *const u16) -> isize;
+    fn GetModuleHandleExW(flags: u32, name: *const u16, module: *mut isize) -> i32;
+    fn GetModuleFileNameW(m: isize, buf: *mut u16, n: u32) -> u32;
 }
+
+// GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT
+const MODULE_FROM_ADDRESS: u32 = 4 | 2;
+const CHAIN_MAX: usize = 12; // return addresses in the "called from" line of a foreign crash
 
 static IMG_BASE: AtomicUsize = AtomicUsize::new(0);
 static IMG_SIZE: AtomicUsize = AtomicUsize::new(0);
@@ -75,23 +85,102 @@ extern "system" fn handler(ep: *const ExceptionPointers) -> i32 {
         rt::os::exit(3);
     }
     let mut ci = CrashInfo::empty();
+    let mut chain = Chain { at: [0; CHAIN_MAX], n: 0 };
     // SAFETY: valid exception record and context from the system.
-    unsafe { fill(&mut ci, (*ep).record, (*ep).context) };
+    unsafe { fill(&mut ci, (*ep).record, (*ep).context, &mut chain) };
     let mut line = StackText::<160>::new();
+    let ours = ci.ip.wrapping_sub(ci.base) < IMG_SIZE.load(Ordering::SeqCst) as u64;
     if let Some((name, base)) = crate::module_at(ci.ip) {
         // jxl-module: inside the loaded JPEG XL writer module
         let _ = writeln!(line, "jfgui: crash 0x{:X} in {name} at offset 0x{:x} (look it up in its .map file)", ci.code,
                          ci.ip.wrapping_sub(base));
-    } else {
+    } else if ours || ci.kind == CK_STACK {
+        // (a stack overflow keeps to this line: the module lookup needs stack)
         let _ = writeln!(line, "jfgui: crash 0x{:X} at image offset 0x{:x} (look it up in the .map file)", ci.code,
                          ci.ip.wrapping_sub(ci.base));
+    } else {
+        foreign_lines(&ci, tid, &chain);
     }
     rt::os::write_stderr(line.bytes());
     rt::crash::report(&ci)
 }
 
-/// CrashInfo from the exception record and the context
-unsafe fn fill(ci: &mut CrashInfo, rec: *const u8, ctx: *const u8) {
+/// the return addresses of the unwound call chain in every module (foreign crashes)
+struct Chain {
+    at: [u64; CHAIN_MAX],
+    n: usize,
+}
+
+/// the stderr lines of a crash outside our image: the module, the offset in it, the thread,
+/// the faulting access, then the call chain as module+offset
+fn foreign_lines(ci: &CrashInfo, tid: usize, chain: &Chain) {
+    let mut line = StackText::<240>::new();
+    let _ = write!(line, "jfgui: crash 0x{:X} ", ci.code);
+    let mut name = StackText::<80>::new();
+    match module_of(ci.ip, &mut name) {
+        Some(base) => {
+            let _ = write!(line, "in {} at offset 0x{:x}", name.as_str(), ci.ip.wrapping_sub(base));
+        }
+        None => {
+            let _ = write!(line, "at 0x{:x}, in no loaded module", ci.ip);
+        }
+    }
+    let _ = write!(line, " (thread {tid}");
+    if ci.access != 2 {
+        let how = match ci.access {
+            0 => "reading",
+            1 => "writing",
+            8 => "executing",
+            _ => "accessing",
+        };
+        let _ = write!(line, ", {how} 0x{:x}", ci.addr);
+    }
+    let _ = writeln!(line, ")");
+    rt::os::write_stderr(line.bytes());
+    if chain.n > 0 {
+        let mut line = StackText::<{ 24 + CHAIN_MAX * 48 }>::new();
+        let _ = write!(line, "jfgui: called from ");
+        for (i, &a) in chain.at[..chain.n].iter().enumerate() {
+            let _ = write!(line, "{}", if i > 0 { ", " } else { "" });
+            write_place(&mut line, a);
+        }
+        let _ = writeln!(line);
+        rt::os::write_stderr(line.bytes());
+    }
+}
+
+/// "<file>+0x<offset>" for an address inside a loaded module, else "0x<address>"
+fn write_place<const N: usize>(out: &mut StackText<N>, addr: u64) {
+    let mut name = StackText::<80>::new();
+    let _ = match module_of(addr, &mut name) {
+        Some(base) => write!(out, "{}+0x{:x}", name.as_str(), addr.wrapping_sub(base)),
+        None => write!(out, "0x{addr:x}"),
+    };
+}
+
+/// the loaded module holding addr: its base; its file name (without the folder) into name
+fn module_of(addr: u64, name: &mut StackText<80>) -> Option<u64> {
+    let mut h = 0isize;
+    // SAFETY: a lookup only; UNCHANGED_REFCOUNT takes no reference on the module.
+    if addr == 0 || unsafe { GetModuleHandleExW(MODULE_FROM_ADDRESS, addr as *const u16, &mut h) } == 0 || h == 0 {
+        return None;
+    }
+    let mut buf = [0u16; 260];
+    // SAFETY: buf holds buf.len() UTF-16 units; the result is at most that many.
+    let n = (unsafe { GetModuleFileNameW(h, buf.as_mut_ptr(), buf.len() as u32) } as usize).min(buf.len());
+    let path = &buf[..n];
+    let file = path.iter().rposition(|&c| c == b'\\' as u16 || c == b'/' as u16).map_or(path, |k| &path[k + 1..]);
+    if file.is_empty() {
+        let _ = name.write_str("?");
+    }
+    for c in char::decode_utf16(file.iter().copied()) {
+        let _ = name.write_char(c.unwrap_or('?'));
+    }
+    Some(h as u64)
+}
+
+/// CrashInfo from the exception record and the context; the whole call chain into chain
+unsafe fn fill(ci: &mut CrashInfo, rec: *const u8, ctx: *const u8, chain: &mut Chain) {
     unsafe {
         let code = *(rec as *const u32);
         ci.code = code;
@@ -134,7 +223,7 @@ unsafe fn fill(ci: &mut CrashInfo, rec: *const u8, ctx: *const u8) {
         }
         // the call chain: exact from the PE unwind data (crash-check), else the stack scan
         // (plat-win; also for a stack overflow, where the unwinder would need more stack)
-        if ci.kind == CK_STACK || !unwind(ci, ctx) {
+        if ci.kind == CK_STACK || !unwind(ci, ctx, chain) {
             frames(ci, *(ctx.add(CTX_FP) as *const u64), *(ctx.add(CTX_SP) as *const u64));
         }
     }
@@ -306,9 +395,9 @@ unsafe extern "system" {
     None
 }
 
-/// CrashInfo::frames from the PE unwind data; false when no frame was found (the caller
-/// scans the stack instead)
-#[cfg(target_arch = "x86_64")] unsafe fn unwind(ci: &mut CrashInfo, fault: *const u8) -> bool {
+/// CrashInfo::frames from the PE unwind data, every module's return addresses into chain;
+/// false when no frame of ours was found (the caller scans the stack instead)
+#[cfg(target_arch = "x86_64")] unsafe fn unwind(ci: &mut CrashInfo, fault: *const u8, chain: &mut Chain) -> bool {
     let (lo, hi) = stack_bounds();
     let mut ctx = Context([0; CONTEXT_SIZE]);
     // SAFETY: the system's CONTEXT record of the fault (CONTEXT_SIZE bytes).
@@ -351,6 +440,10 @@ unsafe extern "system" {
         let ret = ctx.get(CTX_PC);
         if ret == 0 || ctx.get(CTX_SP) <= sp {
             break; // the end of the chain (thread start), or no progress
+        }
+        if chain.n < CHAIN_MAX {
+            chain.at[chain.n] = ret;
+            chain.n += 1;
         }
         if ret >= ci.code0 && ret < ci.code1 {
             add_frame(ci, ret);
@@ -713,10 +806,11 @@ unsafe fn leaf_link(ci: &CrashInfo, ctx: &Context, pc: u64, first: bool, sp: u64
     None
 }
 
-/// CrashInfo::frames from the unwind data; false when no frame was found (the caller scans the stack
-/// instead).  A leaf keeps sp, so only the first step may end at the same sp.
+/// CrashInfo::frames from the unwind data, every module's return addresses into chain; false when no
+/// frame of ours was found (the caller scans the stack instead).  A leaf keeps sp, so only the first
+/// step may end at the same sp.
 #[cfg(target_arch = "aarch64")]
-unsafe fn unwind(ci: &mut CrashInfo, fault: *const u8) -> bool {
+unsafe fn unwind(ci: &mut CrashInfo, fault: *const u8, chain: &mut Chain) -> bool {
     let (lo, hi) = stack_bounds();
     let mut ctx = Context([0; CONTEXT_SIZE]);
     // SAFETY: the system's CONTEXT record of the fault (CONTEXT_SIZE bytes).
@@ -755,6 +849,10 @@ unsafe fn unwind(ci: &mut CrashInfo, fault: *const u8) -> bool {
         let (ret, nsp) = (ctx.get(CTX_PC), ctx.get(CTX_SP));
         if ret == 0 || nsp < sp || (nsp == sp && step > 0) {
             break; // the end of the chain (thread start), or no progress
+        }
+        if chain.n < CHAIN_MAX {
+            chain.at[chain.n] = ret;
+            chain.n += 1;
         }
         if ret >= ci.code0 && ret < ci.code1 {
             add_frame(ci, ret);
