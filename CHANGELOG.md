@@ -18,6 +18,10 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ## [Unreleased]
 
+### Added
+
+- **build:** `build_rs.py test` runs the scripts side by side: `--test-jobs N` at a time (default half the logical CPUs, `jfgui_TEST_JOBS`; 1 = one after the other), Windows and Linux together, the checks after the scripts beside them. An app's scripts keep their order and never run on both targets at once; `#!lock desktop` / `#!lock audio` and `#!serial WHY` among a script's first lines, `apps/NAME/tests/jobs.txt` for a whole app (`independent`, `independent targets`, `lock`, `serial`); each job starts its Linux programs through one WSL process of its own (`linux_task.py serve`); render3dtest's and gputest's validation in parts (`--test A,B`, `--except`). At the end the times of build, scripts and checks and the slowest scripts and apps; `build/test-report.json` and `build/test-times.json` (the longest work first in the next run). `test --quick` with a warm build: 16 to 20 minutes under the load of other sessions instead of about 70 (63 of them scripts one after the other)
+
 ### Fixed
 
 - **wgsl:** A compound assignment of a vector with a scalar (`v += 1.0`, `v -= s`, `v /= 2.0`, `w += 1` of an integer vector, also through a swizzle) splats the scalar as `v + 1.0` does: in SPIR-V `v += 1.0` became a multiply by 1.0 (`-=` and `/=` alike) and integer vectors gave invalid SPIR-V; a float `v *= s` stays a vector times scalar
