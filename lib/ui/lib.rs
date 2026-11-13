@@ -570,6 +570,7 @@ pub(crate) struct Mods {
 /// what a window shows through (Ui::gpu_output): status and counters of the GPU output, for
 /// tests and measurements
 #[derive(Clone, Debug, Default)]
+#[non_exhaustive]
 pub struct GpuOutput {
     /// the output is switched on for this run (jfgui_GPU, the `gpu on` of a script)
     pub wanted: bool,

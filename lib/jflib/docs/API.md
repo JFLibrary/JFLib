@@ -50235,6 +50235,8 @@ not a general RTF file editor. Internal structured fragments use the DOCX codec 
   clipboard layer. Font families use escaped CSS names; fields/anchors become visible text and
   source/note metadata stays in the private DOCX format. The result is bounded to 16 MiB.
   Floating tables carry versioned exact anchors plus CSS float fallback; page units are twips.
+  Raised and lowered text shows its script size in font-size and keeps its nominal size, in half
+  points, in data-jf-size (clipboard_html_decode reads it back).
 
 - **`fn clipboard_rtf_decode(bytes: &[u8]) -> Result<Document, Error>`**
   Decode the bounded RTF clipboard profile into validated, directly formatted paragraphs.
@@ -50256,7 +50258,8 @@ Source: [`lib/doc_io/html_import.rs`](../lib/doc_io/html_import.rs)
 - **`fn clipboard_html_decode(bytes:&[u8])->Result<Document,Error>`**
   Decode a UTF-8 HTML clipboard fragment into editable paragraphs and nested tables.
   Handles inline text/CSS, table grids, merged cells, headers, borders and table positions.
-  JFLib's versioned data attributes retain exact twip anchors and document page settings.
+  JFLib's versioned data attributes retain exact twip anchors and document page settings, and
+  data-jf-size the nominal size of raised and lowered text.
   Input is bounded to 16 MiB, 2 MiB text, 64 element levels and eight table levels.
   Active content and metadata are ignored; external resources are never requested.
 

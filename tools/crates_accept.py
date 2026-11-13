@@ -12,7 +12,7 @@
 The acceptance test of docs/CRATES.md (CR2), run by the full suite (`build_rs.py test` without
 --quick).  It packs every crate as `cargo package` would publish it, unpacks the packages into a
 local source next to the crates from outside (`cargo vendor`), and builds two projects that know
-only `jflib = "0.1"`, offline, with nothing of this repository on their paths:
+only `jflib = "0.2"`, offline, with nothing of this repository on their paths:
 
   hallo   the template lib/jflib/template: Windows (development and release, through rust-lld,
           also as on a machine without Visual Studio's SDK), Linux against glibc; tests/smoke.uis

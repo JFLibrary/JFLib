@@ -244,7 +244,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-jflib"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "codectest"
@@ -513,7 +513,7 @@ dependencies = [
 
 [[package]]
 name = "jflib"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-agent-core",
  "jflib-agent-io",
@@ -576,14 +576,14 @@ dependencies = [
 
 [[package]]
 name = "jflib-agent-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-rt",
 ]
 
 [[package]]
 name = "jflib-agent-io"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-agent-core",
  "jflib-plat",
@@ -592,7 +592,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-appimagert"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-compress",
  "jflib-plat",
@@ -601,7 +601,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-archive"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-img-core",
  "jflib-plat",
@@ -610,7 +610,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-base"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-plat",
  "jflib-rt",
@@ -618,14 +618,14 @@ dependencies = [
 
 [[package]]
 name = "jflib-build"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-compress",
 ]
 
 [[package]]
 name = "jflib-cas"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-agent-core",
  "jflib-compress",
@@ -636,15 +636,15 @@ dependencies = [
 
 [[package]]
 name = "jflib-compress"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "jflib-crypto"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "jflib-datastore"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-agent-core",
  "jflib-crypto",
@@ -654,11 +654,11 @@ dependencies = [
 
 [[package]]
 name = "jflib-datetime"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "jflib-doc-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-base",
  "jflib-rt",
@@ -666,7 +666,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-doc-io"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-archive",
  "jflib-base",
@@ -677,7 +677,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-doc-layout"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-doc-core",
  "jflib-rt",
@@ -685,7 +685,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-doc-view"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-doc-core",
  "jflib-doc-layout",
@@ -697,7 +697,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-eapm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-crypto",
  "jflib-netpkt",
@@ -705,7 +705,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-fx"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -716,7 +716,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-gfx"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-modrt",
  "jflib-rt",
@@ -725,7 +725,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-gltf"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-agent-core",
  "jflib-img-core",
@@ -735,7 +735,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-gpu"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-plat",
  "jflib-rt",
@@ -744,7 +744,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-all"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-avif",
@@ -766,7 +766,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-av1"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -777,7 +777,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-avif"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-av1",
@@ -790,7 +790,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-bmp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -802,7 +802,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-modrt",
@@ -812,7 +812,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-dds"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -823,7 +823,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-gif"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -833,7 +833,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-heif"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-av1",
@@ -846,7 +846,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-hevc"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -857,7 +857,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-jpeg"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -868,7 +868,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-jxl"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -882,7 +882,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-jxl-enc"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -897,7 +897,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-jxr"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -908,7 +908,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-pdn"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -920,7 +920,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-png"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -930,7 +930,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-svg"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -939,7 +939,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-tga"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -949,7 +949,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-tiff"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -961,7 +961,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-img-webp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -972,7 +972,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-installer"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
@@ -984,18 +984,18 @@ dependencies = [
 
 [[package]]
 name = "jflib-modplat"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-modrt",
 ]
 
 [[package]]
 name = "jflib-modrt"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "jflib-module-jxlenc"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-img-jxl",
  "jflib-img-jxl-enc",
@@ -1005,7 +1005,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-netio"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-agent-core",
  "jflib-crypto",
@@ -1015,14 +1015,14 @@ dependencies = [
 
 [[package]]
 name = "jflib-netpkt"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-crypto",
 ]
 
 [[package]]
 name = "jflib-plat"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-compress",
  "jflib-crypto",
@@ -1031,14 +1031,14 @@ dependencies = [
 
 [[package]]
 name = "jflib-render2d"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gpu",
 ]
 
 [[package]]
 name = "jflib-render3d"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-gltf",
  "jflib-gpu",
@@ -1046,15 +1046,15 @@ dependencies = [
 
 [[package]]
 name = "jflib-rt"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "jflib-shader"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "jflib-simd"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-modrt",
  "jflib-rt",
@@ -1062,7 +1062,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-spell"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-plat",
  "jflib-rt",
@@ -1070,11 +1070,11 @@ dependencies = [
 
 [[package]]
 name = "jflib-style-assets"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "jflib-style-backupcraft"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-text",
  "jflib-ui",
@@ -1082,7 +1082,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-style-classic"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-style-assets",
  "jflib-ui",
@@ -1090,7 +1090,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-style-jfoffice"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-fx",
  "jflib-gfx",
@@ -1101,7 +1101,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-style-kde"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-style-assets",
  "jflib-ui",
@@ -1109,7 +1109,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-style-macos"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-style-assets",
  "jflib-ui",
@@ -1117,7 +1117,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-style-netlab"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-text",
  "jflib-ui",
@@ -1125,7 +1125,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-style-winui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-style-assets",
  "jflib-ui",
@@ -1133,7 +1133,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-text"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-base",
  "jflib-gfx",
@@ -1147,7 +1147,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-text-shape"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "harfrust",
  "unicode-bidi",
@@ -1156,7 +1156,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-ui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-agent-core",
  "jflib-agent-io",
@@ -1177,7 +1177,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-update"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-agent-core",
  "jflib-crypto",
@@ -1188,7 +1188,7 @@ dependencies = [
 
 [[package]]
 name = "jflib-wgsl"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jflib-shader",
 ]
@@ -1196,7 +1196,7 @@ dependencies = [
 [[package]]
 name = "jfscript"
 version = "0.1.0"
-source = "git+https://github.com/JFLibrary/JFScript#8cb2b96e3b1e38835b0e5be91279fc7cb5f85c61"
+source = "git+https://github.com/JFLibrary/JFScript#3565e7f63db4bb3cd562ac5f6831b8a285585e75"
 dependencies = [
  "jflib-agent-core",
 ]

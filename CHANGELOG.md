@@ -18,6 +18,16 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ## [Unreleased]
 
+### Fixed
+
+- **wgsl:** A compound assignment of a vector with a scalar (`v += 1.0`, `v -= s`, `v /= 2.0`, `w += 1` of an integer vector, also through a swizzle) splats the scalar as `v + 1.0` does: in SPIR-V `v += 1.0` became a multiply by 1.0 (`-=` and `/=` alike) and integer vectors gave invalid SPIR-V; a float `v *= s` stays a vector times scalar
+- **fx:** black_white_plus with its default "Leuchtdichte" divides the weighted sum by 1000 (it divided by 100, so nearly every pixel came out white); efftest's self test checks its answer
+- **img_jxl:** The edge-preserving filter (EPF) of a frame with chroma subsampling reads each colour plane with its own stride: after upsampling, the chroma planes' stride differs from luma's when the width is no multiple of 16, and the filter read their rows from the wrong place (valid files decoded with wrong colours, up to 144 levels off); codectest --jxlref compares such files with libjxl 0.7 (tools/jxl_epf_fixtures.py)
+- **doc_io:** HTML clipboard round trips keep the size of raised and lowered text: the HTML holds the shown script size in font-size and the import took it for the nominal size, so every copy and paste shrank such text by a third; the nominal size travels in data-jf-size
+- **doc_io:** HTML clipboard round trips keep the line spacing: the import cut the decimals of line-height (250/240 lines, written 1.041666, came back as 249) and rounds them now
+
+## [0.2.0] - 2026-11-13
+
 ### Added
 
 - **Style netlab** is an official style: `jflib::style_netlab`, `JFLIB_STYLE=netlab`, `cargo jflib package --styles netlab`. The crate jflib-style-netlab is on crates.io (0.1.0, published on its own on 2026-11-10 from the state of v0.1.0, for JFNetworker); the style brings its copies of the Inter fonts and `icons.bin` in `assets/`
@@ -153,6 +163,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** plat::a11y: set_active wakes the UI thread when the flag goes off too (an idle app never noticed a client left). Windows: UiaClientsAreListening alone (the touch keyboard's host TextInputHost, TabTip or a vendor's tool always listen on Windows 11) no longer keeps the tree on: 10 s after the last question of a UI Automation client it is off unless a screen reader (SPI_GETSCREENREADER: Narrator, NVDA, JAWS) or Magnifier runs and listens
 - **plat:** The present step copies a large frame's dirty rectangles in row bands on the worker pool (from 1 MB on), from 12 MB on with streaming stores (the same bytes; plat's present_copy.rs, gfx's thresholds): Windows' kept DIB section, X11's MIT-SHM segments and images, Wayland's wl_shm buffers. A 4K frame (3840 x 2160) takes 2.0-2.5 ms in win_present instead of 3.6-4.0 ms (Windows 2.2 / 2.5 ms best / median instead of 3.4 / 4.0, X11 1.9 / 2.0 instead of 3.3 / 4.0, Wayland 2.0 / 2.1 instead of 3.1 / 3.6); copies below 1 MB stay plain row copies on the UI thread
 - **plat:** Wayland: wl_data_offer.set_actions names the effects the drop target under the drag takes (drop_effect_set) instead of every effect the source allows; X11: a drop takes the effect of the last XdndStatus (it picked copy whatever action the source asked for)
+- **ui:** GpuOutput is #[non_exhaustive]: apps read its fields but no longer build it with a struct literal
+- **build:** The template of a new app (cargo jflib new) and the GUIDE name jflib 0.2
 
 ### Removed
 

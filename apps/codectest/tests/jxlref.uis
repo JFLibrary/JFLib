@@ -1,0 +1,4 @@
+#!args --jxlref
+# codectest is a console program: --jxlref decodes the JPEG XL fixtures of jxlref.rs (JPEG
+# transcodes with chroma subsampling and EPF) and compares them with libjxl 0.7's pixels (within 1);
+# it ignores the script (build_rs.py test passes --script); a differing file exits with code 1

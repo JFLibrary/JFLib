@@ -19,7 +19,7 @@ workspace = true
 
 [dependencies]
 # the name its sources use; a module gets modrt as rt
-rt = { package = "jflib-modrt", path = "../modrt", version = "=0.1.0" }
+rt = { package = "jflib-modrt", path = "../modrt", version = "=0.2.0" }
 
 # docs.rs: Windows and Linux only (loadable modules exist on Windows and Linux only, x86-64 and ARM64), not docs.rs's five defaults
 [package.metadata.docs.rs]

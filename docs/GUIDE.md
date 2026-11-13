@@ -77,7 +77,7 @@ cargo jflib new --std notes  # the same template with std
 
 ```toml
 [dependencies]
-jflib = { features = ["std"], version = "0.1" }
+jflib = { features = ["std"], version = "0.2" }
 ```
 
 The program then has std's entry point, panic handler and allocator instead of JFLib's own; a
@@ -111,7 +111,7 @@ of its own and catches a page's panic, say. Both profiles then say `panic = "unw
 
 ```toml
 [dependencies]
-jflib = { features = ["unwind"], version = "0.1" }
+jflib = { features = ["unwind"], version = "0.2" }
 
 [profile.dev]
 panic = "unwind"      # the other lines as in the template

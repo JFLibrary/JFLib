@@ -31,6 +31,8 @@ pub(super) fn context(n:&Node,mut c:Context)->Result<Context,Error>{
     if let Some(v)=n.style("white-space"){c.pre=match v{"pre"|"pre-wrap"|"break-spaces"=>true,"normal"|"nowrap"=>false,_=>return Err(failure("white-space"))};}
     if let Some(v)=n.style("font-family").or_else(||n.attr("face")){c.text.font_family=Some(family(v)?);}
     if let Some(v)=n.style("font-size"){c.text.size_half_points=Some(u16::try_from(length(v)?/10).map_err(|_|Error::Invalid)?);}
+    // our own export: font-size of a raised or lowered span is its shown size, the nominal one is here
+    if n.tag=="span" {if let Some(v)=n.attr("data-jf-size"){c.text.size_half_points=Some(v.trim().parse::<u16>().map_err(|_|Error::Invalid)?);}}
     if let Some(v)=n.style("font-weight"){c.text.bold=Some(match v{"bold"|"bolder"|"600"|"700"|"800"|"900"=>true,"normal"|"lighter"|"100"|"200"|"300"|"400"|"500"=>false,_=>return Err(failure("font weight"))});}
     if let Some(v)=n.style("font-style"){c.text.italic=Some(matches!(v,"italic"|"oblique"));}
     if let Some(v)=n.style("text-decoration"){c.text.underline=Some(v.split_whitespace().any(|v|v=="underline"));c.text.strike=Some(v.split_whitespace().any(|v|v=="line-through"));}
@@ -45,7 +47,7 @@ pub(super) fn context(n:&Node,mut c:Context)->Result<Context,Error>{
         for (key,target) in [("margin-top",&mut c.paragraph.before),("margin-bottom",&mut c.paragraph.after),("margin-left",&mut c.paragraph.left),("margin-right",&mut c.paragraph.right)]{if let Some(v)=n.style(key){*target=length(v)? as u16;}}
     }
     if let Some(v)=n.style("text-indent"){c.paragraph.first_line=twips(v)?;}
-    if let Some(v)=n.style("line-height"){if v!="normal"{let(a,unit)=number(v)?;if !unit.is_empty() && unit!="%"{return Err(failure("absolute CSS line height"));}c.paragraph.line=u16::try_from(a*240/if unit=="%"{100_000_000}else{1_000_000}).map_err(|_|Error::Invalid)?;}}
+    if let Some(v)=n.style("line-height"){if v!="normal"{let(a,unit)=number(v)?;if !unit.is_empty() && unit!="%"{return Err(failure("absolute CSS line height"));}let den=if unit=="%"{100_000_000}else{1_000_000};c.paragraph.line=u16::try_from((a*240+den/2).div_euclid(den)).map_err(|_|Error::Invalid)?;}}
     if let Some(v)=n.style("page-break-before"){c.paragraph.page_break_before=v=="always";}
     c.text.validate()?;Ok(c)
 }

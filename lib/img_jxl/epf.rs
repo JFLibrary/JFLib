@@ -232,7 +232,9 @@ fn run_with(jf: &Jf, pads: &[Vec<f32>], jrn: &mut Jrn, stage: u32) -> i32 {
     }
     let w0 = jrn.p[0].w;
     let n = r4(w0) as usize;
-    let ps = (jrn.p[0].s + 2 * p) as usize; // (every plane is read with plane 0's padded stride)
+    // each plane's padded stride: chroma upsampled to the frame's width has a stride of its own
+    // (r4 of the width), plane 0 that of its blocks
+    let ps = [(jrn.p[0].s + 2 * p) as usize, (jrn.p[1].s + 2 * p) as usize, (jrn.p[2].s + 2 * p) as usize];
     let rl = n + 2 * p as usize; // floats of a padded row from column -p
     let zero = vec![0f32; rl + 8];
     let minsig = tab::EPF[2];
@@ -271,7 +273,7 @@ fn run_with(jf: &Jf, pads: &[Vec<f32>], jrn: &mut Jrn, stage: u32) -> i32 {
             let mut rows: [[&[f32]; 7]; 3] = [[&zero[..]; 7]; 3];
             for c in 0..3 {
                 for dy in -(p as isize)..=(p as isize) {
-                    let st = (y as isize + p as isize + dy) as usize * ps;
+                    let st = (y as isize + p as isize + dy) as usize * ps[c];
                     rows[c][(dy + 3) as usize] = match pads[c].get(st..st + rl + 8) {
                         Some(r) => r,
                         None => match pads[c].get(st..) {

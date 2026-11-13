@@ -148,6 +148,24 @@ pub fn run(t: &mut T) {
         });
         t.check("i++ is a compound in continuing", matches!(cont, Some(Stmt::Compound { op: BinOp::Add, .. })));
     }
+    // compound assignment of a vector with a scalar: the scalar splat as in `v + 1.0` (the
+    // backends saw vector op scalar, and SPIR-V made `v += 1.0` a multiply), not for float *=
+    let src = "fn fa(a: vec3f) -> vec3f { var v = a; v += 1.0; return v; }\nfn ia(a: vec3i) -> vec3i { var v = a; v -= 2; return v; }\nfn im(a: vec2u) -> vec2u { var v = a; v *= 3u; return v; }\nfn fm(a: vec3f) -> vec3f { var v = a; v *= 2.0; return v; }\nfn sw(a: vec4f) -> vec4f { var v = a; v.xy /= 2.0; return v; }\nfn sc(a: f32) -> f32 { var v = a; v += 1.0; return v; }";
+    if let Some(m) = t.pass("compound splats", src) {
+        let rhs = |name: &str| {
+            let f = func(&m, name);
+            f.body.iter().find_map(|s| if let Stmt::Compound { rhs, .. } = s { Some(tree(f, *rhs)) } else { None }).unwrap_or_default()
+        };
+        t.eq("v += 1.0 splats", rhs("fa"), String::from("Splat(Const)"));
+        t.eq("integer v -= 2 splats", rhs("ia"), String::from("Splat(Const)"));
+        t.eq("integer v *= 3u splats", rhs("im"), String::from("Splat(Const)"));
+        t.eq("float v *= 2.0 keeps the scalar", rhs("fm"), String::from("Const"));
+        t.eq("swizzle v.xy /= 2.0 splats", rhs("sw"), String::from("Splat(Const)"));
+        t.eq("scalar += stays scalar", rhs("sc"), String::from("Const"));
+        let f = func(&m, "sw");
+        let ty = f.body.iter().find_map(|s| if let Stmt::Compound { rhs, .. } = s { Some(m.type_name(f.exprs[*rhs as usize].ty)) } else { None });
+        t.eq("swizzle splat has the swizzle's width", ty, Some(String::from("vec2<f32>")));
+    }
     // swizzle views
     if let Some(m) = t.pass("swizzle view", "fn f() { var v: vec4u; v.yz = vec2u(1u, 2u); }") {
         let f = func(&m, "f");

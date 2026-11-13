@@ -1,7 +1,8 @@
 // selftest -- efftest --selftest [all]: built-in checks (tests/selftest.uis)  [apps/efftest/src/selftest.s]
 //
 // On a 97 x 61 hash-pattern image with transparent pixels:
-//   * known answers: invert_colors (c ^ 0x00FFFFFF) and black_white (paint.net intensity)
+//   * known answers: invert_colors (c ^ 0x00FFFFFF), black_white (paint.net intensity) and
+//     black_white_plus with its default "Leuchtdichte" (BT.601 weights)
 //   * every effect of the categories adjust, color, stylize ("all": every registered effect)
 //     with default properties: serial 256-pixel tiles == pool with 23-pixel tiles (bit
 //     identical; the destination is pre-filled differently, so every pixel must be written),
@@ -85,7 +86,7 @@ fn apply(d: &FxDesc, p: &Params, src: &Surface, dst: &mut Surface, tile: i32, se
 /// invert_colors and black_white against direct formulas -> failures  [st_known]
 fn known(src: &Surface, dst: &mut Surface) -> i32 {
     let mut fails = 0;
-    for (name, mode) in [("invert_colors", 0), ("black_white", 1)] {
+    for (name, mode) in [("invert_colors", 0), ("black_white", 1), ("black_white_plus", 2)] {
         let ok = match fx::find(name) {
             Some(d) => {
                 let mut p = Params::default();
@@ -107,7 +108,12 @@ fn check_known(src: &Surface, dst: &Surface, mode: u32) -> bool {
         let (s, d) = (fx::row(src, y), fx::row(dst, y));
         for x in 0..ST_W as usize {
             let c = fx::px(s, x);
-            let e = if mode == 0 { c ^ 0x00FF_FFFF } else { fx::lut::luma(c) * 0x010101 | c & 0xFF00_0000 };
+            let e = match mode {
+                0 => c ^ 0x00FF_FFFF,
+                1 => fx::lut::luma(c) * 0x010101 | c & 0xFF00_0000,
+                // its default "Leuchtdichte": ITU-R BT.601 weights in thousandths, rounded
+                _ => (((c >> 16 & 255) * 299 + (c >> 8 & 255) * 587 + (c & 255) * 114 + 500) / 1000) * 0x010101 | c & 0xFF00_0000,
+            };
             if e != fx::px(d, x) {
                 return false;
             }
