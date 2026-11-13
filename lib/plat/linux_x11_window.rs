@@ -875,7 +875,7 @@ impl X11 {
     }
 
     /// x11_dpi_check: re-read the DPI; on a change E_DPI for every window, which keep their
-    /// DIP size
+    /// DIP size, and a drawn cursor (grab, zoom ...) is made again at the new size
     fn dpi_check(&mut self) {
         let new = self.read_dpi();
         let old = self.dpi;
@@ -897,6 +897,13 @@ impl X11 {
                 self.configure(j as i32, 12, 0, 0, nw as i32, nh as i32);
             }
             self.update_hints(j as i32);
+            // (E3) a drawn cursor at the size of the new dpi (cursor_px), not only after the
+            // next change of the shape
+            let shape = self.xw[j].cursor;
+            if shape >= 0 && crate::cursor_art::drawn(shape as u32).is_some() {
+                self.xw[j].cursor = -1;
+                self.win_set_cursor(j as i32, shape as u32);
+            }
         }
         self.evwin = ev;
         self.flush();

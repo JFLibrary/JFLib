@@ -162,6 +162,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **tools:** tools/i18n_check.py takes a relative path of an app from the current folder first ("." inside the app: it took the repository's apps/. before), a bare name stays apps/NAME first
 - **plat:** jflib's feature std builds for macOS and iOS (aarch64-apple-darwin, aarch64-apple-ios, aarch64-apple-ios-sim): plat::std_start was missing there; it does what the start without std does (SIGPIPE ignored, crash handlers, jfgui_CWD and the canvas on iOS, UIKit's run loop for an app that installed its runtime) with rt's panic hook first
 - **ui:** date_picker inside a flyout of the app's own: a picked day (or Heute) closed every popup, the flyout too; it closes only its calendar now (popup_close_id)
+- **plat:** X11: a drawn cursor (grab, grabbing, zoom, cell, vertical text, alias, copy, context menu) is made again at the new size when the desktop's dpi changes (Xft.dpi), not only at the next change of the shape
 
 ## [0.1.0] - 2026-11-08
 
