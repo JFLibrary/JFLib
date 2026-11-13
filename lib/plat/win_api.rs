@@ -500,13 +500,11 @@ static W_CLASS: [u16; 6] = [0x4A, 0x46, 0x47, 0x55, 0x49, 0]; // "JFGUI"
 
 // ---------------------------------------------------------------- state
 
-/// UI-thread state: the windows, their window procedure and the callbacks
-struct UiThread<T>(T);
-
-// SAFETY: every field is a Cell that only the UI thread touches -- the thread that creates the
-// windows (their window procedure runs there) and calls the plat window API, as in the
-// assembly (no locks there either).  wake() from other threads uses win_thread.rs's atomics.
-unsafe impl<T> Sync for UiThread<T> {}
+// UI-thread state: the windows, their window procedure and the callbacks, in Cells that only the
+// UI thread touches -- the thread that creates the windows (their window procedure runs there)
+// and calls the plat window API; UiOnly refuses other threads.  wake() from other threads uses
+// win_thread.rs's atomics.
+use crate::ui_only::UiOnly;
 
 /// one window record (WW_* of the assembly)
 struct Ww {
@@ -635,7 +633,7 @@ struct St {
 const DRAWN_SIZES: usize = 4;
 const DRAWN_SLOTS: usize = crate::cursor_art::DRAWN_N * DRAWN_SIZES;
 
-static S: UiThread<St> = UiThread(St {
+static S: UiOnly<St> = UiOnly::new(St {
     ww: [const { Ww::new() }; PW_MAX],
     cursors: [const { Cell::new(0) }; CUR_TABLE as usize],
     refresh: Cell::new(None),
@@ -661,7 +659,7 @@ static S: UiThread<St> = UiThread(St {
 });
 
 fn st() -> &'static St {
-    &S.0
+    S.get()
 }
 
 /// the record of window w when it exists  [ww_rec]

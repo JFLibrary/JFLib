@@ -146,10 +146,9 @@ struct Host {
     /// the bar above the on-screen keyboard (a UIToolbar with "Done")
     accessory: Cell<Id>,
 }
-struct Main(Host);
-// SAFETY: only the main thread touches the host (every function here but wake() runs there).
-unsafe impl Sync for Main {}
-static HOST: Main = Main(Host {
+// only the main thread touches the host (every function here but wake() runs there; UiOnly
+// refuses other threads)
+static HOST: crate::ui_only::UiOnly<Host> = crate::ui_only::UiOnly::new(Host {
     window: Cell::new(NIL),
     root: Cell::new(NIL),
     view: Cell::new(NIL),
@@ -184,7 +183,7 @@ pub(crate) fn hosted() -> bool {
 }
 
 fn host() -> &'static Host {
-    &HOST.0
+    HOST.get()
 }
 
 fn main_queue() -> *const c_void {

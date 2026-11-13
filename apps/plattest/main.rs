@@ -4,7 +4,9 @@
 //                                          post from another thread), the worker pool
 //                                          (parallel_for, nested, cancel), background jobs
 //                                          (wait, restart, cancel, E_WAKE when finished),
-//                                          wake latency and coalescing (headless wait)
+//                                          wake latency and coalescing (headless wait), the
+//                                          UI thread's state refused to a second thread (a
+//                                          child: plattest --test uithread-child, exit code 3)
 //   plattest --test files                  mkdir / delete / rename, the streaming file API
 //                                          (also from 64 parallel items), temp files, the
 //                                          temp and config dirs, environment overrides
@@ -440,6 +442,7 @@ fn plattest() -> i32 {
         Some("async-panic") => t_async::t_async_panic, // its children: a panic in a task,
         Some("async-panic-job") => t_async::t_async_panic_job, // in a blocking job,
         Some("async-policy") => t_async::t_async_policy, // aio under a manifest
+        Some("uithread-child") => t_uithread_child,    // (threads) its child: UI state on a second thread
         _ => {
             plat::write_stderr(b"usage: plattest --test threads|files|ini|cpu|pen|cursor|all [--repeat N]\n");
             return 2;
@@ -566,6 +569,7 @@ fn t_threads(t: &mut T) {
     th_jobs(t);
     th_wake(t);
     th_stop(t);
+    th_ui_gate(t);
     plat::thr_shutdown();
 }
 
@@ -602,6 +606,42 @@ fn th_stop(t: &mut T) {
     }
     t.check(started == 160 && sums == 20, "pool: 8 shutdowns at once, 20 times; each restart runs every item");
     t.info(&format!("  ({started} threads, {sums} of 20 restarts complete)\n"));
+}
+
+/// the UI thread's state: the first thread that touches it owns it, another thread panics before
+/// it reaches it (exit code 3) -- in a child process
+fn th_ui_gate(t: &mut T) {
+    let (code, text) = t_async::child(&["--test", "uithread-child"]);
+    t.check(text.contains("uithread: the UI thread twice"), "ui thread: the first thread reaches the UI state, twice");
+    let refused = code == Some(3) && text.contains("the UI thread's state used on thread") && !text.contains("second thread got through");
+    t.check(refused, "ui thread: a second thread panics before it reaches the UI state (exit code 3)");
+    if !refused {
+        out(&format!("  (exit {code:?})\n{text}\n"));
+    }
+}
+
+/// (the child) the main thread reaches UI-thread state twice, then a second thread tries
+fn t_uithread_child(_: &mut T) {
+    plat::setenv("jfgui_OPEN_DRYRUN", Some("1")); // Linux: the portal only prints the address
+    ui_touch();
+    ui_touch();
+    out("uithread: the UI thread twice\n");
+    let h = plat::thread_spawn(0, Box::new(|| {
+        ui_touch();
+        out("uithread: the second thread got through\n");
+    }));
+    if let Some(h) = h {
+        h.join();
+    }
+}
+
+/// a call that reaches UI-thread state without a window: the portal's connection (Linux), the
+/// minimum size of the first window (Windows, macOS)
+fn ui_touch() {
+    #[cfg(target_os = "linux")]
+    let _ = plat::open_url("https://example.org/");
+    #[cfg(not(target_os = "linux"))]
+    plat::win_set_min_size(0, 100, 100);
 }
 
 /// 8 threads running f(index)

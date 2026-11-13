@@ -20,7 +20,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::cell::Cell;
 
-use super::{UiThread, dll_proc, main_hwnd, wide_cap};
+use super::{UiOnly, dll_proc, main_hwnd, wide_cap};
 use crate::{FD_EXT_SHIFT, FD_MULTI, FD_SAVE};
 
 const OFN_OVERWRITEPROMPT: u32 = 0x2;
@@ -73,12 +73,12 @@ struct Fd {
     save: Cell<usize>,
 }
 
-static FD: UiThread<Fd> = UiThread(Fd { state: Cell::new(0), open: Cell::new(0), save: Cell::new(0) });
+static FD: UiOnly<Fd> = UiOnly::new(Fd { state: Cell::new(0), open: Cell::new(0), save: Cell::new(0) });
 
 /// GetOpenFileNameW / GetSaveFileNameW are available (COM is initialised once for the
 /// Explorer dialog)  [fd_load_api]
 fn fd_load_api() -> bool {
-    let f = &FD.0;
+    let f = FD.get();
     if f.state.get() == 0 {
         f.state.set(2); // unavailable unless set below
         let co = dll_proc(b"ole32.dll\0", b"CoInitializeEx\0");
@@ -144,7 +144,8 @@ pub fn file_dialog(flags: u32, path: &mut String, exts: &[&str]) -> (i32, u32) {
         reserved: 0,
         flags_ex: 0,
     };
-    let p = if save { FD.0.save.get() } else { FD.0.open.get() };
+    let fd = FD.get();
+    let p = if save { fd.save.get() } else { fd.open.get() };
     // SAFETY: GetOpenFileNameW / GetSaveFileNameW(OPENFILENAMEW*) -> BOOL; every buffer the
     // record points to lives until the call returns (file holds max_file wide chars).
     let f: unsafe extern "system" fn(*mut Ofn) -> i32 = unsafe { core::mem::transmute(p) };

@@ -24,7 +24,7 @@
 // the focus.  It is destroyed together with its parent.
 
 use super::{BeginPaint, CreateWindowExW, DefWindowProcW, DestroyWindow, EndPaint, GetClientRect, GetMonitorInfoW, GetSystemMetrics,
-            MonitorFromWindow, MonitorInfo, NativeWindow, PaintStruct, Rect, RegisterClassExW, SetWindowPos, ShowWindow, UiThread, WndClassEx,
+            MonitorFromWindow, MonitorInfo, NativeWindow, PaintStruct, Rect, RegisterClassExW, SetWindowPos, ShowWindow, UiOnly, WndClassEx,
             hinst, rec, st};
 use core::cell::Cell;
 
@@ -67,7 +67,7 @@ const MONITOR_NEAREST: u32 = 2;
 const SM_REMOTESESSION: i32 = 0x1000;
 static CLASS_NAME: [u16; 12] = [0x4A, 0x66, 0x47, 0x75, 0x69, 0x47, 0x70, 0x75, 0x4F, 0x75, 0x74, 0]; // "JfGuiGpuOut"
 
-static CLASS: UiThread<Cell<bool>> = UiThread(Cell::new(false));
+static CLASS: UiOnly<Cell<bool>> = UiOnly::new(Cell::new(false));
 
 unsafe extern "system" fn gc_proc(hwnd: isize, msg: u32, wp: usize, lp: isize) -> isize {
     match msg {
@@ -88,7 +88,7 @@ unsafe extern "system" fn gc_proc(hwnd: isize, msg: u32, wp: usize, lp: isize) -
 }
 
 fn class() -> bool {
-    if CLASS.0.get() {
+    if CLASS.get().get() {
         return true;
     }
     // SAFETY: a valid WNDCLASSEXW; the class name is static.
@@ -109,7 +109,7 @@ fn class() -> bool {
         };
         RegisterClassExW(&wc) != 0
     };
-    CLASS.0.set(ok);
+    CLASS.get().set(ok);
     ok
 }
 

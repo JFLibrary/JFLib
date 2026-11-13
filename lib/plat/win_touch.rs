@@ -42,7 +42,7 @@ use core::cell::Cell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{ClientToScreen, GetClientRect, GetSystemMetrics, GetWindowRect, IsWindowVisible, Point, Rect, ScreenToClient, SetWindowPos,
-            UiThread, WWF_TOP, dll_proc, rec, st, ui_hit_at, win_mods, win_work_area};
+            UiOnly, WWF_TOP, dll_proc, rec, st, ui_hit_at, win_mods, win_work_area};
 use crate::{EDGE_BOTTOM, EDGE_LEFT, EDGE_RIGHT, EDGE_TOP, FingerPhase, HB_BLOCK, HB_DRAG, HB_TEXT, PW_MAX, PWF_NOACTIVATE, PWF_TOOL, evq_push,
             finger_event, reach_clamp};
 
@@ -148,7 +148,7 @@ struct Touch {
     cursor: Cell<(i32, i32)>,
 }
 
-static TOUCH: UiThread<Touch> = UiThread(Touch {
+static TOUCH: UiOnly<Touch> = UiOnly::new(Touch {
     loaded: Cell::new(false),
     api: Cell::new(NO_API),
     slots: Cell::new([Slot { used: false, ptr: 0, win: 0, screen: [0; 2], adj: [0; 2] }; SLOTS]),
@@ -164,7 +164,7 @@ static P_FEEDBACK: AtomicUsize = AtomicUsize::new(usize::MAX);
 static LOG: AtomicUsize = AtomicUsize::new(usize::MAX);
 
 fn touch() -> &'static Touch {
-    &TOUCH.0
+    TOUCH.get()
 }
 
 /// (test aid) the touch calls through `api` (None: user32's again, loaded on first use)
