@@ -792,6 +792,102 @@ class ScriptTimeout(Temp):
         self.assertTrue(a["output"].startswith("FAIL"))
 
 
+class TestJobs(Temp):
+    """build_rs.py test side by side (section "test-jobs"): the markers, apps/NAME/tests/jobs.txt, the pool's rules"""
+
+    def app(self, name, scripts, jobs=None):
+        for file, text in scripts.items():
+            self.write(f"apps/{name}/tests/{file}", text)
+        if jobs is not None:
+            self.write(f"apps/{name}/tests/jobs.txt", jobs)
+
+    def test_markers_and_rules(self):
+        self.app("x", {"a.uis": "#!args --a\n#!serial flaky under load\n", "b.uis": "#!lock desktop audio\nclick 1,1\n\n\n\n#!serial\n",
+                       "c.uis": "# none\n"}, "independent   # they share nothing\nlock audio\n")
+        self.app("y", {"a.uis": "#!seral\n", "b.uis": "#!lock gpu\n"}, "serial the whole app\n")
+        self.app("z", {"a.uis": ""}, "parallel\n")
+        with mock.patch.object(build_rs, "ROOT", self.dir), mock.patch.object(build_rs, "apps", lambda: ["x", "y", "z"]):
+            t = self.dir / "apps" / "x" / "tests"
+            self.assertEqual(build_rs.script_markers(t / "a.uis"), (True, set()))
+            self.assertEqual(build_rs.script_markers(t / "b.uis"), (False, {"desktop", "audio"}))     # line 6: no marker
+            self.assertEqual(build_rs.app_test_rules("x"), dict(independent=True, serial=False, locks={"audio"}))
+            self.assertEqual(build_rs.app_test_rules("y"), dict(independent=False, serial=True, locks=set()))
+            self.assertRaises(build_rs.BuildError, build_rs.app_test_rules, "z")
+            bad = build_rs.test_marker_lint()
+        self.assertEqual(len(bad), 3, bad)
+        self.assertIn("apps/y/tests/a.uis:1: unknown marker #!seral", bad[0])
+        self.assertIn("apps/y: unknown test lock gpu", bad[1])
+        self.assertIn("apps/z/tests/jobs.txt:1:", bad[2])
+
+    def run_pool(self, jobs, times=None):
+        """apps c (in order), i (independent), d1 / d2 (one script each holding the desktop lock), s (one serial
+        script in the middle of its app's order) on win and linux -> [(tag, start, end)] in the order they started"""
+        self.app("c", {f"{n}.uis": "" for n in "abc"})
+        self.app("i", {f"{n}.uis": "" for n in "abcd"}, "independent\n")
+        self.app("d1", {"a.uis": "#!lock desktop\n"})
+        self.app("d2", {"a.uis": "#!lock desktop\n"})
+        self.app("s", {"a.uis": "", "b.uis": "#!serial under load\n", "c.uis": ""})
+        spans, lock = [], build_rs.threading.Lock()
+
+        def run(target, exe, script):
+            start = time.monotonic()
+            time.sleep(0.15)
+            with lock:
+                spans.append((f"{target} {script.parent.parent.name}/{script.name}", start, time.monotonic()))
+            return dict(script=script.name, status="passed", exit_code=0, start=start, duration=0.15, output="")
+
+        runs = [(t, t, n, "exe") for t in ("win", "linux") for n in ("c", "d1", "d2", "i", "s")]
+        with mock.patch.object(build_rs, "ROOT", self.dir), mock.patch.object(build_rs, "run_script", run):
+            units, skipped = build_rs.test_units(runs, jobs)
+            records = build_rs.run_test_units(build_rs.order_test_units(units, times or {}, jobs), jobs, lambda u, r: None)
+        self.assertEqual((len(units), skipped, len(records)), (24, 0, 24))
+        return sorted(spans, key=lambda s: s[1])
+
+    @staticmethod
+    def overlap(a, b):
+        return a[1] < b[2] and b[1] < a[2]
+
+    def test_pool_rules(self):
+        spans = self.run_pool(4)
+        by = {s[0]: s for s in spans}
+        order = [s[0] for s in spans]
+        for t in ("win", "linux"):                          # an app's order on each target
+            self.assertLess(order.index(f"{t} c/a.uis"), order.index(f"{t} c/b.uis"))
+            self.assertLess(order.index(f"{t} c/b.uis"), order.index(f"{t} c/c.uis"))
+            self.assertLess(order.index(f"{t} s/a.uis"), order.index(f"{t} s/c.uis"))
+        for app in ("c", "s"):                              # never two scripts of an app at once, on any target
+            mine = [s for s in spans if s[0].split()[1].startswith(app + "/") and not s[0].endswith("s/b.uis")]
+            self.assertFalse([(a[0], b[0]) for a in mine for b in mine if a is not b and self.overlap(a, b)])
+        desk = [s for s in spans if s[0].split()[1].startswith("d")]
+        self.assertFalse([(a[0], b[0]) for a in desk for b in desk if a is not b and self.overlap(a, b)])
+        ind = [s for s in spans if " i/" in s[0]]           # independent: side by side, but never one script twice
+        self.assertTrue(any(self.overlap(a, b) for a in ind for b in ind if a is not b))
+        for n in "abcd":
+            self.assertFalse(self.overlap(by[f"win i/{n}.uis"], by[f"linux i/{n}.uis"]))
+        serial = [by["win s/b.uis"], by["linux s/b.uis"]]   # alone, after the rest, in the suite's order
+        self.assertEqual(order[-2:], ["win s/b.uis", "linux s/b.uis"])
+        self.assertTrue(all(s[1] >= max(o[2] for o in spans if o not in serial) for s in serial))
+
+    def test_one_job_keeps_the_suites_order(self):
+        order = [s[0] for s in self.run_pool(1, times={"win/i/a.uis": 99.0})]
+        expect = [f"{t} {n}" for t in ("win", "linux") for n in
+                  ("c/a.uis", "c/b.uis", "c/c.uis", "d1/a.uis", "d2/a.uis", "i/a.uis", "i/b.uis", "i/c.uis", "i/d.uis",
+                   "s/a.uis", "s/b.uis", "s/c.uis")]
+        self.assertEqual(order, expect)
+
+    def test_longest_work_first(self):
+        units = [build_rs.TestUnit("win", "win", app, Path(f"{n}.uis"), "x", False, {f"app:{app}"}, i)
+                 for i, (app, n) in enumerate([("a", "1"), ("a", "2"), ("b", "1"), ("c", "1")])]
+        times = {"win/a/1.uis": 1.0, "win/a/2.uis": 1.0, "win/b/1.uis": 30.0}     # c: the median (1 s)
+        self.assertEqual([u.key for u in build_rs.order_test_units(units, times, 4)],
+                         ["win/b/1.uis", "win/a/1.uis", "win/a/2.uis", "win/c/1.uis"])
+        self.assertEqual(build_rs.order_test_units(units, times, 1), units)
+        with mock.patch.dict(os.environ, {"jfgui_TEST_JOBS": "3"}):
+            self.assertEqual((build_rs.test_jobs(), build_rs.test_jobs(5)), (3, 5))
+        with mock.patch.dict(os.environ, {"jfgui_TEST_JOBS": ""}):
+            self.assertEqual(build_rs.test_jobs(), max(1, (os.cpu_count() or 2) // 2))
+
+
 class IncrementalCache(Temp):
     """build_rs.incremental_flags: the state a rustc killed during ThinLTO leaves goes, the others stay"""
 

@@ -1,3 +1,4 @@
 #!args --test window
+#!lock desktop
 # the one real window (shown without activation, no real input): the demo in a ui.gpu_view, a pan and a zoom through the
 # functions the pointer calls, the view in the framebuffer = the same scene offscreen

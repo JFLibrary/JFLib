@@ -1,2 +1,3 @@
 #!args --test window --validate
+#!lock desktop
 # the one real window: a few frames, the presented image = the same frame offscreen

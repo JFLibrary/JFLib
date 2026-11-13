@@ -1,3 +1,4 @@
 #!args --test window
+#!lock desktop
 # a plain plat window with a swapchain: FIFO frames, the presented image read back, resize,
 # minimise / restore, IMMEDIATE and MAILBOX frames

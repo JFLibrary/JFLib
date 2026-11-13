@@ -1,4 +1,5 @@
 #!args --verify-dirty
+#!lock desktop
 # ui.image_view on GPU tiles (lib/ui/canvas.rs, docs/GPU.md "Leinwände"): a bitmap and an SVG, panned
 # and zoomed: the view comes from tiles, the CPU's picture follows; every presented image is read
 # back: outside the tiles it equals the framebuffer during the gesture (their differences are

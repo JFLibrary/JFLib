@@ -2080,6 +2080,21 @@ shot build/template.png
   the script (pass them yourself when you run it by hand). A line `#!timeout 1800` among the
   first five sets the seconds it may take there (600 otherwise); a script that takes longer
   counts as failed and the others still run.
+* `build_rs.py test` runs the scripts side by side: `--test-jobs N` at a time (default half the
+  logical CPUs, or `jfgui_TEST_JOBS`; `--test-jobs 1` runs them one after the other in the old
+  order), Windows and Linux together. An app's scripts keep their order and run one at a time,
+  never while the same app runs on the other target (they share `build/`). Among a script's first
+  five lines, `#!lock desktop` (real windows: `gpu on`, a swapchain, a window on the screen) or
+  `#!lock audio` (the real output device) keeps it from running beside another script with the
+  same lock, on either target; `#!serial WHY` runs it alone after the others (for what fails
+  under their load; it leaves its app's order). `apps/NAME/tests/jobs.txt` holds the same for
+  every script of an app (`lock desktop`, `serial WHY`) and `independent` for an app whose scripts
+  share nothing: they run beside each other too. The checks after the scripts (`gendoc`,
+  `test_devkit`, `pkg_check`, `i18n_check`, `site`) run beside them. At the end the suite prints
+  the times of the build, the scripts and the checks and the slowest scripts and apps;
+  `build/test-report.json` keeps every result with its start and end (which scripts ran
+  together), `build/test-times.json` each script's last duration, from which the next run starts
+  the longest work first. A new script that opens a real window or plays sound needs its lock.
 * `--dump` / `dump` print the widget tree (kind, id, label, rect in DIP, states, value): use it
   to find ids and positions without looking at pixels. Prefer `#id` and labels over coordinates.
 * Popups may leave their window (§6): their dump rectangles can be negative or beyond the

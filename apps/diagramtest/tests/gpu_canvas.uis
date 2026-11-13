@@ -1,4 +1,5 @@
 #!args --verify-dirty
+#!lock desktop
 # the canvas on GPU tiles (lib/ui/canvas.rs, docs/GPU.md "Leinwände"): a pan and a wheel zoom come
 # from tiles, the CPU's picture follows; every presented image is read back: outside the tiles it
 # equals the framebuffer during the gesture (their differences are counted), all of it at rest.

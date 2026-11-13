@@ -18,10 +18,15 @@ The crates, their dependencies and the library's version come from the Cargo man
                                                                 source of the app or its crates is saved, start the
                                                                 app again in its session (input replayed, window,
                                                                 style, inspector kept); development builds only
-  python build_rs.py test [--quick]                          lint, build, every apps/*/tests/*.uis (+ apps/*/tests),
+  python build_rs.py test [--quick] [--test-jobs N]          lint, build, every apps/*/tests/*.uis (+ apps/*/tests),
+                                                                N at a time, Windows and Linux together (section
+                                                                "test-jobs": default half the logical CPUs or
+                                                                jfgui_TEST_JOBS, 1 = one after the other; markers #!serial,
+                                                                #!lock, apps/NAME/tests/jobs.txt), the checks beside them;
                                                                 then the crates' acceptance test (tools/crates_accept.py)
-                                                                and parity with asm (both not with --quick)
-  python build_rs.py test NAME                               build one app and run its tests/*.uis
+                                                                and parity with asm (both not with --quick); at the end
+                                                                the times (build, scripts, the slowest scripts and apps)
+  python build_rs.py test NAME [--test-jobs N]               build one app and run its tests/*.uis
   python build_rs.py check [--quick] [--target T]            lint only: the rules, then Clippy over the library
                                                                 (section "clippy"; --quick: the rules alone)
   python build_rs.py new NAME [--kind window|console|tool|service] [--style S] [--title T]
@@ -46,6 +51,7 @@ The crates, their dependencies and the library's version come from the Cargo man
                                                                 missing rows (untranslated); --check: the suite's
                                                                 check (errors only, the gaps are reported)
   options: --target win|linux|both|web|all|android|mac|ios (default both; run: win), --release, --out DIR, -j N (Cargo's jobs),
+           --test-jobs N (test: scripts at the same time, section "test-jobs"),
            --sim (ios: the simulator's build into ios-sim; mac and ios build on a Mac, docs/APPLE.md; mac: test NAME
                  too, programs with windows start in the logged-in session from SSH),
            --profile size|o2 (release variants, section "r13-measure"),
@@ -814,7 +820,7 @@ def lint():
                 prev = s
                 if ln[:2] in ('")', '",', '";'):
                     bad.append(f"{f.relative_to(ROOT)}:{i}: a string literal broken by a line end (a script edit?)")
-    return bad + module_lint() + perm_lint() + manifest_lint()   # jxl-module: modules/*; manifests
+    return bad + module_lint() + perm_lint() + manifest_lint() + test_marker_lint()   # jxl-module: modules/*; manifests; test-jobs
 
 
 # ---------------------------------------------------------------- clippy
@@ -1512,6 +1518,271 @@ def script_timeout(uis):
     return SCRIPT_TIMEOUT
 
 
+# ---------------------------------------------------------------- the suite side by side (section "test-jobs")
+# `test` runs the scripts of every app and target in a pool of --test-jobs processes (default: half the logical
+# CPUs; jfgui_TEST_JOBS; 1 = one after the other as before), Windows and Linux at the same time.  The rules:
+#  * an app's scripts run in their order, one at a time, and never while one of the app's scripts runs on the
+#    other target: they share build/ (pictures, scratch folders) and what the app keeps of its own (lock app:NAME)
+#  * apps/NAME/tests/jobs.txt "independent": its scripts share nothing, each runs on its own beside the others; the same
+#    script on the two targets still one after the other (its pictures; lock script:NAME/FILE.uis)
+#  * "#!lock NAME..." among a script's first five lines (or "lock NAME..." in apps/NAME/tests/jobs.txt for each script):
+#    scripts with a lock in common never run at the same time, on any target -- desktop: real windows on the
+#    desktop (WSLg shows Linux windows there too), audio: the real output device
+#  * "#!serial WHY" (or "serial WHY" in apps/NAME/tests/jobs.txt): alone, after the parallel part (it leaves its app's
+#    order): what fails under the load of the others
+#  * the order: the most work behind a lock first, after the times of the last run (<out>/test-times.json; a
+#    script without one counts 5 s); <out>/test-report.json keeps every result of the last run with its times
+TEST_MARKERS = ("#!args", "#!timeout", "#!serial", "#!lock")
+TEST_LOCKS = ("desktop", "audio")
+TEST_DEFAULT_S = 5.0
+SUITE_CHECKS_JOBS = 2       # the checks after the scripts run beside them in this many processes
+
+
+def test_jobs(value=None):
+    """--test-jobs, else jfgui_TEST_JOBS, else half the logical CPUs"""
+    v = value or os.environ.get("jfgui_TEST_JOBS")
+    return max(1, int(v)) if v else max(1, (os.cpu_count() or 2) // 2)
+
+
+def script_markers(uis):
+    """section "test-jobs": the run markers among a script's first five lines -> (serial, locks)"""
+    serial, locks = False, set()
+    for line in uis.read_text(encoding="utf-8").splitlines()[:5]:
+        if line.startswith("#!serial"):
+            serial = True
+        elif line.startswith("#!lock"):
+            locks.update(line[len("#!lock"):].split())
+    return serial, locks
+
+
+def app_test_rules(name):
+    """apps/NAME/tests/jobs.txt (section "test-jobs") -> dict(independent, serial, locks).  Lines: "independent",
+    "serial WHY", "lock NAME..."; "#" starts a comment"""
+    rules = dict(independent=False, serial=False, locks=set())
+    f = ROOT / "apps" / name / "tests" / "jobs.txt"
+    if not f.exists():
+        return rules
+    for i, ln in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+        w = ln.split("#")[0].split()
+        if not w:
+            continue
+        if w == ["independent"]:
+            rules["independent"] = True
+        elif w[0] == "serial":
+            rules["serial"] = True
+        elif w[0] == "lock" and len(w) > 1:
+            rules["locks"].update(w[1:])
+        else:
+            raise BuildError(f"apps/{name}/tests/jobs.txt:{i}: {ln.strip()!r}: independent, serial WHY or lock NAME... (section test-jobs)")
+    return rules
+
+
+def test_marker_lint():
+    """section "test-jobs": every apps/NAME/tests/jobs.txt reads, a script's "#!" lines are known markers, locks known names"""
+    bad = []
+    for name in apps():
+        try:
+            rules = app_test_rules(name)
+        except BuildError as e:
+            bad.append(str(e))
+            continue
+        locks = set(rules["locks"])
+        for uis in sorted((ROOT / "apps" / name / "tests").glob("*.uis")):
+            for i, line in enumerate(uis.read_text(encoding="utf-8").splitlines()[:5], 1):
+                if line.startswith("#!") and not line.startswith(TEST_MARKERS):
+                    bad.append(f"{uis.relative_to(ROOT).as_posix()}:{i}: unknown marker {line.split()[0]} ({', '.join(TEST_MARKERS)})")
+            locks |= script_markers(uis)[1]
+        bad += [f"apps/{name}: unknown test lock {lk} ({', '.join(TEST_LOCKS)})" for lk in sorted(locks - set(TEST_LOCKS))]
+    return bad
+
+
+class TestUnit:
+    """one script of an app on one target in the suite's pool (section "test-jobs")"""
+
+    def __init__(self, folder, target, app, script, exe, serial, locks, index):
+        self.folder, self.target, self.app, self.script, self.exe = folder, target, app, script, exe
+        self.serial, self.locks, self.index = serial, frozenset(locks), index
+        self.prev = None            # the unit before it in its app's order on this target
+        self.rank = 0.0
+
+    @property
+    def key(self):
+        return f"{self.folder}/{self.app}/{self.script.name}"
+
+    @property
+    def tag(self):
+        return f"[{self.folder}] {self.app}/{self.script.name}"
+
+
+def test_units(runs, jobs):
+    """[(folder, target, app, exe)] in the suite's order -> (units, pending): every script of each app, its locks
+    and the unit before it (section "test-jobs"); pending = how many scripts parity.txt holds back"""
+    units, skipped = [], 0
+    for folder, target, name, exe in runs:
+        rules = app_test_rules(name)
+        pending = pending_scripts(name)
+        prev = None
+        for script in sorted((ROOT / "apps" / name / "tests").glob("*.uis")):
+            if script.name in pending:
+                skipped += 1
+                continue
+            serial, locks = script_markers(script)
+            serial = (serial or rules["serial"]) and jobs > 1
+            locks |= rules["locks"] | {f"script:{name}/{script.name}" if rules["independent"] else f"app:{name}"}
+            u = TestUnit(folder, target, name, script, exe, serial, locks, len(units))
+            if not serial and not rules["independent"]:
+                u.prev, prev = prev, u
+            units.append(u)
+    return units, skipped
+
+
+def load_test_times(out):
+    try:
+        return json.loads((out / "test-times.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def save_test_report(out, units, records, times, started):
+    """<out>/test-times.json (each script's last duration, for the order of the next run) and
+    <out>/test-report.json (this run: status, exit code, start and end in seconds since the scripts began)"""
+    times = dict(times)
+    rows = []
+    for u in units:
+        r = records.get(u)
+        if r is None:
+            continue
+        times[u.key] = round(r["duration"], 2)
+        rows.append(dict(target=u.folder, app=u.app, script=u.script.name, status=r["status"], exit_code=r["exit_code"],
+                         start=round(r["start"] - started, 2), end=round(r["start"] - started + r["duration"], 2),
+                         serial=u.serial, locks=sorted(u.locks)))
+    out.mkdir(parents=True, exist_ok=True)
+    for name, data in (("test-times.json", dict(sorted(times.items()))), ("test-report.json", rows)):
+        tmp = out / f"{name}.{os.getpid()}.tmp"
+        tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
+        os.replace(tmp, out / name)
+
+
+def order_test_units(units, times, jobs):
+    """the order the pool takes ready units in: with one job the suite's order; else the units whose locks have
+    the most work (after the last run's times) first, ties in the suite's order"""
+    if jobs <= 1:
+        return list(units)
+    known = sorted(times.values())
+    default = known[len(known) // 2] if known else TEST_DEFAULT_S
+    work = {}
+    for u in units:
+        for lk in u.locks:
+            work[lk] = work.get(lk, 0.0) + times.get(u.key, default)
+    for u in units:
+        u.rank = max(work[lk] for lk in u.locks)
+    return sorted(units, key=lambda u: (-u.rank, u.index))
+
+
+def run_script(target, exe, script, verify_dirty=False):
+    """one script on an already-built program -> its record (script, status, exit_code, start, duration, output)"""
+    for line in script.read_text(encoding="utf-8").splitlines():
+        if line.startswith(("shot ", "dump ")) and len(line.split()) > 1:
+            (ROOT / line.split()[1]).parent.mkdir(parents=True, exist_ok=True)
+    args = script_args(script) + ["--script", script.relative_to(ROOT).as_posix()]
+    if verify_dirty:
+        args.append("--verify-dirty")
+    started = time.monotonic()
+    limit = script_timeout(script)
+    try:
+        result = run_exe(target, exe, args, timeout=limit)
+        code, output = result.returncode, result.stdout + result.stderr
+    except subprocess.TimeoutExpired as e:    # this script failed, the others still run
+        code, output = "timeout", f"FAIL no end after {limit} s\n" + timeout_output(e)
+    return dict(script=script.name, status="passed" if code == 0 else "failed", exit_code=code,
+                start=started, duration=time.monotonic() - started, output=output)
+
+
+def run_test_units(units, jobs, report):
+    """run the units on `jobs` threads (section "test-jobs"): a unit starts once the unit before it has finished
+    and no running unit holds one of its locks, the first such in `units`; then the serial ones alone, in the
+    suite's order.  report(unit, record) from the thread that ran it -> {unit: record}"""
+    pool = [u for u in units if not u.serial]
+    serial = sorted((u for u in units if u.serial), key=lambda u: u.index)
+    members = set(pool)
+    if any(u.prev is not None and u.prev not in members for u in pool):
+        raise BuildError("test units: a unit waits for one outside the pool")
+    cv = threading.Condition()
+    waiting, held, done, records = list(pool), set(), set(), {}
+    running = [0]
+
+    def run(u):
+        try:
+            rec = run_script(u.target, u.exe, u.script)
+        except Exception as e:      # noqa: BLE001 -- the runner itself failed: this script failed, the others go on
+            rec = dict(script=u.script.name, status="failed", exit_code="error", start=time.monotonic(), duration=0.0,
+                       output=f"FAIL the runner: {e!r}")
+        with cv:
+            records[u] = rec
+        report(u, rec)
+
+    def ready():
+        return next((u for u in waiting if (u.prev is None or u.prev in done) and not u.locks & held), None)
+
+    def worker():
+        while True:
+            with cv:
+                u = ready()
+                while u is None and waiting and running[0]:
+                    cv.wait()
+                    u = ready()
+                if u is None:       # all taken (none can wait forever: a unit waits only for units of the pool)
+                    return
+                waiting.remove(u)
+                held.update(u.locks)
+                running[0] += 1
+            try:
+                run(u)
+            finally:
+                with cv:
+                    held.difference_update(u.locks)
+                    done.add(u)
+                    running[0] -= 1
+                    cv.notify_all()
+
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(max(1, min(jobs, len(pool))))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        while t.is_alive():         # a timeout keeps Ctrl+C working on Windows
+            t.join(0.5)
+    for u in waiting:               # (never: shown as failures should the rules above ever leave one behind)
+        records[u] = dict(script=u.script.name, status="failed", exit_code="not run", start=time.monotonic(), duration=0.0,
+                          output="FAIL not run: it waited for a unit that never ran")
+        report(u, records[u])
+    for u in serial:
+        run(u)
+    return records
+
+
+def time_report(units, records, jobs, phases):
+    """section "test-jobs": the phases' wall times, the script time, the slowest scripts and apps -> lines"""
+    ran = [(u, records[u]) for u in units if u in records]
+    total = sum(r["duration"] for _, r in ran)
+    serial = sum(r["duration"] for u, r in ran if u.serial)
+    lines = ["time: " + ", ".join(f"{name} {s:.1f} s" for name, s in phases)
+             + f" ({jobs} test jobs; {len(ran)} scripts took {total:.1f} s together"
+             + (f", {serial:.1f} s of them alone" if serial else "") + ")"]
+    if not ran:
+        return lines
+    lines.append("slowest scripts:")
+    for u, r in sorted(ran, key=lambda x: -x[1]["duration"])[:12]:
+        lines.append(f"  {r['duration']:7.1f} s  {u.tag}" + ("  (serial)" if u.serial else ""))
+    per = {}
+    for u, r in ran:
+        per.setdefault(u.app, {}).setdefault(u.folder, 0.0)
+        per[u.app][u.folder] += r["duration"]
+    lines.append("slowest apps:")
+    for app, t in sorted(per.items(), key=lambda x: -sum(x[1].values()))[:8]:
+        lines.append(f"  {sum(t.values()):7.1f} s  {app} (" + ", ".join(f"{f} {s:.1f}" for f, s in t.items()) + ")")
+    return lines
+
+
 def timeout_output(e):
     """what a program had written when subprocess.TimeoutExpired ended it (bytes, text or nothing)"""
     return "".join(p.decode("utf-8", "replace") if isinstance(p, bytes) else p or "" for p in (e.stdout, e.stderr))
@@ -1534,49 +1805,95 @@ def run_app_tests(name, target, exe, verify_dirty=False, report=None):
         if script.name in pending:
             record = dict(script=script.name, status="skipped", reason="pending")
         else:
-            for line in script.read_text(encoding="utf-8").splitlines():
-                if line.startswith(("shot ", "dump ")) and len(line.split()) > 1:
-                    (ROOT / line.split()[1]).parent.mkdir(parents=True, exist_ok=True)
-            args = script_args(script) + ["--script", script.relative_to(ROOT).as_posix()]
-            if verify_dirty:
-                args.append("--verify-dirty")
-            started = time.monotonic()
-            limit = script_timeout(script)
-            try:
-                result = run_exe(target, exe, args, timeout=limit)
-                code, output = result.returncode, result.stdout + result.stderr
-            except subprocess.TimeoutExpired as e:    # this script failed, the others still run
-                code, output = "timeout", f"FAIL no end after {limit} s\n" + timeout_output(e)
-            record = dict(script=script.name, status="passed" if code == 0 else "failed",
-                          exit_code=code, duration=time.monotonic() - started, output=output)
+            record = run_script(target, exe, script, verify_dirty)
         records.append(record)
         if report:
             report(record)
     return records
 
 
-def run_tests(builders, out, quick):
+def py_check(*args):
+    """one of the suite's checks (a Python tool of the repository) -> its CompletedProcess"""
+    return subprocess.run([sys.executable, *map(str, args)], cwd=ROOT, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+
+
+def suite_checks(exes):
+    """the checks after the scripts -> [(run, show)]: run() gives a CompletedProcess, show(r) what the suite prints
+    and the failure it counts (or None).  They run beside the scripts (SUITE_CHECKS_JOBS), their output comes after
+    the scripts' summary in this order"""
+    def fail_only(name):
+        return lambda r: (f"FAIL {name}\n" + (r.stdout + r.stderr).strip() if r.returncode else None,
+                          name if r.returncode else None)
+
+    def summary(name):
+        return lambda r: (r.stdout.strip() + (("\n" + r.stderr.strip()) if r.returncode and r.stderr.strip() else ""),
+                          name if r.returncode else None)
+
+    def gendoc(r):
+        api = "".join(ln for ln in r.stdout.splitlines(True) if ln.startswith("API")).strip()
+        return (("FAIL docs/API.md is stale: run python tools/gendoc.py\n" if r.returncode else "") + api,
+                "docs/API.md is stale (python tools/gendoc.py)" if r.returncode else None)
+
+    def i18n(r):
+        return ((r.stdout.strip() + ("\n" + r.stderr.strip() if r.stderr.strip() else "")).strip(),
+                "tools/i18n_check.py --check" if r.returncode else None)
+
+    tools = RS / "tools"
+    rt = exes.get(("linux", "appimagert"))
+    return [
+        # docs/API.md generated from the Rust doc comments must be current (R13); --api: the API
+        # changes since the last release, for information (docs/VERSIONING.md)
+        (lambda: py_check(tools / "gendoc.py", "--check", "--api"), gendoc),
+        # the project generator, the API diff and the changelog helper (tools/tests/test_devkit.py)
+        (lambda: py_check(tools / "tests" / "test_devkit.py"), fail_only("tools/tests/test_devkit.py")),
+        # hot reload's watcher with a stand-in program (the replay with a real app: without --quick, by hand)
+        (lambda: py_check(tools / "tests" / "test_hotreload.py", "--quick"), fail_only("tools/tests/test_hotreload.py --quick")),
+        # the package formats (docs/PACKAGING.md "Checks"): manifests, validators, the AppImage runtime
+        (lambda: py_check(tools / "pkg_check.py", "--quick", "--summary", *(["--runtime", rt] if rt else [])),
+         summary("tools/pkg_check.py --quick")),
+        # the catalogues (tools/i18n_check.py --check): errors only (placeholders, plural forms,
+        # broken rows; the apps whose catalogues are complete stay so); the other gaps are reported
+        (lambda: py_check(tools / "i18n_check.py", "--check"), i18n),
+        # the website's docs (tools/site.py --check): every page, internal link, anchor and image, the HTML, two
+        # builds byte-identical; a temporary folder below build/
+        (lambda: py_check(tools / "site.py", "--check", "--summary"), summary("tools/site.py --check")),
+    ]
+
+
+def print_failure(tag, record):
+    """a failed script as the suite shows it: the line and the lines of its output that tell why (FAIL_LINES)"""
+    lines = [f"FAIL {tag} (exit {record['exit_code']})"]
+    lines += ["   " + ln for ln in record["output"].splitlines() if ln.startswith(FAIL_LINES)]
+    print("\n".join(lines), flush=True)
+
+
+def run_tests(builders, out, quick, jobs=1):
     fails = []
-    total = 0
-    skipped = 0
+    t0 = time.monotonic()
     exes = {(b.target, n): exe for b, n, exe in build_apps(builders, apps())}
-    for b in builders:
-        for name in apps():
-            exe = exes[(b.target, name)]
-            if exe is None:
-                continue
-            for record in run_app_tests(name, b.target, exe):
-                if record['status'] == 'skipped':
-                    skipped += 1
-                    continue
-                total += 1
-                tag = f"[{b.folder}] {name}/{record['script']}"
-                if record['status'] == 'failed':
-                    fails.append(tag)
-                    print(f"FAIL {tag} (exit {record['exit_code']})")
-                    for ln in record['output'].splitlines():
-                        if ln.startswith(FAIL_LINES):
-                            print("   " + ln)
+    t_build = time.monotonic() - t0
+    # the checks after the scripts start now, beside them (section "test-jobs"); with one job after them
+    checks = suite_checks(exes)
+    check_pool = ThreadPoolExecutor(SUITE_CHECKS_JOBS if jobs > 1 else 1)
+    t1 = time.monotonic()
+    check_runs = [check_pool.submit(run) for run, _ in checks] if jobs > 1 else None
+    runs = [(b.folder, b.target, name, exes[(b.target, name)]) for b in builders for name in apps()
+            if exes[(b.target, name)] is not None]
+    units, skipped = test_units(runs, jobs)
+    times = load_test_times(out)
+    printing = threading.Lock()
+
+    def report(u, record):
+        if record["status"] == "failed":
+            with printing:
+                fails.append(u.tag)
+                print_failure(u.tag, record)
+
+    records = run_test_units(order_test_units(units, times, jobs), jobs, report)
+    t_scripts = time.monotonic() - t1
+    save_test_report(out, units, records, times, t1)
+    total = len(units)
     print(f"{total - len(fails)} of {total} scripts passed" + (f" ({skipped} pending)" if skipped else ""))
     # what only runs on a device (G4c): the serial of a device or emulator in jfgui_TEST_ANDROID, its builds
     # with `app androidGallery|gputest --target android`; nobody's phone is touched without it
@@ -1591,52 +1908,21 @@ def run_tests(builders, out, quick):
                 print(f"FAIL {script}\n" + (r.stdout + r.stderr).strip())
     else:
         print("note: the GPU tests on Android need jfgui_TEST_ANDROID=SERIAL (apps/gputest/tests/android.py, apps/androidGallery/tests/android_gpu.py)")
-    # docs/API.md generated from the Rust doc comments must be current (R13); --api: the API
-    # changes since the last release, for information (docs/VERSIONING.md)
-    r = subprocess.run([sys.executable, str(RS / "tools" / "gendoc.py"), "--check", "--api"], cwd=ROOT,
-                       capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if r.returncode:
-        fails.append("docs/API.md is stale (python tools/gendoc.py)")
-        print("FAIL docs/API.md is stale: run python tools/gendoc.py")
-    print("".join(ln for ln in r.stdout.splitlines(True) if ln.startswith("API")).strip())
-    # the project generator, the API diff and the changelog helper (tools/tests/test_devkit.py)
-    r = subprocess.run([sys.executable, str(RS / "tools" / "tests" / "test_devkit.py")], cwd=ROOT,
-                       capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if r.returncode:
-        fails.append("tools/tests/test_devkit.py")
-        print("FAIL tools/tests/test_devkit.py\n" + (r.stdout + r.stderr).strip())
-    # hot reload's watcher with a stand-in program (the replay with a real app: without --quick, by hand)
-    r = subprocess.run([sys.executable, str(RS / "tools" / "tests" / "test_hotreload.py"), "--quick"], cwd=ROOT,
-                       capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
-    if r.returncode:
-        fails.append("tools/tests/test_hotreload.py --quick")
-        print("FAIL tools/tests/test_hotreload.py --quick\n" + (r.stdout + r.stderr).strip())
-    # the package formats (docs/PACKAGING.md "Checks"): manifests, validators, the AppImage runtime
-    rt = exes.get(("linux", "appimagert"))
-    r = subprocess.run([sys.executable, str(RS / "tools" / "pkg_check.py"), "--quick", "--summary"]
-                       + (["--runtime", str(rt)] if rt else []), cwd=ROOT, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
-    print(r.stdout.strip() + (("\n" + r.stderr.strip()) if r.returncode and r.stderr.strip() else ""))
-    if r.returncode:
-        fails.append("tools/pkg_check.py --quick")
-    # the catalogues (tools/i18n_check.py --check): errors only (placeholders, plural forms,
-    # broken rows; the apps whose catalogues are complete stay so); the other gaps are reported
-    r = subprocess.run([sys.executable, str(RS / "tools" / "i18n_check.py"), "--check"], cwd=ROOT, capture_output=True,
-                       text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
-    print((r.stdout.strip() + ("\n" + r.stderr.strip() if r.stderr.strip() else "")).strip())
-    if r.returncode:
-        fails.append("tools/i18n_check.py --check")
-    # the website's docs (tools/site.py --check): every page, internal link, anchor and image, the HTML, two
-    # builds byte-identical; a temporary folder below build/
-    r = subprocess.run([sys.executable, str(RS / "tools" / "site.py"), "--check", "--summary"], cwd=ROOT,
-                       capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
-    print(r.stdout.strip() + (("\n" + r.stderr.strip()) if r.returncode and r.stderr.strip() else ""))
-    if r.returncode:
-        fails.append("tools/site.py --check")
+    if check_runs is None:
+        check_runs = [check_pool.submit(run) for run, _ in checks]
+    for (_, show), f in zip(checks, check_runs):
+        text, fail = show(f.result())
+        if text is not None:
+            print(text)
+        if fail:
+            fails.append(fail)
+    check_pool.shutdown()
+    phases = [("build", t_build), ("scripts", t_scripts), ("checks after them", time.monotonic() - t1 - t_scripts)]
     if not quick:
         # docs/CRATES.md: a project outside the repository builds from the packed crates alone (Windows,
         # Linux, the browser, an APK when the Android SDK is there), its smoke test passes; about 15
         # minutes from nothing
+        t2 = time.monotonic()
         targets = sorted({b.target for b in builders if b.target in ("win", "linux")} | {"web", "android", "package", "watch"})
         r = subprocess.run([sys.executable, str(RS / "tools" / "crates_accept.py"), "--targets", ",".join(targets)], cwd=ROOT,
                            capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
@@ -1644,6 +1930,7 @@ def run_tests(builders, out, quick):
         if r.returncode:
             fails.append("tools/crates_accept.py")
         # parity with the assembly reference (apps that exist in both)
+        t3 = time.monotonic()
         tgt = "both" if len(builders) == 2 else builders[0].target
         for name in apps():
             if not (ROOT.parent / "legacy" / "apps" / name / "src").is_dir():
@@ -1653,32 +1940,40 @@ def run_tests(builders, out, quick):
             print(r.stdout.strip())
             if r.returncode:
                 fails.append(f"parity {name}")
+        phases += [("crates_accept", t3 - t2), ("parity", time.monotonic() - t3)]
+    print("\n".join(time_report(units, records, jobs, phases)))
     return not fails
 
 
-def run_app_suite(builders, name):
-    """test NAME: build one app (with its BINS) and run its tests/*.uis on every target"""
+def run_app_suite(builders, name, jobs=1):
+    """test NAME: build one app (with its BINS) and run its tests/*.uis on every target (section "test-jobs":
+    side by side as far as its rules allow)"""
     if name not in apps():
         raise BuildError(f"no app {name} (apps/{name}/src/main.rs or main.rs)")
-    fails, total = [], 0
+    fails = []
+    runs = []
     for b, n, exe in build_apps(builders, [name]):
         if exe is None:
             print(f"[{b.folder}] {name}: not built for this target (apps/{name}/TARGETS)")
             continue
-        for record in run_app_tests(name, "ios-sim" if getattr(b, "ios_sim", False) else b.target, exe):
-            if record["status"] == "skipped":
-                continue
-            total += 1
-            tag = f"[{b.folder}] {name}/{record['script']}"
+        runs.append((b.folder, "ios-sim" if getattr(b, "ios_sim", False) else b.target, name, exe))
+    units, _ = test_units(runs, jobs)
+    out = builders[0].out if builders else ROOT / "build"
+    times = load_test_times(out)
+    printing = threading.Lock()
+
+    def report(u, record):
+        with printing:
             if record["status"] == "failed":
-                fails.append(tag)
-                print(f"FAIL {tag} (exit {record['exit_code']})")
-                for ln in record["output"].splitlines():
-                    if ln.startswith(FAIL_LINES):
-                        print("   " + ln)
+                fails.append(u.tag)
+                print_failure(u.tag, record)
             else:
-                print(f"ok   {tag} ({record['duration']:.1f} s)")
-    print(f"{total - len(fails)} of {total} scripts passed")
+                print(f"ok   {u.tag} ({record['duration']:.1f} s)", flush=True)
+
+    t1 = time.monotonic()
+    records = run_test_units(order_test_units(units, times, jobs), jobs, report)
+    save_test_report(out, units, records, times, t1)
+    print(f"{len(units) - len(fails)} of {len(units)} scripts passed")
     return not fails
 
 
@@ -2070,6 +2365,9 @@ def main():
     ap.add_argument("--out", help="output folder (default build; --release: build/release; --profile P: build/P)")
     ap.add_argument("-j", type=int, default=os.cpu_count() or 8,
                     help="Cargo's jobs (default: the logical CPUs)")
+    ap.add_argument("--test-jobs", type=int, metavar="N",
+                    help="test: scripts at the same time (section test-jobs; default jfgui_TEST_JOBS, else half the "
+                         "logical CPUs; 1: one after the other)")
     ap.add_argument("--quick", action="store_true",
                     help="test: without the crates' acceptance test and parity with asm; check: the rules alone, no Clippy")
     ap.add_argument("--bin", help="run: one of the app's further executables (apps/NAME/BINS)")
@@ -2189,7 +2487,8 @@ def main():
                 if exe:
                     print(f"[{b.folder}] app {n}: {exe.relative_to(ROOT)} ({exe.stat().st_size} bytes)")
         elif a.cmd == "test":
-            ok = run_app_suite(builders, a.name) if a.name else run_tests(builders, out, a.quick)
+            jobs = test_jobs(a.test_jobs)
+            ok = run_app_suite(builders, a.name, jobs) if a.name else run_tests(builders, out, a.quick, jobs)
             print(f"test: {'ok' if ok else 'FAILED'} ({time.perf_counter() - t0:.1f} s)")
             return 0 if ok else 1
     except BuildError as e:
