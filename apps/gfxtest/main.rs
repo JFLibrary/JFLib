@@ -11,7 +11,11 @@
 //              unclipped and through 24 random clip rectangles each: every pixel inside the
 //              clip must equal the unclipped rendering, every pixel outside the background
 //   gfxtest --shot x.png --bench     timings: fill (PARGB / A8 circle), tmask raster_path
-//                                    (4000 x 3000 lasso), a8_over (Mpx/s)
+//                                    (4000 x 3000 lasso), a8_over (Mpx/s), and --bench-blit's
+//   gfxtest --bench-blit             a 4K canvas's blit (3840 x 2160 XRGB into a framebuffer):
+//                                    the memory's limit (memset, memcpy, a streaming copy), the
+//                                    row copies of before, Dc::blit on one thread and on the pool,
+//                                    blits through dirty rectangles
 // The output lines are those of the assembly version (tools/parity.py compares them).
 // The test pages (shapes, text) need the UI canvas (R5) and the text features of R3; --open
 // (plat_open_folder) comes with R4.
@@ -49,6 +53,11 @@ fn gfxtest() -> i32 {
     }
     if args.flag("--bench") {
         bench();
+        bench_blit();
+        return 0;
+    }
+    if args.flag("--bench-blit") {
+        bench_blit();
         return 0;
     }
     plat::write_stderr(b"gfxtest: the test pages need the UI canvas (R5); use --selftest or --bench\n");
@@ -462,4 +471,93 @@ fn bench() {
     if best != 0 {
         out(&format!("bench: k_a8_over {} Mpx/s\n", 4096 * 2000 / best));
     }
+}
+
+
+// ---- the blit of a canvas at 4K (a web page's frame, FMT_XRGB, into the window's framebuffer)
+
+// best and median of n runs of f (us)
+fn runs(n: usize, mut f: impl FnMut()) -> (u64, u64) {
+    let mut t: Vec<u64> = (0..n)
+        .map(|_| {
+            let t0 = plat::time_us();
+            f();
+            plat::time_us() - t0
+        })
+        .collect();
+    t.sort_unstable();
+    (t[0], t[n / 2])
+}
+
+// plat::parallel_for for gfx::set_parallel (as the UI runtime passes it)
+fn pool_par(n: usize, f: &(dyn Fn(usize) + Sync)) {
+    let _ = plat::parallel_for(n, &|i, _| f(i));
+}
+
+/// --bench-blit (also part of --bench): a 3840 x 2160 XRGB surface into a framebuffer of the same
+/// size -- the plain row copy of before, Dc::blit on one thread and on the pool, the memory's limit
+/// (memset, one copy, a streaming copy on every thread) -- and blits through dirty rectangles
+fn bench_blit() {
+    use gfx::blend::{copy_stream, stream_fence};
+    use gfx::FMT_XRGB;
+    const W: i32 = 3840;
+    const H: i32 = 2160;
+    // two frames, as an engine hands them over by turns (neither stays in the caches)
+    let mut frames = [Surface::new(W, H, FMT_XRGB), Surface::new(W, H, FMT_XRGB)];
+    let mut rng = Rng(777);
+    for f in frames.iter_mut() {
+        for b in f.px.iter_mut() {
+            *b = rng.rnd() as u8;
+        }
+    }
+    let mut fb = Surface::new(W, H, FMT_XRGB);
+    fb.px.fill(1);
+    let bytes = fb.px.len() as u64;
+    let threads = plat::thr_count() + 1;
+    let line = |name: &str, (best, med): (u64, u64)| {
+        let gb = if best == 0 { 0 } else { bytes * 10 / best / 1000 };
+        out(&format!("bench: {name}: best {best} us ({}.{} GB/s), median {med} us\n", gb / 10, gb % 10));
+    };
+    let mut k = 0;
+    let mut next = || {
+        k ^= 1;
+        k
+    };
+    // the memory's limit
+    line("memset 3840x2160x4", runs(21, || fb.px.fill(3)));
+    line("memcpy 3840x2160x4", runs(21, || fb.px.copy_from_slice(&frames[next()].px)));
+    line("copy_stream 3840x2160x4", runs(21, || {
+        copy_stream(&mut fb.px, &frames[next()].px);
+        stream_fence();
+    }));
+    // before: a plain copy of each row (Dc::blit up to charge 8)
+    let stride = fb.stride as usize;
+    line("blit 3840x2160 XRGB, row copies (before)", runs(21, || {
+        let s = &frames[next()];
+        for r in 0..H as usize {
+            let o = r * stride;
+            fb.px[o..o + W as usize * 4].copy_from_slice(&s.px[o..o + W as usize * 4]);
+        }
+    }));
+    let mut dc = Dc::new(W, H);
+    dc.begin(&fb);
+    line("blit 3840x2160 XRGB, Dc::blit on one thread", runs(21, || dc.blit(&mut fb, &frames[next()], 0, 0)));
+    gfx::set_parallel(pool_par);
+    line(&format!("blit 3840x2160 XRGB, Dc::blit on {threads} threads"), runs(21, || dc.blit(&mut fb, &frames[next()], 0, 0)));
+    // damage only: the clip of dirty rectangles (a caret, a line of text, blocks, a band)
+    for (w, h, n) in [(2, 20, 1), (1200, 80, 1), (256, 64, 20), (3840, 400, 1)] {
+        let mut j = 0;
+        let r = runs(41, || {
+            let s = &frames[next()];
+            for i in 0..n {
+                let (x, y) = ((i * 173 + j) % (W - w).max(1), (i * 97 + j * 3) % (H - h).max(1));
+                dc.clip_push(x, y, w, h);
+                dc.blit(&mut fb, s, 0, 0);
+                dc.clip_pop();
+            }
+            j += 1;
+        });
+        out(&format!("bench: blit damage {n} x {w}x{h} ({} KB): best {} us, median {} us\n", (w * h * n * 4) / 1024, r.0, r.1));
+    }
+    dc.end();
 }

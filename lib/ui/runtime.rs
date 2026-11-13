@@ -1186,6 +1186,7 @@ fn prepare(desc: &AppDesc, style: &'static dyn Style) -> (Ui, i32, i32) {
     img_svg::register(); // (svg) .svg / .svgz through img_core::io::load / load_ex
     plat::set_print_deflate(Some(img_core::deflate::zlib_deflate)); // PDFs of plat::print as the asm's
     img_core::set_parallel(icc_par); // the codecs' parallel parts (YUV bands, ICC grids) on the pool
+    gfx::set_parallel(icc_par); // large blits (a canvas's frame at 4K) in row bands on the pool
     let args = Args(plat::args());
     let mut ui = Ui::new(desc, style);
     // the decimal sign of number boxes: the user's format (headless: German)
@@ -1509,7 +1510,7 @@ fn log_start(ui: &Ui) {
     plat::log!(plat::LOG_INFO, "app", "start {} ({}, {})", ui.desc.title, crate::i18n::locale_tag(), crate::i18n::language_code());
 }
 
-/// plat::parallel_for for img_core (which does not depend on plat)
+/// plat::parallel_for for img_core and gfx (which do not depend on plat)
 fn icc_par(n: usize, f: &(dyn Fn(usize) + Sync)) {
     let _ = plat::parallel_for(n, &|i, _| f(i));
 }
