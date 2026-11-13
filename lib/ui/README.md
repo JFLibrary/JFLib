@@ -62,17 +62,19 @@ JFLib's crates share one version and are released together.
 
 ## What's new in 0.2.0
 
-Apps now run natively on macOS and iOS; on macOS their menus move into the system's menu bar. The
-new `ui.form_factor()` tells phones and tablets from desktops, and the title bar, menu bar and
-status bar adapt to them. A window can show GPU content next to its widgets (`ui.gpu_view`, for
-example a 3D scene of `jflib-render3d`). Apps that host web content get what they need: canvases
-that take the keyboard, raw key events, input methods for fields they draw themselves, more mouse
-cursors, popups at any point and a web page's accessibility tree with tables and landmarks. The
-file dialog chooses several files at once, `ui.calendar` shows a month in place, and dock panels
-can move as a group. Among the fixes: text boxes with the same id in two windows no longer share
-their caret and undo, the document views no longer open network or device paths for images, and
-several inputs that made the UI panic are handled. Everything is in the
-[changelog](https://docs.rs/crate/jflib-ui/latest/source/CHANGELOG.md).
+Apps now run natively on macOS and iOS, VoiceOver reads them there, and on macOS their menus move
+into the system's menu bar. The new `ui.form_factor()` tells phones and tablets from desktops,
+and the title bar, menu bar and status bar adapt to them. A window can show GPU content next to
+its widgets (`ui.gpu_view`, for example a 3D scene of `jflib-render3d`). Apps that host web
+content get what they need: canvases that take the keyboard, raw key events, input methods for
+fields they draw themselves, more mouse cursors, popups at any point and a web page's
+accessibility tree with tables and landmarks. On Windows and Linux the file dialog chooses
+several files at once, `ui.calendar` shows a month in place, and dock panels can move as a group.
+Two changes close security holes: the Markdown, HTML and rich-text views open only http, https
+and mailto links by themselves and hand every other link to the app, and they no longer open
+network or device paths for images. Among the other fixes: text boxes with the same id in two
+windows no longer share their caret and undo, and several inputs that made the UI panic are
+handled. Everything is in the [changelog](https://docs.rs/crate/jflib-ui/latest/source/CHANGELOG.md).
 
 ## Documentation
 

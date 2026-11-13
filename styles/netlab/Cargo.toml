@@ -4,7 +4,8 @@ description = "JFLib's NetLab style: sober grey surfaces, clear borders, compact
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
+# its own copies of the Inter fonts (OFL-1.1, assets/OFL-Inter.txt) and of icons.bin (MIT, LICENSE-icons.txt)
+license = "(MIT OR Apache-2.0) AND OFL-1.1 AND MIT"
 repository.workspace = true
 homepage.workspace = true
 
