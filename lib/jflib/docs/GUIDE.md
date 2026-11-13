@@ -1563,8 +1563,10 @@ above) and, with `AF_LOG_FILE` in the app flags, to `logs://APP.log` (INFO and a
 1 MiB it moves to `.1`, three older files are kept). `logs://` is the app's log folder:
 `%LOCALAPPDATA%/APP/Logs` on Windows, `$XDG_STATE_HOME/APP` (`~/.local/state/APP`) on Linux. `jfgui_LOG=error|warn|info|debug|trace`
 sets the levels, `jfgui_LOG_FILE=PATH|1|0` the file. A crash or panic prints the ring's last
-lines and marks the file before the app's crash hook runs; `plat::log_recent(max)` gives the
-newest lines for an own report. `ui.warn` lines are in the log too. The runtime logs start,
+lines and marks the file before the app's crash hook runs, without allocating or waiting: a
+non-blocking stderr that takes nothing for half a second is given up, the crash line goes to
+an OS file only (not to a mount's stream) and does not rotate it. `plat::log_recent(max)` gives
+the newest lines for an own report. `ui.warn` lines are in the log too. The runtime logs start,
 exit, sleep, session end and settings changes.
 
 **Printing** (`plat::print`, `plat::PrintDoc`): `plat::print(&mut job)` prints one image on one

@@ -29607,9 +29607,11 @@ and a rotating file
 
 Lines: "2026-10-17 19:58:07.123 WARN  net: text" (Windows local time, elsewhere UTC with a
 Z); line breaks inside the text become " | ".  The ring holds 64 KiB.  A crash or panic
-writes the ring to stderr and to the log file before the app's crash hook runs (rt::crash
-pre-hook, installed with the first line); it takes the locks only if they are free, so a
-thread that crashed while logging cannot stop the report.
+writes the ring to stderr and a crash line to the log file before the app's crash hook runs
+(rt::crash pre-hook, installed with the first line); it takes the locks only if they are
+free, so a thread that crashed while logging cannot stop the report, and it neither
+allocates nor waits: a stuck stderr is given up, the line goes to an OS file only (not a
+mount's stream) and does not rotate it.
 ```
 
 ```rust
@@ -50522,7 +50524,8 @@ rt -- the runtime under everything: allocator, memory intrinsics, exact SSE floa
 semantics, the minimal OS calls the runtime itself needs, panic handling.
 
   rt::os::{pages_alloc, pages_free, write_stdout, write_stderr, exit, yield_now}   (and on
-  Linux the raw syscall helpers plat builds on)
+  Linux the raw syscall helpers plat builds on); write_stderr_crash: stderr for crash paths,
+  which gives up a stuck non-blocking stderr instead of waiting for it (Linux)
   rt::kernel the Linux kernel ABI per architecture: SYS_*, O_*, Stat, clone_args (also as rt::os::*)
   rt::fx   cvtt / cvt / sqrt / minss / maxss / floor_i / ceil_i / div255
   rt::x87  the extended-precision steps of f64 <-> decimal text (ini.s), fpatan
