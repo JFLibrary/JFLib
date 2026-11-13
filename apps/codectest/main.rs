@@ -13,6 +13,8 @@
 //   --convert-ex IN --to OUT [--straight] [--quality Q]
 //                                  img_load_ex (hint from the extension) + img_save_opt
 //   --core-only                    leave the non-core codecs unregistered
+//   --limits                       the decoders' budgets against crafted files (limits.rs;
+//                                  tests/limits.uis runs it)
 //   --jxlenc FILE                  (jxl-module) save JPEG XL with the writer of the module file
 //                                  FILE (jxlenc.dll / .so; "off" = the assembly-compatible
 //                                  writer) instead of the linked one (img_jxl_enc)
@@ -63,6 +65,7 @@ mod ops_png;
 mod ops_tga;
 mod ops_tiff;
 mod ops_zlib;
+mod limits;
 
 pub const R_UNKNOWN: i32 = -100;
 
@@ -169,6 +172,9 @@ fn codectest() -> i32 {
     match args.value("--jxlenc") {
         Some(f) => img_jxl::writer::use_module(Some(f)),
         None => img_jxl_enc::use_static(),
+    }
+    if args.flag("--limits") {
+        return limits::run();
     }
     let mut ct = Ct { out: Vec::new(), core_only, args };
     if ct.args.flag("--hostile") {

@@ -36,9 +36,14 @@
 // into a tile-sized surface whose rows are then copied into the image under per-row locks
 // (the assembly converts straight into the image); the error of the lowest failing tile
 // wins.
+// Limits (ERR_LIMIT), checked before a decoder allocates: the picture of every coded item as
+// its stream declares it (HEVC SPS, AV1 frame header) within dec.max_pixels(); a grid's tiles
+// together within 4 x (w + 64) x (h + 64) pixels of the image, each counted as at least
+// 64 x 64 and none larger than the first; the item data (and extents) fed to the decoders
+// within the file size plus that.
 
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use gfx::{FMT_ARGB, FMT_PARGB, SFF_OPAQUE, Surface};
 use img_av1::Av1Dec;
@@ -131,6 +136,384 @@ fn streq(p: &[u8], s: &[u8]) -> bool {
     }
 }
 
+/// the largest picture a coded item may have in its stream (before any cropping)
+#[derive(Clone, Copy)]
+struct Lim {
+    w: u32,
+    h: u32,
+    px: u64, // w * h, not counting up to 63 rows / columns of coding padding
+}
+
+impl Lim {
+    fn ok(&self, w: u32, h: u32) -> bool {
+        w <= self.w && h <= self.h && w.saturating_sub(63) as u64 * h.saturating_sub(63) as u64 <= self.px
+    }
+}
+
+/// RBSP bits as img_hevc reads them (zero past the end)
+struct Rb<'d> {
+    d: &'d [u8],
+    pos: usize,
+}
+
+impl Rb<'_> {
+    /// the next n bits (n < 32)
+    fn u(&mut self, n: u32) -> u32 {
+        let mut v = 0u32;
+        for _ in 0..n {
+            let b = self.d.get(self.pos >> 3).map_or(0, |&b| (b >> (7 - (self.pos & 7))) & 1);
+            v = v << 1 | b as u32;
+            self.pos += 1;
+        }
+        v
+    }
+
+    /// ue(v); None for 32 leading zeros or more (img_hevc: ERR_HDR)
+    fn ue(&mut self) -> Option<u32> {
+        let mut lz = 0;
+        while self.u(1) == 0 {
+            lz += 1;
+            if lz >= 32 {
+                return None;
+            }
+        }
+        Some(self.u(lz).wrapping_add((1u32 << lz) - 1))
+    }
+}
+
+/// pic_width / pic_height_in_luma_samples of a layer-0 SPS NAL unit, read as img_hevc's sps()
+/// reads them; None for other NAL units and for an SPS img_hevc refuses before it allocates
+fn spsdim(nal: &[u8]) -> Option<(u32, u32)> {
+    if nal.len() < 2 || nal[0] & 0x80 != 0 || (nal[0] >> 1) & 63 != 33 || ((nal[0] & 1) << 5 | nal[1] >> 3) != 0 {
+        return None;
+    }
+    // the RBSP (emulation prevention bytes removed); the fields read take at most 1045 bits
+    let mut b = [0u8; 136];
+    let (mut n, mut z) = (0usize, 0u32);
+    for &v in &nal[2..] {
+        if n == b.len() {
+            break;
+        }
+        if z >= 2 && v == 3 {
+            z = 0;
+            continue;
+        }
+        b[n] = v;
+        n += 1;
+        z = if v == 0 { z + 1 } else { 0 };
+    }
+    let mut r = Rb { d: &b[..n], pos: 0 };
+    r.pos += 4; // sps_video_parameter_set_id
+    let sub = r.u(3); // sps_max_sub_layers_minus1
+    r.pos += 1 + 96; // temporal_id_nesting, general profile and level
+    let mut skip = 0;
+    for _ in 0..sub {
+        skip += r.u(1) * 88 + r.u(1) * 8; // sub-layer profile / level present
+    }
+    if sub != 0 {
+        skip += 2 * (8 - sub);
+    }
+    r.pos += skip as usize;
+    r.ue()?; // sps_seq_parameter_set_id
+    let chroma = r.ue()?;
+    if chroma > 3 {
+        return None;
+    }
+    if chroma == 3 {
+        r.pos += 1; // separate_colour_plane_flag
+    }
+    let w = r.ue()?;
+    let h = r.ue()?;
+    if w.wrapping_sub(1) > 16383 || h.wrapping_sub(1) > 16383 {
+        return None; // (ERR_HDR from img_hevc)
+    }
+    Some((w, h))
+}
+
+/// img_av1's bit reader (zero bits past end)
+struct Ab<'d> {
+    d: &'d [u8],
+    pos: u64,
+    end: u64,
+}
+
+impl Ab<'_> {
+    fn f(&mut self, n: u32) -> u32 {
+        let mut v = 0u32;
+        for _ in 0..n {
+            let by = self.pos >> 3;
+            let bit = if by < self.end && (by as usize) < self.d.len() { (self.d[by as usize] >> (7 - (self.pos & 7))) as u32 & 1 } else { 0 };
+            v = v.wrapping_shl(1) | bit;
+            self.pos += 1;
+        }
+        v
+    }
+
+    fn uvlc(&mut self) {
+        let mut lz = 0;
+        while self.f(1) == 0 {
+            lz += 1;
+            if lz >= 40 {
+                return;
+            }
+        }
+        if lz < 32 {
+            self.f(lz);
+        }
+    }
+
+    fn leb128(&mut self) -> u64 {
+        let mut v = 0u64;
+        let mut i = 0u32;
+        loop {
+            let b = self.f(8);
+            v |= ((b & 0x7F) as u64).wrapping_shl(7 * i);
+            i += 1;
+            if b & 0x80 == 0 || i >= 8 {
+                return v;
+            }
+        }
+    }
+}
+
+/// the frame sizes img_av1 allocates for an av01 item, found before decoding: the OBUs walked
+/// as Av1Dec::obus walks them, sequence headers and frame headers (up to frame_size) read as
+/// its seqhdr / framehdr read them; `stop`: img_av1 refuses the stream there
+#[derive(Default)]
+struct Av1Scan {
+    state: u32, // 0 nothing, 1 sequence header, 2 frame header (as Av1Dec)
+    stop: bool,
+    // the sequence header fields read before frame_size
+    reduced: u32,
+    opidc: u32,
+    dmip: u32,
+    eqpi: u32,
+    bdlen: u32,
+    brtlen: u32,
+    fptlen: u32,
+    nop: u32,
+    opidcs: [u16; 32],
+    dmpop: [u8; 32],
+    fwbits: u32,
+    fhbits: u32,
+    maxw: u32,
+    maxh: u32,
+    fidp: u32,
+    idlen: u32,
+    eoh: u32,
+    sfsct: u32,
+    sfimv: u32,
+    ohbits: u32,
+}
+
+impl Av1Scan {
+    /// the OBUs of one buffer (configOBUs, then the item data): every frame header img_av1
+    /// would act on within lim -> Ok / Err(ERR_LIMIT)
+    fn obus(&mut self, d: &[u8], lim: Lim) -> Result<(), i32> {
+        let len = d.len() as u64;
+        let mut p = 0u64;
+        while !self.stop && p < len {
+            let mut b = Ab { d, pos: p * 8, end: len };
+            b.f(1);
+            let typ = b.f(4);
+            let ext = b.f(1);
+            let has = b.f(1);
+            b.f(1);
+            let (mut tid, mut sid) = (0, 0);
+            if ext != 0 {
+                tid = b.f(3);
+                sid = b.f(2);
+                b.f(3);
+            }
+            let sz = if has != 0 {
+                b.leb128()
+            } else {
+                let t = len - p - 1;
+                if t < ext as u64 {
+                    self.stop = true; // (ERR_TRUNC)
+                    break;
+                }
+                t - ext as u64
+            };
+            let ps = b.pos >> 3;
+            if sz > len.wrapping_sub(ps) {
+                self.stop = true;
+                break;
+            }
+            let pe = ps.wrapping_add(sz);
+            b.end = pe;
+            let o = self.opidc;
+            let skip = typ != 1 && typ != 2 && ext != 0 && o != 0 && (o >> (tid & 31) & 1 == 0 || o >> ((sid + 8) & 31) & 1 == 0);
+            if !skip {
+                match typ {
+                    1 if self.state != 2 => {
+                        self.stop = !self.seq(&mut b);
+                        self.state = self.state.max(1);
+                    }
+                    2 if self.state == 2 => self.state = 1,
+                    3 | 6 | 7 if self.state != 2 => match self.frame(&mut b, tid, sid) {
+                        Some((w, h)) if self.state != 0 => {
+                            if !lim.ok(w, h) {
+                                return Err(ERR_LIMIT);
+                            }
+                            self.state = 2;
+                        }
+                        _ => self.stop = true,
+                    },
+                    6 => self.stop = true, // (a frame header in state 2)
+                    _ => {}
+                }
+            }
+            p = pe;
+        }
+        Ok(())
+    }
+
+    /// seqhdr up to OrderHintBits; false when img_av1 refuses the header
+    fn seq(&mut self, b: &mut Ab) -> bool {
+        if b.f(3) > 2 {
+            return false; // seq_profile
+        }
+        b.f(1); // still_picture
+        self.reduced = b.f(1);
+        self.dmip = 0;
+        self.eqpi = 0;
+        self.opidc = 0;
+        self.nop = 1;
+        if self.reduced != 0 {
+            b.f(5); // seq_level_idx[ 0 ]
+        } else {
+            if b.f(1) != 0 {
+                // timing_info, decoder_model_info
+                b.f(32);
+                b.f(32);
+                self.eqpi = b.f(1);
+                if self.eqpi != 0 {
+                    b.uvlc();
+                }
+                self.dmip = b.f(1);
+                if self.dmip != 0 {
+                    self.bdlen = b.f(5) + 1;
+                    b.f(32);
+                    self.brtlen = b.f(5) + 1;
+                    self.fptlen = b.f(5) + 1;
+                }
+            }
+            let idd = b.f(1); // initial_display_delay_present_flag
+            self.nop = b.f(5) + 1;
+            for i in 0..self.nop as usize {
+                self.opidcs[i] = b.f(12) as u16;
+                if b.f(5) > 7 {
+                    b.f(1); // seq_tier
+                }
+                self.dmpop[i] = 0;
+                if self.dmip != 0 {
+                    let v = b.f(1);
+                    self.dmpop[i] = v as u8;
+                    if v != 0 {
+                        b.f(self.bdlen);
+                        b.f(self.bdlen);
+                        b.f(1);
+                    }
+                }
+                if idd != 0 && b.f(1) != 0 {
+                    b.f(4);
+                }
+            }
+            self.opidc = self.opidcs[0] as u32;
+        }
+        self.fwbits = b.f(4) + 1;
+        self.fhbits = b.f(4) + 1;
+        self.maxw = b.f(self.fwbits).wrapping_add(1);
+        self.maxh = b.f(self.fhbits).wrapping_add(1);
+        self.fidp = 0;
+        if self.reduced == 0 {
+            self.fidp = b.f(1);
+            if self.fidp != 0 {
+                let d = b.f(4); // delta_frame_id_length_minus_2
+                self.idlen = b.f(3) + d + 3;
+            }
+        }
+        b.f(3); // use_128x128_superblock, enable_filter_intra, enable_intra_edge_filter
+        if self.reduced != 0 {
+            self.eoh = 0;
+            self.sfsct = 2;
+            self.sfimv = 2;
+            self.ohbits = 0;
+        } else {
+            b.f(4); // interintra, masked, warped, dual filter
+            self.eoh = b.f(1);
+            if self.eoh != 0 {
+                b.f(2); // jnt_comp, ref_frame_mvs
+            }
+            self.sfsct = if b.f(1) != 0 { 2 } else { b.f(1) };
+            self.sfimv = 2;
+            if self.sfsct != 0 && b.f(1) == 0 {
+                self.sfimv = b.f(1);
+            }
+            self.ohbits = 0;
+            if self.eoh != 0 {
+                self.ohbits = b.f(3) + 1;
+            }
+        }
+        true
+    }
+
+    /// framehdr up to frame_size -> (UpscaledWidth, FrameHeight); None when img_av1 refuses
+    /// the header before it allocates
+    fn frame(&self, b: &mut Ab, tid: u32, sid: u32) -> Option<(u32, u32)> {
+        let (mut ftype, mut erm) = (0, 1); // KEY_FRAME, error_resilient_mode
+        if self.reduced == 0 {
+            if b.f(1) != 0 {
+                return None; // show_existing_frame
+            }
+            ftype = b.f(2);
+            if ftype != 0 && ftype != 2 {
+                return None; // not KEY_FRAME / INTRA_ONLY_FRAME
+            }
+            if b.f(1) == 0 {
+                return None; // show_frame
+            }
+            if self.dmip != 0 && self.eqpi == 0 {
+                b.f(self.fptlen); // temporal_point_info
+            }
+            if ftype != 0 {
+                erm = b.f(1);
+            }
+        }
+        b.f(1); // disable_cdf_update
+        let sct = if self.sfsct == 2 { b.f(1) } else { self.sfsct };
+        if sct != 0 && self.sfimv == 2 {
+            b.f(1); // force_integer_mv
+        }
+        if self.fidp != 0 {
+            b.f(self.idlen); // current_frame_id
+        }
+        let fso = if self.reduced == 0 { b.f(1) } else { 0 };
+        b.f(self.ohbits); // order_hint
+        if self.dmip != 0 && b.f(1) != 0 {
+            // buffer_removal_time
+            for i in 0..(self.nop as usize).min(32) {
+                let o = self.opidcs[i] as u32;
+                if self.dmpop[i] != 0 && (o == 0 || (o >> (tid & 31) & 1 != 0 && o >> ((sid + 8) & 31) & 1 != 0)) {
+                    b.f(self.brtlen);
+                }
+            }
+        }
+        let refresh = if ftype != 0 { b.f(8) } else { 0xFF };
+        if refresh != 0xFF && erm != 0 && self.eoh != 0 {
+            for _ in 0..8 {
+                b.f(self.ohbits); // ref_order_hint[ i ]
+            }
+        }
+        if fso == 0 {
+            return Some((self.maxw, self.maxh));
+        }
+        let w = b.f(self.fwbits).wrapping_add(1);
+        Some((w, b.f(self.fhbits).wrapping_add(1)))
+    }
+}
+
 /// the rows of the target surface for grid tiles decoded in parallel
 struct Rows<'s> {
     rows: Vec<SpinLock<&'s mut [u8]>>,
@@ -167,14 +550,22 @@ struct Hc<'a, 'b> {
     mode: u32,             // 0 colour, 1 alpha
     tw: u32,               // size of the last decoded tile
     th: u32,
+    tcw: u32, // its picture in the codec stream (before cropping)
+    tch: u32,
     cicp0: u32, // CICP used for the first colour tile
     have0: u32,
+    abud: u64,        // pixels the tiles of one image may decode (see decode)
+    budget: u64,      // item data + extents the decoders may be fed in all
+    spent: AtomicU64, // so far
 }
 
-/// what a decoded tile reports to the serial caller: its size, the CICP used
+/// what a decoded tile reports to the serial caller: its size, its picture in the codec
+/// stream, the CICP used
 struct TileInfo {
     w: u32,
     h: u32,
+    cw: u32,
+    ch: u32,
     cicp: u32,
 }
 
@@ -214,6 +605,10 @@ pub fn decode(data: &[u8], sf: &mut Surface, dec: &ImgDec, meta: &mut ImgMeta) -
         Ok(s) => s,
         Err(e) => return e,
     };
+    // budgets: the tiles of an image (repeated references, crops of big pictures) and the
+    // data fed to the decoders (repeated references, overlapping extents)
+    hc.abud = 4 * (hc.w as u64 + 64) * (hc.h as u64 + 64);
+    hc.budget = data.len() as u64 + hc.abud;
     // colour
     hc.mode = 0;
     let r = hc.image(sf, hc.prim);
@@ -272,8 +667,13 @@ impl<'a, 'b> Hc<'a, 'b> {
             mode: 0,
             tw: 0,
             th: 0,
+            tcw: 0,
+            tch: 0,
             cicp0: 0,
             have0: 0,
+            abud: u64::MAX,
+            budget: u64::MAX,
+            spent: AtomicU64::new(0),
         }
     }
 
@@ -665,8 +1065,9 @@ impl<'a, 'b> Hc<'a, 'b> {
         if kind == 0 {
             return ERR_UNSUPPORTED;
         }
+        let mut lim = Lim { w: u32::MAX, h: u32::MAX, px: self.dec.max_pixels() };
         if kind != KIND_GRID {
-            return self.tile_serial(sf, id, 0, 0);
+            return self.tile_serial(sf, id, 0, 0, lim);
         }
         // tile 0 first (tile size, colour), then the others on the worker pool; the error
         // of the lowest failing tile wins
@@ -675,11 +1076,20 @@ impl<'a, 'b> Hc<'a, 'b> {
             Err(e) => return e,
         };
         let tiles = gd[0].wrapping_mul(gd[1]);
+        // the tiles' pictures together within abud: tile 0 at most abud / tiles (and 64 x 64
+        // for the decoder's setup), the others no larger than tile 0
+        if tiles > 1 {
+            let per = self.abud / tiles as u64;
+            if per < 4096 {
+                return ERR_LIMIT;
+            }
+            lim.px = lim.px.min(per);
+        }
         let t0 = self.bx.ref_(TAG_DIMG, id, 0);
         if t0 < 0 {
             return ERR_HDR;
         }
-        let r = self.tile_serial(sf, t0 as u32, 0, 0);
+        let r = self.tile_serial(sf, t0 as u32, 0, 0, lim);
         if r != 0 {
             return r;
         }
@@ -696,6 +1106,7 @@ impl<'a, 'b> Hc<'a, 'b> {
         }
         let cols = gd[1];
         let (gtw, gth) = (self.tw, self.th);
+        let lim = Lim { w: self.tcw, h: self.tch, px: lim.px };
         let res: Vec<AtomicU32> = (0..tiles).map(|_| AtomicU32::new(0)).collect();
         let stride = (sf.stride as usize).max(1);
         let (w, h) = (sf.w, sf.h);
@@ -709,7 +1120,7 @@ impl<'a, 'b> Hc<'a, 'b> {
             } else {
                 let dx = (t % cols).wrapping_mul(gtw);
                 let dy = (t / cols).wrapping_mul(gth);
-                match me.tile(&mut Dst::Rows(&rows), tid as u32, dx, dy) {
+                match me.tile(&mut Dst::Rows(&rows), tid as u32, dx, dy, lim) {
                     Ok(_) => 0,
                     Err(e) => e,
                 }
@@ -728,11 +1139,13 @@ impl<'a, 'b> Hc<'a, 'b> {
 
     /// a tile decoded by the calling thread: hc_tile with the tile size and the first
     /// colour CICP kept
-    fn tile_serial(&mut self, sf: &mut Surface, id: u32, dx: u32, dy: u32) -> i32 {
-        match self.tile(&mut Dst::Direct(sf), id, dx, dy) {
+    fn tile_serial(&mut self, sf: &mut Surface, id: u32, dx: u32, dy: u32, lim: Lim) -> i32 {
+        match self.tile(&mut Dst::Direct(sf), id, dx, dy, lim) {
             Ok(ti) => {
                 self.tw = ti.w;
                 self.th = ti.h;
+                self.tcw = ti.cw;
+                self.tch = ti.ch;
                 if self.mode == 0 && self.have0 == 0 {
                     self.cicp0 = ti.cicp;
                     self.have0 = 1;
@@ -743,11 +1156,33 @@ impl<'a, 'b> Hc<'a, 'b> {
         }
     }
 
-    /// hc_tile: decode the coded image item id and convert it into the target at (dx, dy):
-    /// colour (mode 0) or alpha (1)
-    fn tile(&self, dst: &mut Dst, id: u32, dx: u32, dy: u32) -> Result<TileInfo, i32> {
+    /// count item id's data and extents against the budget -> Err(ERR_LIMIT) once it is spent
+    fn charge(&self, id: u32) -> Result<(), i32> {
+        if self.spent.load(Ordering::Relaxed) > self.budget {
+            return Err(ERR_LIMIT);
+        }
+        let k = self.bx.find(id);
+        if k < 0 {
+            return Ok(()); // (reported by the caller)
+        }
+        let it = self.bx.items[k as usize];
+        if it.cm != CM_FILE && it.cm != CM_IDAT {
+            return Ok(()); // (refused by Bx::item)
+        }
+        let ex = &self.bx.exts[it.ext0 as usize..(it.ext0 + it.next) as usize];
+        let n = ex.iter().fold(it.next as u64, |a, e| a.saturating_add(e.1));
+        if self.spent.fetch_add(n, Ordering::Relaxed).saturating_add(n) > self.budget {
+            return Err(ERR_LIMIT);
+        }
+        Ok(())
+    }
+
+    /// hc_tile: decode the coded image item id (its picture within lim) and convert it into
+    /// the target at (dx, dy): colour (mode 0) or alpha (1)
+    fn tile(&self, dst: &mut Dst, id: u32, dx: u32, dy: u32, lim: Lim) -> Result<TileInfo, i32> {
+        self.charge(id)?;
         if self.itype(id) == TAG_AV01 {
-            return self.av1tile(dst, id, dx, dy);
+            return self.av1tile(dst, id, dx, dy, lim);
         }
         let Some(hvcc) = self.bx.prop(id, TAG_HVCC) else { return Err(ERR_HDR) };
         let hl = hvcc.len();
@@ -773,7 +1208,13 @@ impl<'a, 'b> Hc<'a, 'b> {
                 if n > hl - p {
                     return Err(ERR_HDR);
                 }
-                let r = hv.nal(&hvcc[p..p + n]);
+                let nal = &hvcc[p..p + n];
+                if let Some((w, h)) = spsdim(nal)
+                    && !lim.ok(w, h)
+                {
+                    return Err(ERR_LIMIT);
+                }
+                let r = hv.nal(nal);
                 if r != 0 {
                     return Err(r);
                 }
@@ -800,7 +1241,13 @@ impl<'a, 'b> Hc<'a, 'b> {
             if n == 0 {
                 continue;
             }
-            let r = hv.nal(&data[p..p + n]);
+            let nal = &data[p..p + n];
+            if let Some((w, h)) = spsdim(nal)
+                && !lim.ok(w, h)
+            {
+                return Err(ERR_LIMIT);
+            }
+            let r = hv.nal(nal);
             if r != 0 {
                 return Err(r);
             }
@@ -841,22 +1288,25 @@ impl<'a, 'b> Hc<'a, 'b> {
         };
         yp.cicp = cicp;
         self.put(&yp, dst, dx, dy)?;
-        Ok(TileInfo { w: pic.w, h: pic.h, cicp })
+        Ok(TileInfo { w: pic.w, h: pic.h, cw: pic.pw[0], ch: pic.ph[0], cicp })
     }
 
     /// hc_av1tile: hc_tile for an av01 item
-    fn av1tile(&self, dst: &mut Dst, id: u32, dx: u32, dy: u32) -> Result<TileInfo, i32> {
+    fn av1tile(&self, dst: &mut Dst, id: u32, dx: u32, dy: u32, lim: Lim) -> Result<TileInfo, i32> {
         let Some(c) = self.bx.prop(id, TAG_AV1C) else { return Err(ERR_HDR) };
         if c.len() < 4 {
             return Err(ERR_HDR);
         }
         let mut av = Av1Dec::new();
         av.set_cancel(self.dec.cancel); // r9-av1
+        let mut sc = Av1Scan::default(); // the frame sizes before img_av1 allocates
         // configOBUs (normally the sequence header)
         if c.len() > 4 {
+            sc.obus(&c[4..], lim)?;
             av.obus(&c[4..])?;
         }
         let data = self.bx.item(id)?;
+        sc.obus(&data, lim)?;
         av.obus(&data)?;
         drop(data);
         let pic = av.finish()?;
@@ -897,7 +1347,7 @@ impl<'a, 'b> Hc<'a, 'b> {
         };
         yp.cicp = cicp;
         self.put(&yp, dst, dx, dy)?;
-        Ok(TileInfo { w: pic.w, h: pic.h, cicp })
+        Ok(TileInfo { w: pic.w, h: pic.h, cw: pic.w, ch: pic.h, cicp })
     }
 
     /// yuv_to_argb (colour) / yuv_alpha (alpha) of a tile into the target at (dx, dy)
