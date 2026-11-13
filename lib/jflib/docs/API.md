@@ -27545,6 +27545,9 @@ APP_LOG: u32 = 3
     cut or extend to len bytes
   - `fn sync(&self) -> bool`
     the data is where readers of the mount find it
+  - `fn deferred(&self) -> bool`
+    whether written bytes reach the provider only by sync or drop (a whole-file buffer: File
+    on a provider without streams or OS files); plat::log refuses such files
 
 - **`trait Provider: Send + Sync`**
   A file tree behind a scheme.  Paths are relative ("" is the root), '/' separated and
@@ -27575,6 +27578,12 @@ APP_LOG: u32 = 3
     File::open on the provider: a stream on the file (mode FO_READ, FO_WRITE: create /
     truncate, FO_RW: open or create).  The default, Generic, lets File::open use os_path,
     else read and write the whole file (written back on sync and when the File is dropped)
+  - `fn create_new(&self, _path: &str) -> Opened`
+    a new file where nothing is (File::create_new, AtomicFile's sibling): the check and the
+    creation in one step, so that no other writer's entry of that name is ever opened or
+    emptied -> a stream for writing; Refused when the name is taken.  The default, Generic:
+    the OS's exclusive create of os_path; without os_path the provider has no
+    File::create_new (AtomicFile then checks and opens, with a name of its own)
   - `fn display_name(&self, _path: &str) -> Option<String>`
     the name to show the user for path (None: its last segment; content:// documents:
     their display name)
@@ -27756,7 +27765,10 @@ is made as safe as SAF allows:
 The document keeps its URI (grants stay valid).  What remains: between the truncation and the
 end of the write other readers see a part; without a journal (none set) a crash leaves that
 part; File streams (File::open) write in place without any of this; opening a document for
-writing, deleting or renaming it drops its pending journal copy.
+writing, deleting or renaming it drops its pending journal copy -- once the host did it (a
+refused open or rename keeps the copy for recover).  Writes of one document with a journal
+run one after the other (also recover and the removal of a copy), so a write that succeeds
+never removes the copy of another that failed.
 ```
 
 ```rust
@@ -29609,7 +29621,10 @@ and a rotating file
   log_file(Some(path), max_bytes, keep) -> bool   append the lines to path (a vfs name like
                                        logs://app.log or an OS path); when it grows
                                        beyond max_bytes it moves to path.1 (path.1 to path.2,
-                                       ... up to keep files) and a new one starts; None stops
+                                       ... up to keep files) and a new one starts; None stops.
+                                       false: it cannot be opened, or it is a file of a
+                                       provider without streams or OS files (its bytes would
+                                       reach the provider only when the log stops)
   log_recent(max_bytes) -> String      the newest whole lines of the ring (a crash report,
                                        a "copy log" button)
 
@@ -29666,7 +29681,9 @@ LOG_TRACE: u32 = 5
 
 - **`fn log_file(path: Option<&str>, max_bytes: u64, keep: u32) -> bool`**
   write the lines to path (rotated at max_bytes, keep older files path.1 .. path.keep);
-  None stops -> false when the file cannot be opened
+  None stops -> false when the file cannot be opened, or when its bytes would reach the
+  provider only at the end (a mount without streams or OS files: nothing of the last segment
+  or a crash line would arrive before the log stops)
 
 ### `plat/a11y.rs`
 
@@ -30395,6 +30412,9 @@ File and FileLock hold an OS file (also behind a folder mount: os_path) or a str
 mount (Provider::open: MemFs, Bundle, ZipFs, Overlay, Sub; other providers: the whole file,
 read at the start and written back by sync and drop); a FileLock on a mount without OS
 files holds inside this process only.
+File::create_new and AtomicFile's sibling on a mount: Provider::create_new (the check and the
+creation in one step: MemFs, Overlay, Sub, content://), else the OS's exclusive create of
+os_path; a provider with neither has no File::create_new.
 AtomicFile is write_file in pieces: a sibling (OS: OsAtomic of win_sys / linux_sys /
 web_files / android_files; mounts: "NAME.tmp-.." in the mount) put in place by commit,
 removed when dropped; content:// (no rename over a document): the bytes in memory, written
@@ -30440,8 +30460,9 @@ in place by commit (aio.rs builds the async writes and copies on it).
   FO_READ (existing, read only), FO_WRITE (create / truncate), FO_RW (open or create);
   on every mount (vfs.rs)
 - **`fn create_new(path: &str) -> Option<File>`**
-  Create a named file exclusively; never open an existing path (a mount without OS
-  files: exclusive inside this process).
+  Create a named file exclusively; never open an existing path.  A mount: the
+  provider's own check-and-create (Provider::create_new: mem://, content://, overlays) or
+  the OS's of a folder mount; None on a provider with neither.
 - **`fn open_temp(dir: Option<&str>) -> Option<File>`**
   a new file without a lasting name in dir (None = temp_dir) that disappears when it is
   closed (also after a crash); a mount without OS files: a file in memory  [plat_file_open_temp]

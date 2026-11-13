@@ -21,6 +21,11 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 ### Added
 
 - **build:** `build_rs.py test` runs the scripts side by side: `--test-jobs N` at a time (default half the logical CPUs, `jfgui_TEST_JOBS`; 1 = one after the other), Windows and Linux together, the checks after the scripts beside them. An app's scripts keep their order and never run on both targets at once; `#!lock desktop` / `#!lock audio` and `#!serial WHY` among a script's first lines, `apps/NAME/tests/jobs.txt` for a whole app (`independent`, `independent targets`, `lock`, `serial`); each job starts its Linux programs through one WSL process of its own (`linux_task.py serve`); render3dtest's and gputest's validation in parts (`--test A,B`, `--except`). At the end the times of build, scripts and checks and the slowest scripts and apps; `build/test-report.json` and `build/test-times.json` (the longest work first in the next run). `test --quick` with a warm build: 16 to 20 minutes under the load of other sessions instead of about 70 (63 of them scripts one after the other)
+- **plat:** `vfs::Provider::create_new` (a new file where nothing is, the check and the creation in one step; the default uses the OS exclusive create of `os_path`) and `vfs::Stream::deferred` (bytes reach the provider only by sync or drop)
+
+### Changed
+
+- **plat:** `File::create_new` on a mount whose provider has neither `Provider::create_new` nor `os_path` returns None (it was exclusive only against other `create_new` calls of the process; `write_file` or `File::open` of another writer in between was emptied). `log_file` returns false for a file of such a provider (its lines reached the provider only when the log stopped, a crash line never)
 
 ### Fixed
 
@@ -38,6 +43,10 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **img_tga, img_webp, img_bmp, img_jxl, netpkt:** Offsets and sizes from a file are checked without wrapping a 32-bit usize (wasm32): TGA's extension offset (a read past the data), WebP chunk sizes near 4 GB (the walk went back into the file), a BMP's ICC profile offset, JXL plane sizes (ERR_NOMEM instead of a plane too small), pcapng block and packet lengths (an endless loop, a bad slice)
 - **img_jxl:** The spline area estimate saturates instead of wrapping: a huge quantizer adjustment or colour factor wrapped it small and let the area limit pass
 - Overflows that only builds with overflow checks saw (a debug build of an app without JFLib's profile aborted): img_heif's encoder for one image without metadata, md_doc's update of changed blocks, the terminal's resize anchor after the scrollback dropped lines, X11's work area, a FILETIME from 2^63 on (Windows), the underline position of variable fonts, shaped glyph offsets
+- **plat:** `File::create_new` and `AtomicFile`'s sibling on mounts check and create in one step (`Provider::create_new`: `MemFs`, `Overlay`, `Sub`, content://; folder mounts the OS exclusive create): another writer's file made between the check and the open was emptied by `create_new` and taken over by `AtomicFile`, which then removed it on drop or renamed it at commit (also on `DirFs` mounts)
+- **plat:** content:// (`ContentFs`): a folder move to another folder is refused before the file in its way is deleted (it was deleted, then the move refused); an open for writing or a rename the provider refuses keeps the pending journal copy for `recover` (it was dropped before asking); writes of one document with a journal run one after the other (also `recover` and the removal of a copy), so a write that succeeded no longer removed the copy of a later one that failed
+- **plat:** Linux trash on a file system without `RENAME_NOREPLACE`: the fallback looked whether the name in `Trash/files` was free and then renamed, replacing an entry another program made in between; now a file goes by a hard link and the removal of its old name, a folder replaces an empty folder made for it (steps that fail on a taken name); a file system without hard links refuses files
+- **plat:** Windows secrets: two writes of one large entry at once (or a small and a large one) could leave the credential pointing at a DPAPI file the other write had swept; set, get and delete of an entry hold `data://secrets/<hash>.lock` (an exclusive handle, across processes) from the file to the sweep
 
 ## [0.2.0] - 2026-11-13
 

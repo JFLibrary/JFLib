@@ -1566,7 +1566,9 @@ above) and, with `AF_LOG_FILE` in the app flags, to `logs://APP.log` (INFO and a
 sets the levels, `jfgui_LOG_FILE=PATH|1|0` the file. A crash or panic prints the ring's last
 lines and marks the file before the app's crash hook runs, without allocating or waiting: a
 non-blocking stderr that takes nothing for half a second is given up, the crash line goes to
-an OS file only (not to a mount's stream) and does not rotate it. `plat::log_recent(max)` gives
+an OS file only (not to a mount's stream) and does not rotate it. `log_file` refuses a file of
+a mount without streams or OS files (its lines would arrive only when the log stops).
+`plat::log_recent(max)` gives
 the newest lines for an own report. `ui.warn` lines are in the log too. The runtime logs start,
 exit, sleep, session end and settings changes.
 

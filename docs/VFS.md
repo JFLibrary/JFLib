@@ -107,7 +107,10 @@ permissions like the path itself).
 | your own `Provider` without `open` | the whole file, read when it is opened and written back by `sync` and when the `File` is dropped | kind and size (the folder's listing) | `set_times` if it has it | inside this process |
 | `content://` (Android, `plat::content::ContentFs`) | the document's file descriptor from the `ContentResolver` (positional; a provider that streams through a pipe: read whole at the start, written in order) | `vfs::stat`: kind, the provider's size and time (no `plat::fs` on Android) | none | inside this process |
 
-- `File::create_new` is exclusive inside this process on mounts without OS files, and
+- `File::create_new` checks and creates in one step: the OS's exclusive create on folder
+  mounts, `Provider::create_new` on `mem://`, overlays, `Sub` and `content://`. A provider
+  with neither has no `File::create_new` (`None`). `AtomicFile`'s sibling is created the same
+  way, so another writer's file of that name is never opened, emptied or removed.
   `File::open_temp(Some("mem://dir"))` returns a file in memory that has no name at all.
 - `write_file` replaces a `mem://` file the way it does on disk: an open handle keeps the old
   bytes; `delete` and `rename` leave open handles alone. `rename` moves a `mem://` folder with
@@ -169,7 +172,11 @@ fallback.
   administrator created a sticky `.Trash`, else `$topdir/.Trash-$uid`. `info/NAME.trashinfo`
   holds the original `Path` (URL-escaped; relative to the top folder there) and the
   `DeletionDate`. A name already in the trash gets `.2`, `.3` ... before its extension
-  (`a.txt`, `a.2.txt`). Nothing is copied across file systems.
+  (`a.txt`, `a.2.txt`). A file system without `RENAME_NOREPLACE` (old kernels, some network
+  file systems) gets steps that fail on a taken name themselves: a file goes by a hard link and
+  the removal of its old name, a folder replaces an empty folder made for it; so nothing in
+  the trash is ever replaced (a file system without hard links refuses files then). Nothing is
+  copied across file systems.
 - **Browser and Android**: there is no trash; `trash` returns `false`.
 
 A name with a scheme works when its mount is a folder (`documents://old.txt`,
@@ -220,7 +227,9 @@ let tex = plat::read_file("pack://textures/wood.png");
 Your own types implement `plat::vfs::Provider`: `kind`, `read` and `list`, and optionally
 `write`, `mkdir`, `delete`, `rename`, `os_path`, `stat` and `set_times` (`vfs::Stat`), and
 `open` for streams of their own (`vfs::Opened::File` with a `vfs::Stream`, `Refused`, or the
-default `Generic`: the OS file of `os_path`, else the whole file), `display_name` (what the
+default `Generic`: the OS file of `os_path`, else the whole file), `create_new` (a new file
+in one step for `File::create_new` and `AtomicFile`; the default uses the OS file of
+`os_path`, without one there is no `File::create_new`), `display_name` (what the
 user sees; `plat::display_name(name)` asks it, else the last segment) and `atomic_rename`
 (false: `AtomicFile` writes in place). `mount` replaces an earlier mount of the
 same scheme. `unmount` removes it. `provider(scheme)` returns a mount's provider, for example
@@ -290,8 +299,11 @@ document in place, as safely as SAF allows:
 The document keeps its URI, so the grants stay valid. What remains: while the write runs, other
 apps can see a part; a crash leaves a part until the app starts again; a `File` stream opened
 for writing writes in place without the journal (opening it, deleting or renaming the
-document drops a pending copy). On the desktop `ContentFs::with_journal(dir)` takes any folder
-(`plattest --test content` uses `mem://`).
+document drops a pending copy once the provider did it; a refused open or rename keeps the
+copy). Writes of one document run one after the other, so a write that succeeds never removes
+the copy of another that failed. A folder is moved only inside its own folder: a move to
+another folder is refused before anything changes. On the desktop
+`ContentFs::with_journal(dir)` takes any folder (`plattest --test content` uses `mem://`).
 
 **Names below a tree** are cached: each name keeps its document's URI once a walk or a listing
 found it, so a name costs one query of the document itself instead of one listing per folder

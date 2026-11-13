@@ -8,10 +8,22 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `vfs::Provider::create_new` (a new file where nothing is, the check and the creation in one step; the default uses the OS exclusive create of `os_path`) and `vfs::Stream::deferred` (bytes reach the provider only by sync or drop)
+
+### Changed
+
+- `File::create_new` on a mount whose provider has neither `Provider::create_new` nor `os_path` returns None (it was exclusive only against other `create_new` calls of the process; `write_file` or `File::open` of another writer in between was emptied). `log_file` returns false for a file of such a provider (its lines reached the provider only when the log stopped, a crash line never)
+
 ### Fixed
 
 - Ogg Vorbis floor 1 keeps its values in 15 bits as libvorbis does. A codebook entry up to 2^24 overflowed i32 in the next point's interpolation; valid streams decode as before.
 - Overflows that only a build with overflow checks saw (a debug build of an app without JFLib's profile aborted): X11's work area with huge edges (Linux), a file time from 2^63 on (Windows).
+- `File::create_new` and `AtomicFile`'s sibling on mounts check and create in one step (`Provider::create_new`: `MemFs`, `Overlay`, `Sub`, content://; folder mounts the OS exclusive create): another writer's file made between the check and the open was emptied by `create_new` and taken over by `AtomicFile`, which then removed it on drop or renamed it at commit (also on `DirFs` mounts)
+- content:// (`ContentFs`): a folder move to another folder is refused before the file in its way is deleted (it was deleted, then the move refused); an open for writing or a rename the provider refuses keeps the pending journal copy for `recover` (it was dropped before asking); writes of one document with a journal run one after the other (also `recover` and the removal of a copy), so a write that succeeded no longer removed the copy of a later one that failed
+- Linux trash on a file system without `RENAME_NOREPLACE`: the fallback looked whether the name in `Trash/files` was free and then renamed, replacing an entry another program made in between; now a file goes by a hard link and the removal of its old name, a folder replaces an empty folder made for it (steps that fail on a taken name); a file system without hard links refuses files
+- Windows secrets: two writes of one large entry at once (or a small and a large one) could leave the credential pointing at a DPAPI file the other write had swept; set, get and delete of an entry hold `data://secrets/<hash>.lock` (an exclusive handle, across processes) from the file to the sweep
 
 ## [0.2.0] - 2026-11-13
 
