@@ -363,7 +363,8 @@ pub(crate) fn uiw_hit_pw(pw: i32, x: i32, y: i32) -> u32 {
 
 /// uiw_drag_pw(pw, x, y, types) -> (accepted DT_* kinds, DE_* effects) of a drag offering
 /// `types` at a client point (px) of platform window pw (the platform's drag hook, dnd.rs):
-/// the drop target there, else what the windows take (drop_accept)
+/// the drop target there with the effects it took (drop_effect_set), else what the windows
+/// take (drop_accept) with every effect
 pub(crate) fn uiw_drag_pw(pw: i32, x: i32, y: i32, types: u32) -> (u32, u32) {
     if !(0..WIN_MAX as i32).contains(&pw) {
         return (0, 0);
@@ -375,15 +376,7 @@ pub(crate) fn uiw_drag_pw(pw: i32, x: i32, y: i32, types: u32) -> (u32, u32) {
     }
     let i = i as usize;
     let x = if p.mirror[i] > 0 { p.mirror[i] - 1 - x } else { x }; // logical
-    let offered = types & plat::DT_STD;
-    let all = offered | p.own; // the app's own drag: its own kinds too
-    let t = match super::dnd::zone_find(&p.zones[i], &p.hits[i], p.modal[i], x, y, all) {
-        Some(z) => z.types & all,
-        None => p.accept & all,
-    };
-    // the platform knows the standard kinds: a target of the app's own kind takes them all
-    let t = if t != 0 && t & offered == 0 { offered } else { t & offered };
-    (t, if t != 0 { plat::DE_ALL } else { 0 })
+    super::dnd::drag_answer(&p.zones[i], &p.hits[i], p.modal[i], p.accept, p.own, x, y, types)
 }
 
 /// (dnd.rs) what the drag hook needs besides the targets: the kinds the windows take, the

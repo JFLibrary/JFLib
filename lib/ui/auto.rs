@@ -159,6 +159,8 @@
 //                                 drag that left the window comes back
 //   dragover X Y [files] [text] [url] [html] [image] [copy|move|link]   another program's
 //                                 drag hovers there (default files);  dragleave: it left
+//   dragover expect copy|move|link|none [ctrl] [shift]   the platform's answer to that drag
+//                                 now (the target's drop_effect_set; the system's pointer)
 //   dragout expect none | text "s" | html "s" | url "s" | files N | image | kinds N
 //                                 what the app's drag handed over when it left the window
 //   dragout end copy|move|link|none   the platform ended that drag (E_DRAG_END)
@@ -2916,6 +2918,12 @@ impl Ui {
             self.inject(app, plat::E_DRAG, 0, -1, -1, 0);
             return;
         }
+        if let Some((verb, r)) = Ui::k1_word(a, 16)
+            && verb == b"expect"
+        {
+            self.sc_dragover_expect(r);
+            return;
+        }
         let (x, r) = parse_int(a);
         let (y, mut r) = parse_int(r);
         let dpi = self.win_dpi(w);
@@ -2945,6 +2953,56 @@ impl Ui {
             effects = plat::DE_COPY | plat::DE_MOVE;
         }
         self.inject(app, plat::E_DRAG, 0, px, py, types | effects << 8);
+    }
+
+    // dragover expect copy|move|link|none [ctrl] [shift]: the platform's answer to the drag that
+    // hovers now (the drop targets of the last pass and their drop_effect_set, plat::drag_decide
+    // with those modifier keys), as IDropTarget::DragOver / XdndStatus / set_actions would give it
+    fn sc_dragover_expect(&mut self, a: &[u8]) {
+        const BAD: &[u8] = b"expected: dragover expect copy|move|link|none [ctrl] [shift]";
+        let Some((want, mut r)) = Ui::k1_word(a, 16) else {
+            self.fail(BAD);
+            return;
+        };
+        let want = match want.as_slice() {
+            b"copy" => plat::DE_COPY,
+            b"move" => plat::DE_MOVE,
+            b"link" => plat::DE_LINK,
+            b"none" => 0,
+            _ => {
+                self.fail(BAD);
+                return;
+            }
+        };
+        let mut mods = 0u8;
+        while let Some((word, rest)) = Ui::k1_word(r, 16) {
+            r = rest;
+            match word.as_slice() {
+                b"ctrl" => mods |= plat::MOD_CTRL,
+                b"shift" => mods |= plat::MOD_SHIFT,
+                _ => {
+                    self.fail(BAD);
+                    return;
+                }
+            }
+        }
+        let name = |e: u32| match e {
+            plat::DE_COPY => "copy",
+            plat::DE_MOVE => "move",
+            plat::DE_LINK => "link",
+            _ => "none",
+        };
+        match self.dnd_answer_now(mods) {
+            None => self.fail(b"no drag hovers (dragover X Y first)"),
+            Some((_, e, all)) if e != want => {
+                let msg = alloc::format!("the platform would answer {} (the target takes {})", name(e), {
+                    let v: Vec<&str> = [plat::DE_COPY, plat::DE_MOVE, plat::DE_LINK].into_iter().filter(|f| all & f != 0).map(name).collect();
+                    if v.is_empty() { String::from("none") } else { v.join("+") }
+                });
+                self.fail(msg.as_bytes());
+            }
+            Some(_) => {}
+        }
     }
 
     // dragout expect none | text "s" | html "s" | url "s" | files N | image | kinds N, dragout

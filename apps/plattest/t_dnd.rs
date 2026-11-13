@@ -28,6 +28,17 @@ fn hook_all(_pw: i32, x: i32, _y: i32, types: u32) -> (u32, u32) {
     if x < 100 { (types, DE_ALL) } else { (0, 0) }
 }
 
+// the hook of a page with an effect per target (ui's drop_effect_set): x < 50 copies, 50..100
+// links, 100..150 a target that takes no effect (refuses), nothing on the right
+fn hook_fx(_pw: i32, x: i32, _y: i32, types: u32) -> (u32, u32) {
+    match x {
+        ..50 => (types, DE_COPY),
+        50..100 => (types, DE_LINK),
+        100..150 => (types, 0),
+        _ => (0, 0),
+    }
+}
+
 // a 2 x 1 PNG (from the encoder of the image crates)
 fn tiny_png() -> Vec<u8> {
     img_png::encode(&[0, 0, 255, 255, 255, 0, 0, 255], 2, 1, 8, false)
@@ -81,6 +92,20 @@ fn shared(t: &mut T) {
     t.check(drag_query(0, 10, 10, DT_TEXT, DE_MOVE | DE_COPY, MOD_SHIFT) == (DT_TEXT, DE_MOVE), "dnd: text may be moved");
     t.check(drag_query(0, 10, 10, DT_FILES, DE_MOVE | DE_COPY, MOD_SHIFT) == (DT_FILES, DE_COPY), "dnd: files are never moved");
     t.check(drag_query(0, 10, 10, DT_FILES, DE_MOVE, 0) == (0, 0), "dnd: files only to move: refused");
+    // an effect per target (drop_effect_set): the answer is one of the target's, all of them for
+    // Wayland's set_actions; a target without effects refuses
+    drag_hook(Some(hook_fx));
+    t.check(drag_query(0, 10, 10, DT_TEXT, DE_ALL, MOD_SHIFT) == (DT_TEXT, DE_COPY), "dnd: a copy target copies, Shift too");
+    t.check(drag_query(0, 60, 10, DT_TEXT | DT_URL, DE_ALL, 0) == (DT_TEXT | DT_URL, DE_LINK), "dnd: a link target links");
+    t.check(drag_query(0, 60, 10, DT_URL, DE_COPY | DE_MOVE, 0) == (0, 0), "dnd: ... a source without link is refused there");
+    t.check(drag_query(0, 120, 10, DT_TEXT, DE_ALL, 0) == (0, 0), "dnd: a target without effects refuses");
+    t.check(drag_query_all(0, 60, 10, DT_FILES, DE_ALL, 0) == (DT_FILES, DE_LINK, DE_LINK), "dnd: drag_query_all: files linked");
+    t.check(drag_query_all(0, 120, 10, DT_TEXT, DE_ALL, 0) == (0, 0, 0), "dnd: drag_query_all: refused");
+    t.check(drag_decide(DT_TEXT, DE_COPY | DE_MOVE, DT_TEXT | DT_HTML, DE_ALL, MOD_SHIFT) == (DT_TEXT, DE_MOVE, DE_COPY | DE_MOVE),
+            "dnd: drag_decide: Shift moves, both effects named");
+    t.check(drag_decide(DT_FILES, DE_ALL, DT_FILES, DE_COPY | DE_MOVE, MOD_SHIFT) == (DT_FILES, DE_COPY, DE_COPY),
+            "dnd: drag_decide: files never moved, the move not named");
+    drag_hook(Some(hook_all));
     // URL lists: comments, local files and blanks out; duplicates once
     drop_reset();
     let n = drop_url_list(b"# comment\r\nhttps://example.org/a\r\nfile:///tmp/x\nnot a url\nmailto:a@b.c\nhttps://example.org/a\n");
@@ -200,6 +225,21 @@ fn ole(t: &mut T) {
         }
     }
     t.check(last == Some(0), "dnd-ole: refused: the last event is E_DRAG leave, no E_DROP");
+    // an effect per target: DragOver's and Drop's pdwEffect are the target's
+    drag_hook(Some(hook_fx));
+    let any = DragData { text: Some(String::from("x")), effects: DE_ALL, ..DragData::default() };
+    t.check(dnd_test_drop(&any, 0, 60, 30, MK_LBUTTON) == Some(DE_LINK), "dnd-ole: a link target: DROPEFFECT_LINK");
+    t.check(dnd_test_drop(&any, 0, 20, 30, MK_LBUTTON | MK_SHIFT) == Some(DE_COPY), "dnd-ole: a copy target: copy, Shift too");
+    t.check(dnd_test_drop(&txt, 0, 60, 30, MK_LBUTTON) == Some(0), "dnd-ole: a link target, a source without link: refused");
+    evq_clear();
+    t.check(dnd_test_drop(&any, 0, 120, 30, MK_LBUTTON) == Some(0), "dnd-ole: a target without effects: DROPEFFECT_NONE");
+    let mut dropped = false;
+    while let Some(e) = evq_pop() {
+        dropped |= e.typ == E_DROP;
+    }
+    t.check(!dropped, "dnd-ole: ... and no E_DROP");
+    let _ = drop_data_take();
+    drag_hook(Some(hook_all));
     let _ = dib_only;
     // ---- the drop source
     t.expect_i(dnd_test_source(false, MK_LBUTTON) as i64, 0, "dnd-ole: QueryContinueDrag: held -> go on");

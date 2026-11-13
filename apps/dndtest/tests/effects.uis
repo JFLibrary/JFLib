@@ -1,0 +1,62 @@
+#!args --verify-dirty
+# the effect per drop target (ui.drop_effect_set): the page (#501, 322..540 x 285..373) answers
+# per point as a web page does -- its left half copies, the top of its right half refuses, the
+# bottom links.  `dragover expect` is what the platform would answer the source there (Windows'
+# DragOver effect, XdndStatus, set_actions: the system's pointer); a drop takes that effect
+theme light
+# outside every target the window takes text and files with every effect (drop_accept): the
+# modifier keys choose
+dragover 600 480 text copy move link
+dragover expect copy
+dragover expect move shift
+dragover expect link ctrl shift
+# the other targets take every effect too (the default); files are never moved
+dragover 82 229 text copy move link
+expect text:"Ziehen: Text bei 82,229  Über: Text-Ziel" exists
+dragover expect copy
+dragover expect move shift
+dragover 640 229 files copy move link
+dragover expect copy shift
+# the page: its left half copies, with Shift too (it takes no move)
+dragover 370 330 text copy move link
+expect text:"Ziehen: Text bei 370,330  Über: Seite (kopieren)" exists
+dragover expect copy
+dragover expect copy shift
+shot build/dnd/effects_page.png 300 270 260 120
+# the top of its right half refuses: no effect, no highlight
+dragover 500 300 text copy move link
+expect text:"Ziehen: Text bei 500,300  Über: Seite (keine)" exists
+dragover expect none
+dragover expect none ctrl
+# the bottom links, files and URLs alike
+dragover 500 355 url copy move link
+expect text:"Ziehen: URL bei 500,355  Über: Seite (verknüpfen)" exists
+dragover expect link
+dragover 500 355 files copy move link
+dragover expect link
+# a source that does not offer the page's effect: refused there
+dragover 500 355 text copy move
+dragover expect none
+dragleave
+expect text:"Ziehen: -  Über: -" exists
+# drops after the drag hovered there: the left half copies, the bottom links, the top refuses
+# (nothing happens: no drop on the page, no UIC_DROP)
+dragover 370 330 text
+drop 370 330 text "links"
+expect text:"Abgelegt: Text -> Seite (kopieren)" exists
+dragover 500 355 url
+drop 500 355 url https://example.org/c
+expect text:"Abgelegt: URL -> Seite (verknüpfen)" exists
+dragover 500 300 text
+drop 500 300 text "oben"
+expect text:"Abgelegt: URL -> Seite (verknüpfen)" exists
+expect text:"UIC_DROP: -" exists
+# the app's own drags pick from the page's effects too: text onto the left half is copied (a
+# plain drag would move), onto the bottom it is refused (the button allows copy and move)
+drag #401 370,330
+expect text:"Abgelegt: Text -> Seite (kopieren)" exists
+expect text:"Ende: Text ziehen kopieren (1)" exists
+drag #401 500,355
+expect text:"Ende: Text ziehen keine (2)" exists
+expect text:"Abgelegt: Text -> Seite (kopieren)" exists
+expect_nowarn

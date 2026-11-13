@@ -34,3 +34,8 @@ Ende: {}	End: {}
 {} Datei(en)	{} file(s)
 Text {}	Text {}
 {} bei {},{} (Fenster {})	{} at {},{} (window {})
+Seite	Page
+Seite ({})	Page ({})
+{} -> Seite ({})	{} -> page ({})
+links kopieren	left half copies
+rechts: oben nicht, unten verknüpfen	right: top refuses, bottom links

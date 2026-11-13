@@ -98,6 +98,9 @@ pub(super) struct Target {
     pos: Option<(i32, i32, u32)>,
     x: i32,
     y: i32,
+    /// the modifiers the source's action of the last Position stands for (the drop takes the
+    /// effect the status named)
+    mods: u8,
     shown: Option<(i32, i32)>,
     /// a Drop to do: its time
     drop: Option<u32>,
@@ -348,6 +351,7 @@ impl X11 {
                 DE_LINK => MOD_SHIFT | MOD_CTRL,
                 _ => 0,
             };
+            self.xd.mods = mods;
             let offer = self.xd.offer;
             let (_, e) = crate::drag_query(w, x, y, offer, DE_ALL, mods);
             let (src, ours, st) = (self.xd.src, self.xd_ourwin(w), self.xd_atoms[D_STATUS]);
@@ -368,7 +372,7 @@ impl X11 {
     // the drop: read what the UI takes, E_DROP, XdndFinished
     fn xd_drop(&mut self, time: u32) {
         let (w, x, y, offer) = (self.xd.win, self.xd.x, self.xd.y, self.xd.offer);
-        let (types, e) = crate::drag_query(w, x, y, offer, DE_ALL, 0);
+        let (types, e) = crate::drag_query(w, x, y, offer, DE_ALL, self.xd.mods);
         let (src, ours, fin) = (self.xd.src, self.xd_ourwin(w), self.xd_atoms[D_FINISHED]);
         self.evwin = w;
         if e == 0 {

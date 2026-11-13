@@ -117,7 +117,7 @@ pub(crate) struct Clip {
     dnd_serial: u32, // of its enter (accept)
     dnd_srcacts: u32, // the source's actions (v3; 0 = unknown)
     dnd_types: u32, // the DT_* kinds it offers
-    dnd_answer: (u32, u32), // what we answered last (kinds, effect)
+    dnd_answer: (u32, u32, u32), // what we answered last (kinds, effect, every effect taken)
     dnd_shown: Option<(i32, i32)>, // the last E_DRAG point
     dnd_win: i32,
     dnd_x: i32,
@@ -262,15 +262,16 @@ impl Wl {
         let c = &self.clip;
         let (w, x, y, offer) = (c.dnd_win, c.dnd_x, c.dnd_y, c.dnd_types);
         let allowed = if c.dnd_srcacts == 0 { DE_COPY | DE_MOVE } else { c.dnd_srcacts & (DE_COPY | DE_MOVE) };
-        let (t, e) = crate::drag_query(w, x, y, offer, allowed, super::xkb::wl_mods() as u8);
-        if (t, e) != self.clip.dnd_answer {
-            self.clip.dnd_answer = (t, e);
+        let (t, e, effs) = crate::drag_query_all(w, x, y, offer, allowed, super::xkb::wl_mods() as u8);
+        if (t, e, effs) != self.clip.dnd_answer {
+            self.clip.dnd_answer = (t, e, effs);
             let mime = Self::dnd_mimes(t, mask).first().map(|m| m.1); // accept(serial, NULL): nothing for us
             let serial = self.clip.dnd_serial;
             self.w.send(o, &DATA_OFFER_ACCEPT, &[A::U(serial), A::S(mime)]);
             if self.g.ddm_ver >= 3 {
-                // the effects we take (no move for files: drag_query), the preferred one
-                let acts = if t == 0 { 0 } else if t & DT_FILES != 0 { DND_ACTION_COPY } else { allowed & (DND_ACTION_COPY | DND_ACTION_MOVE) };
+                // the effects the target there takes (the drop target's, never a move of files:
+                // drag_query_all), the preferred one
+                let acts = if t == 0 { 0 } else { effs & (DND_ACTION_COPY | DND_ACTION_MOVE) };
                 self.w.send(o, &DATA_OFFER_SET_ACTIONS, &[A::U(acts), A::U(e & acts)]);
             }
             self.w.flush();
@@ -762,7 +763,7 @@ pub(crate) fn wlh_dd_enter(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
     c.dnd_offer = offer;
     c.dnd_action = 0;
     c.dnd_serial = a.u(0);
-    c.dnd_answer = (u32::MAX, 0); // the first answer always goes out
+    c.dnd_answer = (u32::MAX, 0, 0); // the first answer always goes out
     c.dnd_shown = None;
     c.dnd_win = w;
     c.dnd_types = 0;
@@ -800,7 +801,7 @@ pub(crate) fn wlh_dd_drop(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
     if o == 0 {
         return;
     }
-    let (t, e) = wl.clip.dnd_answer;
+    let (t, e, _) = wl.clip.dnd_answer;
     let mask = wl.w.obj_iface(o).map_or(0, |x| x.1);
     let queue = Wl::dnd_mimes(if t == u32::MAX { 0 } else { t }, mask);
     if queue.is_empty() || e == 0 || wl.clip.dnd_rfd != 0 {

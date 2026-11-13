@@ -1335,6 +1335,22 @@ ui.dialog_end(); // always
     as before) and it arrives as `UIC_DROP` with `drop_list()` / `drop_data()`. Files are never
     moved (their source would delete them): Shift gives a copy. Dropped files may be read and
     written (`fs.user`).
+  * The effect per target: `ui.drop_effect_set(effects)` right after `drop_target` says which of
+    `DE_COPY | DE_MOVE | DE_LINK` that target takes in this pass (default all). The platform
+    answers the source with one of them (the modifier keys choose, else copy, move, link), so
+    the system's pointer shows it: `IDropTarget::DragOver`'s effect on Windows, the XdndStatus
+    action on X11, `wl_data_offer.set_actions` on Wayland, the drag operation on macOS. `0`
+    refuses the drag there: no drop, no highlight, the pointer shows "no". A canvas that takes
+    drops only in some places (a web page's drop zones, as `dropEffect`) sets it every pass while
+    `DS_HOVER` holds, for the point of `drag_over_px()`; the answers follow the passes, one pass
+    late while the drag moves. The app's own drags inside the window pick from them too.
+
+    ```rust
+    if ui.drop_target(ID_PAGE, DT_FILES | DT_URL | DT_TEXT) == DS_HOVER {
+        let (kinds, x, y) = ui.drag_over_px();
+        ui.drop_effect_set(self.page_effect_at(kinds, x, y)); // e.g. DE_COPY, or 0: not here
+    }
+    ```
   * Positions: `drop_pos()` and `drag_over()` are DIP of the window, rounded; at 150 % three
     pixels share two DIP. A canvas that draws at the display's resolution (a web page) takes
     `drop_pos_px()` / `drag_over_px()`: px of the window like `last_rect`, so `(x - inp.rect[0],
@@ -1342,6 +1358,8 @@ ui.dialog_end(); // always
   * Mirrored windows (RTL): targets and positions stay logical, as every pointer event.
   * Tests: `drag S1 S2` and `down` / `move` / `key esc` / `up` for widget drags; `dragover`,
     `dragleave` and `drop X Y text "s" html "s" url U image F files F...` for other programs;
+    `dragover expect copy|move|link|none [ctrl] [shift]` for what the platform would answer the
+    drag that hovers (the target's `drop_effect_set`);
     `dragout expect ...` / `dragout end move` for a drag that left the window (headless, the
     platform is not involved); see `apps/dndtest`. `plattest --test dnd` checks the shared part
     and Windows' OLE objects without a user, `tools/platshared/dnd_x11.py` XDND both ways under
@@ -2020,6 +2038,7 @@ in DIP):
 | `drop X Y FILE...` | files dropped at (X, Y) of the scoped window (onto a drop target, else `UIC_DROP`) |
 | `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link]`, `drop X Y self` | other content dropped there; `self`: the app's own drag that left the window comes back |
 | `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
+| `dragover expect copy\|move\|link\|none [ctrl] [shift]` | what the platform would answer that drag now (the target's `drop_effect_set`, the system's pointer) |
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
 | `system focus in\|out`, `system suspend\|resume`, `system background\|foreground`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|other\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...; background / foreground: a hidden tab, Android's `onStop` / `onStart`) |
 | `system browser default\|other\|unknown` | (E13) what `ui.default_browser()` answers from here (headless runs never ask the system; at first `other`, section 21); then the app loses the keyboard and gets it back as after the system's settings (`UIC_ACTIVE` 0 and 1; only 1 when it was not active), so an app that keeps the status reads it again |
@@ -2128,7 +2147,12 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   whole frame that knows where it is stale (the segment of the last put first), then
   ShmPutImage of the rectangles; Expose reads the segment of the last put. Wayland: into a free
   wl_shm buffer that waits for its commit (the frame callback). Only with every segment / buffer
-  busy does the damage wait in a staging image. Browser and Android: the B, G, R, x of the
+  busy does the damage wait in a staging image. On these three a copy from 1 MB on runs in row
+  bands on the worker pool, from 12 MB on (a 4K frame, 32 MB) with streaming stores past the
+  caches (`lib/plat/present_copy.rs`, the thresholds of `gfx::COPY_PAR_MIN` / `COPY_STREAM_MIN`);
+  smaller ones stay plain row copies on the UI thread. `plattest --test present-bench [--size WxH]`
+  measures a 4K frame's presents in a real window (the whole frame, a caret, a line of text, 20
+  blocks, a band) and the copy alone. Browser and Android: the B, G, R, x of the
   frame becomes the window's R, G, B, A copy while it is copied in; one window over the whole
   canvas without popups is the canvas itself (no composition), and the host copies rows into
   one buffer per frame (the page's ImageData, Android's Bitmap). Pixels outside the rectangles

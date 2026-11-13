@@ -13,7 +13,14 @@
 //   drag_query(pw, x, y, types, allowed, mods) -> (types, effect)   (OS layers) the hook's answer
 //                                with one effect picked; without a hook: files, copy (as before).
 //                                Files are never moved: a source deletes what it moved, and
-//                                the app gets only the paths (copy or link instead)
+//                                the app gets only the paths (copy or link instead).  The hook
+//                                answers per drop target (ui: drop_effect_set): a target that
+//                                takes no effect refuses the drag there (the system's pointer
+//                                shows it)
+//   drag_query_all(...) -> (types, effect, effects)   drag_query and every effect the target
+//                                takes there (Wayland's set_actions names them all)
+//   drag_decide(types, effects, offered, allowed, mods) -> (types, effect, effects)   what
+//                                drag_query makes of a hook's answer (tests ask it headless)
 //   drag_effect_pick(allowed, mods) -> effect   Ctrl copy, Shift move, Ctrl+Shift link; else
 //                                the first of copy / move / link the mask allows
 //   drop_data_take() -> DragData the pending drop of E_DROP: the paths of drop_take and the rest
@@ -167,6 +174,14 @@ pub fn drag_effect_pick(allowed: u32, mods: u8) -> u32 {
 /// (OS layers) what platform window pw takes at (x, y) px of a drag offering `types` with the
 /// effects `allowed` (0 = copy | move) -> (accepted types, the effect); (0, 0) = refused
 pub fn drag_query(pw: i32, x: i32, y: i32, types: u32, allowed: u32, mods: u8) -> (u32, u32) {
+    let (t, e, _) = drag_query_all(pw, x, y, types, allowed, mods);
+    (t, e)
+}
+
+/// (OS layers) drag_query and every DE_* effect the target there takes of the allowed ones
+/// (Wayland's wl_data_offer.set_actions) -> (accepted types, the effect, the effects); (0, 0, 0)
+/// = refused
+pub fn drag_query_all(pw: i32, x: i32, y: i32, types: u32, allowed: u32, mods: u8) -> (u32, u32, u32) {
     let h = HOOK.load(Ordering::Acquire);
     let (t, e) = if h == 0 {
         (types & DT_FILES, DE_ALL) // no UI: files, as before
@@ -175,14 +190,23 @@ pub fn drag_query(pw: i32, x: i32, y: i32, types: u32, allowed: u32, mods: u8) -
         let f: DragHook = unsafe { core::mem::transmute::<usize, DragHook>(h) };
         f(pw, x, y, types)
     };
+    drag_decide(t, e, types, allowed, mods)
+}
+
+/// what drag_query makes of the hook's answer (accepted types t, effects e) to a drag offering
+/// `types` with the effects `allowed` (0 = copy | move) and the modifier keys `mods` -> (accepted
+/// types, the effect, every effect taken); (0, 0, 0) = refused (no kind or no effect in common).
+/// Files are never moved.  For the OS layers and headless tests (ui's `dragover expect`)
+pub fn drag_decide(t: u32, e: u32, types: u32, allowed: u32, mods: u8) -> (u32, u32, u32) {
     let t = t & types;
     let mut allowed = if allowed & DE_ALL == 0 { DE_COPY | DE_MOVE } else { allowed & DE_ALL };
     if t & DT_FILES != 0 {
         // a move would make the source delete the files: the app gets only their paths
         allowed &= !DE_MOVE;
     }
-    let eff = drag_effect_pick(e & allowed, mods);
-    if t == 0 || eff == 0 { (0, 0) } else { (t, eff) }
+    let all = e & allowed;
+    let eff = drag_effect_pick(all, mods);
+    if t == 0 || eff == 0 { (0, 0, 0) } else { (t, eff, all) }
 }
 
 // ---------------------------------------------------------------- the pending drop

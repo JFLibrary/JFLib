@@ -17,6 +17,11 @@
 //   drop_target(id, types) -> DS_*   the widget at last_rect takes drags of these DT_* kinds:
 //                                    DS_HOVER while one is over it (the style highlights it),
 //                                    DS_DROP in the pass of the drop (drop_data(), drop_effect())
+//   drop_effect_set(effects)         the DE_* effects the target of the last drop_target call
+//                                    takes in this pass (default DE_ALL): the platform answers a
+//                                    drag over it with one of them (the system's pointer shows
+//                                    copy, move or link), 0 refuses the drag there (no drop, no
+//                                    highlight); a drag of the app picks from them too
 //   drop_accept(types)               what the windows take outside every drop target (default
 //                                    DT_FILES); such drops come as UIC_DROP (drop.rs, as before)
 //   drag_over() -> (types, x, y)     the drag over the live window: its kinds and position (DIP);
@@ -33,7 +38,11 @@
 // what would have left the app for the scripts (`dragout expect`, `dragout end`).
 // Other programs' drags: E_DRAG (hover: the targets highlight), E_DROP (onto the drop target at
 // the point, else UIC_DROP when drop_accept takes it).  The platform asks the published targets
-// synchronously (uiw_drag_pw, win.rs) to answer the source with an effect.
+// synchronously (uiw_drag_pw, win.rs) to answer the source with an effect: the effects the target
+// under the point took in the last pass (drop_effect_set), DE_ALL for drop_accept's window --
+// IDropTarget::DragOver's pdwEffect, XdndStatus' action, wl_data_offer.set_actions, macOS'
+// NSDragOperation (plat::drag_query).  The answer follows the app's pass: an effect set for the
+// drag's point in one pass answers the moves until the next pass.
 // Positions stay logical in mirrored (RTL) windows: E_DRAG / E_DROP points are mirrored on the
 // way in like every pointer event; the label next to the pointer is drawn through the mirror.
 
@@ -55,6 +64,8 @@ const LABEL_MAX: usize = 48; // characters of the label next to the pointer
 pub(crate) struct Zone {
     pub(crate) id: u32,
     pub(crate) types: u32,
+    /// the DE_* effects it takes (drop_effect_set; DE_ALL by default, 0 refuses)
+    pub(crate) effects: u32,
     pub(crate) layer: u8,
     pub(crate) x0: i32,
     pub(crate) y0: i32,
@@ -85,6 +96,23 @@ pub(crate) fn zone_find(zones: &[Zone], hits: &[super::ctx::Hit], modal: u32, x:
     best
 }
 
+/// what the platform's hook answers at (x, y) logical px of a window (its targets, hit boxes and
+/// modal layer of the last pass) for a drag offering `offered` (DT_STD bits) -> (accepted DT_*,
+/// DE_* effects): the drop target there with its effects, else `accept` with every effect.  `own`:
+/// the kinds of the app's own drag while the platform carries it
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn drag_answer(zones: &[Zone], hits: &[super::ctx::Hit], modal: u32, accept: u32, own: u32, x: i32, y: i32, offered: u32) -> (u32, u32) {
+    let offered = offered & DT_STD;
+    let all = offered | own; // the app's own drag: its own kinds too
+    let (t, fx) = match zone_find(zones, hits, modal, x, y, all) {
+        Some(z) => (z.types & all, z.effects & DE_ALL),
+        None => (accept & all, DE_ALL),
+    };
+    // the platform knows the standard kinds: a target of the app's own kind takes them all
+    let t = if t != 0 && t & offered == 0 { offered } else { t & offered };
+    if t == 0 || fx == 0 { (0, 0) } else { (t, fx) }
+}
+
 /// the drag and drop state shared by the windows
 pub(crate) struct S {
     phase: u8,
@@ -103,6 +131,10 @@ pub(crate) struct S {
     ext_x: i32,
     ext_y: i32,
     ext_types: u32,
+    ext_allowed: u32,
+    /// the zone of the last drop_target call (window, index in its pass's list, id), for
+    /// drop_effect_set
+    last_zone: Option<(u32, usize, u32)>,
     /// the drop target under the drag (this pass) and its highlight (window, layer, rect),
     /// drawn at the end of the window's pass over the target's content
     over: u32,
@@ -137,6 +169,8 @@ impl Default for S {
             ext_x: 0,
             ext_y: 0,
             ext_types: 0,
+            ext_allowed: 0,
+            last_zone: None,
             over: 0,
             over_win: 0,
             hl: None,
@@ -297,6 +331,7 @@ impl Ui {
         let mut z = Zone {
             id,
             types,
+            effects: DE_ALL,
             layer: c.cmd_layer_ui as u8,
             x0: r[0].max(k[0]),
             y0: r[1].max(k[1]),
@@ -304,15 +339,17 @@ impl Ui {
             y1: r[1].wrapping_add(r[3]).min(k[3]),
         };
         let full = c.zones[cur].len() >= super::ctx::HITS_MAX;
+        let win = self.uiw_cur;
         if z.x1 > z.x0 && z.y1 > z.y0 && !full {
+            self.dnd.last_zone = Some((win, c.zones[cur].len(), id));
             c.zones[cur].push(z);
         } else {
+            self.dnd.last_zone = None;
             z.x1 = z.x0; // clipped away (or no room): no highlight
             if full {
                 self.limit_hit(super::ctx::LIM_ZONES);
             }
         }
-        let win = self.uiw_cur;
         let d = &self.dnd;
         if d.drop_live && d.drop_win == win && d.drop_id == id {
             return DS_DROP;
@@ -322,6 +359,46 @@ impl Ui {
             return DS_HOVER;
         }
         0
+    }
+
+    /// drop_effect_set(effects): the DE_* effects (DE_COPY | DE_MOVE | DE_LINK) the drop target
+    /// of the last drop_target call takes in this pass; DE_ALL until it is called.  The platform
+    /// answers a drag of another program over the target with one of them (the modifier keys
+    /// choose, else copy, move, link in this order; files are never moved): the system's pointer
+    /// shows that effect and the drop carries it (drop_effect()).  0 refuses the drag there: no
+    /// drop, no highlight, the pointer shows "no" -- a page that takes drops only in some places;
+    /// so is a drag that allows none of them (a link target, a source that only copies or moves).
+    /// A drag of the app inside its window picks from them the same way (a plain drag moves when
+    /// both allow it).  Call it after drop_target in every pass the effect should hold, typically
+    /// while drop_target says DS_HOVER, for the point of drag_over_px: the platform's answers
+    /// follow the passes, one pass late while the drag moves
+    pub fn drop_effect_set(&mut self, effects: u32) {
+        let (cur, win) = (self.wp.ctx.hit_cur, self.uiw_cur);
+        let Some((w, i, id)) = self.dnd.last_zone else { return };
+        if w != win {
+            return;
+        }
+        let Some(z) = self.wp.ctx.zones[cur].get_mut(i).filter(|z| z.id == id) else { return };
+        z.effects = effects & DE_ALL;
+        let r = [z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0];
+        if effects & self.dnd_allowed_in(win) == 0 && self.dnd.over == id && self.dnd.hl.is_some_and(|h| h.0 == win && h.2 == r) {
+            self.dnd.hl = None; // a target that refuses the drag over it is not highlighted
+        }
+    }
+
+    // the DE_* effects the drag over window win allows (0 = none): the app's own its source's
+    // (DragData::allowed), another program's what it offers (0 there: copy | move, as
+    // plat::drag_decide), never a move of another program's files
+    fn dnd_allowed_in(&self, win: u32) -> u32 {
+        let d = &self.dnd;
+        if d.phase == PH_IN && d.src_win == win {
+            d.data.allowed()
+        } else if d.ext && d.ext_win == win {
+            let a = if d.ext_allowed == 0 { DE_COPY | DE_MOVE } else { d.ext_allowed };
+            if d.ext_types & DT_FILES != 0 { a & !DE_MOVE } else { a }
+        } else {
+            0
+        }
     }
 
     /// drop_accept(types): the DT_* kinds a window takes outside every drop target (default
@@ -381,6 +458,7 @@ impl Ui {
     /// uiw_pass_begin: the drop target under the drag (the previous pass's targets)
     pub(crate) fn dnd_pass_begin(&mut self) {
         let win = self.uiw_cur;
+        self.dnd.last_zone = None;
         if self.dnd.hl.is_some_and(|h| h.0 == win) {
             self.dnd.hl = None;
         }
@@ -516,17 +594,20 @@ impl Ui {
                 let z = zone_find(&c.zones[c.hit_cur ^ 1], &c.hits[c.hit_cur ^ 1], c.modal_prev, x, y, types);
                 let mut effect = 0;
                 if let Some(z) = z {
-                    // inside the app a plain drag moves (when the source allows it)
-                    let a = self.dnd.data.allowed();
+                    // inside the app a plain drag moves (when the source and the target allow
+                    // it); a target that takes none of the source's effects refuses it
+                    let a = self.dnd.data.allowed() & z.effects;
                     effect = if self.mods & (MOD_CTRL | MOD_SHIFT) == 0 && a & DE_MOVE != 0 {
                         DE_MOVE
                     } else {
                         plat::drag_effect_pick(a, self.mods as u8)
                     };
-                    let win = self.uiw_cur;
-                    let mut data = self.dnd.data.clone();
-                    data.effects = effect;
-                    self.dnd_deliver(z.id, win, x, y, data);
+                    if effect != 0 {
+                        let win = self.uiw_cur;
+                        let mut data = self.dnd.data.clone();
+                        data.effects = effect;
+                        self.dnd_deliver(z.id, win, x, y, data);
+                    }
                 }
                 self.dnd_end(effect);
                 false // the release still reaches the widgets
@@ -585,6 +666,31 @@ impl Ui {
         d.ext_x = x;
         d.ext_y = ev.y;
         d.ext_types = types;
+        d.ext_allowed = (ev.data >> 8) & DE_ALL;
+    }
+
+    /// (scripts: `dragover expect`) what the platform would answer the other program's drag over
+    /// its window now, with the modifier keys mods (plat::drag_decide over the targets of the
+    /// last pass, as uiw_drag_pw does with the published ones) -> (DT_* taken, the DE_* effect,
+    /// every effect taken); None: no drag hovers
+    pub(crate) fn dnd_answer_now(&mut self, mods: u8) -> Option<(u32, u32, u32)> {
+        let d = &self.dnd;
+        if !d.ext {
+            return None;
+        }
+        let (win, x, y, offered, allowed) = (d.ext_win, d.ext_x, d.ext_y, d.ext_types & DT_STD, d.ext_allowed);
+        let own = if d.phase == PH_OUT { d.data.types() } else { 0 };
+        let accept = d.accept;
+        let cur = self.uiw_cur;
+        self.uiw_use(win);
+        let c = &self.wp.ctx;
+        let (t, e) = if self.uiw_inert_now() {
+            (0, 0)
+        } else {
+            drag_answer(&c.zones[c.hit_cur ^ 1], &c.hits[c.hit_cur ^ 1], c.modal_prev, accept, own, x, y, offered)
+        };
+        self.uiw_use(cur);
+        Some(plat::drag_decide(t, e, offered, allowed, mods))
     }
 
     /// E_DROP (drop.rs): the drop of another program (or the app's own drag) at (x, y) logical
@@ -606,13 +712,26 @@ impl Ui {
         let c = &self.wp.ctx;
         let z = if self.uiw_inert_now() { None } else { zone_find(&c.zones[c.hit_cur ^ 1], &c.hits[c.hit_cur ^ 1], c.modal_prev, x, y, types) };
         self.uiw_use(cur);
-        self.dnd.drop_effect = data.effects;
         match z {
             Some(z) => {
-                self.dnd_deliver(z.id, win, x, y, data);
+                // the target's effects (drop_effect_set): the platform picked one of them
+                // already; a scripted drop (or one that raced the pass) gets the first it takes,
+                // and a target that takes none refuses it (nothing happens, no UIC_DROP)
+                let mut fx = z.effects & DE_ALL;
+                if !data.files.is_empty() {
+                    fx &= !DE_MOVE;
+                }
+                if data.effects & fx == 0 {
+                    data.effects = plat::drag_effect_pick(fx, 0);
+                }
+                if data.effects != 0 {
+                    self.dnd.drop_effect = data.effects;
+                    self.dnd_deliver(z.id, win, x, y, data);
+                }
                 true
             }
             None => {
+                self.dnd.drop_effect = data.effects;
                 self.dnd.dropped = data;
                 false
             }

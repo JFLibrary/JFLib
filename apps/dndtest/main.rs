@@ -11,6 +11,9 @@
 // window.  The targets #301..#305 take text, HTML, URLs, an image, files; outside them the
 // window takes files and text (drop_accept) as UIC_DROP.  Three buttons drag content that only
 // other programs take: a text, a PNG (with a BMP copy for DIB targets) and a temporary file.
+// The page (#501) answers per point, as a web page does (drop_effect_set): text, URLs and files
+// are copied on its left half, refused on the top of its right half, linked below that -- the
+// system's pointer shows it while another program's drag hovers.
 // Status lines show what the targets saw: "Über", "Abgelegt", "Ende", "UIC_DROP"; "Pixel" the
 // drag's and the last drop's place in px of the window (drag_over_px, drop_pos_px).  German is
 // the source language, locales/ui.tsv has the English texts.
@@ -46,6 +49,7 @@ const ID_T_TEXT: u32 = 301; // .. 305: text, HTML, URL, image, files
 const ID_OUT_TEXT: u32 = 401;
 const ID_OUT_IMAGE: u32 = 402;
 const ID_OUT_FILE: u32 = 403;
+const ID_PAGE: u32 = 501;
 const TARGET_NAMES: [&str; 5] = ["Text", "HTML", "URL", "Bild", "Dateien"]; // i18n
 const TARGET_TYPES: [u32; 5] = [DT_TEXT, DT_HTML, DT_URL, DT_IMAGE, DT_FILES];
 
@@ -209,6 +213,38 @@ impl Dnd {
         ui.box_end();
     }
 
+    // a page that takes drops only in some places and with an effect of its own there, as a web
+    // page answers per point: its left half copies, the top of its right half refuses, the
+    // bottom links (drop_effect_set for the point of drag_over_px while a drag hovers)
+    fn page(&mut self, ui: &mut Ui) {
+        ui.next_size(220, 90);
+        ui.box_begin(ID_PAGE, BOX_V | BOX_CARD | PAD_8, 4);
+        let r = ui.last_rect();
+        match ui.drop_target(ID_PAGE, DT_TEXT | DT_URL | DT_FILES) {
+            DS_HOVER => {
+                let (_, px, py) = ui.drag_over_px();
+                let e = if px < r[0] + r[2] / 2 {
+                    DE_COPY
+                } else if py < r[1] + r[3] / 2 {
+                    0
+                } else {
+                    DE_LINK
+                };
+                ui.drop_effect_set(e);
+                self.over = tf("Seite ({})", &[effect_name(e)]);
+            }
+            DS_DROP => {
+                let d = ui.drop_data();
+                self.dropped = tf("{} -> Seite ({})", &[&kinds(d.types()), effect_name(ui.drop_effect())]);
+            }
+            _ => {}
+        }
+        ui.text(TS_BODY_STRONG, t("Seite"));
+        ui.text(TS_CAPTION, t("links kopieren"));
+        ui.text(TS_CAPTION, t("rechts: oben nicht, unten verknüpfen"));
+        ui.box_end();
+    }
+
     // a button that drags content out (only other programs or the targets take it)
     fn out_button(&mut self, ui: &mut Ui, id: u32, label: &str) {
         let ev = ui.button(id, label);
@@ -263,6 +299,7 @@ impl App for Dnd {
         self.out_button(ui, ID_OUT_TEXT, t("Text ziehen"));
         self.out_button(ui, ID_OUT_IMAGE, t("Bild ziehen"));
         self.out_button(ui, ID_OUT_FILE, t("Datei ziehen"));
+        self.page(ui);
         ui.box_end();
         let (ty, x, y) = ui.drag_over();
         let over = if ty == 0 { String::from("-") } else { tf("{} bei {},{}", &[&kinds(ty), &format!("{}", x), &format!("{}", y)]) };
