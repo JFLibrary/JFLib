@@ -8,6 +8,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-13
+
 ### Added
 
 - NetLab is an official style of JFLib: `jflib` brings it like the other four, as
@@ -27,5 +29,6 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io, published on its own.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/jflib-style-netlab-v0.1.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/JFLibrary/JFLib/compare/jflib-style-netlab-v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/jflib-style-netlab-v0.1.0

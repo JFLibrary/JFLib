@@ -8,6 +8,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- The edge-preserving filter of a frame with chroma subsampling reads each colour plane with its own stride. When the width is no multiple of 16 the chroma planes' stride differs from luma's after upsampling, and valid files decoded with wrong colours.
+
+## [0.2.0] - 2026-11-13
+
 ### Security
 
 - A container box with a 64-bit size that reaches the end of the number range no longer crashes
@@ -30,5 +36,6 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0

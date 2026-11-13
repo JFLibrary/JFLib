@@ -10,6 +10,13 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Fixed
 
+- HTML clipboard round trips keep the size of raised and lowered text: the import took the shown script size for the nominal one, so every copy and paste shrank such text by a third. The nominal size travels in `data-jf-size`.
+- HTML clipboard round trips keep the line spacing: the import cut the decimals of `line-height` and rounds them now.
+
+## [0.2.0] - 2026-11-13
+
+### Fixed
+
 - A long formatted document can be saved: `encode_docx` (and so `save_docx`) reads its own output
   back, and the XML reader stopped at 30000 elements and 4 MiB a part, which some dozen pages of
   formatted text reach (`Error::Xml`). The parts that grow with a document's content (the text,
@@ -20,5 +27,6 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0

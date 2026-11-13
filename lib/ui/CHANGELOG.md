@@ -8,6 +8,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-13
+
 ### Added
 
 - macOS on Apple silicon: apps run in windows of their own through AppKit, sharp at the Retina
@@ -159,17 +161,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   4.5 to 6 ms, and the present step copies large frames in bands as well.
 - The built-in catalogue has no row "Neuer Ordner" any more; `ui::i18n::t` falls back to the
   text itself.
-
-### Security
-
-- `MV_OPEN_LINKS` and `RT_OPEN_LINKS` open only http, https and mailto links by themselves.
-  Other links of a document (`file:`, `ms-msdt:`, `search-ms:`, relative ones) still reach the
-  app (`MdEv::link`, `ui.richtext_link`), which decides; a link in a Markdown file or in rich
-  text could start a program before.
-- `markdown_view` and `html_view` read an image's file only when it is a regular file of at
-  most 32 MB, and never from a network or device path: `![x](//server/share/x.png)` made Windows
-  connect to that server when the document was shown, and `/dev/zero` was read until memory
-  ran out.
+- `GpuOutput` is `#[non_exhaustive]`: apps read its fields but no longer build it with a struct literal.
 
 ### Fixed
 
@@ -197,9 +189,21 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - `ui::main!` and the new `ui::test_main!` expand without `#[allow(unsafe_code)]`, so a crate
   with `#![forbid(unsafe_code)]` can use them (`ui::main!` was error E0453 there).
 
+### Security
+
+- `MV_OPEN_LINKS` and `RT_OPEN_LINKS` open only http, https and mailto links by themselves.
+  Other links of a document (`file:`, `ms-msdt:`, `search-ms:`, relative ones) still reach the
+  app (`MdEv::link`, `ui.richtext_link`), which decides; a link in a Markdown file or in rich
+  text could start a program before.
+- `markdown_view` and `html_view` read an image's file only when it is a regular file of at
+  most 32 MB, and never from a network or device path: `![x](//server/share/x.png)` made Windows
+  connect to that server when the document was shown, and `/dev/zero` was read until memory
+  ran out.
+
 ## [0.1.0] - 2026-11-08
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0
