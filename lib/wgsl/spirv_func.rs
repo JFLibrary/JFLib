@@ -663,8 +663,9 @@ impl<'g, 'a> Fx<'g, 'a> {
             (Type::Vector(..), Type::Matrix(..)) => return self.g.b.vec_mat(va, vb),
             (Type::Matrix(..), Type::Scalar(_)) => return self.g.b.mat_scale(va, vb),
             (Type::Scalar(_), Type::Matrix(..)) => return self.g.b.mat_scale(vb, va),
-            (Type::Vector(..), Type::Scalar(_)) if float => return self.g.b.vec_scale(va, vb),
-            (Type::Scalar(_), Type::Vector(..)) if float => return self.g.b.vec_scale(vb, va),
+            // (only multiply: the checker splats the scalar of every other mixed operator)
+            (Type::Vector(..), Type::Scalar(_)) if float && op == BinOp::Mul => return self.g.b.vec_scale(va, vb),
+            (Type::Scalar(_), Type::Vector(..)) if float && op == BinOp::Mul => return self.g.b.vec_scale(vb, va),
             _ => {}
         }
         if float {
