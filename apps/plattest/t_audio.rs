@@ -6,7 +6,8 @@
 //                           files that must be refused; the ring in pieces and across a thread;
 //                           the resampler (44.1 <-> 48 kHz, 96 -> 48 kHz without aliasing,
 //                           8 -> 48 kHz without images); tones and their level; Ogg Vorbis
-//                           files of apps/plattest/data/audio against their sine; Linux: the
+//                           files of apps/plattest/data/audio against their sine, crafted
+//                           streams against the decoder's limits; Linux: the
 //                           PulseAudio tagstruct and packets against hand-made bytes
 
 use alloc::format;
@@ -318,6 +319,121 @@ pub fn t_audio_ref(t: &mut T) {
     t.check(best.0 < 1e-3, &format!("audio-ref: {ogg} matches the reference (max {:.2e})", best.0));
 }
 
+// bits least significant first (Vorbis packing)
+struct BitW {
+    b: Vec<u8>,
+    n: usize,
+}
+
+impl BitW {
+    fn put(&mut self, v: u32, bits: u32) {
+        for k in 0..bits {
+            if self.n % 8 == 0 {
+                self.b.push(0);
+            }
+            if (v >> k) & 1 != 0 {
+                let last = self.b.len() - 1;
+                self.b[last] |= 1 << (self.n % 8);
+            }
+            self.n += 1;
+        }
+    }
+}
+
+// Ogg pages of one stream: (header type, granule position, packets) each, CRC-32 as Ogg has it
+fn ogg_pages(pages: &[(u8, i64, Vec<Vec<u8>>)]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for (seq, (htype, gp, packets)) in pages.iter().enumerate() {
+        let (mut table, mut body) = (Vec::new(), Vec::new());
+        for p in packets {
+            table.extend(core::iter::repeat_n(255u8, p.len() / 255));
+            table.push((p.len() % 255) as u8);
+            body.extend_from_slice(p);
+        }
+        let at = out.len();
+        out.extend_from_slice(b"OggS\0");
+        out.push(*htype);
+        out.extend_from_slice(&gp.to_le_bytes());
+        out.extend_from_slice(&0x5EEDu32.to_le_bytes());
+        out.extend_from_slice(&(seq as u32).to_le_bytes());
+        out.extend_from_slice(&[0; 4]);
+        out.push(table.len() as u8);
+        out.extend_from_slice(&table);
+        out.extend_from_slice(&body);
+        let mut c = 0u32;
+        for &x in &out[at..] {
+            c ^= (x as u32) << 24;
+            for _ in 0..8 {
+                c = if c & 0x8000_0000 != 0 { (c << 1) ^ 0x04C1_1DB7 } else { c << 1 };
+            }
+        }
+        out[at + 22..at + 26].copy_from_slice(&c.to_le_bytes());
+    }
+    out
+}
+
+// a crafted Vorbis stream: ch channels at rate, one mode (blocks of 8192 or of 64), floor 1
+// without partitions, residue 0 over 8192 coefficients, 16 submaps; costly: in partitions of 1
+// classified by a book of 65535 dimensions, else one partition of 8192 and a book of 1; then
+// `audio` packets of one byte, all silent
+fn vorbis_crafted(ch: u8, rate: u32, long: bool, audio: usize, costly: bool) -> Vec<u8> {
+    let mut id = vec![1u8];
+    id.extend_from_slice(b"vorbis\0\0\0\0");
+    id.push(ch);
+    id.extend_from_slice(&rate.to_le_bytes());
+    id.extend_from_slice(&[0; 12]);
+    id.extend_from_slice(&[0xD6, 1]); // blocks of 64 and 8192, framing
+    let comment = b"\x03vorbis\0\0\0\0\0\0\0\0\x01".to_vec();
+    let mut w = BitW { b: b"\x05vorbis".to_vec(), n: 56 };
+    w.put(0, 8); // one book: 65535 dimensions (or 1), 2 entries of 1 bit, no lookup
+    w.put(0x56_4342, 24);
+    w.put(if costly { 65535 } else { 1 }, 16);
+    w.put(2, 24);
+    w.put(0, 12);
+    w.put(0, 4);
+    w.put(0, 6); // one time
+    w.put(0, 16);
+    w.put(0, 6); // one floor 1: no partitions, multiplier 1, range 256
+    w.put(1, 16);
+    w.put(0, 7);
+    w.put(8, 4);
+    w.put(0, 6); // one residue 0: 0 .. 8192, partitions of 1 (or 8192), one class, book 0, no books
+    w.put(0, 16);
+    w.put(0, 24);
+    w.put(8192, 24);
+    w.put(if costly { 0 } else { 8191 }, 24);
+    w.put(0, 6);
+    w.put(0, 8);
+    w.put(0, 4);
+    w.put(0, 6); // one mapping of 16 submaps, no coupling
+    w.put(0, 16);
+    w.put(1, 1);
+    w.put(15, 4);
+    w.put(0, 3);
+    for c in 0..ch {
+        w.put(c as u32 % 16, 4);
+    }
+    for _ in 0..16 {
+        w.put(0, 24);
+    }
+    w.put(0, 6); // one mode
+    w.put(long as u32, 1);
+    w.put(0, 40);
+    w.put(1, 1);
+    // audio: not a header, (long: both neighbours long), every floor unused
+    let (packet, frames) = if long { (6u8, 4096i64) } else { (0u8, 32i64) };
+    let mut pages = vec![(2u8, 0i64, vec![id]), (0, 0, vec![comment, w.b])];
+    let mut left = audio;
+    let mut done = 0i64;
+    while left > 0 {
+        let n = left.min(255);
+        done += n as i64;
+        left -= n;
+        pages.push((if left == 0 { 4 } else { 0 }, (done - 1) * frames, vec![vec![packet]; n]));
+    }
+    ogg_pages(&pages)
+}
+
 // the Ogg Vorbis fixtures (apps/plattest/tests/audio, made by libvorbis through ffmpeg from
 // generated tones): the exact length, each channel's tone at its level, in WAVE order
 fn t_vorbis(t: &mut T) {
@@ -383,6 +499,24 @@ fn t_vorbis(t: &mut T) {
         t.check(Sound::decode(&bad).err() == Some(AudioError::Format), "audio vorbis: a damaged page (CRC) is refused");
     }
     t.check(Sound::decode(b"OggS\0\x02").err() == Some(AudioError::Format), "audio vorbis: a stub page is refused");
+    // crafted streams: a silent packet of one byte is 4096 frames; at 384 kHz and 8 channels 10
+    // minutes are 7 GB of samples (from 110 KB): the samples are bounded too
+    let f = vorbis_crafted(8, 384_000, true, 50_000, true);
+    let t0 = plat::time_us();
+    let got = Sound::decode(&f).err();
+    let ms = (plat::time_us() - t0) / 1000;
+    t.check(got == Some(AudioError::Format) && ms < 20_000, &format!("audio vorbis: {} KB that decode to 6.5 GB of samples are refused ({got:?}, {ms} ms)", f.len() / 1024));
+    // silence: a setup of partitions of 1 classified by a book of 65535 dimensions in 16 submaps
+    // costs no more than a cheap one (both only make the samples; timed side by side)
+    let mut runs = Vec::new();
+    for costly in [false, true] {
+        let f = vorbis_crafted(1, 48_000, true, 3000, costly);
+        let t0 = plat::time_us();
+        let s = Sound::decode(&f);
+        runs.push(((plat::time_us() - t0) / 1000, s.ok().filter(|s| s.samples().iter().all(|&v| v == 0.0)).map(|s| s.frames())));
+    }
+    let ok = runs.iter().all(|r| r.1 == Some(2999 * 4096)) && runs[1].0 <= runs[0].0 * 3 + 100;
+    t.check(ok, &format!("audio vorbis: silent packets with a costly setup decode as fast as with a cheap one ({} / {} ms, {:?} frames)", runs[1].0, runs[0].0, runs[1].1));
 }
 
 pub fn t_audio(t: &mut T) {

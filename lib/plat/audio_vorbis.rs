@@ -10,9 +10,10 @@
 // then each audio packet: floors, residues, inverse coupling, the floor curve, the inverse MDCT
 // (a DCT-IV through a complex FFT of a quarter of the block), the power-complementary window
 // and overlap-add.  Channels come out in WAVE order (Vorbis puts the centre second: L C R ..).  Floor type 0 (unused by encoders since 2002) is refused, as are files
-// that would decode to more than 10 minutes (a Sound holds everything decoded; longer audio
-// belongs in a Stream).  An audio packet that ends early decodes as far as it goes (the
-// specification's rule); damaged headers are AudioError::Format.
+// that would decode to more than 10 minutes, or to more samples than 10 minutes of 48 kHz
+// stereo (a Sound holds everything decoded; longer audio belongs in a Stream; a silent packet
+// of one byte decodes to up to 4096 frames).  An audio packet that ends early decodes as far as
+// it goes (the specification's rule); damaged headers are AudioError::Format.
 
 use alloc::vec;
 use alloc::vec::Vec;
@@ -22,6 +23,8 @@ use super::AudioError;
 const FMT: AudioError = AudioError::Format;
 const PI: f64 = core::f64::consts::PI;
 const MAX_SECONDS: u64 = 600;
+// the samples of 10 minutes of 48 kHz stereo (230 MB of f32), whatever rate and channels the header names
+const MAX_SAMPLES: usize = 48_000 * 2 * 600;
 // what a setup header may ask for (a few header bytes alone can name 2^24 entries per book): the
 // entries of one book and of all books, the VQ values of all books (real encoders: < 10^5 / 10^6)
 const MAX_ENTRIES: usize = 1 << 22;
@@ -713,10 +716,11 @@ impl Residue {
     /// decode into the vectors (each n2 long) of the channels not marked `skip`
     fn decode(&self, r: &mut Bits, books: &[Codebook], vecs: &mut [Vec<f32>], skip: &[bool], n2: usize) {
         let ch = vecs.len();
+        // no channel to decode (silence, or a submap without channels): nothing is read
+        if skip.iter().all(|&s| s) {
+            return;
+        }
         if self.typ == 2 {
-            if skip.iter().all(|&s| s) {
-                return;
-            }
             let mut one = vec![vec![0.0f32; n2 * ch]];
             self.decode_inner(r, books, &mut one, &[false], n2 * ch, 1);
             for (i, &v) in one[0].iter().enumerate() {
@@ -736,7 +740,8 @@ impl Residue {
         let per = cb.dims;
         let parts = (end - begin) / self.psize;
         let ch = vecs.len();
-        let mut classes = vec![vec![0usize; parts + per]; ch];
+        // (a classword covers `per` partitions, up to 65535: those past the end are not kept)
+        let mut classes = vec![vec![0usize; parts]; ch];
         for pass in 0..8 {
             let mut p = 0;
             while p < parts {
@@ -747,7 +752,12 @@ impl Residue {
                         }
                         let Some(mut t) = cb.scalar(r) else { return };
                         for i in (0..per).rev() {
-                            classes[j][p + i] = t % self.classes;
+                            if t == 0 {
+                                break; // the lower ones are 0 already
+                            }
+                            if let Some(c) = classes[j].get_mut(p + i) {
+                                *c = t % self.classes;
+                            }
                             t /= self.classes;
                         }
                     }
@@ -956,6 +966,9 @@ pub(crate) fn decode(b: &[u8]) -> Result<(u32, u16, Vec<f32>), AudioError> {
             v.resize(n2, 0.0);
         }
         for (s, &res) in map.residues.iter().enumerate() {
+            if (0..ch).all(|c| map.mux[c] != s || silent[c]) {
+                continue; // no channel of this submap to decode: the residue reads nothing
+            }
             let chans: Vec<usize> = (0..ch).filter(|&c| map.mux[c] == s).collect();
             let mut vecs: Vec<Vec<f32>> = chans.iter().map(|&c| core::mem::take(&mut coef[c])).collect();
             let skip: Vec<bool> = chans.iter().map(|&c| silent[c]).collect();
@@ -1019,9 +1032,10 @@ pub(crate) fn decode(b: &[u8]) -> Result<(u32, u16, Vec<f32>), AudioError> {
         // overlap-add with the previous block: from its centre to this one's
         if prev_n > 0 {
             let len = prev_n / 4 + n / 4;
-            if out.len() / ch + len > max_frames {
+            if out.len() / ch + len > max_frames || out.len() + len * ch > MAX_SAMPLES {
                 return Err(FMT);
             }
+            out.try_reserve(len * ch).map_err(|_| FMT)?;
             let shift = n as isize / 4 - prev_n as isize / 4;
             for k in 0..len {
                 for &c in order {

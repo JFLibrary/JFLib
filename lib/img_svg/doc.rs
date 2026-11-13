@@ -208,6 +208,10 @@ const DEFAULT_W: f64 = 300.0;
 const DEFAULT_H: f64 = 150.0;
 const SIZE_MAX: f64 = 1.0e6;
 const CASCADE_STEPS: u32 = 50_000_000;
+// the bytes the cascade may copy out of style sheet rules, a value and its entry each (a rule
+// that matches every element copies its declarations for each): beyond, ERR_LIMIT
+const CASCADE_BYTES: usize = 128 << 20;
+const DECL_ENTRY: usize = core::mem::size_of::<(u8, String)>();
 
 // an absolute length of the root (em at 16 px; % and invalid values: None)
 fn abs_len(v: Option<&str>) -> Option<f64> {
@@ -257,6 +261,7 @@ impl Svg {
         rules.sort_by(|a, b| (a.sel.spec, a.order).cmp(&(b.sel.spec, b.order)));
         // the cascade
         let mut steps = CASCADE_STEPS;
+        let mut copied = 0usize;
         let mut props_all: Vec<Vec<(u8, String)>> = Vec::with_capacity(dom.els.len());
         for k in 0..dom.els.len() {
             let e = &dom.els[k];
@@ -271,8 +276,14 @@ impl Svg {
                     break;
                 }
                 if r.sel.matches(&dom, k as u32, &mut steps) {
-                    for (n, v) in &r.decls {
+                    // each declaration is a step too (a block may hold thousands)
+                    steps = steps.saturating_sub(u32::try_from(r.decls.len()).unwrap_or(u32::MAX));
+                    for (n, v) in r.decls.iter() {
                         if let Some(p) = prop_id(n) {
+                            copied = copied.saturating_add(v.len() + DECL_ENTRY);
+                            if copied > CASCADE_BYTES {
+                                return Err(img_core::ERR_LIMIT);
+                            }
                             props.push((p, v.clone()));
                         }
                     }
