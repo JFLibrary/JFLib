@@ -1806,7 +1806,8 @@ rich_edit -- ui.richtext: a rich-text editor over a RichDoc (rich_doc.rs), and i
        EV_ACT: the content changed this frame; EV_FOCUS while focused; EV_COMMIT: the focus
        left.  Ids id .. id + 5 (id + 1 the scroll bar, id + 2 .. 5 the link flyout).
        RT_READONLY: select and copy only (a click opens a link); RT_NO_FRAME: no box;
-       RT_OPEN_LINKS: the editor opens an activated link with open_url itself; RT_TAB: Tab
+       RT_OPEN_LINKS: the editor opens an activated http, https or mailto link with open_url
+       itself (other links only reach the app); RT_TAB: Tab
        outside a list inserts a tab (else Tab moves the focus on); RT_PLAIN_PASTE: paste
        only text.
   ui.richtext_toolbar(id, editor, &mut doc, RTB_*) -> EV_ACT when it changed doc
@@ -1844,7 +1845,7 @@ visible paragraphs are drawn.
 RT_READONLY: u32 = 1
 /// no text box frame
 RT_NO_FRAME: u32 = 2
-/// the editor opens activated links itself (open_url)
+/// the editor opens activated http, https and mailto links itself (open_url)
 RT_OPEN_LINKS: u32 = 4
 /// Tab outside a list inserts a tab
 RT_TAB: u32 = 8
@@ -7935,9 +7936,10 @@ md_view -- ui.markdown_view / ui.html_view: a read-only document view over an Md
        view, PgUp / PgDn that a field does not take scroll the view.  The fields follow the
        window's mirroring (as every widget), not the direction of their paragraph.  A
        document without fields reads as before.
-  Flags: MV_NO_FRAME (no card, a smaller padding), MV_OPEN_LINKS (an activated link is also
-       opened with open_url: its scheme rules and the app's policy apply; never without the
-       user's click or Enter), MV_RTL / MV_LTR (the document's direction; default: that of
+  Flags: MV_NO_FRAME (no card, a smaller padding), MV_OPEN_LINKS (an activated http, https
+       or mailto link is also opened with open_url: the app's policy applies; never without
+       the user's click or Enter; links of other schemes and relative ones only reach the
+       app), MV_RTL / MV_LTR (the document's direction; default: that of
        its first strong character, else the window's)
 
 Layout: the blocks in a column; block quotes indent with a bar, lists with their markers in
@@ -7967,8 +7969,10 @@ into view; past the last one the focus moves on), Enter activates the focused li
 drops it, Ctrl+A selects all,
 Ctrl+C / Ctrl+Insert copy the selection as text (list markers, cells by tabs) and HTML.
 Images: names of the VFS ("app://", "data://" ...) and paths (relative ones after base) are
-read on first view and kept in the state; http(s) addresses are never fetched by the view
-(MI_LOCAL: the alt text shows in a frame instead; MI_ASK / MI_APP: the app fetches them).
+read on first view and kept in the state -- of the OS's files only regular ones up to 32 MB,
+never a network or device path ("//server/share", "\\.\..."); http(s) addresses are never
+fetched by the view (MI_LOCAL: the alt text shows in a frame instead; MI_ASK / MI_APP: the
+app fetches them).
 Records: K_BOX id (label: the label, value: the scroll position in DIP); per visible block
 K_HEADING (value: the level), K_TEXT (paragraphs, code, table cells), K_LISTITEM (the first
 block of a list item, value: its number), K_CHECKBOX (a task's box, checked), K_LINK per
@@ -7982,7 +7986,7 @@ the scroll bar, md_field_id(id, i) the fields.
 ```rust
 /// markdown_view flags: no card around the document
 MV_NO_FRAME: u32 = 1
-/// an activated link is also opened (open_url)
+/// an activated link is also opened (open_url) when it is http, https or mailto
 MV_OPEN_LINKS: u32 = 2
 /// the document runs right to left (indents and markers on the right)
 MV_RTL: u32 = 4
@@ -17604,7 +17608,9 @@ CSS pseudo-classes, @media, animation, scripts.
 
 Robustness: malformed input never panics.  The reader is forgiving (xml.rs); limits:
 MAX_INPUT bytes (also after inflating), 250 000 elements, 256 levels, 4096 CSS rules, a
-step budget for selector matching, 1 000 000 element visits per render, 64 levels of
+step budget for selector matching, 128 MB of declarations copied by the cascade (beyond:
+ERR_LIMIT), 1 000 000 element visits and a work budget (pixels painted, layers and masks,
+path points, children walked: 64 per pixel drawn, at least 2^26) per render, 64 levels of
 nesting while drawing, use cycles cut, 8 layers alive at once.
 ```
 
@@ -17684,7 +17690,10 @@ both are drawn into a layer (the bounds of the content, inside the clip) and com
 Text needs a TextHook (the app's font engine): one line per text chunk, tspans with their
 own style and x / y / dx / dy (first values), text-anchor; without a hook text is skipped.
 Limits: MAX_DRAWS element visits per render, MAX_NEST nesting (groups, use), MAX_LAYERS
-layers alive at once (deeper opacity is applied to the paints), use cycles are cut.
+layers alive at once (deeper opacity is applied to the paints), use cycles are cut; the work
+of a render (pixels painted, layers, masks and images allocated, path points filled and
+walked, children and text walked) is bounded by WORK_PER_PX per pixel of the drawn area, at
+least MIN_WORK: a use DAG multiplies visits, each may cover the whole surface.
 ```
 
 - **`trait TextHook`**
@@ -22584,7 +22593,8 @@ folder (absolute paths, "..", a scheme) are refused before the closure sees them
   - `file_bytes: u64` -- bytes of the .glb / .gltf and of each file it names
   - `json_bytes: usize` -- bytes of the JSON part, and the values in it (objects, arrays, numbers, ...)
   - `json_values: usize`
-  - `buffer_bytes: u64` -- bytes of all buffers together
+  - `buffer_bytes: u64` -- bytes of all buffers together, as given (a file two buffers name counts twice), and the zeros of
+    accessors without a buffer view
   - `vertices: u64` -- vertices and indices of all primitives together, as the model holds them (flat normals split vertices)
   - `indices: u64`
   - `nodes: usize` -- nodes, and how deep they nest
@@ -27098,7 +27108,8 @@ STORE: &str = "config://permission-decisions.txt"
   whether Command::spawn / run_elevated may start program (a path, or a name found in PATH)
 
 - **`fn url_allowed(url: &str) -> bool`**
-  whether open_url may open url (its scheme)
+  whether open_url may open url (its scheme); false for anything but an absolute URL (a path, a
+  drive letter), with or without a manifest
 
 - **`fn plugin_allowed(path: &str) -> bool`**
   whether lib_open may load the native library at path

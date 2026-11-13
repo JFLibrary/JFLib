@@ -5063,7 +5063,8 @@ if ui.dialog_begin(ID_ASK, "Datei überschreiben?", &open) {
   `Sound::wav` reads RIFF WAVE with PCM 8 / 16 / 24 / 32 bits and float 32 / 64 (also
   extensible), `Sound::ogg` Ogg Vorbis (floor 1, residues 0 / 1 / 2, coupling; matches
   libvorbis to 5e-5), `Sound::decode` tells them apart, `Sound::tone(freq, ms)` makes a sine,
-  `to_wav()` writes 16-bit PCM. A `Sound` holds everything decoded (10 minutes at most):
+  `to_wav()` writes 16-bit PCM. A `Sound` holds everything decoded (10 minutes at most, and
+  an Ogg Vorbis file no more samples than 10 minutes of 48 kHz stereo -- 5.1 about 3 minutes):
   music belongs in a stream.
 * **`play`** mixes into one stream of 48 kHz stereo that opens with the first sound and ends
   after 2 s of silence (an idle open stream would keep the computer from sleeping); each sound
