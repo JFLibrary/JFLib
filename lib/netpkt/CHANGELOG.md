@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- pcapng block and packet lengths are checked without wrapping a 32-bit usize: on wasm32 a block length near 4 GB looped forever and a captured length past its block cut a bad slice.
+
 ## [0.2.0] - 2026-11-13
 
 ### Security

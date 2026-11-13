@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- `ellipse_fx` and `rrect_fx` compute their control offsets in 64 bits. From a radius of about 59,500 px (rounded rectangles: 73,000 px) they wrapped and the shape came out wrong.
+
 ## [0.2.0] - 2026-11-13
 
 ### Added

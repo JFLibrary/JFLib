@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- COMPOUNDMIN is clamped to 1..=65535. A value of 2^63 wrapped to 0 when doubled, and checking a word then read past its end.
+
 ## [0.2.0] - 2026-11-13
 
 ### Added

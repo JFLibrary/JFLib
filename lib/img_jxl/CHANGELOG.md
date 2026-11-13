@@ -11,6 +11,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - The edge-preserving filter of a frame with chroma subsampling reads each colour plane with its own stride. When the width is no multiple of 16 the chroma planes' stride differs from luma's after upsampling, and valid files decoded with wrong colours.
+- Plane sizes are counted without wrapping a 32-bit usize: on wasm32 a huge frame is `ERR_NOMEM` instead of a plane that is too small.
+- The spline area estimate saturates instead of wrapping. A huge quantizer adjustment or colour factor wrapped it small and let the area limit pass.
 
 ## [0.2.0] - 2026-11-13
 

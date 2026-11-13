@@ -8,6 +8,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- The syntax highlighter reads a block whose depth was lost in the 32-bit line state (below three nested constructs) as one open block, so `*/` closes it; before, the depth went below 0 and the rest of the line stayed a comment.
+- Overflows that only a build with overflow checks saw (a debug build of an app without JFLib's profile aborted): the Markdown document's update of changed blocks, the terminal's resize anchor after the scrollback dropped lines.
+
 ## [0.2.0] - 2026-11-13
 
 ### Added

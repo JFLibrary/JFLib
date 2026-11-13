@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- Overflows that only a build with overflow checks saw (a debug build of an app without JFLib's profile aborted): the underline position of variable fonts, shaped glyph offsets near i32::MAX.
+
 ## [0.2.0] - 2026-11-13
 
 ### Added

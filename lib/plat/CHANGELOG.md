@@ -8,6 +8,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- Ogg Vorbis floor 1 keeps its values in 15 bits as libvorbis does. A codebook entry up to 2^24 overflowed i32 in the next point's interpolation; valid streams decode as before.
+- Overflows that only a build with overflow checks saw (a debug build of an app without JFLib's profile aborted): X11's work area with huge edges (Linux), a file time from 2^63 on (Windows).
+
 ## [0.2.0] - 2026-11-13
 
 ### Added

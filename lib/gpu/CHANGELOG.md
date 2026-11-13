@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- Range checks add without wrapping (Vulkan, Metal, WebGPU): push constants, indirect dispatch, texture barriers, views, the region and data span of texture copies, bind group and bindless buffer ranges. An offset or base near u32::MAX wrapped the sum small, passed the check and reached the driver; now it is `GpuError::Invalid`.
+
 ## [0.2.0] - 2026-11-13
 
 ### Added

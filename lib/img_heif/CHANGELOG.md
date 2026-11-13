@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- The encoder no longer underflows its item count for one image without Exif or XMP (a build with overflow checks aborted).
+
 ## [0.2.0] - 2026-11-13
 
 ### Security
