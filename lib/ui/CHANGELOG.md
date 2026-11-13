@@ -65,6 +65,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   decided, where a wrapping text counts unwrapped and a view inside that rolls sideways itself
   with its whole content: nearly every page rolled sideways into nothing, and the finger after a
   sideways swipe only stopped that roll (no tap, no press and hold on a slider).
+- `ui::main!` in a library crate with std (the app of `cargo jflib new --std`): `cargo test --lib`
+  builds its unit tests. The panic check refused the test build (tests always unwind), and
+  `ui::test_main!` beside `main!` defined `jfgui_main` twice; `main!`'s own `jfgui_main` links the
+  tests now. `ui::test_main!` stays for library crates without `main!`, such as a style crate.
 
 ### Security
 

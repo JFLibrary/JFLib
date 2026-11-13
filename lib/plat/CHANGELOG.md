@@ -39,7 +39,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Security
 
-- `fs::symlink` and `fs::hard_link` want write access to the target as well; a relative symlink target counts from the link's folder. The rules check a path as it is written, so a link at a writable path led to files the app could only read or not reach at all.
+- `fs::symlink` and `fs::hard_link` want write access to the target as well; a relative symlink target counts from the link's folder. Without a manifest every target may be written; under one a target with `..` is refused (the system resolves it after links). The rules check a path as it is written, so a link at a writable path led to files the app could only read or not reach at all.
 - `assoc_unregister` plays back only record lines for the places a registration writes (Windows: Software\Classes, Software\Clients, RegisteredApplications; Linux: the .desktop and MIME files, the user's mimeapps.list). A changed config://assoc.list could set any HKCU value or delete and rename any file of the user.
 - `process::Command::spawn` with a relative program path and a `cwd` checks the file it starts on Linux and macOS (cwd/program), not the same name below this process's folder.
 - `watch::Watcher::new` checks its folders against the manifest on Windows too.

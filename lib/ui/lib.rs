@@ -301,6 +301,12 @@ pub use value::{cvtd, deg_atan2, deg_sincos, grad_at, part_id, px_mix, RangeF, T
 /// `jfgui_main`, the end through `std::process::exit`); the crate then has neither `#![no_std]`
 /// nor `#![no_main]`.  In a library crate (the template's app) that `fn main` stays unused and
 /// the program's own calls `jflib::plat::std_start()`.
+///
+/// The unit tests of the crate that holds it (the template's app with std, `cargo test --lib`)
+/// need no `test_main!`: this `jfgui_main` links their test binary (never called there), and the
+/// panic check leaves the test build out (`cfg(test)`: Cargo builds tests with unwind whatever the
+/// profiles say; doc tests build the crate without it, docs/GUIDE.md "An app with std").  A
+/// `test_main!` next to it would define `jfgui_main` twice (E0428)
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! main {
@@ -327,10 +333,11 @@ macro_rules! main {
 }
 
 /// (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
-/// std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
-/// the tests do not link.  Never called (the test harness has its own main); no panic check
-/// (tests unwind).  `#[cfg(test)] ui::test_main!();` in the crate's lib.rs, also under
-/// `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros)
+/// std and without main! (a style crate's `cargo test`): plat's start of a std program refers to
+/// it, so without it the tests do not link.  Never called (the test harness has its own main); no
+/// panic check (tests unwind).  `#[cfg(test)] ui::test_main!();` in the crate's lib.rs, also under
+/// `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros).  A
+/// crate with main! needs none: its main!'s `jfgui_main` links the tests
 #[macro_export]
 macro_rules! test_main {
     () => {
@@ -343,13 +350,14 @@ macro_rules! test_main {
 }
 
 /// ui::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
-/// std built with the feature `unwind` may unwind as well
+/// std built with the feature `unwind` may unwind as well.  Not in the unit tests of the crate
+/// with main! (`cfg(test)` is the app crate's, where this expands): Cargo builds tests with unwind
 #[cfg(not(feature = "unwind"))]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __ui_panic_check {
     () => {
-        #[cfg(panic = "unwind")]
+        #[cfg(all(panic = "unwind", not(test)))]
         compile_error!("JFLib needs panic = \"abort\": add [profile.dev] and [profile.release] with panic = \"abort\" to this project's Cargo.toml (a program with std may turn on jflib's feature unwind instead)");
     };
 }

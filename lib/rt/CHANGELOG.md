@@ -20,6 +20,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   `-C target-feature=+crt-static` asks for one static file, so a JFLib app builds on Linux with
   plain `cargo run`, no flags and no `--target`.
 
+### Fixed
+
+- `rt::main!` in a library crate with std: `cargo test --lib` builds its unit tests. The panic
+  check refused the test build (tests always unwind); `main!`'s own `jfgui_main` links the tests,
+  `rt::test_main!` stays for library crates without `main!`.
+
 ### Security
 
 - New plat::fs::Dir works below an open folder without ever following a link (Linux openat2 with a step-by-step O_NOFOLLOW fallback, macOS openat walk, Windows folders held open without share-delete), with set_file_times / set_file_mode through a file's own handle; TcpStream::peer_uid returns the user id of the other end of a Unix socket (SO_PEERCRED, getpeereid)

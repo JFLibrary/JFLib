@@ -127,13 +127,20 @@ panic = "unwind"
   where the payload holds the message alone. On Windows the file in it has backslashes
   (`"panicked at src\\page.rs:12:5:\n..."`, the path as Cargo hands it to rustc): compare the
   file with both separators or by its name.
-* Unit tests of a library crate with std (an app's own style crate, `cargo test`): the test binary
-  has the test harness's `main`, but plat's start of a std program asks for the `jfgui_main` a
-  program's `main!` defines, so it does not link (an unresolved `jfgui_main`). One line in the
-  crate's `lib.rs` gives it a stub that is never called: `#[cfg(test)] ui::test_main!();`
-  (`rt::test_main!()` for crates without ui). Tests unwind, the stub has no panic check. The
-  crate may keep `#![forbid(unsafe_code)]` (as the library's styles do): the stub's unsafe
-  attribute comes from the macro, the crate allows nothing for it.
+* Unit tests of a library crate with std: the test binary has the test harness's `main`, but
+  plat's start of a std program asks for the `jfgui_main` a program's `main!` defines.
+  - The app's own crate (the template's `src/lib.rs`, with `ui::main!`) has it: `cargo test --lib`
+    links, and `main!`'s panic check leaves the test build out (Cargo builds tests with unwind,
+    whatever the profiles say). Only `--lib`: a plain `cargo test` also builds the library itself
+    for the doc tests and the program's tests, with unwind and without `cfg(test)`, and the check
+    refuses that (unless the feature `unwind`).
+  - A crate without `main!` (an app's own style crate, `cargo test`) does not link (an unresolved
+    `jfgui_main`). One line in its `lib.rs` gives it a stub that is never called:
+    `#[cfg(test)] ui::test_main!();` (`rt::test_main!()` for crates without ui; next to a `main!`
+    it would define `jfgui_main` twice). Tests unwind, the stub has no panic check.
+
+  Both may keep `#![forbid(unsafe_code)]` (as the library's styles do): the unsafe attributes come
+  from the macros, the crate allows nothing for them.
 * A panic nobody catches ends the program as before: JFLib's crash report (stderr, the crash
   hook), exit code 3. That holds when it leaves the program's start (`App::frame`, `command`, the
   tasks of `ui.spawn`), a thread of JFLib's (`plat::thread_spawn`, the jobs of
