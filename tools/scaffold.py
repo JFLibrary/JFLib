@@ -24,8 +24,9 @@ crate or a Rust keyword.
 
 A library crate (--lib): lib/NAME/src/lib.rs (#![no_std], #![forbid(unsafe_code)], a
 placeholder function), its manifest with --deps (the library crates it uses,
-default none) and in CRATES of tools/gendoc.py, then docs/API.md is regenerated.  Names:
-snake_case.  An app uses it by naming it (NAME::...).
+default none) and in CRATES of tools/gendoc.py, then docs/API.md is regenerated; a CHANGELOG.md
+and the frame of a README.md that `build_rs.py check` refuses until it is written by hand.
+Names: snake_case.  An app uses it by naming it (NAME::...).
 
 apps/scaffoldtest is the output of `new scaffoldtest --kind tool --title "Scaffold-Test"`;
 tools/tests/test_devkit.py checks that the generator still writes exactly its sources, and the
@@ -1083,6 +1084,24 @@ targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown
 """
 
 
+# the crate's page on crates.io and docs.rs: written by hand before it is published (docs/CRATES.md, "README
+# und CHANGELOG je Crate"); build_rs.py check refuses it while the comment is in it (tools/changelog.py)
+LIB_README = """\
+# @PACKAGE@
+
+<!-- write this README by hand before the crate is published (docs/CRATES.md, "README und CHANGELOG
+je Crate"): what the crate is and why it exists, how it is used, a section "## What's new in X.Y.Z",
+where its documentation is, its licence; lib/rt/README.md shows how. build_rs.py check refuses the
+README while this comment is in it. -->
+
+@TITLE@
+
+## License
+
+MIT or Apache-2.0, at your choice.
+"""
+
+
 def before(text, line, new, what):
     """text with `new` inserted before the line `line`"""
     at = re.search(f"^{re.escape(line)}$", text, re.M)
@@ -1113,8 +1132,9 @@ def register_gendoc(text, name, title):
 
 
 def create_lib(root, name, deps=(), title=None, libs=(), crates=()):
-    """lib/NAME with its manifest and licences, entered in the root manifest, the facade and
-    tools/gendoc.py -> the written paths; build_rs.py then brings Cargo.lock up to date"""
+    """lib/NAME with its manifest, licences, a CHANGELOG.md and the frame of its README.md (to be
+    written by hand), entered in the root manifest, the facade and tools/gendoc.py -> the written
+    paths; build_rs.py then brings Cargo.lock up to date"""
     check_lib_name(root, name, crates)
     title = check_title(title or "a JFLib library crate")
     bad = [d for d in deps if d not in libs]
@@ -1139,7 +1159,12 @@ def create_lib(root, name, deps=(), title=None, libs=(), crates=()):
     v = {"NAME": name, "TITLE": title, "DEPS_TEXT": ", ".join(order) or "none", "PACKAGE": "jflib-" + name.replace("_", "-"),
          "DEPS": "".join(f"{d}.workspace = true\n" for d in order)}
     licences = {n: (root / n).read_bytes().decode("utf-8").replace("\r\n", "\n") for n in ("LICENSE-MIT", "LICENSE-APACHE")}
-    paths = write_files(root / "lib" / name, {"src/lib.rs": fill(LIB_MAIN, v), "Cargo.toml": fill(LIB_MANIFEST, v), **licences})
+    import changelog
+    version = re.search(r'^version = "([^"]+)"', workspace.read_text(encoding="utf-8"), re.M)
+    if not version:
+        raise ScaffoldError("Cargo.toml: the version was not found")
+    docs = {"README.md": fill(LIB_README, v), "CHANGELOG.md": changelog.crate_log(v["PACKAGE"], version.group(1))}
+    paths = write_files(root / "lib" / name, {"src/lib.rs": fill(LIB_MAIN, v), "Cargo.toml": fill(LIB_MANIFEST, v), **docs, **licences})
     for write in writes:
         write()
     return paths + [workspace, facade, facade_uses, gendoc]

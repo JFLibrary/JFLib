@@ -8,8 +8,13 @@ All notable changes to the JFLib library -- the crates under `lib/`, the styles,
 `build_rs.py api-diff` checks a release). Apps keep their own versions (`version=` in
 `apps/NAME/PACKAGE`) and their own notes.
 
-Add entries with `python build_rs.py changelog "What changed" --type added|changed|deprecated|removed|fixed|security --area AREA`;
-`python build_rs.py release X.Y.Z` turns `[Unreleased]` into a release.
+Every crate also has a `CHANGELOG.md` of its own in its folder, written from the crate's side, and
+a `README.md` whose section "What's new" sums up its latest release ([docs/VERSIONING.md](docs/VERSIONING.md),
+"Each crate's README and changelog").
+
+Add entries with `python build_rs.py changelog "What changed" --type added|changed|deprecated|removed|fixed|security --area AREA`
+(`--crate C,..`: in those crates' changelogs too); `python build_rs.py release X.Y.Z` turns
+`[Unreleased]` into a release here and in every crate's changelog.
 
 ## [Unreleased]
 
@@ -110,6 +115,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** UIC_A11Y (arg 1: a screen reader or another accessibility client came, 0: it left), also while the app is idle; plat::a11y::check_due() (the window loop asks active() by itself then) and plat::a11y::epoch(); A11yRequest::new(win, id, action) for an app's tests; plattest --test uia-idle and a11y-cost
 - **ui:** ui.drop_effect_set(effects): the DE_* effects the drop target of the last drop_target call takes in this pass (default DE_ALL; 0 refuses the drag there: no drop, no highlight); the platform answers a drag over it with one of them, so the system's pointer shows copy, move, link or no (Windows DragOver / Drop pdwEffect, X11 XdndStatus, Wayland wl_data_offer.set_actions, macOS through plat::drag_query); the app's own drags pick from them too. plat::drag_query_all (the effect and every effect taken) and plat::drag_decide; the script command dragover expect copy|move|link|none [ctrl] [shift]; dndtest's page target (apps/dndtest/tests/effects.uis)
 - **plat:** plattest --test present-bench [--size WxH]: what a 4K frame's presents cost in a real window (the whole frame, a caret, a line of text, 20 blocks, a band) and the present's copy alone against plain row copies (plat::present_copy_bench, doc hidden)
+- **crates:** Every crate has a README.md written for its page on crates.io and docs.rs, with a section "What's new" about its latest release, and a CHANGELOG.md of its own in its package; build_rs.py changelog --crate writes an entry into the crates' changelogs too, build_rs.py release cuts them all and refuses a README whose "What's new" names another version, build_rs.py check and tools/publish.py check both files, build_rs.py new --lib writes a changelog and the frame of a README that check refuses until it is written (docs/VERSIONING.md)
 
 ### Changed
 

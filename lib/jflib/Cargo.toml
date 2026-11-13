@@ -16,7 +16,7 @@ readme = "README.md"
 # docs/GUIDE.md and docs/API.md are copies of the repository's (in git, so `cargo publish` takes them from any
 # checkout): tools/gendoc.py writes both API.md, `python tools/crates_accept.py --template` the guide, build_rs.py
 # check compares them
-include = ["src/**", "build.rs", "README.md", "LICENSE-*", "docs/*.md", "template/**"]
+include = ["src/**", "build.rs", "README.md", "CHANGELOG.md", "LICENSE-*", "docs/*.md", "template/**"]
 
 [lib]
 test = false

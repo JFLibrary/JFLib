@@ -165,6 +165,11 @@ class ScaffoldTest(Temp):
         self.assertIn("#![forbid(unsafe_code)]", lib)
         self.assertIn(self.dir / "lib" / "mylib" / "src" / "lib.rs", paths)
         self.assertTrue((self.dir / "lib" / "mylib" / "LICENSE-MIT").is_file())
+        readme = (self.dir / "lib" / "mylib" / "README.md").read_text(encoding="utf-8")
+        self.assertTrue(readme.startswith("# jflib-mylib\n") and changelog.PLACEHOLDER in readme, "a frame check refuses")
+        log = (self.dir / "lib" / "mylib" / "CHANGELOG.md").read_text(encoding="utf-8")
+        version = root["package"]["version"]
+        self.assertIn(f"## [Unreleased]\n\nFirst release on crates.io.\n\n[Unreleased]: {changelog.REPO}/compare/v{version}...HEAD\n", log)
         with self.assertRaisesRegex(scaffold.ScaffoldError, "exists already"):
             scaffold.create_lib(self.dir, "mylib", [], None, libs, libs)
 
@@ -514,11 +519,81 @@ class ChangelogTest(unittest.TestCase):
             with self.assertRaises(changelog.ChangelogError):
                 bad()
 
+    def test_crate_cut(self):
+        """a crate's changelog: its first entry replaces "no changes", a cut moves the link references
+        on, an [Unreleased] without entries is cut as "no changes\""""
+        head = "# Changelog of jflib-x\n\nIntro.\n\n## [Unreleased]\n\n"
+        refs = (f"## [0.1.0] - 2026-11-08\n\nFirst release on crates.io.\n\n[Unreleased]: {changelog.REPO}/compare/v0.1.0...HEAD\n"
+                f"[0.1.0]: {changelog.REPO}/releases/tag/v0.1.0\n")
+        quiet = head + "No changes in this crate. It is released with the next version of JFLib.\n\n" + refs
+        self.assertTrue(changelog.without_entries(quiet))
+        t = changelog.add_entry(quiet, "A thing", "fixed")
+        self.assertIn("## [Unreleased]\n\n### Fixed\n\n- A thing\n\n## [0.1.0]", t)
+        self.assertFalse(changelog.without_entries(t))
+        c = changelog.cut_crate(t, "0.2.0", "2026-12-01")
+        self.assertIn("## [Unreleased]\n\n## [0.2.0] - 2026-12-01\n\n### Fixed\n\n- A thing\n", c)
+        self.assertIn(f"[Unreleased]: {changelog.REPO}/compare/v0.2.0...HEAD\n[0.2.0]: {changelog.REPO}/compare/v0.1.0...v0.2.0\n"
+                      f"[0.1.0]: {changelog.REPO}/releases/tag/v0.1.0\n", c)
+        c = changelog.cut_crate(quiet, "0.2.0", "2026-12-01")
+        self.assertIn("## [0.2.0] - 2026-12-01\n\nNo changes in this crate. It was released with the others", c)
+        self.assertEqual(changelog.unreleased(c), "")
+        new = changelog.cut_crate(changelog.crate_log("jflib-y", "0.2.0"), "0.3.0", "2027-01-01")
+        self.assertIn("## [0.3.0] - 2027-01-01\n\nFirst release on crates.io.", new)
+        self.assertIn(f"[0.3.0]: {changelog.REPO}/compare/v0.2.0...v0.3.0", new)
+
     def test_repository_changelog(self):
         """CHANGELOG.md has [Unreleased] and a section of the library's version"""
         text, _ = changelog.read()
         self.assertIn(apidiff.lib_version(), changelog.releases(text))
         self.assertTrue(changelog.UNRELEASED.search(text))
+
+
+class CrateDocsTest(Temp):
+    """every crate's README.md and CHANGELOG.md (tools/changelog.py, crate_doc_problems)"""
+
+    def tree(self, readme_b, include=None):
+        """a workspace with the crates a (all as it should be) and b (its README readme_b, an include list)"""
+        self.write("Cargo.toml", '[workspace]\nmembers = ["lib/a", "lib/b", "apps/x"]\n[workspace.package]\nversion = "0.1.0"\n')
+        self.write("CHANGELOG.md", "# Changelog\n\n## [Unreleased]\n\n## [0.1.0] - 2026-11-08\n")
+        self.write("apps/x/Cargo.toml", '[package]\nname = "x"\npublish = false\n')
+        self.write("lib/a/Cargo.toml", '[package]\nname = "jflib-a"\n[lib]\nname = "a"\n')
+        self.write("lib/a/README.md", "# jflib-a\n\nText with [a link](https://jflib.org).\n\n## What's new in 0.2.0\n\nNew.\n")
+        self.write("lib/a/CHANGELOG.md", changelog.crate_log("jflib-a", "0.1.0"))
+        self.write("lib/b/Cargo.toml", '[package]\nname = "jflib-b"\n' + (f"include = {include}\n" if include else ""))
+        self.write("lib/b/README.md", readme_b)
+
+    def test_problems(self):
+        self.tree("# jflib-b\n\nSee [the guide](docs/GUIDE.md) and [here](#below).\n\n```\n[x](not/a/link)\n```\n",
+                  '["src/**", "README.md"]')
+        self.assertEqual(sorted(changelog.crate_doc_problems(self.dir)), sorted([
+            'lib/b/CHANGELOG.md is missing (docs/CRATES.md, "README und CHANGELOG je Crate")',
+            "lib/b/README.md: the link docs/GUIDE.md is relative (crates.io and docs.rs show the text elsewhere)",
+            "lib/b/README.md: needs one section \"## What's new in X.Y.Z\" (has 0)"]))
+        self.write("lib/b/CHANGELOG.md", "# Changelog\n\n## [0.0.9] - 2026-01-01\n")
+        self.write("lib/b/README.md", "# b\n\n" + changelog.PLACEHOLDER + " -->\n\n## What's new in 0.0.9\n")
+        self.assertEqual(sorted(changelog.crate_doc_problems(self.dir)), sorted([
+            "lib/b/Cargo.toml: include lacks CHANGELOG.md, the package would not carry it",
+            "lib/b/README.md: the first line is not '# jflib-b'",
+            "lib/b/README.md: still the placeholder of build_rs.py new --lib: write the README",
+            "lib/b/README.md: \"What's new in 0.0.9\" is older than the library's version 0.1.0",
+            "lib/b/CHANGELOG.md has no '## [Unreleased]' section",
+            "lib/b/CHANGELOG.md: [0.0.9] is no release of CHANGELOG.md"]))
+
+    def test_release_stage(self):
+        self.tree("# jflib-b\n\n## What's new in 0.2.0\n")
+        self.write("lib/b/CHANGELOG.md", changelog.crate_log("jflib-b", "0.1.0"))
+        self.assertEqual(changelog.crate_doc_problems(self.dir), [])
+        self.assertEqual(changelog.crate_doc_problems(self.dir, release="0.2.0"), [])
+        self.assertEqual(changelog.crate_doc_problems(self.dir, release="0.3.0"), [
+            "lib/a/README.md: \"What's new in 0.2.0\", the release is 0.3.0",
+            "lib/b/README.md: \"What's new in 0.2.0\", the release is 0.3.0"])
+        self.assertEqual(changelog.crate_doc_problems(self.dir, release="0.2.0", cut=True), [
+            "lib/a/CHANGELOG.md has no [0.2.0]: python build_rs.py release 0.2.0",
+            "lib/b/CHANGELOG.md has no [0.2.0]: python build_rs.py release 0.2.0"])
+        self.assertEqual(changelog.crate_of("b", self.dir), ("lib/b", "jflib-b", "jflib_b"))
+        self.assertEqual(changelog.crate_of("jflib-a", self.dir)[0], "lib/a")
+        with self.assertRaises(changelog.ChangelogError):
+            changelog.crate_of("x", self.dir)
 
 
 # ---------------------------------------------------------------- build_rs.py i18n

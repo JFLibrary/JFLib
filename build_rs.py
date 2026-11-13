@@ -31,9 +31,10 @@ The crates, their dependencies and the library's version come from the Cargo man
   python build_rs.py api-diff [--against X.Y.Z] [--snapshot] the public API since a release (tools/apidiff.py,
                                                                 docs/VERSIONING.md): exit 1 for breaking changes
                                                                 the library's version does not allow
-  python build_rs.py changelog ["TEXT" --type T --area A]    show / add to [Unreleased] of CHANGELOG.md
-  python build_rs.py release X.Y.Z [--date D] [--force]      CHANGELOG.md, the version in Cargo.toml, docs/api/X.Y.Z.txt
-                                                                (tools/changelog.py)
+  python build_rs.py changelog ["TEXT" --type T --area A]    show / add to [Unreleased] of CHANGELOG.md; --crate C,..:
+                                                                of those crates' CHANGELOG.md too
+  python build_rs.py release X.Y.Z [--date D] [--force]      CHANGELOG.md and the crates', the version in Cargo.toml,
+                                                                docs/api/X.Y.Z.txt (tools/changelog.py)
   python build_rs.py site [--out DIR] [--check]              the docs of the website: guides, API reference, changelog
                                                                 and roadmap from the Markdown -> build/site/
                                                                 (tools/site.py); --check builds into a temporary folder
@@ -725,7 +726,7 @@ def manifest_lint():
     """what rustc does not see, Cargo would only find in a build of its own (docs/CRATES.md) ->
     problems: every crate is in the facade, a style's manifest has the crates its sources name
     (build_rs.py finds them by name), every package holds the licences it needs, the template
-    of lib/jflib is current"""
+    of lib/jflib is current, every crate has its README.md and CHANGELOG.md"""
     bad = []
     members = manifests.workspace()["members"]
     published = [m for m in members if manifests.read(ROOT / m / "Cargo.toml")["package"].get("publish", True)]
@@ -771,6 +772,9 @@ def manifest_lint():
             a, b = ROOT / source_dir / rel, ROOT / copy_dir / rel
             if not a.is_file() or not b.is_file() or not same_text(a, b):
                 bad.append(f"{copy_dir}/{rel}: differs from {source_dir}/{rel}: copy that folder over it")
+    # every published crate's README.md (its page on crates.io and docs.rs) and CHANGELOG.md (tools/changelog.py)
+    import changelog
+    bad += changelog.crate_doc_problems()
     from tools import crates_accept                 # the template of lib/jflib comes from apps/template
     return bad + crates_accept.template_problems()
 
@@ -1719,7 +1723,8 @@ def dev_command(a):
     import changelog
     try:
         if a.cmd == "changelog":
-            return changelog.main(([a.name] if a.name else []) + ["--type", a.type] + (["--area", a.area] if a.area else []))
+            return changelog.main(([a.name] if a.name else []) + ["--type", a.type] + (["--area", a.area] if a.area else [])
+                                  + (["--crate", a.crate] if a.crate else []))
         if not a.name:
             raise changelog.ChangelogError("release: the version is missing (python build_rs.py release 0.2.0)")
         print("\n".join(changelog.release(a.name, a.date, a.force)))
@@ -2077,6 +2082,7 @@ def main():
     ap.add_argument("--all", action="store_true", help="api-diff: list every change")
     ap.add_argument("--type", default="added", help="changelog: added|changed|deprecated|removed|fixed|security")
     ap.add_argument("--area", help="changelog: the part the entry is about (ui, plat, build ...)")
+    ap.add_argument("--crate", help="changelog: the crates it changes (comma-separated): their CHANGELOG.md too")
     ap.add_argument("--date", help="release: the release date (default today)")
     ap.add_argument("--force", action="store_true", help="release: also when the API changes need a larger step")
     ap.add_argument("--check", action="store_true", help="site: build into a temporary folder and check it; i18n: errors only")
