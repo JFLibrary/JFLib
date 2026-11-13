@@ -1701,7 +1701,6 @@ fn fs(i: VsOut) -> @location(0) vec4f {
     if !any(d != vec2f(0.0)) {
         d = vec2f(1.0, 0.0);
     }
-    let col = unpack4x8unorm(i.misc.y);
     let dp = unit_or_zero(-i.nb.xy);
     let dn = unit_or_zero(i.nb.zw);
     // which pieces may touch the pixel: a neighbour's rectangle (a square cap too) lies within h sqrt(2) of its segment,
@@ -1737,6 +1736,7 @@ fn fs(i: VsOut) -> @location(0) vec4f {
             discard;
             return vec4f(0.0);
         }
+        let col = unpack4x8unorm(i.misc.y);
         return vec4f(vec3f(col.z, col.y, col.x) * (col.w * c0), col.w * c0);
     }
     // short thin strokes near their ends: the tile of each piece as a product (the strip's share times the share on its side
@@ -1778,6 +1778,7 @@ fn fs(i: VsOut) -> @location(0) vec4f {
             discard;
             return vec4f(0.0);
         }
+        let col = unpack4x8unorm(i.misc.y);
         return vec4f(vec3f(col.z, col.y, col.x) * (col.w * ct), col.w * ct);
     }
     // its own ends' lines: a cap's, a join's line at right angles (that join not near), none where open
@@ -1976,6 +1977,8 @@ fn fs(i: VsOut) -> @location(0) vec4f {
         discard;
         return vec4f(0.0);
     }
+    // (the colour unpacked where it is returned, as in full_body)
+    let col = unpack4x8unorm(i.misc.y);
     let al = col.w * c;
     return vec4f(vec3f(col.z, col.y, col.x) * al, al);
 }

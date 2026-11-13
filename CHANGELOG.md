@@ -192,6 +192,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** The UI thread's state of plat (windows, clipboard, file and print dialogs, pen and touch, Linux's X11 connection and portals, AppKit's and UIKit's objects) belongs to the UI thread, the first thread that uses it: a call on another thread panics before it touches anything (it raced on unsynchronized Cells and RefCells before, undefined behaviour from safe code)
 =======
 - **plat:** UI Automation: the ExpandCollapse pattern had a wrong interface id, so no client got it (drop-downs and menus too); AT-SPI2: a read-only text box was editable
+- **render2d:** render2d: strokes in a layer with fills on Intel under Linux (Mesa 26.0): single wrong pixels at random, mostly one colour channel, pixels of thin lines missing -- Mesa's Intel register allocation gave a part of the stroke's colour, unpacked at the top of the fragment shader and used at its end, to another value in some pixels (every pixel right with INTEL_DEBUG=spill_fs); the three fragment shaders unpack the colour where they return the pixel (the 166 images of --dump unchanged on NVIDIA; the Iris Xe passes 698 of 700 checks)
 
 ## [0.1.0] - 2026-11-08
 
