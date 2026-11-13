@@ -18,7 +18,6 @@
 // scalar parts (the curve, the arc length, the dequantization) are libjxl's baseline code
 // without FMA.
 
-use alloc::vec;
 use alloc::vec::Vec;
 
 use img_core::{ERR_CODE, ERR_HDR, ERR_LIMIT};
@@ -568,13 +567,15 @@ impl Splines {
             }
         }
         by_y.sort_unstable();
-        let mut ystart = vec![0u32; h as usize + 1];
+        // the rows up to the last one a blob touches (add_to stops there), not the frame height
+        let rows = by_y.last().map_or(0, |e| e.0 as usize + 1);
+        let mut ystart = crate::modular::zvec::<u32>(rows + 1)?;
         let mut idx = Vec::with_capacity(by_y.len());
         for &(y, i) in &by_y {
             idx.push(i);
             ystart[y as usize + 1] += 1;
         }
-        for y in 0..h as usize {
+        for y in 0..rows {
             ystart[y + 1] += ystart[y];
         }
         Ok(Splines { segs, idx, ystart })

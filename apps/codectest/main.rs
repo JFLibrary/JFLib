@@ -16,6 +16,8 @@
 //   --jxlenc FILE                  (jxl-module) save JPEG XL with the writer of the module file
 //                                  FILE (jxlenc.dll / .so; "off" = the assembly-compatible
 //                                  writer) instead of the linked one (img_jxl_enc)
+//   --hostile [--only NAME]        crafted JPEG XL / JPEG XR inputs that must be refused quickly
+//                                  (hostile.rs; tests/hostile.uis); exit code 1 on a failure
 //
 // Batch file: "CTB1", then records {u32 op, u32 arg, u32 len, u8 data[len]}.
 // Result file: "CTR1", then per record {i32 result, u32 len, u8 data[len]}.  An op handler
@@ -43,6 +45,7 @@ use base::Args;
 use gfx::{FMT_A8, Surface};
 use img_core::ImgMeta;
 
+mod hostile;
 mod ops_base;
 mod ops_bmp;
 mod ops_dds;
@@ -168,6 +171,9 @@ fn codectest() -> i32 {
         None => img_jxl_enc::use_static(),
     }
     let mut ct = Ct { out: Vec::new(), core_only, args };
+    if ct.args.flag("--hostile") {
+        return hostile::run(ct.args.value("--only"));
+    }
     if let Some(inp) = ct.args.value("--batch").map(alloc::string::String::from) {
         return run_batch(&mut ct, &inp);
     }
