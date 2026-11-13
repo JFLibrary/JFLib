@@ -95,6 +95,8 @@ panic nobody catches, below). What changes against the template:
 | --- | --- |
 | Windows | `cargo build`; the Visual Studio Build Tools, which Rust's msvc toolchain needs anyway |
 | Linux | `cargo build` on Linux, through cc against glibc; not from Windows, and not with musl |
+| macOS | `cargo build` on a Mac (`cargo jflib mac` makes `NAME.app`) |
+| iOS | `cargo build --target aarch64-apple-ios` (or `aarch64-apple-ios-sim`) on a Mac; `cargo jflib` makes no iOS app yet |
 | Browser | `cargo jflib web`, the modes scalar and SIMD (no threads mode: rustup ships no std with atomics). std has no clock, files, threads or network there: they panic or fail. JFLib's own (`plat::time_us`, `ui.spawn`, `plat::read_file`) work |
 | Android | `cargo jflib android`; `std::fs` needs real paths (the app's folder). JFLib's paths (`/tmp`, `/documents`) are names that only `plat` resolves |
 
@@ -545,6 +547,10 @@ with `const RG_SIZE: Range = Range::new(1, 100, 1, 0);` (min, max, step, `RG_*` 
   `TB_READONLY`, `TB_DIGITS` (+ `TB_SIGNED`, `TB_DECIMAL`), `TB_MULTI` (+ `TB_WRAP`; give it a
   height with `next_size`; + `TB_HYPHENATE`: hyphenation, section 11), `TB_SPELL` (spell
   checking, below). The capacity takes bits 0..22 (at most 8 MB).
+* A `TB_PASSWORD` box sets the input method's purpose itself: `IP_PASSWORD` while it has the
+  keyboard (Windows takes the input method away, X11 keeps the keys from IBus as GTK does,
+  Wayland tells the compositor), the purpose of before once it lost the keyboard or went away
+  with its window -- no `plat::ime_purpose` call in the app (`viewtest` `tests/password.uis`).
 * Formatted text (bold, lists, links ...) and source code with highlighting: the editors
   `ui.richtext` and `ui.code_editor` (section 28).
 * `number_box(id, &mut i32, &Range)`, `number_box_f(id, &mut f64, &RangeF)` with
@@ -745,10 +751,15 @@ if self.tab == 0 {
   `CUR_ZOOM_OUT`, `CUR_CELL`, `CUR_VTEXT`, `CUR_ALIAS`, `CUR_COPY`, `CUR_CONTEXT_MENU`,
   `CUR_ALL_SCROLL`, `CUR_COL_RESIZE`, `CUR_ROW_RESIZE` and the edges and corners `CUR_SIZE_N` /
   `_S` / `_E` / `_W` / `_NE` / `_NW` / `_SE` / `_SW` (`CUR_X0` .. `CUR_X_END`), `CUR_CUSTOM` too.
-  Where a system has no such cursor it shows `plat::cursor_fallback(shape)`'s (grab: the hand,
-  zoom: the crosshair, an edge: its double arrow): Wayland with cursor-shape, the browser and
-  macOS (most) have all of them; Windows has not-allowed, help, progress and the resize shapes,
-  X11's cursor font a few more. `ui.cursor_at(x, y)` is the cursor at a point (px) in the last
+  Wayland with cursor-shape, the browser and macOS (most) have all of them; Windows has
+  not-allowed, help, progress and the resize shapes, X11's cursor font a few more. Grab,
+  grabbing, zoom-in / -out, cell, vertical text, alias, copy and context menu are drawn on
+  Windows, X11 and Wayland without cursor-shape (`lib/plat/cursor_art.rs`: small bitmaps at the
+  size of the system's cursors for the window's dpi, made once per size; white with a black
+  outline as Windows' own, on X11 black with a white outline as the Adwaita and Breeze themes;
+  without RENDER X11 keeps its cursor font's shapes). Where a system
+  still has no such cursor it shows `plat::cursor_fallback(shape)`'s (macOS: zoom and cell the
+  crosshair; an edge: its double arrow). `ui.cursor_at(x, y)` is the cursor at a point (px) in the last
   pass. A page's own pictures (`cursor: url(..)`) are custom cursors: `ui.cursor_new(draw, w, h,
   hot)` -> a handle, `ui.cursor_custom(handle)` + `cursor_next(CUR_CUSTOM)` shows it,
   `ui.cursor_replace(handle, draw, w, h, hot)` draws it anew under the same handle,
@@ -819,7 +830,8 @@ if self.tab == 0 {
   **An input method for a field the page draws itself** (a web page's `<input>`, Japanese or
   Chinese typed into it): while such a field has the focus, `ui.ime_enable(true, IP_TEXT)`
   (also `IP_URL`, `IP_EMAIL`, `IP_NUMBER`, `IP_PHONE`, `IP_SEARCH`; `IP_PASSWORD` takes the
-  input method away on Windows and tells Wayland) and every frame `ui.ime_pos(x, y, h)` at the
+  input method away on Windows, keeps the keys from IBus on X11 and tells Wayland, also when
+  the purpose changes from one field to the next) and every frame `ui.ime_pos(x, y, h)` at the
   field's caret (px of the window: the candidates follow it); `ui.ime_enable(false, 0)` when it
   loses the focus. The composition is the app's to draw at the caret, underlined:
   `ui.ime_preedit()` gives its text and caret (a byte offset; empty when none is going on), a
@@ -1005,6 +1017,31 @@ ui.menubar(None);                        // the menu bar of the AppDesc
   ```
 
   `apps/viewtest` (`tests/menus.uis`) does both.
+  `popup_close()` closes every popup; `popup_close_id(id)` only popup `id` and the popups
+  opened inside it, the flyout around it stays (a `date_picker` in a flyout of the app's own
+  closes its calendar this way when a day is picked). A popup opened inside a flyout is drawn
+  where its `flyout_begin` stands: put a drop-down (a `date_picker`, a `combobox`) last in the
+  flyout, or its list lies under the flyout's later widgets.
+  **A calendar in place** (a web page's date input, a panel): `calendar(id, &mut y, &mut m,
+  &mut d, &DateRange::new(mode, min, max))` draws the month of `date_picker`'s popup without a
+  popup and returns `EV_ACT` when the user picked. `CAL_DAY` picks a day (`DateRange::DAYS`:
+  any day of the years 1 to 9999), `CAL_WEEK` an ISO week (rows from Monday with the week's
+  number; the date becomes its Monday), `CAL_MONTH` a month of a year's twelve (the 1st);
+  what lies before `min` or after `max` (in weeks: their weeks, in months: their months) is
+  disabled, and so are the arrows beyond them. The calendar shows the date's month again when
+  the app changes the date. The civil helpers are `jflib::datetime`'s: `days_in_month`,
+  `weekday` (0 = Monday), `iso_week(y, m, d) -> (year, week)`, `iso_weeks_in_year`,
+  `iso_week_monday(year, week)`:
+
+  ```rust
+  let range = DateRange::new(CAL_WEEK, (2026, 11, 5), (2027, 2, 10));
+  if ui.calendar(ID_WEEK, &mut self.y, &mut self.m, &mut self.d, &range) & EV_ACT != 0 {
+      let (year, week) = datetime::iso_week(self.y, self.m as u8, self.d as u8); // "2026-W48"
+      self.page.set_value(&format!("{year}-W{week:02}"));
+  }
+  ```
+
+  `apps/viewtest` (`tests/calendar.uis`) has both in a flyout at a point of its page.
   A row whose keys the app handles itself (no command of the table, e.g. inside a pane that
   captures them with `capture_shortcut`) shows them with `menu_item_keys(id, label,
   &ui.key_text(VK_F5, MOD_CTRL))`: `key_text(vk, mods)` writes a key as the accelerator texts
@@ -1298,6 +1335,10 @@ ui.dialog_end(); // always
     as before) and it arrives as `UIC_DROP` with `drop_list()` / `drop_data()`. Files are never
     moved (their source would delete them): Shift gives a copy. Dropped files may be read and
     written (`fs.user`).
+  * Positions: `drop_pos()` and `drag_over()` are DIP of the window, rounded; at 150 % three
+    pixels share two DIP. A canvas that draws at the display's resolution (a web page) takes
+    `drop_pos_px()` / `drag_over_px()`: px of the window like `last_rect`, so `(x - inp.rect[0],
+    y - inp.rect[1])` is the pixel of the canvas (`UiInput`'s own `x`, `y` are px too).
   * Mirrored windows (RTL): targets and positions stay logical, as every pointer event.
   * Tests: `drag S1 S2` and `down` / `move` / `key esc` / `up` for widget drags; `dragover`,
     `dragleave` and `drop X Y text "s" html "s" url U image F files F...` for other programs;
@@ -1684,7 +1725,8 @@ impl App for Copier {
   `netio::Client::request_async` and `download(url, headers, name, &ctl)` do the same for HTTP.
 * Test scripts stay deterministic: `sync` waits until no task work is in flight (pool jobs and
   the wake-ups they send), `wait MS` moves the task clock (`sleep` follows the virtual clock in
-  headless runs); wake-ups from other threads reach headless tasks only at `sync`.
+  headless runs); wake-ups from other threads reach headless tasks only at `sync` and in
+  `wait real MS` (real time for an app's own threads, section 12).
   [`apps/asynctest`](../apps/asynctest/main.rs) shows a copy with a progress bar and a cancel
   button and the scripts that step through it.
 * A panic in a task or a blocking job ends the process like any panic (exit code 3). In the
@@ -1953,7 +1995,8 @@ in DIP):
 | `preedit "text" [CURSOR]` | an input method's composition (`ui.ime_preedit`; CURSOR a byte offset, default the end; `""` ends it) |
 | `focus S` | keyboard focus to a widget (focus ring shown) |
 | `cmd ID [ARG]` | run a command as if a menu row was chosen |
-| `wait MS` | advance the virtual clock (16 ms frames; a frame the app or the library asked for comes with the next one, as in the window loop) |
+| `wait MS` | advance the virtual clock (16 ms frames; a frame the app or the library asked for comes with the next one, as in the window loop); nothing else happens meanwhile, so the run is the same every time |
+| `wait real MS` | MS of real time pass while the app's own threads work (an engine with threads of its own): their wake-ups (`plat::wake`) reach `App::command` (`UIC_WAKE`) as they come, and the virtual clock follows the real one (timers fire, frames asked for come). Not deterministic: expect what holds however long the threads took, or `sync` on a hook first |
 | `size W H`, `theme dark\|light\|contrast`, `scale P [window ID]` | window size, theme, dpi |
 | `theme file PATH`, `theme none`, `style NAME` | an app theme from a file (an error is printed and remembered, the theme stays), none, another linked style (§34) |
 | `expect theme "NAME"\|none`, `expect theme error "TEXT"\|none`, `expect style NAME` | the app theme, the error of the last `theme file` (contains TEXT), the style in use |
@@ -1965,7 +2008,7 @@ in DIP):
 | `window ID\|main\|any` | selectors only look into that window |
 | `expect window ID open\|closed\|visible\|active\|modal\|keys`, `expect window ID rect X Y W H` | secondary windows (`keys`: the window the keys go to now -- a tool window borrows them after F6 / Ctrl+F6, §27) |
 | `close window ID`, `movewin ID X Y`, `resizewin ID W H`, `activate ID` | the user moves / closes windows |
-| `sync [MS]` | wait until no background job is pending (`sync_hook_set`) |
+| `sync [MS] [soft]` | wait (real time, at most MS, default 10 s) until no background job is pending (`sync_hook_set`, async tasks, the spell checker); reaching MS fails the script, with `soft` it does not (a note is printed, the expects after it decide). The virtual clock stands still meanwhile: timers of the app fire in `wait real`, not in `sync` |
 | `expect_warn`, `expect_nowarn` | a `UIWARN` was / was not printed since the last check |
 | `gpu on [fast]\|off`, `gpu wait [MS]`, `gpu hold MS`, `gpu lose`, `gpu print`, `gpu budget BYTES`, `gpu tilebudget BYTES`, `gpu settle`, `gpu shot FILE`, `gpu expect gpu\|cpu\|same\|window\|screen\|upload N\|base N\|raster N\|layers N\|images N\|apart N\|tiles N\|fills N\|nodiff` | (Windows, Linux with the GPU; else a SKIP once; GPU.md "Ausgabe der UI") `gpu on`: real windows through the swapchain, shown without activation, every presented image read back and compared with the framebuffer (`fast`: not read back, for measurements), a render after every input edge; a canvas stays on its tiles until `settle` or `same`. `wait`: until the windows are on the swapchain again. `hold`: real time passes, the windows stay as they are (a look from outside). `lose`: the device behaves as lost. `budget`: what image textures may take, `tilebudget`: what canvas tiles may take. `settle`: every canvas back to the CPU's picture. `shot`: the image the window presents now, also a gesture's tiles (`shot` writes the framebuffer). `same`: every canvas settled, every window presents once more, byte for byte; `window`: the window's DC = the framebuffer (the CPU path); `screen`: the composed screen = the framebuffer (a covered window is a note; X11: what the server holds; Wayland: a note, no client can read a window); `upload N`: at most N bytes uploaded since the last check; `base N`: at most N of them to the base texture; `raster N`: at most N pixels of the base layer drawn; `layers N`: N layers above the base have a texture now; `images N`: N image textures exist; `apart N`: N canvases come from tiles now; `tiles N`: N tiles exist; `fills N`: at most N tiles drawn since the last check; `nodiff`: no pixel of a canvas's tiles differed from the CPU's since the last `same` or `nodiff` |
 | `expect scrollcopy [N]\|none` | at least N (default 1) / no rendered frames moved pixels by a scroll copy since the last check (§5; frames checked by `--verify-dirty` copy whenever they can, `jfgui_DEBUG=1` prints each copy) |
@@ -1975,6 +2018,7 @@ in DIP):
 | `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
 | `system focus in\|out`, `system suspend\|resume`, `system background\|foreground`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|other\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...; background / foreground: a hidden tab, Android's `onStop` / `onStart`) |
+| `system browser default\|other\|unknown` | (E13) what `ui.default_browser()` answers from here (headless runs never ask the system; at first `other`, section 21); then the app loses the keyboard and gets it back as after the system's settings (`UIC_ACTIVE` 0 and 1; only 1 when it was not active), so an app that keeps the status reads it again |
 | `system env NAME VALUE\|-` | set (`-` removes) a `jfgui_*` environment variable of the run: the overrides of the system settings (then `system settings ...`), `jfgui_CSD` (the library title bar and its resize band from the next pass), `jfgui_FONT_FALLBACK 1` (system fonts for missing characters from here, section 11) |
 | `sensor accel\|gravity\|gyro\|magnet X Y Z [ACCURACY]`, `sensor rot X Y Z W [abs\|rel]`, `sensor none NAME\|all`, `sensor expect NAME off\|waiting\|running\|paused\|denied\|unavailable` | a reading of `plat::sensors` as the host would deliver it (the sensor exists from now on; a stopped one delivers nothing), a sensor gone, its state (§36) |
 | `location LAT LON [ACC ALT SPEED BEARING]` (`-`: the provider does not say), `location age MS`, `location searching\|denied\|off\|none`, `location expect off\|searching\|fix\|paused\|denied\|disabled\|unavailable` | a fix of `plat::sensors`, how old it is, the host's answer (`off`: the system's switch; `none`: no location service, as at the start), the state (§36) |
@@ -2194,6 +2238,7 @@ row_h)` reports opened and closed nodes (load children lazily) and toggled check
 | `toast(kind, title, msg, ms)`, `toast_host()` | notifications; call `toast_host` once per frame, last; screen readers and scripts see the card (its title), its message (`text:"…"`) and its close button |
 | `spinner(id, size)`, `progress_indeterminate(id)` | waiting |
 | `date_picker`, `time_box`, `weekday_toggles` | dates, times, weekday masks (schedules) |
+| `calendar(id, &mut y, &mut m, &mut d, &DateRange)` | the month calendar of `date_picker` in place, for a panel or a flyout of the app's own (below) |
 
 **Docking** ([`ui/dock.rs`](../lib/ui/dock.rs)): panels at the left, right and bottom of a
 document area, in tab groups with splitters; the user drags tabs onto drop markers, floats
@@ -2257,13 +2302,16 @@ self.dock.focus(P_PROPS);
 * `DockState`: `save()` / `load(text)` (a few lines, `dock 1` first; unknown lines and bad
   values are skipped), `reset`, `show` / `hide` / `toggle` / `focus` / `activate`, `float` /
   `dock_to`, `float_group` / `dock_group_to`, `collapse`, `size` / `set_size`, and for menus and status lines `groups(side)`,
-  `floats()`, `hidden_panels()`, `side(id)`, `visible`, `front`, `shown`.
+  `floats()`, `hidden_panels()`, `side(id)`, `visible`, `front`, `shown`. `show` brings a hidden
+  panel back between the neighbours it had in its group, whichever of them are back already:
+  panels hidden one by one and shown again in any order keep their tab order (the order goes
+  with `save` / `load`; `tests/order.uis`).
 * Keyboard: a group's tab strip is one focus stop (Left / Right / Home / End switch tabs, the
   menu key or Shift+F10 open the group's menu); Ctrl+PgDn / Ctrl+PgUp switch tabs while the
   focus is anywhere in the group. Mirrored windows (RTL) show the left side at the right with
   its markers; menus and markers name the sides as they show.
 * Tests: `apps/docktest` (`tests/layout.uis`, `drag.uis`, `hold.uis`, `float.uis`, `keys.uis`,
-  `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`, `group.uis`). A plain `drag` lasts 128 ms and never gets
+  `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`, `group.uis`, `order.uis`). A plain `drag` lasts 128 ms and never gets
   past the hold: `drag tab:"…" X,Y hold 320`, or `wait 320` between `down` and the first `move`
   (a `move` during the hold does not count towards the drag).
   A floating window is `window 501`, and `window any` + `drag tab:"…" X,Y hold 320` drags its
@@ -2371,7 +2419,12 @@ against `LIB_TEXTS`), `--update` adds the missing texts as rows with empty cells
 catalogue (the one whose texts come from the same folder, `src/` or `crates/`), at its end in
 source order; existing rows are never changed, and the app keeps showing German there until
 the cells are filled. A catalogue the app reads itself without `Catalog::from_tsv` names its
-languages in a comment (`# languages: de en fr`). The suite runs
+languages in a comment (`# languages: de en fr`). An app outside this repository (a cargo app
+of its own) is checked by its path, `python tools/i18n_check.py ../BrowserGUI [--update]` (a relative
+path from the current folder, `.` inside the app; a bare name is the repository's `apps/NAME` first): its
+folders count except build output (`build/`, `target/`), hidden folders and git submodules (an
+engine taken by path), and its places read from the folder that holds it
+(`BrowserGUI/src/main.rs:12`). The suite runs
 `i18n --check`: it fails on errors and on gaps in the catalogues that are complete
 (`COMPLETE`: all of them today, the library too) and only counts the others.
 
@@ -3323,6 +3376,55 @@ let done = plat::assoc::assoc_register(&pkg, &mut |c| self.user_said_yes(&c.what
   the `fs.user` grant of the command line and `plat::assoc::file_uri_path(arg)` turn local
   ones into paths. An app that reads `plat::args()` itself uses `file_uri_path` too.
 
+**A web browser.** An app that shows web pages says so in its `PACKAGE`: `browser=1` with
+`schemes=http https` (and its file types, [PACKAGING.md](PACKAGING.md) "Web browsers"). The
+setup, the packages and `--register` register it as a web browser; becoming the default is the
+user's choice, which the app offers on its settings page:
+
+```rust
+// the app keeps the answer: browser: Option<BrowserStatus> (None: ask again)
+// the settings page
+let status = *self.browser.get_or_insert_with(|| ui.default_browser()); // plat::default_browser_status()
+match status {
+    BrowserStatus::Default => ui.text(TS_BODY, "Narsil ist der Standardbrowser."),
+    _ => {
+        if ui.button(ID_DEFAULT, "Als Standardbrowser festlegen") & EV_ACT != 0 {
+            match ui.default_browser_request() {      // plat::default_browser_request()
+                Ok(()) => self.browser = None,        // Linux sets it at once: ask again
+                Err(e) => self.note = format!("{e}"), // NotRegistered: --register first
+            }
+        }
+    }
+}
+// in command(): back from the system's settings (Windows and macOS ask the user there)
+UIC_ACTIVE if arg != 0 => self.browser = None,       // ask again in the next frame
+```
+
+* Keep the answer instead of asking every frame (the status reads the registry or the
+  `mimeapps.list` files) and ask again when the app is active again (`UIC_ACTIVE` with 1): the
+  user chooses in the system's settings, outside the app. In a script, `system browser
+  default|other|unknown` sends that round trip itself.
+
+* Windows: the request opens Settings at the app's page of the default apps (Windows 10 and later
+  let no program take the default itself; the user picks there); the status is the user's choice
+  of http and https. Linux: the request makes the app's installed `.desktop` file the user's
+  default of `x-scheme-handler/http`, `https` and `text/html` in `mimeapps.list` (and KDE's
+  `BrowserApplication`), as `xdg-settings set default-web-browser` does -- call it only from the
+  user's click; the status reads the defaults (`Unknown` when none is set). macOS: the request
+  asks Launch Services, and macOS asks the user ("Do you want to change your default web
+  browser?"). Flatpak, MSIX, the browser, Android and iOS: `Unknown`, `AssocError::Unavailable`.
+* `AssocError::NotRegistered`: the program is not registered as a browser (a build from `build/`
+  without `--register`); `plat::assoc::assoc_register` registers it first.
+* Headless runs never ask the system: `ui.default_browser()` answers what the script says
+  (`system browser default|other|unknown`, at first `NotDefault`), and
+  `ui.default_browser_request()` prints `ui_default_browser_request`. `plat::default_browser_*`
+  are the real calls (Windows: `jfgui_OPEN_DRYRUN=1` prints the Settings page instead of opening
+  it).
+* The Windows setup of a browser asks once itself: its options page has "Als Standardbrowser
+  festlegen" ("Make <App> my default browser" in other languages), checked as in Firefox's
+  setup, and its last button opens the same Settings page ([PACKAGING.md](PACKAGING.md)). The
+  Linux and macOS packages have no pages: there only the app offers it.
+
 **Recent files.** `ui.recent_add(path)` after opening or saving a file keeps the app's own
 list (`ui.recent_files()`, newest first, at most `ui::RECENT_KEEP`, in `config://recent.list`;
 `recent_remove`, `recent_clear`) and tells the system. To open an entry, call
@@ -3380,7 +3482,9 @@ run), `--test taskbar-win` (by hand: a window with every state), and
 `tools/platshared/desktop_bus.py` in WSL (the Inhibit and Background portals and the
 LauncherEntry signals on a fake bus). `apps/traydemo` has buttons for all of it.
 `plattest --test assoc` registers a test package (Windows: test names in the real HKCU,
-removed again; Linux: scratch XDG folders, `desktop-file-validate`), `--test recent` the xbel
+removed again; Linux: scratch XDG folders, `desktop-file-validate`) and a web browser (the
+registration, the status, the request: a dry run on Windows, mimeapps.list and kdeglobals on
+Linux), `--test recent` the xbel
 list through `jfgui_RECENT` and, on Windows, the explicit id (shortcuts and pins in a scratch
 folder), `--test recent-win` (by hand, no window) the real shell and jump list with the
 derived and the explicit id. `apps/androidGallery/tests/files_web.mjs` checks the browser's
@@ -4144,6 +4248,10 @@ doc.apply_edits(&edits, "Umbenennen");
   `CodeEv::Breakpoint(line)`, `doc.set_breakpoints(&[(line, BP_ON | BP_DISABLED | BP_COND)])`
   draws them (a filled circle, a ring, a bar across), `doc.set_exec_line(Some(line))` marks a
   debugger's line (an arrow and `CodeTheme::exec_line`); both follow edits like diagnostics.
+  `ui.code_reveal(id, line)` scrolls the line into view in the editor's next pass (into the
+  middle when it was not in view; the folds hiding it open) without taking the keyboard focus
+  or moving the caret: a debugger shows where it stopped while the page or its toolbar keeps
+  the keyboard (`apps/editortest`, `tests/code_reveal.uis`).
 * Folding: ranges from the language (`set_fold_ranges`; one that starts where a folded one did
   stays folded), a chevron per range in a column after the numbers (`CE_FOLDS` keeps it), a
   click or Ctrl+Shift+[ / ] folds and unfolds, `fold_all`. Folded lines are out of the view,

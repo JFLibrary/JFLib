@@ -104,6 +104,10 @@ impl App<'_> {
                             xml(&name), xml(&t.desc),
                             t.exts.iter().map(|e| format!("              <uap:FileType ContentType=\"{}\">.{e}</uap:FileType>\n", xml(&t.mime))).collect::<String>());
         }
+        if pkgmeta::browser(&self.meta)? {
+            return Err("MSIX: a web browser (PACKAGE browser=1) cannot be one: Windows reserves http and https for packages; \
+                        take the setup (--formats setup)".to_string());
+        }
         for s in pkgmeta::schemes(&self.meta)? {
             if RESERVED_SCHEMES.contains(&s.as_str()) || s.len() < 2 || s.len() > 39 {
                 return Err(format!("MSIX: URL scheme {s:?} is reserved by Windows or has a bad length (2..39)"));

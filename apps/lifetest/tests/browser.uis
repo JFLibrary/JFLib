@@ -1,0 +1,26 @@
+# (E13) the default browser kept as docs/GUIDE.md section 21 advises: asked once, again when the
+# app is active again (UIC_ACTIVE 1).  `system browser` changes the answer of the headless run
+# and sends the round trip through the system's settings itself: no `system focus out / in`
+theme light
+expect text:"Browser: ein anderer, 1 Mal gefragt" exists
+expect text:"Aktiv: nein  Schlaf: nein  Ende: 0" exists
+# not active: the app gets the keyboard (UIC_ACTIVE 1) and asks again
+system browser default
+expect text:"Browser: Standard, 2 Mal gefragt" exists
+expect text:"Aktiv: ja  Schlaf: nein  Ende: 0" exists
+# active: it loses the keyboard and gets it back (UIC_ACTIVE 0, 1), still active afterwards
+system browser unknown
+expect text:"Browser: unbekannt, 3 Mal gefragt" exists
+expect text:"Aktiv: ja  Schlaf: nein  Ende: 0" exists
+system browser other
+expect text:"Browser: ein anderer, 4 Mal gefragt" exists
+# frames alone do not ask again
+wait 100
+expect text:"Browser: ein anderer, 4 Mal gefragt" exists
+# the app loses the keyboard by itself: kept, asked again when it is back
+system focus out
+expect text:"Aktiv: nein  Schlaf: nein  Ende: 0" exists
+expect text:"Browser: ein anderer, 4 Mal gefragt" exists
+system focus in
+expect text:"Browser: ein anderer, 5 Mal gefragt" exists
+expect_nowarn

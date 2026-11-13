@@ -545,12 +545,14 @@ impl X11 {
     }
 
     /// ime_pos(x, y, h): the caret of the focused text field in window px (h 0: none) ->
-    /// IBus focus / cursor location on the root
+    /// IBus focus / cursor location on the root; a password field (ime_purpose IP_PASSWORD) gets
+    /// no input method, its keys go past IBus (as GTK's input module does)
     pub(super) fn ime_pos(&mut self, x: i32, y: i32, h: i32) {
         // only while a window of ours has the keyboard (the UI calls this on every frame)
         let win = (0..PW_MAX).find(|&k| self.xw[k].win != 0 && self.xw[k].focus);
+        let pw = crate::ime_purpose_of() == crate::IP_PASSWORD;
         match win {
-            Some(i) if h > 0 => {
+            Some(i) if h > 0 && !pw => {
                 let (rx, ry) = if self.xw[i].posok { (self.xw[i].rx, self.xw[i].ry) } else { (0, 0) };
                 let rect = [rx + x, ry + y, h];
                 if !self.ime_on || self.ime_rect != rect || self.ime_win != i as u8 {

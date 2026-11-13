@@ -19,6 +19,8 @@ drop 678 229 text "von rechts"
 expect text:"Text: von rechts" exists
 drop 160 480 build/dnd/f.txt
 expect text:"UIC_DROP: 1 Datei(en) bei 599,480 (Fenster 0)" exists
+# in px: logical too (the window is 760 px wide: 760 - 1 - 160)
+expect text:"Pixel: - / 599,480" exists
 # out of the window on the left: the platform takes it
 down #103
 move 500,110

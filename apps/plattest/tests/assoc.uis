@@ -2,5 +2,6 @@
 # (Rust only) plattest --test assoc: file types and URL schemes without a setup
 # (lib/plat/assoc.rs, lib/ui/assoc.rs). Windows: test ProgIDs, extensions and a scheme in the
 # real HKCU, removed again; Linux: scratch XDG folders (desktop-file-validate and
-# update-mime-database when installed). The whole test runs before the UI starts and ends the
+# update-mime-database when installed); a web browser (browser=1: Default Programs, the status,
+# the request as a dry run / in scratch files). The whole test runs before the UI starts and ends the
 # process with the number of failures.

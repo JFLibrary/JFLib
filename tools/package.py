@@ -56,7 +56,8 @@ previews and the .deb are made the same way for both.
 
 Inputs: apps/<App>/PACKAGE (key=value: display, version, publisher, summary, description,
 generic, categories, section, deb_name, default_win, default_linux, styles; optional
-cross_bins= and unit_<name>=, below; filetypes= / schemes=: the file types and URL schemes the
+cross_bins= and unit_<name>=, below; browser=1: a web browser (registered as one, PACKAGING.md);
+filetypes= / schemes=: the file types and URL schemes the
 app opens -- the setup registers them under HKCU\\Software\\Classes, the .deb in its .desktop
 file and, for "own" types, a shared-mime-info package), apps/<App>/res/app.ico and
 app_{48,128,256}.png (tools/mkicon.py), styles/<style>/INFO (shown name, description;
@@ -230,6 +231,8 @@ def make_setup(app, meta, styles, dist, work, impl="asm", rsout=None, profile="s
         man.append(f"filetypes={meta['filetypes']}")
     if schemes(meta):
         man.append(f"schemes={' '.join(schemes(meta))}")
+    if pkgmeta.browser(meta):
+        man.append("browser=1")                          # the setup registers a web browser too
     man.append(f"app_id={pkgmeta.app_id(meta, app)}")   # the AppUserModelID of shortcuts, pins, ProgIDs
     mtext = ("\n".join(man) + "\n").encode("utf-8")
     entries.append((PK_MANIFEST, PF_ZLIB, "manifest", "", zlib.compress(mtext, 9), len(mtext)))

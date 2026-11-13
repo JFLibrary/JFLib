@@ -565,7 +565,43 @@ fn t_threads(t: &mut T) {
     th_pool(t);
     th_jobs(t);
     th_wake(t);
+    th_stop(t);
     plat::thr_shutdown();
+}
+
+static STOP_GO: AtomicU32 = AtomicU32::new(0);
+
+/// thread: wait until all 8 are there, then stop the pool
+fn w_stop(_: u32) {
+    STOP_GO.fetch_add(1, SeqCst);
+    while STOP_GO.load(SeqCst) < 8 {
+        core::hint::spin_loop();
+    }
+    plat::thr_shutdown();
+}
+
+/// eight threads stop the pool at once (one takes it down, the others wait for it), 20 times;
+/// the pool starts again afterwards each time
+fn th_stop(t: &mut T) {
+    let (mut started, mut sums) = (0u32, 0u32);
+    for _ in 0..20 {
+        plat::thr_init(0);
+        STOP_GO.store(0, SeqCst);
+        let (n, v) = spawn8(w_stop);
+        if n < 8 {
+            // a missing thread would leave the others spinning: let them through
+            STOP_GO.fetch_add(8 - n, SeqCst);
+        }
+        join_all(v);
+        started += n;
+        let sum = AtomicU32::new(0);
+        let _ = plat::parallel_for(100, &|i, _| {
+            sum.fetch_add(i as u32, SeqCst);
+        });
+        sums += (sum.load(SeqCst) == 4950) as u32;
+    }
+    t.check(started == 160 && sums == 20, "pool: 8 shutdowns at once, 20 times; each restart runs every item");
+    t.info(&format!("  ({started} threads, {sums} of 20 restarts complete)\n"));
 }
 
 /// 8 threads running f(index)

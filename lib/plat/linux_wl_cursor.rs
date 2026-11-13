@@ -1,6 +1,8 @@
 // linux_wl_cursor -- pointer cursors: wp_cursor_shape_v1 when the compositor has it (every
 // CSS shape: E3's CUR_X0 .. CUR_X_END too), otherwise a cursor surface with built-in images
-// (WSLg has no cursor-shape; the shapes beyond them show cursor_fallback's)
+// (WSLg has no cursor-shape): the first shapes below, the drawn ones of cursor_art (grab,
+// grabbing, zoom, cell, vertical text, alias, copy, context menu); the other shapes beyond
+// them show cursor_fallback's
 //                                                                 [src/plat/linux/wl_cursor.s]
 //
 //   Wl::win_set_cursor(w, shape)   CUR_* of window w (CUR_NONE hides the pointer); shown
@@ -8,7 +10,7 @@
 //   Wl::cursor_init()              create the cursor surface (after the window)
 //   Wl::cursor_apply()             send the shape of the pointer's window (enter / change,
 //                                  also after a scale change)
-//   image(shape) / render(dst, image, S)   (tests)
+//   image(shape) / render(dst, image, S)   (tests; image: the first shapes and cursor_art's)
 //   Wl::cursor_create(px, w, h, hot_x, hot_y, dpi) -> CUR_USER0 + k / -1   a custom cursor:
 //        the premultiplied pixels in a wl_buffer of their own, buffer scale dpi / 96
 //        (cursor_dpi rounds the window's dpi up to a multiple of 96); shown on a cursor
@@ -25,19 +27,13 @@ use rt::os::{syscall6, SYS_MUNMAP};
 use super::proto::*;
 use super::wire::A;
 use super::Wl;
+pub(crate) use crate::cursor_art::Art;
+use crate::cursor_art::{DRAWN, DRAWN_N, drawn, drawn_index};
 use crate::{CUR_ARROW, CUR_COUNT, CUR_MAX_PX, CUR_NONE, CUR_USER0, CUR_USER_MAX, PW_MAX};
 
 const CUR_IMAGES: usize = 10; // CUR_ARROW .. CUR_SIZE_NESW
+const ALL_IMAGES: usize = CUR_IMAGES + DRAWN_N; // then cursor_art's, in the order of DRAWN
 const SHM_ARGB8888: u32 = 0;
-
-/// a built-in cursor image
-pub(crate) struct Art {
-    pub w: u8,
-    pub h: u8,
-    pub hx: u8,
-    pub hy: u8,
-    pub px: &'static [u8], // w * h characters
-}
 
 /// a custom cursor (buf 0 = free slot)
 #[derive(Clone, Copy, Default)]
@@ -52,7 +48,7 @@ pub(crate) struct Cw {
 
 #[derive(Default)]
 pub(crate) struct Cursor {
-    bufs: [u32; CUR_IMAGES],
+    bufs: [u32; ALL_IMAGES],
     pub shape: u32, // the pointer's shape (g_wl_cur_shape)
     surf: u32,
     s: u32,
@@ -62,7 +58,12 @@ pub(crate) struct Cursor {
 
 /// the image of a CUR_* shape  [wl_cursor_image]
 pub(crate) fn image(shape: u32) -> Option<&'static Art> {
-    CUR_TABLE.get(shape as usize).copied()
+    CUR_TABLE.get(shape as usize).copied().or_else(|| drawn(shape))
+}
+
+/// the built-in image k (0 .. ALL_IMAGES - 1): the first shapes, then cursor_art's
+fn art(k: usize) -> &'static Art {
+    if k < CUR_IMAGES { CUR_TABLE[k] } else { DRAWN[k - CUR_IMAGES] }
 }
 
 /// expand an image into ARGB pixels (S x S blocks, rows of width * S pixels, no padding)
@@ -160,14 +161,18 @@ impl Wl {
                 return;
             }
         } else if (crate::CUR_X0..crate::CUR_X_END).contains(&shape) {
-            // (E3) cursor-shape knows them all; the built-in images the nearest one
+            // (E3) cursor-shape knows them all; the built-in images the drawn ones, else the
+            // nearest one
             if self.inp.csd != 0 {
                 let csd = self.inp.csd;
                 self.w.send(csd, &CSD_SET_SHAPE, &[A::U(serial), A::U(shape_of(shape))]);
                 self.w.flush();
                 return;
             }
-            shape = crate::cursor_fallback(shape);
+            shape = match drawn_index(shape) {
+                Some(k) => (CUR_IMAGES + k) as u32,
+                None => crate::cursor_fallback(shape),
+            };
         } else if shape as usize >= CUR_IMAGES {
             if shape == CUR_NONE {
                 // CUR_NONE: no cursor surface
@@ -190,7 +195,7 @@ impl Wl {
         if s != self.cur.s && !self.cursor_build(s) {
             return;
         }
-        let a = CUR_TABLE[shape as usize];
+        let a = art(shape as usize); // shape: the image's index here
         let cs = self.cur.surf;
         self.w.send(ptr, &POINTER_SET_CURSOR, &[A::U(serial), A::O(cs), A::I(a.hx as i32), A::I(a.hy as i32)]);
         self.w.send(cs, &SURFACE_ATTACH, &[A::O(self.cur.bufs[shape as usize]), A::I(0), A::I(0)]);
@@ -203,11 +208,11 @@ impl Wl {
 
     /// render every image at scale S into new buffers -> ok  [cursor_build]
     fn cursor_build(&mut self, s: u32) -> bool {
-        let total: usize = CUR_TABLE.iter().map(|a| a.w as usize * a.h as usize * (s * s) as usize * 4).sum();
+        let total: usize = (0..ALL_IMAGES).map(art).map(|a| a.w as usize * a.h as usize * (s * s) as usize * 4).sum();
         let Some((pool, map)) = self.shm_pool_new(total) else { return false };
-        let mut nb = [0u32; CUR_IMAGES];
+        let mut nb = [0u32; ALL_IMAGES];
         let mut off = 0usize;
-        for (i, a) in CUR_TABLE.iter().enumerate() {
+        for (i, a) in (0..ALL_IMAGES).map(art).enumerate() {
             let n = a.w as usize * a.h as usize * (s * s) as usize;
             // SAFETY: the mapping holds `total` bytes; this image's pixels are [off, off + n * 4).
             let dst = unsafe { core::slice::from_raw_parts_mut((map + off) as *mut u32, n) };
@@ -221,7 +226,7 @@ impl Wl {
         self.w.send(pool, &SHM_POOL_DESTROY, &[]);
         // SAFETY: our mapping; the compositor has its own.
         unsafe { syscall6(SYS_MUNMAP, map, total, 0, 0, 0, 0) };
-        for i in 0..CUR_IMAGES {
+        for i in 0..ALL_IMAGES {
             let old = self.cur.bufs[i];
             self.cur.bufs[i] = nb[i];
             if old != 0 {

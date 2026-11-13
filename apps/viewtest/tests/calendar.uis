@@ -1,0 +1,66 @@
+# viewtest: a date picker and a calendar inside a flyout of the app's own (a web page's date input)
+#
+# "Datum" opens the flyout at a point of the page (popup_open_at), a pass later
+click "Datum"
+expect "Termin" exists
+expect text:"Datum: 2026-11-13" exists
+expect text:"Kalender: 2026-11-13 2026-W46 Wahl: 0" exists
+# the date picker in the flyout: a day closes its own calendar, not the flyout around it
+# (its days: #0x800F1040 + cell; November 2026 starts on Monday 26 October, cell 25 = the 20th)
+click #125
+expect #0x800F1040 exists
+click #0x800F1059
+expect #0x800F1040 missing
+expect "Termin" exists
+expect text:"Datum: 2026-11-20" exists
+# "Heute" closes only the calendar too
+click #125
+click "Heute"
+expect #0x800F1040 missing
+expect "Termin" exists
+# the calendar in place (cells #0x800F10C0 + cell): days from 2026-11-05 to 2027-02-10
+expect #0x800F10D2 selected
+expect #0x800F10C8 disabled
+expect #0x800F10CA enabled
+# no month before November can be picked: its arrow is off
+expect #0x800003F9 disabled
+click #0x800F10DD
+expect text:"Kalender: 2026-11-24 2026-W48 Wahl: 1" exists
+expect #0x800F10DD selected
+# February 2027 (it starts on a Monday): the 10th is the last day, no month after it
+click #0x800003FA
+click #0x800003FA
+click #0x800003FA
+expect "Februar 2027" exists
+expect #0x800F10C9 enabled
+expect #0x800F10CA disabled
+expect #0x800003FA disabled
+# ISO weeks: a row is a week from Monday; the week of the 5th is the first, of the 10th the last
+click "Woche"
+expect "2026-W48" selected
+expect "2026-W45" enabled
+expect "2026-W44" disabled
+click #0x800003FA
+click #0x800003FA
+click #0x800003FA
+expect "2027-W06" enabled
+expect "2027-W07" disabled
+click "2027-W06"
+expect text:"Kalender: 2027-02-08 2027-W06 Wahl: 2" exists
+expect "2027-W06" selected
+# months: the twelve of the date's year, January and February 2027 only
+click "Monat"
+expect "2027" exists
+expect "Februar 2027" selected
+expect "März 2027" disabled
+expect #0x800003FA disabled
+click "Januar 2027"
+expect text:"Kalender: 2027-01-01 2026-W53 Wahl: 3" exists
+expect "Januar 2027" selected
+click #0x800003F9
+expect "November 2026" enabled
+expect "Oktober 2026" disabled
+expect #0x800003F9 disabled
+# Esc closes the flyout
+key esc
+expect "Termin" missing

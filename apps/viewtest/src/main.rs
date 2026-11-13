@@ -31,6 +31,19 @@
 //                        zoom-in, the north-east corner, a custom cursor of the page's own;
 //                        "Eigener größer" redraws it (ui.cursor_replace), "Eigener frei" frees it
 //                        (ui.cursor_free); "Zeiger:" says ui.cursor_at under the pointer
+//   "Hintergrund"        a thread of the app's own works 300 ms of real time, then plat::wake
+//                        (an engine's thread): UIC_WAKE shows it ("Hintergrund: N"); meanwhile a
+//                        timer polls every 100 ms ("Abfrage: läuft / fertig", an extension
+//                        page's poll); tests/realwait.uis with `wait real`
+//   "Hängt"              the sync hook says a job is running (`sync MS soft`)
+//   "Kennwort"           a TB_PASSWORD box: the input method's purpose ("Zweck: N",
+//                        plat::ime_purpose_of) is IP_PASSWORD while it has the keyboard, set by
+//                        the box itself; command 6 takes the box away while it has it
+//                        (tests/password.uis)
+//   "Datum"              a flyout of the app's own at a point of the page (BrowserGUI's picker
+//                        of an <input type=date>) with a date_picker in it, whose day closes its
+//                        calendar only, and ui.calendar in place: days, ISO weeks or months
+//                        between 2026-11-05 and 2027-02-10 (tests/calendar.uis)
 //
 // tests/keys.uis, tests/menus.uis and tests/links.uis drive it; the texts above the page say what
 // it saw.
@@ -41,10 +54,12 @@
 
 extern crate alloc;
 
+use alloc::boxed::Box;
 use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use plat::a11y::Role;
 use ui::*;
@@ -69,6 +84,14 @@ const ID_DIRS: u32 = 116; // "Ordner wählen"
 const ID_NOTE: u32 = 117; // "Notiz": a text box of this id in the main window and in the app window
 const ID_CHAIN: u32 = 118; // "Kette"
 const ID_AGAIN: u32 = 119; // "Immer neu"
+const ID_WORK: u32 = 120; // "Hintergrund"
+const ID_HANG: u32 = 121; // "Hängt"
+const ID_PW: u32 = 122; // "Kennwort" (TB_PASSWORD)
+const ID_DATEBTN: u32 = 123; // "Datum": opens ID_DATEPOP at a point of the page
+const ID_DATEPOP: u32 = 124; // that flyout
+const ID_DATE: u32 = 125; // the date_picker in it (its calendar's days: #0x800F1040 + cell)
+const ID_CALMODE: u32 = 126; // "Tag" / "Woche" / "Monat"
+const ID_CAL: u32 = 127; // the calendar in place (cells: #0x800F10C0 + day, week row or month)
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 const ID_FD_DIR: u32 = 0x11_0000; // the folder dialog (FD_FOLDER)
 
@@ -77,6 +100,18 @@ const CMD_RELOAD: u32 = 2;
 const CMD_COPY: u32 = 3; // a row of the page's menu (Mi::Item)
 const CMD_TREE: u32 = 4; // after the frame: the tree is complete
 const CMD_CHAIN: u32 = 5; // "Kette": one link of the chain
+const CMD_PW_AWAY: u32 = 6; // the password box goes away (and comes back), as with a closed window
+
+const T_POLL: u32 = 1; // "Hintergrund": the timer that polls the thread's result
+
+// "Hintergrund": the work the app's thread finished (it counts up, then plat::wake)
+static WORK_DONE: AtomicU32 = AtomicU32::new(0);
+// "Hängt": the sync hook reports a job that never ends
+static HANG: AtomicBool = AtomicBool::new(false);
+
+fn sync_pending() -> bool {
+    HANG.load(Ordering::Relaxed)
+}
 
 // the page's context menu
 static PAGE_MENU: [Mi; 3] = [Mi::Cmd(CMD_RELOAD), Mi::Sep, Mi::Item(CMD_COPY, "Link kopieren", 0)];
@@ -90,7 +125,7 @@ const DESC: AppDesc = AppDesc {
     title: "Ansichtstest",
     flags: AF_RESIZABLE,
     w: 560,
-    h: 760,
+    h: 820,
     min_w: 400,
     min_h: 360,
     cmds: &CMDS,
@@ -149,6 +184,20 @@ struct ViewTest {
     app_open: Shared<i32>,
     app_rect: Shared<WinRect>,
     app_tab: u32,
+    /// "Hintergrund": the thread's work UIC_WAKE saw, the poll timer's state; "Hängt"
+    work_seen: u32,
+    polled: &'static str,
+    hang: i32,
+    /// "Kennwort": its text, taken away (CMD_PW_AWAY)
+    pw: String,
+    pw_away: bool,
+    /// "Datum": the flyout opens in the next pass; the date picker's date, the calendar's mode,
+    /// date and picks
+    date_later: bool,
+    date: (i32, u32, u32),
+    cal_mode: i32,
+    cal: (i32, u32, u32),
+    cal_picks: u32,
 }
 
 // (E3) the cursors "Zeiger wechseln" walks through (0: the page's arrow / hand)
@@ -200,8 +249,23 @@ impl Default for ViewTest {
             app_open: Shared::new(0),
             app_rect: Shared::new(WinRect::new(0, 0, 480, 240, 0)),
             app_tab: 0,
+            work_seen: 0,
+            polled: "-",
+            hang: 0,
+            pw: String::new(),
+            pw_away: false,
+            date_later: false,
+            date: (2026, 11, 13),
+            cal_mode: 0,
+            cal: (2026, 11, 13),
+            cal_picks: 0,
         }
     }
+}
+
+// "2026-11-13"
+fn ymd((y, m, d): (i32, u32, u32)) -> String {
+    format!("{y}-{m:02}-{d:02}")
 }
 
 // the link of the page at (x, y) px relative to the page
@@ -343,6 +407,11 @@ impl ViewTest {
             self.later = false;
             ui.popup_open_at(ID_FLYOUT, r[0] + ui.dp(200), r[1] + ui.dp(60));
         }
+        // "Datum": the picker's flyout below a field of the page (an <input type=date>)
+        if self.date_later {
+            self.date_later = false;
+            ui.popup_open_at(ID_DATEPOP, r[0] + ui.dp(16), r[1] + ui.dp(24));
+        }
         // the cursor of the hit box under the pointer: the last pass's, once more when it is not
         // yet the one this pass asked for
         if inp.ev & EV_HOVER != 0 {
@@ -352,6 +421,31 @@ impl ViewTest {
                 ui.repass();
             }
         }
+    }
+
+    // "Datum": a flyout of the app's own (a web page's date input) with a calendar in place --
+    // days, ISO weeks or months between 2026-11-05 and 2027-02-10 -- and a date picker, whose day
+    // closes only the picker's calendar.  The picker comes last: a popup opened inside a flyout
+    // is drawn where its flyout_begin is, so the flyout's later widgets would lie over it
+    fn date_flyout(&mut self, ui: &mut Ui) {
+        if ui.flyout_begin(ID_DATEPOP, 0) {
+            ui.segmented(ID_CALMODE, &mut self.cal_mode, &["Tag", "Woche", "Monat"]);
+            let mode = [CAL_DAY, CAL_WEEK, CAL_MONTH][self.cal_mode.clamp(0, 2) as usize];
+            let range = DateRange::new(mode, (2026, 11, 5), (2027, 2, 10));
+            let (mut y, mut m, mut d) = self.cal;
+            if ui.calendar(ID_CAL, &mut y, &mut m, &mut d, &range) & EV_ACT != 0 {
+                self.cal = (y, m, d);
+                self.cal_picks += 1;
+            }
+            ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
+            ui.text(TS_BODY, "Termin");
+            let (mut y, mut m, mut d) = self.date;
+            if ui.date_picker(ID_DATE, &mut y, &mut m, &mut d) & EV_ACT != 0 {
+                self.date = (y, m, d);
+            }
+            ui.box_end();
+        }
+        ui.flyout_end();
     }
 
     // a canvas with the defaults
@@ -372,12 +466,13 @@ impl ViewTest {
 }
 
 impl App for ViewTest {
-    fn init(&mut self, _ui: &mut Ui) -> bool {
+    fn init(&mut self, ui: &mut Ui) -> bool {
         // --app-window: the app window is open from the start (real-window checks without input,
         // tools/x11check.py appwin)
         if plat::args().iter().any(|a| a == "--app-window") {
             self.app_open.set(1);
         }
+        ui.sync_hook_set(Some(sync_pending));
         true
     }
 
@@ -452,8 +547,16 @@ impl App for ViewTest {
             },
         };
         ui.text(TS_BODY, &format!("Eigener: {own}"));
+        ui.box_begin(0, BOX_H, 8);
         ui.next_size(240, 0);
         ui.textbox(ID_NOTE, Some("Notiz"), &mut self.note, 256);
+        // a password box sets the input method's purpose itself (shown after it: this pass's)
+        if !self.pw_away {
+            ui.next_size(160, 0);
+            ui.textbox(ID_PW, Some("Kennwort"), &mut self.pw, 64 | TB_PASSWORD);
+        }
+        ui.text(TS_BODY, &format!("Zweck: {}", plat::ime_purpose_of()));
+        ui.box_end();
         // a chain of commands, each queued by the frame that saw the one before: the click's
         // frame and the next two use the three command rounds of a frame, the third link's
         // change needs the frame after them
@@ -472,6 +575,32 @@ impl App for ViewTest {
         if self.again != 0 {
             ui.invalidate();
         }
+        ui.box_end();
+        // a thread of the app's own (an engine's): real time, then plat::wake; a timer polls
+        ui.box_begin(0, BOX_H, 8);
+        if ui.button(ID_WORK, "Hintergrund") & EV_ACT != 0 {
+            plat::thread_spawn(0, Box::new(|| {
+                plat::sleep_ms(300);
+                WORK_DONE.fetch_add(1, Ordering::Relaxed);
+                plat::wake();
+            }));
+            self.polled = "läuft";
+            ui.timer(T_POLL, 100);
+        }
+        if ui.checkbox(ID_HANG, "Hängt", &mut self.hang) & EV_ACT != 0 {
+            HANG.store(self.hang != 0, Ordering::Relaxed);
+        }
+        ui.text(TS_BODY, &format!("Hintergrund: {} Abfrage: {}", self.work_seen, self.polled));
+        ui.box_end();
+        // "Datum": the flyout below (date_flyout); what its date picker and calendar hold
+        ui.box_begin(0, BOX_H, 8);
+        if ui.button(ID_DATEBTN, "Datum") & EV_ACT != 0 {
+            self.date_later = true;
+        }
+        let (y, m, d) = self.cal;
+        let (wy, w) = datetime::iso_week(y, m as u8, d as u8);
+        ui.text(TS_BODY, &format!("Datum: {}", ymd(self.date)));
+        ui.text(TS_BODY, &format!("Kalender: {} {wy}-W{w:02} Wahl: {}", ymd(self.cal), self.cal_picks));
         ui.box_end();
         ui.box_end();
         // (E7) an independent app window: its own title bar with a tab and the caption buttons
@@ -505,9 +634,10 @@ impl App for ViewTest {
             self.rows += 1;
         }
         ui.flyout_end();
+        self.date_flyout(ui);
     }
 
-    fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
+    fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
         match id {
             CMD_TREE => {
                 // what a screen reader gets: the page's links as links with their names
@@ -519,6 +649,16 @@ impl App for ViewTest {
             CMD_RELOAD => self.reload += 1,
             CMD_COPY => self.copy += 1,
             CMD_CHAIN => self.chain += 1,
+            CMD_PW_AWAY => self.pw_away = !self.pw_away,
+            // "Hintergrund": the thread's wake-up, the poll timer
+            UIC_WAKE => self.work_seen = WORK_DONE.load(Ordering::Relaxed),
+            UIC_TIMER if arg == T_POLL => {
+                if WORK_DONE.load(Ordering::Relaxed) > 0 {
+                    self.polled = "fertig";
+                } else {
+                    ui.timer(T_POLL, 100);
+                }
+            }
             _ => return false,
         }
         true

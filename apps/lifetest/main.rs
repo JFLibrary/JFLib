@@ -1,7 +1,8 @@
 // lifetest -- the app lifecycle of the runtime (UIC_ACTIVE, UIC_SUSPEND, UIC_SESSION_END,
 // UIC_SETTINGS, UIC_THEME), the log and the settings it follows (high contrast, text scale,
 // animations), for tests/life.uis and tests/settings.uis; the runtime's queues (keys of one
-// pass, commands, timers) for tests/queues.uis
+// pass, commands, timers) for tests/queues.uis; the default browser kept as GUIDE section 21
+// advises (asked once, again after UIC_ACTIVE 1) for tests/browser.uis
 //
 //   build/win/lifetest.exe --script apps/lifetest/tests/life.uis
 //
@@ -51,6 +52,9 @@ struct Life {
     tfired: u32,
     tlast: Option<(u32, u32)>,
     tdisorder: bool,
+    /// (E13) ui.default_browser's answer, kept until the app is active again; how often asked
+    browser: Option<BrowserStatus>,
+    browser_asked: u32,
 }
 
 // the newest log line without its time: "INFO  app: ..."
@@ -104,12 +108,28 @@ impl App for Life {
         ui.text(TS_BODY, &format!("Folge: {}", self.key_seq));
         ui.text(TS_BODY, &format!("Befehle: {}, Reihenfolge: {}", self.cmds, yn(!self.cmds_disorder)));
         ui.text(TS_BODY, &format!("Timer: {} von {}, Reihenfolge: {}", self.tfired, self.tset, yn(!self.tdisorder)));
+        let asked = &mut self.browser_asked;
+        let b = *self.browser.get_or_insert_with(|| {
+            *asked += 1;
+            ui.default_browser()
+        });
+        let b = match b {
+            BrowserStatus::Default => "Standard",
+            BrowserStatus::NotDefault => "ein anderer",
+            _ => "unbekannt",
+        };
+        ui.text(TS_BODY, &format!("Browser: {b}, {} Mal gefragt", self.browser_asked));
         ui.box_end();
     }
 
     fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
         match id {
-            UIC_ACTIVE => self.active = arg != 0,
+            UIC_ACTIVE => {
+                self.active = arg != 0;
+                if self.active {
+                    self.browser = None; // back from the system's settings: ask again
+                }
+            }
             UIC_SUSPEND => self.sleeping = arg != 0,
             UIC_SESSION_END => {
                 self.session_end += 1;

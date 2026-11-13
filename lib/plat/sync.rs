@@ -14,6 +14,7 @@
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use core::cell::UnsafeCell;
+use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicU32, Ordering};
 
@@ -206,11 +207,11 @@ impl<T: ?Sized> Mutex<T> {
         if self.state.compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed).is_err() {
             self.lock_contended();
         }
-        MutexGuard { m: self }
+        MutexGuard { m: self, _t: PhantomData }
     }
 
     pub fn try_lock(&self) -> Option<MutexGuard<'_, T>> {
-        self.state.compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed).ok().map(|_| MutexGuard { m: self })
+        self.state.compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed).ok().map(|_| MutexGuard { m: self, _t: PhantomData })
     }
 
     /// the value without locking (the borrow proves exclusivity)
@@ -257,6 +258,10 @@ impl<T: ?Sized> Mutex<T> {
 /// the locked value; unlocks when dropped
 pub struct MutexGuard<'a, T: ?Sized> {
     m: &'a Mutex<T>,
+    // a shared guard hands out &T on every thread that holds a reference to it, so the guard
+    // may be Sync only when T is (as with &mut T); Send stays T: Send (the unlock is not tied
+    // to the locking thread)
+    _t: PhantomData<&'a mut T>,
 }
 
 impl<T: ?Sized> Deref for MutexGuard<'_, T> {
@@ -356,7 +361,11 @@ impl<T> RwLock<T> {
 impl<T: ?Sized> RwLock<T> {
     pub fn read(&self) -> RwReadGuard<'_, T> {
         let mut s = self.cv.wait_while(self.st.lock(), |s| s.writer || s.writers_waiting > 0);
-        s.readers += 1;
+        // never wrap to 0 (2^32 guards passed to mem::forget): a writer would then share the value
+        s.readers = match s.readers.checked_add(1) {
+            Some(n) => n,
+            None => panic!("RwLock: too many readers"),
+        };
         RwReadGuard { l: self }
     }
 

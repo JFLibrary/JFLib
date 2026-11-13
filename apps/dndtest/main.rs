@@ -11,8 +11,9 @@
 // window.  The targets #301..#305 take text, HTML, URLs, an image, files; outside them the
 // window takes files and text (drop_accept) as UIC_DROP.  Three buttons drag content that only
 // other programs take: a text, a PNG (with a BMP copy for DIB targets) and a temporary file.
-// Status lines show what the targets saw: "Über", "Abgelegt", "Ende", "UIC_DROP".  German is the
-// source language, locales/ui.tsv has the English texts.
+// Status lines show what the targets saw: "Über", "Abgelegt", "Ende", "UIC_DROP"; "Pixel" the
+// drag's and the last drop's place in px of the window (drag_over_px, drop_pos_px).  German is
+// the source language, locales/ui.tsv has the English texts.
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -269,6 +270,11 @@ impl App for Dnd {
         ui.text(TS_BODY, &tf("Abgelegt: {}", &[&self.dropped]));
         ui.text(TS_BODY, &tf("Ende: {}", &[&self.ended]));
         ui.text(TS_BODY, &format!("UIC_DROP: {}", self.uic));
+        // the exact places in px (at 150 %: three pixels for two DIP)
+        let (ty, x, y) = ui.drag_over_px();
+        let (dx, dy) = ui.drop_pos_px();
+        let over = if ty == 0 { String::from("-") } else { format!("{x},{y}") };
+        ui.text(TS_BODY, &format!("Pixel: {over} / {dx},{dy}"));
         ui.box_end();
         // the pass drew the fruit at its old place already: move it now, build again
         if let Some((i, k)) = self.moving.take() {
