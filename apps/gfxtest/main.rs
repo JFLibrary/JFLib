@@ -121,12 +121,36 @@ fn selftest() -> i32 {
     let bg = clip_setup(&mut t);
     clip_test(&mut t, bg.0, FMT_PARGB);
     clip_test(&mut t, bg.1, FMT_A8);
+    big_ellipse_test(&mut t);
     if t.fails == 0 {
         out("selftest: all checks passed\n");
         0
     } else {
         err(&format!("selftest: {} check(s) FAILED\n", t.fails));
         1
+    }
+}
+
+// ---- ellipse_fx past i32 * kappa: from a radius of about 59,500 px the control offsets wrapped
+// (silent when it passes: the output lines stay those of the assembly version)
+
+fn big_ellipse_test(t: &mut T) {
+    let sf = Surface::new(16, 16, FMT_PARGB);
+    t.dc.begin(&sf);
+    let mut worst = 0.0f32;
+    for r in [1_000, 59_000, 70_000, 200_000] {
+        t.path.begin(&t.dc);
+        t.path.ellipse_fx(0, 0, r * FXS, r * FXS);
+        let rr = (r as f32) * (r as f32);
+        // the circle's points: x^2 + y^2 within 0.2 % of r^2 (cubic arcs are 0.03 % off)
+        for &(x, y) in t.path.pts_mut().iter() {
+            worst = worst.max(((x * x + y * y) / rr - 1.0).abs());
+        }
+    }
+    t.dc.end();
+    if worst > 0.002 {
+        err(&format!("ellipse: a large circle is {:.1} % off its radius\n", worst * 100.0));
+        t.fails += 1;
     }
 }
 

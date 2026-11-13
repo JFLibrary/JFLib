@@ -64,6 +64,13 @@ const MAX_PAYLOAD: u32 = 0xFFFF_FFF6; // libwebp MAX_CHUNK_PAYLOAD
 pub const WK_VP8: u32 = 1;
 pub const WK_VP8L: u32 = 2;
 
+/// the offset after the chunk at p with payload size sz (padded to even), None when it passes
+/// end (counted in u64: a size near MAX_PAYLOAD must not wrap a 32-bit usize back into the data)
+fn chunk_next(p: usize, sz: u32, end: usize) -> Option<usize> {
+    let next = p as u64 + ((sz as u64 + 1) & !1) + 8;
+    if next > end as u64 { None } else { Some(next as usize) }
+}
+
 /// the container walk (WPINFO): positions are offsets into the data
 #[derive(Clone, Copy, Default)]
 pub struct Info {
@@ -236,11 +243,10 @@ fn parse_body(d: &[u8], i: &mut Info) -> i32 {
             bad = true;
             break;
         }
-        let next = p + ((sz as usize + 1) & !1) + 8; // padded
-        if next > rend {
+        let Some(next) = chunk_next(p, sz, rend) else {
             bad = true;
             break;
-        }
+        };
         let t = rd32(d, p);
         let sz = sz as u64;
         if t == TAG_ICCP {
@@ -331,10 +337,7 @@ fn wp_frame(i: &mut Info, d: &[u8], c: usize, end: usize) -> i32 {
         if sz > MAX_PAYLOAD {
             return ERR_HDR;
         }
-        let next = p + ((sz as usize + 1) & !1) + 8;
-        if next > end {
-            return ERR_HDR;
-        }
+        let Some(next) = chunk_next(p, sz, end) else { return ERR_HDR };
         let t = rd32(d, p);
         if t == TAG_ALPH {
             if aseen || i.img.is_some() {

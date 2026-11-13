@@ -431,7 +431,9 @@ mod win {
     }
 
     fn ft_ns(ft: [u32; 2]) -> i64 {
-        (((ft[1] as u64) << 32 | ft[0] as u64) as i64 - EPOCH_DIFF).saturating_mul(100)
+        // (a FILETIME from 2^63 on, which SetFileTime takes, is clamped instead of turning negative)
+        let t = i64::try_from((ft[1] as u64) << 32 | ft[0] as u64).unwrap_or(i64::MAX);
+        t.saturating_sub(EPOCH_DIFF).saturating_mul(100)
     }
 
     fn ns_ft(ns: i64) -> u64 {

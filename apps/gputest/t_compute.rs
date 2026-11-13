@@ -201,6 +201,10 @@ pub fn copies(t: &mut T) {
     t.ok(v.as_ref().is_ok_and(|v| v.size() == (8, 8)), "view of mip 2, layer 1: 8 x 8");
     let bad_view = arr.create_view(&ViewDesc { dim: ViewDim::D2, base_mip: 0, mips: 0, base_layer: 0, layers: 0 });
     t.ok(matches!(bad_view, Err(GpuError::Invalid(_))), "a 2D view of 3 layers: Invalid");
+    // base + count past u32 (it wrapped small and passed, the driver got the range)
+    let far = arr.create_view(&ViewDesc { dim: ViewDim::D2, base_mip: u32::MAX, mips: 2, base_layer: 0, layers: 1 });
+    let far_layer = arr.create_view(&ViewDesc { dim: ViewDim::D2, base_mip: 0, mips: 1, base_layer: u32::MAX, layers: 2 });
+    t.ok(matches!(far, Err(GpuError::Invalid(_))) && matches!(far_layer, Err(GpuError::Invalid(_))), "views at base u32::MAX: Invalid");
 }
 
 pub fn timestamps(t: &mut T) {

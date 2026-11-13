@@ -346,7 +346,8 @@ pub fn decode(d: &[u8], sf: &mut Surface, dec: &ImgDec, m: &mut ImgMeta) -> i32 
     let mut ext = 0u32;
     if len >= 18 + TGA_FOOTSIZE && &d[len - 18..] == SIG {
         let eo = u32::from_le_bytes([d[len - 26], d[len - 25], d[len - 24], d[len - 23]]) as usize;
-        if eo >= 18 && eo + TGA_EXTSIZE <= len - TGA_FOOTSIZE && u16_at(d, eo) as usize >= TGA_EXTSIZE {
+        // (eo + TGA_EXTSIZE checked: a 32-bit usize must not wrap past the end)
+        if eo >= 18 && eo.checked_add(TGA_EXTSIZE).is_some_and(|e| e <= len - TGA_FOOTSIZE) && u16_at(d, eo) as usize >= TGA_EXTSIZE {
             ext = d[eo + TGA_EXTSIZE - 1] as u32 + 1;
         }
     }

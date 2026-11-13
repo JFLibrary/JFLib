@@ -20,7 +20,7 @@ use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use img_core::{ERR_HDR, ERR_UNSUPPORTED};
+use img_core::{ERR_HDR, ERR_NOMEM, ERR_UNSUPPORTED};
 use rt::fx::{cvttd, maxsd, maxss, minsd, minss, sqrt};
 
 use crate::frm::{Jf, JBM_REPLACE, JCT_XYB, JCT_YCBCR, JFF_NOISE, JFT_DC, JFT_REGULAR, JFT_SKIPPROG};
@@ -98,7 +98,12 @@ pub(crate) fn par_bands<T: Send>(planes: Vec<(&mut [T], usize)>, h: usize, f: im
 
 /// jr_alloc: zeroed plane samples, stride (w + 3) & -4 floats
 pub fn jr_alloc(w: u32, h: u32) -> Result<Vec<f32>, i32> {
-    zvec(r4(w) as usize * h as usize + 16)
+    zvec(samples(r4(w), h)?)
+}
+
+/// stride * rows + 16 samples (ERR_NOMEM when that passes a 32-bit usize)
+fn samples(stride: u32, rows: u32) -> Result<usize, i32> {
+    (stride as usize).checked_mul(rows as usize).and_then(|n| n.checked_add(16)).ok_or(ERR_NOMEM)
 }
 
 /// jr_pad: mirrored copy with a border of p (stride s + 2 p, h + 2 p rows)
@@ -114,8 +119,9 @@ pub fn jr_pad(jp: &Jrp, p: u32) -> Result<Vec<f32>, i32> {
 pub fn jr_pad_into(jp: &Jrp, p: u32, out: &mut Vec<f32>) -> Result<(), i32> {
     let ps = (jp.s + 2 * p) as usize;
     let rows = (jp.h + 2 * p) as usize;
-    if out.len() != ps * rows + 16 {
-        *out = zvec(ps * rows + 16)?;
+    let n = samples(jp.s + 2 * p, jp.h + 2 * p)?;
+    if out.len() != n {
+        *out = zvec(n)?;
     }
     let w = jp.w as usize;
     let pu = p as usize;

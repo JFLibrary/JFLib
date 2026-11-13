@@ -596,7 +596,9 @@ pub(crate) fn parse(text: &str, encoding: &str) -> Aff {
             "COMPOUNDEND" | "COMPOUNDLAST" => a.cpd_end = a.flag1(v1),
             "COMPOUNDPERMITFLAG" => a.cpd_permit = a.flag1(v1),
             "COMPOUNDFORBIDFLAG" => a.cpd_forbid = a.flag1(v1),
-            "COMPOUNDMIN" => a.cpd_min = v1.parse::<usize>().unwrap_or(3).max(1),
+            // (at most 65535: a larger value means "no compounds" for any real word anyway, and
+            // twice it must not wrap; 2^63 wrapped to 0 and the compound search indexed past the word)
+            "COMPOUNDMIN" => a.cpd_min = v1.parse::<usize>().unwrap_or(3).clamp(1, 0xFFFF),
             "COMPOUNDWORDMAX" => a.cpd_max = v1.parse::<usize>().unwrap_or(0),
             "CHECKCOMPOUNDDUP" => a.cpd_dup = true,
             "CHECKCOMPOUNDCASE" => a.cpd_case = true,

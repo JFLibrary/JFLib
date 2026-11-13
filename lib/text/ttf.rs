@@ -1190,7 +1190,7 @@ impl TtFont {
             m.ul_thick = d;
         }
         if m.ul_pos >= 0 {
-            m.ul_pos = (m.ul_thick + m.ul_thick).wrapping_neg();
+            m.ul_pos = m.ul_thick.wrapping_add(m.ul_thick).wrapping_neg(); // (wrapping as the lines above)
         }
         if m.st_thick <= 0 {
             m.st_thick = m.ul_thick;

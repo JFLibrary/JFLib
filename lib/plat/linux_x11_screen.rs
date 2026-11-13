@@ -585,6 +585,7 @@ impl X11 {
 fn clip(a: [i32; 4], b: Option<[i32; 4]>) -> [i32; 4] {
     let Some(b) = b else { return a };
     let (l, t) = (a[0].max(b[0]), a[1].max(b[1]));
-    let (r, d) = ((a[0] + a[2]).min(b[0] + b[2]), (a[1] + a[3]).min(b[1] + b[3]));
-    if r > l && d > t { [l, t, r - l, d - t] } else { a }
+    // (saturating: _NET_WORKAREA comes from the window manager, any 32-bit values)
+    let (r, d) = (a[0].saturating_add(a[2]).min(b[0].saturating_add(b[2])), a[1].saturating_add(a[3]).min(b[1].saturating_add(b[3])));
+    if r > l && d > t { [l, t, r.saturating_sub(l), d.saturating_sub(t)] } else { a }
 }

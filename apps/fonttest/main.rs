@@ -902,7 +902,8 @@ impl Ft {
             me.t.draw(&mut dc, &mut sf, 5, 22, text.as_bytes());
             dc.end();
             me.t.set_subpixel(SUBPIXEL_NONE);
-            sf.px.chunks_exact(4).map(|p| p[0] as u32 + p[1] as u32 + p[2] as u32 - 3 * 0x20).sum()
+            // (the row padding past 220 pixels stays 0: it adds nothing instead of going below 0)
+            sf.px.chunks_exact(4).map(|p| (p[0] as u32 + p[1] as u32 + p[2] as u32).saturating_sub(3 * 0x20)).sum()
         };
         let (gl, rl) = (light(self, SUBPIXEL_NONE), light(self, SUBPIXEL_RGB));
         self.st_check(rl * 10 > gl * 9 && rl * 10 < gl * 11, &format!("selftest: subpixel white ink {rl} vs greyscale {gl}\n"));

@@ -2407,7 +2407,8 @@ impl MdDoc {
         while s < on - a && s < nn - a && alike(&old[on - 1 - s], &new[nn - 1 - s]) {
             s += 1;
         }
-        let redo: Vec<usize> = (nn - s..nn).filter(|&j| old[j - nn + on] != new[j] || !same(&old[j - nn + on], &new[j])).collect();
+        // (j + on - nn: j - nn first passed 0 for every j, which only wrapped back in release)
+        let redo: Vec<usize> = (nn - s..nn).filter(|&j| old[j + on - nn] != new[j] || !same(&old[j + on - nn], &new[j])).collect();
         let range = (a, on - a - s, nn - a - s);
         DocChange { range: (range.1 > 0 || range.2 > 0).then_some(range), redo, full: true, images, spots }
     }

@@ -278,7 +278,8 @@ impl Texture {
         let d = &self.t.desc;
         let mips = if desc.mips == 0 { d.mips.saturating_sub(desc.base_mip) } else { desc.mips };
         let layers = if desc.layers == 0 { d.layers.saturating_sub(desc.base_layer) } else { desc.layers };
-        if mips == 0 || desc.base_mip + mips > d.mips || layers == 0 || desc.base_layer + layers > d.layers {
+        if mips == 0 || desc.base_mip.checked_add(mips).is_none_or(|e| e > d.mips) || layers == 0
+            || desc.base_layer.checked_add(layers).is_none_or(|e| e > d.layers) {
             return Err(GpuError::Invalid("view range outside the texture"));
         }
         let ok = match desc.dim {
@@ -414,13 +415,14 @@ pub(crate) struct Copy {
 pub(crate) fn copy_region(r: &TextureRegion, l: &DataLayout, data_len: u64) -> Result<Copy> {
     let t = r.texture;
     let d = &t.t.desc;
-    if r.mip >= d.mips || r.layers == 0 || r.base_layer + r.layers > d.layers {
+    if r.mip >= d.mips || r.layers == 0 || r.base_layer.checked_add(r.layers).is_none_or(|e| e > d.layers) {
         return Err(GpuError::Invalid("copy: mip or layers outside the texture"));
     }
     let (mw, mh, md) = ((d.width >> r.mip).max(1), (d.height >> r.mip).max(1), (d.depth >> r.mip).max(1));
     let [x, y, z] = r.origin;
     let [w, h, dd] = r.size;
-    if w == 0 || h == 0 || dd == 0 || x + w > mw || y + h > mh || z + dd > md {
+    let past = |a: u32, n: u32, m: u32| a.checked_add(n).is_none_or(|e| e > m);
+    if w == 0 || h == 0 || dd == 0 || past(x, w, mw) || past(y, h, mh) || past(z, dd, md) {
         return Err(GpuError::Invalid("copy: region outside the mip"));
     }
     let f = d.format;
@@ -443,11 +445,14 @@ pub(crate) fn copy_region(r: &TextureRegion, l: &DataLayout, data_len: u64) -> R
     if l.offset % align != 0 {
         return Err(GpuError::Invalid("copy: data offset not a multiple of the texel size"));
     }
-    let slices = (dd * r.layers) as u64;
-    let span = bpr * rows * (slices - 1) + bpr * (by - 1) + row;
-    if l.offset.checked_add(span).is_none_or(|e| e > data_len) {
+    let slices = dd as u64 * r.layers as u64;
+    // (checked: bytes_per_row and rows_per_image near u32::MAX must not wrap the span small)
+    let span = bpr.checked_mul(rows).and_then(|s| s.checked_mul(slices - 1))
+        .and_then(|s| s.checked_add(bpr * (by - 1) + row))
+        .filter(|&s| l.offset.checked_add(s).is_some_and(|e| e <= data_len));
+    let Some(span) = span else {
         return Err(GpuError::Invalid("copy: data smaller than the region"));
-    }
+    };
     Ok(Copy { bpr, bpi: bpr * rows, span })
 }
 
@@ -864,7 +869,7 @@ impl Device {
                         return Err(GpuError::Invalid("bind group: buffer lacks UNIFORM / STORAGE usage"));
                     }
                     let range = if size == 0 { buffer.size().saturating_sub(offset) } else { size };
-                    if offset % align.max(1) as u64 != 0 || range == 0 || offset + range > buffer.size() || range > max as u64 {
+                    if offset % align.max(1) as u64 != 0 || range == 0 || offset.checked_add(range).is_none_or(|e| e > buffer.size()) || range > max as u64 {
                         return Err(GpuError::Invalid("bind group: buffer range (alignment, size, limit)"));
                     }
                     Res::Buf(buffer.0.h.clone(), offset, range)
@@ -982,7 +987,7 @@ impl Bindless {
 
     pub fn set_buffer(&self, slot: u32, buf: &Buffer, offset: u64, size: u64) -> Result<()> {
         let range = if size == 0 { buf.size().saturating_sub(offset) } else { size };
-        if !buf.usage().contains(BufferUsage::STORAGE) || offset % self.align.max(1) as u64 != 0 || range == 0 || offset + range > buf.size() {
+        if !buf.usage().contains(BufferUsage::STORAGE) || offset % self.align.max(1) as u64 != 0 || range == 0 || offset.checked_add(range).is_none_or(|e| e > buf.size()) {
             return Err(GpuError::Invalid("bindless: buffer range or usage"));
         }
         let t = self.table(2, slot)?;

@@ -1089,6 +1089,16 @@ fn space_sc(s: AddressSpace) -> Sc {
     }
 }
 
+/// the module's words, or why SPIR-V cannot hold them: an instruction past 65535 words (a constant
+/// with that many components, a name of that length; shader writes it with the word count 0)
+fn finished(b: &shader::Module) -> Result<Vec<u32>, String> {
+    let words = b.finish();
+    match shader::parse::parse(&words) {
+        Ok(_) => Ok(words),
+        Err(_) => Err("an instruction is longer than SPIR-V's 65535 words (a constant, array or name too large)".into()),
+    }
+}
+
 /// a library module (spirv::compile_library): every function, uncalled, beside an empty
 /// compute entry point
 pub(crate) fn lower_library(m: &Module, opt: &CompileOptions, values: Vec<Option<Value>>, overrides: &[OverrideInfo]) -> Result<EntryOut, String> {
@@ -1139,7 +1149,7 @@ pub(crate) fn lower_library(m: &Module, opt: &CompileOptions, values: Vec<Option
     if !g.errors.is_empty() {
         return Err(g.errors.join("; "));
     }
-    let words = g.b.finish();
+    let words = finished(&g.b)?;
     Ok(EntryOut {
         name: ep.name.clone(),
         stage: Stage::Compute,
@@ -1502,7 +1512,7 @@ pub(crate) fn lower_entry(m: &Module, ep: &EntryPoint, opt: &CompileOptions, val
     if !g.errors.is_empty() {
         return Err(g.errors.join("; "));
     }
-    let words = g.b.finish();
+    let words = finished(&g.b)?;
     let immediate_size = ep.immediate.map(|gi| g.layout(m.globals[gi as usize].ty).1.div_ceil(4) * 4).unwrap_or(0);
     let resources = resources(&g);
     let io = |list: &[IoVar]| -> Vec<StageVar> { list.iter().map(|v| StageVar { name: v.name.clone(), kind: v.kind, ty: v.ty }).collect() };

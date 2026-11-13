@@ -331,7 +331,7 @@ impl BitW {
             if self.n % 8 == 0 {
                 self.b.push(0);
             }
-            if (v >> k) & 1 != 0 {
+            if k < 32 && (v >> k) & 1 != 0 {
                 let last = self.b.len() - 1;
                 self.b[last] |= 1 << (self.n % 8);
             }

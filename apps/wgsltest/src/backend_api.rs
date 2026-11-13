@@ -241,6 +241,11 @@ pub fn run(t: &mut T) {
     t.check("unknown entry point: an error", wgsl::compile(wgsl::bench::CULL, &CompileOptions { entry: Some("nope"), ..voll }).is_err());
     t.check("one entry point by name", wgsl::compile(vf, &CompileOptions { entry: Some("ok"), ..voll }).is_ok_and(|o| o.entries.len() == 1));
     t.check("SPIR-V 1.7: an error", wgsl::compile(wgsl::bench::CULL, &CompileOptions::new(7)).is_err());
+    // an instruction past SPIR-V's 65535 words (OpName and OpEntryPoint of a name of 262,200
+    // characters): an error, not a module whose 16-bit word count wrapped
+    let long = format!("@compute @workgroup_size(1) fn {}() {{}}", "a".repeat(262_200));
+    let e = wgsl::compile(&long, &voll).err().and_then(|d| d.first().map(|x| format!("{}", x))).unwrap_or_default();
+    t.check(&format!("a name past 65535 words: an error ({})", e), e.contains("65535"));
 }
 
 /// the compile time of the six benchmark shaders per level (check + lower)

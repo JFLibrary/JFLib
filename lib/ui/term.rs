@@ -1291,7 +1291,8 @@ impl Ui {
             // keep the first visible line when the width changes
             let anchor = (!st.at_bottom).then(|| {
                 let l = st.scr.line_at_row(st.top);
-                (l, l.map_or(0, |l| st.top - st.scr.row_of(l)))
+                // (saturating: a top above the first kept line, after the scrollback dropped lines)
+                (l, l.map_or(0, |l| st.top.saturating_sub(st.scr.row_of(l))))
             });
             st.scr.set_cols(cols);
             if let Some((Some(l), sub)) = anchor {

@@ -330,7 +330,8 @@ impl<'a> CommandEncoder<'a> {
     pub fn texture_barrier_range(&mut self, tex: &'a Texture, base_mip: u32, mips: u32, base_layer: u32, layers: u32,
                                  _before: Layout, after: Layout) {
         if self.outside("texture_barrier inside a render pass").is_none()
-            || self.ok(mips > 0 && layers > 0 && base_mip + mips <= tex.mips() && base_layer + layers <= tex.layers(),
+            || self.ok(mips > 0 && layers > 0 && base_mip.checked_add(mips).is_some_and(|e| e <= tex.mips())
+                           && base_layer.checked_add(layers).is_some_and(|e| e <= tex.layers()),
                        "texture_barrier: range outside the texture").is_none()
             || self.ok(after != Layout::Undefined, "texture_barrier: Undefined is no destination").is_none()
         {
@@ -371,7 +372,7 @@ impl<'a> CommandEncoder<'a> {
         let Some(p) = self.current() else { return };
         let bytes = bytes_of(data);
         let n = bytes.len() as u32;
-        let fits = offset % 4 == 0 && n % 4 == 0 && n > 0 && offset + n <= p.layout.0.push;
+        let fits = offset % 4 == 0 && n % 4 == 0 && n > 0 && offset.checked_add(n).is_some_and(|e| e <= p.layout.0.push);
         if self.ok(fits, "push_constants: range outside the layout's (multiples of 4)").is_none() {
             return;
         }
@@ -506,7 +507,7 @@ impl<'a> CommandEncoder<'a> {
     /// workgroup counts (3 x u32) from buf at offset
     pub fn dispatch_indirect(&mut self, buf: &'a Buffer, offset: u64) {
         let ok = self.pass.is_none() && self.compute_pipe.is_some() && buf.usage().contains(BufferUsage::INDIRECT) && offset % 4 == 0
-            && offset + 12 <= buf.size();
+            && offset.checked_add(12).is_some_and(|e| e <= buf.size());
         if self.ok(ok, "dispatch_indirect: pipeline, INDIRECT usage, offset or range").is_none() {
             return;
         }

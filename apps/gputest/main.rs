@@ -432,6 +432,12 @@ fn errors(t: &mut T) {
             e.push_constants(8, &[1u32, 2]);
             t.ok(matches!(e.finish(), Err(GpuError::Invalid(_))), "push constants past the layout: Invalid");
         }
+        // offset + size past u32: the sum wrapped to 4 and passed the check, the driver got the offset
+        if let Some(mut e) = t.res(dev.encoder(), "encoder") {
+            e.set_compute_pipeline(&fp.pipe);
+            e.push_constants(u32::MAX - 3, &[1u32, 2]);
+            t.ok(matches!(e.finish(), Err(GpuError::Invalid(_))), "push constants at u32::MAX - 3: Invalid");
+        }
         let other = dev.create_bind_group_layout(&[Binding { binding: 3, kind: BindingKind::UniformBuffer, stages: Stages::ALL }]);
         let ub = dev.create_buffer(&BufferDesc { size: 256, usage: BufferUsage::UNIFORM, memory: MemoryKind::Upload });
         if let (Some(other), Some(ub)) = (t.res(other, "layout"), t.res(ub, "uniform buffer")) {

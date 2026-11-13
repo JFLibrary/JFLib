@@ -289,7 +289,8 @@ impl Texture {
         let mips = if d.mips == 0 { t.mips.saturating_sub(d.base_mip) } else { d.mips };
         let total = if t.depth > 1 { 1 } else { t.layers };
         let layers = if d.layers == 0 { total.saturating_sub(d.base_layer) } else { d.layers };
-        if mips == 0 || d.base_mip + mips > t.mips || layers == 0 || d.base_layer + layers > total {
+        if mips == 0 || d.base_mip.checked_add(mips).is_none_or(|e| e > t.mips) || layers == 0
+            || d.base_layer.checked_add(layers).is_none_or(|e| e > total) {
             return Err(GpuError::Invalid("create_view: outside the texture"));
         }
         make_view(&self.t, d.dim, d.base_mip, mips, d.base_layer, layers)

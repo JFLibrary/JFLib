@@ -116,7 +116,14 @@ pub struct Module {
     f: Option<Func>,
 }
 
+/// an instruction: SPIR-V's word count has 16 bits, so one longer than 65535 words (a constant or
+/// a name too large) is written as its opcode with the count 0, never valid: parse() and the
+/// validators refuse the module, wgsl reports it, nothing reads its operands as instructions
 fn enc(buf: &mut Vec<u32>, opc: u16, args: &[u32]) {
+    if args.len() >= 0xFFFF {
+        buf.push(opc as u32);
+        return;
+    }
     buf.push(((args.len() as u32 + 1) << 16) | opc as u32);
     buf.extend_from_slice(args);
 }

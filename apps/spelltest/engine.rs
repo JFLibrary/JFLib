@@ -245,6 +245,11 @@ COMPOUNDFORBIDFLAG F\nSFX S Y 1\nSFX S 0 s/F .\nSFX P Y 1\nSFX P 0 x .\nONLYINCO
     // a suffix only at the end of a compound (without COMPOUNDPERMITFLAG)
     t.good(&d, &["barfoox"]);
     t.bad(&d, &["fooxbar"]);
+    // a COMPOUNDMIN past every word (2^63: twice it wrapped to 0 and the search indexed past the
+    // word, an abort): no compounds, the words themselves stay
+    let d = Dictionary::from_bytes(b"COMPOUNDFLAG X\nCOMPOUNDMIN 9223372036854775808\n", b"2\nfoo/X\nbar/X\n");
+    t.good(&d, &["foo", "bar"]);
+    t.bad(&d, &["foobar", "barfoo"]);
 }
 
 // ------------------------------------------------------------------ Hunspell's rules
