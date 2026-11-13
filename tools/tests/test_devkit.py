@@ -175,10 +175,21 @@ class ScaffoldTest(Temp):
 
     def test_manifests_set_version(self):
         """a release changes the version everywhere it stands, and nothing of the crates from outside"""
-        for rel in ("Cargo.toml", "Cargo.lock", "modules/modplat/Cargo.toml"):
+        for rel in ("Cargo.toml", "Cargo.lock", "modules/modplat/Cargo.toml", *manifests.DEP_VERSION_FILES):
             self.write(rel, (ROOT / rel).read_text(encoding="utf-8"))
+        self.assertEqual(manifests.dep_version_problems(self.dir), [], "the repository's files ask for its version")
+        guide = self.write("docs/GUIDE.md", 'jflib = { features = ["std"], version = "0.1" }\njflib-build = "0.1"\n'
+                                            'jflib-netlab = "0.1"\nother = "0.1"\n')
+        self.assertEqual(manifests.dep_version_problems(self.dir), [] if manifests.version().startswith("0.1.") else
+                         [f"docs/GUIDE.md: asks for jflib 0.1, the library is {manifests.version()} (build_rs.py release writes it)"])
         before = manifests.external_lock(self.dir)
         manifests.set_version("7.8.9", self.dir)
+        self.assertEqual(guide.read_text(encoding="utf-8"), 'jflib = { features = ["std"], version = "7.8" }\njflib-build = "7.8"\n'
+                                                            'jflib-netlab = "0.1"\nother = "0.1"\n')
+        template = (self.dir / "lib/jflib/template/Cargo.toml.in").read_text(encoding="utf-8")
+        self.assertIn('jflib = "7.8"', template)
+        self.assertIn('jflib-build = "7.8"', template)
+        self.assertEqual(manifests.dep_version_problems(self.dir), [])
         root = manifests.read(self.dir / "Cargo.toml")["workspace"]
         self.assertEqual(root["package"]["version"], "7.8.9")
         self.assertEqual({d["version"] for d in root["dependencies"].values() if "version" in d}, {"=7.8.9"})  # the unpublished: none

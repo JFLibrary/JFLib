@@ -775,6 +775,7 @@ def manifest_lint():
     # every published crate's README.md (its page on crates.io and docs.rs) and CHANGELOG.md (tools/changelog.py)
     import changelog
     bad += changelog.crate_doc_problems()
+    bad += manifests.dep_version_problems()          # the template and the guide ask for this version of jflib
     from tools import crates_accept                 # the template of lib/jflib comes from apps/template
     return bad + crates_accept.template_problems()
 

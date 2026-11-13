@@ -7,7 +7,7 @@
 //   write(|tx| { tx.put(coll, id, v); tx.delete(coll, id); }) -> Result<seq>
 //   update(coll, id, |v| ...)                                     read-modify-write in one txn
 //   compact()                                                     snapshot now
-//   Journal::open(dir) / append(name, &value) / tail(name, n) / read_month(name, yyyymm)
+//   Journal::open(dir, durable) / append(name, yyyymm, &value) / tail(name, n) / read_month(name, yyyymm)
 //
 // Files in `dir`: LOCK, snap-<seq>.bcs, wal-<first seq>.log; journal/<name>/<yyyymm>.jl.
 //   snapshot: "BCS1" seq:u64 | colls:u32 | per collection name, records:u32 | per record id,

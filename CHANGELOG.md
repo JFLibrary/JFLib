@@ -236,6 +236,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **build:** cargo-jflib: a stub's manifest got the comment lines after the app's [profile.release*] tables (a comment block of the next table, BrowserGUI's note on the engine's crates); only the tables are copied now
 - **plat:** The crash pre-hook (the last log lines, the crash line in the log file) neither allocates nor waits, so the app's crash hook and exit code 3 follow: it no longer rotates a log file that the crash line takes over its size (rotation allocates names and routes them through the mount table, which hung when the crash happened while that table was held; with keep 0 it deleted the crash line), writes the crash line to OS files only (not to a mount's stream), and on Linux a non-blocking stderr that takes nothing for half a second is given up instead of polled without a timeout (rt::os::write_stderr_crash, also for the crash and panic lines)
 - **style_netlab:** The manifest names the licences of the style's own copies of the Inter fonts and of the icon font besides MIT OR Apache-2.0: (MIT OR Apache-2.0) AND OFL-1.1 AND MIT (it said MIT OR Apache-2.0 alone)
+- **build:** build_rs.py release also writes MAJOR.MINOR where an app's dependency names it: the template's Cargo.toml.in (the one cargo jflib new writes, both copies) and the guide's examples; build_rs.py check reports a file that asks for another version (before, a release left the template asking for the old one)
 
 ## [0.1.0] - 2026-11-08
 

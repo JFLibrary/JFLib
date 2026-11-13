@@ -87,7 +87,8 @@ def external_lock(root=ROOT):
 
 def set_version(new, root=ROOT):
     """write the version: [workspace.package], the exact versions of [workspace.dependencies] and
-    modplat's own, and the workspace's entries of Cargo.lock"""
+    modplat's own, the workspace's entries of Cargo.lock, and MAJOR.MINOR where an app's
+    dependency names it (DEP_VERSION_FILES: the template, the guide)"""
     root = Path(root)
 
     def edit(rel, change):
@@ -101,3 +102,34 @@ def set_version(new, root=ROOT):
     edit("modules/modplat/Cargo.toml", pins)
     # every published package: jflib, jflib-*, and cargo-jflib (forgotten before 1.0.0: `--locked` then fails)
     edit("Cargo.lock", lambda t: re.sub(r'(name = "(?:cargo-)?jflib(?:-[a-z0-9-]+)?"\r?\nversion = )"[^"]*"', rf'\g<1>"{new}"', t))
+    # what `cargo jflib new` writes and the guide shows: jflib = "MAJOR.MINOR" (found before 0.2.0: the
+    # template still asked for 0.1 after the release)
+    for rel in DEP_VERSION_FILES:
+        if (root / rel).is_file():
+            edit(rel, lambda t: set_dep_versions(t, new))
+
+
+# the files that name the library's version as an app's dependency does: `jflib = "X.Y"`,
+# `jflib-build = "X.Y"`, `jflib = { features = [..], version = "X.Y" }` (dep_version_problems)
+DEP_VERSION_FILES = ("lib/jflib/template/Cargo.toml.in", "lib/cargo_jflib/template/Cargo.toml.in",
+                     "docs/GUIDE.md", "lib/jflib/docs/GUIDE.md")
+DEP_VERSION = re.compile(r'(\bjflib(?:-build)?\s*=\s*(?:\{[^}\n]*?version\s*=\s*)?")(\d+\.\d+)(")')
+
+
+def set_dep_versions(text, version):
+    """text with every dependency on jflib / jflib-build asking for MAJOR.MINOR of `version`"""
+    mm = ".".join(version.split(".")[:2])
+    return DEP_VERSION.sub(lambda m: m.group(1) + mm + m.group(3), text)
+
+
+def dep_version_problems(root=ROOT):
+    """the files of DEP_VERSION_FILES that ask for another MAJOR.MINOR than the library's version"""
+    root = Path(root)
+    want = ".".join(version(root).split(".")[:2])
+    bad = []
+    for rel in DEP_VERSION_FILES:
+        p = root / rel
+        if p.is_file():
+            for v in sorted({m.group(2) for m in DEP_VERSION.finditer(p.read_text(encoding="utf-8"))} - {want}):
+                bad.append(f"{rel}: asks for jflib {v}, the library is {version(root)} (build_rs.py release writes it)")
+    return bad
