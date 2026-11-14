@@ -122,12 +122,15 @@ impl App<'_> {
             if let Some(img) = self.appimages.borrow().get(style) {
                 files.push(("linux-x86_64", "appimage", img.clone(), img.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string()));
             }
-            // macOS: the app bundle (an installed app replaces its bundle) and the .dmg
+            // macOS: the app bundle (an installed app replaces its bundle) and the .dmg, the same files
+            // for Apple Silicon and Intel Macs (one program for both, docs/INTEL_MAC.md)
             if let Some((dmg, bundle)) = self.dmgs.borrow().get(style) {
                 let jfa = self.work.join(format!("{}-{}-{style}-mac.jfa", self.name, self.version));
                 package::write(&jfa, &jfa1(bundle)?)?;
-                files.push(("macos-aarch64", "app", jfa.clone(), jfa.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string()));
-                files.push(("macos-aarch64", "package", dmg.clone(), dmg.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string()));
+                for target in ["macos-aarch64", "macos-x86_64"] {
+                    files.push((target, "app", jfa.clone(), jfa.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string()));
+                    files.push((target, "package", dmg.clone(), dmg.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string()));
+                }
             }
             if files.is_empty() {
                 continue;

@@ -27,8 +27,10 @@ docs/PACKAGING.md):
   build/dist/<App>-<ver>-x64.msix     MakeAppx of the default Windows style (AppxManifest.xml:
                                       file types, URL schemes, StartupTask), signed like the setup;
                                       build/dist/<App>.appinstaller with PACKAGE appinstaller_url=
-  build/dist/<App>-<ver>-<style>-arm64.dmg   macOS, per style (on a Mac only): NAME.app (Info.plist,
-                                      icon, signature: tools/apple.py) beside a link to /Applications
+  build/dist/<App>-<ver>-<style>-universal.dmg   macOS, per style (on a Mac only): NAME.app (Info.plist,
+                                      icon, signature: tools/apple.py) beside a link to /Applications;
+                                      one program for Apple Silicon and Intel Macs (lipo,
+                                      docs/INTEL_MAC.md)
 A missing tool skips that package and says what it wrote instead; --no-win / --no-deb drop
 every Windows / Linux format.
 
@@ -153,12 +155,23 @@ def build_variants_rs(app, styles, work, targets, rsout, profile):
     tgt = "both" if set(targets) == {"win", "linux"} else targets[0]
     run([sys.executable, "build_rs.py", "app", app, "--target", tgt, "--style", ",".join(styles),
          *rs_mode(profile), "--out", rsout, *STATIC_ARGS])
+    if "mac" in targets:        # the Intel Macs' part (docs/INTEL_MAC.md): into mac-x86_64, joined below
+        run([sys.executable, "build_rs.py", "app", app, "--target", "mac", "--arch", "x86_64", "--style", ",".join(styles),
+             *rs_mode(profile), "--out", rsout])
     for s in styles:
         for t in targets:
             src = ROOT / rsout / t / s if len(styles) > 1 else ROOT / rsout / t
             (ROOT / work / s / t).mkdir(parents=True, exist_ok=True)
+            if t == "mac":      # one program for every Mac (lipo), the app's further programs too (no modules)
+                sys.path.insert(0, str(ROOT))
+                from tools.apple import mac_universal
+                x86 = ROOT / rsout / "mac-x86_64" / s if len(styles) > 1 else ROOT / rsout / "mac-x86_64"
+                mac_universal([src / app, x86 / app], ROOT / work / s / t / app)
+                for m in app_bins(app, t, "rs"):
+                    mac_universal([ROOT / rsout / t / m, ROOT / rsout / "mac-x86_64" / m], ROOT / work / s / t / m)
+                continue
             shutil.copyfile(src / exe_name(app, t), ROOT / work / s / t / exe_name(app, t))
-            shutil.copymode(src / exe_name(app, t), ROOT / work / s / t / exe_name(app, t))   # executable (mac: NAME.app)
+            shutil.copymode(src / exe_name(app, t), ROOT / work / s / t / exe_name(app, t))   # executable
             for m in app_modules(app, t, "rs") + app_bins(app, t, "rs"):
                 shutil.copyfile(ROOT / rsout / t / m, ROOT / work / s / t / m)
 
@@ -475,7 +488,8 @@ def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signin
     folder (kind bundle); Linux the .deb (kind package: the package manager installs it) and the
     style's AppImage (kind appimage: an AppImage replaces its own file; appimages {style: path});
     macOS the app bundle (kind app, a JFA1 bundle of NAME.app: an installed app replaces its
-    bundle) and the .dmg (kind package; dmgs {style: path})"""
+    bundle) and the .dmg (kind package; dmgs {style: path}), the same files for Apple Silicon and
+    Intel Macs (one program for both, docs/INTEL_MAC.md)"""
     seed = update_manifest.load_key(key_file)
     if seed is None:
         signing.skip("Update-Kanal: kein Signierschlüssel (--update-key DATEI, jfgui_UPDATE_KEY_FILE oder jfgui_UPDATE_KEY; "
@@ -504,8 +518,9 @@ def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signin
         if (dmgs or {}).get(s) and bundle.is_dir():
             tmp = ROOT / work / f"{app}-{version}-{s}-mac.jfa"
             tmp.write_bytes(assetpack.pack(bundle))
-            files.append(("macos-aarch64", "app", tmp, tmp.name))
-            files.append(("macos-aarch64", "package", dmgs[s], Path(dmgs[s]).name))
+            for target in ("macos-aarch64", "macos-x86_64"):
+                files.append((target, "app", tmp, tmp.name))
+                files.append((target, "package", dmgs[s], Path(dmgs[s]).name))
         if not files:
             continue
         m = update_manifest.write_channel(ROOT / out / s, app_id, version, files, seed, notes=meta.get("update_notes", ""),
@@ -611,13 +626,13 @@ FORMATS = {"setup": "win", "msix": "win", "deb": "linux", "appimage": "linux", "
 
 
 def make_dmg(app, meta, style, dist, work, multi):
-    """macOS: the style's program as NAME.app, on a disk image -> its path"""
+    """macOS: the style's program (for every Mac, build_variants_rs) as NAME.app, on a disk image -> its path"""
     sys.path.insert(0, str(ROOT))
     from tools.apple import mac_bundle, mac_dmg
     exe = ROOT / work / style / "mac" / app
     bundle = mac_bundle(exe, app)
     version = meta.get("version", "0.1.0")
-    out = ROOT / dist / (f"{app}-{version}-{style}-arm64.dmg" if multi else f"{app}-{version}-arm64.dmg")
+    out = ROOT / dist / (f"{app}-{version}-{style}-universal.dmg" if multi else f"{app}-{version}-universal.dmg")
     mac_dmg(bundle, out, meta.get("display", app))
     print(f"[{style}] {out.relative_to(ROOT)}")
     return out
