@@ -2729,7 +2729,11 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
 * `compress` -- LZ4 and zstd (`compress::zstd::compress(data, level)` / `decompress`; levels
   1 to 19, single-segment frames with checksums); `Codec` picks one by name.
 * `plat::watch::Watcher::new(&roots)` / `take(ms)` -- the changed paths below folders
-  (ReadDirectoryChangesW / inotify, recursive; `overflow` when events were lost).
+  (ReadDirectoryChangesW / inotify, recursive; `overflow` when events were lost). Every change
+  after `new` returned is seen. A root that is deleted or moved away (Linux: also a folder that
+  could not be watched or listed yet) is tried again every second; until it is watched again
+  `watching()` is false and every `take` reports `overflow` after its wait, so a caller that
+  rescans on `overflow` polls meanwhile.
 * `plat::net::UnixListener::bind(path)` / `connect_unix(path, ms)` -- Unix domain sockets (Linux,
   Windows 10 1803 and later) with the stream calls of `TcpStream`. `bind` removes only a socket
   file nobody listens on any more; a file, a folder or a socket that is listened on stays and

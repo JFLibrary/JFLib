@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `watch::Watcher::watching()`: whether every root (Linux: every folder below them) is watched now
+
 ### Changed
 
 - 0 as the effects a source allows means it does not say, so every effect (`DE_ALL`), the same
@@ -15,6 +19,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   `drag_query_all` and `drag_decide`. Before, these took 0 as copy and move, while the effects of
   a drop (`drop_allowed`) took it as every effect. A drag out that names no effects offers
   linking too; files are still never moved.
+- `watch::Watcher::take` reports `overflow` after each wait while a root or folder is not watched (`watching()` false), so a caller that rescans on `overflow` polls until the watcher sees everything again; before, a lost root reported one overflow and then nothing
 
 ### Fixed
 
@@ -22,6 +27,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Windows: `fs::write_file_private` took a file that already had its sibling's name (`NAME.tmpN`) over -- emptied it and kept its access rights, so whoever could read that file could read the private data. The sibling is always a new file now (`CREATE_NEW`, the next number when a name is taken), and a failed write removes it
 - Linux and macOS: `fs::join` and `fs::parent` took `\` for a separator: a folder whose name ends with `\` got no `/` before the child, a name with `\` was cut there (listings, the watcher and backups addressed other files, `mkdir_private` made extra folders). `\` separates on Windows and in vfs names only
 - Linux trash: an entry of a mount's `.Trash-$uid` (or `.Trash/$uid`) could be trashed into that trash again -- its new info file pointed into the trash, the old one was left without its file -- and the home trash was not recognised when `$XDG_DATA_HOME` had `.` or `//` in it. Both are refused now
+- Windows: `Watcher::new` returned before the roots were read, so a change right after it could be missed, and a root whose read failed (deleted, its drive gone) was given up for good after one overflow. `new` now waits until every root's first read is pending (a root that cannot be read fails it); a lost root is opened again every second
+- Linux: the watcher left the folders of a folder whose listing failed (no descriptors left) unwatched for good, and a root moved away kept its watches -- its changes came under the old path -- while a folder made at its path was never watched (also after a deleted root). Such folders and roots are tried again every second
 
 ## [0.2.0] - 2026-11-14
 

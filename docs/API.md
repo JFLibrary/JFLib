@@ -26892,16 +26892,26 @@ Source: [`lib/plat/watch.rs`](../lib/plat/watch.rs)
 ```text
 watch -- changes below folders, as they happen (continuous data protection)
 
-  Watcher::new(&roots) -> Result<Watcher, String>   recursive; one thread watches
+  Watcher::new(&roots) -> Result<Watcher, String>   recursive; one thread watches; every
+                                                     change after new returned is seen
   watcher.take(wait_ms) -> Changes                   the paths changed since the last take
                                                      (waits up to wait_ms for the first);
                                                      overflow: events were lost, rescan
+  watcher.watching() -> bool                         every root (Linux: every folder) is
+                                                     watched now; while not, each take
+                                                     reports overflow (after its wait)
   dropping the watcher stops it
 
 Windows: ReadDirectoryChangesW per root (subtree, overlapped, 64 KiB buffer; an empty
-answer means the buffer overflowed).  Linux: inotify with a watch per folder; new folders
-are added (and reported whole), a full queue or the watch limit reports an overflow (a full
-queue after the whole tree is watched again: lost events may hide new folders).
+answer means the buffer overflowed); new returns once every root's first read is pending
+(a root that cannot be read fails it).  A root whose read fails later (deleted, its drive
+gone) is lost: it is opened again every second, and back it reports an overflow.
+Linux: inotify with a watch per folder; new folders are added (and reported whole), a full
+queue reports an overflow (after the whole tree is watched again: lost events may hide new
+folders).  A folder that could not be watched or listed for a passing reason (the watch
+limit, no descriptors left) is tried again every second; a root moved or deleted ends its
+watches (their events would name the old paths) and is watched again once a folder is at
+its path.  Until then watching() is false.
 macOS: FSEvents with file events (dropped events report an overflow); iOS: none.
 Paths are absolute, in the form of the platform; the folder of a change is enough for a
 caller that walks the tree again.
@@ -26918,7 +26928,11 @@ caller that walks the tree again.
 
 - **`fn new(roots: &[String]) -> Result<Watcher, String>`**
 - **`fn take(&self, wait_ms: u32) -> Changes`**
-  the changes so far (waiting up to wait_ms when there are none yet)
+  the changes so far (waiting up to wait_ms when there are none yet); while a root or
+  folder is not watched (watching() false) overflow is set, after the wait
+- **`fn watching(&self) -> bool`**
+  whether every root (Linux: every folder below them) is watched now; false while one is
+  gone or could not be watched yet (the watcher tries again every second)
 
 ### `plat/certs.rs`
 
