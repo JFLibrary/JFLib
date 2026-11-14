@@ -65,7 +65,8 @@ beschreibend als Referenzprodukt genannt.
   - Normschablonen nach DIN EN/IEC statt US/ANSI (F14).
 - **Sprachen (Nachtrag 2026-11-14):** Alles auf Deutsch, Englisch, Spanisch, Italienisch und
   Französisch, umschaltbar in den Einstellungen (Abschnitt 3.17). F8 und F13 gelten sinngemäß für
-  alle fünf Sprachen. Für F10 ist die Belegung je Sprache abgeleitet und noch zu bestätigen (LG-08).
+  alle fünf Sprachen. F10 gilt je Sprache: Die Standardkürzel folgen der Office-Belegung der
+  gewählten Sprache, alles bleibt anpassbar (LG-08, bestätigt 2026-11-14).
 
 ### 0.2 Quellen
 
@@ -127,7 +128,7 @@ Shape-Tabellen darunter nennen nur Name und Beschreibung.
 
 - **562 Feature-Zeilen** in den Abschnitten 1–3, 4.0 und 5 (davon P1 265, P2 186, P3 105; bei Zeilen mit zwei Prioritäten zählt die erste), darunter 11 Zeilen für Sprachen und Regionen (3.17).
 - **282 Schablonen** in Abschnitt 4 mit **3607 Shape-Zeilen** (nach Zusammenfassen von Doppelungen) und **15 Vorschläge** für eigene Kategorien.
-- **29 bewusst weggelassene** Funktionen (Abschnitt 6), **14 Entscheidungen** zu den Planungsfragen (Abschnitt 8). Noch offen: Testdateien für Version 6 und `.vsd` (F4), Bestätigung der Tastenbelegung je Sprache (LG-08), deutscher Begriff für „AutoVerbinden“ (Glossar 3.17).
+- **29 bewusst weggelassene** Funktionen (Abschnitt 6), **14 Entscheidungen** zu den Planungsfragen (Abschnitt 8). Noch offen: Testdateien für Version 6 und `.vsd` (F4), deutscher Begriff für „AutoVerbinden“ (Glossar 3.17).
 
 <a id="formate"></a>
 ## 1. Dateiformate, Import und Export
@@ -856,7 +857,7 @@ Strg+Umschalt+F, Kursiv Strg+Umschalt+K); das kollidiert mit „In den Vordergru
 deutscher Office-Konvention (Fett Strg+Umschalt+F, Kursiv Strg+Umschalt+K, Unterstrichen
 Strg+Umschalt+U); „In den Vordergrund“, „In den Hintergrund“ und „Kapitälchen“ bekommen freie
 Tasten. Alles bleibt über UI-19 anpassbar und wird auf Konflikte geprüft. Für die anderen vier
-Sprachen gilt die Office-Konvention der jeweiligen Sprache (LG-08, abgeleitet, noch zu bestätigen).
+Sprachen gilt die Office-Konvention der jeweiligen Sprache (LG-08, entschieden 2026-11-14).
 Alle Kürzel: Ort
 `App` (+ `Lib-ui` für Zoom/Fokus), Prio wie angegeben.
 
@@ -909,7 +910,7 @@ nur die Spalten `de` und `en`.
 | LG-05 | Mehrsprachige Shape-Suche | Die Suche in der Seitenleiste findet Namen und Suchbegriffe der Oberflächensprache, dazu universelle Namen. Wer z. B. englische Namen kennt, findet die Shapes auch in einer anderen Sprache. | Nachtrag 2026-11-14 | P2 | App | teilweise (palette-Suche) |
 | LG-06 | Begriffsglossar | Verbindliches Glossar der Fachbegriffe in allen fünf Sprachen als Datei im Repo (Quelle für Katalog und Hilfe). Ein Prüfskript meldet Abweichungen und verbotene Visio-Begriffe. Startfassung siehe unten. | Nachtrag 2026-11-14; F8, F13 | P1 | App | neu |
 | LG-07 | Einheiten und Papierformate je Region | Die Region ist unabhängig von der Sprache einstellbar (z. B. Englisch mit A4). DE, ES, IT, FR und en-GB nutzen metrische Einheiten und A4; en-US nutzt Zoll und Letter. Jede mitgelieferte Schablone und Vorlage gibt es in metrischer und in US-Fassung, wie Visios `_m`/`_u`-Dateien. Der Vorlagendialog schlägt die Fassung der Region vor (MS-07, UI-04). Zahlen, Datum, Uhrzeit und Währung in Feldern, Shape-Daten und Berichten folgen der Region. | Nachtrag 2026-11-14; SbS 1; SWDB (`ORM_M.VSS`/`ORM_U.vss`); `i18n_locale.rs` | P1 | App+Lib-core+Lib-ui | teilweise (Formate vorhanden) |
-| LG-08 | Tastenkürzel je Sprache | **Abgeleitet aus F10, vom Nutzer noch zu bestätigen:** Die Standardbelegung folgt der üblichen Office-Konvention der gewählten Sprache. Fett: DE Strg+Umschalt+F, EN Ctrl+B, ES Ctrl+N, IT/FR Ctrl+G; Kursiv und Unterstrichen entsprechend. Weil die Konventionen auch Speichern, Neu, Suchen und Gruppieren unterschiedlich belegen, wird jede Sprachbelegung auf Konflikte geprüft. Alles bleibt anpassbar (UI-19, 3.16). | Nachtrag 2026-11-14; F10 | P1 | App | neu |
+| LG-08 | Tastenkürzel je Sprache | **Entschieden (F10, 2026-11-14):** Die Standardbelegung folgt der üblichen Office-Konvention der gewählten Sprache. Fett: DE Strg+Umschalt+F, EN Ctrl+B, ES Ctrl+N, IT/FR Ctrl+G; Kursiv und Unterstrichen entsprechend. Weil die Konventionen auch Speichern, Neu, Suchen und Gruppieren unterschiedlich belegen, wird jede Sprachbelegung auf Konflikte geprüft. Alles bleibt anpassbar (UI-19, 3.16). | Nachtrag 2026-11-14; F10 | P1 | App | neu |
 | LG-09 | Rechtschreibung je Sprache | Rechtschreibprüfung und AutoKorrektur in den fünf Sprachen; die Sprache je Textlauf (`LangID`) wählt das Wörterbuch. | Nachtrag 2026-11-14; SbS 1; Z2, Z3 | P2 | App+Lib-ui | teilweise (spell) |
 | LG-10 | Formelnamen | Lokalisierte und universelle Zell- und Funktionsnamen in Formeln (FX-01); der Formel-Editor zeigt die universelle Form. | MS-VSDX; Z2, Z3 | P2 | Lib-core | neu |
 | LG-11 | Übersetzungsprüfung | Ein Prüfskript meldet fehlende Zellen in allen Katalogen und Namenslisten (alle fünf Spalten gefüllt, Platzhalter gleich), wie das i18n-Prüfskript von JFNetworker. | Nachtrag 2026-11-14 | P1 | App | teilweise (Muster in JFNetworker) |
@@ -7279,7 +7280,7 @@ Summe: rund 175 Icons (davon etwa 25 nur für entfallende Befehle, die nicht geb
 
 Am 2026-11-14 hat der Nutzer alle Vorschläge zu den Planungsfragen aus Phase 1 übernommen
 („Alle übernehmen“). Die Spalte „Umgesetzt in“ nennt die Stellen, die danach angepasst wurden.
-Nachtrag desselben Tages: fünf Oberflächensprachen (3.17) und Testmaterial zu F4. Offen sind noch Testdateien für Version 6 und für `.vsd` (F4), die Bestätigung der abgeleiteten Tastenbelegung je Sprache (F10, LG-08) und der deutsche Begriff für „AutoVerbinden“ (Glossar in 3.17).
+Nachtrag desselben Tages: fünf Oberflächensprachen (3.17) und Testmaterial zu F4. Die Tastenbelegung je Sprache (F10, LG-08) hat der Nutzer bestätigt. Offen sind noch Testdateien für Version 6 und für `.vsd` (F4) und der deutsche Begriff für „AutoVerbinden“ (Glossar in 3.17).
 
 | ID | Frage | Entscheidung (2026-11-14) | Umgesetzt in |
 |---|---|---|---|
@@ -7292,7 +7293,7 @@ Nachtrag desselben Tages: fünf Oberflächensprachen (3.17) und Testmaterial zu 
 | F7 | Ersatz für VBA-Automatisierung? | Später eine Skript- und Plugin-Schnittstelle über JFScript mit dem Ereignismodell aus RX-10; nicht in Phase 2. | UI-21, NO-01 |
 | F8 | Welche Begriffe in der Oberfläche? | Durchgehend „Ebene“ (nicht „Layer“), „Beschriftung“ für Callouts, „Legende“ nur für Datenlegenden, „Seite“ statt „Zeichenblatt“. Befehlsnamen sonst wie in Visio. Nachtrag: gilt sinngemäß für alle fünf Sprachen. | Abschnitte 2.9, 3, 7 (Visio-Name jeweils in Klammern), Glossar in 3.17 |
 | F9 | Wie eng hängt JFDiagrammer an JFNetworker? | Gemeinsamer Symbolsatz für Netzwerkgeräte (eine Quelle, zwei Apps); Import von JFNetworker-Projekten mit P3. | SH-G09, IM-11, NO-23 |
-| F10 | Welche Tastenbelegung? | Deutsche Office-Konvention für Textformate; „In den Vordergrund“/„In den Hintergrund“ und „Kapitälchen“ auf freie Tasten; alles anpassbar. Nachtrag, **abgeleitet, vom Nutzer noch zu bestätigen:** In den anderen Sprachen folgt die Standardbelegung der jeweiligen Office-Konvention (Fett: EN Ctrl+B, ES Ctrl+N, IT/FR Ctrl+G). | 3.16, KB-07, KB-11, LG-08 |
+| F10 | Welche Tastenbelegung? | Deutsche Office-Konvention für Textformate; „In den Vordergrund“/„In den Hintergrund“ und „Kapitälchen“ auf freie Tasten; alles anpassbar. Nachtrag (bestätigt 2026-11-14): In den anderen Sprachen folgt die Standardbelegung der jeweiligen Office-Konvention (Fett: EN Ctrl+B, ES Ctrl+N, IT/FR Ctrl+G). | 3.16, KB-07, KB-11, LG-08 |
 | F11 | Welche Vorlagen kommen in P1? | Leere Zeichnung, Standarddiagramm, Standardflussdiagramm, funktionsübergreifendes Flussdiagramm, Standard- und detailliertes Netzwerk und wegen JFNetworker zusätzlich das Rack-Diagramm (samt Rack-Schablonen). Die AWS-Architektur kommt früh in P2. Grundrisse und Konstruktion folgen später. | VL-52, VL-54, SH-145 bis SH-147 |
 | F12 | Mehr Screenshots? | Nein. Für das Verhalten reichen die Bücher; Screenshots wären nur für einen pixelnahen Nachbau nötig. | – |
 | F13 | Visio-eigene Begriffe? | Deutsche beschreibende Begriffe („AutoVerbinden“, „Schnell-Shapes“); englische Visio-Begriffe in der App meiden. Nachtrag: je Sprache eigene beschreibende Begriffe; SmartShapes, AutoConnect, Quick Shapes und ShapeSheet in keiner Sprache. „AutoVerbinden“ ist zugleich Visios deutsche Bezeichnung (Rückfrage im Glossar). | Abschnitt 3, Glossar in 3.17 |
