@@ -23,9 +23,10 @@
 // themselves: a hard link and the old name's removal (files), an empty folder of our own that
 // the rename replaces (folders; a rename onto a folder with entries fails); a file system
 // without hard links refuses files then.  Nothing is copied across file systems, a mount point
-// is not moved, and the trash itself cannot be trashed.  Missing trash folders are created
-// with mode 0700.  (tests) jfgui_TEST_TRASH_FALLBACK set: those steps without trying
-// RENAME_NOREPLACE.
+// is not moved, and a trash and what is in it cannot be trashed (the home trash by its
+// normalised name, a mount's .Trash and .Trash-$uid whichever is in use; names only, a link to
+// a trash is not seen).  Missing trash folders are created with mode 0700.  (tests)
+// jfgui_TEST_TRASH_FALLBACK set: those steps without trying RENAME_NOREPLACE.
 //
 // macOS: NSFileManager's trashItemAtURL:resultingItemURL:error: (the Finder's trash of the item's
 // volume; the Finder can put it back); true only when it reports the new place and the item is
@@ -420,8 +421,9 @@ mod lnx {
     // the trash for an item on device dev, and the Path of its info file
     fn trash_dir(abs: &str, dev: u64, uid: u32) -> Option<(String, String)> {
         let data = crate::data_dir()?;
-        let home = format!("{data}/Trash");
-        if abs == home || abs.starts_with(&format!("{home}/")) {
+        // in the form abs has ("/./", "//" and ".." resolved), so the test below sees it
+        let home = crate::policy::normalize(&format!("{data}/Trash"))?;
+        if inside(abs, &home) {
             return None; // the trash itself
         }
         // the device of the home trash: the folder, or the nearest one above it that exists
@@ -449,8 +451,12 @@ mod lnx {
             top = parent(top);
         }
         let base = if top == "/" { "" } else { top };
-        let key = String::from(&abs[base.len() + 1..]);
         let admin = format!("{base}/.Trash");
+        // what lies in this mount's trashes already (either form, whichever is in use now)
+        if inside(abs, &admin) || inside(abs, &format!("{base}/.Trash-{uid}")) {
+            return None;
+        }
+        let key = String::from(&abs[base.len() + 1..]);
         let mut tries: Vec<String> = Vec::new();
         if meta(&admin, false).is_some_and(|(_, m, _)| m & S_IFMT == S_IFDIR && m & S_ISVTX != 0) {
             tries.push(format!("{admin}/{uid}"));
@@ -463,6 +469,12 @@ mod lnx {
             }
         }
         None
+    }
+
+    // whether abs is dir or lies below it (both normalised; a name, not the file's identity:
+    // a link or a bind mount to a trash is not seen)
+    fn inside(abs: &str, dir: &str) -> bool {
+        abs == dir || abs.strip_prefix(dir).is_some_and(|r| r.starts_with('/'))
     }
 
     // files/ and info/ of a trash exist (follow: links of the home trash are fine)

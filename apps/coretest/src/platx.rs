@@ -404,8 +404,38 @@ fn files(t: &mut T) {
     let long_ok = fs::mkdir_private(&deep) && fs::write_file_private(&fs::join(&deep, "datei.bin"), b"x");
     t.check("long paths", long_ok && fs::stat(&fs::join(&deep, "datei.bin")).is_some_and(|m| m.size == 1));
     t.eq("parent", fs::parent("/a/b/c"), "/a/b");
+    names_and_siblings(t, &base);
     // clean up (best effort)
     remove_tree(&base);
+}
+
+/// '\' separates on Windows (and in vfs names); on Linux and macOS it is part of a name. The
+/// private writer's sibling is always a new file: a file of that name stays as it was.
+fn names_and_siblings(t: &mut T, base: &str) {
+    t.eq("parent of a vfs name with a backslash", fs::parent("mem://a\\b"), "mem://a");
+    if cfg!(windows) {
+        t.eq("join after a backslash", fs::join("C:\\a\\", "f"), String::from("C:\\a\\f"));
+        t.eq("parent across a backslash", fs::parent("C:\\a\\b"), "C:\\a");
+    } else {
+        t.eq("join after a backslash in a name", fs::join("/tmp/a\\", "f"), String::from("/tmp/a\\/f"));
+        t.eq("parent of a name with a backslash", fs::parent("/tmp/a\\b"), "/tmp");
+        let xy = fs::join(base, "x\\y");
+        t.check("mkdir_private of a name with a backslash makes that folder alone",
+                fs::mkdir_private(&xy) && plat::file_exists(&fs::join(base, "x")) == 0 && fs::stat(&xy).is_some_and(|m| m.is_dir()));
+        let d = fs::join(base, "d\\");
+        let inner = fs::join(&d, "in.txt");
+        t.check("a file in a folder whose name ends with a backslash", plat::mkdir(&d) && fs::write_file_private(&inner, b"in")
+                && fs::read_dir(&d).is_some_and(|l| l.len() == 1 && l[0].name == "in.txt" && l[0].kind == fs::FileKind::File));
+    }
+    // a file where the private writer's first sibling would go: it keeps its bytes and its name
+    let p = fs::join(base, "seed.key");
+    let planted = format!("{p}.tmp424242");
+    plat::setenv("jfgui_TEST_PRIVATE_TMP", Some("424242"));
+    let wrote = plat::write_file(&planted, b"planted") && fs::write_file_private(&p, b"secret");
+    plat::setenv("jfgui_TEST_PRIVATE_TMP", None);
+    t.check("write_file_private takes no existing sibling over", wrote && plat::read_file(&p).as_deref() == Some(&b"secret"[..])
+            && plat::read_file(&planted).as_deref() == Some(&b"planted"[..]));
+    plat::delete(&planted);
 }
 
 fn remove_tree(path: &str) {

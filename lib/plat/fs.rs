@@ -2,13 +2,17 @@
 //
 //   stat(path) / lstat(path) -> Option<Meta>     kind, size, times (ns), mode / attributes,
 //                                                 owner, device and file id, link count
-//   read_dir(path) -> Option<Vec<DirEntry>>      names and kinds ("." / ".." left out)
+//   read_dir(path) -> Option<Vec<DirEntry>>      names and kinds ("." / ".." left out); None
+//                                                also when an error cut the listing short
 //   read_link / symlink(target, link, dir) / hard_link(existing, new)
 //   set_times(path, atime_ns, mtime_ns)          on the link itself, never its target
 //   set_mode(path, mode) (Linux) / set_attrs(path, attrs) (Windows) / set_owner (Linux)
 //   free_space(path) -> Option<(free, total)>    sync_dir(dir) (Linux: fsync of the directory)
 //   write_file_private(path, data)               owner-only file (0600 / protected DACL),
-//                                                fsync, atomic rename, directory sync
+//                                                fsync, atomic rename, directory sync; its
+//                                                sibling is always a new file of its own
+//   join(dir, name) / parent(path)               '' separates on Windows only (and in vfs
+//                                                names); on Linux and macOS it is a character
 //   mkdir_private(path)                          owner-only directory (with parents)
 //   local_zone_id() -> "Europe/Berlin" | "win:W. Europe Standard Time"
 //   long_path(path) (Windows): the \\?\ form every call here uses
@@ -81,21 +85,28 @@ pub struct DirEntry {
     pub kind: FileKind,
 }
 
-/// "a/b" + "c" with the platform separator
+// the separators of a path: '/' and '\' on Windows and in vfs names (a mount turns '\' into
+// '/'); '/' alone in other OS paths ('\' is an ordinary character of a Linux or macOS name)
+fn seps(path: &str) -> &'static [char] {
+    if cfg!(windows) || vfs::has_scheme(path) { &['/', '\\'] } else { &['/'] }
+}
+
+/// "a/b" + "c" with the platform separator (Linux, macOS: a '\' is part of a name)
 pub fn join(dir: &str, name: &str) -> String {
     let sep = if cfg!(windows) { '\\' } else { '/' };
     let mut s = String::from(dir);
-    if !s.is_empty() && !s.ends_with(['/', '\\']) {
+    if !s.is_empty() && !s.ends_with(seps(dir)) {
         s.push(sep);
     }
     s.push_str(name);
     s
 }
 
-/// the parent directory of a path ("" for a bare name)
+/// the parent directory of a path ("" for a bare name; Linux, macOS: a '\' is part of a name)
 pub fn parent(path: &str) -> &str {
-    let t = path.trim_end_matches(['/', '\\']);
-    match t.rfind(['/', '\\']) {
+    let sp = seps(path);
+    let t = path.trim_end_matches(sp);
+    match t.rfind(sp) {
         Some(0) => &t[..1],
         Some(i) => &t[..i],
         None => "",
@@ -212,6 +223,12 @@ pub fn symlink(target: &str, link: &str, dir: bool) -> bool {
     }
 }
 
+// the number of write_file_private's first sibling NAME.tmpN (the next ones count up); (tests)
+// jfgui_TEST_PRIVATE_TMP sets it
+fn tmp_seed() -> u64 {
+    crate::env("jfgui_TEST_PRIVATE_TMP").and_then(|v| v.parse::<u64>().ok()).unwrap_or_else(crate::time_us)
+}
+
 /// (net) (device, file id) of an OS path when it is a socket file (Windows: an AF_UNIX reparse
 /// point), a link not followed; without the policy check (net checked fs.write)
 pub(crate) fn socket_id(path: &str) -> Option<(u64, u64)> {
@@ -284,8 +301,9 @@ pub fn sync_dir(dir: &str) -> bool {
     }
 }
 
-/// an owner-only file (0600 / protected DACL), synced and renamed into place; a mount without
-/// OS files: its write (memory of this process)
+/// an owner-only file (0600 / protected DACL), synced and renamed into place (the sibling
+/// NAME.tmpN is created new, never an existing file taken over); a mount without OS files: its
+/// write (memory of this process)
 pub fn write_file_private(path: &str, data: &[u8]) -> bool {
     match at(path) {
         At::Os(o) => sys::write_file_private(o.as_deref().unwrap_or(path), data),
@@ -316,7 +334,11 @@ mod win {
     const GENERIC_WRITE: u32 = 0x4000_0000;
     const SHARE_ALL: u32 = 7;
     const OPEN_EXISTING: u32 = 3;
-    const CREATE_ALWAYS: u32 = 2;
+    const CREATE_NEW: u32 = 1;
+    const ERROR_NO_MORE_FILES: u32 = 18;
+    const ERROR_FILE_EXISTS: u32 = 80;
+    const ERROR_ALREADY_EXISTS: u32 = 183;
+    const TEMP_TRIES: u32 = 16;
     const BACKUP_SEMANTICS: u32 = 0x0200_0000;
     const OPEN_REPARSE_POINT: u32 = 0x0020_0000;
     const WRITE_THROUGH: u32 = 0x8000_0000;
@@ -373,6 +395,7 @@ mod win {
         fn FindFirstFileExW(name: *const u16, level: u32, data: *mut FindData, op: u32, filter: usize, flags: u32) -> isize;
         fn FindNextFileW(h: isize, data: *mut FindData) -> i32;
         fn FindClose(h: isize) -> i32;
+        fn GetLastError() -> u32;
         fn DeviceIoControl(h: isize, code: u32, inb: usize, inn: u32, outb: *mut u8, outn: u32, ret: *mut u32, ov: usize) -> i32;
         fn CreateSymbolicLinkW(link: *const u16, target: *const u16, flags: u32) -> u8;
         fn CreateHardLinkW(new: *const u16, existing: *const u16, sa: usize) -> i32;
@@ -531,20 +554,22 @@ mod win {
             return None;
         }
         let mut out = Vec::new();
-        loop {
+        let end = loop {
             let n = d.name.iter().position(|&c| c == 0).unwrap_or(260);
             let name = String::from_utf16_lossy(&d.name[..n]);
             if name != "." && name != ".." {
                 out.push(DirEntry { kind: kind_of(d.attr, d.reserved[0]), name });
             }
-            // SAFETY: the search handle and record from above.
+            // SAFETY: the search handle and record from above; GetLastError right after the
+            // failed call.
             if unsafe { FindNextFileW(h, &mut d) } == 0 {
-                break;
+                break unsafe { GetLastError() };
             }
-        }
+        };
         // SAFETY: the search handle, closed once.
         unsafe { FindClose(h) };
-        Some(out)
+        // only the end of the listing is a whole listing; another error leaves out what follows
+        (end == ERROR_NO_MORE_FILES).then_some(out)
     }
 
     pub fn read_link(path: &str) -> Option<String> {
@@ -656,32 +681,46 @@ mod win {
         if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
             return false;
         }
-        let tmp = alloc::format!("{}.tmp{}", path, crate::time_us() % 1_000_000);
-        let w = lp(&tmp);
+        // a new sibling of ours (CREATE_NEW: a file of that name -- someone else's, with its own
+        // access rights -- is never taken over); only that one is written and removed again
         let Some((sa, sd)) = private_sa() else { return false };
-        // SAFETY: a valid path and security attributes.
-        let h = unsafe { CreateFileW(w.as_ptr(), GENERIC_WRITE, 0, &sa as *const SecurityAttributes as usize, CREATE_ALWAYS, WRITE_THROUGH, 0) };
+        let mut made = None;
+        let seed = super::tmp_seed();
+        for k in 0..TEMP_TRIES {
+            let tmp = alloc::format!("{}.tmp{}", path, (seed + k as u64) % 1_000_000);
+            let w = lp(&tmp);
+            // SAFETY: a valid path and security attributes; GetLastError right after the call.
+            let (h, e) = unsafe {
+                let h = CreateFileW(w.as_ptr(), GENERIC_WRITE, 0, &sa as *const SecurityAttributes as usize, CREATE_NEW, WRITE_THROUGH, 0);
+                (h, GetLastError())
+            };
+            if h != INVALID {
+                made = Some((H(h), tmp, w));
+                break;
+            }
+            if e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS {
+                break;
+            }
+        }
         // SAFETY: the descriptor from ConvertString..., no longer needed.
         unsafe { LocalFree(sd as *mut core::ffi::c_void) };
-        if h == INVALID {
-            return false;
-        }
-        let h = H(h);
+        let Some((h, tmp, w)) = made else { return false };
         let mut off = 0;
-        while off < data.len() {
+        let mut ok = true;
+        while ok && off < data.len() {
             let n = (data.len() - off).min(1 << 30) as u32;
             let mut done = 0u32;
             // SAFETY: the buffer slice is valid for n bytes.
-            if unsafe { WriteFile(h.0, data[off..].as_ptr(), n, &mut done, core::ptr::null_mut()) } == 0 || done == 0 {
-                return false;
-            }
+            ok = unsafe { WriteFile(h.0, data[off..].as_ptr(), n, &mut done, core::ptr::null_mut()) } != 0 && done != 0;
             off += done as usize;
         }
         // SAFETY: a valid handle.
-        if unsafe { FlushFileBuffers(h.0) } == 0 {
+        ok = ok && unsafe { FlushFileBuffers(h.0) } != 0;
+        drop(h);
+        if !ok {
+            crate::delete_raw(&tmp);
             return false;
         }
-        drop(h);
         let dst = lp(path);
         // MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
         // SAFETY: valid wide paths.
@@ -984,8 +1023,9 @@ mod lnx {
         }
         // O_EXCL: a guessed name that exists (a planted link, a stale file) is never written through
         let mut opened = None;
+        let seed = super::tmp_seed();
         for k in 0..16u64 {
-            let name = alloc::format!("{}.tmp{}", path, crate::time_us().wrapping_add(k) % 1_000_000);
+            let name = alloc::format!("{}.tmp{}", path, seed.wrapping_add(k) % 1_000_000);
             if let Some(fd) = open(&name, O_WRONLY | O_CREAT | O_EXCL, 0o600) {
                 opened = Some((name, fd));
                 break;
@@ -1332,8 +1372,9 @@ mod apl {
         }
         // O_EXCL: a guessed name that exists (a planted link, a stale file) is never written through
         let mut opened = None;
+        let seed = super::tmp_seed();
         for k in 0..16u64 {
-            let name = alloc::format!("{}.tmp{}", path, crate::time_us().wrapping_add(k) % 1_000_000);
+            let name = alloc::format!("{}.tmp{}", path, seed.wrapping_add(k) % 1_000_000);
             if let Some(fd) = open(&name, ffi::O_WRONLY | ffi::O_CREAT | ffi::O_EXCL, 0o600) {
                 opened = Some((name, fd));
                 break;
