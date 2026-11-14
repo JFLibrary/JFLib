@@ -55,6 +55,13 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   widget; else (outside the passes too) the queries (`code_status`, `code_events`, `code_diag`, `code_popup_item`, `spell_errors`) read the
   first window that has the widget, `code_find`, `code_reveal` and `richtext_link` go to the
   first editor of the id that is built, and `canvas_damage` to the canvas in every window.
+- The syntax highlighter nests at most 32 levels within a line (template strings in `${..}`, Nest and Element rules); deeper, the rest of the line keeps the construct's colour. A long line of "`${" ran the stack out.
+- Terminal: cursor moves (`ESC[H`, `f`, `G`, `C`) reach column 1024 at most. The spaces up to a far column made 12 bytes into a scrollback line of 32000 cells.
+
+### Security
+
+- The file dialog takes a chosen path longer than its `cap` as not chosen (the system's dialogs) or says it is too long (the library's own). The path was cut, reported as chosen and granted as cut.
+- The permission dialog's two allowing buttons take no input for half a second after a question appears, so a double click or a held key does not answer it unread.
 
 ## [0.2.0] - 2026-11-14
 

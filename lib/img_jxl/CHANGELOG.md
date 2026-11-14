@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- The bit reader's position saturates instead of wrapping. Past u64::MAX it read the stream again from its start while `check()` saw no error.
+
 ## [0.2.0] - 2026-11-14
 
 ### Fixed

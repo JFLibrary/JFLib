@@ -9823,7 +9823,9 @@ permissions on the UI side (plat::policy, docs/PERMISSIONS.md, docs/VFS.md)
                           manifest's reason (through the app's catalogue), the ask line, and
                           "Einmal erlauben" (until the program ends), "Immer erlauben"
                           (stored), "Ablehnen" (until the program ends), "Nie erlauben"
-                          (stored); Esc = Ablehnen.  The answer reaches the app as
+                          (stored); Esc = Ablehnen.  The two that allow take no input for
+                          half a second after a question appears (window runs), so a
+                          double click or a held key does not answer it unread.  The answer reaches the app as
                           UIC_PERMISSION (arg 1 allowed, 0 refused): an access the UI thread
                           made while the question was open was refused, it may try again.
   Ui::permissions_page(id) -> bool   the ready-made settings section: every ask line and

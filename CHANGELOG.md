@@ -45,6 +45,11 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **wgsl:** `atomic<vec2<u32>>` (`enable atomic_vec2u_min_max;`) is refused outside the storage address space: a workgroup variable of it was taken, and `workgroupUniformLoad` of it panicked in the SPIR-V backend
 - **text:** Line breaking with soft hyphens stops measuring the later soft hyphens once one does not fit (each measures from the line's start): 30 KB of text with many of them froze the UI, cubic over the lines
 - **text:** The CFF charstring operator `roll` rotates in one pass: a roll of the whole CFF2 stack cost num × r moves while the budget counted one operator, and such a font took about 35 s to load
+- **ui:** The syntax highlighter nests at most 32 levels within a line (template strings in `${..}`, Nest and Element rules); deeper, the rest of the line keeps the construct's colour: each level was a recursion, and a long line of "`${" ran the stack out
+- **ui:** Terminal: cursor moves (`ESC[H`, `f`, `G`, `C`) reach column 1024 at most: the spaces up to a far column made 12 bytes into a scrollback line of 32000 cells
+- **netpkt:** IMAP `tokens` nests lists at most 64 deep and takes the rest of the line as one atom: a line of `(` ran the stack out, in the parse and in the drop of the result
+- **img_jpeg:** The scans of an image go over at most 64 times its blocks; further scans are left out as after a missing EOI: thousands of empty scans with a restart interval kept the decoder of a small file busy for minutes
+- **img_jxl:** The bit reader's position saturates instead of wrapping: past u64::MAX (an extensions bundle, a section offset of a crafted table of contents) it read the stream again from its start while `check()` saw no error
 
 ### Security
 
@@ -59,6 +64,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netio:** A response without a length, which runs to the end of the connection, ends only at an orderly end: a reset, or a TLS connection closed without close_notify, is an error instead of the whole body (a body cut short passed for complete)
 - **netio:** SSH `exec`: the names of `exit-signal` requests count against `max_out` like the output (a server could send any number of them)
 - **cargo-jflib:** `cargo jflib web --serve` serves only plain names below the bundle, and only to the Host 127.0.0.1 or localhost: on Windows `GET /C:/...` and `..\` reached any file, and a web page could read the bundle through DNS rebinding
+- **ui:** The file dialog takes a chosen path longer than its `cap` as not chosen (the system's dialogs) or says it is too long (the library's own): the path was cut, reported as chosen and granted as cut, possibly a parent folder under `fs.user`
+- **ui:** The permission dialog's two allowing buttons take no input for half a second after a question appears (window runs): a double click or a held key meant for the previous question answered the next one unread
+- **plat:** Linux: a portal's `Response` counts only when it comes from the portal itself (the sender of its reply to the request): the request path is predictable, and another client on the session bus could answer a file dialog with files of its choice
 
 ## [0.2.0] - 2026-11-14
 

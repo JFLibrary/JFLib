@@ -43,6 +43,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - The answers of the permission tests (`jfgui_PERM_ANSWER`, `jfgui_PERM_TIMEOUT`, `jfgui_PERM_STORE`) are read when the program starts, so a value the app sets later answers none of its questions.
 - Windows: `process::Command::spawn` and `process::launch` refuse a `.bat` or `.cmd` program (87) when it or an argument holds `"`, `%`, `!`, `^`, `&`, `|`, `<`, `>` or a line break. cmd.exe reads its command line by its own rules, and the quoted arguments could run further commands (the class of CVE-2024-24576).
 - `open_folder` shows a file or a package selected in the Finder (`open -R`) instead of opening it, which started apps and .command scripts (macOS); on Windows it starts the Windows folder's explorer.exe.
+- Linux: a portal's `Response` counts only when it comes from the portal itself, the sender of its reply to the request. Another client on the session bus could answer a file dialog with files of its choice.
 
 ## [0.2.0] - 2026-11-14
 
