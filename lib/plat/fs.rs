@@ -424,7 +424,6 @@ mod win {
         fn GetDiskFreeSpaceExW(dir: *const u16, avail: *mut u64, total: *mut u64, free: *mut u64) -> i32;
         fn WriteFile(h: isize, buf: *const u8, n: u32, done: *mut u32, ov: *mut crate::win::Overlapped) -> i32;
         fn FlushFileBuffers(h: isize) -> i32;
-        fn MoveFileExW(old: *const u16, new: *const u16, flags: u32) -> i32;
         fn CreateDirectoryW(name: *const u16, sa: usize) -> i32;
         fn LocalFree(memory: *mut core::ffi::c_void) -> *mut core::ffi::c_void;
         fn GetDynamicTimeZoneInformation(tz: *mut u8) -> u32;
@@ -742,9 +741,8 @@ mod win {
             return false;
         }
         let dst = lp(path);
-        // MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
-        // SAFETY: valid wide paths.
-        let ok = unsafe { MoveFileExW(w.as_ptr(), dst.as_ptr(), 1 | 8) } != 0;
+        // MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH where no POSIX rename exists (win_sys)
+        let ok = crate::replace_move(&w, &dst, 1 | 8);
         if !ok {
             crate::delete_raw(&tmp);
         }
