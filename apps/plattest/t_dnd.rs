@@ -121,16 +121,19 @@ fn shared(t: &mut T) {
     drop_set_html(b"<i>x</i>");
     drop_set_image(vec![1, 2, 3]);
     drop_set_effect(DE_MOVE);
+    drop_set_allowed(DE_COPY | DE_LINK);
     let d = drop_data_take();
+    t.check(drop_allowed() == DE_COPY | DE_LINK, "dnd: the effects the drop's source allows (drop_allowed)");
     t.check(d.urls == ["https://example.org/a", "mailto:a@b.c", "https://example.org/b"], "dnd: the pending drop's URLs");
     t.check(d.files == ["/tmp/x y"], "dnd: the pending drop's path");
     t.check(d.text.as_deref() == Some("Grüße"), "dnd: the text ends at a NUL");
     t.check(d.html.as_deref() == Some("<i>x</i>") && d.image.as_deref() == Some(&[1u8, 2, 3][..]), "dnd: HTML and image");
     t.check(d.effects == DE_MOVE && d.types() == DT_FILES | DT_TEXT | DT_URL | DT_HTML | DT_IMAGE, "dnd: effect and kinds");
-    t.check(drop_data_take() == DragData::default(), "dnd: taken: the pending drop is empty again");
+    t.check(drop_data_take() == DragData::default() && drop_allowed() == 0, "dnd: taken: the pending drop is empty again");
     drop_set_text(b"x");
+    drop_set_allowed(DE_ALL);
     drop_reset();
-    t.check(drop_data_take().text.is_none(), "dnd: drop_reset empties the text too");
+    t.check(drop_data_take().text.is_none() && drop_allowed() == 0, "dnd: drop_reset empties the text and the effects too");
     // other programs' text
     let w: Vec<u8> = "a€\u{1F600}".encode_utf16().flat_map(|u| u.to_le_bytes()).chain([0, 0, 0x41, 0]).collect();
     t.check(drop_text_from(&w, true) == "a€\u{1F600}".as_bytes(), "dnd: UTF-16 up to its NUL");
@@ -204,6 +207,7 @@ fn ole(t: &mut T) {
     t.check(got.text.as_deref() == Some("Hallo\nWelt"), "dnd-ole: the text (CR LF -> LF)");
     t.check(got.html.as_deref() == Some("<b>fett</b>") && got.urls == ["https://example.org/"], "dnd-ole: HTML and URL");
     t.check(got.image.as_deref() == Some(&png[..]) && got.effects == DE_COPY, "dnd-ole: the PNG, the effect");
+    t.check(drop_allowed() == DE_COPY | DE_MOVE, "dnd-ole: Drop's pdwEffect: the effects the source allows (drop_allowed)");
     // Shift: text may be moved, files are not
     let txt = DragData { text: Some(String::from("weg")), effects: DE_COPY | DE_MOVE, ..DragData::default() };
     t.check(dnd_test_drop(&txt, 0, 20, 30, MK_LBUTTON | MK_SHIFT) == Some(DE_MOVE), "dnd-ole: Shift moves text");
@@ -233,6 +237,7 @@ fn ole(t: &mut T) {
     drag_hook(Some(hook_fx));
     let any = DragData { text: Some(String::from("x")), effects: DE_ALL, ..DragData::default() };
     t.check(dnd_test_drop(&any, 0, 60, 30, MK_LBUTTON) == Some(DE_LINK), "dnd-ole: a link target: DROPEFFECT_LINK");
+    t.check(drop_data_take().effects == DE_LINK && drop_allowed() == DE_ALL, "dnd-ole: ... the drop: linked, every effect allowed");
     t.check(dnd_test_drop(&any, 0, 20, 30, MK_LBUTTON | MK_SHIFT) == Some(DE_COPY), "dnd-ole: a copy target: copy, Shift too");
     t.check(dnd_test_drop(&txt, 0, 60, 30, MK_LBUTTON) == Some(0), "dnd-ole: a link target, a source without link: refused");
     evq_clear();
@@ -361,6 +366,7 @@ fn appkit(t: &mut T) {
         crate::out(&alloc::format!("  (URLs {:?})\n", got.urls));
     }
     t.check(got.image.as_deref() == Some(&png[..]) && got.effects == DE_COPY, "dnd-appkit: the PNG, the effect");
+    t.check(drop_allowed() == DE_COPY | DE_MOVE, "dnd-appkit: the operation mask: the effects the source allows (drop_allowed)");
     // Command held: AppKit offers only a move -- text is moved, files never
     let txt = DragData { text: Some(String::from("weg")), effects: DE_COPY | DE_MOVE, ..DragData::default() };
     t.check(dnd_test_drop(&txt, 0, 20, 30, MOVE) == Some(DE_MOVE), "dnd-appkit: a move-only drag moves text");
@@ -449,6 +455,7 @@ pub fn t_dnd_x11(t: &mut T) {
     t.check(d.html.as_deref() == Some("<b>fett</b>"), "dnd-x11: the HTML");
     t.check(d.image.as_deref() == Some(&pattern(300000)[..]), "dnd-x11: the 300 KB image (INCR)");
     t.check(d.effects == DE_COPY, "dnd-x11: copied");
+    t.check(drop_allowed() == DE_ALL, "dnd-x11: the drop allows every effect (no XdndActionList)");
     // a drag that leaves again
     let mut left = false;
     t.check(pump_until(|e| {
@@ -469,6 +476,7 @@ pub fn t_dnd_x11(t: &mut T) {
         t.check(allowed == Some(DE_COPY | DE_MOVE), "dnd-x11 hold: E_DRAG with the effects of the source's XdndActionList");
         let s = drop_waiting();
         t.check(s != 0 && drop_data_take().text.as_deref() == Some("später"), "dnd-x11 hold: the content, its answer waits");
+        t.check(drop_allowed() == DE_COPY | DE_MOVE, "dnd-x11 hold: the drop allows the effects of XdndActionList");
         // a while without an answer (the client checks that no XdndFinished came)
         let dl = plat::time_us() + 700_000;
         while plat::time_us() < dl {

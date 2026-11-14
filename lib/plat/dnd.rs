@@ -30,10 +30,12 @@
 //                                IDataObjectAsyncCapability's async mode; X11: XdndFinished;
 //                                Wayland: wl_data_offer.finish); elsewhere it went at the drop
 //   drop_waiting() -> serial     the drop whose answer waits (0: none), read after drop_data_take
+//   drop_allowed() -> DE_*       the effects the source of that drop allows, as the platform gives
+//                                them with the drop (0: it does not say), read after drop_data_take
 //   drop_finish(serial, effect) -> answered   answer that drop's source: the effect it was taken
 //                                with, 0 = not taken
-//   drop_set_text / drop_set_html / drop_add_url / drop_set_image / drop_set_effect
-//                                (OS layers) fill the pending drop (drop_reset empties it)
+//   drop_set_text / drop_set_html / drop_add_url / drop_set_image / drop_set_effect /
+//   drop_set_allowed             (OS layers) fill the pending drop (drop_reset empties it)
 //   drop_text_from(bytes, utf16) / drop_url_list(text)   decoding helpers of the OS layers
 //   drag_start(data) -> bool     drag data out of the app while the left button is held (the UI
 //                                calls it when an internal drag leaves its window); false when
@@ -226,10 +228,14 @@ struct Rich {
     url_bytes: usize,
     image: Option<Vec<u8>>,
     effect: u32,
+    allowed: u32,
 }
 
 static RICH: SpinLock<Rich> =
-    SpinLock::new(Rich { text: None, html: None, urls: Vec::new(), url_bytes: 0, image: None, effect: 0 });
+    SpinLock::new(Rich { text: None, html: None, urls: Vec::new(), url_bytes: 0, image: None, effect: 0, allowed: 0 });
+
+// the effects the source of the drop drop_data_take took last allows (drop_allowed)
+static TAKEN_ALLOWED: AtomicU32 = AtomicU32::new(0);
 
 /// (drop_reset) forget the pending text, HTML, URLs and image
 pub(crate) fn rich_reset() {
@@ -240,6 +246,7 @@ pub(crate) fn rich_reset() {
     r.url_bytes = 0;
     r.image = None;
     r.effect = 0;
+    r.allowed = 0;
 }
 
 // text of another program: UTF-8 (invalid bytes replaced), up to the first NUL, bounded
@@ -295,6 +302,14 @@ pub fn drop_set_effect(effect: u32) {
     RICH.lock().effect = effect & DE_ALL;
 }
 
+/// (OS layers) the DE_* effects the source of the pending drop allows, as the platform gives them
+/// with the drop: Windows IDropTarget::Drop's pdwEffect, X11 the source's XdndActionList with the
+/// action of its last XdndPosition (every effect without a list), Wayland the offer's
+/// source_actions, macOS the drag's operation mask.  Not called (the browser, Android): 0
+pub fn drop_set_allowed(effects: u32) {
+    RICH.lock().allowed = effects & DE_ALL;
+}
+
 /// the pending drop (E_DROP): its paths (drop_take) and the rest; both start empty again
 pub fn drop_data_take() -> DragData {
     let files = crate::drop_take();
@@ -309,7 +324,16 @@ pub fn drop_data_take() -> DragData {
         ..DragData::default()
     };
     r.url_bytes = 0;
+    TAKEN_ALLOWED.store(core::mem::take(&mut r.allowed), Ordering::Release);
     d
+}
+
+/// drop_allowed() -> the DE_* effects the source of the drop drop_data_take took last allows, as
+/// the platform gave them with the drop (drop_set_allowed: the same the drag said in E_DRAG over
+/// the window); 0: the platform does not say (the browser, Android).  Read it right after
+/// drop_data_take
+pub fn drop_allowed() -> u32 {
+    TAKEN_ALLOWED.load(Ordering::Acquire)
 }
 
 // "scheme:" in front (RFC 3986: a letter, then letters, digits, + - .)

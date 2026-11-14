@@ -39,18 +39,40 @@ dragover 500 355 text copy move
 dragover expect none
 dragleave
 expect text:"Ziehen: -  Über: -" exists
-# drops after the drag hovered there: the left half copies, the bottom links, the top refuses
-# (nothing happens: no drop on the page, no UIC_DROP)
+# drops after the drag hovered there: the left half copies, the bottom links (for a source that
+# allows linking), the top refuses (nothing happens: no drop on the page, no UIC_DROP)
 dragover 370 330 text
 drop 370 330 text "links"
 expect text:"Abgelegt: Text -> Seite (kopieren)" exists
-dragover 500 355 url
+dragover 500 355 url copy link
 drop 500 355 url https://example.org/c
 expect text:"Abgelegt: URL -> Seite (verknüpfen)" exists
 dragover 500 300 text
 drop 500 300 text "oben"
 expect text:"Abgelegt: URL -> Seite (verknüpfen)" exists
 expect text:"UIC_DROP: -" exists
+drop expect none
+# a drop has an effect its source allows: a source that only copies is refused on the linking
+# bottom, as the platform refuses such a drag there (before, the drop got the target's first
+# effect); so is one that only moves on the copying left half -- the effects the drop gives
+# itself count, not the hover's
+dragover 500 355 text copy
+dragover expect none
+drop 500 355 text "nur kopieren"
+drop expect none
+dragover 370 330 text copy move link
+drop 370 330 text "nur verschieben" allows move
+drop expect none
+expect text:"Abgelegt: URL -> Seite (verknüpfen)" exists
+expect text:"UIC_DROP: -" exists
+# outside the targets too: an effect the source does not allow becomes one it does; files that
+# may only be moved are refused (files are never moved): no UIC_DROP
+drop 600 480 text "lose" link allows copy move
+expect text:"UIC_DROP: Text \"lose\" bei 600,480 (Fenster 0)" exists
+drop expect copy
+drop 600 470 files build/dnd/weg.txt allows move
+expect text:"UIC_DROP: Text \"lose\" bei 600,480 (Fenster 0)" exists
+drop expect none
 # the app's own drags pick from the page's effects too: text onto the left half is copied (a
 # plain drag would move), onto the bottom it is refused (the button allows copy and move)
 drag #401 370,330

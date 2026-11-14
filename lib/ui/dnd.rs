@@ -16,7 +16,9 @@
 // Targets:
 //   drop_target(id, types) -> DS_*   the widget at last_rect takes drags of these DT_* kinds:
 //                                    DS_HOVER while one is over it (the style highlights it),
-//                                    DS_DROP in the pass of the drop (drop_data(), drop_effect())
+//                                    DS_DROP in the pass of the drop (drop_data(), drop_effect():
+//                                    one of the target's effects that the source allows; none in
+//                                    common: refused, no DS_DROP)
 //   drop_effect_set(effects)         the DE_* effects the target of the last drop_target call
 //                                    takes in this pass (default DE_ALL): the platform answers a
 //                                    drag over it with one of them (the system's pointer shows
@@ -28,7 +30,8 @@
 //                                    (0, 0, 0) when none; drag_over_px() the position in px of
 //                                    the window, exact (as drop_pos_px, drop.rs)
 //   drag_allowed() -> DE_*           the effects its source allows (DE_ALL where the platform does
-//                                    not say; 0 when none)
+//                                    not say); after a drop its source's, from E_DROP to the end
+//                                    of its passes and while drop_defer waits; 0 when none
 //   drop_defer() -> bool             (in the pass of a drop: DS_DROP or UIC_DROP) the drop's answer
 //                                    to its source waits for drop_finish (at most DROP_DEFER_MS);
 //                                    false: the platform answered at the drop already
@@ -48,7 +51,12 @@
 // under the point took in the last pass (drop_effect_set), DE_ALL for drop_accept's window --
 // IDropTarget::DragOver's pdwEffect, XdndStatus' action, wl_data_offer.set_actions, macOS'
 // NSDragOperation (plat::drag_query).  The answer follows the app's pass: an effect set for the
-// drag's point in one pass answers the moves until the next pass.
+// drag's point in one pass answers the moves until the next pass.  The effects the source allows
+// come with E_DRAG (forgotten when it leaves or the drag ends) and with the drop (plat::
+// drop_allowed; without them those of the hover before it, else every effect): the drop's effect
+// is one the target takes that the source allows -- the platform's, else the first of copy,
+// move, link -- and a target that takes none of them refuses the drop as the platform refuses
+// such a drag over it.
 // The answer of a drop to its source (the effect, or that it was not taken) goes after the
 // passes of E_DROP: the effect it was delivered with -- unless the app called drop_defer in them
 // and answers later with drop_finish (a web page decides asynchronously whether it took a drop).
@@ -160,7 +168,13 @@ pub(crate) struct S {
     ext_x: i32,
     ext_y: i32,
     ext_types: u32,
+    /// the DE_* effects its source allows (E_DRAG; 0: not said); forgotten when it leaves, is
+    /// dropped or the app's own drag ends
     ext_allowed: u32,
+    /// the effects the source of the last drop allows (0: nobody said) and that its passes run
+    /// (E_DROP .. dnd_drop_settled): drag_allowed then, and while its deferred answer waits
+    drop_allowed: u32,
+    drop_now: bool,
     /// the zone of the last drop_target call (window, index in its pass's list, id), for
     /// drop_effect_set
     last_zone: Option<(u32, usize, u32)>,
@@ -207,6 +221,8 @@ impl Default for S {
             ext_y: 0,
             ext_types: 0,
             ext_allowed: 0,
+            drop_allowed: 0,
+            drop_now: false,
             last_zone: None,
             over: 0,
             over_win: 0,
@@ -357,7 +373,9 @@ impl Ui {
 
     /// drop_target(id, types) -> DS_HOVER / DS_DROP / 0: the widget at last_rect takes drags
     /// of these DT_* kinds (DT_USER0 << k: the app's own).  DS_HOVER while such a drag is over
-    /// it (the style draws the highlight), DS_DROP in the pass of the drop (drop_data())
+    /// it (the style draws the highlight), DS_DROP in the pass of the drop (drop_data(),
+    /// drop_effect(): one of the target's effects that the source allows; none in common: the
+    /// drop is refused, no DS_DROP)
     pub fn drop_target(&mut self, id: u32, types: u32) -> u32 {
         if id == 0 || types == 0 {
             return 0;
@@ -468,17 +486,26 @@ impl Ui {
     /// DoDragDrop, X11 the source's XdndActionList with the action it asks for (DE_ALL without a
     /// list), Wayland its source_actions (copy and move: Wayland has no link), macOS the drag's
     /// operation mask (narrowed by the modifier keys, as AppKit hands it on) -- the app's own drag
-    /// its DragData::allowed(); DE_ALL where the platform does not say, 0 when no drag is over the
-    /// window.  A page that decides an effect (a web page's effectAllowed and dropEffect) picks
-    /// from these, then drop_effect_set; the platform never moves another program's files whatever
-    /// this says
+    /// its DragData::allowed(); DE_ALL where the platform does not say.  After a drop, the effects
+    /// its source allows -- as the platform gives them with the drop (Windows Drop's pdwEffect, X11
+    /// the list with the last XdndPosition's action, Wayland source_actions, macOS the operation
+    /// mask), else as the hover before it said, else DE_ALL (the browser, Android) -- from its
+    /// E_DROP to the end of the passes it starts (DS_DROP, App::command's UIC_DROP) and, when the
+    /// app called drop_defer, until its answer went (drop_finish, DROP_DEFER_MS, a newer drop): in
+    /// every window over which no drag is, and drop_finish answers within them.  0 otherwise: no
+    /// drag over the window, no drop in its passes or waiting.  A page that decides an effect (a
+    /// web page's effectAllowed and dropEffect) picks from these, then drop_effect_set; the
+    /// platform never moves another program's files whatever this says
     pub fn drag_allowed(&self) -> u32 {
         let win = self.uiw_cur;
         let d = &self.dnd;
+        let said = |a: u32| if a & DE_ALL != 0 { a & DE_ALL } else { DE_ALL };
         if d.phase == PH_IN && d.src_win == win {
             d.data.allowed()
         } else if d.ext && d.ext_win == win {
-            if d.ext_allowed & DE_ALL != 0 { d.ext_allowed & DE_ALL } else { DE_ALL }
+            said(d.ext_allowed)
+        } else if d.drop_now || d.wait.is_some_and(|w| w.deferred.is_some()) {
+            said(d.drop_allowed)
         } else {
             0
         }
@@ -505,9 +532,9 @@ impl Ui {
 
     /// drop_finish(effect) -> answered: the answer of the drop that waits (drop_defer; or, in the
     /// pass of a drop, instead of the effect it was delivered with): the DE_* effect it was taken
-    /// with, 0 = not taken.  An effect the source does not allow becomes the first it does (copy,
-    /// move, link): taken stays taken.  false: no drop waits (none was deferred, it was answered,
-    /// or its DROP_DEFER_MS were up)
+    /// with, 0 = not taken.  An effect the source does not allow (drag_allowed says them until
+    /// then) becomes the first it does (copy, move, link): taken stays taken.  false: no drop
+    /// waits (none was deferred, it was answered, or its DROP_DEFER_MS were up)
     pub fn drop_finish(&mut self, effect: u32) -> bool {
         let Some(w) = self.dnd.wait else { return false };
         let e = effect & DE_ALL;
@@ -528,6 +555,7 @@ impl Ui {
         let Some(w) = self.dnd.wait.take() else { return };
         if w.deferred.is_some() {
             self.timers.retain(|t| t.0 != UIT_DROP);
+            self.need = true; // drag_allowed says the drop's effects no more
         }
         if !self.headless {
             plat::drop_finish(w.serial, effect);
@@ -550,10 +578,14 @@ impl Ui {
         self.dnd.wait = Some(Wait { serial, fallback: effect, allowed, deferred: None });
     }
 
-    /// (runtime, after the passes of E_DROP) a drop the app did not defer is answered now
+    /// (runtime, after the passes of E_DROP) a drop the app did not defer is answered now; its
+    /// passes are over (drag_allowed: the drop's effects only while its deferred answer waits)
     pub(crate) fn dnd_drop_settled(&mut self) {
         if let Some(w) = self.dnd.wait.filter(|w| w.deferred.is_none()) {
             self.dnd_answer(w.fallback);
+        }
+        if core::mem::take(&mut self.dnd.drop_now) && !self.dnd.wait.is_some_and(|w| w.deferred.is_some()) {
+            self.need = true; // a frame without the drop's effects
         }
     }
 
@@ -584,7 +616,10 @@ impl Ui {
         None
     }
 
-    /// the effect of the last drop (DE_*)
+    /// the effect of the last drop (DE_*): one its target takes (drop_effect_set; outside the
+    /// targets every one) that its source allows (drag_allowed in its passes), files never moved
+    /// -- the platform's choice, else the first of copy, move, link.  A drop with none in common
+    /// is refused (no DS_DROP, no UIC_DROP; its source is answered "not taken")
     pub fn drop_effect(&self) -> u32 {
         self.dnd.drop_effect
     }
@@ -804,6 +839,7 @@ impl Ui {
         if ev.data == 0 {
             if self.dnd.ext_win == win {
                 self.dnd.ext = false;
+                self.dnd.ext_allowed = 0; // the next drag says its own
             }
             return;
         }
@@ -849,18 +885,29 @@ impl Ui {
     }
 
     /// E_DROP (drop.rs): the drop of another program (or the app's own drag) at (x, y) logical
-    /// px of window win -> true when a drop target took it (else UIC_DROP decides).  serial: the
-    /// platform's while the drop's answer waits (plat::drop_waiting), 0 when it went at the drop
-    pub(crate) fn dnd_dropped(&mut self, win: u32, x: i32, y: i32, mut data: DragData, serial: u32) -> bool {
-        // what the source allows (the hover's E_DRAG said it; the app's own drag its data's)
-        let mut allowed = if self.dnd.phase == PH_OUT {
-            self.dnd.data.allowed()
-        } else if self.dnd.ext_allowed & DE_ALL != 0 {
-            self.dnd.ext_allowed & DE_ALL
+    /// px of window win -> true when a drop target took it or it was refused (else UIC_DROP
+    /// decides).  serial: the platform's while the drop's answer waits (plat::drop_waiting), 0
+    /// when it went at the drop; given: the effects its source allows as the platform gave them
+    /// with the drop (plat::drop_allowed; 0: not said)
+    pub(crate) fn dnd_dropped(&mut self, win: u32, x: i32, y: i32, mut data: DragData, serial: u32, given: u32) -> bool {
+        // what the source allows: the app's own drag its data's; another program's as the drop
+        // says, else as the hover over the window before it said (the same drag), else nobody
+        // said (every effect)
+        let d = &self.dnd;
+        let src = if d.phase == PH_OUT {
+            d.data.allowed()
+        } else if given & DE_ALL != 0 {
+            given & DE_ALL
+        } else if d.ext && d.ext_win == win {
+            d.ext_allowed & DE_ALL
         } else {
-            DE_COPY | DE_MOVE
+            0
         };
+        let mut allowed = if src == 0 { DE_ALL } else { src };
         self.dnd.ext = false;
+        self.dnd.ext_allowed = 0;
+        self.dnd.drop_allowed = src;
+        self.dnd.drop_now = true;
         if self.dnd.phase == PH_OUT {
             // the app's own drag came back: its full content
             let effect = data.effects;
@@ -885,19 +932,19 @@ impl Ui {
         } else {
             serial
         };
+        // the effects the drop may have there: the target's (drop_effect_set; the window's
+        // drop_accept outside them: every one) that the source allows, files never moved.  The
+        // platform picked one of them already; a scripted drop (or one that raced the pass) with
+        // another effect gets the first of them, and with none in common nothing happens (no
+        // DS_DROP, no UIC_DROP; the source is answered "not taken"), as the platform refuses
+        // such a drag over the target
+        let fx = z.map_or(DE_ALL, |z| z.effects) & allowed;
+        if data.effects & fx == 0 {
+            data.effects = plat::drag_effect_pick(fx, 0);
+        }
+        let e = data.effects;
         match z {
             Some(z) => {
-                // the target's effects (drop_effect_set): the platform picked one of them
-                // already; a scripted drop (or one that raced the pass) gets the first it takes,
-                // and a target that takes none refuses it (nothing happens, no UIC_DROP)
-                let mut fx = z.effects & DE_ALL;
-                if !data.files.is_empty() {
-                    fx &= !DE_MOVE;
-                }
-                if data.effects & fx == 0 {
-                    data.effects = plat::drag_effect_pick(fx, 0);
-                }
-                let e = data.effects;
                 if e != 0 {
                     self.dnd.drop_effect = e;
                     self.dnd_deliver(z.id, win, x, y, data);
@@ -906,11 +953,12 @@ impl Ui {
                 true
             }
             None => {
-                let e = data.effects;
-                self.dnd.drop_effect = e;
-                self.dnd.dropped = data;
+                if e != 0 {
+                    self.dnd.drop_effect = e;
+                    self.dnd.dropped = data;
+                }
                 self.dnd_wait_begin(serial, e, allowed);
-                false
+                e == 0
             }
         }
     }
@@ -919,6 +967,9 @@ impl Ui {
     pub(crate) fn dnd_out_end(&mut self, effect: u32) {
         if self.dnd.phase == PH_OUT {
             self.dnd.out = None;
+            // its hover over a window of the app (it came back) ended with it
+            self.dnd.ext = false;
+            self.dnd.ext_allowed = 0;
             self.dnd_end(effect & DE_ALL);
         }
     }

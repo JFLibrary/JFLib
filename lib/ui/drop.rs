@@ -23,8 +23,10 @@
 // Which kinds a window takes outside its drop targets: drop_accept (dnd.rs, default DT_FILES).
 // Internal:
 //   drop_receive(ev) -> taken       E_DROP: the platform's pending drop (runtime.rs) onto the
-//                                   drop target at the point (true) or for UIC_DROP (false)
-//   drop_inject(data)               script "drop": the content of the next E_DROP
+//                                   drop target at the point (true; also when no effect the
+//                                   source allows is taken there: refused) or for UIC_DROP (false)
+//   drop_inject(data, allowed)      script "drop": the content of the next E_DROP and the effects
+//                                   its source allows (0: not said)
 //   hclip_img_set(fmt, data)        headless CLIP_PNG (bytes) / CLIP_IMAGE (a CLIPIMG
 //                                   record: png then bmp, see clipimg.rs): PNG + BMP copies
 //   hclip_img_get(fmt)              CLIP_PNG: the PNG; CLIP_IMAGE: the PNG, else the BMP
@@ -42,6 +44,7 @@ use plat::{DragData, Event};
 pub(crate) struct S {
     pub(crate) list: Vec<String>,
     pub(crate) inj: Option<DragData>,
+    pub(crate) inj_allowed: u32,
     pub(crate) hi_png: Option<Vec<u8>>,
     pub(crate) hi_bmp: Option<Vec<u8>>,
     pub(crate) x: i32,
@@ -137,12 +140,16 @@ impl Ui {
     }
 
     /// ui_drop_accept(ev) -> taken: E_DROP of window ev.win (UI index): the platform's drop
-    /// becomes current; a drop target at the point takes it (DS_DROP), else UIC_DROP follows
+    /// becomes current; a drop target at the point takes it (DS_DROP), else UIC_DROP follows --
+    /// unless it takes no effect the source allows there (refused: true, nothing follows)
     pub(crate) fn drop_receive(&mut self, ev: &Event) -> bool {
-        let (data, serial) = if self.headless {
-            (self.dr.inj.take().unwrap_or_default(), 0) // headless: the content of the script's "drop"
+        let (data, serial, allowed) = if self.headless {
+            // headless: the content of the script's "drop"
+            (self.dr.inj.take().unwrap_or_default(), 0, core::mem::take(&mut self.dr.inj_allowed))
         } else {
-            (plat::drop_data_take(), plat::drop_waiting()) // the serial of its answer while it waits
+            // the serial of its answer while it waits, the effects its source allows
+            let data = plat::drop_data_take();
+            (data, plat::drop_waiting(), plat::drop_allowed())
         };
         super::perm::grant_all(&data.files); // the user dropped them (fs.user)
         let win = ev.win as u32;
@@ -151,12 +158,14 @@ impl Ui {
         self.uiw_use(win);
         let x = if self.rtl { self.wp.rt.fb.w - 1 - ev.x } else { ev.x }; // logical (right-to-left)
         self.uiw_use(cur);
-        self.dnd_dropped(win, x, ev.y, data, serial)
+        self.dnd_dropped(win, x, ev.y, data, serial, allowed)
     }
 
-    /// ui_drop_inject(data): (script) the next E_DROP gets this content
-    pub(crate) fn drop_inject(&mut self, data: DragData) {
+    /// ui_drop_inject(data, allowed): (script) the next E_DROP gets this content, its source
+    /// allowing these DE_* effects (0: the platform does not say)
+    pub(crate) fn drop_inject(&mut self, data: DragData, allowed: u32) {
         self.dr.inj = Some(data);
+        self.dr.inj_allowed = allowed;
     }
 
     /// ui_clip_has(fmt): the clipboard offers fmt (cheap: no data is transferred)
