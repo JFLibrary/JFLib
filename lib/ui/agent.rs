@@ -134,7 +134,9 @@ impl<'a> UiHost<'a> {
         bytes.extend_from_slice(&ui.modal_active().to_le_bytes());
         bytes.extend(ui.desc.cmds.iter().map(|c| (ui.cmd_flags(c.id) & CF_DISABLED != 0) as u8));
         for s in ui.sems.iter().filter(|s| s.id != ID_BADGE) {
-            if controls && matches!(s.kind, K_BOX | K_TEXT | K_PROGRESS | K_ICON | K_IMAGE | K_HEADING) { continue; }
+            if controls && matches!(s.kind, K_BOX | K_TEXT | K_PROGRESS | K_ICON | K_IMAGE | K_HEADING | K_TABLE | K_ROW | K_CELL
+                | K_COLHEADER | K_ROWHEADER | K_LANDMARK | K_TREE | K_RADIOGROUP | K_TOOLBAR | K_TOOLTIP | K_SEPARATOR | K_ALERT
+                | K_STATUS | K_LOG | K_METER | K_ARTICLE | K_FIGURE) { continue; }
             let state = if controls { s.state & !(SS_HOVER | SS_PRESSED) } else { s.state };
             bytes.extend_from_slice(&s.id.to_le_bytes());
             bytes.extend_from_slice(&s.kind.to_le_bytes());

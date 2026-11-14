@@ -1,0 +1,20 @@
+# viewtest: lines for some systems only.  `only OS...: COMMAND` runs the command on the systems
+# it names (cargo jflib test's `#!only` names: windows linux macos ios android wasm32), `!OS` on
+# every system but that one; the rest of the script runs everywhere.  The suite runs this script
+# on Windows and Linux: "Notiz" (#117) gets what the lines of the system it runs on typed.
+focus #117
+only windows: type "w"
+only linux: type "l"
+only macos ios: type "m"
+only android wasm32: type "a"
+only !windows: type "-"
+only !linux, !windows: type "?"
+only windows linux macos ios android wasm32: type "+"
+only windows: expect #117 text "w+"
+only linux: expect #117 text "l-+"
+only macos ios: expect #117 text "m-?+"
+only android wasm32: expect #117 text "a-?+"
+# the command after the colon is the rest of the line, colons and quotes included
+only windows linux: expect text:"Dateien: -" exists
+only !windows !linux: expect text:"Dateien: -" exists
+expect_nowarn

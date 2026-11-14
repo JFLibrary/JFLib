@@ -161,6 +161,16 @@ pub fn run(t: &mut T) {
     t.check("key or", matches!(&k[3], SearchKey::Or(a, b) if **a == SearchKey::Flagged && **b == SearchKey::Subject(String::from("Hallo Welt"))));
     t.check("key seq", matches!(&k[4], SearchKey::Seq(_)));
     t.eq("key unknown", imap::parse_search(&imap::tokens(&Line::plain("WHATEVER"))), None);
+    // 200000 '(' in one line: a recursion each (and as deep a drop) ran the stack out; past 64
+    // levels the rest is one atom
+    let deep = imap::tokens(&Line::plain(&"(".repeat(200_000)));
+    let mut d = 0;
+    let mut it = &deep;
+    while let Some(imap::Item::List(inner)) = it.first() {
+        d += 1;
+        it = inner;
+    }
+    t.check("deep lists: 64 levels, then the rest as an atom", d == 64 && matches!(it.first(), Some(imap::Item::Atom(a)) if a.len() == 200_000 - 64));
     // dates
     t.eq("date", imap::internal_date(1_767_225_600), String::from("01-Jan-2026 00:00:00 +0000"));
     t.eq("date 2", imap::internal_date(1_767_225_600 + 86_400 * 59 + 3661), String::from("01-Mar-2026 01:01:01 +0000"));

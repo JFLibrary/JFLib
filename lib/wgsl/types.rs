@@ -319,6 +319,16 @@ impl Types {
         }
     }
 
+    /// whether t holds an atomic<inner> (itself, in an array or a struct member)
+    pub fn contains_atomic_of(&self, t: TypeId, inner: TypeId) -> bool {
+        match self.get(t) {
+            Type::Atomic(i) => i == inner,
+            Type::Array { elem, .. } => self.contains_atomic_of(elem, inner),
+            Type::Struct(i) => self.structs.get(i as usize).is_some_and(|s| s.members.iter().any(|m| self.contains_atomic_of(m.ty, inner))),
+            _ => false,
+        }
+    }
+
     pub fn contains_runtime_array(&self, t: TypeId) -> bool {
         match self.get(t) {
             Type::Array { count: ArrayCount::Runtime, .. } => true,

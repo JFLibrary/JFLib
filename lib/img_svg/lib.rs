@@ -39,7 +39,9 @@
 //
 // Robustness: malformed input never panics.  The reader is forgiving (xml.rs); limits:
 // MAX_INPUT bytes (also after inflating), 250 000 elements, 256 levels, 4096 CSS rules, a
-// step budget for selector matching, 1 000 000 element visits per render, 64 levels of
+// step budget for selector matching, 128 MB of declarations copied by the cascade (beyond:
+// ERR_LIMIT), 1 000 000 element visits and a work budget (pixels painted, layers and masks,
+// path points, children walked: 64 per pixel drawn, at least 2^26) per render, 64 levels of
 // nesting while drawing, use cycles cut, 8 layers alive at once.
 
 #![no_std]

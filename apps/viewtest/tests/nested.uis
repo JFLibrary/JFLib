@@ -1,0 +1,27 @@
+# viewtest: new boxes inside new fill boxes get their size in their first pass.  Ctrl+N opens
+# "Teiler" (a browser's new window); its "Teilen" shows four splits inside each other a pass after
+# the click, each one new in the filling pane of the one before, each taking its orientation and
+# first position from the room it gets (as developer tools dock), the innermost pane a wrapping
+# text over a box that fills the rest.  Before charge 8 the panes were 0 in their first pass, so
+# each split decided from 0 and the frame needed a pass per level: "layout did not settle within
+# 4 passes" (a UIWARN).  Now the click, one pass for the new boxes and one to confirm.
+key ctrl+n
+window any
+expect "Teilen" exists
+expect_nowarn
+click "Teilen"
+expect_nowarn
+# the grips: one above the other, side by side, one above the other, side by side (halves)
+expect #0x80000442 rect 9 281 784 6
+expect #0x8000044A rect 401 287 6 266
+expect #0x80000452 rect 407 420 386 6
+expect #0x8000045A rect 600 426 6 127
+# the innermost column: the text wrapped to its width, the filling box below it
+expect "Ein Text, der hier umbricht: seine Höhe hängt von der Breite ab, die vier neue Teiler ihm lassen." rect 610 430 179 80
+expect "Rest" rect 610 514 179 20
+# away and back: the boxes are known now
+click "Teilen"
+expect "Rest" missing
+click "Teilen"
+expect_nowarn
+expect "Rest" rect 610 514 179 20

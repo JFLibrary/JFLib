@@ -1,0 +1,4 @@
+#!args --hostile
+# codectest is a console program: --hostile runs the crafted JPEG XL / JPEG XR inputs of
+# hostile.rs (refused quickly, no panic, no gigabyte allocations) and their controls, and ignores
+# the script (build_rs.py test passes --script); a failing check exits with code 1

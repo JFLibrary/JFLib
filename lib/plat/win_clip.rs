@@ -31,7 +31,7 @@ use alloc::vec::Vec;
 use core::cell::Cell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use super::{PostMessageW, SendMessageW, UiThread, dll_proc, main_hwnd, wide_cap, win_hwnd};
+use super::{PostMessageW, SendMessageW, UiOnly, dll_proc, main_hwnd, wide_cap, win_hwnd};
 use crate::{CLIP_DOCX, CLIP_HTML, CLIP_RTF, CLIP_IMAGE, CLIP_PNG, CLIP_TEXT, clip_dib_to_bmp, clipimg_split, drop_add, drop_reset};
 
 #[link(name = "user32", kind = "raw-dylib")]
@@ -152,7 +152,7 @@ struct Clip {
     ime_w: Cell<isize>,
 }
 
-static CLIP: UiThread<Clip> = UiThread(Clip {
+static CLIP: UiOnly<Clip> = UiOnly::new(Clip {
     cf_png: Cell::new(0),
     cf_impng: Cell::new(0),
     ime_h: Cell::new(0),
@@ -168,7 +168,7 @@ static P_DFIN: AtomicUsize = AtomicUsize::new(0);
 static SHELL_TRIED: AtomicUsize = AtomicUsize::new(0);
 
 fn clip() -> &'static Clip {
-    &CLIP.0
+    CLIP.get()
 }
 
 /// the clipboard is open (retried while another program holds it)  [clip_open]

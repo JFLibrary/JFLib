@@ -102,7 +102,8 @@ impl Path {
 /// mailbox, 4.1.2)
 pub fn parse_path(arg: &str, key: &str) -> Option<Path> {
     let a = arg.trim_start();
-    if a.len() < key.len() + 1 || !a[..key.len()].eq_ignore_ascii_case(key) {
+    // (compared as bytes: the keyword's length may end inside a character of the argument)
+    if a.len() < key.len() + 1 || !a.as_bytes()[..key.len()].eq_ignore_ascii_case(key.as_bytes()) {
         return None;
     }
     let rest = a[key.len()..].trim_start().strip_prefix(':')?.trim_start();

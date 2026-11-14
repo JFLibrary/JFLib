@@ -262,6 +262,49 @@ fn unix(t: &mut T) {
     drop(l);
     t.check("unix socket file removed", fs::lstat(&path).is_none());
     t.check("unix refused", plat::net::connect_unix(&path, 500).is_err());
+    unix_names(t, &path);
+}
+
+/// UnixListener and the names around it: bind never removes a file, a folder or a socket that
+/// is listened on (an error), only a socket file left by a listener that is gone; a dropped
+/// listener removes only its own socket file, not a name taken again meanwhile
+fn unix_names(t: &mut T, path: &str) {
+    use plat::net::{NetErrorKind, UnixListener};
+    let in_use = |r: Result<UnixListener, plat::net::NetError>| r.err().is_some_and(|e| e.kind == NetErrorKind::AddrInUse);
+    // a file and an empty folder at the name stay
+    plat::write_file(path, b"payload");
+    t.check("unix bind on a file: AddrInUse", in_use(UnixListener::bind(path)));
+    t.check("unix ... the file keeps its bytes", plat::read_file(path).as_deref() == Some(&b"payload"[..]));
+    plat::delete(path);
+    plat::mkdir(path);
+    // (Linux and macOS: AddrInUse; Windows: Other, WSAEINVAL)
+    t.check("unix bind on an empty folder fails, the folder stays", UnixListener::bind(path).is_err() && plat::file_exists(path) == 2);
+    plat::delete(path);
+    // a listener's socket is not taken over
+    let Ok(l1) = UnixListener::bind(path) else {
+        t.check("unix bind", false);
+        return;
+    };
+    t.check("unix second bind on a listened socket: AddrInUse", in_use(UnixListener::bind(path)));
+    t.check("unix ... the first listener still reachable", plat::net::connect_unix(path, 2000).is_ok() && l1.accept_timeout(2000).is_ok_and(|c| c.is_some()));
+    // the name deleted and taken again: dropping the old listener leaves the new file
+    t.check("unix name taken again", plat::delete(path) && plat::write_file(path, b"neu"));
+    drop(l1);
+    t.check("unix a dropped listener leaves a name taken again", plat::read_file(path).as_deref() == Some(&b"neu"[..]));
+    plat::delete(path);
+    // a socket file left behind (its listener gone): bind takes the name
+    let moved = format!("{path}.old");
+    if let Ok(l2) = UnixListener::bind(path) {
+        let mv = plat::rename(path, &moved);
+        drop(l2); // its socket file is elsewhere now: not removed
+        let left = mv && fs::lstat(&moved).is_some() && plat::rename(&moved, path);
+        let l3 = UnixListener::bind(path);
+        t.check("unix bind over a socket file nobody listens on", left && l3.is_ok());
+        let reach = plat::net::connect_unix(path, 2000).is_ok();
+        drop(l3);
+        t.check("unix ... and listens there", reach && fs::lstat(path).is_none());
+    }
+    plat::delete(&moved);
 }
 
 /// plat::watch: new, changed, renamed and deleted files, a new folder and a file in it
@@ -314,6 +357,108 @@ fn watch(t: &mut T) {
         plat::delete(&fs::join(&base, p));
     }
     plat::delete(&base);
+    watch_gaps(t);
+}
+
+/// true once cond holds (polled every 50 ms), false after ms
+fn wait_until(ms: u64, mut cond: impl FnMut() -> bool) -> bool {
+    let dl = plat::time_us() + ms * 1000;
+    loop {
+        if cond() {
+            return true;
+        }
+        if plat::time_us() >= dl {
+            return false;
+        }
+        plat::sleep_ms(50);
+    }
+}
+
+/// a change whose path ends with suffix comes within ms
+fn seen_within(w: &plat::watch::Watcher, suffix: &str, ms: u64) -> bool {
+    wait_until(ms, || w.take(100).paths.iter().any(|p| p.replace('\\', "/").ends_with(suffix)))
+}
+
+/// the watcher's gaps: a change right after new, a root deleted and made again, (Linux) a root
+/// moved away, a folder whose listing failed
+fn watch_gaps(t: &mut T) {
+    use plat::watch::Watcher;
+    let base = fs::join(&plat::temp_dir().unwrap_or_else(|| String::from(".")), &format!("coretest-watch2-{}", plat::random_u64() % 1_000_000));
+    t.check("watch2 dir", fs::mkdir_private(&base));
+    // every change after new returned is seen (Windows: new waits for each root's first read)
+    let mut missed = 0;
+    for i in 0..10 {
+        let Ok(w) = Watcher::new(&[base.clone()]) else { missed += 1; continue };
+        let f = fs::join(&base, &format!("start{i}.txt"));
+        plat::write_file(&f, b"x");
+        if !seen_within(&w, &format!("/start{i}.txt"), 3000) {
+            missed += 1;
+        }
+        drop(w);
+        plat::delete(&f);
+    }
+    t.check("watch: a change right after new is seen (10 watchers)", missed == 0);
+    #[cfg(any(windows, target_os = "linux"))]
+    {
+        // a root deleted: lost (overflow at every take, watching() false); made again: watched
+        // again, its changes are seen
+        let root = fs::join(&base, "wurzel");
+        fs::mkdir_private(&root);
+        let Ok(w) = Watcher::new(&[root.clone()]) else {
+            t.check("watch: a watcher of one root", false);
+            return;
+        };
+        t.check("watch: watching() after new", w.watching());
+        #[cfg(target_os = "linux")]
+        {
+            // (Linux) moved away: its changes there are not reported under the old path; a new
+            // folder at the path is watched
+            let moved = fs::join(&base, "verschoben");
+            t.check("watch: the root moved away", plat::rename(&root, &moved) && wait_until(3000, || !w.watching()));
+            plat::write_file(&fs::join(&moved, "alt.txt"), b"x");
+            t.check("watch: ... its changes there are not reported under the old path", !seen_within(&w, "/wurzel/alt.txt", 1000));
+            fs::mkdir_private(&root);
+            t.check("watch: a new folder at the root's path is watched", wait_until(5000, || w.watching()));
+            plat::write_file(&fs::join(&root, "neu.txt"), b"x");
+            t.check("watch: ... a change in it is seen", seen_within(&w, "/wurzel/neu.txt", 3000));
+            plat::delete(&fs::join(&moved, "alt.txt"));
+            plat::delete(&moved);
+            plat::delete(&fs::join(&root, "neu.txt"));
+        }
+        plat::delete(&root);
+        t.check("watch: a deleted root is lost (overflow, watching() false)", wait_until(3000, || w.take(100).overflow && !w.watching()));
+        fs::mkdir_private(&root);
+        t.check("watch: the root made again is watched again", wait_until(5000, || w.watching()));
+        plat::write_file(&fs::join(&root, "danach.txt"), b"x");
+        t.check("watch: ... a change in it is seen", seen_within(&w, "/wurzel/danach.txt", 3000));
+        drop(w);
+        plat::delete(&fs::join(&root, "danach.txt"));
+        plat::delete(&fs::join(&root, "neu.txt"));
+        plat::delete(&root);
+    }
+    #[cfg(target_os = "linux")]
+    {
+        // the first listing of a folder fails: its folders are watched a second later
+        let list = fs::join(&base, "liste");
+        let deep = fs::join(&list, "a/b");
+        t.check("watch: a tree", fs::mkdir_private(&deep));
+        plat::setenv("jfgui_TEST_WATCH_LIST_FAIL", Some(&list));
+        let w = Watcher::new(&[list.clone()]);
+        plat::setenv("jfgui_TEST_WATCH_LIST_FAIL", None);
+        if let Ok(w) = w {
+            t.check("watch: a folder whose listing failed: not all watched yet", !w.watching() && w.take(0).overflow);
+            t.check("watch: ... a second later it is", wait_until(5000, || w.watching()));
+            plat::write_file(&fs::join(&deep, "x.txt"), b"x");
+            t.check("watch: ... a change two folders down is seen", seen_within(&w, "/liste/a/b/x.txt", 3000));
+        } else {
+            t.check("watch: a watcher of the tree", false);
+        }
+        plat::delete(&fs::join(&deep, "x.txt"));
+        plat::delete(&deep);
+        plat::delete(&fs::join(&list, "a"));
+        plat::delete(&list);
+    }
+    plat::delete(&base);
 }
 
 fn files(t: &mut T) {
@@ -361,8 +506,38 @@ fn files(t: &mut T) {
     let long_ok = fs::mkdir_private(&deep) && fs::write_file_private(&fs::join(&deep, "datei.bin"), b"x");
     t.check("long paths", long_ok && fs::stat(&fs::join(&deep, "datei.bin")).is_some_and(|m| m.size == 1));
     t.eq("parent", fs::parent("/a/b/c"), "/a/b");
+    names_and_siblings(t, &base);
     // clean up (best effort)
     remove_tree(&base);
+}
+
+/// '\' separates on Windows (and in vfs names); on Linux and macOS it is part of a name. The
+/// private writer's sibling is always a new file: a file of that name stays as it was.
+fn names_and_siblings(t: &mut T, base: &str) {
+    t.eq("parent of a vfs name with a backslash", fs::parent("mem://a\\b"), "mem://a");
+    if cfg!(windows) {
+        t.eq("join after a backslash", fs::join("C:\\a\\", "f"), String::from("C:\\a\\f"));
+        t.eq("parent across a backslash", fs::parent("C:\\a\\b"), "C:\\a");
+    } else {
+        t.eq("join after a backslash in a name", fs::join("/tmp/a\\", "f"), String::from("/tmp/a\\/f"));
+        t.eq("parent of a name with a backslash", fs::parent("/tmp/a\\b"), "/tmp");
+        let xy = fs::join(base, "x\\y");
+        t.check("mkdir_private of a name with a backslash makes that folder alone",
+                fs::mkdir_private(&xy) && plat::file_exists(&fs::join(base, "x")) == 0 && fs::stat(&xy).is_some_and(|m| m.is_dir()));
+        let d = fs::join(base, "d\\");
+        let inner = fs::join(&d, "in.txt");
+        t.check("a file in a folder whose name ends with a backslash", plat::mkdir(&d) && fs::write_file_private(&inner, b"in")
+                && fs::read_dir(&d).is_some_and(|l| l.len() == 1 && l[0].name == "in.txt" && l[0].kind == fs::FileKind::File));
+    }
+    // a file where the private writer's first sibling would go: it keeps its bytes and its name
+    let p = fs::join(base, "seed.key");
+    let planted = format!("{p}.tmp424242");
+    plat::setenv("jfgui_TEST_PRIVATE_TMP", Some("424242"));
+    let wrote = plat::write_file(&planted, b"planted") && fs::write_file_private(&p, b"secret");
+    plat::setenv("jfgui_TEST_PRIVATE_TMP", None);
+    t.check("write_file_private takes no existing sibling over", wrote && plat::read_file(&p).as_deref() == Some(&b"secret"[..])
+            && plat::read_file(&planted).as_deref() == Some(&b"planted"[..]));
+    plat::delete(&planted);
 }
 
 fn remove_tree(path: &str) {

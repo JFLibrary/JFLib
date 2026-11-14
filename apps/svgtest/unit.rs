@@ -563,6 +563,8 @@ fn styles(t: &mut T) {
     t.px(&sf, 50, 50, 0xFF00_FFFF, 0, "descendant combinator");
     let sf = r100("<style>/* comment */ .q{fill:red;stroke:none!important} </style><rect class='q' width='100' height='100'/>");
     t.px(&sf, 50, 50, RED, 0, "comments, !important");
+    let sf = r100("<style>circle, .q, rect { fill: red } circle, rect { stroke: none }</style><rect width='100' height='100'/>");
+    t.px(&sf, 50, 50, RED, 0, "selector lists (one block shared)");
     let sf = r100("<rect width='100' height='100' style='fill: red; ; garbage; fill-opacity: 0.5'/>");
     t.px(&sf, 50, 50, 0x8080_0000, 1, "style attribute with junk");
     let sf = r100("<g fill='red'><rect width='100' height='100' fill='inherit'/></g>");
@@ -853,6 +855,29 @@ fn malformed(t: &mut T) {
     let _ = svg.rasterize(16, 16, &mut Opts::default());
     let dt = (plat::time_us() - t0) / 1000;
     t.check(dt < 20_000, &format!("use explosion bounded ({} ms)", dt));
+    // a use DAG of 10^6 visits (6 levels of 10), each covering the whole 256 x 256 surface (a
+    // fill, a layer, a clip mask): the render's work budget ends it, not the visits (10^11 pixels)
+    let leaves = [
+        "<rect id='l0' width='256' height='256' fill='red'/>",
+        "<rect id='l0' width='256' height='256' fill='red' stroke='red' opacity='0.5'/>",
+        "<clipPath id='c'><rect width='200' height='200'/></clipPath><rect id='l0' width='256' height='256' fill='red' clip-path='url(#c)'/>",
+    ];
+    for (i, leaf) in leaves.iter().enumerate() {
+        let mut s = format!("<svg width='256' height='256'><defs>{}", leaf);
+        for k in 1..=6 {
+            s.push_str(&format!("<g id='l{}'>", k));
+            for _ in 0..10 {
+                s.push_str(&format!("<use href='#l{}'/>", k - 1));
+            }
+            s.push_str("</g>");
+        }
+        s.push_str("</defs><use href='#l6'/></svg>");
+        let t0 = plat::time_us();
+        let sf = Svg::parse(s.as_bytes()).and_then(|svg| svg.rasterize(256, 256, &mut Opts::default()));
+        let dt = (plat::time_us() - t0) / 1000;
+        let drawn = sf.as_ref().is_ok_and(|sf| px(sf, 128, 128) >> 24 >= 0xF0);
+        t.check(dt < 20_000 && drawn, &format!("use DAG over the whole surface {}: work bounded ({} ms), drawn", ["(fills)", "(layers)", "(clip masks)"][i], dt));
+    }
     // absurd numbers
     let cases = [
         "<rect width='1e308' height='1e308' fill='red'/>",
@@ -899,6 +924,32 @@ fn malformed(t: &mut T) {
     let _ = r100(&s);
     let dt = (plat::time_us() - t0) / 1000;
     t.check(dt < 20_000, &format!("huge style sheet bounded ({} ms)", dt));
+    // one block of 64 KB behind 4096 selectors that match every element (250 GB of copies without
+    // a budget): the block once in the sheet, the cascade's copies end with ERR_LIMIT
+    let mut s = String::from("<svg><style>");
+    for _ in 0..4096 {
+        s.push_str("*,");
+    }
+    s.push_str(&format!("rect {{ fill: url(#{}) red }}</style>", "x".repeat(64 << 10)));
+    for _ in 0..1000 {
+        s.push_str("<rect width='10' height='10'/>");
+    }
+    s.push_str("</svg>");
+    let t0 = plat::time_us();
+    let got = Svg::parse(s.as_bytes()).err();
+    let dt = (plat::time_us() - t0) / 1000;
+    t.check(got == Some(img_core::ERR_LIMIT) && dt < 20_000, &format!("a block copied to every element: ERR_LIMIT ({:?}, {} ms)", got, dt));
+    let mut s = String::from("<svg width='10' height='10'><style>");
+    for _ in 0..16 {
+        s.push_str("*, ");
+    }
+    s.push_str("rect { fill: red; stroke: none; opacity: 1 }</style>");
+    for _ in 0..1000 {
+        s.push_str("<rect width='10' height='10'/>");
+    }
+    s.push_str("</svg>");
+    let sf = r(&s, 10, 10);
+    t.px(&sf, 5, 5, RED, 0, "a block behind 16 universal selectors on 1000 elements stays within the budget");
     // broken markup
     let broken: [&[u8]; 10] = [
         b"<svg><rect width='10' height='10' fill='red'",

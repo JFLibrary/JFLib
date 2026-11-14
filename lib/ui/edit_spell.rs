@@ -23,14 +23,18 @@
 //   speller() -> Option<&mut Speller>   the checker in use (None while loading, or none);
 //                               loads it when no box asked for it yet
 //   spell_state() -> SPELL_*    OFF (switched off / not asked yet), LOADING, READY, NONE
-//   spell_errors(id) -> ranges  the misspelled byte ranges of box id as last checked
+//   spell_errors(id) -> ranges  the misspelled byte ranges of box id as last checked (of the
+//                               window being built when it has the box; else the first window's,
+//                               the main window first, that checked one)
 //
 // Checking: a box checks when its text changed (a hash of it) or the checker or its word
 // lists did; word results are cached in the Speller, so typing re-checks only new words.  In
 // window mode at most BUDGET new words and BUDGET_US of checking per frame (one word at
 // least; the rest on the timer UIT_SPELL: a long German compound may take milliseconds),
 // headless all at once.  The word being typed (the caret at its end while typing) is marked
-// only once the caret leaves it.  Loading: window mode the system's checker on the UI thread,
+// only once the caret leaves it.  The results are kept per window (WinParts::spell): a box of the
+// same id in two windows is checked by itself, and its menu opens in its own window.
+// Loading: window mode the system's checker on the UI thread,
 // Hunspell files on a worker (plat::Job; no marks until it is read), the personal word list
 // in config://spell (spell::personal_path); headless runs read app:// dictionaries at once
 // and keep the personal list in memory, so scripts never depend on the machine.
@@ -68,7 +72,9 @@ struct BoxSpell {
 
 /// the open suggestion menu
 struct Menu {
+    /// the box and its window
     id: u32,
+    win: u32,
     pid: u32, // its popup
     start: usize,
     end: usize,
@@ -93,6 +99,12 @@ type Loaded = (u32, Option<Dictionary>, String);
 /// suggestions made on a worker: (the job the menu waits for, its result)
 type Sugs = (u32, Option<Vec<String>>);
 
+/// the boxes of one window (WinParts::spell): their results by id
+#[derive(Default)]
+pub(crate) struct W {
+    boxes: BTreeMap<u32, BoxSpell>,
+}
+
 pub(crate) struct S {
     off: bool,
     lang: String,
@@ -103,7 +115,6 @@ pub(crate) struct S {
     load: u32, // number of the load running / last started
     job: Option<plat::Job>,
     slot: Arc<SpinLock<Option<Loaded>>>,
-    boxes: BTreeMap<u32, BoxSpell>,
     budget: u32,
     budget_frame: u32,
     budget_until: u64, // plat::time_us() when the frame's checking time is up
@@ -126,7 +137,6 @@ impl Default for S {
             load: 0,
             job: None,
             slot: Arc::new(SpinLock::new(None)),
-            boxes: BTreeMap::new(),
             budget: 0,
             budget_frame: 0,
             budget_until: 0,
@@ -252,7 +262,9 @@ impl Ui {
         if s.off || s.speller.is_none() {
             return Vec::new();
         }
-        s.boxes.get(&id).filter(|b| b.generation == s.generation).map_or_else(Vec::new, |b| b.bad.clone())
+        let g = s.generation;
+        let p = self.wp_query(|p| p.spell.boxes.get(&id).is_some_and(|b| b.generation == g));
+        p.and_then(|p| p.spell.boxes.get(&id)).filter(|b| b.generation == g).map_or_else(Vec::new, |b| b.bad.clone())
     }
 
     // the personal word list of a checker: config:// in window mode, memory headless
@@ -355,6 +367,7 @@ impl Ui {
         let (headless, frame) = (self.headless, self.frame);
         let e = &mut self.m.edit;
         let s = &mut e.spell;
+        let boxes = &mut self.wp.spell.boxes;
         let Some(sp) = s.speller.as_mut() else { return false };
         let Ok(text) = core::str::from_utf8(&e.buf) else { return false };
         if s.budget_frame != frame {
@@ -363,7 +376,7 @@ impl Ui {
             s.budget_until = if headless { u64::MAX } else { plat::time_us() + BUDGET_US };
         }
         let h = fnv(text.as_bytes());
-        let b = s.boxes.entry(id).or_default();
+        let b = boxes.entry(id).or_default();
         if b.hash != h || b.generation != s.generation || b.rev != sp.revision() || b.seen == 0 {
             b.hash = h;
             b.generation = s.generation;
@@ -385,8 +398,8 @@ impl Ui {
         }
         b.seen = frame.max(1);
         let pending = b.next < b.toks.len();
-        if s.boxes.len() > BOXES_MAX {
-            s.boxes.retain(|k, b| *k == id || frame.wrapping_sub(b.seen) < 600);
+        if boxes.len() > BOXES_MAX {
+            boxes.retain(|k, b| *k == id || frame.wrapping_sub(b.seen) < 600);
         }
         if pending {
             self.timer(UIT_SPELL, 16);
@@ -397,7 +410,7 @@ impl Ui {
     /// (edit.rs) the marks of box id between the text indexes ls..le of a line whose first
     /// character is at x (baseline tb_base, the box's font)
     pub(super) fn spell_draw(&mut self, id: u32, x: i32, ls: usize, le: usize, editing: bool) {
-        let Some(b) = self.m.edit.spell.boxes.get(&id) else { return };
+        let Some(b) = self.wp.spell.boxes.get(&id) else { return };
         let spans: Vec<(usize, usize)> = b.bad.iter().filter(|r| r.1 > ls && r.0 < le).copied().collect();
         if spans.is_empty() {
             return;
@@ -416,9 +429,9 @@ impl Ui {
             let x0 = x.wrapping_add(self.text.caret_x(&self.m.edit.buf[ls..], a0 - ls));
             let x1 = x.wrapping_add(self.text.caret_x(&self.m.edit.buf[ls..], z0 - ls));
             self.spell_wave(x0, x1, base);
-            let lh = self.dp(20);
+            let (lh, win) = (self.dp(20), self.uiw_cur);
             if let Some(m) = self.m.edit.spell.menu.as_mut() {
-                if m.id == id && m.start == a {
+                if m.id == id && m.win == win && m.start == a {
                     m.rect = [x0, base - lh * 3 / 4, (x1 - x0).max(1), lh];
                 }
             }
@@ -452,7 +465,7 @@ impl Ui {
 
     // the misspelled word of box id at text index i
     fn spell_at(&self, id: u32, i: usize) -> Option<(usize, usize)> {
-        self.m.edit.spell.boxes.get(&id)?.bad.iter().find(|r| r.0 <= i && i <= r.1).copied()
+        self.wp.spell.boxes.get(&id)?.bad.iter().find(|r| r.0 <= i && i <= r.1).copied()
     }
 
     // open the menu for the word a..z of box id (its suggestions now or from a worker)
@@ -469,8 +482,8 @@ impl Ui {
         let pid = self.spell_pid(id);
         let e = &self.m.edit;
         let caret = (self.ed_is(id) && self.wp.ctx.focus == id).then_some((e.ed_caret, e.ed_anchor));
-        let rect = self.wp.ctx.last_rect;
-        self.m.edit.spell.menu = Some(Menu { id, pid, start: a, end: z, word, sugs, wait, add_row: 0, kbd, rect, caret });
+        let (rect, win) = (self.wp.ctx.last_rect, self.uiw_cur);
+        self.m.edit.spell.menu = Some(Menu { id, win, pid, start: a, end: z, word, sugs, wait, add_row: 0, kbd, rect, caret });
         self.popup_open(pid);
         if kbd {
             self.wp.ctx.focus_visible = true;
@@ -523,10 +536,14 @@ impl Ui {
         };
         m.sugs = v;
         m.wait = 0;
-        let (kbd, pid, row) = (m.kbd, m.pid, m.add_row);
+        let (kbd, pid, row, win) = (m.kbd, m.pid, m.add_row, m.win);
+        // (outside the passes) the menu's window is made live for its focus and popup
+        let cur = self.uiw_cur;
+        self.uiw_use(win);
         if kbd && row != 0 && self.wp.ctx.focus == row {
             self.pp_flag(pid, crate::popup::PPF_FOCUS);
         }
+        self.uiw_use(cur);
         self.repass();
     }
 
@@ -538,7 +555,7 @@ impl Ui {
 
     /// (edit.rs) the menu of box id is open: the box leaves the keys to it
     pub(super) fn spell_menu_open(&self, id: u32) -> bool {
-        self.m.edit.spell.menu.as_ref().is_some_and(|m| m.id == id && self.popup_is_open(m.pid))
+        self.m.edit.spell.menu.as_ref().is_some_and(|m| m.id == id && m.win == self.uiw_cur && self.popup_is_open(m.pid))
     }
 
     // the menu closed: a box that gets the focus back keeps its caret (instead of starting
@@ -564,8 +581,8 @@ impl Ui {
     // the menu of box id when it is open; its choice is applied to the box's text
     fn spell_menu(&mut self, id: u32) {
         let Some(m) = self.m.edit.spell.menu.as_ref() else { return };
-        if m.id != id {
-            return;
+        if m.id != id || m.win != self.uiw_cur {
+            return; // another box's, or the box of this id in another window
         }
         let (kbd, rect, sugs, pid, wait) = (m.kbd, m.rect, m.sugs.clone(), m.pid, m.wait != 0);
         if !self.popup_is_open(pid) {

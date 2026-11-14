@@ -90,11 +90,9 @@ struct Motion {
     locator: Cell<Id>,
     locating: Cell<bool>,
 }
-struct Main(Motion);
-// SAFETY: only the main thread touches it (sensors.rs calls from the UI thread, the timer and the
-// delegate run on the main queue).
-unsafe impl Sync for Main {}
-static M: Main = Main(Motion {
+// only the main thread touches it (sensors.rs calls from the UI thread, the timer and the delegate
+// run on the main queue; UiOnly refuses other threads)
+static M: crate::ui_only::UiOnly<Motion> = crate::ui_only::UiOnly::new(Motion {
     manager: Cell::new(NIL),
     running: Cell::new(0),
     magnetic: Cell::new(false),
@@ -106,7 +104,7 @@ static M: Main = Main(Motion {
 });
 
 fn m() -> &'static Motion {
-    &M.0
+    M.get()
 }
 
 fn manager() -> Id {

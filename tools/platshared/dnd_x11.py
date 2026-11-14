@@ -9,7 +9,9 @@ A raw X11 client (no Xlib) plays another program:
      with four types (XdndTypeList), XdndPosition at an accepted and a refused point (the
      XdndStatus answers), XdndDrop; it serves XdndSelection (text/uri-list, UTF-8 text,
      text/html, a 300 KB image/png through INCR) and checks XdndFinished; then a drag that
-     only enters and leaves;
+     only enters and leaves; then two drops whose answer waits (plattest's drop_hold, with
+     XdndActionList copy and move): XdndFinished comes only after plattest's drop_finish, not
+     accepted, then accepted as a move;
   2. a drop target: its own override-redirect window with XdndAware = 5; synthetic
      ButtonPress / MotionNotify / ButtonRelease events make plattest's drag_start run and
      cross the window: XdndEnter (types, XdndTypeList), XdndPosition (root point), XdndDrop,
@@ -300,6 +302,26 @@ def run(rs):
         x.client(win, win, x.atom("XdndPosition"), [me, 0, 20 << 16 | 30, 1002, copy])
         x.event(is_client(x, "XdndStatus"))
         x.client(win, win, x.atom("XdndLeave"), [me])
+        # ---- 1b. drops whose answer waits: XdndFinished after plattest's drop_finish
+        move = x.atom("XdndActionMove")
+        x.prop(me, x.atom("XdndActionList"), 4, 32, struct.pack("<2I", copy, move))
+        for k, (act, fin_want) in enumerate(((copy, (win, 0, 0)), (move, (win, 1, move)))):
+            if not until(f"dnd-x11: hold {k}"):
+                break
+            x.client(win, win, x.atom("XdndEnter"), [me, 5 << 24, utf8, 0, 0])
+            x.client(win, win, x.atom("XdndPosition"), [me, 0, 20 << 16 | 30, 1100 + k, act])
+            st = x.event(is_client(x, "XdndStatus"))
+            check(f"hold {k}: XdndStatus accepted with the action asked for",
+                  st is not None and longs(st)[1] & 1 == 1 and longs(st)[4] == act, st and longs(st))
+            t0 = time.time()
+            x.client(win, win, x.atom("XdndDrop"), [me, 0, 1110 + k])
+            fin = serve(x, me, {utf8: "später".encode()}, is_client(x, "XdndFinished"))
+            dt = time.time() - t0
+            check(f"hold {k}: XdndFinished only after drop_finish ({dt:.2f} s)", fin is not None and dt >= 0.5, fin)
+            check(f"hold {k}: XdndFinished {'not accepted' if k == 0 else 'accepted, move'}",
+                  fin is not None and longs(fin)[:3] == fin_want, fin and longs(fin))
+            until(f"dnd-x11: answered {k}")
+        x.req(19, 0, struct.pack("<II", me, x.atom("XdndActionList")))  # DeleteProperty
         # ---- 2. plattest drags onto our window
         if until("dnd-x11: ready to drag"):
             pointer(x, win, 4, 5, 5, 0, 2000)

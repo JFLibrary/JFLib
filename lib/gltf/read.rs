@@ -1,6 +1,9 @@
 // read -- the JSON of a glTF file into a Document (lib.rs has the overview).  Every array index goes through
 // get(), every byte range through checked arithmetic against the buffer it lies in; counts are charged to
-// the limits before anything of that size is allocated.
+// the limits before anything of that size is allocated.  Limits::buffer_bytes counts the bytes the buffers
+// really hold (a file named by several buffers each time) and the zeros of accessors without a buffer view.
+
+use core::cell::Cell;
 
 use alloc::format;
 use alloc::string::String;
@@ -36,6 +39,8 @@ struct Ctx<'a> {
     notes: Vec<String>,
     vertices: u64,
     indices: u64,
+    /// bytes charged to Limits::buffer_bytes
+    buffer_bytes: Cell<u64>,
 }
 
 fn arr<'v>(v: &'v Value, key: &str) -> &'v [Value] {
@@ -192,6 +197,16 @@ impl Ctx<'_> {
         if count as u64 > max {
             return Err(Error::Limit(format!("{w}: {count} elements, the limit is {max}")));
         }
+        // without a buffer view the elements are zeros the file does not hold: buffer bytes too, charged before
+        // they are made (each time the accessor is read)
+        if acc.get("bufferView").is_none() {
+            let comps: u64 = match kind { "SCALAR" => 1, "VEC2" => 2, "VEC3" => 3, _ => 4 };
+            let total = self.buffer_bytes.get().saturating_add((count as u64).saturating_mul(csize(ctype) as u64 * comps));
+            if total > self.limits.buffer_bytes {
+                return Err(Error::Limit(format!("{w}: {count} elements without a buffer view, buffers of more than {} bytes", self.limits.buffer_bytes)));
+            }
+            self.buffer_bytes.set(total);
+        }
         Ok((acc, ctype, count))
     }
 
@@ -308,8 +323,9 @@ pub(crate) fn document(json_bytes: &[u8], bin: Option<&[u8]>, files: &mut dyn Fn
             return Err(Error::Unsupported(format!("the required extension {}", short(name))));
         }
     }
-    let mut cx = Ctx { root: &root, buffers: Vec::new(), views: Vec::new(), limits, notes: Vec::new(), vertices: 0, indices: 0 };
-    // buffers: the first without a uri is a glb's BIN chunk
+    let mut cx = Ctx { root: &root, buffers: Vec::new(), views: Vec::new(), limits, notes: Vec::new(), vertices: 0, indices: 0, buffer_bytes: Cell::new(0) };
+    // buffers: the first without a uri is a glb's BIN chunk; each charged with the bytes it was given (not its
+    // byteLength: a file named by many buffers is read and held each time)
     let mut total = 0u64;
     for (i, b) in arr(&root, "buffers").iter().enumerate() {
         let w = format!("buffer {i}");
@@ -322,7 +338,7 @@ pub(crate) fn document(json_bytes: &[u8], bin: Option<&[u8]>, files: &mut dyn Fn
         if data.len() < len {
             return invalid(format!("{w}: byteLength {len}, but {} bytes there", data.len()));
         }
-        total = total.saturating_add(len as u64);
+        total = total.saturating_add(data.len() as u64);
         if total > limits.buffer_bytes {
             return Err(Error::Limit(format!("buffers of more than {} bytes", limits.buffer_bytes)));
         }
@@ -330,6 +346,7 @@ pub(crate) fn document(json_bytes: &[u8], bin: Option<&[u8]>, files: &mut dyn Fn
         data.truncate(len);
         cx.buffers.push(data);
     }
+    cx.buffer_bytes.set(total);
     for (i, v) in arr(&root, "bufferViews").iter().enumerate() {
         let w = format!("buffer view {i}");
         let buffer = need(v, "buffer", &w)?;

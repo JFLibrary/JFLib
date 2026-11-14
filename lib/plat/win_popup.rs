@@ -24,7 +24,7 @@ use core::cell::Cell;
 use super::{
     BeginPaint, BitmapInfoHeader, ClientToScreen, CreateWindowExW, DefWindowProcW, DestroyWindow, EndPaint, GetDC,
     LoadCursorW, PaintStruct, Point, RegisterClassExW, ReleaseCapture, ReleaseDC, ScreenToClient, SetCapture,
-    SetDIBitsToDevice, SetWindowPos, ShowWindow, TrackMouse, TrackMouseEvent, UiThread, WndClassEx, dip, frame_ok,
+    SetDIBitsToDevice, SetWindowPos, ShowWindow, TrackMouse, TrackMouseEvent, UiOnly, WndClassEx, dip, frame_ok,
     hinst, lp_xy, win_dpi, win_hwnd, win_mods,
 };
 use crate::{BTN_LEFT, BTN_MIDDLE, BTN_RIGHT, E_DOWN, E_LEAVE, E_MOVE, E_UP, E_WHEEL, Event, Frame, PPW_MAX, PW_MAX, evq_push};
@@ -108,10 +108,10 @@ struct Pqs {
     class: Cell<bool>,
 }
 
-static PQ: UiThread<Pqs> = UiThread(Pqs { pq: [const { Pq::new() }; PPW_MAX as usize], class: Cell::new(false) });
+static PQ: UiOnly<Pqs> = UiOnly::new(Pqs { pq: [const { Pq::new() }; PPW_MAX as usize], class: Cell::new(false) });
 
 fn pqs() -> &'static Pqs {
-    &PQ.0
+    PQ.get()
 }
 
 /// the window class exists (registered once)  [pq_class]

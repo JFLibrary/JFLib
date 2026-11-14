@@ -11,7 +11,7 @@ repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
 # template/, web/ and android/ are copies (lib/jflib/template, web/, android/ of the repository; build_rs.py check keeps them equal)
-include = ["src/**", "template/**", "web/**", "android/**", "README.md", "LICENSE-*"]
+include = ["src/**", "template/**", "web/**", "android/**", "README.md", "CHANGELOG.md", "LICENSE-*"]
 
 [[bin]]
 name = "cargo-jflib"

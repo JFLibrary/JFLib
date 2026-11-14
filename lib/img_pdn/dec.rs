@@ -12,6 +12,9 @@
 // inflate state and scratch buffer per thread); the result is the error of the first chunk
 // in file order that fails, else the header error that ended pass 1 -- what the sequential
 // loop returns.
+// Every layer reads a MemoryBlock (and inline byte arrays) of its own (a block referenced by a
+// second layer: ERR_HDR, else each reference would expand it again); the layers' names and
+// metadata together stay within twice the NRBF data + 64 KB (ERR_LIMIT).
 
 use alloc::boxed::Box;
 use alloc::vec;
@@ -23,7 +26,7 @@ use img_core::gzip::{gzip_decode, gzip_decode_st, gzip_isize};
 use img_core::inflate::InflateState;
 use img_core::meta::{Blob, dims_check, mem_check, meta_blob, surf_alloc};
 use img_core::{
-    ERR_CANCEL, ERR_CHUNK, ERR_DIMS, ERR_HDR, ERR_NOMEM, ERR_TRUNC, ERR_UNSUPPORTED, IMG_MAXDIM, IMG_MAXPX_DEF, IMGD_ICC,
+    ERR_CANCEL, ERR_CHUNK, ERR_DIMS, ERR_HDR, ERR_LIMIT, ERR_NOMEM, ERR_TRUNC, ERR_UNSUPPORTED, IMG_MAXDIM, IMG_MAXPX_DEF, IMGD_ICC,
     IMGD_PROBE, IMGF_PDN, IMF_ALPHA, IMF_LOSSLESS, IMM_RGB, IMR_CM, IMR_INCH, IMR_NONE, ImgDec, ImgMeta, Surface,
 };
 use rt::sync::SpinLock;
@@ -266,14 +269,21 @@ impl<'a> Px<'a, '_> {
             doc.layers.push(PdnLayer::default());
         }
         self.payloads()?;
+        // the layers' names and metadata come from the file: shared objects are not copied
+        // without end
+        let mut copied = 0u64;
         for i in 0..self.n {
             if self.dec.cancelled() {
                 return Err(ERR_CANCEL);
             }
             let mut l = core::mem::take(&mut doc.layers[i as usize]);
             let r = self.layer(i, &mut l);
+            copied += (l.name.len() + l.meta.len()) as u64;
             doc.layers[i as usize] = l;
             r?;
+            if copied > 2 * self.data.len() as u64 + 65536 {
+                return Err(ERR_LIMIT);
+            }
         }
         Ok(())
     }
@@ -490,6 +500,10 @@ impl<'a> Px<'a, '_> {
         if stride.wrapping_mul(self.h as u64) != bl {
             return Err(ERR_HDR);
         }
+        // every layer has a block of its own: one referenced again would be expanded again
+        if !self.nb.visit(mb) {
+            return Err(ERR_HDR);
+        }
         // pixels
         l.sf = surf_alloc(self.w, self.h, FMT_ARGB, &self.dec)?;
         let r = self.pixels(&mut l.sf, mb, stride);
@@ -602,8 +616,7 @@ impl<'a> Px<'a, '_> {
     }
 
     // inline chunks: chunk0, chunk1, ... (byte arrays) or pointerData  [px_pixels .pp_inline]
-    fn inline(&self, sf: &mut Surface, mb: i32, fstride: u64, total: u64) -> i32 {
-        let nb = &self.nb;
+    fn inline(&mut self, sf: &mut Surface, mb: i32, fstride: u64, total: u64) -> i32 {
         let w4 = sf.w as usize * 4;
         let hh = sf.h as usize;
         let stride = sf.stride as usize;
@@ -614,17 +627,22 @@ impl<'a> Px<'a, '_> {
             name.clear();
             name.extend_from_slice(b"chunk");
             utoa(k, &mut name);
-            let mut o = nb.get_obj(mb, &name);
+            let mut o = self.nb.get_obj(mb, &name);
             if o < 0 {
                 if k != 0 {
                     break;
                 }
-                o = nb.get_obj(mb, b"pointerData");
+                o = self.nb.get_obj(mb, b"pointerData");
                 if o < 0 {
                     break;
                 }
                 k = 0x7FFF_FFFE; // one piece only
             }
+            // each array once (shared by several blocks it would be expanded again)
+            if !self.nb.visit(o) {
+                return ERR_HDR;
+            }
+            let nb = &self.nb;
             let Some((data, t)) = nb.prim_data(o) else { return ERR_HDR };
             if t != NRT_BYTE {
                 return ERR_HDR;

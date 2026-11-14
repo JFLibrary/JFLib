@@ -650,6 +650,23 @@ Dateien sind mit `git add -f` aufgenommen); sie fällt weg, sobald `.gitignore` 
 
 Die Namen `jflib`, `jflib-rt` und `jflib-ui` waren am 2026-11-04 noch frei. Reserviert ist damit nichts.
 
+**README und CHANGELOG je Crate (entschieden vom Nutzer am 2026-11-13, für 0.2.0):** Mit 0.1.0 hatten nur
+`jflib`, `cargo-jflib`, `agent_core` und `doc_view` eine README, keine Crate einen eigenen Changelog. Dagegen
+entschieden hatte niemand: Der Plan sah nur die README der Fassade vor, weil allein `jflib`, `jflib-build` und
+`cargo-jflib` etwas versprechen (`docs/VERSIONING.md`). Der Nutzer will für jede Crate eine von Hand geschriebene
+README („ein richtiger Text, nicht nur eine technische Liste“, nicht generiert) und einen eigenen `CHANGELOG.md`:
+Auf crates.io soll man direkt sehen, was die Crate ist und was im letzten Update neu oder behoben ist. crates.io
+zeigt nur die README, deshalb hat jede README einen Abschnitt `## What's new in X.Y.Z`, der den Changelog in ein
+paar Sätzen zusammenfasst und auf docs.rs verlinkt. Die Einträge der Crate-Changelogs sind aus Sicht der Crate
+neu geschrieben (aus `[Unreleased]` des großen Changelogs, auch aus Einträgen anderer Bereiche, und den Commits
+seit `v0.1.0`); der große `CHANGELOG.md` bleibt das Gesamtbild. Für 0.1.0 steht in jeder Crate nur „First release
+on crates.io“, `jflib-style-netlab` hat sein eigenes 0.1.0 vom 2026-11-10. Werkzeug: `build_rs.py changelog
+--crate`, `release` schneidet alle Changelogs und verweigert eine README mit veralteter „What's new“,
+`build_rs.py check` und `tools/publish.py` prüfen beides (`tools/changelog.py`, `crate_doc_problems`), `build_rs.py
+new --lib` legt einen Changelog und einen README-Rahmen an, den `check` ablehnt, bis er geschrieben ist. Die Regeln
+für die Texte stehen in `docs/VERSIONING.md`, „Each crate's README and changelog“; `lib/rt`, `lib/img_png` und
+`lib/ui` waren die Muster.
+
 **CI (2026-11-08, auf Wunsch des Nutzers):** `.github/workflows/crates.yml` läuft bei jedem Push auf `main`, bei
 Pull Requests, montags und von Hand. `check`: `cargo check` der Fassade für die vier Ziele mit und ohne `std`, mit der
 versprochenen `rust-version` (1.98) und mit dem neuesten stable, dazu die Crates außerhalb der Fassade (`modrt`,

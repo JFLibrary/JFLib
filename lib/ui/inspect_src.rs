@@ -604,7 +604,7 @@ impl Ui {
         for (k, s) in self.sems.iter().enumerate() {
             let have = self.src_of(k).map(src_text).unwrap_or_default();
             if s.win as i32 != iw && !have.starts_with(want.as_str()) {
-                let kind = KIND_NAMES[if s.kind < K_KIND_COUNT { s.kind as usize } else { 0 }];
+                let kind = kind_name(s.kind);
                 bad.push(format!("{} #{} {:?}: {}", kind, s.id, s.label.as_deref().unwrap_or(""), have));
             }
         }

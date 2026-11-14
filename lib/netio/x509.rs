@@ -1,4 +1,4 @@
-// x509 -- certificates (RFC 5280): the private PKI of BackupCraft (Ed25519, RFC 8410; built
+// x509 -- certificates (RFC 5280): a program's own private PKI (Ed25519, RFC 8410; built
 // and signed here) and the public web PKI (RSA and P-256 / P-384 keys; RSA PKCS #1 v1.5 / PSS
 // and ECDSA signatures with SHA-256 / 384 / 512), parsed strictly
 //

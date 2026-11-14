@@ -21,7 +21,8 @@
 //
 // Sources (SRC_*), tried in this order for every language:
 //   SRC_SYSTEM  Windows: ISpellChecker (plat::spell) for the language, then the Hunspell
-//               folders of DICPATH; Linux: DICPATH, $XDG_DATA_HOME/hunspell
+//               folders of DICPATH; macOS: NSSpellChecker (plat::spell), then
+//               ~/Library/Spelling and /Library/Spelling; iOS: UITextChecker; Linux: DICPATH, $XDG_DATA_HOME/hunspell
 //               (~/.local/share/hunspell), and hunspell, myspell, myspell/dicts below every
 //               XDG_DATA_DIRS folder (/usr/local/share, /usr/share); Web / Android: none
 //   SRC_USER    config://hunspell -- dictionaries the user put there

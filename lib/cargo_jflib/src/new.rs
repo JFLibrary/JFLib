@@ -115,7 +115,7 @@ pub(crate) fn with_std(path: &str, text: &str, name: &str) -> Result<String, Str
         text = text.replacen(old, &new, 1);
     }
     if path == "Cargo.toml" {
-        // the version string ends the table: `jflib = { features = ["std"], version = "0.1" }`
+        // the version string ends the table: `jflib = { features = ["std"], version = "0.2" }`
         let at = text.find("jflib = { features").expect("replaced above");
         let end = text[at..].find('\n').map_or(text.len(), |n| at + n);
         text.insert_str(end, " }");

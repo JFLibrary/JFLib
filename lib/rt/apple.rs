@@ -80,6 +80,8 @@ fn write_all(fd: c_int, mut bytes: &[u8]) {
 pub fn write_stdout(bytes: &[u8]) { write_all(1, bytes); }
 /// Write to stderr.
 pub fn write_stderr(bytes: &[u8]) { write_all(2, bytes); }
+/// stderr for crash paths: write_stderr, which already gives up where a write takes nothing.
+pub fn write_stderr_crash(bytes: &[u8]) { write_stderr(bytes); }
 
 /// Unwinding is disabled; satisfy precompiled core's unused personality reference (std has its own).
 #[cfg(not(feature = "std"))]

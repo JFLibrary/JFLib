@@ -11,11 +11,16 @@
 //               dropped handle cancels, detach runs on; CancelToken::run; a dropped executor
 //   timers      sleeps end in deadline order, never early; the virtual clock (clock_set)
 //   progress    permille, changed() woken by another thread
+//   drops       values dropped outside the locks: a receiver dropped with a sender of its own
+//               channel queued, a cancelled() future whose waker cancels the token when it goes
+//               (dropped, replaced); Executor::ui().block_on takes another thread's wake-up
+//               (each on a thread of its own: the old code hung there)
 //   files       aio read / write / copy (OS files, mem://, a DirFs mount) with progress;
 //               cancelled between chunks through a gated mount (gated://: reads and writes past
 //               the first chunk wait at a gate; the test cancels once the job waits there), the
-//               target unchanged, no sibling left; a dropped future; Reader / Writer;
-//               AtomicFile; Linux: access bits kept
+//               target unchanged, no sibling left; a dropped future; Reader / Writer (a
+//               write's future dropped while its job runs spoils the writer); AtomicFile;
+//               Linux: access bits kept
 //   panics      a panic in a task / a blocking job ends the child with exit code 3
 //   permissions (a child: the manifest stays installed) refused reads and writes fail without
 //               leftovers; a trusted() caller stays trusted on the pool
@@ -50,6 +55,7 @@ pub fn t_async(t: &mut T) {
     cancellation(t);
     timers(t);
     progress(t);
+    drops(t);
     t.scratch_init();
     files(t);
     gated(t);
@@ -59,6 +65,139 @@ pub fn t_async(t: &mut T) {
 
 fn time() -> u64 {
     plat::time_us()
+}
+
+// f on a thread of its own -> Some(its answer) when it returned within ms, None when it is still
+// stuck (a deadlock: the thread is left behind, the process ends anyway)
+fn returns_within(ms: u64, f: impl FnOnce() -> bool + Send + 'static) -> Option<bool> {
+    let done = Arc::new(AtomicU32::new(0)); // 0 running, 1 false, 2 true
+    let d = done.clone();
+    let h = plat::thread_spawn(0, Box::new(move || d.store(1 + f() as u32, SeqCst)))?;
+    let dl = time() + ms * 1000;
+    while done.load(SeqCst) == 0 && time() < dl {
+        plat::sleep_ms(1);
+    }
+    match done.load(SeqCst) {
+        0 => {
+            core::mem::forget(h); // never joined
+            None
+        }
+        v => {
+            h.join();
+            Some(v == 2)
+        }
+    }
+}
+
+// a value that holds a sender of the channel it travels in
+struct Carried(#[allow(dead_code)] plat::sync::Sender<Carried>);
+
+// cancels its token when dropped
+struct CancelOnDrop(CancelToken);
+
+impl Drop for CancelOnDrop {
+    fn drop(&mut self) {
+        self.0.cancel();
+    }
+}
+
+// a waker that does nothing but cancel the token when its last reference goes
+struct CancelWaker(#[allow(dead_code)] CancelOnDrop);
+
+impl alloc::task::Wake for CancelWaker {
+    fn wake(self: Arc<Self>) {}
+}
+
+// a waker that holds a timer (dropped with the waker's last reference)
+struct SleepWaker(#[allow(dead_code)] core::pin::Pin<Box<task::Sleep>>);
+
+impl alloc::task::Wake for SleepWaker {
+    fn wake(self: Arc<Self>) {}
+}
+
+fn noop_waker() -> core::task::Waker {
+    struct Noop;
+    impl alloc::task::Wake for Noop {
+        fn wake(self: Arc<Self>) {}
+    }
+    core::task::Waker::from(Arc::new(Noop))
+}
+
+fn drops(t: &mut T) {
+    // the receiver goes while a sender of the same channel waits in its queue: the queued value
+    // (and the sender in it) is dropped after the lock is released
+    let r = returns_within(3000, || {
+        let (tx, rx) = plat::sync::channel::<Carried>(1);
+        let queued = tx.send(Carried(tx.clone())).is_ok();
+        drop(rx);
+        queued && tx.send(Carried(tx.clone())).is_err()
+    });
+    t.check(r == Some(true), "drops: a receiver dropped with a sender of its channel queued returns; send fails afterwards");
+    // a cancelled() future goes while its waker is the last one of a waker that cancels the
+    // token when dropped
+    let r = returns_within(3000, || {
+        let tok = CancelToken::new();
+        let mut f = Box::pin(tok.cancelled());
+        {
+            let w = core::task::Waker::from(Arc::new(CancelWaker(CancelOnDrop(tok.clone()))));
+            if f.as_mut().poll(&mut core::task::Context::from_waker(&w)).is_ready() {
+                return false;
+            }
+        }
+        drop(f);
+        tok.is_cancelled()
+    });
+    t.check(r == Some(true), "drops: a cancelled() future whose waker cancels the token is dropped (the token cancelled)");
+    // ... the same waker replaced by another one at the next poll
+    let r = returns_within(3000, || {
+        let tok = CancelToken::new();
+        let mut f = Box::pin(tok.cancelled());
+        {
+            let w = core::task::Waker::from(Arc::new(CancelWaker(CancelOnDrop(tok.clone()))));
+            if f.as_mut().poll(&mut core::task::Context::from_waker(&w)).is_ready() {
+                return false;
+            }
+        }
+        let w2 = noop_waker();
+        f.as_mut().poll(&mut core::task::Context::from_waker(&w2)).is_ready()
+    });
+    t.check(r == Some(true), "drops: ... replaced by another waker at the next poll: ready, cancelled");
+    // a timer whose waker holds another (registered) timer: the waker replaced, and dropped with
+    // its timer -- the other timer's drop takes the timers' lock again
+    let r = returns_within(3000, || {
+        let held = || {
+            let mut b = Box::pin(sleep(60_000));
+            let _ = b.as_mut().poll(&mut core::task::Context::from_waker(&noop_waker()));
+            core::task::Waker::from(Arc::new(SleepWaker(b)))
+        };
+        let mut a = Box::pin(sleep(60_000));
+        let _ = a.as_mut().poll(&mut core::task::Context::from_waker(&held()));
+        let pending = a.as_mut().poll(&mut core::task::Context::from_waker(&noop_waker())).is_pending();
+        let _ = a.as_mut().poll(&mut core::task::Context::from_waker(&held()));
+        drop(a);
+        pending
+    });
+    t.check(r == Some(true), "drops: a timer's waker holding another timer: replaced, then dropped with its timer");
+    // Executor::ui().block_on: a task that waits for a blocking job (another thread's wake-up)
+    let r = returns_within(5000, || {
+        let mut ex = Executor::ui();
+        let gate = Arc::new(AtomicBool::new(false));
+        let g = gate.clone();
+        let h = ex.spawn(async move {
+            spawn_blocking(move || {
+                while !g.load(SeqCst) {
+                    plat::sleep_ms(1);
+                }
+                41u32
+            })
+            .await
+                + 1
+        });
+        ex.run(); // the task waits for its job now
+        gate.store(true, SeqCst);
+        ex.block_on(h) == Ok(42)
+    });
+    t.check(r == Some(true), "drops: Executor::ui().block_on finishes a task woken by a blocking job");
 }
 
 // until no blocking job is in flight (at most 10 s)
@@ -473,11 +612,12 @@ fn files(t: &mut T) {
 // ---------------------------------------------------------------- cancel between chunks
 
 // a MemFs whose streams wait at the gate for reads and writes at offsets of `from` and beyond
-// (once per operation: it is cancelled meanwhile)
+// (once per operation: it is cancelled meanwhile); with `only`, just the writes of those bytes
 struct Gated {
     inner: MemFs,
     gate: Arc<Gate>,
     from: u64,
+    only: Option<&'static [u8]>,
 }
 
 // arrived counts the reads / writes that came to the gate; each waits for one post of sem
@@ -509,17 +649,18 @@ struct GatedStream {
     s: Box<dyn Stream>,
     gate: Arc<Gate>,
     from: u64,
+    only: Option<&'static [u8]>,
 }
 
 impl Stream for GatedStream {
     fn read_at(&self, off: u64, buf: &mut [u8]) -> Option<usize> {
-        if off >= self.from {
+        if off >= self.from && self.only.is_none() {
             self.gate.pass();
         }
         self.s.read_at(off, buf)
     }
     fn write_at(&self, off: u64, buf: &[u8]) -> Option<usize> {
-        if off >= self.from {
+        if off >= self.from && self.only.is_none_or(|b| buf == b) {
             self.gate.pass();
         }
         self.s.write_at(off, buf)
@@ -559,7 +700,7 @@ impl Provider for Gated {
     }
     fn open(&self, path: &str, mode: u32) -> Opened {
         match self.inner.open(path, mode) {
-            Opened::File(s) => Opened::File(Box::new(GatedStream { s, gate: self.gate.clone(), from: self.from })),
+            Opened::File(s) => Opened::File(Box::new(GatedStream { s, gate: self.gate.clone(), from: self.from, only: self.only })),
             o => o,
         }
     }
@@ -586,7 +727,7 @@ fn gated(t: &mut T) {
     let Some(sem) = Sem::new(0) else { return };
     let gate = Arc::new(Gate { sem, arrived: Progress::new() });
     let data = pattern(16 * CH);
-    let g = Gated { inner: MemFs::new(), gate: gate.clone(), from: CH as u64 };
+    let g = Gated { inner: MemFs::new(), gate: gate.clone(), from: CH as u64, only: None };
     g.inner.write("src.bin", &data);
     vfs::mount("gated", Arc::new(g));
     let dir = t.subp("aio");
@@ -631,12 +772,43 @@ fn gated(t: &mut T) {
     t.check(gate.arrived.done() == 4 && !gate.sem.wait(0), "aio: each job waited at the gate once and took its post");
     while gate.sem.wait(0) {}
     vfs::unmount("gated");
+    dropped_write(t, &gate);
+}
+
+// a Writer's write whose future is dropped while its job waits: that job may still write, so
+// the writer is spoilt -- a later write and the commit fail; the old writer let the later write
+// land at the same offset, then the dropped one overwrote it, and the commit succeeded
+fn dropped_write(t: &mut T, gate: &Arc<Gate>) {
+    vfs::mount("wgate", Arc::new(Gated { inner: MemFs::new(), gate: gate.clone(), from: 0, only: Some(b"AAAA") }));
+    let Ok(mut w) = block_on(Writer::create("wgate://w.bin")) else {
+        t.check(false, "aio: Writer::create on wgate://");
+        return;
+    };
+    let first = block_on(w.write(b"xxxx".to_vec())) == Ok(());
+    let n = gate.arrived.done();
+    {
+        let mut fa = Box::pin(w.write(b"AAAA".to_vec()));
+        let pending = fa.as_mut().poll(&mut core::task::Context::from_waker(&noop_waker())).is_pending();
+        let dl = time() + 30_000_000;
+        while gate.arrived.done() == n && time() < dl {
+            plat::sleep_ms(1);
+        }
+        t.check(first && pending && gate.arrived.done() == n + 1, "aio: a write's job waits at the gate");
+    } // its future dropped: the job runs on
+    let b = block_on(w.write(b"BBBB".to_vec()));
+    gate.sem.post(1);
+    let idle = pool_idle();
+    let c = block_on(w.commit());
+    t.check(b == Err(IoError::Write), "aio: after a dropped write the next write fails");
+    t.check(idle && c == Err(IoError::Commit) && plat::file_exists("wgate://w.bin") == 0 && no_siblings("wgate://"), "aio: ... and the commit: nothing put in place, no sibling left");
+    while gate.sem.wait(0) {}
+    vfs::unmount("wgate");
 }
 
 // ---------------------------------------------------------------- children
 
 // run plattest with args -> (exit code, stdout + stderr)
-fn child(args: &[&str]) -> (Option<i32>, String) {
+pub(crate) fn child(args: &[&str]) -> (Option<i32>, String) {
     let exe = plat::current_exe().unwrap_or_default();
     let cmd = plat::process::Command { program: &exe, args, cwd: None, env: &[] };
     let Ok(mut c) = cmd.spawn() else { return (None, String::new()) };

@@ -514,6 +514,7 @@ struct X11 {
     xd_init: bool,
     xd: dnd::Target,
     xs: dnd::Source,
+    xh: Option<dnd::Held>, // a drop whose XdndFinished waits (drop_hold)
     // ---- popups, cursors, monitors
     xq: [Xq; PPW_MAX as usize],
     cursors: [u32; CUR_COUNT as usize],
@@ -687,6 +688,7 @@ impl X11 {
             xd_init: false,
             xd: Default::default(),
             xs: Default::default(),
+            xh: None,
             xq: core::array::from_fn(|_| Xq {
                 win: 0,
                 owner: 0,
@@ -731,15 +733,13 @@ impl X11 {
 
 // ------------------------------------------------------------------ the module state
 
-struct Global(RefCell<Option<Box<X11>>>);
-// SAFETY: the X11 state is used by the UI thread only (wake() and the pool never touch it);
-// RefCell checks the (non-reentrant) borrows at run time.
-unsafe impl Sync for Global {}
-static XG: Global = Global(RefCell::new(None));
+// the X11 state is used by the UI thread only (wake() and the pool never touch it; UiOnly refuses
+// other threads); RefCell checks the (non-reentrant) borrows at run time
+static XG: crate::ui_only::UiOnly<RefCell<Option<Box<X11>>>> = crate::ui_only::UiOnly::new(RefCell::new(None));
 
 /// run f on the X11 state (created on first use: the synthetic tests need no connection)
 fn with_x<R>(f: impl FnOnce(&mut X11) -> R) -> R {
-    let mut g = XG.0.borrow_mut();
+    let mut g = XG.get().borrow_mut();
     let x = g.get_or_insert_with(|| Box::new(X11::new()));
     f(x)
 }

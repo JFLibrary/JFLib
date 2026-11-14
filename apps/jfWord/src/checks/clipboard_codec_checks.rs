@@ -376,6 +376,20 @@ pub(crate) fn run() -> (usize, usize) {
         html.contains("Grüße αβ 𝄞 😀") && html.contains("<br>Soft break"),
         "HTML UTF8 and soft breaks"
     );
+    // line spacing in 1/240 lines that CSS writes as a cut decimal (250 = 1.041666...): the
+    // import rounds, so the value survives any number of round trips (it lost 1/240 each)
+    let mut spaced = Document::default();
+    spaced.paragraphs[0].content = vec![Inline::Text(String::from("Spaced"))];
+    let mut lines = Vec::new();
+    for line in [250u16, 241, 365, 500, 719] {
+        spaced.paragraphs[0].format.line = line;
+        let mut back = spaced.clone();
+        for _ in 0..3 {
+            back = doc_io::clipboard_html_decode(&doc_io::clipboard_html_encode(&back).unwrap()).unwrap();
+        }
+        lines.push(back.paragraphs[0].format.line);
+    }
+    check!(lines == [250, 241, 365, 500, 719], format!("HTML round trips keep the line spacing ({lines:?})"));
     let mut markup = Document::default();
     markup.paragraphs[0].content = vec![Inline::Text(String::from("<script>&\"'"))];
     let html = String::from_utf8(doc_io::clipboard_html_encode(&markup).unwrap()).unwrap();

@@ -1,4 +1,5 @@
 #!args --verify-dirty
+#!serial the bench's median must stay under 8000 us, which fails beside the other scripts
 # scrolling: Up / Down by a line (40 DIP), PgUp / PgDn and Space / Shift+Space by a view less a
 # line, Home / End; the wheel (smooth: settled after a wait), the scroll bar; the view's
 # K_BOX value is the position in DIP.  The long document (50 000 blocks): only the blocks in

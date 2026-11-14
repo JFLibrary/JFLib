@@ -678,7 +678,7 @@ fn frame(d: &mut crate::Dec, gray: bool) -> Result<(u32, u32, Box<Cap>), i32> {
         if r != 0 {
             return Err(r);
         }
-        br.pos = jf.end << 3;
+        br.pos = jf.end.saturating_mul(8);
     }
     let mut jf = Jf::default();
     let r = jf_header(jx, &mut br, &mut jf, false);

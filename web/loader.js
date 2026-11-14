@@ -403,7 +403,7 @@ async function service(m) {
     }
     else if(m.kind===11) {
       // the differences of the accessibility tree; a mirror that went wrong asks for all anew
-      if(shadow) try {shadow.apply(decodeA11y(m.data));} catch(error) {console.error(error);send({type:"a11y",on:true});}
+      if(shadow) try {shadow.apply(decodeA11y(m.data));} catch(error) {console.error(error);send({type:"a11y",on:2});}
     }
     else if(m.kind===14) audioHost().then(h=>h.request(m.data)).catch(error=>console.warn("Audio:",error));
     // the colour pick (lib/plat/web_screen.rs): the EyeDropper, opened from the user's gesture
@@ -431,7 +431,7 @@ worker.onmessage=({data:m})=>{
   }
   // (while a finger is down or something moves the next frame comes with the display's)
   else if(m.type==="batch-complete") {inFlight=false;if(m.busy&&!outgoing.length)send({type:"tick"});schedule();}
-  else if(m.type==="ready") {window.__jfguiCompute=m.compute;document.body.dataset.compute=m.compute?.mode || "scalar";document.body.dataset.computeWorkers=String(m.compute?.workers || 0);started=true;activate(enabled);screens();system.ready();if(shadow)send({type:"a11y",on:true});input.focus({preventScroll:true});window.dispatchEvent(new Event("jfgui-ready"));}
+  else if(m.type==="ready") {window.__jfguiCompute=m.compute;document.body.dataset.compute=m.compute?.mode || "scalar";document.body.dataset.computeWorkers=String(m.compute?.workers || 0);started=true;activate(enabled);screens();system.ready();if(shadow)send({type:"a11y",on:2});input.focus({preventScroll:true});window.dispatchEvent(new Event("jfgui-ready"));}
   else if(m.type==="service") service(m);
   // (a test) the GPU output's counters
   else if(m.type==="gpu-test") {const p=pending.get(m.id);if(p){clearTimeout(p.timer);pending.delete(m.id);p.resolve(m.text);}}

@@ -1218,6 +1218,12 @@ impl<'a> Checker<'a> {
         if space != AddressSpace::Storage && space != AddressSpace::Workgroup && self.t.contains_atomic(t) {
             return Err(self.err(sp, format!("Atomics gibt es nur in `storage` (`read_write`) und `workgroup`, nicht in `{}`", space.name())));
         }
+        // (atomic_vec2u_min_max) only atomicStoreMin / atomicStoreMax on a storage buffer: a
+        // workgroup one would reach workgroupUniformLoad, which has no 64-bit atomic load
+        let v2u = self.t.vec(2, Scalar::U32);
+        if space != AddressSpace::Storage && self.t.contains_atomic_of(t, v2u) {
+            return Err(self.err(sp, format!("`atomic<vec2<u32>>` gibt es nur im Adressraum `storage`, nicht in `{}`", space.name())));
+        }
         if self.t.contains_runtime_array(t) && space != AddressSpace::Storage {
             return Err(self.err(sp, format!("Laufzeit-Arrays gibt es nur im Adressraum `storage`, nicht in `{}`", space.name())));
         }

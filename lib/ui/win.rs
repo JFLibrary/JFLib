@@ -74,6 +74,9 @@ pub(crate) const WCH_BTN: u32 = 4; // footer buttons 4, 5, 6
 pub(crate) const WCH_ROLL: u32 = 7; // (form.rs) the scroll view of content taller than a phone's window
 /// root box id of window i (> 0): WROOT_BASE | i
 pub(crate) const WROOT_BASE: u32 = 0xFFFF_7F00;
+/// (charge 11) a request of an id-taking call made outside the passes: for the first window
+/// that builds the id (req_win)
+pub(crate) const WIN_ANY: u32 = u32::MAX;
 
 // window record state bits (UWI_*)
 pub(crate) const UWI_OPEN: u32 = 1; // *open was set at the last window_begin
@@ -363,7 +366,8 @@ pub(crate) fn uiw_hit_pw(pw: i32, x: i32, y: i32) -> u32 {
 
 /// uiw_drag_pw(pw, x, y, types) -> (accepted DT_* kinds, DE_* effects) of a drag offering
 /// `types` at a client point (px) of platform window pw (the platform's drag hook, dnd.rs):
-/// the drop target there, else what the windows take (drop_accept)
+/// the drop target there with the effects it took (drop_effect_set), else what the windows
+/// take (drop_accept) with every effect
 pub(crate) fn uiw_drag_pw(pw: i32, x: i32, y: i32, types: u32) -> (u32, u32) {
     if !(0..WIN_MAX as i32).contains(&pw) {
         return (0, 0);
@@ -375,15 +379,7 @@ pub(crate) fn uiw_drag_pw(pw: i32, x: i32, y: i32, types: u32) -> (u32, u32) {
     }
     let i = i as usize;
     let x = if p.mirror[i] > 0 { p.mirror[i] - 1 - x } else { x }; // logical
-    let offered = types & plat::DT_STD;
-    let all = offered | p.own; // the app's own drag: its own kinds too
-    let t = match super::dnd::zone_find(&p.zones[i], &p.hits[i], p.modal[i], x, y, all) {
-        Some(z) => z.types & all,
-        None => p.accept & all,
-    };
-    // the platform knows the standard kinds: a target of the app's own kind takes them all
-    let t = if t != 0 && t & offered == 0 { offered } else { t & offered };
-    (t, if t != 0 { plat::DE_ALL } else { 0 })
+    super::dnd::drag_answer(&p.zones[i], &p.hits[i], p.modal[i], p.accept, p.own, x, y, types)
 }
 
 /// (dnd.rs) what the drag hook needs besides the targets: the kinds the windows take, the
@@ -553,6 +549,24 @@ impl Ui {
         } else {
             self.m.win.recs[i].save.as_deref_mut()
         }
+    }
+
+    /// (charge 11) the window a request of an id-taking call is for (code_find, code_reveal,
+    /// canvas_damage, a richtext link): the window being built while the passes run, when it has
+    /// a widget of the id (`here`); else (outside the passes: App::command, a task; a window
+    /// without such a widget) WIN_ANY, every window's or the first that builds the id
+    pub(crate) fn req_win(&self, here: bool) -> u32 {
+        if self.building && here { self.uiw_cur } else { WIN_ANY }
+    }
+
+    /// (charge 11) the per-window parts an id-taking query reads (code_status, spell_errors, ...):
+    /// the window being built while the passes run, when it `has` the widget; else the first
+    /// window -- the main window first -- that has it
+    pub(crate) fn wp_query(&self, has: impl Fn(&WinParts) -> bool) -> Option<&WinParts> {
+        if self.building && has(&self.wp) {
+            return Some(&self.wp);
+        }
+        (0..WIN_MAX as u32).filter_map(|i| self.uiw_parts(i)).find(|p| has(p))
     }
 
     /// the dpi of window i (uiw_var(i, &g_ui_dpi); 0 for a window without state)

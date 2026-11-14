@@ -265,6 +265,8 @@ fn html_text(out: &mut String, text: &str) -> Result<(), Error> {
 /// clipboard layer. Font families use escaped CSS names; fields/anchors become visible text and
 /// source/note metadata stays in the private DOCX format. The result is bounded to 16 MiB.
 /// Floating tables carry versioned exact anchors plus CSS float fallback; page units are twips.
+/// Raised and lowered text shows its script size in font-size and keeps its nominal size, in half
+/// points, in data-jf-size (clipboard_html_decode reads it back).
 pub fn clipboard_html_encode(d: &Document) -> Result<Vec<u8>, Error> {
     d.validate()?;
     let p=d.page;
@@ -375,10 +377,14 @@ fn html_paragraph(out:&mut String,d:&Document,p:&Paragraph)->Result<(),Error>{
             // Keep the shared numeric script metrics, rather than shrink twice via <sup>.
             let shift = if f.positioning == TextPositioning::Baseline { String::from("baseline") }
                 else { points(-f.baseline_shift()) };
+            // font-size is the shown (script) size; the nominal size travels in data-jf-size so
+            // that pasting the HTML back does not shrink the text once more per round trip
+            let nominal = if f.positioning == TextPositioning::Baseline { String::new() }
+                else { format!(" data-jf-size=\"{}\"", f.size_half_points) };
             put(
                 out,
                 &format!(
-                    "<span style=\"font-family:'{}';font-weight:{};font-style:{};text-decoration:{decoration};font-size:{};color:#{:06X};background-color:{background};vertical-align:{shift}\">",
+                    "<span style=\"font-family:'{}';font-weight:{};font-style:{};text-decoration:{decoration};font-size:{};color:#{:06X};background-color:{background};vertical-align:{shift}\"{nominal}>",
                     css_family(f.font_family),
                     if f.bold { "bold" } else { "normal" },
                     if f.italic { "italic" } else { "normal" },

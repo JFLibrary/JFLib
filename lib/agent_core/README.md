@@ -1,13 +1,34 @@
-# Shared agent control core
+# jflib-agent-core
 
-`agent_core` is a `no_std` / `alloc` library with no external crates, GUI dependencies,
-operating-system calls or embedded model. `Host` supplies an app's real semantic handlers;
-`Dispatcher` applies the same contracts to GUI commands and external calls. Opening any
-endpoint is a separate, explicit choice made by `agent_io` / the app runtime.
+The core of [JFLib](https://jflib.org)'s agent interface: the part that lets scripts, other
+programs and AI agents operate an app through the same semantic actions its own menus and
+shortcuts run, over JSON-RPC or the Model Context Protocol (MCP). An app describes its actions
+once, with schemas for their input and output; a dispatcher checks every call against them
+before the app's handler runs. The crate does no input or output of its own, opens no endpoint
+and contains no language model: transports hand it complete lines and send back what it returns,
+and nothing is reachable from outside until the app switches control on. It is plain Rust,
+without the standard library and without a line of `unsafe` code.
 
-## Registering an application
+## Do you need this crate?
+
+An app with a window mostly meets it through [`jflib-ui`](https://crates.io/crates/jflib-ui). The
+UI runtime already offers seven general actions to every app (`ui.state`, `ui.command`,
+`ui.focus`, `ui.click`, `ui.type`, `ui.key` and `ui.render`), opens a local endpoint when the app
+is started with `--agent` or calls `ui.set_agent_enabled(true)`, and runs a session over standard
+input and output with `--agent-json` or `--agent-mcp`. The app adds its own actions through
+`App::actions` and `App::action`, with the types of this crate. You use the crate directly to
+declare those actions, or to put the dispatcher behind a transport of your own.
+
+It also holds the strict, bounded JSON that other JFLib crates build on (`agent_core::json`), and
+`agent_core::jmap`, which maps records and string enums to JSON and back
+(`record! { pub struct P { pub a: String, pub n: u32 } }`) so that older and newer programs read
+each other's data.
+
+## Declaring actions
 
 ```rust
+use jflib::agent_core::{ActionSpec, schema::{self, Property, Schema}};
+
 static INSERT: Schema = Schema::Object {
     properties: &[Property { name: "text", schema: &schema::STRING, required: true }],
     additional: false,
@@ -24,45 +45,57 @@ static ACTIONS: &[ActionSpec] = &[
 ];
 ```
 
-Implement `Host::actions`, `revision`, `capabilities` and `execute`. Optional methods add
-availability/modal checks, inspection, transactions, asynchronous tasks and resource
-access. `Dispatcher::execute_local` and `execute_command` use the same schema, capability,
-availability, implementation and output checks as external execution; trusted GUI calls
-do not require an external endpoint or an expected revision.
+An action name is 1 to 128 ASCII letters, digits, `.`, `_` and `-`; names and the optional numeric
+command ids must be unique. The capability bits are opaque here and come from JFLib's platform
+layer. A `Host` implements `actions`, `revision`, `capabilities` and `execute`, the same handler
+the GUI calls; optional methods add availability checks (a modal dialog, an empty selection),
+inspection, transactions, tasks and resources. `Dispatcher::execute_local` and `execute_command`
+let the app's own menus and shortcuts go through the same schema, capability, availability and
+output checks without an endpoint or a revision. An `RpcSession` per connection turns protocol
+lines into calls:
 
-The dispatcher starts **disabled**. `set_enabled(true)` is an explicit host decision.
-Disabling it rejects calls immediately; the IPC adapter also closes all peer connections
-and removes its listener on the next poll (or immediately through `Server::close`).
+```rust
+use jflib::agent_core::{Dispatcher, Protocol, RpcSession};
 
-An action name is 1–128 ASCII letters/digits/`.`/`_`/`-`; names and optional command IDs
-must be unique. Capability bits are opaque to this library and come from `plat`.
-Availability failures contain a concrete machine-readable code and explanation.
+let mut dispatcher = Dispatcher::new();              // starts disabled
+dispatcher.set_enabled(true);                        // the app's explicit decision
+let mut session = RpcSession::new(Protocol::Json, "Notes", "1.0");
+if let Some(reply) = session.handle(&dispatcher, &mut notes, line) {
+    // one newline-terminated JSON-RPC response for the transport to send
+}
+```
 
-## Revision and transaction contracts
+Disabling the dispatcher rejects calls at once; the native transport of
+[`jflib-agent-io`](https://crates.io/crates/jflib-agent-io) then also closes its connections and
+its listener. An action can need the user's confirmation (`ActionSpec::confirm()`) or be closed
+to external control (`ActionSpec::local_only()`), and a host may only tighten that
+(`Host::access`): in an app with a window, the `agent.confirm` and `agent.deny` lines of its
+permission manifest do. Refused calls come back as `forbidden` or `confirmation_required`.
 
-- Mutating `ActionSpec::write` actions require `expectedRevision` externally. The check
-  happens before calling the host. A stale request has no mutation side effects.
-- The host owns revision advancement, undo history and domain state. Returned revisions
-  are always read from the host, never trusted from a result constructor. A revision must
-  move only with a change of state: a client can act on the one it read last. `lib/ui`
-  therefore does not count frames (docs/AGENT_WEB.md, "Aktionsvertrag und Protokolle").
-- Ordered non-atomic batches report each attempted result. They stop on error by default;
-  callers may request continuation. A call's expected revision refers to its execution time.
-- Atomic batches preflight all actions/schemas/capabilities/revisions and transaction
-  domains before `begin_transaction`. Every call's expected revision refers to the batch's
-  initial state. Calls must complete synchronously within an atomic transaction.
-- The host must restore **both state and revision** on rollback, include all affected
-  document/selection/undo state in its snapshot, and commit one undoable operation.
-  A host that cannot guarantee this must leave `supports_transaction` false.
-- Deferred jobs use explicit task IDs. Hosts drive a `TaskTable` at safe interruption
-  points and must recheck relevant state/revisions before committing asynchronous work.
-  A cancellation request first becomes `cancelling`, then `cancelled` at a checkpoint.
+## The contracts
+
+- **Revisions.** An external call of a `write` action must name the revision it read last
+  (`expectedRevision`), unless the action turns that off (`revision_required`). The dispatcher
+  compares it before the handler runs, so a stale request changes nothing. The host owns the
+  revision and must move it only when its state changes; results always report the host's
+  current revision.
+- **Batches.** `actions/batch` runs up to 128 calls in order and reports each one; it stops at
+  the first error unless asked to go on. An atomic batch checks every action, schema, capability,
+  revision and the shared transaction domain before it begins, all its revisions refer to the
+  state at its start, and its calls must complete synchronously. On a rollback the host must
+  restore both its state and its revision and commit the batch as one undo step; a host that
+  cannot promise that keeps `supports_transaction` false.
+- **Tasks.** Long work returns an explicit task id. The host drives a `TaskTable` (up to 1024
+  tasks) at safe interruption points and checks its state again before committing; a cancel
+  request is `cancelling` until a checkpoint turns it into `cancelled`.
+- **Resources** are opaque ids that the app owns, read in chunks of up to 64 KiB, never file
+  paths. There is no action that runs a shell command.
 
 ## JSON control protocol 1
 
-Transport framing is one UTF-8 JSON-RPC 2.0 object per line. Native stdio, named pipes,
-Unix sockets and browser messages share the same dispatcher. JSON-RPC arrays are not a
-transport batch: use `actions/batch` for the defined ordering/transaction behavior.
+One UTF-8 JSON-RPC 2.0 object per line, the same on every transport. A JSON-RPC array is not a
+batch here; `actions/batch` is. Every successful result carries `protocolVersion: "1"`, and a
+request may name that version in `params.protocolVersion`; other versions are refused.
 
 ```json
 {"jsonrpc":"2.0","id":1,"method":"actions/list","params":{"query":"text","limit":20}}
@@ -70,151 +103,107 @@ transport batch: use `actions/batch` for the defined ordering/transaction behavi
 {"jsonrpc":"2.0","id":3,"method":"actions/execute","params":{"action":"document.text.insert","input":{"text":"Example"},"expectedRevision":12}}
 ```
 
-Every successful control result includes `protocolVersion: "1"`. Supplying an optional
-`params.protocolVersion` explicitly selects revision 1; unsupported versions are errors.
-The unversioned spelling remains fixed to revision 1, rather than silently selecting a
-future protocol. Methods:
-
 | Method | Parameters |
 | --- | --- |
 | `agent/info` | none |
-| `actions/list` | optional `query`, `cursor`, `limit` (1–100) |
+| `actions/list` | optional `query`, `cursor`, `limit` (1 to 100) |
 | `actions/describe` | `action` |
 | `actions/execute` | `action`, optional `input`, `expectedRevision` |
-| `actions/batch` | `calls` (1–128), optional `atomic`, `stopOnError` |
-| `state/inspect` | host-defined query/filter/pagination/revision fields |
+| `actions/batch` | `calls` (1 to 128), optional `atomic`, `stopOnError` |
+| `state/inspect` | what the app's inspection defines (filters, pages, `sinceRevision`) |
 | `tasks/get`, `tasks/cancel` | `id` |
-| `resources/read` | `uri`, optional byte `offset`, `limit` (1–65536) |
-| `view/render` | arguments of the registered `ui.render` action |
+| `resources/read` | `uri`, optional byte `offset`, `limit` (1 to 65536) |
+| `view/render` | the arguments of the registered `ui.render` action |
 
-Inspection/delta semantics come from the app/runtime adapter; the generic library never
-pretends to infer a document, image layer or selection from screen coordinates. Resources
-are opaque app-owned identifiers with separately read payload chunks, not unrestricted
-filesystem paths. There is no shell-execution action.
+The library never guesses a document, a layer or a selection from screen coordinates: what
+`state/inspect` reports is the app's to define.
 
-The strict JSON parser validates UTF-8, escapes, surrogate pairs, numeric grammar and
-unique object keys. Numbers retain their exact token and integer conversion is exact even
-for exponent/fraction spellings of integral values. Defaults: 1 MiB encoded, 32 nesting
-levels, 16384 values, 4096 members per container and 256 KiB per decoded string. Encoding
-uses the same bounds and emits no literal line breaks. Clients using floating-point-only
-JSON libraries must preserve large integer IDs/revisions without rounding.
+## MCP
 
-## MCP versions and catalog
-
-The adapter follows the public [2026-07-28 stdio transport](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio),
+The MCP adapter follows the public
+[2026-07-28 stdio transport](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio),
 [schema](https://modelcontextprotocol.io/specification/2026-07-28/schema) and
 [tool contracts](https://modelcontextprotocol.io/specification/2026-07-28/server/tools).
+Requests of revision 2026-07-28 carry `io.modelcontextprotocol/protocolVersion` and the client's
+capabilities in `params._meta`; `server/discover` lists the supported version, and the client's
+identity is never used to authorize anything. The older revision 2025-11-25 is supported through
+`initialize` and `notifications/initialized`. Nine stable tools cover search, describe, execute,
+batch, inspect, task status and cancel, reading resources and rendering; the app's own actions
+are found on demand rather than listed as tools. Errors of a tool are results with `isError`,
+protocol errors stay JSON-RPC errors, and structured content comes with its text form. Small
+resources can also be read with the standard `resources/read`. No subscriptions, sampling,
+elicitation or requests from server to client are offered.
 
-- Modern revision **2026-07-28** requires `params._meta` with
-  `io.modelcontextprotocol/protocolVersion` and per-request `clientCapabilities`.
-  Client identity is optional and never used for authorization. `server/discover` returns
-  modern supported versions and all modern results include `resultType: "complete"`.
-- Legacy revision **2025-11-25** supports `initialize` followed by
-  `notifications/initialized`. Other legacy offers receive a counteroffer of 2025-11-25.
-  Modern requests do not inherit the legacy negotiation state.
-- Nine stable tools provide search, describe, execute, batch, inspect, task status/cancel,
-  resource reading and rendering. Semantic app commands are discovered on demand.
-- Tool execution errors are structured `isError` results; protocol errors remain JSON-RPC
-  errors. Structured content is accompanied by serialized text for compatibility.
-- Small resources also support standard `resources/read`; large resources are explicitly
-  chunked with `jfgui.resources.read`. Tasks are application-owned IDs, not a claim to
-  implement a separately negotiated MCP task extension.
-- Handlers finish synchronously or return an explicit deferred task. MCP cancellation of
-  an already completed request has no effect; deferred work is cancelled through its task
-  action. No subscriptions, sampling, elicitation, or server-to-client requests are advertised.
+## Bounded JSON
 
-`RpcSession` produces protocol strings only. It has no stdout/stderr APIs. Native stdio
-transports write only these strings to stdout and send diagnostics to stderr.
+`json::parse` checks UTF-8, escapes, surrogate pairs, the number grammar and unique keys, and by
+default accepts at most 1 MiB, 32 levels of nesting, 16384 values, 4096 members per container and
+256 KiB per string (`parse_with_limits` sets others). Numbers keep their exact token, so an integer
+written with a fraction or an exponent still converts exactly, and 64-bit ids and revisions are
+never rounded. Encoding applies the same bounds and writes no line breaks, which keeps one message
+on one line; `stringify_pretty` indents for files people read.
 
-## Native local connections and CLI
+## Transports and clients
 
-`agent_io::ipc::Server` is nonblocking and bounds work/output per UI tick. Its listener is
-created only after explicit activation. Each connection owns framing and protocol state.
-The first valid request's explicit MCP version envelope (or legacy initialization)
-selects MCP for that connection; otherwise it remains JSON protocol 1. Later requests
-cannot switch the selected protocol.
+[`jflib-agent-io`](https://crates.io/crates/jflib-agent-io) carries the protocols over standard
+input and output and over a local endpoint that only the same user can reach (a named pipe on
+Windows, a Unix socket on Linux, macOS and iOS); no TCP port is opened. On an endpoint opened for
+JSON, the first valid request decides the protocol of its connection: an MCP version envelope or a
+legacy initialization selects MCP, anything else keeps JSON protocol 1, and later requests cannot
+switch.
 
-Windows uses a unique local named pipe with a protected DACL granting access only to the
-process token's exact user SID, with remote clients rejected. Linux uses a verified mode
-0700 directory `/tmp/jfgui-agent-UID`, a mode 0600 Unix socket, and `SO_PEERCRED` checks.
-Dropping the listener removes its owned socket; stale sockets after crashes are ignored by
-discovery. No TCP listener is opened. Both modes permit multiple explicitly active instances.
-Endpoint slugs are derived from display names, bounded and ASCII-only; spaces, Unicode and
-long window titles remain intact in protocol metadata and cannot prevent activation.
+JFLib's repository has a command-line client,
+[`tools/jfgui-agent.py`](https://github.com/JFLibrary/JFLib/blob/main/tools/jfgui-agent.py) (Python
+with its standard library only), that lists running instances, calls their actions, starts an app
+headless with `--agent-json` or `--agent-mcp`, and acts as an MCP stdio gateway to an instance
+that is already enabled. It passes arguments as a list and never evaluates shell text.
 
-The shared standard-library CLI is `python tools/jfgui-agent.py`:
-
-```text
-jfgui-agent.py list
-jfgui-agent.py actions ENDPOINT --query document
-jfgui-agent.py describe ENDPOINT document.text.replace
-jfgui-agent.py call ENDPOINT document.text.replace --input-file request.json --expected-revision 12
-jfgui-agent.py inspect ENDPOINT --input-json '{"sinceRevision":12}'
-jfgui-agent.py stdio ENDPOINT --protocol mcp
-jfgui-agent.py headless APP --protocol json
-```
-
-`stdio` is a protocol-preserving MCP gateway to an already enabled native instance.
-`headless` starts an app's explicit `--agent-json` / `--agent-mcp` mode using an argument
-array, without shell evaluation. Browser transport and browser bridging are separate host
-adapters and are not provided by this native IPC module.
-
-Run `apps/agenttest` for core contracts and `apps/agenttest/tests/ipc_check.py --exe ...`
-for independent cross-process, current-user isolation, DACL/permissions, instance and
-CLI/MCP-gateway checks on each native operating system.
-`apps/agenttest/tests/gui_ipc_check.py --bin-dir ...` also exercises real Gallery/Kritzel
-event loops, disabled-by-default endpoints, discovery, PNG resources and graphics undo.
-
-## Explicit browser bridge
-
-The optional bridge is separate from normal browser operation. Start it only when an
-external CLI/MCP client is meant to control an explicitly activated browser app:
-
-```text
-python tools/jfgui-agent.py browser-bridge --origin http://127.0.0.1:8765
-python tools/jfgui-agent.py browser-call --url http://127.0.0.1:PORT --token TOKEN actions/list
-python tools/jfgui-agent.py browser-stdio --url http://127.0.0.1:PORT --token TOKEN
-```
-
-`browser-bridge` binds only `127.0.0.1`, chooses an available port by default, and generates
-a fresh 256-bit capability token. It prints `{url, token, origin}` to **stderr**. It has no
-app state, shell actions or file actions; all calls go to the activated browser's same
-Rust dispatcher. The app must explicitly attach using this configuration. Exact-origin
-CORS, a bearer token, one attached browser, bounded message/queue sizes, connection limits,
-and deadlines apply. Native bridge clients bypass environment HTTP proxies and reject
-redirects so capability tokens stay on loopback.
-
-Browser requests include `Authorization: Bearer TOKEN` and the chosen browser `Origin`:
+For a JFLib app in the browser, `jfgui-agent.py browser-bridge --origin ORIGIN` starts an optional
+bridge that is not needed for normal use. It listens only on `127.0.0.1`, prints its address, a
+fresh 256-bit token and the origin to stderr, holds no app state and offers no shell or file
+actions; the activated browser app attaches to it explicitly. It checks the exact origin and the
+bearer token, serves one browser, queues at most 64 requests of up to 1 MiB each, handles at most
+16 HTTP connections at once, and drops a browser that has not polled for 60 seconds. A timeout
+never claims that a change was cancelled or rolled back: inspect the state before retrying.
 
 | Endpoint | Contract |
 | --- | --- |
-| `POST /connect` | `{app}` → `{client, protocolVersion:"1", maxMessageBytes}` |
-| `GET /poll?client=ID` | Up to 20 seconds → `{requests:[{id,session,request}]}`, maximum eight items |
-| `POST /result` | `{client,id,response}` → `{accepted:true}`; response must match the delivered RPC ID |
+| `POST /connect` | `{app}` returns `{client, protocolVersion:"1", maxMessageBytes}` |
+| `GET /poll?client=ID` | up to 20 seconds, returns `{requests:[{id,session,request}]}`, at most eight |
+| `POST /result` | `{client,id,response}` returns `{accepted:true}`; the response must match the delivered id |
 | `POST /disconnect` | `{client}` closes the browser connection and fails outstanding requests |
-| `POST /rpc` | CLI: `{session,request}` → the raw browser JSON-RPC response, maximum 30 seconds |
-| `POST /session/close` | CLI: `{session}` → `{closed:true}` after explicit browser-session release |
+| `POST /rpc` | for the client: `{session,request}` returns the browser's JSON-RPC response, at most 30 seconds |
+| `POST /session/close` | for the client: `{session}` returns `{closed:true}` once the browser released the session |
 
-The browser forwards each envelope to `jfguiAgent.request(request,{session})`. Distinct
-agent sessions have distinct Rust `RpcSession` state. Notifications are acknowledged to
-the bridge with `response:null`, and produce no MCP/JSON stdout response. A timeout never
-claims a mutation was cancelled or rolled back: callers must inspect state before retrying.
-The queue holds at most 64 requests, each at most 1 MiB; at most 16 HTTP connections are
-processed concurrently. A browser with no polls/results for 60 seconds expires when the
-bridge next checks it. There is no HTTP listener when the bridge command is not running.
+The browser keeps a protocol state per session, at most 16; stateless sessions can expire when
+the table is full, initialized legacy MCP sessions stay until they are closed.
 
-Close jobs are delivered as `{id,session,closeSession:true}` and acknowledged with a null
-response after `jfguiAgent.closeSession(session)`. `browser-stdio` releases its session
-on EOF. `browser-call` reuses `cli-json` (or `cli-mcp` for explicit MCP metadata) unless a
-session is supplied. The browser keeps at most 16 protocol sessions; least-recently-used
-stateless JSON/current-MCP entries can expire, while initialized legacy MCP sessions stay
-until explicit close or revocation. A full table of negotiated legacy sessions returns a
-correlated error without executing the request. Malformed envelopes do not reserve slots.
+## Platforms
 
-`apps/agenttest/tests/bridge_check.py` checks actual loopback HTTP, auth, exact-origin CORS,
-request/response correlation, separate sessions, bounded queues, disconnects, timeouts,
-strict JSON and the CLI stdio bridge. The test emulates the browser side; rendering/input
-browser tests belong to the common web host's own validation.
-`apps/agenttest/tests/browser_bridge.mjs` additionally verifies the real Python CLI through
-the HTTP bridge and browser worker into jfWord's Rust dispatcher in Chromium and Firefox,
-including document edits, both MCP revisions, more than 16 requests and session cleanup.
+Every platform JFLib supports, the browser included: the crate makes no calls to the operating
+system.
+
+## How to get it
+
+Like all of JFLib, the crate comes through the one dependency
+[`jflib`](https://crates.io/crates/jflib), as `jflib::agent_core`. All of JFLib's crates share one
+version and are released together.
+
+## What's new in 0.2.0
+
+Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-agent-core/latest/source/CHANGELOG.md) says
+the same.
+
+## Documentation
+
+- [The agent interface and the browser port](https://github.com/JFLibrary/JFLib/blob/main/docs/AGENT_WEB.md)
+  (in German) and [agent rules in an app's permissions](https://github.com/JFLibrary/JFLib/blob/main/docs/PERMISSIONS.md#agent-control)
+- [JFLib's guide](https://docs.rs/jflib/latest/jflib/guide/index.html#2-skeleton): how an app is
+  written and started
+- [API reference](https://github.com/JFLibrary/JFLib/blob/main/docs/API.md#agent_core): every
+  public item of `agent_core`, also on [docs.rs](https://docs.rs/jflib-agent-core)
+
+## License
+
+MIT or Apache-2.0, at your choice.

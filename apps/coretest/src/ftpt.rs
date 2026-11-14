@@ -101,6 +101,14 @@ fn segments(t: &mut T) {
     t.eq("response lines", lr.iter().find(|l| l.proto == Proto::Ftp).map(|l| l.fields.iter().filter(|f| f.name == "Response code").count()), Some(2));
     let bad = segment(40000, ftp::PORT_FTP, b"HELO x\r\n");
     t.eq("unknown command", decode::layers(&bad).iter().find(|l| l.proto == Proto::Ftp).map(|l| l.problems.clone()), Some(alloc::vec![s("a command FTP does not define: HELO")]));
+    // byte 4 inside a character (the reply was cut there), a byte that is no UTF-8 in the verb
+    // (the text's lengths ran past the line)
+    let r8 = segment(ftp::PORT_FTP, 40000, "220\u{e9}tat\r\n".as_bytes());
+    let code = decode::layers(&r8).iter().find(|l| l.proto == Proto::Ftp).and_then(|l| l.fields.iter().find(|f| f.name == "Response code").map(|f| f.value.clone()));
+    t.eq("a reply with a character at byte 4", code, Some(s("220")));
+    let q8 = segment(40000, ftp::PORT_FTP, b"US\xffR x\r\n");
+    let inside = decode::layers(&q8).iter().all(|l| l.fields.iter().all(|f| f.off as u64 + f.len as u64 <= q8.len() as u64));
+    t.check("a request with a byte that is no UTF-8 keeps its fields in the frame", inside);
     let data = segment(ftp::PORT_FTP_DATA, 40001, b"hostname R1\n");
     t.eq("active data", decode::info(&data), (Proto::FtpData, s("FTP Data: 12 bytes")));
     t.eq("active data mask", decode::proto_mask(&data) & decode::P_FTP, decode::P_FTP);

@@ -1,0 +1,60 @@
+#!args --verify-dirty
+# the app's own drags onto "Später" (#502, 549..729 x 285..375), which defers every drop's answer
+# (ui.drop_defer) and gives it 100 ms later (ui.drop_finish): a drag inside the app waits for it
+# too.  Its source reports DS_ACTIVE until the answer ("Quelle"), then DS_END with the effect
+# drop_finish gave (drag_effect, UIC_DRAG_END; "Ende").  Before charge 11 drop_defer said false
+# for the app's own drags and the source ended at the release with the effect of the drop.  The
+# apple is taken (moved), the pear not, the cherry gets no answer (the library's after
+# DROP_DEFER_MS, as the drop was delivered).
+theme light
+drag #101 640,330
+expect text:"Abgelegt: Text+Frucht -> Später (verschieben, erlaubt: kopieren+verschieben)" exists
+expect text:"Antwort: wartet" exists
+expect text:"Quelle: Apfel" exists
+expect text:"Ende: -" exists
+expect text:"Ziehen: -  Über: -" exists
+expect text:"Erlaubt: kopieren+verschieben" exists
+drop expect pending
+wait 150
+expect text:"Antwort: genommen (verschieben)" exists
+expect text:"Ende: Apfel verschieben (1)" exists
+expect text:"Quelle: -" exists
+expect text:"Erlaubt: -" exists
+drop expect move
+# not taken: the drag ends without an effect
+drag #102 640,330
+expect text:"Antwort: wartet" exists
+expect text:"Quelle: Birne" exists
+wait 150
+expect text:"Antwort: nicht genommen" exists
+expect text:"Ende: Birne keine (2)" exists
+drop expect none
+# no answer: after DROP_DEFER_MS the library answers as the drop was delivered (a UIWARN)
+expect_nowarn
+drag #103 640,330
+wait 150
+expect text:"Antwort: keine Antwort" exists
+expect text:"Quelle: Kirsche" exists
+expect text:"Ende: Birne keine (2)" exists
+drop expect pending
+wait 2900
+expect text:"Ende: Kirsche verschieben (3)" exists
+expect text:"Quelle: -" exists
+drop expect move
+expect_warn
+# a drop that is not deferred answers its source after its passes, as before: basket A takes the
+# apple at once
+drag #101 356,114
+expect text:"Ende: Apfel verschieben (4)" exists
+drop expect move
+# a new drag while the answer waits overtakes it: the pear's drop is answered as delivered (it
+# ends, moved), the cherry's drag runs; the late drop_finish of "Später" finds no drop waiting
+drag #102 640,330
+expect text:"Antwort: wartet" exists
+drag #103 82,229
+expect text:"Text: Kirsche" exists
+expect text:"Ende: Kirsche verschieben (6)" exists
+wait 150
+expect text:"Antwort: zu spät" exists
+expect text:"Quelle: -" exists
+expect_nowarn

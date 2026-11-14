@@ -2203,8 +2203,9 @@ pub fn decode(cs: &[u8], dec: Option<&ImgDec>) -> Result<Cs, i32> {
     if r != 0 {
         return Err(r);
     }
-    // spatial mode reads at least one bit per macroblock and plane: fewer bytes cannot be complete
-    if !have_idx && d.mbw as u64 * d.mbh as u64 * d.npl as u64 > end.saturating_sub(base).saturating_mul(8) {
+    // every macroblock reads at least one bit per plane from its tile's first packet (spatial or
+    // DC, with or without an index table): fewer bytes cannot be complete
+    if d.mbw as u64 * d.mbh as u64 * d.npl as u64 > end.saturating_sub(base).saturating_mul(8) {
         return Err(ERR_TRUNC);
     }
     for p in 0..d.npl as usize {

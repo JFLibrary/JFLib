@@ -285,13 +285,17 @@ impl Executor {
     }
 
     /// run until fut is done; the executor's other tasks run alongside.  The thread sleeps on a
-    /// semaphore between wake-ups (Executor::ui: it only yields)
+    /// semaphore between wake-ups (Executor::ui: it only yields, and takes other threads'
+    /// wake-ups itself: no event loop runs meanwhile)
     pub fn block_on<F: Future>(&mut self, fut: F) -> F::Output {
         let mut fut = core::pin::pin!(fut);
         let main = Arc::new(MainWaker { sh: self.sh.clone(), woken: AtomicBool::new(true) });
         let waker = Waker::from(main.clone());
         loop {
             self.sh.notified.store(false, SeqCst);
+            if !self.sh.parked {
+                self.accept_remote();
+            }
             if main.woken.swap(false, SeqCst) {
                 if let Poll::Ready(v) = fut.as_mut().poll(&mut Context::from_waker(&waker)) {
                     return v;
@@ -424,12 +428,12 @@ impl<F: Future> Future for Wrap<F> {
             return Poll::Ready(());
         }
         let Some(f) = this.fut.as_mut() else { return Poll::Ready(()) };
-        {
+        let old = {
             let mut me = this.st.me.lock();
-            if !me.as_ref().is_some_and(|w| w.will_wake(cx.waker())) {
-                *me = Some(cx.waker().clone());
-            }
-        }
+            if me.as_ref().is_some_and(|w| w.will_wake(cx.waker())) { None } else { me.replace(cx.waker().clone()) }
+        };
+        drop(old); // after the lock
+
         match f.as_mut().poll(cx) {
             Poll::Ready(v) => {
                 this.fut = None;
@@ -502,7 +506,8 @@ impl<T> Future for Task<T> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let Some(s) = self.st.as_ref() else { return Poll::Ready(Err(Cancelled)) };
         if s.flags.load(SeqCst) & T_DONE == 0 {
-            *s.waiter.lock() = Some(cx.waker().clone());
+            let old = s.waiter.lock().replace(cx.waker().clone());
+            drop(old); // after the lock
             if s.flags.load(SeqCst) & T_DONE == 0 {
                 return Poll::Pending;
             }
@@ -552,16 +557,17 @@ impl Future for Sleep {
         if now_us() >= self.at {
             if self.id != 0 {
                 let id = core::mem::replace(&mut self.id, 0);
-                TIMERS.lock().retain(|t| t.id != id);
+                drop(timer_take(id));
             }
             return Poll::Ready(());
         }
         let mut g = TIMERS.lock();
         let found = if self.id == 0 { None } else { g.iter_mut().find(|t| t.id == self.id) };
+        let mut old = None;
         match found {
             Some(t) => {
                 if !t.waker.will_wake(cx.waker()) {
-                    t.waker = cx.waker().clone();
+                    old = Some(core::mem::replace(&mut t.waker, cx.waker().clone()));
                 }
                 t.owner = tid();
             }
@@ -572,6 +578,8 @@ impl Future for Sleep {
                 g.push(Timer { at: self.at, id: self.id, owner: tid(), waker: cx.waker().clone() });
             }
         }
+        drop(g);
+        drop(old); // after the lock: a waker's drop may drop other timers
         Poll::Pending
     }
 }
@@ -579,9 +587,16 @@ impl Future for Sleep {
 impl Drop for Sleep {
     fn drop(&mut self) {
         if self.id != 0 {
-            TIMERS.lock().retain(|t| t.id != self.id);
+            drop(timer_take(self.id));
         }
     }
+}
+
+// timer id out of the list; the caller drops it after the lock (its waker's drop may drop other
+// timers)
+fn timer_take(id: u64) -> Option<Timer> {
+    let mut g = TIMERS.lock();
+    g.iter().position(|t| t.id == id).map(|k| g.swap_remove(k))
 }
 
 /// wake this thread's timers that are due at now, earliest deadline first -> how many
@@ -784,7 +799,8 @@ impl<T> Future for Blocking<T> {
     type Output = T;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<T> {
         if !self.cell.done.load(SeqCst) {
-            *self.cell.waker.lock() = Some(cx.waker().clone());
+            let old = self.cell.waker.lock().replace(cx.waker().clone());
+            drop(old); // after the lock
             if !self.cell.done.load(SeqCst) {
                 return Poll::Pending;
             }
@@ -880,17 +896,20 @@ impl Future for WaitCancelled {
         if self.id == 0 {
             self.id = WAIT_ID.fetch_add(1, SeqCst);
         }
-        {
+        // a waker replaced here is dropped after the lock (its drop may cancel this token), before
+        // the check below
+        let old = {
             let mut g = self.tok.0.waiters.lock();
             match g.iter_mut().find(|(i, _)| *i == self.id) {
-                Some((_, w)) => {
-                    if !w.will_wake(cx.waker()) {
-                        *w = cx.waker().clone();
-                    }
+                Some((_, w)) if !w.will_wake(cx.waker()) => Some(core::mem::replace(w, cx.waker().clone())),
+                Some(_) => None,
+                None => {
+                    g.push((self.id, cx.waker().clone()));
+                    None
                 }
-                None => g.push((self.id, cx.waker().clone())),
             }
-        }
+        };
+        drop(old);
         if self.tok.is_cancelled() { Poll::Ready(()) } else { Poll::Pending }
     }
 }
@@ -899,7 +918,12 @@ impl Drop for WaitCancelled {
     fn drop(&mut self) {
         if self.id != 0 {
             let id = self.id;
-            self.tok.0.waiters.lock().retain(|(i, _)| *i != id);
+            // the waker is dropped after the lock (its drop may cancel this token)
+            let gone = {
+                let mut g = self.tok.0.waiters.lock();
+                g.iter().position(|(i, _)| *i == id).map(|k| g.swap_remove(k))
+            };
+            drop(gone);
         }
     }
 }

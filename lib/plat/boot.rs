@@ -47,6 +47,7 @@ pub fn name_and_assets(app: Option<&str>, assets: &'static [u8]) -> Result<(), i
 /// manifest: policy::take_key)
 #[doc(hidden)]
 pub fn permissions(manifest: Option<&str>) -> Result<Option<Key>, i32> {
+    policy::read_env();
     let Some(text) = manifest else { return Ok(policy::take_key()) };
     let key = match policy::install(text) {
         Ok(k) => k,

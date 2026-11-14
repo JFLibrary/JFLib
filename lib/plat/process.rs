@@ -95,14 +95,24 @@ pub fn find(name: &str) -> Option<String> {
 }
 
 impl Command<'_> {
-    /// Start a hidden process with pipes. Dropping its handle terminates its tree.
+    /// Start a hidden process with pipes. Dropping its handle terminates its tree.  Windows: a
+    /// `.bat` or `.cmd` file runs through cmd.exe, which reads its command line by other rules;
+    /// a program or argument with `"`, `%`, `!`, `^`, `&`, `|`, `<`, `>` or a line break is
+    /// refused for it (87), as for process::launch
     pub fn spawn(&self) -> Result<Child, u32> {
         if self.program.is_empty() || self.program.contains('\0')
             || self.args.iter().any(|a| a.contains('\0'))
             || self.cwd.is_some_and(|p| p.contains('\0'))
             || self.env.iter().any(|(k, v)| k.is_empty() || k.contains(['=', '\0']) || v.is_some_and(|s| s.contains('\0')))
         { return Err(22); }
-        if !crate::policy::process_allowed(self.program) {
+        // a relative path with a working folder names a file below cwd on Linux and Apple (the
+        // child changes into cwd, then starts it), so that file is checked; Windows takes a
+        // relative program from this process's folder
+        let target = match self.cwd {
+            Some(d) if !cfg!(windows) && self.program.contains('/') && !self.program.starts_with('/') => alloc::format!("{d}/{}", self.program),
+            _ => String::from(self.program),
+        };
+        if !crate::policy::process_allowed(&target) {
             return Err(if cfg!(windows) { 5 } else { 13 }); // access denied / EACCES
         }
         native::spawn(self)

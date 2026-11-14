@@ -357,6 +357,28 @@ fn broken(t: &mut T, sc: &GScene, glb: &[u8], ext: &[u8], files: &[(String, Vec<
         }
     }
     t.ok(wrong.is_empty(), &format!("{} limits lowered below the file: each a Limit error{}", limits.len(), if wrong.is_empty() { String::new() } else { format!(", not: {wrong:?}") }));
+    // buffer_bytes counts what the buffers hold: 50 buffers of byteLength 1 naming one file of 1000 bytes are
+    // 50 000 bytes, not 50; the zeros of an accessor without a buffer view count too (here 1000 x 12 bytes)
+    let mut many = String::new();
+    for _ in 0..50 {
+        many.push_str(",{\"byteLength\":1,\"uri\":\"big.bin\"}");
+    }
+    let shared = base.replacen("\"}]}", &format!("\"}}{many}]}}"), 1);
+    let big = [(String::from("big.bin"), vec![7u8; 1000])];
+    let zeros = base.replacen("{\"bufferView\":0,\"componentType\":5126,\"count\":3,", "{\"componentType\":5126,\"count\":1000,", 1);
+    let sparse = base.replacen("{\"bufferView\":0,\"componentType\":5126,\"count\":3,\"type\":\"VEC3\"}",
+                               "{\"componentType\":5126,\"count\":3,\"type\":\"VEC3\",\"sparse\":{\"count\":1,\"indices\":{\"bufferView\":1,\"componentType\":5123},\"values\":{\"bufferView\":0}}}", 1);
+    let lim10k = low(&|l| l.buffer_bytes = 10_000);
+    let lim20k = low(&|l| l.buffer_bytes = 20_000);
+    let r = [
+        load(shared.as_bytes(), &big, &lim).map(|d| d.meshes.len()),
+        load(shared.as_bytes(), &big, &lim10k).map(|d| d.meshes.len()),
+        load(zeros.as_bytes(), &[], &lim20k).map(|d| d.meshes[0].primitives[0].positions.len()),
+        load(zeros.as_bytes(), &[], &lim10k).map(|d| d.meshes[0].primitives[0].positions.len()),
+        load(sparse.as_bytes(), &[], &lim).map(|d| d.meshes[0].primitives[0].positions.len()),
+    ];
+    let ok = matches!(r[0], Ok(1)) && matches!(&r[1], Err(g::Error::Limit(_))) && matches!(r[2], Ok(3)) && matches!(&r[3], Err(g::Error::Limit(_))) && matches!(r[4], Ok(3));
+    t.ok(ok, &format!("buffer bytes as held: one file named by 50 buffers loads, over 10 000 bytes a Limit; 1000 zeros without a buffer view under 20 000 bytes load, under 10 000 a Limit; zeros with a sparse value load ({r:?})"));
     // the .glb container
     let mut wrong = Vec::new();
     let mut cases: Vec<(&str, Vec<u8>, Kind)> = Vec::new();

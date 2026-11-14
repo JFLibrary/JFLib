@@ -30,7 +30,8 @@
 //   rsa also  PrivateKey: generate from the caller's bytes, PKCS #1 v1.5 signing (RFC 8017)
 //   eappwd    the sums of EAP-PWD on P-256: pwe, commit, shared, confirm, keys  (RFC 5931)
 //
-// No randomness here: callers pass random bytes in (plat::fill_random), so everything is
+// No randomness here: callers pass random bytes in (plat::fill_random on Windows, Linux, Apple
+// and Android; in the browser the page's crypto.getRandomValues), so everything is
 // deterministic and testable.  Secret-dependent work avoids branches and table lookups
 // (field arithmetic with 51-bit limbs, masked conditional swaps and selects).
 #![no_std]

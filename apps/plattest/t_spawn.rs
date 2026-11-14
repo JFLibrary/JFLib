@@ -67,6 +67,22 @@ pub fn t_launch(t: &mut T) {
     t.check(plat::process::find(sys).is_some_and(|p| p.contains(['/', '\\'])), "launch: find of a system program");
     t.check(plat::process::find("plattest-no-such-program-xyz").is_none(), "launch: find of a missing name");
     t.check(plat::process::find(&exe).is_none(), "launch: find of a path is None");
+    if cfg!(windows) {
+        // a batch file runs through cmd.exe, which would split "x&echo ..." into two commands
+        // (backslashes: cmd.exe does not find a batch file by a path with '/')
+        let bat = t.subp("echo.bat").replace('/', "\\");
+        let hit = t.subp("hit.txt");
+        plat::write_file(&bat, b"@echo %1>NUL\r\n");
+        let bad = alloc::format!("x&echo hit>{hit}");
+        let c = plat::process::Command { program: &bat, args: &[&bad], cwd: None, env: &[] };
+        let e = c.spawn().err();
+        sleep_ms(300);
+        t.check(e == Some(87) && plat::file_exists(&hit) == 0, "launch: a batch file's argument with & is refused (87), nothing runs");
+        t.check(plat::process::launch(&alloc::format!("{bat}. "), &["%PATH%"]).err() == Some(87), "launch: ... also for x.bat. and %");
+        let c = plat::process::Command { program: &bat, args: &["plain"], cwd: None, env: &[] };
+        let e = c.spawn().err();
+        t.check(e.is_none(), &alloc::format!("launch: a batch file with a plain argument starts ({e:?})"));
+    }
     t.scratch_done();
 }
 

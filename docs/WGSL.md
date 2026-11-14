@@ -11,7 +11,7 @@ Maßstab ist die W3C-Spezifikation (Candidate Recommendation vom 26.10.2026); wo
 abweicht, folgt die Crate der Spezifikation, und die Abweichungen stehen
 [unten](#abweichungen-zwischen-spezifikation-und-chrome).
 
-Die Crate ist `no_std` + `alloc`, ohne Abhängigkeiten und ohne `unsafe`. Sie gerät bei keiner
+Die Crate ist `no_std` + `alloc`, hängt nur von `lib/shader` ab (SPIR-V) und hat kein `unsafe`. Sie gerät bei keiner
 Eingabe in Panik: Verschachtelung über den Grenzen ist ein Fehler, nie ein Stapelüberlauf,
 Konstanten sind in der Größe begrenzt.
 

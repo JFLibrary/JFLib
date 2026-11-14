@@ -49,6 +49,8 @@ extern crate alloc;
 pub mod consts;
 pub mod keys;
 mod a11y;
+pub use a11y::{A11yAction, A11yRequest}; // ui.a11y_request_take (section 19)
+mod a11y_auto; // the scripts' command a11y
 mod auto;
 mod auto_perm;
 mod agent;
@@ -224,7 +226,7 @@ pub use desk::{
     DW_RIGHT,
 };
 
-use alloc::collections::{BTreeMap, VecDeque};
+use alloc::collections::VecDeque;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -234,7 +236,7 @@ use text::Text;
 pub use clipimg::{clip_bmp_from_sf, clipimg_parse, clipimg_record};
 pub use cmd::{Cmd, Draw, DrawRef, Gfx, IconHook};
 pub use consts::*;
-pub use ctx::{KeyEvent, Sem, Slot, ease};
+pub use ctx::{KeyEvent, Sem, SemAx, Slot, ease};
 pub use plat::{Preedit, IP_EMAIL, IP_NUMBER, IP_PASSWORD, IP_PHONE, IP_SEARCH, IP_TEXT, IP_URL}; // (E4) ui.ime_preedit, ui.ime_enable
 pub use cursor::CursorDraw;
 pub use edit::TextboxPresentation;
@@ -483,6 +485,20 @@ pub struct WinParts {
     pub(crate) scopy: scrollcopy::W,
     /// the canvases of the pass (canvas.rs)
     pub(crate) canv: canvas::W,
+    /// (charge 11) the id-keyed state of the widget families, per window like the state slots
+    /// (ctx::W): the same id in two windows keeps its own -- the code and rich-text editors'
+    /// views, the colour pickers' fields, the font pickers, the spell checks of text boxes, the
+    /// charts' drawings and line states, the dock and desk areas
+    pub(crate) code: code_edit::W,
+    pub(crate) rich: rich_edit::W,
+    pub(crate) color: color::W,
+    pub(crate) fonts: fontpick::W,
+    pub(crate) spell: edit::spellbox::W,
+    pub(crate) chart: chart::W,
+    pub(crate) dock: dock::W,
+    pub(crate) desk: desk::W,
+    /// the file dialog of the window (filedlg.rs; the folder used last is the app's)
+    pub(crate) fd: filedlg::W,
 }
 
 impl WinParts {
@@ -500,6 +516,15 @@ impl WinParts {
             rtl: Default::default(),
             scopy: Default::default(),
             canv: Default::default(),
+            code: Default::default(),
+            rich: Default::default(),
+            color: Default::default(),
+            fonts: Default::default(),
+            spell: Default::default(),
+            chart: Default::default(),
+            dock: Default::default(),
+            desk: Default::default(),
+            fd: Default::default(),
         }
     }
 }
@@ -516,7 +541,6 @@ pub(crate) struct Mods {
     pub(crate) win: win::S,
     pub(crate) chrome: chrome::S,
     pub(crate) filedlg: filedlg::S,
-    pub(crate) chart: chart::S,
     pub(crate) shell: shell::S,
     pub(crate) notify: notify::S,
     pub(crate) a11y: a11y::S,
@@ -568,6 +592,7 @@ pub(crate) struct Mods {
 /// what a window shows through (Ui::gpu_output): status and counters of the GPU output, for
 /// tests and measurements
 #[derive(Clone, Debug, Default)]
+#[non_exhaustive]
 pub struct GpuOutput {
     /// the output is switched on for this run (jfgui_GPU, the `gpu on` of a script)
     pub wanted: bool,
@@ -658,7 +683,6 @@ pub struct Ui {
     pub(crate) sems: Vec<Sem>,
     pub(crate) semtext_len: usize,
     pub(crate) sem_dummy: Sem,
-    pub(crate) slots: BTreeMap<u32, Slot>,
     pub(crate) keydown: [u8; 256],
     pub(crate) mpts: Vec<[i32; 2]>,
     pub(crate) mprs: Vec<u32>,
@@ -677,6 +701,9 @@ pub struct Ui {
     pub(crate) limits: [u32; ctx::LIM_N],
     pub(crate) mods: u32,
     pub(crate) frame: u32,
+    /// a pass builds the windows (frame_begin .. frame_end): an id-taking call means the window
+    /// being built; outside (App::command, tasks) no window is (win.rs req_win, wp_query)
+    pub(crate) building: bool,
     /// the device: FF_DESKTOP / FF_TABLET / FF_PHONE (form.rs)
     pub(crate) form: u32,
     pub(crate) now_ms: u32,
@@ -752,6 +779,9 @@ pub struct Ui {
     pub(crate) verify_dirty: bool,
     pub(crate) frames_rendered: u32,
     pub(crate) close_at: u32,
+    /// (settings_page) the focused text box of a setting and what was typed into it (blanks at
+    /// its end kept while typing; the setting holds the text as the file keeps it)
+    pub(crate) settings_edit: Option<(u32, String)>,
 
     // ---- dirty regions (ui_dirty.s, shared part)
     pub(crate) drects: Vec<[i32; 4]>,

@@ -107,9 +107,19 @@ impl Ui {
                 }
             }
             (Kind::Text { max, .. }, Val::Text(txt)) => {
-                let mut b = txt.clone();
+                // while the box has the focus it shows what was typed (a blank at its end
+                // before the next word); the setting gets the text as the file keeps it
+                let mut b = match &self.settings_edit {
+                    Some((id, typed)) if *id == cid && self.focused() == cid => typed.clone(),
+                    _ => txt.clone(),
+                };
                 self.next_size(CONTROL_W, 0);
                 self.textbox(cid, None, &mut b, (max as u32).saturating_add(1).min(0xFF_FFFF));
+                if self.focused() == cid {
+                    self.settings_edit = Some((cid, b.clone()));
+                } else if self.settings_edit.as_ref().is_some_and(|(id, _)| *id == cid) {
+                    self.settings_edit = None;
+                }
                 if b != *txt {
                     new = Some(Val::Text(b));
                 }

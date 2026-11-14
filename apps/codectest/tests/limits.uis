@@ -1,0 +1,4 @@
+#!args --limits
+# codectest is a console program: --limits runs the decoder budget checks of limits.rs (crafted
+# HEIF / AVIF / TIFF / PDN files refused quickly, valid files of the same shape decoded) and
+# ignores the script (build_rs.py test passes --script); a failing check exits with code 1

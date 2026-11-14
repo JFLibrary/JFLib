@@ -480,6 +480,6 @@ Konstantenausdrücken modulo 2³² über, `01f` ist für Tint ein gültiges Lite
 Mesh- und Task-Shader (`MeshEXT` / `TaskEXT` sind nur als Modelle bekannt), geclusterte
 Subgroup-Operationen (die anderen schreibt `lib/wgsl` über `Module::emit`),
 `OpTypeForwardPointer` / Physical Storage Buffer, Row-Major-Layouts
-im Layout-Helfer, Switch-Literale breiter als 32 Bit, MSL-Ausgabe; der Validator deckt die oben
+im Layout-Helfer, Switch-Literale breiter als 32 Bit; der Validator deckt die oben
 genannten Lücken nicht ab. Der WGSL-Übersetzer, der diese Crate als Back-End benutzt, ist
 [`lib/wgsl`](WGSL.md) (G2c).

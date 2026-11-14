@@ -1,0 +1,5 @@
+#!args --test upload,window,bench_smoke --validate
+#!serial try_acquire's p99 under 3 ms and IMMEDIATE faster than FIFO fail beside the other scripts
+#!lock desktop
+# a part of the validation (validate.uis): the tests with a real window under VK_LAYER_KHRONOS_validation and
+# synchronization validation; a validation error fails

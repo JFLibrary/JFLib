@@ -407,7 +407,6 @@ fn hatch_cov(slot: u32, q: vec2f) -> f32 {
 fn fill_body(i: VsFill) -> vec4f {
     let q = i.pos.xy;
     let tri = (i.misc.x & M_TRI) != 0u;
-    let col = unpack4x8unorm(i.misc.y);
     let idx = i.ix.x;
     let rec = pool[idx];
     var base = 0u;
@@ -505,6 +504,8 @@ fn fill_body(i: VsFill) -> vec4f {
         discard;
         return vec4f(0.0);
     }
+    // (the colour unpacked where it is returned, as in full_body)
+    let col = unpack4x8unorm(i.misc.y);
     let al = col.w * c;
     return vec4f(vec3f(col.z, col.y, col.x) * al, al);
 }

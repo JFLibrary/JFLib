@@ -662,7 +662,8 @@ pub fn meta(d: &[u8], m: &mut ImgMeta, flags: u32) -> i32 {
             0x7352_4742 | 0x5769_6E20 => m.flags |= IMF_SRGB, // 'sRGB', 'Win '
             0x4D42_4544 if hsz >= 124 && flags & IMGD_ICC != 0 && len >= 138 => {
                 // 'MBED': profile offset from the info header, size
-                let off = u32_at(d, 126) as usize + 14;
+                // (checked: on a 32-bit usize the offset + 14 may wrap)
+                let off = (u32_at(d, 126) as usize).checked_add(14).unwrap_or(usize::MAX);
                 let n = u32_at(d, 130) as usize;
                 if off <= len && n <= len - off {
                     meta_blob(m, Blob::Icc, &d[off..off + n]);

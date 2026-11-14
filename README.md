@@ -96,7 +96,7 @@ without changing the application logic.
   a live inspector (`--inspect`, Ctrl+Shift+I or F12) with an overlay and the widget tree,
   and optional JSON/MCP control that must be explicitly enabled.
 - **Modular design:** dedicated `.rlib` components expose safe APIs to applications.
-  `unsafe` is confined to the runtime, platform, SIMD, and plugin/module boundaries.
+  `unsafe` is confined to the runtime, platform, SIMD, GPU and module boundaries.
 
 JFLIB grew out of the Rust rewrite of jfguiLib. Some identifiers, window titles,
 and text in the apps and detailed documentation still use the earlier name or refer

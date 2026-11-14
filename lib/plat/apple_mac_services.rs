@@ -43,10 +43,9 @@ struct S {
     handler: bool,       // the hot key handler installed
 }
 
-struct Cell(UnsafeCell<S>);
-// SAFETY: the main thread only (AppKit's and Carbon's thread); no borrow spans a call into them.
-unsafe impl Sync for Cell {}
-static ST: Cell = Cell(UnsafeCell::new(S {
+// the main thread only (AppKit's and Carbon's thread; UiOnly refuses other threads); no borrow
+// spans a call into them
+static ST: crate::ui_only::UiOnly<UnsafeCell<S>> = crate::ui_only::UiOnly::new(UnsafeCell::new(S {
     target: core::ptr::null_mut(),
     item: core::ptr::null_mut(),
     tasks: Vec::new(),
@@ -59,7 +58,7 @@ static ST: Cell = Cell(UnsafeCell::new(S {
 
 fn st<R>(f: impl FnOnce(&mut S) -> R) -> R {
     // SAFETY: main thread only; f never calls into AppKit.
-    unsafe { f(&mut *ST.0.get()) }
+    unsafe { f(&mut *ST.get().get()) }
 }
 
 /// the target object of our actions (made once)

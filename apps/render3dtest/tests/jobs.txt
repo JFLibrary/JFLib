@@ -1,0 +1,2 @@
+# how build_rs.py test runs these scripts beside the others (build_rs.py, section "test-jobs")
+independent targets   # each --test run starts from nothing and writes no file (dumps only with a folder given by hand)

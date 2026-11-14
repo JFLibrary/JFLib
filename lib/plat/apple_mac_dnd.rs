@@ -57,11 +57,9 @@ struct D {
     test: (Id, NSPoint, u64), // dnd_test_drop: the pasteboard, the point (window coordinates), the mask
 }
 
-struct Cell(UnsafeCell<D>);
-// SAFETY: the main thread only (AppKit's thread), like apple_mac.rs's state; no borrow spans a call
-// into AppKit.
-unsafe impl Sync for Cell {}
-static DS: Cell = Cell(UnsafeCell::new(D {
+// the main thread only (AppKit's thread; UiOnly refuses other threads), like apple_mac.rs's state;
+// no borrow spans a call into AppKit
+static DS: crate::ui_only::UiOnly<UnsafeCell<D>> = crate::ui_only::UiOnly::new(UnsafeCell::new(D {
     types: 0,
     last: (0, 0),
     out: None,
@@ -73,7 +71,7 @@ static DS: Cell = Cell(UnsafeCell::new(D {
 
 fn d<R>(f: impl FnOnce(&mut D) -> R) -> R {
     // SAFETY: main thread only; the borrow ends inside f, which never calls into AppKit.
-    unsafe { f(&mut *DS.0.get()) }
+    unsafe { f(&mut *DS.get().get()) }
 }
 
 /// (win_create) the view takes drags of these types
@@ -257,6 +255,7 @@ extern "C" fn v_drag_perform(this: Id, _cmd: Sel, info: Id) -> bool {
     crate::drop_reset();
     let files = read(pb, types);
     crate::drop_set_effect(e);
+    crate::drop_set_allowed(de_of(mask)); // the drag's operation mask
     push(w, E_DROP, 0, x, y, files);
     true
 }

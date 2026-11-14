@@ -24,7 +24,9 @@
 //                           manifest's reason (through the app's catalogue), the ask line, and
 //                           "Einmal erlauben" (until the program ends), "Immer erlauben"
 //                           (stored), "Ablehnen" (until the program ends), "Nie erlauben"
-//                           (stored); Esc = Ablehnen.  The answer reaches the app as
+//                           (stored); Esc = Ablehnen.  The two that allow take no input for
+//                           half a second after a question appears (window runs), so a
+//                           double click or a held key does not answer it unread.  The answer reaches the app as
 //                           UIC_PERMISSION (arg 1 allowed, 0 refused): an access the UI thread
 //                           made while the question was open was refused, it may try again.
 //   Ui::permissions_page(id) -> bool   the ready-made settings section: every ask line and
@@ -64,7 +66,14 @@ const B_NEVER: u32 = 0xFFFF_7704;
 pub(crate) struct S {
     open: Shared<i32>,
     shown: u32,
+    /// when it appeared (plat::time_us): the allowing buttons wait ALLOW_DELAY_US
+    since_us: u64,
 }
+
+// a question's buttons that allow take no click, Enter or Space for this long after it appeared:
+// a double click or a held key meant for the previous question (or another window) would
+// otherwise answer this one unread.  Refusing (the buttons, Esc) works at once
+const ALLOW_DELAY_US: u64 = 500_000;
 
 /// (main!) set up the app: its name, its assets (app://), its permissions
 #[doc(hidden)]
@@ -197,6 +206,7 @@ impl Ui {
         };
         if self.m.perm.shown != q.id {
             self.m.perm.shown = q.id;
+            self.m.perm.since_us = plat::time_us();
             self.m.perm.open.set(1);
         }
         let open = self.m.perm.open.clone();
@@ -229,6 +239,9 @@ impl Ui {
             self.box_end();
         }
         self.dialog_end();
+        if picked.is_some_and(|a| a.allows()) && !self.headless && plat::time_us().saturating_sub(self.m.perm.since_us) < ALLOW_DELAY_US {
+            picked = None; // too soon to have been read (ALLOW_DELAY_US)
+        }
         if picked.is_none() && open.get() == 0 {
             picked = Some(Answer::Deny); // Esc
         }

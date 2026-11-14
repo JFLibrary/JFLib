@@ -18,13 +18,14 @@
 //   behave(id, hbflags) -> EV_*     hit box on last_rect + pointer / keyboard behaviour
 //   hit(id, hbflags)                hit box only
 //   hit_rect(id, x, y, w, h, hb)    behave on an explicit rectangle (px)
-//   slot(id) -> &mut Slot           persistent per-id state record
+//   slot(id) -> &mut Slot           persistent per-id state record (per window)
 //   sem(kind, id, label, value)     semantic record (state from the last behave)
 //   clip_push(x, y, w, h) / clip_pop()   clip drawing and hit boxes (px)
 //   layer_set(l) -> previous        modal(layer)   disabled_push() / disabled_pop()
 // Runtime (runtime.rs, win.rs): frame_begin / frame_end (a pass over all windows),
 // uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_update.
 
+use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -175,6 +176,49 @@ pub struct Sem {
     pub depth: u8,
     /// window index (0 = the main window)
     pub win: u8,
+    /// what the record says beyond kind, label and value (its own 64-bit id, a parent, a
+    /// description, cells, states ...): set through the record's setters (id64, parent, desc ...;
+    /// section 19 of the guide); None for the records of the built-in widgets
+    pub ax: Option<alloc::boxed::Box<SemAx>>,
+}
+
+/// What a semantic record says beyond its kind, label and value (Sem::ax): its setters fill it
+/// (`ui.sem_rect(..).id64(7).parent(3).desc("..")`); a web page's accessibility tree needs it.
+#[derive(Clone, Debug, Default, PartialEq)]
+#[non_exhaustive]
+pub struct SemAx {
+    /// the record's own id (below 2^62): a screen reader's requests for it come back with it
+    /// (ui.a11y_request_take); 0: none
+    pub id: u64,
+    /// the record it hangs under in the accessibility tree: one with this id64 (or, without one,
+    /// this widget id) published in the same frame and window; 0: by its rectangle
+    pub parent: u64,
+    /// its name when the label is something else (a text box's or drop-down's label is its text)
+    pub name: Option<String>,
+    /// a description beside the name (a hint, a page's aria-describedby)
+    pub desc: Option<String>,
+    /// a link's address
+    pub url: Option<String>,
+    /// the text a screen reader says for a value (a slider's "Monday", a page's aria-valuetext)
+    pub value_text: Option<String>,
+    /// AS_*
+    pub states: u32,
+    /// its position in its set (1-based) and the set's size (0: unknown)
+    pub set: [u32; 2],
+    /// the level of a heading, tree item, list item or row (1 the top; 0: none / the value)
+    pub level: u32,
+    /// a cell's row, column (0-based), row span, column span (spans 0: no place)
+    pub cell: [u32; 4],
+    /// a table's rows and columns (0: unknown)
+    pub grid: [u32; 2],
+    /// LIVE_* (0: as its kind says)
+    pub live: u32,
+    /// value, minimum, maximum, step with fractions (a meter at 0.4 of 1); None: Sem::value / min
+    /// / max
+    pub range: Option<[f64; 4]>,
+    /// a focused text box's selection: anchor, caret in characters (a page's field; the built-in
+    /// boxes report theirs themselves)
+    pub sel: Option<[u32; 2]>,
 }
 
 /// persistent per-id state (slot)  [SL_*]
@@ -274,6 +318,9 @@ pub(crate) struct W {
     pub(crate) cmd_layer_ui: u32,
     /// keyboard navigation of this window (kbnav.rs)
     pub(crate) kb: super::kbnav::W,
+    /// the state slots of this window's ids (Ui::slot): a box's measurements, a view's scroll
+    /// position, animations -- the same id in two windows has a slot in each
+    pub(crate) slots: BTreeMap<u32, Slot>,
 }
 
 impl W {
@@ -320,6 +367,7 @@ impl W {
             disabled_depth: 0,
             cmd_layer_ui: 0,
             kb: Default::default(),
+            slots: BTreeMap::new(),
         }
     }
 }
@@ -965,7 +1013,7 @@ impl Ui {
         }
         // the menu key / Shift+F10 that no widget took: a right click of the focused widget
         // (kbnav.rs)
-        if self.m.kbnav.ctx == id && id != 0 {
+        if self.kb_ctx_for(id) {
             ev |= self.kb_ctx_take();
         }
         // a click of a screen reader (a11y.rs) acts like Space
@@ -1006,10 +1054,13 @@ impl Ui {
 
     // ------------------------------------------------------------------ state slots
 
-    /// ui_slot(id): persistent per-id state (created on first use)
+    /// ui_slot(id): persistent per-id state of the window being built (created on first use):
+    /// every window keeps its own slots, so the same id in two windows (a title bar's, a
+    /// dialog's box) measures and scrolls in each by itself; outside the passes the main
+    /// window's.  A window's slots go with its state (window_destroy)
     pub fn slot(&mut self, id: u32) -> &mut Slot {
         let frame = self.frame;
-        let s = self.slots.entry(id).or_default();
+        let s = self.wp.ctx.slots.entry(id).or_default();
         s.seen = frame;
         s
     }
@@ -1218,6 +1269,7 @@ impl Ui {
             layer: c.cmd_layer_ui as u8,
             depth: self.wp.lay.boxes.len() as u8,
             win: self.uiw_cur as u8,
+            ax: None,
         };
         if let Some(l) = label {
             // copy the label into the frame text arena (it may live in a scratch buffer)
@@ -1321,6 +1373,7 @@ impl Ui {
         self.semtext_len = 0;
         self.animating = false;
         self.frame = self.frame.wrapping_add(1);
+        self.building = true;
         if self.m.ins.on {
             self.m.ins.boxes.clear(); // the inspector's boxes of this pass (inspect.rs)
         }
@@ -1333,6 +1386,7 @@ impl Ui {
 
     /// ui_frame_end -> another pass is needed before the frame is final
     pub(crate) fn frame_end(&mut self) -> bool {
+        self.building = false;
         self.uiw_frame_end();
         #[cfg(target_os = "android")]
         self.ime_frame_end();

@@ -443,8 +443,12 @@ impl OsFile {
         None
     }
 
-    /// bytes read at off (fewer at the end of the file), None on an error before any byte
+    /// bytes read at off (fewer at the end of the file), None on an error before any byte (an
+    /// end past i64::MAX: no file reaches there)
     pub fn read_at(&self, off: u64, buf: &mut [u8]) -> Option<usize> {
+        if !buf.is_empty() && off.checked_add(buf.len() as u64).is_none_or(|end| end > i64::MAX as u64) {
+            return None;
+        }
         let mut done = 0usize;
         while done < buf.len() {
             let n = (buf.len() - done).min(IO_CHUNK) as u32;
@@ -467,8 +471,13 @@ impl OsFile {
         Some(done)
     }
 
-    /// bytes written at off (the file grows as needed), None on an error before any byte
+    /// bytes written at off (the file grows as needed), None on an error before any byte.  An
+    /// end past i64::MAX is refused before anything is written (u64::MAX in the OVERLAPPED
+    /// record would mean "at the end of the file")
     pub fn write_at(&self, off: u64, buf: &[u8]) -> Option<usize> {
+        if !buf.is_empty() && off.checked_add(buf.len() as u64).is_none_or(|end| end > i64::MAX as u64) {
+            return None;
+        }
         let mut done = 0usize;
         while done < buf.len() {
             let n = (buf.len() - done).min(IO_CHUNK) as u32;

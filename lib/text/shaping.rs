@@ -98,14 +98,14 @@ impl Text {
         for i in 0..self.shaping.glyphs.len() {
             let g=self.shaping.glyphs[i];
             if let Some((dc,sf))=&mut target {
-                self.run_y=baseline-((g.y+128)>>8);
+                self.run_y=baseline-(g.y.saturating_add(128)>>8);
                 if !self.color_glyph(dc,sf,g.font,g.id,pen0.saturating_add(g.x)) { self.glyph_draw(dc,sf,g.font,g.id,pen0.saturating_add(g.x),true); }
             }
         }
         self.run_y=baseline; self.shaping.width
     }
     pub(crate) fn shaped_caret(&self, index: usize) -> i32 {
-        self.shaping.carets.iter().min_by_key(|c| c.0.abs_diff(index)).map_or(0,|c| (c.1+128)>>8)
+        self.shaping.carets.iter().min_by_key(|c| c.0.abs_diff(index)).map_or(0,|c| c.1.saturating_add(128)>>8)
     }
     pub(crate) fn shaped_hit(&self, x: i32) -> usize {
         self.shaping.carets.iter().min_by_key(|c| ((c.1 as i64)-(x as i64*256)).abs()).map_or(0,|c| c.0)

@@ -12,6 +12,7 @@ use crate::T;
 pub const PASS: &[(&str, &str)] = &[
     ("empty module", ""),
     ("shadowing in a block", "fn f() { var a = 1; { var a = 2.0; a += 1.0; } a += 1; }"),
+    ("compound vector op= scalar", "fn f(a: vec3f, b: vec4i, c: vec2u) -> vec3f { var v = a; v += 1.0; v -= 0.5; v /= 2.0; v *= 3.0; var w = b; w += 1; w %= 3; w.yz *= 2; var u = c; u += 2u; u -= 1u; return v + vec3f(w.xyz) + f32(u.x); }"),
     ("module scope in any order", "fn f() -> i32 { return later + g(); }\nconst later = 1;\nfn g() -> i32 { return 2; }"),
     ("shadow a built-in", "fn min() -> u32 { return 0u; }\nfn f() -> u32 { return min(); }"),
     ("shadow an enumerant", "const rgba8unorm = 12;\nfn f() -> i32 { return rgba8unorm; }"),
@@ -350,6 +351,8 @@ pub const FAIL: &[(&str, &str, &str)] = &[
     ("atomicStoreMin without enable", "fn f() { $atomicStoreMin(); }", "atomic_vec2u_min_max"),
     ("arrayLength of a fixed array", "var<private> a: array<i32, 4>;\nfn f() -> u32 { return arrayLength($&a); }", "Laufzeit-Array"),
     ("workgroupUniformLoad of private", "var<private> p: i32;\nfn f() -> i32 { return workgroupUniformLoad($&p); }", "workgroup-Adressraum"),
+    // (the declaration was taken and workgroupUniformLoad of it panicked in the SPIR-V backend)
+    ("atomic vec2u in workgroup", "enable atomic_vec2u_min_max;\nvar<workgroup> w: $atomic<vec2<u32>>;\n@compute @workgroup_size(1) fn main() { _ = workgroupUniformLoad(&w); }", "nur im Adressraum `storage`"),
     ("clamp bounds swapped", "fn f(x: f32) -> f32 { return $clamp(x, 1.0, 0.0); }", "Untergrenze"),
     ("extractBits beyond 32", "fn f(x: u32) -> u32 { return $extractBits(x, 20u, 20u); }", "größer als 32"),
     ("insertBits beyond 32", "const a = $insertBits(1u, 2u, 30u, 3u);", "größer als 32"),

@@ -197,6 +197,15 @@ fn resolve(program: &str) -> Result<Option<Vec<u16>>, u32> {
     }
     Err(2)
 }
+/// A batch file runs through cmd.exe, which reads the command line by its own rules (& | < > ^
+/// split or redirect it, % and ! expand, " switches its quoting), not by the CommandLineToArgvW
+/// rules quote() writes (the class of CVE-2024-24576): its program and arguments must hold none
+/// of those characters.  Windows drops trailing dots and spaces of a name, so "x.bat." is one.
+fn batch_ok(program: &str, args: &[&str]) -> bool {
+    let p = program.trim_end_matches(['.', ' ']).to_ascii_lowercase();
+    !(p.ends_with(".bat") || p.ends_with(".cmd"))
+        || !core::iter::once(program).chain(args.iter().copied()).any(|a| a.contains(['"', '%', '!', '^', '&', '|', '<', '>', '\r', '\n']))
+}
 /// The file of a program name as resolve finds it.
 pub(super) fn find(name: &str) -> Option<String> {
     let w = resolve(name).ok()??;
@@ -206,6 +215,7 @@ pub(super) fn find(name: &str) -> Option<String> {
 /// a process group of its own; first outside this process's job (CREATE_BREAKAWAY_FROM_JOB),
 /// which a job that keeps its children refuses (ERROR_ACCESS_DENIED): then inside it.
 pub(super) fn launch(program: &str, args: &[&str]) -> Result<(), u32> {
+    if !batch_ok(program, args) { return Err(87); }
     let application = resolve(program)?;
     let app = application.as_ref().map_or(core::ptr::null(), |a| a.as_ptr());
     let mut text = quote(program); for a in args { text.push(' '); text.push_str(&quote(a)); }
@@ -228,6 +238,7 @@ pub(super) fn launch(program: &str, args: &[&str]) -> Result<(), u32> {
 /// Native child with captured output and a kill-on-close Windows job.
 pub struct Child { process: Handle, job: Handle, input: Option<Handle>, output: Handle, error: Handle }
 pub(super) fn spawn(c: &Command<'_>) -> Result<Child, u32> {
+    if !batch_ok(c.program, c.args) { return Err(87); }
     let application = resolve(c.program)?;
     let mut line = quote(c.program); for a in c.args { line.push(' '); line.push_str(&quote(a)); }
     let mut line: Vec<u16> = line.encode_utf16().chain(core::iter::once(0)).collect();

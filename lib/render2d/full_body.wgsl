@@ -2,7 +2,6 @@
     let q = i.pos.xy;
     let h = i.par.x;
     let fl = i.misc.x;
-    let col = unpack4x8unorm(i.misc.y);
     let cap = (fl >> 4u) & 15u;
     let dashed = (fl & M_DASHED) != 0u;
     let arc = (fl & M_ARC) != 0u;
@@ -177,5 +176,8 @@
         discard;
         return vec4f(0.0);
     }
+    // (the colour unpacked here, not at the top: alive through the whole body, Mesa's Intel compiler (26.0) gave one of
+    // its parts to another value in some pixels, in fs_fill: a channel or the pixel wrong at random, docs/RENDER2D.md)
+    let col = unpack4x8unorm(i.misc.y);
     let al = col.w * c;
     return vec4f(vec3f(col.z, col.y, col.x) * al, al);

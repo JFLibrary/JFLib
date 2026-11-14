@@ -18,7 +18,6 @@
 // scalar parts (the curve, the arc length, the dequantization) are libjxl's baseline code
 // without FMA.
 
-use alloc::vec;
 use alloc::vec::Vec;
 
 use img_core::{ERR_CODE, ERR_HDR, ERR_LIMIT};
@@ -388,16 +387,18 @@ fn dequantize(q: &QSpline, start: (f32, f32), qadj: i32, ytox: f32, ytob: f32, i
         sp.color[0][i] += ytox * sp.color[1][i];
         sp.color[2][i] += ytob * sp.color[1][i];
     }
+    // (saturating: a huge quantizer adjustment or colour factor must not wrap the estimate small
+    // and let the area limit pass)
     let mut colsum = [0u64; 3];
     for c in 0..3 {
         for i in 0..32 {
-            colsum[c] += ceilf(iq * (q.color[c][i] as f32).abs()) as u64;
+            colsum[c] = colsum[c].saturating_add(ceilf(iq * (q.color[c][i] as f32).abs()) as u64);
         }
     }
-    colsum[0] += ceilf(ytox.abs()) as u64 * colsum[1];
-    colsum[2] += ceilf(ytob.abs()) as u64 * colsum[1];
+    colsum[0] = colsum[0].saturating_add((ceilf(ytox.abs()) as u64).saturating_mul(colsum[1]));
+    colsum[2] = colsum[2].saturating_add((ceilf(ytob.abs()) as u64).saturating_mul(colsum[1]));
     let maxc = colsum[0].max(colsum[1]).max(colsum[2]);
-    let logcolor = 1u64.max(ceil_log2_u64(1 + maxc));
+    let logcolor = 1u64.max(ceil_log2_u64(maxc.saturating_add(1)));
     let wl = ceilf(sqrt((area_limit as f32 / logcolor as f32) / manhattan.max(1) as f32));
     let mut width = 0u64;
     for i in 0..32 {
@@ -405,9 +406,9 @@ fn dequantize(q: &QSpline, start: (f32, f32), qadj: i32, ytox: f32, ytob: f32, i
         sp.sigma[i] = q.sigma[i] as f32 * f * CHANNEL_WEIGHT[3] * iq;
         let wf = ceilf(iq * (q.sigma[i] as f32).abs());
         let w = minss(wl, maxss(1.0, wf)) as u64;
-        width += w * w * logcolor;
+        width = width.saturating_add(w.saturating_mul(w).saturating_mul(logcolor));
     }
-    *total_area += width * manhattan;
+    *total_area = total_area.saturating_add(width.saturating_mul(manhattan));
     if *total_area > area_limit {
         return Err(ERR_LIMIT);
     }
@@ -568,13 +569,15 @@ impl Splines {
             }
         }
         by_y.sort_unstable();
-        let mut ystart = vec![0u32; h as usize + 1];
+        // the rows up to the last one a blob touches (add_to stops there), not the frame height
+        let rows = by_y.last().map_or(0, |e| e.0 as usize + 1);
+        let mut ystart = crate::modular::zvec::<u32>(rows + 1)?;
         let mut idx = Vec::with_capacity(by_y.len());
         for &(y, i) in &by_y {
             idx.push(i);
             ystart[y as usize + 1] += 1;
         }
-        for y in 0..h as usize {
+        for y in 0..rows {
             ystart[y + 1] += ystart[y];
         }
         Ok(Splines { segs, idx, ystart })

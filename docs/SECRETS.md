@@ -76,7 +76,10 @@ let _ = secret_delete("imap.example.org", "alice");         // Ok(true): there w
   The credential then holds an empty value and the attribute `JFLib_File` with the file's
   SHA-256, so a changed, older or foreign file is refused (`Failed`). The new file is written
   before the credential points to it; afterwards the entry's other files are removed (also
-  ones a crash left behind). Deleting the entry deletes its file.
+  ones a crash left behind). Deleting the entry deletes its file. Writes, reads and deletes of
+  one entry hold `data://secrets/<16 hex of the target's SHA-256>.lock` (an exclusive handle,
+  across processes) from the file to that removal, so two writes at once never leave the
+  credential pointing at a removed file; the small lock file stays.
 * In a logon session without a credential store (some service accounts) the calls report
   `Unavailable` (`ERROR_NO_SUCH_LOGON_SESSION`).
 

@@ -402,6 +402,11 @@ impl Conn {
         self.state == State::Closed || self.peer_closed
     }
 
+    /// the peer sent close_notify (an orderly end, not a cut connection)
+    pub fn peer_closed(&self) -> bool {
+        self.peer_closed
+    }
+
     /// the peer's certificate chain (leaf first)
     pub fn peer_certs(&self) -> &[Cert] {
         &self.peer

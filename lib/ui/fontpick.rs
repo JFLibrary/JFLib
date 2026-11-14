@@ -1,5 +1,6 @@
 // fontpick -- the system's fonts in the UI: the font database and its rules, loading a
-// choice, text in such a font, a font picker and a font dialog
+// choice, text in such a font, a font picker and a font dialog (their lists, searches and
+// choices kept per window: WinParts::fonts)
 //
 //   FontSel { family, weight, italic, size, axes }   a choice: a family (also a generic one:
 //                                    "sans-serif", "serif", "monospace" ...), 100..900, italic,
@@ -131,6 +132,13 @@ struct Pick {
     fresh: bool, // the dialog was opened: reset its lists inside its window
 }
 
+/// the pickers and dialogs of one window (WinParts::fonts), by id: a picker of the same id in two
+/// windows keeps its own list, search and choice
+#[derive(Default)]
+pub(crate) struct W {
+    picks: BTreeMap<u32, Pick>,
+}
+
 /// shared state (Ui::m.fonts)
 #[derive(Default)]
 pub(crate) struct S {
@@ -139,7 +147,6 @@ pub(crate) struct S {
     loaded: BTreeMap<(String, u32, bool), (i32, String)>,
     /// choices on variable faces, oldest first: (key, font id, family)
     vloaded: Vec<(VarKey, i32, String)>,
-    picks: BTreeMap<u32, Pick>,
     /// the UI language the fallback follows (i18n::language() + 1; 0: not set yet)
     lang_n: u32,
     /// (ROADMAP §6) font_register: the families of the app's own fonts, in order
@@ -431,7 +438,7 @@ impl Ui {
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn font_picker(&mut self, id: u32, sel: &mut FontSel) -> u32 {
         let _src = self.src_scope();
-        let mut p = self.m.fonts.picks.remove(&id).unwrap_or_default();
+        let mut p = self.wp.fonts.picks.remove(&id).unwrap_or_default();
         self.id_push(id);
         let mut out = 0;
         self.box_begin(0, BOX_H | BOX_XCENTER, 8);
@@ -465,7 +472,7 @@ impl Ui {
         }
         self.box_end();
         self.id_pop();
-        self.m.fonts.picks.insert(id, p);
+        self.wp.fonts.picks.insert(id, p);
         out
     }
 
@@ -473,7 +480,7 @@ impl Ui {
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn font_dialog(&mut self, id: u32, open: &Shared<i32>, sel: &mut FontSel) -> u32 {
         let _src = self.src_scope();
-        let mut p = self.m.fonts.picks.remove(&id).unwrap_or_default();
+        let mut p = self.wp.fonts.picks.remove(&id).unwrap_or_default();
         let rect = p.rect.get_or_insert_with(|| Shared::new(WinRect::new(0, 0, 600, 0, 0))).clone();
         let mut out = 0;
         self.id_push(id);
@@ -600,7 +607,7 @@ impl Ui {
         }
         self.window_end();
         self.id_pop();
-        self.m.fonts.picks.insert(id, p);
+        self.wp.fonts.picks.insert(id, p);
         out
     }
 

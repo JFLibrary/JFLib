@@ -31,6 +31,8 @@
 //             E_POWER / E_SESSION_END (NSWorkspace, SIGTERM), tool windows as panels, printing
 //   services  apple_mac_services.rs: the status item and notifications, the Dock tile, files the
 //             system opens with the app, global shortcuts
+//   a11y      apple_mac_a11y.rs: the accessibility tree as NSAccessibility elements under each view
+//             (VoiceOver), its notifications
 //   tests     apple_mac_test.rs: win_test, file_dialog_autoclose (events to our own windows only)
 //
 // Everything runs on the main thread (AppKit's rule); the state is reached through short borrows
@@ -79,6 +81,10 @@ pub(crate) mod services;
 #[path = "apple_mac_gpu.rs"]
 mod gpu;
 pub use gpu::*;
+// the accessibility tree for VoiceOver (a11y.rs, docs/VOICEOVER.md)
+#[path = "apple_mac_a11y.rs"]
+pub(crate) mod a11y_mac;
+pub use a11y_mac::{AxTestAct, AxTestElem, AxTestText, ax_test_act, ax_test_events, ax_test_focused, ax_test_hit, ax_test_listen, ax_test_text, ax_test_tree, ax_test_window};
 pub use services::hotkey::hotkey_test_post;
 pub(crate) use sysapp::print_dialog;
 pub(crate) use sysapp::{sysmenu_set, sysmenu_supported};
@@ -227,11 +233,9 @@ struct St {
     autoclose: Option<(u32, Option<String>)>, // (test aid) the next file dialog: Cancel / OK after ms
 }
 
-struct Main(UnsafeCell<Option<St>>);
-// SAFETY: only the main thread touches the state (AppKit's thread); other threads only signal the
-// run loop source (SOURCE, MAIN_RL).
-unsafe impl Sync for Main {}
-static ST: Main = Main(UnsafeCell::new(None));
+// only the main thread touches the state (AppKit's thread; UiOnly refuses other threads); other
+// threads only signal the run loop source (SOURCE, MAIN_RL)
+static ST: crate::ui_only::UiOnly<UnsafeCell<Option<St>>> = crate::ui_only::UiOnly::new(UnsafeCell::new(None));
 static VIEW_OFF: AtomicIsize = AtomicIsize::new(0);
 static DEL_OFF: AtomicIsize = AtomicIsize::new(0);
 static SOURCE: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
@@ -241,7 +245,7 @@ static OBS: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
 /// a short borrow of the state (never across a call into AppKit)
 fn with<R>(f: impl FnOnce(&mut St) -> R) -> Option<R> {
     // SAFETY: main thread only; every borrow ends before AppKit can call back (see the top).
-    unsafe { (*ST.0.get()).as_mut().map(f) }
+    unsafe { (*ST.get().get()).as_mut().map(f) }
 }
 
 fn rec<R>(w: i32, f: impl FnOnce(&mut Win) -> R) -> Option<R> {
@@ -311,7 +315,7 @@ fn init() -> bool {
         SOURCE.store(src as *mut c_void, Ordering::SeqCst);
         let obs = observe(del_cls, doff);
         sysapp::observe(app, obs);
-        *ST.0.get() = Some(St { app, view_cls, del_cls, wins: Default::default(), pops: [Pop::NONE; PPW_MAX as usize], hit: None, mv: None, refresh: None, in_refresh: false,
+        *ST.get().get() = Some(St { app, view_cls, del_cls, wins: Default::default(), pops: [Pop::NONE; PPW_MAX as usize], hit: None, mv: None, refresh: None, in_refresh: false,
                                 min0: (0, 0), flags: 0, marked: String::new(), cs, wheel: [0.0; 2], zoom: 0.0, own: false,
                                 cursors: [NIL; CUR_USER_MAX as usize], blank: NIL, drawn: [NIL; crate::cursor_art::DRAWN_N],
                                 autoclose: None });
@@ -459,6 +463,13 @@ pub fn win_create(title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x
             msg!(win, c"setHidesOnDeactivate:", false => bool; ());
         }
         msg!(win, c"setReleasedWhenClosed:", false => bool; ());
+        if flags & PWF_DIALOG != 0 {
+            // VoiceOver: a modal dialog (the UI keeps the input from its owner)
+            let dialog = nsstring("AXDialog");
+            msg!(win, c"setAccessibilitySubrole:", dialog => Id; ());
+            release(dialog);
+            msg!(win, c"setAccessibilityModal:", true => bool; ());
+        }
         let t = nsstring(title);
         msg!(win, c"setTitle:", t => Id; ());
         release(t);
@@ -546,6 +557,7 @@ pub fn win_destroy(w: i32) {
         msg!(r.win, c"close"; ());
     }
     gpu::drop_layer(r.gpu);
+    a11y_mac::forget(w);
     release(r.win);
     release(r.del);
     if w == 0 {
@@ -2062,6 +2074,7 @@ fn view_methods() -> Vec<(&'static core::ffi::CStr, *const c_void, &'static core
         (c"doCommandBySelector:", v_do_command as *const c_void, c"v@::"),
     ];
     v.extend_from_slice(&dnd::view_methods());
+    v.extend_from_slice(&a11y_mac::view_methods());
     v
 }
 

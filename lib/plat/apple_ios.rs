@@ -19,6 +19,8 @@
 // bar above the keyboard (an iPhone's keyboard has no key to close it; the text field keeps the focus,
 // a tap into it brings the keyboard back).  The view controller takes the keys of a hardware keyboard
 // the text system does not (pressesBegan).
+// VoiceOver: apple_ios_a11y.rs gives JFView the elements of the nodes; JFView and the text boxes'
+// elements are UITextInput (apple_ios_text.rs).
 // The ticks: a CADisplayLink while the app animates (jfgui_frame_delay 0), else paused with a timer
 // for the delay; input and wake-ups unpause it.  Px per point: the screen's scale, at most 2 and at
 // most 2048 px on the longer side (as Android's bitmap); dpi 96 x that.
@@ -49,6 +51,11 @@ pub use services::{clip_get, clip_has, clip_set, clip_set_many, file_dialog, fil
 // the motion sensors and the location (sensors.rs through web_sensors.rs)
 #[path = "apple_ios_motion.rs"]
 pub(crate) mod motion;
+// the accessibility tree for VoiceOver (a11y.rs, docs/VOICEOVER.md), UITextInput
+#[path = "apple_ios_a11y.rs"]
+pub(crate) mod a11y_ios;
+pub use a11y_ios::{IosAxAct, IosAxElem, IosAxText, ios_ax_act, ios_ax_escape, ios_ax_events, ios_ax_listen, ios_ax_select, ios_ax_text, ios_ax_tree,
+                   ios_ax_type};
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -146,10 +153,9 @@ struct Host {
     /// the bar above the on-screen keyboard (a UIToolbar with "Done")
     accessory: Cell<Id>,
 }
-struct Main(Host);
-// SAFETY: only the main thread touches the host (every function here but wake() runs there).
-unsafe impl Sync for Main {}
-static HOST: Main = Main(Host {
+// only the main thread touches the host (every function here but wake() runs there; UiOnly
+// refuses other threads)
+static HOST: crate::ui_only::UiOnly<Host> = crate::ui_only::UiOnly::new(Host {
     window: Cell::new(NIL),
     root: Cell::new(NIL),
     view: Cell::new(NIL),
@@ -184,7 +190,7 @@ pub(crate) fn hosted() -> bool {
 }
 
 fn host() -> &'static Host {
-    &HOST.0
+    HOST.get()
 }
 
 fn main_queue() -> *const c_void {
@@ -294,7 +300,7 @@ fn register() {
         (c"pressesEnded:withEvent:", vc_presses_ended as Imp, c"v@:@@"),
         (c"pressesCancelled:withEvent:", vc_presses_ended as Imp, c"v@:@@"),
     ], &[]);
-    subclass(c"UIView", c"JFView", &[
+    let mut view = alloc::vec![
         (c"layoutSubviews", view_layout as Imp, c"v@:"),
         (c"step:", view_step as Imp, c"v@:@"),
         (c"touchesBegan:withEvent:", view_touches_began as Imp, c"v@:@@"),
@@ -316,7 +322,11 @@ fn register() {
         (c"smartInsertDeleteType", trait_no as Imp, c"q@:"),
         (c"inlinePredictionType", trait_no as Imp, c"q@:"),
         (c"autocapitalizationType", trait_zero as Imp, c"q@:"),
-    ], &[c"UIKeyInput"]);
+    ];
+    // VoiceOver's elements, UITextInput (the keyboard sees the text box, compositions)
+    view.extend(a11y_ios::view_methods());
+    view.extend(a11y_ios::text::view_methods());
+    subclass(c"UIView", c"JFView", &view, &[c"UITextInput"]);
 }
 
 extern "C" fn yes(_this: Id, _sel: Sel) -> bool {
@@ -1038,6 +1048,12 @@ fn keyboard(show: bool) {
     }
 }
 
+/// input reached the app: the next tick takes it
+pub(crate) fn input_now() {
+    jfgui_input(time_ms());
+    request_frame();
+}
+
 fn key(vk: u32, mods: u32) {
     jfgui_event(E_KEY_DOWN as u32, 0, mods, 0, 0, 0, vk);
     jfgui_event(E_KEY_UP as u32, 0, mods, 0, 0, 0, vk);
@@ -1046,6 +1062,9 @@ fn key(vk: u32, mods: u32) {
 /// the keyboard's text: Return is the key, a Tab comes as a key (pressesBegan), the rest is text
 extern "C" fn view_insert_text(_this: Id, _sel: Sel, text: Id) {
     let s = string_of(text);
+    if a11y_ios::text::view_insert(&s) {
+        return; // a composition ended with it
+    }
     match s.as_str() {
         "\n" | "\r" => key(13, 0),
         "\t" | "" => {}

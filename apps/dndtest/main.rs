@@ -11,9 +11,21 @@
 // window.  The targets #301..#305 take text, HTML, URLs, an image, files; outside them the
 // window takes files and text (drop_accept) as UIC_DROP.  Three buttons drag content that only
 // other programs take: a text, a PNG (with a BMP copy for DIB targets) and a temporary file.
+// The page (#501) answers per point, as a web page does (drop_effect_set): text, URLs and files
+// are copied on its left half, refused on the top of its right half, linked below that -- the
+// system's pointer shows it while another program's drag hovers.
+// "Später" (#502) decides after the drop whether it took it, as a web page whose drop handler
+// runs in another process: it defers the drop's answer to its source (drop_defer) and gives it
+// 100 ms later (drop_finish): text starting "ja" copied, "link" linked, "nein" not taken, "nie"
+// no answer at all (the library answers after DROP_DEFER_MS); its card shows the effects the
+// drag over the window allows (drag_allowed: also those of a drop while its answer waits) and the
+// answer, "Abgelegt" what drag_allowed said in the drop's pass.  The app's own drags onto it wait
+// for the answer too (charge 11): the apple is taken (moved), the pear not, the cherry and
+// "Text ziehen" get no answer; their source reports DS_ACTIVE until then ("Quelle").
 // Status lines show what the targets saw: "Über", "Abgelegt", "Ende", "UIC_DROP"; "Pixel" the
-// drag's and the last drop's place in px of the window (drag_over_px, drop_pos_px).  German is
-// the source language, locales/ui.tsv has the English texts.
+// drag's and the last drop's place in px of the window (drag_over_px, drop_pos_px); "Quelle" the
+// source that reported DS_ACTIVE in the frame.  German is the source language, locales/ui.tsv has
+// the English texts.
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -46,6 +58,9 @@ const ID_T_TEXT: u32 = 301; // .. 305: text, HTML, URL, image, files
 const ID_OUT_TEXT: u32 = 401;
 const ID_OUT_IMAGE: u32 = 402;
 const ID_OUT_FILE: u32 = 403;
+const ID_PAGE: u32 = 501;
+const ID_LATER: u32 = 502; // "Später": answers its drops 100 ms later
+const T_LATER: u32 = 1; // the timer of that answer
 const TARGET_NAMES: [&str; 5] = ["Text", "HTML", "URL", "Bild", "Dateien"]; // i18n
 const TARGET_TYPES: [u32; 5] = [DT_TEXT, DT_HTML, DT_URL, DT_IMAGE, DT_FILES];
 
@@ -64,6 +79,11 @@ struct Dnd {
     /// jfgui_DNDTEST_PRINT=1: the status lines go to stdout when they change (dnd_x11.py --app)
     print: bool,
     printed: String,
+    /// "Später": the text of the drop whose answer waits, what its source was answered
+    later: Option<String>,
+    answer: String,
+    /// the source that reported DS_ACTIVE in this frame ("Quelle")
+    active: String,
 }
 
 impl Default for Dnd {
@@ -79,6 +99,9 @@ impl Default for Dnd {
             moving: None,
             print: plat::env("jfgui_DNDTEST_PRINT").is_some_and(|v| v == "1"),
             printed: String::new(),
+            later: None,
+            answer: String::from("-"),
+            active: String::from("-"),
         }
     }
 }
@@ -90,6 +113,12 @@ fn effect_name(e: u32) -> &'static str {
         DE_LINK => t("verknüpfen"),
         _ => t("keine"),
     }
+}
+
+// "kopieren+verschieben" of a DE_* mask ("-": none)
+fn effects_name(e: u32) -> String {
+    let v: Vec<&str> = [DE_COPY, DE_MOVE, DE_LINK].into_iter().filter(|f| e & f != 0).map(effect_name).collect();
+    if v.is_empty() { String::from("-") } else { v.join("+") }
 }
 
 fn kinds(ty: u32) -> String {
@@ -150,6 +179,7 @@ impl Dnd {
                 self.ends += 1;
                 self.ended = format!("{} {} ({})", t(FRUITS[i]), effect_name(ui.drag_effect()), self.ends);
             }
+            DS_ACTIVE => self.active = String::from(t(FRUITS[i])),
             _ => {}
         }
     }
@@ -209,6 +239,92 @@ impl Dnd {
         ui.box_end();
     }
 
+    // a page that takes drops only in some places and with an effect of its own there, as a web
+    // page answers per point: its left half copies, the top of its right half refuses, the
+    // bottom links (drop_effect_set for the point of drag_over_px while a drag hovers)
+    fn page(&mut self, ui: &mut Ui) {
+        ui.next_size(220, 90);
+        ui.box_begin(ID_PAGE, BOX_V | BOX_CARD | PAD_8, 4);
+        let r = ui.last_rect();
+        match ui.drop_target(ID_PAGE, DT_TEXT | DT_URL | DT_FILES) {
+            DS_HOVER => {
+                let (_, px, py) = ui.drag_over_px();
+                let e = if px < r[0] + r[2] / 2 {
+                    DE_COPY
+                } else if py < r[1] + r[3] / 2 {
+                    0
+                } else {
+                    DE_LINK
+                };
+                ui.drop_effect_set(e);
+                self.over = tf("Seite ({})", &[effect_name(e)]);
+            }
+            DS_DROP => {
+                let d = ui.drop_data();
+                self.dropped = tf("{} -> Seite ({})", &[&kinds(d.types()), effect_name(ui.drop_effect())]);
+            }
+            _ => {}
+        }
+        ui.text(TS_BODY_STRONG, t("Seite"));
+        ui.text(TS_CAPTION, t("links kopieren"));
+        ui.text(TS_CAPTION, t("rechts: oben nicht, unten verknüpfen"));
+        ui.box_end();
+    }
+
+    // "Später": a page that learns after the drop whether it took it (its drop handler runs
+    // elsewhere): the drop's answer to its source waits (drop_defer), the timer gives it
+    fn later_page(&mut self, ui: &mut Ui) {
+        ui.next_size(180, 90);
+        ui.box_begin(ID_LATER, BOX_V | BOX_CARD | PAD_8, 4);
+        match ui.drop_target(ID_LATER, DT_TEXT) {
+            DS_HOVER => self.over = String::from(t("Später")),
+            DS_DROP => {
+                // the effects the drop's source allows: drag_allowed says them in the drop's pass
+                // (and while its answer waits, on the card)
+                let text = ui.drop_data().text.clone().unwrap_or_default();
+                self.dropped = tf("{} -> Später ({}, erlaubt: {})", &[&kinds(ui.drop_types()), effect_name(ui.drop_effect()), &effects_name(ui.drag_allowed())]);
+                if ui.drop_defer() {
+                    self.answer = String::from(t("wartet"));
+                    self.later = Some(text);
+                    ui.timer(T_LATER, 100);
+                } else {
+                    self.answer = String::from(t("schon beantwortet"));
+                }
+            }
+            _ => {}
+        }
+        ui.text(TS_BODY_STRONG, t("Später"));
+        ui.text(TS_CAPTION, &tf("Erlaubt: {}", &[&effects_name(ui.drag_allowed())]));
+        ui.text(TS_CAPTION, &tf("Antwort: {}", &[&self.answer]));
+        ui.box_end();
+    }
+
+    // the timer of "Später": the answer of the drop that waits
+    fn later_answer(&mut self, ui: &mut Ui) {
+        let Some(text) = self.later.take() else { return };
+        // the app's own drags: a fruit's name (its text) -- the apple taken (moved), the pear not
+        let e = if text.starts_with("ja") {
+            DE_COPY
+        } else if text.starts_with("link") {
+            DE_LINK
+        } else if text == t(FRUITS[0]) {
+            DE_MOVE
+        } else if text.starts_with("nein") || text == t(FRUITS[1]) {
+            0
+        } else {
+            self.answer = String::from(t("keine Antwort")); // "nie": the library answers later
+            return;
+        };
+        let ok = ui.drop_finish(e);
+        self.answer = if !ok {
+            String::from(t("zu spät"))
+        } else if e == 0 {
+            String::from(t("nicht genommen"))
+        } else {
+            tf("genommen ({})", &[effect_name(e)])
+        };
+    }
+
     // a button that drags content out (only other programs or the targets take it)
     fn out_button(&mut self, ui: &mut Ui, id: u32, label: &str) {
         let ev = ui.button(id, label);
@@ -234,6 +350,7 @@ impl Dnd {
                 self.ends += 1;
                 self.ended = format!("{} {} ({})", label, effect_name(ui.drag_effect()), self.ends);
             }
+            DS_ACTIVE => self.active = String::from(label),
             _ => {}
         }
     }
@@ -247,6 +364,7 @@ impl App for Dnd {
 
     fn frame(&mut self, ui: &mut Ui) {
         self.over = String::from("-");
+        self.active = String::from("-");
         ui.box_begin(0, BOX_V | PAD_16, 10);
         ui.text(TS_SUBTITLE, t("Drag & Drop"));
         ui.box_begin(0, BOX_H, 10);
@@ -263,6 +381,8 @@ impl App for Dnd {
         self.out_button(ui, ID_OUT_TEXT, t("Text ziehen"));
         self.out_button(ui, ID_OUT_IMAGE, t("Bild ziehen"));
         self.out_button(ui, ID_OUT_FILE, t("Datei ziehen"));
+        self.page(ui);
+        self.later_page(ui);
         ui.box_end();
         let (ty, x, y) = ui.drag_over();
         let over = if ty == 0 { String::from("-") } else { tf("{} bei {},{}", &[&kinds(ty), &format!("{}", x), &format!("{}", y)]) };
@@ -275,6 +395,7 @@ impl App for Dnd {
         let (dx, dy) = ui.drop_pos_px();
         let over = if ty == 0 { String::from("-") } else { format!("{x},{y}") };
         ui.text(TS_BODY, &format!("Pixel: {over} / {dx},{dy}"));
+        ui.text(TS_BODY, &tf("Quelle: {}", &[&self.active]));
         ui.box_end();
         // the pass drew the fruit at its old place already: move it now, build again
         if let Some((i, k)) = self.moving.take() {
@@ -303,6 +424,7 @@ impl App for Dnd {
                 self.uic = tf("{} bei {},{} (Fenster {})", &[&what, &format!("{}", x), &format!("{}", y), &format!("{}", arg)]);
             }
             UIC_DRAG_END => {} // the sources report through DS_END
+            UIC_TIMER if arg == T_LATER => self.later_answer(ui),
             _ => return false,
         }
         true

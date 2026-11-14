@@ -161,7 +161,8 @@ fn be32(d: &[u8], p: usize) -> u32 {
 /// xc_box: the box at pos -> (body start, body end, next box, type)
 fn xc_box(d: &[u8], pos: u64) -> Result<(u64, u64, u64, u32), i32> {
     let len = d.len() as u64;
-    if pos + 8 > len {
+    // pos may be the far end of a box with a 64-bit size: saturate instead of wrapping
+    if pos.saturating_add(8) > len {
         return Err(ERR_HDR);
     }
     let p = pos as usize;
@@ -169,7 +170,7 @@ fn xc_box(d: &[u8], pos: u64) -> Result<(u64, u64, u64, u32), i32> {
     let typ = u32::from_le_bytes([d[p + 4], d[p + 5], d[p + 6], d[p + 7]]);
     let mut body = pos + 8;
     if size == 1 {
-        if pos + 16 > len {
+        if pos.saturating_add(16) > len {
             return Err(ERR_HDR);
         }
         size = u64::from_be_bytes([d[p + 8], d[p + 9], d[p + 10], d[p + 11], d[p + 12], d[p + 13], d[p + 14], d[p + 15]]);
@@ -225,7 +226,7 @@ pub fn open(data: &[u8]) -> Result<Dec, i32> {
         for pass in 0..2 {
             let mut pos: u64 = 0;
             let (mut nextp, mut lastp) = (0u32, false);
-            while pos + 8 <= len as u64 {
+            while pos.saturating_add(8) <= len as u64 {
                 let (bs, be, next, typ) = xc_box(data, pos)?;
                 if pass == 0 {
                     // jxl-plus: boxes of the JPEG reconstruction
@@ -521,6 +522,11 @@ fn decode_body(data: &[u8], sf: &mut Surface, dec: &ImgDec, mut meta: Option<&mu
         let r = jf_header(&jx, &mut br, &mut jf, false);
         if r != 0 {
             return r;
+        }
+        // a frame of its own size (custom size) is decoded and rendered at that size: the pixel
+        // budget applies to it as to the image
+        if jf.xsize as u64 * jf.ysize as u64 > dec.max_pixels() {
+            return ERR_LIMIT;
         }
         noise::jx_count(&mut jx, &mut jf);
         let r = jf_toc(&mut br, &mut jf);

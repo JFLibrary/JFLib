@@ -4,6 +4,10 @@
 //   dump(path)                           widget tree as JSON lines (None = stdout)
 //
 // Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
+//   only OS...: COMMAND           the command on these systems only, a `!OS` on every other one
+//                                 (`only windows linux: key ctrl+q`, `only !macos: ...`); OS:
+//                                 windows linux macos ios android wasm32 (the names of cargo jflib
+//                                 test's `#!only`); an unknown name is a parse error
 //   size W H                      resize the headless window
 //   theme dark|light|contrast
 //   theme file PATH | none        an app theme from a file (an error is printed and kept for
@@ -59,10 +63,19 @@
 //                   holds however long the threads took)
 //   shot FILE.png   render and save a screenshot
 //   dump [FILE]     print / save the widget tree
-//   expect S exists | missing | hover | nohover | focused | checked | unchecked | disabled |
-//            enabled | selected | open | pressed | unpressed | value N | value MIN..MAX | max N |
-//            text "s" |
+//   expect S exists | missing | hover | nohover | focused | unfocused | checked | unchecked |
+//            disabled | enabled | selected | unselected | open | closed | pressed | unpressed |
+//            value N | value MIN..MAX | max N | text "s" |
 //            rect X Y W H   (rect: '*' takes any value)
+//   a11y ACTION S [ARG]   (a11y_auto.rs, section 19) a screen reader's request for the node of
+//                 record S, as a bridge sends it: click, focus, scroll, expand, collapse,
+//                 increment, decrement, select, add, remove, value N, text "s", selecttext A C
+//   a11y expect S role R | name "s" | desc "s" | url "s" | text "s" | level N | set POS SIZE |
+//                 cell ROW COL [RSPAN CSPAN] | grid ROWS COLS | live polite|assertive|off |
+//                 is STATE | not STATE | can ACTION | cannot ACTION | parent S2 | top |
+//                 children N | missing          (its node in the accessibility tree)
+//   a11y expect announced "s" | none   the last text ui.announce said since the last check
+//   a11y dump [FILE]      the accessibility tree as text
 //   expect theme "NAME" | none    the app theme;  expect theme error "TEXT" | none  the error
 //                                 of the last `theme file` contains TEXT
 //   expect style NAME   expect token NAME #RRGGBB|#AARRGGBB (a colour token now)
@@ -145,11 +158,21 @@
 //                                 script also warns about a widget id used twice in a pass)
 // (K1) Files and clipboard, drag and drop:
 //   drop X Y FILE...              files dropped at (X, Y) DIP of the scoped window
-//   drop X Y [files F...] [text "s"] [html "s"] [url U] [image F.png] [copy|move|link]
-//                                 other content dropped there; drop X Y self: the app's own
-//                                 drag that left the window comes back
+//   drop X Y [files F...] [text "s"] [html "s"] [url U] [image F.png] [copy|move|link] [sync]
+//            [allows copy|move|link...]
+//                                 other content dropped there (copy|move|link: the effect the
+//                                 platform delivers); drop X Y self: the app's own drag that left
+//                                 the window comes back; sync: the platform answers the source at
+//                                 the drop (no drop_defer, as on macOS); allows: the effects the
+//                                 source allows, given with the drop (as Windows' Drop does;
+//                                 without: those of the dragover before it, else every effect)
+//   drop expect copy|move|link|none|pending   what the last drop's source was answered (the
+//                                 effect, none: not taken), pending: the answer waits (drop_defer)
 //   dragover X Y [files] [text] [url] [html] [image] [copy|move|link]   another program's
-//                                 drag hovers there (default files);  dragleave: it left
+//                                 drag hovers there (default files), allowing those effects
+//                                 (default copy and move: drag_allowed);  dragleave: it left
+//   dragover expect copy|move|link|none [ctrl] [shift]   the platform's answer to that drag
+//                                 now (the target's drop_effect_set; the system's pointer)
 //   dragout expect none | text "s" | html "s" | url "s" | files N | image | kinds N
 //                                 what the app's drag handed over when it left the window
 //   dragout end copy|move|link|none   the platform ended that drag (E_DRAG_END)
@@ -185,8 +208,8 @@
 //   FAIL line N: <command> -> <detail>
 // and the script continues.
 //
-// Scripts are bytes (as the asm reads them): lines of at most 1023 bytes, CR dropped; a NUL
-// ends the script.
+// Scripts are bytes (as the asm reads them): lines of at most LINE_MAX - 1 bytes, CR dropped; a
+// NUL ends the script.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -200,7 +223,15 @@ use super::{App, Sem, Ui};
 use gfx::{Surface, FMT_XRGB};
 use plat::{DragData, Event};
 
-const LINE_MAX: usize = 1024;
+// a script line (and so a quoted label of a selector or `expect S text`, which must match a
+// record's whole label: a wrapped paragraph of a web page is one label; and the text of `type`,
+// `commit` and `bench N type`)
+const LINE_MAX: usize = 16384;
+// the bytes of a record's label `dump` writes (cut at a character): labels are bounded by the
+// pass's text arena already (SEMTEXT_MAX)
+const DUMP_TEXT_MAX: usize = 65536;
+// the bytes of a window title `dump` writes
+const DUMP_TITLE_MAX: usize = 172;
 
 /// script runner state (ui_auto.s .bss / .data); survives between scripts (scope, the
 /// warning mark) and between commands (the pointer)
@@ -267,6 +298,57 @@ pub(crate) enum Sel {
 }
 
 // ------------------------------------------------------------------ parsing helpers
+
+/// the system a script runs on, as `only OS:` and cargo jflib test's `#!only` name it
+pub(crate) const SCRIPT_OS: &str = if cfg!(target_arch = "wasm32") {
+    "wasm32"
+} else if cfg!(windows) {
+    "windows"
+} else if cfg!(target_os = "android") {
+    "android"
+} else if cfg!(target_os = "linux") {
+    "linux"
+} else if cfg!(target_os = "macos") {
+    "macos"
+} else if cfg!(target_os = "ios") {
+    "ios"
+} else {
+    "other"
+};
+
+// the names `only` takes
+const SCRIPT_OSES: [&str; 6] = ["windows", "linux", "macos", "ios", "android", "wasm32"];
+
+// only_line(the words after `only`, os) -> Some((it runs on os, the command)): it runs where it is
+// named and not excluded by a `!OS` (with only `!OS`es: every system but those); None: no list up
+// to a ':', an unknown name, no command after it
+fn only_line<'a>(p: &'a [u8], os: &str) -> Option<(bool, &'a [u8])> {
+    let colon = p.iter().position(|&c| c == b':')?;
+    let (list, cmd) = (&p[..colon], skip_ws(&p[colon + 1..]));
+    let (mut named, mut hit, mut out) = (false, false, false);
+    let mut n = 0;
+    for w in list.split(|&c| c == b' ' || c == b'\t' || c == b',').filter(|w| !w.is_empty()) {
+        let (not, name) = match w.strip_prefix(b"!") {
+            Some(x) => (true, x),
+            None => (false, w),
+        };
+        if !SCRIPT_OSES.iter().any(|o| o.as_bytes() == name) {
+            return None;
+        }
+        n += 1;
+        let me = name == os.as_bytes();
+        if not {
+            out |= me;
+        } else {
+            named = true;
+            hit |= me;
+        }
+    }
+    if n == 0 || cmd.is_empty() || cmd[0] == b'#' {
+        return None;
+    }
+    Some(((!named || hit) && !out, cmd))
+}
 
 // skip_ws: blanks and tabs
 pub(crate) fn skip_ws(p: &[u8]) -> &[u8] {
@@ -455,29 +537,24 @@ fn key_lookup(p: &[u8]) -> u32 {
     0
 }
 
-/// json_escape(src, cap): src with " \ escaped and control characters as blanks, at most
-/// cap - 8 bytes copied (room for an escape)
-fn json_escape(out: &mut Vec<u8>, src: &[u8], cap: usize) {
-    let lim = cap - 8;
-    let mut n = 0;
-    for &c in src {
-        if n >= lim || c == 0 {
+/// json_escape(src, max): src with " \ escaped and control characters as blanks; at most max
+/// bytes of src, cut before a character that would not fit whole (a NUL ends it)
+fn json_escape(out: &mut Vec<u8>, src: &[u8], max: usize) {
+    let mut end = src.len().min(max);
+    while end > 0 && end < src.len() && src[end] & 0xC0 == 0x80 {
+        end -= 1; // inside a character: before it
+    }
+    for &c in &src[..end] {
+        if c == 0 {
             break;
         }
         match c {
             b'"' | b'\\' => {
                 out.push(b'\\');
                 out.push(c);
-                n += 2;
             }
-            c if c < 32 => {
-                out.push(b' '); // control characters become spaces
-                n += 1;
-            }
-            c => {
-                out.push(c);
-                n += 1;
-            }
+            c if c < 32 => out.push(b' '), // control characters become spaces
+            c => out.push(c),
         }
     }
 }
@@ -581,7 +658,7 @@ impl Ui {
     fn dump_window(&self, out: &mut Vec<u8>, i: u32) {
         let rec = &self.m.win.recs[i as usize]; // ui-win: Rec holds shared values
         let mut title = Vec::new();
-        json_escape(&mut title, self.uiw_title(i).as_bytes(), 180);
+        json_escape(&mut title, self.uiw_title(i).as_bytes(), DUMP_TITLE_MAX);
         let mut flags = String::new();
         for (b, n) in WFLAG_NAMES.iter().enumerate() {
             if rec.flags & (1 << b) != 0 {
@@ -626,10 +703,10 @@ impl Ui {
             }
         }
         let mut lab = Vec::new();
-        json_escape(&mut lab, r.label.as_deref().unwrap_or("").as_bytes(), 180);
+        json_escape(&mut lab, r.label.as_deref().unwrap_or("").as_bytes(), DUMP_TEXT_MAX);
         // rect in DIP (at the dpi of the record's window)
         let dpi = self.win_dpi(r.win as u32);
-        let kind = if r.kind < K_KIND_COUNT { KIND_NAMES[r.kind as usize] } else { KIND_NAMES[0] };
+        let kind = kind_name(r.kind);
         out.extend_from_slice(
             alloc::format!("{{\"l\":{},\"d\":{},\"id\":{},\"k\":\"{}\",\"t\":\"", r.layer, r.depth, r.id, kind).as_bytes(),
         );
@@ -727,12 +804,27 @@ impl Ui {
     // script_exec(line) -> true = quit
     fn script_exec(&mut self, app: &mut dyn App, line: &[u8]) -> bool {
         self.sc.line = line.to_vec(); // a copy of the line for messages
-        let l = skip_ws(line);
+        let mut l = skip_ws(line);
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 57] = [
-            "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
+        // only OS...: COMMAND -- the command on those systems (the message keeps the whole line)
+        if let Some(r) = word_eq(l, "only") {
+            match only_line(skip_ws(r), SCRIPT_OS) {
+                Some((true, cmd)) => l = cmd,
+                Some((false, _)) => return false,
+                None => {
+                    let mut o = alloc::format!("error: line {}: expected only OS...: COMMAND (OS: {}, !OS: not there): ", self.sc.lineno, SCRIPT_OSES.join(" ")).into_bytes();
+                    o.extend_from_slice(l);
+                    o.push(b'\n');
+                    plat::write_stderr(&o);
+                    self.sc.parse_err = true;
+                    return false;
+                }
+            }
+        }
+        const CMDS: [&str; 58] = [
+            "a11y", "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
             "key", "keys", "keydown", "keyup", "type", "commit", "preedit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
@@ -749,6 +841,7 @@ impl Ui {
         let a = next_word(l);
         match c {
             "quit" => return true,
+            "a11y" => self.sc_a11y(app, a), // a11y_auto.rs
             "system" => self.sc_system(app, a),
             "sensor" => self.sc_sensor(app, a),
             "location" => self.sc_location(app, a),
@@ -1037,7 +1130,8 @@ impl Ui {
             }
             // kind:"Label"
             let mut found = false;
-            for (k, n) in KIND_NAMES.iter().enumerate() {
+            for k in 0..K_KIND_END {
+                let n = kind_name(k);
                 if p.starts_with(n.as_bytes()) && p.get(n.len()) == Some(&b':') {
                     self.sc.sel_kind = k as i32;
                     q = &p[n.len() + 1..];
@@ -1123,7 +1217,7 @@ impl Ui {
     }
 
     fn resolve_label<'a>(&mut self, p: &'a [u8], q: &'a [u8]) -> (Option<Sel>, &'a [u8]) {
-        let Some((label, rest)) = parse_qstring(q, 256) else {
+        let Some((label, rest)) = parse_qstring(q, LINE_MAX) else {
             self.sc.sel_err = 3;
             return (None, p);
         };
@@ -1907,7 +2001,7 @@ impl Ui {
     // commit "text" [N]: the commits of an input method (plat::ime_commit_text) to the window
     // with the keyboard, as the platform queues them
     fn sc_commit(&mut self, app: &mut dyn App, a: &[u8]) {
-        let Some((s, r)) = parse_qstring(a, 1024) else {
+        let Some((s, r)) = parse_qstring(a, LINE_MAX) else {
             self.fail(b"expected a quoted string");
             return;
         };
@@ -1940,9 +2034,9 @@ impl Ui {
         self.process_events(app);
     }
 
-    // type "text"
+    // type "text" (as long as the line: up to LINE_MAX - 1 bytes)
     fn sc_type(&mut self, app: &mut dyn App, a: &[u8]) {
-        let Some((s, _)) = parse_qstring(a, 256) else {
+        let Some((s, _)) = parse_qstring(a, LINE_MAX) else {
             self.fail(b"expected a quoted string");
             return;
         };
@@ -2204,11 +2298,14 @@ impl Ui {
             return;
         };
         let rec = self.sel_rec(s);
-        const STATES: [(&str, u16, bool); 11] = [
+        const STATES: [(&str, u16, bool); 14] = [
             ("hover", SS_HOVER, true),
             ("nohover", SS_HOVER, false),
             ("unpressed", SS_PRESSED, false),
             ("focused", SS_FOCUSED, true),
+            ("unfocused", SS_FOCUSED, false),
+            ("unselected", SS_SELECTED, false),
+            ("closed", SS_OPEN, false),
             ("checked", SS_CHECKED, true),
             ("unchecked", SS_CHECKED, false),
             ("disabled", SS_DISABLED, true),
@@ -2238,7 +2335,7 @@ impl Ui {
                 self.fail(alloc::format!("max is {}", rec.max).as_bytes());
             }
         } else if let Some(r) = word_eq(cond, "text") {
-            let Some((t, _)) = parse_qstring(skip_ws(r), 256) else {
+            let Some((t, _)) = parse_qstring(skip_ws(r), LINE_MAX) else {
                 self.fail(b"expected a quoted string");
                 return;
             };
@@ -2675,7 +2772,7 @@ impl Ui {
             };
             (Kind::Key { mods, vk }, r)
         } else if let Some(r) = word_eq(a, "type") {
-            let Some((s, r)) = parse_qstring(skip_ws(r), 256) else {
+            let Some((s, r)) = parse_qstring(skip_ws(r), LINE_MAX) else {
                 self.fail(b"expected a quoted string");
                 return;
             };
@@ -2817,41 +2914,83 @@ impl Ui {
     }
 
     // drop X Y FILE... | drop X Y [files F...] [text "s"] [html "s"] [url U]... [image F]
-    // [copy|move|link] | drop X Y self: dropped on the scoped window (the main window for
-    // "any"); `self`: the app's own drag that left its window (dragout) comes back
+    // [copy|move|link] [sync] [allows copy|move|link...] | drop X Y self: dropped on the scoped
+    // window (the main window for "any"); `self`: the app's own drag that left its window
+    // (dragout) comes back; `allows`: the effects its source allows, given with the drop
     fn sc_drop(&mut self, app: &mut dyn App, a: &[u8]) {
-        const BAD: &[u8] = b"expected: drop X Y FILE... | drop X Y [files F...] [text \"s\"] [html \"s\"] [url U] [image F] [copy|move|link] | drop X Y self";
+        const BAD: &[u8] = b"expected: drop X Y FILE... | drop X Y [files F...] [text \"s\"] [html \"s\"] [url U] [image F] [copy|move|link] [sync] [allows copy|move|link...] | drop X Y self | drop expect copy|move|link|none|pending";
+        if let Some((verb, r)) = Ui::k1_word(a, 16)
+            && verb == b"expect"
+        {
+            self.sc_drop_expect(r);
+            return;
+        }
         let (x, r) = parse_int(a);
         let (y, r) = parse_int(r);
         let w = self.scope_index().max(0) as u32;
         let dpi = self.win_dpi(w);
         let (px, py) = (dp_at(x, dpi), dp_at(y, dpi));
-        let Some(data) = self.sc_drag_data(r) else {
+        let Some((data, allowed)) = self.sc_drag_data(r) else {
+            self.dnd.sync_next = false;
             self.fail(BAD);
             return;
         };
         if data.types() == 0 && word_eq(skip_ws(r), "self").is_none() {
+            self.dnd.sync_next = false;
             self.fail(BAD);
             return;
         }
         let n = data.files.len() as u32;
-        self.drop_inject(data);
+        self.drop_inject(data, allowed);
         self.sc.sc_win = w;
         self.inject(app, plat::E_DROP, 0, px, py, n);
         self.run_passes(app);
     }
 
-    // sc_drag_data(words) -> the content of `drop` / `dragover` (None: a bad word): plain
-    // words are paths; files / text / html / url / image name a kind; copy / move / link the
-    // effect; self nothing
-    fn sc_drag_data(&mut self, a: &[u8]) -> Option<DragData> {
+    // drop expect copy|move|link|none|pending: what the source of the last drop was answered
+    // (drop_defer / drop_finish, else the effect it was delivered with), or that it waits
+    fn sc_drop_expect(&mut self, a: &[u8]) {
+        let name = |e: u32| match e {
+            plat::DE_COPY => "copy",
+            plat::DE_MOVE => "move",
+            plat::DE_LINK => "link",
+            _ => "none",
+        };
+        let want = match Ui::k1_word(a, 16).map(|w| w.0) {
+            Some(w) if w == b"copy" => Some(plat::DE_COPY),
+            Some(w) if w == b"move" => Some(plat::DE_MOVE),
+            Some(w) if w == b"link" => Some(plat::DE_LINK),
+            Some(w) if w == b"none" => Some(0),
+            Some(w) if w == b"pending" => None,
+            _ => {
+                self.fail(b"expected: drop expect copy|move|link|none|pending");
+                return;
+            }
+        };
+        match (self.dnd_answered(), want) {
+            (None, _) => self.fail(b"no drop yet"),
+            (Some(have), want) if have == want => {}
+            (Some(None), _) => self.fail(b"the answer waits (drop_defer)"),
+            (Some(Some(e)), _) => self.fail(alloc::format!("the source was answered {}", name(e)).as_bytes()),
+        }
+    }
+
+    // sc_drag_data(words) -> (the content of `drop`, the effects its source allows; 0: not said)
+    // (None: a bad word): plain words are paths; files / text / html / url / image name a kind;
+    // copy / move / link the effect; self nothing; sync: the next drop is answered at the drop;
+    // allows: the copy / move / link words after it are the effects the source allows
+    fn sc_drag_data(&mut self, a: &[u8]) -> Option<(DragData, u32)> {
         let mut d = DragData::default();
         let mut r = a;
         let mut kind: &[u8] = b"files";
+        let (mut allows, mut allowed) = (false, 0u32);
         plat::drop_reset();
         while let Some((word, rest)) = Ui::k1_word(r, 4096) {
             r = rest;
             let w = word.as_slice();
+            if !matches!(w, b"copy" | b"move" | b"link") {
+                allows = false;
+            }
             match w {
                 b"files" | b"text" | b"html" | b"url" | b"image" if !matches!(kind, b"text" | b"html" | b"url" | b"image") => {
                     kind = match w {
@@ -2864,14 +3003,27 @@ impl Ui {
                     continue;
                 }
                 b"copy" | b"move" | b"link" if kind == b"files" => {
-                    d.effects = match w {
+                    let e = match w {
                         b"copy" => plat::DE_COPY,
                         b"move" => plat::DE_MOVE,
                         _ => plat::DE_LINK,
                     };
+                    if allows {
+                        allowed |= e;
+                    } else {
+                        d.effects = e;
+                    }
+                    continue;
+                }
+                b"allows" if kind == b"files" => {
+                    allows = true;
                     continue;
                 }
                 b"self" if kind == b"files" => continue,
+                b"sync" if kind == b"files" => {
+                    self.dnd.sync_next = true;
+                    continue;
+                }
                 _ => {}
             }
             let s = String::from_utf8_lossy(w).into_owned();
@@ -2890,7 +3042,7 @@ impl Ui {
             return None; // a kind without its value
         }
         d.files = plat::drop_take();
-        Some(d)
+        Some((d, allowed))
     }
 
     // dragover X Y [files] [text] [url] [html] [image] [copy|move|link] | dragleave: another
@@ -2900,6 +3052,12 @@ impl Ui {
         self.sc.sc_win = w;
         if leave {
             self.inject(app, plat::E_DRAG, 0, -1, -1, 0);
+            return;
+        }
+        if let Some((verb, r)) = Ui::k1_word(a, 16)
+            && verb == b"expect"
+        {
+            self.sc_dragover_expect(r);
             return;
         }
         let (x, r) = parse_int(a);
@@ -2931,6 +3089,56 @@ impl Ui {
             effects = plat::DE_COPY | plat::DE_MOVE;
         }
         self.inject(app, plat::E_DRAG, 0, px, py, types | effects << 8);
+    }
+
+    // dragover expect copy|move|link|none [ctrl] [shift]: the platform's answer to the drag that
+    // hovers now (the drop targets of the last pass and their drop_effect_set, plat::drag_decide
+    // with those modifier keys), as IDropTarget::DragOver / XdndStatus / set_actions would give it
+    fn sc_dragover_expect(&mut self, a: &[u8]) {
+        const BAD: &[u8] = b"expected: dragover expect copy|move|link|none [ctrl] [shift]";
+        let Some((want, mut r)) = Ui::k1_word(a, 16) else {
+            self.fail(BAD);
+            return;
+        };
+        let want = match want.as_slice() {
+            b"copy" => plat::DE_COPY,
+            b"move" => plat::DE_MOVE,
+            b"link" => plat::DE_LINK,
+            b"none" => 0,
+            _ => {
+                self.fail(BAD);
+                return;
+            }
+        };
+        let mut mods = 0u8;
+        while let Some((word, rest)) = Ui::k1_word(r, 16) {
+            r = rest;
+            match word.as_slice() {
+                b"ctrl" => mods |= plat::MOD_CTRL,
+                b"shift" => mods |= plat::MOD_SHIFT,
+                _ => {
+                    self.fail(BAD);
+                    return;
+                }
+            }
+        }
+        let name = |e: u32| match e {
+            plat::DE_COPY => "copy",
+            plat::DE_MOVE => "move",
+            plat::DE_LINK => "link",
+            _ => "none",
+        };
+        match self.dnd_answer_now(mods) {
+            None => self.fail(b"no drag hovers (dragover X Y first)"),
+            Some((_, e, all)) if e != want => {
+                let msg = alloc::format!("the platform would answer {} (the target takes {})", name(e), {
+                    let v: Vec<&str> = [plat::DE_COPY, plat::DE_MOVE, plat::DE_LINK].into_iter().filter(|f| all & f != 0).map(name).collect();
+                    if v.is_empty() { String::from("none") } else { v.join("+") }
+                });
+                self.fail(msg.as_bytes());
+            }
+            Some(_) => {}
+        }
     }
 
     // dragout expect none | text "s" | html "s" | url "s" | files N | image | kinds N, dragout

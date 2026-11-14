@@ -53,6 +53,9 @@
 // window (" (minimiert)" after a minimised one's title, the active one pressed).
 // Structural changes (buttons, menus, keys) are applied at desk_end, followed by another pass;
 // drags change the place at once.  Widget ids are parts of the area id (pid).
+// Every window keeps the state of its window areas (WinParts::desk): an area of the same id in
+// two windows keeps its own; desk_taskbar shows the area of desk_begin's window (outside of
+// desk_begin .. desk_end the window being built's, else the first window's that has the id).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -615,12 +618,17 @@ impl Rt {
     }
 }
 
-/// the window areas of the app (Mods)
+/// the window areas of one window (WinParts::desk): an area of the same id in two windows keeps
+/// its own windows' places, drag and focus
+#[derive(Default)]
+pub(crate) struct W {
+    desks: Vec<Rt>,
+}
+
+/// the window areas between desk_begin and desk_end (Mods): (the window of desk_begin, id)
 #[derive(Default)]
 pub(crate) struct S {
-    desks: Vec<Rt>,
-    /// the areas between desk_begin and desk_end
-    cur: Vec<u32>,
+    cur: Vec<(u32, u32)>,
 }
 
 // a library text (German source; i18n::tr)
@@ -640,16 +648,33 @@ fn named(title: &str, state: u32) -> String {
 }
 
 impl Ui {
-    fn dw_take(&mut self, id: u32) -> Rt {
-        let d = &mut self.m.desk.desks;
+    // the state of window area id of window win (the window of its desk_begin)
+    fn dw_take(&mut self, win: u32, id: u32) -> Rt {
+        let Some(p) = self.uiw_parts_mut(win) else { return Rt { id, ..Rt::default() } };
+        let d = &mut p.desk.desks;
         match d.iter().position(|r| r.id == id) {
             Some(i) => d.swap_remove(i),
             None => Rt { id, ..Rt::default() },
         }
     }
 
-    fn dw_put(&mut self, rt: Rt) {
-        self.m.desk.desks.push(rt);
+    fn dw_put(&mut self, win: u32, rt: Rt) {
+        if let Some(p) = self.uiw_parts_mut(win) {
+            p.desk.desks.push(rt);
+        }
+    }
+
+    // the window whose area id a taskbar shows: the one of an open desk_begin, else the window
+    // being built, else the first window (the main window first) that has such an area
+    fn dw_owner(&self, id: u32) -> u32 {
+        if let Some(&(w, _)) = self.m.desk.cur.iter().rev().find(|e| e.1 == id) {
+            return w;
+        }
+        let has = |p: &super::WinParts| p.desk.desks.iter().any(|r| r.id == id);
+        if has(&self.wp) {
+            return self.uiw_cur;
+        }
+        (0..WIN_MAX as u32).find(|&i| self.uiw_parts(i).is_some_and(has)).unwrap_or(self.uiw_cur)
     }
 
     // the title bar height (DIP): the style's dialog window title bar
@@ -721,10 +746,11 @@ impl Ui {
     /// set); wins: every open window, each frame (titles and icons may change), in the order
     /// the taskbar shows them.
     pub fn desk_begin(&mut self, id: u32, st: &mut DeskState, wins: &[DeskWin]) {
-        let mut rt = self.dw_take(id);
+        let win = self.uiw_cur;
+        let mut rt = self.dw_take(win, id);
         let cur = &mut self.m.desk.cur;
-        cur.retain(|&c| c != id); // (a desk_end the app left out)
-        cur.push(id);
+        cur.retain(|&c| c != (win, id)); // (a desk_end the app left out)
+        cur.push((win, id));
         let tbh = self.dw_tbh();
         rt.infos = wins
             .iter()
@@ -765,14 +791,14 @@ impl Ui {
         rt.next = 0;
         rt.open = 0;
         rt.focus_here = false;
-        self.dw_put(rt);
+        self.dw_put(win, rt);
     }
 
     /// desk_next(&mut st) -> the next window to fill (None: done), from the back to the
     /// front; its content goes into a vertical box (it clips) until the next call
     pub fn desk_next(&mut self, st: &mut DeskState) -> Option<u32> {
-        let id = *self.m.desk.cur.last()?;
-        let mut rt = self.dw_take(id);
+        let (win, id) = *self.m.desk.cur.last()?;
+        let mut rt = self.dw_take(win, id);
         self.dw_close(&mut rt, st);
         let mut out = None;
         if rt.next < rt.order.len() {
@@ -781,15 +807,15 @@ impl Ui {
             self.dw_window(&mut rt, st, key);
             out = Some(key);
         }
-        self.dw_put(rt);
+        self.dw_put(win, rt);
         out
     }
 
     /// desk_end(&mut st) -> what the user did in this pass (and the taskbar since the last
     /// desk_end): close requests, activation, moves, resizes, state changes
     pub fn desk_end(&mut self, st: &mut DeskState) -> Vec<DeskEv> {
-        let Some(id) = self.m.desk.cur.pop() else { return Vec::new() };
-        let mut rt = self.dw_take(id);
+        let Some((win, id)) = self.m.desk.cur.pop() else { return Vec::new() };
+        let mut rt = self.dw_take(win, id);
         self.dw_close(&mut rt, st);
         // the keys, while the focus is inside the area (or nowhere)
         let focus = self.wp.ctx.focus;
@@ -824,7 +850,7 @@ impl Ui {
         rt.focus_in = rt.focus_here;
         rt.last_focus = self.wp.ctx.focus;
         let evs = core::mem::take(&mut rt.evs);
-        self.dw_put(rt);
+        self.dw_put(win, rt);
         evs
     }
 
@@ -1348,10 +1374,10 @@ impl Ui {
     pub fn desk_taskbar_begin(&mut self, id: u32) {
         let l = &self.wp.lay;
         let no_size = l.next_w == 0 && l.next_h == 0 && l.next_rect_set == 0;
-        let open = self.m.desk.cur.contains(&id);
+        let open = self.m.desk.cur.contains(&(self.uiw_cur, id));
         let mut placed = false;
         if no_size && open {
-            if let Some(rt) = self.m.desk.desks.iter().find(|r| r.id == id) {
+            if let Some(rt) = self.wp.desk.desks.iter().find(|r| r.id == id) {
                 let (a, w) = (rt.area, rt.work);
                 let bottom = a[1] + a[3] - (w[1] + w[3]);
                 let top = w[1] - a[1];
@@ -1394,7 +1420,8 @@ impl Ui {
         }
         self.box_begin(pid(id, P_TASK, 0), BOX_H | BOX_FIXED | BOX_CLIP, 0);
         let area = self.box_rect();
-        let mut rt = self.dw_take(id);
+        let owner = self.dw_owner(id);
+        let mut rt = self.dw_take(owner, id);
         let sh = self.style.shell();
         let wins: Vec<(u32, String, u32, u32)> = rt
             .infos
@@ -1562,7 +1589,7 @@ impl Ui {
             rt.focus_here = true;
             rt.focus_in = true;
         }
-        self.dw_put(rt);
+        self.dw_put(owner, rt);
         self.box_end();
     }
 }

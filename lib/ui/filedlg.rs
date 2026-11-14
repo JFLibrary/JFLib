@@ -15,7 +15,11 @@
 //        Where the system has a file dialog (Windows, the Linux portal) that one is shown
 //        (modal); Android's picker answers later: nothing is drawn while it is open, the
 //        chosen document arrives as its content:// name in a later frame.  Otherwise,
-//        headless or with jfgui_FILEDLG=builtin, the library's own dialog.
+//        headless, with FD_BUILTIN or with jfgui_FILEDLG=builtin, the library's own dialog.
+//        FD_BUILTIN: the app chooses the own dialog for this call on every platform (its look,
+//        its keys, the same in every style and on every system); it lists what plat's file
+//        functions see (in the browser and on Android the app's own folders, not the system's
+//        documents).
 //        FD_MULTI (E8, with FD_OPEN): several files -- the system's dialog where it chooses
 //        several (Windows, Linux's portal), the own dialog with Ctrl+click / Shift+click (or
 //        Shift+arrows) on the rows ("a" "b" in the name box, quoted names typed there too);
@@ -24,7 +28,9 @@
 //   filedlg_paths() -> the files of the last confirmed dialog (one without FD_MULTI, the folder
 //        of an FD_FOLDER dialog)
 //
-// One file dialog can be open at a time (the state below is shared).
+// Every window has its dialog's state (WinParts::fd): a dialog of the same id in two windows
+// lists, selects and names by itself, and one window's closed dialog leaves the other's open one
+// alone.  The folder used last and the paths of the last confirmed dialog are the app's.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -42,9 +48,9 @@ const FD_DRIVES: usize = 256; // the plat::drives list (bytes, as the asm's buff
 const FD_NAME_CAP: usize = 256;
 const FD_DIRBIT: u32 = 0x8000_0000;
 
-/// state shared by all windows (one file dialog at a time)
+/// the dialog of one window (WinParts::fd)
 #[derive(Default)]
-pub(crate) struct S {
+pub(crate) struct W {
     /// the names of the folder's entries, each ended by a NUL
     store: Vec<u8>,
     /// entries: offset in store | FD_DIRBIT for folders
@@ -59,13 +65,24 @@ pub(crate) struct S {
     /// FD_FOLDER: folders only, a folder is the answer
     folder: bool,
     dir: String,
-    last: String,
     name: String,
     /// (E8) FD_MULTI in the own dialog: the marked rows, the row a Shift+click counts from
     marks: Vec<i32>,
     anchor: i32,
+}
+
+/// what the windows' dialogs share: the folder used last, the files of the last confirmed dialog
+#[derive(Default)]
+pub(crate) struct S {
+    last: String,
     /// (E8) the files of the last confirmed dialog
     paths: Vec<String>,
+}
+
+// a chosen path fits the caller's cap whole (at most cap - 1 bytes, no NUL): cut, it would name
+// another file or a parent folder, which the dialog then grants (fs.user) as the user's choice
+fn fits_cap(p: &str, cap: u32) -> bool {
+    !p.contains('\0') && p.len() < cap as usize
 }
 
 // str_copy(src, cap): at most cap - 1 bytes, never splitting a UTF-8 sequence
@@ -190,7 +207,7 @@ fn ieq(a: &[u8], b: &[u8]) -> bool {
     }
 }
 
-impl S {
+impl W {
     // fd_entry(i) -> (name, folder) (None when out of range)
     fn entry(&self, i: i32) -> Option<(&str, bool)> {
         if i < 0 || i as usize >= self.idx.len() {
@@ -348,7 +365,7 @@ impl Ui {
         let _src = self.src_scope();
         let mut result = 0;
         // first frame of an opening: load the start folder
-        if open.get() != 0 && self.m.filedlg.id != id {
+        if open.get() != 0 && self.wp.fd.id != id {
             // the system dialog, when there is one (modal: returns when the user is done)
             let r = self.fd_system(flags, path, cap, exts);
             if r == 1 {
@@ -362,8 +379,8 @@ impl Ui {
             }
             if r == plat::FD_PENDING {
                 // the system's picker answers later (Android): wait for it
-                self.m.filedlg.id = id;
-                self.m.filedlg.pending = true;
+                self.wp.fd.id = id;
+                self.wp.fd.pending = true;
             } else if r != -1 {
                 open.set(0);
                 if r != 0 {
@@ -374,14 +391,14 @@ impl Ui {
                 self.fd_init(id, flags, path, exts);
             }
         }
-        if self.m.filedlg.pending && self.m.filedlg.id == id {
+        if self.wp.fd.pending && self.wp.fd.id == id {
             return self.fd_wait(open, path, cap);
         }
         let folder = flags & FD_FOLDER != 0;
         let title = tr(if folder { "Ordner auswählen" } else if flags & FD_SAVE != 0 { "Speichern unter" } else { "Öffnen" });
         if !self.dialog_begin(id, title, open) {
-            if self.m.filedlg.id == id {
-                self.m.filedlg.id = 0;
+            if self.wp.fd.id == id {
+                self.wp.fd.id = 0;
             }
             self.dialog_end();
             if result == EV_ACT {
@@ -394,14 +411,14 @@ impl Ui {
         self.fd_toolbar_row(id);
         // folder contents
         self.next_size(480, 300);
-        let mut sel = self.m.filedlg.sel;
-        let n = self.m.filedlg.idx.len() as i32;
+        let mut sel = self.wp.fd.sel;
+        let n = self.wp.fd.idx.len() as i32;
         let (first, end) = self.list_begin(id.wrapping_add(16), &mut sel, n, 32);
         for i in first..end {
             self.fd_row(i);
         }
         let (ev, sel) = self.list_end(&mut sel);
-        self.m.filedlg.sel = sel;
+        self.wp.fd.sel = sel;
         if ev & EV_DOUBLE != 0 {
             if self.fd_activate(sel) && self.fd_confirm(flags, path, cap) {
                 // a file was double-clicked: confirm like the primary button
@@ -412,7 +429,7 @@ impl Ui {
             // a file was selected: its name goes into the name box
             let multi = flags & (FD_MULTI | FD_SAVE | FD_FOLDER) == FD_MULTI;
             let mods = self.mods;
-            let f = &mut self.m.filedlg;
+            let f = &mut self.wp.fd;
             if multi {
                 f.mark(sel, mods);
             } else if let Some((name, false)) = f.entry(sel) {
@@ -425,16 +442,16 @@ impl Ui {
             self.box_begin(0, BOX_H | BOX_XCENTER, 8);
             self.text(TS_BODY, tr("Dateiname:"));
             self.next_size(-1, 0);
-            let mut name = core::mem::take(&mut self.m.filedlg.name);
+            let mut name = core::mem::take(&mut self.wp.fd.name);
             let ncap = if flags & FD_MULTI != 0 { 4096 } else { FD_NAME_CAP as u32 }; // (E8) several quoted names
             let ev = self.textbox(id.wrapping_add(12), None, &mut name, ncap);
-            self.m.filedlg.name = name;
+            self.wp.fd.name = name;
             if ev & EV_ACT != 0 {
-                self.m.filedlg.msg = None;
+                self.wp.fd.msg = None;
             }
             self.box_end();
         }
-        if let Some(m) = self.m.filedlg.msg {
+        if let Some(m) = self.wp.fd.msg {
             self.text(TS_CAPTION | TX_SECONDARY, m);
         }
         let prim = tr(if folder { "Ordner auswählen" } else if flags & FD_SAVE != 0 { "Speichern" } else { "Öffnen" });
@@ -464,12 +481,12 @@ impl Ui {
     // the system's picker is open (Android): its answer, once it comes
     fn fd_wait(&mut self, open: &Shared<i32>, path: &mut String, cap: u32) -> u32 {
         let Some((r, _, chosen)) = plat::file_dialog_poll() else { return 0 };
-        self.m.filedlg.pending = false;
-        self.m.filedlg.id = 0;
+        self.wp.fd.pending = false;
+        self.wp.fd.id = 0;
         let wanted = open.get() != 0; // the app may have closed it meanwhile
         open.set(0);
         self.repass();
-        if r != 1 || !wanted {
+        if r != 1 || !wanted || !fits_cap(&chosen, cap) {
             return 0;
         }
         *path = copy_cap(&chosen, cap as usize);
@@ -481,22 +498,28 @@ impl Ui {
     // fd_system(flags, path, cap, exts) -> 1 chosen, 0 cancelled, -1 use the own dialog,
     // FD_PENDING the system's picker answers later (fd_wait)
     fn fd_system(&mut self, flags: u32, path: &mut String, cap: u32, exts: &[&str]) -> i32 {
-        if self.headless || plat::getenv("jfgui_FILEDLG").is_some_and(|v| v.as_bytes().first() == Some(&b'b')) {
+        if self.headless || flags & FD_BUILTIN != 0 {
+            return -1; // the app's choice (FD_BUILTIN)
+        }
+        if plat::getenv("jfgui_FILEDLG").is_some_and(|v| v.as_bytes().first() == Some(&b'b')) {
             return -1; // "builtin"
         }
         if self.hr_outside("the system's file dialog") {
             return -1; // hot reload's replay: the own dialog (hotreload.rs)
         }
+        let before = path.clone();
         let r = plat::file_dialog(flags, path, exts).0;
-        if r == 1 {
-            *path = copy_cap(path, cap as usize);
+        if r == 1 && !(fits_cap(path, cap) && plat::file_dialog_paths().iter().all(|p| fits_cap(p, cap))) {
+            // a choice longer than the caller can hold: as if cancelled (nothing granted)
+            *path = before;
+            return 0;
         }
         r
     }
 
     // fd_init(id, flags, path, exts): the dialog opens: choose the start folder and name, list it
     fn fd_init(&mut self, id: u32, flags: u32, path: &str, exts: &[&str]) {
-        let f = &mut self.m.filedlg;
+        let f = &mut self.wp.fd;
         f.id = id;
         f.folder = flags & FD_FOLDER != 0;
         f.exts = exts.iter().map(|e| String::from(*e)).collect();
@@ -506,14 +529,14 @@ impl Ui {
         if !path.is_empty() {
             let mut tmp = norm(&copy_cap(path, FD_PATH));
             if super::perm::trusted(|| plat::file_exists(&tmp)) == 2 {
-                self.m.filedlg.set_dir(&tmp);
+                self.wp.fd.set_dir(&tmp);
                 self.fd_load();
                 return;
             }
             // a file (or a new name): folder part + name part
             match tmp.rfind('/') {
                 Some(k) => {
-                    self.m.filedlg.name = copy_cap(&tmp[k + 1..], FD_NAME_CAP);
+                    self.wp.fd.name = copy_cap(&tmp[k + 1..], FD_NAME_CAP);
                     // cut after the separator for roots ("/", "C:/"), at it otherwise
                     if k == 0 || (k == 2 && tmp.as_bytes()[1] == b':') {
                         tmp.truncate(k + 1);
@@ -521,17 +544,17 @@ impl Ui {
                         tmp.truncate(k);
                     }
                     if super::perm::trusted(|| plat::file_exists(&tmp)) == 2 {
-                        self.m.filedlg.set_dir(&tmp);
+                        self.wp.fd.set_dir(&tmp);
                         self.fd_load();
                         return;
                     }
                 }
-                None => self.m.filedlg.name = copy_cap(&tmp, FD_NAME_CAP),
+                None => self.wp.fd.name = copy_cap(&tmp, FD_NAME_CAP),
             }
         }
         if !self.m.filedlg.last.is_empty() {
             let last = self.m.filedlg.last.clone();
-            self.m.filedlg.set_dir(&last);
+            self.wp.fd.set_dir(&last);
             self.fd_load();
             return;
         }
@@ -541,18 +564,18 @@ impl Ui {
     // fd_go_home: switch to the home folder and list it
     fn fd_go_home(&mut self) {
         let h = copy_cap(&plat::home().unwrap_or_else(|| String::from("/")), FD_PATH);
-        self.m.filedlg.set_dir(&h);
+        self.wp.fd.set_dir(&h);
         self.fd_load();
     }
 
     // fd_toolbar_row(id): up, home, drives, current folder
     fn fd_toolbar_row(&mut self, id: u32) {
         self.box_begin(0, BOX_H | BOX_XCENTER, 4);
-        if is_root(&self.m.filedlg.dir) {
+        if is_root(&self.wp.fd.dir) {
             self.next_flags(ST_DISABLED);
         }
         if self.icon_button(id.wrapping_add(1), IC_UP, tr("Übergeordneter Ordner")) & EV_ACT != 0 {
-            self.m.filedlg.parent();
+            self.wp.fd.parent();
             self.fd_load();
         }
         if self.icon_button(id.wrapping_add(2), IC_HOME, tr("Startordner")) & EV_ACT != 0 {
@@ -571,13 +594,13 @@ impl Ui {
                 label.truncate(2);
             }
             if self.button(id.wrapping_add(3 + k as u32), &label) & EV_ACT != 0 {
-                self.m.filedlg.set_dir(d);
+                self.wp.fd.set_dir(d);
                 self.fd_load();
             }
         }
         self.spacer(8);
         // the folder, with the native separator
-        let disp = copy_cap(&self.m.filedlg.dir, FD_PATH);
+        let disp = copy_cap(&self.wp.fd.dir, FD_PATH);
         #[cfg(windows)]
         let disp = disp.replace('/', "\\");
         self.next_size(-1, 0);
@@ -588,11 +611,11 @@ impl Ui {
     // fd_row(i): one list row: folder / file icon and the name
     fn fd_row(&mut self, i: i32) {
         self.list_item_begin(i);
-        let (name, dir) = match self.m.filedlg.entry(i) {
+        let (name, dir) = match self.wp.fd.entry(i) {
             Some((n, d)) => (String::from(n), d),
             None => (String::new(), false),
         };
-        let marked = self.m.filedlg.marks.len() > 1 && self.m.filedlg.marks.contains(&i);
+        let marked = self.wp.fd.marks.len() > 1 && self.wp.fd.marks.contains(&i);
         self.icon(if dir { IC_FOLDER } else if marked { IC_CHECK_MARK } else { IC_PAGE }, 16);
         self.next_size(-1, 0);
         self.text(TS_BODY | TX_ELLIPSIS, &name);
@@ -601,7 +624,7 @@ impl Ui {
 
     // fd_activate(i) -> entry i is a file (folders are opened here)
     fn fd_activate(&mut self, i: i32) -> bool {
-        let f = &mut self.m.filedlg;
+        let f = &mut self.wp.fd;
         let Some((name, dir)) = f.entry(i) else { return false };
         let name = String::from(name);
         if dir {
@@ -615,7 +638,7 @@ impl Ui {
 
     // fd_confirm(flags, path, cap) -> the chosen path was copied to path
     fn fd_confirm(&mut self, flags: u32, path: &mut String, cap: u32) -> bool {
-        let f = &mut self.m.filedlg;
+        let (f, sh) = (&mut self.wp.fd, &mut self.m.filedlg);
         if flags & FD_FOLDER != 0 {
             // the selected folder, else the one shown
             let mut d = copy_cap(&f.dir, FD_PATH);
@@ -623,9 +646,13 @@ impl Ui {
                 let n = String::from(n);
                 join(&mut d, &n);
             }
-            *path = copy_cap(&d, cap as usize);
-            f.paths = alloc::vec![path.clone()]; // filedlg_paths: the folder, not the last dialog's files
-            f.last = copy_cap(&f.dir, FD_PATH);
+            if !fits_cap(&d, cap) {
+                f.msg = Some(tr("Der Pfad ist zu lang."));
+                return false;
+            }
+            *path = d;
+            sh.paths = alloc::vec![path.clone()]; // filedlg_paths: the folder, not the last dialog's files
+            sh.last = copy_cap(&f.dir, FD_PATH);
             return true;
         }
         if flags & (FD_MULTI | FD_SAVE) == FD_MULTI && f.name.contains('"') {
@@ -657,12 +684,12 @@ impl Ui {
         let ex = super::perm::trusted(|| plat::file_exists(&tmp));
         if ex == 2 {
             // a folder name: go there
-            self.m.filedlg.set_dir(&tmp);
+            self.wp.fd.set_dir(&tmp);
             self.fd_load();
-            self.m.filedlg.name.clear();
+            self.wp.fd.name.clear();
             return false;
         }
-        let f = &mut self.m.filedlg;
+        let (f, sh) = (&mut self.wp.fd, &mut self.m.filedlg);
         if flags & FD_SAVE == 0 {
             if ex != 1 {
                 f.msg = Some(tr("Die Datei wurde nicht gefunden."));
@@ -687,15 +714,19 @@ impl Ui {
                 tmp.push_str(e);
             }
         }
-        *path = copy_cap(&tmp, cap as usize);
-        f.paths = alloc::vec![path.clone()];
-        f.last = copy_cap(&f.dir, FD_PATH);
+        if !fits_cap(&tmp, cap) {
+            f.msg = Some(tr("Der Pfad ist zu lang."));
+            return false;
+        }
+        *path = tmp;
+        sh.paths = alloc::vec![path.clone()];
+        sh.last = copy_cap(&f.dir, FD_PATH);
         true
     }
 
     // (E8) FD_MULTI: the quoted names of the name box ("a" "b") -> every one an existing file
     fn fd_confirm_multi(&mut self, path: &mut String, cap: u32) -> bool {
-        let f = &mut self.m.filedlg;
+        let (f, sh) = (&mut self.wp.fd, &mut self.m.filedlg);
         let names: Vec<String> = f.name.split('"').map(|s| s.trim()).filter(|s| !s.is_empty()).map(String::from).collect();
         let mut all = Vec::new();
         for n in &names {
@@ -715,20 +746,24 @@ impl Ui {
                 f.msg = Some(tr("Die Datei wurde nicht gefunden."));
                 return false;
             }
-            all.push(copy_cap(&t, cap as usize));
+            if !fits_cap(&t, cap) {
+                f.msg = Some(tr("Der Pfad ist zu lang."));
+                return false;
+            }
+            all.push(t);
         }
         if all.is_empty() {
             return false;
         }
         *path = all[0].clone();
-        f.paths = all;
-        f.last = copy_cap(&f.dir, FD_PATH);
+        sh.paths = all;
+        sh.last = copy_cap(&f.dir, FD_PATH);
         true
     }
 
     // fd_load: list the folder (folders first, then files matching the extensions)
     fn fd_load(&mut self) {
-        let f = &mut self.m.filedlg;
+        let f = &mut self.wp.fd;
         f.idx.clear();
         f.store.clear();
         f.marks.clear();
@@ -738,7 +773,7 @@ impl Ui {
         let dir = f.dir.clone();
         let mut ents: Vec<(String, bool)> = Vec::new();
         super::perm::trusted(|| plat::dir_list(&dir, &mut |name: &str, is_dir: bool, _size: u32| ents.push((String::from(name), is_dir))));
-        let f = &mut self.m.filedlg;
+        let f = &mut self.wp.fd;
         for (name, is_dir) in ents {
             // hidden entries, "." and ".."; choosing a folder: folders only
             if name.starts_with('.') || (!is_dir && (f.folder || !f.ext_ok(&name))) {

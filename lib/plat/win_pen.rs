@@ -27,7 +27,7 @@ use alloc::vec;
 use core::cell::Cell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use super::{HTCLIENT, Point, SendMessageW, ScreenToClient, UiThread, dll_proc, st, win_push};
+use super::{HTCLIENT, Point, SendMessageW, ScreenToClient, UiOnly, dll_proc, st, win_push};
 use crate::{BTN_LEFT, BTN_RIGHT, E_DOWN, E_LEAVE, E_MOVE, E_UP, PRESSURE_ONE, PTR_ERASER, PTR_PEN, evq_pen_data,
             pen_enabled};
 
@@ -90,7 +90,7 @@ struct Pen {
     btn: Cell<u8>, // BTN_* held by the pen tip (0 = none)
 }
 
-static PEN: UiThread<Pen> = UiThread(Pen { loaded: Cell::new(false), api: Cell::new(NO_API), btn: Cell::new(0) });
+static PEN: UiOnly<Pen> = UiOnly::new(Pen { loaded: Cell::new(false), api: Cell::new(NO_API), btn: Cell::new(0) });
 
 // user32's functions (0 = missing)
 static P_TYPE: AtomicUsize = AtomicUsize::new(0);
@@ -99,7 +99,7 @@ static P_HIST: AtomicUsize = AtomicUsize::new(0);
 static P_DEVS: AtomicUsize = AtomicUsize::new(0);
 
 fn pen() -> &'static Pen {
-    &PEN.0
+    PEN.get()
 }
 
 /// (test aid) the pointer API through `api` (None: user32's again, loaded on first use)

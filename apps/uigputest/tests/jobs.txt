@@ -1,0 +1,2 @@
+# how build_rs.py test runs these scripts beside the others (build_rs.py, section "test-jobs")
+lock desktop      # real windows through the swapchain, shown on the desktop (WSLg: the Linux ones too)

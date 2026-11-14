@@ -171,27 +171,35 @@ fn literal_at_end(b: &[u8]) -> Option<(usize, usize, bool)> {
 pub fn tokens_from(l: &Line, from: usize) -> Vec<Item> {
     let mut at = from;
     let mut lit = l.text[..from.min(l.text.len())].iter().filter(|&&c| c == 0).count();
-    items(l, &mut at, &mut lit, false)
+    items(l, &mut at, &mut lit, 0)
 }
+
+// lists inside lists a line may open: each is a stack frame here and in the drop of the result;
+// deeper, the rest of the line is one atom (real IMAP nests a few levels: BODYSTRUCTURE)
+const MAX_NEST: u32 = 64;
 
 /// the values of a whole line
 pub fn tokens(l: &Line) -> Vec<Item> {
     tokens_from(l, 0)
 }
 
-fn items(l: &Line, at: &mut usize, lit: &mut usize, nested: bool) -> Vec<Item> {
+fn items(l: &Line, at: &mut usize, lit: &mut usize, depth: u32) -> Vec<Item> {
     let b = &l.text;
     let mut out = Vec::new();
     while *at < b.len() {
         match b[*at] {
             b' ' => *at += 1,
-            b')' if nested => {
+            b')' if depth > 0 => {
                 *at += 1;
                 return out;
             }
+            b'(' if depth >= MAX_NEST => {
+                out.push(Item::Atom(String::from_utf8_lossy(&b[*at..]).into_owned()));
+                *at = b.len();
+            }
             b'(' => {
                 *at += 1;
-                out.push(Item::List(items(l, at, lit, true)));
+                out.push(Item::List(items(l, at, lit, depth + 1)));
             }
             0 => {
                 *at += 1;

@@ -2,8 +2,11 @@
 //
 //   Linux: a scratch XDG_DATA_HOME: the item leaves its place, Trash/files has it and
 //   Trash/info a matching .trashinfo (Path, DeletionDate); the same name twice (a.2.txt),
-//   escaped names, a folder, a vfs folder mount, mem://, missing paths, the trash itself;
-//   another file system (/dev/shm, when it is one): $topdir/.Trash-$uid with a relative Path
+//   escaped names, a folder, a vfs folder mount, mem://, missing paths, the trash itself (also
+//   with a "." in XDG_DATA_HOME); another file system (/dev/shm, when it is one):
+//   $topdir/.Trash-$uid with a relative Path, its own entries refused;
+//   the steps for file systems without RENAME_NOREPLACE (jfgui_TEST_TRASH_FALLBACK): a file
+//   by a hard link, a folder over an empty folder of its own, taken names never replaced
 //   Windows: one throwaway file into the real recycle bin (it must be gone from its place;
 //   the bin is never emptied, nothing else is touched), missing paths, mem://
 //   Both: at the end a manifest installed in this process -- trash counts as writing
@@ -160,7 +163,41 @@ fn linux(t: &mut T, base: &str) {
     vfs::unmount("scratch");
     t.check(!plat::trash(&format!("{tr}/files/a.txt")) && plat::file_exists(&format!("{tr}/files/a.txt")) == 1, "trash: the trash itself is refused");
     t.check(!plat::trash("/"), "trash: the root is refused");
+    // XDG_DATA_HOME with a "." inside: the trash is still the trash (its entry keeps its
+    // place and its info file)
+    plat::setenv("XDG_DATA_HOME", Some(&format!("{base}/./data")));
+    t.check(!plat::trash(&format!("{tr}/files/a.txt")) && plat::file_exists(&format!("{tr}/files/a.txt")) == 1
+        && info_ok(&format!("{tr}/info/a.txt.trashinfo"), &a) && plat::file_exists(&format!("{tr}/files/a.5.txt")) == 0,
+        "trash: the trash itself is refused also when XDG_DATA_HOME has a \".\" in it");
+    plat::setenv("XDG_DATA_HOME", Some(&data));
     other_fs(t, &data);
+    fallback(t, base, &tr);
+}
+
+// a file system without RENAME_NOREPLACE (old kernels, some network file systems): a file goes
+// by a hard link and the old name's removal, a folder replaces an empty folder of its own; a
+// taken name is never replaced (it gets the next one)
+fn fallback(t: &mut T, base: &str, tr: &str) {
+    plat::setenv("jfgui_TEST_TRASH_FALLBACK", Some("1"));
+    let c = format!("{base}/work/c.txt");
+    t.check(plat::write_file(&c, b"link") && plat::trash(&c), "trash fallback: a file");
+    t.check(plat::file_exists(&c) == 0 && plat::read_file(&format!("{tr}/files/c.txt")).as_deref() == Some(&b"link"[..]),
+        "trash fallback: ... gone from its place, in files/c.txt");
+    t.check(plat::fs::stat(&format!("{tr}/files/c.txt")).is_some_and(|m| m.nlink == 1), "trash fallback: ... one name left (the old one removed)");
+    t.check(plat::write_file(&format!("{tr}/files/c.2.txt"), b"orphan") && plat::write_file(&c, b"again") && plat::trash(&c),
+        "trash fallback: the same name, files/c.2.txt taken by an orphan");
+    t.check(plat::read_file(&format!("{tr}/files/c.2.txt")).as_deref() == Some(&b"orphan"[..])
+        && plat::read_file(&format!("{tr}/files/c.3.txt")).as_deref() == Some(&b"again"[..]), "trash fallback: ... the orphan untouched, the file in c.3.txt");
+    let d = format!("{base}/work/dir");
+    t.check(plat::mkdir(&d) && plat::write_file(&format!("{d}/in.txt"), b"in") && plat::trash(&d), "trash fallback: a folder");
+    t.check(plat::file_exists(&d) == 0 && plat::read_file(&format!("{tr}/files/dir/in.txt")).as_deref() == Some(&b"in"[..]),
+        "trash fallback: ... with its files in files/dir");
+    t.check(plat::mkdir(&d) && plat::write_file(&format!("{tr}/files/dir.2"), b"file orphan") && plat::mkdir(&format!("{tr}/files/dir.3"))
+        && plat::write_file(&format!("{tr}/files/dir.3/x"), b"x") && plat::trash(&d), "trash fallback: a folder, dir.2 a file and dir.3 a folder with entries");
+    t.check(plat::read_file(&format!("{tr}/files/dir.2")).as_deref() == Some(&b"file orphan"[..])
+        && plat::read_file(&format!("{tr}/files/dir.3/x")).as_deref() == Some(&b"x"[..])
+        && plat::file_exists(&format!("{tr}/files/dir.4")) == 2 && plat::file_exists(&d) == 0, "trash fallback: ... both untouched, the folder in dir.4");
+    plat::setenv("jfgui_TEST_TRASH_FALLBACK", None);
 }
 
 // a file on another file system goes to $topdir/.Trash-$uid of its mount (/dev/shm on WSL)
@@ -186,6 +223,10 @@ fn other_fs(t: &mut T, data: &str) {
     t.check(info_ok(&format!("{top}/info/{name}.trashinfo"), &name), "trash: ... its Path is relative to the top folder");
     let mode = plat::fs::stat(&top).map_or(0, |m| m.mode & 0o777);
     t.check(mode == 0o700, "trash: ... $topdir/.Trash-$uid has mode 0700");
+    // what is in that trash already stays (it would get an info file pointing into the trash)
+    let inside = format!("{top}/files/{name}");
+    t.check(!plat::trash(&inside) && plat::file_exists(&inside) == 1 && info_ok(&format!("{top}/info/{name}.trashinfo"), &name),
+        "trash: an entry of $topdir/.Trash-$uid is refused, its info file kept");
     // only our own entries go; the folders only when this test made them (and they are empty)
     plat::delete(&format!("{top}/files/{name}"));
     plat::delete(&format!("{top}/info/{name}.trashinfo"));

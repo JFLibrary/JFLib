@@ -133,6 +133,7 @@ pub fn t_assoc(t: &mut T) {
         linux(t, &pkg, &base);
         linux_browser(t, &base);
     }
+    forged_record(t, &base);
     plat::setenv(cfg_var, saved_cfg.as_deref());
     crate::rm_tree(&base);
 }
@@ -325,6 +326,33 @@ fn windows(t: &mut T, pkg: &Package) {
     t.check(code == 0 && get(".jfltest", "").as_deref() == Some("JFLibOther.jfltest"), "assoc: --unregister");
     win_cleanup();
     gone(t, "assoc: test keys removed at the end");
+}
+
+/// a record line outside the registration's places (Windows: a key outside Software\Classes,
+/// Software\Clients and RegisteredApplications -- Run would be an autostart entry; Linux: a
+/// file outside the .desktop and MIME folders) -> unregister does not play it back
+#[cfg(windows)]
+fn forged_record(t: &mut T, base: &str) {
+    const K: &str = "Software\\JFLib-plattest-forged";
+    let rec = "jflib-assoc 1\nexe\tx\nbakkey\tSoftware\\\\JFLib-plattest-forged\nbak\tSoftware\\\\JFLib-plattest-forged\tv\t1\t7800\n";
+    plat::mkdir(&format!("{base}/config"));
+    t.check(plat::write_file("config://assoc.list", rec.as_bytes()) && assoc_unregister() == Ok(true), "assoc: a forged record unregistered");
+    let made = plat::assoc::hkcu_get(K, None).is_some();
+    if made {
+        plat::inst::reg_delete(K);
+    }
+    t.check(!made, "assoc: a record line outside the registration's keys is not played back");
+}
+
+#[cfg(not(windows))]
+fn forged_record(t: &mut T, base: &str) {
+    let victim = format!("{base}/victim.txt");
+    plat::write_file(&format!("{victim}.jflib-saved"), b"x");
+    let rec = format!("jflib-assoc 1\nexe\tx\nsaved\t{victim}\n");
+    plat::mkdir(&format!("{base}/config"));
+    t.check(plat::write_file("config://assoc.list", rec.as_bytes()) && assoc_unregister() == Ok(true), "assoc: a forged record unregistered");
+    t.check(plat::file_exists(&victim) == 0 && plat::file_exists(&format!("{victim}.jflib-saved")) == 1,
+        "assoc: a record line outside the registration's files is not played back");
 }
 
 #[cfg(not(windows))]

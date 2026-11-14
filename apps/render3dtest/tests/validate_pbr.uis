@@ -1,0 +1,4 @@
+#!args --test srgb,pbr --validate
+#!timeout 1200
+# a part of the validation (validate.uis): srgb and pbr under VK_LAYER_KHRONOS_validation and synchronization
+# validation; a validation error fails

@@ -25,7 +25,9 @@
 // TB_WRAP | TB_SPELL), "Ohne Prüfung" (no TB_SPELL) and "Kennwort" (TB_PASSWORD | TB_SPELL:
 // never checked); the switch "Rechtschreibung prüfen" (spell_enable); the language buttons
 // (spell_language); the status lines: language and backend, the misspelled words of each box
-// (spell_errors), the personal word list.
+// (spell_errors), the personal word list.  Command 1 opens "Zweites Fenster" (#120) with a
+// "Betreff" box of the same id (#110) and other text: each window checks its own box and opens
+// the menu of its own (tests/windows.uis).
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -51,6 +53,9 @@ const ID_SUBJECT: u32 = 110;
 const ID_BODY: u32 = 111;
 const ID_PLAIN: u32 = 112;
 const ID_PW: u32 = 113;
+const ID_SECOND: u32 = 120; // command 1: "Zweites Fenster", a "Betreff" box of the same id
+const CMD_SECOND: u32 = 1;
+const SECOND: &str = "Fehlr und das Haus";
 
 const DESC: AppDesc = AppDesc { title: "JFLib Rechtschreibung", flags: AF_RESIZABLE, w: 640, h: 560, min_w: 360, min_h: 300, ..AppDesc::NONE }; // i18n
 
@@ -58,6 +63,10 @@ const SUBJECT: &str = "Die Hasu-Tür";
 const BODY: &str = "Heute ist die Arbit in der Strasse sehr schön. Die Hausaufgaben sind gut, z.B. das Wörterbuch.\nJFLib und E-Mail-Adresse, 3D, https://example.org/wort";
 
 struct Spell {
+    /// command 1: the second window (open, placement) and its "Betreff"
+    second_open: Shared<i32>,
+    second_rect: Shared<WinRect>,
+    second: String,
     on: i32,
     report: Option<String>, // --report: the status printed last
     subject: String,
@@ -68,7 +77,17 @@ struct Spell {
 
 impl Default for Spell {
     fn default() -> Spell {
-        Spell { on: 1, report: None, subject: String::from(SUBJECT), body: String::from(BODY), plain: String::from("Ohne Prüfung: Hasu"), pw: String::from("Hasu") }
+        Spell {
+            second_open: Shared::new(0),
+            second_rect: Shared::new(WinRect::new(40, 40, 420, 200, 0)),
+            second: String::from(SECOND),
+            on: 1,
+            report: None,
+            subject: String::from(SUBJECT),
+            body: String::from(BODY),
+            plain: String::from("Ohne Prüfung: Hasu"),
+            pw: String::from("Hasu"),
+        }
     }
 }
 
@@ -159,6 +178,25 @@ impl App for Spell {
             }
         }
         ui.box_end();
+        // command 1: a box of the same id in another window, checked by itself
+        let (open, rect) = (self.second_open.clone(), self.second_rect.clone());
+        if ui.window_begin(ID_SECOND, t("Zweites Fenster"), Some(&open), WF_TOOL, Some(&rect)) {
+            ui.box_begin(0, BOX_V | pad(12), 8);
+            ui.next_size(-1, 0);
+            ui.textbox(ID_SUBJECT, Some(t("Betreff")), &mut self.second, 256 | TB_SPELL);
+            let e = ui.spell_errors(ID_SUBJECT);
+            ui.text(TS_CAPTION, &tf("Fehler Betreff 2: {}", &[&words(&self.second, &e)]));
+            ui.box_end();
+        }
+        ui.window_end();
+    }
+
+    fn command(&mut self, _ui: &mut Ui, id: u32, _arg: u32) -> bool {
+        if id != CMD_SECOND {
+            return false;
+        }
+        self.second_open.set(1);
+        true
     }
 }
 

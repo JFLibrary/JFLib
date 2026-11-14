@@ -133,7 +133,7 @@ extern "C" fn handler(sig: c_int, si: *const u8, uc: *const u8) -> ! {
     call_chain(&mut ci, lr, fp, sp.min(fp).max(bottom), top);
     let mut line = StackText::<160>::new();
     let _ = writeln!(line, "jfgui: crash signal {sig} at pc 0x{:x}, address 0x{si_addr:x} (image base 0x{:x})", ci.ip, ci.base);
-    rt::os::write_stderr(line.bytes());
+    rt::os::write_stderr_crash(line.bytes());
     rt::crash::report(&ci)
 }
 

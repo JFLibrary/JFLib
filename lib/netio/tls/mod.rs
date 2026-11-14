@@ -1,4 +1,4 @@
-// tls -- TLS for BackupCraft's own servers and agents and for public servers (RFC 8446, 5246)
+// tls -- TLS between a program's own servers and clients and to public servers (RFC 8446, 5246)
 //
 //   Own deployments (both sides): TLS 1.3, TLS_CHACHA20_POLY1305_SHA256 · X25519 · Ed25519
 //   certificates (own CA) · mutual authentication · HelloRetryRequest · KeyUpdate.
@@ -235,6 +235,10 @@ impl Stream for TlsStream {
         self.conn.lock().close();
         let _ = self.flush();
         self.inner.shutdown();
+    }
+
+    fn end_is_clean(&self) -> bool {
+        self.conn.lock().peer_closed()
     }
 
     fn wait_readable(&self, ms: u32) -> bool {

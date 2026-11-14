@@ -8,7 +8,10 @@
 // CryptProtectData (the user's DPAPI key, the target as additional entropy) into
 // data://secrets/<target hash>-<file hash>.bin, and the credential holds an empty value plus the
 // attribute JFLib_File = SHA-256 of that file.  A new file is written before the credential
-// points at it; afterwards the entry's other files are removed.
+// points at it; afterwards the entry's other files are removed.  set and delete of one entry
+// (get too, once the folder exists) hold data://secrets/<target hash>.lock (a FileLock: an
+// exclusive handle, across processes) from the file to the sweep, so an older write never
+// removes the file a newer write's credential points at; the small lock file stays.
 
 use alloc::format;
 use alloc::string::String;
@@ -225,6 +228,26 @@ fn dpapi(protect: bool, data: &[u8], entropy: &[u8]) -> Result<Vec<u8>, SecretEr
     Ok(v)
 }
 
+// the entry's lock (see the header): None where data:// has no folder for it (create: no
+// file can exist then); a lock that stays busy for 10 s is an error
+fn lock(target: &str, create: bool) -> Result<Option<crate::FileLock>, SecretError> {
+    let ready = if create { crate::mkdir(DIR) } else { crate::file_exists(DIR) == 2 };
+    if !ready {
+        return Ok(None);
+    }
+    let path = format!("{DIR}/{}.lock", crypto::hex(&crypto::sha256(target.as_bytes())[..8]));
+    let end = crate::time_us() + 10_000_000;
+    loop {
+        if let Some(l) = crate::FileLock::acquire(&path) {
+            return Ok(Some(l));
+        }
+        if crate::time_us() >= end {
+            return Err(SecretError::Failed(format!("{path} stays locked")));
+        }
+        crate::sleep_ms(2);
+    }
+}
+
 // remove the entry's DPAPI files except keep (an old value, a file a crash left behind)
 fn sweep(target: &str, keep: Option<&[u8; 32]>) {
     let prefix = file_prefix(target);
@@ -256,6 +279,7 @@ pub fn available() -> bool {
 
 pub fn set(n: &Name, secret: &[u8]) -> Result<(), SecretError> {
     let t = target(n);
+    let _l = lock(&t, true)?;
     if secret.len() <= CRED_MAX_BLOB {
         write(&t, n, secret, None)?;
         sweep(&t, None);
@@ -277,6 +301,7 @@ pub fn set(n: &Name, secret: &[u8]) -> Result<(), SecretError> {
 
 pub fn get(n: &Name) -> Result<Option<Vec<u8>>, SecretError> {
     let t = target(n);
+    let _l = lock(&t, false)?;
     let Some(st) = read(&t)? else { return Ok(None) };
     let Some(hash) = st.file else { return Ok(Some(st.blob)) };
     let file = format!("{DIR}/{}", file_name(&t, &hash));
@@ -291,6 +316,7 @@ pub fn get(n: &Name) -> Result<Option<Vec<u8>>, SecretError> {
 
 pub fn delete(n: &Name) -> Result<bool, SecretError> {
     let t = target(n);
+    let _l = lock(&t, true)?;
     let w = crate::to_wide(&t);
     // SAFETY: a NUL-terminated name.
     if unsafe { CredDeleteW(w.as_ptr(), CRED_TYPE_GENERIC, 0) } == 0 {

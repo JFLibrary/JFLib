@@ -296,10 +296,6 @@ fn quote(l: &str) -> String {
     s
 }
 
-fn kind_name(k: u16) -> &'static str {
-    KIND_NAMES[if k < K_KIND_COUNT { k as usize } else { 0 }]
-}
-
 fn state_text(st: u16) -> String {
     let mut s = String::new();
     for (k, n) in STATE_NAMES.iter().enumerate() {

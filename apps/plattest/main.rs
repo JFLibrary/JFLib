@@ -4,7 +4,9 @@
 //                                          post from another thread), the worker pool
 //                                          (parallel_for, nested, cancel), background jobs
 //                                          (wait, restart, cancel, E_WAKE when finished),
-//                                          wake latency and coalescing (headless wait)
+//                                          wake latency and coalescing (headless wait), the
+//                                          UI thread's state refused to a second thread (a
+//                                          child: plattest --test uithread-child, exit code 3)
 //   plattest --test files                  mkdir / delete / rename, the streaming file API
 //                                          (also from 64 parallel items), temp files, the
 //                                          temp and config dirs, environment overrides
@@ -42,6 +44,9 @@
 //                                          missing program
 //   plattest --test window                (Rust only, t_window.rs, Windows) a real-window smoke
 //                                          test of the platform layer; the window closes itself
+//   plattest --test present-bench [--frames N] [--size WxH]   (t_present.rs) what presenting a
+//                                          W x H frame (default 3840 x 2160) costs in a real window:
+//                                          the whole frame, damage only (not in "all": timings)
 //   plattest --test policy                 (t_policy.rs) the app's permissions: path rules,
 //                                          patterns, then a manifest installed in this
 //                                          process (files, grants, processes, URLs, plugins,
@@ -68,18 +73,32 @@
 //                                          against a fake bus (tools/platshared/ibus_bus.py);
 //                                          without one; its X11 glue (synthetic X events)
 //   plattest --test log / log-crash        (t_log.rs) the log: levels, ring, file rotation, the
-//                                          last lines after a crash (a child)
+//                                          last lines after a crash (a child); the crash
+//                                          pre-hook at a file's limit, under the mount table,
+//                                          with a stuck stderr (log-crash-full / -mount / -stderr)
 //   plattest --test life-bus               (t_life.rs, Linux) sleep, settings and SIGTERM against
 //                                          fake buses (tools/platshared/life_bus.py)
-//   plattest --test a11y / a11y-bus / uia / caret   (t_a11y.rs) the accessibility tree for
-//                                          screen readers: headless model and actions; Linux
-//                                          against a fake AT-SPI2 bus (tools/platshared/
+//   plattest --test a11y / a11y-bus / uia / uia-idle / caret / a11y-mac / a11y-ios / a11y-show
+//                                          (t_a11y.rs) the accessibility tree for screen readers:
+//                                          headless model and actions; Linux against a fake AT-SPI2
+//                                          bus (tools/platshared/
 //                                          atspi_bus.py); Windows through IUIAutomation (by
-//                                          hand); caret: the caret for screen magnifiers
+//                                          hand); caret: the caret for screen magnifiers; macOS
+//                                          through AppKit's accessibility entry points (a window),
+//                                          iOS through UIAccessibility under UIKit (simapp);
+//                                          a11y-show: the demo by hand, for a screen reader
 //   plattest --test settings / settings-bus / settings-bus-files   (t_settings.rs) the system
 //                                          settings: the jfgui_* overrides, the title bar's
 //                                          layout; Linux: GTK's / KDE's files, against a fake
 //                                          settings portal (with and without appearance keys)
+//   plattest --test a11y-rich / uia-rich / a11y-rich-bus   (t_a11y_rich.rs) a web page's
+//                                          accessibility tree (apps/a11ytest's page): headless
+//                                          model, requests, live regions, the rich update format;
+//                                          Windows through IUIAutomation (by hand); Linux against
+//                                          atspi_bus.py --rich
+//   plattest --test a11y-cost [--records N]   (t_a11y_cost.rs) what a web page's tree of N rich
+//                                          records costs per frame: the records, the tree, its
+//                                          publish (not in "all": timings; a release build)
 //   plattest --test secret / secret-bus    (t_secret.rs) the system's secret store: the real
 //                                          one (Credential Manager + DPAPI, Secret Service; the
 //                                          test entries are removed again); Linux against a
@@ -175,6 +194,10 @@ use base::{Args, Ini, f64_format, f64_parse};
 
 // the accessibility tree (screen readers)
 mod t_a11y;
+// a web page's accessibility tree (apps/a11ytest's page)
+mod t_a11y_rich;
+// what that tree costs per frame
+mod t_a11y_cost;
 mod t_async;
 // plat-win: the R4 tests of the Windows platform layer
 mod t_cursor;
@@ -191,6 +214,8 @@ mod t_pen;
 mod t_touch;
 mod t_spawn;
 mod t_window;
+// what a present costs in a real window (4K frames)
+mod t_present;
 // plat-shared: printing, the crash guard, the plugin loader, the portal
 #[cfg(not(target_vendor = "apple"))]
 mod t_guard;
@@ -361,6 +386,7 @@ fn plattest() -> i32 {
         Some("crash") => t_crash,
         Some("panic") => t_panic,
         Some("window") => t_window::t_window, // plat-win
+        Some("present-bench") => t_present::t_present_bench, // a real window, 4K presents (not in "all": timings)
         Some("pen") => t_pen::t_pen,             // plat-win
         Some("touch") => t_touch::t_touch,
         Some("cursor") => t_cursor::t_cursor,    // plat-win
@@ -405,14 +431,26 @@ fn plattest() -> i32 {
         Some("ibus-x11") => t_ibus::t_ibus_x11,        // Linux: the X11 glue (synthetic X events)
         Some("log") => t_log::t_log,                   // the log: levels, ring, file, crash
         Some("log-crash") => t_log::t_log_crash,       // its child: logs and panics
+        Some("log-crash-full") => t_log::t_log_crash_full, // children: the pre-hook's crash paths
+        Some("log-crash-mount") => t_log::t_log_crash_mount,
+        #[cfg(target_os = "linux")]
+        Some("log-crash-stderr") => t_log::t_log_crash_stderr,
         Some("life-bus") => t_life::t_life_bus,        // Linux: against tools/platshared/life_bus.py
         Some("settings") => t_settings::t_settings,    // the system settings: overrides, defaults
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
         Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
+        Some("a11y-rich") => t_a11y_rich::t_a11y_rich, // a web page's accessibility tree, headless
+        Some("a11y-cost") => t_a11y_cost::t_a11y_cost, // what that tree costs per frame (not in "all": timings)
+        Some("a11y-rich-bus") => t_a11y_rich::t_a11y_rich_bus, // Linux: against atspi_bus.py --rich
+        Some("uia-rich") => t_a11y_rich::t_uia_rich,   // Windows, by hand: the page through UI Automation
         Some("a11y") => t_a11y::t_a11y,                // the accessibility tree, headless
         Some("a11y-bus") => t_a11y::t_a11y_bus,        // Linux: against tools/platshared/atspi_bus.py
         Some("uia") => t_a11y::t_uia,                  // Windows, by hand: UI Automation
+        Some("uia-idle") => t_a11y::t_uia_idle,        // Windows, by hand: a client comes and goes (10 .. 30 s)
         Some("caret") => t_a11y::t_caret,              // Windows, by hand: the caret for magnifiers
+        Some("a11y-mac") => t_a11y::t_a11y_mac,        // macOS, a real window: NSAccessibility (VoiceOver)
+        Some("a11y-show") => t_a11y::t_a11y_show,      // by hand: the demo for a screen reader
+        Some("a11y-ios") => t_a11y::t_a11y_ios,        // iOS under UIKit (simapp): UIAccessibility (VoiceOver)
         Some("secret") => t_secret::t_secret,          // the system's secret store (not in "all")
         Some("secret-bus") => t_secret::t_secret_bus,  // Linux: against tools/platshared/secret_bus.py
         Some("power") => t_power::t_power,             // plat::inhibit (Windows: real power requests)
@@ -440,6 +478,7 @@ fn plattest() -> i32 {
         Some("async-panic") => t_async::t_async_panic, // its children: a panic in a task,
         Some("async-panic-job") => t_async::t_async_panic_job, // in a blocking job,
         Some("async-policy") => t_async::t_async_policy, // aio under a manifest
+        Some("uithread-child") => t_uithread_child,    // (threads) its child: UI state on a second thread
         _ => {
             plat::write_stderr(b"usage: plattest --test threads|files|ini|cpu|pen|cursor|all [--repeat N]\n");
             return 2;
@@ -566,6 +605,7 @@ fn t_threads(t: &mut T) {
     th_jobs(t);
     th_wake(t);
     th_stop(t);
+    th_ui_gate(t);
     plat::thr_shutdown();
 }
 
@@ -602,6 +642,42 @@ fn th_stop(t: &mut T) {
     }
     t.check(started == 160 && sums == 20, "pool: 8 shutdowns at once, 20 times; each restart runs every item");
     t.info(&format!("  ({started} threads, {sums} of 20 restarts complete)\n"));
+}
+
+/// the UI thread's state: the first thread that touches it owns it, another thread panics before
+/// it reaches it (exit code 3) -- in a child process
+fn th_ui_gate(t: &mut T) {
+    let (code, text) = t_async::child(&["--test", "uithread-child"]);
+    t.check(text.contains("uithread: the UI thread twice"), "ui thread: the first thread reaches the UI state, twice");
+    let refused = code == Some(3) && text.contains("the UI thread's state used on thread") && !text.contains("second thread got through");
+    t.check(refused, "ui thread: a second thread panics before it reaches the UI state (exit code 3)");
+    if !refused {
+        out(&format!("  (exit {code:?})\n{text}\n"));
+    }
+}
+
+/// (the child) the main thread reaches UI-thread state twice, then a second thread tries
+fn t_uithread_child(_: &mut T) {
+    plat::setenv("jfgui_OPEN_DRYRUN", Some("1")); // Linux: the portal only prints the address
+    ui_touch();
+    ui_touch();
+    out("uithread: the UI thread twice\n");
+    let h = plat::thread_spawn(0, Box::new(|| {
+        ui_touch();
+        out("uithread: the second thread got through\n");
+    }));
+    if let Some(h) = h {
+        h.join();
+    }
+}
+
+/// a call that reaches UI-thread state without a window: the portal's connection (Linux), the
+/// minimum size of the first window (Windows, macOS)
+fn ui_touch() {
+    #[cfg(target_os = "linux")]
+    let _ = plat::open_url("https://example.org/");
+    #[cfg(not(target_os = "linux"))]
+    plat::win_set_min_size(0, 100, 100);
 }
 
 /// 8 threads running f(index)
@@ -982,6 +1058,14 @@ fn t_files(t: &mut T) {
     drop(f);
     t.check(sz == 0x100064 && n == 5 && &rb[1..4] == b"XYZ" && rb[0] == pat[9] && rb[4] == pat[13],
             "files: FO_RW keeps the contents and writes in place");
+    // ---- offsets no file reaches: refused, nothing written (Windows read u64::MAX as "append")
+    let f = File::open(&t.subp("data.bin"), FO_RW);
+    let (w1, w2) = (wa(&f, u64::MAX, b"X"), wa(&f, i64::MAX as u64, b"XY"));
+    let (r1, e) = (ra(&f, u64::MAX, &mut rb[..1]), wa(&f, u64::MAX, b""));
+    let sz = fsize(&f);
+    drop(f);
+    t.check(w1 == -1 && w2 == -1 && r1 == -1 && sz == 0x100064, "files: write_at / read_at past i64::MAX are refused, the file unchanged");
+    t.check(e <= 0, "files: an empty write_at there writes nothing");
     // ---- 64 parallel items on one handle
     let fh = File::open(&t.subp("par.bin"), FO_WRITE);
     IO_BAD.store(0, SeqCst);
@@ -1378,6 +1462,11 @@ fn t_ini(t: &mut T) {
     let big = t.subp("toobig.ini");
     plat::write_file(&big, &vec![b'\n'; 0x100_0001]);
     t.check(Ini::load_checked(&big).is_none(), "ini: load_checked: a file over 16 MB is not an empty Ini");
+    // only a name that is surely free counts as missing: a folder there, a name whose existence
+    // cannot be asked (a NUL in it) are no empty Ini a later save would write over
+    let dir = t.subp("folder.ini");
+    t.check(plat::mkdir(&dir) && Ini::load_checked(&dir).is_none(), "ini: load_checked: a folder at the name is not an empty Ini");
+    t.check(Ini::load_checked(&format!("{path}\0x")).is_none(), "ini: load_checked: an unknown existence is not an empty Ini");
     ini_self(t);
     ini_random(t);
     t_f64(t);

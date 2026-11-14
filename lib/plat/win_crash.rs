@@ -101,7 +101,7 @@ extern "system" fn handler(ep: *const ExceptionPointers) -> i32 {
     } else {
         foreign_lines(&ci, tid, &chain);
     }
-    rt::os::write_stderr(line.bytes());
+    rt::os::write_stderr_crash(line.bytes());
     rt::crash::report(&ci)
 }
 

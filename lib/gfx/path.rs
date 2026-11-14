@@ -14,6 +14,11 @@ use rt::fx::{maxss, sqrt};
 
 const KAPPA_FX: i32 = 141; // 0.5523 * 256 (circle approximation by cubics)
 
+/// (r * k) >> 8 in 64 bits: in i32 it wrapped from a radius of about 59,500 px (rrect: 73,000)
+fn kappa(r: i32, k: i32) -> i32 {
+    ((r as i64 * k as i64) >> 8) as i32
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct Sub {
     pub start: usize,
@@ -250,7 +255,7 @@ impl Path {
             self.rect_fx(x, y, w, y1 - y0);
             return;
         }
-        let k = (r * (256 - KAPPA_FX)) >> 8;
+        let k = kappa(r, 256 - KAPPA_FX);
         self.move_fx(x0 + r, y0);
         self.line_fx(x1 - r, y0);
         self.cubic_fx(x1 - k, y0, x1, y0 + k, x1, y0 + r);
@@ -265,8 +270,8 @@ impl Path {
 
     /// path_ellipse: closed ellipse from four cubic arcs
     pub fn ellipse_fx(&mut self, cx: i32, cy: i32, rx: i32, ry: i32) {
-        let kx = (rx * KAPPA_FX) >> 8;
-        let ky = (ry * KAPPA_FX) >> 8;
+        let kx = kappa(rx, KAPPA_FX);
+        let ky = kappa(ry, KAPPA_FX);
         self.move_fx(cx + rx, cy);
         self.cubic_fx(cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry);
         self.cubic_fx(cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy);

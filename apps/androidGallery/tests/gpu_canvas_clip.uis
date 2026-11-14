@@ -1,4 +1,5 @@
 #!args --verify-dirty
+#!lock desktop
 # a canvas from tiles under a scrolling parent's clip (lib/ui/gpu_out.rs, quad_blit; docs/GPU.md "Leinwände"):
 # the page scrolls under its header, the image view's top goes below it.  Where the GPU draws the canvas the
 # framebuffer gets its pixels later (gp_settle), and only what shows of it: every presented image is read

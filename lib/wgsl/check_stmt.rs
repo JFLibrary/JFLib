@@ -761,7 +761,14 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        let id = self.node(&r);
+        let mut id = self.node(&r);
+        // a vector left side and a scalar right side: splat the scalar as binary_te does
+        // (except float multiply), or `v += 1.0` would reach the backends as vector op scalar
+        let (wl, wr) = (self.t.width(sig.p[0]), self.t.width(r.ty));
+        let float_mul = op == BinOp::Mul && self.t.scalar_of(sig.p[0]).is_some_and(|s| s.is_float());
+        if !matches!(op, BinOp::Shl | BinOp::Shr) && !float_mul && wr == Some(1) && wl.is_some_and(|w| w > 1) {
+            id = self.push(ir::ExprKind::Splat(id), sig.p[0], r.span);
+        }
         Ok((sig.ret, id))
     }
 }

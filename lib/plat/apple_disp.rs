@@ -118,10 +118,16 @@ pub use super::ios::{file_dialog, file_dialog_poll};
 
 /// macOS: /usr/bin/open with the argument (LaunchServices), waited for up to 5 s -> 0 / -1; iOS: -1
 fn open_with_launch_services(arg: &str) -> i32 {
+    open_with(&[arg])
+}
+
+// /usr/bin/open with args, the last one the path or URL (never one that reads as an option)
+fn open_with(args: &[&str]) -> i32 {
+    let arg = args.last().copied().unwrap_or("");
     if cfg!(target_os = "ios") || arg.is_empty() || arg.starts_with('-') {
         return -1;
     }
-    let c = crate::process::Command { program: "/usr/bin/open", args: &[arg], cwd: None, env: &[] };
+    let c = crate::process::Command { program: "/usr/bin/open", args, cwd: None, env: &[] };
     let Ok(mut child) = c.spawn_own() else { return -1 };
     child.close_stdin();
     for _ in 0..500 {
@@ -134,12 +140,16 @@ fn open_with_launch_services(arg: &str) -> i32 {
     -1
 }
 
-/// show a folder / a file in the Finder -> 0 / -1  [plat_open_folder]
+/// show a folder / a file in the Finder -> 0 / -1  [plat_open_folder].  A plain folder opens; a
+/// file or a package (a folder with an extension: Name.app, .bundle ...) is only shown, selected
+/// in its folder (open -R): `open` alone would start an app or a .command script
 pub fn open_folder(path: &str) -> i32 {
     if !crate::policy::fs_allowed(path, crate::policy::FS_READ) {
         return -1;
     }
-    open_with_launch_services(path)
+    let name = path.trim_end_matches('/').rsplit('/').next().unwrap_or("");
+    let plain_dir = crate::fs::stat(path).is_some_and(|m| m.is_dir()) && !name.contains('.');
+    if plain_dir { open_with(&[path]) } else { open_with(&["-R", path]) }
 }
 
 /// a web page in the default application (iOS: UIApplication openURL) -> 0 / -1  [plat_open_url]

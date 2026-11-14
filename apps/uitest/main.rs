@@ -280,6 +280,53 @@ fn settings(t: &mut T) {
     t.eq("item key", items[2], IniItem::Key { line: 5, sec: "Sec", key: "key", value: "v w" });
     t.eq("item bad", items[3], IniItem::Bad { line: 6, text: &b"nonsense"[..] });
     t.eq("item bad header", items[4], IniItem::Bad { line: 7, text: &b"[bad"[..] });
+    settings_roundtrip(t);
+}
+
+const S_NOTE: Key<String> = Key::text("misc.note", "", 3); // not in the schema
+const S_BIG: Key<String> = Key::text("misc.big", "", 100_000); // not in the schema
+
+// what a restart reads back is what was set: a reset leaves no line of the key (an explicit
+// default, a value that read as the default, a second line), texts are kept as the file holds
+// them, a value too long for a line is not set
+fn settings_roundtrip(t: &mut T) {
+    let reload = |s: &Settings| Settings::from_ini(Ini::parse(&s.ini().to_bytes()), &SCHEMA2);
+    let mut s = Settings::from_ini(Ini::parse(b"version=2\n[view]\nzoom=100\n"), &SCHEMA2);
+    t.check("reset of an explicit default removes its line", s.reset(&S_ZOOM) && s.ini().get("view", "zoom").is_none() && s.dirty());
+    let mut s = Settings::from_ini(Ini::parse(b"version=2\n[view]\nzoom=abc\n"), &SCHEMA2);
+    t.check("set to the default removes a line that read as it", s.set(&S_ZOOM, 100) && s.ini().get("view", "zoom").is_none());
+    let mut s = Settings::from_ini(Ini::parse(b"version=2\n[view]\nzoom=120\nzoom=200\n"), &SCHEMA2);
+    t.check("reset removes every line of the key", s.reset(&S_ZOOM) && s.ini().get("view", "zoom").is_none());
+    t.eq("... a reload gives the default", reload(&s).get(&S_ZOOM), 100);
+    let mut s = Settings::from_ini(Ini::parse(b"version=2\n[misc]\nextra=5\nextra=9\n"), &SCHEMA2);
+    t.check("reset outside the schema removes every line", s.reset(&S_EXTRA) && s.ini().get("misc", "extra").is_none());
+    // texts (S_NAME: at most 8 bytes)
+    let mut s = Settings::new(&SCHEMA2);
+    s.set(&S_NAME, String::from("  Ada\nL  "));
+    t.eq("text: a line break as a blank, no blanks around it", s.text(&S_NAME), "Ada L");
+    t.eq("... the same after a reload", reload(&s).text(&S_NAME), "Ada L");
+    s.set(&S_NAME, String::from("abcdefg hij"));
+    t.eq("text cut without a blank at its end", (s.text(&S_NAME), reload(&s).text(&S_NAME)), ("abcdefg", "abcdefg"));
+    let s = Settings::from_ini(Ini::parse(b"[misc]\nnote=abcdef\n"), &SCHEMA2);
+    t.eq("text of a key outside the schema keeps its maximum, as get", (s.text(&S_NOTE), s.get(&S_NOTE).as_str()), ("abc", "abc"));
+    let mut s = Settings::new(&SCHEMA2);
+    t.check("a value too long for a line of the file is not set", !s.set(&S_BIG, "x".repeat(70_000)) && s.ini().get("misc", "big").is_none());
+    // Ini: a line longer than 64 KiB would read back as a malformed line
+    let mut ini = Ini::new();
+    t.check("Ini::set refuses a line over 64 KiB", !ini.set("S", "k", &"x".repeat(65_535)) && ini.set("S", "k", &"x".repeat(65_534)));
+    t.check("... the longest one reads back", Ini::parse(&ini.to_bytes()).get("S", "k").map(str::len) == Some(65_534));
+    t.check("... nor a header over it", !ini.set(&"s".repeat(65_535), "k", "v") && ini.sections() == alloc::vec!["S"]);
+    t.check("Ini::set drops the blanks around a value", ini.set("S", "b", "  v w \t") && ini.get("S", "b") == Some("v w"));
+    // sections() of a file with many headers: one lookup per header
+    let mut text = Vec::new();
+    for i in 0..50_000 {
+        text.extend_from_slice(format!("[s{i}]\n").as_bytes());
+    }
+    let ini = Ini::parse(&text);
+    let t0 = plat::time_us();
+    let n = ini.sections().len();
+    let us = plat::time_us() - t0;
+    t.check(&format!("sections of 50000 headers in under a second ({} ms)", us / 1000), n == 50_000 && us < 1_000_000);
 }
 
 // ---- app themes (ui::theme, the theme file)
@@ -469,6 +516,21 @@ fn segment(t: &mut T) {
     t.eq("soft hyphen", wrap_end_hyph(s, 0, s.len(), &mut hfits(10), None), (9, true));
     t.eq("soft hyphen, the hyphen does not fit", wrap_end_hyph(s, 0, s.len(), &mut hfits(9), Some(&mut hook)), (4, false));
     t.eq("words with digits stay whole", wrap_end_hyph("x Silbentrennung2", 0, 17, &mut hfits(12), Some(&mut hook)), (2, false));
+    // a hyphen wider than the text after it (3): the plain break after "c" fits although the
+    // soft hyphen before it did not
+    let mut wide = |a: usize, b: usize, h: bool| b - a + 3 * h as usize <= 6;
+    t.eq("a plain break after a soft hyphen that does not fit", wrap_end_hyph("ab\u{AD}c d", 0, 7, &mut wide, None), (6, false));
+    // 3000 soft hyphens: once one does not fit, the later ones are not measured (each fits
+    // call measures from the line's start: measuring them all was cubic over the lines)
+    let long = "ab\u{AD}".repeat(3000);
+    let mut calls = 0usize;
+    let mut counted = |a: usize, b: usize, h: bool| {
+        calls += 1;
+        b - a + h as usize <= 10
+    };
+    let r = wrap_end_hyph(&long, 0, long.len(), &mut counted, None);
+    t.eq("many soft hyphens: the line", r, (8, true));
+    t.check("many soft hyphens: a few measurements, not one per soft hyphen", calls < 20);
     t.eq("wrap_end ignores soft hyphens' hyphen", wrap_end(s, 0, s.len(), &mut fits(9)), 9);
     t.check("version", unicode_version().starts_with("15."));
 }

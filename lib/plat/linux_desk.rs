@@ -144,6 +144,9 @@ pub(crate) fn portal_request(
     opts.insert(0, ("handle_token", Value::S(tok)));
     args.push(Value::dict(opts));
     let serial = c.send(&Msg::call(PORTAL, PORTAL_PATH, iface, member, args)).ok_or(PortalError::Failed(String::new()))?;
+    // the portal's unique name, the sender of its reply: only its Response counts (the request
+    // path is predictable, and any client on the bus may send a signal on it)
+    let mut portal = String::new();
     let end = crate::time_us() + ms * 1000;
     loop {
         let now = crate::time_us();
@@ -162,11 +165,12 @@ pub(crate) fn portal_request(
                 return Err(if missing { PortalError::Missing } else { PortalError::Failed(m.error) });
             }
             crate::linux_dbus::T_RETURN if m.reply_to == serial => {
+                portal = m.sender.clone();
                 if let Some(p) = m.body.first().and_then(|v| v.as_str()) {
                     handle = String::from(p); // older portals choose the path themselves
                 }
             }
-            crate::linux_dbus::T_SIGNAL if m.member == "Response" && m.path == handle => {
+            crate::linux_dbus::T_SIGNAL if m.member == "Response" && m.path == handle && !portal.is_empty() && m.sender == portal => {
                 let code = m.body.first().and_then(|v| v.as_u32()).unwrap_or(2);
                 return Ok((code, results(m.body.get(1))));
             }

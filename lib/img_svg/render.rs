@@ -11,7 +11,10 @@
 // Text needs a TextHook (the app's font engine): one line per text chunk, tspans with their
 // own style and x / y / dx / dy (first values), text-anchor; without a hook text is skipped.
 // Limits: MAX_DRAWS element visits per render, MAX_NEST nesting (groups, use), MAX_LAYERS
-// layers alive at once (deeper opacity is applied to the paints), use cycles are cut.
+// layers alive at once (deeper opacity is applied to the paints), use cycles are cut; the work
+// of a render (pixels painted, layers, masks and images allocated, path points filled and
+// walked, children and text walked) is bounded by WORK_PER_PX per pixel of the drawn area, at
+// least MIN_WORK: a use DAG multiplies visits, each may cover the whole surface.
 
 use alloc::rc::Rc;
 use alloc::string::String;
@@ -37,6 +40,8 @@ const MAX_LAYERS: u32 = 8;
 // element visits of all bounds queries per render (a use DAG makes one query exponential)
 const MAX_BOUNDS: u32 = 4_000_000;
 const MAX_LAYER_PX: u64 = 1 << 26;
+const WORK_PER_PX: u64 = 64;
+const MIN_WORK: u64 = 1 << 26;
 const MAX_STOPS: usize = 1024;
 const KAPPA: f64 = 0.5522847498307936;
 // the bounds of content whose extent is not followed (everything)
@@ -307,6 +312,10 @@ fn empty(r: [i32; 4]) -> bool {
     r[2] <= r[0] || r[3] <= r[1]
 }
 
+fn area_px(r: [i32; 4]) -> u64 {
+    if empty(r) { 0 } else { (r[2] - r[0]) as u64 * (r[3] - r[1]) as u64 }
+}
+
 // a float box (x0, y0, x1, y1) rounded outwards to device pixels (+1 px of anti-aliasing)
 fn ibox(b: [f64; 4]) -> [i32; 4] {
     let c = |v: f64| v.clamp(-4.0e6, 4.0e6);
@@ -448,6 +457,8 @@ struct R<'a, 'h> {
     layer_px: u64, // pixels of the layers alive (bounded by MAX_LAYER_PX)
     active: Vec<u32>, // use targets being drawn (cycles)
     op_mul: f64,      // the opacity of groups beyond MAX_LAYERS
+    work: u64,        // the work done so far (bounded by work_max)
+    work_max: u64,
 }
 
 /// a text run: its string, style and position changes
@@ -461,17 +472,29 @@ struct Run {
 }
 
 impl<'a, 'h> R<'a, 'h> {
+    /// count n units of work: false once the render's budget is spent (nothing more is drawn)
+    fn charge(&mut self, n: u64) -> bool {
+        self.work = self.work.saturating_add(n);
+        self.work <= self.work_max
+    }
+
     fn fill_shader(&mut self, t: &mut Tgt, rule: u32, sh: &Shader, mask: Option<&Mask>) {
         let clip = match mask {
             Some(m) => inter(t.clip, m.r),
             None => t.clip,
         };
-        if empty(clip) {
+        let pts = self.path.pts_mut().len() as u64;
+        if empty(clip) || !self.charge(pts) {
             return;
         }
         self.path.fill_lines(&mut self.ras);
         let buf = &mut self.buf;
-        self.ras.fill_rows(clip, rule, &mut |y, x, cov| paint::span(t, y, x, cov, sh, mask, buf));
+        let mut painted = 0u64;
+        self.ras.fill_rows(clip, rule, &mut |y, x, cov| {
+            painted += cov.len() as u64;
+            paint::span(t, y, x, cov, sh, mask, buf)
+        });
+        self.charge(painted);
     }
 
     // the style chain of a node from the root (clipPath children, gradient stops)
@@ -550,6 +573,9 @@ impl<'a, 'h> R<'a, 'h> {
         let mut stops: Vec<(f64, u32)> = Vec::new();
         for &c in &chain {
             let Some(g) = doc.node(c) else { continue };
+            if !self.charge(g.kids.len() as u64) {
+                return Ok(None);
+            }
             for kid in &g.kids {
                 let Item::El(s) = kid else { continue };
                 let Some(sn) = doc.node(*s) else { continue };
@@ -668,6 +694,9 @@ impl<'a, 'h> R<'a, 'h> {
             // a nested viewport: its mapping is not followed here (the whole area)
             Kind::Svg if k != 0 => Some(ALL),
             Kind::G | Kind::A | Kind::Switch | Kind::Svg | Kind::Symbol => {
+                if !self.charge(n.kids.len() as u64) {
+                    return None;
+                }
                 let mut b = None;
                 for kid in &n.kids {
                     if let Item::El(c) = kid {
@@ -708,6 +737,9 @@ impl<'a, 'h> R<'a, 'h> {
             }
             _ => {
                 let g = geometry(n, &cs, vp)?;
+                if !self.charge(g.pd().slot_count() as u64) {
+                    return None;
+                }
                 let mut b = g.pd().bounds(Some(&m2))?;
                 if stroke && cs.stroke != Paint::None {
                     let w = cs.sw.get(cs.fs, vp.diag()) * scale_of(&m2);
@@ -750,6 +782,9 @@ impl<'a, 'h> R<'a, 'h> {
         }
         let root = Style::root(0xFF00_0000);
         let cs = self.style_of(k, &root);
+        if !self.charge(n.kids.len() as u64) {
+            return Some(Mask::new([0, 0, 0, 0]));
+        }
         // the bounds of the clip shapes
         let mut b = None;
         for kid in &n.kids {
@@ -759,7 +794,7 @@ impl<'a, 'h> R<'a, 'h> {
         }
         let Some(b) = b else { return Some(Mask::new([0, 0, 0, 0])) };
         let r = inter(area, ibox(b));
-        if empty(r) {
+        if empty(r) || !self.charge(area_px(r)) {
             return Some(Mask::new([0, 0, 0, 0]));
         }
         let mut mask = Mask::new(r);
@@ -822,9 +857,18 @@ impl<'a, 'h> R<'a, 'h> {
     }
 
     fn mask_fill(&mut self, mask: &mut Mask, rule: u32) {
+        let pts = self.path.pts_mut().len() as u64;
+        if !self.charge(pts) {
+            return;
+        }
         self.path.fill_lines(&mut self.ras);
         let r = mask.r;
-        self.ras.fill_rows(r, rule, &mut |y, x, cov| mask.add(y, x, cov));
+        let mut painted = 0u64;
+        self.ras.fill_rows(r, rule, &mut |y, x, cov| {
+            painted += cov.len() as u64;
+            mask.add(y, x, cov)
+        });
+        self.charge(painted);
     }
 
     // a rectangular clip (nested svg viewports) as a mask
@@ -838,6 +882,9 @@ impl<'a, 'h> R<'a, 'h> {
         let mut area = inter(area, ibox(rect_box(m, r)));
         if let Some(p) = parent {
             area = inter(area, p.r);
+        }
+        if !self.charge(area_px(area)) {
+            return Mask::new([0, 0, 0, 0]);
         }
         let mut mask = Mask::new(if empty(area) { [0, 0, 0, 0] } else { area });
         if !empty(area) {
@@ -864,7 +911,7 @@ impl<'a, 'h> R<'a, 'h> {
             Kind::Svg | Kind::G | Kind::A | Kind::Switch | Kind::Use | Kind::Path | Kind::Rect | Kind::Circle | Kind::Ellipse | Kind::Line
                 | Kind::Polyline | Kind::Polygon | Kind::Text | Kind::Image
         );
-        if !drawable || display_none(n) || self.draws >= MAX_DRAWS || self.depth >= MAX_NEST || empty(t.clip) {
+        if !drawable || display_none(n) || self.draws >= MAX_DRAWS || self.work > self.work_max || self.depth >= MAX_NEST || empty(t.clip) {
             return;
         }
         self.draws += 1;
@@ -944,7 +991,8 @@ impl<'a, 'h> R<'a, 'h> {
             if let Some(mk) = mask {
                 r = inter(r, mk.r);
             }
-            if !empty(r) {
+            // (the layer's pixels: allocated, cleared and composited)
+            if !empty(r) && self.charge(area_px(r)) {
                 let mut sf = Surface::new(r[2] - r[0], r[3] - r[1], FMT_PARGB);
                 if !sf.px.is_empty() {
                     self.layers += 1;
@@ -970,6 +1018,9 @@ impl<'a, 'h> R<'a, 'h> {
     #[allow(clippy::too_many_arguments)]
     fn content(&mut self, t: &mut Tgt, n: &Node, cs: &Style, m: &Matrix, vp: Vp, mask: Option<&Mask>, op: f64) {
         let doc = self.doc;
+        if matches!(n.kind, Kind::Svg | Kind::G | Kind::A | Kind::Switch) && !self.charge(n.kids.len() as u64) {
+            return;
+        }
         match n.kind {
             Kind::Svg | Kind::G | Kind::A => {
                 for kid in &n.kids {
@@ -1014,7 +1065,7 @@ impl<'a, 'h> R<'a, 'h> {
                             }
                             let vmask = if overflow_visible(tn) { None } else { Some(self.rect_mask(&m3, [0.0, 0.0, w, h], t.clip, mask)) };
                             let mk = vmask.as_ref().or(mask);
-                            if !mk.is_some_and(|x| empty(x.r)) {
+                            if !mk.is_some_and(|x| empty(x.r)) && self.charge(tn.kids.len() as u64) {
                                 for kid in &tn.kids {
                                     if let Item::El(c) = kid {
                                         self.el(t, *c, &ss, &m4, vp3, mk);
@@ -1109,7 +1160,7 @@ impl<'a, 'h> R<'a, 'h> {
         if let Some(mk) = mask {
             area = inter(area, mk.r);
         }
-        if empty(area) {
+        if empty(area) || !self.charge(area_px(area)) {
             return;
         }
         let Some(inv) = invert(&f) else { return };
@@ -1174,8 +1225,9 @@ impl<'a, 'h> R<'a, 'h> {
         }
     }
 
-    // the runs with the blanks collapsed across them (xml:space default)
-    fn text_runs(&self, n: &Node, cs: &Style) -> Vec<Run> {
+    // the runs with the blanks collapsed across them (xml:space default); none once the
+    // render's budget is spent (their length is charged)
+    fn text_runs(&mut self, n: &Node, cs: &Style) -> Vec<Run> {
         let mut runs = Vec::new();
         self.runs(n, cs, &mut runs, 0);
         let mut prev_space = true;
@@ -1199,6 +1251,9 @@ impl<'a, 'h> R<'a, 'h> {
             if last.s.ends_with(' ') {
                 last.s.pop();
             }
+        }
+        if !self.charge(runs.iter().map(|r| r.s.len() as u64 + 1).sum()) {
+            runs.clear();
         }
         runs
     }
@@ -1445,6 +1500,8 @@ impl Svg {
             layer_px: 0,
             active: Vec::new(),
             op_mul: 1.0,
+            work: 0,
+            work_max: (area_px(area) * WORK_PER_PX).max(MIN_WORK),
         };
         // the root's rectangle clip when m rotates / skews (an axis-aligned m is exact)
         let rot = m.b != 0.0 || m.d != 0.0;

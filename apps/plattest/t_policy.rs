@@ -22,6 +22,10 @@ pub fn t_policy(t: &mut T) {
     normalize_rules(t);
     patterns(t);
     refused_manifests(t);
+    // before the manifest (all is allowed): a path is no URL, the system's opener would start it
+    t.check(!policy::url_allowed("C:\\Windows\\notepad.exe") && !policy::url_allowed("\\\\server\\share\\x.exe")
+            && !policy::url_allowed("x.exe") && !policy::url_allowed("1x:y") && policy::url_allowed("https://example.org"),
+            "policy: a path is no URL (without a manifest too)");
     installed(t);
 }
 
@@ -128,9 +132,10 @@ fn installed(t: &mut T) {
     let listener = TcpListener::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0)).ok();
     let port = listener.as_ref().and_then(|l| l.local_addr().ok()).map_or(0, |a| a.port);
     t.check(port != 0, "policy: a loopback listener before the policy");
+    let here = cwd.replace('\\', "/");
     let manifest = format!(
-        "# plattest --test policy\nfs.read {base}/ro/**\nfs.write {base}/rw/**   # writes imply reads\nfs.user\n\
-         process plattest-no-such-program\nurl https MailTo\n\
+        "# plattest --test policy\nfs.read {base}/ro/**\nfs.write {base}/rw/**   # writes imply reads\nfs.write {base}/one.txt\nfs.user\n\
+         process plattest-no-such-program {here}/plattest-tool\nurl https MailTo\n\
          net.connect 127.0.0.1:{port} *.example.test:443 printer.lan:631-632\nnet.listen 127.0.0.1:0\n"
     );
     let key = match policy::install(&manifest) {
@@ -173,6 +178,22 @@ fn installed(t: &mut T) {
     t.check(plat::fs::stat(&p("no/secret.txt")).is_none(), "policy: fs::stat outside refused");
     t.check(plat::fs::read_dir(&p("no")).is_none(), "policy: fs::read_dir outside refused");
     t.check(!plat::fs::write_file_private(&p("no/x.txt"), b"x"), "policy: fs::write_file_private outside refused");
+    // a rule for the file alone: its folder's fsync after the rename is no second check
+    t.check(plat::fs::write_file_private(&p("one.txt"), b"1") && plat::read_file(&p("one.txt")).as_deref() == Some(&b"1"[..]),
+        "policy: fs::write_file_private of a file whose folder is not in the rules");
+    // links: the rules check the path as written, so a link must not lead where the app may not write
+    t.check(!plat::fs::symlink(&p("no/secret.txt"), &p("rw/l1"), false), "policy: a link to a file outside the rules refused");
+    t.check(!plat::fs::symlink("../no/secret.txt", &p("rw/l2"), false), "policy: a relative link out of fs.write refused");
+    t.check(!plat::fs::symlink(&p("ro/a.txt"), &p("rw/l3"), false), "policy: a link to a file the app may only read refused");
+    t.check(plat::fs::lstat(&p("rw/l1")).is_none() && plat::fs::lstat(&p("rw/l2")).is_none() && plat::fs::lstat(&p("rw/l3")).is_none(),
+        "policy: no refused link was made");
+    if !cfg!(windows) {
+        // (Windows makes links only in developer mode)
+        t.check(plat::fs::symlink("c.txt", &p("rw/l4"), false), "policy: a relative link inside fs.write");
+    }
+    t.check(!plat::fs::hard_link(&p("ro/a.txt"), &p("rw/h1")), "policy: a hard link to a file the app may only read refused");
+    t.check(plat::fs::hard_link(&p("rw/c.txt"), &p("rw/h2")), "policy: a hard link inside fs.write");
+    t.check(plat::watch::Watcher::new(&[p("no")]).is_err(), "policy: Watcher::new outside the rules refused");
     if cfg!(windows) {
         t.check(plat::read_file(&p("RO/A.TXT")).is_some(), "policy: Windows compares without case");
         t.check(plat::read_file(&format!("{}:stream", p("ro/a.txt"))).is_none(), "policy: a stream name is refused");
@@ -192,6 +213,12 @@ fn installed(t: &mut T) {
     let e = plat::process::launch("plattest-other-program", &[]).err();
     t.check(e == Some(if cfg!(windows) { 5 } else { 13 }), "policy: process::launch outside the rules is refused");
     t.check(policy::process_allowed("plattest-no-such-program"), "policy: a listed program name");
+    // a relative path with a working folder: Linux and Apple start cwd/program, which is checked
+    // (the listed path is the same name below this process's folder; Windows starts that one)
+    let cmd = plat::process::Command { program: "./plattest-tool", args: &[], cwd: Some(&p("no")), env: &[] };
+    let e = cmd.spawn().err();
+    let ok = if cfg!(windows) { e.is_some() && e != Some(5) } else { e == Some(13) };
+    t.check(ok, &format!("policy: a relative program with cwd is checked where it starts ({e:?})"));
     t.check(policy::url_allowed("https://example.org") && policy::url_allowed("mailto:a@b"), "policy: listed URL schemes");
     t.expect_i(plat::open_url("ftp://example.org") as i64, -1, "policy: open_url of another scheme refused");
     t.check(plat::lib_open(&p("ro/plugin.dll")).is_err(), "policy: lib_open without plugins refused");

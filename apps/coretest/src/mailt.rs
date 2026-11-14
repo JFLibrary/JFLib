@@ -70,6 +70,7 @@ fn smtp_commands(t: &mut T) {
     t.eq("source route", smtp::parse_path("TO:<@x.lab,@y.lab:bob@b.lab>", "TO").map(|p| p.addr), Some(s("bob@b.lab")));
     t.eq("no brackets", smtp::parse_path("FROM:anna@a.lab", "FROM"), None);
     t.eq("wrong keyword", smtp::parse_path("TO:<a@b>", "FROM"), None);
+    t.eq("the keyword's length inside a character", smtp::parse_path("F\u{e9}\u{20ac}:<a@b>", "FROM"), None);
     t.eq("format", smtp::fmt_path("FROM", "anna@a.lab", &[("SIZE", "345"), ("BODY", "8BITMIME")]), s("FROM:<anna@a.lab> SIZE=345 BODY=8BITMIME"));
     t.eq("auth plain", smtp::auth_plain("anna", "geheim"), s("AGFubmEAZ2VoZWlt"));
     t.eq("auth plain back", smtp::plain_of("AGFubmEAZ2VoZWlt"), Some((s("anna"), s("geheim"))));
@@ -298,5 +299,15 @@ fn segments(t: &mut T) {
     t.eq("pop3 continuation", decode::info(&rest), (Proto::Pop3, s("S: DATA fragment, 11 bytes")));
     let bad = segment(40002, pop3::PORT_POP3, b"HELO x\r\n");
     t.eq("pop3 unknown command", decode::layers(&bad).iter().find(|l| l.proto == Proto::Pop3).map(|l| l.problems.clone()), Some(alloc::vec![s("a command POP3 does not define: HELO")]));
+    // a character right after "+OK" (the description was cut inside it), one after a reply's
+    // enhanced code, bytes that are no UTF-8 in a parameter
+    let p8 = segment(pop3::PORT_POP3, 40002, "+OK\u{e9}t\u{e9}\r\n".as_bytes());
+    t.eq("pop3 a character after +OK", fields(&p8, Proto::Pop3).iter().find(|x| x.0 == "Response indicator").map(|x| x.1.clone()), Some(s("+OK")));
+    let r8 = segment(smtp::PORT_SMTP, 40000, "250 2.1.0\u{e9}x\r\n".as_bytes());
+    t.eq("smtp a character after the enhanced code", fields(&r8, Proto::Smtp).iter().find(|x| x.0 == "Response code").map(|x| x.1.clone()), Some(s("250")));
+    let in_frame = |f: &[u8]| decode::layers(f).iter().all(|l| l.fields.iter().all(|x| x.off as u64 + x.len as u64 <= f.len() as u64));
+    let c8 = segment(40000, smtp::PORT_SMTP, b"MAIL \xff\xff\xffFROM:<a@b>\r\n");
+    let q8 = segment(40002, pop3::PORT_POP3, b"USER \xff\xff\xff\r\n");
+    t.check("fields of lines with bytes that are no UTF-8 stay in the frame", in_frame(&c8) && in_frame(&q8));
     t.eq("names", (Proto::Smtp.name(), Proto::Pop3.name()), ("SMTP", "POP3"));
 }

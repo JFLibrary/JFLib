@@ -467,6 +467,32 @@ fn heights(t: &mut T) {
     t.eq(st.first_visible().0, n - 1, "beyond the end: the last row");
 }
 
+// images of a document that are no regular file: a device (/dev/zero was read until memory ran
+// out), a network path (Windows connected to the server just to show the picture) -- the view
+// shows their alt text at once
+fn odd_images(t: &mut T) {
+    t.group = "images";
+    struct View(MdViewState);
+    impl App for View {
+        fn frame(&mut self, ui: &mut Ui) {
+            ui.next_size(-1, -1);
+            // (Markdown's escapes: \\ is one backslash)
+            ui.markdown_view(1, &mut self.0, r"![zero](/dev/zero) ![unc](//127.0.0.1/share/x.png) ![unc2](\\\\127.0.0.1\\share\\x.png) ![dev](\\\\.\\NUL)", MV_NO_FRAME);
+        }
+    }
+    const D: AppDesc = AppDesc { title: "images", w: 480, h: 320, ..AppDesc::NONE };
+    let Ok(mut rt) = ui::Runtime::new(&D, View(MdViewState::new()), &style::STYLE) else {
+        return t.check(false, "the view starts headless");
+    };
+    let t0 = plat::time_us();
+    rt.step(50, &[]);
+    let ms = (plat::time_us() - t0) / 1000;
+    t.check(ms < 3000, &format!("devices and network paths are not read ({ms} ms)"));
+    let s = rt.ui().a11y_tree();
+    let alts = s.wins.first().map_or(0, |w| w.nodes.iter().filter(|n| n.role == plat::a11y::Role::Image).count());
+    t.eq(alts, 4, "their alt texts are shown");
+}
+
 // the view in a headless runtime as screen readers get it (ui/a11y.rs): headings with their
 // level inside the document's group, the paragraph a label, the link a link; a click on the link
 // (no id of its own: a pointer click through the document's box)
@@ -1203,6 +1229,7 @@ pub fn run() -> i32 {
     dom_cost(&mut t);
     css(&mut t);
     a11y(&mut t);
+    odd_images(&mut t);
     forms(&mut t);
     form_view(&mut t);
     blocks_md(&mut t);

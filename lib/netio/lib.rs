@@ -63,6 +63,12 @@ pub trait Stream: Send + Sync {
     fn wait_readable(&self, _ms: u32) -> bool {
         true
     }
+    /// after read gave Ok(0): whether the peer ended the stream in order.  TLS: only after its
+    /// close_notify -- a TCP end without one may be an attacker cutting a body that runs to the
+    /// end of the connection (HTTP without a length).  Plain streams: always
+    fn end_is_clean(&self) -> bool {
+        true
+    }
 }
 
 impl Stream for TcpStream {

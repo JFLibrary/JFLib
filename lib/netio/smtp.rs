@@ -2,7 +2,8 @@
 //
 //   send(&SmtpConfig, &Mail) -> Result<String, String>   the server's final answer or the
 //                                                        reason it failed (German, for people)
-//   Security::StartTls (port 587) / Tls (465) / None (25; refuses to authenticate in clear)
+//   Security::StartTls (port 587) / Tls (465) / None (25; plain to any server, e.g. a relay
+//   inside a network, and refuses to authenticate in clear: with a user name it is an error)
 //   AUTH PLAIN or LOGIN (whatever the server offers; PLAIN first)
 //   message(&Mail, host, now) -> the RFC 5322 text: UTF-8 subject as an encoded word, the body
 //   text/plain (and text/html as multipart/alternative) in base64, Date and Message-ID
@@ -294,7 +295,7 @@ pub fn message(mail: &Mail, host: &str, now: i64) -> String {
     m.push_str(&format!("To: {}\r\n", mail.to.join(", ")));
     m.push_str(&format!("Subject: {}\r\n", encoded_word(&mail.subject)));
     m.push_str(&format!("Date: {}\r\n", rfc5322_date(now)));
-    m.push_str(&format!("Message-ID: <{}@{}>\r\n", id, if host.is_empty() { "backupcraft" } else { host }));
+    m.push_str(&format!("Message-ID: <{}@{}>\r\n", id, if host.is_empty() { "jflib" } else { host }));
     m.push_str("MIME-Version: 1.0\r\n");
     m.push_str("Auto-Submitted: auto-generated\r\n");
     let text = mail.text.replace("\r\n", "\n").replace('\n', "\r\n");
@@ -302,7 +303,7 @@ pub fn message(mail: &Mail, host: &str, now: i64) -> String {
         m.push_str("Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n");
         m.push_str(&wrap76(&b64(text.as_bytes())));
     } else {
-        let boundary = format!("=_bc_{}", id);
+        let boundary = format!("=_jf_{}", id);
         m.push_str(&format!("Content-Type: multipart/alternative; boundary=\"{}\"\r\n\r\n", boundary));
         m.push_str(&format!("--{}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n", boundary));
         m.push_str(&wrap76(&b64(text.as_bytes())));

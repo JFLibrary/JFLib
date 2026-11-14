@@ -29,14 +29,25 @@ click "Hoher Kontrast"
 shot build/mdviewtest/md_hc.png
 click "Hoher Kontrast"
 theme light
-# a page further: code, the table (a record per cell), the images (an SVG, a PNG, one that is
-# never fetched: its alt text in a frame)
+# a page further: code, the table (a table record around its rows, a record per row and per cell:
+# the header row's cells column headers, every cell with its place), the images (an SVG, a PNG,
+# one that is never fetched: its alt text in a frame)
 click 900,360
 key pgdn
 expect "Hilfe" value 518
 expect heading:"Tabelle" exists
-expect text:"Äpfel" exists
-expect text:"a|b" exists
+expect cell:"Äpfel" exists
+expect cell:"a|b" exists
+expect text:"Äpfel" missing
+a11y expect colheader:"Preis" role columnheader
+a11y expect colheader:"Preis" cell 0 2
+a11y expect cell:"Äpfel" cell 1 0
+a11y expect cell:"0,80 €" cell 2 2
+a11y expect cell:"Äpfel" parent row:"Äpfel 3 1,20 €"
+a11y expect row:"Name Menge Preis" children 3
+a11y expect row:"Äpfel 3 1,20 €" parent table:""
+a11y expect table:"" grid 4 3
+a11y expect table:"" children 4
 expect link:"Preisliste" exists
 expect image:"Logo" exists
 expect image:"Raster" exists
@@ -62,8 +73,9 @@ expect heading:"HTML-Betrachter" value 1
 expect listitem:"Fünf" value 5
 expect listitem:"Sechs" value 6
 expect listitem:"Unterpunkt" exists
-expect text:"Spalte A" exists
-expect text:"22" exists
+expect colheader:"Spalte A" exists
+expect cell:"22" exists
+a11y expect cell:"22" cell 2 1
 expect link:"Link" exists
 shot build/mdviewtest/html_light.png
 theme dark

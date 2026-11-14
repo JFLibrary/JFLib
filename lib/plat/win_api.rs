@@ -125,7 +125,7 @@ pub(crate) mod win_uia;
 #[path = "win_dnd.rs"]
 pub(crate) mod win_dnd;
 pub(crate) use win_dnd::os_drag_start;
-pub use win_dnd::{dnd_test_drop, dnd_test_formats, dnd_test_source};
+pub use win_dnd::{dnd_test_async_end, dnd_test_drop, dnd_test_drop_async, dnd_test_formats, dnd_test_source};
 pub use win_uia::{
     UiaTestAct, UiaTestCaret, UiaTestElem, uia_test_act, uia_test_caret, uia_test_caret_move, uia_test_events, uia_test_hwnd, uia_test_listen,
     uia_test_system_caret, uia_test_tree, uia_test_unlisten,
@@ -500,13 +500,11 @@ static W_CLASS: [u16; 6] = [0x4A, 0x46, 0x47, 0x55, 0x49, 0]; // "JFGUI"
 
 // ---------------------------------------------------------------- state
 
-/// UI-thread state: the windows, their window procedure and the callbacks
-struct UiThread<T>(T);
-
-// SAFETY: every field is a Cell that only the UI thread touches -- the thread that creates the
-// windows (their window procedure runs there) and calls the plat window API, as in the
-// assembly (no locks there either).  wake() from other threads uses win_thread.rs's atomics.
-unsafe impl<T> Sync for UiThread<T> {}
+// UI-thread state: the windows, their window procedure and the callbacks, in Cells that only the
+// UI thread touches -- the thread that creates the windows (their window procedure runs there)
+// and calls the plat window API; UiOnly refuses other threads.  wake() from other threads uses
+// win_thread.rs's atomics.
+use crate::ui_only::UiOnly;
 
 /// one window record (WW_* of the assembly)
 struct Ww {
@@ -635,7 +633,7 @@ struct St {
 const DRAWN_SIZES: usize = 4;
 const DRAWN_SLOTS: usize = crate::cursor_art::DRAWN_N * DRAWN_SIZES;
 
-static S: UiThread<St> = UiThread(St {
+static S: UiOnly<St> = UiOnly::new(St {
     ww: [const { Ww::new() }; PW_MAX],
     cursors: [const { Cell::new(0) }; CUR_TABLE as usize],
     refresh: Cell::new(None),
@@ -661,7 +659,7 @@ static S: UiThread<St> = UiThread(St {
 });
 
 fn st() -> &'static St {
-    &S.0
+    S.get()
 }
 
 /// the record of window w when it exists  [ww_rec]
@@ -1111,6 +1109,28 @@ fn live_refresh() {
     }
 }
 
+/// WM_ENDSESSION (TRUE): the UI takes E_SESSION_END (the app saves) inside the message, through
+/// the wait_refresh closure (else the set_refresh hook) -- when the message came while the UI
+/// waits (wait_refresh) and not inside one of those calls; elsewhere (a modal dialog of the
+/// app's own frame) the event only waits in the queue
+fn session_refresh() {
+    let s = st();
+    if s.in_refresh.get() {
+        return;
+    }
+    if let Some(p) = s.refresh_dyn.get() {
+        s.in_refresh.set(true);
+        // SAFETY: p is the closure wait_refresh borrowed for the duration of its call; this runs
+        // inside that call (a DispatchMessageW of its wait), never re-entered (in_refresh).
+        unsafe { (*p)() };
+        s.in_refresh.set(false);
+    } else if let Some(f) = s.refresh.get() {
+        s.in_refresh.set(true);
+        f();
+        s.in_refresh.set(false);
+    }
+}
+
 /// (win_dnd) redraw inside the modal loop of the app's own DoDragDrop: the wait_refresh
 /// closure (else the set_refresh hook) while events are queued -- the UI shows the
 /// highlight of its drop targets and moves the dragged label
@@ -1457,13 +1477,16 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             }
             1
         }
-        WM_QUERYENDSESSION | WM_ENDSESSION if w == 0 => {
-            // the app saves on E_SESSION_END right after this returns (before WM_ENDSESSION
-            // arrives: Windows asks every app first)
-            if (msg == WM_QUERYENDSESSION || wp != 0) && !ENDING.swap(true, core::sync::atomic::Ordering::Relaxed) {
+        // the question agrees and changes nothing (another app may still cancel: WM_ENDSESSION
+        // FALSE); a confirmed end queues E_SESSION_END and lets the UI take it before this
+        // returns -- Windows may end the process any time after that
+        WM_QUERYENDSESSION if w == 0 => 1,
+        WM_ENDSESSION if w == 0 => {
+            if wp != 0 && !ENDING.swap(true, core::sync::atomic::Ordering::Relaxed) {
                 win_push(E_SESSION_END, 0, 0, 0, 0);
+                session_refresh();
             }
-            if msg == WM_QUERYENDSESSION { 1 } else { 0 }
+            0
         }
         WM_DISPLAYCHANGE if w == 0 => {
             // a monitor came, went, moved or changed its mode (screen.rs: monitors())
@@ -1983,21 +2006,17 @@ impl Ww {
         let mut buf = self.kbuf.take();
         let dst: &mut [u8] = if self.kdc.get() != 0 {
             // SAFETY: the section holds kw * kh 32-bit pixels until kept_free; only this thread
-            // touches it, and no GDI call runs while this slice lives.
+            // touches it (copy_boxes lends row bands of the slice to the pool's workers and
+            // returns when they are done), and no GDI call runs while this slice lives.
             unsafe { core::slice::from_raw_parts_mut(self.kbits.get() as *mut u8, row * kh as usize) }
         } else {
             &mut buf[..]
         };
         if dst.len() >= row * kh as usize {
-            for q in rs {
-                let Some((x, y, w, h)) = clip_rect(q, kw.min(f.w), kh.min(f.h)) else { continue };
-                let (x0, n) = (x as usize * 4, w as usize * 4);
-                for yy in y as usize..(y + h) as usize {
-                    let s = yy * f.stride as usize + x0;
-                    let d = yy * row + x0;
-                    dst[d..d + n].copy_from_slice(&f.px[s..s + n]);
-                }
-            }
+            // (present_copy: a large copy in row bands on the pool, a 4K frame past the caches)
+            let (cw, ch) = (kw.min(f.w), kh.min(f.h));
+            let boxes: Vec<[i32; 4]> = rs.iter().filter_map(|q| clip_rect(q, cw, ch)).map(|(x, y, w, h)| [x, y, x + w, y + h]).collect();
+            crate::present_copy::copy_boxes(dst, row, f.px, f.stride as usize, &boxes, cw, ch);
         }
         self.kbuf.set(buf);
     }
@@ -2300,7 +2319,7 @@ fn pointer_free(msg: u32) -> bool {
         WM_CLOSE | WM_ACTIVATEAPP | WM_SETCURSOR | WM_MOUSEACTIVATE | WM_NCHITTEST | WM_NCACTIVATE
         | WM_NCMOUSEMOVE..=WM_NCLBUTTONDBLCLK | WM_KEYDOWN..=WM_SYSCHAR | WM_MOUSEMOVE..=WM_MOUSEHWHEEL
         | WM_CAPTURECHANGED | WM_NCPOINTERUPDATE..=WM_NCPOINTERUP | WM_POINTERUPDATE..=WM_POINTERCAPTURECHANGED
-        | WM_ENTERSIZEMOVE | WM_EXITSIZEMOVE
+        | WM_ENTERSIZEMOVE | WM_EXITSIZEMOVE | WM_QUERYENDSESSION | WM_ENDSESSION
         | WM_NCMOUSELEAVE | WM_MOUSELEAVE | WM_DISPLAYCHANGE)
 }
 

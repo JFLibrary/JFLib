@@ -19,8 +19,14 @@
 // absolute path -- below a top folder relative to it --, DeletionDate =
 // YYYY-MM-DDThh:mm:ss in UTC: plat has no local time on Linux), then the item is renamed to
 // files/NAME without replacing anything; a name in use gets ".2", ".3" ... before its
-// extension.  Nothing is copied across file systems, a mount point is not moved, and the
-// trash itself cannot be trashed.  Missing trash folders are created with mode 0700.
+// extension.  A file system without RENAME_NOREPLACE gets steps that fail on a taken name
+// themselves: a hard link and the old name's removal (files), an empty folder of our own that
+// the rename replaces (folders; a rename onto a folder with entries fails); a file system
+// without hard links refuses files then.  Nothing is copied across file systems, a mount point
+// is not moved, and a trash and what is in it cannot be trashed (the home trash by its
+// normalised name, a mount's .Trash and .Trash-$uid whichever is in use; names only, a link to
+// a trash is not seen).  Missing trash folders are created with mode 0700.  (tests)
+// jfgui_TEST_TRASH_FALLBACK set: those steps without trying RENAME_NOREPLACE.
 //
 // macOS: NSFileManager's trashItemAtURL:resultingItemURL:error: (the Finder's trash of the item's
 // volume; the Finder can put it back); true only when it reports the new place and the item is
@@ -341,9 +347,10 @@ mod lnx {
     use alloc::string::String;
     use alloc::vec::Vec;
 
-    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_EXCL, O_WRONLY, SYS_CLOSE, SYS_GETUID, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_RENAMEAT2, SYS_UNLINKAT, SYS_WRITE, Stat};
+    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_EXCL, O_WRONLY, SYS_CLOSE, SYS_GETUID, SYS_LINKAT, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_RENAMEAT2, SYS_UNLINKAT, SYS_WRITE, Stat};
 
     const AT_SYMLINK_NOFOLLOW: usize = 0x100;
+    const AT_REMOVEDIR: usize = 0x200;
     const RENAME_NOREPLACE: usize = 1;
     const EINTR: isize = 4;
     const EEXIST: isize = 17;
@@ -390,10 +397,10 @@ mod lnx {
         r == 0 || r == -EEXIST
     }
 
-    fn unlink(path: &str) {
+    fn unlink(path: &str) -> isize {
         let p = z(path);
         // SAFETY: a NUL-terminated path.
-        unsafe { syscall3(SYS_UNLINKAT, AT_FDCWD, p.as_ptr() as usize, 0) };
+        unsafe { syscall3(SYS_UNLINKAT, AT_FDCWD, p.as_ptr() as usize, 0) }
     }
 
     /// path into the freedesktop trash -> whether it went there
@@ -414,8 +421,9 @@ mod lnx {
     // the trash for an item on device dev, and the Path of its info file
     fn trash_dir(abs: &str, dev: u64, uid: u32) -> Option<(String, String)> {
         let data = crate::data_dir()?;
-        let home = format!("{data}/Trash");
-        if abs == home || abs.starts_with(&format!("{home}/")) {
+        // in the form abs has ("/./", "//" and ".." resolved), so the test below sees it
+        let home = crate::policy::normalize(&format!("{data}/Trash"))?;
+        if inside(abs, &home) {
             return None; // the trash itself
         }
         // the device of the home trash: the folder, or the nearest one above it that exists
@@ -443,8 +451,12 @@ mod lnx {
             top = parent(top);
         }
         let base = if top == "/" { "" } else { top };
-        let key = String::from(&abs[base.len() + 1..]);
         let admin = format!("{base}/.Trash");
+        // what lies in this mount's trashes already (either form, whichever is in use now)
+        if inside(abs, &admin) || inside(abs, &format!("{base}/.Trash-{uid}")) {
+            return None;
+        }
+        let key = String::from(&abs[base.len() + 1..]);
         let mut tries: Vec<String> = Vec::new();
         if meta(&admin, false).is_some_and(|(_, m, _)| m & S_IFMT == S_IFDIR && m & S_ISVTX != 0) {
             tries.push(format!("{admin}/{uid}"));
@@ -457,6 +469,12 @@ mod lnx {
             }
         }
         None
+    }
+
+    // whether abs is dir or lies below it (both normalised; a name, not the file's identity:
+    // a link or a bind mount to a trash is not seen)
+    fn inside(abs: &str, dir: &str) -> bool {
+        abs == dir || abs.strip_prefix(dir).is_some_and(|r| r.starts_with('/'))
     }
 
     // files/ and info/ of a trash exist (follow: links of the home trash are fine)
@@ -541,17 +559,43 @@ mod lnx {
     // rename without replacing an existing entry -> 0 or -errno (-EEXIST: the name is taken)
     fn rename_new(old: &str, new: &str) -> isize {
         let (o, n) = (z(old), z(new));
-        // SAFETY: NUL-terminated paths.
-        let r = unsafe { syscall6(SYS_RENAMEAT2, AT_FDCWD, o.as_ptr() as usize, AT_FDCWD, n.as_ptr() as usize, RENAME_NOREPLACE, 0) };
-        if r != -EINVAL && r != -ENOSYS {
+        if crate::env("jfgui_TEST_TRASH_FALLBACK").is_none() {
+            // SAFETY: NUL-terminated paths.
+            let r = unsafe { syscall6(SYS_RENAMEAT2, AT_FDCWD, o.as_ptr() as usize, AT_FDCWD, n.as_ptr() as usize, RENAME_NOREPLACE, 0) };
+            if r != -EINVAL && r != -ENOSYS {
+                return r;
+            }
+        }
+        // a file system without RENAME_NOREPLACE: steps that fail on a taken name themselves (a
+        // look first and a plain rename would replace an entry made in between)
+        if is_dir(meta(old, false)) {
+            // an empty folder of ours takes the name; the rename replaces only that (onto a folder
+            // with entries or onto a file it fails, and our folder goes only while it is empty)
+            // SAFETY: a NUL-terminated path.
+            let r = unsafe { syscall3(SYS_MKDIRAT, AT_FDCWD, n.as_ptr() as usize, 0o700) };
+            if r != 0 {
+                return r;
+            }
+            // SAFETY: NUL-terminated paths.
+            let r = unsafe { rt::os::rename(o.as_ptr() as usize, n.as_ptr() as usize) };
+            if r != 0 {
+                // SAFETY: a NUL-terminated path.
+                unsafe { syscall3(SYS_UNLINKAT, AT_FDCWD, n.as_ptr() as usize, AT_REMOVEDIR) };
+            }
             return r;
         }
-        // a file system without RENAME_NOREPLACE: look first (the info file holds the name)
-        if meta(new, false).is_some() {
-            return -EEXIST;
-        }
+        // anything else (a link itself, not its target): a hard link fails on a taken name, then
+        // the old name goes
         // SAFETY: NUL-terminated paths.
-        unsafe { rt::os::rename(o.as_ptr() as usize, n.as_ptr() as usize) }
+        let r = unsafe { syscall6(SYS_LINKAT, AT_FDCWD, o.as_ptr() as usize, AT_FDCWD, n.as_ptr() as usize, 0, 0) };
+        if r != 0 {
+            return r;
+        }
+        let r = unlink(old);
+        if r != 0 {
+            unlink(new);
+        }
+        r
     }
 
     // the Path value: bytes other than A-Z a-z 0-9 - . _ ~ / as %XX (RFC 3986, as GLib)
