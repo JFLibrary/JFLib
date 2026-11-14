@@ -19,6 +19,16 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   of `cargo jflib test`'s `#!only` line, which skips a whole script: windows, linux, macos, ios,
   android, wasm32. The app decides it where the script runs; an unknown name is a parse error.
 
+### Changed
+
+- A drag whose `DragData::effects` is 0 allows every effect, as `drag_allowed()` and the
+  effects of a drop already said for a source that does not say: inside the app a plain drag
+  still moves, Ctrl+Shift links and a target that only links takes it, and dragged out it offers
+  linking to other programs too. Before, 0 meant copy and move there, and in the highlight of a
+  target whose `drop_effect_set` takes only linking under another program's drag that named no
+  effects. A source that must not be linked names its effects (`DE_COPY | DE_MOVE`); files are
+  still never moved.
+
 ### Fixed
 
 - Test scripts: `type "..."` typed only the first 255 bytes of its quoted text (so did

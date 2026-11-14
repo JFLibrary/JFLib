@@ -4777,7 +4777,9 @@ come with E_DRAG (forgotten when it leaves or the drag ends) and with the drop (
 drop_allowed; without them those of the hover before it, else every effect): the drop's effect
 is one the target takes that the source allows -- the platform's, else the first of copy,
 move, link -- and a target that takes none of them refuses the drop as the platform refuses
-such a drag over it.
+such a drag over it.  An empty set of a source's effects means it does not say: every effect
+(DE_ALL), for the app's own drags (DragData::effects 0) as for another program's (E_DRAG,
+drop_allowed, plat::drag_decide) -- files are never moved.
 The answer of a drop to its source (the effect, or that it was not taken) goes after the
 passes of E_DROP: the effect it was delivered with -- unless the app called drop_defer in them
 and answers later with drop_finish (a web page decides asynchronously whether it took a drop).
@@ -35615,9 +35617,11 @@ DT_STD: u32 = 31  // every kind other programs know
 DT_USER0: u32 = 1 << 8  // the app's own kinds: DT_USER0 << k, k = 0..23
 ```
 
-*effects (bits)*
+*effects (bits).  An empty set of the effects a source allows (DragData::effects of a drag*
 
 ```rust
+// out, drag_query's and drag_decide's `allowed`, the DE_* of E_DRAG, drop_allowed) means the
+// source does not say: every effect, DE_ALL -- the same everywhere (ui: drag_allowed)
 DE_COPY: u32 = 1  // the target copies (DROPEFFECT_COPY, XdndActionCopy)
 DE_MOVE: u32 = 2  // the target moves: the source deletes its original
 DE_LINK: u32 = 4  // the target links to it (not on Wayland)
@@ -35635,7 +35639,8 @@ DE_ALL: u32 = 7  // every effect
   - `app: u32` -- the app's own kind (DT_USER0 &lt;&lt; k bits) and bytes: internal drags only
   - `bytes: Vec<u8>`
   - `label: String` -- what the drag shows next to the pointer inside the app (empty: from the content)
-  - `effects: u32` -- drag out: the DE_\* effects the source allows (0 = copy | move); a drop: the effect chosen
+  - `effects: u32` -- drag out: the DE_\* effects the source allows (0: it does not say, every effect); a drop: the
+    effect chosen
 
 **`impl DragData`**
 
@@ -35650,7 +35655,7 @@ DE_ALL: u32 = 7  // every effect
 - **`fn of_app(kind: u32, bytes: &[u8]) -> DragData`**
   the app's own kind (DT_USER0 &lt;&lt; k) and bytes
 - **`fn allowed(&self) -> u32`**
-  the effects a drag out allows (0 means copy | move)
+  the effects a drag out allows: `effects`, every one (DE_ALL) when it names none
 
 - **`type DragHook = fn(i32, i32, i32, u32) -> (u32, u32)`**
   what the UI takes at a point: f(platform window, x, y px, offered DT_\*) -> (accepted DT_\*,
@@ -35665,7 +35670,8 @@ DE_ALL: u32 = 7  // every effect
 
 - **`fn drag_query(pw: i32, x: i32, y: i32, types: u32, allowed: u32, mods: u8) -> (u32, u32)`**
   (OS layers) what platform window pw takes at (x, y) px of a drag offering `types` with the
-  effects `allowed` (0 = copy | move) -> (accepted types, the effect); (0, 0) = refused
+  effects `allowed` (0: the source does not say, every effect) -> (accepted types, the effect);
+  (0, 0) = refused
 
 - **`fn drag_query_all(pw: i32, x: i32, y: i32, types: u32, allowed: u32, mods: u8) -> (u32, u32, u32)`**
   (OS layers) drag_query and every DE_\* effect the target there takes of the allowed ones
@@ -35674,7 +35680,7 @@ DE_ALL: u32 = 7  // every effect
 
 - **`fn drag_decide(t: u32, e: u32, types: u32, allowed: u32, mods: u8) -> (u32, u32, u32)`**
   what drag_query makes of the hook's answer (accepted types t, effects e) to a drag offering
-  `types` with the effects `allowed` (0 = copy | move) and the modifier keys `mods` -> (accepted
+  `types` with the effects `allowed` (0: not said, every effect) and the modifier keys `mods` -> (accepted
   types, the effect, every effect taken); (0, 0, 0) = refused (no kind or no effect in common).
   Files are never moved.  For the OS layers and headless tests (ui's `dragover expect`)
 

@@ -66,7 +66,9 @@ pub const DT_IMAGE: u32 = 16; // an image file (PNG; a DIB arrives as BMP)
 pub const DT_STD: u32 = 31; // every kind other programs know
 pub const DT_USER0: u32 = 1 << 8; // the app's own kinds: DT_USER0 << k, k = 0..23
 
-// ---- effects (bits)
+// ---- effects (bits).  An empty set of the effects a source allows (DragData::effects of a drag
+// out, drag_query's and drag_decide's `allowed`, the DE_* of E_DRAG, drop_allowed) means the
+// source does not say: every effect, DE_ALL -- the same everywhere (ui: drag_allowed)
 pub const DE_COPY: u32 = 1; // the target copies (DROPEFFECT_COPY, XdndActionCopy)
 pub const DE_MOVE: u32 = 2; // the target moves: the source deletes its original
 pub const DE_LINK: u32 = 4; // the target links to it (not on Wayland)
@@ -98,7 +100,8 @@ pub struct DragData {
     pub bytes: Vec<u8>,
     /// what the drag shows next to the pointer inside the app (empty: from the content)
     pub label: String,
-    /// drag out: the DE_* effects the source allows (0 = copy | move); a drop: the effect chosen
+    /// drag out: the DE_* effects the source allows (0: it does not say, every effect); a drop: the
+    /// effect chosen
     pub effects: u32,
 }
 
@@ -144,9 +147,9 @@ impl DragData {
         DragData { app: kind & !DT_STD, bytes: bytes.to_vec(), ..DragData::default() }
     }
 
-    /// the effects a drag out allows (0 means copy | move)
+    /// the effects a drag out allows: `effects`, every one (DE_ALL) when it names none
     pub fn allowed(&self) -> u32 {
-        if self.effects & DE_ALL == 0 { DE_COPY | DE_MOVE } else { self.effects & DE_ALL }
+        if self.effects & DE_ALL == 0 { DE_ALL } else { self.effects & DE_ALL }
     }
 }
 
@@ -182,7 +185,8 @@ pub fn drag_effect_pick(allowed: u32, mods: u8) -> u32 {
 }
 
 /// (OS layers) what platform window pw takes at (x, y) px of a drag offering `types` with the
-/// effects `allowed` (0 = copy | move) -> (accepted types, the effect); (0, 0) = refused
+/// effects `allowed` (0: the source does not say, every effect) -> (accepted types, the effect);
+/// (0, 0) = refused
 pub fn drag_query(pw: i32, x: i32, y: i32, types: u32, allowed: u32, mods: u8) -> (u32, u32) {
     let (t, e, _) = drag_query_all(pw, x, y, types, allowed, mods);
     (t, e)
@@ -204,12 +208,12 @@ pub fn drag_query_all(pw: i32, x: i32, y: i32, types: u32, allowed: u32, mods: u
 }
 
 /// what drag_query makes of the hook's answer (accepted types t, effects e) to a drag offering
-/// `types` with the effects `allowed` (0 = copy | move) and the modifier keys `mods` -> (accepted
+/// `types` with the effects `allowed` (0: not said, every effect) and the modifier keys `mods` -> (accepted
 /// types, the effect, every effect taken); (0, 0, 0) = refused (no kind or no effect in common).
 /// Files are never moved.  For the OS layers and headless tests (ui's `dragover expect`)
 pub fn drag_decide(t: u32, e: u32, types: u32, allowed: u32, mods: u8) -> (u32, u32, u32) {
     let t = t & types;
-    let mut allowed = if allowed & DE_ALL == 0 { DE_COPY | DE_MOVE } else { allowed & DE_ALL };
+    let mut allowed = if allowed & DE_ALL == 0 { DE_ALL } else { allowed & DE_ALL };
     if t & DT_FILES != 0 {
         // a move would make the source delete the files: the app gets only their paths
         allowed &= !DE_MOVE;

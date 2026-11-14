@@ -109,6 +109,16 @@ fn shared(t: &mut T) {
             "dnd: drag_decide: Shift moves, both effects named");
     t.check(drag_decide(DT_FILES, DE_ALL, DT_FILES, DE_COPY | DE_MOVE, MOD_SHIFT) == (DT_FILES, DE_COPY, DE_COPY),
             "dnd: drag_decide: files never moved, the move not named");
+    // (charge 11) a source that names no effects allows every one, as drag_allowed says: a link
+    // target links its drag (it was copy | move: refused there), files are still never moved
+    t.check(drag_query(0, 60, 10, DT_URL, 0, 0) == (DT_URL, DE_LINK), "dnd: 0 allowed (not said): a link target links");
+    t.check(drag_query_all(0, 60, 10, DT_TEXT, 0, 0) == (DT_TEXT, DE_LINK, DE_LINK), "dnd: drag_query_all: 0 allowed, linked");
+    t.check(drag_decide(DT_TEXT, DE_ALL, DT_TEXT, 0, MOD_CTRL | MOD_SHIFT) == (DT_TEXT, DE_LINK, DE_ALL),
+            "dnd: drag_decide: 0 allowed, every effect taken, Ctrl+Shift links");
+    t.check(drag_decide(DT_FILES, DE_ALL, DT_FILES, 0, MOD_SHIFT) == (DT_FILES, DE_COPY, DE_COPY | DE_LINK),
+            "dnd: drag_decide: 0 allowed, files still never moved");
+    t.expect_i(DragData::default().allowed() as i64, DE_ALL as i64, "dnd: DragData without effects allows every one");
+    t.expect_i(DragData { effects: DE_MOVE, ..DragData::default() }.allowed() as i64, DE_MOVE as i64, "dnd: DragData names its effects");
     drag_hook(Some(hook_all));
     // URL lists: comments, local files and blanks out; duplicates once
     drop_reset();
@@ -140,7 +150,7 @@ fn shared(t: &mut T) {
     t.check(drop_text_from(b"abc\0def", false) == b"abc", "dnd: bytes up to a NUL");
     // the content's kinds and the app's own kind
     let mut a = DragData::of_app(DT_USER0 << 2, b"7");
-    t.check(a.types() == DT_USER0 << 2 && a.allowed() == DE_COPY | DE_MOVE, "dnd: the app's own kind, default effects");
+    t.check(a.types() == DT_USER0 << 2 && a.allowed() == DE_ALL, "dnd: the app's own kind, default effects (every one)");
     a.text = Some(String::from("t"));
     t.check(a.types() & DT_STD == DT_TEXT, "dnd: with text: one standard kind");
     t.check(!drag_start(DragData::of_app(DT_USER0, b"x")), "dnd: only the app's own kind does not leave the app");

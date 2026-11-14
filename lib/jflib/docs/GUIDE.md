@@ -1331,7 +1331,8 @@ ui.dialog_end(); // always
   * Inside the app a widget's drag follows the pointer with a label (the style's tooltip), the
     drop target under it is highlighted (`StyleBasic::drop_highlight`, by default an accent
     frame), Esc cancels, the release drops onto the innermost matching target of the topmost
-    layer (a plain drag moves when the source allows it, Ctrl copies, Shift moves). A target
+    layer (a plain drag moves when the source allows it, Ctrl copies, Shift moves, Ctrl+Shift
+    links). A target
     reports `DS_HOVER` while a matching drag is over it and `DS_DROP` once, in the first pass
     after the drop; the source reports `DS_ACTIVE` and `DS_END` once. A drop changes what this
     pass already drew: apply it after the widgets (end of `frame`) and call `ui.repass()`.
@@ -1386,6 +1387,14 @@ ui.dialog_end(); // always
     over the window, no drop in its passes or waiting. A page that maps a web page's
     `effectAllowed` and `dropEffect` picks from it for `drop_effect_set` and hands it on with the
     drop.
+  * **0 means "not said"** wherever the effects a source allows are given: `DragData::effects` of
+    the app's own drag (`drag_set`, `drag_out`), the effects of another program's hover and drop,
+    the `allowed` of `plat::drag_query` and `plat::drag_decide`. Every effect is allowed then
+    (`DE_ALL`): inside the app a plain drag moves and Ctrl+Shift links, a target that only links
+    takes it, a drag out offers linking to other programs too. A source that names effects limits
+    its drag to them (`d.effects = DE_MOVE | DE_COPY` above). Files are never moved, whatever the
+    source says. (Up to 0.2, a 0 meant copy and move everywhere but in `drag_allowed()` and the
+    effects of a drop.)
   * The answer after the drop: by default the source learns the effect the drop was delivered
     with after its passes. A target that learns later whether it took the drop (a web page's drop
     handler in another process) calls `ui.drop_defer()` in the pass of the drop (`DS_DROP`, or

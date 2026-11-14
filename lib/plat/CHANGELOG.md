@@ -8,6 +8,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- 0 as the effects a source allows means it does not say, so every effect (`DE_ALL`), the same
+  everywhere: `DragData::allowed()` of a drag with `effects` 0, the `allowed` of `drag_query`,
+  `drag_query_all` and `drag_decide`. Before, these took 0 as copy and move, while the effects of
+  a drop (`drop_allowed`) took it as every effect. A drag out that names no effects offers
+  linking too; files are still never moved.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

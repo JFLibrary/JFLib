@@ -74,11 +74,24 @@ drop 600 470 files build/dnd/weg.txt allows move
 expect text:"UIC_DROP: Text \"lose\" bei 600,480 (Fenster 0)" exists
 drop expect none
 # the app's own drags pick from the page's effects too: text onto the left half is copied (a
-# plain drag would move), onto the bottom it is refused (the button allows copy and move)
+# plain drag would move).  "Text ziehen" names no effects: it allows every one (0 means not
+# said, as for another program's drag), so the linking bottom links it -- before charge 11 a 0
+# meant copy and move there, and the drop was refused
 drag #401 370,330
 expect text:"Abgelegt: Text -> Seite (kopieren)" exists
 expect text:"Ende: Text ziehen kopieren (1)" exists
 drag #401 500,355
-expect text:"Ende: Text ziehen keine (2)" exists
-expect text:"Abgelegt: Text -> Seite (kopieren)" exists
+expect text:"Abgelegt: Text -> Seite (verknüpfen)" exists
+expect text:"Ende: Text ziehen verknüpfen (2)" exists
+# a fruit allows copy and move only (DragData::effects): refused on the bottom
+drag #101 500,355
+expect text:"Ende: Apfel keine (3)" exists
+expect text:"Abgelegt: Text -> Seite (verknüpfen)" exists
+# ... and Ctrl+Shift links a drag that names no effects over a target that takes every effect
+drag #401 82,229 ctrl shift
+expect text:"Abgelegt: Text -> Text-Ziel (verknüpfen)" exists
+expect text:"Ende: Text ziehen verknüpfen (4)" exists
+drag #101 82,229 ctrl shift
+expect text:"Abgelegt: Text+Frucht -> Text-Ziel (kopieren)" exists
+expect text:"Ende: Apfel kopieren (5)" exists
 expect_nowarn

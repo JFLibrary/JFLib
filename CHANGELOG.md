@@ -23,6 +23,10 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** `FD_BUILTIN`: the app chooses the library's own file dialog for a `ui.filedlg` call on every platform (Windows, Linux, macOS, Android, the browser), so it looks and behaves the same everywhere and in every style; it lists what plat's file functions see. Before, only the environment variable `jfgui_FILEDLG=builtin` chose it, for every dialog of a run. docs/GUIDE.md section 7
 - **ui:** Test scripts: a line `only OS...: COMMAND` runs one command on the systems it names (`only windows linux: key ctrl+q`), `!OS` on every system but that one; the names are those of cargo jflib test's `#!only` (windows linux macos ios android wasm32), which skips a whole script. The app decides it where the script runs, so build_rs.py test, cargo jflib test and runs by hand behave alike; an unknown name is a parse error. docs/GUIDE.md section 12
 
+### Changed
+
+- **ui, plat:** Drag and drop: 0 as the effects a source allows means it does not say, so every effect (`DE_ALL`), everywhere: `DragData::allowed()` of a drag with `effects` 0 (the app's own drags, inside the app and dragged out), the `allowed` of `plat::drag_query`, `drag_query_all` and `drag_decide`, another program's hover without effects in `drop_effect_set`'s highlight. Before, these took 0 as copy and move, while `ui.drag_allowed()` and the effects of a drop took it as every effect. A drag that names no effects can be linked now (Ctrl+Shift inside the app, a target that only links, other programs); a source that must not be linked names its effects (`DE_COPY | DE_MOVE`). Files are still never moved. docs/GUIDE.md section 7
+
 ### Fixed
 
 - **ui:** Scripts: `type "..."` typed only the first 255 bytes of its quoted text (`bench N type` too, `commit` 1023): they take the whole string now, as long as a script line (16 KiB, the limit of a line and of a label)

@@ -15,10 +15,11 @@ dragover 640 330 text
 expect text:"Erlaubt: kopieren+verschieben" exists
 dragleave
 expect text:"Erlaubt: -" exists
-# the app's own drag: its source's effects (the button allows copy and move)
+# the app's own drag: its source's effects ("Text ziehen" names none: every effect, as an empty
+# set means everywhere -- before charge 11 copy and move)
 down #401
 move 640,330
-expect text:"Erlaubt: kopieren+verschieben" exists
+expect text:"Erlaubt: kopieren+verschieben+verknüpfen" exists
 key esc
 up
 # the app's own drag that left the window and hovers over it again: the platform's effects; when

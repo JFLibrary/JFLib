@@ -56,7 +56,9 @@
 // drop_allowed; without them those of the hover before it, else every effect): the drop's effect
 // is one the target takes that the source allows -- the platform's, else the first of copy,
 // move, link -- and a target that takes none of them refuses the drop as the platform refuses
-// such a drag over it.
+// such a drag over it.  An empty set of a source's effects means it does not say: every effect
+// (DE_ALL), for the app's own drags (DragData::effects 0) as for another program's (E_DRAG,
+// drop_allowed, plat::drag_decide) -- files are never moved.
 // The answer of a drop to its source (the effect, or that it was not taken) goes after the
 // passes of E_DROP: the effect it was delivered with -- unless the app called drop_defer in them
 // and answers later with drop_finish (a web page decides asynchronously whether it took a drop).
@@ -445,15 +447,15 @@ impl Ui {
         }
     }
 
-    // the DE_* effects the drag over window win allows (0 = none): the app's own its source's
-    // (DragData::allowed), another program's what it offers (0 there: copy | move, as
-    // plat::drag_decide), never a move of another program's files
+    // the DE_* effects the drag over window win allows (0 = no drag): the app's own its source's
+    // (DragData::allowed), another program's what it offers (0 there: not said, every effect, as
+    // drag_allowed and plat::drag_decide), never a move of another program's files
     fn dnd_allowed_in(&self, win: u32) -> u32 {
         let d = &self.dnd;
         if d.phase == PH_IN && d.src_win == win {
             d.data.allowed()
         } else if d.ext && d.ext_win == win {
-            let a = if d.ext_allowed == 0 { DE_COPY | DE_MOVE } else { d.ext_allowed };
+            let a = if d.ext_allowed & DE_ALL == 0 { DE_ALL } else { d.ext_allowed & DE_ALL };
             if d.ext_types & DT_FILES != 0 { a & !DE_MOVE } else { a }
         } else {
             0
