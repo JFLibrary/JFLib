@@ -1412,6 +1412,15 @@ ui.dialog_end(); // always
     | Wayland | always | `wl_data_offer.finish`: `dnd_finished` with the action negotiated before the drop (it cannot change after it) | the offer destroyed without `finish` (the protocol has no other answer after a drop; Weston then sends the source `cancelled`) |
     | Windows | only a source whose data object offers `IDataObjectAsyncCapability` in async mode | `EndOperation(S_OK, effect)` | `EndOperation(E_ABORT, DROPEFFECT_NONE)` |
     | Windows, other sources; macOS; the browser (file drops) | never: `IDropTarget::Drop`, `performDragOperation:` and the page's `drop` event answer at once | the effect at the drop | (as taken: the source learns nothing more) |
+    | the app's own drag onto its own target (every platform, headless too) | always | `DS_ACTIVE` until the answer, then `DS_END` with `drag_effect()` the effect, `UIC_DRAG_END` | `DS_END`, `drag_effect()` 0 |
+
+    The app's own drags inside its window take the same way: without `drop_defer` the source's
+    `DS_END` (and `UIC_DRAG_END`) comes after the drop's passes with the effect it was delivered
+    with, in passes right after the drop's (no longer in the same pass as the target's `DS_DROP`;
+    still before the frame is drawn), and with `drop_finish`'s effect after that call. While it
+    waits `drag_allowed()` says the source's effects and
+    `dragging()` is false; a new drag of the app overtakes the answer (given as delivered), as a
+    newer drop does (`apps/dndtest/tests/own_later.uis`).
 
     ```rust
     match ui.drop_target(ID_PAGE, DT_FILES | DT_URL | DT_TEXT) {

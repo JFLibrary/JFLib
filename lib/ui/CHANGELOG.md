@@ -18,6 +18,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   (`only windows linux: key ctrl+q`), and `!OS` on every system but that one. The names are those
   of `cargo jflib test`'s `#!only` line, which skips a whole script: windows, linux, macos, ios,
   android, wasm32. The app decides it where the script runs; an unknown name is a parse error.
+- `ui.drop_defer()` and `ui.drop_finish(effect)` work for the app's own drags too. A drag of the
+  app dropped onto one of its targets waits for the target's answer like another program's drop:
+  its source reports `DS_ACTIVE` until then, and `DS_END` with `drag_effect()` and
+  `UIC_DRAG_END` as `drop_finish` says (0: not taken). After `DROP_DEFER_MS`, or when a new drag
+  of the app overtakes it, it ends as it was delivered. Without `drop_defer` the source's
+  `DS_END` comes in the passes right after the drop's, no longer in the same pass as the target's
+  `DS_DROP`. In the drop's passes `drag_allowed()` says the source's effects, as for other drops,
+  and `dragging()` is false once the drag was dropped.
 
 ### Changed
 

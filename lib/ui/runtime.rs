@@ -844,6 +844,11 @@ impl Ui {
             unseen = self.settle(app, &mut passes, &mut build_us);
             self.agent.reveal = None;
         }
+        // the app's own drop after its passes (or its answer, drop_finish): the source's DS_END and
+        // UIC_DRAG_END in passes of their own (dnd.rs)
+        if self.dnd_own_settled() {
+            unseen = self.settle(app, &mut passes, &mut build_us);
+        }
         self.touch_after_passes();
         self.dnd_after_passes(); // a DS_START without drag_set is no drag
         self.focus_req_expire();

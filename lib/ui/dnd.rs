@@ -5,7 +5,8 @@
 //   drag_source(id, ev) -> DS_*      after the widget's behave (ev = its EV_*): DS_START when it
 //                                    starts being dragged (EV_DRAG; hand the content to drag_set
 //                                    in the same pass, else nothing is dragged), DS_ACTIVE while
-//                                    it is dragged, DS_END once when the drag ended
+//                                    it is dragged (and while the answer of its drop onto a target
+//                                    of the app waits: drop_defer), DS_END once when the drag ended
 //   drag_set(data)                   what is dragged (DragData: text, files, URLs, HTML, a PNG,
 //                                    the app's own kind DT_USER0 << k with bytes, a label shown
 //                                    next to the pointer, the effects the source allows)
@@ -33,8 +34,9 @@
 //                                    not say); after a drop its source's, from E_DROP to the end
 //                                    of its passes and while drop_defer waits; 0 when none
 //   drop_defer() -> bool             (in the pass of a drop: DS_DROP or UIC_DROP) the drop's answer
-//                                    to its source waits for drop_finish (at most DROP_DEFER_MS);
-//                                    false: the platform answered at the drop already
+//                                    to its source waits for drop_finish (at most DROP_DEFER_MS),
+//                                    also for the app's own drag (its DS_END waits for it); false:
+//                                    the platform answered at the drop already
 //   drop_finish(effect) -> bool      the answer: the DE_* effect it was taken with, 0 = not taken
 //
 // An internal drag stays in the app while the pointer stays in its window: the drop target under
@@ -67,6 +69,10 @@
 // the effect at the drop.  A deferred drop without drop_finish is answered after DROP_DEFER_MS as
 // it was delivered (a UIWARN); so is one a newer drop overtakes.  Headless runs keep the answer
 // for the scripts (`drop expect`).
+// The app's own drag dropped onto one of its targets is answered the same way: its source's end
+// (DS_END, drag_effect, UIC_DRAG_END) comes after the drop's passes with the effect it was
+// delivered with, or -- when the target called drop_defer -- with drop_finish's effect (0: not
+// taken), DS_ACTIVE until then; a new drag of the app overtakes it (answered as delivered).
 // Positions stay logical in mirrored (RTL) windows: E_DRAG / E_DROP points are mirrored on the
 // way in like every pointer event; the label next to the pointer is drawn through the mirror.
 
@@ -83,6 +89,7 @@ const PH_NONE: u8 = 0;
 const PH_START: u8 = 1; // drag_source said DS_START, drag_set not called yet
 const PH_IN: u8 = 2; // inside the source window
 const PH_OUT: u8 = 3; // the platform carries it (or, headless, it left the window)
+const PH_DROPPED: u8 = 4; // dropped onto a target of the app: its end waits for the drop's answer
 const LABEL_MAX: usize = 48; // characters of the label next to the pointer
 
 /// a drop target of a pass (clipped, physical px of the window; x1 / y1 exclusive)
@@ -150,6 +157,8 @@ struct Wait {
     allowed: u32,
     /// drop_defer was called: when (ms)
     deferred: Option<u32>,
+    /// the app's own drag (PH_DROPPED): the answer is its source's end, not the platform's
+    own: bool,
 }
 
 /// the drag and drop state shared by the windows
@@ -204,6 +213,10 @@ pub(crate) struct S {
     /// (script `drop ... sync`); the serials of the headless drops
     pub(crate) sync_next: bool,
     serial: u32,
+    /// the app's own drop: its passes run (dnd_own_settled answers it after them unless it was
+    /// deferred); its answer, the source's end to come (source, window, effect)
+    own_passes: bool,
+    own_end: Option<(u32, u32, u32)>,
 }
 
 impl Default for S {
@@ -240,6 +253,8 @@ impl Default for S {
             answered: None,
             sync_next: false,
             serial: 0,
+            own_passes: false,
+            own_end: None,
         }
     }
 }
@@ -282,17 +297,22 @@ impl Ui {
     /// DS_ACTIVE while its content is dragged, DS_END once afterwards (drag_effect())
     pub fn drag_source(&mut self, id: u32, ev: u32) -> u32 {
         let cur = self.uiw_cur;
-        let d = &self.dnd;
         if id == 0 {
             return 0;
         }
+        let d = &self.dnd;
         if d.end_live && d.end_src == id && d.end_win == cur {
             return DS_END;
         }
+        let starts = ev & EV_DRAG != 0 && self.wp.ctx.active == id && self.wp.ctx.mbtn & (1 << BTN_LEFT) != 0;
+        if starts && d.phase == PH_DROPPED {
+            self.dnd_own_overtaken(); // a new drag while the last drop's answer waits
+        }
+        let d = &self.dnd;
         if d.phase != PH_NONE && d.src == id && d.src_win == cur {
             return if d.phase == PH_START { DS_START } else { DS_ACTIVE };
         }
-        if d.phase == PH_NONE && ev & EV_DRAG != 0 && self.wp.ctx.active == id && self.wp.ctx.mbtn & (1 << BTN_LEFT) != 0 {
+        if d.phase == PH_NONE && starts {
             let d = &mut self.dnd;
             d.phase = PH_START;
             d.src = id;
@@ -317,6 +337,9 @@ impl Ui {
     /// drag_out(data) -> started: (the left button held) the platform drags data out of the
     /// app right away (DoDragDrop, Xdnd, wl_data_device.start_drag); UIC_DRAG_END at the end
     pub fn drag_out(&mut self, data: DragData) -> bool {
+        if self.dnd.phase == PH_DROPPED && data.types() & DT_STD != 0 {
+            self.dnd_own_overtaken();
+        }
         if self.dnd.phase != PH_NONE || data.types() & DT_STD == 0 {
             return false;
         }
@@ -331,9 +354,10 @@ impl Ui {
         self.dnd.last_effect
     }
 
-    /// one of the app's drags runs (inside the app or carried by the platform)
+    /// one of the app's drags runs (inside the app or carried by the platform; not once it was
+    /// dropped, also while the drop's answer waits)
     pub fn dragging(&self) -> bool {
-        self.dnd.phase >= PH_IN
+        self.dnd.phase == PH_IN || self.dnd.phase == PH_OUT
     }
 
     // the platform takes the drag over (headless: kept for the scripts) -> it did
@@ -355,11 +379,14 @@ impl Ui {
 
     // the app's drag is over: DS_END in the next pass, UIC_DRAG_END
     fn dnd_end(&mut self, effect: u32) {
+        let (src, win) = (self.dnd.src, self.dnd.src_win);
+        self.dnd_release();
+        self.dnd_ended(src, win, effect);
+    }
+
+    // the app's drag lets go of its content (no phase, no source)
+    fn dnd_release(&mut self) {
         let d = &mut self.dnd;
-        d.end_src = d.src;
-        d.end_win = d.src_win;
-        d.end_live = d.src != 0;
-        d.last_effect = effect;
         d.phase = PH_NONE;
         d.src = 0;
         d.data = DragData::default();
@@ -367,8 +394,67 @@ impl Ui {
             d.over = 0;
         }
         self.dnd_publish();
+    }
+
+    // the drag of source src in window win ended with effect: DS_END in the next pass, UIC_DRAG_END
+    fn dnd_ended(&mut self, src: u32, win: u32, effect: u32) {
+        let d = &mut self.dnd;
+        d.end_src = src;
+        d.end_win = win;
+        d.end_live = src != 0;
+        d.last_effect = effect;
         self.cmd_run(UIC_DRAG_END, effect);
         self.repass = true;
+    }
+
+    // the app's own drag was dropped onto one of its targets with `effect`: the drop's answer --
+    // the source's end -- waits until the drop's passes ran (dnd_own_settled; drop_defer: until
+    // drop_finish).  A drop of another program that still waits is answered as delivered
+    fn dnd_own_dropped(&mut self, effect: u32) {
+        if let Some(w) = self.dnd.wait {
+            self.dnd_answer(w.fallback);
+        }
+        let allowed = self.dnd.data.allowed();
+        let d = &mut self.dnd;
+        d.phase = PH_DROPPED;
+        d.drop_allowed = allowed;
+        d.drop_now = true;
+        d.own_passes = true;
+        d.answered = None;
+        d.wait = Some(Wait { serial: 0, fallback: effect, allowed, deferred: None, own: true });
+    }
+
+    // a new drag of the app while the answer of its last drop waits: that one is answered as it
+    // was delivered (its source's end comes after these passes), the new one may start
+    fn dnd_own_overtaken(&mut self) {
+        if let Some(w) = self.dnd.wait.filter(|w| w.own) {
+            self.dnd_answer(w.fallback);
+        }
+        if self.dnd.phase == PH_DROPPED {
+            self.dnd_release();
+        }
+    }
+
+    /// (runtime, after the passes) the app's own drop: its passes ran -- answered with the effect
+    /// it was delivered with unless the target deferred it -- or its answer came (drop_finish, the
+    /// time is up): the source's end (DS_END, UIC_DRAG_END) -> true: the passes must run again
+    pub(crate) fn dnd_own_settled(&mut self) -> bool {
+        let mut again = false;
+        if core::mem::take(&mut self.dnd.own_passes) {
+            again = true; // drag_allowed says the drop's effects no more (unless it waits)
+            self.dnd.drop_now = false;
+            if let Some(w) = self.dnd.wait.filter(|w| w.own && w.deferred.is_none()) {
+                self.dnd_answer(w.fallback);
+            }
+        }
+        if let Some((src, win, effect)) = self.dnd.own_end.take() {
+            if self.dnd.phase == PH_DROPPED && self.dnd.src == src && self.dnd.src_win == win {
+                self.dnd_release();
+            }
+            self.dnd_ended(src, win, effect);
+            again = true;
+        }
+        again
     }
 
     // ------------------------------------------------------------------ targets
@@ -491,8 +577,9 @@ impl Ui {
     /// its DragData::allowed(); DE_ALL where the platform does not say.  After a drop, the effects
     /// its source allows -- as the platform gives them with the drop (Windows Drop's pdwEffect, X11
     /// the list with the last XdndPosition's action, Wayland source_actions, macOS the operation
-    /// mask), else as the hover before it said, else DE_ALL (the browser, Android) -- from its
-    /// E_DROP to the end of the passes it starts (DS_DROP, App::command's UIC_DROP) and, when the
+    /// mask), else as the hover before it said, else DE_ALL (the browser, Android); the app's own
+    /// drop its DragData::allowed() -- from its E_DROP (the app's own: the release) to the end of
+    /// the passes it starts (DS_DROP, App::command's UIC_DROP) and, when the
     /// app called drop_defer, until its answer went (drop_finish, DROP_DEFER_MS, a newer drop): in
     /// every window over which no drag is, and drop_finish answers within them.  0 otherwise: no
     /// drag over the window, no drop in its passes or waiting.  A page that decides an effect (a
@@ -517,11 +604,12 @@ impl Ui {
     /// App::command's UIC_DROP) the drop's answer to its source -- the effect it was taken with,
     /// or that it was not taken -- waits for drop_finish, at most DROP_DEFER_MS; then it goes as
     /// the drop was delivered (drop_effect()) with a UIWARN.  For a target that learns later
-    /// whether it took the drop (a web page's drop handler in another process).  false: the answer
-    /// went already (the platform answers at the drop: macOS, the browser, Android, Windows with a
-    /// source whose data object has no async mode; an internal drag of the app; outside the pass
-    /// of a drop): drop_finish has nothing to do then.  What the source sees, per platform: docs/
-    /// GUIDE.md section 7, "Drag and drop"
+    /// whether it took the drop (a web page's drop handler in another process).  The app's own drag
+    /// waits too: its source sees DS_ACTIVE until the answer, then DS_END with drag_effect() and
+    /// UIC_DRAG_END as drop_finish says.  false: the answer went already (the platform answers at
+    /// the drop: macOS, the browser, Android, Windows with a source whose data object has no async
+    /// mode; outside the pass of a drop): drop_finish has nothing to do then.  What the source sees,
+    /// per platform: docs/GUIDE.md section 7, "Drag and drop"
     pub fn drop_defer(&mut self) -> bool {
         let now = self.now_ms;
         let Some(w) = self.dnd.wait.as_mut() else { return false };
@@ -559,6 +647,15 @@ impl Ui {
             self.timers.retain(|t| t.0 != UIT_DROP);
             self.need = true; // drag_allowed says the drop's effects no more
         }
+        if w.own {
+            // the app's own drag: its source's end, after the passes (dnd_own_settled)
+            if self.dnd.phase == PH_DROPPED {
+                self.dnd.own_end = Some((self.dnd.src, self.dnd.src_win, effect));
+            }
+            self.dnd.answered = Some(effect);
+            self.need = true;
+            return;
+        }
         if !self.headless {
             plat::drop_finish(w.serial, effect);
         }
@@ -577,7 +674,7 @@ impl Ui {
             return;
         }
         self.dnd.answered = None;
-        self.dnd.wait = Some(Wait { serial, fallback: effect, allowed, deferred: None });
+        self.dnd.wait = Some(Wait { serial, fallback: effect, allowed, deferred: None, own: false });
     }
 
     /// (runtime, after the passes of E_DROP) a drop the app did not defer is answered now; its
@@ -799,6 +896,9 @@ impl Ui {
                         let mut data = self.dnd.data.clone();
                         data.effects = effect;
                         self.dnd_deliver(z.id, win, x, y, data);
+                        // its answer (the source's end) after the drop's passes, or drop_finish's
+                        self.dnd_own_dropped(effect);
+                        return false; // the release still reaches the widgets
                     }
                 }
                 self.dnd_end(effect);

@@ -4726,7 +4726,8 @@ Sources (the app's own drags):
   drag_source(id, ev) -> DS_*      after the widget's behave (ev = its EV_*): DS_START when it
                                    starts being dragged (EV_DRAG; hand the content to drag_set
                                    in the same pass, else nothing is dragged), DS_ACTIVE while
-                                   it is dragged, DS_END once when the drag ended
+                                   it is dragged (and while the answer of its drop onto a target
+                                   of the app waits: drop_defer), DS_END once when the drag ended
   drag_set(data)                   what is dragged (DragData: text, files, URLs, HTML, a PNG,
                                    the app's own kind DT_USER0 << k with bytes, a label shown
                                    next to the pointer, the effects the source allows)
@@ -4754,8 +4755,9 @@ Targets:
                                    not say); after a drop its source's, from E_DROP to the end
                                    of its passes and while drop_defer waits; 0 when none
   drop_defer() -> bool             (in the pass of a drop: DS_DROP or UIC_DROP) the drop's answer
-                                   to its source waits for drop_finish (at most DROP_DEFER_MS);
-                                   false: the platform answered at the drop already
+                                   to its source waits for drop_finish (at most DROP_DEFER_MS),
+                                   also for the app's own drag (its DS_END waits for it); false:
+                                   the platform answered at the drop already
   drop_finish(effect) -> bool      the answer: the DE_* effect it was taken with, 0 = not taken
 
 An internal drag stays in the app while the pointer stays in its window: the drop target under
@@ -4788,6 +4790,10 @@ in async mode) it then reaches the source; elsewhere drop_defer says false and t
 the effect at the drop.  A deferred drop without drop_finish is answered after DROP_DEFER_MS as
 it was delivered (a UIWARN); so is one a newer drop overtakes.  Headless runs keep the answer
 for the scripts (`drop expect`).
+The app's own drag dropped onto one of its targets is answered the same way: its source's end
+(DS_END, drag_effect, UIC_DRAG_END) comes after the drop's passes with the effect it was
+delivered with, or -- when the target called drop_defer -- with drop_finish's effect (0: not
+taken), DS_ACTIVE until then; a new drag of the app overtakes it (answered as delivered).
 Positions stay logical in mirrored (RTL) windows: E_DRAG / E_DROP points are mirrored on the
 way in like every pointer event; the label next to the pointer is drawn through the mirror.
 ```
@@ -4806,7 +4812,8 @@ way in like every pointer event; the label next to the pointer is drawn through 
 - **`fn drag_effect(&self) -> u32`**
   the effect of the app's last drag: DE_COPY / DE_MOVE / DE_LINK, 0 = cancelled / refused
 - **`fn dragging(&self) -> bool`**
-  one of the app's drags runs (inside the app or carried by the platform)
+  one of the app's drags runs (inside the app or carried by the platform; not once it was
+  dropped, also while the drop's answer waits)
 - **`fn drop_target(&mut self, id: u32, types: u32) -> u32`**
   drop_target(id, types) -> DS_HOVER / DS_DROP / 0: the widget at last_rect takes drags
   of these DT_\* kinds (DT_USER0 &lt;&lt; k: the app's own).  DS_HOVER while such a drag is over
@@ -4843,8 +4850,9 @@ way in like every pointer event; the label next to the pointer is drawn through 
   its DragData::allowed(); DE_ALL where the platform does not say.  After a drop, the effects
   its source allows -- as the platform gives them with the drop (Windows Drop's pdwEffect, X11
   the list with the last XdndPosition's action, Wayland source_actions, macOS the operation
-  mask), else as the hover before it said, else DE_ALL (the browser, Android) -- from its
-  E_DROP to the end of the passes it starts (DS_DROP, App::command's UIC_DROP) and, when the
+  mask), else as the hover before it said, else DE_ALL (the browser, Android); the app's own
+  drop its DragData::allowed() -- from its E_DROP (the app's own: the release) to the end of
+  the passes it starts (DS_DROP, App::command's UIC_DROP) and, when the
   app called drop_defer, until its answer went (drop_finish, DROP_DEFER_MS, a newer drop): in
   every window over which no drag is, and drop_finish answers within them.  0 otherwise: no
   drag over the window, no drop in its passes or waiting.  A page that decides an effect (a
@@ -4855,11 +4863,12 @@ way in like every pointer event; the label next to the pointer is drawn through 
   App::command's UIC_DROP) the drop's answer to its source -- the effect it was taken with,
   or that it was not taken -- waits for drop_finish, at most DROP_DEFER_MS; then it goes as
   the drop was delivered (drop_effect()) with a UIWARN.  For a target that learns later
-  whether it took the drop (a web page's drop handler in another process).  false: the answer
-  went already (the platform answers at the drop: macOS, the browser, Android, Windows with a
-  source whose data object has no async mode; an internal drag of the app; outside the pass
-  of a drop): drop_finish has nothing to do then.  What the source sees, per platform: docs/
-  GUIDE.md section 7, "Drag and drop"
+  whether it took the drop (a web page's drop handler in another process).  The app's own drag
+  waits too: its source sees DS_ACTIVE until the answer, then DS_END with drag_effect() and
+  UIC_DRAG_END as drop_finish says.  false: the answer went already (the platform answers at
+  the drop: macOS, the browser, Android, Windows with a source whose data object has no async
+  mode; outside the pass of a drop): drop_finish has nothing to do then.  What the source sees,
+  per platform: docs/GUIDE.md section 7, "Drag and drop"
 - **`fn drop_finish(&mut self, effect: u32) -> bool`**
   drop_finish(effect) -> answered: the answer of the drop that waits (drop_defer; or, in the
   pass of a drop, instead of the effect it was delivered with): the DE_\* effect it was taken
