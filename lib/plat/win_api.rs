@@ -1109,6 +1109,28 @@ fn live_refresh() {
     }
 }
 
+/// WM_ENDSESSION (TRUE): the UI takes E_SESSION_END (the app saves) inside the message, through
+/// the wait_refresh closure (else the set_refresh hook) -- when the message came while the UI
+/// waits (wait_refresh) and not inside one of those calls; elsewhere (a modal dialog of the
+/// app's own frame) the event only waits in the queue
+fn session_refresh() {
+    let s = st();
+    if s.in_refresh.get() {
+        return;
+    }
+    if let Some(p) = s.refresh_dyn.get() {
+        s.in_refresh.set(true);
+        // SAFETY: p is the closure wait_refresh borrowed for the duration of its call; this runs
+        // inside that call (a DispatchMessageW of its wait), never re-entered (in_refresh).
+        unsafe { (*p)() };
+        s.in_refresh.set(false);
+    } else if let Some(f) = s.refresh.get() {
+        s.in_refresh.set(true);
+        f();
+        s.in_refresh.set(false);
+    }
+}
+
 /// (win_dnd) redraw inside the modal loop of the app's own DoDragDrop: the wait_refresh
 /// closure (else the set_refresh hook) while events are queued -- the UI shows the
 /// highlight of its drop targets and moves the dragged label
@@ -1455,13 +1477,16 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             }
             1
         }
-        WM_QUERYENDSESSION | WM_ENDSESSION if w == 0 => {
-            // the app saves on E_SESSION_END right after this returns (before WM_ENDSESSION
-            // arrives: Windows asks every app first)
-            if (msg == WM_QUERYENDSESSION || wp != 0) && !ENDING.swap(true, core::sync::atomic::Ordering::Relaxed) {
+        // the question agrees and changes nothing (another app may still cancel: WM_ENDSESSION
+        // FALSE); a confirmed end queues E_SESSION_END and lets the UI take it before this
+        // returns -- Windows may end the process any time after that
+        WM_QUERYENDSESSION if w == 0 => 1,
+        WM_ENDSESSION if w == 0 => {
+            if wp != 0 && !ENDING.swap(true, core::sync::atomic::Ordering::Relaxed) {
                 win_push(E_SESSION_END, 0, 0, 0, 0);
+                session_refresh();
             }
-            if msg == WM_QUERYENDSESSION { 1 } else { 0 }
+            0
         }
         WM_DISPLAYCHANGE if w == 0 => {
             // a monitor came, went, moved or changed its mode (screen.rs: monitors())
@@ -2294,7 +2319,7 @@ fn pointer_free(msg: u32) -> bool {
         WM_CLOSE | WM_ACTIVATEAPP | WM_SETCURSOR | WM_MOUSEACTIVATE | WM_NCHITTEST | WM_NCACTIVATE
         | WM_NCMOUSEMOVE..=WM_NCLBUTTONDBLCLK | WM_KEYDOWN..=WM_SYSCHAR | WM_MOUSEMOVE..=WM_MOUSEHWHEEL
         | WM_CAPTURECHANGED | WM_NCPOINTERUPDATE..=WM_NCPOINTERUP | WM_POINTERUPDATE..=WM_POINTERCAPTURECHANGED
-        | WM_ENTERSIZEMOVE | WM_EXITSIZEMOVE
+        | WM_ENTERSIZEMOVE | WM_EXITSIZEMOVE | WM_QUERYENDSESSION | WM_ENDSESSION
         | WM_NCMOUSELEAVE | WM_MOUSELEAVE | WM_DISPLAYCHANGE)
 }
 

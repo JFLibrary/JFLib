@@ -282,10 +282,20 @@ fn file_put(b: &[u8]) {
     write_file(&mut s, b);
 }
 
+// a short write counts only the bytes that arrived; the rest is offered again until a write
+// takes nothing (then it is lost, and the next line starts where the file ends: no gap)
 fn write_file(s: &mut Sink, b: &[u8]) {
     let Some(f) = s.file.as_ref() else { return };
-    if f.write_at(s.size, b).is_some() {
-        s.size += b.len() as u64;
+    let mut rest = b;
+    while !rest.is_empty() {
+        match f.write_at(s.size, rest) {
+            Some(n) if n > 0 => {
+                let n = n.min(rest.len());
+                s.size += n as u64;
+                rest = &rest[n..];
+            }
+            _ => break,
+        }
     }
     if s.size >= s.max {
         rotate(s);
@@ -325,8 +335,8 @@ fn crash_dump(info: &rt::crash::CrashInfo) {
             let _ = write!(t, ": {}", info.msg);
         }
         let _ = t.write_str("\n");
-        if s.file.as_ref().is_some_and(|f| f.write_at_crash(s.size, t.bytes()).is_some()) {
-            s.size += t.bytes().len() as u64;
+        if let Some(n) = s.file.as_ref().and_then(|f| f.write_at_crash(s.size, t.bytes())) {
+            s.size += n.min(t.bytes().len()) as u64;
         }
     }
 }

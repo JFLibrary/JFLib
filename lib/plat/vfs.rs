@@ -1127,12 +1127,20 @@ impl Provider for Sub {
     fn set_times(&self, path: &str, atime_ns: i64, mtime_ns: i64) -> bool {
         self.inner.set_times(&self.full(path), atime_ns, mtime_ns)
     }
+    // the root (the folder itself) is refused before inner sees it: an open for writing would
+    // empty or create a file of that name there
     fn open(&self, path: &str, mode: u32) -> Opened {
-        Opened::of(crate::open_in(&self.inner, &self.full(path), mode).filter(|_| !path.is_empty()))
+        if path.is_empty() {
+            return Opened::Refused;
+        }
+        Opened::of(crate::open_in(&self.inner, &self.full(path), mode))
     }
     fn create_new(&self, path: &str) -> Opened {
+        if path.is_empty() {
+            return Opened::Refused;
+        }
         match crate::create_new_in(&self.inner, &self.full(path)) {
-            crate::Created::New(f) if !path.is_empty() => Opened::File(Box::new(f)),
+            crate::Created::New(f) => Opened::File(Box::new(f)),
             crate::Created::Unsupported => Opened::Generic,
             _ => Opened::Refused,
         }

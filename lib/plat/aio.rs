@@ -11,7 +11,8 @@
 //                         size() / pos() / seek(pos): a plat::File (OS file or a mount's stream)
 //                         read chunk by chunk, each chunk a job of the pool
 //   Writer::create(path) -> writer;  writer.write(data).await, writer.commit().await: an
-//                         AtomicFile filled chunk by chunk (dropped without commit: discarded)
+//                         AtomicFile filled chunk by chunk (dropped without commit: discarded;
+//                         a write's future dropped before its end spoils the writer)
 //   Ctl { progress, cancel, chunk }   what an operation reports to (bytes done / total) and
 //                         listens to; clones share both
 //
@@ -219,10 +220,14 @@ impl Reader {
 
 /// an AtomicFile filled chunk by chunk on the pool; dropped without commit, it is discarded
 /// (the sibling is removed by whoever drops the last reference: the dropping thread, or the
-/// pool when a write was still running)
+/// pool when a write was still running).  A write whose future was dropped before it finished
+/// may still land (its job may be running): the writer is spoilt then, later writes give
+/// Err(Write) and the commit Err(Commit)
 pub struct Writer {
     f: Option<Arc<AtomicFile>>,
     pos: u64,
+    // a write under way; still set after it: its future was dropped
+    busy: bool,
 }
 
 impl Writer {
@@ -231,7 +236,7 @@ impl Writer {
         let path = String::from(path);
         spawn_blocking(move || {
             let f = AtomicFile::create(&path).ok_or(IoError::Create)?;
-            Ok(Writer { f: Some(Arc::new(f)), pos: 0 })
+            Ok(Writer { f: Some(Arc::new(f)), pos: 0, busy: false })
         })
     }
 
@@ -242,10 +247,15 @@ impl Writer {
 
     /// append data (on the pool)
     pub async fn write(&mut self, data: Vec<u8>) -> Result<(), IoError> {
+        if self.busy {
+            return Err(IoError::Write); // an earlier write was dropped: where it ends is unknown
+        }
         let f = self.f.clone().ok_or(IoError::Write)?;
         let off = self.pos;
         let n = data.len();
+        self.busy = true;
         let ok = spawn_blocking(move || f.write_at(off, &data) == Some(data.len())).await;
+        self.busy = false;
         if !ok {
             return Err(IoError::Write);
         }
@@ -255,6 +265,9 @@ impl Writer {
 
     /// put the written file in place (on the pool)
     pub async fn commit(mut self) -> Result<(), IoError> {
+        if self.busy {
+            return Err(IoError::Commit); // a dropped write: the bytes are not what was asked
+        }
         let f = self.f.take().ok_or(IoError::Commit)?;
         let f = Arc::try_unwrap(f).map_err(|_| IoError::Commit)?; // a write still running
         if spawn_blocking(move || f.commit()).await { Ok(()) } else { Err(IoError::Commit) }

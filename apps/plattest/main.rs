@@ -1058,6 +1058,14 @@ fn t_files(t: &mut T) {
     drop(f);
     t.check(sz == 0x100064 && n == 5 && &rb[1..4] == b"XYZ" && rb[0] == pat[9] && rb[4] == pat[13],
             "files: FO_RW keeps the contents and writes in place");
+    // ---- offsets no file reaches: refused, nothing written (Windows read u64::MAX as "append")
+    let f = File::open(&t.subp("data.bin"), FO_RW);
+    let (w1, w2) = (wa(&f, u64::MAX, b"X"), wa(&f, i64::MAX as u64, b"XY"));
+    let (r1, e) = (ra(&f, u64::MAX, &mut rb[..1]), wa(&f, u64::MAX, b""));
+    let sz = fsize(&f);
+    drop(f);
+    t.check(w1 == -1 && w2 == -1 && r1 == -1 && sz == 0x100064, "files: write_at / read_at past i64::MAX are refused, the file unchanged");
+    t.check(e <= 0, "files: an empty write_at there writes nothing");
     // ---- 64 parallel items on one handle
     let fh = File::open(&t.subp("par.bin"), FO_WRITE);
     IO_BAD.store(0, SeqCst);
@@ -1454,6 +1462,11 @@ fn t_ini(t: &mut T) {
     let big = t.subp("toobig.ini");
     plat::write_file(&big, &vec![b'\n'; 0x100_0001]);
     t.check(Ini::load_checked(&big).is_none(), "ini: load_checked: a file over 16 MB is not an empty Ini");
+    // only a name that is surely free counts as missing: a folder there, a name whose existence
+    // cannot be asked (a NUL in it) are no empty Ini a later save would write over
+    let dir = t.subp("folder.ini");
+    t.check(plat::mkdir(&dir) && Ini::load_checked(&dir).is_none(), "ini: load_checked: a folder at the name is not an empty Ini");
+    t.check(Ini::load_checked(&format!("{path}\0x")).is_none(), "ini: load_checked: an unknown existence is not an empty Ini");
     ini_self(t);
     ini_random(t);
     t_f64(t);

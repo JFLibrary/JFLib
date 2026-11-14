@@ -17,6 +17,7 @@
 //             shutdown_write, peer_addr / local_addr, wait_readable(ms)
 //   UdpSocket::bind / send_to / recv_from(buf, timeout_ms)
 //   UnixListener::bind(path) / accept() / accept_timeout(ms); connect_unix(path, timeout_ms)
+//             (bind removes only a socket file nobody listens on; the drop only its own)
 //             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
 //             Linux, and Windows 10 1803 and later (AF_UNIX)
 //   resolve(host, port): numeric addresses, "localhost"; Windows also the system resolver
@@ -1527,20 +1528,29 @@ fn unix_addr(path: &str) -> NetResult<Vec<u8>> {
 pub struct UnixListener {
     s: Sock,
     path: String,
+    // the socket file's (device, file id) after the bind: the drop removes only that file
+    id: Option<(u64, u64)>,
 }
 
 impl UnixListener {
-    /// listen on a socket file; one left over at `path` is removed first
+    /// listen on a socket file.  A socket file left at `path` by a listener that is gone (a
+    /// connection to it is refused) is removed first; anything else there -- a file, a folder,
+    /// a socket that is listened on -- stays, and bind fails (AddrInUse; a folder on Windows:
+    /// Other).
     pub fn bind(path: &str) -> NetResult<UnixListener> {
         if !crate::policy::fs_allowed(path, crate::policy::FS_WRITE) {
             return Err(denied());
         }
         let a = unix_addr(path)?;
-        crate::delete_raw(path);
         let s = Sock(sys::socket(AF_UNIX, 1, 0)?);
-        sys::bind_to(s.0, &a)?;
+        if let Err(e) = sys::bind_to(s.0, &a) {
+            if e.kind != NetErrorKind::AddrInUse || !remove_stale(path, &a) {
+                return Err(e);
+            }
+            sys::bind_to(s.0, &a)?;
+        }
         sys::listen_on(s.0, 64)?;
-        Ok(UnixListener { s, path: String::from(path) })
+        Ok(UnixListener { s, path: String::from(path), id: crate::fs::socket_id(path) })
     }
 
     pub fn path(&self) -> &str {
@@ -1565,8 +1575,27 @@ impl UnixListener {
 
 impl Drop for UnixListener {
     fn drop(&mut self) {
-        crate::delete_raw(&self.path);
+        // only its own socket file: a name deleted and taken again meanwhile (a file, another
+        // listener's socket) stays
+        if self.id.is_some() && crate::fs::socket_id(&self.path) == self.id {
+            crate::delete_raw(&self.path);
+        }
     }
+}
+
+// a socket file at path that nobody listens on (a connection is refused at once) -> removed
+fn remove_stale(path: &str, a: &[u8]) -> bool {
+    let Some(id) = crate::fs::socket_id(path) else { return false };
+    let refused = match sys::socket(AF_UNIX, 1, 0) {
+        Ok(c) => {
+            let c = Sock(c);
+            // without blocking: a listener with a full backlog would hold a blocking connect
+            sys::set_nonblocking(c.0, true).is_ok() && sys::connect_to(c.0, a).is_err_and(|e| e.kind == NetErrorKind::Refused)
+        }
+        Err(_) => false,
+    };
+    // still the same file (not replaced meanwhile)
+    refused && crate::fs::socket_id(path) == Some(id) && crate::delete_raw(path)
 }
 
 /// connect to a socket file within `timeout_ms` (0: block)

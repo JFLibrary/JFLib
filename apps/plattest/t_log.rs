@@ -4,7 +4,8 @@
 //                              the ring (whole lines, folded line breaks, at most 64 KiB, the
 //                              newest kept), the file (rotation at 4 KiB into .1 / .2, never a
 //                              .3, stopping; on mem:// at once, a mount without streams
-//                              refused); a child (--test log-crash) logs and panics: exit
+//                              refused, a stream with short writes: whole lines, no gaps);
+//                              a child (--test log-crash) logs and panics: exit
 //                              code 3, its stderr ends with the last log lines, its file with
 //                              the crash; three more children crash where the pre-hook must
 //                              neither allocate nor wait (a file at its limit, a panic under
@@ -91,6 +92,18 @@ pub fn t_log(t: &mut T) {
     t.check(log_file(None, 0, 0), "log: ... stopped");
     vfs::unmount("nostream");
     plat::delete("mem://logs/m.log");
+    // a stream that takes at most 7 bytes per write: the rest of a line follows, the next line
+    // starts where the file ends (no gap of NUL bytes, no lost rest)
+    let mem = Arc::new(vfs::MemFs::new());
+    vfs::mount("short", Arc::new(Short(mem.clone())));
+    t.check(log_file(Some("short://s.log"), 4096, 0), "log: log_file on a stream with short writes");
+    log_info("file", "a line longer than seven bytes");
+    log_info("file", "and the next one");
+    log_file(None, 0, 0);
+    let s = String::from_utf8_lossy(&vfs::Provider::read(&*mem, "s.log").unwrap_or_default()).into_owned();
+    t.check(!s.contains('\0') && s.contains("INFO  file: a line longer than seven bytes\n") && s.ends_with("INFO  file: and the next one\n")
+            && s.matches('\n').count() == 2, "log: short writes: both lines whole, one after the other");
+    vfs::unmount("short");
 
     // a crash: the last lines on stderr, the crash in the file
     let cp = t.subp("logs/crash.log");
@@ -121,6 +134,47 @@ impl vfs::Provider for NoStreams {
     }
     fn write(&self, p: &str, d: &[u8]) -> bool {
         self.0.write(p, d)
+    }
+}
+
+// a MemFs whose streams write at most 7 bytes per call (Some(7) for a longer buffer)
+struct Short(Arc<vfs::MemFs>);
+
+struct ShortStream(alloc::boxed::Box<dyn vfs::Stream>);
+
+impl vfs::Stream for ShortStream {
+    fn read_at(&self, off: u64, buf: &mut [u8]) -> Option<usize> {
+        self.0.read_at(off, buf)
+    }
+    fn write_at(&self, off: u64, buf: &[u8]) -> Option<usize> {
+        self.0.write_at(off, &buf[..buf.len().min(7)])
+    }
+    fn size(&self) -> Option<u64> {
+        self.0.size()
+    }
+}
+
+impl vfs::Provider for Short {
+    fn kind(&self, p: &str) -> u32 {
+        self.0.kind(p)
+    }
+    fn read(&self, p: &str) -> Option<Vec<u8>> {
+        self.0.read(p)
+    }
+    fn list(&self, p: &str, f: &mut dyn FnMut(&str, bool, u64)) -> bool {
+        self.0.list(p, f)
+    }
+    fn write(&self, p: &str, d: &[u8]) -> bool {
+        self.0.write(p, d)
+    }
+    fn mkdir(&self, p: &str) -> bool {
+        self.0.mkdir(p)
+    }
+    fn open(&self, p: &str, mode: u32) -> vfs::Opened {
+        match self.0.open(p, mode) {
+            vfs::Opened::File(s) => vfs::Opened::File(alloc::boxed::Box::new(ShortStream(s))),
+            o => o,
+        }
     }
 }
 

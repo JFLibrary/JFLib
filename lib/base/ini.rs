@@ -132,13 +132,15 @@ impl Ini {
         Ini::parse(&data[..got])
     }
 
-    /// like load, but None when the file exists and could not be read completely (unreadable
-    /// or longer than FILE_MAX); a missing or empty file gives an empty Ini
+    /// like load, but None when the file could not be read completely (unreadable, its size
+    /// unknown, longer than FILE_MAX, or whether it exists is unknown: refused, an I/O error, a
+    /// folder there); a missing or empty file gives an empty Ini
     pub fn load_checked(path: &str) -> Option<Ini> {
         let Some(f) = plat::File::open(path, plat::FO_READ) else {
-            return if plat::file_exists(path) == 1 { None } else { Some(Ini::new()) };
+            // only a name that is surely free counts as missing
+            return (plat::file_exists_checked(path) == Some(0)).then(Ini::new);
         };
-        let full = f.size().unwrap_or(0);
+        let full = f.size()?;
         if full > FILE_MAX {
             return None;
         }

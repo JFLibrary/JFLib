@@ -7,7 +7,8 @@
 //   on mem://, bundles, ZIP archives and a provider without streams; plat::fs on mounts
 //   (stat, times, read_dir, no links); Overlay whiteouts (MemFs and DirFs on top);
 //   File::create_new and AtomicFile's sibling against a writer that comes between the check
-//   and the creation (MemFs, DirFs): its bytes stay, its name is never taken over
+//   and the creation (MemFs, DirFs): its bytes stay, its name is never taken over; OS paths
+//   with a NUL character refused by every file call; a Sub's root never opened in its provider
 
 use alloc::format;
 use alloc::string::String;
@@ -91,7 +92,27 @@ fn dirfs(t: &mut T) {
     t.check(plat::file_exists("scratch:") == 2 && plat::file_exists(&format!("{cwd}/scratch:")) == 0, "vfs: Ini's parent folder is the mount, not a folder 'scratch:'");
     t.check(plat::rename("scratch://sub/x.txt", "scratch://moved/x.txt") && plat::file_exists("scratch://moved/x.txt") == 1, "vfs: DirFs rename creates the folder");
     t.check(vfs::unmount("scratch") && plat::read_file("scratch://moved/x.txt").is_none(), "vfs: unmount");
+    nul_names(t, &base);
     rm_tree(&base);
+}
+
+// an OS path with a NUL character never reaches the system (it would end the name there):
+// victim keeps its bytes and its name, nothing is made at the name before the NUL
+fn nul_names(t: &mut T, base: &str) {
+    let victim = format!("{base}/victim.txt");
+    let (v0, other) = (format!("{victim}\0tail"), format!("{base}/other.txt"));
+    t.check(plat::write_file(&victim, b"keep") && plat::write_file(&other, b"other"), "vfs: NUL: the files");
+    let open_w = File::open(&v0, FO_WRITE).is_none() && File::open(&v0, FO_RW).is_none() && File::create_new(&v0).is_none();
+    let calls = !plat::delete(&v0) && !plat::write_file(&v0, b"x") && !plat::rename(&v0, &format!("{base}/moved.txt"))
+        && !plat::rename(&other, &v0) && plat::read_file(&v0).is_none() && plat::file_exists(&v0) == 0 && plat::file_exists_checked(&v0).is_none()
+        && plat::AtomicFile::create(&v0).is_none() && plat::FileLock::acquire(&v0).is_none();
+    t.check(open_w && calls, "vfs: NUL: open, create_new, delete, write_file, rename, read_file, exists, AtomicFile, FileLock refuse");
+    let fresh = format!("{base}/fresh.txt");
+    let fsx = !plat::fs::write_file_private(&format!("{fresh}\0tail"), b"x") && !plat::fs::mkdir_private(&format!("{base}/dir\0tail"))
+        && !plat::fs::set_times(&v0, 0, 0) && !plat::fs::symlink(&v0, &format!("{base}/link"), false) && plat::fs::stat(&v0).is_none();
+    t.check(fsx && plat::file_exists(&fresh) == 0 && plat::file_exists(&format!("{base}/dir")) == 0 && plat::file_exists(&format!("{base}/link")) == 0,
+            "vfs: NUL: plat::fs refuses too (write_file_private makes nothing at the name before it)");
+    t.check(plat::read_file(&victim).as_deref() == Some(&b"keep"[..]) && plat::read_file(&other).as_deref() == Some(&b"other"[..]), "vfs: NUL: victim and other keep their bytes");
 }
 
 fn bundles(t: &mut T) {
@@ -147,6 +168,21 @@ fn layers(t: &mut T) {
     t.check(Sub::new(low, "../x").is_none(), "vfs: Sub refuses ..");
     vfs::unmount("ov");
     vfs::unmount("theme");
+
+    // the root of a Sub is refused before its provider sees it: inner's folder "d" was replaced
+    // by a file meanwhile, a writing open of sub:// must not empty it (nor create "d" when gone)
+    let inner: Arc<dyn Provider> = Arc::new(MemFs::new());
+    inner.mkdir("d");
+    if let Some(s) = Sub::new(inner.clone(), "d") {
+        vfs::mount("subroot", Arc::new(s));
+        let swapped = inner.delete("d") && inner.write("d", b"payload");
+        let w = File::open("subroot://", FO_WRITE).is_none() && File::open("subroot:", FO_RW).is_none();
+        t.check(swapped && w && inner.read("d").as_deref() == Some(&b"payload"[..]), "vfs: Sub's root opened for writing is refused, inner's file of that name keeps its bytes");
+        let gone = inner.delete("d");
+        let n = File::open("subroot://", FO_WRITE).is_none() && File::create_new("subroot://").is_none();
+        t.check(gone && n && inner.kind("d") == 0, "vfs: ... and nothing is created at that name");
+        vfs::unmount("subroot");
+    }
 }
 
 fn zip(t: &mut T) {

@@ -367,7 +367,9 @@ impl<H: DocHost> ContentFs<H> {
         }
     }
 
-    // a new document at path (a tree name; its folder must exist) -> its description
+    // a new document at path (a tree name; its folder must exist) -> its description.  SAF gives
+    // a document another name ("name (1)") when the name was taken meanwhile: that one is ours
+    // and goes again, and the name counts as taken (None)
     fn create_at(&self, path: &str, dir: bool) -> Option<DocInfo> {
         let Name::Tree(base, root, names) = parse(path)? else { return None };
         let (name, up) = names.split_last()?;
@@ -376,10 +378,39 @@ impl<H: DocHost> ContentFs<H> {
             return None;
         }
         let d = self.host.create(&parent.uri, name, dir)?;
-        if d.name == *name {
-            self.remember(key(base, &names), &d);
+        if d.name != *name {
+            self.host.delete(&d.uri);
+            return None;
         }
+        self.remember(key(base, &names), &d);
         Some(d)
+    }
+
+    // the file at a tree name to write: the one there, else a new one (made meanwhile by
+    // someone else: that one)
+    fn file_for_write(&self, path: &str) -> Option<DocInfo> {
+        match self.create_at(path, false) {
+            Some(d) => Some(d),
+            None => self.lookup(path).filter(|d| !d.dir),
+        }
+    }
+
+    // whether path names the folder the user chose, also in its document form
+    // ("AUTH/tree/T/document/T": the URI ContentFs::document gives for the tree)
+    fn is_tree_root(&self, path: &str, d: &DocInfo) -> bool {
+        match parse(path) {
+            Some(Name::Tree(_, _, n)) => n.is_empty(),
+            Some(Name::Doc(_)) => {
+                let segs: Vec<&str> = path.split('/').collect();
+                if segs.len() != 5 || segs[1] != "tree" {
+                    return false;
+                }
+                let base = &path[..segs[0].len() + segs[1].len() + segs[2].len() + 2];
+                // the host's answer for the tree's root names the same document
+                self.walk(base, &uri_of(base), &[]).is_some_and(|r| r.uri == d.uri)
+            }
+            None => false,
+        }
     }
 
     // the folder a tree name is in -> (root, parent names, own name)
@@ -581,7 +612,7 @@ impl<H: DocHost> Provider for ContentFs<H> {
                 if !up.is_empty() && !self.mkdir(&path[..path.rfind('/').unwrap_or(0)]) {
                     return false;
                 }
-                match self.create_at(path, false) {
+                match self.file_for_write(path) {
                     Some(d) => d,
                     None => return false,
                 }
@@ -606,7 +637,16 @@ impl<H: DocHost> Provider for ContentFs<H> {
                                 self.remember(key(base, &names[..k]), &c);
                                 c
                             }
-                            _ => return false,
+                            // "name (1)": the name was taken meanwhile; ours goes again, the
+                            // folder made under the name is the one
+                            Some(c) => {
+                                self.host.delete(&c.uri);
+                                match self.walk(base, &root, &names[..k]) {
+                                    Some(c) => c,
+                                    None => return false,
+                                }
+                            }
+                            None => return false,
                         },
                     };
                 }
@@ -617,11 +657,15 @@ impl<H: DocHost> Provider for ContentFs<H> {
     }
 
     fn delete(&self, path: &str) -> bool {
-        // never the folder the user chose: it is the user's, not the app's
+        // never the folder the user chose (by its tree name or its document URI): it is the
+        // user's, not the app's
         if matches!(parse(path), Some(Name::Tree(_, _, ref n)) if n.is_empty()) {
             return false;
         }
         let Some(d) = self.lookup(path) else { return false };
+        if self.is_tree_root(path, &d) {
+            return false;
+        }
         if d.dir && self.host.children(&d.uri).is_none_or(|k| !k.is_empty()) {
             return false; // only empty folders
         }
@@ -695,7 +739,7 @@ impl<H: DocHost> Provider for ContentFs<H> {
             Some(d) if d.dir => return Opened::Refused,
             Some(d) => d,
             None if mode == FO_READ => return Opened::Refused,
-            None => match self.create_at(path, false) {
+            None => match self.file_for_write(path) {
                 Some(d) => d,
                 None => return Opened::Refused,
             },
@@ -709,18 +753,15 @@ impl<H: DocHost> Provider for ContentFs<H> {
     }
 
     // the host creates the document; a name taken meanwhile gets "name (1)" from SAF: that
-    // document goes again and the name counts as taken
+    // document goes again and the name counts as taken (create_at)
     fn create_new(&self, path: &str) -> Opened {
-        let Some(Name::Tree(_, _, names)) = parse(path) else { return Opened::Refused };
-        let Some(name) = names.last().map(|n| String::from(*n)) else { return Opened::Refused };
+        if !matches!(parse(path), Some(Name::Tree(_, _, ref n)) if !n.is_empty()) {
+            return Opened::Refused;
+        }
         if self.lookup(path).is_some() {
             return Opened::Refused;
         }
         let Some(d) = self.create_at(path, false) else { return Opened::Refused };
-        if d.name != name {
-            self.host.delete(&d.uri);
-            return Opened::Refused;
-        }
         match self.host.open(&d.uri, FO_WRITE) {
             Some(s) => Opened::File(s),
             None => Opened::Refused,

@@ -37,11 +37,16 @@ pub fn file_exists(path: &str) -> u32 {
     }
 }
 
-/// Some(0) only for a missing path, Some(1/2) for file/directory, None for other errors.
+/// Some(0) only for a missing path, Some(1/2) for file/directory, None for other errors.  A
+/// folder mount answers for its OS file; other mounts have only their kind (0 for missing and
+/// for errors alike).
 pub fn file_exists_checked(path: &str) -> Option<u32> {
     match vfs::route(path) {
         Route::Os => if fs_allowed(path, FS_READ) { crate::file_exists_checked_raw(path) } else { None },
-        Route::Vfs(p, rest) => Some(p.kind(&rest)),
+        Route::Vfs(p, rest) => match p.os_path(&rest) {
+            Some(o) => file_exists_checked(&o),
+            None => Some(p.kind(&rest)),
+        },
         Route::Bad => None,
     }
 }

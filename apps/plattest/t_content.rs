@@ -3,7 +3,8 @@
 // provider: path-like document IDs (a rename changes the URI), "name (1)" when a name is
 // taken, trees with their own URIs, recursive deletes.  Through the ordinary file functions:
 // names below a chosen folder, single documents, AtomicFile written in place, File streams,
-// rename / move, mkdir / delete, stat and display names; the name cache (no listing for a
+// rename / move, mkdir / delete (never the chosen folder, also by its document URI), a name
+// another app takes between the lookup and the create, stat and display names; the name cache (no listing for a
 // known name, checked against the document, emptied when the host reports a change) and the
 // journal of writes (a copy first, read back and compared, an interrupted write finished by
 // recover() in a new provider, as after a restart; a refused stream or rename keeps the copy,
@@ -38,6 +39,9 @@ static REFUSE_OPEN: AtomicBool = AtomicBool::new(false);
 static REFUSE_RENAME: AtomicBool = AtomicBool::new(false);
 static FAIL_B: AtomicBool = AtomicBool::new(false);
 static GATE: AtomicU32 = AtomicU32::new(0);
+// another app makes this name (a folder when true; a file holds "fremd") just before the
+// host's next create of it: the create gets "name (1)"
+static RACE: SpinLock<Option<(String, bool)>> = SpinLock::new(None);
 
 // a storage provider in memory: documents by path ("Docs/a.txt"), IDs "root:" + path
 struct Fake {
@@ -184,6 +188,18 @@ impl DocHost for Host {
         if !self.dirs.lock().contains(&p) {
             return None;
         }
+        let race = {
+            let mut r = RACE.lock();
+            if r.as_ref().is_some_and(|(n, _)| n == name) { r.take() } else { None }
+        };
+        if let Some((n, d)) = race {
+            let q = format!("{p}/{n}");
+            if d {
+                self.dirs.lock().push(q);
+            } else {
+                self.files.lock().insert(q, Arc::new(SpinLock::new(b"fremd".to_vec())));
+            }
+        }
         let path = self.free(&p, name);
         if dir {
             self.dirs.lock().push(path.clone());
@@ -257,6 +273,7 @@ pub fn t_content(t: &mut T) {
     tree_streams(t, &at);
     tree_renames(t, &tree, &at);
     tree_folders(t, &tree, &at);
+    tree_races(t, &tree, &at);
     single(t, &tree, &at);
     cache(t, &fake, &at);
     journal(t, &fake, &tree, &at);
@@ -341,6 +358,27 @@ fn tree_folders(t: &mut T, tree: &str, at: &dyn Fn(&str) -> String) {
     t.check(plat::delete(&at("verschoben.txt")) && plat::delete(&at("neu/strom.bin")) && plat::delete(&at("neu")), "content: files and their folder deleted");
     t.check(!plat::delete(tree) && plat::file_exists(tree) == 2, "content: the chosen folder itself is never deleted");
     t.check(names(tree) == ["hello.txt=15"], "content: the folder as it was");
+    // ... nor by its document form (the URI ContentFs::document gives for it); "Other" is empty
+    let other = |id: &str| format!("content://{AUTH}/tree/{}/document/{}", enc("root:Other"), enc(id));
+    t.check(!plat::delete(&other("root:Other")) && plat::file_exists(&other("root:Other")) == 2, "content: the chosen folder by its document URI is never deleted either");
+}
+
+// a name another app makes between the lookup and the host's create: SAF gives ours
+// "name (1)"; that one goes again, and the data lands at the name asked for (write, open), the
+// folder made meanwhile is the folder (mkdir), create_new refuses
+fn tree_races(t: &mut T, tree: &str, at: &dyn Fn(&str) -> String) {
+    *RACE.lock() = Some((String::from("rennen.txt"), false));
+    t.check(plat::write_file(&at("rennen.txt"), b"unser") && text(&at("rennen.txt")).as_deref() == Some("unser"), "content: write_file: a name taken meanwhile holds our bytes");
+    *RACE.lock() = Some((String::from("strom.txt"), false));
+    let f = File::open(&at("strom.txt"), FO_WRITE);
+    t.check(f.is_some_and(|f| f.write_at(0, b"strom") == Some(5)) && text(&at("strom.txt")).as_deref() == Some("strom"), "content: File FO_WRITE: ... the stream is that document");
+    *RACE.lock() = Some((String::from("exkl.txt"), false));
+    t.check(File::create_new(&at("exkl.txt")).is_none() && text(&at("exkl.txt")).as_deref() == Some("fremd"), "content: File::create_new: refused, the other app's file kept");
+    *RACE.lock() = Some((String::from("ordner"), true));
+    t.check(plat::mkdir(&at("ordner/sub")) && plat::file_exists(&at("ordner/sub")) == 2, "content: mkdir: the folder made meanwhile is used");
+    t.check(names(tree) == ["exkl.txt=5", "hello.txt=15", "ordner/", "rennen.txt=5", "strom.txt=5"], "content: no \"name (1)\" left behind");
+    t.check(plat::delete(&at("ordner/sub")) && plat::delete(&at("ordner")) && plat::delete(&at("rennen.txt")) && plat::delete(&at("strom.txt")) && plat::delete(&at("exkl.txt")), "content: races cleaned up");
+    *RACE.lock() = None;
 }
 
 fn single(t: &mut T, tree: &str, at: &dyn Fn(&str) -> String) {

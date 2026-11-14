@@ -193,8 +193,12 @@ pub fn read_link(path: &str) -> Option<String> {
 }
 
 /// a symbolic link at link to target (dir: a folder's link on Windows); a vfs name as target
-/// stands for its OS path.  Only on OS paths and folder mounts.
+/// stands for its OS path.  Only on OS paths and folder mounts; never a target with a NUL
+/// character (the link would lead to the name before it).
 pub fn symlink(target: &str, link: &str, dir: bool) -> bool {
+    if target.contains('\0') {
+        return false;
+    }
     let t = match vfs::route(target) {
         Route::Os => String::from(target),
         _ => match vfs::os_path(target) {
@@ -206,6 +210,15 @@ pub fn symlink(target: &str, link: &str, dir: bool) -> bool {
         At::Os(o) => sys::symlink(&t, o.as_deref().unwrap_or(link), dir),
         _ => false,
     }
+}
+
+/// (net) (device, file id) of an OS path when it is a socket file (Windows: an AF_UNIX reparse
+/// point), a link not followed; without the policy check (net checked fs.write)
+pub(crate) fn socket_id(path: &str) -> Option<(u64, u64)> {
+    if path.contains('\0') {
+        return None;
+    }
+    sys::socket_id(path)
 }
 
 /// a second name new for the file existing (both OS paths or folder mounts)
@@ -495,6 +508,13 @@ mod win {
             return None;
         }
         meta_of(&open(path, FILE_READ_ATTRIBUTES, OPEN_REPARSE_POINT)?)
+    }
+
+    pub(crate) fn socket_id(path: &str) -> Option<(u64, u64)> {
+        const TAG_AF_UNIX: u32 = 0x8000_0023;
+        let h = open(path, FILE_READ_ATTRIBUTES, OPEN_REPARSE_POINT)?;
+        let m = meta_of(&h)?;
+        (m.attrs & ATTR_REPARSE != 0 && reparse_tag(&h) == TAG_AF_UNIX).then_some((m.dev, m.ino))
     }
 
     pub fn read_dir(path: &str) -> Option<Vec<DirEntry>> {
@@ -797,6 +817,10 @@ mod lnx {
             return None;
         }
         statx(path, AT_SYMLINK_NOFOLLOW)
+    }
+
+    pub(crate) fn socket_id(path: &str) -> Option<(u64, u64)> {
+        statx(path, AT_SYMLINK_NOFOLLOW).filter(|m| m.mode & 0o170000 == 0o140000).map(|m| (m.dev, m.ino))
     }
 
     pub fn read_dir(path: &str) -> Option<Vec<DirEntry>> {
@@ -1145,6 +1169,10 @@ mod apl {
             return None;
         }
         stat_raw(path, false)
+    }
+
+    pub(crate) fn socket_id(path: &str) -> Option<(u64, u64)> {
+        stat_raw(path, false).filter(|m| m.mode & 0o170000 == 0o140000).map(|m| (m.dev, m.ino))
     }
 
     pub fn read_dir(path: &str) -> Option<Vec<DirEntry>> {
