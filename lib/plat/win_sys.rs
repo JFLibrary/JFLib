@@ -28,6 +28,8 @@ unsafe extern "system" {
     fn DeleteFileW(name: *const u16) -> i32;
     fn RemoveDirectoryW(name: *const u16) -> i32;
     fn MoveFileExW(old: *const u16, new: *const u16, flags: u32) -> i32;
+    fn SetFileInformationByHandle(h: isize, class: u32, info: *const u8, size: u32) -> i32;
+    fn GetFullPathNameW(name: *const u16, n: u32, buf: *mut u16, part: usize) -> u32;
     fn GetTempPathW(n: u32, buf: *mut u16) -> u32;
     fn GetEnvironmentVariableW(name: *const u16, buf: *mut u16, n: u32) -> u32;
     fn SetEnvironmentVariableW(name: *const u16, value: *const u16) -> i32;
@@ -56,6 +58,15 @@ const FILE_FLAG_DELETE_ON_CLOSE: u32 = 0x0400_0000;
 const MOVEFILE_REPLACE: u32 = 1;
 const MOVEFILE_COPY_ALLOWED: u32 = 2;
 const MOVEFILE_WRITETHROUGH: u32 = 8;
+const DELETE: u32 = 0x0001_0000;
+const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+const FILE_RENAME_INFO_EX: u32 = 22; // FileRenameInfoEx (Windows 10 1709)
+const RENAME_REPLACE_IF_EXISTS: u32 = 1;
+const RENAME_POSIX_SEMANTICS: u32 = 2;
+const ERROR_ACCESS_DENIED: u32 = 5;
+const ERROR_SHARING_VIOLATION: u32 = 32;
+const ERROR_LOCK_VIOLATION: u32 = 33;
 const ERROR_HANDLE_EOF: u32 = 38;
 const ERROR_FILE_EXISTS: u32 = 80;
 const ERROR_ALREADY_EXISTS: u32 = 183;
@@ -243,8 +254,103 @@ pub(crate) fn delete_raw(path: &str) -> bool {
 /// rename, replacing an existing target  [plat_rename]
 pub(crate) fn rename_raw(old: &str, new: &str) -> bool {
     let (wo, wn) = (to_wide(old), to_wide(new));
-    // SAFETY: NUL-terminated paths.
-    unsafe { MoveFileExW(wo.as_ptr(), wn.as_ptr(), MOVEFILE_REPLACE | MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITETHROUGH) != 0 }
+    replace_move(&wo, &wn, MOVEFILE_REPLACE | MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITETHROUGH)
+}
+
+/// the absolute \\?\ form of a NUL-terminated wide path, NUL-terminated (FILE_RENAME_INFO wants
+/// its target neither relative to this process's folder nor with '/')
+fn verbatim(w: &[u16]) -> Option<Vec<u16>> {
+    let mut buf = alloc::vec![0u16; 1024];
+    let n = loop {
+        // SAFETY: a NUL-terminated path; buf holds buf.len() units.
+        let n = unsafe { GetFullPathNameW(w.as_ptr(), buf.len() as u32, buf.as_mut_ptr(), 0) } as usize;
+        if n == 0 || n > 0x8000 {
+            return None;
+        }
+        if n < buf.len() {
+            break n;
+        }
+        buf.resize(n + 1, 0);
+    };
+    let full = &buf[..n];
+    let has = |p: &str| full.len() >= p.len() && full.iter().zip(p.encode_utf16()).all(|(a, b)| *a == b);
+    let mut out: Vec<u16> = Vec::with_capacity(n + 8);
+    if has("\\\\?\\") || has("\\\\.\\") {
+        out.extend_from_slice(full);
+    } else if has("\\\\") {
+        out.extend("\\\\?\\UNC".encode_utf16()); // \\server\share -> \\?\UNC\server\share
+        out.extend_from_slice(&full[1..]);
+    } else {
+        out.extend("\\\\?\\".encode_utf16());
+        out.extend_from_slice(full);
+    }
+    out.push(0);
+    Some(out)
+}
+
+/// old moved over new (both NUL-terminated) with POSIX semantics: the name is taken over at once
+/// even while another program holds the old new open with FILE_SHARE_DELETE -> Err(error)
+fn rename_posix(old: &[u16], new_full: &[u16]) -> Result<(), u32> {
+    // SAFETY: a NUL-terminated path; DELETE access, every share mode; the link itself, folders too.
+    let h = unsafe { CreateFileW(old.as_ptr(), DELETE, FILE_SHARE_ALL, 0, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, 0) };
+    if h == INVALID {
+        // SAFETY: no arguments.
+        return Err(unsafe { GetLastError() });
+    }
+    // FILE_RENAME_INFO: Flags (u32), RootDirectory (a handle at 8), FileNameLength (bytes, at 16),
+    // FileName (at 20, NUL-terminated)
+    let name = (new_full.len() - 1) * 2;
+    let size = 20 + name + 2;
+    let mut info = alloc::vec![0u64; size.div_ceil(8)];
+    let p = info.as_mut_ptr() as *mut u8;
+    // SAFETY: info holds size bytes, 8-byte aligned; the name is copied without overlap.
+    let ok = unsafe {
+        (p as *mut u32).write(RENAME_REPLACE_IF_EXISTS | RENAME_POSIX_SEMANTICS);
+        (p.add(16) as *mut u32).write(name as u32);
+        core::ptr::copy_nonoverlapping(new_full.as_ptr() as *const u8, p.add(20), name);
+        SetFileInformationByHandle(h, FILE_RENAME_INFO_EX, p, size as u32) != 0
+    };
+    // SAFETY: no arguments; then our handle.
+    let e = if ok { 0 } else { unsafe { GetLastError() } };
+    unsafe { CloseHandle(h) };
+    if ok { Ok(()) } else { Err(e) }
+}
+
+/// old moved over new (NUL-terminated wide paths), replacing it  [plat_rename, OsAtomic]
+///
+/// A virus scanner or the search indexer opens a file just written for a moment.  With
+/// FILE_SHARE_DELETE (as they do) MoveFileEx still could not replace it (ERROR_ACCESS_DENIED);
+/// a POSIX rename can, so it comes first.  A program that holds old or new without sharing
+/// deletion (a sharing or lock violation) is waited for, up to about a quarter second.  Where no
+/// POSIX rename exists (an older Windows, FAT, a network share, another volume) MoveFileEx with
+/// move_flags as before, its access denied waited for as well.
+pub(crate) fn replace_move(old: &[u16], new: &[u16], move_flags: u32) -> bool {
+    let full = verbatim(new);
+    let mut wait = 1u32;
+    for left in (0..9).rev() {
+        let e = match full.as_deref().map(|f| rename_posix(old, f)) {
+            Some(Ok(())) => return true,
+            Some(Err(e @ (ERROR_SHARING_VIOLATION | ERROR_LOCK_VIOLATION))) => e,
+            posix => {
+                // SAFETY: NUL-terminated paths.
+                if unsafe { MoveFileExW(old.as_ptr(), new.as_ptr(), move_flags) } != 0 {
+                    return true;
+                }
+                // a refused POSIX rename stands (MoveFileEx is refused the same way)
+                if matches!(posix, Some(Err(ERROR_ACCESS_DENIED))) {
+                    return false;
+                }
+                // SAFETY: no arguments.
+                unsafe { GetLastError() }
+            }
+        };
+        if left == 0 || !matches!(e, ERROR_SHARING_VIOLATION | ERROR_LOCK_VIOLATION | ERROR_ACCESS_DENIED) {
+            return false;
+        }
+        crate::sleep_ms(wait);
+        wait *= 2;
+    }
+    false
 }
 
 /// f(name, is_dir, size_lo) for every entry except "." and ".."  [plat_dir_list]
@@ -341,8 +447,8 @@ impl OsAtomic {
         let Some(f) = self.f.take() else { return false };
         let ok = f.sync();
         drop(f);
-        // SAFETY: NUL-terminated paths; tmp was created by begin.
-        if ok && unsafe { MoveFileExW(self.tmp.as_ptr(), self.dst.as_ptr(), MOVEFILE_REPLACE | MOVEFILE_WRITETHROUGH) } != 0 {
+        // (tmp was created by begin)
+        if ok && replace_move(&self.tmp, &self.dst, MOVEFILE_REPLACE | MOVEFILE_WRITETHROUGH) {
             self.tmp.clear();
             return true;
         }

@@ -30,6 +30,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Windows: `Watcher::new` returned before the roots were read, so a change right after it could be missed, and a root whose read failed (deleted, its drive gone) was given up for good after one overflow. `new` now waits until every root's first read is pending (a root that cannot be read fails it); a lost root is opened again every second
 - Linux: the watcher left the folders of a folder whose listing failed (no descriptors left) unwatched for good, and a root moved away kept its watches -- its changes came under the old path -- while a folder made at its path was never watched (also after a deleted root). Such folders and roots are tried again every second
 - `fs::write_file_private` reports true when a rule of the manifest allows the file but not its folder. The folder's fsync after the rename was checked as well and made it report false although the file had been replaced.
+- Windows: `rename`, `write_file` and the other writers that replace a file no longer fail while another program holds the old file open for a moment, as a virus scanner or the search indexer does with a file just written. They rename with POSIX semantics (FileRenameInfoEx), which replaces a file held with FILE_SHARE_DELETE, and wait up to about a quarter second for a holder that does not share deletion; elsewhere MoveFileEx as before.
 
 ### Security
 
