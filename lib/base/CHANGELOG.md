@@ -8,6 +8,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- `base::Ini::load_checked` gives None when it cannot tell that the name is free (refused, an I/O error, a folder there) or cannot learn the file's size; only a missing name gives an empty Ini. `file_exists_checked` on a folder mount answers for its OS file (it gave the mount's kind: 0 for an error too)
+
+### Fixed
+
+- `Ini::load_checked` returned an empty Ini for a file it could not open when asking whether it exists failed (refused, an I/O error), and for a file whose size was unknown: a later save replaced the settings it never read
+
 ## [0.2.0] - 2026-11-13
 
 ### Added

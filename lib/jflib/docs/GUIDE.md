@@ -373,7 +373,7 @@ title bar follows GNOME's settings like GTK (section 7, "Title bar").
   | `UIC_EXIT` | the window loop ends (only after a real window ran: save settings here) |
   | `UIC_ACTIVE` | `arg` 1: one of the app's windows got the keyboard, 0: none has it (pause animations, poll less) |
   | `UIC_SUSPEND` | `arg` 1: the system goes to sleep (save, close connections), 2: the app went to the background -- the browser hid the tab (`visibilitychange`), Android stopped the activity (`onStop`); the app may be ended without another word, so save here too --, 0: it woke up / is visible again; to keep it awake see `plat::inhibit` (section 21) |
-  | `UIC_SESSION_END` | logout, shutdown or SIGTERM: save now; `UIC_EXIT` and the end follow |
+  | `UIC_SESSION_END` | logout, shutdown or SIGTERM: save now; `UIC_EXIT` and the end follow. Windows: only a confirmed end (`WM_ENDSESSION`; a logout another app cancels sends nothing), taken while the message is handled -- Windows may end the process right after it |
   | `UIC_SETTINGS` | `arg` = `plat::SET_THEME \| SET_LOCALE \| SET_CONTRAST \| SET_FONTS \| SET_MONITORS`: system settings changed; a system theme and the format (`i18n::locale()`) are already updated; `SET_MONITORS`: a monitor came, went, moved or changed its scale or work area (`ui.monitors()`, section 21) |
   | `UIC_HOTKEY`, `UIC_HOTKEY_LOST` | `arg` = id: a global shortcut was pressed anywhere / the desktop dropped it (`ui.hotkey_error(id)`; section 21) |
   | `UIC_PICK` | `arg` 1: the user picked a colour on the screen (`ui.picked_color()`), 0: cancelled or failed (`ui.screen_error()`) |
@@ -1804,7 +1804,8 @@ impl App for Copier {
   cancel token, the chunk size); `Reader::open` / `read(max)` and `Writer::create` / `write` /
   `commit` chunk by chunk. Writes are atomic like `plat::write_file` (`plat::AtomicFile`, see
   [VFS.md](VFS.md)): cancelled, failed or dropped, the sibling is removed and the old file
-  stays. Names, mounts and permissions are those of the blocking calls.
+  stays. A `Writer::write` whose future is dropped before it ends spoils the writer (its job
+  may still write): later writes and the commit fail. Names, mounts and permissions are those of the blocking calls.
   `netio::Client::request_async` and `download(url, headers, name, &ctl)` do the same for HTTP.
 * Test scripts stay deterministic: `sync` waits until no task work is in flight (pool jobs and
   the wake-ups they send), `wait MS` moves the task clock (`sleep` follows the virtual clock in
@@ -2676,7 +2677,9 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
 * `plat::watch::Watcher::new(&roots)` / `take(ms)` -- the changed paths below folders
   (ReadDirectoryChangesW / inotify, recursive; `overflow` when events were lost).
 * `plat::net::UnixListener::bind(path)` / `connect_unix(path, ms)` -- Unix domain sockets (Linux,
-  Windows 10 1803 and later) with the stream calls of `TcpStream`.
+  Windows 10 1803 and later) with the stream calls of `TcpStream`. `bind` removes only a socket
+  file nobody listens on any more; a file, a folder or a socket that is listened on stays and
+  `bind` fails. A dropped listener removes its socket file, not a name taken again meanwhile.
 * `plat::process::Command { program, args, cwd, env }.spawn()` -- a child process with pipes
   (no shell); dropping the `Child` ends its process tree.
 * `netpkt` -- packets byte for byte, without I/O (written for JFNetworker's simulator): `Mac`,

@@ -26485,6 +26485,7 @@ net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
             shutdown_write, peer_addr / local_addr, wait_readable(ms)
   UdpSocket::bind / send_to / recv_from(buf, timeout_ms)
   UnixListener::bind(path) / accept() / accept_timeout(ms); connect_unix(path, timeout_ms)
+            (bind removes only a socket file nobody listens on; the drop only its own)
             -> UnixStream (the stream calls of TcpStream; addresses and nodelay do not apply)
             Linux, and Windows 10 1803 and later (AF_UNIX)
   resolve(host, port): numeric addresses, "localhost"; Windows also the system resolver
@@ -26629,7 +26630,10 @@ one thread may read while another writes (Arc<TcpStream>).
 **`impl UnixListener`**
 
 - **`fn bind(path: &str) -> NetResult<UnixListener>`**
-  listen on a socket file; one left over at `path` is removed first
+  listen on a socket file.  A socket file left at `path` by a listener that is gone (a
+  connection to it is refused) is removed first; anything else there -- a file, a folder,
+  a socket that is listened on -- stays, and bind fails (AddrInUse; a folder on Windows:
+  Other).
 - **`fn path(&self) -> &str`**
 - **`fn accept(&self) -> NetResult<UnixStream>`**
 - **`fn accept_timeout(&self, ms: u32) -> NetResult<Option<UnixStream>>`**
@@ -26733,7 +26737,8 @@ modes or free space.
 
 - **`fn symlink(target: &str, link: &str, dir: bool) -> bool`**
   a symbolic link at link to target (dir: a folder's link on Windows); a vfs name as target
-  stands for its OS path.  Only on OS paths and folder mounts.
+  stands for its OS path.  Only on OS paths and folder mounts; never a target with a NUL
+  character (the link would lead to the name before it).
 
 - **`fn hard_link(existing: &str, new: &str) -> bool`**
   a second name new for the file existing (both OS paths or folder mounts)
@@ -27248,7 +27253,8 @@ STORE: &str = "config://permission-decisions.txt"
   whether a policy restricts this process
 
 - **`fn fs_allowed(path: &str, mode: u32) -> bool`**
-  whether path may be read (FS_READ) or written (FS_WRITE)
+  whether path may be read (FS_READ) or written (FS_WRITE); never a path with a NUL character
+  (the system would end the name there and reach another file), with or without a policy
 
 - **`fn user_doc_allowed(uri: &str) -> bool`**
   whether the app may reach a document the user chose by its URI (Android's content://
@@ -30507,7 +30513,9 @@ in place by commit (aio.rs builds the async writes and copies on it).
   0 missing, 1 file, 2 directory  [plat_file_exists]
 
 - **`fn file_exists_checked(path: &str) -> Option<u32>`**
-  Some(0) only for a missing path, Some(1/2) for file/directory, None for other errors.
+  Some(0) only for a missing path, Some(1/2) for file/directory, None for other errors.  A
+  folder mount answers for its OS file; other mounts have only their kind (0 for missing and
+  for errors alike).
 
 - **`fn mkdir(path: &str) -> bool`**
   create a directory and its missing parents; an existing directory is fine  [plat_mkdir]
@@ -31122,7 +31130,8 @@ aio -- files without blocking the calling thread: the work runs on the blocking 
                         size() / pos() / seek(pos): a plat::File (OS file or a mount's stream)
                         read chunk by chunk, each chunk a job of the pool
   Writer::create(path) -> writer;  writer.write(data).await, writer.commit().await: an
-                        AtomicFile filled chunk by chunk (dropped without commit: discarded)
+                        AtomicFile filled chunk by chunk (dropped without commit: discarded;
+                        a write's future dropped before its end spoils the writer)
   Ctl { progress, cancel, chunk }   what an operation reports to (bytes done / total) and
                         listens to; clones share both
 
@@ -31186,7 +31195,9 @@ CHUNK: usize = 256 * 1024
 - **`struct Writer`**
   an AtomicFile filled chunk by chunk on the pool; dropped without commit, it is discarded
   (the sibling is removed by whoever drops the last reference: the dropping thread, or the
-  pool when a write was still running)
+  pool when a write was still running).  A write whose future was dropped before it finished
+  may still land (its job may be running): the writer is spoilt then, later writes give
+  Err(Write) and the commit Err(Commit)
 
 **`impl Writer`**
 
@@ -36908,8 +36919,9 @@ a blank (set -> false).  CR / LF inside a value are written as blanks.
 - **`fn load(path: &str) -> Ini`**
   the parsed file; empty when it is missing or unreadable  [ini_load]
 - **`fn load_checked(path: &str) -> Option<Ini>`**
-  like load, but None when the file exists and could not be read completely (unreadable
-  or longer than FILE_MAX); a missing or empty file gives an empty Ini
+  like load, but None when the file could not be read completely (unreadable, its size
+  unknown, longer than FILE_MAX, or whether it exists is unknown: refused, an I/O error, a
+  folder there); a missing or empty file gives an empty Ini
 - **`fn parse(data: &[u8]) -> Ini`**
   parse settings text  [ini_parse]
 - **`fn to_bytes(&self) -> Vec<u8>`**

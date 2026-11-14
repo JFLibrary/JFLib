@@ -149,7 +149,9 @@ ctl.cancel.cancel();                                // stops between two chunks;
 `Writer::create(name)` / `write(data)` / `commit()` work chunk by chunk, each chunk a job of the
 pool. Names, mounts and permissions are those of the blocking functions (the same calls, made
 on a pool thread; a caller inside `Key::trusted` stays trusted there). A cancelled, failed or
-dropped write removes its sibling. `netio::Client::download(url, headers, name, &ctl)` writes an
+dropped write removes its sibling. A `Writer::write` whose future is dropped before it ends
+spoils the writer (its job may still write at that offset): later writes give `Err(Write)`,
+the commit `Err(Commit)`, and nothing is put in place. `netio::Client::download(url, headers, name, &ctl)` writes an
 HTTP body the same way.
 
 ## The trash
@@ -191,6 +193,9 @@ A name with a scheme works when its mount is a folder (`documents://old.txt`,
 - A scheme has at least two characters: lower-case letters, digits, `+`, `-` and `.`.
   Windows drive letters (`C:/`) are never schemes.
 - A scheme that is not mounted is an error, not a relative OS path. `https://` is no file.
+- A name with a NUL character is refused, inside a mount and as an OS path (the system would end
+  the name there and reach another file): every call fails before it reaches the system, also
+  without a manifest (`policy::fs_allowed` is false for it).
 - Writes create missing folders.
 - `rename` works inside one mount. Across mounts (or between a mount and the OS) it fails;
   read and write instead.
@@ -220,7 +225,7 @@ let tex = plat::read_file("pack://textures/wood.png");
 | `MemFs::new()` | files in memory (also behind `mem://`) |
 | `DirFs::new(root)` | an OS folder; goes through the checked OS functions |
 | `Overlay::new(layers)` | several layers: reads from the first layer that has the path, lists every layer, writes to the top layer; deleting or renaming what a lower layer has leaves a whiteout (below) |
-| `Sub::new(provider, folder)` | one folder of another provider as a root |
+| `Sub::new(provider, folder)` | one folder of another provider as a root (its root is no file: opening it is refused before the provider sees the folder's name) |
 | `Bundle::new(bytes)` / `from_static` | a JFA1 bundle (read-only) |
 | `archive::ZipFs::new(bytes, limits)` | a ZIP32 archive (stored / DEFLATE), checked and unpacked once |
 
@@ -261,8 +266,8 @@ files list keeps them).
 | Name | What it is | What works |
 | --- | --- | --- |
 | `content://AUTH/document/ID` | one document (open, save as) | `read_file`, `write_file` (in place, through the journal, read back; below), `File` streams, `AtomicFile` (the same write at commit), `vfs::stat`, `display_name` |
-| `content://AUTH/tree/ID` | a folder the user chose | `dir_list`, `file_exists`, `display_name`; never deleted |
-| `content://AUTH/tree/ID/a/b.txt` | below it, by display names (each looked up among the children) | everything above, plus `mkdir`, `delete` (files, empty folders), `rename` inside a folder (replacing: the target goes first, since providers pick `name (1)`), to another folder (copy, then delete; files only) |
+| `content://AUTH/tree/ID` | a folder the user chose | `dir_list`, `file_exists`, `display_name`; never deleted (also not by its form `tree/ID/document/ID`) |
+| `content://AUTH/tree/ID/a/b.txt` | below it, by display names (each looked up among the children) | everything above, plus `mkdir`, `delete` (files, empty folders), `rename` inside a folder (replacing: the target goes first, since providers pick `name (1)`), to another folder (copy, then delete; files only). A new document or folder that the provider names otherwise (`name (1)`: the name was taken meanwhile, or the provider changed it) goes again: a write or a writing stream then uses the document under the name asked for, `mkdir` the folder, `File::create_new` refuses |
 | `content://AUTH/tree/ID/document/ID2` | Android's own form of a document in a tree | as a single document |
 
 ```rust
