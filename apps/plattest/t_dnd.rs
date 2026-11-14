@@ -5,15 +5,19 @@
 //                           our IDataObject read as a drop target reads it (EnumFormatEtc,
 //                           GetData of every format), our IDropTarget fed with it (DragEnter,
 //                           DragOver, Drop -> E_DRAG / E_DROP and the content), the
-//                           IDropSource's answers, a real window registered with OLE; macOS
+//                           IDropSource's answers, a real window registered with OLE, the
+//                           answer after the drop (drop_hold: a data object in
+//                           IDataObjectAsyncCapability's async mode, EndOperation); macOS
 //                           (in the logged-in session: tools/apple.py gui): the pasteboard our
 //                           drag fills, our view's destination methods fed with it through a
 //                           stand-in NSDraggingInfo (E_DRAG / E_DROP and the content)
 //   plattest --test dnd-x11 (Linux, X11; tools/platshared/dnd_x11.py drives it with a raw X11
 //                           client and synthetic X events) XDND both ways: a drop of a
 //                           URI list, UTF-8 text, HTML and a 300 KB image (INCR) onto window
-//                           0, a leave; our drag (drag_start) dropped onto the client's window,
-//                           and one cancelled with Esc
+//                           0, a leave; two drops whose XdndFinished waits for drop_finish
+//                           (drop_hold: not taken, moved) with the effects of the source's
+//                           XdndActionList; our drag (drag_start) dropped onto the client's
+//                           window, and one cancelled with Esc
 //   (Wayland, DoDragDrop with a real mouse: by hand, docs/GUIDE.md)
 
 use alloc::string::String;
@@ -241,6 +245,37 @@ fn ole(t: &mut T) {
     let _ = drop_data_take();
     drag_hook(Some(hook_all));
     let _ = dib_only;
+    // ---- the answer after the drop (drop_hold): a source in async mode learns it later
+    const E_ABORT: i32 = 0x8000_4004_u32 as i32;
+    let late = DragData { text: Some(String::from("später")), effects: DE_COPY | DE_MOVE, ..DragData::default() };
+    evq_clear();
+    t.check(dnd_test_drop_async(&late, 0, 20, 30, MK_LBUTTON) == Some((DE_COPY, false)) && drop_waiting() == 0,
+            "dnd-ole: without drop_hold Drop answers at once, also to an async source");
+    t.check(dnd_test_async_end() == Some((false, false, 0, 0)), "dnd-ole: ... no operation was started");
+    drop_hold(true);
+    t.check(dnd_test_drop(&late, 0, 20, 30, MK_LBUTTON) == Some(DE_COPY) && drop_waiting() == 0,
+            "dnd-ole hold: a source without async mode gets Drop's effect at once");
+    let r = dnd_test_drop_async(&late, 0, 20, 30, MK_LBUTTON);
+    let s = drop_waiting();
+    t.check(r == Some((DE_COPY, true)) && s != 0, "dnd-ole hold: an async source: StartOperation in Drop, the answer waits");
+    t.check(evq_count() > 0 && drop_data_take().text.as_deref() == Some("später"), "dnd-ole hold: E_DROP and the content as before");
+    t.check(!drop_finish(s.wrapping_add(1), DE_COPY), "dnd-ole hold: drop_finish of another drop: nothing");
+    t.check(drop_finish(s, 0) && drop_waiting() == 0, "dnd-ole hold: drop_finish(not taken)");
+    t.check(dnd_test_async_end() == Some((false, true, E_ABORT, 0)), "dnd-ole hold: EndOperation(E_ABORT, DROPEFFECT_NONE)");
+    t.check(!drop_finish(s, DE_COPY), "dnd-ole hold: a second drop_finish: nothing");
+    let r = dnd_test_drop_async(&late, 0, 20, 30, MK_LBUTTON | MK_SHIFT);
+    let s = drop_waiting();
+    t.check(r == Some((DE_MOVE, true)) && drop_finish(s, DE_MOVE), "dnd-ole hold: moved (Shift), answered later");
+    t.check(dnd_test_async_end() == Some((false, true, 0, DE_MOVE)), "dnd-ole hold: EndOperation(S_OK, DROPEFFECT_MOVE)");
+    // a newer drop overtakes the one that waits: it ends with its Drop's effect
+    let _ = dnd_test_drop_async(&late, 0, 20, 30, MK_LBUTTON);
+    let s = drop_waiting();
+    let _ = dnd_test_drop(&late, 0, 20, 30, MK_LBUTTON);
+    t.check(drop_waiting() == 0 && !drop_finish(s, 0), "dnd-ole hold: a newer drop: the older one waits no more");
+    t.check(dnd_test_async_end() == Some((false, true, 0, DE_COPY)), "dnd-ole hold: ... it got EndOperation(S_OK, its Drop's copy)");
+    drop_hold(false);
+    evq_clear();
+    let _ = drop_data_take();
     // ---- the drop source
     t.expect_i(dnd_test_source(false, MK_LBUTTON) as i64, 0, "dnd-ole: QueryContinueDrag: held -> go on");
     t.expect_i(dnd_test_source(false, 0) as i64, 1, "dnd-ole: QueryContinueDrag: released -> drop");
@@ -420,6 +455,30 @@ pub fn t_dnd_x11(t: &mut T) {
         left = e.typ == E_DRAG && e.data == 0;
         left
     }), "dnd-x11: XdndLeave -> E_DRAG with data 0");
+    // ---- drops whose answer waits (drop_hold): XdndFinished after drop_finish
+    drop_hold(true);
+    for (k, want) in [(0, 0), (1, DE_MOVE)] {
+        crate::out(&alloc::format!("  dnd-x11: hold {k}\n"));
+        let mut allowed = None;
+        t.check(pump_until(|e| {
+            if e.typ == E_DRAG && e.data != 0 {
+                allowed = Some(e.data >> 8);
+            }
+            e.typ == E_DROP
+        }), "dnd-x11 hold: E_DROP");
+        t.check(allowed == Some(DE_COPY | DE_MOVE), "dnd-x11 hold: E_DRAG with the effects of the source's XdndActionList");
+        let s = drop_waiting();
+        t.check(s != 0 && drop_data_take().text.as_deref() == Some("später"), "dnd-x11 hold: the content, its answer waits");
+        // a while without an answer (the client checks that no XdndFinished came)
+        let dl = plat::time_us() + 700_000;
+        while plat::time_us() < dl {
+            plat::wait(plat::time_us() + 50_000);
+            while evq_pop().is_some() {}
+        }
+        t.check(drop_finish(s, want) && drop_waiting() == 0, "dnd-x11 hold: drop_finish");
+        crate::out(&alloc::format!("  dnd-x11: answered {k}\n"));
+    }
+    drop_hold(false);
     crate::out("  dnd-x11: ready to drag\n");
     // ---- our drag onto the client's window
     let data = DragData {

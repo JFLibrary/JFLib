@@ -14,16 +14,21 @@
 //   dnd_request(ev)                 SelectionRequest of XdndSelection: our drag's content
 //
 // Target: Enter takes the source's first three types, or XdndTypeList when it has more
-// (read in dnd_deferred).  Every Position is answered there: dnd::drag_query (the UI's hook)
-// at the point in window pixels, with the source's action as the modifier keys (move = Shift,
+// (read in dnd_deferred), and the actions the source allows from its XdndActionList (GTK and Qt
+// set it; without it every effect counts as allowed).  Every Position is answered there:
+// dnd::drag_query (the UI's hook) at the point in window pixels, with the allowed effects (the
+// list and the requested action) and the source's action as the modifier keys (move = Shift,
 // link = Ctrl+Shift), then XdndStatus (accept, "send more positions", the action) and E_DRAG
-// when the point changed.  Leave: E_DRAG with data 0.  Drop: the kinds the UI took are read
-// from XdndSelection with the drop's time (one ConvertSelection at a time through the
-// clipboard's sel_convert: INCR, 3 s each, bounded): text/uri-list (paths: drop_uri_list,
-// other URLs: drop_url_list), text/plain;charset=utf-8 / UTF8_STRING / text/plain / STRING /
-// TEXT, text/html (UTF-16 with a BOM is converted), image/png, else image/bmp
-// (clip_bmp_fix); then E_DROP and XdndFinished (success, the action).  Every message field is
-// untrusted: the source window must match the one of XdndEnter.
+// (the kinds, the allowed effects) when the point changed.  Leave: E_DRAG with data 0.  Drop:
+// the kinds the UI took are read from XdndSelection with the drop's time (one ConvertSelection
+// at a time through the clipboard's sel_convert: INCR, 3 s each, bounded): text/uri-list
+// (paths: drop_uri_list, other URLs: drop_url_list), text/plain;charset=utf-8 / UTF8_STRING /
+// text/plain / STRING / TEXT, text/html (UTF-16 with a BOM is converted), image/png, else
+// image/bmp (clip_bmp_fix); then E_DROP and XdndFinished (success, the action) -- with
+// dnd::drop_hold on (the UI answers drops itself) XdndFinished waits for dnd::drop_finish
+// (accepted or not, the action of its effect), and a drop that still waits when the next one
+// comes gets its own answer first.  Every message field is untrusted: the source window must
+// match the one of XdndEnter.
 // Source: drag_start owns XdndSelection and puts the types into XdndTypeList; the pointer on
 // the root (motion of the implicit grab) is followed in dnd_deferred: the window under it
 // (TranslateCoordinates from the root down, the first with XdndAware; XdndProxy honoured)
@@ -41,6 +46,11 @@ use alloc::vec::Vec;
 use super::*;
 use crate::{DE_ALL, DE_COPY, DE_LINK, DE_MOVE, DT_FILES, DT_HTML, DT_IMAGE, DT_TEXT, DT_URL, DragData,
             E_DRAG, E_DROP, MOD_CTRL, MOD_SHIFT};
+
+// (dnd::drop_finish) the UI's answer to the drop that waits
+fn x11_drop_finish(effect: u32) {
+    with_x(|s| s.xd_held_end(Some(effect)));
+}
 
 const XDND_VERSION: u32 = 5;
 const DROP_TIMEOUT: u64 = 10_000_000; // us without XdndFinished
@@ -64,7 +74,9 @@ const D_LINK: usize = 14;
 const D_PROXY: usize = 15;
 const D_HTML: usize = 16;
 const D_HTML8: usize = 17;
-pub(super) const D_COUNT: usize = 18;
+const D_ACTIONLIST: usize = 18;
+pub(super) const D_COUNT: usize = 19;
+const ACTIONS_MAX: u32 = 16; // atoms of an XdndActionList we read
 const XD_NAMES: [&str; D_COUNT] = [
     "XdndAware",
     "XdndEnter",
@@ -84,6 +96,7 @@ const XD_NAMES: [&str; D_COUNT] = [
     "XdndProxy",
     "text/html",
     "text/html;charset=utf-8",
+    "XdndActionList",
 ];
 
 /// another program's drag over one of our windows
@@ -94,6 +107,12 @@ pub(super) struct Target {
     types: Vec<u32>,
     list: bool,
     offer: u32,
+    /// the DE_* effects of the source's XdndActionList (0: none read, every effect allowed); read
+    /// in dnd_deferred after the Enter (acts_read)
+    acts: u32,
+    acts_read: bool,
+    /// what the last Position allowed (the list and its requested action, else DE_ALL)
+    allowed: u32,
     /// a Position to answer: root x, y, the source's action
     pos: Option<(i32, i32, u32)>,
     x: i32,
@@ -104,6 +123,15 @@ pub(super) struct Target {
     shown: Option<(i32, i32)>,
     /// a Drop to do: its time
     drop: Option<u32>,
+}
+
+/// a drop whose XdndFinished waits for dnd::drop_finish: the source, our window, the effect of
+/// its drop
+#[derive(Clone, Copy)]
+pub(super) struct Held {
+    src: u32,
+    ours: u32,
+    effect: u32,
 }
 
 /// the app's drag
@@ -340,20 +368,40 @@ impl X11 {
                 }
             }
         }
+        if !self.xd.acts_read {
+            // the actions the source allows (XDND: for XdndActionAsk; GTK and Qt always set it)
+            self.xd.acts_read = true;
+            let (src, al) = (self.xd.src, self.xd_atoms[D_ACTIONLIST]);
+            if al != 0 {
+                if let Some(r) = self.get_property(src, al, XA_ATOM, 0, ACTIONS_MAX, false) {
+                    let n = (rd32(&r, 16) as usize).min((r.len() - 32) / 4);
+                    if rd32(&r, 8) == XA_ATOM && r[1] == 32 {
+                        let a = self.xd_atoms;
+                        self.xd.acts = (0..n).map(|k| rd32(&r, 32 + 4 * k)).fold(0, |m, x| {
+                            m | if x == a[D_COPY] { DE_COPY } else if x == a[D_MOVE] { DE_MOVE } else if x == a[D_LINK] { DE_LINK } else { 0 }
+                        });
+                    }
+                }
+            }
+        }
         if let Some((rx, ry, action)) = self.xd.pos.take() {
             let w = self.xd.win;
             let r = self.xw[(w as u32 as usize) & (PW_MAX - 1)];
             let (x, y) = if r.posok { (rx - r.rx, ry - r.ry) } else { (rx, ry) };
             self.xd.x = x;
             self.xd.y = y;
-            let mods = match self.action_effect(action) {
+            let req = self.action_effect(action);
+            let mods = match req {
                 DE_MOVE => MOD_SHIFT,
                 DE_LINK => MOD_SHIFT | MOD_CTRL,
                 _ => 0,
             };
             self.xd.mods = mods;
+            // allowed: the list with the requested action; no list: every effect
+            let allowed = if self.xd.acts != 0 { self.xd.acts | req } else { DE_ALL };
+            self.xd.allowed = allowed;
             let offer = self.xd.offer;
-            let (_, e) = crate::drag_query(w, x, y, offer, DE_ALL, mods);
+            let (_, e) = crate::drag_query(w, x, y, offer, allowed, mods);
             let (src, ours, st) = (self.xd.src, self.xd_ourwin(w), self.xd_atoms[D_STATUS]);
             let act = self.effect_action(e);
             // accept, "send every position" (the targets differ by place), no rectangle
@@ -361,7 +409,7 @@ impl X11 {
             if self.xd.shown != Some((x, y)) && offer != 0 {
                 self.xd.shown = Some((x, y));
                 self.evwin = w;
-                self.push(E_DRAG, 0, x, y, offer | DE_ALL << 8);
+                self.push(E_DRAG, 0, x, y, offer | allowed << 8);
             }
         }
         if let Some(time) = self.xd.drop {
@@ -372,7 +420,8 @@ impl X11 {
     // the drop: read what the UI takes, E_DROP, XdndFinished
     fn xd_drop(&mut self, time: u32) {
         let (w, x, y, offer) = (self.xd.win, self.xd.x, self.xd.y, self.xd.offer);
-        let (types, e) = crate::drag_query(w, x, y, offer, DE_ALL, self.xd.mods);
+        let allowed = if self.xd.allowed != 0 { self.xd.allowed } else { DE_ALL };
+        let (types, e) = crate::drag_query(w, x, y, offer, allowed, self.xd.mods);
         let (src, ours, fin) = (self.xd.src, self.xd_ourwin(w), self.xd_atoms[D_FINISHED]);
         self.evwin = w;
         if e == 0 {
@@ -435,11 +484,31 @@ impl X11 {
             }
         }
         crate::drop_set_effect(e);
+        // the answer: now, or (drop_hold) when the UI knows it
+        self.xd_held_end(None);
+        if crate::drop_held() {
+            self.xh = Some(Held { src, ours, effect: e });
+            crate::drop_wait_begin(x11_drop_finish);
+        } else {
+            let act = self.effect_action(e);
+            self.xd_send(src, src, fin, [ours, 1, act, 0, 0]);
+        }
         self.evwin = w;
         self.push(E_DROP, 0, x, y, files);
-        let act = self.effect_action(e);
-        self.xd_send(src, src, fin, [ours, 1, act, 0, 0]);
         self.xd = Target::default();
+    }
+
+    /// the drop that waits gets its XdndFinished: accepted with the effect's action, or not
+    /// (effect 0); None: as at its drop, and no one waits for it any more
+    pub(super) fn xd_held_end(&mut self, effect: Option<u32>) {
+        let Some(h) = self.xh.take() else { return };
+        if effect.is_none() {
+            crate::drop_wait_clear();
+        }
+        let e = effect.unwrap_or(h.effect) & DE_ALL;
+        let fin = self.xd_atoms[D_FINISHED];
+        let act = self.effect_action(e);
+        self.xd_send(h.src, h.src, fin, [h.ours, (e != 0) as u32, act, 0, 0]);
     }
 
     /// one type of the drop's data (None: refused or not answered; dead: the source stopped

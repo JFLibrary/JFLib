@@ -1,0 +1,83 @@
+#!args --verify-dirty
+# a drop's answer to its source after the drop (ui.drop_defer / drop_finish): "Später" (#502,
+# 549..729 x 285..375) learns 100 ms after a drop whether it took it, as a web page whose drop
+# handler runs elsewhere.  `drop expect` is what the source was answered (XdndFinished,
+# wl_data_offer.finish, EndOperation of a data object in async mode); headless runs keep it.
+# The card also shows the effects the drag over the window allows (ui.drag_allowed).
+theme light
+# the effects the source allows: as `dragover` offers them (default copy and move)
+dragover 640 330 text copy move link
+expect text:"Erlaubt: kopieren+verschieben+verknüpfen" exists
+dragover 640 330 text copy
+expect text:"Erlaubt: kopieren" exists
+dragover 640 330 text
+expect text:"Erlaubt: kopieren+verschieben" exists
+dragleave
+expect text:"Erlaubt: -" exists
+# the app's own drag: its source's effects (the button allows copy and move)
+down #401
+move 640,330
+expect text:"Erlaubt: kopieren+verschieben" exists
+key esc
+up
+# taken, 100 ms later: the source learns it then
+dragover 640 330 text copy move
+drop 640 330 text "ja bitte"
+expect text:"Abgelegt: Text -> Später (kopieren)" exists
+expect text:"Antwort: wartet" exists
+drop expect pending
+wait 150
+expect text:"Antwort: genommen (kopieren)" exists
+drop expect copy
+# not taken: the source learns that (before charge 10 it was told copy)
+dragover 640 330 text copy move
+drop 640 330 text "nein danke"
+drop expect pending
+wait 150
+expect text:"Antwort: nicht genommen" exists
+drop expect none
+# linked, but the source does not allow linking: taken stays taken, with the first effect it
+# allows
+dragover 640 330 text copy move
+drop 640 330 text "link"
+wait 150
+expect text:"Antwort: genommen (verknüpfen)" exists
+drop expect copy
+# a source that allows linking gets the link
+dragover 640 330 text copy link
+drop 640 330 text "link"
+wait 150
+drop expect link
+# no answer at all: after DROP_DEFER_MS (3 s) the library answers as the drop was delivered,
+# with a UIWARN
+expect_nowarn
+dragover 640 330 text copy move
+drop 640 330 text "nie"
+wait 150
+expect text:"Antwort: keine Antwort" exists
+drop expect pending
+wait 2900
+drop expect copy
+expect_warn
+# a platform that answers at the drop (macOS, the browser, Windows with a source that has no
+# async mode): drop_defer says so, the source got the effect at the drop
+dragover 640 330 text copy move
+drop 640 330 text "ja" sync
+expect text:"Antwort: schon beantwortet" exists
+drop expect copy
+# a drop that is not deferred: answered after its passes with the effect it was delivered with
+drop 82 229 text "Hallo"
+expect text:"Abgelegt: Text -> Text-Ziel (kopieren)" exists
+drop expect copy
+# the page's refusing top: not taken
+dragover 500 300 text
+drop 500 300 text "oben"
+drop expect none
+# a deferred drop the next drop overtakes: answered as delivered then, without a UIWARN
+dragover 640 330 text copy move
+drop 640 330 text "nie"
+drop expect pending
+drop 82 229 text "Neu"
+drop expect copy
+wait 3100
+expect_nowarn
