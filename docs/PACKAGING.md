@@ -341,10 +341,13 @@ Linux and macOS only the app offers it.
 ### macOS: .dmg
 
 `--formats dmg` (on a Mac only, alone: `tools/package.py APP --formats dmg`, `cargo jflib package
---formats dmg`) builds the program for `aarch64-apple-darwin` per style and puts `NAME.app`
-(Info.plist from PACKAGE, the icon, the entitlements of PERMISSIONS: [APPLE.md](APPLE.md) AP7c) on a
-compressed disk image beside a link to `/Applications`: `<App>-<ver>-<style>-arm64.dmg` (one style:
-`<App>-<ver>-arm64.dmg`).  `all` leaves it out (it names the formats of Windows and Linux).  The
+--formats dmg`) builds the program per style for `aarch64-apple-darwin` and `x86_64-apple-darwin` and joins
+both into one program for every Mac (a universal program, `lipo`; [INTEL_MAC.md](INTEL_MAC.md)), then puts
+`NAME.app` (Info.plist from PACKAGE, the icon, the entitlements of PERMISSIONS: [APPLE.md](APPLE.md) AP7c) on a
+compressed disk image beside a link to `/Applications`: `<App>-<ver>-<style>-universal.dmg` (one style:
+`<App>-<ver>-universal.dmg`).  The Intel part needs Rust's target (`rustup target add x86_64-apple-darwin`);
+the program is about twice as large, fonts and images are in it once.  `all` leaves it out (it names the
+formats of Windows and Linux).  The
 signature is ad hoc unless `jfgui_MAC_IDENTITY` names a certificate of the keychain ("Developer ID
 Application: NAME (TEAM)"): then the bundle is signed with it, the hardened runtime and a secure time
 stamp, and the image is signed too.  An ad-hoc signed app downloaded from the internet does not start
@@ -352,7 +355,8 @@ on another Mac without the user's consent (Gatekeeper); that needs Developer ID 
 `jfgui_MAC_NOTARY` names a notarytool profile in the keychain: then the bundle and, after it, the
 image go to Apple's notary service, and both get their ticket stapled (a copy dragged out of the
 image starts offline too).  With `--update` the channel gets the bundle (kind `app`) and the image
-(kind `package`), [UPDATES.md](UPDATES.md) "macOS app bundles".
+(kind `package`), the same two files for `macos-aarch64` and `macos-x86_64`, [UPDATES.md](UPDATES.md)
+"macOS app bundles".  Signature and notarization cover both parts of the program.
 
 Setting it up once, on the Mac (a membership of the Apple Developer Program; [APPLE.md](APPLE.md) AP8c):
 

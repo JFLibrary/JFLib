@@ -16,6 +16,11 @@ vom PC aus per SSH. Windows, Linux, Android und Web ändern sich dabei nicht.
 
 Nicht Teil dieses Plans: Intel-Macs (eigener Plan: [INTEL_MAC.md](INTEL_MAC.md)), der App Store als Ziel, iPad-eigene Oberflächen, native Plugins auf iOS.
 
+**Intel-Macs (2026-11-14):** Seit [INTEL_MAC.md](INTEL_MAC.md) läuft das Programm eines Macs auch auf Intel-Macs
+(`x86_64-apple-darwin`, macOS 13 und neuer). `build_rs.py --target mac --arch x86_64` baut den Intel-Teil nach
+`build/mac-x86_64/`, und die `.dmg` enthält ein Universal-Programm für beide Prozessoren. Geprüft wird unter Rosetta 2
+auf dem Mac mini und auf GitHubs Intel-Runner; Metal auf Intel- und AMD-GPUs ist gebaut, aber nicht geprüft.
+
 ## Ausgangslage
 
 Heute laufen macOS und iOS nur über `--target web` (README, Tabelle der Plattformen). Den Stil `macos` gibt es schon,
@@ -179,7 +184,8 @@ eines Unix-Sockets im Temp-Ordner des Simulators ist länger als die 104 Bytes v
   ([`apple_secret.rs`](../lib/plat/apple_secret.rs): generische Passwörter der Keychain).
 - **Abstürze:** [`apple_crash.rs`](../lib/plat/apple_crash.rs): Signale auf einem eigenen Stack pro Thread, die
   Register aus dem Maschinenkontext, die Aufrufkette über die Frame-Zeiger, die Apples ARM64-ABI vorschreibt; ein
-  Fehler knapp unter dem Stack ist ein Stack-Überlauf. `crash_test` gibt es für ARM64.
+  Fehler knapp unter dem Stack ist ein Stack-Überlauf. `crash_test` gibt es für ARM64 (und x86-64, auf Intel-Macs:
+  [INTEL_MAC.md](INTEL_MAC.md)).
 - **Weiter:** Ordner (`~/Documents` usw., Logs in `~/Library/Logs/<app>`, `HOME` sonst aus `getpwuid_r`), `File::set_len`,
   `create_new`, `spawn_self` / `restart_self`, `open_url` / `open_folder` über `/usr/bin/open`, `print` mit der
   Testvariante `jfgui_PRINT_TO`, `cpu_brand`, Hunspell in `~/Library/Spelling` und `/Library/Spelling`.

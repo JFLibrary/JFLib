@@ -1909,8 +1909,13 @@ Fensterrand hinaus.
   VoiceOver ([VOICEOVER.md](VOICEOVER.md)). Plan mit den Meilensteinen AP0 bis AP8, zusammen mit iOS:
   [APPLE.md](APPLE.md).
 - **P2** · *erledigt* (2026-11-10) · Native iOS-Version, auf dem Host-Weg von Android ([APPLE.md](APPLE.md) AP5).
-- **P3** · *fehlt* · Intel-Macs (`x86_64-apple-darwin`) im selben Universal-Programm, geprüft unter Rosetta 2 und
-  auf GitHubs Intel-Runner. Plan mit den Stufen IM0 bis IM6: [INTEL_MAC.md](INTEL_MAC.md).
+- **P3** · *teilweise* (2026-11-14) · Intel-Macs (`x86_64-apple-darwin`) im selben Universal-Programm
+  ([INTEL_MAC.md](INTEL_MAC.md), IM0 bis IM6). Fertig: der Bau (`--target mac --arch x86_64`, `lipo` in
+  `tools/package.py` und `cargo jflib`, `-universal.dmg`, Update-Kanal für `macos-x86_64`), `rt` mit CPUID und x87
+  wie unter Windows, `plat` mit den `$INODE64`-Funktionen, `objc_msgSend_stret` und dem Absturzkontext von x86-64.
+  Geprüft unter Rosetta 2 auf dem Mac mini: `coretest`, `plattest` ohne und mit Fenstern, die Skripte von `gallery`,
+  `updatetest` in beiden Teilen, `portabletest` mit dem Digest von Windows. Offen: der Lauf auf GitHubs Intel-Runner
+  (Job `intel` in `apple.yml`), die Website; Metal auf Intel- und AMD-GPUs ist gebaut, aber nicht geprüft.
 - **P2** · *teilweise* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
   `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 auf Android, Linux und Windows (dort auf dem
   Runner `windows-11-arm` geprüft). Plan mit den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).

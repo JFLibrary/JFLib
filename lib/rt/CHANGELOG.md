@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- Intel Macs (`x86_64-apple-darwin`): `cpu` detects the processor by CPUID (AVX2, FMA, BMI2) and `x87` computes on the x87 unit, as on Windows and Linux (before, every Apple target took the portable versions); checked under Rosetta 2, where the decimal conversions give the same bits as on Windows ([INTEL_MAC.md](https://github.com/JFLibrary/JFLib/blob/main/docs/INTEL_MAC.md))
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

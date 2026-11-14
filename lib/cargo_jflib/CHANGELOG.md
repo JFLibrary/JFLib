@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `cargo jflib mac` and `cargo jflib package --formats dmg` build one program for Apple Silicon and Intel Macs (both targets, joined by lipo; the Intel part needs `rustup target add x86_64-apple-darwin`), `cargo jflib mac --arch aarch64|x86_64` only one of them; the disk image is `NAME-VERSION-universal.dmg` (was `-arm64.dmg`), the update channel names it and the bundle for `macos-aarch64` and `macos-x86_64`; the helpers cargo jflib runs on the Mac itself are built for its own processor
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

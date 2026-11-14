@@ -224,7 +224,8 @@ Translocation, a quarantined app started from its download folder).  `startup()`
 
 Trial, `healthy()` and the rollback (the copy exchanged back the same way) are those of an `exe`.
 `tools/package.py APP --formats dmg --update DIR` and `cargo jflib package --formats dmg --update DIR`
-write the `app` entry and the `.dmg` (kind `package`) for `macos-aarch64`.  Tested by
+write the `app` entry and the `.dmg` (kind `package`) for `macos-aarch64` and, the same files, for
+`macos-x86_64` (one program for every Mac, [INTEL_MAC.md](INTEL_MAC.md)).  Tested by
 `updatetest --test app` on a Mac (a copy of a signed bundle replaced, rolled back, a bundle of another
 identifier, one changed after signing and one that is no bundle refused); with `jfgui_MAC_IDENTITY` set
 (a Developer ID) its bundles carry that certificate, and the same app signed ad hoc is refused as well.
