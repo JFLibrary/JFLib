@@ -46,7 +46,9 @@ pub use mac::*;
 #[path = "apple_crash.rs"]
 mod crash;
 
-/// libSystem's functions and records this backend uses (Darwin's values, arm64)
+/// libSystem's functions and records this backend uses (Darwin's values: arm64 and x86-64 have the
+/// same records; on x86-64 the functions with 64-bit inodes carry the suffix $INODE64, docs/INTEL_MAC.md --
+/// the names without it return the old records with 32-bit inodes)
 #[allow(non_camel_case_types, dead_code)]
 pub(crate) mod ffi {
     use core::ffi::{c_char, c_int, c_long, c_uint, c_void};
@@ -58,7 +60,7 @@ pub(crate) mod ffi {
         pub tv_nsec: i64,
     }
 
-    /// struct stat with 64-bit inodes (the only one arm64 has)
+    /// struct stat with 64-bit inodes (the only one arm64 has; x86-64: the $INODE64 functions)
     #[repr(C)]
     #[derive(Clone, Copy, Default)]
     pub struct Stat {
@@ -101,7 +103,7 @@ pub(crate) mod ffi {
         pub revents: i16,
     }
 
-    /// pthread_attr_t (64 bytes on arm64)
+    /// pthread_attr_t (64 bytes on arm64 and x86-64)
     #[repr(C, align(8))]
     pub struct PthreadAttr(pub [u8; 64]);
 
@@ -143,7 +145,8 @@ pub(crate) mod ffi {
     #[link(name = "System")]
     unsafe extern "C" {
         // open, openat and fcntl are variadic: on Apple's arm64 the variadic arguments go on the
-        // stack, so they must be declared as such (docs/APPLE.md, Fallen)
+        // stack, so they must be declared as such (docs/APPLE.md, Fallen; x86-64 passes them in
+        // registers either way)
         pub fn open(path: *const c_char, flags: c_int, ...) -> c_int;
         pub fn fcntl(fd: c_int, cmd: c_int, ...) -> c_int;
         pub fn close(fd: c_int) -> c_int;
@@ -151,8 +154,11 @@ pub(crate) mod ffi {
         pub fn write(fd: c_int, buf: *const c_void, n: usize) -> isize;
         pub fn pread(fd: c_int, buf: *mut c_void, n: usize, off: i64) -> isize;
         pub fn pwrite(fd: c_int, buf: *const c_void, n: usize, off: i64) -> isize;
+        #[cfg_attr(all(target_os = "macos", target_arch = "x86_64"), link_name = "fstat$INODE64")]
         pub fn fstat(fd: c_int, st: *mut Stat) -> c_int;
+        #[cfg_attr(all(target_os = "macos", target_arch = "x86_64"), link_name = "stat$INODE64")]
         pub fn stat(path: *const c_char, st: *mut Stat) -> c_int;
+        #[cfg_attr(all(target_os = "macos", target_arch = "x86_64"), link_name = "lstat$INODE64")]
         pub fn lstat(path: *const c_char, st: *mut Stat) -> c_int;
         pub fn mkdir(path: *const c_char, mode: u16) -> c_int;
         pub fn unlink(path: *const c_char) -> c_int;
@@ -166,7 +172,9 @@ pub(crate) mod ffi {
         pub fn fchown(fd: c_int, uid: u32, gid: u32) -> c_int;
         pub fn fchmod(fd: c_int, mode: u16) -> c_int;
         pub fn flock(fd: c_int, op: c_int) -> c_int;
+        #[cfg_attr(all(target_os = "macos", target_arch = "x86_64"), link_name = "opendir$INODE64")]
         pub fn opendir(path: *const c_char) -> *mut c_void;
+        #[cfg_attr(all(target_os = "macos", target_arch = "x86_64"), link_name = "readdir$INODE64")]
         pub fn readdir(dir: *mut c_void) -> *mut Dirent;
         pub fn closedir(dir: *mut c_void) -> c_int;
         pub fn __error() -> *mut c_int;

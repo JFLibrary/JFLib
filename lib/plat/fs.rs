@@ -1090,7 +1090,7 @@ mod apl {
         fn utimensat(dir: c_int, path: *const c_char, ts: *const ffi::Timespec, flags: c_int) -> c_int;
         fn fchmodat(dir: c_int, path: *const c_char, mode: u16, flags: c_int) -> c_int;
         fn fchownat(dir: c_int, path: *const c_char, uid: u32, gid: u32, flags: c_int) -> c_int;
-        fn statfs(path: *const c_char, buf: *mut u8) -> c_int;
+        #[cfg_attr(all(target_os = "macos", target_arch = "x86_64"), link_name = "statfs$INODE64")] fn statfs(path: *const c_char, buf: *mut u8) -> c_int;
     }
 
     fn z(s: &str) -> Vec<u8> {
