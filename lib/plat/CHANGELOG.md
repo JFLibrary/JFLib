@@ -16,6 +16,13 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   a drop (`drop_allowed`) took it as every effect. A drag out that names no effects offers
   linking too; files are still never moved.
 
+### Fixed
+
+- Windows: `fs::read_dir` returned what it had listed so far as the whole folder when `FindNextFileW` failed with another error than the end of the listing (a backup then missed the rest without a word); `None` now
+- Windows: `fs::write_file_private` took a file that already had its sibling's name (`NAME.tmpN`) over -- emptied it and kept its access rights, so whoever could read that file could read the private data. The sibling is always a new file now (`CREATE_NEW`, the next number when a name is taken), and a failed write removes it
+- Linux and macOS: `fs::join` and `fs::parent` took `\` for a separator: a folder whose name ends with `\` got no `/` before the child, a name with `\` was cut there (listings, the watcher and backups addressed other files, `mkdir_private` made extra folders). `\` separates on Windows and in vfs names only
+- Linux trash: an entry of a mount's `.Trash-$uid` (or `.Trash/$uid`) could be trashed into that trash again -- its new info file pointed into the trash, the old one was left without its file -- and the home trash was not recognised when `$XDG_DATA_HOME` had `.` or `//` in it. Both are refused now
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

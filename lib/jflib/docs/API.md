@@ -26719,13 +26719,17 @@ fs -- file system access for backup and restore
 
   stat(path) / lstat(path) -> Option<Meta>     kind, size, times (ns), mode / attributes,
                                                 owner, device and file id, link count
-  read_dir(path) -> Option<Vec<DirEntry>>      names and kinds ("." / ".." left out)
+  read_dir(path) -> Option<Vec<DirEntry>>      names and kinds ("." / ".." left out); None
+                                               also when an error cut the listing short
   read_link / symlink(target, link, dir) / hard_link(existing, new)
   set_times(path, atime_ns, mtime_ns)          on the link itself, never its target
   set_mode(path, mode) (Linux) / set_attrs(path, attrs) (Windows) / set_owner (Linux)
   free_space(path) -> Option<(free, total)>    sync_dir(dir) (Linux: fsync of the directory)
   write_file_private(path, data)               owner-only file (0600 / protected DACL),
-                                               fsync, atomic rename, directory sync
+                                               fsync, atomic rename, directory sync; its
+                                               sibling is always a new file of its own
+  join(dir, name) / parent(path)               '' separates on Windows only (and in vfs
+                                               names); on Linux and macOS it is a character
   mkdir_private(path)                          owner-only directory (with parents)
   local_zone_id() -> "Europe/Berlin" | "win:W. Europe Standard Time"
   long_path(path) (Windows): the \\?\ form every call here uses
@@ -26775,10 +26779,10 @@ modes or free space.
   - `kind: FileKind`
 
 - **`fn join(dir: &str, name: &str) -> String`**
-  "a/b" + "c" with the platform separator
+  "a/b" + "c" with the platform separator (Linux, macOS: a '\\' is part of a name)
 
 - **`fn parent(path: &str) -> &str`**
-  the parent directory of a path ("" for a bare name)
+  the parent directory of a path ("" for a bare name; Linux, macOS: a '\\' is part of a name)
 
 - **`fn stat(path: &str) -> Option<Meta>`**
   the metadata of path, links followed; a vfs name: its folder mount's file, else the
@@ -26822,8 +26826,9 @@ modes or free space.
   whether the folder exists
 
 - **`fn write_file_private(path: &str, data: &[u8]) -> bool`**
-  an owner-only file (0600 / protected DACL), synced and renamed into place; a mount without
-  OS files: its write (memory of this process)
+  an owner-only file (0600 / protected DACL), synced and renamed into place (the sibling
+  NAME.tmpN is created new, never an existing file taken over); a mount without OS files: its
+  write (memory of this process)
 
 - **`fn mkdir_private(path: &str) -> bool`**
   an owner-only folder (with parents)
