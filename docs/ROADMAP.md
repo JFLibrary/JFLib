@@ -1904,10 +1904,13 @@ Fensterrand hinaus.
 
 ## 9. Plattformen
 
-- **P1** · *fehlt* · Native macOS-Version (Cocoa über `objc_msgSend`, gegen libSystem gelinkt, weil
-  macOS keine stabilen Syscalls hat); heute macOS nur über das Web. Plan mit den Meilensteinen AP0 bis
-  AP8, zusammen mit iOS: [APPLE.md](APPLE.md).
-- **P2** · *fehlt* · Native iOS-Version, auf dem Host-Weg von Android ([APPLE.md](APPLE.md) AP5).
+- **P1** · *erledigt* (2026-11-10) · Native macOS-Version auf Apple Silicon (Cocoa über `objc_msgSend`, gegen
+  libSystem gelinkt, weil macOS keine stabilen Syscalls hat), mit `.dmg`, Notarisierung, Updates, Metal (AP6) und
+  VoiceOver ([VOICEOVER.md](VOICEOVER.md)). Plan mit den Meilensteinen AP0 bis AP8, zusammen mit iOS:
+  [APPLE.md](APPLE.md).
+- **P2** · *erledigt* (2026-11-10) · Native iOS-Version, auf dem Host-Weg von Android ([APPLE.md](APPLE.md) AP5).
+- **P3** · *fehlt* · Intel-Macs (`x86_64-apple-darwin`) im selben Universal-Programm, geprüft unter Rosetta 2 und
+  auf GitHubs Intel-Runner. Plan mit den Stufen IM0 bis IM6: [INTEL_MAC.md](INTEL_MAC.md).
 - **P2** · *teilweise* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
   `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 auf Android, Linux und Windows (dort auf dem
   Runner `windows-11-arm` geprüft). Plan mit den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).

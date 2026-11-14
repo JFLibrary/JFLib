@@ -14,7 +14,7 @@ Die Programme der Bibliothek laufen nativ auf einem Mac mit Apple Silicon (`aarc
 iPhone (`aarch64-apple-ios`, im Simulator `aarch64-apple-ios-sim`). Gebaut und getestet wird auf dem Mac, gesteuert
 vom PC aus per SSH. Windows, Linux, Android und Web ändern sich dabei nicht.
 
-Nicht Teil dieses Plans: Intel-Macs, der App Store als Ziel, iPad-eigene Oberflächen, native Plugins auf iOS.
+Nicht Teil dieses Plans: Intel-Macs (eigener Plan: [INTEL_MAC.md](INTEL_MAC.md)), der App Store als Ziel, iPad-eigene Oberflächen, native Plugins auf iOS.
 
 ## Ausgangslage
 
