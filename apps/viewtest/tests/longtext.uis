@@ -1,0 +1,13 @@
+# viewtest: a label is matched and dumped whole.  "Fenster B" (command 8) shows a paragraph of
+# 516 bytes (umlauts, quotes, a backslash) that wraps over several lines: one text record whose
+# label is the whole paragraph, as a web page's paragraph.  Before charge 10 a quoted selector
+# kept 255 bytes of the script's string (so it never matched such a paragraph) and `dump` wrote
+# the first 172 bytes of a label.
+cmd 8
+window 141
+expect text:"Ein langer Absatz, wie ihn eine Webseite zeigt: „Grüße aus dem Fenster B“ steht am Anfang, dann folgen Sätze, die über viele Zeilen umbrechen, damit der Text deutlich länger wird als die 255 Bytes, die ein Wähler früher fassen konnte, und länger als die 172 Bytes, die `dump` früher zeigte. Äpfel, Öfen und Übungen sorgen für Zeichen aus zwei Bytes; ein Rückstrich \\ und \"Anführungszeichen\" stehen auch darin. Am Ende steht ein Satz, an dem man sieht, dass alles angekommen ist: Ende des Absatzes." exists
+expect "Ein langer Absatz, wie ihn eine Webseite zeigt: „Grüße aus dem Fenster B“ steht am Anfang, dann folgen Sätze, die über viele Zeilen umbrechen, damit der Text deutlich länger wird als die 255 Bytes, die ein Wähler früher fassen konnte, und länger als die 172 Bytes, die `dump` früher zeigte. Äpfel, Öfen und Übungen sorgen für Zeichen aus zwei Bytes; ein Rückstrich \\ und \"Anführungszeichen\" stehen auch darin. Am Ende steht ein Satz, an dem man sieht, dass alles angekommen ist: Ende des Absatzes." text "Ein langer Absatz, wie ihn eine Webseite zeigt: „Grüße aus dem Fenster B“ steht am Anfang, dann folgen Sätze, die über viele Zeilen umbrechen, damit der Text deutlich länger wird als die 255 Bytes, die ein Wähler früher fassen konnte, und länger als die 172 Bytes, die `dump` früher zeigte. Äpfel, Öfen und Übungen sorgen für Zeichen aus zwei Bytes; ein Rückstrich \\ und \"Anführungszeichen\" stehen auch darin. Am Ende steht ein Satz, an dem man sieht, dass alles angekommen ist: Ende des Absatzes."
+# a part of it is no label of its own
+expect text:"Ein langer Absatz, wie ihn eine Webseite zeigt:" missing
+dump build/viewtest/longtext.jsonl
+expect_nowarn

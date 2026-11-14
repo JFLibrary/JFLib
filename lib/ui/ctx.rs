@@ -18,13 +18,14 @@
 //   behave(id, hbflags) -> EV_*     hit box on last_rect + pointer / keyboard behaviour
 //   hit(id, hbflags)                hit box only
 //   hit_rect(id, x, y, w, h, hb)    behave on an explicit rectangle (px)
-//   slot(id) -> &mut Slot           persistent per-id state record
+//   slot(id) -> &mut Slot           persistent per-id state record (per window)
 //   sem(kind, id, label, value)     semantic record (state from the last behave)
 //   clip_push(x, y, w, h) / clip_pop()   clip drawing and hit boxes (px)
 //   layer_set(l) -> previous        modal(layer)   disabled_push() / disabled_pop()
 // Runtime (runtime.rs, win.rs): frame_begin / frame_end (a pass over all windows),
 // uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_update.
 
+use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -317,6 +318,9 @@ pub(crate) struct W {
     pub(crate) cmd_layer_ui: u32,
     /// keyboard navigation of this window (kbnav.rs)
     pub(crate) kb: super::kbnav::W,
+    /// the state slots of this window's ids (Ui::slot): a box's measurements, a view's scroll
+    /// position, animations -- the same id in two windows has a slot in each
+    pub(crate) slots: BTreeMap<u32, Slot>,
 }
 
 impl W {
@@ -363,6 +367,7 @@ impl W {
             disabled_depth: 0,
             cmd_layer_ui: 0,
             kb: Default::default(),
+            slots: BTreeMap::new(),
         }
     }
 }
@@ -1049,10 +1054,13 @@ impl Ui {
 
     // ------------------------------------------------------------------ state slots
 
-    /// ui_slot(id): persistent per-id state (created on first use)
+    /// ui_slot(id): persistent per-id state of the window being built (created on first use):
+    /// every window keeps its own slots, so the same id in two windows (a title bar's, a
+    /// dialog's box) measures and scrolls in each by itself; outside the passes the main
+    /// window's.  A window's slots go with its state (window_destroy)
     pub fn slot(&mut self, id: u32) -> &mut Slot {
         let frame = self.frame;
-        let s = self.slots.entry(id).or_default();
+        let s = self.wp.ctx.slots.entry(id).or_default();
         s.seen = frame;
         s
     }
