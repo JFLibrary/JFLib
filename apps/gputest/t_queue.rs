@@ -20,7 +20,7 @@ use alloc::vec::Vec;
 use gpu::*;
 
 use crate::t_compute::{readback, storage};
-use crate::{T, ms_since, out, setup};
+use crate::{T, ms_since, out, setup, sync_validation};
 
 const SRC: &str = "
 struct P { n: u32, k: u32 }
@@ -95,7 +95,7 @@ pub fn queues(t: &mut T) {
         match dev.compute_queue() {
             Some(cq) => {
                 out("  the device has a compute queue (a family without graphics)");
-                let _ = with_queue(t, &dev, cq);
+                let _ = with_queue(t, &dev, cq, sync_validation(&g.adapter));
             }
             None => out("  note: this device has no family without graphics: no compute queue (everything on Device::queue)"),
         }
@@ -165,7 +165,8 @@ fn rounds(t: &mut T, dev: &Device, cq: Option<&ComputeQueue>, wait: bool, what: 
     Some(())
 }
 
-fn with_queue(t: &mut T, dev: &Device, cq: &ComputeQueue) -> Option<()> {
+/// sync: the validation reports missing barriers (main.rs sync_validation)
+fn with_queue(t: &mut T, dev: &Device, cq: &ComputeQueue, sync: bool) -> Option<()> {
     rounds(t, dev, Some(cq), true, "two queues")?;
     // waiting for the compute queue's ids
     let (bgl, step) = pipeline(t, dev, SRC, "step", &[BindingKind::StorageBuffer], 8)?;
@@ -257,7 +258,7 @@ fn with_queue(t: &mut T, dev: &Device, cq: &ComputeQueue) -> Option<()> {
     // queue, which synchronization validation must report; (2) a missing wait between the queues: a long dispatch on
     // the device queue, then the compute queue on its buffer, with and without submit_after -- the layer (1.4.363)
     // reports no hazard between submissions (not even on one queue), so the values tell: sampled against the CPU
-    if t.validate && dev.validating() {
+    if t.validate && dev.validating() && sync {
         let big = storage(t, dev, 1 << 20, BufferUsage::NONE)?;
         let gb = group(t, dev, &bgl, &[Resource::Buffer { buffer: &big, offset: 0, size: 0 }])?;
         let e0 = t.provoke("queues: two dispatches writing one buffer on the compute queue, no barrier between them");

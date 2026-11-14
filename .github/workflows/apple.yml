@@ -42,6 +42,13 @@ jobs:
           rustc --version
           xcodebuild -version
           xcrun simctl list devices available | grep -m 3 iPhone || true
+      # what the gallery's gpu scripts find here (2026-11-14: a virtual GPU, "Apple Paravirtual device", and a screen
+      # too small for their windows, so they SKIP; docs/APPLE.md AP8b); information only, never a failure
+      - name: The screen and the GPU
+        run: |
+          system_profiler SPDisplaysDataType || true
+          python build_rs.py app gputest --target mac
+          build/mac/gputest --info || echo "gputest --info: exit $?"
       - name: coretest (the foundation's self-checks)
         run: python build_rs.py test coretest --target mac
       - name: gallery's scripts

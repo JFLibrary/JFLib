@@ -9430,7 +9430,9 @@ is drawn by the output's render pass: every frame read back into the framebuffer
 lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 
 Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
-Linux program, the browser), or without a GPU, it prints a SKIP once and does nothing):
+Linux program, the browser), without a GPU, or when the screen's work area cannot hold the
+window at `gpu on` (the system keeps it smaller, on the CPU path), it prints a SKIP once and
+does nothing):
   gpu on [fast]          a real window per UI window (shown without activation) with
                          the output, every presented image compared with the framebuffer (fast:
                          not compared, for measurements), a render after every input edge; waits
