@@ -484,6 +484,7 @@ impl X11 {
             }
         }
         crate::drop_set_effect(e);
+        crate::drop_set_allowed(allowed); // the list with the last Position's action
         // the answer: now, or (drop_hold) when the UI knows it
         self.xd_held_end(None);
         if crate::drop_held() {

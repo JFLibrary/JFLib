@@ -38,7 +38,7 @@ Seite	Page
 Seite ({})	Page ({})
 {} -> Seite ({})	{} -> page ({})
 Später	Later
-{} -> Später ({})	{} -> later ({})
+{} -> Später ({}, erlaubt: {})	{} -> later ({}, allowed: {})
 Erlaubt: {}	Allowed: {}
 Antwort: {}	Answer: {}
 wartet	waiting

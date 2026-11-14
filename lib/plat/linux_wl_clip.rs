@@ -133,6 +133,7 @@ pub(crate) struct Clip {
     dnd_xx: i32,
     dnd_xy: i32,
     dnd_xeffect: u32,
+    dnd_xallowed: u32, // the effects its source allows (as E_DRAG said them)
     dnd_xfiles: u32,
     dnd_hoffer: u32, // offer of a drop whose answer waits (drop_hold), its negotiated action
     dnd_haction: u32,
@@ -151,6 +152,14 @@ pub(crate) struct Clip {
 /// MB_* bit of a MIME type name (0 = not used)  [mime_bit]
 fn mime_bit(s: &[u8]) -> u64 {
     MIME_TABLE.iter().find(|m| m.0 == s).map_or(0, |m| m.1)
+}
+
+impl Clip {
+    /// the DE_* effects the source of the drag over our window allows: its source_actions (v3),
+    /// copy and move without them (Wayland has no link)
+    fn dnd_allowed(&self) -> u32 {
+        if self.dnd_srcacts == 0 { DE_COPY | DE_MOVE } else { self.dnd_srcacts & (DE_COPY | DE_MOVE) }
+    }
 }
 
 fn pipe2(flags: usize) -> Option<[i32; 2]> {
@@ -268,7 +277,7 @@ impl Wl {
         let Some((_, mask, _)) = self.w.obj_iface(o) else { return };
         let c = &self.clip;
         let (w, x, y, offer) = (c.dnd_win, c.dnd_x, c.dnd_y, c.dnd_types);
-        let allowed = if c.dnd_srcacts == 0 { DE_COPY | DE_MOVE } else { c.dnd_srcacts & (DE_COPY | DE_MOVE) };
+        let allowed = c.dnd_allowed();
         let (t, e, effs) = crate::drag_query_all(w, x, y, offer, allowed, super::xkb::wl_mods() as u8);
         if (t, e, effs) != self.clip.dnd_answer {
             self.clip.dnd_answer = (t, e, effs);
@@ -339,6 +348,7 @@ impl Wl {
             return;
         }
         crate::drop_set_effect(self.clip.dnd_xeffect);
+        crate::drop_set_allowed(self.clip.dnd_xallowed);
         self.inp.evwin = self.clip.dnd_xwin;
         let (x, y, n) = (self.clip.dnd_xx, self.clip.dnd_xy, self.clip.dnd_xfiles);
         self.push(E_DROP, 0, x, y, n);
@@ -860,6 +870,7 @@ pub(crate) fn wlh_dd_drop(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
     c.dnd_xx = c.dnd_x;
     c.dnd_xy = c.dnd_y;
     c.dnd_xfiles = 0;
+    c.dnd_xallowed = c.dnd_allowed();
     // the negotiated action wins over our preference (v3)
     c.dnd_xeffect = match c.dnd_action {
         DND_ACTION_MOVE if e & DE_ALL != 0 => DE_MOVE,

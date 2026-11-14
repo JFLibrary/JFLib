@@ -549,6 +549,7 @@ unsafe extern "system" fn t_drop(this: This, obj: usize, keys: u32, pt: u64, eff
     if e != 0 {
         let files = read_drop(obj, types);
         crate::drop_set_effect(e);
+        crate::drop_set_allowed(allowed); // Drop's pdwEffect: what the source allows
         // the answer after the drop, where the source's data object allows it
         held_end(None);
         if crate::drop_held() {
