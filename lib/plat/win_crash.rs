@@ -9,6 +9,8 @@
 //   jfgui: crash 0x<code> in <file>.dll at offset 0x<offset> (thread <id>, reading 0x<address>)
 //   jfgui: called from <file>.dll+0x<offset>, ..., <exe>+0x<offset>
 // the second line is the unwound call chain through every module (CHAIN_MAX return addresses).
+// The modules come from the loader's list in the PEB, read without its lock (a driver thread may
+// crash while another thread holds it), every entry checked by VirtualQuery first; nothing allocates.
 // CrashInfo::frames: the call chain, exact from the PE unwind data (RtlVirtualUnwind,
 // crash-check); the stack scan of crash_fill (plat_win.s, plat-win) when that finds nothing
 // and for a stack overflow.  ARM64 (docs/ARM64.md, ARM5): its CONTEXT, unwind data and calls at the end.
@@ -31,13 +33,10 @@ unsafe extern "system" {
     fn AddVectoredExceptionHandler(first: u32, h: Handler) -> usize;
     fn SetUnhandledExceptionFilter(f: Handler) -> usize;
     fn GetModuleHandleW(name: *const u16) -> isize;
-    fn GetModuleHandleExW(flags: u32, name: *const u16, module: *mut isize) -> i32;
-    fn GetModuleFileNameW(m: isize, buf: *mut u16, n: u32) -> u32;
 }
 
-// GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT
-const MODULE_FROM_ADDRESS: u32 = 4 | 2;
 const CHAIN_MAX: usize = 12; // return addresses in the "called from" line of a foreign crash
+const MODULES_MAX: usize = 2048; // entries of the loader's module list looked at, at most
 
 static IMG_BASE: AtomicUsize = AtomicUsize::new(0);
 static IMG_SIZE: AtomicUsize = AtomicUsize::new(0);
@@ -145,7 +144,7 @@ fn foreign_lines(ci: &CrashInfo, tid: usize, chain: &Chain) {
         }
         let _ = writeln!(line);
     }
-    rt::os::write_stderr(line.bytes());
+    rt::os::write_stderr_crash(line.bytes());
 }
 
 /// "<file>+0x<offset>" for an address inside a loaded module, else "0x<address>"
@@ -157,25 +156,90 @@ fn write_place<const N: usize>(out: &mut StackText<N>, addr: u64) {
     };
 }
 
-/// the loaded module holding addr: its base; its file name (without the folder) into name
+/// the loaded module holding addr: its base; its file name (BaseDllName, without the folder) into
+/// name.  GetModuleHandleExW and GetModuleFileNameW take the loader's locks, which another thread
+/// may hold (a driver starting its threads): this walks PEB.Ldr.InLoadOrderModuleList instead,
+/// without a lock, and reads only what VirtualQuery (a system call) shows committed and readable;
+/// a list changing under it gives no module or a wrong name, never a wait
 fn module_of(addr: u64, name: &mut StackText<80>) -> Option<u64> {
-    let mut h = 0isize;
-    // SAFETY: a lookup only; UNCHANGED_REFCOUNT takes no reference on the module.
-    if addr == 0 || unsafe { GetModuleHandleExW(MODULE_FROM_ADDRESS, addr as *const u16, &mut h) } == 0 || h == 0 {
+    if addr == 0 {
         return None;
     }
-    let mut buf = [0u16; 260];
-    // SAFETY: buf holds buf.len() UTF-16 units; the result is at most that many.
-    let n = (unsafe { GetModuleFileNameW(h, buf.as_mut_ptr(), buf.len() as u32) } as usize).min(buf.len());
-    let path = &buf[..n];
-    let file = path.iter().rposition(|&c| c == b'\\' as u16 || c == b'/' as u16).map_or(path, |k| &path[k + 1..]);
-    if file.is_empty() {
-        let _ = name.write_str("?");
+    // x64 layouts (also ARM64): PEB.Ldr +0x18; PEB_LDR_DATA.InLoadOrderModuleList +0x10;
+    // LDR_DATA_TABLE_ENTRY: InLoadOrderLinks +0, DllBase +0x30, SizeOfImage +0x40,
+    // BaseDllName (UNICODE_STRING: Length in bytes, Buffer +8) +0x58
+    let rd = |a: u64| -> Option<u64> {
+        // SAFETY: an aligned read of memory VirtualQuery shows committed and readable.
+        (a & 7 == 0 && readable(a, 8)).then(|| unsafe { *(a as *const u64) })
+    };
+    let ldr = rd(peb()? + 0x18)?;
+    let head = ldr + 0x10;
+    let mut e = rd(head)?;
+    for _ in 0..MODULES_MAX {
+        if e == head || e & 7 != 0 || !readable(e, 0x68) {
+            return None;
+        }
+        // SAFETY: e .. e + 0x68 is readable (checked above).
+        let (base, size) = unsafe { (*((e + 0x30) as *const u64), *((e + 0x40) as *const u32) as u64) };
+        if addr.wrapping_sub(base) < size {
+            // SAFETY: as above.
+            let (len, buf) = unsafe { ((*((e + 0x58) as *const u16) / 2) as usize, *((e + 0x60) as *const u64)) };
+            let n = len.min(128);
+            if n == 0 || buf & 1 != 0 || !readable(buf, 2 * n as u64) {
+                let _ = name.write_str("?");
+            } else {
+                // SAFETY: buf .. buf + 2 n is readable and u16-aligned (checked above).
+                let file = unsafe { core::slice::from_raw_parts(buf as *const u16, n) };
+                for c in char::decode_utf16(file.iter().copied()) {
+                    let _ = name.write_char(c.unwrap_or('?'));
+                }
+            }
+            return Some(base);
+        }
+        e = rd(e)?;
     }
-    for c in char::decode_utf16(file.iter().copied()) {
-        let _ = name.write_char(c.unwrap_or('?'));
+    None
+}
+
+/// this process's PEB (the TEB's field +0x60)
+fn peb() -> Option<u64> {
+    let p: u64;
+    // SAFETY: gs (x64) / x18 (ARM64) points at this thread's TEB; one read.
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        core::arch::asm!("mov {0}, gs:[0x60]", out(reg) p, options(nostack, readonly, preserves_flags));
     }
-    Some(h as u64)
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        core::arch::asm!("ldr {0}, [x18, #0x60]", out(reg) p, options(nostack, readonly, preserves_flags));
+    }
+    (p != 0).then_some(p)
+}
+
+/// a .. a + n lies in committed memory that may be read (no guard page): VirtualQuery per region
+fn readable(a: u64, n: u64) -> bool {
+    const MEM_COMMIT: u32 = 0x1000;
+    let Some(end) = a.checked_add(n) else { return false };
+    let mut p = a;
+    while p < end {
+        // SAFETY: MEMORY_BASIC_INFORMATION is plain data.
+        let mut mi: MemInfo = unsafe { core::mem::zeroed() };
+        // SAFETY: a query only.
+        if unsafe { VirtualQuery(p as usize, &mut mi, core::mem::size_of::<MemInfo>()) } == 0
+            || mi.state != MEM_COMMIT
+            || mi.protect & 0xFF == 0x01 // PAGE_NOACCESS
+            || mi.protect & 0x100 != 0 // PAGE_GUARD
+            || mi.protect == 0
+        {
+            return false;
+        }
+        let next = (mi.base + mi.region) as u64;
+        if next <= p {
+            return false;
+        }
+        p = next;
+    }
+    true
 }
 
 /// CrashInfo from the exception record and the context; the whole call chain into chain
