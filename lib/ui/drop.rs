@@ -139,10 +139,10 @@ impl Ui {
     /// ui_drop_accept(ev) -> taken: E_DROP of window ev.win (UI index): the platform's drop
     /// becomes current; a drop target at the point takes it (DS_DROP), else UIC_DROP follows
     pub(crate) fn drop_receive(&mut self, ev: &Event) -> bool {
-        let data = if self.headless {
-            self.dr.inj.take().unwrap_or_default() // headless: the content of the script's "drop"
+        let (data, serial) = if self.headless {
+            (self.dr.inj.take().unwrap_or_default(), 0) // headless: the content of the script's "drop"
         } else {
-            plat::drop_data_take()
+            (plat::drop_data_take(), plat::drop_waiting()) // the serial of its answer while it waits
         };
         super::perm::grant_all(&data.files); // the user dropped them (fs.user)
         let win = ev.win as u32;
@@ -151,7 +151,7 @@ impl Ui {
         self.uiw_use(win);
         let x = if self.rtl { self.wp.rt.fb.w - 1 - ev.x } else { ev.x }; // logical (right-to-left)
         self.uiw_use(cur);
-        self.dnd_dropped(win, x, ev.y, data)
+        self.dnd_dropped(win, x, ev.y, data, serial)
     }
 
     /// ui_drop_inject(data): (script) the next E_DROP gets this content

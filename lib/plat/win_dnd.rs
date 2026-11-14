@@ -14,6 +14,8 @@
 //                             (plattest, no user) our IDataObject read as a drop target reads
 //                             it; our IDropTarget fed with it (DragEnter, DragOver, Drop);
 //                             the IDropSource's answers
+//   dnd_test_drop_async(..) / dnd_test_async_end()   (plattest) the same with a data object in
+//                             IDataObjectAsyncCapability's async mode, what EndOperation told it
 //
 // Target: DragEnter asks the data object which formats it has (QueryGetData: CF_HDROP,
 // CF_UNICODETEXT / CF_TEXT, "HTML Format", "UniformResourceLocatorW" / "UniformResourceLocator" /
@@ -22,17 +24,25 @@
 // enter, on every new point and on leave.  Drop reads only the kinds the UI takes (HGLOBAL
 // media, each at most 256 MiB): the paths of the DROPFILES block (parsed here, wide or ANSI),
 // text (UTF-16, else bytes), HTML (CF_HTML framing: clip_html_decode), URLs, the image (PNG, else
-// the DIB as a BMP file: clip_dib_to_bmp), then E_DROP (data = the number of paths).
+// the DIB as a BMP file: clip_dib_to_bmp), then E_DROP (data = the number of paths).  With
+// dnd::drop_hold on (the UI answers drops itself) and a source whose data object offers
+// IDataObjectAsyncCapability in async mode (GetAsyncMode TRUE), Drop calls StartOperation and keeps
+// the object: dnd::drop_finish ends it with EndOperation (S_OK and the effect; not taken: E_ABORT,
+// DROPEFFECT_NONE) -- the source learns the result after the drop, as Microsoft's "asynchronous data
+// extraction" has it.  Every other source gets Drop's effect at once (IDropTarget::Drop must answer
+// synchronously); so does an async one when a newer drop comes first.
 // Source: the data object offers CF_UNICODETEXT (the text, else the URLs), CF_HDROP (DROPFILES,
 // wide absolute paths), "HTML Format", "UniformResourceLocatorW" + "UniformResourceLocator",
 // "PNG", CF_DIBV5 + CF_DIB (from DragData::bmp).  GetData hands out a new HGLOBAL each time
 // (TYMED_HGLOBAL only), EnumFormatEtc goes through SHCreateStdEnumFmtEtc, SetData, GetDataHere
-// and advise sinks are refused.  ole32 / shell32 are loaded on the first window.
+// and advise sinks are refused.  It offers IDataObjectAsyncCapability with async mode off for our
+// own drags (so targets extract synchronously, DoDragDrop's effect is the result); the tests turn
+// it on.  ole32 / shell32 are loaded on the first window.
 
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 
 use rt::sync::SpinLock;
 
@@ -49,6 +59,7 @@ const E_NOTIMPL: Hr = 0x8000_4001_u32 as i32;
 const E_NOINTERFACE: Hr = 0x8000_4002_u32 as i32;
 const E_INVALIDARG: Hr = 0x8007_0057_u32 as i32;
 const E_OUTOFMEMORY: Hr = 0x8007_000E_u32 as i32;
+const E_ABORT: Hr = 0x8000_4004_u32 as i32;
 const DV_E_FORMATETC: Hr = 0x8004_0064_u32 as i32;
 const DV_E_TYMED: Hr = 0x8004_0069_u32 as i32;
 const DV_E_DVASPECT: Hr = 0x8004_006B_u32 as i32;
@@ -84,6 +95,9 @@ const IID_UNKNOWN: Iid = Iid(0, 0, 0, [0xC0, 0, 0, 0, 0, 0, 0, 0x46]);
 const IID_DATA_OBJECT: Iid = Iid(0x0000_010e, 0, 0, [0xC0, 0, 0, 0, 0, 0, 0, 0x46]);
 const IID_DROP_SOURCE: Iid = Iid(0x0000_0121, 0, 0, [0xC0, 0, 0, 0, 0, 0, 0, 0x46]);
 const IID_DROP_TARGET: Iid = Iid(0x0000_0122, 0, 0, [0xC0, 0, 0, 0, 0, 0, 0, 0x46]);
+// IDataObjectAsyncCapability (IAsyncOperation): SetAsyncMode, GetAsyncMode, StartOperation,
+// InOperation, EndOperation in slots 3 .. 7
+const IID_ASYNC_CAP: Iid = Iid(0x3D8B_0590, 0xF691, 0x11D2, [0x8E, 0xA9, 0x00, 0x60, 0x97, 0xDF, 0x5B, 0xD4]);
 
 /// FORMATETC (x64: 32 bytes)
 #[repr(C)]
@@ -535,6 +549,15 @@ unsafe extern "system" fn t_drop(this: This, obj: usize, keys: u32, pt: u64, eff
     if e != 0 {
         let files = read_drop(obj, types);
         crate::drop_set_effect(e);
+        // the answer after the drop, where the source's data object allows it
+        held_end(None);
+        if crate::drop_held() {
+            let cap = async_start(obj);
+            if cap != 0 {
+                HELD.lock().replace((cap, e));
+                crate::drop_wait_begin(held_finish);
+            }
+        }
         push(E_DROP, t.w, x, y, files, mods_of(keys));
     } else {
         push(E_DRAG, t.w, -1, -1, 0, 0);
@@ -544,6 +567,60 @@ unsafe extern "system" fn t_drop(this: This, obj: usize, keys: u32, pt: u64, eff
     }
     com_release(t.obj.swap(0, Ordering::AcqRel));
     S_OK
+}
+
+// ---------------------------------------------------------------- the answer after the drop
+
+// the IDataObjectAsyncCapability of the drop whose answer waits (a reference of ours) and the effect
+// of its Drop
+static HELD: SpinLock<Option<(usize, u32)>> = SpinLock::new(None);
+
+// the data object's IDataObjectAsyncCapability in async mode, its operation started -> the interface
+// (a reference of ours); 0: the source extracts synchronously (no such interface, async mode off,
+// StartOperation failed)
+fn async_start(obj: usize) -> usize {
+    if obj == 0 {
+        return 0;
+    }
+    let mut cap = 0usize;
+    // SAFETY: QueryInterface (slot 0) of the source's live data object; then GetAsyncMode (slot 4)
+    // and StartOperation (slot 5, no bind context) of the interface it gave (one reference).
+    unsafe {
+        let qi: unsafe extern "system" fn(usize, *const Iid, *mut usize) -> Hr = core::mem::transmute(vf(obj, 0));
+        if qi(obj, &IID_ASYNC_CAP, &mut cap) < 0 || cap == 0 {
+            return 0;
+        }
+        let mut on = 0i32;
+        let get: unsafe extern "system" fn(usize, *mut i32) -> Hr = core::mem::transmute(vf(cap, 4));
+        let start: unsafe extern "system" fn(usize, usize) -> Hr = core::mem::transmute(vf(cap, 5));
+        if get(cap, &mut on) < 0 || on == 0 || start(cap, 0) < 0 {
+            com_release(cap);
+            return 0;
+        }
+    }
+    cap
+}
+
+// the drop that waits ends: EndOperation with the effect (None: its Drop's, and no one waits for it
+// any more), then our reference goes
+fn held_end(effect: Option<u32>) {
+    let Some((cap, e0)) = HELD.lock().take() else { return };
+    if effect.is_none() {
+        crate::drop_wait_clear();
+    }
+    let e = effect.unwrap_or(e0) & DE_ALL;
+    let hr = if e != 0 { S_OK } else { E_ABORT };
+    // SAFETY: EndOperation(HRESULT, IBindCtx* (none), DWORD) (slot 7) of the interface we hold.
+    unsafe {
+        let end: unsafe extern "system" fn(usize, Hr, usize, u32) -> Hr = core::mem::transmute(vf(cap, 7));
+        end(cap, hr, 0, e);
+    }
+    com_release(cap);
+}
+
+// (dnd::drop_finish) the UI's answer
+fn held_finish(effect: u32) {
+    held_end(Some(effect));
 }
 
 /// (win_create) the window becomes an OLE drop target -> false: OLE is not there
@@ -585,13 +662,98 @@ struct VtData {
     enum_advise: unsafe extern "system" fn(This, *mut usize) -> Hr,
 }
 
-/// our data object: one block of bytes per clipboard format
+/// our data object: one block of bytes per clipboard format; its IDataObjectAsyncCapability (avt)
+/// with the async mode (off for our drags), the operation a target started, what EndOperation said
 #[repr(C)]
 struct DataObj {
     vt: *const VtData,
     refs: AtomicU32,
+    avt: *const VtAsync,
+    async_on: AtomicBool,
+    in_op: AtomicBool,
+    ended: AtomicBool,
+    end_hr: AtomicI32,
+    end_effect: AtomicU32,
     items: Vec<(u16, Vec<u8>)>,
     fmts: Vec<FormatEtc>,
+}
+
+#[repr(C)]
+struct VtAsync {
+    qi: unsafe extern "system" fn(This, *const Iid, *mut This) -> Hr,
+    add: unsafe extern "system" fn(This) -> u32,
+    rel: unsafe extern "system" fn(This) -> u32,
+    set_mode: unsafe extern "system" fn(This, i32) -> Hr,
+    get_mode: unsafe extern "system" fn(This, *mut i32) -> Hr,
+    start: unsafe extern "system" fn(This, usize) -> Hr,
+    in_op: unsafe extern "system" fn(This, *mut i32) -> Hr,
+    end: unsafe extern "system" fn(This, Hr, usize, u32) -> Hr,
+}
+
+static VT_ASYNC: VtAsync =
+    VtAsync { qi: a_qi, add: a_add, rel: a_rel, set_mode: a_set_mode, get_mode: a_get_mode, start: a_start, in_op: a_in_op, end: a_end };
+
+// the data object of its IDataObjectAsyncCapability interface pointer (the avt field)
+//
+// SAFETY: `this` is the address of the avt field of a live DataObj (what d_qi hands out).
+unsafe fn a_obj(this: This) -> This {
+    unsafe { this.sub(core::mem::offset_of!(DataObj, avt)) }
+}
+
+unsafe extern "system" fn a_qi(this: This, riid: *const Iid, out: *mut This) -> Hr {
+    unsafe { d_qi(a_obj(this), riid, out) }
+}
+
+unsafe extern "system" fn a_add(this: This) -> u32 {
+    unsafe { d_add(a_obj(this)) }
+}
+
+unsafe extern "system" fn a_rel(this: This) -> u32 {
+    unsafe { d_rel(a_obj(this)) }
+}
+
+unsafe extern "system" fn a_set_mode(this: This, on: i32) -> Hr {
+    let d = unsafe { &*(a_obj(this) as *const DataObj) };
+    d.async_on.store(on != 0, Ordering::Release);
+    S_OK
+}
+
+unsafe extern "system" fn a_get_mode(this: This, out: *mut i32) -> Hr {
+    let d = unsafe { &*(a_obj(this) as *const DataObj) };
+    if out.is_null() {
+        return E_INVALIDARG;
+    }
+    unsafe { *out = d.async_on.load(Ordering::Acquire) as i32 };
+    S_OK
+}
+
+unsafe extern "system" fn a_start(this: This, _bc: usize) -> Hr {
+    let d = unsafe { &*(a_obj(this) as *const DataObj) };
+    if !d.async_on.load(Ordering::Acquire) {
+        return E_NOTIMPL;
+    }
+    d.in_op.store(true, Ordering::Release);
+    S_OK
+}
+
+unsafe extern "system" fn a_in_op(this: This, out: *mut i32) -> Hr {
+    let d = unsafe { &*(a_obj(this) as *const DataObj) };
+    if out.is_null() {
+        return E_INVALIDARG;
+    }
+    unsafe { *out = d.in_op.load(Ordering::Acquire) as i32 };
+    S_OK
+}
+
+unsafe extern "system" fn a_end(this: This, hr: Hr, _bc: usize, effect: u32) -> Hr {
+    let d = unsafe { &*(a_obj(this) as *const DataObj) };
+    if !d.in_op.swap(false, Ordering::AcqRel) {
+        return E_INVALIDARG; // no operation was started
+    }
+    d.end_hr.store(hr, Ordering::Release);
+    d.end_effect.store(effect, Ordering::Release);
+    d.ended.store(true, Ordering::Release);
+    S_OK
 }
 
 static VT_DATA: VtData = VtData {
@@ -694,7 +856,18 @@ fn data_items(d: &DragData) -> Vec<(u16, Vec<u8>)> {
 fn new_data(d: &DragData) -> *mut DataObj {
     let items = data_items(d);
     let fmts = items.iter().map(|e| fe(e.0)).collect();
-    Box::into_raw(Box::new(DataObj { vt: &VT_DATA, refs: AtomicU32::new(1), items, fmts }))
+    Box::into_raw(Box::new(DataObj {
+        vt: &VT_DATA,
+        refs: AtomicU32::new(1),
+        avt: &VT_ASYNC,
+        async_on: AtomicBool::new(false),
+        in_op: AtomicBool::new(false),
+        ended: AtomicBool::new(false),
+        end_hr: AtomicI32::new(0),
+        end_effect: AtomicU32::new(0),
+        items,
+        fmts,
+    }))
 }
 
 unsafe extern "system" fn d_qi(this: This, riid: *const Iid, out: *mut This) -> Hr {
@@ -705,6 +878,13 @@ unsafe extern "system" fn d_qi(this: This, riid: *const Iid, out: *mut This) -> 
     if id == IID_UNKNOWN || id == IID_DATA_OBJECT {
         unsafe {
             *out = this;
+            d_add(this);
+        }
+        S_OK
+    } else if id == IID_ASYNC_CAP {
+        // the interface's own pointer: the avt field
+        unsafe {
+            *out = this.add(core::mem::offset_of!(DataObj, avt));
             d_add(this);
         }
         S_OK
@@ -1015,6 +1195,60 @@ pub fn dnd_test_drop(data: &DragData, w: i32, x: i32, y: i32, keys: u32) -> Opti
         t_rel(t as This);
     }
     Some(eff)
+}
+
+// the data object dnd_test_drop_async keeps (one reference) for dnd_test_async_end
+static TEST_ASYNC: AtomicUsize = AtomicUsize::new(0);
+
+/// (plattest) dnd_test_drop with a data object in IDataObjectAsyncCapability's async mode (a
+/// source that lets the target answer after the drop) -> (the effect Drop answered, the object
+/// is in an operation the target started); the object is kept for dnd_test_async_end.  None: no
+/// OLE
+pub fn dnd_test_drop_async(data: &DragData, w: i32, x: i32, y: i32, keys: u32) -> Option<(u32, bool)> {
+    if !load() {
+        return None;
+    }
+    let _ = dnd_test_async_end();
+    let hwnd = super::hwnd_of(w);
+    let mut p = Point { x, y };
+    if hwnd != 0 {
+        // SAFETY: our window, a valid POINT.
+        unsafe { super::ClientToScreen(hwnd, &mut p) };
+    }
+    let pt = (p.x as u32 as u64) | ((p.y as u32 as u64) << 32);
+    let t = new_target(w, hwnd);
+    let o = new_data(data);
+    // SAFETY: the object new_data made; it lives until the reference TEST_ASYNC keeps goes.
+    let d = unsafe { &*o };
+    d.async_on.store(true, Ordering::Release);
+    let mut eff = data.allowed();
+    // SAFETY: our own objects through their vtables, as OLE calls them.
+    unsafe {
+        t_enter(t as This, o as usize, keys, pt, &mut eff);
+        eff = data.allowed();
+        t_over(t as This, keys, pt, &mut eff);
+        eff = data.allowed();
+        t_drop(t as This, o as usize, keys, pt, &mut eff);
+        t_rel(t as This);
+    }
+    let in_op = d.in_op.load(Ordering::Acquire);
+    TEST_ASYNC.store(o as usize, Ordering::Release);
+    Some((eff, in_op))
+}
+
+/// (plattest) the object of the last dnd_test_drop_async: (still in its operation, EndOperation
+/// came, its HRESULT, its effect); then it is released.  None: there is none
+pub fn dnd_test_async_end() -> Option<(bool, bool, i32, u32)> {
+    let o = TEST_ASYNC.swap(0, Ordering::AcqRel);
+    if o == 0 {
+        return None;
+    }
+    // SAFETY: the DataObj dnd_test_drop_async kept a reference of.
+    let d = unsafe { &*(o as *const DataObj) };
+    let r = (d.in_op.load(Ordering::Acquire), d.ended.load(Ordering::Acquire), d.end_hr.load(Ordering::Acquire), d.end_effect.load(Ordering::Acquire));
+    // SAFETY: that reference goes.
+    unsafe { d_rel(o as This) };
+    Some(r)
 }
 
 /// (plattest) the IDropSource's answer to QueryContinueDrag(esc, MK_* keys): 0 go on,

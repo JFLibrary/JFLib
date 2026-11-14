@@ -674,6 +674,7 @@ impl Ui {
                         self.cmd_run(UIC_DROP, id);
                     }
                     self.run_passes(app);
+                    self.dnd_drop_settled(); // its answer to the source, unless the app deferred it
                     self.need_render = true;
                     continue;
                 }
@@ -1166,6 +1167,11 @@ fn ev_dropped(ev: &Event) {
     if ev.typ == plat::E_IME_COMMIT {
         let _ = plat::ime_commit_take(ev.data);
     }
+    // a drop onto a window that is gone: its content goes, its source learns nobody took it
+    if ev.typ == plat::E_DROP {
+        let _ = plat::drop_data_take();
+        plat::drop_finish(plat::drop_waiting(), 0);
+    }
 }
 
 // log_event: print an event record
@@ -1347,6 +1353,7 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
     plat::win_hit_hook(Some(super::win::uiw_hit_pw)); // non-client hit tests ask the UI
     plat::win_move_hook(Some(super::win::uiw_moving_pw)); // user moves snap (window_snap)
     plat::drag_hook(Some(super::win::uiw_drag_pw)); // so do drags of other programs (dnd.rs)
+    plat::drop_hold(true); // a drop's answer waits for its passes (drop_defer, dnd.rs)
     plat::set_min_size(ui.desc.min_w as i32, ui.desc.min_h as i32);
     // AF_SAVE_STATE / jfgui_STATE: the placement of the last run (winstate.rs); --size wins
     let state = super::winstate::state_file(ui.desc.flags);
@@ -1479,6 +1486,7 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
         }
     }
     ui.hr_end(); // hot reload: the log's end, the carried state (hotreload.rs)
+    ui.dnd_quit(); // a drop whose answer waits gets it now (dnd.rs)
     ui.call_cmd(app, UIC_EXIT, 0);
     ui.set_agent_enabled(false);
     ui.gp_shutdown();

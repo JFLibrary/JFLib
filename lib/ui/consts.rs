@@ -370,6 +370,9 @@ pub const DS_ACTIVE: u32 = 2; // drag_source: the widget's content is being drag
 pub const DS_END: u32 = 4; // drag_source: the drag ended (once; drag_effect() tells how)
 pub const DS_HOVER: u32 = 8; // drop_target: a matching drag is over the widget (highlighted)
 pub const DS_DROP: u32 = 16; // drop_target: dropped onto the widget (drop_data(), drop_effect())
+/// drop_defer: how long a drop's answer to its source may wait for drop_finish (ms); then it goes
+/// as the drop was delivered
+pub const DROP_DEFER_MS: u32 = 3000;
 
 // ------------------------------------------------------------------ app flags (AppDesc)
 pub const AF_CUSTOM_TITLEBAR: u32 = 1;
