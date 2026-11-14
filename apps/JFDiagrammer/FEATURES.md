@@ -1,6 +1,6 @@
 # JFDiagrammer – Feature-Liste
 
-Stand: 2026-11-14. Phase 1 von JFDiagrammer: vollständige Anforderungsliste.
+Stand: 2026-11-14. Phase 1 von JFDiagrammer: vollständige Anforderungsliste; Planungsfragen F1–F14 entschieden (Abschnitt 8).
 
 JFDiagrammer ist ein eigenständig entwickeltes Diagrammprogramm, das so nah wie möglich an
 Microsoft Visio (Visio Professional für Microsoft 365, deutsche Oberfläche) heranreicht – ohne
@@ -18,7 +18,7 @@ beschreibend als Referenzprodukt genannt.
 5. [Vorlagen, Diagrammtypen und Assistenten](#vorlagen)
 6. [Bewusst weggelassen](#weggelassen)
 7. [Anhang: Ribbon-Icons für die Neuzeichnung](#icons)
-8. [Offene Fragen an den Nutzer](#fragen)
+8. [Entscheidungen zu den Planungsfragen F1–F14](#fragen)
 
 <a id="grundlagen"></a>
 ## 0. Entscheidungen, Quellen und Leseschlüssel
@@ -27,8 +27,8 @@ beschreibend als Referenzprodukt genannt.
 
 - **Ort:** Die App entsteht vorerst unter `apps/JFDiagrammer` (Rust, MIT OR Apache-2.0,
   öffentliches Repo) und baut nur auf der öffentlichen `jflib`-API auf; sie zieht später in ein
-  eigenes Repo um (wie JFNetworker). Die Codecs für die Visio-Formate kommen in eine **neue
-  Crate unter `lib/`**.
+  eigenes Repo um (wie JFNetworker). Modell und Codecs kommen in **zwei neue Crates unter
+  `lib/`**: `diagram_core` und `diagram_io` (F1).
 - **Formate:** `.vsdx`, `.vssx`, `.vssm`, `.vsx` (XML-Schablone 2003–2010) und `.vss`
   (binär). Binärformate (`.vss`/`.vsd`) nur importieren. Bei `.vssm`/`.vsdm` wird der
   Makroteil beim Speichern unverändert durchgereicht und **nie** ausgeführt.
@@ -46,6 +46,23 @@ beschreibend als Referenzprodukt genannt.
   dürfen normgerecht aussehen. libvisio (MPL-2.0) höchstens als Lesestoff, nie Code übernehmen.
 - **Kein VBA.** Alles, was nur über VBA, COM-Add-ins oder Microsoft-Clouddienste geht, steht in
   Abschnitt 6.
+- **Planungsfragen F1–F14 (2026-11-14):** Der Nutzer hat alle Vorschläge aus Abschnitt 8
+  übernommen. Kurzfassung:
+  - zwei Crates `diagram_core` und `diagram_io` (F1);
+  - Normsymbole in Normform mit NetLab-Farben, gestaltete Grafiken im JFNetworker-Stil (F2);
+  - AWS-Icons unverändert, je Kategorie eine Schablone (F3);
+  - `.vss` mit P2 erst nach allen XML-Formaten, `.vsd` mit P3 (F4; ob es alte `.vss`-Testdateien
+    gibt, ist noch offen);
+  - nur DXF, kein DWG (F5);
+  - CSV und `.xlsx` in P2 mit XLSX-Leser in JFLib, ODBC/SQL in P3 (F6);
+  - JFScript-Schnittstelle später, nicht in Phase 2 (F7);
+  - Begriffe Ebene, Beschriftung, Legende, Seite und deutsche statt englischer Visio-Begriffe
+    (F8, F13);
+  - gemeinsamer Netzwerk-Symbolsatz mit JFNetworker, Import von JFNetworker-Projekten P3 (F9);
+  - deutsche Office-Tastenbelegung für Textformate (F10);
+  - Rack-Diagramm schon in P1, AWS-Architektur P2 (F11);
+  - keine weiteren Screenshots nötig (F12);
+  - Normschablonen nach DIN EN/IEC statt US/ANSI (F14).
 
 ### 0.2 Quellen
 
@@ -74,11 +91,13 @@ Jede Feature-Zeile hat eine stabile ID und die Spalten:
 - **Prio** – **P1** Kern (erste brauchbare Version: typische Visio-Zeichnungen öffnen,
   bearbeiten, speichern, drucken), **P2** wichtig für Visio-Nähe im Alltag, **P3** selten oder
   speziell.
-- **Ort** – `Lib-Neu` = die neue Crate unter `lib/` (Arbeitsname `diagram_io`: Dokumentmodell,
-  ShapeSheet, Formeln, Codecs, Exporte, Routing- und Layout-Geometrie; ob Modell und Codecs
-  wie bei `doc_core`/`doc_io` getrennt werden, ist offene Frage F1); `Lib-ui` = `lib/ui`;
+- **Ort** – `Lib-core` = neue Crate `lib/diagram_core` (Dokumentmodell, ShapeSheet, Formeln,
+  Geometrie, Routing, Layout); `Lib-io` = neue Crate `lib/diagram_io` (VSDX/VDX/VSX/VSS-Codecs,
+  Importe und Exporte), beide nach dem Muster `doc_core`/`doc_io` (F1); `Lib-xlsx` = schlanker
+  XLSX-Leser in JFLib (F6; welche Crate, wird bei der Umsetzung festgelegt); `Lib-ui` = `lib/ui`;
   `Lib-plat`, `Lib-img`, `Lib-archive`, `Lib-svg`, `Lib-style` = die bestehenden Crates
-  `plat`, `img_*`, `archive`, `img_svg`, `style_netlab`; `App` = `apps/JFDiagrammer`.
+  `plat`, `img_*`, `archive`, `img_svg`, `style_netlab`; `App` = `apps/JFDiagrammer`;
+  `JFNetworker`/`JFScript` = die eigenen Repos.
   `A+B` heißt: A besitzt die Semantik, B hilft.
 - **Bestand** – **vorhanden** (in JFLib/JFNetworker nutzbar), **teilweise** (Baustein da,
   Visio-Umfang fehlt), **neu**. Der Abgleich ist grob (Abschnitt 0.4), keine Tiefenanalyse.
@@ -101,9 +120,9 @@ Shape-Tabellen darunter nennen nur Name und Beschreibung.
 
 ### 0.5 Umfang
 
-- **546 Feature-Zeilen** in den Abschnitten 1–3, 4.0 und 5 (davon P1 254, P2 183, P3 103; bei Zeilen mit zwei Prioritäten zählt die erste).
+- **550 Feature-Zeilen** in den Abschnitten 1–3, 4.0 und 5 (davon P1 256, P2 183, P3 105; bei Zeilen mit zwei Prioritäten zählt die erste).
 - **278 Schablonen** in Abschnitt 4 mit **3561 Shape-Zeilen** (nach Zusammenfassen von Doppelungen) und **15 Vorschläge** für eigene Kategorien.
-- **28 bewusst weggelassene** Funktionen (Abschnitt 6), **14 offene Fragen** (Abschnitt 8).
+- **29 bewusst weggelassene** Funktionen (Abschnitt 6), **14 Entscheidungen** zu den Planungsfragen (Abschnitt 8; offen ist nur noch, ob es alte `.vss`-Testdateien gibt).
 
 <a id="formate"></a>
 ## 1. Dateiformate, Import und Export
@@ -112,56 +131,56 @@ Shape-Tabellen darunter nennen nur Name und Beschreibung.
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| DF-01 | `.vsdx` lesen | Zeichnung als ZIP-Paket öffnen: Inhaltstypen, Beziehungen, `document.xml`, `pages.xml` + `pageN.xml`, `masters.xml` + `masterN.xml`, Themes, `windows.xml`, Dokumenteigenschaften, Medien. Alle drei Beispieldateien müssen fehlerfrei geladen werden. | Z2, Z3; MS-VSDX; SbS 1, 12 | P1 | Lib-Neu+Lib-archive | teilweise |
-| DF-02 | `.vsdx` schreiben | Deterministisch speichern (gleiche Daten → gleiche Bytes), DEFLATE-komprimiert, nur Teile mit Inhalt; Visio muss die Datei ohne Reparaturmeldung öffnen. | MS-VSDX; SbS 1, 12 | P1 | Lib-Neu+Lib-archive | teilweise |
-| DF-03 | Unbekanntes erhalten | Elemente, Attribute, Teile und `extLst`-Erweiterungen, die das Modell nicht versteht, beim Speichern unverändert zurückschreiben (Round-Trip). Gilt auch für Lösungs-XML (SolutionXML) von Visio-Add-ons. | Z3; MS-VSDX | P1 | Lib-Neu | neu |
-| DF-04 | `.vsdm` (Zeichnung mit Makros) | Wie `.vsdx` öffnen; das VBA-Projekt (`vbaProject.bin` samt Beziehung) unverändert durchreichen, nie ausführen, beim Öffnen sichtbar darauf hinweisen. Speichern als `.vsdx` entfernt es nach Rückfrage. | MS-VSDX; Entscheidung | P2 | Lib-Neu+App | neu |
-| DF-05 | `.vstx`/`.vstm` (Vorlage) | Vorlage öffnet eine neue, unbenannte Zeichnung mit deren Seiten, Schablonen-Verweisen, Formatvorlagen und Theme; „Speichern unter → Vorlage“ schreibt eine. Makroteil wie DF-04. | SbS 12 | P2 | Lib-Neu+App | neu |
-| DF-06 | `.vssx` (Schablone) | Master einer Schablone für die Shapes-Seitenleiste laden (Name, Symbol, QuickInfo, Schnell-Shape-Markierung); eigene Schablonen (z. B. Favoriten) bearbeiten und speichern. | Fav; SbS 1, 2, 7, 12 | P1 | Lib-Neu+App | neu |
-| DF-07 | `.vssm` (Schablone mit Makros) | Wie `.vssx`; Makroteil unverändert durchreichen, nie ausführen. | Entscheidung | P2 | Lib-Neu | neu |
-| DF-08 | Vorschaubild | `docProps/thumbnail.emf` lesen (für Dateidialog/Zuletzt-verwendet) und beim Speichern schreiben; Optionen keine/Entwurf/detailliert und nur erste Seite oder alle Seiten (EMF, siehe EX-07). | Z2, Z3; UG Kap. 2 | P3 | Lib-Neu+Lib-img | neu |
-| DF-09 | Dokumenteigenschaften | Kern- (Titel, Thema, Autor, Stichwörter, Beschreibung, Kategorie, Sprache, zuletzt geändert von, Erstellt/Geändert/Gedruckt), App- (Vorlage, Firma, Manager, Hyperlinkbasis, Seitentitel) und benutzerdefinierte Eigenschaften lesen, bearbeiten, schreiben. | Z2, Z3; SbS 1, 11, 12 | P2 | Lib-Neu+App | neu |
-| DF-10 | Fenster- und Ansichtszustand | `windows.xml`: offene Schablonen mit Reihenfolge, Zeichenfenster mit Zoom, Mittelpunkt, aktiver Seite, Lineal/Raster/Führungslinien/Seitenumbrüche/Verbindungspunkte sichtbar, Einrast- und Klebe-Einstellungen. Lesen und schreiben, damit eine Datei so aufgeht, wie sie gespeichert wurde; „Arbeitsbereich speichern“ abschaltbar. | Z2, Z3; SbS 1; UG Kap. 2 | P2 | Lib-Neu+App | neu |
-| DF-11 | Kommentare-Teil | Moderne Kommentare (`comments.xml`, Autorenliste, Antworten, Bezug auf Seite/Shape) lesen und schreiben; ältere Anmerkungen (Reviewer-/Annotation-Abschnitte) lesen. | SbS 3; MS-VSDX | P2 | Lib-Neu | neu |
-| DF-12 | Datenverbindungen-Teile | Datenverbindungen und Datensatzgruppen (Abfrage, Spalten, Zeilen, Verknüpfung zu Shapes, Aktualisierungsintervall) lesen und schreiben; Daten ohne Netz-/Dateizugriff anzeigen. | SbS 10; MS-VSDX | P2 | Lib-Neu | neu |
-| DF-13 | Validierungs-Teil | Regelsätze, Regeln (Filter-/Testausdruck) und gefundene Probleme lesen und schreiben (Diagrammprüfung, siehe DM-DATA). | SbS 14; MS-VSDX | P3 | Lib-Neu | neu |
-| DF-14 | Eingebettete Medien | Bilder (`visio/media/*`: PNG, JPEG, GIF, BMP, TIFF, EMF, WMF, SVG) und eingebettete OLE-Objekte als Teile mit Beziehung lesen und schreiben; OLE nur mit Vorschaubild anzeigen (Abschnitt 6). | Z2 | P1 | Lib-Neu+Lib-img | teilweise |
-| DF-15 | Robustheit | Jede Datei ist fremde Eingabe: Größen, Anzahl Teile/Elemente, Verschachtelung und Formellänge begrenzen; externe Verweise nie folgen; ZIP64 und große Pakete (> 32 MiB) unterstützen; beschädigte Dateien mit klarer Meldung ablehnen statt halb laden. | Lib-Regeln | P1 | Lib-Neu+Lib-archive | teilweise |
+| DF-01 | `.vsdx` lesen | Zeichnung als ZIP-Paket öffnen: Inhaltstypen, Beziehungen, `document.xml`, `pages.xml` + `pageN.xml`, `masters.xml` + `masterN.xml`, Themes, `windows.xml`, Dokumenteigenschaften, Medien. Alle drei Beispieldateien müssen fehlerfrei geladen werden. | Z2, Z3; MS-VSDX; SbS 1, 12 | P1 | Lib-io+Lib-archive | teilweise |
+| DF-02 | `.vsdx` schreiben | Deterministisch speichern (gleiche Daten → gleiche Bytes), DEFLATE-komprimiert, nur Teile mit Inhalt; Visio muss die Datei ohne Reparaturmeldung öffnen. | MS-VSDX; SbS 1, 12 | P1 | Lib-io+Lib-archive | teilweise |
+| DF-03 | Unbekanntes erhalten | Elemente, Attribute, Teile und `extLst`-Erweiterungen, die das Modell nicht versteht, beim Speichern unverändert zurückschreiben (Round-Trip). Gilt auch für Lösungs-XML (SolutionXML) von Visio-Add-ons. | Z3; MS-VSDX | P1 | Lib-io | neu |
+| DF-04 | `.vsdm` (Zeichnung mit Makros) | Wie `.vsdx` öffnen; das VBA-Projekt (`vbaProject.bin` samt Beziehung) unverändert durchreichen, nie ausführen, beim Öffnen sichtbar darauf hinweisen. Speichern als `.vsdx` entfernt es nach Rückfrage. | MS-VSDX; Entscheidung | P2 | Lib-io+App | neu |
+| DF-05 | `.vstx`/`.vstm` (Vorlage) | Vorlage öffnet eine neue, unbenannte Zeichnung mit deren Seiten, Schablonen-Verweisen, Formatvorlagen und Theme; „Speichern unter → Vorlage“ schreibt eine. Makroteil wie DF-04. | SbS 12 | P2 | Lib-io+App | neu |
+| DF-06 | `.vssx` (Schablone) | Master einer Schablone für die Shapes-Seitenleiste laden (Name, Symbol, QuickInfo, Schnell-Shape-Markierung); eigene Schablonen (z. B. Favoriten) bearbeiten und speichern. | Fav; SbS 1, 2, 7, 12 | P1 | Lib-io+App | neu |
+| DF-07 | `.vssm` (Schablone mit Makros) | Wie `.vssx`; Makroteil unverändert durchreichen, nie ausführen. | Entscheidung | P2 | Lib-io | neu |
+| DF-08 | Vorschaubild | `docProps/thumbnail.emf` lesen (für Dateidialog/Zuletzt-verwendet) und beim Speichern schreiben; Optionen keine/Entwurf/detailliert und nur erste Seite oder alle Seiten (EMF, siehe EX-07). | Z2, Z3; UG Kap. 2 | P3 | Lib-io+Lib-img | neu |
+| DF-09 | Dokumenteigenschaften | Kern- (Titel, Thema, Autor, Stichwörter, Beschreibung, Kategorie, Sprache, zuletzt geändert von, Erstellt/Geändert/Gedruckt), App- (Vorlage, Firma, Manager, Hyperlinkbasis, Seitentitel) und benutzerdefinierte Eigenschaften lesen, bearbeiten, schreiben. | Z2, Z3; SbS 1, 11, 12 | P2 | Lib-io+App | neu |
+| DF-10 | Fenster- und Ansichtszustand | `windows.xml`: offene Schablonen mit Reihenfolge, Zeichenfenster mit Zoom, Mittelpunkt, aktiver Seite, Lineal/Raster/Führungslinien/Seitenumbrüche/Verbindungspunkte sichtbar, Einrast- und Klebe-Einstellungen. Lesen und schreiben, damit eine Datei so aufgeht, wie sie gespeichert wurde; „Arbeitsbereich speichern“ abschaltbar. | Z2, Z3; SbS 1; UG Kap. 2 | P2 | Lib-io+App | neu |
+| DF-11 | Kommentare-Teil | Moderne Kommentare (`comments.xml`, Autorenliste, Antworten, Bezug auf Seite/Shape) lesen und schreiben; ältere Anmerkungen (Reviewer-/Annotation-Abschnitte) lesen. | SbS 3; MS-VSDX | P2 | Lib-io | neu |
+| DF-12 | Datenverbindungen-Teile | Datenverbindungen und Datensatzgruppen (Abfrage, Spalten, Zeilen, Verknüpfung zu Shapes, Aktualisierungsintervall) lesen und schreiben; Daten ohne Netz-/Dateizugriff anzeigen. | SbS 10; MS-VSDX | P2 | Lib-io | neu |
+| DF-13 | Validierungs-Teil | Regelsätze, Regeln (Filter-/Testausdruck) und gefundene Probleme lesen und schreiben (Diagrammprüfung, siehe DM-DATA). | SbS 14; MS-VSDX | P3 | Lib-io | neu |
+| DF-14 | Eingebettete Medien | Bilder (`visio/media/*`: PNG, JPEG, GIF, BMP, TIFF, EMF, WMF, SVG) und eingebettete OLE-Objekte als Teile mit Beziehung lesen und schreiben; OLE nur mit Vorschaubild anzeigen (Abschnitt 6). | Z2 | P1 | Lib-io+Lib-img | teilweise |
+| DF-15 | Robustheit | Jede Datei ist fremde Eingabe: Größen, Anzahl Teile/Elemente, Verschachtelung und Formellänge begrenzen; externe Verweise nie folgen; ZIP64 und große Pakete (> 32 MiB) unterstützen; beschädigte Dateien mit klarer Meldung ablehnen statt halb laden. | Lib-Regeln | P1 | Lib-io+Lib-archive | teilweise |
 
 ### 1.2 Ältere XML-Formate 2003–2010
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| DF-20 | `.vsx` lesen (XML-Schablone) | XML-Schablone im älteren „DatadiagramML“-Schema in Master für die Seitenleiste umwandeln; Zellen, Formeln und Abschnitte auf das Modell abbilden. | Entscheidung; MS-VSDX (Vorgänger) | P2 | Lib-Neu | neu |
-| DF-21 | `.vdx` lesen (XML-Zeichnung) | Zeichnung im gleichen älteren XML-Schema öffnen (eine Datei statt Paket, Bilder base64-eingebettet). | W | P2 | Lib-Neu | neu |
-| DF-22 | `.vtx` lesen (XML-Vorlage) | Vorlage im älteren XML-Schema als neue Zeichnung öffnen. | W | P3 | Lib-Neu | neu |
-| DF-23 | `.vdx`/`.vsx` schreiben | Für Austausch mit sehr alten Programmen; nur wenn ein Nutzer es braucht. | W | P3 | Lib-Neu | neu |
+| DF-20 | `.vsx` lesen (XML-Schablone) | XML-Schablone im älteren „DatadiagramML“-Schema in Master für die Seitenleiste umwandeln; Zellen, Formeln und Abschnitte auf das Modell abbilden. | Entscheidung; MS-VSDX (Vorgänger) | P2 | Lib-io | neu |
+| DF-21 | `.vdx` lesen (XML-Zeichnung) | Zeichnung im gleichen älteren XML-Schema öffnen (eine Datei statt Paket, Bilder base64-eingebettet). | W | P2 | Lib-io | neu |
+| DF-22 | `.vtx` lesen (XML-Vorlage) | Vorlage im älteren XML-Schema als neue Zeichnung öffnen. | W | P3 | Lib-io | neu |
+| DF-23 | `.vdx`/`.vsx` schreiben | Für Austausch mit sehr alten Programmen; nur wenn ein Nutzer es braucht. | W | P3 | Lib-io | neu |
 
 ### 1.3 Binärformate (nur Import)
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| DF-30 | `.vss` importieren (binäre Schablone) | Alte Schablonen bis Visio 2010 in Master umwandeln. Das Binärformat (OLE-Verbunddatei mit komprimierten Datenblöcken) ist von Microsoft nicht als offene Spezifikation veröffentlicht; Umsetzung nur aus eigener Analyse, libvisio höchstens als Lesestoff (offene Frage F4). | Entscheidung | P2 | Lib-Neu | neu |
-| DF-31 | `.vsd` importieren (binäre Zeichnung) | Zeichnungen bis Visio 2010 öffnen, beim Speichern zu `.vsdx` werden. Gleiche Grundlage wie DF-30. | Entscheidung | P3 | Lib-Neu | neu |
-| DF-32 | `.vst` importieren (binäre Vorlage) | Wie DF-31, öffnet eine neue Zeichnung. | W | P3 | Lib-Neu | neu |
+| DF-30 | `.vss` importieren (binäre Schablone) | Alte Schablonen bis Visio 2010 in Master umwandeln. Das Binärformat (OLE-Verbunddatei mit komprimierten Datenblöcken) ist von Microsoft nicht als offene Spezifikation veröffentlicht; Umsetzung nur aus eigener Analyse, libvisio höchstens als Lesestoff. Entscheidung F4: erst nach allen XML-Formaten; ob es alte `.vss`-Testdateien gibt, ist noch offen. | Entscheidung | P2 | Lib-io | neu |
+| DF-31 | `.vsd` importieren (binäre Zeichnung) | Zeichnungen bis Visio 2010 öffnen, beim Speichern zu `.vsdx` werden. Gleiche Grundlage wie DF-30. | Entscheidung | P3 | Lib-io | neu |
+| DF-32 | `.vst` importieren (binäre Vorlage) | Wie DF-31, öffnet eine neue Zeichnung. | W | P3 | Lib-io | neu |
 | DF-33 | Binär schreiben | Nicht vorgesehen (Entscheidung „nur Import“); Speichern unter bietet `.vsd`/`.vss` nicht an. | Entscheidung | – | – | – |
 
 ### 1.4 Export („Speichern unter“ und „Exportieren“)
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| EX-01 | PDF | Vektor-PDF mit echtem Text (Schriften eingebettet), Optionen: alle Seiten/aktuelle Seite/Auswahl/Bereich, Hintergrundseiten ein/aus, Dokumenteigenschaften, Barrierefreiheits-Tags, Lesezeichen je Seite, Hyperlinks klickbar, PDF/A. | SbS 1, 12; TP | P1 | Lib-Neu+Lib-plat | teilweise |
-| EX-02 | XPS | Wie PDF im XPS-Format. | SbS 1, 12 | P3 | Lib-Neu | neu |
-| EX-03 | SVG | Seite als SVG: Geometrie als Pfade, Text als Text, Farben/Verläufe/Transparenz, optional Visio-Zusatzdaten (Shape-Daten) als Attribute. | SbS 12; W | P1 | Lib-Neu | neu |
-| EX-04 | PNG | Rastergrafik mit Ausgabeoptionen: Auflösung (Bildschirm/Drucker/Quelle/eigene DPI), Größe, Hintergrundfarbe oder transparent, Farbtiefe, Interlace; Bereich = Seite oder Auswahl. | SbS 12; W | P1 | Lib-Neu+Lib-img | teilweise |
-| EX-05 | JPEG | Wie PNG, dazu Qualität/Kompression, Hintergrundfarbe. | SbS 12; W | P2 | Lib-Neu+Lib-img | teilweise |
-| EX-06 | GIF, TIFF, BMP | Weitere Rasterformate mit denselben Optionen (TIFF: Kompression). | SbS 12; W | P3 | Lib-Neu+Lib-img | teilweise |
-| EX-07 | EMF (erweiterte Metadatei) | Vektor-Metadatei für Office-Programme; auch für Zwischenablage und Vorschaubild (DF-08). | SbS 12; W | P2 | Lib-Neu | neu |
-| EX-08 | WMF | Ältere Metadatei. | W | P3 | Lib-Neu | neu |
-| EX-09 | Webseite (HTML) | Zeichnung als Webseite mit allen Seiten, Seitenleiste zum Navigieren, Zoom, Shape-Daten-Anzeige beim Klick, Suche; Grafik als SVG (Fallback PNG); Shape-Links als klickbare Flächen, Seitenlinks nur, wenn beide Seiten exportiert werden; eigene HTML-Vorlage mit Platzhaltern. | SbS 12; UG Kap. 11, 25 | P2 | App+Lib-Neu | neu |
-| EX-10 | AutoCAD DWG/DXF | Seite als CAD-Zeichnung exportieren (DXF zuerst, DWG nur mit offener Spezifikation, offene Frage F5). | SbS 12 | P3 | Lib-Neu | neu |
-| EX-11 | Als Vorlage/Schablone speichern | Zeichnung als `.vstx`, Schablone als `.vssx` speichern. | SbS 12 | P1 | Lib-Neu+App | neu |
-| EX-12 | Shape-Bericht exportieren | Berichtsergebnis (Abschnitt 2.10) als CSV/Excel-Tabelle (`.xlsx`), HTML, XML oder als Tabellen-Shape in die Zeichnung. | SbS 7, 8; UG | P2 | App+Lib-Neu | neu |
+| EX-01 | PDF | Vektor-PDF mit echtem Text (Schriften eingebettet), Optionen: alle Seiten/aktuelle Seite/Auswahl/Bereich, Hintergrundseiten ein/aus, Dokumenteigenschaften, Barrierefreiheits-Tags, Lesezeichen je Seite, Hyperlinks klickbar, PDF/A. | SbS 1, 12; TP | P1 | Lib-io+Lib-plat | teilweise |
+| EX-02 | XPS | Wie PDF im XPS-Format. | SbS 1, 12 | P3 | Lib-io | neu |
+| EX-03 | SVG | Seite als SVG: Geometrie als Pfade, Text als Text, Farben/Verläufe/Transparenz, optional Visio-Zusatzdaten (Shape-Daten) als Attribute. | SbS 12; W | P1 | Lib-io | neu |
+| EX-04 | PNG | Rastergrafik mit Ausgabeoptionen: Auflösung (Bildschirm/Drucker/Quelle/eigene DPI), Größe, Hintergrundfarbe oder transparent, Farbtiefe, Interlace; Bereich = Seite oder Auswahl. | SbS 12; W | P1 | Lib-io+Lib-img | teilweise |
+| EX-05 | JPEG | Wie PNG, dazu Qualität/Kompression, Hintergrundfarbe. | SbS 12; W | P2 | Lib-io+Lib-img | teilweise |
+| EX-06 | GIF, TIFF, BMP | Weitere Rasterformate mit denselben Optionen (TIFF: Kompression). | SbS 12; W | P3 | Lib-io+Lib-img | teilweise |
+| EX-07 | EMF (erweiterte Metadatei) | Vektor-Metadatei für Office-Programme; auch für Zwischenablage und Vorschaubild (DF-08). | SbS 12; W | P2 | Lib-io | neu |
+| EX-08 | WMF | Ältere Metadatei. | W | P3 | Lib-io | neu |
+| EX-09 | Webseite (HTML) | Zeichnung als Webseite mit allen Seiten, Seitenleiste zum Navigieren, Zoom, Shape-Daten-Anzeige beim Klick, Suche; Grafik als SVG (Fallback PNG); Shape-Links als klickbare Flächen, Seitenlinks nur, wenn beide Seiten exportiert werden; eigene HTML-Vorlage mit Platzhaltern. | SbS 12; UG Kap. 11, 25 | P2 | App+Lib-io | neu |
+| EX-10 | DXF | Seite als CAD-Zeichnung im offenen DXF-Format exportieren; DWG entfällt (F5, NO-29). | SbS 12 | P3 | Lib-io | neu |
+| EX-11 | Als Vorlage/Schablone speichern | Zeichnung als `.vstx`, Schablone als `.vssx` speichern. | SbS 12 | P1 | Lib-io+App | neu |
+| EX-12 | Shape-Bericht exportieren | Berichtsergebnis (Abschnitt 2.10) als CSV/Excel-Tabelle (`.xlsx`), HTML, XML oder als Tabellen-Shape in die Zeichnung. | SbS 7, 8; UG | P2 | App+Lib-io | neu |
 | EX-13 | Organigramm-Daten exportieren | Personen und Hierarchie einer Organigramm-Zeichnung als CSV/Excel. | SbS 5; W | P3 | App | neu |
 | EX-14 | Kopieren in die Zwischenablage | Auswahl als eigenes Format (verlustfrei innerhalb JFDiagrammer und zwischen Fenstern), als EMF/SVG/PNG und als Text für andere Programme. | SbS 2; W | P1 | App+Lib-ui | teilweise |
 | EX-15 | Drucken | Siehe Abschnitt 3.15 (Seite einrichten, Kacheln, Vorschau). | SbS 12 | P1 | App+Lib-plat | teilweise |
@@ -173,14 +192,16 @@ Shape-Tabellen darunter nennen nur Name und Beschreibung.
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
 | IM-01 | Bilder einfügen | PNG, JPEG, GIF, BMP, TIFF, WebP als Bild-Shape (zuschneiden, Helligkeit/Kontrast, Transparenz). | SbS 3, 5, 12 | P1 | App+Lib-img | teilweise |
-| IM-02 | SVG einfügen | SVG als Bild-Shape; zusätzlich „In Shape konvertieren“: Pfade werden echte Geometrie mit Füllung/Linie, Gruppen bleiben Gruppen. | W | P2 | Lib-Neu+Lib-svg | teilweise |
-| IM-03 | EMF/WMF einfügen | Metadateien als Bild anzeigen, auf Wunsch in Shapes zerlegen. | W | P3 | Lib-Neu | neu |
-| IM-04 | CAD-Zeichnung einfügen | DXF (später DWG) als gesperrtes Hintergrund-Objekt mit Ebenen, Maßstab und Ausschnitt; optional in Shapes umwandeln. | W | P3 | Lib-Neu | neu |
-| IM-05 | Daten importieren | Excel (`.xlsx`), CSV, später ODBC/SQL als Datenquelle für Datenverknüpfung, Organigramm- und Datenvisualisierer-Assistent (Abschnitt 2.10 und 5). | SbS 5, 10 | P2 | App+Lib-Neu | neu |
+| IM-02 | SVG einfügen | SVG als Bild-Shape; zusätzlich „In Shape konvertieren“: Pfade werden echte Geometrie mit Füllung/Linie, Gruppen bleiben Gruppen. | W | P2 | Lib-io+Lib-svg | teilweise |
+| IM-03 | EMF/WMF einfügen | Metadateien als Bild anzeigen, auf Wunsch in Shapes zerlegen. | W | P3 | Lib-io | neu |
+| IM-04 | CAD-Zeichnung einfügen | DXF (DWG entfällt, F5) als gesperrtes Hintergrund-Objekt mit Ebenen, Maßstab und Ausschnitt; optional in Shapes umwandeln. | W | P3 | Lib-io | neu |
+| IM-05 | Daten importieren | CSV und Excel (`.xlsx`, Leser IM-10) in P2, ODBC/SQL erst in P3 (F6), als Datenquelle für Datenverknüpfung, Organigramm- und Datenvisualisierer-Assistent (Abschnitt 2.10 und 5). | SbS 5, 10 | P2 | App+Lib-io | neu |
 | IM-06 | Einfügen aus der Zwischenablage | Text (wird Textfeld-Shape), Bilder, SVG, eigene Shapes; „Inhalte einfügen“ mit Formatwahl. | SbS 2; W | P1 | App+Lib-ui | teilweise |
-| IM-07 | Fremde Diagrammformate (eigene Erweiterung) | draw.io (`.drawio`), GraphML (yEd), Mermaid- und PlantUML-Text, BPMN-2.0-XML (öffentlicher OMG-Standard) importieren und exportieren. Visio bietet das nicht; Vorschlag. | eigener Vorschlag | P3 | Lib-Neu | neu |
-| IM-08 | Verbundene Zeichnung aus CSV/Text | Textdatei mit Datensatzarten „Shape“ (ID, Master, Text, X, Y, Breite, Höhe, Eigenschaften) und „Link“ (ID, Master, Text, von, nach) erzeugt Shapes und Verbinder; Komma- oder Tab-getrennt, Text in Anführungszeichen (auch mehrzeilig), Kommentarzeilen. Einfacher Weg, Diagramme aus Skripten zu erzeugen. | UG Kap. 21 | P2 | Lib-Neu+App | neu |
-| IM-09 | Weitere Vektorformate | EPS, Adobe Illustrator, CGM als Bild einfügen und, wo möglich, in Shapes zerlegen. Alte Fremdformate (ABC FlowCharter, CorelFLOW, CorelDRAW, Micrografx, PICT, IGES, PCX, DWF) entfallen (NO-26). | UG Kap. 9 | P3 | Lib-Neu | neu |
+| IM-07 | Fremde Diagrammformate (eigene Erweiterung) | draw.io (`.drawio`), GraphML (yEd), Mermaid- und PlantUML-Text, BPMN-2.0-XML (öffentlicher OMG-Standard) importieren und exportieren. Visio bietet das nicht; Vorschlag. | eigener Vorschlag | P3 | Lib-io | neu |
+| IM-08 | Verbundene Zeichnung aus CSV/Text | Textdatei mit Datensatzarten „Shape“ (ID, Master, Text, X, Y, Breite, Höhe, Eigenschaften) und „Link“ (ID, Master, Text, von, nach) erzeugt Shapes und Verbinder; Komma- oder Tab-getrennt, Text in Anführungszeichen (auch mehrzeilig), Kommentarzeilen. Einfacher Weg, Diagramme aus Skripten zu erzeugen. | UG Kap. 21 | P2 | Lib-io+App | neu |
+| IM-09 | Weitere Vektorformate | EPS, Adobe Illustrator, CGM als Bild einfügen und, wo möglich, in Shapes zerlegen. Alte Fremdformate (ABC FlowCharter, CorelFLOW, CorelDRAW, Micrografx, PICT, IGES, PCX, DWF) entfallen (NO-26). | UG Kap. 9 | P3 | Lib-io | neu |
+| IM-10 | XLSX-Leser | Schlanker Leser für `.xlsx`-Arbeitsmappen: Blätter, benannte Bereiche, Zellwerte mit Typ, ohne Formelauswertung; als fremde Eingabe begrenzt. Grundlage für Datenverknüpfung, Organigramm-Assistent und Datenvisualisierer. | Entscheidung F6; SbS 5, 10 | P2 | Lib-xlsx | neu |
+| IM-11 | JFNetworker-Projekt importieren | Geräte, Kabel, Gruppen und Beschriftungen eines JFNetworker-Projekts als Netzwerkdiagramm mit den gemeinsamen Symbolen (SH-G09) übernehmen. | Entscheidung F9 | P3 | App | neu |
 
 ### 1.6 Befund aus den Beispieldateien
 
@@ -254,35 +275,35 @@ Zellen und Funktionen darunter.
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| DM-01 | Dokument als Ganzes | Enthält Seiten (Vorder- und Hintergrund), Master, Formatvorlagen, Schriftliste, Farbtabelle, Themes, Dokument-ShapeSheet, Ereignisliste, Datenverbindungen, Kommentare, Validierung, Fensterzustand, Eigenschaften. Neue Zeichnungen heißen „Zeichnung1“, „Zeichnung2“ … (Zähler pro Programmlauf). | SbS 1; Z2, Z3 | P1 | Lib-Neu | neu |
-| DM-02 | Rückgängig/Wiederholen | Jede Benutzeraktion ist **ein** Schritt, auch wenn sie viele Zellen ändert (z. B. Shape einfügen samt Verbinder-Teilung, Organigramm-Stil wechseln); beliebig tiefe Liste mit Namen der Aktion. | SbS 2, 5 | P1 | Lib-Neu+Lib-ui | teilweise |
-| DM-03 | Einstellungen im Dokument | Einrasten (an/aus, worauf: Raster, Lineal-Unterteilungen, Führungslinien, Shape-Ziehpunkte, Scheitelpunkte, Verbindungspunkte, Shape-Geometrie, Ausrichtungsrahmen, Schnittpunkte), Kleben (an Führungslinien, Shape-Ziehpunkte, Scheitelpunkte, Verbindungspunkte, Geometrie), Einrast-Stärke, dynamisches Raster, Einrastwinkel; Schutz von Formatvorlagen/Shapes/Mastern/Hintergründen. | Z2, Z3; SbS 2 | P1 | Lib-Neu | neu |
-| DM-04 | Standard-Formatvorlagen | Dokumentweite Vorgaben für Linie, Füllung, Text und Führungslinien (`DefaultLineStyle` …), Startseite (`TopPage`). | Z2, Z3 | P1 | Lib-Neu | neu |
-| DM-05 | Schriften und Farben | Schriftliste mit Panose/Zeichensätzen und Ersatzschrift, wenn eine Schrift fehlt; alte Farbtabelle (Index → RGB) für Formeln mit Farbindex. | Z2, Z3 | P1 | Lib-Neu+Lib-ui | teilweise |
-| DM-06 | Dateigröße verringern | Unbenutzte Master, Formatvorlagen, Themes und Datenquellen entfernen; Vorschau der Ersparnis. | SbS 1 | P2 | Lib-Neu+App | neu |
-| DM-07 | Persönliche Informationen entfernen | Autor/Manager/Firma, Markup und zwischengespeicherte Fremddaten aus dem Dokument löschen; optional Warnung, wenn sie später wieder hineinkommen. | SbS 12 | P2 | Lib-Neu+App | neu |
-| DM-08 | Kompatibilitätsprüfung | Liste der Inhalte, die ältere Formate (`.vdx`) oder ältere Visio-Versionen nicht darstellen; Kompatibilitätsmodus für importierte Binärdateien mit „Konvertieren“. | SbS 1 | P3 | Lib-Neu+App | neu |
+| DM-01 | Dokument als Ganzes | Enthält Seiten (Vorder- und Hintergrund), Master, Formatvorlagen, Schriftliste, Farbtabelle, Themes, Dokument-ShapeSheet, Ereignisliste, Datenverbindungen, Kommentare, Validierung, Fensterzustand, Eigenschaften. Neue Zeichnungen heißen „Zeichnung1“, „Zeichnung2“ … (Zähler pro Programmlauf). | SbS 1; Z2, Z3 | P1 | Lib-core | neu |
+| DM-02 | Rückgängig/Wiederholen | Jede Benutzeraktion ist **ein** Schritt, auch wenn sie viele Zellen ändert (z. B. Shape einfügen samt Verbinder-Teilung, Organigramm-Stil wechseln); beliebig tiefe Liste mit Namen der Aktion. | SbS 2, 5 | P1 | Lib-core+Lib-ui | teilweise |
+| DM-03 | Einstellungen im Dokument | Einrasten (an/aus, worauf: Raster, Lineal-Unterteilungen, Führungslinien, Shape-Ziehpunkte, Scheitelpunkte, Verbindungspunkte, Shape-Geometrie, Ausrichtungsrahmen, Schnittpunkte), Kleben (an Führungslinien, Shape-Ziehpunkte, Scheitelpunkte, Verbindungspunkte, Geometrie), Einrast-Stärke, dynamisches Raster, Einrastwinkel; Schutz von Formatvorlagen/Shapes/Mastern/Hintergründen. | Z2, Z3; SbS 2 | P1 | Lib-core | neu |
+| DM-04 | Standard-Formatvorlagen | Dokumentweite Vorgaben für Linie, Füllung, Text und Führungslinien (`DefaultLineStyle` …), Startseite (`TopPage`). | Z2, Z3 | P1 | Lib-core | neu |
+| DM-05 | Schriften und Farben | Schriftliste mit Panose/Zeichensätzen und Ersatzschrift, wenn eine Schrift fehlt; alte Farbtabelle (Index → RGB) für Formeln mit Farbindex. | Z2, Z3 | P1 | Lib-core+Lib-ui | teilweise |
+| DM-06 | Dateigröße verringern | Unbenutzte Master, Formatvorlagen, Themes und Datenquellen entfernen; Vorschau der Ersparnis. | SbS 1 | P2 | Lib-core+App | neu |
+| DM-07 | Persönliche Informationen entfernen | Autor/Manager/Firma, Markup und zwischengespeicherte Fremddaten aus dem Dokument löschen; optional Warnung, wenn sie später wieder hineinkommen. | SbS 12 | P2 | Lib-core+App | neu |
+| DM-08 | Kompatibilitätsprüfung | Liste der Inhalte, die ältere Formate (`.vdx`) oder ältere Visio-Versionen nicht darstellen; Kompatibilitätsmodus für importierte Binärdateien mit „Konvertieren“. | SbS 1 | P3 | Lib-core+Lib-io+App | neu |
 | DM-09 | Schreibgeschützt öffnen | Datei nur lesen; Speichern führt zu „Speichern unter“. | SbS 1 | P1 | App | neu |
 | DM-10 | Automatisch wiederherstellen | Regelmäßige Sicherung offener Zeichnungen, Wiederherstellen nach Absturz. | SbS 1 | P2 | App+Lib-plat | teilweise |
-| DM-11 | Dokumentschutz | Formatvorlagen, Shapes, Master und Hintergründe gegen Änderung schützen (Dialog „Dokument schützen“, optional mit Kennwort); die Auswahlsperre einzelner Shapes wirkt erst, wenn zusätzlich „Shapes“ geschützt ist. | Z2, Z3; UG Kap. 19 | P2 | Lib-Neu+App | neu |
+| DM-11 | Dokumentschutz | Formatvorlagen, Shapes, Master und Hintergründe gegen Änderung schützen (Dialog „Dokument schützen“, optional mit Kennwort); die Auswahlsperre einzelner Shapes wirkt erst, wenn zusätzlich „Shapes“ geschützt ist. | Z2, Z3; UG Kap. 19 | P2 | Lib-core+App | neu |
 
 ### 2.2 Seiten
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| PG-01 | Vordergrundseiten | Geordnete Liste von Zeichenblättern mit Name (lokalisiert + universell), eigener Größe, Ausrichtung, Maßeinheit und eigenem Design; gemischte Hoch-/Querformate in einer Datei. | SbS 3; Z3 | P1 | Lib-Neu | neu |
-| PG-02 | Hintergrundseiten | Seiten, deren Inhalt hinter zugewiesenen Seiten erscheint, dort aber nicht auswählbar ist; Ketten (Hintergrund eines Hintergrunds); je Seite genau ein direkter Hintergrund; automatisch erzeugte heißen „VHintergrund-n“, manuelle „Hintergrund-n“. | SbS 3 | P1 | Lib-Neu | neu |
-| PG-03 | Seiten verwalten | Einfügen (nach der aktuellen oder am Ende, erbt Eigenschaften der aktiven Seite), Duplizieren (Inhalt + Eigenschaften), Umbenennen, Löschen, Neu anordnen (Ziehen der Register oder Dialog), Seitenzählung. | SbS 3; A 184030 | P1 | Lib-Neu+App | neu |
-| PG-04 | Zeichenblattgröße | Wie Druckerpapier, vordefinierte Formate (ISO A/B/C, US Letter/Legal/Tabloid, ANSI/ARCH), eigene Größe, „an Zeichnungsinhalt anpassen“; Ausrichtung unabhängig vom Papier. | SbS 3; Z2, Z3 | P1 | Lib-Neu | neu |
-| PG-05 | Automatische Größe | Seite wächst kachelweise, wenn Shapes über den Rand gezogen werden, und schrumpft wieder, wenn der Platz leer wird; pro Seite schaltbar; ohne sie bleiben Shapes auf der Zeichenfläche außerhalb der Seite (nicht gedruckt). | SbS 3; Z2, Z3 | P1 | Lib-Neu+Lib-ui | neu |
-| PG-06 | Zeichnungsmaßstab | Keiner (1:1), vordefiniert in den Gruppen Architektur, Bauingenieur, Metrisch (z. B. 1:1000 bis 50:1), Maschinenbau, oder eigener Maßstab „Seitenmaß = Zeichnungsmaß“; Lineale und Maße zeigen Zeichnungseinheiten, Shapes mit Maßstabsbezug behalten reale Größen; je Seite eigener Maßstab, Hintergrundseiten werden separat eingestellt. | SbS 7; Z2, Z3; UG Kap. 18 | P1 | Lib-Neu | neu |
-| PG-07 | Maßeinheiten | Rund 20 Einheiten je Seite (mm, cm, m, km, Zoll, Fuß, Yard, Meile, Punkt, Pica, Cicero, Didot, Tage, Wochen …); Eingaben mit Einheit werden umgerechnet. | SbS 2, 3; Z3 | P1 | Lib-Neu | neu |
-| PG-08 | Seitenfarbe und -schatten | Hintergrundfarbe der Seite (über Theme/Hintergrund) und optionaler Seitenschatten in der Ansicht. | Z2, Z3 | P2 | Lib-Neu+Lib-ui | neu |
+| PG-01 | Vordergrundseiten | Geordnete Liste von Zeichenblättern mit Name (lokalisiert + universell), eigener Größe, Ausrichtung, Maßeinheit und eigenem Design; gemischte Hoch-/Querformate in einer Datei. | SbS 3; Z3 | P1 | Lib-core | neu |
+| PG-02 | Hintergrundseiten | Seiten, deren Inhalt hinter zugewiesenen Seiten erscheint, dort aber nicht auswählbar ist; Ketten (Hintergrund eines Hintergrunds); je Seite genau ein direkter Hintergrund; automatisch erzeugte heißen „VHintergrund-n“, manuelle „Hintergrund-n“. | SbS 3 | P1 | Lib-core | neu |
+| PG-03 | Seiten verwalten | Einfügen (nach der aktuellen oder am Ende, erbt Eigenschaften der aktiven Seite), Duplizieren (Inhalt + Eigenschaften), Umbenennen, Löschen, Neu anordnen (Ziehen der Register oder Dialog), Seitenzählung. | SbS 3; A 184030 | P1 | Lib-core+App | neu |
+| PG-04 | Seitengröße | Wie Druckerpapier, vordefinierte Formate (ISO A/B/C, US Letter/Legal/Tabloid, ANSI/ARCH), eigene Größe, „an Zeichnungsinhalt anpassen“; Ausrichtung unabhängig vom Papier. | SbS 3; Z2, Z3 | P1 | Lib-core | neu |
+| PG-05 | Automatische Größe | Seite wächst kachelweise, wenn Shapes über den Rand gezogen werden, und schrumpft wieder, wenn der Platz leer wird; pro Seite schaltbar; ohne sie bleiben Shapes auf der Zeichenfläche außerhalb der Seite (nicht gedruckt). | SbS 3; Z2, Z3 | P1 | Lib-core+Lib-ui | neu |
+| PG-06 | Zeichnungsmaßstab | Keiner (1:1), vordefiniert in den Gruppen Architektur, Bauingenieur, Metrisch (z. B. 1:1000 bis 50:1), Maschinenbau, oder eigener Maßstab „Seitenmaß = Zeichnungsmaß“; Lineale und Maße zeigen Zeichnungseinheiten, Shapes mit Maßstabsbezug behalten reale Größen; je Seite eigener Maßstab, Hintergrundseiten werden separat eingestellt. | SbS 7; Z2, Z3; UG Kap. 18 | P1 | Lib-core | neu |
+| PG-07 | Maßeinheiten | Rund 20 Einheiten je Seite (mm, cm, m, km, Zoll, Fuß, Yard, Meile, Punkt, Pica, Cicero, Didot, Tage, Wochen …); Eingaben mit Einheit werden umgerechnet. | SbS 2, 3; Z3 | P1 | Lib-core | neu |
+| PG-08 | Seitenfarbe und -schatten | Hintergrundfarbe der Seite (über Theme/Hintergrund) und optionaler Seitenschatten in der Ansicht. | Z2, Z3 | P2 | Lib-core+Lib-ui | neu |
 | PG-09 | Hintergründe (Galerie) | Fertige Hintergrundmotive als Hintergrundseite anlegen und zuweisen; „Kein“ entfernt. **Motive neu gestalten** (Visios Motive sind geschützt). | SbS 3 | P2 | App | neu |
 | PG-10 | Rahmen und Titel (Galerie) | Seitenrahmen mit Titelblock, Seitenzahl, Datum als Hintergrundseite; kombinierbar mit Hintergrund. **Neu gestalten.** | SbS 3 | P2 | App | neu |
-| PG-11 | Seiten-Layout und Routing | Je Seite: Platzierungsstil (Flussdiagramm, Baum, radial, kreisförmig …), Richtung, Verbinder-Routing-Stil, Linienübergänge (Art, Größe, welche Linien springen), Abstände; bildet den Dialogteil „Layout und Routing“ ab. | SbS 3; Z2, Z3 | P1 | Lib-Neu | neu |
-| PG-12 | Seiten-Shape-Daten und -Zellen | Seiten haben eigene Shape-Daten, User-Zellen, Hyperlinks und Aktionen (z. B. für Titelblöcke). | SbS 8; Z2, Z3 | P2 | Lib-Neu | neu |
-| PG-13 | Seiten-Ansichtszustand | Zoom und Mittelpunkt je Seite merken (`ViewScale`, `ViewCenterX/Y`). | Z2, Z3 | P2 | Lib-Neu+App | neu |
+| PG-11 | Seiten-Layout und Routing | Je Seite: Platzierungsstil (Flussdiagramm, Baum, radial, kreisförmig …), Richtung, Verbinder-Routing-Stil, Linienübergänge (Art, Größe, welche Linien springen), Abstände; bildet den Dialogteil „Layout und Routing“ ab. | SbS 3; Z2, Z3 | P1 | Lib-core | neu |
+| PG-12 | Seiten-Shape-Daten und -Zellen | Seiten haben eigene Shape-Daten, User-Zellen, Hyperlinks und Aktionen (z. B. für Titelblöcke). | SbS 8; Z2, Z3 | P2 | Lib-core | neu |
+| PG-13 | Seiten-Ansichtszustand | Zoom und Mittelpunkt je Seite merken (`ViewScale`, `ViewCenterX/Y`). | Z2, Z3 | P2 | Lib-core+App | neu |
 | PG-14 | Seitengröße am Rand ziehen | Mit Strg an einer Seitenkante ziehen ändert die Größe nur dieser Seite; Shapes behalten ihre Linealkoordinaten. | UG Kap. 3 | P2 | App+Lib-ui | neu |
 | PG-15 | Seitenansicht drehen | Ansicht der Seite um den Linealnullpunkt drehen (nur Ansicht, nicht Druck), z. B. um an einer schrägen Führungslinie zu arbeiten; „waagerecht/senkrecht ansehen“ an einer Führungslinie; standardmäßig aus. | UG Kap. 3 | P3 | App+Lib-ui | neu |
 
@@ -290,61 +311,61 @@ Zellen und Funktionen darunter.
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| LY-01 | Ebenen je Seite | Benannte Eigenschaftsgruppen (keine Stapelreihenfolge); ein Shape auf keiner, einer oder mehreren Ebenen; gleiche Namen auf verschiedenen Seiten sind getrennt. | SbS 3; Z2, Z3 | P1 | Lib-Neu | neu |
-| LY-02 | Ebeneneigenschaften | Sichtbar, Drucken, Aktiv (neue Shapes landen dort), Sperren (nicht wähl- oder änderbar), Einrasten, Kleben, Farbe + Transparenz (überschreibt die Farbe aller Mitglieder), Anzahl Shapes. | SbS 3; Z2, Z3 | P1 | Lib-Neu+App | neu |
-| LY-03 | Zuordnen und Automatik | „Ebene zuweisen“-Dialog mit Mehrfachwahl; Master bringen ihre Ebene mit (z. B. „Verbinder“, „Container“, „Geräte“) und legen sie beim Ablegen an; Kopieren auf andere Seite legt fehlende Ebenen an. | SbS 3; Z3 | P1 | Lib-Neu+App | neu |
-| LY-04 | Ebene löschen | Löscht ihre Shapes, außer solche, die noch auf einer anderen Ebene liegen (vorher warnen). Ebenen werden nicht an andere Seiten vererbt; Einrast- und Klebesperren wirken nur in eine Richtung (auf Shapes der Ebene). | SbS 3; UG Kap. 15 | P1 | Lib-Neu+App | neu |
+| LY-01 | Ebenen je Seite | Benannte Eigenschaftsgruppen (keine Stapelreihenfolge); ein Shape auf keiner, einer oder mehreren Ebenen; gleiche Namen auf verschiedenen Seiten sind getrennt. | SbS 3; Z2, Z3 | P1 | Lib-core | neu |
+| LY-02 | Ebeneneigenschaften | Sichtbar, Drucken, Aktiv (neue Shapes landen dort), Sperren (nicht wähl- oder änderbar), Einrasten, Kleben, Farbe + Transparenz (überschreibt die Farbe aller Mitglieder), Anzahl Shapes. | SbS 3; Z2, Z3 | P1 | Lib-core+App | neu |
+| LY-03 | Zuordnen und Automatik | „Ebene zuweisen“-Dialog mit Mehrfachwahl; Master bringen ihre Ebene mit (z. B. „Verbinder“, „Container“, „Geräte“) und legen sie beim Ablegen an; Kopieren auf andere Seite legt fehlende Ebenen an. | SbS 3; Z3 | P1 | Lib-core+App | neu |
+| LY-04 | Ebene löschen | Löscht ihre Shapes, außer solche, die noch auf einer anderen Ebene liegen (vorher warnen). Ebenen werden nicht an andere Seiten vererbt; Einrast- und Klebesperren wirken nur in eine Richtung (auf Shapes der Ebene). | SbS 3; UG Kap. 15 | P1 | Lib-core+App | neu |
 | LY-05 | Nach Ebene auswählen | Alle Shapes einer oder mehrerer Ebenen auswählen, auch „keine Ebene“. | SbS 3; UG Kap. 15 | P2 | App | neu |
 
 ### 2.4 Master, Schablonen und Formatvorlagen
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| MS-01 | Master | Vorlage-Shape in Schablone oder Dokument: Name (lokal + universell), eindeutige ID und Basis-ID (GUID), Symbolbild, QuickInfo (Prompt), Symbolgröße, Ausrichtung des Namens, „Abgleich über Namen“, verborgen, Typ; Inhalt = eigene Seite mit Shapes. | Fav, Z2, Z3; SbS 1 | P1 | Lib-Neu | neu |
-| MS-02 | Instanzen und Vererbung | Ein abgelegtes Shape verweist auf den Dokument-Master und speichert nur Abweichungen; Ablegen desselben Masters wird über die eindeutige ID mit einer vorhandenen Dokument-Kopie abgeglichen; Master im Dokument bearbeiten wirkt auf alle Instanzen. | Z2, Z3; SbS A | P1 | Lib-Neu | neu |
-| MS-03 | Master-Verknüpfungen | Schablonen-Einträge, die auf Master anderer Schablonen zeigen, optional mit Ablege-Aktionen (Zellen beim Ablegen setzen). | MS-VSDX | P3 | Lib-Neu | neu |
-| MS-04 | Schnell-Shapes | Pro Schablone ein oberer Bereich (durch Linie getrennt) mit den Shapes, die AutoVerbinden und die Schnell-Shapes-Leiste anbieten; Reihenfolge per Ziehen. | SbS 2 | P1 | Lib-Neu+App | neu |
+| MS-01 | Master | Vorlage-Shape in Schablone oder Dokument: Name (lokal + universell), eindeutige ID und Basis-ID (GUID), Symbolbild, QuickInfo (Prompt), Symbolgröße, Ausrichtung des Namens, „Abgleich über Namen“, verborgen, Typ; Inhalt = eigene Seite mit Shapes. | Fav, Z2, Z3; SbS 1 | P1 | Lib-core | neu |
+| MS-02 | Instanzen und Vererbung | Ein abgelegtes Shape verweist auf den Dokument-Master und speichert nur Abweichungen; Ablegen desselben Masters wird über die eindeutige ID mit einer vorhandenen Dokument-Kopie abgeglichen; Master im Dokument bearbeiten wirkt auf alle Instanzen. | Z2, Z3; SbS A | P1 | Lib-core | neu |
+| MS-03 | Master-Verknüpfungen | Schablonen-Einträge, die auf Master anderer Schablonen zeigen, optional mit Ablege-Aktionen (Zellen beim Ablegen setzen). | MS-VSDX | P3 | Lib-core | neu |
+| MS-04 | Schnell-Shapes | Pro Schablone ein oberer Bereich (durch Linie getrennt) mit den Shapes, die AutoVerbinden und die Schnell-Shapes-Leiste anbieten; Reihenfolge per Ziehen. | SbS 2 | P1 | Lib-core+App | neu |
 | MS-05 | Dokumentschablone | Alle Master eines Dokuments als eigene Schablone anzeigen („Dokumentschablone“), dort bearbeiten, löschen, umbenennen. | W | P2 | App | neu |
-| MS-06 | Eigene Schablonen | Neue Schablone anlegen, Shapes hineinziehen (Master entsteht), Master bearbeiten (Symbol, Name, Eigenschaften), speichern; „Favoriten“ und „Meine Shapes“ als feste Orte. | Fav; SbS A; S 1104-132533 | P1 | App+Lib-Neu | neu |
+| MS-06 | Eigene Schablonen | Neue Schablone anlegen, Shapes hineinziehen (Master entsteht), Master bearbeiten (Symbol, Name, Eigenschaften), speichern; „Favoriten“ und „Meine Shapes“ als feste Orte. | Fav; SbS A; S 1104-132533 | P1 | App+Lib-io | neu |
 | MS-07 | Metrische und US-Varianten | Jede mitgelieferte Schablone/Vorlage in metrischer (A4, mm) und US-Fassung (Letter, Zoll); Wahl beim Erstellen. | SbS 1 | P2 | App | neu |
-| MS-09 | Master-Eigenschaften | Name, QuickInfo, Ausrichtung und Größe des Symbols, Symbol automatisch oder manuell aktualisieren, Mastertyp (Shape, Linienmuster, Linienende, Füllmuster), Musterverhalten, „beim Ablegen über Namen abgleichen“. | UG Kap. 5 | P1 | App+Lib-Neu | neu |
-| MS-10 | Instanz und Master im Detail | Ändert man eine Eigenschaft an einer Instanz, folgt nur diese Eigenschaft nicht mehr dem Master; alle anderen schon. Weicht der Maßstab eines Masters um mehr als Faktor 8 vom Seitenmaßstab ab, wird die Instanz beim Ablegen umgerechnet. | UG Kap. 5, 18 | P1 | Lib-Neu | neu |
-| MS-11 | Muster als Master | Eigene Linienmuster (entlang der Linie biegen, kacheln, strecken, Originallinie zeigen), Linienenden (an der Linie oder aufrecht ausgerichtet) und Füllmuster (kacheln, zentriert, gestreckt) als Master in Schablonen; skaliert mit dem Maßstab oder fest; Farbe vom Shape oder eigene. Erscheinen in den Linien- und Füll-Listen. | UG Kap. 5; Z2, Z3 | P2 | Lib-Neu+App | neu |
+| MS-09 | Master-Eigenschaften | Name, QuickInfo, Ausrichtung und Größe des Symbols, Symbol automatisch oder manuell aktualisieren, Mastertyp (Shape, Linienmuster, Linienende, Füllmuster), Musterverhalten, „beim Ablegen über Namen abgleichen“. | UG Kap. 5 | P1 | App+Lib-core | neu |
+| MS-10 | Instanz und Master im Detail | Ändert man eine Eigenschaft an einer Instanz, folgt nur diese Eigenschaft nicht mehr dem Master; alle anderen schon. Weicht der Maßstab eines Masters um mehr als Faktor 8 vom Seitenmaßstab ab, wird die Instanz beim Ablegen umgerechnet. | UG Kap. 5, 18 | P1 | Lib-core | neu |
+| MS-11 | Muster als Master | Eigene Linienmuster (entlang der Linie biegen, kacheln, strecken, Originallinie zeigen), Linienenden (an der Linie oder aufrecht ausgerichtet) und Füllmuster (kacheln, zentriert, gestreckt) als Master in Schablonen; skaliert mit dem Maßstab oder fest; Farbe vom Shape oder eigene. Erscheinen in den Linien- und Füll-Listen. | UG Kap. 5; Z2, Z3 | P2 | Lib-core+App | neu |
 | MS-12 | Shape-Hilfe | Je Master und je Vorlage ein Hilfetext (Kontextmenü „Hilfe zu diesem Shape“). | UG Kap. 1 | P3 | App | neu |
-| MS-08 | Formatvorlagen (StyleSheets) | Benannte Linien-/Füll-/Text-Vorlagen mit Vererbung untereinander; Standardsatz „Kein Stil“, „Normal“, „Keine“, „Nur Text“, „Führungslinie“, „Theme“, „Verbinder“; Definieren mit „basiert auf“, „enthält Text/Linie/Füllung“, „lokale Formatierung beibehalten“; Zuweisen mit Rückfrage, ob alle Teile oder nur einer gelten; „Format des Masters verwenden“ setzt zurück; beim Einfügen gewinnt eine gleichnamige Vorlage im Ziel. | Z2, Z3; UG Kap. 14 | P2 | Lib-Neu+App | neu |
+| MS-08 | Formatvorlagen (StyleSheets) | Benannte Linien-/Füll-/Text-Vorlagen mit Vererbung untereinander; Standardsatz „Kein Stil“, „Normal“, „Keine“, „Nur Text“, „Führungslinie“, „Theme“, „Verbinder“; Definieren mit „basiert auf“, „enthält Text/Linie/Füllung“, „lokale Formatierung beibehalten“; Zuweisen mit Rückfrage, ob alle Teile oder nur einer gelten; „Format des Masters verwenden“ setzt zurück; beim Einfügen gewinnt eine gleichnamige Vorlage im Ziel. | Z2, Z3; UG Kap. 14 | P2 | Lib-core+App | neu |
 
 ### 2.5 Shapes, Geometrie und Gruppen
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| SP-01 | Shape-Arten | 2D-Shapes (Fläche mit Rand), 1D-Shapes (Anfang/Ende, auch wenn sie flächig aussehen wie Rack-Geräte), Gruppen, Fremdobjekte (Bilder, Metadateien, OLE), Führungslinien und Führungspunkte; jedes Shape hat ID, Namen „Blatt.n“ bzw. „<Master>.n“ und frei wählbaren Namen. | SbS 2, 7, 11; Z2, Z3 | P1 | Lib-Neu | neu |
-| SP-02 | Geometrie darstellen | Pfade aus Linien, Kreisbögen, elliptischen Bögen, Ellipsen, NURBS, Polylinien, Splines und relativen Bezierkurven; mehrere Geometrieabschnitte je Shape mit eigener Füll-/Linien-/Sichtbarkeitssteuerung (Grundlage für „intelligente“ Shapes, die Teile ein- und ausblenden). | Z2, Z3; SbS 1, 4 | P1 | Lib-Neu+Lib-ui | teilweise |
-| SP-03 | Transformation | Verschieben, Größe ändern (Kanten- und Eckgriffe, Eckgriffe proportional), Drehen um den Drehpunkt (frei, 15°-Raster nahe am Griff, feiner weiter weg), Spiegeln horizontal/vertikal, Drehpunkt verlegen; gesperrte Eigenschaften zeigen gesperrte Griffe. | SbS 2, 3 | P1 | Lib-Neu+Lib-ui | teilweise |
-| SP-04 | Steuerpunkte | Gelbe Griffe, die der Shape-Designer an Zellen bindet (Pfeilspitzenbreite, Textposition, Ecken, Kabelanschlüsse); können wie Verbinderenden an anderen Shapes kleben (Ethernet-Bus, Legendenschwanz). | SbS 2, 7; Z2, Z3 | P1 | Lib-Neu+Lib-ui | neu |
-| SP-05 | Scheitelpunkte bearbeiten | Mit Stift- oder Linienwerkzeug Scheitelpunkte und Kontrollpunkte verschieben, mit Strg+Klick auf den Umriss hinzufügen, mit Entf löschen, mehrere mit Umschalt gemeinsam ziehen; Bögen über Kontroll- und Exzentrizitätsgriffe umformen; ein Segment beim Zeichnen durch Zurückziehen zurücknehmen; geschlossene Linienzüge werden gefüllte 2D-Shapes. | SbS 2; UG Kap. 4, 24 | P1/P2 | Lib-Neu+Lib-ui | neu |
-| SP-06 | Gruppen | Gruppieren/Gruppierung aufheben (mit Warnung bei formelgebundenen Gruppen-Shapes), verschachtelte Gruppen, Unterauswahl per zweitem Klick, Gruppe hat eigenen Text/Daten/Geometrie, Größenänderung skaliert oder verschiebt Kinder (ResizeMode), Ablegen in Gruppe, Gruppe zuerst oder Kinder zuerst auswählen. | SbS 3; Z2, Z3 | P1 | Lib-Neu+Lib-ui | teilweise |
-| SP-07 | Stapelreihenfolge | Jedes neue Shape liegt oben; In den Vordergrund/Hintergrund, Eine Ebene nach vorne/hinten. | SbS 6 | P1 | Lib-Neu+Lib-ui | teilweise |
-| SP-08 | Shape-Operationen | Vereinigen, Kombinieren, Fragmentieren, Schneiden (Schnittmenge), Subtrahieren, Verbinden, Trimmen, Versatz, Kurve anpassen (Polygon → Spline durch die Punkte), benutzerdefiniertes Anpassen (Toleranz, Kreisbögen, Spitzen erhalten; vereinfacht importierte Grafiken): aus mehreren Shapes neue Geometrie berechnen. | UG Kap. 24; A 183847 | P2 | Lib-Neu | neu |
-| SP-09 | Bilder als Shapes | Eingefügte Bilder sind Shapes: zuschneiden (Bild im Rahmen verschieben), drehen, Helligkeit, Kontrast, Gamma, Transparenz; SVG-Bilder als Vektor. | SbS 3, 5, 12; Z2 | P1 | Lib-Neu+Lib-img | teilweise |
-| SP-10 | Führungslinien und -punkte | Aus dem Lineal ziehen (Führungspunkt aus der Linealecke); Shapes kleben mit Kante, Mitte, Griff oder Endpunkt daran und wandern beim Verschieben mit; nicht gedruckt; drehbar (Kleber bricht, wenn man nach dem Kleben dreht); per „Größe und Position“ genau setzen; Ausrichten/Verteilen kann Führungslinien anlegen und die Shapes ankleben; gleichabständig per Strg-Ziehen und Wiederholen. | SbS 2; UG Kap. 4, 17 | P1 | Lib-Neu+Lib-ui | neu |
-| SP-11 | Shape ändern (ersetzen) | Ausgewählte Shapes durch einen anderen Master ersetzen und dabei Text, Shape-Daten, Format, Kommentare, Klebungen und die meisten Anpassungen übernehmen (gesteuert durch die Ersetzen-Zellen); mehrere auf einmal. | SbS 3; Z2, Z3 | P2 | Lib-Neu+App | neu |
-| SP-12 | Intelligente Shapes | Verhalten aus Formeln: Teile erscheinen beim Vergrößern (Konferenztisch mit Stühlen), Typ per Kontextmenü umschalten (BPMN-Ereignis/-Aufgabe), Höhe in Rack-Einheiten, Text hält 45°-Schritte. Kein Sondercode je Shape – alles über ShapeSheet. | SbS 1, 3, 4, 7 | P1 | Lib-Neu | neu |
+| SP-01 | Shape-Arten | 2D-Shapes (Fläche mit Rand), 1D-Shapes (Anfang/Ende, auch wenn sie flächig aussehen wie Rack-Geräte), Gruppen, Fremdobjekte (Bilder, Metadateien, OLE), Führungslinien und Führungspunkte; jedes Shape hat ID, Namen „Blatt.n“ bzw. „<Master>.n“ und frei wählbaren Namen. | SbS 2, 7, 11; Z2, Z3 | P1 | Lib-core | neu |
+| SP-02 | Geometrie darstellen | Pfade aus Linien, Kreisbögen, elliptischen Bögen, Ellipsen, NURBS, Polylinien, Splines und relativen Bezierkurven; mehrere Geometrieabschnitte je Shape mit eigener Füll-/Linien-/Sichtbarkeitssteuerung (Grundlage für „intelligente“ Shapes, die Teile ein- und ausblenden). | Z2, Z3; SbS 1, 4 | P1 | Lib-core+Lib-ui | teilweise |
+| SP-03 | Transformation | Verschieben, Größe ändern (Kanten- und Eckgriffe, Eckgriffe proportional), Drehen um den Drehpunkt (frei, 15°-Raster nahe am Griff, feiner weiter weg), Spiegeln horizontal/vertikal, Drehpunkt verlegen; gesperrte Eigenschaften zeigen gesperrte Griffe. | SbS 2, 3 | P1 | Lib-core+Lib-ui | teilweise |
+| SP-04 | Steuerpunkte | Gelbe Griffe, die der Shape-Designer an Zellen bindet (Pfeilspitzenbreite, Textposition, Ecken, Kabelanschlüsse); können wie Verbinderenden an anderen Shapes kleben (Ethernet-Bus, Legendenschwanz). | SbS 2, 7; Z2, Z3 | P1 | Lib-core+Lib-ui | neu |
+| SP-05 | Scheitelpunkte bearbeiten | Mit Stift- oder Linienwerkzeug Scheitelpunkte und Kontrollpunkte verschieben, mit Strg+Klick auf den Umriss hinzufügen, mit Entf löschen, mehrere mit Umschalt gemeinsam ziehen; Bögen über Kontroll- und Exzentrizitätsgriffe umformen; ein Segment beim Zeichnen durch Zurückziehen zurücknehmen; geschlossene Linienzüge werden gefüllte 2D-Shapes. | SbS 2; UG Kap. 4, 24 | P1/P2 | Lib-core+Lib-ui | neu |
+| SP-06 | Gruppen | Gruppieren/Gruppierung aufheben (mit Warnung bei formelgebundenen Gruppen-Shapes), verschachtelte Gruppen, Unterauswahl per zweitem Klick, Gruppe hat eigenen Text/Daten/Geometrie, Größenänderung skaliert oder verschiebt Kinder (ResizeMode), Ablegen in Gruppe, Gruppe zuerst oder Kinder zuerst auswählen. | SbS 3; Z2, Z3 | P1 | Lib-core+Lib-ui | teilweise |
+| SP-07 | Stapelreihenfolge | Jedes neue Shape liegt oben; In den Vordergrund/Hintergrund, Eine Ebene nach vorne/hinten. | SbS 6 | P1 | Lib-core+Lib-ui | teilweise |
+| SP-08 | Shape-Operationen | Vereinigen, Kombinieren, Fragmentieren, Schneiden (Schnittmenge), Subtrahieren, Verbinden, Trimmen, Versatz, Kurve anpassen (Polygon → Spline durch die Punkte), benutzerdefiniertes Anpassen (Toleranz, Kreisbögen, Spitzen erhalten; vereinfacht importierte Grafiken): aus mehreren Shapes neue Geometrie berechnen. | UG Kap. 24; A 183847 | P2 | Lib-core | neu |
+| SP-09 | Bilder als Shapes | Eingefügte Bilder sind Shapes: zuschneiden (Bild im Rahmen verschieben), drehen, Helligkeit, Kontrast, Gamma, Transparenz; SVG-Bilder als Vektor. | SbS 3, 5, 12; Z2 | P1 | Lib-core+Lib-img | teilweise |
+| SP-10 | Führungslinien und -punkte | Aus dem Lineal ziehen (Führungspunkt aus der Linealecke); Shapes kleben mit Kante, Mitte, Griff oder Endpunkt daran und wandern beim Verschieben mit; nicht gedruckt; drehbar (Kleber bricht, wenn man nach dem Kleben dreht); per „Größe und Position“ genau setzen; Ausrichten/Verteilen kann Führungslinien anlegen und die Shapes ankleben; gleichabständig per Strg-Ziehen und Wiederholen. | SbS 2; UG Kap. 4, 17 | P1 | Lib-core+Lib-ui | neu |
+| SP-11 | Shape ändern (ersetzen) | Ausgewählte Shapes durch einen anderen Master ersetzen und dabei Text, Shape-Daten, Format, Kommentare, Klebungen und die meisten Anpassungen übernehmen (gesteuert durch die Ersetzen-Zellen); mehrere auf einmal. | SbS 3; Z2, Z3 | P2 | Lib-core+App | neu |
+| SP-12 | Intelligente Shapes | Verhalten aus Formeln: Teile erscheinen beim Vergrößern (Konferenztisch mit Stühlen), Typ per Kontextmenü umschalten (BPMN-Ereignis/-Aufgabe), Höhe in Rack-Einheiten, Text hält 45°-Schritte. Kein Sondercode je Shape – alles über ShapeSheet. | SbS 1, 3, 4, 7 | P1 | Lib-core | neu |
 | SP-13 | Shape-Daten beim Ablegen abfragen | Felder mit „beim Ablegen fragen“ öffnen nach dem Ablegen/Duplizieren einen Eingabedialog. | SbS 8 | P2 | App | neu |
 | SP-14 | Verschieben ohne Raster und Feinschritte | Pfeiltasten verschieben um Rasterschritte, mit Umschalt um ein Pixel/feine Schritte; Alt beim Ziehen hebt Einrasten auf. | SbS B | P1 | Lib-ui | vorhanden |
 | SP-15 | Gruppe öffnen | Eigenes Fenster zum Bearbeiten der Mitglieder einer Gruppe; Shapes aus Seite oder Schablone lassen sich hineinziehen; wahlweise Doppelklick-Aktion. | UG Kap. 4, 7 | P2 | App | neu |
-| SP-16 | Ausrichtungsrahmen aktualisieren | Rahmen einer Gruppe nach Änderungen im Inneren neu berechnen. | UG Kap. 4 | P2 | Lib-Neu | neu |
-| SP-17 | Grenzfälle Gruppen | Führungslinie und angeklebte Shapes nur gemeinsam gruppieren; Bitmaps drehen bei Gruppendrehung nicht mit; importierte Metadateien erst in Gruppe umwandeln (In Gruppe umwandeln). | UG Kap. 4, 9 | P2 | Lib-Neu | neu |
+| SP-16 | Ausrichtungsrahmen aktualisieren | Rahmen einer Gruppe nach Änderungen im Inneren neu berechnen. | UG Kap. 4 | P2 | Lib-core | neu |
+| SP-17 | Grenzfälle Gruppen | Führungslinie und angeklebte Shapes nur gemeinsam gruppieren; Bitmaps drehen bei Gruppendrehung nicht mit; importierte Metadateien erst in Gruppe umwandeln (In Gruppe umwandeln). | UG Kap. 4, 9 | P2 | Lib-core | neu |
 
 ### 2.6 Format: Linie, Füllung, Schatten, Effekte
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| FM-01 | Linie | Farbe + Transparenz, Stärke, Strichmuster (rund 24 Muster + eigene), Abschluss (rund/eckig/flach), Ecken-Verbindungstyp, Eckenrundung, Doppel-/Dreifachlinie, Verlaufslinie. | SbS 6; Z2, Z3 | P1 | Lib-Neu+Lib-ui | teilweise |
-| FM-02 | Linienenden | Rund 45 Pfeilspitzen und Endsymbole für Anfang und Ende, je in Größen sehr klein bis kolossal; eigene Linienenden über Muster-Master. | SbS 6; Z2, Z3 | P1 | Lib-Neu+Lib-ui | teilweise |
-| FM-03 | Füllung | Keine, einfarbig mit Transparenz, Farbverlauf (linear/radial/rechteckig/Pfad, Winkel, Richtung, Stopps mit Farbe/Position/Transparenz/Helligkeit, Voreinstellungen), Muster (Schraffuren mit Vorder-/Hintergrundfarbe); alte Visio-Füllmuster lesen. | SbS 6; Z2, Z3 | P1 (einfarbig), P2 | Lib-Neu+Lib-ui | teilweise |
-| FM-04 | Schatten | Aus/an, Art (einfach, schräg), Farbe + Transparenz, Versatz, Größe, Winkel, Weichzeichnung; Standard-Versatz je Seite. | SbS 6; Z2, Z3; UG Kap. 5 | P2 | Lib-Neu+Lib-ui | neu |
-| FM-05 | Effekte | Spiegelung, Leuchten, weiche Kanten, Abschrägung (3D-Format), 3D-Drehung, jeweils mit Voreinstellungen und Detailoptionen. | SbS 6; Z3 | P3 | Lib-Neu+Lib-ui | neu |
-| FM-06 | Skizzeneffekt | Handgezeichneter Look für Linien und Füllung (für Designs „Handgezeichnet“). | SbS 6; Z2, Z3 | P3 | Lib-Neu | neu |
+| FM-01 | Linie | Farbe + Transparenz, Stärke, Strichmuster (rund 24 Muster + eigene), Abschluss (rund/eckig/flach), Ecken-Verbindungstyp, Eckenrundung, Doppel-/Dreifachlinie, Verlaufslinie. | SbS 6; Z2, Z3 | P1 | Lib-core+Lib-ui | teilweise |
+| FM-02 | Linienenden | Rund 45 Pfeilspitzen und Endsymbole für Anfang und Ende, je in Größen sehr klein bis kolossal; eigene Linienenden über Muster-Master. | SbS 6; Z2, Z3 | P1 | Lib-core+Lib-ui | teilweise |
+| FM-03 | Füllung | Keine, einfarbig mit Transparenz, Farbverlauf (linear/radial/rechteckig/Pfad, Winkel, Richtung, Stopps mit Farbe/Position/Transparenz/Helligkeit, Voreinstellungen), Muster (Schraffuren mit Vorder-/Hintergrundfarbe); alte Visio-Füllmuster lesen. | SbS 6; Z2, Z3 | P1 (einfarbig), P2 | Lib-core+Lib-ui | teilweise |
+| FM-04 | Schatten | Aus/an, Art (einfach, schräg), Farbe + Transparenz, Versatz, Größe, Winkel, Weichzeichnung; Standard-Versatz je Seite. | SbS 6; Z2, Z3; UG Kap. 5 | P2 | Lib-core+Lib-ui | neu |
+| FM-05 | Effekte | Spiegelung, Leuchten, weiche Kanten, Abschrägung (3D-Format), 3D-Drehung, jeweils mit Voreinstellungen und Detailoptionen. | SbS 6; Z3 | P3 | Lib-core+Lib-ui | neu |
+| FM-06 | Skizzeneffekt | Handgezeichneter Look für Linien und Füllung (für Designs „Handgezeichnet“). | SbS 6; Z2, Z3 | P3 | Lib-core | neu |
 | FM-07 | Format übertragen | Format eines Shapes auf eines (Einfachklick) oder viele (Doppelklick, Ende mit Esc/Zeigerwerkzeug) übertragen, inklusive Theme-Bezug, Effekten und Schnellformatvorlage. | SbS 6 | P1 | App | neu |
 | FM-08 | Farbwähler | Theme-Farben (Weiß, Schwarz, Hell, Dunkel, Akzent 1–6 je mit Abstufungen), Variantenfarben, Standardfarben, zuletzt verwendet, weitere Farben (Wabe, RGB/HSL-Eingabe), keine Farbe; Theme-Farben folgen dem Design, feste Farben nicht. | SbS 6 | P1 | Lib-ui+App | teilweise |
 | FM-09 | Format wiederholen | Letzte Formatänderung mit F4 auf eine andere Auswahl anwenden. | UG Kap. 5 | P2 | App | neu |
@@ -353,81 +374,81 @@ Zellen und Funktionen darunter.
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| TX-01 | Shape-Text | Jedes Shape hat Text; Eingabe durch Lostippen, Doppelklick oder F2; Enter-Verhalten einstellbar (Absatz oder Eingabe beenden); Textsperre respektieren. | SbS 3 | P1 | Lib-Neu+Lib-ui | teilweise |
-| TX-02 | Formatierter Text | Mehrere Läufe mit eigenem Zeichenformat, Absätze mit eigenem Absatzformat, Tabstopps, Aufzählungen und Nummerierung, Rechts-nach-links-Text. | Z2, Z3; SbS 3 | P1 | Lib-Neu+Lib-ui | teilweise |
-| TX-03 | Textblock | Eigener Rahmen im Shape: verschieben, Größe ändern, drehen (nur Text dreht), neun Ausrichtungen (links/Mitte/rechts × oben/Mitte/unten), Ränder, Hintergrund, senkrechter Text. | SbS 3, 4; Z2, Z3 | P1 | Lib-Neu+Lib-ui | neu |
-| TX-04 | Textausrichtung beim Drehen | Text dreht mit dem Shape, bleibt aufrecht (Verbinder) oder folgt einer Formel. | SbS 3 | P1 | Lib-Neu | neu |
-| TX-05 | Textfelder (Textfeld-Shapes) | Reine Text-Shapes waagerecht oder senkrecht; mit Format, Design und Effekten wie jedes Shape. | SbS 3 | P1 | Lib-Neu+App | neu |
-| TX-06 | Felder im Text | Dynamische Werte im Shape-Text: Shape-Daten, Datum/Uhrzeit, Dokumentinfo (Autor, Titel, Dateiname …), Seiteninfo (Name, Nummer, Anzahl), Geometrie (Breite, Höhe, Winkel), Objektinfo (ID, Name, Master), benutzerdefinierte Zellen, eigene Formel; jeweils mit Anzeigeformat; aktualisieren sich selbst. | SbS 8 | P1 | Lib-Neu+App | neu |
+| TX-01 | Shape-Text | Jedes Shape hat Text; Eingabe durch Lostippen, Doppelklick oder F2; Enter-Verhalten einstellbar (Absatz oder Eingabe beenden); Textsperre respektieren. | SbS 3 | P1 | Lib-core+Lib-ui | teilweise |
+| TX-02 | Formatierter Text | Mehrere Läufe mit eigenem Zeichenformat, Absätze mit eigenem Absatzformat, Tabstopps, Aufzählungen und Nummerierung, Rechts-nach-links-Text. | Z2, Z3; SbS 3 | P1 | Lib-core+Lib-ui | teilweise |
+| TX-03 | Textblock | Eigener Rahmen im Shape: verschieben, Größe ändern, drehen (nur Text dreht), neun Ausrichtungen (links/Mitte/rechts × oben/Mitte/unten), Ränder, Hintergrund, senkrechter Text. | SbS 3, 4; Z2, Z3 | P1 | Lib-core+Lib-ui | neu |
+| TX-04 | Textausrichtung beim Drehen | Text dreht mit dem Shape, bleibt aufrecht (Verbinder) oder folgt einer Formel. | SbS 3 | P1 | Lib-core | neu |
+| TX-05 | Textfelder (Textfeld-Shapes) | Reine Text-Shapes waagerecht oder senkrecht; mit Format, Design und Effekten wie jedes Shape. | SbS 3 | P1 | Lib-core+App | neu |
+| TX-06 | Felder im Text | Dynamische Werte im Shape-Text: Shape-Daten, Datum/Uhrzeit, Dokumentinfo (Autor, Titel, Dateiname …), Seiteninfo (Name, Nummer, Anzahl), Geometrie (Breite, Höhe, Winkel), Objektinfo (ID, Name, Master), benutzerdefinierte Zellen, eigene Formel; jeweils mit Anzeigeformat; aktualisieren sich selbst. | SbS 8 | P1 | Lib-core+App | neu |
 | TX-07 | Rechtschreibprüfung | Rechtschreibung und AutoKorrektur im Shape-Text, Sprache je Textlauf. | SbS 1 | P2 | App+Lib-ui | vorhanden (spell) |
 | TX-08 | Suchen und Ersetzen | Text in Shapes, Shape-Daten, Shape-Namen und Master-Namen suchen, auf Auswahl/Seite/alle Seiten, Groß-/Kleinschreibung, ganze Wörter. | W | P1 | App | neu |
 | TX-09 | Schriftersatz | Fehlende Schriften ersetzen und melden; Theme-Schriften (Überschrift/Text) folgen dem Design. | Z2, Z3 | P1 | Lib-ui | teilweise |
-| TX-10 | Tabstopps und Textlineal | Bis zu zehn Tabstopps je Absatz (links, zentriert, rechts, dezimal), relativ zum Textblock; Lineal-Nullpunkt per Strg-Ziehen an den Textblockrand. | UG Kap. 7 | P2 | Lib-Neu+App | teilweise (jfWord-Lineal) |
+| TX-10 | Tabstopps und Textlineal | Bis zu zehn Tabstopps je Absatz (links, zentriert, rechts, dezimal), relativ zum Textblock; Lineal-Nullpunkt per Strg-Ziehen an den Textblockrand. | UG Kap. 7 | P2 | Lib-core+App | teilweise (jfWord-Lineal) |
 
 ### 2.8 Verbinder, Kleben, Routing und Layout
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| CN-01 | Verbindungspunkte | Punkte am Shape mit Richtung und Art (nach innen/außen/beides); sichtbar beim Verbinden (grau, Ziel grün) oder immer (Ansicht); hinzufügen, verschieben, löschen mit dem Verbindungspunkt-Werkzeug. | SbS 2; Z2, Z3 | P1 | Lib-Neu+Lib-ui | teilweise |
-| CN-02 | Statisches Kleben | Verbinderende an einem bestimmten Punkt (Verbindungspunkt, Scheitelpunkt, Führungslinie, Steuerpunkt): bleibt dort, egal wohin sich die Shapes bewegen. | SbS 2, 4; Z2, Z3 | P1 | Lib-Neu+Lib-ui | teilweise |
-| CN-03 | Dynamisches Kleben | Verbinderende auf das ganze Shape (Rand leuchtet): Andockpunkt wird bei jeder Bewegung neu gewählt; nur für dynamische Verbinder; Mischformen je Ende; mit Strg beim Ziehen zwischen statisch und dynamisch umschalten; Endpunkte zeigen die Art durch Farbe und Größe. | SbS 2; Z2, Z3; UG Kap. 6 | P1 | Lib-Neu+Lib-ui | neu |
-| CN-04 | Dynamischer Verbinder | 1D-Shape, dessen Knicke automatisch entstehen und verschwinden; Stile rechtwinklig (Standard), gerade, gebogen; Knick- und Segment-Ziehpunkte zum Verschieben, Hinzufügen, Entfernen; „Verbinder zurücksetzen“ zeichnet neu mit wenigen Knicken; Text auf dem Verbinder bleibt aufrecht, mit eigenem Hintergrund. | SbS 2, 4; Z2, Z3 | P1 | Lib-Neu+Lib-ui | teilweise |
-| CN-05 | Routing um Hindernisse | Rechtwinklige Wege um Shapes herum mit Gassen- und Blockabständen, Durchlässigkeit je Shape, Richtung der Verbindungspunkte, Seitenrouting-Stil (rechtwinklig, gerade, Flussdiagramm, Baum, Organigramm, einfach, Netzwerk …) und Richtung; Neu-Verlegen bei Bewegung. | SbS 2, 4; Z2, Z3; UG | P1 | Lib-Neu | neu |
-| CN-06 | Linienübergänge | Wo Verbinder sich kreuzen: Bogen, Lücke, Quadrat oder 2- bis 7-seitiger Sprung; welche Linie springt (waagerechte, senkrechte, zuletzt verlegte, Anzeigereihenfolge), Größe; je Seite und je Verbinder. | Z2, Z3; W | P2 | Lib-Neu+Lib-ui | neu |
+| CN-01 | Verbindungspunkte | Punkte am Shape mit Richtung und Art (nach innen/außen/beides); sichtbar beim Verbinden (grau, Ziel grün) oder immer (Ansicht); hinzufügen, verschieben, löschen mit dem Verbindungspunkt-Werkzeug. | SbS 2; Z2, Z3 | P1 | Lib-core+Lib-ui | teilweise |
+| CN-02 | Statisches Kleben | Verbinderende an einem bestimmten Punkt (Verbindungspunkt, Scheitelpunkt, Führungslinie, Steuerpunkt): bleibt dort, egal wohin sich die Shapes bewegen. | SbS 2, 4; Z2, Z3 | P1 | Lib-core+Lib-ui | teilweise |
+| CN-03 | Dynamisches Kleben | Verbinderende auf das ganze Shape (Rand leuchtet): Andockpunkt wird bei jeder Bewegung neu gewählt; nur für dynamische Verbinder; Mischformen je Ende; mit Strg beim Ziehen zwischen statisch und dynamisch umschalten; Endpunkte zeigen die Art durch Farbe und Größe. | SbS 2; Z2, Z3; UG Kap. 6 | P1 | Lib-core+Lib-ui | neu |
+| CN-04 | Dynamischer Verbinder | 1D-Shape, dessen Knicke automatisch entstehen und verschwinden; Stile rechtwinklig (Standard), gerade, gebogen; Knick- und Segment-Ziehpunkte zum Verschieben, Hinzufügen, Entfernen; „Verbinder zurücksetzen“ zeichnet neu mit wenigen Knicken; Text auf dem Verbinder bleibt aufrecht, mit eigenem Hintergrund. | SbS 2, 4; Z2, Z3 | P1 | Lib-core+Lib-ui | teilweise |
+| CN-05 | Routing um Hindernisse | Rechtwinklige Wege um Shapes herum mit Gassen- und Blockabständen, Durchlässigkeit je Shape, Richtung der Verbindungspunkte, Seitenrouting-Stil (rechtwinklig, gerade, Flussdiagramm, Baum, Organigramm, einfach, Netzwerk …) und Richtung; Neu-Verlegen bei Bewegung. | SbS 2, 4; Z2, Z3; UG | P1 | Lib-core | neu |
+| CN-06 | Linienübergänge | Wo Verbinder sich kreuzen: Bogen, Lücke, Quadrat oder 2- bis 7-seitiger Sprung; welche Linie springt (waagerechte, senkrechte, zuletzt verlegte, Anzeigereihenfolge), Größe; je Seite und je Verbinder. | Z2, Z3; W | P2 | Lib-core+Lib-ui | neu |
 | CN-07 | AutoVerbinden | Beim Zeigen auf ein Shape vier blaue Pfeile; Klick verbindet mit dem nächsten Shape in dieser Richtung oder legt das in der Schablone markierte Shape im Standardabstand an und verbindet es; Ziehen eines Pfeils auf ein beliebiges Shape; Schnell-Shapes-Leiste mit den ersten vier Schnell-Shapes und Live-Vorschau; schaltbar je Dokument und global. | SbS 2, 4 | P1 | App+Lib-ui | neu |
-| CN-08 | Automatisch einfügen | Shape auf einen Verbinder fallen lassen teilt ihn, fügt das Shape ein und schiebt folgende Shapes beiseite. | SbS 2; Z2, Z3 | P2 | Lib-Neu+App | neu |
-| CN-09 | Automatisch löschen | Shape löschen entfernt überflüssige Verbinder; liegt es zwischen zwei Shapes, verbindet der verbleibende Verbinder beide. | SbS 2 | P2 | Lib-Neu+App | neu |
+| CN-08 | Automatisch einfügen | Shape auf einen Verbinder fallen lassen teilt ihn, fügt das Shape ein und schiebt folgende Shapes beiseite. | SbS 2; Z2, Z3 | P2 | Lib-core+App | neu |
+| CN-09 | Automatisch löschen | Shape löschen entfernt überflüssige Verbinder; liegt es zwischen zwei Shapes, verbindet der verbleibende Verbinder beide. | SbS 2 | P2 | Lib-core+App | neu |
 | CN-10 | Verbinderwerkzeug-Automatik | Bei aktivem Verbinderwerkzeug verbindet ein aus der Schablone gezogenes Shape sich mit dem zuvor gewählten Shape. | SbS 4 | P2 | App | neu |
 | CN-11 | Verbinder-Werkzeug „einmal“ | Über die Minisymbolleiste genau einen Verbinder zeichnen, dann zurück zum Zeiger. | SbS 2 | P2 | App | neu |
-| CN-12 | Linien statt Verbinder | Gerade Linien, Bögen, Freihand und Stift kleben ebenfalls an Verbindungspunkten, behalten aber ihre Form. | SbS 2 | P1 | Lib-Neu+Lib-ui | teilweise |
-| CN-13 | Seite neu layouten | Automatisches Anordnen ganzer Diagramme nach Stil (Flussdiagramm, Baum, Organigramm, radial, kreisförmig, kompakter Baum, hierarchisch) und Richtung (oben→unten, links→rechts …), mit Abständen und Verbinder-Stil; Tiefe flach/mittel/tief (wie weit der Algorithmus vorausschaut); internes Layout-Raster (Block- und Gassengröße, Abstand Linie-zu-Linie und Linie-zu-Shape); Flussrichtung folgt Anfang→Ende der Verbinder; Live-Vorschau. | A 183642; TP; UG | P2 | Lib-Neu | neu |
-| CN-14 | Auto-Ausrichten und -Abstand | Verbundene Shapes automatisch ausrichten und/oder gleichmäßig verteilen (Auswahl oder Seite), mit Live-Vorschau. | SbS 6 | P2 | Lib-Neu+App | neu |
-| CN-15 | Verbindungsmodell | Einträge „von Zelle/Teil → zu Zelle/Teil“ (Anfang, Ende, Steuerpunkt → Verbindungspunkt, PinX, Geometrie); bleibt beim Speichern erhalten und wird bei jeder Bewegung neu gerechnet. | Z2, Z3 | P1 | Lib-Neu | neu |
+| CN-12 | Linien statt Verbinder | Gerade Linien, Bögen, Freihand und Stift kleben ebenfalls an Verbindungspunkten, behalten aber ihre Form. | SbS 2 | P1 | Lib-core+Lib-ui | teilweise |
+| CN-13 | Seite neu layouten | Automatisches Anordnen ganzer Diagramme nach Stil (Flussdiagramm, Baum, Organigramm, radial, kreisförmig, kompakter Baum, hierarchisch) und Richtung (oben→unten, links→rechts …), mit Abständen und Verbinder-Stil; Tiefe flach/mittel/tief (wie weit der Algorithmus vorausschaut); internes Layout-Raster (Block- und Gassengröße, Abstand Linie-zu-Linie und Linie-zu-Shape); Flussrichtung folgt Anfang→Ende der Verbinder; Live-Vorschau. | A 183642; TP; UG | P2 | Lib-core | neu |
+| CN-14 | Auto-Ausrichten und -Abstand | Verbundene Shapes automatisch ausrichten und/oder gleichmäßig verteilen (Auswahl oder Seite), mit Live-Vorschau. | SbS 6 | P2 | Lib-core+App | neu |
+| CN-15 | Verbindungsmodell | Einträge „von Zelle/Teil → zu Zelle/Teil“ (Anfang, Ende, Steuerpunkt → Verbindungspunkt, PinX, Geometrie); bleibt beim Speichern erhalten und wird bei jeder Bewegung neu gerechnet. | Z2, Z3 | P1 | Lib-core | neu |
 | CN-16 | Shapes verbinden (Befehl) | Ausgewählte Shapes in Auswahlreihenfolge mit Verbindern verketten; nimmt den in der Schablone markierten Verbinder-Master, sonst den dynamischen Verbinder. | UG Kap. 6 | P1 | App | neu |
-| CN-17 | Layout-Verhalten je Shape | „platzieren und umgehen“, „nie platzieren“, „automatisch“ (wird platzierbar, sobald ein dynamischer Verbinder angeklebt wird); steuert Seite-neu-layouten und Routing. | UG Kap. 6; Z2, Z3 | P1 | Lib-Neu+App | neu |
+| CN-17 | Layout-Verhalten je Shape | „platzieren und umgehen“, „nie platzieren“, „automatisch“ (wird platzierbar, sobald ein dynamischer Verbinder angeklebt wird); steuert Seite-neu-layouten und Routing. | UG Kap. 6; Z2, Z3 | P1 | Lib-core+App | neu |
 
-### 2.9 Container, Listen, Swimlanes, Legenden
+### 2.9 Container, Listen, Swimlanes, Beschriftungen, Legenden
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| ST-01 | Container | Umrandung mit Kopfzeile und logischer Mitgliedschaft; verschachtelbar; bewegt/kopiert/löscht sich mit Inhalt; Inneres ist „durchklickbar“ (Mitglieder direkt wählen, Auswahlrechteck innen starten); Hineinziehen macht Shapes zu Mitgliedern (Rand leuchtet), Herausziehen entfernt sie; Text tippen geht in die Kopfzeile. | SbS 13; Z2, Z3 | P1 | Lib-Neu+Lib-ui | teilweise (Rahmen in diagram.rs) |
-| ST-02 | Containerformat | 14 Container-Stile und 2–4 Kopfzeilen-Stile je Stil (Kopf oben/unten/links/rechts, ohne Kopf), Ränder, automatische Größe (keine / nach Bedarf erweitern / immer an Inhalt anpassen), „An Inhalt anpassen“, Sperren, Inhalt auswählen, Container auflösen, ausgeschlossene/erforderliche Kategorien. **Stile neu gestalten.** | SbS 13; Z2, Z3 | P1 | Lib-Neu+App | neu |
-| ST-03 | Randmitglieder | Shapes auf dem Containerrand bleiben an der Kante haften und wandern mit ihr (z. B. Register an einem Bedienfeld). | SbS 13 | P2 | Lib-Neu | neu |
-| ST-04 | Listen | Container mit geordneten Mitgliedern (waagerecht/senkrecht, Richtung umkehrbar, Abstand); Einfügemarke beim Hineinziehen; Umordnen per Ziehen; Einfüge-Dreieck legt Standardmitglied an; Größe folgt dem Inhalt; Mitglieder kennen ihre Position (Nummerierung per Formel). | SbS 13 | P1 | Lib-Neu+Lib-ui | neu |
-| ST-05 | Swimlanes | Funktionsübergreifendes Flussdiagramm als Liste aus Bahn-Containern mit Titelleiste und Phasen-Trennern; waagerecht/senkrecht; Bahn einfügen (Knopf, Kontextmenü vor/nach, Ziehen auf Grenze, Einfüge-Dreieck); Bahnen per Kopf umordnen; Shapes übernehmen den Bahntitel als Datenwert („Funktion“). | SbS 4, 13 | P1 | Lib-Neu+App | neu |
-| ST-06 | Legenden (Callouts) | Strukturierte Callouts mit Ziel-Shape: bewegen sich mit dem Ziel, werden mit ihm kopiert und gelöscht, bleiben beim eigenen Verschieben verbunden; mehrere je Shape; Lösen/Neu-Anheften über den gelben Steuerpunkt; 14 Stile mit und ohne Schwanz. **Neu gestalten.** | SbS 13 | P1 | Lib-Neu+App | neu |
-| ST-07 | Klassische Callouts | Ältere Callout-Shapes ohne Zielbeziehung (Schwanz klebt per Steuerpunkt). | SbS 13 | P3 | App | neu |
-| ST-08 | Legende für Datengrafiken | Automatisch erzeugte Legende (waagerecht/senkrecht) aus Listen/Containern, die erklärt, was Symbole, Farben und Balken bedeuten; nach Änderungen neu einfügen. | SbS 9, 13 | P2 | App+Lib-Neu | neu |
-| ST-09 | Zählende Legende (Netzwerk) | Legenden-Shape, das die verwendeten Shape-Typen einer Seite mit Anzahl auflistet (`visLegendShape`). | Fav, Z2, Z3 | P2 | App+Lib-Neu | neu |
+| ST-01 | Container | Umrandung mit Kopfzeile und logischer Mitgliedschaft; verschachtelbar; bewegt/kopiert/löscht sich mit Inhalt; Inneres ist „durchklickbar“ (Mitglieder direkt wählen, Auswahlrechteck innen starten); Hineinziehen macht Shapes zu Mitgliedern (Rand leuchtet), Herausziehen entfernt sie; Text tippen geht in die Kopfzeile. | SbS 13; Z2, Z3 | P1 | Lib-core+Lib-ui | teilweise (Rahmen in diagram.rs) |
+| ST-02 | Containerformat | 14 Container-Stile und 2–4 Kopfzeilen-Stile je Stil (Kopf oben/unten/links/rechts, ohne Kopf), Ränder, automatische Größe (keine / nach Bedarf erweitern / immer an Inhalt anpassen), „An Inhalt anpassen“, Sperren, Inhalt auswählen, Container auflösen, ausgeschlossene/erforderliche Kategorien. **Stile neu gestalten.** | SbS 13; Z2, Z3 | P1 | Lib-core+App | neu |
+| ST-03 | Randmitglieder | Shapes auf dem Containerrand bleiben an der Kante haften und wandern mit ihr (z. B. Register an einem Bedienfeld). | SbS 13 | P2 | Lib-core | neu |
+| ST-04 | Listen | Container mit geordneten Mitgliedern (waagerecht/senkrecht, Richtung umkehrbar, Abstand); Einfügemarke beim Hineinziehen; Umordnen per Ziehen; Einfüge-Dreieck legt Standardmitglied an; Größe folgt dem Inhalt; Mitglieder kennen ihre Position (Nummerierung per Formel). | SbS 13 | P1 | Lib-core+Lib-ui | neu |
+| ST-05 | Swimlanes | Funktionsübergreifendes Flussdiagramm als Liste aus Bahn-Containern mit Titelleiste und Phasen-Trennern; waagerecht/senkrecht; Bahn einfügen (Knopf, Kontextmenü vor/nach, Ziehen auf Grenze, Einfüge-Dreieck); Bahnen per Kopf umordnen; Shapes übernehmen den Bahntitel als Datenwert („Funktion“). | SbS 4, 13 | P1 | Lib-core+App | neu |
+| ST-06 | Beschriftungen (Visio: „Legenden“) | Strukturierte Beschriftungen (Callouts) mit Ziel-Shape: bewegen sich mit dem Ziel, werden mit ihm kopiert und gelöscht, bleiben beim eigenen Verschieben verbunden; mehrere je Shape; Lösen/Neu-Anheften über den gelben Steuerpunkt; 14 Stile mit und ohne Schwanz. **Neu gestalten.** | SbS 13 | P1 | Lib-core+App | neu |
+| ST-07 | Klassische Beschriftungen | Ältere Beschriftungs-Shapes ohne Zielbeziehung (Schwanz klebt per Steuerpunkt). | SbS 13 | P3 | App | neu |
+| ST-08 | Legende für Datengrafiken | Automatisch erzeugte Legende (waagerecht/senkrecht) aus Listen/Containern, die erklärt, was Symbole, Farben und Balken bedeuten; nach Änderungen neu einfügen. | SbS 9, 13 | P2 | App+Lib-core | neu |
+| ST-09 | Zählende Legende (Netzwerk) | Legenden-Shape, das die verwendeten Shape-Typen einer Seite mit Anzahl auflistet (`visLegendShape`). | Fav, Z2, Z3 | P2 | App+Lib-core | neu |
 | ST-10 | Wireframes | Bedienoberflächen-Entwürfe aus Containern (Dialog, Bedienfeld) und Listen (Listenfeld). | SbS 13 | P3 | App | neu |
 
 ### 2.10 Daten
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| DA-01 | Shape-Daten | Beliebig viele benannte Felder je Shape, Seite und Dokument; acht Typen (Text, Zahl, feste Liste, variable Liste, Dauer mit Einheit, Datum, Währung, Boolesch) mit Typprüfung und Anzeigeformat; Werte als Formeln. | SbS 8; Z2, Z3, Fav | P1 | Lib-Neu | neu |
-| DA-02 | Shape-Daten definieren | Bezeichnung, Typ, Format bzw. Listenwerte, Standardwert, QuickInfo; im Entwicklermodus zusätzlich interner Name, Sortierschlüssel, beim Ablegen fragen, verborgen; neu/löschen; für mehrere Shapes gleichzeitig. | SbS 8 | P1 | App+Lib-Neu | neu |
-| DA-03 | Shape-Datensätze | Benannte Feldsätze (z. B. „Netzwerkgerät“) einmal definieren und auf viele Shapes anwenden. | W | P3 | App+Lib-Neu | neu |
-| DA-04 | Datenverknüpfung | Datenquelle (Excel, CSV, später ODBC/SQL) anbinden, eindeutigen Schlüssel wählen, Zeilen an Shapes binden (automatisch über Spaltenabgleich, per Ziehen auf ein Shape, durch Ziehen auf leere Fläche = neues Shape aus dem markierten Master), Spalten umbenennen/ausblenden/umtypisieren, mehrere Quellen und n:m-Bindungen, Bindung lösen, Quelle entfernen. | SbS 10 | P2 | App+Lib-Neu | neu |
-| DA-05 | Daten aktualisieren | Alle oder einzelne Quellen manuell oder im Intervall aktualisieren; Konflikte (geänderte/gelöschte Zeilen, überschriebene Benutzerwerte) anzeigen und lösen. | SbS 10 | P2 | App+Lib-Neu | neu |
+| DA-01 | Shape-Daten | Beliebig viele benannte Felder je Shape, Seite und Dokument; acht Typen (Text, Zahl, feste Liste, variable Liste, Dauer mit Einheit, Datum, Währung, Boolesch) mit Typprüfung und Anzeigeformat; Werte als Formeln. | SbS 8; Z2, Z3, Fav | P1 | Lib-core | neu |
+| DA-02 | Shape-Daten definieren | Bezeichnung, Typ, Format bzw. Listenwerte, Standardwert, QuickInfo; im Entwicklermodus zusätzlich interner Name, Sortierschlüssel, beim Ablegen fragen, verborgen; neu/löschen; für mehrere Shapes gleichzeitig. | SbS 8 | P1 | App+Lib-core | neu |
+| DA-03 | Shape-Datensätze | Benannte Feldsätze (z. B. „Netzwerkgerät“) einmal definieren und auf viele Shapes anwenden. | W | P3 | App+Lib-core | neu |
+| DA-04 | Datenverknüpfung | Datenquelle (CSV und `.xlsx` in P2, ODBC/SQL in P3; F6) anbinden, eindeutigen Schlüssel wählen, Zeilen an Shapes binden (automatisch über Spaltenabgleich, per Ziehen auf ein Shape, durch Ziehen auf leere Fläche = neues Shape aus dem markierten Master), Spalten umbenennen/ausblenden/umtypisieren, mehrere Quellen und n:m-Bindungen, Bindung lösen, Quelle entfernen. | SbS 10 | P2 | App+Lib-core+Lib-io | neu |
+| DA-05 | Daten aktualisieren | Alle oder einzelne Quellen manuell oder im Intervall aktualisieren; Konflikte (geänderte/gelöschte Zeilen, überschriebene Benutzerwerte) anzeigen und lösen. | SbS 10 | P2 | App+Lib-core+Lib-io | neu |
 | DA-06 | Schnellimport | Ein Schritt von der Excel-Datei zu verknüpften Shapes samt Datengrafiken, als ein Rückgängig-Schritt. | SbS 1, 10 | P3 | App | neu |
-| DA-07 | Datengrafiken | Je Shape eine Datengrafik aus mehreren Elementen: Text(-callout), Symbolsatz (bis 5 Symbole mit Regeln), Datenleiste (Fortschritt, Sterne, Torte, Thermometer, Tacho, Mehrfachbalken; Min/Max), Farbe nach Wert (eindeutige Werte oder Bereiche); Position je Element, Shape-Text ausblenden; liegt auf eigener Ebene; Galerie, Bearbeiten, Duplizieren, Umbenennen, Löschen, „Shapes mit dieser Grafik auswählen“. **Symbole und Stile neu gestalten.** | SbS 9, 10 | P2 | App+Lib-Neu | neu |
+| DA-07 | Datengrafiken | Je Shape eine Datengrafik aus mehreren Elementen: Text(-callout), Symbolsatz (bis 5 Symbole mit Regeln), Datenleiste (Fortschritt, Sterne, Torte, Thermometer, Tacho, Mehrfachbalken; Min/Max), Farbe nach Wert (eindeutige Werte oder Bereiche); Position je Element, Shape-Text ausblenden; liegt auf eigener Ebene; Galerie, Bearbeiten, Duplizieren, Umbenennen, Löschen, „Shapes mit dieser Grafik auswählen“. **Symbole und Stile neu gestalten.** | SbS 9, 10 | P2 | App+Lib-core | neu |
 | DA-08 | Datengrafik-Felder | Bereich mit allen Feldern; Klick wendet eine passende Grafik an oder entfernt sie; Position und Konfiguration im Ribbon. | SbS 10 | P2 | App | neu |
-| DA-09 | Shape-Berichte | Vordefinierte (Inventar, Netzwerkgeräte, PC, Flussdiagramm, Organigramm, Raum, Fenster/Türen …) und eigene Berichte: Auswahl der Shapes (alle Seiten/Seite/Auswahl, Bedingungen), Spalten, Titel, Zwischensummen, Sortierung, Format; speichern im Dokument oder als Berichtsdefinition; Ausgabe CSV/Excel, HTML, XML oder Tabellen-Shape (statt eingebettetem Excel). | SbS 7, 8 | P2 | App+Lib-Neu | neu |
-| DA-10 | Diagramm überprüfen | Regelsätze im Dokument (Flussdiagramm, Swimlanes, BPMN mit vielen Regeln) prüfen: Problemliste mit Sprung zum Shape, sortierbar, Problem bzw. Regel ignorieren, ignorierte anzeigen, Regelsätze aus anderen Dokumenten importieren, Regelsätze ein/aus. **Zusätzlich eigener Regel-Editor** (Visio hat keinen). | SbS 14 | P2 (Prüfen), P3 (Editor) | Lib-Neu+App | neu |
+| DA-09 | Shape-Berichte | Vordefinierte (Inventar, Netzwerkgeräte, PC, Flussdiagramm, Organigramm, Raum, Fenster/Türen …) und eigene Berichte: Auswahl der Shapes (alle Seiten/Seite/Auswahl, Bedingungen), Spalten, Titel, Zwischensummen, Sortierung, Format; speichern im Dokument oder als Berichtsdefinition; Ausgabe CSV/Excel, HTML, XML oder Tabellen-Shape (statt eingebettetem Excel). | SbS 7, 8 | P2 | App+Lib-core+Lib-io | neu |
+| DA-10 | Diagramm überprüfen | Regelsätze im Dokument (Flussdiagramm, Swimlanes, BPMN mit vielen Regeln) prüfen: Problemliste mit Sprung zum Shape, sortierbar, Problem bzw. Regel ignorieren, ignorierte anzeigen, Regelsätze aus anderen Dokumenten importieren, Regelsätze ein/aus. **Zusätzlich eigener Regel-Editor** (Visio hat keinen). | SbS 14 | P2 (Prüfen), P3 (Editor) | Lib-core+App | neu |
 | DA-11 | Organigramm-Daten | Personen mit Name, Titel, Abteilung, Telefon, E-Mail, Vorgesetzter; Fotos je Person. | SbS 5, 8 | P2 | App | neu |
-| DA-12 | Datenbank-Verknüpfung (ODBC) | Shapes mit Tabellenzeilen verbinden (Schlüsselfelder, Feld ↔ Zelle, Richtung), Zeichnungsmonitor (jede Zeile ein Shape, Löschen/Anlegen wird übertragen), Master aus Tabelle, Shape-Daten in Tabelle exportieren. Die Metadaten liegen in User-Zellen und müssen erhalten bleiben. | UG Kap. 20–22 | P3 | App+Lib-Neu | neu |
+| DA-12 | Datenbank-Verknüpfung (ODBC) | Shapes mit Tabellenzeilen verbinden (Schlüsselfelder, Feld ↔ Zelle, Richtung), Zeichnungsmonitor (jede Zeile ein Shape, Löschen/Anlegen wird übertragen), Master aus Tabelle, Shape-Daten in Tabelle exportieren. Die Metadaten liegen in User-Zellen und müssen erhalten bleiben. | UG Kap. 20–22 | P3 | App+Lib-core+Lib-io | neu |
 | DA-13 | Bericht aktualisieren | Tabellen-Shape eines Berichts über das Kontextmenü neu erzeugen; Berichte über Ebenen getrennt. | UG Kap. 20 | P2 | App | neu |
 
 ### 2.11 Hyperlinks, QuickInfos und Kommentare
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| HL-01 | Hyperlinks | Je Shape (und Seite) mehrere Links: Adresse (Datei, URL, `mailto:`), Unteradresse (Seite, Shape, Zoom; Excel-Bereich, Word-Textmarke, Folie), Beschreibung (QuickInfo), relativer oder absoluter Pfad; Folgen mit Strg+Klick oder Kontextmenü; Zeiger zeigt Link-Symbol. | SbS 11 | P1 | Lib-Neu+App | neu |
-| HL-02 | Hyperlinkbasis | Dokumenteigenschaft, die allen relativen Links vorangestellt wird. | SbS 11; Z2, Z3 | P2 | Lib-Neu | neu |
-| HL-03 | QuickInfo am Shape | Text, der nur beim Zeigen auf das Shape erscheint (Kommentar-Zelle). | SbS 3 | P2 | Lib-Neu+App | neu |
-| HL-04 | Kommentare | Kommentare an Shape (Anker-Shape bei Mehrfachauswahl) oder Seite, mit Autor, Zeit, Antworten (Verlauf), einzelne Einträge löschen; Symbol am Shape (ein-/ausblendbar); Kommentarbereich mit allen Kommentaren, Klick springt zum Shape. | SbS 3, 15; A 183811, A 185607 | P2 | Lib-Neu+App | neu |
-| HL-05 | Freihand-Markup | Überprüfungsebenen je Prüfer (Markup anzeigen/hinzufügen), Freihandanmerkungen. | Z2, Z3; SbS 12 | P3 | Lib-Neu+App | neu |
+| HL-01 | Hyperlinks | Je Shape (und Seite) mehrere Links: Adresse (Datei, URL, `mailto:`), Unteradresse (Seite, Shape, Zoom; Excel-Bereich, Word-Textmarke, Folie), Beschreibung (QuickInfo), relativer oder absoluter Pfad; Folgen mit Strg+Klick oder Kontextmenü; Zeiger zeigt Link-Symbol. | SbS 11 | P1 | Lib-core+App | neu |
+| HL-02 | Hyperlinkbasis | Dokumenteigenschaft, die allen relativen Links vorangestellt wird. | SbS 11; Z2, Z3 | P2 | Lib-core | neu |
+| HL-03 | QuickInfo am Shape | Text, der nur beim Zeigen auf das Shape erscheint (Kommentar-Zelle). | SbS 3 | P2 | Lib-core+App | neu |
+| HL-04 | Kommentare | Kommentare an Shape (Anker-Shape bei Mehrfachauswahl) oder Seite, mit Autor, Zeit, Antworten (Verlauf), einzelne Einträge löschen; Symbol am Shape (ein-/ausblendbar); Kommentarbereich mit allen Kommentaren, Klick springt zum Shape. | SbS 3, 15; A 183811, A 185607 | P2 | Lib-core+App | neu |
+| HL-05 | Freihand-Markup | Überprüfungsebenen je Prüfer (Markup anzeigen/hinzufügen), Freihandanmerkungen. | Z2, Z3; SbS 12 | P3 | Lib-core+App | neu |
 | HL-06 | Link-Verlauf | Vor/Zurück zwischen angesprungenen Seiten und Dokumenten (Alt+Pfeil links/rechts). | UG Kap. 25 | P2 | App | neu |
 | HL-07 | Hyperlink kopieren | Link eines Shapes kopieren und anderswo als Hyperlink einfügen. | UG Kap. 25 | P3 | App | neu |
 
@@ -435,13 +456,13 @@ Zellen und Funktionen darunter.
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| TH-01 | Theme-Modell | Theme-Teil (Farbschema mit Dunkel/Hell/Akzent 1–6/Hyperlink, Schriftschema, Format-Schema mit Füll-, Linien-, Effekt- und Hintergrundstilen) plus Visio-Erweiterungen: vier Farb- und Stilvarianten, Verbinder-Schema, Linienstile mit Pfeilen, Schriftstile, Verzierungsgrad; je Seite ein Theme. | Z2, Z3; SbS 6 | P1 | Lib-Neu | neu |
-| TH-02 | Designs anwenden | Design auf aktuelle Seite oder alle Seiten, Live-Vorschau, „Design auf neue Shapes anwenden“, Shapes können Designs ignorieren („Designs zulassen“); Theme-gebundene Zellen (`THEMEVAL`) folgen automatisch. | SbS 6 | P1 | Lib-Neu+App | neu |
+| TH-01 | Theme-Modell | Theme-Teil (Farbschema mit Dunkel/Hell/Akzent 1–6/Hyperlink, Schriftschema, Format-Schema mit Füll-, Linien-, Effekt- und Hintergrundstilen) plus Visio-Erweiterungen: vier Farb- und Stilvarianten, Verbinder-Schema, Linienstile mit Pfeilen, Schriftstile, Verzierungsgrad; je Seite ein Theme. | Z2, Z3; SbS 6 | P1 | Lib-core | neu |
+| TH-02 | Designs anwenden | Design auf aktuelle Seite oder alle Seiten, Live-Vorschau, „Design auf neue Shapes anwenden“, Shapes können Designs ignorieren („Designs zulassen“); Theme-gebundene Zellen (`THEMEVAL`) folgen automatisch. | SbS 6 | P1 | Lib-core+App | neu |
 | TH-03 | Eigene Designs | JFDiagrammer bringt **eigene** Designs mit (Visios rund 26 Designs mit Namen wie „Linear“, „Einfach“, „Parallel“ sind geschützt und werden nur aus Dateien gelesen); Kategorien z. B. Professionell, Modern, Kräftig, Handgezeichnet. | Entscheidung; SbS 6; Z2, Z3 | P1 | App | neu |
-| TH-04 | Varianten | Vier Varianten je Design (Farbe und Stil). | SbS 6 | P1 | Lib-Neu+App | neu |
-| TH-05 | Farben, Effekte, Verbinder, Verzierung | Eigene Farbsätze anlegen (Akzentfarben, Textfarben auf hell/dunkel, Hintergrund), benutzerdefinierte Sätze löschen; Effekt- und Verbinder-Sätze wählen; Verzierungsgrad niedrig/mittel/hoch. | SbS 6 | P2 | Lib-Neu+App | neu |
-| TH-06 | Schnellformatvorlagen | Je Design 4 Variantenstile und eine Matrix 6 Stärken × 7 Farbvarianten; wirkt auf die Auswahl; Kontrastschutz für Text. | SbS 6; Z2, Z3 | P2 | Lib-Neu+App | neu |
-| TH-07 | Designs übertragen | Ein eingefügtes Shape bringt sein Design (auch eigene Farben) in ein anderes Dokument mit. | SbS 6 | P3 | Lib-Neu | neu |
+| TH-04 | Varianten | Vier Varianten je Design (Farbe und Stil). | SbS 6 | P1 | Lib-core+App | neu |
+| TH-05 | Farben, Effekte, Verbinder, Verzierung | Eigene Farbsätze anlegen (Akzentfarben, Textfarben auf hell/dunkel, Hintergrund), benutzerdefinierte Sätze löschen; Effekt- und Verbinder-Sätze wählen; Verzierungsgrad niedrig/mittel/hoch. | SbS 6 | P2 | Lib-core+App | neu |
+| TH-06 | Schnellformatvorlagen | Je Design 4 Variantenstile und eine Matrix 6 Stärken × 7 Farbvarianten; wirkt auf die Auswahl; Kontrastschutz für Text. | SbS 6; Z2, Z3 | P2 | Lib-core+App | neu |
+| TH-07 | Designs übertragen | Ein eingefügtes Shape bringt sein Design (auch eigene Farben) in ein anderes Dokument mit. | SbS 6 | P3 | Lib-core | neu |
 
 ### 2.13 ShapeSheet: Abschnitte
 
@@ -452,72 +473,72 @@ und schreiben; die Prio sagt, ab wann sie auch **wirken** (Darstellung, Bearbeit
 
 | ID | Abschnitt | Zellen / Zeilen (Auswahl) und Wirkung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| SS-01 | Shape-Transformation | PinX/PinY (Drehpunkt auf der Seite), Width/Height, LocPinX/LocPinY (Drehpunkt im Shape), Angle, FlipX/FlipY, ResizeMode (Gruppenkinder skalieren oder neu positionieren) | Z2, Z3; MS-VSDX | P1 | Lib-Neu | neu |
-| SS-02 | 1D-Endpunkte | BeginX/BeginY/EndX/EndY: Linien und Verbinder sind über Anfang und Ende definiert; Breite = Länge, Winkel folgt | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-03 | Linienformat | LinePattern, LineWeight, LineColor, LineColorTrans, LineCap, Rounding (Eckenrundung), CompoundType (Doppel-/Dreifachlinie), BeginArrow/EndArrow und deren Größe | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-04 | Füllformat und Schatten | FillForegnd/FillBkgnd mit Transparenz, FillPattern (einfarbig, Schraffuren, alte Verlaufsmuster), Schatten: ShdwForegnd, ShdwPattern, ShapeShdwType/-OffsetX/-OffsetY/-ObliqueAngle/-ScaleFactor/-Blur/-Show | Z2, Z3 | P1 (Füllung), P2 (Schatten) | Lib-Neu | neu |
-| SS-05 | Verlaufseigenschaften + Verlaufsstopps | Fill-/LineGradientEnabled, -Dir (linear, radial, rechteckig, Pfad), -Angle, RotateGradientWithShape, UseGroupGradient; eigene Zeilenabschnitte FillGradient/LineGradient mit Stopp-Farbe, -Transparenz, -Position | Z2, Z3 | P2 | Lib-Neu | neu |
-| SS-06 | Zeichen (Character) | je Textlauf: Font, Size, Color + Transparenz, Style (fett/kursiv/unterstrichen/Kapitälchen), Case, Pos (hoch/tief), Strikethru, DblUnderline, DoubleStrikethrough, Overline, Letterspace, FontScale, LangID, asiatische und komplexe Schrift samt Größe | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-07 | Absatz (Paragraph) | Einzüge erste Zeile/links/rechts, Zeilenabstand, Abstand vor/nach, horizontale Ausrichtung, Aufzählung (Bullet, BulletStr, BulletFont, Größe, Textabstand), Flags (rechts nach links) | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-08 | Tabstopps | Position und Ausrichtung je Tabstopp | Z2, Z3 | P2 | Lib-Neu | neu |
-| SS-09 | Textblockformat | Ränder links/rechts/oben/unten, vertikale Ausrichtung, Texthintergrund + Transparenz, Standard-Tabstopp, Textrichtung (waagerecht/senkrecht) | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-10 | Texttransformation | TxtPinX/TxtPinY, TxtWidth/TxtHeight, TxtLocPinX/TxtLocPinY, TxtAngle: eigener Textblock, verschiebbar und drehbar unabhängig vom Shape | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-11 | Textfelder (Field) | eingefügte Felder: Wert (Formel), Format (Datums-/Zahlenbild), Typ, Kalender, Bearbeitungsmodus, Kategorie/Code für den Feld-Dialog | MS-VSDX | P2 | Lib-Neu | neu |
-| SS-12 | Ereignisse | EventDblClick (Doppelklick-Verhalten), EventDrop, EventMultiDrop, EventXFMod (Verschieben/Größe), TheData, TheText | Z2, Z3 | P2 | Lib-Neu | neu |
-| SS-13 | Bildeigenschaften | Helligkeit, Kontrast, Gamma, Weichzeichnen, Schärfen, Rauschen entfernen, Transparenz | Z2 | P2 | Lib-Neu+Lib-img | neu |
-| SS-14 | Fremdbild-Info | ImgOffsetX/Y, ImgWidth/ImgHeight (Zuschneiden), ClippingPath | Z2 | P1 | Lib-Neu | neu |
-| SS-15 | Schutz | Sperren für Breite, Höhe, Seitenverhältnis, Verschieben X/Y, Drehen, Löschen, Auswählen, Formatieren, Textbearbeitung, Scheitelpunkt-Bearbeitung, Zuschneiden, Gruppieren, Anfang/Ende, Shape-Daten, Format aus Gruppe, Theme-Farben/-Effekte/-Verbinder/-Schriften/-Index, Variante, Ersetzen, Vorschau; der Schutz-Dialog zeigt nur einen Teil, der Rest nur im ShapeSheet; Schlösser erscheinen nur bei Größen-/Drehsperren | Z2, Z3; UG Kap. 4, 19 | P1 | Lib-Neu+App | neu |
-| SS-16 | Verschiedenes | keine Objekt-/Steuergriffe, kein Ausrichtungsrahmen, nicht drucken, Text ausblenden, Ausrichtungsrahmen aktualisieren, dynamische Rückmeldung, ObjType (Shape/Verbinder/platzierbar), Ablegequelle, QuickInfo (Comment), Maßstab beim Ablegen, Kalender, Sprache, Shape-Schlüsselwörter (für die Suche) | Z2, Z3 | P2 | Lib-Neu | neu |
-| SS-17 | Gruppeneigenschaften | SelectMode (Gruppe zuerst/Kinder zuerst/nur Gruppe), DisplayMode (Gruppe vor/hinter Kindern/ohne), IsDropTarget (Ablegen fügt zur Gruppe hinzu), IsSnapTarget, IsTextEditTarget, DontMoveChildren | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-18 | Klebeinfo | BegTrigger/EndTrigger (Neuberechnung beim Kleben), GlueType (dynamisch erlaubt/verboten), WalkPreference (welche Seite ein dynamischer Verbinder wählt) | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-19 | Shape-Layout | Durchlässigkeit für Verbinder (X/Y/Platzierung), Platzierungsverhalten (fest/verschiebbar/schiebt andere), Routing-Stil je Shape, Linienübergang-Code/-Stil/-Richtung je Verbinder, Platzierungsspiegelung, Verbinder-Erweiterung, Verbinder teilen (ShapeSplit/ShapeSplittable), Anzeigeebene (DisplayLevel), Beziehungen (Relationships: Container/Liste/Legende) | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-20 | Ebenenzugehörigkeit | LayerMember: Liste der Ebenen-Indizes eines Shapes | Z3 | P1 | Lib-Neu | neu |
-| SS-21 | Theme-Eigenschaften | ThemeIndex, ColorSchemeIndex, EffectSchemeIndex, ConnectorSchemeIndex, FontSchemeIndex, VariationColorIndex, VariationStyleIndex, EmbellishmentIndex (pro Seite und pro Shape überschreibbar) | Z2, Z3 | P2 | Lib-Neu | neu |
-| SS-22 | Schnellformatvorlage | QuickStyleLineColor/-FillColor/-ShadowColor/-FontColor (Theme-Farbindex), -LineMatrix/-FillMatrix/-EffectsMatrix/-FontMatrix (Stärke), QuickStyleType, QuickStyleVariation (Kontrastschutz) | Z2, Z3 | P2 | Lib-Neu | neu |
-| SS-23 | 3D-Drehung | RotationXAngle/YAngle/ZAngle, RotationType (Voreinstellung), Perspective, DistanceFromGround, KeepTextFlat | Z3 | P3 | Lib-Neu | neu |
-| SS-24 | Abschrägung (Fase) | BevelTop/Bottom Type/Width/Height, Tiefe und Kontur (Farbe/Größe), Material, Beleuchtung und Winkel | Z3 | P3 | Lib-Neu | neu |
-| SS-25 | Weitere Effekte | Spiegelung (Transparenz/Größe/Abstand/Unschärfe), Leuchten (Farbe/Transparenz/Größe), weiche Kanten, Skizzeneffekt (an/aus, Seed, Stärke, Linienstärke, Linien-/Füllungsabweichung) | Z2, Z3 | P3 | Lib-Neu | neu |
-| SS-26 | Shape-ersetzen-Verhalten | ReplaceLockShapeData, ReplaceLockText, ReplaceLockFormat, ReplaceCopyCells: was beim „Shape ändern“ erhalten bleibt | Z2, Z3 | P2 | Lib-Neu | neu |
-| SS-27 | Ausrichtung (alt) | AlignLeft/Center/Right/Top/Middle/Bottom: Klebebeziehungen zu Führungslinien | MS-VSDX | P3 | Lib-Neu | neu |
-| SS-28 | Geometrie (mehrere Abschnitte) | je Abschnitt NoFill, NoLine, NoShow, NoSnap, NoQuickDrag; Zeilen MoveTo, LineTo, ArcTo, EllipticalArcTo, NURBSTo, PolylineTo, SplineStart/SplineKnot, InfiniteLine, Ellipse, RelMoveTo, RelLineTo, RelCubBezTo, RelQuadBezTo, RelEllipticalArcTo | Z2, Z3; MS-VSDX | P1 | Lib-Neu | neu |
-| SS-29 | Verbindungspunkte | X, Y, DirX/DirY (Richtung), Type (nach innen/außen/beides), AutoGen, Prompt; Grundlage fürs Kleben | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-30 | Steuerelemente (Controls) | gelbe Steuerpunkte: X, Y, XDyn/YDyn (Ankerpunkt der Rückmeldung), XCon/YCon (Verhalten beim Größe ändern), CanGlue, Tip (QuickInfo) | Z2, Z3 | P1 | Lib-Neu+Lib-ui | neu |
-| SS-31 | Aktionen | eigene Kontextmenüeinträge: Action (Formel), Menu, Checked, Disabled, ReadOnly, Invisible, BeginGroup, ButtonFace, SortKey, TagName, FlyoutChild | Z2, Z3 | P2 | Lib-Neu+App | neu |
-| SS-32 | Aktionskennzeichen (Smart Tags) | Schaltflächen am Shape mit Aktionsmenü: Position, Name, Beschreibung, Ausblenden | MS-VSDX | P3 | Lib-Neu+App | neu |
-| SS-33 | Hyperlinks | Beschreibung, Adresse, Unteradresse (Seite/Shape), Zusatzinfo, Rahmen, neues Fenster, Standard-Link, unsichtbar, Sortierung | MS-VSDX | P2 | Lib-Neu | neu |
-| SS-34 | Shape-Daten (Property) | Label, Prompt, Type (Text, feste Liste, Zahl, Boolesch, variable Liste, Datum, Dauer, Währung), Format, Value, SortKey, Invisible, Verify (beim Ablegen abfragen), DataLinked, Kalender, Sprache | Z2, Z3, Fav | P1 | Lib-Neu | neu |
-| SS-35 | Benutzerdefinierte Zellen (User) | Name, Wert (Formel), Prompt; Träger fast aller Shape-Logik (Container `msv*`, Legenden `vis*`, Netzwerk-Farben) | Z2, Z3, Fav | P1 | Lib-Neu | neu |
-| SS-36 | Scratch | Hilfszeilen A–D, X, Y für Zwischenrechnungen | Z2 | P2 | Lib-Neu | neu |
-| SS-37 | Reviewer/Annotation | alte Kommentar- und Prüferabschnitte | MS-VSDX | P3 | Lib-Neu | neu |
-| SS-38 | Ebenen (Seite) | Name, Name universell, sichtbar, drucken, aktiv, sperren, einrasten, kleben, Farbe + Transparenz, Status | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-39 | Seiteneigenschaften | PageWidth/PageHeight, PageScale/DrawingScale, DrawingScaleType (Architektur/Ingenieur/metrisch/eigene), DrawingSizeType (wie Drucker, an Zeichnung anpassen, Standard, eigene), DrawingResizeType (automatisch vergrößern), InhibitSnap, Schatten-Versatz der Seite, UIVisibility | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-40 | Seitenlayout | PlaceStyle, PlaceDepth, PlaceFlip, RouteStyle, LineJumpCode/LineJumpStyle, Linienübergang-Faktoren, Gassen- und Blockgrößen (AvenueSize, BlockSize), Abstände Linie-zu-Linie/Linie-zu-Knoten, LineAdjustFrom/To, ResizePage, EnableGrid (dynamisches Raster), CtrlAsInput, PageShapeSplit, DynamicsOff, LineRouteExt, PlowCode | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-41 | Druckeigenschaften | Seitenränder, zentrieren X/Y, auf eine Seite anpassen (OnPage), Seiten X/Y (Kacheln), Raster drucken, Ausrichtung, Papierformat (PaperKind), Papierquelle, Skalierung X/Y | Z2, Z3 | P1 | Lib-Neu | neu |
-| SS-42 | Lineal und Raster | Lineal- und Raster-Ursprung, -Dichte (fein/normal/grob/fest), Rasterabstand X/Y | Z2, Z3 | P2 | Lib-Neu | neu |
-| SS-43 | Dokumenteigenschaften (Dokument-ShapeSheet) | OutputFormat, LockPreview, AddMarkup, ViewMarkup, DocLockReplace, NoCoauth, DocLockDuplicatePage, PreviewQuality, PreviewScope, DocLangID | Z2, Z3, Fav | P2 | Lib-Neu | neu |
-| SS-44 | Formatvorlagen-Eigenschaften | EnableLineProps/EnableFillProps/EnableTextProps (welche Teile eine Formatvorlage setzt), HideForApply | Z2, Z3 | P2 | Lib-Neu | neu |
-| SS-45 | Muster-Master | Master mit PatternFlags als eigene Linienmuster, Linienenden und Füllmuster (MS-11) | MS-VSDX; UG Kap. 5 | P3 | Lib-Neu | neu |
+| SS-01 | Shape-Transformation | PinX/PinY (Drehpunkt auf der Seite), Width/Height, LocPinX/LocPinY (Drehpunkt im Shape), Angle, FlipX/FlipY, ResizeMode (Gruppenkinder skalieren oder neu positionieren) | Z2, Z3; MS-VSDX | P1 | Lib-core | neu |
+| SS-02 | 1D-Endpunkte | BeginX/BeginY/EndX/EndY: Linien und Verbinder sind über Anfang und Ende definiert; Breite = Länge, Winkel folgt | Z2, Z3 | P1 | Lib-core | neu |
+| SS-03 | Linienformat | LinePattern, LineWeight, LineColor, LineColorTrans, LineCap, Rounding (Eckenrundung), CompoundType (Doppel-/Dreifachlinie), BeginArrow/EndArrow und deren Größe | Z2, Z3 | P1 | Lib-core | neu |
+| SS-04 | Füllformat und Schatten | FillForegnd/FillBkgnd mit Transparenz, FillPattern (einfarbig, Schraffuren, alte Verlaufsmuster), Schatten: ShdwForegnd, ShdwPattern, ShapeShdwType/-OffsetX/-OffsetY/-ObliqueAngle/-ScaleFactor/-Blur/-Show | Z2, Z3 | P1 (Füllung), P2 (Schatten) | Lib-core | neu |
+| SS-05 | Verlaufseigenschaften + Verlaufsstopps | Fill-/LineGradientEnabled, -Dir (linear, radial, rechteckig, Pfad), -Angle, RotateGradientWithShape, UseGroupGradient; eigene Zeilenabschnitte FillGradient/LineGradient mit Stopp-Farbe, -Transparenz, -Position | Z2, Z3 | P2 | Lib-core | neu |
+| SS-06 | Zeichen (Character) | je Textlauf: Font, Size, Color + Transparenz, Style (fett/kursiv/unterstrichen/Kapitälchen), Case, Pos (hoch/tief), Strikethru, DblUnderline, DoubleStrikethrough, Overline, Letterspace, FontScale, LangID, asiatische und komplexe Schrift samt Größe | Z2, Z3 | P1 | Lib-core | neu |
+| SS-07 | Absatz (Paragraph) | Einzüge erste Zeile/links/rechts, Zeilenabstand, Abstand vor/nach, horizontale Ausrichtung, Aufzählung (Bullet, BulletStr, BulletFont, Größe, Textabstand), Flags (rechts nach links) | Z2, Z3 | P1 | Lib-core | neu |
+| SS-08 | Tabstopps | Position und Ausrichtung je Tabstopp | Z2, Z3 | P2 | Lib-core | neu |
+| SS-09 | Textblockformat | Ränder links/rechts/oben/unten, vertikale Ausrichtung, Texthintergrund + Transparenz, Standard-Tabstopp, Textrichtung (waagerecht/senkrecht) | Z2, Z3 | P1 | Lib-core | neu |
+| SS-10 | Texttransformation | TxtPinX/TxtPinY, TxtWidth/TxtHeight, TxtLocPinX/TxtLocPinY, TxtAngle: eigener Textblock, verschiebbar und drehbar unabhängig vom Shape | Z2, Z3 | P1 | Lib-core | neu |
+| SS-11 | Textfelder (Field) | eingefügte Felder: Wert (Formel), Format (Datums-/Zahlenbild), Typ, Kalender, Bearbeitungsmodus, Kategorie/Code für den Feld-Dialog | MS-VSDX | P2 | Lib-core | neu |
+| SS-12 | Ereignisse | EventDblClick (Doppelklick-Verhalten), EventDrop, EventMultiDrop, EventXFMod (Verschieben/Größe), TheData, TheText | Z2, Z3 | P2 | Lib-core | neu |
+| SS-13 | Bildeigenschaften | Helligkeit, Kontrast, Gamma, Weichzeichnen, Schärfen, Rauschen entfernen, Transparenz | Z2 | P2 | Lib-core+Lib-img | neu |
+| SS-14 | Fremdbild-Info | ImgOffsetX/Y, ImgWidth/ImgHeight (Zuschneiden), ClippingPath | Z2 | P1 | Lib-core | neu |
+| SS-15 | Schutz | Sperren für Breite, Höhe, Seitenverhältnis, Verschieben X/Y, Drehen, Löschen, Auswählen, Formatieren, Textbearbeitung, Scheitelpunkt-Bearbeitung, Zuschneiden, Gruppieren, Anfang/Ende, Shape-Daten, Format aus Gruppe, Theme-Farben/-Effekte/-Verbinder/-Schriften/-Index, Variante, Ersetzen, Vorschau; der Schutz-Dialog zeigt nur einen Teil, der Rest nur im ShapeSheet; Schlösser erscheinen nur bei Größen-/Drehsperren | Z2, Z3; UG Kap. 4, 19 | P1 | Lib-core+App | neu |
+| SS-16 | Verschiedenes | keine Objekt-/Steuergriffe, kein Ausrichtungsrahmen, nicht drucken, Text ausblenden, Ausrichtungsrahmen aktualisieren, dynamische Rückmeldung, ObjType (Shape/Verbinder/platzierbar), Ablegequelle, QuickInfo (Comment), Maßstab beim Ablegen, Kalender, Sprache, Shape-Schlüsselwörter (für die Suche) | Z2, Z3 | P2 | Lib-core | neu |
+| SS-17 | Gruppeneigenschaften | SelectMode (Gruppe zuerst/Kinder zuerst/nur Gruppe), DisplayMode (Gruppe vor/hinter Kindern/ohne), IsDropTarget (Ablegen fügt zur Gruppe hinzu), IsSnapTarget, IsTextEditTarget, DontMoveChildren | Z2, Z3 | P1 | Lib-core | neu |
+| SS-18 | Klebeinfo | BegTrigger/EndTrigger (Neuberechnung beim Kleben), GlueType (dynamisch erlaubt/verboten), WalkPreference (welche Seite ein dynamischer Verbinder wählt) | Z2, Z3 | P1 | Lib-core | neu |
+| SS-19 | Shape-Layout | Durchlässigkeit für Verbinder (X/Y/Platzierung), Platzierungsverhalten (fest/verschiebbar/schiebt andere), Routing-Stil je Shape, Linienübergang-Code/-Stil/-Richtung je Verbinder, Platzierungsspiegelung, Verbinder-Erweiterung, Verbinder teilen (ShapeSplit/ShapeSplittable), Anzeigeebene (DisplayLevel), Beziehungen (Relationships: Container/Liste/Legende) | Z2, Z3 | P1 | Lib-core | neu |
+| SS-20 | Ebenenzugehörigkeit | LayerMember: Liste der Ebenen-Indizes eines Shapes | Z3 | P1 | Lib-core | neu |
+| SS-21 | Theme-Eigenschaften | ThemeIndex, ColorSchemeIndex, EffectSchemeIndex, ConnectorSchemeIndex, FontSchemeIndex, VariationColorIndex, VariationStyleIndex, EmbellishmentIndex (pro Seite und pro Shape überschreibbar) | Z2, Z3 | P2 | Lib-core | neu |
+| SS-22 | Schnellformatvorlage | QuickStyleLineColor/-FillColor/-ShadowColor/-FontColor (Theme-Farbindex), -LineMatrix/-FillMatrix/-EffectsMatrix/-FontMatrix (Stärke), QuickStyleType, QuickStyleVariation (Kontrastschutz) | Z2, Z3 | P2 | Lib-core | neu |
+| SS-23 | 3D-Drehung | RotationXAngle/YAngle/ZAngle, RotationType (Voreinstellung), Perspective, DistanceFromGround, KeepTextFlat | Z3 | P3 | Lib-core | neu |
+| SS-24 | Abschrägung (Fase) | BevelTop/Bottom Type/Width/Height, Tiefe und Kontur (Farbe/Größe), Material, Beleuchtung und Winkel | Z3 | P3 | Lib-core | neu |
+| SS-25 | Weitere Effekte | Spiegelung (Transparenz/Größe/Abstand/Unschärfe), Leuchten (Farbe/Transparenz/Größe), weiche Kanten, Skizzeneffekt (an/aus, Seed, Stärke, Linienstärke, Linien-/Füllungsabweichung) | Z2, Z3 | P3 | Lib-core | neu |
+| SS-26 | Shape-ersetzen-Verhalten | ReplaceLockShapeData, ReplaceLockText, ReplaceLockFormat, ReplaceCopyCells: was beim „Shape ändern“ erhalten bleibt | Z2, Z3 | P2 | Lib-core | neu |
+| SS-27 | Ausrichtung (alt) | AlignLeft/Center/Right/Top/Middle/Bottom: Klebebeziehungen zu Führungslinien | MS-VSDX | P3 | Lib-core | neu |
+| SS-28 | Geometrie (mehrere Abschnitte) | je Abschnitt NoFill, NoLine, NoShow, NoSnap, NoQuickDrag; Zeilen MoveTo, LineTo, ArcTo, EllipticalArcTo, NURBSTo, PolylineTo, SplineStart/SplineKnot, InfiniteLine, Ellipse, RelMoveTo, RelLineTo, RelCubBezTo, RelQuadBezTo, RelEllipticalArcTo | Z2, Z3; MS-VSDX | P1 | Lib-core | neu |
+| SS-29 | Verbindungspunkte | X, Y, DirX/DirY (Richtung), Type (nach innen/außen/beides), AutoGen, Prompt; Grundlage fürs Kleben | Z2, Z3 | P1 | Lib-core | neu |
+| SS-30 | Steuerelemente (Controls) | gelbe Steuerpunkte: X, Y, XDyn/YDyn (Ankerpunkt der Rückmeldung), XCon/YCon (Verhalten beim Größe ändern), CanGlue, Tip (QuickInfo) | Z2, Z3 | P1 | Lib-core+Lib-ui | neu |
+| SS-31 | Aktionen | eigene Kontextmenüeinträge: Action (Formel), Menu, Checked, Disabled, ReadOnly, Invisible, BeginGroup, ButtonFace, SortKey, TagName, FlyoutChild | Z2, Z3 | P2 | Lib-core+App | neu |
+| SS-32 | Aktionskennzeichen (Smart Tags) | Schaltflächen am Shape mit Aktionsmenü: Position, Name, Beschreibung, Ausblenden | MS-VSDX | P3 | Lib-core+App | neu |
+| SS-33 | Hyperlinks | Beschreibung, Adresse, Unteradresse (Seite/Shape), Zusatzinfo, Rahmen, neues Fenster, Standard-Link, unsichtbar, Sortierung | MS-VSDX | P2 | Lib-core | neu |
+| SS-34 | Shape-Daten (Property) | Label, Prompt, Type (Text, feste Liste, Zahl, Boolesch, variable Liste, Datum, Dauer, Währung), Format, Value, SortKey, Invisible, Verify (beim Ablegen abfragen), DataLinked, Kalender, Sprache | Z2, Z3, Fav | P1 | Lib-core | neu |
+| SS-35 | Benutzerdefinierte Zellen (User) | Name, Wert (Formel), Prompt; Träger fast aller Shape-Logik (Container `msv*`, Legenden `vis*`, Netzwerk-Farben) | Z2, Z3, Fav | P1 | Lib-core | neu |
+| SS-36 | Scratch | Hilfszeilen A–D, X, Y für Zwischenrechnungen | Z2 | P2 | Lib-core | neu |
+| SS-37 | Reviewer/Annotation | alte Kommentar- und Prüferabschnitte | MS-VSDX | P3 | Lib-core | neu |
+| SS-38 | Ebenen (Seite) | Name, Name universell, sichtbar, drucken, aktiv, sperren, einrasten, kleben, Farbe + Transparenz, Status | Z2, Z3 | P1 | Lib-core | neu |
+| SS-39 | Seiteneigenschaften | PageWidth/PageHeight, PageScale/DrawingScale, DrawingScaleType (Architektur/Ingenieur/metrisch/eigene), DrawingSizeType (wie Drucker, an Zeichnung anpassen, Standard, eigene), DrawingResizeType (automatisch vergrößern), InhibitSnap, Schatten-Versatz der Seite, UIVisibility | Z2, Z3 | P1 | Lib-core | neu |
+| SS-40 | Seitenlayout | PlaceStyle, PlaceDepth, PlaceFlip, RouteStyle, LineJumpCode/LineJumpStyle, Linienübergang-Faktoren, Gassen- und Blockgrößen (AvenueSize, BlockSize), Abstände Linie-zu-Linie/Linie-zu-Knoten, LineAdjustFrom/To, ResizePage, EnableGrid (dynamisches Raster), CtrlAsInput, PageShapeSplit, DynamicsOff, LineRouteExt, PlowCode | Z2, Z3 | P1 | Lib-core | neu |
+| SS-41 | Druckeigenschaften | Seitenränder, zentrieren X/Y, auf eine Seite anpassen (OnPage), Seiten X/Y (Kacheln), Raster drucken, Ausrichtung, Papierformat (PaperKind), Papierquelle, Skalierung X/Y | Z2, Z3 | P1 | Lib-core | neu |
+| SS-42 | Lineal und Raster | Lineal- und Raster-Ursprung, -Dichte (fein/normal/grob/fest), Rasterabstand X/Y | Z2, Z3 | P2 | Lib-core | neu |
+| SS-43 | Dokumenteigenschaften (Dokument-ShapeSheet) | OutputFormat, LockPreview, AddMarkup, ViewMarkup, DocLockReplace, NoCoauth, DocLockDuplicatePage, PreviewQuality, PreviewScope, DocLangID | Z2, Z3, Fav | P2 | Lib-core | neu |
+| SS-44 | Formatvorlagen-Eigenschaften | EnableLineProps/EnableFillProps/EnableTextProps (welche Teile eine Formatvorlage setzt), HideForApply | Z2, Z3 | P2 | Lib-core | neu |
+| SS-45 | Muster-Master | Master mit PatternFlags als eigene Linienmuster, Linienenden und Füllmuster (MS-11) | MS-VSDX; UG Kap. 5 | P3 | Lib-core | neu |
 | SS-46 | ShapeSheet-Fenster | Ansicht und Bearbeitung aller Abschnitte eines Shapes, einer Seite oder des Dokuments mit Formelzeile; Abschnitt/Zeile einfügen und löschen; Werte oder Formeln anzeigen; Vorgänger/Nachfolger einer Zelle anzeigen; Funktion einfügen (Auswahldialog) | SbS A; A 183847, A 190010; UG | P2 | App+Lib-ui | neu |
 
 ### 2.14 Formel-Engine und Funktionen
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| FX-01 | Formel-Parser | Visio-Formelsyntax: Zahlen mit Einheit (`10 mm`, `45 deg`), Zeichenketten, Operatoren `+ - * / ^ & = <> < > <= >= %`, Klammern, Funktionsaufrufe, Zellbezüge lokal (`Width`), in Abschnitten (`Geometry1.X1`, `Prop.Name`, `User.Farbe`, `Connections.X1`, `Controls.Row_1`), auf andere Shapes (`Sheet.5!Width`), auf Seite/Dokument (`ThePage!PageScale`, `TheDoc!…`), Fehlerwerte (`#REF!`, `#VALUE!`, `#DIV/0!`, `#NAME?`, `#N/A`). Lokalisierte und universelle Namen. | Z2, Z3; MS-VSDX | P1 | Lib-Neu | neu |
-| FX-02 | Auswertung und Neuberechnung | Abhängigkeitsgraph über Zellen, Shapes, Seite und Dokument; nur betroffene Zellen neu rechnen; Zyklen erkennen und begrenzen; typisierte Ergebnisse (Zahl mit Einheit, Text, Bool, Farbe, Datum, Fehler); `V` beim Speichern aktuell halten. | MS-VSDX | P1 | Lib-Neu | neu |
-| FX-03 | Vererbung | Zelle lokal → Master-Shape → Formatvorlage → Standard; lokale Formel überschreibt; „Formel löschen“ stellt Vererbung wieder her; nur Abweichungen speichern. | Z2, Z3 | P1 | Lib-Neu | neu |
-| FX-04 | Schutzmechanik | `GUARD` (Formel bleibt bei Benutzeraktionen), `THEMEGUARD`, `SETATREF`/`SETATREFEXPR`/`SETATREFEVAL` (Benutzeränderung wird in eine andere Zelle umgeleitet), `SETF` (Formel aus einer Aktion setzen), `DEPENDSON`, Auslöser-Zellen (`XFTRIGGER`, BegTrigger/EndTrigger). | Z2, Z3 | P1 | Lib-Neu | neu |
-| FX-05 | Einheiten | Umrechnung zwischen Seiten- und Zeichnungseinheiten (Maßstab), Anzeige in mm/cm/m/km/in/ft/yd/mi/pt/pica/Cicero/Didot, Winkel deg/rad/min/sec, Dauer und Datum. | Z2, Z3 | P1 | Lib-Neu | neu |
-| FX-06 | Mathe und Logik | ABS, AND, OR, NOT, IF, MIN, MAX, SUM, SQRT, POW, EXP, LN, LOG10, SIN, COS, TAN, ASIN, ACOS, ATAN, ATAN2, SINH, COSH, TANH, PI, ROUND, INT, INTUP, TRUNC, FLOOR, CEILING, MODULUS, SIGN, MAGNITUDE, ANG360, RAD, DEG, BITAND, BITOR, BITXOR, BITNOT, INDEX, LOOKUP, RAND, TRUE, FALSE | Z2, Z3; MS-VSDX | P1 | Lib-Neu | neu |
-| FX-07 | Geometrie | PNT, PNTX, PNTY, PAR, LOC, NURBS, POLYLINE, BOUND, ANGLETOLOC, ANGLETOPAR, LOCTOLOC, LOCTOPAR (P1); PATHLENGTH, POINTALONGPATH, ANGLEALONGPATH, DISTTOPATH, NEARESTPOINTONPATH, INTERSECTX, INTERSECTY, SEGMENTCOUNT, GRAVITY (P2) | Z2, Z3; MS-VSDX | P1/P2 | Lib-Neu | neu |
-| FX-08 | Farbe und Theme | RGB, HSL, RED, GREEN, BLUE, HUE, SAT, LUM, HUEDIFF, SATDIFF, LUMDIFF, TINT, SHADE, TONE, BLEND, MSOTINT, MSOSHADE, THEMEVAL, THEMEPROP, THEMERESTORE, ISTHEMED, CELLISTHEMED | Z2, Z3 | P1 | Lib-Neu | neu |
-| FX-09 | Text | SHAPETEXT, TEXTWIDTH, TEXTHEIGHT, FONT, STRSAME (P1); STRSAMEEX, LEN, LEFT, RIGHT, MID, FIND, SUBSTITUTE, REPLACE, REPT, LOWER, UPPER, TRIM, CHAR, FORMAT, FORMATEX, EVALTEXT (P2) | Z2, Z3; MS-VSDX | P1/P2 | Lib-Neu+Lib-ui | neu |
-| FX-10 | Datum und Zeit | NOW, DATE, TIME, DATETIME, DATEVALUE, TIMEVALUE, DAY, MONTH, YEAR, HOUR, MINUTE, SECOND, WEEKDAY, DAYOFYEAR | MS-VSDX | P2 | Lib-Neu | neu |
-| FX-11 | Dokument- und Shape-Info | MASTERNAME, PAGENAME, PAGENUMBER, PAGECOUNT, DOCCREATION, DOCLASTSAVE, DOCLASTPRINT, DOCLASTEDIT, ID, NAME, TYPE, TYPEDESC, DATA1/DATA2/DATA3, USERUI, IS1D, REF, ARG, ISERR, ISERROR, ISERRNA, ISERRVALUE, DEFAULTEVENT | Z2, Z3; MS-VSDX | P2 | Lib-Neu | neu |
-| FX-12 | Struktur | CONTAINERCOUNT, CONTAINERSHEETREF, CONTAINERMEMBERCOUNT, LISTMEMBERCOUNT, LISTORDER, LISTSHEETREF, CALLOUTCOUNT, CALLOUTTARGETREF, HASCATEGORY, WALKGLUE | Z2, Z3; MS-VSDX | P2 | Lib-Neu | neu |
-| FX-13 | Validierung | Funktionen der Regel-Ausdrücke der Diagrammprüfung (z. B. AGGCOUNT, FILTERSET, GLUEDSHAPES, CONNECTEDSHAPES, ONLAYER, ONBOUNDARYOF) | MS-VSDX | P3 | Lib-Neu | neu |
-| FX-14 | Aktionen ohne VBA | OPENTEXTWIN, OPENSHEETWIN, OPENGROUPWIN, GOTOPAGE, HYPERLINK, PLAYSOUND, SETF, DOCMD (auf eigene Befehle abgebildet), RUNADDON nur für bekannte eingebaute Funktionen (z. B. Shape-Daten-Dialog), sonst ignorieren und melden | Z2, Z3 | P2 | Lib-Neu+App | neu |
-| FX-15 | Nicht ausgeführt | RUNMACRO, CALLTHIS, RUNADDON/RUNADDONWARGS mit fremden Add-ons, Aufruf externer Programme: Formel bleibt erhalten, Wirkung entfällt (Abschnitt 6) | Entscheidung | – | Lib-Neu | – |
+| FX-01 | Formel-Parser | Visio-Formelsyntax: Zahlen mit Einheit (`10 mm`, `45 deg`), Zeichenketten, Operatoren `+ - * / ^ & = <> < > <= >= %`, Klammern, Funktionsaufrufe, Zellbezüge lokal (`Width`), in Abschnitten (`Geometry1.X1`, `Prop.Name`, `User.Farbe`, `Connections.X1`, `Controls.Row_1`), auf andere Shapes (`Sheet.5!Width`), auf Seite/Dokument (`ThePage!PageScale`, `TheDoc!…`), Fehlerwerte (`#REF!`, `#VALUE!`, `#DIV/0!`, `#NAME?`, `#N/A`). Lokalisierte und universelle Namen. | Z2, Z3; MS-VSDX | P1 | Lib-core | neu |
+| FX-02 | Auswertung und Neuberechnung | Abhängigkeitsgraph über Zellen, Shapes, Seite und Dokument; nur betroffene Zellen neu rechnen; Zyklen erkennen und begrenzen; typisierte Ergebnisse (Zahl mit Einheit, Text, Bool, Farbe, Datum, Fehler); `V` beim Speichern aktuell halten. | MS-VSDX | P1 | Lib-core | neu |
+| FX-03 | Vererbung | Zelle lokal → Master-Shape → Formatvorlage → Standard; lokale Formel überschreibt; „Formel löschen“ stellt Vererbung wieder her; nur Abweichungen speichern. | Z2, Z3 | P1 | Lib-core | neu |
+| FX-04 | Schutzmechanik | `GUARD` (Formel bleibt bei Benutzeraktionen), `THEMEGUARD`, `SETATREF`/`SETATREFEXPR`/`SETATREFEVAL` (Benutzeränderung wird in eine andere Zelle umgeleitet), `SETF` (Formel aus einer Aktion setzen), `DEPENDSON`, Auslöser-Zellen (`XFTRIGGER`, BegTrigger/EndTrigger). | Z2, Z3 | P1 | Lib-core | neu |
+| FX-05 | Einheiten | Umrechnung zwischen Seiten- und Zeichnungseinheiten (Maßstab), Anzeige in mm/cm/m/km/in/ft/yd/mi/pt/pica/Cicero/Didot, Winkel deg/rad/min/sec, Dauer und Datum. | Z2, Z3 | P1 | Lib-core | neu |
+| FX-06 | Mathe und Logik | ABS, AND, OR, NOT, IF, MIN, MAX, SUM, SQRT, POW, EXP, LN, LOG10, SIN, COS, TAN, ASIN, ACOS, ATAN, ATAN2, SINH, COSH, TANH, PI, ROUND, INT, INTUP, TRUNC, FLOOR, CEILING, MODULUS, SIGN, MAGNITUDE, ANG360, RAD, DEG, BITAND, BITOR, BITXOR, BITNOT, INDEX, LOOKUP, RAND, TRUE, FALSE | Z2, Z3; MS-VSDX | P1 | Lib-core | neu |
+| FX-07 | Geometrie | PNT, PNTX, PNTY, PAR, LOC, NURBS, POLYLINE, BOUND, ANGLETOLOC, ANGLETOPAR, LOCTOLOC, LOCTOPAR (P1); PATHLENGTH, POINTALONGPATH, ANGLEALONGPATH, DISTTOPATH, NEARESTPOINTONPATH, INTERSECTX, INTERSECTY, SEGMENTCOUNT, GRAVITY (P2) | Z2, Z3; MS-VSDX | P1/P2 | Lib-core | neu |
+| FX-08 | Farbe und Theme | RGB, HSL, RED, GREEN, BLUE, HUE, SAT, LUM, HUEDIFF, SATDIFF, LUMDIFF, TINT, SHADE, TONE, BLEND, MSOTINT, MSOSHADE, THEMEVAL, THEMEPROP, THEMERESTORE, ISTHEMED, CELLISTHEMED | Z2, Z3 | P1 | Lib-core | neu |
+| FX-09 | Text | SHAPETEXT, TEXTWIDTH, TEXTHEIGHT, FONT, STRSAME (P1); STRSAMEEX, LEN, LEFT, RIGHT, MID, FIND, SUBSTITUTE, REPLACE, REPT, LOWER, UPPER, TRIM, CHAR, FORMAT, FORMATEX, EVALTEXT (P2) | Z2, Z3; MS-VSDX | P1/P2 | Lib-core+Lib-ui | neu |
+| FX-10 | Datum und Zeit | NOW, DATE, TIME, DATETIME, DATEVALUE, TIMEVALUE, DAY, MONTH, YEAR, HOUR, MINUTE, SECOND, WEEKDAY, DAYOFYEAR | MS-VSDX | P2 | Lib-core | neu |
+| FX-11 | Dokument- und Shape-Info | MASTERNAME, PAGENAME, PAGENUMBER, PAGECOUNT, DOCCREATION, DOCLASTSAVE, DOCLASTPRINT, DOCLASTEDIT, ID, NAME, TYPE, TYPEDESC, DATA1/DATA2/DATA3, USERUI, IS1D, REF, ARG, ISERR, ISERROR, ISERRNA, ISERRVALUE, DEFAULTEVENT | Z2, Z3; MS-VSDX | P2 | Lib-core | neu |
+| FX-12 | Struktur | CONTAINERCOUNT, CONTAINERSHEETREF, CONTAINERMEMBERCOUNT, LISTMEMBERCOUNT, LISTORDER, LISTSHEETREF, CALLOUTCOUNT, CALLOUTTARGETREF, HASCATEGORY, WALKGLUE | Z2, Z3; MS-VSDX | P2 | Lib-core | neu |
+| FX-13 | Validierung | Funktionen der Regel-Ausdrücke der Diagrammprüfung (z. B. AGGCOUNT, FILTERSET, GLUEDSHAPES, CONNECTEDSHAPES, ONLAYER, ONBOUNDARYOF) | MS-VSDX | P3 | Lib-core | neu |
+| FX-14 | Aktionen ohne VBA | OPENTEXTWIN, OPENSHEETWIN, OPENGROUPWIN, GOTOPAGE, HYPERLINK, PLAYSOUND, SETF, DOCMD (auf eigene Befehle abgebildet), RUNADDON nur für bekannte eingebaute Funktionen (z. B. Shape-Daten-Dialog), sonst ignorieren und melden | Z2, Z3 | P2 | Lib-core+App | neu |
+| FX-15 | Nicht ausgeführt | RUNMACRO, CALLTHIS, RUNADDON/RUNADDONWARGS mit fremden Add-ons, Aufruf externer Programme: Formel bleibt erhalten, Wirkung entfällt (Abschnitt 6) | Entscheidung | – | Lib-core | – |
 | FX-16 | Formel-Editor | Formeln in ShapeSheet, Shape-Daten und Feldern bearbeiten: Syntaxprüfung, Autovervollständigen von Zellen und Funktionen, Fehleranzeige | W | P2 | App+Lib-ui | neu |
 
 <a id="oberflaeche"></a>
@@ -558,6 +579,7 @@ Katalog/Galerie, **KK** Kontrollkästchen, **Tog** Umschaltknopf, **Combo** Eing
 | UI-18 | Optionen – Erweitert | Livedynamik, Verbinder teilen, Verbinder mit löschen, AutoVerbinden, Übergänge, Rad zoomt, Auswahl beim Zoomen zentrieren, Teilauswahl im Rahmen, mehr Größengriffe beim Zeigen, Formel-Autovervollständigen, Enter beendet Text, Rückgängig-Tiefe, Text-Zoom beim Bearbeiten; Freihand-Genauigkeit/Glättung; Standardeinheiten (Seite, Text, Winkel, Dauer); Seitenansicht drehen erlauben; Speichern/Öffnen-Warnungen, Visio-Daten in SVG; Shape-Suche (alle/irgendein Wort); Entwicklermodus; Dateispeicherorte (Zeichnungen, Vorlagen, Schablonen). | A 184549, A 184605, A 184620; SbS 1, 12; UG Kap. 3, 18 | P1/P2 | App | neu |
 | UI-19 | Optionen – Menüband und Schnellzugriff anpassen | Register und Gruppen ein-/ausblenden, eigene Gruppen; Schnellzugriff mit beliebigen Befehlen, Reihenfolge, unter dem Menüband, Import/Export. | A 184640, A 184700; SbS 1, A | P2 (Schnellzugriff), P3 (Menüband) | App+Lib-ui | teilweise |
 | UI-20 | Optionen – Erweiterungen | Statt COM/VBA: Liste eigener Erweiterungen (später), aktiv/inaktiv. | A 184718 | P3 | App | neu |
+| UI-21 | Skript- und Erweiterungsschnittstelle | Automatisierung und Erweiterungen über JFScript mit dem Ereignismodell aus RX-10 (Auswahl, Zellen, Shapes, Seiten, Dokument); ersetzt VBA und COM-Add-ins. **Später, nicht in Phase 2** (F7). | Entscheidung F7; A 185942 | P3 | App+JFScript | neu |
 
 ### 3.2 Titelleiste, Registerzeile und Menüband allgemein
 
@@ -605,20 +627,20 @@ Katalog/Galerie, **KK** Kontrollkästchen, **Tog** Umschaltknopf, **Combo** Eing
 | RS-27 | Anordnen | Gruppieren | DD klein | Gruppieren, Gruppierung aufheben, zu Gruppe hinzufügen, aus Gruppe entfernen | A 183536; SbS 3 | P1 | neu |
 | RS-28 | Bearbeiten | Shape ändern | Kat groß | Ersetzen durch Master der offenen Schablonen | A 183536; SbS 3 | P2 | neu |
 | RS-29 | Bearbeiten | Suchen | DD klein | Suchen (Strg+F), Ersetzen (Strg+H) | A 184334 | P1 | neu |
-| RS-30 | Bearbeiten | Layer | DD klein | Layer zuweisen, Layereigenschaften | A 184351; SbS 3 | P1 | neu |
+| RS-30 | Bearbeiten | Ebenen (Visio: „Layer“) | DD klein | Ebene zuweisen, Ebeneneigenschaften | A 184351; SbS 3 | P1 | neu |
 | RS-31 | Bearbeiten | Markieren | DD klein | Alles markieren, Nach Typ auswählen (Shapes/Gruppen/Führungslinien/OLE/Freihand, Ebene, Formatvorlage), Bereich auswählen, Lassoauswahl | A 184405; SbS 2, 3 | P1/P2 | teilweise |
 
 ### 3.4 Register „Einfügen“
 
 | ID | Gruppe | Befehl | Typ | Beschreibung | Quelle | Prio | Bestand |
 |---|---|---|---|---|---|---|---|
-| RE-01 | Seiten | Neues Zeichenblatt | SK groß | Leeres Zeichenblatt, Hintergrundzeichenblatt, Dieses Zeichenblatt duplizieren (Umschalt+F11) | A 184742; SbS 3; TP | P1 | neu |
+| RE-01 | Seiten | Neue Seite (Visio: „Neues Zeichenblatt“) | SK groß | Leere Seite, Hintergrundseite, Diese Seite duplizieren (Umschalt+F11) | A 184742; SbS 3; TP | P1 | neu |
 | RE-02 | Illustrationen | Bilder | DD groß | Bild aus Datei (Archiv- und Onlinebilder entfallen, NO-17) | A 184758; SbS 3 | P1 | teilweise |
 | RE-03 | Illustrationen | Piktogramme | K groß | Sammlung einfacher Symbole einfügen – **eigene** Symbolsammlung (z. B. aus Fluent-Icons der Bibliothek, Lizenz prüfen) | A 183603 | P3 | teilweise (style_assets) |
 | RE-04 | Illustrationen | Diagramm | K groß | Visio bettet ein Excel-Diagramm ein; JFDiagrammer: eigenes Diagramm-Shape (Balken, Linie, Torte) aus Shape-Daten oder CSV | A 183603; TP | P3 | teilweise (chart.rs) |
 | RE-05 | Illustrationen | CAD-Zeichnung | K groß | DXF einfügen (IM-04) | A 183603 | P3 | neu |
 | RE-06 | Diagrammteile | Container | Kat groß | 14 Container-Stile, um Auswahl legen oder leer einfügen | A 184817; SbS 13 | P1 | teilweise |
-| RE-07 | Diagrammteile | Legende | Kat groß | 14 Callout-Stile an die Auswahl hängen (Linie, Klammer, Unterstrich, Klammer mit Zeiger, Rechteck mit Zeiger, eckige Sprechblase, Keil, Ellipse mit Zeiger, Kreis, Gedankenwolke, ovale Sprechblase, Tropfen, Zickzack, schräges Etikett) – **Formen neu zeichnen** | A 184834; SbS 13 | P1 | neu |
+| RE-07 | Diagrammteile | Beschriftung (Visio: „Legende“) | Kat groß | 14 Beschriftungsstile an die Auswahl hängen (Linie, Klammer, Unterstrich, Klammer mit Zeiger, Rechteck mit Zeiger, eckige Sprechblase, Keil, Ellipse mit Zeiger, Kreis, Gedankenwolke, ovale Sprechblase, Tropfen, Zickzack, schräges Etikett) – **Formen neu zeichnen** | A 184834; SbS 13 | P1 | neu |
 | RE-08 | Diagrammteile | Verbinder | K groß | einen Verbinder einfügen bzw. Werkzeug | A 183603 | P1 | teilweise |
 | RE-09 | Links | Link | K groß | Hyperlink-Dialog (Strg+K) | A 183603; SbS 11 | P1 | neu |
 | RE-10 | Text | Textfeld | SK groß | horizontales/vertikales Textfeld | A 184850; SbS 3 | P1 | neu |
@@ -639,15 +661,15 @@ Katalog/Galerie, **KK** Kontrollkästchen, **Tog** Umschaltknopf, **Combo** Eing
 
 | ID | Gruppe | Befehl | Typ | Beschreibung | Quelle | Prio | Bestand |
 |---|---|---|---|---|---|---|---|
-| RW-01 | Zeichenblatt einrichten | Ausrichtung | DD groß | Hoch-/Querformat | A 185238; SbS 3 | P1 | neu |
-| RW-02 | Zeichenblatt einrichten | Format | DD groß | Papierformate mit Maßen (Letter, Legal, A3–A5, B4/B5, Umschläge, Behördenformate …), „Größe an Zeichnung anpassen“, „Weitere Zeichenblattformate“ | A 185254, A 185314; SbS 3 | P1 | neu |
-| RW-03 | Zeichenblatt einrichten | Automatisch anpassen | Tog groß | Auto-Größe der Seite (PG-05) | A 183642; SbS 3 | P1 | neu |
-| RW-04 | Zeichenblatt einrichten | DS | – | Dialog „Seite einrichten“ (3.15) | A 183642; SbS 3 | P1 | neu |
+| RW-01 | Seite einrichten | Ausrichtung | DD groß | Hoch-/Querformat | A 185238; SbS 3 | P1 | neu |
+| RW-02 | Seite einrichten | Format | DD groß | Papierformate mit Maßen (Letter, Legal, A3–A5, B4/B5, Umschläge, Behördenformate …), „Größe an Zeichnung anpassen“, „Weitere Seitenformate“ | A 185254, A 185314; SbS 3 | P1 | neu |
+| RW-03 | Seite einrichten | Automatisch anpassen | Tog groß | Auto-Größe der Seite (PG-05) | A 183642; SbS 3 | P1 | neu |
+| RW-04 | Seite einrichten | DS | – | Dialog „Seite einrichten“ (3.15) | A 183642; SbS 3 | P1 | neu |
 | RW-05 | Designs | Designkatalog | Kat | Gruppen Professionell, Modern, Kräftig, Handgezeichnet + „Kein Design“; „Design auf neue Shapes anwenden“; Rechtsklick: auf alle Seiten/aktuelle Seite. **Eigene Designs** (TH-03) | A 183642, A 183706; SbS 6 | P1 | neu |
 | RW-06 | Varianten | Variantenkatalog + Menü | Kat | 4 Varianten; Farben ▸ (neue Designfarben), Effekte ▸, Verbinder ▸, Schriftarten ▸, Verzierung ▸ | A 183642; SbS 6 | P1/P2 | neu |
 | RW-07 | Hintergründe | Hintergründe | DD groß | Hintergrundmotive + Hintergrundfarbe (PG-09) | A 183642; SbS 3 | P2 | neu |
 | RW-08 | Hintergründe | Rahmen und Titel | DD groß | Rahmen mit Titelblock (PG-10) | A 183642; SbS 3 | P2 | neu |
-| RW-09 | Layout | Zeichenblattlayout neu anordnen | DD groß | Flussdiagramm (4 Richtungen), Hierarchie, kompakte Struktur, radial, kreisförmig; „Weitere Layoutoptionen“ (Abstände, Verbinderstil, Routing auf Verbinder anwenden) | A 183642; TP | P2 | neu |
+| RW-09 | Layout | Seite neu layouten (Visio: „Zeichenblattlayout neu anordnen“) | DD groß | Flussdiagramm (4 Richtungen), Hierarchie, kompakte Struktur, radial, kreisförmig; „Weitere Layoutoptionen“ (Abstände, Verbinderstil, Routing auf Verbinder anwenden) | A 183642; TP | P2 | neu |
 | RW-10 | Layout | Verbinder | DD groß | rechtwinklig/gerade/gebogen, Linienübergänge anzeigen und Stil, neu routen | A 183642; SbS 2 | P1 | teilweise |
 | RW-11 | Layout | DS | – | „Seite einrichten → Layout und Routing“ | A 183642 | P1 | neu |
 
@@ -656,7 +678,7 @@ Katalog/Galerie, **KK** Kontrollkästchen, **Tog** Umschaltknopf, **Combo** Eing
 | ID | Gruppe | Befehl | Typ | Beschreibung | Quelle | Prio | Bestand |
 |---|---|---|---|---|---|---|---|
 | RD-01 | Externe Daten | Schnellimport | K groß | Excel/CSV in einem Schritt verknüpfen (DA-06) | A 183728; SbS 10 | P3 | neu |
-| RD-02 | Externe Daten | Benutzerdefinierter Import | K groß | Datenauswahl-Assistent: Excel, CSV, später ODBC/SQL; Bereich, Spalten, Schlüssel (DA-04) | A 183728; SbS 10 | P2 | neu |
+| RD-02 | Externe Daten | Benutzerdefinierter Import | K groß | Datenauswahl-Assistent: CSV und `.xlsx` (P2), ODBC/SQL (P3, F6); Bereich, Spalten, Schlüssel (DA-04) | A 183728; SbS 10 | P2 | neu |
 | RD-03 | Externe Daten | Alle aktualisieren | SK groß | Alle aktualisieren; Daten aktualisieren (je Quelle, Intervall); nach Aktualisierung automatisch verknüpfen | A 185335; SbS 10 | P2 | neu |
 | RD-04 | Datengrafiken | Datengrafik-Katalog | Kat | Keine, Text, Datenbalken, Symbolsätze, Farbe nach Wert | A 183728; SbS 9, 10 | P2 | neu |
 | RD-05 | Datengrafiken | Position, Konfigurieren | DD/K klein | Lage am Shape; Element bearbeiten | A 183728; SbS 10 | P2 | neu |
@@ -693,7 +715,7 @@ Katalog/Galerie, **KK** Kontrollkästchen, **Tog** Umschaltknopf, **Combo** Eing
 | RA-02 | Ansicht / Anzeigen | Lineal, Seitenumbruch, Gitternetz, Führungslinien | KK | Anzeige ein/aus (Raster standardmäßig aus) | A 183830, A 183959; SbS 1, 2 | P1 | teilweise |
 | RA-03 | Ansicht / Anzeigen | Aufgabenbereiche | DD groß | Shapes, Shape-Daten, Größe und Position, Zoom und Verschieben, Shape formatieren, Zeichnungsexplorer, Ebenen, Kommentare, Probleme | A 183830; SbS 1; TP | P1 | teilweise (dock) |
 | RA-04 | Ansicht / Anzeigen | DS | – | Dialog „Lineal und Gitternetz“ (Unterteilung, Abstand, Ursprung) | A 183830; TP | P2 | neu |
-| RA-05 | Ansicht / Zoom | Zoom, An Fenster anpassen, Zeichenblattbreite | K klein | Zoom-Dialog; Seite einpassen (Strg+Umschalt+W); Breite einpassen | A 183830; SbS 1 | P1 | teilweise |
+| RA-05 | Ansicht / Zoom | Zoom, An Fenster anpassen, Seitenbreite | K klein | Zoom-Dialog; Seite einpassen (Strg+Umschalt+W); Breite einpassen | A 183830; SbS 1 | P1 | teilweise |
 | RA-06 | Ansicht / Visuelle Unterstützung | Dynamisches Gitter, AutoVerbinden, Verbindungspunkte | KK | Hilfen ein/aus | A 183830; SbS 2 | P1 | neu |
 | RA-07 | Ansicht / Visuelle Unterstützung | DS | – | Dialog „Ausrichten und Kleben“ (DM-03) | A 183830; UG | P1 | neu |
 | RA-08 | Ansicht / Fenster | Neues Fenster, Alle anordnen, Überlappend, Fenster wechseln | K/DD groß | zweite Ansicht derselben Zeichnung, Anordnen | A 183830; SbS 1 | P2/P3 | teilweise |
@@ -742,7 +764,7 @@ Katalog/Galerie, **KK** Kontrollkästchen, **Tog** Umschaltknopf, **Combo** Eing
 | SL-07 | Favoriten / Meine Shapes | Eigene Schablone „Favoriten“: Shapes per Rechtsklick „Zu meinen Shapes hinzufügen“ oder Ziehen hineinlegen, umordnen, entfernen; gespeichert als `.vssx` im Benutzerordner. | Fav; W | P1 | App | neu |
 | SL-08 | Schablonen-Menü | Am Schablonentitel: Schließen, Speichern, Bearbeiten (Kontextregister RK-08), Ansichtsoptionen, neues Master, Reihenfolge. | A 185905 | P2 | App | neu |
 | SL-09 | Leerzustand | Ohne offene Schablone ein Hinweis mit Link auf „Weitere Shapes“. | A 08-214121 | P1 | App | neu |
-| SL-10 | Master aus Zeichnung | Shape von der Seite in eine bearbeitbare Schablone ziehen erzeugt einen Master mit automatisch gerendertem Symbol. | SbS A | P2 | App+Lib-Neu | neu |
+| SL-10 | Master aus Zeichnung | Shape von der Seite in eine bearbeitbare Schablone ziehen erzeugt einen Master mit automatisch gerendertem Symbol. | SbS A | P2 | App+Lib-core | neu |
 | SL-11 | Schablonen-Bericht | Neue Zeichnung mit allen Mastern einer Schablone als Katalogübersicht. | UG Anhang | P3 | App | neu |
 
 ### 3.12 Zeichenfenster
@@ -797,7 +819,7 @@ Katalog/Galerie, **KK** Kontrollkästchen, **Tog** Umschaltknopf, **Combo** Eing
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| SB-01 | Seite | „Zeichenbl. 1 von n“; Klick öffnet Seitenliste. | A 183536; SbS 1 | P1 | App | neu |
+| SB-01 | Seite | „Seite 1 von n“ (Visio: „Zeichenbl.“); Klick öffnet Seitenliste. | A 183536; SbS 1 | P1 | App | neu |
 | SB-02 | Maße der Auswahl | Breite, Höhe, Winkel bzw. Länge; Klick öffnet „Größe und Position“. | SbS 1 | P1 | App | neu |
 | SB-03 | Sprache | Sprache des Textes an der Einfügemarke; Klick setzt sie. | A 183536 | P2 | App | neu |
 | SB-04 | Zoom | Präsentationsmodus, Zoom −/+, Regler (Mitte 100 %), Zoomwert (Klick = Dialog), An Fenster anpassen, Fenster wechseln. | A 183536; SbS 1 | P1 | App+Lib-ui | teilweise |
@@ -810,7 +832,7 @@ Katalog/Galerie, **KK** Kontrollkästchen, **Tog** Umschaltknopf, **Combo** Eing
 |---|---|---|---|---|---|---|
 | PR-01 | Druckansicht | Backstage „Drucken“ (Strg+P): links Einstellungen, rechts Vorschau mit Blattwahl, Zoom, Verschieben, Kachelung sichtbar; Farbe/Graustufen. | SbS 12; TP | P1 | App+Lib-plat | teilweise |
 | PR-02 | Druckbereich | Alle Seiten, aktuelle Seite, aktuelle Ansicht, Auswahl, Bereich; ohne Hintergrund; hohe Qualität (Effekte ein/aus); Exemplare; Drucker und Papier. | SbS 12; TP | P1 | App+Lib-plat | teilweise |
-| PR-03 | Kacheln | Zeichenblatt größer als Papier → über mehrere Blätter (Anpassen auf x %, „an n × m Blätter anpassen“), nie abgeschnitten, Kacheln beginnen oben links; Seitenumbrüche sichtbar, Shapes von Umbrüchen wegschieben/meiden. | SbS 3, 6, 12; UG Kap. 3, 10 | P1 | App | neu |
+| PR-03 | Kacheln | Seite größer als Papier → über mehrere Blätter (Anpassen auf x %, „an n × m Blätter anpassen“), nie abgeschnitten, Kacheln beginnen oben links; Seitenumbrüche sichtbar, Shapes von Umbrüchen wegschieben/meiden. | SbS 3, 6, 12; UG Kap. 3, 10 | P1 | App | neu |
 | PR-04 | Kopf- und Fußzeile | Je Druckblatt links/Mitte/rechts mit Platzhaltern für Seitenzahl, Gesamtzahl gedruckter Seiten, Seitenname, Dateiname, Dateiendung, Datum kurz/lang, Uhrzeit; Abstand vom Papierrand, Schrift. | SbS 12; UG Kap. 10 | P2 | App | neu |
 | PR-05 | Seite einrichten – Drucken einrichten | Papierformat, Ausrichtung, Zoom (anpassen auf %), „Anpassen an“ Blätter, Gitternetz drucken, Vorschau. | SbS 3 | P1 | App | neu |
 | PR-06 | Seite einrichten – Seitengröße | Wie Drucker, vordefiniert, benutzerdefiniert, automatisch erweitern, Ausrichtung. | SbS 3 | P1 | App | neu |
@@ -824,8 +846,10 @@ Katalog/Galerie, **KK** Kontrollkästchen, **Tog** Umschaltknopf, **Combo** Eing
 Grundlage ist die Liste aus SbS Anhang B (englische Belegung) plus Fließtext und Tutorial.
 Die deutsche Oberfläche belegt einige Textformate anders (Office-Konvention: Fett
 Strg+Umschalt+F, Kursiv Strg+Umschalt+K); das kollidiert mit „In den Vordergrund“
-(Strg+Umschalt+F) und „Kapitälchen“ (Strg+Umschalt+K). JFDiagrammer braucht deshalb eine
-**konfliktgeprüfte Belegung je Sprache** und eine Anpassungsseite (UI-19). Alle Kürzel: Ort
+(Strg+Umschalt+F) und „Kapitälchen“ (Strg+Umschalt+K). Entscheidung F10: Textformate nach
+deutscher Office-Konvention (Fett Strg+Umschalt+F, Kursiv Strg+Umschalt+K, Unterstrichen
+Strg+Umschalt+U); „In den Vordergrund“, „In den Hintergrund“ und „Kapitälchen“ bekommen freie
+Tasten. Alles bleibt über UI-19 anpassbar und wird auf Konflikte geprüft. Alle Kürzel: Ort
 `App` (+ `Lib-ui` für Zoom/Fokus), Prio wie angegeben.
 
 | ID | Bereich | Aktion → Kürzel | Quelle | Prio | Bestand |
@@ -836,11 +860,11 @@ Strg+Umschalt+F, Kursiv Strg+Umschalt+K); das kollidiert mit „In den Vordergru
 | KB-04 | Schwenken | Rad (senkrecht), Umschalt+Rad (waagerecht), Strg+Umschalt+Rechts-Ziehen | SbS 1, B | P1 | teilweise |
 | KB-05 | Seiten | nächste/vorige Seite Strg+Bild ab/auf, alle Seiten Alt+F3, neue Seite Umschalt+F11, Seite einrichten Umschalt+F5 | SbS 1, B; TP | P1 | neu |
 | KB-06 | Fokus/Barrierefreiheit | Tab/Umschalt+Tab von Shape zu Shape (gesperrte überspringen), Enter wählt fokussiertes Shape (mit Umschalt Mehrfachauswahl), Esc hebt auf | SbS B | P1 | teilweise (diagram.rs) |
-| KB-07 | Anordnen | Pfeiltasten verschieben, Umschalt+Pfeil 1 Pixel; Gruppieren Strg+G/Strg+Umschalt+G; Aufheben Strg+Umschalt+U; Vordergrund Strg+Umschalt+F; Hintergrund Strg+Umschalt+B; 90° links Strg+L, rechts Strg+R; horizontal spiegeln Strg+H, vertikal Strg+J; Shapes ausrichten F8 | SbS B | P1 | teilweise |
+| KB-07 | Anordnen | Pfeiltasten verschieben, Umschalt+Pfeil 1 Pixel; Gruppieren Strg+G/Strg+Umschalt+G; Aufheben Strg+Umschalt+U; Vordergrund/Hintergrund auf freien Tasten (Visio: Strg+Umschalt+F/B; F10); 90° links Strg+L, rechts Strg+R; horizontal spiegeln Strg+H, vertikal Strg+J; Shapes ausrichten F8 | SbS B | P1 | teilweise |
 | KB-08 | Werkzeuge | Zeiger Strg+1, Text Strg+2, Verbinder Strg+3, Verbindungspunkt Strg+Umschalt+1, Zuschneiden Strg+Umschalt+2, Textblock Strg+Umschalt+4, Format übertragen Strg+Umschalt+P | SbS B | P1 | neu |
 | KB-09 | Zeichenwerkzeuge | Bleistift Strg+4, Freihand Strg+5, Linie Strg+6, Bogen Strg+7, Rechteck Strg+8, Ellipse Strg+9; Umschalt beim Zeichnen = Quadrat/Kreis; Umschalt-Ziehen = Achse halten; Strg+Umschalt-Ziehen = duplizieren und Achse halten | SbS 2, B | P1 | neu |
 | KB-10 | Text | Bearbeiten F2 (Ende F2/Esc), Text-Dialog F11, Umschalt+Enter neue Zeile (wenn Enter beendet), Rechtschreibung F7; Cursor/Markieren mit Pos1/Ende, Strg+Pfeile (Wort, Absatz), Umschalt-Varianten, Strg+Rücktaste | SbS 3, B | P1 | teilweise (rich_edit) |
-| KB-11 | Textformat | Fett, Kursiv, Unterstrichen, doppelt unterstrichen Strg+Umschalt+D, Großbuchstaben Strg+Umschalt+A, Kapitälchen, tief Strg+=, hoch Strg+Umschalt+=, größer Strg+Umschalt+>, kleiner Strg+Umschalt+<; ältere Visio-Belegung: Fett Strg+Umschalt+B, Kursiv Strg+Umschalt+I, Kapitälchen Strg+Umschalt+Y, tief Strg+Umschalt+X, hoch Strg+Umschalt+Z | SbS B; UG Kap. 8 | P1/P2 | neu |
+| KB-11 | Textformat | Fett Strg+Umschalt+F, Kursiv Strg+Umschalt+K, Unterstrichen Strg+Umschalt+U (F10), doppelt unterstrichen Strg+Umschalt+D, Großbuchstaben Strg+Umschalt+A, Kapitälchen (freie Taste), tief Strg+=, hoch Strg+Umschalt+=, größer Strg+Umschalt+>, kleiner Strg+Umschalt+<; ältere Visio-Belegung: Fett Strg+Umschalt+B, Kursiv Strg+Umschalt+I, Kapitälchen Strg+Umschalt+Y, tief Strg+Umschalt+X, hoch Strg+Umschalt+Z | SbS B; UG Kap. 8 | P1/P2 | neu |
 | KB-12 | Textausrichtung | links/zentriert/rechts/Blocksatz Strg+Umschalt+L/C/R/J, oben/Mitte/unten Strg+Umschalt+T/M/V | SbS B | P1 | neu |
 | KB-13 | Links | Hyperlink Strg+K, folgen Strg+Klick | SbS 11 | P1 | neu |
 | KB-14 | Fenster | Präsentationsmodus F5 (Esc beendet, Bild/Pfeile blättern), nebeneinander Umschalt+F7, untereinander Strg+Umschalt+F7, überlappend Alt+F7, Ausrichten und Kleben Alt+F9 | SbS B; TP | P2 | neu |
@@ -862,8 +886,8 @@ dem Namen nach. Zusammen sind es rund 5400 Shape-Einträge; viele davon sind Dop
 
 - **Norm: …** – Symbole einer öffentlichen Norm oder Notation (ISO 5807, BPMN 2.0, UML 2.5,
   IEC 60617, ISO 10628/ISA 5.1, ISO 7010 …). Sie dürfen normgerecht aussehen und werden nach der
-  Norm neu gezeichnet. Visios Zeichnung ist dabei kein Vorbild. Farben, Strichstärken und Schrift
-  kommen aus dem NetLab-Design.
+  Norm neu gezeichnet, und zwar in der DIN-EN/IEC-Fassung statt US/ANSI (F14). Visios Zeichnung
+  ist dabei kein Vorbild. Farben, Strichstärken und Schrift kommen aus dem NetLab-Design (F2).
 - **Generisch** – schlichte Grundgeometrie (Rechteck, Pfeil, Stern, Block), die jeder gleich
   zeichnen würde. Sie wird frei nach Maß gebaut.
 - **Visio-Design** – gestaltete Grafiken (Geräte, Möbel, Personen, Dekor, 3D-Darstellungen).
@@ -877,14 +901,15 @@ dem Namen nach. Zusammen sind es rund 5400 Shape-Einträge; viele davon sind Dop
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| SH-G01 | Stilrichtlinie JFNetworker-Stil | Gemeinsame Regeln für alle neu gezeichneten Shapes: Strichstärken, Ecken, Flächen, Akzentfarben aus dem Theme (Akzent 1–6), Schatten, Symbolraster, Text unter oder im Shape. Sie werden aus den JFNetworker-Symbolen (`icons/*.svg`) abgeleitet und schriftlich festgehalten, bevor Phase 3 beginnt. | Entscheidung; JFNetworker `icons/` | P1 | App | teilweise |
-| SH-G02 | Echte Master | Jede Shape ist ein vollständiger Master mit ShapeSheet: Geometrie mit Formeln, Verbindungspunkten, Steuerpunkten, Shape-Daten, Theme-Bezug (`THEMEVAL`), Ebene, Kategorien und Schlüsselwörtern. Nur so verhalten sich die Shapes wie in Visio und überstehen VSDX-Speichern und -Laden. | SbS 1, A; Z2, Z3 | P1 | App+Lib-Neu | neu |
+| SH-G01 | Stilrichtlinie JFNetworker-Stil | Gemeinsame Regeln für alle neu gezeichneten Shapes: Strichstärken, Ecken, Flächen, Akzentfarben aus dem Theme (Akzent 1–6), Schatten, Symbolraster, Text unter oder im Shape. Sie werden aus den JFNetworker-Symbolen (`icons/*.svg`) abgeleitet und schriftlich festgehalten, bevor Phase 3 beginnt; Normsymbole behalten ihre Normform (F2). | Entscheidung; JFNetworker `icons/` | P1 | App | teilweise |
+| SH-G02 | Echte Master | Jede Shape ist ein vollständiger Master mit ShapeSheet: Geometrie mit Formeln, Verbindungspunkten, Steuerpunkten, Shape-Daten, Theme-Bezug (`THEMEVAL`), Ebene, Kategorien und Schlüsselwörtern. Nur so verhalten sich die Shapes wie in Visio und überstehen VSDX-Speichern und -Laden. | SbS 1, A; Z2, Z3 | P1 | App+Lib-core | neu |
 | SH-G03 | Schablonen als Dateien | Mitgelieferte Schablonen liegen als `.vssx` (metrisch und US) im Programm; Name, Symbolbilder (aus dem Shape gerendert), QuickInfos und Suchbegriffe auf Deutsch und Englisch (lokaler und universeller Name). | Fav; SbS 1 | P1 | App | neu |
 | SH-G04 | Schnell-Shapes je Schablone | Für jede Schablone sind die ersten Shapes als Schnell-Shapes festgelegt (für AutoVerbinden). | SbS 2; S 1104-131657 | P1 | App | neu |
-| SH-G05 | Fremde Master anzeigen | Shapes aus geöffneten Visio-Dateien zeigen immer ihre eigenen Master aus der Datei. Sie werden nicht durch JFDiagrammer-Shapes ersetzt. „Shape ändern“ kann auf eigene Shapes wechseln. | Z2, Z3; Entscheidung | P1 | Lib-Neu+App | neu |
+| SH-G05 | Fremde Master anzeigen | Shapes aus geöffneten Visio-Dateien zeigen immer ihre eigenen Master aus der Datei. Sie werden nicht durch JFDiagrammer-Shapes ersetzt. „Shape ändern“ kann auf eigene Shapes wechseln. | Z2, Z3; Entscheidung | P1 | Lib-core+App | neu |
 | SH-G06 | AWS-Icons ausliefern | Die offiziellen AWS-Architektur-Icons als SVG unverändert in je einer Schablone pro AWS-Kategorie. Sie lassen sich nur skalieren, nicht umfärben (von Designs ausgenommen). Namensnennung und Lizenztext stehen im Info-Dialog und in den Schablonen-Eigenschaften. Neue Icon-Ausgaben werden mit einem Abgleich-Skript eingespielt. | Entscheidung; S 1104-132208 | P2 | App | neu |
 | SH-G07 | Azure-Download-Knopf | Unter „Weitere Shapes › Netzwerk › Azure“ steht ein Knopf, der die offizielle Microsoft-Seite für die Azure-Icons im Browser öffnet. Der Nutzer lädt das ZIP selbst und stimmt den Bedingungen selbst zu. JFDiagrammer liest das ZIP (nur SVG) und baut daraus lokale Schablonen im Benutzerordner, je Azure-Kategorie eine. Nichts davon wird mitgeliefert oder weitergegeben. | Entscheidung; S 1104-132208 | P3 | App+Lib-svg | teilweise (img_svg, archive) |
 | SH-G08 | Eigene Ergänzungen | Neue Kategorien und Normvarianten (DIN EN statt US/ANSI), siehe Vorschläge am Ende dieses Abschnitts. | Entscheidung | P2/P3 | App | neu |
+| SH-G09 | Gemeinsamer Netzwerk-Symbolsatz | Die Netzwerkgeräte-Symbole liegen in einer Quelle für JFNetworker und JFDiagrammer, damit beide Apps gleich aussehen. Sie sind die Grundlage der P1-Netzwerkschablonen. | Entscheidung F9; JFNetworker `icons/` | P1 | App+JFNetworker | teilweise |
 
 ### 4.1 Kategorien aus „Weitere Shapes“
 
@@ -978,7 +1003,7 @@ Schablonen mit gleichem Namen; unten sind sie mit „(Drahtmodell)“ bzw. „(S
 
 ### 4.2 Übersicht aller Schablonen
 
-Prio folgt dem Richtwert. Abweichungen mit Begründung: SH-036 EPC-Diagramm-Shapes P2 (die EPK ist im deutschsprachigen
+Prio folgt dem Richtwert; nach Entscheidung F11 sind die Rack-Schablonen SH-145 bis SH-147 P1. Weitere Abweichungen mit Begründung: SH-036 EPC-Diagramm-Shapes P2 (die EPK ist im deutschsprachigen
 Raum verbreitet; Inhalt muss nachgeliefert werden), SH-049 Karten ist der eine P2-Organigramm-Stil (schlichtester,
 zeitloser Stil; die stil-unabhängigen Hilfs-Shapes kommen aus SH-045), SH-063 Halbleiter P2 (Dioden und Transistoren
 gehören zum Grundbestand jedes Schaltplans), SH-266 Zeitachsen P2 (häufig gebraucht, einfache Formen), SH-150
@@ -1131,9 +1156,9 @@ generische Container-Rahmen (P3, neu zu bauen).
 | SH-142 | Detailliertes Netzwerkdiagramm | Netzwerk | Visio-Design | 15 | S 1104-140835, S Übersicht | P1 | App | teilweise (JFNetworker-Symbole) |
 | SH-143 | Detailliertes Netzwerkdiagramm - 3D | Netzwerk | Visio-Design | 16 | S 1104-140818 | P3 | App | neu |
 | SH-144 | Exchange-Objekte | Netzwerk | Visio-Design | 17 | S 1104-135400, S 1104-135605 | P3 | App | neu |
-| SH-145 | Freistehende Gestelle | Netzwerk | Visio-Design | 9 | S 1104-135343 | P2 | App | neu |
-| SH-146 | Gestellmontierte Geräte | Netzwerk | Visio-Design | 19 | S 1104-135329 | P2 | App | neu |
-| SH-147 | Gestellmontierte Server | Netzwerk | Visio-Design | 17 | S 1104-135314, S Übersicht | P2 | App | neu |
+| SH-145 | Freistehende Gestelle | Netzwerk | Visio-Design | 9 | S 1104-135343 | P1 | App | neu |
+| SH-146 | Gestellmontierte Geräte | Netzwerk | Visio-Design | 19 | S 1104-135329 | P1 | App | neu |
+| SH-147 | Gestellmontierte Server | Netzwerk | Visio-Design | 17 | S 1104-135314, S Übersicht | P1 | App | neu |
 | SH-148 | Gestellmontierte Server - 3D | Netzwerk | Visio-Design | 17 | S 1104-135224 | P3 | App | neu |
 | SH-149 | LDAP-Objekte | Netzwerk | Visio-Design | 21 | S 1104-135208 | P3 | App | neu |
 | SH-150 | Microsoft-Produkte | Netzwerk | Visio-Design (Markenlogos) | 22 | S 1104-135146 | – | App | – (nicht nachbauen) |
@@ -6781,9 +6806,9 @@ Azure-Icons gar nicht mitgeliefert werden (SH-G07).
 **US/ANSI-Darstellung gegenüber DIN EN/IEC.** Viele Norm-Schablonen zeichnen im US-Stil: Elektrotechnik (SH-057 bis
 SH-074, z. B. Widerstand als Zickzack, Schalter- und Relaisformen nach IEEE 315), Elektroinstallation (SH-175), HLK
 (SH-184 bis SH-187, SH-206) und Sanitär (SH-205). Auch Fahrzeuge (Pick-ups, Schulbus, SH-176), Sportfelder (American
-Football, Baseball, SH-209) und die Verkehrszeichen (SH-220) sind US-geprägt. Vorschlag (offene Frage F14): die
-Norm-Schablonen nach DIN EN/IEC zeichnen (IEC 60617, ISO 10628, ISO 1219, DIN 1356), eine ANSI-Variante höchstens
-später. Die Prio-Spalte in 4.2 gilt für die Fassung, die gebaut wird.
+Football, Baseball, SH-209) und die Verkehrszeichen (SH-220) sind US-geprägt. Entschieden (F14): Die
+Norm-Schablonen werden nach DIN EN/IEC gezeichnet (IEC 60617, ISO 10628, ISO 1219, DIN 1356), eine ANSI-Variante
+höchstens später. Die Prio-Spalte in 4.2 gilt für die DIN-EN/IEC-Fassung.
 
 **Grenzen des Materials.** 31 Schablonen stehen nur im Menü. Viele Namen sind in Visio abgeschnitten („…“); Ergänzungen
 in Klammern sind sinngemäß. Bei einigen Shapes ist die Bedeutung aus Bild und Namen nicht sicher (z. B. „LSX“ in
@@ -6823,7 +6848,7 @@ und US-Fassung (MS-07). Die Kategorien folgen „Neu“ bzw. „Weitere Shapes�
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
 | VL-01 | Vorlagenkatalog | Kategorien mit Vorschaubildern (aus der Vorlage gerendert), Beschreibung, Einheitenwahl, Startdiagramme mit löschbarem Tipp-Shape. | SbS 1; A 190353 | P1 | App | neu |
-| VL-02 | Vorlagen-Inhalt | Liste der zu öffnenden Schablonen (Reihenfolge, welche aktiv), Seiten (auch Hintergrund), Seitengröße, Maßstab, Einheiten, Ebenen, Design, Formatvorlagen, Regelsätze, Kontextregister. | SbS 1, 12 | P1 | App+Lib-Neu | neu |
+| VL-02 | Vorlagen-Inhalt | Liste der zu öffnenden Schablonen (Reihenfolge, welche aktiv), Seiten (auch Hintergrund), Seitengröße, Maßstab, Einheiten, Ebenen, Design, Formatvorlagen, Regelsätze, Kontextregister. | SbS 1, 12 | P1 | App+Lib-core | neu |
 | VL-03 | Eigene Vorlagen | Speichern als Vorlage, eigener Vorlagenordner erscheint als Kategorie; Doppelklick auf eine Vorlage im Dateimanager startet eine neue Zeichnung. | SbS 12 | P1 | App | neu |
 | VL-04 | Vorlagenabhängige Register | Organigramm, Swimlanes, Brainstorming, Zeitachse, Kalender, Gantt bringen eigene Register/Kontextmenüs mit (3.10). | SbS 1, 4, 5; TP | P1 | App | neu |
 
@@ -6851,14 +6876,14 @@ und US-Fassung (MS-07). Die Kategorien folgen „Neu“ bzw. „Weitere Shapes�
 | VL-37 | Geschäft | Wertstromdiagramm | Wertstrom-Symbole (Lean) | SbS 1; S 1104-131939 | P3 | Lean-Notation |
 | VL-38 | Geschäft | Diagramme und Grafiken, Marketingdiagramme | Balken-/Torten-Shapes, Matrix, Pyramide, Zyklus, Venn | S 1104-131939 | P2 | generisch |
 | VL-39 | Geschäft | Pivotdiagramm | Datenhierarchie als Baum (VL-82) | S 1104-131939 | P3 | – |
-| VL-40 | Konstruktion | Grundlagen Elektrotechnik, Schaltkreise und Logik, Industriesteuerungen, Elektrische Systeme | Elektro-Symbole | SbS 1; S 1104-132112 | P2 | IEC 60617 / IEEE 315 |
+| VL-40 | Konstruktion | Grundlagen Elektrotechnik, Schaltkreise und Logik, Industriesteuerungen, Elektrische Systeme | Elektro-Symbole | SbS 1; S 1104-132112 | P2 | IEC 60617 (DIN-EN-Fassung, F14) |
 | VL-41 | Konstruktion | Teile und Baugruppen, Fluidtechnik | Federn, Lager, Schrauben, Schweißsymbole, Form- und Lagetoleranzen, Pneumatik/Hydraulik | S 1104-132112 | P3 | ISO 1219, ISO 2553, ISO 1101 |
 | VL-42 | Konstruktion | R&I-Fließbild, Prozessflussdiagramm | Behälter, Pumpen, Wärmetauscher, Instrumente, Rohrleitungen, Armaturen | S 1104-132112 | P3 | ISO 10628, ISA 5.1 |
 | VL-50 | Netzwerk | Standardnetzwerk (2D/3D) | Computer und Monitore, Netzwerk und Peripheriegeräte | SbS 7 | P1 | – |
 | VL-51 | Netzwerk | Detailliertes Netzwerk (2D/3D) | + Server, Netzwerksymbole, Netzwerkadressen, Raumelemente; Netzwerkberichte | SbS 7; A 183424 | P1 | – |
-| VL-52 | Netzwerk | Rack-Diagramm | Gestelle, gestellmontierte Geräte/Server, Höheneinheiten, Maßstab 1:20 | SbS 7 | P2 | 19-Zoll (EIA-310) |
+| VL-52 | Netzwerk | Rack-Diagramm | Gestelle, gestellmontierte Geräte/Server, Höheneinheiten, Maßstab 1:20; wegen JFNetworker schon in P1 (F11) | SbS 7; Entscheidung F11 | P1 | 19-Zoll (EIA-310) |
 | VL-53 | Netzwerk | Active Directory, LDAP-Verzeichnis | Verzeichnisobjekte, Standorte und Dienste | SbS 7; S 1104-132208 | P3 | – |
-| VL-54 | Netzwerk | AWS-Architektur | AWS-Schablonen (Original-Icons) + Gruppenrahmen | S 1104-132208 | P2 | AWS-Original |
+| VL-54 | Netzwerk | AWS-Architektur | AWS-Schablonen (Original-Icons) + Gruppenrahmen; früh in P2 (F11) | S 1104-132208; Entscheidung F11 | P2 | AWS-Original |
 | VL-55 | Netzwerk | Azure-Architektur | nur nach Azure-Download (Abschnitt 4) | S 1104-132208 | P3 | Azure-Download |
 | VL-60 | Pläne und Grundrisse | Grundriss, Hausplan, Büroplan | Wände/Türen/Fenster, Möbel, Bad/Küche, Bemaßung; Maßstab | TP; S 1104-132248 | P2 | DIN 1356 (Bauzeichnung, wo zutreffend) |
 | VL-61 | Pläne und Grundrisse | Elektro- und Telekommunikationsplan | Installationssymbole | S 1104-132248 | P2 | DIN EN 60617-11 |
@@ -6891,7 +6916,7 @@ und US-Fassung (MS-07). Die Kategorien folgen „Neu“ bzw. „Weitere Shapes�
 | AS-11 | Shapes nummerieren, Array, Maßlinien | Werkzeuge statt Visio-Add-ons: Shapes in Reihenfolge nummerieren (Präfix, Start, Schritt), Shapes als Raster vervielfältigen, Bemaßung zwischen zwei Punkten. | A 185746; TP | P2 | App | neu |
 | AS-12 | Mehrere Shapes hinzufügen | Organigramm: Anzahl und Typ auf einmal. | SbS 5; TP | P3 | App | neu |
 | AS-13 | Vergleichen und Synchronisieren | Organigramm-Versionen vergleichen (Unterschiedsbericht als HTML), synchronisierte Kopien. | TP | P3 | App | neu |
-| AS-14 | Fremdformat-Importassistent (eigen) | draw.io, GraphML, Mermaid, PlantUML, BPMN-XML in Shapes umsetzen (IM-07). | eigener Vorschlag | P3 | App+Lib-Neu | neu |
+| AS-14 | Fremdformat-Importassistent (eigen) | draw.io, GraphML, Mermaid, PlantUML, BPMN-XML in Shapes umsetzen (IM-07). | eigener Vorschlag | P3 | App+Lib-io | neu |
 | AS-15 | Seitenlayout-Assistent | Seitengröße, Ausrichtung, Maßstab, Rahmen und Schriftfeld (Titelblock) als Hintergrundseite in einem Schritt. | UG Kap. 3, Anhang | P3 | App | neu |
 | AS-16 | Büroplan-Assistent | Maßstab, Seitengröße und Grundwände eines Büroplans. | UG Anhang | P3 | App | neu |
 | AS-17 | Verhalten-Assistent (ohne Formeln) | Häufiges Shape-Verhalten per Dialog statt ShapeSheet einstellen: Text skaliert mit dem Shape, Text bleibt aufrecht, Sperren, Verbinder-Verhalten. | UG Kap. 8, 19, Anhang | P2 | App | neu |
@@ -6908,9 +6933,9 @@ dem Speichern in Visio weiter funktioniert.
 
 | ID | Funktion | Begründung | Umgang mit vorhandenen Daten | Quelle |
 |---|---|---|---|---|
-| NO-01 | VBA: Visual-Basic-Editor, Makros ausführen/aufzeichnen, Makro-Sicherheit, `RUNMACRO`/`CALLTHIS` | Entscheidung des Nutzers; Makros sind ein Sicherheitsrisiko und an die Microsoft-Laufzeit gebunden | VBA-Projekt in `.vsdm`/`.vssm`/`.vstm` unverändert durchreichen, nie ausführen, beim Öffnen darauf hinweisen | Entscheidung; SbS A; A 183847 |
+| NO-01 | VBA: Visual-Basic-Editor, Makros ausführen/aufzeichnen, Makro-Sicherheit, `RUNMACRO`/`CALLTHIS` | Entscheidung des Nutzers; Makros sind ein Sicherheitsrisiko und an die Microsoft-Laufzeit gebunden | VBA-Projekt in `.vsdm`/`.vssm`/`.vstm` unverändert durchreichen, nie ausführen, beim Öffnen darauf hinweisen; Automatisierung später über JFScript (UI-21, F7) | Entscheidung; SbS A; A 183847 |
 | NO-02 | COM-Add-ins, VSL-Add-ons, „Lösungen“ von Drittanbietern, `RUNADDON` für fremde Add-ons | Windows-/COM-gebunden, fremder Code | Lösungs-XML und Formeln erhalten; Aufruf meldet „nicht verfügbar“ | SbS A; A 183847 |
-| NO-03 | ActiveX-Steuerelemente im Zeichenblatt (Entwurfsmodus, Steuerelemente einfügen) | nur Windows/COM, ausführbarer Code | als Fremdobjekt mit Vorschaubild erhalten | SbS A; A 183847 |
+| NO-03 | ActiveX-Steuerelemente auf der Seite (Entwurfsmodus, Steuerelemente einfügen) | nur Windows/COM, ausführbarer Code | als Fremdobjekt mit Vorschaubild erhalten | SbS A; A 183847 |
 | NO-04 | OLE: eingebettete Office-Objekte bearbeiten (Excel-Tabelle, Word-Dokument) | erfordert die fremden Programme über COM | Objekt erhalten, Vorschaubild zeigen; „Öffnen mit …“ der eingebetteten Datei als P3-Ersatz | SbS 8; A 183603 |
 | NO-05 | SharePoint-Workflows, Export nach SharePoint Designer, Power Automate | Clouddienst-/Serverbindung an Microsoft | Workflow-Shapes als normale Shapes zeichnen; Exportbefehle fehlen | SbS 4, 15; A 183751 |
 | NO-06 | Visio Services, Visio-Webzeichnung (`.vdw`), Visio für das Web, Power-BI-Visual | Microsoft-Serverprodukte | – | SbS 4, 15; A 183751 |
@@ -6930,12 +6955,13 @@ dem Speichern in Visio weiter funktioniert.
 | NO-20 | Online-Vorlagensuche | Office-Onlinekatalog | eigene Vorlagen und Vorlagenordner (VL-03) | SbS 1 |
 | NO-21 | Web-Export als XAML (Silverlight) oder VML, Visio Viewer (Browser-Add-on), `.vdw`/`.vwi` | veraltete bzw. Microsoft-gebundene Techniken, schon in Visio 2016 überholt | Webseite als HTML + SVG (EX-09) | SbS 12, Gl |
 | NO-22 | Berichte als eingebettetes Excel-Objekt; Organigramm-Assistent, der Excel/Notepad fernsteuert | OLE- und Programmsteuerung fremder Programme | Tabellen-Shape, CSV/XLSX direkt schreiben (DA-09); CSV-Beispieldatei anlegen und öffnen lassen (AS-01) | SbS 5, 8 |
-| NO-23 | Netzwerk automatisch erkennen und zeichnen | gab es nur in sehr alten Versionen; Netzwerkzugriff | später eigenes Thema (z. B. Import aus JFNetworker-Projekten, offene Frage F9) | SbS 7 |
+| NO-23 | Netzwerk automatisch erkennen und zeichnen | gab es nur in sehr alten Versionen; Netzwerkzugriff | stattdessen Import von JFNetworker-Projekten (IM-11, P3, F9) | SbS 7 |
 | NO-24 | Office-Hintergrund, Office-Design, Konto-Seite | Office-spezifisch | nur Hell/Dunkel des NetLab-Styles (UI-02) | SbS 1; A 184427 |
 | NO-25 | Mitbearbeitungs-Marker, „Updates verfügbar“, Kontaktkarten, Kommentieren im Browser | an Microsoft-Dienste gebunden | lokale Kommentare mit Verlauf und Filter (HL-04) | SbS 15 |
 | NO-26 | Alte Fremdformate (ABC FlowCharter, CorelFLOW, CorelDRAW, Micrografx Designer, Macintosh PICT, IGES, PCX, AutoCAD DWF) | ausgestorben bzw. ohne offene Spezifikation | ältere Zeichnungen über Visio oder SVG/PDF umwandeln | UG Kap. 9 |
 | NO-27 | Lotus Notes, Laufzettel per Mail (Office 97), Exchange-Ordner, Outlook-Journal, Microsoft Binder, Visio im Internet Explorer (ActiveX-Dokument), serverseitige Image Maps | ausgestorbene Office- und Browser-Integration | – | UG Kap. 11–13, 23 |
 | NO-28 | Arbeitsbereich als eigene `.vsw`-Datei | nur Visio 5; der Arbeitsbereich steckt heute in der Zeichnung (DF-10) | – | UG Kap. 2 |
+| NO-29 | AutoCAD DWG lesen und schreiben | kein offen dokumentiertes Format (F5) | DXF verwenden (EX-10, IM-04) | SbS 12; Entscheidung F5 |
 
 <a id="icons"></a>
 ## 7. Anhang: Ribbon-Icons für die Neuzeichnung
@@ -7018,18 +7044,18 @@ Summe: rund 175 Icons (davon etwa 25 nur für entfallende Befehle, die nicht geb
 
 | Register / Gruppe | Icon | Größe | Motiv (Vorschlag) | Prio |
 |---|---|---|---|---|
-| Einfügen / Seiten | Neues Zeichenblatt; Leer, Hintergrund, Duplizieren | g; k | Blatt mit Plus; Blatt, Blatt mit Fläche, zwei Blätter | P1 |
+| Einfügen / Seiten | Neue Seite; Leer, Hintergrund, Duplizieren | g; k | Blatt mit Plus; Blatt, Blatt mit Fläche, zwei Blätter | P1 |
 | Einfügen / Illustrationen | Bilder, Piktogramme, Diagramm, CAD-Zeichnung | g | Bild mit Bergen, einfaches Symbol, Säulen, Blatt mit Bemaßung | P1/P3 |
-| Einfügen / Diagrammteile | Container, Legende (Callout), Verbinder | g | Rahmen mit Kopfleiste, Sprechblase, Verbinder mit Plus | P1 |
+| Einfügen / Diagrammteile | Container, Beschriftung, Verbinder | g | Rahmen mit Kopfleiste, Sprechblase, Verbinder mit Plus | P1 |
 | Einfügen / Links | Link | g | Kettenglieder | P1 |
 | Einfügen / Text | Textfeld; horizontal, vertikal | g; k | A im Rahmen; liegend/stehend | P1 |
 | Einfügen / Text | QuickInfo, Objekt, Feld, Symbol | g | Notizzettel, Fenster, Feld mit Klammern, Ω | P2/P3 |
 | Zeichnen / Tools | Auswählen, Mit Finger zeichnen, Radierer, Lasso | g | Pfeil, Hand mit Linie, Radiergummi, gestricheltes Oval | P3 |
 | Zeichnen / Stifte | Farbe, Linienstärke | k | Stift mit Balken, Linien dick→dünn | P3 |
 | Zeichnen / Konvertieren | Freihand in Text, Freihand in Shapes | g | geschriebenes „a“ → gedrucktes „a“, Kritzel → Kasten | P3 |
-| Entwurf / Zeichenblatt einrichten | Ausrichtung; Hoch-, Querformat | g | zwei Blätter; Blatt hoch, Blatt quer | P1 |
-| Entwurf / Zeichenblatt einrichten | Format; Papierformat-Einträge; An Zeichnung anpassen; Weitere Formate | g; k | Blatt mit Maßpfeil; Blattumriss im Seitenverhältnis; Rahmen mit Pfeilen; Blatt mit Zahnrad | P1 |
-| Entwurf / Zeichenblatt einrichten | Automatisch anpassen | g | Blatt mit Pfeilen nach außen | P1 |
+| Entwurf / Seite einrichten | Ausrichtung; Hoch-, Querformat | g | zwei Blätter; Blatt hoch, Blatt quer | P1 |
+| Entwurf / Seite einrichten | Format; Papierformat-Einträge; An Zeichnung anpassen; Weitere Formate | g; k | Blatt mit Maßpfeil; Blattumriss im Seitenverhältnis; Rahmen mit Pfeilen; Blatt mit Zahnrad | P1 |
+| Entwurf / Seite einrichten | Automatisch anpassen | g | Blatt mit Pfeilen nach außen | P1 |
 | Entwurf / Varianten | Farben, Effekte, Verbinder, Schriftarten, Verzierung | k | Farbfelder, Stern, Verbinderlinie, Aa, Ornamentecke | P2 |
 | Entwurf / Hintergründe | Hintergründe, Rahmen und Titel, Hintergrundfarbe | g; k | Blatt mit Fläche, Blatt mit Rand und Titelfeld; Farbeimer | P2 |
 | Entwurf / Layout | Seite neu layouten; Layout-Einträge (Fluss in 4 Richtungen, Hierarchie, kompakt, radial, kreisförmig) | g; k | Kastenhierarchie; je kleine Schemazeichnung | P2 |
@@ -7055,7 +7081,7 @@ Summe: rund 175 Icons (davon etwa 25 nur für entfallende Befehle, die nicht geb
 | Überprüfen | Shape-Berichte, Dokument schützen | g | Blatt mit Balken, Blatt mit Schloss | P2/P3 |
 | Ansicht | Präsentationsmodus | g | Leinwand | P2 |
 | Ansicht | Aufgabenbereiche, Lineal und Gitternetz (DS), Ausrichten und Kleben (DS) | g; k | Fenster mit Seitenleiste; Lineal; Magnet | P1 |
-| Ansicht | Zoom, An Fenster anpassen, Zeichenblattbreite | k | Lupe, Rahmen mit Pfeilen, Doppelpfeil waagerecht | P1 |
+| Ansicht | Zoom, An Fenster anpassen, Seitenbreite | k | Lupe, Rahmen mit Pfeilen, Doppelpfeil waagerecht | P1 |
 | Ansicht | Neues Fenster, Alle anordnen, Überlappend, Fenster wechseln | g | Fenster mit Plus, zwei Fenster nebeneinander, gestaffelt, Fenster mit Kreispfeil | P2/P3 |
 | Ansicht | Werkzeuge (Ersatz für Add-Ons): Array, Nummerieren, Maßlinie | g; k | Kästchenraster, Kästen mit 1-2-3, Maßpfeil | P2/P3 |
 | Entwicklertools | ShapeSheet anzeigen (Shape, Seite, Dokument) | g; k | Tabellengitter | P2 |
@@ -7080,21 +7106,25 @@ Summe: rund 175 Icons (davon etwa 25 nur für entfallende Befehle, die nicht geb
 | Schablone bearbeiten | Neuer Master, Master-Eigenschaften, Master bearbeiten, Symbol bearbeiten, Schablone speichern | P2 |
 
 <a id="fragen"></a>
-## 8. Offene Fragen an den Nutzer
+## 8. Entscheidungen zu den Planungsfragen F1–F14
 
-| ID | Frage | Hintergrund | Vorschlag (nur Empfehlung, nicht entschieden) |
+Am 2026-11-14 hat der Nutzer alle Vorschläge zu den Planungsfragen aus Phase 1 übernommen
+(„Alle übernehmen“). Die Spalte „Umgesetzt in“ nennt die Stellen, die danach angepasst wurden.
+Offen ist nur noch eine Teilfrage zu F4.
+
+| ID | Frage | Entscheidung (2026-11-14) | Umgesetzt in |
 |---|---|---|---|
-| F1 | Eine neue Crate oder zwei? Und wie soll sie heißen? | Entschieden ist **eine** neue Crate für die Codecs. Der Codec braucht aber das ganze Dokumentmodell samt Formel-Engine, Routing und Layout. JFLib trennt das bei Textdokumenten in `doc_core` und `doc_io`. | Zwei Crates nach dem Vorbild `diagram_core` (Modell, ShapeSheet, Formeln, Geometrie, Routing) + `diagram_io` (VSDX/VDX/VSX/VSS, Exporte). Ohne deine Zustimmung bleibt es bei einer Crate (Arbeitsname `diagram_io`). |
-| F2 | Wie weit reicht „JFNetworker-Stil“ bei genormten Symbolen? | Flussdiagramm-, BPMN-, UML-, Elektro- und R&I-Symbole dürfen normgerecht aussehen. | Normform beibehalten, nur Strichstärken, Farben, Schriften und Schatten aus dem NetLab-Design; gestaltete Grafiken (Geräte, Möbel, Personen) ganz im JFNetworker-Stil. |
-| F3 | Welche AWS-Icon-Ausgabe und in welcher Form? | CC BY-ND 2.0 erlaubt keine Bearbeitung, also kein Umfärben nach Theme. | Aktuelle offizielle Ausgabe als SVG unverändert mitliefern, je AWS-Kategorie eine Schablone, Namensnennung im Info-Dialog und in den Schablonen-Eigenschaften; Shapes sind von Designs ausgenommen. |
-| F4 | Lohnt der Import von binären `.vss`/`.vsd`? | Dafür gibt es keine offene Spezifikation von Microsoft. Er müsste aus eigener Analyse entstehen; libvisio wäre höchstens Lesestoff. Das Risiko ist hoch. | `.vss` mit P2 halten, aber erst nach allen XML-Formaten. Vorher braucht es eine Sammlung echter Testdateien (gibt es alte `.vss`-Schablonen von dir?). `.vsd` bleibt P3. |
-| F5 | Gehört DWG dazu oder nur DXF? | DXF ist offen dokumentiert, DWG nicht frei. | Nur DXF (Import und Export); DWG weglassen. |
-| F6 | Welche Datenquellen in P2? | Visio verknüpft mit Excel, Access, SQL Server, ODBC und SharePoint. JFLib kann bisher keine `.xlsx` lesen. | P2: CSV und `.xlsx` (dafür ein schlanker XLSX-Leser in der Bibliothek); ODBC/SQL erst P3. |
-| F7 | Soll es einen Ersatz für VBA-Automatisierung geben? | Ohne VBA fehlt jede Automatisierung (Makros, eigene Regeln, Aktionen). | Später eine Skript- und Plugin-Schnittstelle über JFScript mit dem Ereignismodell aus RX-10; nicht in Phase 2. |
-| F8 | Welche Begriffe soll die Oberfläche verwenden? | Visio mischt „Layer“ und „Ebene“, „Legende“ (Callout) und „Legende“ (Datenlegende), „Zeichenblatt“ und „Seite“. | Durchgehend „Ebene“, „Beschriftung“ für Callouts, „Legende“ nur für Datenlegenden, „Seite“ statt „Zeichenblatt“. Befehlsnamen sonst wie Visio. |
-| F9 | Wie eng hängt JFDiagrammer an JFNetworker? | Beide haben Netzwerksymbole. JFNetworker-Projekte könnten als Diagramm importiert werden. | Gemeinsamer Symbolsatz für Netzwerkgeräte (eine Quelle, zwei Apps); Import von JFNetworker-Projekten als P3. |
-| F10 | Welche Tastenbelegung? | Die US-Belegung von Visio kollidiert mit der deutschen Office-Konvention (Strg+Umschalt+F, Strg+Umschalt+K). | Deutsche Office-Konvention für Textformate, „In den Vordergrund“ auf eine freie Taste legen; alles anpassbar. |
-| F11 | Welche Vorlagen kommen in die erste Version (P1)? | Laut Liste: leere Zeichnung, Standarddiagramm, Standardflussdiagramm, funktionsübergreifendes Flussdiagramm, Standard- und detailliertes Netzwerk. | Wegen JFNetworker auch Rack-Diagramm und AWS-Architektur früh (P1/P2); Grundrisse und Konstruktion später. |
-| F12 | Mehr Screenshots? | Es fehlen Kontextregister, Aufgabenbereiche, Kontextmenüs, Minisymbolleiste, AutoVerbinden-Pfeile, „Seite einrichten“, Ebeneneigenschaften und die Backstage-Seiten Neu, Speichern unter, Drucken und Exportieren. Diese Zeilen stützen sich auf Buch, Tutorial oder Kenntnis (`W`). | Nur nötig, wenn die Oberfläche pixelnah nachgebaut werden soll. Für das Verhalten reichen die Bücher. |
-| F13 | Wie heißen die Visio-eigenen Begriffe in eigenen Produkten? | „SmartShapes“, „AutoConnect“ und „Quick Shapes“ sind Visio-Begriffe. Deutsch beschreibend sind sie vermutlich unkritisch („AutoVerbinden“, „Schnell-Shapes“). | Deutsche Beschreibungen verwenden; englische Visio-Begriffe in der App meiden. |
-| F14 | Norm-Schablonen nach DIN EN/IEC oder wie Visio nach US/ANSI? | Visios Elektro-, HLK- und Sanitär-Schablonen zeichnen meist im US-Stil (IEEE 315, ANSI). Für den deutschen Markt passen DIN EN/IEC-Symbole besser (4.13). | DIN EN/IEC als Standard, ANSI höchstens als spätere zweite Fassung. |
+| F1 | Eine neue Crate oder zwei? | Zwei Crates nach dem Muster `doc_core`/`doc_io`: `diagram_core` (Modell, ShapeSheet, Formeln, Geometrie, Routing, Layout) und `diagram_io` (VSDX/VDX/VSX/VSS, Importe, Exporte). | 0.1, 0.3; Spalte „Ort“ (`Lib-core`, `Lib-io`) |
+| F2 | Wie weit reicht „JFNetworker-Stil“ bei genormten Symbolen? | Normsymbole behalten ihre Normform; Strichstärken, Farben, Schriften und Schatten kommen aus dem NetLab-Design. Gestaltete Grafiken (Geräte, Möbel, Personen) werden ganz im JFNetworker-Stil gezeichnet. | 4 (Kennzeichnung), SH-G01 |
+| F3 | Welche AWS-Icon-Ausgabe und in welcher Form? | Die aktuelle offizielle Ausgabe als SVG, unverändert, je AWS-Kategorie eine Schablone. Namensnennung im Info-Dialog und in den Schablonen-Eigenschaften. Die Icons sind von Designs ausgenommen. | SH-G06, NO-14 |
+| F4 | Lohnt der Import von binären `.vss`/`.vsd`? | `.vss` mit P2, aber erst nach allen XML-Formaten; `.vsd` mit P3. **Noch offen:** Ob der Nutzer alte `.vss`-Testdateien hat; ohne Testdateien ist der Import kaum prüfbar. | DF-30, DF-31 |
+| F5 | DWG oder nur DXF? | Nur DXF (Import und Export); DWG entfällt. | EX-10, IM-04, NO-29 |
+| F6 | Welche Datenquellen in P2? | CSV und `.xlsx` in P2; dafür ein schlanker XLSX-Leser in JFLib. ODBC/SQL erst in P3. | IM-05, IM-10, DA-04, RD-02 |
+| F7 | Ersatz für VBA-Automatisierung? | Später eine Skript- und Plugin-Schnittstelle über JFScript mit dem Ereignismodell aus RX-10; nicht in Phase 2. | UI-21, NO-01 |
+| F8 | Welche Begriffe in der Oberfläche? | Durchgehend „Ebene“ (nicht „Layer“), „Beschriftung“ für Callouts, „Legende“ nur für Datenlegenden, „Seite“ statt „Zeichenblatt“. Befehlsnamen sonst wie in Visio. | Abschnitte 2.9, 3, 7 (Visio-Name jeweils in Klammern) |
+| F9 | Wie eng hängt JFDiagrammer an JFNetworker? | Gemeinsamer Symbolsatz für Netzwerkgeräte (eine Quelle, zwei Apps); Import von JFNetworker-Projekten mit P3. | SH-G09, IM-11, NO-23 |
+| F10 | Welche Tastenbelegung? | Deutsche Office-Konvention für Textformate; „In den Vordergrund“/„In den Hintergrund“ und „Kapitälchen“ auf freie Tasten; alles anpassbar. | 3.16, KB-07, KB-11 |
+| F11 | Welche Vorlagen kommen in P1? | Leere Zeichnung, Standarddiagramm, Standardflussdiagramm, funktionsübergreifendes Flussdiagramm, Standard- und detailliertes Netzwerk und wegen JFNetworker zusätzlich das Rack-Diagramm (samt Rack-Schablonen). Die AWS-Architektur kommt früh in P2. Grundrisse und Konstruktion folgen später. | VL-52, VL-54, SH-145 bis SH-147 |
+| F12 | Mehr Screenshots? | Nein. Für das Verhalten reichen die Bücher; Screenshots wären nur für einen pixelnahen Nachbau nötig. | – |
+| F13 | Visio-eigene Begriffe? | Deutsche beschreibende Begriffe („AutoVerbinden“, „Schnell-Shapes“); englische Visio-Begriffe in der App meiden. | Abschnitt 3 |
+| F14 | DIN EN/IEC oder US/ANSI? | Normschablonen nach DIN EN/IEC; eine ANSI-Fassung höchstens später. | 4 (Kennzeichnung), 4.13, VL-40 |
