@@ -1600,7 +1600,9 @@ ui.dialog_end(); // always
   Types: `Key<bool>`, `Key<i64>` (`int`), `Key<f64>` (`num`, with decimals), `Key<String>`
   (`text`, at most N bytes), `Key<usize>` (`choice`: the file keeps the word), `Key<u32>`
   (`color` 0xRRGGBB, the file `#RRGGBB`); `.restart()` marks keys that take effect after a
-  restart. `settings_page` shows a card per section with a switch, number box, text box,
+  restart. What a restart reads back is what was set: a text keeps line breaks as blanks and
+  no blanks around it, a reset (or the default) removes every line of the key, and a value too
+  long for a line of the file (64 KiB) is not set. `settings_page` shows a card per section with a switch, number box, text box,
   combo box or colour button per key and a reset button; labels go through `i18n::t`.
   `s.revision()` counts changes, `s.ini_mut()` holds free-form data (recent files).
 * **Window placement**: `AF_SAVE_STATE` in the app flags keeps the main window's position,

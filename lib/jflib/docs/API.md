@@ -36974,7 +36974,8 @@ ini -- settings files: UTF-8 "[section]" / "key=value" text              [src/co
   ini.get(sec, key) -> Option<&str>   (get_bytes for values that are not UTF-8)
   ini.get_int(sec, key, def)   decimal (+/-), 0x hex, true/false/yes/no/on/off; else def
   ini.get_f64(sec, key, def)   '.' decimal point only; else def
-  ini.set(sec, key, value) / set_int / set_f64 -> bool   add or replace (false: bad name)
+  ini.set(sec, key, value) / set_int / set_f64 -> bool   add or replace (false: a bad name,
+                                or a line longer than LINE_MAX: it would not read back)
   ini.remove(sec, key) -> bool
   ini.section(sec) -> Vec<(&str, &str)>   the keys of a section and their values, in order
   ini.sections() -> Vec<&str>   the section names in file order (each once; not "")
@@ -36992,7 +36993,8 @@ read up to FILE_MAX bytes; after LINES_MAX lines the rest is kept as one verbati
 Line ends: LF, CRLF (any number of CRs before the LF are dropped) when reading; written as
 CRLF on Windows, LF on Linux.  Key names must not contain '=', NUL, CR or LF nor start with
 ';' '#' '['; section names must not contain ']', NUL, CR or LF; neither may start or end with
-a blank (set -> false).  CR / LF inside a value are written as blanks.
+a blank (set -> false).  CR / LF / NUL inside a value are written as blanks and blanks around
+a value are dropped (reading drops them too): get after set gives what a reload gives.
 ```
 
 - **`struct Ini`**
@@ -37036,7 +37038,8 @@ a blank (set -> false).  CR / LF inside a value are written as blanks.
 - **`fn get_f64(&self, sec: &str, key: &str, def: f64) -> f64`**
   the whole value must be the number  [ini_get_f64]
 - **`fn set(&mut self, sec: &str, key: &str, value: &str) -> bool`**
-  add or replace (false: a bad name)  [ini_set]
+  add or replace (false: a bad name, or a line longer than LINE_MAX -- it would be read
+  back as a malformed line, not as this key or section)  [ini_set]
 - **`fn set_int(&mut self, sec: &str, key: &str, value: i64) -> bool`**
   [ini_set_int]
 - **`fn set_f64(&mut self, sec: &str, key: &str, value: f64) -> bool`**
@@ -37190,8 +37193,12 @@ says so), step(n) (int: the number box's step).
   rename(&mut ini, "old.key", "new.key")   for migrations
 
 Names are "section.key" (no '.': the top of the file).  The file keeps only values that
-differ from the default (setting the default removes the line), so a new default reaches
-users who never changed it; comments, unknown keys and other sections survive (Ini).
+differ from the default (setting the default or a reset removes every line of the key, also
+one that already read as the default), so a new default reaches users who never changed it;
+comments, unknown keys and other sections survive (Ini).  set / reset report whether the
+value or the file changed.  A text is kept as the file can hold it: CR, LF and NUL become
+blanks, blanks around it go, then it is cut to its maximum (what a restart reads back); a
+value whose line would be too long for the file is not set (false, a WARN).
 The format version is "version=N" at the top: a file of an older version (no line: 0)
 runs migrate(from, &mut ini) once before its values are read (rename keys, convert units)
 and is saved with the new version by the next save; a missing file needs no migration; a
@@ -37343,9 +37350,11 @@ KF_RESTART: u32 = 2
 - **`fn text(&self, k: &Key<String>) -> &str`**
   a text without copying it
 - **`fn set<T: Value>(&mut self, k: &Key<T>, v: T) -> bool`**
-  set a value (made valid for the key) -> it changed
+  set a value (made valid for the key) -> the value or the file changed (the default
+  removes every line of the key, also one that held it already)
 - **`fn reset<T>(&mut self, k: &Key<T>) -> bool`**
-  back to the default (the line leaves the file)
+  back to the default: every line of the key leaves the file (also an explicit default,
+  a value that read as the default, a second line of the same key)
 - **`fn reset_all(&mut self) -> bool`**
   every key of the schema back to its default
 - **`fn is_default<T>(&self, k: &Key<T>) -> bool`**
@@ -37355,7 +37364,7 @@ KF_RESTART: u32 = 2
 - **`fn default_at(&self, i: usize) -> Val`**
   the default of schema key i
 - **`fn set_at(&mut self, i: usize, v: Val) -> bool`**
-  set schema key i (made valid) -> it changed
+  set schema key i (made valid) -> the value or the file changed (as set)
 - **`fn dirty(&self) -> bool`**
   unsaved changes
 - **`fn revision(&self) -> u32`**
