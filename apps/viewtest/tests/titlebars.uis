@@ -1,0 +1,46 @@
+# viewtest: the same fixed ids in two windows.  Command 8 opens "Fenster A" and "Fenster B" (two
+# browser windows): each has a title bar of its own (the library's box TB_ID) with tabs of other
+# widths, and a sheet box of one fixed id (#150) with a text box of one fixed id (#153) whose
+# contents differ.  Before charge 10 every id had one measurement slot for all windows: each
+# window's pass stored its size, the other window's pass found the size changed and asked for
+# another pass, every pass -- "layout did not settle within 4 passes" (a UIWARN).  Now every
+# window keeps its own slots.
+cmd 8
+expect window 140 open
+expect window 141 open
+expect_nowarn
+window 140
+expect titlebar:"Fenster A" exists
+expect "Start" exists
+expect text:"Reiter: Start" exists
+window 141
+expect titlebar:"Fenster B" exists
+expect "Zwei mit einem langen Namen" exists
+click "Drei, noch etwas länger"
+expect text:"Reiter: Drei, noch etwas länger" exists
+expect_nowarn
+# the text boxes of one id: each its own width, text and caret
+window 140
+expect #153 rect * * 200 *
+window 141
+expect #153 rect * * 320 *
+window 140
+click #153
+key end
+type "x"
+expect #153 text "Blatt Ax"
+window 141
+click #153
+key end
+type "yz"
+expect #153 text "Blatt Byz"
+window 140
+expect #153 text "Blatt Ax"
+expect_nowarn
+# a frame later (time passes, both windows are built again): still settled
+wait 100
+expect_nowarn
+window 141
+click "Eins"
+expect text:"Reiter: Eins" exists
+expect_nowarn
