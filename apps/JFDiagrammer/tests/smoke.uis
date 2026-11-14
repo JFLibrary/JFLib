@@ -1,0 +1,37 @@
+# JFDiagrammer, JD0: the window opens with its four areas -- register row and ribbon, the
+# Shapes sidebar, the canvas, the status bar -- and the registers switch the ribbon's groups.
+# German, the source language (lang_*.uis: the other four)
+expect tab:"Start" selected
+expect tab:"Einfügen" unselected
+expect tab:"Entwurf" exists
+expect tab:"Ansicht" exists
+# the ribbon of Start: placeholders, every button disabled (Paste shares its German word with
+# the register Einfügen, the kind tells them apart)
+expect text:"Zwischenablage" exists
+expect button:"Einfügen" disabled
+expect button:"Ausschneiden" disabled
+expect text:"Anordnen" exists
+# the sidebar: its title and the empty state
+expect text:"Shapes" exists
+expect text:"Keine Schablone geöffnet." exists
+expect button:"Weitere Shapes" disabled
+# the canvas and the status bar
+expect canvas:"Zeichenfläche" exists
+expect text:"Seite 1 von 1" exists
+expect text:"100 %" exists
+shot build/JFDiagrammer.png
+# the registers switch the ribbon
+click tab:"Einfügen"
+expect tab:"Einfügen" selected
+expect text:"Illustrationen" exists
+expect button:"Bilder" disabled
+expect text:"Zwischenablage" missing
+click tab:"Entwurf"
+expect text:"Seite einrichten" exists
+expect text:"Varianten" exists
+click tab:"Ansicht"
+expect text:"Anzeigen" exists
+expect button:"Aufgabenbereiche" disabled
+click tab:"Start"
+expect tab:"Start" selected
+expect text:"Zwischenablage" exists

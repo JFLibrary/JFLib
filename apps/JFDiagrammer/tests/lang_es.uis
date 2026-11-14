@@ -1,0 +1,18 @@
+#!args --lang es
+# JFDiagrammer, JD0: the window in Spanish (--lang es): the four areas show the catalogue's
+# column es (locales/ui.tsv), the library's own texts follow the same language
+expect tab:"Inicio" selected
+expect tab:"Insertar" exists
+expect tab:"Diseño" exists
+expect tab:"Vista" exists
+expect text:"Portapapeles" exists
+expect button:"Pegar" disabled
+expect text:"Formas" exists
+expect text:"No hay ninguna colección de formas abierta." exists
+expect button:"Más formas" disabled
+expect canvas:"Lienzo de dibujo" exists
+expect text:"Página 1 de 1" exists
+expect text:"100 %" exists
+click tab:"Insertar"
+expect text:"Ilustraciones" exists
+expect text:"Portapapeles" missing

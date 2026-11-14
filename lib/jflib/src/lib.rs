@@ -64,6 +64,8 @@ pub use eapm;
 pub use render3d;
 pub use render2d;
 pub use gltf;
+pub use diagram_core;
+pub use diagram_io;
 #[doc(hidden)]
 pub use style_assets;
 

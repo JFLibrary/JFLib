@@ -1,0 +1,8 @@
+# JFDiagrammer: what the program may do (docs/PERMISSIONS.md).  Everything that is not listed is
+# refused (in the library, plugins, scripts and agent actions too).  The app's own folders
+# (config://, data://, cache://, logs://) and app:// need no line.
+#
+# Stage JD0 (the empty window) needs no rule.  The rules come with the functions (PLAN.md):
+# fs.user                            JD3: the drawings and stencils the user opens and saves
+# print                              JD12: printing (plat::print)
+# url https mailto                   JD8: a shape's hyperlink, after the app shows the address

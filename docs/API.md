@@ -104,6 +104,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#doc_view-crate-root) · [src/coords.rs](#doc_viewsrccoordsrs) · [src/fonts.rs](#doc_viewsrcfontsrs) · [src/measure.rs](#doc_viewsrcmeasurers) · [src/page.rs](#doc_viewsrcpagers) · [src/cell_border_editor.rs](#doc_viewsrccell_border_editorrs) · [src/table.rs](#doc_viewsrctablers) · [src/table_editor.rs](#doc_viewsrctable_editorrs) · [src/formula_editor.rs](#doc_viewsrcformula_editorrs) · [src/table_style_editor.rs](#doc_viewsrctable_style_editorrs) · [src/table_position_editor.rs](#doc_viewsrctable_position_editorrs) · [src/ruler.rs](#doc_viewsrcrulerrs) · [src/ruler_input.rs](#doc_viewsrcruler_inputrs) · [src/tab_editor.rs](#doc_viewsrctab_editorrs)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
+- [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
+- [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 
@@ -51178,6 +51180,64 @@ Related Word stories resolved by OPC identity, never guessed from ZIP file names
   - `Footer` -- A section footer part.
   - `Footnote` -- A normal footnote (separator/continuation definitions are excluded).
   - `Endnote` -- A normal endnote (separator/continuation definitions are excluded).
+
+## diagram_core
+
+*the diagram model: ShapeSheet cells, formulas, geometry, routing and layout* -- crate root [`lib/diagram_core/src/lib.rs`](../lib/diagram_core/src/lib.rs)
+
+```text
+diagram_core -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
+
+The model behind JFDiagrammer (apps/JFDiagrammer, plan in its PLAN.md), usable by any app that
+draws or reads diagrams of the Visio kind.  It holds no file format (that is diagram_io) and no
+widget (the canvas is ui::diagram); it is plain data and the rules that compute it.
+
+The ShapeSheet is the model (decision V1): every cell is kept as the file has it -- formula,
+cached value, unit and where it comes from (local, inherited from the master or from a style,
+deleted) -- and documents, pages and shapes are views on these cells.  So a round trip through
+a file loses nothing, and the behaviour Visio files carry works without translation.
+
+What is to come here, by stage of the plan (none of it exists yet):
+  JD2   document, foreground and background pages, layers, masters, shapes and groups, styles,
+        theme data; sections, rows and cells; the inheritance shape -> master shape -> style ->
+        document; NameU and Name; units (inches inside, as in the file); hyperlinks, shape data
+        and user cells; an edit API with transactions for undo and redo
+  JD4   geometry rows and transforms (pin, local pin, angle, flips, groups) for drawing
+  JD6   the formula engine: parser of the universal syntax, evaluation over a dependency graph
+        with incremental recalculation, units, inheritance, GUARD and locks
+  JD7  glue, the dynamic connector with right-angle routing around obstacles, layout
+
+Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
+opening a file (connectors, layout and containers move only when something moves), and a
+formula with an unknown function keeps its cached value instead of failing.
+```
+
+## diagram_io
+
+*Visio file formats (the VSDX family) and diagram exports* -- crate root [`lib/diagram_io/src/lib.rs`](../lib/diagram_io/src/lib.rs)
+
+```text
+diagram_io -- Visio file formats (the VSDX family) and diagram exports
+
+Reads and writes the model of diagram_core (apps/JFDiagrammer, plan in its PLAN.md).  The
+format follows the public specification [MS-VSDX]; no code of other implementations is used.
+
+What is to come here, by stage of the plan (none of it exists yet):
+  JD3   reading the VSDX family into the model: .vsdx, .vssx, .vstx and the macro-enabled
+        .vsdm / .vssm, whose macro part is passed through unchanged and never run; document.xml
+        (styles, the document's ShapeSheet, colours, fonts), pages with their shapes and
+        connects, masters, themes, windows.xml, properties and media; comments and data
+        recordsets are kept
+  JD5   writing the model back with everything it does not know; new documents with the own
+        default theme; .vssx stencils
+  JD12  exports: SVG, PNG and PDF through the library's writers
+  later the XML formats of 2003-2010 (.vdx, .vsx) and importing the binary .vss / .vsd
+
+The ZIP and OPC parts come from archive (archive::opc, JD1), shared with doc_io's DOCX.
+Every file is untrusted input: sizes, counts and nesting are bounded, a file that breaks a
+rule is an error and never a panic, external links are kept as data and never followed, and
+nothing in a file is ever run.
+```
 
 ## rt
 

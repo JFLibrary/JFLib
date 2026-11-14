@@ -18,6 +18,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "JFDiagrammer"
+version = "0.1.0"
+dependencies = [
+ "jflib-build",
+ "jflib-style-netlab",
+ "jflib-ui",
+]
+
+[[package]]
 name = "Kritzel"
 version = "0.1.0"
 dependencies = [
@@ -524,6 +533,8 @@ dependencies = [
  "jflib-crypto",
  "jflib-datastore",
  "jflib-datetime",
+ "jflib-diagram-core",
+ "jflib-diagram-io",
  "jflib-doc-core",
  "jflib-doc-io",
  "jflib-doc-layout",
@@ -655,6 +666,17 @@ dependencies = [
 [[package]]
 name = "jflib-datetime"
 version = "0.2.0"
+
+[[package]]
+name = "jflib-diagram-core"
+version = "0.2.0"
+
+[[package]]
+name = "jflib-diagram-io"
+version = "0.2.0"
+dependencies = [
+ "jflib-diagram-core",
+]
 
 [[package]]
 name = "jflib-doc-core"

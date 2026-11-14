@@ -151,6 +151,8 @@ CRATES = [
     ("doc_layout", "typographic paragraph flow and page layout", "full"),
     ("doc_view", "shared document fonts, page painting, thumbnails and page coordinates", "full"),
     ("doc_io", "conservative DOCX interchange and bounded file I/O", "full"),
+    ("diagram_core", "the diagram model: ShapeSheet cells, formulas, geometry, routing and layout", "full"),
+    ("diagram_io", "Visio file formats (the VSDX family) and diagram exports", "full"),
     ("rt", "the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records",
      "full"),
 ]

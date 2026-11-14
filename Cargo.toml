@@ -63,6 +63,8 @@ members = [
     "lib/render3d",
     "lib/render2d",
     "lib/gltf",
+    "lib/diagram_core",
+    "lib/diagram_io",
     "lib/jflib",
     "lib/jflib_build",
     "lib/cargo_jflib",
@@ -148,6 +150,7 @@ members = [
     "apps/wgsltest",
     "apps/viewtest",
     "apps/a11ytest",
+    "apps/JFDiagrammer",
 ]
 
 # The one version of the library (rt::VERSION; `build_rs.py release` writes it, docs/VERSIONING.md)
@@ -213,6 +216,8 @@ style_assets = { package = "jflib-style-assets", path = "lib/style_assets", vers
 render3d = { package = "jflib-render3d", path = "lib/render3d", version = "=0.2.0" }
 render2d = { package = "jflib-render2d", path = "lib/render2d", version = "=0.2.0" }
 gltf = { package = "jflib-gltf", path = "lib/gltf", version = "=0.2.0" }
+diagram_core = { package = "jflib-diagram-core", path = "lib/diagram_core", version = "=0.2.0" }
+diagram_io = { package = "jflib-diagram-io", path = "lib/diagram_io", version = "=0.2.0" }
 style_winui = { package = "jflib-style-winui", path = "styles/winui", version = "=0.2.0" }
 style_classic = { package = "jflib-style-classic", path = "styles/classic", version = "=0.2.0" }
 style_kde = { package = "jflib-style-kde", path = "styles/kde", version = "=0.2.0" }

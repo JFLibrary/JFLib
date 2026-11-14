@@ -1,0 +1,18 @@
+#!args --lang en
+# JFDiagrammer, JD0: the window in English (--lang en): the four areas show the catalogue's
+# column en (locales/ui.tsv), the library's own texts follow the same language
+expect tab:"Home" selected
+expect tab:"Insert" exists
+expect tab:"Design" exists
+expect tab:"View" exists
+expect text:"Clipboard" exists
+expect button:"Paste" disabled
+expect text:"Shapes" exists
+expect text:"No stencil open." exists
+expect button:"More Shapes" disabled
+expect canvas:"Drawing canvas" exists
+expect text:"Page 1 of 1" exists
+expect text:"100%" exists
+click tab:"Insert"
+expect text:"Illustrations" exists
+expect text:"Clipboard" missing
