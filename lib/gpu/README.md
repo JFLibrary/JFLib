@@ -104,7 +104,8 @@ system has them.
   with the same `Swapchain` type.
 - **macOS and iOS:** Metal. Devices with Metal 3 (A14, M1 and newer) reach `Voll`, other devices and
   the iOS simulator `Basis`. Swapchains sit on a `CAMetalLayer` and present with `Fifo` only.
-  Timestamps are not built on Metal yet.
+  Timestamps are not built on Metal yet. Metal is part of the system, so there is no
+  `NoLoader` here: a machine without a Metal device gets `GpuError::NoAdapter`.
 - **The browser:** WebGPU, level `Basis`. Adapter and device arrive later, and `instance.prepare()`
   says when they are there. The worker the app runs in cannot wait for the GPU, so `wait` answers
   at once, `wait_idle` and `Queue::read_buffer` are `Unsupported`, and `Buffer::read` says

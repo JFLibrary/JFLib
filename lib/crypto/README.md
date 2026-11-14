@@ -26,8 +26,9 @@ repositories and its updater build on them, and any program can use them directl
 ## How it is built
 
 The crate never makes up randomness itself. Keys, nonces and salts come from the caller, which
-keeps every function deterministic and testable; on Windows, Linux, macOS and iOS
-`plat::random_bytes` gives them from the system's generator.
+keeps every function deterministic and testable; on Windows, Linux, macOS, iOS and Android
+`plat::random_bytes` gives them from the system's generator. In the browser `plat` has none, a
+web page takes them from `crypto.getRandomValues`.
 
 ```rust
 use jflib::{crypto, plat};

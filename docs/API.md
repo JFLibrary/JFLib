@@ -12937,7 +12937,8 @@ fallback -- characters a font lacks, drawn with another font (font fallback)
   set_fallback_fonts(ids)        (shaping.rs) the app's own chain, tried first; shaping uses
                                  it as well
   set_system_fallback(on)        then system fonts: the families of FAMILIES (this OS's
-                                 list, after the ';' separated families of
+                                 list: Windows, macOS / iOS, Linux and the rest; after
+                                 the ';' separated families of
                                  jfgui_FALLBACK_FONTS), found with a FontDb of the font
                                  folders (scanned on the first missing character; its cache
                                  is cache://fontdb.fdb, not with jfgui_FONTDIRS) and loaded
@@ -16640,11 +16641,11 @@ WPP_ICON: u32 = 4
 WPP_TEXT: u32 = 5
 IOF_WEBP_NOEXACT: u32 = 0x20000  // RGB under alpha 0 may change (default: kept exactly)
 IOF_WEBP_SHARPYUV: u32 = 0x40000  // lossy: sharp RGB -> YUV 4:2:0
-IOF_WEBP_1THREAD: u32 = 0x80000  // no worker threads (the output is the same either way)
+IOF_WEBP_1THREAD: u32 = 0x80000  // accepted, no effect: the encoder runs on the calling thread
 // WEBPENC flags (Cfg::flags)
 WEF_NOEXACT: u32 = 1
 WEF_NOHDR: u32 = 2  // VP8L: header-less stream (ALPH chunk)
-WEF_1THREAD: u32 = 4
+WEF_1THREAD: u32 = 4  // accepted, no effect (no worker threads)
 WEF_SHARPYUV: u32 = 8
 // test-only flags (codectest ops 126..128): force a configuration / predictor mode, switch
 // off stages
@@ -19000,7 +19001,8 @@ level Voll on Metal 3 devices of the Apple7 or Mac2 family (A14, M1 and newer), 
 lacks is said in mtl_dev.rs).
 
   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
-                   Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
+                   Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader (Vulkan,
+                   WebGPU), Err(NoAdapter) without a GPU (Metal: without a Metal device)
   instance.adapters() -> Result<Vec<Adapter>>   every GPU, discrete ones first
   instance.adapter() -> Result<Adapter>         the first usable one (jfgui_GPU_ADAPTER: an
                    index into adapters() or a part of the name)
@@ -19097,7 +19099,9 @@ COLOR_TARGETS_MAX: usize = 8
   what went wrong
   - `Disabled` -- the GPU is switched off (jfgui_GPU=0)
   - `NoLoader` -- the GPU API is not installed (no vulkan-1.dll or libvulkan.so.1, jfgui_GPU_DLL names a
-    missing file, a Linux program not linked against glibc, a browser without navigator.gpu)
+    missing file, a Linux program not linked against glibc, a browser without navigator.gpu);
+    never on macOS and iOS, where Metal is part of the system: a Mac without a Metal device
+    gives NoAdapter
   - `NoAdapter` -- no usable GPU (or jfgui_GPU_ADAPTER matched none)
   - `Unsupported(&'static str)` -- the adapter or this backend lacks something (a feature, a format, the level)
   - `Invalid(&'static str)` -- a call the API does not allow (sizes, alignments, states, order)
@@ -26891,9 +26895,12 @@ Source: [`lib/plat/rand.rs`](../lib/plat/rand.rs)
 ```text
 rand -- the operating system's cryptographic random number generator
 
-  fill_random(&mut buf)        BCryptGenRandom (system-preferred RNG) / getrandom(2) / getentropy (Apple)
+  fill_random(&mut buf)        BCryptGenRandom (system-preferred RNG) / getrandom(2) / getentropy
+                               (Apple) / arc4random_buf (Android: bionic's ChaCha20 generator,
+                               seeded by the kernel, every API level)
   random_bytes::<N>() -> [u8; N]          random_u64()
 
+Not in the browser: there the page's crypto.getRandomValues is the source.
 There is no fallback: when the system RNG fails the process stops (a key made from weak
 randomness is worse than no key).
 ```
@@ -38105,7 +38112,8 @@ crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rus
   rsa also  PrivateKey: generate from the caller's bytes, PKCS #1 v1.5 signing (RFC 8017)
   eappwd    the sums of EAP-PWD on P-256: pwe, commit, shared, confirm, keys  (RFC 5931)
 
-No randomness here: callers pass random bytes in (plat::fill_random), so everything is
+No randomness here: callers pass random bytes in (plat::fill_random on Windows, Linux, Apple
+and Android; in the browser the page's crypto.getRandomValues), so everything is
 deterministic and testable.  Secret-dependent work avoids branches and table lookups
 (field arithmetic with 51-bit limbs, masked conditional swaps and selects).
 ```
@@ -39918,7 +39926,7 @@ MSG_CHANNEL_FAILURE: u8 = 100
 Source: [`lib/netio/tls/mod.rs`](../lib/netio/tls/mod.rs)
 
 ```text
-tls -- TLS for BackupCraft's own servers and agents and for public servers (RFC 8446, 5246)
+tls -- TLS between a program's own servers and clients and to public servers (RFC 8446, 5246)
 
   Own deployments (both sides): TLS 1.3, TLS_CHACHA20_POLY1305_SHA256 · X25519 · Ed25519
   certificates (own CA) · mutual authentication · HelloRetryRequest · KeyUpdate.
@@ -40252,7 +40260,7 @@ url -- absolute http(s) URLs, percent encoding, query strings
 Source: [`lib/netio/x509.rs`](../lib/netio/x509.rs)
 
 ```text
-x509 -- certificates (RFC 5280): the private PKI of BackupCraft (Ed25519, RFC 8410; built
+x509 -- certificates (RFC 5280): a program's own private PKI (Ed25519, RFC 8410; built
 and signed here) and the public web PKI (RSA and P-256 / P-384 keys; RSA PKCS #1 v1.5 / PSS
 and ECDSA signatures with SHA-256 / 384 / 512), parsed strictly
 
@@ -50335,9 +50343,12 @@ Shared Word bibliography XML codec: used by DOCX and standalone source lists.
   Decode a complete standalone Word source list. External tags are validated but remapped
   to sequential IDs; use Edit::ImportSources to allocate identities in an existing document.
   Unrepresented fields/types abort the whole import; no partial or silent content import.
+  Read with the limits `encode_sources` writes with (8 MiB, 250000 elements), so every list
+  it encodes decodes again.
 
 - **`fn load_sources(path: &str) -> Result<Vec<Source>, Error>`**
-  Load a bounded standalone Word bibliography XML file.
+  Load a bounded standalone Word bibliography XML file (at most 8 MiB, what `save_sources`
+  may write).
 
 - **`fn save_sources(path: &str, sources: &[Source]) -> Result<(), Error>`**
   Export a source list using the platform's temporary-file/rename write.

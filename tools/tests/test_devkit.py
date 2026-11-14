@@ -264,7 +264,8 @@ class ScaffoldTest(Temp):
 
     def test_manifests_docs_rs(self):
         """every crate that goes to crates.io names its docs.rs targets (docs.rs's five defaults
-        include macOS and 32-bit Windows, none of JFLib's targets) and what crates.io shows of it:
+        include 32-bit Windows, none of JFLib's targets, and macOS, whose pages docs.rs does not
+        build for JFLib yet) and what crates.io shows of it:
         description, license, repository, homepage (docs/CRATES.md, CR7)"""
         import subprocess
         import tomllib

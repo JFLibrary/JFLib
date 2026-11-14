@@ -495,7 +495,59 @@ const LANGS: &[(&str, &str, &[&str])] = &[
     ("fa", "sans-serif", &["Segoe UI", "Tahoma"]),
 ];
 
-#[cfg(not(windows))]
+// macOS and iOS (the system font, SF, is a hidden ".SF NS" face: Helvetica Neue stands in)
+#[cfg(target_vendor = "apple")]
+const GEN: &[(&str, &[&str])] = &[
+    ("sans-serif", &["Helvetica Neue", "Helvetica", "Arial", "Lucida Grande"]),
+    ("serif", &["Times New Roman", "Times", "Georgia", "Palatino"]),
+    ("monospace", &["Menlo", "Monaco", "Courier New", "Courier"]),
+    ("cursive", &["Apple Chancery", "Snell Roundhand", "Noteworthy"]),
+    ("fantasy", &["Papyrus", "Impact", "Marker Felt"]),
+    ("system-ui", &["Helvetica Neue", "Lucida Grande"]),
+    ("math", &["STIX Two Math", "Apple Symbols"]),
+    ("sans", &["sans-serif"]),
+    ("mono", &["monospace"]),
+    ("Segoe UI", &["Helvetica Neue", "Helvetica"]),
+    ("Consolas", &["Menlo", "Monaco"]),
+    ("Cascadia Mono", &["Menlo", "Monaco"]),
+    ("Liberation Sans", &["Arial", "Helvetica"]),
+    ("Liberation Serif", &["Times New Roman", "Times"]),
+    ("Liberation Mono", &["Courier New", "Menlo"]),
+    ("DejaVu Sans", &["Helvetica Neue", "Verdana"]),
+    ("DejaVu Serif", &["Times New Roman", "Georgia"]),
+    ("DejaVu Sans Mono", &["Menlo", "Monaco"]),
+];
+
+#[cfg(target_vendor = "apple")]
+const LANGS: &[(&str, &str, &[&str])] = &[
+    ("ja", "sans-serif", &["Hiragino Sans", "Hiragino Kaku Gothic ProN"]),
+    ("ja", "serif", &["Hiragino Mincho ProN"]),
+    ("ja", "monospace", &["Hiragino Sans"]),
+    ("zh-cn", "sans-serif", &["PingFang SC", "Hiragino Sans GB", "Heiti SC"]),
+    ("zh-cn", "serif", &["Songti SC", "STSong"]),
+    ("zh-cn", "monospace", &["PingFang SC", "Heiti SC"]),
+    ("zh-tw", "sans-serif", &["PingFang TC", "Heiti TC"]),
+    ("zh-tw", "serif", &["Songti TC"]),
+    ("zh-tw", "monospace", &["PingFang TC", "Heiti TC"]),
+    ("zh-hk", "sans-serif", &["PingFang HK", "PingFang TC", "Heiti TC"]),
+    ("ko", "sans-serif", &["Apple SD Gothic Neo", "AppleGothic"]),
+    ("ko", "serif", &["AppleMyungjo"]),
+    ("ko", "monospace", &["Apple SD Gothic Neo"]),
+    ("th", "sans-serif", &["Thonburi", "Sukhumvit Set"]),
+    ("hi", "sans-serif", &["Kohinoor Devanagari", "Devanagari Sangam MN"]),
+    ("mr", "sans-serif", &["Kohinoor Devanagari", "Devanagari Sangam MN"]),
+    ("ne", "sans-serif", &["Kohinoor Devanagari", "Devanagari Sangam MN"]),
+    ("bn", "sans-serif", &["Kohinoor Bangla", "Bangla Sangam MN"]),
+    ("ta", "sans-serif", &["Tamil Sangam MN", "Tamil MN"]),
+    ("te", "sans-serif", &["Kohinoor Telugu"]),
+    ("gu", "sans-serif", &["Kohinoor Gujarati"]),
+    ("he", "sans-serif", &["Arial Hebrew", "Lucida Grande"]),
+    ("ar", "sans-serif", &["Geeza Pro"]),
+    ("fa", "sans-serif", &["Geeza Pro"]),
+    ("am", "sans-serif", &["Kefa III"]),
+];
+
+#[cfg(not(any(windows, target_vendor = "apple")))]
 const GEN: &[(&str, &[&str])] = &[
     ("sans-serif", &["DejaVu Sans", "Noto Sans", "Liberation Sans", "Ubuntu", "Cantarell", "FreeSans"]),
     ("serif", &["DejaVu Serif", "Noto Serif", "Liberation Serif", "FreeSerif"]),
@@ -517,7 +569,7 @@ const GEN: &[(&str, &[&str])] = &[
     ("Consolas", &["DejaVu Sans Mono", "Liberation Mono"]),
 ];
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_vendor = "apple")))]
 const LANGS: &[(&str, &str, &[&str])] = &[
     ("ja", "sans-serif", &["Noto Sans CJK JP", "IPAGothic", "TakaoGothic", "VL Gothic"]),
     ("ja", "serif", &["Noto Serif CJK JP", "IPAMincho", "TakaoMincho"]),

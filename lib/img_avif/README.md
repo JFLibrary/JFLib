@@ -26,7 +26,7 @@ pixels), keeps the tiles of a grid within about four times the image, and refuse
 The writer stores the whole image as one AV1 key frame, up to 134 million pixels, in BT.709 with
 full range. Chroma is 4:2:0 by default; `chroma` 444 keeps it at full resolution, and 400 leaves
 it out for a grey picture (422 is written as 4:2:0). The quality from 1 to 100 picks the
-quantizer on libavif's scale of 0 to 63. With `IOF_LOSSLESS` the picture is 4:4:4 without colour
+quantizer on libavif's scale of 0 to 63; 0 stands for 95, the default `io::opt_init` sets. With `IOF_LOSSLESS` the picture is 4:4:4 without colour
 conversion and without quantization, so the RGB values come back exactly. An image with
 transparent pixels gets its alpha as a second, grey picture. An ICC profile, EXIF (with the
 orientation set to 1) and XMP go along when the options ask for them. The samples are 8 bits, and

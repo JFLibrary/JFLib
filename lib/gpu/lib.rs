@@ -8,7 +8,8 @@
 // lacks is said in mtl_dev.rs).
 //
 //   Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
-//                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
+//                    Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader (Vulkan,
+//                    WebGPU), Err(NoAdapter) without a GPU (Metal: without a Metal device)
 //   instance.adapters() -> Result<Vec<Adapter>>   every GPU, discrete ones first
 //   instance.adapter() -> Result<Adapter>         the first usable one (jfgui_GPU_ADAPTER: an
 //                    index into adapters() or a part of the name)
@@ -179,7 +180,9 @@ pub enum GpuError {
     /// the GPU is switched off (jfgui_GPU=0)
     Disabled,
     /// the GPU API is not installed (no vulkan-1.dll or libvulkan.so.1, jfgui_GPU_DLL names a
-    /// missing file, a Linux program not linked against glibc, a browser without navigator.gpu)
+    /// missing file, a Linux program not linked against glibc, a browser without navigator.gpu);
+    /// never on macOS and iOS, where Metal is part of the system: a Mac without a Metal device
+    /// gives NoAdapter
     NoLoader,
     /// no usable GPU (or jfgui_GPU_ADAPTER matched none)
     NoAdapter,
@@ -207,8 +210,9 @@ impl core::fmt::Display for GpuError {
             GpuError::Disabled => f.write_str("GPU disabled (jfgui_GPU=0)"),
             #[cfg(not(any(target_arch = "wasm32", target_vendor = "apple")))]
             GpuError::NoLoader => f.write_str("no GPU API installed (Vulkan loader missing)"),
+            // (Metal does not give it: no device is NoAdapter)
             #[cfg(target_vendor = "apple")]
-            GpuError::NoLoader => f.write_str("no Metal device"),
+            GpuError::NoLoader => f.write_str("no GPU API installed"),
             #[cfg(target_arch = "wasm32")]
             GpuError::NoLoader => f.write_str("no WebGPU in this browser"),
             GpuError::NoAdapter => f.write_str("no usable GPU"),

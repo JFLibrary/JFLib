@@ -141,8 +141,9 @@ log file that rotates.
   in a canvas.
 
 In the browser and on Android plat has no sockets, child processes, services, `plat::sync`,
-`plat::fs`, folder watching or random numbers of its own; native plugins load on Windows and
-Linux only.
+`plat::fs` or folder watching. The system's random numbers (`plat::fill_random`,
+`plat::random_bytes`) are there on Android too, but not in the browser, where a page has
+`crypto.getRandomValues`. Native plugins load on Windows and Linux only.
 
 ## How to get it
 

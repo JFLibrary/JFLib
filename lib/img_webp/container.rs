@@ -620,7 +620,8 @@ pub fn load_argb(sf: &Surface) -> Result<(Vec<u32>, u32, u32), i32> {
 }
 
 /// WEBPENC from an ImgOpt: effort, quality, preset, flags (IOF_WEBP_NOEXACT,
-/// IOF_WEBP_SHARPYUV, IOF_WEBP_1THREAD), cancel flag  [wpe_cfg_from_opt]
+/// IOF_WEBP_SHARPYUV, IOF_WEBP_1THREAD -- the last without effect: no worker threads), cancel
+/// flag  [wpe_cfg_from_opt]
 pub fn cfg_from_opt<'a>(o: &ImgOpt<'a>) -> Cfg<'a> {
     let mut fl = 0;
     if o.flags & crate::IOF_WEBP_NOEXACT != 0 {

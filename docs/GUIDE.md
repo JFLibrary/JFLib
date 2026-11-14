@@ -2628,8 +2628,8 @@ finish.
 
 ## 17. Network programs
 
-The building blocks of BackupCraft's server, agent and command-line client are library crates
-that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
+The building blocks of network programs -- servers, agents, command-line clients -- are library
+crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
 
 * `netio::Server::start(&addr, ServerConfig, handler)` -- an HTTP/1.1 server with a worker pool,
   keep-alive and limits; `start_with(.., Some(wrap))` puts TLS (or anything else) under it and
@@ -2660,7 +2660,8 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
 * `crypto` -- hashes (SHA-2 incl. SHA-384, BLAKE2b, BLAKE3), MACs, KDFs, Argon2id, AEAD
   (ChaCha20-Poly1305, XChaCha, AES-GCM), X25519, P-256 key exchange, Ed25519, RSA (PKCS#1 v1.5,
   PSS) and ECDSA P-256 / P-384 verification (randomness comes from the caller:
-  `plat::random_bytes`). For protocols that are defined with them (WPA2 and WPA3): SHA-1
+  `plat::random_bytes` on Windows, Linux, macOS, iOS and Android; the browser has no system
+  generator in `plat`, a web page takes `crypto.getRandomValues`). For protocols that are defined with them (WPA2 and WPA3): SHA-1
   (`sha1`, `Sha1`, `hmac_sha1`; broken for collisions, new designs take SHA-256), PBKDF2 over
   any hash (`pbkdf2::<H>`, `pbkdf2_sha1`), the AES key wrap of RFC 3394 (`aes_wrap` /
   `aes_unwrap`, which checks the integrity value) and AES-CMAC of RFC 4493 (`cmac_aes`).
@@ -3080,7 +3081,7 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
-  nonces use `plat::random_bytes`.
+  nonces use `plat::random_bytes` (not in the browser, see `crypto` above).
 * `base::metrics` -- measuring without keeping the values: `Counter`, `Gauge` (with its
   maximum), `Hist` (log-linear: exact below 32, then 32 steps per power of two, so a quantile is
   at most 1.6 % off; `quantile(per_mille)`, `p50` / `p95` / `p99`, `merge`) and `Window` (n

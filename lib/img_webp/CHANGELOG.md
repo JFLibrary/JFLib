@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - Chunk sizes near 4 GB are checked without wrapping a 32-bit usize: on wasm32 the walk through the chunks went back into the file.
+- No dependency on `plat` any more (it used nothing of it); `IOF_WEBP_1THREAD` and `WEF_1THREAD` are documented as without effect, the encoder has no worker threads
 
 ## [0.2.0] - 2026-11-13
 

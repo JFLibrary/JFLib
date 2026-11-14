@@ -28,6 +28,14 @@ impl BibliographyFormat {
             ))
         }
     }
+    /// The largest input the format's decoder takes: Word XML what `encode_sources` may write
+    /// (8 MiB), RIS and BibTeX 4 MiB.
+    fn input_limit(self) -> usize {
+        match self {
+            Self::WordXml => crate::BODY.bytes,
+            Self::Ris | Self::Bibtex => 4 << 20,
+        }
+    }
     /// Default filename extension without a dot.
     pub fn extension(self) -> &'static str {
         match self {
@@ -39,7 +47,7 @@ impl BibliographyFormat {
 }
 /// Decode one complete source list. Errors never return a partially decoded list.
 pub fn decode_bibliography(bytes: &[u8], format: BibliographyFormat) -> Result<Vec<Source>, Error> {
-    if bytes.len() > 4 << 20 {
+    if bytes.len() > format.input_limit() {
         return Err(Error::Limit);
     }
     match format {
@@ -62,7 +70,7 @@ pub fn encode_bibliography(
 /// Load a bounded source file, choosing the codec from its extension.
 pub fn load_bibliography(path: &str) -> Result<Vec<Source>, Error> {
     let format = BibliographyFormat::from_path(path)?;
-    decode_bibliography(&crate::read_file(path, 4 << 20)?, format)
+    decode_bibliography(&crate::read_file(path, format.input_limit())?, format)
 }
 /// Save through the platform's temporary-file/rename writer after complete encoding.
 pub fn save_bibliography(path: &str, sources: &[Source]) -> Result<(), Error> {

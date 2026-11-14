@@ -40,12 +40,12 @@ pub const WPP_ICON: u32 = 4;
 pub const WPP_TEXT: u32 = 5;
 pub const IOF_WEBP_NOEXACT: u32 = 0x20000; // RGB under alpha 0 may change (default: kept exactly)
 pub const IOF_WEBP_SHARPYUV: u32 = 0x40000; // lossy: sharp RGB -> YUV 4:2:0
-pub const IOF_WEBP_1THREAD: u32 = 0x80000; // no worker threads (the output is the same either way)
+pub const IOF_WEBP_1THREAD: u32 = 0x80000; // accepted, no effect: the encoder runs on the calling thread
 
 // WEBPENC flags (Cfg::flags)
 pub const WEF_NOEXACT: u32 = 1;
 pub const WEF_NOHDR: u32 = 2; // VP8L: header-less stream (ALPH chunk)
-pub const WEF_1THREAD: u32 = 4;
+pub const WEF_1THREAD: u32 = 4; // accepted, no effect (no worker threads)
 pub const WEF_SHARPYUV: u32 = 8;
 // test-only flags (codectest ops 126..128): force a configuration / predictor mode, switch
 // off stages

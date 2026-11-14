@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- The AVIF writer takes quality 0 as 95, like `io::opt_init(IMGF_AVIF)` and the other writers (it was 85)
+
 ## [0.2.0] - 2026-11-13
 
 ### Security

@@ -1,8 +1,11 @@
 // rand -- the operating system's cryptographic random number generator
 //
-//   fill_random(&mut buf)        BCryptGenRandom (system-preferred RNG) / getrandom(2) / getentropy (Apple)
+//   fill_random(&mut buf)        BCryptGenRandom (system-preferred RNG) / getrandom(2) / getentropy
+//                                (Apple) / arc4random_buf (Android: bionic's ChaCha20 generator,
+//                                seeded by the kernel, every API level)
 //   random_bytes::<N>() -> [u8; N]          random_u64()
 //
+// Not in the browser: there the page's crypto.getRandomValues is the source.
 // There is no fallback: when the system RNG fails the process stops (a key made from weak
 // randomness is worse than no key).
 
@@ -53,6 +56,18 @@ fn os_fill(buf: &mut [u8]) -> bool {
         // SAFETY: the chunk is valid for its length (at most 256 bytes).
         unsafe { getentropy(chunk.as_mut_ptr(), chunk.len()) == 0 }
     })
+}
+
+#[cfg(target_os = "android")]
+fn os_fill(buf: &mut [u8]) -> bool {
+    #[link(name = "c")]
+    unsafe extern "C" {
+        fn arc4random_buf(buf: *mut u8, len: usize);
+    }
+    // bionic aborts the process itself when it cannot seed the generator
+    // SAFETY: the buffer is valid for buf.len() bytes.
+    unsafe { arc4random_buf(buf.as_mut_ptr(), buf.len()) };
+    true
 }
 
 /// fill a buffer with cryptographically secure random bytes (stops the process on failure)

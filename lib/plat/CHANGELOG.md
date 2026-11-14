@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Added
 
 - `vfs::Provider::create_new` (a new file where nothing is, the check and the creation in one step; the default uses the OS exclusive create of `os_path`) and `vfs::Stream::deferred` (bytes reach the provider only by sync or drop)
+- `fill_random`, `random_bytes` and `random_u64` on Android (bionic's `arc4random_buf`); the browser has none, which the docs now say (a web page takes `crypto.getRandomValues`)
 
 - `drop_hold(on)`, `drop_waiting()` and `drop_finish(serial, effect)`: a drop's answer to its
   source waits after `E_DROP` until the program gives it, where the platform allows a later

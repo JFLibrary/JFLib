@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - Overflows that only a build with overflow checks saw (a debug build of an app without JFLib's profile aborted): the underline position of variable fonts, shaped glyph offsets near i32::MAX.
+- macOS and iOS: the system fallback and `FontConf`'s built-in tables name Apple's fonts (Helvetica Neue, Hiragino, Heiti, Apple SD Gothic Neo, Thonburi, Kohinoor, Geeza Pro, ...); they named Linux families, so Chinese, Japanese, Korean and other scripts found no font there. Emoji still have none: Apple Color Emoji's glyphs are sbix bitmaps, which `text` does not draw
 
 ## [0.2.0] - 2026-11-13
 

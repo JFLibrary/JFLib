@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - Range checks add without wrapping (Vulkan, Metal, WebGPU): push constants, indirect dispatch, texture barriers, views, the region and data span of texture copies, bind group and bindless buffer ranges. An offset or base near u32::MAX wrapped the sum small, passed the check and reached the driver; now it is `GpuError::Invalid`.
+- `GpuError::NoLoader` never comes on macOS and iOS (no Metal device is `NoAdapter`): the docs say so, and its text there no longer claims a missing Metal device
 
 ## [0.2.0] - 2026-11-13
 

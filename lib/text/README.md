@@ -77,7 +77,10 @@ size (`set_font`) and draws into a `gfx` surface (`draw`).
 What differs between the systems is where the installed fonts are. The font database scans the
 font folders of Windows, of Linux (with the folders of the fontconfig configuration, whose rules
 `FontConf` reads there as well; elsewhere it has built-in tables), and of macOS and iOS.
-`jfgui_FONTDIRS` replaces them. JFLib's UI turns the system fonts for missing characters on in
+The built-in tables and the fallback list name each system's own families: Segoe UI, YaHei
+and Yu Gothic on Windows, Noto and DejaVu on Linux, Helvetica Neue, Hiragino, Heiti and Apple
+SD Gothic Neo on macOS and iOS. Apple's colour emoji are sbix bitmaps, which `text` does not
+draw, so emoji stay without a fallback there. `jfgui_FONTDIRS` replaces the folders. JFLib's UI turns the system fonts for missing characters on in
 its windows and leaves them off in headless runs, so screenshots match on every machine.
 
 ## How to get it

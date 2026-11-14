@@ -965,7 +965,6 @@ version = "0.2.0"
 dependencies = [
  "jflib-gfx",
  "jflib-img-core",
- "jflib-plat",
  "jflib-rt",
  "jflib-simd",
 ]

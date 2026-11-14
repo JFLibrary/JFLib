@@ -7,8 +7,8 @@
 // (default; 2 x 2 chroma averaged), 4:4:4 (opt.chroma 444) or 4:0:0 (opt.chroma 400: luma only;
 // 422 is written as 4:2:0); IOF_LOSSLESS: 4:4:4 with the identity matrix (G, B, R planes, nclx
 // matrix 0) and base_q_idx 0 -- the RGB values come back exactly.  Quality q (opt.quality, 0 =
-// 85): quantizer ((100 - q) * 63 + 50) / 100 (libavif's 0..63 scale), base_q_idx 4 * it
-// (62 -> 249, 63 -> 255, at least 1).  The AV1 frame has the image's size (no padding, no grid);
+// 95 like io::opt_init and the other writers): quantizer ((100 - q) * 63 + 50) / 100
+// (libavif's 0..63 scale), base_q_idx 4 * it (62 -> 249, 63 -> 255, at least 1).  The AV1 frame has the image's size (no padding, no grid);
 // the encoder (img_av1::encode) works on the worker pool.  Alpha (any pixel < 255): a 4:0:0
 // auxiliary item (auxC "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha", same quantizer, straight
 // alpha).  Metadata: ICC as colr prof (IOF_EMBED_ICC), EXIF as an Exif item with orientation 1
@@ -121,7 +121,7 @@ pub fn encode(sf: &Surface, opt: &ImgOpt, out: &mut Vec<u8>) -> i32 {
     } else {
         let mut q = opt.quality as i32;
         if q == 0 {
-            q = 85;
+            q = 95;
         }
         let q = q.clamp(1, 100) as u32;
         let quant = ((100 - q) * 63 + 50) / 100; // 0..62 (q >= 1)

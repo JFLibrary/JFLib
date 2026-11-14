@@ -1,6 +1,6 @@
 // Shared Word bibliography XML codec: used by DOCX and standalone source lists.
 use crate::package::{B, DECL};
-use crate::{Error, Node, container, esc, leaf, parse, parse_body, source_id, unsupported};
+use crate::{Error, Node, container, esc, leaf, parse_body, source_id, unsupported};
 use alloc::{collections::BTreeSet, format, string::String, vec::Vec};
 use doc_core::{Person, Source, SourceKind};
 
@@ -214,12 +214,15 @@ pub(crate) fn read_sources(root: &Node, document_ids: bool) -> Result<Vec<Source
 /// Decode a complete standalone Word source list. External tags are validated but remapped
 /// to sequential IDs; use Edit::ImportSources to allocate identities in an existing document.
 /// Unrepresented fields/types abort the whole import; no partial or silent content import.
+/// Read with the limits `encode_sources` writes with (8 MiB, 250000 elements), so every list
+/// it encodes decodes again.
 pub fn decode_sources(bytes: &[u8]) -> Result<Vec<Source>, Error> {
-    read_sources(&parse(bytes)?, false)
+    read_sources(&parse_body(bytes)?, false)
 }
-/// Load a bounded standalone Word bibliography XML file.
+/// Load a bounded standalone Word bibliography XML file (at most 8 MiB, what `save_sources`
+/// may write).
 pub fn load_sources(path: &str) -> Result<Vec<Source>, Error> {
-    decode_sources(&crate::read_file(path, 4 << 20)?)
+    decode_sources(&crate::read_file(path, crate::BODY.bytes)?)
 }
 /// Export a source list using the platform's temporary-file/rename write.
 pub fn save_sources(path: &str, sources: &[Source]) -> Result<(), Error> {

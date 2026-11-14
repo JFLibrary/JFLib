@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- `Client::new()` sends the user agent `JFLib-netio` and `ssh::Client` the version `SSH-2.0-JFLib_netio` (both still named CraftLIB); a mail without a HELO name gets its Message-ID at `jflib` instead of `backupcraft`
+
 ## [0.2.0] - 2026-11-13
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

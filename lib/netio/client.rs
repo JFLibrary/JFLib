@@ -90,7 +90,7 @@ impl Default for Client {
 
 impl Client {
     pub fn new() -> Client {
-        Client { connect_ms: 5000, timeout_ms: 30_000, max_body: 64 << 20, user_agent: String::from("CraftLIB-netio"), connector: None }
+        Client { connect_ms: 5000, timeout_ms: 30_000, max_body: 64 << 20, user_agent: String::from("JFLib-netio"), connector: None }
     }
 
     /// the TLS layer for https URLs
