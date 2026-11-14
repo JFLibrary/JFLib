@@ -1,15 +1,25 @@
 // watch -- changes below folders, as they happen (continuous data protection)
 //
-//   Watcher::new(&roots) -> Result<Watcher, String>   recursive; one thread watches
+//   Watcher::new(&roots) -> Result<Watcher, String>   recursive; one thread watches; every
+//                                                      change after new returned is seen
 //   watcher.take(wait_ms) -> Changes                   the paths changed since the last take
 //                                                      (waits up to wait_ms for the first);
 //                                                      overflow: events were lost, rescan
+//   watcher.watching() -> bool                         every root (Linux: every folder) is
+//                                                      watched now; while not, each take
+//                                                      reports overflow (after its wait)
 //   dropping the watcher stops it
 //
 // Windows: ReadDirectoryChangesW per root (subtree, overlapped, 64 KiB buffer; an empty
-// answer means the buffer overflowed).  Linux: inotify with a watch per folder; new folders
-// are added (and reported whole), a full queue or the watch limit reports an overflow (a full
-// queue after the whole tree is watched again: lost events may hide new folders).
+// answer means the buffer overflowed); new returns once every root's first read is pending
+// (a root that cannot be read fails it).  A root whose read fails later (deleted, its drive
+// gone) is lost: it is opened again every second, and back it reports an overflow.
+// Linux: inotify with a watch per folder; new folders are added (and reported whole), a full
+// queue reports an overflow (after the whole tree is watched again: lost events may hide new
+// folders).  A folder that could not be watched or listed for a passing reason (the watch
+// limit, no descriptors left) is tried again every second; a root moved or deleted ends its
+// watches (their events would name the old paths) and is watched again once a folder is at
+// its path.  Until then watching() is false.
 // macOS: FSEvents with file events (dropped events report an overflow); iOS: none.
 // Paths are absolute, in the form of the platform; the folder of a change is enough for a
 // caller that walks the tree again.
@@ -34,6 +44,8 @@ pub struct Changes {
 struct Pending {
     paths: BTreeSet<String>,
     overflow: bool,
+    // roots (Linux: also folders) not watched now: every take reports an overflow meanwhile
+    down: usize,
 }
 
 struct Shared {
@@ -59,6 +71,42 @@ impl Shared {
         self.pending.lock().overflow = true;
         self.cv.notify_all();
     }
+
+    // (Windows) a root's read failed: it is not watched until it can be opened again
+    #[cfg(windows)]
+    fn lost(&self) {
+        let mut g = self.pending.lock();
+        g.down += 1;
+        g.overflow = true;
+        drop(g);
+        self.cv.notify_all();
+    }
+
+    // (Windows) the root is watched again: what changed meanwhile was not seen
+    #[cfg(windows)]
+    fn back(&self) {
+        let mut g = self.pending.lock();
+        g.down = g.down.saturating_sub(1);
+        g.overflow = true;
+        drop(g);
+        self.cv.notify_all();
+    }
+
+    // (Linux) n roots and folders are not watched now; fewer than before: an overflow (what
+    // changed in them meanwhile was not seen)
+    #[cfg(target_os = "linux")]
+    fn set_down(&self, n: usize) {
+        let mut g = self.pending.lock();
+        if n == g.down {
+            return;
+        }
+        if n < g.down {
+            g.overflow = true;
+        }
+        g.down = n;
+        drop(g);
+        self.cv.notify_all();
+    }
 }
 
 pub struct Watcher {
@@ -73,15 +121,22 @@ impl Watcher {
         Ok(Watcher { shared, threads })
     }
 
-    /// the changes so far (waiting up to wait_ms when there are none yet)
+    /// the changes so far (waiting up to wait_ms when there are none yet); while a root or
+    /// folder is not watched (watching() false) overflow is set, after the wait
     pub fn take(&self, wait_ms: u32) -> Changes {
         let mut g = self.shared.pending.lock();
         if g.paths.is_empty() && !g.overflow && wait_ms > 0 {
             g = self.shared.cv.wait_timeout(g, Some(wait_ms)).0;
         }
-        let out = Changes { paths: core::mem::take(&mut g.paths).into_iter().collect(), overflow: g.overflow };
+        let out = Changes { paths: core::mem::take(&mut g.paths).into_iter().collect(), overflow: g.overflow || g.down > 0 };
         g.overflow = false;
         out
+    }
+
+    /// whether every root (Linux: every folder below them) is watched now; false while one is
+    /// gone or could not be watched yet (the watcher tries again every second)
+    pub fn watching(&self) -> bool {
+        self.shared.pending.lock().down == 0
     }
 }
 
@@ -106,6 +161,7 @@ mod imp {
     const FILTER: u32 = 0x1 | 0x2 | 0x4 | 0x8 | 0x10 | 0x100; // names, dirs, attributes, size, write, security
     const INVALID: isize = -1;
     const WAIT_OBJECT_0: u32 = 0;
+    const ERROR_NOTIFY_ENUM_DIR: u32 = 1022;
     const BUF: usize = 64 * 1024;
 
     #[repr(C)]
@@ -127,6 +183,7 @@ mod imp {
         fn GetOverlappedResult(h: isize, ov: *mut Ov, done: *mut u32, wait: i32) -> i32;
         fn CancelIoEx(h: isize, ov: *mut Ov) -> i32;
         fn ResetEvent(h: isize) -> i32;
+        fn GetLastError() -> u32;
     }
 
     struct Handles {
@@ -134,8 +191,19 @@ mod imp {
         event: isize,
     }
 
-    // the handles are used by the one thread that owns them
-    unsafe impl Send for Handles {}
+    impl Drop for Handles {
+        fn drop(&mut self) {
+            // SAFETY: owned handles, closed once; no read is pending any more (watch() waits for
+            // a cancelled one before it returns).
+            unsafe {
+                CloseHandle(self.event);
+                CloseHandle(self.dir);
+            }
+        }
+    }
+
+    // the answer of a root's thread to start(): its first read is pending, or why not
+    type Ready = Arc<crate::sync::Mutex<Option<Result<(), String>>>>;
 
     pub fn start(roots: &[String], shared: &Arc<Shared>) -> Result<Vec<crate::Thread>, String> {
         let mut out = Vec::new();
@@ -147,50 +215,98 @@ mod imp {
             }
             Err(msg)
         };
+        let mut readies: Vec<Ready> = Vec::new();
         for root in roots {
-            let w: Vec<u16> = crate::fs::long_path(root).encode_utf16().chain(core::iter::once(0)).collect();
-            // SAFETY: a NUL-terminated wide path; no security attributes or template.
-            let dir = unsafe { CreateFileW(w.as_ptr(), FILE_LIST_DIRECTORY, SHARE_ALL, 0, OPEN_EXISTING, BACKUP_SEMANTICS | OVERLAPPED, 0) };
-            if dir == INVALID {
-                return fail(&mut out, alloc::format!("{} kann nicht überwacht werden", root));
-            }
-            // SAFETY: an unnamed manual-reset event.
-            let event = unsafe { CreateEventW(0, 1, 0, 0) };
-            if event == 0 {
-                // SAFETY: the directory handle opened above.
-                unsafe { CloseHandle(dir) };
-                return fail(&mut out, alloc::format!("{} kann nicht überwacht werden", root));
-            }
-            let h = Handles { dir, event };
-            let sh = shared.clone();
-            let base = root.clone();
-            match crate::thread_spawn(128 * 1024, alloc::boxed::Box::new(move || run(h, &sh, &base))) {
+            let ready: Ready = Arc::new(crate::sync::Mutex::new(None));
+            let (sh, base, r) = (shared.clone(), root.clone(), ready.clone());
+            match crate::thread_spawn(128 * 1024, alloc::boxed::Box::new(move || run(base, &sh, r))) {
                 Some(t) => out.push(t),
-                None => {
-                    // SAFETY: the handles opened above; the closure that owned them never ran.
-                    unsafe {
-                        CloseHandle(event);
-                        CloseHandle(dir);
-                    }
-                    return fail(&mut out, String::from("kein Thread für die Überwachung"));
+                None => return fail(&mut out, String::from("kein Thread für die Überwachung")),
+            }
+            readies.push(ready);
+        }
+        // every root's first read is pending before new returns: a change made right after it
+        // is seen (one made before the read began would not be)
+        for r in &readies {
+            let res = loop {
+                if let Some(res) = r.lock().take() {
+                    break res;
                 }
+                crate::sleep_ms(1);
+            };
+            if let Err(e) = res {
+                return fail(&mut out, e);
             }
         }
         Ok(out)
     }
 
-    fn run(h: Handles, sh: &Shared, base: &str) {
+    fn open(root: &str) -> Option<Handles> {
+        let w: Vec<u16> = crate::fs::long_path(root).encode_utf16().chain(core::iter::once(0)).collect();
+        // SAFETY: a NUL-terminated wide path; no security attributes or template.
+        let dir = unsafe { CreateFileW(w.as_ptr(), FILE_LIST_DIRECTORY, SHARE_ALL, 0, OPEN_EXISTING, BACKUP_SEMANTICS | OVERLAPPED, 0) };
+        if dir == INVALID {
+            return None;
+        }
+        // SAFETY: an unnamed manual-reset event.
+        let event = unsafe { CreateEventW(0, 1, 0, 0) };
+        if event == 0 {
+            // SAFETY: the directory handle opened above.
+            unsafe { CloseHandle(dir) };
+            return None;
+        }
+        Some(Handles { dir, event })
+    }
+
+    // one root: its folder opened and a read kept pending; a root that cannot be opened or read
+    // (deleted, its drive gone) is lost and opened again every second -- the first time it
+    // fails new instead
+    fn run(root: String, sh: &Shared, ready: Ready) {
         let mut buf = alloc::vec![0u32; BUF / 4];
+        let mut ready = Some(ready);
+        let mut lost = false;
+        while !sh.stop.load(Ordering::SeqCst) {
+            if let Some(h) = open(&root) {
+                if watch(&h, &root, &mut buf, sh, &mut ready, &mut lost) {
+                    break; // stopped
+                }
+            }
+            if let Some(r) = ready.take() {
+                *r.lock() = Some(Err(alloc::format!("{} kann nicht überwacht werden", root)));
+                return;
+            }
+            if !lost {
+                lost = true;
+                sh.lost();
+            }
+            for _ in 0..10 {
+                if sh.stop.load(Ordering::SeqCst) {
+                    break;
+                }
+                crate::sleep_ms(100);
+            }
+        }
+    }
+
+    // reads of an open root until the watcher stops (true) or a read fails (false)
+    fn watch(h: &Handles, base: &str, buf: &mut [u32], sh: &Shared, ready: &mut Option<Ready>, lost: &mut bool) -> bool {
         let sep = if base.ends_with(['\\', '/']) { "" } else { "\\" };
-        'outer: while !sh.stop.load(Ordering::SeqCst) {
+        loop {
             let mut ov = Ov { event: h.event, ..Ov::default() };
             // SAFETY: the buffer and the OVERLAPPED stay alive until the operation completed or
             // was cancelled and waited for (below).
             unsafe { ResetEvent(h.event) };
             let ok = unsafe { ReadDirectoryChangesW(h.dir, buf.as_mut_ptr() as *mut u8, BUF as u32, 1, FILTER, core::ptr::null_mut(), &mut ov, 0) };
             if ok == 0 {
-                sh.overflow();
-                break;
+                return false;
+            }
+            // the system collects changes from here on, also between two reads
+            if let Some(r) = ready.take() {
+                *r.lock() = Some(Ok(()));
+            }
+            if *lost {
+                *lost = false;
+                sh.back();
             }
             loop {
                 // SAFETY: a valid event handle.
@@ -202,7 +318,7 @@ mod imp {
                         CancelIoEx(h.dir, &mut ov);
                         GetOverlappedResult(h.dir, &mut ov, &mut n, 1);
                     }
-                    break 'outer;
+                    return true;
                 }
                 if w == WAIT_OBJECT_0 {
                     break;
@@ -210,8 +326,16 @@ mod imp {
             }
             let mut n = 0u32;
             // SAFETY: the read completed (its event is set).
-            if unsafe { GetOverlappedResult(h.dir, &mut ov, &mut n, 0) } == 0 || n == 0 {
-                sh.overflow();
+            if unsafe { GetOverlappedResult(h.dir, &mut ov, &mut n, 0) } == 0 {
+                // SAFETY: right after the failed call.
+                if unsafe { GetLastError() } == ERROR_NOTIFY_ENUM_DIR {
+                    sh.overflow(); // too many changes for the buffer
+                    continue;
+                }
+                return false; // the folder went (deleted, moved off its volume, the drive)
+            }
+            if n == 0 {
+                sh.overflow(); // the buffer overflowed
                 continue;
             }
             let bytes: &[u8] = {
@@ -236,11 +360,6 @@ mod imp {
                 }
                 off += next;
             }
-        }
-        // SAFETY: owned handles.
-        unsafe {
-            CloseHandle(h.event);
-            CloseHandle(h.dir);
         }
     }
 }
@@ -273,10 +392,41 @@ mod imp {
     // one thread owns the descriptor
     unsafe impl Send for Fd {}
 
+    const ENOENT: isize = 2;
+    const EACCES: isize = 13;
+    const ENOTDIR: isize = 20;
+
     struct State {
         fd: usize,
         roots: Vec<String>,
         dirs: BTreeMap<i32, String>,
+        // folders not (fully) watched for a passing reason: their watch or listing failed
+        // (the watch limit, no descriptors left); tried again every second
+        retry: Vec<String>,
+        // (tests) jfgui_TEST_WATCH_LIST_FAIL: the first listing of this folder fails
+        list_fail: Option<String>,
+    }
+
+    impl State {
+        fn watched(&self, root: &str) -> bool {
+            self.dirs.values().any(|d| d == root)
+        }
+
+        // roots not watched (moved, deleted) and folders waiting for another try
+        fn down(&self) -> usize {
+            self.roots.iter().filter(|r| !self.watched(r)).count() + self.retry.len()
+        }
+
+        // the watches of dir and of the folders below it end
+        fn drop_tree(&mut self, dir: &str) {
+            let pre = alloc::format!("{dir}/");
+            let gone: Vec<i32> = self.dirs.iter().filter(|(_, d)| **d == dir || d.starts_with(&pre)).map(|(w, _)| *w).collect();
+            for w in gone {
+                self.dirs.remove(&w);
+                // SAFETY: our inotify descriptor and one of its watches (gone already: EINVAL).
+                unsafe { syscall3(SYS_INOTIFY_RM_WATCH, self.fd, w as usize, 0) };
+            }
+        }
     }
 
     // dir and every folder below it; a worklist, not recursion: the depth of a tree is not ours
@@ -288,15 +438,37 @@ mod imp {
             // SAFETY: a NUL-terminated path.
             let wd = unsafe { syscall3(SYS_INOTIFY_ADD_WATCH, st.fd, z.as_ptr() as usize, MASK as usize) };
             if wd < 0 {
-                sh.overflow(); // the watch limit or a folder that went away: rescans cover it
+                sh.overflow(); // rescans cover what this watch would have seen
+                // gone meanwhile or not ours to read: nothing to try again; the watch limit,
+                // memory: again in a second
+                if !matches!(-wd, ENOENT | ENOTDIR | EACCES) {
+                    st.retry.push(dir);
+                }
                 continue;
             }
-            for e in crate::fs::read_dir(&dir).unwrap_or_default() {
-                if e.kind == crate::fs::FileKind::Dir {
-                    todo.push(crate::fs::join(&dir, &e.name));
+            st.dirs.insert(wd as i32, dir.clone());
+            let list = if st.list_fail.as_deref() == Some(dir.as_str()) {
+                st.list_fail = None;
+                None
+            } else {
+                crate::fs::read_dir(&dir)
+            };
+            match list {
+                Some(l) => {
+                    for e in l {
+                        if e.kind == crate::fs::FileKind::Dir {
+                            todo.push(crate::fs::join(&dir, &e.name));
+                        }
+                    }
                 }
+                // its folders are not watched: again in a second (the watch stays; adding it
+                // again hands it back and lists the folder)
+                None if crate::fs::lstat(&dir).is_some_and(|m| m.is_dir()) => {
+                    sh.overflow();
+                    st.retry.push(dir);
+                }
+                None => sh.overflow(),
             }
-            st.dirs.insert(wd as i32, dir);
         }
     }
 
@@ -306,6 +478,7 @@ mod imp {
     // watches the walk no longer reaches (moved out, deleted) end.
     fn rescan(st: &mut State, sh: &Shared) {
         let old = core::mem::take(&mut st.dirs);
+        st.retry.clear(); // the walk tries them again
         for r in st.roots.clone() {
             add(st, &r, sh);
         }
@@ -315,13 +488,27 @@ mod imp {
         }
     }
 
+    // every second: the folders waiting for another try, the roots not watched that are
+    // folders (again)
+    fn retry(st: &mut State, sh: &Shared) {
+        for d in core::mem::take(&mut st.retry) {
+            add(st, &d, sh);
+        }
+        for r in st.roots.clone() {
+            if !st.watched(&r) && crate::fs::lstat(&r).is_some_and(|m| m.is_dir()) {
+                add(st, &r, sh);
+            }
+        }
+    }
+
     pub fn start(roots: &[String], shared: &Arc<Shared>) -> Result<Vec<crate::Thread>, String> {
         // SAFETY: no pointers.
         let fd = unsafe { syscall3(SYS_INOTIFY_INIT1, IN_NONBLOCK | IN_CLOEXEC, 0, 0) };
         if fd < 0 {
             return Err(String::from("inotify ist nicht verfügbar"));
         }
-        let mut st = State { fd: fd as usize, roots: roots.to_vec(), dirs: BTreeMap::new() };
+        let list_fail = crate::env("jfgui_TEST_WATCH_LIST_FAIL").filter(|v| !v.is_empty());
+        let mut st = State { fd: fd as usize, roots: roots.to_vec(), dirs: BTreeMap::new(), retry: Vec::new(), list_fail };
         for r in roots {
             if !crate::fs::lstat(r).is_some_and(|m| m.is_dir()) {
                 // SAFETY: our descriptor.
@@ -330,6 +517,7 @@ mod imp {
             }
             add(&mut st, r, shared);
         }
+        shared.set_down(st.down());
         let sh = shared.clone();
         let owned = Fd(fd as usize);
         match crate::thread_spawn(128 * 1024, alloc::boxed::Box::new(move || run(owned, st, &sh))) {
@@ -344,7 +532,15 @@ mod imp {
 
     fn run(fd: Fd, mut st: State, sh: &Shared) {
         let mut buf = alloc::vec![0u8; 64 * 1024];
+        let mut next_try = crate::time_us() + 1_000_000;
         while !sh.stop.load(Ordering::SeqCst) {
+            if crate::time_us() >= next_try {
+                next_try = crate::time_us() + 1_000_000;
+                if st.down() > 0 {
+                    retry(&mut st, sh);
+                    sh.set_down(st.down());
+                }
+            }
             let mut pfd = [fd.0 as i32, 1i32 /* POLLIN */];
             // SAFETY: one pollfd (fd: i32, events: i16, revents: i16 = the second i32).
             let r = unsafe { rt::os::poll(pfd.as_mut_ptr() as usize, 1, 300) };
@@ -375,6 +571,18 @@ mod imp {
                 let Some(dir) = st.dirs.get(&wd).cloned() else { continue };
                 if mask & IN_IGNORED != 0 {
                     st.dirs.remove(&wd);
+                    if st.roots.contains(&dir) {
+                        st.drop_tree(&dir); // a root's watch ended (unmounted): the rest too
+                        sh.overflow();
+                    }
+                    continue;
+                }
+                if mask & (IN_MOVE_SELF | IN_DELETE_SELF) != 0 && st.roots.contains(&dir) {
+                    // the root itself moved or went: its watches end (their events would name
+                    // the old paths); it is watched again once a folder is at its path
+                    st.drop_tree(&dir);
+                    sh.push(dir);
+                    sh.overflow();
                     continue;
                 }
                 let path = if name.is_empty() { dir.clone() } else { crate::fs::join(&dir, &name) };
@@ -385,16 +593,11 @@ mod imp {
                     // a folder moved away (out of the tree, or renamed: IN_MOVED_TO watches it
                     // again): its watches and those below it end, else their events would
                     // name paths that no longer exist
-                    let pre = alloc::format!("{path}/");
-                    let gone: Vec<i32> = st.dirs.iter().filter(|(_, d)| **d == path || d.starts_with(&pre)).map(|(w, _)| *w).collect();
-                    for w in gone {
-                        st.dirs.remove(&w);
-                        // SAFETY: our inotify descriptor and one of its watches.
-                        unsafe { syscall3(SYS_INOTIFY_RM_WATCH, fd.0, w as usize, 0) };
-                    }
+                    st.drop_tree(&path);
                 }
                 sh.push(path);
             }
+            sh.set_down(st.down());
         }
         // SAFETY: our descriptor.
         unsafe { syscall3(SYS_CLOSE, fd.0, 0, 0) };

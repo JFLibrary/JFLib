@@ -357,6 +357,108 @@ fn watch(t: &mut T) {
         plat::delete(&fs::join(&base, p));
     }
     plat::delete(&base);
+    watch_gaps(t);
+}
+
+/// true once cond holds (polled every 50 ms), false after ms
+fn wait_until(ms: u64, mut cond: impl FnMut() -> bool) -> bool {
+    let dl = plat::time_us() + ms * 1000;
+    loop {
+        if cond() {
+            return true;
+        }
+        if plat::time_us() >= dl {
+            return false;
+        }
+        plat::sleep_ms(50);
+    }
+}
+
+/// a change whose path ends with suffix comes within ms
+fn seen_within(w: &plat::watch::Watcher, suffix: &str, ms: u64) -> bool {
+    wait_until(ms, || w.take(100).paths.iter().any(|p| p.replace('\\', "/").ends_with(suffix)))
+}
+
+/// the watcher's gaps: a change right after new, a root deleted and made again, (Linux) a root
+/// moved away, a folder whose listing failed
+fn watch_gaps(t: &mut T) {
+    use plat::watch::Watcher;
+    let base = fs::join(&plat::temp_dir().unwrap_or_else(|| String::from(".")), &format!("coretest-watch2-{}", plat::random_u64() % 1_000_000));
+    t.check("watch2 dir", fs::mkdir_private(&base));
+    // every change after new returned is seen (Windows: new waits for each root's first read)
+    let mut missed = 0;
+    for i in 0..10 {
+        let Ok(w) = Watcher::new(&[base.clone()]) else { missed += 1; continue };
+        let f = fs::join(&base, &format!("start{i}.txt"));
+        plat::write_file(&f, b"x");
+        if !seen_within(&w, &format!("/start{i}.txt"), 3000) {
+            missed += 1;
+        }
+        drop(w);
+        plat::delete(&f);
+    }
+    t.check("watch: a change right after new is seen (10 watchers)", missed == 0);
+    #[cfg(any(windows, target_os = "linux"))]
+    {
+        // a root deleted: lost (overflow at every take, watching() false); made again: watched
+        // again, its changes are seen
+        let root = fs::join(&base, "wurzel");
+        fs::mkdir_private(&root);
+        let Ok(w) = Watcher::new(&[root.clone()]) else {
+            t.check("watch: a watcher of one root", false);
+            return;
+        };
+        t.check("watch: watching() after new", w.watching());
+        #[cfg(target_os = "linux")]
+        {
+            // (Linux) moved away: its changes there are not reported under the old path; a new
+            // folder at the path is watched
+            let moved = fs::join(&base, "verschoben");
+            t.check("watch: the root moved away", plat::rename(&root, &moved) && wait_until(3000, || !w.watching()));
+            plat::write_file(&fs::join(&moved, "alt.txt"), b"x");
+            t.check("watch: ... its changes there are not reported under the old path", !seen_within(&w, "/wurzel/alt.txt", 1000));
+            fs::mkdir_private(&root);
+            t.check("watch: a new folder at the root's path is watched", wait_until(5000, || w.watching()));
+            plat::write_file(&fs::join(&root, "neu.txt"), b"x");
+            t.check("watch: ... a change in it is seen", seen_within(&w, "/wurzel/neu.txt", 3000));
+            plat::delete(&fs::join(&moved, "alt.txt"));
+            plat::delete(&moved);
+            plat::delete(&fs::join(&root, "neu.txt"));
+        }
+        plat::delete(&root);
+        t.check("watch: a deleted root is lost (overflow, watching() false)", wait_until(3000, || w.take(100).overflow && !w.watching()));
+        fs::mkdir_private(&root);
+        t.check("watch: the root made again is watched again", wait_until(5000, || w.watching()));
+        plat::write_file(&fs::join(&root, "danach.txt"), b"x");
+        t.check("watch: ... a change in it is seen", seen_within(&w, "/wurzel/danach.txt", 3000));
+        drop(w);
+        plat::delete(&fs::join(&root, "danach.txt"));
+        plat::delete(&fs::join(&root, "neu.txt"));
+        plat::delete(&root);
+    }
+    #[cfg(target_os = "linux")]
+    {
+        // the first listing of a folder fails: its folders are watched a second later
+        let list = fs::join(&base, "liste");
+        let deep = fs::join(&list, "a/b");
+        t.check("watch: a tree", fs::mkdir_private(&deep));
+        plat::setenv("jfgui_TEST_WATCH_LIST_FAIL", Some(&list));
+        let w = Watcher::new(&[list.clone()]);
+        plat::setenv("jfgui_TEST_WATCH_LIST_FAIL", None);
+        if let Ok(w) = w {
+            t.check("watch: a folder whose listing failed: not all watched yet", !w.watching() && w.take(0).overflow);
+            t.check("watch: ... a second later it is", wait_until(5000, || w.watching()));
+            plat::write_file(&fs::join(&deep, "x.txt"), b"x");
+            t.check("watch: ... a change two folders down is seen", seen_within(&w, "/liste/a/b/x.txt", 3000));
+        } else {
+            t.check("watch: a watcher of the tree", false);
+        }
+        plat::delete(&fs::join(&deep, "x.txt"));
+        plat::delete(&deep);
+        plat::delete(&fs::join(&list, "a"));
+        plat::delete(&list);
+    }
+    plat::delete(&base);
 }
 
 fn files(t: &mut T) {
