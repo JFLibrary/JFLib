@@ -185,9 +185,11 @@ Fehler übrig.
   - Ein Universal-Programm der Gallery besteht ihre Skripte mit `arch -arm64` und mit `arch -x86_64`.
   - `cargo jflib mac -p portabletest` baut ein Bündel mit `x86_64 arm64`. Beide Teile geben den Digest
     `af6940ef15c56d1f` aus. Mit `--arch x86_64` entsteht nur der Intel-Teil.
-- **Nicht geprüft:** Signatur mit Developer ID und Notarisierung einer Universal-`.dmg`. Sie laufen wie bisher und
-  decken laut Apple beide Teile ab. Den Start einer Universal-`.dmg` auf einem echten Intel-Mac kann nur der Nutzer
-  prüfen, wenn er einen hat.
+  - Mit Developer ID und Notarisierung (`jfgui_MAC_IDENTITY`, `jfgui_MAC_NOTARY`, `keychain_run`) läuft das wie
+    bisher. `codesign` zeigt `Mach-O universal (x86_64 arm64)` mit Hardened Runtime. Bündel und `.dmg` sind
+    notarisiert und geheftet, `spctl` sagt „accepted, Notarized Developer ID“. Die App aus der `.dmg` startet mit
+    `arch -arm64` und `arch -x86_64` (`--auto-close`) und endet mit 0.
+- **Nicht geprüft:** der Start einer Universal-`.dmg` auf einem echten Intel-Mac (kein Gerät, Entscheidung 3a).
 
 ### IM4: CI auf echtem Intel (S)
 
