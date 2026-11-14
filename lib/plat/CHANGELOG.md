@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `watch::Watcher::watching()`: whether every root (Linux: every folder below them) is watched now
+
 ### Changed
 
 - 0 as the effects a source allows means it does not say, so every effect (`DE_ALL`), the same
@@ -15,6 +19,28 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   `drag_query_all` and `drag_decide`. Before, these took 0 as copy and move, while the effects of
   a drop (`drop_allowed`) took it as every effect. A drag out that names no effects offers
   linking too; files are still never moved.
+- `watch::Watcher::take` reports `overflow` after each wait while a root or folder is not watched (`watching()` false), so a caller that rescans on `overflow` polls until the watcher sees everything again; before, a lost root reported one overflow and then nothing
+
+### Fixed
+
+- Windows: `fs::read_dir` returned what it had listed so far as the whole folder when `FindNextFileW` failed with another error than the end of the listing (a backup then missed the rest without a word); `None` now
+- Windows: `fs::write_file_private` took a file that already had its sibling's name (`NAME.tmpN`) over -- emptied it and kept its access rights, so whoever could read that file could read the private data. The sibling is always a new file now (`CREATE_NEW`, the next number when a name is taken), and a failed write removes it
+- Linux and macOS: `fs::join` and `fs::parent` took `\` for a separator: a folder whose name ends with `\` got no `/` before the child, a name with `\` was cut there (listings, the watcher and backups addressed other files, `mkdir_private` made extra folders). `\` separates on Windows and in vfs names only
+- Linux trash: an entry of a mount's `.Trash-$uid` (or `.Trash/$uid`) could be trashed into that trash again -- its new info file pointed into the trash, the old one was left without its file -- and the home trash was not recognised when `$XDG_DATA_HOME` had `.` or `//` in it. Both are refused now
+- Windows: `Watcher::new` returned before the roots were read, so a change right after it could be missed, and a root whose read failed (deleted, its drive gone) was given up for good after one overflow. `new` now waits until every root's first read is pending (a root that cannot be read fails it); a lost root is opened again every second
+- Linux: the watcher left the folders of a folder whose listing failed (no descriptors left) unwatched for good, and a root moved away kept its watches -- its changes came under the old path -- while a folder made at its path was never watched (also after a deleted root). Such folders and roots are tried again every second
+- `fs::write_file_private` reports true when a rule of the manifest allows the file but not its folder. The folder's fsync after the rename was checked as well and made it report false although the file had been replaced.
+
+### Security
+
+- `fs::symlink` and `fs::hard_link` want write access to the target as well; a relative symlink target counts from the link's folder. The rules check a path as it is written, so a link at a writable path led to files the app could only read or not reach at all.
+- `assoc_unregister` plays back only record lines for the places a registration writes (Windows: Software\Classes, Software\Clients, RegisteredApplications; Linux: the .desktop and MIME files, the user's mimeapps.list). A changed config://assoc.list could set any HKCU value or delete and rename any file of the user.
+- `process::Command::spawn` with a relative program path and a `cwd` checks the file it starts on Linux and macOS (cwd/program), not the same name below this process's folder.
+- `watch::Watcher::new` checks its folders against the manifest on Windows too.
+- The answers of the permission tests (`jfgui_PERM_ANSWER`, `jfgui_PERM_TIMEOUT`, `jfgui_PERM_STORE`) are read when the program starts, so a value the app sets later answers none of its questions.
+- Windows: `process::Command::spawn` and `process::launch` refuse a `.bat` or `.cmd` program (87) when it or an argument holds `"`, `%`, `!`, `^`, `&`, `|`, `<`, `>` or a line break. cmd.exe reads its command line by its own rules, and the quoted arguments could run further commands (the class of CVE-2024-24576).
+- `open_folder` shows a file or a package selected in the Finder (`open -R`) instead of opening it, which started apps and .command scripts (macOS); on Windows it starts the Windows folder's explorer.exe.
+- Linux: a portal's `Response` counts only when it comes from the portal itself, the sender of its reply to the request. Another client on the session bus could answer a file dialog with files of its choice.
 
 ## [0.2.0] - 2026-11-14
 

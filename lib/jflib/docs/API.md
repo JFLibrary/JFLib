@@ -9823,7 +9823,9 @@ permissions on the UI side (plat::policy, docs/PERMISSIONS.md, docs/VFS.md)
                           manifest's reason (through the app's catalogue), the ask line, and
                           "Einmal erlauben" (until the program ends), "Immer erlauben"
                           (stored), "Ablehnen" (until the program ends), "Nie erlauben"
-                          (stored); Esc = Ablehnen.  The answer reaches the app as
+                          (stored); Esc = Ablehnen.  The two that allow take no input for
+                          half a second after a question appears (window runs), so a
+                          double click or a held key does not answer it unread.  The answer reaches the app as
                           UIC_PERMISSION (arg 1 allowed, 0 refused): an access the UI thread
                           made while the question was open was refused, it may try again.
   Ui::permissions_page(id) -> bool   the ready-made settings section: every ask line and
@@ -26687,7 +26689,10 @@ a program name stands for.
 **`impl Command<'_>`**
 
 - **`fn spawn(&self) -> Result<Child, u32>`**
-  Start a hidden process with pipes. Dropping its handle terminates its tree.
+  Start a hidden process with pipes. Dropping its handle terminates its tree.  Windows: a
+  `.bat` or `.cmd` file runs through cmd.exe, which reads its command line by other rules;
+  a program or argument with `"`, `%`, `!`, `^`, `&`, `|`, `<`, `>` or a line break is
+  refused for it (87), as for process::launch
 
 ### `plat/process_win.rs` (Windows)
 
@@ -27070,13 +27075,17 @@ fs -- file system access for backup and restore
 
   stat(path) / lstat(path) -> Option<Meta>     kind, size, times (ns), mode / attributes,
                                                 owner, device and file id, link count
-  read_dir(path) -> Option<Vec<DirEntry>>      names and kinds ("." / ".." left out)
+  read_dir(path) -> Option<Vec<DirEntry>>      names and kinds ("." / ".." left out); None
+                                               also when an error cut the listing short
   read_link / symlink(target, link, dir) / hard_link(existing, new)
   set_times(path, atime_ns, mtime_ns)          on the link itself, never its target
   set_mode(path, mode) (Linux) / set_attrs(path, attrs) (Windows) / set_owner (Linux)
   free_space(path) -> Option<(free, total)>    sync_dir(dir) (Linux: fsync of the directory)
   write_file_private(path, data)               owner-only file (0600 / protected DACL),
-                                               fsync, atomic rename, directory sync
+                                               fsync, atomic rename, directory sync; its
+                                               sibling is always a new file of its own
+  join(dir, name) / parent(path)               '' separates on Windows only (and in vfs
+                                               names); on Linux and macOS it is a character
   mkdir_private(path)                          owner-only directory (with parents)
   local_zone_id() -> "Europe/Berlin" | "win:W. Europe Standard Time"
   long_path(path) (Windows): the \\?\ form every call here uses
@@ -27126,10 +27135,10 @@ modes or free space.
   - `kind: FileKind`
 
 - **`fn join(dir: &str, name: &str) -> String`**
-  "a/b" + "c" with the platform separator
+  "a/b" + "c" with the platform separator (Linux, macOS: a '\\' is part of a name)
 
 - **`fn parent(path: &str) -> &str`**
-  the parent directory of a path ("" for a bare name)
+  the parent directory of a path ("" for a bare name; Linux, macOS: a '\\' is part of a name)
 
 - **`fn stat(path: &str) -> Option<Meta>`**
   the metadata of path, links followed; a vfs name: its folder mount's file, else the
@@ -27147,10 +27156,13 @@ modes or free space.
 - **`fn symlink(target: &str, link: &str, dir: bool) -> bool`**
   a symbolic link at link to target (dir: a folder's link on Windows); a vfs name as target
   stands for its OS path.  Only on OS paths and folder mounts; never a target with a NUL
-  character (the link would lead to the name before it).
+  character (the link would lead to the name before it).  With a manifest the app needs write
+  access to link and to target (a relative one counted from link's folder): the rules check a
+  path as it is written, so whatever may use the link reaches the target with the link's rights.
 
 - **`fn hard_link(existing: &str, new: &str) -> bool`**
-  a second name new for the file existing (both OS paths or folder mounts)
+  a second name new for the file existing (both OS paths or folder mounts); with a manifest
+  the app needs write access to both (writing through new changes existing)
 
 - **`fn set_times(path: &str, atime_ns: i64, mtime_ns: i64) -> bool`**
   access and modification times (ns since 1970), on a link itself, never its target; a
@@ -27173,8 +27185,9 @@ modes or free space.
   whether the folder exists
 
 - **`fn write_file_private(path: &str, data: &[u8]) -> bool`**
-  an owner-only file (0600 / protected DACL), synced and renamed into place; a mount without
-  OS files: its write (memory of this process)
+  an owner-only file (0600 / protected DACL), synced and renamed into place (the sibling
+  NAME.tmpN is created new, never an existing file taken over); a mount without OS files: its
+  write (memory of this process)
 
 - **`fn mkdir_private(path: &str) -> bool`**
   an owner-only folder (with parents)
@@ -27238,16 +27251,26 @@ Source: [`lib/plat/watch.rs`](../lib/plat/watch.rs)
 ```text
 watch -- changes below folders, as they happen (continuous data protection)
 
-  Watcher::new(&roots) -> Result<Watcher, String>   recursive; one thread watches
+  Watcher::new(&roots) -> Result<Watcher, String>   recursive; one thread watches; every
+                                                     change after new returned is seen
   watcher.take(wait_ms) -> Changes                   the paths changed since the last take
                                                      (waits up to wait_ms for the first);
                                                      overflow: events were lost, rescan
+  watcher.watching() -> bool                         every root (Linux: every folder) is
+                                                     watched now; while not, each take
+                                                     reports overflow (after its wait)
   dropping the watcher stops it
 
 Windows: ReadDirectoryChangesW per root (subtree, overlapped, 64 KiB buffer; an empty
-answer means the buffer overflowed).  Linux: inotify with a watch per folder; new folders
-are added (and reported whole), a full queue or the watch limit reports an overflow (a full
-queue after the whole tree is watched again: lost events may hide new folders).
+answer means the buffer overflowed); new returns once every root's first read is pending
+(a root that cannot be read fails it).  A root whose read fails later (deleted, its drive
+gone) is lost: it is opened again every second, and back it reports an overflow.
+Linux: inotify with a watch per folder; new folders are added (and reported whole), a full
+queue reports an overflow (after the whole tree is watched again: lost events may hide new
+folders).  A folder that could not be watched or listed for a passing reason (the watch
+limit, no descriptors left) is tried again every second; a root moved or deleted ends its
+watches (their events would name the old paths) and is watched again once a folder is at
+its path.  Until then watching() is false.
 macOS: FSEvents with file events (dropped events report an overflow); iOS: none.
 Paths are absolute, in the form of the platform; the folder of a change is enough for a
 caller that walks the tree again.
@@ -27264,7 +27287,11 @@ caller that walks the tree again.
 
 - **`fn new(roots: &[String]) -> Result<Watcher, String>`**
 - **`fn take(&self, wait_ms: u32) -> Changes`**
-  the changes so far (waiting up to wait_ms when there are none yet)
+  the changes so far (waiting up to wait_ms when there are none yet); while a root or
+  folder is not watched (watching() false) overflow is set, after the wait
+- **`fn watching(&self) -> bool`**
+  whether every root (Linux: every folder below them) is watched now; false while one is
+  gone or could not be watched yet (the watcher tries again every second)
 
 ### `plat/certs.rs`
 
@@ -34112,7 +34139,9 @@ macOS's windows: apple_mac.rs.
   (apple_mac_app.rs print_dialog); iOS: ERR_UNSUPPORTED before AP5
 
 - **`fn open_folder(path: &str) -> i32`**
-  show a folder / a file in the Finder -> 0 / -1  [plat_open_folder]
+  show a folder / a file in the Finder -> 0 / -1  [plat_open_folder].  A plain folder opens; a
+  file or a package (a folder with an extension: Name.app, .bundle ...) is only shown, selected
+  in its folder (open -R): `open` alone would start an app or a .command script
 
 - **`fn open_url(url: &str) -> i32`**
   a web page in the default application (iOS: UIApplication openURL) -> 0 / -1  [plat_open_url]
@@ -39731,6 +39760,10 @@ error answer or a closed connection, never a panic.
     no more writes from this side
   - `fn wait_readable(&self, _ms: u32) -> bool`
     whether bytes (or the end) can be read within `ms`
+  - `fn end_is_clean(&self) -> bool`
+    after read gave Ok(0): whether the peer ended the stream in order.  TLS: only after its
+    close_notify -- a TCP end without one may be an attacker cutting a body that runs to the
+    end of the connection (HTTP without a length).  Plain streams: always
 
 ### `netio/client.rs`
 
@@ -40474,6 +40507,8 @@ AL_CERTIFICATE_REQUIRED: u8 = 116
 - **`fn server(cfg: ServerConfig) -> Conn`**
 - **`fn established(&self) -> bool`**
 - **`fn closed(&self) -> bool`**
+- **`fn peer_closed(&self) -> bool`**
+  the peer sent close_notify (an orderly end, not a cut connection)
 - **`fn peer_certs(&self) -> &[Cert]`**
   the peer's certificate chain (leaf first)
 - **`fn version(&self) -> &'static str`**

@@ -119,7 +119,11 @@ permissions like the path itself).
   `hard_link` fail), no owners or modes (`set_mode` / `set_owner` fail on Linux, `set_attrs` on
   Windows; the calls that do nothing on an OS succeed), no `free_space`. `stat` reports Linux
   modes `0644` / `0755` and `ctime` = `mtime`. `write_file_private` and `mkdir_private` are
-  the mount's `write` and `mkdir`.
+  the mount's `write` and `mkdir`. On OS paths `write_file_private` writes a new sibling of
+  its own (`NAME.tmpN`, never an existing file of that name) and renames it into place;
+  `read_dir` gives `None` also when an error cut the listing short (Windows).
+- `plat::fs::join` and `parent` take `\` for a separator on Windows and in vfs names only; on
+  Linux and macOS it is a character of a name (`join("/tmp/a\\", "f")` is `/tmp/a\/f`).
 - A `symlink` target with a scheme stands for its OS path; links work on OS paths and folder
   mounts only.
 
@@ -178,7 +182,9 @@ fallback.
   file systems) gets steps that fail on a taken name themselves: a file goes by a hard link and
   the removal of its old name, a folder replaces an empty folder made for it; so nothing in
   the trash is ever replaced (a file system without hard links refuses files then). Nothing is
-  copied across file systems.
+  copied across file systems. A trash and what is in it cannot be trashed again: the home
+  trash (also when `$XDG_DATA_HOME` has `.` or `//` in it) and a mount's `.Trash` and
+  `.Trash-$uid` (by name: a link to a trash is not recognised).
 - **Browser and Android**: there is no trash; `trash` returns `false`.
 
 A name with a scheme works when its mount is a folder (`documents://old.txt`,

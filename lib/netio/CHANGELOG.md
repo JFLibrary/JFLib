@@ -8,6 +8,15 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `Stream::end_is_clean()` (default true): after a read gave 0, whether the peer ended the stream in order. `TlsStream` answers whether close_notify came.
+
+### Security
+
+- A response without a length, which runs to the end of the connection, ends only at an orderly end. A reset, or a TLS connection closed without close_notify, is an error instead of the whole body.
+- SSH `exec`: the names of `exit-signal` requests count against `max_out` like the output.
+
 ## [0.2.0] - 2026-11-14
 
 ### Fixed

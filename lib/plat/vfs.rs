@@ -248,6 +248,12 @@ fn scheme_ok(s: &str) -> bool {
     b.len() >= 2 && b[0].is_ascii_lowercase() && b.iter().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || b"+-.".contains(c))
 }
 
+/// (fs) whether name is a vfs name ("scheme:" ...), not an OS path
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+pub(crate) fn has_scheme(name: &str) -> bool {
+    split(name).is_some()
+}
+
 // "scheme:" + "", "/" or "//" + rest -> (scheme, rest); None for an OS path
 fn split(name: &str) -> Option<(&str, &str)> {
     let k = name.find(':')?;

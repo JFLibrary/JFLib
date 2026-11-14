@@ -1031,15 +1031,9 @@ impl Cs<'_, '_> {
             r += num;
         }
         let first = self.sp - num as usize;
-        for _ in 0..r {
-            let top = self.st[self.sp - 1];
-            let mut k = self.sp - 1;
-            while k > first {
-                self.st[k] = self.st[k - 1];
-                k -= 1;
-            }
-            self.st[first] = top;
-        }
+        // in one pass: r single steps cost num * r moves, and the budget counts a roll as one
+        // operator (a font of rolls of the whole CFF2 stack took about 35 s to load)
+        self.st[first..self.sp].rotate_right(r as usize);
     }
 
     // CFF2 blend: n defaults, n x k deltas, n -> the n values at the instance (k: the regions of

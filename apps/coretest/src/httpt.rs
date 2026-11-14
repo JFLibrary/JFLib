@@ -85,7 +85,43 @@ fn raw(addr: &SocketAddr, req: &[u8]) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// fixed bytes, then the end: orderly or not (TLS without close_notify)
+struct Scripted {
+    data: SpinLock<Vec<u8>>,
+    clean: bool,
+}
+
+impl netio::Stream for Scripted {
+    fn read(&self, buf: &mut [u8]) -> plat::net::NetResult<usize> {
+        let mut d = self.data.lock();
+        let n = buf.len().min(d.len());
+        buf[..n].copy_from_slice(&d[..n]);
+        d.drain(..n);
+        Ok(n)
+    }
+    fn write_all(&self, _: &[u8]) -> plat::net::NetResult<()> {
+        Ok(())
+    }
+    fn set_timeouts(&self, _: Option<u32>, _: Option<u32>) {}
+    fn end_is_clean(&self) -> bool {
+        self.clean
+    }
+}
+
+/// a body without a length runs to the end of the connection: only an orderly end ends it
+fn until_close(t: &mut T) {
+    let read = |clean: bool| {
+        let s = Scripted { data: SpinLock::new(b"the first half".to_vec()), clean };
+        netio::http::Reader::new(&s).body(&Headers::new(), 1 << 20, true)
+    };
+    t.eq("until close: an orderly end ends the body", read(true).ok(), Some(b"the first half".to_vec()));
+    let cut = read(false);
+    t.check("until close: an end without close_notify is an error, not the whole body",
+        matches!(cut, Err(netio::http::ReadError::Net(e)) if e.kind == plat::net::NetErrorKind::Reset));
+}
+
 pub fn run(t: &mut T) {
+    until_close(t);
     urls(t);
     let cfg = ServerConfig { threads: 4, max_body: 1 << 20, idle_ms: 2000, ..ServerConfig::default() };
     let srv = Server::start(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0), cfg, Arc::new(handler));

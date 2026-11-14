@@ -993,6 +993,19 @@ fn auto() -> Option<Answer> {
     [Answer::Once, Answer::Always, Answer::Deny, Answer::Never].into_iter().find(|a| *a as u8 == v)
 }
 
+/// (boot::permissions, before the app's own code) read jfgui_PERM_ANSWER, jfgui_PERM_TIMEOUT
+/// and jfgui_PERM_STORE now, from the environment the program was started with: a value the
+/// app sets later (plat::setenv) neither answers its own questions nor moves the stored answers
+pub(crate) fn read_env() {
+    let _ = auto();
+    let _ = wait_ms();
+    let mut s = STORE_S.lock();
+    if s.path.is_none() {
+        let p = store_path(&s);
+        s.path = Some(p);
+    }
+}
+
 #[cfg_attr(not(any(windows, target_os = "linux", target_vendor = "apple")), allow(dead_code))]
 fn wait_ms() -> u32 {
     let v = WAIT.load(Ordering::Acquire);

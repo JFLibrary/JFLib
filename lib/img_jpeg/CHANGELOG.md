@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- The scans of an image go over at most 64 times its blocks; further scans are left out as after a missing EOI. Thousands of empty scans with a restart interval kept the decoder of a small file busy for minutes.
+
 ## [0.2.0] - 2026-11-14
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

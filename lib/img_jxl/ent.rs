@@ -177,7 +177,7 @@ fn histogram(jb: &mut Jb, counts: &mut [u32; 260]) -> Result<u32, i32> {
         let pk = (jb.peek64() & 127) as usize;
         let bits = tab::HISTHUFF[pk * 2] as u32;
         let lc = tab::HISTHUFF[pk * 2 + 1] as u32;
-        jb.pos = jb.pos.wrapping_add(bits as u64);
+        jb.pos = jb.pos.saturating_add(bits as u64);
         if lc == 13 {
             let rle = varlen(jb, 3);
             counts[i as usize] = 13 | (rle + 5) << 8;
@@ -411,7 +411,7 @@ fn psym(jp: &Jp, jb: &mut Jb) -> i32 {
     let e = jp.fast[(bits & 1023) as usize];
     let len = e & 255;
     if len != 0 {
-        jb.pos = jb.pos.wrapping_add(len as u64);
+        jb.pos = jb.pos.saturating_add(len as u64);
         return (e >> 8) as i32;
     }
     let mut code = 0u32;
@@ -421,7 +421,7 @@ fn psym(jp: &Jp, jb: &mut Jb) -> i32 {
         bits >>= 1;
         let d = code.wrapping_sub(jp.firstc[l as usize]);
         if d < jp.count[l as usize] {
-            jb.pos = jb.pos.wrapping_add(l as u64);
+            jb.pos = jb.pos.saturating_add(l as u64);
             let k = d.wrapping_add(jp.firsti[l as usize]) as usize;
             return jp.sorted.get(k).copied().unwrap_or(0) as i32;
         }
@@ -497,7 +497,7 @@ fn prefix(jb: &mut Jb, alpha: u32) -> Result<Box<Jp>, i32> {
         let pk = (jb.peek64() & 15) as usize;
         let bits = CLHUFF[pk * 2] as u32;
         let v = CLHUFF[pk * 2 + 1] as u32;
-        jb.pos = jb.pos.wrapping_add(bits as u64);
+        jb.pos = jb.pos.saturating_add(bits as u64);
         cl[CLORDER[idx as usize] as usize] = v as u8;
         if v != 0 {
             space -= (32 >> v) as i32;

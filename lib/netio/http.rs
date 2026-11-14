@@ -436,10 +436,12 @@ impl<'a> Reader<'a> {
                     return Err(ReadError::Bad);
                 }
                 self.pos = self.buf.len();
+                // only an orderly end ends such a body: a reset, or TLS without close_notify,
+                // may be the body cut short, which must not pass for the whole of it
                 match self.fill() {
-                    Ok(0) => return Ok(total),
+                    Ok(0) if self.s.end_is_clean() => return Ok(total),
+                    Ok(0) => return Err(ReadError::Net(NetError::new(NetErrorKind::Reset, 0))),
                     Ok(_) => {}
-                    Err(e) if e.kind == NetErrorKind::Reset => return Ok(total),
                     Err(e) => return Err(ReadError::Net(e)),
                 }
             }

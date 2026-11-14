@@ -79,6 +79,12 @@ pub(crate) struct S {
     paths: Vec<String>,
 }
 
+// a chosen path fits the caller's cap whole (at most cap - 1 bytes, no NUL): cut, it would name
+// another file or a parent folder, which the dialog then grants (fs.user) as the user's choice
+fn fits_cap(p: &str, cap: u32) -> bool {
+    !p.contains('\0') && p.len() < cap as usize
+}
+
 // str_copy(src, cap): at most cap - 1 bytes, never splitting a UTF-8 sequence
 fn copy_cap(src: &str, cap: usize) -> String {
     let src = super::basic::cstr(src);
@@ -480,7 +486,7 @@ impl Ui {
         let wanted = open.get() != 0; // the app may have closed it meanwhile
         open.set(0);
         self.repass();
-        if r != 1 || !wanted {
+        if r != 1 || !wanted || !fits_cap(&chosen, cap) {
             return 0;
         }
         *path = copy_cap(&chosen, cap as usize);
@@ -501,9 +507,12 @@ impl Ui {
         if self.hr_outside("the system's file dialog") {
             return -1; // hot reload's replay: the own dialog (hotreload.rs)
         }
+        let before = path.clone();
         let r = plat::file_dialog(flags, path, exts).0;
-        if r == 1 {
-            *path = copy_cap(path, cap as usize);
+        if r == 1 && !(fits_cap(path, cap) && plat::file_dialog_paths().iter().all(|p| fits_cap(p, cap))) {
+            // a choice longer than the caller can hold: as if cancelled (nothing granted)
+            *path = before;
+            return 0;
         }
         r
     }
@@ -637,7 +646,11 @@ impl Ui {
                 let n = String::from(n);
                 join(&mut d, &n);
             }
-            *path = copy_cap(&d, cap as usize);
+            if !fits_cap(&d, cap) {
+                f.msg = Some(tr("Der Pfad ist zu lang."));
+                return false;
+            }
+            *path = d;
             sh.paths = alloc::vec![path.clone()]; // filedlg_paths: the folder, not the last dialog's files
             sh.last = copy_cap(&f.dir, FD_PATH);
             return true;
@@ -701,7 +714,11 @@ impl Ui {
                 tmp.push_str(e);
             }
         }
-        *path = copy_cap(&tmp, cap as usize);
+        if !fits_cap(&tmp, cap) {
+            f.msg = Some(tr("Der Pfad ist zu lang."));
+            return false;
+        }
+        *path = tmp;
         sh.paths = alloc::vec![path.clone()];
         sh.last = copy_cap(&f.dir, FD_PATH);
         true
@@ -729,7 +746,11 @@ impl Ui {
                 f.msg = Some(tr("Die Datei wurde nicht gefunden."));
                 return false;
             }
-            all.push(copy_cap(&t, cap as usize));
+            if !fits_cap(&t, cap) {
+                f.msg = Some(tr("Der Pfad ist zu lang."));
+                return false;
+            }
+            all.push(t);
         }
         if all.is_empty() {
             return false;

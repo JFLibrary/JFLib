@@ -469,6 +469,21 @@ fn segment(t: &mut T) {
     t.eq("soft hyphen", wrap_end_hyph(s, 0, s.len(), &mut hfits(10), None), (9, true));
     t.eq("soft hyphen, the hyphen does not fit", wrap_end_hyph(s, 0, s.len(), &mut hfits(9), Some(&mut hook)), (4, false));
     t.eq("words with digits stay whole", wrap_end_hyph("x Silbentrennung2", 0, 17, &mut hfits(12), Some(&mut hook)), (2, false));
+    // a hyphen wider than the text after it (3): the plain break after "c" fits although the
+    // soft hyphen before it did not
+    let mut wide = |a: usize, b: usize, h: bool| b - a + 3 * h as usize <= 6;
+    t.eq("a plain break after a soft hyphen that does not fit", wrap_end_hyph("ab\u{AD}c d", 0, 7, &mut wide, None), (6, false));
+    // 3000 soft hyphens: once one does not fit, the later ones are not measured (each fits
+    // call measures from the line's start: measuring them all was cubic over the lines)
+    let long = "ab\u{AD}".repeat(3000);
+    let mut calls = 0usize;
+    let mut counted = |a: usize, b: usize, h: bool| {
+        calls += 1;
+        b - a + h as usize <= 10
+    };
+    let r = wrap_end_hyph(&long, 0, long.len(), &mut counted, None);
+    t.eq("many soft hyphens: the line", r, (8, true));
+    t.check("many soft hyphens: a few measurements, not one per soft hyphen", calls < 20);
     t.eq("wrap_end ignores soft hyphens' hyphen", wrap_end(s, 0, s.len(), &mut fits(9)), 9);
     t.check("version", unicode_version().starts_with("15."));
 }

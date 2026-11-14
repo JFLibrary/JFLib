@@ -27,6 +27,7 @@ use super::{dll_proc, wide_cap};
 #[link(name = "kernel32", kind = "raw-dylib")]
 unsafe extern "system" {
     fn GetFileAttributesW(name: *const u16) -> u32;
+    fn GetWindowsDirectoryW(buf: *mut u16, size: u32) -> u32;
     fn GetLogicalDrives() -> u32;
     fn GetModuleFileNameW(m: isize, buf: *mut u16, n: u32) -> u32;
     fn CreateProcessW(app: *const u16, cmd: *mut u16, pa: usize, ta: usize, inherit: i32, flags: u32, env: usize,
@@ -148,7 +149,15 @@ pub fn open_folder(path: &str) -> i32 {
         let mut param: Vec<u16> = "/select,\"".encode_utf16().collect();
         param.extend_from_slice(&w[..w.len() - 1]);
         param.extend_from_slice(&[b'"' as u16, 0]);
-        let exe: Vec<u16> = "explorer.exe\0".encode_utf16().collect();
+        // the Windows folder's explorer.exe: ShellExecuteW looks for a bare name in the
+        // current folder too, where a download may have put one
+        let mut dir = [0u16; 260];
+        // SAFETY: a buffer of 260 UTF-16 units; the result is the length without the NUL.
+        let n = unsafe { GetWindowsDirectoryW(dir.as_mut_ptr(), 260) } as usize;
+        if n == 0 || n >= dir.len() {
+            return -1;
+        }
+        let exe: Vec<u16> = dir[..n].iter().copied().chain("\\explorer.exe\0".encode_utf16()).collect();
         shell_exec(&exe, Some(&param))
     } else {
         shell_exec(&w, None)

@@ -6,7 +6,8 @@
 //! where this ELF file ends (its section header table, docs/PACKAGING.md "AppImage").
 //!
 //! It does not mount the image (no FUSE needed): the first start extracts it into
-//! $XDG_CACHE_HOME/appimage-run/<name>-<xxh64 of the image> (into a part folder that is
+//! $XDG_CACHE_HOME/appimage-run/<name>-<xxh64 of the image> (without $XDG_CACHE_HOME and $HOME:
+//! $TMPDIR/appimage-run-<uid>, only when that folder is this user's alone; into a part folder that is
 //! renamed into place, so parallel starts and broken runs never leave a half folder in use);
 //! later starts of the same file reuse it, and folders of other versions of the same name
 //! that were not used for 7 days are removed.  Then AppRun of that folder (a relative link:
@@ -197,8 +198,13 @@ fn launch(file: &File, offset: u64, me: &str, argv0: &str, args: &[&str]) -> i32
         Err(e) => return fail(&e),
     };
     let Some(key) = image_key(file, offset) else { return fail(&format!("{me} lässt sich nicht lesen")) };
-    let Some(base) = plat::cache_dir().or_else(plat::temp_dir) else { return fail("kein Cache-Ordner ($XDG_CACHE_HOME, $HOME)") };
-    let root = format!("{base}/appimage-run");
+    let root = match plat::cache_dir() {
+        Some(base) => format!("{base}/appimage-run"),
+        None => match shared_root() {
+            Ok(r) => r,
+            Err(e) => return fail(&e),
+        },
+    };
     let stem = stem(me);
     let dir = format!("{root}/{stem}-{key}");
     let ready = lstat(&format!("{dir}/AppRun")).is_some();
@@ -266,6 +272,22 @@ fn stem(path: &str) -> String {
     let name = name.strip_suffix(".AppImage").or_else(|| name.strip_suffix(".appimage")).unwrap_or(name);
     let s: String = name.chars().take(64).map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') { c } else { '_' }).collect();
     if s.is_empty() { String::from("app") } else { s }
+}
+
+/// without $XDG_CACHE_HOME and $HOME: $TMPDIR/appimage-run-<uid>, which every user can name.
+/// Another user may have made it first and put an AppRun in it, so it must be a folder (no
+/// link) of this user that nobody else may write to
+fn shared_root() -> Result<String, String> {
+    let tmp = plat::temp_dir().ok_or("kein Cache-Ordner ($XDG_CACHE_HOME, $HOME) und kein $TMPDIR")?;
+    // /proc/self is /proc/<pid>, which belongs to the process's user
+    let uid = plat::fs::stat("/proc/self").map(|m| m.uid).ok_or("kein Cache-Ordner ($XDG_CACHE_HOME, $HOME), /proc fehlt")?;
+    let root = format!("{tmp}/appimage-run-{uid}");
+    plat::fs::mkdir_private(&root);
+    match lstat(&root) {
+        Some(m) if m.is_dir() && m.uid == uid && m.mode & 0o077 == 0 => Ok(root),
+        Some(_) => Err(format!("{root} gehört einem anderen Benutzer oder ist für andere offen")),
+        None => Err(format!("{root} wurde nicht angelegt")),
+    }
 }
 
 /// remove the folders of other images of the same name not used for KEEP_DAYS (a running

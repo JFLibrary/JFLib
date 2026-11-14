@@ -8,6 +8,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- Line breaking with soft hyphens (`segment::wrap_end_hyph`) stops measuring the later soft hyphens once one does not fit. 30 KB of text with many of them froze the UI.
+- The CFF charstring operator `roll` rotates in one pass. A roll of the whole CFF2 stack cost num × r moves while the budget counted one operator; such a font took about 35 s to load.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

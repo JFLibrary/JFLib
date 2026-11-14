@@ -830,7 +830,10 @@ impl Client {
                         "exit-signal" => {
                             out.status = None;
                             let sig = r.str().unwrap_or("");
-                            out.stderr.extend_from_slice(format!("\n(signal {})", sig).as_bytes());
+                            // within max_out as the output: a server may send any number of them
+                            let note = format!("\n(signal {})", sig);
+                            let room = max_out.saturating_sub(out.stderr.len());
+                            out.stderr.extend_from_slice(&note.as_bytes()[..note.len().min(room)]);
                         }
                         _ => {}
                     }
