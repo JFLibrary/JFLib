@@ -27,8 +27,12 @@
 //   rename(&mut ini, "old.key", "new.key")   for migrations
 //
 // Names are "section.key" (no '.': the top of the file).  The file keeps only values that
-// differ from the default (setting the default removes the line), so a new default reaches
-// users who never changed it; comments, unknown keys and other sections survive (Ini).
+// differ from the default (setting the default or a reset removes every line of the key, also
+// one that already read as the default), so a new default reaches users who never changed it;
+// comments, unknown keys and other sections survive (Ini).  set / reset report whether the
+// value or the file changed.  A text is kept as the file can hold it: CR, LF and NUL become
+// blanks, blanks around it go, then it is cut to its maximum (what a restart reads back); a
+// value whose line would be too long for the file is not set (false, a WARN).
 // The format version is "version=N" at the top: a file of an older version (no line: 0)
 // runs migrate(from, &mut ini) once before its values are read (rename keys, convert units)
 // and is saved with the new version by the next save; a missing file needs no migration; a
@@ -84,7 +88,7 @@ impl Desc {
             Kind::Bool(d) => Val::Bool(d),
             Kind::Int { def, .. } => Val::Int(def),
             Kind::Num { def, .. } => Val::Num(def),
-            Kind::Text { def, .. } => Val::Text(String::from(def)),
+            Kind::Text { def, max } => Val::Text(canon(def, max)),
             Kind::Choice { def, .. } => Val::Choice(def),
             Kind::Color(d) => Val::Color(d & 0xFF_FFFF),
         }
@@ -96,10 +100,7 @@ impl Desc {
             (Kind::Bool(_), Val::Bool(b)) => Val::Bool(b),
             (Kind::Int { min, max, .. }, Val::Int(x)) => Val::Int(x.clamp(min, max.max(min))),
             (Kind::Num { min, max, .. }, Val::Num(x)) if !x.is_nan() && !min.is_nan() && !max.is_nan() => Val::Num(x.clamp(min, max.max(min))),
-            (Kind::Text { max, .. }, Val::Text(mut s)) => {
-                cut(&mut s, max);
-                Val::Text(s)
-            }
+            (Kind::Text { max, .. }, Val::Text(s)) => Val::Text(canon(&s, max)),
             (Kind::Choice { items, .. }, Val::Choice(i)) if i < items.len() => Val::Choice(i),
             (Kind::Color(_), Val::Color(c)) => Val::Color(c & 0xFF_FFFF),
             _ => self.default_val(),
@@ -369,15 +370,20 @@ pub fn rename(ini: &mut Ini, old: &str, new: &str) -> bool {
     true
 }
 
-// cut s to at most max bytes at a character boundary
-fn cut(s: &mut String, max: usize) {
-    if s.len() > max {
-        let mut n = max;
-        while !s.is_char_boundary(n) {
-            n -= 1;
-        }
-        s.truncate(n);
+// s cut to at most max bytes at a character boundary, without blanks at its end
+fn cut(s: &str, max: usize) -> &str {
+    let mut n = max.min(s.len());
+    while !s.is_char_boundary(n) {
+        n -= 1;
     }
+    s[..n].trim_end_matches([' ', '\t'])
+}
+
+// a text as the file keeps it -- CR, LF and NUL as blanks, no blanks around it, at most max
+// bytes -- so the value a program sets is the value it reads after a restart
+fn canon(s: &str, max: usize) -> String {
+    let t: String = s.chars().map(|c| if matches!(c, '\r' | '\n' | '\0') { ' ' } else { c }).collect();
+    String::from(cut(t.trim_matches([' ', '\t']), max))
 }
 
 /// typed settings over a file (see the module header)
@@ -464,12 +470,17 @@ impl Settings {
     pub fn text(&self, k: &Key<String>) -> &str {
         match self.schema.index(k.d.name).map(|i| &self.vals[i]) {
             Some(Val::Text(s)) => s,
+            // a key outside the schema: the file's text, at most the key's max bytes (as get)
             _ => {
                 let (s, n) = k.d.split();
+                let max = match k.d.kind {
+                    Kind::Text { max, .. } => max,
+                    _ => usize::MAX,
+                };
                 match self.ini.get(s, n) {
-                    Some(t) => t,
+                    Some(t) => cut(t, max),
                     None => match k.d.kind {
-                        Kind::Text { def, .. } => def,
+                        Kind::Text { def, .. } => cut(def.trim_matches([' ', '\t']), max),
                         _ => "",
                     },
                 }
@@ -477,29 +488,31 @@ impl Settings {
         }
     }
 
-    /// set a value (made valid for the key) -> it changed
+    /// set a value (made valid for the key) -> the value or the file changed (the default
+    /// removes every line of the key, also one that held it already)
     pub fn set<T: Value>(&mut self, k: &Key<T>, v: T) -> bool {
         match self.schema.index(k.d.name) {
             Some(i) => self.set_at(i, v.into_val()),
             None => {
                 let v = k.d.fit(v.into_val());
-                if read(&self.ini, &k.d) == v {
+                let old = read(&self.ini, &k.d);
+                let Some(file) = write(&mut self.ini, &k.d, &v) else { return false };
+                if old == v && !file {
                     return false;
                 }
-                write(&mut self.ini, &k.d, &v);
                 self.changed();
                 true
             }
         }
     }
 
-    /// back to the default (the line leaves the file)
+    /// back to the default: every line of the key leaves the file (also an explicit default,
+    /// a value that read as the default, a second line of the same key)
     pub fn reset<T>(&mut self, k: &Key<T>) -> bool {
         match self.schema.index(k.d.name) {
             Some(i) => self.set_at(i, k.d.default_val()),
             None => {
-                let (s, n) = k.d.split();
-                let gone = self.ini.remove(s, n);
+                let gone = write(&mut self.ini, &k.d, &k.d.default_val()) == Some(true);
                 if gone {
                     self.changed();
                 }
@@ -535,14 +548,15 @@ impl Settings {
         self.schema.keys[i].default_val()
     }
 
-    /// set schema key i (made valid) -> it changed
+    /// set schema key i (made valid) -> the value or the file changed (as set)
     pub fn set_at(&mut self, i: usize, v: Val) -> bool {
         let d = &self.schema.keys[i];
         let v = d.fit(v);
-        if self.vals[i] == v {
+        // the file first: at the default its lines go even when the value read as the default
+        let Some(file) = write(&mut self.ini, d, &v) else { return false };
+        if self.vals[i] == v && !file {
             return false;
         }
-        write(&mut self.ini, d, &v);
         self.vals[i] = v;
         self.changed();
         true
@@ -614,12 +628,25 @@ fn read(ini: &Ini, d: &Desc) -> Val {
     }
 }
 
-// the key's line: removed at the default, else written
-fn write(ini: &mut Ini, d: &Desc, v: &Val) {
+// the key's lines for v: at the default every one of them goes (a second line of the key would
+// be read after a restart), else its line holds v -> whether the file changed; None: the file
+// cannot hold the value (a line longer than Ini's maximum), nothing changed
+fn write(ini: &mut Ini, d: &Desc, v: &Val) -> Option<bool> {
     let (s, n) = d.split();
     if *v == d.default_val() {
-        ini.remove(s, n);
-    } else {
-        ini.set(s, n, &d.format(v));
+        let mut gone = false;
+        while ini.remove(s, n) {
+            gone = true;
+        }
+        return Some(gone);
     }
+    let text = d.format(v);
+    if ini.get(s, n) == Some(text.as_str()) {
+        return Some(false);
+    }
+    if !ini.set(s, n, &text) {
+        plat::log_warn("settings", &alloc::format!("{}: the value is too long for the file and is not set", d.name));
+        return None;
+    }
+    Some(true)
 }
