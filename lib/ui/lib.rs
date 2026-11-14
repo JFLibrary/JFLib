@@ -779,6 +779,9 @@ pub struct Ui {
     pub(crate) verify_dirty: bool,
     pub(crate) frames_rendered: u32,
     pub(crate) close_at: u32,
+    /// (settings_page) the focused text box of a setting and what was typed into it (blanks at
+    /// its end kept while typing; the setting holds the text as the file keeps it)
+    pub(crate) settings_edit: Option<(u32, String)>,
 
     // ---- dirty regions (ui_dirty.s, shared part)
     pub(crate) drects: Vec<[i32; 4]>,
