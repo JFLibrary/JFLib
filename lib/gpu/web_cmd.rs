@@ -101,7 +101,8 @@ impl<'a> CommandEncoder<'a> {
         if !self.outside("copy_buffer in a render pass") {
             return;
         }
-        if src_off % 4 != 0 || dst_off % 4 != 0 || size % 4 != 0 || src_off + size > src.size() || dst_off + size > dst.size() {
+        if src_off % 4 != 0 || dst_off % 4 != 0 || size % 4 != 0 || src_off.checked_add(size).is_none_or(|e| e > src.size())
+            || dst_off.checked_add(size).is_none_or(|e| e > dst.size()) {
             return self.fail("copy_buffer: outside the buffers, or not in multiples of 4");
         }
         let (a, b, c) = (split(src_off), split(dst_off), split(size));
@@ -113,7 +114,7 @@ impl<'a> CommandEncoder<'a> {
         if !self.outside("fill_buffer in a render pass") {
             return;
         }
-        if offset % 4 != 0 || size % 4 != 0 || offset + size > buf.size() {
+        if offset % 4 != 0 || size % 4 != 0 || offset.checked_add(size).is_none_or(|e| e > buf.size()) {
             return self.fail("fill_buffer: outside the buffer, or not in multiples of 4");
         }
         let (a, b) = (split(offset), split(size));
@@ -202,7 +203,7 @@ impl<'a> CommandEncoder<'a> {
         let Some(layout) = layout else {
             return self.fail("push_constants before a pipeline");
         };
-        if offset % 4 != 0 || bytes.len() % 4 != 0 || offset as usize + bytes.len() > layout.0.push as usize {
+        if offset % 4 != 0 || bytes.len() % 4 != 0 || (offset as usize).checked_add(bytes.len()).is_none_or(|e| e > layout.0.push as usize) {
             return self.fail("push_constants: beyond the layout's block, or not in multiples of 4");
         }
         self.w.extend_from_slice(&[OP_PUSH, offset, bytes.len() as u32 / 4]);
@@ -224,7 +225,7 @@ impl<'a> CommandEncoder<'a> {
         if !self.outside("dispatch_indirect in a render pass") {
             return;
         }
-        if self.compute.is_none() || !buf.usage().contains(BufferUsage::INDIRECT) || offset % 4 != 0 || offset + 12 > buf.size() {
+        if self.compute.is_none() || !buf.usage().contains(BufferUsage::INDIRECT) || offset % 4 != 0 || offset.checked_add(12).is_none_or(|e| e > buf.size()) {
             return self.fail("dispatch_indirect: no pipeline, no INDIRECT usage, or outside the buffer");
         }
         let o = split(offset);
@@ -334,7 +335,7 @@ impl<'a> CommandEncoder<'a> {
         if !self.drawing() {
             return;
         }
-        if !buf.usage().contains(BufferUsage::INDIRECT) || offset % 4 != 0 || offset + 16 > buf.size() {
+        if !buf.usage().contains(BufferUsage::INDIRECT) || offset % 4 != 0 || offset.checked_add(16).is_none_or(|e| e > buf.size()) {
             return self.fail("draw_indirect: no INDIRECT usage, or outside the buffer");
         }
         let o = split(offset);
@@ -346,7 +347,7 @@ impl<'a> CommandEncoder<'a> {
         if !self.drawing() {
             return;
         }
-        if !buf.usage().contains(BufferUsage::INDIRECT) || offset % 4 != 0 || offset + 20 > buf.size() {
+        if !buf.usage().contains(BufferUsage::INDIRECT) || offset % 4 != 0 || offset.checked_add(20).is_none_or(|e| e > buf.size()) {
             return self.fail("draw_indexed_indirect: no INDIRECT usage, or outside the buffer");
         }
         let o = split(offset);

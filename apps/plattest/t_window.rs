@@ -10,7 +10,9 @@
 // docked to the owner when it moves), enable, the clipboard round trip (text, PNG, image +
 // DIB), the IME caret, the system file dialog (closed by a timer: Cancel, then a name + OK;
 // FD_MULTI with two quoted names and with one),
-// a WM_DROPFILES of jfgui_TEST_DROPFILES, wake() from a thread, close and destroy.
+// a WM_DROPFILES of jfgui_TEST_DROPFILES, the session end (a cancelled one changes nothing, a
+// confirmed one sent from a thread is taken inside WM_ENDSESSION), wake() from a thread, close
+// and destroy.
 // The clipboard's text is saved and put back at the end.  Windows here; macOS: t_window_mac.rs
 // (Linux: linuxtest).
 
@@ -46,8 +48,27 @@ mod win {
     const WM_ENTERSIZEMOVE: u32 = 0x0231;
     const WM_EXITSIZEMOVE: u32 = 0x0232;
     const WM_SETCURSOR: u32 = 0x0020;
+    const WM_QUERYENDSESSION: u32 = 0x0011;
+    const WM_ENDSESSION: u32 = 0x0016;
 
     static REFRESHED: AtomicU32 = AtomicU32::new(0);
+    // E_SESSION_END taken in wait_refresh's closure; its count when SendMessageW returned
+    static SESSION: AtomicU32 = AtomicU32::new(0);
+    static AT_RETURN: AtomicU32 = AtomicU32::new(u32::MAX);
+
+    #[allow(unsafe_code)]
+    mod user32 {
+        #[link(name = "user32", kind = "raw-dylib")]
+        unsafe extern "system" {
+            fn SendMessageW(hwnd: isize, msg: u32, wp: usize, lp: isize) -> isize;
+        }
+
+        /// SendMessageW from another thread: it returns once the window's thread handled it
+        pub fn send(hwnd: isize, msg: u32, wp: usize, lp: isize) -> isize {
+            // SAFETY: plain values to a window of this process.
+            unsafe { SendMessageW(hwnd, msg, wp, lp) }
+        }
+    }
 
     fn refresh() {
         REFRESHED.fetch_add(1, SeqCst);
@@ -475,6 +496,39 @@ mod win {
         let g = open_folder("C:/no such folder/x.png");
         setenv("jfgui_OPEN_DRYRUN", None);
         t.check(u == 0 && f == 0 && g == -1, "shell: open_url / open_folder (dry run), a missing path -> -1");
+
+        // ---- the session end: the question changes nothing, a cancelled end neither; a
+        // confirmed end (sent from another thread, as Windows sends it) is taken by the UI in
+        // wait_refresh's closure before WM_ENDSESSION returns (Windows may end the process then)
+        evq_clear();
+        let q = win_test_send(0, WM_QUERYENDSESSION, 0, 0);
+        win_test_send(0, WM_ENDSESSION, 0, 0);
+        let ev = pump(30);
+        t.check(q == 1 && !ev.iter().any(|e| e.typ == E_SESSION_END), "session: WM_QUERYENDSESSION agrees, a cancelled end queues nothing");
+        let hwnd = win_native(0).map_or(0, |n| n.hwnd);
+        SESSION.store(0, SeqCst);
+        AT_RETURN.store(u32::MAX, SeqCst);
+        let th = thread_spawn(0, Box::new(move || {
+            user32::send(hwnd, WM_ENDSESSION, 1, 0);
+            AT_RETURN.store(SESSION.load(SeqCst), SeqCst);
+        }));
+        let dl = time_us() + 5_000_000;
+        while AT_RETURN.load(SeqCst) == u32::MAX && time_us() < dl {
+            wait_refresh(time_us() + 20_000, &mut || {
+                while let Some(e) = evq_pop() {
+                    if e.typ == E_SESSION_END {
+                        SESSION.fetch_add(1, SeqCst);
+                    }
+                }
+            });
+        }
+        if let Some(th) = th {
+            th.join();
+        }
+        win_test_send(0, WM_ENDSESSION, 1, 0); // a second confirmation: no second event
+        let ev = pump(30);
+        t.check(AT_RETURN.load(SeqCst) == 1 && SESSION.load(SeqCst) == 1 && !ev.iter().any(|e| e.typ == E_SESSION_END),
+                "session: a confirmed end is taken by the UI before WM_ENDSESSION returns, once");
 
         // ---- wake from another thread, close, destroy
         evq_clear();

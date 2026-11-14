@@ -54,6 +54,10 @@ pub fn write_stderr(b: &[u8]) {
         host_write(2, b.as_ptr(), b.len());
     }
 }
+/// The diagnostic channel for crash paths (the host copies at once, as write_stderr).
+pub fn write_stderr_crash(b: &[u8]) {
+    write_stderr(b);
+}
 
 /// Allocate zeroed, page-aligned memory, or return null on exhaustion.
 ///

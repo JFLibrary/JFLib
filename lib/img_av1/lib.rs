@@ -1,4 +1,4 @@
-// img_av1 -- AV1 intra decoder for AVIF still images (AV1 bitstream specification; model:
+// img_av1 -- AV1 intra decoder and encoder for AVIF still images (AV1 bitstream specification; model:
 // tools/av1_ref.py, bit-exact)                                  [src/img/av1*.s]
 //
 //   Av1Dec::new() -> decoder                  av1_new (av1_free = drop)

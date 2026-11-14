@@ -30,7 +30,12 @@
 // data 0).  Drop: the taken kinds are received one after the other through non-blocking pipes
 // served by the wait loop (text/uri-list -> paths and URLs, text, text/html, image/png or
 // image/bmp; each bounded), then E_DROP (x, y = position in the window's pixels, data = the
-// paths) and finish + destroy the offer.
+// paths) and finish + destroy the offer.  With dnd::drop_hold on (the UI answers drops itself)
+// the offer stays after E_DROP until dnd::drop_finish: taken, finish (the source gets
+// dnd_finished with the action negotiated before the drop: it cannot change after it); not
+// taken, the offer is destroyed without finish (the protocol has no other "not taken" after a
+// drop; Weston then sends the source cancelled).  A drop that still waits when the next one comes
+// is finished first.
 
 use alloc::vec;
 use alloc::vec::Vec;
@@ -117,7 +122,7 @@ pub(crate) struct Clip {
     dnd_serial: u32, // of its enter (accept)
     dnd_srcacts: u32, // the source's actions (v3; 0 = unknown)
     dnd_types: u32, // the DT_* kinds it offers
-    dnd_answer: (u32, u32), // what we answered last (kinds, effect)
+    dnd_answer: (u32, u32, u32), // what we answered last (kinds, effect, every effect taken)
     dnd_shown: Option<(i32, i32)>, // the last E_DRAG point
     dnd_win: i32,
     dnd_x: i32,
@@ -128,7 +133,10 @@ pub(crate) struct Clip {
     dnd_xx: i32,
     dnd_xy: i32,
     dnd_xeffect: u32,
+    dnd_xallowed: u32, // the effects its source allows (as E_DRAG said them)
     dnd_xfiles: u32,
+    dnd_hoffer: u32, // offer of a drop whose answer waits (drop_hold), its negotiated action
+    dnd_haction: u32,
     dnd_queue: Vec<(u32, &'static [u8])>, // the kinds still to read: (DT_* kind, MIME type)
     dnd_kind: (u32, &'static [u8]), // the one being read
     dnd_rfd: i32, // its pipe (0 = none)
@@ -144,6 +152,14 @@ pub(crate) struct Clip {
 /// MB_* bit of a MIME type name (0 = not used)  [mime_bit]
 fn mime_bit(s: &[u8]) -> u64 {
     MIME_TABLE.iter().find(|m| m.0 == s).map_or(0, |m| m.1)
+}
+
+impl Clip {
+    /// the DE_* effects the source of the drag over our window allows: its source_actions (v3),
+    /// copy and move without them (Wayland has no link)
+    fn dnd_allowed(&self) -> u32 {
+        if self.dnd_srcacts == 0 { DE_COPY | DE_MOVE } else { self.dnd_srcacts & (DE_COPY | DE_MOVE) }
+    }
 }
 
 fn pipe2(flags: usize) -> Option<[i32; 2]> {
@@ -261,16 +277,17 @@ impl Wl {
         let Some((_, mask, _)) = self.w.obj_iface(o) else { return };
         let c = &self.clip;
         let (w, x, y, offer) = (c.dnd_win, c.dnd_x, c.dnd_y, c.dnd_types);
-        let allowed = if c.dnd_srcacts == 0 { DE_COPY | DE_MOVE } else { c.dnd_srcacts & (DE_COPY | DE_MOVE) };
-        let (t, e) = crate::drag_query(w, x, y, offer, allowed, super::xkb::wl_mods() as u8);
-        if (t, e) != self.clip.dnd_answer {
-            self.clip.dnd_answer = (t, e);
+        let allowed = c.dnd_allowed();
+        let (t, e, effs) = crate::drag_query_all(w, x, y, offer, allowed, super::xkb::wl_mods() as u8);
+        if (t, e, effs) != self.clip.dnd_answer {
+            self.clip.dnd_answer = (t, e, effs);
             let mime = Self::dnd_mimes(t, mask).first().map(|m| m.1); // accept(serial, NULL): nothing for us
             let serial = self.clip.dnd_serial;
             self.w.send(o, &DATA_OFFER_ACCEPT, &[A::U(serial), A::S(mime)]);
             if self.g.ddm_ver >= 3 {
-                // the effects we take (no move for files: drag_query), the preferred one
-                let acts = if t == 0 { 0 } else if t & DT_FILES != 0 { DND_ACTION_COPY } else { allowed & (DND_ACTION_COPY | DND_ACTION_MOVE) };
+                // the effects the target there takes (the drop target's, never a move of files:
+                // drag_query_all), the preferred one
+                let acts = if t == 0 { 0 } else { effs & (DND_ACTION_COPY | DND_ACTION_MOVE) };
                 self.w.send(o, &DATA_OFFER_SET_ACTIONS, &[A::U(acts), A::U(e & acts)]);
             }
             self.w.flush();
@@ -331,10 +348,40 @@ impl Wl {
             return;
         }
         crate::drop_set_effect(self.clip.dnd_xeffect);
+        crate::drop_set_allowed(self.clip.dnd_xallowed);
         self.inp.evwin = self.clip.dnd_xwin;
         let (x, y, n) = (self.clip.dnd_xx, self.clip.dnd_xy, self.clip.dnd_xfiles);
         self.push(E_DROP, 0, x, y, n);
-        self.dnd_end(true);
+        if crate::drop_held() {
+            // the answer waits for the UI: the transfer ends, the offer stays
+            self.dnd_hold_end(None);
+            let c = &mut self.clip;
+            c.dnd_hoffer = core::mem::take(&mut c.dnd_xoffer);
+            c.dnd_haction = c.dnd_xaction;
+            self.dnd_end(false);
+            crate::drop_wait_begin(wl_drop_finish);
+        } else {
+            self.dnd_end(true);
+        }
+    }
+
+    /// the drop that waits is answered: taken (effect != 0) finish when an action was negotiated,
+    /// then the offer goes; None: as at its drop (taken), and no one waits for it any more
+    pub(crate) fn dnd_hold_end(&mut self, effect: Option<u32>) {
+        let o = core::mem::take(&mut self.clip.dnd_hoffer);
+        if o == 0 {
+            return;
+        }
+        if effect.is_none() {
+            crate::drop_wait_clear();
+        }
+        if effect.is_none_or(|e| e != 0) && self.g.ddm_ver >= 3 && self.clip.dnd_haction != 0 {
+            self.w.send(o, &DATA_OFFER_FINISH, &[]);
+        }
+        if o != self.clip.sel_offer {
+            self.w.send(o, &DATA_OFFER_DESTROY, &[]);
+        }
+        self.w.flush();
     }
 
     /// the drop pipe is readable: read what is there; at its end the next MIME type, after the
@@ -707,6 +754,11 @@ impl Wl {
     }
 }
 
+// (dnd::drop_finish) the UI's answer to the drop that waits
+fn wl_drop_finish(effect: u32) {
+    super::with(|wl| wl.dnd_hold_end(Some(effect)));
+}
+
 // ------------------------------------------------------------------ offers (paste side)
 
 /// wl_data_device.data_offer(new id): track the new offer  [wlh_dd_offer]
@@ -762,7 +814,7 @@ pub(crate) fn wlh_dd_enter(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
     c.dnd_offer = offer;
     c.dnd_action = 0;
     c.dnd_serial = a.u(0);
-    c.dnd_answer = (u32::MAX, 0); // the first answer always goes out
+    c.dnd_answer = (u32::MAX, 0, 0); // the first answer always goes out
     c.dnd_shown = None;
     c.dnd_win = w;
     c.dnd_types = 0;
@@ -800,7 +852,8 @@ pub(crate) fn wlh_dd_drop(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
     if o == 0 {
         return;
     }
-    let (t, e) = wl.clip.dnd_answer;
+    wl.dnd_hold_end(None); // a drop that still waits: answered as at its drop
+    let (t, e, _) = wl.clip.dnd_answer;
     let mask = wl.w.obj_iface(o).map_or(0, |x| x.1);
     let queue = Wl::dnd_mimes(if t == u32::MAX { 0 } else { t }, mask);
     if queue.is_empty() || e == 0 || wl.clip.dnd_rfd != 0 {
@@ -817,6 +870,7 @@ pub(crate) fn wlh_dd_drop(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
     c.dnd_xx = c.dnd_x;
     c.dnd_xy = c.dnd_y;
     c.dnd_xfiles = 0;
+    c.dnd_xallowed = c.dnd_allowed();
     // the negotiated action wins over our preference (v3)
     c.dnd_xeffect = match c.dnd_action {
         DND_ACTION_MOVE if e & DE_ALL != 0 => DE_MOVE,

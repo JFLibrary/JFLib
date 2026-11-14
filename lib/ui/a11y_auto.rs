@@ -16,7 +16,9 @@
 //                         required invalid busy haspopup visited modal multiselect offscreen
 //                         selectable; ACTION: click focus value text expand step scroll select
 //   a11y expect announced "s" | none   the last text ui.announce said since the last check
-//   a11y dump [FILE]      the tree as text, a node per line indented by its depth
+//   a11y dump [FILE]      the tree as text, a node per line indented by its depth: role[/sub],
+//                         name, text (a slider's, meter's or progress bar's: valuetext), desc,
+//                         url, value and range of those, the states, level, set, cell, live, key
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -79,7 +81,7 @@ fn qstring(p: &[u8]) -> Option<String> {
     parse_qstring(skip_ws(p), 4096).map(|(s, _)| String::from_utf8_lossy(&s).into_owned())
 }
 
-// one line of the dump: role[/sub] "name" [text] states, key
+// one line of the dump: role[/sub] "name" [text] [desc] [url] [value] states, the rich fields, key
 fn dump_node(out: &mut String, t: &WinTree, k: usize) {
     let n = &t.nodes[k];
     let mut depth = 0;
@@ -97,8 +99,22 @@ fn dump_node(out: &mut String, t: &WinTree, k: usize) {
         out.push_str(n.sub.aria());
     }
     out.push_str(&alloc::format!(" {:?}", n.name));
+    // a slider's, meter's or progress bar's value (its text: the record's value_text)
+    let ranged = matches!(n.role, ax::Role::Slider | ax::Role::Progress);
     if !n.text.is_empty() {
-        out.push_str(&alloc::format!(" text={:?}", n.text));
+        out.push_str(&alloc::format!(" {}={:?}", if ranged { "valuetext" } else { "text" }, n.text));
+    }
+    if !n.desc.is_empty() {
+        out.push_str(&alloc::format!(" desc={:?}", n.desc));
+    }
+    if !n.url.is_empty() {
+        out.push_str(&alloc::format!(" url={:?}", n.url));
+    }
+    if ranged {
+        out.push_str(&alloc::format!(" value={}", n.value));
+        if n.max > n.min {
+            out.push_str(&alloc::format!(" range={}..{}", n.min, n.max));
+        }
     }
     for (name, bit) in STATES {
         if n.state & bit != 0 {

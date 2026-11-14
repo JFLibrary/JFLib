@@ -3046,24 +3046,28 @@ impl Ui {
         }
     }
 
-    /// ui.canvas_gpu_damage: the tiles over content rectangle r go, the next frame is the CPU's
+    /// ui.canvas_gpu_damage: the tiles over content rectangle r go, the next frame is the CPU's --
+    /// of the canvas of the window being built; outside the passes of the canvas of that id in
+    /// every window (as canvas_damage)
     pub(crate) fn gp_canvas_damage(&mut self, id: u32, r: [f64; 4]) {
-        let i = self.uiw_cur as usize;
+        let cur = self.uiw_cur as usize;
+        let w = self.req_win(self.m.gout.canvases.iter().any(|c| c.win == cur && c.id == id));
         let S { canvases, tile_free, .. } = &mut self.m.gout;
-        let Some(c) = canvases.iter_mut().find(|c| c.win == i && c.id == id) else { return };
-        c.damaged = true;
-        for l in c.levels.iter_mut() {
-            let t = TILE as f64;
-            let cell = |u: f64, f: f64, m: f64| flr((u * l.scale + f + m) / t) as i32;
-            let (ix0, ix1) = (cell(r[0], l.fx, -2.0), cell(r[2], l.fx, 2.0));
-            let (iy0, iy1) = (cell(r[1], l.fy, -2.0), cell(r[3], l.fy, 2.0));
-            l.tiles.retain(|&(ix, iy), tile| {
-                let hit = ix >= ix0 && ix <= ix1 && iy >= iy0 && iy <= iy1;
-                if hit {
-                    tile_free.push(tile.tex.clone());
-                }
-                !hit
-            });
+        for c in canvases.iter_mut().filter(|c| c.id == id && (w == super::win::WIN_ANY || c.win == w as usize)) {
+            c.damaged = true;
+            for l in c.levels.iter_mut() {
+                let t = TILE as f64;
+                let cell = |u: f64, f: f64, m: f64| flr((u * l.scale + f + m) / t) as i32;
+                let (ix0, ix1) = (cell(r[0], l.fx, -2.0), cell(r[2], l.fx, 2.0));
+                let (iy0, iy1) = (cell(r[1], l.fy, -2.0), cell(r[3], l.fy, 2.0));
+                l.tiles.retain(|&(ix, iy), tile| {
+                    let hit = ix >= ix0 && ix <= ix1 && iy >= iy0 && iy <= iy1;
+                    if hit {
+                        tile_free.push(tile.tex.clone());
+                    }
+                    !hit
+                });
+            }
         }
     }
 

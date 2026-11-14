@@ -19,8 +19,12 @@
 //        lists, indent, clear format; the buttons show the state at the caret and give the
 //        focus back to the editor (ids id .. id + 149)
 //   ui.richtext_link(id) -> Option<String>   a link the user activated (Ctrl+click, a click
-//        when read-only, Ctrl+Enter on it), taken once
+//        when read-only, Ctrl+Enter on it), taken once (in a pass: in the window being built
+//        when it has the editor; outside the passes: in any window)
 //   ui.richtext_link_dialog(id)              open the editor's link flyout (as Ctrl+K)
+//
+// Every window keeps its editors' views (WinParts::rich): an editor of the same id in two
+// windows scrolls and lays out by itself.
 //
 // Keys (besides those of ed_core.rs): Ctrl+B / I / U bold, italic, underline, Ctrl+Shift+X
 // strike, Ctrl+Space clear format, Ctrl+K link, Ctrl+L / E / R / J alignment, Ctrl+Shift+8 /
@@ -58,6 +62,7 @@ use crate::keys::*;
 use crate::rich_doc::*;
 use crate::rich_html::clip_html;
 use crate::vicon::paint_svg_icon2;
+use crate::win::WIN_ANY;
 use crate::{FontSel, Sp, Ui};
 
 /// richtext flags: select and copy only
@@ -190,11 +195,17 @@ struct View {
     caret_rect: [i32; 4],
 }
 
-/// shared state (Ui::m.rich)
+/// the editors of one window (WinParts::rich): their views by id, so an editor of the same id in
+/// two windows scrolls and lays out by itself
+#[derive(Default)]
+pub(crate) struct W {
+    views: BTreeMap<u32, View>,
+}
+
+/// shared state (Ui::m.rich): the link the user activated (window, editor, url), the toolbar icons
 #[derive(Default)]
 pub(crate) struct S {
-    views: BTreeMap<u32, View>,
-    link: Option<(u32, String)>,
+    link: Option<(u32, u32, String)>,
     icons: BTreeMap<(usize, u32, u32), Rc<Art>>,
 }
 
@@ -660,7 +671,7 @@ impl Ui {
         let (tx, ty) = (r[0] + pad, r[1] + pad);
         let tw = (r[2] - pad * 2 - sbw).max(self.dp(40));
         let th = (r[3] - pad * 2).max(1);
-        let mut v = self.m.rich.views.remove(&id).unwrap_or_default();
+        let mut v = self.wp.rich.views.remove(&id).unwrap_or_default();
         v.seen = self.frame;
         let rev0 = doc.revision();
         let sel0 = doc.selection();
@@ -1067,11 +1078,11 @@ impl Ui {
         if v.link_open {
             self.rt_link_flyout(id, doc, &mut v);
         }
-        self.m.rich.views.insert(id, v);
+        self.wp.rich.views.insert(id, v);
         // views of editors no longer drawn go
         let frame_now = self.frame;
-        if self.m.rich.views.len() > 8 {
-            self.m.rich.views.retain(|_, v| frame_now.wrapping_sub(v.seen) < 600);
+        if self.wp.rich.views.len() > 8 {
+            self.wp.rich.views.retain(|_, v| frame_now.wrapping_sub(v.seen) < 600);
         }
         self.wp.ctx.last_rect = r;
         out
@@ -1215,7 +1226,7 @@ impl Ui {
     }
 
     fn rt_link_activate(&mut self, id: u32, url: &str, flags: u32) {
-        self.m.rich.link = Some((id, String::from(url)));
+        self.m.rich.link = Some((self.uiw_cur, id, String::from(url)));
         if flags & RT_OPEN_LINKS != 0 {
             self.open_doc_link(url);
         }
@@ -1223,10 +1234,12 @@ impl Ui {
     }
 
     /// a link the user activated in richtext `id` (Ctrl+click, a click when read-only,
-    /// Ctrl+Enter), taken once
+    /// Ctrl+Enter), taken once: in a pass the window being built's editor (when it has one of the
+    /// id), else (outside the passes) the editor of that id in any window
     pub fn richtext_link(&mut self, id: u32) -> Option<String> {
+        let w = self.req_win(self.wp.rich.views.contains_key(&id));
         match &self.m.rich.link {
-            Some((i, _)) if *i == id => self.m.rich.link.take().map(|l| l.1),
+            Some((lw, i, _)) if *i == id && (w == WIN_ANY || *lw == w) => self.m.rich.link.take().map(|l| l.2),
             _ => None,
         }
     }
@@ -1250,9 +1263,9 @@ impl Ui {
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn richtext_link_dialog(&mut self, id: u32, doc: &RichDoc) {
         let _src = self.src_scope();
-        let mut v = self.m.rich.views.remove(&id).unwrap_or_default();
+        let mut v = self.wp.rich.views.remove(&id).unwrap_or_default();
         self.rt_link_open(id, doc, &mut v);
-        self.m.rich.views.insert(id, v);
+        self.wp.rich.views.insert(id, v);
     }
 
     fn rt_link_flyout(&mut self, id: u32, doc: &mut RichDoc, v: &mut View) {
@@ -1476,9 +1489,9 @@ impl Ui {
         if groups & RTB_LINK != 0 {
             let on = !fmt.link.is_empty();
             if self.rt_tool(id(21), ART_LINK, tr("Link"), on, true, 0) {
-                let mut v = self.m.rich.views.remove(&editor).unwrap_or_default();
+                let mut v = self.wp.rich.views.remove(&editor).unwrap_or_default();
                 self.rt_link_open(editor, doc, &mut v);
-                self.m.rich.views.insert(editor, v);
+                self.wp.rich.views.insert(editor, v);
             }
             sep(self);
         }

@@ -12,8 +12,9 @@
 // to the manifest's ports (ABI 4+); seccomp-bpf denies a list of dangerous syscalls (ptrace,
 // process_vm_*, kexec, module loading, mount, bpf, perf_event_open, userfaultfd, keyctl ...)
 // and execve when no program is allowed.  Windows: process mitigation policies (image load,
-// extension points, dynamic code; strict adds strict handle checks and child-process
-// creation).  The browser and Android have no such API; apply() does nothing there.
+// extension points, dynamic code; strict adds child-process creation, strict handle checks are
+// deliberately not set: win_sandbox.rs).  The browser and Android have no such API; apply() does
+// nothing there.
 
 /// what [`apply`] installed (the fields not relevant to this OS stay false / -1)
 #[derive(Clone, Copy)]

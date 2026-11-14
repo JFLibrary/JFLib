@@ -14,6 +14,14 @@
 //   "Dateien öffnen"     the file dialog with FD_MULTI in the folder --files DIR (E8): several
 //                        files at once, ui.filedlg_paths() shown as "Dateien: N a b"
 //   "Ordner wählen"      a folder dialog (FD_FOLDER) in --files DIR: filedlg_paths() is the folder
+//   command 10           two windows "Werkzeug A" and "Werkzeug B" (a browser's windows with the
+//                        same panels) whose widgets have the same fixed ids: a code editor, a
+//                        colour picker with fields, a font picker, a line chart and a file
+//                        dialog (FD_BUILTIN); each window keeps its own editor view, fields,
+//                        picker list, chart cursor and dialog (tests/perwindow.uis)
+//   command 9            "Speichern unter" in --files DIR with the library's own dialog on every
+//                        system (FD_BUILTIN, as a browser's "Save as" that looks the same
+//                        everywhere), the second type ("dat") selected (tests/builtin.uis)
 //   "Notiz"              a text box; the app window has one of the same id (each keeps its caret)
 //   "Kette"              three commands, each queued by the frame that saw the one before (the
 //                        three command rounds of a frame; the frame after them shows "Kette: 3")
@@ -44,6 +52,19 @@
 //                        of an <input type=date>) with a date_picker in it, whose day closes its
 //                        calendar only, and ui.calendar in place: days, ISO weeks or months
 //                        between 2026-11-05 and 2027-02-10 (tests/calendar.uis)
+//   Ctrl+N               a window of its own ("Teiler", as a browser's new window); its "Teilen"
+//                        shows four splits inside each other at once, each taking its
+//                        orientation and first position from the room it gets (as developer
+//                        tools dock), the innermost pane a wrapping text over a box that fills the
+//                        rest: new boxes inside new fill boxes get their size in their first pass
+//                        and settle without "layout did not settle" (tests/nested.uis)
+//   command 8            two app windows ("Fenster A", "Fenster B", as two browser windows), each
+//                        with a title bar of its own whose tabs differ (one short tab, three
+//                        long ones) and a sheet box of the same fixed id with a text box of the
+//                        same fixed id inside, the second one with a long wrapping paragraph:
+//                        every window keeps its own measurements of an id, so neither title bar
+//                        nor sheet flips between the windows' sizes (tests/titlebars.uis); the
+//                        paragraph is found by its whole text (tests/longtext.uis)
 //
 // tests/keys.uis, tests/menus.uis and tests/links.uis drive it; the texts above the page say what
 // it saw.
@@ -92,8 +113,26 @@ const ID_DATEPOP: u32 = 124; // that flyout
 const ID_DATE: u32 = 125; // the date_picker in it (its calendar's days: #0x800F1040 + cell)
 const ID_CALMODE: u32 = 126; // "Tag" / "Woche" / "Monat"
 const ID_CAL: u32 = 127; // the calendar in place (cells: #0x800F10C0 + day, week row or month)
+const ID_NESTWIN: u32 = 128; // "Teiler" (Ctrl+N)
+const ID_NESTBTN: u32 = 129; // its "Teilen"
+const ID_SPLIT: u32 = 136; // its four splits: 136 .. 139
+const ID_NESTIN: u32 = 133; // the innermost pane's column: the wrapping text, then ID_NESTFILL
+const ID_NESTFILL: u32 = 134; // the box that fills the rest of it
+const ID_NESTAREA: u32 = 135; // the area of "Teiler" the splits fill
+const ID_TBWIN: u32 = 140; // command 8: "Fenster A" (140) and "Fenster B" (141)
+const ID_TBTAB: u32 = 142; // their tabs in the title bars: 142 .. 145
+const ID_SHEET: u32 = 150; // the sheet box of both windows (one fixed id)
+const ID_SHEET_TEXT: u32 = ID_SHEET + 3; // its text box (one fixed id in both windows)
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 const ID_FD_DIR: u32 = 0x11_0000; // the folder dialog (FD_FOLDER)
+const ID_FD_SAVE: u32 = 0x12_0000; // command 9: "Speichern unter", the own dialog (FD_BUILTIN; name box + 12)
+const ID_TOOLWIN: u32 = 160; // command 10: "Werkzeug A" (160) and "Werkzeug B" (161)
+const ID_TCODE: u32 = 170; // their code editors (170 .. 185; the find box 173)
+const ID_TCOLOR: u32 = 190; // their colour pickers (the hex field part_id(190, 10) = #1610615786)
+const ID_TFONT: u32 = 200; // their font pickers
+const ID_TCHART: u32 = 210; // their line charts
+const ID_TFDBTN: u32 = 211; // "Datei öffnen" of each
+const ID_TFD: u32 = 0x13_0000; // their file dialogs (rows + 17 + i, name box + 12)
 
 const CMD_NEW_TAB: u32 = 1;
 const CMD_RELOAD: u32 = 2;
@@ -101,6 +140,10 @@ const CMD_COPY: u32 = 3; // a row of the page's menu (Mi::Item)
 const CMD_TREE: u32 = 4; // after the frame: the tree is complete
 const CMD_CHAIN: u32 = 5; // "Kette": one link of the chain
 const CMD_PW_AWAY: u32 = 6; // the password box goes away (and comes back), as with a closed window
+const CMD_NESTED: u32 = 7; // Ctrl+N: the window "Teiler"
+const CMD_TWO: u32 = 8; // "Fenster A" and "Fenster B"
+const CMD_SAVE_AS: u32 = 9; // "Speichern unter" in the library's own dialog (FD_BUILTIN)
+const CMD_TOOLS: u32 = 10; // "Werkzeug A" and "Werkzeug B"
 
 const T_POLL: u32 = 1; // "Hintergrund": the timer that polls the thread's result
 
@@ -116,10 +159,35 @@ fn sync_pending() -> bool {
 // the page's context menu
 static PAGE_MENU: [Mi; 3] = [Mi::Cmd(CMD_RELOAD), Mi::Sep, Mi::Item(CMD_COPY, "Link kopieren", 0)];
 
-static CMDS: [Command; 2] = [
+static CMDS: [Command; 3] = [
     Command::new(CMD_NEW_TAB, "Neuer Tab", 0, MOD_CTRL, VK_T, 0),
     Command::new(CMD_RELOAD, "Neu laden", 0, 0, VK_F5, 0),
+    Command::new(CMD_NESTED, "Neues Fenster mit Teilern", 0, MOD_CTRL, VK_N, 0),
 ];
+
+// the innermost pane's text of "Teiler": long enough to wrap there
+const NEST_TEXT: &str = "Ein Text, der hier umbricht: seine Höhe hängt von der Breite ab, die vier neue Teiler ihm lassen.";
+
+// the paragraph of "Fenster B": about 600 bytes with umlauts and quotes, wrapped (a selector and
+// `dump` take its whole text)
+const LONG_TEXT: &str = "Ein langer Absatz, wie ihn eine Webseite zeigt: „Grüße aus dem Fenster B“ steht am Anfang, \
+    dann folgen Sätze, die über viele Zeilen umbrechen, damit der Text deutlich länger wird als die 255 Bytes, \
+    die ein Wähler früher fassen konnte, und länger als die 172 Bytes, die `dump` früher zeigte. Äpfel, Öfen und \
+    Übungen sorgen für Zeichen aus zwei Bytes; ein Rückstrich \\ und \"Anführungszeichen\" stehen auch darin. \
+    Am Ende steht ein Satz, an dem man sieht, dass alles angekommen ist: Ende des Absatzes.";
+
+// a series of a line chart: the values at x = 0, 1, 2, ...
+fn series(v: &[f64]) -> SeriesBuf {
+    let mut b = SeriesBuf::new(16);
+    for (i, &y) in v.iter().enumerate() {
+        b.push(i as f64, y);
+    }
+    b
+}
+
+// the tabs of the two title bars: "Fenster A" one short one, "Fenster B" three long ones
+const TABS_A: [&str; 1] = ["Start"];
+const TABS_B: [&str; 3] = ["Eins", "Zwei mit einem langen Namen", "Drei, noch etwas länger"];
 
 const DESC: AppDesc = AppDesc {
     title: "Ansichtstest",
@@ -162,6 +230,9 @@ struct ViewTest {
     /// the folder dialog (FD_FOLDER): open, its path
     dir_open: Shared<i32>,
     dir_path: String,
+    /// command 9: "Speichern unter" (FD_SAVE | FD_BUILTIN): open, its path
+    save_open: Shared<i32>,
+    save_path: String,
     /// "Notiz" in the main window and in the app window (text boxes of the same id)
     note: String,
     app_note: String,
@@ -198,6 +269,27 @@ struct ViewTest {
     cal_mode: i32,
     cal: (i32, u32, u32),
     cal_picks: u32,
+    /// Ctrl+N: the window "Teiler", its splits shown ("Teilen"), their positions once moved
+    nest_open: Shared<i32>,
+    nest_rect: Shared<WinRect>,
+    nested: bool,
+    split: [Option<i32>; 4],
+    /// command 8: "Fenster A" and "Fenster B" (open, placement), the tab each shows, the text of
+    /// each one's sheet box
+    two_open: [Shared<i32>; 2],
+    two_rect: [Shared<WinRect>; 2],
+    two_tab: [usize; 2],
+    two_text: [String; 2],
+    /// command 10: "Werkzeug A" and "Werkzeug B" (open, placement) and what each one's widgets
+    /// of the same ids show: a document, a colour, a font, a series, a file dialog
+    tool_open: [Shared<i32>; 2],
+    tool_rect: [Shared<WinRect>; 2],
+    tool_code: [CodeDoc; 2],
+    tool_color: [u32; 2],
+    tool_font: [FontSel; 2],
+    tool_series: [SeriesBuf; 2],
+    tool_fd: [Shared<i32>; 2],
+    tool_path: [String; 2],
 }
 
 // (E3) the cursors "Zeiger wechseln" walks through (0: the page's arrow / hand)
@@ -234,6 +326,8 @@ impl Default for ViewTest {
             files: String::from("-"),
             dir_open: Shared::new(0),
             dir_path: String::new(),
+            save_open: Shared::new(0),
+            save_path: String::new(),
             note: String::new(),
             app_note: String::new(),
             chain: 0,
@@ -259,6 +353,22 @@ impl Default for ViewTest {
             cal_mode: 0,
             cal: (2026, 11, 13),
             cal_picks: 0,
+            nest_open: Shared::new(0),
+            nest_rect: Shared::new(WinRect::new(40, 40, 800, 600, 0)),
+            nested: false,
+            split: [None; 4],
+            two_open: [Shared::new(0), Shared::new(0)],
+            two_rect: [Shared::new(WinRect::new(60, 60, 520, 360, 0)), Shared::new(WinRect::new(120, 120, 640, 420, 0))],
+            two_tab: [0; 2],
+            two_text: [String::from("Blatt A"), String::from("Blatt B")],
+            tool_open: [Shared::new(0), Shared::new(0)],
+            tool_rect: [Shared::new(WinRect::new(80, 40, 560, 880, 0)), Shared::new(WinRect::new(140, 80, 560, 880, 0))],
+            tool_code: [CodeDoc::from_text("eins\nzwei\ndrei\n"), CodeDoc::from_text("alpha\nbeta\n")],
+            tool_color: [0xFFFF_0000, 0xFF00_00FF],
+            tool_font: [FontSel::new("sans-serif", 11.0), FontSel::new("serif", 14.0)],
+            tool_series: [series(&[1.0, 3.0, 2.0, 5.0]), series(&[4.0, 4.0, 1.0])],
+            tool_fd: [Shared::new(0), Shared::new(0)],
+            tool_path: [String::new(), String::new()],
         }
     }
 }
@@ -448,6 +558,136 @@ impl ViewTest {
         ui.flyout_end();
     }
 
+    // Ctrl+N: "Teiler", a window of its own.  "Teilen" (below the area, so the splits come a pass
+    // after the click) shows four splits inside each other, each one new in the filling pane of
+    // the one before; as a browser's developer tools dock by the room they have, each split takes
+    // its orientation and first position from the size of the box it goes into (wider than twice
+    // its height: side by side, else one above the other; half of it).  The innermost pane is a
+    // column of a wrapping text and a box that fills the rest
+    fn nested_window(&mut self, ui: &mut Ui) {
+        let (open, rect) = (self.nest_open.clone(), self.nest_rect.clone());
+        if ui.window_begin(ID_NESTWIN, "Teiler", Some(&open), WF_APP | WF_RESIZABLE, Some(&rect)) {
+            ui.next_size(-1, -1);
+            ui.box_begin(0, BOX_V | pad(8), 8);
+            ui.next_size(-1, -1);
+            ui.box_begin(ID_NESTAREA, BOX_V, 0);
+            if self.nested {
+                self.splits(ui);
+            }
+            ui.box_end();
+            if ui.button(ID_NESTBTN, "Teilen") & EV_ACT != 0 {
+                self.nested = !self.nested;
+                ui.repass();
+            }
+            ui.box_end();
+        }
+        ui.window_end();
+    }
+
+    // command 8: "Fenster A" (k = 0) and "Fenster B" (k = 1), two app windows built from the same
+    // code with ids of their own fixed values: the title bar (TB_ID inside the library) with its
+    // tabs, the sheet box ID_SHEET and its text box ID_SHEET_TEXT
+    fn two_windows(&mut self, ui: &mut Ui) {
+        for k in 0..2 {
+            let (open, rect) = (self.two_open[k].clone(), self.two_rect[k].clone());
+            let title = if k == 0 { "Fenster A" } else { "Fenster B" };
+            if ui.window_begin(ID_TBWIN + k as u32, title, Some(&open), WF_APP | WF_RESIZABLE, Some(&rect)) {
+                ui.titlebar_begin(title, 0);
+                let tabs: &[&str] = if k == 0 { &TABS_A } else { &TABS_B };
+                for (i, t) in tabs.iter().enumerate() {
+                    if ui.button(ID_TBTAB + i as u32, t) & EV_ACT != 0 {
+                        self.two_tab[k] = i;
+                    }
+                }
+                ui.titlebar_end();
+                ui.next_size(-1, 0);
+                ui.box_begin(ID_SHEET, BOX_V | BOX_CARD | pad(12), 8);
+                ui.text(TS_BODY, &format!("Reiter: {}", tabs[self.two_tab[k].min(tabs.len() - 1)]));
+                if k == 1 {
+                    ui.text(TS_BODY | TX_WRAP, LONG_TEXT);
+                }
+                ui.next_size(if k == 0 { 200 } else { 320 }, 0);
+                ui.textbox(ID_SHEET_TEXT, Some("Blatt"), &mut self.two_text[k], 4096); // (a long `type`: tests/longtext.uis)
+                ui.box_end();
+            }
+            ui.window_end();
+        }
+    }
+
+    // command 10: "Werkzeug A" and "Werkzeug B", the same widgets with the same fixed ids in two
+    // windows; each shows what its own widgets say
+    fn tool_windows(&mut self, ui: &mut Ui) {
+        for k in 0..2 {
+            let (open, rect) = (self.tool_open[k].clone(), self.tool_rect[k].clone());
+            let name = if k == 0 { "A" } else { "B" };
+            let title = format!("Werkzeug {}", name);
+            if ui.window_begin(ID_TOOLWIN + k as u32, &title, Some(&open), WF_TOOL | WF_RESIZABLE, Some(&rect)) {
+                ui.box_begin(0, BOX_V | pad(8), 6);
+                // the code editor: its caret and find matches
+                ui.next_size(-1, 110);
+                ui.code_editor(ID_TCODE, &mut self.tool_code[k], &Highlighter::plain(), CE_NO_GUTTER);
+                let st = ui.code_status(ID_TCODE);
+                ui.text(TS_BODY, &format!("Code {}: Z{} S{} Treffer {}", name, st.line, st.col, st.matches));
+                // the colour picker with its fields (the hex text is taken on Enter)
+                ui.color_picker_ex(ID_TCOLOR, &mut self.tool_color[k], CP_FIELDS);
+                ui.text(TS_BODY, &format!("Farbe {}: #{:06X}", name, self.tool_color[k] & 0xFF_FFFF));
+                // the font picker
+                ui.font_picker(ID_TFONT, &mut self.tool_font[k]);
+                ui.text(TS_BODY, &format!("Schrift {}: {} {}", name, self.tool_font[k].family, self.tool_font[k].size));
+                // the line chart: the point of its keyboard cursor
+                ui.next_size(-1, 90);
+                let ser = [LcSeries::new("Werte", &self.tool_series[k])];
+                let pt = ui.line_chart(ID_TCHART, &LineChart::new(&ser).x_axis(LX_NUM));
+                let pt = pt.map_or(String::from("-"), |(_, x)| format!("{}", x));
+                ui.text(TS_BODY, &format!("Diagramm {}: {}", name, pt));
+                // a file dialog of its own (the library's)
+                if ui.button(ID_TFDBTN, "Datei öffnen") & EV_ACT != 0 {
+                    let dir = plat::arg_value("--files").unwrap_or_default();
+                    self.tool_path[k] = format!("{}/", dir.trim_end_matches('/'));
+                    self.tool_fd[k].set(1);
+                }
+                let fd = self.tool_fd[k].clone();
+                if ui.filedlg(ID_TFD, FD_OPEN | FD_BUILTIN, &fd, &mut self.tool_path[k], 4096, &[]) & EV_ACT != 0 {
+                    let n = self.tool_path[k].rsplit('/').next().unwrap_or("").len();
+                    self.tool_path[k] = String::from(&self.tool_path[k][self.tool_path[k].len() - n..]);
+                }
+                let shown = if self.tool_fd[k].get() != 0 { "-" } else { self.tool_path[k].as_str() };
+                ui.text(TS_BODY, &format!("Datei {}: {}", name, if shown.is_empty() || shown.ends_with('/') { "-" } else { shown }));
+                ui.box_end();
+            }
+            ui.window_end();
+        }
+    }
+
+    // the four splits of "Teiler" and the innermost column
+    fn splits(&mut self, ui: &mut Ui) {
+        let names = ["Links", "Oben", "Mitte", "Innen"];
+        for (i, name) in names.iter().enumerate() {
+            let r = ui.box_rect();
+            let (w, h) = (ui.px2dip(r[2]), ui.px2dip(r[3]));
+            let vertical = w < 2 * h;
+            let pos = self.split[i].unwrap_or(if vertical { h } else { w } / 2);
+            ui.next_size(-1, -1);
+            ui.split_begin(ID_SPLIT + i as u32, pos, vertical);
+            ui.text(TS_BODY, name);
+            ui.split_next();
+        }
+        ui.next_size(-1, -1);
+        ui.box_begin(ID_NESTIN, BOX_V | pad(4), 4);
+        ui.text(TS_BODY | TX_WRAP, NEST_TEXT);
+        ui.next_size(-1, -1);
+        ui.box_begin(ID_NESTFILL, BOX_V | BOX_BG, 0);
+        ui.text(TS_BODY, "Rest");
+        ui.box_end();
+        ui.box_end();
+        for i in (0..names.len()).rev() {
+            let mut p = self.split[i].unwrap_or(0);
+            if ui.split_end(&mut p) {
+                self.split[i] = Some(p);
+            }
+        }
+    }
+
     // a canvas with the defaults
     fn plain(&mut self, ui: &mut Ui) {
         ui.next_size(360, 60);
@@ -619,6 +859,9 @@ impl App for ViewTest {
             ui.box_end();
         }
         ui.window_end();
+        self.nested_window(ui);
+        self.two_windows(ui);
+        self.tool_windows(ui);
         // (E8) several files: the names the dialog chose, in its order
         if ui.filedlg(ID_FD, FD_OPEN | FD_MULTI, &self.fd_open, &mut self.fd_path, 4096, &["txt=Textdatei"]) & EV_ACT != 0 {
             let all = ui.filedlg_paths();
@@ -629,6 +872,13 @@ impl App for ViewTest {
             let all = ui.filedlg_paths();
             let names: Vec<&str> = all.iter().map(|p| p.rsplit('/').next().unwrap_or(p)).collect();
             self.files = format!("{} {}", all.len(), names.join(" "));
+        }
+        // command 9: the library's own dialog wherever the app runs (FD_BUILTIN), the second
+        // type selected: a name without an extension gets ".dat"
+        let flags = FD_SAVE | FD_BUILTIN | 1 << FD_EXT_SHIFT;
+        if ui.filedlg(ID_FD_SAVE, flags, &self.save_open, &mut self.save_path, 4096, &["txt=Textdatei", "dat=Daten"]) & EV_ACT != 0 {
+            let name = self.save_path.rsplit('/').next().unwrap_or(&self.save_path);
+            self.files = format!("1 {}", name);
         }
         if ui.flyout_begin(ID_FLYOUT, 0) && ui.menu_item(ID_ROW, "Eintrag A") & EV_ACT != 0 {
             self.rows += 1;
@@ -650,6 +900,21 @@ impl App for ViewTest {
             CMD_COPY => self.copy += 1,
             CMD_CHAIN => self.chain += 1,
             CMD_PW_AWAY => self.pw_away = !self.pw_away,
+            CMD_NESTED => self.nest_open.set(1),
+            CMD_TWO => {
+                self.two_open[0].set(1);
+                self.two_open[1].set(1);
+            }
+            CMD_TOOLS => {
+                self.tool_open[0].set(1);
+                self.tool_open[1].set(1);
+            }
+            CMD_SAVE_AS => {
+                // in the folder of --files
+                let dir = plat::arg_value("--files").unwrap_or_default();
+                self.save_path = format!("{}/", dir.trim_end_matches('/'));
+                self.save_open.set(1);
+            }
             // "Hintergrund": the thread's wake-up, the poll timer
             UIC_WAKE => self.work_seen = WORK_DONE.load(Ordering::Relaxed),
             UIC_TIMER if arg == T_POLL => {

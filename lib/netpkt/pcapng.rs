@@ -219,7 +219,9 @@ pub fn read(bytes: &[u8]) -> Result<Capture, ReadErr> {
         }
         let typ = r.u32(o);
         let len = r.u32(o + 4) as usize;
-        if len < 12 || len % 4 != 0 || o + len > bytes.len() {
+        // (len > the rest, not o + len > the length: on a 32-bit usize o + len wraps, and the
+        // walk went back into the file for ever)
+        if len < 12 || len % 4 != 0 || len > bytes.len() - o {
             return Err(ReadErr::BadBlock);
         }
         let body = o + 8;
@@ -259,7 +261,7 @@ pub fn read(bytes: &[u8]) -> Result<Capture, ReadErr> {
                 let ts = ((r.u32(body + 4) as u64) << 32) | r.u32(body + 8) as u64;
                 let caplen = r.u32(body + 12) as usize;
                 let orig_len = r.u32(body + 16);
-                if body + 20 + caplen > end {
+                if caplen > end - body - 20 {
                     return Err(ReadErr::BadBlock);
                 }
                 let units = cap.interfaces.get(iface as usize).map(|i| i.units).unwrap_or(1_000_000);

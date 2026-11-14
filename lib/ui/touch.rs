@@ -1252,8 +1252,8 @@ impl Ui {
             d[0] = d[0].wrapping_neg(); // the content moves in logical coordinates
         }
         let mut moved = false;
-        let Ui { wp, m, slots, .. } = self;
-        let W { pans, hit_cur, .. } = &wp.ctx;
+        let Ui { wp, m, .. } = self;
+        let W { pans, hit_cur, slots, .. } = &mut wp.ctx;
         let views = &pans[*hit_cur ^ 1];
         let t = &mut m.touch;
         for &id in t.chain.iter() {

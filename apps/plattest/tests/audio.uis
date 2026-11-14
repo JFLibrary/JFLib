@@ -1,4 +1,5 @@
 #!args --test audio
+#!serial its ring check has 20 s for 2 million samples, which ran out beside the other scripts
 # (Rust only) plattest --test audio: plat::audio without a device (lib/plat/audio.rs): WAV files
 # in every format and the damaged ones, the stream's ring, the resampler, generated tones, Ogg
 # Vorbis files, the PulseAudio wire format (Linux).

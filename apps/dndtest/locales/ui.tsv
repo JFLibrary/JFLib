@@ -31,6 +31,22 @@ Datei ziehen	Drag file
 Ziehen: {}  Über: {}	Dragging: {}  Over: {}
 Abgelegt: {}	Dropped: {}
 Ende: {}	End: {}
+Quelle: {}	Source: {}
 {} Datei(en)	{} file(s)
 Text {}	Text {}
 {} bei {},{} (Fenster {})	{} at {},{} (window {})
+Seite	Page
+Seite ({})	Page ({})
+{} -> Seite ({})	{} -> page ({})
+Später	Later
+{} -> Später ({}, erlaubt: {})	{} -> later ({}, allowed: {})
+Erlaubt: {}	Allowed: {}
+Antwort: {}	Answer: {}
+wartet	waiting
+schon beantwortet	answered already
+keine Antwort	no answer
+zu spät	too late
+nicht genommen	not taken
+genommen ({})	taken ({})
+links kopieren	left half copies
+rechts: oben nicht, unten verknüpfen	right: top refuses, bottom links

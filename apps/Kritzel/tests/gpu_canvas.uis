@@ -1,4 +1,5 @@
 #!args --verify-dirty
+#!lock desktop
 # the canvas on GPU tiles (lib/ui/canvas.rs, docs/GPU.md "Leinwände"): a pan comes from tiles, byte
 # for byte what the CPU draws (blit_scaled's mapping does not depend on the place); a zoom step and a
 # stroke go the CPU's way, the stroke's tiles are drawn again when the view next moves over them.

@@ -255,7 +255,9 @@ const F_COCREATE: usize = 13;
 const F_NOTSUP: usize = 14;
 const F_SA_DESTROY: usize = 15;
 const F_NOTIFY: usize = 16;
-const F_N: usize = 17;
+const F_SPI: usize = 17;
+const F_FINDWIN: usize = 18;
+const F_N: usize = 19;
 static FNS: [AtomicUsize; F_N] = [const { AtomicUsize::new(0) }; F_N];
 static LOADED: AtomicU32 = AtomicU32::new(0);
 
@@ -281,6 +283,8 @@ fn load() {
         (b"UIAutomationCore.dll\0", b"UiaGetReservedNotSupportedValue\0"),
         (b"oleaut32.dll\0", b"SafeArrayDestroy\0"),
         (b"UIAutomationCore.dll\0", b"UiaRaiseNotificationEvent\0"),
+        (b"user32.dll\0", b"SystemParametersInfoW\0"),
+        (b"user32.dll\0", b"FindWindowW\0"),
     ];
     for (k, (dll, name)) in names.iter().enumerate() {
         FNS[k].store(dll_proc(dll, name), Ordering::Release);
@@ -1503,6 +1507,9 @@ static LAST_CALL: AtomicU64 = AtomicU64::new(0);
 static LAST_CHECK: AtomicU64 = AtomicU64::new(0);
 // a client that neither asks nor listens for this long is gone (us)
 const IDLE_US: u64 = 10_000_000;
+// idle() looks at most this often (us); check_due asks for a look at most this often
+const CHECK_US: u64 = 1_000_000;
+const DUE_US: u64 = 2_000_000;
 
 // a client asked: the tree is needed (again)
 fn client_seen() {
@@ -1512,18 +1519,41 @@ fn client_seen() {
     }
 }
 
-/// (a11y::active, at most once a second) no client asked for 10 s and none listens for events
-/// (UiaClientsAreListening): assistive technology is gone, the UI stops building the tree until
-/// the next question (any UIA client -- the touch keyboard, a tool -- turns it on for a while)
+/// (a11y::active, at most once a second) no client asked for 10 s, and no screen reader (nor
+/// Magnifier) listens for events: assistive technology is gone, the UI stops building the tree
+/// until the next question (any UIA client -- the touch keyboard, a tool -- turns it on for a
+/// while).  UiaClientsAreListening alone is no sign: it is true for any client on the desktop that
+/// subscribed to any event, and on Windows 11 the touch keyboard's host (TextInputHost), TabTip or
+/// a vendor's tool always do -- the tree was built in every frame then.  Screen readers say they
+/// run (SPI_SETSCREENREADER: Narrator, NVDA, JAWS) and keep the tree while they listen, however
+/// long the user does nothing (their events -- a focus that moves -- must not get lost); a client
+/// that only listens (the touch keyboard: JFLib shows that itself, win_touch.rs) keeps it for 10 s
+/// after its last question
 pub(crate) fn idle() {
     let now = crate::time_us();
-    if now.wrapping_sub(LAST_CHECK.load(Ordering::Relaxed)) < 1_000_000 || LOADED.load(Ordering::Acquire) != 2 {
+    if now.wrapping_sub(LAST_CHECK.load(Ordering::Relaxed)) < CHECK_US || LOADED.load(Ordering::Acquire) != 2 {
         return;
     }
     LAST_CHECK.store(now, Ordering::Relaxed);
-    if now.wrapping_sub(LAST_CALL.load(Ordering::Relaxed)) > IDLE_US && !listening() {
+    if now.wrapping_sub(LAST_CALL.load(Ordering::Relaxed)) > IDLE_US && !(listening() && at_present()) {
         ax::set_active(false);
     }
+}
+
+// assistive technology says it runs: a screen reader set SPI_SETSCREENREADER (Narrator, NVDA and
+// JAWS do; the flag goes with them), or Windows' Magnifier runs (its window, class MagUIClass:
+// it follows the keyboard focus by UIA's events and sets no flag)
+fn at_present() -> bool {
+    let spi = f(F_SPI);
+    let mut on = 0i32;
+    // SAFETY: SystemParametersInfoW(SPI_GETSCREENREADER = 0x46, 0, BOOL*, 0) -> BOOL.
+    if spi != 0 && unsafe { core::mem::transmute::<usize, unsafe extern "system" fn(u32, u32, *mut i32, u32) -> i32>(spi)(0x46, 0, &mut on, 0) } != 0 && on != 0 {
+        return true;
+    }
+    let find = f(F_FINDWIN);
+    let class: [u16; 11] = [b'M' as u16, b'a' as u16, b'g' as u16, b'U' as u16, b'I' as u16, b'C' as u16, b'l' as u16, b'a' as u16, b's' as u16, b's' as u16, 0];
+    // SAFETY: FindWindowW(LPCWSTR class, LPCWSTR title = NULL) -> HWND; a NUL-terminated class.
+    find != 0 && unsafe { core::mem::transmute::<usize, unsafe extern "system" fn(*const u16, *const u16) -> isize>(find)(class.as_ptr(), core::ptr::null()) } != 0
 }
 
 /// (wndproc, WM_GETOBJECT) the root provider of platform window pw for UiaRootObjectId; None:
@@ -1544,6 +1574,17 @@ pub(crate) fn get_object(hwnd: isize, pw: i32, wp: usize, lp: isize) -> Option<i
     let r = unsafe { ret(hwnd, wp, lp, iface(e, O_SIMPLE)) };
     release(e);
     Some(r)
+}
+
+/// (a11y::check_due, while active) when idle() wants to look again: 10 s after the last question,
+/// at least 2 s after its last look (a client that keeps listening: every 2 s); None before UIA
+/// was loaded (nothing turns it off then)
+pub(crate) fn idle_due() -> Option<u64> {
+    if LOADED.load(Ordering::Acquire) != 2 {
+        return None;
+    }
+    let call = LAST_CALL.load(Ordering::Relaxed).saturating_add(IDLE_US + 20_000); // (just past it)
+    Some(call.max(LAST_CHECK.load(Ordering::Relaxed).saturating_add(DUE_US)))
 }
 
 /// (wndproc, WM_DESTROY) UIA lets go of the window's providers

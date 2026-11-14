@@ -2,7 +2,7 @@
 // over the target at 1 unit per pixel), per level and width: inserting them, the first frame (everything goes up),
 // frames with everything in view and zoomed in (a tenth in view), frames with 1000 entities changed each
 //
-//   render2dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--basis] [--scene cad [--plain | --g6a2b | --g6b1 | --expand]]
+//   render2dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--basis] [--scene cad [--plain | --g6a2b | --g6b1 | --g6b2 | --expand | --no-text]]
 //   render2dtest --bench N --scene estate [--inserts K]   a block of about N records (a house) inserted K times (10 000)
 //
 // GPU times are the scene's timestamps (FrameStats): uploads, visibility (the three compute passes), the draw; each
@@ -103,7 +103,7 @@ pub fn bench(n: u32) -> i32 {
 }
 
 /// the measuring scene's stage: --plain the drawing of G6a2a, --g6a2b that of G6a2b, --g6b1 that of G6b1 (fills, hatches,
-/// curves), else with blocks (G6b2)
+/// curves), --g6b2 that of G6b2 (blocks), else with text (G6c; --no-text: the same without it)
 pub fn cad_mode() -> cad::Mode {
     let args = plat::args();
     if args.iter().any(|a| a == "--plain") {
@@ -114,8 +114,14 @@ pub fn cad_mode() -> cad::Mode {
         cad::Mode::Fills
     } else if args.iter().any(|a| a == "--expand") {
         cad::Mode::Expanded
-    } else {
+    } else if args.iter().any(|a| a == "--g6b2") {
         cad::Mode::Blocks
+    } else if args.iter().any(|a| a == "--no-text") {
+        cad::Mode::NoText
+    } else if args.iter().any(|a| a == "--text-mixed") {
+        cad::Mode::TextMixed
+    } else {
+        cad::Mode::Text
     }
 }
 
@@ -146,6 +152,11 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level, 
             out(&format!("{level:?}, {wname}: of them {} arcs and circles ({} pieces), {} dashed entities ({} records), {} fills ({} hatched; {} records), {} curves ({} records); {} blocks inserted {} times \
                           ({} records drawn); {} records in the pool",
                          c.arcs, c.arc_records, c.dashed, c.dashed_records, c.fills, c.hatched, c.fill_records, c.curves, c.curve_records, c.blocks, c.inserts, c.insert_records, c.segments + c.arcs));
+        }
+        if c.texts > 0 {
+            let ti = s.text_info();
+            out(&format!("{level:?}, {wname}: {} texts of {} characters ({} records: glyphs and bars); {} glyphs, {} tiles S, {} pages", c.texts, c.chars, c.text_records, ti.glyphs, ti.tiles_s,
+                         ti.pages));
         }
         let mut t = Target { color: dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?, used: false };
         let views = cad::views(&c, size);

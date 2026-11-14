@@ -28,6 +28,7 @@ use alloc::vec::Vec;
 
 use super::cmd::{cmd_bbox, cmd_parts, pos_mix, Cmd};
 use super::consts::L_COUNT;
+use super::win::WIN_ANY;
 use super::Ui;
 
 const CELL_SHIFT: u32 = 5; // 32 px cells
@@ -239,12 +240,12 @@ impl Ui {
 
     /// dmg_canvas_seen(id): remember the rectangle (last_rect) and window of canvas id (a
     /// new id takes the record seen longest ago when that canvas was not drawn in the last
-    /// two passes, else a new record)
+    /// two passes, else a new record; a canvas of the same id in two windows has one in each)
     pub(crate) fn dmg_canvas_seen(&mut self, id: u32) {
         let e = Cvs { id, win: self.uiw_cur, frame: self.frame, rect: self.wp.ctx.last_rect };
         let (mut old, mut age) = (0, 0u32);
         for (i, c) in self.cvs.iter_mut().enumerate() {
-            if c.id == id {
+            if c.id == id && c.win == e.win {
                 *c = e;
                 return;
             }
@@ -261,13 +262,24 @@ impl Ui {
     }
 
     /// ui_canvas_damage(id, x, y, w, h): redraw part of a canvas with the next render (px
-    /// relative to the canvas, cut to it)
+    /// relative to the canvas, cut to it): the canvas of the window being built (when it has one
+    /// of the id); else (outside the passes: App::command, a task) the canvas of that id in every
+    /// window
     pub fn canvas_damage(&mut self, id: u32, x: i32, y: i32, w: i32, h: i32) {
         if id == 0 {
             return;
         }
+        let cur = self.uiw_cur;
+        let win = self.req_win(self.cvs.iter().any(|e| e.id == id && e.win == cur));
         // never emitted: its first render draws it all
-        let Some(e) = self.cvs.iter().find(|e| e.id == id).copied() else { return };
+        let es: Vec<Cvs> = self.cvs.iter().filter(|e| e.id == id && (win == WIN_ANY || e.win == win)).copied().collect();
+        for e in es {
+            self.dmg_canvas(e, x, y, w, h);
+        }
+    }
+
+    // the damage x, y, w, h (px of the canvas) of canvas e
+    fn dmg_canvas(&mut self, e: Cvs, x: i32, y: i32, w: i32, h: i32) {
         let r = e.rect;
         let x0 = x.wrapping_add(r[0]).max(r[0]);
         let x1 = w.wrapping_add(x.wrapping_add(r[0])).min(r[0].wrapping_add(r[2]));

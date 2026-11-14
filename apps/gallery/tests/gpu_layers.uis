@@ -1,4 +1,5 @@
 #!args --verify-dirty
+#!lock desktop
 # the layers above the base as textures of their own (lib/ui/gpu_out.rs, docs/GPU.md "Ebenen") on
 # real gallery pages: a menu, a submenu, a tooltip, a content dialog with its smoke, a second
 # window, a new size, a theme, a lost device.  Every presented image is read back and compared

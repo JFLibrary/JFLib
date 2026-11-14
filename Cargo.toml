@@ -152,7 +152,7 @@ members = [
 
 # The one version of the library (rt::VERSION; `build_rs.py release` writes it, docs/VERSIONING.md)
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.98"
 license = "MIT OR Apache-2.0"
@@ -161,68 +161,68 @@ homepage = "https://jflib.org"
 
 # Exact versions: only the way through the crate jflib is promised, the crates below it change together.
 [workspace.dependencies]
-rt = { package = "jflib-rt", path = "lib/rt", version = "=0.1.0" }
-agent_core = { package = "jflib-agent-core", path = "lib/agent_core", version = "=0.1.0" }
-plat = { package = "jflib-plat", path = "lib/plat", version = "=0.1.0" }
-base = { package = "jflib-base", path = "lib/base", version = "=0.1.0" }
-agent_io = { package = "jflib-agent-io", path = "lib/agent_io", version = "=0.1.0" }
-simd = { package = "jflib-simd", path = "lib/simd", version = "=0.1.0" }
-gfx = { package = "jflib-gfx", path = "lib/gfx", version = "=0.1.0" }
-img_core = { package = "jflib-img-core", path = "lib/img_core", version = "=0.1.0" }
-archive = { package = "jflib-archive", path = "lib/archive", version = "=0.1.0" }
-doc_core = { package = "jflib-doc-core", path = "lib/doc_core", version = "=0.1.0" }
-doc_layout = { package = "jflib-doc-layout", path = "lib/doc_layout", version = "=0.1.0" }
-doc_io = { package = "jflib-doc-io", path = "lib/doc_io", version = "=0.1.0" }
-img_png = { package = "jflib-img-png", path = "lib/img_png", version = "=0.1.0" }
-text_shape = { package = "jflib-text-shape", path = "lib/text_shape", version = "=0.1.0" }
-text = { package = "jflib-text", path = "lib/text", version = "=0.1.0" }
-img_jpeg = { package = "jflib-img-jpeg", path = "lib/img_jpeg", version = "=0.1.0" }
-img_bmp = { package = "jflib-img-bmp", path = "lib/img_bmp", version = "=0.1.0" }
-img_gif = { package = "jflib-img-gif", path = "lib/img_gif", version = "=0.1.0" }
-img_tga = { package = "jflib-img-tga", path = "lib/img_tga", version = "=0.1.0" }
-img_tiff = { package = "jflib-img-tiff", path = "lib/img_tiff", version = "=0.1.0" }
-img_webp = { package = "jflib-img-webp", path = "lib/img_webp", version = "=0.1.0" }
-img_hevc = { package = "jflib-img-hevc", path = "lib/img_hevc", version = "=0.1.0" }
-img_av1 = { package = "jflib-img-av1", path = "lib/img_av1", version = "=0.1.0" }
-img_heif = { package = "jflib-img-heif", path = "lib/img_heif", version = "=0.1.0" }
-img_avif = { package = "jflib-img-avif", path = "lib/img_avif", version = "=0.1.0" }
-img_jxl = { package = "jflib-img-jxl", path = "lib/img_jxl", version = "=0.1.0" }
-img_jxl_enc = { package = "jflib-img-jxl-enc", path = "lib/img_jxl_enc", version = "=0.1.0" }
-img_jxr = { package = "jflib-img-jxr", path = "lib/img_jxr", version = "=0.1.0" }
-img_dds = { package = "jflib-img-dds", path = "lib/img_dds", version = "=0.1.0" }
-img_pdn = { package = "jflib-img-pdn", path = "lib/img_pdn", version = "=0.1.0" }
-fx = { package = "jflib-fx", path = "lib/fx", version = "=0.1.0" }
-img_svg = { package = "jflib-img-svg", path = "lib/img_svg", version = "=0.1.0" }
-img_all = { package = "jflib-img-all", path = "lib/img_all", version = "=0.1.0" }
-spell = { package = "jflib-spell", path = "lib/spell", version = "=0.1.0" }
-ui = { package = "jflib-ui", path = "lib/ui", version = "=0.1.0" }
-doc_view = { package = "jflib-doc-view", path = "lib/doc_view", version = "=0.1.0" }
-datetime = { package = "jflib-datetime", path = "lib/datetime", version = "=0.1.0" }
-crypto = { package = "jflib-crypto", path = "lib/crypto", version = "=0.1.0" }
-compress = { package = "jflib-compress", path = "lib/compress", version = "=0.1.0" }
-shader = { package = "jflib-shader", path = "lib/shader", version = "=0.1.0" }
-wgsl = { package = "jflib-wgsl", path = "lib/wgsl", version = "=0.1.0" }
-netpkt = { package = "jflib-netpkt", path = "lib/netpkt", version = "=0.1.0" }
-datastore = { package = "jflib-datastore", path = "lib/datastore", version = "=0.1.0" }
-netio = { package = "jflib-netio", path = "lib/netio", version = "=0.1.0" }
-cas = { package = "jflib-cas", path = "lib/cas", version = "=0.1.0" }
-update = { package = "jflib-update", path = "lib/update", version = "=0.1.0" }
-gpu = { package = "jflib-gpu", path = "lib/gpu", version = "=0.1.0" }
-eapm = { package = "jflib-eapm", path = "lib/eapm", version = "=0.1.0" }
-style_assets = { package = "jflib-style-assets", path = "lib/style_assets", version = "=0.1.0" }
-render3d = { package = "jflib-render3d", path = "lib/render3d", version = "=0.1.0" }
-render2d = { package = "jflib-render2d", path = "lib/render2d", version = "=0.1.0" }
-gltf = { package = "jflib-gltf", path = "lib/gltf", version = "=0.1.0" }
-style_winui = { package = "jflib-style-winui", path = "styles/winui", version = "=0.1.0" }
-style_classic = { package = "jflib-style-classic", path = "styles/classic", version = "=0.1.0" }
-style_kde = { package = "jflib-style-kde", path = "styles/kde", version = "=0.1.0" }
-style_macos = { package = "jflib-style-macos", path = "styles/macos", version = "=0.1.0" }
-style_netlab = { package = "jflib-style-netlab", path = "styles/netlab", version = "=0.1.0" }
-modrt = { package = "jflib-modrt", path = "modules/modrt", version = "=0.1.0" }
-modplat = { package = "jflib-modplat", path = "modules/modplat", version = "=0.1.0" }
-jflib-build = { path = "lib/jflib_build", version = "=0.1.0" }
-installer = { package = "jflib-installer", path = "lib/installer", version = "=0.1.0" }
-appimagert = { package = "jflib-appimagert", path = "lib/appimagert", version = "=0.1.0" }
+rt = { package = "jflib-rt", path = "lib/rt", version = "=0.2.0" }
+agent_core = { package = "jflib-agent-core", path = "lib/agent_core", version = "=0.2.0" }
+plat = { package = "jflib-plat", path = "lib/plat", version = "=0.2.0" }
+base = { package = "jflib-base", path = "lib/base", version = "=0.2.0" }
+agent_io = { package = "jflib-agent-io", path = "lib/agent_io", version = "=0.2.0" }
+simd = { package = "jflib-simd", path = "lib/simd", version = "=0.2.0" }
+gfx = { package = "jflib-gfx", path = "lib/gfx", version = "=0.2.0" }
+img_core = { package = "jflib-img-core", path = "lib/img_core", version = "=0.2.0" }
+archive = { package = "jflib-archive", path = "lib/archive", version = "=0.2.0" }
+doc_core = { package = "jflib-doc-core", path = "lib/doc_core", version = "=0.2.0" }
+doc_layout = { package = "jflib-doc-layout", path = "lib/doc_layout", version = "=0.2.0" }
+doc_io = { package = "jflib-doc-io", path = "lib/doc_io", version = "=0.2.0" }
+img_png = { package = "jflib-img-png", path = "lib/img_png", version = "=0.2.0" }
+text_shape = { package = "jflib-text-shape", path = "lib/text_shape", version = "=0.2.0" }
+text = { package = "jflib-text", path = "lib/text", version = "=0.2.0" }
+img_jpeg = { package = "jflib-img-jpeg", path = "lib/img_jpeg", version = "=0.2.0" }
+img_bmp = { package = "jflib-img-bmp", path = "lib/img_bmp", version = "=0.2.0" }
+img_gif = { package = "jflib-img-gif", path = "lib/img_gif", version = "=0.2.0" }
+img_tga = { package = "jflib-img-tga", path = "lib/img_tga", version = "=0.2.0" }
+img_tiff = { package = "jflib-img-tiff", path = "lib/img_tiff", version = "=0.2.0" }
+img_webp = { package = "jflib-img-webp", path = "lib/img_webp", version = "=0.2.0" }
+img_hevc = { package = "jflib-img-hevc", path = "lib/img_hevc", version = "=0.2.0" }
+img_av1 = { package = "jflib-img-av1", path = "lib/img_av1", version = "=0.2.0" }
+img_heif = { package = "jflib-img-heif", path = "lib/img_heif", version = "=0.2.0" }
+img_avif = { package = "jflib-img-avif", path = "lib/img_avif", version = "=0.2.0" }
+img_jxl = { package = "jflib-img-jxl", path = "lib/img_jxl", version = "=0.2.0" }
+img_jxl_enc = { package = "jflib-img-jxl-enc", path = "lib/img_jxl_enc", version = "=0.2.0" }
+img_jxr = { package = "jflib-img-jxr", path = "lib/img_jxr", version = "=0.2.0" }
+img_dds = { package = "jflib-img-dds", path = "lib/img_dds", version = "=0.2.0" }
+img_pdn = { package = "jflib-img-pdn", path = "lib/img_pdn", version = "=0.2.0" }
+fx = { package = "jflib-fx", path = "lib/fx", version = "=0.2.0" }
+img_svg = { package = "jflib-img-svg", path = "lib/img_svg", version = "=0.2.0" }
+img_all = { package = "jflib-img-all", path = "lib/img_all", version = "=0.2.0" }
+spell = { package = "jflib-spell", path = "lib/spell", version = "=0.2.0" }
+ui = { package = "jflib-ui", path = "lib/ui", version = "=0.2.0" }
+doc_view = { package = "jflib-doc-view", path = "lib/doc_view", version = "=0.2.0" }
+datetime = { package = "jflib-datetime", path = "lib/datetime", version = "=0.2.0" }
+crypto = { package = "jflib-crypto", path = "lib/crypto", version = "=0.2.0" }
+compress = { package = "jflib-compress", path = "lib/compress", version = "=0.2.0" }
+shader = { package = "jflib-shader", path = "lib/shader", version = "=0.2.0" }
+wgsl = { package = "jflib-wgsl", path = "lib/wgsl", version = "=0.2.0" }
+netpkt = { package = "jflib-netpkt", path = "lib/netpkt", version = "=0.2.0" }
+datastore = { package = "jflib-datastore", path = "lib/datastore", version = "=0.2.0" }
+netio = { package = "jflib-netio", path = "lib/netio", version = "=0.2.0" }
+cas = { package = "jflib-cas", path = "lib/cas", version = "=0.2.0" }
+update = { package = "jflib-update", path = "lib/update", version = "=0.2.0" }
+gpu = { package = "jflib-gpu", path = "lib/gpu", version = "=0.2.0" }
+eapm = { package = "jflib-eapm", path = "lib/eapm", version = "=0.2.0" }
+style_assets = { package = "jflib-style-assets", path = "lib/style_assets", version = "=0.2.0" }
+render3d = { package = "jflib-render3d", path = "lib/render3d", version = "=0.2.0" }
+render2d = { package = "jflib-render2d", path = "lib/render2d", version = "=0.2.0" }
+gltf = { package = "jflib-gltf", path = "lib/gltf", version = "=0.2.0" }
+style_winui = { package = "jflib-style-winui", path = "styles/winui", version = "=0.2.0" }
+style_classic = { package = "jflib-style-classic", path = "styles/classic", version = "=0.2.0" }
+style_kde = { package = "jflib-style-kde", path = "styles/kde", version = "=0.2.0" }
+style_macos = { package = "jflib-style-macos", path = "styles/macos", version = "=0.2.0" }
+style_netlab = { package = "jflib-style-netlab", path = "styles/netlab", version = "=0.2.0" }
+modrt = { package = "jflib-modrt", path = "modules/modrt", version = "=0.2.0" }
+modplat = { package = "jflib-modplat", path = "modules/modplat", version = "=0.2.0" }
+jflib-build = { path = "lib/jflib_build", version = "=0.2.0" }
+installer = { package = "jflib-installer", path = "lib/installer", version = "=0.2.0" }
+appimagert = { package = "jflib-appimagert", path = "lib/appimagert", version = "=0.2.0" }
 # the styles of the apps: not published
 style_jfoffice = { package = "jflib-style-jfoffice", path = "styles/jfoffice" }
 style_backupcraft = { package = "jflib-style-backupcraft", path = "styles/backupcraft" }

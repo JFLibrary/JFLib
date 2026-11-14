@@ -262,6 +262,49 @@ fn unix(t: &mut T) {
     drop(l);
     t.check("unix socket file removed", fs::lstat(&path).is_none());
     t.check("unix refused", plat::net::connect_unix(&path, 500).is_err());
+    unix_names(t, &path);
+}
+
+/// UnixListener and the names around it: bind never removes a file, a folder or a socket that
+/// is listened on (an error), only a socket file left by a listener that is gone; a dropped
+/// listener removes only its own socket file, not a name taken again meanwhile
+fn unix_names(t: &mut T, path: &str) {
+    use plat::net::{NetErrorKind, UnixListener};
+    let in_use = |r: Result<UnixListener, plat::net::NetError>| r.err().is_some_and(|e| e.kind == NetErrorKind::AddrInUse);
+    // a file and an empty folder at the name stay
+    plat::write_file(path, b"payload");
+    t.check("unix bind on a file: AddrInUse", in_use(UnixListener::bind(path)));
+    t.check("unix ... the file keeps its bytes", plat::read_file(path).as_deref() == Some(&b"payload"[..]));
+    plat::delete(path);
+    plat::mkdir(path);
+    // (Linux and macOS: AddrInUse; Windows: Other, WSAEINVAL)
+    t.check("unix bind on an empty folder fails, the folder stays", UnixListener::bind(path).is_err() && plat::file_exists(path) == 2);
+    plat::delete(path);
+    // a listener's socket is not taken over
+    let Ok(l1) = UnixListener::bind(path) else {
+        t.check("unix bind", false);
+        return;
+    };
+    t.check("unix second bind on a listened socket: AddrInUse", in_use(UnixListener::bind(path)));
+    t.check("unix ... the first listener still reachable", plat::net::connect_unix(path, 2000).is_ok() && l1.accept_timeout(2000).is_ok_and(|c| c.is_some()));
+    // the name deleted and taken again: dropping the old listener leaves the new file
+    t.check("unix name taken again", plat::delete(path) && plat::write_file(path, b"neu"));
+    drop(l1);
+    t.check("unix a dropped listener leaves a name taken again", plat::read_file(path).as_deref() == Some(&b"neu"[..]));
+    plat::delete(path);
+    // a socket file left behind (its listener gone): bind takes the name
+    let moved = format!("{path}.old");
+    if let Ok(l2) = UnixListener::bind(path) {
+        let mv = plat::rename(path, &moved);
+        drop(l2); // its socket file is elsewhere now: not removed
+        let left = mv && fs::lstat(&moved).is_some() && plat::rename(&moved, path);
+        let l3 = UnixListener::bind(path);
+        t.check("unix bind over a socket file nobody listens on", left && l3.is_ok());
+        let reach = plat::net::connect_unix(path, 2000).is_ok();
+        drop(l3);
+        t.check("unix ... and listens there", reach && fs::lstat(path).is_none());
+    }
+    plat::delete(&moved);
 }
 
 /// plat::watch: new, changed, renamed and deleted files, a new folder and a file in it

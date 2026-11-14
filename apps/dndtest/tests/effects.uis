@@ -1,0 +1,97 @@
+#!args --verify-dirty
+# the effect per drop target (ui.drop_effect_set): the page (#501, 322..540 x 285..373) answers
+# per point as a web page does -- its left half copies, the top of its right half refuses, the
+# bottom links.  `dragover expect` is what the platform would answer the source there (Windows'
+# DragOver effect, XdndStatus, set_actions: the system's pointer); a drop takes that effect
+theme light
+# outside every target the window takes text and files with every effect (drop_accept): the
+# modifier keys choose
+dragover 600 480 text copy move link
+dragover expect copy
+dragover expect move shift
+dragover expect link ctrl shift
+# the other targets take every effect too (the default); files are never moved
+dragover 82 229 text copy move link
+expect text:"Ziehen: Text bei 82,229  Über: Text-Ziel" exists
+dragover expect copy
+dragover expect move shift
+dragover 640 229 files copy move link
+dragover expect copy shift
+# the page: its left half copies, with Shift too (it takes no move)
+dragover 370 330 text copy move link
+expect text:"Ziehen: Text bei 370,330  Über: Seite (kopieren)" exists
+dragover expect copy
+dragover expect copy shift
+shot build/dnd/effects_page.png 300 270 260 120
+# the top of its right half refuses: no effect, no highlight
+dragover 500 300 text copy move link
+expect text:"Ziehen: Text bei 500,300  Über: Seite (keine)" exists
+dragover expect none
+dragover expect none ctrl
+# the bottom links, files and URLs alike
+dragover 500 355 url copy move link
+expect text:"Ziehen: URL bei 500,355  Über: Seite (verknüpfen)" exists
+dragover expect link
+dragover 500 355 files copy move link
+dragover expect link
+# a source that does not offer the page's effect: refused there
+dragover 500 355 text copy move
+dragover expect none
+dragleave
+expect text:"Ziehen: -  Über: -" exists
+# drops after the drag hovered there: the left half copies, the bottom links (for a source that
+# allows linking), the top refuses (nothing happens: no drop on the page, no UIC_DROP)
+dragover 370 330 text
+drop 370 330 text "links"
+expect text:"Abgelegt: Text -> Seite (kopieren)" exists
+dragover 500 355 url copy link
+drop 500 355 url https://example.org/c
+expect text:"Abgelegt: URL -> Seite (verknüpfen)" exists
+dragover 500 300 text
+drop 500 300 text "oben"
+expect text:"Abgelegt: URL -> Seite (verknüpfen)" exists
+expect text:"UIC_DROP: -" exists
+drop expect none
+# a drop has an effect its source allows: a source that only copies is refused on the linking
+# bottom, as the platform refuses such a drag there (before, the drop got the target's first
+# effect); so is one that only moves on the copying left half -- the effects the drop gives
+# itself count, not the hover's
+dragover 500 355 text copy
+dragover expect none
+drop 500 355 text "nur kopieren"
+drop expect none
+dragover 370 330 text copy move link
+drop 370 330 text "nur verschieben" allows move
+drop expect none
+expect text:"Abgelegt: URL -> Seite (verknüpfen)" exists
+expect text:"UIC_DROP: -" exists
+# outside the targets too: an effect the source does not allow becomes one it does; files that
+# may only be moved are refused (files are never moved): no UIC_DROP
+drop 600 480 text "lose" link allows copy move
+expect text:"UIC_DROP: Text \"lose\" bei 600,480 (Fenster 0)" exists
+drop expect copy
+drop 600 470 files build/dnd/weg.txt allows move
+expect text:"UIC_DROP: Text \"lose\" bei 600,480 (Fenster 0)" exists
+drop expect none
+# the app's own drags pick from the page's effects too: text onto the left half is copied (a
+# plain drag would move).  "Text ziehen" names no effects: it allows every one (0 means not
+# said, as for another program's drag), so the linking bottom links it -- before charge 11 a 0
+# meant copy and move there, and the drop was refused
+drag #401 370,330
+expect text:"Abgelegt: Text -> Seite (kopieren)" exists
+expect text:"Ende: Text ziehen kopieren (1)" exists
+drag #401 500,355
+expect text:"Abgelegt: Text -> Seite (verknüpfen)" exists
+expect text:"Ende: Text ziehen verknüpfen (2)" exists
+# a fruit allows copy and move only (DragData::effects): refused on the bottom
+drag #101 500,355
+expect text:"Ende: Apfel keine (3)" exists
+expect text:"Abgelegt: Text -> Seite (verknüpfen)" exists
+# ... and Ctrl+Shift links a drag that names no effects over a target that takes every effect
+drag #401 82,229 ctrl shift
+expect text:"Abgelegt: Text -> Text-Ziel (verknüpfen)" exists
+expect text:"Ende: Text ziehen verknüpfen (4)" exists
+drag #101 82,229 ctrl shift
+expect text:"Abgelegt: Text+Frucht -> Text-Ziel (kopieren)" exists
+expect text:"Ende: Apfel kopieren (5)" exists
+expect_nowarn

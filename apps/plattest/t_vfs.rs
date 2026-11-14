@@ -5,15 +5,19 @@
 //   base::Ini and os_path), JFA1 bundles (pack_bundle, LZ4, damaged bundles), Overlay, Sub,
 //   archive::ZipFs, the app's folders (app_id, app_dir, config://); File / FileLock streams
 //   on mem://, bundles, ZIP archives and a provider without streams; plat::fs on mounts
-//   (stat, times, read_dir, no links); Overlay whiteouts (MemFs and DirFs on top)
+//   (stat, times, read_dir, no links); Overlay whiteouts (MemFs and DirFs on top);
+//   File::create_new and AtomicFile's sibling against a writer that comes between the check
+//   and the creation (MemFs, DirFs): its bytes stay, its name is never taken over; OS paths
+//   with a NUL character refused by every file call; a Sub's root never opened in its provider
 
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use plat::vfs::{self, Bundle, DirFs, MemFs, Overlay, Provider, Route, Sub};
-use plat::{FO_READ, FO_RW, FO_WRITE, File, FileLock};
+use plat::vfs::{self, Bundle, DirFs, MemFs, Opened, Overlay, Provider, Route, Sub};
+use plat::{AtomicFile, FO_READ, FO_RW, FO_WRITE, File, FileLock};
+use rt::sync::SpinLock;
 
 use crate::{T, rm_tree};
 
@@ -35,6 +39,7 @@ pub fn t_vfs(t: &mut T) {
     streams(t);
     fs_names(t);
     whiteouts(t);
+    races(t);
 }
 
 fn routes(t: &mut T) {
@@ -87,7 +92,27 @@ fn dirfs(t: &mut T) {
     t.check(plat::file_exists("scratch:") == 2 && plat::file_exists(&format!("{cwd}/scratch:")) == 0, "vfs: Ini's parent folder is the mount, not a folder 'scratch:'");
     t.check(plat::rename("scratch://sub/x.txt", "scratch://moved/x.txt") && plat::file_exists("scratch://moved/x.txt") == 1, "vfs: DirFs rename creates the folder");
     t.check(vfs::unmount("scratch") && plat::read_file("scratch://moved/x.txt").is_none(), "vfs: unmount");
+    nul_names(t, &base);
     rm_tree(&base);
+}
+
+// an OS path with a NUL character never reaches the system (it would end the name there):
+// victim keeps its bytes and its name, nothing is made at the name before the NUL
+fn nul_names(t: &mut T, base: &str) {
+    let victim = format!("{base}/victim.txt");
+    let (v0, other) = (format!("{victim}\0tail"), format!("{base}/other.txt"));
+    t.check(plat::write_file(&victim, b"keep") && plat::write_file(&other, b"other"), "vfs: NUL: the files");
+    let open_w = File::open(&v0, FO_WRITE).is_none() && File::open(&v0, FO_RW).is_none() && File::create_new(&v0).is_none();
+    let calls = !plat::delete(&v0) && !plat::write_file(&v0, b"x") && !plat::rename(&v0, &format!("{base}/moved.txt"))
+        && !plat::rename(&other, &v0) && plat::read_file(&v0).is_none() && plat::file_exists(&v0) == 0 && plat::file_exists_checked(&v0).is_none()
+        && plat::AtomicFile::create(&v0).is_none() && plat::FileLock::acquire(&v0).is_none();
+    t.check(open_w && calls, "vfs: NUL: open, create_new, delete, write_file, rename, read_file, exists, AtomicFile, FileLock refuse");
+    let fresh = format!("{base}/fresh.txt");
+    let fsx = !plat::fs::write_file_private(&format!("{fresh}\0tail"), b"x") && !plat::fs::mkdir_private(&format!("{base}/dir\0tail"))
+        && !plat::fs::set_times(&v0, 0, 0) && !plat::fs::symlink(&v0, &format!("{base}/link"), false) && plat::fs::stat(&v0).is_none();
+    t.check(fsx && plat::file_exists(&fresh) == 0 && plat::file_exists(&format!("{base}/dir")) == 0 && plat::file_exists(&format!("{base}/link")) == 0,
+            "vfs: NUL: plat::fs refuses too (write_file_private makes nothing at the name before it)");
+    t.check(plat::read_file(&victim).as_deref() == Some(&b"keep"[..]) && plat::read_file(&other).as_deref() == Some(&b"other"[..]), "vfs: NUL: victim and other keep their bytes");
 }
 
 fn bundles(t: &mut T) {
@@ -143,6 +168,21 @@ fn layers(t: &mut T) {
     t.check(Sub::new(low, "../x").is_none(), "vfs: Sub refuses ..");
     vfs::unmount("ov");
     vfs::unmount("theme");
+
+    // the root of a Sub is refused before its provider sees it: inner's folder "d" was replaced
+    // by a file meanwhile, a writing open of sub:// must not empty it (nor create "d" when gone)
+    let inner: Arc<dyn Provider> = Arc::new(MemFs::new());
+    inner.mkdir("d");
+    if let Some(s) = Sub::new(inner.clone(), "d") {
+        vfs::mount("subroot", Arc::new(s));
+        let swapped = inner.delete("d") && inner.write("d", b"payload");
+        let w = File::open("subroot://", FO_WRITE).is_none() && File::open("subroot:", FO_RW).is_none();
+        t.check(swapped && w && inner.read("d").as_deref() == Some(&b"payload"[..]), "vfs: Sub's root opened for writing is refused, inner's file of that name keeps its bytes");
+        let gone = inner.delete("d");
+        let n = File::open("subroot://", FO_WRITE).is_none() && File::create_new("subroot://").is_none();
+        t.check(gone && n && inner.kind("d") == 0, "vfs: ... and nothing is created at that name");
+        vfs::unmount("subroot");
+    }
 }
 
 fn zip(t: &mut T) {
@@ -276,6 +316,103 @@ fn streams(t: &mut T) {
     drop(f);
     t.check(inner.read("p.txt").as_deref() == Some(&b"plain!"[..]), "vfs: ... and dropping it writes it back");
     t.check(File::open("plain://p.txt", FO_READ).and_then(|f| read_all(&f)).as_deref() == Some(&b"plain!"[..]), "vfs: ... read as a stream");
+    vfs::unmount("plain");
+}
+
+// another writer: once armed, the next name containing the pattern is written ("kept") by it --
+// in kind(), after the answer "missing" (a check, then the creation), and when the creation
+// itself starts (create_new); everything else goes to the provider inside
+struct Racer {
+    inner: Arc<dyn Provider>,
+    armed: SpinLock<Option<&'static str>>,
+    hit: SpinLock<Option<String>>,
+}
+
+impl Racer {
+    fn intrude(&self, p: &str) {
+        let mut a = self.armed.lock();
+        if a.is_some_and(|pat| p.contains(pat)) {
+            *a = None;
+            self.inner.write(p, b"kept");
+            *self.hit.lock() = Some(String::from(p));
+        }
+    }
+}
+
+impl Provider for Racer {
+    fn kind(&self, p: &str) -> u32 {
+        let k = self.inner.kind(p);
+        if k == 0 {
+            self.intrude(p);
+        }
+        k
+    }
+    fn read(&self, p: &str) -> Option<Vec<u8>> {
+        self.inner.read(p)
+    }
+    fn list(&self, p: &str, f: &mut dyn FnMut(&str, bool, u64)) -> bool {
+        self.inner.list(p, f)
+    }
+    fn write(&self, p: &str, d: &[u8]) -> bool {
+        self.inner.write(p, d)
+    }
+    fn mkdir(&self, p: &str) -> bool {
+        self.inner.mkdir(p)
+    }
+    fn delete(&self, p: &str) -> bool {
+        self.inner.delete(p)
+    }
+    fn rename(&self, o: &str, n: &str) -> bool {
+        self.inner.rename(o, n)
+    }
+    fn os_path(&self, p: &str) -> Option<String> {
+        self.inner.os_path(p)
+    }
+    fn open(&self, p: &str, mode: u32) -> Opened {
+        self.inner.open(p, mode)
+    }
+    fn create_new(&self, p: &str) -> Opened {
+        self.intrude(p);
+        self.inner.create_new(p)
+    }
+}
+
+// File::create_new and AtomicFile's sibling: what another writer puts under the name between
+// the check and the creation is never opened, emptied or removed
+fn races(t: &mut T) {
+    let cwd = plat::cwd().replace('\\', "/");
+    let base = format!("{cwd}/build/plattest/{}-vfsrace-{:x}", crate::OS, plat::time_us() & 0xFF_FFFF);
+    let inners: [(&str, Arc<dyn Provider>); 2] = [("MemFs", Arc::new(MemFs::new())), ("DirFs", Arc::new(DirFs::new(&base)))];
+    for (what, inner) in inners {
+        let r = Arc::new(Racer { inner, armed: SpinLock::new(None), hit: SpinLock::new(None) });
+        vfs::mount("race", r.clone());
+        *r.armed.lock() = Some("a.txt");
+        let f = File::create_new("race://a.txt");
+        t.check(r.hit.lock().is_some() && f.is_none() && plat::read_file("race://a.txt").as_deref() == Some(&b"kept"[..]),
+            &format!("vfs race ({what}): File::create_new against a writer in between: refused, its bytes kept"));
+        // AtomicFile's sibling: another name, the writer's file stays (dropped and committed)
+        *r.hit.lock() = None;
+        *r.armed.lock() = Some(".tmp-");
+        let a = AtomicFile::create("race://b.txt");
+        let other = r.hit.lock().clone().unwrap_or_default();
+        t.check(a.is_some() && !other.is_empty(), &format!("vfs race ({what}): AtomicFile::create against a writer of its sibling's name"));
+        drop(a);
+        t.check(plat::read_file(&format!("race://{other}")).as_deref() == Some(&b"kept"[..]), &format!("vfs race ({what}): ... dropped, the writer's file stays"));
+        *r.armed.lock() = Some(".tmp-");
+        let ok = AtomicFile::create("race://b.txt").is_some_and(|a| a.write_at(0, b"neu") == Some(3) && a.commit());
+        let other2 = r.hit.lock().clone().unwrap_or_default();
+        t.check(ok && plat::read_file("race://b.txt").as_deref() == Some(&b"neu"[..]) && other2 != other
+            && plat::read_file(&format!("race://{other2}")).as_deref() == Some(&b"kept"[..]), &format!("vfs race ({what}): ... committed, the writer's file stays too"));
+        *r.armed.lock() = None;
+        vfs::unmount("race");
+    }
+    rm_tree(&base);
+    // a provider without a step that checks and creates at once (and no OS files): no
+    // File::create_new; AtomicFile still writes (with a sibling name of its own)
+    vfs::mount("plain", Arc::new(Plain(Arc::new(MemFs::new()))));
+    t.check(File::create_new("plain://n.txt").is_none(), "vfs: no File::create_new on a provider without Provider::create_new or OS files");
+    let ok = AtomicFile::create("plain://n.txt").is_some_and(|a| a.write_at(0, b"plain") == Some(5) && a.commit());
+    t.check(ok && plat::read_file("plain://n.txt").as_deref() == Some(&b"plain"[..]), "vfs: ... AtomicFile works there");
     vfs::unmount("plain");
 }
 

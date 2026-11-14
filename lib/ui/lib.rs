@@ -226,7 +226,7 @@ pub use desk::{
     DW_RIGHT,
 };
 
-use alloc::collections::{BTreeMap, VecDeque};
+use alloc::collections::VecDeque;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -485,6 +485,20 @@ pub struct WinParts {
     pub(crate) scopy: scrollcopy::W,
     /// the canvases of the pass (canvas.rs)
     pub(crate) canv: canvas::W,
+    /// (charge 11) the id-keyed state of the widget families, per window like the state slots
+    /// (ctx::W): the same id in two windows keeps its own -- the code and rich-text editors'
+    /// views, the colour pickers' fields, the font pickers, the spell checks of text boxes, the
+    /// charts' drawings and line states, the dock and desk areas
+    pub(crate) code: code_edit::W,
+    pub(crate) rich: rich_edit::W,
+    pub(crate) color: color::W,
+    pub(crate) fonts: fontpick::W,
+    pub(crate) spell: edit::spellbox::W,
+    pub(crate) chart: chart::W,
+    pub(crate) dock: dock::W,
+    pub(crate) desk: desk::W,
+    /// the file dialog of the window (filedlg.rs; the folder used last is the app's)
+    pub(crate) fd: filedlg::W,
 }
 
 impl WinParts {
@@ -502,6 +516,15 @@ impl WinParts {
             rtl: Default::default(),
             scopy: Default::default(),
             canv: Default::default(),
+            code: Default::default(),
+            rich: Default::default(),
+            color: Default::default(),
+            fonts: Default::default(),
+            spell: Default::default(),
+            chart: Default::default(),
+            dock: Default::default(),
+            desk: Default::default(),
+            fd: Default::default(),
         }
     }
 }
@@ -518,7 +541,6 @@ pub(crate) struct Mods {
     pub(crate) win: win::S,
     pub(crate) chrome: chrome::S,
     pub(crate) filedlg: filedlg::S,
-    pub(crate) chart: chart::S,
     pub(crate) shell: shell::S,
     pub(crate) notify: notify::S,
     pub(crate) a11y: a11y::S,
@@ -570,6 +592,7 @@ pub(crate) struct Mods {
 /// what a window shows through (Ui::gpu_output): status and counters of the GPU output, for
 /// tests and measurements
 #[derive(Clone, Debug, Default)]
+#[non_exhaustive]
 pub struct GpuOutput {
     /// the output is switched on for this run (jfgui_GPU, the `gpu on` of a script)
     pub wanted: bool,
@@ -660,7 +683,6 @@ pub struct Ui {
     pub(crate) sems: Vec<Sem>,
     pub(crate) semtext_len: usize,
     pub(crate) sem_dummy: Sem,
-    pub(crate) slots: BTreeMap<u32, Slot>,
     pub(crate) keydown: [u8; 256],
     pub(crate) mpts: Vec<[i32; 2]>,
     pub(crate) mprs: Vec<u32>,
@@ -679,6 +701,9 @@ pub struct Ui {
     pub(crate) limits: [u32; ctx::LIM_N],
     pub(crate) mods: u32,
     pub(crate) frame: u32,
+    /// a pass builds the windows (frame_begin .. frame_end): an id-taking call means the window
+    /// being built; outside (App::command, tasks) no window is (win.rs req_win, wp_query)
+    pub(crate) building: bool,
     /// the device: FF_DESKTOP / FF_TABLET / FF_PHONE (form.rs)
     pub(crate) form: u32,
     pub(crate) now_ms: u32,

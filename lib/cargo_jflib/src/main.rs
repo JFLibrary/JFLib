@@ -74,12 +74,13 @@ USAGE:
         signed ad hoc; with `sandbox` in PERMISSIONS the App Sandbox); on a Mac; --run starts it
     cargo jflib package [-p PKG] [--styles winui,kde] [--formats setup,deb,..|all] [--no-win] [--no-deb]
         the app with every style built in, the look picked at installation, in target/jflib-package/:
-        setup (NAME_Setup.exe) and deb by default, also msix (MakeAppx), appimage (one per style),
-        rpm (the .spec; the .rpm with rpmbuild) and flatpak (the manifest; the bundle with
-        flatpak-builder; on Windows through WSL); the styles from --styles or PACKAGE styles=,
-        default winui; the rest of PACKAGE as in README.md of cargo-jflib.  Signed with what the
-        environment names (jfgui_SIGN_PFX / jfgui_SIGN_THUMBPRINT: Authenticode, jfgui_GPG_KEY:
-        AppImages, apt repository, Flatpak); --sign: every signature required
+        setup (NAME_Setup.exe) and deb by default (an app with std: those of this system), also msix
+        (MakeAppx), appimage (one per style), rpm (the .spec; the .rpm with rpmbuild) and flatpak
+        (the manifest; the bundle with flatpak-builder; on Windows through WSL); the styles from
+        --styles or PACKAGE styles=, default winui; the rest of PACKAGE as in README.md of
+        cargo-jflib.  Signed with what the environment names (jfgui_SIGN_PFX / jfgui_SIGN_THUMBPRINT:
+        Authenticode, jfgui_GPG_KEY: AppImages, apt repository, Flatpak); --sign: every signature
+        required
         --repo DIR: a flat apt repository with the .deb; --update DIR: a signed update channel
         per style (the key from --update-key, jfgui_UPDATE_KEY_FILE or jfgui_UPDATE_KEY)
     cargo jflib keygen FILE [-p PKG]

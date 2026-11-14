@@ -1,4 +1,5 @@
 #!args --rtl --verify-dirty
+#!lock desktop
 # a mirrored window: the canvas stays on the CPU, pan and zoom as without tiles (GPU.md "Leinwände").
 # Without a GPU `gpu` prints a SKIP once and does nothing.
 system env jfgui_GPU_VALIDATE 1

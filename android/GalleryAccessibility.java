@@ -3,6 +3,14 @@
  * frames (lib/plat/a11y_wire.rs: the format, lib/plat/web_a11y.rs: the bridge), explore by
  * touch (hover), the accessibility focus, events for TalkBack, and its actions back to Rust
  * (click, focus, value, text, selection). All calls run on the UI thread, like the library.
+ *
+ * The host reads the rich format (VERSION2; bridge.c turns the mirror on with jfgui_a11y(2)):
+ * tables (CollectionInfo, their cells and headers CollectionItemInfo), trees (hierarchical,
+ * expand / collapse), the place in a set, descriptions (hint / tooltip text), a link's address,
+ * invalid fields, live regions (setLiveRegion; a change inside one is reported on the region)
+ * and announcements (announceForAccessibility); the further actions scroll into view, expand /
+ * collapse, increment / decrement and select. Landmarks, tool bars, articles and the other
+ * kinds Android has no class for stay groups.
  */
 package org.jflib.gallery;
 
@@ -21,6 +29,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
+import android.view.accessibility.AccessibilityNodeInfo.CollectionInfo;
 import android.view.accessibility.AccessibilityNodeInfo.CollectionItemInfo;
 import android.view.accessibility.AccessibilityNodeInfo.RangeInfo;
 import android.view.accessibility.AccessibilityNodeProvider;
@@ -29,6 +38,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.function.DoubleSupplier;
 
@@ -39,11 +49,22 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
         TABLIST = 15, TAB = 16, COMBO = 17, IMAGE = 18, CANVAS = 19, DIALOG = 20, HEADING = 21, WINDOW = -1;
     // plat::a11y::S_* and A_*
     static final int S_FOCUSED = 1, S_FOCUSABLE = 2, S_DISABLED = 4, S_CHECKED = 8, S_MIXED = 16, S_SELECTED = 32,
-        S_EXPANDED = 64, S_PRESSED = 128, S_MULTILINE = 256, S_PROTECTED = 512, S_READONLY = 1024;
-    static final int A_CLICK = 1, A_FOCUS = 2, A_VALUE = 4, A_TEXT = 8;
-    // jfgui_a11y_act kinds and the update events (a11y_wire.rs E_*)
-    static final int ACT_CLICK = 1, ACT_FOCUS = 2, ACT_VALUE = 3, ACT_TEXT = 4, ACT_SELECT = 5;
-    static final int E_WINDOW = 1, E_ACTIVE = 2, E_FOCUS = 3, E_STATE = 4, E_NAME = 5, E_VALUE = 6, E_TEXT = 7, E_CARET = 8;
+        S_EXPANDED = 64, S_PRESSED = 128, S_MULTILINE = 256, S_PROTECTED = 512, S_READONLY = 1024, S_REQUIRED = 1 << 11,
+        S_INVALID = 1 << 12, S_BUSY = 1 << 13, S_HASPOPUP = 1 << 14, S_VISITED = 1 << 15, S_MODAL = 1 << 16,
+        S_MULTISELECT = 1 << 17, S_COLLAPSED = 1 << 18, S_OFFSCREEN = 1 << 19, S_SELECTABLE = 1 << 20;
+    static final int A_CLICK = 1, A_FOCUS = 2, A_VALUE = 4, A_TEXT = 8, A_EXPAND = 16, A_STEP = 32, A_SCROLL = 64, A_SELECT = 128;
+    // plat::a11y::Sub in declaration order (VERSION2; 6 .. 13 the landmarks)
+    static final int SUB_TABLE = 1, SUB_ROW = 2, SUB_CELL = 3, SUB_COLHEADER = 4, SUB_ROWHEADER = 5, SUB_TREE = 14,
+        SUB_TREEITEM = 15, SUB_ALERT = 20, SUB_STATUS = 21, SUB_LOG = 22, SUB_METER = 23;
+    static final int LIVE_POLITE = 1, LIVE_ASSERTIVE = 2;
+    // jfgui_a11y_act kinds (6 ..: plat::a11y::Op) and the update events (a11y_wire.rs E_*)
+    static final int ACT_CLICK = 1, ACT_FOCUS = 2, ACT_VALUE = 3, ACT_TEXT = 4, ACT_SELECT = 5, ACT_SCROLL = 6,
+        ACT_EXPAND = 7, ACT_COLLAPSE = 8, ACT_INCREMENT = 9, ACT_DECREMENT = 10, ACT_SELECT_ITEM = 11,
+        ACT_ADD_ITEM = 12, ACT_REMOVE_ITEM = 13;
+    static final int E_WINDOW = 1, E_ACTIVE = 2, E_FOCUS = 3, E_STATE = 4, E_NAME = 5, E_VALUE = 6, E_TEXT = 7, E_CARET = 8,
+        E_ANNOUNCE = 9;
+    // the update formats (a11y_wire.rs VERSION, VERSION2)
+    static final int VERSION = 1, VERSION2 = 2;
 
     /** A node of the tree, or a window (role WINDOW). */
     static final class Node {
@@ -52,6 +73,12 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
         int[] rect = new int[4], caretRect = new int[4];
         String name = "", text = "";
         double value, min, max, step;
+        // VERSION2: what it is more exactly (SUB_*), its description and address, its place in a
+        // set (position from 1, size), its level, a cell's row, column, row span and column span,
+        // a table's rows and columns, its live region (LIVE_*, 0 none)
+        int sub, setPos, setSize, level, live;
+        int[] cell = new int[4], grid = new int[2];
+        String desc = "", url = "";
         Node parent;
         final ArrayList<Node> children = new ArrayList<>();
     }
@@ -120,6 +147,14 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
         if (!manager.isEnabled()) return;
         if (structure || changed.size() > 16) sendHost(AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE);
         else for (Node n : changed) if (byVid.get(n.vid) == n) send(n, AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED, AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED);
+        // a live region speaks when something inside it changed (TalkBack reads the region again)
+        HashSet<Node> regions = new HashSet<>();
+        for (Node n : changed) {
+            Node r = n;
+            while (r != null && r.role != WINDOW && r.live == 0) r = r.parent;
+            if (r != null && r.role != WINDOW && (r.state & S_BUSY) == 0 && byVid.get(r.vid) == r && regions.add(r))
+                send(r, AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED, AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE);
+        }
         for (int i = 0; i < events.size(); i++) event(events.get(i), (String)extra.get(i));
     }
 
@@ -146,7 +181,9 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
 
     // one update -> the structure changed
     private boolean update(ByteBuffer b, ArrayList<Node> changed, ArrayList<int[]> events, ArrayList<Object> extra) {
-        if ((b.get() & 255) != 1) throw new IllegalStateException("a11y: unknown update version");
+        int version = b.get() & 255;
+        if (version != VERSION && version != VERSION2) throw new IllegalStateException("a11y: unknown update version");
+        boolean rich = version == VERSION2;
         // a full update lists every window with its order: nodes that stay keep their ids
         boolean structure = (b.get() & 1) != 0;
         LinkedHashMap<Integer, Win> next = new LinkedHashMap<>();
@@ -195,6 +232,16 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
                 n.anchor = b.getInt();
                 rect(b, n.caretRect);
                 n.value = b.getDouble(); n.min = b.getDouble(); n.max = b.getDouble(); n.step = b.getDouble();
+                if (rich) {
+                    n.sub = b.get() & 255;
+                    n.desc = str(b);
+                    n.url = str(b);
+                    n.setPos = b.getInt(); n.setSize = b.getInt();
+                    n.level = b.getInt();
+                    for (int i = 0; i < 4; i++) n.cell[i] = b.getInt();
+                    n.grid[0] = b.getInt(); n.grid[1] = b.getInt();
+                    n.live = b.get() & 255;
+                }
                 changed.add(n);
             }
             next.put(win, w);
@@ -210,7 +257,7 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
             long key = b.getLong();
             int a = b.getInt(), c = b.getInt();
             events.add(new int[] {kind, win, (int)key, (int)(key >>> 32), a, c});
-            extra.add(kind == E_TEXT ? str(b) : null);
+            extra.add(kind == E_TEXT || (kind == E_ANNOUNCE && rich) ? str(b) : null);
         }
         if (b.hasRemaining()) throw new IllegalStateException("a11y: bytes after the update");
         return structure;
@@ -230,7 +277,13 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
     }
 
     // an event of the update for TalkBack
+    @SuppressWarnings("deprecation")
     private void event(int[] e, String old) {
+        if (e[0] == E_ANNOUNCE) {
+            // a text to say (ui.announce): Android has no politeness, TalkBack queues it
+            if (old != null && !old.isEmpty()) view.announceForAccessibility(old);
+            return;
+        }
         Node n = node(e[1], (e[2] & 0xFFFFFFFFL) | ((long)e[3] << 32));
         if (n == null) return;
         switch (e[0]) {
@@ -311,6 +364,7 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
     }
 
     private static String className(Node n) {
+        if (n.sub == SUB_TABLE) return "android.widget.GridView";
         switch (n.role) {
             case LABEL: case HEADING: case LINK: case LISTITEM: case MENUITEM: case TAB: return "android.widget.TextView";
             case BUTTON: return (n.state & S_PRESSED) != 0 ? "android.widget.ToggleButton" : "android.widget.Button";
@@ -417,7 +471,7 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
                 break;
             case LINK: {
                 SpannableString s = new SpannableString(n.name);
-                s.setSpan(new URLSpan(""), 0, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                s.setSpan(new URLSpan(n.url), 0, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 info.setText(s);
                 break;
             }
@@ -430,13 +484,23 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
                 else if (!n.name.isEmpty()) info.setContentDescription(n.name);
                 break;
         }
+        rich(info, n);
         if (enabled) {
             if ((n.actions & A_CLICK) != 0) {
                 info.setClickable(true);
                 info.addAction(AccessibilityAction.ACTION_CLICK);
-                if (n.role == COMBO || (n.role == MENU && n.key >= 0))
+                if ((n.role == COMBO || (n.role == MENU && n.key >= 0)) && (n.actions & A_EXPAND) == 0)
                     info.addAction((n.state & S_EXPANDED) != 0 ? AccessibilityAction.ACTION_COLLAPSE : AccessibilityAction.ACTION_EXPAND);
             }
+            if ((n.actions & A_EXPAND) != 0)
+                info.addAction((n.state & S_EXPANDED) != 0 ? AccessibilityAction.ACTION_COLLAPSE : AccessibilityAction.ACTION_EXPAND);
+            if ((n.actions & A_STEP) != 0 && (n.actions & A_VALUE) == 0) {
+                info.addAction(AccessibilityAction.ACTION_SCROLL_FORWARD);
+                info.addAction(AccessibilityAction.ACTION_SCROLL_BACKWARD);
+            }
+            if ((n.actions & A_SCROLL) != 0) info.addAction(AccessibilityAction.ACTION_SHOW_ON_SCREEN);
+            if ((n.actions & A_SELECT) != 0)
+                info.addAction((n.state & S_SELECTED) != 0 ? AccessibilityAction.ACTION_CLEAR_SELECTION : AccessibilityAction.ACTION_SELECT);
             if ((n.actions & A_FOCUS) != 0 && (n.state & S_FOCUSED) == 0) info.addAction(AccessibilityAction.ACTION_FOCUS);
             if ((n.actions & A_VALUE) != 0) {
                 info.addAction(AccessibilityAction.ACTION_SET_PROGRESS);
@@ -448,6 +512,35 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
         }
         addAccessibilityFocus(info, vid);
         return info;
+    }
+    // the rich fields (VERSION2): tables, their cells and headers, trees, the place in a set, a
+    // description, invalid fields, live regions, a meter's range
+    @SuppressWarnings("deprecation")
+    private static void rich(AccessibilityNodeInfo info, Node n) {
+        boolean selected = (n.state & S_SELECTED) != 0;
+        int mode = (n.state & S_MULTISELECT) != 0 ? CollectionInfo.SELECTION_MODE_MULTIPLE
+            : (n.state & S_SELECTABLE) != 0 ? CollectionInfo.SELECTION_MODE_SINGLE : CollectionInfo.SELECTION_MODE_NONE;
+        if (n.sub == SUB_TABLE) {
+            int rows = n.grid[0] > 0 ? n.grid[0] : n.children.size(), cols = Math.max(1, n.grid[1]);
+            info.setCollectionInfo(CollectionInfo.obtain(rows, cols, false, mode));
+        } else if (n.sub == SUB_TREE) {
+            info.setCollectionInfo(CollectionInfo.obtain(n.setSize > 0 ? n.setSize : n.children.size(), 1, true, mode));
+        }
+        if ((n.sub == SUB_CELL || n.sub == SUB_COLHEADER || n.sub == SUB_ROWHEADER) && n.cell[2] > 0 && n.cell[3] > 0) {
+            info.setCollectionItemInfo(CollectionItemInfo.obtain(n.cell[0], n.cell[2], n.cell[1], n.cell[3],
+                n.sub != SUB_CELL, selected));
+        } else if (n.setSize > 0 && n.setPos > 0 && n.role != HEADING) {
+            info.setCollectionItemInfo(CollectionItemInfo.obtain(n.setPos - 1, 1, 0, 1, false, selected));
+        }
+        if (n.sub == SUB_METER && n.value >= n.min && n.max > n.min)
+            info.setRangeInfo(RangeInfo.obtain(RangeInfo.RANGE_TYPE_FLOAT, (float)n.min, (float)n.max, (float)n.value));
+        if (!n.desc.isEmpty()) {
+            if (n.role != TEXTBOX) info.setHintText(n.desc);
+            else if (Build.VERSION.SDK_INT >= 28) info.setTooltipText(n.desc);
+        }
+        if ((n.state & S_INVALID) != 0) info.setContentInvalid(true);
+        if (n.live != 0)
+            info.setLiveRegion(n.live == LIVE_ASSERTIVE ? View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE : View.ACCESSIBILITY_LIVE_REGION_POLITE);
     }
     @SuppressWarnings("deprecation")
     private static void setBoundsInParent(AccessibilityNodeInfo info, Rect r) { info.setBoundsInParent(r); }
@@ -496,10 +589,19 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
         }
         if (n.role == WINDOW || (n.state & S_DISABLED) != 0) return false;
         double step = Math.max(n.step, (n.max - n.min) / 20);
+        if ((action == AccessibilityNodeInfo.ACTION_EXPAND || action == AccessibilityNodeInfo.ACTION_COLLAPSE) && (n.actions & A_EXPAND) != 0)
+            return act(n, action == AccessibilityNodeInfo.ACTION_EXPAND ? ACT_EXPAND : ACT_COLLAPSE, 0, 0, 0, null);
+        if ((action == AccessibilityNodeInfo.ACTION_SCROLL_FORWARD || action == AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+                && (n.actions & A_STEP) != 0 && (n.actions & A_VALUE) == 0)
+            return act(n, action == AccessibilityNodeInfo.ACTION_SCROLL_FORWARD ? ACT_INCREMENT : ACT_DECREMENT, 0, 0, 0, null);
         switch (action) {
             case AccessibilityNodeInfo.ACTION_CLICK: case AccessibilityNodeInfo.ACTION_EXPAND: case AccessibilityNodeInfo.ACTION_COLLAPSE:
                 if ((n.actions & A_CLICK) != 0) return act(n, ACT_CLICK, 0, 0, 0, null);
                 return (n.actions & A_FOCUS) != 0 && act(n, ACT_FOCUS, 0, 0, 0, null);
+            case AccessibilityNodeInfo.ACTION_SELECT:
+                return (n.actions & A_SELECT) != 0 && act(n, ACT_SELECT_ITEM, 0, 0, 0, null);
+            case AccessibilityNodeInfo.ACTION_CLEAR_SELECTION:
+                return (n.actions & A_SELECT) != 0 && act(n, ACT_REMOVE_ITEM, 0, 0, 0, null);
             case AccessibilityNodeInfo.ACTION_FOCUS:
                 if ((n.actions & A_FOCUS) == 0) return false;
                 view.requestFocus();
@@ -523,6 +625,8 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
             default:
                 if (action == android.R.id.accessibilityActionSetProgress && (n.actions & A_VALUE) != 0 && args != null)
                     return act(n, ACT_VALUE, 0, 0, args.getFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, (float)n.value), null);
+                if (action == android.R.id.accessibilityActionShowOnScreen && (n.actions & A_SCROLL) != 0)
+                    return act(n, ACT_SCROLL, 0, 0, 0, null);
                 return false;
         }
     }

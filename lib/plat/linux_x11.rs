@@ -514,6 +514,7 @@ struct X11 {
     xd_init: bool,
     xd: dnd::Target,
     xs: dnd::Source,
+    xh: Option<dnd::Held>, // a drop whose XdndFinished waits (drop_hold)
     // ---- popups, cursors, monitors
     xq: [Xq; PPW_MAX as usize],
     cursors: [u32; CUR_COUNT as usize],
@@ -687,6 +688,7 @@ impl X11 {
             xd_init: false,
             xd: Default::default(),
             xs: Default::default(),
+            xh: None,
             xq: core::array::from_fn(|_| Xq {
                 win: 0,
                 owner: 0,

@@ -31,7 +31,8 @@
 //   instance: claim(app) -> Primary / Forwarded / Alone, take() -> requests of later starts
 //            (the app's single instance; pipe / abstract socket per user)  (instance.rs)
 //   spell:   sys_spell_find / sys_spell_languages, SysSpeller (check, suggest): the system's
-//            spell checker (Windows ISpellChecker; elsewhere none)          (spell.rs)
+//            spell checker (Windows ISpellChecker, macOS NSSpellChecker, iOS UITextChecker;
+//            elsewhere none)                                                (spell.rs)
 //   tray:    tray_set / tray_remove (the symbol in the notification area, its menu), notify /
 //            notify_close (system notifications), tray_take() -> events   (tray.rs)
 //   power:   inhibit(reason, INHIBIT_SUSPEND | INHIBIT_IDLE) -> Option<Inhibit> (no standby /
@@ -90,7 +91,8 @@
 //            jxlenc_encode (modhost.rs; the records in modabi.rs)
 //
 // The layer knows events, pixel rows, files and threads only -- no UI, no gfx.  One of the
-// four crates that may contain `unsafe` (rt, simd, plat, plugin); nothing unsafe leaves it.
+// four library crates that may contain `unsafe` (rt, simd, plat, gpu); nothing unsafe leaves it
+// but dl_sym and dl_close (a symbol of a library loaded at run time is the caller's to trust).
 #![no_std]
 #[cfg(feature = "std")]
 extern crate std;
@@ -118,9 +120,11 @@ pub mod watch;
 /// The operating system's trusted certificate authorities (TLS clients of public servers).
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 pub mod certs;
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+// The system's cryptographic random numbers (fill_random, random_bytes): Windows, Linux, Apple
+// and Android; not in the browser (there the page's crypto.getRandomValues).
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 mod rand;
-#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub use rand::*;
 
 use alloc::string::String;
@@ -161,7 +165,8 @@ pub mod content;
 pub mod secret;
 /// One running instance per app and user; later starts hand over their arguments.
 pub mod instance;
-/// The system's spell checker (Windows ISpellChecker); Hunspell files are the spell crate's.
+/// The system's spell checker (Windows ISpellChecker, macOS NSSpellChecker, iOS UITextChecker);
+/// Hunspell files are the spell crate's.
 pub mod spell;
 /// The app's symbol in the notification area and system notifications.
 pub mod tray;
@@ -272,6 +277,12 @@ mod linux_desk;
 // the damage regions of the X11 / Wayland presents
 #[cfg(target_os = "linux")]
 mod linux_damage;
+// the copy of a present's dirty rectangles into the window's pixels (Windows, X11, Wayland): in
+// row bands on the pool when large, past the caches at 4K
+#[cfg(any(windows, target_os = "linux"))]
+mod present_copy;
+#[cfg(any(windows, target_os = "linux"))]
+pub use present_copy::present_copy_bench;
 // the log: levels, a ring for crash reports, stderr, a rotating file
 mod log;
 pub use log::*;

@@ -255,6 +255,7 @@ extern "C" fn v_drag_perform(this: Id, _cmd: Sel, info: Id) -> bool {
     crate::drop_reset();
     let files = read(pb, types);
     crate::drop_set_effect(e);
+    crate::drop_set_allowed(de_of(mask)); // the drag's operation mask
     push(w, E_DROP, 0, x, y, files);
     true
 }

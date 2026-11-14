@@ -335,8 +335,12 @@ pub fn active() -> bool {
     ACTIVE.load(Ordering::Relaxed)
 }
 
-/// whether path may be read (FS_READ) or written (FS_WRITE)
+/// whether path may be read (FS_READ) or written (FS_WRITE); never a path with a NUL character
+/// (the system would end the name there and reach another file), with or without a policy
 pub fn fs_allowed(path: &str, mode: u32) -> bool {
+    if path.contains('\0') {
+        return false;
+    }
     if !active() && SCOPED.load(Ordering::Acquire) == 0 {
         return true;
     }

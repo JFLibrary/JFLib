@@ -3,7 +3,8 @@
 //   set_fallback_fonts(ids)        (shaping.rs) the app's own chain, tried first; shaping uses
 //                                  it as well
 //   set_system_fallback(on)        then system fonts: the families of FAMILIES (this OS's
-//                                  list, after the ';' separated families of
+//                                  list: Windows, macOS / iOS, Linux and the rest; after
+//                                  the ';' separated families of
 //                                  jfgui_FALLBACK_FONTS), found with a FontDb of the font
 //                                  folders (scanned on the first missing character; its cache
 //                                  is cache://fontdb.fdb, not with jfgui_FONTDIRS) and loaded
@@ -37,7 +38,21 @@ const FAMILIES: &[&str] = &[
     "MS Gothic", "SimSun", "Arial Unicode MS",
 ];
 
-#[cfg(not(windows))]
+// macOS and iOS: the families in /System/Library/Fonts (and its Supplemental folder), Latin
+// and symbols first, then Chinese, Japanese, Korean and the other scripts.  PingFang is a
+// downloaded asset on macOS (not in the font folders), Hiragino and Heiti stand in for it.
+// Not here: Apple Color Emoji, whose glyphs are sbix bitmaps (text draws COLR and CBDT only),
+// and the hidden ".SF ..." system faces.
+#[cfg(target_vendor = "apple")]
+const FAMILIES: &[&str] = &[
+    "Helvetica Neue", "Helvetica", "Lucida Grande", "Apple Symbols", "PingFang SC", "Hiragino Sans GB", "Heiti SC",
+    "PingFang TC", "Heiti TC", "Hiragino Sans", "Apple SD Gothic Neo", "AppleGothic", "Thonburi",
+    "Kohinoor Devanagari", "Kohinoor Bangla", "Kohinoor Gujarati", "Kohinoor Telugu", "Tamil Sangam MN",
+    "Geeza Pro", "Arial Hebrew", "Kefa III", "Noto Sans Armenian", "Menlo", "STIX Two Math", "Arial Unicode MS",
+    "Times New Roman", "Arial",
+];
+
+#[cfg(not(any(windows, target_vendor = "apple")))]
 const FAMILIES: &[&str] = &[
     "DejaVu Sans", "Noto Sans", "Liberation Sans", "Noto Sans CJK SC", "Noto Sans CJK JP", "Noto Sans CJK KR",
     "Noto Sans CJK TC", "Noto Color Emoji", "Noto Emoji", "Noto Sans Symbols", "Noto Sans Symbols2", "Noto Sans Math",

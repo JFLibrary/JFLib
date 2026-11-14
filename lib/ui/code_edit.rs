@@ -39,6 +39,13 @@
 //   ui.code_theme_set(Some(theme))     the colours of every code editor (None: code_theme())
 //   ui.code_font_size(pt)              the size of the code editors' font (default 10 pt)
 //
+// Every window keeps the state of its editors (WinParts::code): an editor of the same id in two
+// windows scrolls, finds and pops up by itself.  code_find and code_reveal made in a window's
+// pass are for that window's editor (when it has one of the id), else (outside the passes:
+// App::command) for the first editor of the id that is built; code_status, code_diag,
+// code_events and code_popup_item read the window being built's editor, else the first window's
+// (the main window first) that has one.
+//
 // Diagnostics (CodeDoc::set_diagnostics; they follow the edits, code_doc.rs) are wavy
 // underlines below their text in the colour of their severity (infos below warnings below
 // errors; a point or the end of a line: one cell) and a marker in the gutter's first column on
@@ -99,6 +106,7 @@ use crate::ed_core::*;
 use crate::highlight::*;
 use crate::i18n::tr;
 use crate::keys::*;
+use crate::win::WIN_ANY;
 use crate::{Sp, Ui};
 
 /// code_editor flags: select, copy and find only
@@ -226,16 +234,21 @@ struct View {
     show_caret: bool,
 }
 
+/// the editors of one window (WinParts::code): their views by id
+#[derive(Default)]
+pub(crate) struct W {
+    views: BTreeMap<u32, View>,
+}
+
 /// shared state (Ui::m.code)
 #[derive(Default)]
 pub(crate) struct S {
-    views: BTreeMap<u32, View>,
     theme: Option<CodeTheme>,
     size_pt: f32,
-    // a find request: id, query, replace row
-    find_req: Option<(u32, String, bool)>,
-    // code_reveal: the line each editor shows in its next pass
-    reveal_req: BTreeMap<u32, usize>,
+    // a find request: window (WIN_ANY: the first editor of the id), id, query, replace row
+    find_req: Option<(u32, u32, String, bool)>,
+    // code_reveal: the line each editor shows in its next pass, by (window or WIN_ANY, id)
+    reveal_req: BTreeMap<(u32, u32), usize>,
     // the drawings of wavy underlines: colour, size key (the same object every frame)
     waves: Vec<(u32, u32, DrawRef)>,
 }
@@ -350,9 +363,12 @@ impl Ui {
     }
 
     /// open the find bar of code editor id with a query (replace: with the replace row); the
-    /// editor selects the first match from its caret on
+    /// editor selects the first match from its caret on.  Called in a window's pass: that
+    /// window's editor (when it has one of the id); else (App::command, a window without one) the
+    /// first editor of the id built next
     pub fn code_find(&mut self, id: u32, query: &str, replace: bool) {
-        self.m.code.find_req = Some((id, String::from(query), replace));
+        let w = self.req_win(self.wp.code.views.contains_key(&id));
+        self.m.code.find_req = Some((w, id, String::from(query), replace));
         self.repass();
     }
 
@@ -361,32 +377,42 @@ impl Ui {
     /// unfolded.  The keyboard focus, the caret and the selection stay as they are: a debugger
     /// shows the execution line while the page or its toolbar keeps the keyboard
     /// (CodeDoc::set_exec_line marks it).  A later request for the same editor replaces it.
+    /// Called in a window's pass: that window's editor (when it has one of the id); else
+    /// (App::command, a window without one) the first editor of the id built next
     pub fn code_reveal(&mut self, id: u32, line: usize) {
-        self.m.code.reveal_req.insert(id, line);
+        let w = self.req_win(self.wp.code.views.contains_key(&id));
+        self.m.code.reveal_req.insert((w, id), line);
         self.repass();
     }
 
+    // the view of code editor id a query reads: the window being built's, outside the passes
+    // the first window's that has one
+    fn ce_view(&self, id: u32) -> Option<&View> {
+        self.wp_query(|p| p.code.views.contains_key(&id)).and_then(|p| p.code.views.get(&id))
+    }
+
     /// the caret, the find matches, the lines tokenized and the diagnostics in code editor
-    /// id's last frame
+    /// id's last frame (of the window being built; outside the passes, or when that window has
+    /// none of the id, the first window's that has one, the main window first)
     pub fn code_status(&self, id: u32) -> CodeStatus {
-        self.m.code.views.get(&id).map_or(CodeStatus::default(), |v| v.status)
+        self.ce_view(id).map_or(CodeStatus::default(), |v| v.status)
     }
 
     /// the most severe diagnostic at the caret of code editor id in its last frame (its
     /// message for a status bar)
     pub fn code_diag(&self, id: u32) -> Option<Diag> {
-        self.m.code.views.get(&id).and_then(|v| v.caret_diag.clone())
+        self.ce_view(id).and_then(|v| v.caret_diag.clone())
     }
 
     /// what the user asked of code editor id in its last pass (go to definition, rename,
     /// format, a breakpoint's click)
     pub fn code_events(&self, id: u32) -> Vec<CodeEv> {
-        self.m.code.views.get(&id).map_or(Vec::new(), |v| v.events.clone())
+        self.ce_view(id).map_or(Vec::new(), |v| v.events.clone())
     }
 
     /// the item the completion list of code editor id has chosen (None: closed)
     pub fn code_popup_item(&self, id: u32) -> Option<CompItem> {
-        let v = self.m.code.views.get(&id)?;
+        let v = self.ce_view(id)?;
         let p = &v.pop;
         p.shown.get(p.sel).and_then(|&i| p.items.get(i)).filter(|_| p.open).cloned()
     }
@@ -643,7 +669,7 @@ impl Ui {
         let frame = flags & CE_NO_FRAME == 0;
         let m = self.ce_metrics();
         let theme = self.m.code.theme.clone().unwrap_or_else(|| self.code_theme());
-        let mut v = self.m.code.views.remove(&id).unwrap_or_default();
+        let mut v = self.wp.code.views.remove(&id).unwrap_or_default();
         v.seen = self.frame;
         v.hl.count = 0;
         v.events.clear();
@@ -651,9 +677,10 @@ impl Ui {
         let rev0 = doc.revision();
         let sel0 = doc.selection();
         let tw = doc.tab_width.clamp(1, 16) as usize;
-        // a find request
-        if let Some((rid, q, rep)) = self.m.code.find_req.take() {
-            if rid == id && flags & CE_NO_FIND == 0 {
+        // a find request (for this window's editor, or for the first editor of the id)
+        let win = self.uiw_cur;
+        if let Some((rw, rid, q, rep)) = self.m.code.find_req.take() {
+            if rid == id && (rw == win || rw == WIN_ANY) && flags & CE_NO_FIND == 0 {
                 v.find.open = true;
                 v.find.replace = rep;
                 v.find.query = q;
@@ -661,11 +688,12 @@ impl Ui {
                 v.find.key.2 = u64::MAX;
                 self.focus(id.wrapping_add(3));
             } else {
-                self.m.code.find_req = Some((rid, q, rep));
+                self.m.code.find_req = Some((rw, rid, q, rep));
             }
         }
         // a line to show (code_reveal): out of its folds before the rows are counted
-        let reveal = self.m.code.reveal_req.remove(&id).map(|l| l.min(doc.line_count().saturating_sub(1)));
+        let req = &mut self.m.code.reveal_req;
+        let reveal = req.remove(&(win, id)).or_else(|| req.remove(&(WIN_ANY, id))).map(|l| l.min(doc.line_count().saturating_sub(1)));
         if let Some(l) = reveal {
             doc.reveal(l);
         }
@@ -1478,10 +1506,10 @@ impl Ui {
                 self.ca_signature_popup(sh, cx_px - m.cw * 2, cy, cy + m.lh, &pf, &theme);
             }
         }
-        self.m.code.views.insert(id, v);
+        self.wp.code.views.insert(id, v);
         let now = self.frame;
-        if self.m.code.views.len() > 8 {
-            self.m.code.views.retain(|_, v| now.wrapping_sub(v.seen) < 600);
+        if self.wp.code.views.len() > 8 {
+            self.wp.code.views.retain(|_, v| now.wrapping_sub(v.seen) < 600);
         }
         self.wp.ctx.last_rect = r;
         out

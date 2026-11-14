@@ -4,7 +4,7 @@
 //        a Metal device; jfgui_GPU_VALIDATE=1 turns Metal's API validation on (MTL_DEBUG_LAYER)
 //   instance.adapters()                     macOS: MTLCopyAllDevices, iOS: the system's device
 //   adapter.create_device(&DeviceDesc)      a command queue and a timeline (MTLSharedEvent); level
-//        Basis (Voll: AP6g)
+//        Voll on Metal 3 devices of the Apple7 or Mac2 family (A14, M1 and newer), else Basis
 //   device.queue() -> &Queue                submit([cmd, ..]) -> SubmitId (the event's value),
 //        write_buffer / write_texture / write_texture_rects(_at) (staged in shared buffers, copied by
 //        a blit encoder before the next submission), read_buffer (submits and waits)

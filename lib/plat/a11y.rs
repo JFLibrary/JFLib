@@ -22,8 +22,11 @@
 //                                ui itself); without one they stay German
 //
 // Linux: AT-SPI2 on the accessibility bus (linux_atspi.rs).  Windows: UI Automation providers
-// answering WM_GETOBJECT (win_uia.rs).  The browser and Android (web_a11y.rs): the host keeps
-// a mirror of the tree -- an ARIA shadow tree in the DOM (web/a11y.js), virtual views of an
+// answering WM_GETOBJECT (win_uia.rs).  macOS: NSAccessibility elements under each window's view,
+// turned on by the first question of an assistive technology (apple_mac_a11y.rs, VoiceOver).  iOS:
+// UIAccessibility elements under the host's view while VoiceOver runs (apple_ios_a11y.rs).  The
+// browser and Android (web_a11y.rs): the host keeps a mirror of the tree -- an ARIA shadow tree
+// in the DOM (web/a11y.js), virtual views of an
 // AccessibilityNodeProvider (android/GalleryAccessibility.java) -- fed with the differences
 // of every published tree (a11y_wire.rs: Mirror, the wire format); the host turns the mirror
 // on (active() follows it) and sends the actions back.
@@ -44,7 +47,7 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use rt::sync::SpinLock;
 
@@ -871,11 +874,13 @@ static OPS: SpinLock<Vec<OpRequest>> = SpinLock::new(Vec::new());
 static ANNOUNCED: SpinLock<Vec<(u8, String, u8)>> = SpinLock::new(Vec::new());
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 static STARTED: AtomicBool = AtomicBool::new(false);
+static EPOCH: AtomicU32 = AtomicU32::new(0);
 
 /// start the platform bridge (once): Linux connects to the accessibility bus when assistive
 /// technology is enabled (jfgui_A11Y=1 forces it, jfgui_A11Y=0 or NO_AT_BRIDGE=1 turn it off);
-/// Windows answers WM_GETOBJECT from now on; the browser and Android hosts turn their mirror
-/// on themselves (jfgui_a11y), jfgui_A11Y=0 keeps it off there too
+/// Windows answers WM_GETOBJECT from now on, macOS the accessibility questions of its views; the
+/// browser and Android hosts turn their mirror on themselves (jfgui_a11y), jfgui_A11Y=0 keeps it
+/// off there too
 pub fn start(app: &str) {
     if STARTED.swap(true, Ordering::AcqRel) {
         return;
@@ -887,8 +892,9 @@ pub fn start(app: &str) {
 }
 
 /// assistive technology may be listening (the UI publishes snapshots only then); on Windows it
-/// turns false again 10 s after the last question of a UI Automation client when none listens for
-/// events, and true with the next question
+/// turns false again 10 s after the last question of a UI Automation client unless a screen
+/// reader (SPI_GETSCREENREADER) or Magnifier listens for events, and true with the next question
+/// (win_uia.rs idle)
 pub fn active() -> bool {
     #[cfg(windows)]
     if ACTIVE.load(Ordering::Relaxed) {
@@ -897,13 +903,33 @@ pub fn active() -> bool {
     ACTIVE.load(Ordering::Acquire)
 }
 
-/// (bridges) assistive technology is there (true) or gone; true wakes the UI thread so that it
-/// publishes
+/// when (time_us) active() wants to be asked again although nothing happens: the platform's
+/// fallback that notices a client is gone (Windows: at most every 2 s while active); None: never.
+/// The UI's window loop waits at most until then and asks, so an idle app learns it too
+/// (UIC_A11Y)
+pub fn check_due() -> Option<u64> {
+    #[cfg(windows)]
+    if ACTIVE.load(Ordering::Relaxed) {
+        return crate::win_uia::idle_due();
+    }
+    None
+}
+
+/// (bridges) assistive technology is there (true) or gone; a change wakes the UI thread (it
+/// publishes, and the app hears of it: UIC_A11Y).  Every call is a new epoch: a host that turned
+/// its mirror on again needs the whole tree, even an unchanged one
 #[allow(dead_code)]
 pub(crate) fn set_active(on: bool) {
-    if ACTIVE.swap(on, Ordering::AcqRel) != on && on {
+    EPOCH.fetch_add(1, Ordering::AcqRel);
+    if ACTIVE.swap(on, Ordering::AcqRel) != on {
         crate::wake();
     }
+}
+
+/// a number that changes whenever a bridge turned on or off (set_active): the UI publishes a tree
+/// equal to the last one again only after it changed (an unchanged frame publishes nothing)
+pub fn epoch() -> u32 {
+    EPOCH.load(Ordering::Acquire)
 }
 
 /// the tree last published
@@ -1100,7 +1126,13 @@ use crate::win_uia as native;
 #[cfg(any(target_arch = "wasm32", target_os = "android"))]
 use crate::web::a11y_host as native;
 
-#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android")))]
+#[cfg(target_os = "macos")]
+use crate::apple::mac::a11y_mac as native;
+
+#[cfg(target_os = "ios")]
+use crate::apple::ios::a11y_ios as native;
+
+#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android", target_vendor = "apple")))]
 mod native {
     use super::{Change, Snapshot};
     use alloc::vec::Vec;

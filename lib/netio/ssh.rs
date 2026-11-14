@@ -57,7 +57,7 @@ pub const MSG_CHANNEL_REQUEST: u8 = 98;
 pub const MSG_CHANNEL_SUCCESS: u8 = 99;
 pub const MSG_CHANNEL_FAILURE: u8 = 100;
 
-const VERSION: &str = "SSH-2.0-CraftLIB_netio";
+const VERSION: &str = "SSH-2.0-JFLib_netio";
 const MAX_PACKET: usize = 256 * 1024;
 const CIPHER: &str = "chacha20-poly1305@openssh.com";
 const HOST_KEY_ALG: &str = "ssh-ed25519";

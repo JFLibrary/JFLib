@@ -1,0 +1,4 @@
+#!args --test alpha,occlusion,shadows,env --validate
+#!timeout 1200
+# a part of the validation (validate.uis): alpha, occlusion, shadows and env under VK_LAYER_KHRONOS_validation and
+# synchronization validation; a validation error fails

@@ -542,13 +542,9 @@ impl Hw<'_> {
         // ipma v0, 7-bit indices
         let s = begin(&mut b, TAG_IPMA);
         put32(&mut b, 0);
-        let mut ne = self.nitem - 2; // entries: every image item
-        if self.idexif == 0 {
-            ne += 1;
-        }
-        if self.idxmp == 0 {
-            ne += 1;
-        }
+        // entries: every image item (the items without the Exif and XMP ones; nitem - 2 + 1 + 1
+        // wrapped below 0 for a single image without metadata)
+        let ne = self.nitem - (self.idexif != 0) as u32 - (self.idxmp != 0) as u32;
         put32(&mut b, ne);
         for id in 1..=self.nitem {
             let kind = self.kinds[id as usize];

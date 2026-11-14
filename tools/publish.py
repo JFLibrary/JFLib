@@ -21,7 +21,8 @@ Before the first upload:
   - `cargo login` with a token of crates.io: cargo uses it, this script never sees it;
   - the commit to publish checked out, without changes (cargo refuses a package with uncommitted
     files), its release cut (`python build_rs.py release X.Y.Z`: CHANGELOG.md has [X.Y.Z]);
-  - the facade's copies of docs/GUIDE.md and docs/API.md current (the script checks it).
+  - the facade's copies of docs/GUIDE.md and docs/API.md current, every crate's README.md telling
+    what is new in X.Y.Z and its CHANGELOG.md cut (the script checks both).
 For the first release every name must be free: while `jflib` is not on crates.io, a name that is
 taken stops the script before anything is uploaded. After the last crate: `git tag vX.Y.Z`.
 Everything it prints also goes to build/publish.log.
@@ -147,6 +148,8 @@ def preflight(version):
         bad.append(f"CHANGELOG.md has no [{version}]: python build_rs.py release {version}")
     elif m.group(1) != datetime.date.today().isoformat():
         say(f"note: CHANGELOG.md dates [{version}] {m.group(1)}, today is {datetime.date.today()}: fix the date if it matters")
+    from tools import changelog                     # every crate's README.md tells what is new in it, its CHANGELOG.md has it
+    bad += changelog.crate_doc_problems(release=version, cut=True)
     return bad
 
 

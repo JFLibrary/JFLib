@@ -106,6 +106,11 @@ pub fn shot(t: &mut T, dev: &Device, off: &mut Off, r: &mut Renderer, s: &mut Sc
     t.res(off.read(), what)
 }
 
+/// (shot, where a loop's variable takes its name)
+fn shot_of(t: &mut T, dev: &Device, off: &mut Off, r: &mut Renderer, s: &mut Scene, what: &str) -> Option<Vec<u8>> {
+    shot(t, dev, off, r, s, what)
+}
+
 /// a drawing on the GPU in a new scene: its image
 pub fn gpu_image(t: &mut T, dev: &Device, r: &mut Renderer, off: &mut Off, d: &Drawing, cam: &Camera, what: &str) -> Option<Vec<u8>> {
     let mut s = t.res(Scene::new(r), "Scene::new")?;
@@ -811,7 +816,9 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
     let mut outv = Vec::new();
     for (src, list, o) in [(render2d::CULL_WGSL, &[("COUNT", "count"), ("SCAN", "scan"), ("WRITE", "write"), ("INSTANCES", "instances")][..], &exact), (render2d::SCATTER_WGSL, &[("SCATTER", "main")][..], &opt),
                            (render2d::STROKE_WGSL, &[("VS", "vs"), ("VS_FULL", "vs_full"), ("VS_FILL", "vs_fill")][..], &exact),
-                           (render2d::STROKE_WGSL, &[("FS", "fs"), ("FS_FULL", "fs_full"), ("FS_FILL", "fs_fill")][..], &opt)] {
+                           (render2d::STROKE_WGSL, &[("FS", "fs"), ("FS_FULL", "fs_full"), ("FS_FILL", "fs_fill")][..], &opt),
+                           (render2d::TEXT_WGSL, &[("VS_TEXT", "vs_text"), ("VS_TEXT_ALL", "vs_text_all")][..], &exact),
+                           (render2d::TEXT_WGSL, &[("FS_TEXT", "fs_text"), ("FS_TEXT_ALL", "fs_text_all")][..], &opt)] {
         match wgsl::compile(src, o) {
             Ok(o) => {
                 for (name, entry) in list {
@@ -831,7 +838,7 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
 
 fn gen_shaders(path: &str) -> i32 {
     let Some(v) = compile_shaders() else { return 1 };
-    let mut s = String::from("// written by render2dtest --gen-shaders from common.wgsl + block.wgsl + cull.wgsl, scatter.wgsl, common.wgsl + block.wgsl + stroke.wgsl + fill.wgsl (shader::BASIS, no robustness; COUNT, SCAN, WRITE, INSTANCES, VS, VS_FULL and VS_FILL exact); do not edit\n");
+    let mut s = String::from("// written by render2dtest --gen-shaders from common.wgsl + block.wgsl + textc.wgsl + cull.wgsl, scatter.wgsl, common.wgsl + block.wgsl + stroke.wgsl + fill.wgsl (+ textc.wgsl + text.wgsl: the text entries) (shader::BASIS, no robustness; COUNT, SCAN, WRITE, INSTANCES, VS, VS_FULL, VS_FILL, VS_TEXT and VS_TEXT_ALL exact); do not edit\n");
     for (name, w) in &v {
         s.push_str(&format!("pub const {name}: &[u32] = &[\n"));
         for row in w.chunks(10) {
@@ -858,9 +865,10 @@ fn shaders(t: &mut T) {
         t.ok(false, "the WGSL compiles");
         return;
     };
-    let table: [(&str, &[u32]); 11] = [("COUNT", render2d::COUNT_SPV), ("SCAN", render2d::SCAN_SPV), ("WRITE", render2d::WRITE_SPV), ("INSTANCES", render2d::INSTANCES_SPV), ("SCATTER", render2d::SCATTER_SPV),
+    let table: [(&str, &[u32]); 15] = [("COUNT", render2d::COUNT_SPV), ("SCAN", render2d::SCAN_SPV), ("WRITE", render2d::WRITE_SPV), ("INSTANCES", render2d::INSTANCES_SPV), ("SCATTER", render2d::SCATTER_SPV),
                                        ("VS", render2d::VS_SPV), ("VS_FULL", render2d::VS_FULL_SPV), ("FS", render2d::FS_SPV), ("FS_FULL", render2d::FS_FULL_SPV),
-                                       ("VS_FILL", render2d::VS_FILL_SPV), ("FS_FILL", render2d::FS_FILL_SPV)];
+                                       ("VS_FILL", render2d::VS_FILL_SPV), ("FS_FILL", render2d::FS_FILL_SPV), ("VS_TEXT", render2d::VS_TEXT_SPV), ("FS_TEXT", render2d::FS_TEXT_SPV),
+                                       ("VS_TEXT_ALL", render2d::VS_TEXT_ALL_SPV), ("FS_TEXT_ALL", render2d::FS_TEXT_ALL_SPV)];
     for (name, embedded) in table {
         let made = v.iter().find(|x| x.0 == name).map_or(&[][..], |x| &x.1[..]);
         t.ok(made == embedded, &format!("{name}: {} words embedded, as wgsl::compile makes them (if not: render2dtest --gen-shaders lib/render2d/shaders_spv.rs)", embedded.len()));
@@ -875,9 +883,16 @@ fn dump_all(dir: &str) -> i32 {
         let Some(mut r) = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new") else { return };
         for shot in shots() {
             let Some(mut off) = t.res(Off::new(dev, shot.w, shot.h), "target") else { return };
-            let img = match &shot.b {
-                Some(b) => crate::blocks::block_image(t, dev, &mut r, &mut off, b, &shot.cam, &shot.name),
-                None => gpu_image(t, dev, &mut r, &mut off, &shot.d, &shot.cam, &shot.name),
+            let img = match (&shot.b, &shot.t) {
+                (_, Some(_)) => {
+                    let Some(mut s) = t.res(Scene::new(&r), "Scene::new") else { return };
+                    if t.res(s.set_camera(&shot.cam), &shot.name).is_none() || t.res(shot.build(&mut s), &shot.name).is_none() {
+                        return;
+                    }
+                    shot_of(t, dev, &mut off, &mut r, &mut s, &shot.name)
+                }
+                (Some(b), None) => crate::blocks::block_image(t, dev, &mut r, &mut off, b, &shot.cam, &shot.name),
+                (None, None) => gpu_image(t, dev, &mut r, &mut off, &shot.d, &shot.cam, &shot.name),
             };
             let Some(img) = img else { return };
             let path = format!("{dir}/{}_{}.bgra", level.to_lowercase(), shot.name);
@@ -904,6 +919,15 @@ pub fn run() -> i32 {
     if let Some(dir) = plat::arg_value("--dump") {
         return dump_all(&dir);
     }
+    if let Some(dir) = plat::arg_value("--text-shot") {
+        return crate::textgpu::text_shot(&dir);
+    }
+    if let Some(dir) = plat::arg_value("--text-dump") {
+        return crate::textcpu::text_dump(&dir);
+    }
+    if args.iter().any(|a| a == "--text-error") {
+        return crate::textcpu::text_error();
+    }
     if args.iter().any(|a| a == "--demo") {
         return crate::demo::launch();
     }
@@ -915,10 +939,11 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 22] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
+    let list: [(&str, fn(&mut T)); 24] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
                                           ("arcs", arcs), ("dashes", dashes), ("curves", curves), ("fills", fills), ("hatches", hatches), ("layers", layers),
                                           ("changes", crate::scenes::changes), ("churn", crate::scenes::churn), ("visibility", crate::scenes::visibility), ("coords", crate::scenes::coords),
-                                          ("phase", crate::scenes::phase), ("blocks", crate::blocks::blocks), ("transparency", crate::blocks::transparency), ("levels", levels), ("errors", errors)];
+                                          ("phase", crate::scenes::phase), ("blocks", crate::blocks::blocks), ("transparency", crate::blocks::transparency), ("levels", levels), ("errors", errors),
+                                          ("text", crate::textgpu::text), ("textdeep", crate::textgpu::textdeep)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {

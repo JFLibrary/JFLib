@@ -902,7 +902,8 @@ impl Ft {
             me.t.draw(&mut dc, &mut sf, 5, 22, text.as_bytes());
             dc.end();
             me.t.set_subpixel(SUBPIXEL_NONE);
-            sf.px.chunks_exact(4).map(|p| p[0] as u32 + p[1] as u32 + p[2] as u32 - 3 * 0x20).sum()
+            // (the row padding past 220 pixels stays 0: it adds nothing instead of going below 0)
+            sf.px.chunks_exact(4).map(|p| (p[0] as u32 + p[1] as u32 + p[2] as u32).saturating_sub(3 * 0x20)).sum()
         };
         let (gl, rl) = (light(self, SUBPIXEL_NONE), light(self, SUBPIXEL_RGB));
         self.st_check(rl * 10 > gl * 9 && rl * 10 < gl * 11, &format!("selftest: subpixel white ink {rl} vs greyscale {gl}\n"));
@@ -948,6 +949,35 @@ impl Ft {
         let a = self.st_draw(FONT_REG, sz, SUBPIXEL_NONE, FMT_XRGB, black, "Silben");
         let b = self.st_draw(FONT_REG, sz, SUBPIXEL_NONE, FMT_XRGB, black, "Sil\u{AD}ben");
         self.st_check(a.px == b.px, "selftest: a soft hyphen was drawn\n");
+    }
+
+    // fallback.rs on macOS and iOS: the system's font folders (no jfgui_FONTDIRS) give a font for
+    // Han, kana, Hangul, Thai, Hebrew, Arabic and Devanagari; elsewhere nothing to check
+    #[cfg(not(target_vendor = "apple"))]
+    fn st_fallback_apple(&mut self) {}
+
+    #[cfg(target_vendor = "apple")]
+    fn st_fallback_apple(&mut self) {
+        let (dirs, fams) = (plat::env("jfgui_FONTDIRS"), plat::env("jfgui_FALLBACK_FONTS"));
+        plat::setenv("jfgui_FONTDIRS", None);
+        plat::setenv("jfgui_FALLBACK_FONTS", None);
+        let st = &style::STYLE;
+        let mut t = Text::new(st.fonts(), st.font_names());
+        t.set_system_fallback(true);
+        for cp in [0x4E2Du32, 0x3042, 0xAC00, 0x0E01, 0x05D0, 0x0627, 0x0905] {
+            if t.has(FONT_REG, cp) {
+                continue;
+            }
+            let fb = t.fallback_for(cp);
+            let ok = fb.is_some_and(|f| t.has(f, cp));
+            self.st_check(ok, &format!("selftest: Apple system fallback for U+{cp:04X} {fb:?}\n"));
+        }
+        // the language's forms: Japanese takes Hiragino Sans for Han characters
+        t.set_fallback_lang("ja");
+        let ja = t.fallback_for(0x4E2D);
+        self.st_check(ja.is_some_and(|f| t.has(f, 0x4E2D)), &format!("selftest: Apple fallback for U+4E2D in ja {ja:?}\n"));
+        plat::setenv("jfgui_FALLBACK_FONTS", fams.as_deref());
+        plat::setenv("jfgui_FONTDIRS", dirs.as_deref());
     }
 
     // fallback.rs: system fallback from jfgui_FONTDIRS, the app's chain, never-fallback marks
@@ -1598,6 +1628,8 @@ impl Ft {
         self.st_fontconf();
         // ---- fallback: a character the UI font lacks comes from DejaVu Serif (lib/doc_view)
         self.st_fallback();
+        // ---- macOS / iOS: the system's own fonts for CJK and other scripts (fallback.rs FAMILIES)
+        self.st_fallback_apple();
         // ---- subpixel smoothing (text/lcd.rs), the soft hyphen
         self.st_subpixel();
         // ---- variable fonts (tests/varfont)

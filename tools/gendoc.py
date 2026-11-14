@@ -99,7 +99,7 @@ CRATES = [
     ("img_all", "registration of every codec", "full"),
     ("img_png", "PNG", "codec"),
     ("img_jpeg", "JPEG", "codec"),
-    ("img_bmp", "BMP, ICO, CUR", "codec"),
+    ("img_bmp", "BMP", "codec"),
     ("img_gif", "GIF", "codec"),
     ("img_tga", "TGA", "codec"),
     ("img_tiff", "TIFF", "codec"),
@@ -118,23 +118,24 @@ CRATES = [
      "full"),                                                                              # svg
     ("fx", "effects and adjustments", "full"),
     ("gpu", "the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, "
-     "swapchains (Vulkan on Windows)", "full"),
+     "swapchains (Vulkan, Metal, WebGPU)", "full"),
     ("render3d", "the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), "
      "visibility on the GPU, glTF scenes on the GPU", "full"),
     ("render2d", "the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills "
-     "and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, strokes with analytic "
-     "coverage, f64 coordinates relative to the camera, visibility on the GPU", "full"),
+     "and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of "
+     "multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on "
+     "the GPU", "full"),
     ("gltf", "glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU",
      "full"),
     ("shader", "SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders",
      "full"),
     ("wgsl", "the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the "
      "SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL", "full"),
-    ("plat", "the platform layer: process, files, threads, windows (Windows and Linux)", "full"),
+    ("plat", "the platform layer: windows, input, files, threads, network, processes, desktop services", "full"),
     ("base", "UTF-8, command line, settings files, numbers and text", "full"),
     ("datetime", "timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules", "full"),
     ("crypto", "hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)", "full"),
-    ("compress", "LZ4 block and frame, xxHash32, codec ids", "full"),
+    ("compress", "LZ4 block and frame, Zstandard, xxHash32 and xxHash64, codec ids", "full"),
     ("datastore", "an embedded journal database: JSON collections, transactions, snapshots, crash recovery",
      "full"),
     ("netio", "HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS", "full"),
@@ -1059,7 +1060,7 @@ def generate():
         "A name in a description such as `ui_box_begin` or `[img_save]` is the assembly routine the "
         "function was ported from; the algorithm specs in `legacy/ASMLIB/docs/modules/*.md` describe "
         "both versions.", "",
-        "Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, \"SIMD kernels\"), "
+        "Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`), "
         "the style crates (docs/STYLES.md), plugins (`plugins/README.md`).", "")
     toc_at = len(w.md) + 2
     w.heading(2, "Contents")

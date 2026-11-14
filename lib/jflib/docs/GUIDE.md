@@ -32,7 +32,7 @@ The examples below were compiled and run against the library (R13); identifiers 
   see it: only the `sandbox` line confines it, as far as the operating system enforces the
   manifest ([PERMISSIONS.md](PERMISSIONS.md), "OS sandbox"). The rules below are this
   repository's; an app of your own may follow them as it likes.
-* **`unsafe` only in `rt`, `simd`, `plat` and `plugin`.** Every other library and style crate
+* **`unsafe` only in `rt`, `simd`, `plat` and `gpu`.** Every other library and style crate
   has `#![forbid(unsafe_code)]`; apps have `#![deny(unsafe_code)]`, whose only exception is
   the `ui::main!` entry point. The safe interfaces of those four crates are all an app needs.
 * **No system libraries** beyond kernel32 / user32 / gdi32 on Windows (other DLLs only through
@@ -77,7 +77,7 @@ cargo jflib new --std notes  # the same template with std
 
 ```toml
 [dependencies]
-jflib = { features = ["std"], version = "0.1" }
+jflib = { features = ["std"], version = "0.2" }
 ```
 
 The program then has std's entry point, panic handler and allocator instead of JFLib's own; a
@@ -111,7 +111,7 @@ of its own and catches a page's panic, say. Both profiles then say `panic = "unw
 
 ```toml
 [dependencies]
-jflib = { features = ["unwind"], version = "0.1" }
+jflib = { features = ["unwind"], version = "0.2" }
 
 [profile.dev]
 panic = "unwind"      # the other lines as in the template
@@ -373,7 +373,7 @@ title bar follows GNOME's settings like GTK (section 7, "Title bar").
   | `UIC_EXIT` | the window loop ends (only after a real window ran: save settings here) |
   | `UIC_ACTIVE` | `arg` 1: one of the app's windows got the keyboard, 0: none has it (pause animations, poll less) |
   | `UIC_SUSPEND` | `arg` 1: the system goes to sleep (save, close connections), 2: the app went to the background -- the browser hid the tab (`visibilitychange`), Android stopped the activity (`onStop`); the app may be ended without another word, so save here too --, 0: it woke up / is visible again; to keep it awake see `plat::inhibit` (section 21) |
-  | `UIC_SESSION_END` | logout, shutdown or SIGTERM: save now; `UIC_EXIT` and the end follow |
+  | `UIC_SESSION_END` | logout, shutdown or SIGTERM: save now; `UIC_EXIT` and the end follow. Windows: only a confirmed end (`WM_ENDSESSION`; a logout another app cancels sends nothing), taken while the message is handled -- Windows may end the process right after it |
   | `UIC_SETTINGS` | `arg` = `plat::SET_THEME \| SET_LOCALE \| SET_CONTRAST \| SET_FONTS \| SET_MONITORS`: system settings changed; a system theme and the format (`i18n::locale()`) are already updated; `SET_MONITORS`: a monitor came, went, moved or changed its scale or work area (`ui.monitors()`, section 21) |
   | `UIC_HOTKEY`, `UIC_HOTKEY_LOST` | `arg` = id: a global shortcut was pressed anywhere / the desktop dropped it (`ui.hotkey_error(id)`; section 21) |
   | `UIC_PICK` | `arg` 1: the user picked a colour on the screen (`ui.picked_color()`), 0: cancelled or failed (`ui.screen_error()`) |
@@ -587,7 +587,8 @@ let bad = ui.spell_errors(ID_BODY);           // misspelled byte ranges, as last
 if let Some(sp) = ui.speller() { sp.add("JFLib"); } // spell::Speller: check, suggest, add, ignore
 ```
 
-* The checker (crate `spell`): Windows' own (`ISpellChecker`) when it knows the language, else
+* The checker (crate `spell`): the system's own when it knows the language (Windows'
+  `ISpellChecker`, macOS' `NSSpellChecker` with `~/Library/Spelling`, iOS' `UITextChecker`), else
   Hunspell dictionaries the library reads itself -- Linux `/usr/share/hunspell`, `myspell`,
   `~/.local/share/hunspell`, `DICPATH`; then `config://hunspell` and the app's own in
   `apps/NAME/assets/hunspell` (`de_DE.aff` + `de_DE.dic`; Web and Android only these).
@@ -1242,8 +1243,9 @@ ui.dialog_end(); // always
   path, cap, exts)` -> `EV_ACT` when a file (`FD_FOLDER`: a folder) was chosen; `path` then
   holds an absolute path with `/` separators (Windows accepts them). It shows the system dialog
   (Explorer on Windows, the desktop's file chooser through xdg-desktop-portal on Linux) and
-  falls back to the library's own dialog when there is none, in headless runs, or with
-  `jfgui_FILEDLG=builtin`; `FD_FOLDER` uses the own dialog on Windows (folders only, the
+  falls back to the library's own dialog when there is none, in headless runs, with
+  `FD_BUILTIN` (the app's choice, below) or with `jfgui_FILEDLG=builtin` (every dialog of the
+  run); `FD_FOLDER` uses the own dialog on Windows (folders only, the
   selected or shown folder is the answer). On Android it is the system's picker (Storage
   Access Framework): `path` becomes a `content://` name ([VFS.md](VFS.md), "Android"),
   readable and writable with the ordinary file functions and kept across restarts; show the
@@ -1286,6 +1288,18 @@ ui.dialog_end(); // always
   }
   ```
 
+  **The library's own dialog by choice** (`FD_BUILTIN`): the app's dialog looks and behaves the
+  same on every system and in every style (a browser's "Save as", a dialog the app's tests drive
+  in real windows), where `jfgui_FILEDLG=builtin` only switches a whole run. It lists what
+  `plat`'s file functions see: on Windows, Linux and macOS the file system, in the browser and on
+  Android the app's own folders (not the system's documents or the user's files outside them).
+  The other flags keep their meaning (`apps/viewtest/tests/builtin.uis`):
+
+  ```rust
+  let flags = FD_SAVE | FD_BUILTIN | 1 << FD_EXT_SHIFT; // the own dialog, the second type selected
+  if ui.filedlg(ID_FILEDLG, flags, &open, &mut self.path, 1040, &EXTS) & EV_ACT != 0 { /* save */ }
+  ```
+
 * **Drag and drop** ([`ui/dnd.rs`](../lib/ui/dnd.rs), [`plat/dnd.rs`](../lib/plat/dnd.rs)):
   what a drag carries is a `DragData` (`files`, `text`, `urls`, `html`, `image` = a PNG file,
   `bmp`, the app's own `app` kind `DT_USER0 << k` with `bytes`, a `label`, `effects`); its kinds
@@ -1317,7 +1331,8 @@ ui.dialog_end(); // always
   * Inside the app a widget's drag follows the pointer with a label (the style's tooltip), the
     drop target under it is highlighted (`StyleBasic::drop_highlight`, by default an accent
     frame), Esc cancels, the release drops onto the innermost matching target of the topmost
-    layer (a plain drag moves when the source allows it, Ctrl copies, Shift moves). A target
+    layer (a plain drag moves when the source allows it, Ctrl copies, Shift moves, Ctrl+Shift
+    links). A target
     reports `DS_HOVER` while a matching drag is over it and `DS_DROP` once, in the first pass
     after the drop; the source reports `DS_ACTIVE` and `DS_END` once. A drop changes what this
     pass already drew: apply it after the widgets (end of `frame`) and call `ui.repass()`.
@@ -1335,6 +1350,89 @@ ui.dialog_end(); // always
     as before) and it arrives as `UIC_DROP` with `drop_list()` / `drop_data()`. Files are never
     moved (their source would delete them): Shift gives a copy. Dropped files may be read and
     written (`fs.user`).
+  * The effect per target: `ui.drop_effect_set(effects)` right after `drop_target` says which of
+    `DE_COPY | DE_MOVE | DE_LINK` that target takes in this pass (default all). The platform
+    answers the source with one of them (the modifier keys choose, else copy, move, link), so
+    the system's pointer shows it: `IDropTarget::DragOver`'s effect on Windows, the XdndStatus
+    action on X11, `wl_data_offer.set_actions` on Wayland, the drag operation on macOS. `0`
+    refuses the drag there: no drop, no highlight, the pointer shows "no". A canvas that takes
+    drops only in some places (a web page's drop zones, as `dropEffect`) sets it every pass while
+    `DS_HOVER` holds, for the point of `drag_over_px()`; the answers follow the passes, one pass
+    late while the drag moves. The app's own drags inside the window pick from them too. A drop
+    keeps the effect the platform picked when the target takes it, else it gets the first of the
+    target's effects that the source allows (copy, move, link; a scripted drop, or one that raced
+    the pass); with none in common it is refused as the platform refuses such a drag over the
+    target: no `DS_DROP`, no `UIC_DROP`, the source is answered "not taken". `ui.drop_effect()`
+    is always an effect the source allows.
+
+    ```rust
+    if ui.drop_target(ID_PAGE, DT_FILES | DT_URL | DT_TEXT) == DS_HOVER {
+        let (kinds, x, y) = ui.drag_over_px();
+        ui.drop_effect_set(self.page_effect_at(kinds, x, y)); // e.g. DE_COPY, or 0: not here
+    }
+    ```
+  * What the source allows: `ui.drag_allowed()` gives the `DE_*` effects of the drag over the
+    window as its source offers them -- Windows the effects of its `DoDragDrop`, X11 the source's
+    `XdndActionList` with the action it asks for (without a list: all), Wayland its
+    `source_actions` (copy and move; Wayland has no link), macOS the drag's operation mask (AppKit
+    narrows it by the modifier keys), the app's own drag its `DragData::allowed()`; `DE_ALL` where
+    the platform does not say. They are forgotten when the drag leaves the window or ends. A drop
+    carries its own (`plat::drop_allowed()`): Windows the effects of `IDropTarget::Drop`, X11 the
+    list with the last `XdndPosition`'s action, Wayland the offer's `source_actions`, macOS the
+    operation mask of `performDragOperation:`; without them (the browser's and Android's drops)
+    those of the hover before it, else `DE_ALL`. `drag_allowed()` says them from the drop's
+    `E_DROP` to the end of the passes it starts (`DS_DROP`, `App::command`'s `UIC_DROP`) and, after
+    `ui.drop_defer()`, until its answer went (`drop_finish`, `DROP_DEFER_MS`, a newer drop) -- in
+    every window over which no drag is; `drop_finish` answers within them. 0 otherwise: no drag
+    over the window, no drop in its passes or waiting. A page that maps a web page's
+    `effectAllowed` and `dropEffect` picks from it for `drop_effect_set` and hands it on with the
+    drop.
+  * **0 means "not said"** wherever the effects a source allows are given: `DragData::effects` of
+    the app's own drag (`drag_set`, `drag_out`), the effects of another program's hover and drop,
+    the `allowed` of `plat::drag_query` and `plat::drag_decide`. Every effect is allowed then
+    (`DE_ALL`): inside the app a plain drag moves and Ctrl+Shift links, a target that only links
+    takes it, a drag out offers linking to other programs too. A source that names effects limits
+    its drag to them (`d.effects = DE_MOVE | DE_COPY` above). Files are never moved, whatever the
+    source says. (Up to 0.2, a 0 meant copy and move everywhere but in `drag_allowed()` and the
+    effects of a drop.)
+  * The answer after the drop: by default the source learns the effect the drop was delivered
+    with after its passes. A target that learns later whether it took the drop (a web page's drop
+    handler in another process) calls `ui.drop_defer()` in the pass of the drop (`DS_DROP`, or
+    in `App::command`'s `UIC_DROP`) and answers with `ui.drop_finish(effect)` when it knows: the
+    effect it took the drop with, 0 = not taken (an effect the source does not allow becomes the
+    first it does; `drag_allowed()` says them until then). Without `drop_finish` the answer goes
+    after `DROP_DEFER_MS` (3 s) as the drop was delivered, with a `UIWARN`; so does a deferred drop
+    the next drop overtakes, and one that waits when the app ends. `drop_defer()` returns false
+    where the answer went at the drop already; then `drop_finish` does nothing. What the source
+    sees:
+
+    | Platform | deferred (`drop_defer` true) | taken | not taken |
+    |---|---|---|---|
+    | X11 | always | `XdndFinished` accepted, the effect's action | `XdndFinished` not accepted, no action (an XDND 5 source; older ones see only that it ended) |
+    | Wayland | always | `wl_data_offer.finish`: `dnd_finished` with the action negotiated before the drop (it cannot change after it) | the offer destroyed without `finish` (the protocol has no other answer after a drop; Weston then sends the source `cancelled`) |
+    | Windows | only a source whose data object offers `IDataObjectAsyncCapability` in async mode | `EndOperation(S_OK, effect)` | `EndOperation(E_ABORT, DROPEFFECT_NONE)` |
+    | Windows, other sources; macOS; the browser (file drops) | never: `IDropTarget::Drop`, `performDragOperation:` and the page's `drop` event answer at once | the effect at the drop | (as taken: the source learns nothing more) |
+    | the app's own drag onto its own target (every platform, headless too) | always | `DS_ACTIVE` until the answer, then `DS_END` with `drag_effect()` the effect, `UIC_DRAG_END` | `DS_END`, `drag_effect()` 0 |
+
+    The app's own drags inside its window go the same way. Without `drop_defer` the source's
+    `DS_END` (and `UIC_DRAG_END`) comes with the effect the drop was delivered with, in passes
+    right after the drop's: no longer in the same pass as the target's `DS_DROP`, still before the
+    frame is drawn. With `drop_defer` it comes after `drop_finish` with that effect. While the
+    answer waits, `drag_allowed()` says the source's effects and `dragging()` is false; a new drag
+    of the app overtakes it (answered as delivered), as a newer drop does
+    (`apps/dndtest/tests/own_later.uis`).
+
+    ```rust
+    match ui.drop_target(ID_PAGE, DT_FILES | DT_URL | DT_TEXT) {
+        DS_DROP => {
+            let deferred = ui.drop_defer();          // the page decides later
+            self.engine.drop(ui.drop_data().clone(), deferred);
+        }
+        _ => {}
+    }
+    // later, when the engine says DropDone { taken, effect }:
+    ui.drop_finish(if taken { effect } else { 0 });
+    ```
   * Positions: `drop_pos()` and `drag_over()` are DIP of the window, rounded; at 150 % three
     pixels share two DIP. A canvas that draws at the display's resolution (a web page) takes
     `drop_pos_px()` / `drag_over_px()`: px of the window like `last_rect`, so `(x - inp.rect[0],
@@ -1342,10 +1440,18 @@ ui.dialog_end(); // always
   * Mirrored windows (RTL): targets and positions stay logical, as every pointer event.
   * Tests: `drag S1 S2` and `down` / `move` / `key esc` / `up` for widget drags; `dragover`,
     `dragleave` and `drop X Y text "s" html "s" url U image F files F...` for other programs;
+    `dragover expect copy|move|link|none [ctrl] [shift]` for what the platform would answer the
+    drag that hovers (the target's `drop_effect_set`); `dragover X Y text copy link` sets the
+    effects the source allows (`drop ... allows copy link`: the effects a drop gives itself, as
+    Windows' `Drop` does; without, those of the `dragover` before it, else all); `drop expect
+    copy|move|link|none|pending` for the answer the source of the last drop got (`drop ... sync`:
+    a platform that answers at the drop);
     `dragout expect ...` / `dragout end move` for a drag that left the window (headless, the
-    platform is not involved); see `apps/dndtest`. `plattest --test dnd` checks the shared part
-    and Windows' OLE objects without a user, `tools/platshared/dnd_x11.py` XDND both ways under
-    WSLg (`--app`: also with the real dndtest window). By hand only: dragging with a real mouse to and from Explorer, a browser, a file
+    platform is not involved); see `apps/dndtest` (`tests/later.uis`: the answer after the drop).
+    `plattest --test dnd` checks the shared part and Windows' OLE objects without a user (also the
+    answer after the drop with a data object in async mode), `tools/platshared/dnd_x11.py` XDND
+    both ways under WSLg (also `XdndActionList` and `XdndFinished` after `drop_finish`; `--app`:
+    with the real dndtest window). By hand only: dragging with a real mouse to and from Explorer, a browser, a file
     manager, and everything on Wayland (a compositor gives the drag to the client of a real
     button press).
 
@@ -1507,7 +1613,7 @@ ui.dialog_end(); // always
 * **Images** (`img_core::io`): the runtime registers PNG, JPEG, BMP, GIF and SVG (`.svg`,
   `.svgz`: drawn at their intrinsic size, section 31) at start-up and connects the file
   functions. For every other format call `img_all::use_all_codecs()` once in `App::init`
-  (TIFF, TGA, WebP, AVIF, HEIC, JPEG XL, JPEG XR, DDS, PDN).
+  (TIFF, TGA, WebP, AVIF, HEIC, JPEG XL, JPEG XR, DDS, PDN, PSD).
 
   ```rust
   match img_core::io::load_ex(path, None, None) {   // any registered format -> FMT_PARGB
@@ -1545,8 +1651,12 @@ above) and, with `AF_LOG_FILE` in the app flags, to `logs://APP.log` (INFO and a
 1 MiB it moves to `.1`, three older files are kept). `logs://` is the app's log folder:
 `%LOCALAPPDATA%/APP/Logs` on Windows, `$XDG_STATE_HOME/APP` (`~/.local/state/APP`) on Linux. `jfgui_LOG=error|warn|info|debug|trace`
 sets the levels, `jfgui_LOG_FILE=PATH|1|0` the file. A crash or panic prints the ring's last
-lines and marks the file before the app's crash hook runs; `plat::log_recent(max)` gives the
-newest lines for an own report. `ui.warn` lines are in the log too. The runtime logs start,
+lines and marks the file before the app's crash hook runs, without allocating or waiting: a
+non-blocking stderr that takes nothing for half a second is given up, the crash line goes to
+an OS file only (not to a mount's stream) and does not rotate it. `log_file` refuses a file of
+a mount without streams or OS files (its lines would arrive only when the log stops).
+`plat::log_recent(max)` gives
+the newest lines for an own report. `ui.warn` lines are in the log too. The runtime logs start,
 exit, sleep, session end and settings changes.
 
 **Printing** (`plat::print`, `plat::PrintDoc`): `plat::print(&mut job)` prints one image on one
@@ -1725,7 +1835,8 @@ impl App for Copier {
   cancel token, the chunk size); `Reader::open` / `read(max)` and `Writer::create` / `write` /
   `commit` chunk by chunk. Writes are atomic like `plat::write_file` (`plat::AtomicFile`, see
   [VFS.md](VFS.md)): cancelled, failed or dropped, the sibling is removed and the old file
-  stays. Names, mounts and permissions are those of the blocking calls.
+  stays. A `Writer::write` whose future is dropped before it ends spoils the writer (its job
+  may still write): later writes and the commit fail. Names, mounts and permissions are those of the blocking calls.
   `netio::Client::request_async` and `download(url, headers, name, &ctl)` do the same for HTTP.
 * Test scripts stay deterministic: `sync` waits until no task work is in flight (pool jobs and
   the wake-ups they send), `wait MS` moves the task clock (`sleep` follows the virtual clock in
@@ -1781,8 +1892,10 @@ if (desc.render)(&args, &mut dst) == 0 {
 ## 11. Styles, theme, fonts
 
 * The look comes from one style crate linked at build time: `winui` (default), `classic`,
-  `macos`, `kde`. `apps/NAME/STYLE` sets an app's style, `build_rs.py ... --style S` overrides
-  it. Only the linked style is in the executable. [STYLES.md](STYLES.md) has the model and how
+  `macos`, `kde`, `netlab`. In an app of your own, `jflib::style` is the style the environment
+  variable `JFLIB_STYLE` names at build time (`winui` without it; §2), and `cargo jflib package
+  --styles` builds the packages of several; in this repository `apps/NAME/STYLE` sets an app's
+  style and `build_rs.py ... --style S` overrides it. Only the linked style is in the executable. [STYLES.md](STYLES.md) has the model and how
   to write one. Your own colours, corners, spacing, control heights and type without a style
   crate: an app theme; several styles in one app, switched at run time: §34.
 * Colours of your own drawing come from the theme tokens: `ui.color(T_TEXT)`, `T_ACCENT`,
@@ -1994,8 +2107,8 @@ in DIP):
 | `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... (every key a pass of its own, as the platform delivers them) |
 | `keydown CHORD [scan N] [left\|right\|numpad]`, `keyup CHORD ...` | a key down and held (shift / ctrl / alt stay held for the following events; down again: an auto-repeat) and up again, with a scancode and location for `ui.key_event_take` |
 | `keys [N] CHORD...` | the chords N times over, queued for ONE pass of the window with the keyboard (more keys than frames, as a tool window hands them on) |
-| `type "text"` | typed text (`"\n"` presses Enter) |
-| `commit "text" [N]` | an input method commits the text (N times over: one long commit, as the platform queues it) |
+| `type "text"` | typed text (`"\n"` presses Enter), a character per event; the whole quoted string, as long as a script line (16 KiB) |
+| `commit "text" [N]` | an input method commits the text (N times over: one long commit, as the platform queues it); the text as long as a script line |
 | `preedit "text" [CURSOR]` | an input method's composition (`ui.ime_preedit`; CURSOR a byte offset, default the end; `""` ends it) |
 | `focus S` | keyboard focus to a widget (focus ring shown) |
 | `cmd ID [ARG]` | run a command as if a menu row was chosen |
@@ -2018,8 +2131,10 @@ in DIP):
 | `expect scrollcopy [N]\|none` | at least N (default 1) / no rendered frames moved pixels by a scroll copy since the last check (§5; frames checked by `--verify-dirty` copy whenever they can, `jfgui_DEBUG=1` prints each copy) |
 | `expect sound KIND\|none` | the last sound `ui.beep` / `ui.dialog_sound` asked for since the last check (`default`, `information`, `warning`, `error`, `question`, `notify`; headless runs play nothing, §33) |
 | `drop X Y FILE...` | files dropped at (X, Y) of the scoped window (onto a drop target, else `UIC_DROP`) |
-| `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link]`, `drop X Y self` | other content dropped there; `self`: the app's own drag that left the window comes back |
-| `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
+| `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link] [sync] [allows copy\|move\|link...]`, `drop X Y self` | other content dropped there (`copy`/`move`/`link`: the effect the platform delivers); `self`: the app's own drag that left the window comes back; `sync`: the platform answers the source at the drop, as macOS does (`ui.drop_defer()` says false); `allows`: the effects the source allows, given with the drop as Windows' `Drop` does (without: those of the `dragover` before it, else all; `ui.drag_allowed()` in the drop's pass) |
+| `drop expect copy\|move\|link\|none\|pending` | what the source of the last drop was answered (`none`: not taken; the effect it was delivered with, or `ui.drop_finish`'s), `pending`: the answer waits (`ui.drop_defer`, §7) |
+| `dragover X Y [files] [text] [url] [html] [image] [copy\|move\|link]`, `dragleave` | another program's drag hovers there, its source allowing those effects (default copy and move: `ui.drag_allowed()`) / leaves |
+| `dragover expect copy\|move\|link\|none [ctrl] [shift]` | what the platform would answer that drag now (the target's `drop_effect_set`, the system's pointer) |
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
 | `system focus in\|out`, `system suspend\|resume`, `system background\|foreground`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|other\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...; background / foreground: a hidden tab, Android's `onStop` / `onStart`) |
 | `system browser default\|other\|unknown` | (E13) what `ui.default_browser()` answers from here (headless runs never ask the system; at first `other`, section 21); then the app loses the keyboard and gets it back as after the system's settings (`UIC_ACTIVE` 0 and 1; only 1 when it was not active), so an app that keeps the status reads it again |
@@ -2040,6 +2155,10 @@ in DIP):
 `text:"Klicks: 2"`), `X,Y` (a point in DIP). A label must match exactly one widget (plain text is
 ignored when a control with the same label exists; with matches in several windows the topmost
 window wins, then the topmost layer, so an ambiguous label resolves to the dialog or popup).
+A label is the record's whole text: a wrapped paragraph (a web page's) is one record and its
+selector the whole paragraph, as `dump` shows it (a script line holds up to 16 KiB, and so do the
+quoted strings of `type` and `commit`; `dump` writes up to 64 KiB of a label;
+`apps/viewtest/tests/longtext.uis`).
 Failed expectations print `FAIL line N: <command> -> <detail>` and the script goes on.
 
 ```
@@ -2056,6 +2175,32 @@ shot build/template.png
   the script (pass them yourself when you run it by hand). A line `#!timeout 1800` among the
   first five sets the seconds it may take there (600 otherwise); a script that takes longer
   counts as failed and the others still run.
+* **Lines for some systems**: `only OS...: COMMAND` runs the command only on the systems it
+  names, `!OS` on every system but that one (`only windows: key ctrl+q`, `only !macos: expect
+  "Beenden" exists`, `only linux macos: ...`; blanks or commas between the names). The names are
+  those of `cargo jflib test`'s `#!only` line, which skips a whole script: `windows`, `linux`,
+  `macos`, `ios`, `android`, `wasm32`. The app decides it where the script runs, so it works
+  under `build_rs.py test`, `cargo jflib test` and by hand alike; an unknown name or a line
+  without a command is a parse error (exit code 2). `apps/viewtest/tests/onlyos.uis`.
+* `build_rs.py test` runs the scripts side by side: `--test-jobs N` at a time (default half the
+  logical CPUs, or `jfgui_TEST_JOBS`; `--test-jobs 1` runs them one after the other in the old
+  order), Windows and Linux together. An app's scripts keep their order and run one at a time,
+  never while the same app runs on the other target (they share `build/`). Among a script's first
+  five lines, `#!lock desktop` (real windows: `gpu on`, a swapchain, a window on the screen; one
+  such script at a time per target) or `#!lock audio` (the real output device; one at a time on
+  both targets, WSLg plays into Windows' mix) keeps it from running beside another script with
+  the same lock; `#!serial WHY` runs it alone after the others (for what fails under their load,
+  such as a time limit in ms; it leaves its app's order). `apps/NAME/tests/jobs.txt` holds the
+  same for every script of an app (`lock desktop`, `serial WHY`), and `independent` for an app
+  whose scripts share nothing: they run beside each other too, the same script on the two targets
+  one after the other (its pictures); `independent targets` when they write no files at all (the
+  GPU tests' `--test` runs). The checks after the scripts (`gendoc`, `test_devkit`, `pkg_check`,
+  `i18n_check`, `site`) run beside them, and each job starts its Linux programs through one WSL
+  process of its own (`linux_task.py serve`). At the end the suite prints the times of the build, the
+  scripts and the checks and the slowest scripts and apps; `build/test-report.json` keeps every
+  result with its start and end (which scripts ran together) and the end of a failed script's
+  output, `build/test-times.json` each script's last duration, from which the next run starts the
+  longest work first. A new script that opens a real window or plays sound needs its lock.
 * `--dump` / `dump` print the widget tree (kind, id, label, rect in DIP, states, value): use it
   to find ids and positions without looking at pixels. Prefer `#id` and labels over coordinates.
 * Popups may leave their window (§6): their dump rectangles can be negative or beyond the
@@ -2088,9 +2233,10 @@ same.
 In this repository:
 
 ```sh
-python build_rs.py test --quick     # lint, build every app (both targets), every .uis script
+python build_rs.py test --quick     # lint, build every app (both targets), every .uis script (side by side)
 python build_rs.py test             # ... plus parity with the assembly reference
 python build_rs.py test NAME        # one app: build it, run its tests/*.uis
+python build_rs.py test --quick --test-jobs 1   # the scripts one after the other (section 12)
 python build_rs.py check            # the rules lint, then Clippy over the library (below)
 python build_rs.py check --quick    # the rules lint alone
 python tools/gendoc.py --check      # docs/API.md matches the doc comments
@@ -2128,7 +2274,12 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   whole frame that knows where it is stale (the segment of the last put first), then
   ShmPutImage of the rectangles; Expose reads the segment of the last put. Wayland: into a free
   wl_shm buffer that waits for its commit (the frame callback). Only with every segment / buffer
-  busy does the damage wait in a staging image. Browser and Android: the B, G, R, x of the
+  busy does the damage wait in a staging image. On these three a copy from 1 MB on runs in row
+  bands on the worker pool, from 12 MB on (a 4K frame, 32 MB) with streaming stores past the
+  caches (`lib/plat/present_copy.rs`, the thresholds of `gfx::COPY_PAR_MIN` / `COPY_STREAM_MIN`);
+  smaller ones stay plain row copies on the UI thread. `plattest --test present-bench [--size WxH]`
+  measures a 4K frame's presents in a real window (the whole frame, a caret, a line of text, 20
+  blocks, a band) and the copy alone. Browser and Android: the B, G, R, x of the
   frame becomes the window's R, G, B, A copy while it is copied in; one window over the whole
   canvas without popups is the canvas itself (no composition), and the host copies rows into
   one buffer per frame (the page's ImageData, Android's Bitmap). Pixels outside the rectangles
@@ -2160,7 +2311,27 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   control whose segments take `id + 1 ..`). Scripts (and `jfgui_DEBUG=1`) print a `UIWARN`
   for an id two widgets of one pass share, with both positions; `expect_nowarn` fails on it.
   Ids are per window: windows may use the same ids (a text box of one id in two app windows
-  keeps its own caret, selection and undo in each).
+  keeps its own caret, selection and undo in each). So do the state slots (`ui.slot(id)`): a
+  box of one id measures in every window by itself and a view of one id keeps its own scroll
+  position, so two windows built by the same code (a browser's windows with their own title
+  bars, a dialog box of a fixed id) settle each in its own size; a window's slots go with its
+  state (`window_destroy`), and a panel that floats out into a tool window starts there with
+  fresh ones (its scroll positions too). The same holds for the state the widget families keep
+  by id: the code and rich-text editors' views (scroll position, find bar, completion list),
+  the colour pickers' fields, the font pickers' lists, the spell checks of `TB_SPELL` boxes and
+  their suggestion menus, the charts' drawings and line-chart cursors, the dock and window
+  areas (`dock_begin`, `desk_begin`), the file dialog (`filedlg`), the canvases of
+  `canvas_damage` and the menu key's target -- a browser's windows built by the same code with
+  the same ids each keep their own (`apps/viewtest/tests/perwindow.uis`,
+  `apps/spelltest/tests/windows.uis`). Calls that name an id address the window being built
+  when it has such a widget; else -- outside the passes (`App::command`, a task), or in a window
+  without one -- `code_status`, `code_events`, `code_diag`, `code_popup_item` and `spell_errors`
+  read the first window, the main window first, that has such a widget, `code_find`,
+  `code_reveal` and `richtext_link` go to the first editor of the id that is built,
+  `canvas_damage` and `canvas_gpu_damage` to the canvas of that id in every window. What is the
+  app's stays app-wide: the code editors' theme and font size, the spell checker, the folder a
+  file dialog used last and `filedlg_paths()`, the dock's floating windows' ids (the area's id +
+  1 ..: areas in two windows that float panels need ids of their own).
 * `ui.canvas(...)` records the version *before* you react to its input. When handling the
   returned `UiInput` changes the content, bump the version and call `ui.repass()`; otherwise
   the dirty-region renderer shows the change one frame late (`--verify-dirty` reports it).
@@ -2512,8 +2683,8 @@ finish.
 
 ## 17. Network programs
 
-The building blocks of BackupCraft's server, agent and command-line client are library crates
-that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
+The building blocks of network programs -- servers, agents, command-line clients -- are library
+crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
 
 * `netio::Server::start(&addr, ServerConfig, handler)` -- an HTTP/1.1 server with a worker pool,
   keep-alive and limits; `start_with(.., Some(wrap))` puts TLS (or anything else) under it and
@@ -2527,8 +2698,9 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   P-256) or TLS 1.2 with ECDHE, RSA / ECDSA / Ed25519 certificates, the chain built and checked
   against the system's authorities (Windows CryptoAPI, Linux CA bundle) and extra CAs;
   `netio::trust::system_connector(extra)` gives the connector for `Client`.
-* `netio::smtp::send(&SmtpConfig, &Mail)` -- e-mail (STARTTLS, TLS, or plain on loopback;
-  AUTH PLAIN / LOGIN only over TLS; text and HTML parts, RFC 2047 subjects).
+* `netio::smtp::send(&SmtpConfig, &Mail)` -- e-mail (STARTTLS, TLS, or plain to any server
+  with `Security::None`, e.g. a relay on port 25 inside a network; AUTH PLAIN / LOGIN only over
+  TLS, a plain connection with a user name is refused; text and HTML parts, RFC 2047 subjects).
 * `netio::ssh::Client` -- run commands on a machine over SSH (curve25519, ssh-ed25519,
   chacha20-poly1305, strict key exchange), host key pinned by fingerprint.
 * `netio::dns::resolve` -- names to addresses (Linux: hosts file, resolv.conf, UDP and TCP).
@@ -2540,11 +2712,15 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   and `Display` know `[fe80::1%2]:53`.
 * `datastore::Store` -- JSON collections in a crash-safe journal database with transactions;
   `Journal` for append-only logs.
-* `cas::Repo` -- content-addressed, deduplicated, encrypted repositories with signed snapshots.
+* `cas::Repo` -- content-addressed, deduplicated, encrypted repositories with signed snapshots:
+  only trusted keys (`CreateOptions::signer`, `trust_signer`) save and load them
+  (`CasError::UntrustedSigner`); the list is protected by the repository key, so it does not
+  keep out someone who can open the repository.
 * `crypto` -- hashes (SHA-2 incl. SHA-384, BLAKE2b, BLAKE3), MACs, KDFs, Argon2id, AEAD
   (ChaCha20-Poly1305, XChaCha, AES-GCM), X25519, P-256 key exchange, Ed25519, RSA (PKCS#1 v1.5,
   PSS) and ECDSA P-256 / P-384 verification (randomness comes from the caller:
-  `plat::random_bytes`). For protocols that are defined with them (WPA2 and WPA3): SHA-1
+  `plat::random_bytes` on Windows, Linux, macOS, iOS and Android; the browser has no system
+  generator in `plat`, a web page takes `crypto.getRandomValues`). For protocols that are defined with them (WPA2 and WPA3): SHA-1
   (`sha1`, `Sha1`, `hmac_sha1`; broken for collisions, new designs take SHA-256), PBKDF2 over
   any hash (`pbkdf2::<H>`, `pbkdf2_sha1`), the AES key wrap of RFC 3394 (`aes_wrap` /
   `aes_unwrap`, which checks the integrity value) and AES-CMAC of RFC 4493 (`cmac_aes`).
@@ -2555,7 +2731,9 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
 * `plat::watch::Watcher::new(&roots)` / `take(ms)` -- the changed paths below folders
   (ReadDirectoryChangesW / inotify, recursive; `overflow` when events were lost).
 * `plat::net::UnixListener::bind(path)` / `connect_unix(path, ms)` -- Unix domain sockets (Linux,
-  Windows 10 1803 and later) with the stream calls of `TcpStream`.
+  Windows 10 1803 and later) with the stream calls of `TcpStream`. `bind` removes only a socket
+  file nobody listens on any more; a file, a folder or a socket that is listened on stays and
+  `bind` fails. A dropped listener removes its socket file, not a name taken again meanwhile.
 * `plat::process::Command { program, args, cwd, env }.spawn()` -- a child process with pipes
   (no shell); dropping the `Child` ends its process tree.
 * `netpkt` -- packets byte for byte, without I/O (written for JFNetworker's simulator): `Mac`,
@@ -2964,7 +3142,7 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
-  nonces use `plat::random_bytes`.
+  nonces use `plat::random_bytes` (not in the browser, see `crypto` above).
 * `base::metrics` -- measuring without keeping the values: `Counter`, `Gauge` (with its
   maximum), `Hist` (log-linear: exact below 32, then 32 steps per power of two, so a quantile is
   at most 1.6 % off; `quantile(per_mille)`, `p50` / `p95` / `p99`, `merge`) and `Window` (n
@@ -3042,14 +3220,16 @@ ui::main!({
 
 Every semantic record of a frame (`sem()`, section 12's `dump`) becomes a node of the
 accessibility tree that screen readers read: AT-SPI2 on Linux (Orca), UI Automation on Windows
-(Narrator, NVDA), an ARIA shadow tree in the DOM in the browser (NVDA / JAWS / VoiceOver with the
-browser), an `AccessibilityNodeProvider` on Android (TalkBack). Nothing has to be switched on:
-the first window frame starts the bridge. Linux connects to the accessibility bus only when
-assistive technology is enabled (`org.a11y.Status`; `jfgui_A11Y=1` forces it), Windows answers
-`WM_GETOBJECT`, Android follows the system's accessibility switch, the browser cannot tell and
-always keeps the shadow tree (`?a11y=0` in the page address leaves it out); everywhere the UI
-builds the tree only while a client listens. `jfgui_A11Y=0` (or `NO_AT_BRIDGE=1`) turns it
-off. Headless runs have no bridge.
+(Narrator, NVDA), NSAccessibility on macOS and UIAccessibility on iOS (VoiceOver), an ARIA
+shadow tree in the DOM in the browser (NVDA / JAWS / VoiceOver with the browser), an
+`AccessibilityNodeProvider` on Android (TalkBack). Nothing has to be switched on: the first
+window frame starts the bridge. Linux connects to the accessibility bus only when assistive
+technology is enabled (`org.a11y.Status`; `jfgui_A11Y=1` forces it), Windows answers
+`WM_GETOBJECT`, macOS the first question an assistive technology asks a window, iOS follows
+VoiceOver's and Switch Control's switches (and a question to its view), Android follows the
+system's accessibility switch, the browser cannot tell and always keeps the shadow tree
+(`?a11y=0` in the page address leaves it out); everywhere the UI builds the tree only while a
+client listens. `jfgui_A11Y=0` (or `NO_AT_BRIDGE=1`) turns it off. Headless runs have no bridge.
 
 What the built-in widgets report (role on AT-SPI / UI Automation, the name, state and value,
 the actions a screen reader can take):
@@ -3156,6 +3336,25 @@ its ranges, `GetCaretRange` and the selection (NVDA, Narrator, Magnifier); a mov
 `object:text-caret-moved` -- also when a text box gets the focus -- for Orca and GNOME's zoom;
 `SetCaretOffset` / `SetSelection` move the caret.
 
+**VoiceOver on the Mac and the iPhone** reads the tree in the app's own process
+(`lib/plat/apple_mac_a11y.rs`, `apple_ios_a11y.rs`): every node is an accessibility element of its
+own that stays the same while its widget does. On macOS the window's view is no element itself, so
+the nodes hang directly on the window: roles and subroles (a switch is a check box with the subrole
+`AXSwitch`, a tab a radio button with `AXTabButton`, a heading `AXHeading` with its level as value,
+a password box `AXSecureTextField`), names as title, description or value as AppKit's own controls
+have them, values, the focus, frames, press, increment / decrement (5 % of a slider's range, as on
+Android), setting values, the focus and a selection; text boxes answer the text attributes
+(characters, lines, the insertion point, the selection, the rectangle of a range: VoiceOver reads by
+character and word and follows the caret). Notifications: focus, values, titles, a list's
+selection, layout, popup menus opening and closing; dialog windows are `AXDialog`. On iOS the nodes
+are the elements of the host's view: lists, tab strips (a tab bar), dialogs, menus and titled boxes
+are containers, everything else an element with its traits (header, button, selected, adjustable,
+not enabled, toggle button for a switch from iOS 17); a double tap clicks, swiping up or down on a
+slider sets it, VoiceOver's Escape gesture presses Escape, and each of them runs a frame at once so
+that VoiceOver reads the new state. Text boxes and the view are `UITextInput`: VoiceOver reads and
+moves in the text, the keyboard sees the text around the caret and composes into the preedit. The
+app menus in the macOS menu bar are real `NSMenu`s, which VoiceOver reads without the tree.
+
 **The browser and Android** keep a mirror of the tree: after every frame the library sends the
 differences to the tree the host has (`plat::a11y::wire`: new and changed nodes, the order when
 nodes came or went, the events) -- in the browser from the WASM worker to the page, on Android
@@ -3193,7 +3392,12 @@ Testing: `ui.a11y_tree()` returns the tree as the bridges serve it (headless, e.
 browser's / Android's update format, `tools/platshared/atspi_bus.py` the AT-SPI2 bridge in WSL
 (a fake bus, and with `--real` at-spi2-core through libatspi; both follow the caret),
 `plattest --test uia` the UI Automation providers through IUIAutomation and `plattest --test
-caret` the caret alone: system caret and TextPattern2 (Windows, a window for a few seconds).
+caret` the caret alone: system caret and TextPattern2 (Windows, a window for a few seconds),
+`plattest --test a11y-mac` the NSAccessibility elements as AppKit serves them to VoiceOver (a
+real window: `python3 tools/apple.py gui build/mac/plattest --test a11y-mac`), `plattest --test
+a11y-ios` the UIAccessibility elements and UITextInput under UIKit in the simulator (`tools/apple.py
+simapp build/ios-sim/plattest --test a11y-ios`), and `plattest --test a11y-show` shows the demo for
+a probe by hand with a screen reader.
 `node apps/androidGallery/tests/a11y_web.mjs build` checks the shadow tree of the androidGallery
 web build in Chromium (Chromium's own accessibility tree through the DevTools protocol, clicks,
 values, Tab, typing, selections; Playwright through `tools/tests/playwright.mjs`), and the
@@ -3229,7 +3433,7 @@ while let Some(q) = ui.a11y_request_take() {     // a screen reader acts on a no
 
 **Kinds.** Beside the kinds of section 12 (`K_LINK`, `K_HEADING`, `K_TEXTBOX`, `K_LIST` ...):
 
-| Kind (value) | UI Automation | AT-SPI2 | Browser (ARIA) | Bridges without it (Apple until the VoiceOver bridge maps them, Android) |
+| Kind (value) | UI Automation | AT-SPI2 | Browser (ARIA) | Bridges without it (Apple until the VoiceOver bridge maps them; Android's class, with the extras below) |
 |---|---|---|---|---|
 | `K_TABLE` (grid: `.grid(rows, cols)`) | Table + Grid, Table, Selection | table + Table | `table` (`aria-rowcount` / `colcount`) | group |
 | `K_ROW` | DataItem | table row | `row` | group |
@@ -3277,8 +3481,14 @@ the virtual buffers of NVDA and JAWS, Orca) reach them, the pointer and `GetAcce
 not, UIA reports IsOffscreen and AT-SPI2 no "showing". They cost what any record costs: a record
 of at most 4 KB text per field (`SEMS_MAX` 65 536 records a frame), the tree is built only while
 a client listens. Publish them only while `ui.a11y_active()` says one does (it turns true with a
-frame of its own; on Windows false again 10 s after the last question of a UI Automation client
-when none listens for events).
+frame of its own; on Windows false again 10 s after the last question of a UI Automation client,
+unless a screen reader -- one that says it runs, `SPI_GETSCREENREADER`: Narrator, NVDA, JAWS -- or
+Magnifier listens for events: a client that only listens, as the touch keyboard's host
+TextInputHost always does on Windows 11, keeps nothing on). The app gets the command `UIC_A11Y`
+when it flips (arg 1: a client came, 0: it left), also while it is idle: the window loop looks by
+itself. A frame whose records, windows and carets equal those of the tree published last
+publishes nothing (the key of its inputs is compared, not the tree built): a page that does not
+move costs its records, not the tree.
 
 **Requests.** A screen reader's actions on a record with an id64 come back to the app, not to a
 widget: `ui.a11y_request_take() -> Option<A11yRequest { win, id, action }>` in every frame
@@ -3292,7 +3502,8 @@ RemoveFromSelection); AT-SPI2 GrabFocus, the actions click / expand / collapse /
 decrement, Component.ScrollTo, Value, EditableText, Text's caret and selection, Selection on the
 container; the browser the DOM's click, focus (a node out of view is scrolled in first), the
 input of a range or number field, text and selection edits. Records without an id64 keep the
-widget paths (`EV_ACT`, `a11y_value`, `a11y_text`).
+widget paths (`EV_ACT`, `a11y_value`, `a11y_text`). An app's own tests build requests with
+`A11yRequest::new(win, id, action)`.
 
 **Announcements and live regions.** `ui.announce("Gespeichert", LIVE_POLITE)` (or
 `LIVE_ASSERTIVE`) is said with this frame's tree: UI Automation's notification event (Windows 10
@@ -3309,7 +3520,9 @@ increment|decrement|select|add|remove S`, `a11y value S N`, `a11y text S "s"`, `
 A C`; `a11y expect S role cell` (the Sub's ARIA name or the role's), `name "s"`, `desc "s"`,
 `url "s"`, `level N`, `set POS SIZE`, `cell ROW COL`, `grid ROWS COLS`, `live polite`, `is
 offscreen`, `not collapsed`, `can expand`, `parent S2`, `children N`, `missing`; `a11y expect
-announced "s"` (headless runs keep what `ui.announce` said); `a11y dump` prints the tree. `expect
+announced "s"` (headless runs keep what `ui.announce` said); `a11y dump` prints the tree (a node per
+line: role, name, text, description, address, a value with its range and text, states, set, cell,
+live). `expect
 S unfocused | unselected | closed` complete the states.
 
 Testing: `apps/a11ytest` shows such a page (its `src/page.rs`: landmarks, a table with headers, a
@@ -3318,8 +3531,13 @@ view); `plattest --test a11y-rich` reads it headless (kinds, fields, parents, ou
 requests, live changes, the rich update format), `plattest --test uia-rich` through
 IUIAutomation (Windows), `python3 tools/platshared/atspi_bus.py --rich` through AT-SPI2 (WSL), and
 `node apps/a11ytest/tests/a11y_web.mjs build` in Chromium after `build_rs.py app a11ytest --target
-web`. The browser's host reads the rich update format (`a11y_wire::VERSION2`, `jfgui_a11y(2)`);
-Android's host reads the first one and shows the basic roles.
+web`. The browser's host and Android's read the rich update format (`a11y_wire::VERSION2`,
+`jfgui_a11y(2)`). Android shows tables as collections (their cells and headers with their place,
+TalkBack's table navigation), trees as hierarchical collections with expand / collapse, the place in a
+set, descriptions (hint text), a link's address, invalid fields, live regions (`setLiveRegion`; a change
+inside one is reported on the region) and announcements (`announceForAccessibility`), and takes the
+further actions (show on screen, expand / collapse, increment / decrement, select); landmarks, tool
+bars, articles and the other kinds without an Android class stay groups.
 
 ## 20. Secrets (passwords, tokens, keys)
 
@@ -4702,8 +4920,10 @@ let sf = doc.rasterize(256, 256, &mut img_svg::Opts::default())?;
 * Robustness: malformed files never panic; the reader is forgiving (unclosed tags, unquoted
   attributes, a broken path draws up to the error, `svg.truncated()` tells). Limits: 32 MB
   per file (also inflated), 250 000 elements, 256 levels, entity references expand once (no
-  exponential growth), `use` cycles are cut, 1 000 000 element visits and 64 levels of
-  nesting per render, a step budget for CSS selectors.
+  exponential growth), `use` cycles are cut, a step budget for CSS selectors and 128 MB of
+  declarations the cascade copies (beyond: `ERR_LIMIT`), and per render 1 000 000 element
+  visits, a work budget (pixels painted, layers and masks, path points: 64 per pixel drawn, at
+  least 2^26) and 64 levels of nesting.
 
 **The image viewer** shows a bitmap or an SVG in a zoomable, scrollable view; the app keeps an
 `ImageViewState`:
@@ -4993,7 +5213,8 @@ sheet: `css_shots.uis` (light, dark, high contrast, mirrored), `css_scale.uis` (
 
 ## 33. Sound: streams, short sounds, the system's sounds
 
-[`plat::audio`](../lib/plat/audio.rs) plays sound on all four targets: **streams** the app fills
+[`plat::audio`](../lib/plat/audio.rs) plays sound on Windows, Linux, Android and in the browser
+(macOS and iOS have no backend yet: `AudioError::Unavailable`): **streams** the app fills
 (a synthesizer, a decoder, a tone generator), **short sounds** from memory or files mixed
 together (`play`, `play_file`), and **the system's own sounds** for events (`sound`). The UI
 side is `ui.beep(kind)` and `ui.dialog_sound(kind)` ([`ui/sound.rs`](../lib/ui/sound.rs)).
@@ -5038,7 +5259,7 @@ if ui.dialog_begin(ID_ASK, "Datei überschreiben?", &open) {
 
 * **One model: the ring.** A stream has a ring the app writes into and the platform's audio
   thread drains; `open_fill` is the same stream without a ring, its `fill` called on that
-  thread. This works on all four targets alike: the browser's sound runs in an AudioWorklet
+  thread. This works on every target with sound alike: the browser's sound runs in an AudioWorklet
   that cannot call into the app's WASM instance, so it is fed from a buffer anyway, and the
   ring keeps the app's code (allocation, locks, the UI's pace) off the real-time thread.
   `fill` runs on Windows / Linux / Android on the audio thread and in the browser in the

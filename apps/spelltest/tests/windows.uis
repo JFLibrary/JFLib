@@ -1,0 +1,37 @@
+#!args --verify-dirty
+# a text box of the same id in two windows (charge 11): command 1 opens "Zweites Fenster" (#120)
+# with a "Betreff" box of the main window's id (#110) and other text.  Each window checks its own
+# box (the results are kept per window) and the suggestion menu opens in the window of its box:
+# before, the main window's box of that id found the menu closed in its own window and dropped
+# it before the second window's pass could draw it.
+theme light
+cmd 1
+expect window 120 open
+window 120
+expect text:"Fehler Betreff 2: Fehlr" exists
+window main
+expect text:"Fehler Betreff: Hasu" exists
+# the menu of the second window's box, opened with the menu key at the caret
+activate 120
+window 120
+click #110
+key home
+key apps
+expect menuitem:"Fehler" exists
+expect menuitem:"Fehler" focused
+wait 50
+expect menuitem:"Fehler" exists
+click menuitem:"Fehler"
+expect menuitem:"Fehler" missing
+expect #110 text "Fehler und das Haus"
+expect text:"Fehler Betreff 2: -" exists
+# the main window's box of the same id is untouched, and its own menu opens there
+window main
+expect #110 text "Die Hasu-Tür"
+expect text:"Fehler Betreff: Hasu" exists
+activate main
+rclick 70,136
+expect menuitem:"Haus" exists
+key esc
+expect menuitem:"Haus" missing
+expect_nowarn

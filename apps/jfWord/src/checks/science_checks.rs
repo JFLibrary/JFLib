@@ -141,6 +141,34 @@ pub(crate) fn run() -> (usize, usize) {
         other.document().sources == sources,
         "standalone sources preserve content"
     );
+    // A list encode_sources writes reads back: more than the general reader's 30000 elements
+    // (1024 sources with 8 authors each) and more than 4 MiB (escaped '&' in long titles).
+    let long = |n: usize, authors: usize, title: &str| -> Vec<Source> {
+        (1..=n)
+            .map(|i| Source {
+                id: i as u64,
+                title: format!("{title}{i}"),
+                year: String::from("2026"),
+                authors: (0..authors)
+                    .map(|k| Person { given: format!("G{k}"), family: format!("F{i}"), ..Default::default() })
+                    .collect(),
+                ..Default::default()
+            })
+            .collect()
+    };
+    let many = long(1024, 8, "Quelle ");
+    let amps = long(300, 0, &"&".repeat(4000));
+    for (list, what) in [(&many, "32000 elements"), (&amps, "over 4 MiB")] {
+        let bytes = doc_io::encode_sources(list);
+        check!(
+            bytes.as_ref().is_ok_and(|b| doc_io::decode_sources(b).as_ref() == Ok(list)),
+            &format!("a saved long source list loads back ({what})")
+        );
+    }
+    check!(
+        doc_io::encode_sources(&amps).is_ok_and(|b| b.len() > 4 << 20),
+        "the escaped list is over 4 MiB"
+    );
     check!(
         other.undo() && other.document().sources.is_empty() && !other.can_undo(),
         "whole import undone in one step"

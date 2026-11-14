@@ -165,15 +165,31 @@ class ScaffoldTest(Temp):
         self.assertIn("#![forbid(unsafe_code)]", lib)
         self.assertIn(self.dir / "lib" / "mylib" / "src" / "lib.rs", paths)
         self.assertTrue((self.dir / "lib" / "mylib" / "LICENSE-MIT").is_file())
+        readme = (self.dir / "lib" / "mylib" / "README.md").read_text(encoding="utf-8")
+        self.assertTrue(readme.startswith("# jflib-mylib\n") and changelog.PLACEHOLDER in readme, "a frame check refuses")
+        log = (self.dir / "lib" / "mylib" / "CHANGELOG.md").read_text(encoding="utf-8")
+        version = root["package"]["version"]
+        self.assertIn(f"## [Unreleased]\n\nFirst release on crates.io.\n\n[Unreleased]: {changelog.REPO}/compare/v{version}...HEAD\n", log)
         with self.assertRaisesRegex(scaffold.ScaffoldError, "exists already"):
             scaffold.create_lib(self.dir, "mylib", [], None, libs, libs)
 
     def test_manifests_set_version(self):
         """a release changes the version everywhere it stands, and nothing of the crates from outside"""
-        for rel in ("Cargo.toml", "Cargo.lock", "modules/modplat/Cargo.toml"):
+        for rel in ("Cargo.toml", "Cargo.lock", "modules/modplat/Cargo.toml", *manifests.DEP_VERSION_FILES):
             self.write(rel, (ROOT / rel).read_text(encoding="utf-8"))
+        self.assertEqual(manifests.dep_version_problems(self.dir), [], "the repository's files ask for its version")
+        guide = self.write("docs/GUIDE.md", 'jflib = { features = ["std"], version = "0.1" }\njflib-build = "0.1"\n'
+                                            'jflib-netlab = "0.1"\nother = "0.1"\n')
+        self.assertEqual(manifests.dep_version_problems(self.dir), [] if manifests.version().startswith("0.1.") else
+                         [f"docs/GUIDE.md: asks for jflib 0.1, the library is {manifests.version()} (build_rs.py release writes it)"])
         before = manifests.external_lock(self.dir)
         manifests.set_version("7.8.9", self.dir)
+        self.assertEqual(guide.read_text(encoding="utf-8"), 'jflib = { features = ["std"], version = "7.8" }\njflib-build = "7.8"\n'
+                                                            'jflib-netlab = "0.1"\nother = "0.1"\n')
+        template = (self.dir / "lib/jflib/template/Cargo.toml.in").read_text(encoding="utf-8")
+        self.assertIn('jflib = "7.8"', template)
+        self.assertIn('jflib-build = "7.8"', template)
+        self.assertEqual(manifests.dep_version_problems(self.dir), [])
         root = manifests.read(self.dir / "Cargo.toml")["workspace"]
         self.assertEqual(root["package"]["version"], "7.8.9")
         self.assertEqual({d["version"] for d in root["dependencies"].values() if "version" in d}, {"=7.8.9"})  # the unpublished: none
@@ -248,7 +264,8 @@ class ScaffoldTest(Temp):
 
     def test_manifests_docs_rs(self):
         """every crate that goes to crates.io names its docs.rs targets (docs.rs's five defaults
-        include macOS and 32-bit Windows, none of JFLib's targets) and what crates.io shows of it:
+        include 32-bit Windows, none of JFLib's targets, and macOS, whose pages docs.rs does not
+        build for JFLib yet) and what crates.io shows of it:
         description, license, repository, homepage (docs/CRATES.md, CR7)"""
         import subprocess
         import tomllib
@@ -514,11 +531,87 @@ class ChangelogTest(unittest.TestCase):
             with self.assertRaises(changelog.ChangelogError):
                 bad()
 
+    def test_crate_cut(self):
+        """a crate's changelog: its first entry replaces "no changes", a cut moves the link references
+        on, an [Unreleased] without entries is cut as "no changes\""""
+        head = "# Changelog of jflib-x\n\nIntro.\n\n## [Unreleased]\n\n"
+        refs = (f"## [0.1.0] - 2026-11-08\n\nFirst release on crates.io.\n\n[Unreleased]: {changelog.REPO}/compare/v0.1.0...HEAD\n"
+                f"[0.1.0]: {changelog.REPO}/releases/tag/v0.1.0\n")
+        quiet = head + "No changes in this crate. It is released with the next version of JFLib.\n\n" + refs
+        self.assertTrue(changelog.without_entries(quiet))
+        t = changelog.add_entry(quiet, "A thing", "fixed")
+        self.assertIn("## [Unreleased]\n\n### Fixed\n\n- A thing\n\n## [0.1.0]", t)
+        self.assertFalse(changelog.without_entries(t))
+        c = changelog.cut_crate(t, "0.2.0", "2026-12-01")
+        self.assertIn("## [Unreleased]\n\n## [0.2.0] - 2026-12-01\n\n### Fixed\n\n- A thing\n", c)
+        self.assertIn(f"[Unreleased]: {changelog.REPO}/compare/v0.2.0...HEAD\n[0.2.0]: {changelog.REPO}/compare/v0.1.0...v0.2.0\n"
+                      f"[0.1.0]: {changelog.REPO}/releases/tag/v0.1.0\n", c)
+        c = changelog.cut_crate(quiet, "0.2.0", "2026-12-01")
+        self.assertIn("## [0.2.0] - 2026-12-01\n\nNo changes in this crate. It was released with the others", c)
+        self.assertEqual(changelog.unreleased(c), "")
+        new = changelog.cut_crate(changelog.crate_log("jflib-y", "0.2.0"), "0.3.0", "2027-01-01")
+        self.assertIn("## [0.3.0] - 2027-01-01\n\nFirst release on crates.io.", new)
+        self.assertIn(f"[0.3.0]: {changelog.REPO}/compare/v0.2.0...v0.3.0", new)
+
     def test_repository_changelog(self):
         """CHANGELOG.md has [Unreleased] and a section of the library's version"""
         text, _ = changelog.read()
         self.assertIn(apidiff.lib_version(), changelog.releases(text))
         self.assertTrue(changelog.UNRELEASED.search(text))
+
+
+class CrateDocsTest(Temp):
+    """every crate's README.md and CHANGELOG.md (tools/changelog.py, crate_doc_problems)"""
+
+    def tree(self, readme_b, include=None):
+        """a workspace with the crates a (all as it should be) and b (its README readme_b, an include list)"""
+        self.write("Cargo.toml", '[workspace]\nmembers = ["lib/a", "lib/b", "apps/x"]\n[workspace.package]\nversion = "0.1.0"\n')
+        self.write("CHANGELOG.md", "# Changelog\n\n## [Unreleased]\n\n## [0.1.0] - 2026-11-08\n")
+        self.write("apps/x/Cargo.toml", '[package]\nname = "x"\npublish = false\n')
+        self.write("lib/a/Cargo.toml", '[package]\nname = "jflib-a"\n[lib]\nname = "a"\n')
+        self.write("lib/a/README.md", "# jflib-a\n\nText with [a link](https://jflib.org).\n\n## What's new in 0.2.0\n\nNew.\n")
+        self.write("lib/a/CHANGELOG.md", changelog.crate_log("jflib-a", "0.1.0"))
+        self.write("lib/b/Cargo.toml", '[package]\nname = "jflib-b"\n' + (f"include = {include}\n" if include else ""))
+        self.write("lib/b/README.md", readme_b)
+
+    def test_problems(self):
+        self.tree("# jflib-b\n\nSee [the guide](docs/GUIDE.md) and [here](#below).\n\n```\n[x](not/a/link)\n```\n",
+                  '["src/**", "README.md"]')
+        self.assertEqual(sorted(changelog.crate_doc_problems(self.dir)), sorted([
+            'lib/b/CHANGELOG.md is missing (docs/CRATES.md, "README und CHANGELOG je Crate")',
+            "lib/b/README.md: the link docs/GUIDE.md is relative (crates.io and docs.rs show the text elsewhere)",
+            "lib/b/README.md: needs one section \"## What's new in X.Y.Z\" (has 0)"]))
+        self.write("lib/b/CHANGELOG.md", "# Changelog\n\n## [0.0.9] - 2026-01-01\n")
+        self.write("lib/b/README.md", "# b\n\n" + changelog.PLACEHOLDER + " -->\n\n## What's new in 0.0.9\n")
+        self.assertEqual(sorted(changelog.crate_doc_problems(self.dir)), sorted([
+            "lib/b/Cargo.toml: include lacks CHANGELOG.md, the package would not carry it",
+            "lib/b/README.md: the first line is not '# jflib-b'",
+            "lib/b/README.md: still the placeholder of build_rs.py new --lib: write the README",
+            "lib/b/README.md: \"What's new in 0.0.9\" is older than the library's version 0.1.0",
+            "lib/b/CHANGELOG.md has no '## [Unreleased]' section",
+            "lib/b/CHANGELOG.md: [0.0.9] is no release of CHANGELOG.md"]))
+
+    def test_release_stage(self):
+        self.tree("# jflib-b\n\n## What's new in 0.2.0\n")
+        self.write("lib/b/CHANGELOG.md", changelog.crate_log("jflib-b", "0.1.0"))
+        self.assertEqual(changelog.crate_doc_problems(self.dir), [])
+        self.assertEqual(changelog.crate_doc_problems(self.dir, release="0.2.0"), [])
+        self.assertEqual(changelog.crate_doc_problems(self.dir, release="0.3.0"), [
+            "lib/a/README.md: \"What's new in 0.2.0\", the release is 0.3.0",
+            "lib/b/README.md: \"What's new in 0.2.0\", the release is 0.3.0"])
+        self.assertEqual(changelog.crate_doc_problems(self.dir, release="0.2.0", cut=True), [
+            "lib/a/CHANGELOG.md has no [0.2.0]: python build_rs.py release 0.2.0",
+            "lib/b/CHANGELOG.md has no [0.2.0]: python build_rs.py release 0.2.0"])
+        readme = ('# jflib-b\n\n```toml\njflib = "0.2"\njflib-build = { version = "=0.1.0" }\n```\n\n'
+                  "cp -r jflib-0.3.*/template .\n\n## What's new in 0.2.0\n")
+        self.write("lib/b/README.md", readme)
+        self.assertEqual(changelog.crate_doc_problems(self.dir), [
+            "lib/b/README.md: an example names version 0.1, the README is for 0.2.0",
+            "lib/b/README.md: an example names version 0.3, the README is for 0.2.0"])
+        self.assertEqual(changelog.crate_of("b", self.dir), ("lib/b", "jflib-b", "jflib_b"))
+        self.assertEqual(changelog.crate_of("jflib-a", self.dir)[0], "lib/a")
+        with self.assertRaises(changelog.ChangelogError):
+            changelog.crate_of("x", self.dir)
 
 
 # ---------------------------------------------------------------- build_rs.py i18n
@@ -698,6 +791,155 @@ class ScriptTimeout(Temp):
         self.assertEqual(limits, {"--a": build_rs.SCRIPT_TIMEOUT, "--b": 7})
         self.assertIn("partial", a["output"])
         self.assertTrue(a["output"].startswith("FAIL"))
+
+
+class TestJobs(Temp):
+    """build_rs.py test side by side (section "test-jobs"): the markers, apps/NAME/tests/jobs.txt, the pool's rules"""
+
+    def app(self, name, scripts, jobs=None):
+        for file, text in scripts.items():
+            self.write(f"apps/{name}/tests/{file}", text)
+        if jobs is not None:
+            self.write(f"apps/{name}/tests/jobs.txt", jobs)
+
+    def test_markers_and_rules(self):
+        self.app("x", {"a.uis": "#!args --a\n#!serial flaky under load\n", "b.uis": "#!lock desktop audio\nclick 1,1\n\n\n\n#!serial\n",
+                       "c.uis": "# none\n"}, "independent   # they share nothing\nlock audio\n")
+        self.app("y", {"a.uis": "#!seral\n", "b.uis": "#!lock gpu\n"}, "serial the whole app\n")
+        self.app("z", {"a.uis": ""}, "parallel\n")
+        with mock.patch.object(build_rs, "ROOT", self.dir), mock.patch.object(build_rs, "apps", lambda: ["x", "y", "z"]):
+            t = self.dir / "apps" / "x" / "tests"
+            self.assertEqual(build_rs.script_markers(t / "a.uis"), (True, set()))
+            self.assertEqual(build_rs.script_markers(t / "b.uis"), (False, {"desktop", "audio"}))     # line 6: no marker
+            self.assertEqual(build_rs.app_test_rules("x"), dict(independent=True, targets=False, serial=False, locks={"audio"}))
+            self.assertEqual(build_rs.app_test_rules("y"), dict(independent=False, targets=False, serial=True, locks=set()))
+            self.assertRaises(build_rs.BuildError, build_rs.app_test_rules, "z")
+            bad = build_rs.test_marker_lint()
+        self.assertEqual(len(bad), 3, bad)
+        self.assertIn("apps/y/tests/a.uis:1: unknown marker #!seral", bad[0])
+        self.assertIn("apps/y: unknown test lock gpu", bad[1])
+        self.assertIn("apps/z/tests/jobs.txt:1:", bad[2])
+
+    def run_pool(self, jobs, times=None):
+        """apps c (in order), i (independent), d1 / d2 (one script each holding the desktop lock), s (one serial
+        script in the middle of its app's order), t (independent targets) on win and linux -> [(tag, start, end)] in
+        the order they started"""
+        self.app("c", {f"{n}.uis": "" for n in "abc"})
+        self.app("i", {f"{n}.uis": "" for n in "abcd"}, "independent\n")
+        self.app("d1", {"a.uis": "#!lock desktop\n"})
+        self.app("d2", {"a.uis": "#!lock desktop audio\n"})
+        self.app("s", {"a.uis": "", "b.uis": "#!serial under load\n", "c.uis": ""})
+        self.app("t", {"a.uis": "#!lock audio\n", "b.uis": ""}, "independent targets\n")
+        spans, lock, runners = [], build_rs.threading.Lock(), []
+
+        class Runner:           # stands in for host_exec.LinuxRunner: one per thread that runs Linux scripts
+            def __init__(self):
+                self.p, self.closed = mock.Mock(poll=lambda: None), False
+                runners.append(self)
+
+            def close(self):
+                self.closed = True
+
+        def run(target, exe, script, runner=None):
+            start = time.monotonic()
+            time.sleep(0.15)
+            with lock:
+                spans.append((f"{target} {script.parent.parent.name}/{script.name}", start, time.monotonic()))
+            self.assertEqual(runner is not None, target == "linux" and os.name == "nt")
+            return dict(script=script.name, status="passed", exit_code=0, start=start, duration=0.15, output="")
+
+        runs = [(t, t, n, "exe") for t in ("win", "linux") for n in ("c", "d1", "d2", "i", "s", "t")]
+        with mock.patch.object(build_rs, "ROOT", self.dir), mock.patch.object(build_rs, "run_script", run), \
+                mock.patch.object(build_rs, "LinuxRunner", Runner):
+            units, skipped = build_rs.test_units(runs, jobs)
+            records = build_rs.run_test_units(build_rs.order_test_units(units, times or {}, jobs), jobs, lambda u, r: None)
+        self.assertEqual((len(units), skipped, len(records)), (28, 0, 28))
+        self.assertTrue(all(r.closed for r in runners))
+        self.assertLessEqual(len(runners), jobs + 1 if os.name == "nt" else 0)    # the workers' and the serial part's
+        return sorted(spans, key=lambda s: s[1])
+
+    @staticmethod
+    def overlap(a, b):
+        return a[1] < b[2] and b[1] < a[2]
+
+    def test_pool_rules(self):
+        spans = self.run_pool(4, times={"win/t/b.uis": 50.0, "linux/t/b.uis": 50.0})    # those two first, together
+        by = {s[0]: s for s in spans}
+        order = [s[0] for s in spans]
+        for t in ("win", "linux"):                          # an app's order on each target
+            self.assertLess(order.index(f"{t} c/a.uis"), order.index(f"{t} c/b.uis"))
+            self.assertLess(order.index(f"{t} c/b.uis"), order.index(f"{t} c/c.uis"))
+            self.assertLess(order.index(f"{t} s/a.uis"), order.index(f"{t} s/c.uis"))
+        for app in ("c", "s"):                              # never two scripts of an app at once, on any target
+            mine = [s for s in spans if s[0].split()[1].startswith(app + "/") and not s[0].endswith("s/b.uis")]
+            self.assertFalse([(a[0], b[0]) for a in mine for b in mine if a is not b and self.overlap(a, b)])
+        for t in ("win", "linux"):                          # desktop: one at a time per target
+            desk = [s for s in spans if s[0].startswith(t + " d")]
+            self.assertFalse([(a[0], b[0]) for a in desk for b in desk if a is not b and self.overlap(a, b)])
+        audio = [by[k] for k in ("win d2/a.uis", "linux d2/a.uis", "win t/a.uis", "linux t/a.uis")]    # audio: on both
+        self.assertFalse([(a[0], b[0]) for a in audio for b in audio if a is not b and self.overlap(a, b)])
+        ind = [s for s in spans if " i/" in s[0]]           # independent: side by side, but never one script twice
+        self.assertTrue(any(self.overlap(a, b) for a in ind for b in ind if a is not b))
+        for n in "abcd":
+            self.assertFalse(self.overlap(by[f"win i/{n}.uis"], by[f"linux i/{n}.uis"]))
+        self.assertTrue(self.overlap(by["win t/b.uis"], by["linux t/b.uis"]))     # independent targets: that too
+        serial = [by["win s/b.uis"], by["linux s/b.uis"]]   # alone, after the rest, in the suite's order
+        self.assertEqual(order[-2:], ["win s/b.uis", "linux s/b.uis"])
+        self.assertTrue(all(s[1] >= max(o[2] for o in spans if o not in serial) for s in serial))
+
+    def test_one_job_keeps_the_suites_order(self):
+        order = [s[0] for s in self.run_pool(1, times={"win/i/a.uis": 99.0})]
+        expect = [f"{t} {n}" for t in ("win", "linux") for n in
+                  ("c/a.uis", "c/b.uis", "c/c.uis", "d1/a.uis", "d2/a.uis", "i/a.uis", "i/b.uis", "i/c.uis", "i/d.uis",
+                   "s/a.uis", "s/b.uis", "s/c.uis", "t/a.uis", "t/b.uis")]
+        self.assertEqual(order, expect)
+
+    def test_linux_runner_answers(self):
+        """host_exec.LinuxRunner: its answers, a timeout, and what is not its answer (wsl.exe's own UTF-16 message, the
+        end of the process): RuntimeError, and run_script runs the script once more the old way"""
+        import host_exec
+
+        class P:
+            def __init__(self, out):
+                self.stdin, self.stdout = io.BytesIO(), io.BytesIO(out)
+
+            def poll(self):
+                return None
+
+            def wait(self, timeout=None):
+                return 0
+
+        def runner(out):
+            with mock.patch.object(host_exec.subprocess, "Popen", lambda *a, **k: P(out)):
+                return host_exec.LinuxRunner()
+
+        r = runner(b'{"code": 3, "out": "a\\n", "err": "", "timeout": false}\n'
+                   b'{"code": 0, "out": "b", "err": "c", "timeout": true}\n')
+        self.assertEqual(r.run(["x"]).stdout, "a\n")
+        with self.assertRaises(subprocess.TimeoutExpired) as e:
+            r.run(["x"], timeout=5)
+        self.assertEqual((e.exception.output, e.exception.stderr), ("b", "c"))
+        self.assertRaises(RuntimeError, r.run, ["x"])                                      # the end of the process
+        self.assertRaises(RuntimeError, runner("Dieser Vorgang wurde abgebrochen\r\n".encode("utf-16-le")).run, ["x"])
+        uis = self.write("apps/x/tests/a.uis", "#!args --a\n")
+        broken = mock.Mock(run=mock.Mock(side_effect=RuntimeError("gone")))
+        old = mock.Mock(return_value=subprocess.CompletedProcess("x", 0, "ok", ""))
+        with mock.patch.object(build_rs, "ROOT", self.dir), mock.patch.object(build_rs, "run_exe", old), \
+                mock.patch.object(build_rs, "exe_arch", lambda exe: None):
+            rec = build_rs.run_script("linux", "x", uis, runner=broken)
+        self.assertEqual((rec["status"], broken.run.call_count, old.call_count), ("passed", 1, 1))
+
+    def test_longest_work_first(self):
+        units = [build_rs.TestUnit("win", "win", app, Path(f"{n}.uis"), "x", False, {f"app:{app}"}, i)
+                 for i, (app, n) in enumerate([("a", "1"), ("a", "2"), ("b", "1"), ("c", "1")])]
+        times = {"win/a/1.uis": 1.0, "win/a/2.uis": 1.0, "win/b/1.uis": 30.0}     # c: the median (1 s)
+        self.assertEqual([u.key for u in build_rs.order_test_units(units, times, 4)],
+                         ["win/b/1.uis", "win/a/1.uis", "win/a/2.uis", "win/c/1.uis"])
+        self.assertEqual(build_rs.order_test_units(units, times, 1), units)
+        with mock.patch.dict(os.environ, {"jfgui_TEST_JOBS": "3"}):
+            self.assertEqual((build_rs.test_jobs(), build_rs.test_jobs(5)), (3, 5))
+        with mock.patch.dict(os.environ, {"jfgui_TEST_JOBS": ""}):
+            self.assertEqual(build_rs.test_jobs(), max(1, (os.cpu_count() or 2) // 2))
 
 
 class IncrementalCache(Temp):

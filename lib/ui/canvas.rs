@@ -123,7 +123,9 @@ impl Ui {
         }
     }
 
-    /// the content rectangle x0, y0, x1, y1 (content units) of canvas id changed: its tiles go
+    /// the content rectangle x0, y0, x1, y1 (content units) of canvas id changed: its tiles go (of
+    /// the window being built when it has the canvas; else, outside the passes too, of the canvas
+    /// of that id in every window)
     pub fn canvas_gpu_damage(&mut self, id: u32, r: [f64; 4]) {
         if self.gp_canvas_wanted() {
             self.gp_canvas_damage(id, r);

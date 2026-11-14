@@ -18,8 +18,9 @@
 //   files       aio read / write / copy (OS files, mem://, a DirFs mount) with progress;
 //               cancelled between chunks through a gated mount (gated://: reads and writes past
 //               the first chunk wait at a gate; the test cancels once the job waits there), the
-//               target unchanged, no sibling left; a dropped future; Reader / Writer;
-//               AtomicFile; Linux: access bits kept
+//               target unchanged, no sibling left; a dropped future; Reader / Writer (a
+//               write's future dropped while its job runs spoils the writer); AtomicFile;
+//               Linux: access bits kept
 //   panics      a panic in a task / a blocking job ends the child with exit code 3
 //   permissions (a child: the manifest stays installed) refused reads and writes fail without
 //               leftovers; a trusted() caller stays trusted on the pool
@@ -611,11 +612,12 @@ fn files(t: &mut T) {
 // ---------------------------------------------------------------- cancel between chunks
 
 // a MemFs whose streams wait at the gate for reads and writes at offsets of `from` and beyond
-// (once per operation: it is cancelled meanwhile)
+// (once per operation: it is cancelled meanwhile); with `only`, just the writes of those bytes
 struct Gated {
     inner: MemFs,
     gate: Arc<Gate>,
     from: u64,
+    only: Option<&'static [u8]>,
 }
 
 // arrived counts the reads / writes that came to the gate; each waits for one post of sem
@@ -647,17 +649,18 @@ struct GatedStream {
     s: Box<dyn Stream>,
     gate: Arc<Gate>,
     from: u64,
+    only: Option<&'static [u8]>,
 }
 
 impl Stream for GatedStream {
     fn read_at(&self, off: u64, buf: &mut [u8]) -> Option<usize> {
-        if off >= self.from {
+        if off >= self.from && self.only.is_none() {
             self.gate.pass();
         }
         self.s.read_at(off, buf)
     }
     fn write_at(&self, off: u64, buf: &[u8]) -> Option<usize> {
-        if off >= self.from {
+        if off >= self.from && self.only.is_none_or(|b| buf == b) {
             self.gate.pass();
         }
         self.s.write_at(off, buf)
@@ -697,7 +700,7 @@ impl Provider for Gated {
     }
     fn open(&self, path: &str, mode: u32) -> Opened {
         match self.inner.open(path, mode) {
-            Opened::File(s) => Opened::File(Box::new(GatedStream { s, gate: self.gate.clone(), from: self.from })),
+            Opened::File(s) => Opened::File(Box::new(GatedStream { s, gate: self.gate.clone(), from: self.from, only: self.only })),
             o => o,
         }
     }
@@ -724,7 +727,7 @@ fn gated(t: &mut T) {
     let Some(sem) = Sem::new(0) else { return };
     let gate = Arc::new(Gate { sem, arrived: Progress::new() });
     let data = pattern(16 * CH);
-    let g = Gated { inner: MemFs::new(), gate: gate.clone(), from: CH as u64 };
+    let g = Gated { inner: MemFs::new(), gate: gate.clone(), from: CH as u64, only: None };
     g.inner.write("src.bin", &data);
     vfs::mount("gated", Arc::new(g));
     let dir = t.subp("aio");
@@ -769,6 +772,37 @@ fn gated(t: &mut T) {
     t.check(gate.arrived.done() == 4 && !gate.sem.wait(0), "aio: each job waited at the gate once and took its post");
     while gate.sem.wait(0) {}
     vfs::unmount("gated");
+    dropped_write(t, &gate);
+}
+
+// a Writer's write whose future is dropped while its job waits: that job may still write, so
+// the writer is spoilt -- a later write and the commit fail; the old writer let the later write
+// land at the same offset, then the dropped one overwrote it, and the commit succeeded
+fn dropped_write(t: &mut T, gate: &Arc<Gate>) {
+    vfs::mount("wgate", Arc::new(Gated { inner: MemFs::new(), gate: gate.clone(), from: 0, only: Some(b"AAAA") }));
+    let Ok(mut w) = block_on(Writer::create("wgate://w.bin")) else {
+        t.check(false, "aio: Writer::create on wgate://");
+        return;
+    };
+    let first = block_on(w.write(b"xxxx".to_vec())) == Ok(());
+    let n = gate.arrived.done();
+    {
+        let mut fa = Box::pin(w.write(b"AAAA".to_vec()));
+        let pending = fa.as_mut().poll(&mut core::task::Context::from_waker(&noop_waker())).is_pending();
+        let dl = time() + 30_000_000;
+        while gate.arrived.done() == n && time() < dl {
+            plat::sleep_ms(1);
+        }
+        t.check(first && pending && gate.arrived.done() == n + 1, "aio: a write's job waits at the gate");
+    } // its future dropped: the job runs on
+    let b = block_on(w.write(b"BBBB".to_vec()));
+    gate.sem.post(1);
+    let idle = pool_idle();
+    let c = block_on(w.commit());
+    t.check(b == Err(IoError::Write), "aio: after a dropped write the next write fails");
+    t.check(idle && c == Err(IoError::Commit) && plat::file_exists("wgate://w.bin") == 0 && no_siblings("wgate://"), "aio: ... and the commit: nothing put in place, no sibling left");
+    while gate.sem.wait(0) {}
+    vfs::unmount("wgate");
 }
 
 // ---------------------------------------------------------------- children

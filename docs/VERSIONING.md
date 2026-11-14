@@ -44,7 +44,7 @@ through it and for the two tools around it:
 
 | Crate | What is promised |
 | --- | --- |
-| `jflib` | every crate it shows, by its path `jflib::CRATE::...`, as [API.md](API.md) documents it (the rules of "What is public" below); of the styles `jflib::style::STYLE` and `jflib::style_NAME::STYLE`; its feature `std` (an app with std: `plat::std_start`, `rt::panic_hook`, `rt::Alloc`) |
+| `jflib` | every crate it shows, by its path `jflib::CRATE::...`, as [API.md](API.md) documents it (the rules of "What is public" below); of the styles `jflib::style::STYLE` and `jflib::style_NAME::STYLE`; its features `std` (an app with std: `plat::std_start`, `rt::panic_hook`, `rt::Alloc`) and `unwind` (with std and `panic = "unwind"`: `rt::panic_take`, `rt::abort_on_unwind`) |
 | `jflib-build` | `app()`, `console()`, `Build::app()`, `Build::console()`, `.part_of()`, `.run()` and the files it reads next to `Cargo.toml`: `PERMISSIONS`, `PACKAGE`, `assets/`, `res/app.ico` |
 | `cargo-jflib` | its commands and their options, the `PACKAGE` keys and environment variables its README names, where it writes (`target/jflib-*`) |
 | the other `jflib-*` crates | nothing of their own: they are published because `jflib` needs them. A program may name one directly, but `jflib` pins every one to its own version (`=X.Y.Z`), so they move together. `simd`, `text_shape` and `style_assets` are building blocks, hidden in `jflib` (`#[doc(hidden)]`) |
@@ -161,10 +161,14 @@ describes the format and the rules in detail.
 ## Releasing the library
 
 1. `python build_rs.py api-diff`: read the breaking changes and decide the version.
-2. `python build_rs.py changelog` shows `[Unreleased]`; add what is missing.
+2. `python build_rs.py changelog` shows `[Unreleased]`; add what is missing, here and in the
+   crates' changelogs (below). Rewrite the section "What's new in X.Y.Z" of every crate's
+   `README.md` for the new version: a few sentences about its changelog, or that it has no
+   changes of its own; examples that name a version (`jflib = "X.Y"`) follow.
 3. `python build_rs.py release X.Y.Z` renames `[Unreleased]` to `[X.Y.Z] - DATE` (a new empty
-   `[Unreleased]` above it), writes the version to `Cargo.toml` and `Cargo.lock` and the snapshot `docs/api/X.Y.Z.txt`. It
-   refuses a version that is not newer than the last release or too small for the API changes
+   `[Unreleased]` above it) here and in every crate's `CHANGELOG.md`, writes the version to `Cargo.toml` and `Cargo.lock` and the snapshot `docs/api/X.Y.Z.txt`. It
+   refuses a version that is not newer than the last release or too small for the API changes,
+   and READMEs whose "What's new" names another version
    (`--force` cuts it anyway, with a warning; `--date` sets the date).
 4. `python build_rs.py test --quick` (both targets) and `python tools/gendoc.py --check`, then
    commit and tag: `git tag vX.Y.Z`. The tools never commit, tag or push.
@@ -184,3 +188,29 @@ python build_rs.py changelog "Wrong DPI on the second monitor" --type fixed --ar
 
 A branch adds its entries under `[Unreleased]` before it is merged. Apps note their own changes
 in their own files (for example `apps/NAME/README.md`), not here.
+
+### Each crate's README and changelog
+
+Every published crate has a `README.md`, the page crates.io and docs.rs show, and a
+`CHANGELOG.md` of its own, both in its folder and in its package. The README is written by hand
+for someone who lands on that page: what the crate is and why it exists, how it is used, a
+section `## What's new in X.Y.Z` with a few sentences about the latest release, where the
+documentation is, the licence. Only absolute links: crates.io and docs.rs show the text away from
+the repository. The crate's changelog has this file's format; its entries are written from the
+crate's side, shorter than here, and an entry that changes several crates stands in each.
+A crate without changes says "No changes in this crate" under `[Unreleased]`; `release` turns
+that into the release's text, since all crates are released together.
+
+```
+python build_rs.py changelog "Tables sort by column" --crate ui     # here (area ui) and in lib/ui/CHANGELOG.md
+python build_rs.py changelog "..." --type fixed --crate plat,rt     # here and in both crates' files
+python build_rs.py changelog --crate ui                             # show [Unreleased] of lib/ui
+```
+
+`--crate` takes a folder (`lib/ui`), a package (`jflib-ui`) or a lib name (`ui`) and writes the
+same text into the crates' files; reword it there where the crate's side reads better.
+`build_rs.py check` reports a crate without these files, a README that is still the frame
+`build_rs.py new --lib` writes, a relative link, a missing or outdated "What's new", an
+example that names another version than the README is for (`jflib = "0.1"`, `jflib-0.1.*`), and a
+changelog section that is no release of the library; `tools/publish.py` also wants every
+crate's changelog cut for the version it uploads.

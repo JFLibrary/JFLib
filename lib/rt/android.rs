@@ -88,6 +88,8 @@ fn log(bytes: &[u8], priority: i32) {
 pub fn write_stdout(bytes: &[u8]) { log(bytes, 4); }
 /// Write errors to Android logcat.
 pub fn write_stderr(bytes: &[u8]) { log(bytes, 6); }
+/// stderr for crash paths: logcat, as write_stderr.
+pub fn write_stderr_crash(bytes: &[u8]) { write_stderr(bytes); }
 
 /// Unwinding is disabled; satisfy precompiled core's unused personality reference (std has its own).
 #[cfg(not(feature = "std"))]

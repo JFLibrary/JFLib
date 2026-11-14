@@ -86,7 +86,7 @@ extern "system" fn handler(ep: *const ExceptionPointers) -> i32 {
         let _ = writeln!(line, "jfgui: crash 0x{:X} at image offset 0x{:x} (look it up in the .map file)", ci.code,
                          ci.ip.wrapping_sub(ci.base));
     }
-    rt::os::write_stderr(line.bytes());
+    rt::os::write_stderr_crash(line.bytes());
     rt::crash::report(&ci)
 }
 

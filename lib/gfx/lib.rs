@@ -9,6 +9,10 @@
 //                                      coordinates stay the target's, only the pixel rows move
 //   dc: set_color(argb), set_opacity(op), clip_push(x, y, w, h) / clip_pop(), origin(x, y),
 //       translate(dx, dy), fill / clear / hline / vline / frame / blit / blit_scaled (sf, ...)
+//   set_parallel(f) / parallel()       the loop large copies run on (the UI runtime passes the
+//                                      worker pool's): a blit that copies XRGB rows from
+//                                      COPY_PAR_MIN bytes on is cut into row bands on it, from
+//                                      COPY_STREAM_MIN bytes on past the caches (a 4K canvas)
 //   path (Path, 24.8 and float API), raster (Raster), stroke (Path::stroke), shapes (Shapes),
 //   blend (row kernels), straight (straight-alpha rows), blendmode (paint.net blend modes),
 //   tmask (tiled masks), flood (flood fill), gradient, pathdata (SVG path data), dash
@@ -64,6 +68,74 @@ pub const ERR_FAIL: i32 = -1;
 pub const ERR_NOMEM: i32 = -8;
 pub const ERR_LIMIT: i32 = -15;
 const SURF_MAX: i32 = 65536; // largest surface side (px)
+/// a blit's plain copy (XRGB source) from this many bytes on runs in row bands on the loop of
+/// set_parallel (gfxtest --bench-blit: a 1 MB copy takes about a fifth on 12 workers)
+pub const COPY_PAR_MIN: usize = 1 << 20;
+/// ... and from this many on with streaming stores (gfx::blend::copy_stream): source and target
+/// together no longer fit the caches, the target is not read first.  A 4K frame (32 MB): 1.9 ms on
+/// 12 workers and the calling thread, 2.7 ms with plain stores, 5 ms on one thread (Ryzen 5 3600,
+/// DDR4-3200, a loaded machine; the memory's limit for such a copy is about 1.7 ms there)
+pub const COPY_STREAM_MIN: usize = 12 << 20;
+// bytes of a band of such a copy (the pool hands the bands out as threads get free)
+const COPY_BAND: usize = 256 * 1024;
+
+/// runs f(i) for every i in 0..n, possibly on several threads (img_core::ParallelFor)
+pub type ParallelFor = fn(usize, &(dyn Fn(usize) + Sync));
+
+static PAR: rt::sync::SpinLock<Option<ParallelFor>> = rt::sync::SpinLock::new(None);
+
+/// the loop large copies run on (Dc::blit, COPY_PAR_MIN); the UI runtime passes a wrapper of
+/// plat::parallel_for -- gfx does not depend on plat.  Without it they run on the calling thread
+/// (the same bytes)
+pub fn set_parallel(f: ParallelFor) {
+    *PAR.lock() = Some(f);
+}
+
+/// the loop set by set_parallel
+pub fn parallel() -> Option<ParallelFor> {
+    *PAR.lock()
+}
+
+/// rows rows of n bytes: from src (stride ss) at row sy, byte sx into dst (stride ds) at row dy,
+/// byte dx.  From COPY_PAR_MIN bytes on in bands on the loop of set_parallel, from
+/// COPY_STREAM_MIN on past the caches (fenced before it returns)
+#[allow(clippy::too_many_arguments)]
+fn copy_rows(dst: &mut [u8], ds: usize, dy: usize, dx: usize, src: &[u8], ss: usize, sy: usize, sx: usize, n: usize, rows: usize) {
+    let bytes = rows.saturating_mul(n);
+    let stream = bytes >= COPY_STREAM_MIN;
+    let copy = |d: &mut [u8], s: &[u8]| {
+        if stream {
+            blend::copy_stream(d, s);
+        } else {
+            d.copy_from_slice(s);
+        }
+    };
+    let par = if bytes >= COPY_PAR_MIN && rows >= 2 { parallel() } else { None };
+    let Some(pf) = par else {
+        for r in 0..rows {
+            let (d, s) = ((dy + r) * ds + dx, (sy + r) * ss + sx);
+            copy(&mut dst[d..d + n], &src[s..s + n]);
+        }
+        if stream {
+            blend::stream_fence();
+        }
+        return;
+    };
+    // bands of bh rows: chunks of the target's rows from row dy on (each band locks its own)
+    let bh = rows.div_ceil((bytes / COPY_BAND).clamp(2, rows));
+    let chunks: Vec<rt::sync::SpinLock<&mut [u8]>> = dst[dy * ds..].chunks_mut(bh * ds).take(rows.div_ceil(bh)).map(rt::sync::SpinLock::new).collect();
+    pf(chunks.len(), &|i| {
+        let Some(cell) = chunks.get(i) else { return };
+        let mut c = cell.lock();
+        for r in i * bh..((i + 1) * bh).min(rows) {
+            let (d, s) = ((r - i * bh) * ds + dx, (sy + r) * ss + sx);
+            copy(&mut c[d..d + n], &src[s..s + n]);
+        }
+        if stream {
+            blend::stream_fence(); // (this thread's stores, before the loop reports it done)
+        }
+    });
+}
 
 /// pixels of one image: rows of `stride` bytes (4 per pixel, A8: 1)
 #[derive(Default)]
@@ -388,7 +460,8 @@ impl Dc {
         self.vline(sf, x + w - 1, y + 1, h - 2);
     }
 
-    /// draw a surface at x, y: premultiplied over (x opacity), XRGB sources are copied  [gfx_blit]
+    /// draw a surface at x, y: premultiplied over (x opacity), XRGB sources are copied (a large
+    /// copy in row bands on the loop of set_parallel, COPY_PAR_MIN)  [gfx_blit]
     pub fn blit(&self, sf: &mut Surface, src: &Surface, x: i32, y: i32) {
         if sf.fmt == FMT_A8 || src.fmt == FMT_A8 {
             return;
@@ -397,16 +470,15 @@ impl Dc {
         let sx = (x0 - x.wrapping_add(self.ox)) as usize;
         let sy = (y0 - y.wrapping_add(self.oy)) as usize;
         let n = (x1 - x0) as usize;
+        let (ds, ss) = (sf.stride as usize, src.stride as usize);
+        if src.fmt == FMT_XRGB {
+            copy_rows(&mut sf.px, ds, (y0 - self.row0) as usize, x0 as usize * 4, &src.px, ss, sy, sx * 4, n * 4, (y1 - y0) as usize);
+            return;
+        }
         for r in 0..(y1 - y0) as usize {
-            let d = ((y0 - self.row0) as usize + r) * sf.stride as usize + x0 as usize * 4;
-            let s = (sy + r) * src.stride as usize + sx * 4;
-            let dst = &mut sf.px[d..d + n * 4];
-            let srow = &src.px[s..s + n * 4];
-            if src.fmt == FMT_XRGB {
-                dst.copy_from_slice(srow);
-            } else {
-                blend::blit_over(dst, srow, self.opac);
-            }
+            let d = ((y0 - self.row0) as usize + r) * ds + x0 as usize * 4;
+            let s = (sy + r) * ss + sx * 4;
+            blend::blit_over(&mut sf.px[d..d + n * 4], &src.px[s..s + n * 4], self.opac);
         }
     }
 

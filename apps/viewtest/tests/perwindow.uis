@@ -1,0 +1,88 @@
+#!args --files apps/viewtest/tests/files
+# viewtest: widgets of the same fixed ids in two windows keep their state each (charge 11).
+# Command 10 opens "Werkzeug A" (160) and "Werkzeug B" (161), as two browser windows with the
+# same panels: a code editor (#170, its find box #173), a colour picker with fields (the hex field
+# #1610615786), a font picker (its family button #245343264, the list's search box #181849733),
+# a line chart (#210) and a file dialog of the library's own (#211 opens it; rows #1245201..,
+# name box #1245196).  Before charge 11 their state was kept per id for all windows: B's pass
+# took A's editor view (its find bar), overwrote A's hex text while A typed it, closed A's font
+# list (and with it A's search), cleared A's chart cursor and reset A's open file dialog (its
+# selection and name) in every pass.  A is built before B, so each check below failed then.
+cmd 10
+expect window 160 open
+expect window 161 open
+expect_nowarn
+# the code editor: the find bar and its matches are A's alone
+window 160
+focus #170
+key ctrl+f
+type "ei"
+expect #173 focused
+expect text:"Code A: Z1 S3 Treffer 3" exists
+window 161
+expect #173 missing
+expect text:"Code B: Z1 S1 Treffer 0" exists
+# a frame later (both windows built again): still so
+wait 50
+expect text:"Code B: Z1 S1 Treffer 0" exists
+window 160
+expect text:"Code A: Z1 S3 Treffer 3" exists
+key esc
+# the colour fields: A's hex text while it is typed (taken on Enter), B's colour stays
+click #1610615786
+key ctrl+a
+type "00FF00"
+wait 50
+expect #1610615786 text "00FF00"
+key enter
+expect text:"Farbe A: #00FF00" exists
+window 161
+expect #1610615786 text "0000FF"
+expect text:"Farbe B: #0000FF" exists
+# the font picker: A's list stays open with its search
+window 160
+click #245343264
+expect #181849733 focused
+type "zzq"
+wait 50
+expect #181849733 text "zzq"
+expect #181849733 focused
+# (the button closes it again)
+click #245343264
+expect #181849733 missing
+window 161
+expect #181849733 missing
+expect text:"Schrift B: serif 14" exists
+# the line chart: A's keyboard cursor moves on from where it was
+window 160
+focus #210
+key home
+expect text:"Diagramm A: 0" exists
+wait 50
+key right
+expect text:"Diagramm A: 1" exists
+window 161
+expect text:"Diagramm B: -" exists
+# the file dialog: A's selection and name stay while B's dialog of the same id is closed
+window 160
+click #211
+expect dialog:"Öffnen" exists
+click #1245201
+wait 50
+expect #1245196 text "a.txt"
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect text:"Datei A: a.txt" exists
+window 161
+expect text:"Datei B: -" exists
+# ... and B's own dialog opens in B with its own selection
+click #211
+expect dialog:"Öffnen" exists
+click #1245202
+wait 50
+expect #1245196 text "b.txt"
+click button:"Öffnen"
+expect text:"Datei B: b.txt" exists
+window 160
+expect text:"Datei A: a.txt" exists
+expect_nowarn

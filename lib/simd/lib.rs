@@ -20,7 +20,7 @@
 // Pixel helpers work on "pixel lanes": the 4 bytes of a pixel zero-extended to 4 u16 lanes,
 // PX = 2 (SSE2) / 4 (AVX2) pixels per register, pixels 2k and 2k + 1 in 128-bit lane k.
 //
-// One of the four crates that may contain `unsafe` (rt, simd, plat, plugin).  Every
+// One of the four library crates that may contain `unsafe` (rt, simd, plat, gpu).  Every
 // intrinsic is an unsafe call (core::arch requires the feature on the calling function, even
 // SSE2, the x86-64 baseline: sse!); Avx2 intrinsics are only reached through an Avx2 value,
 // which exists only after the CPU check (Avx2::new) -- the precondition of all of them.

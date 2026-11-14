@@ -6,8 +6,8 @@
 //   jfgui_a11y(on) -> 1      (host) the mirror on / off (plat::a11y::active() follows it); on
 //                            again: everything anew with the next frame.  on 2: the host reads
 //                            the rich format (a11y_wire VERSION2: Sub, descriptions, cells,
-//                            announcements ...; web/a11y.js), 1 the first one (Android's host).
-//                            jfgui_A11Y=0 refuses.
+//                            announcements ...; web/a11y.js and Android's host since charge 8),
+//                            1 the first one.  jfgui_A11Y=0 refuses.
 //   jfgui_a11y_act(win, key_lo, key_hi, act, a, b, value, len) -> 1 queued / 0 refused
 //                            an action for node key of window win (plat::a11y::Act): 1 click,
 //                            2 focus, 3 value (value), 4 text (the input buffer's len UTF-8

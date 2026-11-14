@@ -13,12 +13,29 @@
 //   drag_query(pw, x, y, types, allowed, mods) -> (types, effect)   (OS layers) the hook's answer
 //                                with one effect picked; without a hook: files, copy (as before).
 //                                Files are never moved: a source deletes what it moved, and
-//                                the app gets only the paths (copy or link instead)
+//                                the app gets only the paths (copy or link instead).  The hook
+//                                answers per drop target (ui: drop_effect_set): a target that
+//                                takes no effect refuses the drag there (the system's pointer
+//                                shows it)
+//   drag_query_all(...) -> (types, effect, effects)   drag_query and every effect the target
+//                                takes there (Wayland's set_actions names them all)
+//   drag_decide(types, effects, offered, allowed, mods) -> (types, effect, effects)   what
+//                                drag_query makes of a hook's answer (tests ask it headless)
 //   drag_effect_pick(allowed, mods) -> effect   Ctrl copy, Shift move, Ctrl+Shift link; else
 //                                the first of copy / move / link the mask allows
 //   drop_data_take() -> DragData the pending drop of E_DROP: the paths of drop_take and the rest
-//   drop_set_text / drop_set_html / drop_add_url / drop_set_image / drop_set_effect
-//                                (OS layers) fill the pending drop (drop_reset empties it)
+//   drop_hold(on)                (the UI) the program answers drops itself: where the platform
+//                                allows a later answer, a drop's answer to its source waits after
+//                                E_DROP for drop_finish (Windows: a source whose data object is in
+//                                IDataObjectAsyncCapability's async mode; X11: XdndFinished;
+//                                Wayland: wl_data_offer.finish); elsewhere it went at the drop
+//   drop_waiting() -> serial     the drop whose answer waits (0: none), read after drop_data_take
+//   drop_allowed() -> DE_*       the effects the source of that drop allows, as the platform gives
+//                                them with the drop (0: it does not say), read after drop_data_take
+//   drop_finish(serial, effect) -> answered   answer that drop's source: the effect it was taken
+//                                with, 0 = not taken
+//   drop_set_text / drop_set_html / drop_add_url / drop_set_image / drop_set_effect /
+//   drop_set_allowed             (OS layers) fill the pending drop (drop_reset empties it)
 //   drop_text_from(bytes, utf16) / drop_url_list(text)   decoding helpers of the OS layers
 //   drag_start(data) -> bool     drag data out of the app while the left button is held (the UI
 //                                calls it when an internal drag leaves its window); false when
@@ -36,7 +53,7 @@
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 
 use rt::sync::SpinLock;
 
@@ -49,7 +66,9 @@ pub const DT_IMAGE: u32 = 16; // an image file (PNG; a DIB arrives as BMP)
 pub const DT_STD: u32 = 31; // every kind other programs know
 pub const DT_USER0: u32 = 1 << 8; // the app's own kinds: DT_USER0 << k, k = 0..23
 
-// ---- effects (bits)
+// ---- effects (bits).  An empty set of the effects a source allows (DragData::effects of a drag
+// out, drag_query's and drag_decide's `allowed`, the DE_* of E_DRAG, drop_allowed) means the
+// source does not say: every effect, DE_ALL -- the same everywhere (ui: drag_allowed)
 pub const DE_COPY: u32 = 1; // the target copies (DROPEFFECT_COPY, XdndActionCopy)
 pub const DE_MOVE: u32 = 2; // the target moves: the source deletes its original
 pub const DE_LINK: u32 = 4; // the target links to it (not on Wayland)
@@ -81,7 +100,8 @@ pub struct DragData {
     pub bytes: Vec<u8>,
     /// what the drag shows next to the pointer inside the app (empty: from the content)
     pub label: String,
-    /// drag out: the DE_* effects the source allows (0 = copy | move); a drop: the effect chosen
+    /// drag out: the DE_* effects the source allows (0: it does not say, every effect); a drop: the
+    /// effect chosen
     pub effects: u32,
 }
 
@@ -127,9 +147,9 @@ impl DragData {
         DragData { app: kind & !DT_STD, bytes: bytes.to_vec(), ..DragData::default() }
     }
 
-    /// the effects a drag out allows (0 means copy | move)
+    /// the effects a drag out allows: `effects`, every one (DE_ALL) when it names none
     pub fn allowed(&self) -> u32 {
-        if self.effects & DE_ALL == 0 { DE_COPY | DE_MOVE } else { self.effects & DE_ALL }
+        if self.effects & DE_ALL == 0 { DE_ALL } else { self.effects & DE_ALL }
     }
 }
 
@@ -165,8 +185,17 @@ pub fn drag_effect_pick(allowed: u32, mods: u8) -> u32 {
 }
 
 /// (OS layers) what platform window pw takes at (x, y) px of a drag offering `types` with the
-/// effects `allowed` (0 = copy | move) -> (accepted types, the effect); (0, 0) = refused
+/// effects `allowed` (0: the source does not say, every effect) -> (accepted types, the effect);
+/// (0, 0) = refused
 pub fn drag_query(pw: i32, x: i32, y: i32, types: u32, allowed: u32, mods: u8) -> (u32, u32) {
+    let (t, e, _) = drag_query_all(pw, x, y, types, allowed, mods);
+    (t, e)
+}
+
+/// (OS layers) drag_query and every DE_* effect the target there takes of the allowed ones
+/// (Wayland's wl_data_offer.set_actions) -> (accepted types, the effect, the effects); (0, 0, 0)
+/// = refused
+pub fn drag_query_all(pw: i32, x: i32, y: i32, types: u32, allowed: u32, mods: u8) -> (u32, u32, u32) {
     let h = HOOK.load(Ordering::Acquire);
     let (t, e) = if h == 0 {
         (types & DT_FILES, DE_ALL) // no UI: files, as before
@@ -175,14 +204,23 @@ pub fn drag_query(pw: i32, x: i32, y: i32, types: u32, allowed: u32, mods: u8) -
         let f: DragHook = unsafe { core::mem::transmute::<usize, DragHook>(h) };
         f(pw, x, y, types)
     };
+    drag_decide(t, e, types, allowed, mods)
+}
+
+/// what drag_query makes of the hook's answer (accepted types t, effects e) to a drag offering
+/// `types` with the effects `allowed` (0: not said, every effect) and the modifier keys `mods` -> (accepted
+/// types, the effect, every effect taken); (0, 0, 0) = refused (no kind or no effect in common).
+/// Files are never moved.  For the OS layers and headless tests (ui's `dragover expect`)
+pub fn drag_decide(t: u32, e: u32, types: u32, allowed: u32, mods: u8) -> (u32, u32, u32) {
     let t = t & types;
-    let mut allowed = if allowed & DE_ALL == 0 { DE_COPY | DE_MOVE } else { allowed & DE_ALL };
+    let mut allowed = if allowed & DE_ALL == 0 { DE_ALL } else { allowed & DE_ALL };
     if t & DT_FILES != 0 {
         // a move would make the source delete the files: the app gets only their paths
         allowed &= !DE_MOVE;
     }
-    let eff = drag_effect_pick(e & allowed, mods);
-    if t == 0 || eff == 0 { (0, 0) } else { (t, eff) }
+    let all = e & allowed;
+    let eff = drag_effect_pick(all, mods);
+    if t == 0 || eff == 0 { (0, 0, 0) } else { (t, eff, all) }
 }
 
 // ---------------------------------------------------------------- the pending drop
@@ -194,10 +232,14 @@ struct Rich {
     url_bytes: usize,
     image: Option<Vec<u8>>,
     effect: u32,
+    allowed: u32,
 }
 
 static RICH: SpinLock<Rich> =
-    SpinLock::new(Rich { text: None, html: None, urls: Vec::new(), url_bytes: 0, image: None, effect: 0 });
+    SpinLock::new(Rich { text: None, html: None, urls: Vec::new(), url_bytes: 0, image: None, effect: 0, allowed: 0 });
+
+// the effects the source of the drop drop_data_take took last allows (drop_allowed)
+static TAKEN_ALLOWED: AtomicU32 = AtomicU32::new(0);
 
 /// (drop_reset) forget the pending text, HTML, URLs and image
 pub(crate) fn rich_reset() {
@@ -208,6 +250,7 @@ pub(crate) fn rich_reset() {
     r.url_bytes = 0;
     r.image = None;
     r.effect = 0;
+    r.allowed = 0;
 }
 
 // text of another program: UTF-8 (invalid bytes replaced), up to the first NUL, bounded
@@ -263,6 +306,14 @@ pub fn drop_set_effect(effect: u32) {
     RICH.lock().effect = effect & DE_ALL;
 }
 
+/// (OS layers) the DE_* effects the source of the pending drop allows, as the platform gives them
+/// with the drop: Windows IDropTarget::Drop's pdwEffect, X11 the source's XdndActionList with the
+/// action of its last XdndPosition (every effect without a list), Wayland the offer's
+/// source_actions, macOS the drag's operation mask.  Not called (the browser, Android): 0
+pub fn drop_set_allowed(effects: u32) {
+    RICH.lock().allowed = effects & DE_ALL;
+}
+
 /// the pending drop (E_DROP): its paths (drop_take) and the rest; both start empty again
 pub fn drop_data_take() -> DragData {
     let files = crate::drop_take();
@@ -277,7 +328,16 @@ pub fn drop_data_take() -> DragData {
         ..DragData::default()
     };
     r.url_bytes = 0;
+    TAKEN_ALLOWED.store(core::mem::take(&mut r.allowed), Ordering::Release);
     d
+}
+
+/// drop_allowed() -> the DE_* effects the source of the drop drop_data_take took last allows, as
+/// the platform gave them with the drop (drop_set_allowed: the same the drag said in E_DRAG over
+/// the window); 0: the platform does not say (the browser, Android).  Read it right after
+/// drop_data_take
+pub fn drop_allowed() -> u32 {
+    TAKEN_ALLOWED.load(Ordering::Acquire)
 }
 
 // "scheme:" in front (RFC 3986: a letter, then letters, digits, + - .)
@@ -321,6 +381,77 @@ pub fn drop_url_list(text: &[u8]) -> u32 {
         }
     }
     n
+}
+
+// ---------------------------------------------------------------- the answer of a drop
+
+// drop_hold is on; the serial of the drop whose answer waits (0: none) and the OS layer's function
+// that gives it; the last serial handed out
+static HOLD: AtomicBool = AtomicBool::new(false);
+static WAITING: AtomicU32 = AtomicU32::new(0);
+static FINISH: AtomicUsize = AtomicUsize::new(0);
+static SERIAL: AtomicU32 = AtomicU32::new(0);
+
+/// drop_hold(on): (the UI, at its start) the program answers drops itself.  On, the OS layers keep
+/// a drop's answer to its source open after E_DROP where the platform allows a later answer, until
+/// drop_finish: Windows when the source's data object offers IDataObjectAsyncCapability in async
+/// mode (StartOperation in IDropTarget::Drop, EndOperation later), X11 (XdndFinished), Wayland
+/// (wl_data_offer.finish); everywhere else, and on Windows for every other source, the answer went
+/// at the drop (drop_waiting says 0).  Off (the default): every drop is answered at once, as before
+pub fn drop_hold(on: bool) {
+    HOLD.store(on, Ordering::Release);
+}
+
+/// (OS layers) drop_hold is on
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), allow(dead_code))]
+pub(crate) fn drop_held() -> bool {
+    HOLD.load(Ordering::Acquire)
+}
+
+/// drop_waiting() -> the serial of the last drop whose answer to its source waits for drop_finish;
+/// 0: none (it was answered at the drop, or no drop came).  Read it right after drop_data_take
+pub fn drop_waiting() -> u32 {
+    WAITING.load(Ordering::Acquire)
+}
+
+/// drop_finish(serial, effect) -> answered: the source of drop `serial` (drop_waiting) learns how
+/// the drop ended: the DE_* effect it was taken with, 0 = not taken.  false: that drop does not
+/// wait (answered already, or a newer drop replaced it).  Windows: EndOperation(S_OK, effect),
+/// not taken EndOperation(E_ABORT, DROPEFFECT_NONE); X11: XdndFinished with "accepted" and the
+/// effect's action; Wayland: taken wl_data_offer.finish (the action stays the one negotiated
+/// before the drop), not taken the offer destroyed without finish
+pub fn drop_finish(serial: u32, effect: u32) -> bool {
+    if serial == 0 || WAITING.compare_exchange(serial, 0, Ordering::AcqRel, Ordering::Acquire).is_err() {
+        return false;
+    }
+    let f = FINISH.swap(0, Ordering::AcqRel);
+    if f != 0 {
+        // SAFETY: FINISH only ever holds 0 or a fn(u32) stored by drop_wait_begin.
+        let f: fn(u32) = unsafe { core::mem::transmute::<usize, fn(u32)>(f) };
+        f(effect & DE_ALL);
+    }
+    true
+}
+
+/// (OS layers) the drop about to be pushed keeps its answer open until finish(effect) is called
+/// through drop_finish -> its serial.  A drop that still waited is no longer waited for: the layer
+/// answers it itself before (as at its drop)
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), allow(dead_code))]
+pub(crate) fn drop_wait_begin(finish: fn(u32)) -> u32 {
+    let mut s = SERIAL.fetch_add(1, Ordering::AcqRel).wrapping_add(1);
+    if s == 0 {
+        s = SERIAL.fetch_add(1, Ordering::AcqRel).wrapping_add(1);
+    }
+    FINISH.store(finish as usize, Ordering::Release);
+    WAITING.store(s, Ordering::Release);
+    s
+}
+
+/// (OS layers) the drop that waited was answered by the layer itself (its window went away)
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), allow(dead_code))]
+pub(crate) fn drop_wait_clear() {
+    WAITING.store(0, Ordering::Release);
+    FINISH.store(0, Ordering::Release);
 }
 
 // ---------------------------------------------------------------- the outgoing drag

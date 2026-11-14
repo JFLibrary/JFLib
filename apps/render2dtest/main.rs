@@ -69,6 +69,12 @@ mod refimg;
 mod scenes;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 mod tests;
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+mod textcpu;
+#[cfg(not(target_os = "android"))]
+mod textdraw;
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+mod textgpu;
 #[cfg(target_arch = "wasm32")]
 mod web;
 

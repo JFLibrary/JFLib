@@ -138,7 +138,8 @@ fn table(nodes:&[Node],n:&Node,c:Context,depth:usize)->Result<InputTable,Error>{
 }
 /// Decode a UTF-8 HTML clipboard fragment into editable paragraphs and nested tables.
 /// Handles inline text/CSS, table grids, merged cells, headers, borders and table positions.
-/// JFLib's versioned data attributes retain exact twip anchors and document page settings.
+/// JFLib's versioned data attributes retain exact twip anchors and document page settings, and
+/// data-jf-size the nominal size of raised and lowered text.
 /// Input is bounded to 16 MiB, 2 MiB text, 64 element levels and eight table levels.
 /// Active content and metadata are ignored; external resources are never requested.
 pub fn clipboard_html_decode(bytes:&[u8])->Result<Document,Error>{

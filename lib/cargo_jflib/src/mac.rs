@@ -2,8 +2,10 @@
 // (docs/APPLE.md AP7c): the program for aarch64-apple-darwin, Info.plist from PACKAGE (display,
 // version, app_id, filetypes= as document types -- "own" ones exported as the app's types --,
 // schemes= as URL types; browser=1: http and https as the web URL type and the web documents with
-// their system types, so macOS lists the app as a web browser), the icon as NAME.icns from
-// res/app_*.png, signed ad hoc; with `sandbox`
+// their system types, so macOS lists the app as a web browser; the languages of src/locales/ui.tsv
+// as the bundle's localizations: without them macOS takes the app for an English one and VoiceOver
+// reads its texts with an English voice), the icon as NAME.icns from res/app_*.png, signed ad hoc;
+// with `sandbox`
 // in PERMISSIONS the App Sandbox and the entitlements its rules need.  The same bundle as the JFLib
 // repository's tools/apple.py mac_bundle.  On a Mac only (Apple's SDK, codesign).  --run starts it
 // through `open` (in the logged-in session, also from SSH) and waits for it.  jfgui_MAC_IDENTITY
@@ -80,7 +82,7 @@ pub(crate) fn bundle(dir: &Path, version: &str, exe: &Path, out: &Path) -> Resul
         fs::create_dir_all(&res).map_err(|e| e.to_string())?;
         fs::write(res.join(format!("{name}.icns")), i).map_err(|e| e.to_string())?;
     }
-    fs::write(contents.join("Info.plist"), info_plist(&meta, &name, version, icns.is_some())?).map_err(|e| e.to_string())?;
+    fs::write(contents.join("Info.plist"), info_plist(&meta, &name, version, icns.is_some(), &languages(dir))?).map_err(|e| e.to_string())?;
     fs::write(contents.join("PkgInfo"), "APPL????").map_err(|e| e.to_string())?;
     let ent = entitlements(pkgmeta::permissions(dir).as_deref());
     let ent_file = out.join(format!("{name}.entitlements"));
@@ -254,6 +256,21 @@ fn array(items: &[String]) -> String {
     s + "</array>"
 }
 
+/// the language codes of the app's catalogue (the first line of src/locales/ui.tsv or
+/// locales/ui.tsv); without one the library's German and English
+fn languages(dir: &Path) -> Vec<String> {
+    for f in [dir.join("src/locales/ui.tsv"), dir.join("locales/ui.tsv")] {
+        if let Ok(t) = fs::read_to_string(&f) {
+            let langs: Vec<String> = t.lines().next().unwrap_or("").split('\t').map(str::trim).filter(|c| !c.is_empty()).map(String::from).collect();
+            if !langs.is_empty() {
+                return langs;
+            }
+            break;
+        }
+    }
+    vec!["de".into(), "en".into()]
+}
+
 /// the system's type (UTI) of a web browser's document by its MIME type, and whether a browser
 /// is its Default viewer (LSHandlerRank; the others stay Alternate)
 fn web_uti(mime: &str) -> Option<(&'static str, bool)> {
@@ -266,8 +283,9 @@ fn web_uti(mime: &str) -> Option<(&'static str, bool)> {
     }
 }
 
-/// Info.plist from PACKAGE (see the file header)
-fn info_plist(meta: &Meta, name: &str, version: &str, icon: bool) -> Result<String, String> {
+/// Info.plist from PACKAGE (see the file header); `langs` the bundle's localizations, English its
+/// development region where the app has it (the UI falls back to English, ui::i18n)
+fn info_plist(meta: &Meta, name: &str, version: &str, icon: bool, langs: &[String]) -> Result<String, String> {
     let browser = pkgmeta::browser(meta)?;
     let aid = pkgmeta::app_id(meta, name)?;
     let display = meta.or("display", name);
@@ -283,6 +301,11 @@ fn info_plist(meta: &Meta, name: &str, version: &str, icon: bool) -> Result<Stri
     d.push_str("\t<key>NSHighResolutionCapable</key>\n\t<true/>\n\t<key>CFBundleSupportedPlatforms</key>\n\t<array><string>MacOSX</string></array>\n");
     if let Some(p) = meta.get("publisher") {
         d.push_str(&string("NSHumanReadableCopyright", p));
+    }
+    if let Some(first) = langs.first() {
+        let region = if langs.iter().any(|l| l == "en") { "en" } else { first.as_str() };
+        d.push_str(&string("CFBundleDevelopmentRegion", region));
+        d.push_str(&format!("\t<key>CFBundleLocalizations</key>\n\t{}\n", array(langs)));
     }
     if icon {
         d.push_str(&string("CFBundleIconFile", name));
@@ -412,9 +435,17 @@ mod tests {
     #[test]
     fn plist_and_entitlements() {
         let m = Meta::read(Path::new("/nonexistent"));
-        let p = info_plist(&m, "hallo", "1.2.3", true).unwrap();
+        let langs = languages(Path::new("/nonexistent"));
+        assert_eq!(langs, ["de", "en"]);
+        let p = info_plist(&m, "hallo", "1.2.3", true, &langs).unwrap();
         assert!(p.contains("<key>CFBundleIdentifier</key>\n\t<string>org.example.hallo</string>")
             && p.contains("<key>CFBundleShortVersionString</key>\n\t<string>1.2.3</string>") && p.contains("<key>CFBundleIconFile</key>"));
+        assert!(p.contains("<key>CFBundleDevelopmentRegion</key>\n\t<string>en</string>")
+            && p.contains("<key>CFBundleLocalizations</key>\n\t<array><string>de</string><string>en</string></array>"));
+        let fr = info_plist(&m, "hallo", "1.2.3", false, &["de".into(), "fr".into()]).unwrap();
+        assert!(fr.contains("<key>CFBundleDevelopmentRegion</key>\n\t<string>de</string>"));
+        // the template's catalogue
+        assert_eq!(languages(&Path::new(env!("CARGO_MANIFEST_DIR")).join("template")), ["de", "en"]);
         let perms = vec![("sandbox".to_string(), vec![]), ("net.connect".into(), vec!["*".into()]), ("fs.write".into(), vec!["$DOWNLOADS/**".into()]),
                          ("fs.read".into(), vec!["$HOME/Projekte/**".into(), "$TEMP/x/**".into()])];
         let e = entitlements(Some(&perms)).unwrap();
@@ -427,7 +458,7 @@ mod tests {
     fn a_browser_plist() {
         let types = "html,htm|text/html|HTML-Dokument; pdf|application/pdf|PDF-Dokument";
         let m = Meta(vec![("schemes".into(), "http https narsil".into()), ("filetypes".into(), types.into()), ("browser".into(), "1".into())]);
-        let p = info_plist(&m, "netz", "1.0.0", false).unwrap();
+        let p = info_plist(&m, "netz", "1.0.0", false, &[]).unwrap();
         assert!(p.contains("<dict><key>CFBundleURLName</key><string>Web site URL</string><key>CFBundleTypeRole</key><string>Viewer</string>\
                             <key>CFBundleURLSchemes</key><array><string>http</string><string>https</string></array></dict>"), "{p}");
         assert!(p.contains("<key>CFBundleURLSchemes</key><array><string>narsil</string></array>"), "{p}");
@@ -437,7 +468,7 @@ mod tests {
         assert!(p.contains("<key>LSHandlerRank</key><string>Alternate</string><key>LSItemContentTypes</key><array><string>com.adobe.pdf</string></array>"), "{p}");
         // without browser=1: one URL type, editors, no system types
         let m = Meta(vec![("schemes".into(), "http https".into()), ("filetypes".into(), types.into())]);
-        let p = info_plist(&m, "netz", "1.0.0", false).unwrap();
+        let p = info_plist(&m, "netz", "1.0.0", false, &[]).unwrap();
         assert!(!p.contains("Web site URL") && !p.contains("public.html") && p.contains("<string>Editor</string>"), "{p}");
     }
 }

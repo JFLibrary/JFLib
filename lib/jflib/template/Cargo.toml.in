@@ -5,10 +5,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-jflib = "0.1"
+jflib = "0.2"
 
 [build-dependencies]
-jflib-build = "0.1"
+jflib-build = "0.2"
 
 # Cargo takes no profile from a dependency.  JFLib's runtime needs panic = "abort"; a development
 # build without overflow checks and debug assertions is the build JFLib is tested with.

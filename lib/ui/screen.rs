@@ -38,13 +38,15 @@ use super::Ui;
 /// the state of the screen services
 #[derive(Default)]
 pub(crate) struct S {
-    /// a pick is running; the colour picker that asked (0: the app itself)
+    /// a pick is running; the colour picker that asked (0: the app itself) and its window
     pub(crate) picking: bool,
     pub(crate) pick_for: u32,
+    pub(crate) pick_win: u32,
     /// the last picked colour (taken by picked_color / the colour picker)
     pub(crate) picked: Option<u32>,
-    /// a picked colour for the colour picker pick_for, until its next pass applies it
-    pub(crate) pending: Option<(u32, u32)>,
+    /// a picked colour for the colour picker pick_for of window pick_win, until its next pass
+    /// applies it: (window, picker, colour)
+    pub(crate) pending: Option<(u32, u32, u32)>,
     shot: Option<Surface>,
     error: Option<ScreenError>,
     /// why shortcuts were dropped: (id, why)
@@ -139,6 +141,7 @@ impl Ui {
         }
         self.m.screen.picking = true;
         self.m.screen.pick_for = owner;
+        self.m.screen.pick_win = self.uiw_cur;
         true
     }
 
@@ -181,7 +184,7 @@ impl Ui {
         match r {
             Ok(c) => {
                 if s.pick_for != 0 {
-                    s.pending = Some((s.pick_for, c));
+                    s.pending = Some((s.pick_win, s.pick_for, c));
                 } else {
                     s.picked = Some(c);
                 }

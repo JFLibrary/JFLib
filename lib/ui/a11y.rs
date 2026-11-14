@@ -83,6 +83,14 @@ pub struct A11yRequest {
     pub action: A11yAction,
 }
 
+impl A11yRequest {
+    /// A request as `ui.a11y_request_take` hands it out (window id, the record's id64, the
+    /// action): for an app's tests of its own handling, the struct being `non_exhaustive`.
+    pub fn new(win: u32, id: u64, action: A11yAction) -> A11yRequest {
+        A11yRequest { win, id, action }
+    }
+}
+
 /// What a screen reader asks of a record (`A11yRequest::action`).
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
@@ -128,6 +136,11 @@ pub(crate) struct S {
     text: Option<(u8, u32, String)>,
     /// a selection for (window, text box): anchor, caret in characters (waits for the focus)
     select: Option<(u8, u32, i32, i32)>,
+    /// plat::a11y::active() as the app last heard of it (UIC_A11Y)
+    active: bool,
+    /// what the tree published last was made of (a11y_key; 0: none): an equal frame publishes
+    /// nothing
+    published: u64,
     /// the caret of the focused text box per window: the pass that drew it, x, y, w, h (window
     /// px; ime_pos reports it)
     caret: [(u32, [i32; 4]); WIN_MAX],
@@ -300,7 +313,9 @@ impl Ui {
     // the tree of window i
     fn a11y_win(&self, i: u32) -> WinTree {
         let recs: Vec<&Sem> = self.sems.iter().filter(|s| s.win as u32 == i).collect();
-        let mut cands: Vec<Cand> = Vec::new();
+        // (room for every record and a few synthetic containers: a Cand is large, growing the Vec
+        // copied them again and again)
+        let mut cands: Vec<Cand> = Vec::with_capacity(recs.len() + 16);
         let mut occ: BTreeMap<u32, u32> = BTreeMap::new();
         // the scoped records open at a record: (the last record they hold, their candidate)
         let mut scopes: Vec<(usize, usize)> = Vec::new();
@@ -821,11 +836,80 @@ impl Ui {
             return;
         }
         if plat::a11y::active() {
+            // the same records, windows and carets as the tree published last: the same tree (no
+            // change to send; the bridges answer from it) -- a page that does not move costs the
+            // key alone, not the tree
+            let key = self.a11y_key();
+            if key == self.m.a11y.published && said.is_empty() {
+                return;
+            }
             for (w, text, p) in said {
                 plat::a11y::announce(w, &text, p);
             }
             plat::a11y::publish(self.a11y_tree());
+            self.m.a11y.published = key;
+        } else {
+            self.m.a11y.published = 0;
         }
+    }
+
+    /// (benchmarks: plattest --test a11y-cost) the key a11y_frame compares with the tree published
+    /// last: equal keys, equal trees
+    #[doc(hidden)]
+    pub fn a11y_tree_key(&self) -> u64 {
+        self.a11y_key()
+    }
+
+    // a11y_win's inputs as a 64-bit key: the bridge's epoch, the shown windows (title, flags,
+    // place, size, keyboard, platform window), the carets drawn in this pass, every record
+    fn a11y_key(&self) -> u64 {
+        let mut h = Mix(plat::a11y::epoch() as u64 ^ 0x6A09_E667_F3BC_C908);
+        for i in 0..WIN_MAX as u32 {
+            if i != 0 && !self.uiw_drawable(i) {
+                continue;
+            }
+            let rec = &self.m.win.recs[i as usize];
+            let fb = self.win_fb(i);
+            h.u64(i as u64 | (rec.flags as u64) << 8 | (self.uiw_plat_state(i) as u64) << 32);
+            h.u64((rec.sx as u32 as u64) | (rec.sy as u32 as u64) << 32);
+            h.u64((fb.w as u32 as u64) | (fb.h as u32 as u64) << 32);
+            h.u64(if self.headless { self.m.win.active as u64 } else { self.uiw_pw(i) as u32 as u64 });
+            h.str(if i == 0 { self.title() } else { self.uiw_title(i) });
+            let (pass, r) = self.m.a11y.caret[i as usize & (WIN_MAX - 1)];
+            if pass == self.frame {
+                h.rect(&r);
+            }
+        }
+        for s in &self.sems {
+            h.u64(s.id as u64 | (s.kind as u64) << 32 | (s.state as u64) << 48);
+            h.rect(&s.rect);
+            h.u64(s.value as u32 as u64 | (s.max as u32 as u64) << 32);
+            h.u64(s.min as u32 as u64 | (s.layer as u64) << 32 | (s.depth as u64) << 40 | (s.win as u64) << 48);
+            h.opt(s.label.as_deref());
+            if let Some(a) = s.ax.as_deref() {
+                h.u64(a.id);
+                h.u64(a.parent);
+                for t in [&a.name, &a.desc, &a.url, &a.value_text] {
+                    h.opt(t.as_deref());
+                }
+                h.u64(a.states as u64 | (a.level as u64) << 32);
+                h.u64(a.set[0] as u64 | (a.set[1] as u64) << 32);
+                h.rect(&a.cell.map(|v| v as i32));
+                h.u64(a.grid[0] as u64 | (a.grid[1] as u64) << 32);
+                h.u64(a.live as u64);
+                if let Some(r) = a.range {
+                    for v in r {
+                        h.u64(v.to_bits());
+                    }
+                }
+                if let Some([x, y]) = a.sel {
+                    h.u64(x as u64 | (y as u64) << 32 | 1 << 63);
+                }
+            } else {
+                h.u64(u64::MAX);
+            }
+        }
+        h.0 | 1 // (0: nothing published)
     }
 
     // the record of the click waiting for a widget, as of the last pass
@@ -875,6 +959,12 @@ impl Ui {
     /// (runtime, E_WAKE) take the actions of the assistive technology: a node of the last
     /// pass that is enabled and not behind a modal dialog; the next passes carry them out
     pub(crate) fn a11y_poll(&mut self) {
+        // a client came or left (the bridges wake this thread when it flips): the app hears it
+        let on = self.a11y_active();
+        if on != self.m.a11y.active {
+            self.m.a11y.active = on;
+            self.cmd_run(UIC_A11Y, on as u32);
+        }
         // the further actions: offered by records with an id64 only, for the app
         for o in plat::a11y::take_ops() {
             let action = match o.op {
@@ -995,7 +1085,9 @@ impl Ui {
     /// A screen reader (or another client of the accessibility tree) listens: the library builds
     /// the tree from the records only then.  Records that only it needs -- the content of a page
     /// out of view (`AS_OFFSCREEN`) -- are best published only while this is true; it turns true
-    /// with a frame of its own when a client comes.  Always false in headless runs.
+    /// with a frame of its own when a client comes, and the app gets the command `UIC_A11Y` (arg
+    /// 1) then and when it leaves (arg 0; Windows: 10 s after its last question unless a screen
+    /// reader listens), also while nothing else happens.  Always false in headless runs.
     pub fn a11y_active(&self) -> bool {
         !self.headless && plat::a11y::active()
     }
@@ -1085,6 +1177,36 @@ fn cut(s: &str, max: usize) -> String {
         b -= 1;
     }
     String::from(&s[..b])
+}
+
+// a quick 64-bit mix of words (a11y_key; no defence against chosen input is needed there)
+struct Mix(u64);
+
+impl Mix {
+    fn u64(&mut self, v: u64) {
+        self.0 = (self.0.rotate_left(5) ^ v).wrapping_mul(0x51_7CC1_B727_220A_95);
+    }
+    fn rect(&mut self, r: &[i32; 4]) {
+        self.u64(r[0] as u32 as u64 | (r[1] as u32 as u64) << 32);
+        self.u64(r[2] as u32 as u64 | (r[3] as u32 as u64) << 32);
+    }
+    fn str(&mut self, s: &str) {
+        let b = s.as_bytes();
+        self.u64(b.len() as u64);
+        let mut c = b.chunks_exact(8);
+        for w in &mut c {
+            self.u64(u64::from_le_bytes([w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]]));
+        }
+        let mut last = [0u8; 8];
+        last[..c.remainder().len()].copy_from_slice(c.remainder());
+        self.u64(u64::from_le_bytes(last));
+    }
+    fn opt(&mut self, s: Option<&str>) {
+        match s {
+            Some(s) => self.str(s),
+            None => self.u64(0xA5A5_A5A5_A5A5_A5A5),
+        }
+    }
 }
 
 // a text of a record's SemAx: None when empty, cut to AX_TEXT_MAX

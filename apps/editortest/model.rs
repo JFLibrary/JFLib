@@ -399,6 +399,11 @@ fn grammars(t: &mut T) {
     let (v, st2) = toks(&r, "inside */ x */ after", st);
     t.check(has(&v, "com:inside */ x */"), &format!("nested comment closes after two: {:?}", v));
     t.eq(st2, 0, "closed");
+    // the same block with its depth lost (shifted out of the 32-bit state below three nested
+    // constructs): one open block, the first */ closes it (d -= 1 passed 0 and the rest of the
+    // line stayed a comment)
+    let (v, st2) = toks(&r, "inside */ after", st & 0xFF);
+    t.check(has(&v, "com:inside */") && st2 == 0, &format!("a block whose depth was lost closes at */: {:?} {:#x}", v, st2));
     let (v, _) = toks(&r, "let c = 'x'; let l: &'a str = r#\"raw \"q\"\"#; println!(\"{}\", c);", 0);
     for w in ["str:'x'", "meta:'a", "str:r#\"raw \"q\"\"#", "fn:println!"] {
         t.check(has(&v, w), &format!("rust {:?} in {:?}", w, v));

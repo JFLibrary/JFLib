@@ -12,6 +12,7 @@ use crate::T;
 pub const PASS: &[(&str, &str)] = &[
     ("empty module", ""),
     ("shadowing in a block", "fn f() { var a = 1; { var a = 2.0; a += 1.0; } a += 1; }"),
+    ("compound vector op= scalar", "fn f(a: vec3f, b: vec4i, c: vec2u) -> vec3f { var v = a; v += 1.0; v -= 0.5; v /= 2.0; v *= 3.0; var w = b; w += 1; w %= 3; w.yz *= 2; var u = c; u += 2u; u -= 1u; return v + vec3f(w.xyz) + f32(u.x); }"),
     ("module scope in any order", "fn f() -> i32 { return later + g(); }\nconst later = 1;\nfn g() -> i32 { return 2; }"),
     ("shadow a built-in", "fn min() -> u32 { return 0u; }\nfn f() -> u32 { return min(); }"),
     ("shadow an enumerant", "const rgba8unorm = 12;\nfn f() -> i32 { return rgba8unorm; }"),

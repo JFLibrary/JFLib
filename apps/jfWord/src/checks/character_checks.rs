@@ -87,6 +87,15 @@ pub(crate) fn run_checks() -> (usize, usize) {
     check!(html.contains("background-color:#FFFF00;vertical-align:-2.20pt")
         && html.contains("background-color:#00FFFF;vertical-align:3.65pt")
         && html.contains("font-size:7.50pt"), "HTML uses shared display size and baseline shifts");
+    // pasting that HTML back keeps the nominal size (data-jf-size); it shrank by a third per trip
+    let chars = |d: &Document| d.paragraphs[0].content.iter().flat_map(|i| {
+        let f = d.resolve_paragraph_text(&d.paragraphs[0], i.format());
+        i.text().unwrap_or("").chars().map(move |_| (f.size_half_points, f.positioning))
+    }).collect::<alloc::vec::Vec<_>>();
+    let back = doc_io::clipboard_html_decode(html.as_bytes()).unwrap();
+    let again = doc_io::clipboard_html_decode(&doc_io::clipboard_html_encode(&back).unwrap()).unwrap();
+    check!(back.plain_text() == sample.plain_text() && chars(&back) == chars(&sample) && chars(&again) == chars(&sample),
+        "HTML round trips keep the nominal size of raised and lowered text");
     let mut text = text::Text::new(style::STYLE.fonts(), style::STYLE.font_names());
     let fonts = doc_view::Fonts::new(&mut text).unwrap();
     for size in [8, 22, 96, 288] {

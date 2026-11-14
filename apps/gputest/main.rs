@@ -60,6 +60,8 @@
 //        msl         (AP6) every shader of the repository through the MSL translation (t_msl.rs): on
 //                    Metal translated and compiled by ShaderModule::from_spirv, elsewhere translated
 //        all         every test above
+//   gputest --test A,B,... [--except C,D,...] [--validate]   several tests in the list's order, `all` without
+//                   some (tests/validate*.uis: the tests with a real window apart from the rest)
 //   --validate      with VK_LAYER_KHRONOS_validation (jfgui_GPU_VALIDATE, synchronization
 //                   validation); a validation error fails the test.  Without the layer: a note,
 //                   the test runs as without --validate.  The layer's messages go to stderr, which
@@ -432,6 +434,12 @@ fn errors(t: &mut T) {
             e.push_constants(8, &[1u32, 2]);
             t.ok(matches!(e.finish(), Err(GpuError::Invalid(_))), "push constants past the layout: Invalid");
         }
+        // offset + size past u32: the sum wrapped to 4 and passed the check, the driver got the offset
+        if let Some(mut e) = t.res(dev.encoder(), "encoder") {
+            e.set_compute_pipeline(&fp.pipe);
+            e.push_constants(u32::MAX - 3, &[1u32, 2]);
+            t.ok(matches!(e.finish(), Err(GpuError::Invalid(_))), "push constants at u32::MAX - 3: Invalid");
+        }
         let other = dev.create_bind_group_layout(&[Binding { binding: 3, kind: BindingKind::UniformBuffer, stages: Stages::ALL }]);
         let ub = dev.create_buffer(&BufferDesc { size: 256, usage: BufferUsage::UNIFORM, memory: MemoryKind::Upload });
         if let (Some(other), Some(ub)) = (t.res(other, "layout"), t.res(ub, "uniform buffer")) {
@@ -535,7 +543,6 @@ fn run() -> i32 {
         plat::write_stderr(b"gputest: --info, --test NAME [--validate], --bench or --bench N (see apps/gputest/main.rs)\n");
         return 2;
     };
-    let all = test == "all";
     let tests: [(&str, fn(&mut T)); 20] = [
         ("info", info),
         ("compute", t_compute::compute),
@@ -558,16 +565,25 @@ fn run() -> i32 {
         ("noloader", t_glibc::noloader),
         ("msl", t_msl::msl),
     ];
+    // --test A,B,...: those tests in the list's order; --except A,B,...: not those (the suite runs the validation of
+    // the tests with a real window apart from the rest of `all`, tests/validate*.uis)
+    let names: Vec<&str> = test.split(',').collect();
+    let except_arg = plat::arg_value("--except").unwrap_or_default();
+    let except: Vec<&str> = except_arg.split(',').filter(|n| !n.is_empty()).collect();
+    if let Some(bad) = names.iter().chain(except.iter()).find(|n| **n != "all" && !tests.iter().any(|(m, _)| m == *n)) {
+        plat::write_stderr(format!("gputest: no test {bad}\n").as_bytes());
+        return 2;
+    }
     let mut ran = false;
     for (name, f) in tests {
-        if all || test == name {
+        if (names.contains(&"all") || names.contains(&name)) && !except.contains(&name) {
             out(&format!("== {name}{}", if validate { " (validation)" } else { "" }));
             f(&mut t);
             ran = true;
         }
     }
     if !ran {
-        plat::write_stderr(format!("gputest: no test {test}\n").as_bytes());
+        plat::write_stderr(format!("gputest: no test in {test}\n").as_bytes());
         return 2;
     }
     if validate {

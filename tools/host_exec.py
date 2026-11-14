@@ -85,6 +85,61 @@ def run_linux(args, cwd=ROOT, timeout=600, env=None):
         return subprocess.CompletedProcess(command, p.returncode, stdout, stderr)
 
 
+class LinuxRunner:
+    """one WSL process that runs Linux programs one after the other for one thread (tools/linux_task.py serve):
+    what run_linux does without a wsl.exe and two Pythons per program (build_rs.py test, section "test-jobs").
+    run() answers as run_linux; RuntimeError when the process is gone (the caller can fall back to run_linux)"""
+
+    def __init__(self, cwd=ROOT):
+        import queue
+        import threading
+        self.p = subprocess.Popen(
+            ['wsl.exe', '-d', os.environ.get('jfgui_WSL_DISTRO', 'Ubuntu-24.04'), '-e', 'python3',
+             linux_path(ROOT / 'tools/linux_task.py'), '--cwd', linux_path(cwd), 'serve'],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        self.lines = queue.Queue()
+
+        def read():
+            for line in iter(self.p.stdout.readline, b''):
+                self.lines.put(line)
+            self.lines.put(b'')
+        threading.Thread(target=read, daemon=True).start()
+
+    def run(self, args, timeout=600):
+        import json
+        import queue
+        try:
+            self.p.stdin.write((json.dumps({'args': list(map(str, args)), 'timeout': timeout}) + '\n').encode('utf-8'))
+            self.p.stdin.flush()
+            line = self.lines.get(timeout=(timeout or 86400) + 60)
+        except (OSError, queue.Empty) as e:
+            self.close()
+            raise RuntimeError(f'linux_task serve: {e!r}') from e
+        if not line:
+            self.close()
+            raise RuntimeError('linux_task serve: the WSL process ended')
+        try:
+            a = json.loads(line.decode('utf-8'))
+        except ValueError as e:     # (UnicodeDecodeError too) not our answer: wsl.exe's own message (UTF-16)
+            self.close()
+            raise RuntimeError(f'linux_task serve: {line[:200]!r}') from e
+        if a['timeout']:
+            raise subprocess.TimeoutExpired(args, timeout, output=a['out'], stderr=a['err'])
+        return subprocess.CompletedProcess(args, a['code'], a['out'], a['err'])
+
+    def close(self):
+        try:
+            self.p.stdin.close()
+        except OSError:
+            pass
+        try:
+            self.p.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            self.p.kill()
+            self.p.wait()
+
+
 def run_native(target, exe, args, timeout=600, env=None, gui=False):
     """run a built program of target here; gui: it opens windows (the Mac from SSH starts it in the
     logged-in session, tools/apple.py gui_run); a Linux program for another processor runs under

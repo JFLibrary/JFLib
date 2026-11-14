@@ -563,7 +563,8 @@ impl Highlighter {
     // continue a construct open at the line start -> (where it ends, the state: 0 closed)
     fn resume(&self, t: &str, state: u32, bol: usize, out: &mut Vec<Token>) -> (usize, u32) {
         let n = t.len();
-        let ri = (state & 0xFF) as usize - 1;
+        // (a low byte 0: no construct, e.g. a state whose bits were shifted out)
+        let Some(ri) = ((state & 0xFF) as usize).checked_sub(1) else { return (0, 0) };
         let Some(rule) = self.g.rules.get(ri) else { return (0, 0) };
         match rule {
             Rule::Block { open, close, kind, nested, bol: only } => {
@@ -673,7 +674,9 @@ impl Highlighter {
 
 // from i inside a block (depth open blocks): the end and the depth left (0: closed)
 fn scan_block(t: &str, i: usize, open: &str, close: &str, nested: bool, depth: u32) -> (usize, u32) {
-    let mut d = depth;
+    // an open block has depth 1 at least: a depth the 32-bit line state lost (a block more than
+    // three constructs deep, whose bits were shifted out) counts as 1, d -= 1 must not pass 0
+    let mut d = depth.max(1);
     let mut j = i;
     while j < t.len() {
         if t[j..].starts_with(close) {

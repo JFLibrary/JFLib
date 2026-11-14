@@ -72,6 +72,8 @@ struct Opts {
     package: Option<String>,
     styles: Option<String>,
     formats: Vec<&'static str>,
+    /// no --formats: the default (setup and deb; an app with std: the formats of this system)
+    formats_default: bool,
     /// every signature required (--sign)
     sign: bool,
     /// --repo DIR: a flat apt repository with the .deb
@@ -84,6 +86,7 @@ struct Opts {
 
 fn options(args: &[String]) -> Result<Opts, String> {
     let (mut styles, mut formats, mut no_win, mut no_deb, mut rest) = (None, "setup,deb".to_string(), false, false, Vec::new());
+    let mut formats_default = true;
     let (mut sign, mut repo, mut update, mut update_url, mut update_key) = (false, None, None, String::new(), None);
     let mut i = 0;
     while i < args.len() {
@@ -92,7 +95,10 @@ fn options(args: &[String]) -> Result<Opts, String> {
                 let v = args.get(i + 1).cloned().ok_or_else(|| format!("{flag} needs a value"))?;
                 match flag {
                     "--styles" => styles = Some(v),
-                    "--formats" => formats = v,
+                    "--formats" => {
+                        formats = v;
+                        formats_default = false;
+                    }
                     "--repo" => repo = Some(PathBuf::from(v)),
                     "--update" => update = Some(PathBuf::from(v)),
                     "--update-url" => update_url = v,
@@ -122,7 +128,7 @@ fn options(args: &[String]) -> Result<Opts, String> {
     // in the order they are made; --no-win / --no-deb drop every Windows / Linux format
     let formats = FORMATS.iter().filter(|(f, sys)| wanted.iter().any(|w| w == f) && !(no_win && *sys == "win" || no_deb && *sys == "linux"))
         .map(|f| f.0).collect();
-    Ok(Opts { package: o.package, styles, formats, sign, repo, update, update_url, update_key })
+    Ok(Opts { package: o.package, styles, formats, formats_default, sign, repo, update, update_url, update_key })
 }
 
 /// a style's shown name and description (INFO of its crate)
@@ -193,7 +199,9 @@ fn profiles(root: &Path) -> String {
 /// and a [profile.dev.package.X] of a crate the stub does not have was a warning of Cargo's), but
 /// always with panic = "abort" -- the stubs are programs without std, while an app with jflib's
 /// feature unwind has panic = "unwind" (or none, Cargo's default): [profile.release] (not
-/// .package.X / .build-override) gets panic = "abort" in place of its panic line, and there is one
+/// .package.X / .build-override) gets panic = "abort" in place of its panic line, and there is one.
+/// Only the tables: the comment lines in them are left out (a comment above the next table, which
+/// belongs to that one, came along before)
 fn stub_profiles(text: &str) -> String {
     let mut out = String::new();
     let mut inside = false;
@@ -215,9 +223,9 @@ fn stub_profiles(text: &str) -> String {
                 continue;
             }
         }
-        // the app's own panic line (the stub's is above)
+        // the app's own panic line (the stub's is above); comments are no part of the table
         let panic_key = t.strip_prefix("panic").is_some_and(|r| r.trim_start().starts_with('='));
-        if inside && !panic_key {
+        if inside && !panic_key && !t.starts_with('#') {
             out += line;
             out.push('\n');
         }
@@ -612,8 +620,29 @@ fn has_interpreter(elf: &[u8]) -> bool {
     elf.starts_with(b"\x7fELF") && (0..count).any(|k| elf.get(phoff + k * size..phoff + k * size + 4) == Some(&3u32.to_le_bytes()[..]))
 }
 
+/// the formats of this system (std_formats: an app with std packages only these here)
+fn host_formats(host: Option<&str>) -> Vec<&'static str> {
+    FORMATS.iter().filter(|f| Some(f.1) == host).map(|f| f.0).collect()
+}
+
+/// an app with std is built on the system it runs on: without --formats it gets the default's
+/// formats of this system (Windows: the setup, Linux: the .deb); none left -> what to pass
+fn std_formats(formats: &mut Vec<&'static str>, host: Option<&str>, name: &str) -> Result<(), String> {
+    let here = host_formats(host);
+    formats.retain(|f| here.contains(f));
+    if formats.is_empty() {
+        return Err(if here.is_empty() {
+            format!("{name} has std (jflib's feature std): its packages are made on the system they are for; on a Mac --formats dmg")
+        } else {
+            format!("{name} has std (jflib's feature std): its packages are made on the system they are for; here --formats {}",
+                    here.join(","))
+        });
+    }
+    Ok(())
+}
+
 pub(crate) fn run(args: &[String]) -> Result<(), String> {
-    let o = options(args)?;
+    let mut o = options(args)?;
     if o.formats.is_empty() {
         return Err("nothing to package: --formats, --no-win and --no-deb leave no format".to_string());
     }
@@ -636,11 +665,14 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
         }
     }
     let own_styles = styles_check(&styles, &own)?;
+    let host = if cfg!(windows) { Some("win") } else if cfg!(target_os = "linux") { Some("linux") } else { None };
+    if p.package.std && o.formats_default {
+        std_formats(&mut o.formats, host, &name)?;
+    }
     let wants = |f: &str| o.formats.contains(&f);
     if wants("dmg") && !cfg!(target_os = "macos") {
         return Err("a dmg is made on a Mac (Apple's hdiutil and codesign): there --formats dmg".to_string());
     }
-    let host = if cfg!(windows) { Some("win") } else if cfg!(target_os = "linux") { Some("linux") } else { None };
     let mut targets: Vec<&str> = Vec::new();
     if wants("setup") || wants("msix") {
         targets.push("win");
@@ -653,9 +685,11 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
     if p.package.std {
         for (system, formats, shown) in [("win", "setup, msix", "Windows"), ("linux", "deb, appimage, rpm, flatpak", "Linux")] {
             if targets.contains(&system) && host != Some(system) {
+                let here = host_formats(host);
+                let pass = if here.is_empty() { "dmg".to_string() } else { here.join(",") };
                 return Err(format!(
-                    "{name} has std (jflib's feature std): its {formats} are made on {shown} itself; here --formats \
-                     with the formats of this system"
+                    "{name} has std (jflib's feature std): its {formats} are made on {shown} itself; here --formats {pass} \
+                     (without --formats: those of this system)"
                 ));
             }
         }
@@ -808,6 +842,11 @@ mod tests {
         assert!(stub_profiles("[package]\nname = \"x\"\n").starts_with("[profile.release]\npanic = \"abort\"\n"));
         // a key that only starts with panic stays
         assert!(stub_profiles("[profile.release]\npanicky = 1\n").contains("panicky = 1\n"));
+        // only the tables: the comments of the next one (BrowserGUI's engine crates) and those inside stay out
+        let app = "[profile.release]\n# the app's own\nlto = \"fat\"\n\n# The engine's crates as narsil/Cargo.toml builds them\n\
+                   # in development builds.\n[profile.dev.package.narsil-tls]\nopt-level = 3\n";
+        assert_eq!(stub_profiles(app), "[profile.release]\npanic = \"abort\"\nlto = \"fat\"\n\n");
+        assert!(!stub_profiles(app).contains('#'));
     }
 
     // a stub's crates from the folders where the app has them from paths (JFLib's workspace), else from crates.io
@@ -862,5 +901,27 @@ mod tests {
         let o = options(&["--formats".into(), "flatpak,setup".into()]).unwrap();
         assert_eq!(o.formats, ["setup", "flatpak"]);
         assert!(options(&["--formats".into(), "snap".into()]).is_err());
+        // the default: setup and deb, noted as the default
+        let o = options(&[]).unwrap();
+        assert_eq!((o.formats.as_slice(), o.formats_default), (&["setup", "deb"][..], true));
+        assert!(!options(&["--formats".into(), "setup,deb".into()]).unwrap().formats_default);
+    }
+
+    // an app with std without --formats: the default's formats of the system it is packaged on
+    #[test]
+    fn std_default_formats() {
+        let mut f = vec!["setup", "deb"];
+        std_formats(&mut f, Some("win"), "Narsil").unwrap();
+        assert_eq!(f, ["setup"]);
+        let mut f = vec!["setup", "deb"];
+        std_formats(&mut f, Some("linux"), "Narsil").unwrap();
+        assert_eq!(f, ["deb"]);
+        // --no-win on Windows leaves nothing: the error says what to pass
+        let mut f = vec!["deb"];
+        let e = std_formats(&mut f, Some("win"), "Narsil").unwrap_err();
+        assert!(e.contains("Narsil has std") && e.contains("--formats setup,msix"), "{e}");
+        let mut f = vec!["setup", "deb"];
+        assert!(std_formats(&mut f, None, "Narsil").unwrap_err().contains("--formats dmg"));
+        assert_eq!(host_formats(Some("linux")), ["deb", "appimage", "rpm", "flatpak"]);
     }
 }

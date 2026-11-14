@@ -39,6 +39,9 @@
 // and gives its tab strip the focus (the app binds it to its commands).
 // Structural changes (clicks, drops, menu rows) are applied at dock_end, followed by another
 // pass; splitters change the sizes at once.  Widget ids are parts of the area id (pid).
+// Every window keeps the state of its dock areas (WinParts::dock): an area of the same id in two
+// windows lays out, drags and floats by itself.  The ids of the floating windows are the app's
+// window ids, though: areas that float panels in two windows need ids of their own.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -915,12 +918,19 @@ impl Rt {
     }
 }
 
-/// the dock areas of the app (Mods)
+/// the dock areas of one window (WinParts::dock): a dock area of the same id in two windows (a
+/// browser's windows) keeps its own layout, drag and focus.  Its floating windows take the ids
+/// after the area's (window ids are the app's): areas that float panels need ids of their own
+#[derive(Default)]
+pub(crate) struct W {
+    docks: Vec<Rt>,
+}
+
+/// the dock areas between dock_begin and dock_end (Mods): (the window of dock_begin, id) -- a
+/// floating window of the area may be live meanwhile
 #[derive(Default)]
 pub(crate) struct S {
-    docks: Vec<Rt>,
-    /// the areas between dock_begin and dock_end
-    cur: Vec<u32>,
+    cur: Vec<(u32, u32)>,
 }
 
 // a library text (German source; i18n::tr)
@@ -929,16 +939,20 @@ fn tr(s: &'static str) -> &'static str {
 }
 
 impl Ui {
-    fn dk_take(&mut self, id: u32) -> Rt {
-        let d = &mut self.m.dock.docks;
+    // the state of dock area id of window win (the window of its dock_begin)
+    fn dk_take(&mut self, win: u32, id: u32) -> Rt {
+        let Some(p) = self.uiw_parts_mut(win) else { return Rt { id, ..Rt::default() } };
+        let d = &mut p.dock.docks;
         match d.iter().position(|r| r.id == id) {
             Some(i) => d.swap_remove(i),
             None => Rt { id, ..Rt::default() },
         }
     }
 
-    fn dk_put(&mut self, rt: Rt) {
-        self.m.dock.docks.push(rt);
+    fn dk_put(&mut self, win: u32, rt: Rt) {
+        if let Some(p) = self.uiw_parts_mut(win) {
+            p.dock.docks.push(rt);
+        }
     }
 
     // a side's name as the user sees it (mirrored windows show left at the right)
@@ -1003,10 +1017,11 @@ impl Ui {
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn dock_begin(&mut self, id: u32, st: &mut DockState, panels: &[DockPanel]) {
         let _src = self.src_scope();
-        let mut rt = self.dk_take(id);
+        let win = self.uiw_cur;
+        let mut rt = self.dk_take(win, id);
         let cur = &mut self.m.dock.cur;
-        cur.retain(|&c| c != id); // (a dock_end the app left out)
-        cur.push(id);
+        cur.retain(|&c| c != (win, id)); // (a dock_end the app left out)
+        cur.push((win, id));
         rt.panels = panels.iter().filter(|p| p.id != 0).map(|p| PInfo { id: p.id, title: String::from(p.title), icon: p.icon, flags: p.flags }).collect();
         st.adopt(panels);
         for k in 0..rt.wins.len() {
@@ -1057,7 +1072,7 @@ impl Ui {
         }
         rt.next = 0;
         rt.open = 0;
-        self.dk_put(rt);
+        self.dk_put(win, rt);
     }
 
     /// dock_next(&mut st) -> the next place to fill (None: done): DOCK_CENTER, then the id of
@@ -1065,8 +1080,8 @@ impl Ui {
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn dock_next(&mut self, st: &mut DockState) -> Option<u32> {
         let _src = self.src_scope();
-        let id = *self.m.dock.cur.last()?;
-        let mut rt = self.dk_take(id);
+        let (win, id) = *self.m.dock.cur.last()?;
+        let mut rt = self.dk_take(win, id);
         self.dk_close(&mut rt);
         let mut out = None;
         while out.is_none() && rt.next < rt.slots.len() {
@@ -1098,7 +1113,7 @@ impl Ui {
                 Slot::Float(f) => out = self.dk_float_open(&mut rt, st, f),
             }
         }
-        self.dk_put(rt);
+        self.dk_put(win, rt);
         out
     }
 
@@ -1106,8 +1121,8 @@ impl Ui {
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn dock_end(&mut self, st: &mut DockState) -> bool {
         let _src = self.src_scope();
-        let Some(id) = self.m.dock.cur.pop() else { return false };
-        let mut rt = self.dk_take(id);
+        let Some((win, id)) = self.m.dock.cur.pop() else { return false };
+        let mut rt = self.dk_take(win, id);
         self.dk_close(&mut rt);
         self.dk_overlay(&rt, st);
         let acts = core::mem::take(&mut rt.acts);
@@ -1117,7 +1132,7 @@ impl Ui {
         self.box_end(); // the area
         rt.focus_in = core::mem::take(&mut rt.focus_now);
         let changed = core::mem::take(&mut rt.changed);
-        self.dk_put(rt);
+        self.dk_put(win, rt);
         changed
     }
 

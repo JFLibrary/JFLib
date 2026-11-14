@@ -1,0 +1,24 @@
+#!args --files apps/viewtest/tests/files
+# viewtest: an app chooses the library's own file dialog (FD_BUILTIN), as a browser whose "Save
+# as" looks and behaves the same on every system.  Command 9 opens it in the folder of --files
+# with the second type ("dat") selected.  Headless runs always show the own dialog; FD_BUILTIN
+# makes windows on Windows, Linux, macOS and Android show it too (before, only the environment
+# variable jfgui_FILEDLG=builtin did, for every dialog of the run).  The flag leaves the type's
+# index in bits 8..15 alone: a name without an extension gets the second type's.  The dialog's
+# name box is #1179660 (id + 12).
+cmd 9
+expect dialog:"Speichern unter" exists
+expect "a.txt" exists
+focus #1179660
+type "neu"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect text:"Dateien: 1 neu.dat" exists
+# again, with a name that has its extension: it stays
+cmd 9
+expect dialog:"Speichern unter" exists
+focus #1179660
+type "notiz.txt"
+click button:"Speichern"
+expect text:"Dateien: 1 notiz.txt" exists
+expect_nowarn

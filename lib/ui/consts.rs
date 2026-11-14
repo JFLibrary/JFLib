@@ -359,6 +359,7 @@ pub const UIC_SCREENSHOT: u32 = 0x7FFF_0018; // arg 1: the picture is there (scr
 pub const UIC_RECENT: u32 = 0x7FFF_0019; // arg 1: the file of recent_open is readable now (recent_reopened), 0: refused or gone
 pub const UIC_SENSOR: u32 = 0x7FFF_001B; // arg = plat::sensors::SENSOR_* bits: new readings or another state (plat::sensors::read, state)
 pub const UIC_LOCATION: u32 = 0x7FFF_001C; // arg = plat::sensors::LocationState: a new fix or another state (location_fix)
+pub const UIC_A11Y: u32 = 0x7FFF_001D; // arg 1: a screen reader (an accessibility client) came, 0: it left (ui.a11y_active), also while the app is idle
 pub const TRAY_ACTIVATE: u32 = 1; // UIC_TRAY: the symbol was clicked
 pub const TRAY_SECONDARY: u32 = 2; // UIC_TRAY: double click (Windows) / middle click (Linux)
 
@@ -369,6 +370,9 @@ pub const DS_ACTIVE: u32 = 2; // drag_source: the widget's content is being drag
 pub const DS_END: u32 = 4; // drag_source: the drag ended (once; drag_effect() tells how)
 pub const DS_HOVER: u32 = 8; // drop_target: a matching drag is over the widget (highlighted)
 pub const DS_DROP: u32 = 16; // drop_target: dropped onto the widget (drop_data(), drop_effect())
+/// drop_defer: how long a drop's answer to its source may wait for drop_finish (ms); then it goes
+/// as the drop was delivered
+pub const DROP_DEFER_MS: u32 = 3000;
 
 // ------------------------------------------------------------------ app flags (AppDesc)
 pub const AF_CUSTOM_TITLEBAR: u32 = 1;
@@ -542,6 +546,9 @@ pub const FD_SAVE: u32 = 1;
 pub const FD_FOLDER: u32 = 2;
 /// (E8) open several files at once (with FD_OPEN): ui.filedlg_paths() has all of them, `path` the first
 pub const FD_MULTI: u32 = 4;
+/// the library's own dialog on every platform, never the system's (as `jfgui_FILEDLG=builtin`
+/// does for every dialog of a run): an app whose dialog must look and behave the same everywhere
+pub const FD_BUILTIN: u32 = 8;
 pub const FD_EXT_SHIFT: u32 = 8;
 
 // ------------------------------------------------------------------ windows (win.rs)

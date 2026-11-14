@@ -677,13 +677,15 @@ impl Floor1 {
                 step2[lo] = true;
                 step2[hi] = true;
                 step2[i] = true;
-                fy[i] = if val >= room {
+                // 15 bits as libvorbis keeps them (floor1_inverse1: & 0x7fff): a codebook entry up
+                // to 2^24 made the next render_point's dy * dx pass i32
+                fy[i] = (if val >= room {
                     if highroom > lowroom { val - lowroom + pred } else { pred - val + highroom - 1 }
                 } else if val & 1 == 1 {
                     pred - (val + 1) / 2
                 } else {
                     pred + val / 2
-                };
+                }) & 0x7fff;
             } else {
                 fy[i] = pred;
             }

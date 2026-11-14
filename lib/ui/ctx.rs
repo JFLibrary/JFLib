@@ -18,13 +18,14 @@
 //   behave(id, hbflags) -> EV_*     hit box on last_rect + pointer / keyboard behaviour
 //   hit(id, hbflags)                hit box only
 //   hit_rect(id, x, y, w, h, hb)    behave on an explicit rectangle (px)
-//   slot(id) -> &mut Slot           persistent per-id state record
+//   slot(id) -> &mut Slot           persistent per-id state record (per window)
 //   sem(kind, id, label, value)     semantic record (state from the last behave)
 //   clip_push(x, y, w, h) / clip_pop()   clip drawing and hit boxes (px)
 //   layer_set(l) -> previous        modal(layer)   disabled_push() / disabled_pop()
 // Runtime (runtime.rs, win.rs): frame_begin / frame_end (a pass over all windows),
 // uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_update.
 
+use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -317,6 +318,9 @@ pub(crate) struct W {
     pub(crate) cmd_layer_ui: u32,
     /// keyboard navigation of this window (kbnav.rs)
     pub(crate) kb: super::kbnav::W,
+    /// the state slots of this window's ids (Ui::slot): a box's measurements, a view's scroll
+    /// position, animations -- the same id in two windows has a slot in each
+    pub(crate) slots: BTreeMap<u32, Slot>,
 }
 
 impl W {
@@ -363,6 +367,7 @@ impl W {
             disabled_depth: 0,
             cmd_layer_ui: 0,
             kb: Default::default(),
+            slots: BTreeMap::new(),
         }
     }
 }
@@ -1008,7 +1013,7 @@ impl Ui {
         }
         // the menu key / Shift+F10 that no widget took: a right click of the focused widget
         // (kbnav.rs)
-        if self.m.kbnav.ctx == id && id != 0 {
+        if self.kb_ctx_for(id) {
             ev |= self.kb_ctx_take();
         }
         // a click of a screen reader (a11y.rs) acts like Space
@@ -1049,10 +1054,13 @@ impl Ui {
 
     // ------------------------------------------------------------------ state slots
 
-    /// ui_slot(id): persistent per-id state (created on first use)
+    /// ui_slot(id): persistent per-id state of the window being built (created on first use):
+    /// every window keeps its own slots, so the same id in two windows (a title bar's, a
+    /// dialog's box) measures and scrolls in each by itself; outside the passes the main
+    /// window's.  A window's slots go with its state (window_destroy)
     pub fn slot(&mut self, id: u32) -> &mut Slot {
         let frame = self.frame;
-        let s = self.slots.entry(id).or_default();
+        let s = self.wp.ctx.slots.entry(id).or_default();
         s.seen = frame;
         s
     }
@@ -1365,6 +1373,7 @@ impl Ui {
         self.semtext_len = 0;
         self.animating = false;
         self.frame = self.frame.wrapping_add(1);
+        self.building = true;
         if self.m.ins.on {
             self.m.ins.boxes.clear(); // the inspector's boxes of this pass (inspect.rs)
         }
@@ -1377,6 +1386,7 @@ impl Ui {
 
     /// ui_frame_end -> another pass is needed before the frame is final
     pub(crate) fn frame_end(&mut self) -> bool {
+        self.building = false;
         self.uiw_frame_end();
         #[cfg(target_os = "android")]
         self.ime_frame_end();

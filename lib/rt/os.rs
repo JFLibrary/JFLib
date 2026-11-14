@@ -50,6 +50,12 @@ mod imp {
         write_handle(-12i32 as u32, b)
     }
 
+    /// stderr for crash paths (Windows: write_stderr; a pipe without room in PIPE_NOWAIT mode
+    /// writes nothing, which ends the write)
+    pub fn write_stderr_crash(b: &[u8]) {
+        write_stderr(b)
+    }
+
     /// zeroed pages, or null
     ///
     /// # Safety
@@ -238,12 +244,56 @@ mod imp {
         }
     }
 
+    /// write_fd for crash paths: a non-blocking descriptor that takes nothing for wait_ms is
+    /// given up (false) instead of waited for without end; true: all written or the descriptor
+    /// failed
+    pub fn write_fd_within(fd: usize, b: &[u8], wait_ms: i32) -> bool {
+        let mut off = 0;
+        while off < b.len() {
+            // SAFETY: b is a valid buffer.
+            let r = unsafe { syscall3(SYS_WRITE, fd, b.as_ptr() as usize + off, b.len() - off) };
+            if r == -4 {
+                continue; // EINTR
+            }
+            if r == -11 {
+                // EAGAIN: wait at most wait_ms for room (a closed reader wakes the poll, then
+                // the write fails)
+                let mut pfd = [fd as i32, 4]; // struct pollfd: fd, events POLLOUT, revents 0
+                // SAFETY: one pollfd record.
+                let p = unsafe { poll(pfd.as_mut_ptr() as usize, 1, wait_ms) };
+                if p == 0 || (p < 0 && p != -4) {
+                    return false;
+                }
+                continue;
+            }
+            if r <= 0 {
+                break;
+            }
+            off += r as usize;
+        }
+        true
+    }
+
     pub fn write_stdout(b: &[u8]) {
         write_fd(1, b)
     }
 
     pub fn write_stderr(b: &[u8]) {
         write_fd(2, b)
+    }
+
+    /// the crash paths' stderr gave up (it took nothing for ERR_WAIT_MS)
+    static ERR_GONE: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+    const ERR_WAIT_MS: i32 = 500;
+
+    /// stderr for crash paths, which neither allocate nor wait without end: a non-blocking
+    /// stderr that takes nothing for half a second is given up for the rest of the crash.  (A
+    /// blocking one whose reader stopped reading still blocks, as for any program.)
+    pub fn write_stderr_crash(b: &[u8]) {
+        use core::sync::atomic::Ordering::Relaxed;
+        if !ERR_GONE.load(Relaxed) && !write_fd_within(2, b, ERR_WAIT_MS) {
+            ERR_GONE.store(true, Relaxed);
+        }
     }
 
     /// zeroed pages, or null
