@@ -237,6 +237,10 @@ impl Stream for TlsStream {
         self.inner.shutdown();
     }
 
+    fn end_is_clean(&self) -> bool {
+        self.conn.lock().peer_closed()
+    }
+
     fn wait_readable(&self, ms: u32) -> bool {
         if self.conn.lock().has_plain() {
             return true;

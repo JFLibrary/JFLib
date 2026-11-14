@@ -750,16 +750,26 @@ pub fn wrap_end_hyph(
     let mut best = pos;
     let mut best_h = false;
     let mut next = limit;
+    // the width of pos..e only grows with e: after one soft hyphen that did not fit no later
+    // one does (more text, the same hyphen), so those are not measured again.  (A later plain
+    // opportunity may still fit: the hyphen can be wider than the text after it.)  Measuring
+    // every soft hyphen of the rest of a paragraph from pos was cubic over its lines
+    let mut shy_failed = false;
     for &(o, _) in &ops {
         let e = pos + o;
         if e > limit || e == pos {
             continue;
         }
         let h = shy(e);
+        if h && shy_failed {
+            continue;
+        }
         if fits(pos, visible(e), h) {
             best = e;
             best_h = h;
-        } else if !h {
+        } else if h {
+            shy_failed = true;
+        } else {
             next = e;
             break;
         }

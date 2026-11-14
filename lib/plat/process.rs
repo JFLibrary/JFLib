@@ -95,7 +95,10 @@ pub fn find(name: &str) -> Option<String> {
 }
 
 impl Command<'_> {
-    /// Start a hidden process with pipes. Dropping its handle terminates its tree.
+    /// Start a hidden process with pipes. Dropping its handle terminates its tree.  Windows: a
+    /// `.bat` or `.cmd` file runs through cmd.exe, which reads its command line by other rules;
+    /// a program or argument with `"`, `%`, `!`, `^`, `&`, `|`, `<`, `>` or a line break is
+    /// refused for it (87), as for process::launch
     pub fn spawn(&self) -> Result<Child, u32> {
         if self.program.is_empty() || self.program.contains('\0')
             || self.args.iter().any(|a| a.contains('\0'))

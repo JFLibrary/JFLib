@@ -181,22 +181,46 @@ fn content_type(path: &Path) -> &'static str {
     }
 }
 
-fn answer(mut s: TcpStream, root: &Path) -> std::io::Result<()> {
+/// the file below root a request path names, None for anything but plain names: on Windows
+/// "/C:/x" made root.join() take the drive's path and "..\" passed a check of '/' alone
+fn file_of(root: &Path, path: &str) -> Option<std::path::PathBuf> {
+    let rel = path.trim_start_matches('/');
+    if rel.is_empty() {
+        return Some(root.join("index.html"));
+    }
+    let mut file = root.to_path_buf();
+    for c in rel.split('/') {
+        if c.is_empty() || c == "." || c == ".." || c.contains(['\\', ':', '\0']) {
+            return None;
+        }
+        file.push(c);
+    }
+    Some(file)
+}
+
+fn answer(mut s: TcpStream, root: &Path, port: u16) -> std::io::Result<()> {
     let mut first = String::new();
     let mut r = BufReader::new(s.try_clone()?);
     r.read_line(&mut first)?;
+    let mut host = String::new();
     loop {
         let mut line = String::new();
         if r.read_line(&mut line)? == 0 || line == "\r\n" || line == "\n" {
             break;
         }
+        if let Some((k, v)) = line.split_once(':') {
+            if k.trim().eq_ignore_ascii_case("host") {
+                host = v.trim().to_ascii_lowercase();
+            }
+        }
     }
+    // only this machine's names: a web page that points its own name at 127.0.0.1 (DNS
+    // rebinding) gets nothing
+    let local = host == format!("127.0.0.1:{port}") || host == format!("localhost:{port}");
     let path = first.split_whitespace().nth(1).unwrap_or("/").split(['?', '#']).next().unwrap_or("/").to_string();
-    let rel = path.trim_start_matches('/');
-    let file = root.join(if rel.is_empty() { "index.html" } else { rel });
-    let inside = !rel.split('/').any(|c| c == "..");
-    let (status, body, kind) = match fs::read(&file) {
-        Ok(b) if inside => ("200 OK", b, content_type(&file)),
+    let file = file_of(root, &path).filter(|_| local);
+    let (status, body, kind) = match file.as_ref().map(|f| (fs::read(f), f)) {
+        Some((Ok(b), f)) => ("200 OK", b, content_type(f)),
         _ => ("404 Not Found", b"not found".to_vec(), "text/plain"),
     };
     write!(s, "HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nCross-Origin-Opener-Policy: same-origin\r\n\
@@ -211,8 +235,24 @@ fn serve(root: &Path, port: u16) -> Result<(), String> {
     for stream in listener.incoming().flatten() {
         let root = root.to_path_buf();
         std::thread::spawn(move || {
-            let _ = answer(stream, &root);
+            let _ = answer(stream, &root, port);
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::file_of;
+    use std::path::Path;
+
+    #[test]
+    fn request_paths_stay_below_the_root() {
+        let root = Path::new("bundle");
+        assert_eq!(file_of(root, "/"), Some(root.join("index.html")));
+        assert_eq!(file_of(root, "/pkg/app.wasm"), Some(root.join("pkg").join("app.wasm")));
+        for bad in ["/C:/Windows/win.ini", "/..\\secret", "/a/../../x", "/./x", "/a//b", "/x:stream", "/c:\\x"] {
+            assert_eq!(file_of(root, bad), None, "{bad}");
+        }
+    }
 }
