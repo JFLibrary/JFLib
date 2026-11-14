@@ -52,6 +52,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Windows: URL schemes are registered as `"<exe>" -- "%1"` and plat::args keeps the URL after -- as one argument, so a quote in a link cannot add options; ui stops reading options at --. Apps registered before keep the old command until they are registered again
 - New plat::fs::Dir works below an open folder without ever following a link (Linux openat2 with a step-by-step O_NOFOLLOW fallback, macOS openat walk, Windows folders held open without share-delete), with set_file_times / set_file_mode through a file's own handle; TcpStream::peer_uid returns the user id of the other end of a Unix socket (SO_PEERCRED, getpeereid)
 
+### Fixed
+
+- Windows: the buttons of a system title bar work (a main window without AF_CUSTOM_TITLEBAR, windows with PWF_SYSFRAME): the window procedure made the non-client messages of every caption button (WM_NCMOUSEMOVE, WM_NCLBUTTONDOWN, WM_NCLBUTTONUP on HTCLOSE, HTMAXBUTTON, HTMINBUTTON) presses in the UI, so the X, maximize and minimize of such a window did nothing; only the library frame's buttons, which the UI draws, take that way now
+
 ## [0.2.0] - 2026-11-14
 
 ### Added
