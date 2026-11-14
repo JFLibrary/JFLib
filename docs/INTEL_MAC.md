@@ -1,12 +1,12 @@
 # Intel-Mac-Plan: JFLib auf Macs mit Intel-Prozessor
 
-Stand 2026-11-14, auf Basis von `main` 85cd8d06. Noch nichts umgesetzt; die Entscheidungen unten sind offen. Die
-Aufwände sind geschätzt.
+Stand 2026-11-14, auf Basis von `main` 85cd8d06. Noch nichts umgesetzt. Die fünf Entscheidungen unten hat der Nutzer
+am 2026-11-14 alle wie empfohlen getroffen. Die Aufwände sind geschätzt.
 
 ## Ziel
 
 Die Programme der Bibliothek laufen auch auf Macs mit Intel-Prozessor (`x86_64-apple-darwin`), aus derselben `.app` und
-derselben `.dmg` wie auf Apple Silicon (ein Universal-Programm, Entscheidung 1). Gebaut wird weiter auf dem Mac mini
+derselben `.dmg` wie auf Apple Silicon (ein Universal-Programm, Entscheidung 1a). Gebaut wird weiter auf dem Mac mini
 (M2), der das Intel-Programm mitbaut. Geprüft wird unter Rosetta 2 auf dem Mac mini und auf GitHubs Intel-Runner.
 Eine macOS-VM ist kein Weg: macOS darf laut Apples Lizenz nur auf Apple-Hardware laufen, also nicht auf dem PC, und
 der Mac mini virtualisiert nur ARM-Versionen von macOS.
@@ -21,7 +21,7 @@ Sicherheitsupdates, und viele sind noch im Einsatz. Die Prüfmöglichkeiten lauf
 `macos-15-intel` als letztes x86_64-Image für macOS angekündigt, mit Ende etwa im Herbst 2027, und Apple will Rosetta
 nach macOS 27 einschränken. Rust baut `x86_64-apple-darwin` seit 1.90 nur noch als Tier 2. Der Plan ist deshalb
 schlank: kein neuer Code, wo der x86-64-Code von Windows und Linux schon passt, und eine klare Regel für die Zeit
-danach (Entscheidung 4).
+danach (Entscheidung 4a).
 
 ## Ausgangslage
 
@@ -68,8 +68,8 @@ Gefunden in `main` 85cd8d06; der Apple-Code nimmt an vielen Stellen arm64 an:
 
 - `build_rs.py --target mac --arch x86_64` baut nach `build/mac-x86_64/` (wie `win-arm64`); ohne `--arch` bleibt `mac`
   arm64. `tools/apple.py` und cargo-jflib nehmen das zweite Ziel an.
-- `rt` nach Entscheidung 2: die x86-Erkennung (`rt/cpu.rs`, CPUID) und `x87.rs` auch auf Intel-Macs, oder portabel wie
-  auf Apple Silicon. `plat/cpu.rs` bekommt die passenden `cfg`s.
+- `rt` wie unter Windows und Linux (Entscheidung 2a): die x86-Erkennung (`rt/cpu.rs`, CPUID) und `x87.rs` auch auf
+  Intel-Macs. `plat/cpu.rs` bekommt die passenden `cfg`s.
 - `plat/apple.rs`: die `$INODE64`-Namen per `link_name` auf x86-64, die Records (`Stat`, `Dirent`, `Pollfd`,
   `PthreadAttr`, dazu `SigAction` in `apple_crash.rs`) gegen die SDK-Header von x86-64 geprüft.
 - `msg!` wählt `objc_msgSend_stret`, wenn der Rückgabetyp auf x86-64 größer als 16 Byte ist; dasselbe für die
@@ -104,7 +104,7 @@ Gefunden in `main` 85cd8d06; der Apple-Code nimmt an vielen Stellen arm64 an:
   Mac2 (laut Apple: AMD Vega, Radeon 5000 und 6000, Intel UHD 630, Iris Plus), das MSL unseres Compilers auf den
   Treibern von AMD und Intel.
 - Rosetta führt nur den x86-Code aus, die GPU dahinter bleibt die des M2; der Intel-Runner hat keine nutzbare GPU.
-  Ohne echten Intel-Mac (Entscheidung 3) gilt Metal auf Intel-GPUs in der Doku als „gebaut, nicht geprüft“.
+  Ohne echten Intel-Mac (Entscheidung 3a) gilt Metal auf Intel-GPUs in der Doku als „gebaut, nicht geprüft“.
 
 ### IM6: Doku und Website (S)
 
@@ -116,7 +116,7 @@ Gefunden in `main` 85cd8d06; der Apple-Code nimmt an vielen Stellen arm64 an:
 ```text
 IM0 -> IM1 -> IM2 -> IM3 -> IM6
               IM4 nach IM1, parallel zu IM2/IM3
-              IM5 nach IM2 (mit Gerät), sonst nur der Vermerk in IM6
+              IM5 nach IM2: ohne Gerät (3a) nur am Code und der Vermerk in IM6
 ```
 
 Aufwand zusammen M. Die Arbeit liegt in `build_rs.py`, `tools/apple.py`, cargo-jflib, `lib/rt` (Auswahl der Module),
@@ -124,8 +124,8 @@ Aufwand zusammen M. Die Arbeit liegt in `build_rs.py`, `tools/apple.py`, cargo-j
 
 ## Prüfung
 
-- **Rosetta 2 auf dem Mac mini:** die Suite des Macs für den x86-64-Teil. Die Ausgaben werden mit denen des
-  arm64-Teils verglichen (Entscheidung 2b) oder mit Windows x86-64 (2a).
+- **Rosetta 2 auf dem Mac mini:** die Suite des Macs für den x86-64-Teil. Die Ausgaben werden mit denen von
+  Windows x86-64 verglichen (Entscheidung 2a), soweit IM0 zeigt, dass Rosetta x87 exakt rechnet.
 - **GitHubs Intel-Runner:** die Probe auf echter Intel-Hardware, ohne Fenster und GPU.
 - **Von Hand:** Der Nutzer startet die Universal-`.dmg` auf dem Mac mini (arm64-Teil) und, falls vorhanden, auf einem
   Intel-Mac.
@@ -139,12 +139,12 @@ Aufwand zusammen M. Die Arbeit liegt in `build_rs.py`, `tools/apple.py`, cargo-j
 - **Rosetta ist kein Intel:** Die Emulation unter Windows on ARM hält x87 nur in doppelter Genauigkeit; ob Rosetta
   exakt rechnet und AVX2 meldet, klärt IM0. Maßgeblich bleibt der Intel-Runner.
 - **Lebensdauer:** Mit macOS 28 auf dem Mac mini kann Rosetta wegfallen, mit Herbst 2027 der Intel-Runner. Danach ist
-  der Intel-Teil nur noch gebaut, nicht mehr geprüft (Entscheidung 4).
+  der Intel-Teil nur noch gebaut, nicht mehr geprüft (Entscheidung 4a).
 - **Größe:** Das Programm in `.app` und `.dmg` wird etwa doppelt so groß; Schriften und Bilder bleiben einmal drin.
 
 ## Entscheidungen
 
-Offen; jeweils mit Empfehlung.
+Entschieden (Nutzer, 2026-11-14): alle wie empfohlen, also 1a, 2a, 3a, 4a und 5a.
 
 1. **Paket:** (a, empfohlen) ein Universal-Programm in derselben `.app`/`.dmg` für alle Macs, das Manifest nennt
    dieselbe Datei für beide Ziele; (b) eigene Intel-Pakete (kleiner, aber doppelte Downloads und Kanäle).
