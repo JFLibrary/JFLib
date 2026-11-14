@@ -1,9 +1,9 @@
 # Intel-Mac-Plan: JFLib auf Macs mit Intel-Prozessor
 
 Stand 2026-11-14, auf Basis von `main` 85cd8d06. Die fünf Entscheidungen unten hat der Nutzer am 2026-11-14 alle wie
-empfohlen getroffen. IM0 bis IM3 sind umgesetzt und unter Rosetta 2 geprüft, IM5 ist am Code geprüft, die Doku aus
-IM6 ist nachgezogen (je ein Abschnitt „Umgesetzt“ unten). Offen: der Lauf des Jobs `intel` (IM4, braucht den Branch
-auf GitHub) und die Website (IM6, Inhalt erst abstimmen).
+empfohlen getroffen. IM0 bis IM3 sind umgesetzt und unter Rosetta 2 geprüft, der Job `intel` (IM4) lief grün auf
+einem echten Intel-Prozessor, IM5 ist am Code geprüft, die Doku aus IM6 ist nachgezogen (je ein Abschnitt
+„Umgesetzt“ unten). Offen: die Website (IM6, Inhalt erst abstimmen).
 
 ## Ziel
 
@@ -205,7 +205,7 @@ Fehler übrig.
   `updatetest`, `plattest` ohne Fenster. Das ist der einzige Lauf auf einem echten Intel-Prozessor (echtes x87, echtes
   AVX2), ohne GPU. Er bleibt, bis GitHub das Image abschaltet (angekündigt für etwa Herbst 2027).
 
-**Umgesetzt (2026-11-14), noch nicht gelaufen:** Der Job `intel` in [`apple.yml`](../.github/workflows/apple.yml) läuft
+**Umgesetzt (2026-11-14):** Der Job `intel` in [`apple.yml`](../.github/workflows/apple.yml) läuft
 auf `macos-15-intel` und wird von Hand gestartet, zusammen mit dem Job für Apple Silicon. Er zeigt zuerst Prozessor und
 Merkmale (`sysctl`) und führt dann diese Schritte aus, alle mit `--target mac --arch x86_64`:
 
@@ -216,8 +216,26 @@ Merkmale (`sysctl`) und führt dann diese Schritte aus, alle mit `--target mac -
 
 Den x87-Dump (`--math-dump`) lädt der Job als Artefakt hoch. Dagegen vergleicht man einen Dump von Windows x86-64 mit
 `python apps/portabletest/tests/x87_diff.py A.txt B.txt`; das Skript endet mit Exitcode 1, wenn sich eine
-Dezimal-Umwandlung unterscheidet. Damit der Job läuft, muss der Branch auf GitHub liegen; das braucht das Ja des
-Nutzers.
+Dezimal-Umwandlung unterscheidet.
+
+**Erster Lauf (2026-11-14, Lauf 43629546089 auf `claude/intel-mac-cd6e58`):** Der Job `intel` war in 8,5 Minuten
+grün, auf einem Intel Core i7-8700B (Mac mini 2018) mit Xcode 16.4, Rust 1.100.
+
+- `coretest`, die 43 Skripte von `gallery` und `updatetest` (3 von 3) sind grün.
+- `plattest --test all` 221, `cliprich` 27, `spell` 56, `cpu` 7 (AVX2, FMA, BMI2 erkannt, AVX2 läuft) und `crash`
+  7 sind grün.
+- `portabletest` gibt den Digest `af6940ef15c56d1f` aus, wie unter Windows, unter Rosetta und auf Apple Silicon.
+- Der x87-Dump gegen Windows auf dem Ryzen:
+  - die Dezimal-Umwandlungen und `exp2`, `log2`, `sin`, `cos`, `atan2` bitgleich;
+  - Intel und AMD unterscheiden sich in 28 von 360 000 Ergebnissen um 1 ulp: `pow` 24, `pow_gamma` 1, `rz_exp2` 3.
+- Rosetta gegen echtes Intel:
+  - die Dezimal-Umwandlungen bitgleich;
+  - 36 Ergebnisse um 1 ulp anders, in `pow`, `pow_gamma`, `cos`, `sincos_cos`, `sin_wide` und `cos_wide`.
+  - Rosetta ahmt also weder Intels noch AMDs transzendente x87-Befehle genau nach.
+- Der arm64-Job desselben Laufs scheitert an drei GPU-Skripten der Gallery (`gpu_layers`, `gpu_layers_rtl`,
+  `gpu_output`): Auf der virtuellen GPU des Runners kommt die UI-Ausgabe nicht auf die Swapchain. Auf dem M2 des
+  Mac mini sind im arm64-Build mit denselben Änderungen alle 43 Skripte grün. `apple.yml` lief zuletzt am 2026-11-10,
+  also vor Metal (AP6); der Fehler hängt nicht an diesem Plan.
 
 ### IM5: Metal auf Intel-GPUs (S, ohne Gerät nur am Code)
 
