@@ -750,7 +750,10 @@ Skripte (1000×900, 1000×800) nicht, macOS hält sie kleiner, sie bleiben auf d
 meldet in diesem Fall jetzt `SKIP` (die Arbeitsfläche des Bildschirms kleiner als das Fenster, das System hält es
 kleiner). Dabei gefunden: Wurde der Device verloren, während kein Fenster auf ihm zeigte, versuchte ein neues
 Fenster seine Swapchain immer wieder auf dem verlorenen Device; jetzt gilt das als Ausfall des Device, ein neuer
-folgt. Ein Schritt des Workflows zeigt Bildschirm und GPU des Runners (`system_profiler`, `gputest --info`).
+folgt. Ein Schritt des Workflows zeigt Bildschirm und GPU des Runners (`NSScreen` über `osascript`, `gputest
+--info`). Der Lauf 43638582705 meldete „Apple Paravirtual device“, Familie Apple4, Metal 2.4, Stufe Basis, nutzbar
+(`missing` leer); die drei Skripte liefen dort mit `SKIP` in je rund einer Sekunde durch (vorher 26 s mit Fehlern).
+`system_profiler SPDisplaysDataType` gibt auf diesen Runnern nichts aus.
 
 **AP8c umgesetzt (2026-11-10):** Mit `jfgui_MAC_IDENTITY` („Developer ID Application: …“) und `jfgui_MAC_NOTARY`
 (ein Profil von `xcrun notarytool store-credentials`) notarisieren `tools/package.py --formats dmg` und `cargo jflib
