@@ -8,11 +8,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
-### Fixed
-
-- An instruction longer than SPIR-V's 65535 words is written with the word count 0, which no reader accepts, instead of a count that wrapped and made its operands look like the next instructions.
-
-## [0.2.0] - 2026-11-13
+## [0.2.0] - 2026-11-14
 
 ### Added
 
@@ -27,6 +23,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   samplers and storage buffers into Metal 3 argument buffers (MSL 3.0), wraps signed integer
   arithmetic as SPIR-V does, clamps image reads into the image and drops stores outside it, as
   WGSL allows.
+
+### Fixed
+
+- An instruction longer than SPIR-V's 65535 words is written with the word count 0, which no reader accepts, instead of a count that wrapped and made its operands look like the next instructions.
 
 ## [0.1.0] - 2026-11-08
 

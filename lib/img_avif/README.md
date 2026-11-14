@@ -69,7 +69,8 @@ Reading AVIF files is safer against hostile files. A grid image can no longer ma
 decode thousands of large tiles from a small file: every tile is checked before it is decoded,
 and the tiles together must stay within about four times the image. The pixel budget now also
 applies to the picture an AV1 item declares in its stream, not only to the image's size. Both
-fail with `ERR_LIMIT` before anything is allocated. Everything is in the
+fail with `ERR_LIMIT` before anything is allocated. The writer takes quality 0 as 95, like the
+other writers (it was 85). Everything is in the
 [changelog](https://docs.rs/crate/jflib-img-avif/latest/source/CHANGELOG.md).
 
 ## Documentation

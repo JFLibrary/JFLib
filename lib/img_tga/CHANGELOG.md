@@ -8,13 +8,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-14
+
 ### Fixed
 
 - The extension area's offset is checked without wrapping a 32-bit usize: on wasm32 an offset near 4 GB passed the check and the decoder aborted the program.
-
-## [0.2.0] - 2026-11-13
-
-No changes in this crate. It was released with the others because all of JFLib's crates move together.
 
 ## [0.1.0] - 2026-11-08
 

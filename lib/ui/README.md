@@ -70,10 +70,14 @@ content get what they need: canvases that take the keyboard, raw key events, inp
 fields they draw themselves, more mouse cursors, popups at any point and a web page's
 accessibility tree with tables and landmarks. On Windows and Linux the file dialog chooses
 several files at once, `ui.calendar` shows a month in place, and dock panels can move as a group.
+A drop target can answer the drag's source later (`ui.drop_defer`, `ui.drop_finish`),
+`ui.drag_allowed` tells which effects the source allows, and a drop always has an effect its
+source allows.
 Two changes close security holes: the Markdown, HTML and rich-text views open only http, https
 and mailto links by themselves and hand every other link to the app, and they no longer open
 network or device paths for images. Among the other fixes: text boxes with the same id in two
-windows no longer share their caret and undo, and several inputs that made the UI panic are
+windows no longer share their caret and undo or flip between their sizes, and several inputs
+that made the UI panic are
 handled. Everything is in the [changelog](https://docs.rs/crate/jflib-ui/latest/source/CHANGELOG.md).
 
 ## Documentation

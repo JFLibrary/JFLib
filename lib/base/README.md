@@ -79,7 +79,8 @@ version and are released together. It runs on every platform JFLib supports.
 
 The XML reader takes limits of its own: `xml::parse_with` with an `xml::Limits` of bytes,
 elements and nesting depth, for formats whose documents legitimately grow beyond the defaults of
-`xml::parse`. Everything is in the
+`xml::parse`. `Ini::load_checked` gives None for a file it cannot read instead of an empty Ini,
+whose next save replaced the settings it never read. Everything is in the
 [changelog](https://docs.rs/crate/jflib-base/latest/source/CHANGELOG.md).
 
 ## Documentation

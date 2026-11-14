@@ -34,9 +34,9 @@ version and are released together.
 
 ## What's new in 0.2.0
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
-together. The [changelog](https://docs.rs/crate/jflib-img-bmp/latest/source/CHANGELOG.md) says
-the same.
+One fix for 32-bit targets such as wasm32: the offset of an embedded ICC profile is checked
+without wrapping. Everything is in the
+[changelog](https://docs.rs/crate/jflib-img-bmp/latest/source/CHANGELOG.md).
 
 ## Documentation
 

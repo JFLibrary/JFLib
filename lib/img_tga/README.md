@@ -34,9 +34,9 @@ version and are released together.
 
 ## What's new in 0.2.0
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
-together. The [changelog](https://docs.rs/crate/jflib-img-tga/latest/source/CHANGELOG.md) says
-the same.
+One fix protects the decoder against hostile files on 32-bit targets: on wasm32 an extension
+area offset near 4 GB passed the check and aborted the program; it is checked without wrapping
+now. Everything is in the [changelog](https://docs.rs/crate/jflib-img-tga/latest/source/CHANGELOG.md).
 
 ## Documentation
 

@@ -74,9 +74,9 @@ and are released together. It runs on every platform JFLib supports.
 
 ## What's new in 0.2.0
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
-together. The [changelog](https://docs.rs/crate/jflib-fx/latest/source/CHANGELOG.md) says the
-same.
+`black_white_plus` with its default weighting (luminance) gives the right picture now: it
+divided the weighted sum by 100 instead of 1000, so nearly every pixel came out white.
+Everything is in the [changelog](https://docs.rs/crate/jflib-fx/latest/source/CHANGELOG.md).
 
 ## Documentation
 

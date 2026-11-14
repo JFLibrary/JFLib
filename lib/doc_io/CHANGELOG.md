@@ -8,13 +8,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
-### Fixed
-
-- HTML clipboard round trips keep the size of raised and lowered text: the import took the shown script size for the nominal one, so every copy and paste shrank such text by a third. The nominal size travels in `data-jf-size`.
-- HTML clipboard round trips keep the line spacing: the import cut the decimals of `line-height` and rounds them now.
-- A source list that `encode_sources` / `save_sources` writes loads back: `decode_sources` / `load_sources` read with the same limits, 8 MiB and 250000 elements (they stopped at 4 MiB and 30000, so a long list could be saved but not opened); `decode_bibliography` / `load_bibliography` take Word XML up to 8 MiB too
-
-## [0.2.0] - 2026-11-13
+## [0.2.0] - 2026-11-14
 
 ### Fixed
 
@@ -23,6 +17,9 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   formatted text reach (`Error::Xml`). The parts that grow with a document's content (the text,
   the notes, the sources, the tables' identities) are now written and read up to 250000 elements
   and 8 MiB, the size a package holds in one part; `decode_docx` reads such documents too.
+- HTML clipboard round trips keep the size of raised and lowered text: the import took the shown script size for the nominal one, so every copy and paste shrank such text by a third. The nominal size travels in `data-jf-size`.
+- HTML clipboard round trips keep the line spacing: the import cut the decimals of `line-height` and rounds them now.
+- A source list that `encode_sources` / `save_sources` writes loads back: `decode_sources` / `load_sources` read with the same limits, 8 MiB and 250000 elements (they stopped at 4 MiB and 30000, so a long list could be saved but not opened); `decode_bibliography` / `load_bibliography` take Word XML up to 8 MiB too
 
 ## [0.1.0] - 2026-11-08
 

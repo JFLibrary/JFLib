@@ -90,7 +90,8 @@ JFLib's crates share one version and are released together.
 
 ## What's new in 0.2.0
 
-On macOS and iOS the font database now scans the system's font folders. Switching the system
+On macOS and iOS the font database now scans the system's font folders, and the fallback names
+Apple's fonts, so Chinese, Japanese, Korean and other scripts find one there. Switching the system
 fonts for missing characters on or off no longer leaves the line shaped last with its old
 glyphs. Everything is in the
 [changelog](https://docs.rs/crate/jflib-text/latest/source/CHANGELOG.md).

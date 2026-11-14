@@ -76,6 +76,9 @@ was then saved without its data. `Writer::finish_unsaved` now keeps gc out until
 saved through the `Unsaved` it returns, and `Repo::save_snapshot` waits for a running gc and
 refuses a snapshot whose chunks a gc has removed. Before it sweeps, gc rebuilds lost index files
 from the packs and stops when a referenced chunk might still be in a pack it cannot read.
+`save_snapshot` refuses a key the repository does not trust (`CasError::UntrustedSigner`): it
+added such a key to the trusted signers by itself, so the signature check of `load_snapshot`
+never refused a snapshot saved through the API.
 Everything is in the [changelog](https://docs.rs/crate/jflib-cas/latest/source/CHANGELOG.md).
 
 ## Documentation

@@ -69,7 +69,9 @@ JFLib's crates share one version and are released together.
 ## What's new in 0.2.0
 
 On macOS and iOS the crate now uses the system's own spell checker, and on macOS it finds
-Hunspell dictionaries in the Spelling folders of the system and the user. Everything is in the
+Hunspell dictionaries in the Spelling folders of the system and the user. A dictionary's
+`COMPOUNDMIN` is clamped to 1..=65535: a huge value made checking a word read past its end.
+Everything is in the
 [changelog](https://docs.rs/crate/jflib-spell/latest/source/CHANGELOG.md).
 
 ## Documentation

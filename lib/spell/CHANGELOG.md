@@ -8,11 +8,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
-### Fixed
-
-- COMPOUNDMIN is clamped to 1..=65535. A value of 2^63 wrapped to 0 when doubled, and checking a word then read past its end.
-
-## [0.2.0] - 2026-11-13
+## [0.2.0] - 2026-11-14
 
 ### Added
 
@@ -20,6 +16,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   `UITextChecker` on iOS, with the languages it knows and the words the user taught it; a
   `Speller` on it reports the backend `"system"`. On macOS `SRC_SYSTEM` also takes Hunspell
   dictionaries from `~/Library/Spelling` and `/Library/Spelling`.
+
+### Fixed
+
+- COMPOUNDMIN is clamped to 1..=65535. A value of 2^63 wrapped to 0 when doubled, and checking a word then read past its end.
 
 ## [0.1.0] - 2026-11-08
 

@@ -8,13 +8,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-14
+
 ### Fixed
 
 - The offset of an embedded ICC profile is checked without wrapping a 32-bit usize (wasm32).
-
-## [0.2.0] - 2026-11-13
-
-No changes in this crate. It was released with the others because all of JFLib's crates move together.
 
 ## [0.1.0] - 2026-11-08
 

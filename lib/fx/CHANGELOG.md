@@ -8,13 +8,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-14
+
 ### Fixed
 
 - `black_white_plus` with its default weighting (luminance) divides the weighted sum by 1000; it divided by 100, so nearly every pixel came out white.
-
-## [0.2.0] - 2026-11-13
-
-No changes in this crate. It was released with the others because all of JFLib's crates move together.
 
 ## [0.1.0] - 2026-11-08
 

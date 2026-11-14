@@ -86,7 +86,8 @@ Android included. The blocking clients and servers on real sockets (HTTP, TLS, S
 The dissector no longer panics on packets from the network: a TLS ClientHello split across TCP
 segments, an FTP or POP3 reply with a character across its fourth byte, and lines with bytes
 that are not UTF-8 are taken apart within their bytes. `smtp::parse_path` no longer cuts an
-argument inside a character. Everything is in the
+argument inside a character, and on 32-bit targets pcapng's block and packet lengths are
+checked without wrapping. Everything is in the
 [changelog](https://docs.rs/crate/jflib-netpkt/latest/source/CHANGELOG.md).
 
 ## Documentation

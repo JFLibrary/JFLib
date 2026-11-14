@@ -80,8 +80,10 @@ names with a scheme that JFLib's platform layer knows, such as `documents://`.
 Long formatted documents can be saved. `encode_docx`, and with it `save_docx`, checks its own
 output with the XML reader, which stopped at 30000 elements and 4 MiB a part, a size some dozen
 pages of formatted text reach. The parts that grow with a document's content are now written and
-read up to 250000 elements and 8 MiB. The
-[changelog](https://docs.rs/crate/jflib-doc-io/latest/source/CHANGELOG.md) says the same.
+read up to 250000 elements and 8 MiB, and a long source list that could be saved now loads back.
+HTML clipboard round trips keep the size of raised and
+lowered text and the line spacing; before, every copy and paste shrank such text by a third.
+Everything is in the [changelog](https://docs.rs/crate/jflib-doc-io/latest/source/CHANGELOG.md).
 
 ## Documentation
 

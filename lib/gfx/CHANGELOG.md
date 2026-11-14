@@ -8,11 +8,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
-### Fixed
-
-- `ellipse_fx` and `rrect_fx` compute their control offsets in 64 bits. From a radius of about 59,500 px (rounded rectangles: 73,000 px) they wrapped and the shape came out wrong.
-
-## [0.2.0] - 2026-11-13
+## [0.2.0] - 2026-11-14
 
 ### Added
 
@@ -34,6 +30,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - `blend::copy_stream` ends with the fence its non-temporal stores need before anything reads or
   writes the copy again; callers no longer call `stream_fence` after it.
+- `ellipse_fx` and `rrect_fx` compute their control offsets in 64 bits. From a radius of about 59,500 px (rounded rectangles: 73,000 px) they wrapped and the shape came out wrong.
 
 ## [0.1.0] - 2026-11-08
 

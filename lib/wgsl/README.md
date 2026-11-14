@@ -75,9 +75,11 @@ extension is not supported yet; the documentation lists what else is missing.
 
 ## What's new in 0.2.0
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
-together. The [changelog](https://docs.rs/crate/jflib-wgsl/latest/source/CHANGELOG.md) says the
-same.
+Compound assignments of a vector with a scalar compile right now: in SPIR-V `v += 1.0` became a
+multiplication by 1.0 (`-=` and `/=` alike), and integer vectors gave invalid SPIR-V. A module
+whose SPIR-V would need an instruction longer than 65535 words is a compile error instead of a
+broken module. Everything is in the
+[changelog](https://docs.rs/crate/jflib-wgsl/latest/source/CHANGELOG.md).
 
 ## Documentation
 

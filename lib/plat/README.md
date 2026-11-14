@@ -162,10 +162,18 @@ modules. The accessibility tree carries what a web page needs (tables, landmarks
 more actions) to UI Automation, AT-SPI2, TalkBack and the browser. New are the registration of an
 app as a web browser with its default status, print jobs of several pages, several files from one
 file dialog, more mouse cursors, raw key events, an input method for fields an app draws itself
-and drop effects per target, and large frames reach the screen faster. Among the fixes:
+and drop effects per target, and large frames reach the screen faster. A drop target can give its
+answer to the source after the drop (`drop_hold`, `drop_finish`) and learns which effects the
+source allows (`drop_allowed`). Among the fixes:
 `open_url` takes only absolute URLs (a path could start a program), the UI thread's state panics
 on other threads instead of racing, deadlocks in channels and async tasks and races in the worker
-pool are gone, and the crash report no longer allocates or waits. `dl_sym` and `dl_close` are `unsafe fn` now.
+pool are gone, and the crash report no longer allocates or waits. `File::create_new` and
+`AtomicFile` check and create in one step on every mount, so a file another writer makes in
+between is no longer emptied or taken over, and content://, the Linux trash and Windows secrets
+no longer lose data to concurrent writes. A path with a NUL character is refused instead of
+reaching the system cut at the NUL, `UnixListener::bind` no longer removes what is at its path,
+and on Windows an app saves at logout before Windows may end it. `dl_sym` and `dl_close` are
+`unsafe fn` now.
 Everything is in the [changelog](https://docs.rs/crate/jflib-plat/latest/source/CHANGELOG.md).
 
 ## Documentation

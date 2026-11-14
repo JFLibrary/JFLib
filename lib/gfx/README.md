@@ -79,7 +79,8 @@ Large blits are faster: an XRGB source of 1 MB or more is copied in row bands on
 and from 12 MB on past the caches, so the blit of a 4K canvas frame took about 2 ms on the UI
 thread instead of about 5 ms in JFLib's measurement. `gfx::set_parallel` sets the loop the bands
 run on, and `blend::copy_stream_rows` copies a block of rows with one fence. `blend::copy_stream`
-now ends with the fence its streaming stores need. Everything is in the
+now ends with the fence its streaming stores need, and `ellipse_fx` and `rrect_fx` no longer
+wrap for radii from about 59,500 px. Everything is in the
 [changelog](https://docs.rs/crate/jflib-gfx/latest/source/CHANGELOG.md).
 
 ## Documentation

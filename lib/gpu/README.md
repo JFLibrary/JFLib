@@ -136,7 +136,9 @@ shaders stay SPIR-V and are translated by jflib-shader, and devices with Metal 3
 `Voll`. On Vulkan a device can have a second queue for compute and copies when asked for
 (`Adapter::create_device_with` with `DeviceOptions::compute_queue`), while `create_device` stays
 as it was. `TextureView::usage` and `TextureView::same` are new, and validation with
-`jfgui_GPU_VALIDATE` now also sees what shaders read and write through their bindings. Everything
+`jfgui_GPU_VALIDATE` now also sees what shaders read and write through their bindings. Range
+checks no longer wrap: an offset near `u32::MAX` is `GpuError::Invalid` instead of reaching the
+driver. Everything
 is in the [changelog](https://docs.rs/crate/jflib-gpu/latest/source/CHANGELOG.md).
 
 ## Documentation

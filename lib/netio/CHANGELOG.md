@@ -8,14 +8,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-14
+
 ### Fixed
 
 - `Client::new()` sends the user agent `JFLib-netio` and `ssh::Client` the version `SSH-2.0-JFLib_netio` (both still named CraftLIB); a mail without a HELO name gets its Message-ID at `jflib` instead of `backupcraft`
 - `smtp::send` with `Security::None`: the docs (GUIDE section 17, the README) say what the code does, a plain connection to any server (a relay on port 25 inside a network) and no login without TLS; they said "plain on loopback"
-
-## [0.2.0] - 2026-11-13
-
-No changes in this crate. It was released with the others because all of JFLib's crates move together.
 
 ## [0.1.0] - 2026-11-08
 

@@ -8,47 +8,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
-### Added
-
-- `vfs::Provider::create_new` (a new file where nothing is, the check and the creation in one step; the default uses the OS exclusive create of `os_path`) and `vfs::Stream::deferred` (bytes reach the provider only by sync or drop)
-- `fill_random`, `random_bytes` and `random_u64` on Android (bionic's `arc4random_buf`); the browser has none, which the docs now say (a web page takes `crypto.getRandomValues`)
-
-- `drop_hold(on)`, `drop_waiting()` and `drop_finish(serial, effect)`: a drop's answer to its
-  source waits after `E_DROP` until the program gives it, where the platform allows a later
-  answer: X11 (`XdndFinished`), Wayland (`wl_data_offer.finish`) and Windows for a source whose
-  data object offers `IDataObjectAsyncCapability` in async mode (`EndOperation`).
-- Windows: the data object of the app's drags offers `IDataObjectAsyncCapability` (async mode
-  off); `dnd_test_drop_async` and `dnd_test_async_end` test the late answer without a user.
-- `drop_allowed()` and `drop_set_allowed(effects)`: the effects the source of a drop allows, as
-  the platform gives them with the drop (Windows `IDropTarget::Drop`, X11 the `XdndActionList`
-  with the last `XdndPosition`'s action, Wayland `source_actions`, macOS the operation mask); 0
-  in the browser and on Android.
-
-### Changed
-
-- `File::create_new` on a mount whose provider has neither `Provider::create_new` nor `os_path` returns None (it was exclusive only against other `create_new` calls of the process; `write_file` or `File::open` of another writer in between was emptied). `log_file` returns false for a file of such a provider (its lines reached the provider only when the log stopped, a crash line never)
-- X11: the effects another program's drag allows come from the source's `XdndActionList` and the
-  action it asks for (`E_DRAG`, the `XdndStatus` answer); without a list every effect, as before.
-- `net::UnixListener::bind` removes only a socket file nobody listens on any more; a file, a folder or a socket that is listened on stays and `bind` fails (AddrInUse; a folder on Windows: Other). It removed whatever was at the path first: a file with its bytes, an empty folder, another listener's socket
-- `base::Ini::load_checked` gives None when it cannot tell that the name is free (refused, an I/O error, a folder there) or cannot learn the file's size; only a missing name gives an empty Ini. `file_exists_checked` on a folder mount answers for its OS file (it gave the mount's kind: 0 for an error too)
-
-### Fixed
-
-- Ogg Vorbis floor 1 keeps its values in 15 bits as libvorbis does. A codebook entry up to 2^24 overflowed i32 in the next point's interpolation; valid streams decode as before.
-- Overflows that only a build with overflow checks saw (a debug build of an app without JFLib's profile aborted): X11's work area with huge edges (Linux), a file time from 2^63 on (Windows).
-- `File::create_new` and `AtomicFile`'s sibling on mounts check and create in one step (`Provider::create_new`: `MemFs`, `Overlay`, `Sub`, content://; folder mounts the OS exclusive create): another writer's file made between the check and the open was emptied by `create_new` and taken over by `AtomicFile`, which then removed it on drop or renamed it at commit (also on `DirFs` mounts)
-- content:// (`ContentFs`): a folder move to another folder is refused before the file in its way is deleted (it was deleted, then the move refused); an open for writing or a rename the provider refuses keeps the pending journal copy for `recover` (it was dropped before asking); writes of one document with a journal run one after the other (also `recover` and the removal of a copy), so a write that succeeded no longer removed the copy of a later one that failed
-- Linux trash on a file system without `RENAME_NOREPLACE`: the fallback looked whether the name in `Trash/files` was free and then renamed, replacing an entry another program made in between; now a file goes by a hard link and the removal of its old name, a folder replaces an empty folder made for it (steps that fail on a taken name); a file system without hard links refuses files
-- Windows secrets: two writes of one large entry at once (or a small and a large one) could leave the credential pointing at a DPAPI file the other write had swept; set, get and delete of an entry hold `data://secrets/<hash>.lock` (an exclusive handle, across processes) from the file to the sweep
-- Windows logout and shutdown: `WM_QUERYENDSESSION` ended the app already (`UIC_SESSION_END`, then `UIC_EXIT`), also when another app cancelled the logout; and the app saved only after `WM_ENDSESSION` had returned, when Windows may end the process. Now only a confirmed `WM_ENDSESSION` sends it, and the UI takes it while the message is handled (when it comes during the wait for events; elsewhere it waits in the queue)
-- An OS path with a NUL character reached the system cut at the NUL: `delete`, `File::open` for writing, `rename`, `fs::write_file_private` and the rest changed the file named by the part before it. `policy::fs_allowed` refuses such a path, also without a manifest, so every file call fails; `fs::symlink` refuses such a target
-- Windows: `File::write_at` at offset u64::MAX appended to the file (the OVERLAPPED value for "at the end") and reported success; an offset whose end passes i64::MAX is refused before anything is written, for `read_at` too
-- The log file counted a short write as the whole line: the rest was lost, the next line started past the end (a gap of NUL bytes), the rotation came early. Only the bytes written count now, and the rest of the line follows
-- content:// (`ContentFs`): a new document the provider named `name (1)` (the name taken meanwhile) took the bytes of `write_file` or a writing `File::open`, which reported success; now that document goes again and the one under the name asked for is written (`mkdir` takes the folder made meanwhile instead of failing and leaving `name (1)`). The chosen folder could be deleted by its document form (`tree/ID/document/ID`)
-- `vfs::Sub`: opening its root for writing emptied or created a file of the folder's name in the inner provider and was refused only then; refused first now (`create_new` too)
-- `aio::Writer`: a write whose future was dropped while its job ran could overwrite a later write at the same offset, and the commit succeeded. Such a writer is spoilt now: later writes give `Err(Write)`, the commit `Err(Commit)`, nothing is put in place
-
-## [0.2.0] - 2026-11-13
+## [0.2.0] - 2026-11-14
 
 ### Added
 
@@ -184,6 +144,18 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   leaves plat's threads (the pool, `spawn_blocking`) or the start of the program uncaught still
   ends it with JFLib's crash report and exit code 3, while panics the app catches leave it
   running.
+- `vfs::Provider::create_new` (a new file where nothing is, the check and the creation in one step; the default uses the OS exclusive create of `os_path`) and `vfs::Stream::deferred` (bytes reach the provider only by sync or drop)
+- `fill_random`, `random_bytes` and `random_u64` on Android (bionic's `arc4random_buf`); the browser has none, which the docs now say (a web page takes `crypto.getRandomValues`)
+- `drop_hold(on)`, `drop_waiting()` and `drop_finish(serial, effect)`: a drop's answer to its
+  source waits after `E_DROP` until the program gives it, where the platform allows a later
+  answer: X11 (`XdndFinished`), Wayland (`wl_data_offer.finish`) and Windows for a source whose
+  data object offers `IDataObjectAsyncCapability` in async mode (`EndOperation`).
+- Windows: the data object of the app's drags offers `IDataObjectAsyncCapability` (async mode
+  off); `dnd_test_drop_async` and `dnd_test_async_end` test the late answer without a user.
+- `drop_allowed()` and `drop_set_allowed(effects)`: the effects the source of a drop allows, as
+  the platform gives them with the drop (Windows `IDropTarget::Drop`, X11 the `XdndActionList`
+  with the last `XdndPosition`'s action, Wayland `source_actions`, macOS the operation mask); 0
+  in the browser and on Android.
 
 ### Changed
 
@@ -214,6 +186,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Wayland: `wl_data_offer.set_actions` names the effects the drop target under the drag takes
   instead of every effect the source allows.
 - Windows: the CoreCLR host's AppDomain is called `JFLib.ClrHost` (was `PaintCraft.PdnHost`).
+- `File::create_new` on a mount whose provider has neither `Provider::create_new` nor `os_path` returns None (it was exclusive only against other `create_new` calls of the process; `write_file` or `File::open` of another writer in between was emptied). `log_file` returns false for a file of such a provider (its lines reached the provider only when the log stopped, a crash line never)
+- X11: the effects another program's drag allows come from the source's `XdndActionList` and the
+  action it asks for (`E_DRAG`, the `XdndStatus` answer); without a list every effect, as before.
+- `net::UnixListener::bind` removes only a socket file nobody listens on any more; a file, a folder or a socket that is listened on stays and `bind` fails (AddrInUse; a folder on Windows: Other). It removed whatever was at the path first: a file with its bytes, an empty folder, another listener's socket
+- `base::Ini::load_checked` gives None when it cannot tell that the name is free (refused, an I/O error, a folder there) or cannot learn the file's size; only a missing name gives an empty Ini. `file_exists_checked` on a folder mount answers for its OS file (it gave the mount's kind: 0 for an error too)
 
 ### Fixed
 
@@ -257,6 +234,19 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   held, and with `keep` 0 it deleted the crash line), it writes the crash line to files of the
   operating system only, and on Linux it gives up a non-blocking stderr that takes nothing for half
   a second instead of waiting for it.
+- Ogg Vorbis floor 1 keeps its values in 15 bits as libvorbis does. A codebook entry up to 2^24 overflowed i32 in the next point's interpolation; valid streams decode as before.
+- Overflows that only a build with overflow checks saw (a debug build of an app without JFLib's profile aborted): X11's work area with huge edges (Linux), a file time from 2^63 on (Windows).
+- `File::create_new` and `AtomicFile`'s sibling on mounts check and create in one step (`Provider::create_new`: `MemFs`, `Overlay`, `Sub`, content://; folder mounts the OS exclusive create): another writer's file made between the check and the open was emptied by `create_new` and taken over by `AtomicFile`, which then removed it on drop or renamed it at commit (also on `DirFs` mounts)
+- content:// (`ContentFs`): a folder move to another folder is refused before the file in its way is deleted (it was deleted, then the move refused); an open for writing or a rename the provider refuses keeps the pending journal copy for `recover` (it was dropped before asking); writes of one document with a journal run one after the other (also `recover` and the removal of a copy), so a write that succeeded no longer removed the copy of a later one that failed
+- Linux trash on a file system without `RENAME_NOREPLACE`: the fallback looked whether the name in `Trash/files` was free and then renamed, replacing an entry another program made in between; now a file goes by a hard link and the removal of its old name, a folder replaces an empty folder made for it (steps that fail on a taken name); a file system without hard links refuses files
+- Windows secrets: two writes of one large entry at once (or a small and a large one) could leave the credential pointing at a DPAPI file the other write had swept; set, get and delete of an entry hold `data://secrets/<hash>.lock` (an exclusive handle, across processes) from the file to the sweep
+- Windows logout and shutdown: `WM_QUERYENDSESSION` ended the app already (`UIC_SESSION_END`, then `UIC_EXIT`), also when another app cancelled the logout; and the app saved only after `WM_ENDSESSION` had returned, when Windows may end the process. Now only a confirmed `WM_ENDSESSION` sends it, and the UI takes it while the message is handled (when it comes during the wait for events; elsewhere it waits in the queue)
+- An OS path with a NUL character reached the system cut at the NUL: `delete`, `File::open` for writing, `rename`, `fs::write_file_private` and the rest changed the file named by the part before it. `policy::fs_allowed` refuses such a path, also without a manifest, so every file call fails; `fs::symlink` refuses such a target
+- Windows: `File::write_at` at offset u64::MAX appended to the file (the OVERLAPPED value for "at the end") and reported success; an offset whose end passes i64::MAX is refused before anything is written, for `read_at` too
+- The log file counted a short write as the whole line: the rest was lost, the next line started past the end (a gap of NUL bytes), the rotation came early. Only the bytes written count now, and the rest of the line follows
+- content:// (`ContentFs`): a new document the provider named `name (1)` (the name taken meanwhile) took the bytes of `write_file` or a writing `File::open`, which reported success; now that document goes again and the one under the name asked for is written (`mkdir` takes the folder made meanwhile instead of failing and leaving `name (1)`). The chosen folder could be deleted by its document form (`tree/ID/document/ID`)
+- `vfs::Sub`: opening its root for writing emptied or created a file of the folder's name in the inner provider and was refused only then; refused first now (`create_new` too)
+- `aio::Writer`: a write whose future was dropped while its job ran could overwrite a later write at the same offset, and the commit succeeded. Such a writer is spoilt now: later writes give `Err(Write)`, the commit `Err(Commit)`, nothing is put in place
 
 ### Security
 

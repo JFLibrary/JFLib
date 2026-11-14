@@ -837,6 +837,7 @@ cas::CasError::NotARepository	variant	NotARepository	non-exhaustive
 cas::CasError::NotEmpty	variant	NotEmpty	non-exhaustive
 cas::CasError::NotFound	variant	NotFound(String)	non-exhaustive
 cas::CasError::TooLarge	variant	TooLarge	non-exhaustive
+cas::CasError::UntrustedSigner	variant	UntrustedSigner	non-exhaustive
 cas::CasResult	type	type CasResult<T> = Result<T, CasError>	
 cas::CheckReport	impl	impl Clone	
 cas::CheckReport	impl	impl Debug	
@@ -12302,8 +12303,10 @@ plat::dl_open	fn	fn dl_open(name: &str) -> Option<usize>
 plat::dl_open	fn	fn dl_open(name: &str) -> Option<usize>	linux
 plat::dl_sym	fn	unsafe fn dl_sym(handle: usize, name: &[u8]) -> usize	
 plat::dl_sym	fn	unsafe fn dl_sym(handle: usize, name: &[u8]) -> usize	linux
+plat::dnd_test_async_end	fn	fn dnd_test_async_end() -> Option<(bool, bool, i32, u32)>	windows
 plat::dnd_test_drop	fn	fn dnd_test_drop(data: &DragData, w: i32, x: i32, y: i32, keys: u32) -> Option<u32>	windows
 plat::dnd_test_drop	fn	fn dnd_test_drop(data: &DragData, w: i32, x: i32, y: i32, mask: u64) -> Option<u32>	apple
+plat::dnd_test_drop_async	fn	fn dnd_test_drop_async(data: &DragData, w: i32, x: i32, y: i32, keys: u32) -> Option<(u32, bool)>	windows
 plat::dnd_test_formats	fn	fn dnd_test_formats(data: &DragData) -> Option<Vec<(String, Vec<u8>)>>	apple
 plat::dnd_test_formats	fn	fn dnd_test_formats(data: &DragData) -> Option<Vec<(String, Vec<u8>)>>	windows
 plat::dnd_test_source	fn	fn dnd_test_source(esc: bool, keys: u32) -> u32	windows
@@ -12322,8 +12325,12 @@ plat::drives	fn	fn drives() -> Vec<String>	linux
 plat::drives	fn	fn drives() -> Vec<String>	windows
 plat::drop_add	fn	fn drop_add(path: &str) -> bool	
 plat::drop_add_url	fn	fn drop_add_url(url: &str) -> bool	
+plat::drop_allowed	fn	fn drop_allowed() -> u32	
 plat::drop_data_take	fn	fn drop_data_take() -> DragData	
+plat::drop_finish	fn	fn drop_finish(serial: u32, effect: u32) -> bool	
+plat::drop_hold	fn	fn drop_hold(on: bool)	
 plat::drop_reset	fn	fn drop_reset()	
+plat::drop_set_allowed	fn	fn drop_set_allowed(effects: u32)	
 plat::drop_set_effect	fn	fn drop_set_effect(effect: u32)	
 plat::drop_set_html	fn	fn drop_set_html(bytes: &[u8]) -> bool	
 plat::drop_set_image	fn	fn drop_set_image(bytes: Vec<u8>) -> bool	
@@ -12332,6 +12339,7 @@ plat::drop_take	fn	fn drop_take() -> Vec<String>
 plat::drop_text_from	fn	fn drop_text_from(bytes: &[u8], utf16: bool) -> Vec<u8>	
 plat::drop_uri_list	fn	fn drop_uri_list(data: &[u8]) -> u32	
 plat::drop_url_list	fn	fn drop_url_list(text: &[u8]) -> u32	
+plat::drop_waiting	fn	fn drop_waiting() -> u32	
 plat::env	fn	fn env(name: &str) -> Option<String>	
 plat::env	fn	fn env(name: &str) -> Option<String>	apple
 plat::env	fn	fn env(name: &str) -> Option<String>	linux
@@ -12565,6 +12573,7 @@ plat::instance::Claim	enum	enum Claim	non-exhaustive
 plat::instance::Claim	impl	impl Clone	non-exhaustive
 plat::instance::Claim	impl	impl Copy	non-exhaustive
 plat::instance::Claim	impl	impl Debug	non-exhaustive
+plat::instance::Claim	impl	impl Drop	
 plat::instance::Claim	impl	impl Eq	non-exhaustive
 plat::instance::Claim	impl	impl PartialEq	non-exhaustive
 plat::instance::Claim::Alone	variant	Alone	non-exhaustive
@@ -13691,6 +13700,7 @@ plat::vfs::Overlay	struct	struct Overlay
 plat::vfs::Overlay::new	method	fn new(layers: Vec<Arc<dyn Provider>>) -> Overlay	
 plat::vfs::Provider	trait	trait Provider: Send + Sync	
 plat::vfs::Provider::atomic_rename	trait-fn	fn atomic_rename(&self) -> bool	provided
+plat::vfs::Provider::create_new	trait-fn	fn create_new(&self, _path: &str) -> Opened	provided
 plat::vfs::Provider::delete	trait-fn	fn delete(&self, _path: &str) -> bool	provided
 plat::vfs::Provider::display_name	trait-fn	fn display_name(&self, _path: &str) -> Option<String>	provided
 plat::vfs::Provider::kind	trait-fn	fn kind(&self, path: &str) -> u32	
@@ -13719,6 +13729,7 @@ plat::vfs::Stat.kind	field	kind: u32
 plat::vfs::Stat.mtime_ns	field	mtime_ns: i64	
 plat::vfs::Stat.size	field	size: u64	
 plat::vfs::Stream	trait	trait Stream: Send + Sync	
+plat::vfs::Stream::deferred	trait-fn	fn deferred(&self) -> bool	provided
 plat::vfs::Stream::read_at	trait-fn	fn read_at(&self, off: u64, buf: &mut [u8]) -> Option<usize>	
 plat::vfs::Stream::set_len	trait-fn	fn set_len(&self, _len: u64) -> bool	provided
 plat::vfs::Stream::size	trait-fn	fn size(&self) -> Option<u64>	
@@ -16767,6 +16778,7 @@ ui::DPort	struct	struct DPort	all-pub
 ui::DPort.at	field	at: [f32; 2]	
 ui::DPort.flags	field	flags: u32	
 ui::DPort.key	field	key: u64	
+ui::DROP_DEFER_MS	const	const DROP_DEFER_MS: u32	
 ui::DR_BEZIER	const	const DR_BEZIER: u8	
 ui::DR_ORTHO	const	const DR_ORTHO: u8	
 ui::DR_STRAIGHT	const	const DR_STRAIGHT: u8	
@@ -19376,6 +19388,7 @@ ui::Ui::dp	method	fn dp(&self, dip: i32) -> i32
 ui::Ui::dp_fx	method	fn dp_fx(&self, dip_fx: i32) -> i32	
 ui::Ui::dp_text	method	fn dp_text(&self, dip: i32) -> i32	
 ui::Ui::dpi	method	fn dpi(&self) -> i32	
+ui::Ui::drag_allowed	method	fn drag_allowed(&self) -> u32	
 ui::Ui::drag_effect	method	fn drag_effect(&self) -> u32	
 ui::Ui::drag_out	method	fn drag_out(&mut self, data: DragData) -> bool	
 ui::Ui::drag_over	method	fn drag_over(&self) -> (u32, i32, i32)	
@@ -19398,8 +19411,10 @@ ui::Ui::draw_unclip	method	fn draw_unclip(&mut self)
 ui::Ui::drop_accept	method	fn drop_accept(&mut self, types: u32)	
 ui::Ui::drop_count	method	fn drop_count(&self) -> u32	
 ui::Ui::drop_data	method	fn drop_data(&self) -> &DragData	
+ui::Ui::drop_defer	method	fn drop_defer(&mut self) -> bool	
 ui::Ui::drop_effect	method	fn drop_effect(&self) -> u32	
 ui::Ui::drop_effect_set	method	fn drop_effect_set(&mut self, effects: u32)	
+ui::Ui::drop_finish	method	fn drop_finish(&mut self, effect: u32) -> bool	
 ui::Ui::drop_list	method	fn drop_list(&self) -> &[String]	
 ui::Ui::drop_path	method	fn drop_path(&self, i: u32) -> Option<&str>	
 ui::Ui::drop_pos	method	fn drop_pos(&self) -> (i32, i32)	
