@@ -2,7 +2,8 @@
 //
 //   send(&SmtpConfig, &Mail) -> Result<String, String>   the server's final answer or the
 //                                                        reason it failed (German, for people)
-//   Security::StartTls (port 587) / Tls (465) / None (25; refuses to authenticate in clear)
+//   Security::StartTls (port 587) / Tls (465) / None (25; plain to any server, e.g. a relay
+//   inside a network, and refuses to authenticate in clear: with a user name it is an error)
 //   AUTH PLAIN or LOGIN (whatever the server offers; PLAIN first)
 //   message(&Mail, host, now) -> the RFC 5322 text: UTF-8 subject as an encoded word, the body
 //   text/plain (and text/html as multipart/alternative) in base64, Date and Message-ID

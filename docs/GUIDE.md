@@ -2643,8 +2643,9 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   P-256) or TLS 1.2 with ECDHE, RSA / ECDSA / Ed25519 certificates, the chain built and checked
   against the system's authorities (Windows CryptoAPI, Linux CA bundle) and extra CAs;
   `netio::trust::system_connector(extra)` gives the connector for `Client`.
-* `netio::smtp::send(&SmtpConfig, &Mail)` -- e-mail (STARTTLS, TLS, or plain on loopback;
-  AUTH PLAIN / LOGIN only over TLS; text and HTML parts, RFC 2047 subjects).
+* `netio::smtp::send(&SmtpConfig, &Mail)` -- e-mail (STARTTLS, TLS, or plain to any server
+  with `Security::None`, e.g. a relay on port 25 inside a network; AUTH PLAIN / LOGIN only over
+  TLS, a plain connection with a user name is refused; text and HTML parts, RFC 2047 subjects).
 * `netio::ssh::Client` -- run commands on a machine over SSH (curve25519, ssh-ed25519,
   chacha20-poly1305, strict key exchange), host key pinned by fingerprint.
 * `netio::dns::resolve` -- names to addresses (Linux: hosts file, resolv.conf, UDP and TCP).
@@ -2656,7 +2657,10 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   and `Display` know `[fe80::1%2]:53`.
 * `datastore::Store` -- JSON collections in a crash-safe journal database with transactions;
   `Journal` for append-only logs.
-* `cas::Repo` -- content-addressed, deduplicated, encrypted repositories with signed snapshots.
+* `cas::Repo` -- content-addressed, deduplicated, encrypted repositories with signed snapshots:
+  only trusted keys (`CreateOptions::signer`, `trust_signer`) save and load them
+  (`CasError::UntrustedSigner`); the list is protected by the repository key, so it does not
+  keep out someone who can open the repository.
 * `crypto` -- hashes (SHA-2 incl. SHA-384, BLAKE2b, BLAKE3), MACs, KDFs, Argon2id, AEAD
   (ChaCha20-Poly1305, XChaCha, AES-GCM), X25519, P-256 key exchange, Ed25519, RSA (PKCS#1 v1.5,
   PSS) and ECDSA P-256 / P-384 verification (randomness comes from the caller:

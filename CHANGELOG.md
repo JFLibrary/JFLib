@@ -35,6 +35,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 - **plat:** `File::create_new` on a mount whose provider has neither `Provider::create_new` nor `os_path` returns None (it was exclusive only against other `create_new` calls of the process; `write_file` or `File::open` of another writer in between was emptied). `log_file` returns false for a file of such a provider (its lines reached the provider only when the log stopped, a crash line never)
 - **plat:** X11: the effects another program's drag allows are the source's `XdndActionList` with the action it asks for, in `E_DRAG` and for the `XdndStatus` answer (without a list every effect, as before)
+- **cas:** `Repo::save_snapshot` and `Unsaved::save_snapshot` refuse a key the repository does not trust with the new `CasError::UntrustedSigner`. They added the key to the trusted signers by themselves, so `load_snapshot`'s signature check never refused a snapshot saved through the API and `trust_signer` changed nothing. Trusted are `CreateOptions::signer` and the keys given to `trust_signer`; a program that saves with another key calls `trust_signer` first. The list is protected by the repository key: it keeps out other keys and mistakes, not someone who can open the repository
 
 ### Fixed
 
@@ -67,6 +68,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netio:** `Client::new()` sends the user agent `JFLib-netio` and `ssh::Client` the version `SSH-2.0-JFLib_netio` (both still named CraftLIB); a mail without a HELO name gets its Message-ID at `jflib` instead of `backupcraft`
 - **gpu:** `GpuError::NoLoader` never comes on macOS and iOS (no Metal device is `NoAdapter`): the docs say so, and its text there no longer claims a missing Metal device
 - **build:** The manifests' docs.rs comments (and `tools/scaffold.py`'s) no longer call macOS none of JFLib's targets
+- **netio:** `smtp::send` with `Security::None`: the docs (GUIDE section 17, the README) say what the code does, a plain connection to any server (a relay on port 25 inside a network) and no login without TLS; they said "plain on loopback"
 
 ## [0.2.0] - 2026-11-13
 

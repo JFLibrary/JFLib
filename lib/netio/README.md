@@ -87,8 +87,9 @@ key exchange that closes the Terrapin attack, checks the host key against a pinn
 logs in with a password or an Ed25519 key, and `exec` returns the exit status, stdout and stderr.
 RSA and ECDSA keys, port forwarding and terminals are not part of it.
 
-`smtp::send` delivers a message over STARTTLS, TLS or a plain connection, logs in with AUTH PLAIN
-or LOGIN only over an encrypted one, checks the server's certificate like a browser and uses
+`smtp::send` delivers a message over STARTTLS, TLS or a plain connection (`Security::None`, to
+any server, such as a relay on port 25 inside a network), logs in with AUTH PLAIN or LOGIN only
+over an encrypted one, checks the server's certificate like a browser and uses
 nothing the server sent before the switch to TLS. Subjects in UTF-8 and HTML parts beside the
 text are written as the RFCs want them.
 

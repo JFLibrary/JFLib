@@ -150,6 +150,13 @@ fn store(t: &mut T) {
     let _ = plat::write_file(&plat::fs::join(&plat::fs::join(&dir, "snapshots"), "s2.snap"), &forged);
     t.check("unknown signer refused", matches!(repo.load_snapshot("s2"), Err(CasError::Corrupt(_))));
     plat::delete(&plat::fs::join(&plat::fs::join(&dir, "snapshots"), "s2.snap"));
+    // ... and may not save one through the API either (it is not trusted by saving)
+    t.check("unknown signer may not save", matches!(repo.save_snapshot(&snap("s2", alloc::vec![root.clone()], 0), &stranger), Err(CasError::UntrustedSigner)) && repo.snapshot_ids() == ["s1"]);
+    t.check("unknown signer still refused on load", matches!(repo.load_snapshot("s2"), Err(CasError::NotFound(_))));
+    // trust_signer lets another key save (a restored server with a new key)
+    t.check("trust another signer", repo.trust_signer(&stranger.public).is_ok());
+    t.check("trusted signer saves", repo.save_snapshot(&snap("s2", alloc::vec![root.clone()], 0), &stranger).is_ok() && repo.load_snapshot("s2").is_ok());
+    t.check("delete the second signer's snapshot", repo.delete_snapshot("s2", 1_900_000_000).is_ok());
     // immutability
     t.check("immutable snapshot", repo.save_snapshot(&snap("s3", alloc::vec![root.clone()], 2_000_000_000), &signer).is_ok());
     t.check("delete refused while immutable", matches!(repo.delete_snapshot("s3", 1_900_000_000), Err(CasError::Immutable(_))));

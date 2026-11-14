@@ -16,6 +16,11 @@
 //   repo.gc(progress)                     mark & sweep, repack sparse packs
 //   repo.add_passphrase / set_recovery / set_immutable_days / trust_signer
 //
+// Signers: snapshots are saved and loaded only with trusted keys -- CreateOptions::signer and
+// the keys given to trust_signer (save_snapshot: UntrustedSigner, load_snapshot: Corrupt).
+// The list sits in repo.json under the MAC of the repository key, so it keeps out other keys
+// and mistakes, not someone who holds the repository key (who could call trust_signer).
+//
 // Layout:  repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
 // Keys:    one random repository key, wrapped in repo.json for the server's master key, for
 //          passphrases (Argon2id) and for the recovery kit (sealed box); per purpose keys are
@@ -72,6 +77,9 @@ pub enum CasError {
     NotFound(String),
     Cancelled,
     TooLarge,
+    /// save_snapshot with a key the repository does not trust (CreateOptions::signer and the
+    /// keys of trust_signer are trusted)
+    UntrustedSigner,
 }
 
 impl core::fmt::Display for CasError {
@@ -87,6 +95,7 @@ impl core::fmt::Display for CasError {
             CasError::NotFound(s) => write!(f, "nicht gefunden: {}", s),
             CasError::Cancelled => f.write_str("abgebrochen"),
             CasError::TooLarge => f.write_str("zu groß"),
+            CasError::UntrustedSigner => f.write_str("der Signaturschlüssel ist für dieses Repository nicht freigegeben"),
         }
     }
 }
@@ -169,7 +178,8 @@ pub struct CreateOptions {
     /// the server's wrap key
     pub master: [u8; 32],
     pub recovery: Option<[u8; 32]>,
-    /// the public key whose snapshots this repository trusts
+    /// the public key whose snapshots this repository trusts (the only one that may save
+    /// snapshots until trust_signer adds another)
     pub signer: [u8; 32],
     pub immutable_days: u32,
 }
@@ -510,7 +520,10 @@ impl Repo {
         })
     }
 
-    /// trust snapshots signed by another key too (a restored server)
+    /// trust snapshots signed by another key too (a restored server with a new key): only
+    /// trusted keys may save snapshots, and load_snapshot refuses the others.  The list is
+    /// protected by the repository key: whoever opens the repository can call this, so the
+    /// check keeps out other keys and mistakes, not a holder of the repository key.
     pub fn trust_signer(&self, pk: &[u8; 32]) -> CasResult<()> {
         let h = crypto::hex(pk);
         self.update_cfg(|v| {
@@ -614,7 +627,8 @@ impl Repo {
         join(&join(&self.path, "snapshots"), &format!("{}.snap", id))
     }
 
-    /// store a snapshot (after its writer finished); signed by `signer`.
+    /// store a snapshot (after its writer finished); signed by `signer`, a key the repository
+    /// trusts (CreateOptions::signer or one given to trust_signer), else UntrustedSigner.
     ///
     /// Between the writer's finish and this call the new chunks belong to no snapshot, and a
     /// gc of another thread -- one that waited for the writer runs at that very moment --
@@ -638,8 +652,10 @@ impl Repo {
 
     // (the caller keeps gc out: gc_lock shared, or the Unsaved of the snapshot's writer)
     fn write_snapshot(&self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()> {
+        // never trusted by itself: the key must be in the list before (load_snapshot's check
+        // would else hold for every key that went through here)
         if !self.trusted(&signer.public) {
-            self.trust_signer(&signer.public)?;
+            return Err(CasError::UntrustedSigner);
         }
         if bad_snap_id(&snap.id) {
             return Err(CasError::NotFound(snap.id.clone()));
@@ -1061,7 +1077,8 @@ pub struct Unsaved<'a> {
 }
 
 impl Unsaved<'_> {
-    /// store the snapshot of these chunks (signed by `signer`); gc may run again afterwards
+    /// store the snapshot of these chunks (signed by `signer`, a trusted key, else
+    /// UntrustedSigner); gc may run again afterwards
     pub fn save_snapshot(self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()> {
         self.repo.write_snapshot(snap, signer)
     }

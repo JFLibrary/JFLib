@@ -26,8 +26,12 @@ unsaved.save_snapshot(&snap, &signer)?;                    // signed with a cryp
 ```
 
 Directories are stored as tree chunks of their entries, so an unchanged folder produces the same
-tree chunk and is stored only once. `load_snapshot` returns a snapshot after checking its
-signature against the keys the repository trusts, and `read_chunk` and `read_tree` give back the
+tree chunk and is stored only once. Snapshots are signed: the key given at creation
+(`CreateOptions::signer`) and the ones added with `trust_signer` are trusted, `save_snapshot`
+refuses any other key with `CasError::UntrustedSigner`, and `load_snapshot` returns a snapshot
+only after checking its signature against the trusted keys. The list of trusted keys is
+protected by the repository key, so it keeps out other keys and mistakes, not someone who can
+open the repository: that can call `trust_signer` too. `read_chunk` and `read_tree` give back the
 plain data. Several writers can run at once; one process holds a repository at a time.
 
 ## What is inside

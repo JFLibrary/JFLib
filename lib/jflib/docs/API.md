@@ -39730,7 +39730,8 @@ smtp -- sending mail (RFC 5321) for notifications
 
   send(&SmtpConfig, &Mail) -> Result<String, String>   the server's final answer or the
                                                        reason it failed (German, for people)
-  Security::StartTls (port 587) / Tls (465) / None (25; refuses to authenticate in clear)
+  Security::StartTls (port 587) / Tls (465) / None (25; plain to any server, e.g. a relay
+  inside a network, and refuses to authenticate in clear: with a user name it is an error)
   AUTH PLAIN or LOGIN (whatever the server offers; PLAIN first)
   message(&Mail, host, now) -> the RFC 5322 text: UTF-8 subject as an encoded word, the body
   text/plain (and text/html as multipart/alternative) in base64, Date and Message-ID
@@ -47595,6 +47596,11 @@ format "bcrepo-1")
   repo.gc(progress)                     mark & sweep, repack sparse packs
   repo.add_passphrase / set_recovery / set_immutable_days / trust_signer
 
+Signers: snapshots are saved and loaded only with trusted keys -- CreateOptions::signer and
+the keys given to trust_signer (save_snapshot: UntrustedSigner, load_snapshot: Corrupt).
+The list sits in repo.json under the MAC of the repository key, so it keeps out other keys
+and mistakes, not someone who holds the repository key (who could call trust_signer).
+
 Layout:  repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
 Keys:    one random repository key, wrapped in repo.json for the server's master key, for
          passphrases (Argon2id) and for the recovery kit (sealed box); per purpose keys are
@@ -47631,6 +47637,8 @@ KIND_TREE: u8 = 1
   - `NotFound(String)`
   - `Cancelled`
   - `TooLarge`
+  - `UntrustedSigner` -- save_snapshot with a key the repository does not trust (CreateOptions::signer and the
+    keys of trust_signer are trusted)
 
 - **`type CasResult<T> = Result<T, CasError>`**
 
@@ -47662,7 +47670,8 @@ KIND_TREE: u8 = 1
   - `compression: Codec`
   - `master: [u8; 32]` -- the server's wrap key
   - `recovery: Option<[u8; 32]>`
-  - `signer: [u8; 32]` -- the public key whose snapshots this repository trusts
+  - `signer: [u8; 32]` -- the public key whose snapshots this repository trusts (the only one that may save
+    snapshots until trust_signer adds another)
   - `immutable_days: u32`
 
 - **`struct WriteStats`**
@@ -47723,14 +47732,18 @@ KIND_TREE: u8 = 1
 - **`fn set_immutable_days(&self, days: u32) -> CasResult<()>`**
   raise the immutability (never lowers it)
 - **`fn trust_signer(&self, pk: &[u8; 32]) -> CasResult<()>`**
-  trust snapshots signed by another key too (a restored server)
+  trust snapshots signed by another key too (a restored server with a new key): only
+  trusted keys may save snapshots, and load_snapshot refuses the others.  The list is
+  protected by the repository key: whoever opens the repository can call this, so the
+  check keeps out other keys and mistakes, not a holder of the repository key.
 - **`fn writer(&self) -> Writer<'_>`**
   a writer for new chunks (backups run several at once; gc waits for them)
 - **`fn read_chunk(&self, id: &ChunkId) -> CasResult<Vec<u8>>`**
   the plain content of a chunk
 - **`fn read_tree(&self, id: &ChunkId) -> CasResult<Tree>`**
 - **`fn save_snapshot(&self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()>`**
-  store a snapshot (after its writer finished); signed by `signer`.
+  store a snapshot (after its writer finished); signed by `signer`, a key the repository
+  trusts (CreateOptions::signer or one given to trust_signer), else UntrustedSigner.
 
   Between the writer's finish and this call the new chunks belong to no snapshot, and a
   gc of another thread -- one that waited for the writer runs at that very moment --
@@ -47791,7 +47804,8 @@ KIND_TREE: u8 = 1
 **`impl Unsaved<'_>`**
 
 - **`fn save_snapshot(self, snap: &Snapshot, signer: &ed25519::Keypair) -> CasResult<()>`**
-  store the snapshot of these chunks (signed by `signer`); gc may run again afterwards
+  store the snapshot of these chunks (signed by `signer`, a trusted key, else
+  UntrustedSigner); gc may run again afterwards
 
 ### `cas/chunker.rs`
 

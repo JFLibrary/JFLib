@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- `Repo::save_snapshot` and `Unsaved::save_snapshot` refuse a key the repository does not trust with the new `CasError::UntrustedSigner`. They added the key to the trusted signers by themselves, so `load_snapshot`'s signature check never refused a snapshot saved through the API and `trust_signer` changed nothing. Trusted are `CreateOptions::signer` and the keys given to `trust_signer`; a program that saves with another key calls `trust_signer` first. The list is protected by the repository key: it keeps out other keys and mistakes, not someone who can open the repository
+
 ## [0.2.0] - 2026-11-13
 
 ### Added
