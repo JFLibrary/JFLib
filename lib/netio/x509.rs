@@ -55,6 +55,7 @@ const OID_SHA384: &[u64] = &[2, 16, 840, 1, 101, 3, 4, 2, 2];
 const OID_SHA512: &[u64] = &[2, 16, 840, 1, 101, 3, 4, 2, 3];
 const OID_SERVER_AUTH: &[u64] = &[1, 3, 6, 1, 5, 5, 7, 3, 1];
 const OID_CLIENT_AUTH: &[u64] = &[1, 3, 6, 1, 5, 5, 7, 3, 2];
+const OID_ANY_EKU: &[u64] = &[2, 5, 29, 37, 0];
 
 /// key usage bits as they appear in the first byte
 pub const KU_DIGITAL_SIGNATURE: u8 = 0x80;
@@ -506,6 +507,13 @@ impl Cert {
         self.eku.iter().any(|e| *e == want)
     }
 
+    // a CA on the path whose extended key usage names purposes passes on only those (or any
+    // purpose: anyExtendedKeyUsage); without the extension it does not restrict
+    fn ca_eku_allows(&self, u: Usage) -> bool {
+        let any = der::oid_bytes(OID_ANY_EKU);
+        self.eku_allows(u) || self.eku.iter().any(|e| *e == any)
+    }
+
     /// whether the certificate names this host (DNS name, case-insensitive; IP address)
     pub fn names(&self, host: &str) -> bool {
         if let Some(ip) = IpAddr::parse(host.trim_matches(['[', ']'])) {
@@ -528,11 +536,31 @@ fn dns_in(name: &str, base: &str) -> bool {
     if base.is_empty() {
         return true;
     }
-    let name = name.trim_start_matches("*.");
     if let Some(b) = base.strip_prefix('.') {
         return name.ends_with(base) && name.len() > b.len();
     }
-    name == base || (name.len() > base.len() && name.ends_with(base) && name.as_bytes()[name.len() - base.len() - 1] == b'.')
+    name == base || below(name, base)
+}
+
+// name is a subdomain of base ("a.b.c" of "b.c")
+fn below(name: &str, base: &str) -> bool {
+    name.len() > base.len() && name.ends_with(base) && name.as_bytes()[name.len() - base.len() - 1] == b'.'
+}
+
+/// a wildcard "*.d" stands for every name one label below d: whether every one of them lies
+/// in a constraint subtree (every: a permitted one must hold them all) or some of them does
+/// (an excluded one must hold none: "*.example.com" stands for "host.example.com" too)
+fn wild_in(d: &str, base: &str, every: bool) -> bool {
+    if base.is_empty() {
+        return true;
+    }
+    let b = base.strip_prefix('.').unwrap_or(base);
+    // x.d lies below b for every x when d is b or below it (also in ".b": x.d is a subdomain)
+    if d == b || below(d, b) {
+        return true;
+    }
+    // a plain base one label below d is one of the names
+    !every && !base.starts_with('.') && below(b, d) && !b[..b.len() - d.len() - 1].contains('.')
 }
 
 fn ip_in(ip: &IpAddr, range: &[u8]) -> bool {
@@ -547,7 +575,12 @@ fn ip_in(ip: &IpAddr, range: &[u8]) -> bool {
 /// the leaf's names against the name constraints of a CA on its path
 fn constraints_allow(leaf: &Cert, nc: &NameConstraints) -> bool {
     for d in &leaf.dns {
-        if nc.excluded_dns.iter().any(|b| dns_in(d, b)) || (!nc.permitted_dns.is_empty() && !nc.permitted_dns.iter().any(|b| dns_in(d, b))) {
+        // a wildcard is checked for the names it stands for, not for its base alone
+        let within = |b: &String, every: bool| match d.strip_prefix("*.") {
+            Some(w) => wild_in(w, b, every),
+            None => dns_in(d, b),
+        };
+        if nc.excluded_dns.iter().any(|b| within(b, false)) || (!nc.permitted_dns.is_empty() && !nc.permitted_dns.iter().any(|b| within(b, true))) {
             return false;
         }
     }
@@ -583,12 +616,12 @@ pub fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&st
     let mut why = String::from("keine vertrauenswürdige Zertifizierungsstelle");
     let mut used = alloc::vec![false; chain.len()];
     let mut budget = 64u32;
-    if path(leaf, chain, anchors, now, 0, &mut used, &mut budget, &mut why) { Ok(()) } else { Err(why) }
+    if path(leaf, chain, anchors, now, 0, usage, &mut used, &mut budget, &mut why) { Ok(()) } else { Err(why) }
 }
 
 /// a path from `cur` upwards (depth: CAs between the leaf and cur)
 #[allow(clippy::too_many_arguments)]
-fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, used: &mut [bool], budget: &mut u32, why: &mut String) -> bool {
+fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, usage: Usage, used: &mut [bool], budget: &mut u32, why: &mut String) -> bool {
     if depth > 8 {
         *why = String::from("Zertifikatskette zu lang");
         return false;
@@ -608,6 +641,10 @@ fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, us
         }
         if a.name_constraints.as_ref().is_some_and(|nc| !constraints_allow(leaf, nc)) {
             *why = String::from("der Name ist für diese Zertifizierungsstelle nicht erlaubt");
+            continue;
+        }
+        if !a.ca_eku_allows(usage) {
+            *why = String::from("die Zertifizierungsstelle ist nicht für diesen Zweck");
             continue;
         }
         return true;
@@ -637,8 +674,13 @@ fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, us
             *why = String::from("der Name ist für diese Zertifizierungsstelle nicht erlaubt");
             continue;
         }
+        // a CA whose extended key usage names other purposes cannot certify this one
+        if !next.ca_eku_allows(usage) {
+            *why = String::from("die Zertifizierungsstelle ist nicht für diesen Zweck");
+            continue;
+        }
         used[i] = true;
-        if path(next, chain, anchors, now, depth + 1, used, budget, why) {
+        if path(next, chain, anchors, now, depth + 1, usage, used, budget, why) {
             return true;
         }
         used[i] = false;
@@ -680,10 +722,22 @@ pub struct CertBuilder {
     pub client_auth: bool,
 }
 
+/// a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
+pub fn extension(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8> {
+    ext(oid, critical, value)
+}
+
 impl CertBuilder {
     /// the DER certificate, signed by `key`; `issuer`: the issuing certificate (None: self
     /// signed with the builder's own name)
     pub fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8> {
+        self.sign_ext(issuer, key, &[])
+    }
+
+    /// sign with further extensions (each one from `extension`: name constraints, a CA's
+    /// extended key usage ...); one with the OID of an extension the builder writes itself
+    /// replaces that one (basic constraints without a path length, other key usages)
+    pub fn sign_ext(&self, issuer: Option<&Cert>, key: &Keypair, extra: &[Vec<u8>]) -> Vec<u8> {
         let alg = der::seq(&[&der::oid(OID_ED25519)]);
         let mut serial = self.serial;
         serial[0] &= 0x7f; // positive
@@ -725,6 +779,10 @@ impl CertBuilder {
         exts.push(ext(OID_SKI, false, &der::octets(&ski[..20])));
         let aki_src = issuer.map_or(ski[..20].to_vec(), |i| if i.ski.is_empty() { crypto::sha256(&i.public_key)[..20].to_vec() } else { i.ski.clone() });
         exts.push(ext(OID_AKI, false, &der::seq(&[&der::tlv(0x80, &aki_src)])));
+        let oid_of = |e: &[u8]| Der::new(e).seq().and_then(|mut d| d.read(der::OID).map(Vec::from));
+        let replaced: Vec<Vec<u8>> = extra.iter().filter_map(|e| oid_of(e)).collect();
+        exts.retain(|e| oid_of(e).is_none_or(|o| !replaced.contains(&o)));
+        exts.extend(extra.iter().cloned());
         let ext_parts: Vec<&[u8]> = exts.iter().map(|v| v.as_slice()).collect();
         let tbs = der::seq(&[
             &der::explicit(0, &der::small_int(2)),

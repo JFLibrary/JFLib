@@ -256,11 +256,22 @@ pub struct Reader<'a> {
     buf: Vec<u8>,
     pos: usize,
     deadline_us: Option<u64>,
+    // (since, grace in us, bytes a second) of set_min_rate, and the bytes read since
+    rate: Option<(u64, u64, u64)>,
+    got: u64,
 }
 
 impl<'a> Reader<'a> {
     pub fn new(s: &'a dyn Stream) -> Reader<'a> {
-        Reader { s, buf: Vec::with_capacity(8192), pos: 0, deadline_us: None }
+        Reader { s, buf: Vec::with_capacity(8192), pos: 0, deadline_us: None, rate: None, got: 0 }
+    }
+
+    /// reads fail with TimedOut once fewer than `bytes_per_s` arrived on average since this
+    /// call, counted after a first `grace_ms` (a body that dribbles in a byte now and then, each
+    /// within the stream's timeout, must not hold the reader for hours); None: no such limit
+    pub fn set_min_rate(&mut self, rate: Option<(u32, u32)>) {
+        self.rate = rate.map(|(r, g)| (plat::time_us(), g as u64 * 1000, r.max(1) as u64));
+        self.got = 0;
     }
 
     /// reads fail with TimedOut once plat::time_us() is past this (a limit for a whole head,
@@ -282,10 +293,17 @@ impl<'a> Reader<'a> {
         if self.deadline_us.is_some_and(|d| plat::time_us() > d) {
             return Err(NetError::new(NetErrorKind::TimedOut, 0));
         }
+        if let Some((t0, grace, r)) = self.rate {
+            if plat::time_us() > t0 + grace + self.got.saturating_mul(1_000_000) / r {
+                return Err(NetError::new(NetErrorKind::TimedOut, 0));
+            }
+        }
         let old = self.buf.len();
         self.buf.resize(old + 16 * 1024, 0);
         let n = self.s.read(&mut self.buf[old..]);
-        self.buf.truncate(old + *n.as_ref().unwrap_or(&0));
+        let got = *n.as_ref().unwrap_or(&0);
+        self.buf.truncate(old + got);
+        self.got += got as u64;
         n
     }
 
