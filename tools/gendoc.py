@@ -122,8 +122,9 @@ CRATES = [
     ("render3d", "the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), "
      "visibility on the GPU, glTF scenes on the GPU", "full"),
     ("render2d", "the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills "
-     "and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, strokes with analytic "
-     "coverage, f64 coordinates relative to the camera, visibility on the GPU", "full"),
+     "and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of "
+     "multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on "
+     "the GPU", "full"),
     ("gltf", "glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU",
      "full"),
     ("shader", "SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders",

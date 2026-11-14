@@ -36,14 +36,20 @@ use alloc::sync::Arc;
 
 use gpu::*;
 
+mod atlas;
 mod block;
 pub mod curve;
 pub mod fill;
 pub mod math;
+pub mod msdf;
 mod scene;
+pub mod text;
 
 pub use scene::{Block, BlockId, Camera, Cap, EntityId, FrameStats, HatchLine, Insert, InstanceInfo, Join, Layer, LayerId, Scene, Shape, Style, StyleId, Transparency, Unit, UploadInfo, ARC_STEP,
                 BLOCK_DEPTH, BY_BLOCK_COLOR, BY_BLOCK_DASH, BY_BLOCK_WIDTH, DASH_MAX, HATCH_DASH_MAX, HATCH_MAX, TRANSPARENCY_MAX};
+pub use scene::{TextInfo, TEXT_BAR_BELOW, TEXT_FILL_FROM, TEXT_LARGE_FROM};
+pub use text::{layout_mtext, layout_text, Attach, Bar as TextBar, FontId, FontMetrics, Fonts, GlyphShape, HAlign, Layout as TextLayout, Line as TextLine, MText, Placed as PlacedGlyph, Text, TextStyle, TextStyleId,
+               VAlign, FALLBACK_MAX, LINE_SPACING};
 
 /// the most frames the CPU may record ahead of the GPU
 pub const FRAMES_MAX: usize = 3;
@@ -87,10 +93,16 @@ mod spv {
 /// stroke.wgsl with fs_full from full_body.wgsl, the same body as the function full_body, and fill.wgsl)
 pub const COMMON_WGSL: &str = include_str!("common.wgsl");
 pub const BLOCK_WGSL: &str = include_str!("block.wgsl");
-pub const CULL_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block.wgsl"), include_str!("cull.wgsl"));
+pub const CULL_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block.wgsl"), include_str!("textc.wgsl"), include_str!("cull.wgsl"));
 pub const SCATTER_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("scatter.wgsl"));
 pub const STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block.wgsl"), include_str!("stroke.wgsl"), "\n@fragment\nfn fs_full(i: VsOut) -> @location(0) vec4f {\n",
                                       include_str!("full_body.wgsl"), "}\n\nfn full_body(i: VsOut) -> vec4f {\n", include_str!("full_body.wgsl"), "}\n", include_str!("fill.wgsl"));
+/// text (G6c): STROKE_WGSL with textc.wgsl and text.wgsl behind it (vs_text / fs_text for layers of text alone, vs_text_all
+/// / fs_text_all for text among anything else)
+pub const TEXT_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block.wgsl"), include_str!("stroke.wgsl"), "\n@fragment\nfn fs_full(i: VsOut) -> @location(0) vec4f {\n",
+                                    include_str!("full_body.wgsl"), "}\n\nfn full_body(i: VsOut) -> vec4f {\n", include_str!("full_body.wgsl"), "}\n", include_str!("fill.wgsl"), include_str!("textc.wgsl"),
+                                    include_str!("text.wgsl"));
+pub const TEXTC_WGSL: &str = include_str!("textc.wgsl");
 #[cfg(not(target_arch = "wasm32"))]
 pub const COUNT_SPV: &[u32] = spv::COUNT;
 #[cfg(not(target_arch = "wasm32"))]
@@ -113,6 +125,14 @@ pub const FS_FULL_SPV: &[u32] = spv::FS_FULL;
 pub const VS_FILL_SPV: &[u32] = spv::VS_FILL;
 #[cfg(not(target_arch = "wasm32"))]
 pub const FS_FILL_SPV: &[u32] = spv::FS_FILL;
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_TEXT_SPV: &[u32] = spv::VS_TEXT;
+#[cfg(not(target_arch = "wasm32"))]
+pub const FS_TEXT_SPV: &[u32] = spv::FS_TEXT;
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_TEXT_ALL_SPV: &[u32] = spv::VS_TEXT_ALL;
+#[cfg(not(target_arch = "wasm32"))]
+pub const FS_TEXT_ALL_SPV: &[u32] = spv::FS_TEXT_ALL;
 
 /// Renderer::new.  Made with `new` and changed field by field (it may grow)
 #[derive(Clone, Copy, Debug)]
@@ -154,6 +174,10 @@ pub struct Renderer {
     stroke_full: RenderPipeline,
     /// fills, hatches and everything fs_full draws, for the layers that hold a fill
     stroke_fill: RenderPipeline,
+    /// text (G6c): layers of text alone (fs_text), text among anything else (fs_text_all: fs_fill's work too)
+    text: RenderPipeline,
+    text_all: RenderPipeline,
+    pub(crate) text_layout: BindGroupLayout,
     pub(crate) count_layout: BindGroupLayout,
     pub(crate) scan_layout: BindGroupLayout,
     pub(crate) write_layout: BindGroupLayout,
@@ -176,21 +200,27 @@ struct Modules {
     fs_full: ShaderModule,
     vs_fill: ShaderModule,
     fs_fill: ShaderModule,
+    vs_text: ShaderModule,
+    fs_text: ShaderModule,
+    vs_text_all: ShaderModule,
+    fs_text_all: ShaderModule,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 fn modules(dev: &Device) -> Result<Modules> {
     let m = |w: &[u32]| ShaderModule::from_spirv(dev, w);
     Ok(Modules { count: m(COUNT_SPV)?, scan: m(SCAN_SPV)?, write: m(WRITE_SPV)?, instances: m(INSTANCES_SPV)?, scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, vs_full: m(VS_FULL_SPV)?, fs: m(FS_SPV)?,
-                 fs_full: m(FS_FULL_SPV)?, vs_fill: m(VS_FILL_SPV)?, fs_fill: m(FS_FILL_SPV)? })
+                 fs_full: m(FS_FULL_SPV)?, vs_fill: m(VS_FILL_SPV)?, fs_fill: m(FS_FILL_SPV)?, vs_text: m(VS_TEXT_SPV)?, fs_text: m(FS_TEXT_SPV)?, vs_text_all: m(VS_TEXT_ALL_SPV)?,
+                 fs_text_all: m(FS_TEXT_ALL_SPV)? })
 }
 
 #[cfg(target_arch = "wasm32")]
 fn modules(dev: &Device) -> Result<Modules> {
     let c = ShaderModule::from_wgsl(dev, CULL_WGSL)?;
     let s = ShaderModule::from_wgsl(dev, STROKE_WGSL)?;
+    let t = ShaderModule::from_wgsl(dev, TEXT_WGSL)?;
     Ok(Modules { count: c.clone(), scan: c.clone(), write: c.clone(), instances: c, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: s.clone(), vs_full: s.clone(), fs: s.clone(),
-                 fs_full: s.clone(), vs_fill: s.clone(), fs_fill: s })
+                 fs_full: s.clone(), vs_fill: s.clone(), fs_fill: s, vs_text: t.clone(), fs_text: t.clone(), vs_text_all: t.clone(), fs_text_all: t })
 }
 
 impl Renderer {
@@ -220,11 +250,15 @@ impl Renderer {
         // record of an insert, 8: the instances' spaces)
         let draw_layout = dev.create_bind_group_layout(&[b(0, BindingKind::UniformBuffer, vfs), b(1, read, vfs), b(2, read, vfs), b(3, read, vs), b(4, read, vs), b(5, read, Stages::FRAGMENT),
                                                          b(6, read, vfs), b(7, read, vs), b(8, read, vs)])?;
+        // (G6c: the text pipelines' own layout, the draw's and 9: the atlas, 10: the glyph table; the others keep theirs)
+        let text_layout = dev.create_bind_group_layout(&[b(0, BindingKind::UniformBuffer, vfs), b(1, read, vfs), b(2, read, vfs), b(3, read, vs), b(4, read, vs), b(5, read, Stages::FRAGMENT),
+                                                         b(6, read, vfs), b(7, read, vs), b(8, read, vs), b(9, BindingKind::Texture, Stages::FRAGMENT), b(10, read, vfs)])?;
         let pl = |g: &BindGroupLayout, push: u32| dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[g], push_constants: push });
         // (only scan, scatter and the draw read a push constant; a layout that says more than its pass sets is an error in the browser, where the
         // values are a bind group)
         let (count_pl, scan_pl, write_pl, scatter_pl, draw_pl) = (pl(&count_layout, 0)?, pl(&scan_layout, 16)?, pl(&write_layout, 0)?, pl(&scatter_layout, 4)?, pl(&draw_layout, 4)?);
         let inst_pl = pl(&inst_layout, 16)?;
+        let text_pl = pl(&text_layout, 4)?;
         let compute = |layout: &PipelineLayout, m: &ShaderModule, entry: &str| dev.create_compute_pipeline(&ComputePipelineDesc { layout, shader: ShaderStage::new(m, entry) });
         let count = compute(&count_pl, &md.count, "count")?;
         let scan = compute(&scan_pl, &md.scan, "scan")?;
@@ -232,9 +266,9 @@ impl Renderer {
         let scatter = compute(&scatter_pl, &md.scatter, "main")?;
         let instances = compute(&inst_pl, &md.instances, "instances")?;
         // premultiplied blending of sRGB codes; no depth (the overlap at joins: stroke.wgsl)
-        let stroke_with = |vs: &ShaderModule, ventry: &str, fs: &ShaderModule, fentry: &str| {
+        let stroke_with = |vs: &ShaderModule, ventry: &str, fs: &ShaderModule, fentry: &str, layout: &PipelineLayout| {
             dev.create_render_pipeline(&RenderPipelineDesc {
-                layout: &draw_pl,
+                layout,
                 vertex: ShaderStage::new(vs, ventry),
                 fragment: Some(ShaderStage::new(fs, fentry)),
                 buffers: &[],
@@ -245,9 +279,11 @@ impl Renderer {
                 depth: None,
             })
         };
-        let stroke = stroke_with(&md.vs, "vs", &md.fs, "fs")?;
-        let stroke_full = stroke_with(&md.vs_full, "vs_full", &md.fs_full, "fs_full")?;
-        let stroke_fill = stroke_with(&md.vs_fill, "vs_fill", &md.fs_fill, "fs_fill")?;
+        let stroke = stroke_with(&md.vs, "vs", &md.fs, "fs", &draw_pl)?;
+        let stroke_full = stroke_with(&md.vs_full, "vs_full", &md.fs_full, "fs_full", &draw_pl)?;
+        let stroke_fill = stroke_with(&md.vs_fill, "vs_fill", &md.fs_fill, "fs_fill", &draw_pl)?;
+        let text = stroke_with(&md.vs_text, "vs_text", &md.fs_text, "fs_text", &text_pl)?;
+        let text_all = stroke_with(&md.vs_text_all, "vs_text_all", &md.fs_text_all, "fs_text_all", &text_pl)?;
         let mut idx = alloc::vec::Vec::with_capacity(BATCH as usize * 6);
         for q in 0..BATCH {
             let v = (q * 4) as u16;
@@ -277,6 +313,9 @@ impl Renderer {
             stroke,
             stroke_full,
             stroke_fill,
+            text,
+            text_all,
+            text_layout,
             count_layout,
             scan_layout,
             write_layout,
@@ -359,6 +398,22 @@ impl Renderer {
         if let Some((up, size)) = &s.up.hatch {
             e.copy_buffer(up, 0, &s.hatch_buf, 0, *size);
         }
+        // (G6c: the glyph table's rows, a copy beside the styles under the same two barriers: the one above against the frame
+        // before's vertex and fragment reads, the one below before this frame's)
+        if let Some((up, dst, size)) = &s.up.gtab {
+            e.copy_buffer(up, 0, &s.gtab_buf, *dst, *size);
+        }
+        // (G6c: new tiles of the atlas.  The texture from sampled (the frame before's fragment shaders read it: their reads
+        // finish first) or, new, from nothing to a copy's target, the tiles' rectangles, back to sampled before any shader of
+        // this frame reads it)
+        if let (Some(at), Some(tex)) = (&s.up.atlas, &s.atlas_tex) {
+            e.texture_barrier(tex, if at.fresh { Layout::Undefined } else { Layout::Sampled }, Layout::CopyDst);
+            for c in &at.copies {
+                e.copy_buffer_to_texture(&at.buf, DataLayout { offset: c.offset, bytes_per_row: c.row, rows_per_image: 0 },
+                                         TextureRegion { texture: tex, mip: 0, origin: [c.x, c.y, 0], size: [c.w, c.h, 1], base_layer: c.page, layers: 1 });
+            }
+            e.texture_barrier(tex, Layout::CopyDst, Layout::Sampled);
+        }
         if let Some((up, order, layers)) = &s.up.tables {
             if *order > 0 {
                 e.copy_buffer(up, 0, &s.einfo_buf, 0, *order);
@@ -432,7 +487,7 @@ impl Renderer {
         e.begin_render(&RenderPassDesc { color: &[color], depth: None });
         if layers > 0 {
             // runs of visible layers that take the same pipeline: those with fills fs_fill, with arcs or dash patterns
-            // fs_full, the others fs
+            // fs_full, the others fs; text alone fs_text, text among others fs_text_all (G6c: their own bind group)
             let class = |k: u32| s.full.get(k as usize).copied().unwrap_or(scene::CLASS_PLAIN);
             let mut k = 0;
             while k < layers {
@@ -440,12 +495,19 @@ impl Renderer {
                 while k + n < layers && class(k + n) == class(k) {
                     n += 1;
                 }
-                e.set_render_pipeline(match class(k) {
-                    scene::CLASS_FILL => &self.stroke_fill,
-                    scene::CLASS_FULL => &self.stroke_full,
-                    _ => &self.stroke,
-                });
-                e.set_bind_group(0, &g.draw);
+                let (pipe, group) = match class(k) {
+                    scene::CLASS_TEXT => (&self.text, g.text.as_ref()),
+                    scene::CLASS_TEXT_ALL => (&self.text_all, g.text.as_ref()),
+                    scene::CLASS_FILL => (&self.stroke_fill, Some(&g.draw)),
+                    scene::CLASS_FULL => (&self.stroke_full, Some(&g.draw)),
+                    _ => (&self.stroke, Some(&g.draw)),
+                };
+                let Some(group) = group else {
+                    k += n;
+                    continue;
+                };
+                e.set_render_pipeline(pipe);
+                e.set_bind_group(0, group);
                 e.set_index_buffer(&self.quads, 0, IndexFormat::U16);
                 if self.multi {
                     e.push_constants(0, &[0u32]);

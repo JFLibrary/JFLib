@@ -167,6 +167,15 @@ impl Probe {
             t.jobs.push(Job { off, kind: Kind::Send(shot.name, shot.alpha) });
             t.scenes.push(s);
         }
+        // (G6c) the atlas's bytes for the text test's drawings: the same as on Vulkan, on every target
+        {
+            let mut s = Scene::new(&r)?;
+            let mut items = crate::textdraw::text_drawing(0);
+            items.extend(crate::textdraw::text_drawing(2));
+            crate::textdraw::build(&mut s, &items)?;
+            let h = s.atlas_hash();
+            self.yes(h == crate::textdraw::ATLAS_HASH, &format!("text: the atlas's bytes as on Vulkan (hash {h:016x}, expected {:016x})", crate::textdraw::ATLAS_HASH));
+        }
         // the same drawing at the origin and at +-1e7 (lines; arcs and dashes; curves, fills, hatches)
         for which in 0..3u8 {
             for k in 0..FAR_POINTS.len() + 1 {
@@ -386,8 +395,12 @@ impl Probe {
             cad::Mode::Arcs
         } else if plat::env("jfgui_GPU_PROBE_FILLS").is_some() {
             cad::Mode::Fills
-        } else {
+        } else if plat::env("jfgui_GPU_PROBE_BLOCKS").is_some() {
             cad::Mode::Blocks
+        } else if plat::env("jfgui_GPU_PROBE_NOTEXT").is_some() {
+            cad::Mode::NoText
+        } else {
+            cad::Mode::Text
         };
         // (the estate: a block of about n records inserted jfgui_GPU_PROBE_INSERTS times, G6b2)
         let c = match plat::env("jfgui_GPU_PROBE_ESTATE") {
@@ -397,6 +410,7 @@ impl Probe {
         say(&format!("bench: {} records in {} entities ({} arcs and circles of {} pieces, {} dashed of {} records, {} fills ({} hatched) of {} records, {} curves of {} records, {} blocks inserted {} times: {} records),                       {:.0} x {:.0} m, inserted in {:.0} ms (wasm)",
                      c.segments, c.entities, c.arcs, c.arc_records, c.dashed, c.dashed_records, c.fills, c.hatched, c.fill_records, c.curves, c.curve_records, c.blocks, c.inserts, c.insert_records, c.width, c.height,
                      (plat::time_us() - t0) as f64 / 1000.0));
+        say(&format!("bench: {} texts of {} characters ({} records)", c.texts, c.chars, c.text_records));
         let size = (1920, 1080);
         let off = dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?;
         self.mode = Mode::Bench(Box::new(Bench { r, s, off, used: false, size, cads: [c], styled, n, view: 0, sent: 0, done: 0, flight: Vec::new(), t0: 0, cam: Camera::new([0.0, 0.0], 1.0), cpu_ms: Vec::new() }));

@@ -6,7 +6,8 @@
 //   ini.get(sec, key) -> Option<&str>   (get_bytes for values that are not UTF-8)
 //   ini.get_int(sec, key, def)   decimal (+/-), 0x hex, true/false/yes/no/on/off; else def
 //   ini.get_f64(sec, key, def)   '.' decimal point only; else def
-//   ini.set(sec, key, value) / set_int / set_f64 -> bool   add or replace (false: bad name)
+//   ini.set(sec, key, value) / set_int / set_f64 -> bool   add or replace (false: a bad name,
+//                                 or a line longer than LINE_MAX: it would not read back)
 //   ini.remove(sec, key) -> bool
 //   ini.section(sec) -> Vec<(&str, &str)>   the keys of a section and their values, in order
 //   ini.sections() -> Vec<&str>   the section names in file order (each once; not "")
@@ -24,7 +25,8 @@
 // Line ends: LF, CRLF (any number of CRs before the LF are dropped) when reading; written as
 // CRLF on Windows, LF on Linux.  Key names must not contain '=', NUL, CR or LF nor start with
 // ';' '#' '['; section names must not contain ']', NUL, CR or LF; neither may start or end with
-// a blank (set -> false).  CR / LF inside a value are written as blanks.
+// a blank (set -> false).  CR / LF / NUL inside a value are written as blanks and blanks around
+// a value are dropped (reading drops them too): get after set gives what a reload gives.
 
 use alloc::format;
 use alloc::vec::Vec;
@@ -315,9 +317,12 @@ impl Ini {
     /// out; the keys before the first header are not a section here)
     pub fn sections(&self) -> Vec<&str> {
         let mut out: Vec<&str> = Vec::new();
+        // the names seen, in ASCII lower case (ieq): one lookup per header instead of a
+        // comparison with every name before it
+        let mut seen: alloc::collections::BTreeSet<Vec<u8>> = alloc::collections::BTreeSet::new();
         for l in self.lines.iter().filter(|l| l.kind == Kind::Sec) {
             if let Ok(n) = core::str::from_utf8(&l.name) {
-                if !out.iter().any(|o| ieq(o.as_bytes(), n.as_bytes())) {
+                if seen.insert(n.as_bytes().to_ascii_lowercase()) {
                     out.push(n);
                 }
             }
@@ -379,12 +384,17 @@ impl Ini {
         }
     }
 
-    /// add or replace (false: a bad name)  [ini_set]
+    /// add or replace (false: a bad name, or a line longer than LINE_MAX -- it would be read
+    /// back as a malformed line, not as this key or section)  [ini_set]
     pub fn set(&mut self, sec: &str, key: &str, value: &str) -> bool {
         if !name_ok(key.as_bytes(), true) || (!sec.is_empty() && !name_ok(sec.as_bytes(), false)) {
             return false;
         }
         let v: Vec<u8> = value.bytes().map(|c| if c == b'\r' || c == b'\n' || c == 0 { b' ' } else { c }).collect();
+        let v = trim(&v).to_vec(); // as reading gives it back
+        if key.len() + 1 + v.len() > LINE_MAX || (!sec.is_empty() && sec.len() + 2 > LINE_MAX && self.find_sec(sec).is_none()) {
+            return false; // "key=value" / a new "[sec]"
+        }
         if let Some(i) = self.find_kv(sec, key) {
             let l = &mut self.lines[i];
             l.value = v;

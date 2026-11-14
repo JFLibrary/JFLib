@@ -461,6 +461,7 @@ impl Ui {
             verify_dirty: false,
             frames_rendered: 0,
             close_at: 0,
+            settings_edit: None,
             drects: Vec::new(),
             dmg: Vec::new(),
             cvs: Vec::new(),

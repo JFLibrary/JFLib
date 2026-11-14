@@ -1013,6 +1013,54 @@ fn block_byte(i: usize, c: usize) -> u8 {
     (i * 31 + c * 7) as u8
 }
 
+/// (Windows) a target another program holds open for a moment, as a virus scanner or the indexer
+/// does with a file just written: shared for deletion it is replaced at once (a POSIX rename;
+/// MoveFileEx alone failed with ERROR_ACCESS_DENIED), not shared once the holder lets go
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn replace_held(t: &mut T) {
+    #[link(name = "kernel32", kind = "raw-dylib")]
+    unsafe extern "system" {
+        fn CreateFileW(name: *const u16, access: u32, share: u32, sa: usize, disp: u32, flags: u32, tmpl: isize) -> isize;
+        fn CloseHandle(h: isize) -> i32;
+    }
+    // GENERIC_READ, OPEN_EXISTING with the share mode
+    let hold = |p: &str, share: u32| -> isize {
+        let w: Vec<u16> = p.replace('/', "\\").encode_utf16().chain(core::iter::once(0)).collect();
+        // SAFETY: a NUL-terminated path.
+        unsafe { CreateFileW(w.as_ptr(), 0x8000_0000, share, 0, 3, 0, 0) }
+    };
+    let (src, dst) = (t.subp("held-src.txt"), t.subp("held.txt"));
+    plat::write_file(&dst, b"old");
+    plat::write_file(&src, b"new");
+    let h1 = hold(&dst, 7); // read, write and delete shared, as scanners and the indexer do
+    let r = plat::rename(&src, &dst);
+    let h2 = hold(&dst, 7);
+    let w = plat::write_file(&dst, b"newer");
+    let got = plat::read_file(&dst);
+    // SAFETY: our handles.
+    unsafe {
+        CloseHandle(h1);
+        CloseHandle(h2);
+    }
+    t.check(h1 != -1 && h2 != -1 && r && w && got.as_deref() == Some(&b"newer"[..]),
+        "files: plat_rename and write_file replace a target held open with FILE_SHARE_DELETE");
+    // held without sharing deletion, let go after 50 ms: the replace waits for it
+    let h3 = hold(&dst, 3);
+    let closer = plat::thread_spawn(64 * 1024, alloc::boxed::Box::new(move || {
+        plat::sleep_ms(50);
+        // SAFETY: the handle opened above, closed once.
+        unsafe { CloseHandle(h3) };
+    }));
+    let w = plat::write_file(&dst, b"last");
+    if let Some(c) = closer {
+        c.join();
+    }
+    t.check(h3 != -1 && w && plat::read_file(&dst).as_deref() == Some(&b"last"[..]),
+        "files: write_file waits for a holder that does not share deletion (50 ms)");
+    plat::delete(&dst);
+}
+
 /// directories, names, the streaming file API, temp files, system dirs
 fn t_files(t: &mut T) {
     t.scratch_init();
@@ -1093,6 +1141,8 @@ fn t_files(t: &mut T) {
     rb[..4].fill(0);
     let n = read_small(&py, &mut rb[..16]);
     t.check(r && e == 0 && n == 3 && &rb[..4] == b"AAA\0", "files: plat_rename replaces an existing target");
+    #[cfg(windows)]
+    replace_held(t);
     // ---- delete
     let d1 = plat::delete(&py);
     let e = plat::file_exists(&py);

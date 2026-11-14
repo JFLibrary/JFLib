@@ -79,6 +79,9 @@ fn shown(i: u32, vw: View, blk: bool, ins: u32) -> bool {
     if view.misc.x != 0.0 {
         return true;
     }
+    if kind_of_record(r) >= K_GLYPH {
+        return text_shown(r, vw);
+    }
     let st = style_in(r.w.z - 1u, ins, blk);
     let kind = kind_of_record(r);
     if kind == K_TRI {
@@ -143,6 +146,27 @@ fn shown(i: u32, vw: View, blk: bool, ins: u32) -> bool {
         return false;
     }
     return true;
+}
+
+// a glyph's or a bar's record (G6c, textc.wgsl): drawn in this mode (glyphs or bars) and its box, mapped to pixels (the
+// parallelogram's box), grown by 2 px (its quad's pixel and the smoothed edge) and by what f32 may round far points to,
+// meets the target
+fn text_shown(r: Record, vw: View) -> bool {
+    let a = text_map(r, vw);
+    if text_glyphs(a) == (kind_of_record(r) == K_BAR) {
+        return false;
+    }
+    let b = text_box(r);
+    let o = to_px(rel2(r.a, vw).xy, vw);
+    let p0 = o + a * b.xy;
+    let p1 = o + a * b.zy;
+    let p2 = o + a * b.xw;
+    let p3 = o + a * b.zw;
+    let m = 2.0 + 1e-3 + 4e-6 * (length(p0) + length(p1) + length(p2) + length(p3));
+    let lo = min(min(p0, p1), min(p2, p3)) - vec2f(m);
+    let hi = max(max(p0, p1), max(p2, p3)) + vec2f(m);
+    let hv = 0.5 * view.turn.zw;
+    return all(lo <= hv) && all(hi >= -hv);
 }
 
 @compute @workgroup_size(256)
