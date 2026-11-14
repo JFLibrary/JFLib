@@ -226,7 +226,7 @@ pub use desk::{
     DW_RIGHT,
 };
 
-use alloc::collections::{BTreeMap, VecDeque};
+use alloc::collections::VecDeque;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -661,7 +661,6 @@ pub struct Ui {
     pub(crate) sems: Vec<Sem>,
     pub(crate) semtext_len: usize,
     pub(crate) sem_dummy: Sem,
-    pub(crate) slots: BTreeMap<u32, Slot>,
     pub(crate) keydown: [u8; 256],
     pub(crate) mpts: Vec<[i32; 2]>,
     pub(crate) mprs: Vec<u32>,

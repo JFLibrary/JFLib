@@ -50,6 +50,13 @@
 //                        tools dock), the innermost pane a wrapping text over a box that fills the
 //                        rest: new boxes inside new fill boxes get their size in their first pass
 //                        and settle without "layout did not settle" (tests/nested.uis)
+//   command 8            two app windows ("Fenster A", "Fenster B", as two browser windows), each
+//                        with a title bar of its own whose tabs differ (one short tab, three
+//                        long ones) and a sheet box of the same fixed id with a text box of the
+//                        same fixed id inside, the second one with a long wrapping paragraph:
+//                        every window keeps its own measurements of an id, so neither title bar
+//                        nor sheet flips between the windows' sizes (tests/titlebars.uis); the
+//                        paragraph is found by its whole text (tests/longtext.uis)
 //
 // tests/keys.uis, tests/menus.uis and tests/links.uis drive it; the texts above the page say what
 // it saw.
@@ -104,6 +111,10 @@ const ID_SPLIT: u32 = 136; // its four splits: 136 .. 139
 const ID_NESTIN: u32 = 133; // the innermost pane's column: the wrapping text, then ID_NESTFILL
 const ID_NESTFILL: u32 = 134; // the box that fills the rest of it
 const ID_NESTAREA: u32 = 135; // the area of "Teiler" the splits fill
+const ID_TBWIN: u32 = 140; // command 8: "Fenster A" (140) and "Fenster B" (141)
+const ID_TBTAB: u32 = 142; // their tabs in the title bars: 142 .. 145
+const ID_SHEET: u32 = 150; // the sheet box of both windows (one fixed id)
+const ID_SHEET_TEXT: u32 = ID_SHEET + 3; // its text box (one fixed id in both windows)
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 const ID_FD_DIR: u32 = 0x11_0000; // the folder dialog (FD_FOLDER)
 
@@ -114,6 +125,7 @@ const CMD_TREE: u32 = 4; // after the frame: the tree is complete
 const CMD_CHAIN: u32 = 5; // "Kette": one link of the chain
 const CMD_PW_AWAY: u32 = 6; // the password box goes away (and comes back), as with a closed window
 const CMD_NESTED: u32 = 7; // Ctrl+N: the window "Teiler"
+const CMD_TWO: u32 = 8; // "Fenster A" and "Fenster B"
 
 const T_POLL: u32 = 1; // "Hintergrund": the timer that polls the thread's result
 
@@ -137,6 +149,18 @@ static CMDS: [Command; 3] = [
 
 // the innermost pane's text of "Teiler": long enough to wrap there
 const NEST_TEXT: &str = "Ein Text, der hier umbricht: seine Höhe hängt von der Breite ab, die vier neue Teiler ihm lassen.";
+
+// the paragraph of "Fenster B": about 600 bytes with umlauts and quotes, wrapped (a selector and
+// `dump` take its whole text)
+const LONG_TEXT: &str = "Ein langer Absatz, wie ihn eine Webseite zeigt: „Grüße aus dem Fenster B“ steht am Anfang, \
+    dann folgen Sätze, die über viele Zeilen umbrechen, damit der Text deutlich länger wird als die 255 Bytes, \
+    die ein Wähler früher fassen konnte, und länger als die 172 Bytes, die `dump` früher zeigte. Äpfel, Öfen und \
+    Übungen sorgen für Zeichen aus zwei Bytes; ein Rückstrich \\ und \"Anführungszeichen\" stehen auch darin. \
+    Am Ende steht ein Satz, an dem man sieht, dass alles angekommen ist: Ende des Absatzes.";
+
+// the tabs of the two title bars: "Fenster A" one short one, "Fenster B" three long ones
+const TABS_A: [&str; 1] = ["Start"];
+const TABS_B: [&str; 3] = ["Eins", "Zwei mit einem langen Namen", "Drei, noch etwas länger"];
 
 const DESC: AppDesc = AppDesc {
     title: "Ansichtstest",
@@ -220,6 +244,12 @@ struct ViewTest {
     nest_rect: Shared<WinRect>,
     nested: bool,
     split: [Option<i32>; 4],
+    /// command 8: "Fenster A" and "Fenster B" (open, placement), the tab each shows, the text of
+    /// each one's sheet box
+    two_open: [Shared<i32>; 2],
+    two_rect: [Shared<WinRect>; 2],
+    two_tab: [usize; 2],
+    two_text: [String; 2],
 }
 
 // (E3) the cursors "Zeiger wechseln" walks through (0: the page's arrow / hand)
@@ -285,6 +315,10 @@ impl Default for ViewTest {
             nest_rect: Shared::new(WinRect::new(40, 40, 800, 600, 0)),
             nested: false,
             split: [None; 4],
+            two_open: [Shared::new(0), Shared::new(0)],
+            two_rect: [Shared::new(WinRect::new(60, 60, 520, 360, 0)), Shared::new(WinRect::new(120, 120, 640, 420, 0))],
+            two_tab: [0; 2],
+            two_text: [String::from("Blatt A"), String::from("Blatt B")],
         }
     }
 }
@@ -500,6 +534,36 @@ impl ViewTest {
         ui.window_end();
     }
 
+    // command 8: "Fenster A" (k = 0) and "Fenster B" (k = 1), two app windows built from the same
+    // code with ids of their own fixed values: the title bar (TB_ID inside the library) with its
+    // tabs, the sheet box ID_SHEET and its text box ID_SHEET_TEXT
+    fn two_windows(&mut self, ui: &mut Ui) {
+        for k in 0..2 {
+            let (open, rect) = (self.two_open[k].clone(), self.two_rect[k].clone());
+            let title = if k == 0 { "Fenster A" } else { "Fenster B" };
+            if ui.window_begin(ID_TBWIN + k as u32, title, Some(&open), WF_APP | WF_RESIZABLE, Some(&rect)) {
+                ui.titlebar_begin(title, 0);
+                let tabs: &[&str] = if k == 0 { &TABS_A } else { &TABS_B };
+                for (i, t) in tabs.iter().enumerate() {
+                    if ui.button(ID_TBTAB + i as u32, t) & EV_ACT != 0 {
+                        self.two_tab[k] = i;
+                    }
+                }
+                ui.titlebar_end();
+                ui.next_size(-1, 0);
+                ui.box_begin(ID_SHEET, BOX_V | BOX_CARD | pad(12), 8);
+                ui.text(TS_BODY, &format!("Reiter: {}", tabs[self.two_tab[k].min(tabs.len() - 1)]));
+                if k == 1 {
+                    ui.text(TS_BODY | TX_WRAP, LONG_TEXT);
+                }
+                ui.next_size(if k == 0 { 200 } else { 320 }, 0);
+                ui.textbox(ID_SHEET_TEXT, Some("Blatt"), &mut self.two_text[k], 256);
+                ui.box_end();
+            }
+            ui.window_end();
+        }
+    }
+
     // the four splits of "Teiler" and the innermost column
     fn splits(&mut self, ui: &mut Ui) {
         let names = ["Links", "Oben", "Mitte", "Innen"];
@@ -701,6 +765,7 @@ impl App for ViewTest {
         }
         ui.window_end();
         self.nested_window(ui);
+        self.two_windows(ui);
         // (E8) several files: the names the dialog chose, in its order
         if ui.filedlg(ID_FD, FD_OPEN | FD_MULTI, &self.fd_open, &mut self.fd_path, 4096, &["txt=Textdatei"]) & EV_ACT != 0 {
             let all = ui.filedlg_paths();
@@ -733,6 +798,10 @@ impl App for ViewTest {
             CMD_CHAIN => self.chain += 1,
             CMD_PW_AWAY => self.pw_away = !self.pw_away,
             CMD_NESTED => self.nest_open.set(1),
+            CMD_TWO => {
+                self.two_open[0].set(1);
+                self.two_open[1].set(1);
+            }
             // "Hintergrund": the thread's wake-up, the poll timer
             UIC_WAKE => self.work_seen = WORK_DONE.load(Ordering::Relaxed),
             UIC_TIMER if arg == T_POLL => {

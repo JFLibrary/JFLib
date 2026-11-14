@@ -35,6 +35,7 @@
 // while the app is idle.  Several windows (win.rs): one App::frame builds all of them; every
 // event carries its window (Event::win).
 
+#[cfg(any(target_arch = "wasm32", target_os = "android", target_os = "ios"))]
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -393,7 +394,6 @@ impl Ui {
             sems: Vec::new(),
             semtext_len: 0,
             sem_dummy: Default::default(),
-            slots: BTreeMap::new(),
             keydown: [0; 256],
             mpts: Vec::new(),
             mprs: Vec::new(),

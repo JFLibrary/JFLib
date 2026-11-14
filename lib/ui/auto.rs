@@ -211,7 +211,14 @@ use super::{App, Sem, Ui};
 use gfx::{Surface, FMT_XRGB};
 use plat::{DragData, Event};
 
-const LINE_MAX: usize = 1024;
+// a script line (and so a quoted label of a selector or `expect S text`, which must match a
+// record's whole label: a wrapped paragraph of a web page is one label)
+const LINE_MAX: usize = 16384;
+// the bytes of a record's label `dump` writes (cut at a character): labels are bounded by the
+// pass's text arena already (SEMTEXT_MAX)
+const DUMP_TEXT_MAX: usize = 65536;
+// the bytes of a window title `dump` writes
+const DUMP_TITLE_MAX: usize = 172;
 
 /// script runner state (ui_auto.s .bss / .data); survives between scripts (scope, the
 /// warning mark) and between commands (the pointer)
@@ -466,29 +473,24 @@ fn key_lookup(p: &[u8]) -> u32 {
     0
 }
 
-/// json_escape(src, cap): src with " \ escaped and control characters as blanks, at most
-/// cap - 8 bytes copied (room for an escape)
-fn json_escape(out: &mut Vec<u8>, src: &[u8], cap: usize) {
-    let lim = cap - 8;
-    let mut n = 0;
-    for &c in src {
-        if n >= lim || c == 0 {
+/// json_escape(src, max): src with " \ escaped and control characters as blanks; at most max
+/// bytes of src, cut before a character that would not fit whole (a NUL ends it)
+fn json_escape(out: &mut Vec<u8>, src: &[u8], max: usize) {
+    let mut end = src.len().min(max);
+    while end > 0 && end < src.len() && src[end] & 0xC0 == 0x80 {
+        end -= 1; // inside a character: before it
+    }
+    for &c in &src[..end] {
+        if c == 0 {
             break;
         }
         match c {
             b'"' | b'\\' => {
                 out.push(b'\\');
                 out.push(c);
-                n += 2;
             }
-            c if c < 32 => {
-                out.push(b' '); // control characters become spaces
-                n += 1;
-            }
-            c => {
-                out.push(c);
-                n += 1;
-            }
+            c if c < 32 => out.push(b' '), // control characters become spaces
+            c => out.push(c),
         }
     }
 }
@@ -592,7 +594,7 @@ impl Ui {
     fn dump_window(&self, out: &mut Vec<u8>, i: u32) {
         let rec = &self.m.win.recs[i as usize]; // ui-win: Rec holds shared values
         let mut title = Vec::new();
-        json_escape(&mut title, self.uiw_title(i).as_bytes(), 180);
+        json_escape(&mut title, self.uiw_title(i).as_bytes(), DUMP_TITLE_MAX);
         let mut flags = String::new();
         for (b, n) in WFLAG_NAMES.iter().enumerate() {
             if rec.flags & (1 << b) != 0 {
@@ -637,7 +639,7 @@ impl Ui {
             }
         }
         let mut lab = Vec::new();
-        json_escape(&mut lab, r.label.as_deref().unwrap_or("").as_bytes(), 180);
+        json_escape(&mut lab, r.label.as_deref().unwrap_or("").as_bytes(), DUMP_TEXT_MAX);
         // rect in DIP (at the dpi of the record's window)
         let dpi = self.win_dpi(r.win as u32);
         let kind = kind_name(r.kind);
@@ -1136,7 +1138,7 @@ impl Ui {
     }
 
     fn resolve_label<'a>(&mut self, p: &'a [u8], q: &'a [u8]) -> (Option<Sel>, &'a [u8]) {
-        let Some((label, rest)) = parse_qstring(q, 256) else {
+        let Some((label, rest)) = parse_qstring(q, LINE_MAX) else {
             self.sc.sel_err = 3;
             return (None, p);
         };
@@ -2254,7 +2256,7 @@ impl Ui {
                 self.fail(alloc::format!("max is {}", rec.max).as_bytes());
             }
         } else if let Some(r) = word_eq(cond, "text") {
-            let Some((t, _)) = parse_qstring(skip_ws(r), 256) else {
+            let Some((t, _)) = parse_qstring(skip_ws(r), LINE_MAX) else {
                 self.fail(b"expected a quoted string");
                 return;
             };
