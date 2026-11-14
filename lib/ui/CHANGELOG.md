@@ -15,13 +15,23 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   the effect, or that it was not taken -- at most `DROP_DEFER_MS` (3 s) after the drop. X11 and
   Wayland carry the late answer, Windows for a source whose data object is in async mode; on
   macOS and in the browser `drop_defer` says the answer went at the drop.
-- `ui.drag_allowed()`: the effects the source of the drag over a window allows.
-- Script commands `drop expect copy|move|link|none|pending` and `drop ... sync`.
+- `ui.drag_allowed()`: the effects the source of the drag over a window allows; after a drop
+  those of its source, from its `E_DROP` to the end of its passes and, after `drop_defer`, until
+  its answer went.
+- Script commands `drop expect copy|move|link|none|pending`, `drop ... sync` and
+  `drop ... allows copy|move|link` (the effects a drop's source allows, given with the drop).
 
 ### Fixed
 
 - The syntax highlighter reads a block whose depth was lost in the 32-bit line state (below three nested constructs) as one open block, so `*/` closes it; before, the depth went below 0 and the rest of the line stayed a comment.
 - Overflows that only a build with overflow checks saw (a debug build of an app without JFLib's profile aborted): the Markdown document's update of changed blocks, the terminal's resize anchor after the scrollback dropped lines.
+- The effects another program's drag allows are forgotten when it leaves the window, is dropped
+  or the app's own drag ends, and a drop takes those the platform gives with it: a drop without
+  a hover before it no longer has the effects of the drag before it.
+- A drop has an effect its source allows: the first of the target's effects that the source
+  allows when the platform's is not one the target takes (it was the target's first effect, so a
+  copy-only drop onto a move target was delivered as a move); with none in common the drop is
+  refused (no `DS_DROP`, no `UIC_DROP`, the source is answered "not taken").
 - Every window keeps its own state slots (`ui.slot`): a box or view of the same id in two
   windows, such as the title bar's box in two app windows, no longer flips between their sizes
   ("layout did not settle within 4 passes").

@@ -1344,7 +1344,12 @@ ui.dialog_end(); // always
     refuses the drag there: no drop, no highlight, the pointer shows "no". A canvas that takes
     drops only in some places (a web page's drop zones, as `dropEffect`) sets it every pass while
     `DS_HOVER` holds, for the point of `drag_over_px()`; the answers follow the passes, one pass
-    late while the drag moves. The app's own drags inside the window pick from them too.
+    late while the drag moves. The app's own drags inside the window pick from them too. A drop
+    keeps the effect the platform picked when the target takes it, else it gets the first of the
+    target's effects that the source allows (copy, move, link; a scripted drop, or one that raced
+    the pass); with none in common it is refused as the platform refuses such a drag over the
+    target: no `DS_DROP`, no `UIC_DROP`, the source is answered "not taken". `ui.drop_effect()`
+    is always an effect the source allows.
 
     ```rust
     if ui.drop_target(ID_PAGE, DT_FILES | DT_URL | DT_TEXT) == DS_HOVER {
@@ -1357,17 +1362,27 @@ ui.dialog_end(); // always
     `XdndActionList` with the action it asks for (without a list: all), Wayland its
     `source_actions` (copy and move; Wayland has no link), macOS the drag's operation mask (AppKit
     narrows it by the modifier keys), the app's own drag its `DragData::allowed()`; `DE_ALL` where
-    the platform does not say, 0 when no drag is over the window. A page that maps a web page's
-    `effectAllowed` and `dropEffect` picks from it for `drop_effect_set`.
+    the platform does not say. They are forgotten when the drag leaves the window or ends. A drop
+    carries its own (`plat::drop_allowed()`): Windows the effects of `IDropTarget::Drop`, X11 the
+    list with the last `XdndPosition`'s action, Wayland the offer's `source_actions`, macOS the
+    operation mask of `performDragOperation:`; without them (the browser's and Android's drops)
+    those of the hover before it, else `DE_ALL`. `drag_allowed()` says them from the drop's
+    `E_DROP` to the end of the passes it starts (`DS_DROP`, `App::command`'s `UIC_DROP`) and, after
+    `ui.drop_defer()`, until its answer went (`drop_finish`, `DROP_DEFER_MS`, a newer drop) -- in
+    every window over which no drag is; `drop_finish` answers within them. 0 otherwise: no drag
+    over the window, no drop in its passes or waiting. A page that maps a web page's
+    `effectAllowed` and `dropEffect` picks from it for `drop_effect_set` and hands it on with the
+    drop.
   * The answer after the drop: by default the source learns the effect the drop was delivered
     with after its passes. A target that learns later whether it took the drop (a web page's drop
     handler in another process) calls `ui.drop_defer()` in the pass of the drop (`DS_DROP`, or
     in `App::command`'s `UIC_DROP`) and answers with `ui.drop_finish(effect)` when it knows: the
     effect it took the drop with, 0 = not taken (an effect the source does not allow becomes the
-    first it does). Without `drop_finish` the answer goes after `DROP_DEFER_MS` (3 s) as the drop
-    was delivered, with a `UIWARN`; so does a deferred drop the next drop overtakes, and one that
-    waits when the app ends. `drop_defer()` returns false where the answer went at the drop
-    already; then `drop_finish` does nothing. What the source sees:
+    first it does; `drag_allowed()` says them until then). Without `drop_finish` the answer goes
+    after `DROP_DEFER_MS` (3 s) as the drop was delivered, with a `UIWARN`; so does a deferred drop
+    the next drop overtakes, and one that waits when the app ends. `drop_defer()` returns false
+    where the answer went at the drop already; then `drop_finish` does nothing. What the source
+    sees:
 
     | Platform | deferred (`drop_defer` true) | taken | not taken |
     |---|---|---|---|
@@ -1396,8 +1411,10 @@ ui.dialog_end(); // always
     `dragleave` and `drop X Y text "s" html "s" url U image F files F...` for other programs;
     `dragover expect copy|move|link|none [ctrl] [shift]` for what the platform would answer the
     drag that hovers (the target's `drop_effect_set`); `dragover X Y text copy link` sets the
-    effects the source allows; `drop expect copy|move|link|none|pending` for the answer the source
-    of the last drop got (`drop ... sync`: a platform that answers at the drop);
+    effects the source allows (`drop ... allows copy link`: the effects a drop gives itself, as
+    Windows' `Drop` does; without, those of the `dragover` before it, else all); `drop expect
+    copy|move|link|none|pending` for the answer the source of the last drop got (`drop ... sync`:
+    a platform that answers at the drop);
     `dragout expect ...` / `dragout end move` for a drag that left the window (headless, the
     platform is not involved); see `apps/dndtest` (`tests/later.uis`: the answer after the drop).
     `plattest --test dnd` checks the shared part and Windows' OLE objects without a user (also the
@@ -2082,7 +2099,7 @@ in DIP):
 | `expect scrollcopy [N]\|none` | at least N (default 1) / no rendered frames moved pixels by a scroll copy since the last check (§5; frames checked by `--verify-dirty` copy whenever they can, `jfgui_DEBUG=1` prints each copy) |
 | `expect sound KIND\|none` | the last sound `ui.beep` / `ui.dialog_sound` asked for since the last check (`default`, `information`, `warning`, `error`, `question`, `notify`; headless runs play nothing, §33) |
 | `drop X Y FILE...` | files dropped at (X, Y) of the scoped window (onto a drop target, else `UIC_DROP`) |
-| `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link] [sync]`, `drop X Y self` | other content dropped there; `self`: the app's own drag that left the window comes back; `sync`: the platform answers the source at the drop, as macOS does (`ui.drop_defer()` says false) |
+| `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link] [sync] [allows copy\|move\|link...]`, `drop X Y self` | other content dropped there (`copy`/`move`/`link`: the effect the platform delivers); `self`: the app's own drag that left the window comes back; `sync`: the platform answers the source at the drop, as macOS does (`ui.drop_defer()` says false); `allows`: the effects the source allows, given with the drop as Windows' `Drop` does (without: those of the `dragover` before it, else all; `ui.drag_allowed()` in the drop's pass) |
 | `drop expect copy\|move\|link\|none\|pending` | what the source of the last drop was answered (`none`: not taken; the effect it was delivered with, or `ui.drop_finish`'s), `pending`: the answer waits (`ui.drop_defer`, §7) |
 | `dragover X Y [files] [text] [url] [html] [image] [copy\|move\|link]`, `dragleave` | another program's drag hovers there, its source allowing those effects (default copy and move: `ui.drag_allowed()`) / leaves |
 | `dragover expect copy\|move\|link\|none [ctrl] [shift]` | what the platform would answer that drag now (the target's `drop_effect_set`, the system's pointer) |

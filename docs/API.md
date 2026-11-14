@@ -4394,9 +4394,13 @@ Windows (ID = the app's window id, 0 / main = the main window):
 (K1) Files and clipboard, drag and drop:
   drop X Y FILE...              files dropped at (X, Y) DIP of the scoped window
   drop X Y [files F...] [text "s"] [html "s"] [url U] [image F.png] [copy|move|link] [sync]
-                                other content dropped there; drop X Y self: the app's own
-                                drag that left the window comes back; sync: the platform
-                                answers the source at the drop (no drop_defer, as on macOS)
+           [allows copy|move|link...]
+                                other content dropped there (copy|move|link: the effect the
+                                platform delivers); drop X Y self: the app's own drag that left
+                                the window comes back; sync: the platform answers the source at
+                                the drop (no drop_defer, as on macOS); allows: the effects the
+                                source allows, given with the drop (as Windows' Drop does;
+                                without: those of the dragover before it, else every effect)
   drop expect copy|move|link|none|pending   what the last drop's source was answered (the
                                 effect, none: not taken), pending: the answer waits (drop_defer)
   dragover X Y [files] [text] [url] [html] [image] [copy|move|link]   another program's
@@ -4661,8 +4665,10 @@ headless image clipboard; the command lines of later starts (AF_SINGLE_INSTANCE)
 Which kinds a window takes outside its drop targets: drop_accept (dnd.rs, default DT_FILES).
 Internal:
   drop_receive(ev) -> taken       E_DROP: the platform's pending drop (runtime.rs) onto the
-                                  drop target at the point (true) or for UIC_DROP (false)
-  drop_inject(data)               script "drop": the content of the next E_DROP
+                                  drop target at the point (true; also when no effect the
+                                  source allows is taken there: refused) or for UIC_DROP (false)
+  drop_inject(data, allowed)      script "drop": the content of the next E_DROP and the effects
+                                  its source allows (0: not said)
   hclip_img_set(fmt, data)        headless CLIP_PNG (bytes) / CLIP_IMAGE (a CLIPIMG
                                   record: png then bmp, see clipimg.rs): PNG + BMP copies
   hclip_img_get(fmt)              CLIP_PNG: the PNG; CLIP_IMAGE: the PNG, else the BMP
@@ -4723,7 +4729,9 @@ Sources (the app's own drags):
 Targets:
   drop_target(id, types) -> DS_*   the widget at last_rect takes drags of these DT_* kinds:
                                    DS_HOVER while one is over it (the style highlights it),
-                                   DS_DROP in the pass of the drop (drop_data(), drop_effect())
+                                   DS_DROP in the pass of the drop (drop_data(), drop_effect():
+                                   one of the target's effects that the source allows; none in
+                                   common: refused, no DS_DROP)
   drop_effect_set(effects)         the DE_* effects the target of the last drop_target call
                                    takes in this pass (default DE_ALL): the platform answers a
                                    drag over it with one of them (the system's pointer shows
@@ -4735,7 +4743,8 @@ Targets:
                                    (0, 0, 0) when none; drag_over_px() the position in px of
                                    the window, exact (as drop_pos_px, drop.rs)
   drag_allowed() -> DE_*           the effects its source allows (DE_ALL where the platform does
-                                   not say; 0 when none)
+                                   not say); after a drop its source's, from E_DROP to the end
+                                   of its passes and while drop_defer waits; 0 when none
   drop_defer() -> bool             (in the pass of a drop: DS_DROP or UIC_DROP) the drop's answer
                                    to its source waits for drop_finish (at most DROP_DEFER_MS);
                                    false: the platform answered at the drop already
@@ -4755,7 +4764,12 @@ synchronously (uiw_drag_pw, win.rs) to answer the source with an effect: the eff
 under the point took in the last pass (drop_effect_set), DE_ALL for drop_accept's window --
 IDropTarget::DragOver's pdwEffect, XdndStatus' action, wl_data_offer.set_actions, macOS'
 NSDragOperation (plat::drag_query).  The answer follows the app's pass: an effect set for the
-drag's point in one pass answers the moves until the next pass.
+drag's point in one pass answers the moves until the next pass.  The effects the source allows
+come with E_DRAG (forgotten when it leaves or the drag ends) and with the drop (plat::
+drop_allowed; without them those of the hover before it, else every effect): the drop's effect
+is one the target takes that the source allows -- the platform's, else the first of copy,
+move, link -- and a target that takes none of them refuses the drop as the platform refuses
+such a drag over it.
 The answer of a drop to its source (the effect, or that it was not taken) goes after the
 passes of E_DROP: the effect it was delivered with -- unless the app called drop_defer in them
 and answers later with drop_finish (a web page decides asynchronously whether it took a drop).
@@ -4786,7 +4800,9 @@ way in like every pointer event; the label next to the pointer is drawn through 
 - **`fn drop_target(&mut self, id: u32, types: u32) -> u32`**
   drop_target(id, types) -> DS_HOVER / DS_DROP / 0: the widget at last_rect takes drags
   of these DT_\* kinds (DT_USER0 &lt;&lt; k: the app's own).  DS_HOVER while such a drag is over
-  it (the style draws the highlight), DS_DROP in the pass of the drop (drop_data())
+  it (the style draws the highlight), DS_DROP in the pass of the drop (drop_data(),
+  drop_effect(): one of the target's effects that the source allows; none in common: the
+  drop is refused, no DS_DROP)
 - **`fn drop_effect_set(&mut self, effects: u32)`**
   drop_effect_set(effects): the DE_\* effects (DE_COPY | DE_MOVE | DE_LINK) the drop target
   of the last drop_target call takes in this pass; DE_ALL until it is called.  The platform
@@ -4814,10 +4830,16 @@ way in like every pointer event; the label next to the pointer is drawn through 
   DoDragDrop, X11 the source's XdndActionList with the action it asks for (DE_ALL without a
   list), Wayland its source_actions (copy and move: Wayland has no link), macOS the drag's
   operation mask (narrowed by the modifier keys, as AppKit hands it on) -- the app's own drag
-  its DragData::allowed(); DE_ALL where the platform does not say, 0 when no drag is over the
-  window.  A page that decides an effect (a web page's effectAllowed and dropEffect) picks
-  from these, then drop_effect_set; the platform never moves another program's files whatever
-  this says
+  its DragData::allowed(); DE_ALL where the platform does not say.  After a drop, the effects
+  its source allows -- as the platform gives them with the drop (Windows Drop's pdwEffect, X11
+  the list with the last XdndPosition's action, Wayland source_actions, macOS the operation
+  mask), else as the hover before it said, else DE_ALL (the browser, Android) -- from its
+  E_DROP to the end of the passes it starts (DS_DROP, App::command's UIC_DROP) and, when the
+  app called drop_defer, until its answer went (drop_finish, DROP_DEFER_MS, a newer drop): in
+  every window over which no drag is, and drop_finish answers within them.  0 otherwise: no
+  drag over the window, no drop in its passes or waiting.  A page that decides an effect (a
+  web page's effectAllowed and dropEffect) picks from these, then drop_effect_set; the
+  platform never moves another program's files whatever this says
 - **`fn drop_defer(&mut self) -> bool`**
   drop_defer() -> waits: (in the pass of a drop: while drop_target says DS_DROP, or in
   App::command's UIC_DROP) the drop's answer to its source -- the effect it was taken with,
@@ -4831,11 +4853,14 @@ way in like every pointer event; the label next to the pointer is drawn through 
 - **`fn drop_finish(&mut self, effect: u32) -> bool`**
   drop_finish(effect) -> answered: the answer of the drop that waits (drop_defer; or, in the
   pass of a drop, instead of the effect it was delivered with): the DE_\* effect it was taken
-  with, 0 = not taken.  An effect the source does not allow becomes the first it does (copy,
-  move, link): taken stays taken.  false: no drop waits (none was deferred, it was answered,
-  or its DROP_DEFER_MS were up)
+  with, 0 = not taken.  An effect the source does not allow (drag_allowed says them until
+  then) becomes the first it does (copy, move, link): taken stays taken.  false: no drop
+  waits (none was deferred, it was answered, or its DROP_DEFER_MS were up)
 - **`fn drop_effect(&self) -> u32`**
-  the effect of the last drop (DE_\*)
+  the effect of the last drop (DE_\*): one its target takes (drop_effect_set; outside the
+  targets every one) that its source allows (drag_allowed in its passes), files never moved
+  -- the platform's choice, else the first of copy, move, link.  A drop with none in common
+  is refused (no DS_DROP, no UIC_DROP; its source is answered "not taken")
 
 #### `ui/clipimg.rs`
 
@@ -35527,10 +35552,12 @@ drop and the app's own outgoing drag (the parts every OS shares)       (docs/GUI
                                IDataObjectAsyncCapability's async mode; X11: XdndFinished;
                                Wayland: wl_data_offer.finish); elsewhere it went at the drop
   drop_waiting() -> serial     the drop whose answer waits (0: none), read after drop_data_take
+  drop_allowed() -> DE_*       the effects the source of that drop allows, as the platform gives
+                               them with the drop (0: it does not say), read after drop_data_take
   drop_finish(serial, effect) -> answered   answer that drop's source: the effect it was taken
                                with, 0 = not taken
-  drop_set_text / drop_set_html / drop_add_url / drop_set_image / drop_set_effect
-                               (OS layers) fill the pending drop (drop_reset empties it)
+  drop_set_text / drop_set_html / drop_add_url / drop_set_image / drop_set_effect /
+  drop_set_allowed             (OS layers) fill the pending drop (drop_reset empties it)
   drop_text_from(bytes, utf16) / drop_url_list(text)   decoding helpers of the OS layers
   drag_start(data) -> bool     drag data out of the app while the left button is held (the UI
                                calls it when an internal drag leaves its window); false when
@@ -35638,8 +35665,20 @@ DE_ALL: u32 = 7  // every effect
 - **`fn drop_set_effect(effect: u32)`**
   (OS layers) the effect the drop was made with (DE_\*)
 
+- **`fn drop_set_allowed(effects: u32)`**
+  (OS layers) the DE_\* effects the source of the pending drop allows, as the platform gives them
+  with the drop: Windows IDropTarget::Drop's pdwEffect, X11 the source's XdndActionList with the
+  action of its last XdndPosition (every effect without a list), Wayland the offer's
+  source_actions, macOS the drag's operation mask.  Not called (the browser, Android): 0
+
 - **`fn drop_data_take() -> DragData`**
   the pending drop (E_DROP): its paths (drop_take) and the rest; both start empty again
+
+- **`fn drop_allowed() -> u32`**
+  drop_allowed() -> the DE_\* effects the source of the drop drop_data_take took last allows, as
+  the platform gave them with the drop (drop_set_allowed: the same the drag said in E_DRAG over
+  the window); 0: the platform does not say (the browser, Android).  Read it right after
+  drop_data_take
 
 - **`fn drop_text_from(bytes: &[u8], utf16: bool) -> Vec<u8>`**
   (OS layers) text in other programs' encodings -> UTF-8 bytes: UTF-16 LE (utf16, up to a

@@ -18,6 +18,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   data object offers `IDataObjectAsyncCapability` in async mode (`EndOperation`).
 - Windows: the data object of the app's drags offers `IDataObjectAsyncCapability` (async mode
   off); `dnd_test_drop_async` and `dnd_test_async_end` test the late answer without a user.
+- `drop_allowed()` and `drop_set_allowed(effects)`: the effects the source of a drop allows, as
+  the platform gives them with the drop (Windows `IDropTarget::Drop`, X11 the `XdndActionList`
+  with the last `XdndPosition`'s action, Wayland `source_actions`, macOS the operation mask); 0
+  in the browser and on Android.
 
 ### Changed
 
