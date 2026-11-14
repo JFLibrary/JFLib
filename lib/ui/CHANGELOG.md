@@ -58,6 +58,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   first editor of the id that is built, and `canvas_damage` to the canvas in every window.
 - The syntax highlighter nests at most 32 levels within a line (template strings in `${..}`, Nest and Element rules); deeper, the rest of the line keeps the construct's colour. A long line of "`${" ran the stack out.
 - Terminal: cursor moves (`ESC[H`, `f`, `G`, `C`) reach column 1024 at most. The spaces up to a far column made 12 bytes into a scrollback line of 32000 cells.
+- On a phone or a tablet a vertical scroll view rolls sideways only while its content is laid
+  out wider than the view, and only as far as that content reaches. Before, the natural width
+  decided, where a wrapping text counts unwrapped and a view inside that rolls sideways itself
+  with its whole content: nearly every page rolled sideways into nothing, and the finger after a
+  sideways swipe only stopped that roll (no tap, no press and hold on a slider).
 
 ### Security
 
