@@ -242,7 +242,7 @@ mod imp {
         let fails = Arc::new(AtomicU32::new(u32::MAX));
         let f2 = fails.clone();
         let th = plat::thread_spawn(2 << 20, Box::new(move || {
-            let mut t = T { fails: 0, validate: false, expected: 0 };
+            let mut t = T { fails: 0, validate: false, expected: 0, inst: None };
             if let Some(g) = setup(&mut t) {
                 crate::t_compute::fill_check(&mut t, &g.dev, 1000, "on a plat thread: compute");
             }
@@ -329,7 +329,7 @@ mod imp {
             "exit-gpu" => {
                 // the instance and device stay open, work may still run: what the driver's
                 // destructors meet at the end of a program that does not clean up
-                let mut t = T { fails: 0, validate: false, expected: 0 };
+                let mut t = T { fails: 0, validate: false, expected: 0, inst: None };
                 if let Some(g) = setup(&mut t) {
                     crate::t_compute::fill_check(&mut t, &g.dev, 1000, "before the exit");
                     if let Ok(e) = g.dev.encoder() {

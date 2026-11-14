@@ -677,7 +677,7 @@ fn changes(t: &mut T, dev: &Device, r: &mut Renderer, level: &str) {
 
 /// --text-shot DIR: the drawings of the text test on the device's level as DIR/text_K.bgra and their references
 pub fn text_shot(dir: &str) -> i32 {
-    let mut t = T { fails: 0, validate: false };
+    let mut t = T { fails: 0, validate: false, inst: None };
     let mut first = true;
     on_levels(&mut t, &mut |t, dev, level| {
         if !first {
