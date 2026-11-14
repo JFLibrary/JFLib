@@ -51,8 +51,8 @@ beschreibend als Referenzprodukt genannt.
   - zwei Crates `diagram_core` und `diagram_io` (F1);
   - Normsymbole in Normform mit NetLab-Farben, gestaltete Grafiken im JFNetworker-Stil (F2);
   - AWS-Icons unverändert, je Kategorie eine Schablone (F3);
-  - `.vss` mit P2 erst nach allen XML-Formaten, `.vsd` mit P3 (F4; ob es alte `.vss`-Testdateien
-    gibt, ist noch offen);
+  - `.vss` mit P2 erst nach allen XML-Formaten, `.vsd` mit P3 (F4; vier `.vss` der Version 11
+    liegen lokal als Testmaterial vor, Version 6 und `.vsd` fehlen noch);
   - nur DXF, kein DWG (F5);
   - CSV und `.xlsx` in P2 mit XLSX-Leser in JFLib, ODBC/SQL in P3 (F6);
   - JFScript-Schnittstelle später, nicht in Phase 2 (F7);
@@ -63,6 +63,9 @@ beschreibend als Referenzprodukt genannt.
   - Rack-Diagramm schon in P1, AWS-Architektur P2 (F11);
   - keine weiteren Screenshots nötig (F12);
   - Normschablonen nach DIN EN/IEC statt US/ANSI (F14).
+- **Sprachen (Nachtrag 2026-11-14):** Alles auf Deutsch, Englisch, Spanisch, Italienisch und
+  Französisch, umschaltbar in den Einstellungen (Abschnitt 3.17). F8 und F13 gelten sinngemäß für
+  alle fünf Sprachen. Für F10 ist die Belegung je Sprache abgeleitet und noch zu bestätigen (LG-08).
 
 ### 0.2 Quellen
 
@@ -78,6 +81,7 @@ Worte. Befehls- und Featurenamen stehen so da, wie die deutsche Oberfläche sie 
 | `UG` | `UsrGuide.PDF` (Benutzerhandbuch zu Visio 5.0, 1997/98), `UG Kap. n`; die ShapeSheet-Referenz fehlt dort (sie stand in einem eigenen Entwicklerbuch), daher stützen sich 2.13/2.14 auf die Beispieldateien und MS-VSDX |
 | `TP` | `microsoft_visio_tutorial.pdf` (Tutorial zu Visio 2016, 72 Kapitel) |
 | `Z2`, `Z3`, `Fav` | Beispieldateien `Zeichnung2.vsdx`, `Zeichnung 3.vsdx`, `Favoriten.vssx` (entpackt und ausgewertet, Abschnitt 1.6) |
+| `SWDB` | binäre Schablonen `context/files/SWDB_DE/` (Express-G, Jackson, ORM, ROOM; Version 11, deutsch, metrisch); Microsoft-Inhalt, nur lokal, nur die Namensliste ausgelesen |
 | `MS-VSDX` | öffentliche Formatspezifikation [MS-VSDX] (nicht im Kontextordner; nur zur Einordnung) |
 | `W` | Kenntnis des Referenzprodukts, in den lokalen Quellen nicht direkt belegt – vor der Umsetzung prüfen |
 
@@ -112,6 +116,7 @@ Shape-Tabellen darunter nennen nur Name und Beschreibung.
 | `lib/ui/diagram.rs` | Knoten/Kanten-Canvas: Zoom 0,1–8 mit Rad und Strg+Rad, Verschieben (Mittelmaus, Leertaste, Hand-Werkzeug), Einpassen, Übersichtskarte, Raster mit Einrasten, Rechteck-Auswahl (Umschalt/Strg), Pfeiltasten-Verschieben, Tab-Navigation, Ports an Knoten, Kanten gerade/Bezier/orthogonal mit Wegpunkten, Pfeilspitzen und Strichmuster (gfx), Rahmen mit Titelleiste und Einklappen, ein Größengriff, Bildschirmleser-Semantik, GPU-Kacheln | Drehen, acht Größengriffe, gelbe Steuerpunkte, Klebepunkte mit Richtung, dynamisches Verbinder-Routing um Shapes, Linienübergänge, verschachtelte Gruppen, Ebenen, Lineale, Führungslinien, dynamisches Raster (Ausrichtungshilfen), Seitenfläche und Seitenumbrüche, Text auf Shapes, Formelauswertung |
 | `lib/ui/ribbon.rs` + jfWord | Ribbon-Gruppen mit Beschriftung und Dialogstarter, große/kleine Knöpfe, Menü- und Split-Knöpfe, Galerien und Kacheln, Einklappen schmaler Gruppen; Registerleiste und Backstage in jfWord (`ribbon_tabs.rs`, `shell_ui.rs`), Lineal (`ruler_ui.rs`) | Kontextregister, Live-Vorschau in allen Galerien, Netlab-Look (eckig), Visio-Register und -Befehle |
 | `lib/ui` sonst | `dock.rs` (andockbare Bereiche), `history.rs` (Rückgängig), `color.rs` (Farbwahl), `fontpick.rs`, `filedlg.rs`, `recent.rs`, `settings_page.rs`, `grid.rs`, `dnd.rs`, `rich_edit.rs`, `chart.rs`, `timeline.rs`, `vicon.rs`, i18n, Barrierefreiheit | Aufgabenbereiche mit Visio-Inhalt, Shape-Daten-Fenster, Zeichnungsexplorer, ShapeSheet-Fenster |
+| `lib/ui` i18n | `tr()` für Bibliothekstexte in neun Sprachen (darunter DE, EN, ES, IT, FR), App-Kataloge als TSV (`Catalog::from_tsv`, `locales/*.tsv`), Sprachwechsel zur Laufzeit (`set_language`, übersetzte Befehls- und Menütabellen), regionale Formate (`i18n_locale.rs`), Nachrichten mit Plural (`i18n_msg.rs`), Einstellungsseite (`settings_page.rs`) | App-Katalog mit fünf Spalten, Namen aller Schablonen/Shapes/Vorlagen in fünf Sprachen, Glossar, Prüfskript (3.17) |
 | `lib/archive`, `img_core::deflate` | ZIP lesen (gespeichert + DEFLATE), ZIP schreiben (nur „gespeichert“), zlib-Kompressor | DEFLATE beim Schreiben einhängen; Grenzen (512 Teile, 8 MiB je Teil, 32 MiB gesamt, kein ZIP64) passen nicht für große Zeichnungen |
 | `lib/doc_io` | OPC-Paket und XML für DOCX (Muster für VSDX: Beziehungen, Inhaltstypen, Erhalt unbekannter Teile) | VSDX-Schema |
 | `lib/img_svg`, `img_*` | SVG lesen und rendern; PNG, JPEG, GIF, TIFF, BMP, WebP u. a. lesen/schreiben | SVG schreiben, SVG in Shape-Geometrie umwandeln, EMF/WMF lesen und schreiben |
@@ -120,9 +125,9 @@ Shape-Tabellen darunter nennen nur Name und Beschreibung.
 
 ### 0.5 Umfang
 
-- **550 Feature-Zeilen** in den Abschnitten 1–3, 4.0 und 5 (davon P1 256, P2 183, P3 105; bei Zeilen mit zwei Prioritäten zählt die erste).
-- **278 Schablonen** in Abschnitt 4 mit **3561 Shape-Zeilen** (nach Zusammenfassen von Doppelungen) und **15 Vorschläge** für eigene Kategorien.
-- **29 bewusst weggelassene** Funktionen (Abschnitt 6), **14 Entscheidungen** zu den Planungsfragen (Abschnitt 8; offen ist nur noch, ob es alte `.vss`-Testdateien gibt).
+- **562 Feature-Zeilen** in den Abschnitten 1–3, 4.0 und 5 (davon P1 265, P2 186, P3 105; bei Zeilen mit zwei Prioritäten zählt die erste), darunter 11 Zeilen für Sprachen und Regionen (3.17).
+- **282 Schablonen** in Abschnitt 4 mit **3607 Shape-Zeilen** (nach Zusammenfassen von Doppelungen) und **15 Vorschläge** für eigene Kategorien.
+- **29 bewusst weggelassene** Funktionen (Abschnitt 6), **14 Entscheidungen** zu den Planungsfragen (Abschnitt 8). Noch offen: Testdateien für Version 6 und `.vsd` (F4), Bestätigung der Tastenbelegung je Sprache (LG-08), deutscher Begriff für „AutoVerbinden“ (Glossar 3.17).
 
 <a id="formate"></a>
 ## 1. Dateiformate, Import und Export
@@ -160,10 +165,11 @@ Shape-Tabellen darunter nennen nur Name und Beschreibung.
 
 | ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
 |---|---|---|---|---|---|---|
-| DF-30 | `.vss` importieren (binäre Schablone) | Alte Schablonen bis Visio 2010 in Master umwandeln. Das Binärformat (OLE-Verbunddatei mit komprimierten Datenblöcken) ist von Microsoft nicht als offene Spezifikation veröffentlicht; Umsetzung nur aus eigener Analyse, libvisio höchstens als Lesestoff. Entscheidung F4: erst nach allen XML-Formaten; ob es alte `.vss`-Testdateien gibt, ist noch offen. | Entscheidung | P2 | Lib-io | neu |
-| DF-31 | `.vsd` importieren (binäre Zeichnung) | Zeichnungen bis Visio 2010 öffnen, beim Speichern zu `.vsdx` werden. Gleiche Grundlage wie DF-30. | Entscheidung | P3 | Lib-io | neu |
+| DF-30 | `.vss` importieren (binäre Schablone) | Alte Schablonen bis Visio 2010 in Master umwandeln. Das Binärformat (OLE-Verbunddatei mit komprimierten Datenblöcken) ist von Microsoft nicht als offene Spezifikation veröffentlicht; Umsetzung nur aus eigener Analyse, libvisio höchstens als Lesestoff. Entscheidung F4: erst nach allen XML-Formaten. Testmaterial (Nachtrag 2026-11-14): vier binäre Schablonen der Version 11 (Visio 2003–2010) lokal in `context/files/SWDB_DE/` (`exprg_m.vss`, `jacksn_m.vss`, `orm_m.vss`, `room_m.vss`). Sie sind Microsoft-Inhalt und kommen nie ins Repo; Tests mit ihnen laufen nur lokal und werden übersprungen, wenn die Dateien fehlen. Es fehlen noch Version 6 (Visio 2000/2002) und binäre Zeichnungen. | Entscheidung; SWDB | P2 | Lib-io | neu |
+| DF-31 | `.vsd` importieren (binäre Zeichnung) | Zeichnungen bis Visio 2010 öffnen, beim Speichern zu `.vsdx` werden. Gleiche Grundlage wie DF-30; Testdateien für `.vsd` fehlen noch. | Entscheidung | P3 | Lib-io | neu |
 | DF-32 | `.vst` importieren (binäre Vorlage) | Wie DF-31, öffnet eine neue Zeichnung. | W | P3 | Lib-io | neu |
 | DF-33 | Binär schreiben | Nicht vorgesehen (Entscheidung „nur Import“); Speichern unter bietet `.vsd`/`.vss` nicht an. | Entscheidung | – | – | – |
+| DF-34 | Lokaler Testkorpus Binärformate | Testfälle für DF-30 bis DF-32 lesen Dateien aus einem lokalen, gitignorierten Ordner (heute `context/files/SWDB_DE/`, Version 11). Fehlt der Ordner, werden die Tests übersprungen, nicht als Fehler gewertet. Ziel: je eine Datei der Versionen 6 und 11, Schablonen und Zeichnungen. | Nachtrag 2026-11-14; SWDB | P2 | Lib-io | neu |
 
 ### 1.4 Export („Speichern unter“ und „Exportieren“)
 
@@ -574,7 +580,7 @@ Katalog/Galerie, **KK** Kontrollkästchen, **Tog** Umschaltknopf, **Combo** Eing
 | UI-13 | Optionen – Allgemein | Minisymbolleiste, Livevorschau (Menüband und Shapes-Seitenleiste), QuickInfo-Stil, Benutzername und Initialen (für Kommentare), Hell/Dunkel, Startbildschirm. | A 184427, A 08-214158; SbS 1 | P1 | App | teilweise |
 | UI-14 | Optionen – Dokumentprüfung | AutoKorrektur, Rechtschreibung während der Eingabe, Ausnahmen (Großbuchstaben, Zahlen, Adressen), Wörterbücher. | A 184444; SbS 1 | P2 | App+Lib-ui | teilweise (spell) |
 | UI-15 | Optionen – Speichern | Standardformat, AutoWiederherstellen-Intervall, Standardorte für Zeichnungen und persönliche Vorlagen. | A 184500; SbS 1 | P1 | App | neu |
-| UI-16 | Optionen – Sprache | Anzeige- und Bearbeitungssprachen mit Reihenfolge. | A 184517; SbS 1 | P2 | App+Lib-ui | teilweise (i18n) |
+| UI-16 | Optionen – Sprache | Anzeige- und Bearbeitungssprachen mit Reihenfolge; Oberflächensprache DE/EN/ES/IT/FR ohne Neustart (LG-02), Region für Einheiten und Formate (LG-07). | A 184517; SbS 1; Nachtrag 2026-11-14 | P1 | App+Lib-ui | teilweise (i18n) |
 | UI-17 | Optionen – Barrierefreiheit | QuickInfo-Format, Tastenkürzel in QuickInfos. | A 184532 | P2 | App | neu |
 | UI-18 | Optionen – Erweitert | Livedynamik, Verbinder teilen, Verbinder mit löschen, AutoVerbinden, Übergänge, Rad zoomt, Auswahl beim Zoomen zentrieren, Teilauswahl im Rahmen, mehr Größengriffe beim Zeigen, Formel-Autovervollständigen, Enter beendet Text, Rückgängig-Tiefe, Text-Zoom beim Bearbeiten; Freihand-Genauigkeit/Glättung; Standardeinheiten (Seite, Text, Winkel, Dauer); Seitenansicht drehen erlauben; Speichern/Öffnen-Warnungen, Visio-Daten in SVG; Shape-Suche (alle/irgendein Wort); Entwicklermodus; Dateispeicherorte (Zeichnungen, Vorlagen, Schablonen). | A 184549, A 184605, A 184620; SbS 1, 12; UG Kap. 3, 18 | P1/P2 | App | neu |
 | UI-19 | Optionen – Menüband und Schnellzugriff anpassen | Register und Gruppen ein-/ausblenden, eigene Gruppen; Schnellzugriff mit beliebigen Befehlen, Reihenfolge, unter dem Menüband, Import/Export. | A 184640, A 184700; SbS 1, A | P2 (Schnellzugriff), P3 (Menüband) | App+Lib-ui | teilweise |
@@ -849,7 +855,9 @@ Strg+Umschalt+F, Kursiv Strg+Umschalt+K); das kollidiert mit „In den Vordergru
 (Strg+Umschalt+F) und „Kapitälchen“ (Strg+Umschalt+K). Entscheidung F10: Textformate nach
 deutscher Office-Konvention (Fett Strg+Umschalt+F, Kursiv Strg+Umschalt+K, Unterstrichen
 Strg+Umschalt+U); „In den Vordergrund“, „In den Hintergrund“ und „Kapitälchen“ bekommen freie
-Tasten. Alles bleibt über UI-19 anpassbar und wird auf Konflikte geprüft. Alle Kürzel: Ort
+Tasten. Alles bleibt über UI-19 anpassbar und wird auf Konflikte geprüft. Für die anderen vier
+Sprachen gilt die Office-Konvention der jeweiligen Sprache (LG-08, abgeleitet, noch zu bestätigen).
+Alle Kürzel: Ort
 `App` (+ `Lib-ui` für Zoom/Fokus), Prio wie angegeben.
 
 | ID | Bereich | Aktion → Kürzel | Quelle | Prio | Bestand |
@@ -873,12 +881,82 @@ Tasten. Alles bleibt über UI-19 anpassbar und wird auf Konflikte geprüft. Alle
 | KB-17 | Entwickler | ShapeSheet des Dokuments: Umschalt+Rechtsklick auf Seite; Visual-Basic-Editor Alt+F11 **entfällt** | SbS A | P2 | neu |
 | KB-18 | Wiederholen | F4 wiederholt die letzte Formatänderung bzw. die letzte Kopie mit gleichem Abstand | UG Kap. 5, 17 | P2 | neu |
 
+### 3.17 Sprachen und Regionen
+
+Nachtrag des Nutzers (2026-11-14): Alles gibt es auf **Deutsch, Englisch, Spanisch,
+Italienisch und Französisch**, umschaltbar in den Einstellungen. Deutsch ist wie in allen
+JFLib-Apps die Quellsprache der Kataloge. Die Entscheidungen F8 und F13 gelten sinngemäß für
+alle fünf Sprachen: Jede Sprache bekommt eigene beschreibende Begriffe. Visio-eigene Begriffe
+(SmartShapes, AutoConnect, Quick Shapes, ShapeSheet in der Oberfläche) werden in keiner
+Sprache verwendet.
+
+**Bestand in JFLib:** `lib/ui/i18n.rs` übersetzt die eigenen Texte der Bibliothek
+(Dateidialog, Befehlsleiste, Kurzbefehle, Datumswahl …) schon in neun Sprachen, darunter alle
+fünf. Apps bringen ihre Texte als TSV-Katalog mit (`Catalog::from_tsv`, `locales/*.tsv`, erste
+Zeile = Sprachspalten). `set_language` wirkt prozessweit und **zur Laufzeit**. Befehls- und
+Menütabellen werden je Sprache einmal übersetzt (`i18n::commands`/`menu`). JFNetworker
+schaltet so schon ohne Neustart um (`src/app/tr.rs`, `apply`). `i18n_locale.rs` liefert
+Zahlen-, Datums- und Währungsformate je Region, `i18n_msg.rs` Platzhalter und Pluralformen,
+`settings_page.rs` die Einstellungsseite mit Auswahlfeldern. Die vorhandenen App-Kataloge haben
+nur die Spalten `de` und `en`.
+
+| ID | Feature | Beschreibung | Quelle | Prio | Ort | Bestand |
+|---|---|---|---|---|---|---|
+| LG-01 | Fünf Oberflächensprachen | Menüband, Backstage, Dialoge, Aufgabenbereiche, Kontextmenüs, Meldungen, QuickInfos, Statusleiste und Assistenten auf DE, EN, ES, IT, FR; Katalog `locales/ui.tsv` mit fünf Spalten, Platzhalter und Plural über `msg`. Fehlende Übersetzungen fallen auf Englisch zurück, dann auf Deutsch. | Nachtrag 2026-11-14; `lib/ui/i18n.rs` | P1 | App+Lib-ui | teilweise (Bibliothekstexte fertig, App-Katalog neu) |
+| LG-02 | Sprache umschalten ohne Neustart | Einstellung „Sprache“ (Systemsprache oder eine der fünf) auf der Einstellungsseite. Ein Wechsel wirkt sofort, wie in JFNetworker. Die App darf deshalb keine übersetzten Texte zwischenspeichern, außer über die Tabellen-Funktionen der Bibliothek. Gespeicherte Dokumente ändern ihre Namen dabei nicht (LG-04). | Nachtrag 2026-11-14; `i18n::set_language`, JFNetworker `tr::apply` | P1 | App+Lib-ui | vorhanden (Bibliothek), App neu |
+| LG-03 | Hilfe und QuickInfos | QuickInfos mit Beschreibung und Tastenkürzel, Offline-Hilfe und Online-Dokumentation in allen fünf Sprachen; die Hilfe folgt der Oberflächensprache. | Nachtrag 2026-11-14; A 184532 | P1 | App | teilweise (md_view) |
+| LG-04 | Namen von Schablonen, Shapes und Vorlagen | Jeder mitgelieferte Master, jede Schablone und jede Vorlage hat einen universellen Namen (`NameU`, sprachneutraler Schlüssel) und angezeigte Namen, QuickInfos und Suchbegriffe in allen fünf Sprachen. Beim Ablegen schreibt JFDiagrammer den Namen der aktuellen Sprache als `Name` ins Dokument. **Beim Import** ist `NameU` der Schlüssel (Master-Abgleich, Formelbezüge, Zuordnung zu eigenen Shapes); `Name` ist der angezeigte Name aus der Datei und bleibt unverändert. | Nachtrag 2026-11-14; Z2, Z3 (`Name` „Zeichenblatt-1“, `NameU` „Page-1“), Fav, SWDB (Liste alternativer Dateinamen je Sprache) | P1 | App+Lib-core | neu |
+| LG-05 | Mehrsprachige Shape-Suche | Die Suche in der Seitenleiste findet Namen und Suchbegriffe der Oberflächensprache, dazu universelle Namen. Wer z. B. englische Namen kennt, findet die Shapes auch in einer anderen Sprache. | Nachtrag 2026-11-14 | P2 | App | teilweise (palette-Suche) |
+| LG-06 | Begriffsglossar | Verbindliches Glossar der Fachbegriffe in allen fünf Sprachen als Datei im Repo (Quelle für Katalog und Hilfe). Ein Prüfskript meldet Abweichungen und verbotene Visio-Begriffe. Startfassung siehe unten. | Nachtrag 2026-11-14; F8, F13 | P1 | App | neu |
+| LG-07 | Einheiten und Papierformate je Region | Die Region ist unabhängig von der Sprache einstellbar (z. B. Englisch mit A4). DE, ES, IT, FR und en-GB nutzen metrische Einheiten und A4; en-US nutzt Zoll und Letter. Jede mitgelieferte Schablone und Vorlage gibt es in metrischer und in US-Fassung, wie Visios `_m`/`_u`-Dateien. Der Vorlagendialog schlägt die Fassung der Region vor (MS-07, UI-04). Zahlen, Datum, Uhrzeit und Währung in Feldern, Shape-Daten und Berichten folgen der Region. | Nachtrag 2026-11-14; SbS 1; SWDB (`ORM_M.VSS`/`ORM_U.vss`); `i18n_locale.rs` | P1 | App+Lib-core+Lib-ui | teilweise (Formate vorhanden) |
+| LG-08 | Tastenkürzel je Sprache | **Abgeleitet aus F10, vom Nutzer noch zu bestätigen:** Die Standardbelegung folgt der üblichen Office-Konvention der gewählten Sprache. Fett: DE Strg+Umschalt+F, EN Ctrl+B, ES Ctrl+N, IT/FR Ctrl+G; Kursiv und Unterstrichen entsprechend. Weil die Konventionen auch Speichern, Neu, Suchen und Gruppieren unterschiedlich belegen, wird jede Sprachbelegung auf Konflikte geprüft. Alles bleibt anpassbar (UI-19, 3.16). | Nachtrag 2026-11-14; F10 | P1 | App | neu |
+| LG-09 | Rechtschreibung je Sprache | Rechtschreibprüfung und AutoKorrektur in den fünf Sprachen; die Sprache je Textlauf (`LangID`) wählt das Wörterbuch. | Nachtrag 2026-11-14; SbS 1; Z2, Z3 | P2 | App+Lib-ui | teilweise (spell) |
+| LG-10 | Formelnamen | Lokalisierte und universelle Zell- und Funktionsnamen in Formeln (FX-01); der Formel-Editor zeigt die universelle Form. | MS-VSDX; Z2, Z3 | P2 | Lib-core | neu |
+| LG-11 | Übersetzungsprüfung | Ein Prüfskript meldet fehlende Zellen in allen Katalogen und Namenslisten (alle fünf Spalten gefüllt, Platzhalter gleich), wie das i18n-Prüfskript von JFNetworker. | Nachtrag 2026-11-14 | P1 | App | teilweise (Muster in JFNetworker) |
+
+**Glossar, Startfassung (Vorschlag, bei der Übersetzung zu prüfen).** Verbindlich wird es mit
+LG-06. Zu jedem Begriff ist zu prüfen, dass er nicht Visios eigener Lokalisierung eines
+Visio-Begriffs entspricht. Beim Deutschen gibt es dazu eine Rückfrage: „AutoVerbinden“ (F13)
+ist zugleich Visios eigene deutsche Bezeichnung (A 183830). Die Alternative „Verbindungspfeile“
+steht in Klammern, bis der Nutzer entscheidet.
+
+| Begriff | DE | EN | ES | IT | FR |
+|---|---|---|---|---|---|
+| Seite | Seite | Page | Página | Pagina | Page |
+| Hintergrundseite | Hintergrundseite | Background page | Página de fondo | Pagina di sfondo | Page d'arrière-plan |
+| Ebene | Ebene | Layer | Capa | Livello | Calque |
+| Schablone | Schablone | Stencil | Colección de formas | Raccolta di forme | Bibliothèque de formes |
+| Master | Master-Shape | Master shape | Forma maestra | Forma master | Forme maître |
+| Shape | Shape | Shape | Forma | Forma | Forme |
+| Verbinder | Verbinder | Connector | Conector | Connettore | Connecteur |
+| Verbindungspunkt | Verbindungspunkt | Connection point | Punto de conexión | Punto di connessione | Point de connexion |
+| Steuerpunkt | Steuerpunkt | Control handle | Controlador | Maniglia di controllo | Poignée de contrôle |
+| Container | Container | Container | Contenedor | Contenitore | Conteneur |
+| Liste | Liste | List | Lista | Elenco | Liste |
+| Swimlane | Bahn | Lane | Calle | Corsia | Couloir |
+| Beschriftung (Callout) | Beschriftung | Callout | Llamada | Richiamo | Bulle d'annotation |
+| Legende (Daten) | Legende | Legend | Leyenda | Legenda | Légende |
+| Design | Design | Theme | Tema | Tema | Thème |
+| Variante | Variante | Variant | Variante | Variante | Variante |
+| Schnellformatvorlage | Schnellformatvorlage | Style preset | Estilo predefinido | Stile predefinito | Style prédéfini |
+| Schnell-Shapes | Schnell-Shapes | Top shapes | Formas principales | Forme principali | Formes principales |
+| AutoVerbinden | AutoVerbinden (Alternative: Verbindungspfeile) | Connect arrows | Flechas de conexión | Frecce di collegamento | Flèches de liaison |
+| Intelligente Shapes | Intelligente Shapes | Adaptive shapes | Formas adaptables | Forme adattive | Formes adaptatives |
+| ShapeSheet (in der Oberfläche) | Formelblatt | Formula sheet | Hoja de fórmulas | Foglio formule | Feuille de formules |
+| Shape-Daten | Shape-Daten | Shape data | Datos de forma | Dati forma | Données de forme |
+| Datengrafik | Datengrafik | Data graphic | Gráfico de datos | Grafica dati | Graphique de données |
+| Führungslinie | Führungslinie | Guide | Guía | Guida | Repère |
+| Raster | Raster | Grid | Cuadrícula | Griglia | Grille |
+| Lineal | Lineal | Ruler | Regla | Righello | Règle |
+| Menüband | Menüband | Ribbon | Cinta de opciones | Barra multifunzione | Ruban |
+| Aufgabenbereich | Aufgabenbereich | Task pane | Panel de tareas | Riquadro attività | Volet |
+
 <a id="shapes"></a>
 ## 4. Shape-Kategorien und Schablonen
 
 Grundlage sind alle 278 Bilder in `context/shapes/` (deutsches Visio für Microsoft 365). Das
 Menü „Weitere Shapes“ nennt 278 Schablonen. 247 davon sind mit ihren Shapes zu sehen, 31 nur
-dem Namen nach. Zusammen sind es rund 5400 Shape-Einträge; viele davon sind Doppelungen
+dem Namen nach; vier weitere stammen aus binären Testdateien älterer Versionen (SH-279 bis SH-282). Zusammen sind es rund 5400 Shape-Einträge; viele davon sind Doppelungen
 (derselbe Verbinder in vielen Schablonen, elf Organigramm-Stile, 2D/3D-Paare, ältere
 „– Visio 2013“-Fassungen).
 
@@ -903,7 +981,7 @@ dem Namen nach. Zusammen sind es rund 5400 Shape-Einträge; viele davon sind Dop
 |---|---|---|---|---|---|---|
 | SH-G01 | Stilrichtlinie JFNetworker-Stil | Gemeinsame Regeln für alle neu gezeichneten Shapes: Strichstärken, Ecken, Flächen, Akzentfarben aus dem Theme (Akzent 1–6), Schatten, Symbolraster, Text unter oder im Shape. Sie werden aus den JFNetworker-Symbolen (`icons/*.svg`) abgeleitet und schriftlich festgehalten, bevor Phase 3 beginnt; Normsymbole behalten ihre Normform (F2). | Entscheidung; JFNetworker `icons/` | P1 | App | teilweise |
 | SH-G02 | Echte Master | Jede Shape ist ein vollständiger Master mit ShapeSheet: Geometrie mit Formeln, Verbindungspunkten, Steuerpunkten, Shape-Daten, Theme-Bezug (`THEMEVAL`), Ebene, Kategorien und Schlüsselwörtern. Nur so verhalten sich die Shapes wie in Visio und überstehen VSDX-Speichern und -Laden. | SbS 1, A; Z2, Z3 | P1 | App+Lib-core | neu |
-| SH-G03 | Schablonen als Dateien | Mitgelieferte Schablonen liegen als `.vssx` (metrisch und US) im Programm; Name, Symbolbilder (aus dem Shape gerendert), QuickInfos und Suchbegriffe auf Deutsch und Englisch (lokaler und universeller Name). | Fav; SbS 1 | P1 | App | neu |
+| SH-G03 | Schablonen als Dateien | Mitgelieferte Schablonen liegen als `.vssx` (metrisch und US) im Programm; Name, Symbolbilder (aus dem Shape gerendert), QuickInfos und Suchbegriffe in allen fünf Sprachen, mit universellem Namen als Schlüssel (LG-04). | Fav; SbS 1 | P1 | App | neu |
 | SH-G04 | Schnell-Shapes je Schablone | Für jede Schablone sind die ersten Shapes als Schnell-Shapes festgelegt (für AutoVerbinden). | SbS 2; S 1104-131657 | P1 | App | neu |
 | SH-G05 | Fremde Master anzeigen | Shapes aus geöffneten Visio-Dateien zeigen immer ihre eigenen Master aus der Datei. Sie werden nicht durch JFDiagrammer-Shapes ersetzt. „Shape ändern“ kann auf eigene Shapes wechseln. | Z2, Z3; Entscheidung | P1 | Lib-core+App | neu |
 | SH-G06 | AWS-Icons ausliefern | Die offiziellen AWS-Architektur-Icons als SVG unverändert in je einer Schablone pro AWS-Kategorie. Sie lassen sich nur skalieren, nicht umfärben (von Designs ausgenommen). Namensnennung und Lizenztext stehen im Info-Dialog und in den Schablonen-Eigenschaften. Neue Icon-Ausgaben werden mit einem Abgleich-Skript eingespielt. | Entscheidung; S 1104-132208 | P2 | App | neu |
@@ -993,6 +1071,7 @@ Namen nach zu sehen.
   Symbolleisten, UML-Aktivität, UML-Anwendungsfall, UML-Klasse, UML-Kommunikation, UML-Komponente, UML-Sequenz,
   UML-Statuscomputer, UML-Verteilung, Unternehmensanwendung, Web- und Mediensymbole
 - **Software und Datenbank › Webdiagramm** (S 1104-132449): Konzeptionelle Website-Shapes, Websiteübersicht-Shapes
+- **Nur in älteren Versionen** (SWDB, nicht im aktuellen Menü): Express-G, Jackson, ORM-Diagramm, ROOM
 - **Terminplan** (S 1104-132502): Gantt-Diagramm-Shapes, Kalender-Shapes, PERT-Diagramm-Shapes, Zeitachsen-Shapes
 - **Visio-Extras** (S 1104-132515): Anmerkungen, Bemaßung - Technik, Benutzerdefinierte Linienmuster (nur Menü),
   Benutzerdefinierte Muster - Skaliert, Benutzerdefinierte Muster - Unskaliert, Beschriftungen, Ornamente, Symbole,
@@ -1290,6 +1369,10 @@ generische Container-Rahmen (P3, neu zu bauen).
 | SH-276 | Titelblöcke | Visio-Extras | Norm: ISO 5457, ISO 7200 | 29 | S 1105-160831 | P2 | App | neu |
 | SH-277 | Verbinder | Visio-Extras | Generisch | 69 | S 1105-160807 | P1 | App | neu |
 | SH-278 | Zeichentools | Visio-Extras | Generisch | 31 | S 1105-160819 | P3 | App | neu |
+| SH-279 | Express-G | Software und Datenbank (ältere Version) | Norm: ISO 10303-11 (EXPRESS-G) | 17 | SWDB | P3 | App | neu |
+| SH-280 | Jackson | Software und Datenbank (ältere Version) | Norm: JSP-Notation | 5 | SWDB | P3 | App | neu |
+| SH-281 | ORM-Diagramm | Software und Datenbank (ältere Version) | Norm: ORM-/NIAM-Notation | 26 | SWDB | P3 | App | neu |
+| SH-282 | ROOM | Software und Datenbank (ältere Version) | Norm: ROOM-Notation | 17 | SWDB | P3 | App | neu |
 
 ### 4.3 Allgemein
 
@@ -6403,6 +6486,92 @@ Inhaltsarten einer Website als Icons, z. B. für automatisch erzeugte Sitemaps. 
 | Goldener Kreis / Lilafarbene Raute / Blaues Dreiecke / Grünes Quadrat | farbige Markierungsformen |
 | Off-Page-V… | Verweis auf andere Seite |
 
+**Nur in älteren Visio-Versionen (binäre Schablonen, Testmaterial `SWDB`)**
+
+Diese vier Schablonen stehen nicht mehr im Menü der aktuellen Version. Sie liegen als binäre
+`.vss` (Version 11, Visio 2003–2010, deutsch, metrisch) lokal in `context/files/SWDB_DE/`. Die
+Namen wurden aus der unkomprimierten Namensliste der Dateien gelesen. Einzelne Master stehen nur
+in komprimierten Blöcken und sind daher nur bruchstückhaft lesbar; sie sind markiert. Die Dateien
+sind Microsoft-Inhalt und kommen nie ins Repo.
+
+#### SH-279 Express-G
+
+Schema- und Entitätsdiagramme für Produktdatenmodelle in der grafischen EXPRESS-Notation (STEP).
+Kennzeichnung: Norm: ISO 10303-11 (EXPRESS-G).
+
+| Shape | Beschreibung |
+|---|---|
+| Entität | Kasten für eine Entität |
+| Basistyp | Kasten für einen einfachen Datentyp (Zahl, Text, Wahrheitswert …) |
+| Aufzählungstyp | Kasten für einen Typ mit fester Werteliste |
+| Definierter Typ | Kasten für einen benannten, abgeleiteten Typ |
+| Gewählter Typ | Kasten für einen Auswahltyp aus mehreren Typen |
+| Kardinalität / Inverse Kardinalität | Mengenangabe einer Beziehung bzw. der Gegenrichtung |
+| Normale Beziehung | Beziehungslinie mit Kreis am Zielende |
+| Baumstruktur | kräftige Linie für Untertyp-Bäume |
+| Beziehungszeiger | Markierung der Beziehungsrichtung (Bedeutung prüfen) |
+| Untertyp/ Obertyp | Kennzeichnung einer Unter-/Obertyp-Beziehung |
+| Verwendete Entität / Referenzierte Entität | Verweis auf eine Entität aus einem anderen Schema |
+| Beschriftung | Textetikett |
+| To-Page-Referenz / From-Page-Referenz | Sprungmarke zu bzw. von einer anderen Seite |
+| Zeichenblatt-Referenz | Verweis auf eine andere Seite |
+
+#### SH-280 Jackson
+
+Programmstruktur nach der Jackson-Methode (JSP): Bäume aus Sequenz, Auswahl und Wiederholung.
+Kennzeichnung: Norm: JSP-Notation (Jackson Structured Programming).
+
+| Shape | Beschreibung |
+|---|---|
+| Prozedur | Kasten für einen Strukturknoten |
+| Prozedur 2 | Variante des Strukturknotens (vermutlich mit Auswahl- oder Wiederholungsmarke) |
+| Prozess | Kasten für einen Prozess |
+| Strukturverbinder | Linie vom Elternknoten zu den Kindknoten |
+| Logischer Verbinder | Linie für eine logische Verbindung zwischen Prozessen |
+
+#### SH-281 ORM-Diagramm
+
+Konzeptionelle Datenmodelle nach Object Role Modeling (ORM/NIAM): Objekttypen, Faktentypen mit
+Rollen und Einschränkungen. Kennzeichnung: Norm: ORM-/NIAM-Notation.
+
+| Shape | Beschreibung |
+|---|---|
+| Entität | Objekttyp (abgerundeter Kasten) |
+| Wert / Unär / Binär | Werttyp sowie Faktentypen mit einer bzw. zwei Rollen (nur bruchstückhaft lesbar) |
+| Vertikal binär | binärer Faktentyp mit senkrecht gestapelten Rollen |
+| Quaternär | Faktentyp mit vier Rollen |
+| Rollenverbinder / Erf. Rollenverbinder | Linie von einer Rolle zum Objekttyp, optional bzw. verpflichtend |
+| Untertypverbinder | Pfeil vom Untertyp zum Obertyp |
+| Einschränkungsverbinder | gestrichelte Linie zu einer Einschränkung |
+| Eindeutigkeitseinschränkung / Eindeutigk.-Einschr. links / Mitte / rechts | Strich über Rollen, die eindeutig sind |
+| Ext. Eindeutigkts.einschränkung | Eindeutigkeit über Rollen mehrerer Faktentypen |
+| Erforderlichkeitseinschränkung / Ext. Erforderlichkts.einschrkg | Pflichtrolle bzw. Pflicht über mehrere Rollen |
+| Frequenzeinschränkung / Ext. Frequ.-Einschränkung | Häufigkeitsangabe einer Rolle |
+| Ausschlusseinschränkung | Kreis mit Kreuz: Rollen schließen sich aus |
+| Gleichheitseinschränkung | Kreis mit Gleichheitszeichen |
+| Subseteinschränkung | Kreis mit Teilmengenzeichen |
+| Ringeinschränkung | Kennzeichen für Ringbeziehungen (reflexiv, symmetrisch …) |
+| P-Einschränkung / Ext. P-Einschränkung | bevorzugter Identifikator (Primärschlüssel) |
+| Index- Anmerkung | Anmerkung zu einem Index |
+
+#### SH-282 ROOM
+
+Echtzeitsysteme nach der ROOM-Methode (Real-time Object-Oriented Modeling): Akteure mit
+Anschlüssen und Zustandsautomaten. Kennzeichnung: Norm: ROOM-Notation.
+
+| Shape | Beschreibung |
+|---|---|
+| Akteurklasse | Rahmen einer Akteurklasse mit ihrer inneren Struktur |
+| Akteurreferenz / Veränderte Akteurref. | eingebetteter Akteur, normal bzw. veränderlich |
+| Relayanschlüsse / Endanschluss / Referenzanschlüsse | Anschlusspunkte am Rand eines Akteurs |
+| Bindung | Verbindung zwischen zwei Anschlüssen |
+| Layer/Export-Verbindungen | Verbindung zu Diensten der unteren Schicht |
+| Zustandskontext | Rahmen eines Zustandsautomaten |
+| Zustand | Zustand mit Namen |
+| Übergang / Gruppenübergang / Interner Übergang / Übergang zu History | Zustandsübergänge in ihren Varianten |
+| Übergangspunkte / Entscheidungspunkt | Anschlusspunkt am Zustandsrand bzw. Verzweigung |
+| Textdefinitionen | Textblock für Definitionen |
+
 ### 4.10 Terminplan
 
 #### SH-263 Gantt-Diagramm-Shapes
@@ -7110,21 +7279,21 @@ Summe: rund 175 Icons (davon etwa 25 nur für entfallende Befehle, die nicht geb
 
 Am 2026-11-14 hat der Nutzer alle Vorschläge zu den Planungsfragen aus Phase 1 übernommen
 („Alle übernehmen“). Die Spalte „Umgesetzt in“ nennt die Stellen, die danach angepasst wurden.
-Offen ist nur noch eine Teilfrage zu F4.
+Nachtrag desselben Tages: fünf Oberflächensprachen (3.17) und Testmaterial zu F4. Offen sind noch Testdateien für Version 6 und für `.vsd` (F4), die Bestätigung der abgeleiteten Tastenbelegung je Sprache (F10, LG-08) und der deutsche Begriff für „AutoVerbinden“ (Glossar in 3.17).
 
 | ID | Frage | Entscheidung (2026-11-14) | Umgesetzt in |
 |---|---|---|---|
 | F1 | Eine neue Crate oder zwei? | Zwei Crates nach dem Muster `doc_core`/`doc_io`: `diagram_core` (Modell, ShapeSheet, Formeln, Geometrie, Routing, Layout) und `diagram_io` (VSDX/VDX/VSX/VSS, Importe, Exporte). | 0.1, 0.3; Spalte „Ort“ (`Lib-core`, `Lib-io`) |
 | F2 | Wie weit reicht „JFNetworker-Stil“ bei genormten Symbolen? | Normsymbole behalten ihre Normform; Strichstärken, Farben, Schriften und Schatten kommen aus dem NetLab-Design. Gestaltete Grafiken (Geräte, Möbel, Personen) werden ganz im JFNetworker-Stil gezeichnet. | 4 (Kennzeichnung), SH-G01 |
 | F3 | Welche AWS-Icon-Ausgabe und in welcher Form? | Die aktuelle offizielle Ausgabe als SVG, unverändert, je AWS-Kategorie eine Schablone. Namensnennung im Info-Dialog und in den Schablonen-Eigenschaften. Die Icons sind von Designs ausgenommen. | SH-G06, NO-14 |
-| F4 | Lohnt der Import von binären `.vss`/`.vsd`? | `.vss` mit P2, aber erst nach allen XML-Formaten; `.vsd` mit P3. **Noch offen:** Ob der Nutzer alte `.vss`-Testdateien hat; ohne Testdateien ist der Import kaum prüfbar. | DF-30, DF-31 |
+| F4 | Lohnt der Import von binären `.vss`/`.vsd`? | `.vss` mit P2, aber erst nach allen XML-Formaten; `.vsd` mit P3. Nachtrag: Testmaterial für Version 11 liegt vor (vier `.vss` in `context/files/SWDB_DE/`, nur Schablonen, nur lokal, nie ins Repo; Tests werden ohne die Dateien übersprungen). **Noch offen:** Version 6 (Visio 2000/2002) und binäre `.vsd`-Zeichnungen. | DF-30, DF-31, DF-34, SH-279 bis SH-282 |
 | F5 | DWG oder nur DXF? | Nur DXF (Import und Export); DWG entfällt. | EX-10, IM-04, NO-29 |
 | F6 | Welche Datenquellen in P2? | CSV und `.xlsx` in P2; dafür ein schlanker XLSX-Leser in JFLib. ODBC/SQL erst in P3. | IM-05, IM-10, DA-04, RD-02 |
 | F7 | Ersatz für VBA-Automatisierung? | Später eine Skript- und Plugin-Schnittstelle über JFScript mit dem Ereignismodell aus RX-10; nicht in Phase 2. | UI-21, NO-01 |
-| F8 | Welche Begriffe in der Oberfläche? | Durchgehend „Ebene“ (nicht „Layer“), „Beschriftung“ für Callouts, „Legende“ nur für Datenlegenden, „Seite“ statt „Zeichenblatt“. Befehlsnamen sonst wie in Visio. | Abschnitte 2.9, 3, 7 (Visio-Name jeweils in Klammern) |
+| F8 | Welche Begriffe in der Oberfläche? | Durchgehend „Ebene“ (nicht „Layer“), „Beschriftung“ für Callouts, „Legende“ nur für Datenlegenden, „Seite“ statt „Zeichenblatt“. Befehlsnamen sonst wie in Visio. Nachtrag: gilt sinngemäß für alle fünf Sprachen. | Abschnitte 2.9, 3, 7 (Visio-Name jeweils in Klammern), Glossar in 3.17 |
 | F9 | Wie eng hängt JFDiagrammer an JFNetworker? | Gemeinsamer Symbolsatz für Netzwerkgeräte (eine Quelle, zwei Apps); Import von JFNetworker-Projekten mit P3. | SH-G09, IM-11, NO-23 |
-| F10 | Welche Tastenbelegung? | Deutsche Office-Konvention für Textformate; „In den Vordergrund“/„In den Hintergrund“ und „Kapitälchen“ auf freie Tasten; alles anpassbar. | 3.16, KB-07, KB-11 |
+| F10 | Welche Tastenbelegung? | Deutsche Office-Konvention für Textformate; „In den Vordergrund“/„In den Hintergrund“ und „Kapitälchen“ auf freie Tasten; alles anpassbar. Nachtrag, **abgeleitet, vom Nutzer noch zu bestätigen:** In den anderen Sprachen folgt die Standardbelegung der jeweiligen Office-Konvention (Fett: EN Ctrl+B, ES Ctrl+N, IT/FR Ctrl+G). | 3.16, KB-07, KB-11, LG-08 |
 | F11 | Welche Vorlagen kommen in P1? | Leere Zeichnung, Standarddiagramm, Standardflussdiagramm, funktionsübergreifendes Flussdiagramm, Standard- und detailliertes Netzwerk und wegen JFNetworker zusätzlich das Rack-Diagramm (samt Rack-Schablonen). Die AWS-Architektur kommt früh in P2. Grundrisse und Konstruktion folgen später. | VL-52, VL-54, SH-145 bis SH-147 |
 | F12 | Mehr Screenshots? | Nein. Für das Verhalten reichen die Bücher; Screenshots wären nur für einen pixelnahen Nachbau nötig. | – |
-| F13 | Visio-eigene Begriffe? | Deutsche beschreibende Begriffe („AutoVerbinden“, „Schnell-Shapes“); englische Visio-Begriffe in der App meiden. | Abschnitt 3 |
+| F13 | Visio-eigene Begriffe? | Deutsche beschreibende Begriffe („AutoVerbinden“, „Schnell-Shapes“); englische Visio-Begriffe in der App meiden. Nachtrag: je Sprache eigene beschreibende Begriffe; SmartShapes, AutoConnect, Quick Shapes und ShapeSheet in keiner Sprache. „AutoVerbinden“ ist zugleich Visios deutsche Bezeichnung (Rückfrage im Glossar). | Abschnitt 3, Glossar in 3.17 |
 | F14 | DIN EN/IEC oder US/ANSI? | Normschablonen nach DIN EN/IEC; eine ANSI-Fassung höchstens später. | 4 (Kennzeichnung), 4.13, VL-40 |
