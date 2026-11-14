@@ -22,3 +22,4 @@ rust-project.json
 *.keystore
 *.jks
 /SECURITY_REVIEW_LIB.md
+/temp
