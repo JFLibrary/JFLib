@@ -11,6 +11,13 @@ use gpu::*;
 use render2d::math::{sincos, sqrt};
 use render2d::{Camera, Cap, EntityId, Join, Layer, LayerId, Renderer, Scene, Shape, Style, Unit};
 
+/// fonts of the repository for the text tests and the measuring scene (G6c): DejaVu Serif and Sans Mono (lib/doc_view),
+/// Inter (styles/netlab)
+pub const SERIF: &[u8] = include_bytes!("../../lib/doc_view/assets/DejaVuSerif.ttf");
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub const MONO: &[u8] = include_bytes!("../../lib/doc_view/assets/DejaVuSansMono.ttf");
+pub const SANS: &[u8] = include_bytes!("../../styles/netlab/assets/Inter-Regular.ttf");
+
 // ---------------------------------------------------------------- a test drawing
 
 /// an entity of a test drawing
@@ -522,12 +529,17 @@ pub struct Shot {
     pub alpha: Option<u32>,
     /// (G6b2) a drawing of blocks instead of `d`
     pub b: Option<BlockDrawing>,
+    /// (G6c) texts instead of `d`
+    pub t: Option<Vec<crate::textdraw::TItem>>,
 }
 
 impl Shot {
     /// its drawing in a scene
     #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
     pub fn build(&self, s: &mut Scene) -> Result<()> {
+        if let Some(t) = &self.t {
+            return crate::textdraw::build(s, t).map(|_| ());
+        }
         match &self.b {
             Some(b) => build_blocks(s, b).map(|_| ()),
             None => build(s, &self.d).map(|_| ()),
@@ -538,7 +550,7 @@ impl Shot {
 /// the images the browser is compared with Vulkan on: caps, joins, hairlines, units, overlap, every case of the tests
 pub fn shots() -> Vec<Shot> {
     let mut v = Vec::new();
-    let mut add = |name: String, w: u32, h: u32, d: Drawing, cam: Camera, alpha: Option<u32>| v.push(Shot { name, w, h, d, cam, alpha, b: None });
+    let mut add = |name: String, w: u32, h: u32, d: Drawing, cam: Camera, alpha: Option<u32>| v.push(Shot { name, w, h, d, cam, alpha, b: None, t: None });
     for cap in CAPS {
         for width in [1.0f32, 2.5, 6.0, 15.0] {
             add(format!("caps_{cap:?}_{width}"), 320, 240, caps_drawing(cap, width), pixel_camera(320, 240), None);
@@ -598,8 +610,15 @@ pub fn shots() -> Vec<Shot> {
     }
     // blocks inserted in every way, transparency (G6b2)
     for (name, b) in [("blocks", blocks_drawing(false)), ("blocks_uneven", blocks_drawing(true)), ("transparency", transparency_drawing([0, 40, 90]))] {
-        v.push(Shot { name: name.into(), w: 360, h: 270, d: Drawing::default(), cam: pixel_camera(360, 270), alpha: None, b: Some(b) });
+        v.push(Shot { name: name.into(), w: 360, h: 270, d: Drawing::default(), cam: pixel_camera(360, 270), alpha: None, b: Some(b), t: None });
     }
+    // text: sizes, turned and mirrored, large (class L, a fill), MTEXT, bidi and pixels; translucent (G6c)
+    for k in 0..5 {
+        v.push(Shot { name: format!("text_{k}"), w: 640, h: 400, d: Drawing::default(), cam: pixel_camera(640, 400), alpha: None, b: None, t: Some(crate::textdraw::text_drawing(k)) });
+    }
+    let mut tr = crate::textdraw::TItem::new("Translucent AVAWAY fij", 1, [10.0, 40.0], 30.0);
+    tr.color = 0x8020_40C0;
+    v.push(Shot { name: "text_translucent".into(), w: 360, h: 100, d: Drawing::default(), cam: pixel_camera(360, 100), alpha: Some(0x80), b: None, t: Some(vec![tr]) });
     v
 }
 

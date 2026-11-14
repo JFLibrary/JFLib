@@ -64,8 +64,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs) · [vk_dmabuf.rs](#gpuvk_dmabufrs) · [web_cmd.rs](#gpuweb_cmdrs) · [web_dev.rs](#gpuweb_devrs) · [web_res.rs](#gpuweb_resrs) · [web_swap.rs](#gpuweb_swaprs) · [mtl_cmd.rs (Apple)](#gpumtl_cmdrs-apple) · [mtl_dev.rs (Apple)](#gpumtl_devrs-apple) · [mtl_res.rs (Apple)](#gpumtl_resrs-apple) · [mtl_swap.rs (Apple)](#gpumtl_swaprs-apple)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
-- [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
-  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [scene.rs](#render2dsceners)
+- [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
+  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [text.rs](#render2dtextrs)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -22154,7 +22154,7 @@ CLASS_MAX: u32 = CLASS_MIN << (CLASSES - 1)
 
 ## render2d
 
-*the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU* -- crate root [`lib/render2d/lib.rs`](../lib/render2d/lib.rs)
+*the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU* -- crate root [`lib/render2d/lib.rs`](../lib/render2d/lib.rs)
 
 ```text
 render2d -- the core of the 2D renderer for CAD on lib/gpu (G6a, G6b; docs/RENDER2D.md): a retained scene of
@@ -22206,6 +22206,10 @@ BLOCK_WGSL: &str = include_str!("block.wgsl")
 CULL_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block. ...
 SCATTER_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("scatte ...
 STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block. ...
+/// text (G6c): STROKE_WGSL with textc.wgsl and text.wgsl behind it (vs_text / fs_text for layers of text alone, vs_text_all
+/// / fs_text_all for text among anything else)
+TEXT_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block. ...
+TEXTC_WGSL: &str = include_str!("textc.wgsl")
 COUNT_SPV: &[u32] = spv::COUNT
 SCAN_SPV: &[u32] = spv::SCAN
 WRITE_SPV: &[u32] = spv::WRITE
@@ -22217,6 +22221,10 @@ FS_SPV: &[u32] = spv::FS
 FS_FULL_SPV: &[u32] = spv::FS_FULL
 VS_FILL_SPV: &[u32] = spv::VS_FILL
 FS_FILL_SPV: &[u32] = spv::FS_FILL
+VS_TEXT_SPV: &[u32] = spv::VS_TEXT
+FS_TEXT_SPV: &[u32] = spv::FS_TEXT
+VS_TEXT_ALL_SPV: &[u32] = spv::VS_TEXT_ALL
+FS_TEXT_ALL_SPV: &[u32] = spv::FS_TEXT_ALL
 ```
 
 - **`struct RendererDesc`**
@@ -22401,6 +22409,97 @@ math -- what the scene computes on the CPU in f64 (no libm in no_std; render3d's
 
 - **`fn split(x: f64) -> (f32, f32)`**
   a coordinate as the two f32 the GPU holds of it: hi = f32(x), lo = f32(x - hi) (decision 28; docs/RENDER2D.md)
+
+### `render2d/msdf.rs`
+
+Source: [`lib/render2d/msdf.rs`](../lib/render2d/msdf.rs)
+
+```text
+msdf -- multi-channel signed distance fields of glyph outlines on the CPU (G6c, decision 27; docs/RENDER2D.md "Text").
+
+A glyph's contours (lines, quadratic and cubic Bézier segments in em units, y up) become a tile of RGBA texels: red,
+green and blue each the signed pseudo-distance to the nearest edge of its colour, alpha the true signed distance to the
+nearest edge of any colour (an MTSDF), positive inside, 0.5 on the outline, range / 2 texels on either side clamped.
+The median of red, green and blue keeps a corner sharp at any magnification: edge colouring gives the two edges at a
+corner different colours, so that two channels meet there as two straight half planes.  As msdfgen (Chlumsky, MIT;
+rewritten from its description, nothing taken over as code):
+
+  edge colouring   per contour the corners (a turn sharper than CORNER_CROSS, or back); none: every edge white (all
+                   channels); one: three colours along the contour (an edge split in thirds where it has fewer than
+                   three); more: cyan, magenta, yellow switching at each corner, the last spline different from the first
+  distances        per texel and channel the edge of that colour with the least true distance (ties: the one met more
+                   squarely), then its pseudo-distance (an end's tangent extended beyond the edge); alpha the least
+                   true distance.  The nearest point of a curve: samples, then a safe Newton step in the bracket around
+                   each sampled minimum (no trigonometry: the same bits on every target)
+  sign correction  each texel's centre inside or out by the non-zero winding of a scanline; where the median says
+                   otherwise every channel is mirrored at 0.5 (wrong signs from overlapping or touching contours)
+  error correction a texel whose channels clash with a neighbour's (two channels jumping across 0.5 by more than a
+                   texel's worth while the third stays: interpolating between them would make a false edge, at corners
+                   and where contours come near each other) takes its median in all three channels; then the same for
+                   the diagonal neighbours
+
+Everything is f64 with +, -, *, / and a square root by Newton's method (math::sqrt): the same tile bytes on every
+target (Windows, Linux, wasm32, Android), which the browser's and Vulkan's images rely on.
+```
+
+- **`type P = [f64; 2]`**
+
+- **`enum Seg`**
+  a segment of a contour (em units, y up)
+  - `Line(P, P)`
+  - `Quad(P, P, P)`
+  - `Cubic(P, P, P, P)`
+
+```rust
+/// a corner is a turn whose cross product of the unit directions exceeds this (sin 3 rad, msdfgen's default angle) or
+/// that turns back (dot <= 0)
+CORNER_CROSS: f64 = 0.141_120_008_059_867_22
+```
+
+**`impl Seg`**
+
+- **`fn start(&self) -> P`**
+- **`fn end(&self) -> P`**
+- **`fn point(&self, t: f64) -> P`**
+  the point at t (de Casteljau)
+- **`fn dir_start(&self) -> P`**
+  the direction at its start (a control point on the end: the next one), msdfgen's direction(0)
+- **`fn dir_end(&self) -> P`**
+- **`fn bbox(&self) -> [f64; 4]`**
+  its control hull's box: x0, y0, x1, y1
+
+- **`struct Params`**
+  how a size class of the atlas makes its tiles: texels per em, the distance range (texels, both sides together), the
+  texels around the glyph's box
+  - `em: f64`
+  - `range: f64`
+  - `pad: u32`
+
+- **`struct Tile`**
+  a glyph's field: w x h texels of RGBA (row 0 the lowest), texel (i, j) centred at ((x0 + i + 0.5) / em, (y0 + j + 0.5)
+  / em) em units
+  - `w: u32`
+  - `h: u32`
+  - `x0: i32`
+  - `y0: i32`
+  - `px: Vec<u8>`
+
+- **`fn bounds(contours: &[Vec<Seg>]) -> Option<[f64; 4]>`**
+  the box of the contours' control hulls (None: no segment)
+
+- **`fn tile_box(b: [f64; 4], p: &Params) -> (i32, i32, u32, u32)`**
+  the tile's texel box for contours of this box: (x0, y0, w, h) in texels of the class
+
+- **`fn tile(contours: &[Vec<Seg>], p: &Params) -> Option<Tile>`**
+  a glyph's tile (None: no outline).  contours in em units, y up, closed (each segment starts where the one before
+  ended); fill rule non-zero
+
+- **`fn contours_of(pts: &[(f32, f32)], tags: &[u8], ends: &[u32], s: f64) -> Vec<Vec<Seg>>`**
+  the outline as quadratic and cubic segments from lib/text's outline buffer (font units, TrueType contours with their
+  implied on-curve midpoints, CFF contours of cubics), scaled by `s` (1 / units per em: em units)
+
+- **`fn ink_area(contours: &[Vec<Seg>]) -> f64`**
+  the area the contours fill (non-zero; em units squared), each segment as 16 chords: what a glyph's ink weighs
 
 ### `render2d/scene.rs`
 
@@ -22646,6 +22745,9 @@ BLOCK_DEPTH: u32 = 16
     (docs/RENDER2D.md "Flächen")
   - `Insert(Insert)` -- a block (G6b2): on a layer in its place in the order, or inside another block; its entities in their order, each with
     its style or by block the insert's (docs/RENDER2D.md "Blöcke")
+  - `Text(Text<'a>)` -- a single line of text (G6c; DXF's TEXT): its glyphs from the scene's atlas of distance fields, small as bars, very
+    large as fills of their outlines; the style's colour (docs/RENDER2D.md "Text")
+  - `MText(MText<'a>)` -- text of several lines (G6c; the basics of DXF's MTEXT)
 
 ```rust
 /// the largest angle of one piece of an arc (a record): a full circle is 16 of them.  Its quad covers the piece's ring
@@ -22671,8 +22773,35 @@ ARC_STEP: f64 = core::f64::consts::PI / 8.0
   - `stamps: Option<[f64; 4]>` -- the GPU's clock (ms) at the start, after the uploads, after the visibility, after the draw (None: no
     timestamps here)
 
+```rust
+/// (G6c) text from this many pixels per em on is drawn as fills of its outlines (the edge error of the atlas's class L grows
+/// with the size: docs/RENDER2D.md "Entscheidungen in G6c"); textc.wgsl's T_BAR and text.wgsl's T_SL below it
+TEXT_FILL_FROM: f64 = 160.0
+/// (G6c) text.wgsl's T_SL: from this many pixels per em (the map's larger stretch) the glyphs come from class L
+TEXT_LARGE_FROM: f64 = 40.0
+/// (G6c) textc.wgsl's T_BAR: below this many pixels per em a text is drawn as bars
+TEXT_BAR_BELOW: f64 = 7.0
+```
+
 - **`struct Scene`**
   entities, layers, styles and the camera of one scene of a Renderer
+
+- **`struct TextInfo`**
+  what a scene's text holds (Scene::text_info).  It may grow
+  - `fonts: u32`
+  - `glyphs: u32` -- the glyph table's rows, their tiles of class S and L, the atlas's pages (PAGE x PAGE texels, 4 bytes each) and the
+    texture's layers
+  - `tiles_s: u32`
+  - `tiles_l: u32`
+  - `pages: u32`
+  - `layers: u32`
+  - `made: u32` -- tiles made so far; glyphs that found no page (the device's most layers)
+  - `failed: u32`
+  - `fills: u32` -- texts drawn as fills now; texts that changed between glyphs and fills in the last prepare
+  - `switched: u32`
+  - `sent_bytes: u64` -- what the last prepare sent of the atlas (bytes) and of the glyph table (rows)
+  - `sent_rows: u32`
+  - `decided_scale: f64` -- the scale text decides its mode and class by (Camera::scale's units)
 
 **`impl Scene`**
 
@@ -22691,6 +22820,22 @@ ARC_STEP: f64 = core::f64::consts::PI / 8.0
   the layer goes, with every entity on it
 - **`fn drawn_layers(&self) -> Vec<LayerId>`**
   the visible layers in the order the last prepare drew them (the lists' order: lists_buffer)
+- **`fn add_font(&mut self, data: &[u8], face: u32) -> Result<text::FontId>`**
+  a font from TrueType or OpenType bytes (face: a collection's font, else 0), lib/text's parser
+- **`fn fonts(&mut self) -> &mut Fonts`**
+  the scene's fonts: their metrics and glyph outlines, and what lays text out with them (text::layout_text,
+  layout_mtext: the CPU path of G6e draws the same layout)
+- **`fn add_text_style(&mut self, s: &TextStyle) -> Result<TextStyleId>`**
+  a text style (DXF's STYLE) for texts
+- **`fn set_text_style(&mut self, id: TextStyleId, s: &TextStyle) -> Result<()>`**
+  a text style changes: every text of it is laid out again (its records go up, a block's once for all its inserts)
+- **`fn text_style(&self, id: TextStyleId) -> Option<TextStyle>`**
+- **`fn text_layout(&self, id: EntityId) -> Option<&text::Layout>`**
+  a text's layout (G6d picks with its extent: TextLayout::quad, bounds; G6e draws it): None for any other entity
+- **`fn text_info(&self) -> TextInfo`**
+  what the scene's text holds (TextInfo)
+- **`fn atlas_hash(&self) -> u64`**
+  (tests) FNV-1a of the atlas's pages: the same bytes on every target for the same texts
 - **`fn insert(&mut self, layer: LayerId, style: StyleId, s: &Shape) -> Result<EntityId>`**
   a new entity at the end of its layer (drawn over everything there); an insert of a block (Shape::Insert) sits there
   with its block's entities
@@ -22752,6 +22897,212 @@ ARC_STEP: f64 = core::f64::consts::PI / 8.0
   target's in pixels
 - **`fn submitted(&mut self, id: SubmitId)`**
   the frame went to the GPU: Queue::submit's or Swapchain::present's answer
+
+### `render2d/text.rs`
+
+Source: [`lib/render2d/text.rs`](../lib/render2d/text.rs)
+
+```text
+text -- fonts, text styles and the layout of text (G6c; docs/RENDER2D.md "Text"): what a scene draws of a text, and
+what the CPU path of G6e (lib/gfx outlines of the same layout) and picking in G6d (each text's extent) take from it.
+
+Fonts are TrueType or OpenType (also a collection's face) from their bytes: lib/text parses them (outlines, metrics),
+lib/text_shape shapes (HarfRust: kerning, ligatures, marks, Arabic joining, Indic reordering; Unicode bidi and script
+runs; fallback fonts per run that the first font cannot show).  A text style is DXF's STYLE: a font, fallback fonts,
+a fixed height or none, a width factor, an oblique angle; heights in drawing units, or in pixels for annotation that
+keeps its size on the screen.
+
+A layout is in em units of the text's frame (x along the baseline, y up; one em = the font's units per em): its lines
+(baseline origin, glyphs in visual order with their pens), the bars small text is drawn as, its ink box; and the frame
+itself: origin + m · e maps a point e of the frame to the drawing (or, for a style in pixels, to pixels from the origin).
+Heights are cap heights, as DXF's TEXT and MTEXT measure them (the em is height / cap height).
+```
+
+- **`struct FontId(pub u32)`**
+  a font of a scene (Scene::add_font)
+
+- **`struct TextStyleId(pub u32)`**
+  a text style of a scene (Scene::add_text_style)
+
+```rust
+/// the most fallback fonts of a text style
+FALLBACK_MAX: usize = 4
+/// AutoCAD's single line spacing: baselines 5/3 of the text height apart (MText::line_spacing multiplies it)
+LINE_SPACING: f64 = 5.0 / 3.0
+```
+
+- **`struct TextStyle`**
+  DXF's STYLE: how texts of it look.  Made with `new` and changed field by field (it may grow)
+  - `font: FontId`
+  - `fallback: [FontId; FALLBACK_MAX]` -- fonts for what `font` lacks, tried in this order per run of one script (the first `fallbacks`)
+  - `fallbacks: u32`
+  - `height: f64` -- a fixed cap height (0: each text says its own), in `unit`s
+  - `width: f64` -- how much wider than the font (1: as it is)
+  - `oblique: f64` -- how far the glyphs lean, radians from upright (positive: to the right)
+  - `unit: Unit` -- Drawing: heights in drawing units, the text zooms with the drawing; Px: pixels, the text keeps its size on the screen
+
+**`impl TextStyle`**
+
+- **`const fn new(font: FontId) -> TextStyle`**
+  a font upright, its own width, heights per text, in drawing units
+- **`fn with_fallbacks(mut self, fonts: &[FontId]) -> TextStyle`**
+  the same with fallback fonts (at most FALLBACK_MAX)
+
+- **`enum HAlign`**
+  DXF TEXT's horizontal alignment (group 72)
+  - `Left`
+  - `Center`
+  - `Right`
+  - `Aligned` -- between `at` and `at2`: the height follows the width (the width factor stays)
+  - `Middle` -- the centre of the baseline and the middle of all the text's ink, descenders too
+  - `Fit` -- between `at` and `at2`: the width factor follows (the height stays)
+
+- **`enum VAlign`**
+  DXF TEXT's vertical alignment (group 73): the baseline, the font's descender, half the cap height, the cap height
+  - `Baseline`
+  - `Bottom`
+  - `Middle`
+  - `Top`
+
+- **`enum Attach`**
+  MTEXT's attachment point (group 71, 1 to 9): where `at` lies on the text's block
+  - `TopLeft`
+  - `TopCenter`
+  - `TopRight`
+  - `MiddleLeft`
+  - `MiddleCenter`
+  - `MiddleRight`
+  - `BottomLeft`
+  - `BottomCenter`
+  - `BottomRight`
+
+- **`struct Text<'a>`**
+  a single line of text (DXF's TEXT).  Made with `new` and changed field by field (it may grow)
+  - `text: &'a str` -- one line (control characters are left out)
+  - `style: TextStyleId`
+  - `at: [f64; 2]` -- the alignment point: the baseline's start for Left / Baseline (DXF 10), else the point the alignment names (DXF
+    11); Aligned and Fit run the baseline from `at` (DXF 10) to `at2` (DXF 11)
+  - `at2: [f64; 2]`
+  - `height: Option<f64>` -- the cap height (None: the style's), in the style's unit
+  - `rotation: f64` -- radians, counter-clockwise (Aligned and Fit: the direction from at to at2)
+  - `width: Option<f64>` -- the width factor and the oblique angle (None: the style's; DXF 41, 51)
+  - `oblique: Option<f64>`
+  - `halign: HAlign`
+  - `valign: VAlign`
+  - `backward: bool` -- DXF 71: mirrored in x (backward), mirrored in y (upside down)
+  - `upside_down: bool`
+
+**`impl<'a> Text<'a>`**
+
+- **`const fn new(text: &'a str, style: TextStyleId, at: [f64; 2]) -> Text<'a>`**
+  left on the baseline at `at`, unturned, the style's height, width and oblique angle
+
+- **`struct MText<'a>`**
+  text of several lines (the basics of DXF's MTEXT: explicit breaks, a wrapping width, line spacing, the nine attachment
+  points, rotation; its inline formatting codes are G6e's, which maps them onto runs).  Made with `new` and changed field
+  by field (it may grow: runs with their own font, height and colour)
+  - `text: &'a str` -- lines broken at '\\n'
+  - `style: TextStyleId`
+  - `at: [f64; 2]`
+  - `height: Option<f64>` -- the cap height (None: the style's), in the style's unit
+  - `width: f64` -- wrap lines longer than this (0: no wrapping), in the style's unit
+  - `rotation: f64`
+  - `attach: Attach`
+  - `line_spacing: f64` -- times LINE_SPACING times the height between baselines (DXF 44)
+
+**`impl<'a> MText<'a>`**
+
+- **`const fn new(text: &'a str, style: TextStyleId, at: [f64; 2]) -> MText<'a>`**
+  top left at `at`, no wrapping, single spacing
+
+- **`struct Placed`**
+  a glyph of a layout
+  - `font: FontId`
+  - `glyph: u32`
+  - `pen: [f64; 2]` -- its origin, em units from its line's origin
+  - `advance: f64` -- its advance (em)
+  - `cluster: u32` -- the byte where its cluster starts in the text
+  - `mark: bool` -- a mark (no advance: an accent or vowel sign over its base): it has no cell of its own
+  - `blank: bool` -- whitespace or no outline: no ink, no bar
+
+- **`struct Line`**
+  a line of a layout: its baseline's origin (em, in the frame), its glyphs (a range of Layout::glyphs) and bars, its
+  advance width (em)
+  - `origin: [f64; 2]`
+  - `glyphs: core::ops::Range<u32>`
+  - `bars: core::ops::Range<u32>`
+  - `width: f64`
+
+- **`struct Bar`**
+  a word drawn as one bar when its text is small (em, from its line's origin): from its ink's left to its right, from the
+  baseline to the x-height, `ink` the share of that box its glyphs cover
+  - `x0: f64`
+  - `x1: f64`
+  - `y0: f64`
+  - `y1: f64`
+  - `ink: f64`
+
+- **`struct Layout`**
+  a text laid out: in em units of its frame, and the frame
+  - `origin: [f64; 2]` -- where the frame's origin lies (drawing units) and its map from em units: origin + (m[0] x + m[1] y, m[2] x + m[3] y)
+    (a style in pixels: pixels from the origin, y up, before the camera's rotation)
+  - `m: [f64; 4]`
+  - `px: bool`
+  - `glyphs: Vec<Placed>`
+  - `lines: Vec<Line>`
+  - `bars: Vec<Bar>`
+  - `ink: Option<[f64; 4]>` -- the box of the glyphs' ink (em, in the frame; empty text: None)
+  - `cell: [f64; 4]` -- the box of the lines: advances, descender to cap height (em, in the frame)
+  - `em: f64` -- the em in drawing units (or pixels): what the zoom decides by
+  - `x_height: f64` -- the x-height (em) the bars stand on
+
+**`impl Layout`**
+
+- **`fn to_drawing(&self, e: [f64; 2]) -> [f64; 2]`**
+  a point of the frame (em) in the drawing (a style in pixels: pixels from the origin)
+- **`fn quad_of(&self, b: [f64; 4]) -> [[f64; 2]; 4]`**
+  the corners of a box of the frame in the drawing (counter-clockwise from its lower left in the frame)
+- **`fn quad(&self) -> [[f64; 2]; 4]`**
+  the text's extent in the drawing: its ink box's corners (picking, G6d), or the cell's where it has no ink
+- **`fn bounds(&self) -> [f64; 4]`**
+  the axis-aligned box of quad() (drawing units)
+
+- **`struct GlyphShape`**
+  what a scene knows of a glyph: its contours (em), the box of its control hulls, the area it fills
+  - `contours: Vec<Vec<Seg>>`
+  - `bbox: Option<[f64; 4]>`
+  - `area: f64`
+
+- **`struct Fonts`**
+  the fonts of a scene (or of anyone laying out text: the CPU path of G6e)
+
+- **`struct FontMetrics`**
+  a font's metrics in em units (Fonts::metrics)
+  - `units_per_em: f64`
+  - `cap_height: f64`
+  - `x_height: f64`
+  - `ascender: f64`
+  - `descender: f64`
+
+**`impl Fonts`**
+
+- **`fn new() -> Fonts`**
+- **`fn add(&mut self, data: &[u8], face: u32) -> Result<FontId>`**
+  a font from TrueType or OpenType bytes (face: the font of a collection, else 0)
+- **`fn has(&self, f: FontId) -> bool`**
+- **`fn len(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn metrics(&self, f: FontId) -> Option<FontMetrics>`**
+- **`fn glyph_of(&self, f: FontId, c: char) -> u32`**
+  the glyph for a character (0: the font lacks it)
+- **`fn shape(&mut self, f: FontId, g: u32) -> Option<&GlyphShape>`**
+  a glyph's contours in em units (y up) and what is known of them (cached)
+
+- **`fn layout_text(fonts: &mut Fonts, styles: &[TextStyle], t: &Text) -> Result<Layout>`**
+  a single line laid out (DXF TEXT)
+
+- **`fn layout_mtext(fonts: &mut Fonts, styles: &[TextStyle], t: &MText) -> Result<Layout>`**
+  text of several lines laid out (the basics of DXF MTEXT)
 
 ## gltf
 

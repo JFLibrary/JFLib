@@ -1,0 +1,4 @@
+#!args --test textdeep
+# text (G6c) at 1e7 against at the origin; at 1e-6 units per pixel near 1e7, 24 pans of 0.37 px: the ink's centroid within
+# 1/16 px of lib/gfx's; only a glyph's end, a bar's end, a turned text's corner in the target: culled = not culled; texts
+# added, edited, removed, a block's text changed: every frame as a scene built anew, and what went up

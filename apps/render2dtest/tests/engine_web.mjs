@@ -7,9 +7,10 @@
 //   python build_rs.py app render2dtest --target win
 //   python build_rs.py app render2dtest --target web
 //   node apps/render2dtest/tests/engine_web.mjs [build] [--modes=simd,threads,scalar] [--native=FILE] [--gpu=d3d12|vulkan|swiftshader] [--save=DIR]
-//   node apps/render2dtest/tests/engine_web.mjs --bench [--n=1000000] [--thin] [--plain | --g6a2b | --g6b1 | --estate [--inserts=K]] [--modes=simd]    the
+//   node apps/render2dtest/tests/engine_web.mjs --bench [--n=1000000] [--thin] [--plain | --g6a2b | --g6b1 | --g6b2 | --no-text | --estate [--inserts=K]] [--modes=simd]    the
 //        measuring scene (--plain: without arcs and dashes, the drawing of G6a2a; --g6a2b: with arcs and dashes, without fills, hatches and
-//        curves; --g6b1: with them, without blocks; --estate: a block of about n records inserted K times, 10 000)
+//        curves; --g6b1: with them, without blocks; --g6b2: with blocks, without text; --no-text: the drawing of G6c without its text;
+//        --estate: a block of about n records inserted K times, 10 000)
 import {createServer} from 'node:http';
 import {mkdtemp, readFile, rm, readdir, writeFile} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
@@ -96,6 +97,8 @@ try {
       if(benchRun&&args.includes('--g6a2b')) gpuenv+=',jfgui_GPU_PROBE_ARCS=1';
       if(benchRun&&args.includes('--g6b1')) gpuenv+=',jfgui_GPU_PROBE_FILLS=1';
       if(benchRun&&args.includes('--estate')) gpuenv+=',jfgui_GPU_PROBE_ESTATE=1';
+      if(benchRun&&args.includes('--g6b2')) gpuenv+=',jfgui_GPU_PROBE_BLOCKS=1';
+      if(benchRun&&args.includes('--no-text')) gpuenv+=',jfgui_GPU_PROBE_NOTEXT=1';
       if(benchRun&&option('inserts')) gpuenv+=`,jfgui_GPU_PROBE_INSERTS=${option('inserts')}`;
       await page.goto(`http://127.0.0.1:${server.address().port}/index.html?compute=${mode}&gpuenv=${gpuenv}`);
       const about=await page.evaluate(async()=>{try {const a=await navigator.gpu?.requestAdapter(); if(!a) return 'no adapter'; const i=a.info; return `${i.vendor} ${i.architecture} ${i.device} ${i.description} backend ${i.backendType} driver ${i.driver}`;} catch(e) {return String(e);}});
@@ -111,7 +114,7 @@ try {
         ran++;
         let good=end.startsWith('render2dtest: ')&&/ 0 failed/.test(end)&&!fail.length&&count>0&&compute===mode;
         console.log(`${good?'PASS':'FAIL'} chromium ${browser.version()} ${compute}: ${end} (${lines.find(l=>l.startsWith('adapter:'))||'no adapter line'})`);
-        for(const l of lines.filter(l=>/^ok .*(the drawing at|dash patterns at|1e-6 units|seed |culled|blend)/.test(l))) console.log(`  ${l}`);
+        for(const l of lines.filter(l=>/^ok .*(the drawing at|dash patterns at|1e-6 units|seed |culled|blend|atlas)/.test(l))) console.log(`  ${l}`);
         if(!benchRun&&!skipped) {
           let total=0;
           for(const level of ['voll','basis']) {

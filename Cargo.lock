@@ -1033,6 +1033,8 @@ name = "jflib-render2d"
 version = "0.2.0"
 dependencies = [
  "jflib-gpu",
+ "jflib-text",
+ "jflib-text-shape",
 ]
 
 [[package]]

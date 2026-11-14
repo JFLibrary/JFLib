@@ -33,7 +33,9 @@ use crate::gallery::Rng;
 pub const ORIGIN: [f64; 2] = [500_000.0, 5_400_000.0];
 
 /// the drawing of a G6 stage: G6a2a (lines only), G6a2b (arcs and dashes), G6b1 (fills, hatches, curves too), G6b2 (blocks;
-/// Expanded: the same drawing, every insert's entities as entities of their own: what instancing costs)
+/// Expanded: the same drawing, every insert's entities as entities of their own: what instancing costs), G6c (Text: real
+/// text instead of the labels' stroked characters: street names, parcel numbers, rooms, dimensions, a title block, a text in
+/// the lamps' block; NoText: the same drawing without the text, what text costs)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     Plain,
@@ -41,6 +43,36 @@ pub enum Mode {
     Fills,
     Blocks,
     Expanded,
+    Text,
+    NoText,
+    /// G6c's drawing with a text on the layers of the contours, the streets and the outer walls too: they take fs_text_all, the
+    /// pipeline of text among others (what that costs the lines and fills)
+    TextMixed,
+}
+
+impl Mode {
+    /// the drawing has G6b2's blocks
+    fn blocks(self) -> bool {
+        matches!(self, Mode::Blocks | Mode::Expanded | Mode::Text | Mode::NoText | Mode::TextMixed)
+    }
+
+    /// G6c's drawing (with its text or without)
+    fn text(self) -> bool {
+        matches!(self, Mode::Text | Mode::NoText | Mode::TextMixed)
+    }
+}
+
+/// the text of G6c's drawing: its layers (parcel numbers and rooms, dimensions, street names, the title block) and their
+/// styles, text styles in Inter and DejaVu Serif
+struct Texts {
+    labels: Pen,
+    dims: Pen,
+    streets: Pen,
+    title: Pen,
+    sans: render2d::TextStyleId,
+    serif: render2d::TextStyleId,
+    /// NoText: none of it is inserted
+    on: bool,
 }
 
 /// an entity of a block as the CPU keeps it (Mode::Expanded draws inserts as entities of their own)
@@ -79,6 +111,10 @@ pub struct Cad {
     pub insert_records: u32,
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     pub trees: Vec<(EntityId, Insert)>,
+    /// (Mode::Text) texts, their characters, their records (glyphs and bars; not in `segments`), texts in blocks (each once)
+    pub texts: u32,
+    pub chars: u32,
+    pub text_records: u32,
 }
 
 struct Pen {
@@ -109,6 +145,8 @@ struct Pens {
     g6b: Option<G6b>,
     /// (Mode::Blocks) the blocks and the lamps' layer
     blocks: Option<Blocks>,
+    /// (Mode::Text) the text's layers and styles
+    texts: Option<Texts>,
 }
 
 /// a block of the drawing, the records an insert of it draws in the overview, its entities (Part, style)
@@ -169,9 +207,32 @@ struct Sink<'a> {
     trees: Vec<(EntityId, Insert)>,
     /// (Mode::Expanded) the blocks' entities: each insert's as entities of their own
     expand: Option<Vec<Vec<(StyleId, Part)>>>,
+    texts: u32,
+    chars: u32,
+    text_records: u32,
 }
 
 impl Sink<'_> {
+    /// (G6c) a text on a layer (not counted against the records: the drawing's records stay those of G6b2, the text comes on
+    /// top); none in Mode::NoText
+    fn text(&mut self, t: &Texts, l: &Pen, s: &str, at: [f64; 2], h: f64, rot: f64, halign: render2d::HAlign, serif: bool) -> Result<()> {
+        if !t.on {
+            return Ok(());
+        }
+        let mut x = render2d::Text::new(s, if serif { t.serif } else { t.sans }, at);
+        x.height = Some(h);
+        x.rotation = rot;
+        x.halign = halign;
+        if halign != render2d::HAlign::Left {
+            x.valign = render2d::VAlign::Middle;
+        }
+        let id = self.s.insert(l.l, l.s, &Shape::Text(x))?;
+        self.texts += 1;
+        self.chars += s.chars().filter(|c| !c.is_whitespace()).count() as u32;
+        self.text_records += self.s.locate(id).map_or(0, |x| x.1);
+        Ok(())
+    }
+
     /// an insert of a block (its records counted as an insert draws them); dropped when they do not fit
     fn ins(&mut self, l: LayerId, st: StyleId, b: Blk, ins: Insert) -> Result<Option<EntityId>> {
         let n = b.records * ins.columns * ins.rows;
@@ -291,7 +352,7 @@ impl Sink<'_> {
 
 fn pens(s: &mut Scene, styled: bool, mode: Mode) -> Result<Pens> {
     let plain = mode == Mode::Plain;
-    let fills = mode == Mode::Fills || mode == Mode::Blocks || mode == Mode::Expanded;
+    let fills = mode == Mode::Fills || mode.blocks();
     let mut order = 0;
     // (a dash pattern: lengths, its unit, its phase; in the plain drawing none)
     let mut pen = |s: &mut Scene, color: u32, width: f32, unit: Unit, cap: Cap, join: Join, dash: (&[f32], Unit)| -> Result<Pen> {
@@ -341,6 +402,7 @@ fn pens(s: &mut Scene, styled: bool, mode: Mode) -> Result<Pens> {
         extra: None,
         g6b: None,
         blocks: None,
+        texts: None,
     };
     if !plain {
         p.extra = Some(Extra {
@@ -367,8 +429,11 @@ fn pens(s: &mut Scene, styled: bool, mode: Mode) -> Result<Pens> {
         s.set_layer(walls.l, &l)?;
         p.g6b = Some(G6b { building, walls, island, isle_edge });
     }
-    if mode == Mode::Blocks || mode == Mode::Expanded {
+    if mode.blocks() {
         p.blocks = Some(blocks(s, &p, styled, &mut order)?);
+    }
+    if mode.text() {
+        p.texts = Some(texts(s, &p, mode, &mut order)?);
     }
     Ok(p)
 }
@@ -435,6 +500,55 @@ fn blocks(s: &mut Scene, p: &Pens, styled: bool, order: &mut i32) -> Result<Bloc
     *order += 1;
     Ok(Blocks { door: b(0, 5), window: b(1, 3), stair: b(2, 11), table: b(3, 4), tree: b(4, 18), oval: b(5, 26), manhole: b(6, 26), column: b(7, 16), lamp: b(8, 20), glyphs, lamps, any: p.detail.s,
                 defs })
+}
+
+/// (G6c) the text's fonts, styles and layers (over everything else, in this order); the lamps' block gets its text "LP"
+fn texts(s: &mut Scene, p: &Pens, mode: Mode, order: &mut i32) -> Result<Texts> {
+    let sans_f = s.add_font(crate::gallery::SANS, 0)?;
+    let serif_f = s.add_font(crate::gallery::SERIF, 0)?;
+    let sans = s.add_text_style(&render2d::TextStyle::new(sans_f).with_fallbacks(&[serif_f]))?;
+    let serif = s.add_text_style(&render2d::TextStyle::new(serif_f).with_fallbacks(&[sans_f]))?;
+    let mut tl = |s: &mut Scene, color: u32| -> Result<Pen> {
+        let l = s.add_layer(&Layer::new(*order))?;
+        *order += 1;
+        Ok(Pen { l, s: s.add_style(&Style::new(color))?, dashed: false })
+    };
+    let t = Texts { labels: tl(s, 0xFF20_2020)?, dims: tl(s, 0xFF40_4080)?, streets: tl(s, 0xFF30_3030)?, title: tl(s, 0xFF10_1010)?, sans, serif, on: mode != Mode::NoText };
+    if mode == Mode::TextMixed {
+        // (a text on each of three layers of lines and walls: they draw with fs_text_all)
+        for (pen, at) in [(&p.contour, [ORIGIN[0] + 5.0, ORIGIN[1] + 5.0]), (&p.street, [ORIGIN[0] + 9.0, ORIGIN[1] + 5.0]), (&p.outer, [ORIGIN[0] + 13.0, ORIGIN[1] + 5.0])] {
+            let mut x = render2d::Text::new("x", sans, at);
+            x.height = Some(0.5);
+            s.insert(pen.l, pen.s, &Shape::Text(x))?;
+        }
+    }
+    if let (Some(b), true) = (&p.blocks, t.on) {
+        // (a text in a block: the lamps' "LP", 0.35 m, beside the lamp; drawn once per lamp)
+        let mut x = render2d::Text::new("LP", sans, [0.45, -0.75]);
+        x.height = Some(0.35);
+        s.insert_in(b.lamp.id, t.labels.s, &Shape::Text(x))?;
+    }
+    Ok(t)
+}
+
+const STREETS: [&str; 16] = ["Hauptstraße", "Lindenallee", "Am Mühlbach", "Schillerstraße", "Goethestraße", "Bahnhofstraße", "Kirchgasse", "Gartenweg", "Rosenstraße", "Ringstraße", "Brückenstraße",
+                             "Ahornweg", "Schulstraße", "Marktplatz", "Feldweg", "Kastanienallee"];
+const USES: [&str; 6] = ["Wohnhaus", "Garage", "Schuppen", "Büro", "Werkstatt", "Lager"];
+
+/// (G6c) a parcel's texts: its number at its lower left corner, its building's use and number in its middle, every other one
+/// its width along its lower side (a dimension's text)
+fn parcel_texts(k: &mut Sink, rng: &mut Rng, t: &Texts, x: f64, y: f64, w: f64, h: f64) -> Result<()> {
+    use alloc::format;
+    let n = format!("{}/{}", 100 + rng.below(3900), 1 + rng.below(9));
+    k.text(t, &t.labels, &n, [x + 1.0, y + 1.0], 0.9, 0.0, render2d::HAlign::Left, false)?;
+    let u = format!("{} {}", USES[rng.below(USES.len() as u32) as usize], 1 + rng.below(40));
+    k.text(t, &t.labels, &u, [x + 0.5 * w, y + 0.5 * h], 0.6, 0.0, render2d::HAlign::Middle, false)?;
+    if rng.below(2) == 0 {
+        let cm = (w * 100.0 + 0.5) as u32;
+        let d = format!("{},{:02}", cm / 100, cm % 100);
+        k.text(t, &t.dims, &d, [x + 0.5 * w, y + 0.45], 0.35, 0.0, render2d::HAlign::Center, false)?;
+    }
+    Ok(())
 }
 
 /// f with the shape of a block's entity
@@ -645,6 +759,9 @@ fn block(k: &mut Sink, rng: &mut Rng, p: &Pens, x0: f64, y0: f64, w: f64, h: f64
                 k.poly(&p.parcel, &rect(px, py, pw, 0.5 * ih), true)?;
             }
             parcel(k, rng, p, px, py, pw, 0.5 * ih)?;
+            if let Some(t) = &p.texts {
+                parcel_texts(k, rng, t, px, py, pw, 0.5 * ih)?;
+            }
         }
     }
     // trees: a crown (plain: twelve-sided; else a circle) and its cross, along the pavement
@@ -685,6 +802,10 @@ fn block(k: &mut Sink, rng: &mut Rng, p: &Pens, x0: f64, y0: f64, w: f64, h: f64
     for _ in 0..6 + rng.below(5) {
         let (mut lx, ly) = (rng.range(x0 + 4.0, x0 + w - 12.0), rng.range(y0 + 4.0, y0 + h - 4.0));
         for _ in 0..4 + rng.below(5) {
+            if p.texts.is_some() {
+                // (G6c: real text instead, per parcel)
+                break;
+            }
             if let Some(b) = &p.blocks {
                 // (a character: one of the twenty glyphs)
                 let g = b.glyphs[rng.below(b.glyphs.len() as u32) as usize];
@@ -726,14 +847,14 @@ pub fn build(s: &mut Scene, n: u32, seed: u32, styled: bool, mode: Mode) -> Resu
     let rows = blocks.div_ceil(cols);
     let (width, height) = (cols as f64 * pitch_x + 20.0, rows as f64 * pitch_y + 20.0);
     // (fills and curves are flattened for the camera they come with: the overview's at full HD)
-    if mode == Mode::Fills || mode == Mode::Blocks || mode == Mode::Expanded {
+    if mode == Mode::Fills || mode.blocks() {
         s.set_camera(&views(&Cad { segments: n, entities: 0, fills: 0, hatched: 0, fill_records: 0, curves: 0, curve_records: 0, arcs: 0, arc_records: 0, dashed: 0, dashed_records: 0, width, height,
-                                   blocks: 0, inserts: 0, insert_records: 0, trees: Vec::new() },
+                                   blocks: 0, inserts: 0, insert_records: 0, trees: Vec::new(), texts: 0, chars: 0, text_records: 0 },
                             (1920, 1080))[0].cam)?;
     }
     let expand = if mode == Mode::Expanded { p.blocks.as_ref().map(|b| b.defs.clone()) } else { None };
     let mut k = Sink { s, left: n, ents: 0, arcs: 0, arc_records: 0, dashed: 0, dashed_records: 0, fills: 0, hatched: 0, fill_records: 0, curves: 0, curve_records: 0, inserts: 0, insert_records: 0,
-                       trees: Vec::new(), expand };
+                       trees: Vec::new(), expand, texts: 0, chars: 0, text_records: 0 };
     let at = |x: f64, y: f64| [ORIGIN[0] + x, ORIGIN[1] + y];
     // streets: both edges and the centre line of each, long polylines with a point per block
     let road = 12.0;
@@ -754,6 +875,21 @@ pub fn build(s: &mut Scene, n: u32, seed: u32, styled: bool, mode: Mode) -> Resu
         for (dy, pen) in [(0.0, &p.street), (0.5 * road, &p.centre), (road, &p.street)] {
             let pts: Vec<[f64; 2]> = (0..=cols).map(|c| at(10.0 + c as f64 * pitch_x, y + dy + rng.range(-0.2, 0.2))).collect();
             k.poly(pen, &pts, false)?;
+        }
+    }
+    // (G6c) street names along the streets' axes between every two crossings, the vertical ones turned by a quarter
+    if let Some(t) = &p.texts {
+        for c in 0..=cols {
+            let name = STREETS[(c as usize * 5) % STREETS.len()];
+            for r in 0..rows {
+                k.text(t, &t.streets, name, at(10.0 + c as f64 * pitch_x - 1.5, 10.0 + (r as f64 + 0.5) * pitch_y), 2.5, core::f64::consts::FRAC_PI_2, render2d::HAlign::Center, false)?;
+            }
+        }
+        for r in 0..=rows {
+            let name = STREETS[(r as usize * 3 + 7) % STREETS.len()];
+            for c in 0..cols {
+                k.text(t, &t.streets, name, at(10.0 + (c as f64 + 0.5) * pitch_x, 10.0 + r as f64 * pitch_y + 1.5), 2.5, 0.0, render2d::HAlign::Center, false)?;
+            }
         }
     }
     // islands at the crossings (G6b1): an ellipse, filled and outlined
@@ -807,6 +943,19 @@ pub fn build(s: &mut Scene, n: u32, seed: u32, styled: bool, mode: Mode) -> Resu
             block(&mut k, &mut rng, &p, ORIGIN[0] + x0, ORIGIN[1] + y0, pitch_x - road - 8.0, pitch_y - road - 8.0)?;
         }
     }
+    // (G6c) a title block at the lower right: a frame, an MTEXT and single lines in the serif face
+    if let (Some(t), true) = (&p.texts, p.texts.as_ref().is_some_and(|t| t.on)) {
+        let (x0, y0) = (width - 190.0, 2.0);
+        let mut m = render2d::MText::new("Bebauungsplan Nr. 47 \"Am Mühlbach\"\nGemarkung Neustadt, Flur 12\nMaßstab 1:1000\nStand: 14.11.2026, Entwurf", t.serif, at(x0 + 4.0, y0 + 46.0));
+        m.height = Some(4.0);
+        m.line_spacing = 1.2;
+        k.s.insert(t.title.l, t.title.s, &Shape::MText(m))?;
+        k.texts += 1;
+        k.chars += 110;
+        for (j, line) in ["Planverfasser: Ingenieurbüro für Stadtplanung", "Gezeichnet: J. F.   Geprüft: A. B.", "Blatt 1 von 3   Index c   Format A0"].iter().enumerate() {
+            k.text(t, &t.title, line, at(x0 + 4.0, y0 + 14.0 - 4.0 * j as f64), 1.6, 0.0, render2d::HAlign::Left, true)?;
+        }
+    }
     // whatever is left: contour lines over the whole of it, a point every few metres
     let mut pts = Vec::new();
     let mut y = 0.0;
@@ -822,7 +971,8 @@ pub fn build(s: &mut Scene, n: u32, seed: u32, styled: bool, mode: Mode) -> Resu
     }
     let blocks = p.blocks.as_ref().map_or(0, |b| 9 + b.glyphs.len() as u32);
     Ok(Cad { segments: n, entities: k.ents, fills: k.fills, hatched: k.hatched, fill_records: k.fill_records, curves: k.curves, curve_records: k.curve_records, arcs: k.arcs, arc_records: k.arc_records,
-             dashed: k.dashed, dashed_records: k.dashed_records, width, height, blocks, inserts: k.inserts, insert_records: k.insert_records, trees: k.trees })
+             dashed: k.dashed, dashed_records: k.dashed_records, width, height, blocks, inserts: k.inserts, insert_records: k.insert_records, trees: k.trees, texts: k.texts, chars: k.chars,
+             text_records: k.text_records })
 }
 
 /// a housing estate: one block of about 1000 records (a house: its outline, walls, doors swinging in arcs, windows,
@@ -905,7 +1055,7 @@ pub fn estate(s: &mut Scene, inserts: u32, styled: bool) -> Result<Cad> {
     }
     let (width, height) = (side as f64 * 25.0 + 20.0, side as f64 * 20.0 + 20.0);
     Ok(Cad { segments: records * inserts, entities: inserts, fills: 0, hatched: 0, fill_records: 0, curves: 0, curve_records: 0, arcs: 0, arc_records: 0, dashed: 0, dashed_records: 0, width, height,
-             blocks: 1, inserts, insert_records: records * inserts, trees })
+             blocks: 1, inserts, insert_records: records * inserts, trees, texts: 0, chars: 0, text_records: 0 })
 }
 
 /// a named view of the drawing in a target of `size`

@@ -31,10 +31,13 @@ use gpu::*;
 
 use alloc::boxed::Box;
 
+use crate::atlas::{self, Atlas, GLYPH_WORDS};
 use crate::block::{self, Fam, Xf};
 use crate::curve::{self, Curve, Flat};
 use crate::fill;
 use crate::math::{sincos, split, sqrt};
+use crate::msdf::Seg;
+use crate::text::{self, Fonts, MText, Text, TextStyle, TextStyleId};
 use crate::{Renderer, Tag, CHANGE_WORDS, DRAW_BYTES, ENTRY_BYTES, HATCH_BYTES, HATCH_WORDS, INST_BYTES, INST_WORDS, LAYERS_MAX, PAGE, RECORD_BYTES, RECORD_WORDS, SPACE_BYTES, STAMPS, STYLE_BYTES,
             STYLE_WORDS, VIEW_BYTES};
 
@@ -94,15 +97,15 @@ impl Camera {
 
     /// common.wgsl's View for a target of `size`: the centre as hi + lo and what that leaves of it, the scale, the
     /// rotation, the size; the rotation's map to pixels (cos, -sin, sin, cos: to_px with it is bit for bit what it was
-    /// with the rotation alone, G6b2)
-    fn words(&self, size: (u32, u32), all: bool) -> [f32; 20] {
+    /// with the rotation alone, G6b2); misc.z (G6c) the scale over the one text last decided its mode and class by
+    fn words(&self, size: (u32, u32), all: bool, text: f32) -> [f32; 20] {
         let (hx, lx) = split(self.center[0]);
         let (hy, ly) = split(self.center[1]);
         let rx = ((self.center[0] - hx as f64) - lx as f64) as f32;
         let ry = ((self.center[1] - hy as f64) - ly as f64) as f32;
         let (s, c) = sincos(self.rotation);
         let (s, c) = (s as f32, c as f32);
-        [hx, hy, lx, ly, rx, ry, (1.0 / self.scale) as f32, self.scale as f32, c, s, size.0 as f32, size.1 as f32, all as u32 as f32, 0.0, 0.0, 0.0, c, -s, s, c]
+        [hx, hy, lx, ly, rx, ry, (1.0 / self.scale) as f32, self.scale as f32, c, s, size.0 as f32, size.1 as f32, all as u32 as f32, 0.0, text, 0.0, c, -s, s, c]
     }
 }
 
@@ -652,6 +655,11 @@ pub enum Shape<'a> {
     /// a block (G6b2): on a layer in its place in the order, or inside another block; its entities in their order, each with
     /// its style or by block the insert's (docs/RENDER2D.md "Blöcke")
     Insert(Insert),
+    /// a single line of text (G6c; DXF's TEXT): its glyphs from the scene's atlas of distance fields, small as bars, very
+    /// large as fills of their outlines; the style's colour (docs/RENDER2D.md "Text")
+    Text(Text<'a>),
+    /// text of several lines (G6c; the basics of DXF's MTEXT)
+    MText(MText<'a>),
 }
 
 /// the largest angle of one piece of an arc (a record): a full circle is 16 of them.  Its quad covers the piece's ring
@@ -700,6 +708,46 @@ enum Geom {
     Fill(Box<FillG>),
     /// an insert of a block (G6b2): on a layer one record of zeros (its place in the order), in a block none
     Insert(Insert),
+    /// a text (G6c): its layout and records
+    Text(Box<TextG>),
+}
+
+/// what a text was made from (Scene::set_text_style lays it out again)
+#[derive(Clone, Debug)]
+enum TextSrc {
+    Single(alloc::string::String, Text<'static>),
+    Multi(alloc::string::String, MText<'static>),
+}
+
+/// a glyph's record of a text: its row of the glyph table, its pen (em from the text's origin), its cell's right end, its quad
+/// box from its pen (f16 pairs: x0 y0, x1 y1), flags (G_MARK) | its neighbours' distances (textc.wgsl)
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct GRec {
+    row: u32,
+    pen: [f32; 2],
+    cell_r: f32,
+    quad: [u32; 2],
+    flags: u32,
+}
+
+/// a text laid out (G6c): its layout, its glyphs' and bars' records, its box in the drawing; very large (FILL_FROM), its
+/// glyphs' outlines as a fill
+#[derive(Clone)]
+pub(crate) struct TextG {
+    src: TextSrc,
+    lay: text::Layout,
+    glyphs: Vec<GRec>,
+    /// x0, x1, y0, y1 (em from the origin), the ink's share
+    bars: Vec<[f32; 5]>,
+    /// its ink's box in the drawing (a style in pixels: its origin)
+    bounds: [f64; 4],
+    /// pixels per em along its height and the map's larger stretch, per drawing unit of the camera's scale (a style in
+    /// pixels: per pixel)
+    em_h: f64,
+    stretch: f64,
+    /// its glyphs have tiles of class L
+    large: bool,
+    fill: Option<FillG>,
 }
 
 /// how a curve or fill was last flattened: its zoom band, the tolerance's coarsening (times 4 each), the window (None:
@@ -841,13 +889,29 @@ struct Ent {
     dirty: bool,
     /// which pipeline its layer needs (CLASS_*: an arc or a dashed style the second, a fill the third: lib.rs)
     class: u8,
+    /// (G6c) its records: TX_NONE no text, TX_ONLY text alone, TX_MIXED text and others (an insert's blocks)
+    tx: u8,
     geom: Geom,
 }
 
-/// the pipelines a layer can take: solid segments only, arcs or dash patterns too, fills too (lib.rs)
+/// the pipelines a layer can take: solid segments only, arcs or dash patterns too, fills too (lib.rs); text alone, text among
+/// others (G6c)
 pub(crate) const CLASS_PLAIN: u8 = 0;
 pub(crate) const CLASS_FULL: u8 = 1;
 pub(crate) const CLASS_FILL: u8 = 2;
+pub(crate) const CLASS_TEXT: u8 = 3;
+pub(crate) const CLASS_TEXT_ALL: u8 = 4;
+const TX_NONE: u8 = 0;
+const TX_ONLY: u8 = 1;
+const TX_MIXED: u8 = 2;
+
+/// (G6c) text from this many pixels per em on is drawn as fills of its outlines (the edge error of the atlas's class L grows
+/// with the size: docs/RENDER2D.md "Entscheidungen in G6c"); textc.wgsl's T_BAR and text.wgsl's T_SL below it
+pub const TEXT_FILL_FROM: f64 = 160.0;
+/// (G6c) text.wgsl's T_SL: from this many pixels per em (the map's larger stretch) the glyphs come from class L
+pub const TEXT_LARGE_FROM: f64 = 40.0;
+/// (G6c) textc.wgsl's T_BAR: below this many pixels per em a text is drawn as bars
+pub const TEXT_BAR_BELOW: f64 = 7.0;
 
 /// a place of the layer region nobody holds
 const NONE: u32 = u32::MAX;
@@ -873,6 +937,11 @@ struct LayerSlot {
     /// its live entities of CLASS_FULL and of CLASS_FILL: more than none, the layer takes fs_full or fs_fill
     full: u32,
     fills: u32,
+    /// (G6c) its live entities with text records, those with nothing else, all of them: text and nothing else takes
+    /// fs_text, text among others fs_text_all
+    texts: u32,
+    pure: u32,
+    ents: u32,
     /// AutoCAD's transparency of its entities by layer (percent; the layer table carries it, G6b2)
     transparency: u32,
     /// its live inserts of blocks; their entries of the visibility as last made, and for which layout, size and instances
@@ -907,6 +976,8 @@ struct BlockSlot {
     /// the pipeline its entities need (CLASS_*), more where one takes its dash pattern by block
     class: u8,
     bb_dash: bool,
+    /// (G6c) its entities' text records (TX_*)
+    tx: u8,
     variants: Vec<Variant>,
 }
 
@@ -958,6 +1029,8 @@ pub(crate) struct Groups {
     pub write: BindGroup,
     pub inst: BindGroup,
     pub draw: BindGroup,
+    /// (G6c) the text pipelines' (none while the scene has no atlas)
+    pub text: Option<BindGroup>,
 }
 
 /// a frame in flight's own data
@@ -971,6 +1044,9 @@ pub(crate) struct FrameSlot {
     insts: Option<Buffer>,
     pub readback: Option<Buffer>,
     last: Option<(SubmitId, u64)>,
+    /// (G6c) the atlas's tiles and the glyph table's rows of this frame
+    atlas: Option<Buffer>,
+    gtab: Option<Buffer>,
 }
 
 /// what the last prepare left for Renderer::record
@@ -989,6 +1065,9 @@ pub(crate) struct Uploads {
     pub insts: Option<(Buffer, Vec<(u64, u64, u64)>)>,
     /// rows in the frame slot's change buffer
     pub scatter: u32,
+    /// (G6c) the glyph table's rows (source, destination offset, bytes), the atlas's tiles
+    pub gtab: Option<(Buffer, u64, u64)>,
+    pub atlas: Option<AtlasUp>,
 }
 
 fn storage(dev: &Device, size: u64, more: BufferUsage) -> Result<Buffer> {
@@ -1136,6 +1215,92 @@ pub struct Scene {
     /// bumped whenever the pool's layout or the instances change (a layer's cached entries are made again)
     layout_gen: u64,
     inst_info: InstanceInfo,
+    // ---- text (G6c; docs/RENDER2D.md "Text")
+    fonts: Fonts,
+    text_styles: Vec<TextStyle>,
+    atlas: Atlas,
+    /// the scale text last decided its mode (glyphs or bars) and its class by: it moves when the scale leaves HYST around it
+    text_scale: f64,
+    /// the texts on layers (prepare looks at them: class L, fills; dead or reused slots are dropped)
+    texts: Vec<TextRef>,
+    texts_dirty: bool,
+    /// the texts' largest em along their height and largest stretch (units per em)
+    text_max: (f64, f64),
+    /// texts drawn as fills, texts that changed between glyphs and fills in the last prepare
+    text_fills: u32,
+    text_switched: u32,
+    pub(crate) gtab_buf: Buffer,
+    gtab_cap: u32,
+    pub(crate) atlas_tex: Option<Texture>,
+    atlas_view: Option<TextureView>,
+    atlas_layers: u32,
+    /// every page and every row of the glyph table go up with the next prepare (a new texture, a resend)
+    atlas_all: bool,
+    /// the texture is new: no frame that took it from nothing has reached the GPU yet
+    atlas_fresh: bool,
+    /// every row of the glyph table goes up with the next prepare (a new table, a resend)
+    gtab_all: bool,
+}
+
+/// (G6c) a text on a layer as prepare looks at it (Scene::retext): its slot, pixels per em along its height and the map's
+/// larger stretch per unit of the scale, in pixels, its glyphs in class L, drawn as a fill
+#[derive(Clone, Copy, Debug)]
+struct TextRef {
+    slot: u32,
+    em_h: f64,
+    stretch: f64,
+    px: bool,
+    large: bool,
+    fill: bool,
+}
+
+impl TextRef {
+    fn of(slot: u32) -> TextRef {
+        TextRef { slot, em_h: 0.0, stretch: 0.0, px: true, large: false, fill: false }
+    }
+}
+
+/// what a scene's text holds (Scene::text_info).  It may grow
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TextInfo {
+    pub fonts: u32,
+    /// the glyph table's rows, their tiles of class S and L, the atlas's pages (PAGE x PAGE texels, 4 bytes each) and the
+    /// texture's layers
+    pub glyphs: u32,
+    pub tiles_s: u32,
+    pub tiles_l: u32,
+    pub pages: u32,
+    pub layers: u32,
+    /// tiles made so far; glyphs that found no page (the device's most layers)
+    pub made: u32,
+    pub failed: u32,
+    /// texts drawn as fills now; texts that changed between glyphs and fills in the last prepare
+    pub fills: u32,
+    pub switched: u32,
+    /// what the last prepare sent of the atlas (bytes) and of the glyph table (rows)
+    pub sent_bytes: u64,
+    pub sent_rows: u32,
+    /// the scale text decides its mode and class by (Camera::scale's units)
+    pub decided_scale: f64,
+}
+
+/// a copy of the atlas's tiles from the frame's upload buffer (Renderer::record)
+pub(crate) struct TexCopy {
+    pub offset: u64,
+    pub row: u32,
+    pub page: u32,
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
+/// what goes up of the atlas this frame; fresh: a new texture (from nothing)
+pub(crate) struct AtlasUp {
+    pub buf: Buffer,
+    pub copies: Vec<TexCopy>,
+    pub fresh: bool,
 }
 
 impl Scene {
@@ -1145,7 +1310,8 @@ impl Scene {
         let (entries_cap, layers_cap) = (64u32, 16u32);
         let mut frames = Vec::new();
         for _ in 0..r.desc.frames_in_flight {
-            frames.push(FrameSlot { stage: upload(&dev, VIEW_BYTES)?, changes: None, styles: None, hatch: None, scatter_group: None, runs: None, insts: None, readback: None, last: None });
+            frames.push(FrameSlot { stage: upload(&dev, VIEW_BYTES)?, changes: None, styles: None, hatch: None, scatter_group: None, runs: None, insts: None, readback: None, last: None, atlas: None,
+                                    gtab: None });
         }
         Ok(Scene {
             tag: r.tag.clone(),
@@ -1237,6 +1403,23 @@ impl Scene {
             epx_blocks: 0,
             layout_gen: 0,
             inst_info: InstanceInfo::default(),
+            fonts: Fonts::new(),
+            text_styles: Vec::new(),
+            atlas: Atlas::new(r.dev.limits().max_texture_layers.max(1)),
+            text_scale: 0.0,
+            texts: Vec::new(),
+            texts_dirty: false,
+            text_max: (0.0, 0.0),
+            text_fills: 0,
+            text_switched: 0,
+            gtab_buf: storage(&dev, GLYPH_WORDS as u64 * 4, none)?,
+            gtab_cap: 1,
+            atlas_tex: None,
+            atlas_view: None,
+            atlas_layers: 0,
+            atlas_all: true,
+            atlas_fresh: false,
+            gtab_all: true,
             dev,
         })
     }
@@ -1322,7 +1505,7 @@ impl Scene {
         if l.transparency > TRANSPARENCY_MAX {
             return Err(GpuError::Invalid("Layer: a transparency of at most TRANSPARENCY_MAX percent"));
         }
-        let fresh = LayerSlot { live: true, era: 0, visible: l.visible, order: l.order, seq, base: 0, cap: 0, used: 0, holes: 0, owners: Vec::new(), repack: false, repacked: false, full: 0, fills: 0,
+        let fresh = LayerSlot { live: true, era: 0, visible: l.visible, order: l.order, seq, base: 0, cap: 0, used: 0, holes: 0, owners: Vec::new(), repack: false, repacked: false, full: 0, fills: 0, texts: 0, pure: 0, ents: 0,
                                 transparency: l.transparency, inserts: 0, cache: Vec::new(), cache_key: (0, 0, u64::MAX) };
         let slot = match self.free_layers.pop() {
             Some(s) => {
@@ -1374,6 +1557,7 @@ impl Scene {
     pub fn remove_layer(&mut self, id: LayerId) -> Result<()> {
         let i = self.layer_index(id)?;
         self.touch();
+        self.texts_dirty = true;
         let owners = core::mem::take(&mut self.layers[i].owners);
         let mut last = NONE;
         for o in owners {
@@ -1405,6 +1589,311 @@ impl Scene {
     /// the visible layers in the order the last prepare drew them (the lists' order: lists_buffer)
     pub fn drawn_layers(&self) -> Vec<LayerId> {
         self.drawn.iter().map(|&s| LayerId { slot: s, era: self.layers[s as usize].era }).collect()
+    }
+
+    // ------------------------------------------------------------ text (G6c)
+
+    /// a font from TrueType or OpenType bytes (face: a collection's font, else 0), lib/text's parser
+    pub fn add_font(&mut self, data: &[u8], face: u32) -> Result<text::FontId> {
+        self.fonts.add(data, face)
+    }
+
+    /// the scene's fonts: their metrics and glyph outlines, and what lays text out with them (text::layout_text,
+    /// layout_mtext: the CPU path of G6e draws the same layout)
+    pub fn fonts(&mut self) -> &mut Fonts {
+        &mut self.fonts
+    }
+
+    /// a text style (DXF's STYLE) for texts
+    pub fn add_text_style(&mut self, s: &TextStyle) -> Result<TextStyleId> {
+        s.check(&self.fonts)?;
+        self.text_styles.push(*s);
+        Ok(TextStyleId(self.text_styles.len() as u32 - 1))
+    }
+
+    /// a text style changes: every text of it is laid out again (its records go up, a block's once for all its inserts)
+    pub fn set_text_style(&mut self, id: TextStyleId, s: &TextStyle) -> Result<()> {
+        s.check(&self.fonts)?;
+        let Some(d) = self.text_styles.get_mut(id.0 as usize) else { return Err(GpuError::Invalid("Scene: a text style it does not have")) };
+        *d = *s;
+        self.touch();
+        self.texts_dirty = true;
+        for i in 0..self.ents.len() {
+            let src = match &self.ents[i].geom {
+                Geom::Text(t) if self.ents[i].live && src_style(&t.src) == id => t.src.clone(),
+                _ => continue,
+            };
+            let blk = self.ents[i].block != NONE;
+            let geom = self.text_from(src, blk)?;
+            if blk {
+                self.block_regeom(i, geom);
+            } else {
+                self.regeom(i, geom);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn text_style(&self, id: TextStyleId) -> Option<TextStyle> {
+        self.text_styles.get(id.0 as usize).copied()
+    }
+
+    /// a text's layout (G6d picks with its extent: TextLayout::quad, bounds; G6e draws it): None for any other entity
+    pub fn text_layout(&self, id: EntityId) -> Option<&text::Layout> {
+        let i = self.get(id).ok()?;
+        match &self.ents[i].geom {
+            Geom::Text(t) => Some(&t.lay),
+            _ => None,
+        }
+    }
+
+    /// what the scene's text holds (TextInfo)
+    pub fn text_info(&self) -> TextInfo {
+        let rows = &self.atlas.rows;
+        TextInfo {
+            fonts: self.fonts.len() as u32,
+            glyphs: rows.len() as u32,
+            tiles_s: rows.iter().filter(|r| r.tiles[0].is_some()).count() as u32,
+            tiles_l: rows.iter().filter(|r| r.tiles[1].is_some()).count() as u32,
+            pages: self.atlas.pages(),
+            layers: self.atlas_layers,
+            made: self.atlas.made,
+            failed: self.atlas.failed,
+            fills: self.text_fills,
+            switched: self.text_switched,
+            sent_bytes: self.atlas.sent_bytes,
+            sent_rows: self.atlas.sent_rows,
+            decided_scale: self.text_scale,
+        }
+    }
+
+    /// (tests) FNV-1a of the atlas's pages: the same bytes on every target for the same texts
+    pub fn atlas_hash(&self) -> u64 {
+        self.atlas.hash()
+    }
+
+    /// a text shape's geometry (None: not text); blk: in a block (its glyphs get class L at once: an insert may draw them large)
+    fn text_geom(&mut self, s: &Shape, blk: bool) -> Result<Option<Geom>> {
+        let src = match s {
+            Shape::Text(t) => TextSrc::Single(t.text.into(), owned_text(t)),
+            Shape::MText(t) => TextSrc::Multi(t.text.into(), owned_mtext(t)),
+            _ => return Ok(None),
+        };
+        Ok(Some(self.text_from(src, blk)?))
+    }
+
+    fn text_from(&mut self, src: TextSrc, blk: bool) -> Result<Geom> {
+        let lay = match &src {
+            TextSrc::Single(s, t) => text::layout_text(&mut self.fonts, &self.text_styles, &Text { text: s, ..*t })?,
+            TextSrc::Multi(s, t) => text::layout_mtext(&mut self.fonts, &self.text_styles, &MText { text: s, ..*t })?,
+        };
+        let m = lay.m;
+        let em_h = sqrt(m[1] * m[1] + m[3] * m[3]);
+        let s2 = m[0] * m[0] + m[1] * m[1] + m[2] * m[2] + m[3] * m[3];
+        let det = m[0] * m[3] - m[1] * m[2];
+        let stretch = sqrt(0.5 * (s2 + sqrt((s2 * s2 - 4.0 * det * det).max(0.0))));
+        let mut glyphs: Vec<GRec> = Vec::new();
+        for line in &lay.lines {
+            // the line's glyphs with ink: row, pen and ink box (em from the text's origin), a mark
+            let mut ink: Vec<(u32, [f64; 2], [f64; 4], bool)> = Vec::new();
+            for gi in line.glyphs.start..line.glyphs.end {
+                let pg = lay.glyphs[gi as usize];
+                if pg.blank {
+                    continue;
+                }
+                let Some(sh) = self.fonts.shape(pg.font, pg.glyph) else { continue };
+                let Some(bb) = sh.bbox else { continue };
+                let row = self.atlas.row(pg.font, pg.glyph, Some(bb));
+                self.atlas.ensure(row, 0, &sh.contours);
+                let pen = [line.origin[0] + pg.pen[0], line.origin[1] + pg.pen[1]];
+                ink.push((row, pen, [pen[0] + bb[0], pen[1] + bb[1], pen[0] + bb[2], pen[1] + bb[3]], pg.mark));
+            }
+            let first = glyphs.len();
+            let chain: Vec<usize> = (0..ink.len()).filter(|&k| !ink[k].3).collect();
+            for (k, &(row, pen, bb, mark)) in ink.iter().enumerate() {
+                let mut flags = 0u32;
+                let mut cell_r = 0.0f32;
+                let mut q = bb;
+                if mark {
+                    flags |= G_MARK;
+                } else {
+                    let c = chain.iter().position(|&x| x == k).unwrap_or(0);
+                    let cl = pen[0];
+                    if c > 0 {
+                        let p = chain[c - 1];
+                        if k - p <= 255 {
+                            flags |= ((k - p) as u32) << 16;
+                            // (its previous neighbour's ink in its cell)
+                            let pb = ink[p].2;
+                            if pb[2] > cl {
+                                q = [q[0].min(pb[0].max(cl)), q[1].min(pb[1]), q[2].max(pb[2]), q[3].max(pb[3])];
+                            }
+                        }
+                    }
+                    if c + 1 < chain.len() {
+                        let n = chain[c + 1];
+                        if n - k <= 255 {
+                            flags |= ((n - k) as u32) << 24;
+                            let cr = ink[n].1[0];
+                            cell_r = cr as f32;
+                            let nb = ink[n].2;
+                            if nb[0] < cr {
+                                q = [q[0].min(nb[0]), q[1].min(nb[1]), q[2].max(nb[2].min(cr)), q[3].max(nb[3])];
+                            }
+                        }
+                    }
+                }
+                let rel = [(q[0] - pen[0]) as f32, (q[1] - pen[1]) as f32, (q[2] - pen[0]) as f32, (q[3] - pen[1]) as f32];
+                let quad = [f16_of(rel[0], false) as u32 | (f16_of(rel[1], false) as u32) << 16, f16_of(rel[2], true) as u32 | (f16_of(rel[3], true) as u32) << 16];
+                glyphs.push(GRec { row, pen: [pen[0] as f32, pen[1] as f32], cell_r, quad, flags });
+            }
+            let _ = first;
+        }
+        let mut bars = Vec::with_capacity(lay.bars.len());
+        for line in &lay.lines {
+            for b in &lay.bars[line.bars.start as usize..line.bars.end as usize] {
+                let (ox, oy) = (line.origin[0], line.origin[1]);
+                bars.push([(b.x0 + ox) as f32, (b.x1 + ox) as f32, (b.y0 + oy) as f32, (b.y1 + oy) as f32, b.ink as f32]);
+            }
+        }
+        let bounds = if lay.px { [lay.origin[0], lay.origin[1], lay.origin[0], lay.origin[1]] } else { lay.bounds() };
+        let mut t = TextG { src, lay, glyphs, bars, bounds, em_h, stretch, large: false, fill: None };
+        // (in a block, or in pixels: class L when it may be drawn that large, at once)
+        if blk || (t.lay.px && t.stretch >= TEXT_LARGE_FROM / 1.02) {
+            self.text_large(&mut t);
+        }
+        Ok(Geom::Text(Box::new(t)))
+    }
+
+    /// a text's glyphs get tiles of class L (a page each where there is one)
+    fn text_large(&mut self, t: &mut TextG) {
+        for g in &t.glyphs {
+            let (font, glyph) = (self.atlas.rows[g.row as usize].font, self.atlas.rows[g.row as usize].glyph);
+            if let Some(sh) = self.fonts.shape(font, glyph) {
+                self.atlas.ensure(g.row, 1, &sh.contours);
+            }
+        }
+        t.large = true;
+    }
+
+    /// a text's glyphs' outlines in the drawing as the rings of a fill (each contour one), flattened for this camera
+    fn text_fill(&mut self, t: &TextG, ctx: &FlatCtx) -> FillG {
+        let lay = &t.lay;
+        let mut rings = Vec::new();
+        for line in &lay.lines {
+            for gi in line.glyphs.start..line.glyphs.end {
+                let pg = lay.glyphs[gi as usize];
+                if pg.blank {
+                    continue;
+                }
+                let Some(sh) = self.fonts.shape(pg.font, pg.glyph) else { continue };
+                let o = [line.origin[0] + pg.pen[0], line.origin[1] + pg.pen[1]];
+                let at = |p: [f64; 2]| lay.to_drawing([o[0] + p[0], o[1] + p[1]]);
+                for c in &sh.contours {
+                    let mut ring: Option<Curve> = None;
+                    for s in c {
+                        let piece = match *s {
+                            Seg::Line(a, b) => Curve::polyline(&[at(a), at(b)], false),
+                            Seg::Quad(a, b, cc) => Curve::bezier(&[at(a), at(b), at(cc)], 2, false),
+                            Seg::Cubic(a, b, cc, d) => Curve::bezier(&[at(a), at(b), at(cc), at(d)], 3, false),
+                        };
+                        match &mut ring {
+                            Some(r) => r.append(&piece),
+                            None => ring = Some(piece),
+                        }
+                    }
+                    if let Some(r) = ring {
+                        rings.push(r.ring());
+                    }
+                }
+            }
+        }
+        let (prep, st) = flatten_fill(&rings, ctx);
+        let bounds = bounds_of(rings.iter());
+        FillG { rings, prep, st, bounds }
+    }
+
+    /// texts near the view (G6c): class L where their glyphs are drawn that large, fills where larger still (TEXT_FILL_FROM)
+    /// and back, a fill's flattening when the zoom band or the window no longer holds it (as curves)
+    fn retext(&mut self) {
+        self.text_switched = 0;
+        if self.texts.is_empty() {
+            return;
+        }
+        if self.texts_dirty {
+            // (a slot can come twice, dead ones and others go; what decides lies beside the list, so that a frame looks at
+            // the texts it may change only)
+            self.texts.sort_unstable_by_key(|t| t.slot);
+            self.texts.dedup_by_key(|t| t.slot);
+            let ents = &self.ents;
+            self.texts.retain_mut(|r| {
+                let e = &ents[r.slot as usize];
+                match &e.geom {
+                    Geom::Text(t) if e.live && e.block == NONE => {
+                        *r = TextRef { slot: r.slot, em_h: t.em_h, stretch: t.stretch, px: t.lay.px, large: t.large, fill: t.fill.is_some() };
+                        true
+                    }
+                    _ => false,
+                }
+            });
+            self.text_max = self.texts.iter().filter(|r| !r.px).fold((0.0f64, 0.0f64), |a, r| (a.0.max(r.em_h), a.1.max(r.stretch)));
+            self.texts_dirty = false;
+        }
+        let dec = self.text_scale;
+        // (no text large enough for class L or a fill, and none drawn as one: nothing to look at)
+        let (em_max, stretch_max) = self.text_max;
+        if self.text_fills == 0 && em_max / dec < TEXT_FILL_FROM && stretch_max / dec < TEXT_LARGE_FROM / 1.02 {
+            return;
+        }
+        let ctx = FlatCtx::new(&self.camera, self.size);
+        for n in 0..self.texts.len() {
+            let r = self.texts[n];
+            let fill = r.em_h / dec >= TEXT_FILL_FROM;
+            if r.px || (!fill && !r.fill && (r.large || r.stretch / dec < TEXT_LARGE_FROM / 1.02)) {
+                continue;
+            }
+            let i = r.slot as usize;
+            let stale = match &self.ents[i].geom {
+                Geom::Text(t) if ctx.near(&t.bounds, FILL_REACH) => t.fill.as_ref().is_none_or(|f| ctx.stale(&f.st, FILL_REACH)),
+                _ => continue,
+            };
+            if fill {
+                if !stale {
+                    continue;
+                }
+                let Geom::Text(t) = &self.ents[i].geom else { continue };
+                let mut fresh = (**t).clone();
+                let f = self.text_fill(&fresh, &ctx);
+                if fresh.fill.as_ref().is_some_and(|o| o.prep == f.prep) {
+                    // (the same outline: nothing goes up)
+                    if let Geom::Text(t) = &mut self.ents[i].geom {
+                        t.fill = Some(f);
+                    }
+                    continue;
+                }
+                fresh.fill = Some(f);
+                self.text_switched += !r.fill as u32;
+                self.texts[n].fill = true;
+                self.regeom(i, Geom::Text(Box::new(fresh)));
+            } else {
+                let want_l = !r.large && r.stretch / dec >= TEXT_LARGE_FROM / 1.02;
+                let Geom::Text(t) = &self.ents[i].geom else { continue };
+                let mut fresh = (**t).clone();
+                if want_l {
+                    self.text_large(&mut fresh);
+                    self.texts[n].large = true;
+                }
+                if fresh.fill.take().is_some() {
+                    self.text_switched += 1;
+                    self.texts[n].fill = false;
+                    self.regeom(i, Geom::Text(Box::new(fresh)));
+                } else if let Geom::Text(t) = &mut self.ents[i].geom {
+                    // (class L: the glyph table's rows change, no record)
+                    t.large = fresh.large;
+                }
+            }
+        }
+        self.text_fills = self.texts.iter().filter(|r| r.fill).count() as u32;
     }
 
     // ------------------------------------------------------------ entities
@@ -1547,7 +2036,7 @@ impl Scene {
         match self.free_ents.pop() {
             Some(f) => f,
             None => {
-                self.ents.push(Ent { live: false, era: 0, layer: 0, block: NONE, style: 0, at: 0, alloc: 0, count: 0, dirty: false, class: CLASS_PLAIN, geom: Geom::Line([[0.0; 2]; 2]) });
+                self.ents.push(Ent { live: false, era: 0, layer: 0, block: NONE, style: 0, at: 0, alloc: 0, count: 0, dirty: false, class: CLASS_PLAIN, tx: TX_NONE, geom: Geom::Line([[0.0; 2]; 2]) });
                 self.ents.len() as u32 - 1
             }
         }
@@ -1578,13 +2067,20 @@ impl Scene {
             return Err(GpuError::Invalid("Scene: a style it does not have"));
         }
         self.check_insert(s, None)?;
-        let geom = Scene::geom(s, &self.camera, self.size, &self.styles[style.0 as usize])?;
+        let geom = match self.text_geom(s, false)? {
+            Some(g) => g,
+            None => Scene::geom(s, &self.camera, self.size, &self.styles[style.0 as usize])?,
+        };
         let count = record_count(&geom);
         self.touch();
         let slot = self.new_slot();
         if let Some(m) = flat_meta(&geom) {
             self.curves.push((slot, m.0, m.1, if matches!(geom, Geom::Fill(_)) { u32::MAX } else { style.0 }));
             self.curves_dirty = true;
+        }
+        if matches!(geom, Geom::Text(_)) {
+            self.texts.push(TextRef::of(slot));
+            self.texts_dirty = true;
         }
         if let Geom::Insert(ins) = geom {
             self.blocks[ins.block.slot as usize].inserted += 1;
@@ -1601,6 +2097,10 @@ impl Scene {
         let class = class_of(&geom, &self.styles[style.0 as usize]);
         l.full += (class == CLASS_FULL) as u32;
         l.fills += (class == CLASS_FILL) as u32;
+        let tx = tx_of(&geom);
+        l.texts += (tx != TX_NONE) as u32;
+        l.pure += (tx == TX_ONLY) as u32;
+        l.ents += 1;
         let e = &mut self.ents[slot as usize];
         e.live = true;
         e.layer = li as u32;
@@ -1610,6 +2110,7 @@ impl Scene {
         e.alloc = count;
         e.count = count;
         e.class = class;
+        e.tx = tx;
         e.geom = geom;
         let era = e.era;
         self.live += 1;
@@ -1630,8 +2131,16 @@ impl Scene {
         let i = self.get(id)?;
         let blk = self.ents[i].block;
         self.check_insert(s, if blk == NONE { None } else { Some(blk as usize) })?;
-        let geom = Scene::geom(s, &self.camera, self.size, &self.styles[self.ents[i].style as usize])?;
+        let geom = match self.text_geom(s, blk != NONE)? {
+            Some(g) => g,
+            None => Scene::geom(s, &self.camera, self.size, &self.styles[self.ents[i].style as usize])?,
+        };
         self.touch();
+        if blk == NONE && matches!(geom, Geom::Text(_)) {
+            self.texts.push(TextRef::of(i as u32));
+        }
+        // (a text that changes or stops being one: its summary again)
+        self.texts_dirty |= matches!(geom, Geom::Text(_)) || matches!(self.ents[i].geom, Geom::Text(_));
         if blk != NONE {
             self.block_regeom(i, geom);
             return Ok(());
@@ -1687,10 +2196,24 @@ impl Scene {
         }
         let class = class_of(&geom, &self.styles[self.ents[i].style as usize]);
         self.set_class(i, class);
+        self.set_tx(i, tx_of(&geom));
         let e = &mut self.ents[i];
         e.geom = geom;
         e.count = count;
         self.mark(i as u32);
+    }
+
+    /// (G6c) an entity's text records changed (TX_*): its layer's counts
+    fn set_tx(&mut self, i: usize, tx: u8) {
+        let e = &mut self.ents[i];
+        if e.tx != tx && e.layer != NONE {
+            let l = &mut self.layers[e.layer as usize];
+            l.texts -= (e.tx != TX_NONE) as u32;
+            l.pure -= (e.tx == TX_ONLY) as u32;
+            l.texts += (tx != TX_NONE) as u32;
+            l.pure += (tx == TX_ONLY) as u32;
+        }
+        e.tx = tx;
     }
 
     /// an entity needs another pipeline for its layer (CLASS_*; a block's entity has none: its inserts' layers count it)
@@ -1757,11 +2280,14 @@ impl Scene {
         }
         self.insert_counts(i, -1);
         self.set_class(i, CLASS_PLAIN);
+        self.set_tx(i, TX_NONE);
+        self.texts_dirty |= matches!(self.ents[i].geom, Geom::Text(_));
         let e = &mut self.ents[i];
         e.live = false;
         e.era = e.era.wrapping_add(1);
         let (li, at) = (e.layer as usize, e.at);
         let l = &mut self.layers[li];
+        l.ents -= 1;
         let n = held(l, at, i as u32);
         for o in &mut l.owners[at as usize..(at + n) as usize] {
             *o = NONE;
@@ -1806,7 +2332,7 @@ impl Scene {
         }
         self.touch();
         let fresh = BlockSlot { live: true, era: 0, base: b.base, ents: Vec::new(), inserted: 0, nested: Vec::new(), parents: Vec::new(), height: 0, changed: true, banded: false, arcs: false,
-                                bounds: None, reach: (0.0, 0.0), reach_bb: false, class: CLASS_PLAIN, bb_dash: false, variants: Vec::new() };
+                                bounds: None, reach: (0.0, 0.0), reach_bb: false, class: CLASS_PLAIN, tx: TX_NONE, bb_dash: false, variants: Vec::new() };
         let slot = match self.free_blocks.pop() {
             Some(s) => {
                 let era = self.blocks[s as usize].era;
@@ -1883,7 +2409,10 @@ impl Scene {
             return Err(GpuError::Invalid("Scene: a style it does not have"));
         }
         self.check_insert(s, Some(b))?;
-        let geom = Scene::geom(s, &self.camera, self.size, &self.styles[style.0 as usize])?;
+        let geom = match self.text_geom(s, true)? {
+            Some(g) => g,
+            None => Scene::geom(s, &self.camera, self.size, &self.styles[style.0 as usize])?,
+        };
         self.touch();
         let slot = self.new_slot();
         if let Geom::Insert(ins) = geom {
@@ -1899,6 +2428,7 @@ impl Scene {
         e.count = 0;
         e.dirty = false;
         e.class = CLASS_PLAIN;
+        e.tx = TX_NONE;
         e.geom = geom;
         let era = e.era;
         self.live += 1;
@@ -2288,6 +2818,28 @@ impl Scene {
             self.styles_dirty = true;
             self.groups = None;
         }
+        // (G6c) the glyph table, and the atlas's texture once there is a glyph: whole pages as layers, twice as many as the
+        // pages when they outgrow it (every page and row go up again)
+        let rows = self.atlas.rows.len() as u32;
+        if rows > self.gtab_cap {
+            self.gtab_cap = rows.max(self.gtab_cap * 2);
+            self.gtab_buf = storage(&dev, self.gtab_cap as u64 * GLYPH_WORDS as u64 * 4, none)?;
+            self.gtab_all = true;
+            self.groups = None;
+        }
+        let pages = self.atlas.pages().max(1);
+        if rows > 0 && (self.atlas_tex.is_none() || pages > self.atlas_layers) {
+            let most = dev.limits().max_texture_layers.max(1);
+            let layers = pages.next_power_of_two().min(most).max(pages.min(most));
+            let tex = dev.create_texture(&TextureDesc { width: atlas::PAGE, height: atlas::PAGE, depth: 1, layers, mips: 1, format: Format::Rgba8Unorm,
+                                                        usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST, cube: false })?;
+            self.atlas_view = Some(tex.create_view(&ViewDesc { dim: ViewDim::D2Array, base_mip: 0, mips: 1, base_layer: 0, layers })?);
+            self.atlas_tex = Some(tex);
+            self.atlas_layers = layers;
+            self.atlas_all = true;
+            self.atlas_fresh = true;
+            self.groups = None;
+        }
         Ok(())
     }
 
@@ -2305,6 +2857,12 @@ impl Scene {
             inst: g(&r.inst_layout, &[entry(0, &self.view_ubo), entry(12, &self.spaces), entry(13, &self.inst_buf)])?,
             draw: g(&r.draw_layout, &[entry(0, &self.view_ubo), entry(1, &self.pool), entry(2, &self.styles_buf), entry(3, &self.visible), entry(4, &self.lists_buf), entry(5, &self.hatch_buf), entry(6, &self.epx),
                                        entry(7, &self.vinst), entry(8, &self.spaces)])?,
+            text: match &self.atlas_view {
+                Some(v) => Some(g(&r.text_layout, &[entry(0, &self.view_ubo), entry(1, &self.pool), entry(2, &self.styles_buf), entry(3, &self.visible), entry(4, &self.lists_buf), entry(5, &self.hatch_buf),
+                                                     entry(6, &self.epx), entry(7, &self.vinst), entry(8, &self.spaces), BindEntry { binding: 9, resource: Resource::Texture(v) },
+                                                     entry(10, &self.gtab_buf)])?),
+                None => None,
+            },
         });
         for f in &mut self.frames {
             f.scatter_group = None;
@@ -2345,7 +2903,19 @@ impl Scene {
             table.push([first, order.len() as u32 - first, self.layers[i].transparency, 0]);
         }
         self.drawn = vis.iter().map(|&i| i as u32).collect();
-        self.full = vis.iter().map(|&i| if self.layers[i].fills > 0 { CLASS_FILL } else if self.layers[i].full > 0 { CLASS_FULL } else { CLASS_PLAIN }).collect();
+        self.full = vis.iter().map(|&i| {
+            let l = &self.layers[i];
+            // (G6c: text alone fs_text, text among others fs_text_all, which draws what fs_fill draws too)
+            if l.texts > 0 {
+                if l.ents > l.pure { CLASS_TEXT_ALL } else { CLASS_TEXT }
+            } else if l.fills > 0 {
+                CLASS_FILL
+            } else if l.full > 0 {
+                CLASS_FULL
+            } else {
+                CLASS_PLAIN
+            }
+        }).collect();
         self.vis_items = items;
         (order, table)
     }
@@ -2360,7 +2930,8 @@ impl Scene {
         eat(self.layout_gen);
         for (k, l) in self.layers.iter().enumerate() {
             if l.live {
-                for v in [k as u64, l.base as u64, l.used as u64, l.visible as u64, l.order as u32 as u64, l.seq, l.transparency as u64, l.inserts as u64, l.full as u64, l.fills as u64] {
+                for v in [k as u64, l.base as u64, l.used as u64, l.visible as u64, l.order as u32 as u64, l.seq, l.transparency as u64, l.inserts as u64, l.full as u64, l.fills as u64, l.texts as u64,
+                          l.pure as u64, l.ents as u64] {
                     eat(v);
                 }
             }
@@ -2514,6 +3085,8 @@ impl Scene {
         self.inst_send_all = true;
         self.styles_dirty = true;
         self.hatch_for = None;
+        self.atlas_all = true;
+        self.gtab_all = true;
         self.last_order.clear();
         self.last_layers.clear();
         self.last_layers.push([u32::MAX; 4]);
@@ -2578,6 +3151,7 @@ impl Scene {
         let (mut banded, mut arcs, mut bb, mut bb_dash, mut class) = (false, false, false, false, CLASS_PLAIN);
         let mut bounds: Option<[f64; 4]> = None;
         let mut reach = (0.0f64, 0.0f64);
+        let (mut has_text, mut has_other) = (false, false);
         let mut grow = |b: [f64; 4]| {
             let b = [b[0] - base[0], b[1] - base[1], b[2] - base[0], b[3] - base[1]];
             bounds = Some(match bounds {
@@ -2588,8 +3162,13 @@ impl Scene {
         for &slot in &self.blocks[k].ents {
             let e = &self.ents[slot as usize];
             let st = &self.styles[e.style as usize];
+            has_other |= !matches!(e.geom, Geom::Insert(_) | Geom::Text(_));
             match &e.geom {
                 Geom::Insert(_) => continue,
+                Geom::Text(t) => {
+                    has_text = true;
+                    grow(t.bounds);
+                }
                 Geom::Line(p) => grow([p[0][0].min(p[1][0]), p[0][1].min(p[1][1]), p[0][0].max(p[1][0]), p[0][1].max(p[1][1])]),
                 Geom::Poly(p, _) => {
                     let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
@@ -2632,6 +3211,7 @@ impl Scene {
         b.reach_bb = bb;
         b.bb_dash = bb_dash;
         b.class = class;
+        b.tx = if !has_text { TX_NONE } else if has_other { TX_MIXED } else { TX_ONLY };
     }
 
     /// block k's records for a zoom band (i32::MIN: none; no curves then) and arcs as curves (uneven scales): its
@@ -2863,6 +3443,7 @@ impl Scene {
             }
             let (first, count) = self.ins_range[slot];
             let mut class = CLASS_PLAIN;
+            let (mut text, mut other) = (false, false);
             for x in first..first + count {
                 let it = &self.insts[x as usize];
                 let bl = &self.blocks[it.block as usize];
@@ -2870,8 +3451,12 @@ impl Scene {
                 if bl.bb_dash && self.style_at(it.ins).dashes > 0 {
                     class = class.max(CLASS_FULL);
                 }
+                // (G6c: text among its blocks' records, and others)
+                text |= bl.tx != TX_NONE;
+                other |= bl.tx == TX_MIXED || (bl.tx == TX_NONE && bl.bounds.is_some());
             }
             self.set_class(slot, class);
+            self.set_tx(slot, if !text { TX_NONE } else if other { TX_MIXED } else { TX_ONLY });
         }
         self.inst_send_all = true;
         self.inst_send.clear();
@@ -3022,6 +3607,71 @@ impl Scene {
         }
     }
 
+    /// (G6c) what goes up of the text this frame: the glyph table's changed rows (all of them after a new table or a resend),
+    /// the atlas's new tiles (every page after a new texture or a resend), each in rows of 256 bytes (WebGPU's rule) from
+    /// the frame's upload buffer; the bytes
+    fn text_uploads(&mut self, slot: usize) -> Result<u64> {
+        self.atlas.sent_bytes = 0;
+        self.atlas.sent_rows = 0;
+        if self.atlas_tex.is_none() {
+            return Ok(0);
+        }
+        let dev = self.dev.clone();
+        let all = self.atlas_all;
+        let mut bytes = 0u64;
+        let range = if self.gtab_all { Some((0, self.atlas.rows.len() as u32)) } else { self.atlas.rows_dirty };
+        if let Some((a, b)) = range.filter(|r| r.1 > r.0) {
+            let words: Vec<[u32; GLYPH_WORDS]> = self.atlas.rows[a as usize..b as usize].iter().map(|r| r.words()).collect();
+            let size = words.len() as u64 * GLYPH_WORDS as u64 * 4;
+            let f = &mut self.frames[slot];
+            if f.gtab.as_ref().is_none_or(|x| x.size() < size) {
+                f.gtab = Some(upload(&dev, size.next_power_of_two())?);
+            }
+            let Some(up) = f.gtab.clone() else { return Err(GpuError::Invalid("Scene::prepare")) };
+            up.write(0, &words)?;
+            self.up.gtab = Some((up, a as u64 * GLYPH_WORDS as u64 * 4, size));
+            self.atlas.sent_rows = b - a;
+            bytes += size;
+        }
+        self.atlas.rows_dirty = None;
+        self.gtab_all = false;
+        let list: Vec<(u32, u32, u32, u32, u32)> = if all { (0..self.atlas.pages()).map(|p| (p, 0, 0, atlas::PAGE, atlas::PAGE)).collect() } else { core::mem::take(&mut self.atlas.dirty) };
+        self.atlas.dirty.clear();
+        if !list.is_empty() || self.atlas_fresh {
+            let mut total = 0u64;
+            let mut copies = Vec::with_capacity(list.len());
+            for &(page, x, y, w, h) in &list {
+                let row = (w * 4).div_ceil(256) * 256;
+                copies.push(TexCopy { offset: total, row, page, x, y, w, h });
+                total += row as u64 * h as u64;
+            }
+            let mut data = vec![0u8; total as usize];
+            for c in &copies {
+                let src = self.atlas.page(c.page);
+                let n = (c.w * 4) as usize;
+                for j in 0..c.h {
+                    let s = (((c.y + j) * atlas::PAGE + c.x) * 4) as usize;
+                    let d = c.offset as usize + (j * c.row) as usize;
+                    data[d..d + n].copy_from_slice(&src[s..s + n]);
+                }
+            }
+            let f = &mut self.frames[slot];
+            let need = total.max(256);
+            if f.atlas.as_ref().is_none_or(|b| b.size() < need) {
+                f.atlas = Some(upload(&dev, need.next_power_of_two())?);
+            }
+            let Some(buf) = f.atlas.clone() else { return Err(GpuError::Invalid("Scene::prepare")) };
+            if total > 0 {
+                buf.write(0, &data)?;
+            }
+            self.up.atlas = Some(AtlasUp { buf, copies, fresh: self.atlas_fresh });
+            self.atlas.sent_bytes = total;
+            bytes += total;
+        }
+        self.atlas_all = false;
+        Ok(bytes)
+    }
+
     /// curves and fills the last prepare flattened again (their zoom band changed, or the view left their window)
     pub fn reflattened(&self) -> u32 {
         self.reflat
@@ -3049,7 +3699,14 @@ impl Scene {
         self.size = size;
         self.up = Uploads::default();
         self.upload_info = UploadInfo::default();
+        // (G6c: the scale text decides by moves only when the scale leaves HYST around it: no flicker between glyphs and bars
+        // or between classes while zooming)
+        let sc = self.camera.scale;
+        if !(self.text_scale > 0.0) || sc < self.text_scale / curve::HYST || sc > self.text_scale * curve::HYST {
+            self.text_scale = sc;
+        }
         self.reflatten();
+        self.retext();
         self.blocks_prepare()?;
         self.layout(full)?;
         // (the entries and the layer table again only when what they come from changed: with many inserts they are long)
@@ -3234,6 +3891,7 @@ impl Scene {
             self.inst_send_all = false;
             self.inst_send.clear();
         }
+        bytes += self.text_uploads(slot)?;
         self.inst_info.blocks = self.blocks.iter().filter(|b| b.live).count() as u32;
         self.inst_info.variants = self.blocks.iter().map(|b| b.variants.len() as u32).sum();
         self.inst_info.block_records = self.blocks.iter().flat_map(|b| b.variants.iter()).map(|v| v.recs.len() as u32).sum();
@@ -3249,7 +3907,7 @@ impl Scene {
                 f.readback = Some(dev.create_buffer(&BufferDesc { size, usage: BufferUsage::NONE, memory: MemoryKind::Readback })?);
             }
         }
-        self.frames[slot].stage.write(0, &self.camera.words(size, !self.culling))?;
+        self.frames[slot].stage.write(0, &self.camera.words(size, !self.culling, (self.camera.scale / self.text_scale) as f32))?;
         self.upload_info.bytes = bytes;
         self.prepared = true;
         Ok(())
@@ -3258,6 +3916,10 @@ impl Scene {
     /// the frame went to the GPU: Queue::submit's or Swapchain::present's answer
     pub fn submitted(&mut self, id: SubmitId) {
         let slot = self.slot;
+        if self.up.atlas.as_ref().is_some_and(|a| a.fresh) {
+            // (the frame that takes the atlas's texture from nothing is on its way)
+            self.atlas_fresh = false;
+        }
         self.frames[slot].last = Some((id, self.frame));
         self.frame += 1;
         self.prepared = false;
@@ -3307,8 +3969,10 @@ fn style_reach(st: &Style) -> f64 {
 /// the pipeline an entity's layer needs: a fill the third, an arc or a dashed style the second (lib.rs); an insert's is
 /// its blocks' (Scene::rebuild_insts)
 fn class_of(g: &Geom, st: &Style) -> u8 {
-    if matches!(g, Geom::Fill(..)) {
+    if matches!(g, Geom::Fill(..)) || matches!(g, Geom::Text(t) if t.fill.is_some()) {
         CLASS_FILL
+    } else if matches!(g, Geom::Text(_)) {
+        CLASS_PLAIN
     } else if matches!(g, Geom::Arc(..)) || st.dashes > 0 {
         CLASS_FULL
     } else {
@@ -3363,6 +4027,18 @@ fn record_count(g: &Geom) -> u32 {
             (e + g.prep.tris.len()).max(1) as u32
         }
         Geom::Insert(_) => 1,
+        Geom::Text(t) => match &t.fill {
+            Some(f) => record_count(&Geom::Fill(Box::new(f.clone()))),
+            None => (t.glyphs.len() + t.bars.len()).max(1) as u32,
+        },
+    }
+}
+
+/// (G6c) an entity's text records: a text drawn as glyphs and bars has nothing else, one drawn as a fill none
+fn tx_of(g: &Geom) -> u8 {
+    match g {
+        Geom::Text(t) if t.fill.is_none() => TX_ONLY,
+        _ => TX_NONE,
     }
 }
 
@@ -3376,6 +4052,56 @@ fn distinct(p: &[[f64; 2]]) -> usize {
     }
     n
 }
+
+/// a text's parameters without its string (TextSrc keeps the string beside them)
+fn owned_text(t: &Text) -> Text<'static> {
+    Text { text: "", style: t.style, at: t.at, at2: t.at2, height: t.height, rotation: t.rotation, width: t.width, oblique: t.oblique, halign: t.halign, valign: t.valign, backward: t.backward,
+           upside_down: t.upside_down }
+}
+
+fn owned_mtext(t: &MText) -> MText<'static> {
+    MText { text: "", style: t.style, at: t.at, height: t.height, width: t.width, rotation: t.rotation, attach: t.attach, line_spacing: t.line_spacing }
+}
+
+fn src_style(s: &TextSrc) -> TextStyleId {
+    match s {
+        TextSrc::Single(_, t) => t.style,
+        TextSrc::Multi(_, t) => t.style,
+    }
+}
+
+/// x as an f16 (its bits), rounded towards +infinity (up) or -infinity; beyond 65504 the largest
+fn f16_of(x: f32, up: bool) -> u16 {
+    if x == 0.0 || x.is_nan() {
+        return 0;
+    }
+    let neg = x < 0.0;
+    let b = x.abs().to_bits();
+    let e = ((b >> 23) & 0xff) as i32 - 127;
+    let m = b & 0x7f_ffff;
+    // (the magnitude truncated, and whether anything was cut off)
+    let (mut h, cut) = if e > 15 {
+        (0x7bffu32, false)
+    } else if e >= -14 {
+        (((e + 15) as u32) << 10 | m >> 13, m & 0x1fff != 0)
+    } else {
+        // (a subnormal f16: multiples of 2^-24)
+        let v = x.abs() as f64 * 16_777_216.0;
+        let t = v as u32;
+        (t.min(0x3ff), v != t as f64)
+    };
+    // (towards +infinity: a positive magnitude grows; towards -infinity: a negative one)
+    if cut && (up != neg) && h < 0x7bff {
+        h += 1;
+    }
+    (h as u16) | if neg { 0x8000 } else { 0 }
+}
+
+// textc.wgsl: a glyph's and a bar's record, a mark, a map to pixels
+const K_GLYPH: u32 = 5;
+const K_BAR: u32 = 6;
+const G_MARK: u32 = 1;
+const G_PX: u32 = 2;
 
 // common.wgsl's Record: the kinds and the flags of its last word
 const K_SEG: u32 = 0;
@@ -3409,6 +4135,30 @@ const F_RESTART_B: u32 = 64;
 fn records(g: &Geom, style: u32, shift: [f64; 2], out: &mut Vec<[u32; RECORD_WORDS]>) {
     if let Geom::Insert(_) = g {
         out.push([0; RECORD_WORDS]);
+        return;
+    }
+    if let Geom::Text(t) = g {
+        // (G6c) very large: its outlines' fill; else its glyphs, then its bars (textc.wgsl)
+        if let Some(f) = &t.fill {
+            records(&Geom::Fill(Box::new(f.clone())), style, shift, out);
+            return;
+        }
+        let first = out.len();
+        let (x, lx) = split(t.lay.origin[0] - shift[0]);
+        let (y, ly) = split(t.lay.origin[1] - shift[1]);
+        let a = [x.to_bits(), y.to_bits(), lx.to_bits(), ly.to_bits()];
+        let m = t.lay.m.map(|v| (v as f32).to_bits());
+        let px = if t.lay.px { G_PX } else { 0 };
+        for gr in &t.glyphs {
+            out.push([a[0], a[1], a[2], a[3], m[0], m[1], m[2], m[3], gr.pen[0].to_bits(), gr.pen[1].to_bits(), gr.row, gr.cell_r.to_bits(), gr.quad[0], gr.quad[1], style + 1,
+                      gr.flags | px | K_GLYPH << 8]);
+        }
+        for b in &t.bars {
+            out.push([a[0], a[1], a[2], a[3], m[0], m[1], m[2], m[3], b[0].to_bits(), b[1].to_bits(), b[2].to_bits(), b[3].to_bits(), b[4].to_bits(), 0, style + 1, px | K_BAR << 8]);
+        }
+        if out.len() == first {
+            out.push([0; RECORD_WORDS]);
+        }
         return;
     }
     let b = |v: f32| v.to_bits();

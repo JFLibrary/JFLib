@@ -25,6 +25,13 @@ they were inserted in, also when one is updated.
   records lie on the GPU once and every insert is an instance with its transform, so moving a
   thousand inserts sends only their transforms. Styles can take their colour, width or dash
   pattern from the insert.
+- **Text:** fonts from their TrueType or OpenType bytes, text styles as DXF's STYLE (font,
+  fallback fonts, height, width factor, oblique angle, in drawing units or pixels), single lines
+  with every alignment of DXF's TEXT and multi-line text with MTEXT's wrapping, spacing and nine
+  attachment points, shaped with kerning, ligatures, bidi and Arabic joining. Glyphs come from an
+  atlas of multi-channel signed distance fields made from the outlines on the CPU and stay sharp
+  at any size, turn, width factor or slant; tiny text is drawn as a bar per word, very large text
+  as a fill of its outlines. The layout is there for picking and for drawing without a GPU.
 
 The camera has a centre in `f64`, a scale in drawing units per pixel and a rotation; its y axis
 points up on the screen.

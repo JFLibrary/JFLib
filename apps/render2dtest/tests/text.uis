@@ -1,0 +1,5 @@
+#!args --test text
+# text (G6c): alignments and MTEXT layouts, the atlas's bytes (a hash every target shares); texts of every size, turned,
+# wide, narrow, oblique, mirrored, in pixels, large (class L, a fill), MTEXT, translucent (blended once), Arabic, in blocks
+# (turned, mirrored, uneven) against lib/gfx's exact fill of the same layout; bars below 7 px per em; class L and fills by
+# zoom; Voll and Basis byte for byte
