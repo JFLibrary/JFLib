@@ -567,7 +567,7 @@ impl ViewTest {
                     ui.text(TS_BODY | TX_WRAP, LONG_TEXT);
                 }
                 ui.next_size(if k == 0 { 200 } else { 320 }, 0);
-                ui.textbox(ID_SHEET_TEXT, Some("Blatt"), &mut self.two_text[k], 256);
+                ui.textbox(ID_SHEET_TEXT, Some("Blatt"), &mut self.two_text[k], 4096); // (a long `type`: tests/longtext.uis)
                 ui.box_end();
             }
             ui.window_end();

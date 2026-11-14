@@ -22,6 +22,10 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 - **ui:** `FD_BUILTIN`: the app chooses the library's own file dialog for a `ui.filedlg` call on every platform (Windows, Linux, macOS, Android, the browser), so it looks and behaves the same everywhere and in every style; it lists what plat's file functions see. Before, only the environment variable `jfgui_FILEDLG=builtin` chose it, for every dialog of a run. docs/GUIDE.md section 7
 
+### Fixed
+
+- **ui:** Scripts: `type "..."` typed only the first 255 bytes of its quoted text (`bench N type` too, `commit` 1023): they take the whole string now, as long as a script line (16 KiB, the limit of a line and of a label)
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

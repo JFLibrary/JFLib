@@ -2089,8 +2089,8 @@ in DIP):
 | `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... (every key a pass of its own, as the platform delivers them) |
 | `keydown CHORD [scan N] [left\|right\|numpad]`, `keyup CHORD ...` | a key down and held (shift / ctrl / alt stay held for the following events; down again: an auto-repeat) and up again, with a scancode and location for `ui.key_event_take` |
 | `keys [N] CHORD...` | the chords N times over, queued for ONE pass of the window with the keyboard (more keys than frames, as a tool window hands them on) |
-| `type "text"` | typed text (`"\n"` presses Enter) |
-| `commit "text" [N]` | an input method commits the text (N times over: one long commit, as the platform queues it) |
+| `type "text"` | typed text (`"\n"` presses Enter), a character per event; the whole quoted string, as long as a script line (16 KiB) |
+| `commit "text" [N]` | an input method commits the text (N times over: one long commit, as the platform queues it); the text as long as a script line |
 | `preedit "text" [CURSOR]` | an input method's composition (`ui.ime_preedit`; CURSOR a byte offset, default the end; `""` ends it) |
 | `focus S` | keyboard focus to a widget (focus ring shown) |
 | `cmd ID [ARG]` | run a command as if a menu row was chosen |
@@ -2138,8 +2138,9 @@ in DIP):
 ignored when a control with the same label exists; with matches in several windows the topmost
 window wins, then the topmost layer, so an ambiguous label resolves to the dialog or popup).
 A label is the record's whole text: a wrapped paragraph (a web page's) is one record and its
-selector the whole paragraph, as `dump` shows it (a script line holds up to 16 KiB, `dump` writes
-up to 64 KiB of a label; `apps/viewtest/tests/longtext.uis`).
+selector the whole paragraph, as `dump` shows it (a script line holds up to 16 KiB, and so do the
+quoted strings of `type` and `commit`; `dump` writes up to 64 KiB of a label;
+`apps/viewtest/tests/longtext.uis`).
 Failed expectations print `FAIL line N: <command> -> <detail>` and the script goes on.
 
 ```

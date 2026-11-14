@@ -220,7 +220,8 @@ use gfx::{Surface, FMT_XRGB};
 use plat::{DragData, Event};
 
 // a script line (and so a quoted label of a selector or `expect S text`, which must match a
-// record's whole label: a wrapped paragraph of a web page is one label)
+// record's whole label: a wrapped paragraph of a web page is one label; and the text of `type`,
+// `commit` and `bench N type`)
 const LINE_MAX: usize = 16384;
 // the bytes of a record's label `dump` writes (cut at a character): labels are bounded by the
 // pass's text arena already (SEMTEXT_MAX)
@@ -1930,7 +1931,7 @@ impl Ui {
     // commit "text" [N]: the commits of an input method (plat::ime_commit_text) to the window
     // with the keyboard, as the platform queues them
     fn sc_commit(&mut self, app: &mut dyn App, a: &[u8]) {
-        let Some((s, r)) = parse_qstring(a, 1024) else {
+        let Some((s, r)) = parse_qstring(a, LINE_MAX) else {
             self.fail(b"expected a quoted string");
             return;
         };
@@ -1963,9 +1964,9 @@ impl Ui {
         self.process_events(app);
     }
 
-    // type "text"
+    // type "text" (as long as the line: up to LINE_MAX - 1 bytes)
     fn sc_type(&mut self, app: &mut dyn App, a: &[u8]) {
-        let Some((s, _)) = parse_qstring(a, 256) else {
+        let Some((s, _)) = parse_qstring(a, LINE_MAX) else {
             self.fail(b"expected a quoted string");
             return;
         };
@@ -2701,7 +2702,7 @@ impl Ui {
             };
             (Kind::Key { mods, vk }, r)
         } else if let Some(r) = word_eq(a, "type") {
-            let Some((s, r)) = parse_qstring(skip_ws(r), 256) else {
+            let Some((s, r)) = parse_qstring(skip_ws(r), LINE_MAX) else {
                 self.fail(b"expected a quoted string");
                 return;
             };

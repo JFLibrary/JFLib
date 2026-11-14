@@ -15,6 +15,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   style (a browser's "Save as"). It lists what plat's file functions see. Before, only the
   environment variable `jfgui_FILEDLG=builtin` chose it, and for every dialog of a run.
 
+### Fixed
+
+- Test scripts: `type "..."` typed only the first 255 bytes of its quoted text (so did
+  `bench N type`, and `commit` 1023). They take the whole string now, as long as a script line
+  (16 KiB).
+
 ## [0.2.0] - 2026-11-14
 
 ### Added
