@@ -119,8 +119,11 @@ Ja des Nutzers). Ein Rust-Programm für x86-64 läuft dort unter Rosetta (`sysct
   - `apple.rs` ruft auf x86-64 `fstat`, `stat`, `lstat`, `opendir` und `readdir` mit der Endung `$INODE64` auf.
     Außerhalb von `apple.rs` fanden sich zwei weitere Stellen: `statfs$INODE64` in `fs.rs` und
     `realpath$DARWIN_EXTSN` in `watch.rs` (nur diese Fassung legt die Antwort selbst an).
-  - Die Records sind auf x86-64 dieselben wie auf arm64: `stat` mit 144 Byte, `dirent`, `pollfd`, `pthread_attr_t`
-    mit 64 Byte, `sigaction` und `uc_mcontext` bei 48.
+  - Die Records sind auf x86-64 dieselben wie auf arm64: `stat` mit 144 Byte, `statfs` mit 2168, `dirent`,
+    `pollfd`, `pthread_attr_t` mit 64 Byte, `sigaction`, `uc_mcontext` bei 48, `si_addr` bei 24. Geprüft mit
+    clang gegen die SDK-Header beider Prozessoren; dort stehen auch die Offsets des x86-64-Kontexts (`__err` 4,
+    `__faultvaddr` 8, rbp 64, rsp 72, rip 144). clang ruft für x86-64 genau die Namen auf, die `plat` jetzt
+    benutzt.
 - **`msg!`:** `msg_entry` wählt auf x86-64 `objc_msgSend_stret`, wenn das Ergebnis größer als 16 Byte ist. Das neue
   `msg_super!` macht dasselbe mit `objc_msgSendSuper_stret`; der einzige Super-Aufruf (`sendEvent:` des Panels) nutzt
   es. Ein BOOL wird als Byte gelesen, weil er auf x86-64 ein `signed char` mit beliebigem Wert ist. `gpu/mtl_objc.rs`
@@ -138,6 +141,11 @@ Ja des Nutzers). Ein Rust-Programm für x86-64 läuft dort unter Rosetta (`sysct
     `NSDocumentController` auch im arm64-Build (ein bis zwei Prüfungen).
   - Der arm64-Build mit denselben Änderungen ist ebenso grün: `plattest all` 220, `crash` 7, `coretest`,
     `portabletest` mit demselben Digest.
+- **Windows und Linux x86-64 unverändert:** `coretest` und `plattest` wurden im Release vorher und nachher aus
+  demselben Ordner gebaut. Unter Linux sind beide bitgleich, unter Windows unterscheidet sich nur der Zeitstempel im
+  PE-Kopf. Dafür behalten die Dateien, die Windows und Linux übersetzen (`rt/lib.rs`, `fs.rs`, `watch.rs`), ihre
+  Zeilenzahl, denn Panic-Orte enthalten Zeilennummern. `cargo check -p jflib` für wasm32 und Android, je mit und ohne
+  `std`, läuft ohne neue Warnungen, und die 33 Tests von cargo-jflib sind grün.
 
 ### IM2: Fenster und Dienste (S–M)
 
