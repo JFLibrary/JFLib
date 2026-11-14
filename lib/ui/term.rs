@@ -89,6 +89,9 @@ const A_DIM: u8 = 2;
 const A_UNDER: u8 = 4;
 const A_INV: u8 = 8;
 const LINE_MAX: usize = 32768; // cells of a line before a forced break
+// the farthest column a cursor move reaches (wider than any screen): a move pads the line with
+// spaces up to it, and "ESC[1;32000H" (12 bytes) made every scrollback line 32000 cells
+const JUMP_MAX: usize = 1024;
 const INPUT_CAP: u32 = 0x1_0000; // bytes of the input line
 const HIST_MAX: usize = 500;
 const PARAMS_MAX: usize = 16;
@@ -457,9 +460,10 @@ impl Screen {
                 3 => self.clear(),
                 _ => {}
             },
-            b'H' | b'f' => self.col = self.arg(1, 1) as usize - 1,
-            b'G' => self.col = self.arg(0, 1) as usize - 1,
-            b'C' => self.col = (self.col + self.arg(0, 1) as usize).min(LINE_MAX - 1),
+            b'H' | b'f' => self.col = (self.arg(1, 1) as usize - 1).min(JUMP_MAX - 1),
+            b'G' => self.col = (self.arg(0, 1) as usize - 1).min(JUMP_MAX - 1),
+            // (not beyond JUMP_MAX unless the text itself already reaches further)
+            b'C' => self.col = (self.col + self.arg(0, 1) as usize).min(self.col.max(JUMP_MAX - 1)),
             b'D' => self.col = self.col.saturating_sub(self.arg(0, 1) as usize),
             _ => {}
         }

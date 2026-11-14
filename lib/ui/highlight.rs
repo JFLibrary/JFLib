@@ -147,7 +147,13 @@ pub struct Grammar {
 #[derive(Clone, Copy)]
 pub struct Highlighter {
     g: &'static Grammar,
+    /// how deep this scan is nested (interpolations, Nest and Element rules): each level is a
+    /// recursion, and "`${`${`${..." in one line would otherwise run the stack out
+    lvl: u8,
 }
+
+// nesting levels a line may open; deeper, the rest of the line is the construct's own colour
+const MAX_LEVEL: u8 = 32;
 
 fn push(out: &mut Vec<Token>, start: usize, end: usize, kind: u8) {
     if end <= start {
@@ -213,52 +219,57 @@ fn utf8_len(b: u8) -> usize {
 impl Highlighter {
     /// an app's own grammar
     pub const fn new(g: &'static Grammar) -> Highlighter {
-        Highlighter { g }
+        Highlighter { g, lvl: 0 }
+    }
+
+    // the highlighter of a construct nested one level deeper (grammar g); None past MAX_LEVEL
+    fn deeper(&self, g: &'static Grammar) -> Option<Highlighter> {
+        (self.lvl < MAX_LEVEL).then_some(Highlighter { g, lvl: self.lvl + 1 })
     }
     /// plain text: no tokens
     pub const fn plain() -> Highlighter {
-        Highlighter { g: &PLAIN }
+        Highlighter { g: &PLAIN, lvl: 0 }
     }
     /// Rust
     pub const fn rust() -> Highlighter {
-        Highlighter { g: &RUST }
+        Highlighter { g: &RUST, lvl: 0 }
     }
     /// JSON (and JSONC comments)
     pub const fn json() -> Highlighter {
-        Highlighter { g: &JSON }
+        Highlighter { g: &JSON, lvl: 0 }
     }
     /// INI files
     pub const fn ini() -> Highlighter {
-        Highlighter { g: &INI }
+        Highlighter { g: &INI, lvl: 0 }
     }
     /// TOML
     pub const fn toml() -> Highlighter {
-        Highlighter { g: &TOML }
+        Highlighter { g: &TOML, lvl: 0 }
     }
     /// a Markdown subset
     pub const fn markdown() -> Highlighter {
-        Highlighter { g: &MARKDOWN }
+        Highlighter { g: &MARKDOWN, lvl: 0 }
     }
     /// the scripting language of JFScript (.jfs, JFNetworker's scripts)
     pub const fn jfs() -> Highlighter {
-        Highlighter { g: &JFS }
+        Highlighter { g: &JFS, lvl: 0 }
     }
     /// JavaScript (template strings over lines with their ${..}, regular expressions)
     pub const fn javascript() -> Highlighter {
-        Highlighter { g: &JAVASCRIPT }
+        Highlighter { g: &JAVASCRIPT, lvl: 0 }
     }
     /// CSS (selectors, at-rules, properties, values with units and colours, nested rules)
     pub const fn css() -> Highlighter {
-        Highlighter { g: &CSS }
+        Highlighter { g: &CSS, lvl: 0 }
     }
     /// HTML (also XML and SVG): tags, attributes, comments, entities, doctype; the content of
     /// <script> as JavaScript and of <style> as CSS
     pub const fn html() -> Highlighter {
-        Highlighter { g: &HTML }
+        Highlighter { g: &HTML, lvl: 0 }
     }
     /// WAT, the text format of WebAssembly (modules, instructions, $names, types)
     pub const fn wat() -> Highlighter {
-        Highlighter { g: &WAT }
+        Highlighter { g: &WAT, lvl: 0 }
     }
 
     /// by name or extension, also of a path ("rs", "Rust", "x/y.toml"); plain() for others
@@ -268,7 +279,7 @@ impl Highlighter {
         let ext = ext.rsplit('.').next().unwrap_or(ext).to_ascii_lowercase();
         for g in [&RUST, &JSON, &INI, &TOML, &MARKDOWN, &JFS, &JAVASCRIPT, &CSS, &HTML, &WAT] {
             if g.name.eq_ignore_ascii_case(s) || g.exts.contains(&ext.as_str()) {
-                return Highlighter { g };
+                return Highlighter { g, lvl: 0 };
             }
         }
         Highlighter::plain()
@@ -452,8 +463,12 @@ impl Highlighter {
                     }
                     Rule::Nest { open, close, kind, inner } => {
                         if t[i..].starts_with(open) && !(prev && open.starts_with(|c: char| c.is_alphanumeric())) {
+                            let Some(h) = self.deeper(*inner) else {
+                                push(out, i, n, *kind);
+                                return (n, Some(0));
+                            };
                             push(out, i, i + open.len(), *kind);
-                            match Highlighter::new(*inner).nest_run(t, i + open.len(), 0, bol, close, out) {
+                            match h.nest_run(t, i + open.len(), 0, bol, close, out) {
                                 Ok(e) => {
                                     push(out, e, e + close.len(), *kind);
                                     i = e + close.len();
@@ -465,10 +480,14 @@ impl Highlighter {
                     }
                     Rule::Element { name, tag, inner } => {
                         if let Some(gt) = element_start(t, i, name) {
+                            let (Some(th), Some(h)) = (self.deeper(*tag), self.deeper(*inner)) else {
+                                push(out, i, n, SY_TEXT);
+                                return (n, Some(0));
+                            };
                             push(out, i, i + 1, SY_PUNCT);
-                            Highlighter::new(*tag).scan(&t[..gt], i + 1, bol, false, out, &mut |_, _| false);
+                            th.scan(&t[..gt], i + 1, bol, false, out, &mut |_, _| false);
                             push(out, gt, gt + 1, SY_PUNCT);
-                            match Highlighter::new(*inner).element_run(t, gt + 1, 0, bol, name, out) {
+                            match h.element_run(t, gt + 1, 0, bol, name, out) {
                                 Ok(e) => {
                                     i = e;
                                     continue 'outer;
@@ -542,9 +561,14 @@ impl Highlighter {
                 return (j + close.len(), 0);
             }
             if t[j..].starts_with(start) {
+                let Some(h) = self.deeper(self.g) else {
+                    // nested too deep: the rest of the line stays the string
+                    push(out, s, b.len(), SY_STRING);
+                    return (b.len(), 0);
+                };
                 push(out, s, j, SY_STRING);
                 push(out, j, j + start.len(), SY_META);
-                let (e, st) = self.scan(t, j + start.len(), bol, true, out, &mut |_, _| false);
+                let (e, st) = h.scan(t, j + start.len(), bol, true, out, &mut |_, _| false);
                 let st = st.unwrap_or(0);
                 if st != 0 || e >= b.len() {
                     return (b.len(), st);
@@ -580,14 +604,14 @@ impl Highlighter {
                 let (e, done) = scan_str(t, 0, 0, close, *escape, *kind, out);
                 if done { (e, 0) } else { (n, state) }
             }
-            Rule::Nest { close, kind, inner, .. } => match Highlighter::new(*inner).nest_run(t, 0, state >> 8, bol, close, out) {
+            Rule::Nest { close, kind, inner, .. } => match self.deeper(*inner).map_or(Err(0), |h| h.nest_run(t, 0, state >> 8, bol, close, out)) {
                 Ok(e) => {
                     push(out, e, e + close.len(), *kind);
                     (e + close.len(), 0)
                 }
                 Err(st) => (n, enc_in(ri, st)),
             },
-            Rule::Element { name, inner, .. } => match Highlighter::new(*inner).element_run(t, 0, state >> 8, bol, name, out) {
+            Rule::Element { name, inner, .. } => match self.deeper(*inner).map_or(Err(0), |h| h.element_run(t, 0, state >> 8, bol, name, out)) {
                 Ok(e) => (e, 0),
                 Err(st) => (n, enc_in(ri, st)),
             },

@@ -13,7 +13,9 @@
 //   ext() -> u64                extensions bundle: skips the extension bits, returns the mask
 //   check() -> 0 / ERR_*        the sticky error, or ERR_TRUNC when read past the section end
 //
-// The position is a wrapping u64 like the assembly's (jb_ext saturates it at u64::MAX).
+// The position saturates at u64::MAX (jb_ext, section offsets from a crafted table of contents):
+// past the section end it stays there.  The assembly's wraps, and a reader that wrapped read
+// the stream again from its start while check() saw nothing wrong.
 
 use img_core::{ERR_HDR, ERR_TRUNC};
 
@@ -50,11 +52,11 @@ impl<'a> Jb<'a> {
 
     /// jb_section: reader over bytes start .. start + size of buf
     pub fn section(buf: &'a [u8], start: u64, size: u64) -> Self {
-        let pos = start << 3;
+        let pos = start.saturating_mul(8);
         if buf.len() < 8 {
             return Jb { buf, pos: 1 << 62, lim: 0, end: 0, err: ERR_TRUNC };
         }
-        Jb { buf, pos, lim: buf.len() as u64 - 8, end: (size << 3).wrapping_add(pos), err: 0 }
+        Jb { buf, pos, lim: buf.len() as u64 - 8, end: size.saturating_mul(8).saturating_add(pos), err: 0 }
     }
 
     /// jb_check: 0, the sticky error, or ERR_TRUNC (read past the section end)
@@ -93,7 +95,7 @@ impl<'a> Jb<'a> {
     #[inline(always)]
     pub fn f(&mut self, n: u32) -> u32 {
         let v = self.peek64();
-        self.pos = self.pos.wrapping_add(n as u64);
+        self.pos = self.pos.saturating_add(n as u64);
         (v & ((1u64 << (n & 63)).wrapping_sub(1))) as u32
     }
 

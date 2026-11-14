@@ -67,6 +67,8 @@ use crate::{JDF_CMYK, JDF_NO_ORIENT, JDF_RGB, JDF_STRAIGHT, JDF_YCC};
 
 const MAX_DIM: u32 = 32768;
 const MAX_PIXELS: u64 = 1 << 28;
+// the scans together go over at most this many times the image's blocks (see the SOS segment)
+const SCAN_WORK: u64 = 64;
 
 const BAND_LOG: u32 = 4; // rows converted before a transposed write-out
 const BAND: u32 = 1 << BAND_LOG;
@@ -497,6 +499,8 @@ struct Dec<'a> {
     mcuy: u32,
     mode: u32, // 0 no frame yet, 1 sequential, 2 progressive
     scans: u32,
+    // the blocks the scans so far went over (scan_work), against SCAN_WORK x the image's blocks
+    work: u64,
     ri: u32, // restart interval
     jfif: bool,
     adobe: bool,
@@ -572,6 +576,7 @@ impl<'a> Dec<'a> {
             mcuy: 0,
             mode: 0,
             scans: 0,
+            work: 0,
             ri: 0,
             jfif: false,
             adobe: false,
@@ -677,6 +682,14 @@ impl<'a> Dec<'a> {
                     let r = self.sos(seg);
                     if r != 0 {
                         return r;
+                    }
+                    // each scan goes over all its blocks even without data (a restart interval
+                    // keeps it going): thousands of empty scans in a small file took minutes.
+                    // Past SCAN_WORK x the image's blocks the rest is left out, as after a
+                    // missing EOI (a progressive file of libjpeg's script goes over about 6 x)
+                    self.work += self.scan_work();
+                    if self.work > SCAN_WORK * self.image_blocks() {
+                        break;
                     }
                     if !self.planes && self.mode == 1 {
                         // the first scan of a sequential image: rings or planes
@@ -1076,6 +1089,22 @@ impl<'a> Dec<'a> {
             }
             e += 12;
             cnt -= 1;
+        }
+    }
+
+    /// the blocks of every component of the frame
+    fn image_blocks(&self) -> u64 {
+        self.comp[..self.nc as usize].iter().map(|c| c.nbw as u64 * c.nbh as u64).sum()
+    }
+
+    /// the blocks the current scan goes over (scan_mcus)
+    fn scan_work(&self) -> u64 {
+        if self.ns == 1 {
+            let c = &self.comp[self.scomp[0]];
+            c.nbw as u64 * c.nbh as u64
+        } else {
+            let per: u64 = self.scomp[..self.ns as usize].iter().map(|&ci| self.comp[ci].h as u64 * self.comp[ci].v as u64).sum();
+            self.mcux as u64 * self.mcuy as u64 * per
         }
     }
 

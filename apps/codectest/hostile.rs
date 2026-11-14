@@ -3,6 +3,7 @@
 // working far beyond the input or the pixel budget; and controls: the same kind of input made
 // valid, and encoder round trips, still decode.  Exit code 1 when a check fails.
 //
+//   jpeg_scans       20000 empty scans of a 2048 x 2048 progressive JPEG with restarts (200 KB)
 //   jxl_box64        a container box with a 64-bit size reaching to the end of u64 (28 bytes)
 //   jxl_crop         a frame of its own size (custom crop) larger than the pixel budget
 //   jxl_palettes     273 palette transforms of 137727 entries each on a 1 x 1 image
@@ -356,8 +357,38 @@ fn same_pixels(a: &Surface, b: &Surface) -> bool {
 
 // ------------------------------------------------------------------ checks
 
+/// a progressive grey JPEG of w x h with a restart interval of 1 MCU and `scans` DC scans
+/// without any entropy-coded data (each SOS segment straight after the last)
+fn jpeg_empty_scans(w: u16, h: u16, scans: usize) -> Vec<u8> {
+    let mut d = vec![0xFF, 0xD8];
+    d.extend_from_slice(&[0xFF, 0xDB, 0, 67, 0]); // DQT: table 0, all 1
+    d.extend_from_slice(&[1u8; 64]);
+    d.extend_from_slice(&[0xFF, 0xC2, 0, 11, 8]); // SOF2: 8 bits, h, w, 1 component (id 1, 1x1, table 0)
+    d.extend_from_slice(&h.to_be_bytes());
+    d.extend_from_slice(&w.to_be_bytes());
+    d.extend_from_slice(&[1, 1, 0x11, 0]);
+    d.extend_from_slice(&[0xFF, 0xDD, 0, 4, 0, 1]); // DRI: 1 MCU
+    for _ in 0..scans {
+        d.extend_from_slice(&[0xFF, 0xDA, 0, 8, 1, 1, 0x00, 0, 0, 0x00]); // SOS: DC first of component 1
+    }
+    d.extend_from_slice(&[0xFF, 0xD9]);
+    d
+}
+
 pub fn run(only: Option<&str>) -> i32 {
     let mut t = H { ok: 0, failed: 0, only: only.map(String::from) };
+
+    // 0: 20000 empty scans of a 2048 x 2048 progressive JPEG (200 KB): each went over every
+    // block (the restart interval keeps it going) -- about 1.3e9 blocks; now the scans stop at
+    // 64 x the image's blocks and the image so far comes back
+    if t.on("jpeg_scans") {
+        let d = jpeg_empty_scans(2048, 2048, 20_000);
+        let t0 = plat::time_us();
+        let r = img_jpeg::decode_fl(&d, 0);
+        let us = plat::time_us().wrapping_sub(t0);
+        t.check("jpeg_scans", r.as_ref().is_ok_and(|s| s.w == 2048 && s.h == 2048) && us < 4 * QUICK_US,
+            format!("{} bytes: {} in {} ms", d.len(), if r.is_ok() { "the image" } else { "an error" }, us / 1000));
+    }
 
     // 1: box with a 64-bit size up to u64::MAX - 3 (the next box position overflowed)
     if t.on("jxl_box64") {

@@ -757,6 +757,11 @@ fn web(t: &mut T) {
     let (v, st) = toks(&js, "const re = /a[/]b\\/c/gi; let s = 'x\\n' + \"y\";", 0);
     t.eq(v, s(&["kw:const", "str:/a[/]b\\/c/gi", "kw:let", "str:'x", "esc:\\n", "str:'", "str:\"y\""]), "js regex, strings, escapes");
     t.eq(st, 0, "js: nothing open");
+    // 20000 template strings inside each other's ${..}: each level was a recursion and the
+    // stack ran out; past 32 levels the rest of the line is the string
+    let deep = "x = `${".repeat(20_000);
+    let (v, _) = toks(&js, &deep, 0);
+    t.check(!v.is_empty() && v.last().is_some_and(|l| l.starts_with("str:")), "js: deeply nested template strings end as a string");
     let (v, _) = toks(&js, "x = a / b / c; return /re/.test(s)", 0);
     t.eq(v, s(&["kw:return", "str:/re/", "fn:test"]), "js: division is no regex, after return it is");
     let (v, _) = toks(&js, "p.catch(e => e).finally(); function f() { return this.default }", 0);

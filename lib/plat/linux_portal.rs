@@ -63,6 +63,7 @@ const MSG_SIGNAL: u8 = 4;
 const HF_PATH: u8 = 1;
 const HF_MEMBER: u8 = 3;
 const HF_REPLY: u8 = 5;
+const HF_SENDER: u8 = 7;
 const MP_NAME_END: usize = 200; // req_path: the name part ends here (256 bytes total)
 const SKIP_DEPTH_MAX: u32 = 32;
 const OF_CAP: usize = 1024; // open_folder: absolute path
@@ -130,6 +131,9 @@ struct Bus {
     token: Vec<u8>,
     req_path: Vec<u8>,
     handle: Vec<u8>,
+    // the portal's unique bus name: the sender of its reply to our call, the only one whose
+    // Response counts (the request path is predictable, any client on the bus may send to it)
+    portal: Vec<u8>,
     uri: Vec<u8>,
     uris: Vec<Vec<u8>>,
     filter: Vec<u8>,
@@ -227,6 +231,7 @@ impl Bus {
             token: Vec::new(),
             req_path: Vec::new(),
             handle: Vec::new(),
+            portal: Vec::new(),
             uri: Vec::new(),
             uris: Vec::new(),
             filter: Vec::new(),
@@ -732,6 +737,9 @@ impl Bus {
         if self.msg_type() != MSG_SIGNAL || !self.field_is(HF_MEMBER, S_RESPONSE) {
             return false;
         }
+        if self.portal.is_empty() || !self.field_is(HF_SENDER, &self.portal) {
+            return false;
+        }
         match self.msg_field(HF_PATH) {
             Field::Str(a, e) => {
                 let p = &self.rbuf[a..e];
@@ -739,6 +747,14 @@ impl Bus {
             }
             _ => false,
         }
+    }
+
+    /// keep the sender of the reply at rbuf as the portal's name (is_our_response)
+    fn keep_portal(&mut self) {
+        self.portal = match self.msg_field(HF_SENDER) {
+            Field::Str(a, e) => self.rbuf[a..e].to_vec(),
+            _ => Vec::new(),
+        };
     }
 
     /// take the events wait() queued: window events are kept for later, input events are
@@ -990,6 +1006,7 @@ impl Bus {
         if !self.msg_send(3) || !self.wait_reply(3, T_CALL) || self.msg_type() == MSG_ERROR {
             return (-1, 0);
         }
+        self.keep_portal();
         self.rd_body_begin();
         if let Some(h) = self.rd_str() {
             self.handle = copy_cap(&h, 256);
@@ -1442,6 +1459,7 @@ impl Bus {
             return false;
         }
         self.handle.clear();
+        self.keep_portal();
         self.rd_body_begin();
         if let Some(h) = self.rd_str() {
             self.handle = copy_cap(&h, 256);
