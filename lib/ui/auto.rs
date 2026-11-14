@@ -154,11 +154,15 @@
 //                                 script also warns about a widget id used twice in a pass)
 // (K1) Files and clipboard, drag and drop:
 //   drop X Y FILE...              files dropped at (X, Y) DIP of the scoped window
-//   drop X Y [files F...] [text "s"] [html "s"] [url U] [image F.png] [copy|move|link]
+//   drop X Y [files F...] [text "s"] [html "s"] [url U] [image F.png] [copy|move|link] [sync]
 //                                 other content dropped there; drop X Y self: the app's own
-//                                 drag that left the window comes back
+//                                 drag that left the window comes back; sync: the platform
+//                                 answers the source at the drop (no drop_defer, as on macOS)
+//   drop expect copy|move|link|none|pending   what the last drop's source was answered (the
+//                                 effect, none: not taken), pending: the answer waits (drop_defer)
 //   dragover X Y [files] [text] [url] [html] [image] [copy|move|link]   another program's
-//                                 drag hovers there (default files);  dragleave: it left
+//                                 drag hovers there (default files), allowing those effects
+//                                 (default copy and move: drag_allowed);  dragleave: it left
 //   dragover expect copy|move|link|none [ctrl] [shift]   the platform's answer to that drag
 //                                 now (the target's drop_effect_set; the system's pointer)
 //   dragout expect none | text "s" | html "s" | url "s" | files N | image | kinds N
@@ -2838,17 +2842,25 @@ impl Ui {
     // [copy|move|link] | drop X Y self: dropped on the scoped window (the main window for
     // "any"); `self`: the app's own drag that left its window (dragout) comes back
     fn sc_drop(&mut self, app: &mut dyn App, a: &[u8]) {
-        const BAD: &[u8] = b"expected: drop X Y FILE... | drop X Y [files F...] [text \"s\"] [html \"s\"] [url U] [image F] [copy|move|link] | drop X Y self";
+        const BAD: &[u8] = b"expected: drop X Y FILE... | drop X Y [files F...] [text \"s\"] [html \"s\"] [url U] [image F] [copy|move|link] [sync] | drop X Y self | drop expect copy|move|link|none|pending";
+        if let Some((verb, r)) = Ui::k1_word(a, 16)
+            && verb == b"expect"
+        {
+            self.sc_drop_expect(r);
+            return;
+        }
         let (x, r) = parse_int(a);
         let (y, r) = parse_int(r);
         let w = self.scope_index().max(0) as u32;
         let dpi = self.win_dpi(w);
         let (px, py) = (dp_at(x, dpi), dp_at(y, dpi));
         let Some(data) = self.sc_drag_data(r) else {
+            self.dnd.sync_next = false;
             self.fail(BAD);
             return;
         };
         if data.types() == 0 && word_eq(skip_ws(r), "self").is_none() {
+            self.dnd.sync_next = false;
             self.fail(BAD);
             return;
         }
@@ -2859,9 +2871,37 @@ impl Ui {
         self.run_passes(app);
     }
 
+    // drop expect copy|move|link|none|pending: what the source of the last drop was answered
+    // (drop_defer / drop_finish, else the effect it was delivered with), or that it waits
+    fn sc_drop_expect(&mut self, a: &[u8]) {
+        let name = |e: u32| match e {
+            plat::DE_COPY => "copy",
+            plat::DE_MOVE => "move",
+            plat::DE_LINK => "link",
+            _ => "none",
+        };
+        let want = match Ui::k1_word(a, 16).map(|w| w.0) {
+            Some(w) if w == b"copy" => Some(plat::DE_COPY),
+            Some(w) if w == b"move" => Some(plat::DE_MOVE),
+            Some(w) if w == b"link" => Some(plat::DE_LINK),
+            Some(w) if w == b"none" => Some(0),
+            Some(w) if w == b"pending" => None,
+            _ => {
+                self.fail(b"expected: drop expect copy|move|link|none|pending");
+                return;
+            }
+        };
+        match (self.dnd_answered(), want) {
+            (None, _) => self.fail(b"no drop yet"),
+            (Some(have), want) if have == want => {}
+            (Some(None), _) => self.fail(b"the answer waits (drop_defer)"),
+            (Some(Some(e)), _) => self.fail(alloc::format!("the source was answered {}", name(e)).as_bytes()),
+        }
+    }
+
     // sc_drag_data(words) -> the content of `drop` / `dragover` (None: a bad word): plain
     // words are paths; files / text / html / url / image name a kind; copy / move / link the
-    // effect; self nothing
+    // effect; self nothing; sync: the next drop is answered at the drop
     fn sc_drag_data(&mut self, a: &[u8]) -> Option<DragData> {
         let mut d = DragData::default();
         let mut r = a;
@@ -2890,6 +2930,10 @@ impl Ui {
                     continue;
                 }
                 b"self" if kind == b"files" => continue,
+                b"sync" if kind == b"files" => {
+                    self.dnd.sync_next = true;
+                    continue;
+                }
                 _ => {}
             }
             let s = String::from_utf8_lossy(w).into_owned();

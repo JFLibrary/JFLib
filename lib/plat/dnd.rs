@@ -24,6 +24,14 @@
 //   drag_effect_pick(allowed, mods) -> effect   Ctrl copy, Shift move, Ctrl+Shift link; else
 //                                the first of copy / move / link the mask allows
 //   drop_data_take() -> DragData the pending drop of E_DROP: the paths of drop_take and the rest
+//   drop_hold(on)                (the UI) the program answers drops itself: where the platform
+//                                allows a later answer, a drop's answer to its source waits after
+//                                E_DROP for drop_finish (Windows: a source whose data object is in
+//                                IDataObjectAsyncCapability's async mode; X11: XdndFinished;
+//                                Wayland: wl_data_offer.finish); elsewhere it went at the drop
+//   drop_waiting() -> serial     the drop whose answer waits (0: none), read after drop_data_take
+//   drop_finish(serial, effect) -> answered   answer that drop's source: the effect it was taken
+//                                with, 0 = not taken
 //   drop_set_text / drop_set_html / drop_add_url / drop_set_image / drop_set_effect
 //                                (OS layers) fill the pending drop (drop_reset empties it)
 //   drop_text_from(bytes, utf16) / drop_url_list(text)   decoding helpers of the OS layers
@@ -43,7 +51,7 @@
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 
 use rt::sync::SpinLock;
 
@@ -345,6 +353,77 @@ pub fn drop_url_list(text: &[u8]) -> u32 {
         }
     }
     n
+}
+
+// ---------------------------------------------------------------- the answer of a drop
+
+// drop_hold is on; the serial of the drop whose answer waits (0: none) and the OS layer's function
+// that gives it; the last serial handed out
+static HOLD: AtomicBool = AtomicBool::new(false);
+static WAITING: AtomicU32 = AtomicU32::new(0);
+static FINISH: AtomicUsize = AtomicUsize::new(0);
+static SERIAL: AtomicU32 = AtomicU32::new(0);
+
+/// drop_hold(on): (the UI, at its start) the program answers drops itself.  On, the OS layers keep
+/// a drop's answer to its source open after E_DROP where the platform allows a later answer, until
+/// drop_finish: Windows when the source's data object offers IDataObjectAsyncCapability in async
+/// mode (StartOperation in IDropTarget::Drop, EndOperation later), X11 (XdndFinished), Wayland
+/// (wl_data_offer.finish); everywhere else, and on Windows for every other source, the answer went
+/// at the drop (drop_waiting says 0).  Off (the default): every drop is answered at once, as before
+pub fn drop_hold(on: bool) {
+    HOLD.store(on, Ordering::Release);
+}
+
+/// (OS layers) drop_hold is on
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), allow(dead_code))]
+pub(crate) fn drop_held() -> bool {
+    HOLD.load(Ordering::Acquire)
+}
+
+/// drop_waiting() -> the serial of the last drop whose answer to its source waits for drop_finish;
+/// 0: none (it was answered at the drop, or no drop came).  Read it right after drop_data_take
+pub fn drop_waiting() -> u32 {
+    WAITING.load(Ordering::Acquire)
+}
+
+/// drop_finish(serial, effect) -> answered: the source of drop `serial` (drop_waiting) learns how
+/// the drop ended: the DE_* effect it was taken with, 0 = not taken.  false: that drop does not
+/// wait (answered already, or a newer drop replaced it).  Windows: EndOperation(S_OK, effect),
+/// not taken EndOperation(E_ABORT, DROPEFFECT_NONE); X11: XdndFinished with "accepted" and the
+/// effect's action; Wayland: taken wl_data_offer.finish (the action stays the one negotiated
+/// before the drop), not taken the offer destroyed without finish
+pub fn drop_finish(serial: u32, effect: u32) -> bool {
+    if serial == 0 || WAITING.compare_exchange(serial, 0, Ordering::AcqRel, Ordering::Acquire).is_err() {
+        return false;
+    }
+    let f = FINISH.swap(0, Ordering::AcqRel);
+    if f != 0 {
+        // SAFETY: FINISH only ever holds 0 or a fn(u32) stored by drop_wait_begin.
+        let f: fn(u32) = unsafe { core::mem::transmute::<usize, fn(u32)>(f) };
+        f(effect & DE_ALL);
+    }
+    true
+}
+
+/// (OS layers) the drop about to be pushed keeps its answer open until finish(effect) is called
+/// through drop_finish -> its serial.  A drop that still waited is no longer waited for: the layer
+/// answers it itself before (as at its drop)
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), allow(dead_code))]
+pub(crate) fn drop_wait_begin(finish: fn(u32)) -> u32 {
+    let mut s = SERIAL.fetch_add(1, Ordering::AcqRel).wrapping_add(1);
+    if s == 0 {
+        s = SERIAL.fetch_add(1, Ordering::AcqRel).wrapping_add(1);
+    }
+    FINISH.store(finish as usize, Ordering::Release);
+    WAITING.store(s, Ordering::Release);
+    s
+}
+
+/// (OS layers) the drop that waited was answered by the layer itself (its window went away)
+#[cfg_attr(any(target_arch = "wasm32", target_os = "android", target_vendor = "apple"), allow(dead_code))]
+pub(crate) fn drop_wait_clear() {
+    WAITING.store(0, Ordering::Release);
+    FINISH.store(0, Ordering::Release);
 }
 
 // ---------------------------------------------------------------- the outgoing drag

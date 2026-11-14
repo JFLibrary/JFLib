@@ -14,6 +14,11 @@
 // The page (#501) answers per point, as a web page does (drop_effect_set): text, URLs and files
 // are copied on its left half, refused on the top of its right half, linked below that -- the
 // system's pointer shows it while another program's drag hovers.
+// "Später" (#502) decides after the drop whether it took it, as a web page whose drop handler
+// runs in another process: it defers the drop's answer to its source (drop_defer) and gives it
+// 100 ms later (drop_finish): text starting "ja" copied, "link" linked, "nein" not taken, "nie"
+// no answer at all (the library answers after DROP_DEFER_MS); its card shows the effects the
+// drag over the window allows (drag_allowed) and the answer.
 // Status lines show what the targets saw: "Über", "Abgelegt", "Ende", "UIC_DROP"; "Pixel" the
 // drag's and the last drop's place in px of the window (drag_over_px, drop_pos_px).  German is
 // the source language, locales/ui.tsv has the English texts.
@@ -50,6 +55,8 @@ const ID_OUT_TEXT: u32 = 401;
 const ID_OUT_IMAGE: u32 = 402;
 const ID_OUT_FILE: u32 = 403;
 const ID_PAGE: u32 = 501;
+const ID_LATER: u32 = 502; // "Später": answers its drops 100 ms later
+const T_LATER: u32 = 1; // the timer of that answer
 const TARGET_NAMES: [&str; 5] = ["Text", "HTML", "URL", "Bild", "Dateien"]; // i18n
 const TARGET_TYPES: [u32; 5] = [DT_TEXT, DT_HTML, DT_URL, DT_IMAGE, DT_FILES];
 
@@ -68,6 +75,9 @@ struct Dnd {
     /// jfgui_DNDTEST_PRINT=1: the status lines go to stdout when they change (dnd_x11.py --app)
     print: bool,
     printed: String,
+    /// "Später": the text of the drop whose answer waits, what its source was answered
+    later: Option<String>,
+    answer: String,
 }
 
 impl Default for Dnd {
@@ -83,6 +93,8 @@ impl Default for Dnd {
             moving: None,
             print: plat::env("jfgui_DNDTEST_PRINT").is_some_and(|v| v == "1"),
             printed: String::new(),
+            later: None,
+            answer: String::from("-"),
         }
     }
 }
@@ -94,6 +106,12 @@ fn effect_name(e: u32) -> &'static str {
         DE_LINK => t("verknüpfen"),
         _ => t("keine"),
     }
+}
+
+// "kopieren+verschieben" of a DE_* mask ("-": none)
+fn effects_name(e: u32) -> String {
+    let v: Vec<&str> = [DE_COPY, DE_MOVE, DE_LINK].into_iter().filter(|f| e & f != 0).map(effect_name).collect();
+    if v.is_empty() { String::from("-") } else { v.join("+") }
 }
 
 fn kinds(ty: u32) -> String {
@@ -245,6 +263,55 @@ impl Dnd {
         ui.box_end();
     }
 
+    // "Später": a page that learns after the drop whether it took it (its drop handler runs
+    // elsewhere): the drop's answer to its source waits (drop_defer), the timer gives it
+    fn later_page(&mut self, ui: &mut Ui) {
+        ui.next_size(180, 90);
+        ui.box_begin(ID_LATER, BOX_V | BOX_CARD | PAD_8, 4);
+        match ui.drop_target(ID_LATER, DT_TEXT) {
+            DS_HOVER => self.over = String::from(t("Später")),
+            DS_DROP => {
+                let text = ui.drop_data().text.clone().unwrap_or_default();
+                self.dropped = tf("{} -> Später ({})", &[&kinds(ui.drop_types()), effect_name(ui.drop_effect())]);
+                if ui.drop_defer() {
+                    self.answer = String::from(t("wartet"));
+                    self.later = Some(text);
+                    ui.timer(T_LATER, 100);
+                } else {
+                    self.answer = String::from(t("schon beantwortet"));
+                }
+            }
+            _ => {}
+        }
+        ui.text(TS_BODY_STRONG, t("Später"));
+        ui.text(TS_CAPTION, &tf("Erlaubt: {}", &[&effects_name(ui.drag_allowed())]));
+        ui.text(TS_CAPTION, &tf("Antwort: {}", &[&self.answer]));
+        ui.box_end();
+    }
+
+    // the timer of "Später": the answer of the drop that waits
+    fn later_answer(&mut self, ui: &mut Ui) {
+        let Some(text) = self.later.take() else { return };
+        let e = if text.starts_with("ja") {
+            DE_COPY
+        } else if text.starts_with("link") {
+            DE_LINK
+        } else if text.starts_with("nein") {
+            0
+        } else {
+            self.answer = String::from(t("keine Antwort")); // "nie": the library answers later
+            return;
+        };
+        let ok = ui.drop_finish(e);
+        self.answer = if !ok {
+            String::from(t("zu spät"))
+        } else if e == 0 {
+            String::from(t("nicht genommen"))
+        } else {
+            tf("genommen ({})", &[effect_name(e)])
+        };
+    }
+
     // a button that drags content out (only other programs or the targets take it)
     fn out_button(&mut self, ui: &mut Ui, id: u32, label: &str) {
         let ev = ui.button(id, label);
@@ -300,6 +367,7 @@ impl App for Dnd {
         self.out_button(ui, ID_OUT_IMAGE, t("Bild ziehen"));
         self.out_button(ui, ID_OUT_FILE, t("Datei ziehen"));
         self.page(ui);
+        self.later_page(ui);
         ui.box_end();
         let (ty, x, y) = ui.drag_over();
         let over = if ty == 0 { String::from("-") } else { tf("{} bei {},{}", &[&kinds(ty), &format!("{}", x), &format!("{}", y)]) };
@@ -340,6 +408,7 @@ impl App for Dnd {
                 self.uic = tf("{} bei {},{} (Fenster {})", &[&what, &format!("{}", x), &format!("{}", y), &format!("{}", arg)]);
             }
             UIC_DRAG_END => {} // the sources report through DS_END
+            UIC_TIMER if arg == T_LATER => self.later_answer(ui),
             _ => return false,
         }
         true

@@ -125,7 +125,7 @@ pub(crate) mod win_uia;
 #[path = "win_dnd.rs"]
 pub(crate) mod win_dnd;
 pub(crate) use win_dnd::os_drag_start;
-pub use win_dnd::{dnd_test_drop, dnd_test_formats, dnd_test_source};
+pub use win_dnd::{dnd_test_async_end, dnd_test_drop, dnd_test_drop_async, dnd_test_formats, dnd_test_source};
 pub use win_uia::{
     UiaTestAct, UiaTestCaret, UiaTestElem, uia_test_act, uia_test_caret, uia_test_caret_move, uia_test_events, uia_test_hwnd, uia_test_listen,
     uia_test_system_caret, uia_test_tree, uia_test_unlisten,
