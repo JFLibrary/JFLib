@@ -4247,6 +4247,10 @@ auto -- UI automation for headless tests: scripts and the widget dump  [src/ui/u
   dump(path)                           widget tree as JSON lines (None = stdout)
 
 Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
+  only OS...: COMMAND           the command on these systems only, a `!OS` on every other one
+                                (`only windows linux: key ctrl+q`, `only !macos: ...`); OS:
+                                windows linux macos ios android wasm32 (the names of cargo jflib
+                                test's `#!only`); an unknown name is a parse error
   size W H                      resize the headless window
   theme dark|light|contrast
   theme file PATH | none        an app theme from a file (an error is printed and kept for
@@ -4447,8 +4451,8 @@ wins).  Points are in the scoped window (main for any).  Failed expectations pri
   FAIL line N: <command> -> <detail>
 and the script continues.
 
-Scripts are bytes (as the asm reads them): lines of at most 1023 bytes, CR dropped; a NUL
-ends the script.
+Scripts are bytes (as the asm reads them): lines of at most LINE_MAX - 1 bytes, CR dropped; a
+NUL ends the script.
 ```
 
 **`impl Ui`**

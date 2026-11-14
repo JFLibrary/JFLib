@@ -21,6 +21,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 ### Added
 
 - **ui:** `FD_BUILTIN`: the app chooses the library's own file dialog for a `ui.filedlg` call on every platform (Windows, Linux, macOS, Android, the browser), so it looks and behaves the same everywhere and in every style; it lists what plat's file functions see. Before, only the environment variable `jfgui_FILEDLG=builtin` chose it, for every dialog of a run. docs/GUIDE.md section 7
+- **ui:** Test scripts: a line `only OS...: COMMAND` runs one command on the systems it names (`only windows linux: key ctrl+q`), `!OS` on every system but that one; the names are those of cargo jflib test's `#!only` (windows linux macos ios android wasm32), which skips a whole script. The app decides it where the script runs, so build_rs.py test, cargo jflib test and runs by hand behave alike; an unknown name is a parse error. docs/GUIDE.md section 12
 
 ### Fixed
 

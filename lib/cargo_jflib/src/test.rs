@@ -5,6 +5,8 @@
 // whose engine is a feature.
 // A line "#!only windows linux .." among the script's first lines runs it on these systems only
 // (target_os of --target, else of this machine; others: skipped), e.g. scripts of native plugins.
+// One line of a script is restricted in the script itself: "only windows linux: COMMAND" (ui's
+// script runner, with the names target_os gives here: windows linux macos ios android wasm32).
 
 use std::fs;
 use std::path::Path;

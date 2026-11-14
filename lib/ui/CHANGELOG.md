@@ -14,6 +14,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   system's, on every platform, so the dialog looks and behaves the same everywhere and in every
   style (a browser's "Save as"). It lists what plat's file functions see. Before, only the
   environment variable `jfgui_FILEDLG=builtin` chose it, and for every dialog of a run.
+- Test scripts: a line `only OS...: COMMAND` runs one command on the systems it names
+  (`only windows linux: key ctrl+q`), and `!OS` on every system but that one. The names are those
+  of `cargo jflib test`'s `#!only` line, which skips a whole script: windows, linux, macos, ios,
+  android, wasm32. The app decides it where the script runs; an unknown name is a parse error.
 
 ### Fixed
 

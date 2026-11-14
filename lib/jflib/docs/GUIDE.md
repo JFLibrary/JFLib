@@ -2157,6 +2157,13 @@ shot build/template.png
   the script (pass them yourself when you run it by hand). A line `#!timeout 1800` among the
   first five sets the seconds it may take there (600 otherwise); a script that takes longer
   counts as failed and the others still run.
+* **Lines for some systems**: `only OS...: COMMAND` runs the command only on the systems it
+  names, `!OS` on every system but that one (`only windows: key ctrl+q`, `only !macos: expect
+  "Beenden" exists`, `only linux macos: ...`; blanks or commas between the names). The names are
+  those of `cargo jflib test`'s `#!only` line, which skips a whole script: `windows`, `linux`,
+  `macos`, `ios`, `android`, `wasm32`. The app decides it where the script runs, so it works
+  under `build_rs.py test`, `cargo jflib test` and by hand alike; an unknown name or a line
+  without a command is a parse error (exit code 2). `apps/viewtest/tests/onlyos.uis`.
 * `build_rs.py test` runs the scripts side by side: `--test-jobs N` at a time (default half the
   logical CPUs, or `jfgui_TEST_JOBS`; `--test-jobs 1` runs them one after the other in the old
   order), Windows and Linux together. An app's scripts keep their order and run one at a time,

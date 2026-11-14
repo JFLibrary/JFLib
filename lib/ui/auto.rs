@@ -4,6 +4,10 @@
 //   dump(path)                           widget tree as JSON lines (None = stdout)
 //
 // Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
+//   only OS...: COMMAND           the command on these systems only, a `!OS` on every other one
+//                                 (`only windows linux: key ctrl+q`, `only !macos: ...`); OS:
+//                                 windows linux macos ios android wasm32 (the names of cargo jflib
+//                                 test's `#!only`); an unknown name is a parse error
 //   size W H                      resize the headless window
 //   theme dark|light|contrast
 //   theme file PATH | none        an app theme from a file (an error is printed and kept for
@@ -204,8 +208,8 @@
 //   FAIL line N: <command> -> <detail>
 // and the script continues.
 //
-// Scripts are bytes (as the asm reads them): lines of at most 1023 bytes, CR dropped; a NUL
-// ends the script.
+// Scripts are bytes (as the asm reads them): lines of at most LINE_MAX - 1 bytes, CR dropped; a
+// NUL ends the script.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -294,6 +298,57 @@ pub(crate) enum Sel {
 }
 
 // ------------------------------------------------------------------ parsing helpers
+
+/// the system a script runs on, as `only OS:` and cargo jflib test's `#!only` name it
+pub(crate) const SCRIPT_OS: &str = if cfg!(target_arch = "wasm32") {
+    "wasm32"
+} else if cfg!(windows) {
+    "windows"
+} else if cfg!(target_os = "android") {
+    "android"
+} else if cfg!(target_os = "linux") {
+    "linux"
+} else if cfg!(target_os = "macos") {
+    "macos"
+} else if cfg!(target_os = "ios") {
+    "ios"
+} else {
+    "other"
+};
+
+// the names `only` takes
+const SCRIPT_OSES: [&str; 6] = ["windows", "linux", "macos", "ios", "android", "wasm32"];
+
+// only_line(the words after `only`, os) -> Some((it runs on os, the command)): it runs where it is
+// named and not excluded by a `!OS` (with only `!OS`es: every system but those); None: no list up
+// to a ':', an unknown name, no command after it
+fn only_line<'a>(p: &'a [u8], os: &str) -> Option<(bool, &'a [u8])> {
+    let colon = p.iter().position(|&c| c == b':')?;
+    let (list, cmd) = (&p[..colon], skip_ws(&p[colon + 1..]));
+    let (mut named, mut hit, mut out) = (false, false, false);
+    let mut n = 0;
+    for w in list.split(|&c| c == b' ' || c == b'\t' || c == b',').filter(|w| !w.is_empty()) {
+        let (not, name) = match w.strip_prefix(b"!") {
+            Some(x) => (true, x),
+            None => (false, w),
+        };
+        if !SCRIPT_OSES.iter().any(|o| o.as_bytes() == name) {
+            return None;
+        }
+        n += 1;
+        let me = name == os.as_bytes();
+        if not {
+            out |= me;
+        } else {
+            named = true;
+            hit |= me;
+        }
+    }
+    if n == 0 || cmd.is_empty() || cmd[0] == b'#' {
+        return None;
+    }
+    Some(((!named || hit) && !out, cmd))
+}
 
 // skip_ws: blanks and tabs
 pub(crate) fn skip_ws(p: &[u8]) -> &[u8] {
@@ -749,9 +804,24 @@ impl Ui {
     // script_exec(line) -> true = quit
     fn script_exec(&mut self, app: &mut dyn App, line: &[u8]) -> bool {
         self.sc.line = line.to_vec(); // a copy of the line for messages
-        let l = skip_ws(line);
+        let mut l = skip_ws(line);
         if l.is_empty() || l[0] == b'#' {
             return false;
+        }
+        // only OS...: COMMAND -- the command on those systems (the message keeps the whole line)
+        if let Some(r) = word_eq(l, "only") {
+            match only_line(skip_ws(r), SCRIPT_OS) {
+                Some((true, cmd)) => l = cmd,
+                Some((false, _)) => return false,
+                None => {
+                    let mut o = alloc::format!("error: line {}: expected only OS...: COMMAND (OS: {}, !OS: not there): ", self.sc.lineno, SCRIPT_OSES.join(" ")).into_bytes();
+                    o.extend_from_slice(l);
+                    o.push(b'\n');
+                    plat::write_stderr(&o);
+                    self.sc.parse_err = true;
+                    return false;
+                }
+            }
         }
         const CMDS: [&str; 58] = [
             "a11y", "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
