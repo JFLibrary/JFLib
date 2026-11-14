@@ -8,6 +8,24 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `ui.drop_defer()` and `ui.drop_finish(effect)`: a drop target that learns only later whether
+  it took a drop (a web page's drop handler in another process) tells the drag's source then --
+  the effect, or that it was not taken -- at most `DROP_DEFER_MS` (3 s) after the drop. X11 and
+  Wayland carry the late answer, Windows for a source whose data object is in async mode; on
+  macOS and in the browser `drop_defer` says the answer went at the drop.
+- `ui.drag_allowed()`: the effects the source of the drag over a window allows.
+- Script commands `drop expect copy|move|link|none|pending` and `drop ... sync`.
+
+### Fixed
+
+- Every window keeps its own state slots (`ui.slot`): a box or view of the same id in two
+  windows, such as the title bar's box in two app windows, no longer flips between their sizes
+  ("layout did not settle within 4 passes").
+- Script selectors and `expect S text` match a record's whole label, also a wrapped paragraph of
+  more than 255 bytes; `dump` writes labels up to 64 KiB.
+
 ## [0.2.0] - 2026-11-13
 
 ### Added

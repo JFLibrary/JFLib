@@ -8,6 +8,20 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `drop_hold(on)`, `drop_waiting()` and `drop_finish(serial, effect)`: a drop's answer to its
+  source waits after `E_DROP` until the program gives it, where the platform allows a later
+  answer: X11 (`XdndFinished`), Wayland (`wl_data_offer.finish`) and Windows for a source whose
+  data object offers `IDataObjectAsyncCapability` in async mode (`EndOperation`).
+- Windows: the data object of the app's drags offers `IDataObjectAsyncCapability` (async mode
+  off); `dnd_test_drop_async` and `dnd_test_async_end` test the late answer without a user.
+
+### Changed
+
+- X11: the effects another program's drag allows come from the source's `XdndActionList` and the
+  action it asks for (`E_DRAG`, the `XdndStatus` answer); without a list every effect, as before.
+
 ## [0.2.0] - 2026-11-13
 
 ### Added
