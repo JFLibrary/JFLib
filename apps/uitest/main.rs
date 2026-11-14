@@ -329,6 +329,45 @@ fn settings_roundtrip(t: &mut T) {
     t.check(&format!("sections of 50000 headers in under a second ({} ms)", us / 1000), n == 50_000 && us < 1_000_000);
 }
 
+// ---- base::xml: the declaration as written, namespace well-formedness, "]]>" in attributes,
+// the names the tree keeps bounded
+
+fn xml(t: &mut T) {
+    use base::xml::{self, Error};
+    t.check("a literal ]]> in an attribute value", xml::parse("<r a=\"]]>\"/>").is_ok_and(|n| n.attr("", "a") == Some("]]>")));
+    t.check("... but not in text", xml::parse("<r>]]></r>").is_err());
+    t.check("a declaration with a line break or a tab after xml",
+            xml::parse("<?xml\nversion=\"1.0\"?><r/>").is_ok() && xml::parse("<?xml\tversion='1.0' encoding='UTF-8'?>\r\n<r/>").is_ok());
+    t.check("a plain declaration", xml::parse("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><r/>").is_ok());
+    t.check("<?xml-stylesheet is no declaration", xml::parse("<?xml-stylesheet href='x'?><r/>").is_err());
+    t.check("a reference in the declaration is no version 1.0", xml::parse("<?xml version=\"&#49;.0\"?><r/>").is_err());
+    t.check("namespace attributes in the declaration",
+            xml::parse("<?xml xmlns:p=\"urn:x\" version=\"1.0\"?><r/>").is_err() && xml::parse("<?xml version=\"1.0\" xmlns=\"urn:x\"?><r/>").is_err());
+    t.check("declaration attributes need white space between them", xml::parse("<?xml version='1.0'encoding='UTF-8'?><r/>").is_err());
+    for bad in ["<r xmlns:=\"urn:x\"/>", "<p:1 xmlns:p=\"urn:x\"/>", "<r xmlns:p=\"urn:x\" p:.x=\"v\"/>", "<r xmlns:p:q=\"urn:x\"/>", "<r xmlns:1p=\"urn:x\"/>"] {
+        t.check(&format!("not namespace-well-formed: {bad}"), xml::parse(bad).is_err());
+    }
+    t.check("prefixed names", xml::parse("<p:r xmlns:p=\"urn:x\" p:a-b.c=\"1\"/>").is_ok_and(|n| n.is("urn:x", "r") && n.attr("urn:x", "a-b.c") == Some("1")));
+    // every name holds a copy of its namespace URI: 10000 elements with 10 attributes and a
+    // 4000-byte URI would keep 440 MB of names from 1 MB of text
+    let uri = format!("urn:x:{}", "a".repeat(3994));
+    let attrs: String = (b'A'..=b'J').map(|c| format!(" p:{}=\"\"", c as char)).collect();
+    let mut s = format!("<r xmlns:p=\"{uri}\">");
+    for _ in 0..10_000 {
+        s.push_str(&format!("<p:n{attrs}/>"));
+    }
+    s.push_str("</r>");
+    t.check("the names a tree keeps are bounded (16 x the text's limit)", xml::parse(&s) == Err(Error::Limit));
+    // a word-processing document: 20000 elements, 5 attributes each, a 61-byte URI
+    let w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    let mut s = format!("<w:r xmlns:w=\"{w}\">");
+    for _ in 0..20_000 {
+        s.push_str("<w:p w:a=\"1\" w:b=\"2\" w:c=\"3\" w:d=\"4\" w:e=\"5\"/>");
+    }
+    s.push_str("</w:r>");
+    t.check("... an ordinary document within", xml::parse(&s).is_ok_and(|n| n.children.len() == 20_000));
+}
+
 // ---- app themes (ui::theme, the theme file)
 
 fn themes(t: &mut T) {
@@ -627,7 +666,7 @@ fn chart(t: &mut T) {
 fn run() -> i32 {
     let only = plat::arg_value("--only").map(String::from);
     let groups: &[(&str, fn(&mut T))] =
-        &[("history", history), ("easing", easing), ("settings", settings), ("themes", themes), ("ids", ids), ("segment", segment), ("chart", chart)];
+        &[("history", history), ("easing", easing), ("settings", settings), ("xml", xml), ("themes", themes), ("ids", ids), ("segment", segment), ("chart", chart)];
     let (mut failed, mut total) = (0, 0);
     for (name, f) in groups {
         if only.as_deref().is_some_and(|o| o != *name) {
