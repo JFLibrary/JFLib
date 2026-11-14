@@ -1352,6 +1352,41 @@ ui.dialog_end(); // always
         ui.drop_effect_set(self.page_effect_at(kinds, x, y)); // e.g. DE_COPY, or 0: not here
     }
     ```
+  * What the source allows: `ui.drag_allowed()` gives the `DE_*` effects of the drag over the
+    window as its source offers them -- Windows the effects of its `DoDragDrop`, X11 the source's
+    `XdndActionList` with the action it asks for (without a list: all), Wayland its
+    `source_actions` (copy and move; Wayland has no link), macOS the drag's operation mask (AppKit
+    narrows it by the modifier keys), the app's own drag its `DragData::allowed()`; `DE_ALL` where
+    the platform does not say, 0 when no drag is over the window. A page that maps a web page's
+    `effectAllowed` and `dropEffect` picks from it for `drop_effect_set`.
+  * The answer after the drop: by default the source learns the effect the drop was delivered
+    with after its passes. A target that learns later whether it took the drop (a web page's drop
+    handler in another process) calls `ui.drop_defer()` in the pass of the drop (`DS_DROP`, or
+    in `App::command`'s `UIC_DROP`) and answers with `ui.drop_finish(effect)` when it knows: the
+    effect it took the drop with, 0 = not taken (an effect the source does not allow becomes the
+    first it does). Without `drop_finish` the answer goes after `DROP_DEFER_MS` (3 s) as the drop
+    was delivered, with a `UIWARN`; so does a deferred drop the next drop overtakes, and one that
+    waits when the app ends. `drop_defer()` returns false where the answer went at the drop
+    already; then `drop_finish` does nothing. What the source sees:
+
+    | Platform | deferred (`drop_defer` true) | taken | not taken |
+    |---|---|---|---|
+    | X11 | always | `XdndFinished` accepted, the effect's action | `XdndFinished` not accepted, no action (an XDND 5 source; older ones see only that it ended) |
+    | Wayland | always | `wl_data_offer.finish`: `dnd_finished` with the action negotiated before the drop (it cannot change after it) | the offer destroyed without `finish` (the protocol has no other answer after a drop; Weston then sends the source `cancelled`) |
+    | Windows | only a source whose data object offers `IDataObjectAsyncCapability` in async mode | `EndOperation(S_OK, effect)` | `EndOperation(E_ABORT, DROPEFFECT_NONE)` |
+    | Windows, other sources; macOS; the browser (file drops) | never: `IDropTarget::Drop`, `performDragOperation:` and the page's `drop` event answer at once | the effect at the drop | (as taken: the source learns nothing more) |
+
+    ```rust
+    match ui.drop_target(ID_PAGE, DT_FILES | DT_URL | DT_TEXT) {
+        DS_DROP => {
+            let deferred = ui.drop_defer();          // the page decides later
+            self.engine.drop(ui.drop_data().clone(), deferred);
+        }
+        _ => {}
+    }
+    // later, when the engine says DropDone { taken, effect }:
+    ui.drop_finish(if taken { effect } else { 0 });
+    ```
   * Positions: `drop_pos()` and `drag_over()` are DIP of the window, rounded; at 150 % three
     pixels share two DIP. A canvas that draws at the display's resolution (a web page) takes
     `drop_pos_px()` / `drag_over_px()`: px of the window like `last_rect`, so `(x - inp.rect[0],
@@ -1360,11 +1395,15 @@ ui.dialog_end(); // always
   * Tests: `drag S1 S2` and `down` / `move` / `key esc` / `up` for widget drags; `dragover`,
     `dragleave` and `drop X Y text "s" html "s" url U image F files F...` for other programs;
     `dragover expect copy|move|link|none [ctrl] [shift]` for what the platform would answer the
-    drag that hovers (the target's `drop_effect_set`);
+    drag that hovers (the target's `drop_effect_set`); `dragover X Y text copy link` sets the
+    effects the source allows; `drop expect copy|move|link|none|pending` for the answer the source
+    of the last drop got (`drop ... sync`: a platform that answers at the drop);
     `dragout expect ...` / `dragout end move` for a drag that left the window (headless, the
-    platform is not involved); see `apps/dndtest`. `plattest --test dnd` checks the shared part
-    and Windows' OLE objects without a user, `tools/platshared/dnd_x11.py` XDND both ways under
-    WSLg (`--app`: also with the real dndtest window). By hand only: dragging with a real mouse to and from Explorer, a browser, a file
+    platform is not involved); see `apps/dndtest` (`tests/later.uis`: the answer after the drop).
+    `plattest --test dnd` checks the shared part and Windows' OLE objects without a user (also the
+    answer after the drop with a data object in async mode), `tools/platshared/dnd_x11.py` XDND
+    both ways under WSLg (also `XdndActionList` and `XdndFinished` after `drop_finish`; `--app`:
+    with the real dndtest window). By hand only: dragging with a real mouse to and from Explorer, a browser, a file
     manager, and everything on Wayland (a compositor gives the drag to the client of a real
     button press).
 
@@ -2043,8 +2082,9 @@ in DIP):
 | `expect scrollcopy [N]\|none` | at least N (default 1) / no rendered frames moved pixels by a scroll copy since the last check (§5; frames checked by `--verify-dirty` copy whenever they can, `jfgui_DEBUG=1` prints each copy) |
 | `expect sound KIND\|none` | the last sound `ui.beep` / `ui.dialog_sound` asked for since the last check (`default`, `information`, `warning`, `error`, `question`, `notify`; headless runs play nothing, §33) |
 | `drop X Y FILE...` | files dropped at (X, Y) of the scoped window (onto a drop target, else `UIC_DROP`) |
-| `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link]`, `drop X Y self` | other content dropped there; `self`: the app's own drag that left the window comes back |
-| `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
+| `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link] [sync]`, `drop X Y self` | other content dropped there; `self`: the app's own drag that left the window comes back; `sync`: the platform answers the source at the drop, as macOS does (`ui.drop_defer()` says false) |
+| `drop expect copy\|move\|link\|none\|pending` | what the source of the last drop was answered (`none`: not taken; the effect it was delivered with, or `ui.drop_finish`'s), `pending`: the answer waits (`ui.drop_defer`, §7) |
+| `dragover X Y [files] [text] [url] [html] [image] [copy\|move\|link]`, `dragleave` | another program's drag hovers there, its source allowing those effects (default copy and move: `ui.drag_allowed()`) / leaves |
 | `dragover expect copy\|move\|link\|none [ctrl] [shift]` | what the platform would answer that drag now (the target's `drop_effect_set`, the system's pointer) |
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
 | `system focus in\|out`, `system suspend\|resume`, `system background\|foreground`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|other\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...; background / foreground: a hidden tab, Android's `onStop` / `onStart`) |
@@ -2066,6 +2106,9 @@ in DIP):
 `text:"Klicks: 2"`), `X,Y` (a point in DIP). A label must match exactly one widget (plain text is
 ignored when a control with the same label exists; with matches in several windows the topmost
 window wins, then the topmost layer, so an ambiguous label resolves to the dialog or popup).
+A label is the record's whole text: a wrapped paragraph (a web page's) is one record and its
+selector the whole paragraph, as `dump` shows it (a script line holds up to 16 KiB, `dump` writes
+up to 64 KiB of a label; `apps/viewtest/tests/longtext.uis`).
 Failed expectations print `FAIL line N: <command> -> <detail>` and the script goes on.
 
 ```
@@ -2211,7 +2254,12 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   control whose segments take `id + 1 ..`). Scripts (and `jfgui_DEBUG=1`) print a `UIWARN`
   for an id two widgets of one pass share, with both positions; `expect_nowarn` fails on it.
   Ids are per window: windows may use the same ids (a text box of one id in two app windows
-  keeps its own caret, selection and undo in each).
+  keeps its own caret, selection and undo in each). So do the state slots (`ui.slot(id)`): a
+  box of one id measures in every window by itself and a view of one id keeps its own scroll
+  position, so two windows built by the same code (a browser's windows with their own title
+  bars, a dialog box of a fixed id) settle each in its own size; a window's slots go with its
+  state (`window_destroy`), and a panel that floats out into a tool window starts there with
+  fresh ones (its scroll positions too).
 * `ui.canvas(...)` records the version *before* you react to its input. When handling the
   returned `UiInput` changes the content, bump the version and call `ui.repass()`; otherwise
   the dirty-region renderer shows the change one frame late (`--verify-dirty` reports it).

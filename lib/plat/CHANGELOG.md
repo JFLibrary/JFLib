@@ -12,9 +12,18 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - `vfs::Provider::create_new` (a new file where nothing is, the check and the creation in one step; the default uses the OS exclusive create of `os_path`) and `vfs::Stream::deferred` (bytes reach the provider only by sync or drop)
 
+- `drop_hold(on)`, `drop_waiting()` and `drop_finish(serial, effect)`: a drop's answer to its
+  source waits after `E_DROP` until the program gives it, where the platform allows a later
+  answer: X11 (`XdndFinished`), Wayland (`wl_data_offer.finish`) and Windows for a source whose
+  data object offers `IDataObjectAsyncCapability` in async mode (`EndOperation`).
+- Windows: the data object of the app's drags offers `IDataObjectAsyncCapability` (async mode
+  off); `dnd_test_drop_async` and `dnd_test_async_end` test the late answer without a user.
+
 ### Changed
 
 - `File::create_new` on a mount whose provider has neither `Provider::create_new` nor `os_path` returns None (it was exclusive only against other `create_new` calls of the process; `write_file` or `File::open` of another writer in between was emptied). `log_file` returns false for a file of such a provider (its lines reached the provider only when the log stopped, a crash line never)
+- X11: the effects another program's drag allows come from the source's `XdndActionList` and the
+  action it asks for (`E_DRAG`, the `XdndStatus` answer); without a list every effect, as before.
 
 ### Fixed
 
