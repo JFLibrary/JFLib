@@ -17,6 +17,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - `Settings`: a reset left a line of the key in the file when the value already read as the default, and only the first line when the key was there twice -- after a restart the old value came back. A text with a line break or blanks around it read back otherwise after a restart, and `text()` of a key outside the schema ignored its maximum
 - `Ini::set` accepted a line longer than 64 KiB that the file then read as a malformed line (the key gone, the keys after a long header in the section before), and `Ini::sections` compared every header with every name before it (a file of 50 000 headers: seconds)
+- `xml::parse`: a literal `]]>` in an attribute value was refused (it is allowed there, not in text); a declaration with a line break or tab after `<?xml` was refused; the declaration went through the element parser, so `version="&#49;.0"` passed as 1.0 and a namespace attribute in it vanished (now read as written: version, encoding, standalone in this order); `xmlns:` with an empty prefix set the default namespace and names with an invalid local part (`p:1`, `p:.x`) or prefix (`xmlns:1p`, `xmlns:p:q`) passed; and every element and attribute name kept its own copy of the namespace URI, so 1 MB of text could hold hundreds of MB -- the names a tree keeps are now at most 16 times the text limit (`Error::Limit`)
 
 ## [0.2.0] - 2026-11-14
 
