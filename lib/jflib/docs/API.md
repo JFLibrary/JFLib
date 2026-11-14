@@ -38423,7 +38423,8 @@ cron -- 5-field cron schedules evaluated in a time zone
                                 a-b, a-b/n, */n, lists a,b; month names jan..dec, weekday
                                 names sun..sat (0 and 7 = Sunday); @hourly @daily @midnight
                                 @weekly @monthly @yearly @annually.  Day of month and day of
-                                week restricted both: either matches (Vixie cron).
+                                week restricted both: either matches; one of them beginning
+                                with "*" (also "*/2"): both must match (Vixie cron).
   cron.next_after(ts, &zone)    the first run after ts: a wall time in a DST gap runs at the
                                 jump (right after the gap), a repeated wall time runs once
                                 (its first occurrence); None when nothing matches within
