@@ -95,6 +95,16 @@ pub fn run(t: &mut T) {
     let fri13 = Cron::parse("0 0 13 * fri").unwrap();
     // day of month OR day of week: Friday 2026-10-16 comes first
     t.eq("dom or dow", fri13.next_after(ts("2026-10-12T00:00:00Z"), &Zone::utc()), Some(ts("2026-10-13T00:00:00Z")));
+    // Vixie cron: a day field beginning with "*" ("*/2") makes both day fields count
+    let odd_mondays = Cron::parse("0 0 */2 * mon").unwrap();
+    t.check("*/2 and mon: an odd Tuesday is no match", !odd_mondays.matches_date(2026, 10, 13));
+    t.check("*/2 and mon: an even Monday is none", !odd_mondays.matches_date(2026, 10, 12));
+    t.check("*/2 and mon: an odd Monday is one", odd_mondays.matches_date(2026, 10, 19));
+    // "7-7" is Sunday alone
+    let sun = Cron::parse("0 0 * * 7-7").unwrap();
+    t.check("7-7: Sunday, not Monday", sun.matches_date(2026, 10, 11) && !sun.matches_date(2026, 10, 12));
+    t.eq("7-7: weekly", sun.next_after(ts("2026-10-11T00:00:00Z"), &Zone::utc()), Some(ts("2026-10-18T00:00:00Z")));
+    t.check("5-7 and 0-7 as before", Cron::parse("0 0 * * 5-7").unwrap().matches_date(2026, 10, 11) && Cron::parse("0 0 * * 0-7").unwrap().matches_date(2026, 10, 14));
     let q = Cron::parse("*/15 * * * *").unwrap();
     t.eq("describe every 15", q.describe(false).as_str(), "Alle 15 Minuten");
     t.eq("next 3", q.next_n(ts("2026-10-12T10:07:00Z"), &Zone::utc(), 3).len(), 3);

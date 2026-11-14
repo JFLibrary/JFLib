@@ -23,6 +23,11 @@ pub fn run(t: &mut T) {
     t.eq("hash64 a", hash64(b"a"), 0x02C0_BDBF_4814_20F8);
     t.eq("hash64 foobar", hash64(b"foobar"), 0x404D_A9E3_B740_78C2);
     t.eq("hash64 token", hash64(b"10.0.4.11#0"), 0x0FB5_2DAB_029B_9205);
+    // several tokens at one place: the circle belongs to the first of them, not to nobody
+    let mut same: Ring<&str> = Ring::new();
+    same.add("a", "same", 1);
+    same.add("b", "same", 1);
+    t.eq("shares of tokens at one place", same.shares(), alloc::vec![("a", 1_000_000), ("b", 0)]);
     let empty: Ring<String> = Ring::new();
     t.check("empty ring", empty.owner(5).is_none() && empty.preference(5, 2).is_empty() && empty.is_empty());
     let names = ["10.0.4.11", "10.0.4.12", "10.0.4.13"];
