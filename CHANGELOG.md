@@ -31,6 +31,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 - **ui, plat:** Drag and drop: 0 as the effects a source allows means it does not say, so every effect (`DE_ALL`), everywhere: `DragData::allowed()` of a drag with `effects` 0 (the app's own drags, inside the app and dragged out), the `allowed` of `plat::drag_query`, `drag_query_all` and `drag_decide`, another program's hover without effects in `drop_effect_set`'s highlight. Before, these took 0 as copy and move, while `ui.drag_allowed()` and the effects of a drop took it as every effect. A drag that names no effects can be linked now (Ctrl+Shift inside the app, a target that only links, other programs); a source that must not be linked names its effects (`DE_COPY | DE_MOVE`). Files are still never moved. docs/GUIDE.md section 7
 - **plat:** `watch::Watcher::take` reports `overflow` after each wait while a root or folder is not watched (`watching()` false), so a caller that rescans on `overflow` polls until the watcher sees everything again; before, a lost root reported one overflow and then nothing
+- **base:** `Settings::set`, `set_at` and `reset` report whether the value or the file changed: setting the default removes every line of the key, also one that already read as the default (an explicit default, an invalid value), and that counts as a change (`dirty`, `revision`). A text is kept as the file holds it -- CR, LF and NUL as blanks, no blanks around it -- and a value whose line would be longer than 64 KiB is not set (false)
+- **base:** `Ini::set` refuses a line longer than 64 KiB (`key=value`, a new `[section]`) and drops the blanks around a value, as reading does: `get` after `set` gives what a reload gives
 
 ### Fixed
 
@@ -51,6 +53,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** IMAP `tokens` nests lists at most 64 deep and takes the rest of the line as one atom: a line of `(` ran the stack out, in the parse and in the drop of the result
 - **img_jpeg:** The scans of an image go over at most 64 times its blocks; further scans are left out as after a missing EOI: thousands of empty scans with a restart interval kept the decoder of a small file busy for minutes
 - **img_jxl:** The bit reader's position saturates instead of wrapping: past u64::MAX (an extensions bundle, a section offset of a crafted table of contents) it read the stream again from its start while `check()` saw no error
+- **base:** `Settings`: a reset left a line of the key in the file when the value already read as the default, and only the first line when the key was there twice -- after a restart the old value came back. A text with a line break or blanks around it read back otherwise after a restart, and `text()` of a key outside the schema ignored its maximum
+- **base:** `Ini::set` accepted a line longer than 64 KiB that the file then read as a malformed line (the key gone, the keys after a long header in the section before), and `Ini::sections` compared every header with every name before it (a file of 50 000 headers: seconds)
 
 ### Security
 
