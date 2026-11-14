@@ -3,7 +3,8 @@
 # 549..729 x 285..375) learns 100 ms after a drop whether it took it, as a web page whose drop
 # handler runs elsewhere.  `drop expect` is what the source was answered (XdndFinished,
 # wl_data_offer.finish, EndOperation of a data object in async mode); headless runs keep it.
-# The card also shows the effects the drag over the window allows (ui.drag_allowed).
+# The card also shows the effects the drag over the window allows (ui.drag_allowed), also those
+# of a drop while its answer waits; "Abgelegt" what drag_allowed said in the drop's pass.
 theme light
 # the effects the source allows: as `dragover` offers them (default copy and move)
 dragover 640 330 text copy move link
@@ -20,14 +21,52 @@ move 640,330
 expect text:"Erlaubt: kopieren+verschieben" exists
 key esc
 up
-# taken, 100 ms later: the source learns it then
+# the app's own drag that left the window and hovers over it again: the platform's effects; when
+# the platform ends it (dropped elsewhere) its hover ends too
+down #401
+move 780,300
+dragover 640 330 text copy
+expect text:"Erlaubt: kopieren" exists
+dragout end copy
+expect text:"Ziehen: -  Über: -" exists
+expect text:"Erlaubt: -" exists
+up
+# taken, 100 ms later: the source learns it then.  In the drop's pass drag_allowed says what its
+# source allows (as the hover said), and on while the answer waits -- no drag hovers any more
 dragover 640 330 text copy move
 drop 640 330 text "ja bitte"
-expect text:"Abgelegt: Text -> Später (kopieren)" exists
+expect text:"Abgelegt: Text -> Später (kopieren, erlaubt: kopieren+verschieben)" exists
 expect text:"Antwort: wartet" exists
+expect text:"Ziehen: -  Über: -" exists
+expect text:"Erlaubt: kopieren+verschieben" exists
 drop expect pending
 wait 150
 expect text:"Antwort: genommen (kopieren)" exists
+expect text:"Erlaubt: -" exists
+drop expect copy
+# the effects the platform gives with the drop (Windows' Drop, X11's last XdndPosition, Wayland's
+# source_actions, macOS' mask) count, not the hover's
+dragover 640 330 text copy move
+drop 640 330 text "link" allows copy link
+expect text:"Abgelegt: Text -> Später (kopieren, erlaubt: kopieren+verknüpfen)" exists
+expect text:"Erlaubt: kopieren+verknüpfen" exists
+wait 150
+expect text:"Antwort: genommen (verknüpfen)" exists
+expect text:"Erlaubt: -" exists
+drop expect link
+# a drag that left says nothing about the next drop: one without a hover and without effects of
+# its own allows every effect (before, it had the effects of the drag before: copy only)
+dragover 640 330 text copy
+dragleave
+drop 640 330 text "link"
+expect text:"Abgelegt: Text -> Später (kopieren, erlaubt: kopieren+verschieben+verknüpfen)" exists
+wait 150
+drop expect link
+# an effect the source does not allow is not delivered: the first it allows that the target
+# takes (before, the drop said link)
+drop 640 330 text "ja" link allows copy move
+expect text:"Abgelegt: Text -> Später (kopieren, erlaubt: kopieren+verschieben)" exists
+wait 150
 drop expect copy
 # not taken: the source learns that (before charge 10 it was told copy)
 dragover 640 330 text copy move
@@ -65,6 +104,9 @@ dragover 640 330 text copy move
 drop 640 330 text "ja" sync
 expect text:"Antwort: schon beantwortet" exists
 drop expect copy
+# drag_allowed said the drop's effects in its pass only: the answer went at the drop
+expect text:"Abgelegt: Text -> Später (kopieren, erlaubt: kopieren+verschieben)" exists
+expect text:"Erlaubt: -" exists
 # a drop that is not deferred: answered after its passes with the effect it was delivered with
 drop 82 229 text "Hallo"
 expect text:"Abgelegt: Text -> Text-Ziel (kopieren)" exists

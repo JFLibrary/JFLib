@@ -18,7 +18,8 @@
 // runs in another process: it defers the drop's answer to its source (drop_defer) and gives it
 // 100 ms later (drop_finish): text starting "ja" copied, "link" linked, "nein" not taken, "nie"
 // no answer at all (the library answers after DROP_DEFER_MS); its card shows the effects the
-// drag over the window allows (drag_allowed) and the answer.
+// drag over the window allows (drag_allowed: also those of a drop while its answer waits) and the
+// answer, "Abgelegt" what drag_allowed said in the drop's pass.
 // Status lines show what the targets saw: "Über", "Abgelegt", "Ende", "UIC_DROP"; "Pixel" the
 // drag's and the last drop's place in px of the window (drag_over_px, drop_pos_px).  German is
 // the source language, locales/ui.tsv has the English texts.
@@ -271,8 +272,10 @@ impl Dnd {
         match ui.drop_target(ID_LATER, DT_TEXT) {
             DS_HOVER => self.over = String::from(t("Später")),
             DS_DROP => {
+                // the effects the drop's source allows: drag_allowed says them in the drop's pass
+                // (and while its answer waits, on the card)
                 let text = ui.drop_data().text.clone().unwrap_or_default();
-                self.dropped = tf("{} -> Später ({})", &[&kinds(ui.drop_types()), effect_name(ui.drop_effect())]);
+                self.dropped = tf("{} -> Später ({}, erlaubt: {})", &[&kinds(ui.drop_types()), effect_name(ui.drop_effect()), &effects_name(ui.drag_allowed())]);
                 if ui.drop_defer() {
                     self.answer = String::from(t("wartet"));
                     self.later = Some(text);

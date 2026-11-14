@@ -155,9 +155,13 @@
 // (K1) Files and clipboard, drag and drop:
 //   drop X Y FILE...              files dropped at (X, Y) DIP of the scoped window
 //   drop X Y [files F...] [text "s"] [html "s"] [url U] [image F.png] [copy|move|link] [sync]
-//                                 other content dropped there; drop X Y self: the app's own
-//                                 drag that left the window comes back; sync: the platform
-//                                 answers the source at the drop (no drop_defer, as on macOS)
+//            [allows copy|move|link...]
+//                                 other content dropped there (copy|move|link: the effect the
+//                                 platform delivers); drop X Y self: the app's own drag that left
+//                                 the window comes back; sync: the platform answers the source at
+//                                 the drop (no drop_defer, as on macOS); allows: the effects the
+//                                 source allows, given with the drop (as Windows' Drop does;
+//                                 without: those of the dragover before it, else every effect)
 //   drop expect copy|move|link|none|pending   what the last drop's source was answered (the
 //                                 effect, none: not taken), pending: the answer waits (drop_defer)
 //   dragover X Y [files] [text] [url] [html] [image] [copy|move|link]   another program's
@@ -2839,10 +2843,11 @@ impl Ui {
     }
 
     // drop X Y FILE... | drop X Y [files F...] [text "s"] [html "s"] [url U]... [image F]
-    // [copy|move|link] | drop X Y self: dropped on the scoped window (the main window for
-    // "any"); `self`: the app's own drag that left its window (dragout) comes back
+    // [copy|move|link] [sync] [allows copy|move|link...] | drop X Y self: dropped on the scoped
+    // window (the main window for "any"); `self`: the app's own drag that left its window
+    // (dragout) comes back; `allows`: the effects its source allows, given with the drop
     fn sc_drop(&mut self, app: &mut dyn App, a: &[u8]) {
-        const BAD: &[u8] = b"expected: drop X Y FILE... | drop X Y [files F...] [text \"s\"] [html \"s\"] [url U] [image F] [copy|move|link] [sync] | drop X Y self | drop expect copy|move|link|none|pending";
+        const BAD: &[u8] = b"expected: drop X Y FILE... | drop X Y [files F...] [text \"s\"] [html \"s\"] [url U] [image F] [copy|move|link] [sync] [allows copy|move|link...] | drop X Y self | drop expect copy|move|link|none|pending";
         if let Some((verb, r)) = Ui::k1_word(a, 16)
             && verb == b"expect"
         {
@@ -2854,7 +2859,7 @@ impl Ui {
         let w = self.scope_index().max(0) as u32;
         let dpi = self.win_dpi(w);
         let (px, py) = (dp_at(x, dpi), dp_at(y, dpi));
-        let Some(data) = self.sc_drag_data(r) else {
+        let Some((data, allowed)) = self.sc_drag_data(r) else {
             self.dnd.sync_next = false;
             self.fail(BAD);
             return;
@@ -2865,7 +2870,7 @@ impl Ui {
             return;
         }
         let n = data.files.len() as u32;
-        self.drop_inject(data);
+        self.drop_inject(data, allowed);
         self.sc.sc_win = w;
         self.inject(app, plat::E_DROP, 0, px, py, n);
         self.run_passes(app);
@@ -2899,17 +2904,22 @@ impl Ui {
         }
     }
 
-    // sc_drag_data(words) -> the content of `drop` / `dragover` (None: a bad word): plain
-    // words are paths; files / text / html / url / image name a kind; copy / move / link the
-    // effect; self nothing; sync: the next drop is answered at the drop
-    fn sc_drag_data(&mut self, a: &[u8]) -> Option<DragData> {
+    // sc_drag_data(words) -> (the content of `drop`, the effects its source allows; 0: not said)
+    // (None: a bad word): plain words are paths; files / text / html / url / image name a kind;
+    // copy / move / link the effect; self nothing; sync: the next drop is answered at the drop;
+    // allows: the copy / move / link words after it are the effects the source allows
+    fn sc_drag_data(&mut self, a: &[u8]) -> Option<(DragData, u32)> {
         let mut d = DragData::default();
         let mut r = a;
         let mut kind: &[u8] = b"files";
+        let (mut allows, mut allowed) = (false, 0u32);
         plat::drop_reset();
         while let Some((word, rest)) = Ui::k1_word(r, 4096) {
             r = rest;
             let w = word.as_slice();
+            if !matches!(w, b"copy" | b"move" | b"link") {
+                allows = false;
+            }
             match w {
                 b"files" | b"text" | b"html" | b"url" | b"image" if !matches!(kind, b"text" | b"html" | b"url" | b"image") => {
                     kind = match w {
@@ -2922,11 +2932,20 @@ impl Ui {
                     continue;
                 }
                 b"copy" | b"move" | b"link" if kind == b"files" => {
-                    d.effects = match w {
+                    let e = match w {
                         b"copy" => plat::DE_COPY,
                         b"move" => plat::DE_MOVE,
                         _ => plat::DE_LINK,
                     };
+                    if allows {
+                        allowed |= e;
+                    } else {
+                        d.effects = e;
+                    }
+                    continue;
+                }
+                b"allows" if kind == b"files" => {
+                    allows = true;
                     continue;
                 }
                 b"self" if kind == b"files" => continue,
@@ -2952,7 +2971,7 @@ impl Ui {
             return None; // a kind without its value
         }
         d.files = plat::drop_take();
-        Some(d)
+        Some((d, allowed))
     }
 
     // dragover X Y [files] [text] [url] [html] [image] [copy|move|link] | dragleave: another
