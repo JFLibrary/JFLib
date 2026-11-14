@@ -100,10 +100,10 @@ pub struct DonutSlice<'a> {
     pub color: u32,
 }
 
-/// shared state: the drawing objects of the charts by id (hash, object), the line charts'
-/// states by id
+/// the charts of one window (WinParts::chart): their drawing objects by id (hash, object), the
+/// line charts' states by id -- a chart of the same id in two windows keeps its own
 #[derive(Default)]
-pub(crate) struct S {
+pub(crate) struct W {
     cache: BTreeMap<u32, (u64, DrawRef)>,
     lines: BTreeMap<u32, LcState>,
 }
@@ -1397,16 +1397,16 @@ impl Ui {
 
     // the cached drawing object for id with this content hash (built by make otherwise)
     fn chart_obj(&mut self, id: u32, hash: u64, make: impl FnOnce() -> DrawRef) -> DrawRef {
-        if let Some((h, d)) = self.m.chart.cache.get(&id) {
+        if let Some((h, d)) = self.wp.chart.cache.get(&id) {
             if *h == hash {
                 return d.clone();
             }
         }
         let d = make();
-        if self.m.chart.cache.len() > 256 {
-            self.m.chart.cache.clear();
+        if self.wp.chart.cache.len() > 256 {
+            self.wp.chart.cache.clear();
         }
-        self.m.chart.cache.insert(id, (hash, d.clone()));
+        self.wp.chart.cache.insert(id, (hash, d.clone()));
         d
     }
 
@@ -1906,7 +1906,7 @@ impl Ui {
             .collect();
         let lw = (if hc { self.dp_fx(512) } else { self.dp_fx(384) }).max(256);
         let (t2, tx) = (self.color(T_TEXT2), self.color(T_TEXT));
-        let mut st = self.m.chart.lines.remove(&id).unwrap_or_default();
+        let mut st = self.wp.chart.lines.remove(&id).unwrap_or_default();
         // the view and what each series shows of it
         let view = c.view();
         let mut h = Fnv::new();
@@ -2311,10 +2311,10 @@ impl Ui {
         st.hover = hk;
         st.cursor = cursor;
         st.rect = rect;
-        if self.m.chart.lines.len() > 64 {
-            self.m.chart.lines.clear();
+        if self.wp.chart.lines.len() > 64 {
+            self.wp.chart.lines.clear();
         }
-        self.m.chart.lines.insert(id, st);
+        self.wp.chart.lines.insert(id, st);
         // the legend: the series' labels (high contrast: line samples with their dashes)
         if c.flags & LC_NO_LEGEND == 0 && n > 0 {
             let items: Vec<(&str, u32)> = c.series.iter().enumerate().map(|(i, s)| (s.label, looks[i].color)).collect();

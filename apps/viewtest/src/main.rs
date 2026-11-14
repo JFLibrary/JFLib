@@ -14,6 +14,11 @@
 //   "Dateien öffnen"     the file dialog with FD_MULTI in the folder --files DIR (E8): several
 //                        files at once, ui.filedlg_paths() shown as "Dateien: N a b"
 //   "Ordner wählen"      a folder dialog (FD_FOLDER) in --files DIR: filedlg_paths() is the folder
+//   command 10           two windows "Werkzeug A" and "Werkzeug B" (a browser's windows with the
+//                        same panels) whose widgets have the same fixed ids: a code editor, a
+//                        colour picker with fields, a font picker, a line chart and a file
+//                        dialog (FD_BUILTIN); each window keeps its own editor view, fields,
+//                        picker list, chart cursor and dialog (tests/perwindow.uis)
 //   command 9            "Speichern unter" in --files DIR with the library's own dialog on every
 //                        system (FD_BUILTIN, as a browser's "Save as" that looks the same
 //                        everywhere), the second type ("dat") selected (tests/builtin.uis)
@@ -121,6 +126,13 @@ const ID_SHEET_TEXT: u32 = ID_SHEET + 3; // its text box (one fixed id in both w
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 const ID_FD_DIR: u32 = 0x11_0000; // the folder dialog (FD_FOLDER)
 const ID_FD_SAVE: u32 = 0x12_0000; // command 9: "Speichern unter", the own dialog (FD_BUILTIN; name box + 12)
+const ID_TOOLWIN: u32 = 160; // command 10: "Werkzeug A" (160) and "Werkzeug B" (161)
+const ID_TCODE: u32 = 170; // their code editors (170 .. 185; the find box 173)
+const ID_TCOLOR: u32 = 190; // their colour pickers (the hex field part_id(190, 10) = #1610615786)
+const ID_TFONT: u32 = 200; // their font pickers
+const ID_TCHART: u32 = 210; // their line charts
+const ID_TFDBTN: u32 = 211; // "Datei öffnen" of each
+const ID_TFD: u32 = 0x13_0000; // their file dialogs (rows + 17 + i, name box + 12)
 
 const CMD_NEW_TAB: u32 = 1;
 const CMD_RELOAD: u32 = 2;
@@ -131,6 +143,7 @@ const CMD_PW_AWAY: u32 = 6; // the password box goes away (and comes back), as w
 const CMD_NESTED: u32 = 7; // Ctrl+N: the window "Teiler"
 const CMD_TWO: u32 = 8; // "Fenster A" and "Fenster B"
 const CMD_SAVE_AS: u32 = 9; // "Speichern unter" in the library's own dialog (FD_BUILTIN)
+const CMD_TOOLS: u32 = 10; // "Werkzeug A" and "Werkzeug B"
 
 const T_POLL: u32 = 1; // "Hintergrund": the timer that polls the thread's result
 
@@ -162,6 +175,15 @@ const LONG_TEXT: &str = "Ein langer Absatz, wie ihn eine Webseite zeigt: „Grü
     die ein Wähler früher fassen konnte, und länger als die 172 Bytes, die `dump` früher zeigte. Äpfel, Öfen und \
     Übungen sorgen für Zeichen aus zwei Bytes; ein Rückstrich \\ und \"Anführungszeichen\" stehen auch darin. \
     Am Ende steht ein Satz, an dem man sieht, dass alles angekommen ist: Ende des Absatzes.";
+
+// a series of a line chart: the values at x = 0, 1, 2, ...
+fn series(v: &[f64]) -> SeriesBuf {
+    let mut b = SeriesBuf::new(16);
+    for (i, &y) in v.iter().enumerate() {
+        b.push(i as f64, y);
+    }
+    b
+}
 
 // the tabs of the two title bars: "Fenster A" one short one, "Fenster B" three long ones
 const TABS_A: [&str; 1] = ["Start"];
@@ -258,6 +280,16 @@ struct ViewTest {
     two_rect: [Shared<WinRect>; 2],
     two_tab: [usize; 2],
     two_text: [String; 2],
+    /// command 10: "Werkzeug A" and "Werkzeug B" (open, placement) and what each one's widgets
+    /// of the same ids show: a document, a colour, a font, a series, a file dialog
+    tool_open: [Shared<i32>; 2],
+    tool_rect: [Shared<WinRect>; 2],
+    tool_code: [CodeDoc; 2],
+    tool_color: [u32; 2],
+    tool_font: [FontSel; 2],
+    tool_series: [SeriesBuf; 2],
+    tool_fd: [Shared<i32>; 2],
+    tool_path: [String; 2],
 }
 
 // (E3) the cursors "Zeiger wechseln" walks through (0: the page's arrow / hand)
@@ -329,6 +361,14 @@ impl Default for ViewTest {
             two_rect: [Shared::new(WinRect::new(60, 60, 520, 360, 0)), Shared::new(WinRect::new(120, 120, 640, 420, 0))],
             two_tab: [0; 2],
             two_text: [String::from("Blatt A"), String::from("Blatt B")],
+            tool_open: [Shared::new(0), Shared::new(0)],
+            tool_rect: [Shared::new(WinRect::new(80, 40, 560, 880, 0)), Shared::new(WinRect::new(140, 80, 560, 880, 0))],
+            tool_code: [CodeDoc::from_text("eins\nzwei\ndrei\n"), CodeDoc::from_text("alpha\nbeta\n")],
+            tool_color: [0xFFFF_0000, 0xFF00_00FF],
+            tool_font: [FontSel::new("sans-serif", 11.0), FontSel::new("serif", 14.0)],
+            tool_series: [series(&[1.0, 3.0, 2.0, 5.0]), series(&[4.0, 4.0, 1.0])],
+            tool_fd: [Shared::new(0), Shared::new(0)],
+            tool_path: [String::new(), String::new()],
         }
     }
 }
@@ -574,6 +614,51 @@ impl ViewTest {
         }
     }
 
+    // command 10: "Werkzeug A" and "Werkzeug B", the same widgets with the same fixed ids in two
+    // windows; each shows what its own widgets say
+    fn tool_windows(&mut self, ui: &mut Ui) {
+        for k in 0..2 {
+            let (open, rect) = (self.tool_open[k].clone(), self.tool_rect[k].clone());
+            let name = if k == 0 { "A" } else { "B" };
+            let title = format!("Werkzeug {}", name);
+            if ui.window_begin(ID_TOOLWIN + k as u32, &title, Some(&open), WF_TOOL | WF_RESIZABLE, Some(&rect)) {
+                ui.box_begin(0, BOX_V | pad(8), 6);
+                // the code editor: its caret and find matches
+                ui.next_size(-1, 110);
+                ui.code_editor(ID_TCODE, &mut self.tool_code[k], &Highlighter::plain(), CE_NO_GUTTER);
+                let st = ui.code_status(ID_TCODE);
+                ui.text(TS_BODY, &format!("Code {}: Z{} S{} Treffer {}", name, st.line, st.col, st.matches));
+                // the colour picker with its fields (the hex text is taken on Enter)
+                ui.color_picker_ex(ID_TCOLOR, &mut self.tool_color[k], CP_FIELDS);
+                ui.text(TS_BODY, &format!("Farbe {}: #{:06X}", name, self.tool_color[k] & 0xFF_FFFF));
+                // the font picker
+                ui.font_picker(ID_TFONT, &mut self.tool_font[k]);
+                ui.text(TS_BODY, &format!("Schrift {}: {} {}", name, self.tool_font[k].family, self.tool_font[k].size));
+                // the line chart: the point of its keyboard cursor
+                ui.next_size(-1, 90);
+                let ser = [LcSeries::new("Werte", &self.tool_series[k])];
+                let pt = ui.line_chart(ID_TCHART, &LineChart::new(&ser).x_axis(LX_NUM));
+                let pt = pt.map_or(String::from("-"), |(_, x)| format!("{}", x));
+                ui.text(TS_BODY, &format!("Diagramm {}: {}", name, pt));
+                // a file dialog of its own (the library's)
+                if ui.button(ID_TFDBTN, "Datei öffnen") & EV_ACT != 0 {
+                    let dir = plat::arg_value("--files").unwrap_or_default();
+                    self.tool_path[k] = format!("{}/", dir.trim_end_matches('/'));
+                    self.tool_fd[k].set(1);
+                }
+                let fd = self.tool_fd[k].clone();
+                if ui.filedlg(ID_TFD, FD_OPEN | FD_BUILTIN, &fd, &mut self.tool_path[k], 4096, &[]) & EV_ACT != 0 {
+                    let n = self.tool_path[k].rsplit('/').next().unwrap_or("").len();
+                    self.tool_path[k] = String::from(&self.tool_path[k][self.tool_path[k].len() - n..]);
+                }
+                let shown = if self.tool_fd[k].get() != 0 { "-" } else { self.tool_path[k].as_str() };
+                ui.text(TS_BODY, &format!("Datei {}: {}", name, if shown.is_empty() || shown.ends_with('/') { "-" } else { shown }));
+                ui.box_end();
+            }
+            ui.window_end();
+        }
+    }
+
     // the four splits of "Teiler" and the innermost column
     fn splits(&mut self, ui: &mut Ui) {
         let names = ["Links", "Oben", "Mitte", "Innen"];
@@ -776,6 +861,7 @@ impl App for ViewTest {
         ui.window_end();
         self.nested_window(ui);
         self.two_windows(ui);
+        self.tool_windows(ui);
         // (E8) several files: the names the dialog chose, in its order
         if ui.filedlg(ID_FD, FD_OPEN | FD_MULTI, &self.fd_open, &mut self.fd_path, 4096, &["txt=Textdatei"]) & EV_ACT != 0 {
             let all = ui.filedlg_paths();
@@ -818,6 +904,10 @@ impl App for ViewTest {
             CMD_TWO => {
                 self.two_open[0].set(1);
                 self.two_open[1].set(1);
+            }
+            CMD_TOOLS => {
+                self.tool_open[0].set(1);
+                self.tool_open[1].set(1);
             }
             CMD_SAVE_AS => {
                 // in the folder of --files

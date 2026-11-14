@@ -104,14 +104,17 @@ impl W {
 /// shared state (Mods)
 #[derive(Default)]
 pub(crate) struct S {
-    /// the widget that gets the menu key as a right click in the next pass
+    /// the widget that gets the menu key as a right click in the next pass, and its window (the
+    /// same id in another window does not)
     pub(crate) ctx: u32,
+    ctx_win: u32,
     /// the pass that asked for it (a widget that never calls behave lets it expire)
     ctx_set: u32,
     ctx_frame: u32,
     ctx_rect: [i32; 4],
-    /// a group member the arrows just focused (a radio selects itself)
+    /// a group member the arrows just focused (a radio selects itself), and its window
     moved: u32,
+    moved_win: u32,
     /// the keys went to a tool window by F6 / Ctrl+F6 (Esc gives them back)
     pub(crate) tool: bool,
     /// Space on a focused list: the first check box / switch of the selected row acts
@@ -329,7 +332,7 @@ impl Ui {
 
     /// kb_moved(id): the arrows of its group just focused the widget (once)
     pub(crate) fn kb_moved(&mut self, id: u32) -> bool {
-        if id != 0 && self.m.kbnav.moved == id {
+        if id != 0 && self.m.kbnav.moved == id && self.m.kbnav.moved_win == self.uiw_cur {
             self.m.kbnav.moved = 0;
             return true;
         }
@@ -350,6 +353,7 @@ impl Ui {
     pub(crate) fn kb_ctx_take(&mut self) -> u32 {
         let k = &mut self.m.kbnav;
         k.ctx = 0;
+        k.ctx_win = self.uiw_cur;
         k.ctx_frame = self.frame;
         k.ctx_rect = self.wp.ctx.last_rect;
         EV_RCLICK
@@ -359,13 +363,19 @@ impl Ui {
     /// in this pass (menu_popup opens there)
     pub(crate) fn kb_ctx_rect(&self) -> Option<[i32; 4]> {
         let k = &self.m.kbnav;
-        if k.ctx_frame != 0 && k.ctx_frame == self.frame { Some(k.ctx_rect) } else { None }
+        if k.ctx_frame != 0 && k.ctx_frame == self.frame && k.ctx_win == self.uiw_cur { Some(k.ctx_rect) } else { None }
+    }
+
+    /// kb_ctx_for(id): the menu key no widget took is meant for widget id of the window being built
+    pub(crate) fn kb_ctx_for(&self, id: u32) -> bool {
+        let k = &self.m.kbnav;
+        id != 0 && k.ctx == id && k.ctx_win == self.uiw_cur
     }
 
     /// kb_ctx_redirect(from, to): the menu key meant for `from` goes to `to` (a focused list:
     /// its selected row)
     pub(crate) fn kb_ctx_redirect(&mut self, from: u32, to: u32) {
-        if self.m.kbnav.ctx == from && from != 0 {
+        if self.kb_ctx_for(from) {
             self.m.kbnav.ctx = to;
         }
     }
@@ -656,6 +666,7 @@ impl Ui {
         if id != f {
             self.wp.ctx.focus = id;
             self.m.kbnav.moved = id;
+            self.m.kbnav.moved_win = self.uiw_cur;
             self.repass = true;
         }
         self.wp.ctx.focus_visible = true;
@@ -674,6 +685,7 @@ impl Ui {
             return false;
         }
         self.m.kbnav.ctx = f;
+        self.m.kbnav.ctx_win = self.uiw_cur;
         self.m.kbnav.ctx_set = self.frame;
         self.repass = true;
         true

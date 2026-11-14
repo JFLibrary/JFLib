@@ -2316,7 +2316,21 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   position, so two windows built by the same code (a browser's windows with their own title
   bars, a dialog box of a fixed id) settle each in its own size; a window's slots go with its
   state (`window_destroy`), and a panel that floats out into a tool window starts there with
-  fresh ones (its scroll positions too).
+  fresh ones (its scroll positions too). The same holds for the state the widget families keep
+  by id: the code and rich-text editors' views (scroll position, find bar, completion list),
+  the colour pickers' fields, the font pickers' lists, the spell checks of `TB_SPELL` boxes and
+  their suggestion menus, the charts' drawings and line-chart cursors, the dock and window
+  areas (`dock_begin`, `desk_begin`), the file dialog (`filedlg`), the canvases of
+  `canvas_damage` and the menu key's target -- a browser's windows built by the same code with
+  the same ids each keep their own (`apps/viewtest/tests/perwindow.uis`,
+  `apps/spelltest/tests/windows.uis`). Calls that name an id address the window being built
+  when it has such a widget; else -- outside the passes (`App::command`, a task), or in a window
+  without one -- `code_status`, `code_events`, `code_diag`, `code_popup_item` and `spell_errors`
+  read the first window, the main window first, that has such a widget, `code_find`,
+  `code_reveal` and `richtext_link` go to the first editor of the id that is built,
+  `canvas_damage` and `canvas_gpu_damage` to the canvas of that id in every window. App-wide stay what is the app's: the code editors' theme and font size, the spell
+  checker, the folder a file dialog used last and `filedlg_paths()`, the dock's floating windows'
+  ids (the area's id + 1 ..: areas in two windows that float panels need ids of their own).
 * `ui.canvas(...)` records the version *before* you react to its input. When handling the
   returned `UiInput` changes the content, bump the version and call `ui.repass()`; otherwise
   the dirty-region renderer shows the change one frame late (`--verify-dirty` reports it).

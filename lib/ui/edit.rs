@@ -77,7 +77,7 @@ use text::segment;
 mod surface;
 pub use surface::TextSurfaceLine;
 #[path = "edit_spell.rs"]
-mod spellbox;
+pub(crate) mod spellbox;
 
 const TB_NAT_W: i32 = 200; // natural width of a text box (DIP)
 const NB_NAT_W: i32 = 120; // ... of a number box

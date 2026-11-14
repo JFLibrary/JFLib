@@ -1370,14 +1370,18 @@ edit_spell -- spell checking in text boxes (edit.rs includes it as `spellbox`)
   speller() -> Option<&mut Speller>   the checker in use (None while loading, or none);
                               loads it when no box asked for it yet
   spell_state() -> SPELL_*    OFF (switched off / not asked yet), LOADING, READY, NONE
-  spell_errors(id) -> ranges  the misspelled byte ranges of box id as last checked
+  spell_errors(id) -> ranges  the misspelled byte ranges of box id as last checked (of the
+                              window being built when it has the box; else the first window's,
+                              the main window first, that checked one)
 
 Checking: a box checks when its text changed (a hash of it) or the checker or its word
 lists did; word results are cached in the Speller, so typing re-checks only new words.  In
 window mode at most BUDGET new words and BUDGET_US of checking per frame (one word at
 least; the rest on the timer UIT_SPELL: a long German compound may take milliseconds),
 headless all at once.  The word being typed (the caret at its end while typing) is marked
-only once the caret leaves it.  Loading: window mode the system's checker on the UI thread,
+only once the caret leaves it.  The results are kept per window (WinParts::spell): a box of the
+same id in two windows is checked by itself, and its menu opens in its own window.
+Loading: window mode the system's checker on the UI thread,
 Hunspell files on a worker (plat::Job; no marks until it is read), the personal word list
 in config://spell (spell::personal_path); headless runs read app:// dictionaries at once
 and keep the personal list in memory, so scripts never depend on the machine.
@@ -1822,8 +1826,12 @@ rich_edit -- ui.richtext: a rich-text editor over a RichDoc (rich_doc.rs), and i
        lists, indent, clear format; the buttons show the state at the caret and give the
        focus back to the editor (ids id .. id + 149)
   ui.richtext_link(id) -> Option<String>   a link the user activated (Ctrl+click, a click
-       when read-only, Ctrl+Enter on it), taken once
+       when read-only, Ctrl+Enter on it), taken once (in a pass: in the window being built
+       when it has the editor; outside the passes: in any window)
   ui.richtext_link_dialog(id)              open the editor's link flyout (as Ctrl+K)
+
+Every window keeps its editors' views (WinParts::rich): an editor of the same id in two
+windows scrolls and lays out by itself.
 
 Keys (besides those of ed_core.rs): Ctrl+B / I / U bold, italic, underline, Ctrl+Shift+X
 strike, Ctrl+Space clear format, Ctrl+K link, Ctrl+L / E / R / J alignment, Ctrl+Shift+8 /
@@ -1883,7 +1891,8 @@ RTB_ALL: u32 = 255
   ui_richtext(id, doc, RT_\*) -> EV_\* (see the module header)
 - **`fn richtext_link(&mut self, id: u32) -> Option<String>`**
   a link the user activated in richtext `id` (Ctrl+click, a click when read-only,
-  Ctrl+Enter), taken once
+  Ctrl+Enter), taken once: in a pass the window being built's editor (when it has one of the
+  id), else (outside the passes) the editor of that id in any window
 - **`fn richtext_link_dialog(&mut self, id: u32, doc: &RichDoc)`**
   open the link flyout of richtext `id` (as Ctrl+K does): the url of the link at the
   caret or "https://"; OK sets it on the selection (without one: inserts it as linked
@@ -2490,6 +2499,13 @@ highlighting (highlight.rs)
   ui.code_theme_set(Some(theme))     the colours of every code editor (None: code_theme())
   ui.code_font_size(pt)              the size of the code editors' font (default 10 pt)
 
+Every window keeps the state of its editors (WinParts::code): an editor of the same id in two
+windows scrolls, finds and pops up by itself.  code_find and code_reveal made in a window's
+pass are for that window's editor (when it has one of the id), else (outside the passes:
+App::command) for the first editor of the id that is built; code_status, code_diag,
+code_events and code_popup_item read the window being built's editor, else the first window's
+(the main window first) that has one.
+
 Diagnostics (CodeDoc::set_diagnostics; they follow the edits, code_doc.rs) are wavy
 underlines below their text in the colour of their severity (infos below warnings below
 errors; a point or the end of a line: one cell) and a marker in the gutter's first column on
@@ -2576,16 +2592,21 @@ CE_FOLDS: u32 = 128
   the size of the code editors' font in points (0: 10 pt)
 - **`fn code_find(&mut self, id: u32, query: &str, replace: bool)`**
   open the find bar of code editor id with a query (replace: with the replace row); the
-  editor selects the first match from its caret on
+  editor selects the first match from its caret on.  Called in a window's pass: that
+  window's editor (when it has one of the id); else (App::command, a window without one) the
+  first editor of the id built next
 - **`fn code_reveal(&mut self, id: u32, line: usize)`**
   scroll code editor id so that line (from 0) is in view in its next pass: in the middle
   of the view when it was not in it (no scroll when it was), the folded ranges that hide it
   unfolded.  The keyboard focus, the caret and the selection stay as they are: a debugger
   shows the execution line while the page or its toolbar keeps the keyboard
   (CodeDoc::set_exec_line marks it).  A later request for the same editor replaces it.
+  Called in a window's pass: that window's editor (when it has one of the id); else
+  (App::command, a window without one) the first editor of the id built next
 - **`fn code_status(&self, id: u32) -> CodeStatus`**
   the caret, the find matches, the lines tokenized and the diagnostics in code editor
-  id's last frame
+  id's last frame (of the window being built; outside the passes, or when that window has
+  none of the id, the first window's that has one, the main window first)
 - **`fn code_diag(&self, id: u32) -> Option<Diag>`**
   the most severe diagnostic at the caret of code editor id in its last frame (its
   message for a status bar)
@@ -2972,6 +2993,9 @@ tabs while the focus is anywhere in the group, DockState::focus(id) brings a pan
 and gives its tab strip the focus (the app binds it to its commands).
 Structural changes (clicks, drops, menu rows) are applied at dock_end, followed by another
 pass; splitters change the sizes at once.  Widget ids are parts of the area id (pid).
+Every window keeps the state of its dock areas (WinParts::dock): an area of the same id in two
+windows lays out, drags and floats by itself.  The ids of the floating windows are the app's
+window ids, though: areas that float panels in two windows need ids of their own.
 ```
 
 ```rust
@@ -3858,9 +3882,11 @@ color -- colour swatches, the colour picker and the HSV colour wheel
   hsv_to_rgb(h, s, v) -> 0xFFRRGGBB       h 0..3599 (tenths of a degree), s / v 0..1000
   rgb_to_hsv(rgb) -> (h, s, v)            inverse (same ranges)
 
-The wheel image is cached per widget (WC_MAX entries, shared by all windows): a
+The wheel image is cached per widget and window (WC_MAX entries, shared by all windows): a
 premultiplied image at full value for the current size (antialiased rim), and the image
-scaled to the current value; only a change of size or value re-renders it.
+scaled to the current value; only a change of size or value re-renders it.  The fields of a
+CP_FIELDS picker are kept per window (WinParts::color): a picker of the same id in two windows
+edits its own hex text.
 ```
 
 - **`fn hsv_to_rgb(h: u32, s: u32, v: u32) -> u32`**
@@ -4107,7 +4133,9 @@ filedlg -- Open / Save file dialog (ContentDialog with a folder list), both OS
   filedlg_paths() -> the files of the last confirmed dialog (one without FD_MULTI, the folder
        of an FD_FOLDER dialog)
 
-One file dialog can be open at a time (the state below is shared).
+Every window has its dialog's state (WinParts::fd): a dialog of the same id in two windows
+lists, selects and names by itself, and one window's closed dialog leaves the other's open one
+alone.  The folder used last and the paths of the last confirmed dialog are the app's.
 ```
 
 **`impl Ui`**
@@ -4956,7 +4984,9 @@ it lies: what it shows there is the GPU's.
   dirty_force_full: the next frame redraws and presents everything
 - **`fn canvas_damage(&mut self, id: u32, x: i32, y: i32, w: i32, h: i32)`**
   ui_canvas_damage(id, x, y, w, h): redraw part of a canvas with the next render (px
-  relative to the canvas, cut to it)
+  relative to the canvas, cut to it): the canvas of the window being built (when it has one
+  of the id); else (outside the passes: App::command, a task) the canvas of that id in every
+  window
 
 ### Style contract
 
@@ -8404,7 +8434,8 @@ Source: [`lib/ui/fontpick.rs`](../lib/ui/fontpick.rs)
 
 ```text
 fontpick -- the system's fonts in the UI: the font database and its rules, loading a
-choice, text in such a font, a font picker and a font dialog
+choice, text in such a font, a font picker and a font dialog (their lists, searches and
+choices kept per window: WinParts::fonts)
 
   FontSel { family, weight, italic, size, axes }   a choice: a family (also a generic one:
                                    "sans-serif", "serif", "monospace" ...), 100..900, italic,
@@ -9561,7 +9592,9 @@ frame; the widget's code stays the same on every target.
 - **`fn canvas_gpu(&mut self, d: CanvasDesc)`**
   the custom command recorded last shows this content through this view (module header)
 - **`fn canvas_gpu_damage(&mut self, id: u32, r: [f64; 4])`**
-  the content rectangle x0, y0, x1, y1 (content units) of canvas id changed: its tiles go
+  the content rectangle x0, y0, x1, y1 (content units) of canvas id changed: its tiles go (of
+  the window being built when it has the canvas; else, outside the passes too, of the canvas
+  of that id in every window)
 
 #### `ui/gpu_view.rs`
 
@@ -10958,6 +10991,9 @@ it, whatever the windows above cover.  The taskbar is a group "Taskleiste" with 
 window (" (minimiert)" after a minimised one's title, the active one pressed).
 Structural changes (buttons, menus, keys) are applied at desk_end, followed by another pass;
 drags change the place at once.  Widget ids are parts of the area id (pid).
+Every window keeps the state of its window areas (WinParts::desk): an area of the same id in
+two windows keeps its own; desk_taskbar shows the area of desk_begin's window (outside of
+desk_begin .. desk_end the window being built's, else the first window's that has the id).
 ```
 
 ```rust

@@ -24,9 +24,11 @@
 //   hsv_to_rgb(h, s, v) -> 0xFFRRGGBB       h 0..3599 (tenths of a degree), s / v 0..1000
 //   rgb_to_hsv(rgb) -> (h, s, v)            inverse (same ranges)
 //
-// The wheel image is cached per widget (WC_MAX entries, shared by all windows): a
+// The wheel image is cached per widget and window (WC_MAX entries, shared by all windows): a
 // premultiplied image at full value for the current size (antialiased rim), and the image
-// scaled to the current value; only a change of size or value re-renders it.
+// scaled to the current value; only a change of size or value re-renders it.  The fields of a
+// CP_FIELDS picker are kept per window (WinParts::color): a picker of the same id in two windows
+// edits its own hex text.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -66,6 +68,8 @@ struct Fields {
 #[derive(Default)]
 struct Wc {
     id: u32,
+    /// the window of the wheel (an id of two windows has an entry in each)
+    win: u32,
     /// side in px of the cached images (0 = none)
     size: i32,
     /// value of the display image (-1 = stale)
@@ -76,10 +80,15 @@ struct Wc {
     disp: Rc<Surface>,
 }
 
+/// the pickers' fields of one window (WinParts::color), by id
+#[derive(Default)]
+pub(crate) struct W {
+    fields: BTreeMap<u32, Fields>,
+}
+
 /// state shared by all windows
 #[derive(Default)]
 pub(crate) struct S {
-    fields: BTreeMap<u32, Fields>,
     wc: [Wc; WC_MAX],
     wc_ver: u32,
     spec: Option<Rc<SpectrumDraw>>,
@@ -345,8 +354,8 @@ impl Ui {
         let mut ev = 0;
         let old = *argb;
         // a colour the pipette picked for this picker (screen.rs)
-        if let Some((owner, c)) = self.m.screen.pending {
-            if owner == id {
+        if let Some((win, owner, c)) = self.m.screen.pending {
+            if owner == id && win == self.uiw_cur {
                 self.m.screen.pending = None;
                 let a = if *argb >> 24 == 0 { 0xFF00_0000 } else { *argb & 0xFF00_0000 };
                 *argb = a | (c & 0xFF_FFFF);
@@ -567,7 +576,7 @@ impl Ui {
         // this frame's values
         let (h, s, v) = self.cp_hsv(id);
         {
-            let f = self.m.color.fields.entry(id).or_default();
+            let f = self.wp.color.fields.entry(id).or_default();
             let c = *argb;
             f.rgba = [((c >> 16) & 255) as i32, ((c >> 8) & 255) as i32, (c & 255) as i32, (c >> 24) as i32];
             let mut hh = h.wrapping_add(5) / 10;
@@ -590,9 +599,9 @@ impl Ui {
                 self.next_size(24, 0);
                 self.text(TS_BODY, FLD_LEFT[row]);
                 self.next_size(72, 0);
-                let mut val = self.m.color.fields.get(&id).map_or(0, |f| f.rgba[row]);
+                let mut val = self.wp.color.fields.get(&id).map_or(0, |f| f.rgba[row]);
                 let e = self.number_box(part_id(id, row as u32 + 3), &mut val, &RG_BYTE);
-                if let Some(f) = self.m.color.fields.get_mut(&id) {
+                if let Some(f) = self.wp.color.fields.get_mut(&id) {
                     f.rgba[row] = val;
                 }
                 ev |= e;
@@ -605,9 +614,9 @@ impl Ui {
             self.text(TS_BODY, FLD_RIGHT[row]);
             if row == 3 {
                 self.next_size(88, 0);
-                let mut t = self.m.color.fields.get(&id).map_or(String::new(), |f| f.hex.clone());
+                let mut t = self.wp.color.fields.get(&id).map_or(String::new(), |f| f.hex.clone());
                 let e = self.textbox(part_id(id, 10), None, &mut t, 12);
-                if let Some(f) = self.m.color.fields.get_mut(&id) {
+                if let Some(f) = self.wp.color.fields.get_mut(&id) {
                     f.hex = t;
                 }
                 ev |= e & !EV_ACT;
@@ -618,10 +627,10 @@ impl Ui {
                 }
             } else {
                 self.next_size(72, 0);
-                let mut val = self.m.color.fields.get(&id).map_or(0, |f| f.hsv[row]);
+                let mut val = self.wp.color.fields.get(&id).map_or(0, |f| f.hsv[row]);
                 let rg = if row == 0 { &RG_HUE } else { &RG_PCT };
                 let e = self.number_box(part_id(id, row as u32 + 7), &mut val, rg);
-                if let Some(f) = self.m.color.fields.get_mut(&id) {
+                if let Some(f) = self.wp.color.fields.get_mut(&id) {
                     f.hsv[row] = val;
                 }
                 ev |= e;
@@ -638,12 +647,12 @@ impl Ui {
     // .cf_hex_text: the colour as RRGGBB (AARRGGBB with CP_ALPHA) into the hex field
     fn cf_hex_text(&mut self, id: u32, argb: u32, flags: u32) {
         let t = if flags & CP_ALPHA != 0 { format!("{:08X}", argb) } else { format!("{:06X}", argb & 0xFF_FFFF) };
-        self.m.color.fields.entry(id).or_default().hex = t;
+        self.wp.color.fields.entry(id).or_default().hex = t;
     }
 
     // .cf_apply_rgba: R G B A fields -> *argb, HSV follows
     fn cf_apply_rgba(&mut self, id: u32, argb: &mut u32, flags: u32) {
-        let f = self.m.color.fields.entry(id).or_default().rgba;
+        let f = self.wp.color.fields.entry(id).or_default().rgba;
         let mut c = (f[3] as u32) << 24 | (f[0] as u32) << 16 | (f[1] as u32) << 8 | f[2] as u32;
         if flags & CP_ALPHA == 0 {
             c = (c & 0xFF_FFFF) | (*argb & 0xFF00_0000);
@@ -653,7 +662,7 @@ impl Ui {
 
     // .cf_apply_hsv: H S V fields -> slot HSV -> *argb (alpha kept)
     fn cf_apply_hsv(&mut self, id: u32, argb: &mut u32) {
-        let f = self.m.color.fields.entry(id).or_default().hsv;
+        let f = self.wp.color.fields.entry(id).or_default().hsv;
         let sl = self.slot(id);
         sl.scrollx = f[0].wrapping_mul(10);
         sl.scrolly = f[1].wrapping_mul(10);
@@ -667,7 +676,7 @@ impl Ui {
 
     // .cf_apply_hex: the hex text -> *argb (6 digits keep the alpha)
     fn cf_apply_hex(&mut self, id: u32, argb: &mut u32, _flags: u32) {
-        let t = self.m.color.fields.entry(id).or_default().hex.clone();
+        let t = self.wp.color.fields.entry(id).or_default().hex.clone();
         let b = t.as_bytes();
         // hex digits (the asm tests c | 32 against '0'..'9' and 'a'..'f')
         let n = b.iter().take_while(|&&c| c != 0).filter(|&&c| matches!(c | 32, b'0'..=b'9' | b'a'..=b'f')).count();
@@ -706,14 +715,14 @@ impl Ui {
 
     // wc_get(id, side, v) -> the display image of wheel id at this size and value
     fn wc_get(&mut self, id: u32, side: i32, v: i32) -> Rc<Surface> {
-        let frame = self.frame;
+        let (frame, win) = (self.frame, self.uiw_cur);
         let s = &mut self.m.color;
-        // the entry of id, else a free or the least recently used one
+        // the entry of id in this window, else a free or the least recently used one
         let mut cand = 0;
         let mut age = u32::MAX;
         let mut found = None;
         for (i, e) in s.wc.iter().enumerate() {
-            if e.id == id {
+            if e.id == id && e.win == win {
                 found = Some(i);
                 break;
             }
@@ -727,7 +736,7 @@ impl Ui {
             Some(i) => i,
             None => {
                 let e = &mut s.wc[cand];
-                *e = Wc { id, ..Wc::default() };
+                *e = Wc { id, win, ..Wc::default() };
                 cand
             }
         };
@@ -859,7 +868,8 @@ impl Ui {
         }
         // the cached image at the current value
         let img = self.wc_get(id, side, v.clamp(0, 1000));
-        let ver = self.m.color.wc.iter().find(|e| e.id == id).map_or(0, |e| e.ver);
+        let win = self.uiw_cur;
+        let ver = self.m.color.wc.iter().find(|e| e.id == id && e.win == win).map_or(0, |e| e.ver);
         self.draw_image(&img, ver, wx, wy, 0, 0);
         // paint (style): rim, marker, focus visual
         let st = self.style;

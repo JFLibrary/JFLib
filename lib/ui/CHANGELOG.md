@@ -42,6 +42,19 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Test scripts: `type "..."` typed only the first 255 bytes of its quoted text (so did
   `bench N type`, and `commit` 1023). They take the whole string now, as long as a script line
   (16 KiB).
+- Widgets of the same id in two windows (a browser's windows built by the same code) keep
+  their state each, as the state slots since 0.2.0: the code and rich-text editors' views
+  (scroll position, find bar, completion list), the colour pickers' fields and wheel images, the
+  font pickers' lists and searches, the spell checks of `TB_SPELL` boxes and their suggestion
+  menu, the charts' drawings and line-chart cursors, the dock and window areas, the file dialog,
+  the canvases of `canvas_damage`, the target of the menu key and of a focus group's arrows, the
+  colour picker a pipette pick is for. Before, one window's widget took over the other's state:
+  a find bar showed in both, a hex colour being typed was overwritten, a font list or a file
+  dialog opened again in every pass, a chart's cursor was lost, a spell menu in a second window
+  closed at once. Calls that name an id address the window being built when it has such a
+  widget; else (outside the passes too) the queries (`code_status`, `code_events`, `code_diag`, `code_popup_item`, `spell_errors`) read the
+  first window that has the widget, `code_find`, `code_reveal` and `richtext_link` go to the
+  first editor of the id that is built, and `canvas_damage` to the canvas in every window.
 
 ## [0.2.0] - 2026-11-14
 

@@ -1013,7 +1013,7 @@ impl Ui {
         }
         // the menu key / Shift+F10 that no widget took: a right click of the focused widget
         // (kbnav.rs)
-        if self.m.kbnav.ctx == id && id != 0 {
+        if self.kb_ctx_for(id) {
             ev |= self.kb_ctx_take();
         }
         // a click of a screen reader (a11y.rs) acts like Space
@@ -1373,6 +1373,7 @@ impl Ui {
         self.semtext_len = 0;
         self.animating = false;
         self.frame = self.frame.wrapping_add(1);
+        self.building = true;
         if self.m.ins.on {
             self.m.ins.boxes.clear(); // the inspector's boxes of this pass (inspect.rs)
         }
@@ -1385,6 +1386,7 @@ impl Ui {
 
     /// ui_frame_end -> another pass is needed before the frame is final
     pub(crate) fn frame_end(&mut self) -> bool {
+        self.building = false;
         self.uiw_frame_end();
         #[cfg(target_os = "android")]
         self.ime_frame_end();

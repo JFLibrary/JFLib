@@ -74,6 +74,9 @@ pub(crate) const WCH_BTN: u32 = 4; // footer buttons 4, 5, 6
 pub(crate) const WCH_ROLL: u32 = 7; // (form.rs) the scroll view of content taller than a phone's window
 /// root box id of window i (> 0): WROOT_BASE | i
 pub(crate) const WROOT_BASE: u32 = 0xFFFF_7F00;
+/// (charge 11) a request of an id-taking call made outside the passes: for the first window
+/// that builds the id (req_win)
+pub(crate) const WIN_ANY: u32 = u32::MAX;
 
 // window record state bits (UWI_*)
 pub(crate) const UWI_OPEN: u32 = 1; // *open was set at the last window_begin
@@ -546,6 +549,24 @@ impl Ui {
         } else {
             self.m.win.recs[i].save.as_deref_mut()
         }
+    }
+
+    /// (charge 11) the window a request of an id-taking call is for (code_find, code_reveal,
+    /// canvas_damage, a richtext link): the window being built while the passes run, when it has
+    /// a widget of the id (`here`); else (outside the passes: App::command, a task; a window
+    /// without such a widget) WIN_ANY, every window's or the first that builds the id
+    pub(crate) fn req_win(&self, here: bool) -> u32 {
+        if self.building && here { self.uiw_cur } else { WIN_ANY }
+    }
+
+    /// (charge 11) the per-window parts an id-taking query reads (code_status, spell_errors, ...):
+    /// the window being built while the passes run, when it `has` the widget; else the first
+    /// window -- the main window first -- that has it
+    pub(crate) fn wp_query(&self, has: impl Fn(&WinParts) -> bool) -> Option<&WinParts> {
+        if self.building && has(&self.wp) {
+            return Some(&self.wp);
+        }
+        (0..WIN_MAX as u32).filter_map(|i| self.uiw_parts(i)).find(|p| has(p))
     }
 
     /// the dpi of window i (uiw_var(i, &g_ui_dpi); 0 for a window without state)
