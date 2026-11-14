@@ -205,7 +205,9 @@ pub fn read_link(path: &str) -> Option<String> {
 
 /// a symbolic link at link to target (dir: a folder's link on Windows); a vfs name as target
 /// stands for its OS path.  Only on OS paths and folder mounts; never a target with a NUL
-/// character (the link would lead to the name before it).
+/// character (the link would lead to the name before it).  With a manifest the app needs write
+/// access to link and to target (a relative one counted from link's folder): the rules check a
+/// path as it is written, so whatever may use the link reaches the target with the link's rights.
 pub fn symlink(target: &str, link: &str, dir: bool) -> bool {
     if target.contains('\0') {
         return false;
@@ -218,7 +220,10 @@ pub fn symlink(target: &str, link: &str, dir: bool) -> bool {
         },
     };
     match at(link) {
-        At::Os(o) => sys::symlink(&t, o.as_deref().unwrap_or(link), dir),
+        At::Os(o) => {
+            let l = o.as_deref().unwrap_or(link);
+            link_target_allowed(&t, l) && sys::symlink(&t, l, dir)
+        }
         _ => false,
     }
 }
@@ -227,6 +232,20 @@ pub fn symlink(target: &str, link: &str, dir: bool) -> bool {
 // jfgui_TEST_PRIVATE_TMP sets it
 fn tmp_seed() -> u64 {
     crate::env("jfgui_TEST_PRIVATE_TMP").and_then(|v| v.parse::<u64>().ok()).unwrap_or_else(crate::time_us)
+}
+
+/// symlink's target as the link leads to it (a relative one from the link's folder) may be
+/// written: the link's own path may be, and the rules do not follow links
+fn link_target_allowed(target: &str, link: &str) -> bool {
+    let Some(l) = crate::policy::normalize(link) else { return false };
+    let mut base = String::from(parent(&l));
+    if base.ends_with(':') {
+        base.push('\\'); // a link at the root of a drive
+    }
+    match crate::policy::normalize_for(target, cfg!(windows), &base) {
+        Some(t) => crate::policy::fs_allowed(&t, crate::policy::FS_WRITE),
+        None => false,
+    }
 }
 
 /// (net) (device, file id) of an OS path when it is a socket file (Windows: an AF_UNIX reparse
@@ -238,7 +257,8 @@ pub(crate) fn socket_id(path: &str) -> Option<(u64, u64)> {
     sys::socket_id(path)
 }
 
-/// a second name new for the file existing (both OS paths or folder mounts)
+/// a second name new for the file existing (both OS paths or folder mounts); with a manifest
+/// the app needs write access to both (writing through new changes existing)
 pub fn hard_link(existing: &str, new: &str) -> bool {
     match (at(existing), at(new)) {
         (At::Os(e), At::Os(n)) => sys::hard_link(e.as_deref().unwrap_or(existing), n.as_deref().unwrap_or(new)),
@@ -615,7 +635,7 @@ mod win {
     }
 
     pub fn hard_link(existing: &str, new: &str) -> bool {
-        if !(crate::policy::fs_allowed(existing, crate::policy::FS_READ) && crate::policy::fs_allowed(new, crate::policy::FS_WRITE)) {
+        if !(crate::policy::fs_allowed(existing, crate::policy::FS_WRITE) && crate::policy::fs_allowed(new, crate::policy::FS_WRITE)) {
             return false;
         }
         let (e, n) = (lp(existing), lp(new));
@@ -937,7 +957,7 @@ mod lnx {
     }
 
     pub fn hard_link(existing: &str, new: &str) -> bool {
-        if !(crate::policy::fs_allowed(existing, crate::policy::FS_READ) && crate::policy::fs_allowed(new, crate::policy::FS_WRITE)) {
+        if !(crate::policy::fs_allowed(existing, crate::policy::FS_WRITE) && crate::policy::fs_allowed(new, crate::policy::FS_WRITE)) {
             return false;
         }
         let (e, n) = (z(existing), z(new));
@@ -1012,6 +1032,12 @@ mod lnx {
         if !(crate::policy::fs_allowed(dir, crate::policy::FS_WRITE)) {
             return false;
         }
+        fsync_dir(dir)
+    }
+
+    /// sync_dir without the manifest's check: the folder of a file that was allowed and has
+    /// just been renamed into place (a rule for that file alone does not cover its folder)
+    fn fsync_dir(dir: &str) -> bool {
         let Some(fd) = open(if dir.is_empty() { "." } else { dir }, O_RDONLY | O_DIRECTORY, 0) else { return false };
         // SAFETY: an owned descriptor.
         unsafe { syscall3(SYS_FSYNC, fd.0, 0, 0) >= 0 }
@@ -1055,7 +1081,7 @@ mod lnx {
             unlink(&tmp);
             return false;
         }
-        sync_dir(super::parent(path))
+        fsync_dir(super::parent(path))
     }
 
     fn unlink(path: &str) {
@@ -1285,7 +1311,7 @@ mod apl {
     }
 
     pub fn hard_link(existing: &str, new: &str) -> bool {
-        if !(crate::policy::fs_allowed(existing, crate::policy::FS_READ) && crate::policy::fs_allowed(new, crate::policy::FS_WRITE)) {
+        if !(crate::policy::fs_allowed(existing, crate::policy::FS_WRITE) && crate::policy::fs_allowed(new, crate::policy::FS_WRITE)) {
             return false;
         }
         let (e, n) = (z(existing), z(new));
@@ -1361,6 +1387,12 @@ mod apl {
         if !(crate::policy::fs_allowed(dir, crate::policy::FS_WRITE)) {
             return false;
         }
+        fsync_dir(dir)
+    }
+
+    /// sync_dir without the manifest's check: the folder of a file that was allowed and has
+    /// just been renamed into place (a rule for that file alone does not cover its folder)
+    fn fsync_dir(dir: &str) -> bool {
         let Some(fd) = open(if dir.is_empty() { "." } else { dir }, ffi::O_RDONLY | ffi::O_DIRECTORY, 0) else { return false };
         // SAFETY: an owned descriptor.
         unsafe { ffi::fsync(fd.0) == 0 }
@@ -1404,7 +1436,7 @@ mod apl {
             unlink(&tmp);
             return false;
         }
-        sync_dir(super::parent(path))
+        fsync_dir(super::parent(path))
     }
 
     fn unlink(path: &str) {

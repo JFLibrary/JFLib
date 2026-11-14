@@ -474,9 +474,31 @@ fn put_default(mime: &str, ours: &str) -> Result<Option<Line>, AssocError> {
     Ok(Some(alloc::vec![String::from("default"), file, String::from(mime), had, old.unwrap_or_default(), value, String::from(made)]))
 }
 
+/// a record line's file is one register writes: a .desktop file or MIME package of
+/// $XDG_DATA_HOME (any app id), a mimeapps.list of $XDG_CONFIG_HOME.  The record is a file the
+/// app could change, and its lines delete, rename and rewrite with the unchecked functions
+fn recorded_place(kind: &str, path: &str) -> bool {
+    // path's name directly in dir (no folder below it, no hidden name)
+    let name_in = |dir: Option<String>| -> Option<String> {
+        let d = dir?;
+        let n = path.strip_prefix(d.as_str())?.strip_prefix('/')?;
+        (!n.is_empty() && !n.contains('/') && !n.starts_with('.')).then(|| String::from(n))
+    };
+    let data = crate::data_dir();
+    match kind {
+        "file" | "saved" => name_in(data.as_ref().map(|d| format!("{d}/applications"))).is_some_and(|n| n.ends_with(".desktop"))
+            || name_in(data.as_ref().map(|d| format!("{d}/mime/packages"))).is_some_and(|n| n.ends_with(".xml")),
+        "default" => name_in(crate::config_dir()).is_some_and(|n| n == "mimeapps.list" || n.ends_with("-mimeapps.list")),
+        _ => false,
+    }
+}
+
 pub fn undo(lines: &[Line]) {
     let field = |l: &Line, i: usize| l.get(i).cloned().unwrap_or_default();
     for l in lines.iter().rev() {
+        if !recorded_place(&l[0], &field(l, 1)) {
+            continue;
+        }
         match l[0].as_str() {
             "file" => {
                 let p = field(l, 1);

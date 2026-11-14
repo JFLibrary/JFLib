@@ -102,7 +102,14 @@ impl Command<'_> {
             || self.cwd.is_some_and(|p| p.contains('\0'))
             || self.env.iter().any(|(k, v)| k.is_empty() || k.contains(['=', '\0']) || v.is_some_and(|s| s.contains('\0')))
         { return Err(22); }
-        if !crate::policy::process_allowed(self.program) {
+        // a relative path with a working folder names a file below cwd on Linux and Apple (the
+        // child changes into cwd, then starts it), so that file is checked; Windows takes a
+        // relative program from this process's folder
+        let target = match self.cwd {
+            Some(d) if !cfg!(windows) && self.program.contains('/') && !self.program.starts_with('/') => alloc::format!("{d}/{}", self.program),
+            _ => String::from(self.program),
+        };
+        if !crate::policy::process_allowed(&target) {
             return Err(if cfg!(windows) { 5 } else { 13 }); // access denied / EACCES
         }
         native::spawn(self)

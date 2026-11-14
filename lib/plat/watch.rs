@@ -116,6 +116,10 @@ pub struct Watcher {
 
 impl Watcher {
     pub fn new(roots: &[String]) -> Result<Watcher, String> {
+        // the names below a root are read access (Windows opens the folder itself, unchecked)
+        if let Some(r) = roots.iter().find(|r| !crate::policy::fs_allowed(r, crate::policy::FS_READ)) {
+            return Err(alloc::format!("{r}: vom Berechtigungs-Manifest (PERMISSIONS) nicht erlaubt"));
+        }
         let shared = Arc::new(Shared { pending: Mutex::new(Pending::default()), cv: Condvar::new(), stop: AtomicBool::new(false) });
         let threads = imp::start(roots, &shared)?;
         Ok(Watcher { shared, threads })

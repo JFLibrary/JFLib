@@ -525,6 +525,12 @@ pub fn register(pkg: &Package, exe: &str, take: &mut dyn FnMut(&Conflict) -> boo
 pub fn undo(lines: &[Line]) {
     let field = |l: &Line, i: usize| l.get(i).cloned().unwrap_or_default();
     for l in lines.iter().rev() {
+        // only the places register writes: the record is a file the app could change, and
+        // a line for Software\Microsoft\Windows\CurrentVersion\Run would be an autostart entry
+        // past the manifest
+        if !removable(&field(l, 1)) {
+            continue;
+        }
         match l[0].as_str() {
             "key" => {
                 del_tree(&field(l, 1));
