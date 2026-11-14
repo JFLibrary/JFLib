@@ -1414,13 +1414,13 @@ ui.dialog_end(); // always
     | Windows, other sources; macOS; the browser (file drops) | never: `IDropTarget::Drop`, `performDragOperation:` and the page's `drop` event answer at once | the effect at the drop | (as taken: the source learns nothing more) |
     | the app's own drag onto its own target (every platform, headless too) | always | `DS_ACTIVE` until the answer, then `DS_END` with `drag_effect()` the effect, `UIC_DRAG_END` | `DS_END`, `drag_effect()` 0 |
 
-    The app's own drags inside its window take the same way: without `drop_defer` the source's
-    `DS_END` (and `UIC_DRAG_END`) comes after the drop's passes with the effect it was delivered
-    with, in passes right after the drop's (no longer in the same pass as the target's `DS_DROP`;
-    still before the frame is drawn), and with `drop_finish`'s effect after that call. While it
-    waits `drag_allowed()` says the source's effects and
-    `dragging()` is false; a new drag of the app overtakes the answer (given as delivered), as a
-    newer drop does (`apps/dndtest/tests/own_later.uis`).
+    The app's own drags inside its window go the same way. Without `drop_defer` the source's
+    `DS_END` (and `UIC_DRAG_END`) comes with the effect the drop was delivered with, in passes
+    right after the drop's: no longer in the same pass as the target's `DS_DROP`, still before the
+    frame is drawn. With `drop_defer` it comes after `drop_finish` with that effect. While the
+    answer waits, `drag_allowed()` says the source's effects and `dragging()` is false; a new drag
+    of the app overtakes it (answered as delivered), as a newer drop does
+    (`apps/dndtest/tests/own_later.uis`).
 
     ```rust
     match ui.drop_target(ID_PAGE, DT_FILES | DT_URL | DT_TEXT) {
@@ -2328,9 +2328,10 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   without one -- `code_status`, `code_events`, `code_diag`, `code_popup_item` and `spell_errors`
   read the first window, the main window first, that has such a widget, `code_find`,
   `code_reveal` and `richtext_link` go to the first editor of the id that is built,
-  `canvas_damage` and `canvas_gpu_damage` to the canvas of that id in every window. App-wide stay what is the app's: the code editors' theme and font size, the spell
-  checker, the folder a file dialog used last and `filedlg_paths()`, the dock's floating windows'
-  ids (the area's id + 1 ..: areas in two windows that float panels need ids of their own).
+  `canvas_damage` and `canvas_gpu_damage` to the canvas of that id in every window. What is the
+  app's stays app-wide: the code editors' theme and font size, the spell checker, the folder a
+  file dialog used last and `filedlg_paths()`, the dock's floating windows' ids (the area's id +
+  1 ..: areas in two windows that float panels need ids of their own).
 * `ui.canvas(...)` records the version *before* you react to its input. When handling the
   returned `UiInput` changes the content, bump the version and call `ui.repass()`; otherwise
   the dirty-region renderer shows the change one frame late (`--verify-dirty` reports it).
