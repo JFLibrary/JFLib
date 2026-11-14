@@ -26800,10 +26800,13 @@ modes or free space.
 - **`fn symlink(target: &str, link: &str, dir: bool) -> bool`**
   a symbolic link at link to target (dir: a folder's link on Windows); a vfs name as target
   stands for its OS path.  Only on OS paths and folder mounts; never a target with a NUL
-  character (the link would lead to the name before it).
+  character (the link would lead to the name before it).  With a manifest the app needs write
+  access to link and to target (a relative one counted from link's folder): the rules check a
+  path as it is written, so whatever may use the link reaches the target with the link's rights.
 
 - **`fn hard_link(existing: &str, new: &str) -> bool`**
-  a second name new for the file existing (both OS paths or folder mounts)
+  a second name new for the file existing (both OS paths or folder mounts); with a manifest
+  the app needs write access to both (writing through new changes existing)
 
 - **`fn set_times(path: &str, atime_ns: i64, mtime_ns: i64) -> bool`**
   access and modification times (ns since 1970), on a link itself, never its target; a

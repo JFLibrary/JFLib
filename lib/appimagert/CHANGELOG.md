@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Security
+
+- Without $XDG_CACHE_HOME and $HOME the runtime unpacks into $TMPDIR/appimage-run-<uid>, and only when that folder belongs to this user alone. It used /tmp/appimage-run, which every user can make, and would have started another user's AppRun from it.
+
 ## [0.2.0] - 2026-11-14
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

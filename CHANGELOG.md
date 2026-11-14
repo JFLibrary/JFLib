@@ -40,6 +40,16 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Linux trash: an entry of a mount's `.Trash-$uid` (or `.Trash/$uid`) could be trashed into that trash again -- its new info file pointed into the trash, the old one was left without its file -- and the home trash was not recognised when `$XDG_DATA_HOME` had `.` or `//` in it. Both are refused now
 - **plat:** Windows: `Watcher::new` returned before the roots were read, so a change right after it could be missed, and a root whose read failed (deleted, its drive gone) was given up for good after one overflow. `new` now waits until every root's first read is pending (a root that cannot be read fails it); a lost root is opened again every second
 - **plat:** Linux: the watcher left the folders of a folder whose listing failed (no descriptors left) unwatched for good, and a root moved away kept its watches -- its changes came under the old path -- while a folder made at its path was never watched (also after a deleted root). Such folders and roots are tried again every second
+- **plat:** `fs::write_file_private` reports true when a rule allows the file but not its folder: the folder's fsync after the rename was checked against the manifest and made it report false although the file had been replaced
+
+### Security
+
+- **plat:** `fs::symlink` and `fs::hard_link` want write access to the target as well (a relative symlink target counts from the link's folder): the rules check a path as it is written, so with a manifest a link at a writable path led to files the app could only read or not reach at all
+- **plat:** `assoc_unregister` plays back only record lines for the places a registration writes (Windows: Software\Classes, Software\Clients, RegisteredApplications; Linux: the .desktop and MIME files of $XDG_DATA_HOME, the user's mimeapps.list): config://assoc.list could set any HKCU value (an autostart entry under Run) or delete and rename any file of the user
+- **plat:** `process::Command::spawn` with a relative program path and a `cwd` checks the file it starts on Linux and macOS (cwd/program), not the same name below this process's folder
+- **plat:** `watch::Watcher::new` checks its folders against the manifest on Windows too
+- **plat:** The answers of the permission tests (`jfgui_PERM_ANSWER`, `jfgui_PERM_TIMEOUT`, `jfgui_PERM_STORE`) are read when the program starts, so a value the app sets later answers none of its questions. docs/PERMISSIONS.md says what the rules hold against: content that steers the app and its mistakes, not an app that goes around them on purpose
+- **appimagert:** Without $XDG_CACHE_HOME and $HOME the runtime unpacks into $TMPDIR/appimage-run-<uid> and only when that folder is this user's alone: it used /tmp/appimage-run, which every user can make, and would have started another user's AppRun from it
 
 ## [0.2.0] - 2026-11-14
 

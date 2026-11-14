@@ -30,6 +30,18 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Windows: `Watcher::new` returned before the roots were read, so a change right after it could be missed, and a root whose read failed (deleted, its drive gone) was given up for good after one overflow. `new` now waits until every root's first read is pending (a root that cannot be read fails it); a lost root is opened again every second
 - Linux: the watcher left the folders of a folder whose listing failed (no descriptors left) unwatched for good, and a root moved away kept its watches -- its changes came under the old path -- while a folder made at its path was never watched (also after a deleted root). Such folders and roots are tried again every second
 
+### Fixed
+
+- `fs::write_file_private` reports true when a rule of the manifest allows the file but not its folder. The folder's fsync after the rename was checked as well and made it report false although the file had been replaced.
+
+### Security
+
+- `fs::symlink` and `fs::hard_link` want write access to the target as well; a relative symlink target counts from the link's folder. The rules check a path as it is written, so a link at a writable path led to files the app could only read or not reach at all.
+- `assoc_unregister` plays back only record lines for the places a registration writes (Windows: Software\Classes, Software\Clients, RegisteredApplications; Linux: the .desktop and MIME files, the user's mimeapps.list). A changed config://assoc.list could set any HKCU value or delete and rename any file of the user.
+- `process::Command::spawn` with a relative program path and a `cwd` checks the file it starts on Linux and macOS (cwd/program), not the same name below this process's folder.
+- `watch::Watcher::new` checks its folders against the manifest on Windows too.
+- The answers of the permission tests (`jfgui_PERM_ANSWER`, `jfgui_PERM_TIMEOUT`, `jfgui_PERM_STORE`) are read when the program starts, so a value the app sets later answers none of its questions.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

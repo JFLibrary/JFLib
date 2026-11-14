@@ -4,8 +4,11 @@ An app can declare which files, programs, URL schemes, plugins, printers and net
 addresses it uses, whether it keeps secrets in the system's store, whether it may start
 itself at login, whether it plays sound, whether it may register global shortcuts and whether it
 may take pictures of the screen. The
-platform layer then refuses everything else, in every part of the process: the app's own
-code, the library, codecs, plugins that go through the host API, scripts and agent actions.
+platform layer then refuses everything else that goes through it, in every part of the process:
+the app's own code, the library, codecs, plugins that go through the host API, scripts and agent
+actions. The rules keep honest code honest: they hold against content that steers the app (a
+document, a script, an agent action, a plugin's request) and against the app's mistakes, not
+against an app that sets out to go around them ([Limits](#limits): the app's own code).
 Apps without a `PERMISSIONS` file keep the old behaviour and may do everything.
 
 A rule can also ask the user at the first access ("permprompt wants to write files"), with
@@ -515,6 +518,23 @@ In addition:
 - **Lexical checks.** A symbolic link inside an allowed folder can lead outside it. On
   Linux a path with a `..` segment is refused, because the kernel applies `..` after
   symbolic links (`allowed/link/../x`). Windows resolves `..` in the text, as the policy does.
+  `plat::fs::symlink` and `hard_link` therefore want write access to the target as well as
+  to the new name (a relative target counts from the link's folder), so a link made through
+  `plat` leads nowhere the app could not write; links the user or other programs made can.
+- **The app's own code.** The rules are no wall between the app and itself. An app may use
+  `std` and system calls, which do not pass `plat` at all, and the library offers it ways that
+  only matter when it means to go around its own manifest: it can fill the drop list and post
+  the drop event itself (`plat::drop_add`, `plat::evq_push`: with `fs.user` a drop grants its
+  files), drive its own permission dialog through `a11y::request` or the dialog's fixed widget
+  ids, forget answers (`policy::forget`, `forget_all`), move or remount its config folder under
+  the stored answers, or set the
+  environment variables the library reads while it runs (`$APPIMAGE`, and the stand-ins of
+  the tests for the system's recent list and the printer, `jfgui_RECENT` and `jfgui_PRINT_TO`,
+  which are written like the real ones, not as the app's files). The answers of the question
+  tests (`jfgui_PERM_ANSWER`, `jfgui_PERM_TIMEOUT`, `jfgui_PERM_STORE`) are read once when the
+  program starts. What the rules do hold against is content that steers honest
+  code: a path in a document, a script, an agent action, a plugin's request through the host
+  API. Only the [OS sandbox](#os-sandbox) contains an app that does not want to be contained.
 - **Not a sandbox against native code, by default.** Native plugins and app code that call the
   OS directly bypass `plat` ([Plugins](#plugins): what an in-process plugin can still do). An
   app that adds a `sandbox` line to its manifest has the operating system enforce the manifest
