@@ -55,6 +55,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   widget; else (outside the passes too) the queries (`code_status`, `code_events`, `code_diag`, `code_popup_item`, `spell_errors`) read the
   first window that has the widget, `code_find`, `code_reveal` and `richtext_link` go to the
   first editor of the id that is built, and `canvas_damage` to the canvas in every window.
+- The GPU output: a window whose swapchain could not be made because the device was lost (lost while no window showed on it: the others on the CPU path, hidden or kept at another size) no longer tries again on the lost device every 2, 4, 8 ... seconds; every window goes to the CPU path and a new device follows, as for a failure while showing. Test scripts: `gpu on` prints a SKIP when the screen's work area cannot hold the script's window (the system keeps it smaller, on the CPU path), instead of checks that cannot hold there.
 - On a phone or a tablet a vertical scroll view rolls sideways only while its content is laid
   out wider than the view, and only as far as that content reaches. Before, the natural width
   decided, where a wrapping text counts unwrapped and a view inside that rolls sideways itself

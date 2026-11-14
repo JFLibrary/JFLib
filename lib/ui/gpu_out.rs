@@ -156,7 +156,9 @@
 // lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 //
 // Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
-// Linux program, the browser), or without a GPU, it prints a SKIP once and does nothing):
+// Linux program, the browser), without a GPU, or when the screen's work area cannot hold the
+// window at `gpu on` (the system keeps it smaller, on the CPU path), it prints a SKIP once and
+// does nothing):
 //   gpu on [fast]          a real window per UI window (shown without activation) with
 //                          the output, every presented image compared with the framebuffer (fast:
 //                          not compared, for measurements), a render after every input edge; waits
@@ -1969,6 +1971,16 @@ impl Ui {
                     }
                     match r {
                         Ok(b) => self.gp_built(win, b),
+                        // a device lost while no window showed on it (the others on the CPU path, hidden, kept at
+                        // another size): nobody noticed it before.  It goes for every window, a new device follows;
+                        // this window's swapchain tried again on the lost one would fail for good
+                        Err(e @ GpuError::DeviceLost) => {
+                            if let Some(w) = self.m.gout.win(win) {
+                                w.stage = Stage::Cpu;
+                                w.lost = false;
+                            }
+                            self.gp_failed(win, e);
+                        }
                         Err(e) => {
                             let now = plat::time_us();
                             let s = &mut self.m.gout;
@@ -3834,6 +3846,26 @@ impl Ui {
         }
     }
 
+    /// `gpu on`: the screen cannot hold the script's window (GitHub's Mac runners: a screen of 1024 x 768).  The system
+    /// keeps the window smaller than the frame and it stays on the CPU path, so none of the script's GPU checks would
+    /// mean anything -> why, for a SKIP.  A window kept at another size on a screen large enough (a window manager
+    /// that is late) stays as it was: notes, the checks that need no swapchain still count
+    fn gp_no_room(&mut self) -> Option<String> {
+        let (fw, fh) = (self.wp.rt.fb.w, self.wp.rt.fb.h);
+        let i = self.gp_scoped();
+        let w = self.m.gout.win(i)?;
+        if w.stage == Stage::Gpu || !kept_at_other_size(w) {
+            return None;
+        }
+        let work = plat::monitors().first()?.work;
+        if fw <= work[2] && fh <= work[3] {
+            return None;
+        }
+        let (kw, kh) = plat::win_size(w.pw);
+        let (ww, wh) = (work[2], work[3]);
+        Some(format!("the screen's work area of {ww}x{wh} cannot hold the {fw}x{fh} window (the system keeps it at {kw}x{kh}, on the CPU path)"))
+    }
+
     fn gp_skip(&mut self, why: &str) {
         self.m.gout.skip = true;
         plat::write_stdout(format!("SKIP gpu: {why}\n").as_bytes());
@@ -3867,6 +3899,8 @@ impl Ui {
                 } else {
                     self.fail(why.as_bytes());
                 }
+            } else if let Some(why) = self.gp_no_room() {
+                self.gp_skip(&why);
             }
             return;
         }

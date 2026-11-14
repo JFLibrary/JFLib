@@ -33,7 +33,8 @@
 //                    queues is found by the values (the validation layer does not report it)
 //        syncval     (--validate only) a copy and a fill into one buffer without a barrier, then two
 //                    dispatches writing one buffer without one: the validation layer must report each
-//                    hazard with exactly one error (synchronization validation on)
+//                    hazard with exactly one error (synchronization validation on; Vulkan only:
+//                    Metal tracks hazards itself and its validation reports none, SKIP there)
 //        spec        pipeline constants (t_spec.rs): lib/shader's spec_fill as SPIR-V 1.3
 //                    (WorkgroupSize built-in) and 1.6 (LocalSizeId) with its defaults and with
 //                    constants for every override (workgroup sizes 1 .. the limit) = its CPU
@@ -184,6 +185,14 @@ pub struct Gpu {
     pub inst: Instance,
     pub adapter: Adapter,
     pub dev: Device,
+}
+
+/// the validation reports a hazard provoked on purpose: only Vulkan's layer has synchronization validation.  Metal's API
+/// validation (MTL_DEBUG_LAYER) stops the process at a misuse and counts nothing (gpu::validation_messages is (0, 0)), and
+/// Metal tracks the hazards between commands itself: no barrier is missing there.  Without it the provoked cases do not
+/// apply (SKIP); every other check of --validate stays
+pub fn sync_validation(adapter: &Adapter) -> bool {
+    adapter.info().backend == "Vulkan"
 }
 
 /// this program can show something on this device
@@ -496,6 +505,10 @@ fn syncval(t: &mut T) {
     let Some(g) = setup(t) else { return };
     if !g.inst.validating() {
         out("SKIP: no validation layer");
+        return;
+    }
+    if !sync_validation(&g.adapter) {
+        out(&format!("SKIP: {} has no synchronization validation (it tracks hazards itself)", g.adapter.info().backend));
         return;
     }
     let dev = &g.dev;
