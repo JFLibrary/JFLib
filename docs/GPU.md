@@ -1435,13 +1435,20 @@ Die Folge `info,compute,copies,upload,…,scene,wgsl` (alle Tests außer `window
 stürzte vorher in 5 von 24 Läufen ab (beim Abbau von `upload`, `copies`, `scene`), `info,compute,copies` allein in
 0 von 15.
 
-**Abhilfe:** Die Tests von gputest teilen sich eine Instanz (`setup`); eigene legen nur `info`, `errors` (mit
-`noloader`) und `churn` an. `gputest --test churn --validate` zeigt den Fehler weiter; nach einem neuen Treiber so
-nachprüfen. Mit einer Instanz trat er nicht auf (0 von 10 Läufen mit je 200 Geräten); wer unter Validierung
-Instanzen in schneller Folge anlegt und abbaut, kann ihn treffen. Danach lief die Testfolge ohne Fenster 10-mal ohne
-Absturz und `validate.uis` in der Suite grün; Abstürze über die Threads der Pipelines sind damit nicht
-ausgeschlossen. `render2dtest` und `render3dtest` legen noch je Test eine Instanz an. Der Fehler gehört an NVIDIA
-gemeldet.
+**Abhilfe:** Die Tests von gputest, `render2dtest` und `render3dtest` teilen sich je Prozess eine Instanz
+(`setup`, `T::inst`); jeder Test legt weiter seine eigenen Geräte an. Eigene Instanzen legen nur `info`, `errors`
+(mit `noloader`) und `churn` von gputest an. `gputest --test churn --validate` zeigt den Fehler weiter; nach einem
+neuen Treiber so nachprüfen. Mit einer Instanz trat er nicht auf (0 von 10 Läufen mit je 200 Geräten); wer unter
+Validierung Instanzen in schneller Folge anlegt und abbaut, kann ihn treffen. Danach lief die Testfolge ohne
+Fenster 10-mal ohne Absturz und `validate.uis` in der Suite grün.
+
+**Pipelines** (2026-11-14): `gputest --test churn_shared --validate` legt auf der geteilten Instanz 200 Geräte an,
+jedes mit einer Compute-Pipeline und einem Dispatch: kein Absturz in 4 Läufen. Die Gegenprobe `churn`, abwechselnd
+damit, stürzte an diesem Tag aber auch nicht ab (0 von 2; fremde Last, 30 bis 280 s je Lauf statt 20 bis 50 s am
+Vortag). Das sagt also nichts: Ob die Threads der Pipelines den Absturz auf einer geteilten Instanz auslösen, ist
+offen (render2d sah ihn in G6b2 beim Anlegen einer Pipeline, mit je einer Instanz pro Test). Nachprüfen, wenn
+`churn` wieder abstürzt: `gputest --test churn_shared --validate` abwechselnd mit `--test churn --validate`. Der
+Fehler gehört an NVIDIA gemeldet.
 
 ## Tests
 

@@ -62,6 +62,8 @@
 //        all         every test above
 //        churn       (not in all) 200 times an instance and a device, created and dropped: with
 //                    --validate it reproduces the NVIDIA driver's crash (docs/GPU.md, Validierung)
+//        churn_shared (not in all) 200 devices on the shared instance, each with a compute
+//                    pipeline and a dispatch: the driver's threads of devices and pipelines
 //   gputest --test A,B,... [--except C,D,...] [--validate]   several tests in the list's order, `all` without
 //                   some (tests/validate*.uis: the tests with a real window apart from the rest)
 //   --validate      with VK_LAYER_KHRONOS_validation (jfgui_GPU_VALIDATE, synchronization
@@ -528,6 +530,20 @@ fn churn(t: &mut T) {
     t.ok(true, "200 instances and devices created and dropped");
 }
 
+/// 200 devices on the shared instance, each with the fill pipeline and a dispatch (docs/GPU.md,
+/// "Absturz im NVIDIA-Treiber": the driver starts threads for pipelines too)
+fn churn_shared(t: &mut T) {
+    let t0 = plat::time_us();
+    for i in 0..200 {
+        let Some(g) = setup(t) else { return };
+        t_compute::fill_check(t, &g.dev, 1000, "churn_shared fill");
+        drop(g);
+        if i % 50 == 49 {
+            out(&format!("  {} devices with a pipeline: {:.0} ms", i + 1, ms_since(t0)));
+        }
+    }
+}
+
 fn syncval(t: &mut T) {
     if !t.validate {
         out("SKIP: needs --validate");
@@ -583,7 +599,7 @@ fn run() -> i32 {
         plat::write_stderr(b"gputest: --info, --test NAME [--validate], --bench or --bench N (see apps/gputest/main.rs)\n");
         return 2;
     };
-    let tests: [(&str, fn(&mut T)); 21] = [
+    let tests: [(&str, fn(&mut T)); 22] = [
         ("info", info),
         ("compute", t_compute::compute),
         ("copies", t_compute::copies),
@@ -605,6 +621,7 @@ fn run() -> i32 {
         ("noloader", t_glibc::noloader),
         ("msl", t_msl::msl),
         ("churn", churn),
+        ("churn_shared", churn_shared),
     ];
     // --test A,B,...: those tests in the list's order; --except A,B,...: not those (the suite runs the validation of
     // the tests with a real window apart from the rest of `all`, tests/validate*.uis)
@@ -617,8 +634,9 @@ fn run() -> i32 {
     }
     let mut ran = false;
     for (name, f) in tests {
-        // churn only by name: it is the reproducer of the driver's crash, not a check
-        if ((names.contains(&"all") && name != "churn") || names.contains(&name)) && !except.contains(&name) {
+        // churn and churn_shared only by name: the driver's crash, reproduced or not, no check
+        let by_name = name.starts_with("churn");
+        if ((names.contains(&"all") && !by_name) || names.contains(&name)) && !except.contains(&name) {
             out(&format!("== {name}{}", if validate { " (validation)" } else { "" }));
             f(&mut t);
             ran = true;
