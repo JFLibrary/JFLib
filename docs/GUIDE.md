@@ -5776,7 +5776,8 @@ What the library does by itself on a phone or a tablet, and only there:
   as wide as in the last pass; fill widgets give way, but keep 64 DIP (an image list beside the bar
   stays visible);
 - the status bar's items roll sideways with the finger while they are wider than the bar;
-- a vertical scroll view whose content is wider than the view rolls sideways too;
+- a vertical scroll view whose content is laid out wider than the view rolls sideways too, as far as
+  that content reaches (a wrapping text or a view inside that rolls sideways itself is no reason);
 - windows are at most as large as the screen, and those of the main window lie inside it; a window or a
   content dialog cut shorter than its content rolls it, a dialog's footer stays below;
 - Android paints the status bar, the navigation bar and a cut-out's strip in the colours at the app's
@@ -5787,7 +5788,7 @@ What only the app knows it decides with `form_factor()`: which panels a phone sh
 (`scroll_begin(id, SC_H | SC_NOBAR | BOX_XCENTER)` around a tool bar row, only when `ui.mobile()`, keeps
 the desktop's row as it was), which hints speak of a mouse.
 
-Test it on the desktop: `system env jfgui_FORM phone` in a script (`apps/gallery/tests/form_factor.uis`),
-or a program started with `jfgui_FORM=phone` in a window of a phone's size. On Android a tablet comes from
-the emulator's `pixel_tablet` profile, a phone from the same emulator with `adb shell wm size 1080x2400`
-and `wm density 420`.
+Test it on the desktop: `system env jfgui_FORM phone` in a script (`apps/gallery/tests/form_factor.uis`,
+`apps/androidGallery/tests/touch_phone.uis`), or a program started with `jfgui_FORM=phone` in a window
+of a phone's size. On Android a tablet comes from the emulator's `pixel_tablet` profile, a phone from the
+same emulator with `adb shell wm size 1080x2400` and `wm density 420`.
