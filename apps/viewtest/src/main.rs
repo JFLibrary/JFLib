@@ -14,6 +14,9 @@
 //   "Dateien öffnen"     the file dialog with FD_MULTI in the folder --files DIR (E8): several
 //                        files at once, ui.filedlg_paths() shown as "Dateien: N a b"
 //   "Ordner wählen"      a folder dialog (FD_FOLDER) in --files DIR: filedlg_paths() is the folder
+//   command 9            "Speichern unter" in --files DIR with the library's own dialog on every
+//                        system (FD_BUILTIN, as a browser's "Save as" that looks the same
+//                        everywhere), the second type ("dat") selected (tests/builtin.uis)
 //   "Notiz"              a text box; the app window has one of the same id (each keeps its caret)
 //   "Kette"              three commands, each queued by the frame that saw the one before (the
 //                        three command rounds of a frame; the frame after them shows "Kette: 3")
@@ -117,6 +120,7 @@ const ID_SHEET: u32 = 150; // the sheet box of both windows (one fixed id)
 const ID_SHEET_TEXT: u32 = ID_SHEET + 3; // its text box (one fixed id in both windows)
 const ID_FD: u32 = 0x10_0000; // the file dialog (ids .. + 0x3FFF; rows + 17 + i, name box + 12)
 const ID_FD_DIR: u32 = 0x11_0000; // the folder dialog (FD_FOLDER)
+const ID_FD_SAVE: u32 = 0x12_0000; // command 9: "Speichern unter", the own dialog (FD_BUILTIN; name box + 12)
 
 const CMD_NEW_TAB: u32 = 1;
 const CMD_RELOAD: u32 = 2;
@@ -126,6 +130,7 @@ const CMD_CHAIN: u32 = 5; // "Kette": one link of the chain
 const CMD_PW_AWAY: u32 = 6; // the password box goes away (and comes back), as with a closed window
 const CMD_NESTED: u32 = 7; // Ctrl+N: the window "Teiler"
 const CMD_TWO: u32 = 8; // "Fenster A" and "Fenster B"
+const CMD_SAVE_AS: u32 = 9; // "Speichern unter" in the library's own dialog (FD_BUILTIN)
 
 const T_POLL: u32 = 1; // "Hintergrund": the timer that polls the thread's result
 
@@ -203,6 +208,9 @@ struct ViewTest {
     /// the folder dialog (FD_FOLDER): open, its path
     dir_open: Shared<i32>,
     dir_path: String,
+    /// command 9: "Speichern unter" (FD_SAVE | FD_BUILTIN): open, its path
+    save_open: Shared<i32>,
+    save_path: String,
     /// "Notiz" in the main window and in the app window (text boxes of the same id)
     note: String,
     app_note: String,
@@ -286,6 +294,8 @@ impl Default for ViewTest {
             files: String::from("-"),
             dir_open: Shared::new(0),
             dir_path: String::new(),
+            save_open: Shared::new(0),
+            save_path: String::new(),
             note: String::new(),
             app_note: String::new(),
             chain: 0,
@@ -777,6 +787,13 @@ impl App for ViewTest {
             let names: Vec<&str> = all.iter().map(|p| p.rsplit('/').next().unwrap_or(p)).collect();
             self.files = format!("{} {}", all.len(), names.join(" "));
         }
+        // command 9: the library's own dialog wherever the app runs (FD_BUILTIN), the second
+        // type selected: a name without an extension gets ".dat"
+        let flags = FD_SAVE | FD_BUILTIN | 1 << FD_EXT_SHIFT;
+        if ui.filedlg(ID_FD_SAVE, flags, &self.save_open, &mut self.save_path, 4096, &["txt=Textdatei", "dat=Daten"]) & EV_ACT != 0 {
+            let name = self.save_path.rsplit('/').next().unwrap_or(&self.save_path);
+            self.files = format!("1 {}", name);
+        }
         if ui.flyout_begin(ID_FLYOUT, 0) && ui.menu_item(ID_ROW, "Eintrag A") & EV_ACT != 0 {
             self.rows += 1;
         }
@@ -801,6 +818,12 @@ impl App for ViewTest {
             CMD_TWO => {
                 self.two_open[0].set(1);
                 self.two_open[1].set(1);
+            }
+            CMD_SAVE_AS => {
+                // in the folder of --files
+                let dir = plat::arg_value("--files").unwrap_or_default();
+                self.save_path = format!("{}/", dir.trim_end_matches('/'));
+                self.save_open.set(1);
             }
             // "Hintergrund": the thread's wake-up, the poll timer
             UIC_WAKE => self.work_seen = WORK_DONE.load(Ordering::Relaxed),

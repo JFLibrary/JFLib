@@ -8,6 +8,13 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `FD_BUILTIN` in the flags of `ui.filedlg`: the library's own file dialog instead of the
+  system's, on every platform, so the dialog looks and behaves the same everywhere and in every
+  style (a browser's "Save as"). It lists what plat's file functions see. Before, only the
+  environment variable `jfgui_FILEDLG=builtin` chose it, and for every dialog of a run.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

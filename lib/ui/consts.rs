@@ -546,6 +546,9 @@ pub const FD_SAVE: u32 = 1;
 pub const FD_FOLDER: u32 = 2;
 /// (E8) open several files at once (with FD_OPEN): ui.filedlg_paths() has all of them, `path` the first
 pub const FD_MULTI: u32 = 4;
+/// the library's own dialog on every platform, never the system's (as `jfgui_FILEDLG=builtin`
+/// does for every dialog of a run): an app whose dialog must look and behave the same everywhere
+pub const FD_BUILTIN: u32 = 8;
 pub const FD_EXT_SHIFT: u32 = 8;
 
 // ------------------------------------------------------------------ windows (win.rs)

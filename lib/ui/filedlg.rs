@@ -15,7 +15,11 @@
 //        Where the system has a file dialog (Windows, the Linux portal) that one is shown
 //        (modal); Android's picker answers later: nothing is drawn while it is open, the
 //        chosen document arrives as its content:// name in a later frame.  Otherwise,
-//        headless or with jfgui_FILEDLG=builtin, the library's own dialog.
+//        headless, with FD_BUILTIN or with jfgui_FILEDLG=builtin, the library's own dialog.
+//        FD_BUILTIN: the app chooses the own dialog for this call on every platform (its look,
+//        its keys, the same in every style and on every system); it lists what plat's file
+//        functions see (in the browser and on Android the app's own folders, not the system's
+//        documents).
 //        FD_MULTI (E8, with FD_OPEN): several files -- the system's dialog where it chooses
 //        several (Windows, Linux's portal), the own dialog with Ctrl+click / Shift+click (or
 //        Shift+arrows) on the rows ("a" "b" in the name box, quoted names typed there too);
@@ -481,7 +485,10 @@ impl Ui {
     // fd_system(flags, path, cap, exts) -> 1 chosen, 0 cancelled, -1 use the own dialog,
     // FD_PENDING the system's picker answers later (fd_wait)
     fn fd_system(&mut self, flags: u32, path: &mut String, cap: u32, exts: &[&str]) -> i32 {
-        if self.headless || plat::getenv("jfgui_FILEDLG").is_some_and(|v| v.as_bytes().first() == Some(&b'b')) {
+        if self.headless || flags & FD_BUILTIN != 0 {
+            return -1; // the app's choice (FD_BUILTIN)
+        }
+        if plat::getenv("jfgui_FILEDLG").is_some_and(|v| v.as_bytes().first() == Some(&b'b')) {
             return -1; // "builtin"
         }
         if self.hr_outside("the system's file dialog") {

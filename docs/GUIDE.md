@@ -1243,8 +1243,9 @@ ui.dialog_end(); // always
   path, cap, exts)` -> `EV_ACT` when a file (`FD_FOLDER`: a folder) was chosen; `path` then
   holds an absolute path with `/` separators (Windows accepts them). It shows the system dialog
   (Explorer on Windows, the desktop's file chooser through xdg-desktop-portal on Linux) and
-  falls back to the library's own dialog when there is none, in headless runs, or with
-  `jfgui_FILEDLG=builtin`; `FD_FOLDER` uses the own dialog on Windows (folders only, the
+  falls back to the library's own dialog when there is none, in headless runs, with
+  `FD_BUILTIN` (the app's choice, below) or with `jfgui_FILEDLG=builtin` (every dialog of the
+  run); `FD_FOLDER` uses the own dialog on Windows (folders only, the
   selected or shown folder is the answer). On Android it is the system's picker (Storage
   Access Framework): `path` becomes a `content://` name ([VFS.md](VFS.md), "Android"),
   readable and writable with the ordinary file functions and kept across restarts; show the
@@ -1285,6 +1286,18 @@ ui.dialog_end(); // always
   if ui.filedlg(ID_FILEDLG, FD_OPEN | FD_MULTI, &open, &mut self.path, 4096, &EXTS) & EV_ACT != 0 {
       for p in ui.filedlg_paths() { self.upload.push(p); }
   }
+  ```
+
+  **The library's own dialog by choice** (`FD_BUILTIN`): the app's dialog looks and behaves the
+  same on every system and in every style (a browser's "Save as", a dialog the app's tests drive
+  in real windows), where `jfgui_FILEDLG=builtin` only switches a whole run. It lists what
+  `plat`'s file functions see: on Windows, Linux and macOS the file system, in the browser and on
+  Android the app's own folders (not the system's documents or the user's files outside them).
+  The other flags keep their meaning (`apps/viewtest/tests/builtin.uis`):
+
+  ```rust
+  let flags = FD_SAVE | FD_BUILTIN | 1 << FD_EXT_SHIFT; // the own dialog, the second type selected
+  if ui.filedlg(ID_FILEDLG, flags, &open, &mut self.path, 1040, &EXTS) & EV_ACT != 0 { /* save */ }
   ```
 
 * **Drag and drop** ([`ui/dnd.rs`](../lib/ui/dnd.rs), [`plat/dnd.rs`](../lib/plat/dnd.rs)):

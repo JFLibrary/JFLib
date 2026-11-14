@@ -4094,7 +4094,11 @@ filedlg -- Open / Save file dialog (ContentDialog with a folder list), both OS
        Where the system has a file dialog (Windows, the Linux portal) that one is shown
        (modal); Android's picker answers later: nothing is drawn while it is open, the
        chosen document arrives as its content:// name in a later frame.  Otherwise,
-       headless or with jfgui_FILEDLG=builtin, the library's own dialog.
+       headless, with FD_BUILTIN or with jfgui_FILEDLG=builtin, the library's own dialog.
+       FD_BUILTIN: the app chooses the own dialog for this call on every platform (its look,
+       its keys, the same in every style and on every system); it lists what plat's file
+       functions see (in the browser and on Android the app's own folders, not the system's
+       documents).
        FD_MULTI (E8, with FD_OPEN): several files -- the system's dialog where it chooses
        several (Windows, Linux's portal), the own dialog with Ctrl+click / Shift+click (or
        Shift+arrows) on the rows ("a" "b" in the name box, quoted names typed there too);
@@ -5897,6 +5901,9 @@ FD_SAVE: u32 = 1
 FD_FOLDER: u32 = 2
 /// (E8) open several files at once (with FD_OPEN): ui.filedlg_paths() has all of them, `path` the first
 FD_MULTI: u32 = 4
+/// the library's own dialog on every platform, never the system's (as `jfgui_FILEDLG=builtin`
+/// does for every dialog of a run): an app whose dialog must look and behave the same everywhere
+FD_BUILTIN: u32 = 8
 FD_EXT_SHIFT: u32 = 8
 ```
 

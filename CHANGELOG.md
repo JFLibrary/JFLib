@@ -18,6 +18,10 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ## [Unreleased]
 
+### Added
+
+- **ui:** `FD_BUILTIN`: the app chooses the library's own file dialog for a `ui.filedlg` call on every platform (Windows, Linux, macOS, Android, the browser), so it looks and behaves the same everywhere and in every style; it lists what plat's file functions see. Before, only the environment variable `jfgui_FILEDLG=builtin` chose it, for every dialog of a run. docs/GUIDE.md section 7
+
 ## [0.2.0] - 2026-11-14
 
 ### Added
