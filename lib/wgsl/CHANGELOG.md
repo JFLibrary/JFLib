@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- `atomic<vec2<u32>>` (`enable atomic_vec2u_min_max;`) is refused outside the storage address space. A workgroup variable of it was taken, and `workgroupUniformLoad` of it panicked in the SPIR-V backend.
+
 ## [0.2.0] - 2026-11-14
 
 ### Fixed

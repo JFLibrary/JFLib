@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Security
+
+- `cargo jflib web --serve` serves only plain names below the bundle, and only to the Host 127.0.0.1 or localhost. On Windows `GET /C:/...` and `..\` reached any file, and a web page could read the bundle through DNS rebinding.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

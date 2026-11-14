@@ -24,6 +24,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** Test scripts: a line `only OS...: COMMAND` runs one command on the systems it names (`only windows linux: key ctrl+q`), `!OS` on every system but that one; the names are those of cargo jflib test's `#!only` (windows linux macos ios android wasm32), which skips a whole script. The app decides it where the script runs, so build_rs.py test, cargo jflib test and runs by hand behave alike; an unknown name is a parse error. docs/GUIDE.md section 12
 - **ui:** `ui.drop_defer()` and `ui.drop_finish(effect)` work for the app's own drags too: a drag of the app dropped onto one of its targets waits for the target's answer like another program's drop -- its source reports `DS_ACTIVE` until the answer, then `DS_END` with `drag_effect()` and `UIC_DRAG_END` as `drop_finish` says (0: not taken); after `DROP_DEFER_MS`, or when a new drag of the app overtakes it, as it was delivered. Without `drop_defer` the source's `DS_END` comes in the passes right after the drop's (no longer in the same pass as the target's `DS_DROP`); in the drop's passes `drag_allowed()` says the source's effects, as for other drops; `dragging()` is false once the drag was dropped. docs/GUIDE.md section 7
 - **plat:** `watch::Watcher::watching()`: whether every root (Linux: every folder below them) is watched now
+- **netio:** `Stream::end_is_clean()` (default true): after a read gave 0, whether the peer ended the stream in order; `TlsStream` answers whether close_notify came
 
 ### Changed
 
@@ -41,6 +42,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Windows: `Watcher::new` returned before the roots were read, so a change right after it could be missed, and a root whose read failed (deleted, its drive gone) was given up for good after one overflow. `new` now waits until every root's first read is pending (a root that cannot be read fails it); a lost root is opened again every second
 - **plat:** Linux: the watcher left the folders of a folder whose listing failed (no descriptors left) unwatched for good, and a root moved away kept its watches -- its changes came under the old path -- while a folder made at its path was never watched (also after a deleted root). Such folders and roots are tried again every second
 - **plat:** `fs::write_file_private` reports true when a rule allows the file but not its folder: the folder's fsync after the rename was checked against the manifest and made it report false although the file had been replaced
+- **wgsl:** `atomic<vec2<u32>>` (`enable atomic_vec2u_min_max;`) is refused outside the storage address space: a workgroup variable of it was taken, and `workgroupUniformLoad` of it panicked in the SPIR-V backend
+- **text:** Line breaking with soft hyphens stops measuring the later soft hyphens once one does not fit (each measures from the line's start): 30 KB of text with many of them froze the UI, cubic over the lines
+- **text:** The CFF charstring operator `roll` rotates in one pass: a roll of the whole CFF2 stack cost num × r moves while the budget counted one operator, and such a font took about 35 s to load
 
 ### Security
 
@@ -50,6 +54,11 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** `watch::Watcher::new` checks its folders against the manifest on Windows too
 - **plat:** The answers of the permission tests (`jfgui_PERM_ANSWER`, `jfgui_PERM_TIMEOUT`, `jfgui_PERM_STORE`) are read when the program starts, so a value the app sets later answers none of its questions. docs/PERMISSIONS.md says what the rules hold against: content that steers the app and its mistakes, not an app that goes around them on purpose
 - **appimagert:** Without $XDG_CACHE_HOME and $HOME the runtime unpacks into $TMPDIR/appimage-run-<uid> and only when that folder is this user's alone: it used /tmp/appimage-run, which every user can make, and would have started another user's AppRun from it
+- **plat:** Windows: `process::Command::spawn` and `process::launch` refuse a `.bat` or `.cmd` program (87) when it or an argument holds `"`, `%`, `!`, `^`, `&`, `|`, `<`, `>` or a line break: cmd.exe reads its command line by its own rules, and arguments quoted for CommandLineToArgvW could run further commands (the class of CVE-2024-24576)
+- **plat:** `open_folder` shows a file or a package selected in the Finder (`open -R`) instead of opening it, which started apps and .command scripts (macOS); on Windows it starts the Windows folder's explorer.exe, not one ShellExecute may find in the current folder
+- **netio:** A response without a length, which runs to the end of the connection, ends only at an orderly end: a reset, or a TLS connection closed without close_notify, is an error instead of the whole body (a body cut short passed for complete)
+- **netio:** SSH `exec`: the names of `exit-signal` requests count against `max_out` like the output (a server could send any number of them)
+- **cargo-jflib:** `cargo jflib web --serve` serves only plain names below the bundle, and only to the Host 127.0.0.1 or localhost: on Windows `GET /C:/...` and `..\` reached any file, and a web page could read the bundle through DNS rebinding
 
 ## [0.2.0] - 2026-11-14
 

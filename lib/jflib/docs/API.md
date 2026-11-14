@@ -26336,7 +26336,10 @@ a program name stands for.
 **`impl Command<'_>`**
 
 - **`fn spawn(&self) -> Result<Child, u32>`**
-  Start a hidden process with pipes. Dropping its handle terminates its tree.
+  Start a hidden process with pipes. Dropping its handle terminates its tree.  Windows: a
+  `.bat` or `.cmd` file runs through cmd.exe, which reads its command line by other rules;
+  a program or argument with `"`, `%`, `!`, `^`, `&`, `|`, `<`, `>` or a line break is
+  refused for it (87), as for process::launch
 
 ### `plat/process_win.rs` (Windows)
 
@@ -33783,7 +33786,9 @@ macOS's windows: apple_mac.rs.
   (apple_mac_app.rs print_dialog); iOS: ERR_UNSUPPORTED before AP5
 
 - **`fn open_folder(path: &str) -> i32`**
-  show a folder / a file in the Finder -> 0 / -1  [plat_open_folder]
+  show a folder / a file in the Finder -> 0 / -1  [plat_open_folder].  A plain folder opens; a
+  file or a package (a folder with an extension: Name.app, .bundle ...) is only shown, selected
+  in its folder (open -R): `open` alone would start an app or a .command script
 
 - **`fn open_url(url: &str) -> i32`**
   a web page in the default application (iOS: UIApplication openURL) -> 0 / -1  [plat_open_url]
@@ -39402,6 +39407,10 @@ error answer or a closed connection, never a panic.
     no more writes from this side
   - `fn wait_readable(&self, _ms: u32) -> bool`
     whether bytes (or the end) can be read within `ms`
+  - `fn end_is_clean(&self) -> bool`
+    after read gave Ok(0): whether the peer ended the stream in order.  TLS: only after its
+    close_notify -- a TCP end without one may be an attacker cutting a body that runs to the
+    end of the connection (HTTP without a length).  Plain streams: always
 
 ### `netio/client.rs`
 
@@ -40145,6 +40154,8 @@ AL_CERTIFICATE_REQUIRED: u8 = 116
 - **`fn server(cfg: ServerConfig) -> Conn`**
 - **`fn established(&self) -> bool`**
 - **`fn closed(&self) -> bool`**
+- **`fn peer_closed(&self) -> bool`**
+  the peer sent close_notify (an orderly end, not a cut connection)
 - **`fn peer_certs(&self) -> &[Cert]`**
   the peer's certificate chain (leaf first)
 - **`fn version(&self) -> &'static str`**

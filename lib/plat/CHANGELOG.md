@@ -41,6 +41,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - `process::Command::spawn` with a relative program path and a `cwd` checks the file it starts on Linux and macOS (cwd/program), not the same name below this process's folder.
 - `watch::Watcher::new` checks its folders against the manifest on Windows too.
 - The answers of the permission tests (`jfgui_PERM_ANSWER`, `jfgui_PERM_TIMEOUT`, `jfgui_PERM_STORE`) are read when the program starts, so a value the app sets later answers none of its questions.
+- Windows: `process::Command::spawn` and `process::launch` refuse a `.bat` or `.cmd` program (87) when it or an argument holds `"`, `%`, `!`, `^`, `&`, `|`, `<`, `>` or a line break. cmd.exe reads its command line by its own rules, and the quoted arguments could run further commands (the class of CVE-2024-24576).
+- `open_folder` shows a file or a package selected in the Finder (`open -R`) instead of opening it, which started apps and .command scripts (macOS); on Windows it starts the Windows folder's explorer.exe.
 
 ## [0.2.0] - 2026-11-14
 
