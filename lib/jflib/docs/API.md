@@ -27352,6 +27352,10 @@ one thread may read while another writes (Arc<TcpStream>).
 - **`fn set_write_timeout(&self, ms: Option<u32>)`**
 - **`fn set_nodelay(&self, on: bool) -> NetResult<()>`**
 - **`fn set_keepalive(&self, on: bool) -> NetResult<()>`**
+- **`fn peer_uid(&self) -> Option<u32>`**
+  the user id of the process at the other end of a Unix socket, as the kernel recorded it
+  when it connected or listened (Linux SO_PEERCRED, macOS getpeereid): not what the socket
+  file's owner claims.  Unix sockets only (TCP has no meaningful answer); None on Windows
 - **`fn read(&self, buf: &mut [u8]) -> NetResult<usize>`**
   up to buf.len() bytes; Ok(0) = the peer closed its side
 - **`fn read_exact(&self, buf: &mut [u8]) -> NetResult<()>`**
@@ -27435,6 +27439,10 @@ fs -- file system access for backup and restore
                                                made owner-only
   local_zone_id() -> "Europe/Berlin" | "win:W. Europe Standard Time"
   long_path(path) (Windows): the \\?\ form every call here uses
+  Dir                                          an open folder: entries below it reached
+                                               relative to it, never through a link (the
+                                               section "folders by handle")
+  set_file_times / set_file_mode (File)        through the open file's own handle
 
 Windows: reparse points count as links only for symbolic links and junctions; other tags
 (deduplication, cloud placeholders) are ordinary files whose data is read.  Files are
@@ -27541,6 +27549,82 @@ modes or free space.
   SYSTEM or the administrators) and let nobody else write to it (Windows: grant nobody else
   anything), else false: someone else's folder, made before the program, may hold planted files.
   Linux and macOS make one of this user that others may only read owner-only (0700).
+
+- **`struct Dir`**
+  An open folder: what lies below it is reached relative to it and never through a link, so
+  a folder on the way that is swapped for a link (or renamed) after a check cannot lead a
+  privileged read, write, change or removal out of it.
+
+  ```text
+  Dir::open(path)                   the folder as it is (a link to it is followed: the
+                                    trusted start, e.g. a shared folder); OS paths and
+                                    folder mounts only
+  open_dir(rel)                     a folder below ("a/b"; no "..", nothing absolute) with no
+                                    link on the way: Linux openat2 (RESOLVE_BENEATH |
+                                    RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS), else openat
+                                    with O_NOFOLLOW for every component (kernels before 5.6,
+                                    a seccomp filter that refuses openat2)
+  names                             one component: no separator, not "." or ".." (Windows:
+                                    no ':' either); "" is the folder itself where noted
+  lstat / read_link / read_dir      links are reported, never followed
+  open_file(name)                   a regular file, read only; a link or anything else: None
+  create_new(name)                  a new file (Linux, macOS 0600), never an existing name
+  mkdir / remove / rename / symlink a link is removed or renamed as the link
+  set_times / set_mode / set_attrs  on the entry itself, never on a link's target
+  set_file_times / set_file_mode    through an open File's own handle (whatever its name
+                                    has become meanwhile)
+  ```
+
+  macOS: openat with O_NOFOLLOW component by component, the \*at calls on the folder.  Windows
+  has no calls relative to an open folder in its API: a Dir holds every folder from its start
+  down open without FILE_SHARE_DELETE (checked to be a folder, not a junction or a link), so
+  none of them can be renamed, removed or replaced while it lives, and its entries are named
+  by path below them (with OPEN_REPARSE_POINT).  The manifest's rules (policy.rs) are checked
+  on the path an entry has below the start.
+
+**`impl Dir`**
+
+- **`fn open(path: &str) -> Option<Dir>`**
+  the folder `path` as it is (a link to it is followed); None when it is no folder
+- **`fn path(&self) -> &str`**
+  the path the folder was opened as (with the names below its start)
+- **`fn open_dir(&self, rel: &str) -> Option<Dir>`**
+  a folder below this one ("a/b"): no component may be a link (or a junction), none may
+  be ".." and the path may not be absolute
+- **`fn lstat(&self, name: &str) -> Option<Meta>`**
+  the metadata of an entry itself ("": the folder), a link not followed
+- **`fn read_link(&self, name: &str) -> Option<String>`**
+  the target of a symbolic link (Windows: also a junction)
+- **`fn read_dir(&self) -> Option<Vec<DirEntry>>`**
+  the entries of the folder ("." / ".." left out); None also when an error cut it short
+- **`fn open_file(&self, name: &str) -> Option<crate::File>`**
+  a regular file, read only (never through a link; a folder, device or pipe: None)
+- **`fn create_new(&self, name: &str) -> Option<crate::File>`**
+  a new file, read and write (Linux, macOS: 0600); an existing name, also a link: None
+- **`fn mkdir(&self, name: &str) -> bool`**
+  a new folder (Linux, macOS: 0777 less the umask); false also when the name exists
+- **`fn remove(&self, name: &str) -> bool`**
+  a file, a link (never what it points to) or an empty folder
+- **`fn rename(&self, name: &str, to: &Dir, to_name: &str) -> bool`**
+  rename `name` to `to_name` in `to` (this folder or another Dir on the same volume),
+  replacing an existing file there; a link is renamed as the link
+- **`fn symlink(&self, target: &str, name: &str, dir: bool) -> bool`**
+  a symbolic link `name` to `target` (dir: a folder's link on Windows); the rules as for
+  symlink: the target as the link leads to it must be writable
+- **`fn set_times(&self, name: &str, atime_ns: i64, mtime_ns: i64) -> bool`**
+  access and modification times (ns since 1970) of an entry itself ("": the folder)
+- **`fn set_mode(&self, name: &str, mode: u32) -> bool`**
+  permission bits (07777) of an entry ("": the folder); a link is left alone (Windows:
+  nothing to do)
+- **`fn set_attrs(&self, name: &str, attrs: u32) -> bool`**
+  FILE_ATTRIBUTE_\* of an entry ("": the folder; Linux, macOS: nothing to do)
+
+- **`fn set_file_times(f: &crate::File, atime_ns: i64, mtime_ns: i64) -> bool`**
+  access and modification times of an open file, through its handle; a mount's stream: false
+
+- **`fn set_file_mode(f: &crate::File, mode: u32) -> bool`**
+  permission bits (07777) of an open file, through its handle (Windows: nothing to do); a
+  mount's stream: false
 
 ### `plat/service.rs`
 
