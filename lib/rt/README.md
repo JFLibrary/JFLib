@@ -56,8 +56,9 @@ and the browser (wasm32).
 
 Intel Macs (`x86_64-apple-darwin`): `cpu` detects the processor by CPUID and `x87` computes on the
 x87 unit, as on Windows and Linux; under Rosetta 2 the decimal conversions give the same bits as on
-Windows. On Linux the build script picks the build against glibc itself, so `cargo run` needs no
-flags. Everything is in the [changelog](https://docs.rs/crate/jflib-rt/latest/source/CHANGELOG.md).
+Windows. `cargo test --lib` builds the unit tests of a library crate with std and `rt::main!`. On
+Linux the build script picks the build against glibc itself, so `cargo run` needs no flags.
+Everything is in the [changelog](https://docs.rs/crate/jflib-rt/latest/source/CHANGELOG.md).
 
 ## Documentation
 

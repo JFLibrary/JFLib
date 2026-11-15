@@ -66,11 +66,11 @@ JFLib's crates share one version and are released together.
 systems only (`only windows linux: key ctrl+q`), and the app's own drags wait for `drop_defer` and
 `drop_finish` like other programs' drops; a drag that names no effects allows every effect. Fixes:
 widgets of the same id in two windows keep their own state, `type` in test scripts takes the whole
-string, a phone's page rolls sideways only when its content is laid out wider, and the syntax
-highlighter and the terminal have limits against crafted input. The file dialog no longer cuts a
-path that is too long, and the permission dialog ignores input for half a second after a question
-appears. Everything is in the
-[changelog](https://docs.rs/crate/jflib-ui/latest/source/CHANGELOG.md).
+string, a phone's page rolls sideways only when its content is laid out wider, the syntax
+highlighter and the terminal have limits against crafted input, and `cargo test --lib` builds the
+unit tests of an app with std and `ui::main!`. The file dialog no longer cuts a path that is too
+long, and the permission dialog ignores input for half a second after a question appears. Everything
+is in the [changelog](https://docs.rs/crate/jflib-ui/latest/source/CHANGELOG.md).
 
 ## Documentation
 
