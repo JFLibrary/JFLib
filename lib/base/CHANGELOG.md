@@ -8,6 +8,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-15
+
 ### Changed
 
 - `Settings::set`, `set_at` and `reset` report whether the value or the file changed: setting the default removes every line of the key, also one that already read as the default (an explicit default, an invalid value), and that counts as a change (`dirty`, `revision`). A text is kept as the file holds it -- CR, LF and NUL as blanks, no blanks around it -- and a value whose line would be longer than 64 KiB is not set (false)
@@ -41,6 +43,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0

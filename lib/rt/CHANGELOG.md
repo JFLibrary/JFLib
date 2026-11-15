@@ -8,6 +8,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-15
+
 ### Added
 
 - Intel Macs (`x86_64-apple-darwin`): `cpu` detects the processor by CPUID (AVX2, FMA, BMI2) and `x87` computes on the x87 unit, as on Windows and Linux (before, every Apple target took the portable versions); checked under Rosetta 2, where the decimal conversions give the same bits as on Windows ([INTEL_MAC.md](https://github.com/JFLibrary/JFLib/blob/main/docs/INTEL_MAC.md))
@@ -63,6 +65,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0

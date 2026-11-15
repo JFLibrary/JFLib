@@ -8,6 +8,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-15
+
 ### Added
 
 - `FD_BUILTIN` in the flags of `ui.filedlg`: the library's own file dialog instead of the
@@ -290,6 +292,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0
