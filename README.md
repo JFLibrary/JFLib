@@ -1,5 +1,7 @@
 # JFLIB
 
+**[jflib.org](https://jflib.org)** · [Discord](https://discord.gg/cX3jUxVvTm) · [Apps on jfreund.org](https://jfreund.org)
+
 **A GUI library in Rust, with its own renderer, interchangeable styles, and apps built on top.**
 
 The library is designed to be used by AI Agents, not by Humans – Thus the entire Codebase is optimized for hardware efficiency.
