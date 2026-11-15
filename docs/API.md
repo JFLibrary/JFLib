@@ -27426,7 +27426,13 @@ fs -- file system access for backup and restore
                                                sibling is always a new file of its own
   join(dir, name) / parent(path)               '' separates on Windows only (and in vfs
                                                names); on Linux and macOS it is a character
-  mkdir_private(path)                          owner-only directory (with parents)
+  mkdir_private(path)                          owner-only directory (with parents); an
+                                               existing one must be a folder (no link) of
+                                               this user (Windows: also SYSTEM's or the
+                                               administrators') nobody else may write to
+                                               (Windows: has any access to), else false;
+                                               Linux, macOS: one others may only read is
+                                               made owner-only
   local_zone_id() -> "Europe/Berlin" | "win:W. Europe Standard Time"
   long_path(path) (Windows): the \\?\ form every call here uses
 
@@ -27530,7 +27536,11 @@ modes or free space.
   write (memory of this process)
 
 - **`fn mkdir_private(path: &str) -> bool`**
-  an owner-only folder (with parents)
+  an owner-only folder (with parents; existing parents are taken as they are).  An existing
+  folder must be the folder itself (no link or junction), belong to this user (Windows: or to
+  SYSTEM or the administrators) and let nobody else write to it (Windows: grant nobody else
+  anything), else false: someone else's folder, made before the program, may hold planted files.
+  Linux and macOS make one of this user that others may only read owner-only (0700).
 
 ### `plat/service.rs`
 
@@ -27550,6 +27560,9 @@ service -- programs that run as a system service
       Windows: the service control manager (automatic start as LocalSystem, restart after a
       failure); Linux: a systemd unit in /etc/systemd/system and systemctl.  Both need
       administrator / root rights; the errors say so.
+  program_path(&ServiceSpec) -> the program install registers: Windows: a program outside
+      Program Files is copied to %ProgramFiles%\<name>\ first (only administrators may change
+      it there; uninstall leaves the copy, a new install replaces it); Linux, macOS: the program
   unit_text(&ServiceSpec) -> the systemd unit install writes (Linux)
   plist_text(&ServiceSpec) -> the launchd property list install writes (macOS: a daemon in
       /Library/LaunchDaemons, launchctl bootstrap / bootout / kickstart; iOS has no services)
@@ -27871,7 +27884,9 @@ Questions to the user ("ask" lines; one decision per line):
                                          Nobody asks (headless runs, console programs): refused
   Key::answer(id, Answer)                Once / Deny: until the program ends; Always / Never:
                                          also stored (Key::set_store, env jfgui_PERM_STORE,
-                                         STORE in config://; the app cannot write that file)
+                                         STORE in config://; the app cannot write that file,
+                                         by no other name either -- 8.3, case, link -- and
+                                         STORE also not while another store is chosen)
   Key::set_answer(Some(a))               every question answered with a, without asking
                                          (scripts; env jfgui_PERM_ANSWER=once|always|deny|never)
   decisions() -> Vec<Decision>           every ask line and agent action with its answer
@@ -28034,7 +28049,8 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn user_doc_allowed(uri: &str) -> bool`**
   whether the app may reach a document the user chose by its URI (Android's content://
-  names; the system grants each one): with fs.user in the manifest, or without a manifest
+  names; the system grants each one): with fs.user in the manifest, or without a manifest;
+  inside on_behalf every plugin scope needs fs.user as well
 
 - **`fn process_allowed(program: &str) -> bool`**
   whether Command::spawn / run_elevated may start program (a path, or a name found in PATH)
@@ -28807,7 +28823,9 @@ Channel (control_ipc_win.rs / control_ipc_linux.rs): Windows the pipe
 \\.\pipe\jfgui-instance-<user SID>-<app> (current user, local clients, one pipe instance:
 the first process that creates it is the instance; the starting process lets it take the
 foreground); Linux the abstract socket jfgui-instance-<uid>-<app>.  Both ends make sure the
-other runs as the same user.  Message: "JFI1", u32 length of the rest, u32 count, count x
+other runs as the same user (Linux: also in the same mount namespace, so a sandboxed process
+of the user -- Flatpak, bubblewrap, Firejail -- is refused).  Message: "JFI1", u32 length of
+the rest, u32 count, count x
 (u32 length, UTF-8): the working folder, then the arguments (without the program), on Linux
 then "XAT1", u32 length, the start's $XDG_ACTIVATION_TOKEN when it has one (the running
 instance's window comes forward with it on Wayland: linux_wl_act.rs; an instance of an older
@@ -29628,7 +29646,8 @@ written) and puts back what was there.  Windows (win_assoc.rs): the setup's entr
 HKCU\Software\Classes -- the ProgID <app>.<ext> (description, DefaultIcon, shell\open\command
 = "<exe>" "%1", AppUserModelID = the app id: what Windows asks of a handler with an explicit
 id for the recent files of the type), .<ext>\OpenWithProgids, for own types the default and
-Content Type of .<ext>, a scheme's key (URL:<display>, URL Protocol) -- then SHChangeNotify.
+Content Type of .<ext>, a scheme's key (URL:<display>, URL Protocol, shell\open\command =
+"<exe>" -- "%1": the URL after "--" is one argument, never options) -- then SHChangeNotify.
 A default of another program is the extension's default value (HKCU or HKLM) or a key of the
 same name with another command; the user's own choice in Windows' dialog (UserChoice, hashed) is never
 changed (Conflict::fixed).  Linux (linux_assoc.rs): $XDG_DATA_HOME/applications/<app_id>.desktop
@@ -33860,7 +33879,8 @@ its own path (text-input-v3, linux_wl_ime.rs).
   ibus_available() -> bool        jfgui_IME=0 turns it off
   ibus_ready() -> bool            the input context exists (keys go to it only then)
 
-Signals of the context: CommitText -> ime_commit_text, UpdatePreeditText (cursor in
+Signals of the context (only from the portal connection that made it): CommitText ->
+ime_commit_text, UpdatePreeditText (cursor in
 characters -> bytes) / HidePreeditText -> ime_preedit_set, ForwardKeyEvent -> E_TEXT or the
 key's E_KEY_DOWN / E_KEY_UP.  Capabilities: preedit text and focus (IBus draws its own
 candidate window).  Every result wakes the UI thread.
@@ -33895,7 +33915,8 @@ linux_life -- lifecycle events on Linux
 
 SIGTERM (logout, shutdown, `kill`) sets a flag and wakes the loop: the app gets
 E_SESSION_END (UIC_SESSION_END), saves, and ends.  The watcher thread has connections of
-its own (linux_dbus.rs): logind's PrepareForSleep(b) on the system bus -> E_POWER (1
+its own (linux_dbus.rs): logind's PrepareForSleep(b) on the system bus (only from the unique
+name that owns org.freedesktop.login1, followed through NameOwnerChanged) -> E_POWER (1
 sleep, 0 woke up); the settings portal's SettingChanged(namespace, key, value) on the
 session bus -> E_SETTINGS with SET_THEME (color-scheme, accent-color, gtk-theme),
 SET_CONTRAST (contrast, high-contrast), SET_FONTS (font names, text-scaling-factor),
@@ -39742,7 +39763,8 @@ MSK and an EMSK.  Nothing of its packets here (netpkt::eap) and no state (eapm)
 
   GROUP, RAND_FUNC, PRF                       the ciphersuite this knows; ciphersuite() its bytes
   kdf(key, label, n)                          n bytes of the KDF of RFC 5931 2.5
-  pwe(token, peer_id, server_id, password)    the password element: hunting and pecking (2.8.3)
+  pwe(token, peer_id, server_id, password)    the password element: hunting and pecking (2.8.3),
+                                              at least ROUNDS rounds
   commit(pwe, rand, mask)                     (Scalar, Element) of one side, from its two random
                                               scalars (2.8.5.1); None to draw again
   shared(pwe, rand, peer_scalar, peer_element)   ss, the x coordinate of k (2.8.5.2); None for
@@ -39751,9 +39773,11 @@ MSK and an EMSK.  Nothing of its packets here (netpkt::eap) and no state (eapm)
                                               (2.8.5.3)
   keys(ss, confirm_p, confirm_s, scalar_p, scalar_s)   (MSK, EMSK) (2.9)
 
-H(x) is HMAC-SHA-256 with a key of 32 zero bytes.  This looks for PWE the plain way, which
-shows by its time how many rounds a password needs; RFC 8146 and later hostapd run a fixed
-number of them.  The simulator has no such observer.
+H(x) is HMAC-SHA-256 with a key of 32 zero bytes.  The plain search would show by its time how
+many rounds a password needs (Dragonblood, CVE-2019-9494); as RFC 8146 and hostapd, pwe runs
+ROUNDS rounds whatever round found the point, keeps the first one without a branch on it and
+only goes on beyond ROUNDS in the case (about 2^-40) that none of them found one.  The point is
+the same as the plain search's.
 ```
 
 ```rust
@@ -39763,6 +39787,8 @@ GROUP: u16 = 19
 RAND_FUNC: u8 = 1
 /// the PRF: HMAC-SHA-256
 PRF: u8 = 1
+/// the rounds pwe always runs (k = 40 of RFC 8146 and hostapd)
+ROUNDS: u8 = 40
 ```
 
 - **`fn ciphersuite() -> [u8; 4]`**
@@ -39774,7 +39800,8 @@ PRF: u8 = 1
 
 - **`fn pwe(token: &[u8; 4], peer_id: &[u8], server_id: &[u8], password: &[u8]) -> [u8; 64]`**
   the password element: a point both sides find from the password and their names; the counter
-  starts at 1, the lowest bit of pwd-seed picks y
+  starts at 1, the lowest bit of pwd-seed picks y; the first round's point that has one, after
+  ROUNDS rounds in any case
 
 - **`fn commit(pwe: &[u8; 64], rand: &[u8; 32], mask: &[u8; 32]) -> Option<([u8; 32], [u8; 64])>`**
   Scalar = rand + mask mod n, Element = -(mask \* PWE); None when a random value is no scalar or
@@ -45122,7 +45149,8 @@ lines, replies with their multi-line form, the host-port of PORT and of the 227 
 EPRT and the 229 reply to EPSV (RFC 2428), FEAT's list (RFC 2389)
 
   Command { verb, arg }     Command::parse(line) (the verb in capitals, the argument as
-                            typed), Command::new(verb, arg), to_line() ("USER anna\r\n")
+                            typed), Command::new(verb, arg), to_line() ("USER anna\r\n"; CR,
+                            LF and NUL of the fields left out)
   Reply { code, lines }     to_bytes(): one line "220 text", or "211-first" ... "211 last"
                             (the inner lines start with a space when they could look like
                             the end); is_final / is_ok (1xx preliminary, 2xx done, 3xx more)
@@ -45161,7 +45189,8 @@ PORT_FTP_DATA: u16 = 20
 - **`fn parse(line: &str) -> Option<Command>`**
   a line without its line end; None for an empty one
 - **`fn to_line(&self) -> String`**
-  the line on the wire, CRLF included
+  the line on the wire, CRLF included; CR, LF and NUL of verb and argument are left out (they
+  would end the line and start another command)
 
 - **`struct Reply`**
   a reply of a server
@@ -45232,10 +45261,12 @@ ENHANCEDSTATUSCODES (RFC 2034 with the codes of RFC 3463) and AUTH with PLAIN an
 (RFC 4954, 4616); no STARTTLS
 
   Command { verb, arg }     Command::parse(line) (the verb in capitals, the argument as
-                            typed), Command::new(verb, arg), to_line() ("EHLO pc1\r\n")
+                            typed), Command::new(verb, arg), to_line() ("EHLO pc1\r\n"; CR, LF
+                            and NUL of the fields left out)
   Path { addr, params }     parse_path(arg, "FROM" | "TO"): the address of MAIL FROM:<..> or
                             RCPT TO:<..> (empty for the null reverse path "<>") and the
-                            parameters after it (SIZE=1234, BODY=8BITMIME); fmt_path
+                            parameters after it (SIZE=1234, BODY=8BITMIME); fmt_path (without
+                            CR, LF, NUL, angle brackets in the address and blanks in parameters)
   Reply { code, lines }     Reply::new(code, text), Reply::enh(code, "2.1.0", text) (the
                             enhanced code before the text), to_bytes(): "250 text" or the
                             multi-line form "250-first" ... "250 last" of 4.2.1; text(),
@@ -45282,7 +45313,8 @@ LOGIN_PASS: &str = "UGFzc3dvcmQ6"
 - **`fn parse(line: &str) -> Option<Command>`**
   a line without its line end; None for an empty one
 - **`fn to_line(&self) -> String`**
-  the line on the wire, CRLF included
+  the line on the wire, CRLF included; CR, LF and NUL of verb and argument are left out (they
+  would end the line and start another command)
 
 - **`struct Path`**
   the address and parameters of MAIL FROM or RCPT TO
@@ -45302,7 +45334,9 @@ LOGIN_PASS: &str = "UGFzc3dvcmQ6"
   mailbox, 4.1.2)
 
 - **`fn fmt_path(key: &str, addr: &str, params: &[(&str, &str)]) -> String`**
-  "FROM:&lt;addr> SIZE=n" with the parameters given
+  "FROM:&lt;addr> SIZE=n" with the parameters given; the address loses CR, LF, NUL and angle
+  brackets, the parameters those and blanks, so that neither ends the path, adds a parameter or
+  starts another command
 
 - **`struct Reply`**
   a reply of a server
@@ -45414,7 +45448,8 @@ and USER / PASS, and CAPA of RFC 2449: command lines, the status line +OK / -ERR
 responses with their dot-stuffing
 
   Command { verb, args }    Command::parse(line) (the verb in capitals), Command::new(verb,
-                            args), to_line() ("RETR 1\r\n")
+                            args), to_line() ("RETR 1\r\n"; CR, LF and NUL of the fields left
+                            out)
   Response { ok, text, body }   Response::ok(text) / err(text), with_body(bytes) (a multi-
                             line response: the lines of the bytes follow the status line,
                             each with a leading dot doubled, then the line with the dot);
@@ -45450,7 +45485,8 @@ PORT_POP3: u16 = 110
 - **`fn parse(line: &str) -> Option<Command>`**
   a line without its line end; None for an empty one
 - **`fn to_line(&self) -> String`**
-  the line on the wire, CRLF included
+  the line on the wire, CRLF included; CR, LF and NUL of verb and arguments are left out
+  (they would end the line and start another command)
 - **`fn num(&self, k: usize) -> Option<u32>`**
   argument k as a number (a message number)
 
@@ -45524,7 +45560,8 @@ Message-ID, a text/plain body in UTF-8 as 7bit, 8bit or quoted-printable, multip
                                (MIME-Version 1.0, text/plain in UTF-8; 7bit for ASCII, 8bit
                                when the server takes 8BITMIME, else quoted-printable)
   fold(name, value)            "Name: value\r\n" with continuation lines that start with a
-                               space (2.2.3)
+                               space (2.2.3); CR and LF of a value become spaces, so no value
+                               adds a field or ends the header
 
 Lines of a header field are at most 78 characters where there is whitespace to break at
 (2.1.1); a word longer than that stays whole.  Display names and subjects with characters
@@ -45561,7 +45598,8 @@ part, other parts (attachments) are named but not decoded.
   a field at the top (trace fields: Received, Return-Path)
 - **`fn remove(&mut self, name: &str)`**
 - **`fn header_bytes(&self) -> Vec<u8>`**
-  the header as it travels (CRLF, folded), without the empty line
+  the header as it travels (CRLF, folded), without the empty line; a field whose name is
+  empty or holds other than printable characters but the colon is left out
 - **`fn to_bytes(&self) -> Vec<u8>`**
   header, empty line, body (the body as it is)
 - **`fn subject(&self) -> String`**
@@ -45581,7 +45619,8 @@ part, other parts (attachments) are named but not decoded.
 
 - **`fn fold(name: &str, value: &str) -> String`**
   "Name: value\\r\\n" folded at whitespace so that no line is longer than 78 characters where
-  that is possible
+  that is possible.  No text starts a field or the body of its own: the name keeps only its
+  printable characters but the colon, CR and LF in the value become spaces, NUL is left out
 
 - **`fn unfold(s: &str) -> String`**
   removes the line ends of folded lines (CRLF or LF before whitespace)
@@ -47621,7 +47660,8 @@ sets, flags, FETCH items, SEARCH keys and the ENVELOPE of a message
                             answers it)
   tokens(&Line) -> Vec<Item>   the values of a line
   Command { tag, verb, args }  Command::parse(&line) (the verb in capitals); line(tag, verb,
-                            args) the bytes of a simple command
+                            args) the bytes of a simple command (CR, LF, NUL left out but for
+                            whole literals)
   Status, Kind, Response    Response::parse(&line): a tagged status, an untagged one, untagged
                             data, a continuation; response code, text, the values
   ok / no / bad / untagged / cont   server lines ("a1 OK done\r\n")
@@ -47714,7 +47754,9 @@ RECENT: &str = "\\Recent"
   the text of argument k
 
 - **`fn line(tag: &str, verb: &str, args: &str) -> Vec<u8>`**
-  a simple command line of a client
+  a simple command line of a client; CR, LF and NUL of tag, verb and arguments are left out
+  (they would end the line and start another command), but for the line end after a literal's
+  "{n}" ("{n+}") in the arguments and the n bytes of the literal after it (astring)
 
 - **`enum Status`**
   the status of a response
@@ -47764,7 +47806,7 @@ RECENT: &str = "\\Recent"
   "+ text"
 
 - **`fn quoted(s: &str) -> String`**
-  a string in quotes
+  a string in quotes (without CR, LF and NUL, which a quoted string cannot hold)
 
 - **`fn astring(s: &str) -> String`**
   an atom when it can be one, else a quoted string, else a literal (for other bytes)
