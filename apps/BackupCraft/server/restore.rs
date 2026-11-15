@@ -253,7 +253,7 @@ impl Restorer<'_> {
                     _ => false,
                 };
                 if !fits {
-                    match bc_fs::remove_tree(dest) {
+                    match bc_fs::remove_tree_in(self.root.as_deref(), dest) {
                         Ok(()) => self.removed += 1,
                         Err(e) => self.warn(dest, &e),
                     }
@@ -273,7 +273,7 @@ impl Restorer<'_> {
                 if self.mirror && self.may_remove {
                     for e in plat::fs::read_dir(dest).unwrap_or_default() {
                         if tree.find(&e.name).is_none() {
-                            match bc_fs::remove_tree(&plat::fs::join(dest, &e.name)) {
+                            match bc_fs::remove_tree_in(self.root.as_deref(), &plat::fs::join(dest, &e.name)) {
                                 Ok(()) => self.removed += 1,
                                 Err(x) => self.warn(dest, &x),
                             }

@@ -333,7 +333,7 @@ fn restore_remove(st: &State, req: &Request) -> Response {
     if bc_fs::inside(&[d.path.clone()], &root) {
         return err(403, code::FORBIDDEN, "ein freigegebener Ordner selbst wird nicht gelöscht");
     }
-    match bc_fs::remove_tree(&d.path) {
+    match bc_fs::remove_tree_in(Some(root.as_str()), &d.path) {
         Ok(()) => done(),
         Err(e) => err(409, code::CONFLICT, &e),
     }

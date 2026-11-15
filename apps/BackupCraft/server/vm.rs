@@ -15,8 +15,9 @@
 // file, size, bus) and one raw image per disk ("disk0.raw", ...) stored in blocks of
 // bc_vm::BLOCK -- block i of a disk is chunk i of its file, so an incremental backup replaces
 // only the dirty blocks and the NBD export reads any block at once.  A VM that does not run is
-// read from its disk files (qcow2 through qemu-img convert); the next backup after such a cold
-// one is full again.  Backups are crash-consistent (no guest agent).
+// read from its disk files (qcow2 through qemu-img convert) when a QEMU of root or of the
+// server's user named them (trusted_peer); the next backup after such a cold one is full
+// again.  Backups are crash-consistent (no guest agent).
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -114,6 +115,20 @@ fn run_tool(program: &str, args: &[&str], timeout_s: u32) -> Result<(), String> 
 
 static SCANNED: Mutex<i64> = Mutex::new(0);
 
+/// a QMP socket as it lies in its folder: (owner, device, inode); None for anything else (a
+/// link to a socket elsewhere, a file)
+fn socket_id(path: &str) -> Option<(u32, u64, u64)> {
+    plat::fs::lstat(path).filter(|m| m.mode & 0o170000 == 0o140000).map(|m| (m.uid, m.dev, m.ino))
+}
+
+/// whether the server may read the disk files a QEMU reports: its socket belongs to root or to
+/// the user the server runs as.  Any other process could name files of others (/etc/shadow) the
+/// server would then copy into a point; its VMs are backed up only while they run (QEMU reads
+/// the disks itself), their files are not kept for cold backups.
+fn trusted_peer(ctx: &Ctx, owner: u32) -> bool {
+    owner == 0 || plat::fs::lstat(&ctx.data).is_some_and(|m| m.uid == owner)
+}
+
 /// look at the QMP sockets again: VMs found are running (or paused), known ones not found stopped;
 /// a socket another client holds (a backup) keeps its VM as it was
 pub fn scan(ctx: &Ctx) -> Vec<Vm> {
@@ -124,6 +139,7 @@ pub fn scan(ctx: &Ctx) -> Vec<Vm> {
     for f in folders(ctx) {
         for e in plat::fs::read_dir(&f).unwrap_or_default() {
             let path = plat::fs::join(&f, &e.name);
+            let sock = socket_id(&path);
             let mut q = match bc_vm::reach(&path, 3000) {
                 bc_vm::Reach::Up(q) => q,
                 bc_vm::Reach::Busy => {
@@ -135,6 +151,9 @@ pub fn scan(ctx: &Ctx) -> Vec<Vm> {
                 bc_vm::Reach::Down => continue,
             };
             let Ok(i) = bc_vm::info(&mut q) else { continue };
+            drop(q);
+            // the socket that answered is the one whose owner was looked at (not a link)
+            let files = sock.is_some_and(|s| socket_id(&path) == Some(s) && trusted_peer(ctx, s.0));
             let id = format!("{}:{}", host.id, i.name);
             found.insert(id.clone(), Vm {
                 id,
@@ -146,7 +165,7 @@ pub fn scan(ctx: &Ctx) -> Vec<Vm> {
                 qmp: path,
                 memory_mb: i.memory_mb,
                 cpus: i.cpus,
-                disks: i.disks.into_iter().map(|d| VmDisk { node: d.node, file: d.file, format: d.format, size: d.size, bus: d.bus }).collect(),
+                disks: i.disks.into_iter().map(|d| VmDisk { node: d.node, file: if files { d.file } else { String::new() }, format: d.format, size: d.size, bus: d.bus }).collect(),
                 version: i.version,
                 seen: t,
             });
@@ -340,7 +359,9 @@ fn backup_vm(o: &OpCtl, ctx: &Ctx, repo: &Repo, w: &mut cas::Writer, job: &Job, 
             let mut res = Ok(());
             for (k, d) in dumps.iter().enumerate() {
                 if res.is_ok() {
+                    // QEMU writes the dump; a link put in its place is not followed
                     let r = match (&prev_nodes[k], d.incremental) {
+                        _ if !plat::fs::lstat(&d.path).is_some_and(|m| m.is_file()) => Err(format!("{}: keine Datei", d.path)),
                         (Some(p), true) => ingest_dirty(o, repo, w, &names[k], &d.path, p, d.size, st, &mut changed),
                         _ => ingest_raw(o, w, &names[k], &d.path, d.size, st),
                     };
@@ -366,11 +387,19 @@ fn backup_vm(o: &OpCtl, ctx: &Ctx, repo: &Repo, w: &mut cas::Writer, job: &Job, 
             engine::session_log(ctx, s, LogLevel::Info, &format!("{}: läuft nicht – Sicherung aus den Plattendateien", vm.name));
             for (k, d) in vm.disks.iter().enumerate() {
                 let name = format!("disk{}.raw", k);
+                // empty: reported by a QEMU the server does not take file names from (scan)
+                if d.file.is_empty() {
+                    return Err(format!("Die Plattendateien von {} sind nicht bekannt: ihr QEMU läuft nicht als root oder als Benutzer des Servers", vm.name));
+                }
                 let (src, temp) = if d.format == "raw" {
                     (d.file.clone(), false)
                 } else {
+                    if d.format.is_empty() || !d.format.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-') {
+                        return Err(format!("{}: unbekanntes Format „{}“", d.file, d.format));
+                    }
                     let out = plat::fs::join(spool, &format!("{}-{}.raw", tag, k));
-                    run_tool(&qemu_img(ctx), &["convert", "-q", "-O", "raw", &d.file, &out], 24 * 3600)?;
+                    // the format QEMU named: no guessing from the file's contents
+                    run_tool(&qemu_img(ctx), &["convert", "-q", "-f", &d.format, "-O", "raw", &d.file, &out], 24 * 3600)?;
                     (out, true)
                 };
                 let r = ingest_raw(o, w, &name, &src, d.size, st);

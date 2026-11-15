@@ -12,6 +12,13 @@
 //   free_target              an existing entry: skip, "name (wiederhergestellt N).ext" or replace
 //   temp_name / finish_file  data goes to "<name>.bcrestore-<random>" and is renamed into
 //                            place when complete and synced; times, mode, attributes follow
+//                            (set-user-ID and set-group-ID never: the owner is not restored,
+//                            the file belongs to whoever restores it -- root)
+//   remove_tree_in           the way from the shared folder checked again before each step
+//
+// The checks are by path: plat has no calls relative to an open folder, so a folder swapped
+// for a link between a check and its use is followed (narrowed where possible: metadata goes
+// to the temporary file before its rename, removals check the way again before every entry).
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -225,13 +232,17 @@ pub fn temp_name(dest: &str) -> String {
     format!("{}.bcrestore-{:08x}", dest, plat::random_u64() as u32)
 }
 
-/// times, permissions (Linux) and attributes (Windows) of a restored entry
+/// set-user-ID and set-group-ID: not restored, the owner is not restored either (a file of
+/// any user in a backup would come back as a set-user-ID file of root)
+const MODE_SETID: u32 = 0o6000;
+
+/// times, permissions (Linux, without MODE_SETID) and attributes (Windows) of a restored entry
 pub fn apply_meta(path: &str, atime_ns: i64, mtime_ns: i64, mode: u32, attrs: u32) {
     if mtime_ns != 0 {
         plat::fs::set_times(&plat::fs::long_path(path), atime_ns, mtime_ns);
     }
     if cfg!(target_os = "linux") && mode != 0 {
-        plat::fs::set_mode(path, mode);
+        plat::fs::set_mode(path, mode & !MODE_SETID);
     }
     if cfg!(windows) && attrs & 0x27 != 0 {
         plat::fs::set_attrs(path, attrs);
@@ -239,27 +250,42 @@ pub fn apply_meta(path: &str, atime_ns: i64, mtime_ns: i64, mode: u32, attrs: u3
 }
 
 /// a complete temporary file into place: synced through its own handle (never reopened by
-/// name), renamed, its metadata applied
+/// name), its times and mode set while it still has its random name (a folder on the way
+/// swapped for a link after the rename cannot turn them onto another file of that name),
+/// renamed, its attributes applied
 pub fn finish_file(file: plat::File, tmp: &str, dest: &str, atime_ns: i64, mtime_ns: i64, mode: u32, attrs: u32) -> Result<(), String> {
     let lp = plat::fs::long_path(tmp);
     let synced = file.sync();
     drop(file);
+    if synced {
+        apply_meta(tmp, atime_ns, mtime_ns, mode, 0);
+    }
     if !synced || !plat::rename(&lp, &plat::fs::long_path(dest)) {
         plat::delete(&lp);
         return Err(String::from("konnte nicht an seinen Platz gelegt werden"));
     }
-    apply_meta(dest, atime_ns, mtime_ns, mode, attrs);
+    apply_meta(dest, 0, 0, 0, attrs);
     Ok(())
 }
 
 /// remove a file, a link (never what it points to) or a folder with everything below it (links
 /// below are removed as links)
 pub fn remove_tree(path: &str) -> Result<(), String> {
+    remove_tree_in(None, path)
+}
+
+/// remove_tree of a path in the shared folder `root`: the way from it is checked again before
+/// every listing and every deletion, so a folder swapped for a link meanwhile (a large tree
+/// gives time for it) stops the removal instead of leading it out of the folder
+pub fn remove_tree_in(root: Option<&str>, path: &str) -> Result<(), String> {
+    let way = || root.map_or(Ok(()), |r| no_links(r, path, false));
+    way()?;
     let m = plat::fs::lstat(path).ok_or_else(|| format!("{}: nicht vorhanden", path))?;
     if m.is_dir() && !m.is_symlink() {
         for e in plat::fs::read_dir(path).unwrap_or_default() {
-            remove_tree(&plat::fs::join(path, &e.name))?;
+            remove_tree_in(root, &plat::fs::join(path, &e.name))?;
         }
+        way()?;
     }
     if plat::delete(&plat::fs::long_path(path)) { Ok(()) } else { Err(format!("{} kann nicht gelöscht werden", path)) }
 }

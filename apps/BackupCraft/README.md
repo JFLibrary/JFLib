@@ -225,7 +225,8 @@ reads tapes without any server (encrypted sets with the recovery kit).
 (setting `hypervisor.qmp`). A running VM is backed up by QEMU itself in one transaction over its
 disks (crash-consistent) with a persistent dirty bitmap: the next run reads only the changed
 blocks. Disks are stored in 1 MiB blocks, block i = chunk i. A VM that is off is read from its
-disk files.
+disk files, but only when the QEMU that reported them runs as root or as the server's user (the
+owner of its QMP socket); the server does not read files another QEMU names.
 
 **Instant start.** A VM boots straight from a restore point: the server exports its disks
 over NBD from the repository (read-only), a qcow2 overlay takes the guest's writes. *Merge*
