@@ -16,7 +16,9 @@ fn failure(s:&str)->Error {unsupported(&format!("HTML clipboard: {s}"))}
 fn entities(s:&str)->Result<String,Error>{
     let mut out=String::new();let mut rest=s;
     while let Some(at)=rest.find('&') {out.push_str(&rest[..at]);rest=&rest[at+1..];
-        let Some(end)=rest.find(';').filter(|n|*n<=32) else {out.push('&');continue;};
+        // a reference is at most 32 bytes: the ';' is looked for there only (searching the whole
+        // rest after every bare '&' made a long run of them quadratic)
+        let Some(end)=rest.as_bytes().iter().take(33).position(|&b|b==b';') else {out.push('&');continue;};
         let key=&rest[..end];let c=match key {
             "amp"=>Some('&'),"lt"=>Some('<'),"gt"=>Some('>'),"quot"=>Some('"'),"apos"=>Some('\''),"nbsp"=>Some('\u{a0}'),
             "ndash"=>Some('–'),"mdash"=>Some('—'),"bull"=>Some('•'),"copy"=>Some('©'),

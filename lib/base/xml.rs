@@ -76,8 +76,10 @@ pub fn escape(s: &str) -> Result<String, Error> {
     }
     Ok(out)
 }
-fn unescape(s: &str) -> Result<String, Error> {
-    if s.contains('<') || s.contains("]]>") {
+// references decoded; text: element content, where a literal "]]>" is not allowed (it is in
+// an attribute value)
+fn unescape(s: &str, text: bool) -> Result<String, Error> {
+    if s.contains('<') || (text && s.contains("]]>")) {
         return Err(Error::Syntax);
     }
     let mut out = String::new();
@@ -126,9 +128,14 @@ fn unescape(s: &str) -> Result<String, Error> {
     Ok(out)
 }
 type Namespaces = Vec<(String, String)>;
+// an NCName of the subset: a letter or '_' first, then letters, digits, '_', '.', '-'
+fn ncname(s: &str) -> bool {
+    s.as_bytes().first().is_some_and(|b| b.is_ascii_alphabetic() || *b == b'_')
+        && s.bytes().all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
+}
 fn expand(q: &str, namespaces: &Namespaces, attr: bool) -> Result<Name, Error> {
     let (prefix, local) = q.split_once(':').unwrap_or(("", q));
-    if local.is_empty() || local.contains(':') {
+    if !ncname(local) || (!prefix.is_empty() && !ncname(prefix)) {
         return Err(Error::Syntax);
     }
     let ns = if prefix.is_empty() && attr {
@@ -152,8 +159,18 @@ struct Parser<'a> {
     pos: usize,
     nodes: usize,
     lim: Limits,
+    // bytes of the names the tree keeps: each element and attribute name holds a copy of its
+    // namespace URI, so a long URI and many names would multiply a small text
+    kept: usize,
 }
 impl<'a> Parser<'a> {
+    fn keep(&mut self, n: &Name) -> Result<(), Error> {
+        self.kept = self.kept.saturating_add(n.ns.len() + n.local.len());
+        if self.kept > self.lim.bytes.saturating_mul(16) {
+            return Err(Error::Limit);
+        }
+        Ok(())
+    }
     fn rest(&self) -> &'a str {
         &self.s[self.pos..]
     }
@@ -238,14 +255,17 @@ impl<'a> Parser<'a> {
                 return Err(Error::Syntax);
             };
             let end = self.rest().find(quote).ok_or(Error::Syntax)?;
-            let value = unescape(&self.rest()[..end].replace(['\n', '\t'], " "))?;
+            let value = unescape(&self.rest()[..end].replace(['\n', '\t'], " "), false)?;
             self.pos += end + 1;
             if attrs.iter().any(|(n, _)| *n == name) {
                 return Err(Error::Syntax);
             }
             if name == "xmlns" || name.starts_with("xmlns:") {
                 let prefix = name.strip_prefix("xmlns:").unwrap_or("");
-                if prefix == "xmlns"
+                // "xmlns:" declares a prefix: one there must be (an empty one is no default
+                // namespace), and a valid one
+                if (name != "xmlns" && !ncname(prefix))
+                    || prefix == "xmlns"
                     || (!prefix.is_empty() && value.is_empty())
                     || value == "http://www.w3.org/2000/xmlns/"
                     || (prefix == "xml") != (value == "http://www.w3.org/XML/1998/namespace")
@@ -267,11 +287,13 @@ impl<'a> Parser<'a> {
             text: String::new(),
             children: Vec::new(),
         };
+        self.keep(&node.name)?;
         for (q, v) in attrs {
             if q == "xmlns" || q.starts_with("xmlns:") {
                 continue;
             }
             let n = expand(q, &scope, true)?;
+            self.keep(&n)?;
             if node.attrs.iter().any(|(a, _)| *a == n) {
                 return Err(Error::Syntax);
             }
@@ -293,7 +315,7 @@ impl<'a> Parser<'a> {
                 node.children.push(self.node(&scope, depth + 1)?);
             } else {
                 let end = self.rest().find('<').ok_or(Error::Syntax)?;
-                node.text.push_str(&unescape(&self.rest()[..end])?);
+                node.text.push_str(&unescape(&self.rest()[..end], true)?);
                 self.pos += end;
             }
         }
@@ -305,6 +327,53 @@ impl<'a> Parser<'a> {
         }
         Ok(node)
     }
+}
+// the inside of "<?xml ... ?>": version="1.0", then optionally encoding and standalone, in this
+// order, each after white space, values as written (a reference or another attribute is no
+// declaration)
+fn xml_decl(d: &str, lim: Limits) -> Result<(), Error> {
+    let mut p = Parser { s: d, pos: 0, nodes: 0, lim, kept: 0 };
+    let mut last = 0;
+    loop {
+        let before = p.pos;
+        p.ws();
+        if p.rest().is_empty() {
+            break;
+        }
+        if before == p.pos {
+            return Err(Error::Syntax); // no white space before the attribute
+        }
+        let name = p.name()?;
+        p.ws();
+        if !p.eat("=") {
+            return Err(Error::Syntax);
+        }
+        p.ws();
+        let quote = if p.eat("\"") {
+            '"'
+        } else if p.eat("'") {
+            '\''
+        } else {
+            return Err(Error::Syntax);
+        };
+        let end = p.rest().find(quote).ok_or(Error::Syntax)?;
+        let value = &p.rest()[..end];
+        p.pos += end + 1;
+        let order = match name {
+            "version" if value == "1.0" => 1,
+            "encoding" if matches!(value, "UTF-8" | "utf-8" | "UTF-16" | "utf-16" | "UTF-16LE" | "UTF-16BE") => 2,
+            "standalone" if matches!(value, "yes" | "no") => 3,
+            _ => return Err(Error::Unsupported),
+        };
+        if order <= last || (last == 0 && order != 1) {
+            return Err(if last == 0 { Error::Unsupported } else { Error::Syntax });
+        }
+        last = order;
+    }
+    if last == 0 {
+        return Err(Error::Unsupported); // no version
+    }
+    Ok(())
 }
 /// Parse a bounded XML subset. DTDs, processing instructions, comments, CDATA and mixed
 /// content are explicitly rejected. No resources are ever resolved or fetched.
@@ -329,45 +398,15 @@ pub fn parse_with(s: &str, lim: Limits) -> Result<Node, Error> {
         pos: 0,
         nodes: 0,
         lim,
+        kept: 0,
     };
-    if p.eat("<?xml ") {
+    // the declaration: "<?xml" and white space (a space, a tab, a line break), read as it is
+    // written -- no references, no namespace attributes
+    let r = p.rest().as_bytes();
+    if r.starts_with(b"<?xml") && r.get(5).is_some_and(|b| matches!(b, b' ' | b'\t' | b'\n')) {
+        p.pos += 5;
         let end = p.rest().find("?>").ok_or(Error::Syntax)?;
-        let decl = &p.rest()[..end];
-        let declaration = alloc::format!("<declaration {decl}/>");
-        let mut dp = Parser {
-            s: &declaration,
-            pos: 0,
-            nodes: 0,
-            lim,
-        };
-        let dn = dp.node(&Vec::new(), 0)?;
-        if dn.attrs.is_empty()
-            || dn.attrs[0].0.local != "version"
-            || dn.attrs[0].1 != "1.0"
-            || !dp.rest().is_empty()
-        {
-            return Err(Error::Unsupported);
-        }
-        let mut last = 0;
-        for (name, value) in &dn.attrs {
-            let order = match name.local.as_str() {
-                "version" if value == "1.0" => 1,
-                "encoding"
-                    if matches!(
-                        value.as_str(),
-                        "UTF-8" | "utf-8" | "UTF-16" | "utf-16" | "UTF-16LE" | "UTF-16BE"
-                    ) =>
-                {
-                    2
-                }
-                "standalone" if matches!(value.as_str(), "yes" | "no") => 3,
-                _ => return Err(Error::Unsupported),
-            };
-            if !name.ns.is_empty() || order <= last {
-                return Err(Error::Syntax);
-            }
-            last = order;
-        }
+        xml_decl(&p.rest()[..end], lim)?;
         p.pos += end + 2;
     }
     p.ws();
