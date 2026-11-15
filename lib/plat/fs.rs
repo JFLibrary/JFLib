@@ -254,7 +254,9 @@ fn link_target_allowed(target: &str, link: &str) -> bool {
     }
     match crate::policy::normalize_for(target, cfg!(windows), &base) {
         Some(t) => crate::policy::fs_allowed(&t, crate::policy::FS_WRITE),
-        None => false,
+        // ".." (the system resolves it after links, the rules cannot): refused under rules,
+        // as such a path is everywhere; without rules every target may be written
+        None => !target.is_empty() && !target.contains('\0') && crate::policy::fs_unrestricted(),
     }
 }
 

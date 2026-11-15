@@ -914,8 +914,10 @@ def check_docs(run, vendor, toolchain):
         run.notes.append("docs: much output (docs.rs keeps 102.4 kB of log): " + "; ".join(chatty))
 
 def out_file(project, target_dir, triple, profile, name):
-    """a file the build script of the project wrote to its OUT_DIR"""
-    found = sorted((target_dir / triple / profile / "build").glob(f"{project}-*/out/{name}"), key=lambda p: p.stat().st_mtime)
+    """a file the build script of the project wrote to its OUT_DIR (Cargo's build folder: NAME-HASH/out
+    up to 1.98, NAME/HASH/out in newer versions)"""
+    build = target_dir / triple / profile / "build"
+    found = sorted([*build.glob(f"{project}-*/out/{name}"), *build.glob(f"{project}/*/out/{name}")], key=lambda p: p.stat().st_mtime)
     return found[-1] if found else None
 
 

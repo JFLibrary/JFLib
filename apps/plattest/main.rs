@@ -1168,6 +1168,15 @@ fn t_files(t: &mut T) {
     let w = wa(&f, 100, &pat[..10]);
     t.check(f.is_some() && w == 10, "files: plat_file_open_temp(0) in the system temp directory");
     drop(f);
+    // ---- a relative link that climbs out of its folder (an AppImage's usr/bin/NAME ->
+    // ../lib/NAME/NAME): without rules it is made as written; under rules ".." is refused
+    // (t_policy)
+    if !cfg!(windows) {
+        plat::mkdir(&t.subp("ln/bin"));
+        plat::mkdir(&t.subp("ln/lib"));
+        let made = plat::fs::symlink("../lib/x", &t.subp("ln/bin/x"), false);
+        t.check(made && plat::fs::read_link(&t.subp("ln/bin/x")).as_deref() == Some("../lib/x"), "files: a symlink to ../lib/x without rules");
+    }
     // ---- system directories
     let td = plat::temp_dir();
     t.check(td.as_deref().is_some_and(|d| plat::file_exists(d) == 2), "files: plat_temp_dir is an existing directory");
