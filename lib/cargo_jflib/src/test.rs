@@ -16,8 +16,9 @@ use crate::cargo;
 
 pub(crate) fn run(args: &[String]) -> Result<(), String> {
     let mut o = crate::opts(args)?;
-    // on Linux always with --target: the template's rustflags (rust-lld, relocation-model=static)
-    // must reach the program only, without --target Cargo gives them to the build scripts too
+    // on Linux with --target: an app made from a template up to jflib 0.2.0 has Linux rustflags
+    // (rust-lld, relocation-model=static) that must reach the program only, without --target Cargo
+    // gives them to the build scripts too (with today's template it makes no difference)
     if o.target.is_none() && cfg!(target_os = "linux") {
         o.target = Some(format!("{}-unknown-linux-gnu", std::env::consts::ARCH));
     }

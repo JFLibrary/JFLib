@@ -8,6 +8,13 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- Linux: a program links against glibc unless `-C target-feature=+crt-static` makes it one static
+  file, and is linked to a fixed address with `-no-pie`; `-C relocation-model=static` is only
+  needed for the static file. So `cargo run` needs no flags and no `--target` on Linux; the
+  rustflags of templates up to 0.2.0 still work with `--target`.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

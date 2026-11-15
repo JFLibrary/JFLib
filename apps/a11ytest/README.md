@@ -20,7 +20,6 @@ a11ytest --title "Barrierefreiheit"` on 2026-11-13.
 ## Build, run, test
 
 ```sh
-python build_rs.py app a11ytest                 # build/win/a11ytest.exe and build/linux/a11ytest
-python build_rs.py run a11ytest                 # the demo, for a screen reader by hand
+cargo run -p a11ytest                           # the demo, for a screen reader by hand
 python build_rs.py test a11ytest                # build it and run tests/*.uis (Windows and Linux)
 ```

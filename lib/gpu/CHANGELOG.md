@@ -8,6 +8,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- Linux: the build script sets `--cfg jfgui_glibc` (Vulkan through the system's dynamic linker)
+  also without std, unless `-C target-feature=+crt-static` asks for one static file; so a JFLib
+  app builds on Linux with plain `cargo run`, no flags and no `--target`.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

@@ -15,6 +15,7 @@ pub(crate) struct Target {
     arch: String,
     env: String,
     features: Vec<String>,
+    /// --cfg jfgui_glibc in the rustflags (templates up to jflib 0.2.0, build_rs.py)
     glibc: bool,
     rustflags: String,
     /// a program with std (jflib's feature std, DEP_JFLIB_STD): the C runtime's entry and libraries
@@ -114,37 +115,41 @@ impl Target {
         Ok(args)
     }
 
-    /// one static file, or with --cfg jfgui_glibc a program against glibc; the linker is cc (the
-    /// default) or lld (`-C linker-flavor=ld.lld`, the template's .cargo/config.toml)
+    /// a program against glibc (the default) or, with -C target-feature=+crt-static, one static
+    /// file; rt, plat, gpu and ui make the same choice in their build scripts.  The linker is cc
+    /// (Rust's default on Linux, so plain `cargo run` needs no flags) or lld (`-C
+    /// linker-flavor=ld.lld`, as build_rs.py and `cargo jflib package` link)
     fn linux(&self, out_dir: &Path) -> Result<Vec<String>, String> {
         let triple = &self.triple;
         if self.std {
             return self.linux_std(out_dir);
         }
-        if !self.flag("relocation-model=static") {
-            return Err(format!(
-                "{triple}: JFLib's programs start without a C runtime and need -C relocation-model=static: \
-                 [target.{triple}] rustflags in .cargo/config.toml (the template of the crate jflib has it; JFLib's \
-                 repository in apps/.cargo/config.toml, Cargo started in the app's folder), and cargo run --target {triple}, \
-                 also on Linux (the flags must not reach the build scripts)"
-            ));
-        }
         let crt_static = self.features.iter().any(|f| f == "crt-static");
-        if self.glibc == crt_static {
-            return Err(if self.glibc {
-                format!("{triple}: --cfg jfgui_glibc links against glibc, -C target-feature=+crt-static makes it static: remove one")
-            } else {
-                format!(
-                    "{triple}: a program without --cfg jfgui_glibc is one static file and needs -C target-feature=+crt-static \
-                     in [target.{triple}] rustflags (or --cfg jfgui_glibc: a window with the GPU, against glibc)"
-                )
-            });
+        if self.glibc && crt_static {
+            return Err(format!("{triple}: --cfg jfgui_glibc links against glibc, -C target-feature=+crt-static makes it static: remove one"));
+        }
+        let glibc = !crt_static;
+        // JFLib's own start does not relocate the program, so it is linked to a fixed address.
+        // Code for any address (Rust's default) links there as well; -C relocation-model=static
+        // only saves the indirection through the GOT.
+        let pic = !self.flag("relocation-model=static");
+        if !glibc && pic {
+            return Err(format!(
+                "{triple}: one static file (-C target-feature=+crt-static) also needs -C relocation-model=static in \
+                 [target.{triple}] rustflags of .cargo/config.toml, and cargo build --target {triple}, also on Linux \
+                 (the flags must not reach the build scripts and proc macros)"
+            ));
         }
         let ld = self.flag("linker-flavor=ld");
         // ld takes its arguments as they are, cc the linker's behind -Wl,
         let wl = |a: &str| if ld { a.to_string() } else { format!("-Wl,{}", a.replace(' ', ",")) };
         let mut args = vec!["-nostdlib".to_string()];
-        if self.glibc {
+        if pic {
+            // rustc asks for a position-independent program (-pie) before these arguments: the
+            // last one counts, for cc as for ld
+            args.push(if ld { "--no-pie" } else { "-no-pie" }.to_string());
+        }
+        if glibc {
             let (interp, _) = glibc_abi(&self.arch).ok_or_else(|| format!("{triple}: no glibc build for {}", self.arch))?;
             args.push(wl(&format!("--dynamic-linker={interp}")));
         } else {
@@ -158,7 +163,7 @@ impl Target {
                 args.push(wl(a));
             }
         }
-        if self.glibc {
+        if glibc {
             args.push(wl("--no-as-needed"));
             args.extend(self.glibc_stubs(&out_dir.join("glibc"))?.iter().map(|p| p.display().to_string()));
         }
@@ -172,7 +177,7 @@ impl Target {
         if self.flag("linker-flavor=ld") || self.features.iter().any(|f| f == "crt-static") {
             return Err(format!(
                 "{triple}: a program with std (jflib's feature std) links against glibc through cc: remove the rustflags of \
-                 [target.{triple}] from .cargo/config.toml (rust-lld, crt-static and jfgui_glibc are for JFLib's own runtime)"
+                 [target.{triple}] from .cargo/config.toml (rust-lld and crt-static are for JFLib's own runtime)"
             ));
         }
         Ok(vec![format!("-Wl,-Map={}", out_dir.join("program.map").display())])

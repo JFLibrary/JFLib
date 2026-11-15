@@ -10,7 +10,7 @@ plays the warning sound when it opens. Made with `python build_rs.py new audiote
 ## Build, run, test
 
 ```sh
-python build_rs.py run audiotest                      # Windows (Linux: --target linux)
+cargo run -p audiotest                                # Windows, Linux, macOS
 python build_rs.py test audiotest                     # tests/*.uis on Windows and Linux (WSL)
 python build_rs.py app audiotest --target web         # then:
 node apps/audiotest/tests/audio_web.mjs build --engines=chromium,firefox

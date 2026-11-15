@@ -24,12 +24,14 @@
 //! instead; on Linux it is built on Linux, through the system's cc.
 //!
 //! It also gives the linker what JFLib's own runtime needs: its entry point and no C runtime, on
-//! Windows the subsystem; on Linux one static file or, with `--cfg jfgui_glibc`, a program
-//! against glibc (the libraries to link against are made here, the build machine needs no glibc);
-//! for the browser the exports of the wasm module.  The linker's map of a Windows or Linux program
-//! is `program.map` in the build script's `OUT_DIR` (crash reports name offsets into it).  What a build script cannot set, the linker
-//! and the relocation model, comes from the project's `.cargo/config.toml`: the template in the
-//! crate `jflib` has it, an error here names the line that is missing.
+//! Windows the subsystem; on Linux a program against glibc (the libraries to link against are
+//! made here, the build machine needs no glibc) or, with `-C target-feature=+crt-static`, one
+//! static file; for the browser the exports of the wasm module.  The linker's map of a Windows or
+//! Linux program is `program.map` in the build script's `OUT_DIR` (crash reports name offsets into
+//! it).  What a build script cannot set comes from the project's `.cargo/config.toml`: on Windows
+//! the linker (rust-lld), on Linux nothing, so `cargo run` is all it takes there too; one static
+//! file needs two rustflags and `--target` (the template in the crate `jflib` says which), an error
+//! here names what is missing.
 #![forbid(unsafe_code)]
 
 mod assets;

@@ -52,6 +52,11 @@ jobs:
         run: cargo check --locked -p jflib --target ${{ matrix.target }}
       - name: jflib with std
         run: cargo check --locked -p jflib --features std --target ${{ matrix.target }}
+      - name: jflib as one static Linux file (crt-static, no glibc)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        env:
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C target-feature=+crt-static -C relocation-model=static"
+        run: cargo check --locked -p jflib --target ${{ matrix.target }}
       - name: The crates outside the facade
         run: |
           t=${{ matrix.target }}

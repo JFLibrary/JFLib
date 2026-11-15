@@ -12,10 +12,10 @@ and the saved state. Ctrl+N opens a new window, F11 switches full screen.
 ## Build, run, test
 
 ```sh
-python build_rs.py run desktest                   # Windows (Linux: --target linux)
+cargo run -p desktest                             # Windows, Linux, macOS
 python build_rs.py test desktest                  # tests/*.uis on Windows and Linux (WSL)
-build/win/desktest.exe --check-fullscreen         # full screen with real windows (exit code 1 on a failure)
-jfgui_BACKEND=wayland build/linux/desktest --check-fullscreen   # the same on Linux: x11 or wayland
+cargo run -p desktest -- --check-fullscreen       # full screen with real windows (exit code 1 on a failure)
+jfgui_BACKEND=wayland cargo run -p desktest -- --check-fullscreen   # Linux: x11 or wayland
 python build_rs.py app desktest --target web      # then:
 node apps/desktest/tests/fullscreen_web.mjs build --engines=chromium,firefox
 ```

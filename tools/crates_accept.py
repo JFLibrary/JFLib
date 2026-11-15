@@ -966,8 +966,15 @@ def accept(targets, out, docs_toolchain="nightly"):
             jfa = out_file("probe", target_dir, WIN, "debug", "app.jfa")
             run.check(jfa is not None and jfa.read_bytes() == assetpack.pack(probe / "assets"), "the probe's bundle is assetpack.py's")
     if "linux" in targets:
-        if run.cmd("hallo-linux", ["cargo", "build", "--target", LINUX], hallo, env):
+        # the template has no Linux flags: on Linux plain `cargo build`, as a user builds it; elsewhere
+        # rust-lld appended for the cross build, as `cargo jflib package` does it
+        if sys.platform.startswith("linux"):
+            hallo_linux, exe = ["cargo", "build"], target_dir / "debug" / "hallo"
+        else:
+            hallo_linux = ["cargo", "build", "--target", LINUX, "--config",
+                           f'target.{LINUX}.rustflags=["-C", "linker=rust-lld", "-C", "linker-flavor=ld.lld"]']
             exe = target_dir / LINUX / "debug" / "hallo"
+        if run.cmd("hallo-linux", hallo_linux, hallo, env):
             r = run_linux([linux_path(exe), "--script", "tests/smoke.uis"], cwd=hallo, timeout=600)
             run.check(r.returncode == 0, f"hallo-linux-smoke (exit {r.returncode})" + ("" if r.returncode == 0 else "\n    " + (r.stdout + r.stderr).strip()[-600:]))
         if run.cmd("probe-linux", ["cargo", "build", "--target", LINUX], probe, env):

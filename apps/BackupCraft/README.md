@@ -25,8 +25,7 @@ the NBD server) and `bc_volume` (volumes, VSS / LVM snapshots).
 ## Quick start
 
 ```sh
-python build_rs.py app BackupCraft --target win          # or --target linux / both
-build/win/BackupCraft.exe --fixture                      # the console with demo data
+cargo run -p BackupCraft -- --fixture                    # the console with demo data (Windows, Linux)
 ```
 
 ### Setup assistant

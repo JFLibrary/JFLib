@@ -162,6 +162,7 @@ fn styles_check(styles: &[String], own: &BTreeMap<String, PathBuf>) -> Result<Ve
 fn build(p: &Project, triple: &str, style: &str, own: bool) -> Result<PathBuf, String> {
     let mut cmd = cargo::command();
     cmd.current_dir(&p.package.dir).args(["build", "--release", "-p", &p.package.name, "--target", triple]);
+    cross_linker(&mut cmd, triple);
     if own {
         cmd.env_remove("JFLIB_STYLE");
     } else {
@@ -338,8 +339,19 @@ pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, Stri
                                             "-C", "target-feature=+crt-static"].join("\u{1f}"));
     } else {
         cmd.arg("--target-dir").arg(&p.target_dir);
+        cross_linker(&mut cmd, s.triple);
     }
     cargo::build(&mut cmd)?.into_iter().filter_map(|a| a.executable).next().ok_or_else(|| format!("cargo built no {}", s.name))
+}
+
+/// A Linux program built on another system links with rust-lld (it comes with rustup), appended to
+/// the project's rustflags: there is no cc for Linux there.  On Linux itself Rust's default, cc,
+/// links the program as it links the build scripts (`cargo run` needs no flags).
+fn cross_linker(cmd: &mut Command, triple: &str) {
+    let native = cfg!(target_os = "linux") && triple.starts_with(std::env::consts::ARCH);
+    if triple.ends_with("-unknown-linux-gnu") && !native {
+        cmd.arg("--config").arg(format!(r#"target.{triple}.rustflags=["-C", "linker=rust-lld", "-C", "linker-flavor=ld.lld"]"#));
+    }
 }
 
 /// files by their path: the licences of the crates
