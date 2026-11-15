@@ -33,6 +33,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Linux: the watcher left the folders of a folder whose listing failed (no descriptors left) unwatched for good, and a root moved away kept its watches -- its changes came under the old path -- while a folder made at its path was never watched (also after a deleted root). Such folders and roots are tried again every second
 - `fs::write_file_private` reports true when a rule of the manifest allows the file but not its folder. The folder's fsync after the rename was checked as well and made it report false although the file had been replaced.
 - Windows: `rename`, `write_file` and the other writers that replace a file no longer fail while another program holds the old file open for a moment, as a virus scanner or the search indexer does with a file just written. They rename with POSIX semantics (FileRenameInfoEx), which replaces a file held with FILE_SHARE_DELETE, and wait up to about a quarter second for a holder that does not share deletion; elsewhere MoveFileEx as before.
+- Windows: the buttons of a system title bar work (a main window without AF_CUSTOM_TITLEBAR, windows with PWF_SYSFRAME): the window procedure made the non-client messages of every caption button (WM_NCMOUSEMOVE, WM_NCLBUTTONDOWN, WM_NCLBUTTONUP on HTCLOSE, HTMAXBUTTON, HTMINBUTTON) presses in the UI, so the X, maximize and minimize of such a window did nothing; only the library frame's buttons, which the UI draws, take that way now
 
 ### Security
 
@@ -51,10 +52,6 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - fs::mkdir_private refuses an existing folder that is a link, belongs to another user or that others may write to (Windows: whose DACL grants anyone but SYSTEM, the administrators or the owner access), and makes an own folder that others may only read owner-only; Windows: service::install copies a program outside Program Files to %ProgramFiles%\<name> and registers that copy, so a LocalSystem service no longer runs a program its user can replace (new service::program_path)
 - Windows: URL schemes are registered as `"<exe>" -- "%1"` and plat::args keeps the URL after -- as one argument, so a quote in a link cannot add options; ui stops reading options at --. Apps registered before keep the old command until they are registered again
 - New plat::fs::Dir works below an open folder without ever following a link (Linux openat2 with a step-by-step O_NOFOLLOW fallback, macOS openat walk, Windows folders held open without share-delete), with set_file_times / set_file_mode through a file's own handle; TcpStream::peer_uid returns the user id of the other end of a Unix socket (SO_PEERCRED, getpeereid)
-
-### Fixed
-
-- Windows: the buttons of a system title bar work (a main window without AF_CUSTOM_TITLEBAR, windows with PWF_SYSFRAME): the window procedure made the non-client messages of every caption button (WM_NCMOUSEMOVE, WM_NCLBUTTONDOWN, WM_NCLBUTTONUP on HTCLOSE, HTMAXBUTTON, HTMINBUTTON) presses in the UI, so the X, maximize and minimize of such a window did nothing; only the library frame's buttons, which the UI draws, take that way now
 
 ## [0.2.0] - 2026-11-14
 
