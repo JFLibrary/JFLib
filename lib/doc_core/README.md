@@ -83,11 +83,11 @@ in a JFLib app. The word processor
 [jfWord](https://github.com/JFLibrary/JFLib/tree/main/apps/jfWord) in JFLib's repository uses all
 four.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
-together. The [changelog](https://docs.rs/crate/jflib-doc-core/latest/source/CHANGELOG.md) says
-the same.
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-doc-core/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

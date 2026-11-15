@@ -81,13 +81,11 @@ Android included. The blocking clients and servers on real sockets (HTTP, TLS, S
 [`jflib-netio`](https://crates.io/crates/jflib-netio), the EAP methods as state machines in
 [`jflib-eapm`](https://crates.io/crates/jflib-eapm).
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-The dissector no longer panics on packets from the network: a TLS ClientHello split across TCP
-segments, an FTP or POP3 reply with a character across its fourth byte, and lines with bytes
-that are not UTF-8 are taken apart within their bytes. `smtp::parse_path` no longer cuts an
-argument inside a character, and on 32-bit targets pcapng's block and packet lengths are
-checked without wrapping. Everything is in the
+Mail headers and the FTP, SMTP, POP3 and IMAP command builders no longer let CR, LF or NUL start a
+new header field or command (header and command injection), and IMAP `tokens` nests lists at most 64
+deep. Everything is in the
 [changelog](https://docs.rs/crate/jflib-netpkt/latest/source/CHANGELOG.md).
 
 ## Documentation

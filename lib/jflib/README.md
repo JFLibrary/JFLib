@@ -131,21 +131,14 @@ switch at run time (`jflib::style_kde::STYLE`).
   only the `sandbox` line confines it, as far as the operating system enforces the manifest
   (docs/PERMISSIONS.md, "OS sandbox").
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-JFLib runs natively on macOS and iOS now, with windows through AppKit and UIKit, VoiceOver, the
-app's menus in the Mac's menu bar and a Metal backend for the GPU, and `cargo jflib` makes a Mac
-app and its disk image. Windows and Linux run on ARM64 as well. Three crates join the facade:
-`jflib::render3d`, a 3D engine on the GPU layer, `jflib::gltf`, which imports glTF 2.0 models,
-and `jflib::render2d`, a 2D renderer for CAD drawings. NetLab is an official style
-(`jflib::style_netlab`, `JFLIB_STYLE=netlab`), and the feature `unwind` lets an app with std
-survive the panics it catches. The UI learned what phones and tablets and apps that host web
-content need, and shows GPU content beside its widgets. Programs link again with Rust 1.99, which
-failed on Windows with 0.1.0, and a round of fixes closes holes against hostile documents, images
-and packets and removes deadlocks and races. `plat::dl_sym` and `plat::dl_close` are `unsafe fn`
-now. Every crate has a README and a changelog of its own; the
-[library's changelog](https://docs.rs/crate/jflib/latest/source/CHANGELOG.md) sums them up and
-links to each.
+The template's `.cargo/config.toml` has no Linux tables any more: `cargo run` builds a JFLib app on
+Linux as on Windows and macOS, without `--target`. A project made from an older template drops the
+`[target.*-unknown-linux-gnu]` tables of its `.cargo/config.toml` (with them it still builds with
+`--target`). Through its crates 0.2.1 also brings Intel Macs, a round of security fixes in `plat`
+and the other crates, and fixes in `ui`, `base`, `netio` and others. Everything is in the
+[changelog](https://docs.rs/crate/jflib/latest/source/CHANGELOG.md).
 
 ## License
 

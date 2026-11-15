@@ -52,11 +52,12 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::crypto`. All of JFLib's crates share one
 version and are released together. It runs on every platform JFLib supports.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
-together. The [changelog](https://docs.rs/crate/jflib-crypto/latest/source/CHANGELOG.md) says
-the same.
+`eappwd::pwe` always runs at least 40 hunting-and-pecking rounds and picks the point without
+branching, so its time no longer shows how many rounds a password needs (Dragonblood,
+CVE-2019-9494); the element it computes is unchanged. Everything is in the
+[changelog](https://docs.rs/crate/jflib-crypto/latest/source/CHANGELOG.md).
 
 ## Documentation
 

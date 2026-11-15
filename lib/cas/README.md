@@ -68,18 +68,10 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::cas`. All of JFLib's crates share one
 version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-A backup's new chunks are safe between the end of its writer and its snapshot. A gc running in
-another thread could start in exactly that gap and remove them as unreferenced, and the snapshot
-was then saved without its data. `Writer::finish_unsaved` now keeps gc out until the snapshot is
-saved through the `Unsaved` it returns, and `Repo::save_snapshot` waits for a running gc and
-refuses a snapshot whose chunks a gc has removed. Before it sweeps, gc rebuilds lost index files
-from the packs and stops when a referenced chunk might still be in a pack it cannot read.
-`save_snapshot` refuses a key the repository does not trust (`CasError::UntrustedSigner`): it
-added such a key to the trusted signers by itself, so the signature check of `load_snapshot`
-never refused a snapshot saved through the API.
-Everything is in the [changelog](https://docs.rs/crate/jflib-cas/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-cas/latest/source/CHANGELOG.md) says the same.
 
 ## Documentation
 

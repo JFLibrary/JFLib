@@ -52,13 +52,12 @@ running, and `rt::panic_take()` tells what it said. The guide explains it under
 Windows (x86-64 and ARM64), Linux (x86-64 and ARM64), macOS and iOS on Apple silicon, Android,
 and the browser (wasm32).
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-rt now runs on macOS and iOS, on Linux for ARM64 and on Windows for ARM64. Programs link again
-with Rust 1.99: its LLVM turns some loops into calls to `wcslen`, so with 0.1.0 every program on
-Windows failed to link. `SpinLock::try_lock` no longer releases a lock it failed to take. The
-software math used outside x86-64 is now accurate to about half an ulp instead of up to 118 ulp.
-Everything is in the [changelog](https://docs.rs/crate/jflib-rt/latest/source/CHANGELOG.md).
+Intel Macs (`x86_64-apple-darwin`): `cpu` detects the processor by CPUID and `x87` computes on the
+x87 unit, as on Windows and Linux; under Rosetta 2 the decimal conversions give the same bits as on
+Windows. On Linux the build script picks the build against glibc itself, so `cargo run` needs no
+flags. Everything is in the [changelog](https://docs.rs/crate/jflib-rt/latest/source/CHANGELOG.md).
 
 ## Documentation
 

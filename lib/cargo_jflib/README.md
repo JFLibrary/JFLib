@@ -112,17 +112,15 @@ commands and their options, the `PACKAGE` keys and the environment variables thi
 part of what JFLib's version number promises. Keep it at the version of the app's `jflib`; the
 host pages it puts around the app for the browser and Android belong to that version.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-`cargo jflib mac` makes the app a Mac app, `NAME.app` with its icon, file types, URL schemes and
-languages, signed ad hoc or with a Developer ID, and `package --formats dmg` puts it on a disk
-image that Apple can notarize; the update channel carries the Mac app too. `cargo jflib test`
-takes `--features`, `--no-default-features` and `--dir`, and skips a script whose `#!only` line
-names other systems. `package` builds a style of the app's own and registers an app with
-`browser=1` as a web browser, and an app with std is packaged for the system it runs on by
-default. Several fixes concern the stubs `package` builds next to the app: they take JFLib's
-crates from the app's paths or its checkout, take only its release profile and always build with
-`panic = "abort"`. Everything is in the
+`cargo jflib new` writes a `.cargo/config.toml` without Linux tables, so `cargo run` builds the app
+on Linux as on Windows and macOS, without `--target`; `cargo jflib package` adds rust-lld itself for
+a Linux program built on another system. `cargo jflib mac` and `cargo jflib package --formats dmg`
+build one program for Apple silicon and Intel Macs (`NAME-VERSION-universal.dmg`). Security: `web
+--serve` serves only plain names below the bundle and only to 127.0.0.1 or localhost, `android
+--release` refuses a debuggable manifest, and the browser loader takes `?theme=` only as a plain
+theme name. Everything is in the
 [changelog](https://docs.rs/crate/cargo-jflib/latest/source/CHANGELOG.md).
 
 ## Documentation

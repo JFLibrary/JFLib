@@ -74,13 +74,11 @@ Windows, Linux and macOS; in the browser and on Android `jflib` leaves it out.
 `cargo jflib package --update DIR` writes a signed channel per style next to the packages. All of
 JFLib's crates share one version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Programs on macOS can update themselves now: a channel's new kind `app` replaces the app bundle as
-a whole, checked against the installed bundle's signature, with trial and rollback as everywhere
-else. `update::target()` names macOS and iOS (a Mac reported itself as `linux-aarch64`), and an
-updated program on a Mac keeps its executable bit. Everything is in the
-[changelog](https://docs.rs/crate/jflib-update/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-update/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

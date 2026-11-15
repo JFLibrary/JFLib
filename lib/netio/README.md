@@ -106,12 +106,14 @@ of JFLib's crates share one version and are released together. Its connections a
 go through the platform layer, so the network rules of an app's `PERMISSIONS` file apply to them:
 a name the rules do not cover fails before any query is sent.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-The HTTP and SSH clients name themselves after JFLib now (`JFLib-netio`,
-`SSH-2.0-JFLib_netio`; they still said CraftLIB), and a mail without a HELO name gets its
-Message-ID at `jflib`. The docs of `smtp::send` with `Security::None` say what it does: a plain
-connection to any server and no login without TLS. Everything is in the
+The server ends a request body that comes slower than `MIN_BODY_RATE` (1 KiB a second) after a first
+`read_ms`, a TLS read ends after its timeout also when only empty records arrive, and X.509 checks
+wildcard certificates against excluded name constraints and the extended key usage of the CAs on the
+path. A response without a length ends only at an orderly end (`Stream::end_is_clean`), and SSH
+`exec` counts `exit-signal` names against `max_out`. New: `x509::CertBuilder::sign_ext` and
+`x509::extension`. Everything is in the
 [changelog](https://docs.rs/crate/jflib-netio/latest/source/CHANGELOG.md).
 
 ## Documentation

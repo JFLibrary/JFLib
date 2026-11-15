@@ -71,13 +71,11 @@ browser and on a PC.
 It comes along with [`jflib`](https://crates.io/crates/jflib), as `jflib::simd` (hidden in the
 documentation, see above). All of JFLib's crates share one version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-`copy_stream` now ends with the fence its non-temporal stores need, so the copy is complete before
-anyone touches it again, the copying thread included; before, the caller had to call
-`stream_fence` itself. The new `copy_stream_rows` copies a block of rows with one fence at the
-end. Everything is in the
-[changelog](https://docs.rs/crate/jflib-simd/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-simd/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

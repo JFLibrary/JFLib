@@ -58,12 +58,11 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::gltf`. All of JFLib's crates share one
 version and are released together. It runs on every platform JFLib supports.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-jflib-gltf is new in this release: glTF 2.0 import of `.gltf` and `.glb` files into a model
-without a GPU, with meshes, materials, decoded PNG and JPEG images, nodes in `f64`, the instances
-of a scene and the lights of `KHR_lights_punctual`, all read as untrusted input within limits.
-Everything is in the [changelog](https://docs.rs/crate/jflib-gltf/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-gltf/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

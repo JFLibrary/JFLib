@@ -48,12 +48,11 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::datetime`. All of JFLib's crates share one
 version and are released together. It runs on every platform JFLib supports.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-ISO 8601 weeks: `iso_week` gives the week of a date with its week-numbering year,
-`iso_weeks_in_year` says whether a year has 52 or 53 weeks, and `iso_week_monday` gives the Monday
-of a week. The week calendar of `ui.calendar` in `jflib-ui` is built on them. Everything is in the
-[changelog](https://docs.rs/crate/jflib-datetime/latest/source/CHANGELOG.md).
+One fix in `cron`: a day field that begins with `*` and a step (`*/2`) now needs both day fields to
+match, as Vixie cron does, and `7-7` as the day of the week is Sunday rather than every day.
+Everything is in the [changelog](https://docs.rs/crate/jflib-datetime/latest/source/CHANGELOG.md).
 
 ## Documentation
 

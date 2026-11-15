@@ -77,13 +77,11 @@ version and are released together. It runs on every platform JFLib supports. Bes
 parts it holds the shaders of JFLib's GPU benchmark scene with their data layout and CPU
 references (`bench`) and small sample shaders for tests (`samples`).
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-The crate translates SPIR-V into the Metal Shading Language now (`shader::msl`). That is how
-jflib-gpu runs the modules of jflib-wgsl and of this builder on macOS and iOS, unchanged. The
-translation substitutes specialization constants, turns bindless arrays into Metal 3 argument
-buffers and keeps WGSL's rules for overflow and image access outside the bounds. Everything is in
-the [changelog](https://docs.rs/crate/jflib-shader/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-shader/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

@@ -36,15 +36,11 @@ uninstall entry. Files the user put there stay.
 The pages are in German; only the default-browser option also speaks English. On the command
 line `--dir PATH` and `--style ID` preset the folder and the look.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-A setup of a web browser offers to make it the default browser and registers it the way Windows
-expects one: through Default Programs, without taking the keys of `http` and `https` from the
-system. Uninstalling now removes every file of a large installation, also beyond the 4096 bytes
-at which `install.ini` used to cut the list, together with the folders that held them, and a
-package may hold up to 65536 files instead of 256. A setup that cannot write `install.ini` fails
-instead of leaving an installation nothing can remove. Everything is in the
-[changelog](https://docs.rs/crate/jflib-installer/latest/source/CHANGELOG.md).
+Windows: URL schemes are registered as `"<exe>" -- "%1"`, so a quote in a link can no longer add
+options to the program. Apps registered before keep the old command until they are registered again.
+Everything is in the [changelog](https://docs.rs/crate/jflib-installer/latest/source/CHANGELOG.md).
 
 ## Documentation
 

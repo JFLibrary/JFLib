@@ -61,12 +61,11 @@ Like all of JFLib, the crate comes through the one dependency
 GIF and SVG at start-up by itself; JPEG XR needs `img_all::use_all_codecs()` once. All of JFLib's
 crates share one version and are released together. It runs on every platform JFLib supports.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-A file with an index table now gets the same plausibility check as one without: a file of 86 bytes
-that claims 16384 x 16384 pixels fails with `ERR_TRUNC` right after its headers instead of after
-allocating gigabytes. Everything is in the
-[changelog](https://docs.rs/crate/jflib-img-jxr/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-img-jxr/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

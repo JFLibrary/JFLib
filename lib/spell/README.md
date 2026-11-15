@@ -66,13 +66,11 @@ libhyphen 2.8's for 214,000 words. JFLib's UI uses it for `TX_HYPHENATE` texts a
 Through the one dependency [`jflib`](https://crates.io/crates/jflib), as `jflib::spell`. All of
 JFLib's crates share one version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-On macOS and iOS the crate now uses the system's own spell checker, and on macOS it finds
-Hunspell dictionaries in the Spelling folders of the system and the user. A dictionary's
-`COMPOUNDMIN` is clamped to 1..=65535: a huge value made checking a word read past its end.
-Everything is in the
-[changelog](https://docs.rs/crate/jflib-spell/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-spell/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

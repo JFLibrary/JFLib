@@ -41,11 +41,11 @@ file already in memory.
 Like all of JFLib, the crate comes through the one dependency [`jflib`](https://crates.io/crates/jflib),
 as `jflib::img_png`. All of JFLib's crates share one version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
-together. The [changelog](https://docs.rs/crate/jflib-img-png/latest/source/CHANGELOG.md) says
-the same.
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-img-png/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

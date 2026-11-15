@@ -75,15 +75,11 @@ Like all of JFLib, the crate comes through the one dependency
 version and are released together. File names may be paths of the operating system or the
 names with a scheme that JFLib's platform layer knows, such as `documents://`.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Long formatted documents can be saved. `encode_docx`, and with it `save_docx`, checks its own
-output with the XML reader, which stopped at 30000 elements and 4 MiB a part, a size some dozen
-pages of formatted text reach. The parts that grow with a document's content are now written and
-read up to 250000 elements and 8 MiB, and a long source list that could be saved now loads back.
-HTML clipboard round trips keep the size of raised and
-lowered text and the line spacing; before, every copy and paste shrank such text by a third.
-Everything is in the [changelog](https://docs.rs/crate/jflib-doc-io/latest/source/CHANGELOG.md).
+One fix: the HTML clipboard import looks for the end of a character reference in its first 32 bytes
+only, so a long run of bare ampersands no longer takes quadratic time. Everything is in the
+[changelog](https://docs.rs/crate/jflib-doc-io/latest/source/CHANGELOG.md).
 
 ## Documentation
 

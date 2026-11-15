@@ -73,11 +73,11 @@ Like all of JFLib, the crate comes through the one dependency
 GIF and SVG at start-up by itself; DDS needs `img_all::use_all_codecs()` once. All of JFLib's
 crates share one version and are released together. It runs on every platform JFLib supports.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
-together. The [changelog](https://docs.rs/crate/jflib-img-dds/latest/source/CHANGELOG.md) says
-the same.
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-img-dds/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 
