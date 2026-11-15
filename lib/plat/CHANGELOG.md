@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Added
 
 - `watch::Watcher::watching()`: whether every root (Linux: every folder below them) is watched now
+- Intel Macs (`x86_64-apple-darwin`): libSystem's functions with 64-bit inodes (`stat$INODE64`, `readdir$INODE64`, `statfs$INODE64` ...), Objective-C messages that return structures over 16 bytes (`NSRect`) through `objc_msgSend_stret`, a BOOL read as a byte, crash reports from the x86-64 context (registers, the chain over rbp), `cpu_features` with AVX2 where the processor has it; checked under Rosetta 2 ([INTEL_MAC.md](https://github.com/JFLibrary/JFLib/blob/main/docs/INTEL_MAC.md))
 
 ### Changed
 

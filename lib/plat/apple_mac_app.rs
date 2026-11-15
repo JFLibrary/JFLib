@@ -42,15 +42,6 @@ unsafe extern "C" {
 }
 #[link(name = "PDFKit", kind = "framework")]
 unsafe extern "C" {}
-#[repr(C)]
-struct ObjcSuper {
-    receiver: Id,
-    class: Id,
-}
-#[link(name = "objc")]
-unsafe extern "C" {
-    fn objc_msgSendSuper();
-}
 // libdispatch (libSystem): a signal source on the main queue
 unsafe extern "C" {
     static _dispatch_source_type_signal: c_void;
@@ -418,12 +409,9 @@ pub(super) fn panel_class() -> Id {
 
 extern "C" fn p_send_event(this: Id, cmd: Sel, ev: Id) {
     PANEL_EV.store(ev, Ordering::SeqCst);
-    let sup = ObjcSuper { receiver: this, class: class(c"NSPanel") };
+    let sup = crate::apple::objc::ObjcSuper { receiver: this, class: class(c"NSPanel") };
     // SAFETY: [super sendEvent:ev] through objc_msgSendSuper with its exact signature.
-    unsafe {
-        let f: unsafe extern "C" fn(*const ObjcSuper, Sel, Id) = core::mem::transmute(objc_msgSendSuper as *const ());
-        f(&sup, cmd, ev);
-    }
+    unsafe { crate::apple::objc::msg_super!(&sup, cmd, ev => Id; ()) };
     PANEL_EV.store(core::ptr::null_mut(), Ordering::SeqCst);
 }
 

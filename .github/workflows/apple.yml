@@ -4,6 +4,11 @@
 # scripts in the iOS simulator, and a .dmg of BackupCraft as an artifact.  Windows of AppKit, the
 # iPhone and signing with a certificate stay with the Mac at home (tools/apple.py; scripts never
 # open a window, plattest --test window does).
+#
+# The job "intel" (docs/INTEL_MAC.md IM4) runs the Intel Macs' part on GitHub's last x86-64 image,
+# macos-15-intel (announced to end around autumn 2027; then the job goes and the part stays built
+# only, decision 4a): the only run on a real Intel processor (real x87, real AVX2; no usable GPU).
+# Its x87 dump (artifact) compares with one of Windows x86-64: apps/portabletest/tests/x87_diff.py.
 name: Apple
 
 on:
@@ -65,3 +70,57 @@ jobs:
           name: BackupCraft-dmg
           path: build/dist/*.dmg
           retention-days: 7
+
+  intel:
+    name: Intel Macs (x86-64)
+    runs-on: macos-15-intel
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Rust, Xcode and the processor
+        run: |
+          rustup toolchain install stable --profile minimal --target x86_64-apple-darwin --no-self-update
+          rustup default stable
+          rustc --version
+          xcodebuild -version
+          uname -m
+          sysctl -n machdep.cpu.brand_string machdep.cpu.features
+          sysctl -n machdep.cpu.leaf7_features || true
+      - name: coretest (the foundation's self-checks)
+        run: python build_rs.py test coretest --target mac --arch x86_64
+      - name: gallery's scripts
+        run: python build_rs.py test gallery --target mac --arch x86_64
+      - name: updatetest (checks, downloads, applying, rollback, app bundles)
+        run: python build_rs.py test updatetest --target mac --arch x86_64
+      - name: plattest without windows, the processor and the crash report
+        run: |
+          python build_rs.py app plattest --target mac --arch x86_64
+          for t in all cliprich spell cpu; do
+            echo "::group::plattest --test $t"
+            build/mac-x86_64/plattest --test "$t"
+            echo "::endgroup::"
+          done
+          # the crash test ends with exit code 3 (the report's); its checks run in the hook
+          set +e
+          build/mac-x86_64/plattest --test crash > crash.txt 2>&1
+          code=$?
+          set -e
+          cat crash.txt
+          test "$code" = 3 && grep -q " 0 failure(s)" crash.txt
+      - name: portabletest (SIMD backends, x87) and its x87 dump
+        run: |
+          python build_rs.py app portabletest --target mac --arch x86_64
+          build/mac-x86_64/portabletest
+          build/mac-x86_64/portabletest --simd sse2
+          build/mac-x86_64/portabletest --math-dump > math-intel.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: x87-dump-intel
+          path: math-intel.txt
+          retention-days: 30

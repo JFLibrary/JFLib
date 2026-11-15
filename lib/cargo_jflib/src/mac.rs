@@ -1,5 +1,7 @@
-// `cargo jflib mac [-p PKG] [--release] [--run [-- ARGS]]` -- the app as NAME.app for macOS
-// (docs/APPLE.md AP7c): the program for aarch64-apple-darwin, Info.plist from PACKAGE (display,
+// `cargo jflib mac [-p PKG] [--release] [--arch aarch64|x86_64] [--run [-- ARGS]]` -- the app as NAME.app
+// for macOS (docs/APPLE.md AP7c): one program for every Mac (docs/INTEL_MAC.md), built for
+// aarch64-apple-darwin and x86_64-apple-darwin and joined by lipo (--arch: one of them only, quicker
+// while developing), Info.plist from PACKAGE (display,
 // version, app_id, filetypes= as document types -- "own" ones exported as the app's types --,
 // schemes= as URL types; browser=1: http and https as the web URL type and the web documents with
 // their system types, so macOS lists the app as a web browser; the languages of src/locales/ui.tsv
@@ -22,7 +24,12 @@ use std::process::Command;
 use crate::cargo;
 use crate::pkgmeta::{self, Meta, xml};
 
+/// Apple Silicon and Intel Macs: a bundle holds both programs, joined by lipo (docs/INTEL_MAC.md, decision 1a)
 pub(crate) const TRIPLE: &str = "aarch64-apple-darwin";
+pub(crate) const X86_TRIPLE: &str = "x86_64-apple-darwin";
+pub(crate) const TRIPLES: [&str; 2] = [TRIPLE, X86_TRIPLE];
+/// this Mac's own (the helpers cargo-jflib builds and runs here, such as the update channel's signer)
+pub(crate) const HOST_TRIPLE: &str = if cfg!(target_arch = "x86_64") { X86_TRIPLE } else { TRIPLE };
 pub(crate) const MAC_MIN: &str = "13.0";
 /// (ICNS type, PNG size): up to the largest res/app_*.png (an icon is never scaled up)
 const ICNS: [(&[u8; 4], usize); 11] = [(b"icp4", 16), (b"icp5", 32), (b"ic11", 32), (b"icp6", 64), (b"ic12", 64), (b"ic07", 128),
@@ -30,10 +37,18 @@ const ICNS: [(&[u8; 4], usize); 11] = [(b"icp4", 16), (b"icp5", 32), (b"ic11", 3
 
 pub(crate) fn run_cmd(args: &[String]) -> Result<(), String> {
     let (mut run, mut rest, mut app_args) = (false, Vec::new(), Vec::new());
+    let mut triples = TRIPLES.to_vec();
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
             "--run" => run = true,
+            "--arch" => {
+                triples = match it.next().map(String::as_str) {
+                    Some("aarch64") => vec![TRIPLE],
+                    Some("x86_64") => vec![X86_TRIPLE],
+                    _ => return Err("--arch needs aarch64 (Apple Silicon) or x86_64 (Intel Macs)".into()),
+                }
+            }
             "--" => {
                 app_args.extend(it.by_ref().cloned());
             }
@@ -45,15 +60,19 @@ pub(crate) fn run_cmd(args: &[String]) -> Result<(), String> {
     }
     let o = crate::opts(&rest)?;
     let p = cargo::project(o.package.as_deref())?;
-    let mut cmd = cargo::command();
-    cmd.args(["build", "-p", &p.package.name, "--target", TRIPLE]).env("MACOSX_DEPLOYMENT_TARGET", MAC_MIN);
-    if o.release {
-        cmd.arg("--release");
+    let mut exes = Vec::new();
+    for triple in triples {
+        let mut cmd = cargo::command();
+        cmd.args(["build", "-p", &p.package.name, "--target", triple]).env("MACOSX_DEPLOYMENT_TARGET", MAC_MIN);
+        if o.release {
+            cmd.arg("--release");
+        }
+        let built = cargo::build(&mut cmd).map_err(|e| target_hint(triple, e))?;
+        exes.push(built.into_iter().filter(|a| a.package_id == p.package.id).find_map(|a| a.executable).ok_or("cargo built no program")?);
     }
-    let exe = cargo::build(&mut cmd)?.into_iter().filter(|a| a.package_id == p.package.id).find_map(|a| a.executable)
-        .ok_or("cargo built no program")?;
     let out = p.target_dir.join("jflib-mac");
     fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
+    let exe = universal(&exes, &out.join(".universal"))?;
     let app = bundle(&p.package.dir, &p.package.version, &exe, &out)?;
     println!("{}", app.display());
     if run {
@@ -64,6 +83,32 @@ pub(crate) fn run_cmd(args: &[String]) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// a failed build for `triple`: the error, for an Intel Mac's part with the way to add its target
+pub(crate) fn target_hint(triple: &str, e: String) -> String {
+    if triple == X86_TRIPLE {
+        format!("{e}\n(the Intel Macs' part: rustup target add {X86_TRIPLE}; cargo jflib mac --arch aarch64 builds for Apple Silicon only)")
+    } else {
+        e
+    }
+}
+
+/// the programs of one app for several Macs as one program in dir (lipo -create; a single one as it
+/// is) -> its path, named as they are
+pub(crate) fn universal(exes: &[PathBuf], dir: &Path) -> Result<PathBuf, String> {
+    let [first, ..] = exes else { return Err("no program to join".into()) };
+    if exes.len() == 1 {
+        return Ok(first.clone());
+    }
+    let name = first.file_name().ok_or("the program has no name")?;
+    fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let out = dir.join(name);
+    let st = Command::new("lipo").arg("-create").arg("-output").arg(&out).args(exes).status().map_err(|e| format!("lipo: {e}"))?;
+    if !st.success() {
+        return Err(format!("lipo -create {} failed", out.display()));
+    }
+    Ok(out)
 }
 
 /// the program exe as out/NAME.app: Contents/MacOS/NAME, Info.plist, Resources/NAME.icns, signed

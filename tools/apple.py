@@ -8,6 +8,9 @@ the iPhone.  Runs on a Mac only (Xcode's tools: codesign, xcrun simctl, xcrun de
                                                             sign it for the iPhone only
     python tools/apple.py gui build/mac/NAME [ARGS..]       start a program with windows from SSH
     python tools/apple.py mac build/mac/NAME [APP]           pack a macOS program as NAME.app beside it
+    python tools/apple.py universal build/mac/NAME build/mac-x86_64/NAME [OUT]
+                                                            one program for every Mac (lipo; default
+                                                            build/mac-universal/NAME) and its NAME.app
     python tools/apple.py dmg build/mac/NAME.app [OUT.dmg]   the bundle as a disk image (docs/APPLE.md AP8)
     python tools/apple.py notarize PATH.app|PATH.dmg         notarize and staple (Developer ID, AP8c)
 
@@ -24,6 +27,10 @@ apps with `ui` through gui_run there -- `open` starts a small runner bundle in t
 which runs the program in the repository folder and hands back its output and exit code.  When the
 program has its NAME.app beside it, the copy inside the bundle runs (its bundle identifier: macOS
 gives notifications only to bundled programs).
+
+Intel Macs (docs/INTEL_MAC.md): build_rs.py --target mac --arch x86_64 builds their part into
+build/mac-x86_64 (it runs under Rosetta 2 on an Apple Silicon Mac); mac_universal joins it with the
+ARM64 program into one (lipo), which tools/package.py puts into the .dmg.
 
 build_rs.py packs every program it builds for mac into NAME.app too (mac_bundle, docs/APPLE.md AP7c):
 Info.plist from apps/APP/PACKAGE (display, version, app_id, filetypes= as document types -- "own"
@@ -288,6 +295,18 @@ def mac_bundle(exe, app=None):
     (contents / "PkgInfo").write_bytes(b"APPL????")
     mac_sign(bundle, mac_entitlements(pkgmeta.permissions(app)))
     return bundle
+
+
+def mac_universal(exes, out):
+    """the programs of one app for Apple Silicon and Intel Macs as one program at out (lipo -create;
+    docs/INTEL_MAC.md, decision 1a) -> out"""
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if out.exists():
+        out.unlink()
+    run(["lipo", "-create", "-output", out, *exes])
+    out.chmod(0o755)
+    return out
 
 
 def mac_identity():
@@ -638,13 +657,21 @@ def device_run(app, args, timeout=600):
 
 
 def main():
-    if len(sys.argv) < 3 or sys.argv[1] not in ("sim", "simapp", "device", "sign", "gui", "mac", "dmg", "notarize"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("sim", "simapp", "device", "sign", "gui", "mac", "universal", "dmg", "notarize"):
         print(__doc__)
         return 2
     cmd, path, rest = sys.argv[1], sys.argv[2], sys.argv[3:]
     try:
         if cmd == "mac":
             print(mac_bundle(path, rest[0] if rest else None))
+            return 0
+        if cmd == "universal":
+            if not rest:
+                print(__doc__)
+                return 2
+            name = Path(path).name
+            out = Path(rest[1]) if len(rest) > 1 else ROOT / "build" / "mac-universal" / name
+            print(mac_bundle(mac_universal([path, rest[0]], out), name))
             return 0
         if cmd == "dmg":
             print(mac_dmg(path, rest[0] if rest else None))

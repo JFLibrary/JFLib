@@ -21294,8 +21294,9 @@ built yet (level Basis; Features says so).
 
 - **`fn create_compute_pipeline(&self, desc: &ComputePipelineDesc) -> Result<ComputePipeline>`**
 - **`fn create_compute_pipeline_sized(&self, desc: &ComputePipelineDesc, size: u32) -> Result<ComputePipeline>`**
-  create_compute_pipeline with a required subgroup size: Metal's SIMD groups have one size
-  (32), so only 0 (the driver's choice) and that size work
+  create_compute_pipeline with a required subgroup size: Metal's SIMD groups have one size on
+  Apple's GPUs (32), so only 0 (the driver's choice) and that size work; on an Intel Mac's GPU
+  the driver picks it per pipeline (min and max of the limits differ), so only 0
 - **`fn create_render_pipeline(&self, desc: &RenderPipelineDesc) -> Result<RenderPipeline>`**
 
 - **`struct Timestamps`**
@@ -27840,7 +27841,7 @@ applies `--simd sse2` before the app starts.
 
 - **`fn cpu_brand() -> String`**
   the processor name from CPUID 0x80000002..4 (macOS, iOS: sysctl machdep.cpu.brand_string,
-  "Apple M2"), blanks trimmed  [cpu_brand]
+  "Apple M2", on an Intel Mac Intel's name; under Rosetta 2 the Mac's own chip), blanks trimmed  [cpu_brand]
 
 - **`fn avx2_probe() -> bool`**
   run two 256-bit AVX2 instructions (they fault without OS support); only call it when
@@ -27851,10 +27852,11 @@ applies `--simd sse2` before the app starts.
   it: a thread started with a misaligned stack shows here)  [plattest th_raw]
 
 - **`fn avx2_probe() -> bool`**
-  The browser does not advertise or execute native AVX2 instructions.
+  The browser does not advertise or execute native AVX2 instructions (nor do ARM64 processors).
 
 - **`fn stack_aligned() -> bool`**
-  WebAssembly's compiler-managed value/call stacks satisfy their platform ABI.
+  WebAssembly's compiler-managed value/call stacks satisfy their platform ABI (Apple Silicon: the
+  system starts every thread; Intel Macs read rsp as Windows and Linux do).
 
 - **`fn stack_aligned() -> bool`**
   the stack pointer is 16-byte aligned (ARM64 faults on a memory access through a misaligned sp: a

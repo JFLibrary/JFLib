@@ -26,7 +26,7 @@ pub(crate) fn simd_override() {
 }
 
 /// the processor name from CPUID 0x80000002..4 (macOS, iOS: sysctl machdep.cpu.brand_string,
-/// "Apple M2"), blanks trimmed  [cpu_brand]
+/// "Apple M2", on an Intel Mac Intel's name; under Rosetta 2 the Mac's own chip), blanks trimmed  [cpu_brand]
 #[cfg(not(all(any(target_os = "linux", windows), target_arch = "aarch64")))] pub fn cpu_brand() -> String {
     #[cfg(target_vendor = "apple")]
     {
@@ -81,12 +81,13 @@ pub fn stack_aligned() -> bool {
     sp & 15 == 0
 }
 
-/// The browser does not advertise or execute native AVX2 instructions.
-#[cfg(any(target_arch = "wasm32", all(target_os = "android", not(target_arch = "x86_64")), target_vendor = "apple", all(any(target_os = "linux", windows), target_arch = "aarch64")))]
+/// The browser does not advertise or execute native AVX2 instructions (nor do ARM64 processors).
+#[cfg(any(target_arch = "wasm32", all(target_os = "android", not(target_arch = "x86_64")), all(target_vendor = "apple", target_arch = "aarch64"), all(any(target_os = "linux", windows), target_arch = "aarch64")))]
 pub fn avx2_probe() -> bool { false }
 
-/// WebAssembly's compiler-managed value/call stacks satisfy their platform ABI.
-#[cfg(any(target_arch = "wasm32", all(target_os = "android", not(target_arch = "x86_64")), target_vendor = "apple"))]
+/// WebAssembly's compiler-managed value/call stacks satisfy their platform ABI (Apple Silicon: the
+/// system starts every thread; Intel Macs read rsp as Windows and Linux do).
+#[cfg(any(target_arch = "wasm32", all(target_os = "android", not(target_arch = "x86_64")), all(target_vendor = "apple", target_arch = "aarch64")))]
 pub fn stack_aligned() -> bool { true }
 
 // ---- Linux on ARM64 (docs/ARM64.md): no AVX2 (above), the stack pointer read directly, the name from
