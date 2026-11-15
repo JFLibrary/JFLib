@@ -79,10 +79,10 @@ sandbox                               # let the OS enforce the manifest too (OS 
 | --- | --- | --- |
 | `fs.read` | patterns | reading files and listing folders below the patterns; `plat::recent_add` takes only such files (and the user's, `fs.user`) |
 | `fs.write` | patterns | creating, writing, renaming, deleting and `plat::trash` below the patterns (includes reading) |
-| `fs.user` | – | the files of the file dialog, of drops and of the command line: read and write |
+| `fs.user` | – | the files of the file dialog, of drops and of the command line: read and write (not the values of the library's options such as `--theme dark`, `plat::VALUE_OPTS`, except the files of `--theme-file`, `--shot` and `--script`) |
 | `process` | patterns or program names | `plat::process::Command::spawn`, `launch` and `run_elevated`; a name without `/` matches a program looked up in `PATH` (the live inspector's "Im Editor öffnen" in development builds starts the editor through `launch`: the same rule, no exception -- GUIDE.md §30) |
 | `url` | schemes or `*` | `plat::open_url` (`https`, `mailto`, ...) |
-| `plugins` | patterns | `plat::lib_open` (native plugin libraries) |
+| `plugins` | patterns | `plat::lib_open` (native plugin libraries); `plat::clr_run` (Windows: `coreclr.dll`, the managed program and every DLL of the runtime's and the program's folders) |
 | `print` | – | `plat::print` |
 | `secrets` | – | `plat::secret`: the app's own entries in the system's secret store ([SECRETS.md](SECRETS.md)) |
 | `autostart` | – | `plat::autostart_set`: the app's own entry that starts it at login (Run key, XDG autostart, Background portal); `autostart_get` / `autostart_entry` need nothing |
@@ -216,6 +216,7 @@ they open again after a restart (a recent-files list): Android's `content://` na
 Flatpak sandbox everything below the documents portal's mount (`$XDG_RUNTIME_DIR/doc/`: the
 sandbox shows only what the user gave the app), and the browser's `/handles/` files (one
 handle of the user's own file each). Outside a sandbox the portal's mount is an ordinary path.
+On behalf of a plugin ([Plugins](#plugins)) such a document also needs the plugin's `fs.user`.
 
 The library's own file dialog lists folders without checks, because the user is navigating.
 `--shot` and the file commands of `.uis` scripts (`shot`, `dump`, `clip file` ...) are also
@@ -275,9 +276,11 @@ is allowed (`policy::audio_granted`, no question, no `PERMDENY`).
 - **The stored answers** (`Always`, `Never`) live in `config://permission-decisions.txt`, one
   line per rule (`always fs.read $DOCUMENTS/**`, `never agent document.delete`); deleting a
   line asks again. The app's own folders are writable for the app, but not this file: the
-  user's answers cannot be written by the app through `plat`. `jfgui_PERM_STORE` names
-  another file (empty: memory only); test scripts keep the answers in memory unless
-  `jfgui_PERM_STORE` or `perm store` names a file.
+  user's answers cannot be written by the app through `plat`, not by another name of the same
+  file either (an 8.3 name, another case on macOS, a link). `jfgui_PERM_STORE` names another
+  file (empty: memory only); test scripts keep the answers in memory unless
+  `jfgui_PERM_STORE` or `perm store` names a file. This file and every store chosen in the
+  run stay protected while the answers are kept elsewhere.
 - **Revoking.** `ui.permissions_page(id)` is a ready-made settings section: every ask line
   and every answered agent action with what it allows, the rule, the reason and the answer
   ("Immer erlaubt", "Bis zum Programmende abgelehnt", "Wird beim nächsten Zugriff gefragt",

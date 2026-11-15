@@ -89,6 +89,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **web:** The browser loader passes ?theme= only as a plain theme name and the worker drops arguments containing line breaks, so the page address can no longer add arguments or grant files
 - **appimagert:** Extracting an AppImage drops setuid, setgid, sticky and world-write bits of the image and respects the umask; --appimage-extract refuses a squashfs-root that is not the user's own folder or a current folder where other users can rename entries, and keeps the extracted folders private until it finishes
 - **plat:** plat::trash on Linux opens and checks a mount's trash folder by folder through descriptors (no links; .Trash must be owned by root or the user, files/ and info/ by the user), so another local user can no longer redirect a trashed item by swapping a folder
+- **plat:** The stored permission answers (config://permission-decisions.txt) stay protected from the app's writes while another store or memory is chosen (--script, perm store, jfgui_PERM_STORE), as does every store chosen in the run, and they can no longer be written through another name of the same file (a Windows 8.3 name, another case on macOS, a hard or symbolic link); Android content:// documents opened on behalf of a plugin need the plugin's own fs.user as well
 
 ## [0.2.0] - 2026-11-14
 

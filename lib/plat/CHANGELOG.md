@@ -44,6 +44,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Linux: a portal's `Response` counts only when it comes from the portal itself, the sender of its reply to the request. Another client on the session bus could answer a file dialog with files of its choice.
 - plat::net::resolve on Windows and Apple refuses host names with NUL or other control characters, so the system resolver can no longer look up a shorter name than the one the net.connect rules allowed; plat::clr_run checks the plugins rules for the managed program and every DLL of the runtime's and the program's folders, not only coreclr.dll; with fs.user the values of the library's options (plat::VALUE_OPTS, e.g. --theme /) are no longer granted as user files (--theme-file, --shot and --script still are)
 - plat::trash on Linux opens and checks a mount's trash folder by folder through descriptors (no links; .Trash must be owned by root or the user, files/ and info/ by the user), so another local user can no longer redirect a trashed item by swapping a folder
+- The stored permission answers (config://permission-decisions.txt) stay protected from the app's writes while another store or memory is chosen (--script, perm store, jfgui_PERM_STORE), as does every store chosen in the run, and they can no longer be written through another name of the same file (a Windows 8.3 name, another case on macOS, a hard or symbolic link); Android content:// documents opened on behalf of a plugin need the plugin's own fs.user as well
 
 ## [0.2.0] - 2026-11-14
 
