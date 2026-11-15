@@ -434,6 +434,8 @@ impl Ui {
             text_scale_forced: false,
             text_scale: 100,
             dbl_ms: 500,
+            wheel_lines: 3,
+            wheel_chars: 3,
             font_prefs: (None, None, None),
             tb_sys: plat::Titlebar::default(),
             blink_ms: 530,

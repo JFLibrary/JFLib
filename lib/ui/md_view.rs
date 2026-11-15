@@ -162,7 +162,6 @@ const CELL_PX: i32 = 10;
 const CELL_PY: i32 = 6;
 const RULE_H: i32 = 20;
 const LINE_DIP: i32 = 40;
-const WHEEL_DIP: i32 = 48;
 const IMG_BYTES: usize = 32 << 20;
 const HEAD_SCALE: [u32; 6] = [200, 150, 125, 100, 88, 85];
 const TABLE_SAMPLE: usize = 200;
@@ -2245,20 +2244,31 @@ impl Ui {
             st.sb_pos = pos;
         }
         // ---- the wheel (over the text or one of its fields)
-        let wy = self.wp.ctx.wheel_y;
+        let (wy, precise, py) = (self.wp.ctx.wheel_y, self.wp.ctx.wheel_precise, self.wp.ctx.wheel_px_y);
         let over = ev & EV_HOVER != 0 || field_of(id, self.wp.ctx.hot, st.doc.fields().len()).is_some();
-        if over && wy != 0 {
-            let d = wy.wrapping_neg().wrapping_mul(self.dp(WHEEL_DIP)) / 120;
+        if over && (wy != 0 || py != 0) {
+            // a notch: the system's lines (a page: the view); a touchpad's pixels at once
+            let d = if precise {
+                py.wrapping_neg()
+            } else {
+                wy.wrapping_neg().wrapping_mul(self.wheel_notch_px(self.dp(WHEEL_LINE_DIP), view_h, false)) / 120
+            };
             let max = (st.rows.total() - view_h as i64).max(0);
             let p = st.rows.pos();
             if (d < 0 && p > 0) || (d > 0 && p < max) {
-                if st.pending == 0 {
-                    st.t0 = self.now_ms as i32;
+                if precise {
+                    st.rows.set_pos((p + st.pending as i64 + d as i64).clamp(0, max));
+                    st.pending = 0;
+                    st.follow = false;
+                } else {
+                    if st.pending == 0 {
+                        st.t0 = self.now_ms as i32;
+                    }
+                    st.pending += d;
                 }
-                st.pending += d;
                 st.reveal = None;
-                self.wp.ctx.wheel_y = 0;
-                if self.anim_off {
+                self.wheel_take_y();
+                if self.anim_off || precise {
                     self.repass();
                 } else {
                     self.animating = true;

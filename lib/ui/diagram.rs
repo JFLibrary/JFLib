@@ -530,6 +530,8 @@ pub struct DiagramState {
     store: Rc<RefCell<Backing>>,
     /// the view moves until this ms (wheel turns, the minimap)
     moving_until: u32,
+    /// Ctrl + wheel: the part of a zoom step turned so far (120 = a step)
+    zoom_rem: i32,
     /// how the view's pan and zoom use the GPU (canvas.rs)
     pub gpu: CanvasGpu,
     /// the widget's id (the tiles' canvas)
@@ -570,6 +572,7 @@ impl DiagramState {
             mini_ext: None,
             store: Rc::new(RefCell::new(Backing::default())),
             moving_until: 0,
+            zoom_rem: 0,
             gpu: CanvasGpu::Zoom,
             id: 0,
         }
@@ -788,19 +791,31 @@ impl DiagramState {
 
     // ---- gestures
 
-    fn wheel(&mut self, wx: i32, wy: i32, mods: u32, at: [i32; 2], notch: i32) {
+    // the wheel: Ctrl zooms a step per notch (at most 16 a turn; the fine steps of a touchpad add
+    // up -- each of them was a whole step), else it pans notch[0] px per notch (sideways
+    // notch[1]), a precise turn by its pixels px (dx, dy)
+    fn wheel(&mut self, wx: i32, wy: i32, mods: u32, at: [i32; 2], notch: [i32; 2], px: Option<[i32; 2]>) {
         if wy != 0 && mods & MOD_CTRL != 0 {
-            let n = wy.unsigned_abs().div_ceil(120).min(16);
-            for _ in 0..n {
-                self.vp.step(if wy > 0 { 1 } else { -1 }, at[0] as f32 + 0.5, at[1] as f32 + 0.5);
+            let t = self.zoom_rem.saturating_add(wy);
+            self.zoom_rem = t % 120;
+            let n = (t / 120).clamp(-16, 16);
+            for _ in 0..n.unsigned_abs() {
+                self.vp.step(n.signum(), at[0] as f32 + 0.5, at[1] as f32 + 0.5);
             }
             return;
         }
         // wheel up shows the upper part (Shift: the left part)
-        let k = notch as f64 / 120.0 / self.vp.scale();
-        let (dx, dy) = if mods & MOD_SHIFT != 0 { (wx - wy, 0) } else { (wx, -wy) };
-        self.vp.cx += dx as f64 * k;
-        self.vp.cy += dy as f64 * k;
+        let s = self.vp.scale();
+        let (mut dx, mut dy) = match px {
+            Some(p) => (p[0] as f64, -(p[1] as f64)),
+            None => (wx as f64 * notch[1] as f64 / 120.0, -(wy as f64) * notch[0] as f64 / 120.0),
+        };
+        if mods & MOD_SHIFT != 0 {
+            dx += dy;
+            dy = 0.0;
+        }
+        self.vp.cx += dx / s;
+        self.vp.cy += dy / s;
     }
 
     fn step(&mut self, m: &DModel, i: &In, out: &mut Vec<DEv>) {
@@ -2178,15 +2193,18 @@ impl Ui {
         // Enter activates; behave would take it as a click
         let enter = self.wp.ctx.focus == id && self.key_peek(VK_RETURN);
         let lim = self.dp(DRAG_DIP);
-        let notch = self.dp(48);
+        // a notch: the system's lines of WHEEL_LINE_DIP (a page: the view), sideways its characters
+        let line = self.dp(WHEEL_LINE_DIP);
+        let notch = [self.wheel_notch_px(line, r[3], false), self.wheel_notch_px(line, r[2], true)];
         let ev = self.behave(id, HB_FOCUS | HB_MOVES | HB_GRAB_H | HB_GRAB_V | cur << HB_CURSOR_SHIFT);
         let state = self.wp.ctx.last_state;
         let c = &self.wp.ctx;
         let (now, dbl) = (self.now_ms, self.dbl_ms);
         let inp = In { tool, mods, space, ev, px: [mx, my], p, btn: c.mbtn, pressed: c.pressed, mine: c.active == id, lim, now, dbl };
-        if ev & EV_HOVER != 0 && (c.wheel_x != 0 || c.wheel_y != 0) {
-            let wx = if self.rtl { -c.wheel_x } else { c.wheel_x };
-            st.wheel(wx, c.wheel_y, mods, [mx, my], notch);
+        if ev & EV_HOVER != 0 && (c.wheel_x | c.wheel_y | c.wheel_px_x | c.wheel_px_y) != 0 {
+            let flip = if self.rtl { -1 } else { 1 };
+            let px = c.wheel_precise.then_some([c.wheel_px_x.wrapping_mul(flip), c.wheel_px_y]);
+            st.wheel(c.wheel_x.wrapping_mul(flip), c.wheel_y, mods, [mx, my], notch, px);
             st.moving_until = now.wrapping_add(MOVING_MS);
         }
         st.step(m, &inp, &mut out);

@@ -862,13 +862,14 @@ impl Ui {
             let m = ch.wrapping_sub(vh).max(0);
             y.min(m).max(0)
         };
-        let wy = self.wp.ctx.wheel_y;
-        if ev & EV_HOVER != 0 && wy != 0 {
-            let d = wy.wrapping_mul(lh.wrapping_mul(3)) / 120;
+        let (wy, precise, py) = (self.wp.ctx.wheel_y, self.wp.ctx.wheel_precise, self.wp.ctx.wheel_px_y);
+        if ev & EV_HOVER != 0 && (wy != 0 || py != 0) {
+            // the system's lines per notch (a page: the box), a touchpad's pixels
+            let d = if precise { py } else { wy.wrapping_mul(self.wheel_notch_px(lh, vh, false)) / 120 };
             let c = clamp_y(sy.wrapping_sub(d));
             if c != sy {
                 sy = c;
-                self.wp.ctx.wheel_y = 0;
+                self.wheel_take_y();
             } // at the end: the page may scroll
         }
         // a finger may roll it; its way (touch.rs)

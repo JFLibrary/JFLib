@@ -488,6 +488,16 @@ pub struct UiInput {
     pub press_y: i32,
     pub wheel_x: i32,     // wheel delta (120 per notch)
     pub wheel_y: i32,
+    /// the turn came from a device that scrolls by pixels or in fine steps (a touchpad, a
+    /// trackpad, a high-resolution wheel: plat::WHEEL_PIXELS / WHEEL_FINE): scroll by
+    /// wheel_px_x / wheel_px_y, at once (no smooth scrolling); wheel_x / wheel_y say the same
+    /// turn in notches (120 = what a notch scrolls: Ui::wheel_notch_px)
+    pub wheel_precise: bool,
+    /// a precise turn in physical pixels (up / right positive, as wheel_x / wheel_y): the
+    /// platform's pixels (macOS, Wayland) or, from Windows' fine steps, 120 = wheel_lines() lines
+    /// (wheel_chars() for wheel_px_x) of WHEEL_LINE_DIP; 0 for a notched wheel
+    pub wheel_px_x: i32,
+    pub wheel_px_y: i32,
     pub mods: u32,
     pub pts: alloc::vec::Vec<[i32; 2]>, // move points since the last frame (relative px)
     pub rect: [i32; 4],   // widget rectangle (absolute px)
@@ -501,6 +511,10 @@ pub struct UiInput {
 }
 
 pub const UI_PRESSURE_ONE: u32 = 65535;
+/// a line of the wheel in the library's views (DIP): a notch scrolls Ui::wheel_lines of them
+/// (48 DIP with the usual three); where a device scrolls in fine steps without pixels of its own
+/// (Windows), 120 of them are wheel_lines such lines of pixels
+pub const WHEEL_LINE_DIP: i32 = 16;
 
 // ------------------------------------------------------------------ containers
 pub const SC_V: u32 = 0x0100_0000; // vertical scrolling, children top to bottom (default)

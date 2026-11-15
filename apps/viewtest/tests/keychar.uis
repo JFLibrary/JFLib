@@ -1,0 +1,25 @@
+# viewtest: the keyboard layout's character of a key (KeyEvent::ch, E2): what a browser names
+# the key (KeyboardEvent.key) also when Ctrl or Alt is held and the key types nothing.  "Roh:"
+# shows it as =c (=c! a dead key).  keydown / keyup carry the US layout's character; `char "c"`
+# plays another layout (here a German keyboard).
+click "Rohe Tasten"
+click #101
+# Ctrl+Z, Ctrl+Shift+Z: the letter with its Shift
+key ctrl+z ctrl+shift+z
+expect text:"Roh: +C-Z=z -C-Z=z +C-S-Z=Z -C-S-Z=Z" exists
+# a German keyboard: Ctrl++ is the key VK_OEM_PLUS ("=" on the US layout), its character "+";
+# Ctrl+7 the digit
+keydown ctrl left scan 29
+keydown + scan 27 char "+"
+keyup + scan 27 char "+"
+keydown 7 scan 8
+keyup 7 scan 8
+keyup ctrl left scan 29
+expect text:"Roh: +C-Z=z -C-Z=z +C-S-Z=Z -C-S-Z=Z +Strg:L#29 +C-Plus=+#27 -C-Plus=+#27 +C-7=7#8 -C-7=7#8 -Strg:L#29" exists
+# a dead key (German ´): its spacing character, marked; keys without a character have none
+keydown ] scan 13 char "´" dead
+keyup ] scan 13 char "´" dead
+keydown f2 char none
+keyup f2
+key enter
+expect text:"Roh: +C-Z=z -C-Z=z +C-S-Z=Z -C-S-Z=Z +Strg:L#29 +C-Plus=+#27 -C-Plus=+#27 +C-7=7#8 -C-7=7#8 -Strg:L#29 +]=´!#13 -]=´!#13 +F2 -F2 +Eingabe -Eingabe" exists

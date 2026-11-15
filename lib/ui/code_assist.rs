@@ -443,9 +443,12 @@ impl Ui {
         if ev & EV_HOVER != 0 {
             let wy = self.wp.ctx.wheel_y;
             if wy != 0 && pop.shown.len() > POP_ROWS {
-                let d = if wy > 0 { -3 } else { 3 };
+                // the system's lines per notch (a page: the rows shown); a touchpad's fine steps
+                // add up (each of them scrolled three rows)
+                let per = if self.wheel_lines == plat::WHEEL_PAGE { POP_ROWS as i32 } else { self.wheel_lines as i32 };
+                let d = -self.wheel_steps(id, per) as isize;
                 pop.top = (pop.top as isize + d).clamp(0, (pop.shown.len() - POP_ROWS) as isize) as usize;
-                self.wp.ctx.wheel_y = 0;
+                self.wheel_take_y();
                 self.repass();
             }
         }

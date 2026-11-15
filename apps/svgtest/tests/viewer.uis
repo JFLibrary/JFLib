@@ -69,6 +69,12 @@ click "Größer"
 click "Größer"
 click "Größer"
 click "Größer"
+# the horizontal wheel pans while the wheel zooms: two notches (three characters of 16 DIP, 48
+# px each: 1.5 pixels at 6400 %) to the right -- it went twice as far --, and back
+wheel 520,445 0 240
+expect text:"zoom: 6400 %  cx: 17.5  cy: 12.0  fit: 0" exists
+wheel 520,445 0 -240
+expect text:"zoom: 6400 %  cx: 16.0  cy: 12.0  fit: 0" exists
 # a drag pans by the pointer's way / zoom: (-160, -96) px = (2.5, 1.5) pixels
 drag 520,445 360,349
 expect text:"zoom: 6400 %  cx: 18.5  cy: 13.5  fit: 0" exists

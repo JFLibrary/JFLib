@@ -26,8 +26,11 @@
 //   "Kette"              three commands, each queued by the frame that saw the one before (the
 //                        three command rounds of a frame; the frame after them shows "Kette: 3")
 //   "Rohe Tasten"        (E2) the page takes the keys as they go down and up (ui.key_event_take):
-//                        "Roh:" lists them (+ down, - up, C- S- A- held modifiers, * repeat, :L :R :N
-//                        location, #scancode)
+//                        "Roh:" lists them (+ down, - up, C- S- A- held modifiers, =c the layout's
+//                        character (=c! a dead key), * repeat, :L :R :N location, #scancode)
+//   "Rad:"               the last wheel turn over the page: notches dy dx, "genau" and the pixels
+//                        of a precise turn (a touchpad); the system's lines and characters of a
+//                        notch (ui.wheel_lines / wheel_chars)
 //   "Eingabefeld"        (E4) the page has an editable field of its own: ui.ime_enable while it
 //                        has the focus, ui.ime_pos at its caret, the composition from
 //                        ui.ime_preedit drawn by the page ("IME:"), the committed text from
@@ -247,6 +250,8 @@ struct ViewTest {
     /// (E2) "Rohe Tasten": the page takes KeyEvents; what it took
     raw: i32,
     raw_keys: Vec<String>,
+    /// the last wheel turn over the page ("Rad:"): notches dy dx, a precise turn's pixels
+    wheel: String,
     /// (E4) "Eingabefeld": the page's own field; whether the input method is on for it, its text
     ime: i32,
     ime_on: bool,
@@ -337,6 +342,7 @@ impl Default for ViewTest {
             custom: 0,
             raw: 0,
             raw_keys: Vec::new(),
+            wheel: String::from("-"),
             ime: 0,
             ime_on: false,
             field: String::new(),
@@ -439,6 +445,15 @@ impl ViewTest {
             // what an engine's tree would say: a link with its text, no hit box of its own
             ui.sem_rect(K_LINK, 0, lr, Some(text), 0);
         }
+        // the wheel over the page ("Rad:"): its notches (dy dx), a precise turn's pixels too
+        if inp.wheel_x != 0 || inp.wheel_y != 0 || inp.wheel_px_x != 0 || inp.wheel_px_y != 0 {
+            self.wheel = if inp.wheel_precise {
+                format!("{} {} genau {} {}", inp.wheel_y, inp.wheel_x, inp.wheel_px_y, inp.wheel_px_x)
+            } else {
+                format!("{} {}", inp.wheel_y, inp.wheel_x)
+            };
+            ui.repass();
+        }
         // a click on the page: on a link?
         if inp.ev & EV_ACT != 0 {
             if let Some(i) = link_at(ui, inp.press_x, inp.press_y) {
@@ -484,7 +499,12 @@ impl ViewTest {
                         mods.push_str(t);
                     }
                 }
-                self.raw_keys.push(format!("{}{}{}{}{}{}", if k.down { "+" } else { "-" }, mods, raw_name(ui, k.vk), if k.repeat { "*" } else { "" }, loc, scan));
+                // the layout's character: =c (a dead key: =c!)
+                let ch = match char::from_u32(k.ch).filter(|_| k.ch != 0) {
+                    Some(c) => format!("={c}{}", if k.dead { "!" } else { "" }),
+                    None => String::new(),
+                };
+                self.raw_keys.push(format!("{}{}{}{}{}{}{}", if k.down { "+" } else { "-" }, mods, raw_name(ui, k.vk), ch, if k.repeat { "*" } else { "" }, loc, scan));
                 ui.repass();
             }
         }
@@ -815,6 +835,9 @@ impl App for ViewTest {
         if self.again != 0 {
             ui.invalidate();
         }
+        // the last wheel turn over the page and what a notch scrolls (the system's setting)
+        let lines = if ui.wheel_lines() == plat::WHEEL_PAGE { String::from("Seite") } else { format!("{}", ui.wheel_lines()) };
+        ui.text(TS_BODY, &format!("Rad: {} Zeilen {} Zeichen {}", self.wheel, lines, ui.wheel_chars()));
         ui.box_end();
         // a thread of the app's own (an engine's): real time, then plat::wake; a timer polls
         ui.box_begin(0, BOX_H, 8);

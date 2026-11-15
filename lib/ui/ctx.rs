@@ -148,6 +148,17 @@ pub struct KeyEvent {
     pub scancode: u32,
     /// KL_STANDARD, KL_LEFT / KL_RIGHT (the two Shift, Ctrl, Alt, Windows keys), KL_NUMPAD
     pub location: u32,
+    /// the character the keyboard layout gives the key with Shift, Caps Lock and AltGr as they
+    /// are but without Ctrl, Alt and the Windows / Super key (0: none) -- what a browser names
+    /// the key (KeyboardEvent.key): "z" for Ctrl+Z on a German keyboard, "+" for its Ctrl++, "@"
+    /// for AltGr+Q, "Z" for Ctrl+Shift+Z.  Keys that type no character (Enter, Tab, Esc,
+    /// Backspace, the arrows, F1 ...) have none.  Windows (10 1607 and later: ToUnicodeEx),
+    /// Linux (the keymap), macOS (charactersIgnoringModifiers); 0 in the browser and on
+    /// Android; a headless run's keys have the US layout's (scripts: `keydown ... char "c"`)
+    pub ch: u32,
+    /// the key is a dead key (´ ^ ~ ...): ch is its spacing character, the text it makes
+    /// comes with the next key
+    pub dead: bool,
 }
 
 // (E2) a KeyEvent of the batch: the index of its down in keyq (-1: an up), taken
@@ -296,6 +307,16 @@ pub(crate) struct W {
     pub(crate) released: u32,
     pub(crate) wheel_x: i32,
     pub(crate) wheel_y: i32,
+    /// a precise turn of this pass (plat::WHEEL_PIXELS / WHEEL_FINE) and its pixels
+    pub(crate) wheel_precise: bool,
+    pub(crate) wheel_px_x: i32,
+    pub(crate) wheel_px_y: i32,
+    /// the fractions of the last precise turns (dy, dx) between notches and pixels, of the
+    /// kind (WHEEL_*) wheel_kind
+    pub(crate) wheel_rem: [i32; 2],
+    pub(crate) wheel_kind: u8,
+    /// (wheel_steps) the widget whose whole lines the wheel scrolled last and the fraction left
+    pub(crate) wheel_acc: (u32, i32),
     pub(crate) moved: bool,
     pub(crate) press_x: i32,
     pub(crate) press_y: i32,
@@ -346,6 +367,12 @@ impl W {
             released: 0,
             wheel_x: 0,
             wheel_y: 0,
+            wheel_precise: false,
+            wheel_px_x: 0,
+            wheel_px_y: 0,
+            wheel_rem: [0; 2],
+            wheel_kind: 0,
+            wheel_acc: (0, 0),
             moved: false,
             press_x: 0,
             press_y: 0,
@@ -370,6 +397,14 @@ impl W {
             slots: BTreeMap::new(),
         }
     }
+}
+
+/// v * num / den with the fraction carried in rem (the same units as v * num) from call to call
+fn scale_rem(v: i32, rem: &mut i32, num: i32, den: i32) -> i32 {
+    let t = v as i64 * num as i64 + *rem as i64;
+    let d = den.max(1) as i64;
+    *rem = (t % d) as i32;
+    (t / d).clamp(i32::MIN as i64, i32::MAX as i64) as i32
 }
 
 /// hit_find_list(list, modal_layer, x, y) -> (id, flags) of the topmost hit box at the
@@ -740,9 +775,7 @@ impl Ui {
                 1
             }
             plat::E_WHEEL => {
-                let c = &mut self.wp.ctx;
-                c.wheel_y = c.wheel_y.wrapping_add(ev.data as u16 as i16 as i32);
-                c.wheel_x = c.wheel_x.wrapping_add((ev.data as i32) >> 16);
+                self.wheel_input(ev);
                 1
             }
             plat::E_KEY_DOWN => {
@@ -755,7 +788,16 @@ impl Ui {
                 self.key_push((vk | self.mods << 16) & 0x7FFF_FFFF);
                 // (E2) as it went down
                 let kq = if self.wp.ctx.keyq.len() > n { n as i32 } else { -1 };
-                let ev = KeyEvent { vk, mods: self.mods, down: true, repeat: ev.data >> 31 != 0, scancode: ev.x as u32, location: ev.y as u32 };
+                let ev = KeyEvent {
+                    vk,
+                    mods: self.mods,
+                    down: true,
+                    repeat: ev.data >> 31 != 0,
+                    scancode: ev.x as u32,
+                    location: plat::key_location(ev.y),
+                    ch: plat::key_char(ev.y),
+                    dead: plat::key_dead(ev.y),
+                };
                 self.raw_push(ev, kq);
                 1
             }
@@ -764,7 +806,16 @@ impl Ui {
                 self.keydown[k as usize] = 0;
                 // (E2) as it went up: a pass of its own for a canvas that takes the keyboard
                 let keys = self.focus_has_keys();
-                let ev = KeyEvent { vk: ev.data & 0xFFFF, mods: self.mods, down: false, repeat: false, scancode: ev.x as u32, location: ev.y as u32 };
+                let ev = KeyEvent {
+                    vk: ev.data & 0xFFFF,
+                    mods: self.mods,
+                    down: false,
+                    repeat: false,
+                    scancode: ev.x as u32,
+                    location: plat::key_location(ev.y),
+                    ch: plat::key_char(ev.y),
+                    dead: plat::key_dead(ev.y),
+                };
                 self.raw_push(ev, -1);
                 // (popup agent) Alt release: a pass for the menu bar's Alt tap
                 (k == VK_MENU || keys) as u32
@@ -825,6 +876,70 @@ impl Ui {
         }
     }
 
+    // the wheel: notches (120 each), fine steps or pixels (plat::WHEEL_*) -> wheel_x / wheel_y in
+    // notches and, for a precise turn, wheel_px_x / wheel_px_y in pixels: a notch is
+    // wheel_notch_px(WHEEL_LINE_DIP) (a page counts three lines here); the fractions wait for
+    // the next turn of the same kind
+    fn wheel_input(&mut self, ev: &Event) {
+        let (dy, dx) = (ev.data as u16 as i16 as i32, (ev.data as i32) >> 16);
+        let kind = ev.btn & (plat::WHEEL_PIXELS | plat::WHEEL_FINE);
+        let line = self.dp(WHEEL_LINE_DIP);
+        let notch = |n: u32| line.saturating_mul(if n == plat::WHEEL_PAGE { 3 } else { n as i32 }).max(1);
+        let (ny, nx) = (notch(self.wheel_lines), notch(self.wheel_chars));
+        let c = &mut self.wp.ctx;
+        if kind != c.wheel_kind {
+            c.wheel_kind = kind;
+            c.wheel_rem = [0; 2];
+        }
+        if kind == 0 {
+            c.wheel_y = c.wheel_y.wrapping_add(dy);
+            c.wheel_x = c.wheel_x.wrapping_add(dx);
+            return;
+        }
+        c.wheel_precise = true;
+        let [ry, rx] = &mut c.wheel_rem;
+        if kind & plat::WHEEL_PIXELS != 0 {
+            c.wheel_px_y = c.wheel_px_y.wrapping_add(dy);
+            c.wheel_px_x = c.wheel_px_x.wrapping_add(dx);
+            c.wheel_y = c.wheel_y.wrapping_add(scale_rem(dy, ry, 120, ny));
+            c.wheel_x = c.wheel_x.wrapping_add(scale_rem(dx, rx, 120, nx));
+        } else {
+            c.wheel_y = c.wheel_y.wrapping_add(dy);
+            c.wheel_x = c.wheel_x.wrapping_add(dx);
+            c.wheel_px_y = c.wheel_px_y.wrapping_add(scale_rem(dy, ry, ny, 120));
+            c.wheel_px_x = c.wheel_px_x.wrapping_add(scale_rem(dx, rx, nx, 120));
+        }
+    }
+
+    /// the wheel of this pass is taken (a view scrolled with it): views around it get none
+    pub(crate) fn wheel_take(&mut self) {
+        let c = &mut self.wp.ctx;
+        c.wheel_x = 0;
+        c.wheel_y = 0;
+        c.wheel_px_x = 0;
+        c.wheel_px_y = 0;
+    }
+
+    /// the vertical wheel of this pass is taken
+    pub(crate) fn wheel_take_y(&mut self) {
+        let c = &mut self.wp.ctx;
+        c.wheel_y = 0;
+        c.wheel_px_y = 0;
+    }
+
+    /// (views that scroll by whole lines or rows) the lines this pass's vertical wheel scrolls
+    /// widget id, up positive: per_notch of them per notch, the fraction kept for its next turn
+    /// (the fine steps of a touchpad add up instead of being cut off one by one)
+    pub(crate) fn wheel_steps(&mut self, id: u32, per_notch: i32) -> i32 {
+        let c = &mut self.wp.ctx;
+        if c.wheel_acc.0 != id {
+            c.wheel_acc = (id, 0);
+        }
+        let t = c.wheel_acc.1 as i64 + c.wheel_y as i64 * per_notch as i64;
+        c.wheel_acc.1 = (t % 120) as i32;
+        (t / 120).clamp(i32::MIN as i64, i32::MAX as i64) as i32
+    }
+
     /// ui_input_clear_edges: after the first pass of a batch the edges are consumed
     pub(crate) fn input_clear_edges(&mut self) {
         let c = &mut self.wp.ctx;
@@ -832,6 +947,9 @@ impl Ui {
         c.released = 0;
         c.wheel_x = 0;
         c.wheel_y = 0;
+        c.wheel_precise = false;
+        c.wheel_px_x = 0;
+        c.wheel_px_y = 0;
         c.keyq.clear();
         c.rawq.clear();
         c.textq.clear();

@@ -733,6 +733,9 @@ pub struct Ui {
     pub(crate) text_scale_forced: bool,
     pub(crate) text_scale: u32,
     pub(crate) dbl_ms: u32,
+    /// the system's lines and characters of a wheel notch (SysSettings::wheel_lines / wheel_chars)
+    pub(crate) wheel_lines: u32,
+    pub(crate) wheel_chars: u32,
     /// the system's font rendering: smoothing, hinting, subpixel order (SysSettings)
     pub(crate) font_prefs: (Option<bool>, Option<u8>, Option<u8>),
     /// the system's title bar: buttons and click actions (SysSettings::titlebar, chrome.rs)
