@@ -3,7 +3,8 @@
 //   clr_run(dir, app, args)        self-contained .NET applications bring coreclr.dll and their
 //                                  whole framework: load that runtime into this process, trust
 //                                  every assembly of dir, execute app's Main -> its exit code.
-//                                  No installed .NET is involved.  Plugin policy applies; ARM64 refuses x64.
+//                                  No installed .NET is involved.  Plugin policy applies (coreclr.dll, app
+//                                  and every DLL of dir and of app's folder); ARM64 refuses x64.
 //   machine_reg_string(sub, name)  a string value of HKLM\sub (None: missing or another type)
 
 use alloc::format;
@@ -78,16 +79,28 @@ pub fn clr_run(dir: &str, app: &str, args: &[String]) -> Result<i32, String> {
         return Err(format!("{runtime}: durch eine Richtlinie gesperrt"));
     } #[cfg(target_arch = "aarch64")] if crate::other_machine(&runtime) { return Err(other_processor(&runtime)); }
     let app_dir = app.rsplit_once('\\').map_or(".", |v| v.0);
+    // the runtime loads app and the DLLs of dir (trusted, native search) and of app's folder
+    // (APP_PATHS) without plat: each of them needs the plugins policy as well
+    let dlls = |folder: &str| {
+        let mut v: Vec<String> = Vec::new();
+        crate::dir_list_raw(folder, &mut |name, is_dir, _| {
+            if !is_dir && name.len() > 4 && name[name.len() - 4..].eq_ignore_ascii_case(".dll") {
+                v.push(format!("{}\\{name}", folder.trim_end_matches('\\')));
+            }
+        });
+        v
+    };
+    let runtime_dlls = dlls(&dir);
+    let app_dlls = if app_dir.trim_end_matches('\\').eq_ignore_ascii_case(dir.trim_end_matches('\\')) { Vec::new() } else { dlls(app_dir) };
+    if let Some(p) = core::iter::once(&app).chain(&runtime_dlls).chain(&app_dlls).find(|p| !crate::policy::plugin_allowed(p)) {
+        return Err(format!("{p}: durch eine Richtlinie gesperrt"));
+    }
     // the trusted list takes absolute paths with backslashes only
     let mut trusted = String::new();
-    crate::dir_list_raw(&dir, &mut |name, is_dir, _| {
-        if !is_dir && name.len() > 4 && name[name.len() - 4..].eq_ignore_ascii_case(".dll") {
-            trusted.push_str(dir.trim_end_matches('\\'));
-            trusted.push('\\');
-            trusted.push_str(name);
-            trusted.push(';');
-        }
-    });
+    for p in &runtime_dlls {
+        trusted.push_str(p);
+        trusted.push(';');
+    }
     let exe = absolute(&crate::current_exe().unwrap_or_default());
     let keys = [
         utf8z("TRUSTED_PLATFORM_ASSEMBLIES"),

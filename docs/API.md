@@ -28296,7 +28296,8 @@ own code runs (docs/PERMISSIONS.md, docs/VFS.md)
   name_and_assets(app, assets) -> Result<(), i32>    vfs::set_app_id, the JFA1 bundle as app://
   permissions(manifest) -> Result<Option<Key>, i32>  install the manifest; with fs.user the
                           paths on the command line are the user's (read + write, folders
-                          with everything below; a local file:// URI as its path); without
+                          with everything below; a local file:// URI as its path; not the
+                          values of the library's VALUE_OPTS but --theme-file, --shot, --script); without
                           a manifest the process's key (policy::take_key: it answers the
                           questions of agent actions).  A `sandbox` line then hands the
                           manifest to the OS as well (sandbox::apply)
@@ -33222,7 +33223,8 @@ win_clr -- run a managed program on the CoreCLR another application ships
   clr_run(dir, app, args)        self-contained .NET applications bring coreclr.dll and their
                                  whole framework: load that runtime into this process, trust
                                  every assembly of dir, execute app's Main -> its exit code.
-                                 No installed .NET is involved.  Plugin policy applies; ARM64 refuses x64.
+                                 No installed .NET is involved.  Plugin policy applies (coreclr.dll, app
+                                 and every DLL of dir and of app's folder); ARM64 refuses x64.
   machine_reg_string(sub, name)  a string value of HKLM\sub (None: missing or another type)
 ```
 

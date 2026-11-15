@@ -85,6 +85,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Linux: a portal's `Response` counts only when it comes from the portal itself (the sender of its reply to the request): the request path is predictable, and another client on the session bus could answer a file dialog with files of its choice
 - **tools:** Only APKs signed with the debug key are debuggable (aapt2 --debug-mode): the app manifests no longer set android:debuggable, and a release-key build stops on a manifest that does, so another app can no longer pass jfgui_* settings through launch extras to a release build
 - **cargo-jflib:** cargo jflib android: --release refuses a manifest that sets android:debuggable, debug APKs are debuggable through aapt2 --debug-mode; a copied clipboard image is shared as a new file each time and earlier copies are deleted, so an app that kept a descriptor of an earlier image cannot read later ones
+- **plat:** plat::net::resolve on Windows and Apple refuses host names with NUL or other control characters, so the system resolver can no longer look up a shorter name than the one the net.connect rules allowed; plat::clr_run checks the plugins rules for the managed program and every DLL of the runtime's and the program's folders, not only coreclr.dll; with fs.user the values of the library's options (plat::VALUE_OPTS, e.g. --theme /) are no longer granted as user files (--theme-file, --shot and --script still are)
+- **web:** The browser loader passes ?theme= only as a plain theme name and the worker drops arguments containing line breaks, so the page address can no longer add arguments or grant files
 
 ## [0.2.0] - 2026-11-14
 

@@ -469,7 +469,7 @@ try {
   const store=await openSecrets(app);
   if(store) {secretStore=store;initialSecrets=encodeSecrets(store.entries);for(const e of store.entries)e.value?.fill(0);store.entries=null;}
 }catch(error){console.warn("Geheimnisspeicher nicht verfügbar:",error);}
-const args=[];if(enabled)args.push("--agent");if(params.get("theme"))args.push("--theme",params.get("theme"));
+const args=[];if(enabled)args.push("--agent");const theme=params.get("theme");if(theme&&/^[A-Za-z0-9][\w-]{0,31}$/.test(theme))args.push("--theme",theme);
 // the GPU output's switches from the address (docs/GPU.md "Ausgabe im Browser"): ?gpu=0|1, ?gpuenv=NAME=value,..
 // phones and tablets stay on the old path until one has been tested (an iPad calls itself a Mac)
 const handheld=navigator.userAgentData?.mobile||/Android|iPhone|iPad|iPod|Mobile/.test(navigator.userAgent)||(/Mac/.test(navigator.platform)&&navigator.maxTouchPoints>1);

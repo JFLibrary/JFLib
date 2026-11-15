@@ -1642,6 +1642,11 @@ pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
     }
     #[cfg(any(windows, target_vendor = "apple"))]
     {
+        // the system resolver reads the name up to a NUL: a name with control characters would
+        // be checked whole but looked up shortened
+        if h.bytes().any(|b| b < 0x20 || b == 0x7f) {
+            return Err(NetError::new(NetErrorKind::NotFound, 0));
+        }
         if !crate::policy::net_name_allowed(h) {
             return Err(denied());
         }
