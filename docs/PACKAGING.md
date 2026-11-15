@@ -128,7 +128,8 @@ packaged setup is that exe with a payload and a trailer appended.
   `HKCU\Software\Classes` (description, `DefaultIcon`, `shell\open\command` = `"<exe>" "%1"`) and
   the app in `.<ext>\OpenWithProgids` ("Open with"). An `own` type also becomes the default of its
   extensions (`.<ext>` default value and `Content Type`). A scheme gets `HKCU\Software\Classes\<scheme>`
-  (`URL:<display>`, `URL Protocol`, `DefaultIcon`, the open command). `SHChangeNotify` tells
+  (`URL:<display>`, `URL Protocol`, `DefaultIcon`, the open command `"<exe>" -- "%1"`: the URL
+  after `--` reaches the program as one argument, and a quote in it adds no options). `SHChangeNotify` tells
   Explorer. `install.ini` `assoc=` lists what was added (`T:` key trees, `V:` values), and
   `uninstall.exe` removes exactly that. In test mode the values go to
   `<ASMINST_SHELL_DIR>\assoc.txt` (`subkey|name=value` lines).
@@ -256,7 +257,7 @@ ignored by git. The code is in [`tools/codesign.py`](../tools/codesign.py).
 | AppImage | the type-2 signature as `appimagetool --sign` writes it: an armored detached GPG signature of the file's SHA-256 (the two sections taken as zeros, 64 hex digits) in `.sha256_sig`, the armored public key in `.sig_key` (gpg in Linux / WSL) | `jfgui_GPG_KEY`, `jfgui_GPG_HOME`, `jfgui_GPG_PASSPHRASE` (as the apt repository) | unsigned, "jfgui_GPG_KEY setzen" |
 | Flatpak | the commits and the summary of the repository `flatpak/repo` (flatpak-builder / `build-update-repo --gpg-sign`) and the bundle (`build-bundle --gpg-sign`), which carries the public key (`--gpg-keys`) and the repository's address (`--repo-url`, PACKAGE `flatpak_repo_url=`); the key as `flatpak/<app id>.gpg` and a `<app id>.flatpakrepo` beside it | `jfgui_GPG_KEY`, `jfgui_GPG_HOME` (flatpak signs through gpg-agent: a key with a passphrase must be unlocked there) | unsigned repository and bundle |
 | RPM | not signed: `rpmsign` (and rpmbuild) are missing in the test system | -- | -- |
-| Android | `build_rs.py app NAME --target android --release` signs with the release key (apksigner reads the passwords from the environment) | `jfgui_ANDROID_KEYSTORE`, `jfgui_ANDROID_KEYSTORE_PASS`, `jfgui_ANDROID_KEY_ALIAS`, optional `jfgui_ANDROID_KEY_PASS` | the build fails and names the variables; `jfgui_ANDROID_DEBUG_SIGN=1` signs a release build with the debug key (tests only). Debug builds keep the local debug key |
+| Android | `build_rs.py app NAME --target android --release` signs with the release key (apksigner reads the passwords from the environment) | `jfgui_ANDROID_KEYSTORE`, `jfgui_ANDROID_KEYSTORE_PASS`, `jfgui_ANDROID_KEY_ALIAS`, optional `jfgui_ANDROID_KEY_PASS` | the build fails and names the variables; `jfgui_ANDROID_DEBUG_SIGN=1` signs a release build with the debug key (tests only). Debug builds keep the local debug key. Only builds under the debug key are debuggable (aapt2 `--debug-mode`: the self-tests' `jfgui_*` extras, `run-as`); a manifest that sets `android:debuggable` stops a release-key build |
 
 A user adds the signed repository with:
 

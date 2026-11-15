@@ -5,7 +5,8 @@
 //
 // SIGTERM (logout, shutdown, `kill`) sets a flag and wakes the loop: the app gets
 // E_SESSION_END (UIC_SESSION_END), saves, and ends.  The watcher thread has connections of
-// its own (linux_dbus.rs): logind's PrepareForSleep(b) on the system bus -> E_POWER (1
+// its own (linux_dbus.rs): logind's PrepareForSleep(b) on the system bus (only from the unique
+// name that owns org.freedesktop.login1, followed through NameOwnerChanged) -> E_POWER (1
 // sleep, 0 woke up); the settings portal's SettingChanged(namespace, key, value) on the
 // session bus -> E_SETTINGS with SET_THEME (color-scheme, accent-color, gtk-theme),
 // SET_CONTRAST (contrast, high-contrast), SET_FONTS (font names, text-scaling-factor),
@@ -30,6 +31,8 @@ use crate::{E_POWER, E_SESSION_END, E_SETTINGS, Event, SET_CONTRAST, SET_FONTS, 
 const SIGTERM: usize = 15;
 const SA_RESTORER: usize = 0x0400_0000;
 const SA_RESTART: usize = 0x1000_0000;
+const BUS: &str = "org.freedesktop.DBus";
+const LOGIND: &str = "org.freedesktop.login1";
 
 static STARTED: AtomicBool = AtomicBool::new(false);
 static TERM: AtomicBool = AtomicBool::new(false);
@@ -77,15 +80,28 @@ fn add_match(c: &mut Conn, rule: &str) {
 fn watch() {
     let mut sys = Conn::system();
     let mut ses = Conn::session();
+    // logind's unique name: PrepareForSleep counts only from it (any client of the system bus
+    // may send a signal of that name, also to us alone past the match rules)
+    let mut logind = String::new();
     if let Some(c) = sys.as_mut() {
-        add_match(c, "type='signal',interface='org.freedesktop.login1.Manager',member='PrepareForSleep'");
+        add_match(c, "type='signal',sender='org.freedesktop.login1',interface='org.freedesktop.login1.Manager',member='PrepareForSleep',path='/org/freedesktop/login1'");
+        add_match(c, "type='signal',sender='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.freedesktop.login1'");
+        // (after the match: a logind that starts meanwhile is seen either way)
+        logind = c.name_owner(LOGIND).unwrap_or_default();
     }
     if let Some(c) = ses.as_mut() {
         add_match(c, "type='signal',interface='org.freedesktop.portal.Settings',member='SettingChanged'");
     }
     let mut files = Files::new();
     loop {
-        for c in [sys.as_mut(), ses.as_mut()].into_iter().flatten() {
+        if let Some(c) = sys.as_mut() {
+            while let Some(m) = c.read(0) {
+                if let Some(sleep) = sleep_signal(&m, &mut logind) {
+                    push(E_POWER, sleep as u32);
+                }
+            }
+        }
+        if let Some(c) = ses.as_mut() {
             while let Some(m) = c.read(0) {
                 handle(&m);
             }
@@ -194,16 +210,36 @@ impl Files {
     }
 }
 
+/// a message of the system bus -> Some(sleep) for logind's PrepareForSleep(sleep); logind is
+/// its unique name (followed here through the bus's NameOwnerChanged; "" while none runs)
+fn sleep_signal(m: &Msg, logind: &mut String) -> Option<bool> {
+    if m.typ != T_SIGNAL {
+        return None;
+    }
+    let arg = |k: usize| m.body.get(k).and_then(|v| v.as_str()).unwrap_or("");
+    match (m.iface.as_str(), m.member.as_str()) {
+        (BUS, "NameOwnerChanged") if m.sender == BUS && arg(0) == LOGIND => {
+            *logind = String::from(arg(2));
+            None
+        }
+        ("org.freedesktop.login1.Manager", "PrepareForSleep")
+            if !logind.is_empty() && m.sender == *logind && m.path == "/org/freedesktop/login1" =>
+        {
+            match m.body.first() {
+                Some(Value::B(sleep)) => Some(*sleep),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+// a message of the session bus
 fn handle(m: &Msg) {
     if m.typ != T_SIGNAL {
         return;
     }
     match (m.iface.as_str(), m.member.as_str()) {
-        ("org.freedesktop.login1.Manager", "PrepareForSleep") => {
-            if let Some(Value::B(sleep)) = m.body.first() {
-                push(E_POWER, *sleep as u32);
-            }
-        }
         ("org.freedesktop.portal.Settings", "SettingChanged") => {
             let ns = m.body.first().and_then(|v| v.as_str()).unwrap_or("");
             let key = m.body.get(1).and_then(|v| v.as_str()).unwrap_or("");

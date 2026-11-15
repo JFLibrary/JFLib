@@ -161,18 +161,35 @@ fn sibling(name: &str) -> Option<String> {
     (plat::file_exists(&p) == 1).then_some(p)
 }
 
-/// a report file the elevated program writes (made by this user, so it may delete it after)
-fn report_file() -> String {
+/// a report file the elevated program writes (made by this user, so it may delete it after).
+/// It carries the setup token: Linux and macOS put it, owner-only, into a new owner-only folder
+/// (the temporary folder may be shared, and the elevated writer keeps the file's owner and mode)
+fn report_file() -> Option<String> {
     let dir = plat::temp_dir().unwrap_or_else(|| String::from("."));
-    let p = plat::fs::join(&dir, &format!("bc-setup-{:x}.json", plat::random_u64()));
-    let _ = plat::write_file(&p, b"");
-    p
+    let name = format!("bc-setup-{:x}", plat::random_u64());
+    if cfg!(windows) {
+        let p = plat::fs::join(&dir, &format!("{}.json", name));
+        let _ = plat::write_file(&p, b"");
+        return Some(p);
+    }
+    let dir = plat::fs::join(&dir, &name);
+    let p = plat::fs::join(&dir, "report.json");
+    // a folder of that name made by someone else is not used
+    (plat::fs::lstat(&dir).is_none() && plat::fs::mkdir_private(&dir) && plat::fs::write_file_private(&p, b"")).then_some(p)
+}
+
+/// remove the report (and its folder)
+fn drop_report(path: &str) {
+    plat::delete(path);
+    if !cfg!(windows) {
+        plat::delete(plat::fs::parent(path));
+    }
 }
 
 fn read_report(path: &str) -> Option<Value> {
-    let b = plat::read_file(path)?;
-    plat::delete(path);
-    j::parse(&b)
+    let b = plat::read_file(path);
+    drop_report(path);
+    j::parse(&b?)
 }
 
 /// run `program args` with administrator rights in a thread; the outcome lands in the slot
@@ -456,7 +473,11 @@ fn start_server(app: &mut Console) {
         s.message = String::from(t("bc-server wurde neben der Konsole nicht gefunden (Installation unvollständig?)."));
         return;
     };
-    let report = report_file();
+    let Some(report) = report_file() else {
+        s.phase = Phase::Failed;
+        s.message = format!("{} ({})", t("Einrichtung nicht möglich"), plat::temp_dir().unwrap_or_default());
+        return;
+    };
     let mut args = alloc::vec![String::from("--data"), String::from(s.data.trim())];
     if s.network == 1 {
         args.extend([String::from("--listen"), format!("0.0.0.0:{}", port())]);
@@ -467,7 +488,7 @@ fn start_server(app: &mut Console) {
         args.extend([String::from("--listen"), format!("127.0.0.1:{}", port())]);
     }
     if plat::env("BC_SETUP_NO_SERVICE").is_some() {
-        plat::delete(&report);
+        drop_report(&report);
         s.work = Some(start_child(exe, args, String::from(s.data.trim())));
     } else {
         let mut all = alloc::vec![String::from("service"), String::from("install")];
@@ -676,7 +697,11 @@ fn start_agent(app: &mut Console) {
         s.message = String::from(t("bc-agent wurde neben der Konsole nicht gefunden (Installation unvollständig?)."));
         return;
     };
-    let report = report_file();
+    let Some(report) = report_file() else {
+        s.phase = Phase::Failed;
+        s.message = format!("{} ({})", t("Einrichtung nicht möglich"), plat::temp_dir().unwrap_or_default());
+        return;
+    };
     let mut args = alloc::vec![
         String::from("pair"),
         String::from("--server"), String::from(s.a_server.trim()),

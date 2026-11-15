@@ -18,6 +18,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Security
 
 - `cargo jflib web --serve` serves only plain names below the bundle, and only to the Host 127.0.0.1 or localhost. On Windows `GET /C:/...` and `..\` reached any file, and a web page could read the bundle through DNS rebinding.
+- cargo jflib android: --release refuses a manifest that sets android:debuggable, debug APKs are debuggable through aapt2 --debug-mode; a copied clipboard image is shared as a new file each time and earlier copies are deleted, so an app that kept a descriptor of an earlier image cannot read later ones
+- The browser loader passes ?theme= only as a plain theme name and the worker drops arguments containing line breaks, so the page address can no longer add arguments or grant files
 
 ## [0.2.0] - 2026-11-14
 

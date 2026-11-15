@@ -15,7 +15,8 @@
 // DefaultIcon, shell\open\command = "<exe>" "%1", AppUserModelID = the app id),
 // Software\Classes\.<ext>\OpenWithProgids\<ProgID>,
 // for "own" types also the default value and Content Type of Software\Classes\.<ext>; a scheme:
-// Software\Classes\<scheme> ("URL:<display>", URL Protocol, DefaultIcon, shell\open\command).
+// Software\Classes\<scheme> ("URL:<display>", URL Protocol, DefaultIcon, shell\open\command =
+// "<exe>" -- "%1": a quote in the URL cannot add options).
 // A web browser (manifest browser=1): http and https through the ProgID <app>URL,
 // Software\Clients\StartMenuInternet\<app> (Default Programs: Capabilities with the URL and
 // file associations) and the value <app> in Software\RegisteredApplications; the user makes it

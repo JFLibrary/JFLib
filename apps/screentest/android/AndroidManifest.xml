@@ -6,7 +6,7 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <application android:label="Bildschirm-Test" android:icon="@drawable/ic_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
-        android:allowBackup="false" android:debuggable="true" android:extractNativeLibs="false"
+        android:allowBackup="false" android:extractNativeLibs="false"
         android:supportsRtl="true">
         <activity android:name="org.jflib.gallery.GalleryActivity" android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode"

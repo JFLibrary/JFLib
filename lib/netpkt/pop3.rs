@@ -3,7 +3,8 @@
 // responses with their dot-stuffing
 //
 //   Command { verb, args }    Command::parse(line) (the verb in capitals), Command::new(verb,
-//                             args), to_line() ("RETR 1\r\n")
+//                             args), to_line() ("RETR 1\r\n"; CR, LF and NUL of the fields left
+//                             out)
 //   Response { ok, text, body }   Response::ok(text) / err(text), with_body(bytes) (a multi-
 //                             line response: the lines of the bytes follow the status line,
 //                             each with a leading dot doubled, then the line with the dot);
@@ -57,9 +58,15 @@ impl Command {
         let args = if verb == "PASS" { if rest.is_empty() { Vec::new() } else { alloc::vec![String::from(rest)] } } else { rest.split_whitespace().map(String::from).collect() };
         Some(Command { verb, args })
     }
-    /// the line on the wire, CRLF included
+    /// the line on the wire, CRLF included; CR, LF and NUL of verb and arguments are left out
+    /// (they would end the line and start another command)
     pub fn to_line(&self) -> String {
-        if self.args.is_empty() { format!("{}\r\n", self.verb) } else { format!("{} {}\r\n", self.verb, self.args.join(" ")) }
+        let verb = crate::one_line(&self.verb);
+        if self.args.is_empty() {
+            format!("{}\r\n", verb)
+        } else {
+            format!("{} {}\r\n", verb, self.args.iter().map(|a| crate::one_line(a)).collect::<Vec<_>>().join(" "))
+        }
     }
     /// argument k as a number (a message number)
     pub fn num(&self, k: usize) -> Option<u32> {

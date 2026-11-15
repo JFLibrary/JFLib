@@ -40,7 +40,9 @@
 //                                          Nobody asks (headless runs, console programs): refused
 //   Key::answer(id, Answer)                Once / Deny: until the program ends; Always / Never:
 //                                          also stored (Key::set_store, env jfgui_PERM_STORE,
-//                                          STORE in config://; the app cannot write that file)
+//                                          STORE in config://; the app cannot write that file,
+//                                          by no other name either -- 8.3, case, link -- and
+//                                          STORE also not while another store is chosen)
 //   Key::set_answer(Some(a))               every question answered with a, without asking
 //                                          (scripts; env jfgui_PERM_ANSWER=once|always|deny|never)
 //   decisions() -> Vec<Decision>           every ask line and agent action with its answer
@@ -353,15 +355,21 @@ pub fn fs_allowed(path: &str, mode: u32) -> bool {
         return false;
     };
     let segs = split(&fold(&n));
-    if mode & FS_WRITE != 0 && active() && store_protects(&segs) {
+    let store = mode & FS_WRITE != 0 && active();
+    if store && store_protects(&segs) {
         record(kind, path, &scope_name(), true); // the stored answers are the user's
         return false;
     }
     // documents the system hands over one at a time, like Android's content://: with fs.user
-    if user_doc_path(&n) && scopes_here().is_empty() && POLICY.lock().as_ref().is_some_and(|p| p.user) {
-        return true;
+    let ok = (user_doc_path(&n) && scopes_here().is_empty() && POLICY.lock().as_ref().is_some_and(|p| p.user))
+        || decide(kind, path, &Req::Fs(&segs, mode), true) == Verdict::Allow;
+    // another name of a store's file (8.3, case, a link): only a path the rules allow is
+    // looked at (a refused one, e.g. on a stranger's server, is never touched)
+    if ok && store && store_alias(&n) {
+        record(kind, path, &scope_name(), true);
+        return false;
     }
-    decide(kind, path, &Req::Fs(&segs, mode), true) == Verdict::Allow
+    ok
 }
 
 // a normalised path of such a document: Flatpak's documents portal inside the sandbox (it shows
@@ -381,9 +389,15 @@ fn user_doc_path(_: &str) -> bool {
 }
 
 /// whether the app may reach a document the user chose by its URI (Android's content://
-/// names; the system grants each one): with fs.user in the manifest, or without a manifest
+/// names; the system grants each one): with fs.user in the manifest, or without a manifest;
+/// inside on_behalf every plugin scope needs fs.user as well
 pub fn user_doc_allowed(uri: &str) -> bool {
-    if !active() || bypassed() {
+    let scopes = scopes_here();
+    if let Some(s) = scopes.iter().find(|s| s.p.as_ref().is_some_and(|pp| !pp.user)) {
+        record("fs.user", uri, &s.name, true);
+        return false;
+    }
+    if !active() || (scopes.is_empty() && bypassed()) {
         return true;
     }
     if POLICY.lock().as_ref().is_some_and(|p| p.user) {
@@ -1109,8 +1123,9 @@ struct Store {
     loaded: bool,
     /// None: not chosen yet (jfgui_PERM_STORE, else STORE); Some(None): memory only
     path: Option<Option<String>>,
-    /// the OS file of the store, folded segments (refused to the app's writes)
-    os: Option<Vec<String>>,
+    /// the OS files of the stores: STORE and every store chosen in this run (normalised path,
+    /// folded segments; refused to the app's writes)
+    os: Vec<(String, Vec<String>)>,
     stored: Vec<(String, bool)>,
     session: Vec<(String, bool)>,
     /// reasons of rules that are not ask lines (agent actions asked in this run)
@@ -1120,7 +1135,7 @@ struct Store {
 static STORE_S: SpinLock<Store> = SpinLock::new(Store {
     loaded: false,
     path: None,
-    os: None,
+    os: Vec::new(),
     stored: Vec::new(),
     session: Vec::new(),
     reasons: Vec::new(),
@@ -1184,7 +1199,16 @@ fn load() {
         store_path(&s)
     };
     let data = path.as_deref().and_then(store_read).unwrap_or_default();
-    let os = path.as_deref().and_then(store_os).and_then(|o| normalize(&o)).map(|n| split(&fold(&n)));
+    // the default file stays protected while another store (or memory) is chosen: a later
+    // run reads it again
+    let os: Vec<(String, Vec<String>)> = path.iter().map(String::as_str).chain(Some(STORE))
+        .filter_map(store_os)
+        .filter_map(|o| normalize(&o))
+        .map(|n| {
+            let segs = store_fold(&split(&fold(&n)));
+            (n, segs)
+        })
+        .collect();
     let mut stored = Vec::new();
     for line in String::from_utf8_lossy(&data).lines() {
         let line = line.trim();
@@ -1203,7 +1227,11 @@ fn load() {
     if !s.loaded {
         s.loaded = true;
         s.stored = stored;
-        s.os = os;
+    }
+    for o in os {
+        if !s.os.contains(&o) {
+            s.os.push(o);
+        }
     }
 }
 
@@ -1251,10 +1279,91 @@ fn decide_rule(rule: &str, a: Answer, reason: &str) {
     }
 }
 
-// whether segs is the store's OS file (refused to the app's writes)
+// whether segs is a store's OS file (refused to the app's writes)
 fn store_protects(segs: &[String]) -> bool {
     load();
-    STORE_S.lock().os.as_deref() == Some(segs)
+    let segs = store_fold(segs);
+    STORE_S.lock().os.iter().any(|(_, s)| *s == segs)
+}
+
+// Apple's file systems are usually without case (APFS, HFS+): another case of a store's name
+// names the same file
+fn store_fold(segs: &[String]) -> Vec<String> {
+    if cfg!(target_vendor = "apple") {
+        segs.iter().map(|s| s.chars().flat_map(char::to_lowercase).collect()).collect()
+    } else {
+        segs.to_vec()
+    }
+}
+
+// whether the normalised OS path n names a store's file by another name: the same file (an
+// 8.3 name, another case, a link), or, while the store does not exist yet, its name in the
+// same folder (reached by another name)
+fn store_alias(n: &str) -> bool {
+    load();
+    let stores: Vec<String> = STORE_S.lock().os.iter().map(|(s, _)| s.clone()).collect();
+    let id = file_id(n);
+    let leaf = |p: &str| -> (String, Vec<String>) {
+        let (dir, name) = p.rsplit_once('/').unwrap_or(("", p));
+        // the root's folder: "/" and "C:/" ("C:" alone is the drive's current folder)
+        let dir = if dir.is_empty() || dir.ends_with(':') { alloc::format!("{}/", dir) } else { String::from(dir) };
+        (dir, store_fold(&[fold(name)]))
+    };
+    let (dir, name) = leaf(n);
+    stores.iter().any(|s| match file_id(s) {
+        Some(sid) => id == Some(sid),
+        None => {
+            let (sdir, sname) = leaf(s);
+            name == sname && file_id(&sdir).is_some_and(|d| file_id(&dir) == Some(d))
+        }
+    })
+}
+
+// the identity of a file or folder (volume / device, file id; links followed), None when it
+// does not exist; raw, not checked against the rules
+#[cfg(windows)]
+fn file_id(n: &str) -> Option<(u64, u64)> {
+    // BY_HANDLE_FILE_INFORMATION (as in fs.rs)
+    #[repr(C)]
+    struct ByHandleInfo {
+        attrs: u32,
+        created: [u32; 2],
+        accessed: [u32; 2],
+        written: [u32; 2],
+        volume: u32,
+        size_hi: u32,
+        size_lo: u32,
+        links: u32,
+        index_hi: u32,
+        index_lo: u32,
+    }
+    #[link(name = "kernel32", kind = "raw-dylib")]
+    unsafe extern "system" {
+        fn CreateFileW(name: *const u16, access: u32, share: u32, sa: usize, disp: u32, flags: u32, tmpl: isize) -> isize;
+        fn GetFileInformationByHandle(h: isize, info: *mut ByHandleInfo) -> i32;
+        fn CloseHandle(h: isize) -> i32;
+    }
+    const FILE_READ_ATTRIBUTES: u32 = 0x80;
+    const SHARE_ALL: u32 = 7;
+    const OPEN_EXISTING: u32 = 3;
+    const BACKUP_SEMANTICS: u32 = 0x0200_0000; // folders too
+    let w: Vec<u16> = crate::fs::long_path(n).encode_utf16().chain(core::iter::once(0)).collect();
+    // SAFETY: a NUL-terminated wide path; no security attributes.
+    let h = unsafe { CreateFileW(w.as_ptr(), FILE_READ_ATTRIBUTES, SHARE_ALL, 0, OPEN_EXISTING, BACKUP_SEMANTICS, 0) };
+    if h == -1 {
+        return None;
+    }
+    // SAFETY: the record is plain data, zero is a valid start.
+    let mut i: ByHandleInfo = unsafe { core::mem::zeroed() };
+    // SAFETY: a valid handle and output record.
+    let ok = unsafe { GetFileInformationByHandle(h, &mut i) } != 0;
+    // SAFETY: the handle opened above, closed once.
+    unsafe { CloseHandle(h) };
+    ok.then(|| (i.volume as u64, (i.index_hi as u64) << 32 | i.index_lo as u64))
+}
+#[cfg(not(windows))]
+fn file_id(n: &str) -> Option<(u64, u64)> {
+    crate::dev_ino(n)
 }
 
 /// every ask line of the manifest and every answered rule (agent actions, stored answers of

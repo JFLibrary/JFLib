@@ -350,16 +350,22 @@ pub(crate) fn parse_hex(s: &[u8]) -> (u32, &[u8]) {
     (v, &s[i..])
 }
 
-// the command line (argument 0 is the program)
+// the command line (argument 0 is the program); options end at "--" (what follows, a URL a
+// scheme hands over, is no option)
 struct Args(Vec<String>);
 
 impl Args {
+    fn opts(&self) -> &[String] {
+        let a = self.0.get(1..).unwrap_or(&[]);
+        &a[..a.iter().position(|x| x == "--").unwrap_or(a.len())]
+    }
     fn value(&self, name: &str) -> Option<&str> {
-        let i = self.0.iter().skip(1).position(|a| a == name)? + 1;
-        self.0.get(i + 1).map(|s| s.as_str())
+        let a = self.opts();
+        let i = a.iter().position(|x| x == name)?;
+        a.get(i + 1).map(|s| s.as_str())
     }
     fn flag(&self, name: &str) -> bool {
-        self.0.iter().skip(1).any(|a| a == name)
+        self.opts().iter().any(|a| a == name)
     }
     // arg_int: parse_int of the value, the default when the option is missing
     fn int(&self, name: &str, def: i32) -> i32 {

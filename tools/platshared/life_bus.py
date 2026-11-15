@@ -4,10 +4,12 @@ system bus and a fake session bus.  Run inside WSL / Linux from the repository r
 
   python3 tools/platshared/life_bus.py [--rs build]
 
-The system bus plays logind: after the AddMatch it sends PrepareForSleep(true) and
-PrepareForSleep(false).  The session bus plays the settings portal: SettingChanged for
-color-scheme (u), an unrelated key (s), text-scaling-factor (d) and GNOME's button-layout (s).
-plattest --test life-bus must see E_POWER 1 / 0 and E_SETTINGS SET_THEME / SET_FONTS /
+The system bus plays logind (unique name :1.9): after the watcher's GetNameOwner it sends a
+PrepareForSleep(true) from another client (:1.66, must not count), then logind's
+PrepareForSleep(true) and PrepareForSleep(false).  The session bus plays the settings portal:
+SettingChanged for color-scheme (u), an unrelated key (s), text-scaling-factor (d) and GNOME's
+button-layout (s).  plattest --test life-bus must see E_POWER 1 / 0 (the other client's signal
+gives nothing) and E_SETTINGS SET_THEME / SET_FONTS /
 SET_OTHER.  Its ReadAll has no answer, so plattest reads the settings files of a scratch
 XDG_CONFIG_HOME; when it says so, this script rewrites kdeglobals (as KDE does: a new file
 renamed over the old one) and plattest must see E_SETTINGS SET_THEME | SET_OTHER (inotify, once
@@ -21,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from portal_bus import R, W, listen_unix, message, parse  # noqa: E402
 
 fails = 0
+LOGIND_UNIQUE = ":1.9"  # the fake system bus's logind
 
 
 def check(name, ok, info=""):
@@ -30,9 +33,10 @@ def check(name, ok, info=""):
     return ok
 
 
-def serve(path, rec, signals):
-    """a bus that answers Hello / AddMatch and sends `signals` after the first AddMatch; every
-    connection gets a thread (plattest reads the settings, then its watcher connects)"""
+def serve(path, rec, signals, trigger):
+    """a bus that answers Hello / AddMatch / GetNameOwner and sends `signals` (sender, path,
+    iface, member, sig, values) after the first call of `trigger`; every connection gets a
+    thread (plattest reads the settings, then its watcher connects)"""
     srv = listen_unix(path, 4)
     srv.settimeout(20)
     first = True
@@ -44,10 +48,10 @@ def serve(path, rec, signals):
                 rec["error"] = "no connection"
             return
         first = False
-        threading.Thread(target=conn, args=(c, rec, signals), daemon=True).start()
+        threading.Thread(target=conn, args=(c, rec, signals, trigger), daemon=True).start()
 
 
-def conn(c, rec, signals):
+def conn(c, rec, signals, trigger):
     c.settimeout(15)
     authed = False
     buf = b""
@@ -84,14 +88,21 @@ def conn(c, rec, signals):
         body = R(m["body"]).all(sig) if sig else []
         if m["type"] != 1:
             continue
-        send(2, [(5, "u", m["serial"]), (6, "s", ":1.42"), (7, "s", "org.freedesktop.DBus")],
-             "s" if member == "Hello" else "", W().all("s", [":1.42"]) if member == "Hello" else b"")
+        if member == "Hello":
+            rsig, rbody = "s", W().all("s", [":1.42"])
+        elif member == "GetNameOwner":
+            # logind runs as :1.9; nobody else owns a name here
+            rec.setdefault("owners", []).append(body[0])
+            rsig, rbody = ("s", W().all("s", [LOGIND_UNIQUE])) if body[0] == "org.freedesktop.login1" else ("", b"")
+        else:
+            rsig, rbody = "", b""
+        send(2, [(5, "u", m["serial"]), (6, "s", ":1.42"), (7, "s", "org.freedesktop.DBus")], rsig, rbody)
         if member == "AddMatch":
             rec.setdefault("matches", []).append(body[0])
-            if not rec.get("sent"):
-                rec["sent"] = True
-                for path, iface, mem, s, vals in signals:
-                    send(4, [(1, "o", path), (2, "s", iface), (3, "s", mem), (7, "s", ":1.9")], s, W().all(s, vals))
+        if member == trigger and not rec.get("sent"):
+            rec["sent"] = True
+            for sender, path, iface, mem, s, vals in signals:
+                send(4, [(1, "o", path), (2, "s", iface), (3, "s", mem), (7, "s", sender)], s, W().all(s, vals))
 
 
 def main():
@@ -101,18 +112,23 @@ def main():
     exe = Path(a.rs) / "linux" / "plattest"
     sysrec, sesrec = {}, {}
     login = "/org/freedesktop/login1"
-    sleep = [(login, "org.freedesktop.login1.Manager", "PrepareForSleep", "b", [True]),
-             (login, "org.freedesktop.login1.Manager", "PrepareForSleep", "b", [False])]
+    mgr = "org.freedesktop.login1.Manager"
+    # first a PrepareForSleep from another client of the system bus: it must not count (E_POWER
+    # stays 1, 0), then logind's own
+    sleep = [(":1.66", login, mgr, "PrepareForSleep", "b", [True]),
+             (LOGIND_UNIQUE, login, mgr, "PrepareForSleep", "b", [True]),
+             (LOGIND_UNIQUE, login, mgr, "PrepareForSleep", "b", [False])]
     desk = "/org/freedesktop/portal/desktop"
     sett = "org.freedesktop.portal.Settings"
-    settings = [(desk, sett, "SettingChanged", "ssv", ["org.freedesktop.appearance", "color-scheme", ("u", 1)]),
-                (desk, sett, "SettingChanged", "ssv", ["org.example.app", "whatever", ("s", "x")]),
-                (desk, sett, "SettingChanged", "ssv", ["org.gnome.desktop.interface", "text-scaling-factor", ("d", 1.25)]),
-                (desk, sett, "SettingChanged", "ssv", ["org.gnome.desktop.wm.preferences", "button-layout", ("s", "close:")])]
+    settings = [(":1.9", desk, sett, "SettingChanged", "ssv", ["org.freedesktop.appearance", "color-scheme", ("u", 1)]),
+                (":1.9", desk, sett, "SettingChanged", "ssv", ["org.example.app", "whatever", ("s", "x")]),
+                (":1.9", desk, sett, "SettingChanged", "ssv", ["org.gnome.desktop.interface", "text-scaling-factor", ("d", 1.25)]),
+                (":1.9", desk, sett, "SettingChanged", "ssv", ["org.gnome.desktop.wm.preferences", "button-layout", ("s", "close:")])]
     with tempfile.TemporaryDirectory() as d:
         sp, ep = os.path.join(d, "system"), os.path.join(d, "session")
-        ts = [threading.Thread(target=serve, args=(listen_unix(sp, 1), sysrec, sleep), daemon=True),
-              threading.Thread(target=serve, args=(listen_unix(ep, 1), sesrec, settings), daemon=True)]
+        # the system bus sends after the watcher asked who owns logind; the session bus after its AddMatch
+        ts = [threading.Thread(target=serve, args=(listen_unix(sp, 1), sysrec, sleep, "GetNameOwner"), daemon=True),
+              threading.Thread(target=serve, args=(listen_unix(ep, 1), sesrec, settings, "AddMatch"), daemon=True)]
         for t in ts:
             t.start()
         cfg = os.path.join(d, "config")
@@ -149,6 +165,10 @@ def main():
     check("SASL on both buses", sysrec.get("auth") and sesrec.get("auth"), (sysrec, sesrec))
     check("a match for logind's PrepareForSleep",
           any("org.freedesktop.login1.Manager" in m and "PrepareForSleep" in m for m in sysrec.get("matches", [])), sysrec.get("matches"))
+    check("logind's owner asked (GetNameOwner) and followed (NameOwnerChanged)",
+          "org.freedesktop.login1" in sysrec.get("owners", [])
+          and any("NameOwnerChanged" in m and "org.freedesktop.login1" in m for m in sysrec.get("matches", [])),
+          (sysrec.get("owners"), sysrec.get("matches")))
     check("a match for the portal's SettingChanged",
           any("org.freedesktop.portal.Settings" in m and "SettingChanged" in m for m in sesrec.get("matches", [])), sesrec.get("matches"))
     print("life_bus:", "all passed" if fails == 0 else f"{fails} FAILED")

@@ -31,7 +31,9 @@ embedded GPG signature, which the runtime reads back for its options. The runtim
 4.0 images compressed with zstd or lz4 and checks every position and size in the image, so a
 damaged file gives an error, not a crash. It understands the usual options:
 
-- `--appimage-extract [PATTERN]`: unpack into `./squashfs-root`
+- `--appimage-extract [PATTERN]`: unpack into `./squashfs-root` (a folder of the user's own, in a
+  current folder no other user can rename entries in; the image's modes lose setuid, setgid and
+  sticky, and what the umask removes)
 - `--appimage-extract-and-run`: the same as a plain start, since this runtime always unpacks
 - `--appimage-offset`, `--appimage-updateinformation`, `--appimage-signature`
 - `--appimage-portable-home`, `--appimage-portable-config`: a home or config folder next to the

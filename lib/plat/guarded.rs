@@ -271,6 +271,22 @@ impl Drop for Whole {
     }
 }
 
+// (fs.rs: Dir, set_file_times / set_file_mode) a File of an OS file opened there; the OS file
+// behind a File
+#[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+impl File {
+    pub(crate) fn from_os(f: OsFile) -> File {
+        File(Inner::Os(f))
+    }
+
+    pub(crate) fn os(&self) -> Option<&OsFile> {
+        match &self.0 {
+            Inner::Os(f) => Some(f),
+            Inner::Vfs(_) => None,
+        }
+    }
+}
+
 impl File {
     /// FO_READ (existing, read only), FO_WRITE (create / truncate), FO_RW (open or create);
     /// on every mount (vfs.rs)

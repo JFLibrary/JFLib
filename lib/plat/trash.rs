@@ -14,7 +14,10 @@
 // Linux: the freedesktop trash specification 1.0.  An item on the file system of
 // $XDG_DATA_HOME/Trash goes there (~/.local/share/Trash), any other to the top folder of
 // its own mount: $topdir/.Trash/$uid when the administrator made a sticky $topdir/.Trash
-// (no link), else $topdir/.Trash-$uid (both owned by the user, no links).  First
+// (no link, owned by root or the user), else $topdir/.Trash-$uid (both owned by the user, no
+// links).  The trash's folders are opened one below the other without following links, checked
+// on their descriptors, and info/ and files/ are used through those descriptors: a folder
+// swapped by another user after the check is never written to.  First
 // info/NAME.trashinfo is created exclusively ("[Trash Info]", Path = the URL-escaped
 // absolute path -- below a top folder relative to it --, DeletionDate =
 // YYYY-MM-DDThh:mm:ss in UTC: plat has no local time on Linux), then the item is renamed to
@@ -347,7 +350,7 @@ mod lnx {
     use alloc::string::String;
     use alloc::vec::Vec;
 
-    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_EXCL, O_WRONLY, SYS_CLOSE, SYS_GETUID, SYS_LINKAT, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_RENAMEAT2, SYS_UNLINKAT, SYS_WRITE, Stat};
+    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_DIRECTORY, O_EXCL, O_NOFOLLOW, O_RDONLY, O_WRONLY, SYS_CLOSE, SYS_FSTAT, SYS_GETUID, SYS_LINKAT, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_RENAMEAT, SYS_RENAMEAT2, SYS_UNLINKAT, SYS_WRITE, Stat};
 
     const AT_SYMLINK_NOFOLLOW: usize = 0x100;
     const AT_REMOVEDIR: usize = 0x200;
@@ -389,18 +392,70 @@ mod lnx {
         }
     }
 
-    // a folder with mode 0700 (the umask applies), or an existing one
-    fn mkdir700(path: &str) -> bool {
-        let p = z(path);
-        // SAFETY: a NUL-terminated path.
-        let r = unsafe { syscall3(SYS_MKDIRAT, AT_FDCWD, p.as_ptr() as usize, 0o700) };
-        r == 0 || r == -EEXIST
+    /// an open folder, closed when dropped
+    struct Fd(usize);
+    impl Drop for Fd {
+        fn drop(&mut self) {
+            // SAFETY: an owned descriptor.
+            unsafe { syscall3(SYS_CLOSE, self.0, 0, 0) };
+        }
     }
 
-    fn unlink(path: &str) -> isize {
+    /// the folders of a trash, held open: info files and items go through these descriptors
+    struct Trash {
+        files: Fd,
+        info: Fd,
+    }
+
+    /// name below dir (a descriptor or AT_FDCWD) as a folder with mode 0700 (the umask applies)
+    /// or an existing one, opened (follow: links followed) -> its descriptor when it is a folder
+    /// of owner (None: anyone's).  The checks are on the descriptor, so what was checked is what
+    /// is used later, also when the name is swapped meanwhile
+    fn sub(dir: usize, name: &str, follow: bool, owner: Option<u32>) -> Option<Fd> {
+        let p = z(name);
+        // SAFETY: a NUL-terminated path.
+        let r = unsafe { syscall3(SYS_MKDIRAT, dir, p.as_ptr() as usize, 0o700) };
+        if r != 0 && r != -EEXIST {
+            return None;
+        }
+        let fd = open_dir(dir, name, follow)?;
+        let (_, mode, uid) = fmeta(&fd)?;
+        (mode & S_IFMT == S_IFDIR && owner.is_none_or(|o| uid == o)).then_some(fd)
+    }
+
+    /// name below dir opened as a folder (follow: links followed, else a link is refused)
+    fn open_dir(dir: usize, name: &str, follow: bool) -> Option<Fd> {
+        let p = z(name);
+        let flags = O_RDONLY | O_DIRECTORY | O_CLOEXEC | if follow { 0 } else { O_NOFOLLOW };
+        loop {
+            // SAFETY: a NUL-terminated path.
+            let r = unsafe { syscall6(SYS_OPENAT, dir, p.as_ptr() as usize, flags, 0, 0, 0) };
+            if r == -EINTR {
+                continue;
+            }
+            return (r >= 0).then_some(Fd(r as usize));
+        }
+    }
+
+    /// (st_dev, st_mode, st_uid) of an open descriptor
+    fn fmeta(fd: &Fd) -> Option<(u64, u32, u32)> {
+        let mut st = Stat::default();
+        // SAFETY: an owned descriptor; st is a struct stat.
+        let r = unsafe { syscall3(SYS_FSTAT, fd.0, &mut st as *mut Stat as usize, 0) };
+        (r == 0).then_some((st.st_dev, st.st_mode, st.st_uid))
+    }
+
+    /// files/ and info/ below an open trash (follow: links of the home trash are fine)
+    fn ready(trash: &Fd, follow: bool, owner: Option<u32>) -> Option<Trash> {
+        let files = sub(trash.0, "files", follow, owner)?;
+        let info = sub(trash.0, "info", follow, owner)?;
+        Some(Trash { files, info })
+    }
+
+    fn unlink_at(dir: usize, path: &str, flags: usize) -> isize {
         let p = z(path);
         // SAFETY: a NUL-terminated path.
-        unsafe { syscall3(SYS_UNLINKAT, AT_FDCWD, p.as_ptr() as usize, 0) }
+        unsafe { syscall3(SYS_UNLINKAT, dir, p.as_ptr() as usize, flags) }
     }
 
     /// path into the freedesktop trash -> whether it went there
@@ -419,7 +474,7 @@ mod lnx {
     }
 
     // the trash for an item on device dev, and the Path of its info file
-    fn trash_dir(abs: &str, dev: u64, uid: u32) -> Option<(String, String)> {
+    fn trash_dir(abs: &str, dev: u64, uid: u32) -> Option<(Trash, String)> {
         let data = crate::data_dir()?;
         // in the form abs has ("/./", "//" and ".." resolved), so the test below sees it
         let home = crate::policy::normalize(&format!("{data}/Trash"))?;
@@ -439,8 +494,8 @@ mod lnx {
         };
         if home_dev == Some(dev) {
             crate::mkdir_raw(&data);
-            let ok = mkdir700(&home) && is_dir(meta(&home, true)) && ready(&home, true);
-            return ok.then(|| (home, String::from(abs)));
+            let t = sub(AT_FDCWD, &home, true, None)?;
+            return Some((ready(&t, true, None)?, String::from(abs)));
         }
         // the top folder of the item's own mount
         let mut top = parent(abs);
@@ -457,18 +512,16 @@ mod lnx {
             return None;
         }
         let key = String::from(&abs[base.len() + 1..]);
-        let mut tries: Vec<String> = Vec::new();
-        if meta(&admin, false).is_some_and(|(_, m, _)| m & S_IFMT == S_IFDIR && m & S_ISVTX != 0) {
-            tries.push(format!("{admin}/{uid}"));
+        let topfd = open_dir(AT_FDCWD, top, true).filter(|f| fmeta(f).is_some_and(|m| m.0 == dev))?;
+        // the administrator's sticky .Trash: no link, and only root or the user may own it (the
+        // owner of a sticky folder may rename the entries of everybody in it)
+        let shared = open_dir(topfd.0, ".Trash", false)
+            .filter(|f| fmeta(f).is_some_and(|(_, m, u)| m & S_IFMT == S_IFDIR && m & S_ISVTX != 0 && (u == 0 || u == uid)));
+        let own = |dir: &Fd, name: &str| sub(dir.0, name, false, Some(uid)).and_then(|t| ready(&t, false, Some(uid)));
+        if let Some(t) = shared.and_then(|a| own(&a, &format!("{uid}"))) {
+            return Some((t, key));
         }
-        tries.push(format!("{base}/.Trash-{uid}"));
-        for t in tries {
-            let own = |p: &str| meta(p, false).is_some_and(|(_, m, u)| m & S_IFMT == S_IFDIR && u == uid);
-            if mkdir700(&t) && own(&t) && ready(&t, false) {
-                return Some((t, key));
-            }
-        }
-        None
+        Some((own(&topfd, &format!(".Trash-{uid}"))?, key))
     }
 
     // whether abs is dir or lies below it (both normalised; a name, not the file's identity:
@@ -477,16 +530,8 @@ mod lnx {
         abs == dir || abs.strip_prefix(dir).is_some_and(|r| r.starts_with('/'))
     }
 
-    // files/ and info/ of a trash exist (follow: links of the home trash are fine)
-    fn ready(trash: &str, follow: bool) -> bool {
-        ["files", "info"].iter().all(|s| {
-            let p = format!("{trash}/{s}");
-            mkdir700(&p) && is_dir(meta(&p, follow))
-        })
-    }
-
     /// the info file (exclusively), then the item under the same free name
-    fn put(abs: &str, trash: &str, key: &str) -> bool {
+    fn put(abs: &str, trash: &Trash, key: &str) -> bool {
         let name = &abs[abs.rfind('/').map_or(0, |k| k + 1)..];
         if name.is_empty() {
             return false;
@@ -508,16 +553,16 @@ mod lnx {
         );
         for n in 1..=NAME_TRIES {
             let free = if n == 1 { String::from(name) } else { format!("{stem}.{n}{ext}") };
-            let info = format!("{trash}/info/{free}.trashinfo");
-            match create_new(&info, text.as_bytes()) {
+            let info = format!("{free}.trashinfo");
+            match create_new(trash.info.0, &info, text.as_bytes()) {
                 Ok(()) => {}
                 Err(e) if e == -EEXIST => continue,
                 Err(_) => return false,
             }
-            match rename_new(abs, &format!("{trash}/files/{free}")) {
+            match rename_new(abs, trash.files.0, &free) {
                 0 => return true,
                 r => {
-                    unlink(&info);
+                    unlink_at(trash.info.0, &info, 0);
                     if r != -EEXIST {
                         return false;
                     }
@@ -527,11 +572,11 @@ mod lnx {
         false
     }
 
-    // a new file with data (O_EXCL, 0600) -> Err(-errno); a failed write removes it
-    fn create_new(path: &str, data: &[u8]) -> Result<(), isize> {
-        let p = z(path);
+    // a new file with data in dir (O_EXCL, 0600) -> Err(-errno); a failed write removes it
+    fn create_new(dir: usize, name: &str, data: &[u8]) -> Result<(), isize> {
+        let p = z(name);
         // SAFETY: a NUL-terminated path; O_EXCL never opens an existing entry.
-        let fd = unsafe { syscall6(SYS_OPENAT, AT_FDCWD, p.as_ptr() as usize, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600, 0, 0) };
+        let fd = unsafe { syscall6(SYS_OPENAT, dir, p.as_ptr() as usize, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600, 0, 0) };
         if fd < 0 {
             return Err(fd);
         }
@@ -550,18 +595,19 @@ mod lnx {
         // SAFETY: our descriptor.
         unsafe { syscall3(SYS_CLOSE, fd as usize, 0, 0) };
         if off < data.len() {
-            unlink(path);
+            unlink_at(dir, name, 0);
             return Err(-EINVAL);
         }
         Ok(())
     }
 
-    // rename without replacing an existing entry -> 0 or -errno (-EEXIST: the name is taken)
-    fn rename_new(old: &str, new: &str) -> isize {
-        let (o, n) = (z(old), z(new));
+    // rename old to name below dir without replacing an existing entry -> 0 or -errno (-EEXIST:
+    // the name is taken)
+    fn rename_new(old: &str, dir: usize, name: &str) -> isize {
+        let (o, n) = (z(old), z(name));
         if crate::env("jfgui_TEST_TRASH_FALLBACK").is_none() {
             // SAFETY: NUL-terminated paths.
-            let r = unsafe { syscall6(SYS_RENAMEAT2, AT_FDCWD, o.as_ptr() as usize, AT_FDCWD, n.as_ptr() as usize, RENAME_NOREPLACE, 0) };
+            let r = unsafe { syscall6(SYS_RENAMEAT2, AT_FDCWD, o.as_ptr() as usize, dir, n.as_ptr() as usize, RENAME_NOREPLACE, 0) };
             if r != -EINVAL && r != -ENOSYS {
                 return r;
             }
@@ -572,28 +618,31 @@ mod lnx {
             // an empty folder of ours takes the name; the rename replaces only that (onto a folder
             // with entries or onto a file it fails, and our folder goes only while it is empty)
             // SAFETY: a NUL-terminated path.
-            let r = unsafe { syscall3(SYS_MKDIRAT, AT_FDCWD, n.as_ptr() as usize, 0o700) };
+            let r = unsafe { syscall3(SYS_MKDIRAT, dir, n.as_ptr() as usize, 0o700) };
             if r != 0 {
                 return r;
             }
             // SAFETY: NUL-terminated paths.
-            let r = unsafe { rt::os::rename(o.as_ptr() as usize, n.as_ptr() as usize) };
+            let mut r = unsafe { syscall6(SYS_RENAMEAT2, AT_FDCWD, o.as_ptr() as usize, dir, n.as_ptr() as usize, 0, 0) };
+            if r == -ENOSYS {
+                // SAFETY: NUL-terminated paths.
+                r = unsafe { syscall6(SYS_RENAMEAT, AT_FDCWD, o.as_ptr() as usize, dir, n.as_ptr() as usize, 0, 0) };
+            }
             if r != 0 {
-                // SAFETY: a NUL-terminated path.
-                unsafe { syscall3(SYS_UNLINKAT, AT_FDCWD, n.as_ptr() as usize, AT_REMOVEDIR) };
+                unlink_at(dir, name, AT_REMOVEDIR);
             }
             return r;
         }
         // anything else (a link itself, not its target): a hard link fails on a taken name, then
         // the old name goes
         // SAFETY: NUL-terminated paths.
-        let r = unsafe { syscall6(SYS_LINKAT, AT_FDCWD, o.as_ptr() as usize, AT_FDCWD, n.as_ptr() as usize, 0, 0) };
+        let r = unsafe { syscall6(SYS_LINKAT, AT_FDCWD, o.as_ptr() as usize, dir, n.as_ptr() as usize, 0, 0) };
         if r != 0 {
             return r;
         }
-        let r = unlink(old);
+        let r = unlink_at(AT_FDCWD, old, 0);
         if r != 0 {
-            unlink(new);
+            unlink_at(dir, name, 0);
         }
         r
     }

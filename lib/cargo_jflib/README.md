@@ -33,7 +33,9 @@ through `ANDROID_SDK_ROOT`, `ANDROID_HOME` or where Android Studio puts it, the 
 below the SDK or `ANDROID_NDK_HOME`. The manifest comes from `PACKAGE` (`app_id`, `display`,
 `version`) and `PERMISSIONS` (location), unless the app has its own `android/AndroidManifest.xml`;
 `android/res/` is compiled in when it is there. A release key: `jfgui_ANDROID_KEYSTORE`,
-`jfgui_ANDROID_KEYSTORE_PASS`, `jfgui_ANDROID_KEY_ALIAS` and `jfgui_ANDROID_KEY_PASS`.
+`jfgui_ANDROID_KEYSTORE_PASS`, `jfgui_ANDROID_KEY_ALIAS` and `jfgui_ANDROID_KEY_PASS`. The debug
+APK is debuggable (aapt2 `--debug-mode`), a `--release` APK never: a manifest of the app that sets
+`android:debuggable` stops it.
 
 `package` builds the app with `--release` once per style (`JFLIB_STYLE`) for Windows and for
 Linux, both from any machine (on a Mac also for macOS, with `--formats dmg`): the Linux program

@@ -275,6 +275,128 @@ third-party code, data, and fonts in JFLib with their licenses.
 
 ### Other targets and packages
 
+```powershell
+rustup target add x86_64-pc-windows-msvc
+python build_rs.py app gallery --target win
+.\build\win\gallery.exe
+```
+
+### Linux quick start
+
+```sh
+rustup target add x86_64-unknown-linux-gnu
+python3 build_rs.py app gallery --target linux
+./build/linux/gallery
+```
+
+Displaying the Linux app requires an active Wayland or X11 session; building it does not
+require a display. Windows can also build Linux output when the Linux Rust target and
+`ld.lld` are installed. To run that output, the build script uses WSL, with `Ubuntu-24.04`
+as the default distribution. Set `jfgui_WSL_DISTRO` to select a different distribution.
+
+### Start your own app
+
+```sh
+python build_rs.py new hello --title "Hello"     # apps/hello: a window app that builds and passes its test
+python build_rs.py test hello                    # build it, run apps/hello/tests/*.uis (Windows and Linux)
+python build_rs.py run hello --target win
+```
+
+`--kind console`, `--kind tool` (a window plus a command line program on a shared crate) and
+`--kind service` (a background service) start other kinds of programs; `--style kde` picks the
+style. `python build_rs.py new --lib NAME --deps rt,plat` adds a library crate under `lib/`.
+Every app gets its sources, `PERMISSIONS`, `PACKAGE` (its own `version=0.1.0`), `TARGETS`, a
+smoke test and a README; the [developer guide](docs/GUIDE.md) (section 2) explains them.
+
+### More apps and build options
+
+```sh
+# Build individual apps
+python build_rs.py app Kritzel --target win
+python build_rs.py app Kritzel --target win
+python build_rs.py app jfWord --target win
+
+# Build Windows and Linux together; both Rust targets must be installed
+python build_rs.py app jfWord --target both
+
+# Build and launch; everything after -- is passed to the app
+python build_rs.py run gallery --target win -- --theme dark
+
+# Optimized build in build/release/win/
+python build_rs.py app Kritzel --target win --release
+
+# Build all apps for a target, or just the library components
+python build_rs.py all --target win
+python build_rs.py lib --target win
+```
+
+| Option | Effect |
+| --- | --- |
+| `--target win` / `linux` / `web` / `android` | Build one target; the app must support it |
+| `--target both` | Windows and Linux; the default for `app`, `lib`, and `all` |
+| `--target all` | Windows, Linux, and Web where supported; Android is built separately |
+| `--style kde` | Select a style; otherwise, use `apps/NAME/STYLE`, falling back to `winui` |
+| `--style winui,classic,macos,kde,jfoffice` | Build several style variants in one invocation |
+| `--release` | Optimized build with LTO; output defaults to `build/release/` |
+| `--profile size` | Release profile tuned for smaller output; writes to `build/size/` |
+| `--profile o2` | Optimized build without LTO; writes to `build/o2/` |
+| `--out build/my-build` | Use a custom output directory, including for release builds |
+| `-j 8` | Limit the number of concurrent compiler processes |
+
+Development builds produce `build/win/NAME.exe` or `build/linux/NAME`.
+When building multiple styles, the path also includes the style, for example
+`build/win/classic/gallery.exe`. Selecting a single explicit style does not add this
+subdirectory. Builds are incremental, and warnings are treated as build errors.
+An app's loadable modules, such as codectest's `jxlenc.dll` or `jxlenc.so`, are built automatically.
+
+### Browser builds
+
+```sh
+rustup target add wasm32-unknown-unknown
+rustup component add rust-src
+python build_rs.py app gallery --target web
+python tools/serve_web.py build/web/gallery
+```
+
+Then open [http://127.0.0.1:8766/](http://127.0.0.1:8766/). LLVM's `wasm-ld` is also
+required. The default build includes scalar, SIMD128, and worker variants; the browser
+host selects a variant based on available capabilities. The local server supplies the
+isolation headers required for shared memory.
+
+Use `--web-mode scalar` to build only the scalar variant, which does not require
+`rust-src`. Other apps follow the same pattern, for example
+`python build_rs.py app jfWord --target web`. See the
+[web and agent infrastructure guide](docs/AGENT_WEB.md) and [WASM compute documentation](docs/WASM_COMPUTE.md).
+
+### Android APKs
+
+Additional requirements are **JDK 17+**, **Android SDK Platform 36**, **Build-Tools 35+**,
+and **NDK r29**. `ANDROID_SDK_ROOT` / `ANDROID_HOME` and `ANDROID_NDK_HOME` can override
+the automatically detected paths.
+
+```sh
+rustup target add aarch64-linux-android
+python build_rs.py app androidGallery --target android
+```
+
+Output: `build/android/androidGallery-arm64-v8a-debug.apk`.
+For an x86-64 emulator:
+
+```sh
+rustup target add x86_64-linux-android
+python build_rs.py app androidGallery --target android --android-abi x86_64
+```
+
+Android builds use Cargo, the SDK, and the NDK, without Gradle. Debug builds are
+signed with a local debug key. `--release` signs with the release key named by
+`jfgui_ANDROID_KEYSTORE`, `jfgui_ANDROID_KEYSTORE_PASS`, and `jfgui_ANDROID_KEY_ALIAS`
+(`jfgui_ANDROID_KEY_PASS` if the key has its own password) and writes
+`<app>-<abi>-release.apk`; without them the build stops and names what is missing
+(`jfgui_ANDROID_DEBUG_SIGN=1` keeps the debug key for test builds; docs/PACKAGING.md,
+"Signing"). Only builds under the debug key are debuggable (the self-tests' `jfgui_*`
+extras); a manifest that sets `android:debuggable` stops a release build. Other apps
+need an Android entry in `TARGETS` and a suitable manifest and resources.
+
 An app of your own builds for the browser (`cargo jflib web`), Android (`cargo jflib android`) and iOS
 (`cargo build --target aarch64-apple-ios` on a Mac), and `cargo jflib package` makes its installers and
 packages ([Your own app with Cargo](#your-own-app-with-cargo), the [README of cargo-jflib](lib/cargo_jflib/README.md),

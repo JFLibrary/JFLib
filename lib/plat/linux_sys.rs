@@ -400,6 +400,16 @@ pub(crate) fn file_exists_checked_raw(path: &str) -> Option<u32> {
 static TEMP_SEQ: AtomicU32 = AtomicU32::new(0);
 
 impl OsFile {
+    /// (fs.rs: Dir) an OS file of a descriptor opened there, which it now owns
+    pub(crate) fn from_raw(raw: i32) -> OsFile {
+        OsFile(raw)
+    }
+
+    /// (fs.rs: set_file_times / set_file_mode) its descriptor
+    pub(crate) fn raw(&self) -> i32 {
+        self.0
+    }
+
     /// Create a private named file exclusively; never follow or overwrite an existing path.
     pub(crate) fn create_new_raw(path: &str) -> Option<OsFile> {
         let p = path_z(path);

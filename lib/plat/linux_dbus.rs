@@ -14,6 +14,7 @@
 //   Conn::system() -> Option<Conn>      the same on the system bus (logind; linux_life.rs)
 //   Conn::send(&Msg) -> serial          Conn::read(timeout_ms) -> Option<Msg> (None: nothing yet
 //                                       or the connection broke: Conn::broken)
+//   Conn::name_owner(name) -> Option<String>   the unique name owning a well-known name (set-up)
 //   Msg::call / Msg::reply / Msg::error / Msg::signal   the four message kinds
 //   Value::{Y, B, I, U, X, D, S, O, G, V, A, R, E}      byte, bool, int32, uint32, int64 (sent
 //                                       only: a received x / t reads as U), double, string,
@@ -710,6 +711,14 @@ impl Conn {
             }
         }
         None
+    }
+
+    /// the unique name that owns the well-known name now (None: nobody, or no answer; as
+    /// wait_reply only during set-up).  Signals of a service count only from that name: any
+    /// client may send a signal with the service's interface and path
+    pub(crate) fn name_owner(&mut self, name: &str) -> Option<String> {
+        let s = self.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "GetNameOwner", alloc::vec![Value::str(name)]))?;
+        self.wait_reply(s, 3000)?.body.first().and_then(|v| v.as_str()).map(String::from)
     }
 }
 

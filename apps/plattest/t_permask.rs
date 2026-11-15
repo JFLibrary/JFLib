@@ -5,7 +5,8 @@
 //      a plain rule wins over an ask line, fixed answers (Key::set_answer), the asking thread
 //      (Pending, Key::answer, the decision for the line), another thread waiting for the answer
 //      and refused after the timeout, Key::ask_here(false) withdrawing a question, the stored
-//      answers (a file: written, protected from the app, reloaded, forgotten), decisions(),
+//      answers (a file: written, protected from the app -- also through a hard link and after
+//      another store is chosen --, reloaded, forgotten), decisions(),
 //      agent rules and questions, the network's name check, sound (the quiet audio_granted
 //      of ui's dialog sounds against audio_allowed, which asks)
 // A policy stays installed until the process ends: this test is not part of "all".
@@ -224,6 +225,21 @@ fn installed(t: &mut T) {
     t.check(text.contains("always print\n") && text.contains("never url mailto\n"), "permask: written to the file");
     t.check(!text.contains(&rule_ask), "permask: once / deny are not stored");
     t.check(!plat::write_file(&store, b"always fs.read /\n"), "permask: the app cannot write the file");
+    // ... nor by another name of the same file (8.3 name, case, link): a hard link where the
+    // app may write
+    #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+    {
+        let alias = p("plain/alias.txt");
+        if key.trusted(|| plat::fs::hard_link(&store, &alias)) {
+            t.check(!plat::write_file(&alias, b"always fs.read /\n"), "permask: ... nor through a hard link");
+            t.check(plat::File::open(&alias, plat::FO_RW).is_none(), "permask: ... nor open it for writing");
+            key.trusted(|| plat::delete(&alias));
+        } else {
+            t.check(false, "permask: hard link to the store");
+        }
+    }
+    #[cfg(target_vendor = "apple")]
+    t.check(!plat::write_file(&p("plain/Answers.TXT"), b"always fs.read /\n"), "permask: ... nor by another case (Apple)");
     policy::reload();
     t.check(answer_of("print") == Some(Answer::Always) && answer_of("url mailto") == Some(Answer::Never), "permask: reloaded");
     policy::forget("print");
@@ -232,6 +248,7 @@ fn installed(t: &mut T) {
     policy::forget_all();
     t.check(policy::decisions().iter().all(|d| d.answer.is_none()), "permask: forget_all");
     key.set_store(None);
+    t.check(!plat::write_file(&store, b"always fs.read /\n"), "permask: a store chosen before stays protected (memory now)");
     key.trusted(|| rm_tree(&base));
 }
 

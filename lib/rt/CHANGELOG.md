@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Security
+
+- New plat::fs::Dir works below an open folder without ever following a link (Linux openat2 with a step-by-step O_NOFOLLOW fallback, macOS openat walk, Windows folders held open without share-delete), with set_file_times / set_file_mode through a file's own handle; TcpStream::peer_uid returns the user id of the other end of a Unix socket (SO_PEERCRED, getpeereid)
+
 ### Changed
 
 - Linux: the build script picks rt's build against glibc (`--cfg jfgui_glibc`) unless

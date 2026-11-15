@@ -4,7 +4,8 @@
 //   value would mean something else without any error), every struct stat field the library reads,
 //   the order of clone's arguments, and the helpers for the calls ARM64 does not have: poll, fork,
 //   dup2, rename.  The numbers themselves are compared with the kernel's headers by
-//   tools/kernel_table_check.py.
+//   tools/kernel_table_check.py.  plat::fs::Dir on the kernel's *at calls and openat2: no link on
+//   the way below an open folder, also none swapped in after it was opened.
 
 #[cfg(not(target_os = "linux"))]
 pub fn t_kernel(t: &mut crate::T) {
@@ -114,6 +115,7 @@ mod lnx {
         forks(t);
         dups(t);
         renames(t, &dir);
+        dirs(t, &dir);
         unlink(&dir, AT_REMOVEDIR);
         t.check(stat(&dir, 0).is_none(), "kernel: unlinkat(AT_REMOVEDIR) took the folder");
     }
@@ -292,5 +294,92 @@ mod lnx {
         // SAFETY: NUL-terminated paths; the old name is gone.
         t.check(unsafe { rename(pa.as_ptr() as usize, pb.as_ptr() as usize) } == ENOENT, "kernel: rename of nothing is ENOENT");
         unlink(&b, 0);
+    }
+
+    fn read_all(f: &plat::File) -> Vec<u8> {
+        let mut b = alloc::vec![0u8; 64];
+        let n = f.read_at(0, &mut b).unwrap_or(0);
+        b.truncate(n);
+        b
+    }
+
+    /// plat::fs::Dir: an open folder's entries never through a link, a folder swapped for a
+    /// link after it was opened not followed (bc_fs's restores and the agent's reads)
+    fn dirs(t: &mut T, dir: &str) {
+        use plat::fs::Dir;
+        let (root, out) = (format!("{dir}/root"), format!("{dir}/out"));
+        for d in [&root, &format!("{root}/a"), &format!("{root}/a/b"), &out, &format!("{out}/b")] {
+            plat::mkdir(d);
+        }
+        plat::write_file(&format!("{root}/a/b/f"), b"data");
+        plat::write_file(&format!("{out}/b/f"), b"SECRET");
+        for v in ["victim", "file"] {
+            plat::write_file(&format!("{out}/{v}"), b"v");
+            let p = z(&format!("{out}/{v}"));
+            // SAFETY: a NUL-terminated path.
+            unsafe { syscall3(SYS_FCHMODAT, AT_FDCWD, p.as_ptr() as usize, 0o600) };
+        }
+        plat::fs::symlink(&out, &format!("{root}/lnk"), true);
+        plat::fs::symlink(&format!("{out}/victim"), &format!("{root}/a/flink"), false);
+
+        let Some(r) = Dir::open(&root) else {
+            t.check(false, "kernel: Dir::open");
+            return;
+        };
+        t.check(r.lstat("").is_some_and(|m| m.is_dir()), "kernel: Dir: lstat of the folder itself");
+        let b = r.open_dir("a/b");
+        t.check(b.as_ref().and_then(|b| b.open_file("f")).is_some_and(|f| read_all(&f) == b"data"), "kernel: Dir: open_dir(\"a/b\") and open_file");
+        t.check(r.open_dir("lnk").is_none() && r.open_dir("lnk/b").is_none(), "kernel: Dir: open_dir refuses a link on the way");
+        t.check(r.open_dir("a/../a").is_none() && r.open_dir("/").is_none() && r.open_dir("").is_none(), "kernel: Dir: open_dir refuses '..', absolute and empty paths");
+        t.check(r.lstat("lnk").is_some_and(|m| m.is_symlink()) && r.read_link("lnk").as_deref() == Some(out.as_str()), "kernel: Dir: lstat and read_link of a link");
+        t.check(r.lstat("a/b").is_none() && r.lstat("..").is_none(), "kernel: Dir: names are one component");
+        let Some(a) = r.open_dir("a") else {
+            t.check(false, "kernel: Dir: open_dir(\"a\")");
+            return;
+        };
+        t.check(a.open_file("flink").is_none() && a.open_file("b").is_none(), "kernel: Dir: open_file refuses a link and a folder");
+        t.check(!a.set_mode("flink", 0o666) && stat(&format!("{out}/victim"), 0).is_some_and(|s| s.st_mode & 0o777 == 0o600), "kernel: Dir: set_mode leaves a link and its target alone");
+        t.check(a.create_new("flink").is_none(), "kernel: Dir: create_new refuses a link's name");
+        let names = a.read_dir().map(|mut v| {
+            v.sort_by(|x, y| x.name.cmp(&y.name));
+            v.into_iter().map(|e| (e.name, e.kind)).collect::<Vec<_>>()
+        });
+        let want = alloc::vec![(alloc::string::String::from("b"), plat::fs::FileKind::Dir), (alloc::string::String::from("flink"), plat::fs::FileKind::Symlink)];
+        t.check(names.as_ref() == Some(&want), &format!("kernel: Dir: read_dir ({names:?})"));
+
+        // a file written, its times and mode set through its handle, renamed into place
+        let f = a.create_new("tmp");
+        t.check(f.is_some() && a.create_new("tmp").is_none(), "kernel: Dir: create_new makes a new file only");
+        if let Some(f) = f {
+            f.write_at(0, b"restored");
+            t.check(plat::fs::set_file_mode(&f, 0o640) && plat::fs::set_file_times(&f, 1_000_000_000_000_000_000, 1_100_000_000_000_000_000), "kernel: set_file_mode / set_file_times");
+            drop(f);
+        }
+        t.check(a.rename("tmp", &a, "file") && a.lstat("tmp").is_none(), "kernel: Dir: rename");
+        t.check(a.lstat("file").is_some_and(|m| m.mode & 0o777 == 0o640 && m.mtime_ns == 1_100_000_000_000_000_000 && m.size == 8), "kernel: Dir: the file has the mode and times set through its handle");
+        t.check(a.set_mode("file", 0o604) && a.lstat("file").is_some_and(|m| m.mode & 0o777 == 0o604), "kernel: Dir: set_mode");
+        t.check(a.set_times("file", 5_000_000_000, 6_000_000_000) && a.lstat("file").is_some_and(|m| m.mtime_ns == 6_000_000_000), "kernel: Dir: set_times");
+        t.check(a.set_times("", 7_000_000_000, 8_000_000_000) && r.lstat("a").is_some_and(|m| m.mtime_ns == 8_000_000_000), "kernel: Dir: set_times of the folder itself");
+        t.check(a.mkdir("m") && !a.mkdir("m") && a.remove("m") && a.lstat("m").is_none(), "kernel: Dir: mkdir and remove of a folder");
+        t.check(a.symlink("file", "sl", false) && a.lstat("sl").is_some_and(|m| m.is_symlink()) && a.remove("sl") && a.lstat("file").is_some(), "kernel: Dir: symlink, removed as the link");
+
+        // the swap: "a" renamed away and a link to the outside folder put in its place after a
+        // and b were opened -- what is done in them stays in the real folders
+        plat::rename(&format!("{root}/a"), &format!("{root}/a.old"));
+        plat::fs::symlink(&out, &format!("{root}/a"), true);
+        t.check(b.as_ref().and_then(|b| b.open_file("f")).is_some_and(|f| read_all(&f) == b"data"), "kernel: Dir: an open folder is not redirected by a link swapped in");
+        t.check(r.open_dir("a/b").is_none() && r.open_dir("a").is_none(), "kernel: Dir: the swapped-in link is refused when opening again");
+        t.check(a.create_new("new").is_some() && plat::fs::lstat(&format!("{root}/a.old/new")).is_some() && plat::fs::lstat(&format!("{out}/new")).is_none(), "kernel: Dir: a file is created in the real folder, not through the link");
+        let mode = |p: &str| stat(p, 0).map_or(0, |s| s.st_mode & 0o777);
+        t.check(a.set_mode("file", 0o644) && mode(&format!("{out}/file")) == 0o600 && mode(&format!("{root}/a.old/file")) == 0o644, "kernel: Dir: a change stays in the real folder");
+        t.check(a.remove("new") && a.remove("file") && plat::fs::lstat(&format!("{out}/b/f")).is_some(), "kernel: Dir: removals stay in the real folder");
+        drop((a, b, r));
+
+        for f in [format!("{root}/a.old/b/f"), format!("{root}/a.old/flink"), format!("{root}/a"), format!("{root}/lnk"), format!("{out}/b/f"), format!("{out}/victim"), format!("{out}/file")] {
+            unlink(&f, 0);
+        }
+        for d in [format!("{root}/a.old/b"), format!("{root}/a.old"), root, format!("{out}/b"), out] {
+            unlink(&d, AT_REMOVEDIR);
+        }
     }
 }

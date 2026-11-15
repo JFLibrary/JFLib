@@ -6,7 +6,7 @@
 //      the plugin's rules AND the app's -- files, the network, processes, URLs; the refusal
 //      names the plugin; a plugin without a manifest gets nothing; nested scopes intersect;
 //      jobs on the pool (spawn_blocking, parallel_for) keep the scope; outside it the app's
-//      rules alone
+//      rules alone; a document the user chose (user_doc_allowed) needs every plugin's fs.user
 // A policy stays installed until the process ends: this test is not part of "all".
 
 use alloc::format;
@@ -27,6 +27,7 @@ pub fn t_plugperm(t: &mut T) {
             format!("# what the plugin needs\nfs.read $PLUGIN/data/**\nfs.write $PLUGIN/out/**\nfs.read {base}/app/**\n\
                      fs.write {base}/elsewhere/**\nnet.connect 127.0.0.1:7\nprocess plattest-helper\n").as_bytes())
         && plat::write_file(&p("plugins/other.permissions"), b"fs.write $PLUGIN/data/**\n")
+        && plat::write_file(&p("plugins/user.permissions"), b"fs.user\n")
         && plat::write_file(&p("plugins/bad.permissions"), b"fs.read /x\nask fs.read /y\n")
         && plat::write_file(&p("plugins/agent.permissions"), b"agent.deny doc.x\n");
     t.check(ok, "plugperm: scratch tree");
@@ -41,7 +42,7 @@ pub fn t_plugperm(t: &mut T) {
 
     let manifest = format!(
         "# plattest --test plugperm\nfs.write {base}/plugins/**\nfs.read {base}/app/**\n\
-         net.connect 127.0.0.1:7-8\nprocess plattest-helper plattest-other\nurl https\n"
+         net.connect 127.0.0.1:7-8\nprocess plattest-helper plattest-other\nurl https\nfs.user\n"
     );
     let key = match policy::install(&manifest) {
         Ok(k) => k,
@@ -79,6 +80,20 @@ pub fn t_plugperm(t: &mut T) {
     let d = policy::denials();
     t.check(d.iter().any(|x| x.kind == "fs.write" && x.target == p("plugins/data/x.txt") && x.plugin == "good"), "plugperm: the refusal names the plugin");
     t.check(plat::write_file(&p("plugins/data/x.txt"), b"x") && policy::url_allowed("https://example.org"), "plugperm: outside, the app's rules alone");
+
+    // documents the user chose (Android's content://, policy::user_doc_allowed): the app's
+    // fs.user, and that of every plugin it acts for
+    let doc = "content://org.example.docs/document/1";
+    t.check(policy::user_doc_allowed(doc), "plugperm: a chosen document with the app's fs.user");
+    policy::on_behalf(&good, || t.check(!policy::user_doc_allowed(doc), "plugperm: ... not for a plugin without fs.user"));
+    t.check(policy::denials().iter().any(|x| x.kind == "fs.user" && x.target == doc && x.plugin == "good"), "plugperm: ... the refusal names the plugin");
+    match policy::plugin_rights(&p("plugins/user.dll")) {
+        Ok(user) => {
+            policy::on_behalf(&user, || t.check(policy::user_doc_allowed(doc), "plugperm: ... a plugin with fs.user"));
+            policy::on_behalf(&good, || policy::on_behalf(&user, || t.check(!policy::user_doc_allowed(doc), "plugperm: ... nested: every plugin needs fs.user")));
+        }
+        Err(_) => t.check(false, "plugperm: user.permissions parses"),
+    }
 
     if let Ok(none) = &none {
         policy::on_behalf(none, || {

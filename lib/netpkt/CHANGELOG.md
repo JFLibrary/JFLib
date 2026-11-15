@@ -12,6 +12,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - IMAP `tokens` nests lists at most 64 deep and takes the rest of the line as one atom. A line of `(` ran the stack out.
 
+### Security
+
+- imf::fold, Message::header_bytes and Draft::to_bytes no longer let CR, LF or NUL in a field start a new field (header injection), and the FTP, SMTP, POP3 and IMAP command builders (to_line, fmt_path, imap::line, imap::quoted) leave out CR, LF and NUL so an argument cannot start another command; fmt_path also drops angle brackets from the address and blanks from parameters
+
 ## [0.2.0] - 2026-11-14
 
 ### Fixed

@@ -165,6 +165,18 @@ fn manifest_gaps(manifest: &str, dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// a manifest that sets android:debuggable to anything but false.  Debug builds are debuggable
+/// through aapt2 --debug-mode; a release build must not be: the host takes the jfgui_* extras of
+/// whoever starts the app as settings when it is (GalleryActivity)
+fn debuggable(manifest: &str) -> bool {
+    manifest.split("android:debuggable").skip(1).any(|rest| {
+        let Some(rest) = rest.trim_start().strip_prefix('=') else { return false };
+        let rest = rest.trim_start();
+        let Some(quote) = rest.chars().next().filter(|q| *q == '"' || *q == '\'') else { return true };
+        rest[1..].split(quote).next().unwrap_or("").trim() != "false"
+    })
+}
+
 fn files_below(root: &Path, dir: &Path, out: &mut Vec<(String, Vec<u8>)>) -> Result<(), String> {
     for e in fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?.flatten() {
         let p = e.path();
@@ -214,6 +226,10 @@ pub(crate) fn run_cmd(args: &[String]) -> Result<(), String> {
         default_manifest(&p.package.dir, &p.package.name, &p.package.version, res.join("drawable").is_dir())
     };
     manifest_gaps(&manifest, &p.package.dir)?;
+    if o.release && debuggable(&manifest) {
+        return Err("android/AndroidManifest.xml sets android:debuggable: a release build must not be debuggable \
+                    (remove the attribute; debug builds get it from aapt2 --debug-mode)".to_string());
+    }
     let work = p.target_dir.join("jflib-android").join(&abi).join(&p.package.name);
     fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
 
@@ -273,6 +289,9 @@ pub(crate) fn run_cmd(args: &[String]) -> Result<(), String> {
     let mut link = Command::new(&aapt2);
     link.arg("link").arg("-o").arg(&unsigned).arg("-I").arg(&t.platform).arg("--manifest").arg(&manifest_out)
         .args(["--min-sdk-version", &MIN_API.to_string(), "--target-sdk-version", &TARGET_API.to_string(), "--auto-add-overlay"]);
+    if !o.release {
+        link.arg("--debug-mode");
+    }
     if res.is_dir() {
         let compiled = work.join("compiled-res.zip");
         run(Command::new(&aapt2).arg("compile").arg("--dir").arg(&res).arg("-o").arg(&compiled))?;
@@ -322,4 +341,18 @@ pub(crate) fn run_cmd(args: &[String]) -> Result<(), String> {
         print!("{}", run(Command::new(adb).args(["install", "-r"]).arg(&apk))?);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::debuggable;
+
+    #[test]
+    fn a_release_manifest_must_not_be_debuggable() {
+        assert!(debuggable(r#"<application android:debuggable="true">"#));
+        assert!(debuggable("<application android:debuggable = 'true' >"));
+        assert!(debuggable(r#"<application android:debuggable="@bool/debug">"#));
+        assert!(!debuggable(r#"<application android:debuggable="false">"#));
+        assert!(!debuggable(r#"<application android:allowBackup="false">"#));
+    }
 }

@@ -26,7 +26,8 @@
 //                                (MIME-Version 1.0, text/plain in UTF-8; 7bit for ASCII, 8bit
 //                                when the server takes 8BITMIME, else quoted-printable)
 //   fold(name, value)            "Name: value\r\n" with continuation lines that start with a
-//                                space (2.2.3)
+//                                space (2.2.3); CR and LF of a value become spaces, so no value
+//                                adds a field or ends the header
 //
 // Lines of a header field are at most 78 characters where there is whitespace to break at
 // (2.1.1); a word longer than that stays whole.  Display names and subjects with characters
@@ -138,10 +139,14 @@ impl Message {
     pub fn remove(&mut self, name: &str) {
         self.fields.retain(|f| !f.name.eq_ignore_ascii_case(name));
     }
-    /// the header as it travels (CRLF, folded), without the empty line
+    /// the header as it travels (CRLF, folded), without the empty line; a field whose name is
+    /// empty or holds other than printable characters but the colon is left out
     pub fn header_bytes(&self) -> Vec<u8> {
         let mut s = String::new();
         for f in &self.fields {
+            if f.name.is_empty() || !f.name.bytes().all(|c| (33..=126).contains(&c) && c != b':') {
+                continue;
+            }
             s.push_str(&fold(&f.name, &f.value));
         }
         s.into_bytes()
@@ -248,8 +253,12 @@ fn trim_eol(l: &[u8]) -> &[u8] {
 }
 
 /// "Name: value\r\n" folded at whitespace so that no line is longer than 78 characters where
-/// that is possible
+/// that is possible.  No text starts a field or the body of its own: the name keeps only its
+/// printable characters but the colon, CR and LF in the value become spaces, NUL is left out
 pub fn fold(name: &str, value: &str) -> String {
+    let name: String = name.chars().filter(|&c| ('!'..='~').contains(&c) && c != ':').collect();
+    let value: String = value.chars().filter(|&c| c != '\0').map(|c| if matches!(c, '\r' | '\n') { ' ' } else { c }).collect();
+    let (name, value) = (name.as_str(), value.as_str());
     if value.is_empty() {
         return format!("{}:\r\n", name);
     }

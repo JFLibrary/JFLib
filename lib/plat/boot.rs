@@ -6,7 +6,8 @@
 //   name_and_assets(app, assets) -> Result<(), i32>    vfs::set_app_id, the JFA1 bundle as app://
 //   permissions(manifest) -> Result<Option<Key>, i32>  install the manifest; with fs.user the
 //                           paths on the command line are the user's (read + write, folders
-//                           with everything below; a local file:// URI as its path); without
+//                           with everything below; a local file:// URI as its path; not the
+//                           values of the library's VALUE_OPTS but --theme-file, --shot, --script); without
 //                           a manifest the process's key (policy::take_key: it answers the
 //                           questions of agent actions).  A `sandbox` line then hands the
 //                           manifest to the OS as well (sandbox::apply)
@@ -56,13 +57,26 @@ pub fn permissions(manifest: Option<&str>) -> Result<Option<Key>, i32> {
             return Err(2);
         }
     };
-    for a in crate::args().iter().skip(1) {
-        // "--name=value": the value; other options are no paths
+    let args = crate::args();
+    let mut rest = args.iter().skip(1);
+    while let Some(a) = rest.next() {
+        // "--name=value": the value; other options are no paths, nor are the values of the
+        // library's options (VALUE_OPTS: "--theme dark") except the files it reads and writes
         let v = match a.strip_prefix("--") {
-            Some(o) => match o.split_once('=') {
-                Some((_, v)) => v,
-                None => continue,
-            },
+            Some(o) => {
+                let (name, value) = o.split_once('=').map_or((o, None), |(n, v)| (n, Some(v)));
+                let library = crate::VALUE_OPTS.iter().any(|x| x[2..] == *name) && !matches!(name, "theme-file" | "shot" | "script");
+                match value {
+                    Some(v) if !library => v,
+                    Some(_) => continue,
+                    None => {
+                        if library {
+                            rest.next();
+                        }
+                        continue;
+                    }
+                }
+            }
             None => a.as_str(),
         };
         if !v.is_empty() && !v.starts_with('-') {

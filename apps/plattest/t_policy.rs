@@ -279,6 +279,11 @@ fn installed(t: &mut T) {
     if cfg!(windows) {
         t.check(denied(plat::net::resolve("evil.org", 80).map(|_| ()).map_err(|e| e.kind)), "policy: resolve of a refused name is Denied");
     }
+    if cfg!(any(windows, target_vendor = "apple")) {
+        // the system resolver would stop at the NUL: an allowed name must not carry another one
+        let r = plat::net::resolve("127.0.0.1\0.a.example.test", 443).map(|_| ()).map_err(|e| e.kind);
+        t.check(r == Err(NetErrorKind::NotFound), "policy: resolve of a name with a NUL is refused");
+    }
     t.check(denied(plat::net::connect_unix(&p("no/sock"), 500).map(|_| ()).map_err(|e| e.kind)), "policy: a Unix socket outside fs.write is Denied");
     drop(listener);
 

@@ -46,6 +46,11 @@ fn commands(t: &mut T) {
     t.eq("empty", Command::parse("\r\n"), None);
     t.eq("line", Command::new("retr", "r1-config").to_line(), s("RETR r1-config\r\n"));
     t.eq("line without argument", Command::new("QUIT", "").to_line(), s("QUIT\r\n"));
+    // no command of its own through CR, LF (a lone one too) or NUL in a field
+    let inj = Command::new("RETR", "a.txt\r\nDELE b.txt").to_line();
+    t.eq("line: CRLF left out", inj.clone(), s("RETR a.txtDELE b.txt\r\n"));
+    t.eq("line: one line on the wire", Lines::new().push(inj.as_bytes()), alloc::vec![s("RETR a.txtDELE b.txt")]);
+    t.eq("line: a lone LF and NUL", Command { verb: s("RETR\n"), arg: s("a\nb\0") }.to_line(), s("RETR ab\r\n"));
     t.check("known verbs", ftp::verb_known("epsv") && ftp::verb_known("XPWD") && ftp::verb_known("XRMD") && !ftp::verb_known("HELO"));
     let mut l = Lines::new();
     t.eq("lines in pieces", l.push(b"USER an"), Vec::<String>::new());

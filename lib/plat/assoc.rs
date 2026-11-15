@@ -47,7 +47,8 @@
 // HKCU\Software\Classes -- the ProgID <app>.<ext> (description, DefaultIcon, shell\open\command
 // = "<exe>" "%1", AppUserModelID = the app id: what Windows asks of a handler with an explicit
 // id for the recent files of the type), .<ext>\OpenWithProgids, for own types the default and
-// Content Type of .<ext>, a scheme's key (URL:<display>, URL Protocol) -- then SHChangeNotify.
+// Content Type of .<ext>, a scheme's key (URL:<display>, URL Protocol, shell\open\command =
+// "<exe>" -- "%1": the URL after "--" is one argument, never options) -- then SHChangeNotify.
 // A default of another program is the extension's default value (HKCU or HKLM) or a key of the
 // same name with another command; the user's own choice in Windows' dialog (UserChoice, hashed) is never
 // changed (Conflict::fixed).  Linux (linux_assoc.rs): $XDG_DATA_HOME/applications/<app_id>.desktop
@@ -284,6 +285,7 @@ pub fn reg_entries(app: &str, display: &str, exe: &str, types: &[FileType], sche
     };
     let icon = format!("{exe},0");
     let cmd = format!("\"{exe}\" \"%1\"");
+    let url_cmd = url_command(exe);
     let classes = "Software\\Classes";
     for t in types {
         let progid = format!("{app}.{}", t.exts[0]);
@@ -308,9 +310,16 @@ pub fn reg_entries(app: &str, display: &str, exe: &str, types: &[FileType], sche
         put(&key, "", &format!("URL:{display}"), &key, RV_TREE);
         put(&key, "URL Protocol", "", &key, RV_TREE);
         put(&format!("{key}\\DefaultIcon"), "", &icon, &key, RV_TREE);
-        put(&format!("{key}\\shell\\open\\command"), "", &cmd, &key, RV_TREE);
+        put(&format!("{key}\\shell\\open\\command"), "", &url_cmd, &key, RV_TREE);
     }
     out
+}
+
+/// the open command of a URL scheme: "<exe>" -- "%1".  A link's text can hold a quote and
+/// blanks, which would end "%1" and add options of its own; after "--" plat::args (Windows)
+/// takes the rest of the command line as the one argument it is, and no option comes after it
+pub(crate) fn url_command(exe: &str) -> String {
+    format!("\"{exe}\" -- \"%1\"")
 }
 
 /// the schemes a web browser opens through its ProgID <app>URL (Windows: no keys of their own)
@@ -349,7 +358,7 @@ pub fn package_entries(pkg: &Package, exe: &str) -> Vec<RegValue> {
     put(&url, "", &format!("{display} URL"), &url, RV_TREE);
     put(&url, "URL Protocol", "", &url, RV_TREE);
     put(&format!("{url}\\DefaultIcon"), "", &icon, &url, RV_TREE);
-    put(&format!("{url}\\shell\\open\\command"), "", &format!("\"{exe}\" \"%1\""), &url, RV_TREE);
+    put(&format!("{url}\\shell\\open\\command"), "", &url_command(exe), &url, RV_TREE);
     let app_key = format!("{url}\\Application");
     put(&app_key, "ApplicationName", display, &url, RV_TREE);
     put(&app_key, "ApplicationIcon", &icon, &url, RV_TREE);
