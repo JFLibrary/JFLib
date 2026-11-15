@@ -52,80 +52,34 @@ wired into this app's file workflow.
 
 ## Build and run
 
-**Run these commands from the JFLib repository root**, where `build_rs.py` is
-located. The app name is case-sensitive: **`Kritzel`**.
-
-You need Python 3, Rust through rustup, and LLVM/LLD. The repository targets Rust
-1.98.x and builds directly with `rustc` through its Python script. See the
-[shared build prerequisites](../../README.md#prerequisites) for tool paths and
-platform setup. Use `python3` instead of `python` where required.
-
-### Windows
-
-```powershell
-rustup target add x86_64-pc-windows-msvc
-python build_rs.py app Kritzel --target win
-.\build\win\Kritzel.exe
-```
-
-To build and launch with an image:
-
-```powershell
-python build_rs.py run Kritzel --target win -- --open "C:\Pictures\example.png"
-```
-
-### Linux
+Kritzel is an app of the JFLib repository. Cargo builds it in its folder, the same on Windows,
+Linux and macOS (the app name is case-sensitive: **`Kritzel`**):
 
 ```sh
-rustup target add x86_64-unknown-linux-gnu
-python3 build_rs.py app Kritzel --target linux
-./build/linux/Kritzel
+cd apps/Kritzel
+cargo run                                        # build and start
+cargo run -- --open "C:\Pictures\example.png"    # with an image
+cargo run -- --theme dark --scale 150            # theme and scale are chosen at launch
+cargo build --release                            # opt-level 2 + LTO: target/release/
 ```
 
-Running the desktop app requires a Wayland or X11 session. See the
-[Linux build notes](../../README.md#linux-quick-start) for cross-building and WSL.
+You need Rust through rustup (the repository targets 1.98.x) and what the
+[shared prerequisites](../../README.md#prerequisites) list for your system. Running the desktop app
+on Linux requires a Wayland or X11 session.
 
-### Browser / WebAssembly
-
-```sh
-rustup target add wasm32-unknown-unknown
-rustup component add rust-src
-python build_rs.py app Kritzel --target web
-python tools/serve_web.py build/web/Kritzel
-```
-
-Open [http://127.0.0.1:8766/](http://127.0.0.1:8766/). LLVM's `wasm-ld` is required.
-For a smaller build that does not need `rust-src`, add `--web-mode scalar` to the
-build command. See the [browser build guide](../../README.md#browser-builds) for
-the SIMD and worker variants.
-
-This app currently has `win`, `linux`, and `web` build targets. Dedicated native
-Android, macOS, and iOS app targets are not currently provided.
-
-### Release builds and styles
-
-```sh
-# Optimized Windows build: build/release/win/Kritzel.exe
-python build_rs.py app Kritzel --target win --release
-
-# Separate style variants: build/win/<style>/Kritzel.exe
-python build_rs.py app Kritzel --target win --style winui,classic,macos,kde,jfoffice
-```
-
-Styles are selected when building. Theme and scale can be selected when launching:
-
-```powershell
-.\build\win\Kritzel.exe --theme dark --scale 150
-```
+The app's targets are `win`, `linux`, and `web`; dedicated native Android, macOS, and iOS app
+targets are not currently provided. Its browser build comes from the repository's tool, as for its
+other apps ([other targets](../../README.md#other-targets-and-packages)). The style is chosen when
+building: the dependency `style` in `apps/Kritzel/Cargo.toml` names it (`jflib-style-winui`).
 
 ### Build Manager
 
 The same build can be configured through the graphical
 [Build Manager](../buildManager/README.md):
 
-```powershell
-python build_rs.py app buildManager --target win
-.\build\win\buildManager.exe
+```sh
+cd apps/buildManager
+cargo run
 ```
 
 Select the JFLib repository and **Kritzel**, choose the target and style under
@@ -140,11 +94,11 @@ release builds, and packages.
 
 *The same app with JFLib's Classic style.*
 
-To build this variant on its own:
+To build this variant, let the dependency `style` in `apps/Kritzel/Cargo.toml` name the Classic
+style, then `cargo run` as above:
 
-```powershell
-python build_rs.py app Kritzel --target win --style classic --out build/kritzel-classic
-.\build\kritzel-classic\win\Kritzel.exe
+```toml
+style = { package = "jflib-style-classic", path = "../../styles/classic" }
 ```
 
 ## Work in progress and current limits

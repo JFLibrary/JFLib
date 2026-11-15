@@ -28,7 +28,7 @@ keyboard"). Made with `python build_rs.py new viewtest --title "Ansichtstest"` o
 ## Build, run, test
 
 ```sh
-python build_rs.py app viewtest                 # build/win/viewtest.exe and build/linux/viewtest
+cargo run -p viewtest                          # the app
 python build_rs.py test viewtest                # build it and run tests/*.uis (Windows and Linux)
 ```
 

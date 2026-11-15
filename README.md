@@ -11,9 +11,9 @@ formerly called PaintCraft, has its own repository, [JFLibrary/JFPainter](https:
 so do the network simulator JFNetworker, [JFLibrary/JFNetworker](https://github.com/JFLibrary/JFNetworker), and its scripting language
 JFScript, [JFLibrary/JFScript](https://github.com/JFLibrary/JFScript).
 The Rust code uses `#![no_std]`, `core`, and `alloc`; an app of its own may use `std` and `std`
-crates (the feature `std` of `jflib`, [docs/GUIDE.md](docs/GUIDE.md)). Cargo builds the library and the apps;
-a Python build script (`build_rs.py`) sits on top for this repository's own apps, its tests and
-its packages. Complex text shaping uses pinned HarfRust and Unicode crates; these are statically
+crates (the feature `std` of `jflib`, [docs/GUIDE.md](docs/GUIDE.md)). Cargo builds the library and the apps,
+with `cargo run` on Windows, Linux and macOS alike; a Python script (`build_rs.py`) runs this
+repository's tests and checks. Complex text shaping uses pinned HarfRust and Unicode crates; these are statically
 linked. See the [dependency notices](lib/text_shape/NOTICE.md).
 
 ```sh
@@ -29,7 +29,7 @@ is on [docs.rs](https://docs.rs/jflib). More under [Your own app with Cargo](#yo
 ![Kritzel displaying a JFLIB sample drawing created in the app](docs/images/readme/kritzel-winui.png)
 
 [Library](#the-library) · [Feature tour](#feature-tour) · [Platforms](#platforms) · [Apps](#apps) ·
-[Your own app with Cargo](#your-own-app-with-cargo) · [Build with Python](#building-apps-with-python) · [Build Manager](#build-manager) ·
+[Your own app with Cargo](#your-own-app-with-cargo) · [Build the apps](#building-the-apps-of-this-repository) · [Build Manager](#build-manager) ·
 [Rust examples](#small-gui-examples) · [Styles](#styles) · [Documentation](#documentation)
 
 ## The library
@@ -105,7 +105,7 @@ to the original assembly version.
 ## Feature tour
 
 Newer parts of the library, captured from the demo and test apps named above each picture
-(`python build_rs.py run NAME --target win` starts them). The [roadmap](docs/ROADMAP.md)
+(`cargo run` in `apps/NAME` starts them). The [roadmap](docs/ROADMAP.md)
 shows what is done and what is still missing; the [changelog](CHANGELOG.md) lists the
 changes of each version (0.1.0 is the first on crates.io).
 
@@ -179,7 +179,7 @@ current limitations.
 
 ## Apps
 
-Pass the app names in the first column exactly as written to `build_rs.py app NAME`.
+The first column is the app's folder under `apps/`: `cd apps/NAME`, then `cargo run`.
 
 | App | Description | Targets |
 | --- | --- | --- |
@@ -228,9 +228,9 @@ An app outside this repository needs one dependency, the crate `jflib`, and the 
 
 ```sh
 cargo install cargo-jflib
-cargo jflib new hello        # a window app with its test and the settings for Windows and Linux
+cargo jflib new hello        # a window app with its test
 cd hello
-cargo run                    # on Linux: cargo run --target x86_64-unknown-linux-gnu (.cargo/config.toml says why)
+cargo run                    # Windows, Linux and macOS alike
 cargo jflib test             # run tests/*.uis
 cargo jflib watch            # hot reload while you edit
 cargo jflib package          # a setup for Windows and a .deb (--formats all: also MSIX, AppImage, RPM, Flatpak)
@@ -242,27 +242,28 @@ crate [`jflib`](lib/jflib/README.md) and of [`cargo-jflib`](lib/cargo_jflib/READ
 [docs/VERSIONING.md](docs/VERSIONING.md) says what the crates promise.
 
 The apps of this repository build the same way, with Cargo started in their folder: `cd apps/gallery`,
-then `cargo run` (on Linux `cargo run --target x86_64-unknown-linux-gnu`); `apps/.cargo/config.toml`
-has the template's settings. `cargo jflib` is then the one of this repository, not the one from
-crates.io: `cargo install --path lib/cargo_jflib`.
+then `cargo run` ([Building the apps](#building-the-apps-of-this-repository)). `cargo jflib` is then the
+one of this repository, not the one from crates.io: `cargo install --path lib/cargo_jflib`.
 
-## Building apps with Python
+## Building the apps of this repository
 
-**Run all commands below from the root of this repository**, the directory containing
-`build_rs.py`, `apps/`, `lib/`, and `styles/`.
+Cargo builds every app of this repository in its folder, the same on Windows, Linux and macOS:
+
+```sh
+cd apps/gallery
+cargo run                                # build and start: target/debug/gallery (.exe on Windows)
+cargo run -- --theme dark --scale 150    # everything after -- goes to the app
+cargo build --release                    # opt-level 2 + LTO: target/release/
+```
 
 ### Prerequisites
 
-- **Python 3.11 or newer**; the build tools use the standard library.
 - **Rust installed through rustup**, with `rustc` and `cargo` on your `PATH`. The code targets Rust **1.98.x**.
-- **LLVM / LLD**: `lld-link` for Windows, `ld.lld` for Linux, and `llvm-rc` for Windows
-  app icons. `llvm-nm` is used for additional compiler checks. On Windows, the build
-  script also checks `C:\Program Files\LLVM\bin` automatically; otherwise, the tools
-  must be on your `PATH`.
-- The appropriate **Rust target** for your desired output.
+- **Windows:** what Rust's msvc toolchain always needs for the build scripts, the Visual Studio Build Tools.
+- **Linux:** a C compiler as `cc` (gcc or clang), as for any Rust program with a build script. A program
+  with a window links against glibc; showing it needs a Wayland or X11 session, building it does not.
+- **macOS:** Xcode's command line tools, on Apple silicon.
 
-On systems where Python is named `python3`, replace `python` with `python3`.
-Web and Android builds need the additional tools listed below.
 The first build downloads the versions pinned in `Cargo.lock` from
 crates.io. Later builds use Cargo's cache; `CARGO_NET_OFFLINE=true` enforces offline
 use after that cache has been populated. No system HarfBuzz installation is needed.
@@ -270,149 +271,16 @@ Keep the generated `THIRD_PARTY_NOTICES.md` and `licenses/` folder with distribu
 binaries; every package format and the APK include them automatically. They list the
 third-party code, data, and fonts in JFLib with their licenses.
 
-### Windows quick start
+### Other targets and packages
 
-```powershell
-rustup target add x86_64-pc-windows-msvc
-python build_rs.py app gallery --target win
-.\build\win\gallery.exe
-```
-
-### Linux quick start
-
-```sh
-rustup target add x86_64-unknown-linux-gnu
-python3 build_rs.py app gallery --target linux
-./build/linux/gallery
-```
-
-Displaying the Linux app requires an active Wayland or X11 session; building it does not
-require a display. Windows can also build Linux output when the Linux Rust target and
-`ld.lld` are installed. To run that output, the build script uses WSL, with `Ubuntu-24.04`
-as the default distribution. Set `jfgui_WSL_DISTRO` to select a different distribution.
-
-### Start your own app
-
-```sh
-python build_rs.py new hello --title "Hello"     # apps/hello: a window app that builds and passes its test
-python build_rs.py test hello                    # build it, run apps/hello/tests/*.uis (Windows and Linux)
-python build_rs.py run hello --target win
-```
-
-`--kind console`, `--kind tool` (a window plus a command line program on a shared crate) and
-`--kind service` (a background service) start other kinds of programs; `--style kde` picks the
-style. `python build_rs.py new --lib NAME --deps rt,plat` adds a library crate under `lib/`.
-Every app gets its sources, `PERMISSIONS`, `PACKAGE` (its own `version=0.1.0`), `TARGETS`, a
-smoke test and a README; the [developer guide](docs/GUIDE.md) (section 2) explains them.
-
-### More apps and build options
-
-```sh
-# Build individual apps
-python build_rs.py app Kritzel --target win
-python build_rs.py app Kritzel --target win
-python build_rs.py app jfWord --target win
-
-# Build Windows and Linux together; both Rust targets must be installed
-python build_rs.py app jfWord --target both
-
-# Build and launch; everything after -- is passed to the app
-python build_rs.py run gallery --target win -- --theme dark
-
-# Optimized build in build/release/win/
-python build_rs.py app Kritzel --target win --release
-
-# Build all apps for a target, or just the library components
-python build_rs.py all --target win
-python build_rs.py lib --target win
-```
-
-| Option | Effect |
-| --- | --- |
-| `--target win` / `linux` / `web` / `android` | Build one target; the app must support it |
-| `--target both` | Windows and Linux; the default for `app`, `lib`, and `all` |
-| `--target all` | Windows, Linux, and Web where supported; Android is built separately |
-| `--style kde` | Select a style; otherwise, use `apps/NAME/STYLE`, falling back to `winui` |
-| `--style winui,classic,macos,kde,jfoffice` | Build several style variants in one invocation |
-| `--release` | Optimized build with LTO; output defaults to `build/release/` |
-| `--profile size` | Release profile tuned for smaller output; writes to `build/size/` |
-| `--profile o2` | Optimized build without LTO; writes to `build/o2/` |
-| `--out build/my-build` | Use a custom output directory, including for release builds |
-| `-j 8` | Limit the number of concurrent compiler processes |
-
-Development builds produce `build/win/NAME.exe` or `build/linux/NAME`.
-When building multiple styles, the path also includes the style, for example
-`build/win/classic/gallery.exe`. Selecting a single explicit style does not add this
-subdirectory. Builds are incremental, and warnings are treated as build errors.
-An app's loadable modules, such as codectest's `jxlenc.dll` or `jxlenc.so`, are built automatically.
-
-### Browser builds
-
-```sh
-rustup target add wasm32-unknown-unknown
-rustup component add rust-src
-python build_rs.py app gallery --target web
-python tools/serve_web.py build/web/gallery
-```
-
-Then open [http://127.0.0.1:8766/](http://127.0.0.1:8766/). LLVM's `wasm-ld` is also
-required. The default build includes scalar, SIMD128, and worker variants; the browser
-host selects a variant based on available capabilities. The local server supplies the
-isolation headers required for shared memory.
-
-Use `--web-mode scalar` to build only the scalar variant, which does not require
-`rust-src`. Other apps follow the same pattern, for example
-`python build_rs.py app jfWord --target web`. See the
-[web and agent infrastructure guide](docs/AGENT_WEB.md) and [WASM compute documentation](docs/WASM_COMPUTE.md).
-
-### Android APKs
-
-Additional requirements are **JDK 17+**, **Android SDK Platform 36**, **Build-Tools 35+**,
-and **NDK r29**. `ANDROID_SDK_ROOT` / `ANDROID_HOME` and `ANDROID_NDK_HOME` can override
-the automatically detected paths.
-
-```sh
-rustup target add aarch64-linux-android
-python build_rs.py app androidGallery --target android
-```
-
-Output: `build/android/androidGallery-arm64-v8a-debug.apk`.
-For an x86-64 emulator:
-
-```sh
-rustup target add x86_64-linux-android
-python build_rs.py app androidGallery --target android --android-abi x86_64
-```
-
-Android builds use Cargo, the SDK, and the NDK, without Gradle. Debug builds are
-signed with a local debug key. `--release` signs with the release key named by
-`jfgui_ANDROID_KEYSTORE`, `jfgui_ANDROID_KEYSTORE_PASS`, and `jfgui_ANDROID_KEY_ALIAS`
-(`jfgui_ANDROID_KEY_PASS` if the key has its own password) and writes
-`<app>-<abi>-release.apk`; without them the build stops and names what is missing
-(`jfgui_ANDROID_DEBUG_SIGN=1` keeps the debug key for test builds; docs/PACKAGING.md,
-"Signing"). Other apps need an Android entry in `TARGETS` and a suitable manifest and
-resources.
+An app of your own builds for the browser (`cargo jflib web`), Android (`cargo jflib android`) and iOS
+(`cargo build --target aarch64-apple-ios` on a Mac), and `cargo jflib package` makes its installers and
+packages ([Your own app with Cargo](#your-own-app-with-cargo), the [README of cargo-jflib](lib/cargo_jflib/README.md),
+the [packaging guide](docs/PACKAGING.md)). This repository's own apps get their browser, Android and iOS
+builds, their style variants and packages from the repository's tool `build_rs.py`, as its tests do
+([developer guide](docs/GUIDE.md), section 2; [web and agent guide](docs/AGENT_WEB.md); [docs/APPLE.md](docs/APPLE.md)).
 
 <img src="docs/images/readme/pocket-gallery.png" alt="Pocket Gallery desktop preview with buttons, a checkbox, a switch, a slider, accent colors, and text input" width="320">
-
-### macOS and iOS
-
-Apple's SDK and tools (Xcode) are on a Mac, so these targets build there, on Apple silicon:
-
-```sh
-rustup target add aarch64-apple-darwin aarch64-apple-ios aarch64-apple-ios-sim
-python build_rs.py app gallery --target mac
-python build_rs.py test gallery --target mac
-python build_rs.py test androidGallery --target ios --sim
-python tools/package.py BackupCraft --formats dmg
-```
-
-A macOS program is also packed as `NAME.app` beside it; `tools/package.py --formats dmg` (and `cargo jflib
-package --formats dmg`) puts it on a disk image. The signature is ad hoc unless `jfgui_MAC_IDENTITY` names a
-Developer ID certificate; with `jfgui_MAC_NOTARY` (a notarytool profile) the app and the image are notarized as
-well, so a downloaded `.dmg` passes Gatekeeper ([docs/PACKAGING.md](docs/PACKAGING.md) "macOS: .dmg"). For an iPhone, `python tools/apple.py device build/ios/androidGallery.app` signs, installs
-and starts the app (a development certificate and profile from Xcode). The plan and its state:
-[docs/APPLE.md](docs/APPLE.md).
 
 ## Build Manager
 
@@ -425,16 +293,9 @@ required when using the Build Manager.
 
 Build and launch it once:
 
-```powershell
-# Windows
-python build_rs.py app buildManager --target win
-.\build\win\buildManager.exe
-```
-
 ```sh
-# Linux
-python3 build_rs.py app buildManager --target linux
-./build/linux/buildManager
+cd apps/buildManager
+cargo run
 ```
 
 The current app uses German UI labels. The steps below include those labels so you can
@@ -454,20 +315,12 @@ find the corresponding controls:
 5. Use **Release** to prepare optimized builds and packages. **Package data (Paketdaten)**
    contains the metadata from `apps/APP/PACKAGE`.
 
-The GUI currently offers **Windows, Linux, and Web** build targets. Build Android apps
-through the Python script. Release packages need suitable package metadata and resources.
+The GUI currently offers **Windows, Linux, and Web** build targets, not yet Android.
+Release packages need suitable package metadata and resources.
 Windows installers require a Windows host; Debian packages require `dpkg-deb`
 (through WSL on Windows). Output defaults to `build/manager/`, and profiles are saved
 in `build-profiles.json`.
 
-To build a package directly from the terminal, for example forCraft:
-
-```sh
-python tools/package.py Kritzel --styles winui,classic --no-deb
-```
-
-This creates the Windows installer at `build/dist/Kritzel_Setup.exe`.
-`--formats all` also writes an AppImage, a Flatpak bundle, an MSIX package and an RPM .spec.
 See the [Build Manager documentation](apps/buildManager/README.md) and
 [packaging guide](docs/PACKAGING.md) for details.
 
@@ -475,14 +328,15 @@ See the [Build Manager documentation](apps/buildManager/README.md) and
 
 ### A window with a click counter
 
-Create `apps/hello/src/main.rs` with this complete app:
+Make a project with `cargo jflib new hello` and replace its `src/lib.rs` with this complete app
+(its `src/main.rs` only links it):
 
 ```rust
 #![no_std]
-#![no_main]
 #![deny(unsafe_code)]
 
 extern crate alloc;
+use jflib::{style, ui};
 use ui::*;
 
 const DESC: AppDesc = AppDesc {
@@ -519,8 +373,8 @@ ui::main!(ui::launch(&DESC, Counter::default(), &style::STYLE));
 ```
 
 ```sh
-python build_rs.py run hello --target win
-# On Linux: python3 build_rs.py run hello --target linux
+cd hello
+cargo run
 ```
 
 ![The click counter example after two clicks, with German labels in this screenshot](docs/images/readme/example-counter.png)
@@ -533,7 +387,7 @@ to the style selected at build time.
 ### A text field, checkbox, and slider
 
 In the example above, replace `Counter`, its `impl App`, and the `ui::main!` invocation
-with this version. Keep the crate attributes, `extern crate alloc`, `use ui::*`, and
+with this version. Keep the crate attributes, `extern crate alloc`, the `use` lines, and
 `DESC` unchanged:
 
 ```rust
@@ -566,10 +420,9 @@ Values are updated directly through `&mut`. Checkboxes use `i32` (`0` / `1`), an
 widget IDs must be unique within a frame. File operations, dialogs, and larger actions
 can be dispatched to `App::command` through `ui.cmd_run(...)`.
 
-New apps can use `src/main.rs`; existing flat `main.rs` projects are also supported.
-Each app must have only one of these entry points. A `STYLE` file containing a name
-such as `kde` sets the default style. A `TARGETS` file can explicitly list supported
-targets, such as `win linux web`.
+In this repository an app's program is `src/main.rs` or a flat `main.rs`, never both; a `STYLE`
+file (such as `kde`) and a `TARGETS` file (such as `win linux web`) tell `build_rs.py` the app's
+default style and its targets.
 More examples: [template](apps/template/main.rs), [widget gallery](apps/gallery/main.rs),
 and [developer guide](docs/GUIDE.md).
 
@@ -610,19 +463,20 @@ links several styles can switch between them while it runs
 | ![Widget gallery in the BackupCraft style](docs/images/readme/gallery-backupcraft.png) |
 
 ```sh
-python build_rs.py app gallery --target win --style winui,classic,macos,kde,jfoffice,backupcraft
+JFLIB_STYLE=kde cargo run     # an app of your own: jflib::style is then the KDE style
 ```
 
-On Windows, launch `build/win/kde/gallery.exe` or `build/win/macos/gallery.exe`, for example.
-For Linux, use the same build command with `--target linux`.
+`JFLIB_STYLE` names `winui` (the default), `classic`, `macos`, `kde` or `netlab`; every style is also there
+under its own name (`jflib::style_kde::STYLE`) for a switch at run time. The apps of this repository
+name their style in their `Cargo.toml`.
 
 **The apps use the same styles. Here is Kritzel with Classic:**
 
 ![Kritzel displaying the same JFLIB drawing in the Classic style](docs/images/readme/kritzel-classic.png)
 
 ```sh
-python build_rs.py app Kritzel --target win --style classic --out build/kritzel-classic
-python build_rs.py run gallery --target win -- --theme dark --scale 150
+cd apps/gallery
+cargo run -- --theme dark --scale 150
 ```
 
 [STYLES.md](docs/STYLES.md) describes the style contract, creating custom styles, and
@@ -634,7 +488,8 @@ for more details about the Office style.
 GUI apps can render directly to a PNG without opening a visible window:
 
 ```sh
-python build_rs.py run gallery --target win -- --shot build/gallery.png --size 1000x800 --scale 100 --theme light --anim off
+cd apps/gallery
+cargo run -- --shot gallery.png --size 1000x800 --scale 100 --theme light --anim off
 ```
 
 `--shot` saves the image and exits the app. To prepare particular views or interaction
@@ -642,7 +497,13 @@ sequences, use `.uis` scripts with commands such as `click`, `type`, `theme`, `e
 and `shot`. Run the existing template test with:
 
 ```sh
-python build_rs.py run template --target win -- --script apps/template/tests/smoke.uis --verify-dirty
+cd apps/template
+cargo run -- --script tests/smoke.uis --verify-dirty
+```
+
+The repository's own checks and its test suite run from its root:
+
+```sh
 python build_rs.py check
 python build_rs.py test --quick --target win
 ```

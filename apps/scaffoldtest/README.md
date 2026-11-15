@@ -5,9 +5,8 @@ A JFLib tool: a window and a command line program on one shared crate. Made with
 ## Build, run, test
 
 ```sh
-python build_rs.py app scaffoldtest                 # build/win/scaffoldtest.exe and build/linux/scaffoldtest
-python build_rs.py run scaffoldtest                 # the window (Linux: --target linux)
-python build_rs.py run scaffoldtest --bin scaffoldtest-cli -- README.md   # the command line program
+cargo run -p scaffoldtest                           # the window
+cargo run -p scaffoldtest-cli -- README.md          # the command line program
 python build_rs.py test scaffoldtest                # build it and run tests/*.uis (Windows and Linux)
 ```
 
