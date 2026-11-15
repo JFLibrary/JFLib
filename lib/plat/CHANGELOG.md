@@ -43,6 +43,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - `open_folder` shows a file or a package selected in the Finder (`open -R`) instead of opening it, which started apps and .command scripts (macOS); on Windows it starts the Windows folder's explorer.exe.
 - Linux: a portal's `Response` counts only when it comes from the portal itself, the sender of its reply to the request. Another client on the session bus could answer a file dialog with files of its choice.
 - plat::net::resolve on Windows and Apple refuses host names with NUL or other control characters, so the system resolver can no longer look up a shorter name than the one the net.connect rules allowed; plat::clr_run checks the plugins rules for the managed program and every DLL of the runtime's and the program's folders, not only coreclr.dll; with fs.user the values of the library's options (plat::VALUE_OPTS, e.g. --theme /) are no longer granted as user files (--theme-file, --shot and --script still are)
+- plat::trash on Linux opens and checks a mount's trash folder by folder through descriptors (no links; .Trash must be owned by root or the user, files/ and info/ by the user), so another local user can no longer redirect a trashed item by swapping a folder
 
 ## [0.2.0] - 2026-11-14
 

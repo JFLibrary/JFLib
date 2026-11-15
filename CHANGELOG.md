@@ -87,6 +87,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **cargo-jflib:** cargo jflib android: --release refuses a manifest that sets android:debuggable, debug APKs are debuggable through aapt2 --debug-mode; a copied clipboard image is shared as a new file each time and earlier copies are deleted, so an app that kept a descriptor of an earlier image cannot read later ones
 - **plat:** plat::net::resolve on Windows and Apple refuses host names with NUL or other control characters, so the system resolver can no longer look up a shorter name than the one the net.connect rules allowed; plat::clr_run checks the plugins rules for the managed program and every DLL of the runtime's and the program's folders, not only coreclr.dll; with fs.user the values of the library's options (plat::VALUE_OPTS, e.g. --theme /) are no longer granted as user files (--theme-file, --shot and --script still are)
 - **web:** The browser loader passes ?theme= only as a plain theme name and the worker drops arguments containing line breaks, so the page address can no longer add arguments or grant files
+- **appimagert:** Extracting an AppImage drops setuid, setgid, sticky and world-write bits of the image and respects the umask; --appimage-extract refuses a squashfs-root that is not the user's own folder or a current folder where other users can rename entries, and keeps the extracted folders private until it finishes
+- **plat:** plat::trash on Linux opens and checks a mount's trash folder by folder through descriptors (no links; .Trash must be owned by root or the user, files/ and info/ by the user), so another local user can no longer redirect a trashed item by swapping a folder
 
 ## [0.2.0] - 2026-11-14
 

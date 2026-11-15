@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Security
 
 - Without $XDG_CACHE_HOME and $HOME the runtime unpacks into $TMPDIR/appimage-run-<uid>, and only when that folder belongs to this user alone. It used /tmp/appimage-run, which every user can make, and would have started another user's AppRun from it.
+- Extracting an AppImage drops setuid, setgid, sticky and world-write bits of the image and respects the umask; --appimage-extract refuses a squashfs-root that is not the user's own folder or a current folder where other users can rename entries, and keeps the extracted folders private until it finishes
 
 ## [0.2.0] - 2026-11-14
 

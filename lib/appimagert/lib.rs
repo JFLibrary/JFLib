@@ -30,6 +30,11 @@
 //! TARGET_APPIMAGE=FILE uses another file's image (tests, a runtime without an image).  Exit
 //! code: the app's; 127 when AppRun does not start; 1 for errors of the runtime (on stderr).
 //!
+//! Extracting takes the image's modes without setuid, setgid and sticky and without what the
+//! umask removes or write for others; --appimage-extract refuses a current folder that another
+//! user could rename entries in (not sticky, or owned by someone else than the user or root) and
+//! a squashfs-root (or a folder in it) that is not the user's own folder.
+//!
 //! The program is `appimagert::main!();` (the library is named `appimagert`) in a `#![no_std]`
 //! `#![no_main]` crate built static for Linux with jflib-build's build script (apps/appimagert
 //! here; the stub `cargo jflib package` makes).
@@ -111,8 +116,13 @@ pub fn run() -> i32 {
                 Ok(i) => i,
                 Err(e) => return fail(&e),
             };
+            if let Err(e) = here_private() {
+                return fail(&e);
+            }
+            // by its name below the current folder (the process holds that folder, its path
+            // above is not looked up again)
             let dest = join(&plat::cwd(), "squashfs-root");
-            match extract(&mut img, &dest, args.get(2).map(String::as_str)) {
+            match extract(&mut img, "squashfs-root", args.get(2).map(String::as_str)) {
                 Ok(n) => {
                     plat::write_stdout(format!("{n} Einträge nach {dest} entpackt\n").as_bytes());
                     0
@@ -279,8 +289,7 @@ fn stem(path: &str) -> String {
 /// link) of this user that nobody else may write to
 fn shared_root() -> Result<String, String> {
     let tmp = plat::temp_dir().ok_or("kein Cache-Ordner ($XDG_CACHE_HOME, $HOME) und kein $TMPDIR")?;
-    // /proc/self is /proc/<pid>, which belongs to the process's user
-    let uid = plat::fs::stat("/proc/self").map(|m| m.uid).ok_or("kein Cache-Ordner ($XDG_CACHE_HOME, $HOME), /proc fehlt")?;
+    let (uid, _) = own_ids().ok_or("kein Cache-Ordner ($XDG_CACHE_HOME, $HOME), /proc fehlt")?;
     let root = format!("{tmp}/appimage-run-{uid}");
     plat::fs::mkdir_private(&root);
     match lstat(&root) {
@@ -288,6 +297,31 @@ fn shared_root() -> Result<String, String> {
         Some(_) => Err(format!("{root} gehört einem anderen Benutzer oder ist für andere offen")),
         None => Err(format!("{root} wurde nicht angelegt")),
     }
+}
+
+/// the user and group of this process: /proc/self is /proc/<pid>, which belongs to them
+fn own_ids() -> Option<(u32, u32)> {
+    plat::fs::stat("/proc/self").map(|m| (m.uid, m.gid))
+}
+
+/// the process's umask (/proc/self/status since Linux 4.7; else the usual 022)
+fn umask() -> u32 {
+    let status = plat::read_file("/proc/self/status").unwrap_or_default();
+    let text = String::from_utf8_lossy(&status);
+    text.lines().find_map(|l| l.strip_prefix("Umask:")).and_then(|v| u32::from_str_radix(v.trim(), 8).ok()).unwrap_or(0o022)
+}
+
+/// --appimage-extract writes below ./squashfs-root by that name, so nobody else may rename or
+/// replace it meanwhile (a link put there would take the files elsewhere): the current folder
+/// must be this user's or root's and, when other users may write to it, sticky
+fn here_private() -> Result<(), String> {
+    let (uid, gid) = own_ids().ok_or("/proc fehlt")?;
+    let m = lstat(".").ok_or("der aktuelle Ordner ist nicht lesbar")?;
+    let others = m.mode & 0o002 != 0 || (m.mode & 0o020 != 0 && m.gid != gid);
+    if (m.uid != uid && m.uid != 0) || (others && m.mode & 0o1000 == 0) {
+        return Err(String::from("der aktuelle Ordner gehört einem anderen Benutzer oder andere dürfen darin umbenennen: --appimage-extract in einem eigenen Ordner aufrufen"));
+    }
+    Ok(())
 }
 
 /// remove the folders of other images of the same name not used for KEEP_DAYS (a running
@@ -318,15 +352,23 @@ fn remove_tree(path: &str) -> bool {
 // ---------------------------------------------------------------- extraction
 
 /// write the image's tree below dest (only the paths matching pattern, with their folders)
-/// -> the number of entries written
+/// -> the number of entries written.  The image's modes lose setuid, setgid and sticky, and
+/// what the umask removes and write for others (chmod is not subject to the umask).  Until
+/// their contents are in, dest and every folder below it are the user's alone (mode 0700; an
+/// existing one must be the user's), so nobody else can swap a folder on the way for a link;
+/// the modes are set at the end
 fn extract(img: &mut Image, dest: &str, pattern: Option<&str>) -> Result<u64, String> {
     let broken = || String::from("beschädigtes SquashFS-Abbild");
     let root = img.root().filter(|r| r.kind == Kind::Dir).ok_or_else(broken)?;
+    let (uid, _) = own_ids().ok_or("/proc fehlt")?;
+    let keep = 0o777 & !(umask() | 0o002);
     if !plat::mkdir(dest) {
         return Err(format!("{dest} wurde nicht angelegt"));
     }
+    let mut made = BTreeSet::new();
+    let mut modes: Vec<(String, u32)> = Vec::new(); // folders: set after their contents
+    modes.push((String::from(dest), make_dir(dest, uid, keep, &mut made)?));
     let mut count = 0u64;
-    let mut modes: Vec<(String, u16)> = Vec::new(); // folders: set after their contents
     let mut stack: Vec<(Inode, String, usize)> = vec![(root, String::new(), 0)];
     while let Some((dir, rel, depth)) = stack.pop() {
         if depth > MAX_DEPTH {
@@ -343,18 +385,22 @@ fn extract(img: &mut Image, dest: &str, pattern: Option<&str>) -> Result<u64, St
             let target = format!("{dest}/{path_in}");
             let wanted = pattern.is_none_or(|p| matches(p.as_bytes(), path_in.as_bytes()));
             if wanted && pattern.is_some() {
-                // only some entries: their folders were not made on the way down
+                // only some entries: their folders were not made on the way down (they keep
+                // the mode they had or got from mkdir)
                 let mut at = String::from(dest);
                 for part in rel.split('/').filter(|p| !p.is_empty()) {
                     at = format!("{at}/{part}");
-                    make_dir(&at)?;
+                    if !made.contains(&at) {
+                        let mode = make_dir(&at, uid, keep, &mut made)?;
+                        modes.push((at.clone(), mode));
+                    }
                 }
             }
             match node.kind {
                 Kind::Dir => {
                     if wanted {
-                        make_dir(&target)?;
-                        modes.push((target, node.mode));
+                        make_dir(&target, uid, keep, &mut made)?;
+                        modes.push((target, node.mode as u32 & keep | 0o700));
                         count += 1;
                     }
                     stack.push((node, path_in, depth + 1));
@@ -362,7 +408,7 @@ fn extract(img: &mut Image, dest: &str, pattern: Option<&str>) -> Result<u64, St
                 Kind::File if wanted => {
                     clear(&target)?;
                     write_file(img, &node, &target)?;
-                    plat::fs::set_mode(&target, node.mode as u32);
+                    plat::fs::set_mode(&target, node.mode as u32 & keep);
                     count += 1;
                 }
                 Kind::Symlink if wanted => {
@@ -377,25 +423,35 @@ fn extract(img: &mut Image, dest: &str, pattern: Option<&str>) -> Result<u64, St
         }
     }
     for (path, mode) in modes.iter().rev() {
-        plat::fs::set_mode(path, *mode as u32 | 0o700);
+        plat::fs::set_mode(path, *mode);
     }
     Ok(count)
 }
 
-/// a folder at path: an existing folder is fine, another kind of entry is replaced
-fn make_dir(path: &str) -> Result<(), String> {
-    match lstat(path) {
-        Some(m) if m.is_dir() => Ok(()),
-        _ => {
-            clear(path)?;
-            if plat::mkdir(path) { Ok(()) } else { Err(format!("{path} wurde nicht angelegt")) }
+/// a folder at path, the user's alone (mode 0700) until extract() sets its mode -> the mode it
+/// keeps when the image gives it none (keep of what it had, or got from mkdir).  An existing
+/// folder must be the user's, another kind of entry is replaced
+fn make_dir(path: &str, uid: u32, keep: u32, made: &mut BTreeSet<String>) -> Result<u32, String> {
+    if !lstat(path).is_some_and(|m| m.is_dir()) {
+        clear(path)?;
+        if !plat::mkdir(path) {
+            return Err(format!("{path} wurde nicht angelegt"));
         }
     }
+    let m = lstat(path).filter(|m| m.is_dir()).ok_or_else(|| format!("{path} wurde nicht angelegt"))?;
+    if m.uid != uid {
+        return Err(format!("{path} gehört einem anderen Benutzer"));
+    }
+    if !plat::fs::set_mode(path, 0o700) && m.mode & 0o022 != 0 {
+        return Err(format!("{path}: Rechte nicht gesetzt"));
+    }
+    made.insert(String::from(path));
+    Ok(m.mode & keep | 0o700)
 }
 
 /// make room for a file or link: an old file or link goes (a link is never written through),
-/// a folder in the way is an error.  The parent is a real folder: made by extract() on the
-/// way down, links among the parents replaced by make_dir()
+/// a folder in the way is an error.  The parent is a real folder of the user's alone: made by
+/// make_dir() on the way down, links among the parents replaced there
 fn clear(path: &str) -> Result<(), String> {
     match lstat(path) {
         None => Ok(()),
