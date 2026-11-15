@@ -36,6 +36,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   target whose `drop_effect_set` takes only linking under another program's drag that named no
   effects. A source that must not be linked names its effects (`DE_COPY | DE_MOVE`); files are
   still never moved.
+- Linux: the build script sets `--cfg jfgui_glibc` (the output through the GPU) also without std, unless `-C target-feature=+crt-static` asks for one static file; so a JFLib app builds on Linux with plain `cargo run`, no flags and no `--target`.
 
 ### Fixed
 

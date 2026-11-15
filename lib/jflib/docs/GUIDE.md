@@ -299,8 +299,7 @@ depend on the host; never report a VFS write as durable before its completion ar
 **Build and run**, an app of your own:
 
 ```
-cargo run                                        # build and start (Windows)
-cargo run --target x86_64-unknown-linux-gnu      # Linux: always with --target (.cargo/config.toml says why)
+cargo run                                        # build and start (Windows, Linux, macOS)
 cargo build --release                            # opt-level 2 + LTO, the profile of Cargo.toml
 JFLIB_STYLE=kde cargo run                        # another style built in
 cargo jflib watch                                # hot reload (section 30)

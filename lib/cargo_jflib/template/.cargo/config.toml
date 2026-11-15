@@ -5,14 +5,10 @@ linker = "rust-lld"
 [target.aarch64-pc-windows-msvc]
 linker = "rust-lld"
 
-# Linux: a program with a window links against glibc (the GPU drivers are glibc libraries).  A
-# command-line program can be one static file instead: "-C", "target-feature=+crt-static" in place
-# of "--cfg", "jfgui_glibc".  Always build with --target x86_64-unknown-linux-gnu, also on Linux:
-# these flags then reach only the program, not the build scripts and proc macros (linked by cc,
-# compiled for a shared library).  The linker is set here and not as `linker`, which would reach
-# them too.
-[target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "linker=rust-lld", "-C", "linker-flavor=ld.lld", "-C", "relocation-model=static", "--cfg", "jfgui_glibc"]
-
-[target.aarch64-unknown-linux-gnu]
-rustflags = ["-C", "linker=rust-lld", "-C", "linker-flavor=ld.lld", "-C", "relocation-model=static", "--cfg", "jfgui_glibc"]
+# Linux needs nothing here: a program with a window links against glibc through cc, as every Rust
+# program does (the GPU drivers are glibc libraries), so `cargo run` is all it takes.  A
+# command-line program can be one static file instead: these two lines, and always build it with
+# --target x86_64-unknown-linux-gnu, also on Linux (the flags must not reach the build scripts and
+# proc macros).
+# [target.x86_64-unknown-linux-gnu]
+# rustflags = ["-C", "target-feature=+crt-static", "-C", "relocation-model=static"]

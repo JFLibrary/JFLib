@@ -20,6 +20,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   a drop (`drop_allowed`) took it as every effect. A drag out that names no effects offers
   linking too; files are still never moved.
 - `watch::Watcher::take` reports `overflow` after each wait while a root or folder is not watched (`watching()` false), so a caller that rescans on `overflow` polls until the watcher sees everything again; before, a lost root reported one overflow and then nothing
+- Linux: the build script picks plat's build against glibc (`--cfg jfgui_glibc`: pthreads, the dynamic linker) also without std, unless `-C target-feature=+crt-static` asks for one static file; so a JFLib app builds on Linux with plain `cargo run`, no flags and no `--target`.
 
 ### Fixed
 

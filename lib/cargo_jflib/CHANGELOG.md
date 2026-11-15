@@ -8,6 +8,13 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- `cargo jflib new`: the template's `.cargo/config.toml` has no Linux tables any more, `cargo run`
+  builds the app on Linux too. `cargo jflib package` adds rust-lld itself for a Linux program built
+  on another system; `test` and `watch` keep `--target` on Linux, so apps from older templates
+  build too.
+
 ### Security
 
 - `cargo jflib web --serve` serves only plain names below the bundle, and only to the Host 127.0.0.1 or localhost. On Windows `GET /C:/...` and `..\` reached any file, and a web page could read the bundle through DNS rebinding.

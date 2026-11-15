@@ -35,7 +35,7 @@ to `Cargo.toml`).
 | --- | --- |
 | `Cargo.toml` | `jflib`, and `jflib-build` for the build script; the profiles below |
 | `build.rs` | `jflib_build::app()`, or `jflib_build::console()` for a command-line program |
-| `.cargo/config.toml` | the linker (rust-lld, it comes with rustup) and what Linux needs (with std only `+crt-static` for Windows) |
+| `.cargo/config.toml` | the linker for Windows (rust-lld, it comes with rustup); Linux needs nothing (with std only `+crt-static` for Windows) |
 | `src/lib.rs` | the app: a `ui::App` and `ui::main!` |
 | `src/main.rs` | the program, it only links the app, so the same code builds for the browser |
 | `PERMISSIONS` | what the app may do; without the file everything |
@@ -99,7 +99,7 @@ strip = "symbols"
 | Target | Build | Notes |
 | --- | --- | --- |
 | Windows | `cargo build`; ARM64: `--target aarch64-pc-windows-msvc` | rust-lld; the program links without import libraries, the build scripts need what Rust's msvc toolchain always needs (the Visual Studio Build Tools) |
-| Linux | `cargo build --target x86_64-unknown-linux-gnu`; ARM64: `--target aarch64-unknown-linux-gnu` | a window links against glibc (the GPU); a command-line program can be one static file (`.cargo/config.toml`) |
+| Linux | `cargo build`, on ARM64 Linux too | a window links against glibc (the GPU) through cc, as every Rust program; a command-line program can be one static file (`.cargo/config.toml`, then with `--target`); from Windows `cargo jflib package` builds the Linux packages |
 | macOS | `cargo build` on a Mac; `cargo jflib mac` makes `NAME.app` | Apple silicon; Apple's linker needs nothing in `.cargo/config.toml` |
 | iOS | `cargo build --target aarch64-apple-ios` (or `aarch64-apple-ios-sim`) on a Mac | devices and the simulator; `cargo jflib` makes no iOS app yet |
 | Browser | `cargo jflib web` | scalar, SIMD and with threads, the page around them and the licences in `target/jflib-web/NAME/`; threads need `rustup component add rust-src` |
@@ -114,10 +114,13 @@ switch at run time (`jflib::style_kde::STYLE`).
 - **A file added later:** after adding `PERMISSIONS`, `PACKAGE`, `assets/` or `res/app.ico` to
   a project that had none, run `cargo clean -p NAME` once. The build script watches only what
   exists; watching a missing file would compile the program again on every build.
-- **Always `--target` for Linux, on Linux too:** without it Cargo hands the target's flags to
-  the build scripts and proc macros as well, and the static relocation model breaks them. With it
-  they are linked by cc as usual and only the program by rust-lld. Without the two linker flags
-  cc links the program too.
+- **Linux needs no flags:** a program with a window links against glibc through cc, as the
+  build scripts do, so `cargo run` is all it takes there too. Only one static file (a
+  command-line program) takes `-C target-feature=+crt-static` and `-C relocation-model=static`
+  in `.cargo/config.toml`, and is then always built with `--target x86_64-unknown-linux-gnu`,
+  also on Linux: without it Cargo hands these flags to the build scripts and proc macros as well.
+  A project made from a template up to 0.2.0 drops the `[target.*-unknown-linux-gnu]` tables of
+  its `.cargo/config.toml` (with them it still builds with `--target`).
 - **Paths in a release program:** panic messages name the source files with the build
   machine's paths. `RUSTFLAGS="--remap-path-prefix=$HOME=~"` removes them.
 - **Versions:** the crates below `jflib` (`jflib-ui`, `jflib-plat`, ...) always come in the

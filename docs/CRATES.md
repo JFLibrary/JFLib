@@ -229,6 +229,10 @@ Die beiden offenen Fälle:
   `--target`, und `rust-lld` findet die C-Bibliotheken nicht. Deshalb steht der Linker in den `rustflags`, die mit
   `--target` nur das Programm erreichen. Zweitens scheitern ohne `--target` die Proc-Macros am Relocation-Modell.
   Unter Linux heißt es also immer `--target x86_64-unknown-linux-gnu`, das README sagt es.
+  Seit 0.2.1 nicht mehr: rt, plat, gpu und ui wählen den glibc-Build in ihren Build-Skripten, jflib-build linkt
+  mit `-no-pie` an eine feste Adresse statt `relocation-model=static` zu verlangen, die Vorlage hat keine
+  Linux-Flags mehr. Schlichtes `cargo run` genügt, nur die eine statische Datei (`+crt-static`) braucht weiter
+  `--target`.
 - **Ohne Visual Studio:** Drei Stellen in `plat` linkten `kernel32` noch über eine Importbibliothek, sie nutzen jetzt
   `raw-dylib`. Damit braucht das Programm selbst keine Importbibliothek mehr. Nachgestellt mit
   `/lldignoreenv /winsysroot:<leerer Ordner>`, denn `/lldignoreenv` allein hält `rust-lld` nicht davon ab, Visual
