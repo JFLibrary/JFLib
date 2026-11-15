@@ -98,12 +98,21 @@ bc-server service status | start | stop | uninstall
 ```
 
 `--report FILE` (server and `bc-agent pair`) writes the outcome as JSON for the setup
-assistant: `ok`, `message` and, for a new server, its setup token and CA fingerprint.
+assistant: `ok`, `message` and, for a new server, its setup token and CA fingerprint. On Linux
+and macOS the token is written only into a file and folder nobody else may read (the setup
+assistant makes both, owner-only, in the temporary folder).
 
 Windows registers `BackupCraftServer` / `BackupCraftAgent` (automatic start as LocalSystem,
-restart after a failure); Linux writes the systemd units `backupcraft-server` /
-`backupcraft-agent`. Both log to standard output and `<data>/logs/*.log` (10 MB, five older
-files kept).
+restart after a failure); a program outside Program Files (the per-user setup's folder) is first
+copied to `%ProgramFiles%\BackupCraftServer` / `%ProgramFiles%\BackupCraftAgent` (with the server
+the Linux agent for the SSH push), where only administrators may change it, and registered from
+there: after an update, `service uninstall` and `service install` again. Linux writes the systemd
+units `backupcraft-server` / `backupcraft-agent`. Both log to standard output and
+`<data>/logs/*.log` (10 MB, five older files kept).
+
+The data folder (and its `db`, `keys`, `journal` folders) must be the service's own: an existing
+one that is a link, belongs to another user or that others may write to (Windows: that grants
+anyone but SYSTEM, the administrators and the owner access) is refused.
 
 ### Packages
 

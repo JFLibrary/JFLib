@@ -13,7 +13,13 @@
 //                                                sibling is always a new file of its own
 //   join(dir, name) / parent(path)               '' separates on Windows only (and in vfs
 //                                                names); on Linux and macOS it is a character
-//   mkdir_private(path)                          owner-only directory (with parents)
+//   mkdir_private(path)                          owner-only directory (with parents); an
+//                                                existing one must be a folder (no link) of
+//                                                this user (Windows: also SYSTEM's or the
+//                                                administrators') nobody else may write to
+//                                                (Windows: has any access to), else false;
+//                                                Linux, macOS: one others may only read is
+//                                                made owner-only
 //   local_zone_id() -> "Europe/Berlin" | "win:W. Europe Standard Time"
 //   long_path(path) (Windows): the \\?\ form every call here uses
 //
@@ -332,7 +338,11 @@ pub fn write_file_private(path: &str, data: &[u8]) -> bool {
     }
 }
 
-/// an owner-only folder (with parents)
+/// an owner-only folder (with parents; existing parents are taken as they are).  An existing
+/// folder must be the folder itself (no link or junction), belong to this user (Windows: or to
+/// SYSTEM or the administrators) and let nobody else write to it (Windows: grant nobody else
+/// anything), else false: someone else's folder, made before the program, may hold planted files.
+/// Linux and macOS make one of this user that others may only read owner-only (0700).
 pub fn mkdir_private(path: &str) -> bool {
     match at(path) {
         At::Os(o) => sys::mkdir_private(o.as_deref().unwrap_or(path)),
@@ -351,6 +361,10 @@ mod win {
 
     const FILE_READ_ATTRIBUTES: u32 = 0x80;
     const FILE_WRITE_ATTRIBUTES: u32 = 0x100;
+    const READ_CONTROL: u32 = 0x2_0000;
+    const SE_FILE_OBJECT: u32 = 1;
+    const OWNER_INFO: u32 = 1;
+    const DACL_INFO: u32 = 4;
     const GENERIC_WRITE: u32 = 0x4000_0000;
     const SHARE_ALL: u32 = 7;
     const OPEN_EXISTING: u32 = 3;
@@ -428,11 +442,16 @@ mod win {
         fn LocalFree(memory: *mut core::ffi::c_void) -> *mut core::ffi::c_void;
         fn GetDynamicTimeZoneInformation(tz: *mut u8) -> u32;
         fn GetFullPathNameW(name: *const u16, n: u32, buf: *mut u16, part: usize) -> u32;
+        fn GetCurrentProcess() -> isize;
     }
 
     #[link(name = "advapi32", kind = "raw-dylib")]
     unsafe extern "system" {
         fn ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl: *const u16, rev: u32, sd: *mut usize, len: *mut u32) -> i32;
+        fn GetSecurityInfo(h: isize, kind: u32, info: u32, owner: *mut usize, group: *mut usize, dacl: *mut usize, sacl: *mut usize, sd: *mut usize) -> u32;
+        fn ConvertSidToStringSidW(sid: usize, text: *mut *mut u16) -> i32;
+        fn OpenProcessToken(process: isize, access: u32, token: *mut isize) -> i32;
+        fn GetTokenInformation(token: isize, class: u32, info: *mut u8, len: u32, ret: *mut u32) -> i32;
     }
 
     fn wz(s: &str) -> Vec<u16> {
@@ -753,20 +772,142 @@ mod win {
         if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
             return false;
         }
+        if lstat(path).is_some() {
+            return private_dir(path);
+        }
+        let up = super::parent(path);
+        if !up.is_empty() && up != path && !up.ends_with(':') && !make_parents(up) {
+            return false;
+        }
+        create_private(path) || private_dir(path)
+    }
+
+    // the parents of mkdir_private's folder: an existing one is taken as it is (C:\ProgramData,
+    // a share), new ones are private
+    fn make_parents(path: &str) -> bool {
+        if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
+            return false;
+        }
         if stat(path).is_some_and(|m| m.is_dir()) {
             return true;
         }
         let up = super::parent(path);
-        if !up.is_empty() && up != path && !up.ends_with(':') && !mkdir_private(up) {
+        if !up.is_empty() && up != path && !up.ends_with(':') && !make_parents(up) {
             return false;
         }
+        create_private(path) || stat(path).is_some_and(|m| m.is_dir())
+    }
+
+    fn create_private(path: &str) -> bool {
         let w = lp(path);
         let Some((sa, sd)) = private_sa() else { return false };
         // SAFETY: valid path and security attributes.
         let ok = unsafe { CreateDirectoryW(w.as_ptr(), &sa as *const SecurityAttributes as usize) } != 0;
         // SAFETY: as above.
         unsafe { LocalFree(sd as *mut core::ffi::c_void) };
-        ok || stat(path).is_some_and(|m| m.is_dir())
+        ok
+    }
+
+    /// an existing folder mkdir_private hands out: a folder itself (no link or junction), owned
+    /// by SYSTEM, the administrators or this user, whose DACL grants nobody else anything (someone
+    /// else's folder, made before the program, may hold planted files or let them be read)
+    fn private_dir(path: &str) -> bool {
+        let Some(h) = open(path, READ_CONTROL | FILE_READ_ATTRIBUTES, OPEN_REPARSE_POINT) else { return false };
+        if !meta_of(&h).is_some_and(|m| m.is_dir()) {
+            return false;
+        }
+        let (mut owner, mut dacl, mut sd) = (0usize, 0usize, 0usize);
+        // SAFETY: a handle with READ_CONTROL; owner and DACL point into sd, freed below.
+        let e = unsafe { GetSecurityInfo(h.0, SE_FILE_OBJECT, OWNER_INFO | DACL_INFO, &mut owner, core::ptr::null_mut(), &mut dacl, core::ptr::null_mut(), &mut sd) };
+        if e != 0 {
+            return false;
+        }
+        let me = user_sid();
+        let trusted = |s: &str| s == "S-1-5-18" || s == "S-1-5-32-544" || me.as_deref() == Some(s);
+        // (a null DACL grants everyone everything)
+        let ok = sid_text(owner).is_some_and(|s| trusted(&s))
+            && dacl != 0
+            // CREATOR OWNER (S-1-3-0) and OWNER RIGHTS (S-1-3-4) stand for the owner checked here
+            // and for whoever may create entries
+            && grants_only(dacl, &|s| trusted(s) || s == "S-1-3-0" || s == "S-1-3-4");
+        // SAFETY: the descriptor from GetSecurityInfo, no longer used.
+        unsafe { LocalFree(sd as *mut core::ffi::c_void) };
+        ok
+    }
+
+    /// whether every allowing ACE of the ACL at acl names a SID ok() accepts (or grants nothing)
+    fn grants_only(acl: usize, ok: &dyn Fn(&str) -> bool) -> bool {
+        // SAFETY: an ACL from GetSecurityInfo: its 8-byte header holds its size (AclSize).
+        let size = unsafe { core::ptr::read_unaligned((acl + 2) as *const u16) } as usize;
+        if size < 8 {
+            return false;
+        }
+        // SAFETY: the ACL is AclSize bytes long.
+        let b = unsafe { core::slice::from_raw_parts(acl as *const u8, size) };
+        let count = u16::from_le_bytes([b[4], b[5]]) as usize;
+        let mut off = 8;
+        for _ in 0..count {
+            if off + 4 > size {
+                return false;
+            }
+            let len = u16::from_le_bytes([b[off + 2], b[off + 3]]) as usize;
+            if len < 4 || off + len > size {
+                return false;
+            }
+            match b[off] {
+                // ACCESS_ALLOWED_ACE and ACCESS_ALLOWED_CALLBACK_ACE: header, mask, SID
+                0 | 9 => {
+                    if len < 16 {
+                        return false;
+                    }
+                    let mask = u32::from_le_bytes([b[off + 4], b[off + 5], b[off + 6], b[off + 7]]);
+                    if mask != 0 && !sid_text(b[off + 8..].as_ptr() as usize).is_some_and(|s| ok(&s)) {
+                        return false;
+                    }
+                }
+                // the object ACEs (directory objects, not files): never trusted
+                5 | 11 => return false,
+                _ => {}
+            }
+            off += len;
+        }
+        true
+    }
+
+    /// "S-1-5-..." of a SID
+    fn sid_text(sid: usize) -> Option<String> {
+        let mut p: *mut u16 = core::ptr::null_mut();
+        // SAFETY: a SID from the system; the text is freed with LocalFree below.
+        if sid == 0 || unsafe { ConvertSidToStringSidW(sid, &mut p) } == 0 || p.is_null() {
+            return None;
+        }
+        let mut n = 0;
+        // SAFETY: a NUL-terminated string from ConvertSidToStringSidW.
+        while unsafe { *p.add(n) } != 0 {
+            n += 1;
+        }
+        // SAFETY: n characters before the NUL.
+        let s = String::from_utf16_lossy(unsafe { core::slice::from_raw_parts(p, n) });
+        // SAFETY: allocated by ConvertSidToStringSidW.
+        unsafe { LocalFree(p as *mut core::ffi::c_void) };
+        Some(s)
+    }
+
+    /// the SID of the user this process runs as
+    fn user_sid() -> Option<String> {
+        let mut t = 0isize;
+        // SAFETY: TOKEN_QUERY on the own process's token (the pseudo handle needs no closing).
+        if unsafe { OpenProcessToken(GetCurrentProcess(), 8, &mut t) } == 0 {
+            return None;
+        }
+        let t = H(t);
+        let mut buf = [0usize; 64]; // TOKEN_USER (the SID's pointer first) and the SID
+        let mut n = 0u32;
+        // SAFETY: the buffer holds the given number of bytes; TokenUser = 1.
+        if unsafe { GetTokenInformation(t.0, 1, buf.as_mut_ptr() as *mut u8, core::mem::size_of_val(&buf) as u32, &mut n) } == 0 {
+            return None;
+        }
+        sid_text(buf[0])
     }
 
     pub fn local_zone_id() -> Option<String> {
@@ -791,7 +932,7 @@ mod lnx {
     use super::{DirEntry, FileKind, Meta};
     use alloc::string::String;
     use alloc::vec::Vec;
-    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_DIRECTORY, O_EXCL, O_NOFOLLOW, O_NONBLOCK, O_PATH, O_RDONLY, O_WRONLY, SYS_CLOSE, SYS_FCHMOD, SYS_FCHMODAT, SYS_FCHOWNAT, SYS_FSYNC, SYS_GETDENTS64, SYS_LINKAT, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_READLINKAT, SYS_STATFS, SYS_SYMLINKAT, SYS_UNLINKAT, SYS_UTIMENSAT, SYS_WRITE, Stat};
+    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_DIRECTORY, O_EXCL, O_NOFOLLOW, O_NONBLOCK, O_PATH, O_RDONLY, O_WRONLY, SYS_CLOSE, SYS_FCHMOD, SYS_FCHMODAT, SYS_FCHOWNAT, SYS_FSYNC, SYS_GETDENTS64, SYS_GETEUID, SYS_LINKAT, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_READLINKAT, SYS_STATFS, SYS_SYMLINKAT, SYS_UNLINKAT, SYS_UTIMENSAT, SYS_WRITE, Stat};
 
     const AT_SYMLINK_NOFOLLOW: usize = 0x100;
     const EINTR: isize = 4;
@@ -1092,17 +1233,49 @@ mod lnx {
         if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
             return false;
         }
+        if statx(path, AT_SYMLINK_NOFOLLOW).is_some() {
+            return private_dir(path);
+        }
+        let up = super::parent(path);
+        if !up.is_empty() && up != path && !make_parents(up) {
+            return false;
+        }
+        let p = z(path);
+        // SAFETY: a NUL-terminated path.
+        let r = unsafe { syscall3(SYS_MKDIRAT, AT_FDCWD, p.as_ptr() as usize, 0o700) };
+        r >= 0 || private_dir(path)
+    }
+
+    // the parents of mkdir_private's folder: an existing one is taken as it is (/var/lib, a
+    // mount), new ones are private
+    fn make_parents(path: &str) -> bool {
+        if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
+            return false;
+        }
         if stat(path).is_some_and(|m| m.is_dir()) {
             return true;
         }
         let up = super::parent(path);
-        if !up.is_empty() && up != path && !mkdir_private(up) {
+        if !up.is_empty() && up != path && !make_parents(up) {
             return false;
         }
         let p = z(path);
         // SAFETY: a NUL-terminated path.
         let r = unsafe { syscall3(SYS_MKDIRAT, AT_FDCWD, p.as_ptr() as usize, 0o700) };
         r >= 0 || stat(path).is_some_and(|m| m.is_dir())
+    }
+
+    /// an existing folder mkdir_private hands out: a folder itself (no link) of this user (root's:
+    /// root's) that nobody else may write to (someone else's, made before the program, may hold
+    /// planted files); one others may only read is made owner-only
+    fn private_dir(path: &str) -> bool {
+        let Some(m) = statx(path, AT_SYMLINK_NOFOLLOW) else { return false };
+        // SAFETY: geteuid has no arguments.
+        let euid = unsafe { syscall3(SYS_GETEUID, 0, 0, 0) } as u32;
+        if !m.is_dir() || m.uid != euid || m.mode & 0o022 != 0 {
+            return false;
+        }
+        m.mode & 0o077 == 0 || set_mode(path, 0o700)
     }
 
     pub fn local_zone_id() -> Option<String> {
@@ -1155,6 +1328,7 @@ mod apl {
         fn fchmodat(dir: c_int, path: *const c_char, mode: u16, flags: c_int) -> c_int;
         fn fchownat(dir: c_int, path: *const c_char, uid: u32, gid: u32, flags: c_int) -> c_int;
         fn statfs(path: *const c_char, buf: *mut u8) -> c_int;
+        fn geteuid() -> u32;
     }
 
     fn z(s: &str) -> Vec<u8> {
@@ -1447,17 +1621,48 @@ mod apl {
         if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
             return false;
         }
+        if stat_raw(path, false).is_some() {
+            return private_dir(path);
+        }
+        let up = super::parent(path);
+        if !up.is_empty() && up != path && !make_parents(up) {
+            return false;
+        }
+        let p = z(path);
+        // SAFETY: a NUL-terminated path.
+        let r = unsafe { ffi::mkdir(zp(&p), 0o700) };
+        r == 0 || private_dir(path)
+    }
+
+    // the parents of mkdir_private's folder: an existing one is taken as it is (/Library, a
+    // volume), new ones are private
+    fn make_parents(path: &str) -> bool {
+        if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
+            return false;
+        }
         if stat(path).is_some_and(|m| m.is_dir()) {
             return true;
         }
         let up = super::parent(path);
-        if !up.is_empty() && up != path && !mkdir_private(up) {
+        if !up.is_empty() && up != path && !make_parents(up) {
             return false;
         }
         let p = z(path);
         // SAFETY: a NUL-terminated path.
         let r = unsafe { ffi::mkdir(zp(&p), 0o700) };
         r == 0 || stat(path).is_some_and(|m| m.is_dir())
+    }
+
+    /// an existing folder mkdir_private hands out: a folder itself (no link) of this user (root's:
+    /// root's) that nobody else may write to (someone else's, made before the program, may hold
+    /// planted files); one others may only read is made owner-only
+    fn private_dir(path: &str) -> bool {
+        let Some(m) = stat_raw(path, false) else { return false };
+        // SAFETY: geteuid has no arguments.
+        if !m.is_dir() || m.uid != unsafe { geteuid() } || m.mode & 0o022 != 0 {
+            return false;
+        }
+        m.mode & 0o077 == 0 || set_mode(path, 0o700)
     }
 
     /// TZ, else the target of /etc/localtime (/var/db/timezone/zoneinfo/Europe/Berlin)

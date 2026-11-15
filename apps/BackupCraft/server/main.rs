@@ -178,7 +178,10 @@ fn service_cmd(sub: &str) -> i32 {
                 exe: &exe,
                 args: &args,
             };
-            let r = plat::service::install(&spec).and_then(|_| plat::service::start(SERVICE)).map(|_| {
+            let r = plat::service::install(&spec).and_then(|_| {
+                copy_agents(&spec);
+                plat::service::start(SERVICE)
+            }).map(|_| {
                 format!("Dienst {} eingerichtet und gestartet (Daten: {}; das Setup-Token steht in setup.token)", SERVICE, args[3])
             });
             if let Some(file) = plat::arg_value("--report") {
@@ -201,10 +204,37 @@ fn service_cmd(sub: &str) -> i32 {
     }
 }
 
+/// the service runs a copy of this program in Program Files when it lies elsewhere (Windows,
+/// plat::service::program_path): the Linux agent the SSH push sends (ssh_push.rs,
+/// agents/linux-x86_64/bc-agent next to the program) goes along (best effort: without it the push
+/// says so)
+fn copy_agents(spec: &plat::service::ServiceSpec) {
+    let Some(to) = plat::service::program_path(spec) else { return };
+    let (from, to) = (plat::fs::parent(spec.exe), plat::fs::parent(&to));
+    if from.eq_ignore_ascii_case(to) {
+        return;
+    }
+    let src = ["agents", "linux-x86_64", "bc-agent"].iter().fold(String::from(from), |p, n| plat::fs::join(&p, n));
+    let Some(b) = plat::read_file(&src) else { return };
+    let mut dir = String::from(to);
+    for n in ["agents", "linux-x86_64"] {
+        dir = plat::fs::join(&dir, n);
+        let _ = plat::mkdir(&dir);
+    }
+    let _ = plat::write_file(&plat::fs::join(&dir, "bc-agent"), &b);
+}
+
 /// --report FILE (the console's setup assistant, which started this install with administrator
 /// rights and cannot read the data folder): once the service runs, its setup token (empty when it
-/// is set up already) and the SHA-256 of its CA as JSON {ok, message, token, ca_fingerprint}
+/// is set up already) and the SHA-256 of its CA as JSON {ok, message, token, ca_fingerprint}.
+/// Linux and macOS: the token only into a file nobody else may read, in such a folder (the
+/// writer keeps an existing file's owner and mode)
 fn report(file: &str, data: &str, r: &Result<String, String>) {
+    let private = cfg!(windows) || [plat::fs::parent(file), file].iter().all(|p| plat::fs::lstat(p).is_some_and(|m| !m.is_symlink() && m.mode & 0o077 == 0));
+    let r = &match r {
+        Ok(_) if !private => Err(format!("{} ist für andere Benutzer lesbar: das Setup-Token steht in {}", file, plat::fs::join(data, "setup.token"))),
+        r => r.clone(),
+    };
     let mut v = bc_proto::j::obj([
         ("ok", bc_proto::j::Value::Bool(r.is_ok())),
         ("message", bc_proto::j::Value::string(match r {
