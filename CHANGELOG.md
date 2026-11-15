@@ -95,6 +95,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **crypto:** eappwd::pwe always runs at least 40 hunting-and-pecking rounds and selects the first point without branching, so its time no longer shows how many rounds a password needs (Dragonblood, CVE-2019-9494); the element is unchanged
 - **netpkt:** imf::fold, Message::header_bytes and Draft::to_bytes no longer let CR, LF or NUL in a field start a new field (header injection), and the FTP, SMTP, POP3 and IMAP command builders (to_line, fmt_path, imap::line, imap::quoted) leave out CR, LF and NUL so an argument cannot start another command; fmt_path also drops angle brackets from the address and blanks from parameters
 - **plat:** Windows: URL schemes are registered as `"<exe>" -- "%1"` and plat::args keeps the URL after -- as one argument, so a quote in a link cannot add options; ui stops reading options at --. Apps registered before keep the old command until they are registered again
+- **plat:** New plat::fs::Dir works below an open folder without ever following a link (Linux openat2 with a step-by-step O_NOFOLLOW fallback, macOS openat walk, Windows folders held open without share-delete), with set_file_times / set_file_mode through a file's own handle; TcpStream::peer_uid returns the user id of the other end of a Unix socket (SO_PEERCRED, getpeereid)
 
 ## [0.2.0] - 2026-11-14
 

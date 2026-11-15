@@ -122,9 +122,10 @@ fn socket_id(path: &str) -> Option<(u32, u64, u64)> {
 }
 
 /// whether the server may read the disk files a QEMU reports: its socket belongs to root or to
-/// the user the server runs as.  Any other process could name files of others (/etc/shadow) the
-/// server would then copy into a point; its VMs are backed up only while they run (QEMU reads
-/// the disks itself), their files are not kept for cold backups.
+/// the user the server runs as, and so does the process that answered on it (SO_PEERCRED).  Any
+/// other process could name files of others (/etc/shadow) the server would then copy into a
+/// point; its VMs are backed up only while they run (QEMU reads the disks itself), their files
+/// are not kept for cold backups.
 fn trusted_peer(ctx: &Ctx, owner: u32) -> bool {
     owner == 0 || plat::fs::lstat(&ctx.data).is_some_and(|m| m.uid == owner)
 }
@@ -151,9 +152,12 @@ pub fn scan(ctx: &Ctx) -> Vec<Vm> {
                 bc_vm::Reach::Down => continue,
             };
             let Ok(i) = bc_vm::info(&mut q) else { continue };
+            // the process that answered (the kernel's record of it, Linux and macOS) and the
+            // socket file, looked at again (not a link, not swapped meanwhile)
+            let peer = q.peer_uid();
             drop(q);
-            // the socket that answered is the one whose owner was looked at (not a link)
-            let files = sock.is_some_and(|s| socket_id(&path) == Some(s) && trusted_peer(ctx, s.0));
+            let files = sock.is_some_and(|s| socket_id(&path) == Some(s) && trusted_peer(ctx, s.0))
+                && peer.map_or(cfg!(windows), |u| trusted_peer(ctx, u));
             let id = format!("{}:{}", host.id, i.name);
             found.insert(id.clone(), Vm {
                 id,

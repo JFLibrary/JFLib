@@ -133,6 +133,7 @@ mod arch {
     pub const SYS_EXECVEAT: usize = 322;
     pub const SYS_USERFAULTFD: usize = 323;
     pub const SYS_CLOSE_RANGE: usize = 436;
+    pub const SYS_OPENAT2: usize = 437;
     pub const SYS_LANDLOCK_CREATE_RULESET: usize = 444;
     pub const SYS_LANDLOCK_ADD_RULE: usize = 445;
     pub const SYS_LANDLOCK_RESTRICT_SELF: usize = 446;
@@ -297,6 +298,7 @@ mod arch {
     pub const SYS_EXECVEAT: usize = 281;
     pub const SYS_USERFAULTFD: usize = 282;
     pub const SYS_CLOSE_RANGE: usize = 436;
+    pub const SYS_OPENAT2: usize = 437;
     pub const SYS_LANDLOCK_CREATE_RULESET: usize = 444;
     pub const SYS_LANDLOCK_ADD_RULE: usize = 445;
     pub const SYS_LANDLOCK_RESTRICT_SELF: usize = 446;

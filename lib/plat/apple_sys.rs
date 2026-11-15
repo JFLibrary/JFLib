@@ -397,6 +397,16 @@ fn open_z(p: &[u8], flags: i32, mode: u32) -> Option<OsFile> {
 }
 
 impl OsFile {
+    /// (fs.rs: Dir) an OS file of a descriptor opened there, which it now owns
+    pub(crate) fn from_raw(raw: i32) -> OsFile {
+        OsFile(raw)
+    }
+
+    /// (fs.rs: set_file_times / set_file_mode) its descriptor
+    pub(crate) fn raw(&self) -> i32 {
+        self.0
+    }
+
     /// Create a private named file exclusively; never follow or overwrite an existing path.
     #[allow(dead_code)] // (fs.rs: write_file_private, AP3)
     pub(crate) fn create_new_raw(path: &str) -> Option<OsFile> {

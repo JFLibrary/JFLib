@@ -22,6 +22,10 @@
 //                                                made owner-only
 //   local_zone_id() -> "Europe/Berlin" | "win:W. Europe Standard Time"
 //   long_path(path) (Windows): the \\?\ form every call here uses
+//   Dir                                          an open folder: entries below it reached
+//                                                relative to it, never through a link (the
+//                                                section "folders by handle")
+//   set_file_times / set_file_mode (File)        through the open file's own handle
 //
 // Windows: reparse points count as links only for symbolic links and junctions; other tags
 // (deduplication, cloud placeholders) are ordinary files whose data is read.  Files are
@@ -351,12 +355,184 @@ pub fn mkdir_private(path: &str) -> bool {
     }
 }
 
+// ------------------------------------------------------------------ folders by handle
+
+/// An open folder: what lies below it is reached relative to it and never through a link, so
+/// a folder on the way that is swapped for a link (or renamed) after a check cannot lead a
+/// privileged read, write, change or removal out of it.
+///
+///   Dir::open(path)                   the folder as it is (a link to it is followed: the
+///                                     trusted start, e.g. a shared folder); OS paths and
+///                                     folder mounts only
+///   open_dir(rel)                     a folder below ("a/b"; no "..", nothing absolute) with no
+///                                     link on the way: Linux openat2 (RESOLVE_BENEATH |
+///                                     RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS), else openat
+///                                     with O_NOFOLLOW for every component (kernels before 5.6,
+///                                     a seccomp filter that refuses openat2)
+///   names                             one component: no separator, not "." or ".." (Windows:
+///                                     no ':' either); "" is the folder itself where noted
+///   lstat / read_link / read_dir      links are reported, never followed
+///   open_file(name)                   a regular file, read only; a link or anything else: None
+///   create_new(name)                  a new file (Linux, macOS 0600), never an existing name
+///   mkdir / remove / rename / symlink a link is removed or renamed as the link
+///   set_times / set_mode / set_attrs  on the entry itself, never on a link's target
+///   set_file_times / set_file_mode    through an open File's own handle (whatever its name
+///                                     has become meanwhile)
+///
+/// macOS: openat with O_NOFOLLOW component by component, the *at calls on the folder.  Windows
+/// has no calls relative to an open folder in its API: a Dir holds every folder from its start
+/// down open without FILE_SHARE_DELETE (checked to be a folder, not a junction or a link), so
+/// none of them can be renamed, removed or replaced while it lives, and its entries are named
+/// by path below them (with OPEN_REPARSE_POINT).  The manifest's rules (policy.rs) are checked
+/// on the path an entry has below the start.
+pub struct Dir {
+    path: String,
+    os: sys::OsDir,
+}
+
+// the separators of an OS path
+fn os_seps() -> &'static [char] {
+    if cfg!(windows) { &['/', '\\'] } else { &['/'] }
+}
+
+// one component of a path below a Dir
+fn one_name(name: &str) -> bool {
+    !name.is_empty() && name != "." && name != ".." && !name.contains(os_seps()) && !name.contains('\0') && !(cfg!(windows) && name.contains(':'))
+}
+
+impl Dir {
+    /// the folder `path` as it is (a link to it is followed); None when it is no folder
+    pub fn open(path: &str) -> Option<Dir> {
+        let At::Os(o) = at(path) else { return None };
+        let p = o.unwrap_or_else(|| String::from(path));
+        if p.is_empty() || p.contains('\0') || !crate::policy::fs_allowed(&p, crate::policy::FS_READ) {
+            return None;
+        }
+        Some(Dir { os: sys::OsDir::open(&p)?, path: p })
+    }
+
+    /// the path the folder was opened as (with the names below its start)
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    /// a folder below this one ("a/b"): no component may be a link (or a junction), none may
+    /// be ".." and the path may not be absolute
+    pub fn open_dir(&self, rel: &str) -> Option<Dir> {
+        let names: Vec<&str> = rel.split(os_seps()).filter(|n| !n.is_empty()).collect();
+        if names.is_empty() || rel.starts_with(os_seps()) || !names.iter().all(|n| one_name(n)) {
+            return None;
+        }
+        let mut path = self.path.clone();
+        for n in &names {
+            path = join(&path, n);
+        }
+        if !crate::policy::fs_allowed(&path, crate::policy::FS_READ) {
+            return None;
+        }
+        Some(Dir { os: self.os.open_dir(&names)?, path })
+    }
+
+    // the path of an entry ("": the folder itself when `own`) if the rules allow `access`
+    fn entry(&self, name: &str, own: bool, access: u32) -> Option<String> {
+        let p = if own && name.is_empty() {
+            self.path.clone()
+        } else if one_name(name) {
+            join(&self.path, name)
+        } else {
+            return None;
+        };
+        crate::policy::fs_allowed(&p, access).then_some(p)
+    }
+
+    /// the metadata of an entry itself ("": the folder), a link not followed
+    pub fn lstat(&self, name: &str) -> Option<Meta> {
+        self.entry(name, true, crate::policy::FS_READ)?;
+        self.os.lstat(name)
+    }
+
+    /// the target of a symbolic link (Windows: also a junction)
+    pub fn read_link(&self, name: &str) -> Option<String> {
+        self.entry(name, false, crate::policy::FS_READ)?;
+        self.os.read_link(name)
+    }
+
+    /// the entries of the folder ("." / ".." left out); None also when an error cut it short
+    pub fn read_dir(&self) -> Option<Vec<DirEntry>> {
+        self.entry("", true, crate::policy::FS_READ)?;
+        self.os.read_dir()
+    }
+
+    /// a regular file, read only (never through a link; a folder, device or pipe: None)
+    pub fn open_file(&self, name: &str) -> Option<crate::File> {
+        self.entry(name, false, crate::policy::FS_READ)?;
+        self.os.open_file(name)
+    }
+
+    /// a new file, read and write (Linux, macOS: 0600); an existing name, also a link: None
+    pub fn create_new(&self, name: &str) -> Option<crate::File> {
+        self.entry(name, false, crate::policy::FS_WRITE)?;
+        self.os.create_new(name)
+    }
+
+    /// a new folder (Linux, macOS: 0777 less the umask); false also when the name exists
+    pub fn mkdir(&self, name: &str) -> bool {
+        self.entry(name, false, crate::policy::FS_WRITE).is_some() && self.os.mkdir(name)
+    }
+
+    /// a file, a link (never what it points to) or an empty folder
+    pub fn remove(&self, name: &str) -> bool {
+        self.entry(name, false, crate::policy::FS_WRITE).is_some() && self.os.remove(name)
+    }
+
+    /// rename `name` to `to_name` in `to` (this folder or another Dir on the same volume),
+    /// replacing an existing file there; a link is renamed as the link
+    pub fn rename(&self, name: &str, to: &Dir, to_name: &str) -> bool {
+        self.entry(name, false, crate::policy::FS_WRITE).is_some() && to.entry(to_name, false, crate::policy::FS_WRITE).is_some() && self.os.rename(name, &to.os, to_name)
+    }
+
+    /// a symbolic link `name` to `target` (dir: a folder's link on Windows); the rules as for
+    /// symlink: the target as the link leads to it must be writable
+    pub fn symlink(&self, target: &str, name: &str, dir: bool) -> bool {
+        let Some(l) = self.entry(name, false, crate::policy::FS_WRITE) else { return false };
+        !target.is_empty() && !target.contains('\0') && link_target_allowed(target, &l) && self.os.symlink(target, name, dir)
+    }
+
+    /// access and modification times (ns since 1970) of an entry itself ("": the folder)
+    pub fn set_times(&self, name: &str, atime_ns: i64, mtime_ns: i64) -> bool {
+        self.entry(name, true, crate::policy::FS_WRITE).is_some() && self.os.set_times(name, atime_ns, mtime_ns)
+    }
+
+    /// permission bits (07777) of an entry ("": the folder); a link is left alone (Windows:
+    /// nothing to do)
+    pub fn set_mode(&self, name: &str, mode: u32) -> bool {
+        self.entry(name, true, crate::policy::FS_WRITE).is_some() && self.os.set_mode(name, mode)
+    }
+
+    /// FILE_ATTRIBUTE_* of an entry ("": the folder; Linux, macOS: nothing to do)
+    pub fn set_attrs(&self, name: &str, attrs: u32) -> bool {
+        self.entry(name, true, crate::policy::FS_WRITE).is_some() && self.os.set_attrs(name, attrs)
+    }
+}
+
+/// access and modification times of an open file, through its handle; a mount's stream: false
+pub fn set_file_times(f: &crate::File, atime_ns: i64, mtime_ns: i64) -> bool {
+    f.os().is_some_and(|o| sys::set_file_times(o, atime_ns, mtime_ns))
+}
+
+/// permission bits (07777) of an open file, through its handle (Windows: nothing to do); a
+/// mount's stream: false
+pub fn set_file_mode(f: &crate::File, mode: u32) -> bool {
+    f.os().is_some_and(|o| sys::set_file_mode(o, mode))
+}
+
 // ------------------------------------------------------------------ Windows
 
 #[cfg(windows)]
 mod win {
     use super::{DirEntry, FileKind, Meta};
     use alloc::string::String;
+    use alloc::sync::Arc;
     use alloc::vec::Vec;
 
     const FILE_READ_ATTRIBUTES: u32 = 0x80;
@@ -582,6 +758,10 @@ mod win {
         if !(crate::policy::fs_allowed(path, crate::policy::FS_READ)) {
             return None;
         }
+        read_dir_raw(path)
+    }
+
+    fn read_dir_raw(path: &str) -> Option<Vec<DirEntry>> {
         let pat = wz(&super::join(&long_path(path), "*"));
         // SAFETY: plain data, filled by the call.
         let mut d: FindData = unsafe { core::mem::zeroed() };
@@ -614,6 +794,10 @@ mod win {
         if !crate::policy::fs_allowed(path, crate::policy::FS_READ) {
             return None;
         }
+        read_link_raw(path)
+    }
+
+    fn read_link_raw(path: &str) -> Option<String> {
         let h = open(path, FILE_READ_ATTRIBUTES, OPEN_REPARSE_POINT)?;
         let mut buf = alloc::vec![0u8; 16 * 1024];
         let mut got = 0u32;
@@ -665,6 +849,10 @@ mod win {
         if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
             return false;
         }
+        set_times_raw(path, atime_ns, mtime_ns)
+    }
+
+    fn set_times_raw(path: &str, atime_ns: i64, mtime_ns: i64) -> bool {
         let Some(h) = open(path, FILE_WRITE_ATTRIBUTES, OPEN_REPARSE_POINT) else { return false };
         let (a, m) = (ns_ft(atime_ns), ns_ft(mtime_ns));
         // SAFETY: a valid handle; creation time unchanged (null).
@@ -676,6 +864,10 @@ mod win {
         if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
             return false;
         }
+        set_attrs_raw(path, attrs)
+    }
+
+    fn set_attrs_raw(path: &str, attrs: u32) -> bool {
         let w = lp(path);
         // SAFETY: a valid wide path.
         unsafe { SetFileAttributesW(w.as_ptr(), attrs & 0x27 | if attrs & 0x27 == 0 { 0x80 } else { 0 }) != 0 }
@@ -923,6 +1115,149 @@ mod win {
         }
         Some(alloc::format!("win:{}", String::from_utf16_lossy(&w)))
     }
+
+    // ---- Dir: every folder from the start down held open without FILE_SHARE_DELETE
+
+    const GENERIC_READ: u32 = 0x8000_0000;
+    const SHARE_NO_DELETE: u32 = 3;
+    const ERROR_SHARING_VIOLATION: u32 = 32;
+
+    // a folder held open, and the folders above it
+    struct Pin {
+        h: H,
+        _up: Option<Arc<Pin>>,
+    }
+
+    /// an open folder: its \\?\ path, below folders that cannot move while it lives
+    pub struct OsDir {
+        path: String,
+        pin: Arc<Pin>,
+    }
+
+    // a folder opened so that it cannot be renamed or removed, nor anything put in its place,
+    // while the handle lives (`follow`: a link to it is followed: the start).  One that another
+    // program already holds with delete access cannot be opened that way: it is held without
+    // the guarantee (checked to be a folder all the same)
+    fn hold(path: &str, follow: bool) -> Option<H> {
+        let w = lp(path);
+        let flags = BACKUP_SEMANTICS | if follow { 0 } else { OPEN_REPARSE_POINT };
+        // SAFETY: a valid wide path; no security attributes; GetLastError right after the call.
+        let (mut h, e) = unsafe { (CreateFileW(w.as_ptr(), FILE_READ_ATTRIBUTES, SHARE_NO_DELETE, 0, OPEN_EXISTING, flags, 0), GetLastError()) };
+        if h == INVALID && e == ERROR_SHARING_VIOLATION {
+            // SAFETY: as above.
+            h = unsafe { CreateFileW(w.as_ptr(), FILE_READ_ATTRIBUTES, SHARE_ALL, 0, OPEN_EXISTING, flags, 0) };
+        }
+        if h == INVALID {
+            return None;
+        }
+        let h = H(h);
+        // (a junction or a symbolic link counts as a link, not as a folder)
+        meta_of(&h).is_some_and(|m| m.is_dir()).then_some(h)
+    }
+
+    fn owned(h: H) -> crate::File {
+        let raw = h.0;
+        core::mem::forget(h);
+        crate::File::from_os(crate::OsFile::from_raw(raw))
+    }
+
+    impl OsDir {
+        pub fn open(path: &str) -> Option<OsDir> {
+            let path = long_path(path);
+            Some(OsDir { pin: Arc::new(Pin { h: hold(&path, true)?, _up: None }), path })
+        }
+
+        pub fn open_dir(&self, names: &[&str]) -> Option<OsDir> {
+            let mut path = self.path.clone();
+            let mut pin = self.pin.clone();
+            for n in names {
+                path = super::join(&path, n);
+                pin = Arc::new(Pin { h: hold(&path, false)?, _up: Some(pin) });
+            }
+            Some(OsDir { path, pin })
+        }
+
+        fn full(&self, name: &str) -> String {
+            if name.is_empty() { self.path.clone() } else { super::join(&self.path, name) }
+        }
+
+        pub fn lstat(&self, name: &str) -> Option<Meta> {
+            if name.is_empty() {
+                return meta_of(&self.pin.h);
+            }
+            meta_of(&open(&self.full(name), FILE_READ_ATTRIBUTES, OPEN_REPARSE_POINT)?)
+        }
+
+        pub fn read_link(&self, name: &str) -> Option<String> {
+            read_link_raw(&self.full(name))
+        }
+
+        pub fn read_dir(&self) -> Option<Vec<DirEntry>> {
+            read_dir_raw(&self.path)
+        }
+
+        pub fn open_file(&self, name: &str) -> Option<crate::File> {
+            let p = self.full(name);
+            let first = open(&p, GENERIC_READ, OPEN_REPARSE_POINT)?;
+            let m = meta_of(&first)?;
+            if !m.is_file() {
+                return None;
+            }
+            if m.attrs & ATTR_REPARSE == 0 {
+                return Some(owned(first));
+            }
+            // another reparse point (deduplication, a cloud file): its data, if the name still
+            // leads to the same file
+            let h = open(&p, GENERIC_READ, 0)?;
+            meta_of(&h).is_some_and(|n| n.is_file() && (n.dev, n.ino) == (m.dev, m.ino)).then(|| owned(h))
+        }
+
+        pub fn create_new(&self, name: &str) -> Option<crate::File> {
+            crate::OsFile::create_new_raw(&self.full(name)).map(crate::File::from_os)
+        }
+
+        pub fn mkdir(&self, name: &str) -> bool {
+            let w = lp(&self.full(name));
+            // SAFETY: a valid wide path; default security.
+            unsafe { CreateDirectoryW(w.as_ptr(), 0) != 0 }
+        }
+
+        pub fn remove(&self, name: &str) -> bool {
+            crate::delete_raw(&self.full(name))
+        }
+
+        pub fn rename(&self, name: &str, to: &OsDir, to_name: &str) -> bool {
+            crate::rename_raw(&self.full(name), &to.full(to_name))
+        }
+
+        pub fn symlink(&self, target: &str, name: &str, dir: bool) -> bool {
+            let (t, l) = (wz(target), lp(&self.full(name)));
+            // SAFETY: valid wide strings.
+            unsafe { CreateSymbolicLinkW(l.as_ptr(), t.as_ptr(), if dir { 1 } else { 0 } | 2) != 0 }
+        }
+
+        pub fn set_times(&self, name: &str, atime_ns: i64, mtime_ns: i64) -> bool {
+            set_times_raw(&self.full(name), atime_ns, mtime_ns)
+        }
+
+        pub fn set_mode(&self, _name: &str, _mode: u32) -> bool {
+            true
+        }
+
+        pub fn set_attrs(&self, name: &str, attrs: u32) -> bool {
+            set_attrs_raw(&self.full(name), attrs)
+        }
+    }
+
+    pub fn set_file_times(f: &crate::OsFile, atime_ns: i64, mtime_ns: i64) -> bool {
+        let (a, m) = (ns_ft(atime_ns), ns_ft(mtime_ns));
+        // SAFETY: the file's handle; creation time unchanged (null).
+        unsafe { SetFileTime(f.raw(), core::ptr::null(), &a, &m) != 0 }
+    }
+
+    pub fn set_file_mode(_f: &crate::OsFile, _mode: u32) -> bool {
+        true
+    }
 }
 
 // ------------------------------------------------------------------ Linux
@@ -932,7 +1267,7 @@ mod lnx {
     use super::{DirEntry, FileKind, Meta};
     use alloc::string::String;
     use alloc::vec::Vec;
-    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_DIRECTORY, O_EXCL, O_NOFOLLOW, O_NONBLOCK, O_PATH, O_RDONLY, O_WRONLY, SYS_CLOSE, SYS_FCHMOD, SYS_FCHMODAT, SYS_FCHOWNAT, SYS_FSYNC, SYS_GETDENTS64, SYS_GETEUID, SYS_LINKAT, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_READLINKAT, SYS_STATFS, SYS_SYMLINKAT, SYS_UNLINKAT, SYS_UTIMENSAT, SYS_WRITE, Stat};
+    use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_CREAT, O_DIRECTORY, O_EXCL, O_NOFOLLOW, O_NONBLOCK, O_PATH, O_RDONLY, O_RDWR, O_WRONLY, SYS_CLOSE, SYS_FCHMOD, SYS_FCHMODAT, SYS_FCHOWNAT, SYS_FSTAT, SYS_FSYNC, SYS_GETDENTS64, SYS_GETEUID, SYS_LINKAT, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_OPENAT2, SYS_READLINKAT, SYS_RENAMEAT, SYS_RENAMEAT2, SYS_STATFS, SYS_SYMLINKAT, SYS_UNLINKAT, SYS_UTIMENSAT, SYS_WRITE, Stat};
 
     const AT_SYMLINK_NOFOLLOW: usize = 0x100;
     const EINTR: isize = 4;
@@ -980,14 +1315,23 @@ mod lnx {
 
     fn statx(path: &str, flags: usize) -> Option<Meta> {
         let p = z(path);
+        stat_in(AT_FDCWD, &p, flags)
+    }
+
+    // newfstatat of a NUL-terminated name relative to dir
+    fn stat_in(dir: usize, name: &[u8], flags: usize) -> Option<Meta> {
         let mut st = Stat::default();
-        // SAFETY: a NUL-terminated path; st is a struct stat.
-        let r = unsafe { syscall6(SYS_NEWFSTATAT, AT_FDCWD, p.as_ptr() as usize, &mut st as *mut Stat as usize, flags, 0, 0) };
+        // SAFETY: a NUL-terminated name; st is a struct stat.
+        let r = unsafe { syscall6(SYS_NEWFSTATAT, dir, name.as_ptr() as usize, &mut st as *mut Stat as usize, flags, 0, 0) };
         if r < 0 {
             return None;
         }
+        Some(meta_of(&st))
+    }
+
+    fn meta_of(st: &Stat) -> Meta {
         let t = |s: i64, ns: i64| s.saturating_mul(1_000_000_000).saturating_add(ns);
-        Some(Meta {
+        Meta {
             kind: Some(kind_of_mode(st.st_mode)),
             size: st.st_size as u64,
             atime_ns: t(st.st_atime, st.st_atime_nsec),
@@ -1000,7 +1344,7 @@ mod lnx {
             dev: st.st_dev,
             ino: st.st_ino,
             nlink: st.st_nlink as u32,
-        })
+        }
     }
 
     pub fn stat(path: &str) -> Option<Meta> {
@@ -1026,6 +1370,12 @@ mod lnx {
             return None;
         }
         let fd = open(path, O_RDONLY | O_DIRECTORY, 0)?;
+        list_fd(&fd, &|name| lstat(&super::join(path, name)).and_then(|m| m.kind).unwrap_or(FileKind::Other))
+    }
+
+    // the entries of an open folder (getdents64 from its current position); `unknown`: the
+    // kind of an entry the file system does not name (d_type 0)
+    fn list_fd(fd: &Fd, unknown: &dyn Fn(&str) -> FileKind) -> Option<Vec<DirEntry>> {
         let mut out = Vec::new();
         let mut buf = alloc::vec![0u8; 32 * 1024];
         loop {
@@ -1055,7 +1405,7 @@ mod lnx {
                         4 => FileKind::Dir,
                         8 => FileKind::File,
                         10 => FileKind::Symlink,
-                        0 => lstat(&super::join(path, &name)).and_then(|m| m.kind).unwrap_or(FileKind::Other),
+                        0 => unknown(&name),
                         _ => FileKind::Other,
                     };
                     out.push(DirEntry { name, kind });
@@ -1296,6 +1646,214 @@ mod lnx {
         crate::read_file_raw("/etc/timezone").map(|b| String::from(String::from_utf8_lossy(&b).trim())).filter(|s| !s.is_empty())
     }
 
+    // ---- Dir: the *at calls on an open folder
+
+    const AT_EMPTY_PATH: usize = 0x1000;
+    const AT_REMOVEDIR: usize = 0x200;
+    const EPERM: isize = 1;
+    const ENOENT: isize = 2;
+    const E2BIG: isize = 7;
+    const EAGAIN: isize = 11;
+    const EISDIR: isize = 21;
+    const EINVAL: isize = 22;
+    const ENOSYS: isize = 38;
+    const RESOLVE_NO_MAGICLINKS: u64 = 0x02;
+    const RESOLVE_NO_SYMLINKS: u64 = 0x04;
+    const RESOLVE_BENEATH: u64 = 0x08;
+    const S_IFMT: u32 = 0o170000;
+
+    /// an open folder (O_RDONLY | O_DIRECTORY: also listed through it)
+    pub struct OsDir(Fd);
+
+    // openat of a NUL-terminated name relative to dir
+    fn open_in(dir: usize, name: &[u8], flags: usize, mode: usize) -> Option<Fd> {
+        loop {
+            // SAFETY: a NUL-terminated name.
+            let r = unsafe { syscall6(SYS_OPENAT, dir, name.as_ptr() as usize, flags | O_CLOEXEC, mode, 0, 0) };
+            if r == -EINTR {
+                continue;
+            }
+            return (r >= 0).then_some(Fd(r as usize));
+        }
+    }
+
+    // an open regular file (fstat) as a File; anything else is closed again
+    fn regular(fd: Fd) -> Option<crate::File> {
+        let mut st = Stat::default();
+        // SAFETY: an owned descriptor; st is a struct stat.
+        if unsafe { syscall3(SYS_FSTAT, fd.0, &mut st as *mut Stat as usize, 0) } < 0 || st.st_mode & S_IFMT != 0o100000 {
+            return None;
+        }
+        Some(owned(fd))
+    }
+
+    fn owned(fd: Fd) -> crate::File {
+        let raw = fd.0 as i32;
+        core::mem::forget(fd);
+        crate::File::from_os(crate::OsFile::from_raw(raw))
+    }
+
+    fn timespecs(atime_ns: i64, mtime_ns: i64) -> [i64; 4] {
+        [atime_ns.div_euclid(1_000_000_000), atime_ns.rem_euclid(1_000_000_000), mtime_ns.div_euclid(1_000_000_000), mtime_ns.rem_euclid(1_000_000_000)]
+    }
+
+    impl OsDir {
+        pub fn open(path: &str) -> Option<OsDir> {
+            open(path, O_RDONLY | O_DIRECTORY, 0).map(OsDir)
+        }
+
+        pub fn open_dir(&self, names: &[&str]) -> Option<OsDir> {
+            let flags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC;
+            let rel = z(&names.join("/"));
+            // struct open_how: flags, mode, resolve
+            let how: [u64; 3] = [flags as u64, 0, RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS];
+            loop {
+                // SAFETY: a NUL-terminated path and a 24-byte open_how.
+                let r = unsafe { syscall6(SYS_OPENAT2, (self.0).0, rel.as_ptr() as usize, how.as_ptr() as usize, 24, 0, 0) };
+                if r >= 0 {
+                    return Some(OsDir(Fd(r as usize)));
+                }
+                if r == -EINTR {
+                    continue;
+                }
+                // no openat2 (before 5.6, a seccomp filter), or a rename meanwhile (EAGAIN):
+                // the same rule one component at a time; anything else (ELOOP: a link) is final
+                if ![-ENOSYS, -EPERM, -EAGAIN, -EINVAL, -E2BIG].contains(&r) {
+                    return None;
+                }
+                break;
+            }
+            let mut cur: Option<Fd> = None;
+            for n in names {
+                let base = cur.as_ref().map_or((self.0).0, |f| f.0);
+                cur = Some(open_in(base, &z(n), flags, 0)?);
+            }
+            cur.map(OsDir)
+        }
+
+        pub fn lstat(&self, name: &str) -> Option<Meta> {
+            if name.is_empty() {
+                return stat_in((self.0).0, b"\0", AT_EMPTY_PATH);
+            }
+            stat_in((self.0).0, &z(name), AT_SYMLINK_NOFOLLOW)
+        }
+
+        pub fn read_link(&self, name: &str) -> Option<String> {
+            let p = z(name);
+            let mut buf = alloc::vec![0u8; 4096];
+            // SAFETY: a NUL-terminated name; the buffer is writable.
+            let r = unsafe { syscall6(SYS_READLINKAT, (self.0).0, p.as_ptr() as usize, buf.as_mut_ptr() as usize, buf.len(), 0, 0) };
+            if r < 0 {
+                return None;
+            }
+            buf.truncate(r as usize);
+            Some(String::from_utf8_lossy(&buf).into_owned())
+        }
+
+        pub fn read_dir(&self) -> Option<Vec<DirEntry>> {
+            // a descriptor of its own: getdents moves the position
+            let fd = open_in((self.0).0, b".\0", O_RDONLY | O_DIRECTORY, 0)?;
+            list_fd(&fd, &|name| self.lstat(name).and_then(|m| m.kind).unwrap_or(FileKind::Other))
+        }
+
+        pub fn open_file(&self, name: &str) -> Option<crate::File> {
+            // O_NONBLOCK: a pipe swapped in does not block the open (and is refused)
+            regular(open_in((self.0).0, &z(name), O_RDONLY | O_NOFOLLOW | O_NONBLOCK, 0)?)
+        }
+
+        pub fn create_new(&self, name: &str) -> Option<crate::File> {
+            open_in((self.0).0, &z(name), O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600).map(owned)
+        }
+
+        pub fn mkdir(&self, name: &str) -> bool {
+            let p = z(name);
+            // SAFETY: a NUL-terminated name; 0777 (the umask applies).
+            unsafe { syscall3(SYS_MKDIRAT, (self.0).0, p.as_ptr() as usize, 0o777) >= 0 }
+        }
+
+        pub fn remove(&self, name: &str) -> bool {
+            let p = z(name);
+            // SAFETY: a NUL-terminated name.
+            unsafe {
+                let r = syscall3(SYS_UNLINKAT, (self.0).0, p.as_ptr() as usize, 0);
+                r == 0 || ((r == -EISDIR || r == -EPERM) && syscall3(SYS_UNLINKAT, (self.0).0, p.as_ptr() as usize, AT_REMOVEDIR) == 0)
+            }
+        }
+
+        pub fn rename(&self, name: &str, to: &OsDir, to_name: &str) -> bool {
+            let (a, b) = (z(name), z(to_name));
+            // SAFETY: NUL-terminated names; renameat where there is no renameat2 (before 3.15)
+            unsafe {
+                let r = syscall6(SYS_RENAMEAT2, (self.0).0, a.as_ptr() as usize, (to.0).0, b.as_ptr() as usize, 0, 0);
+                if r != -ENOSYS {
+                    return r == 0;
+                }
+                syscall6(SYS_RENAMEAT, (self.0).0, a.as_ptr() as usize, (to.0).0, b.as_ptr() as usize, 0, 0) == 0
+            }
+        }
+
+        pub fn symlink(&self, target: &str, name: &str, _dir: bool) -> bool {
+            let (t, l) = (z(target), z(name));
+            // SAFETY: NUL-terminated target and name.
+            unsafe { syscall3(SYS_SYMLINKAT, t.as_ptr() as usize, (self.0).0, l.as_ptr() as usize) >= 0 }
+        }
+
+        pub fn set_times(&self, name: &str, atime_ns: i64, mtime_ns: i64) -> bool {
+            let ts = timespecs(atime_ns, mtime_ns);
+            if name.is_empty() {
+                // SAFETY: two timespecs; a null name changes the folder itself (futimens)
+                return unsafe { syscall6(SYS_UTIMENSAT, (self.0).0, 0, ts.as_ptr() as usize, 0, 0, 0) >= 0 };
+            }
+            let p = z(name);
+            // SAFETY: a NUL-terminated name and two timespecs; the link itself.
+            unsafe { syscall6(SYS_UTIMENSAT, (self.0).0, p.as_ptr() as usize, ts.as_ptr() as usize, AT_SYMLINK_NOFOLLOW, 0, 0) >= 0 }
+        }
+
+        /// as set_mode: through a descriptor of the entry (O_PATH | O_NOFOLLOW, a link refused),
+        /// never through a name looked up again
+        pub fn set_mode(&self, name: &str, mode: u32) -> bool {
+            let bits = (mode & 0o7777) as usize;
+            if name.is_empty() {
+                // SAFETY: an owned descriptor.
+                return unsafe { syscall3(SYS_FCHMOD, (self.0).0, bits, 0) >= 0 };
+            }
+            let p = z(name);
+            if let Some(fd) = open_in((self.0).0, &p, O_PATH | O_NOFOLLOW, 0) {
+                let mut st = Stat::default();
+                // SAFETY: an owned descriptor; st is a struct stat.
+                if unsafe { syscall3(SYS_FSTAT, fd.0, &mut st as *mut Stat as usize, 0) } < 0 || st.st_mode & S_IFMT == 0o120000 {
+                    return false;
+                }
+                let link = z(&alloc::format!("/proc/self/fd/{}", fd.0));
+                // SAFETY: fchmodat on a NUL-terminated path.
+                let r = unsafe { syscall6(SYS_FCHMODAT, AT_FDCWD, link.as_ptr() as usize, bits, 0, 0, 0) };
+                if r != -ENOENT {
+                    return r >= 0; // (-ENOENT: no /proc)
+                }
+            }
+            match open_in((self.0).0, &p, O_RDONLY | O_NOFOLLOW | O_NONBLOCK, 0) {
+                // SAFETY: an owned descriptor.
+                Some(fd) => unsafe { syscall3(SYS_FCHMOD, fd.0, bits, 0) >= 0 },
+                None => false,
+            }
+        }
+
+        pub fn set_attrs(&self, _name: &str, _attrs: u32) -> bool {
+            true
+        }
+    }
+
+    pub fn set_file_times(f: &crate::OsFile, atime_ns: i64, mtime_ns: i64) -> bool {
+        let ts = timespecs(atime_ns, mtime_ns);
+        // SAFETY: the file's descriptor and two timespecs; a null name: the file itself (futimens)
+        unsafe { syscall6(SYS_UTIMENSAT, f.raw() as usize, 0, ts.as_ptr() as usize, 0, 0, 0) >= 0 }
+    }
+
+    pub fn set_file_mode(f: &crate::OsFile, mode: u32) -> bool {
+        // SAFETY: the file's descriptor.
+        unsafe { syscall3(SYS_FCHMOD, f.raw() as usize, (mode & 0o7777) as usize, 0) >= 0 }
+    }
+
     /// the \\?\ form exists on Windows only
     pub fn long_path(path: &str) -> String {
         String::from(path)
@@ -1329,6 +1887,15 @@ mod apl {
         fn fchownat(dir: c_int, path: *const c_char, uid: u32, gid: u32, flags: c_int) -> c_int;
         fn statfs(path: *const c_char, buf: *mut u8) -> c_int;
         fn geteuid() -> u32;
+        fn openat(dir: c_int, path: *const c_char, flags: c_int, ...) -> c_int;
+        fn fstatat(dir: c_int, path: *const c_char, st: *mut Stat, flags: c_int) -> c_int;
+        fn mkdirat(dir: c_int, path: *const c_char, mode: u16) -> c_int;
+        fn unlinkat(dir: c_int, path: *const c_char, flags: c_int) -> c_int;
+        fn renameat(from_dir: c_int, from: *const c_char, to_dir: c_int, to: *const c_char) -> c_int;
+        fn readlinkat(dir: c_int, path: *const c_char, buf: *mut c_char, size: usize) -> isize;
+        fn symlinkat(target: *const c_char, dir: c_int, link: *const c_char) -> c_int;
+        fn fdopendir(fd: c_int) -> *mut core::ffi::c_void;
+        fn futimens(fd: c_int, ts: *const ffi::Timespec) -> c_int;
     }
 
     fn z(s: &str) -> Vec<u8> {
@@ -1378,8 +1945,12 @@ mod apl {
         if r < 0 {
             return None;
         }
+        Some(meta_of(&st))
+    }
+
+    fn meta_of(st: &Stat) -> Meta {
         let t = |ts: ffi::Timespec| ts.tv_sec.saturating_mul(1_000_000_000).saturating_add(ts.tv_nsec);
-        Some(Meta {
+        Meta {
             kind: Some(kind_of_mode(st.st_mode as u32)),
             size: st.st_size as u64,
             atime_ns: t(st.st_atimespec),
@@ -1392,7 +1963,7 @@ mod apl {
             dev: st.st_dev as u32 as u64,
             ino: st.st_ino,
             nlink: st.st_nlink as u32,
-        })
+        }
     }
 
     pub fn stat(path: &str) -> Option<Meta> {
@@ -1423,6 +1994,15 @@ mod apl {
         if dir.is_null() {
             return None;
         }
+        let out = list_stream(dir, &|name| lstat(&super::join(path, name)).and_then(|m| m.kind).unwrap_or(FileKind::Other));
+        // SAFETY: our stream.
+        unsafe { ffi::closedir(dir) };
+        Some(out)
+    }
+
+    // the entries of an open stream; `unknown`: the kind of an entry the file system does not
+    // name (d_type 0)
+    fn list_stream(dir: *mut core::ffi::c_void, unknown: &dyn Fn(&str) -> FileKind) -> Vec<DirEntry> {
         let mut out = Vec::new();
         loop {
             // SAFETY: an open stream; the entry stays valid until the next readdir.
@@ -1442,15 +2022,13 @@ mod apl {
                     4 => FileKind::Dir,
                     8 => FileKind::File,
                     10 => FileKind::Symlink,
-                    0 => lstat(&super::join(path, &name)).and_then(|m| m.kind).unwrap_or(FileKind::Other),
+                    0 => unknown(&name),
                     _ => FileKind::Other,
                 };
                 out.push(DirEntry { name, kind });
             }
         }
-        // SAFETY: our stream.
-        unsafe { ffi::closedir(dir) };
-        Some(out)
+        out
     }
 
     pub fn read_link(path: &str) -> Option<String> {
@@ -1678,6 +2256,179 @@ mod apl {
         }
         let t = read_link_raw("/etc/localtime")?;
         t.find("zoneinfo/").map(|i| String::from(&t[i + 9..]))
+    }
+
+    // ---- Dir: the *at calls on an open folder, O_NOFOLLOW component by component
+
+    const AT_REMOVEDIR: c_int = 0x0080;
+
+    /// an open folder (O_RDONLY | O_DIRECTORY)
+    pub struct OsDir(Fd);
+
+    // openat of a name relative to dir
+    fn open_in(dir: c_int, name: &str, flags: c_int, mode: u32) -> Option<Fd> {
+        let p = z(name);
+        loop {
+            // SAFETY: a NUL-terminated name; the mode is the variadic argument.
+            let r = unsafe { openat(dir, zp(&p), flags | ffi::O_CLOEXEC, mode) };
+            if r < 0 && ffi::errno() == ffi::EINTR {
+                continue;
+            }
+            return (r >= 0).then_some(Fd(r));
+        }
+    }
+
+    fn owned(fd: Fd) -> crate::File {
+        let raw = fd.0;
+        core::mem::forget(fd);
+        crate::File::from_os(crate::OsFile::from_raw(raw))
+    }
+
+    fn timespecs(atime_ns: i64, mtime_ns: i64) -> [ffi::Timespec; 2] {
+        [
+            ffi::Timespec { tv_sec: atime_ns.div_euclid(1_000_000_000), tv_nsec: atime_ns.rem_euclid(1_000_000_000) },
+            ffi::Timespec { tv_sec: mtime_ns.div_euclid(1_000_000_000), tv_nsec: mtime_ns.rem_euclid(1_000_000_000) },
+        ]
+    }
+
+    fn fd_meta(fd: c_int) -> Option<Meta> {
+        let mut st = Stat::default();
+        // SAFETY: an open descriptor; st is a struct stat.
+        (unsafe { ffi::fstat(fd, &mut st) } == 0).then(|| meta_of(&st))
+    }
+
+    impl OsDir {
+        pub fn open(path: &str) -> Option<OsDir> {
+            open(path, ffi::O_RDONLY | ffi::O_DIRECTORY, 0).map(OsDir)
+        }
+
+        pub fn open_dir(&self, names: &[&str]) -> Option<OsDir> {
+            let mut cur: Option<Fd> = None;
+            for n in names {
+                let base = cur.as_ref().map_or((self.0).0, |f| f.0);
+                cur = Some(open_in(base, n, ffi::O_RDONLY | ffi::O_DIRECTORY | ffi::O_NOFOLLOW, 0)?);
+            }
+            cur.map(OsDir)
+        }
+
+        pub fn lstat(&self, name: &str) -> Option<Meta> {
+            if name.is_empty() {
+                return fd_meta((self.0).0);
+            }
+            let p = z(name);
+            let mut st = Stat::default();
+            // SAFETY: a NUL-terminated name; st is a struct stat; the link itself.
+            (unsafe { fstatat((self.0).0, zp(&p), &mut st, AT_SYMLINK_NOFOLLOW) } == 0).then(|| meta_of(&st))
+        }
+
+        pub fn read_link(&self, name: &str) -> Option<String> {
+            let p = z(name);
+            let mut buf = alloc::vec![0u8; 4096];
+            // SAFETY: a NUL-terminated name; the buffer is writable for its length.
+            let r = unsafe { readlinkat((self.0).0, zp(&p), buf.as_mut_ptr().cast(), buf.len()) };
+            if r < 0 {
+                return None;
+            }
+            buf.truncate(r as usize);
+            Some(String::from_utf8_lossy(&buf).into_owned())
+        }
+
+        pub fn read_dir(&self) -> Option<Vec<DirEntry>> {
+            // a descriptor of its own for the stream (it takes the descriptor over)
+            let fd = open_in((self.0).0, ".", ffi::O_RDONLY | ffi::O_DIRECTORY, 0)?;
+            // SAFETY: an owned descriptor, handed to the stream on success.
+            let dir = unsafe { fdopendir(fd.0) };
+            if dir.is_null() {
+                return None;
+            }
+            core::mem::forget(fd);
+            let out = list_stream(dir, &|name| self.lstat(name).and_then(|m| m.kind).unwrap_or(FileKind::Other));
+            // SAFETY: our stream (closes the descriptor).
+            unsafe { ffi::closedir(dir) };
+            Some(out)
+        }
+
+        pub fn open_file(&self, name: &str) -> Option<crate::File> {
+            // O_NONBLOCK: a pipe swapped in does not block the open (and is refused)
+            let fd = open_in((self.0).0, name, ffi::O_RDONLY | ffi::O_NOFOLLOW | ffi::O_NONBLOCK, 0)?;
+            fd_meta(fd.0).is_some_and(|m| m.is_file()).then(|| owned(fd))
+        }
+
+        pub fn create_new(&self, name: &str) -> Option<crate::File> {
+            open_in((self.0).0, name, ffi::O_RDWR | ffi::O_CREAT | ffi::O_EXCL | ffi::O_NOFOLLOW, 0o600).map(owned)
+        }
+
+        pub fn mkdir(&self, name: &str) -> bool {
+            let p = z(name);
+            // SAFETY: a NUL-terminated name; 0777 (the umask applies).
+            unsafe { mkdirat((self.0).0, zp(&p), 0o777) == 0 }
+        }
+
+        pub fn remove(&self, name: &str) -> bool {
+            let p = z(name);
+            // SAFETY: a NUL-terminated name; a folder (not a link to one) with AT_REMOVEDIR.
+            unsafe { unlinkat((self.0).0, zp(&p), 0) == 0 || (self.lstat(name).is_some_and(|m| m.is_dir()) && unlinkat((self.0).0, zp(&p), AT_REMOVEDIR) == 0) }
+        }
+
+        pub fn rename(&self, name: &str, to: &OsDir, to_name: &str) -> bool {
+            let (a, b) = (z(name), z(to_name));
+            // SAFETY: NUL-terminated names.
+            unsafe { renameat((self.0).0, zp(&a), (to.0).0, zp(&b)) == 0 }
+        }
+
+        pub fn symlink(&self, target: &str, name: &str, _dir: bool) -> bool {
+            let (t, l) = (z(target), z(name));
+            // SAFETY: NUL-terminated target and name.
+            unsafe { symlinkat(zp(&t), (self.0).0, zp(&l)) == 0 }
+        }
+
+        pub fn set_times(&self, name: &str, atime_ns: i64, mtime_ns: i64) -> bool {
+            let ts = timespecs(atime_ns, mtime_ns);
+            if name.is_empty() {
+                // SAFETY: an owned descriptor and two timespecs.
+                return unsafe { futimens((self.0).0, ts.as_ptr()) == 0 };
+            }
+            let p = z(name);
+            // SAFETY: a NUL-terminated name and two timespecs; the link itself.
+            unsafe { utimensat((self.0).0, zp(&p), ts.as_ptr(), AT_SYMLINK_NOFOLLOW) == 0 }
+        }
+
+        /// as set_mode: through a descriptor of the entry (O_NOFOLLOW), else fchmodat without
+        /// following; a link is left alone
+        pub fn set_mode(&self, name: &str, mode: u32) -> bool {
+            let bits = (mode & 0o7777) as u16;
+            if name.is_empty() {
+                // SAFETY: an owned descriptor.
+                return unsafe { ffi::fchmod((self.0).0, bits) == 0 };
+            }
+            if self.lstat(name).is_none_or(|m| m.is_symlink()) {
+                return false;
+            }
+            match open_in((self.0).0, name, ffi::O_RDONLY | ffi::O_NOFOLLOW | ffi::O_NONBLOCK, 0) {
+                // SAFETY: an owned descriptor.
+                Some(fd) => unsafe { ffi::fchmod(fd.0, bits) == 0 },
+                None => {
+                    let p = z(name);
+                    // SAFETY: a NUL-terminated name, never followed.
+                    unsafe { fchmodat((self.0).0, zp(&p), bits, AT_SYMLINK_NOFOLLOW) == 0 }
+                }
+            }
+        }
+
+        pub fn set_attrs(&self, _name: &str, _attrs: u32) -> bool {
+            true
+        }
+    }
+
+    pub fn set_file_times(f: &crate::OsFile, atime_ns: i64, mtime_ns: i64) -> bool {
+        let ts = timespecs(atime_ns, mtime_ns);
+        // SAFETY: the file's descriptor and two timespecs.
+        unsafe { futimens(f.raw(), ts.as_ptr()) == 0 }
+    }
+
+    pub fn set_file_mode(f: &crate::OsFile, mode: u32) -> bool {
+        // SAFETY: the file's descriptor.
+        unsafe { ffi::fchmod(f.raw(), (mode & 0o7777) as u16) == 0 }
     }
 
     /// the \\?\ form exists on Windows only

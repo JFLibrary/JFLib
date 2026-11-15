@@ -6,7 +6,10 @@
 //   - operators and administrators: also to the original place and replacing files
 //   - every name from the restore point is checked (no separators, no "..", no drive)
 //   - no symbolic link on the way: a folder of the target path that is a link stops the
-//     restore of that entry (a link planted in the target cannot redirect the data)
+//     restore of that entry (a link planted in the target cannot redirect the data); the
+//     entry's folder is opened from the restore folder without following links and the entry
+//     written, renamed, changed and removed relative to it (bc_fs::open_parent), so a folder
+//     swapped for a link meanwhile is not followed either
 //   - files are written to "<name>.bcrestore-<random>" in their folder and renamed when
 //     complete and synced; times, permissions and attributes follow
 //   - existing files: skip, rename ("name (wiederhergestellt).ext", "... 2" ...) or replace
@@ -209,9 +212,9 @@ impl Restorer<'_> {
         engine::session_log(self.ctx, self.s, LogLevel::Warning, &format!("{}: {}", path, what));
     }
 
-    /// the destination of an entry that exists already -> None: skip it
-    fn resolve(&mut self, dest: &str) -> Option<String> {
-        match bc_fs::free_target(dest, self.conflict.as_str()) {
+    /// the destination of an entry that exists already (in its open folder) -> None: skip it
+    fn resolve(&mut self, dir: &bc_fs::Dir, dest: &str) -> Option<String> {
+        match bc_fs::free_target_in(dir, dest, self.conflict.as_str()) {
             (Target::Free, p) => Some(p),
             (Target::Renamed, p) => {
                 self.renamed += 1;
@@ -231,29 +234,25 @@ impl Restorer<'_> {
         if let Dst::Agent(h) = self.dst {
             return self.node_agent(h, n, dest);
         }
-        if let Some(root) = &self.root {
-            if let Err(e) = bc_fs::no_links(root, dest, false) {
+        // the entry's folder, made and opened from the restore folder (no link on the way);
+        // everything below happens relative to it
+        let (dir, name) = match bc_fs::open_parent(self.root.as_deref(), dest, true) {
+            Ok(x) => x,
+            Err(e) => {
                 self.warn(dest, &e);
                 return Ok(());
             }
-        }
-        let parent = plat::fs::parent(dest);
-        if !parent.is_empty() {
-            if let Err(e) = bc_fs::ensure_dir(parent) {
-                self.warn(dest, &e);
-                return Ok(());
-            }
-        }
+        };
         if self.mirror && self.may_remove {
             // an entry of another kind where this one goes: it goes first
-            if let Some(m) = plat::fs::lstat(dest) {
+            if let Some(m) = dir.lstat(&name) {
                 let fits = match n.kind {
                     NodeKind::Dir => m.is_dir() && !m.is_symlink(),
                     NodeKind::File => m.is_file(),
                     _ => false,
                 };
                 if !fits {
-                    match bc_fs::remove_tree_in(self.root.as_deref(), dest) {
+                    match bc_fs::remove_tree_at(&dir, &name, dest) {
                         Ok(()) => self.removed += 1,
                         Err(e) => self.warn(dest, &e),
                     }
@@ -262,18 +261,21 @@ impl Restorer<'_> {
         }
         match n.kind {
             NodeKind::Dir => {
-                if let Err(e) = bc_fs::ensure_dir(dest) {
-                    self.warn(dest, &e);
-                    return Ok(());
-                }
+                let sub = match bc_fs::sub_dir(&dir, &name, dest, true) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        self.warn(dest, &e);
+                        return Ok(());
+                    }
+                };
                 let tree = match n.tree {
                     Some(t) => self.repo.read_tree(&t).map_err(engine::err_text)?,
                     None => return Ok(()),
                 };
                 if self.mirror && self.may_remove {
-                    for e in plat::fs::read_dir(dest).unwrap_or_default() {
+                    for e in sub.read_dir().unwrap_or_default() {
                         if tree.find(&e.name).is_none() {
-                            match bc_fs::remove_tree_in(self.root.as_deref(), &plat::fs::join(dest, &e.name)) {
+                            match bc_fs::remove_tree_at(&sub, &e.name, &plat::fs::join(dest, &e.name)) {
                                 Ok(()) => self.removed += 1,
                                 Err(x) => self.warn(dest, &x),
                             }
@@ -287,11 +289,11 @@ impl Restorer<'_> {
                     }
                     self.node(c, &plat::fs::join(dest, &c.name))?;
                 }
-                bc_fs::apply_meta(dest, n.atime_ns, n.mtime_ns, n.mode, 0);
+                bc_fs::apply_meta_in(&sub, "", n.atime_ns, n.mtime_ns, n.mode, 0);
             }
             NodeKind::File => {
                 if self.mirror {
-                    if let Some(m) = plat::fs::lstat(dest).filter(|m| m.is_file()) {
+                    if let Some(m) = dir.lstat(&name).filter(|m| m.is_file()) {
                         if same_file(m.size, m.mtime_ns, n) {
                             self.unchanged += 1;
                             self.done += n.size;
@@ -300,15 +302,15 @@ impl Restorer<'_> {
                         }
                     }
                 }
-                let Some(dest) = self.resolve(dest) else { return Ok(()) };
-                self.file(n, &dest)?;
+                let Some(dest) = self.resolve(&dir, dest) else { return Ok(()) };
+                self.file(n, &dir, &dest)?;
             }
             NodeKind::Symlink => {
-                if self.mirror && plat::fs::read_link(dest).is_some_and(|l| l == n.link) {
+                if self.mirror && dir.read_link(&name).is_some_and(|l| l == n.link) {
                     return Ok(());
                 }
-                let Some(dest) = self.resolve(dest) else { return Ok(()) };
-                if let Err(e) = bc_fs::make_link(&n.link, &dest, true, n.attrs & bc_fs::ATTR_DIRECTORY != 0) {
+                let Some(dest) = self.resolve(&dir, dest) else { return Ok(()) };
+                if let Err(e) = bc_fs::make_link_in(&dir, &n.link, bc_fs::file_name(&dest), true, n.attrs & bc_fs::ATTR_DIRECTORY != 0) {
                     self.warn(&dest, &e);
                 }
             }
@@ -317,10 +319,11 @@ impl Restorer<'_> {
         Ok(())
     }
 
-    fn file(&mut self, n: &Node, dest: &str) -> Result<(), String> {
-        let tmp = bc_fs::temp_name(dest);
-        let lp = plat::fs::long_path(&tmp);
-        let Some(f) = plat::File::create_new(&lp) else {
+    /// a file `dest` (a name in the open folder `dir`) from its chunks
+    fn file(&mut self, n: &Node, dir: &bc_fs::Dir, dest: &str) -> Result<(), String> {
+        let tmp_path = bc_fs::temp_name(dest);
+        let tmp = bc_fs::file_name(&tmp_path);
+        let Some(f) = dir.create_new(tmp) else {
             self.warn(dest, "kann nicht geschrieben werden");
             return Ok(());
         };
@@ -328,14 +331,14 @@ impl Restorer<'_> {
         for id in &n.chunks {
             if self.o.cancelled() {
                 drop(f);
-                plat::delete(&lp);
+                dir.remove(tmp);
                 return Err(String::from("Abgebrochen"));
             }
             let data = match self.repo.read_chunk(id) {
                 Ok(d) => d,
                 Err(e) => {
                     drop(f);
-                    plat::delete(&lp);
+                    dir.remove(tmp);
                     self.s.errors += 1;
                     engine::session_log(self.ctx, self.s, LogLevel::Error, &format!("{}: {}", dest, engine::err_text(e)));
                     return Ok(());
@@ -343,7 +346,7 @@ impl Restorer<'_> {
             };
             if f.write_at(off, &data) != Some(data.len()) {
                 drop(f);
-                plat::delete(&lp);
+                dir.remove(tmp);
                 self.warn(dest, "Schreibfehler (Speicher voll?)");
                 return Ok(());
             }
@@ -351,7 +354,7 @@ impl Restorer<'_> {
             self.done += data.len() as u64;
             self.o.progress(self.done, self.total.max(self.done));
         }
-        if let Err(e) = bc_fs::finish_file(f, &tmp, dest, n.atime_ns, n.mtime_ns, n.mode, n.attrs) {
+        if let Err(e) = bc_fs::finish_file_in(f, dir, tmp, bc_fs::file_name(dest), n.atime_ns, n.mtime_ns, n.mode, n.attrs) {
             self.warn(dest, &e);
             return Ok(());
         }

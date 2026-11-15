@@ -5,7 +5,9 @@
 // failback).  Removing (replica
 // mirrors): the restore folders only, never a folder itself, links as links.  Restored files are
 // written to temporary files the agent itself names and remembers; write / commit / abort
-// accept only those.
+// accept only those.  After the check the folder is opened from the shared folder without
+// following a link (bc_fs::open_dir) and the entry is used relative to that open folder, so a
+// folder swapped for a link after the check is not followed either.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -35,14 +37,25 @@ pub struct State {
     pub changes: Mutex<ChangeLog>,
     pub changed: plat::sync::Condvar,
     /// open restores: temporary file -> its handle (written through it only, so a link swapped
-    /// in for the name cannot redirect the data), destination, start
+    /// in for the name cannot redirect the data), its open folder and name there, destination,
+    /// start
     pub temps: Mutex<BTreeMap<String, Temp>>,
 }
 
 pub struct Temp {
     file: plat::File,
+    dir: bc_fs::Dir,
+    name: String,
     dest: String,
     at: i64,
+}
+
+impl Temp {
+    /// the temporary file closed and removed (from its open folder)
+    fn discard(self) {
+        drop(self.file);
+        self.dir.remove(&self.name);
+    }
 }
 
 fn err(status: u16, c: &str, m: &str) -> Response {
@@ -142,12 +155,13 @@ fn info(st: &State) -> Response {
 
 fn list(st: &State, req: &Request) -> Response {
     let path = q(req, "path");
-    if let Err(r) = st.check(&path, Access::Write, true) {
-        return r;
-    }
+    let root = match st.check(&path, Access::Write, true) {
+        Ok(r) => r,
+        Err(r) => return r,
+    };
     let offset = q_u64(req, "offset") as usize;
     let limit = req.query("limit").and_then(|v| v.parse().ok()).unwrap_or(1000usize).clamp(1, 5000);
-    match bc_fs::listing(&path, offset, limit) {
+    match bc_fs::listing(Some(&root), &path, offset, limit) {
         Some(l) => ok(&l),
         None => err(404, code::NOT_FOUND, &format!("{}: Ordner nicht lesbar", path)),
     }
@@ -155,11 +169,11 @@ fn list(st: &State, req: &Request) -> Response {
 
 fn stat(st: &State, req: &Request) -> Response {
     let path = q(req, "path");
-    if let Err(r) = st.check(&path, Access::Write, false) {
-        return r;
-    }
-    let name = &path[plat::fs::parent(&path).len()..];
-    match bc_fs::entry(&path, name.trim_start_matches(['/', '\\'])) {
+    let root = match st.check(&path, Access::Write, false) {
+        Ok(r) => r,
+        Err(r) => return r,
+    };
+    match bc_fs::entry_in(Some(&root), &path) {
         Some(e) => ok(&e),
         None => err(404, code::NOT_FOUND, &format!("{}: nicht vorhanden oder nicht lesbar", path)),
     }
@@ -167,15 +181,18 @@ fn stat(st: &State, req: &Request) -> Response {
 
 fn read(st: &State, req: &Request) -> Response {
     let path = q(req, "path");
-    if let Err(r) = st.check(&path, Access::Read, true) {
-        return r;
-    }
+    let root = match st.check(&path, Access::Read, true) {
+        Ok(r) => r,
+        Err(r) => return r,
+    };
     if !plat::fs::lstat(&path).is_some_and(|m| m.is_file()) {
         return err(400, code::BAD_REQUEST, &format!("{}: keine Datei", path));
     }
     let off = q_u64(req, "offset");
     let len = q_u64(req, "len").clamp(1, READ_MAX) as usize;
-    let Some(f) = plat::File::open(&plat::fs::long_path(&path), plat::FO_READ) else {
+    // opened in its folder, the folder opened from the shared folder: no link followed, also
+    // none swapped in after the checks above (a regular file only)
+    let Some(f) = bc_fs::open_parent(Some(&root), &path, false).ok().and_then(|(d, name)| d.open_file(&name)) else {
         return err(409, code::CONFLICT, "Datei nicht lesbar (gesperrt oder keine Berechtigung)");
     };
     let mut buf = alloc::vec![0u8; len];
@@ -219,33 +236,38 @@ fn drop_stale(st: &State) {
     let mut temps = st.temps.lock();
     let old: Vec<String> = temps.iter().filter(|(_, x)| t - x.at > 6 * 3600).map(|(k, _)| k.clone()).collect();
     for k in old {
-        temps.remove(&k);
-        plat::delete(&plat::fs::long_path(&k));
+        if let Some(t) = temps.remove(&k) {
+            t.discard();
+        }
     }
 }
 
 fn restore_open(st: &State, req: &Request) -> Response {
     let Some(r) = body::<RestoreOpen>(req) else { return err(400, code::BAD_REQUEST, "Ungültige Anfrage") };
-    if let Err(x) = st.check(&r.path, Access::Write, false) {
-        return x;
-    }
+    let root = match st.check(&r.path, Access::Write, false) {
+        Ok(root) => root,
+        Err(x) => return x,
+    };
     drop_stale(st);
-    let parent = plat::fs::parent(&r.path);
-    if let Err(e) = bc_fs::ensure_dir(parent) {
-        return err(409, code::CONFLICT, &e);
-    }
-    let (t, dest) = bc_fs::free_target(&r.path, &r.conflict);
+    // the folder made and opened from the shared folder: the temporary file is created, renamed
+    // and removed in it, never through a link
+    let (dir, _) = match bc_fs::open_parent(Some(&root), &r.path, true) {
+        Ok(d) => d,
+        Err(e) => return err(409, code::CONFLICT, &e),
+    };
+    let (t, dest) = bc_fs::free_target_in(&dir, &r.path, &r.conflict);
     if t == bc_fs::Target::Skip {
         return ok(&RestoreOpened { skip: true, tmp: String::new(), dest });
     }
-    if plat::fs::lstat(&dest).is_some_and(|m| m.is_dir()) {
+    if dir.lstat(bc_fs::file_name(&dest)).is_some_and(|m| m.is_dir()) {
         return err(409, code::CONFLICT, &format!("{} ist ein Ordner", dest));
     }
     let tmp = bc_fs::temp_name(&dest);
-    let Some(file) = plat::File::create_new(&plat::fs::long_path(&tmp)) else {
+    let name = String::from(bc_fs::file_name(&tmp));
+    let Some(file) = dir.create_new(&name) else {
         return err(409, code::CONFLICT, &format!("{}: kann nicht geschrieben werden", dest));
     };
-    st.temps.lock().insert(tmp.clone(), Temp { file, dest: dest.clone(), at: crate::now() });
+    st.temps.lock().insert(tmp.clone(), Temp { file, dir, name, dest: dest.clone(), at: crate::now() });
     ok(&RestoreOpened { skip: false, tmp, dest })
 }
 
@@ -272,13 +294,13 @@ fn restore_commit(st: &State, req: &Request) -> Response {
         temps.remove(&c.tmp)
     };
     let Some(t) = t else { return err(404, code::NOT_FOUND, "unbekannte Wiederherstellung") };
-    // the way to the destination is checked again: it may have changed meanwhile
+    // the way to the destination is checked again: it may have changed meanwhile (the rename
+    // itself happens in the folder opened by restore_open)
     if let Err(x) = st.check(&c.dest, Access::Write, false) {
-        drop(t);
-        plat::delete(&plat::fs::long_path(&c.tmp));
+        t.discard();
         return x;
     }
-    match bc_fs::finish_file(t.file, &c.tmp, &c.dest, c.atime_ns, c.mtime_ns, c.mode, c.attrs) {
+    match bc_fs::finish_file_in(t.file, &t.dir, &t.name, bc_fs::file_name(&c.dest), c.atime_ns, c.mtime_ns, c.mode, c.attrs) {
         Ok(()) => done(),
         Err(e) => err(409, code::CONFLICT, &format!("{}: {}", c.dest, e)),
     }
@@ -341,29 +363,34 @@ fn restore_remove(st: &State, req: &Request) -> Response {
 
 fn restore_mkdir(st: &State, req: &Request) -> Response {
     let Some(d) = body::<RestoreDir>(req) else { return err(400, code::BAD_REQUEST, "Ungültige Anfrage") };
-    if let Err(x) = st.check(&d.path, Access::Write, true) {
-        return x;
-    }
-    if let Err(e) = bc_fs::ensure_dir(&d.path) {
-        return err(409, code::CONFLICT, &e);
-    }
-    bc_fs::apply_meta(&d.path, d.atime_ns, d.mtime_ns, d.mode, 0);
+    let root = match st.check(&d.path, Access::Write, true) {
+        Ok(r) => r,
+        Err(x) => return x,
+    };
+    // made and opened from the shared folder; its times and mode set through the open folder
+    let dir = match bc_fs::open_dir(Some(&root), &d.path, true) {
+        Ok(dir) => dir,
+        Err(e) => return err(409, code::CONFLICT, &e),
+    };
+    bc_fs::apply_meta_in(&dir, "", d.atime_ns, d.mtime_ns, d.mode, 0);
     done()
 }
 
 fn restore_symlink(st: &State, req: &Request) -> Response {
     let Some(l) = body::<RestoreLink>(req) else { return err(400, code::BAD_REQUEST, "Ungültige Anfrage") };
-    if let Err(x) = st.check(&l.path, Access::Write, false) {
-        return x;
-    }
-    if let Err(e) = bc_fs::ensure_dir(plat::fs::parent(&l.path)) {
-        return err(409, code::CONFLICT, &e);
-    }
-    let (t, dest) = bc_fs::free_target(&l.path, &l.conflict);
+    let root = match st.check(&l.path, Access::Write, false) {
+        Ok(r) => r,
+        Err(x) => return x,
+    };
+    let (dir, _) = match bc_fs::open_parent(Some(&root), &l.path, true) {
+        Ok(d) => d,
+        Err(e) => return err(409, code::CONFLICT, &e),
+    };
+    let (t, dest) = bc_fs::free_target_in(&dir, &l.path, &l.conflict);
     if t == bc_fs::Target::Skip {
         return done();
     }
-    match bc_fs::make_link(&l.target, &dest, true, l.dir) {
+    match bc_fs::make_link_in(&dir, &l.target, bc_fs::file_name(&dest), true, l.dir) {
         Ok(()) => done(),
         Err(e) => err(409, code::CONFLICT, &format!("{}: {}", dest, e)),
     }
@@ -373,8 +400,7 @@ fn restore_abort(st: &State, req: &Request) -> Response {
     let tmp = q(req, "tmp");
     let t = st.temps.lock().remove(&tmp);
     if let Some(t) = t {
-        drop(t);
-        plat::delete(&plat::fs::long_path(&tmp));
+        t.discard();
     }
     done()
 }

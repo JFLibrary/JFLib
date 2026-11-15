@@ -498,6 +498,16 @@ pub(crate) fn file_exists_checked_raw(path: &str) -> Option<u32> {
 static TEMP_SEQ: AtomicU32 = AtomicU32::new(0);
 
 impl OsFile {
+    /// (fs.rs: Dir) an OS file of a handle opened there, which it now owns
+    pub(crate) fn from_raw(raw: isize) -> OsFile {
+        OsFile(raw)
+    }
+
+    /// (fs.rs: set_file_times / set_file_mode) its handle
+    pub(crate) fn raw(&self) -> isize {
+        self.0
+    }
+
     /// Create a named file exclusively, allowing a helper to read while its owner writes.
     pub(crate) fn create_new_raw(path: &str) -> Option<OsFile> {
         Self::open_mode(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, CREATE_NEW)
