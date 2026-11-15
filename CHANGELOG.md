@@ -83,6 +83,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** The file dialog takes a chosen path longer than its `cap` as not chosen (the system's dialogs) or says it is too long (the library's own): the path was cut, reported as chosen and granted as cut, possibly a parent folder under `fs.user`
 - **ui:** The permission dialog's two allowing buttons take no input for half a second after a question appears (window runs): a double click or a held key meant for the previous question answered the next one unread
 - **plat:** Linux: a portal's `Response` counts only when it comes from the portal itself (the sender of its reply to the request): the request path is predictable, and another client on the session bus could answer a file dialog with files of its choice
+- **tools:** Only APKs signed with the debug key are debuggable (aapt2 --debug-mode): the app manifests no longer set android:debuggable, and a release-key build stops on a manifest that does, so another app can no longer pass jfgui_* settings through launch extras to a release build
+- **cargo-jflib:** cargo jflib android: --release refuses a manifest that sets android:debuggable, debug APKs are debuggable through aapt2 --debug-mode; a copied clipboard image is shared as a new file each time and earlier copies are deleted, so an app that kept a descriptor of an earlier image cannot read later ones
 
 ## [0.2.0] - 2026-11-14
 

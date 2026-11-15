@@ -159,6 +159,17 @@ def manifest_for(manifest, work):
     return out
 
 
+def debuggable_attribute(manifest):
+    """a manifest that sets android:debuggable to anything but false -> the message, or None.  Debug
+    builds are debuggable through aapt2 --debug-mode; a release build must not be: GalleryActivity
+    takes the jfgui_* extras of whoever starts the app as settings when it is"""
+    for value in re.findall(r'android:debuggable\s*=\s*(?:"([^"]*)"|\'([^\']*)\')', manifest):
+        if ''.join(value).strip() != 'false':
+            return ('AndroidManifest.xml sets android:debuggable: a release build must not be debuggable '
+                    '(remove the attribute; debug builds get it from aapt2 --debug-mode).')
+    return None
+
+
 def native_link_flags():
     """what every native link of this target has: only what is used, 16 KiB pages, no text relocations"""
     return ['-Wl,--gc-sections,--exclude-libs,ALL,--no-undefined', '-Wl,-z,max-page-size=16384',
@@ -222,6 +233,8 @@ def build_apk(builder, name, style, variant, archive, notices):
     output = builder.android_output / f'{key}-{builder.android_abi}-{"release" if release else "debug"}.apk'
     # Packaging and tool versions participate in freshness, including the host sources.
     missing = manifest_gaps(build.app_permissions(name), manifest.read_text(encoding='utf-8'))
+    if not missing and release:
+        missing = debuggable_attribute(manifest.read_text(encoding='utf-8'))
     if missing:
         raise error(f'{name}: {missing}')
     digest = hashlib.sha256(Path(archive).read_bytes() + style.encode())
@@ -270,8 +283,11 @@ def build_apk(builder, name, style, variant, archive, notices):
     resources = work / 'compiled-res.zip'
     run([sdkbuild / ('aapt2' + suffix), 'compile', '--dir', app / 'android' / 'res', '-o', resources])
     unsigned = work / 'unsigned.apk'
+    # debuggable only under the debug key (debug builds, jfgui_ANDROID_DEBUG_SIGN=1): the self-tests'
+    # jfgui_* extras and run-as; a build signed with the release key never is
     run([sdkbuild / ('aapt2' + suffix), 'link', '-o', unsigned, '-I', platform, '--manifest', manifest_for(manifest, work),
-         '-R', resources, '--min-sdk-version', str(MIN_API), '--target-sdk-version', '35', '--auto-add-overlay'])
+         '-R', resources, '--min-sdk-version', str(MIN_API), '--target-sdk-version', '35', '--auto-add-overlay',
+         *([] if release else ['--debug-mode'])])
     with zipfile.ZipFile(unsigned, 'a') as apk:
         apk.write(dex / 'classes.dex', 'classes.dex', compress_type=zipfile.ZIP_DEFLATED)
         apk.write(native, f'lib/{builder.android_abi}/libjfgui_android.so', compress_type=zipfile.ZIP_STORED)

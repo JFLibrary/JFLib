@@ -390,8 +390,9 @@ signed with a local debug key. `--release` signs with the release key named by
 (`jfgui_ANDROID_KEY_PASS` if the key has its own password) and writes
 `<app>-<abi>-release.apk`; without them the build stops and names what is missing
 (`jfgui_ANDROID_DEBUG_SIGN=1` keeps the debug key for test builds; docs/PACKAGING.md,
-"Signing"). Other apps need an Android entry in `TARGETS` and a suitable manifest and
-resources.
+"Signing"). Only builds under the debug key are debuggable (the self-tests' `jfgui_*`
+extras); a manifest that sets `android:debuggable` stops a release build. Other apps
+need an Android entry in `TARGETS` and a suitable manifest and resources.
 
 <img src="docs/images/readme/pocket-gallery.png" alt="Pocket Gallery desktop preview with buttons, a checkbox, a switch, a slider, accent colors, and text input" width="320">
 
