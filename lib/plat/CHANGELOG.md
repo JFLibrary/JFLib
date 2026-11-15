@@ -11,6 +11,22 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Added
 
 - `watch::Watcher::watching()`: whether every root (Linux: every folder below them) is watched now
+- `SysSettings::wheel_lines` and `wheel_chars`: what a notch of the wheel scrolls (Windows
+  `SPI_GETWHEELSCROLLLINES`, `WHEEL_PAGE` for a page, and `SPI_GETWHEELSCROLLCHARS`; KDE's
+  `[KDE] WheelScrollLines` of kdeglobals; 3 elsewhere), `wheel_amount`, the overrides
+  `jfgui_WHEEL_LINES=N|page` and `jfgui_WHEEL_CHARS=N`; Windows reports a change of them as
+  `E_SETTINGS` with `SET_OTHER`.
+- `E_WHEEL`'s `btn`: `WHEEL_FINE` -- the 120 a notch in fine steps (Windows: a delta that is no
+  multiple of 120 or one from a touchpad by `GetCurrentInputMessageSource`, over popups too;
+  Wayland: `axis_value120` that is no multiple of 120) -- and `WHEEL_PIXELS` -- data in physical
+  pixels (Wayland's continuous axes, the fraction kept for the next frame; macOS' precise
+  deltas).
+- (E2) The keyboard layout's character of a key event in `Event::y` of `E_KEY_DOWN` /
+  `E_KEY_UP`, above the location: `key_y`, `key_location`, `key_char`, `key_dead`, `KEY_DEAD`.
+  It is what the key gives with Shift, Caps Lock and AltGr but without Ctrl, Alt and the
+  Windows / Super key: Windows through `ToUnicodeEx` without touching the keyboard state (10 1607
+  and later), Linux from the keymap (`xkb_key_y`, X11 and Wayland), macOS
+  `charactersIgnoringModifiers`. `key_char_test` and `key_layouts_test` (Windows) for plattest.
 
 ### Changed
 
@@ -21,6 +37,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   linking too; files are still never moved.
 - `watch::Watcher::take` reports `overflow` after each wait while a root or folder is not watched (`watching()` false), so a caller that rescans on `overflow` polls until the watcher sees everything again; before, a lost root reported one overflow and then nothing
 - Linux: the build script picks plat's build against glibc (`--cfg jfgui_glibc`: pthreads, the dynamic linker) also without std, unless `-C target-feature=+crt-static` asks for one static file; so a JFLib app builds on Linux with plain `cargo run`, no flags and no `--target`.
+- (E2) `Event::y` of key events carries the key's character above its location: code that
+  compared it with a `KL_*` takes `key_location(y)`.
+- Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical
+  pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point).
 
 ### Fixed
 

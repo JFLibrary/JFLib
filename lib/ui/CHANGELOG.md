@@ -26,6 +26,27 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   `DS_END` comes in the passes right after the drop's, no longer in the same pass as the target's
   `DS_DROP`. In the drop's passes `drag_allowed()` says the source's effects, as for other drops,
   and `dragging()` is false once the drag was dropped.
+- What a notch of the wheel scrolls as the system says it: `ui.wheel_lines()` (Windows' mouse
+  settings, KDE's; `plat::WHEEL_PAGE`: a page), `ui.wheel_chars()` and `ui.wheel_notch_px(line_px,
+  page_px, horizontal)`, followed live (`UIC_SETTINGS`); `WHEEL_LINE_DIP` (16), the library's
+  line. Scroll views, lists and documents scroll that many lines of 16 DIP a notch (48 DIP with
+  three, as before), text boxes, the rich and code editors, the terminal and the code completion
+  list that many of their own lines; image views and diagrams pan by it.
+- Pixel-precise scrolling: `UiInput::wheel_precise`, `wheel_px_x` and `wheel_px_y` give a
+  touchpad's, trackpad's or high-resolution wheel's turn in physical pixels (`plat::WHEEL_PIXELS`
+  as the platform gives them, Windows' fine steps `WHEEL_FINE` as `wheel_lines()` lines of 16 DIP
+  per 120), to scroll by at once; `wheel_x` / `wheel_y` say the same turn in notches, the fractions
+  of both carried from turn to turn. The library's scroll views, lists, documents, text boxes,
+  rich and code editors, image views and diagrams scroll by the pixels at once (no smooth
+  scrolling).
+- `KeyEvent::ch` and `KeyEvent::dead`: the character the keyboard layout gives the key with Shift,
+  Caps Lock and AltGr but without Ctrl, Alt and the Windows / Super key -- as a browser names the
+  key also when Ctrl or Alt is held: Ctrl+Z on a German keyboard is `VK_Z` with `'z'`, its Ctrl++
+  `VK_OEM_PLUS` with `'+'`, AltGr+Q `'@'`; 0 for keys without a character; a dead key with its
+  spacing character.
+- Test scripts: `wheel S DY [DX] [fine|pixels]` (a horizontal turn, fine steps, a trackpad's
+  pixels) and `keydown` / `keyup ... [char "c"|none] [dead]`; a script's keys have the US layout's
+  characters.
 
 ### Changed
 
@@ -37,6 +58,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   effects. A source that must not be linked names its effects (`DE_COPY | DE_MOVE`); files are
   still never moved.
 - Linux: the build script sets `--cfg jfgui_glibc` (the output through the GPU) also without std, unless `-C target-feature=+crt-static` asks for one static file; so a JFLib app builds on Linux with plain `cargo run`, no flags and no `--target`.
+- A notch of the wheel scrolls the system's lines in the library's views, no longer always three;
+  headless runs stay at three. A trackpad on macOS and a touchpad on Wayland, which plat gives in
+  pixels now, scroll the views by the fingers' way (4.8 times it on Wayland and 1.2 on macOS
+  before).
 
 ### Fixed
 
@@ -58,6 +83,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   first editor of the id that is built, and `canvas_damage` to the canvas in every window.
 - The syntax highlighter nests at most 32 levels within a line (template strings in `${..}`, Nest and Element rules); deeper, the rest of the line keeps the construct's colour. A long line of "`${" ran the stack out.
 - Terminal: cursor moves (`ESC[H`, `f`, `G`, `C`) reach column 1024 at most. The spaces up to a far column made 12 bytes into a scrollback line of 32000 cells.
+- The code editor's horizontal wheel scrolled the wrong way: tilted right it scrolled left.
+- An image view whose wheel zooms panned twice as far with the horizontal wheel while the
+  vertical one stood still (and not at all in a right-to-left window).
+- The fine steps of a precision touchpad were cut off one by one where whole lines count: the
+  terminal never scrolled with steps below 40, the code completion list scrolled three rows on
+  each of them, Ctrl + each of them zoomed a diagram a whole step. They add up now.
 
 ### Security
 
