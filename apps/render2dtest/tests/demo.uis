@@ -1,16 +1,37 @@
 #!args --demo
-# the demo headless: its view draws on a device of its own and every frame is read back; a drag pans the drawing with
-# the pointer, the wheel zooms at the pointer (the red line through x = 0 is 9 px wide, at the view's middle, x 360; the
-# blue line through y = 50 is 5 px wide, at y 222; the view starts at y 32, 1 unit = 1 px)
+# the demo headless: its view draws on a device of its own and every frame is read back; a drag with the middle button pans
+# the drawing with the pointer, the wheel zooms at the pointer (the red line through x = 0 is 9 px wide, at the view's
+# middle, x 360; the blue line through y = 50 is 5 px wide, at y 222; the view starts at y 32, 1 unit = 1 px).  G6d: a
+# window drawn with the left button selects (blue, grips), the line under the pointer is highlighted (orange), a click
+# picks, Esc clears
 wait 600
 expect pixel 358 300 #D02020
 expect pixel 600 222 #2040C0
-drag 358,300 458,300
+# a window around the part's slot (a line from (-40, -20) to (40, -20), 14 units wide, round, translucent): selected, its
+# grips at its ends and middle; a pixel of it away from the red line and the grid
+expect pixel 385 288 #7C9F8A
+drag 300,278 420,306
 wait 200
-expect pixel 458 300 #D02020
-expect pixel 358 300 #F4F1EA
+expect pixel 385 288 #618FD7
+expect pixel 400 291 #1E64FF
+key esc
+wait 200
+expect pixel 385 288 #7C9F8A
+drag 358,300 458,300 middle
+wait 200
+# the red line under the pointer: hovered, orange, 2 px wider (the pointer's snap marker sits where it crosses the grid)
+expect pixel 458 400 #F97F1B
 # one notch at (458, 300): 2^(1/4) larger about the pointer, the red line stays under it, the blue line moves up to 207
 wheel 458,300 120
 wait 200
-expect pixel 458 300 #D02020
+expect pixel 458 400 #F97F1B
 expect pixel 600 207 #2040C0
+# a click picks the red line; the pointer away: selected, blue
+click 458,400
+wait 200
+move 650,470
+wait 200
+expect pixel 458 420 #4B53C7
+key esc
+wait 200
+expect pixel 458 420 #D02020

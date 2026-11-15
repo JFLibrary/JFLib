@@ -1,0 +1,4 @@
+#!args --test overlay
+# the overlay (G6d): rubber bands, a filled polygon, window and crossing boxes against the same geometry as plain entities
+# and against lib/gfx, grips and the nine snap markers; an empty overlay changes no pixel and sends nothing; a rubber band
+# from near 1e7 at 1e-6 units per pixel where the camera puts it; Voll and Basis alike

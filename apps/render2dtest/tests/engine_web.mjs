@@ -7,10 +7,10 @@
 //   python build_rs.py app render2dtest --target win
 //   python build_rs.py app render2dtest --target web
 //   node apps/render2dtest/tests/engine_web.mjs [build] [--modes=simd,threads,scalar] [--native=FILE] [--gpu=d3d12|vulkan|swiftshader] [--save=DIR]
-//   node apps/render2dtest/tests/engine_web.mjs --bench [--n=1000000] [--thin] [--plain | --g6a2b | --g6b1 | --g6b2 | --no-text | --estate [--inserts=K]] [--modes=simd]    the
+//   node apps/render2dtest/tests/engine_web.mjs --bench [--n=1000000] [--thin] [--plain | --g6a2b | --g6b1 | --g6b2 | --no-text | --estate [--inserts=K]] [--g6d] [--modes=simd]    the
 //        measuring scene (--plain: without arcs and dashes, the drawing of G6a2a; --g6a2b: with arcs and dashes, without fills, hatches and
 //        curves; --g6b1: with them, without blocks; --g6b2: with blocks, without text; --no-text: the drawing of G6c without its text;
-//        --estate: a block of about n records inserted K times, 10 000)
+//        --estate: a block of about n records inserted K times, 10 000; --g6d: 100 000 entities selected and a full overlay in every frame)
 import {createServer} from 'node:http';
 import {mkdtemp, readFile, rm, readdir, writeFile} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
@@ -99,6 +99,7 @@ try {
       if(benchRun&&args.includes('--estate')) gpuenv+=',jfgui_GPU_PROBE_ESTATE=1';
       if(benchRun&&args.includes('--g6b2')) gpuenv+=',jfgui_GPU_PROBE_BLOCKS=1';
       if(benchRun&&args.includes('--no-text')) gpuenv+=',jfgui_GPU_PROBE_NOTEXT=1';
+      if(benchRun&&args.includes('--g6d')) gpuenv+=',jfgui_GPU_PROBE_HIGHLIGHT=1';
       if(benchRun&&option('inserts')) gpuenv+=`,jfgui_GPU_PROBE_INSERTS=${option('inserts')}`;
       await page.goto(`http://127.0.0.1:${server.address().port}/index.html?compute=${mode}&gpuenv=${gpuenv}`);
       const about=await page.evaluate(async()=>{try {const a=await navigator.gpu?.requestAdapter(); if(!a) return 'no adapter'; const i=a.info; return `${i.vendor} ${i.architecture} ${i.device} ${i.description} backend ${i.backendType} driver ${i.driver}`;} catch(e) {return String(e);}});

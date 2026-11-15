@@ -1,0 +1,5 @@
+#!args --test pick
+# picking (G6d): random drawings of every kind of shape with blocks inserted in every way (moved, turned, scaled evenly and
+# unevenly, mirrored, arrays, nested) against the same drawing expanded by the test into plain entities, hit for hit, in
+# order, distance for distance; the index against brute force; at the origin, at 1e7 and at 1e-6 units per pixel; exact
+# cases (caps, joins, a miter's limit, rings, an arc's end, curves against their parameters, a fill with a hole, inserts)

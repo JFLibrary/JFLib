@@ -4,6 +4,9 @@
 //
 //   render2dtest --bench N [--res 1080p|4k|WxH] [--frames F] [--basis] [--scene cad [--plain | --g6a2b | --g6b1 | --g6b2 | --expand | --no-text]]
 //   render2dtest --bench N --scene estate [--inserts K]   a block of about N records (a house) inserted K times (10 000)
+//   render2dtest --bench N --scene cad --g6d [..]          G6d: the index (build, memory), picks, windows and snaps per view
+//                (CPU), then each view's frame with nothing highlighted against 100 000 entities selected, one hovered and
+//                a full overlay (rounds in turn), what the highlight's change sends
 //
 // GPU times are the scene's timestamps (FrameStats): uploads, visibility (the three compute passes), the draw; each
 // frame is waited for before the next (no frames in flight: the times are the frame's own), medians over F frames.
@@ -13,7 +16,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use gpu::*;
-use render2d::{Camera, Cap, EntityId, Join, Layer, Renderer, RendererDesc, Scene, Shape, Style};
+use render2d::{Camera, Cap, EntityId, Join, Layer, Region, Renderer, RendererDesc, Scene, SelectMode, Shape, SnapOptions, Style};
 
 use crate::cad;
 use crate::gallery::{bg_clear, Rng, BG};
@@ -202,6 +205,9 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level, 
             out(&format!("{level:?}, {wname}, {} (scale {:.3}): GPU per frame {:.3} ms (uploads {ma:.3}, visibility {mb:.3}, draw {mc:.3}); prepare {mp:.3} ms CPU; {vis} visible",
                          v.name, v.cam.scale, ma + mb + mc));
         }
+        if plat::args().iter().any(|a| a == "--g6d") {
+            g6d(dev, &mut r, &mut s, &mut t, size, frames, &views, level, wname, c.trees.first().map(|x| (x.1.block, c.trees.len())))?;
+        }
         // (blocks) 1000 inserts moved per frame, at the district: their transforms alone go up
         if c.trees.len() >= 1000 {
             s.set_camera(&views[1].cam)?;
@@ -233,6 +239,210 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level, 
         }
         dev.wait_idle()?;
     }
+    Ok(())
+}
+
+/// percentiles of a list of times (ms): median, 99th, largest
+fn spread(v: &mut [f64]) -> (f64, f64, f64) {
+    if v.is_empty() {
+        return (0.0, 0.0, 0.0);
+    }
+    v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
+    (v[v.len() / 2], v[(v.len() * 99 / 100).min(v.len() - 1)], v[v.len() - 1])
+}
+
+/// G6d on the measuring scene: the index, the queries' times per view, the frames with and without highlights and an overlay
+#[allow(clippy::too_many_arguments)]
+fn g6d(dev: &Device, r: &mut Renderer, s: &mut Scene, t: &mut Target, size: (u32, u32), frames: usize, views: &[cad::View], level: Level, wname: &str, block: Option<(render2d::BlockId, usize)>) -> Result<()> {
+    // the index in one go (the first query builds it)
+    let t0 = plat::time_us();
+    s.build_index();
+    let build_ms = (plat::time_us() - t0) as f64 / 1000.0;
+    let ii = s.index_info();
+    out(&format!("{level:?}, {wname}, G6d index: built in {build_ms:.1} ms CPU; {} entries in {} nodes, height {}, {:.2} MB; {} block trees ({} entries, {:.3} MB); {} looked at by every query",
+                 ii.entries, ii.nodes, ii.height, ii.bytes as f64 / 1048576.0, ii.block_trees, ii.block_entries, ii.block_bytes as f64 / 1048576.0, ii.outside));
+    // what a change costs the index: 1000 lines inserted, moved, removed (each set applied by the next query), a block's change
+    {
+        let c0 = views[0].cam.center;
+        let lay = s.drawn_layers()[0];
+        let st = s.add_style(&Style::new(0xFF20_2020))?;
+        let mut ids = Vec::with_capacity(1000);
+        let mut rng = crate::gallery::Rng(3);
+        let line = |rng: &mut crate::gallery::Rng| {
+            let a = [c0[0] + rng.range(-1500.0, 1500.0), c0[1] + rng.range(-800.0, 800.0)];
+            Shape::Line { a, b: [a[0] + rng.range(-5.0, 5.0), a[1] + rng.range(-5.0, 5.0)] }
+        };
+        for _ in 0..1000 {
+            ids.push(s.insert(lay, st, &line(&mut rng))?);
+        }
+        let t0 = plat::time_us();
+        let _ = s.pick(c0, 1.0);
+        let ins_ms = (plat::time_us() - t0) as f64 / 1000.0;
+        for &id in &ids {
+            s.update(id, &line(&mut rng))?;
+        }
+        let t0 = plat::time_us();
+        let _ = s.pick(c0, 1.0);
+        let upd_ms = (plat::time_us() - t0) as f64 / 1000.0;
+        for &id in &ids {
+            s.remove(id)?;
+        }
+        let t0 = plat::time_us();
+        let _ = s.pick(c0, 1.0);
+        let rem_ms = (plat::time_us() - t0) as f64 / 1000.0;
+        out(&format!("{level:?}, {wname}, G6d index per change (1000 each, applied by the next query): insert {:.2} us, update {:.2} us, remove {:.2} us", ins_ms, upd_ms, rem_ms));
+        // a block inserted many times gets an entity more: its tree and every insert's box again with the next query
+        if let Some((b, n)) = block {
+            let id = s.insert_in(b, st, &Shape::Line { a: [0.0, 0.0], b: [0.3, 0.2] })?;
+            let t0 = plat::time_us();
+            let _ = s.pick(c0, 1.0);
+            let bms = (plat::time_us() - t0) as f64 / 1000.0;
+            let info = s.index_info();
+            s.remove(id)?;
+            let _ = s.pick(c0, 1.0);
+            out(&format!("{level:?}, {wname}, G6d: a block of {n} inserts changed: the next query {bms:.2} ms ({} blocks made again, {} entries updated)", info.blocks_synced, info.synced));
+        }
+    }
+    // queries per view: picks (3 px), snaps (10 px, all kinds and a base point), a window and a crossing of a quarter of the view
+    let mut rng = crate::gallery::Rng(11);
+    for v in views {
+        s.set_camera(&v.cam)?;
+        let (mut pk, mut sn, mut hits) = (Vec::new(), Vec::new(), 0usize);
+        let opt = SnapOptions::new(10.0, render2d::SNAP_ALL);
+        for k in 0..600 {
+            let q = v.cam.to_drawing([rng.range(0.0, size.0 as f64), rng.range(0.0, size.1 as f64)], size);
+            let t0 = plat::time_us();
+            hits += s.pick(q, 3.0).len();
+            pk.push((plat::time_us() - t0) as f64 / 1000.0);
+            let o = if k % 2 == 0 { opt.with_base(v.cam.to_drawing([rng.range(0.0, size.0 as f64), rng.range(0.0, size.1 as f64)], size)) } else { opt };
+            let t0 = plat::time_us();
+            let _ = s.snap(q, &o);
+            sn.push((plat::time_us() - t0) as f64 / 1000.0);
+        }
+        let (pm, p99, px) = spread(&mut pk);
+        let (sm, s99, sx) = spread(&mut sn);
+        let a = v.cam.to_drawing([0.25 * size.0 as f64, 0.25 * size.1 as f64], size);
+        let b = v.cam.to_drawing([0.75 * size.0 as f64, 0.75 * size.1 as f64], size);
+        let t0 = plat::time_us();
+        let w = s.select(Region::Rect(a, b), SelectMode::Window).len();
+        let wt = (plat::time_us() - t0) as f64 / 1000.0;
+        let t0 = plat::time_us();
+        let cr = s.select(Region::Rect(a, b), SelectMode::Crossing).len();
+        let ct = (plat::time_us() - t0) as f64 / 1000.0;
+        out(&format!("{level:?}, {wname}, {} G6d queries: pick (3 px) median {pm:.4} ms, 99 % {p99:.4}, most {px:.4} ({hits} hits in 600); snap (10 px, all kinds) median {sm:.4} ms, 99 % {s99:.4}, \
+                      most {sx:.4}; a window of the view's middle quarter {wt:.3} ms ({w}), a crossing {ct:.3} ms ({cr})", v.name));
+    }
+    // a window over the whole overview
+    s.set_camera(&views[0].cam)?;
+    let a = views[0].cam.to_drawing([0.0, 0.0], size);
+    let b = views[0].cam.to_drawing([size.0 as f64, size.1 as f64], size);
+    let t0 = plat::time_us();
+    let all = s.select(Region::Rect([a[0].min(b[0]), a[1].min(b[1])], [a[0].max(b[0]), a[1].max(b[1])]), SelectMode::Window);
+    let wall = (plat::time_us() - t0) as f64 / 1000.0;
+    let t0 = plat::time_us();
+    let all2 = s.select(Region::Rect([a[0].min(b[0]), a[1].min(b[1])], [a[0].max(b[0]), a[1].max(b[1])]), SelectMode::Crossing);
+    let call = (plat::time_us() - t0) as f64 / 1000.0;
+    out(&format!("{level:?}, {wname}, G6d: a window over the whole overview {wall:.2} ms ({} entities), a crossing {call:.2} ms ({})", all.len(), all2.len()));
+    // where the snap's time goes in the overview: the same 600 points with fewer kinds
+    {
+        let v = &views[0];
+        let mut rng = crate::gallery::Rng(17);
+        let pts: Vec<([f64; 2], [f64; 2])> = (0..600)
+            .map(|_| {
+                let q = v.cam.to_drawing([rng.range(0.0, size.0 as f64), rng.range(0.0, size.1 as f64)], size);
+                (q, v.cam.to_drawing([rng.range(0.0, size.0 as f64), rng.range(0.0, size.1 as f64)], size))
+            })
+            .collect();
+        let all_k = render2d::SNAP_ALL;
+        let sets = [("all kinds, a base point", all_k, true), ("all kinds", all_k, false), ("without intersections", all_k & !render2d::SNAP_INT, false),
+                    ("endpoints only", render2d::SNAP_END, false)];
+        let mut line = String::new();
+        for (name, kinds, with_base) in sets {
+            let mut ts = Vec::new();
+            let mut n = 0;
+            for &(q, b) in &pts {
+                let o = SnapOptions::new(10.0, kinds);
+                let o = if with_base { o.with_base(b) } else { o };
+                let t0 = plat::time_us();
+                n += s.snaps(q, &o).len();
+                ts.push((plat::time_us() - t0) as f64 / 1000.0);
+            }
+            let (m, p99, mx) = spread(&mut ts);
+            line += &format!("; {name}: median {m:.4} ms, 99 % {p99:.3}, most {mx:.3} ({n} candidates)");
+        }
+        out(&format!("{level:?}, {wname}, overview G6d snaps (10 px, 600 points){line}"));
+    }
+    // the scene's changes above (lines, a block) go up first: what follows is the highlight alone
+    let _ = frame(dev, r, s, t, size)?;
+    // 100 000 selected: what goes up, CPU; then the frames with and without, rounds in turn
+    let sel: Vec<EntityId> = all.iter().copied().take(100_000).collect();
+    let t0 = plat::time_us();
+    s.set_highlights(&sel, render2d::HL_SELECTED)?;
+    let set_ms = (plat::time_us() - t0) as f64 / 1000.0;
+    let (prep, st, _) = frame(dev, r, s, t, size)?;
+    let hi = s.highlight_info();
+    out(&format!("{level:?}, {wname}, G6d: {} entities selected, the first time (the highlight's pipelines made): set_highlights {set_ms:.2} ms CPU, prepare {prep:.2} ms CPU, {} of {} words up ({:.3} MB, {} runs), GPU uploads {:.3} ms, {} records",
+                 sel.len(), hi.sent_words, hi.words, hi.sent_words as f64 * 4.0 / 1048576.0, hi.runs, st[0], s.upload_info().records));
+    s.clear_highlights(render2d::HL_SELECTED | render2d::HL_HOVER);
+    let _ = frame(dev, r, s, t, size)?;
+    let t0 = plat::time_us();
+    s.set_highlights(&sel, render2d::HL_SELECTED)?;
+    let set_ms = (plat::time_us() - t0) as f64 / 1000.0;
+    let (prep, st, _) = frame(dev, r, s, t, size)?;
+    let hi = s.highlight_info();
+    out(&format!("{level:?}, {wname}, G6d: {} entities selected again: set_highlights {set_ms:.2} ms CPU, prepare {prep:.2} ms CPU, {} of {} words up ({:.3} MB, {} runs), GPU uploads {:.3} ms, {} records",
+                 sel.len(), hi.sent_words, hi.words, hi.sent_words as f64 * 4.0 / 1048576.0, hi.runs, st[0], s.upload_info().records));
+    // the hover moving from entity to entity: what goes up
+    let mut hv = Vec::new();
+    let mut words = 0;
+    for k in 0..20 {
+        if k > 0 {
+            s.set_highlight(sel[(k - 1) * 997 % sel.len()], render2d::HL_SELECTED)?;
+        }
+        s.set_highlight(sel[k * 997 % sel.len()], render2d::HL_SELECTED | render2d::HL_HOVER)?;
+        let t0 = plat::time_us();
+        let _ = frame(dev, r, s, t, size)?;
+        hv.push((plat::time_us() - t0) as f64 / 1000.0);
+        words = words.max(s.highlight_info().sent_words);
+    }
+    out(&format!("{level:?}, {wname}, G6d: the hover moved per frame: at most {words} words up"));
+    for v in views {
+        // rounds in turn: nothing, the overlay alone, the selection alone, both
+        let mut gpu: [Vec<f64>; 4] = Default::default();
+        let mut cpu: [Vec<f64>; 4] = Default::default();
+        for round in 0..12 {
+            let st_k = round % 4;
+            let (lit, ov) = (st_k >= 2, st_k % 2 == 1);
+            if lit {
+                s.set_highlights(&sel, render2d::HL_SELECTED)?;
+            } else {
+                s.clear_highlights(render2d::HL_SELECTED | render2d::HL_HOVER);
+            }
+            s.overlay().clear();
+            for k in 0..frames / 2 + 3 {
+                let mut cam = v.cam;
+                cam.center[0] += k as f64 * 0.37 * cam.scale;
+                s.set_camera(&cam)?;
+                if ov {
+                    cad::g6d_overlay(s, k, v);
+                }
+                let (p, st, _) = frame(dev, r, s, t, size)?;
+                if k >= 3 {
+                    gpu[st_k].push(st[0] + st[1] + st[2]);
+                    cpu[st_k].push(p);
+                }
+            }
+        }
+        cad::g6d_overlay(s, 0, v);
+        let oi = s.overlay_info();
+        s.overlay().clear();
+        let m: Vec<(f64, f64)> = (0..4).map(|k| (median(&mut gpu[k]), median(&mut cpu[k]))).collect();
+        out(&format!("{level:?}, {wname}, {} G6d frames: nothing highlighted {:.3} ms GPU (prepare {:.3} ms CPU); a full overlay ({} records, {:.1} KB) {:.3} ms GPU (prepare {:.3} ms CPU); \
+                      {} selected {:.3} ms GPU (prepare {:.3} ms CPU); both {:.3} ms GPU (prepare {:.3} ms CPU)",
+                     v.name, m[0].0, m[0].1, oi.records, oi.bytes as f64 / 1024.0, m[1].0, m[1].1, sel.len(), m[2].0, m[2].1, m[3].0, m[3].1));
+    }
+    s.clear_highlights(render2d::HL_SELECTED | render2d::HL_HOVER);
+    s.overlay().clear();
     Ok(())
 }
 

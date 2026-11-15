@@ -1,0 +1,4 @@
+#!args --test select
+# area selection (G6d): windows and crossings by rectangles and polygons against the drawing expanded by the test (an
+# insert: all or any of its entities), the index against brute force, at the origin, at 1e7 and at 1e-6 units per pixel;
+# exact cases (a cubic whose hull leaves the window, an arc, a region inside a fill, an array's copies, a polygon's notch)

@@ -1,0 +1,3 @@
+#!args --test pickchurn
+# the spatial index under churn (G6d): thousands of random changes between queries, picks, crossings and snaps against
+# brute force after each round, the trees' invariants

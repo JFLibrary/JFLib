@@ -65,7 +65,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
-  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [text.rs](#render2dtextrs)
+  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [text.rs](#render2dtextrs)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -22212,6 +22212,21 @@ STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block. ..
 /// / fs_text_all for text among anything else)
 TEXT_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block. ...
 TEXTC_WGSL: &str = include_str!("textc.wgsl")
+/// (G6d) the highlight's look (behind the stroke and text shaders: hl_wgsl) and the write pass with highlights (behind
+/// CULL_WGSL: write_hl_wgsl)
+HL_WGSL: &str = include_str!("hl.wgsl")
+HL_WRITE_WGSL: &str = include_str!("hl_write.wgsl")
+```
+
+- **`fn hl_wgsl(base: &str) -> alloc::string::String`**
+  (G6d) the vertex shaders that read the highlight: STROKE_WGSL or TEXT_WGSL with every visible list's word through
+  hl_take, ink through hl_ink, half_width through hl_wider, and hl.wgsl behind them (the entries keep their names: vs,
+  vs_full, vs_fill, vs_text, vs_text_all).  The plain sources and their shaders stay as they are
+
+- **`fn write_hl_wgsl() -> alloc::string::String`**
+  (G6d) CULL_WGSL with the write pass that puts the highlight into the visible list (entry write_hl)
+
+```rust
 COUNT_SPV: &[u32] = spv::COUNT
 SCAN_SPV: &[u32] = spv::SCAN
 WRITE_SPV: &[u32] = spv::WRITE
@@ -22227,6 +22242,13 @@ VS_TEXT_SPV: &[u32] = spv::VS_TEXT
 FS_TEXT_SPV: &[u32] = spv::FS_TEXT
 VS_TEXT_ALL_SPV: &[u32] = spv::VS_TEXT_ALL
 FS_TEXT_ALL_SPV: &[u32] = spv::FS_TEXT_ALL
+/// (G6d) the vertex shaders of hl_wgsl and write_hl
+VS_HL_SPV: &[u32] = spv::VS_HL
+VS_FULL_HL_SPV: &[u32] = spv::VS_FULL_HL
+VS_FILL_HL_SPV: &[u32] = spv::VS_FILL_HL
+VS_TEXT_HL_SPV: &[u32] = spv::VS_TEXT_HL
+VS_TEXT_ALL_HL_SPV: &[u32] = spv::VS_TEXT_ALL_HL
+WRITE_HL_SPV: &[u32] = spv::WRITE_HL
 ```
 
 - **`struct RendererDesc`**
@@ -22899,6 +22921,324 @@ TEXT_BAR_BELOW: f64 = 7.0
   target's in pixels
 - **`fn submitted(&mut self, id: SubmitId)`**
   the frame went to the GPU: Queue::submit's or Swapchain::present's answer
+
+### `render2d/hl.rs`
+
+Source: [`lib/render2d/hl.rs`](../lib/render2d/hl.rs)
+
+```text
+hl -- highlighting selected and hovered entities (G6d, decision 30; docs/RENDER2D.md "Hervorheben").  A child of
+scene.rs.
+
+Two bits per entity on a layer (an insert as a whole): selected, hovered.  On the GPU a mask of two bits per record of the
+pool and per instance of a block (u32 words: a header word with the instances' first word, then the records', then the
+instances'); changing a highlight sends the changed words only (runs, a copy each), never geometry.  While anything is
+highlighted the write pass of the visibility is write_hl, which puts a visible record's bits into bits 29 and 30 of its
+word in the visible list, and the layers holding a highlighted entity draw with vertex shaders that read them there
+(hl_wgsl: the same shaders with the colour mixed toward the highlight and strokes wider); every other pipeline, and
+every frame without a highlight, stays as it was.
+```
+
+```rust
+/// selected: the colour three quarters of the way to HL_SELECTED_RGB, strokes a quarter pixel wider on either side (a
+/// hairline stays on the fast way of short thin strokes)
+HL_SELECTED: u8 = 1
+/// hovered: the colour seven eighths of the way to HL_HOVER_RGB, strokes a pixel wider on either side (over a selection)
+HL_HOVER: u8 = 2
+/// the highlights' colours (sRGB, 0xRRGGBB) and the least alpha a highlighted colour gets (hl.wgsl)
+HL_SELECTED_RGB: u32 = 0x1E64FF
+HL_HOVER_RGB: u32 = 0xFF8C1A
+HL_ALPHA: u32 = 0xB0
+```
+
+- **`struct HighlightInfo`**
+  what the last prepare sent of the highlights (Scene::highlight_info).  It may grow
+  - `entities: u32` -- entities highlighted (selected, hovered or both)
+  - `words: u32` -- the mask's words on the GPU; the words and runs the last prepare sent; it made the mask anew
+  - `sent_words: u32`
+  - `runs: u32`
+  - `full: bool`
+
+**`impl Scene`**
+
+- **`fn set_highlight(&mut self, id: EntityId, bits: u8) -> Result<()>`**
+  an entity on a layer is highlighted (HL_SELECTED, HL_HOVER, both, or 0: not); an insert as a whole.  Only the
+  mask's changed words go up with the next prepare
+- **`fn set_highlights(&mut self, ids: &[EntityId], bits: u8) -> Result<()>`**
+  many at once (the same bits for each)
+- **`fn highlight(&self, id: EntityId) -> u8`**
+  an entity's highlight bits (0 for a dead id)
+- **`fn clear_highlights(&mut self, bits: u8)`**
+  these bits off on every entity (HL_HOVER: no hover left; HL_SELECTED | HL_HOVER: nothing highlighted)
+- **`fn highlighted(&self) -> Vec<EntityId>`**
+  the entities highlighted now
+- **`fn highlight_info(&self) -> HighlightInfo`**
+  what the last prepare sent of the highlights
+
+### `render2d/overlay.rs`
+
+Source: [`lib/render2d/overlay.rs`](../lib/render2d/overlay.rs)
+
+```text
+overlay -- an immediate-mode layer over the scene, made anew every frame (G6d, decision 24; docs/RENDER2D.md
+"Überlagerung"): rubber bands, window and crossing boxes, grips, snap markers.  A child of scene.rs.
+
+The app fills it between frames (Scene::overlay: clear, then lines, boxes, grips, markers in drawing units or in pixels);
+prepare maps everything into the target's pixels on the CPU in f64 (a drawing unit through the camera: at 1e7 and 1e-6
+units per pixel well within 1/1000 px), makes records (scene.rs records(): the same 64 bytes as every record), the
+styles, the visible list, the fills' edges in pixels (what count writes for the scene), all into the frame's own upload
+buffer, and Renderer::record copies them into the overlay's buffers under the barriers that cover the scene's uploads and
+draws them with fs_fill (strokes, arcs, dashes and fills: anti-aliased as everything else) after the scene's layers in the
+same render pass.  An empty overlay costs a test per frame: nothing goes up, nothing is drawn.  No culling: what lies
+beside the target the vertex shader clips away.
+```
+
+- **`enum Space`**
+  what overlay coordinates are: drawing units (through the camera at prepare) or pixels of the target (x right, y down
+  from its top left corner)
+  - `Drawing`
+  - `Px`
+
+- **`enum Grip`**
+  a grip's state: AutoCAD's cold (unselected), hover, hot (selected)
+  - `Cold`
+  - `Hover`
+  - `Hot`
+
+```rust
+/// a grip's side (px, odd: whole pixels around the pixel it sits on) and colours (cold, hover, hot, its outline)
+GRIP_PX: f64 = 9.0
+GRIP_COLD: u32 = 0xFF1E_64FF
+GRIP_HOVER: u32 = 0xFFFF_8C1A
+GRIP_HOT: u32 = 0xFFE0_2020
+GRIP_EDGE: u32 = 0xFF1A_1A1A
+/// a snap marker's size (px), its lines' width (px) and colour
+MARKER_PX: f64 = 12.0
+MARKER_WIDTH: f32 = 2.0
+MARKER_COLOR: u32 = 0xFFD8_9000
+/// AutoCAD's window box (solid, blue tint) and crossing box (dashed, green tint): outline, fill
+WINDOW_EDGE: u32 = 0xFF20_60FF
+WINDOW_FILL: u32 = 0x3020_60FF
+CROSSING_EDGE: u32 = 0xFF20_A040
+CROSSING_FILL: u32 = 0x3020_C040
+```
+
+- **`struct Overlay`**
+  the overlay of a scene: made anew every frame (Scene::overlay).  What it holds at prepare is drawn over the scene
+
+- **`struct OverlayInfo`**
+  what the last prepare made of the overlay (Scene::overlay_info).  It may grow
+  - `items: u32`
+  - `records: u32` -- its records and those drawn, its styles; the bytes it sent
+  - `drawn: u32`
+  - `styles: u32`
+  - `bytes: u64`
+
+**`impl Overlay`**
+
+- **`fn clear(&mut self)`**
+  nothing in it
+- **`fn is_empty(&self) -> bool`**
+- **`fn len(&self) -> usize`**
+- **`fn line(&mut self, a: [f64; 2], b: [f64; 2], space: Space, style: &Style)`**
+  a line (a rubber band) in the style's look (widths and dashes in pixels or drawing units)
+- **`fn polyline(&mut self, points: &[[f64; 2]], closed: bool, space: Space, style: &Style)`**
+  a polyline
+- **`fn arc(&mut self, center: [f64; 2], radius: f64, start: f64, sweep: f64, space: Space, style: &Style)`**
+  an arc (angles counter-clockwise from the x axis, in the drawing's sense: y up in drawing units, y down in pixels
+  turns them clockwise on the screen)
+- **`fn circle(&mut self, center: [f64; 2], radius: f64, space: Space, style: &Style)`**
+- **`fn rect(&mut self, a: [f64; 2], b: [f64; 2], space: Space, style: &Style)`**
+  a rectangle's outline (axis-aligned in its space)
+- **`fn fill(&mut self, points: &[[f64; 2]], space: Space, color: u32)`**
+  a filled polygon (even-odd) of a colour (0xAARRGGBB)
+- **`fn fill_rect(&mut self, a: [f64; 2], b: [f64; 2], space: Space, color: u32)`**
+- **`fn selection_box(&mut self, first: [f64; 2], second: [f64; 2], space: Space)`**
+  AutoCAD's selection box from the first corner to the second, axis-aligned on the screen: a window (the second
+  corner right of the first on the screen: solid outline, blue tint) or a crossing (left: dashed, green tint)
+- **`fn grip(&mut self, at: [f64; 2], space: Space, state: Grip)`**
+  a grip: a square of GRIP_PX pixels on the pixel the point lies on
+- **`fn marker(&mut self, kind: SnapKind, at: [f64; 2], space: Space)`**
+  a snap marker: AutoCAD's symbol of the kind (square endpoint, triangle midpoint, circle centre, diamond quadrant, X
+  intersection, the right angle of perpendicular, the circle and line of tangent, the hourglass of nearest, two squares
+  of insertion), MARKER_PX pixels, on the pixel the point lies on
+
+- **`fn box_is_window(first_px: [f64; 2], second_px: [f64; 2]) -> bool`**
+  a selection box is a window: its second corner (pixels) lies right of its first
+
+**`impl Scene`**
+
+- **`fn overlay(&mut self) -> &mut Overlay`**
+  the overlay: what is drawn over the scene with the next frames (clear it and fill it again for each frame)
+- **`fn overlay_info(&self) -> OverlayInfo`**
+  what the last prepare made of the overlay
+
+### `render2d/pick.rs`
+
+Source: [`lib/render2d/pick.rs`](../lib/render2d/pick.rs)
+
+```text
+pick -- a scene's spatial index, picking, area selection and object snaps on the CPU in f64 (G6d, decisions 24 and 30;
+docs/RENDER2D.md "Auswahl und Fang").  A child of scene.rs: it reads the scene's entities, layers and blocks.
+
+The index: an R-tree (index.rs) of the entities on layers by their boxes (the centre line's, grown by how far a width in
+drawing units reaches), and one per block of its entities in its own units.  An insert sits in the scene's tree by its
+copies' boxes (its block's box through each transform, an array's corner copies), never once per entity of its block:
+a query that meets it goes down into the block through the inverse transform (nested inserts likewise).  Texts in pixels
+and inserts of blocks that hold them have no fixed box in the drawing: they are looked at by every query.  The tree is
+built in one go by the first query (or build_index) and then kept in step: every change of the scene notes what it
+touched, the next query applies it (a change of a block: its tree again, and its inserts' boxes when its box moved).
+
+What a query decides is exact against the geometry in f64: a stroke's drawn region (its width, at least a pixel; caps,
+joins, miters up to their limit; a dash pattern's gaps count as the stroke, as AutoCAD picks them), arcs and curves
+themselves (not their flattening), a fill's inside (even-odd, holes) and a hatched one's, a text's quad.  Hits are in the
+painter's order, topmost first.  Hidden layers are skipped; a filter can skip more (a layer lock of an app).
+```
+
+- **`struct Target`**
+  where a pick or a snap found something: the entity on a layer, its layer and, inside an insert, the way down to the
+  entity
+  - `entity: EntityId`
+  - `layer: LayerId`
+  - `path: Vec<(u32, EntityId)>` -- inside an insert, one step per level: the copy of the insert above (row \* columns + column; 0 for a single insert)
+    and the entity of its block the way goes on with (a nested insert, ..., last the entity itself).  Empty for an
+    entity on a layer
+
+- **`struct Hit`**
+  a hit of Scene::pick
+  - `target: Target`
+  - `distance: f64` -- pixels from the point to what is drawn of it (0: on it)
+
+- **`enum Region<'a>`**
+  an area selection's region in drawing units (Scene::select)
+  - `Rect([f64; 2], [f64; 2])` -- two opposite corners of an axis-aligned rectangle
+  - `Polygon(&'a [[f64; 2]])` -- a closed polygon (even-odd; AutoCAD's WPolygon and CPolygon)
+
+- **`enum SelectMode`**
+  AutoCAD's two area selections
+  - `Window` -- what lies wholly inside
+  - `Crossing` -- what lies inside or touches the boundary
+
+- **`enum SnapKind`**
+  the kinds of object snap (decision 30, and AutoCAD's insertion point)
+  - `Endpoint` -- a line's or arc's ends, a polyline's and a Bézier chain's vertices, a fill's corners
+  - `Midpoint` -- the middle of a line, of each segment of a polyline, of an arc, of each Bézier piece and of an open ellipse or spline
+    (by length)
+  - `Center` -- a circle's, arc's or ellipse's centre (looked for when the pointer is over the curve)
+  - `Quadrant` -- the points of a circle, arc or ellipse on its own axes (an ellipse made of a circle by an uneven insert: its axes'
+    ends)
+  - `Intersection` -- where two pieces near the pointer cross (also across inserts, fills' edges, a polyline with itself)
+  - `Perpendicular` -- the foot of the perpendicular from the base point (SnapOptions::base)
+  - `Tangent` -- where a line from the base point touches a circle, arc or curve
+  - `Nearest` -- the nearest point of what is near the pointer
+  - `Insertion` -- a text's alignment point, an insert's insertion point (each copy of an array)
+
+```rust
+SNAP_END: u32 = 1
+SNAP_MID: u32 = 2
+SNAP_CEN: u32 = 4
+SNAP_QUA: u32 = 8
+SNAP_INT: u32 = 16
+SNAP_PER: u32 = 32
+SNAP_TAN: u32 = 64
+SNAP_NEA: u32 = 128
+SNAP_INS: u32 = 256
+SNAP_ALL: u32 = 511
+```
+
+**`impl SnapKind`**
+
+- **`const fn bit(self) -> u32`**
+  its bit of SnapOptions::kinds
+- **`const fn rank(self) -> u32`**
+  its rank among kinds equally near the pointer (lower first): endpoint, intersection, midpoint, centre, quadrant,
+  insertion, perpendicular, tangent; nearest only when nothing else is there
+
+- **`struct SnapOptions`**
+  what Scene::snap looks for.  Made with `new` (it may grow)
+  - `aperture: f64` -- the aperture's radius in pixels: what lies within it of the pointer
+  - `kinds: u32` -- the kinds looked for (SNAP_\* bits)
+  - `base: Option<[f64; 2]>` -- the command's last point: perpendicular and tangent need it (None: they are not looked for)
+
+**`impl SnapOptions`**
+
+- **`const fn new(aperture: f64, kinds: u32) -> SnapOptions`**
+- **`const fn with_base(mut self, base: [f64; 2]) -> SnapOptions`**
+  the same with a base point for perpendicular and tangent
+
+- **`struct Snap`**
+  an object snap (Scene::snap): its kind, the point (drawing units, f64), how far from the pointer (px), what it lies on
+  (an intersection: both)
+  - `kind: SnapKind`
+  - `point: [f64; 2]`
+  - `distance: f64`
+  - `target: Target`
+  - `other: Option<Target>`
+
+- **`struct IndexInfo`**
+  what the spatial index holds (Scene::index_info).  It may grow
+  - `entries: u32` -- entities on layers in the scene's tree, its nodes, levels, bytes
+  - `nodes: u32`
+  - `height: u32`
+  - `bytes: u64`
+  - `block_trees: u32` -- blocks with a tree, their entries and bytes
+  - `block_entries: u32`
+  - `block_bytes: u64`
+  - `outside: u32` -- entities looked at by every query (texts in pixels, inserts of blocks holding them)
+  - `synced: u32` -- what the last sync applied: changes of entities on layers, blocks made again; the scene's tree made anew
+  - `blocks_synced: u32`
+  - `rebuilt: bool`
+
+**`impl Scene`**
+
+- **`fn build_index(&mut self)`**
+  builds the spatial index now (else the first pick, select or snap does)
+- **`fn index_info(&self) -> IndexInfo`**
+  what the index holds
+- **`fn index_check(&mut self) -> Result<u32, &'static str>`**
+  (tests) the trees' invariants hold
+
+**`impl Scene`**
+
+- **`fn pick(&mut self, at: [f64; 2], tolerance: f64) -> Vec<Hit>`**
+  what is drawn within `tolerance` pixels of a point of the drawing (f64), topmost first (the painter's order: an app
+  cycles through overlapping ones); inside an insert the hit names the insert and the way down to the entity
+- **`fn pick_filtered(&mut self, at: [f64; 2], tolerance: f64, filter: &dyn Fn(LayerId) -> bool) -> Vec<Hit>`**
+  pick with a filter of layers (false: skipped; hidden layers are skipped anyway): a layer lock of an app
+- **`fn pick_brute(&mut self, at: [f64; 2], tolerance: f64) -> Vec<Hit>`**
+  (tests) pick without the index: every entity, every entity of every block
+
+**`impl Scene`**
+
+- **`fn select(&mut self, region: Region, mode: SelectMode) -> Vec<EntityId>`**
+  the entities on layers a region selects (an insert as a whole): Window what lies wholly inside, Crossing what lies
+  inside or touches it (AutoCAD's); by the centre lines (widths do not count, as in AutoCAD), a fill by its rings (a
+  crossing region inside a fill touches it), a text by its quad.  In no particular order
+- **`fn select_filtered(&mut self, region: Region, mode: SelectMode, filter: &dyn Fn(LayerId) -> bool) -> Vec<EntityId>`**
+  select with a filter of layers (false: skipped)
+- **`fn select_brute(&mut self, region: Region, mode: SelectMode) -> Vec<EntityId>`**
+  (tests) select without the index
+
+**`impl Scene`**
+
+- **`fn snap(&mut self, at: [f64; 2], opt: &SnapOptions) -> Option<Snap>`**
+  the object snap at a point of the drawing (f64): of the kinds asked for within the aperture, the one nearest the
+  pointer (equally near: endpoint, intersection, midpoint, centre, quadrant, insertion, perpendicular, tangent),
+  nearest only where nothing else is
+- **`fn snaps(&mut self, at: [f64; 2], opt: &SnapOptions) -> Vec<Snap>`**
+  every snap candidate in that order (an app cycles through them)
+- **`fn snaps_filtered(&mut self, at: [f64; 2], opt: &SnapOptions, filter: &dyn Fn(LayerId) -> bool) -> Vec<Snap>`**
+  snaps with a filter of layers (false: skipped)
+- **`fn snaps_brute(&mut self, at: [f64; 2], opt: &SnapOptions) -> Vec<Snap>`**
+  (tests) snaps without the index
+
+**`impl Scene`**
+
+- **`fn grip_points(&self, id: EntityId) -> Vec<[f64; 2]>`**
+  AutoCAD's grips of an entity on a layer (drawing units): a line's ends and middle, a polyline's vertices and its
+  segments' middles, an arc's centre, ends and middle, a circle's centre and quadrants, an ellipse's centre and its
+  axes' ends (an open one's ends too), a Bézier chain's and a spline's control points, a fill's corners, a text's
+  alignment point, an insert's insertion point (each copy of an array).  Empty for a dead id or a block's entity
 
 ### `render2d/text.rs`
 

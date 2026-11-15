@@ -814,11 +814,16 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
     let opt = wgsl::CompileOptions { robust: false, ..wgsl::CompileOptions::new(shader::BASIS) };
     let exact = wgsl::CompileOptions { exact: true, ..opt };
     let mut outv = Vec::new();
+    // (G6d: the highlight's vertex shaders and write pass from their own sources: the plain ones stay as they were)
+    let (hl_stroke, hl_text, hl_write) = (render2d::hl_wgsl(render2d::STROKE_WGSL), render2d::hl_wgsl(render2d::TEXT_WGSL), render2d::write_hl_wgsl());
     for (src, list, o) in [(render2d::CULL_WGSL, &[("COUNT", "count"), ("SCAN", "scan"), ("WRITE", "write"), ("INSTANCES", "instances")][..], &exact), (render2d::SCATTER_WGSL, &[("SCATTER", "main")][..], &opt),
                            (render2d::STROKE_WGSL, &[("VS", "vs"), ("VS_FULL", "vs_full"), ("VS_FILL", "vs_fill")][..], &exact),
                            (render2d::STROKE_WGSL, &[("FS", "fs"), ("FS_FULL", "fs_full"), ("FS_FILL", "fs_fill")][..], &opt),
                            (render2d::TEXT_WGSL, &[("VS_TEXT", "vs_text"), ("VS_TEXT_ALL", "vs_text_all")][..], &exact),
-                           (render2d::TEXT_WGSL, &[("FS_TEXT", "fs_text"), ("FS_TEXT_ALL", "fs_text_all")][..], &opt)] {
+                           (render2d::TEXT_WGSL, &[("FS_TEXT", "fs_text"), ("FS_TEXT_ALL", "fs_text_all")][..], &opt),
+                           (&hl_stroke[..], &[("VS_HL", "vs"), ("VS_FULL_HL", "vs_full"), ("VS_FILL_HL", "vs_fill")][..], &exact),
+                           (&hl_text[..], &[("VS_TEXT_HL", "vs_text"), ("VS_TEXT_ALL_HL", "vs_text_all")][..], &exact),
+                           (&hl_write[..], &[("WRITE_HL", "write_hl")][..], &exact)] {
         match wgsl::compile(src, o) {
             Ok(o) => {
                 for (name, entry) in list {
@@ -838,7 +843,7 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
 
 fn gen_shaders(path: &str) -> i32 {
     let Some(v) = compile_shaders() else { return 1 };
-    let mut s = String::from("// written by render2dtest --gen-shaders from common.wgsl + block.wgsl + textc.wgsl + cull.wgsl, scatter.wgsl, common.wgsl + block.wgsl + stroke.wgsl + fill.wgsl (+ textc.wgsl + text.wgsl: the text entries) (shader::BASIS, no robustness; COUNT, SCAN, WRITE, INSTANCES, VS, VS_FULL, VS_FILL, VS_TEXT and VS_TEXT_ALL exact); do not edit\n");
+    let mut s = String::from("// written by render2dtest --gen-shaders from common.wgsl + block.wgsl + textc.wgsl + cull.wgsl, scatter.wgsl, common.wgsl + block.wgsl + stroke.wgsl + fill.wgsl (+ textc.wgsl + text.wgsl: the text entries; *_HL: render2d::hl_wgsl of them, WRITE_HL: cull.wgsl + hl_write.wgsl) (shader::BASIS, no robustness; COUNT, SCAN, WRITE, INSTANCES, the vertex shaders and WRITE_HL exact); do not edit\n");
     for (name, w) in &v {
         s.push_str(&format!("pub const {name}: &[u32] = &[\n"));
         for row in w.chunks(10) {
@@ -865,10 +870,11 @@ fn shaders(t: &mut T) {
         t.ok(false, "the WGSL compiles");
         return;
     };
-    let table: [(&str, &[u32]); 15] = [("COUNT", render2d::COUNT_SPV), ("SCAN", render2d::SCAN_SPV), ("WRITE", render2d::WRITE_SPV), ("INSTANCES", render2d::INSTANCES_SPV), ("SCATTER", render2d::SCATTER_SPV),
+    let table: [(&str, &[u32]); 21] = [("COUNT", render2d::COUNT_SPV), ("SCAN", render2d::SCAN_SPV), ("WRITE", render2d::WRITE_SPV), ("INSTANCES", render2d::INSTANCES_SPV), ("SCATTER", render2d::SCATTER_SPV),
                                        ("VS", render2d::VS_SPV), ("VS_FULL", render2d::VS_FULL_SPV), ("FS", render2d::FS_SPV), ("FS_FULL", render2d::FS_FULL_SPV),
                                        ("VS_FILL", render2d::VS_FILL_SPV), ("FS_FILL", render2d::FS_FILL_SPV), ("VS_TEXT", render2d::VS_TEXT_SPV), ("FS_TEXT", render2d::FS_TEXT_SPV),
-                                       ("VS_TEXT_ALL", render2d::VS_TEXT_ALL_SPV), ("FS_TEXT_ALL", render2d::FS_TEXT_ALL_SPV)];
+                                       ("VS_TEXT_ALL", render2d::VS_TEXT_ALL_SPV), ("FS_TEXT_ALL", render2d::FS_TEXT_ALL_SPV), ("VS_HL", render2d::VS_HL_SPV), ("VS_FULL_HL", render2d::VS_FULL_HL_SPV),
+                                       ("VS_FILL_HL", render2d::VS_FILL_HL_SPV), ("VS_TEXT_HL", render2d::VS_TEXT_HL_SPV), ("VS_TEXT_ALL_HL", render2d::VS_TEXT_ALL_HL_SPV), ("WRITE_HL", render2d::WRITE_HL_SPV)];
     for (name, embedded) in table {
         let made = v.iter().find(|x| x.0 == name).map_or(&[][..], |x| &x.1[..]);
         t.ok(made == embedded, &format!("{name}: {} words embedded, as wgsl::compile makes them (if not: render2dtest --gen-shaders lib/render2d/shaders_spv.rs)", embedded.len()));
@@ -884,6 +890,13 @@ fn dump_all(dir: &str) -> i32 {
         for shot in shots() {
             let Some(mut off) = t.res(Off::new(dev, shot.w, shot.h), "target") else { return };
             let img = match (&shot.b, &shot.t) {
+                _ if shot.x.is_some() => {
+                    let Some(mut s) = t.res(Scene::new(&r), "Scene::new") else { return };
+                    if t.res(s.set_camera(&shot.cam), &shot.name).is_none() || t.res(shot.build(&mut s), &shot.name).is_none() {
+                        return;
+                    }
+                    shot_of(t, dev, &mut off, &mut r, &mut s, &shot.name)
+                }
                 (_, Some(_)) => {
                     let Some(mut s) = t.res(Scene::new(&r), "Scene::new") else { return };
                     if t.res(s.set_camera(&shot.cam), &shot.name).is_none() || t.res(shot.build(&mut s), &shot.name).is_none() {
@@ -939,11 +952,12 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate };
-    let list: [(&str, fn(&mut T)); 24] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
+    let list: [(&str, fn(&mut T)); 30] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
                                           ("arcs", arcs), ("dashes", dashes), ("curves", curves), ("fills", fills), ("hatches", hatches), ("layers", layers),
                                           ("changes", crate::scenes::changes), ("churn", crate::scenes::churn), ("visibility", crate::scenes::visibility), ("coords", crate::scenes::coords),
                                           ("phase", crate::scenes::phase), ("blocks", crate::blocks::blocks), ("transparency", crate::blocks::transparency), ("levels", levels), ("errors", errors),
-                                          ("text", crate::textgpu::text), ("textdeep", crate::textgpu::textdeep)];
+                                          ("text", crate::textgpu::text), ("textdeep", crate::textgpu::textdeep), ("pick", crate::picks::pick), ("select", crate::picks::select),
+                                          ("snap", crate::picks::snap), ("pickchurn", crate::picks::churn), ("highlight", crate::hlov::highlight), ("overlay", crate::hlov::overlay)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {

@@ -109,6 +109,8 @@ struct Bench {
     t0: u64,
     cam: Camera,
     cpu_ms: Vec<f64>,
+    /// G6d: entities selected (and a full overlay each frame), 0 without
+    sel: usize,
 }
 
 enum Mode {
@@ -412,8 +414,16 @@ impl Probe {
                      (plat::time_us() - t0) as f64 / 1000.0));
         say(&format!("bench: {} texts of {} characters ({} records)", c.texts, c.chars, c.text_records));
         let size = (1920, 1080);
+        // G6d: up to 100 000 entities selected from a window over the overview, a full overlay in every frame
+        let mut sel = 0;
+        if plat::env("jfgui_GPU_PROBE_HIGHLIGHT").is_some() {
+            let t0 = plat::time_us();
+            let ids = cad::g6d_selection(&mut s, &c, size)?;
+            sel = ids.len();
+            say(&format!("bench: G6d: {sel} entities selected in {:.0} ms (wasm: the index, the window, set_highlights)", (plat::time_us() - t0) as f64 / 1000.0));
+        }
         let off = dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?;
-        self.mode = Mode::Bench(Box::new(Bench { r, s, off, used: false, size, cads: [c], styled, n, view: 0, sent: 0, done: 0, flight: Vec::new(), t0: 0, cam: Camera::new([0.0, 0.0], 1.0), cpu_ms: Vec::new() }));
+        self.mode = Mode::Bench(Box::new(Bench { r, s, off, used: false, size, cads: [c], styled, n, view: 0, sent: 0, done: 0, flight: Vec::new(), t0: 0, cam: Camera::new([0.0, 0.0], 1.0), cpu_ms: Vec::new(), sel }));
         Ok(())
     }
 
@@ -432,8 +442,8 @@ impl Probe {
                 let ms = (plat::time_us() - b.t0) as f64 / 1000.0 / BENCH_FRAMES as f64;
                 let cpu = median(&mut b.cpu_ms);
                 let v = &cad::views(&b.cads[0], b.size)[b.view];
-                say(&format!("bench {} {}: {ms:.2} ms per frame ({:.1} frames/s), {cpu:.2} ms of it wasm (prepare, record, submit); {} segments, {}", v.name, if b.styled { "styled" } else { "hairlines" }, 1000.0 / ms, b.n,
-                             if b.view == 0 { "all in view" } else { "partly in view" }));
+                say(&format!("bench {} {}: {ms:.2} ms per frame ({:.1} frames/s), {cpu:.2} ms of it wasm (prepare, record, submit); {} segments, {}{}", v.name, if b.styled { "styled" } else { "hairlines" }, 1000.0 / ms, b.n,
+                             if b.view == 0 { "all in view" } else { "partly in view" }, if b.sel > 0 { format!(", G6d: {} selected and a full overlay", b.sel) } else { String::new() }));
                 b.view += 1;
                 b.sent = 0;
                 b.done = 0;
@@ -453,6 +463,9 @@ impl Probe {
             b.cam = cam;
             let t = plat::time_us();
             b.s.set_camera(&cam)?;
+            if b.sel > 0 {
+                cad::g6d_overlay(&mut b.s, k as usize, &view[b.view]);
+            }
             b.s.prepare(&mut b.r, b.size)?;
             let mut e = dev.encoder()?;
             let color = ColorAttachment { view: b.off.view(), load: Load::Clear, clear: bg_clear(BG), store: true, before: if b.used { Layout::ColorTarget } else { Layout::Undefined }, after: Layout::ColorTarget };

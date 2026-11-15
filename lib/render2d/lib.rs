@@ -40,6 +40,8 @@ mod atlas;
 mod block;
 pub mod curve;
 pub mod fill;
+mod geo;
+mod index;
 pub mod math;
 pub mod msdf;
 mod scene;
@@ -47,6 +49,10 @@ pub mod text;
 
 pub use scene::{Block, BlockId, Camera, Cap, EntityId, FrameStats, HatchLine, Insert, InstanceInfo, Join, Layer, LayerId, Scene, Shape, Style, StyleId, Transparency, Unit, UploadInfo, ARC_STEP,
                 BLOCK_DEPTH, BY_BLOCK_COLOR, BY_BLOCK_DASH, BY_BLOCK_WIDTH, DASH_MAX, HATCH_DASH_MAX, HATCH_MAX, TRANSPARENCY_MAX};
+// (G6d) picking, area selection, object snaps; highlighting; the overlay
+pub use scene::{box_is_window, Grip, HighlightInfo, Hit, IndexInfo, Overlay, OverlayInfo, Region, SelectMode, Snap, SnapKind, SnapOptions, Space, Target, CROSSING_EDGE, CROSSING_FILL, GRIP_COLD, GRIP_EDGE,
+                GRIP_HOT, GRIP_HOVER, GRIP_PX, HL_ALPHA, HL_HOVER, HL_HOVER_RGB, HL_SELECTED, HL_SELECTED_RGB, MARKER_COLOR, MARKER_PX, MARKER_WIDTH, SNAP_ALL, SNAP_CEN, SNAP_END, SNAP_INS, SNAP_INT,
+                SNAP_MID, SNAP_NEA, SNAP_PER, SNAP_QUA, SNAP_TAN, WINDOW_EDGE, WINDOW_FILL};
 pub use scene::{TextInfo, TEXT_BAR_BELOW, TEXT_FILL_FROM, TEXT_LARGE_FROM};
 pub use text::{layout_mtext, layout_text, Attach, Bar as TextBar, FontId, FontMetrics, Fonts, GlyphShape, HAlign, Layout as TextLayout, Line as TextLine, MText, Placed as PlacedGlyph, Text, TextStyle, TextStyleId,
                VAlign, FALLBACK_MAX, LINE_SPACING};
@@ -103,6 +109,30 @@ pub const TEXT_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("b
                                     include_str!("full_body.wgsl"), "}\n\nfn full_body(i: VsOut) -> vec4f {\n", include_str!("full_body.wgsl"), "}\n", include_str!("fill.wgsl"), include_str!("textc.wgsl"),
                                     include_str!("text.wgsl"));
 pub const TEXTC_WGSL: &str = include_str!("textc.wgsl");
+/// (G6d) the highlight's look (behind the stroke and text shaders: hl_wgsl) and the write pass with highlights (behind
+/// CULL_WGSL: write_hl_wgsl)
+pub const HL_WGSL: &str = include_str!("hl.wgsl");
+pub const HL_WRITE_WGSL: &str = include_str!("hl_write.wgsl");
+
+/// (G6d) the vertex shaders that read the highlight: STROKE_WGSL or TEXT_WGSL with every visible list's word through
+/// hl_take, ink through hl_ink, half_width through hl_wider, and hl.wgsl behind them (the entries keep their names: vs,
+/// vs_full, vs_fill, vs_text, vs_text_all).  The plain sources and their shaders stay as they are
+pub fn hl_wgsl(base: &str) -> alloc::string::String {
+    let mut s = base.replace("item_of(visible[l.x + j], l.x + j)", "item_of(hl_take(visible[l.x + j]), l.x + j)");
+    s = s.replace("fn ink(color: u32, t: u32, layer_t: u32) -> u32 {",
+                  "fn ink(color: u32, t: u32, layer_t: u32) -> u32 {\n    return hl_ink(ink_own(color, t, layer_t));\n}\n\nfn ink_own(color: u32, t: u32, layer_t: u32) -> u32 {");
+    s = s.replace("fn half_width(st: Style, view: View) -> f32 {",
+                  "fn half_width(st: Style, view: View) -> f32 {\n    return half_width_own(st, view) + hl_wider();\n}\n\nfn half_width_own(st: Style, view: View) -> f32 {");
+    s.push_str(HL_WGSL);
+    s
+}
+
+/// (G6d) CULL_WGSL with the write pass that puts the highlight into the visible list (entry write_hl)
+pub fn write_hl_wgsl() -> alloc::string::String {
+    let mut s = alloc::string::String::from(CULL_WGSL);
+    s.push_str(HL_WRITE_WGSL);
+    s
+}
 #[cfg(not(target_arch = "wasm32"))]
 pub const COUNT_SPV: &[u32] = spv::COUNT;
 #[cfg(not(target_arch = "wasm32"))]
@@ -133,6 +163,19 @@ pub const FS_TEXT_SPV: &[u32] = spv::FS_TEXT;
 pub const VS_TEXT_ALL_SPV: &[u32] = spv::VS_TEXT_ALL;
 #[cfg(not(target_arch = "wasm32"))]
 pub const FS_TEXT_ALL_SPV: &[u32] = spv::FS_TEXT_ALL;
+/// (G6d) the vertex shaders of hl_wgsl and write_hl
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_HL_SPV: &[u32] = spv::VS_HL;
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_FULL_HL_SPV: &[u32] = spv::VS_FULL_HL;
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_FILL_HL_SPV: &[u32] = spv::VS_FILL_HL;
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_TEXT_HL_SPV: &[u32] = spv::VS_TEXT_HL;
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_TEXT_ALL_HL_SPV: &[u32] = spv::VS_TEXT_ALL_HL;
+#[cfg(not(target_arch = "wasm32"))]
+pub const WRITE_HL_SPV: &[u32] = spv::WRITE_HL;
 
 /// Renderer::new.  Made with `new` and changed field by field (it may grow)
 #[derive(Clone, Copy, Debug)]
@@ -186,6 +229,51 @@ pub struct Renderer {
     pub(crate) draw_layout: BindGroupLayout,
     /// u16, 0 1 2 2 1 3 per quad, BATCH quads (written once, with the first submission)
     quads: Buffer,
+    /// (G6d) the pipelines that read the highlight, made with the first scene that highlights something
+    hl: Option<HlPipes>,
+}
+
+/// (G6d) the write pass with highlights and the vertex shaders that read them, with the plain fragment shaders
+struct HlPipes {
+    write: ComputePipeline,
+    pub(crate) write_layout: BindGroupLayout,
+    stroke: RenderPipeline,
+    stroke_full: RenderPipeline,
+    stroke_fill: RenderPipeline,
+    text: RenderPipeline,
+    text_all: RenderPipeline,
+}
+
+/// the highlight's shader modules: the write pass, the vertex shaders, the plain fragment shaders
+struct HlModules {
+    write: ShaderModule,
+    vs: ShaderModule,
+    vs_full: ShaderModule,
+    vs_fill: ShaderModule,
+    vs_text: ShaderModule,
+    vs_text_all: ShaderModule,
+    fs: ShaderModule,
+    fs_full: ShaderModule,
+    fs_fill: ShaderModule,
+    fs_text: ShaderModule,
+    fs_text_all: ShaderModule,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn hl_modules(dev: &Device) -> Result<HlModules> {
+    let m = |w: &[u32]| ShaderModule::from_spirv(dev, w);
+    Ok(HlModules { write: m(WRITE_HL_SPV)?, vs: m(VS_HL_SPV)?, vs_full: m(VS_FULL_HL_SPV)?, vs_fill: m(VS_FILL_HL_SPV)?, vs_text: m(VS_TEXT_HL_SPV)?, vs_text_all: m(VS_TEXT_ALL_HL_SPV)?, fs: m(FS_SPV)?,
+                   fs_full: m(FS_FULL_SPV)?, fs_fill: m(FS_FILL_SPV)?, fs_text: m(FS_TEXT_SPV)?, fs_text_all: m(FS_TEXT_ALL_SPV)? })
+}
+
+#[cfg(target_arch = "wasm32")]
+fn hl_modules(dev: &Device) -> Result<HlModules> {
+    let w = ShaderModule::from_wgsl(dev, &write_hl_wgsl())?;
+    let s = ShaderModule::from_wgsl(dev, &hl_wgsl(STROKE_WGSL))?;
+    let t = ShaderModule::from_wgsl(dev, &hl_wgsl(TEXT_WGSL))?;
+    let fs = ShaderModule::from_wgsl(dev, STROKE_WGSL)?;
+    let ft = ShaderModule::from_wgsl(dev, TEXT_WGSL)?;
+    Ok(HlModules { write: w, vs: s.clone(), vs_full: s.clone(), vs_fill: s, vs_text: t.clone(), vs_text_all: t, fs: fs.clone(), fs_full: fs.clone(), fs_fill: fs, fs_text: ft.clone(), fs_text_all: ft })
 }
 
 struct Modules {
@@ -297,7 +385,8 @@ impl Renderer {
         let by_binding = l.max_storage_binding as u64 / RECORD_BYTES;
         let max_entries = l.max_compute_workgroups[0].min(1 << 24);
         let by_dispatch = max_entries as u64 * PAGE as u64;
-        let max_records = (by_binding / PAGE as u64 * PAGE as u64).min(by_dispatch).min(1 << 31) as u32;
+        // (below 2^29: bits 29 and 30 of a visible list's word carry the highlight, G6d)
+        let max_records = (by_binding / PAGE as u64 * PAGE as u64).min(by_dispatch).min(1 << 29) as u32;
         Ok(Renderer {
             dev: dev.clone(),
             desc: *desc,
@@ -323,7 +412,53 @@ impl Renderer {
             inst_layout,
             draw_layout,
             quads,
+            hl: None,
         })
+    }
+
+    /// (G6d) the highlight's pipelines, made once (Scene::prepare, when a scene highlights something)
+    pub(crate) fn ensure_hl(&mut self) -> Result<()> {
+        if self.hl.is_some() {
+            return Ok(());
+        }
+        let dev = self.dev.clone();
+        let md = hl_modules(&dev)?;
+        let b = |binding, kind, stages| Binding { binding, kind, stages };
+        let (cs, rw, read) = (Stages::COMPUTE, BindingKind::StorageBuffer, BindingKind::StorageBufferRead);
+        let write_layout = dev.create_bind_group_layout(&[b(3, read, cs), b(4, rw, cs), b(7, rw, cs), b(10, rw, cs), b(14, rw, cs), b(15, read, cs)])?;
+        let write_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&write_layout], push_constants: 0 })?;
+        let write = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &write_pl, shader: ShaderStage::new(&md.write, "write_hl") })?;
+        let draw_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&self.draw_layout], push_constants: 4 })?;
+        let text_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&self.text_layout], push_constants: 4 })?;
+        let color = self.desc.color;
+        let pipe = |vs: &ShaderModule, ventry: &str, fs: &ShaderModule, fentry: &str, layout: &PipelineLayout| {
+            dev.create_render_pipeline(&RenderPipelineDesc {
+                layout,
+                vertex: ShaderStage::new(vs, ventry),
+                fragment: Some(ShaderStage::new(fs, fentry)),
+                buffers: &[],
+                topology: Topology::Triangles,
+                cull: Cull::None,
+                front_cw: false,
+                targets: &[ColorTarget { format: color, blend: Some(Blend::PREMULTIPLIED), write_mask: 0xF }],
+                depth: None,
+            })
+        };
+        self.hl = Some(HlPipes {
+            write,
+            write_layout,
+            stroke: pipe(&md.vs, "vs", &md.fs, "fs", &draw_pl)?,
+            stroke_full: pipe(&md.vs_full, "vs_full", &md.fs_full, "fs_full", &draw_pl)?,
+            stroke_fill: pipe(&md.vs_fill, "vs_fill", &md.fs_fill, "fs_fill", &draw_pl)?,
+            text: pipe(&md.vs_text, "vs_text", &md.fs_text, "fs_text", &text_pl)?,
+            text_all: pipe(&md.vs_text_all, "vs_text_all", &md.fs_text_all, "fs_text_all", &text_pl)?,
+        });
+        Ok(())
+    }
+
+    /// (G6d) the write pass's bind group layout with the highlight (None until the first highlight)
+    pub(crate) fn hl_write_layout(&self) -> Option<&BindGroupLayout> {
+        self.hl.as_ref().map(|h| &h.write_layout)
     }
 
     pub fn device(&self) -> &Device {
@@ -434,6 +569,27 @@ impl Renderer {
                 e.copy_buffer(up, src, &s.inst_buf, dst, size);
             }
         }
+        // (G6d: the highlight mask's changed words, read by write_hl; the overlay's records, styles, lists and fill edges, read
+        // by the vertex and fragment shaders: under the same two barriers as the records, the one above against the frame
+        // before's reads, the one below before this frame's)
+        if let (Some((up, runs)), Some(hb)) = (&s.up.hl, &s.hl.buf) {
+            for &(src, dst, size) in runs {
+                e.copy_buffer(up, src, hb, dst, size);
+            }
+        }
+        if let (Some(ov), Some(g)) = (&s.up.ov, &s.ov_gpu) {
+            for &(src, dst, size) in &ov.copies {
+                let to = match dst {
+                    0 => &g.view,
+                    1 => &g.pool,
+                    2 => &g.styles,
+                    3 => &g.visible,
+                    4 => &g.lists,
+                    _ => &g.epx,
+                };
+                e.copy_buffer(&ov.buf, src, to, 0, size);
+            }
+        }
         if s.up.scatter > 0 {
             let Some(group) = &f.scatter_group else { return Err(GpuError::Invalid("record: Scene::prepare comes first")) };
             e.set_compute_pipeline(&self.scatter);
@@ -471,8 +627,17 @@ impl Renderer {
             if s.entries > 0 {
                 // the offsets before the write reads them
                 e.barrier(Access::COMPUTE_WRITE, Access::COMPUTE_READ);
-                e.set_compute_pipeline(&self.write);
-                e.set_bind_group(0, &g.write);
+                // (G6d: with a highlight the write that puts it into the visible list: the same buffers and the mask)
+                match (&self.hl, &s.hl_group, s.hl_on) {
+                    (Some(h), Some(hg), true) => {
+                        e.set_compute_pipeline(&h.write);
+                        e.set_bind_group(0, hg);
+                    }
+                    _ => {
+                        e.set_compute_pipeline(&self.write);
+                        e.set_bind_group(0, &g.write);
+                    }
+                }
                 e.dispatch(s.entries, 1, 1);
             }
             // the lists, the draws (scan) and the visible list (write) before the indirect draws and the vertex shader
@@ -488,19 +653,27 @@ impl Renderer {
         if layers > 0 {
             // runs of visible layers that take the same pipeline: those with fills fs_fill, with arcs or dash patterns
             // fs_full, the others fs; text alone fs_text, text among others fs_text_all (G6c: their own bind group)
-            let class = |k: u32| s.full.get(k as usize).copied().unwrap_or(scene::CLASS_PLAIN);
+            // (G6d: a layer holding a highlighted entity takes the same class's pipeline with the highlight's vertex shader)
+            let hl = |k: u32| s.hl_on && self.hl.is_some() && s.hl_drawn.get(k as usize).copied().unwrap_or(false);
+            let class = |k: u32| (s.full.get(k as usize).copied().unwrap_or(scene::CLASS_PLAIN), hl(k));
             let mut k = 0;
             while k < layers {
                 let mut n = 1;
                 while k + n < layers && class(k + n) == class(k) {
                     n += 1;
                 }
-                let (pipe, group) = match class(k) {
-                    scene::CLASS_TEXT => (&self.text, g.text.as_ref()),
-                    scene::CLASS_TEXT_ALL => (&self.text_all, g.text.as_ref()),
-                    scene::CLASS_FILL => (&self.stroke_fill, Some(&g.draw)),
-                    scene::CLASS_FULL => (&self.stroke_full, Some(&g.draw)),
-                    _ => (&self.stroke, Some(&g.draw)),
+                let (cls, lit) = class(k);
+                let (pipe, group) = match (self.hl.as_ref().filter(|_| lit), cls) {
+                    (Some(h), scene::CLASS_TEXT) => (&h.text, g.text.as_ref()),
+                    (Some(h), scene::CLASS_TEXT_ALL) => (&h.text_all, g.text.as_ref()),
+                    (Some(h), scene::CLASS_FILL) => (&h.stroke_fill, Some(&g.draw)),
+                    (Some(h), scene::CLASS_FULL) => (&h.stroke_full, Some(&g.draw)),
+                    (Some(h), _) => (&h.stroke, Some(&g.draw)),
+                    (None, scene::CLASS_TEXT) => (&self.text, g.text.as_ref()),
+                    (None, scene::CLASS_TEXT_ALL) => (&self.text_all, g.text.as_ref()),
+                    (None, scene::CLASS_FILL) => (&self.stroke_fill, Some(&g.draw)),
+                    (None, scene::CLASS_FULL) => (&self.stroke_full, Some(&g.draw)),
+                    (None, _) => (&self.stroke, Some(&g.draw)),
                 };
                 let Some(group) = group else {
                     k += n;
@@ -520,6 +693,16 @@ impl Renderer {
                     }
                 }
                 k += n;
+            }
+        }
+        // (G6d) the overlay over everything: its own records, one draw of fs_fill (strokes, arcs, dashes, fills)
+        if let (Some(ov), Some(gg)) = (&s.up.ov, &s.ov_gpu) {
+            if let (true, Some(group)) = (ov.quads > 0, &gg.group) {
+                e.set_render_pipeline(&self.stroke_fill);
+                e.set_bind_group(0, group);
+                e.set_index_buffer(&self.quads, 0, IndexFormat::U16);
+                e.push_constants(0, &[0u32]);
+                e.draw_indexed(6 * ov.quads.min(BATCH), ov.quads.div_ceil(BATCH), 0, 0, 0);
             }
         }
         e.end_render();
