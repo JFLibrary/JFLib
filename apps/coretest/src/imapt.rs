@@ -91,6 +91,17 @@ pub fn run(t: &mut T) {
     t.eq("NIL", cmd("a X nil").args, alloc::vec![Item::Nil]);
     t.eq("line", imap::line("a1", "SELECT", "INBOX"), b"a1 SELECT INBOX\r\n".to_vec());
     t.eq("line bare", imap::line("a2", "NOOP", ""), b"a2 NOOP\r\n".to_vec());
+    // no second command through CR, LF or NUL; a literal's line end and bytes stay
+    let one = |b: &[u8]| lines(b).iter().filter(|x| matches!(x, Read::Line(_))).count();
+    let inj = imap::line("a1", "SELECT", &imap::quoted("INBOX\r\na2 DELETE INBOX"));
+    t.eq("line: quoted without CRLF", inj.clone(), b"a1 SELECT \"INBOXa2 DELETE INBOX\"\r\n".to_vec());
+    t.eq("line: one command", one(&inj), 1);
+    t.eq("line: raw arguments", imap::line("a1", "SELECT", "INBOX\r\na2 DELETE INBOX\0"), b"a1 SELECT INBOXa2 DELETE INBOX\r\n".to_vec());
+    t.eq("line: tag and verb", imap::line("a1\r\nb1", "NOOP\n", ""), b"a1b1 NOOP\r\n".to_vec());
+    let login = imap::line("a3", "LOGIN", &alloc::format!("{} {}", imap::astring("bob"), imap::astring("pä\r\nss")));
+    t.eq("line: a literal kept", login.clone(), "a3 LOGIN bob {7}\r\npä\r\nss\r\n".as_bytes().to_vec());
+    t.eq("line: a literal, one command", one(&login), 1);
+    t.eq("line: a cut literal is none", imap::line("a", "X", "y{9}\r\nab"), b"a X y{9}ab\r\n".to_vec());
     // responses
     let r = resp("a1 OK [READ-WRITE] SELECT done");
     t.eq("tagged", r.kind.clone(), Kind::Tagged(String::from("a1")));
@@ -129,6 +140,7 @@ pub fn run(t: &mut T) {
     t.eq("astring atom", imap::astring("INBOX"), String::from("INBOX"));
     t.eq("astring quoted", imap::astring("my box"), String::from("\"my box\""));
     t.eq("astring escapes", imap::quoted("a\"b"), String::from("\"a\\\"b\""));
+    t.eq("quoted without CR, LF, NUL", imap::quoted("a\r\nb\0"), String::from("\"ab\""));
     t.eq("astring literal", imap::astring("Büro"), String::from("{5}\r\nBüro"));
     // sequence sets
     let s = SeqSet::parse("1:3,5,7:*").expect("set");

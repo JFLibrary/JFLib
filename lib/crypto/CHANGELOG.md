@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Security
+
+- eappwd::pwe always runs at least 40 hunting-and-pecking rounds and selects the first point without branching, so its time no longer shows how many rounds a password needs (Dragonblood, CVE-2019-9494); the element is unchanged
+
 ## [0.2.0] - 2026-11-14
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

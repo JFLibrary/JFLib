@@ -173,3 +173,9 @@ pub fn put16(b: &mut [u8], off: usize, v: u16) {
 pub fn put32(b: &mut [u8], off: usize, v: u32) {
     b[off..off + 4].copy_from_slice(&v.to_be_bytes());
 }
+
+/// s without CR, LF and NUL: what a line-based protocol's writer puts of a caller's text into one
+/// line, so that no text ends the line early and starts a command or a header field of its own
+pub(crate) fn one_line(s: &str) -> alloc::string::String {
+    s.chars().filter(|c| !matches!(c, '\r' | '\n' | '\0')).collect()
+}

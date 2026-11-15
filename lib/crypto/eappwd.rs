@@ -4,7 +4,8 @@
 //
 //   GROUP, RAND_FUNC, PRF                       the ciphersuite this knows; ciphersuite() its bytes
 //   kdf(key, label, n)                          n bytes of the KDF of RFC 5931 2.5
-//   pwe(token, peer_id, server_id, password)    the password element: hunting and pecking (2.8.3)
+//   pwe(token, peer_id, server_id, password)    the password element: hunting and pecking (2.8.3),
+//                                               at least ROUNDS rounds
 //   commit(pwe, rand, mask)                     (Scalar, Element) of one side, from its two random
 //                                               scalars (2.8.5.1); None to draw again
 //   shared(pwe, rand, peer_scalar, peer_element)   ss, the x coordinate of k (2.8.5.2); None for
@@ -13,9 +14,11 @@
 //                                               (2.8.5.3)
 //   keys(ss, confirm_p, confirm_s, scalar_p, scalar_s)   (MSK, EMSK) (2.9)
 //
-// H(x) is HMAC-SHA-256 with a key of 32 zero bytes.  This looks for PWE the plain way, which
-// shows by its time how many rounds a password needs; RFC 8146 and later hostapd run a fixed
-// number of them.  The simulator has no such observer.
+// H(x) is HMAC-SHA-256 with a key of 32 zero bytes.  The plain search would show by its time how
+// many rounds a password needs (Dragonblood, CVE-2019-9494); as RFC 8146 and hostapd, pwe runs
+// ROUNDS rounds whatever round found the point, keeps the first one without a branch on it and
+// only goes on beyond ROUNDS in the case (about 2^-40) that none of them found one.  The point is
+// the same as the plain search's.
 
 use alloc::vec::Vec;
 
@@ -30,6 +33,8 @@ pub const RAND_FUNC: u8 = 1;
 pub const PRF: u8 = 1;
 
 const HUNT: &[u8] = b"EAP-pwd Hunting And Pecking";
+/// the rounds pwe always runs (k = 40 of RFC 8146 and hostapd)
+pub const ROUNDS: u8 = 40;
 
 /// group | random function | PRF
 pub fn ciphersuite() -> [u8; 4] {
@@ -67,22 +72,34 @@ pub fn kdf(key: &[u8], label: &[u8], n: usize) -> Vec<u8> {
 }
 
 /// the password element: a point both sides find from the password and their names; the counter
-/// starts at 1, the lowest bit of pwd-seed picks y
+/// starts at 1, the lowest bit of pwd-seed picks y; the first round's point that has one, after
+/// ROUNDS rounds in any case
 pub fn pwe(token: &[u8; 4], peer_id: &[u8], server_id: &[u8], password: &[u8]) -> [u8; 64] {
+    let mut out = [0u8; 64];
+    // 0xFF once a round found the point
+    let mut found = 0u8;
     let mut counter = 0u8;
-    loop {
+    let mut rounds = 0u32;
+    while rounds < ROUNDS as u32 || found == 0 {
         counter = counter.wrapping_add(1);
+        rounds += 1;
         let seed = h(&[token, peer_id, server_id, password, &[counter]]);
         let value = kdf(&seed, HUNT, 32);
         let mut x = [0u8; 32];
         x.copy_from_slice(&value);
-        if let Some(y) = p256::y_for_x(&x, seed[31] & 1 == 1) {
-            let mut out = [0u8; 64];
-            out[..32].copy_from_slice(&x);
-            out[32..].copy_from_slice(&y);
-            return out;
+        let (ok, y) = match p256::y_for_x(&x, seed[31] & 1 == 1) {
+            Some(y) => (0xFFu8, y),
+            None => (0u8, [0u8; 32]),
+        };
+        // taken only by the first round with a point, without a branch on which one that is
+        let take = core::hint::black_box(ok & !found);
+        for i in 0..32 {
+            out[i] ^= (out[i] ^ x[i]) & take;
+            out[32 + i] ^= (out[32 + i] ^ y[i]) & take;
         }
+        found |= ok;
     }
+    out
 }
 
 /// Scalar = rand + mask mod n, Element = -(mask * PWE); None when a random value is no scalar or

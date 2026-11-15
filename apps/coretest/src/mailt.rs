@@ -77,6 +77,16 @@ fn smtp_commands(t: &mut T) {
     t.eq("login challenges", (imf::b64_decode(smtp::LOGIN_USER.as_bytes()), imf::b64_decode(smtp::LOGIN_PASS.as_bytes())), (Some(b"Username:".to_vec()), Some(b"Password:".to_vec())));
     let r = smtp::received("pc1", "pc1.a.lab [10.0.1.10]", "mail.a.lab", "ESMTPA", "4F2A1B", Some("bob@b.lab"), "Thu, 01 Jan 2026 00:00:05 +0000");
     t.eq("received", r, s("from pc1 (pc1.a.lab [10.0.1.10]) by mail.a.lab with ESMTPA id 4F2A1B for <bob@b.lab>; Thu, 01 Jan 2026 00:00:05 +0000"));
+    // no command of its own through CR, LF or NUL in a field
+    t.eq("line: CRLF left out", Command::new("RCPT", "TO:<x@a.lab>\r\nDATA").to_line(), s("RCPT TO:<x@a.lab>DATA\r\n"));
+    t.eq("line: lone LF and NUL left out", Command::new("HELO\n", "pc1\0\nQUIT").to_line(), s("HELO pc1QUIT\r\n"));
+    t.eq("path: CRLF and brackets left out", smtp::fmt_path("TO", "x@a.lab>\r\nRCPT TO:<evil@b.lab", &[]), s("TO:<x@a.labRCPT TO:evil@b.lab>"));
+    t.eq("path: no parameter through the address", smtp::fmt_path("TO", "x@a.lab> NOTIFY=NEVER", &[]), s("TO:<x@a.lab NOTIFY=NEVER>"));
+    t.eq("path: no parameter through a parameter", smtp::fmt_path("FROM", "a@b", &[("SIZE", "1 BODY=8BITMIME\r\n")]), s("FROM:<a@b> SIZE=1BODY=8BITMIME"));
+    let mut st = Stream::new();
+    st.push(Command::new("RCPT", &smtp::fmt_path("TO", "x@a.lab>\r\nRCPT TO:<evil@b.lab", &[])).to_line().as_bytes());
+    let first = st.line();
+    t.eq("path: one command on the wire", (first.is_some(), st.line()), (true, None));
 }
 
 fn smtp_replies(t: &mut T) {
@@ -137,6 +147,9 @@ fn pop3_t(t: &mut T) {
     t.eq("parse", pop3::Command::parse("retr 2\r\n"), Some(pop3::Command { verb: s("RETR"), args: alloc::vec![s("2")] }));
     t.eq("a password with spaces", pop3::Command::parse("PASS ge heim").map(|c| c.args), Some(alloc::vec![s("ge heim")]));
     t.eq("line", pop3::Command::new("top", &["1", "0"]).to_line(), s("TOP 1 0\r\n"));
+    let l = pop3::Command::new("USER", &["bob\r\nDELE 1"]).to_line();
+    t.eq("line: CRLF left out", l.clone(), s("USER bobDELE 1\r\n"));
+    t.eq("line: one command", l.trim_end().lines().count(), 1);
     let multi = |l: &str| pop3::Command::parse(l).is_some_and(|c| pop3::multi_line(&c));
     t.check("multi-line commands", multi("LIST") && multi("UIDL") && multi("RETR 1") && multi("TOP 1 5") && multi("CAPA"));
     t.check("single-line commands", !multi("LIST 1") && !multi("UIDL 2") && !multi("STAT") && !multi("DELE 1") && !multi("USER bob"));
@@ -183,6 +196,15 @@ fn imf_header(t: &mut T) {
     m2.set("subject", "b");
     m2.body = b"hi\r\n".to_vec();
     t.eq("set and prepend", m2.to_bytes(), b"Received: from x by y; date\r\nSubject: b\r\n\r\nhi\r\n".to_vec());
+    // no field and no body through CR / LF in a value, none through a bad name
+    let mut m3 = Message::new();
+    m3.add("X", "a\r\nInjected: 1\r\n\r\nbody");
+    m3.add("Bad\r\nName", "v");
+    m3.add("Ok", "v\0w");
+    t.eq("CR / LF of a value: spaces", m3.header_bytes(), b"X: a  Injected: 1    body\r\nOk: vw\r\n".to_vec());
+    let back = Message::parse(&m3.to_bytes());
+    t.eq("no injected field", (back.get("Injected"), back.fields.len(), back.body.len()), (None, 2, 0));
+    t.eq("fold: a name keeps its printable characters", imf::fold("A\r\nB: c", "v"), s("ABc: v\r\n"));
     let (ct, ps) = imf::params("text/plain; charset=\"UTF-8\"; format=flowed");
     t.eq("params", (ct, ps), (s("text/plain"), alloc::vec![(s("charset"), s("UTF-8")), (s("format"), s("flowed"))]));
     t.eq("param", imf::param("multipart/report; report-type=delivery-status; boundary=\"a;b\"", "boundary"), Some(s("a;b")));
@@ -272,6 +294,18 @@ fn imf_bodies(t: &mut T) {
     t.eq("report parts", parts.len(), 2);
     t.eq("the status part", parts.get(1).map(|p| Message::parse(p).get("Content-Type").map(String::from)), Some(Some(s("message/delivery-status"))));
     t.eq("crlf and back", imf::lf(&imf::crlf(b"a\nb\r\nc\n")), b"a\nb\nc\n".to_vec());
+    // a reply to mail whose subject and display name decode to CRLF: no Bcc, no other field
+    let got = Message::parse(b"From: =?UTF-8?Q?A=0D=0AX-Injected=3A_1?= <a@a.lab>\r\nSubject: =?UTF-8?Q?hi=0D=0ABcc:_victim@example.invalid?=\r\n\r\nx");
+    t.check("decoded CRLF (the attack)", got.subject().contains("\r\nBcc:") && got.from().is_some_and(|m| m.name.contains("\r\n")));
+    let reply = Draft { subject: alloc::format!("Re: {}", got.subject()), to: got.from().into_iter().collect(), ..d.clone() };
+    let m = Message::parse(&reply.to_bytes(false));
+    t.eq("reply: no injected field", (m.get("Bcc"), m.get("X-Injected")), (None, None));
+    t.eq("reply: the subject on one line", m.get("Subject"), Some("Re: hi  Bcc: victim@example.invalid"));
+    t.eq("reply: the fields", m.fields.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(),
+        alloc::vec!["From", "To", "Subject", "Date", "Message-ID", "MIME-Version", "Content-Type", "Content-Transfer-Encoding"]);
+    let bad = Draft { subject: s("Re: hi\r\nBcc: victim@example.invalid"), to: alloc::vec![Mailbox::new("B", "b@b.lab>\r\nX-Injected: 1")], ..d.clone() };
+    let m = Message::parse(&bad.to_bytes(false));
+    t.eq("draft: CRLF in subject and address", (m.get("Bcc"), m.get("X-Injected"), m.text()), (None, None, s("Hallo Bob,\nbis bald.\n")));
 }
 
 fn segments(t: &mut T) {

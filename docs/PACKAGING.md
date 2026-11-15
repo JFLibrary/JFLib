@@ -128,7 +128,8 @@ packaged setup is that exe with a payload and a trailer appended.
   `HKCU\Software\Classes` (description, `DefaultIcon`, `shell\open\command` = `"<exe>" "%1"`) and
   the app in `.<ext>\OpenWithProgids` ("Open with"). An `own` type also becomes the default of its
   extensions (`.<ext>` default value and `Content Type`). A scheme gets `HKCU\Software\Classes\<scheme>`
-  (`URL:<display>`, `URL Protocol`, `DefaultIcon`, the open command). `SHChangeNotify` tells
+  (`URL:<display>`, `URL Protocol`, `DefaultIcon`, the open command `"<exe>" -- "%1"`: the URL
+  after `--` reaches the program as one argument, and a quote in it adds no options). `SHChangeNotify` tells
   Explorer. `install.ini` `assoc=` lists what was added (`T:` key trees, `V:` values), and
   `uninstall.exe` removes exactly that. In test mode the values go to
   `<ASMINST_SHELL_DIR>\assoc.txt` (`subkey|name=value` lines).

@@ -4,10 +4,12 @@
 // (RFC 4954, 4616); no STARTTLS
 //
 //   Command { verb, arg }     Command::parse(line) (the verb in capitals, the argument as
-//                             typed), Command::new(verb, arg), to_line() ("EHLO pc1\r\n")
+//                             typed), Command::new(verb, arg), to_line() ("EHLO pc1\r\n"; CR, LF
+//                             and NUL of the fields left out)
 //   Path { addr, params }     parse_path(arg, "FROM" | "TO"): the address of MAIL FROM:<..> or
 //                             RCPT TO:<..> (empty for the null reverse path "<>") and the
-//                             parameters after it (SIZE=1234, BODY=8BITMIME); fmt_path
+//                             parameters after it (SIZE=1234, BODY=8BITMIME); fmt_path (without
+//                             CR, LF, NUL, angle brackets in the address and blanks in parameters)
 //   Reply { code, lines }     Reply::new(code, text), Reply::enh(code, "2.1.0", text) (the
 //                             enhanced code before the text), to_bytes(): "250 text" or the
 //                             multi-line form "250-first" ... "250 last" of 4.2.1; text(),
@@ -71,9 +73,11 @@ impl Command {
         let (v, a) = l.split_once(' ').unwrap_or((l, ""));
         Some(Command { verb: v.to_ascii_uppercase(), arg: String::from(a.trim_end()) })
     }
-    /// the line on the wire, CRLF included
+    /// the line on the wire, CRLF included; CR, LF and NUL of verb and argument are left out (they
+    /// would end the line and start another command)
     pub fn to_line(&self) -> String {
-        if self.arg.is_empty() { format!("{}\r\n", self.verb) } else { format!("{} {}\r\n", self.verb, self.arg) }
+        let (verb, arg) = (crate::one_line(&self.verb), crate::one_line(&self.arg));
+        if arg.is_empty() { format!("{}\r\n", verb) } else { format!("{} {}\r\n", verb, arg) }
     }
 }
 
@@ -123,10 +127,15 @@ pub fn parse_path(arg: &str, key: &str) -> Option<Path> {
     Some(Path { addr: String::from(addr.trim()), params })
 }
 
-/// "FROM:<addr> SIZE=n" with the parameters given
+/// "FROM:<addr> SIZE=n" with the parameters given; the address loses CR, LF, NUL and angle
+/// brackets, the parameters those and blanks, so that neither ends the path, adds a parameter or
+/// starts another command
 pub fn fmt_path(key: &str, addr: &str, params: &[(&str, &str)]) -> String {
-    let mut s = format!("{}:<{}>", key, addr);
+    let addr: String = crate::one_line(addr).chars().filter(|c| !matches!(c, '<' | '>')).collect();
+    let word = |s: &str| crate::one_line(s).chars().filter(|c| !c.is_whitespace()).collect::<String>();
+    let mut s = format!("{}:<{}>", word(key), addr);
     for (k, v) in params {
+        let (k, v) = (word(k), word(v));
         if v.is_empty() {
             s.push_str(&format!(" {}", k));
         } else {

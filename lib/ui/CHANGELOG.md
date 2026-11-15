@@ -62,6 +62,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - The file dialog takes a chosen path longer than its `cap` as not chosen (the system's dialogs) or says it is too long (the library's own). The path was cut, reported as chosen and granted as cut.
 - The permission dialog's two allowing buttons take no input for half a second after a question appears, so a double click or a held key does not answer it unread.
+- Windows: URL schemes are registered as `"<exe>" -- "%1"` and plat::args keeps the URL after -- as one argument, so a quote in a link cannot add options; ui stops reading options at --. Apps registered before keep the old command until they are registered again
 
 ## [0.2.0] - 2026-11-14
 

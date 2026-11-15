@@ -319,17 +319,22 @@ enum Tree {
     Other(String, bool),
 }
 
+/// c is cmd, or for a scheme the command of before "--" (a registration of an older version)
+fn same_command(c: &str, cmd: &str) -> bool {
+    c.eq_ignore_ascii_case(cmd) || (cmd.ends_with(" -- \"%1\"") && c.eq_ignore_ascii_case(&cmd.replacen(" -- \"%1\"", " \"%1\"", 1)))
+}
+
 fn tree_state(v: &View, root: &str, cmd: &str) -> Tree {
     let command = format!("{root}\\shell\\open\\command");
     if v.exists(root) {
         return match v.get(&command, "") {
-            Some(c) if c.eq_ignore_ascii_case(cmd) => Tree::Mine,
+            Some(c) if same_command(&c, cmd) => Tree::Mine,
             c => Tree::Other(c.unwrap_or_else(|| String::from("(no command)")), true),
         };
     }
     if exists(HKLM, root) {
         return match get_sz(HKLM, &command, "") {
-            Some(c) if c.eq_ignore_ascii_case(cmd) => Tree::Free,
+            Some(c) if same_command(&c, cmd) => Tree::Free,
             c => Tree::Other(c.unwrap_or_else(|| String::from("(no command)")), false),
         };
     }
