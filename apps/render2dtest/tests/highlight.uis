@@ -1,0 +1,4 @@
+#!args --test highlight
+# highlighting (G6d): selected and hovered entities of every kind against the same drawing restyled to the highlight's
+# colour and width, byte for byte, and against lib/gfx; only the mask's words go up; cleared: the image of before; one
+# entity highlighted leaves every other pixel; texts and inserts as a whole; Voll and Basis alike

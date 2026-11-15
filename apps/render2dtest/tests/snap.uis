@@ -1,0 +1,4 @@
+#!args --test snap
+# object snaps (G6d): every kind on exact cases (an ellipse made of a circle by an uneven insert keeps its centre and its
+# axes' ends), the rules of priority, hidden layers and a filter; the index against brute force and against the drawing
+# expanded by the test on random drawings; at the origin, at 1e7 and at 1e-6 units per pixel

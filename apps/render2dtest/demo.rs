@@ -1,6 +1,9 @@
-// demo -- render2d in a view of a window (ui.gpu_view): a drawing to pan by dragging and to zoom with the wheel at the
-// pointer.  The connection to render2d lives here, in the app (View2d, a GpuContent): lib/ui knows nothing of it, as
-// with render3d (docs/RENDER2D.md "In der Oberfläche").
+// demo -- render2d in a view of a window (ui.gpu_view): a drawing to pan by dragging with the middle or right button (a
+// finger: any drag) and to zoom with the wheel at the pointer; G6d: the object snap under the pointer (its marker), the
+// entity under it highlighted, a click picks (Shift: adds or takes away), a drag with the left button selects by a window
+// (to the right) or a crossing (to the left), grips on what is selected, Esc clears.  The connection to render2d lives
+// here, in the app (View2d, a GpuContent): lib/ui knows nothing of it, as with render3d (docs/RENDER2D.md "In der
+// Oberfläche").
 //
 //   render2dtest --demo           the demo (in the browser and on Android the app is this)
 //   render2dtest --test window    a real window (once): the demo, a pan and a zoom through the same functions the
@@ -13,8 +16,13 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 
 use gpu::{ColorAttachment, CommandEncoder, Device, GpuError, Load, SubmitId};
-use render2d::{Camera, Cap, Join, Layer, Renderer, RendererDesc, Scene, Shape, Style, Unit};
+use render2d::{Camera, Cap, EntityId, Grip, Join, Layer, Region, Renderer, RendererDesc, Scene, SelectMode, Shape, SnapKind, SnapOptions, Space, Style, Unit};
 use ui::*;
+
+/// the demo's object snaps: aperture (px) and kinds; a pick's tolerance (px)
+pub const APERTURE: f64 = 10.0;
+pub const SNAPS: u32 = render2d::SNAP_END | render2d::SNAP_MID | render2d::SNAP_CEN | render2d::SNAP_QUA | render2d::SNAP_INT | render2d::SNAP_NEA | render2d::SNAP_INS;
+pub const PICK_PX: f64 = 3.0;
 
 pub const VIEW_ID: u32 = 900;
 /// the view's background (sRGB codes)
@@ -34,11 +42,125 @@ pub struct View2d {
     pub s: Option<Scene>,
     pub draws: u32,
     pub attaches: u32,
+    // ---- G6d
+    /// the pointer over the view (px), the snap there, the entity under it, what is selected, a selection box's first corner
+    pub pointer: Option<[f64; 2]>,
+    pub snap: Option<(SnapKind, [f64; 2])>,
+    pub hover: Option<EntityId>,
+    pub selected: Vec<EntityId>,
+    pub boxa: Option<[f64; 2]>,
 }
 
 impl View2d {
     pub fn new() -> Rc<RefCell<View2d>> {
-        Rc::new(RefCell::new(View2d { cam: Camera::new([0.0, 0.0], 1.0), size: (0, 0), dev: None, r: None, s: None, draws: 0, attaches: 0 }))
+        Rc::new(RefCell::new(View2d { cam: Camera::new([0.0, 0.0], 1.0), size: (0, 0), dev: None, r: None, s: None, draws: 0, attaches: 0, pointer: None, snap: None, hover: None,
+                                      selected: Vec::new(), boxa: None }))
+    }
+
+    /// (G6d) the pointer moved (px of the view; None: it left): the snap and the entity under it, their highlight
+    pub fn hover_at(&mut self, at: Option<[f64; 2]>) {
+        self.pointer = at;
+        let (cam, size) = (self.cam, self.size);
+        let Some(s) = self.s.as_mut() else { return };
+        let _ = s.set_camera(&cam);
+        let (snap, hover) = match at {
+            Some(q) if size.0 > 0 => {
+                let p = cam.to_drawing(q, size);
+                (s.snap(p, &SnapOptions::new(APERTURE, SNAPS)).map(|x| (x.kind, x.point)), s.pick(p, PICK_PX).first().map(|h| h.target.entity))
+            }
+            _ => (None, None),
+        };
+        self.snap = snap;
+        if hover != self.hover {
+            if let Some(h) = self.hover {
+                let keep = if self.selected.contains(&h) { render2d::HL_SELECTED } else { 0 };
+                let _ = s.set_highlight(h, keep);
+            }
+            if let Some(h) = hover {
+                let b = s.highlight(h) | render2d::HL_HOVER;
+                let _ = s.set_highlight(h, b);
+            }
+            self.hover = hover;
+        }
+    }
+
+    /// (G6d) a click at a point of the view: the entity under it selected (add: Shift, taken away when it was), nothing
+    /// there: the selection cleared (not with Shift)
+    pub fn click(&mut self, q: [f64; 2], add: bool) {
+        let (cam, size) = (self.cam, self.size);
+        let Some(s) = self.s.as_mut() else { return };
+        let _ = s.set_camera(&cam);
+        let hit = s.pick(cam.to_drawing(q, size), PICK_PX).first().map(|h| h.target.entity);
+        let mut sel = if add { self.selected.clone() } else { Vec::new() };
+        if let Some(h) = hit {
+            if add && sel.contains(&h) {
+                sel.retain(|&x| x != h);
+            } else if !sel.contains(&h) {
+                sel.push(h);
+            }
+        }
+        self.select_set(sel);
+    }
+
+    /// (G6d) a selection box from a to b (px of the view): a window to the right, a crossing to the left
+    pub fn select_box(&mut self, a: [f64; 2], b: [f64; 2], add: bool) {
+        let (cam, size) = (self.cam, self.size);
+        let Some(s) = self.s.as_mut() else { return };
+        let _ = s.set_camera(&cam);
+        let corners = [cam.to_drawing(a, size), cam.to_drawing([b[0], a[1]], size), cam.to_drawing(b, size), cam.to_drawing([a[0], b[1]], size)];
+        let mode = if render2d::box_is_window(a, b) { SelectMode::Window } else { SelectMode::Crossing };
+        let got = s.select(Region::Polygon(&corners), mode);
+        let mut sel = if add { self.selected.clone() } else { Vec::new() };
+        for g in got {
+            if !sel.contains(&g) {
+                sel.push(g);
+            }
+        }
+        self.select_set(sel);
+    }
+
+    /// (G6d) what is selected now: the highlights follow (the hover stays on top)
+    pub fn select_set(&mut self, sel: Vec<EntityId>) {
+        let Some(s) = self.s.as_mut() else { return };
+        for &old in &self.selected {
+            if !sel.contains(&old) {
+                let b = s.highlight(old) & !render2d::HL_SELECTED;
+                let _ = s.set_highlight(old, b);
+            }
+        }
+        for &new in &sel {
+            let b = s.highlight(new) | render2d::HL_SELECTED;
+            let _ = s.set_highlight(new, b);
+        }
+        self.selected = sel;
+    }
+
+    /// (G6d) the overlay of this frame: the selection box, the selection's grips (hovered under the pointer), the snap's
+    /// marker
+    fn overlay(&mut self) {
+        let (pointer, boxa, snap) = (self.pointer, self.boxa, self.snap);
+        let (cam, size) = (self.cam, self.size);
+        let sel = self.selected.clone();
+        let Some(s) = self.s.as_mut() else { return };
+        let mut grips: Vec<([f64; 2], Grip)> = Vec::new();
+        for id in sel {
+            for g in s.grip_points(id) {
+                let at = cam.to_screen(g, size);
+                let near = pointer.is_some_and(|p| (p[0] - at[0]).abs() <= 0.5 * render2d::GRIP_PX && (p[1] - at[1]).abs() <= 0.5 * render2d::GRIP_PX);
+                grips.push((g, if near { Grip::Hover } else { Grip::Cold }));
+            }
+        }
+        let ov = s.overlay();
+        ov.clear();
+        if let (Some(a), Some(p)) = (boxa, pointer) {
+            ov.selection_box(a, p, Space::Px);
+        }
+        for (g, state) in grips {
+            ov.grip(g, Space::Drawing, state);
+        }
+        if let (Some((kind, at)), None) = (snap, boxa) {
+            ov.marker(kind, at, Space::Drawing);
+        }
     }
 
     /// what a drag does: the drawing follows the pointer
@@ -145,11 +267,12 @@ impl GpuContent for View2d {
 
     fn draw<'a>(&'a mut self, e: &mut CommandEncoder<'a>, target: ColorAttachment<'a>, size: (u32, u32)) -> gpu::Result<()> {
         {
+            self.size = size;
+            self.overlay();
             let (Some(r), Some(s)) = (self.r.as_mut(), self.s.as_mut()) else { return Err(GpuError::Invalid("View2d: not attached")) };
             s.set_camera(&self.cam)?;
             s.prepare(r, size)?;
         }
-        self.size = size;
         self.draws += 1;
         let me: &'a View2d = self;
         let (Some(r), Some(s)) = (me.r.as_ref(), me.s.as_ref()) else { return Err(GpuError::Invalid("View2d: not attached")) };
@@ -178,8 +301,11 @@ pub fn crate_clear(c: u32) -> [f32; 4] {
 pub struct Demo {
     pub view: Rc<RefCell<View2d>>,
     pub ver: u32,
-    /// the pointer at the last drag step
+    /// the pointer at the last drag step (a pan)
     last: Option<(i32, i32)>,
+    /// (G6d) where the left button went down, and whether it has moved since (a selection box)
+    press: Option<[f64; 2]>,
+    boxing: bool,
     /// (the window test) its steps
     #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
     test: Option<WindowTest>,
@@ -191,6 +317,8 @@ impl Demo {
             view: View2d::new(),
             ver: 1,
             last: None,
+            press: None,
+            boxing: false,
             #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
             test: None,
         }
@@ -208,14 +336,21 @@ impl App for Demo {
         ui.draw_rect(0, 0, w, TOP);
         ui.draw_color(0xFFE8_ECF0);
         let c = self.view.borrow().cam;
-        ui.draw_text(12, 22, &format!("render2d: ziehen schiebt, das Rad zoomt (1 px = {:.3e} mm)", c.scale), (13u32 << 16) | FONT_REG);
+        let (nsel, snap) = {
+            let v = self.view.borrow();
+            (v.selected.len(), v.snap.map(|s| s.0))
+        };
+        ui.draw_text(12, 22, &format!("render2d: Mitte/rechts ziehen schiebt, Rad zoomt, Klick wählt, links ziehen: Fenster/Kreuzen (1 px = {:.3e} mm; {nsel} gewählt{})", c.scale,
+                                      snap.map(|k| format!(", Fang {k:?}")).unwrap_or_default()), (13u32 << 16) | FONT_REG);
         let r = view_rect(w, h);
         ui.next_rect_px(r[0], r[1], r[2], r[3]);
         let inp = ui.gpu_view(VIEW_ID, &self.view, self.ver).clone();
-        // a drag: the drawing follows the pointer; the wheel zooms at the pointer (the view took this pass's version:
-        // another pass shows the new one, and the title with it)
+        // a drag with the middle or right button (a finger: any): the drawing follows the pointer; the wheel zooms at the
+        // pointer (the view took this pass's version: another pass shows the new one, and the title with it)
         let ver = self.ver;
-        if inp.btn & (1 << BTN_LEFT) != 0 {
+        let touch = inp.ptype == PTR_TOUCH;
+        let pan = inp.btn & ((1 << BTN_MIDDLE) | (1 << BTN_RIGHT)) != 0 || (touch && inp.btn & (1 << BTN_LEFT) != 0);
+        if pan {
             if let Some((x, y)) = self.last {
                 if (inp.x, inp.y) != (x, y) {
                     self.view.borrow_mut().drag((inp.x - x) as f64, (inp.y - y) as f64);
@@ -225,6 +360,54 @@ impl App for Demo {
             self.last = Some((inp.x, inp.y));
         } else {
             self.last = None;
+        }
+        // (G6d) the left button: a click picks, a drag selects by a box; the pointer's snap and hover
+        let at = [inp.x as f64 + 0.5, inp.y as f64 + 0.5];
+        let over = inp.ev & EV_HOVER != 0 || inp.btn != 0;
+        let add = inp.mods & MOD_SHIFT != 0;
+        if !touch {
+            if inp.pressed & (1 << BTN_LEFT) != 0 {
+                self.press = Some(at);
+                self.boxing = false;
+            }
+            if let (Some(p), true) = (self.press, inp.btn & (1 << BTN_LEFT) != 0) {
+                if (at[0] - p[0]).abs() > 3.0 || (at[1] - p[1]).abs() > 3.0 {
+                    self.boxing = true;
+                }
+                let mut v = self.view.borrow_mut();
+                let want = if self.boxing { Some(p) } else { None };
+                if v.boxa != want {
+                    v.boxa = want;
+                    self.ver += 1;
+                }
+            }
+            if inp.released & (1 << BTN_LEFT) != 0 {
+                if let Some(p) = self.press.take() {
+                    let mut v = self.view.borrow_mut();
+                    if self.boxing {
+                        v.select_box(p, at, add);
+                    } else {
+                        v.click(at, add);
+                    }
+                    v.boxa = None;
+                    self.boxing = false;
+                    self.ver += 1;
+                }
+            }
+        } else if inp.released & (1 << BTN_LEFT) != 0 && (inp.x - inp.press_x).abs() <= 3 && (inp.y - inp.press_y).abs() <= 3 {
+            self.view.borrow_mut().click(at, false);
+            self.ver += 1;
+        }
+        {
+            let mut v = self.view.borrow_mut();
+            let want = if over { Some(at) } else { None };
+            if v.pointer != want {
+                let before = (v.snap, v.hover);
+                v.hover_at(want);
+                if (v.snap, v.hover) != before || v.boxa.is_some() || !v.selected.is_empty() {
+                    self.ver += 1;
+                }
+            }
         }
         if inp.wheel_y != 0 {
             self.view.borrow_mut().wheel(inp.x as f64 + 0.5, inp.y as f64 + 0.5, inp.wheel_y);
@@ -241,6 +424,13 @@ impl App for Demo {
 
     fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
         if id == UIC_TIMER {
+            ui.invalidate();
+            return true;
+        }
+        // (G6d) Esc: nothing selected
+        if id == UIC_ESCAPE {
+            self.view.borrow_mut().select_set(Vec::new());
+            self.ver += 1;
             ui.invalidate();
             return true;
         }

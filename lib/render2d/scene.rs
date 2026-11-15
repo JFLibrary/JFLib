@@ -38,6 +38,17 @@ use crate::fill;
 use crate::math::{sincos, split, sqrt};
 use crate::msdf::Seg;
 use crate::text::{self, Fonts, MText, Text, TextStyle, TextStyleId};
+#[path = "hl.rs"]
+mod hl;
+#[path = "overlay.rs"]
+mod overlay;
+#[path = "pick.rs"]
+mod pick;
+pub use hl::{HighlightInfo, HL_ALPHA, HL_HOVER, HL_HOVER_RGB, HL_SELECTED, HL_SELECTED_RGB};
+pub use overlay::{box_is_window, Grip, Overlay, OverlayInfo, Space, CROSSING_EDGE, CROSSING_FILL, GRIP_COLD, GRIP_EDGE, GRIP_HOT, GRIP_HOVER, GRIP_PX, MARKER_COLOR, MARKER_PX, MARKER_WIDTH, WINDOW_EDGE,
+                  WINDOW_FILL};
+pub use pick::{Hit, IndexInfo, Region, SelectMode, Snap, SnapKind, SnapOptions, Target, SNAP_ALL, SNAP_CEN, SNAP_END, SNAP_INS, SNAP_INT, SNAP_MID, SNAP_NEA, SNAP_PER, SNAP_QUA, SNAP_TAN};
+
 use crate::{Renderer, Tag, CHANGE_WORDS, DRAW_BYTES, ENTRY_BYTES, HATCH_BYTES, HATCH_WORDS, INST_BYTES, INST_WORDS, LAYERS_MAX, PAGE, RECORD_BYTES, RECORD_WORDS, SPACE_BYTES, STAMPS, STYLE_BYTES,
             STYLE_WORDS, VIEW_BYTES};
 
@@ -766,6 +777,32 @@ struct CurveG {
     st: FlatState,
     /// the curve's box (its control hulls)
     bounds: [f64; 4],
+    /// what it was made from (G6d: its snap points)
+    src: CurveSrc,
+}
+
+/// the shape a curve was made from, as far as its object snaps go (G6d)
+#[derive(Clone, Copy, Debug)]
+enum CurveSrc {
+    /// Bézier pieces end to end (their vertices, each piece's middle)
+    Chain,
+    /// an ellipse's arc (its centre, axes; an open one's ends and middle)
+    Ellipse { center: [f64; 2], radii: [f64; 2], rotation: f64, start: f64, sweep: f64 },
+    /// a B-spline (an open one's ends and middle)
+    Spline,
+}
+
+impl CurveSrc {
+    fn of(s: &Shape) -> CurveSrc {
+        match *s {
+            Shape::Ellipse { center, radii, rotation, start, sweep } => {
+                let tau = core::f64::consts::TAU;
+                CurveSrc::Ellipse { center, radii, rotation, start, sweep: if sweep.abs() >= tau { tau.copysign(sweep) } else { sweep } }
+            }
+            Shape::Spline { .. } => CurveSrc::Spline,
+            _ => CurveSrc::Chain,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -1047,6 +1084,9 @@ pub(crate) struct FrameSlot {
     /// (G6c) the atlas's tiles and the glyph table's rows of this frame
     atlas: Option<Buffer>,
     gtab: Option<Buffer>,
+    /// (G6d) the highlight mask's changed words, the overlay of this frame
+    hl: Option<Buffer>,
+    ov: Option<Buffer>,
 }
 
 /// what the last prepare left for Renderer::record
@@ -1068,6 +1108,9 @@ pub(crate) struct Uploads {
     /// (G6c) the glyph table's rows (source, destination offset, bytes), the atlas's tiles
     pub gtab: Option<(Buffer, u64, u64)>,
     pub atlas: Option<AtlasUp>,
+    /// (G6d) the highlight mask's runs (source, destination, bytes); the overlay
+    pub hl: Option<(Buffer, Vec<(u64, u64, u64)>)>,
+    pub ov: Option<overlay::OvUp>,
 }
 
 fn storage(dev: &Device, size: u64, more: BufferUsage) -> Result<Buffer> {
@@ -1240,6 +1283,19 @@ pub struct Scene {
     atlas_fresh: bool,
     /// every row of the glyph table goes up with the next prepare (a new table, a resend)
     gtab_all: bool,
+    // ---- picking, selection, snapping (G6d; pick.rs)
+    /// the spatial index (None until the first query)
+    idx: Option<Box<pick::Index>>,
+    // ---- highlighting and the overlay (G6d; hl.rs, overlay.rs)
+    pub(crate) hl: hl::Hl,
+    /// write_hl's bind group (the write pass's buffers and the mask)
+    pub(crate) hl_group: Option<BindGroup>,
+    /// this frame draws highlights: write_hl, and per visible layer in draw order whether it holds one
+    pub(crate) hl_on: bool,
+    pub(crate) hl_drawn: Vec<bool>,
+    ov: overlay::Overlay,
+    ov_info: overlay::OverlayInfo,
+    pub(crate) ov_gpu: Option<overlay::OvGpu>,
 }
 
 /// (G6c) a text on a layer as prepare looks at it (Scene::retext): its slot, pixels per em along its height and the map's
@@ -1311,7 +1367,7 @@ impl Scene {
         let mut frames = Vec::new();
         for _ in 0..r.desc.frames_in_flight {
             frames.push(FrameSlot { stage: upload(&dev, VIEW_BYTES)?, changes: None, styles: None, hatch: None, scatter_group: None, runs: None, insts: None, readback: None, last: None, atlas: None,
-                                    gtab: None });
+                                    gtab: None, hl: None, ov: None });
         }
         Ok(Scene {
             tag: r.tag.clone(),
@@ -1420,6 +1476,14 @@ impl Scene {
             atlas_all: true,
             atlas_fresh: false,
             gtab_all: true,
+            idx: None,
+            hl: hl::Hl::default(),
+            hl_group: None,
+            hl_on: false,
+            hl_drawn: Vec::new(),
+            ov: overlay::Overlay::default(),
+            ov_info: overlay::OverlayInfo::default(),
+            ov_gpu: None,
             dev,
         })
     }
@@ -1464,7 +1528,12 @@ impl Scene {
         let Some(old) = self.styles.get_mut(id.0 as usize) else { return Err(GpuError::Invalid("set_style: no such style")) };
         let was = old.dashes > 0;
         let hatched = old.hatches > 0;
+        // (G6d: a width in units, its join or limit changed: the index's boxes grow with them)
+        let reach = (old.width, old.unit, old.join, old.miter_limit) != (s.width, s.unit, s.join, s.miter_limit);
         *old = *s;
+        if reach {
+            self.idx_all();
+        }
         self.styles_dirty = true;
         if !self.blocks.is_empty() {
             // (blocks: what they need of it (reach, pipeline, the styles derived by block) is looked at again; their records
@@ -1537,6 +1606,7 @@ impl Scene {
         }
         self.touch();
         let s = &mut self.layers[i];
+        // (picking skips hidden layers when it looks: the index keeps them)
         if s.order != l.order {
             // (a new order: on top of the layers of that order)
             s.seq = self.layer_seq;
@@ -1572,6 +1642,8 @@ impl Scene {
                 e.era = e.era.wrapping_add(1);
                 self.free_ents.push(o);
                 self.live -= 1;
+                self.idx_top(o);
+                self.hl_forget(o);
             }
             last = o;
         }
@@ -1629,6 +1701,7 @@ impl Scene {
                 self.block_regeom(i, geom);
             } else {
                 self.regeom(i, geom);
+                self.idx_top(i as u32);
             }
         }
         Ok(())
@@ -1976,7 +2049,7 @@ impl Scene {
             let ctx = FlatCtx::new(cam, size);
             let (flat, fs) = ctx.flatten(&c, stroke_reach(st, ctx.scale));
             let bounds = c.bounds();
-            return Ok(Geom::Curve(Box::new(CurveG { c, flat, st: fs, bounds })));
+            return Ok(Geom::Curve(Box::new(CurveG { c, flat, st: fs, bounds, src: CurveSrc::of(s) })));
         }
         match *s {
             Shape::Line { a, b } => {
@@ -2115,6 +2188,7 @@ impl Scene {
         let era = e.era;
         self.live += 1;
         self.mark(slot);
+        self.idx_top(slot);
         Ok(EntityId { slot, era })
     }
 
@@ -2136,6 +2210,10 @@ impl Scene {
             None => Scene::geom(s, &self.camera, self.size, &self.styles[self.ents[i].style as usize])?,
         };
         self.touch();
+        self.hl_touch(i as u32);
+        if blk == NONE {
+            self.idx_top(i as u32);
+        }
         if blk == NONE && matches!(geom, Geom::Text(_)) {
             self.texts.push(TextRef::of(i as u32));
         }
@@ -2239,10 +2317,12 @@ impl Scene {
         self.touch();
         self.ents[i].style = style.0;
         if self.ents[i].block != NONE {
+            self.idx_block(self.ents[i].block as usize);
             self.blocks[self.ents[i].block as usize].changed = true;
             self.insts_dirty |= matches!(self.ents[i].geom, Geom::Insert(_));
             return Ok(());
         }
+        self.idx_top(i as u32);
         if matches!(self.ents[i].geom, Geom::Insert(_)) {
             self.insts_dirty = true;
             return Ok(());
@@ -2260,8 +2340,11 @@ impl Scene {
     pub fn remove(&mut self, id: EntityId) -> Result<()> {
         let i = self.get(id)?;
         self.touch();
+        self.hl_touch(i as u32);
+        self.hl_forget(i as u32);
         if self.ents[i].block != NONE {
             let b = self.ents[i].block as usize;
+            self.idx_block(b);
             if let Geom::Insert(ins) = self.ents[i].geom {
                 self.unnest(b, ins.block.slot as usize);
             }
@@ -2299,6 +2382,7 @@ impl Scene {
         self.freed.push((li as u32, l.era, at, n));
         self.free_ents.push(i as u32);
         self.live -= 1;
+        self.idx_top(i as u32);
         Ok(())
     }
 
@@ -2365,6 +2449,7 @@ impl Scene {
             return Err(GpuError::Invalid("Block: a finite base point"));
         }
         self.touch();
+        self.idx_block(k);
         self.blocks[k].base = b.base;
         self.blocks[k].changed = true;
         self.insts_dirty = true;
@@ -2378,6 +2463,7 @@ impl Scene {
             return Err(GpuError::Invalid("remove_block: the block is inserted (remove its inserts first)"));
         }
         self.touch();
+        self.idx_block(k);
         for i in core::mem::take(&mut self.blocks[k].ents) {
             if let Geom::Insert(ins) = self.ents[i as usize].geom {
                 self.unnest(k, ins.block.slot as usize);
@@ -2436,12 +2522,14 @@ impl Scene {
         bl.ents.push(slot);
         bl.changed = true;
         self.insts_dirty = true;
+        self.idx_block(b);
         Ok(EntityId { slot, era })
     }
 
     /// a block's entity got new geometry: its block's records are made again (a nested insert changed: the nesting too)
     fn block_regeom(&mut self, i: usize, geom: Geom) {
         let b = self.ents[i].block as usize;
+        self.idx_block(b);
         if let Geom::Insert(ins) = self.ents[i].geom {
             self.unnest(b, ins.block.slot as usize);
         }
@@ -2867,6 +2955,8 @@ impl Scene {
         for f in &mut self.frames {
             f.scatter_group = None;
         }
+        // (G6d: write_hl's group names the write pass's buffers too)
+        self.hl_group = None;
         Ok(())
     }
 
@@ -3230,13 +3320,13 @@ impl Scene {
                 Geom::Insert(_) => splits.push(at),
                 Geom::Curve(g) => {
                     let flat = flat_whole(&g.c, tol);
-                    records(&Geom::Curve(Box::new(CurveG { c: g.c.clone(), flat, st: g.st, bounds: g.bounds })), e.style, bl.base, &mut recs);
+                    records(&Geom::Curve(Box::new(CurveG { c: g.c.clone(), flat, st: g.st, bounds: g.bounds, src: g.src })), e.style, bl.base, &mut recs);
                 }
                 &Geom::Arc(c, r, a0, sw) if uneven => {
                     let cv = Curve::ellipse(c, [r, r], 0.0, a0, sw);
                     let flat = flat_whole(&cv, tol);
                     let bounds = cv.bounds();
-                    records(&Geom::Curve(Box::new(CurveG { c: cv, flat, st: FlatState { band, coarse: 0, window: None }, bounds })), e.style, bl.base, &mut recs);
+                    records(&Geom::Curve(Box::new(CurveG { c: cv, flat, st: FlatState { band, coarse: 0, window: None }, bounds, src: CurveSrc::Chain })), e.style, bl.base, &mut recs);
                 }
                 Geom::Fill(g) => {
                     let pts: Vec<Vec<[f64; 2]>> = g.rings.iter().map(|c| flat_whole(c, tol).pts).collect();
@@ -3587,7 +3677,7 @@ impl Scene {
                         }
                         continue;
                     }
-                    Geom::Curve(Box::new(CurveG { c: g.c.clone(), flat, st: fs, bounds: g.bounds }))
+                    Geom::Curve(Box::new(CurveG { c: g.c.clone(), flat, st: fs, bounds: g.bounds, src: g.src }))
                 }
                 Geom::Fill(g) => {
                     let (prep, fs) = flatten_fill(&g.rings, &ctx);
@@ -3892,6 +3982,25 @@ impl Scene {
             self.inst_send.clear();
         }
         bytes += self.text_uploads(slot)?;
+        // (G6d) the highlight mask (its changed words; anew where the pool or the instances were laid out anew), write_hl's
+        // bind group, the layers that draw a highlight; the overlay
+        if self.hl.count > 0 {
+            r.ensure_hl()?;
+        }
+        let laid_out = self.upload_info.rebuild || self.inst_info.rebuilt;
+        bytes += self.hl_prepare(slot, laid_out)?;
+        self.hl_on = self.hl.count > 0 && self.hl.buf.is_some() && r.hl_write_layout().is_some();
+        if self.hl_on {
+            if self.hl_group.is_none() {
+                let (Some(layout), Some(hb)) = (r.hl_write_layout(), self.hl.buf.as_ref()) else { return Err(GpuError::Invalid("Scene::prepare")) };
+                self.hl_group = Some(dev.create_bind_group(&BindGroupDesc {
+                    layout,
+                    entries: &[entry(3, &self.einfo_buf), entry(4, &self.masks), entry(7, &self.offsets), entry(10, &self.visible), entry(14, &self.vinst), entry(15, hb)],
+                })?);
+            }
+            self.hl_drawn = self.hl_layers();
+        }
+        bytes += self.ov_prepare(r, slot, size)?;
         self.inst_info.blocks = self.blocks.iter().filter(|b| b.live).count() as u32;
         self.inst_info.variants = self.blocks.iter().map(|b| b.variants.len() as u32).sum();
         self.inst_info.block_records = self.blocks.iter().flat_map(|b| b.variants.iter()).map(|v| v.recs.len() as u32).sum();
