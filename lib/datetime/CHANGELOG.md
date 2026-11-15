@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- `cron`: a day field beginning with `*` and a step (`*/2`) let either day field match, Vixie cron wants both (`0 0 */2 * mon`: odd Mondays, not every Monday and every odd day); `7-7` as the day of the week meant every day, it is Sunday
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

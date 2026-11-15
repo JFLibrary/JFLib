@@ -96,6 +96,13 @@ pub(crate) fn run_checks() -> (usize, usize) {
     let again = doc_io::clipboard_html_decode(&doc_io::clipboard_html_encode(&back).unwrap()).unwrap();
     check!(back.plain_text() == sample.plain_text() && chars(&back) == chars(&sample) && chars(&again) == chars(&sample),
         "HTML round trips keep the nominal size of raised and lowered text");
+    // a long run of bare ampersands: each looked for its ';' through the whole rest (quadratic)
+    let amps = alloc::format!("<html><body><p>{}</p></body></html>", "&".repeat(100_000));
+    let t0 = plat::time_us();
+    let pasted = doc_io::clipboard_html_decode(amps.as_bytes());
+    let ms = (plat::time_us() - t0) / 1000;
+    check!(pasted.is_ok_and(|d| d.plain_text().matches('&').count() == 100_000) && ms < 500,
+        "HTML: 100000 bare ampersands decode in linear time");
     let mut text = text::Text::new(style::STYLE.fonts(), style::STYLE.font_names());
     let fonts = doc_view::Fonts::new(&mut text).unwrap();
     for size in [8, 22, 96, 288] {

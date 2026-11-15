@@ -116,7 +116,9 @@ pub(crate) fn doc_abort(_d: &mut crate::PrintDoc) {}
 #[cfg(target_os = "ios")]
 pub use super::ios::{file_dialog, file_dialog_poll};
 
-/// macOS: /usr/bin/open with the argument (LaunchServices), waited for up to 5 s -> 0 / -1; iOS: -1
+/// macOS: /usr/bin/open with the argument (LaunchServices), waited for up to 5 s -> 0 / -1 (iOS
+/// opens URLs through UIApplication: apple_ios.rs)
+#[cfg(not(target_os = "ios"))]
 fn open_with_launch_services(arg: &str) -> i32 {
     open_with(&[arg])
 }

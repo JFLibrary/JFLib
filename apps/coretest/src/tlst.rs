@@ -68,8 +68,129 @@ pub fn pki(seed: u8) -> Pki {
 pub fn run(t: &mut T) {
     schedule(t);
     certs(t);
+    restricted_cas(t);
     loopback(t);
+    empty_records(t);
     https(t);
+}
+
+/// a CA certificate below `root` (None: its own root) with further extensions
+fn ca_with(seed: u8, root: Option<(&Cert, &Keypair)>, extra: &[Vec<u8>]) -> (Cert, Keypair) {
+    let key = Keypair::from_seed(&[seed; 32]);
+    let b = CertBuilder {
+        serial: [seed; 16],
+        cn: format!("Restricted CA {}", seed),
+        not_before: NOW - 86_400,
+        not_after: NOW + 3650 * 86_400,
+        public_key: key.public,
+        is_ca: true,
+        ..CertBuilder::default()
+    };
+    let der = match root {
+        Some((c, k)) => b.sign_ext(Some(c), k, extra),
+        None => b.sign_ext(None, &key, extra),
+    };
+    (Cert::parse(&der).unwrap_or_default(), key)
+}
+
+/// a server certificate for `dns`, issued by `ca`
+fn leaf_of(seed: u8, dns: &str, ca: &Cert, ca_key: &Keypair) -> Cert {
+    let key = Keypair::from_seed(&[seed; 32]);
+    let der = CertBuilder {
+        serial: [seed; 16],
+        cn: String::from(dns),
+        not_before: NOW - 3600,
+        not_after: NOW + 365 * 86_400,
+        public_key: key.public,
+        dns: alloc::vec![String::from(dns)],
+        server_auth: true,
+        ..CertBuilder::default()
+    }
+    .sign(Some(ca), ca_key);
+    Cert::parse(&der).unwrap_or_default()
+}
+
+/// name constraints with wildcards (a wildcard stands for every name one label below it, so
+/// an excluded name among them refuses it) and the purposes of CAs on the path
+fn restricted_cas(t: &mut T) {
+    use netio::der;
+    use netio::x509::extension;
+    const NAME_CONSTRAINTS: &[u64] = &[2, 5, 29, 30];
+    const EKU: &[u64] = &[2, 5, 29, 37];
+    let subtrees = |tag: u8, names: &[&str]| {
+        let parts: Vec<Vec<u8>> = names.iter().map(|n| der::seq(&[&der::tlv(0x82, n.as_bytes())])).collect();
+        der::tlv(tag, &parts.concat())
+    };
+    let ok = |leaf: &Cert, ca: &Cert, host: &str| verify_chain(core::slice::from_ref(leaf), core::slice::from_ref(ca), NOW, Some(host), Usage::Server).is_ok();
+    // excluded: the host secret.example.com and every subdomain of example.net
+    let nc = extension(NAME_CONSTRAINTS, true, &der::seq(&[&subtrees(0xa1, &["secret.example.com", ".example.net"])]));
+    let (ca, ck) = ca_with(60, None, &[nc]);
+    t.check("constraints: an excluded host is refused", !ok(&leaf_of(61, "secret.example.com", &ca, &ck), &ca, "secret.example.com"));
+    t.check("constraints: another host passes", ok(&leaf_of(62, "www.example.com", &ca, &ck), &ca, "www.example.com"));
+    t.check("constraints: a wildcard that stands for an excluded host is refused", !ok(&leaf_of(63, "*.example.com", &ca, &ck), &ca, "www.example.com"));
+    t.check("constraints: a wildcard below excluded subdomains is refused", !ok(&leaf_of(64, "*.example.net", &ca, &ck), &ca, "www.example.net"));
+    t.check("constraints: a wildcard elsewhere passes", ok(&leaf_of(65, "*.example.org", &ca, &ck), &ca, "www.example.org"));
+    // permitted: example.com and its subdomains
+    let nc = extension(NAME_CONSTRAINTS, true, &der::seq(&[&subtrees(0xa0, &["example.com"])]));
+    let (pca, pk) = ca_with(66, None, &[nc]);
+    t.check("constraints: a wildcard inside a permitted tree passes", ok(&leaf_of(67, "*.example.com", &pca, &pk), &pca, "a.example.com"));
+    t.check("constraints: a wildcard outside it is refused", !ok(&leaf_of(68, "*.example.org", &pca, &pk), &pca, "a.example.org"));
+    // an intermediate CA for client certificates only cannot certify a server (the root's
+    // basic constraints without a path length: the builder's CAs have path length 0)
+    let unbounded = extension(&[2, 5, 29, 19], true, &der::seq(&[&der::boolean(true)]));
+    let (root, rk) = ca_with(70, None, &[unbounded]);
+    let eku = |oids: &[&[u64]]| {
+        let parts: Vec<Vec<u8>> = oids.iter().map(|o| der::oid(o)).collect();
+        let refs: Vec<&[u8]> = parts.iter().map(|v| v.as_slice()).collect();
+        extension(EKU, false, &der::seq(&refs))
+    };
+    let path_ok = |inter: &(Cert, Keypair), seed: u8| {
+        let leaf = leaf_of(seed, "srv.lab", &inter.0, &inter.1);
+        verify_chain(&[leaf, inter.0.clone()], core::slice::from_ref(&root), NOW, Some("srv.lab"), Usage::Server).is_ok()
+    };
+    let client_only = ca_with(71, Some((&root, &rk)), &[eku(&[&[1, 3, 6, 1, 5, 5, 7, 3, 2]])]);
+    t.check("purpose: an intermediate for client certificates cannot certify a server", !path_ok(&client_only, 72));
+    let server = ca_with(73, Some((&root, &rk)), &[eku(&[&[1, 3, 6, 1, 5, 5, 7, 3, 1]])]);
+    t.check("purpose: an intermediate for servers can", path_ok(&server, 74));
+    let any = ca_with(75, Some((&root, &rk)), &[eku(&[&[2, 5, 29, 37, 0]])]);
+    t.check("purpose: an intermediate for any purpose can", path_ok(&any, 76));
+    let plain = ca_with(77, Some((&root, &rk)), &[]);
+    t.check("purpose: an intermediate without the extension can", path_ok(&plain, 78));
+    // a trusted CA restricted to clients does not anchor a server
+    let (anchor, ak) = ca_with(79, None, &[eku(&[&[1, 3, 6, 1, 5, 5, 7, 3, 2]])]);
+    t.check("purpose: a trusted CA for client certificates does not anchor a server", !ok(&leaf_of(80, "srv.lab", &anchor, &ak), &anchor, "srv.lab"));
+}
+
+/// records without data (empty application data records) do not keep a read going past the
+/// stream's read timeout (an HTTP deadline is checked between reads)
+fn empty_records(t: &mut T) {
+    let p = pki(50);
+    let scfg = ServerConfig { identity: p.server.clone(), client_auth: None, client_auth_optional: false };
+    let (addr, th) = server(scfg, |r| {
+        if let Ok(s) = r {
+            for _ in 0..60 {
+                if s.test_send_empty_record().is_err() {
+                    break;
+                }
+                plat::sleep_ms(50);
+            }
+            s.shutdown();
+        }
+    });
+    let ccfg = ClientConfig { trust: Trust::Anchors(alloc::vec![p.ca.clone()]), identity: None, server_name: String::from("localhost") };
+    match client(&addr, ccfg) {
+        Ok(c) => {
+            c.set_timeouts(Some(300), None);
+            let t0 = plat::time_us();
+            let mut b = [0u8; 16];
+            let r = c.read(&mut b);
+            let ms = (plat::time_us() - t0) / 1000;
+            t.check(&format!("empty records: a read ends with its timeout ({ms} ms)"),
+                    r.is_err_and(|e| e.kind == plat::net::NetErrorKind::TimedOut) && ms < 1500);
+        }
+        Err(e) => t.check(&format!("empty records: handshake: {}", e), false),
+    }
+    th.join();
 }
 
 fn schedule(t: &mut T) {

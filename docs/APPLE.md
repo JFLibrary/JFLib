@@ -14,7 +14,8 @@ Die Programme der Bibliothek laufen nativ auf einem Mac mit Apple Silicon (`aarc
 iPhone (`aarch64-apple-ios`, im Simulator `aarch64-apple-ios-sim`). Gebaut und getestet wird auf dem Mac, gesteuert
 vom PC aus per SSH. Windows, Linux, Android und Web ändern sich dabei nicht.
 
-Nicht Teil dieses Plans: Intel-Macs, der App Store als Ziel, iPad-eigene Oberflächen, native Plugins auf iOS.
+Nicht Teil dieses Plans: Intel-Macs, der App Store als Ziel, native Plugins auf iOS. Das iPad kam am 2026-11-11
+als AP9 dazu.
 
 ## Ausgangslage
 
@@ -769,6 +770,28 @@ und GUIDE nennen macOS und iOS (mit AP8a–AP8c). Die Website jflib.org (Reposit
 Nutzer abgestimmt) führt beide als native Ziele auf der Startseite, unter Features, im Vergleich und in der Roadmap
 (dort „Fertig“; als Nächstes Metal und VoiceOver), in allen fünf Sprachen; Docs und Galerie kommen aus `8c94d080`.
 
+### AP9: iPadOS (M)
+
+Das iPad ist dasselbe Bauziel wie das iPhone (`aarch64-apple-ios`). `tools/apple.py` trägt schon beide Gerätefamilien
+(`UIDeviceFamily` 1 und 2) und die vier Ausrichtungen des iPads ein, die App läuft dort also nativ. Geprüft ist das
+noch nie; ein iPad zum Testen fehlt bisher, der Simulator hat welche.
+
+- **Fenstergrößen:** Split View, Slide Over und Stage Manager ändern die Größe frei und laufend. Der Host gibt jede
+  Größe sauber weiter, auch mit Sicherheitsbereich und Tastatur.
+- **Form-Faktor:** `ui.form_factor()` meldet auf dem iPad `FF_TABLET`. Zu klären: ob ein großes Fenster im Stage Manager
+  als Desktop zählt.
+- **Menüs:** Die Menüs der App kommen in die Menüleiste von iPadOS (`UIMenuBuilder`). Dasselbe Problem hat der Mac: Im
+  Vollbild verdeckt die Leiste von macOS die Menüzeile im Fenster (vom Nutzer gesehen am 2026-11-10). Beide
+  zusammen entwerfen.
+- **Tastatur und Zeiger:** Tastenkürzel über `UIKeyCommand` (mit der Übersicht beim Halten von ⌘), Mausbewegung ohne
+  Taste (`UIHoverGestureRecognizer`, siehe AP5).
+- **Apple Pencil:** Druck und Neigung auf dem iPad prüfen, Schweben auf Geräten, die es können.
+- **Bei Bedarf:** mehrere Fenster einer App (`UIApplicationSupportsMultipleScenes`), Drag & Drop zwischen Apps.
+
+**Fertig, wenn:** `androidGallery` im iPad-Simulator in allen Fenstergrößen richtig läuft, die Skripte grün sind und
+die Menüs in der Leiste von iPadOS erscheinen. Stift und Stage Manager brauchen ein echtes iPad; ohne eines bleiben sie
+als ungeprüft vermerkt.
+
 ## Reihenfolge
 
 ```text
@@ -776,6 +799,7 @@ AP0 -> AP2 -> AP3 -> AP4 -> AP7 -> AP8
 AP1 (Safari): sofort, parallel
 AP5 (iOS): nach AP2, parallel zu AP3/AP4
 AP6 (Metal): nach AP4 oder AP5
+AP9 (iPadOS): nach AP5, unabhängig von AP6
 ```
 
 Vom ARM64-Plan nutzt Apple NEON (ARM6, fertig), später ARM4 (Plugin-ABI, nur für macOS-Plugins) und ARM7: Ein Mac

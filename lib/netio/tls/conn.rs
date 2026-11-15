@@ -448,6 +448,16 @@ impl Conn {
         Ok(())
     }
 
+    /// (tests) an application data record without data
+    pub fn write_empty(&mut self) -> Result<(), TlsError> {
+        if self.state != State::Established {
+            return Err(TlsError::Closed);
+        }
+        let rec = self.wr.as_mut().ok_or(TlsError::Closed)?.seal(APPLICATION_DATA, &[]);
+        self.out.extend_from_slice(&rec);
+        Ok(())
+    }
+
     /// send close_notify
     pub fn close(&mut self) {
         if self.state != State::Closed {

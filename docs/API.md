@@ -38763,7 +38763,8 @@ cron -- 5-field cron schedules evaluated in a time zone
                                 a-b, a-b/n, */n, lists a,b; month names jan..dec, weekday
                                 names sun..sat (0 and 7 = Sunday); @hourly @daily @midnight
                                 @weekly @monthly @yearly @annually.  Day of month and day of
-                                week restricted both: either matches (Vixie cron).
+                                week restricted both: either matches; one of them beginning
+                                with "*" (also "*/2"): both must match (Vixie cron).
   cron.next_after(ts, &zone)    the first run after ts: a wall time in a DST gap runs at the
                                 jump (right after the gap), a repeated wall time runs once
                                 (its first occurrence); None when nothing matches within
@@ -40432,6 +40433,10 @@ MAX_HEADERS: usize = 100
 **`impl<'a> Reader<'a>`**
 
 - **`fn new(s: &'a dyn Stream) -> Reader<'a>`**
+- **`fn set_min_rate(&mut self, rate: Option<(u32, u32)>)`**
+  reads fail with TimedOut once fewer than `bytes_per_s` arrived on average since this
+  call, counted after a first `grace_ms` (a body that dribbles in a byte now and then, each
+  within the stream's timeout, must not hold the reader for hours); None: no such limit
 - **`fn set_deadline(&mut self, deadline_us: Option<u64>)`**
   reads fail with TimedOut once plat::time_us() is past this (a limit for a whole head,
   where the stream's timeout counts each read)
@@ -40502,13 +40507,23 @@ worker serves one connection at a time (keep-alive, pipelined requests in order)
 
 The handler runs on a worker thread; it must not panic (panics abort the process).
 Requests with both Content-Length and Transfer-Encoding are refused (request smuggling).
+A slow client holds a worker only so long: the head must arrive within read_ms, a body at
+MIN_BODY_RATE on average after a first read_ms (over TLS too: records without data end a read
+after read_ms).
+```
+
+```rust
+/// the slowest request body a server waits for, in bytes a second on average (after a first
+/// read_ms): slower ones end the connection
+MIN_BODY_RATE: u32 = 1024
 ```
 
 - **`struct ServerConfig`**
   - `threads: usize` -- worker threads (connections served at once)
   - `max_body: usize` -- the largest request body
   - `idle_ms: u32` -- how long an idle keep-alive connection stays open
-  - `read_ms: u32` -- the longest wait for the next bytes of a request in progress
+  - `read_ms: u32` -- the longest wait for the next bytes of a request in progress; the head must be complete
+    within it, a body must bring 1 KiB a second on average after it (MIN_BODY_RATE)
   - `write_ms: u32`
   - `max_requests: usize` -- requests per connection
 
@@ -40787,6 +40802,8 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
 
 **`impl TlsStream`**
 
+- **`fn test_send_empty_record(&self) -> NetResult<()>`**
+  (tests) send an application data record without data
 - **`fn peer_certs(&self) -> Vec<Cert>`**
   the peer's certificate chain (leaf first)
 - **`fn last_error(&self) -> Option<TlsError>`**
@@ -40868,6 +40885,8 @@ AL_CERTIFICATE_REQUIRED: u8 = 116
 - **`fn has_plain(&self) -> bool`**
 - **`fn read_plain(&mut self, buf: &mut [u8]) -> usize`**
 - **`fn write_plain(&mut self, data: &[u8]) -> Result<(), TlsError>`**
+- **`fn write_empty(&mut self) -> Result<(), TlsError>`**
+  (tests) an application data record without data
 - **`fn close(&mut self)`**
   send close_notify
 - **`fn feed(&mut self, data: &[u8]) -> Result<(), TlsError>`**
@@ -41176,11 +41195,18 @@ KU_CRL_SIGN: u8 = 0x02
   - `server_auth: bool`
   - `client_auth: bool`
 
+- **`fn extension(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8>`**
+  a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
+
 **`impl CertBuilder`**
 
 - **`fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8>`**
   the DER certificate, signed by `key`; `issuer`: the issuing certificate (None: self
   signed with the builder's own name)
+- **`fn sign_ext(&self, issuer: Option<&Cert>, key: &Keypair, extra: &[Vec<u8>]) -> Vec<u8>`**
+  sign with further extensions (each one from `extension`: name constraints, a CA's
+  extended key usage ...); one with the OID of an extension the builder writes itself
+  replaces that one (basic constraints without a path length, other key usages)
 
 - **`fn ed25519_pkcs8(seed: &[u8; 32]) -> Vec<u8>`**
   the PKCS#8 form of an Ed25519 private key (for interoperable PEM files)

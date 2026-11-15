@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- HTML clipboard import: a long run of bare ampersands looked for the closing `;` through the whole rest each time (quadratic); a reference is looked for in its first 32 bytes only
+
 ## [0.2.0] - 2026-11-14
 
 ### Fixed

@@ -244,8 +244,8 @@ struct Slot {
     sum: u128,
     min: u64,
     max: u64,
-    /// (bucket, count), ascending
-    cells: Vec<(u16, u32)>,
+    /// (bucket, count), ascending; a count of u64 as n (record_n adds up to u32::MAX at a time)
+    cells: Vec<(u16, u64)>,
 }
 
 impl Slot {
@@ -259,8 +259,8 @@ impl Slot {
     fn add(&mut self, bucket: usize, v: u64, n: u32) {
         let b = bucket as u16;
         match self.cells.binary_search_by_key(&b, |c| c.0) {
-            Ok(i) => self.cells[i].1 = self.cells[i].1.saturating_add(n),
-            Err(i) => self.cells.insert(i, (b, n)),
+            Ok(i) => self.cells[i].1 = self.cells[i].1.saturating_add(n as u64),
+            Err(i) => self.cells.insert(i, (b, n as u64)),
         }
         self.n = self.n.saturating_add(n as u64);
         self.sum = self.sum.saturating_add(v as u128 * n as u128);
@@ -276,7 +276,7 @@ fn add_slot(h: &mut Hist, s: &Slot) {
         if h.counts.len() <= i {
             h.counts.resize(i + 1, 0);
         }
-        h.counts[i] = h.counts[i].saturating_add(c as u64);
+        h.counts[i] = h.counts[i].saturating_add(c);
     }
     h.n = h.n.saturating_add(s.n);
     h.sum = h.sum.saturating_add(s.sum);
@@ -309,7 +309,7 @@ impl Window {
     }
     /// the heap memory it holds: its slots and their histograms (none before the first value)
     pub fn bytes(&self) -> usize {
-        self.ring.capacity() * core::mem::size_of::<Slot>() + self.ring.iter().map(|s| s.cells.capacity() * core::mem::size_of::<(u16, u32)>()).sum::<usize>()
+        self.ring.capacity() * core::mem::size_of::<Slot>() + self.ring.iter().map(|s| s.cells.capacity() * core::mem::size_of::<(u16, u64)>()).sum::<usize>()
     }
     pub fn span(&self) -> u64 {
         self.span
@@ -360,15 +360,11 @@ impl Window {
     /// times, to the resolution of the slots; slots the ring no longer holds are left out
     pub fn hist_between(&self, from: u64, to: u64) -> Hist {
         let mut h = Hist::with_bits(self.bits);
-        let len = self.len as u64;
         let (a, b) = (from.div_ceil(self.span), to.div_ceil(self.span));
-        // only the newest `len` slot numbers can still be in the ring
-        for i in a.max(b.saturating_sub(len))..b {
-            if let Some(s) = self.ring.get((i % len) as usize)
-                && s.idx == i
-            {
-                add_slot(&mut h, s);
-            }
+        // the slots the ring holds whose numbers lie in [a, b): an end past the newest slot
+        // must not leave out the older ones that are still there
+        for s in self.ring.iter().filter(|s| s.idx != u64::MAX && s.idx >= a && s.idx < b) {
+            add_slot(&mut h, s);
         }
         h
     }
@@ -415,7 +411,7 @@ impl Window {
                 let mut cum = 0u64;
                 let mut v = if r == 1 { s.min } else { s.max };
                 for &(b, c) in s.cells.iter().filter(|_| r > 1 && r < s.n) {
-                    cum += c as u64;
+                    cum += c;
                     if cum >= r {
                         v = estimate(self.bits as u32, b as usize, s.min, s.max);
                         break;

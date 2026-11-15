@@ -119,6 +119,13 @@ impl<M: Ord + Clone> Ring<M> {
             return out;
         }
         let mut arcs: Vec<u128> = alloc::vec![0; self.members.len()];
+        // every token at one place: the first of them (the one lookups find) owns the circle
+        if self.tokens[0].0 == self.tokens[n - 1].0 {
+            if let Ok(k) = self.members.binary_search(&self.tokens[0].1) {
+                out[k].1 = 1_000_000;
+            }
+            return out;
+        }
         for i in 0..n {
             // the arc that ends at token i: from the token before it (exclusive)
             let prev = if i == 0 { self.tokens[n - 1].0 } else { self.tokens[i - 1].0 };

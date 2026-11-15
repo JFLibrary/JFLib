@@ -120,8 +120,45 @@ fn until_close(t: &mut T) {
         matches!(cut, Err(netio::http::ReadError::Net(e)) if e.kind == plat::net::NetErrorKind::Reset));
 }
 
+/// a request body that dribbles in (a byte every 200 ms, each within read_ms) ends the
+/// connection once the body falls below the minimum rate, not after the whole body (200 s)
+fn slow_body(t: &mut T) {
+    let cfg = ServerConfig { threads: 1, read_ms: 500, ..ServerConfig::default() };
+    let Ok(srv) = Server::start(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0), cfg, Arc::new(handler)) else {
+        t.check("slow body: server start", false);
+        return;
+    };
+    let Ok(s) = TcpStream::connect(&srv.local_addr(), 2000) else {
+        t.check("slow body: connect", false);
+        return;
+    };
+    s.set_read_timeout(Some(150));
+    let _ = s.write_all(b"POST /echo HTTP/1.1\r\nHost: x\r\nContent-Length: 1000\r\n\r\n");
+    let t0 = plat::time_us();
+    let mut ended = false;
+    while plat::time_us() - t0 < 6_000_000 {
+        if s.write_all(b"x").is_err() {
+            ended = true;
+            break;
+        }
+        let mut b = [0u8; 64];
+        match s.read(&mut b) {
+            Err(e) if e.kind == plat::net::NetErrorKind::TimedOut => {}
+            _ => {
+                ended = true; // closed (or an answer): the server is done with it
+                break;
+            }
+        }
+        plat::sleep_ms(50);
+    }
+    let ms = (plat::time_us() - t0) / 1000;
+    t.check(&format!("slow body: the server ends a dribbling body ({ms} ms)"), ended && ms < 3000);
+    srv.stop();
+}
+
 pub fn run(t: &mut T) {
     until_close(t);
+    slow_body(t);
     urls(t);
     let cfg = ServerConfig { threads: 4, max_body: 1 << 20, idle_ms: 2000, ..ServerConfig::default() };
     let srv = Server::start(&SocketAddr::new(IpAddr::LOCALHOST_V4, 0), cfg, Arc::new(handler));
