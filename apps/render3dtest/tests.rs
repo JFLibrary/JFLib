@@ -15,6 +15,8 @@ use crate::cpu::{self, RefCamera, RefScene};
 pub struct T {
     pub fails: u32,
     pub validate: bool,
+    /// the instance the tests share (setup)
+    pub inst: Option<Instance>,
 }
 
 pub fn out(s: &str) {
@@ -50,8 +52,14 @@ pub struct Gpu {
     pub adapter: Adapter,
 }
 
-/// None (SKIP, not a failure) without Vulkan or a usable GPU
+/// None (SKIP, not a failure) without Vulkan or a usable GPU.  The tests share one instance (T::inst):
+/// one per test loads and unloads the Vulkan loader and its layers each time, and under the validation
+/// layer the NVIDIA driver then crashes in a thread of a destroyed device (docs/GPU.md, "Absturz im
+/// NVIDIA-Treiber"); every test makes its own devices
 pub fn setup(t: &mut T) -> Option<Gpu> {
+    if let Some(inst) = t.inst.clone() {
+        return adapter_of(t, inst);
+    }
     let inst = match Instance::with(&InstanceDesc { app_name: "render3dtest", validate: t.validate }) {
         Ok(i) => i,
         Err(e @ (GpuError::NoLoader | GpuError::NoAdapter | GpuError::Disabled)) => {
@@ -66,6 +74,12 @@ pub fn setup(t: &mut T) -> Option<Gpu> {
     if t.validate && !inst.validating() {
         out("note: validation layer not available, running without it");
     }
+    t.inst = Some(inst.clone());
+    adapter_of(t, inst)
+}
+
+/// the adapter of inst
+fn adapter_of(t: &mut T, inst: Instance) -> Option<Gpu> {
     let adapter = match inst.adapter() {
         Ok(a) => a,
         Err(e @ (GpuError::NoAdapter | GpuError::Unsupported(_))) => {
@@ -1261,7 +1275,7 @@ const DUMP_FORMATS: [(&str, Format); 5] = [("rgba8", Format::Rgba8Unorm), ("bgra
                                            ("rgba16f", Format::Rgba16Float), ("rgba32f", Format::Rgba32Float)];
 
 fn dump(dir: &str) -> i32 {
-    let mut t = T { fails: 0, validate: false };
+    let mut t = T { fails: 0, validate: false, inst: None };
     let Some(g) = setup(&mut t) else { return 0 };
     let fmt = plat::arg_value("--format");
     let Some(&(ext, format)) = (match &fmt {
@@ -1294,7 +1308,7 @@ fn dump(dir: &str) -> i32 {
 /// what Voll takes) and once with Shadows::for_level(Basis) (2 x 1024): what the Basis default looks like.  Writes
 /// DIR/basis_4x2048.rgba and DIR/basis_2x1024.rgba, rows of R, G, B, A; --res WxH (1920 x 1080)
 fn shadow_shots(dir: &str) -> i32 {
-    let mut t = T { fails: 0, validate: false };
+    let mut t = T { fails: 0, validate: false, inst: None };
     let Some(g) = setup(&mut t) else { return 0 };
     let (w, h) = plat::arg_value("--res")
         .and_then(|r| {
@@ -1348,7 +1362,7 @@ pub fn run() -> i32 {
         plat::write_stderr(b"render3dtest: --test NAME [--validate], --bench N, --gen-shaders FILE, --dump DIR, --shadow-shots DIR (see apps/render3dtest/main.rs)\n");
         return 2;
     };
-    let mut t = T { fails: 0, validate };
+    let mut t = T { fails: 0, validate, inst: None };
     let list: [(&str, fn(&mut T)); 20] = [("shaders", shaders), ("pixels", pixels), ("visibility", visibility), ("changes", changes), ("many", many),
                                           ("levels", levels), ("coords", coords), ("frames", frames), ("errors", errors), ("textures", crate::tex::textures),
                                           ("mirror", crate::tex::mirror), ("gltf", crate::gltftest::gltf), ("pbr", crate::pbr::pbr),

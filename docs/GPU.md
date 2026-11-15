@@ -282,7 +282,9 @@ Swapchain benutzt hatte; ohne Validierung, mit `jfgui_GPU_COMPUTE=0`, ohne den S
 in Teilfolgen nicht, auch nicht in der genauen Folge bis `bindless`, die beim ersten Mal abstürzte. Danach fragt
 `lib/gpu` die Zeitleiste der Rechen-Warteschlange nur noch, wenn auf ihr etwas aussteht (vorher bei jedem Aufräumen),
 und die ganze Reihe lief grün; ob das die Ursache war, ist nicht belegt (vermutet: die Schicht). Seit dem Review
-hat ein Gerät die Rechen-Warteschlange nur auf Wunsch; die Tests außer `queues` laufen ohne sie.
+hat ein Gerät die Rechen-Warteschlange nur auf Wunsch; die Tests außer `queues` laufen ohne sie. Aufgeklärt am
+2026-11-13, sehr wahrscheinlich derselbe Fehler: ein Arbeits-Thread des NVIDIA-Treibers
+([Absturz im NVIDIA-Treiber](#absturz-im-nvidia-treiber-unter-validierung)).
 
 **Läuft etwas nebeneinander?** Zwei lange Dispatches (1 Mio. × 2000 Schritte, je ein Puffer) nacheinander auf der
 Warteschlange des Geräts: 1,75 ms; je einer auf jeder: 1,46 ms (ein Lauf, `gputest --test queues`). Die
@@ -1380,6 +1382,73 @@ Achtung bei Messungen: Der Vulkan Configurator (`vkconfig`) kann Schichten für 
 erzwingen (eine Loader-Einstellungsdatei unter `%LOCALAPPDATA%\LunarG\vulkan`), etwa
 GFXReconstruct, das jeden Aufruf aufzeichnet. `VK_LOADER_LAYERS_DISABLE` hebt das nicht auf;
 für Messungen den Configurator ausschalten.
+
+### Absturz im NVIDIA-Treiber unter Validierung
+
+Auf dem Entwicklungs-PC (RTX 2070 SUPER, Treiber 32.0.16.1088, Vulkan SDK 1.4.363.0) stürzte
+`gputest --test all --validate` sporadisch mit Exit 3 ab, immer beim Abbau eines Tests (nach seiner letzten
+Prüfung) und immer in einem Thread des Treibers. Seit dem 2026-11-13 nennt der Absturzbericht unter Windows das
+Modul, den Thread und die Aufrufkette durch alle Module ([`win_crash.rs`](../lib/plat/win_crash.rs)):
+
+```text
+jfgui: crash 0xC0000005 at 0x0, in no loaded module (thread 23384, executing 0x0)
+jfgui: called from nvoglv64.dll+0xa3d2a8, KERNEL32.DLL+0x2dda7, ntdll.dll+0x7ee4c
+```
+
+- **Stelle:** `vkCreateDevice` startet in `nvoglv64.dll` Arbeits-Threads über eine Startroutine (RVA `0xa3d280`),
+  die `[obj+0x10]` ihres Thread-Objekts aufruft (`0xa3d2a5`, zurück nach `0xa3d2a8`). Beim Absturz ist `obj` schon
+  freigegeben: Das Ziel war 0, privater Heap (lesbar, nicht ausführbar, laut `VirtualQuery`) oder Daten im Treiber,
+  einmal war `obj` selbst Müll (`reading 0xffffffffffffffff`). Es trifft immer denselben Thread (Funktion
+  `0xf455d0`, eine Schleife mit 1-s-Takt auf globalem Zustand, die erste von fünf, die `vkCreateDevice` so
+  startet). Ein Haken auf das `CreateThread` des Treibers (nur zur Diagnose, nicht im Code) zeigte: Der
+  abstürzende Thread entstand 2,4 bis 19,5 s vorher in `vkCreateDevice` eines Geräts, das längst zerstört war.
+  Der Aufrufstapel:
+  `Adapter::create_device_with` → Loader → NV-Schicht (in `nvoglv64.dll`) → OBS-Hook → Validierungsschicht →
+  Treiber. Der Treiber gibt das Thread-Objekt also frei, ohne auf den Thread zu warten.
+- **Nicht JFLib:** `nvoglv64.dll` bleibt die ganze Zeit geladen (Protokoll über `LdrRegisterDllNotification`),
+  ein Gerät wird erst nach `vkDeviceWaitIdle` und nach allen seinen Objekten zerstört, kein Thread von JFLib ist
+  beteiligt.
+- **Mit Debugger bestätigt** (eine zweite Session, unabhängig, am selben Tag): derselbe Erzeuger
+  (`CreateThread` bei `nvoglv64.dll+0xa3b4d4`, Start `+0xa3d280`, Parameter das Objekt), ein Thread aus dem
+  `vkCreateDevice` des vorigen Tests lief 817 ms nicht an und stürzte erst nach dem Abbau von Gerät und Instanz
+  ab. Solche Threads entstehen auch beim Anlegen von Pipelines, 180 bis 230 je `--test all`; das passt zu
+  [RENDER2D.md](RENDER2D.md) (der Absturz in G6b2 nur, wenn der Renderer die Pipeline des Instanzdurchgangs anlegt).
+- **Auslöser:** viele Instanzen mit je einem Gerät nacheinander, mit Validierungsschicht. Bis zum 2026-11-13
+  legte jeder Test von gputest seine eigene Instanz an. Jede validierte Instanz lädt und entlädt `vulkan-1.dll`, die
+  Validierungsschicht (21 MB) mit `MSVCP140` und `PSAPI` und, über den impliziten Vulkan-Hook von OBS Studio
+  (`VK_LAYER_OBS_HOOK`, `C:\ProgramData\obs-studio-hook\graphics-hook64.dll` 1.8.6, immer aktiv, auch ohne
+  laufendes OBS), `dbghelp`. Vermutlich kommt der neue Thread des Treibers deshalb so spät an die Reihe (Loader-Lock;
+  nicht belegt). Last durch andere Programme macht den Absturz häufiger.
+
+Gezählt mit `gputest --test churn` (200-mal Instanz und Gerät, der Build ohne Diagnose; „Diagnose“: mit dem
+DLL-Protokoll und dem Haken auf `CreateThread`, die das Timing verschieben):
+
+| Variante | abgestürzte Läufe |
+| --- | --- |
+| `--validate` | 10 von 12; Diagnose 7 von 9 und 3 von 3 |
+| `--validate`, eine Instanz mit 200 Geräten | 0 von 6; Diagnose 0 von 4 |
+| `--validate`, OBS-Hook aus (`DISABLE_VULKAN_OBS_CAPTURE=1`) | 6 von 8; Diagnose 0 von 14 |
+| ohne `--validate` | 0 von 4; Diagnose 0 von 4 (je 400-mal) |
+| `--validate`, Schicht und `vulkan-1.dll` festgehalten (`GET_MODULE_HANDLE_EX_FLAG_PIN`) | Diagnose 1 von 6 (nur die Schicht: 2 von 6) |
+
+Die Folge `info,compute,copies,upload,…,scene,wgsl` (alle Tests außer `window`, `bench_smoke`, `glibc`, `noloader`)
+stürzte vorher in 5 von 24 Läufen ab (beim Abbau von `upload`, `copies`, `scene`), `info,compute,copies` allein in
+0 von 15.
+
+**Abhilfe:** Die Tests von gputest, `render2dtest` und `render3dtest` teilen sich je Prozess eine Instanz
+(`setup`, `T::inst`); jeder Test legt weiter seine eigenen Geräte an. Eigene Instanzen legen nur `info`, `errors`
+(mit `noloader`) und `churn` von gputest an. `gputest --test churn --validate` zeigt den Fehler weiter; nach einem
+neuen Treiber so nachprüfen. Mit einer Instanz trat er nicht auf (0 von 10 Läufen mit je 200 Geräten); wer unter
+Validierung Instanzen in schneller Folge anlegt und abbaut, kann ihn treffen. Danach lief die Testfolge ohne
+Fenster 10-mal ohne Absturz und `validate.uis` in der Suite grün.
+
+**Pipelines** (2026-11-14): `gputest --test churn_shared --validate` legt auf der geteilten Instanz 200 Geräte an,
+jedes mit einer Compute-Pipeline und einem Dispatch: kein Absturz in 4 Läufen. Die Gegenprobe `churn`, abwechselnd
+damit, stürzte an diesem Tag aber auch nicht ab (0 von 2; fremde Last, 30 bis 280 s je Lauf statt 20 bis 50 s am
+Vortag). Das sagt also nichts: Ob die Threads der Pipelines den Absturz auf einer geteilten Instanz auslösen, ist
+offen (render2d sah ihn in G6b2 beim Anlegen einer Pipeline, mit je einer Instanz pro Test). Nachprüfen, wenn
+`churn` wieder abstürzt: `gputest --test churn_shared --validate` abwechselnd mit `--test churn --validate`. Der
+Fehler gehört an NVIDIA gemeldet.
 
 ## Tests
 

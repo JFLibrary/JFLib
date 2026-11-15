@@ -60,6 +60,10 @@
 //        msl         (AP6) every shader of the repository through the MSL translation (t_msl.rs): on
 //                    Metal translated and compiled by ShaderModule::from_spirv, elsewhere translated
 //        all         every test above
+//        churn       (not in all) 200 times an instance and a device, created and dropped: with
+//                    --validate it reproduces the NVIDIA driver's crash (docs/GPU.md, Validierung)
+//        churn_shared (not in all) 200 devices on the shared instance, each with a compute
+//                    pipeline and a dispatch: the driver's threads of devices and pipelines
 //   gputest --test A,B,... [--except C,D,...] [--validate]   several tests in the list's order, `all` without
 //                   some (tests/validate*.uis: the tests with a real window apart from the rest)
 //   --validate      with VK_LAYER_KHRONOS_validation (jfgui_GPU_VALIDATE, synchronization
@@ -126,6 +130,8 @@ pub struct T {
     pub validate: bool,
     /// validation errors a test provoked on purpose (syncval)
     pub expected: u32,
+    /// the instance the tests share (setup)
+    pub inst: Option<Instance>,
 }
 
 pub fn out(s: &str) {
@@ -191,8 +197,24 @@ pub fn windows(dev: &Device) -> bool {
     dev.features().swapchain && !cfg!(target_os = "android")
 }
 
-/// the GPU for a test; None (SKIP, not a failure) without Vulkan or a usable GPU
+/// the GPU for a test, on the instance the tests share; None (SKIP, not a failure) without Vulkan or
+/// a usable GPU.  One instance per process: a new one per test loads and unloads the Vulkan loader and
+/// its layers each time, and under the validation layer the NVIDIA driver then crashes in a worker
+/// thread of a destroyed device (docs/GPU.md, "Absturz im NVIDIA-Treiber"; churn still does that)
 pub fn setup(t: &mut T) -> Option<Gpu> {
+    let inst = match &t.inst {
+        Some(i) => i.clone(),
+        None => {
+            let i = instance(t)?;
+            t.inst = Some(i.clone());
+            i
+        }
+    };
+    gpu_on(t, inst)
+}
+
+/// a new instance; None (SKIP or a failure) without one
+fn instance(t: &mut T) -> Option<Instance> {
     let inst = match Instance::with(&InstanceDesc { app_name: "gputest", validate: t.validate }) {
         Ok(i) => i,
         Err(e @ (GpuError::NoLoader | GpuError::NoAdapter | GpuError::Disabled)) => {
@@ -207,6 +229,11 @@ pub fn setup(t: &mut T) -> Option<Gpu> {
     if t.validate && !inst.validating() {
         out("note: validation layer not available, running without it");
     }
+    Some(inst)
+}
+
+/// adapter and device on inst
+fn gpu_on(t: &mut T, inst: Instance) -> Option<Gpu> {
     let adapter = match inst.adapter() {
         Ok(a) => a,
         Err(e @ (GpuError::NoAdapter | GpuError::Unsupported(_))) => {
@@ -488,6 +515,35 @@ fn errors(t: &mut T) {
     drop(inst);
 }
 
+/// 200 instances, each with a device, created and dropped one after the other (docs/GPU.md,
+/// "Absturz im NVIDIA-Treiber")
+fn churn(t: &mut T) {
+    let t0 = plat::time_us();
+    for i in 0..200 {
+        let Some(inst) = instance(t) else { return };
+        let Some(g) = gpu_on(t, inst) else { return };
+        drop(g);
+        if i % 50 == 49 {
+            out(&format!("  {} instances and devices: {:.0} ms", i + 1, ms_since(t0)));
+        }
+    }
+    t.ok(true, "200 instances and devices created and dropped");
+}
+
+/// 200 devices on the shared instance, each with the fill pipeline and a dispatch (docs/GPU.md,
+/// "Absturz im NVIDIA-Treiber": the driver starts threads for pipelines too)
+fn churn_shared(t: &mut T) {
+    let t0 = plat::time_us();
+    for i in 0..200 {
+        let Some(g) = setup(t) else { return };
+        t_compute::fill_check(t, &g.dev, 1000, "churn_shared fill");
+        drop(g);
+        if i % 50 == 49 {
+            out(&format!("  {} devices with a pipeline: {:.0} ms", i + 1, ms_since(t0)));
+        }
+    }
+}
+
 fn syncval(t: &mut T) {
     if !t.validate {
         out("SKIP: needs --validate");
@@ -524,7 +580,7 @@ fn syncval(t: &mut T) {
 fn run() -> i32 {
     let args = plat::args();
     let validate = args.iter().any(|a| a == "--validate");
-    let mut t = T { fails: 0, validate, expected: 0 };
+    let mut t = T { fails: 0, validate, expected: 0, inst: None };
     if let Some(kind) = plat::arg_value("--glibc-child") {
         return t_glibc::glibc_child(&kind);
     }
@@ -543,7 +599,7 @@ fn run() -> i32 {
         plat::write_stderr(b"gputest: --info, --test NAME [--validate], --bench or --bench N (see apps/gputest/main.rs)\n");
         return 2;
     };
-    let tests: [(&str, fn(&mut T)); 20] = [
+    let tests: [(&str, fn(&mut T)); 22] = [
         ("info", info),
         ("compute", t_compute::compute),
         ("copies", t_compute::copies),
@@ -564,6 +620,8 @@ fn run() -> i32 {
         ("glibc", t_glibc::glibc),
         ("noloader", t_glibc::noloader),
         ("msl", t_msl::msl),
+        ("churn", churn),
+        ("churn_shared", churn_shared),
     ];
     // --test A,B,...: those tests in the list's order; --except A,B,...: not those (the suite runs the validation of
     // the tests with a real window apart from the rest of `all`, tests/validate*.uis)
@@ -576,7 +634,9 @@ fn run() -> i32 {
     }
     let mut ran = false;
     for (name, f) in tests {
-        if (names.contains(&"all") || names.contains(&name)) && !except.contains(&name) {
+        // churn and churn_shared only by name: the driver's crash, reproduced or not, no check
+        let by_name = name.starts_with("churn");
+        if ((names.contains(&"all") && !by_name) || names.contains(&name)) && !except.contains(&name) {
             out(&format!("== {name}{}", if validate { " (validation)" } else { "" }));
             f(&mut t);
             ran = true;

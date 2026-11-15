@@ -75,7 +75,7 @@ fn time_of(f: usize) -> f32 {
 }
 
 pub fn bench(n: u32, validate: bool) -> i32 {
-    let mut t = T { fails: 0, validate };
+    let mut t = T { fails: 0, validate, inst: None };
     let num = |name: &str, d: usize| plat::arg_value(name).and_then(|v| v.parse::<usize>().ok()).unwrap_or(d);
     let (mut w, mut h) = (1920u32, 1080u32);
     if let Some(r) = plat::arg_value("--res") {
@@ -458,7 +458,7 @@ fn verify_lists(t: &mut T, dev: &Device, s: &Scene, objs: &[sb::Object], n: usiz
 
 /// --bench-upload: per class the CPU's levels alone, add_texture, and until the GPU has them
 pub fn bench_upload() -> i32 {
-    let mut t = T { fails: 0, validate: false };
+    let mut t = T { fails: 0, validate: false, inst: None };
     let Some(g) = setup(&mut t) else { return 0 };
     let Some(dev) = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device") else { return 1 };
     out(&format!("{} ({}), level {:?}; release builds measure, a debug build is slower", dev.info().name, dev.info().driver_info, dev.level()));
@@ -497,7 +497,7 @@ pub fn bench_upload() -> i32 {
 /// --bench-gltf: a .glb made here, read and put on the GPU
 pub fn bench_gltf() -> i32 {
     use crate::gltfgen::{Enc, Form, GMat, GNode, GPrim, GScene};
-    let mut t = T { fails: 0, validate: false };
+    let mut t = T { fails: 0, validate: false, inst: None };
     let num = |name: &str| plat::arg_value(name).and_then(|v| v.parse::<usize>().ok());
     let (nodes, vertices) = match (num("--nodes"), num("--vertices")) {
         (None, None) => (100_000, 0),

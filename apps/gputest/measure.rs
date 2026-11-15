@@ -551,7 +551,7 @@ pub fn bench_scene(n: u32, validate: bool) -> i32 {
             return 2;
         }
     };
-    let mut t = T { fails: 0, validate, expected: 0 };
+    let mut t = T { fails: 0, validate, expected: 0, inst: None };
     let Some(g) = crate::setup(&mut t) else { return if t.fails > 0 { 1 } else { 0 } };
     out(&format!("{} ({}), level {:?}", g.dev.info().name, g.dev.info().driver_info, g.dev.level()));
     if let Some(r) = run(&mut t, &g, &c) {

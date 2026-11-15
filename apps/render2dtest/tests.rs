@@ -16,6 +16,8 @@ use crate::refimg::{self, Tol};
 pub struct T {
     pub fails: u32,
     pub validate: bool,
+    /// the instance the tests share (setup)
+    pub inst: Option<Instance>,
 }
 
 pub fn out(s: &str) {
@@ -53,8 +55,14 @@ pub struct Gpu {
     pub adapter: Adapter,
 }
 
-/// None (SKIP, not a failure) without Vulkan or a usable GPU
+/// None (SKIP, not a failure) without Vulkan or a usable GPU.  The tests share one instance (T::inst):
+/// one per test loads and unloads the Vulkan loader and its layers each time, and under the validation
+/// layer the NVIDIA driver then crashes in a thread of a destroyed device (docs/GPU.md, "Absturz im
+/// NVIDIA-Treiber"); every test makes its own devices
 pub fn setup(t: &mut T) -> Option<Gpu> {
+    if let Some(inst) = t.inst.clone() {
+        return adapter_of(t, inst);
+    }
     let inst = match Instance::with(&InstanceDesc { app_name: "render2dtest", validate: t.validate }) {
         Ok(i) => i,
         Err(e @ (GpuError::NoLoader | GpuError::NoAdapter | GpuError::Disabled)) => {
@@ -69,6 +77,12 @@ pub fn setup(t: &mut T) -> Option<Gpu> {
     if t.validate && !inst.validating() {
         out("note: validation layer not available, running without it");
     }
+    t.inst = Some(inst.clone());
+    adapter_of(t, inst)
+}
+
+/// the adapter of inst
+fn adapter_of(t: &mut T, inst: Instance) -> Option<Gpu> {
     let adapter = match inst.adapter() {
         Ok(a) => a,
         Err(e @ (GpuError::NoAdapter | GpuError::Unsupported(_))) => {
@@ -883,7 +897,7 @@ fn shaders(t: &mut T) {
 
 /// gallery::shots() on both levels into DIR (tests/engine_web.mjs compares the browser's with them)
 fn dump_all(dir: &str) -> i32 {
-    let mut t = T { fails: 0, validate: false };
+    let mut t = T { fails: 0, validate: false, inst: None };
     let mut files = 0;
     on_levels(&mut t, &mut |t, dev, level| {
         let Some(mut r) = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new") else { return };
@@ -951,7 +965,7 @@ pub fn run() -> i32 {
         plat::write_stderr(b"render2dtest: --test NAME [--validate], --bench N, --demo, --gen-shaders FILE (see apps/render2dtest/main.rs)\n");
         return 2;
     };
-    let mut t = T { fails: 0, validate };
+    let mut t = T { fails: 0, validate, inst: None };
     let list: [(&str, fn(&mut T)); 30] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
                                           ("arcs", arcs), ("dashes", dashes), ("curves", curves), ("fills", fills), ("hatches", hatches), ("layers", layers),
                                           ("changes", crate::scenes::changes), ("churn", crate::scenes::churn), ("visibility", crate::scenes::visibility), ("coords", crate::scenes::coords),
