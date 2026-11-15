@@ -25,7 +25,7 @@ use super::{
     BeginPaint, BitmapInfoHeader, ClientToScreen, CreateWindowExW, DefWindowProcW, DestroyWindow, EndPaint, GetDC,
     LoadCursorW, PaintStruct, Point, RegisterClassExW, ReleaseCapture, ReleaseDC, ScreenToClient, SetCapture,
     SetDIBitsToDevice, SetWindowPos, ShowWindow, TrackMouse, TrackMouseEvent, UiOnly, WndClassEx, dip, frame_ok,
-    hinst, lp_xy, win_dpi, win_hwnd, win_mods,
+    hinst, lp_xy, wheel_of, win_dpi, win_hwnd, win_mods,
 };
 use crate::{BTN_LEFT, BTN_MIDDLE, BTN_RIGHT, E_DOWN, E_LEAVE, E_MOVE, E_UP, E_WHEEL, Event, Frame, PPW_MAX, PW_MAX, evq_push};
 
@@ -296,8 +296,9 @@ pub(super) fn win_popup_under(owner: i32) -> bool {
     pq_find(pq_under()).is_some_and(|q| q.owner.get() == owner)
 }
 
-/// hwnd is a popup: the wheel event (screen point) is pushed for its owner  [win_popup_wheel]
-pub(super) fn win_popup_wheel(hwnd: isize, sx: i32, sy: i32, data: u32) -> bool {
+/// hwnd is a popup: the wheel event (screen point; kind: WHEEL_*) is pushed for its owner
+/// [win_popup_wheel]
+pub(super) fn win_popup_wheel(hwnd: isize, sx: i32, sy: i32, kind: u8, data: u32) -> bool {
     let Some(q) = pq_find(hwnd) else { return false };
     if q.owner.get() < 0 {
         return false;
@@ -305,7 +306,7 @@ pub(super) fn win_popup_wheel(hwnd: isize, sx: i32, sy: i32, data: u32) -> bool 
     let mut p = Point { x: sx, y: sy };
     // SAFETY: our popup window and a valid POINT.
     unsafe { ScreenToClient(hwnd, &mut p) };
-    pq_push(q, E_WHEEL, 0, p.x, p.y, data);
+    pq_push(q, E_WHEEL, kind, p.x, p.y, data);
     true
 }
 
@@ -362,12 +363,11 @@ unsafe extern "system" fn pq_proc(hwnd: isize, msg: u32, wp: usize, lp: isize) -
             0
         }
         WM_MOUSEWHEEL | WM_MOUSEHWHEEL => {
-            let d = (wp >> 16) as u16 as u32;
-            let data = if msg == WM_MOUSEWHEEL { d } else { d << 16 };
+            let (kind, data) = wheel_of(msg, wp);
             let mut p = Point { x, y };
             // SAFETY: our popup window and a valid POINT.
             unsafe { ScreenToClient(hwnd, &mut p) };
-            pq_push(q, E_WHEEL, 0, p.x, p.y, data);
+            pq_push(q, E_WHEEL, kind, p.x, p.y, data);
             0
         }
         WM_MOUSELEAVE => {

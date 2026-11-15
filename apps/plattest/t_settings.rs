@@ -1,11 +1,12 @@
 // t_settings -- the system settings the UI follows (lib/plat/settings.rs, linux_settings.rs)
 //
 //   plattest --test settings       the jfgui_* overrides (and their limits), the defaults, the
-//                                  title bar's layout and actions (GNOME's names); Windows: the
-//                                  system's values are plausible; Linux without the portal
-//                                  (jfgui_PORTAL_SETTINGS=0): the defaults, then GTK's
-//                                  settings.ini (gtk-4.0 before gtk-3.0) and KDE's kdeglobals in
-//                                  a scratch XDG_CONFIG_HOME
+//                                  title bar's layout and actions (GNOME's names), the wheel's
+//                                  lines and characters; Windows: the system's values are
+//                                  plausible; Linux without the portal (jfgui_PORTAL_SETTINGS=0):
+//                                  the defaults, then GTK's settings.ini (gtk-4.0 before gtk-3.0)
+//                                  and KDE's kdeglobals (WheelScrollLines on KDE) in a scratch
+//                                  XDG_CONFIG_HOME
 //   plattest --test settings-bus   (Linux; tools/platshared/settings_bus.py starts it on a fake
 //                                  session bus) the portal's ReadAll: color-scheme, accent-color
 //                                  (ddd), high-contrast, enable-animations, text-scaling-factor
@@ -22,10 +23,10 @@ use plat::{TB_BTN_CLOSE as C, TB_BTN_MAX as X, TB_BTN_MIN as N};
 
 use crate::T;
 
-const VARS: [&str; 14] = [
+const VARS: [&str; 16] = [
     "jfgui_THEME", "jfgui_ACCENT", "jfgui_CONTRAST", "jfgui_REDUCE_MOTION", "jfgui_TEXT_SCALE", "jfgui_DOUBLE_CLICK_MS", "jfgui_CARET_BLINK_MS",
     "jfgui_FONT_AA", "jfgui_FONT_HINTING", "jfgui_FONT_RGBA", "jfgui_BUTTON_LAYOUT", "jfgui_TITLEBAR_DOUBLE_CLICK", "jfgui_TITLEBAR_MIDDLE_CLICK",
-    "jfgui_TITLEBAR_RIGHT_CLICK",
+    "jfgui_TITLEBAR_RIGHT_CLICK", "jfgui_WHEEL_LINES", "jfgui_WHEEL_CHARS",
 ];
 
 fn clear() {
@@ -39,6 +40,8 @@ pub fn t_settings(t: &mut T) {
     t.check(sys_settings_env() == SysSettings::default(), "settings: no overrides: the defaults");
     let d = SysSettings::default();
     t.check(d.text_scale == 100 && d.double_click_ms == 500 && d.caret_blink_ms == 530 && d.dark.is_none() && !d.high_contrast, "settings: the defaults");
+    t.check(d.wheel_lines == 3 && d.wheel_chars == 3, "settings: the wheel's defaults: three lines, three characters");
+    wheel(t);
     for (k, v) in [
         ("jfgui_THEME", "dark"),
         ("jfgui_ACCENT", "#123456"),
@@ -74,6 +77,8 @@ pub fn t_settings(t: &mut T) {
         t.check((100..=5000).contains(&s.double_click_ms) && (100..=225).contains(&s.text_scale) && s.caret_blink_ms <= 5000, "settings: the system's values are plausible");
         t.check(!s.high_contrast || s.contrast_colors.is_some(), "settings: high contrast comes with its colours");
         t.check(s.font_aa.is_some() && (s.font_aa == Some(false) || s.font_rgba.is_some()), "settings: font smoothing and its kind");
+        t.check(((1..=100).contains(&s.wheel_lines) || s.wheel_lines == plat::WHEEL_PAGE) && (1..=100).contains(&s.wheel_chars),
+            "settings: the wheel's lines and characters (SPI_GETWHEELSCROLLLINES / CHARS) are plausible");
     }
     #[cfg(target_os = "linux")]
     {
@@ -153,9 +158,32 @@ fn files(t: &mut T) {
     plat::setenv("jfgui_CONFIG_SETTINGS", Some("0"));
     t.check(sys_settings().dark.is_none(), "settings files: jfgui_CONFIG_SETTINGS=0 skips them");
     plat::setenv("jfgui_CONFIG_SETTINGS", None);
+    // the lines of a wheel notch: KDE's WheelScrollLines, on KDE only
+    put("kdeglobals", "[KDE]\nWheelScrollLines=7\n");
+    t.check(sys_settings().wheel_lines == 3, "settings files: kdeglobals' WheelScrollLines outside KDE: not read");
+    plat::setenv("XDG_CURRENT_DESKTOP", Some("KDE"));
+    t.check(sys_settings().wheel_lines == 7, "settings files: on KDE kdeglobals' WheelScrollLines 7");
+    plat::setenv("XDG_CURRENT_DESKTOP", Some("GNOME"));
     files_done(&home);
     plat::setenv("XDG_CONFIG_HOME", old.0.as_deref());
     plat::setenv("XDG_CURRENT_DESKTOP", old.1.as_deref());
+}
+
+// the wheel: jfgui_WHEEL_LINES (a number or "page"), jfgui_WHEEL_CHARS, their limits
+fn wheel(t: &mut T) {
+    plat::setenv("jfgui_WHEEL_LINES", Some("7"));
+    plat::setenv("jfgui_WHEEL_CHARS", Some("5"));
+    let s = sys_settings_env();
+    t.check(s.wheel_lines == 7 && s.wheel_chars == 5, "settings: jfgui_WHEEL_LINES, jfgui_WHEEL_CHARS");
+    plat::setenv("jfgui_WHEEL_LINES", Some("page"));
+    plat::setenv("jfgui_WHEEL_CHARS", Some("500"));
+    let s = sys_settings_env();
+    t.check(s.wheel_lines == plat::WHEEL_PAGE && s.wheel_chars == 100, "settings: jfgui_WHEEL_LINES=page, the characters at most 100");
+    plat::setenv("jfgui_WHEEL_LINES", Some("0"));
+    t.check(sys_settings_env().wheel_lines == 1, "settings: jfgui_WHEEL_LINES=0 -> 1 (at least a line)");
+    t.check(plat::wheel_amount(u32::MAX) == plat::WHEEL_PAGE && plat::wheel_amount(250) == 100, "settings: wheel_amount keeps the page, at most 100");
+    plat::setenv("jfgui_WHEEL_LINES", None);
+    plat::setenv("jfgui_WHEEL_CHARS", None);
 }
 
 // the title bar: GNOME's names, the defaults, the overrides

@@ -204,7 +204,8 @@ fn reg_dword(key: &str, val: &str) -> Option<u32> {
 }
 
 /// (settings.rs) the system's settings: theme, accent (DWM), high contrast and its colours,
-/// client-area animations, text scale (Accessibility), double-click and caret blink times
+/// client-area animations, text scale (Accessibility), double-click and caret blink times, the
+/// lines and characters of a wheel notch
 pub(crate) fn sys_settings_os(s: &mut crate::SysSettings) {
     let t = theme();
     if t >= 0 {
@@ -251,6 +252,16 @@ pub(crate) fn sys_settings_os(s: &mut crate::SysSettings) {
                     crate::FONT_RGBA_RGB
                 });
             }
+        }
+        // the wheel: SPI_GETWHEELSCROLLLINES (WHEEL_PAGESCROLL = u32::MAX: a page),
+        // SPI_GETWHEELSCROLLCHARS
+        let mut n = 3u32;
+        if unsafe { f(0x0068, 0, &mut n as *mut u32 as *mut u8, 0) } != 0 {
+            s.wheel_lines = crate::wheel_amount(n);
+        }
+        let mut n = 3u32;
+        if unsafe { f(0x006C, 0, &mut n as *mut u32 as *mut u8, 0) } != 0 {
+            s.wheel_chars = n.clamp(1, 100);
         }
     }
     let dbl = dll_proc(b"user32.dll\0", b"GetDoubleClickTime\0");

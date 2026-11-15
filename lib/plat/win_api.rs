@@ -72,7 +72,7 @@ use core::cell::Cell;
 use crate::{
     CUR_ARROW, CUR_COUNT, CUR_MAX_PX, CUR_TABLE, CUR_USER0, CUR_USER_MAX, E_CLOSE, E_DOWN, E_DPI, E_DROP, E_FOCUS_IN,
     E_FOCUS_OUT, E_KEY_DOWN, E_KEY_UP, E_LEAVE, E_MOVE, E_PAINT, E_POWER, E_RESIZE, E_SESSION_END, E_SETTINGS, E_TEXT,
-    E_UP, E_WHEEL, E_WINPOS, SET_CONTRAST, SET_FONTS, SET_LOCALE, SET_MONITORS, SET_THEME,
+    E_UP, E_WHEEL, E_WINPOS, SET_CONTRAST, SET_FONTS, SET_LOCALE, SET_MONITORS, SET_OTHER, SET_THEME,
     Event, Frame, HB_CLOSE, HB_DRAG, HB_MAX, HB_MIN, HB_TEXT, MOD_ALT, MOD_ALTGR, MOD_CAPS, MOD_CTRL, MOD_NUM, MOD_SHIFT,
     MOD_SUPER, PW_DEFAULT, PW_KEEP, PW_MAX, PW_NOOWNER, PWF_MASK, PWF_NOACTIVATE, PWF_RESIZABLE, PWF_SYSFRAME,
     PWF_TOOL, PWS_SHOWNA, WCMD_CLOSE, WCMD_MAXIMIZE, WCMD_MINIMIZE, WST_ACTIVE, WST_MAXIMIZED, WST_MINIMIZED, evq_count,
@@ -284,6 +284,9 @@ unsafe extern "system" {
     fn ReleaseCapture() -> i32;
     fn TrackMouseEvent(t: *mut TrackMouse) -> i32;
     fn GetKeyState(vk: i32) -> i16;
+    fn GetKeyboardState(ks: *mut u8) -> i32;
+    fn GetKeyboardLayout(thread: u32) -> isize;
+    fn ToUnicodeEx(vk: u32, scan: u32, ks: *const u8, buf: *mut u16, n: i32, flags: u32, hkl: isize) -> i32;
     fn WindowFromPoint(p: Point) -> isize;
     fn GetSystemMetrics(i: i32) -> i32;
     fn MonitorFromWindow(h: isize, flags: u32) -> isize;
@@ -408,6 +411,10 @@ fn setting_bits(wp: usize, lp: isize) -> u32 {
     // SPI_SETFONTSMOOTHING, _TYPE, _CONTRAST, _ORIENTATION
     if matches!(wp, 0x004B | 0x200B | 0x200D | 0x2013) {
         return SET_FONTS;
+    }
+    // SPI_SETWHEELSCROLLLINES, SPI_SETWHEELSCROLLCHARS (the mouse's control panel)
+    if matches!(wp, 0x0069 | 0x006D) {
+        return SET_OTHER;
     }
     if lp == 0 {
         return 0;
@@ -624,6 +631,9 @@ struct St {
     ptr_win: Cell<i32>, // window under the pointer (-1 = none)
     get_dpi: Cell<usize>, // GetDpiForWindow
     sm_dpi: Cell<usize>,  // GetSystemMetricsForDpi
+    msg_src: Cell<usize>, // GetCurrentInputMessageSource (Windows 8)
+    /// ToUnicodeEx leaves the keyboard state alone when asked (Windows 10 1607): key characters
+    uni_ok: Cell<bool>,
     hinst: Cell<isize>,
     /// (E3) the drawn cursors made so far: (shape << 16 | size px, HCURSOR); DRAWN_SIZES sizes
     /// per shape (the windows' dpis), kept for the process
@@ -654,6 +664,8 @@ static S: UiOnly<St> = UiOnly::new(St {
     ptr_win: Cell::new(-1),
     get_dpi: Cell::new(0),
     sm_dpi: Cell::new(0),
+    msg_src: Cell::new(0),
+    uni_ok: Cell::new(false),
     hinst: Cell::new(0),
     drawn: [const { Cell::new((0, 0)) }; DRAWN_SLOTS],
 });
@@ -745,6 +757,21 @@ fn dll_proc(dll: &[u8], name: &[u8]) -> usize {
     }
 }
 
+/// the build number of Windows (RtlGetVersion: the real one, whatever the manifest says; 0 =
+/// unknown)
+fn os_build() -> u32 {
+    let p = dll_proc(b"ntdll.dll\0", b"RtlGetVersion\0");
+    if p == 0 {
+        return 0;
+    }
+    // OSVERSIONINFOW: size, major, minor, build, platform id, then 128 UTF-16 units
+    let mut v = [0u32; 69];
+    v[0] = 276;
+    // SAFETY: RtlGetVersion(OSVERSIONINFOW*) -> NTSTATUS; v holds the 276 bytes of the record.
+    let f: unsafe extern "system" fn(*mut u32) -> i32 = unsafe { core::mem::transmute(p) };
+    if unsafe { f(v.as_mut_ptr()) } == 0 { v[3] } else { 0 }
+}
+
 // ---------------------------------------------------------------- creation
 
 /// optional functions, DPI awareness, cursors and the window class (once) -> false on failure
@@ -795,6 +822,8 @@ fn win_dyn_init() {
     s.dyn_done.set(true);
     s.get_dpi.set(dll_proc(b"user32.dll\0", b"GetDpiForWindow\0"));
     s.sm_dpi.set(dll_proc(b"user32.dll\0", b"GetSystemMetricsForDpi\0"));
+    s.msg_src.set(dll_proc(b"user32.dll\0", b"GetCurrentInputMessageSource\0"));
+    s.uni_ok.set(os_build() >= 14393);
     let p = dll_proc(b"user32.dll\0", b"SetProcessDpiAwarenessContext\0");
     let mut ok = false;
     if p != 0 {
@@ -1285,8 +1314,7 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             (msg == WM_XBUTTONUP) as isize
         }
         WM_MOUSEWHEEL | WM_MOUSEHWHEEL => {
-            let d = (wp >> 16) as u16 as u32;
-            let data = if msg == WM_MOUSEWHEEL { d } else { d << 16 }; // dy up / dx right positive
+            let (kind, data) = wheel_of(msg, wp); // dy up / dx right positive
             // the position arrives in screen coordinates; it belongs to our window under the
             // pointer (Windows may send it to the focus window, e.g. the main window while the
             // pointer is over a tool window that never takes the focus) (U3)
@@ -1302,7 +1330,7 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
                     }
                     None => {
                         // one of the popup windows: pushed for its owner
-                        if popup::win_popup_wheel(under, sx, sy, data) {
+                        if popup::win_popup_wheel(under, sx, sy, kind, data) {
                             return 0;
                         }
                     }
@@ -1311,7 +1339,7 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             let mut p = Point { x: sx, y: sy };
             // SAFETY: our window and a valid POINT.
             unsafe { ScreenToClient(to, &mut p) };
-            win_push(E_WHEEL, 0, p.x, p.y, data);
+            win_push(E_WHEEL, kind, p.x, p.y, data);
             0
         }
         WM_MOUSELEAVE => {
@@ -1742,11 +1770,132 @@ fn button(msg: u32, wp: usize) -> u8 {
 fn push_key(typ: u8, wp: usize, lp: isize) {
     let vk = wp as u32 & 0xFF;
     let data = vk | (((lp as u32) >> 30) & 1) << 31;
-    // (E2) the scan code (bits 16..23, extended: bit 24) and where the key sits
+    // (E2) the scan code (bits 16..23, extended: bit 24), where the key sits and its character
     let sc = (lp as u32 >> 16) & 0xFF;
     let ext = (lp as u32 >> 24) & 1 != 0;
     let scan = if ext { 0xE000 | sc } else { sc };
-    win_push(typ, 0, scan as i32, key_location(vk, sc, ext) as i32, data);
+    let mut ks = [0u8; 256];
+    // SAFETY: GetKeyboardState fills 256 bytes (the state of the message being handled).
+    let (ch, dead) = if unsafe { GetKeyboardState(ks.as_mut_ptr()) } != 0 {
+        // SAFETY: no memory arguments (0: this thread's layout).
+        layout_char(vk, scan, unsafe { GetKeyboardLayout(0) }, &mut ks)
+    } else {
+        (0, false)
+    };
+    win_push(typ, 0, scan as i32, crate::key_y(key_location(vk, sc, ext), ch, dead), data);
+}
+
+/// (E2) the character layout hkl gives key vk (scan code scan) in keyboard state ks: Shift, Caps
+/// Lock and AltGr as they are, without Ctrl, Alt and the Windows keys (AltGr is Windows' Ctrl +
+/// Alt: its character first; a key without one gives the plain one) -> (character, dead key);
+/// (0, false) for a key that types no character.  ToUnicodeEx is asked to leave the keyboard
+/// state alone (wFlags bit 2): a pending dead key stays for the text; Windows before 10 1607
+/// does not know that flag, there no character is looked up.  ks is changed.
+fn layout_char(vk: u32, scan: u32, hkl: isize, ks: &mut [u8; 256]) -> (u32, bool) {
+    win_dyn_init();
+    if !st().uni_ok.get() || vk == 0 {
+        return (0, false);
+    }
+    let held = |ks: &[u8; 256], k: i32| ks[k as usize] & 0x80 != 0;
+    if held(ks, VK_CONTROL) && held(ks, VK_MENU) {
+        let r = to_unicode(vk, scan, hkl, ks);
+        if r.0 != 0 {
+            return r;
+        }
+    }
+    // VK_CONTROL, VK_MENU and both sides' (0xA2..0xA5), the Windows keys
+    for k in [VK_CONTROL, VK_MENU, 0xA2, 0xA3, 0xA4, VK_RMENU, VK_LWIN, VK_RWIN] {
+        ks[k as usize] = 0;
+    }
+    to_unicode(vk, scan, hkl, ks)
+}
+
+// ToUnicodeEx without changing the keyboard state -> (the first character, dead key); control
+// characters are none
+fn to_unicode(vk: u32, scan: u32, hkl: isize, ks: &[u8; 256]) -> (u32, bool) {
+    let mut buf = [0u16; 8];
+    // SAFETY: a 256-byte key state and a buffer of 8 UTF-16 units; flags 4: the keyboard state
+    // stays (Windows 10 1607 and later, checked by the caller).
+    let n = unsafe { ToUnicodeEx(vk, scan, ks.as_ptr(), buf.as_mut_ptr(), buf.len() as i32, 4, hkl) };
+    if n == 0 {
+        return (0, false);
+    }
+    let (hi, lo) = (buf[0] as u32, buf[1] as u32);
+    let c = if (0xD800..0xDC00).contains(&hi) && n >= 2 && (0xDC00..0xE000).contains(&lo) {
+        ((hi - 0xD800) << 10) + (lo - 0xDC00) + 0x10000
+    } else {
+        hi
+    };
+    if c < 0x20 || c == 0x7F || (0xD800..0xE000).contains(&c) { (0, false) } else { (c, n < 0) }
+}
+
+/// (test aid, plattest --test keychar) the character layout hkl (one of key_layouts_test) gives
+/// key vk with the modifiers MOD_SHIFT, MOD_CTRL, MOD_ALT, MOD_ALTGR (the right Alt: Ctrl + Alt as
+/// Windows makes it), MOD_CAPS -> (character, dead key), as a key event of that layout says it;
+/// the thread's keyboard state is not touched
+pub fn key_char_test(hkl: isize, vk: u32, mods: u8) -> (u32, bool) {
+    let mut ks = [0u8; 256];
+    let mut set = |k: i32| ks[k as usize] = 0x80;
+    if mods & MOD_SHIFT != 0 {
+        set(VK_SHIFT);
+        set(0xA0);
+    }
+    if mods & (MOD_CTRL | MOD_ALTGR) != 0 {
+        set(VK_CONTROL);
+        set(0xA2);
+    }
+    if mods & MOD_ALT != 0 {
+        set(VK_MENU);
+        set(0xA4);
+    }
+    if mods & MOD_ALTGR != 0 {
+        set(VK_MENU);
+        set(VK_RMENU);
+    }
+    if mods & MOD_CAPS != 0 {
+        ks[VK_CAPITAL as usize] = 1;
+    }
+    layout_char(vk, 0, hkl, &mut ks) // (the scan code: ToUnicodeEx goes by the virtual key)
+}
+
+/// (test aid) the keyboard layouts loaded for the user (GetKeyboardLayoutList), HKLs whose low
+/// word is the language (0x0407 German, 0x0409 English (US)) and high word the layout
+pub fn key_layouts_test() -> Vec<isize> {
+    let p = dll_proc(b"user32.dll\0", b"GetKeyboardLayoutList\0");
+    if p == 0 {
+        return Vec::new();
+    }
+    // SAFETY: GetKeyboardLayoutList(int n, HKL* list) -> the count (n 0: only the count).
+    let f: unsafe extern "system" fn(i32, *mut isize) -> i32 = unsafe { core::mem::transmute(p) };
+    let n = unsafe { f(0, core::ptr::null_mut()) }.clamp(0, 64);
+    let mut v = alloc::vec![0isize; n as usize];
+    let got = unsafe { f(n, v.as_mut_ptr()) }.clamp(0, n);
+    v.truncate(got as usize);
+    v
+}
+
+/// E_WHEEL's btn and data of a WM_MOUSEWHEEL / WM_MOUSEHWHEEL: fine (WHEEL_FINE) when the delta
+/// is no multiple of 120 (a precision touchpad, a high-resolution wheel) or the message came from
+/// a touchpad (GetCurrentInputMessageSource: IMDT_TOUCHPAD)
+pub(super) fn wheel_of(msg: u32, wp: usize) -> (u8, u32) {
+    let d = (wp >> 16) as u16;
+    let data = if msg == WM_MOUSEWHEEL { d as u32 } else { (d as u32) << 16 };
+    let fine = (d as i16) % 120 != 0 || from_touchpad();
+    (if fine { crate::WHEEL_FINE } else { 0 }, data)
+}
+
+// the input message being handled came from a touchpad (GetCurrentInputMessageSource:
+// IMDT_TOUCHPAD; false before Windows 8.1, which does not say)
+fn from_touchpad() -> bool {
+    let p = st().msg_src.get();
+    if p == 0 {
+        return false;
+    }
+    let mut src = [0u32; 2]; // INPUT_MESSAGE_SOURCE: deviceType, originId
+    // SAFETY: GetCurrentInputMessageSource(INPUT_MESSAGE_SOURCE*) -> BOOL (loaded: p != 0).
+    let f: unsafe extern "system" fn(*mut u32) -> i32 = unsafe { core::mem::transmute(p) };
+    let ok = unsafe { f(src.as_mut_ptr()) } != 0;
+    ok && src[0] & 0x10 != 0
 }
 
 /// (E2) the KL_* location of a key: the sides of Shift (scan code 0x36 right), Ctrl, Alt

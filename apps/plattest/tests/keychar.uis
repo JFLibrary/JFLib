@@ -1,0 +1,4 @@
+#!args --test keychar
+# the keyboard layout's character of a key event (plat::key_y, KeyEvent::ch): its packing in
+# Event::y; Windows: the user's layouts through ToUnicodeEx (German and English (US) when loaded),
+# the thread's keyboard state untouched; Linux: the fallback keymap with Ctrl, Shift, Caps Lock
