@@ -8,7 +8,7 @@ The fake bus (SASL EXTERNAL, little-endian messages; the marshalling of portal_b
 bus daemon, org.freedesktop.portal.IBus and an input method behind the input context:
 
   'a'        UpdatePreeditText "かな", cursor 1 (characters), visible; taken
-  Return     CommitText "かな"; taken
+  Return     CommitText "かな" (after a CommitText from another client, which must not count); taken
   'z'        not taken
   BackSpace  ForwardKeyEvent Left and 'c'; taken
   'b'        UpdatePreeditText "b"; taken
@@ -76,14 +76,14 @@ def serve(path, rec, mode):
         f = fields + ([(8, "g", sig)] if sig else [])
         c.sendall(message(mtype, ser[0], f, body))
 
-    def reply(m, sig="", body=b""):
-        send(2, [(5, "u", m["serial"]), (6, "s", ":1.42"), (7, "s", "org.freedesktop.DBus")], sig, body)
+    def reply(m, sig="", body=b"", sender="org.freedesktop.DBus"):
+        send(2, [(5, "u", m["serial"]), (6, "s", ":1.42"), (7, "s", sender)], sig, body)
 
     def error(m, name, text):
         send(3, [(4, "s", name), (5, "u", m["serial"]), (6, "s", ":1.42"), (7, "s", ":1.5")], "s", W().all("s", [text]))
 
-    def signal(member, sig="", vals=()):
-        send(4, [(1, "o", CTX), (2, "s", IC), (3, "s", member), (7, "s", ":1.5")], sig, W().all(sig, list(vals)) if sig else b"")
+    def signal(member, sig="", vals=(), sender=":1.5"):
+        send(4, [(1, "o", CTX), (2, "s", IC), (3, "s", member), (7, "s", sender)], sig, W().all(sig, list(vals)) if sig else b"")
 
     while True:
         m, buf = parse(buf)
@@ -114,7 +114,7 @@ def serve(path, rec, mode):
             if mode == "none":
                 error(m, "org.freedesktop.DBus.Error.ServiceUnknown", "no input method")
             else:
-                reply(m, "o", W().all("o", [CTX]))
+                reply(m, "o", W().all("o", [CTX]), sender=":1.5")  # the portal: the context's signals come from it
         elif member == "SetCapabilities":
             rec["caps"] = (fl.get(1), body)
             reply(m)
@@ -130,6 +130,8 @@ def serve(path, rec, mode):
             elif keyval == 0x61:
                 signal("UpdatePreeditText", "vub", [ibus_text("かな"), 1, True])
             elif keyval == 0xFF0D:
+                # another client's CommitText on the context's path first: it must not count
+                signal("CommitText", "v", [ibus_text("spoof")], sender=":1.66")
                 signal("CommitText", "v", [ibus_text("かな")])
             elif keyval == 0xFF08:
                 signal("ForwardKeyEvent", "uuu", [0xFF51, 105, 0])

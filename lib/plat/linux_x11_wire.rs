@@ -3,7 +3,8 @@
 //                                                              [src/plat/linux/x11_wire.s]
 //
 //   connect() -> bool                ($DISPLAY: ":N[.S]", "unix:N", "/path[:N]"; abstract
-//        socket @/tmp/.X11-unix/XN first, then the file socket; TCP "host:N" is refused
+//        socket @/tmp/.X11-unix/XN first (only when its owner is this user or root:
+//        SO_PEERCRED), then the file socket; TCP "host:N" is refused
 //        with a message; MIT-MAGIC-COOKIE-1 from $XAUTHORITY or ~/.Xauthority)
 //   req(major | minor << 8, bytes) -> (body offset in out, seq)   bytes include the 4-byte
 //        header; BIG-REQUESTS length when > 256 KB; the request space is zeroed
@@ -30,7 +31,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 #[cfg_attr(jfgui_glibc, allow(unused_imports))]
-use rt::os::{syscall3, syscall6, SYS_CLOSE, SYS_CONNECT, SYS_READ, SYS_SENDMSG, SYS_SOCKET, SYS_UNAME, SYS_WRITE};
+use rt::os::{syscall3, syscall6, SYS_CLOSE, SYS_CONNECT, SYS_GETEUID, SYS_GETSOCKOPT, SYS_GETUID, SYS_READ, SYS_SENDMSG, SYS_SOCKET, SYS_UNAME, SYS_WRITE};
 
 use super::*;
 
@@ -102,6 +103,18 @@ fn write_all(fd: i32, mut d: &[u8]) -> bool {
 pub(super) fn sys_close(fd: i32) {
     // SAFETY: closes a descriptor we own.
     unsafe { syscall3(SYS_CLOSE, fd as usize, 0, 0) };
+}
+
+// the process at the other end of the connected socket fd runs as this user or as root
+// (SO_PEERCRED)
+fn peer_trusted(fd: i32) -> bool {
+    let mut cred = [0u32; 3]; // struct ucred: pid, uid, gid
+    let mut len = 12u32;
+    // SAFETY: getsockopt(SOL_SOCKET, SO_PEERCRED) writes at most the 12-byte record and its length.
+    let r = unsafe { syscall6(SYS_GETSOCKOPT, fd as usize, SOL_SOCKET as usize, 17, cred.as_mut_ptr() as usize, &mut len as *mut u32 as usize, 0) };
+    // SAFETY: getuid / geteuid have no arguments.
+    let (uid, euid) = unsafe { (syscall3(SYS_GETUID, 0, 0, 0) as u32, syscall3(SYS_GETEUID, 0, 0, 0) as u32) };
+    r == 0 && len == 12 && (cred[1] == 0 || cred[1] == uid || cred[1] == euid)
 }
 
 impl X11 {
@@ -273,6 +286,16 @@ impl X11 {
                 return false;
             }
             break;
+        }
+        // an abstract name has no owner or permissions: any local user may have bound it, and
+        // the cookie goes out next -- only an X server of this user or root gets it (else the
+        // file socket)
+        if abstr && !peer_trusted(fd as i32) {
+            if self.debug {
+                eprint(&format!("x11: @{} belongs to another user, not used\n", alloc::string::String::from_utf8_lossy(path)));
+            }
+            sys_close(fd as i32);
+            return false;
         }
         self.fd = fd as i32;
         if self.debug {

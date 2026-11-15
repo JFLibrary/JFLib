@@ -9,7 +9,8 @@ bus daemon, org.kde.StatusNotifierWatcher, a panel that shows the item and
 org.freedesktop.Notifications.  plattest --test tray-bus sets a symbol with a menu and sends a
 notification; the fake then reads the item's properties (GetAll), the menu layout (GetLayout),
 activates the symbol, clicks the menu row "Beenden" (Event clicked) and clicks the
-notification (ActionInvoked, then NotificationClosed).  plattest must see NoteClicked, Activate
+notification (a NotificationClosed from another client, which must not count, then the
+server's ActionInvoked and NotificationClosed).  plattest must see NoteClicked, Activate
 and Menu(2); the fake checks what it was told.  Exit code 0 = passed.
 """
 import argparse, os, socket, subprocess, sys, tempfile, threading
@@ -56,8 +57,8 @@ def serve(path, rec):
         c.sendall(message(mtype, ser[0], f, body))
         return ser[0]
 
-    def reply(m, sig="", body=b""):
-        send(2, [(5, "u", m["serial"]), (6, "s", ":1.42"), (7, "s", "org.freedesktop.DBus")], sig, body)
+    def reply(m, sig="", body=b"", sender="org.freedesktop.DBus"):
+        send(2, [(5, "u", m["serial"]), (6, "s", ":1.42"), (7, "s", sender)], sig, body)
 
     def ask(path, iface, member, sig="", body=b"", what=None):
         s = send(1, [(1, "o", path), (2, "s", iface), (3, "s", member), (6, "s", ":1.42"), (7, "s", ":1.7")], sig, body)
@@ -100,10 +101,15 @@ def serve(path, rec):
                 ask("/MenuBar", "com.canonical.dbusmenu", "GetLayout", "iias", W().all("iias", [0, -1, []]))
             elif member == "Notify":
                 rec["notify"] = body
-                reply(m, "u", W().all("u", [77]))
-                for mem, s, vals in (("ActionInvoked", "us", [77, "default"]), ("NotificationClosed", "uu", [77, 2])):
+                # the notification server :1.3 answers: its signals for the note count
+                reply(m, "u", W().all("u", [77]), sender=":1.3")
+                # first another client (:1.66) claims the note was closed -- it must not count
+                # (else the click is lost and NoteClosed arrives) -- then the server's own signals
+                for snd, mem, s, vals in ((":1.66", "NotificationClosed", "uu", [77, 2]),
+                                          (":1.3", "ActionInvoked", "us", [77, "default"]),
+                                          (":1.3", "NotificationClosed", "uu", [77, 2])):
                     send(4, [(1, "o", "/org/freedesktop/Notifications"), (2, "s", "org.freedesktop.Notifications"),
-                             (3, "s", mem), (7, "s", ":1.3")], s, W().all(s, vals))
+                             (3, "s", mem), (7, "s", snd)], s, W().all(s, vals))
             else:
                 reply(m)
         elif m["type"] in (2, 3):
