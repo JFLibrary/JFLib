@@ -460,6 +460,19 @@ impl Ui {
         self.repass = true;
     }
 
+    // (edit.rs) Esc in a text box built inside the top popup closes that popup as Esc anywhere
+    // else in it does (flyout_begin): a focused box owns Esc, so the flyout never sees it.
+    // -> whether a popup closed (the focus went back to where it was when the popup opened)
+    pub(crate) fn pp_escape_in_content(&mut self) -> bool {
+        let l = self.wp.popup.fl_level;
+        if l == 0 || l != self.wp.popup.pp_n {
+            return false;
+        }
+        self.pp_close_to(l - 1);
+        self.wp.ctx.focus_visible = true;
+        true
+    }
+
     // pp_dismiss_all: close every popup and leave menu bar mode
     fn pp_dismiss_all(&mut self) {
         self.pp_close_to(0);
