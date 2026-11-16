@@ -37,6 +37,7 @@ const SEED: u32 = 0x811C_9DC5; // FNV-1a offset basis: the scope outside every s
 const PRIME: u32 = 0x0100_0193;
 const TAG_NAME: u32 = 1;
 const TAG_NUM: u32 = 2;
+const TAG_PAIR: u32 = 3;
 const DEPTH_MAX: usize = 64; // id scopes inside each other (fixed: nesting; deeper ones warn)
 
 const fn fnv(mut h: u32, b: &[u8], tag: u32) -> u32 {
@@ -61,6 +62,13 @@ const fn finish(mut h: u32) -> u32 {
 /// the id of a name outside every scope (the same as ui.id(name) there)
 pub const fn wid(name: &str) -> u32 {
     finish(fnv(SEED, name.as_bytes(), TAG_NAME))
+}
+
+/// (dock.rs) an id of its own for a pair of ids, hashed as wid hashes a name (with a tag no
+/// name and no number uses)
+pub(crate) const fn pair_id(a: u32, b: u32) -> u32 {
+    let (a, b) = (a.to_le_bytes(), b.to_le_bytes());
+    finish(fnv(SEED, &[a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]], TAG_PAIR))
 }
 
 /// the id of the last name inside the scopes of the names before it (id_push_str each);

@@ -2522,8 +2522,10 @@ self.dock.focus(P_PROPS);
   clicks, double clicks, the menu and the splitters need no hold. A drag shows drop markers at the
   three edges of the area and on the group under the pointer (as a tab, before, after); a
   release over a strip inserts the tab there, anywhere else -- also outside the window -- the
-  panel floats in a tool window (`WF_TOOL`, window ids `ID + 1 .. ID + DOCK_FLOAT_MAX`, six at
-  most). A floating window's tabs drag back onto the markers, its pin button or a double click
+  panel floats in a tool window (`WF_TOOL`, six at most; window ids `ID + 1 .. ID +
+  DOCK_FLOAT_MAX` in the main window, `dock_float_id(ID, window, k)` in general: an area of the
+  same id in another window floats in windows of its own). A floating window's tabs drag back
+  onto the markers, its pin button or a double click
   docks it where it came from, its close button hides its panels. Esc cancels a hold and a drag
   (the release is no click then). Painters: `StyleShell::dock_*` (stock ones from the tokens).
 * Panels that belong together (an app's developer tools in one group): with `DP_GROUP` on the

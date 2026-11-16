@@ -1,0 +1,25 @@
+# a dock area of the same id (500) in a second window floats its panels in windows of its own
+# (charge 13): the main window's in 501 .., the second window's in dock_float_id(500, 600, k),
+# 247011071 for the first.  Before, both areas used 501 .. and the second one's floating window
+# took over the main one's.  Command 7 opens the second window, 8 / 9 float Eigenschaften of
+# the main / the second window's area.
+cmd 7
+expect window 600 open
+cmd 8
+expect window 501 open
+cmd 9
+expect window 247011071 open
+expect window 501 open
+window 600
+expect text:"Schwebend: Eigenschaften in Fenster 247011071" exists
+window main
+expect text:"L: [Dateien]+Gliederung | R: - | U: [Ausgabe], [Suche] | F: [Eigenschaften] | V: Verlauf" exists
+# each floating window belongs to its own area: closing the main one's hides only that panel
+close window 501
+expect window 501 closed
+expect window 247011071 open
+expect text:"L: [Dateien]+Gliederung | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf+Eigenschaften" exists
+window 600
+expect text:"Schwebend: Eigenschaften in Fenster 247011071" exists
+window main
+expect_nowarn
