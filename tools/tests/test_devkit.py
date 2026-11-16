@@ -820,6 +820,23 @@ class TestJobs(Temp):
         self.assertIn("apps/y: unknown test lock gpu", bad[1])
         self.assertIn("apps/z/tests/jobs.txt:1:", bad[2])
 
+    def test_only_marker(self):
+        """#!only OS... among a script's first five lines: the systems it runs on (SCRIPT_OS names), skipped and counted
+        on the others; the lint reports unknown names"""
+        self.app("o", {"a.uis": "#!only linux\n", "b.uis": "click 1,1\n", "c.uis": "# c\n#!only windows, macos bsd\n"})
+        with mock.patch.object(build_rs, "ROOT", self.dir), mock.patch.object(build_rs, "apps", lambda: ["o"]):
+            t = self.dir / "apps" / "o" / "tests"
+            self.assertEqual(build_rs.script_only(t / "a.uis"), {"linux"})
+            self.assertIsNone(build_rs.script_only(t / "b.uis"))
+            self.assertEqual(build_rs.script_only(t / "c.uis"), {"windows", "macos", "bsd"})
+            self.assertEqual([build_rs.script_runs_on(t / f, "win") for f in ("a.uis", "b.uis", "c.uis")], [False, True, True])
+            self.assertEqual([build_rs.script_runs_on(t / f, "linux") for f in ("a.uis", "b.uis", "c.uis")], [True, True, False])
+            bad = build_rs.test_marker_lint()
+            units, skipped, only = build_rs.test_units([(g, g, "o", "exe") for g in ("win", "linux")], 2)
+        self.assertEqual(len(bad), 1, bad)
+        self.assertIn("apps/o/tests/c.uis: #!only knows no bsd", bad[0])
+        self.assertEqual((len(units), skipped, only), (4, 0, 2))
+
     def run_pool(self, jobs, times=None):
         """apps c (in order), i (independent), d1 / d2 (one script each holding the desktop lock), s (one serial
         script in the middle of its app's order), t (independent targets) on win and linux -> [(tag, start, end)] in
@@ -851,9 +868,9 @@ class TestJobs(Temp):
         runs = [(t, t, n, "exe") for t in ("win", "linux") for n in ("c", "d1", "d2", "i", "s", "t")]
         with mock.patch.object(build_rs, "ROOT", self.dir), mock.patch.object(build_rs, "run_script", run), \
                 mock.patch.object(build_rs, "LinuxRunner", Runner):
-            units, skipped = build_rs.test_units(runs, jobs)
+            units, skipped, only = build_rs.test_units(runs, jobs)
             records = build_rs.run_test_units(build_rs.order_test_units(units, times or {}, jobs), jobs, lambda u, r: None)
-        self.assertEqual((len(units), skipped, len(records)), (28, 0, 28))
+        self.assertEqual((len(units), skipped, only, len(records)), (28, 0, 0, 28))
         self.assertTrue(all(r.closed for r in runners))
         self.assertLessEqual(len(runners), jobs + 1 if os.name == "nt" else 0)    # the workers' and the serial part's
         return sorted(spans, key=lambda s: s[1])
