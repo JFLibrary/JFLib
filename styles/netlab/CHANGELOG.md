@@ -8,6 +8,16 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Changed
+
+- The ribbon (only ribbons use these; JFNetworker has none): a 92 DIP band in the panel colour
+  from edge to edge with a frame line along its bottom (no frame at the sides), groups of 66 DIP
+  controls with 16 DIP captions; the register row of `ui.ribbon_tabs` on the window colour,
+  the selected register framed on three sides with a 2 DIP accent edge and open toward the
+  band, File on the accent, context registers under a 3 DIP edge of their set's colour; key
+  tips as small badges in the text colour. Large buttons (`ST_LARGE`) show a 32 DIP icon over up
+  to two caption lines (a long caption breaks at its middle blank) and are 66 DIP high.
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

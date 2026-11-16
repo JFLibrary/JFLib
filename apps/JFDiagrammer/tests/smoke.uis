@@ -1,23 +1,42 @@
-# JFDiagrammer, JD0: the window opens with its four areas -- register row and ribbon, the
-# Shapes sidebar, the canvas, the status bar -- and the registers switch the ribbon's groups.
-# German, the source language (lang_*.uis: the other four)
+# JFDiagrammer, JD8: the window opens with its parts -- the own title bar with the quick access
+# toolbar, the register row (File and the four registers), the ribbon, the Shapes panel, the
+# canvas with its page tab, the status bar.  German, the source language (lang_*.uis: the
+# other four)
+expect tab:"Datei" exists
 expect tab:"Start" selected
 expect tab:"Einfügen" unselected
 expect tab:"Entwurf" exists
 expect tab:"Ansicht" exists
-# the ribbon of Start: placeholders, every button disabled (Paste shares its German word with
-# the register Einfügen, the kind tells them apart)
+# no selection: no context registers
+expect tab:"Format" missing
+# the quick access toolbar: its commands have no function yet
+expect button:"Speichern" disabled
+expect button:"Rückgängig" disabled
+expect button:"Wiederholen" disabled
+# the ribbon of Start: every P1 group, the commands disabled until their function exists
 expect text:"Zwischenablage" exists
+expect text:"Schriftart" exists
+expect text:"Absatz" exists
+expect text:"Tools" exists
+expect text:"Formenarten" exists
+expect text:"Anordnen" exists
+expect text:"Bearbeiten" exists
 expect button:"Einfügen" disabled
 expect button:"Ausschneiden" disabled
-expect text:"Anordnen" exists
-# the sidebar: its title and the empty state
-expect text:"Shapes" exists
+expect button:"Fett" disabled
+expect button:"Zeigertool" enabled
+expect button:"Zeigertool" checked
+expect button:"Ausrichten" disabled
+# the dialog launchers
+expect button:"Shape formatieren: Formenarten" enabled
+expect button:"Text: Schriftart" disabled
+# the Shapes panel, the canvas, the page tab, the status bar
+expect tab:"Shapes" exists
 expect text:"Keine Schablone geöffnet." exists
 expect button:"Weitere Shapes" disabled
-# the canvas and the status bar
 expect canvas:"Zeichenfläche" exists
-expect text:"Seite 1 von 1" exists
+expect tab:"Seite-1" selected
+expect button:"Seite 1 von 1" exists
 expect text:"100 %" exists
 shot build/JFDiagrammer.png
 # the registers switch the ribbon
@@ -31,7 +50,7 @@ expect text:"Seite einrichten" exists
 expect text:"Varianten" exists
 click tab:"Ansicht"
 expect text:"Anzeigen" exists
-expect button:"Aufgabenbereiche" disabled
+expect button:"Aufgabenbereiche" enabled
 click tab:"Start"
 expect tab:"Start" selected
 expect text:"Zwischenablage" exists

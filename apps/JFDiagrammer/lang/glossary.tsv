@@ -1,0 +1,47 @@
+# glossary.tsv -- JFDiagrammer's binding terms in five languages (FEATURES.md 3.17, LG-06)
+#
+# A row: the term's key (German), then the word in de, en, es, it, fr.  The catalogue
+# (locales/ui.tsv) and the help use these words; check_lang.py warns when a catalogue row
+# that has the German word lacks the word of another language, and fails on the forbidden
+# terms below.  Each language has descriptive terms of its own; Visio's own terms
+# (SmartShapes, AutoConnect, Quick Shapes, ShapeSheet in the UI) are used in none (F8, F13).
+# "Verbindungspfeile" stands for Visio's "AutoVerbinden" until the user decides (PLAN.md,
+# open question 2).
+# term	de	en	es	it	fr
+Seite	Seite	Page	Página	Pagina	Page
+Hintergrundseite	Hintergrundseite	Background page	Página de fondo	Pagina di sfondo	Page d'arrière-plan
+Ebene	Ebene	Layer	Capa	Livello	Calque
+Schablone	Schablone	Stencil	Colección de formas	Raccolta di forme	Bibliothèque de formes
+Master	Master-Shape	Master shape	Forma maestra	Forma master	Forme maître
+Shape	Shape	Shape	Forma	Forma	Forme
+Verbinder	Verbinder	Connector	Conector	Connettore	Connecteur
+Verbindungspunkt	Verbindungspunkt	Connection point	Punto de conexión	Punto di connessione	Point de connexion
+Steuerpunkt	Steuerpunkt	Control handle	Controlador	Maniglia di controllo	Poignée de contrôle
+Container	Container	Container	Contenedor	Contenitore	Conteneur
+Liste	Liste	List	Lista	Elenco	Liste
+Swimlane	Bahn	Lane	Calle	Corsia	Couloir
+Beschriftung	Beschriftung	Callout	Llamada	Richiamo	Bulle d'annotation
+Legende	Legende	Legend	Leyenda	Legenda	Légende
+Design	Design	Theme	Tema	Tema	Thème
+Variante	Variante	Variant	Variante	Variante	Variante
+Schnellformatvorlage	Schnellformatvorlage	Style preset	Estilo predefinido	Stile predefinito	Style prédéfini
+Schnell-Shapes	Schnell-Shapes	Top shapes	Formas principales	Forme principali	Formes principales
+AutoVerbinden	Verbindungspfeile	Connect arrows	Flechas de conexión	Frecce di collegamento	Flèches de liaison
+Intelligente Shapes	Intelligente Shapes	Adaptive shapes	Formas adaptables	Forme adattive	Formes adaptatives
+ShapeSheet	Formelblatt	Formula sheet	Hoja de fórmulas	Foglio formule	Feuille de formules
+Shape-Daten	Shape-Daten	Shape data	Datos de forma	Dati forma	Données de forme
+Datengrafik	Datengrafik	Data graphic	Gráfico de datos	Grafica dati	Graphique de données
+Führungslinie	Führungslinie	Guide	Guía	Guida	Repère
+Raster	Raster	Grid	Cuadrícula	Griglia	Grille
+Lineal	Lineal	Ruler	Regla	Righello	Règle
+Menüband	Menüband	Ribbon	Cinta de opciones	Barra multifunzione	Ruban
+Aufgabenbereich	Aufgabenbereich	Task pane	Panel de tareas	Riquadro attività	Volet
+
+# forbidden: "!", the language ("*" every language), the term (case-insensitive, a whole word)
+!	*	SmartShapes
+!	*	AutoConnect
+!	*	Quick Shapes
+!	*	ShapeSheet
+!	de	AutoVerbinden
+!	de	Zeichenblatt
+!	de	Layer

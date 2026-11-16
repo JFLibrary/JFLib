@@ -5091,6 +5091,23 @@ the widget families are being ported; a finished style overrides every function.
     None preserves the ordinary UI type ramp in existing style previews.
   - `fn ribbon_metrics(&self) -> crate::RibbonMetrics`
     Group sizing and overflow policy. Existing styles preserve compact flyouts.
+  - `fn ribbon_box_flags(&self) -> u32`
+    BOX_\* decoration of the ribbon's scroll box (BOX_LAYER: a framed panel). A style that
+    paints the band itself returns 0 and draws it in `ribbon_band`.
+  - `fn ribbon_band(&self, _ui: &mut Ui, _sp: &Sp)`
+    Paint the ribbon band when `ribbon_box_flags` is 0 (sp: the band, px). It is drawn
+    right after the band is placed, below the groups.
+  - `fn ribbon_tabs_height(&self) -> i32`
+    Height of the register row of `Ui::ribbon_tabs` in DIP.
+  - `fn ribbon_tabs_strip(&self, ui: &mut Ui, sp: &Sp)`
+    Paint the register row behind its registers (sp: the row; s[0], s[1]: x and width of
+    the selected register in px, width 0 when none is shown). The default draws a
+    divider along the bottom that leaves the selected register open toward the ribbon.
+  - `fn ribbon_tab(&self, ui: &mut Ui, sp: &Sp)`
+    Paint one register (sp: rect, label, ev, state 3 = disabled; value 1 = selected;
+    flags RT_FILE / RT_CONTEXT; value2 the ARGB colour of its context set or 0).
+  - `fn keytip(&self, ui: &mut Ui, sp: &Sp)`
+    Paint a key tip badge of the ribbon's access keys (sp: the badge, label = its keys).
   - `fn preview_card_offset(&self) -> Option<[i32; 2]>`
     Optional optical offset of a preview card in 24.8 DIP. Opts into the
     fractional panel painter; None keeps the original integer painter.
@@ -10101,6 +10118,115 @@ no legacy counterpart. Uses normal focus, semantics, popups and style tokens.
 - **`fn ribbon_sample_tile(&mut self, id: u32, label: &str, preview: &str, typography: u32, selected: bool, sample: Option<RibbonSample>) -> u32`**
   Style-gallery tile with explicit highlight, baseline and text decorations.
 
+#### `ui/ribbon_shell.rs`
+
+Source: [`lib/ui/ribbon_shell.rs`](../lib/ui/ribbon_shell.rs)
+
+```text
+ribbon_shell -- the window parts around a ribbon: the register row with its context sets,
+the ribbon's access keys (key tips) and the backstage frame of the File register
+
+  ribbon_tabs(id, &mut sel, tabs) -> EV_*    the register row: an optional File register
+                                    (RibbonTab::file: activating it returns EV_OPEN and
+                                    leaves `sel`), the registers, then the context sets
+                                    (RibbonTab::context: a coloured edge, the set's name in
+                                    the tooltip); EV_ACT when `sel` changed
+  keytip(level, label)              an access key for the last widget, made from its label
+  keytip_keys(level, keys)          ... with fixed keys ("1" for a quick access button)
+  keytips_level() -> 0 / 1 / 2      the key tip mode: off, the registers, the commands
+  backstage_begin(id, back, items, &mut sel) -> Option<i32>   the File register's page:
+                                    a navigation pane (a back item, the items, BS_FOOTER
+                                    items at its bottom) and a scrolling content area the
+                                    app fills; Some(-1): back (or Esc), Some(i): item i was
+                                    activated (a page item also selects itself)
+  backstage_end()
+
+Key tips (Office's access keys): Alt pressed and released alone, or F10, shows a badge with
+keys on every register (and on what the app marks with keytip at level 1, its quick access
+buttons); typing a register's keys shows its ribbon with a badge on every command (level 2:
+the ribbon's buttons register themselves between ribbon_begin and ribbon_end, other controls
+through keytip(2, label)); typing a command's keys activates it in the next pass as a click
+would.  Esc steps back a level, a click or Alt ends the mode.  Keys made from labels take the
+first free letter of the label (accents dropped), then "0A".."0Z" (never a single "0", so no
+key is the start of another); they follow the labels of the current language.
+
+Ids: a register is id + 1 + i (its record is a tab, K_TAB, so scripts click tab:"Start");
+the backstage's back item id + 1, its items id + 2 + i, its content view id + 0x40.
+```
+
+```rust
+/// RibbonTab::flags: the File register (opens the backstage; never selected)
+RT_FILE: u32 = 1 << 20
+/// RibbonTab::flags: a register of a context set (shown while the app's selection asks for it)
+RT_CONTEXT: u32 = 1 << 21
+/// BackstageItem::flags: an action (Schließen): activating it does not select it
+BS_ACTION: u32 = 1 << 20
+/// BackstageItem::flags: placed at the bottom of the pane (Optionen, Info)
+BS_FOOTER: u32 = 1 << 21
+/// BackstageItem::flags: a divider before the item
+BS_SEP: u32 = 1 << 22
+```
+
+- **`struct RibbonTab<'a>`**
+  a register of `ribbon_tabs`
+  - `label: &'a str` -- the visible name (also its record's label)
+  - `flags: u32` -- RT_FILE, RT_CONTEXT, ST_DISABLED
+  - `set: &'a str` -- RT_CONTEXT: the name of its context set ("Container-Tools"); tooltip and screen readers
+  - `color: u32` -- RT_CONTEXT: the set's colour (ARGB; 0 = the accent)
+
+**`impl<'a> RibbonTab<'a>`**
+
+- **`const fn new(label: &'a str) -> RibbonTab<'a>`**
+  a fixed register
+- **`const fn file(label: &'a str) -> RibbonTab<'a>`**
+  the File register (activating it returns EV_OPEN)
+- **`const fn context(label: &'a str, set: &'a str, color: u32) -> RibbonTab<'a>`**
+  a register of the context set `set` in `color` (ARGB, 0 = the accent)
+- **`const fn flags(mut self, f: u32) -> RibbonTab<'a>`**
+  add flags (ST_DISABLED)
+
+- **`struct BackstageItem<'a>`**
+  an item of the backstage's navigation pane
+  - `label: &'a str`
+  - `icon: u32`
+  - `flags: u32` -- BS_ACTION, BS_FOOTER, BS_SEP, ST_DISABLED
+
+**`impl<'a> BackstageItem<'a>`**
+
+- **`const fn new(label: &'a str, icon: u32) -> BackstageItem<'a>`**
+- **`const fn flags(mut self, f: u32) -> BackstageItem<'a>`**
+  add flags (BS_ACTION, BS_FOOTER, BS_SEP, ST_DISABLED)
+- **`const fn enabled(mut self, on: bool) -> BackstageItem<'a>`**
+  disabled unless `on`
+
+**`impl Ui`**
+
+- **`fn keytips_level(&self) -> u32`**
+  The key tip mode of the window: 0 off, 1 the registers' keys are shown, 2 the commands'.
+- **`fn keytips_off(&mut self)`**
+  End the key tip mode (the app opened something the keys should not reach).
+- **`fn keytip(&mut self, level: u32, label: &str)`**
+  An access key for the last widget at `level` (1: beside the registers, such as a quick
+  access button; 2: a command of the shown ribbon), made from its label: shown as a
+  badge while the mode is at that level; typing it activates the widget in the next
+  pass. The ribbon's own buttons register themselves.
+- **`fn keytip_keys(&mut self, level: u32, keys: &str)`**
+  keytip with fixed keys (upper-case letters or digits, at most three).
+- **`fn ribbon_tabs(&mut self, id: u32, sel: &mut i32, tabs: &[RibbonTab<'_>]) -> u32`**
+  The register row above a ribbon (see the module header): returns EV_ACT when `sel`
+  changed, EV_OPEN when the File register was activated (click, Enter, its key tip).
+  `sel` indexes `tabs` and never names the File register. The row is one focus stop:
+  Left / Right / Home / End choose among the enabled registers. It also runs the key
+  tip mode (Alt tap or F10): call it once per pass, before the ribbon. The row is as wide
+  as its box and as high as the style says (Style::ribbon_tabs_height).
+- **`fn backstage_begin(&mut self, id: u32, back: &str, items: &[BackstageItem<'_>], sel: &mut i32, nav_w: i32) -> Option<i32>`**
+  The File register's page (see the module header): a navigation pane `nav_w` DIP wide
+  with a back item labelled `back`, the items, then the area for the page; the app fills
+  it and calls backstage_end. Returns Some(-1) for back (also Esc), Some(i) when item i
+  was activated (a page item, not BS_ACTION, becomes `*sel`).
+- **`fn backstage_end(&mut self)`**
+  Finish the page begun with backstage_begin.
+
 #### `ui/settings_page.rs`
 
 Source: [`lib/ui/settings_page.rs`](../lib/ui/settings_page.rs)
@@ -10109,6 +10235,7 @@ Source: [`lib/ui/settings_page.rs`](../lib/ui/settings_page.rs)
 settings_page -- the settings page of a typed schema (base::settings)
 
   settings_page(id, &mut settings) -> true when a value changed in this pass
+  settings_section(id, &mut settings, section)   the same for the keys of one section
 
 The keys of the schema without KF_HIDDEN, grouped by section: the sections of
 Schema::sections first (with their titles), then the others in the order of their first
@@ -10129,6 +10256,11 @@ then the key's name ("value", "reset", "swatch", "pick" inside it; ids.rs).
 
 - **`fn settings_page(&mut self, id: u32, s: &mut Settings) -> bool`**
   the settings page of the schema of `s` (see the module header) -> a value changed
+- **`fn settings_section(&mut self, id: u32, s: &mut Settings, section: &str) -> bool`**
+  settings_page with only the keys of `section` (the part of their names before the
+  '.'): one page of a settings dialog that lists its sections at the side (an options
+  page of the File register). The section's title is shown; the ids are those
+  settings_page gives the same keys.
 
 #### `ui/slider.rs`
 

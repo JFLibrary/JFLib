@@ -1,77 +1,84 @@
-// shell -- the main window: register row and ribbon on top, the Shapes sidebar on the left,
-// the drawing canvas in the middle, the status bar below (FEATURES.md 3, UI-01)
+// shell -- the main window (FEATURES.md 3, UI-01): the title bar with the quick access toolbar,
+// the register row and the ribbon, the dock area (the Shapes panel on the left, the canvas in
+// the middle, the task panes on the right), the status bar; the File register's backstage in
+// place of everything below the title bar
 //
 //   frame(app, ui)    the whole window, built on every pass
 //
-// Stage JD0: placeholders.  The sidebar shows the empty state (no stencil open, SL-09), the
-// canvas is an empty ui.diagram with the grid, the status bar the page and the zoom.  The
-// widths and ids are the frame JD8 (the shell) and JD9 (the sidebar) fill in.
+// The title bar is the app's own (AF_CUSTOM_TITLEBAR): it carries the quick access toolbar like
+// Visio's (UI-30) and follows the theme, so it is dark in the dark theme on every system
+// (JD0's note 7: the system frame stayed light).  The register row is ui.ribbon_tabs: File,
+// the four registers, the context registers the selection asks for; it also runs the access
+// keys (Alt or F10, UI-37); the quick access buttons answer to 1, 2, 3.
 
 use alloc::format;
-use alloc::vec::Vec;
-use ui::i18n::{t, tf};
 use ui::*;
 
-use crate::{ribbon, Diagrammer};
+use crate::commands::{self, REDO, SAVE, UNDO};
+use crate::icons::JD_QAT_CUSTOMIZE;
+use crate::{backstage, panes, ribbon, Diagrammer};
 
 const ID_TABS: u32 = 100;
-const ID_SIDEBAR: u32 = 400;
-const ID_MORE_SHAPES: u32 = 401;
-const ID_CANVAS: u32 = 300;
-const SIDEBAR_W: i32 = 240; // DIP; JD9 makes it resizable and dockable (SL-01)
+const ID_QAT_MORE: u32 = 120;
 
 /// the main window
 pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
+    let title = format!("{} – JFDiagrammer", app.drawing_name());
+    if ui.title() != title {
+        ui.set_title(&title);
+    }
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 0);
-    // the register row: the names in the current language, the selection kept by index
-    let names: Vec<&str> = ribbon::TABS.iter().map(|s| t(s)).collect();
-    ui.next_size(-1, 30);
-    ui.tabs_scrolling(ID_TABS, &mut app.tab, &names);
-    ribbon::draw(ui, app.tab);
-    ui.separator();
-    // sidebar and canvas side by side, they take the height between ribbon and status bar
-    ui.next_size(-1, -1);
-    ui.box_begin(0, BOX_H, 0);
-    sidebar(ui);
-    canvas(app, ui);
-    ui.box_end();
-    status(app, ui);
-    ui.box_end();
-}
-
-// the Shapes sidebar: its title and the empty state (no stencil open yet)
-fn sidebar(ui: &mut Ui) {
-    ui.next_size(SIDEBAR_W, -1);
-    ui.box_begin(ID_SIDEBAR, BOX_V | BOX_BG | pad(12), 8);
-    ui.text(TS_SUBTITLE, t("Shapes"));
-    ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Keine Schablone geöffnet."));
-    ui.next_flags(ST_DISABLED);
-    ui.button(ID_MORE_SHAPES, t("Weitere Shapes"));
-    ui.tooltip(t("Noch nicht verfügbar"));
-    ui.box_end();
-    ui.separator(); // in the row: a vertical line
-}
-
-// the drawing canvas: an empty diagram (the page and its shapes come with JD4)
-fn canvas(app: &mut Diagrammer, ui: &mut Ui) {
-    let st = &mut app.canvas;
-    // the name screen readers and scripts see (canvas:"Zeichenfläche"), in the current language
-    let name = t("Zeichenfläche");
-    if st.name != name {
-        st.name = name.into();
+    titlebar(ui, &title);
+    if app.backstage.is_some() {
+        backstage::frame(app, ui);
+        ui.box_end();
+        return;
     }
-    let model = DModel { nodes: &[], ports: &[], edges: &[], wps: &[], ver: 0 };
+    // the register row: File, the registers, the context ones (the selection kind decides)
+    let regs = ribbon::tabs(app);
+    let mut sel = regs.iter().position(|r| *r == app.reg).unwrap_or(1) as i32;
+    let descs = ribbon::tab_descs(ui, &regs);
+    let ev = ui.ribbon_tabs(ID_TABS, &mut sel, &descs);
+    app.reg = regs.get(sel.max(1) as usize).copied().unwrap_or(ribbon::Reg::Start);
+    if ev & EV_OPEN != 0 {
+        app.open_backstage(ui, app.last_page);
+    }
+    ribbon::draw(app, ui, app.reg);
+    // the dock area: the Shapes panel, the canvas, the task panes
+    let panels = panes::panels();
     ui.next_size(-1, -1);
-    ui.diagram(ID_CANVAS, st, &model, DG_SELECT, None, 0);
+    ui.dock_begin(panes::ID_DOCK, &mut app.panes, &panels);
+    while let Some(p) = ui.dock_next(&mut app.panes) {
+        if p == DOCK_CENTER {
+            panes::center(app, ui);
+        } else {
+            panes::content(app, ui, p);
+        }
+    }
+    if ui.dock_end(&mut app.panes) {
+        app.save_layout();
+    }
+    panes::status(app, ui);
+    ui.box_end();
 }
 
-// the status bar: the page and the zoom (SB-01, SB-04)
-fn status(app: &Diagrammer, ui: &mut Ui) {
-    let zoom = (app.canvas.vp.zoom * 100.0 + 0.5) as i32;
-    ui.statusbar_begin();
-    ui.text(TS_CAPTION, &tf("Seite {} von {}", &["1", "1"]));
-    ui.spacer(-1); // the zoom on the right
-    ui.text(TS_CAPTION, &tf("{} %", &[&format!("{}", zoom.max(1))]));
-    ui.statusbar_end();
+// the title bar: the quick access toolbar (Speichern, Rückgängig, Wiederholen, its menu) and
+// the drawing's name
+fn titlebar(ui: &mut Ui, title: &str) {
+    ui.titlebar_begin_opt(None, 0);
+    for (k, id) in [SAVE, UNDO, REDO].into_iter().enumerate() {
+        ui.next_size(28, 26);
+        ui.cmd_button(id, ST_SUBTLE | ST_ICON_ONLY | ST_COMPACT);
+        ui.tooltip(&commands::tip(ui, id));
+        ui.keytip_keys(1, ["1", "2", "3"][k]);
+    }
+    ui.next_size(22, 26);
+    ui.next_flags(ST_SUBTLE | ST_ICON_ONLY | ST_COMPACT | ST_DISABLED);
+    ui.next_icon(JD_QAT_CUSTOMIZE);
+    ui.button(ID_QAT_MORE, commands::label(commands::QAT_CUSTOMIZE));
+    ui.tooltip(&commands::tip(ui, commands::QAT_CUSTOMIZE));
+    ui.spacer(-1);
+    ui.text(TS_BODY | TX_ELLIPSIS, title);
+    ui.titlebar_end();
 }

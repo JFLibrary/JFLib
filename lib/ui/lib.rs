@@ -190,6 +190,7 @@ mod recent;
 // large redraws on several threads: row bands of the dirty rectangles (render_live's hook)
 mod render_par;
 mod ribbon;
+mod ribbon_shell; // register row, key tips, backstage (ribbon_shell.rs)
 mod settings_page;
 mod shell;
 mod slider;
@@ -253,6 +254,7 @@ pub use rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH};
 pub use plat::{DE_ALL, DE_COPY, DE_LINK, DE_MOVE, DT_FILES, DT_HTML, DT_IMAGE, DT_STD, DT_TEXT, DT_URL, DT_USER0, DragData};
 pub use popup::{Command, Mi}; // ui-popup: the command table and menu records
 pub use ribbon::{RibbonGroup, RibbonGroupMode, RibbonLayout, RibbonMetrics, RibbonSample};
+pub use ribbon_shell::{BackstageItem, RibbonTab, BS_ACTION, BS_FOOTER, BS_SEP, RT_CONTEXT, RT_FILE};
 pub use runtime::{Runtime, launch, run, run_window};
 pub use style::{Sp, Style, StyleBasic, StyleChrome, StyleData, StyleEdit, StyleList, StyleMisc, StylePopup, StyleShell, StyleValue};
 pub use data::{GridCol, GridEv, GridState, TreeEv, TreeRow, TreeState};
@@ -507,6 +509,8 @@ pub struct WinParts {
     pub(crate) desk: desk::W,
     /// the file dialog of the window (filedlg.rs; the folder used last is the app's)
     pub(crate) fd: filedlg::W,
+    /// the ribbon's key tip mode (ribbon_shell.rs)
+    pub(crate) rshell: ribbon_shell::W,
 }
 
 impl WinParts {
@@ -533,6 +537,7 @@ impl WinParts {
             dock: Default::default(),
             desk: Default::default(),
             fd: Default::default(),
+            rshell: Default::default(),
         }
     }
 }

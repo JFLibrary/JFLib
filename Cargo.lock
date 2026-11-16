@@ -21,7 +21,10 @@ dependencies = [
 name = "JFDiagrammer"
 version = "0.1.0"
 dependencies = [
+ "jflib-base",
  "jflib-build",
+ "jflib-plat",
+ "jflib-rt",
  "jflib-style-netlab",
  "jflib-ui",
 ]

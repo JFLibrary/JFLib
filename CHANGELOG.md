@@ -35,6 +35,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **archive:** `Limits::ratio`: the highest ratio of a DEFLATE part's size to its compressed size, checked for parts over 1 MiB before they are inflated (denser: `Limit`, a ZIP bomb). The default, 1032, is the most DEFLATE can reach and refuses nothing; a part that claims more is `Invalid` before its buffer is allocated. `Limits` also derives `Debug`, `PartialEq` and `Eq`
 - **archive:** `archive::opc`, the Open Packaging Conventions (ECMA-376 Part 2) for DOCX and VSDX, taken out of doc_io: `Package` (`read`, `from_entries`, `part`, `content_type`, `relationships`, `resolve`, `main_part`, `set_part`, `replace`, `remove_part`, `set_relationships`, `write`; parts nobody touched go back unchanged), `ContentTypes`, `Relationship`, `Rules` (macros, exact names, XML limits), `normalize` and `same_part` (part names compared ASCII case-insensitive and percent-escape aware), `rels_name`, `rels_source`, `parse_relationships`, `relationships_xml`
 - **Tests:** codectest `--archive` (tests/archive.uis): lib/archive and archive::opc against crafted archives and packages -- round trips (stored byte for byte as before, DEFLATE at every level), hostile names, broken directories, an overlap bomb, limits and a 16 MiB bomb, ZIP64 written (65535 parts, a lowered threshold) and read from foreign layouts, hostile ZIP64 records, OPC packages (unknown parts kept, name equivalence, the exact profile, hostile relationships and content types, macros, XML limits, 20000 parts)
+- **ui:** Ribbon shell parts: `ui.ribbon_tabs` (register row with the File register and context sets), the ribbon's access keys (`ui.keytip`, `keytip_keys`, `keytips_level`, `keytips_off`), `ui.backstage_begin` / `backstage_end` (`BackstageItem`), `ui.settings_section`; Style hooks `ribbon_box_flags`, `ribbon_band`, `ribbon_tabs_height`, `ribbon_tabs_strip`, `ribbon_tab`, `keytip` (defaults keep every style's look). docs/GUIDE.md section 6
 
 ### Changed
 
@@ -42,6 +43,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point); the UI makes notches of them as `wheel_lines()` lines of 16 DIP, so its views follow the fingers' way (they scrolled 4.8 times it on Wayland, 1.2 times on macOS)
 - **ui:** A notch of the wheel scrolls the system's lines (`ui.wheel_lines()`) in the library's views, no longer always three; headless runs stay at three
 - **doc_io:** The DOCX reader's package checks (content types, relationships, part names) are archive::opc's with `Rules { exact_names: true, .. }`; DOCX files open, are refused and are saved exactly as before
+- **style_netlab:** NetLab's ribbon: a 92 DIP band without side frames, the register row with the selected register open toward the band, context registers, key tips; large buttons with a 32 DIP icon over two caption lines (only ribbons use them; JFNetworker's look stays)
 
 ### Fixed
 

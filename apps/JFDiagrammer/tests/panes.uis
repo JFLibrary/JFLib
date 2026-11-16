@@ -1,0 +1,58 @@
+# JFDiagrammer, JD8: the task panes in the dock area (Ansicht › Aufgabenbereiche, the dialog
+# launcher of Formenarten, the measures in the status bar), the status bar's zoom, the grid
+# toggle and the context menus of the page, the page tab and the stencils
+expect tab:"Shapes" exists
+expect tab:"Shape-Daten" missing
+click tab:"Ansicht"
+click button:"Aufgabenbereiche"
+expect "Shape-Daten" exists
+click "Shape-Daten"
+expect tab:"Shape-Daten" exists
+expect text:"Keine Shape-Daten" exists
+click button:"Aufgabenbereiche"
+click "Verschieben und Zoomen"
+expect tab:"Verschieben und Zoomen" selected
+click button:"Aufgabenbereiche"
+click "Shapes"
+expect tab:"Shapes" missing
+click button:"Aufgabenbereiche"
+click "Shapes"
+expect tab:"Shapes" exists
+shot build/JFDiagrammer-panes.png
+# Shape formatieren through the launcher of Formenarten
+click tab:"Start"
+click button:"Shape formatieren: Formenarten"
+expect tab:"Shape formatieren" selected
+expect tab:"Füllung und Linie" selected
+click tab:"Effekte"
+expect button:"Schatten" disabled
+# Größe und Position through the measures in the status bar
+click button:"Breite: –  Höhe: –  Winkel: –"
+expect tab:"Größe und Position" selected
+expect text:"Drehpunkt" exists
+expect text:"Kein Shape ausgewählt." exists
+# the zoom in the status bar
+expect text:"100 %" exists
+click button:"Vergrößern"
+expect text:"125 %" exists
+click button:"Verkleinern"
+click button:"Verkleinern"
+expect text:"75 %" exists
+key alt+f6
+expect text:"100 %" exists
+# the grid of the canvas
+click tab:"Ansicht"
+expect checkbox:"Gitternetz" unchecked
+click checkbox:"Gitternetz"
+expect checkbox:"Gitternetz" checked
+expect checkbox:"Lineal" disabled
+# the page's context menu on the canvas, the page tab's, the stencils'
+rclick canvas:"Zeichenfläche"
+expect "Seite einrichten" disabled
+key esc
+rclick tab:"Seite-1"
+expect "Seite umbenennen" disabled
+key esc
+rclick "Schablonenbereich"
+expect "Schablone schließen" disabled
+key esc

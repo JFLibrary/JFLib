@@ -1,0 +1,480 @@
+// commands -- every command of the window: its id, label and icons, its handler (once the
+// function behind it exists), its state, and the library's command table in the current
+// language with that language's shortcuts (lang/shortcuts.tsv)
+//
+//   DEFS                      the commands (id, label, 16 px icon, 32 px icon); the constant's
+//                             name (BOLD, NEW_PAGE ...) is the command's key in shortcuts.tsv
+//                             and in the [keys] section of the settings (own shortcuts)
+//   HANDLERS                  the commands that do something today; a later stage adds a line
+//                             (id, fn) here and the ribbon, the menus, the shortcuts and the
+//                             quick access toolbar enable it everywhere
+//   CHECKED                   toggles: whether the command shows as checked
+//   run(app, ui, id)          App::command: the handler, if any
+//   states(app, ui)           every pass: CF_DISABLED for commands without a handler,
+//                             CF_CHECKED for toggles that are on
+//   table(lang, ini)          the library's command table for language `lang` (a catalogue
+//                             column): labels in that language, the Office shortcuts of the
+//                             language, own shortcuts from the settings on top; made once per
+//                             language and set of own shortcuts
+//   tip(ui, id)               the QuickInfo: label, shortcut, "not available yet"
+//   label(id)                 the label in the current language
+//
+// Commands without a handler are shown everywhere (ribbon, menus, shortcuts), disabled, with
+// the QuickInfo "Noch nicht verfügbar"; the handler table is the only place that changes when
+// a function arrives (PLAN.md JD8: "Befehle werden angeschlossen, sobald die Funktionen dahinter
+// fertig sind").  Labels with '|' carry a context for German words with two meanings
+// ("Linie|Format" is the line format, "Linie|Zeichentool" the drawing tool); the screen shows
+// the part before it (tc).
+
+use alloc::string::String;
+use alloc::vec::Vec;
+
+use base::Ini;
+use ui::i18n;
+use ui::*;
+
+use crate::icons::*;
+use crate::{tc, Diagrammer};
+
+/// a command of the window
+pub(crate) struct Def {
+    pub id: u32,
+    /// the constant's name: the key of shortcuts.tsv and of own shortcuts
+    pub name: &'static str,
+    /// the German label (catalogue key, may carry a context after '|')
+    pub label: &'static str,
+    /// 16 px icon (0 = none)
+    pub icon: u32,
+    /// 32 px icon for large buttons (0 = none)
+    pub large: u32,
+}
+
+macro_rules! commands {
+    ($($c:ident = $id:literal, $label:literal, $icon:expr, $large:expr;)*) => {
+        // some are reached only by name (shortcuts.tsv) until a later stage draws them
+        $(#[allow(dead_code)] pub(crate) const $c: u32 = $id;)*
+        pub(crate) static DEFS: &[Def] = &[$(Def { id: $id, name: stringify!($c), label: $label, icon: $icon, large: $large },)*];
+    };
+}
+
+// i18n
+commands! {
+    // the File register, the quick access toolbar
+    NEW = 0x1001, "Neu", JD_NEW, JD_NEW_L;
+    OPEN = 0x1002, "Öffnen", JD_OPEN, JD_OPEN_L;
+    SAVE = 0x1003, "Speichern", JD_SAVE, JD_SAVE_L;
+    SAVE_AS = 0x1004, "Speichern unter", 0, JD_SAVE_AS_L;
+    PRINT = 0x1005, "Drucken", JD_PRINT, JD_PRINT_L;
+    EXPORT = 0x1006, "Exportieren", 0, JD_EXPORT_L;
+    CLOSE = 0x1007, "Schließen", 0, JD_CLOSE_L;
+    OPTIONS = 0x1008, "Optionen", 0, JD_OPTIONS_L;
+    INFO = 0x1009, "Info", 0, JD_INFO_L;
+    UNDO = 0x1010, "Rückgängig", JD_UNDO, 0;
+    REDO = 0x1011, "Wiederholen", JD_REDO, 0;
+    QAT_CUSTOMIZE = 0x1012, "Symbolleiste für den Schnellzugriff anpassen", JD_QAT_CUSTOMIZE, 0;
+    // Start: Zwischenablage
+    PASTE = 0x1100, "Einfügen|Zwischenablage", JD_PASTE, JD_PASTE_L;
+    PASTE_SPECIAL = 0x1101, "Inhalte einfügen", JD_PASTE_SPECIAL, 0;
+    PASTE_LINK = 0x1102, "Als Link einfügen", JD_PASTE_LINK, 0;
+    DUPLICATE = 0x1103, "Duplizieren", JD_DUPLICATE, 0;
+    CUT = 0x1104, "Ausschneiden", JD_CUT, 0;
+    COPY = 0x1105, "Kopieren", JD_COPY, 0;
+    FORMAT_PAINTER = 0x1106, "Format übertragen", JD_FORMAT_PAINTER, JD_FORMAT_PAINTER_L;
+    // Start: Schriftart, Absatz
+    FONT = 0x1110, "Schriftart", 0, 0;
+    FONT_SIZE = 0x1111, "Schriftgrad", 0, 0;
+    BOLD = 0x1112, "Fett", JD_BOLD_F, 0;
+    ITALIC = 0x1113, "Kursiv", JD_ITALIC_K, 0;
+    UNDERLINE = 0x1114, "Unterstrichen", JD_UNDERLINE_U, 0;
+    STRIKE = 0x1115, "Durchgestrichen", JD_STRIKETHROUGH, 0;
+    FONT_COLOR = 0x1116, "Schriftfarbe", JD_FONT_COLOR, 0;
+    TEXT_DIALOG = 0x1117, "Text|Dialogfeld", 0, 0;
+    VALIGN_TOP = 0x1120, "Oben ausrichten|Text", JD_VALIGN_TOP, 0;
+    VALIGN_MIDDLE = 0x1121, "Mittig ausrichten|Text", JD_VALIGN_MIDDLE, 0;
+    VALIGN_BOTTOM = 0x1122, "Unten ausrichten|Text", JD_VALIGN_BOTTOM, 0;
+    TEXT_LEFT = 0x1123, "Linksbündig", JD_TEXT_LEFT, 0;
+    TEXT_CENTER = 0x1124, "Zentriert", JD_TEXT_CENTER, 0;
+    TEXT_RIGHT = 0x1125, "Rechtsbündig", JD_TEXT_RIGHT, 0;
+    TEXT_JUSTIFY = 0x1126, "Blocksatz", JD_TEXT_JUSTIFY, 0;
+    // Start: Tools
+    POINTER = 0x1130, "Zeigertool", JD_POINTER, JD_POINTER_L;
+    CONNECTOR_TOOL = 0x1131, "Verbinder|Tool", JD_CONNECTOR, JD_CONNECTOR_L;
+    TEXT_TOOL = 0x1132, "Text|Tool", JD_TEXT, JD_TEXT_L;
+    DRAW_TOOLS = 0x1133, "Zeichentools", JD_RECTANGLE, 0;
+    RECTANGLE = 0x1134, "Rechteck", JD_RECTANGLE, 0;
+    ELLIPSE = 0x1135, "Ellipse", JD_ELLIPSE, 0;
+    LINE_TOOL = 0x1136, "Linie|Zeichentool", JD_LINE, 0;
+    FREEFORM = 0x1137, "Freihandform", JD_FREEFORM, 0;
+    ARC = 0x1138, "Bogen", JD_ARC, 0;
+    PENCIL = 0x1139, "Bleistift", JD_PENCIL, 0;
+    // Start: Formenarten
+    FILL = 0x1140, "Füllung", JD_FILL, 0;
+    FILL_NONE = 0x1141, "Keine Füllung", 0, 0;
+    FILL_OPTIONS = 0x1142, "Füllungsoptionen", 0, 0;
+    LINE_FORMAT = 0x1143, "Linie|Format", JD_LINE_COLOR, 0;
+    LINE_NONE = 0x1144, "Keine Linie", 0, 0;
+    LINE_WEIGHT = 0x1145, "Stärke", JD_LINE_WEIGHT, 0;
+    LINE_DASH = 0x1146, "Striche", JD_LINE_DASH, 0;
+    LINE_ARROWS = 0x1147, "Pfeile", JD_LINE_ARROWS, 0;
+    LINE_OPTIONS = 0x1148, "Linienoptionen", JD_LINE_OPTIONS, 0;
+    MORE_COLORS = 0x1149, "Weitere Farben", JD_MORE_COLORS, 0;
+    FORMAT_PANE = 0x114A, "Shape formatieren", 0, 0;
+    // Start: Anordnen
+    ALIGN = 0x1150, "Ausrichten", JD_ALIGN, JD_ALIGN_L;
+    AUTO_ALIGN = 0x1151, "Automatisch ausrichten", 0, 0;
+    ALIGN_LEFT = 0x1152, "Links ausrichten", JD_ALIGN_LEFT, 0;
+    ALIGN_CENTER = 0x1153, "Zentriert ausrichten", JD_ALIGN_CENTER, 0;
+    ALIGN_RIGHT = 0x1154, "Rechts ausrichten", JD_ALIGN_RIGHT, 0;
+    ALIGN_TOP = 0x1155, "Oben ausrichten|Shapes", JD_ALIGN_TOP, 0;
+    ALIGN_MIDDLE = 0x1156, "Mittig ausrichten|Shapes", JD_ALIGN_MIDDLE, 0;
+    ALIGN_BOTTOM = 0x1157, "Unten ausrichten|Shapes", JD_ALIGN_BOTTOM, 0;
+    POSITION = 0x1158, "Positionieren", JD_POSITION, JD_POSITION_L;
+    DISTRIBUTE_H = 0x1159, "Horizontal verteilen", JD_DISTRIBUTE_H, 0;
+    DISTRIBUTE_V = 0x115A, "Vertikal verteilen", JD_DISTRIBUTE_V, 0;
+    ROTATE_LEFT = 0x115B, "Um 90° nach links drehen", JD_ROTATE_LEFT, 0;
+    ROTATE_RIGHT = 0x115C, "Um 90° nach rechts drehen", JD_ROTATE_RIGHT, 0;
+    FLIP_H = 0x115D, "Horizontal spiegeln", JD_FLIP_H, 0;
+    FLIP_V = 0x115E, "Vertikal spiegeln", JD_FLIP_V, 0;
+    BRING_FRONT = 0x1160, "In den Vordergrund", JD_BRING_FRONT, 0;
+    BRING_FORWARD = 0x1161, "Eine Ebene nach vorne", JD_BRING_FORWARD, 0;
+    SEND_BACK = 0x1162, "In den Hintergrund", JD_SEND_BACK, 0;
+    SEND_BACKWARD = 0x1163, "Eine Ebene nach hinten", JD_SEND_BACKWARD, 0;
+    GROUP_MENU = 0x1164, "Gruppieren|Menü", JD_GROUP, 0;
+    GROUP = 0x1165, "Gruppieren", JD_GROUP, 0;
+    UNGROUP = 0x1166, "Gruppierung aufheben", JD_UNGROUP, 0;
+    // Start: Bearbeiten
+    FIND_MENU = 0x1170, "Suchen|Menü", JD_SEARCH, 0;
+    FIND = 0x1171, "Suchen", JD_SEARCH, 0;
+    REPLACE = 0x1172, "Ersetzen", JD_REPLACE, 0;
+    LAYERS = 0x1173, "Ebenen", JD_LAYER_ASSIGN, 0;
+    LAYER_ASSIGN = 0x1174, "Ebene zuweisen", JD_LAYER_ASSIGN, 0;
+    LAYER_PROPERTIES = 0x1175, "Ebeneneigenschaften", JD_LAYER_PROPERTIES, 0;
+    SELECT_MENU = 0x1176, "Markieren", JD_SELECT, 0;
+    SELECT_ALL = 0x1177, "Alles markieren", JD_SELECT_ALL, 0;
+    SELECT_BY_TYPE = 0x1178, "Nach Typ auswählen", JD_SELECT_BY_TYPE, 0;
+    SELECT_AREA = 0x1179, "Bereich auswählen", JD_SELECT_AREA, 0;
+    LASSO = 0x117A, "Lassoauswahl", JD_LASSO, 0;
+    // Einfügen
+    NEW_PAGE = 0x1200, "Neue Seite", JD_NEW_PAGE, JD_NEW_PAGE_L;
+    PAGE_BLANK = 0x1201, "Leere Seite", JD_PAGE_BLANK, 0;
+    PAGE_BACKGROUND = 0x1202, "Hintergrundseite", JD_PAGE_BACKGROUND, 0;
+    PAGE_DUPLICATE = 0x1203, "Diese Seite duplizieren", JD_PAGE_DUPLICATE, 0;
+    PICTURES = 0x1204, "Bilder", JD_PICTURES, JD_PICTURES_L;
+    PICTURE_FILE = 0x1205, "Bild aus Datei", JD_PICTURES, 0;
+    CONTAINER = 0x1206, "Container", JD_CONTAINER, JD_CONTAINER_L;
+    CALLOUT = 0x1207, "Beschriftung", JD_CALLOUT, JD_CALLOUT_L;
+    INSERT_CONNECTOR = 0x1208, "Verbinder|Einfügen", JD_CONNECTOR, JD_INSERT_CONNECTOR_L;
+    LINK = 0x1209, "Link", JD_LINK, JD_LINK_L;
+    TEXT_BOX = 0x120A, "Textfeld", JD_TEXT_BOX_H, JD_TEXT_BOX_L;
+    TEXT_BOX_H = 0x120B, "Horizontales Textfeld", JD_TEXT_BOX_H, 0;
+    TEXT_BOX_V = 0x120C, "Vertikales Textfeld", JD_TEXT_BOX_V, 0;
+    FIELD = 0x120D, "Feld", 0, JD_FIELD_L;
+    // Entwurf
+    ORIENTATION = 0x1300, "Ausrichtung|Seite", 0, JD_ORIENTATION_L;
+    PORTRAIT = 0x1301, "Hochformat", JD_PORTRAIT, 0;
+    LANDSCAPE = 0x1302, "Querformat", JD_LANDSCAPE, 0;
+    PAGE_SIZE = 0x1303, "Größe|Seite", 0, JD_PAGE_SIZE_L;
+    FIT_DRAWING = 0x1304, "Größe an Zeichnung anpassen", JD_FIT_DRAWING, 0;
+    MORE_SIZES = 0x1305, "Weitere Seitenformate", JD_MORE_SIZES, 0;
+    AUTO_SIZE = 0x1306, "Automatisch anpassen", 0, JD_AUTO_SIZE_L;
+    PAGE_SETUP = 0x1307, "Seite einrichten", 0, 0;
+    THEMES = 0x1308, "Designs", 0, 0;
+    THEME_NEW_SHAPES = 0x1309, "Design auf neue Shapes anwenden", 0, 0;
+    VAR_COLORS = 0x130A, "Farben", JD_VAR_COLORS, 0;
+    VAR_EFFECTS = 0x130B, "Effekte|Varianten", JD_VAR_EFFECTS, 0;
+    VAR_CONNECTORS = 0x130C, "Verbinder|Varianten", JD_VAR_CONNECTORS, 0;
+    VAR_FONTS = 0x130D, "Schriftarten", JD_VAR_FONTS, 0;
+    VAR_EMBELLISHMENT = 0x130E, "Verzierung", JD_VAR_EMBELLISHMENT, 0;
+    CONNECTORS = 0x1310, "Verbinder|Layout", JD_CONNECTOR, JD_CONNECTOR_L;
+    CONN_RIGHT_ANGLE = 0x1311, "Rechtwinklig", JD_CONNECTOR_RIGHT_ANGLE, 0;
+    CONN_STRAIGHT = 0x1312, "Gerade", JD_CONNECTOR_STRAIGHT, 0;
+    CONN_CURVED = 0x1313, "Gebogen", JD_CONNECTOR_CURVED, 0;
+    LINE_JUMPS = 0x1314, "Linienübergänge anzeigen", JD_LINE_JUMPS, 0;
+    REROUTE = 0x1315, "Verbinder neu routen", 0, 0;
+    LAYOUT_ROUTING = 0x1316, "Layout und Routing", 0, 0;
+    // Ansicht
+    RULER = 0x1400, "Lineal", JD_RULER, 0;
+    PAGE_BREAKS = 0x1401, "Seitenumbrüche", 0, 0;
+    GRID = 0x1402, "Gitternetz", JD_GRID, 0;
+    GUIDES = 0x1403, "Führungslinien", JD_GUIDES, 0;
+    TASK_PANES = 0x1404, "Aufgabenbereiche", JD_TASK_PANES, JD_TASK_PANES_L;
+    ZOOM = 0x1405, "Zoom", JD_ZOOM, JD_ZOOM_L;
+    FIT_WINDOW = 0x1406, "An Fenster anpassen", JD_FIT_WINDOW, 0;
+    PAGE_WIDTH = 0x1407, "Seitenbreite", JD_PAGE_WIDTH, 0;
+    DYN_GRID = 0x1408, "Dynamisches Gitter", 0, 0;
+    CONNECT_ARROWS = 0x1409, "Verbindungspfeile", 0, 0;
+    CONN_POINTS = 0x140A, "Verbindungspunkte", JD_CONNECTION_POINT, 0;
+    SNAP_GLUE = 0x140B, "Ausrichten und Kleben", JD_SNAP_GLUE, 0;
+    ZOOM_IN = 0x140C, "Vergrößern", JD_ZOOM_IN, 0;
+    ZOOM_OUT = 0x140D, "Verkleinern", JD_ZOOM_OUT, 0;
+    // the task panes (Ansicht › Aufgabenbereiche)
+    PANE_SHAPES = 0x1410, "Shapes", JD_STENCIL_MENU, 0;
+    PANE_FORMAT = 0x1411, "Shape formatieren|Bereich", 0, 0;
+    PANE_SIZEPOS = 0x1412, "Größe und Position", 0, 0;
+    PANE_DATA = 0x1413, "Shape-Daten", JD_SHAPE_DATA, 0;
+    PANE_PANZOOM = 0x1414, "Verschieben und Zoomen", 0, 0;
+    // pages
+    PAGE_NEXT = 0x1420, "Nächste Seite", 0, 0;
+    PAGE_PREV = 0x1421, "Vorherige Seite", 0, 0;
+    PAGES_ALL = 0x1422, "Alle Seiten", JD_PAGES_ALL, 0;
+    PAGE_INSERT = 0x1423, "Seite einfügen", JD_PAGE_ADD, 0;
+    PAGE_DELETE = 0x1424, "Seite löschen", 0, 0;
+    PAGE_RENAME = 0x1425, "Seite umbenennen", 0, 0;
+    PAGE_REORDER = 0x1426, "Seiten neu anordnen", 0, 0;
+    DRAWING_SCALE = 0x1427, "Zeichnungsmaßstab", 0, 0;
+    // text
+    EDIT_TEXT = 0x1430, "Text bearbeiten", 0, 0;
+    SYMBOL = 0x1431, "Symbol", 0, JD_SYMBOL_L;
+    SCREEN_TIP = 0x1432, "QuickInfo", 0, JD_SCREEN_TIP_L;
+    // context register Container-Tools › Format
+    CT_MARGINS = 0x1500, "Ränder", JD_CT_MARGINS, JD_CT_MARGINS_L;
+    CT_FIT = 0x1501, "An Inhalt anpassen", JD_CT_FIT_CONTENTS, JD_CT_FIT_CONTENTS_L;
+    CT_AUTOSIZE = 0x1502, "Automatische Größe", JD_CT_AUTO_SIZE, JD_CT_AUTO_SIZE_L;
+    CT_STYLES = 0x1503, "Containerformatvorlagen", 0, 0;
+    CT_HEADING = 0x1504, "Kopfzeilenstil", JD_CT_HEADING, JD_CT_HEADING_L;
+    CT_LOCK = 0x1505, "Container sperren", JD_CT_LOCK, JD_CT_LOCK_L;
+    CT_SELECT = 0x1506, "Inhalt auswählen", JD_CT_SELECT_CONTENTS, JD_CT_SELECT_CONTENTS_L;
+    CT_DISBAND = 0x1507, "Container auflösen", JD_CT_DISBAND, JD_CT_DISBAND_L;
+    CT_ADD = 0x1508, "Zu Container hinzufügen", 0, 0;
+    CT_REMOVE = 0x1509, "Aus Container entfernen", 0, 0;
+    // the shape's context menu
+    SHAPE_DATA_DEFINE = 0x1600, "Shape-Daten definieren", 0, 0;
+    HYPERLINK = 0x1601, "Hyperlink", 0, 0;
+    FORMAT_TEXT = 0x1602, "Text formatieren", 0, 0;
+    FORMAT_LINE = 0x1603, "Linie formatieren", 0, 0;
+    FORMAT_FILL = 0x1604, "Füllung formatieren", 0, 0;
+    FORMAT_SHADOW = 0x1605, "Schatten formatieren", 0, 0;
+    CONN_RESET = 0x1606, "Verbinder zurücksetzen", 0, 0;
+    ADD_TO_MY_SHAPES = 0x1607, "Zu meinen Shapes hinzufügen", 0, 0;
+    COMMENT_NEW = 0x1608, "Neuer Kommentar", 0, 0;
+    // the stencil's menu (Shapes sidebar)
+    STENCIL_CLOSE = 0x1700, "Schablone schließen", 0, 0;
+    STENCIL_SAVE = 0x1701, "Schablone speichern", 0, 0;
+    STENCIL_EDIT = 0x1702, "Schablone bearbeiten", 0, 0;
+    STENCIL_VIEW_ICONS = 0x1703, "Symbole und Namen", 0, 0;
+    STENCIL_VIEW_ICONS_ONLY = 0x1704, "Nur Symbole", 0, 0;
+    STENCIL_VIEW_NAMES = 0x1705, "Nur Namen", 0, 0;
+    STENCIL_NEW_MASTER = 0x1706, "Neues Master-Shape", 0, 0;
+    STENCIL_ORDER = 0x1707, "Reihenfolge der Schablonen", 0, 0;
+    MORE_SHAPES = 0x1708, "Weitere Shapes", JD_MORE_SHAPES, 0;
+}
+
+/// a command's handler: what it does (the function behind it exists)
+pub(crate) type Handler = fn(&mut Diagrammer, &mut Ui);
+
+// the commands that work today; later stages add their line here (and to CHECKED)
+static HANDLERS: &[(u32, Handler)] = &[
+    (NEW, |a, ui| a.open_backstage(ui, crate::backstage::PAGE_NEW)),
+    (OPEN, |a, ui| a.open_backstage(ui, crate::backstage::PAGE_OPEN)),
+    (PRINT, |a, ui| a.open_backstage(ui, crate::backstage::PAGE_PRINT)),
+    (EXPORT, |a, ui| a.open_backstage(ui, crate::backstage::PAGE_EXPORT)),
+    (OPTIONS, |a, ui| a.open_backstage(ui, crate::backstage::PAGE_OPTIONS)),
+    (INFO, |a, ui| a.open_backstage(ui, crate::backstage::PAGE_INFO)),
+    (POINTER, |a, _| a.tool = POINTER),
+    (GRID, |a, _| a.view_grid = !a.view_grid),
+    (FIT_WINDOW, |a, _| a.canvas.request_fit()),
+    (ZOOM_IN, |a, _| a.zoom_step(1)),
+    (ZOOM_OUT, |a, _| a.zoom_step(-1)),
+    (FORMAT_PANE, |a, _| a.panes.show(crate::panes::P_FORMAT)),
+    (PANE_SHAPES, |a, _| a.panes.toggle(crate::panes::P_SHAPES)),
+    (PANE_FORMAT, |a, _| a.panes.toggle(crate::panes::P_FORMAT)),
+    (PANE_SIZEPOS, |a, _| a.panes.toggle(crate::panes::P_SIZEPOS)),
+    (PANE_DATA, |a, _| a.panes.toggle(crate::panes::P_DATA)),
+    (PANE_PANZOOM, |a, _| a.panes.toggle(crate::panes::P_PANZOOM)),
+];
+
+// toggles: whether the command is on
+static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
+    (POINTER, |a| a.tool == POINTER),
+    (GRID, |a| a.view_grid),
+    (PANE_SHAPES, |a| a.panes.visible(crate::panes::P_SHAPES)),
+    (PANE_FORMAT, |a| a.panes.visible(crate::panes::P_FORMAT)),
+    (PANE_SIZEPOS, |a| a.panes.visible(crate::panes::P_SIZEPOS)),
+    (PANE_DATA, |a| a.panes.visible(crate::panes::P_DATA)),
+    (PANE_PANZOOM, |a| a.panes.visible(crate::panes::P_PANZOOM)),
+];
+
+/// the handler of a command (None: not available yet)
+pub(crate) fn handler(id: u32) -> Option<Handler> {
+    HANDLERS.iter().find(|h| h.0 == id).map(|h| h.1)
+}
+
+/// the command exists and works
+pub(crate) fn enabled(id: u32) -> bool {
+    handler(id).is_some()
+}
+
+/// the toggle is on
+pub(crate) fn checked(app: &Diagrammer, id: u32) -> bool {
+    CHECKED.iter().find(|c| c.0 == id).is_some_and(|c| (c.1)(app))
+}
+
+/// App::command: run the handler -> handled
+pub(crate) fn run(app: &mut Diagrammer, ui: &mut Ui, id: u32) -> bool {
+    match handler(id) {
+        Some(h) => {
+            h(app, ui);
+            ui.repass();
+            true
+        }
+        None => DEFS.iter().any(|d| d.id == id),
+    }
+}
+
+/// every pass: the commands' states for the menus and the shortcuts
+pub(crate) fn states(app: &Diagrammer, ui: &mut Ui) {
+    for d in DEFS {
+        let f = if enabled(d.id) { 0 } else { CF_DISABLED } | if checked(app, d.id) { CF_CHECKED } else { 0 };
+        ui.cmd_state(d.id, f);
+    }
+}
+
+/// the definition of a command
+pub(crate) fn def(id: u32) -> Option<&'static Def> {
+    DEFS.iter().find(|d| d.id == id)
+}
+
+/// a command's label in the current language
+pub(crate) fn label(id: u32) -> &'static str {
+    def(id).map_or("", |d| tc(d.label))
+}
+
+/// the QuickInfo of a command: its label, its shortcut, and that it is not there yet
+pub(crate) fn tip(ui: &Ui, id: u32) -> String {
+    let mut s = String::from(label(id));
+    if let Some(c) = ui.desc.cmds.iter().take_while(|c| c.id != 0).find(|c| c.id == id && c.key != 0) {
+        s.push_str(" (");
+        s.push_str(&ui.key_text(c.key as u32, c.mods as u32));
+        s.push(')');
+    }
+    if !enabled(id) {
+        s.push_str(" · ");
+        s.push_str(i18n::t("Noch nicht verfügbar"));
+    }
+    s
+}
+
+// ------------------------------------------------------------------ shortcuts
+
+static SHORTCUTS: &str = include_str!("../lang/shortcuts.tsv");
+
+/// the library's command table in language column `lang` (de en es it fr), with own
+/// shortcuts from the settings' [keys] section (NAME=Ctrl+Shift+F, "" = none) on top
+pub(crate) fn table(lang: usize, own: &Ini) -> &'static [Command] {
+    // made once per language and set of own shortcuts
+    static CACHE: rt::sync::SpinLock<Vec<(usize, String, &'static [Command])>> = rt::sync::SpinLock::new(Vec::new());
+    let key = own_keys(own);
+    if let Some(t) = CACHE.lock().iter().find(|c| c.0 == lang && c.1 == key).map(|c| c.2) {
+        return t;
+    }
+    let keys = shortcuts(lang, own);
+    let mut v: Vec<Command> = Vec::with_capacity(DEFS.len() + 8);
+    for d in DEFS {
+        let label = tc(d.label);
+        let mine: Vec<&(u32, u32, u32)> = keys.iter().filter(|k| k.0 == d.id).collect();
+        let icon = crate::lang::letter_icon(d.id, lang);
+        if mine.is_empty() {
+            v.push(Command::new(d.id, label, icon, 0, 0, 0));
+        }
+        for k in mine {
+            v.push(Command::new(d.id, label, icon, k.2, k.1, 0));
+        }
+    }
+    v.push(Command::new(0, "", 0, 0, 0, 0));
+    let t: &'static [Command] = Vec::leak(v);
+    CACHE.lock().push((lang, key, t));
+    t
+}
+
+// the own shortcuts as one text (the cache key)
+fn own_keys(own: &Ini) -> String {
+    let mut s = String::new();
+    for d in DEFS {
+        if let Some(v) = own.get("keys", d.name) {
+            s.push_str(d.name);
+            s.push('=');
+            s.push_str(v);
+            s.push('\n');
+        }
+    }
+    s
+}
+
+/// (id, vk, mods) of every shortcut in language column `lang`, own ones replacing the table's
+pub(crate) fn shortcuts(lang: usize, own: &Ini) -> Vec<(u32, u32, u32)> {
+    let mut out = Vec::new();
+    for line in SHORTCUTS.lines() {
+        if line.starts_with('#') || line.trim().is_empty() {
+            continue;
+        }
+        let cells: Vec<&str> = line.split('\t').collect();
+        let Some(d) = DEFS.iter().find(|d| d.name == cells[0]) else { continue };
+        let cell = match own.get("keys", d.name) {
+            Some(v) => v,
+            None => cells.get(1 + lang).copied().unwrap_or(""),
+        };
+        for chord in cell.split('|') {
+            if let Some((vk, mods)) = parse_chord(chord) {
+                out.push((d.id, vk, mods));
+            }
+        }
+    }
+    // own shortcuts of commands the table has no line for
+    for d in DEFS {
+        if !out.iter().any(|k| k.0 == d.id) {
+            if let Some(v) = own.get("keys", d.name) {
+                for chord in v.split('|') {
+                    if let Some((vk, mods)) = parse_chord(chord) {
+                        out.push((d.id, vk, mods));
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+/// "Ctrl+Shift+F", "Alt+F9", "F12", "Ctrl+PgDn" -> (VK, MOD_*) (English key names, as in
+/// shortcuts.tsv; None for "" and anything unknown)
+pub(crate) fn parse_chord(s: &str) -> Option<(u32, u32)> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    let mut mods = 0;
+    let mut vk = 0;
+    for part in s.split('+') {
+        match part.trim() {
+            "Ctrl" => mods |= MOD_CTRL,
+            "Shift" => mods |= MOD_SHIFT,
+            "Alt" => mods |= MOD_ALT,
+            "PgUp" => vk = VK_PRIOR,
+            "PgDn" => vk = VK_NEXT,
+            "Del" => vk = VK_DELETE,
+            "Ins" => vk = VK_INSERT,
+            "Home" => vk = VK_HOME,
+            "End" => vk = VK_END,
+            "Enter" => vk = VK_RETURN,
+            "Left" => vk = VK_LEFT,
+            "Right" => vk = VK_RIGHT,
+            "Up" => vk = VK_UP,
+            "Down" => vk = VK_DOWN,
+            "=" => vk = VK_OEM_PLUS,
+            "<" => vk = VK_OEM_102,
+            ">" => {
+                vk = VK_OEM_102;
+                mods |= MOD_SHIFT;
+            }
+            k if k.len() == 1 && k.as_bytes()[0].is_ascii_alphanumeric() => vk = k.as_bytes()[0].to_ascii_uppercase() as u32,
+            k if k.len() > 1 && k.starts_with('F') => {
+                let n: u32 = k[1..].parse().ok()?;
+                if !(1..=24).contains(&n) {
+                    return None;
+                }
+                vk = VK_F1 + n - 1;
+            }
+            _ => return None,
+        }
+    }
+    (vk != 0).then_some((vk, mods))
+}

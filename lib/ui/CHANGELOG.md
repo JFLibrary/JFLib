@@ -10,6 +10,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- The window parts around a ribbon: `ui.ribbon_tabs(id, &mut sel, &tabs)`, the register row
+  with the File register (`RibbonTab::file`, `EV_OPEN`), registers and context sets
+  (`RibbonTab::context`, a coloured edge); the ribbon's access keys (key tips: Alt or F10,
+  `ui.keytip`, `ui.keytip_keys`, `ui.keytips_level`, `ui.keytips_off`; the ribbon's buttons
+  register themselves); `ui.backstage_begin` / `backstage_end` with `BackstageItem` (`BS_ACTION`,
+  `BS_FOOTER`, `BS_SEP`), the File register's page; `ui.settings_section`, one section of a
+  settings schema. Style hooks with defaults that keep every style's look: `ribbon_box_flags`,
+  `ribbon_band`, `ribbon_tabs_height`, `ribbon_tabs_strip`, `ribbon_tab`, `keytip`.
 - What a notch of the wheel scrolls as the system says it: `ui.wheel_lines()` (Windows' mouse
   settings, KDE's; `plat::WHEEL_PAGE`: a page), `ui.wheel_chars()` and `ui.wheel_notch_px(line_px,
   page_px, horizontal)`, followed live (`UIC_SETTINGS`); `WHEEL_LINE_DIP` (16), the library's

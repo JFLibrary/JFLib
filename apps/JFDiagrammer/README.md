@@ -18,6 +18,18 @@ NetLab-Stil nach dem abgenommenen Probeblatt ([`icons/probeblatt.png`](icons/pro
 die Übersicht steht in [`icons/uebersicht.png`](icons/uebersicht.png). Die Platzhalter im
 Menüband tragen sie schon (nur die Designs-Galerie nicht, Galerien bekommen Vorschauen).
 
+**JD8 (App-Hülle):** eigene Titelleiste mit Schnellzugriff (Speichern, Rückgängig, Wiederholen),
+Registerzeile mit Datei, Start, Einfügen, Entwurf, Ansicht und den Kontextregistern
+Container-Tools › Format und Textwerkzeuge › Text, das Menüband mit allen P1-Befehlen dieser
+Register (32-px-Icons auf großen Knöpfen), Zugriffstasten (Alt oder F10), Backstage mit Neu
+(Vorlagen-Vorschau), Öffnen, Speichern, Drucken, Exportieren, Info und Optionen (Allgemein,
+Speichern, Sprache, Erweitert, Tastenkürzel), Aufgabenbereiche im Dock (Shapes, Shape formatieren,
+Größe und Position, Shape-Daten, Verschieben und Zoomen), Statusleiste mit Seite, Maßen und Zoom,
+Kontextmenüs für Shape, Seite, Seitenregister und Schablone. Die Sprache wechselt in den Optionen
+ohne Neustart; jede Sprache hat ihre Office-Tastenkürzel ([`lang/shortcuts.tsv`](lang/shortcuts.tsv)).
+Befehle ohne Funktion sind sichtbar und ausgegraut: [`src/commands.rs`](src/commands.rs) hat je
+Befehl eine Zeile, spätere Etappen hängen nur einen Handler in `HANDLERS` an.
+
 ## Bauen, starten, testen
 
 ```sh
@@ -25,6 +37,7 @@ python build_rs.py app JFDiagrammer          # build/win/JFDiagrammer.exe und bu
 python build_rs.py run JFDiagrammer          # bauen und starten (Linux: --target linux)
 python build_rs.py test JFDiagrammer         # bauen und tests/*.uis ausführen
 python build_rs.py i18n JFDiagrammer         # der Sprachkatalog gegen die Quellen
+python apps/JFDiagrammer/check_lang.py       # Katalog, Glossar, Tastenkürzel
 ```
 
 ## Icons
@@ -49,7 +62,11 @@ python apps/JFDiagrammer/mkicons.py --part kontext --prio P2 --overview x.png   
 Deutsch, Englisch, Spanisch, Italienisch und Französisch (FEATURES.md 3.17). Die Texte stehen
 auf Deutsch im Code und übersetzt in [`locales/ui.tsv`](locales/ui.tsv) mit den Spalten
 `de en es it fr`. Die Sprache folgt `--lang`, `jfgui_LANG` oder dem System; Sprachen ohne Spalte
-bekommen Englisch. Umschalten in den Einstellungen kommt mit den Optionen (JD8). Ein deutsches
+bekommen Englisch. In der App wechselt Datei › Optionen › Sprache sie sofort, ohne Neustart.
+Verbindliche Begriffe stehen im Glossar [`lang/glossary.tsv`](lang/glossary.tsv) (LG-06), die
+Tastenkürzel je Sprache nach der Office-Belegung in [`lang/shortcuts.tsv`](lang/shortcuts.tsv)
+(LG-08; eigene Kürzel im Abschnitt `[keys]` der Einstellungsdatei); `check_lang.py` prüft
+Katalog, Glossar und Kürzel (LG-11). Ein deutsches
 Wort mit zwei Bedeutungen trägt im Katalog einen Kontext nach `|` (`Einfügen|Zwischenablage` ist
 „Paste“, `Einfügen` das Register „Insert“), `tc()` zeigt ihn nie an.
 
@@ -58,12 +75,17 @@ Wort mit zwei Bedeutungen trägt im Katalog einen Kontext nach `|` (`Einfügen|Z
 | Datei | Inhalt |
 |---|---|
 | `src/main.rs` | Einstieg, Katalog, Zustand der App |
-| `src/shell.rs` | das Fenster: Registerzeile, Menüband, Seitenleiste, Zeichenfläche, Statusleiste |
-| `src/ribbon.rs` | die Platzhalter-Gruppen der vier Register |
+| `src/shell.rs` | das Fenster: Titelleiste mit Schnellzugriff, Registerzeile, Menüband, Dock, Statusleiste |
+| `src/commands.rs` | jeder Befehl: Beschriftung, Icons, Handler, Zustand, Befehlstabelle je Sprache |
+| `src/ribbon.rs` | die Register Start, Einfügen, Entwurf, Ansicht und die Kontextregister |
+| `src/backstage.rs`, `src/options.rs` | Datei-Register (Backstage) und Optionen (`base::settings`) |
+| `src/panes.rs` | Aufgabenbereiche, Zeichenfläche mit Seitenregistern, Statusleiste, Kontextmenüs |
+| `src/lang.rs` | die fünf Sprachen, Umschalten zur Laufzeit, Buchstaben-Icons für F/K/U |
+| `lang/shortcuts.tsv`, `lang/glossary.tsv`, `check_lang.py` | Tastenkürzel je Sprache, Glossar, Sprachprüfung |
 | `src/icons.rs`, `src/icons_data.rs` | die eigenen Menüband-Icons (Hook, Farben; Daten aus `mkicons.py`) |
 | `icons/icons.txt`, `icons/*.svg`, `mkicons.py` | Liste und Quellen der Icons, ihr Skript; `icons/probeblatt.png` (abgenommen), `icons/uebersicht.png` |
 | `locales/ui.tsv` | die Texte in fünf Sprachen |
-| `tests/*.uis` | die Testskripte (`smoke.uis` deutsch, `lang_*.uis` je Sprache) |
+| `tests/*.uis` | die Testskripte (`smoke.uis`, `backstage.uis`, `options.uis`, `panes.uis`, `keytips.uis`, `context*.uis` deutsch, `lang_*.uis` je Sprache, `lang_switch.uis` der Wechsel) |
 | `STYLE`, `TARGETS`, `PACKAGE`, `PERMISSIONS` | Stil (`netlab`), Zielplattformen, Identität (`org.jfreund.JFDiagrammer`), Rechte |
 | `android/` | Manifest und Platzhalter-Symbol für die APK (`--target android`) |
 
