@@ -30284,7 +30284,7 @@ SOUND_NOTIFY: u32 = 5
 
 - **`fn ring_check(n: usize, piece: usize, take: usize, threaded: bool) -> bool`**
   (tests) the ring of a push stream: n samples written in pieces of `piece` and read in
-  pieces of `take`, by turns or (threaded, Windows / Linux) by a writer thread while this one
+  pieces of `take`, by turns or (threaded, Windows / Linux / macOS / iOS) by a writer thread while this one
   reads -> whether every sample arrived once and in order.  The reader gives up after 20 s
   (a loaded machine): then it tells the writer to stop, which may wait at a full ring, and
   the check fails instead of waiting for it forever
@@ -51901,6 +51901,11 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
   that leaves it ends the program as an uncaught panic: JFLib's crash report, exit code 3.  plat
   runs its threads and the program's start through it.  Without that feature a panic never
   unwinds, and this is `f()`.
+
+- **`fn outline_lse() -> Option<bool>`**
+  (tests, docs/ARM64.md ARM7) the way compiler-builtins' outline atomics went: Some(true) LSE, Some(false)
+  the LL/SC loops (a CPU without LSE, or jfgui_ARM_LLSC=1); None where the program has none of them (x86-64;
+  Windows and Apple on ARM64 inline their atomics; Android, glibc and std leave it to the C library)
 
 **`mod portable`**
 

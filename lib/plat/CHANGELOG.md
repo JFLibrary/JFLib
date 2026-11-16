@@ -34,6 +34,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical
   pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point).
 
+### Fixed
+
+- Windows on ARM64: function pointers that plat looks up once (GetProcAddress: the drop functions of shell32, the pointer and touch functions of user32, Shell_NotifyIconW, GetDpiForMonitor) are published with Release and read with Acquire; with Relaxed another thread on a weakly ordered CPU could see the last of the three pointers of WM_DROPFILES before the first (docs/ARM64.md, ARM7). The cooperative Job of the browser and of Android hands its items' results to a thread that polls done() or items_done() (Release / Acquire)
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

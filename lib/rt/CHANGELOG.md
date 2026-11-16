@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- rt::outline_lse(): the way the outline atomics of a static Linux ARM64 program went (LSE or the LL/SC loops; None where a program has none); jfgui_ARM_LLSC=1 in the environment makes them take LL/SC on a CPU with LSE, so the same program checks both ways (docs/ARM64.md, ARM7)
+
 ## [0.2.1] - 2026-11-16
 
 ### Added
