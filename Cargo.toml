@@ -223,9 +223,6 @@ modplat = { package = "jflib-modplat", path = "modules/modplat", version = "=0.2
 jflib-build = { path = "lib/jflib_build", version = "=0.2.1" }
 installer = { package = "jflib-installer", path = "lib/installer", version = "=0.2.1" }
 appimagert = { package = "jflib-appimagert", path = "lib/appimagert", version = "=0.2.1" }
-# the styles of the apps: not published
-style_jfoffice = { package = "jflib-style-jfoffice", path = "styles/jfoffice" }
-style_backupcraft = { package = "jflib-style-backupcraft", path = "styles/backupcraft" }
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
