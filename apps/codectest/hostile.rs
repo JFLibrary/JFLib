@@ -7,7 +7,8 @@
 //   jxl_box64        a container box with a 64-bit size reaching to the end of u64 (28 bytes)
 //   jxl_crop         a frame of its own size (custom crop) larger than the pixel budget
 //   jxl_palettes     273 palette transforms of 137727 entries each on a 1 x 1 image
-//   jxl_squeeze      65416 squeeze steps on one channel of a 1 x 1 image (74 KB)
+//   jxl_squeeze      65416 squeeze steps on one channel of a 1 x 1 image (74 KB), 65120 on a
+//                    palette's meta channel (no shift to count)
 //   jxl_spline_rows  the spline draw cache of a frame 2^30 rows high
 //   jxl_patch_area   20480 patches of 128 x 128 on a 128 x 128 frame
 //   jxr_index        a 16384 x 16384 image with an index table and no tile data (86 bytes)
@@ -279,11 +280,19 @@ fn jxl_modular(w: &mut Jw, trs: &[Tr]) {
 
 /// a w x h RGB image of one modular frame with these transforms
 fn jxl_modular_file(xs: u32, ys: u32, trs: &[Tr]) -> Vec<u8> {
-    let mut s = Jw::new();
-    jxl_modular(&mut s, trs);
+    jxl_modular_frames(xs, ys, &[trs.to_vec()])
+}
+
+/// a w x h RGB image of modular frames, each with its transforms (all but the last saved as
+/// reference 0, not shown)
+fn jxl_modular_frames(xs: u32, ys: u32, frames: &[Vec<Tr>]) -> Vec<u8> {
     let mut w = Jw::new();
     jxl_head(&mut w, xs, ys);
-    jxl_frame(&mut w, JFT_REGULAR, 0, None, true, &done(s));
+    for (i, trs) in frames.iter().enumerate() {
+        let mut s = Jw::new();
+        jxl_modular(&mut s, trs);
+        jxl_frame(&mut w, JFT_REGULAR, 0, None, i + 1 == frames.len(), &done(s));
+    }
     done(w)
 }
 
@@ -464,7 +473,21 @@ pub fn run(only: Option<&str>) -> i32 {
         t.check("jxl_squeeze/control", r == 0 && w == 16 && h == 16, format!("two squeezes: result {r}, {w} x {h}"));
         let d = jxl_modular_file(1, 1, &sq_transforms(&vec![[1, 1, 0, 1]; 221 * 296]));
         t.refuse("jxl_squeeze/1x1", ERR_HDR, || jxl_dec(&d, 0).0);
-        // (a palette's meta channel has no shift to count: that path stays open for now)
+        // a palette's meta channel has no shift to count: the channel moves are (56 s before),
+        // over all frames of the decode
+        let meta = |steps: usize| {
+            let mut trs = vec![Tr::Pal(1, 0)];
+            trs.extend(sq_transforms(&vec![[1, 1, 0, 1]; steps]));
+            trs
+        };
+        let (r, w, h) = jxl_dec(&jxl_modular_file(1, 1, &meta(1000)), 0);
+        t.check("jxl_squeeze/meta_1000", r == 0 && w == 1 && h == 1, format!("1000 steps on the meta channel: result {r}, {w} x {h}"));
+        let d = jxl_modular_file(1, 1, &meta(220 * 296));
+        t.refuse("jxl_squeeze/meta", ERR_LIMIT, || jxl_dec(&d, 0).0);
+        let (r, w, h) = jxl_dec(&jxl_modular_frames(1, 1, &[meta(4000)]), 0);
+        t.check("jxl_squeeze/frames_1", r == 0 && w == 1 && h == 1, format!("one frame of 4000 steps: result {r}, {w} x {h}"));
+        let d = jxl_modular_frames(1, 1, &vec![meta(4000); 6]);
+        t.refuse("jxl_squeeze/frames_6", ERR_LIMIT, || jxl_dec(&d, 0).0);
     }
 
     // 4: the spline draw cache of a 2^30 rows high frame (no blobs)

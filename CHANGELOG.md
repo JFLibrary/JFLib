@@ -35,6 +35,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** `ui::dock_float_id(area, win, k)`: the window id of a dock area's floating window `k` -- `area + 1 + k` in the main window as before, an id of its own hashed from area and window in any other. docs/GUIDE.md section 15
 - **build:** `build_rs.py test` honours `#!only windows linux ...` among a script's first five lines as `cargo jflib test` does: on the other targets the script is skipped and counted ("skipped: #!only"); the marker lint reports unknown system names
 - **tests:** plattest `--test alive` (this process, System / init, 0, a child before and after it ends), spelltest tests/window_gone.uis, docktest tests/windows.uis (a dock area of the same id in a second window), fontpicktest tests/picker.uis (Esc in the search box), viewtest tests/onlylinux.uis (`#!only`)
+- **img_jxl:** `modular::SqWork` / `SQ_WORK` and `frm::Jf::sq_work`: the squeeze budget of a decode, handed on from frame to frame (`modular::jm_decode` called alone has one of its own)
 
 ### Changed
 
@@ -70,6 +71,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** Esc in a text box inside the top popup closes the popup and gives the focus back to where it was when the popup opened, as Esc anywhere else in it does: in the font picker's search box it only took the focus away and left the family list open (the next click then closed it instead of opening it)
 - **ui:** A dock area of the same id in a second window floats its panels in windows of its own: both used the window ids `id + 1 ..`, and the second one took over the main window's floating windows ("window 501 begun twice in one pass")
 - **plat:** Android and macOS with std: `read` / `write` (Android) and `free` (macOS) declared with `void *` buffers as libc and std declare them (the clashing declarations warned); the workspace no longer lists the apps' style crates it never uses (`unused workspace dependency` on every target); iOS no longer warns of the unused `objc_msg_super`
+- **img_jxl:** Modular images: the squeeze steps of a decode may move at most 2^24 channel entries in all, over its frames and groups (each step's residuals go in as one block), beyond that `ERR_LIMIT`: steps on a palette's meta channel, which has no shift to count, inserted a channel each near the front of the list (74 KB took 56 s; now refused in about 0.3 s)
 
 ### Security
 

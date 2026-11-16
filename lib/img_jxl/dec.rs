@@ -16,7 +16,7 @@ use crate::bits::Jb;
 use crate::ent::je_read;
 use crate::frm::{ghdr_default, Jf, JCT_NONE, JCT_YCBCR, JFF_NOISE, JFF_PATCHES, JFF_SKIPDCSMOOTH, JFF_SPLINES, JFF_USEDC};
 use crate::hdr::{Jx, JCS_GRAY};
-use crate::modular::{jm_decode, jm_tree, Mi};
+use crate::modular::{jm_decode_in, jm_tree, Mi};
 
 /// jf.dbg bit: decode for the JPEG reconstruction (serial, unscaled DC, the quantized
 /// coefficients captured instead of pixels)  [jxl-plus]
@@ -124,7 +124,7 @@ fn xd_group_decode(jx: &Jx, jf: &Jf, rect: [u32; 4], jb: &mut Jb, mins: i32, max
     }
     let gtree = if jf.gtree.nodes.is_empty() { None } else { Some(&jf.gtree) };
     let gcode = jf.gcode.as_deref();
-    let r = jm_decode(jb, &mut gi, stream, 0xFF_FFFF, gtree, gcode, true, None);
+    let r = jm_decode_in(jb, &mut gi, stream, 0xFF_FFFF, gtree, gcode, true, None, &jf.sq_work);
     if r != 0 {
         return Err(r);
     }
@@ -204,7 +204,7 @@ fn xd_global(jx: &Jx, jf: &mut Jf, jb: &mut Jb) -> i32 {
     }
     let gtree = if jf.gtree.nodes.is_empty() { None } else { Some(&jf.gtree) };
     let gcode = jf.gcode.as_deref();
-    let r = jm_decode(jb, &mut full, 0, jf.gdim, gtree, gcode, false, Some(&mut jf.ghdr));
+    let r = jm_decode_in(jb, &mut full, 0, jf.gdim, gtree, gcode, false, Some(&mut jf.ghdr), &jf.sq_work);
     jf.full = Some(full);
     r
 }
