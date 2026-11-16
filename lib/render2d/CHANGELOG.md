@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- The CPU path (G6e1): a scene draws without a GPU through lib/gfx (`Scene::draw_cpu` into a `gfx::Surface`, `cpu_info`, `CpuInfo`, `set_cpu_single`) with the camera, the painter's order, the visible layers and the look of a frame on the GPU, highlights and the overlay included: entities found through the R-tree, every point placed relative to the view in f64 and clipped to a guard band before lib/gfx (exact at 1e7 and 1e-6 units per pixel), strokes as convex pieces adding up to the GPU's union (joins cut at the bisectors, else the union of both strips less their intersection), arcs within 1/128 px near the view, curves and fills as the GPU flattens them, dash patterns and hatches cut in f64 with the GPU's flat tones, text from its glyphs' outlines and bars below 7 px per em. The same bytes on every target, also in row bands on lib/gfx's parallel loop. A scene without a device (`Scene::new_cpu`) does everything but a GPU frame -- picking, snapping and highlighting included -- and is put on a renderer's device and taken off again (`attach`, `detach`, `attached`): the drawing survives a lost device. docs/RENDER2D.md section Der CPU-Weg
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

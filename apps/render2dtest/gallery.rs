@@ -636,6 +636,43 @@ pub const DASH_CASES: [(Cap, Join, f32); 6] = [(Cap::Butt, Join::Miter, 1.0), (C
 /// periods of the flat tone test (px): flat, mixed, exact
 pub const FLAT_PERIODS: [f32; 3] = [1.5, 3.0, 6.0];
 
+// ---------------------------------------------------------------- the CPU path (G6e1)
+
+/// the CPU path's image of a scene (rows of B, G, R, A as Off::read gives them): a target of w x h cleared to bg, the scene
+/// drawn over it by Scene::draw_cpu
+pub fn cpu_image(s: &mut Scene, w: u32, h: u32, bg: u32) -> Vec<u8> {
+    let mut sf = gfx::Surface::new(w as i32, h as i32, gfx::FMT_XRGB);
+    let mut dc = gfx::Dc::new(w as i32, h as i32);
+    dc.begin(&sf);
+    dc.clear(&mut sf, bg | 0xFF00_0000);
+    s.draw_cpu(&mut dc, &mut sf, [0, 0, w as i32, h as i32]);
+    let mut v = Vec::with_capacity((w * h * 4) as usize);
+    for y in 0..h as usize {
+        for p in sf.px[y * sf.stride as usize..][..w as usize * 4].chunks_exact(4) {
+            v.extend_from_slice(&[p[0], p[1], p[2], 255]);
+        }
+    }
+    v
+}
+
+/// a shot's scene without a device (Scene::new_cpu), drawn on the CPU
+pub fn cpu_shot(sh: &Shot) -> Result<Vec<u8>> {
+    let mut s = Scene::new_cpu();
+    s.set_camera(&sh.cam)?;
+    sh.build(&mut s)?;
+    Ok(cpu_image(&mut s, sh.w, sh.h, BG))
+}
+
+/// FNV-1a over bytes (the CPU path's images: the same hash on every target)
+pub fn fnv(h: u64, b: &[u8]) -> u64 {
+    let mut h = h;
+    for &x in b {
+        h ^= x as u64;
+        h = h.wrapping_mul(0x0100_0000_01b3);
+    }
+    h
+}
+
 // ---------------------------------------------------------------- large coordinates
 
 pub const FAR_POINTS: [[f64; 2]; 3] = [[1.0e7, 1.0e7], [-9_999_999.5, 3_141_592.653_589_793], [9_876_543.210_987, -9_999_000.0]];

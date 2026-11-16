@@ -1032,7 +1032,9 @@ dependencies = [
 name = "jflib-render2d"
 version = "0.2.1"
 dependencies = [
+ "jflib-gfx",
  "jflib-gpu",
+ "jflib-rt",
  "jflib-text",
  "jflib-text-shape",
 ]

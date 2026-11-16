@@ -89,6 +89,12 @@ Visibility runs in compute shaders that keep the painter's order and write the i
 level `Voll` one multi-draw draws every visible layer, on `Basis` there is one indirect draw per
 layer.
 
+Without a GPU the same scene is drawn on the CPU through [`jflib-gfx`](https://crates.io/crates/jflib-gfx)
+(`Scene::new_cpu`, `Scene::draw_cpu`): the same painter's order, look, highlights and overlay, exact
+area coverage from its rasterizer, the same bytes on every target, in row bands on the worker pool
+where the UI sets one. A scene made without a device can be put on one later (`attach`) and taken
+off again when the device is lost (`detach`): the drawing stays.
+
 ## Platforms and getting it
 
 The same WGSL shaders run on every path: compiled ahead to SPIR-V for Vulkan and Metal, and handed
@@ -96,7 +102,7 @@ to WebGPU as text in the browser. It has been tested on Vulkan under Windows and
 and Intel GPUs, and on WebGPU in Chromium; Android and Apple's Metal have not been tested yet.
 Inside a window it is the content of a `ui.gpu_view` of
 [`jflib-ui`](https://crates.io/crates/jflib-ui): the app connects the two with a `GpuContent` of
-its own. Text, selection and DXF import are not part of it yet.
+its own. DXF import is not part of it yet.
 
 Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::render2d`. All of JFLib's crates share one

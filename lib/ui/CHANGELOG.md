@@ -31,6 +31,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Test scripts: `wheel S DY [DX] [fine|pixels]` (a horizontal turn, fine steps, a trackpad's
   pixels) and `keydown` / `keyup ... [char "c"|none] [dead]`; a script's keys have the US layout's
   characters.
+- `GpuContent::paints()` (default false): a view's content that paints itself on the CPU (render2d's CPU path) is painted wherever there is no device, also where a lost device left its last frame read back, which would otherwise stay whatever changes
 
 ### Changed
 

@@ -1,0 +1,5 @@
+#!args --test cpu
+# G6e1: the CPU path (Scene::draw_cpu through lib/gfx) against the GPU on every image of --dump, by category (pixels beyond 2
+# codes, the largest difference, the ink, each within its category's bounds); a scene without a device draws the same bytes as
+# the CPU path of the same scene on a device; row bands on lib/gfx's parallel loop the same bytes as one thread; a scene taken
+# off its device and attached to another renderer, or made without one and attached later, the same image on the GPU
