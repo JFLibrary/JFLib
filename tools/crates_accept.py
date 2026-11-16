@@ -191,6 +191,11 @@ def forget_changed(out, crates, target_dirs):
             for f in fp.iterdir():
                 if f.name.rsplit("-", 1)[0] in changed:
                     shutil.rmtree(f, ignore_errors=True)
+        # newer Cargo keeps every unit's fingerprint and output in <profile>/build/PACKAGE/HASH
+        for b in (f for pat in ("*/build", "*/*/build", "*/*/*/build") for f in d.glob(pat)):
+            for f in b.iterdir():
+                if f.is_dir() and f.name in changed:
+                    shutil.rmtree(f, ignore_errors=True)
     stamp.write_text(json.dumps(new, indent=1, sort_keys=True), encoding="utf-8")
     return changed
 
