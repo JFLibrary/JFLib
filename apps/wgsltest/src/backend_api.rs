@@ -67,6 +67,15 @@ fn main(@builtin(local_invocation_index) i: u32) {
 pub fn run(t: &mut T) {
     let voll = CompileOptions::new(shader::VOLL);
     let basis = CompileOptions::new(shader::BASIS);
+    // an override-sized workgroup array compiled with the defaults (specialized later): its
+    // length is max(n, 1) as specialization constant operations, so a 0 or a negative n set
+    // then is no empty array and the robust clamp to length - 1 still bounds the index
+    let src = "override n: i32 = 0;\nvar<workgroup> a: array<u32, n>;\n@compute @workgroup_size(1) fn main(@builtin(local_invocation_index) i: u32) { a[i] = i; }";
+    if let Some(o) = compile(t, "override array with a default of 0", src, &voll) {
+        let w = &o.entries[0].words;
+        t.check("override array: its length is max(n, 1) (OpSpecConstantOp SLessThan + Select)", count_op(w, op::SpecConstantOp) >= 2);
+        t.check("override array: the module validates", shader::val::validate(w).is_ok());
+    }
     // what the benchmark shaders report
     if let Some(o) = compile(t, "cull", wgsl::bench::CULL, &voll) {
         let e = &o.entries[0];

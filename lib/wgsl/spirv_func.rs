@@ -343,7 +343,7 @@ impl<'g, 'a> Fx<'g, 'a> {
                 }
                 ArrayCount::Override(o) => {
                     if robust {
-                        let n = self.g.override_value(o);
+                        let n = self.g.array_len_override(o);
                         let n = if self.scalar(m.overrides[o as usize].ty) == Scalar::I32 {
                             let u = self.g.b.ty_u32();
                             self.g.b.bitcast(u, n)
@@ -1543,7 +1543,7 @@ fn zero_memory(fx: &mut Fx, var: Id, t: TypeId) {
         Type::Array { elem, count: ArrayCount::Override(_) | ArrayCount::Expr(_), .. } => {
             let n = match *m.ty(t) {
                 Type::Array { count: ArrayCount::Override(o), .. } => {
-                    let v = fx.g.override_value(o);
+                    let v = fx.g.array_len_override(o);
                     if fx.scalar(m.overrides[o as usize].ty) == Scalar::I32 {
                         let u = fx.g.b.ty_u32();
                         fx.g.b.bitcast(u, v)

@@ -151,6 +151,10 @@ pub(crate) struct Bx<'a> {
     pub data: &'a [u8],
     pub primary: u32, // pitm item id (0 = no pitm)
     pub items: Vec<Item>,
+    // (id, index) of every item, sorted: find in log time -- the boxes after iinf look each of
+    // their entries up, and a linear search was O(items x entries) when they were not in
+    // iinf's order
+    by_id: Vec<(u32, u32)>,
     pub exts: Vec<(u64, u64)>, // {offset, length}
     pub props: Vec<Prop>,      // ipma indices 1..len
     pub assoc: Vec<u32>,       // property index (1-based, 0 = none) | essential << 31
@@ -252,6 +256,7 @@ impl<'a> Bx<'a> {
             data,
             primary: 0,
             items: Vec::new(),
+            by_id: Vec::new(),
             exts: Vec::new(),
             props: Vec::new(),
             assoc: Vec::new(),
@@ -322,6 +327,8 @@ impl<'a> Bx<'a> {
         if r != 0 {
             return Err(r);
         }
+        bx.by_id = bx.items.iter().enumerate().map(|(k, it)| (it.id, k as u32)).collect();
+        bx.by_id.sort_unstable();
         // pitm: version 0 u16, else u32
         let (s, e) = ch[CH_PITM];
         if s != 0 && s + 6 <= e {
@@ -359,9 +366,10 @@ impl<'a> Bx<'a> {
 
     /// isobmff_find: index of the (first) item with that id or -1
     pub fn find(&self, id: u32) -> i32 {
-        match self.items.iter().position(|it| it.id == id) {
-            Some(k) => k as i32,
-            None => -1,
+        let at = self.by_id.partition_point(|&(i, _)| i < id);
+        match self.by_id.get(at) {
+            Some(&(i, k)) if i == id => k as i32,
+            _ => -1,
         }
     }
 

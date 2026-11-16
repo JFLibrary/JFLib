@@ -178,6 +178,13 @@ fn speller(t: &mut T) {
     let text = "Tüür-Haus-Tag E-Mial E-Mail-Adr.";
     let bad: Vec<&str> = sp.misspelled(text).iter().map(|&(a, b)| &text[a..b]).collect();
     t.check(bad == ["Tüür", "E-Mial", "Adr"], &format!("misspelled() of hyphenated words = {:?}", bad));
+    // a word of 3000 parts: runs of at most 8 parts are tried (every run to the end was
+    // quadratic: 4.5 million checks)
+    let long = alloc::vec!["Haus"; 3000].join("-") + "-Hasu";
+    let t0 = plat::time_us();
+    let bad: Vec<&str> = sp.misspelled(&long).iter().map(|&(a, b)| &long[a..b]).collect();
+    let ms = (plat::time_us() - t0) / 1000;
+    t.check(bad == ["Hasu"] && ms < 2000, &format!("misspelled() of a word of 3001 parts: {:?} in {ms} ms", bad));
 }
 
 // ------------------------------------------------------------------ small dictionaries

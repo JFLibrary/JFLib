@@ -6,6 +6,9 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+// parts of a hyphenated word that token_errors tries as one word ("E-Mail-Adresse": 3)
+const RUN_MAX: usize = 8;
+
 use crate::check::{captype, lower, title, Cap};
 use crate::token::Token;
 use crate::Dictionary;
@@ -338,7 +341,9 @@ impl Speller {
         let mut out: Vec<(usize, usize)> = Vec::new();
         let mut i = 0;
         while i < parts.len() {
-            let mut j = parts.len();
+            // a run of at most RUN_MAX parts: trying every run to the end was quadratic in
+            // the parts (a word of 1000 parts: 500 000 dictionary checks in the UI thread)
+            let mut j = parts.len().min(i + RUN_MAX);
             let mut found = false;
             while j > i {
                 let (s, e) = (parts[i].0, parts[j - 1].1);

@@ -122,6 +122,7 @@ fn selftest() -> i32 {
     clip_test(&mut t, bg.0, FMT_PARGB);
     clip_test(&mut t, bg.1, FMT_A8);
     big_ellipse_test(&mut t);
+    flat_budget_test(&mut t);
     if t.fails == 0 {
         out("selftest: all checks passed\n");
         0
@@ -150,6 +151,29 @@ fn big_ellipse_test(t: &mut T) {
     t.dc.end();
     if worst > 0.002 {
         err(&format!("ellipse: a large circle is {:.1} % off its radius\n", worst * 100.0));
+        t.fails += 1;
+    }
+}
+
+// ---- PData: 4000 tight cubics (up to 1000 points each) flatten to the walk's budget of 2^20
+// points, the cubics past it are chords, and the path still ends at the last end point (silent
+// when it passes)
+
+fn flat_budget_test(t: &mut T) {
+    let mut pd = gfx::pathdata::PData::new();
+    pd.move_to(0.0, 0.0);
+    for i in 0..4000 {
+        let x = i as f64;
+        pd.cubic(&[x + 1e6, 1e6, x - 1e6, -1e6, x + 1.0, 0.0]);
+    }
+    let sf = Surface::new(16, 16, FMT_PARGB);
+    t.dc.begin(&sf);
+    t.path.begin(&t.dc);
+    pd.emit(&mut t.path, None);
+    let (n, last) = (t.path.pts_mut().len(), t.path.pts_mut().last().copied());
+    t.dc.end();
+    if n > (1 << 20) + 4000 + 4 || last != Some((4000.0, 0.0)) {
+        err(&format!("pathdata: 4000 tight cubics made {n} points, the last {last:?}\n"));
         t.fails += 1;
     }
 }

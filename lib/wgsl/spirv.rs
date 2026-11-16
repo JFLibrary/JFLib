@@ -363,6 +363,8 @@ pub(crate) struct Gen<'a> {
     pub globals: BTreeMap<u32, GVar>,
     over: BTreeMap<u32, Id>,
     hidden: BTreeMap<ExprId, Id>,
+    /// array_len_override's lengths
+    alen: BTreeMap<u32, Id>,
     /// the override values: substituted (subst) or the specialization constants' defaults
     pub values: Vec<Option<Value>>,
     pub subst: bool,
@@ -397,6 +399,7 @@ impl<'a> Gen<'a> {
             globals: BTreeMap::new(),
             over: BTreeMap::new(),
             hidden: BTreeMap::new(),
+            alen: BTreeMap::new(),
             values,
             subst,
             spec: Vec::new(),
@@ -566,7 +569,7 @@ impl<'a> Gen<'a> {
                     }
                     ArrayCount::Runtime => self.b.ty_runtime_array(e, Some(stride)),
                     ArrayCount::Override(o) => {
-                        let len = self.override_value(o);
+                        let len = self.array_len_override(o);
                         self.b.ty_array_id(e, len)
                     }
                     ArrayCount::Expr(x) => {
@@ -724,6 +727,32 @@ impl<'a> Gen<'a> {
             id
         };
         self.over.insert(o, id);
+        id
+    }
+
+    /// the length of an array sized by override o (its type: u32 or i32), at least 1.  The
+    /// pipeline checks refuse a length <= 0 when they see the value, but a module compiled with
+    /// the defaults is specialized later by its specialization constants: 0 there declared an
+    /// empty array, and the robust index clamp to length - 1 let every index through
+    pub fn array_len_override(&mut self, o: u32) -> Id {
+        if let Some(&id) = self.alen.get(&o) {
+            return id;
+        }
+        let n = self.override_value(o);
+        let id = if self.subst {
+            n // a constant override_values checked (> 0)
+        } else {
+            let signed = scalar_of(self.m, self.m.overrides[o as usize].ty) == Scalar::I32;
+            let (t, one, less) = if signed {
+                (self.b.ty_i32(), self.b.const_i32(1), shader::op::SLessThan)
+            } else {
+                (self.b.ty_u32(), self.b.const_u32(1), shader::op::ULessThan)
+            };
+            let bt = self.b.ty_bool();
+            let lt = self.b.spec_op(bt, less, &[n, one], &[]);
+            self.b.spec_op(t, shader::op::Select, &[lt, one, n], &[])
+        };
+        self.alen.insert(o, id);
         id
     }
 

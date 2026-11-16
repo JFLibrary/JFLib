@@ -151,6 +151,29 @@ pub fn run(t: &mut T) {
     t.check("shift by 32: Err", reflect::constant_values(&one_op(op::ShiftLeftLogical, 32), &[]).is_err());
     t.check("shift by 31: Ok", reflect::constant_values(&one_op(op::ShiftLeftLogical, 31), &[]).is_ok());
     t.check("FAdd (no Shader operation): Err", reflect::constant_values(&one_op(op::FAdd, 1), &[]).is_err());
+    // modules whose constants would take any amount of memory or time: refused quickly
+    let t0 = plat::time_us();
+    let mut m = Module::new(3);
+    let (u, c) = (m.ty_u32(), m.const_u32(1));
+    let (mut ty, mut v) = (u, c);
+    for _ in 0..8 {
+        ty = m.ty_array(ty, 16); // composites of composites: 16^8 words
+        v = m.const_composite(ty, &[v; 16]);
+    }
+    t.check("16^8 words of nested composites: Err", reflect::constant_values(&m.finish(), &[]).is_err());
+    let mut m = Module::new(3);
+    let u = m.ty_u32();
+    let big = m.ty_array(u, 1 << 30);
+    m.const_null(big);
+    t.check("ConstantNull of 2^30 words: Err", reflect::constant_values(&m.finish(), &[]).is_err());
+    let mut m = Module::new(3);
+    let mut s = m.ty_u32();
+    for _ in 0..48 {
+        s = m.ty_struct(&[s, s]); // measured member by member this was 2^48 steps
+    }
+    m.const_null(s);
+    t.check("ConstantNull of 48 nested structs of two: Err", reflect::constant_values(&m.finish(), &[]).is_err());
+    t.check("... all three within a second", plat::time_us() - t0 < 1_000_000);
     // half conversions
     for (x, h) in [(1.0f32, 0x3c00u16), (-2.0, 0xc000), (65504.0, 0x7bff), (65520.0, 0x7c00), (5.960_464_5e-8, 0x0001),
                    (2.980_232_2e-8, 0x0000), (8.940_697e-8, 0x0002), (-0.0, 0x8000), (f32::INFINITY, 0x7c00),
