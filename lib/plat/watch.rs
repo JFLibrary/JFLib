@@ -654,7 +654,8 @@ mod imp {
         #[link(name = "System")]
         unsafe extern "C" {
             #[cfg_attr(all(target_os = "macos", target_arch = "x86_64"), link_name = "realpath$DARWIN_EXTSN")] fn realpath(path: *const u8, out: *mut u8) -> *mut u8;
-            fn free(p: *mut u8);
+            // (`void *` as libc and std declare it: with std both link the same symbol)
+            fn free(p: *mut core::ffi::c_void);
         }
         let z: Vec<u8> = p.bytes().chain(core::iter::once(0)).collect();
         // SAFETY: a NUL-terminated path; realpath mallocs the answer, freed below.
@@ -668,7 +669,7 @@ mod imp {
                 n += 1;
             }
             let s = String::from_utf8_lossy(core::slice::from_raw_parts(r, n)).into_owned();
-            free(r);
+            free(r.cast());
             Some(s)
         }
     }
