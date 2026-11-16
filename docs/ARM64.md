@@ -742,6 +742,10 @@ sich als Wartezeit von 10 s, die abläuft. Geprüft wird:
 |---|---|---|---|---|---|---|
 | Mac mini M2 (macOS 27.2, 8 Kerne), `--scale 4` | LSE (inline, wie gebaut) | 20 min | 1114 | 0 | 660 + 450 Prüfungen, 0 Fehler | 89 054 742 / 32 von 89 Mio. Runden, 1 131 751 von 223 Mio. Kopien |
 | | LL/SC (`-lse` gebaut) | 20 min | 1388 | 0 | 660 + 450, 0 Fehler | 35 924 024 / 73 von 111 Mio., 1 404 209 von 278 Mio. |
+| `ubuntu-24.04-arm` (Neoverse N2, 4 Kerne, Kernel 7.0) | LSE (Outline-Atomics, `AT_HWCAP`) | 15 min | 2445 | 0 | 660 + 455, 0 Fehler | 25 836 952 / 531 749 von 48,9 Mio., 94 310 009 von 122 Mio. |
+| | LL/SC (`jfgui_ARM_LLSC=1`) | 15 min | 2209 | 0 | 660 + 455, 0 Fehler | 8 003 693 / 517 050 von 44,2 Mio., 85 424 769 von 110 Mio. |
+| `windows-11-arm` (Cobalt 100, 4 Kerne) | LL/SC (inline, wie gebaut) | 15 min | 3572 | 0 | 660 + 450, 0 Fehler | 18 078 404 / 921 537 von 71,4 Mio., 135 878 573 von 179 Mio. |
+| | LSE (`+lse` gebaut) | 15 min | 3676 | 0 | 654 von 660 (eine Zeitprüfung, unten) + 450 | 44 418 054 / 951 657 von 73,5 Mio., 139 757 050 von 184 Mio. |
 Was ein Durchgang auf dem M2 in 20 min mit LSE bewegte: 713 Mio. Sperren je mit `SpinLock` und `Mutex`, 232 Mio. mit `RwLock`, 89 Mio.
 Items durch die Condvar-Warteschlange, 125 Mio. Nachrichten über `channel`, 22 Mio. Übergaben per `Sem`, 859 Mio. Items von
 `parallel_for` und 229 Mio. eines `Job`, 53 Mio. Heap-Blöcke zwischen Threads, 624 Mio. Ereignisse, 3,6 Mrd. Audio-Samples, je 89 Mio.
@@ -751,6 +755,16 @@ mit Relaxed selten (32 und 73 Runden), zerrissene Kopien eines Seqlocks ohne Fen
 alles bei 0. Nebenbei: Auf dem M2 war LL/SC nicht langsamer, mit LL/SC liefen 25 % mehr Durchgänge (die `SpinLock` doppelt so schnell,
 `Mutex` langsamer); ob Windows ARM64 `+lse` bekommen soll, entscheidet das nicht.
 
+Die Runner (Workflow `arm64-atomics.yml`, Run 43977942938, Programme mit rustc 1.98.1 auf `windows-latest` gebaut) ordnen noch stärker um:
+Message Passing mit Relaxed in gut 1 % der Runden, zerrissene Seqlock-Kopien ohne Fences in 77 %. Store Buffering mit Release/Acquire
+sahen sie nie: Für ARMv8.0 übersetzt Rust einen Acquire-Load als `ldar`, und `stlr` → `ldar` bleibt in Ordnung; der Mac nimmt `ldapr`
+(RCpc), dort ist es erlaubt und kommt vor. Rot war nur `plattest --test threads` mit dem `+lse`-Bau unter Windows, 6-mal von 20 dieselbe
+Zeitprüfung: `Sem::wait(50)` muss nach 40 ms bis 3 s enden. Das ist `WaitForSingleObject` gegen `QueryPerformanceCounter`, keine
+Atomics; Windows darf ein Warten um bis zu einen Timer-Tick zu früh beenden (15,6 ms beim Standardtakt, auf dem Entwicklungsrechner
+dauerte es 61,6 ms). Die Grenze ist jetzt 33 ms, und ein Fehlschlag nennt die Zeit. Derselbe Push ließ auch `arm64-windows.yml` laufen
+(Run 43977942326): 56 von 57, darunter `atomics.uis` (0,3 s), `pen.uis`, `touch.uis` und `guard.uis`; rot nur `screen.uis`, wie seit ARM0
+am Runner (die Windows-Einrichtung, Grau `8a898a`, liegt über dem Bildschirm).
+
 Unter x86-64 (Windows, Linux in WSL) ist `--test atomics` in 1,5 bis 15 s grün (je nach Last); die SB-Kontrolle mit Relaxed sieht auch
 dort Umordnungen (136 bis 526 von 20 000 Runden), MP und der Seqlock ohne Fences nicht (TSO).
 
@@ -759,6 +773,18 @@ dort Umordnungen (136 bis 526 von 20 000 Runden), MP und der Seqlock ohne Fences
 `stlr`, einen SeqCst-Load als `ldar`; ARMv8 verbietet, dass das `ldar` vor dem `stlr` wirkt, QEMU setzt dazwischen keine
 Store→Load-Barriere. Das ist ein Fehler von QEMU, kein Fehler im Code (auf echter Hardware 0, siehe oben); die Variante mit
 Read-Modify-Writes, die der Pool nutzt, besteht auch unter QEMU. Unter „Fallen“ nachgetragen.
+
+**x86-64:** Auf x86-64 sind Acquire-Loads und Release-Stores dieselben `mov` wie Relaxed, SeqCst ist nirgends dazugekommen. Release-Bau
+für Windows, Basis `7c44e9cf` und dieser Stand nacheinander aus demselben Ordner: `coretest` Byte für Byte gleich bis auf den
+Zeitstempel. In `gallery` ordnet LLVM genau eine Funktion anders an, die Liste der Monitore mit dem eingebetteten `monitor_dpi`, dessen
+Zeiger auf `GetDpiForMonitor` jetzt mit Acquire gelesen wird; ihr seltener Rückweg (`GetDC`, `GetDeviceCaps`) liegt nun im Rumpf,
+`.text` ist 32 Bytes kürzer. Sonst ist das Programm gleich (Disassembly mit herausgerechneten Adressen verglichen).
+
+Hier geprüft: `cargo check -p jflib` mit und ohne `std` für Windows, Linux, wasm32, Android, Linux ARM64 und Windows ARM64 (unter rustc
+1.100 warnt Android mit `std` vor den Deklarationen von `read` und `write` in `plat/android_host.rs`, schon vor ARM7);
+`build_rs.py check` mit Clippy, `gendoc --check --api`; `build_rs.py test asynctest` (4 von 4), `test coretest` für Windows, Linux
+und unter `qemu-aarch64`, `test plattest` für Windows und Linux 89 von 90 (rot `screen.uis` unter Windows in der Suite, allein 93 von 93
+grün: andere Fenster auf dem Desktop).
 
 ### ARM8: Fenster und GPU (M)
 

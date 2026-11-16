@@ -763,8 +763,10 @@ fn th_sem(t: &mut T) {
     let t0 = plat::time_us();
     let got = s.wait(50);
     let dt = plat::time_us() - t0;
-    t.check(!got && (40000..3000000).contains(&dt), "sem: wait(50 ms) on a zero count times out after about 50 ms");
-    t.info(&format!("  (took {dt} us)\n"));
+    // (Windows may end a wait up to one timer tick early, 15.6 ms at the default resolution: windows-11-arm)
+    let ok = !got && (33000..3000000).contains(&dt);
+    t.check(ok, "sem: wait(50 ms) on a zero count times out after about 50 ms");
+    if ok { t.info(&format!("  (took {dt} us)\n")) } else { out(&format!("  (got {got}, took {dt} us)\n")) }
     // counting
     s.post(2);
     let (a, b, c) = (s.wait(0), s.wait(0), s.wait(0));
