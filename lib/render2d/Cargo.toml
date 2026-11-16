@@ -19,6 +19,10 @@ workspace = true
 
 [dependencies]
 gpu.workspace = true
+# the CPU path (G6e1): the scene drawn through lib/gfx's rasterizer without a device
+gfx.workspace = true
+# (its row bands on lib/gfx's parallel loop: a spin lock per band)
+rt.workspace = true
 # fonts (outlines, metrics) and shaping (HarfRust, bidi) for text (G6c)
 text.workspace = true
 text_shape.workspace = true

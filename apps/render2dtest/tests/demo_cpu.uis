@@ -1,0 +1,31 @@
+#!args --demo --no-gpu
+# the demo without a device (G6e1): --no-gpu sets jfgui_GPU=0, so the view paints its scene through the CPU path (Scene::draw_cpu, a scene
+# made without a device); the same script as demo.uis, the same places: the red line through x = 0 (9 px wide, at x 360),
+# the blue one through y = 50 (5 px, at y 222); a window selects (blue, grips), Esc clears, the line under the pointer
+# orange, the wheel zooms at the pointer, a click picks.  Picking, snapping and highlighting work without a device
+wait 600
+expect pixel 358 300 #D02020
+expect pixel 600 222 #2040C0
+expect pixel 385 288 #7C9F8A
+drag 300,278 420,306
+wait 200
+expect pixel 385 288 #618FD7
+expect pixel 400 291 #1E64FF
+key esc
+wait 200
+expect pixel 385 288 #7C9F8A
+drag 358,300 458,300 middle
+wait 200
+expect pixel 458 400 #F97F1B
+wheel 458,300 120
+wait 200
+expect pixel 458 400 #F97F1B
+expect pixel 600 207 #2040C0
+click 458,400
+wait 200
+move 650,470
+wait 200
+expect pixel 458 420 #4B53C7
+key esc
+wait 200
+expect pixel 458 420 #D02020

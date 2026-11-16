@@ -3,7 +3,9 @@
 // entity under it highlighted, a click picks (Shift: adds or takes away), a drag with the left button selects by a window
 // (to the right) or a crossing (to the left), grips on what is selected, Esc clears.  The connection to render2d lives
 // here, in the app (View2d, a GpuContent): lib/ui knows nothing of it, as with render3d (docs/RENDER2D.md "In der
-// Oberfläche").
+// Oberfläche").  G6e1: the scene is made without a device and lives on when the device goes (attach, detach); without one
+// (jfgui_GPU=0, no Vulkan or WebGPU, before the first frame, a lost device) the view paints it through the CPU path
+// (Scene::draw_cpu), picks, snaps and highlights as on the GPU.
 //
 //   render2dtest --demo           the demo (in the browser and on Android the app is this)
 //   render2dtest --test window    a real window (once): the demo, a pan and a zoom through the same functions the
@@ -13,7 +15,7 @@
 use alloc::format;
 use alloc::rc::Rc;
 use alloc::vec::Vec;
-use core::cell::RefCell;
+use core::cell::{Cell, RefCell};
 
 use gpu::{ColorAttachment, CommandEncoder, Device, GpuError, Load, SubmitId};
 use render2d::{Camera, Cap, EntityId, Grip, Join, Layer, Region, Renderer, RendererDesc, Scene, SelectMode, Shape, SnapKind, SnapOptions, Space, Style, Unit};
@@ -27,21 +29,24 @@ pub const PICK_PX: f64 = 3.0;
 pub const VIEW_ID: u32 = 900;
 /// the view's background (sRGB codes)
 pub const PAPER: u32 = 0xFFF4_F1EA;
-/// what View2d paints without a device
-const NO_DEVICE: u32 = 0xFF55_5A60;
 /// the window and where the view lies in it (below a title row)
 pub const DESC: AppDesc = AppDesc { title: "render2dtest", flags: AF_RESIZABLE | AF_GPU_3D, w: 720, h: 512, min_w: 200, min_h: 150, ..AppDesc::NONE };
 pub const TOP: i32 = 32;
 
-/// the demo's view: a Renderer and a Scene on the device lib/ui hands over, and the camera
+/// the demo's view: the scene (made without a device; on the device lib/ui hands over while there is one, with a Renderer
+/// there), and the camera
 pub struct View2d {
     pub cam: Camera,
     pub size: (u32, u32),
     pub dev: Option<Device>,
     pub r: Option<Renderer>,
-    pub s: Option<Scene>,
+    /// (a RefCell: GpuContent::paint has &self, the CPU path needs the scene mutable: its index, text's decided scale)
+    pub s: RefCell<Scene>,
     pub draws: u32,
     pub attaches: u32,
+    /// (G6e1) frames painted on the CPU, the last one's time (us)
+    pub paints: Cell<u32>,
+    pub paint_us: Cell<u64>,
     // ---- G6d
     /// the pointer over the view (px), the snap there, the entity under it, what is selected, a selection box's first corner
     pub pointer: Option<[f64; 2]>,
@@ -53,15 +58,18 @@ pub struct View2d {
 
 impl View2d {
     pub fn new() -> Rc<RefCell<View2d>> {
-        Rc::new(RefCell::new(View2d { cam: Camera::new([0.0, 0.0], 1.0), size: (0, 0), dev: None, r: None, s: None, draws: 0, attaches: 0, pointer: None, snap: None, hover: None,
-                                      selected: Vec::new(), boxa: None }))
+        let mut s = Scene::new_cpu();
+        // (the drawing's values are all valid: fill refuses none of them)
+        let _ = fill(&mut s);
+        Rc::new(RefCell::new(View2d { cam: Camera::new([0.0, 0.0], 1.0), size: (0, 0), dev: None, r: None, s: RefCell::new(s), draws: 0, attaches: 0, paints: Cell::new(0), paint_us: Cell::new(0),
+                                      pointer: None, snap: None, hover: None, selected: Vec::new(), boxa: None }))
     }
 
     /// (G6d) the pointer moved (px of the view; None: it left): the snap and the entity under it, their highlight
     pub fn hover_at(&mut self, at: Option<[f64; 2]>) {
         self.pointer = at;
         let (cam, size) = (self.cam, self.size);
-        let Some(s) = self.s.as_mut() else { return };
+        let s = self.s.get_mut();
         let _ = s.set_camera(&cam);
         let (snap, hover) = match at {
             Some(q) if size.0 > 0 => {
@@ -88,7 +96,7 @@ impl View2d {
     /// there: the selection cleared (not with Shift)
     pub fn click(&mut self, q: [f64; 2], add: bool) {
         let (cam, size) = (self.cam, self.size);
-        let Some(s) = self.s.as_mut() else { return };
+        let s = self.s.get_mut();
         let _ = s.set_camera(&cam);
         let hit = s.pick(cam.to_drawing(q, size), PICK_PX).first().map(|h| h.target.entity);
         let mut sel = if add { self.selected.clone() } else { Vec::new() };
@@ -105,7 +113,7 @@ impl View2d {
     /// (G6d) a selection box from a to b (px of the view): a window to the right, a crossing to the left
     pub fn select_box(&mut self, a: [f64; 2], b: [f64; 2], add: bool) {
         let (cam, size) = (self.cam, self.size);
-        let Some(s) = self.s.as_mut() else { return };
+        let s = self.s.get_mut();
         let _ = s.set_camera(&cam);
         let corners = [cam.to_drawing(a, size), cam.to_drawing([b[0], a[1]], size), cam.to_drawing(b, size), cam.to_drawing([a[0], b[1]], size)];
         let mode = if render2d::box_is_window(a, b) { SelectMode::Window } else { SelectMode::Crossing };
@@ -121,7 +129,7 @@ impl View2d {
 
     /// (G6d) what is selected now: the highlights follow (the hover stays on top)
     pub fn select_set(&mut self, sel: Vec<EntityId>) {
-        let Some(s) = self.s.as_mut() else { return };
+        let s = self.s.get_mut();
         for &old in &self.selected {
             if !sel.contains(&old) {
                 let b = s.highlight(old) & !render2d::HL_SELECTED;
@@ -137,11 +145,10 @@ impl View2d {
 
     /// (G6d) the overlay of this frame: the selection box, the selection's grips (hovered under the pointer), the snap's
     /// marker
-    fn overlay(&mut self) {
+    fn overlay(&self, s: &mut Scene) {
         let (pointer, boxa, snap) = (self.pointer, self.boxa, self.snap);
         let (cam, size) = (self.cam, self.size);
         let sel = self.selected.clone();
-        let Some(s) = self.s.as_mut() else { return };
         let mut grips: Vec<([f64; 2], Grip)> = Vec::new();
         for id in sel {
             for g in s.grip_points(id) {
@@ -250,17 +257,16 @@ pub fn fill(s: &mut Scene) -> gpu::Result<()> {
 impl GpuContent for View2d {
     fn attach(&mut self, dev: &Device) -> gpu::Result<()> {
         let r = Renderer::new(dev, &RendererDesc::new(GPU_VIEW_FORMAT))?;
-        let mut s = Scene::new(&r)?;
-        fill(&mut s)?;
+        // (the scene and what is selected stay: on the device everything goes up with the first frame)
+        self.s.get_mut().attach(&r)?;
         self.r = Some(r);
-        self.s = Some(s);
         self.dev = Some(dev.clone());
         self.attaches += 1;
         Ok(())
     }
 
     fn detach(&mut self) {
-        self.s = None;
+        self.s.get_mut().detach();
         self.r = None;
         self.dev = None;
     }
@@ -268,26 +274,40 @@ impl GpuContent for View2d {
     fn draw<'a>(&'a mut self, e: &mut CommandEncoder<'a>, target: ColorAttachment<'a>, size: (u32, u32)) -> gpu::Result<()> {
         {
             self.size = size;
-            self.overlay();
-            let (Some(r), Some(s)) = (self.r.as_mut(), self.s.as_mut()) else { return Err(GpuError::Invalid("View2d: not attached")) };
-            s.set_camera(&self.cam)?;
+            self.overlay(&mut self.s.borrow_mut());
+            let cam = self.cam;
+            let (Some(r), s) = (self.r.as_mut(), self.s.get_mut()) else { return Err(GpuError::Invalid("View2d: not attached")) };
+            s.set_camera(&cam)?;
             s.prepare(r, size)?;
         }
         self.draws += 1;
-        let me: &'a View2d = self;
-        let (Some(r), Some(s)) = (me.r.as_ref(), me.s.as_ref()) else { return Err(GpuError::Invalid("View2d: not attached")) };
+        let me: &'a mut View2d = self;
+        let (Some(r), s) = (me.r.as_ref(), me.s.get_mut()) else { return Err(GpuError::Invalid("View2d: not attached")) };
+        let s: &'a Scene = s;
         r.record(e, s, ColorAttachment { load: Load::Clear, clear: crate_clear(PAPER), ..target })
     }
 
     fn submitted(&mut self, id: SubmitId) {
-        if let Some(s) = self.s.as_mut() {
-            s.submitted(id);
-        }
+        self.s.get_mut().submitted(id);
     }
 
+    /// without a device: the same scene through the CPU path (paper, the drawing, the highlights and the overlay)
     fn paint(&self, g: &mut Gfx, r: [i32; 4]) {
-        g.dc.set_color(NO_DEVICE);
+        g.dc.set_color(PAPER);
         g.dc.fill(g.sf, r[0], r[1], r[2], r[3]);
+        let Ok(mut s) = self.s.try_borrow_mut() else { return };
+        if s.set_camera(&self.cam).is_err() {
+            return;
+        }
+        self.overlay(&mut s);
+        let t0 = plat::time_us();
+        s.draw_cpu(g.dc, g.sf, r);
+        self.paint_us.set(plat::time_us().saturating_sub(t0));
+        self.paints.set(self.paints.get() + 1);
+    }
+
+    fn paints(&self) -> bool {
+        true
     }
 }
 
@@ -343,6 +363,8 @@ impl App for Demo {
         ui.draw_text(12, 22, &format!("render2d: Mitte/rechts ziehen schiebt, Rad zoomt, Klick wählt, links ziehen: Fenster/Kreuzen (1 px = {:.3e} mm; {nsel} gewählt{})", c.scale,
                                       snap.map(|k| format!(", Fang {k:?}")).unwrap_or_default()), (13u32 << 16) | FONT_REG);
         let r = view_rect(w, h);
+        // (the view's size for the pointer's mapping: also without a device, where no frame tells it)
+        self.view.borrow_mut().size = (r[2].max(0) as u32, r[3].max(0) as u32);
         ui.next_rect_px(r[0], r[1], r[2], r[3]);
         let inp = ui.gpu_view(VIEW_ID, &self.view, self.ver).clone();
         // a drag with the middle or right button (a finger: any): the drawing follows the pointer; the wheel zooms at the
@@ -491,7 +513,7 @@ impl Demo {
         let (w, h) = v.size;
         let cam = v.cam;
         let View2d { dev, r, s, .. } = &mut *v;
-        let (dev, r, s) = (dev.clone()?, r.as_mut()?, s.as_mut()?);
+        let (dev, r, s) = (dev.clone()?, r.as_mut()?, s.get_mut());
         s.set_camera(&cam).ok()?;
         let mut off = crate::gallery::Off::new(&dev, w, h).ok()?;
         off.bg = PAPER;

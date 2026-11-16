@@ -44,6 +44,9 @@ mod hl;
 mod overlay;
 #[path = "pick.rs"]
 mod pick;
+#[path = "cpu.rs"]
+mod cpu;
+pub use cpu::CpuInfo;
 pub use hl::{HighlightInfo, HL_ALPHA, HL_HOVER, HL_HOVER_RGB, HL_SELECTED, HL_SELECTED_RGB};
 pub use overlay::{box_is_window, Grip, Overlay, OverlayInfo, Space, CROSSING_EDGE, CROSSING_FILL, GRIP_COLD, GRIP_EDGE, GRIP_HOT, GRIP_HOVER, GRIP_PX, MARKER_COLOR, MARKER_PX, MARKER_WIDTH, WINDOW_EDGE,
                   WINDOW_FILL};
@@ -1135,10 +1138,31 @@ fn held(l: &LayerSlot, at: u32, slot: u32) -> u32 {
     l.owners[at as usize..].iter().take_while(|&&o| o == slot).count() as u32
 }
 
-/// entities, layers, styles and the camera of one scene of a Renderer
+/// a scene's resource on its device: there while the scene is attached to a renderer (Scene::attach), none for a scene
+/// without a device (Scene::new_cpu, detach).  What reaches one checks Scene::attached first (prepare, record, wait_slot);
+/// the accessors for tests (pool_buffer and its kin) panic on a scene without a device
+pub(crate) struct Dv<T>(pub Option<T>);
+
+impl<T> core::ops::Deref for Dv<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        match &self.0 {
+            Some(v) => v,
+            None => panic!("render2d: a scene without a device has no GPU resources (Scene::attach first)"),
+        }
+    }
+}
+
+fn dv<T>(v: T) -> Dv<T> {
+    Dv(Some(v))
+}
+
+/// entities, layers, styles and the camera of one scene: on a Renderer's device, or without one (Scene::new_cpu; draw_cpu
+/// draws it through lib/gfx)
 pub struct Scene {
-    dev: Device,
-    pub(crate) tag: Arc<Tag>,
+    /// the device it is attached to and whose renderer (Scene::attach; none: a scene without a device, G6e1)
+    dev: Dv<Device>,
+    pub(crate) tag: Option<Arc<Tag>>,
     max_records: u32,
     max_entries: u32,
     /// the largest storage binding (bytes)
@@ -1154,11 +1178,11 @@ pub struct Scene {
     hatch_of: Vec<u32>,
     hatched: Vec<u32>,
     hatch_for: Option<(Camera, (u32, u32))>,
-    pub(crate) hatch_buf: Buffer,
+    pub(crate) hatch_buf: Dv<Buffer>,
     hatch_cap: u32,
     /// per record of the pool: a fill edge's segment in pixels (cull.wgsl count writes it, fill.wgsl reads it); one record's
     /// worth while no layer holds a fill
-    epx: Buffer,
+    epx: Dv<Buffer>,
     epx_cap: u32,
     /// the entities that are curves or fills (flattened per zoom band: prepare looks at them; dead or reused slots are
     /// skipped and dropped), and how many prepare flattened again
@@ -1180,27 +1204,27 @@ pub struct Scene {
     pub(crate) size: (u32, u32),
     culling: bool,
     pub(crate) stats_on: bool,
-    pub(crate) pool: Buffer,
+    pub(crate) pool: Dv<Buffer>,
     pool_cap: u32,
-    pub(crate) styles_buf: Buffer,
+    pub(crate) styles_buf: Dv<Buffer>,
     styles_cap: u32,
     /// per entry of the visibility: page, instance + 1, first | count << 16, epx offset (cull.wgsl einfo)
-    pub(crate) einfo_buf: Buffer,
-    masks: Buffer,
-    counts: Buffer,
-    offsets: Buffer,
+    pub(crate) einfo_buf: Dv<Buffer>,
+    masks: Dv<Buffer>,
+    counts: Dv<Buffer>,
+    offsets: Dv<Buffer>,
     entries_cap: u32,
-    pub(crate) layers_buf: Buffer,
-    pub(crate) lists_buf: Buffer,
-    pub(crate) draws_buf: Buffer,
+    pub(crate) layers_buf: Dv<Buffer>,
+    pub(crate) lists_buf: Dv<Buffer>,
+    pub(crate) draws_buf: Dv<Buffer>,
     layers_cap: u32,
-    visible: Buffer,
+    visible: Dv<Buffer>,
     visible_cap: u32,
     /// per place of the visible list: the instance of an insert's record there (G6b2; as large as `visible` while there are
     /// instances, else one word)
-    vinst: Buffer,
+    vinst: Dv<Buffer>,
     vinst_cap: u32,
-    pub(crate) view_ubo: Buffer,
+    pub(crate) view_ubo: Dv<Buffer>,
     pub(crate) groups: Option<Groups>,
     pub(crate) frames: Vec<FrameSlot>,
     pub(crate) ts: Option<Timestamps>,
@@ -1246,9 +1270,9 @@ pub struct Scene {
     /// instances whose words go up (first, count), or all of them
     inst_send: Vec<(u32, u32)>,
     inst_send_all: bool,
-    pub(crate) inst_buf: Buffer,
+    pub(crate) inst_buf: Dv<Buffer>,
     inst_cap: u32,
-    spaces: Buffer,
+    spaces: Dv<Buffer>,
     space_cap: u32,
     pub(crate) inst_count: u32,
     /// the hatch table's rows for instances (after the hatched styles'): (instance, style)
@@ -1272,7 +1296,7 @@ pub struct Scene {
     /// texts drawn as fills, texts that changed between glyphs and fills in the last prepare
     text_fills: u32,
     text_switched: u32,
-    pub(crate) gtab_buf: Buffer,
+    pub(crate) gtab_buf: Dv<Buffer>,
     gtab_cap: u32,
     pub(crate) atlas_tex: Option<Texture>,
     atlas_view: Option<TextureView>,
@@ -1296,6 +1320,8 @@ pub struct Scene {
     ov: overlay::Overlay,
     ov_info: overlay::OverlayInfo,
     pub(crate) ov_gpu: Option<overlay::OvGpu>,
+    // ---- the CPU path (G6e1; cpu.rs)
+    cpu: cpu::CpuState,
 }
 
 /// (G6c) a text on a layer as prepare looks at it (Scene::retext): its slot, pixels per em along its height and the map's
@@ -1360,20 +1386,24 @@ pub(crate) struct AtlasUp {
 }
 
 impl Scene {
+    /// a scene on a renderer's device (Scene::new_cpu, then attach)
     pub fn new(r: &Renderer) -> Result<Scene> {
-        let dev = r.dev.clone();
-        let none = BufferUsage::NONE;
-        let (entries_cap, layers_cap) = (64u32, 16u32);
-        let mut frames = Vec::new();
-        for _ in 0..r.desc.frames_in_flight {
-            frames.push(FrameSlot { stage: upload(&dev, VIEW_BYTES)?, changes: None, styles: None, hatch: None, scatter_group: None, runs: None, insts: None, readback: None, last: None, atlas: None,
-                                    gtab: None, hl: None, ov: None });
-        }
-        Ok(Scene {
-            tag: r.tag.clone(),
-            max_records: r.max_records,
-            max_entries: r.max_entries,
-            max_binding: r.dev.limits().max_storage_binding as u64,
+        let mut s = Scene::new_cpu();
+        s.attach(r)?;
+        Ok(s)
+    }
+
+    /// a scene without a device (G6e1): everything but a frame on the GPU works on it (entities, layers, styles, blocks,
+    /// text, picking, selection, snaps, highlights, the overlay), and draw_cpu draws it through lib/gfx.  attach puts it on
+    /// a renderer's device (all of it goes up with the next prepare), detach takes it off again (a lost device: the drawing
+    /// stays)
+    pub fn new_cpu() -> Scene {
+        Scene {
+            dev: Dv(None),
+            tag: None,
+            max_records: 1 << 29,
+            max_entries: 1 << 24,
+            max_binding: u64::MAX,
             styles: Vec::new(),
             styles_dirty: false,
             px_dash: false,
@@ -1381,9 +1411,9 @@ impl Scene {
             hatch_of: Vec::new(),
             hatched: Vec::new(),
             hatch_for: None,
-            hatch_buf: storage(&dev, HATCH_BYTES, none)?,
+            hatch_buf: Dv(None),
             hatch_cap: 1,
-            epx: storage(&dev, 16, none)?,
+            epx: Dv(None),
             epx_cap: 1,
             curves: Vec::new(),
             curves_dirty: false,
@@ -1401,26 +1431,26 @@ impl Scene {
             size: (0, 0),
             culling: true,
             stats_on: false,
-            pool: storage(&dev, PAGE as u64 * RECORD_BYTES, none)?,
+            pool: Dv(None),
             pool_cap: PAGE,
-            styles_buf: storage(&dev, 16 * STYLE_BYTES, none)?,
+            styles_buf: Dv(None),
             styles_cap: 16,
-            einfo_buf: storage(&dev, entries_cap as u64 * ENTRY_BYTES, none)?,
-            masks: storage(&dev, entries_cap as u64 * 32, none)?,
-            counts: storage(&dev, entries_cap as u64 * 4, none)?,
-            offsets: storage(&dev, entries_cap as u64 * 4, none)?,
-            entries_cap,
-            layers_buf: storage(&dev, layers_cap as u64 * 16, none)?,
-            lists_buf: storage(&dev, layers_cap as u64 * 16, none)?,
-            draws_buf: storage(&dev, layers_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?,
-            layers_cap,
-            visible: storage(&dev, PAGE as u64 * 4, none)?,
+            einfo_buf: Dv(None),
+            masks: Dv(None),
+            counts: Dv(None),
+            offsets: Dv(None),
+            entries_cap: 64,
+            layers_buf: Dv(None),
+            lists_buf: Dv(None),
+            draws_buf: Dv(None),
+            layers_cap: 16,
+            visible: Dv(None),
             visible_cap: PAGE,
-            vinst: storage(&dev, 4, none)?,
+            vinst: Dv(None),
             vinst_cap: 1,
-            view_ubo: dev.create_buffer(&BufferDesc { size: VIEW_BYTES, usage: BufferUsage::UNIFORM, memory: MemoryKind::Device })?,
+            view_ubo: Dv(None),
             groups: None,
-            frames,
+            frames: Vec::new(),
             ts: None,
             last_order: Vec::new(),
             last_layers: Vec::new(),
@@ -1450,9 +1480,9 @@ impl Scene {
             band_scale: 0.0,
             inst_send: Vec::new(),
             inst_send_all: false,
-            inst_buf: storage(&dev, INST_BYTES, none)?,
+            inst_buf: Dv(None),
             inst_cap: 1,
-            spaces: storage(&dev, SPACE_BYTES, none)?,
+            spaces: Dv(None),
             space_cap: 1,
             inst_count: 0,
             inst_hatch: Vec::new(),
@@ -1461,14 +1491,14 @@ impl Scene {
             inst_info: InstanceInfo::default(),
             fonts: Fonts::new(),
             text_styles: Vec::new(),
-            atlas: Atlas::new(r.dev.limits().max_texture_layers.max(1)),
+            atlas: Atlas::new(0),
             text_scale: 0.0,
             texts: Vec::new(),
             texts_dirty: false,
             text_max: (0.0, 0.0),
             text_fills: 0,
             text_switched: 0,
-            gtab_buf: storage(&dev, GLYPH_WORDS as u64 * 4, none)?,
+            gtab_buf: Dv(None),
             gtab_cap: 1,
             atlas_tex: None,
             atlas_view: None,
@@ -1484,8 +1514,115 @@ impl Scene {
             ov: overlay::Overlay::default(),
             ov_info: overlay::OverlayInfo::default(),
             ov_gpu: None,
-            dev,
-        })
+            cpu: cpu::CpuState::default(),
+        }
+    }
+
+    /// the scene on a renderer's device (G6e1): its buffers made there, everything it holds goes up with the next prepare.
+    /// Attached to another renderer before, it leaves that one first; to the same one, nothing happens.  An error leaves it
+    /// without a device
+    pub fn attach(&mut self, r: &Renderer) -> Result<()> {
+        if self.tag.as_ref().is_some_and(|t| Arc::ptr_eq(t, &r.tag)) {
+            return Ok(());
+        }
+        self.detach();
+        let dev = r.dev.clone();
+        let none = BufferUsage::NONE;
+        let (entries_cap, layers_cap) = (64u32, 16u32);
+        let mut frames = Vec::new();
+        for _ in 0..r.desc.frames_in_flight {
+            frames.push(FrameSlot { stage: upload(&dev, VIEW_BYTES)?, changes: None, styles: None, hatch: None, scatter_group: None, runs: None, insts: None, readback: None, last: None, atlas: None,
+                                    gtab: None, hl: None, ov: None });
+        }
+        let hatch_buf = storage(&dev, HATCH_BYTES, none)?;
+        let epx = storage(&dev, 16, none)?;
+        let pool = storage(&dev, PAGE as u64 * RECORD_BYTES, none)?;
+        let styles_buf = storage(&dev, 16 * STYLE_BYTES, none)?;
+        let einfo_buf = storage(&dev, entries_cap as u64 * ENTRY_BYTES, none)?;
+        let masks = storage(&dev, entries_cap as u64 * 32, none)?;
+        let counts = storage(&dev, entries_cap as u64 * 4, none)?;
+        let offsets = storage(&dev, entries_cap as u64 * 4, none)?;
+        let layers_buf = storage(&dev, layers_cap as u64 * 16, none)?;
+        let lists_buf = storage(&dev, layers_cap as u64 * 16, none)?;
+        let draws_buf = storage(&dev, layers_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
+        let visible = storage(&dev, PAGE as u64 * 4, none)?;
+        let vinst = storage(&dev, 4, none)?;
+        let view_ubo = dev.create_buffer(&BufferDesc { size: VIEW_BYTES, usage: BufferUsage::UNIFORM, memory: MemoryKind::Device })?;
+        let inst_buf = storage(&dev, INST_BYTES, none)?;
+        let spaces = storage(&dev, SPACE_BYTES, none)?;
+        let gtab_buf = storage(&dev, GLYPH_WORDS as u64 * 4, none)?;
+        self.tag = Some(r.tag.clone());
+        self.max_records = r.max_records;
+        self.max_entries = r.max_entries;
+        self.max_binding = dev.limits().max_storage_binding as u64;
+        self.atlas.max_pages = dev.limits().max_texture_layers.max(1);
+        (self.hatch_buf, self.hatch_cap, self.epx, self.epx_cap, self.pool, self.pool_cap) = (dv(hatch_buf), 1, dv(epx), 1, dv(pool), PAGE);
+        (self.styles_buf, self.styles_cap, self.einfo_buf, self.masks, self.counts, self.offsets, self.entries_cap) = (dv(styles_buf), 16, dv(einfo_buf), dv(masks), dv(counts), dv(offsets), entries_cap);
+        (self.layers_buf, self.lists_buf, self.draws_buf, self.layers_cap) = (dv(layers_buf), dv(lists_buf), dv(draws_buf), layers_cap);
+        (self.visible, self.visible_cap, self.vinst, self.vinst_cap, self.view_ubo) = (dv(visible), PAGE, dv(vinst), 1, dv(view_ubo));
+        (self.inst_buf, self.inst_cap, self.spaces, self.space_cap, self.gtab_buf, self.gtab_cap) = (dv(inst_buf), 1, dv(spaces), 1, dv(gtab_buf), 1);
+        self.frames = frames;
+        // (what the device holds of it: nothing yet; the first prepare lays it out and sends everything)
+        self.styles_dirty = true;
+        self.styles_scale = 0.0;
+        self.hatch_for = None;
+        self.layout_dirty = true;
+        self.filled = false;
+        self.sent = false;
+        self.prepared = false;
+        self.stale = false;
+        self.waited = false;
+        self.last_order.clear();
+        self.last_layers.clear();
+        self.vis_items = 0;
+        self.tables_sig = 0;
+        self.entries = 0;
+        self.vis_layers = 0;
+        self.up = Uploads::default();
+        self.upload_info = UploadInfo::default();
+        self.frame = 0;
+        self.slot = 0;
+        self.inst_send_all = true;
+        self.inst_send.clear();
+        self.atlas_layers = 0;
+        self.atlas_all = true;
+        self.atlas_fresh = false;
+        self.gtab_all = true;
+        self.hl.cap = 0;
+        self.hl.full = true;
+        self.hl_on = false;
+        self.hl_drawn.clear();
+        self.dev = dv(dev);
+        Ok(())
+    }
+
+    /// the scene off its device (G6e1; a lost device, another renderer next): what it made there goes, what it holds stays;
+    /// draw_cpu draws it, attach puts it on a device again
+    pub fn detach(&mut self) {
+        self.tag = None;
+        for d in [&mut self.hatch_buf, &mut self.epx, &mut self.pool, &mut self.styles_buf, &mut self.einfo_buf, &mut self.masks, &mut self.counts, &mut self.offsets, &mut self.layers_buf,
+                  &mut self.lists_buf, &mut self.draws_buf, &mut self.visible, &mut self.vinst, &mut self.view_ubo, &mut self.inst_buf, &mut self.spaces, &mut self.gtab_buf] {
+            d.0 = None;
+        }
+        self.frames.clear();
+        self.groups = None;
+        self.ts = None;
+        self.atlas_tex = None;
+        self.atlas_view = None;
+        self.hl.buf = None;
+        self.hl_group = None;
+        self.ov_gpu = None;
+        self.up = Uploads::default();
+        self.prepared = false;
+        self.stale = false;
+        self.sent = false;
+        self.filled = false;
+        self.dev = Dv(None);
+    }
+
+    /// the scene is on a renderer's device (Scene::new, attach); else only draw_cpu draws it
+    pub fn attached(&self) -> bool {
+        self.tag.is_some()
     }
 
     fn touch(&mut self) {
@@ -2636,7 +2773,8 @@ impl Scene {
     }
 
     /// (tests, tools) after a frame's visibility: per visible layer in draw order (drawn_layers) its first place in the
-    /// visible list and its count (16 bytes each); the visible list (record places in the pool); the indirect draws
+    /// visible list and its count (16 bytes each); the visible list (record places in the pool); the indirect draws.  These
+    /// and pool_buffer panic on a scene without a device (Scene::attached)
     pub fn lists_buffer(&self) -> &Buffer {
         &self.lists_buf
     }
@@ -2659,7 +2797,7 @@ impl Scene {
     /// wait for the frame that last used this frame's slot, so its data can be written; prepare does it too.  The
     /// browser cannot wait, and needs not: its writes go in queue order
     pub fn wait_slot(&mut self) -> Result<()> {
-        if self.waited {
+        if self.waited || self.frames.is_empty() {
             return Ok(());
         }
         self.waited = true;
@@ -2813,11 +2951,11 @@ impl Scene {
         if need > self.max_records as u64 {
             return Err(GpuError::Unsupported("Scene: more records than this device's bindings and one dispatch reach"));
         }
-        let old = core::mem::replace(&mut self.pool, storage(&self.dev, need * RECORD_BYTES, BufferUsage::NONE)?);
+        let old = core::mem::replace(&mut self.pool, dv(storage(&self.dev, need * RECORD_BYTES, BufferUsage::NONE)?));
         self.pool_cap = need as u32;
         self.upload_info.rebuild = true;
         self.upload_info.moved = moves.iter().map(|m| m.2 / RECORD_BYTES).sum();
-        self.up.rebuild = Some((old, moves));
+        self.up.rebuild = old.0.map(|o| (o, moves));
         self.groups = None;
         for f in &mut self.frames {
             f.scatter_group = None;
@@ -2840,19 +2978,19 @@ impl Scene {
         if entries > self.entries_cap {
             self.entries_cap = entries.max(self.entries_cap * 2);
             let n = self.entries_cap as u64;
-            self.einfo_buf = storage(&dev, n * ENTRY_BYTES, none)?;
-            self.masks = storage(&dev, n * 32, none)?;
-            self.counts = storage(&dev, n * 4, none)?;
-            self.offsets = storage(&dev, n * 4, none)?;
+            self.einfo_buf = dv(storage(&dev, n * ENTRY_BYTES, none)?);
+            self.masks = dv(storage(&dev, n * 32, none)?);
+            self.counts = dv(storage(&dev, n * 4, none)?);
+            self.offsets = dv(storage(&dev, n * 4, none)?);
             self.groups = None;
         }
         let layers = self.last_layers.len() as u32;
         if layers > self.layers_cap {
             self.layers_cap = layers.max(self.layers_cap * 2);
             let n = self.layers_cap as u64;
-            self.layers_buf = storage(&dev, n * 16, none)?;
-            self.lists_buf = storage(&dev, n * 16, none)?;
-            self.draws_buf = storage(&dev, n * DRAW_BYTES, BufferUsage::INDIRECT)?;
+            self.layers_buf = dv(storage(&dev, n * 16, none)?);
+            self.lists_buf = dv(storage(&dev, n * 16, none)?);
+            self.draws_buf = dv(storage(&dev, n * DRAW_BYTES, BufferUsage::INDIRECT)?);
             self.groups = None;
         }
         // (the visible list: every record the entries cover could be in it; an insert's records once per instance)
@@ -2862,13 +3000,13 @@ impl Scene {
                 return Err(GpuError::Unsupported("Scene: more records in the visible layers (an insert's once per instance) than this device's bindings reach"));
             }
             self.visible_cap = items as u32;
-            self.visible = storage(&dev, items * 4, none)?;
+            self.visible = dv(storage(&dev, items * 4, none)?);
             self.groups = None;
         }
         let vi = if self.insts.is_empty() { 1 } else { self.visible_cap };
         if vi > self.vinst_cap {
             self.vinst_cap = vi;
-            self.vinst = storage(&dev, vi as u64 * 4, none)?;
+            self.vinst = dv(storage(&dev, vi as u64 * 4, none)?);
             self.groups = None;
         }
         let epx = if self.layers.iter().any(|l| l.live && l.fills > 0) || self.epx_blocks > 0 { self.pool_cap as u64 + self.epx_blocks as u64 } else { 1 };
@@ -2877,32 +3015,32 @@ impl Scene {
                 return Err(GpuError::Unsupported("Scene: more fill edges (an insert's once per instance) than this device's bindings reach"));
             }
             self.epx_cap = epx as u32;
-            self.epx = storage(&dev, epx * 16, none)?;
+            self.epx = dv(storage(&dev, epx * 16, none)?);
             self.groups = None;
         }
         let insts = self.insts.len() as u32;
         if insts > self.inst_cap {
             self.inst_cap = insts.max(self.inst_cap * 2);
-            self.inst_buf = storage(&dev, self.inst_cap as u64 * INST_BYTES, none)?;
+            self.inst_buf = dv(storage(&dev, self.inst_cap as u64 * INST_BYTES, none)?);
             self.inst_send_all = true;
             self.groups = None;
         }
         if insts > self.space_cap {
             self.space_cap = insts.max(self.space_cap * 2);
-            self.spaces = storage(&dev, self.space_cap as u64 * SPACE_BYTES, none)?;
+            self.spaces = dv(storage(&dev, self.space_cap as u64 * SPACE_BYTES, none)?);
             self.groups = None;
         }
         let rows = (self.hatched.len() + self.inst_hatch.len()) as u32;
         if rows > self.hatch_cap {
             self.hatch_cap = rows.max(self.hatch_cap * 2);
-            self.hatch_buf = storage(&dev, self.hatch_cap as u64 * HATCH_BYTES, none)?;
+            self.hatch_buf = dv(storage(&dev, self.hatch_cap as u64 * HATCH_BYTES, none)?);
             self.hatch_for = None;
             self.groups = None;
         }
         let styles = (self.styles.len() + self.derived.len()) as u32;
         if styles > self.styles_cap {
             self.styles_cap = styles.max(self.styles_cap * 2);
-            self.styles_buf = storage(&dev, self.styles_cap as u64 * STYLE_BYTES, none)?;
+            self.styles_buf = dv(storage(&dev, self.styles_cap as u64 * STYLE_BYTES, none)?);
             self.styles_dirty = true;
             self.groups = None;
         }
@@ -2911,7 +3049,7 @@ impl Scene {
         let rows = self.atlas.rows.len() as u32;
         if rows > self.gtab_cap {
             self.gtab_cap = rows.max(self.gtab_cap * 2);
-            self.gtab_buf = storage(&dev, self.gtab_cap as u64 * GLYPH_WORDS as u64 * 4, none)?;
+            self.gtab_buf = dv(storage(&dev, self.gtab_cap as u64 * GLYPH_WORDS as u64 * 4, none)?);
             self.gtab_all = true;
             self.groups = None;
         }
@@ -3770,8 +3908,10 @@ impl Scene {
     /// the frame's data for Renderer::record: waits for this slot's last frame, sends what changed.  size: the
     /// target's in pixels
     pub fn prepare(&mut self, r: &mut Renderer, size: (u32, u32)) -> Result<()> {
-        if !Arc::ptr_eq(&self.tag, &r.tag) {
-            return Err(GpuError::Invalid("Scene::prepare: another Renderer than its own"));
+        match &self.tag {
+            None => return Err(GpuError::Invalid("Scene::prepare: a scene without a device (Scene::attach first; draw_cpu draws it on the CPU)")),
+            Some(t) if !Arc::ptr_eq(t, &r.tag) => return Err(GpuError::Invalid("Scene::prepare: another Renderer than its own")),
+            _ => {}
         }
         if size.0 == 0 || size.1 == 0 {
             return Err(GpuError::Invalid("Scene::prepare: a target of at least 1 x 1"));
@@ -4025,6 +4165,9 @@ impl Scene {
     /// the frame went to the GPU: Queue::submit's or Swapchain::present's answer
     pub fn submitted(&mut self, id: SubmitId) {
         let slot = self.slot;
+        if slot >= self.frames.len() {
+            return;
+        }
         if self.up.atlas.as_ref().is_some_and(|a| a.fresh) {
             // (the frame that takes the atlas's texture from nothing is on its way)
             self.atlas_fresh = false;

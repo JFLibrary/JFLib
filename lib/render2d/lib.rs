@@ -54,6 +54,8 @@ pub use scene::{box_is_window, Grip, HighlightInfo, Hit, IndexInfo, Overlay, Ove
                 GRIP_HOT, GRIP_HOVER, GRIP_PX, HL_ALPHA, HL_HOVER, HL_HOVER_RGB, HL_SELECTED, HL_SELECTED_RGB, MARKER_COLOR, MARKER_PX, MARKER_WIDTH, SNAP_ALL, SNAP_CEN, SNAP_END, SNAP_INS, SNAP_INT,
                 SNAP_MID, SNAP_NEA, SNAP_PER, SNAP_QUA, SNAP_TAN, WINDOW_EDGE, WINDOW_FILL};
 pub use scene::{TextInfo, TEXT_BAR_BELOW, TEXT_FILL_FROM, TEXT_LARGE_FROM};
+// (G6e1) the CPU path: Scene::new_cpu, attach, detach, draw_cpu
+pub use scene::CpuInfo;
 pub use text::{layout_mtext, layout_text, Attach, Bar as TextBar, FontId, FontMetrics, Fonts, GlyphShape, HAlign, Layout as TextLayout, Line as TextLine, MText, Placed as PlacedGlyph, Text, TextStyle, TextStyleId,
                VAlign, FALLBACK_MAX, LINE_SPACING};
 
@@ -482,8 +484,8 @@ impl Renderer {
     /// one frame of a prepared scene into e: its uploads, its visibility, its render pass (the colour attachment's load
     /// and clear as it says, sRGB codes)
     pub fn record<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, color: ColorAttachment<'a>) -> Result<()> {
-        if !Arc::ptr_eq(&s.tag, &self.tag) {
-            return Err(GpuError::Invalid("record: a scene of another Renderer"));
+        if !s.tag.as_ref().is_some_and(|t| Arc::ptr_eq(t, &self.tag)) {
+            return Err(GpuError::Invalid("record: a scene of another Renderer, or one without a device"));
         }
         if !s.prepared {
             return Err(GpuError::Invalid("record: Scene::prepare comes first"));

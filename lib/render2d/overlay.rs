@@ -56,7 +56,7 @@ pub const CROSSING_EDGE: u32 = 0xFF20_A040;
 pub const CROSSING_FILL: u32 = 0x3020_C040;
 
 #[derive(Clone)]
-enum Item {
+pub(super) enum Item {
     Line([f64; 2], [f64; 2], Space, Style),
     Poly(Vec<[f64; 2]>, bool, Space, Style),
     Arc([f64; 2], f64, f64, f64, Space, Style),
@@ -96,6 +96,11 @@ impl Overlay {
 
     pub fn len(&self) -> usize {
         self.items.len()
+    }
+
+    /// (the CPU path) what it holds
+    pub(super) fn items(&self) -> &[Item] {
+        &self.items
     }
 
     /// a line (a rubber band) in the style's look (widths and dashes in pixels or drawing units)
@@ -169,9 +174,9 @@ fn pen(color: u32, width: f32) -> Style {
 }
 
 /// the overlay made into pixels: geometry in the overlay's own frame (target pixels with y up: (x, -y)) and styles in pixels
-struct Built {
-    geoms: Vec<(Geom, u32)>,
-    styles: Vec<Style>,
+pub(super) struct Built {
+    pub(super) geoms: Vec<(Geom, u32)>,
+    pub(super) styles: Vec<Style>,
 }
 
 impl Built {
@@ -205,7 +210,7 @@ fn in_px(st: &Style, scale: f64) -> Style {
     s
 }
 
-fn build(items: &[Item], cam: &Camera, size: (u32, u32)) -> Built {
+pub(super) fn build(items: &[Item], cam: &Camera, size: (u32, u32)) -> Built {
     let mut b = Built { geoms: Vec::new(), styles: Vec::new() };
     // a point in the overlay's frame: target pixels, y up
     let px = |p: [f64; 2], sp: Space| -> [f64; 2] {

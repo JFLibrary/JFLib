@@ -12,6 +12,8 @@
 //   GpuContent::draw(e, target, size)            a frame into target (GPU_VIEW_FORMAT, the view's size)
 //   GpuContent::submitted(id)                    the frame went to the queue
 //   GpuContent::paint(g, r)                      what the view shows without a device
+//   GpuContent::paints()                         paint draws what a frame would (render2d's CPU path): without a
+//                                                device the view paints, not the last frame of a device that is gone
 //   ui.gpu_view_info(win, id)                    what a view does now (tests, measurements)
 //   AF_GPU_3D                                    the app shows views: the UI's device at level Voll on the
 //                                                fastest adapter (without it, as ever: Basis, the frugal one)
@@ -27,7 +29,8 @@
 //     jfgui_GPU_OUTPUT=0, jfgui_GPU_VIEWS=0, a script without `gpu on`): the frame is read back at once and the
 //     Draw copies it into the framebuffer, in the cells the CPU draws.
 //   - no device (jfgui_GPU=0, no Vulkan or no usable adapter, a static Linux program, a lost device not back
-//     yet): the last frame read back, else GpuContent::paint.
+//     yet): the last frame read back, else GpuContent::paint (a content that paints itself, GpuContent::paints:
+//     always its painting).
 // The device is the UI output's (one for all windows); without an output in this run (not wanted, never
 // possible) the views make one of their own on first use.  A new device (generation) detaches the content from
 // the old one and attaches it to the new one; its next frame follows.
@@ -81,6 +84,12 @@ pub trait GpuContent {
     /// g, clipped to r (x, y, w, h); a dark grey unless the content says otherwise
     fn paint(&self, g: &mut Gfx, r: [i32; 4]) {
         paint_default(g, r);
+    }
+    /// paint draws what a frame would (render2d's CPU path, G6e1): without a device the view paints, also where it holds a
+    /// frame read back from an earlier device (a lost one); false (the default): that last frame stays until a device draws
+    /// again
+    fn paints(&self) -> bool {
+        false
     }
 }
 
@@ -271,11 +280,16 @@ impl Draw for ViewDraw {
         let mut c = self.0.c.borrow_mut();
         #[cfg(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32"))]
         c.read();
-        if c.image_frame != 0 && (c.image.w, c.image.h) == (r[2], r[3]) {
+        let content = c.content.upgrade();
+        // (no device now and a content that paints itself: its painting, not a frame of a device that is gone)
+        #[cfg(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32"))]
+        let gone = c.gpu.is_none() && content.as_ref().and_then(|x| x.try_borrow().ok()).is_some_and(|x| x.paints());
+        #[cfg(not(any(windows, jfgui_glibc, target_os = "android", target_vendor = "apple", target_arch = "wasm32")))]
+        let gone = false;
+        if c.image_frame != 0 && (c.image.w, c.image.h) == (r[2], r[3]) && !gone {
             g.dc.blit(g.sf, &c.image, r[0], r[1]);
             return;
         }
-        let content = c.content.upgrade();
         drop(c);
         // (borrowed elsewhere: an app that reads the framebuffer while it holds its content)
         match content.as_ref().and_then(|x| x.try_borrow().ok()) {

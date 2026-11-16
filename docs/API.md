@@ -65,7 +65,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
-  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [text.rs](#render2dtextrs)
+  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [cpu.rs](#render2dcpurs) · [text.rs](#render2dtextrs)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -9667,6 +9667,8 @@ texture of the view's size, and the frame is read back from there.
   GpuContent::draw(e, target, size)            a frame into target (GPU_VIEW_FORMAT, the view's size)
   GpuContent::submitted(id)                    the frame went to the queue
   GpuContent::paint(g, r)                      what the view shows without a device
+  GpuContent::paints()                         paint draws what a frame would (render2d's CPU path): without a
+                                               device the view paints, not the last frame of a device that is gone
   ui.gpu_view_info(win, id)                    what a view does now (tests, measurements)
   AF_GPU_3D                                    the app shows views: the UI's device at level Voll on the
                                                fastest adapter (without it, as ever: Basis, the frugal one)
@@ -9682,7 +9684,8 @@ Where a frame shows (gpu_out.rs "views"):
     jfgui_GPU_OUTPUT=0, jfgui_GPU_VIEWS=0, a script without `gpu on`): the frame is read back at once and the
     Draw copies it into the framebuffer, in the cells the CPU draws.
   - no device (jfgui_GPU=0, no Vulkan or no usable adapter, a static Linux program, a lost device not back
-    yet): the last frame read back, else GpuContent::paint.
+    yet): the last frame read back, else GpuContent::paint (a content that paints itself, GpuContent::paints:
+    always its painting).
 The device is the UI output's (one for all windows); without an output in this run (not wanted, never
 possible) the views make one of their own on first use.  A new device (generation) detaches the content from
 the old one and attaches it to the new one; its next frame follows.
@@ -9722,6 +9725,10 @@ GPU_VIEW_FORMAT: gpu::Format = gpu::Format::Bgra8Unorm
   - `fn paint(&self, g: &mut Gfx, r: [i32; 4])`
     what the view shows without a device (no GPU, jfgui_GPU=0, before the first frame): painted on the CPU into
     g, clipped to r (x, y, w, h); a dark grey unless the content says otherwise
+  - `fn paints(&self) -> bool`
+    paint draws what a frame would (render2d's CPU path, G6e1): without a device the view paints, also where it holds a
+    frame read back from an earlier device (a lost one); false (the default): that last frame stays until a device draws
+    again
 
 - **`struct GpuViewInfo`**
   what a view does now (Ui::gpu_view_info; tests and measurements)
@@ -22861,7 +22868,8 @@ TEXT_BAR_BELOW: f64 = 7.0
 ```
 
 - **`struct Scene`**
-  entities, layers, styles and the camera of one scene of a Renderer
+  entities, layers, styles and the camera of one scene: on a Renderer's device, or without one (Scene::new_cpu; draw_cpu
+  draws it through lib/gfx)
 
 - **`struct TextInfo`**
   what a scene's text holds (Scene::text_info).  It may grow
@@ -22883,6 +22891,21 @@ TEXT_BAR_BELOW: f64 = 7.0
 **`impl Scene`**
 
 - **`fn new(r: &Renderer) -> Result<Scene>`**
+  a scene on a renderer's device (Scene::new_cpu, then attach)
+- **`fn new_cpu() -> Scene`**
+  a scene without a device (G6e1): everything but a frame on the GPU works on it (entities, layers, styles, blocks,
+  text, picking, selection, snaps, highlights, the overlay), and draw_cpu draws it through lib/gfx.  attach puts it on
+  a renderer's device (all of it goes up with the next prepare), detach takes it off again (a lost device: the drawing
+  stays)
+- **`fn attach(&mut self, r: &Renderer) -> Result<()>`**
+  the scene on a renderer's device (G6e1): its buffers made there, everything it holds goes up with the next prepare.
+  Attached to another renderer before, it leaves that one first; to the same one, nothing happens.  An error leaves it
+  without a device
+- **`fn detach(&mut self)`**
+  the scene off its device (G6e1; a lost device, another renderer next): what it made there goes, what it holds stays;
+  draw_cpu draws it, attach puts it on a device again
+- **`fn attached(&self) -> bool`**
+  the scene is on a renderer's device (Scene::new, attach); else only draw_cpu draws it
 - **`fn add_style(&mut self, s: &Style) -> Result<StyleId>`**
   a style for entities; the next frame shows it
 - **`fn set_style(&mut self, id: StyleId, s: &Style) -> Result<()>`**
@@ -22955,7 +22978,8 @@ TEXT_BAR_BELOW: f64 = 7.0
   what the last prepare sent
 - **`fn lists_buffer(&self) -> &Buffer`**
   (tests, tools) after a frame's visibility: per visible layer in draw order (drawn_layers) its first place in the
-  visible list and its count (16 bytes each); the visible list (record places in the pool); the indirect draws
+  visible list and its count (16 bytes each); the visible list (record places in the pool); the indirect draws.  These
+  and pool_buffer panic on a scene without a device (Scene::attached)
 - **`fn visible_buffer(&self) -> &Buffer`**
 - **`fn draws_buffer(&self) -> &Buffer`**
 - **`fn pool_buffer(&self) -> &Buffer`**
@@ -23292,6 +23316,61 @@ SNAP_ALL: u32 = 511
   segments' middles, an arc's centre, ends and middle, a circle's centre and quadrants, an ellipse's centre and its
   axes' ends (an open one's ends too), a Bézier chain's and a spline's control points, a fill's corners, a text's
   alignment point, an insert's insertion point (each copy of an array).  Empty for a dead id or a block's entity
+
+### `render2d/cpu.rs`
+
+Source: [`lib/render2d/cpu.rs`](../lib/render2d/cpu.rs)
+
+```text
+cpu -- the CPU path (G6e1, decision 31; docs/RENDER2D.md "Der CPU-Weg"): a scene drawn through lib/gfx's rasterizer
+without a device, with the camera, the painter's order, the visible layers and the look of a frame on the GPU.  A child
+of scene.rs: it reads the scene's entities, layers, styles, blocks, texts, highlights and overlay, and its R-tree (pick.rs).
+
+A frame: the view's box in the drawing (f64), grown by the widest reach in pixels, through the R-tree; the entities found
+sorted into the painter's order (layer, then place in the layer), inserts walked down into their blocks through the
+inverse transforms as pick.rs walks them (the copies of an array that meet the view, each block's own tree, nested
+inserts).  Every point goes from its units to pixels relative to the view in f64 (a block's through its insert's
+transform, the camera's centre taken off before anything is scaled), so ±1e7 at 1e-6 units per pixel stays exact; centre
+lines are clipped in f64 to the target grown by the stroke's reach, and every piece handed to lib/gfx is clipped to the
+target and GUARD px around it: lib/gfx sees small f32 numbers only.  Each entity is one fill of lib/gfx (exact area
+coverage by signed accumulation), blended once in its colour as the GPU blends it (premultiplied sRGB codes).
+
+Strokes are convex pieces whose areas add up to the union the GPU computes: per segment its strip, cut at the bisector of
+each join where the cut fits both segments (miter: the tip comes from the cut, bevel: its line cuts too, round: the
+perpendicular through the vertex, the outer sector a piece of its own), else the GPU's union |a| + |w| + |b| - |a ∩ b|
+(both strips end at the perpendicular, the join's piece beyond both, their intersection subtracted: the accumulation's
+sign takes it); caps as planes (butt, square) or half disks.  Arcs are flattened within ARC_TOL px only where they come
+near the view; curves and fills as the GPU flattens them (the scene's flattening while it holds for the camera, else the
+same function for this camera; a block's per zoom band), fills even-odd from oriented rings.  Dash patterns cut in f64
+along each entity's lengths, flat tones and mixes at the GPU's thresholds; hatches clipped to the fill in f64 and
+multiplied by its coverage as the GPU does; text from its glyphs' outlines in G6c's layout, bars below TEXT_BAR_BELOW px
+per em; highlights and the overlay as G6d draws them.
+```
+
+- **`struct CpuInfo`**
+  what the last draw_cpu did (Scene::draw_cpu, cpu_info).  It may grow
+  - `found: u32` -- entities on layers the index found near the view (an insert once), and what was drawn: entities on layers, each copy
+    of a block's entity in an insert once
+  - `drawn: u32`
+  - `fills: u32` -- fills lib/gfx made (an entity one, a bar of small text one, a hatch's coverages more) and the lines it rasterized
+  - `lines: u64`
+  - `flattened: u32` -- curves and fills flattened on the way (the scene's flattening was made for another zoom band or window; a block's
+    curves and fills each time)
+  - `overlay: u32` -- overlay items drawn
+
+**`impl Scene`**
+
+- **`fn draw_cpu(&mut self, dc: &mut Dc, sf: &mut Surface, r: [i32; 4]) -> CpuInfo`**
+  the scene drawn on the CPU through lib/gfx (G6e1, decision 31): the camera's view of a target of r's size into the
+  rectangle r (x, y, w, h, relative to dc's origin) of sf, clipped to dc's clip, blended over what is there (the app
+  clears it first, as a frame's load does); the painter's order, the visible layers, the look, the highlights and the
+  overlay of a frame on the GPU (docs/RENDER2D.md "Der CPU-Weg").  With and without a device.  dc keeps its colour,
+  clip and origin
+- **`fn set_cpu_single(&mut self, single: bool)`**
+  draw_cpu on one thread (false: row bands on lib/gfx's parallel loop where one is set, gfx::set_parallel: lib/ui sets
+  its worker pool there; the same bytes either way)
+- **`fn cpu_info(&self) -> CpuInfo`**
+  what the last draw_cpu did
 
 ### `render2d/text.rs`
 
