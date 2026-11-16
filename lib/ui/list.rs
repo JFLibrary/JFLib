@@ -51,6 +51,7 @@
 // Widget ids used internally: (id << 3 | k) | 0x80000000 for sub parts (k = 1..7),
 // (id + 1 + i) | 0xC0000000 for the content box of custom list rows.
 
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use super::consts::*;
@@ -128,6 +129,9 @@ pub(crate) struct Scr {
     ev: u32,
     /// its content is a scroll copy region (scrollcopy.rs)
     copy: bool,
+    /// (form.rs) a phone's or a tablet's view that the app lets roll only up and down: 1 its laid-out
+    /// width is measured (W::wide), 2 it rolls sideways too, as far as that width
+    fit: u8,
 }
 
 /// a list on the stack  [LS_*]
@@ -181,6 +185,9 @@ pub(crate) struct W {
     ldrag_to: i32,
     /// autoscroll clock
     ldrag_t: u32,
+    /// (form.rs) the views of fit 1 or 2 whose content the last pass laid out wider than them: that
+    /// width (px, padding included)
+    wide: BTreeMap<u32, i32>,
 }
 
 // clamp_mem(v, max) -> (v moved into 0 .. max, it had to be moved)
@@ -275,9 +282,19 @@ impl Ui {
             my = s.meash.wrapping_sub(e.rect[3]).max(0);
         }
         if e.flags & SC_H != 0 {
-            mx = s.measw.wrapping_sub(e.rect[2]).max(0);
+            mx = self.scr_width(e).wrapping_sub(e.rect[2]).max(0);
         }
         (mx, my)
+    }
+
+    // scr_width(entry) -> how wide its content is (px): the natural width; a phone's view that rolls
+    // sideways only because of form.rs: the room its content takes (the natural width counts a
+    // wrapping text unwrapped and a view inside at its content's width: it would roll into nothing)
+    fn scr_width(&mut self, e: &Scr) -> i32 {
+        if e.fit == 2 {
+            return self.wp.list.wide.get(&e.id).copied().unwrap_or(0);
+        }
+        self.slot(e.id).measw
     }
 
     // scr_open(id, flags, hbflags) -> EV of the viewport hit box: places the viewport (a
@@ -317,6 +334,7 @@ impl Ui {
             hit0: c.hits[c.hit_cur].len(),
             ev: 0,
             copy: false,
+            fit: 0,
         };
         self.slot(id);
         // viewport hit box (the content's hit boxes follow it)
@@ -442,8 +460,9 @@ impl Ui {
         let t = st.scrollbar_thickness(self); // bar thickness (hover area)
         let axes = scr_axes(e.flags);
         let s = *self.slot(e.id);
+        let cw = self.scr_width(e);
         let vneed = axes & 1 != 0 && s.meash > e.rect[3];
-        let hneed = axes & 2 != 0 && s.measw > e.rect[2];
+        let hneed = axes & 2 != 0 && cw > e.rect[2];
         let r = e.rect;
         if vneed {
             let h = if hneed { r[3].wrapping_sub(t) } else { r[3] };
@@ -462,7 +481,7 @@ impl Ui {
             let w = if vneed { r[2].wrapping_sub(t) } else { r[2] };
             self.wp.ctx.last_rect = [r[0], r[1].wrapping_add(r[3]).wrapping_sub(t), w, t];
             let id = e.id.wrapping_mul(8).wrapping_add(2) | 0x8000_0000;
-            let (p, _) = self.sbar_core(id, s.scrollx, s.measw, r[2], false);
+            let (p, _) = self.sbar_core(id, s.scrollx, cw, r[2], false);
             if p != s.scrollx {
                 let sl = self.slot(e.id);
                 sl.scrollx = p;
@@ -551,6 +570,16 @@ impl Ui {
             self.scroll_copy_end();
         }
         self.box_end();
+        if e.fit != 0 {
+            // (form.rs) how wide the content is laid out: the next pass rolls sideways while it is
+            // wider than the view (a change is one more pass: the layout inside stays the same)
+            let w = self.wp.lay.ended_w;
+            let wide = &mut self.wp.list.wide;
+            let changed = if w > e.rect[2] { wide.insert(e.id, w) != Some(w) } else { wide.remove(&e.id).is_some() };
+            if changed {
+                self.repass();
+            }
+        }
         self.scr_follow(&e);
         if let Some(id) = self.agent_reveal() {
             self.scr_show(&e, id); // a click from outside (agent.rs)
@@ -594,13 +623,16 @@ impl Ui {
         let _src = self.src_scope();
         self.scr_open(id, flags & !SCR_F_LIST, 0);
         // (form.rs) on a phone or a tablet a view that rolls only up and down rolls sideways too
-        // while its content is wider than it (the last pass's): nothing is out of the finger's reach.
-        // A desktop's views never change.
+        // while its content is laid out wider than it (the last pass's, scr_close): nothing is out of
+        // the finger's reach.  Laid out, not natural: a wrapping text or a view that rolls sideways
+        // itself is no reason.  A desktop's views never change.
         if flags & SC_H == 0 && self.mobile() {
             let top = self.scr_top();
-            let e = self.wp.list.scr[top];
-            if self.slot(id).measw > e.rect[2] {
-                self.wp.list.scr[top].flags |= SC_H | SC_V;
+            let e = &mut self.wp.list.scr[top];
+            e.fit = 1;
+            if self.wp.list.wide.get(&id).is_some_and(|&w| w > e.rect[2]) {
+                e.flags |= SC_H | SC_V;
+                e.fit = 2;
             }
         }
         self.scr_offset();

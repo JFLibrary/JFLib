@@ -1629,9 +1629,10 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             if hb & (HB_CLOSE | HB_MAX | HB_MIN) == 0 && hb & HB_DRAG != 0 { HTCAPTION } else { HTCLIENT }
         }
         // caption buttons are non-client for Windows (snap layouts) but drawn by the UI:
-        // their mouse messages become client events
+        // their mouse messages become client events.  Only in the library frame: a system
+        // frame's buttons are Windows' own (its X closes through WM_SYSCOMMAND / WM_CLOSE)
         WM_NCMOUSEMOVE => {
-            if !nc_is_button(wp) {
+            if r.flags.get() & WWF_CUSTOM == 0 || !nc_is_button(wp) {
                 return def();
             }
             let (x, y) = nc_client_pos(hwnd, lp);
@@ -1643,7 +1644,7 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             0
         }
         WM_NCLBUTTONDOWN | WM_NCLBUTTONDBLCLK | WM_NCLBUTTONUP => {
-            if !nc_is_button(wp) {
+            if r.flags.get() & WWF_CUSTOM == 0 || !nc_is_button(wp) {
                 return def();
             }
             let (x, y) = nc_client_pos(hwnd, lp);

@@ -1,0 +1,81 @@
+#!args --size 390x780 --anim off --theme light --verify-dirty
+# The finger on a phone or a tablet (lib/ui/form.rs; jfgui_FORM here, so every system checks it; on
+# iOS and Android the gallery is one by itself).  A page the app lets roll only up and down rolls
+# sideways too, but only while its content is laid out wider than the screen: a wrapping text and a
+# row that rolls sideways itself are no reason (they once made every page roll sideways into nothing,
+# and the next finger only stopped that roll: touch.uis's sliders failed in the iOS simulator).  A
+# window stays whole on the screen.
+system env jfgui_FORM phone
+
+# ---- the start page fits: a sideways swipe moves nothing
+pointer touch
+expect #100 rect 36 280 254 44
+swipe 380,400 20,400 400 hold
+expect #100 rect 36 280 254 44
+expect #10 value 0
+# narrower than its row of colours: it rolls sideways, until the last colour is on the screen
+size 200 780
+expect #204 rect 228 648 40 40
+swipe 190,400 10,400 400 hold
+expect #204 rect 160 648 40 40
+expect #100 rect -32 320 64 44
+swipe 190,400 10,400 400 hold
+expect #204 rect 160 648 40 40
+swipe 10,400 190,400 400 hold
+expect #204 rect 228 648 40 40
+expect #10 value 0
+size 390 780
+expect #100 rect 36 280 254 44
+
+# ---- the row that rolls by itself and the wrapping texts leave the page where it is ...
+pointer mouse
+click #900
+click menuitem:"Container"
+click tab:"Rollen"
+pointer touch
+size 390 500
+expect #5042 rect 16 304 358 40
+swipe 380,260 20,260 400 hold
+expect #5042 rect 16 304 358 40
+swipe 300,186 100,186 300 hold
+expect #5040 value 200
+expect #5042 rect 16 304 358 40
+# ... so a sideways flick on a slider that waits for a press and hold rolls nothing ...
+flick #5042 80 0 300
+expect #5042 value 0
+expect #5042 rect 16 304 358 40
+# ... and the next finger stops no roll: held, it moves the slider; a tap sets the other one
+finger down #5042
+wait 500
+finger move 300,0
+finger up
+expect #5042 value 50..100
+tap #5043
+expect #5043 value 45..55
+size 390 780
+pointer mouse
+key esc
+pointer touch
+
+# ---- a window stays whole on the screen, its title bar below the top edge
+pointer mouse
+click #900
+click menuitem:"Fenster & Dialoge"
+click #7000
+expect window 7100 open
+pointer touch
+expect window 7100 rect 24 48 260 272
+window 7100
+flick 100,14 -900 -900 300
+window any
+expect window 7100 rect 0 40 260 272
+window 7100
+flick 210,14 900 2000 300
+window any
+expect window 7100 rect 128 506 260 272
+window 7100
+tap 245,14
+window any
+expect window 7100 closed
+pointer mouse
+print done

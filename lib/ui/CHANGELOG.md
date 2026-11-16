@@ -10,22 +10,6 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
-- `FD_BUILTIN` in the flags of `ui.filedlg`: the library's own file dialog instead of the
-  system's, on every platform, so the dialog looks and behaves the same everywhere and in every
-  style (a browser's "Save as"). It lists what plat's file functions see. Before, only the
-  environment variable `jfgui_FILEDLG=builtin` chose it, and for every dialog of a run.
-- Test scripts: a line `only OS...: COMMAND` runs one command on the systems it names
-  (`only windows linux: key ctrl+q`), and `!OS` on every system but that one. The names are those
-  of `cargo jflib test`'s `#!only` line, which skips a whole script: windows, linux, macos, ios,
-  android, wasm32. The app decides it where the script runs; an unknown name is a parse error.
-- `ui.drop_defer()` and `ui.drop_finish(effect)` work for the app's own drags too. A drag of the
-  app dropped onto one of its targets waits for the target's answer like another program's drop:
-  its source reports `DS_ACTIVE` until then, and `DS_END` with `drag_effect()` and
-  `UIC_DRAG_END` as `drop_finish` says (0: not taken). After `DROP_DEFER_MS`, or when a new drag
-  of the app overtakes it, it ends as it was delivered. Without `drop_defer` the source's
-  `DS_END` comes in the passes right after the drop's, no longer in the same pass as the target's
-  `DS_DROP`. In the drop's passes `drag_allowed()` says the source's effects, as for other drops,
-  and `dragging()` is false once the drag was dropped.
 - What a notch of the wheel scrolls as the system says it: `ui.wheel_lines()` (Windows' mouse
   settings, KDE's; `plat::WHEEL_PAGE`: a page), `ui.wheel_chars()` and `ui.wheel_notch_px(line_px,
   page_px, horizontal)`, followed live (`UIC_SETTINGS`); `WHEEL_LINE_DIP` (16), the library's
@@ -50,6 +34,43 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Changed
 
+- A notch of the wheel scrolls the system's lines in the library's views, no longer always three;
+  headless runs stay at three. A trackpad on macOS and a touchpad on Wayland, which plat gives in
+  pixels now, scroll the views by the fingers' way (4.8 times it on Wayland and 1.2 on macOS
+  before).
+
+### Fixed
+
+- The code editor's horizontal wheel scrolled the wrong way: tilted right it scrolled left.
+- An image view whose wheel zooms panned twice as far with the horizontal wheel while the
+  vertical one stood still (and not at all in a right-to-left window).
+- The fine steps of a precision touchpad were cut off one by one where whole lines count: the
+  terminal never scrolled with steps below 40, the code completion list scrolled three rows on
+  each of them, Ctrl + each of them zoomed a diagram a whole step. They add up now.
+
+## [0.2.1] - 2026-11-16
+
+### Added
+
+- `FD_BUILTIN` in the flags of `ui.filedlg`: the library's own file dialog instead of the
+  system's, on every platform, so the dialog looks and behaves the same everywhere and in every
+  style (a browser's "Save as"). It lists what plat's file functions see. Before, only the
+  environment variable `jfgui_FILEDLG=builtin` chose it, and for every dialog of a run.
+- Test scripts: a line `only OS...: COMMAND` runs one command on the systems it names
+  (`only windows linux: key ctrl+q`), and `!OS` on every system but that one. The names are those
+  of `cargo jflib test`'s `#!only` line, which skips a whole script: windows, linux, macos, ios,
+  android, wasm32. The app decides it where the script runs; an unknown name is a parse error.
+- `ui.drop_defer()` and `ui.drop_finish(effect)` work for the app's own drags too. A drag of the
+  app dropped onto one of its targets waits for the target's answer like another program's drop:
+  its source reports `DS_ACTIVE` until then, and `DS_END` with `drag_effect()` and
+  `UIC_DRAG_END` as `drop_finish` says (0: not taken). After `DROP_DEFER_MS`, or when a new drag
+  of the app overtakes it, it ends as it was delivered. Without `drop_defer` the source's
+  `DS_END` comes in the passes right after the drop's, no longer in the same pass as the target's
+  `DS_DROP`. In the drop's passes `drag_allowed()` says the source's effects, as for other drops,
+  and `dragging()` is false once the drag was dropped.
+
+### Changed
+
 - A drag whose `DragData::effects` is 0 allows every effect, as `drag_allowed()` and the
   effects of a drop already said for a source that does not say: inside the app a plain drag
   still moves, Ctrl+Shift links and a target that only links takes it, and dragged out it offers
@@ -58,10 +79,6 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   effects. A source that must not be linked names its effects (`DE_COPY | DE_MOVE`); files are
   still never moved.
 - Linux: the build script sets `--cfg jfgui_glibc` (the output through the GPU) also without std, unless `-C target-feature=+crt-static` asks for one static file; so a JFLib app builds on Linux with plain `cargo run`, no flags and no `--target`.
-- A notch of the wheel scrolls the system's lines in the library's views, no longer always three;
-  headless runs stay at three. A trackpad on macOS and a touchpad on Wayland, which plat gives in
-  pixels now, scroll the views by the fingers' way (4.8 times it on Wayland and 1.2 on macOS
-  before).
 
 ### Fixed
 
@@ -83,12 +100,15 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   first editor of the id that is built, and `canvas_damage` to the canvas in every window.
 - The syntax highlighter nests at most 32 levels within a line (template strings in `${..}`, Nest and Element rules); deeper, the rest of the line keeps the construct's colour. A long line of "`${" ran the stack out.
 - Terminal: cursor moves (`ESC[H`, `f`, `G`, `C`) reach column 1024 at most. The spaces up to a far column made 12 bytes into a scrollback line of 32000 cells.
-- The code editor's horizontal wheel scrolled the wrong way: tilted right it scrolled left.
-- An image view whose wheel zooms panned twice as far with the horizontal wheel while the
-  vertical one stood still (and not at all in a right-to-left window).
-- The fine steps of a precision touchpad were cut off one by one where whole lines count: the
-  terminal never scrolled with steps below 40, the code completion list scrolled three rows on
-  each of them, Ctrl + each of them zoomed a diagram a whole step. They add up now.
+- On a phone or a tablet a vertical scroll view rolls sideways only while its content is laid
+  out wider than the view, and only as far as that content reaches. Before, the natural width
+  decided, where a wrapping text counts unwrapped and a view inside that rolls sideways itself
+  with its whole content: nearly every page rolled sideways into nothing, and the finger after a
+  sideways swipe only stopped that roll (no tap, no press and hold on a slider).
+- `ui::main!` in a library crate with std (the app of `cargo jflib new --std`): `cargo test --lib`
+  builds its unit tests. The panic check refused the test build (tests always unwind), and
+  `ui::test_main!` beside `main!` defined `jfgui_main` twice; `main!`'s own `jfgui_main` links the
+  tests now. `ui::test_main!` stays for library crates without `main!`, such as a style crate.
 
 ### Security
 
@@ -316,6 +336,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0

@@ -189,9 +189,9 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::agent_core`. All of JFLib's crates share one
 version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
 together. The [changelog](https://docs.rs/crate/jflib-agent-core/latest/source/CHANGELOG.md) says
 the same.
 

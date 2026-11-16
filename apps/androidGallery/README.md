@@ -433,7 +433,7 @@ Rollen, Weiterrollen, Tippen und was den Finger selbst nimmt, stehen in
 
 ```powershell
 python build_rs.py app androidGallery --target win
-python build_rs.py test androidGallery --target win        # tests/touch.uis, touch_rtl.uis
+python build_rs.py test androidGallery --target win        # tests/touch.uis, touch_rtl.uis, touch_phone.uis
 node apps/androidGallery/tests/touch_web.mjs build --engines=chromium
 python build_rs.py app androidGallery --target android --android-abi arm64-v8a
 python apps/androidGallery/tests/android_touch.py --serial SERIAL

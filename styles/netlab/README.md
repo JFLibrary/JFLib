@@ -45,16 +45,11 @@ ui.set_style("netlab");
 the person installing it choose. Of this crate `jflib` promises only `STYLE`. All of JFLib's
 crates share one version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-NetLab is now one of JFLib's official styles: `jflib` brings it like the other four, as
-`jflib::style_netlab`, as `jflib::style` with `JFLIB_STYLE=netlab`, and in packages with
-`cargo jflib package --styles netlab`. Version 0.1.0 was published on its own, and an app had to
-name the crate itself; such an app can drop that dependency now, and if it keeps it, it must use
-the same version as `jflib`. Views that scroll only vertically keep the room of the visible
-scroll bar free, so their content no longer runs under it, and the manifest now names the
-licences of the fonts and icons the crate carries. Everything is in the
-[changelog](https://docs.rs/crate/jflib-style-netlab/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-style-netlab/latest/source/CHANGELOG.md) says
+the same.
 
 ## Documentation
 

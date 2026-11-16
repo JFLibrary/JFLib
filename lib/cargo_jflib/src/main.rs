@@ -10,8 +10,8 @@
 //!                                      the app for the browser in target/jflib-web/NAME/
 //! cargo jflib android [-p PKG] [--release] [--abi arm64-v8a|x86_64] [--install]
 //!                                      the app as an APK in target/jflib-android/
-//! cargo jflib mac [-p PKG] [--release] [--run [-- ARGS]]
-//!                                      the app as NAME.app in target/jflib-mac/ (on a Mac)
+//! cargo jflib mac [-p PKG] [--release] [--arch aarch64|x86_64] [--run [-- ARGS]]
+//!                                      the app as NAME.app in target/jflib-mac/ (on a Mac; for every Mac)
 //! cargo jflib package [-p PKG] [--styles winui,kde] [--formats setup,deb,..|all] [--no-win] [--no-deb]
 //!                     [--sign] [--repo DIR] [--update DIR [--update-url URL] [--update-key FILE]]
 //!                                      setup, MSIX, .deb, AppImage, RPM, Flatpak in target/jflib-package/
@@ -69,9 +69,11 @@ USAGE:
     cargo jflib android [-p PKG] [--release] [--abi arm64-v8a|x86_64] [--install]
         the app as an APK: target/jflib-android/NAME-ABI-debug.apk (--release: signed with the key
         of jfgui_ANDROID_KEYSTORE); needs the Android SDK and NDK and a JDK; --install: adb install
-    cargo jflib mac [-p PKG] [--release] [--run [-- ARGS]]
+    cargo jflib mac [-p PKG] [--release] [--arch aarch64|x86_64] [--run [-- ARGS]]
         the app as NAME.app: target/jflib-mac/NAME.app (Info.plist from PACKAGE, the icon from res/,
-        signed ad hoc; with `sandbox` in PERMISSIONS the App Sandbox); on a Mac; --run starts it
+        signed ad hoc; with `sandbox` in PERMISSIONS the App Sandbox); on a Mac; one program for Apple
+        Silicon and Intel Macs (lipo; the Intel part needs rustup target add x86_64-apple-darwin),
+        --arch only one of them; --run starts it
     cargo jflib package [-p PKG] [--styles winui,kde] [--formats setup,deb,..|all] [--no-win] [--no-deb]
         the app with every style built in, the look picked at installation, in target/jflib-package/:
         setup (NAME_Setup.exe) and deb by default (an app with std: those of this system), also msix

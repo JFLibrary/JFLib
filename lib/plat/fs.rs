@@ -254,7 +254,9 @@ fn link_target_allowed(target: &str, link: &str) -> bool {
     }
     match crate::policy::normalize_for(target, cfg!(windows), &base) {
         Some(t) => crate::policy::fs_allowed(&t, crate::policy::FS_WRITE),
-        None => false,
+        // ".." (the system resolves it after links, the rules cannot): refused under rules,
+        // as such a path is everywhere; without rules every target may be written
+        None => !target.is_empty() && !target.contains('\0') && crate::policy::fs_unrestricted(),
     }
 }
 
@@ -1885,16 +1887,16 @@ mod apl {
         fn utimensat(dir: c_int, path: *const c_char, ts: *const ffi::Timespec, flags: c_int) -> c_int;
         fn fchmodat(dir: c_int, path: *const c_char, mode: u16, flags: c_int) -> c_int;
         fn fchownat(dir: c_int, path: *const c_char, uid: u32, gid: u32, flags: c_int) -> c_int;
-        fn statfs(path: *const c_char, buf: *mut u8) -> c_int;
+        #[cfg_attr(all(target_os = "macos", target_arch = "x86_64"), link_name = "statfs$INODE64")] fn statfs(path: *const c_char, buf: *mut u8) -> c_int;
         fn geteuid() -> u32;
         fn openat(dir: c_int, path: *const c_char, flags: c_int, ...) -> c_int;
-        fn fstatat(dir: c_int, path: *const c_char, st: *mut Stat, flags: c_int) -> c_int;
+        #[cfg_attr(all(target_os = "macos", target_arch = "x86_64"), link_name = "fstatat$INODE64")] fn fstatat(dir: c_int, path: *const c_char, st: *mut Stat, flags: c_int) -> c_int;
         fn mkdirat(dir: c_int, path: *const c_char, mode: u16) -> c_int;
         fn unlinkat(dir: c_int, path: *const c_char, flags: c_int) -> c_int;
         fn renameat(from_dir: c_int, from: *const c_char, to_dir: c_int, to: *const c_char) -> c_int;
         fn readlinkat(dir: c_int, path: *const c_char, buf: *mut c_char, size: usize) -> isize;
         fn symlinkat(target: *const c_char, dir: c_int, link: *const c_char) -> c_int;
-        fn fdopendir(fd: c_int) -> *mut core::ffi::c_void;
+        #[cfg_attr(all(target_os = "macos", target_arch = "x86_64"), link_name = "fdopendir$INODE64")] fn fdopendir(fd: c_int) -> *mut core::ffi::c_void;
         fn futimens(fd: c_int, ts: *const ffi::Timespec) -> c_int;
     }
 

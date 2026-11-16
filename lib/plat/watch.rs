@@ -653,7 +653,7 @@ mod imp {
     fn real_path(p: &str) -> Option<String> {
         #[link(name = "System")]
         unsafe extern "C" {
-            fn realpath(path: *const u8, out: *mut u8) -> *mut u8;
+            #[cfg_attr(all(target_os = "macos", target_arch = "x86_64"), link_name = "realpath$DARWIN_EXTSN")] fn realpath(path: *const u8, out: *mut u8) -> *mut u8;
             fn free(p: *mut u8);
         }
         let z: Vec<u8> = p.bytes().chain(core::iter::once(0)).collect();

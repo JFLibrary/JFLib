@@ -48,11 +48,11 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::img_webp`. All of JFLib's crates share one
 version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-One fix protects the decoder against hostile files on 32-bit targets: chunk sizes near 4 GB are
-checked without wrapping, where on wasm32 the walk through the chunks went back into the file.
-Everything is in the [changelog](https://docs.rs/crate/jflib-img-webp/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-img-webp/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

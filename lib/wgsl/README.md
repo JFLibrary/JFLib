@@ -73,12 +73,10 @@ Like all of JFLib, the crate comes through the one dependency
 version and are released together. It runs on every platform JFLib supports. The `buffer_view`
 extension is not supported yet; the documentation lists what else is missing.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Compound assignments of a vector with a scalar compile right now: in SPIR-V `v += 1.0` became a
-multiplication by 1.0 (`-=` and `/=` alike), and integer vectors gave invalid SPIR-V. A module
-whose SPIR-V would need an instruction longer than 65535 words is a compile error instead of a
-broken module. Everything is in the
+One fix: `atomic<vec2<u32>>` is refused outside the storage address space; a workgroup variable of
+it was taken and panicked in the SPIR-V backend. Everything is in the
 [changelog](https://docs.rs/crate/jflib-wgsl/latest/source/CHANGELOG.md).
 
 ## Documentation

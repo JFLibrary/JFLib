@@ -88,12 +88,11 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::render3d`. All of JFLib's crates share one
 version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-jflib-render3d is new in this release: meshes, glTF's PBR materials with textures, scenes of
-instances with `f64` positions, sun, point and spot lights, environment light, cascaded shadows,
-visibility and occlusion on the GPU, detail levels, and glTF scenes put on the GPU in one call.
-Everything is in the [changelog](https://docs.rs/crate/jflib-render3d/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-render3d/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

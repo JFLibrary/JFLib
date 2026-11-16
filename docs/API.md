@@ -224,19 +224,27 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   nor `#![no_main]`.  In a library crate (the template's app) that `fn main` stays unused and
   the program's own calls `jflib::plat::std_start()`.
 
+  The unit tests of the crate that holds it (the template's app with std, `cargo test --lib`)
+  need no `test_main!`: this `jfgui_main` links their test binary (never called there), and the
+  panic check leaves the test build out (`cfg(test)`: Cargo builds tests with unwind whatever the
+  profiles say; doc tests build the crate without it, docs/GUIDE.md "An app with std").  A
+  `test_main!` next to it would define `jfgui_main` twice (E0428)
+
 - **`main!(...)`**
   (see above)
 
 - **`test_main!(...)`**
   (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
-  std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
-  the tests do not link.  Never called (the test harness has its own main); no panic check
-  (tests unwind).  `#[cfg(test)] ui::test_main!();` in the crate's lib.rs, also under
-  `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros)
+  std and without main! (a style crate's `cargo test`): plat's start of a std program refers to
+  it, so without it the tests do not link.  Never called (the test harness has its own main); no
+  panic check (tests unwind).  `#[cfg(test)] ui::test_main!();` in the crate's lib.rs, also under
+  `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros).  A
+  crate with main! needs none: its main!'s `jfgui_main` links the tests
 
 - **`__ui_panic_check!(...)`**
   ui::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
-  std built with the feature `unwind` may unwind as well
+  std built with the feature `unwind` may unwind as well.  Not in the unit tests of the crate
+  with main! (`cfg(test)` is the app crate's, where this expands): Cargo builds tests with unwind
 
 - **`__ui_panic_check!(...)`**
   (see above)
@@ -21338,8 +21346,9 @@ built yet (level Basis; Features says so).
 
 - **`fn create_compute_pipeline(&self, desc: &ComputePipelineDesc) -> Result<ComputePipeline>`**
 - **`fn create_compute_pipeline_sized(&self, desc: &ComputePipelineDesc, size: u32) -> Result<ComputePipeline>`**
-  create_compute_pipeline with a required subgroup size: Metal's SIMD groups have one size
-  (32), so only 0 (the driver's choice) and that size work
+  create_compute_pipeline with a required subgroup size: Metal's SIMD groups have one size on
+  Apple's GPUs (32), so only 0 (the driver's choice) and that size work; on an Intel Mac's GPU
+  the driver picks it per pipeline (min and max of the limits differ), so only 0
 - **`fn create_render_pipeline(&self, desc: &RenderPipelineDesc) -> Result<RenderPipeline>`**
 
 - **`struct Timestamps`**
@@ -27884,7 +27893,7 @@ applies `--simd sse2` before the app starts.
 
 - **`fn cpu_brand() -> String`**
   the processor name from CPUID 0x80000002..4 (macOS, iOS: sysctl machdep.cpu.brand_string,
-  "Apple M2"), blanks trimmed  [cpu_brand]
+  "Apple M2", on an Intel Mac Intel's name; under Rosetta 2 the Mac's own chip), blanks trimmed  [cpu_brand]
 
 - **`fn avx2_probe() -> bool`**
   run two 256-bit AVX2 instructions (they fault without OS support); only call it when
@@ -27895,10 +27904,11 @@ applies `--simd sse2` before the app starts.
   it: a thread started with a misaligned stack shows here)  [plattest th_raw]
 
 - **`fn avx2_probe() -> bool`**
-  The browser does not advertise or execute native AVX2 instructions.
+  The browser does not advertise or execute native AVX2 instructions (nor do ARM64 processors).
 
 - **`fn stack_aligned() -> bool`**
-  WebAssembly's compiler-managed value/call stacks satisfy their platform ABI.
+  WebAssembly's compiler-managed value/call stacks satisfy their platform ABI (Apple Silicon: the
+  system starts every thread; Intel Macs read rsp as Windows and Linux do).
 
 - **`fn stack_aligned() -> bool`**
   the stack pointer is 16-byte aligned (ARM64 faults on a memory access through a misaligned sp: a
@@ -51853,19 +51863,27 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
   start of a std program (`jfgui_std_start`: crash handlers, the panic hook, then `jfgui_main`,
   the end through `std::process::exit`); the crate then has neither `#![no_std]` nor `#![no_main]`.
 
+  The unit tests of a library crate that holds it (`cargo test --lib`) need no `test_main!`: this
+  `jfgui_main` links their test binary (never called there), and the panic check leaves the test
+  build out (`cfg(test)`: Cargo builds tests with unwind whatever the profiles say; doc tests
+  build the crate without it, docs/GUIDE.md "An app with std").  A `test_main!` next to it
+  would define `jfgui_main` twice (E0428)
+
 - **`main!(...)`**
   (see above)
 
 - **`test_main!(...)`**
   (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
-  std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
-  the tests do not link.  Never called (the test harness has its own main); no panic check
-  (tests unwind).  `#[cfg(test)] rt::test_main!();` in the crate's lib.rs, also under
-  `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros)
+  std and without main! (a style crate's `cargo test`): plat's start of a std program refers to
+  it, so without it the tests do not link.  Never called (the test harness has its own main); no
+  panic check (tests unwind).  `#[cfg(test)] rt::test_main!();` in the crate's lib.rs, also under
+  `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros).  A
+  crate with main! needs none: its main!'s `jfgui_main` links the tests
 
 - **`__rt_panic_check!(...)`**
   rt::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
-  std built with the feature `unwind` may unwind as well
+  std built with the feature `unwind` may unwind as well.  Not in the unit tests of the crate
+  with main! (`cfg(test)` is the app crate's, where this expands): Cargo builds tests with unwind
 
 - **`__rt_panic_check!(...)`**
   (see above)

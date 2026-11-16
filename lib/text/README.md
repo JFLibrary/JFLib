@@ -88,12 +88,11 @@ its windows and leaves them off in headless runs, so screenshots match on every 
 Through the one dependency [`jflib`](https://crates.io/crates/jflib), as `jflib::text`. All of
 JFLib's crates share one version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-On macOS and iOS the font database now scans the system's font folders, and the fallback names
-Apple's fonts, so Chinese, Japanese, Korean and other scripts find one there. Switching the system
-fonts for missing characters on or off no longer leaves the line shaped last with its old
-glyphs. Everything is in the
+Two fixes against slow input: line breaking with many soft hyphens no longer measures each of them
+from the line's start, and the CFF charstring operator `roll` rotates in one pass, so such a font
+loads at once instead of in about 35 seconds. Everything is in the
 [changelog](https://docs.rs/crate/jflib-text/latest/source/CHANGELOG.md).
 
 ## Documentation

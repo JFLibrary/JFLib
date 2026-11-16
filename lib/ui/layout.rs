@@ -77,6 +77,11 @@ pub(crate) struct BoxFrame {
     /// width kept free right of the content (a scroll view's bar, StyleList::scrollbar_room);
     /// part of the natural width
     pub(crate) gutter: i32,
+    /// the right edge (absolute px) of what was placed in it, a clipping box inside it only with
+    /// its own rectangle (i32::MIN: nothing yet): how far its content really reaches -- a wrapping
+    /// text at its wrapped width, a scroll view at its own (form.rs: what a phone's view rolls
+    /// sideways for; the natural width says what the content would like, not where it is)
+    pub(crate) ext: i32,
 }
 
 /// a row of a wrapping box (BOX_WRAP): its height (the tallest child) and its children's
@@ -85,6 +90,15 @@ pub(crate) struct BoxFrame {
 pub(crate) struct Row {
     pub(crate) h: i32,
     pub(crate) w: i32,
+}
+
+impl BoxFrame {
+    // reach(r): a child placed at r (px)
+    fn reach(&mut self, r: [i32; 4]) {
+        if r[2] > 0 {
+            self.ext = self.ext.max(r[0].wrapping_add(r[2]));
+        }
+    }
 }
 
 /// a wrapping box being built: its rows so far (the last one is being filled), that row's
@@ -160,6 +174,9 @@ pub(crate) struct W {
     /// wrapping boxes (BOX_WRAP): the open ones, the rows each one measured (previous pass)
     pub(crate) wraps: Vec<Wrap>,
     pub(crate) wrap_rows: BTreeMap<u32, Vec<Row>>,
+    /// box_end: how wide the content of the box it ended is laid out (px: its reach from the
+    /// content start, BoxFrame::ext, + padding + gutter; scroll views read it, list.rs)
+    pub(crate) ended_w: i32,
 }
 
 impl Ui {
@@ -324,10 +341,13 @@ impl Ui {
         let gk = self.wp.lay.boxes.last().map_or(0, |b| b.grid);
         if gk != 0 && self.wp.lay.next_rect_set == 0 {
             let r = self.grid_place(gk as usize, iw, ih);
+            self.top().reach(r);
             self.wp.ctx.last_rect = r;
             return r;
         }
         let l = &mut self.wp.lay;
+        // (window px are no part of the box's content)
+        let in_box = l.next_rect_set != 2;
         let r = if l.next_rect_set == 0 {
             let n = l.boxes.len();
             let b = &mut l.boxes[n - 1];
@@ -477,6 +497,11 @@ impl Ui {
         };
         l.next_w = 0;
         l.next_h = 0;
+        if in_box {
+            if let Some(b) = l.boxes.last_mut() {
+                b.reach(r);
+            }
+        }
         self.wp.ctx.last_rect = r;
         if repass {
             self.repass = true;
@@ -608,6 +633,7 @@ impl Ui {
             fixedp: s.fixed,
             wsump: s.wsum,
             gcell,
+            ext: i32::MIN,
             ..BoxFrame::default()
         };
         // cursor at the start of the main axis, shifted for centre / end alignment (a wrapping
@@ -674,6 +700,10 @@ impl Ui {
             s.fixed = b.fixed;
             s.wsum = b.wsum;
         }
+        // how wide it is laid out (its reach from the content start; a scroll view reads it); what
+        // a clipping box holds reaches no further than the box itself for its parent
+        let reach = if b.ext == i32::MIN { 0 } else { b.ext.wrapping_sub(b.pos[0]).max(0) };
+        self.wp.lay.ended_w = reach.wrapping_add(p2).wrapping_add(b.gutter);
         // late correction: the parent accounted for our previous natural size (a grid parent
         // takes this pass's size for the cell)
         let n = self.wp.lay.boxes.len();
@@ -684,6 +714,9 @@ impl Ui {
         if n >= 2 {
             let l = &mut self.wp.lay;
             let p = &mut l.boxes[n - 2];
+            if b.flags & BOX_CLIP == 0 && b.ext != i32::MIN {
+                p.ext = p.ext.max(b.ext);
+            }
             let (mut along, mut across) = (w, h);
             if p.flags & BOX_V != 0 {
                 core::mem::swap(&mut along, &mut across);

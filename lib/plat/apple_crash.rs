@@ -1,4 +1,4 @@
-// apple_crash -- crash handling on macOS and iOS (arm64; the promises of linux_crash.rs)
+// apple_crash -- crash handling on macOS and iOS (arm64; Intel Macs x86-64; the promises of linux_crash.rs)
 //
 // SIGSEGV, SIGBUS, SIGILL, SIGFPE and SIGTRAP run a handler on a 64 KB alternate stack (every thread
 // has its own: thread_alt_stack): it fills a CrashInfo from the signal's context, prints "jfgui: crash
@@ -6,6 +6,9 @@
 // SA_RESETHAND: a crash inside the handler ends the process.  CrashInfo::frames: the link register,
 // then the chain of frame records (fp, lr) -- Apple's arm64 ABI keeps the frame pointer, so no unwind
 // tables are needed -- read only inside the crashing thread's stack.  CrashInfo::regs: x0 .. x15, pc.
+// x86-64 (docs/INTEL_MAC.md): the same chain through rbp (Apple's x86-64 ABI keeps the frame pointer
+// too); first the word at rsp when it is a return address into the program (a leaf without a frame,
+// such as crash_test); CrashInfo::regs: rax .. r15, rip as on Linux and Windows.
 // A fault just below the thread's stack is a stack overflow (CK_STACK: no hook).
 
 use core::ffi::{c_int, c_void};
@@ -74,17 +77,100 @@ pub(crate) fn crash_init() {
     }
 }
 
-// Darwin's arm64 signal context: ucontext->uc_mcontext (offset 48) -> mcontext64: the exception
-// state (far, esr), then the thread state x0 .. x28, fp, lr, sp, pc
+// the signal's context: ucontext->uc_mcontext (offset 48, both processors) -> mcontext64
 const UC_MCONTEXT: usize = 48;
-const MC_FAR: usize = 0;
-const MC_ESR: usize = 8;
-const MC_X: usize = 16;
-const MC_FP: usize = 16 + 29 * 8;
-const MC_LR: usize = MC_FP + 8;
-const MC_SP: usize = MC_LR + 8;
-const MC_PC: usize = MC_SP + 8;
 const SI_ADDR: usize = 24;
+// Darwin's arm64 mcontext64: the exception state (far, esr), then the thread state x0 .. x28, fp, lr, sp, pc
+#[cfg(target_arch = "aarch64")] const MC_FAR: usize = 0;
+#[cfg(target_arch = "aarch64")] const MC_ESR: usize = 8;
+#[cfg(target_arch = "aarch64")] const MC_X: usize = 16;
+#[cfg(target_arch = "aarch64")] const MC_FP: usize = 16 + 29 * 8;
+#[cfg(target_arch = "aarch64")] const MC_LR: usize = MC_FP + 8;
+#[cfg(target_arch = "aarch64")] const MC_SP: usize = MC_LR + 8;
+#[cfg(target_arch = "aarch64")] const MC_PC: usize = MC_SP + 8;
+// Darwin's x86-64 mcontext64: the exception state (trapno u16, cpu u16, err u32, faultvaddr u64), then
+// the thread state rax rbx rcx rdx rdi rsi rbp rsp r8 .. r15 rip rflags cs fs gs
+#[cfg(target_arch = "x86_64")] const MC_ERR: usize = 4;
+#[cfg(target_arch = "x86_64")] const MC_FAULTVADDR: usize = 8;
+#[cfg(target_arch = "x86_64")] const MC_SS: usize = 16;
+// thread-state indexes of CrashInfo::regs' rax rbx rcx rdx rsi rdi rbp rsp r8 .. r15 rip
+#[cfg(target_arch = "x86_64")] const SS_REGS: [usize; 17] = [0, 1, 2, 3, 5, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+
+/// fill ci from the machine context mc: the address, the kind of access, the registers, the
+/// instruction pointer -> (sp, fp, the first return address: lr / the word at rsp, 0 if none)
+///
+/// # Safety
+/// mc is the kernel's machine context of the signal; sp's word is readable (the faulting thread's stack).
+#[cfg(target_arch = "aarch64")]
+unsafe fn context(ci: &mut CrashInfo, si_addr: u64, mc: *const u8) -> (u64, u64, u64) {
+    // SAFETY: (caller) mc holds the arm64 exception and thread state.
+    unsafe {
+        let rd = |o: usize| *(mc.add(o) as *const u64);
+        if ci.kind == CK_ACCESS || ci.kind == CK_BUS {
+            ci.addr = si_addr;
+            // a data abort's syndrome: bit 6 (WnR) is a write; an instruction abort (EC 0x20, 0x21) a fetch
+            let esr = *(mc.add(MC_ESR) as *const u32);
+            ci.access = if matches!(esr >> 26, 0x20 | 0x21) { 8 } else { esr >> 6 & 1 };
+            if ci.addr == 0 {
+                ci.addr = rd(MC_FAR);
+            }
+        }
+        for i in 0..16 {
+            ci.regs[i] = rd(MC_X + i * 8);
+        }
+        ci.ip = rd(MC_PC);
+        ci.regs[16] = ci.ip;
+        (rd(MC_SP), rd(MC_FP), rd(MC_LR))
+    }
+}
+
+/// (x86-64) see the arm64 version; the first return address is the word at rsp when it points into
+/// the program right after a call (a leaf without a frame record of its own)
+///
+/// # Safety
+/// As the arm64 version.
+#[cfg(target_arch = "x86_64")]
+unsafe fn context(ci: &mut CrashInfo, si_addr: u64, mc: *const u8) -> (u64, u64, u64) {
+    // SAFETY: (caller) mc holds the x86-64 exception and thread state.
+    unsafe {
+        let rd = |o: usize| *(mc.add(o) as *const u64);
+        if ci.kind == CK_ACCESS || ci.kind == CK_BUS {
+            ci.addr = si_addr;
+            if ci.addr == 0 {
+                ci.addr = rd(MC_FAULTVADDR);
+            }
+        }
+        if ci.kind == CK_ACCESS {
+            // page fault error code: bit 1 write, bit 4 instruction fetch
+            let err = *(mc.add(MC_ERR) as *const u32);
+            ci.access = if err & 16 != 0 { 8 } else { err >> 1 & 1 };
+        }
+        for (i, &r) in SS_REGS.iter().enumerate() {
+            ci.regs[i] = rd(MC_SS + r * 8);
+        }
+        ci.ip = ci.regs[16];
+        (ci.regs[7], ci.regs[6], 0)
+    }
+}
+
+/// (x86-64) the word at rsp when it is a return address into the program's code: the byte 5 before
+/// it is a call rel32 (E8), or a call through a register or memory (FF /2) ends there
+#[cfg(target_arch = "x86_64")]
+fn leaf_return(ci: &CrashInfo, sp: u64, bottom: u64, top: u64) -> u64 {
+    if sp % 8 != 0 || sp < bottom || sp + 8 > top {
+        return 0;
+    }
+    // SAFETY: sp .. sp + 8 lies inside the crashing thread's stack (checked above).
+    let ret = unsafe { *(sp as *const u64) };
+    if ret < ci.code0 + 6 || ret > ci.code1 {
+        return 0;
+    }
+    // SAFETY: ret - 6 .. ret lies inside the program's __TEXT segment (checked above).
+    let b = |k: u64| unsafe { *((ret - k) as *const u8) };
+    let call = b(5) == 0xE8 || (b(2) == 0xFF && b(1) >> 3 & 7 == 2) || (b(3) == 0xFF && b(2) >> 3 & 7 == 2)
+        || (b(6) == 0xFF && b(5) >> 3 & 7 == 2);
+    if call { ret } else { 0 }
+}
 
 extern "C" fn handler(sig: c_int, si: *const u8, uc: *const u8) -> ! {
     if rt::crash::busy() {
@@ -102,23 +188,9 @@ extern "C" fn handler(sig: c_int, si: *const u8, uc: *const u8) -> ! {
     // SAFETY: the kernel passes a valid siginfo and ucontext with its machine context.
     let (si_addr, sp, fp, lr) = unsafe {
         let mc = *(uc.add(UC_MCONTEXT) as *const *const u8);
-        let rd = |o: usize| *(mc.add(o) as *const u64);
         let si_addr = *(si.add(SI_ADDR) as *const u64);
-        if ci.kind == CK_ACCESS || ci.kind == CK_BUS {
-            ci.addr = si_addr;
-            // a data abort's syndrome: bit 6 (WnR) is a write; an instruction abort (EC 0x20, 0x21) a fetch
-            let esr = *(mc.add(MC_ESR) as *const u32);
-            ci.access = if matches!(esr >> 26, 0x20 | 0x21) { 8 } else { esr >> 6 & 1 };
-            if ci.addr == 0 {
-                ci.addr = rd(MC_FAR);
-            }
-        }
-        for i in 0..16 {
-            ci.regs[i] = rd(MC_X + i * 8);
-        }
-        ci.ip = rd(MC_PC);
-        ci.regs[16] = ci.ip;
-        (si_addr, rd(MC_SP), rd(MC_FP), rd(MC_LR))
+        let (sp, fp, lr) = context(&mut ci, si_addr, mc);
+        (si_addr, sp, fp, lr)
     };
     // SAFETY: the calling thread's own stack bounds.
     let (top, bottom) = unsafe {
@@ -130,6 +202,8 @@ extern "C" fn handler(sig: c_int, si: *const u8, uc: *const u8) -> ! {
         ci.kind = CK_STACK;
     }
     code_range(&mut ci);
+    #[cfg(target_arch = "x86_64")]
+    let lr = lr.max(leaf_return(&ci, sp, bottom, top)); // (no link register: the word at rsp)
     call_chain(&mut ci, lr, fp, sp.min(fp).max(bottom), top);
     let mut line = StackText::<160>::new();
     let _ = writeln!(line, "jfgui: crash signal {sig} at pc 0x{:x}, address 0x{si_addr:x} (image base 0x{:x})", ci.ip, ci.base);

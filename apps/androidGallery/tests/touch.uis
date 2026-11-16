@@ -364,7 +364,9 @@ pointer mouse
 key esc
 pointer touch
 
-# ---- a window moved by finger in every direction, not out of reach
+# ---- a window moved by finger in every direction, not out of reach: on a desktop 48 DIP of it stay
+# on the screen, on a phone or a tablet (iOS, Android: lib/ui/form.rs) all of it, its title bar below
+# the top edge (touch_phone.uis checks that on every system)
 pointer mouse
 click #900
 click menuitem:"Fenster & Dialoge"
@@ -379,27 +381,32 @@ expect window 7100 rect 54 88 260 272
 window 7100
 flick 100,14 -900 -900 300
 window any
-expect window 7100 rect -214 0 260 272
+only !ios, !android: expect window 7100 rect -214 0 260 272
+only ios, android: expect window 7100 rect 0 40 260 272
 window 7100
 flick 210,14 900 2000 300
 window any
-expect window 7100 rect 342 732 260 272
+only !ios, !android: expect window 7100 rect 342 732 260 272
+only ios, android: expect window 7100 rect 128 506 260 272
 # back; a tap on a title bar does not move it, its widgets work, the close button by finger
 window 7100
 flick 100,14 -300 -700 300
 window any
-expect window 7100 rect 42 32 260 272
+only !ios, !android: expect window 7100 rect 42 32 260 272
+only ios, android: expect window 7100 rect 0 40 260 272
 window 7100
 tap 100,14
 tap #7101
 window any
-expect window 7100 rect 42 32 260 272
+only !ios, !android: expect window 7100 rect 42 32 260 272
+only ios, android: expect window 7100 rect 0 40 260 272
 expect #7101 value 51
 window 7100
 flick #7101 30 0 300
 window any
 expect #7101 value 60..80
-expect window 7100 rect 42 32 260 272
+only !ios, !android: expect window 7100 rect 42 32 260 272
+only ios, android: expect window 7100 rect 0 40 260 272
 window 7100
 tap 245,14
 window any

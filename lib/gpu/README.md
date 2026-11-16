@@ -129,17 +129,13 @@ version and are released together. To show a scene of your own inside a window b
 [`jflib-ui`](https://crates.io/crates/jflib-ui) has `ui.gpu_view`, which hands your content the
 UI's own device.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-jflib-gpu now runs on macOS and iOS through Metal, with the same types and methods as on Vulkan:
-shaders stay SPIR-V and are translated by jflib-shader, and devices with Metal 3 reach level
-`Voll`. On Vulkan a device can have a second queue for compute and copies when asked for
-(`Adapter::create_device_with` with `DeviceOptions::compute_queue`), while `create_device` stays
-as it was. `TextureView::usage` and `TextureView::same` are new, and validation with
-`jfgui_GPU_VALIDATE` now also sees what shaders read and write through their bindings. Range
-checks no longer wrap: an offset near `u32::MAX` is `GpuError::Invalid` instead of reaching the
-driver. Everything
-is in the [changelog](https://docs.rs/crate/jflib-gpu/latest/source/CHANGELOG.md).
+Metal runs on Intel Macs (`x86_64-apple-darwin`). There an Intel or AMD GPU reports subgroup sizes
+from 8 to 64 and `Device::create_compute_pipeline_sized` takes only 0; built and run under Rosetta
+2, not yet checked on such a GPU. On Linux the build script picks the build against glibc itself, so
+`cargo run` needs no flags. Everything is in the
+[changelog](https://docs.rs/crate/jflib-gpu/latest/source/CHANGELOG.md).
 
 ## Documentation
 

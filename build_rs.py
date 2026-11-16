@@ -55,8 +55,10 @@ The crates, their dependencies and the library's version come from the Cargo man
            --sim (ios: the simulator's build into ios-sim; mac and ios build on a Mac, docs/APPLE.md; mac: test NAME
                  too, programs with windows start in the logged-in session from SSH),
            --profile size|o2 (release variants, section "r13-measure"),
-           --arch x86_64|aarch64 (default x86_64; docs/ARM64.md; run and test NAME start a static Linux
-           program of the other processor under qemu-aarch64 in WSL, tools/host_exec.py)
+           --arch x86_64|aarch64 (default x86_64, mac and ios aarch64; docs/ARM64.md; run and test NAME start
+           a static Linux program of the other processor under qemu-aarch64 in WSL, tools/host_exec.py;
+           mac --arch x86_64: the Intel Macs' program into mac-x86_64, run and test start it under
+           Rosetta 2, docs/INTEL_MAC.md)
 
 Cargo: every target builds in a Cargo folder of its own below <out> (cargo, cargo-glibc,
 cargo-web-<mode>, cargo-android-<abi>, cargo-modules), side by side.  One `cargo
@@ -68,8 +70,9 @@ the apps themselves stay programs.  The modules link over modrt / modplat (cargo
 
 Output folders (--out overrides): build/<target> for development builds, build/release/<target>
 for --release, build/<profile>/<target> for --profile (so the variants never rebuild each
-other).  --arch aarch64 puts win-arm64 and linux-arm64 in place of <target>.  The assembly
-reference builds into legacy/build (legacy/build.py).
+other).  --arch aarch64 puts win-arm64 and linux-arm64 in place of <target>, --target mac --arch x86_64
+mac-x86_64 (tools/package.py and tools/apple.py universal join it with mac's program into one for every
+Mac, lipo).  The assembly reference builds into legacy/build (legacy/build.py).
 
 Linux: command-line and server programs are one static file without libc.  A program that names
 ui links dynamically against glibc and nothing else (section "glibc"; every GPU driver is a glibc
@@ -154,6 +157,10 @@ APPLE_MIN = {"mac": ("MACOSX_DEPLOYMENT_TARGET", "13.0"), "ios": ("IPHONEOS_DEPL
 ARCHS = ("x86_64", "aarch64")
 ARM64_TRIPLE = {"win": "aarch64-pc-windows-msvc", "linux": "aarch64-unknown-linux-gnu"}
 ARM64_FOLDER = {"win": "win-arm64", "linux": "linux-arm64"}
+# --target mac --arch x86_64 (docs/INTEL_MAC.md): the Intel Macs' program in a folder of its own; Apple's
+# targets build for ARM64 without --arch
+MAC_X86_TRIPLE = "x86_64-apple-darwin"
+MAC_X86_FOLDER = "mac-x86_64"
 RUSTC_VERSION = manifests.workspace()["package"]["rust-version"]  # the toolchain this code is written for (checked, minor ignored)
 UNSAFE_OK = {"rt", "simd", "plat", "gpu"}   # gpu: the Vulkan FFI (lib/gpu/vk_*.rs)
 
@@ -170,12 +177,22 @@ class BuildError(Exception):
     pass
 
 
+def native_arch(target):
+    """the processor a target builds for without --arch: ARM64 for Apple's, x86-64 for the others (Android:
+    --android-abi)"""
+    return "aarch64" if target in APPLE else "x86_64"
+
+
 def arch_triple(target, arch):
+    if target in APPLE:
+        return MAC_X86_TRIPLE if target == "mac" and arch == "x86_64" else TRIPLE[target]
     return ARM64_TRIPLE[target] if arch == "aarch64" else TRIPLE[target]
 
 
 def arch_folder(target, arch):
     """the target's folder below the output folder, and its name in the build's messages"""
+    if target in APPLE:
+        return MAC_X86_FOLDER if target == "mac" and arch == "x86_64" else target
     return ARM64_FOLDER[target] if arch == "aarch64" else target
 
 
@@ -928,9 +945,10 @@ class Builder:
     into <out>/<target dir> (cargo_build), the programs copied to <out>/<folder> as before"""
 
     def __init__(self, target, out, release, jobs, profile=None, web_mode="scalar", android_abi="arm64-v8a", glibc_base=None,
-                 arch="x86_64", ios_sim=False):
+                 arch=None, ios_sim=False):
         self.target = target
-        self.arch = arch
+        self.arch = arch or native_arch(target)     # None: the target's own (mac, ios: ARM64)
+        arch = self.arch
         self.ios_sim = ios_sim and target == "ios"    # Apple: the simulator's build (docs/APPLE.md)
         self.folder = "ios-sim" if self.ios_sim else arch_folder(target, arch)
         self.out = out
@@ -974,7 +992,7 @@ class Builder:
         folder = {"win": "cargo", "linux": "cargo-glibc" if self.glibc else "cargo", "web": f"cargo-web-{self.web_mode}",
                   "android": f"cargo-android-{self.android_abi}", "mac": "cargo-mac",
                   "ios": "cargo-ios-sim" if self.ios_sim else "cargo-ios"}[self.target]
-        return self.out / (folder if self.arch == "x86_64" else f"{folder}-{self.arch}")
+        return self.out / (folder if self.arch == native_arch(self.target) else f"{folder}-{self.arch}")
 
     def glibc_twin(self):
         """section "glibc": the Builder of the programs linked against glibc (once per Builder): its
@@ -1220,7 +1238,7 @@ class Builder:
         return exe
 
 
-def make_builders(targets, out, release, jobs, profile=None, web_mode="auto", android_abi="arm64-v8a", arch="x86_64",
+def make_builders(targets, out, release, jobs, profile=None, web_mode="auto", android_abi="arm64-v8a", arch=None,
                   ios_sim=False):
     """The CLI and Build Manager use the same browser variant selection."""
     return [Builder(target, out, release, jobs, profile, mode, android_abi, arch=arch, ios_sim=ios_sim)
@@ -2396,9 +2414,11 @@ def main():
     ap.add_argument("--sim", action="store_true", help="ios: the simulator's build (ios-sim; docs/APPLE.md)")
     ap.add_argument("--android-abi", choices=["arm64-v8a", "x86_64"], default="arm64-v8a",
                     help="Android native ABI (default ARM64; x86_64 for emulator tests)")
-    ap.add_argument("--arch", choices=ARCHS, default="x86_64",
-                    help="win and linux: the processor (aarch64 builds into win-arm64 and linux-arm64, docs/ARM64.md; "
-                         "run and test NAME start static Linux programs under qemu-aarch64)")
+    ap.add_argument("--arch", choices=ARCHS,
+                    help="the processor (default x86_64, mac and ios aarch64): win and linux aarch64 build into "
+                         "win-arm64 and linux-arm64 (docs/ARM64.md; run and test NAME start static Linux programs under "
+                         "qemu-aarch64), mac x86_64 into mac-x86_64 (Intel Macs, docs/INTEL_MAC.md; run and test NAME "
+                         "start it under Rosetta 2)")
     ap.add_argument("--style")
     ap.add_argument("--web-mode", choices=["auto", "scalar", "simd", "threads"], default="auto",
                     help="browser bundle: auto builds scalar, SIMD128 and shared-memory worker variants")
@@ -2434,7 +2454,7 @@ def main():
     ap.add_argument("--unused", action="store_true", help="i18n: list the unused rows of every app")
     a = ap.parse_args(argv)
     set_static_ui(a.static)                         # section "glibc"
-    if a.arch != "x86_64" and (a.cmd == "watch" or a.cmd == "test" and not a.name):
+    if a.arch == "aarch64" and (a.cmd == "watch" or a.cmd == "test" and not a.name):
         print(f"{a.cmd}: not for --arch {a.arch} (docs/ARM64.md: qemu-aarch64 starts static programs only, the whole suite runs in the ARM64 VM); "
               f"one app: python build_rs.py test coretest --target linux --arch {a.arch}")
         return 1
@@ -2477,10 +2497,13 @@ def main():
     host = "both" if os.name == "nt" else "mac" if sys.platform == "darwin" else "linux"
     tgt = a.target or ("win" if a.cmd == "run" else host if a.cmd == "check" else "both")
     targets = ["win", "linux"] if tgt == "both" else ["win", "linux", "web"] if tgt == "all" else [tgt]
-    if a.arch != "x86_64" and not set(targets) <= set(ARM64_TRIPLE):
-        raise BuildError(f"--arch {a.arch} is for win and linux (Android: --android-abi).")
-    if a.cmd in ("run", "test") and a.arch != host_arch() and not set(targets) & set(APPLE):   # (--arch: win, linux)
-        foreign_start_check(a.name, targets, a.arch)
+    if a.arch == "aarch64" and not set(targets) <= set(ARM64_TRIPLE) | set(APPLE):
+        raise BuildError(f"--arch {a.arch} is for win and linux (Android: --android-abi; mac and ios are ARM64 anyway).")
+    if a.arch == "x86_64" and "ios" in targets:
+        raise BuildError("ios is ARM64 only (every iPhone and iPad, and the simulator on an Apple Silicon Mac; docs/INTEL_MAC.md).")
+    arch = a.arch or (native_arch(targets[0]) if set(targets) & set(APPLE) else "x86_64")
+    if a.cmd in ("run", "test") and arch != host_arch() and not set(targets) & set(APPLE):   # (--arch: win, linux)
+        foreign_start_check(a.name, targets, arch)
     if "android" in targets and a.cmd not in ("app", "lib", "check"):
         raise BuildError("Android supports app/lib builds; install the resulting APK with adb install -r FILE.apk.")
     if set(targets) & set(APPLE):                   # docs/APPLE.md: Apple's SDK and tools are on a Mac only
@@ -2496,7 +2519,7 @@ def main():
     out = ((ROOT / a.out).resolve() if a.out else ROOT / "build" / a.profile if a.profile
            else ROOT / "build" / "release" if a.release else ROOT / "build")
     web_mode = "simd" if a.cmd == "check" and a.web_mode == "auto" else a.web_mode    # check: one browser build
-    builders = make_builders(targets, out, a.release, a.j, a.profile, web_mode, a.android_abi, a.arch, a.sim)
+    builders = make_builders(targets, out, a.release, a.j, a.profile, web_mode, a.android_abi, arch, a.sim)
     t0 = time.perf_counter()
     try:
         if a.cmd == "check":

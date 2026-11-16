@@ -70,11 +70,11 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::agent_io`. All of JFLib's crates share one
 version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-The local endpoint now exists on macOS and iOS too, as a Unix socket in a private folder with the
-peer's user checked by `getpeereid`. The
-[changelog](https://docs.rs/crate/jflib-agent-io/latest/source/CHANGELOG.md) says the same.
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-agent-io/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

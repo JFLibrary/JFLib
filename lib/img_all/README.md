@@ -57,13 +57,11 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::img_all`. All of JFLib's crates share one
 version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
-together. Some of the codecs it registers did change: the TIFF, HEIC, JPEG XL, JPEG XR and
-Paint.NET decoders refuse more kinds of hostile files, as their own changelogs describe. This
-crate's [changelog](https://docs.rs/crate/jflib-img-all/latest/source/CHANGELOG.md) lists no
-changes of its own.
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-img-all/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

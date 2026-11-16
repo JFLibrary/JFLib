@@ -79,13 +79,12 @@ says so, and an error here names what is missing.
 `.part_of()`, `.run()` and the files it reads. All of JFLib's crates share one version and are
 released together; keep `jflib-build` at the version of `jflib`.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-The build script accepts macOS and iOS, where Apple's linker needs nothing extra. `PACKAGE` takes
-`browser=1` for an app that is a web browser, which needs `http` and `https` among its
-`schemes=`. For programs against glibc on ARM64 Linux, the libraries made for linking also carry
-`getauxval`, through which the runtime reads the page size there. When the Linux flags are
-missing, the error says to build with `--target`, on Linux too. Everything is in the
+On Linux a program links against glibc unless `-C target-feature=+crt-static` makes it one static
+file, and it is linked to a fixed address with `-no-pie`, so `-C relocation-model=static` is only
+needed for the static file. `cargo run` needs no flags and no `--target` on Linux any more; the
+rustflags of older templates still work with `--target`. Everything is in the
 [changelog](https://docs.rs/crate/jflib-build/latest/source/CHANGELOG.md).
 
 ## Documentation

@@ -36,9 +36,9 @@ longer than 65,536 bytes is refused.
 Through the one dependency [`jflib`](https://crates.io/crates/jflib), which brings it along. All
 of JFLib's crates share one version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
 together. The [changelog](https://docs.rs/crate/jflib-text-shape/latest/source/CHANGELOG.md) says
 the same.
 

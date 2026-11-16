@@ -102,12 +102,13 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::render2d`. All of JFLib's crates share one
 version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-jflib-render2d is new in this release: the scene of lines, polylines, arcs, circles, curves, fills
-and hatches with layers and styles, dash patterns, blocks inserted many times and transparency,
-drawn on jflib-gpu with coverage from the geometry and `f64` coordinates. Everything is in the
-[changelog](https://docs.rs/crate/jflib-render2d/latest/source/CHANGELOG.md).
+Text and picking. Fonts from TrueType or OpenType bytes, text styles like DXF's STYLE, single-line
+texts with DXF's alignments and the basics of MTEXT, drawn from an atlas of multi-channel signed
+distance fields (G6c). `Scene::pick`, `Scene::select` and `Scene::snap` on a spatial index of its
+own, highlighting of selected and hovered entities, and an overlay made anew every frame (G6d).
+Everything is in the [changelog](https://docs.rs/crate/jflib-render2d/latest/source/CHANGELOG.md).
 
 ## Documentation
 

@@ -337,16 +337,19 @@ pub fn active() -> bool {
     ACTIVE.load(Ordering::Relaxed)
 }
 
+/// whether no rule restricts file access here and now (no manifest and no plugin's scope, or the
+/// policy bypassed outside one): then fs_allowed is true for every path without a NUL
+pub(crate) fn fs_unrestricted() -> bool {
+    (!active() && SCOPED.load(Ordering::Acquire) == 0) || (!scoped_here() && (!active() || bypassed()))
+}
+
 /// whether path may be read (FS_READ) or written (FS_WRITE); never a path with a NUL character
 /// (the system would end the name there and reach another file), with or without a policy
 pub fn fs_allowed(path: &str, mode: u32) -> bool {
     if path.contains('\0') {
         return false;
     }
-    if !active() && SCOPED.load(Ordering::Acquire) == 0 {
-        return true;
-    }
-    if !scoped_here() && (!active() || bypassed()) {
+    if fs_unrestricted() {
         return true;
     }
     let kind = if mode & FS_WRITE != 0 { "fs.write" } else { "fs.read" };

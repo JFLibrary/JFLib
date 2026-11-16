@@ -63,15 +63,11 @@ Like all of JFLib, the crate comes through the one dependency
 GIF and SVG at start-up by itself; AVIF needs `img_all::use_all_codecs()` once. All of JFLib's
 crates share one version and are released together. It runs on every platform JFLib supports.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Reading AVIF files is safer against hostile files. A grid image can no longer make the reader
-decode thousands of large tiles from a small file: every tile is checked before it is decoded,
-and the tiles together must stay within about four times the image. The pixel budget now also
-applies to the picture an AV1 item declares in its stream, not only to the image's size. Both
-fail with `ERR_LIMIT` before anything is allocated. The writer takes quality 0 as 95, like the
-other writers (it was 85). Everything is in the
-[changelog](https://docs.rs/crate/jflib-img-avif/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-img-avif/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

@@ -1061,10 +1061,12 @@ impl Device {
         self.compute_pipeline(desc)
     }
 
-    /// create_compute_pipeline with a required subgroup size: Metal's SIMD groups have one size
-    /// (32), so only 0 (the driver's choice) and that size work
+    /// create_compute_pipeline with a required subgroup size: Metal's SIMD groups have one size on
+    /// Apple's GPUs (32), so only 0 (the driver's choice) and that size work; on an Intel Mac's GPU
+    /// the driver picks it per pipeline (min and max of the limits differ), so only 0
     pub fn create_compute_pipeline_sized(&self, desc: &ComputePipelineDesc, size: u32) -> Result<ComputePipeline> {
-        if size != 0 && size != self.sh.limits.subgroup_size {
+        let l = &self.sh.limits;
+        if size != 0 && (size != l.subgroup_size || l.subgroup_min_size != l.subgroup_max_size) {
             return Err(GpuError::Unsupported("subgroup size control"));
         }
         self.compute_pipeline(desc)

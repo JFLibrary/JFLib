@@ -10,7 +10,6 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
-- `watch::Watcher::watching()`: whether every root (Linux: every folder below them) is watched now
 - `SysSettings::wheel_lines` and `wheel_chars`: what a notch of the wheel scrolls (Windows
   `SPI_GETWHEELSCROLLLINES`, `WHEEL_PAGE` for a page, and `SPI_GETWHEELSCROLLCHARS`; KDE's
   `[KDE] WheelScrollLines` of kdeglobals; 3 elsewhere), `wheel_amount`, the overrides
@@ -30,6 +29,20 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Changed
 
+- (E2) `Event::y` of key events carries the key's character above its location: code that
+  compared it with a `KL_*` takes `key_location(y)`.
+- Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical
+  pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point).
+
+## [0.2.1] - 2026-11-16
+
+### Added
+
+- `watch::Watcher::watching()`: whether every root (Linux: every folder below them) is watched now
+- Intel Macs (`x86_64-apple-darwin`): libSystem's functions with 64-bit inodes (`stat$INODE64`, `readdir$INODE64`, `statfs$INODE64` ...), Objective-C messages that return structures over 16 bytes (`NSRect`) through `objc_msgSend_stret`, a BOOL read as a byte, crash reports from the x86-64 context (registers, the chain over rbp), `cpu_features` with AVX2 where the processor has it; checked under Rosetta 2 ([INTEL_MAC.md](https://github.com/JFLibrary/JFLib/blob/main/docs/INTEL_MAC.md))
+
+### Changed
+
 - 0 as the effects a source allows means it does not say, so every effect (`DE_ALL`), the same
   everywhere: `DragData::allowed()` of a drag with `effects` 0, the `allowed` of `drag_query`,
   `drag_query_all` and `drag_decide`. Before, these took 0 as copy and move, while the effects of
@@ -37,10 +50,6 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   linking too; files are still never moved.
 - `watch::Watcher::take` reports `overflow` after each wait while a root or folder is not watched (`watching()` false), so a caller that rescans on `overflow` polls until the watcher sees everything again; before, a lost root reported one overflow and then nothing
 - Linux: the build script picks plat's build against glibc (`--cfg jfgui_glibc`: pthreads, the dynamic linker) also without std, unless `-C target-feature=+crt-static` asks for one static file; so a JFLib app builds on Linux with plain `cargo run`, no flags and no `--target`.
-- (E2) `Event::y` of key events carries the key's character above its location: code that
-  compared it with a `KL_*` takes `key_location(y)`.
-- Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical
-  pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point).
 
 ### Fixed
 
@@ -52,10 +61,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Linux: the watcher left the folders of a folder whose listing failed (no descriptors left) unwatched for good, and a root moved away kept its watches -- its changes came under the old path -- while a folder made at its path was never watched (also after a deleted root). Such folders and roots are tried again every second
 - `fs::write_file_private` reports true when a rule of the manifest allows the file but not its folder. The folder's fsync after the rename was checked as well and made it report false although the file had been replaced.
 - Windows: `rename`, `write_file` and the other writers that replace a file no longer fail while another program holds the old file open for a moment, as a virus scanner or the search indexer does with a file just written. They rename with POSIX semantics (FileRenameInfoEx), which replaces a file held with FILE_SHARE_DELETE, and wait up to about a quarter second for a holder that does not share deletion; elsewhere MoveFileEx as before.
+- Windows: the buttons of a system title bar work (a main window without AF_CUSTOM_TITLEBAR, windows with PWF_SYSFRAME): the window procedure made the non-client messages of every caption button (WM_NCMOUSEMOVE, WM_NCLBUTTONDOWN, WM_NCLBUTTONUP on HTCLOSE, HTMAXBUTTON, HTMINBUTTON) presses in the UI, so the X, maximize and minimize of such a window did nothing; only the library frame's buttons, which the UI draws, take that way now
 
 ### Security
 
-- `fs::symlink` and `fs::hard_link` want write access to the target as well; a relative symlink target counts from the link's folder. The rules check a path as it is written, so a link at a writable path led to files the app could only read or not reach at all.
+- `fs::symlink` and `fs::hard_link` want write access to the target as well; a relative symlink target counts from the link's folder. Without a manifest every target may be written; under one a target with `..` is refused (the system resolves it after links). The rules check a path as it is written, so a link at a writable path led to files the app could only read or not reach at all.
 - `assoc_unregister` plays back only record lines for the places a registration writes (Windows: Software\Classes, Software\Clients, RegisteredApplications; Linux: the .desktop and MIME files, the user's mimeapps.list). A changed config://assoc.list could set any HKCU value or delete and rename any file of the user.
 - `process::Command::spawn` with a relative program path and a `cwd` checks the file it starts on Linux and macOS (cwd/program), not the same name below this process's folder.
 - `watch::Watcher::new` checks its folders against the manifest on Windows too.
@@ -329,6 +339,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0
