@@ -95,7 +95,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
   <br>[lib.rs](#update-crate-root) · [appimage.rs](#updateappimagers) · [apply.rs](#updateapplyrs) · [fetch.rs](#updatefetchrs) · [manifest.rs](#updatemanifestrs)
 - [archive](#archive) -- bounded ZIP32 containers (stored and DEFLATE)
-  <br>[lib.rs](#archive-crate-root)
+  <br>[lib.rs](#archive-crate-root) · [opc.rs](#archiveopcrs)
 - [doc_core](#doc_core) -- structured documents, sources, citations and undo/redo
   <br>[lib.rs](#doc_core-crate-root) · [citation.rs](#doc_corecitationrs) · [format.rs](#doc_coreformatrs) · [tabs.rs](#doc_coretabsrs) · [tables.rs](#doc_coretablesrs) · [table_grid.rs](#doc_coretable_gridrs) · [table_tree.rs](#doc_coretable_treers) · [table_position.rs](#doc_coretable_positionrs) · [table_styles.rs](#doc_coretable_stylesrs) · [cell_borders.rs](#doc_corecell_bordersrs) · [character.rs](#doc_corecharacterrs) · [formula/mod.rs](#doc_coreformulamodrs) · [styles.rs](#doc_corestylesrs) · [fragment.rs](#doc_corefragmentrs) · [table_fragment.rs](#doc_coretable_fragmentrs) · [notes.rs](#doc_corenotesrs) · [paragraph_edit.rs](#doc_coreparagraph_editrs) · [text_range.rs](#doc_coretext_rangers) · [story_range.rs](#doc_corestory_rangers) · [search.rs](#doc_coresearchrs) · [source.rs](#doc_coresourcers) · [source_audit.rs](#doc_coresource_auditrs) · [source_import.rs](#doc_coresource_importrs) · [source_library.rs](#doc_coresource_libraryrs) · [source_merge.rs](#doc_coresource_mergers)
 - [doc_layout](#doc_layout) -- typographic paragraph flow and page layout
@@ -49537,8 +49537,9 @@ MAX_SIG: usize = 4096
 *bounded ZIP32 containers (stored and DEFLATE)* -- crate root [`lib/archive/lib.rs`](../lib/archive/lib.rs)
 
 ```text
-In-memory ZIP32 interchange. New native library code, independent of document/UI code.
-Raw DEFLATE and CRC reuse the existing safe codec primitives; no paths are extracted.
+In-memory ZIP interchange (ZIP32, ZIP64 when it is needed). New native library code,
+independent of document/UI code. Raw DEFLATE, inflate and CRC reuse img_core's safe codec
+primitives; no paths are extracted. `opc` builds the Open Packaging Conventions on top.
 ZipFs shows an archive as a read-only plat::vfs tree:
   plat::vfs::mount("pack", Arc::new(archive::ZipFs::new(&bytes, Limits::default())?))
   -> plat::read_file("pack://textures/a.png"), plat::File::open("pack://..", FO_READ),
@@ -49553,11 +49554,18 @@ ZipFs shows an archive as a read-only plat::vfs tree:
   - `data: Vec<u8>`
 
 - **`struct Limits`**
-  Bounds are checked before decompression or allocation of advertised sizes.
-  - `entries: usize`
-  - `part_bytes: usize`
-  - `total_bytes: usize`
-  - `archive_bytes: usize`
+  Bounds are checked before decompression or allocation of advertised sizes. The default
+  (512 parts, 8 MiB a part, 32 MiB in all, archives up to 32 MiB) suits documents; readers of
+  large packages pass larger values and a smaller `ratio`:
+  `Limits { entries: 100_000, part_bytes: 512 << 20, total_bytes: 2 << 30, archive_bytes: 1 << 30, ratio: 200 }`.
+  - `entries: usize` -- Most parts in one archive.
+  - `part_bytes: usize` -- Most bytes of one part, uncompressed.
+  - `total_bytes: usize` -- Most bytes of all parts together, uncompressed.
+  - `archive_bytes: usize` -- Most bytes of the archive itself.
+  - `ratio: usize` -- Highest ratio of a DEFLATE part's size to its compressed size, checked for parts over
+    1 MiB before they are inflated: a denser part is refused with `Limit` (a ZIP bomb). The
+    default, 1032, is the most DEFLATE can reach and so refuses nothing; a part claiming more
+    is `Invalid` whatever this value is.
 
 - **`enum Error`**
   Structural, integrity, feature or resource-limit failure.
@@ -49566,12 +49574,29 @@ ZipFs shows an archive as a read-only plat::vfs tree:
   - `Checksum`
   - `Limit`
 
+- **`enum Method`**
+  How `write_with` stores the parts.
+  - `Stored` -- Uncompressed, as `write` stores them.
+  - `Deflate(u8)` -- DEFLATE at a level from 1 (fastest) to 9 (smallest); 6 is the usual choice, 0 counts as
+    1 and higher values as 9. A part that does not get smaller is stored instead.
+
 - **`fn read(b: &[u8], limits: Limits) -> Result<Vec<Entry>, Error>`**
-  Read stored/DEFLATE ZIP32 files. Reject encryption, multi-disk/ZIP64, ambiguous names,
-  duplicate parts, overlapping local records, trailing payloads and CRC mismatches.
+  Read stored/DEFLATE ZIP files, ZIP64 included. Reject encryption, multi-disk archives,
+  ambiguous names (absolute, `..`, `\`, `:`, `%`, control characters, a case-insensitive
+  duplicate), duplicate parts, overlapping local records, data between or after the parts,
+  sizes a DEFLATE stream cannot reach and CRC mismatches.
 
 - **`fn write(entries: &[Entry], limits: Limits) -> Result<Vec<u8>, Error>`**
-  Deterministic stored ZIP32 writer (UTF-8 names, fixed DOS date 1980-01-01).
+  Deterministic stored ZIP writer (UTF-8 names, fixed DOS date 1980-01-01): the same parts
+  always give the same bytes. ZIP64 records only where an archive needs them (65535 parts or
+  more, a size or offset of 4 GiB or more).
+
+- **`fn write_with(entries: &[Entry], limits: Limits, method: Method) -> Result<Vec<u8>, Error>`**
+  `write` with DEFLATE when `method` asks for it; just as deterministic.
+
+- **`fn write_zip64_from(entries: &[Entry], limits: Limits, method: Method, at: u64) -> Result<Vec<u8>, Error>`**
+  For tests: `write_with` that writes ZIP64 records for every size and offset from `at` bytes
+  on, as if `at` were 4 GiB.
 
 - **`struct ZipFs(plat::vfs::MemFs)`**
   A ZIP archive as a read-only plat::vfs provider (mount it under a scheme of its own). The
@@ -49581,6 +49606,187 @@ ZipFs shows an archive as a read-only plat::vfs tree:
 
 - **`fn new(b: &[u8], limits: Limits) -> Result<ZipFs, Error>`**
   Read every part of the archive; Invalid also for names that collide as file and folder.
+
+### `archive/opc.rs`
+
+Source: [`lib/archive/opc.rs`](../lib/archive/opc.rs)
+
+```text
+Open Packaging Conventions (ECMA-376 Part 2) over this crate's ZIP reader and writer: a
+package's parts, their content types ([Content_Types].xml) and relationships (_rels/*.rels).
+DOCX (doc_io) and VSDX (diagram_io) share it. New native library code, taken out of doc_io's
+DOCX preservation. Nothing outside the package is ever resolved or fetched: external targets
+stay text.
+
+  Package::read(bytes, limits, rules) -> parts, content types, relationships, all checked
+  package.relationships(source) / package.resolve(source, target) / package.part(name)
+  package.set_part(..) / remove_part(..) / set_relationships(..), then package.write(..):
+  the parts nobody touched go back as they came (unknown parts are kept, never dropped)
+
+Part names are compared the way OPC says, ASCII case-insensitive and percent-escape aware
+("Word/Media/a%20b.png" names the same part as "word/media/a b.png"), unless Rules::exact_names
+asks for the older profile of exact strings without escapes.
+```
+
+```rust
+/// The ZIP item that holds the content types; it is no part of its own.
+CONTENT_TYPES: &str = "[Content_Types].xml"
+/// The package's own relationship part.
+PACKAGE_RELS: &str = "_rels/.rels"
+/// Content type of a relationship part.
+RELS_TYPE: &str = "application/vnd.openxmlformats-package.relationships+xml"
+/// Namespace of `[Content_Types].xml`.
+NS_TYPES: &str = "http://schemas.openxmlformats.org/package/2006/content-t ...
+/// Namespace of relationship parts.
+NS_RELS: &str = "http://schemas.openxmlformats.org/package/2006/relations ...
+/// Relationship type from the package to its main part (transitional OOXML).
+OFFICE_DOCUMENT: &str = "http://schemas.openxmlformats.org/officeDocument/2006/re ...
+/// Relationship type from the package to its main part (strict OOXML).
+OFFICE_DOCUMENT_STRICT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/ ...
+```
+
+- **`enum Error`**
+  Why a package was refused.
+  - `Zip(crate::Error)` -- The ZIP container.
+  - `Xml(xml::Error)` -- `[Content_Types].xml` or a relationship part is not XML within `Rules::xml`.
+  - `Invalid` -- Package structure: a missing or duplicate part, content type or relationship id, a part
+    without a content type, a relationship part without its source, a target that leaves the
+    package or names no part, text that is not Unicode.
+  - `Root(String)` -- `[Content_Types].xml` or a relationship part has another root element, or attributes or
+    text on it; the root's local name.
+  - `Address` -- A part name or internal target this module does not resolve: empty, a backslash, `:`,
+    `?`, `#`, a control character or a bad percent-escape (also an escaped `/` or `\`);
+    with `Rules::exact_names` any `%`.
+  - `ContentType` -- An empty content type, or without `Rules::macros` one of a macro project.
+  - `MacroPart` -- Without `Rules::macros`: a part of a macro project (`vbaProject.bin`, `vbaData.xml`),
+    whatever its content type says.
+  - `MacroRelationship` -- Without `Rules::macros`: a relationship of a macro project's type.
+
+- **`struct Rules`**
+  What a package may hold and how its names compare.
+  - `macros: bool` -- Accept macro (VBA) projects. Off by default: content types, relationship types and part
+    names of a macro project refuse the package.
+  - `exact_names: bool` -- Compare part names and targets as exact strings and refuse percent-escapes, instead of
+    OPC's case-insensitive, escape-aware equivalence (and refuse `%` in ZIP names). The
+    conservative profile of jfWord's DOCX reader.
+  - `xml: xml::Limits` -- Limits of `[Content_Types].xml` and of each relationship part.
+
+**`impl Rules`**
+
+- **`const DEFAULT: Rules = Rules { macros: false, exact_names: false, xml: xml::Limi ...`**
+  No macros, OPC's name equivalence, the XML reader's default limits.
+- **`fn resolve(&self, source: &str, target: &str) -> Result<String, Error>`**
+  Resolve a relationship's target against its source part (`""` for the package) to a
+  part name without the leading `/`. `..` may not climb out of the package. With OPC's
+  equivalence the result is in canonical form (see `normalize`).
+
+- **`fn normalize(name: &str) -> Result<String, Error>`**
+  A part name in canonical form, without the leading `/`: escapes of unreserved characters
+  decoded (`%41` is `A`), other escapes in upper case, spaces, non-ASCII and other characters
+  a URI path may not hold escaped (`ä` is `%C3%A4`). `Address` for a bad name: a bad escape,
+  an escaped `/` or `\`, a control character, an empty, `.` or `..` segment.
+
+- **`fn same_part(a: &str, b: &str) -> bool`**
+  Whether two part names name the same part (OPC: ASCII case-insensitive, after `normalize`).
+
+- **`fn rels_name(source: &str) -> String`**
+  The relationship part of a source part: `_rels/.rels` for the package (`""`),
+  `dir/_rels/name.rels` for `dir/name`.
+
+- **`fn rels_source(name: &str) -> Result<String, Error>`**
+  The source part of a relationship part (`""` for `_rels/.rels`); `Invalid` for a name
+  that is no relationship part's.
+
+- **`struct ContentTypes`**
+  `[Content_Types].xml`: content types by extension (defaults) and by part (overrides).
+
+**`impl ContentTypes`**
+
+- **`fn new() -> Self`**
+  Empty: no defaults, no overrides, OPC's name equivalence.
+- **`fn get(&self, part: &str) -> Option<&str>`**
+  The content type of a part: its override, else the default for its extension
+  (case-insensitive); None when it has neither.
+- **`fn defaults(&self) -> impl Iterator<Item = (&str, &str)>`**
+  The defaults in file order: (extension, content type).
+- **`fn overrides(&self) -> impl Iterator<Item = (&str, &str)>`**
+  The overrides in file order: (part name without the leading `/`, content type).
+- **`fn set_default(&mut self, extension: &str, content_type: &str) -> Result<(), Error>`**
+  Set the default of an extension (no `.`, `/` or `\`), replacing an earlier one.
+- **`fn set_override(&mut self, part: &str, content_type: &str) -> Result<(), Error>`**
+  Set the override of a part, replacing an earlier one.
+- **`fn remove_override(&mut self, part: &str) -> bool`**
+  Remove the override of a part; false when it had none.
+- **`fn to_xml(&self) -> Result<String, Error>`**
+  `[Content_Types].xml` with an XML declaration: the defaults, then the overrides.
+
+- **`struct Relationship`**
+  One relationship of a source part.
+  - `id: String` -- Unique among the source's relationships (`rId1` …).
+  - `kind: String` -- The relationship type, a URI (`Type`).
+  - `target: String` -- The target as written: relative to the source part, or a URI when `external`.
+  - `external: bool` -- `TargetMode="External"`: the target is outside the package and never followed here.
+
+- **`fn parse_relationships(xml: &[u8], rules: Rules) -> Result<Vec<Relationship>, Error>`**
+  The relationships of one relationship part, checked but not resolved: the root element,
+  each relationship's attributes, unique ids, the target mode, macro types.
+
+- **`fn relationships_xml(list: &[Relationship]) -> Result<String, Error>`**
+  A relationship part with an XML declaration.
+
+- **`struct Package`**
+  An OPC package: every ZIP item in archive order with its bytes, the content types and the
+  main part. Parts this crate does not understand are kept as they are; `write` puts them back
+  unchanged, `[Content_Types].xml` too unless the content types changed.
+
+**`impl Package`**
+
+- **`fn new(rules: Rules) -> Package`**
+  An empty package to fill: only `[Content_Types].xml`. `write` needs the package's
+  relationships (`set_relationships("", ..)`) and a content type for every part.
+- **`fn read(bytes: &[u8], limits: Limits, rules: Rules) -> Result<Package, Error>`**
+  Read and check a package within the ZIP `limits` (percent-escapes in ZIP names only
+  without `Rules::exact_names`).
+- **`fn from_entries(entries: Vec<Entry>, rules: Rules) -> Result<Package, Error>`**
+  Check the ZIP items of a package already read.
+- **`fn entries(&self) -> &[Entry]`**
+  Every ZIP item in archive order, `[Content_Types].xml` included as it was read (or last
+  written); parts added later at the end.
+- **`fn rules(&self) -> Rules`**
+  The rules the package was read with.
+- **`fn main_part(&self) -> Option<&str>`**
+  The stored name of the part the package's internal `officeDocument` relationship names
+  (its main part, `word/document.xml` or `visio/document.xml`).
+- **`fn content_types(&self) -> &ContentTypes`**
+  The content types.
+- **`fn content_types_mut(&mut self) -> &mut ContentTypes`**
+  The content types to change; `write` checks the result.
+- **`fn content_type(&self, name: &str) -> Option<&str>`**
+  The content type of a part.
+- **`fn name_of(&self, name: &str) -> Option<&str>`**
+  The stored name of the part a name refers to.
+- **`fn part(&self, name: &str) -> Option<&[u8]>`**
+  The bytes of a part (any equivalent name finds it).
+- **`fn relationships(&self, source: &str) -> Result<Vec<Relationship>, Error>`**
+  The relationships of a part (`""` for the package's own); empty when it has none.
+- **`fn resolve(&self, source: &str, target: &str) -> Result<&str, Error>`**
+  The stored name of the part an internal target of `source` names.
+- **`fn set_part(&mut self, name: &str, content_type: &str, data: Vec<u8>) -> Result<(), Error>`**
+  Add a part or replace its bytes (an existing part keeps its stored name), and make
+  `content_type` its content type: the default of its extension when that matches,
+  otherwise an override.
+- **`fn replace(&mut self, name: &str, data: Vec<u8>) -> Result<(), Error>`**
+  Replace the bytes of an existing part, keeping its content type.
+- **`fn remove_part(&mut self, name: &str) -> bool`**
+  Remove a part with its override and its own relationship part; false when there is no
+  such part. Relationships of other parts that name it are the caller's to change.
+- **`fn set_relationships(&mut self, source: &str, list: &[Relationship]) -> Result<(), Error>`**
+  Replace the relationships of a part (`""`: the package's); an empty list removes its
+  relationship part. Adds the default for `.rels` when there is none.
+- **`fn write(&self, limits: Limits, method: Method) -> Result<Vec<u8>, Error>`**
+  The package as a ZIP archive, after checking it as `read` would: every part in its
+  order, `[Content_Types].xml` new when the content types changed. Deterministic: the same
+  package always gives the same bytes.
 
 ## doc_core
 
@@ -51666,6 +51872,7 @@ Source: [`lib/doc_io/preservation.rs`](../lib/doc_io/preservation.rs)
 ```text
 Bounded OPC inspection and original-byte preservation for foreign Word documents.
 New native library code. Unrepresented content is never exposed as an editable model.
+The package itself (content types, relationships, part names) is archive::opc's.
 ```
 
 - **`enum DocxMode`**

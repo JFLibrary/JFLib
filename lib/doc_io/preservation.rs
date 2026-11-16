@@ -1,13 +1,32 @@
 // Bounded OPC inspection and original-byte preservation for foreign Word documents.
 // New native library code. Unrepresented content is never exposed as an editable model.
+// The package itself (content types, relationships, part names) is archive::opc's.
 use crate::{Error, decode_docx, encode_docx, find, parse, read_file, unsupported};
-use alloc::{collections::BTreeSet, format, string::String, vec::Vec};
-use archive::{Entry, Limits};
+use alloc::{format, string::String, vec::Vec};
+use archive::{
+    Entry, Limits,
+    opc::{self, Package, Rules},
+};
 use base::xml::Node;
 use doc_core::Document;
 
-const REL: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
-const CT: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
+/// jfWord's conservative OPC profile: no macros, part names and targets as exact strings
+/// without percent-escapes, the XML reader's default limits.
+pub(super) const RULES: Rules = Rules { exact_names: true, ..Rules::DEFAULT };
+/// An OPC refusal as the DOCX reader reports it.
+pub(super) fn opc_error(error: opc::Error) -> Error {
+    match error {
+        opc::Error::Zip(error) => Error::Archive(error),
+        opc::Error::Xml(error) => Error::Xml(error),
+        opc::Error::Root(local) => Error::Unsupported(local),
+        opc::Error::Address => unsupported("Nicht unterstützte interne Paketadresse"),
+        opc::Error::ContentType => unsupported("Makros oder ungültiger Inhaltstyp"),
+        opc::Error::MacroPart => unsupported("VBA-Inhalte werden nicht unterstützt"),
+        opc::Error::MacroRelationship => unsupported("VBA-Verknüpfung"),
+        _ => Error::Invalid,
+    }
+}
+
 const MAIN: &str =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
 const STRICT_W: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -60,12 +79,13 @@ impl DocxFile {
             return Err(unsupported("Verschlüsselte DOCX- oder binäre DOC-Datei"));
         }
         let entries = archive::read(bytes, Limits::default()).map_err(Error::Archive)?;
-        let content_types = content_types(&entries)?;
-        let main_part = relationships(&entries, &content_types)?;
-        if content_type(&content_types, &main_part) != Some(MAIN) {
+        let package = Package::from_entries(entries, RULES).map_err(opc_error)?;
+        let main_part = String::from(package.main_part().ok_or(Error::Invalid)?);
+        let (entries, content_types) = (package.entries(), package.content_types());
+        if content_types.get(&main_part) != Some(MAIN) {
             return Err(unsupported("Kein makrofreies DOCX-Hauptdokument"));
         }
-        let root = parse(find(&entries, &main_part)?)?;
+        let root = parse(find(entries, &main_part)?)?;
         if !(root.is(crate::package::W, "document") || root.is(STRICT_W, "document"))
             || !root.text.is_empty()
             || root.children.iter().filter(|n| word(n, "body")).count() != 1
@@ -97,7 +117,7 @@ impl DocxFile {
                     ),
                 );
                 inspect(&root, &mut report);
-                for entry in &entries {
+                for entry in entries {
                     inspect_part(entry, &mut report);
                 }
                 None
@@ -114,11 +134,11 @@ impl DocxFile {
             );
         }
         let text = crate::preserved_text::TextSession::new(
-            &entries,
+            entries,
             &report.main_part,
             &root,
             document.is_none(),
-            &content_types,
+            content_types,
         )?;
         if document.is_none() && text.runs().is_empty() {
             issue(
@@ -288,209 +308,7 @@ fn issue(report: &mut DocxReport, text: String) {
 fn word(node: &Node, name: &str) -> bool {
     node.is(crate::package::W, name) || node.is(STRICT_W, name)
 }
-fn macro_type(value: &str) -> bool {
-    let lower = value.to_ascii_lowercase();
-    lower.contains("macroenabled") || lower.contains("vbaproject") || lower.contains("vbadata")
-}
 
-pub(super) struct Types {
-    defaults: Vec<(String, String)>,
-    overrides: Vec<(String, String)>,
-}
-pub(super) fn content_type<'a>(types: &'a Types, name: &str) -> Option<&'a str> {
-    types
-        .overrides
-        .iter()
-        .find(|(n, _)| n == name)
-        .map(|(_, t)| t.as_str())
-        .or_else(|| {
-            name.rsplit_once('.').and_then(|(_, extension)| {
-                types
-                    .defaults
-                    .iter()
-                    .find(|(e, _)| e.eq_ignore_ascii_case(extension))
-                    .map(|(_, t)| t.as_str())
-            })
-        })
-}
-fn content_types(entries: &[Entry]) -> Result<Types, Error> {
-    let root = parse(find(entries, "[Content_Types].xml")?)?;
-    crate::container(&root, CT, "Types")?;
-    let mut types = Types {
-        defaults: Vec::new(),
-        overrides: Vec::new(),
-    };
-    for node in &root.children {
-        if !node.children.is_empty() || !node.text.is_empty() || node.attrs.len() != 2 {
-            return Err(Error::Invalid);
-        }
-        let value = node.attr("", "ContentType").ok_or(Error::Invalid)?;
-        if value.is_empty() || macro_type(value) {
-            return Err(unsupported("Makros oder ungültiger Inhaltstyp"));
-        }
-        if node.is(CT, "Default") {
-            let extension = node.attr("", "Extension").ok_or(Error::Invalid)?;
-            if extension.is_empty()
-                || extension.contains(['/', '\\', '.'])
-                || types
-                    .defaults
-                    .iter()
-                    .any(|(e, _)| e.eq_ignore_ascii_case(extension))
-            {
-                return Err(Error::Invalid);
-            }
-            types
-                .defaults
-                .push((String::from(extension), String::from(value)));
-        } else if node.is(CT, "Override") {
-            let name = node
-                .attr("", "PartName")
-                .and_then(|n| n.strip_prefix('/'))
-                .ok_or(Error::Invalid)?;
-            if resolve("", name)? != name
-                || types.overrides.iter().any(|(n, _)| n == name)
-                || !entries.iter().any(|e| e.name == name)
-            {
-                return Err(Error::Invalid);
-            }
-            types
-                .overrides
-                .push((String::from(name), String::from(value)));
-        } else {
-            return Err(Error::Invalid);
-        }
-    }
-    for entry in entries {
-        if entry.name == "[Content_Types].xml" {
-            continue;
-        }
-        if content_type(&types, &entry.name).is_none() {
-            return Err(Error::Invalid);
-        }
-        if entry.name.to_ascii_lowercase().contains("vbaproject")
-            || entry.name.to_ascii_lowercase().ends_with("vbadata.xml")
-        {
-            return Err(unsupported("VBA-Inhalte werden nicht unterstützt"));
-        }
-    }
-    Ok(types)
-}
-
-// Resolve OPC part-relative paths without touching a filesystem or following a URL.
-pub(super) fn resolve(source: &str, target: &str) -> Result<String, Error> {
-    if target.is_empty()
-        || target.contains(['\\', ':', '%', '?', '#'])
-        || target.chars().any(char::is_control)
-    {
-        return Err(unsupported("Nicht unterstützte interne Paketadresse"));
-    }
-    let mut components: Vec<&str> = if target.starts_with('/') {
-        Vec::new()
-    } else {
-        source
-            .rsplit_once('/')
-            .map_or(Vec::new(), |(dir, _)| dir.split('/').collect())
-    };
-    for part in target.strip_prefix('/').unwrap_or(target).split('/') {
-        match part {
-            "" => return Err(Error::Invalid),
-            "." => {}
-            ".." => {
-                if components.pop().is_none() {
-                    return Err(Error::Invalid);
-                }
-            }
-            _ => components.push(part),
-        }
-    }
-    if components.is_empty() {
-        return Err(Error::Invalid);
-    }
-    Ok(components.join("/"))
-}
-pub(super) fn relationship_source(name: &str) -> Result<String, Error> {
-    if name == "_rels/.rels" {
-        return Ok(String::new());
-    }
-    let name = name.strip_suffix(".rels").ok_or(Error::Invalid)?;
-    if let Some((dir, file)) = name.rsplit_once("/_rels/") {
-        if file.is_empty() || file.contains('/') {
-            return Err(Error::Invalid);
-        }
-        Ok(format!("{dir}/{file}"))
-    } else if let Some(file) = name.strip_prefix("_rels/") {
-        if file.is_empty() || file.contains('/') {
-            return Err(Error::Invalid);
-        }
-        Ok(String::from(file))
-    } else {
-        Err(Error::Invalid)
-    }
-}
-fn relationships(entries: &[Entry], types: &Types) -> Result<String, Error> {
-    find(entries, "_rels/.rels")?;
-    let mut main = None;
-    for entry in entries.iter().filter(|e| e.name.ends_with(".rels")) {
-        if content_type(types, &entry.name)
-            != Some("application/vnd.openxmlformats-package.relationships+xml")
-        {
-            return Err(Error::Invalid);
-        }
-        let source = relationship_source(&entry.name)?;
-        if !source.is_empty() && !entries.iter().any(|e| e.name == source) {
-            return Err(Error::Invalid);
-        }
-        let root = parse(&entry.data)?;
-        crate::container(&root, REL, "Relationships")?;
-        let mut ids = BTreeSet::new();
-        for node in &root.children {
-            if !node.is(REL, "Relationship")
-                || !node.text.is_empty()
-                || !node.children.is_empty()
-                || node.attrs.len() < 3
-                || node.attrs.len() > 4
-                || node.attrs.iter().any(|(n, _)| {
-                    !n.ns.is_empty()
-                        || !matches!(n.local.as_str(), "Id" | "Type" | "Target" | "TargetMode")
-                })
-            {
-                return Err(Error::Invalid);
-            }
-            let id = node.attr("", "Id").ok_or(Error::Invalid)?;
-            let kind = node.attr("", "Type").ok_or(Error::Invalid)?;
-            let target = node.attr("", "Target").ok_or(Error::Invalid)?;
-            if id.is_empty() || kind.is_empty() || target.is_empty() || !ids.insert(id) {
-                return Err(Error::Invalid);
-            }
-            if macro_type(kind) {
-                return Err(unsupported("VBA-Verknüpfung"));
-            }
-            let external = match node.attr("", "TargetMode") {
-                None | Some("Internal") => false,
-                Some("External") => true,
-                _ => return Err(Error::Invalid),
-            };
-            let office = matches!(
-                kind,
-                "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
-                    | "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument"
-            );
-            if office && source.is_empty() {
-                if external || main.is_some() {
-                    return Err(Error::Invalid);
-                }
-                main = Some(resolve(&source, target)?);
-            }
-            if !external {
-                let part = resolve(&source, target)?;
-                if !entries.iter().any(|e| e.name == part) {
-                    return Err(Error::Invalid);
-                }
-            }
-        }
-    }
-    main.ok_or(Error::Invalid)
-}
 
 fn inspect_part(entry: &Entry, report: &mut DocxReport) {
     let name = entry.name.as_str();

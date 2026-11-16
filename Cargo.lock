@@ -259,6 +259,7 @@ version = "0.2.1"
 name = "codectest"
 version = "0.0.0"
 dependencies = [
+ "jflib-archive",
  "jflib-base",
  "jflib-build",
  "jflib-gfx",
@@ -614,6 +615,7 @@ dependencies = [
 name = "jflib-archive"
 version = "0.2.1"
 dependencies = [
+ "jflib-base",
  "jflib-img-core",
  "jflib-plat",
  "jflib-rt",

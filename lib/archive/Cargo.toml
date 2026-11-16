@@ -1,6 +1,6 @@
 [package]
 name = "jflib-archive"
-description = "In-memory ZIP32 reading and writing for JFLib"
+description = "In-memory ZIP reading and writing (DEFLATE, ZIP64) and OPC packages for JFLib"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -18,10 +18,11 @@ doctest = false
 workspace = true
 
 [dependencies]
-# plat: ZipFs (vfs)
+# plat: ZipFs (vfs); base: XML of the OPC packages (opc)
 rt.workspace = true
 img_core.workspace = true
 plat.workspace = true
+base.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
 # of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)

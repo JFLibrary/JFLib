@@ -20,6 +20,9 @@
 //                                  writer) instead of the linked one (img_jxl_enc)
 //   --hostile [--only NAME]        crafted JPEG XL / JPEG XR inputs that must be refused quickly
 //                                  (hostile.rs; tests/hostile.uis); exit code 1 on a failure
+//   --archive [--only NAME]        lib/archive's ZIP reader / writer and archive::opc against
+//                                  crafted archives and packages (archive_checks.rs;
+//                                  tests/archive.uis); exit code 1 on a failure
 //   --jxlref                       JPEG XL fixtures decoded against libjxl's pixels (jxlref.rs;
 //                                  tests/jxlref.uis); exit code 1 on a failure
 //
@@ -49,6 +52,7 @@ use base::Args;
 use gfx::{FMT_A8, Surface};
 use img_core::ImgMeta;
 
+mod archive_checks;
 mod hostile;
 mod jxlref;
 mod ops_base;
@@ -183,6 +187,9 @@ fn codectest() -> i32 {
         return jxlref::run();
     }
     let mut ct = Ct { out: Vec::new(), core_only, args };
+    if ct.args.flag("--archive") {
+        return archive_checks::run(ct.args.value("--only"));
+    }
     if ct.args.flag("--hostile") {
         return hostile::run(ct.args.value("--only"));
     }

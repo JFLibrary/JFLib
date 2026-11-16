@@ -1,7 +1,7 @@
 // Related Word stories resolved by OPC identity, never guessed from ZIP file names.
 use crate::{Error, parse, preservation};
 use alloc::{format, string::String, vec::Vec};
-use archive::Entry;
+use archive::{Entry, opc};
 
 /// The Word story containing an individually editable preserved text leaf.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,11 +33,11 @@ impl DocxStory {
 pub(super) fn related(
     entries: &[Entry],
     main: &str,
-    types: &preservation::Types,
+    types: &opc::ContentTypes,
 ) -> Result<Vec<(String, DocxStory)>, Error> {
     let mut found = Vec::new();
     for entry in entries.iter().filter(|e| e.name.ends_with(".rels")) {
-        if preservation::relationship_source(&entry.name)? != main {
+        if opc::rels_source(&entry.name).map_err(preservation::opc_error)? != main {
             continue;
         }
         let root = parse(&entry.data)?;
@@ -62,11 +62,10 @@ pub(super) fn related(
                 "endnotes" => DocxStory::Endnote,
                 _ => continue,
             };
-            let target = preservation::resolve(
-                main,
-                relationship.attr("", "Target").ok_or(Error::Invalid)?,
-            )?;
-            if preservation::content_type(types, &target)
+            let target = preservation::RULES
+                .resolve(main, relationship.attr("", "Target").ok_or(Error::Invalid)?)
+                .map_err(preservation::opc_error)?;
+            if types.get(&target)
                 != Some(
                     format!(
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.{kind}+xml"
