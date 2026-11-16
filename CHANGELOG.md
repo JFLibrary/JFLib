@@ -69,7 +69,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** A suggestion menu open in a window that closes or whose state is freed (`ui.window_destroy`) goes with the window: it stayed an app-wide entry, and the menu key opened no menu in any other window until a right click replaced it
 - **ui:** Esc in a text box inside the top popup closes the popup and gives the focus back to where it was when the popup opened, as Esc anywhere else in it does: in the font picker's search box it only took the focus away and left the family list open (the next click then closed it instead of opening it)
 - **ui:** A dock area of the same id in a second window floats its panels in windows of its own: both used the window ids `id + 1 ..`, and the second one took over the main window's floating windows ("window 501 begun twice in one pass")
-- **plat:** Android with std: `read` / `write` declared with `void *` buffers as libc and std declare them (the clashing declarations warned); the workspace no longer lists the apps' style crates it never uses (`unused workspace dependency` on every target)
+- **plat:** Android and macOS with std: `read` / `write` (Android) and `free` (macOS) declared with `void *` buffers as libc and std declare them (the clashing declarations warned); the workspace no longer lists the apps' style crates it never uses (`unused workspace dependency` on every target); iOS no longer warns of the unused `objc_msg_super`
 
 ### Security
 

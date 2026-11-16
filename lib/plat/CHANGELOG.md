@@ -44,9 +44,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Windows: the open dialog's result is split into a folder and names only when it is such a list. One file chosen with multiple selection on came back with the rest of a longer suggested name as a second file.
 - Linux: reading the clipboard or a drop from another program ends after 30 s in all (Wayland, X11 with INCR). The 3 s deadline started anew with every piece, so a program sending slowly froze the app for as long as it liked.
 - macOS: a GUI app catches SIGTERM with a handler that does nothing instead of ignoring it (the dispatch source reports it as before). Its child processes inherited the ignored signal and could not be ended with a plain kill.
-- Android with std: `read` / `write` declared with `void *` buffers as libc and std declare them
-  (the clashing declarations warned); the workspace no longer lists the apps' style crates it never
-  uses (`unused workspace dependency` on every target).
+- Android and macOS with std: `read` / `write` (Android) and `free` (macOS) declared with `void *`
+  buffers as libc and std declare them (the clashing declarations warned); the workspace no longer
+  lists the apps' style crates it never uses (`unused workspace dependency` on every target); iOS no
+  longer warns of the unused `objc_msg_super`.
 
 ### Security
 
