@@ -8,7 +8,7 @@
 //                every level, empty archives, ZipFs, data descriptors
 //   zip_names    names: `..`, absolute, empty segments, `\`, `:`, `%`, control characters,
 //                1025 bytes, duplicates (exact, ASCII case, Unicode case), non-UTF-8, a local
-//                name other than the central one
+//                name other than the central one; a name 512 levels deep still reads
 //   zip_dir      broken directories: truncation, end record, offsets, counts, disks, gaps,
 //                overlapping records (a "quoted" overlap bomb), CRC, encryption, methods,
 //                versions, local fields that disagree, bad DEFLATE data
@@ -393,6 +393,14 @@ fn zip_names(t: &mut H) {
         let z = plain(&[rec(a, b"1", false), rec(b, b"2", false)]).z;
         t.check("zip_names/dup_read", read_err(&z, Limits::default()) == Err(Error::Invalid), format!("read refuses {a:?} + {b:?}"));
     }
+    // depth: 512 levels in 1023 bytes are a name like any other, in a ZipFs too
+    let deep = format!("{}a", "a/".repeat(511));
+    let z = archive::write(&[entry(&deep, b"deep"), entry("top.txt", b"top")], Limits::default()).unwrap_or_default();
+    let fs_ok = archive::ZipFs::new(&z, Limits::default()).is_ok_and(|fs| {
+        use plat::vfs::Provider;
+        fs.read(&deep).as_deref() == Some(&b"deep"[..])
+    });
+    t.quick("zip_names/deep", (Ok(2), true), || (read_err(&z, Limits::default()), fs_ok));
     let mut r = rec("gr\u{fc}n.txt", b"x", false);
     r.flags = 0;
     t.check("zip_names/no_utf8_flag", read_err(&plain(&[r]).z, Limits::default()) == Err(Error::Unsupported), String::from("non-ASCII name without the UTF-8 flag"));
