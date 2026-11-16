@@ -1,16 +1,24 @@
 """mkicons.py -- JFDiagrammer's ribbon icons (own artwork, NetLab look) -> src/icons_data.rs
 
-    python apps/JFDiagrammer/mkicons.py                  the Rust data from icons/*.svg
-    python apps/JFDiagrammer/mkicons.py --sheet FILE     ... and the preview sheet (PNG)
-    python apps/JFDiagrammer/mkicons.py --zoom FILE      ... and an 8x pixel view (checking)
+    python apps/JFDiagrammer/mkicons.py                   the Rust data from icons/*.svg
+    python apps/JFDiagrammer/mkicons.py --overview FILE   ... and all icons in a grid (PNG)
+    python apps/JFDiagrammer/mkicons.py --sheet FILE      ... and the approved sample sheet (PNG)
+      --part P[,P..] --prio P1[,P2]   only these rows (icons/icons.txt) for --overview / --zoom
+      --zoom FILE                     the overview with every pixel 8x (checking the grid)
+      --no-rust                       leave src/icons_data.rs alone (drawing in parallel)
+      --strict                        a missing SVG is an error (else a note; the icon is left out)
 
-Every icon is drawn twice, by hand, on its own pixel grid: icons/NAME_16.svg (viewBox 0 0 16 16,
-small buttons) and icons/NAME_32.svg (0 0 32 32, large buttons).  Rules (FEATURES.md 7, JD14):
+icons/icons.txt lists every icon: its number (code point 0x10F200 + n for 16 px, 0x10F600 + n
+for 32 px), its file stem, its sizes, priority, name, place and a motif hint.  Each size is
+drawn by hand on its own pixel grid: icons/STEM_16.svg (viewBox 0 0 16 16, small buttons) and
+icons/STEM_32.svg (0 0 32 32, large buttons).  Rules (FEATURES.md 7, JD14, approved 2026-11-16):
 
   grid        whole pixels: 1 px lines centred on pixel centres (x.5), fills on pixel edges;
               a 1 px margin at 16, 2 px at 32; diagonals at 45 degrees where it can be
   lines       1 px in both sizes, like the 1 DIP frames of the NetLab style; square corners
               (miter joins, butt caps); marks (plus, cross, letters) are 1 px small, 2 px large
+  shapes      straight and square: a circle only where the thing is round (a lens, a clock, a
+              globe, the ellipse tool); a container that is a circle elsewhere becomes a square
   colours     four roles, by the first / second class name of an element (vsym's role names):
                 ink    lines and letters: the icon colour the style asks for (text, disabled)
                 body   a neutral surface: the ink at 12 %
@@ -19,13 +27,15 @@ small buttons) and icons/NAME_32.svg (0 0 32 32, large buttons).  Rules (FEATURE
               shade (the ink at 26 %) is there for a second neutral surface.  The colours in the
               SVG files are the light theme's, only for viewing; the palette decides.
   accent      at most one accent element per icon; a disabled icon is all ink
+  overlaps    surfaces are translucent: a shape behind another is drawn only where it shows,
+              with a 1 px gap to the front shape's outline
 
 Strokes become filled outlines here (the library's vector icons only know round joins), so the
 corners stay square at every size.  Each element is one or two layers of ui::Symbol (lib/ui/
 symbol.rs): its fill, then its stroke.  The check warns about axis-parallel edges off the pixel
 grid.  icons_data.rs is deterministic (a rerun writes the same bytes); do not edit it.
 
-Needs a JFLib checkout for tools/vsym.py (SVG parsing) and, for the sheet, tools/refrender.py,
+Needs a JFLib checkout for tools/vsym.py (SVG parsing) and, for the sheets, tools/refrender.py,
 tools/ttf2bin.py and the Inter fonts of styles/netlab: JFLIB, else the repository around this
 folder, else ../JFLib beside it.
 """
@@ -52,24 +62,9 @@ ROOT = jflib_root()
 sys.path.insert(0, str(ROOT / "tools"))
 import vsym  # noqa: E402
 
-# (file stem, constant, code point of the small icon, German name, register / group); the large
-# icon is the code point + 0x80 (constant + "_L").  Code points stay once given.
-ICONS = [
-    ("pointer", "JD_POINTER", 0x10_F200, "Zeigertool", "Start · Tools"),
-    ("connector", "JD_CONNECTOR", 0x10_F201, "Verbinder", "Start · Tools"),
-    ("text", "JD_TEXT", 0x10_F202, "Text", "Start · Tools"),
-    ("rectangle", "JD_RECTANGLE", 0x10_F203, "Rechteck", "Start · Tools"),
-    ("connection_point", "JD_CONNECTION_POINT", 0x10_F204, "Verbindungspunkt", "Start · Tools"),
-    ("format_painter", "JD_FORMAT_PAINTER", 0x10_F205, "Format übertragen", "Start · Zwischenablage"),
-    ("align", "JD_ALIGN", 0x10_F206, "Ausrichten", "Start · Anordnen"),
-    ("bring_front", "JD_BRING_FRONT", 0x10_F207, "In den Vordergrund", "Start · Anordnen"),
-    ("group", "JD_GROUP", 0x10_F208, "Gruppieren", "Start · Anordnen"),
-    ("new_page", "JD_NEW_PAGE", 0x10_F209, "Neue Seite", "Einfügen · Seiten"),
-    ("container", "JD_CONTAINER", 0x10_F20A, "Container", "Einfügen · Diagrammteile"),
-    ("relayout", "JD_RELAYOUT", 0x10_F20B, "Seite neu layouten", "Entwurf · Layout"),
-    ("task_panes", "JD_TASK_PANES", 0x10_F20C, "Aufgabenbereiche", "Ansicht · Fenster"),
-]
-LARGE = 0x80
+BASE = 0x10_F200  # the code point of icon n at 16 px
+LARGE = 0x400  # ... + this at 32 px
+SAMPLE = 0x010  # numbers below: the approved sample sheet
 SIZES = (16, 32)
 MARGIN = {16: 1.0, 32: 2.0}
 MITER_LIMIT = 4.0  # SVG's default
@@ -296,15 +291,41 @@ def icon(path, size):
     return [(r, ru, p) for r, ru, p, *_ in layers], art, warns
 
 
-def load_all():
-    rows, failed = [], False
-    for stem, const, cp, name, place in ICONS:
-        row = {"stem": stem, "const": const, "cp": cp, "name": name, "place": place}
-        for size in SIZES:
-            f = HERE / "icons" / f"{stem}_{size}.svg"
+def table():
+    """icons/icons.txt -> rows {part, n, cp, stem, const, sizes, prio, name, place, motif}"""
+    rows, part, seen = [], None, {}
+    for k, line in enumerate((HERE / "icons" / "icons.txt").read_text(encoding="utf-8").splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            part = line[1:-1]
+            continue
+        f = [c.strip() for c in line.split("|")]
+        if len(f) != 7 or part is None:
+            sys.exit(f"mkicons: icons.txt:{k}: a row is n | stem | sizes | prio | Name | Ort | Motiv, in a [part]")
+        n, stem, sizes, prio, name, place, motif = f
+        sizes = tuple(int(v) for v in sizes.split())
+        if not sizes or any(v not in SIZES for v in sizes) or prio not in ("P1", "P2", "P3"):
+            sys.exit(f"mkicons: icons.txt:{k}: sizes 16 / 32, prio P1..P3")
+        n = int(n, 16)
+        for key in (n, stem):
+            if key in seen:
+                sys.exit(f"mkicons: icons.txt:{k}: {key} also in line {seen[key]}")
+            seen[key] = k
+        rows.append({"part": part, "n": n, "cp": BASE + n, "stem": stem, "const": "JD_" + stem.upper(),
+                     "sizes": sizes, "prio": prio, "name": name, "place": place, "motif": motif})
+    return rows
+
+
+def load(rows, strict):
+    """the drawn sizes of each row: row[16] / row[32] = (layers, art); missing files are noted"""
+    failed, missing = False, []
+    for row in rows:
+        for size in row["sizes"]:
+            f = HERE / "icons" / f"{row['stem']}_{size}.svg"
             if not f.is_file():
-                print(f"mkicons: error: {f.name} missing", file=sys.stderr)
-                failed = True
+                missing.append(f.name)
                 continue
             try:
                 layers, art, warns = icon(f, size)
@@ -315,7 +336,14 @@ def load_all():
             for w in warns:
                 print(f"mkicons: warning: {w}", file=sys.stderr)
             row[size] = (layers, art)
-        rows.append(row)
+    extra = sorted({p.name for p in (HERE / "icons").glob("*.svg")}
+                   - {f"{r['stem']}_{s}.svg" for r in table() for s in r["sizes"]})
+    for name in extra:
+        print(f"mkicons: warning: {name} is not in icons.txt", file=sys.stderr)
+    if missing:
+        print(f"mkicons: {'error' if strict else 'note'}: {len(missing)} SVG files not drawn yet"
+              + (f" ({', '.join(missing[:6])}{', ...' if len(missing) > 6 else ''})"), file=sys.stderr)
+        failed |= strict
     if failed:
         sys.exit(1)
     return rows
@@ -324,31 +352,29 @@ def load_all():
 def write_rust(rows):
     out = HERE / "src" / "icons_data.rs"
     lines = [
-        "// icons_data -- JFDiagrammer's ribbon icons (own artwork; see mkicons.py), from icons/*.svg;",
-        "// generated by mkicons.py (python apps/JFDiagrammer/mkicons.py), do not edit.",
+        "// icons_data -- JFDiagrammer's ribbon icons (own artwork; see mkicons.py), from icons/*.svg and",
+        "// icons/icons.txt; generated by mkicons.py (python apps/JFDiagrammer/mkicons.py), do not edit.",
         "// Each art is filled layers for ui::Symbol::parse(art, [grid, grid]) (lib/ui/symbol.rs);",
         "// roles: 0 ink, 1 body, 2 shade, 4 tint (the accent), 9 hi (the accent surface).",
         "",
     ]
-    for r in rows:
-        lines.append(f"/// {r['name']} ({r['place']}), 16 px")
-        lines.append(f"pub(crate) const {r['const']}: u32 = 0x{r['cp'] >> 16:X}_{r['cp'] & 0xFFFF:04X};")
-        cpl = r["cp"] + LARGE
-        lines.append(f"/// {r['name']}, 32 px (large buttons)")
-        lines.append(f"pub(crate) const {r['const']}_L: u32 = 0x{cpl >> 16:X}_{cpl & 0xFFFF:04X};")
-    lines += ["", "/// (code point, grid, art), sorted by code point",
-              "pub(crate) static ARTS: &[(u32, f32, &str)] = &["]
     items = []
     for r in rows:
-        items.append((r["cp"], r["const"], 16, r[16][1]))
-        items.append((r["cp"] + LARGE, r["const"] + "_L", 32, r[32][1]))
+        for size, const, cp in ((16, r["const"], r["cp"]), (32, r["const"] + "_L", r["cp"] + LARGE)):
+            if size not in r:
+                continue
+            lines.append(f"/// {r['name']} ({r['place']}), {size} px")
+            lines.append(f"pub(crate) const {const}: u32 = 0x{cp >> 16:X}_{cp & 0xFFFF:04X};")
+            items.append((cp, const, size, r[size][1]))
+    lines += ["", "/// (code point, grid, art), sorted by code point",
+              "pub(crate) static ARTS: &[(u32, f32, &str)] = &["]
     for _, const, grid, art in sorted(items):
         lines.append(f'    ({const}, {grid}.0, "{art}"),')
     lines.append("];")
     out.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     n = sum(a.count("|") + 1 for *_, a in items)
     print(f"{out.relative_to(HERE.parent.parent).as_posix() if HERE.parent.parent in out.parents else out}: "
-          f"{len(items)} icons, {n} layers")
+          f"{len(items)} drawings of {len(rows)} icons, {n} layers")
 
 
 # ---------------------------------------------------------------- the preview
@@ -470,28 +496,87 @@ def sheet(rows, path, zoom=1):
                 cv.rect(16, y, col_name - 24, 1, rgb(light["line"]))
         cv.text(f["reg"], "Quellen: apps/JFDiagrammer/icons/*_16.svg, *_32.svg  ·  Skript: apps/JFDiagrammer/mkicons.py",
                 11, 16, height - 16, rgb(light["sub"]))
-        img = np.clip(np.rint(cv.px), 0, 255).astype(np.uint8)
-        if zoom > 1:
-            img = img.repeat(zoom, axis=0).repeat(zoom, axis=1)
-            for k in range(0, img.shape[0], zoom):  # a faint pixel grid
-                img[k, :, :] = (img[k, :, :].astype(np.int32) * 7 // 8).astype(np.uint8)
-            for k in range(0, img.shape[1], zoom):
-                img[:, k, :] = (img[:, k, :].astype(np.int32) * 7 // 8).astype(np.uint8)
-        rr.write_png(str(path), img)
-        print(f"{path}: {img.shape[1]} x {img.shape[0]}")
+        save(cv, np, rr, path, zoom)
+
+
+def save(cv, np, rr, path, zoom):
+    """the canvas as PNG; zoom > 1: every pixel zoom x zoom with a faint pixel grid"""
+    img = np.clip(np.rint(cv.px), 0, 255).astype(np.uint8)
+    if zoom > 1:
+        img = img.repeat(zoom, axis=0).repeat(zoom, axis=1)
+        for k in range(0, img.shape[0], zoom):
+            img[k, :, :] = (img[k, :, :].astype(np.int32) * 7 // 8).astype(np.uint8)
+        for k in range(0, img.shape[1], zoom):
+            img[:, k, :] = (img[:, k, :].astype(np.int32) * 7 // 8).astype(np.uint8)
+    rr.write_png(str(path), img)
+    print(f"{path}: {img.shape[1]} x {img.shape[0]}")
+
+
+def overview(rows, path, what, zoom=1):
+    """every row in a grid: name and stem, then 32 and 16 px on the light and the dark ribbon
+    (a size not drawn yet stays empty)"""
+    import numpy as np
+    import refrender as rr
+    with tempfile.TemporaryDirectory() as work:
+        f = {k: rr.load_font(str(v)) for k, v in sgf_fonts(work).items()}
+        ncol, cw, ch, head = 4, 200, 86, 64
+        nrow = (len(rows) + ncol - 1) // ncol
+        width, height = 16 + ncol * cw, head + nrow * ch + 16
+        light, dark = THEMES["hell"], THEMES["dunkel"]
+        cv = rr.Canvas(width, height, rgb(light["page"]))
+        drawn = sum(1 for r in rows if all(s in r for s in r["sizes"]))
+        cv.text(f["semi"], f"JFDiagrammer – Menüband-Icons: {what}", 16, 16, 28, rgb(light["ink"]))
+        cv.text(f["reg"], f"{len(rows)} Icons, {drawn} fertig gezeichnet; je Feld 32 und 16 px, hell und dunkel",
+                11, 16, 46, rgb(light["sub"]))
+        for j, r in enumerate(rows):
+            x, y = 16 + (j % ncol) * cw, head + (j // ncol) * ch
+            cv.text(f["semi"], r["name"][:30], 11, x, y + 12, rgb(light["ink"]))
+            cv.text(f["reg"], f"{r['stem']} · {r['prio']}", 10, x, y + 25, rgb(light["sub"]))
+            for k, t in enumerate((light, dark)):
+                bx = x + k * 92
+                cv.rect(bx, y + 32, 88, 46, rgb(t["bg"]))
+                pal = palette(t)
+                if 32 in r:
+                    paint_icon(cv, rr, np, r[32][0], bx + 7, y + 39, 1.0, pal)
+                if 16 in r:
+                    paint_icon(cv, rr, np, r[16][0], bx + 58, y + 47, 1.0, pal)
+        save(cv, np, rr, path, zoom)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
-    ap.add_argument("--sheet", help="write the preview sheet (PNG)")
-    ap.add_argument("--zoom", help="write the sheet with every pixel 8x (PNG)")
+    ap.add_argument("--sheet", help="the approved sample sheet (PNG)")
+    ap.add_argument("--overview", help="the selected icons in a grid (PNG)")
+    ap.add_argument("--zoom", help="the overview with every pixel 8x (PNG)")
+    ap.add_argument("--part", help="only these parts of icons.txt (comma separated)")
+    ap.add_argument("--prio", help="only these priorities (comma separated, e.g. P1)")
+    ap.add_argument("--no-rust", action="store_true", help="leave src/icons_data.rs alone")
+    ap.add_argument("--strict", action="store_true", help="a missing SVG file is an error")
     a = ap.parse_args()
-    rows = load_all()
-    write_rust(rows)
-    if a.sheet:
-        sheet(rows, a.sheet)
+    rows = table()
+    parts = {p for r in rows for p in [r["part"]]}
+    sel = rows
+    if a.part:
+        want = set(a.part.split(","))
+        if want - parts:
+            sys.exit(f"mkicons: unknown part {', '.join(sorted(want - parts))} (parts: {', '.join(sorted(parts))})")
+        sel = [r for r in sel if r["part"] in want]
+    if a.prio:
+        sel = [r for r in sel if r["prio"] in set(a.prio.split(","))]
+    full = sel is rows
+    load(rows if full or not a.no_rust else sel, a.strict)
+    if not a.no_rust:
+        write_rust(rows)
+    what = ", ".join(x for x in (a.part, a.prio) if x) or "alle"
+    if a.overview:
+        overview(sel, a.overview, what)
     if a.zoom:
-        sheet(rows, a.zoom, zoom=8)
+        overview(sel, a.zoom, what, zoom=8)
+    if a.sheet:
+        sample = [r for r in rows if r["n"] < SAMPLE]
+        if any(16 not in r or 32 not in r for r in sample):
+            sys.exit("mkicons: the sample sheet needs both sizes of its icons")
+        sheet(sorted(sample, key=lambda r: r["n"]), a.sheet)
 
 
 if __name__ == "__main__":
