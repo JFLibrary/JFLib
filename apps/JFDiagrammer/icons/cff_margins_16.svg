@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Ränder, 16 px</title>
+  <rect class="hi" fill="#C2D2E5" x="2" y="5" width="2" height="7"/>
+  <rect class="tint" stroke="#1F5FA8" x="1.5" y="4.5" width="13" height="8"/>
+  <path class="tint" stroke="#1F5FA8" d="M4.5 5V12"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="10.5" y="6.5" width="2" height="4"/>
+  <path class="ink" fill="#1D2228" d="M5 8.5L7 6.5V10.5Z M10 8.5L8 6.5V10.5Z"/>
+  <path class="ink" stroke="#1D2228" d="M7 8.5H8"/>
+</svg>

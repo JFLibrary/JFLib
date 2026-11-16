@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Eine Ebene nach hinten, 16 px</title>
+  <polygon class="hi" fill="#C2D2E5" points="7,5 11,5 11,9 9,9 9,11 5,11 5,7 7,7"/>
+  <path class="tint" stroke="#1F5FA8" d="M7 4.5H11.5V9M9 11.5H4.5V7"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="1.5" width="4" height="4"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="10.5" y="10.5" width="4" height="4"/>
+</svg>

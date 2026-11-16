@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Öffnen, 16 px</title>
+  <polygon class="shade" fill="#B9BBBE" points="2,3 6,3 8,5 12,5 12,7 2,7"/>
+  <path class="ink" stroke="#1D2228" d="M1.5 15V2.5H5.5L7.5 4.5H12.5V7"/>
+  <polygon class="body" fill="#DCDEE1" stroke="#1D2228" points="2.2,14.5 11.5,14.5 13.5,8.5 4.2,8.5"/>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Weitere Farben, 16 px</title>
+  <rect class="ink" fill="#1D2228" x="2" y="2" width="3" height="4"/>
+  <rect class="shade" fill="#B9BBBE" x="6" y="2" width="4" height="4"/>
+  <rect class="body" fill="#DCDEE1" x="11" y="2" width="3" height="4"/>
+  <rect class="shade" fill="#B9BBBE" x="2" y="7" width="3" height="4"/>
+  <rect class="body" fill="#DCDEE1" x="6" y="7" width="4" height="4"/>
+  <rect class="shade" fill="#B9BBBE" x="11" y="7" width="3" height="4"/>
+  <rect class="tint" fill="#1F5FA8" x="2" y="12" width="12" height="3"/>
+</svg>

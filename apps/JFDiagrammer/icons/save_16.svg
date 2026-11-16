@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Speichern, 16 px</title>
+  <path class="body" fill="#DCDEE1" d="M2 2H4V6H11V2H12L14 4V14H13V8H3V14H2Z"/>
+  <path class="shade" fill="#B9BBBE" fill-rule="evenodd" d="M5 2H10V5H5Z M8 2H9V4H8Z"/>
+  <rect class="ink" fill="#1D2228" x="8" y="2" width="1" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M1.5 1.5H11.5L14.5 4.5V14.5H1.5Z"/>
+  <path class="ink" stroke="#1D2228" d="M4.5 2V5.5H10.5V2"/>
+  <path class="ink" stroke="#1D2228" d="M3.5 14V8.5H12.5V14"/>
+</svg>

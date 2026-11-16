@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Markieren, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M1 1.5H3M4 1.5H6M7 1.5H9M10 1.5H12M1.5 1V3M1.5 4V6M1.5 7V9M11.5 1V3M11.5 4V6M1 8.5H3M4 8.5H6"/>
+  <polygon class="body" fill="#DCDEE1" stroke="#1D2228" points="7.5,5.5 7.5,12.5 9.5,10.5 10.5,12.5 11.5,12.5 10.5,10.5 12.5,10.5"/>
+</svg>

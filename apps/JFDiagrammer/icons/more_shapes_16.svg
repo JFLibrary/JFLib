@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Weitere Shapes, 16 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="3.5" width="3" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="3.5" width="3" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="8.5" width="3" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="8.5" width="3" height="3"/>
+  <polygon class="ink" fill="#1D2228" points="11,4 14.5,7.5 11,11"/>
+</svg>

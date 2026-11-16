@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Link, 32 px</title>
+  <path class="ink" stroke="#1D2228" stroke-width="2" d="M17.5 20.5L10 28L4 22L11.5 14.5M14.5 11.5L22 4L28 10L20.5 17.5"/>
+  <path class="tint" stroke="#1F5FA8" stroke-width="2" d="M11.5 20.5L20.5 11.5"/>
+</svg>

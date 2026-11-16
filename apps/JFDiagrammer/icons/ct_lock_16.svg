@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Container sperren, 16 px</title>
+  <rect class="body" fill="#DCDEE1" x="2" y="3" width="12" height="3"/>
+  <path class="ink" stroke="#1D2228" d="M4 4.5H9"/>
+  <path class="ink" stroke="#1D2228" d="M8 13.5H1.5V2.5H14.5V8 M2 6.5H14"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="3.5" y="8.5" width="3" height="3"/>
+  <path class="tint" stroke="#1F5FA8" d="M10.5 11V9.5H13.5V11"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="9.5" y="11.5" width="5" height="3"/>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Rückgängig, 16 px</title>
+  <path class="ink" stroke="#1D2228" d="M5 4.5H10.5L13.5 7.5V9.5L10.5 12.5H4"/>
+  <polygon class="ink" fill="#1D2228" points="5,2 5,7 2.5,4.5"/>
+</svg>

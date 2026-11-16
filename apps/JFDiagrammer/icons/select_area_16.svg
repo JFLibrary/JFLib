@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Bereichsauswahl, 16 px</title>
+  <rect class="hi" fill="#C2D2E5" x="2" y="2" width="9" height="9"/>
+  <path class="tint" stroke="#1F5FA8" d="M1 1.5H3M4 1.5H6M7 1.5H9M10 1.5H12M1.5 1V3M1.5 4V6M1.5 7V9M1.5 10V12M1 11.5H3M4 11.5H6M7 11.5H9M11.5 1V3M11.5 4V6M11.5 7V9"/>
+  <path class="ink" stroke="#1D2228" d="M12.5 10V15M10 12.5H15"/>
+</svg>
