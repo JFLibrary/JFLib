@@ -34,6 +34,17 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical
   pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point).
 
+### Fixed
+
+- Windows: a service whose `run` ends with an error code is started again, as systemd
+  (`Restart=on-failure`) and launchd (`KeepAlive` with `SuccessfulExit` false) do it.
+  `service::install` set the failure actions but not `SERVICE_FAILURE_ACTIONS_FLAG`, without
+  which they only follow a process that ends without reporting `SERVICE_STOPPED`, and
+  `run_service` does report the stop (with error 1066), so the service stayed stopped. A stop
+  that was asked for is reported without an error whatever `run` returned, so it is never
+  answered with a restart. Services installed before keep their setting until they are installed
+  again.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

@@ -27697,6 +27697,11 @@ service -- programs that run as a system service
       Windows: the service control manager (automatic start as LocalSystem, restart after a
       failure); Linux: a systemd unit in /etc/systemd/system and systemctl.  Both need
       administrator / root rights; the errors say so.
+      A failure is a crash or a run() that returned another code than 0 without a stop having
+      been asked for: the service manager then starts the program again (Windows: 5 s after
+      the first failure, 15 s after the second, 60 s after every further one, counted anew
+      after a day without one; systemd: after 5 s; launchd: at the earliest 5 s after the
+      last start).
   program_path(&ServiceSpec) -> the program install registers: Windows: a program outside
       Program Files is copied to %ProgramFiles%\<name>\ first (only administrators may change
       it there; uninstall leaves the copy, a new install replaces it); Linux, macOS: the program

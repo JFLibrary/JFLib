@@ -50,6 +50,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **gltf:** Scenes are read and their instances counted without walking every node once per scene (scenes x nodes; nodes without a mesh never reached the limit), and a document keeps at most 64 different notes
 - **gfx:** `PData` flattens at most 2^20 points of curves per walk, a cubic past that is its chord: a large SVG path of tight curves made hundreds of MB
 - **spell:** `token_errors` tries runs of at most 8 parts of a hyphenated word: a word of 1000 parts took 500 000 checks in the UI thread
+- **plat:** Windows: a service whose `run` ends with an error code is started again, as systemd (`Restart=on-failure`) and launchd (`KeepAlive` with `SuccessfulExit` false) do it -- `service::install` set the failure actions but not `SERVICE_FAILURE_ACTIONS_FLAG`, without which they only follow a process that ends without reporting `SERVICE_STOPPED`, and `run_service` does report the stop (with error 1066), so the service stayed stopped. A stop that was asked for is reported without an error whatever `run` returned, so it is never answered with a restart. Services installed before keep their setting until they are installed again
 
 ## [0.2.1] - 2026-11-16
 
