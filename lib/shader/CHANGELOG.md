@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- `reflect::constant_values` measures each type once and refuses constants of more than 4 Mi words in all: nested composites, a ConstantNull of a huge array or nested structs took any amount of memory or exponential time when a compute pipeline was made.
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

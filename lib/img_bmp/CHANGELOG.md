@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- The metadata scan takes an embedded PNG or JPEG's size wherever the decoder decodes one (BI_PNG in an OS/2 header too) and refuses an embedded file it cannot read: the BMP header's size passed the caller's pixel limit while the decoder unpacked the embedded image.
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

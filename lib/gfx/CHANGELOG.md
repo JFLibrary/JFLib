@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- `PData` flattens at most 2^20 points of curves per walk, a cubic past that is its chord: a large SVG path of tight curves made hundreds of MB.
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

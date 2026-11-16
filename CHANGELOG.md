@@ -42,6 +42,14 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** The fine steps of a precision touchpad (Windows' wheel deltas below 120) were cut off one by one where whole lines count: the terminal never scrolled with steps below 40, the code completion list scrolled three rows on each of them (and on two notches at once), Ctrl + each of them zoomed a diagram a whole step; they add up now
 - **Tests:** linuxtest's Wayland synth test expected key events at x = 0, y = 0, as before the scan code and the location came (E2)
 - **build:** jflib-build: a project in a folder with a blank in its path (`My Projects/app`) links for Linux again -- the path of the linker's map was split at the blank when lld links (one static file, `cargo jflib package`) and had the blank turned into a comma behind cc's `-Wl,`; it is one argument now (through cc as `-Xlinker`)
+- **render3d:** Textures taller than wide are resampled columns first: rows first held height x size floats (a 1 x 32768 texture: 1 GiB for 128 KB of texels)
+- **shader:** `reflect::constant_values` measures each type once and refuses constants of more than 4 Mi words in all: nested composites, a ConstantNull of a huge array or nested structs took any amount of memory or exponential time when a compute pipeline was made
+- **wgsl:** An override-sized workgroup array is at least 1 long in SPIR-V compiled with the defaults (max(n, 1) as specialization constant operations): specialized later to 0 or a negative value it was empty, and the robust index clamp and its zero initialisation were unbounded
+- **img_bmp:** The metadata scan takes an embedded PNG or JPEG's size wherever the decoder decodes one (BI_PNG in an OS/2 header too) and refuses an embedded file it cannot read: the BMP header's size passed the caller's pixel limit while the decoder unpacked the embedded image
+- **img_heif:** Items are found by id in logarithmic time: the boxes after iinf looked their entries up linearly, items x entries already in a probe
+- **gltf:** Scenes are read and their instances counted without walking every node once per scene (scenes x nodes; nodes without a mesh never reached the limit), and a document keeps at most 64 different notes
+- **gfx:** `PData` flattens at most 2^20 points of curves per walk, a cubic past that is its chord: a large SVG path of tight curves made hundreds of MB
+- **spell:** `token_errors` tries runs of at most 8 parts of a hyphenated word: a word of 1000 parts took 500 000 checks in the UI thread
 
 ## [0.2.1] - 2026-11-16
 

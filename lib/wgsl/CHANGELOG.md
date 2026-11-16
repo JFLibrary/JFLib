@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- An override-sized workgroup array is at least 1 long in SPIR-V compiled with the defaults (max(n, 1) as specialization constant operations): specialized later to 0 or a negative value it was empty, and the robust index clamp and its zero initialisation were unbounded.
+
 ## [0.2.1] - 2026-11-16
 
 ### Fixed

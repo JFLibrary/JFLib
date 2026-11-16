@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- Scenes are read and their instances counted without walking every node once per scene (scenes x nodes; nodes without a mesh never reached the limit), and a document keeps at most 64 different notes.
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.
