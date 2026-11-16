@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- Modular images: a squeeze of a channel whose shift is already above 30 is refused (`ERR_HDR`, as libjxl does). Squeeze steps on a 1 x 1 channel added an empty channel each, up to 65536, each inserted into the middle of the list (74 KB took 232 s).
+
 ## [0.2.1] - 2026-11-16
 
 ### Fixed

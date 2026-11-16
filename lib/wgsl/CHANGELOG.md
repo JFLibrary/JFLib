@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - An override-sized workgroup array is at least 1 long in SPIR-V compiled with the defaults (max(n, 1) as specialization constant operations): specialized later to 0 or a negative value it was empty, and the robust index clamp and its zero initialisation were unbounded.
+- An assignment to a swizzle of a vector in memory (`v.xz = ...`) stores only those components in SPIR-V. It loaded and stored the whole vector, a race with other invocations writing its other components.
 
 ## [0.2.1] - 2026-11-16
 

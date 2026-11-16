@@ -50,6 +50,20 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **gltf:** Scenes are read and their instances counted without walking every node once per scene (scenes x nodes; nodes without a mesh never reached the limit), and a document keeps at most 64 different notes
 - **gfx:** `PData` flattens at most 2^20 points of curves per walk, a cubic past that is its chord: a large SVG path of tight curves made hundreds of MB
 - **spell:** `token_errors` tries runs of at most 8 parts of a hyphenated word: a word of 1000 parts took 500 000 checks in the UI thread
+- **plat:** `parallel_for` with the feature `unwind`: a panic in an item of the calling thread cancels the job and waits for the workers before it unwinds: caught with `catch_unwind`, they went on using the freed job
+- **plat:** Windows: the open dialog's result is split into a folder and names only when it is such a list: one file chosen with multiple selection on came back with the rest of a longer suggested name as a second file
+- **plat:** Linux: reading the clipboard or a drop from another program ends after 30 s in all (Wayland, X11 with INCR): the 3 s deadline started anew with every piece, so a program sending slowly froze the app for as long as it liked (up to 512 MB)
+- **plat:** macOS: a GUI app catches SIGTERM with a handler that does nothing instead of ignoring it (the dispatch source reports it as before): its child processes inherited the ignored signal and could not be ended with a plain kill
+- **update:** An apply that ended in the middle (a crash between two files, or after the app bundle's exchange) keeps its backup of the old version at the next start and finishes there, also when the new program is the one starting: the second attempt backed up files already replaced as the old ones, and a rollback then kept the new version
+- **gpu:** Vulkan, several threads: a buffer or image dropped while another thread has taken the pending uploads but not submitted them yet is destroyed only after their submission: it took the next submission's value, which could be another thread's submission without the uploads, and the driver then copied from or into a destroyed buffer
+- **wgsl:** An assignment to a swizzle of a vector in memory (`v.xz = ...`) stores only those components in SPIR-V: it loaded and stored the whole vector, a race with other invocations writing its other components
+- **ui:** Dock: a floating window is found by its slot when the dock's windows are walked: the app changing the layout in the same pass made the stored index name another floating window or none
+- **img_jxl:** Modular images: a squeeze of a channel whose shift is already above 30 is refused (`ERR_HDR`, as libjxl does): squeeze steps on a 1 x 1 channel added an empty channel each, up to 65536, each inserted into the middle of the list (74 KB took 232 s)
+
+### Security
+
+- **plat:** Windows: dwmapi, crypt32, winmm, iphlpapi, bcrypt and avrt are loaded from System32 when first used instead of being imported by the program: a DLL of such a name beside the program (a setup in the download folder) was loaded in their place
+- **plat:** `screen::pick_test_point`, the colour picker's test aid, obeys `screen.capture` like the picker: it read screen pixels without the permission
 
 ## [0.2.1] - 2026-11-16
 
