@@ -973,11 +973,23 @@ impl<'g, 'a> Fx<'g, 'a> {
         }
     }
 
-    /// store r through l (a swizzle view writes its components: the whole vector, read,
-    /// modified, written back)
+    /// store r through l (a swizzle view writes its components, each through its own access
+    /// chain: reading and writing back the whole vector also wrote the components it did not
+    /// assign, over what another invocation wrote to them meanwhile -- workgroup, storage)
     fn assign(&mut self, l: V, r: Id) {
         match l {
             V::Ptr(p) => self.store_ptr(&p, r),
+            V::Swz(p, cs, n) if self.g.tid(Type::Scalar(self.scalar(p.ty))).is_some() => {
+                let ct = self.g.tid(Type::Scalar(self.scalar(p.ty))).unwrap_or(p.ty);
+                for (i, &c) in cs[..n as usize].iter().enumerate() {
+                    let mut q = p.clone();
+                    q.chain.push(Step::Const(c as u32));
+                    q.ty = ct;
+                    // (one component: r is that scalar)
+                    let v = if n == 1 { r } else { self.g.b.extract(r, &[i as u32]) };
+                    self.store_ptr(&q, v);
+                }
+            }
             V::Swz(p, cs, n) => {
                 let old = self.load_ptr(&p);
                 let w = self.width(p.ty) as u32;

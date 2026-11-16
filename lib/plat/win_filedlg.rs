@@ -154,8 +154,12 @@ pub fn file_dialog(flags: u32, path: &mut String, exts: &[&str]) -> (i32, u32) {
         return (0, 0);
     }
     // the chosen path -> UTF-8 with '/' separators; FD_MULTI: "folder\0name\0name\0\0" for
-    // several files, the full path for one
-    let parts = multi_parts(&file);
+    // several files, the full path for one.  A list is one when nFileOffset follows a NUL (one
+    // file: it follows the last '\'): after one path shorter than the suggested name the rest of
+    // that name stays in the buffer behind its NUL, and was read as a second entry
+    let off = ofn.file_offset as usize;
+    let listed = multi && off > 0 && off < file.len() && file[off - 1] == 0;
+    let parts = if listed { multi_parts(&file) } else { multi_parts(&file).into_iter().take(1).collect() };
     let mut all: Vec<String> = Vec::new();
     if parts.len() > 1 {
         let dir = super::super::from_wide(parts[0]).replace('\\', "/");

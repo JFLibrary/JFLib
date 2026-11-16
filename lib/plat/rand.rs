@@ -11,10 +11,9 @@
 
 #[cfg(windows)]
 fn os_fill(buf: &mut [u8]) -> bool {
-    #[link(name = "bcrypt", kind = "raw-dylib")]
-    unsafe extern "system" {
-        fn BCryptGenRandom(alg: usize, buf: *mut u8, len: u32, flags: u32) -> i32;
-    }
+    crate::win_dll::system_dll! { "bcrypt.dll" {
+        fn BCryptGenRandom(alg: usize, buf: *mut u8, len: u32, flags: u32) -> i32 = -1;
+    } }
     const BCRYPT_USE_SYSTEM_PREFERRED_RNG: u32 = 2;
     for chunk in buf.chunks_mut(1 << 30) {
         // SAFETY: the buffer is valid for chunk.len() bytes.

@@ -688,11 +688,13 @@ impl Wl {
         let mut buf: Vec<u8> = vec![0; 65536];
         let mut len = 0usize;
         let rich = matches!(fmt, CLIP_HTML | CLIP_RTF | CLIP_DOCX);
-        // 3 s without data (not 3 s in all: large data, made while it is read, takes longer)
-        let mut deadline = crate::time_us() + READ_TIMEOUT;
+        // 3 s without data (not 3 s in all: large data, made while it is read, takes longer), and
+        // READ_TOTAL in all: a program sending a byte every 2.9 s held the UI thread for good
+        let start = crate::time_us();
+        let mut deadline = start + READ_TIMEOUT;
         loop {
             let now = crate::time_us();
-            if now >= deadline {
+            if now >= deadline || now - start >= crate::CLIP_READ_TOTAL_US {
                 if self.w.debug {
                     crate::write_stderr(b"[wl] clipboard: no data for 3 s\n");
                 }
@@ -739,7 +741,7 @@ impl Wl {
                 break;
             }
             len += r as usize;
-            deadline = crate::time_us() + READ_TIMEOUT;
+            deadline = (crate::time_us() + READ_TIMEOUT).min(start + crate::CLIP_READ_TOTAL_US);
             if rich && len > crate::CLIP_RICH_MAX {
                 sys_close(p[0]);
                 return None;

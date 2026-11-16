@@ -408,11 +408,11 @@ mod sys {
         fn FreeAddrInfoW(ai: *mut AddrInfoW);
     }
 
-    #[link(name = "iphlpapi", kind = "raw-dylib")]
-    unsafe extern "system" {
-        fn GetAdaptersAddresses(family: u32, flags: u32, reserved: usize, buf: *mut u8, size: *mut u32) -> u32;
-        fn if_nametoindex(name: *const u8) -> u32;
-    }
+    // (ERROR_NOT_SUPPORTED without the DLL)
+    crate::win_dll::system_dll! { "iphlpapi.dll" {
+        fn GetAdaptersAddresses(family: u32, flags: u32, reserved: usize, buf: *mut u8, size: *mut u32) -> u32 = 50;
+        fn if_nametoindex(name: *const u8) -> u32 = 0;
+    } }
 
     static STARTED: AtomicU8 = AtomicU8::new(0);
 

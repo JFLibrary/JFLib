@@ -849,7 +849,9 @@ enum Act {
 enum Slot {
     Center,
     Group(usize),
-    Float(usize),
+    /// a floating window by its slot, not its index: the app may change the DockState between
+    /// dock_next calls (close a panel, float or dock one), which moves the indices
+    Float(u8),
 }
 
 // the library's side of a floating window: its open flag and placement
@@ -1067,7 +1069,7 @@ impl Ui {
         }
         for f in 0..st.floats.len() {
             if st.floats[f].group.panels.iter().any(|&p| rt.present(p)) {
-                rt.slots.push(Slot::Float(f));
+                rt.slots.push(Slot::Float(st.floats[f].slot));
             }
         }
         rt.next = 0;
@@ -1110,7 +1112,12 @@ impl Ui {
                     rt.hits0 = self.wp.ctx.hits[self.wp.ctx.hit_cur].len();
                     out = Some(geo.active);
                 }
-                Slot::Float(f) => out = self.dk_float_open(&mut rt, st, f),
+                Slot::Float(s) => {
+                    // (gone meanwhile: nothing to fill)
+                    if let Some(f) = st.floats.iter().position(|x| x.slot == s) {
+                        out = self.dk_float_open(&mut rt, st, f);
+                    }
+                }
             }
         }
         self.dk_put(win, rt);

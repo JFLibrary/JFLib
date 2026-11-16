@@ -70,11 +70,10 @@ unsafe extern "system" {
     fn CredFree(buf: *mut c_void);
 }
 
-#[link(name = "crypt32", kind = "raw-dylib")]
-unsafe extern "system" {
-    fn CryptProtectData(input: *const Blob, descr: *const u16, entropy: *const Blob, reserved: *mut c_void, prompt: *mut c_void, flags: u32, out: *mut Blob) -> i32;
-    fn CryptUnprotectData(input: *const Blob, descr: *mut *mut u16, entropy: *const Blob, reserved: *mut c_void, prompt: *mut c_void, flags: u32, out: *mut Blob) -> i32;
-}
+crate::win_dll::system_dll! { "crypt32.dll" {
+    fn CryptProtectData(input: *const Blob, descr: *const u16, entropy: *const Blob, reserved: *mut c_void, prompt: *mut c_void, flags: u32, out: *mut Blob) -> i32 = 0;
+    fn CryptUnprotectData(input: *const Blob, descr: *mut *mut u16, entropy: *const Blob, reserved: *mut c_void, prompt: *mut c_void, flags: u32, out: *mut Blob) -> i32 = 0;
+} }
 
 #[link(name = "kernel32", kind = "raw-dylib")]
 unsafe extern "system" {

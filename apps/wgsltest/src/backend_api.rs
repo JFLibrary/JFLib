@@ -76,6 +76,18 @@ pub fn run(t: &mut T) {
         t.check("override array: its length is max(n, 1) (OpSpecConstantOp SLessThan + Select)", count_op(w, op::SpecConstantOp) >= 2);
         t.check("override array: the module validates", shader::val::validate(w).is_ok());
     }
+    // a swizzle assignment to shared memory stores its components one by one: loading and
+    // storing the whole vector wrote the other components too, over another invocation's
+    let src = "var<workgroup> w: vec4u;\n@compute @workgroup_size(1) fn main() { w.yz = vec2u(1u, 2u); }";
+    let whole = "var<workgroup> w: vec4u;\n@compute @workgroup_size(1) fn main() { w = vec4u(0u, 1u, 2u, 0u); }";
+    let swz = CompileOptions { features: voll.features | wgsl::feature::SWIZZLE_ASSIGNMENT, ..voll };
+    if let (Some(o), Some(b)) = (compile(t, "swizzle assignment to workgroup memory", src, &swz), compile(t, "a whole vector to workgroup memory", whole, &swz)) {
+        let (w, base) = (&o.entries[0].words, &b.entries[0].words);
+        // (the zero initialisation of workgroup memory loads the invocation index in both)
+        t.check(&format!("swizzle assignment: no load of the vector ({} loads, a whole store {})", count_op(w, op::Load), count_op(base, op::Load)),
+            count_op(w, op::Load) == count_op(base, op::Load) && count_op(w, op::Store) >= count_op(base, op::Store) + 1);
+        t.check("swizzle assignment: the module validates", shader::val::validate(w).is_ok());
+    }
     // what the benchmark shaders report
     if let Some(o) = compile(t, "cull", wgsl::bench::CULL, &voll) {
         let e = &o.entries[0];

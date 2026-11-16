@@ -477,10 +477,13 @@ impl X11 {
         }
         // (an error of the first read keeps what was read, as the assembly)
         if typ == self.atoms[A_INCR] {
-            // INCR: the owner writes chunks after each delete; an empty one ends it
+            // INCR: the owner writes chunks after each delete; an empty one ends it.  3 s for each
+            // chunk, CLIP_READ_TOTAL_US in all: an owner writing a byte every 2.9 s held the UI
+            // thread for good
             self.rb.clear();
+            let start = crate::time_us();
             loop {
-                if !self.clip_wait(|s| s.cb_newval) {
+                if crate::time_us() - start >= crate::CLIP_READ_TOTAL_US || !self.clip_wait(|s| s.cb_newval) {
                     return self.convert_timeout();
                 }
                 self.cb_newval = false;
