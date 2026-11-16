@@ -5,6 +5,10 @@ Klammern (DF-01, CN-05 …) verweisen auf die Feature-Liste. Aufwände sind gesc
 (S = eine Session, M = zwei bis drei, L = mehr). Was noch nicht entschieden ist, steht unter
 „Offene Fragen“.
 
+**Erledigt** (2026-11-16, Branch `claude/jfdiagrammer-base`): JD0 Gerüst, JD1 ZIP und OPC
+(`archive::opc`, DEFLATE, ZIP64, `Limits::ratio`), JD2 Dokumentmodell (`diagram_core`, Rückgängig
+über inverse Schritte) und JD14 alle 303 Menüband-Icons. Nächste Welle: C.
+
 ## Ziel
 
 Am Ende von Phase 2 öffnet, bearbeitet und speichert JFDiagrammer `.vsdx`- und `.vssx`-Dateien
