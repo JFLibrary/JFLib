@@ -1,0 +1,31 @@
+[package]
+name = "pdftest"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "pdftest"
+path = "src/main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+gfx.workspace = true
+img_core.workspace = true
+img_jpeg.workspace = true
+text_shape.workspace = true
+pdf.workspace = true
+
+[build-dependencies]
+jflib-build.workspace = true

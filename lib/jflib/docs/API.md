@@ -109,6 +109,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
+- [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
+  <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers)
 
 ## ui
 
@@ -54030,3 +54032,460 @@ callback such as a window procedure: core panics once more there, with one of NO
   (`"panicked at FILE:LINE:COL:\nMESSAGE"`), taken: for a panic the app caught with
   `std::panic::catch_unwind`, whose payload holds the message alone.  None when no panic came
   since the last call (or the program is built with `panic = "abort"`).
+
+## pdf
+
+*vector PDF writer with embedded font subsets, links and outlines* -- crate root [`lib/pdf/src/lib.rs`](../lib/pdf/src/lib.rs)
+
+```text
+pdf -- a vector PDF writer: pages of their own size drawn on a canvas (paths, fills with the
+non-zero or even-odd rule, strokes with width, dashes, caps, joins and miter limit,
+transforms, clipping, alpha, RGB colours), images (JPEG passed through, other pixels with
+FlateDecode and their alpha as a soft mask), text in embedded TrueType / OpenType subsets
+(CID fonts with Identity-H, ToUnicode for search and copy, glyphs and widths from the
+library's shaping), links to URIs and to places in the document, nested outlines
+(bookmarks), the document information and XMP metadata.  PDF 1.7 with a classic xref table;
+the same document always gives the same bytes.  Not here: PDF/A, encryption, forms.
+
+  let mut doc = Document::new();
+  let page = doc.add_page(A4.0, A4.1);              // points (1/72 inch); mm(210.0) converts
+  let font = doc.add_font(bytes, 0)?;                // TrueType / OpenType (CFF), a collection's face
+  {
+      let mut c = doc.canvas(page, Origin::TopLeft); // or BottomLeft (PDF's own page space)
+      c.set_fill_color(Rgb::hex(0x2060C0));
+      c.rect(40.0, 40.0, 200.0, 100.0);
+      c.fill(FillRule::NonZero);
+      c.text(font, 12.0, 40.0, 180.0, "Hallo, Welt");  // shaped; returns the advance
+      c.link_uri(40.0, 168.0, 80.0, 16.0, "https://example.org/");
+  }                                                  // the drawing goes into the page here
+  doc.add_outline(None, "Start", Dest::Fit(page));
+  let bytes = doc.write()?;
+
+  Document     add_page / page_size / page_count, canvas(page, origin) -> Canvas,
+               add_font -> FontId, font_metrics, shape, text_width, add_image(Image) -> ImageId,
+               add_outline -> OutlineId, set_outline_open, set_info(Info), set_language,
+               set_compression, write() -> bytes
+  Canvas       save / restore, transform / translate / scale / rotate, fill / stroke colour and
+               alpha, line width, cap, join, miter limit, dash, path building (move_to,
+               line_to, curve_to, quad_to, rect, rounded_rect, ellipse, circle, arc, close,
+               append_path), fill / stroke / fill_stroke / clip / end_path, image /
+               image_transform, text / text_fallback / glyphs, set_text_mode, link_uri /
+               link_dest, dest (a destination at a point of this canvas)
+  Path         the same path building, kept and drawn later (Canvas::fill_path, stroke_path)
+  Image        jpeg(file), gray / rgb / rgba(w, h, pixels), from_surface(gfx::Surface),
+               with_alpha, interpolate
+
+Text: Canvas::text shapes one line with lib/text_shape (HarfRust: kerning, ligatures, marks,
+Arabic joining, bidi); Canvas::glyphs takes glyphs a layout shaped already (pdf::Glyph).  Each glyph is
+placed where the shaping put it (TJ adjustments against the font's widths); the CIDs are the
+font's glyph ids.  The first glyph of each cluster maps to the cluster's text in ToUnicode.
+Variable fonts are embedded at their default instance, colour glyphs as their outlines.
+Fonts whose OS/2 fsType forbids embedding are refused (Error::FontLicense); fsType "no
+subsetting" embeds every glyph.
+```
+
+### `pdf` crate root
+
+```rust
+/// A4 portrait in points
+A4: (f64, f64) = (595.275_590_551_181_1, 841.889_763_779_527_6)
+/// A3 portrait in points
+A3: (f64, f64) = (841.889_763_779_527_6, 1_190.551_181_102_362_2)
+/// A5 portrait in points
+A5: (f64, f64) = (419.527_559_055_118_1, 595.275_590_551_181_1)
+/// US Letter portrait in points
+LETTER: (f64, f64) = (612.0, 792.0)
+/// US Legal portrait in points
+LEGAL: (f64, f64) = (612.0, 1008.0)
+```
+
+- **`fn mm(v: f64) -> f64`**
+  millimetres in points
+
+- **`fn inch(v: f64) -> f64`**
+  inches in points
+
+```rust
+/// the smallest and largest page side PDF readers take (ISO 32000-1, Annex C)
+PAGE_MIN: f64 = 3.0
+PAGE_MAX: f64 = 14_400.0
+```
+
+- **`enum Error`**
+  - `Font(&'static str)` -- the font file cannot be used: damaged, or a kind not taken
+  - `FontLicense(&'static str)` -- the font's licence (OS/2 fsType) does not allow embedding
+  - `Image(&'static str)` -- image data that does not fit what it claims
+  - `Unsupported(&'static str)` -- valid input this writer does not handle (CFF2 fonts, arithmetic-coded JPEG, ...)
+  - `Invalid(&'static str)` -- the document cannot be written as it is (no pages, a link to a page it lacks, ...)
+
+- **`struct Glyph`**
+  a shaped glyph for Canvas::glyphs: Document::shape gives them, a text layout that shaped
+  its lines already builds its own
+  - `font: usize` -- which of the fonts passed along (0: the first)
+  - `id: u32` -- the glyph id in that font
+  - `advance: i32` -- how far the pen moves after the glyph, in font units
+  - `x: i32` -- the glyph's offset from the pen in font units (y up)
+  - `y: i32`
+  - `cluster: usize` -- the byte range of the text the glyph stands for (its cluster): cluster..end
+  - `end: usize`
+
+- **`struct PageId(pub u32)`**
+  a page of a document (Document::add_page), counted from 0
+
+- **`struct FontId(u32)`**
+  a font of a document (Document::add_font)
+
+- **`struct ImageId(u32)`**
+  an image of a document (Document::add_image)
+
+- **`struct OutlineId(u32)`**
+  an outline item (Document::add_outline)
+
+- **`enum Dest`**
+  a place in the document for links and outline items
+  - `Fit(PageId)` -- the whole page in the window
+  - `Xyz { page: PageId, left: f64, top: f64, zoom: Option<f64> }` -- the point (left, top) of PDF page space (points from the bottom left, y up) at the top
+    left of the window; zoom None keeps the reader's (Canvas::dest builds one from a
+    canvas's own coordinates)
+
+- **`struct Date`**
+  a date of the document information: local time and its offset from UTC
+  - `year: u16`
+  - `month: u8`
+  - `day: u8`
+  - `hour: u8`
+  - `minute: u8`
+  - `second: u8`
+  - `offset_minutes: i16` -- minutes east of UTC (+60: Central European Time), -1439 to 1439
+
+- **`struct Info`**
+  the document information (the Info dictionary and the same in XMP metadata); unset fields
+  are left out
+  - `title: Option<String>`
+  - `author: Option<String>`
+  - `subject: Option<String>`
+  - `keywords: Option<String>`
+  - `creator: Option<String>` -- the program the document was made with
+  - `producer: Option<String>` -- the program that wrote the PDF (None: "JFLib")
+  - `created: Option<Date>`
+  - `modified: Option<Date>`
+
+- **`struct Document`**
+  a PDF document being built: its pages, fonts, images, outlines and information
+
+**`impl Document`**
+
+- **`fn new() -> Document`**
+- **`fn add_page(&mut self, width: f64, height: f64) -> PageId`**
+  a new page at the end, width and height in points (clamped to PAGE_MIN .. PAGE_MAX)
+- **`fn page_count(&self) -> usize`**
+- **`fn page_size(&self, page: PageId) -> Option<(f64, f64)>`**
+  width and height in points
+- **`fn canvas(&mut self, page: PageId, origin: Origin) -> Canvas<'_>`**
+  drawing on a page (panics for a page this document does not have)
+- **`fn add_font(&mut self, data: Vec<u8>, face: u32) -> Result<FontId, Error>`**
+  a TrueType or OpenType font (glyf or CFF outlines; `face`: of a collection, else 0)
+- **`fn font_metrics(&self, font: FontId) -> Option<FontMetrics>`**
+- **`fn shape(&self, fonts: &[FontId], text: &str) -> Vec<Glyph>`**
+  one line shaped with the fonts (the first, then fallbacks per script run); empty for an
+  unknown font or a line beyond 64 KiB
+- **`fn text_width(&self, fonts: &[FontId], size: f64, text: &str) -> f64`**
+  the advance of one shaped line at `size` points
+- **`fn add_image(&mut self, img: Image) -> ImageId`**
+- **`fn add_outline(&mut self, parent: Option<OutlineId>, title: &str, dest: Dest) -> OutlineId`**
+  an outline item (bookmark) under `parent` (None: at the top), after its siblings; open
+  (its children shown) until set_outline_open says otherwise
+- **`fn set_outline_open(&mut self, item: OutlineId, open: bool)`**
+- **`fn set_info(&mut self, info: Info)`**
+- **`fn set_language(&mut self, lang: &str)`**
+  the document's language (BCP 47, e.g. "de-DE")
+- **`fn set_compression(&mut self, level: u8)`**
+  DEFLATE level 0 (streams uncompressed, for reading the file) to 9; default 6
+- **`fn write(&self) -> Result<Vec<u8>, Error>`**
+  the PDF file
+
+### `pdf/src/canvas.rs`
+
+Source: [`lib/pdf/src/canvas.rs`](../lib/pdf/src/canvas.rs)
+
+```text
+canvas -- drawing on one page: paths, paint, transforms, clipping, images, text, links
+
+The canvas writes the page's content stream.  Graphics state that only matters when
+something is painted (colours, alpha, line width, caps, joins, miter limit, dash, text mode)
+is kept as wanted and written just before the paint operator that needs it, so a run of
+paths in the same style writes it once.  Transforms (`cm`) are written at once; a path
+still open when the transform changes keeps where it was drawn.  Path construction is
+buffered until it is painted, so no state operator ever lands inside a path object.
+```
+
+- **`enum Origin`**
+  where a canvas puts (0, 0) and which way y grows
+  - `TopLeft` -- the top left corner of the page, y downwards (as gfx, the screen and page layout)
+  - `BottomLeft` -- the bottom left corner, y upwards (PDF's own page space)
+
+- **`struct Canvas<'a>`**
+  drawing on one page (Document::canvas).  Coordinates are points (1/72 inch) from the
+  origin the canvas was made with; what it draws goes into the page when it is dropped, with
+  every save it left open restored.  Several canvases on one page draw one after the other.
+
+**`impl<'a> Canvas<'a>`**
+
+- **`fn page(&self) -> PageId`**
+  the page this canvas draws on
+- **`fn page_size(&self) -> (f64, f64)`**
+  width and height of the page in points
+- **`fn ctm(&self) -> Matrix`**
+  the current transform from this canvas's coordinates to PDF page space (points from the
+  bottom left, y up)
+- **`fn document(&self) -> &Document`**
+  the document (fonts, metrics, shaping) while drawing
+- **`fn save(&mut self)`**
+  saves the whole state (transform, clip, colours, alpha, stroke and text settings)
+- **`fn restore(&mut self)`**
+  back to the state of the matching save (none open: nothing happens)
+- **`fn depth(&self) -> usize`**
+  how many saves are open
+- **`fn transform(&mut self, m: Matrix)`**
+  m first, then the current transform (singular or not finite: ignored)
+- **`fn translate(&mut self, tx: f64, ty: f64)`**
+- **`fn scale(&mut self, sx: f64, sy: f64)`**
+- **`fn rotate(&mut self, angle: f64)`**
+  radians: counter-clockwise where y points up, clockwise where it points down
+- **`fn set_fill_color(&mut self, c: Rgb)`**
+- **`fn set_stroke_color(&mut self, c: Rgb)`**
+- **`fn set_fill_alpha(&mut self, a: f64)`**
+  opacity of fills, text fills and images, 0 to 1 (kept in thousandths)
+- **`fn set_stroke_alpha(&mut self, a: f64)`**
+  opacity of strokes, 0 to 1 (kept in thousandths)
+- **`fn set_line_width(&mut self, w: f64)`**
+  in the coordinates at the time of the stroke (0: the thinnest line the device draws)
+- **`fn set_line_cap(&mut self, cap: LineCap)`**
+- **`fn set_line_join(&mut self, join: LineJoin)`**
+- **`fn set_miter_limit(&mut self, limit: f64)`**
+  the longest miter, as a multiple of the line width (at least 1)
+- **`fn set_dash(&mut self, pattern: &[f64], phase: f64)`**
+  dashes: lengths on, off, on, ... from `phase` into the pattern; an empty list (or one
+  with a negative length or only zeros) draws solid lines
+- **`fn set_text_mode(&mut self, mode: TextMode)`**
+- **`fn move_to(&mut self, x: f64, y: f64)`**
+- **`fn line_to(&mut self, x: f64, y: f64)`**
+- **`fn curve_to(&mut self, x1: f64, y1: f64, x2: f64, y2: f64, x: f64, y: f64)`**
+- **`fn quad_to(&mut self, x1: f64, y1: f64, x: f64, y: f64)`**
+- **`fn close(&mut self)`**
+- **`fn rect(&mut self, x: f64, y: f64, w: f64, h: f64)`**
+- **`fn rounded_rect(&mut self, x: f64, y: f64, w: f64, h: f64, r: f64)`**
+- **`fn ellipse(&mut self, cx: f64, cy: f64, rx: f64, ry: f64)`**
+- **`fn circle(&mut self, cx: f64, cy: f64, r: f64)`**
+- **`fn arc(&mut self, cx: f64, cy: f64, rx: f64, ry: f64, start: f64, sweep: f64)`**
+  Path::arc on the canvas's path
+- **`fn append_path(&mut self, p: &Path)`**
+  a prepared path's subpaths, in the current coordinates
+- **`fn fill(&mut self, rule: FillRule)`**
+  fills the path and starts a new one
+- **`fn stroke(&mut self)`**
+  strokes the path and starts a new one
+- **`fn fill_stroke(&mut self, rule: FillRule)`**
+  fills, then strokes the path, and starts a new one
+- **`fn clip(&mut self, rule: FillRule)`**
+  intersects the clip with the path (until the matching restore) and starts a new path
+- **`fn end_path(&mut self)`**
+  drops the path without painting it
+- **`fn fill_path(&mut self, p: &Path, rule: FillRule)`**
+- **`fn stroke_path(&mut self, p: &Path)`**
+- **`fn image(&mut self, img: ImageId, x: f64, y: f64, w: f64, h: f64)`**
+  the image upright (as it looks on the page) in the rectangle x, y, w, h of the current
+  coordinates
+- **`fn image_transform(&mut self, img: ImageId, m: Matrix)`**
+  the image's unit square (row 0 along y = 1, column 0 along x = 0) mapped by m into the
+  current coordinates
+- **`fn text(&mut self, font: FontId, size: f64, x: f64, y: f64, s: &str) -> f64`**
+  one line of text shaped with the font (kerning, ligatures, marks, bidi), its baseline
+  starting at (x, y), `size` the em in points; upright as it looks on the page.  Returns
+  the advance along the baseline (0 when nothing was drawn).
+- **`fn text_fallback(&mut self, fonts: &[FontId], size: f64, x: f64, y: f64, s: &str) -> f64`**
+  the same with fallback fonts: a run of one script the first font cannot show comes from
+  the first of the others that can
+- **`fn glyphs(&mut self, fonts: &[FontId], size: f64, x: f64, y: f64, glyphs: &[Glyph], text: &str) -> f64`**
+  shaped glyphs (in visual order; `Glyph::font` indexes `fonts`) from the
+  pen at (x, y); `text` is the shaped string (each glyph's cluster is a byte range of it)
+  for search and copy.  Returns the advance.
+- **`fn link_uri(&mut self, x: f64, y: f64, w: f64, h: f64, uri: &str)`**
+  a link on the rectangle x, y, w, h (its box on the page when turned) to a URI
+- **`fn link_dest(&mut self, x: f64, y: f64, w: f64, h: f64, dest: Dest)`**
+  a link on the rectangle x, y, w, h to a place in the document
+- **`fn dest(&self, x: f64, y: f64) -> Dest`**
+  a destination showing the point (x, y) of this canvas at the top left of the window,
+  the zoom unchanged
+
+### `pdf/src/font.rs`
+
+Source: [`lib/pdf/src/font.rs`](../lib/pdf/src/font.rs)
+
+```text
+font -- TrueType / OpenType fonts for a document: their metrics, the glyphs a document uses,
+and what goes into the file: a Type0 font with Identity-H encoding over a CIDFont whose CIDs
+are the font's glyph ids, a subset of the font program (TrueType: unused glyphs emptied in
+glyf; CFF: unused charstrings replaced by endchar, cff.rs), the widths (W) and a ToUnicode
+CMap for search and copy.
+
+Glyph ids stay as they are (CIDToGIDMap /Identity), so nothing in the content stream depends on
+which glyphs the document uses; the emptied entries of glyf, loca and hmtx compress to
+almost nothing.
+```
+
+- **`struct FontMetrics`**
+  the vertical metrics of a font in its own units (Document::font_metrics)
+  - `units_per_em: u16`
+  - `ascent: i16` -- above the baseline (positive)
+  - `descent: i16` -- below the baseline (negative)
+  - `line_gap: i16`
+  - `cap_height: i16`
+  - `x_height: i16`
+  - `glyphs: u16` -- how many glyphs the font has
+
+### `pdf/src/geom.rs`
+
+Source: [`lib/pdf/src/geom.rs`](../lib/pdf/src/geom.rs)
+
+```text
+geom -- matrices, colours, paths and the stroke parameters of a canvas
+```
+
+- **`struct Matrix`**
+  an affine matrix as PDF writes it (`a b c d e f cm`): x' = a x + c y + e, y' = b x + d y + f
+  - `a: f64`
+  - `b: f64`
+  - `c: f64`
+  - `d: f64`
+  - `e: f64`
+  - `f: f64`
+
+**`impl Matrix`**
+
+- **`const IDENTITY: Matrix = Matrix { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 0.0, f: 0.0 }`**
+- **`const fn new(a: f64, b: f64, c: f64, d: f64, e: f64, f: f64) -> Matrix`**
+- **`const fn translate(tx: f64, ty: f64) -> Matrix`**
+- **`const fn scale(sx: f64, sy: f64) -> Matrix`**
+- **`fn rotate(angle: f64) -> Matrix`**
+  a rotation by `angle` radians: counter-clockwise where y points up, clockwise on a canvas
+  whose y points down
+- **`fn then(&self, next: &Matrix) -> Matrix`**
+  self first, then `next` (PDF's self × next)
+- **`fn apply(&self, x: f64, y: f64) -> (f64, f64)`**
+- **`fn det(&self) -> f64`**
+- **`fn invert(&self) -> Option<Matrix>`**
+  the inverse; None when the matrix is singular or not finite
+
+- **`struct Rgb`**
+  an RGB colour, each part 0 to 1 (DeviceRGB)
+  - `r: f64`
+  - `g: f64`
+  - `b: f64`
+
+**`impl Rgb`**
+
+- **`const BLACK: Rgb = Rgb { r: 0.0, g: 0.0, b: 0.0 }`**
+- **`const WHITE: Rgb = Rgb { r: 1.0, g: 1.0, b: 1.0 }`**
+- **`const fn new(r: f64, g: f64, b: f64) -> Rgb`**
+- **`fn from_u8(r: u8, g: u8, b: u8) -> Rgb`**
+  from 0..255 parts
+- **`fn hex(rgb: u32) -> Rgb`**
+  from 0xRRGGBB
+
+- **`enum FillRule`**
+  which parts of a path a fill covers (PDF `f` / `f*`)
+  - `NonZero`
+  - `EvenOdd`
+
+- **`enum LineCap`**
+  the ends of open subpaths and dashes (PDF `J`)
+  - `Butt`
+  - `Round`
+  - `Square`
+
+- **`enum LineJoin`**
+  the corners of a stroke (PDF `j`)
+  - `Miter`
+  - `Round`
+  - `Bevel`
+
+- **`enum TextMode`**
+  how text is painted (PDF `Tr`)
+  - `Fill`
+  - `Stroke`
+  - `FillStroke`
+  - `Invisible` -- not painted, but found by search and copied (e.g. text over a scanned page)
+
+- **`struct Path`**
+  a path: subpaths of lines and cubic curves, built once and drawn on any canvas
+  (Canvas::append_path) or built on the canvas itself (its move_to, line_to, ...)
+
+**`impl Path`**
+
+- **`fn new() -> Path`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn clear(&mut self)`**
+- **`fn current(&self) -> Option<(f64, f64)>`**
+  the current point (None before the first move_to and after clear)
+- **`fn move_to(&mut self, x: f64, y: f64) -> &mut Path`**
+  starts a subpath
+- **`fn line_to(&mut self, x: f64, y: f64) -> &mut Path`**
+  a straight line from the current point (without one: a move_to)
+- **`fn curve_to(&mut self, x1: f64, y1: f64, x2: f64, y2: f64, x: f64, y: f64) -> &mut Path`**
+  a cubic Bézier curve with control points (x1, y1) and (x2, y2) to (x, y)
+- **`fn quad_to(&mut self, x1: f64, y1: f64, x: f64, y: f64) -> &mut Path`**
+  a quadratic Bézier curve (written as the same cubic)
+- **`fn close(&mut self) -> &mut Path`**
+  closes the subpath with a line to its start
+- **`fn rect(&mut self, x: f64, y: f64, w: f64, h: f64) -> &mut Path`**
+  a closed rectangle as its own subpath (PDF `re`)
+- **`fn ellipse(&mut self, cx: f64, cy: f64, rx: f64, ry: f64) -> &mut Path`**
+  a closed ellipse around (cx, cy) as four cubic curves
+- **`fn circle(&mut self, cx: f64, cy: f64, r: f64) -> &mut Path`**
+- **`fn rounded_rect(&mut self, x: f64, y: f64, w: f64, h: f64, r: f64) -> &mut Path`**
+  a closed rectangle with corners rounded by r (at most half the shorter side)
+- **`fn arc(&mut self, cx: f64, cy: f64, rx: f64, ry: f64, start: f64, sweep: f64) -> &mut Path`**
+  an elliptical arc around (cx, cy) from angle `start` over `sweep` radians (positive:
+  from +x towards +y), as cubic curves of at most 90 degrees; it continues the subpath
+  with a line to its start, or starts one
+- **`fn append(&mut self, other: &Path) -> &mut Path`**
+  appends another path's subpaths
+- **`fn transform(&mut self, m: &Matrix)`**
+  every point mapped by m (a rectangle becomes four lines when m turns it)
+
+### `pdf/src/image.rs`
+
+Source: [`lib/pdf/src/image.rs`](../lib/pdf/src/image.rs)
+
+```text
+image -- raster images for a document: JPEG files as they are (DCTDecode), all other pixels
+FlateDecode with PNG predictors and their alpha as a soft mask (SMask)
+```
+
+- **`struct Image`**
+  an image for Document::add_image: a JPEG passed through, or 8-bit pixels (gray, RGB, RGBA,
+  a gfx surface) with an optional alpha channel
+
+**`impl Image`**
+
+- **`fn jpeg(data: Vec<u8>) -> Result<Image, Error>`**
+  a JPEG file, embedded unchanged: baseline, extended or progressive, 8 bits, 1, 3 or 4
+  components (Adobe's inverted CMYK understood)
+- **`fn gray(w: u32, h: u32, px: &[u8]) -> Result<Image, Error>`**
+  8-bit gray, rows from the top
+- **`fn rgb(w: u32, h: u32, px: &[u8]) -> Result<Image, Error>`**
+  8-bit RGB, rows from the top
+- **`fn rgba(w: u32, h: u32, px: &[u8]) -> Result<Image, Error>`**
+  8-bit RGBA with straight (not premultiplied) alpha, rows from the top
+- **`fn from_surface(s: &gfx::Surface) -> Result<Image, Error>`**
+  a gfx surface: XRGB (opaque), PARGB (premultiplied, un-premultiplied here), ARGB, A8
+  (as gray)
+- **`fn with_alpha(mut self, alpha: Vec<u8>) -> Result<Image, Error>`**
+  an alpha channel (one byte per pixel, rows from the top) for any image, a JPEG too
+- **`fn interpolate(mut self, on: bool) -> Image`**
+  smooth the image when a reader scales it up (PDF /Interpolate)
+- **`fn size(&self) -> (u32, u32)`**
+  width and height in pixels
+- **`fn is_jpeg(&self) -> bool`**
+- **`fn has_alpha(&self) -> bool`**
