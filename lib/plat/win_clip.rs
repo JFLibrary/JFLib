@@ -588,7 +588,7 @@ pub fn clip_has(fmt: u32) -> bool {
 
 /// the shell32 drop functions are there  [shell_load]
 fn shell_load() -> bool {
-    if P_DFIN.load(Ordering::Relaxed) != 0 {
+    if P_DFIN.load(Ordering::Acquire) != 0 {
         return true;
     }
     if SHELL_TRIED.swap(1, Ordering::Relaxed) != 0 {
@@ -599,9 +599,9 @@ fn shell_load() -> bool {
     if q == 0 || p == 0 || f == 0 {
         return false;
     }
-    P_DQF.store(q, Ordering::Relaxed);
+    P_DQF.store(q, Ordering::Relaxed); // (published by P_DFIN's Release)
     P_DQP.store(p, Ordering::Relaxed);
-    P_DFIN.store(f, Ordering::Relaxed);
+    P_DFIN.store(f, Ordering::Release);
     true
 }
 
@@ -616,9 +616,9 @@ pub(super) fn win_drop_files(hdrop: isize) -> (u32, i32, i32) {
     // SAFETY: the shell32 functions with their signatures; the HDROP comes from the system
     // (or win_drop_selftest); every buffer holds what the calls are told.
     unsafe {
-        let dqf: unsafe extern "system" fn(isize, u32, *mut u16, u32) -> u32 = core::mem::transmute(P_DQF.load(Ordering::Relaxed));
-        let dqp: unsafe extern "system" fn(isize, *mut [i32; 2]) -> i32 = core::mem::transmute(P_DQP.load(Ordering::Relaxed));
-        let dfin: unsafe extern "system" fn(isize) = core::mem::transmute(P_DFIN.load(Ordering::Relaxed));
+        let dqf: unsafe extern "system" fn(isize, u32, *mut u16, u32) -> u32 = core::mem::transmute(P_DQF.load(Ordering::Acquire));
+        let dqp: unsafe extern "system" fn(isize, *mut [i32; 2]) -> i32 = core::mem::transmute(P_DQP.load(Ordering::Acquire));
+        let dfin: unsafe extern "system" fn(isize) = core::mem::transmute(P_DFIN.load(Ordering::Acquire));
         drop_reset();
         let files = dqf(hdrop, 0xFFFF_FFFF, core::ptr::null_mut(), 0).min(DROP_FILES_MAX);
         let mut added = 0;

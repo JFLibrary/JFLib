@@ -340,6 +340,28 @@ mod imp {
     #[cfg(all(target_arch = "aarch64", not(jfgui_glibc), not(feature = "std")))]
     static AUXV: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
 
+    // ARM7 (docs/ARM64.md): jfgui_ARM_LLSC=1 in the environment hides LSE from the outline atomics
+    // (getauxval(AT_HWCAP) without HWCAP_ATOMICS), so on a CPU with LSE the same program takes the LL/SC
+    // loops of ARMv8.0 (slower under contention, never wrong): both ways checked on one device
+    #[cfg(all(target_arch = "aarch64", not(jfgui_glibc), not(feature = "std")))]
+    static NO_LSE: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+    #[cfg(all(target_arch = "aarch64", not(jfgui_glibc), not(feature = "std")))]
+    const LLSC_VAR: &[u8] = b"jfgui_ARM_LLSC=1\0";
+    #[cfg(all(target_arch = "aarch64", not(jfgui_glibc), not(feature = "std")))]
+    const HWCAP_ATOMICS: usize = 1 << 8;
+
+    /// (rt::outline_lse) whether the outline atomics of compiler-builtins take LSE (true) or the LL/SC
+    /// loops (false): the flag their constructor set from AT_HWCAP
+    #[cfg(all(target_arch = "aarch64", not(jfgui_glibc), not(feature = "std")))]
+    #[doc(hidden)]
+    pub fn lse_atomics_flag() -> bool {
+        unsafe extern "C" {
+            static __aarch64_have_lse_atomics: u8; // compiler-rt's flag (hidden: inside this program)
+        }
+        // SAFETY: a byte the constructor wrote before main; read only.
+        unsafe { core::ptr::read_volatile(&raw const __aarch64_have_lse_atomics) != 0 }
+    }
+
     /// The start of a static ARM64 program, before anything else (plat's _start): sp is the stack
     /// the kernel started the process with (argc, argv, 0, envp, 0, then the auxiliary vector),
     /// which answers getauxval from now on; then the constructors of .init_array run.
@@ -358,8 +380,13 @@ mod imp {
         unsafe {
             let mut p = sp.add(*sp + 2); // envp
             while *p != 0 {
+                let v = *p as *const u8;
+                if (0..LLSC_VAR.len()).all(|i| *v.add(i) == LLSC_VAR[i]) {
+                    NO_LSE.store(true, core::sync::atomic::Ordering::Relaxed);
+                }
                 p = p.add(1);
             }
+            // (one thread so far; the threads started later see both through their clone)
             AUXV.store(p.add(1) as usize, core::sync::atomic::Ordering::Relaxed);
             let mut f = &raw const __init_array_start;
             while f < &raw const __init_array_end {
@@ -383,6 +410,9 @@ mod imp {
         // SAFETY: the vector process_start found: pairs of type and value, ended by AT_NULL (0).
         unsafe {
             while *p != 0 {
+                if *p == typ && typ == AT_HWCAP && NO_LSE.load(core::sync::atomic::Ordering::Relaxed) {
+                    return *p.add(1) & !HWCAP_ATOMICS;
+                }
                 if *p == typ {
                     return *p.add(1);
                 }

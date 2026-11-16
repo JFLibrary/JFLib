@@ -187,9 +187,9 @@ fn touch_api() -> TouchApi {
     if !t.loaded.get() {
         t.loaded.set(true);
         let u = b"user32.dll\0";
-        P_INFO.store(dll_proc(u, b"GetPointerTouchInfo\0"), Ordering::Relaxed);
-        P_HIST.store(dll_proc(u, b"GetPointerTouchInfoHistory\0"), Ordering::Relaxed);
-        let on = |a: &AtomicUsize| a.load(Ordering::Relaxed) != 0;
+        P_INFO.store(dll_proc(u, b"GetPointerTouchInfo\0"), Ordering::Release);
+        P_HIST.store(dll_proc(u, b"GetPointerTouchInfoHistory\0"), Ordering::Release);
+        let on = |a: &AtomicUsize| a.load(Ordering::Acquire) != 0;
         t.api.set(TouchApi {
             info: if on(&P_INFO) { Some(real_info) } else { None },
             hist: if on(&P_HIST) { Some(real_hist) } else { None },
@@ -214,7 +214,7 @@ fn pti(b: &[u8]) -> TouchInfo {
 fn real_info(id: u32) -> Option<TouchInfo> {
     let mut b = [0u8; PTI_SIZE];
     // SAFETY: GetPointerTouchInfo(UINT32, POINTER_TOUCH_INFO*) -> BOOL; b holds one record.
-    let f: unsafe extern "system" fn(u32, *mut u8) -> i32 = unsafe { core::mem::transmute(P_INFO.load(Ordering::Relaxed)) };
+    let f: unsafe extern "system" fn(u32, *mut u8) -> i32 = unsafe { core::mem::transmute(P_INFO.load(Ordering::Acquire)) };
     if unsafe { f(id, b.as_mut_ptr()) } != 0 { Some(pti(&b)) } else { None }
 }
 
@@ -225,7 +225,7 @@ fn real_hist(id: u32, count: &mut u32, out: &mut [TouchInfo]) -> bool {
     // SAFETY: GetPointerTouchInfoHistory(UINT32, UINT32*, POINTER_TOUCH_INFO*) -> BOOL; b holds
     // `room` records, the system writes at most *count of them.
     let f: unsafe extern "system" fn(u32, *mut u32, *mut u8) -> i32 =
-        unsafe { core::mem::transmute(P_HIST.load(Ordering::Relaxed)) };
+        unsafe { core::mem::transmute(P_HIST.load(Ordering::Acquire)) };
     if unsafe { f(id, &mut c, b.as_mut_ptr()) } == 0 {
         return false;
     }
@@ -243,10 +243,10 @@ fn real_now() -> u32 {
 
 /// no system visuals for a touch of this window: the UI answers a finger itself
 pub(super) fn feedback_off(hwnd: isize) {
-    let mut p = P_FEEDBACK.load(Ordering::Relaxed);
+    let mut p = P_FEEDBACK.load(Ordering::Acquire);
     if p == usize::MAX {
         p = dll_proc(b"user32.dll\0", b"SetWindowFeedbackSetting\0");
-        P_FEEDBACK.store(p, Ordering::Relaxed);
+        P_FEEDBACK.store(p, Ordering::Release);
     }
     if p == 0 {
         return;
@@ -302,7 +302,7 @@ fn log_down(id: u32, ht: u32, from: i32, to: Option<i32>, i: &TouchInfo) {
         let (x, y) = client(from, i.x, i.y);
         // the record as the system gave it: the position, the raw one, the contact, the raw contact
         let mut b = [0u8; PTI_SIZE];
-        let f = P_INFO.load(Ordering::Relaxed);
+        let f = P_INFO.load(Ordering::Acquire);
         if f != 0 {
             // SAFETY: GetPointerTouchInfo(UINT32, POINTER_TOUCH_INFO*) -> BOOL; b holds one record.
             let f: unsafe extern "system" fn(u32, *mut u8) -> i32 = unsafe { core::mem::transmute(f) };

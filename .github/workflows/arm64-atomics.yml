@@ -1,0 +1,142 @@
+# ARM7 (docs/ARM64.md): the memory order on real ARM64 processors. plattest --test atomics runs long (and
+# the thread and async tests repeated), in both ways of the atomics: on ubuntu-24.04-arm the static Linux
+# program with the outline atomics as they choose (LSE where the CPU has it) and with jfgui_ARM_LLSC=1
+# (the LL/SC loops); on windows-11-arm the Windows program as built (inline LL/SC, ARMv8.0) and one built
+# with -C target-feature=+lse (inline LSE). Built on an x64 runner as on the PC (build_rs.py --arch aarch64).
+# Started by hand, or by a push to a branch arm64-test/... (workflow_dispatch needs the file on main).
+name: ARM64 atomics
+
+on:
+  workflow_dispatch:
+    inputs:
+      secs:
+        description: seconds of plattest --test atomics for each way
+        default: "900"
+  push:
+    branches: ["arm64-test/**"]
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: 1
+  SECS: ${{ inputs.secs || '900' }}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust and LLD
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --no-self-update --target aarch64-pc-windows-msvc,aarch64-unknown-linux-gnu
+          rustup default 1.98.1
+          rustc --version
+          "/c/Program Files/LLVM/bin/ld.lld.exe" --version
+      - name: plattest for Linux ARM64 (static) and Windows ARM64 (as built, and with LSE)
+        run: |
+          python -u build_rs.py app plattest --target linux --arch aarch64 --static
+          python -u build_rs.py app plattest --target win --arch aarch64
+          JFLIB_EXTRA_RUSTFLAGS="-C target-feature=+lse" python -u build_rs.py app plattest --target win --arch aarch64 --out build/lse
+          mkdir -p dist/lse
+          cp build/linux-arm64/plattest dist/plattest
+          cp build/win-arm64/plattest.exe dist/plattest.exe
+          cp build/lse/win-arm64/plattest.exe dist/lse/plattest.exe
+      - name: The atomic instructions in the programs
+        run: |
+          od="/c/Program Files/LLVM/bin/llvm-objdump.exe"
+          for f in dist/plattest dist/plattest.exe dist/lse/plattest.exe; do
+            "$od" -d --no-show-raw-insn "$f" > dis.txt
+            echo "$f: LL/SC $(grep -cP '\t(ld[a]?xr[bh]?|ld[a]?xp)\s' dis.txt), LSE $(grep -cP '\t(cas[a-z]*|ldadd[a-z]*|ldclr[a-z]*|ldset[a-z]*|ldeor[a-z]*|swp[a-z]*)\s' dis.txt)"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atomics-programs
+          retention-days: 7
+          path: dist/
+
+  linux:
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: atomics-programs
+          path: dist
+      - name: The machine
+        run: |
+          chmod +x dist/plattest
+          uname -a
+          nproc
+          lscpu | grep -iE "model name|vendor|core|socket|flags" || true
+          grep -m1 -i features /proc/cpuinfo
+      - name: atomics, LSE (as the outline atomics choose)
+        run: |
+          ./dist/plattest --test atomics --secs "$SECS" 2>&1 | tee atomics-linux-lse.txt
+          exit ${PIPESTATUS[0]}
+      - name: atomics, LL/SC (jfgui_ARM_LLSC=1)
+        run: |
+          jfgui_ARM_LLSC=1 ./dist/plattest --test atomics --secs "$SECS" 2>&1 | tee atomics-linux-llsc.txt
+          exit ${PIPESTATUS[0]}
+      - name: threads and async, both ways
+        run: |
+          set +e
+          fails=0
+          for e in 0 1; do
+            for t in "threads --repeat 20" "async --repeat 5"; do
+              echo "== jfgui_ARM_LLSC=$e plattest --test $t"
+              env jfgui_ARM_LLSC=$e ./dist/plattest --test $t 2>&1 | tail -n 3 | tee -a threads-linux.txt
+              fails=$((fails + ${PIPESTATUS[0]}))
+            done
+          done
+          exit $fails
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atomics-linux
+          retention-days: 7
+          path: "*.txt"
+
+  windows:
+    needs: build
+    runs-on: windows-11-arm
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: atomics-programs
+          path: dist
+      - name: The machine
+        run: Get-CimInstance Win32_Processor | Format-List Name, Architecture, NumberOfLogicalProcessors
+      - name: atomics, LL/SC (as built)
+        run: |
+          ./dist/plattest.exe --test atomics --secs $env:SECS *>&1 | Tee-Object atomics-win-llsc.txt
+          exit $LASTEXITCODE
+      - name: atomics, LSE (-C target-feature=+lse)
+        run: |
+          ./dist/lse/plattest.exe --test atomics --secs $env:SECS *>&1 | Tee-Object atomics-win-lse.txt
+          exit $LASTEXITCODE
+      - name: threads and async, both builds
+        run: |
+          $fails = 0
+          foreach ($p in "dist/plattest.exe", "dist/lse/plattest.exe") {
+            foreach ($t in @("threads", "20"), @("async", "5")) {
+              "== $p --test $($t[0]) --repeat $($t[1])" | Tee-Object -Append threads-win.txt
+              & $p --test $t[0] --repeat $t[1] *>&1 | Select-Object -Last 3 | Tee-Object -Append threads-win.txt
+              $fails += $LASTEXITCODE
+            }
+          }
+          exit $fails
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atomics-windows
+          retention-days: 7
+          path: "*.txt"
