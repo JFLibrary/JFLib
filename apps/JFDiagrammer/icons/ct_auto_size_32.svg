@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Automatische Größe, 32 px</title>
+  <rect class="hi" fill="#C2D2E5" x="10" y="5" width="12" height="5"/>
+  <path class="ink" stroke="#1D2228" d="M12 7.5H17"/>
+  <rect class="tint" stroke="#1F5FA8" x="9.5" y="4.5" width="13" height="23"/>
+  <path class="tint" stroke="#1F5FA8" d="M10 10.5H22"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="13.5" y="16.5" width="5" height="5"/>
+  <path class="ink" fill="#1D2228" d="M2 16L5 13V15H8V17H5V19Z M30 16L27 13V15H24V17H27V19Z"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Neu erstellen, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="3,7 26,7 26,17 17,17 17,23 3,23"/>
+  <path class="ink" stroke="#1D2228" d="M17 23.5H2.5V6.5H26.5V17"/>
+  <path class="ink" stroke="#1D2228" d="M6.5 7V23M22.5 7V17"/>
+  <path class="tint" fill="#1F5FA8" d="M22 19H24V23H28V25H24V29H22V25H18V23H22Z"/>
+</svg>

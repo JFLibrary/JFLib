@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Alle Seiten, 16 px</title>
+  <polygon class="ink" fill="#1D2228" points="4,6 12,6 8,2"/>
+  <path class="ink" stroke="#1D2228" d="M3 9.5H13M3 12.5H13"/>
+</svg>

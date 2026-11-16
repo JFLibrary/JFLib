@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Kurve anpassen, 16 px</title>
+  <path class="ink" stroke="#1D2228" d="M1.5 6.5L4.5 3.5L7.5 6.5L10.5 3.5L13.5 6.5"/>
+  <path class="tint" stroke="#1F5FA8" d="M1.5 13.5C3 9 5 9 7.5 11.5S12 14 13.5 9.5"/>
+</svg>

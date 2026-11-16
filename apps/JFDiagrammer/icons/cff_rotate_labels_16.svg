@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Bahnbeschriftungen drehen, 16 px</title>
+  <rect class="body" fill="#DCDEE1" x="2" y="2" width="10" height="12"/>
+  <path class="ink" stroke="#1D2228" d="M15 1.5H1.5V14.5H15 M12.5 2V14"/>
+  <path class="tint" fill="#1F5FA8" fill-rule="evenodd" d="M3 7.5L11 3.5V4.618L9 5.618V10.382L11 11.382V12.5L3 8.5Z M8 6.118L4.236 8L8 9.882Z"/>
+</svg>

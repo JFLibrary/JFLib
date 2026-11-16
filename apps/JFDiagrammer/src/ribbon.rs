@@ -7,11 +7,14 @@
 // Every button is disabled ("not available yet") and does nothing; JD8 builds the real
 // registers (FEATURES.md 3.3-3.9) and connects them as the functions behind them are done.
 // A group is a list of columns: one large button, or up to three small ones stacked.
+// Icons: the app's own (JD_*, icons.rs; JD_*_L on large buttons).  The Designs gallery keeps
+// the style's IC_DIAMOND until it shows rendered previews (FEATURES.md 7: galleries get none).
 
 use alloc::vec::Vec;
 use ui::i18n::t;
 use ui::*;
 
+use crate::icons::*;
 use crate::tc;
 
 /// the registers, left to right (FEATURES.md 3.2, UI-31; Datei and the others follow in JD8)
@@ -29,33 +32,39 @@ struct Group(&'static str, &'static [Col]);
 
 static START: [Group; 4] = [
     Group("Zwischenablage", &[
-        Big("Einfügen|Zwischenablage", IC_PASTE),
-        Small(&[("Ausschneiden", IC_CUT), ("Kopieren", IC_COPY), ("Format übertragen", IC_BRUSH)]),
+        Big("Einfügen|Zwischenablage", JD_PASTE_L),
+        Small(&[("Ausschneiden", JD_CUT), ("Kopieren", JD_COPY), ("Format übertragen", JD_FORMAT_PAINTER)]),
     ]),
-    Group("Tools", &[Small(&[("Zeiger", IC_POINTER), ("Verbinder", IC_LINE), ("Text", IC_TEXT_BOX)])]),
-    Group("Anordnen", &[Small(&[("Ausrichten", IC_ALIGN_CENTER), ("Position", IC_MOVE), ("Gruppieren", IC_SHAPES)])]),
-    Group("Bearbeiten", &[Small(&[("Suchen", IC_SEARCH), ("Ebenen", IC_LAYERS), ("Markieren", IC_SELECT_RECT)])]),
+    Group("Tools", &[
+        Small(&[("Zeiger", JD_POINTER), ("Verbinder", JD_CONNECTOR), ("Text", JD_TEXT)]),
+        Small(&[("Rechteck", JD_RECTANGLE), ("Verbindungspunkt", JD_CONNECTION_POINT)]),
+    ]),
+    Group("Anordnen", &[
+        Big("Ausrichten", JD_ALIGN_L),
+        Small(&[("Position", JD_POSITION), ("In den Vordergrund", JD_BRING_FRONT), ("Gruppieren", JD_GROUP)]),
+    ]),
+    Group("Bearbeiten", &[Small(&[("Suchen", JD_SEARCH), ("Ebenen", JD_LAYER_ASSIGN), ("Markieren", JD_SELECT)])]),
 ];
 
 static INSERT: [Group; 4] = [
-    Group("Seiten", &[Big("Leere Seite", IC_PAGE)]),
-    Group("Illustrationen", &[Big("Bilder", IC_PICTURES)]),
-    Group("Diagrammteile", &[Small(&[("Container", IC_SELECT_RECT), ("Beschriftung", IC_EDIT)])]),
-    Group("Links", &[Big("Hyperlink", IC_LINK)]),
+    Group("Seiten", &[Big("Leere Seite", JD_NEW_PAGE_L)]),
+    Group("Illustrationen", &[Big("Bilder", JD_PICTURES_L)]),
+    Group("Diagrammteile", &[Small(&[("Container", JD_CONTAINER), ("Beschriftung", JD_CALLOUT)])]),
+    Group("Links", &[Big("Hyperlink", JD_LINK_L)]),
 ];
 
 static DESIGN: [Group; 4] = [
-    Group("Seite einrichten", &[Big("Ausrichtung", IC_ROTATE), Big("Größe", IC_FIT_PAGE)]),
+    Group("Seite einrichten", &[Big("Ausrichtung", JD_ORIENTATION_L), Big("Größe", JD_PAGE_SIZE_L)]),
     Group("Designs", &[Big("Design", IC_DIAMOND)]),
-    Group("Varianten", &[Small(&[("Farben", IC_COLOR), ("Schriftarten", IC_FONT), ("Effekte", IC_BRIGHTNESS)])]),
-    Group("Hintergründe", &[Big("Hintergrund", IC_IMAGE), Small(&[("Rahmen und Titel", IC_PAGE)])]),
+    Group("Varianten", &[Small(&[("Farben", JD_VAR_COLORS), ("Schriftarten", JD_VAR_FONTS), ("Effekte", JD_VAR_EFFECTS)])]),
+    Group("Hintergründe", &[Big("Hintergrund", JD_BACKGROUNDS_L), Big("Rahmen und Titel", JD_BORDERS_TITLES_L)]),
 ];
 
 static VIEW: [Group; 4] = [
-    Group("Ansichten", &[Big("Vollbild", IC_FULL_SCREEN)]),
-    Group("Anzeigen", &[Small(&[("Lineal", IC_RULER), ("Raster", IC_GRID), ("Führungslinien", IC_LINE)])]),
-    Group("Zoom", &[Big("Zoom", IC_ZOOM), Small(&[("An Fenster anpassen", IC_FIT_PAGE), ("Seitenbreite", IC_PAGE)])]),
-    Group("Fenster", &[Big("Aufgabenbereiche", IC_VIEW)]),
+    Group("Ansichten", &[Big("Vollbild", JD_PRESENTATION_L)]),
+    Group("Anzeigen", &[Small(&[("Lineal", JD_RULER), ("Raster", JD_GRID), ("Führungslinien", JD_GUIDES)])]),
+    Group("Zoom", &[Big("Zoom", JD_ZOOM_L), Small(&[("An Fenster anpassen", JD_FIT_WINDOW), ("Seitenbreite", JD_PAGE_WIDTH)])]),
+    Group("Fenster", &[Big("Aufgabenbereiche", JD_TASK_PANES_L)]),
 ];
 
 // ids: the ribbon 200, its groups 1000 + 10 per group (id..=id + 3 each), the buttons 2000 +

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Hilfe, 32 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="3.5" y="3.5" width="25" height="25"/>
+  <path class="ink" stroke="#1D2228" stroke-width="2" d="M12 12V9H20V15H16V19"/>
+  <rect class="ink" fill="#1D2228" x="15" y="22" width="2" height="2"/>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Sprache, 32 px</title>
+  <path class="ink" fill="#1D2228" fill-rule="evenodd" d="M2 20L7 4H9L14 20H11.5L10.25 16H5.75L4.5 20Z M6.375 14H9.625L8 8.8Z"/>
+  <path class="tint" fill="#1F5FA8" d="M22 12H24V15H22Z M17 16H29V18H17Z"/>
+  <path class="tint" stroke="#1F5FA8" stroke-width="2" d="M19 19L28 28M27 19L18 28"/>
+</svg>

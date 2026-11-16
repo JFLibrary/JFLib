@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Daten importieren, 16 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="4.5" width="5" height="4"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="9.5" y="1.5" width="5" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="9.5" y="5.5" width="5" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="11.5" width="5" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M7 6.5H9M7.5 6V2.5H9M3.5 9V11"/>
+  <path class="tint" stroke="#1F5FA8" d="M12 12.5H15"/>
+  <polygon class="tint" fill="#1F5FA8" points="12,10 12,15 9.5,12.5"/>
+</svg>

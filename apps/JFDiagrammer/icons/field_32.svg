@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Feld, 32 px</title>
+  <path class="ink" stroke="#1D2228" stroke-width="2" d="M10 7H8V14.5L6 16.5L8 18.5V26H10 M22 7H24V14.5L26 16.5L24 18.5V26H22"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="12.5" y="12.5" width="7" height="8"/>
+</svg>

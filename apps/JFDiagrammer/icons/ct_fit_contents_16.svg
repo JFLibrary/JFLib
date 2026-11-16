@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>An Inhalt anpassen, 16 px</title>
+  <rect class="hi" fill="#C2D2E5" x="5" y="3" width="6" height="3"/>
+  <path class="ink" stroke="#1D2228" d="M6 4.5H9"/>
+  <rect class="tint" stroke="#1F5FA8" x="4.5" y="2.5" width="7" height="11"/>
+  <path class="tint" stroke="#1F5FA8" d="M5 6.5H11"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="8.5" width="3" height="3"/>
+  <path class="ink" fill="#1D2228" d="M1 6L3 8L1 10Z M15 6L13 8L15 10Z"/>
+</svg>

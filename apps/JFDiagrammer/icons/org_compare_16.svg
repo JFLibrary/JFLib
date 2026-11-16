@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Vergleichen, 16 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="3.5" y="1.5" width="2" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M4.5 4V5M2.5 7V5.5H6.5V7"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="7.5" width="2" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="5.5" y="7.5" width="2" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="10.5" y="6.5" width="2" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M11.5 9V10M9.5 12V10.5H13.5V12"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="8.5" y="12.5" width="2" height="2"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="12.5" y="12.5" width="2" height="2"/>
+</svg>

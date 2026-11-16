@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Bildrahmen, 16 px</title>
+  <path class="hi" fill="#C2D2E5" fill-rule="evenodd" d="M2 2H14V14H2Z M4 4V12H12V4Z"/>
+  <path class="tint" stroke="#1F5FA8" d="M1.5 1.5H14.5V14.5H1.5Z M4.5 4.5H11.5V11.5H4.5Z"/>
+  <polygon class="body" fill="#DCDEE1" points="5,11 5,10.5 7,8.5 9,10.5 9,11"/>
+  <path class="ink" stroke="#1D2228" d="M5 10.5L7 8.5L9 10.5"/>
+  <circle class="ink" fill="#1D2228" cx="9.5" cy="6.5" r="1"/>
+</svg>

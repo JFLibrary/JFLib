@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Zeichnungsexplorer, 16 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="1.5" width="2" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M6 2.5H13"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="5.5" y="6.5" width="2" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M10 7.5H14"/>
+  <path class="ink" stroke="#1D2228" d="M2.5 4V12.5H5M3 7.5H5"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="5.5" y="11.5" width="2" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M10 12.5H13"/>
+</svg>

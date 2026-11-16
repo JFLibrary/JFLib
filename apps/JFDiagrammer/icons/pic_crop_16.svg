@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Zuschneiden, 16 px</title>
+  <rect class="hi" fill="#C2D2E5" x="5" y="5" width="6" height="6"/>
+  <path class="ink" stroke="#1D2228" d="M4.5 1V11.5H15M1 4.5H11.5V15"/>
+</svg>

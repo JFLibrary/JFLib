@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Ausrichtung, 16 px</title>
+  <path class="body" fill="#DCDEE1" d="M2 4H3V6H2Z M2 7H3V9H2Z M2 10H3V12H2Z"/>
+  <path class="ink" stroke="#1D2228" d="M1.5 3.5H7.5V12.5H1.5Z M2 6.5H7 M2 9.5H7 M3.5 4V12"/>
+  <path class="hi" fill="#C2D2E5" d="M10 4H11V5H10Z M12 4H14V5H12Z"/>
+  <rect class="tint" stroke="#1F5FA8" x="9.5" y="3.5" width="5" height="9"/>
+  <path class="tint" stroke="#1F5FA8" d="M10 5.5H14 M11.5 4V12"/>
+</svg>

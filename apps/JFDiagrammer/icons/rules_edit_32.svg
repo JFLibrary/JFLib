@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Regeln bearbeiten, 32 px</title>
+  <path class="ink" fill="#1D2228" d="M4 4H7V7H4Z M4 11H7V14H4Z M4 18H7V21H4Z M4 25H7V28H4Z"/>
+  <path class="ink" stroke="#1D2228" d="M10 5.5H28M10 12.5H28M10 19.5H21M10 26.5H14"/>
+  <polygon class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" points="25,19 29,23 22.5,29.5 18.5,29.5 18.5,25.5"/>
+  <polygon class="tint" fill="#1F5FA8" points="18,26 18,30 22,30"/>
+</svg>

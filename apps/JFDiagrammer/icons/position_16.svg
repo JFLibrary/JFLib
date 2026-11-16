@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Positionieren, 16 px</title>
+  <rect class="hi" fill="#C2D2E5" x="5" y="2" width="2" height="12"/>
+  <rect class="hi" fill="#C2D2E5" x="10" y="2" width="2" height="12"/>
+  <path class="tint" stroke="#1F5FA8" d="M5 1.5H7M10 1.5H12M5 14.5H7M10 14.5H12"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="4.5" width="2" height="7"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="7.5" y="4.5" width="2" height="7"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="12.5" y="4.5" width="2" height="7"/>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Rahmen und Titel, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="7,3 19,3 19,9 25,9 25,29 7,29"/>
+  <polygon class="shade" fill="#B9BBBE" points="20,3 25,8 20,8"/>
+  <path class="ink" stroke="#1D2228" d="M6.5 2.5H19.5L25.5 8.5V29.5H6.5Z M19.5 3V8.5H25"/>
+  <rect class="hi" fill="#C2D2E5" x="10" y="23" width="12" height="3"/>
+  <rect class="tint" stroke="#1F5FA8" x="9.5" y="11.5" width="13" height="15"/>
+  <path class="tint" stroke="#1F5FA8" d="M10 22.5H22"/>
+  <path class="ink" stroke="#1D2228" d="M12 24.5H18"/>
+</svg>

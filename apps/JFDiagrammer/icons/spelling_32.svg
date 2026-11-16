@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Rechtschreibung, 32 px</title>
+  <path class="ink" fill="#1D2228" fill-rule="evenodd" d="M6 9H11V18H6L4 16V11Z M6 11V16H9V11Z M13 4H15V9H18L20 11V16L18 18H13Z M15 11V16H18V11Z M24 9H28V11H24V16H28V18H24L22 16V11Z"/>
+  <path class="tint" stroke="#1F5FA8" stroke-width="2" d="M11 25L14 28L21 21"/>
+</svg>

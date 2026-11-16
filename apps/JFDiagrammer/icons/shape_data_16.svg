@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Shape-Daten, 16 px</title>
+  <path class="ink" stroke="#1D2228" d="M1 3.5H5M1 8.5H4M1 13.5H5"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="2.5" width="8" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="7.5" width="8" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="12.5" width="8" height="2"/>
+</svg>

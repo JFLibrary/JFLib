@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Hauptthema, 32 px</title>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="3.5" y="8.5" width="25" height="15"/>
+  <path class="ink" stroke="#1D2228" d="M8 13.5H24M10 18.5H22"/>
+</svg>

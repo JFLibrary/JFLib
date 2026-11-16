@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Sprünge, 16 px</title>
+  <path class="ink" stroke="#1D2228" d="M7.5 2V6M7.5 9V14"/>
+  <path class="tint" stroke="#1F5FA8" d="M1 10.5H4.5V7.5H10.5V10.5H15"/>
+</svg>

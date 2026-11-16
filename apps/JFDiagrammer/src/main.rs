@@ -9,6 +9,7 @@
 //   src/main.rs     the entry, the catalogue, the app's state
 //   src/shell.rs    the window: register row, ribbon, Shapes sidebar, canvas, status bar
 //   src/ribbon.rs   the placeholder groups of the registers Start, Einfügen, Entwurf, Ansicht
+//   src/icons.rs    the ribbon icons (JD14: own artwork in icons/*.svg, mkicons.py)
 //
 // Languages: German source texts, the catalogue locales/ui.tsv with the columns de, en, es,
 // it, fr (FEATURES.md 3.17).  The language follows --lang / jfgui_LANG / the system (the
@@ -26,6 +27,7 @@
 
 extern crate alloc;
 
+mod icons;
 mod ribbon;
 mod shell;
 
@@ -50,16 +52,26 @@ pub(crate) struct Diagrammer {
     tab: i32,
     /// the canvas' view and selection (an empty page until JD4 brings the model)
     canvas: DiagramState,
+    /// the ribbon icons' hook (set in init)
+    icons: Option<icons::Icons>,
 }
 
 impl Diagrammer {
     fn new() -> Diagrammer {
-        Diagrammer { tab: TAB_START, canvas: DiagramState::new() }
+        Diagrammer { tab: TAB_START, canvas: DiagramState::new(), icons: None }
     }
 }
 
 impl App for Diagrammer {
+    fn init(&mut self, ui: &mut Ui) -> bool {
+        self.icons = Some(icons::Icons::install(ui));
+        true
+    }
+
     fn frame(&mut self, ui: &mut Ui) {
+        if let Some(icons) = &self.icons {
+            icons.update(ui); // the theme may have changed (the system, high contrast)
+        }
         shell::frame(self, ui);
     }
 }

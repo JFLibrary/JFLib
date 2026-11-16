@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Groß-/Kleinschreibung, 16 px</title>
+  <path class="ink" fill="#1D2228" fill-rule="evenodd" d="M1 13L4 3H5L8 13H6.6L6 11H3L2.4 13Z M3.3 10H5.7L4.5 6Z"/>
+  <path class="ink" fill="#1D2228" fill-rule="evenodd" d="M10 7H14L15 8V13H11L10 12V10L11 9H14V8H10Z M11 10V12H14V10Z"/>
+</svg>

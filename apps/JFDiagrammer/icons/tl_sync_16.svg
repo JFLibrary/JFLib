@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Synchronisieren, 16 px</title>
+  <path class="ink" stroke="#1D2228" d="M1 3.5H15M2.5 4V6M12.5 4V6"/>
+  <path class="ink" stroke="#1D2228" d="M1 12.5H15M2.5 13V15M12.5 13V15"/>
+  <path class="tint" stroke="#1F5FA8" d="M7.5 4V8"/>
+  <polygon class="tint" fill="#1F5FA8" points="5,8 10,8 7.5,10.5"/>
+</svg>

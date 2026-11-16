@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Abstand verkleinern, 16 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="2.5" width="4" height="5"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="9.5" y="2.5" width="4" height="5"/>
+  <path class="tint" stroke="#1F5FA8" d="M1 11.5H4M12 11.5H15"/>
+  <polygon class="tint" fill="#1F5FA8" points="4,9.0 4,14.0 6.5,11.5"/>
+  <polygon class="tint" fill="#1F5FA8" points="12,9.0 12,14.0 9.5,11.5"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Ersetzen, 16 px</title>
+  <path class="ink" fill="#1D2228" fill-rule="evenodd" d="M1 3H4L5 4V8H2L1 7V6L2 5H4V4H1Z M2 6V7H4V6Z M6 1H7V3H9L10 4V7L9 8H6Z M7 4V7H9V4Z"/>
+  <path class="ink" stroke="#1D2228" d="M1 11.5H6"/>
+  <polygon class="ink" fill="#1D2228" points="6,9 6,14 8.5,11.5"/>
+  <path class="tint" fill="#1F5FA8" d="M11 9H14V10H11V13H14V14H11L10 13V10Z"/>
+</svg>
