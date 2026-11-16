@@ -33,8 +33,9 @@
 // (SubmitId).  completed caches the last value seen reached (vkGetSemaphoreCounterValue at
 // submits, polls and waits).  A dropped resource goes to the garbage with the value of the
 // latest submit and is destroyed once that value is reached -- earlier if no submit is
-// pending; a buffer or image, which the open upload command buffer may name, with the value of
-// the next submit, which runs it.  Command buffers come from slots (a transient command pool with one buffer each),
+// pending; a buffer or image, which the open upload command buffer (or one another thread took
+// and has not submitted yet) may name, waits until every such upload is submitted and then takes
+// the value reached by then (State::pending).  Command buffers come from slots (a transient command pool with one buffer each),
 // reused once their submission completed.  Uploads: the data goes into the staging ring, the
 // copies into one upload command buffer that ends with a global barrier (copy writes -> every
 // later access) and is put before the caller's command buffers in the next vkQueueSubmit.
@@ -121,6 +122,8 @@ struct Chunk {
 struct Upload {
     slot: Slot,
     retired: Vec<Chunk>,
+    /// its number (State::up_gen when it was opened)
+    num: u64,
 }
 
 /// the staging ring
@@ -146,6 +149,15 @@ pub(crate) struct State {
     busy: Vec<(u64, Slot)>,
     pools: Vec<vk::Handle>, // descriptor pools of the bind groups (the last one is filled)
     upload: Option<Upload>,
+    /// the number of the last upload opened
+    up_gen: u64,
+    /// the numbers of the uploads submit_on took whose submissions are not in `submitted` yet
+    in_flight: Vec<u64>,
+    /// buffers and images an open or taken upload may name, with the newest such upload's
+    /// number: they become garbage of the then reached `submitted` once every upload up to it
+    /// is submitted (another thread may take the upload and submit it after a submission of
+    /// its own that does not carry it; "the next submission" was too early)
+    pending: Vec<(u64, u64, Garbage)>,
     ring: Ring,
 }
 
@@ -516,6 +528,9 @@ impl Adapter {
                 busy: Vec::new(),
                 pools: Vec::new(),
                 upload: None,
+                up_gen: 0,
+                in_flight: Vec::new(),
+                pending: Vec::new(),
                 ring: Ring::default(),
             }),
         });
@@ -618,15 +633,42 @@ impl Shared {
     /// its drop releases right after this
     pub fn defer(&self, g: Garbage) {
         let mut st = self.st.lock();
-        let named = st.upload.is_some() && matches!(g, Garbage::Buffer(..) | Garbage::Image(..));
-        let v = self.submitted() + named as u64;
         // (G5d) and the compute queue's latest submission
         let vc = self.lane_submitted();
+        // an open upload, or one another thread took to submit, may name a buffer or image:
+        // it waits until every upload up to the newest of them is submitted (State::pending)
+        if matches!(g, Garbage::Buffer(..) | Garbage::Image(..)) && !self.lost.load(Ordering::Relaxed) {
+            if let Some(num) = st.upload.as_ref().map(|u| u.num).or_else(|| st.in_flight.iter().max().copied()) {
+                st.pending.push((num, vc, g));
+                return;
+            }
+        }
+        let v = self.submitted();
         let lane_done = self.lane.as_ref().is_none_or(|l| vc <= l.completed.load(Ordering::Acquire));
         if (v <= self.completed.load(Ordering::Acquire) && lane_done) || self.lost.load(Ordering::Relaxed) {
             self.destroy(&mut st, g);
         } else {
             st.garbage.push((v, vc, g));
+        }
+    }
+
+    /// the pending buffers and images whose uploads are all in `submitted` now (no older or equal
+    /// upload is open or taken and unsubmitted) become garbage of its value
+    fn settle(&self, st: &mut State) {
+        if st.pending.is_empty() {
+            return;
+        }
+        let lost = self.lost.load(Ordering::Relaxed);
+        let oldest = st.in_flight.iter().copied().chain(st.upload.as_ref().map(|u| u.num)).min();
+        let v = self.submitted();
+        let mut i = 0;
+        while i < st.pending.len() {
+            if lost || oldest.is_none_or(|o| st.pending[i].0 < o) {
+                let (_, vc, g) = st.pending.swap_remove(i);
+                st.garbage.push((v, vc, g));
+            } else {
+                i += 1;
+            }
         }
     }
 
@@ -859,7 +901,8 @@ impl Shared {
                 st.free.push(slot);
                 return Err(e);
             }
-            st.upload = Some(Upload { slot, retired: Vec::new() });
+            st.up_gen += 1;
+            st.upload = Some(Upload { slot, retired: Vec::new(), num: st.up_gen });
         }
         if n == 0 {
             return Ok((0, 0, 0));
@@ -985,10 +1028,27 @@ impl Shared {
         if compute {
             return self.submit_lane(cbs, slots, waits);
         }
-        let up = self.st.lock().upload.take();
+        let up = {
+            let mut st = self.st.lock();
+            let u = st.upload.take();
+            if let Some(u) = &u {
+                st.in_flight.push(u.num); // (defer: until `submitted` holds its value)
+            }
+            u
+        };
         let mut all: Vec<vk::CommandBuffer> = Vec::with_capacity(cbs.len() + 1);
         let mut chunks: Vec<Chunk> = Vec::new();
         let uploads = up.is_some();
+        let num = up.as_ref().map_or(0, |u| u.num);
+        // after `submitted` holds this submission's value (or it failed): under st's lock, so
+        // defer sees one or the other
+        let put_back = |me: &Self| {
+            if uploads {
+                let mut st = me.st.lock();
+                st.in_flight.retain(|&g| g != num);
+                me.settle(&mut st);
+            }
+        };
         if let Some(u) = up {
             let mb = vk::MemoryBarrier {
                 s_type: vk::STRUCTURE_TYPE_MEMORY_BARRIER,
@@ -1007,6 +1067,7 @@ impl Shared {
             slots.push(u.slot);
             chunks = u.retired;
             if let Err(e) = self.vk(r) {
+                put_back(self);
                 self.fail_submit(slots, chunks);
                 return Err(e);
             }
@@ -1056,6 +1117,7 @@ impl Shared {
             self.submitted.store(value, Ordering::Release);
         }
         drop(q);
+        put_back(self);
         if let Err(e) = self.vk(r) {
             self.fail_submit(slots, chunks);
             return Err(e);
@@ -1282,8 +1344,9 @@ impl Drop for Shared {
             for c in ring.cur.into_iter().chain(ring.free).chain(ring.busy.into_iter().map(|(_, c)| c)) {
                 st.garbage.push((0, 0, Garbage::Buffer(c.buf, c.a)));
             }
+            let pending = core::mem::take(&mut st.pending);
             let garbage = core::mem::take(&mut st.garbage);
-            for (_, _, g) in garbage {
+            for (_, _, g) in garbage.into_iter().chain(pending) {
                 self.destroy(&mut st, g);
             }
             for (_, s) in core::mem::take(&mut st.busy) {

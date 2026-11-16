@@ -19923,8 +19923,9 @@ The timeline: one timeline semaphore per device; every submit signals the next v
 (SubmitId).  completed caches the last value seen reached (vkGetSemaphoreCounterValue at
 submits, polls and waits).  A dropped resource goes to the garbage with the value of the
 latest submit and is destroyed once that value is reached -- earlier if no submit is
-pending; a buffer or image, which the open upload command buffer may name, with the value of
-the next submit, which runs it.  Command buffers come from slots (a transient command pool with one buffer each),
+pending; a buffer or image, which the open upload command buffer (or one another thread took
+and has not submitted yet) may name, waits until every such upload is submitted and then takes
+the value reached by then (State::pending).  Command buffers come from slots (a transient command pool with one buffer each),
 reused once their submission completed.  Uploads: the data goes into the staging ring, the
 copies into one upload command buffer that ends with a global barrier (copy writes -> every
 later access) and is put before the caller's command buffers in the next vkQueueSubmit.
@@ -30561,7 +30562,7 @@ pick, no capture.  Android: the host's DisplayManager displays, no pick, no capt
 - **`fn pick_test_point(p: Option<(i32, i32)>)`**
   (test aid) the next pick_start answers the pixel at the desktop point x, y at once,
   without asking the user (Windows, X11; the portal and the browser ignore it); None: ask
-  again
+  again.  With a manifest only where `screen.capture` allows pictures of the screen
 
 - **`fn capture_available() -> bool`**
   whether pictures of the screen can be taken here (the permission is checked when taking)

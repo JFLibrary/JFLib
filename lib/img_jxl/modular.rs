@@ -429,6 +429,12 @@ fn jm_meta(mi: &mut Mi, mt: &mut Mt, room: &mut u64) -> i32 {
                 let offset = if st[1] != 0 { ec + 1 } else { mi.nch() };
                 for c in bc..=ec {
                     let ch = &mut mi.ch[c as usize];
+                    // too many squeezes (libjxl: shift > 30): a 1 x 1 channel squeezed over and
+                    // over added an empty channel each time, up to JM_MAXCH, each one inserted
+                    // into the middle of the list (minutes from a few KB)
+                    if ch.hs > 30 || ch.vs > 30 {
+                        return ERR_HDR;
+                    }
                     let (w, h) = (ch.w, ch.h);
                     if w == 0 || h == 0 {
                         return ERR_HDR;

@@ -69,10 +69,9 @@ unsafe extern "system" {
     fn GetPixel(dc: isize, x: i32, y: i32) -> u32;
 }
 
-#[link(name = "dwmapi", kind = "raw-dylib")]
-unsafe extern "system" {
-    fn DwmSetWindowAttribute(h: isize, attr: u32, value: *const u32, size: u32) -> i32;
-}
+crate::win_dll::system_dll! { "dwmapi.dll" {
+    fn DwmSetWindowAttribute(h: isize, attr: u32, value: *const u32, size: u32) -> i32 = crate::win_dll::E_FAIL;
+} }
 
 #[link(name = "kernel32", kind = "raw-dylib")]
 unsafe extern "system" {

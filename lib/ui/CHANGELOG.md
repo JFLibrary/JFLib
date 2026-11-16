@@ -48,6 +48,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - The fine steps of a precision touchpad were cut off one by one where whole lines count: the
   terminal never scrolled with steps below 40, the code completion list scrolled three rows on
   each of them, Ctrl + each of them zoomed a diagram a whole step. They add up now.
+- Dock: a floating window is found by its slot when the dock's windows are walked. The app changing the layout in the same pass made the stored index name another floating window or none.
 
 ## [0.2.1] - 2026-11-16
 

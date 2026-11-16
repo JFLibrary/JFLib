@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- Vulkan, several threads: a buffer or image dropped while another thread has taken the pending uploads but not submitted them yet is destroyed only after their submission. It took the next submission's value, which could be another thread's submission without the uploads, and the driver then copied from or into a destroyed buffer.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

@@ -305,7 +305,8 @@ fn staged_manifest(cfg: &Config, st: &State) -> Result<(Manifest, Package), Erro
     if !st.seen.is_empty() && manifest::newer(&st.seen, &man.version) {
         return Err(Error::Replay(String::from(&st.seen)));
     }
-    if !manifest::newer(&man.version, &cfg.version) {
+    // (the same version: an apply that ended after the program file, which runs now, finishes)
+    if !manifest::newer(&man.version, &cfg.version) && !(man.version == cfg.version && resumed(cfg, st).is_some()) {
         return Err(Error::Manifest(String::from("das bereitgestellte Update ist nicht neuer als die laufende Version")));
     }
     if man.app != cfg.app || man.version != st.version || pkg.kind.name() != st.kind {
@@ -567,30 +568,38 @@ pub(crate) fn apply_staged(cfg: &Config, st: &mut State) -> Result<(), Error> {
             }
         }
     };
-    // the backup of every file the update touches
+    // the backup of every file the update touches; an attempt that ended in the middle (a crash
+    // between two files) left its backup of the old files: it stays (a new one would back up
+    // files already replaced as the old ones)
     let backup = path(cfg, "backup");
-    let fresh = path(cfg, "backup.new");
-    remove_tree(&fresh);
-    let mut list = format!("from={}\n", cfg.version);
-    for (rel, _) in &files {
-        let target = format!("{}/{}", dir, rel);
-        if plat::file_exists(&target) == 1 {
-            if !copy_file(&target, &format!("{}/files/{}", fresh, rel)) {
-                return Err(Error::Io(format!("die Sicherung von {} in {} kann nicht geschrieben werden", target, backup)));
+    let from = match resumed(cfg, st) {
+        Some(from) => from,
+        None => {
+            let fresh = path(cfg, "backup.new");
+            remove_tree(&fresh);
+            let mut list = format!("from={}\n", cfg.version);
+            for (rel, _) in &files {
+                let target = format!("{}/{}", dir, rel);
+                if plat::file_exists(&target) == 1 {
+                    if !copy_file(&target, &format!("{}/files/{}", fresh, rel)) {
+                        return Err(Error::Io(format!("die Sicherung von {} in {} kann nicht geschrieben werden", target, backup)));
+                    }
+                    list.push_str(&format!("R {}\n", rel));
+                } else {
+                    list.push_str(&format!("N {}\n", rel));
+                }
             }
-            list.push_str(&format!("R {}\n", rel));
-        } else {
-            list.push_str(&format!("N {}\n", rel));
+            if !write(&format!("{}/list", fresh), list.as_bytes()) {
+                return Err(Error::Io(format!("die Sicherung in {} kann nicht geschrieben werden", backup)));
+            }
+            // the previous backup goes only now that the new one is complete
+            remove_tree(&backup);
+            if !plat::rename(&fresh, &backup) || !mark_applying(cfg, st) {
+                return Err(Error::Io(format!("die Sicherung in {} kann nicht geschrieben werden", backup)));
+            }
+            String::from(&cfg.version)
         }
-    }
-    if !write(&format!("{}/list", fresh), list.as_bytes()) {
-        return Err(Error::Io(format!("die Sicherung in {} kann nicht geschrieben werden", backup)));
-    }
-    // the previous backup goes only now that the new one is complete
-    remove_tree(&backup);
-    if !plat::rename(&fresh, &backup) {
-        return Err(Error::Io(format!("die Sicherung in {} kann nicht geschrieben werden", backup)));
-    }
+    };
     // the new files; on a failure the old ones come back
     for (i, (rel, src)) in files.iter().enumerate() {
         if let Err(e) = swap(cfg, &format!("{}/{}", dir, rel), src, appimage) {
@@ -601,10 +610,42 @@ pub(crate) fn apply_staged(cfg: &Config, st: &mut State) -> Result<(), Error> {
             return Err(e);
         }
     }
+    trial(cfg, st, from)
+}
+
+// the stage Trial after a complete apply (from: the version before it); the apply's marker goes
+fn trial(cfg: &Config, st: &mut State, from: String) -> Result<(), Error> {
     st.stage = Stage::Trial;
-    st.from = String::from(&cfg.version);
+    st.from = from;
     st.starts = 0;
-    save(cfg, st)
+    save(cfg, st)?;
+    plat::delete(&path(cfg, APPLYING));
+    Ok(())
+}
+
+/// the marker of an apply in progress, in the backup's folder: the staged update it belongs to
+const APPLYING: &str = "backup/applying";
+
+fn applying_text(st: &State) -> String {
+    format!("version={}\nkind={}\nfile={}\n", st.version, st.kind, st.file)
+}
+
+// the backup in place belongs to the apply of this staged update that starts now
+fn mark_applying(cfg: &Config, st: &State) -> bool {
+    write(&path(cfg, APPLYING), applying_text(st).as_bytes())
+}
+
+// an apply of this staged update ended in the middle -> the version before it (its backup in
+// place holds the files from before the first attempt)
+fn resumed(cfg: &Config, st: &State) -> Option<String> {
+    let mark = plat::read_file(&path(cfg, APPLYING))?;
+    if mark != applying_text(st).as_bytes() {
+        return None;
+    }
+    let list = plat::read_file(&path(cfg, "backup/list"))?;
+    let text = String::from_utf8_lossy(&list);
+    let from = text.lines().next()?.strip_prefix("from=")?;
+    Some(String::from(from))
 }
 
 // (macOS) the staged app bundle in place of `bundle` (the lock is held) -> Ok: stage Trial
@@ -648,32 +689,36 @@ fn apply_app(cfg: &Config, st: &mut State, bundle: &str) -> Result<(), Error> {
         remove_tree(&new);
         return fail(st, Error::Rejected(why));
     }
-    // the backup: a copy of the installed bundle
+    // the backup: a copy of the installed bundle (kept from an attempt that ended after the
+    // exchange: the installed bundle is the new one already)
     let backup = path(cfg, "backup");
-    let fresh = path(cfg, "backup.new");
-    remove_tree(&fresh);
-    let name = split_dir(bundle).1;
-    let list = format!("from={}\nA {}\n", cfg.version, name);
-    if !copy_tree(bundle, &format!("{}/app/{}", fresh, name)) || !write(&format!("{}/list", fresh), list.as_bytes()) {
-        remove_tree(&new);
-        remove_tree(&fresh);
-        return Err(Error::Io(format!("die Sicherung von {} in {} kann nicht geschrieben werden", bundle, backup)));
-    }
-    remove_tree(&backup);
-    if !plat::rename(&fresh, &backup) {
-        remove_tree(&new);
-        return Err(Error::Io(format!("die Sicherung in {} kann nicht geschrieben werden", backup)));
-    }
+    let from = match resumed(cfg, st) {
+        Some(from) => from,
+        None => {
+            let fresh = path(cfg, "backup.new");
+            remove_tree(&fresh);
+            let name = split_dir(bundle).1;
+            let list = format!("from={}\nA {}\n", cfg.version, name);
+            if !copy_tree(bundle, &format!("{}/app/{}", fresh, name)) || !write(&format!("{}/list", fresh), list.as_bytes()) {
+                remove_tree(&new);
+                remove_tree(&fresh);
+                return Err(Error::Io(format!("die Sicherung von {} in {} kann nicht geschrieben werden", bundle, backup)));
+            }
+            remove_tree(&backup);
+            if !plat::rename(&fresh, &backup) || !mark_applying(cfg, st) {
+                remove_tree(&new);
+                return Err(Error::Io(format!("die Sicherung in {} kann nicht geschrieben werden", backup)));
+            }
+            String::from(&cfg.version)
+        }
+    };
     // the two bundles exchanged in one step; the old one (now at the new one's name) goes
     if !plat::pkg::app_bundle_swap(&new, bundle) {
         remove_tree(&new);
         return Err(not_writable(cfg, bundle));
     }
     remove_tree(&new);
-    st.stage = Stage::Trial;
-    st.from = String::from(&cfg.version);
-    st.starts = 0;
-    save(cfg, st)
+    trial(cfg, st, from)
 }
 
 // the backed-up state of the files (only: of these; new ones removed)

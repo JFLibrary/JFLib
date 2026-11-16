@@ -57,10 +57,9 @@ unsafe extern "system" {
     fn GetTickCount() -> u32;
 }
 
-#[link(name = "dwmapi", kind = "raw-dylib")]
-unsafe extern "system" {
-    fn DwmGetWindowAttribute(h: isize, attr: u32, value: *mut u32, size: u32) -> i32;
-}
+crate::win_dll::system_dll! { "dwmapi.dll" {
+    fn DwmGetWindowAttribute(h: isize, attr: u32, value: *mut u32, size: u32) -> i32 = crate::win_dll::E_FAIL;
+} }
 
 const PTI_SIZE: usize = 144; // POINTER_TOUCH_INFO (x64)
 pub const TOUCH_HIST: usize = 16; // samples per WM_POINTERUPDATE

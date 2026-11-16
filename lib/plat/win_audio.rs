@@ -48,16 +48,14 @@ unsafe extern "system" {
     fn Sleep(ms: u32);
 }
 
-#[link(name = "avrt", kind = "raw-dylib")]
-unsafe extern "system" {
-    fn AvSetMmThreadCharacteristicsW(task: *const u16, index: *mut u32) -> isize;
-    fn AvRevertMmThreadCharacteristics(h: isize) -> i32;
-}
+crate::win_dll::system_dll! { "avrt.dll" {
+    fn AvSetMmThreadCharacteristicsW(task: *const u16, index: *mut u32) -> isize = 0;
+    fn AvRevertMmThreadCharacteristics(h: isize) -> i32 = 0;
+} }
 
-#[link(name = "winmm", kind = "raw-dylib")]
-unsafe extern "system" {
-    fn PlaySoundW(sound: *const u16, module: isize, flags: u32) -> i32;
-}
+crate::win_dll::system_dll! { "winmm.dll" {
+    fn PlaySoundW(sound: *const u16, module: isize, flags: u32) -> i32 = 0;
+} }
 
 /// a COM GUID
 #[repr(C)]

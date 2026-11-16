@@ -34,6 +34,18 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical
   pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point).
 
+### Fixed
+
+- `parallel_for` with the feature `unwind`: a panic in an item of the calling thread cancels the job and waits for the workers before it unwinds. Caught with `catch_unwind`, they went on using the freed job.
+- Windows: the open dialog's result is split into a folder and names only when it is such a list. One file chosen with multiple selection on came back with the rest of a longer suggested name as a second file.
+- Linux: reading the clipboard or a drop from another program ends after 30 s in all (Wayland, X11 with INCR). The 3 s deadline started anew with every piece, so a program sending slowly froze the app for as long as it liked.
+- macOS: a GUI app catches SIGTERM with a handler that does nothing instead of ignoring it (the dispatch source reports it as before). Its child processes inherited the ignored signal and could not be ended with a plain kill.
+
+### Security
+
+- Windows: dwmapi, crypt32, winmm, iphlpapi, bcrypt and avrt are loaded from System32 when first used instead of being imported by the program. A DLL of such a name beside the program (a setup in the download folder) was loaded in their place.
+- `screen::pick_test_point`, the colour picker's test aid, obeys `screen.capture` like the picker. It read screen pixels without the permission.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

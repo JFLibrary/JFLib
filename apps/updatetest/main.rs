@@ -782,6 +782,36 @@ fn t_stand_in(t: &mut T, s: &Server, dir: &str) {
     t.check(plat::read_file(&prog).as_deref() == Some(&b"old bundle program"[..]), "bundle: the old program is back");
     t.check(plat::file_exists(&module) == 0, "bundle: the new module is gone");
 
+    // a bundle apply that ended in the middle (the program file new, the module not yet, the
+    // stage still staged): the next start, already the new program, keeps the first backup
+    let inst = format!("{}/inst-crash", dir);
+    let prog = format!("{}/app.bin", inst);
+    plat::mkdir(&inst);
+    plat::write_file(&prog, b"old crash program");
+    let mut c = config(s, dir, "bundle", "1.0.0", "s-crash");
+    c.exe = prog.clone();
+    let u = Updater::new(c.clone());
+    t.check(matches!(u.check(), Ok(Check::Available(_))) && u.download().is_ok(), "crash: the bundle checked and downloaded");
+    let state_file = format!("{}/state", c.dir);
+    let staged_state = plat::read_file(&state_file).unwrap_or_default();
+    let st = update::state(&c);
+    t.eq(update::startup(&c), Startup::Applied(String::from("2.0.0")), "crash: put in place");
+    let module = format!("{}/mods/extra.dat", inst);
+    // (the state of the crash: the marker as the apply leaves it between two files)
+    plat::write_file(&state_file, &staged_state);
+    plat::write_file(&format!("{}/backup/applying", c.dir), format!("version={}\nkind={}\nfile={}\n", st.version, st.kind, st.file).as_bytes());
+    plat::delete(&module);
+    c.version = String::from("2.0.0");
+    t.eq(update::startup(&c), Startup::Applied(String::from("2.0.0")), "crash: the new program finishes the apply at its start");
+    t.check(plat::read_file(&format!("{}/backup/files/app.bin", c.dir)).as_deref() == Some(&b"old crash program"[..]), "crash: the backup still holds the old program");
+    t.check(plat::read_file(&module).as_deref() == Some(&b"Modul 2.0.0\n"[..]), "crash: the module is written");
+    let st = update::state(&c);
+    t.check(st.stage == Stage::Trial && st.from == "1.0.0" && plat::file_exists(&format!("{}/backup/applying", c.dir)) == 0,
+            &format!("crash: trial from 1.0.0, the marker gone (from {})", st.from));
+    t.eq(update::startup(&c), Startup::Trial(String::from("2.0.0")), "crash: trial");
+    t.eq(update::startup(&c), Startup::RollingBack(String::from("2.0.0")), "crash: rolled back without healthy()");
+    t.check(plat::read_file(&prog).as_deref() == Some(&b"old crash program"[..]) && plat::file_exists(&module) == 0, "crash: the old program is back, the module gone");
+
     // a package: downloaded and checked, installed by the app
     let c = config(s, dir, "package", "1.0.0", "s-package");
     let u = Updater::new(c.clone());

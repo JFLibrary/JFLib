@@ -55,7 +55,6 @@ unsafe extern "C" {
 const COMMAND: u64 = 1 << 20;
 const OPTION: u64 = 1 << 19;
 const SIGTERM: i32 = 15;
-const SIG_IGN: usize = 1;
 const TERMINATE_CANCEL: usize = 0;
 const TERMINATE_NOW: usize = 1;
 const PANEL_OPTIONS: usize = 1 | 4 | 8 | 1 << 17; // NSPrintPanel: copies, paper size, orientation, preview
@@ -73,9 +72,12 @@ pub(super) fn gui_once() {
         return;
     }
     menus();
-    // SAFETY: SIGTERM ignored by the default action; a dispatch source on the main queue reports it.
+    // SAFETY: SIGTERM caught by a handler that does nothing (not SIG_IGN: an ignored signal stays
+    // ignored across exec, so every child process would be deaf to it; a handler goes back to the
+    // default there; signal() installs it with SA_RESTART); a dispatch source on the main queue
+    // reports it (kqueue sees every delivery, caught or not).
     unsafe {
-        signal(SIGTERM, SIG_IGN);
+        signal(SIGTERM, on_sigterm_signal as *const () as usize);
         let src = dispatch_source_create(&_dispatch_source_type_signal, SIGTERM as usize, 0, &_dispatch_main_q);
         if !src.is_null() {
             dispatch_source_set_event_handler_f(src, on_sigterm);
@@ -83,6 +85,9 @@ pub(super) fn gui_once() {
         }
     }
 }
+
+// the signal handler: nothing (the dispatch source does the work)
+extern "C" fn on_sigterm_signal(_: i32) {}
 
 extern "C" fn on_sigterm(_: *mut c_void) {
     push(0, E_SESSION_END, 0, 0, 0, 0);

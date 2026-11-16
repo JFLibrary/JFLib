@@ -325,6 +325,9 @@ pub use pool::*;
 mod win;
 #[cfg(windows)]
 pub use win::*;
+// functions of System32 DLLs that are no KnownDLLs, loaded on first use (DLL planting)
+#[cfg(windows)]
+pub(crate) mod win_dll;
 // a managed program on the runtime another application ships; values of HKLM
 #[cfg(windows)]
 mod win_clr;
