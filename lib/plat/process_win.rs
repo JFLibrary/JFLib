@@ -26,6 +26,7 @@ unsafe extern "system" {
     fn TerminateProcess(process: isize, code: u32) -> i32;
     fn ResumeThread(thread: isize) -> u32;
     fn GetExitCodeProcess(process: isize, code: *mut u32) -> i32;
+    fn GetProcessId(process: isize) -> u32;
     fn WaitForSingleObject(h: isize, ms: u32) -> u32;
     fn PeekNamedPipe(h: isize, buf: usize, size: u32, read: usize, available: *mut u32, left: usize) -> i32;
     fn ReadFile(h: isize, buf: *mut u8, n: u32, done: *mut u32, ov: *mut crate::win::Overlapped) -> i32;
@@ -300,6 +301,11 @@ fn read(h: &Handle, bytes: &mut [u8]) -> Result<Option<usize>, u32> {
     Ok(Some(n as usize))
 }
 impl Child {
+    /// The child's process id (as plat::process_alive takes it).
+    pub fn id(&self) -> u32 {
+        // SAFETY: owned process handle.
+        unsafe { GetProcessId(self.process.0) }
+    }
     /// Read stdout without waiting; None means no data, Some(0) means EOF.
     pub fn read_stdout(&mut self, bytes: &mut [u8]) -> Result<Option<usize>, u32> { read(&self.output, bytes) }
     /// Read stderr without waiting; None means no data, Some(0) means EOF.

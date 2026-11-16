@@ -42,6 +42,9 @@
 //                                          (--test launched --marker FILE WORDS...) writes its
 //                                          words to FILE, each as it was given; find; a
 //                                          missing program
+//   plattest --test alive                  (t_spawn.rs) process_id, process_alive: this
+//                                          process, 0, u32::MAX, a child (--test alive-child)
+//                                          before and after it is ended; Child::id
 //   plattest --test window                (Rust only, t_window.rs, Windows) a real-window smoke
 //                                          test of the platform layer; the window closes itself
 //   plattest --test present-bench [--frames N] [--size WxH]   (t_present.rs) what presenting a
@@ -406,6 +409,8 @@ fn plattest() -> i32 {
         Some("spawned") => t_spawn::t_spawned,   // plat-win
         Some("launch") => t_spawn::t_launch,     // process::launch: a program on its own
         Some("launched") => t_spawn::t_launched, // its program: writes its words
+        Some("alive") => t_spawn::t_alive,       // process_alive: this process, a child
+        Some("alive-child") => t_spawn::t_alive_child, // its child: sleeps until ended
         Some("print") => t_print::t_print,             // plat-shared
         Some("printlayout") => t_print::t_printlayout, // plat-shared
         Some("printjob") => t_print::t_printjob,       // plat-shared

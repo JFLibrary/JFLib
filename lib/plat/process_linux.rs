@@ -127,6 +127,8 @@ impl Child {
         let r = unsafe { syscall3(SYS_WRITE, fd.0 as usize, bytes.as_ptr() as usize, bytes.len()) };
         if r == -11 || r == -4 { Ok(None) } else if r < 0 { Err((-r) as u32) } else { Ok(Some(r as usize)) }
     }
+    /// The child's process id (as plat::process_alive takes it).
+    pub fn id(&self) -> u32 { self.pid as u32 }
     /// Close stdin to request orderly helper shutdown.
     pub fn close_stdin(&mut self) { self.input = None; }
     /// Poll exit status; signals map to 128 + signal.

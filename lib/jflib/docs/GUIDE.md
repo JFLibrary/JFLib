@@ -2803,7 +2803,11 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   file nobody listens on any more; a file, a folder or a socket that is listened on stays and
   `bind` fails. A dropped listener removes its socket file, not a name taken again meanwhile.
 * `plat::process::Command { program, args, cwd, env }.spawn()` -- a child process with pipes
-  (no shell); dropping the `Child` ends its process tree.
+  (no shell); dropping the `Child` ends its process tree, `Child::id()` gives its process id.
+* `plat::process_alive(pid)` -- whether a process with this id runs (the owner of a lock file,
+  a helper started earlier; a process of another user counts too), on every target, false in
+  the browser; `plat::process_id()` is this process's id. Ids are reused once a process ended,
+  so a lock file should hold more than the id where that matters.
 * `netpkt` -- packets byte for byte, without I/O (written for JFNetworker's simulator): `Mac`,
   `Ipv4`, `Ipv6` (RFC 5952 text), `Prefix4` / `Prefix6`; the Internet checksum
   (`checksum::sum` / `finish` / `verify`, pseudo headers, `update16` for incremental changes)
