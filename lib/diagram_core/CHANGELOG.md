@@ -10,7 +10,26 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
-- The crate, as an empty frame for the diagram model (ShapeSheet cells, formulas, geometry, routing and layout): it has no public items yet; the plan is
-  [apps/JFDiagrammer/PLAN.md](https://github.com/JFLibrary/JFLib/blob/main/apps/JFDiagrammer/PLAN.md).
+- The crate, with the document model of stage JD2 of the plan
+  [apps/JFDiagrammer/PLAN.md](https://github.com/JFLibrary/JFLib/blob/main/apps/JFDiagrammer/PLAN.md):
+  - `Document` with foreground and background pages, masters (a stencil is a document without
+    pages), styles, the document sheet, theme parts and other package parts kept as bytes;
+    `Page`, `Master` and `Style` with their attributes, sheets and `Connect` entries
+  - `ShapeTree` of shapes, groups, foreign objects and guides with their subshapes, file IDs
+    found through a map, slots (`ShapeRef`) that stay valid across undo
+  - the ShapeSheet store `Sheet`, `Section`, `Row` and `Cell`: formula, cached value, unit and
+    error as the file has them (`Value`, `Formula`, `CellError`), indexed and named rows, Del
+    marks; `Extras` keeps what the model does not know at the place it stood
+  - `Document::resolve` reads a cell through the master shape and the line, fill and text
+    styles and says where its formula comes from (`Origin`); `rows` and `section_indices`
+    merge inherited, overridden and deleted rows; `shape_data`, `user_cells`, `hyperlinks`,
+    `layers` and `layer_members` show them
+  - `Unit` knows every unit code of a cell and converts to inches, radians and days, `Implicit`
+    resolves the page's drawing, text, angle and duration units
+  - `Strings` and `Sym` keep cell names, formulas and texts once per document
+  - edits in a `Transaction` become one `Change` that undoes and redoes by inverse steps, sized
+    by what it changes; `ui::history` takes it as one step. Formula and value stay a pair:
+    `set_formula` leaves the cell stale for the formula engine, `set_constant` writes a value
+    whose formula is the value, `set_result` stores the engine's result, GUARD is respected
 
 [Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD

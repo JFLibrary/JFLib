@@ -105,6 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/page.rs](#diagram_coresrcpagers) · [src/shape.rs](#diagram_coresrcshapers) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
@@ -52023,20 +52024,1425 @@ cached value, unit and where it comes from (local, inherited from the master or 
 deleted) -- and documents, pages and shapes are views on these cells.  So a round trip through
 a file loses nothing, and the behaviour Visio files carry works without translation.
 
-What is to come here, by stage of the plan (none of it exists yet):
-  JD2   document, foreground and background pages, layers, masters, shapes and groups, styles,
-        theme data; sections, rows and cells; the inheritance shape -> master shape -> style ->
-        document; NameU and Name; units (inches inside, as in the file); hyperlinks, shape data
-        and user cells; an edit API with transactions for undo and redo
+  Document            pages (foreground, background), masters, styles, the document sheet,
+                      themes and parts kept as bytes; a stencil is a document without pages
+  Page, Master, Style  their attributes, sheets, shape trees and Connect entries
+  ShapeTree, ShapeData, Shape   shapes, groups, foreign objects, guides and their subshapes
+  Sheet, Section, Row, Cell     the ShapeSheet store; Value, Formula, Unit, Origin
+  doc.resolve(sheet, addr)      a cell with inheritance: shape -> master shape -> styles
+  doc.rows / shape_data / user_cells / hyperlinks / layers   rows as they really are
+  doc.transaction(label)        edits with undo and redo (Change; ui::history wraps it)
+  Unit, convert, Implicit       unit codes and conversion to the internal units (inches,
+                                radians, days)
+  Strings, Sym                  the document's string table (compact cells)
+  Extras                        what the file had and the model does not know (DF-03)
+
+What is to come here, by stage of the plan:
   JD4   geometry rows and transforms (pin, local pin, angle, flips, groups) for drawing
   JD6   the formula engine: parser of the universal syntax, evaluation over a dependency graph
         with incremental recalculation, units, inheritance, GUARD and locks
-  JD7  glue, the dynamic connector with right-angle routing around obstacles, layout
+  JD7   glue, the dynamic connector with right-angle routing around obstacles, layout
 
 Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 opening a file (connectors, layout and containers move only when something moves), and a
 formula with an unknown function keeps its cached value instead of failing.
 ```
+
+### `diagram_core/src/cell.rs`
+
+Source: [`lib/diagram_core/src/cell.rs`](../lib/diagram_core/src/cell.rs)
+
+```text
+cell -- one ShapeSheet cell as the file keeps it: name, formula, cached value, unit, error
+
+  Cell::new(name)                    no value, no formula attribute
+  Cell { name, value, formula, unit, error, stale }
+  Value::Num(f64) / Text(Sym) / Absent      the cached value V (internal units)
+  Formula::Absent / Inherited / NoFormula / Expr(Sym)
+  CellError::parse("#REF!")          the error state E
+  Origin                             where a cell's formula comes from (local, master shape,
+                                     style, default) or that its row was deleted
+
+Formula and value are a pair (PLAN.md, "Fallen"):
+* Formula::Absent -- no F attribute: the value itself is the formula, a constant shown in U.
+* Formula::Expr -- F holds an expression; V is its last result.  A formula the engine (JD6)
+  cannot evaluate keeps V as it is.
+* Formula::Inherited -- F="Inh": the formula belongs to the master shape or style, V is this
+  sheet's own result of it.
+* Formula::NoFormula -- F="No Formula": explicitly without formula, V is a plain value.
+`stale` says the formula changed and V is not its result yet; the engine clears it.  V holds
+numbers as f64 and everything else as text: "Themed" (theme inheritance), "#RRGGBB" colours,
+strings, NURBS(...) and POLYLINE(...) results, "1.#INF".
+```
+
+- **`enum Value`**
+  a cached value (V), numbers in internal units
+  - `Absent` -- no V attribute
+  - `Num(f64)` -- a number (lengths in inches, angles in radians ...)
+  - `Text(Sym)` -- anything that is not a number, as written
+
+**`impl Value`**
+
+- **`fn parse(text: &str, unit: Option<Unit>, strings: &mut Strings) -> Value`**
+  V as the file writes it with its unit U: a finite number parses to Num, everything else
+  stays text -- also every value of a STR or GUID cell and of an unknown unit ("007" is a
+  serial number there, not 7)
+- **`fn num(self) -> Option<f64>`**
+  the number, if the value is one
+- **`fn text(self) -> Option<Sym>`**
+  the text, if the value is one
+
+- **`enum Formula`**
+  the formula state of a cell (F)
+  - `Absent` -- no F attribute: the value is the formula (a constant)
+  - `Inherited` -- F="Inh": the formula is inherited, the value is this sheet's own
+  - `NoFormula` -- F="No Formula": no formula
+  - `Expr(Sym)` -- F holds an expression in the universal syntax
+
+**`impl Formula`**
+
+- **`fn parse(text: &str, strings: &mut Strings) -> Formula`**
+  F as the file writes it ("Inh", "No Formula" or an expression)
+- **`fn expr(self) -> Option<Sym>`**
+  the expression, if F holds one
+
+- **`enum CellError`**
+  the error state of a cell (E), after [MS-VSDX] Cell_Type
+  - `Dim` -- #DIM!: a dimension out of range
+  - `DivZero` -- #DIV/0!
+  - `Value` -- #VALUE!: an operand of the wrong type
+  - `Ref` -- #REF!: a reference to a cell that does not exist
+  - `Num` -- #NUM!: an invalid number
+  - `NotAvailable` -- #N/A: no value available
+  - `Name` -- #NAME?: an unknown name
+
+**`impl CellError`**
+
+- **`fn parse(text: &str) -> Option<CellError>`**
+  the error of an E text (None for texts the crate does not know: keep them as Sym)
+- **`fn as_str(self) -> &'static str`**
+  the text E holds
+
+- **`enum Origin`**
+  where a cell's formula comes from
+  - `Local` -- the sheet itself
+  - `Master` -- the master shape (of an instance or of a subshape of one)
+  - `Style` -- a style sheet (LineStyle, FillStyle, TextStyle and the styles they are based on)
+  - `Default` -- nowhere: the cell has its built-in default
+  - `Deleted` -- its row or section was deleted in the sheet or on the way to the master (Del="1")
+
+- **`struct Cell`**
+  one cell as the file keeps it
+  - `name: Sym` -- the cell name (N): "PinX", "X", "Value" ...
+  - `value: Value` -- the cached value (V) in internal units
+  - `formula: Formula` -- the formula state (F)
+  - `unit: Option<Unit>` -- the unit it is shown in (U); None: no U attribute
+  - `error: Option<Sym>` -- the error state (E) as written; CellError::parse types it
+  - `stale: bool` -- the formula changed and the value is not its result yet
+
+**`impl Cell`**
+
+- **`fn new(name: Sym) -> Cell`**
+  a cell without value and formula attribute
+- **`fn constant(name: Sym, value: Value, unit: Option<Unit>) -> Cell`**
+  a constant: the value is the formula
+- **`fn has_own_formula(&self) -> bool`**
+  whether the cell keeps its own formula (not F="Inh")
+
+### `diagram_core/src/document.rs`
+
+Source: [`lib/diagram_core/src/document.rs`](../lib/diagram_core/src/document.rs)
+
+```text
+document -- the document: pages, masters, styles, the document sheet, themes and parts
+
+  Document::new(DocKind::Drawing)        empty: no pages, masters or styles
+  doc.intern("PinX") / sym(..) / str(sym)   the document's string table (strings.rs)
+  doc.pages() / page(r) / page_by_id(id) / page_by_name_u(..)     (masters, styles alike)
+  doc.shape(r) -> Option<Shape>          a shape with its links: id, data, children,
+                                         parent, master shape, NameU and Name
+  doc.sheet(SheetRef) / sheet_styles(..)  any ShapeSheet of the document
+  doc.insert_page(page) / insert_master / insert_style      (untracked, for loaders)
+  doc.page_mut(r) / master_mut / style_mut / doc_sheet_mut  (untracked)
+  doc.unused_page_name("Page")           "Page-3": the first free number
+  doc.transaction(label)                 tracked edits with undo (edit.rs)
+
+Handles: PageRef, MasterRef and StyleRef are slots of the document like ShapeRef is a slot of
+its tree: stable for the document's life, also across undo, never reused.  The file's IDs
+(page ID, master ID, style ID, shape ID) are attributes of the objects; references inside
+the model use them as the file does (Master="2", LineStyle="3", BackPage="4", MasterShape),
+so a shape whose master is gone still says which one it was.
+
+Untracked access (the *_mut functions, the public fields) is for building a document --
+diagram_io while reading, tests -- and for data the edit API does not cover yet.  Changes
+made that way bypass the transactions, so an undo history recorded before them no longer
+fits the document: clear it.
+
+Names (LG-04): NameU is the universal key (formulas, matching masters, own shapes), Name what
+the user sees; a file's Name stays as read.  A shape without NameU is "Sheet.<ID>", an
+instance "<master's NameU>.<ID>"; without Name it shows its NameU.
+```
+
+- **`struct PageRef(pub(crate) u32)`**
+  a page of the document (a slot, stable across undo)
+
+- **`struct MasterRef(pub(crate) u32)`**
+  a master of the document
+
+- **`struct StyleRef(pub(crate) u32)`**
+  a style of the document
+
+- **`enum Owner`**
+  what holds a shape tree
+  - `Page(PageRef)` -- the shapes of a page
+  - `Master(MasterRef)` -- the shapes of a master
+
+- **`struct ShapeRef`**
+  a shape: its tree and its slot there
+  - `owner: Owner` -- the page or master
+  - `slot: u32` -- the slot in its tree
+
+- **`enum SheetRef`**
+  any ShapeSheet of the document
+  - `Document` -- the document sheet
+  - `Style(StyleRef)` -- a style sheet
+  - `Page(PageRef)` -- a page sheet
+  - `Master(MasterRef)` -- a master's page sheet
+  - `Shape(ShapeRef)` -- a shape's sheet
+
+- **`enum DocKind`**
+  what the document is
+  - `Drawing` -- a drawing (.vsdx, .vsdm)
+  - `Template` -- a template (.vstx, .vstm)
+  - `Stencil` -- a stencil: masters without pages (.vssx, .vssm)
+
+- **`struct DocSettings`**
+  the DocumentSettings element
+  - `top_page: Option<u32>` -- TopPage: the ID of the page shown first
+  - `default_text_style: Option<u32>` -- DefaultTextStyle: the style ID new text gets
+  - `default_line_style: Option<u32>` -- DefaultLineStyle
+  - `default_fill_style: Option<u32>` -- DefaultFillStyle
+  - `default_guide_style: Option<u32>` -- DefaultGuideStyle
+  - `attrs: Vec<(Sym, Sym)>` -- the other attributes in file order
+  - `items: Vec<(Sym, Sym)>` -- the child elements and their text in file order (GlueSettings, SnapSettings,
+    SnapExtensions, SnapAngles, DynamicGridEnabled, ProtectStyles ...)
+  - `extras: Extras` -- unknown items
+
+- **`struct ColorEntry`**
+  an entry of the old colour table (Colors): index -> RGB
+  - `ix: u32` -- IX
+  - `rgb: Sym` -- RGB as written ("#000000")
+
+- **`struct FaceName`**
+  a font of the document (FaceName), its attributes in file order (NameU, Panose ...)
+  - `attrs: Vec<(Sym, Sym)>` -- the attributes
+
+- **`struct DocSheet`**
+  the document's own ShapeSheet (DocumentSheet)
+  - `styles: StyleRefs` -- LineStyle, FillStyle, TextStyle
+  - `attrs: Vec<(Sym, Sym)>` -- the other attributes in file order (Name, NameU ...)
+  - `sheet: Sheet` -- the cells
+
+- **`struct Theme`**
+  a theme part, kept as read (typed later, JD11)
+  - `part: Sym` -- the part name (/visio/theme/theme1.xml)
+  - `data: Vec<u8>` -- its bytes
+
+- **`struct Part`**
+  a package part the model keeps as bytes: media, document properties, windows, comments,
+  data recordsets, the thumbnail, a macro project
+  - `name: Sym` -- the part name
+  - `content_type: Sym` -- its content type
+  - `rel_type: Sym` -- the type of the relationship that points to it
+  - `data: Vec<u8>` -- its bytes
+
+- **`enum DocError`**
+  why an object could not be put into the document
+  - `DuplicateId(u32)` -- another object of the same kind has this ID
+
+- **`struct Document`**
+  a drawing, template or stencil
+  - `kind: DocKind` -- drawing, template or stencil
+  - `macros: bool` -- whether the file is macro-enabled (.vsdm, .vssm, .vstm); macros are kept, never run
+  - `settings: DocSettings` -- DocumentSettings
+  - `colors: Vec<ColorEntry>` -- the old colour table
+  - `faces: Vec<FaceName>` -- the fonts
+  - `themes: Vec<Theme>` -- the theme parts (Page::theme indexes them)
+  - `parts: Vec<Part>` -- the other package parts, as bytes
+  - `attrs: Vec<(Sym, Sym)>` -- the attributes of the VisioDocument element
+  - `extras: Extras` -- unknown items of the VisioDocument element (EventList, HeaderFooter, PublishSettings ...
+    until they are typed)
+  - `pages_extras: Extras` -- unknown items of the Pages element
+  - `masters_extras: Extras` -- unknown items of the Masters element
+
+**`impl Document`**
+
+- **`fn new(kind: DocKind) -> Document`**
+  an empty document of this kind
+- **`fn strings(&self) -> &Strings`**
+  the string table
+- **`fn intern(&mut self, text: &str) -> Sym`**
+  the handle of a text, added when new
+- **`fn sym(&self, text: &str) -> Option<Sym>`**
+  the handle of a text the document already has
+- **`fn str(&self, sym: Sym) -> &str`**
+  the text of a handle
+- **`fn pages(&self) -> impl Iterator<Item = PageRef> + '_`**
+  the pages in document order (foreground and background)
+- **`fn foreground_pages(&self) -> impl Iterator<Item = PageRef> + '_`**
+  the foreground pages in document order
+- **`fn background_pages(&self) -> impl Iterator<Item = PageRef> + '_`**
+  the background pages in document order
+- **`fn page_count(&self) -> usize`**
+  the number of pages
+- **`fn page(&self, r: PageRef) -> Option<&Page>`**
+  a page
+- **`fn page_mut(&mut self, r: PageRef) -> Option<&mut Page>`**
+  a page for untracked changes (see the module comment)
+- **`fn page_by_id(&self, id: u32) -> Option<PageRef>`**
+  the page with this page ID
+- **`fn page_by_name_u(&self, name_u: &str) -> Option<PageRef>`**
+  the page with this universal name
+- **`fn page_position(&self, r: PageRef) -> Option<usize>`**
+  the position of a page in document order
+- **`fn background_of(&self, r: PageRef) -> Option<PageRef>`**
+  the background page of a page
+- **`fn insert_page(&mut self, page: Page) -> Result<PageRef, DocError>`**
+  add a page at the end (untracked)
+- **`fn unused_page_name(&self, prefix: &str) -> String`**
+  "&lt;prefix>-&lt;n>" with the smallest n no page has as Name or NameU
+- **`fn masters(&self) -> impl Iterator<Item = MasterRef> + '_`**
+  the masters in document order
+- **`fn master(&self, r: MasterRef) -> Option<&Master>`**
+  a master
+- **`fn master_mut(&mut self, r: MasterRef) -> Option<&mut Master>`**
+  a master for untracked changes
+- **`fn master_by_id(&self, id: u32) -> Option<MasterRef>`**
+  the master with this master ID
+- **`fn master_by_name_u(&self, name_u: &str) -> Option<MasterRef>`**
+  the master with this universal name
+- **`fn insert_master(&mut self, master: Master) -> Result<MasterRef, DocError>`**
+  add a master at the end (untracked)
+- **`fn styles(&self) -> impl Iterator<Item = StyleRef> + '_`**
+  the styles in document order
+- **`fn style(&self, r: StyleRef) -> Option<&Style>`**
+  a style
+- **`fn style_mut(&mut self, r: StyleRef) -> Option<&mut Style>`**
+  a style for untracked changes
+- **`fn style_by_id(&self, id: u32) -> Option<StyleRef>`**
+  the style with this style ID
+- **`fn style_by_name_u(&self, name_u: &str) -> Option<StyleRef>`**
+  the style with this universal name
+- **`fn insert_style(&mut self, style: Style) -> Result<StyleRef, DocError>`**
+  add a style at the end (untracked)
+- **`fn doc_sheet(&self) -> &DocSheet`**
+  the document's own ShapeSheet
+- **`fn doc_sheet_mut(&mut self) -> &mut DocSheet`**
+  the document sheet for untracked changes
+- **`fn sheet(&self, r: SheetRef) -> Option<&Sheet>`**
+  any sheet of the document
+- **`fn sheet_styles(&self, r: SheetRef) -> StyleRefs`**
+  the styles a sheet inherits from (a style: the styles it is based on)
+- **`fn tree(&self, owner: Owner) -> Option<&ShapeTree>`**
+  the shape tree of a page or master
+- **`fn shape(&self, r: ShapeRef) -> Option<Shape<'_>>`**
+  a shape and its links
+- **`fn shape_by_id(&self, owner: Owner, id: u32) -> Option<ShapeRef>`**
+  the shape with this file ID on a page or in a master
+- **`fn top_shapes(&self, owner: Owner) -> impl Iterator<Item = ShapeRef> + '_`**
+  the top-level shapes of a page or master in z-order
+- **`fn all_shapes(&self, owner: Owner) -> impl Iterator<Item = ShapeRef> + '_`**
+  every shape of a page or master, groups before their subshapes
+- **`fn master_shape_of(&self, r: ShapeRef) -> Option<ShapeRef>`**
+  the shape `r` inherits from: for an instance its master's master shape, for a
+  subshape of an instance the shape MasterShape names in the instance's master
+- **`fn master_of(&self, r: ShapeRef) -> Option<MasterRef>`**
+  the master an instance (or a subshape of one) belongs to
+- **`fn master_in_use(&self, id: u32) -> bool`**
+  whether any shape of the document is an instance of the master with this ID
+- **`fn master_depends_on(&self, a: u32, b: u32) -> bool`**
+  whether the master with ID `a` uses the master with ID `b` (itself or through instances
+  in its shapes, at any depth)
+- **`fn style_in_use(&self, id: u32) -> bool`**
+  whether any sheet, style or setting of the document names the style with this ID
+
+- **`struct Shape<'d>`**
+  a shape with access to its document (Document::shape)
+
+**`impl<'d> Shape<'d>`**
+
+- **`fn r(&self) -> ShapeRef`**
+  its handle
+- **`fn id(&self) -> u32`**
+  its file ID (unique on its page or in its master)
+- **`fn data(&self) -> &'d ShapeData`**
+  everything it holds itself
+- **`fn header(&self) -> &'d ShapeHeader`**
+  its attributes
+- **`fn sheet(&self) -> &'d Sheet`**
+  its own cells (without inheritance)
+- **`fn sheet_ref(&self) -> SheetRef`**
+  as a sheet reference
+- **`fn parent(&self) -> Option<ShapeRef>`**
+  the group it belongs to
+- **`fn children(&self) -> impl Iterator<Item = ShapeRef> + 'd`**
+  its subshapes in z-order
+- **`fn master_shape(&self) -> Option<ShapeRef>`**
+  the shape it inherits from (Document::master_shape_of)
+- **`fn is_deleted(&self) -> bool`**
+  whether the master's subshape is deleted here (Del="1")
+- **`fn text(&self) -> Option<&'d Text>`**
+  its text, from the master shape when it has none of its own
+- **`fn name_u(&self) -> String`**
+  the universal name: NameU, else derived ("Sheet.7", "&lt;master's NameU>.7")
+- **`fn name(&self) -> String`**
+  the shown name: Name, else NameU, else derived from the master's Name
+
+### `diagram_core/src/edit.rs`
+
+Source: [`lib/diagram_core/src/edit.rs`](../lib/diagram_core/src/edit.rs)
+
+```text
+edit -- changing a document in transactions that can be undone and redone (DM-02)
+
+  let mut tx = doc.transaction("Verschieben");      every edit goes through tx
+  tx.set_length(sheet, addr, 25.0, Unit::Millimeters)?;
+  tx.set_formula(sheet, addr, "Width*0.5")?;          ... add_shape, delete_row, add_page ...
+  let change = tx.commit();                           Option<Change>: None when nothing changed
+  (dropping tx without commit takes all its edits back)
+  change.undo(&mut doc) / change.redo(&mut doc)       -> bool
+  change.label() / merging(key) / merge(&next) / sheets()
+
+With ui::history (lib/ui/history.rs) the app wraps a Change in an Edit of its own (the orphan
+rule keeps the impl in the app; diagram_core does not depend on ui):
+
+  struct Step(Change);
+  impl Edit<Document> for Step {
+      fn apply(&mut self, d: &mut Document) { self.0.redo(d); }
+      fn revert(&mut self, d: &mut Document) { self.0.undo(d); }
+      fn label(&self) -> &str { self.0.label() }
+      fn merge(&mut self, next: &mut dyn Edit<Document>) -> bool {
+          next.value().and_then(|v| v.downcast_ref::<Step>()).is_some_and(|n| self.0.merge(&n.0))
+      }
+      fn value(&self) -> Option<&dyn core::any::Any> { Some(self) }
+  }
+  history.record(Box::new(Step(change)));            the change is already applied
+
+How undo works: inverse operations, not snapshots.  Each edit is broken into primitive steps
+on the smallest part it touches -- one cell, one row, one section, one shape's attributes,
+one shape subtree, one page, master or style -- and each step, when it runs, hands back the
+step that undoes it (a cell's old content, a removed subtree, an old position).  Undo runs the
+inverse steps backwards and collects their inverses for redo.  So a step costs memory and time
+in proportion to what it changes, whatever the size of the drawing: moving 1000 shapes keeps
+2000 cells, not 1000 sheets or the document.  Handles stay valid because slots are never
+reused and deleted shapes come back into their slots.  The steps address cells and rows by
+position, which holds because undo and redo replay them in exact reverse order on the state
+they left; an untracked change in between (the *_mut functions) breaks that, a step that no
+longer fits is refused (undo returns false) and the steps run before it are taken back; when
+even that fails the change is_broken and refuses from then on.  IDs, like slots, are never
+handed out twice (NoIds once a file used the largest one); a step that would give two pages,
+masters or styles one ID is refused.
+
+Structure keeps inheritance: a subshape of an instance stays in its instance, the master
+shape of a master in use stays its first top-level shape (InUse), an instance never goes into
+a master it depends on (Cycle).  delete_shapes deletes a selection in one pass.
+
+Formula and value stay a pair: set_formula keeps the old value and marks the cell stale for
+the engine (JD6), set_constant writes a value whose formula is the value itself, set_result
+is the engine's way to store a formula's result; GUARD(...) formulas refuse both unless
+forced (force_formula, force_constant).  Deleting an inherited row, section or subshape writes
+a Del="1" mark; restore_row and restore_section remove it again.
+```
+
+- **`enum EditError`**
+  why an edit was refused (the transaction keeps its earlier edits)
+  - `NoSheet` -- the sheet does not exist
+  - `NoShape` -- the shape does not exist
+  - `NoPage` -- the page does not exist
+  - `NoMaster` -- the master does not exist
+  - `NoStyle` -- the style does not exist
+  - `NoSection` -- the section does not exist for the sheet
+  - `NoRow` -- the row does not exist for the sheet
+  - `Deleted` -- the row or section is deleted here (Del="1"); restore it first
+  - `Guarded` -- GUARD protects the formula; force_formula / force_constant override it
+  - `Exists` -- it exists already
+  - `InUse` -- something still refers to it (instances of a master, users of a style)
+  - `Cycle` -- the change would make a cycle (background pages, styles, groups)
+  - `NotBackground` -- the page is not a background page
+  - `Invalid` -- the request does not fit the object
+  - `Stale` -- the document no longer matches (changed outside transactions)
+  - `NoIds` -- no free ID is left (a file used the largest ID, 4294967295)
+
+- **`struct Change`**
+  a committed transaction: one undo step
+
+**`impl Change`**
+
+- **`fn label(&self) -> &str`**
+  the label of the transaction ("Verschieben")
+- **`fn steps(&self) -> usize`**
+  the number of primitive steps
+- **`fn is_undone(&self) -> bool`**
+  whether it is undone now
+- **`fn is_broken(&self) -> bool`**
+  whether it stopped working: a step no longer fitted and what ran before could not be
+  taken back (only after untracked changes); undo and redo then refuse
+- **`fn merging(mut self, key: u32) -> Change`**
+  changes with the same non-zero key merge into one step (a drag)
+- **`fn merge_key(&self) -> u32`**
+  the merge key (0: none)
+- **`fn merge(&mut self, next: &Change) -> bool`**
+  take the following change into this one when both have the same non-zero key and
+  both are applied -> whether it did (the next change is then part of this step)
+- **`fn undo(&mut self, doc: &mut Document) -> bool`**
+  take the change back -> false when it is undone already or no longer fits the document
+  (then nothing changes)
+- **`fn redo(&mut self, doc: &mut Document) -> bool`**
+  do the change again -> false when it is applied or no longer fits
+- **`fn sheets(&self) -> Vec<SheetRef>`**
+  the sheets it touches, for recalculation: whose cells, rows, sections or attributes it
+  changes, shapes it adds or removes (of a removed group only the group), the page or
+  master sheet of changed Connect entries, added or removed pages, masters and styles, the
+  document sheet for the settings
+
+- **`struct Transaction<'d>`**
+  edits that become one undo step (Document::transaction)
+
+**`impl Document`**
+
+- **`fn transaction(&mut self, label: &str) -> Transaction<'_>`**
+  start a transaction; its edits become one undo step when committed
+
+**`impl<'d> Transaction<'d>`**
+
+- **`fn doc(&self) -> &Document`**
+  the document as it is now (with the edits so far)
+- **`fn intern(&mut self, s: &str) -> Sym`**
+  the handle of a text (cell names for addresses, values)
+- **`fn single(&mut self, cell: &str) -> CellAddr`**
+  the address of a single cell by name
+- **`fn named(&mut self, section: &str, row: &str, cell: &str) -> CellAddr`**
+  the address of a cell of a named row (User, Property, Hyperlink ...)
+- **`fn commit(mut self) -> Option<Change>`**
+  end the transaction -> the change to keep for undo (None: nothing changed)
+- **`fn rollback(self)`**
+  take every edit of the transaction back
+- **`fn set_formula(&mut self, sheet: SheetRef, addr: &CellAddr, formula: &str) -> Result<(), EditError>`**
+  give the cell a formula of its own; its value stays until the engine computes the new
+  one (the cell is stale until then)
+- **`fn force_formula(&mut self, sheet: SheetRef, addr: &CellAddr, formula: &str) -> Result<(), EditError>`**
+  set_formula also over a GUARD formula
+- **`fn set_constant(&mut self, sheet: SheetRef, addr: &CellAddr, value: Value, unit: Option<Unit>) -> Result<(), EditError>`**
+  set the cell to a constant: the value (internal units) is its formula, shown in `unit`
+- **`fn force_constant(&mut self, sheet: SheetRef, addr: &CellAddr, value: Value, unit: Option<Unit>) -> Result<(), EditError>`**
+  set_constant also over a GUARD formula
+- **`fn set_length(&mut self, sheet: SheetRef, addr: &CellAddr, value: f64, unit: Unit) -> Result<(), EditError>`**
+  set a length or angle given in `unit` (converted to internal units, shown in `unit`)
+- **`fn set_string(&mut self, sheet: SheetRef, addr: &CellAddr, value: &str) -> Result<(), EditError>`**
+  set a string constant (shown as STR)
+- **`fn inherit_cell(&mut self, sheet: SheetRef, addr: &CellAddr) -> Result<(), EditError>`**
+  remove the sheet's own cell: the cell inherits again ("Formel löschen")
+- **`fn set_result(&mut self, sheet: SheetRef, addr: &CellAddr, value: Value, error: Option<CellError>) -> Result<(), EditError>`**
+  (the engine) store the result of the cell's formula for this sheet; a cell that
+  inherits its formula gets an F="Inh" cell of its own
+- **`fn add_section(&mut self, sheet: SheetRef, name: &str) -> Result<SecKey, EditError>`**
+  add a section of the sheet's own -> its key (Geometry: the next free index); Exists
+  when the sheet has it already
+- **`fn delete_section(&mut self, sheet: SheetRef, sk: SecKey) -> Result<(), EditError>`**
+  delete a section: an inherited one gets a Del="1" mark, an own one goes
+- **`fn restore_section(&mut self, sheet: SheetRef, sk: SecKey) -> Result<(), EditError>`**
+  remove the Del="1" mark of an inherited section: it is inherited again
+- **`fn add_row(&mut self, sheet: SheetRef, sk: SecKey, key: Option<RowKey>, kind: Option<&str>) -> Result<RowKey, EditError>`**
+  add a row of the sheet's own to a section (made when missing) -> its key; `key` None:
+  the next index (Geometry from 1, other indexed sections from 0); `kind` the row type
+  (Geometry: "LineTo" ...)
+- **`fn delete_row(&mut self, sheet: SheetRef, sk: SecKey, key: RowKey) -> Result<(), EditError>`**
+  delete a row: an inherited one gets a Del="1" mark (its own cells go), an own one goes
+- **`fn restore_row(&mut self, sheet: SheetRef, sk: SecKey, key: RowKey) -> Result<(), EditError>`**
+  remove the Del="1" mark of an inherited row: it is inherited again
+- **`fn set_user(&mut self, sheet: SheetRef, name: &str, value: Value, unit: Option<Unit>) -> Result<(), EditError>`**
+  set a user-defined cell (User.&lt;name>.Value) to a constant, adding the row when missing
+- **`fn set_user_formula(&mut self, sheet: SheetRef, name: &str, formula: &str) -> Result<(), EditError>`**
+  give a user-defined cell a formula, adding the row when missing
+- **`fn set_shape_data(&mut self, sheet: SheetRef, name: &str, label: &str, value: Value) -> Result<(), EditError>`**
+  set a shape data field (Prop.&lt;name>): its label and value, adding the row when missing
+- **`fn set_hyperlink(&mut self, sheet: SheetRef, name: &str, address: &str, sub_address: &str, description: &str) -> Result<(), EditError>`**
+  add or change a hyperlink (Hyperlink.&lt;name>): address, sub-address, description
+- **`fn add_layer(&mut self, page: PageRef, name: &str, name_univ: &str) -> Result<u32, EditError>`**
+  add a layer to a page -> its index; visible, printed, snapping and gluing, not locked
+- **`fn set_layers(&mut self, shape: ShapeRef, layers: &[u32]) -> Result<(), EditError>`**
+  put a shape on these layers (LayerMember; empty: on none)
+- **`fn delete_layer(&mut self, page: PageRef, ix: u32) -> Result<(), EditError>`**
+  delete a layer of a page; shapes on it leave it (their own LayerMember cells), the
+  shapes themselves stay (LY-04 asks the user first and deletes them before)
+- **`fn add_shape(&mut self, owner: Owner, parent: Option<ShapeRef>, kind: ShapeKind) -> Result<ShapeRef, EditError>`**
+  add an empty shape on a page or in a master, on top of its siblings -> its handle; a
+  parent that is not a group becomes one
+- **`fn add_shape_with(&mut self, owner: Owner, parent: Option<ShapeRef>, data: ShapeData) -> Result<ShapeRef, EditError>`**
+  add a shape with its attributes and cells (the ID is the tree's next one)
+- **`fn add_instance(&mut self, owner: Owner, master: MasterRef, pin_x: f64, pin_y: f64) -> Result<ShapeRef, EditError>`**
+  drop an instance of a master on a page (MS-02): a shape that inherits everything from
+  the master shape and sets only its pin, with subshapes for the master's subshapes
+  -> the instance; its Name is the caller's (LG-04: the name in the current language)
+- **`fn delete_shape(&mut self, shape: ShapeRef) -> Result<(), EditError>`**
+  delete a shape with its subshapes and the glue records of them; a subshape the master
+  passes on gets a Del="1" mark instead
+- **`fn delete_shapes(&mut self, shapes: &[ShapeRef]) -> Result<(), EditError>`**
+  delete several shapes in one go (a selection): the glue records are searched once, not
+  once per shape; shapes inside another one of the list go with it.  The master shape of a
+  master in use cannot be deleted (InUse: its instances would inherit from another shape)
+- **`fn undelete_shape(&mut self, shape: ShapeRef) -> Result<(), EditError>`**
+  bring a deleted subshape of an instance back (remove its Del="1" mark)
+- **`fn move_shape(&mut self, shape: ShapeRef, parent: Option<ShapeRef>, pos: Option<usize>) -> Result<(), EditError>`**
+  move a shape in the z-order or into another group of the same tree: under `parent`
+  (None: top level) at `pos` (None: on top); a parent that is not a group becomes one.
+  Coordinates stay as they are (re-grouping with transforms is the canvas's work, JD7)
+- **`fn bring_to_front(&mut self, shape: ShapeRef) -> Result<(), EditError>`**
+  put a shape on top of its siblings
+- **`fn send_to_back(&mut self, shape: ShapeRef) -> Result<(), EditError>`**
+  put a shape below its siblings
+- **`fn bring_forward(&mut self, shape: ShapeRef) -> Result<(), EditError>`**
+  move a shape one step up among its siblings
+- **`fn send_backward(&mut self, shape: ShapeRef) -> Result<(), EditError>`**
+  move a shape one step down among its siblings
+- **`fn set_shape_names(&mut self, shape: ShapeRef, name: Option<&str>, name_u: Option<&str>) -> Result<(), EditError>`**
+  set a shape's Name and NameU (None: derived again)
+- **`fn set_shape_styles(&mut self, shape: ShapeRef, styles: StyleRefs) -> Result<(), EditError>`**
+  set the styles a shape inherits from (LineStyle, FillStyle, TextStyle)
+- **`fn set_shape_header(&mut self, shape: ShapeRef, header: ShapeHeader) -> Result<(), EditError>`**
+  set a shape's attributes as a whole (kind, names, references)
+- **`fn set_text(&mut self, shape: ShapeRef, text: Option<Text>) -> Result<(), EditError>`**
+  set a shape's own text (None: inherited from the master shape again)
+- **`fn set_foreign(&mut self, shape: ShapeRef, foreign: Option<ForeignData>) -> Result<(), EditError>`**
+  set the picture data of a Foreign shape
+- **`fn add_connect(&mut self, owner: Owner, connect: Connect) -> Result<(), EditError>`**
+  add a Connect entry on a page or in a master
+- **`fn remove_connect(&mut self, owner: Owner, index: usize) -> Result<(), EditError>`**
+  remove the Connect entry at `index`
+- **`fn add_page(&mut self, name: &str, name_u: &str, background: bool, pos: Option<usize>) -> Result<PageRef, EditError>`**
+  add a page (foreground or background) at `pos` in document order (None: at the end)
+  with the next free page ID -> its handle
+- **`fn delete_page(&mut self, page: PageRef) -> Result<(), EditError>`**
+  delete a page; pages that had it as background lose that background, TopPage moves to
+  the first remaining foreground page
+- **`fn move_page(&mut self, page: PageRef, pos: usize) -> Result<(), EditError>`**
+  move a page to `pos` in document order
+- **`fn rename_page(&mut self, page: PageRef, name: &str, name_u: &str) -> Result<(), EditError>`**
+  rename a page (Name and NameU)
+- **`fn set_page_header(&mut self, page: PageRef, header: PageHeader) -> Result<(), EditError>`**
+  set the page's attributes as a whole
+- **`fn set_background(&mut self, page: PageRef, back: Option<PageRef>) -> Result<(), EditError>`**
+  give a page a background page (None: none); the background must be a background page
+  and the chain of backgrounds must not lead back to the page
+- **`fn set_page_theme(&mut self, page: PageRef, theme: Option<u32>) -> Result<(), EditError>`**
+  set the theme of a page (an index into Document::themes, None: none)
+- **`fn add_master(&mut self, name: &str, name_u: &str) -> Result<MasterRef, EditError>`**
+  add an empty master with the next free master ID -> its handle (add shapes with
+  add_shape(Owner::Master(..)))
+- **`fn delete_master(&mut self, master: MasterRef) -> Result<(), EditError>`**
+  delete a master that no shape uses (InUse otherwise)
+- **`fn rename_master(&mut self, master: MasterRef, name: &str, name_u: &str) -> Result<(), EditError>`**
+  rename a master (Name and NameU)
+- **`fn set_master_header(&mut self, master: MasterRef, header: MasterHeader) -> Result<(), EditError>`**
+  set the master's attributes as a whole
+- **`fn add_style(&mut self, name: &str, name_u: &str, based_on: StyleRefs) -> Result<StyleRef, EditError>`**
+  add a style with the next free style ID, based on `based_on` -> its handle
+- **`fn delete_style(&mut self, style: StyleRef) -> Result<(), EditError>`**
+  delete a style nothing refers to (InUse otherwise)
+- **`fn rename_style(&mut self, style: StyleRef, name: &str, name_u: &str) -> Result<(), EditError>`**
+  rename a style (Name and NameU)
+- **`fn set_based_on(&mut self, style: StyleRef, based_on: StyleRefs) -> Result<(), EditError>`**
+  set the styles a style is based on (Cycle when a chain would lead back to it)
+- **`fn update_settings(&mut self, f: impl FnOnce(&mut DocSettings)) -> Result<(), EditError>`**
+  change the document settings (snap, glue, protection, default styles ...)
+
+### `diagram_core/src/inherit.rs`
+
+Source: [`lib/diagram_core/src/inherit.rs`](../lib/diagram_core/src/inherit.rs)
+
+```text
+inherit -- reading cells with inheritance: shape -> master shape -> styles -> default
+
+  doc.resolve(sheet, &addr) -> Resolved   the formula's origin and source cell, the value
+  doc.rows(sheet, sec) -> Vec<EffRow>     the rows a section really has: inherited ones,
+                                          overridden ones and own ones, minus deleted ones
+  doc.section_indices(sheet, name)        which Geometry sections (indices) a shape has
+  doc.parent_sheet(sheet, category)       the next sheet on the way up
+
+The way up from a sheet (FX-03, MS-10, [MS-VSDX] Style-to-Shape Inheritance):
+* a shape asks first its own style of the cell's category when it names one itself
+  (LineStyle for line cells, FillStyle for fill and effect cells, TextStyle for text);
+* otherwise the master shape (instances and their subshapes); the master shape then follows
+  the same rules, so its styles come after it;
+* a shape without master asks its style of the category, cells without category end there;
+* a style asks the style it is based on for that category; pages, masters' pages and the
+  document ask their LineStyle/FillStyle/TextStyle;
+* at the end the cell has its default (Origin::Default; the document's "No Style" style is
+  normally the last style of every chain and holds real values).
+A cell with F="Inh" on the way gives the value (its sheet's own result) but not the formula;
+the search goes on for the formula.  A row or section with Del="1" on the way ends the
+search: Origin::Deleted.  Rows are matched by IX or N, sections by name and index.  The way
+is at most 64 sheets long (a cycle of styles or masters in a broken file ends there).
+```
+
+- **`struct Resolved<'d>`**
+  a cell read with inheritance
+  - `origin: Origin` -- where the formula comes from
+  - `source: Option<SheetRef>` -- the sheet whose cell holds the formula (None: default or deleted)
+  - `cell: Option<&'d Cell>` -- that cell
+  - `cached: Option<&'d Cell>` -- the nearest cell on the way, which holds the value for the asked sheet (an F="Inh"
+    cell of the sheet itself, else the source cell)
+
+**`impl<'d> Resolved<'d>`**
+
+- **`fn value(&self) -> Value`**
+  the value for the asked sheet
+- **`fn num(&self) -> Option<f64>`**
+  the value as a number
+- **`fn formula(&self) -> Formula`**
+  the formula (Formula::Absent when the source cell is a constant or there is none)
+- **`fn unit(&self) -> Option<Unit>`**
+  the unit the value is shown in
+- **`fn error(&self) -> Option<Sym>`**
+  the error state of the value
+- **`fn exists(&self) -> bool`**
+  whether the cell exists for the sheet (not default, not deleted)
+
+- **`struct EffRow`**
+  a row a section really has (Document::rows)
+  - `key: RowKey` -- IX or N
+  - `kind: Option<Sym>` -- the row type (T), from the nearest sheet that names it
+  - `origin: Origin` -- where the row comes from: Local when only the asked sheet has it
+  - `local: bool` -- whether the asked sheet has an entry for it (own row or override)
+
+**`impl Document`**
+
+- **`fn category(&self, addr: &CellAddr) -> Option<Category>`**
+  the category of the cell at `addr` (which style it inherits from)
+- **`fn parent_sheet(&self, sheet: SheetRef, cat: Option<Category>) -> Option<SheetRef>`**
+  the next sheet up from `sheet` for a cell of this category
+- **`fn resolve(&self, sheet: SheetRef, addr: &CellAddr) -> Resolved<'_>`**
+  the cell at `addr` for `sheet`, with inheritance
+- **`fn value_of(&self, sheet: SheetRef, cell: &str) -> Value`**
+  the value of a single cell (PinX, Width ...) for `sheet`, with inheritance
+- **`fn rows(&self, sheet: SheetRef, sec: SecKey) -> Vec<EffRow>`**
+  the rows section `sec` really has for `sheet`: inherited, overridden and own rows
+  without the deleted ones; indexed rows by rising index, named rows in the order the
+  master shape or style has them, then the own ones
+- **`fn has_row(&self, sheet: SheetRef, sec: SecKey, key: RowKey) -> bool`**
+  whether section `sec` has row `key` for `sheet` (inherited or own, not deleted)
+- **`fn section_indices(&self, sheet: SheetRef, name: Sym) -> Vec<u32>`**
+  the indices of the sections named `name` that `sheet` really has (Geometry1 is 0)
+- **`fn has_section(&self, sheet: SheetRef, sec: SecKey) -> bool`**
+  whether `sheet` has section `sec` (inherited or own, not deleted)
+- **`fn is_guarded(&self, sheet: SheetRef, addr: &CellAddr) -> bool`**
+  whether the effective formula at `addr` is guarded (GUARD(...) at its top): edits of
+  the user leave it alone (FX-04; the engine of JD6 knows the rest)
+- **`fn geometry(&self, sheet: SheetRef) -> Vec<SecKey>`**
+  the Geometry sections of a sheet as keys
+
+- **`fn guarded(formula: &str) -> bool`**
+  whether a formula text is GUARD(...) as a whole
+
+### `diagram_core/src/names.rs`
+
+Source: [`lib/diagram_core/src/names.rs`](../lib/diagram_core/src/names.rs)
+
+```text
+names -- the section, row and cell names the model itself refers to, and the style categories
+
+  names::PIN_X ...                 (crate) fixed Syms: every Strings table starts with them
+  Category::of(section, cell)      which style a cell inherits from: line, fill (with the
+                                   effects) or text; None: only from the master shape
+
+The categories follow the public format description [MS-VSDX] ("Style-to-Shape Inheritance",
+"Line Properties", "Fill Properties", "Effect Properties", "Text"): LineStyle carries the
+line cells and the LineGradient section, FillStyle the fill and effect cells and the
+FillGradient section, TextStyle the Character, Paragraph and Tabs sections and the text block
+cells.
+```
+
+- **`enum Category`**
+  which style sheet a cell inherits from (the style attributes LineStyle, FillStyle, TextStyle)
+  - `Line` -- LineStyle: line cells and the LineGradient section
+  - `Fill` -- FillStyle: fill and effect cells (shadow, bevel, glow, reflection, soft edges, sketch,
+    3D rotation) and the FillGradient section
+  - `Text` -- TextStyle: the Character, Paragraph and Tabs sections and the text block cells
+
+**`impl Category`**
+
+- **`fn of(section: Option<&str>, cell: &str) -> Option<Category>`**
+  the category of a cell; `section` is the name of its section (None: a single cell)
+- **`fn of_section(section: &str) -> Option<Category>`**
+  the category of a whole section (None: rows come only from the master shape)
+
+- **`fn named_rows(section: &str) -> bool`**
+  whether rows of this section are named (N) rather than indexed (IX), after [MS-VSDX] Row_Type
+
+### `diagram_core/src/page.rs`
+
+Source: [`lib/diagram_core/src/page.rs`](../lib/diagram_core/src/page.rs)
+
+```text
+page -- pages, masters and styles: the containers of sheets and shapes
+
+  Page { header, sheet, shapes, connects, theme, extras, contents_extras, part }
+  PageHeader { id, name, name_u, background, back_page, sheet_styles, attrs ... }
+  Master { header, sheet, icon, shapes, connects, extras, contents_extras, part }
+  MasterHeader { id, name, name_u, base_id, unique_id, sheet_styles, attrs ... }
+  Style { header, sheet, extras }  StyleHeader { id, name, name_u, based_on, attrs ... }
+  Connect { from_sheet, from_cell, from_part, to_sheet, to_cell, to_part }
+  attr(&attrs, name) -> Option<Sym>   one of the attributes kept as written
+
+A foreground page names its background page by the background's page ID (back_page); a
+background page can have one of its own.  A master's content is a page of its own with
+shapes; a stencil is a document of masters without pages.  The attributes the model works
+with are fields, every other attribute stays in `attrs` in file order (ViewScale,
+ViewCenterX, Prompt, IconSize, PatternFlags ...), read with attr().
+Connect rows are the file's record of glue (CN-15): which cell of which shape (FromSheet,
+FromCell, FromPart) is glued to which part of which other shape (ToSheet, ToCell, ToPart);
+the sheets are shape IDs of the same page or master.
+```
+
+- **`fn attr(attrs: &[(Sym, Sym)], name: Sym) -> Option<Sym>`**
+  the value of an attribute kept as written
+
+- **`struct Connect`**
+  a Connect entry
+  - `from_sheet: u32` -- FromSheet: the ID of the glued shape (a connector, a callout)
+  - `from_cell: Option<Sym>` -- FromCell: its glued cell (BeginX, EndX, Controls.Row_1 ...)
+  - `from_part: Option<i32>` -- FromPart as written
+  - `to_sheet: u32` -- ToSheet: the ID of the shape it is glued to
+  - `to_cell: Option<Sym>` -- ToCell: the cell glued to (Connections.X1, PinX ...)
+  - `to_part: Option<i32>` -- ToPart as written
+  - `extras: Extras` -- unknown items
+
+- **`struct PageHeader`**
+  the attributes of a page (and of its PageSheet element)
+  - `id: u32` -- ID: unique among the pages of the document
+  - `name: Option<Sym>` -- Name: the language-dependent name ("Zeichenblatt-1")
+  - `name_u: Option<Sym>` -- NameU: the universal name ("Page-1")
+  - `is_custom_name: Option<bool>` -- IsCustomName as written
+  - `is_custom_name_u: Option<bool>` -- IsCustomNameU as written
+  - `background: bool` -- Background="1": a background page
+  - `back_page: Option<u32>` -- BackPage: the ID of this page's background page
+  - `sheet_styles: StyleRefs` -- LineStyle, FillStyle, TextStyle of the PageSheet element
+  - `attrs: Vec<(Sym, Sym)>` -- the other attributes of the Page element in file order
+
+- **`struct Page`**
+  a foreground or background page
+  - `header: PageHeader` -- the attributes
+  - `sheet: Sheet` -- the page's ShapeSheet (size, scale, layout, print, layers in the Layer section)
+  - `shapes: ShapeTree` -- the shapes on the page
+  - `connects: Vec<Connect>` -- the glue records
+  - `theme: Option<u32>` -- the theme of the page (an index into Document::themes)
+  - `extras: Extras` -- unknown items of the Page element (in pages.xml)
+  - `contents_extras: Extras` -- unknown items of the PageContents element (the page's own part)
+  - `part: Option<Sym>` -- the name of the page's part as read (None: a new page)
+
+**`impl Page`**
+
+- **`fn new(header: PageHeader) -> Page`**
+  an empty page with this header
+
+- **`struct MasterHeader`**
+  the attributes of a master (and of its PageSheet element)
+  - `id: u32` -- ID: unique among the masters of the document
+  - `name: Option<Sym>` -- Name: the language-dependent name
+  - `name_u: Option<Sym>` -- NameU: the universal name; with BaseID the key for matching masters (LG-04, MS-02)
+  - `is_custom_name: Option<bool>` -- IsCustomName as written
+  - `is_custom_name_u: Option<bool>` -- IsCustomNameU as written
+  - `base_id: Option<Sym>` -- BaseID: the GUID of the master's origin
+  - `unique_id: Option<Sym>` -- UniqueID: the GUID of this master's version
+  - `sheet_styles: StyleRefs` -- LineStyle, FillStyle, TextStyle of the PageSheet element
+  - `attrs: Vec<(Sym, Sym)>` -- the other attributes of the Master element in file order (Prompt, Hidden, IconSize ...)
+
+- **`struct Master`**
+  a master: a template shape with its own page
+  - `header: MasterHeader` -- the attributes
+  - `sheet: Sheet` -- the master page's ShapeSheet
+  - `icon: Option<Sym>` -- the icon as written (base64 text of the Icon element)
+  - `shapes: ShapeTree` -- the master's shapes; the first top-level shape is the master shape of instances
+  - `connects: Vec<Connect>` -- glue records inside the master
+  - `extras: Extras` -- unknown items of the Master element (in masters.xml)
+  - `contents_extras: Extras` -- unknown items of the MasterContents element
+  - `part: Option<Sym>` -- the name of the master's part as read
+
+**`impl Master`**
+
+- **`fn new(header: MasterHeader) -> Master`**
+  an empty master with this header
+- **`fn master_shape(&self) -> Option<u32>`**
+  the slot of the shape instances inherit from (the first top-level shape)
+
+- **`struct StyleHeader`**
+  the attributes of a style sheet
+  - `id: u32` -- ID: unique among the styles (0 is "No Style")
+  - `name: Option<Sym>` -- Name: the language-dependent name
+  - `name_u: Option<Sym>` -- NameU: the universal name
+  - `is_custom_name: Option<bool>` -- IsCustomName as written
+  - `is_custom_name_u: Option<bool>` -- IsCustomNameU as written
+  - `based_on: StyleRefs` -- LineStyle, FillStyle, TextStyle: the styles this one is based on
+  - `attrs: Vec<(Sym, Sym)>` -- the other attributes in file order
+
+- **`struct Style`**
+  a style sheet (Formatvorlage)
+  - `header: StyleHeader` -- the attributes
+  - `sheet: Sheet` -- its cells
+  - `extras: Extras` -- unknown items of the StyleSheet element
+
+### `diagram_core/src/shape.rs`
+
+Source: [`lib/diagram_core/src/shape.rs`](../lib/diagram_core/src/shape.rs)
+
+```text
+shape -- shapes and their tree on a page or in a master
+
+  ShapeData { header, sheet, text, foreign, data, extras }   one shape without its children
+  ShapeHeader                     the attributes: Type, ID-based references (Master,
+                                  MasterShape, LineStyle, FillStyle, TextStyle), Name, NameU,
+                                  Del and what else stood there
+  ShapeKind                       Shape, Group, Foreign, Guide
+  StyleRefs { line, fill, text }  the style IDs of a shape, page sheet or style (based on)
+  Text / TextItem                 the shape text: characters between cp, pp, tp and fld marks
+  ForeignData                     picture data of a Foreign shape (inline or a package part)
+  ShapeTree                       the shapes of a page or master: slots, IDs, z-order
+    tree.insert(parent, id, data) -> slot     (untracked; loaders build trees with it)
+    tree.get(slot) / by_id(id) / top() / children(slot) / parent(slot) / iter()
+
+A shape lives in a slot of its tree; the slot is its handle (ShapeRef) and never changes,
+even when the shape is deleted and the deletion undone.  Slots are not reused.  The file's
+shape ID is unique per page or master (by_id, a BTreeMap: thousands of shapes, no linear
+search).  Children are kept in z-order, the last one on top.
+```
+
+- **`enum ShapeKind`**
+  the shape type (attribute Type)
+  - `Shape` -- Shape: a shape with geometry
+  - `Group` -- Group: has subshapes
+  - `Foreign` -- Foreign: shows its ForeignData (a picture, a metafile, an OLE object's image)
+  - `Guide` -- Guide: a guide line or guide point, not shown
+  - `Unspecified` -- no Type attribute (the deleted subshapes of an instance)
+  - `Other(Sym)` -- a type the crate does not know, as written
+
+**`impl ShapeKind`**
+
+- **`fn parse(text: &str, strings: &mut Strings) -> ShapeKind`**
+  the kind of a Type attribute
+- **`fn as_str(self) -> Option<&'static str>`**
+  the Type attribute (None: Unspecified or Other, whose Sym holds it)
+
+- **`struct StyleRefs`**
+  the style IDs a sheet inherits from (LineStyle, FillStyle, TextStyle); for a style these
+  are the styles it is based on
+  - `line: Option<u32>` -- LineStyle
+  - `fill: Option<u32>` -- FillStyle
+  - `text: Option<u32>` -- TextStyle
+
+**`impl StyleRefs`**
+
+- **`const fn all(id: u32) -> StyleRefs`**
+  all three the same style
+- **`fn get(&self, cat: Category) -> Option<u32>`**
+  the style of a category
+- **`fn uses(&self, id: u32) -> bool`**
+  whether `id` is one of the three
+
+- **`struct ShapeHeader`**
+  the attributes of a shape
+  - `kind: ShapeKind` -- Type
+  - `name: Option<Sym>` -- Name: the language-dependent name (shown); None: derived (Shape::name)
+  - `name_u: Option<Sym>` -- NameU: the universal name (key for formulas and matching); None: derived
+  - `is_custom_name: Option<bool>` -- IsCustomName as written
+  - `is_custom_name_u: Option<bool>` -- IsCustomNameU as written
+  - `master: Option<u32>` -- Master: the ID of the master this shape is an instance of
+  - `master_shape: Option<u32>` -- MasterShape: the ID of the shape in the master that this subshape inherits from
+  - `styles: StyleRefs` -- LineStyle, FillStyle, TextStyle
+  - `del: bool` -- Del="1": the subshape the master passes on is deleted here
+  - `original_id: Option<u32>` -- OriginalID as written
+  - `unique_id: Option<Sym>` -- UniqueID as written
+
+- **`enum TextItem`**
+  one item of a shape text
+  - `Chars(Box<str>)` -- characters
+  - `Cp(u32)` -- cp IX: from here on the Character row IX applies
+  - `Pp(u32)` -- pp IX: from here on the Paragraph row IX applies
+  - `Tp(u32)` -- tp IX: from here on the Tabs row IX applies
+  - `Field(u32)` -- fld IX: the text field of Field row IX
+  - `Other(Sym)` -- an element the crate does not know, as XML text
+
+- **`struct Text`**
+  the text of a shape (element Text)
+  - `items: Vec<TextItem>` -- characters and marks in file order
+  - `extras: Extras` -- unknown attributes of the Text element
+
+**`impl Text`**
+
+- **`fn plain(text: &str) -> Text`**
+  a text of plain characters
+- **`fn chars(&self) -> String`**
+  the characters without marks (fields left out)
+
+- **`enum ForeignPayload`**
+  where the picture of a Foreign shape is
+  - `None` -- none
+  - `Inline(Box<str>)` -- inline, base64 as written
+  - `Part(Sym)` -- a part of the package (its name, e.g. /visio/media/image1.png)
+
+- **`struct ForeignData`**
+  the picture data of a Foreign shape (element ForeignData)
+  - `attrs: Vec<(Sym, Sym)>` -- the attributes in file order (ForeignType, CompressionType, ObjectWidth ...)
+  - `payload: ForeignPayload` -- the data
+  - `extras: Extras` -- unknown children
+
+- **`struct ShapeData`**
+  one shape without its subshapes
+  - `header: ShapeHeader` -- the attributes
+  - `sheet: Sheet` -- the ShapeSheet: only what the shape sets itself, the rest is inherited
+  - `text: Option<Box<Text>>` -- the text; None: inherited from the master shape (or none)
+  - `foreign: Option<Box<ForeignData>>` -- the picture of a Foreign shape
+  - `data: [Option<Sym>; 3]` -- Data1, Data2, Data3 as written
+  - `extras: Extras` -- unknown items of the Shape element
+
+**`impl ShapeData`**
+
+- **`fn new(kind: ShapeKind) -> ShapeData`**
+  a shape of this kind with nothing set
+
+- **`enum TreeError`**
+  why a shape could not be put into a tree
+  - `DuplicateId(u32)` -- another shape of the tree has this ID
+  - `NoParent` -- the parent slot holds no shape
+
+- **`struct ShapeTree`**
+  the shapes of a page or a master
+
+**`impl ShapeTree`**
+
+- **`fn new() -> ShapeTree`**
+  an empty tree; new shapes get IDs from 4 on ([MS-VSDX] ShapeSheet_Type: an ID is at least 4)
+- **`fn insert(&mut self, parent: Option<u32>, id: u32, data: ShapeData) -> Result<u32, TreeError>`**
+  add a shape with its file ID under `parent` (None: top level), on top of its siblings
+  -> its slot (untracked: no undo step; loaders build trees with it)
+- **`fn get(&self, slot: u32) -> Option<&ShapeData>`**
+  the shape in a slot
+- **`fn id(&self, slot: u32) -> Option<u32>`**
+  the file ID of the shape in a slot
+- **`fn by_id(&self, id: u32) -> Option<u32>`**
+  the slot of the shape with this file ID
+- **`fn top(&self) -> &[u32]`**
+  the top-level shapes in z-order (bottom first)
+- **`fn children(&self, slot: u32) -> &[u32]`**
+  the subshapes of a shape in z-order
+- **`fn parent(&self, slot: u32) -> Option<u32>`**
+  the group a shape belongs to (None: top level or no shape)
+- **`fn len(&self) -> usize`**
+  the number of shapes (all levels)
+- **`fn is_empty(&self) -> bool`**
+  whether the tree has no shapes
+- **`fn next_id(&self) -> Option<u32>`**
+  the ID the next new shape gets (None: the tree has had the ID 4294967295, no new IDs)
+- **`fn iter(&self) -> TreeIter<'_>`**
+  every shape slot, each group before its subshapes, in z-order
+- **`fn is_within(&self, mut slot: u32, ancestor: u32) -> bool`**
+  whether `slot` is `ancestor` or lies inside it
+
+- **`struct TreeIter<'a>`**
+  the slots of a tree, groups before their subshapes (ShapeTree::iter)
+
+### `diagram_core/src/sheet.rs`
+
+Source: [`lib/diagram_core/src/sheet.rs`](../lib/diagram_core/src/sheet.rs)
+
+```text
+sheet -- the ShapeSheet store: sheets of single cells and sections of rows (decision V1)
+
+  Sheet { cells, sections, triggers, extras }    a shape's, page's, master's, style's or the
+                                                 document's cells
+  Section { name, index, del, cells, rows, ... }  Geometry1..n (index), Character, User ...
+  Row { key, kind, del, cells, ... }             RowKey::Index(ix) or RowKey::Named(name)
+  CellAddr::single(c) / section(s, c) / row(s, r, c)   where a cell sits in a sheet
+  SecKey { name, index }                         a section: Geometry has index 0, 1, 2 ...,
+                                                 every other section index 0
+  sheet.cell(name) / section(key) / find(addr)   plain lookups, no inheritance (inherit.rs)
+  Extras / Extra / Place / ExtraItem             what the file had and the model does not
+                                                 know (DF-03), at the place it stood
+
+Rows of the sections User, Property, Actions, Control, Hyperlink and ActionTag are named (N),
+the others indexed (IX); IX may be missing in the file, then the row's position counts
+(`ix_written` remembers which).  `del` is the file's Del="1": the row or section a master shape
+or style would pass on is deleted here.  Cells keep the file's order.
+
+Extras: diagram_io fills them while reading (JD3) and writes them back at their place (JD5):
+unknown attributes of the element, unknown child elements and text after the n-th known
+child, and what stood inside a cell (RefBy, text) by the cell's position.  The model never
+looks into them.
+```
+
+- **`enum Place`**
+  where an unknown item stood
+  - `Element` -- an attribute of the element itself
+  - `AfterChild(u32)` -- a child after this many known children (0: before the first)
+  - `InCell(u32)` -- inside the element's cell at this position (attributes, RefBy, text)
+
+- **`enum ExtraItem`**
+  an unknown attribute, element or text
+  - `Attribute { name: Sym, value: Sym, }` -- name="value" (the name with its prefix as written)
+  - `Element(Sym)` -- an element with everything inside it, as XML text
+  - `Text(Sym)` -- character data
+
+- **`struct Extra`**
+  one unknown item and its place
+  - `place: Place` -- where it stood
+  - `item: ExtraItem` -- what it was
+
+- **`struct Extras(Option<Box<Vec<Extra>>>)`**
+  the unknown items of one element (nothing allocated while there are none)
+
+**`impl Extras`**
+
+- **`const fn new() -> Self`**
+  none
+- **`fn push(&mut self, extra: Extra)`**
+  add one item
+- **`fn items(&self) -> &[Extra]`**
+  the items in the order they were added
+- **`fn is_empty(&self) -> bool`**
+  whether there are none
+
+- **`struct Trigger`**
+  an update trigger (Trigger N="..." with its RefBy children kept as XML)
+  - `name: Sym` -- the trigger name (N)
+  - `inner: Sym` -- its children as XML text (Sym::EMPTY: none)
+
+- **`enum RowKey`**
+  how a row is identified in its section
+  - `Index(u32)` -- IX (rows of Geometry, Character, Connection ...)
+  - `Named(Sym)` -- N (rows of User, Property, Hyperlink ...)
+
+- **`struct SecKey`**
+  how a section is identified in its sheet: Geometry by index, every other section index 0
+  - `name: Sym` -- the section name (N)
+  - `index: u32` -- IX of the section (0-based; only Geometry has several)
+
+**`impl SecKey`**
+
+- **`const fn one(name: Sym) -> SecKey`**
+  a section that exists once per sheet
+
+- **`struct CellAddr`**
+  where a cell sits in a sheet
+  - `section: Option<SecKey>` -- None: a single cell of the sheet
+  - `row: Option<RowKey>` -- None: a cell of the section itself (Geometry's NoFill ...)
+  - `cell: Sym` -- the cell name
+
+**`impl CellAddr`**
+
+- **`const fn single(cell: Sym) -> CellAddr`**
+  a single cell (PinX, Width ...)
+- **`const fn section(section: SecKey, cell: Sym) -> CellAddr`**
+  a cell of a section itself (Geometry1.NoFill)
+- **`const fn row(section: SecKey, row: RowKey, cell: Sym) -> CellAddr`**
+  a cell of a row (Geometry1.X2, Prop.Name.Value)
+
+- **`struct Row`**
+  a row of a section
+  - `key: RowKey` -- IX or N
+  - `ix_written: bool` -- whether IX stood in the file (false: the position gave the index)
+  - `local_name: Option<Sym>` -- the language-dependent name (LocalName)
+  - `kind: Option<Sym>` -- the row type (T): MoveTo, LineTo ... in Geometry; None: inherited or none
+  - `del: bool` -- Del="1": the inherited row is deleted here
+  - `cells: Vec<Cell>` -- the cells in file order
+  - `triggers: Vec<Trigger>` -- update triggers of the row
+  - `extras: Extras` -- unknown items
+
+**`impl Row`**
+
+- **`fn new(key: RowKey) -> Row`**
+  an empty row
+- **`fn cell(&self, name: Sym) -> Option<&Cell>`**
+  the cell named `name`
+- **`fn cell_pos(&self, name: Sym) -> Option<usize>`**
+  the position of the cell named `name`
+
+- **`struct Section`**
+  a section of a sheet
+  - `name: Sym` -- the section name (N)
+  - `index: u32` -- IX (0-based; counted when the file has none)
+  - `ix_written: bool` -- whether IX stood in the file
+  - `del: bool` -- Del="1": the inherited section is deleted here
+  - `cells: Vec<Cell>` -- cells of the section itself (Geometry: NoFill, NoLine, NoShow, NoSnap, NoQuickDrag)
+  - `rows: Vec<Row>` -- the rows in file order (indexed rows by rising IX)
+  - `triggers: Vec<Trigger>` -- update triggers of the section
+  - `extras: Extras` -- unknown items
+
+**`impl Section`**
+
+- **`fn new(key: SecKey) -> Section`**
+  an empty section
+- **`fn key(&self) -> SecKey`**
+  the section's key
+- **`fn row(&self, key: RowKey) -> Option<&Row>`**
+  the row with this key
+- **`fn row_pos(&self, key: RowKey) -> Option<usize>`**
+  the position of the row with this key
+- **`fn cell(&self, name: Sym) -> Option<&Cell>`**
+  the cell of the section itself named `name`
+- **`fn insert_pos(&self, key: RowKey) -> usize`**
+  where a new indexed row with this index belongs (rows stay sorted by index)
+
+- **`struct Sheet`**
+  a ShapeSheet: single cells and sections
+  - `cells: Vec<Cell>` -- the single cells in file order
+  - `sections: Vec<Section>` -- the sections in file order
+  - `triggers: Vec<Trigger>` -- update triggers of the sheet
+  - `extras: Extras` -- unknown items
+
+- **`enum Local<'a>`**
+  what a sheet holds at an address, without inheritance
+  - `Cell(&'a Cell)` -- the cell is here
+  - `Deleted` -- the row or section is here with Del="1"
+  - `Missing` -- nothing here: ask the parent
+
+**`impl Sheet`**
+
+- **`fn new() -> Sheet`**
+  an empty sheet
+- **`fn cell(&self, name: Sym) -> Option<&Cell>`**
+  the single cell named `name`
+- **`fn section(&self, key: SecKey) -> Option<&Section>`**
+  the section with this key
+- **`fn section_pos(&self, key: SecKey) -> Option<usize>`**
+  the position of the section with this key
+- **`fn find(&self, addr: &CellAddr) -> Local<'_>`**
+  the cell at `addr` in this sheet alone (no inheritance)
+- **`fn is_empty(&self) -> bool`**
+  whether the sheet holds no cells, sections or triggers
+
+### `diagram_core/src/strings.rs`
+
+Source: [`lib/diagram_core/src/strings.rs`](../lib/diagram_core/src/strings.rs)
+
+```text
+strings -- the document's string table: names, formulas and texts kept once, as Sym
+
+  Strings::new()                  "" is Sym::EMPTY, then the names the crate knows
+  s.intern("PinX") -> Sym         the string's handle (the same text -> the same Sym)
+  s.get("PinX") -> Option<Sym>    without adding it
+  s.str(sym) -> &str
+
+A drawing with thousands of shapes repeats a few hundred cell names and formulas many times
+(THEMEVAL(), GUARD(Width*0.5) ...); each text is kept once and a cell holds four-byte
+handles.  The table only grows: a Sym stays valid as long as its document, so undo steps can
+keep them.  A Sym belongs to one document; between documents texts go through str().
+```
+
+- **`struct Sym(pub(crate) u32)`**
+  a text of a document's string table (cell and row names, formulas, values, raw XML)
+
+**`impl Sym`**
+
+- **`const EMPTY: Sym = Sym(0)`**
+  the empty text
+- **`fn index(self) -> u32`**
+  the position in the table (0 = the empty text)
+
+- **`struct Strings`**
+  the string table of a document
+
+**`impl Strings`**
+
+- **`fn new() -> Self`**
+  a table with the empty text and the names the crate itself refers to
+- **`fn intern(&mut self, text: &str) -> Sym`**
+  the handle of `text`, added when it is new
+- **`fn get(&self, text: &str) -> Option<Sym>`**
+  the handle of `text` when the table has it
+- **`fn str(&self, sym: Sym) -> &str`**
+  the text of a handle ("" for a handle of another, larger table)
+- **`fn len(&self) -> usize`**
+  the number of texts in the table
+- **`fn is_empty(&self) -> bool`**
+  whether the table holds nothing but the empty text and the known names
+
+### `diagram_core/src/units.rs`
+
+Source: [`lib/diagram_core/src/units.rs`](../lib/diagram_core/src/units.rs)
+
+```text
+units -- the unit codes of a cell (attribute U) and conversion to the internal units
+
+  Unit::parse("MM") / u.code()     the code as the file writes it; Unit::Other keeps codes the
+                                   crate does not know
+  u.dimension()                    Length, Angle, Duration, Date, Area, Number, Text ...
+  u.to_internal(25.4) -> 1.0       a value in the unit -> the value V stores (inches, radians,
+                                   days, square inches); u.from_internal(1.0) -> 25.4
+  convert(x, from, to)             between two units of one dimension
+  Implicit { drawing, page, text, angle, duration }   what DL, DP, DT, DA, DE stand for on a page
+
+The file keeps every value in internal units: lengths in inches, angles in radians, durations
+and dates in days; U only says how the value is shown and typed in (FEATURES.md 1.6, [MS-VSDX]
+Cell_Type).  A text size of 8 pt is V="0.1111" U="PT", an angle of 270 degrees
+V="4.7124" U="DEG".  DL, DP, DT, DA and DE are "the page's drawing, page, text, angle and
+duration unit": without the page they convert like inches, inches, points, radians and days.
+Ciceros and didots use the Didot point of 0.376065 mm (1157 dd = 1238 pt of 1/72.27 in).
+```
+
+- **`enum Unit`**
+  a unit code of the attribute U
+  - `Inches` -- IN: inches
+  - `InchesFrac` -- IN_F: inches shown as fractions
+  - `Feet` -- FT: feet
+  - `FeetInches` -- F_I: feet and inches
+  - `Yards` -- YD: yards
+  - `Miles` -- MI: miles
+  - `MilesFrac` -- MI_F: miles shown as fractions
+  - `NauticalMiles` -- NM: nautical miles (1852 m)
+  - `Millimeters` -- MM: millimetres
+  - `Centimeters` -- CM: centimetres
+  - `Meters` -- M: metres
+  - `Kilometers` -- KM: kilometres
+  - `Points` -- PT: points (1/72 in)
+  - `Picas` -- P: picas (12 pt)
+  - `PicasPoints` -- P_PT: picas and points
+  - `Didots` -- D: didots
+  - `Ciceros` -- C: ciceros (12 didots)
+  - `CicerosDidots` -- C_D: ciceros and didots
+  - `DrawingLength` -- DL: the page's drawing unit
+  - `PageLength` -- DP: the page's page unit
+  - `TextLength` -- DT: the text unit (points)
+  - `Degrees` -- DEG: degrees
+  - `DegreesMinSec` -- AD: degrees, minutes, seconds
+  - `Radians` -- RAD: radians
+  - `DefaultAngle` -- DA: the default angle unit
+  - `Days` -- ED: elapsed days
+  - `Hours` -- EH: elapsed hours
+  - `Minutes` -- EM: elapsed minutes
+  - `Seconds` -- ES: elapsed seconds
+  - `Weeks` -- EW: elapsed weeks
+  - `DefaultDuration` -- DE: the default duration unit
+  - `Date` -- DATE: a date (days)
+  - `Acres` -- AC: acres
+  - `Hectares` -- HA: hectares
+  - `Percent` -- PER: per cent (the value is a fraction: 0.5 is 50 %)
+  - `Currency` -- CY: currency
+  - `Bool` -- BOOL: a truth value
+  - `Color` -- COLOR: a colour (index or RGB)
+  - `Str` -- STR: a string
+  - `Guid` -- GUID: a GUID string
+  - `Point` -- PNT: a two-dimensional point
+  - `Nurbs` -- NURBS: the result of a NURBS() formula
+  - `Polyline` -- POLYLINE: the result of a POLYLINE() formula
+  - `Number` -- NUM: a plain number
+  - `Other(Sym)` -- a code the crate does not know, kept as written
+
+- **`enum Dimension`**
+  what a unit measures
+  - `Length` -- internal unit: inches
+  - `Angle` -- internal unit: radians
+  - `Duration` -- internal unit: days
+  - `Date` -- internal unit: days since 30 December 1899
+  - `Area` -- internal unit: square inches
+  - `Number` -- a plain number (per cent as a fraction, currency)
+  - `Typed` -- strings, colours, truth values, points, NURBS and polylines: no conversion
+  - `Unknown` -- an unknown unit
+
+**`impl Unit`**
+
+- **`fn parse(code: &str) -> Option<Unit>`**
+  the unit of a known code (None: unknown, keep it as Unit::Other)
+- **`fn code(self) -> Option<&'static str>`**
+  the code as the file writes it (None for Other: its Sym holds the code)
+- **`fn dimension(self) -> Dimension`**
+  what the unit measures
+- **`fn factor(self) -> Option<f64>`**
+  how many internal units one of this unit is (None: the unit has no factor)
+- **`fn to_internal(self, value: f64) -> f64`**
+  a value given in this unit -> the internal value V stores (unchanged without a factor)
+- **`fn from_internal(self, internal: f64) -> f64`**
+  an internal value -> the value in this unit (unchanged without a factor)
+
+- **`fn convert(value: f64, from: Unit, to: Unit) -> Option<f64>`**
+  `value` in unit `from` -> unit `to`; None when the dimensions differ or a unit has no factor
+
+- **`struct Implicit`**
+  what the implicit units stand for on a page (its drawing, page, text, angle and duration
+  units); `resolve` replaces DL, DP, DT, DA and DE by them
+  - `drawing: Unit` -- DL: the drawing unit (shown lengths of the drawing)
+  - `page: Unit` -- DP: the page unit
+  - `text: Unit` -- DT: the text unit
+  - `angle: Unit` -- DA: the angle unit
+  - `duration: Unit` -- DE: the duration unit
+
+**`impl Implicit`**
+
+- **`fn resolve(&self, unit: Unit) -> Unit`**
+  the explicit unit behind `unit` (other units unchanged)
+
+### `diagram_core/src/views.rs`
+
+Source: [`lib/diagram_core/src/views.rs`](../lib/diagram_core/src/views.rs)
+
+```text
+views -- rows of a sheet as the user knows them: shape data, user cells, hyperlinks, layers
+
+  doc.section_rows(sheet, sec) -> Vec<RowView>   every row a section really has
+  doc.shape_data(sheet)        the Property rows (DA-01: Label, Type, Format, Value ...)
+  doc.user_cells(sheet)        the User rows (Value, Prompt)
+  doc.hyperlinks(sheet)        the Hyperlink rows (Address, SubAddress, Description ...)
+  doc.layers(page)             the Layer rows of a page sheet (Name, Visible, Print, Lock ...)
+  doc.layer_members(shape)     the layer indices of a shape (LayerMember "0;2")
+  row.get("Label") -> Resolved   row.text("Label") / num(..) / flag(..)
+
+The views read through inheritance (inherit.rs): an instance shows the shape data of its
+master with its own values over them.  Shape data, user cells and hyperlinks exist on shapes,
+pages and the document alike.
+```
+
+- **`struct RowView<'d>`**
+  one row of a section with access to its cells
+  - `sheet: SheetRef` -- the sheet asked
+  - `section: SecKey` -- the section
+  - `row: EffRow` -- the row
+
+**`impl<'d> RowView<'d>`**
+
+- **`fn key(&self) -> RowKey`**
+  IX or N
+- **`fn name(&self) -> Option<&'d str>`**
+  the universal name of a named row (Prop.&lt;name>, User.&lt;name>)
+- **`fn addr(&self, cell: Sym) -> CellAddr`**
+  the address of one of its cells
+- **`fn cell(&self, cell: Sym) -> Resolved<'d>`**
+  a cell of the row
+- **`fn get(&self, cell: &str) -> Resolved<'d>`**
+  a cell of the row by name
+- **`fn text(&self, cell: &str) -> Option<&'d str>`**
+  a cell's value as text (None: a number or no value)
+- **`fn num(&self, cell: &str) -> Option<f64>`**
+  a cell's value as a number
+- **`fn flag(&self, cell: &str) -> bool`**
+  a cell's value as a truth value (a number other than 0, or "TRUE")
+
+**`impl Document`**
+
+- **`fn section_rows(&self, sheet: SheetRef, sec: SecKey) -> Vec<RowView<'_>>`**
+  every row section `sec` really has for `sheet`
+- **`fn shape_data(&self, sheet: SheetRef) -> Vec<RowView<'_>>`**
+  the shape data fields (Property rows)
+- **`fn user_cells(&self, sheet: SheetRef) -> Vec<RowView<'_>>`**
+  the user-defined cells (User rows)
+- **`fn hyperlinks(&self, sheet: SheetRef) -> Vec<RowView<'_>>`**
+  the hyperlinks (Hyperlink rows)
+- **`fn layers(&self, page: PageRef) -> Vec<RowView<'_>>`**
+  the layers of a page (Layer rows of its page sheet; the index is the layer's number)
+- **`fn layer_by_name(&self, page: PageRef, name: &str) -> Option<u32>`**
+  the layer of a page with this universal name (NameUniv, else Name) -> its index
+- **`fn layer_members(&self, shape: ShapeRef) -> Vec<u32>`**
+  the layers a shape is on (its LayerMember cell, with inheritance)
+
+- **`fn parse_members(text: &str) -> Vec<u32>`**
+  a LayerMember text ("0;2") -> the layer indices
 
 ## diagram_io
 

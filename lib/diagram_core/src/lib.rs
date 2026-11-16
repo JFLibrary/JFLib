@@ -9,15 +9,24 @@
 // deleted) -- and documents, pages and shapes are views on these cells.  So a round trip through
 // a file loses nothing, and the behaviour Visio files carry works without translation.
 //
-// What is to come here, by stage of the plan (none of it exists yet):
-//   JD2   document, foreground and background pages, layers, masters, shapes and groups, styles,
-//         theme data; sections, rows and cells; the inheritance shape -> master shape -> style ->
-//         document; NameU and Name; units (inches inside, as in the file); hyperlinks, shape data
-//         and user cells; an edit API with transactions for undo and redo
+//   Document            pages (foreground, background), masters, styles, the document sheet,
+//                       themes and parts kept as bytes; a stencil is a document without pages
+//   Page, Master, Style  their attributes, sheets, shape trees and Connect entries
+//   ShapeTree, ShapeData, Shape   shapes, groups, foreign objects, guides and their subshapes
+//   Sheet, Section, Row, Cell     the ShapeSheet store; Value, Formula, Unit, Origin
+//   doc.resolve(sheet, addr)      a cell with inheritance: shape -> master shape -> styles
+//   doc.rows / shape_data / user_cells / hyperlinks / layers   rows as they really are
+//   doc.transaction(label)        edits with undo and redo (Change; ui::history wraps it)
+//   Unit, convert, Implicit       unit codes and conversion to the internal units (inches,
+//                                 radians, days)
+//   Strings, Sym                  the document's string table (compact cells)
+//   Extras                        what the file had and the model does not know (DF-03)
+//
+// What is to come here, by stage of the plan:
 //   JD4   geometry rows and transforms (pin, local pin, angle, flips, groups) for drawing
 //   JD6   the formula engine: parser of the universal syntax, evaluation over a dependency graph
 //         with incremental recalculation, units, inheritance, GUARD and locks
-//   JD7  glue, the dynamic connector with right-angle routing around obstacles, layout
+//   JD7   glue, the dynamic connector with right-angle routing around obstacles, layout
 //
 // Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 // opening a file (connectors, layout and containers move only when something moves), and a
@@ -26,3 +35,36 @@
 #![forbid(unsafe_code)]
 
 extern crate alloc;
+
+mod cell;
+mod document;
+mod edit;
+mod inherit;
+mod names;
+mod page;
+mod shape;
+mod sheet;
+mod strings;
+mod units;
+mod views;
+
+pub use cell::{Cell, CellError, Formula, Origin, Value};
+pub use document::{
+    ColorEntry, DocError, DocKind, DocSettings, DocSheet, Document, FaceName, MasterRef, Owner, PageRef, Part, Shape,
+    ShapeRef, SheetRef, StyleRef, Theme,
+};
+pub use edit::{Change, EditError, Transaction};
+pub use inherit::{guarded, EffRow, Resolved};
+pub use names::{named_rows, Category};
+pub use page::{attr, Connect, Master, MasterHeader, Page, PageHeader, Style, StyleHeader};
+pub use shape::{
+    ForeignData, ForeignPayload, ShapeData, ShapeHeader, ShapeKind, ShapeTree, StyleRefs, Text, TextItem, TreeError,
+    TreeIter,
+};
+pub use sheet::{CellAddr, Extra, ExtraItem, Extras, Local, Place, Row, RowKey, SecKey, Section, Sheet, Trigger};
+pub use strings::{Strings, Sym};
+pub use units::{convert, Dimension, Implicit, Unit};
+pub use views::{parse_members, RowView};
+
+#[cfg(test)]
+mod tests;
