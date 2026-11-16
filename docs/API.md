@@ -180,7 +180,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [File dialog](#file-dialog): `filedlg`, `filedlg_paths`
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
-- [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `set_theme`, `clear_theme`, `app_theme`, `load_theme`, `styles_add`, `style_names`, `style_name`, `set_style`, `dp_text`, `ts_base`
+- [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `wheel_lines`, `wheel_chars`, `wheel_notch_px`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `set_theme`, `clear_theme`, `app_theme`, `load_theme`, `styles_add`, `style_names`, `style_name`, `set_style`, `dp_text`, `ts_base`
 - [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_next`, `cursor_replace`, `cursor_free`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_pos_px`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_effect_set`, `drop_accept`, `drag_over`, `drag_over_px`, `drag_allowed`, `drop_defer`, `drop_finish`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
 
 ### App, AppDesc, Ui, run, async tasks
@@ -640,6 +640,15 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
     extended keys), Linux's evdev code; 0 where the platform does not tell (macOS, the
     browser, Android)
   - `location: u32` -- KL_STANDARD, KL_LEFT / KL_RIGHT (the two Shift, Ctrl, Alt, Windows keys), KL_NUMPAD
+  - `ch: u32` -- the character the keyboard layout gives the key with Shift, Caps Lock and AltGr as they
+    are but without Ctrl, Alt and the Windows / Super key (0: none) -- what a browser names
+    the key (KeyboardEvent.key): "z" for Ctrl+Z on a German keyboard, "+" for its Ctrl++, "@"
+    for AltGr+Q, "Z" for Ctrl+Shift+Z.  Keys that type no character (Enter, Tab, Esc,
+    Backspace, the arrows, F1 ...) have none.  Windows (10 1607 and later: ToUnicodeEx),
+    Linux (the keymap), macOS (charactersIgnoringModifiers); 0 in the browser and on
+    Android; a headless run's keys have the US layout's (scripts: `keydown ... char "c"`)
+  - `dead: bool` -- the key is a dead key (´ ^ ~ ...): ch is its spacing character, the text it makes
+    comes with the next key
 
 - **`struct Sem`**
   semantic record (dump / expect)  [SR_\*]
@@ -2640,7 +2649,8 @@ list -- scroll views, scroll bars, lists, tabs and expanders (WinUI 3 style)
   scroll_begin(id, flags)                clipped viewport that takes its size like a box
        (next_size / parent) and lays its children out in a content area that may be
        larger; flags = SC_V (default) | SC_H | SC_NOBAR | SC_NOWHEEL | BOX_BG | BOX_CARD |
-       PAD_n ...  Mouse wheel (48 DIP per notch, smooth), overlay scroll bars (2 DIP, 6 DIP
+       PAD_n ...  Mouse wheel (the system's lines of 16 DIP per notch -- 48 DIP with three --
+       smooth; a touchpad's pixels at once), overlay scroll bars (2 DIP, 6 DIP
        while pointed at, draggable thumb, click on the track pages), Tab focus is scrolled
        into view.  A style whose bars stay visible (netlab) keeps their room free right of
        the content of a view that scrolls only vertically, always, so nothing moves when
@@ -4315,13 +4325,20 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                   then they lift
   pan2 S DX DY [MS]   two fingers around S (80 DIP apart) move by DX, DY (DIP) in MS ms (default 300),
                   then they lift
-  wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
-                  those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
+  wheel S DY [DX] [fine|pixels] [shift|ctrl|alt]...   DY (DX: sideways, right positive) in
+                  wheel units (120 = one notch); the words hold those modifiers during the
+                  wheel event (e.g. Ctrl + wheel zoom); fine: a device in fine steps (a
+                  precision touchpad on Windows: plat::WHEEL_FINE), pixels: DY and DX are DIP
+                  of a device that scrolls by pixels (plat::WHEEL_PIXELS: a trackpad)
   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
-  keydown CHORD [scan N] [left|right|numpad]   (E2) the key goes down and stays down (a
-                  modifier key -- shift, ctrl, alt -- is held for the following events; once
-                  more while down: an auto-repeat); keyup CHORD [scan N] [left|right|numpad]
-                  lets it go; scan N and the location reach ui.key_event_take
+  keydown CHORD [scan N] [left|right|numpad] [char "c"|none] [dead]   (E2) the key goes down
+                  and stays down (a modifier key -- shift, ctrl, alt -- is held for the
+                  following events; once more while down: an auto-repeat); keyup CHORD [...]
+                  lets it go; scan N, the location and the character reach
+                  ui.key_event_take (KeyEvent::ch: the US layout's for the key and its Shift --
+                  `key` gives those too --, char "c" another layout's, e.g. a German
+                  keyboard's Ctrl++ `keydown ctrl++ char "+"` -- the key VK_OEM_PLUS, "=" on
+                  the US layout; dead: a dead key)
   preedit "text" [CURSOR]   (E4) an input method's composition (ui.ime_preedit; CURSOR a byte
                   offset, default the end; "" ends it); commit "text" commits
                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
@@ -4517,8 +4534,10 @@ theme -- colour tokens, accent colour and type ramp of the linked style  [src/ui
   text_scale() / set_text_scale(percent)   text sizes and line heights (not the controls)
   sys_apply(settings)        (runtime) plat::sys_settings: theme, accent, contrast, reduced
                              motion (anim_off), text scale, double-click and caret times,
-                             font smoothing and its subpixel order; what the app or the
-                             command line fixed stays
+                             font smoothing and its subpixel order, the wheel's lines and
+                             characters; what the app or the command line fixed stays
+  wheel_lines() / wheel_chars() / wheel_notch_px(line_px, page_px, horizontal)   what a
+                             notch of the wheel scrolls (the system's setting)
   color(tok) -> argb         0xAARRGGBB of a T_* token (byte offset)
   ts_font(ts)                select font and pixel size of a TS_* text style
   ts_line(ts) -> px          line height of a text style
@@ -4584,6 +4603,19 @@ The values come from the style (Style::tokens, accent, ts_size / ts_line / ts_fo
   where the system says nothing; smoothing off (ui.text.antialias()) and the subpixel
   order (ui.text.subpixel(): subpixel smoothing on the window's framebuffer) are applied,
   hinting is not
+- **`fn wheel_lines(&self) -> u32`**
+  the lines a notch of the wheel scrolls as the system says it (1..=100; plat::WHEEL_PAGE:
+  a page): Windows' mouse settings (SPI_GETWHEELSCROLLLINES), KDE's WheelScrollLines; 3
+  elsewhere and in headless runs (jfgui_WHEEL_LINES).  The library's views scroll that many
+  lines per notch (120 of UiInput::wheel_y): WHEEL_LINE_DIP each, their text's lines in text
+  views; an app that scrolls by lines of its own takes this many per notch too
+- **`fn wheel_chars(&self) -> u32`**
+  the characters a notch of the horizontal wheel scrolls (1..=100; Windows
+  SPI_GETWHEELSCROLLCHARS; 3 elsewhere and in headless runs, jfgui_WHEEL_CHARS)
+- **`fn wheel_notch_px(&self, line_px: i32, page_px: i32, horizontal: bool) -> i32`**
+  the pixels a notch of the wheel scrolls in a view whose lines are line_px high and whose
+  page is page_px: wheel_lines lines (a page for plat::WHEEL_PAGE); horizontal: wheel_chars
+  characters of line_px
 - **`fn set_text_scale(&mut self, percent: u32)`**
   scale text sizes and line heights (50..300 %); the system's scale no longer applies
 - **`fn color(&self, tok: u32) -> u32`**
@@ -5887,6 +5919,14 @@ PART_BASE: u32 = 0x6000_0000  // part_id(id, k): ids of the parts of composite w
   - `press_y: i32`
   - `wheel_x: i32` -- wheel delta (120 per notch)
   - `wheel_y: i32`
+  - `wheel_precise: bool` -- the turn came from a device that scrolls by pixels or in fine steps (a touchpad, a
+    trackpad, a high-resolution wheel: plat::WHEEL_PIXELS / WHEEL_FINE): scroll by
+    wheel_px_x / wheel_px_y, at once (no smooth scrolling); wheel_x / wheel_y say the same
+    turn in notches (120 = what a notch scrolls: Ui::wheel_notch_px)
+  - `wheel_px_x: i32` -- a precise turn in physical pixels (up / right positive, as wheel_x / wheel_y): the
+    platform's pixels (macOS, Wayland) or, from Windows' fine steps, 120 = wheel_lines() lines
+    (wheel_chars() for wheel_px_x) of WHEEL_LINE_DIP; 0 for a notched wheel
+  - `wheel_px_y: i32`
   - `mods: u32`
   - `pts: alloc::vec::Vec<[i32; 2]>` -- move points since the last frame (relative px)
   - `rect: [i32; 4]` -- widget rectangle (absolute px)
@@ -5900,6 +5940,10 @@ PART_BASE: u32 = 0x6000_0000  // part_id(id, k): ids of the parts of composite w
 
 ```rust
 UI_PRESSURE_ONE: u32 = 65535
+/// a line of the wheel in the library's views (DIP): a notch scrolls Ui::wheel_lines of them
+/// (48 DIP with the usual three); where a device scrolls in fine steps without pixels of its own
+/// (Windows), 120 of them are wheel_lines such lines of pixels
+WHEEL_LINE_DIP: i32 = 16
 ```
 
 *containers*
@@ -31219,7 +31263,11 @@ Overrides (tests, shots, users): jfgui_THEME=dark|light, jfgui_ACCENT=RRGGBB,
 jfgui_CONTRAST=high|normal, jfgui_REDUCE_MOTION=1|0, jfgui_TEXT_SCALE=PERCENT,
 jfgui_DOUBLE_CLICK_MS=N, jfgui_CARET_BLINK_MS=N (0: a steady caret),
 jfgui_FONT_AA=1|0, jfgui_FONT_HINTING=none|slight|medium|full,
-jfgui_FONT_RGBA=none|rgb|bgr|vrgb|vbgr.
+jfgui_FONT_RGBA=none|rgb|bgr|vrgb|vbgr, jfgui_WHEEL_LINES=N|page, jfgui_WHEEL_CHARS=N.
+
+The wheel (wheel_lines, wheel_chars: what a notch scrolls): Windows SPI_GETWHEELSCROLLLINES
+(WHEEL_PAGESCROLL: a page) and SPI_GETWHEELSCROLLCHARS; KDE's [KDE] WheelScrollLines of
+kdeglobals; GNOME, macOS, the browser and Android have no such setting (3 and 3).
 
 Font rendering (font_aa, font_hinting, font_rgba; None: the system says nothing): Windows
 SPI_GETFONTSMOOTHING, SPI_GETFONTSMOOTHINGTYPE (ClearType: subpixels) and
@@ -31323,6 +31371,19 @@ TB_ACT_MENU: u8 = 4
   - `font_hinting: Option<u8>` -- FONT_HINT_\*
   - `font_rgba: Option<u8>` -- FONT_RGBA_\* (subpixel smoothing and its order)
   - `titlebar: Titlebar` -- the title bar the library draws (Linux client-side decorations, AF_CUSTOM_TITLEBAR)
+  - `wheel_lines: u32` -- lines a notch of the wheel scrolls (1..=100), WHEEL_PAGE: a page (Windows
+    SPI_GETWHEELSCROLLLINES, KDE's WheelScrollLines; elsewhere 3)
+  - `wheel_chars: u32` -- characters a notch of the horizontal wheel scrolls (1..=100; Windows
+    SPI_GETWHEELSCROLLCHARS; elsewhere 3)
+
+```rust
+/// SysSettings::wheel_lines: a notch of the wheel scrolls a page
+WHEEL_PAGE: u32 = u32::MAX
+```
+
+- **`fn wheel_amount(n: u32) -> u32`**
+  a number of lines or characters per notch as the system says it: 1..=100, the page
+  (WHEEL_PAGE, Windows' WHEEL_PAGESCROLL) kept; 0 (Windows: the wheel does not scroll) is 1
 
 - **`fn sys_settings() -> SysSettings`**
   the system's settings and the jfgui_\* overrides
@@ -32212,6 +32273,16 @@ callbacks (refresh, hit hook) never hold a reference across a Win32 call.
 
 - **`fn win_create(title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x: i32, y: i32) -> i32`**
   a hidden window (see the file header) -> index / -1  [plat_win_create]
+
+- **`fn key_char_test(hkl: isize, vk: u32, mods: u8) -> (u32, bool)`**
+  (test aid, plattest --test keychar) the character layout hkl (one of key_layouts_test) gives
+  key vk with the modifiers MOD_SHIFT, MOD_CTRL, MOD_ALT, MOD_ALTGR (the right Alt: Ctrl + Alt as
+  Windows makes it), MOD_CAPS -> (character, dead key), as a key event of that layout says it;
+  the thread's keyboard state is not touched
+
+- **`fn key_layouts_test() -> Vec<isize>`**
+  (test aid) the keyboard layouts loaded for the user (GetKeyboardLayoutList), HKLs whose low
+  word is the language (0x0407 German, 0x0409 English (US)) and high word the layout
 
 - **`fn win_hit_hook(f: Option<fn(i32, i32, i32) -> u32>)`**
   f(w, x, y) -> HB_\* flags at a client point (None = no hit tests)
@@ -33753,6 +33824,11 @@ KV_MODSHIFT: u32 = 24
 - **`fn xkb_key(evdev: u32) -> (u32, u32)`**
   evdev code -> (VK code, text codepoint (0 = none))  [xkb_key]
 
+- **`fn xkb_key_y(evdev: u32) -> i32`**
+  (E2) evdev code -> Event::y of its key event: the KL_\* location and the character the key
+  gives with the current Shift, Caps Lock, AltGr and Num Lock but without Ctrl, Alt and Super
+  (plat::key_y)
+
 - **`fn xkb_dead_reset()`**
   forget a pending dead key (the keyboard focus changed)
 
@@ -34767,7 +34843,8 @@ The view and the delegate never act: they push events into the ring (evq.rs), as
   modifiers Command is MOD_CTRL (the library's shortcuts are Ctrl+..), Control MOD_SUPER, Option
             MOD_ALT
   gestures  the trackpad's pinch becomes Ctrl + wheel (120 per 0.2 of magnification), as Windows
-            makes it of a touchpad's pinch; two-finger scrolling is the wheel with fine steps
+            makes it of a touchpad's pinch; two-finger scrolling is the wheel in physical pixels
+            (WHEEL_PIXELS)
   settings  a change of the appearance or the accent colour (distributed notifications) and of the
             screens push E_SETTINGS (SET_THEME, SET_MONITORS) for window 0
   frame     PWF_SYSFRAME: the system's title bar; otherwise the content reaches under a transparent
@@ -36675,9 +36752,9 @@ E_NONE: u8 = 0
 E_MOVE: u8 = 1
 E_DOWN: u8 = 2  // btn
 E_UP: u8 = 3  // btn
-E_WHEEL: u8 = 4  // data = (i16 dy) | (i16 dx << 16), 120 per notch, up / right positive
-E_KEY_DOWN: u8 = 5  // data = VK | (repeat << 31); (E2) x = scancode, y = KL_* location
-E_KEY_UP: u8 = 6  // data = VK; (E2) x = scancode, y = KL_* location
+E_WHEEL: u8 = 4  // data = (i16 dy) | (i16 dx << 16), 120 per notch, up / right positive; btn = WHEEL_*
+E_KEY_DOWN: u8 = 5  // data = VK | (repeat << 31); (E2) x = scancode, y = key_y(KL_* location, character)
+E_KEY_UP: u8 = 6  // data = VK; (E2) x = scancode, y = key_y(KL_* location, character)
 E_TEXT: u8 = 7  // data = Unicode codepoint
 E_RESIZE: u8 = 8  // x = width, y = height (physical pixels)
 E_DPI: u8 = 9  // data = dpi (96 = 100 %)
@@ -36706,6 +36783,19 @@ SET_MONITORS: u32 = 32  // monitors added, removed, moved, rescaled; work areas 
 EVQ_CAP: usize = 256  // event ring capacity (power of two)
 ```
 
+*E_WHEEL's btn: what kind of turn (0: a wheel's notches, 120 each)*
+
+```rust
+/// the 120 per notch come in fine steps: a device without notches or with finer ones (Windows: a
+/// precision touchpad's two fingers, a high-resolution wheel -- deltas that are no multiple of
+/// 120; Wayland: axis_value120 of such a wheel)
+WHEEL_FINE: u8 = 1
+/// data holds physical pixels of the window (the same i16 dy | i16 dx << 16, up / right
+/// positive) from a device that scrolls by pixels: Wayland's fingers and continuous axes, the
+/// trackpad and Magic Mouse on macOS
+WHEEL_PIXELS: u8 = 2
+```
+
 *pointer types, buttons, modifiers*
 
 ```rust
@@ -36727,7 +36817,7 @@ MOD_CAPS: u8 = 32
 MOD_NUM: u8 = 64
 ```
 
-*(E2) where a key sits (Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:*
+*(E2) where a key sits (key_location of Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:*
 
 ```rust
 // Windows' scan code (0xE0.. for extended keys), Linux's evdev code, 0 where unknown)
@@ -36736,6 +36826,31 @@ KL_LEFT: u32 = 1  // the left Shift, Ctrl, Alt, Windows key
 KL_RIGHT: u32 = 2
 KL_NUMPAD: u32 = 3  // the keys of the number block
 ```
+
+*(E2) the character of a key: Event::y of E_KEY_DOWN / E_KEY_UP holds the KL_\* location in*
+
+```rust
+// bits 0..7, the character the keyboard layout gives the key in bits 8..28 (key_char) and
+// KEY_DEAD.  The character is the one the key types with Shift, Caps Lock and AltGr as they are
+// but without Ctrl, Alt and the Windows / Super key -- what a browser names the key: "z" for
+// Ctrl+Z on a German keyboard (whose Z sits at the US layout's Y), "+" for Ctrl++ there, "@" for
+// AltGr+Q; 0 for a key that types nothing (Enter, Tab, Esc, Backspace, the arrows, F1 ...: control
+// characters are none) and where the platform does not say (the browser, Android, iOS)
+/// the key is a dead key; key_char is its spacing character (´ ^ ~ ...)
+KEY_DEAD: i32 = 1 << 29
+```
+
+- **`const fn key_y(location: u32, ch: u32, dead: bool) -> i32`**
+  (E2) Event::y of a key event: its KL_\* location and character (0: none)
+
+- **`const fn key_location(y: i32) -> u32`**
+  (E2) the KL_\* location of a key event's y
+
+- **`const fn key_char(y: i32) -> u32`**
+  (E2) the character of a key event's y (0: none)
+
+- **`const fn key_dead(y: i32) -> bool`**
+  (E2) a key event's y says a dead key
 
 - **`const fn evdev_location(code: u32) -> u32`**
   (E2) the KL_\* location of a Linux evdev key code (both sides' modifiers, the number block)

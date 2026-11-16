@@ -1,0 +1,17 @@
+#!args --verify-dirty
+# the wheel in the code editor (ui/code_edit.rs) on a long line: the horizontal wheel tilted
+# right scrolls right, as Shift + the wheel turned down does (it scrolled left); a trackpad's
+# pixels scroll sideways and back to the same place
+size 1000 680
+click tab:"Code"
+cmd 904 100000
+expect text:"lines: 1" exists
+focus #3000
+wheel #3000 0 120
+shot build/editortest/code_wheel_right.png
+wheel #3000 0 -120
+wheel #3000 -120 shift
+expect same build/editortest/code_wheel_right.png
+wheel #3000 0 20 pixels
+wheel #3000 0 -20 pixels
+expect same build/editortest/code_wheel_right.png

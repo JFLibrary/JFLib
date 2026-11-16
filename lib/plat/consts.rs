@@ -6,9 +6,9 @@ pub const E_NONE: u8 = 0;
 pub const E_MOVE: u8 = 1;
 pub const E_DOWN: u8 = 2; // btn
 pub const E_UP: u8 = 3; // btn
-pub const E_WHEEL: u8 = 4; // data = (i16 dy) | (i16 dx << 16), 120 per notch, up / right positive
-pub const E_KEY_DOWN: u8 = 5; // data = VK | (repeat << 31); (E2) x = scancode, y = KL_* location
-pub const E_KEY_UP: u8 = 6; // data = VK; (E2) x = scancode, y = KL_* location
+pub const E_WHEEL: u8 = 4; // data = (i16 dy) | (i16 dx << 16), 120 per notch, up / right positive; btn = WHEEL_*
+pub const E_KEY_DOWN: u8 = 5; // data = VK | (repeat << 31); (E2) x = scancode, y = key_y(KL_* location, character)
+pub const E_KEY_UP: u8 = 6; // data = VK; (E2) x = scancode, y = key_y(KL_* location, character)
 pub const E_TEXT: u8 = 7; // data = Unicode codepoint
 pub const E_RESIZE: u8 = 8; // x = width, y = height (physical pixels)
 pub const E_DPI: u8 = 9; // data = dpi (96 = 100 %)
@@ -37,6 +37,16 @@ pub const SET_OTHER: u32 = 16;
 pub const SET_MONITORS: u32 = 32; // monitors added, removed, moved, rescaled; work areas (screen::monitors)
 pub const EVQ_CAP: usize = 256; // event ring capacity (power of two)
 
+// ---- E_WHEEL's btn: what kind of turn (0: a wheel's notches, 120 each)
+/// the 120 per notch come in fine steps: a device without notches or with finer ones (Windows: a
+/// precision touchpad's two fingers, a high-resolution wheel -- deltas that are no multiple of
+/// 120; Wayland: axis_value120 of such a wheel)
+pub const WHEEL_FINE: u8 = 1;
+/// data holds physical pixels of the window (the same i16 dy | i16 dx << 16, up / right
+/// positive) from a device that scrolls by pixels: Wayland's fingers and continuous axes, the
+/// trackpad and Magic Mouse on macOS
+pub const WHEEL_PIXELS: u8 = 2;
+
 // ---- pointer types, buttons, modifiers
 pub const PTR_MOUSE: u32 = 0;
 pub const PTR_PEN: u32 = 1; // pen tip
@@ -55,12 +65,43 @@ pub const MOD_ALTGR: u8 = 16;
 pub const MOD_CAPS: u8 = 32;
 pub const MOD_NUM: u8 = 64;
 
-// ---- (E2) where a key sits (Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:
+// ---- (E2) where a key sits (key_location of Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:
 // Windows' scan code (0xE0.. for extended keys), Linux's evdev code, 0 where unknown)
 pub const KL_STANDARD: u32 = 0;
 pub const KL_LEFT: u32 = 1; // the left Shift, Ctrl, Alt, Windows key
 pub const KL_RIGHT: u32 = 2;
 pub const KL_NUMPAD: u32 = 3; // the keys of the number block
+
+// ---- (E2) the character of a key: Event::y of E_KEY_DOWN / E_KEY_UP holds the KL_* location in
+// bits 0..7, the character the keyboard layout gives the key in bits 8..28 (key_char) and
+// KEY_DEAD.  The character is the one the key types with Shift, Caps Lock and AltGr as they are
+// but without Ctrl, Alt and the Windows / Super key -- what a browser names the key: "z" for
+// Ctrl+Z on a German keyboard (whose Z sits at the US layout's Y), "+" for Ctrl++ there, "@" for
+// AltGr+Q; 0 for a key that types nothing (Enter, Tab, Esc, Backspace, the arrows, F1 ...: control
+// characters are none) and where the platform does not say (the browser, Android, iOS)
+/// the key is a dead key; key_char is its spacing character (´ ^ ~ ...)
+pub const KEY_DEAD: i32 = 1 << 29;
+
+/// (E2) Event::y of a key event: its KL_* location and character (0: none)
+pub const fn key_y(location: u32, ch: u32, dead: bool) -> i32 {
+    let c = if ch <= 0x10_FFFF { ch } else { 0 };
+    ((location & 0xFF) | c << 8) as i32 | if dead && c != 0 { KEY_DEAD } else { 0 }
+}
+
+/// (E2) the KL_* location of a key event's y
+pub const fn key_location(y: i32) -> u32 {
+    y as u32 & 0xFF
+}
+
+/// (E2) the character of a key event's y (0: none)
+pub const fn key_char(y: i32) -> u32 {
+    (y as u32 >> 8) & 0x1F_FFFF
+}
+
+/// (E2) a key event's y says a dead key
+pub const fn key_dead(y: i32) -> bool {
+    y & KEY_DEAD != 0
+}
 
 /// (E2) the KL_* location of a Linux evdev key code (both sides' modifiers, the number block)
 pub const fn evdev_location(code: u32) -> u32 {

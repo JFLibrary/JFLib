@@ -826,6 +826,18 @@ impl Xkb {
         }
     }
 
+    /// (E2) evdev -> the character of the key at its level (Shift, Caps Lock, AltGr, Num Lock as
+    /// they are) whatever Ctrl, Alt and Super say, and whether it is a dead key; control
+    /// characters are none
+    fn char_of(&self, evdev: u32) -> (u32, bool) {
+        if evdev >= 256 || self.keys[evdev as usize].flags & KF_DEF == 0 {
+            return (0, false);
+        }
+        let v = self.keys[evdev as usize].cp[self.level_of(evdev) as usize];
+        let c = v & KV_CP;
+        if c < 0x20 || c == 0x7F || c > 0x10_FFFF { (0, false) } else { (c, v & KV_DEAD != 0) }
+    }
+
     /// evdev -> (VK, text) for the current modifiers
     fn key_of(&self, evdev: u32) -> (u32, u32) {
         if evdev >= 256 {
@@ -1046,6 +1058,14 @@ pub fn xkb_mod_bit(evdev: u32) -> u32 {
 /// evdev code -> (VK code, text codepoint (0 = none))  [xkb_key]
 pub fn xkb_key(evdev: u32) -> (u32, u32) {
     XKB.lock().key_of(evdev)
+}
+
+/// (E2) evdev code -> Event::y of its key event: the KL_* location and the character the key
+/// gives with the current Shift, Caps Lock, AltGr and Num Lock but without Ctrl, Alt and Super
+/// (plat::key_y)
+pub fn xkb_key_y(evdev: u32) -> i32 {
+    let (c, dead) = XKB.lock().char_of(evdev);
+    crate::key_y(crate::evdev_location(evdev), c, dead)
 }
 
 /// the dead key held back by xkb_key_typed (its spacing character, 0 = none)

@@ -987,18 +987,28 @@ impl Ui {
             Ui::ce_find_update(&mut v.find, doc);
         }
         // ---- wheel, the caret into view
-        let wy = self.wp.ctx.wheel_y;
-        let wx = self.wp.ctx.wheel_x;
-        let over = ev & EV_HOVER != 0 || self.wp.ctx.hot == id.wrapping_add(1) || self.wp.ctx.hot == id.wrapping_add(2);
-        if over && (wy != 0 || wx != 0) {
-            let (dx, dy) = if self.mods & MOD_SHIFT != 0 { (wy, 0) } else { (wx, wy) };
-            let sy = (v.sy - dy * m.lh * 3 / 120).clamp(0, (total_h - th).max(0));
-            let sx = (v.sx - dx * m.cw * 6 / 120).clamp(0, (content_w - tw_px).max(0));
+        let c = &self.wp.ctx;
+        let (wy, wx, precise, py, px) = (c.wheel_y, c.wheel_x, c.wheel_precise, c.wheel_px_y, c.wheel_px_x);
+        let over = ev & EV_HOVER != 0 || c.hot == id.wrapping_add(1) || c.hot == id.wrapping_add(2);
+        if over && (wy != 0 || wx != 0 || py != 0 || px != 0) {
+            // pixels down and right: a notch the system's lines, sideways twice its characters (six
+            // with three), a touchpad's pixels; Shift turns the vertical wheel sideways (up: left)
+            let (lines, chars) = (self.wheel_notch_px(m.lh, th, false), self.wheel_notch_px(m.cw.saturating_mul(2), tw_px, true));
+            let (mut dy, mut dx) = if precise {
+                (py.wrapping_neg(), px)
+            } else {
+                (wy.saturating_mul(lines) / -120, wx.saturating_mul(chars) / 120)
+            };
+            if self.mods & MOD_SHIFT != 0 {
+                dx = dx.saturating_add(if precise { dy } else { wy.saturating_mul(chars) / -120 });
+                dy = 0;
+            }
+            let sy = (v.sy + dy).clamp(0, (total_h - th).max(0));
+            let sx = (v.sx + dx).clamp(0, (content_w - tw_px).max(0));
             if sy != v.sy || sx != v.sx {
                 v.sy = sy;
                 v.sx = sx;
-                self.wp.ctx.wheel_y = 0;
-                self.wp.ctx.wheel_x = 0;
+                self.wheel_take();
             }
         }
         // the finger's way (touch.rs)

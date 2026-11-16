@@ -11,8 +11,10 @@
 // window with the keyboard focus (kb_win).  Pointer positions are converted from surface
 // coordinates (24.8 fixed, logical) to physical pixels: px = fixed * scale120 / 30720 (the
 // window's scale).  Wheel events are accumulated until wl_pointer.frame: axis_value120
-// (seat >= 8) or discrete steps x 120 (WSLg) or the continuous value x 12 / 256
-// (touchpads); vertical is negated so that up = positive, like Win32.
+// (seat >= 8; WHEEL_FINE when no multiple of 120: a high-resolution wheel) or discrete steps
+// x 120 (WSLg), else the continuous value as physical pixels (WHEEL_PIXELS: a touchpad's
+// fingers; the fraction waits for the next frame); vertical is negated so that up = positive,
+// like Win32.
 // Keys: the keymap is parsed by linux_xkb.rs; key repeat uses repeat_info (default 25/s
 // after 600 ms) with its own deadline in wait (modifiers never repeat).
 // wl_touch: every finger goes to plat::finger, for the window of its surface (a popup's: its owner,
@@ -25,11 +27,11 @@ use rt::os::{syscall6, SYS_MMAP, SYS_MUNMAP};
 use super::proto::*;
 use super::wire::{sys_close, Args, A};
 use super::xkb::{wl_mods, wl_mods_set, xkb_dead_reset, xkb_dump, xkb_is_dead, xkb_is_modifier, xkb_key, xkb_key_typed,
-                 xkb_mod_bit, xkb_parse, xkb_set_mods, xkb_use_fallback};
+                 xkb_key_y, xkb_mod_bit, xkb_parse, xkb_set_mods, xkb_use_fallback};
 use super::Wl;
 use crate::{
     Event, BTN_LEFT, BTN_MIDDLE, BTN_RIGHT, BTN_X1, BTN_X2, E_DOWN, E_FOCUS_IN, E_FOCUS_OUT, E_KEY_DOWN, E_KEY_UP,
-    E_LEAVE, E_MOVE, E_TEXT, E_UP, E_WHEEL, PW_MAX,
+    E_LEAVE, E_MOVE, E_TEXT, E_UP, E_WHEEL, PW_MAX, WHEEL_FINE, WHEEL_PIXELS,
 };
 
 const BTN_CODE_LEFT: u32 = 0x110; // linux/input-event-codes.h
@@ -83,6 +85,7 @@ pub(crate) struct Input {
     ax_disc: [i32; 2],
     ax_120: [i32; 2],
     ax_flags: u32, // bit axis: discrete, bit 2+axis: value120
+    ax_rem: [i64; 2], // the continuous axes' fraction of a physical pixel (x 30720)
 }
 
 impl Input {
@@ -118,6 +121,7 @@ impl Input {
             ax_disc: [0; 2],
             ax_120: [0; 2],
             ax_flags: 0,
+            ax_rem: [0; 2],
         }
     }
 }
@@ -141,6 +145,17 @@ impl Wl {
         let r = &self.win[w];
         let s = if r.flags & super::window::WLWF_USED != 0 { r.s120 } else { self.inp.s120_test };
         (fixed as i64 * s as i64 / 30720) as i32
+    }
+
+    /// a continuous axis' value of this frame (24.8 logical) in physical pixels at the scale of
+    /// the pointer's window, its fraction kept for the next frame
+    fn axis_px(&mut self, ax: usize) -> i32 {
+        let w = self.inp.ptr_win.max(0) as usize & (PW_MAX - 1);
+        let r = &self.win[w];
+        let s = if r.flags & super::window::WLWF_USED != 0 { r.s120 } else { self.inp.s120_test };
+        let t = self.inp.ax_val[ax] as i64 * s as i64 + self.inp.ax_rem[ax];
+        self.inp.ax_rem[ax] = t % 30720;
+        (t / 30720) as i32
     }
 
     /// the left button is held (the implicit grab of a drag, dnd.rs)
@@ -187,7 +202,7 @@ impl Wl {
         let code = self.inp.rep_key - 1;
         let (vk, text) = xkb_key(code);
         if vk != 0 {
-            self.push(E_KEY_DOWN, 0, code as i32, crate::evdev_location(code) as i32, vk | 0x8000_0000);
+            self.push(E_KEY_DOWN, 0, code as i32, xkb_key_y(code), vk | 0x8000_0000);
         }
         if text != 0 {
             self.push(E_TEXT, 0, 0, 0, text);
@@ -486,17 +501,26 @@ pub(crate) fn wlh_ptr_frame(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
         wl.child_drag_frame(wheel);
     }
     let mut d = [0i32; 2]; // dy, dx
+    let f = wl.inp.ax_flags;
+    // no steps on either axis: a touchpad's fingers (or another continuous source) in pixels
+    let pixels = f == 0;
+    let mut fine = false;
     for ax in 0..2 {
-        let f = wl.inp.ax_flags;
         let v = if f & 1 << (ax + 2) != 0 {
+            fine |= wl.inp.ax_120[ax] % 120 != 0;
             wl.inp.ax_120[ax]
         } else if f & 1 << ax != 0 {
             wl.inp.ax_disc[ax].wrapping_mul(120)
+        } else if pixels {
+            wl.axis_px(ax)
         } else {
             ((wl.inp.ax_val[ax] as i64 * 12) >> 8) as i32
         };
         let v = v.clamp(-32767, 32767);
         d[ax] = if ax == 0 { -v } else { v }; // Wayland: positive = down
+    }
+    if !pixels {
+        wl.inp.ax_rem = [0; 2];
     }
     wl.inp.ax_flags = 0;
     wl.inp.ax_val = [0; 2];
@@ -506,9 +530,10 @@ pub(crate) fn wlh_ptr_frame(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
         return;
     }
     let data = (d[0] as u32 & 0xFFFF) | (d[1] as u32) << 16;
+    let kind = if pixels { WHEEL_PIXELS } else if fine { WHEEL_FINE } else { 0 };
     wl.ptr_evwin();
     let (x, y) = (wl.inp.mx, wl.inp.my);
-    wl.push(E_WHEEL, 0, x, y, data);
+    wl.push(E_WHEEL, kind, x, y, data);
 }
 
 // ------------------------------------------------------------------ keyboard
@@ -586,8 +611,8 @@ pub(crate) fn wlh_kb_key(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
         let dead = xkb_is_dead(key);
         let (vk, text) = xkb_key_typed(key); // dead keys composed (´ e -> é)
         if vk != 0 {
-            // (E2) the evdev code and where the key sits
-            wl.push(E_KEY_DOWN, 0, key as i32, crate::evdev_location(key) as i32, vk);
+            // (E2) the evdev code, where the key sits and its character
+            wl.push(E_KEY_DOWN, 0, key as i32, xkb_key_y(key), vk);
         }
         for t in text.into_iter().filter(|&t| t != 0) {
             wl.push(E_TEXT, 0, 0, 0, t);
@@ -604,7 +629,7 @@ pub(crate) fn wlh_kb_key(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
             wl.inp.rep_key = 0;
         }
         if vk != 0 {
-            wl.push(E_KEY_UP, 0, key as i32, crate::evdev_location(key) as i32, vk);
+            wl.push(E_KEY_UP, 0, key as i32, xkb_key_y(key), vk);
         }
     }
 }

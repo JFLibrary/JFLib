@@ -18,6 +18,30 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ## [Unreleased]
 
+### Added
+
+- **plat:** What a notch of the wheel scrolls as the system says it: `SysSettings::wheel_lines` (Windows `SPI_GETWHEELSCROLLLINES`, `WHEEL_PAGE` for its "one screen at a time"; KDE's `[KDE] WheelScrollLines` of kdeglobals, also while a portal answers; 3 elsewhere) and `wheel_chars` (Windows `SPI_GETWHEELSCROLLCHARS`, else 3), `wheel_amount`; the overrides `jfgui_WHEEL_LINES=N|page` and `jfgui_WHEEL_CHARS=N`; a change of the mouse's settings on Windows is an `E_SETTINGS` with `SET_OTHER`
+- **ui:** `ui.wheel_lines()`, `ui.wheel_chars()` and `ui.wheel_notch_px(line_px, page_px, horizontal)`: the system's lines (a page) and characters of a notch, followed live (`UIC_SETTINGS`); `WHEEL_LINE_DIP` (16): the library's line. Its views scroll that many lines a notch: scroll views, lists and documents lines of 16 DIP (48 DIP with three, as before), text boxes, the rich and code editors, the terminal and the code completion list their own lines, image views and diagrams pan by it. docs/GUIDE.md section 5
+- **plat:** Pixel-precise wheel turns: `E_WHEEL`'s `btn` says `WHEEL_FINE` (the 120 a notch in fine steps: Windows' `WM_MOUSEWHEEL` / `WM_MOUSEHWHEEL` with a delta that is no multiple of 120 -- a precision touchpad, a high-resolution wheel -- or from a touchpad by `GetCurrentInputMessageSource`, also over popups; Wayland's `axis_value120` that is no multiple of 120) or `WHEEL_PIXELS` (data in physical pixels: Wayland's continuous axes -- a touchpad's fingers, the fraction kept for the next frame --, macOS' precise deltas -- a trackpad, a Magic Mouse)
+- **ui:** `UiInput::wheel_precise`, `wheel_px_x` and `wheel_px_y`: a touchpad's or high-resolution wheel's turn in physical pixels (up and right positive; Windows' fine steps as `wheel_lines()` lines of 16 DIP per 120), which an app scrolls by at once; `wheel_x` / `wheel_y` say the same turn in notches, the fractions of both carried from turn to turn. The library's scroll views, lists, documents, text boxes, rich and code editors, image views and diagrams scroll by the pixels at once, without smooth scrolling. docs/GUIDE.md section 5
+- **plat:** (E2) The keyboard layout's character of a key event: `Event::y` of `E_KEY_DOWN` / `E_KEY_UP` holds the location and the character the key gives with Shift, Caps Lock and AltGr as they are but without Ctrl, Alt and the Windows / Super key, and whether it is a dead key (`key_y`, `key_location`, `key_char`, `key_dead`, `KEY_DEAD`). Windows asks the layout through `ToUnicodeEx` without touching the keyboard state (Windows 10 1607 and later: a pending dead key stays for the text; before, no character), Linux the keymap of X11 and Wayland (`xkb_key_y`), macOS `charactersIgnoringModifiers`; the browser and Android give none. `key_char_test` and `key_layouts_test` for plattest (Windows)
+- **ui:** `KeyEvent::ch` and `KeyEvent::dead` (`ui.key_event_take`): the character the layout gives the key, as a browser names it (`KeyboardEvent.key`) also when Ctrl or Alt is held and the key types nothing -- Ctrl+Z on a German keyboard is `VK_Z` with `'z'`, its Ctrl++ `VK_OEM_PLUS` (the US layout's "=") with `'+'`, AltGr+Q `'@'`, Ctrl+Shift+Z `'Z'`; 0 for keys without a character (Enter, Tab, Esc, the arrows, F1 ...). docs/GUIDE.md section 5
+- **ui:** Script commands `wheel S DY [DX] [fine|pixels]` (a horizontal turn, a precision touchpad's fine steps, a trackpad's pixels in DIP) and `keydown` / `keyup ... [char "c"|none] [dead]` (another layout's character, a dead key); a script's keys have the US layout's characters. docs/GUIDE.md section 12
+- **Tests:** viewtest's page shows the wheel ("Rad:": notches, the pixels of a precise turn, the system's lines and characters) and the characters of raw keys: tests/wheel.uis (fine steps, pixels and their fractions, `jfgui_WHEEL_LINES` 5 and page), tests/keychar.uis (Ctrl+Z, Ctrl+Shift+Z, a German keyboard's Ctrl++, a dead key, keys without a character); gallery tests/wheel.uis (a scroll view: the system's lines, a trackpad's pixels at once, fine steps adding up, a page); termtest tests/wheel_fine.uis; diagramtest tests/wheel_fine.uis; editortest tests/code_wheel.uis; svgtest tests/viewer.uis (the horizontal wheel while the wheel zooms); plattest `--test keychar` (Windows: the user's German and US layouts through `ToUnicodeEx`; Linux: the fallback keymap) and `--test settings` (the wheel's overrides; Linux: KDE's WheelScrollLines on KDE only)
+
+### Changed
+
+- **plat:** (E2) `Event::y` of key events carries the key's character above its location: code that compared it with a `KL_*` takes `plat::key_location(y)` (`KeyEvent::location` is as before)
+- **plat:** Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point); the UI makes notches of them as `wheel_lines()` lines of 16 DIP, so its views follow the fingers' way (they scrolled 4.8 times it on Wayland, 1.2 times on macOS)
+- **ui:** A notch of the wheel scrolls the system's lines (`ui.wheel_lines()`) in the library's views, no longer always three; headless runs stay at three
+
+### Fixed
+
+- **ui:** The code editor's horizontal wheel scrolled the wrong way: tilted right it scrolled left (Shift + the wheel was right)
+- **ui:** An image view whose wheel zooms panned twice as far with the horizontal wheel while the vertical one stood still (and not at all in a right-to-left window)
+- **ui:** The fine steps of a precision touchpad (Windows' wheel deltas below 120) were cut off one by one where whole lines count: the terminal never scrolled with steps below 40, the code completion list scrolled three rows on each of them (and on two notches at once), Ctrl + each of them zoomed a diagram a whole step; they add up now
+- **Tests:** linuxtest's Wayland synth test expected key events at x = 0, y = 0, as before the scan code and the location came (E2)
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

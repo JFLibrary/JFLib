@@ -34,7 +34,9 @@
 // rendering the portal does not give comes from fontconfig's conf.d (/etc/fonts/conf.d,
 // $XDG_CONFIG_HOME/fontconfig/conf.d): the links 10-hinting-{none,slight,medium,full}.conf,
 // 10-sub-pixel-{rgb,bgr,vrgb,vbgr,none}.conf, 10-no-sub-pixel.conf, 10-no-antialias.conf /
-// 10-yes-antialias.conf (jfgui_FONTCONFIG_SETTINGS=0 skips them).
+// 10-yes-antialias.conf (jfgui_FONTCONFIG_SETTINGS=0 skips them).  The lines of a wheel notch:
+// on KDE kdeglobals' [KDE] WheelScrollLines (Plasma's mouse settings; the portal does not say
+// it, GNOME has no such setting), also while a portal answers.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -88,6 +90,9 @@ pub(crate) fn sys_settings_os(s: &mut SysSettings) {
     }
     FILES.store(files, Ordering::Relaxed);
     DARK.store(s.dark.map_or(-1, |d| d as i32), Ordering::Relaxed);
+    if kde_desktop() && !crate::env("jfgui_CONFIG_SETTINGS").is_some_and(|v| v.starts_with('0')) {
+        kde_wheel(s);
+    }
     if !crate::env("jfgui_FONTCONFIG_SETTINGS").is_some_and(|v| v.starts_with('0')) {
         fontconfig_links(s);
     }
@@ -281,12 +286,28 @@ pub(crate) fn config_files(s: &mut SysSettings, mut got: u32) {
             s.dark = Some(d);
         }
     }
-    let kde = crate::env("XDG_CURRENT_DESKTOP").is_some_and(|d| d.to_ascii_uppercase().split(':').any(|p| p == "KDE"));
-    if got & GOT_ACCENT == 0 && (kde || got & GOT_ANSWER == 0) {
+    if got & GOT_ACCENT == 0 && (kde_desktop() || got & GOT_ANSWER == 0) {
         if let Some(a) = accent {
             s.accent = Some(a);
         }
     }
+}
+
+/// the session is KDE's (XDG_CURRENT_DESKTOP names it)
+fn kde_desktop() -> bool {
+    crate::env("XDG_CURRENT_DESKTOP").is_some_and(|d| d.to_ascii_uppercase().split(':').any(|p| p == "KDE"))
+}
+
+/// KDE's lines per wheel notch: kdeglobals' [KDE] WheelScrollLines
+fn kde_wheel(s: &mut SysSettings) {
+    let Some(home) = crate::config_dir() else { return };
+    ini_each(&alloc::format!("{home}/kdeglobals"), &mut |sec, k, val| {
+        if sec == "KDE" && k == "WheelScrollLines" {
+            if let Ok(n) = val.parse::<u32>() {
+                s.wheel_lines = crate::wheel_amount(n);
+            }
+        }
+    });
 }
 
 /// a GTK theme name of a dark variant ("Yaru-dark", "Adwaita-dark", "Name:dark")

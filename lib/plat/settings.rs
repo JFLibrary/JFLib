@@ -9,7 +9,11 @@
 // jfgui_CONTRAST=high|normal, jfgui_REDUCE_MOTION=1|0, jfgui_TEXT_SCALE=PERCENT,
 // jfgui_DOUBLE_CLICK_MS=N, jfgui_CARET_BLINK_MS=N (0: a steady caret),
 // jfgui_FONT_AA=1|0, jfgui_FONT_HINTING=none|slight|medium|full,
-// jfgui_FONT_RGBA=none|rgb|bgr|vrgb|vbgr.
+// jfgui_FONT_RGBA=none|rgb|bgr|vrgb|vbgr, jfgui_WHEEL_LINES=N|page, jfgui_WHEEL_CHARS=N.
+//
+// The wheel (wheel_lines, wheel_chars: what a notch scrolls): Windows SPI_GETWHEELSCROLLLINES
+// (WHEEL_PAGESCROLL: a page) and SPI_GETWHEELSCROLLCHARS; KDE's [KDE] WheelScrollLines of
+// kdeglobals; GNOME, macOS, the browser and Android have no such setting (3 and 3).
 //
 // Font rendering (font_aa, font_hinting, font_rgba; None: the system says nothing): Windows
 // SPI_GETFONTSMOOTHING, SPI_GETFONTSMOOTHINGTYPE (ClearType: subpixels) and
@@ -199,7 +203,16 @@ pub struct SysSettings {
     pub font_rgba: Option<u8>,
     /// the title bar the library draws (Linux client-side decorations, AF_CUSTOM_TITLEBAR)
     pub titlebar: Titlebar,
+    /// lines a notch of the wheel scrolls (1..=100), WHEEL_PAGE: a page (Windows
+    /// SPI_GETWHEELSCROLLLINES, KDE's WheelScrollLines; elsewhere 3)
+    pub wheel_lines: u32,
+    /// characters a notch of the horizontal wheel scrolls (1..=100; Windows
+    /// SPI_GETWHEELSCROLLCHARS; elsewhere 3)
+    pub wheel_chars: u32,
 }
+
+/// SysSettings::wheel_lines: a notch of the wheel scrolls a page
+pub const WHEEL_PAGE: u32 = u32::MAX;
 
 impl Default for SysSettings {
     fn default() -> Self {
@@ -216,8 +229,16 @@ impl Default for SysSettings {
             font_hinting: None,
             font_rgba: None,
             titlebar: Titlebar::default(),
+            wheel_lines: 3,
+            wheel_chars: 3,
         }
     }
+}
+
+/// a number of lines or characters per notch as the system says it: 1..=100, the page
+/// (WHEEL_PAGE, Windows' WHEEL_PAGESCROLL) kept; 0 (Windows: the wheel does not scroll) is 1
+pub fn wheel_amount(n: u32) -> u32 {
+    if n == WHEEL_PAGE { n } else { n.clamp(1, 100) }
 }
 
 /// the system's settings and the jfgui_* overrides
@@ -282,6 +303,18 @@ fn env_overrides(s: &mut SysSettings) {
     }
     if let Some(v) = crate::env("jfgui_FONT_RGBA").as_deref().and_then(font_rgba_parse) {
         s.font_rgba = Some(v);
+    }
+    match crate::env("jfgui_WHEEL_LINES").as_deref().map(str::trim) {
+        Some("page") => s.wheel_lines = WHEEL_PAGE,
+        Some(v) => {
+            if let Ok(n) = v.parse::<u32>() {
+                s.wheel_lines = wheel_amount(n);
+            }
+        }
+        None => {}
+    }
+    if let Some(v) = num("jfgui_WHEEL_CHARS") {
+        s.wheel_chars = v.clamp(1, 100);
     }
     if let Some(v) = crate::env("jfgui_BUTTON_LAYOUT") {
         s.titlebar.buttons = Some(titlebar_layout_parse(&v));

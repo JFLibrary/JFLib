@@ -1454,12 +1454,13 @@ impl Ui {
             }
         }
         let wy = self.wp.ctx.wheel_y;
-        if (ev & EV_HOVER != 0 || self.wp.ctx.hot == sid) && wy != 0 {
-            let t = clamp_top(top as i64 - (wy as i64 * 3) / 120);
-            if t != top {
-                top = t;
-                self.wp.ctx.wheel_y = 0;
-            }
+        if (ev & EV_HOVER != 0 || self.wp.ctx.hot == sid) && wy != 0 && clamp_top(top as i64 - wy.signum() as i64) != top {
+            // the system's lines per notch (a page: the rows shown); a touchpad's fine steps add
+            // up to whole rows (they were cut off one by one: it never scrolled)
+            let per = if self.wheel_lines == plat::WHEEL_PAGE { (vrows as i32).max(1) } else { self.wheel_lines as i32 };
+            let n = self.wheel_steps(sid, per);
+            top = clamp_top(top as i64 - n as i64);
+            self.wheel_take_y();
         }
         // a finger may roll it, row by row (the way below a row waits); its way (touch.rs)
         let lh = m.lh.max(1) as i64;

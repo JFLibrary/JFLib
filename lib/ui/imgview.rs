@@ -727,22 +727,32 @@ impl Ui {
             // the wheel
             let c = &self.wp.ctx;
             let (wx, wy) = if ev & EV_HOVER != 0 { (c.wheel_x, c.wheel_y) } else { (0, 0) };
-            if wx != 0 || wy != 0 {
+            let (precise, px, py) = (c.wheel_precise, c.wheel_px_x as f64, c.wheel_px_y as f64);
+            if wx != 0 || wy != 0 || (precise && ev & EV_HOVER != 0 && (px != 0.0 || py != 0.0)) {
                 let ctrl = self.mods & MOD_CTRL != 0;
                 let shift = self.mods & MOD_SHIFT != 0;
                 let zoom = if flags & IV_WHEEL_SCROLL != 0 { ctrl } else { !shift };
                 let s = st.zoom * unit;
-                let notch = self.dp(48) as f64;
-                if zoom && wy != 0 {
-                    let f = rt::x87::pow(1.25, wy as f64 / 120.0);
-                    st.zoom_at(st.zoom * f, mx as f64 + 0.5 - cxv, my as f64 + 0.5 - cyv);
-                } else {
-                    // wheel up shows the upper part (Shift: the left part)
-                    let (mut ddx, mut ddy) = (wx as f64 / 120.0 * notch, -(wy as f64) / 120.0 * notch);
-                    if shift {
-                        ddx += ddy;
-                        ddy = 0.0;
+                // a notch: the system's lines of WHEEL_LINE_DIP (a page: the view)
+                let line = self.dp(WHEEL_LINE_DIP);
+                let notch = self.wheel_notch_px(line, r[3], false) as f64;
+                let notch_x = self.wheel_notch_px(line, r[2], true) as f64;
+                // wheel up shows the upper part (Shift: the left part); a touchpad's pixels
+                let (mut ddx, mut ddy) =
+                    if precise { (px, -py) } else { (wx as f64 / 120.0 * notch_x, -(wy as f64) / 120.0 * notch) };
+                if zoom {
+                    // the vertical wheel zooms, the horizontal one pans (it panned twice as far
+                    // when the vertical one stood still)
+                    if wy != 0 {
+                        let f = rt::x87::pow(1.25, wy as f64 / 120.0);
+                        st.zoom_at(st.zoom * f, mx as f64 + 0.5 - cxv, my as f64 + 0.5 - cyv);
                     }
+                    ddy = 0.0;
+                } else if shift {
+                    ddx += ddy;
+                    ddy = 0.0;
+                }
+                if ddx != 0.0 || ddy != 0.0 {
                     if self.rtl {
                         ddx = -ddx;
                     }
@@ -750,13 +760,7 @@ impl Ui {
                     st.cx += ddx / s;
                     st.cy += ddy / s;
                 }
-                if zoom && wx != 0 {
-                    st.fit = false;
-                    st.cx += wx as f64 / 120.0 * notch / s;
-                }
-                let c = &mut self.wp.ctx;
-                c.wheel_x = 0;
-                c.wheel_y = 0;
+                self.wheel_take();
             }
             // presses: pan (left, middle), zoom rectangle (Ctrl + left)
             let c = &self.wp.ctx;

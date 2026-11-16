@@ -512,9 +512,9 @@ impl X11 {
                 return; // its text comes as E_IME_COMMIT / E_PREEDIT
             }
             if vk != 0 {
-                // (E2) the evdev code (X keycode - 8) and where the key sits
+                // (E2) the evdev code (X keycode - 8), where the key sits and its character
                 let code = kc.wrapping_sub(8);
-                self.push(E_KEY_DOWN, 0, code as i32, crate::evdev_location(code) as i32, vk | rep);
+                self.push(E_KEY_DOWN, 0, code as i32, crate::xkb_key_y(code), vk | rep);
             }
             // dead keys composed (´ e -> é); a repeating dead key gives nothing
             let typed = if rep != 0 && dead { [0, 0] } else { crate::xkb_key_typed(ev).1 };
@@ -540,7 +540,7 @@ impl X11 {
         }
         if vk != 0 {
             let code = kc.wrapping_sub(8);
-            self.push(E_KEY_UP, 0, code as i32, crate::evdev_location(code) as i32, vk);
+            self.push(E_KEY_UP, 0, code as i32, crate::xkb_key_y(code), vk);
         }
     }
 

@@ -14,7 +14,8 @@
 //   modifiers Command is MOD_CTRL (the library's shortcuts are Ctrl+..), Control MOD_SUPER, Option
 //             MOD_ALT
 //   gestures  the trackpad's pinch becomes Ctrl + wheel (120 per 0.2 of magnification), as Windows
-//             makes it of a touchpad's pinch; two-finger scrolling is the wheel with fine steps
+//             makes it of a touchpad's pinch; two-finger scrolling is the wheel in physical pixels
+//             (WHEEL_PIXELS)
 //   settings  a change of the appearance or the accent colour (distributed notifications) and of the
 //             screens push E_SETTINGS (SET_THEME, SET_MONITORS) for window 0
 //   frame     PWF_SYSFRAME: the system's title bar; otherwise the content reaches under a transparent
@@ -53,7 +54,7 @@ use crate::{
     Event, Frame, HB_CLOSE, HB_DRAG, HB_MAX, HB_MIN, MOD_ALT, MOD_CAPS, MOD_CTRL, MOD_SHIFT, MOD_SUPER, PW_DEFAULT, PW_KEEP,
     PPW_MAX, PW_MAX, PW_NOOWNER, PWF_DIALOG, PWF_NOCLOSE, PWF_RESIZABLE, PWF_SYSFRAME, PWF_TOOL, PWS_HIDE, PWS_SHOWNA, WCMD_CLOSE,
     WCMD_FULLSCREEN, WCMD_LOWER, WCMD_MAXIMIZE, WCMD_MINIMIZE, WCMD_RESTORE, WCMD_WINDOWED, WST_ACTIVE, WST_FULLSCREEN,
-    WST_MAXIMIZED, WST_MINIMIZED, evq_count, evq_push, E_SETTINGS, SET_MONITORS, SET_THEME,
+    WST_MAXIMIZED, WST_MINIMIZED, evq_count, evq_push, E_SETTINGS, SET_MONITORS, SET_THEME, WHEEL_PIXELS,
 };
 
 type CfRef = *const c_void;
@@ -1798,9 +1799,10 @@ extern "C" fn v_scroll(this: Id, _cmd: Sel, ev: Id) {
     let (precise, dx, dy) = unsafe {
         (msg!(ev, c"hasPreciseScrollingDeltas"; bool), msg!(ev, c"scrollingDeltaX"; f64), msg!(ev, c"scrollingDeltaY"; f64))
     };
-    // 120 per notch (a line); a trackpad's points: 40 points a notch; the rest waits for the next event.
-    // Up and right are positive: AppKit's deltaY > 0 scrolls up, deltaX > 0 to the left.
-    let k = if precise { 3.0 } else { 120.0 };
+    // 120 per notch (a line); a trackpad's (and a Magic Mouse's) points as physical pixels
+    // (WHEEL_PIXELS); the rest waits for the next event.  Up and right are positive: AppKit's
+    // deltaY > 0 scrolls up, deltaX > 0 to the left.
+    let k = if precise { target(this).map_or(1.0, |t| t.3) } else { 120.0 };
     let (wy, wx) = with(|s| {
         s.wheel[0] += dy * k;
         s.wheel[1] -= dx * k;
@@ -1812,7 +1814,7 @@ extern "C" fn v_scroll(this: Id, _cmd: Sel, ev: Id) {
     .unwrap_or((0.0, 0.0));
     if wy != 0.0 || wx != 0.0 {
         let data = (wy.clamp(-32768.0, 32767.0) as i16 as u16 as u32) | ((wx.clamp(-32768.0, 32767.0) as i16 as u16 as u32) << 16);
-        push(w, E_WHEEL, 0, x, y, data);
+        push(w, E_WHEEL, if precise { WHEEL_PIXELS } else { 0 }, x, y, data);
     }
 }
 
@@ -1851,7 +1853,7 @@ extern "C" fn v_key_down(this: Id, _cmd: Sel, ev: Id) {
         let repeat: bool = msg!(ev, c"isARepeat"; bool);
         let vk = vk_of(code, ev);
         if vk != 0 {
-            push(w, E_KEY_DOWN, 0, 0, 0, vk | if repeat { 1 << 31 } else { 0 });
+            push(w, E_KEY_DOWN, 0, 0, key_y_of(ev), vk | if repeat { 1 << 31 } else { 0 });
         }
         let f: u64 = msg!(ev, c"modifierFlags"; u64);
         if f & FLAG_COMMAND == 0 {
@@ -1866,8 +1868,19 @@ extern "C" fn v_key_up(this: Id, _cmd: Sel, ev: Id) {
     let code: u16 = unsafe { msg!(ev, c"keyCode"; u16) };
     let vk = vk_of(code, ev);
     if vk != 0 {
-        push(view_win(this), E_KEY_UP, 0, 0, 0, vk);
+        push(view_win(this), E_KEY_UP, 0, 0, key_y_of(ev), vk);
     }
+}
+
+/// (E2) Event::y of a key event: the character the key gives without Command, Option and Control
+/// (charactersIgnoringModifiers: Shift applies); AppKit's function keys (U+F700..U+F8FF: arrows,
+/// F1 ...) and control characters are none
+fn key_y_of(ev: Id) -> i32 {
+    // SAFETY: charactersIgnoringModifiers of a key event.
+    let s = string_of(unsafe { msg!(ev, c"charactersIgnoringModifiers"; Id) });
+    let c = s.chars().next().map_or(0, |c| c as u32);
+    let c = if c < 0x20 || c == 0x7F || (0xF700..0xF900).contains(&c) { 0 } else { c };
+    crate::key_y(crate::KL_STANDARD, c, false)
 }
 extern "C" fn v_flags_changed(this: Id, _cmd: Sel, ev: Id) {
     // SAFETY: keyCode / modifierFlags of a flags-changed event.

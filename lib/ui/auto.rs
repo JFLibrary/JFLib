@@ -36,13 +36,20 @@
 //                   then they lift
 //   pan2 S DX DY [MS]   two fingers around S (80 DIP apart) move by DX, DY (DIP) in MS ms (default 300),
 //                   then they lift
-//   wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
-//                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
+//   wheel S DY [DX] [fine|pixels] [shift|ctrl|alt]...   DY (DX: sideways, right positive) in
+//                   wheel units (120 = one notch); the words hold those modifiers during the
+//                   wheel event (e.g. Ctrl + wheel zoom); fine: a device in fine steps (a
+//                   precision touchpad on Windows: plat::WHEEL_FINE), pixels: DY and DX are DIP
+//                   of a device that scrolls by pixels (plat::WHEEL_PIXELS: a trackpad)
 //   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
-//   keydown CHORD [scan N] [left|right|numpad]   (E2) the key goes down and stays down (a
-//                   modifier key -- shift, ctrl, alt -- is held for the following events; once
-//                   more while down: an auto-repeat); keyup CHORD [scan N] [left|right|numpad]
-//                   lets it go; scan N and the location reach ui.key_event_take
+//   keydown CHORD [scan N] [left|right|numpad] [char "c"|none] [dead]   (E2) the key goes down
+//                   and stays down (a modifier key -- shift, ctrl, alt -- is held for the
+//                   following events; once more while down: an auto-repeat); keyup CHORD [...]
+//                   lets it go; scan N, the location and the character reach
+//                   ui.key_event_take (KeyEvent::ch: the US layout's for the key and its Shift --
+//                   `key` gives those too --, char "c" another layout's, e.g. a German
+//                   keyboard's Ctrl++ `keydown ctrl++ char "+"` -- the key VK_OEM_PLUS, "=" on
+//                   the US layout; dead: a dead key)
 //   preedit "text" [CURSOR]   (E4) an input method's composition (ui.ime_preedit; CURSOR a byte
 //                   offset, default the end; "" ends it); commit "text" commits
 //                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
@@ -470,6 +477,30 @@ fn chord(p: &[u8]) -> Option<(u32, u32, &[u8])> {
     // the key name ends at a blank
     let vk = key_lookup(p);
     (vk != 0).then(|| (mods, vk, next_word(p)))
+}
+
+// us_char(vk, shift) -> the character the US layout gives the key (KeyEvent::ch of a script's
+// keys): letters, digits, the space bar, the punctuation keys (VK_OEM_*) with and without Shift,
+// the number block's digits and signs; 0 for the other keys
+fn us_char(vk: u32, shift: bool) -> u32 {
+    const SHIFTED_DIGITS: &[u8; 10] = b")!@#$%^&*(";
+    // VK_OEM_1 ..= VK_OEM_3 (0xBA..0xC0) and VK_OEM_4 ..= VK_OEM_7 (0xDB..0xDE): plain, shifted
+    const OEM: [(u32, u8, u8); 11] = [
+        (0xBA, b';', b':'), (0xBB, b'=', b'+'), (0xBC, b',', b'<'), (0xBD, b'-', b'_'), (0xBE, b'.', b'>'), (0xBF, b'/', b'?'),
+        (0xC0, b'`', b'~'), (0xDB, b'[', b'{'), (0xDC, b'\\', b'|'), (0xDD, b']', b'}'), (0xDE, b'\'', b'"'),
+    ];
+    match vk {
+        0x41..=0x5A => if shift { vk } else { vk + 32 },
+        0x30..=0x39 => if shift { SHIFTED_DIGITS[(vk - 0x30) as usize] as u32 } else { vk },
+        0x20 => 0x20,
+        0x60..=0x69 => vk - 0x30, // VK_NUMPAD0..9
+        0x6A => b'*' as u32,
+        0x6B => b'+' as u32,
+        0x6D => b'-' as u32,
+        0x6E => b'.' as u32,
+        0x6F => b'/' as u32,
+        _ => OEM.iter().find(|o| o.0 == vk).map_or(0, |o| (if shift { o.2 } else { o.1 }) as u32),
+    }
 }
 
 // mod_word(p) -> MOD_* of the word shift / ctrl / alt at p (0 = another word): the modifiers
@@ -1816,8 +1847,10 @@ impl Ui {
         self.sc.finger_id = 0;
     }
 
-    // wheel S DY [shift|ctrl|alt]...: the words hold those modifiers during the wheel event
-    // (not during the move to S)
+    // wheel S DY [DX] [fine|pixels] [shift|ctrl|alt]...: the words hold those modifiers during
+    // the wheel event (not during the move to S); fine: the 120 per notch of a device in fine
+    // steps (plat::WHEEL_FINE, a precision touchpad on Windows), pixels: DY and DX are DIP of a
+    // device that scrolls by pixels (plat::WHEEL_PIXELS, physical px at the window's scale)
     fn sc_wheel(&mut self, app: &mut dyn App, a: &[u8]) {
         let (s, r) = self.resolve(a);
         if s.is_none() {
@@ -1825,25 +1858,45 @@ impl Ui {
             return;
         }
         let (dy, r) = parse_int(r);
+        let mut q = skip_ws(r);
+        let mut dx = 0;
+        if q.first().is_some_and(|&c| c == b'-' || c.is_ascii_digit()) {
+            let (v, r) = parse_int(q);
+            dx = v;
+            q = skip_ws(r);
+        }
         let saved_mods = self.sc.script_mods;
         let mut mods = saved_mods;
-        let mut q = skip_ws(r);
+        let mut kind = 0u8;
         while !q.is_empty() {
-            let m = mod_word(q);
-            if m == 0 {
-                let mut d = b"unknown wheel option ".to_vec();
-                d.extend_from_slice(q);
-                self.fail(&d);
-                return;
+            if word_eq(q, "fine").is_some() {
+                kind = plat::WHEEL_FINE;
+            } else if word_eq(q, "pixels").is_some() {
+                kind = plat::WHEEL_PIXELS;
+            } else {
+                let m = mod_word(q);
+                if m == 0 {
+                    let mut d = b"unknown wheel option ".to_vec();
+                    d.extend_from_slice(q);
+                    self.fail(&d);
+                    return;
+                }
+                mods |= m;
             }
-            mods |= m;
             q = next_word(q);
         }
         let (x, y) = (self.sc.sel_x, self.sc.sel_y);
         self.mouse_to(app, x, y);
         let (sx, sy) = (self.sc.sc_x, self.sc.sc_y);
+        let (dy, dx) = if kind == plat::WHEEL_PIXELS {
+            let dpi = self.win_dpi(self.sc.sc_win);
+            (dp_at(dy, dpi), dp_at(dx, dpi))
+        } else {
+            (dy, dx)
+        };
+        let data = (dy.clamp(-32768, 32767) as u16 as u32) | (dx.clamp(-32768, 32767) as u16 as u32) << 16;
         self.sc.script_mods = mods;
-        self.inject(app, plat::E_WHEEL, 0, sx, sy, dy as u16 as u32);
+        self.inject(app, plat::E_WHEEL, kind as u32, sx, sy, data);
         self.sc.script_mods = saved_mods;
     }
 
@@ -1939,29 +1992,55 @@ impl Ui {
         }
     }
 
-    // a key pressed and released with modifiers (and those keydown holds)
+    // a key pressed and released with modifiers (and those keydown holds), with the US layout's
+    // character (KeyEvent::ch)
     fn press(&mut self, app: &mut dyn App, mods: u32, vk: u32) {
         let held = self.sc.script_mods;
         self.sc.script_mods = held | mods;
-        self.inject(app, plat::E_KEY_DOWN, 0, 0, 0, vk);
-        self.inject(app, plat::E_KEY_UP, 0, 0, 0, vk);
+        let y = plat::key_y(KL_STANDARD, us_char(vk, self.sc.script_mods & MOD_SHIFT != 0), false);
+        self.inject(app, plat::E_KEY_DOWN, 0, 0, y, vk);
+        self.inject(app, plat::E_KEY_UP, 0, 0, y, vk);
         self.sc.script_mods = held;
     }
 
-    // (E2) keydown / keyup CHORD [scan N] [left|right|numpad]: one key down (an auto-repeat when
-    // it is down already) or up; shift / ctrl / alt stay held between their keydown and keyup
+    // (E2) keydown / keyup CHORD [scan N] [left|right|numpad] [char "c"|none] [dead]: one key
+    // down (an auto-repeat when it is down already) or up; shift / ctrl / alt stay held between
+    // their keydown and keyup.  The key's character (KeyEvent::ch) is the US layout's for it and
+    // Shift, char "c" another layout's (a German keyboard's Ctrl++: keydown ctrl++ char "+"),
+    // char none none; dead: a dead key
     fn sc_keyraw(&mut self, app: &mut dyn App, a: &[u8], down: bool) {
         let Some((mods, vk, rest)) = chord(skip_ws(a)) else {
             self.fail(b"unknown key");
             return;
         };
         let (mut scan, mut loc) = (0i32, KL_STANDARD);
+        let (mut ch, mut dead): (Option<u32>, bool) = (None, false);
         let mut q = skip_ws(rest);
         while !q.is_empty() {
             if let Some(r) = word_eq(q, "scan") {
                 let (n, r) = parse_int(skip_ws(r));
                 scan = n;
                 q = skip_ws(r);
+                continue;
+            }
+            if let Some(r) = word_eq(q, "char") {
+                let r = skip_ws(r);
+                if let Some(r) = word_eq(r, "none") {
+                    ch = Some(0);
+                    q = skip_ws(r);
+                    continue;
+                }
+                let Some((s, r)) = parse_qstring(r, 16) else {
+                    self.fail(b"keydown / keyup: char \"c\" or char none");
+                    return;
+                };
+                ch = Some(core::str::from_utf8(&s).ok().and_then(|s| s.chars().next()).map_or(0, |c| c as u32));
+                q = skip_ws(r);
+                continue;
+            }
+            if word_eq(q, "dead").is_some() {
+                dead = true;
+                q = next_word(q);
                 continue;
             }
             loc = if word_eq(q, "left").is_some() {
@@ -1985,15 +2064,18 @@ impl Ui {
             _ => 0,
         };
         let held = self.sc.script_mods;
+        // the character with the Shift of the event (a Shift's own event: its new state)
+        let shift = (if down { held | own | mods } else { (held | mods) & !own }) & MOD_SHIFT != 0;
+        let y = plat::key_y(loc, ch.unwrap_or_else(|| us_char(vk, shift)), dead);
         if down {
             // a modifier's own event carries its new state (as Win32 and Wayland do)
             let repeat = if self.keydown[(vk & 255) as usize] != 0 { 1 << 31 } else { 0 };
             self.sc.script_mods = held | own | mods;
-            self.inject(app, plat::E_KEY_DOWN, 0, scan, loc as i32, vk | repeat);
+            self.inject(app, plat::E_KEY_DOWN, 0, scan, y, vk | repeat);
             self.sc.script_mods = held | own;
         } else {
             self.sc.script_mods = (held | mods) & !own;
-            self.inject(app, plat::E_KEY_UP, 0, scan, loc as i32, vk);
+            self.inject(app, plat::E_KEY_UP, 0, scan, y, vk);
             self.sc.script_mods = held & !own;
         }
     }

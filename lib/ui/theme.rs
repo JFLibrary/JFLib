@@ -13,8 +13,10 @@
 //   text_scale() / set_text_scale(percent)   text sizes and line heights (not the controls)
 //   sys_apply(settings)        (runtime) plat::sys_settings: theme, accent, contrast, reduced
 //                              motion (anim_off), text scale, double-click and caret times,
-//                              font smoothing and its subpixel order; what the app or the
-//                              command line fixed stays
+//                              font smoothing and its subpixel order, the wheel's lines and
+//                              characters; what the app or the command line fixed stays
+//   wheel_lines() / wheel_chars() / wheel_notch_px(line_px, page_px, horizontal)   what a
+//                              notch of the wheel scrolls (the system's setting)
 //   color(tok) -> argb         0xAARRGGBB of a T_* token (byte offset)
 //   ts_font(ts)                select font and pixel size of a TS_* text style
 //   ts_line(ts) -> px          line height of a text style
@@ -286,6 +288,29 @@ impl Ui {
         self.font_prefs
     }
 
+    /// the lines a notch of the wheel scrolls as the system says it (1..=100; plat::WHEEL_PAGE:
+    /// a page): Windows' mouse settings (SPI_GETWHEELSCROLLLINES), KDE's WheelScrollLines; 3
+    /// elsewhere and in headless runs (jfgui_WHEEL_LINES).  The library's views scroll that many
+    /// lines per notch (120 of UiInput::wheel_y): WHEEL_LINE_DIP each, their text's lines in text
+    /// views; an app that scrolls by lines of its own takes this many per notch too
+    pub fn wheel_lines(&self) -> u32 {
+        self.wheel_lines
+    }
+
+    /// the characters a notch of the horizontal wheel scrolls (1..=100; Windows
+    /// SPI_GETWHEELSCROLLCHARS; 3 elsewhere and in headless runs, jfgui_WHEEL_CHARS)
+    pub fn wheel_chars(&self) -> u32 {
+        self.wheel_chars
+    }
+
+    /// the pixels a notch of the wheel scrolls in a view whose lines are line_px high and whose
+    /// page is page_px: wheel_lines lines (a page for plat::WHEEL_PAGE); horizontal: wheel_chars
+    /// characters of line_px
+    pub fn wheel_notch_px(&self, line_px: i32, page_px: i32, horizontal: bool) -> i32 {
+        let n = if horizontal { self.wheel_chars } else { self.wheel_lines };
+        if n == plat::WHEEL_PAGE { page_px.max(line_px) } else { line_px.saturating_mul(n as i32) }
+    }
+
     /// scale text sizes and line heights (50..300 %); the system's scale no longer applies
     pub fn set_text_scale(&mut self, percent: u32) {
         self.text_scale_forced = true;
@@ -326,6 +351,8 @@ impl Ui {
         }
         self.dbl_ms = s.double_click_ms;
         self.blink_ms = s.caret_blink_ms;
+        self.wheel_lines = plat::wheel_amount(s.wheel_lines);
+        self.wheel_chars = s.wheel_chars.clamp(1, 100);
         // font smoothing off: black-and-white glyphs; a subpixel order: subpixel smoothing on
         // opaque targets (text/lcd.rs; headless only through jfgui_FONT_RGBA, so shots stay
         // the same everywhere); hinting is kept for the app (font_prefs)

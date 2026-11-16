@@ -909,6 +909,10 @@ impl Ui {
         let (wx, wy) = if ev & EV_HOVER != 0 { (c.wheel_x, c.wheel_y) } else { (0, 0) };
         inp.wheel_x = wx;
         inp.wheel_y = wy;
+        let hover = ev & EV_HOVER != 0;
+        inp.wheel_precise = hover && c.wheel_precise;
+        inp.wheel_px_x = if hover { c.wheel_px_x } else { 0 };
+        inp.wheel_px_y = if hover { c.wheel_px_y } else { 0 };
         inp.mods = self.mods;
         inp.rect = r;
         inp.dpi = self.wp.rt.dpi;

@@ -840,12 +840,14 @@ impl Ui {
         }
         // ---- wheel, the caret into view
         let lh = lays.first().and_then(|l| l.rows.first()).map_or(self.dp(20), |r| r.h);
-        let wy = self.wp.ctx.wheel_y;
-        if (ev & EV_HOVER != 0 || self.wp.ctx.hot == id.wrapping_add(1)) && wy != 0 {
-            let s = (v.scroll - wy * lh * 3 / 120).clamp(0, (total - th).max(0));
+        let (wy, precise, py) = (self.wp.ctx.wheel_y, self.wp.ctx.wheel_precise, self.wp.ctx.wheel_px_y);
+        if (ev & EV_HOVER != 0 || self.wp.ctx.hot == id.wrapping_add(1)) && (wy != 0 || py != 0) {
+            // the system's lines per notch (a page: the view), a touchpad's pixels
+            let d = if precise { py } else { wy.saturating_mul(self.wheel_notch_px(lh, th, false)) / 120 };
+            let s = (v.scroll - d).clamp(0, (total - th).max(0));
             if s != v.scroll {
                 v.scroll = s;
-                self.wp.ctx.wheel_y = 0;
+                self.wheel_take_y();
             }
         }
         // the finger's way (touch.rs)

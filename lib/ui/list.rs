@@ -4,7 +4,8 @@
 //   scroll_begin(id, flags)                clipped viewport that takes its size like a box
 //        (next_size / parent) and lays its children out in a content area that may be
 //        larger; flags = SC_V (default) | SC_H | SC_NOBAR | SC_NOWHEEL | BOX_BG | BOX_CARD |
-//        PAD_n ...  Mouse wheel (48 DIP per notch, smooth), overlay scroll bars (2 DIP, 6 DIP
+//        PAD_n ...  Mouse wheel (the system's lines of 16 DIP per notch -- 48 DIP with three --
+//        smooth; a touchpad's pixels at once), overlay scroll bars (2 DIP, 6 DIP
 //        while pointed at, draggable thumb, click on the track pages), Tab focus is scrolled
 //        into view.  A style whose bars stay visible (netlab) keeps their room free right of
 //        the content of a view that scrolls only vertically, always, so nothing moves when
@@ -65,7 +66,6 @@ const LIST_MAX: usize = 4;
 const EXP_MAX: usize = 16;
 /// tab widths on the stack; more tabs (any number) use the heap
 const TABS_INLINE: usize = 32;
-const WHEEL_DIP: i32 = 48;
 
 // tab widths: on the stack up to TABS_INLINE tabs (no allocation), on the heap beyond
 #[derive(Default)]
@@ -497,7 +497,7 @@ impl Ui {
             return;
         }
         let c = &self.wp.ctx;
-        if c.wheel_y | c.wheel_x == 0 {
+        if c.wheel_y | c.wheel_x | c.wheel_px_y | c.wheel_px_x == 0 {
             return;
         }
         // hovered: the hot widget is one of our hit boxes on our layer
@@ -510,10 +510,17 @@ impl Ui {
         if !found {
             return;
         }
-        let step = self.dp(WHEEL_DIP);
+        // a notch: the system's lines of WHEEL_LINE_DIP (a page: the view's); a precise turn
+        // (a touchpad) by its pixels, at once
+        let line = self.dp(WHEEL_LINE_DIP);
+        let (sy, sx) = (self.wheel_notch_px(line, e.rect[3], false), self.wheel_notch_px(line, e.rect[2], true));
         let c = &self.wp.ctx;
-        let mut dy = c.wheel_y.wrapping_neg().wrapping_mul(step) / 120; // wheel up = towards the start
-        let mut dx = c.wheel_x.wrapping_mul(step) / 120;
+        let precise = c.wheel_precise;
+        let (mut dy, mut dx) = if precise {
+            (c.wheel_px_y.wrapping_neg(), c.wheel_px_x)
+        } else {
+            (c.wheel_y.wrapping_neg().wrapping_mul(sy) / 120, c.wheel_x.wrapping_mul(sx) / 120) // wheel up = towards the start
+        };
         let axes = scr_axes(e.flags);
         // the vertical wheel scrolls sideways in horizontal views or with Shift
         if axes & 1 == 0 || (axes & 2 != 0 && self.mods & MOD_SHIFT != 0) {
@@ -541,13 +548,12 @@ impl Ui {
         }
         s.adur = ny as u32;
         s.at0 = nx as u32;
-        if anim_off {
+        if anim_off || precise {
             s.scrolly = ny;
             s.scrollx = nx;
         }
-        self.wp.ctx.wheel_y = 0;
-        self.wp.ctx.wheel_x = 0;
-        if anim_off {
+        self.wheel_take();
+        if anim_off || precise {
             self.repass();
         } else {
             self.animating = true;

@@ -89,8 +89,12 @@
 //                                          a11y-show: the demo by hand, for a screen reader
 //   plattest --test settings / settings-bus / settings-bus-files   (t_settings.rs) the system
 //                                          settings: the jfgui_* overrides, the title bar's
-//                                          layout; Linux: GTK's / KDE's files, against a fake
-//                                          settings portal (with and without appearance keys)
+//                                          layout, the wheel's lines; Linux: GTK's / KDE's files,
+//                                          against a fake settings portal (with and without
+//                                          appearance keys)
+//   plattest --test keychar                (t_keychar.rs) the layout's character of a key event
+//                                          (plat::key_y): Windows the user's layouts through
+//                                          ToUnicodeEx (German, US), Linux the fallback keymap
 //   plattest --test a11y-rich / uia-rich / a11y-rich-bus   (t_a11y_rich.rs) a web page's
 //                                          accessibility tree (apps/a11ytest's page): headless
 //                                          model, requests, live regions, the rich update format;
@@ -260,6 +264,8 @@ mod t_print;
 mod t_reg;
 mod t_secret;
 mod t_settings;
+// the layout's character of a key event
+mod t_keychar;
 mod t_tray;
 // the desktop integration: keeping awake, autostart, the taskbar button
 mod t_autostart;
@@ -437,6 +443,7 @@ fn plattest() -> i32 {
         Some("log-crash-stderr") => t_log::t_log_crash_stderr,
         Some("life-bus") => t_life::t_life_bus,        // Linux: against tools/platshared/life_bus.py
         Some("settings") => t_settings::t_settings,    // the system settings: overrides, defaults
+        Some("keychar") => t_keychar::t_keychar,       // the layout's character of a key event
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
         Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
         Some("a11y-rich") => t_a11y_rich::t_a11y_rich, // a web page's accessibility tree, headless
