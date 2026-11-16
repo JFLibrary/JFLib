@@ -56,18 +56,21 @@ none, run `cargo clean -p NAME` once.
 
 A JFLib program starts without a C runtime, so the linker has to be told how to put it together.
 On Windows that is the entry point, the window or console subsystem and the icon. On Linux it is
-one static file, or with `--cfg jfgui_glibc` a program against glibc, which a window needs for the
-GPU drivers; the libraries to link against are made here, so the build machine needs no glibc.
+a program against glibc, which a window needs for the GPU drivers, or with
+`-C target-feature=+crt-static` one static file; the libraries to link against are made here, so
+the build machine needs no glibc.
 For the browser it is the exports of the WebAssembly module. macOS, iOS and Android need nothing
 extra. A program with `std` gets the C runtime's entry point and libraries instead, and on Linux
 it is built on Linux, through the system's `cc`. The linker's map of a Windows or Linux program
 lands in the build script's `OUT_DIR` as `program.map`; JFLib's crash reports name offsets into
 it.
 
-What a build script cannot set, the linker and the relocation model, comes from the project's
-`.cargo/config.toml`. The template of `jflib` has it, and an error here names what is missing.
-Build Linux programs with `--target x86_64-unknown-linux-gnu` (or the ARM64 triple), on Linux too,
-so that those flags reach the program and not the build scripts.
+What a build script cannot set comes from the project's `.cargo/config.toml`: on Windows the
+linker (rust-lld). Linux needs nothing there: the program links through cc as the build scripts
+do, so `cargo run` is all it takes. One static file takes `-C target-feature=+crt-static` and
+`-C relocation-model=static` there and is built with `--target x86_64-unknown-linux-gnu`, on Linux
+too, so that those flags reach the program and not the build scripts. The template of `jflib`
+says so, and an error here names what is missing.
 
 ## Its promise
 
@@ -76,13 +79,12 @@ so that those flags reach the program and not the build scripts.
 `.part_of()`, `.run()` and the files it reads. All of JFLib's crates share one version and are
 released together; keep `jflib-build` at the version of `jflib`.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-The build script accepts macOS and iOS, where Apple's linker needs nothing extra. `PACKAGE` takes
-`browser=1` for an app that is a web browser, which needs `http` and `https` among its
-`schemes=`. For programs against glibc on ARM64 Linux, the libraries made for linking also carry
-`getauxval`, through which the runtime reads the page size there. When the Linux flags are
-missing, the error says to build with `--target`, on Linux too. Everything is in the
+On Linux a program links against glibc unless `-C target-feature=+crt-static` makes it one static
+file, and it is linked to a fixed address with `-no-pie`, so `-C relocation-model=static` is only
+needed for the static file. `cargo run` needs no flags and no `--target` on Linux any more; the
+rustflags of older templates still work with `--target`. Everything is in the
 [changelog](https://docs.rs/crate/jflib-build/latest/source/CHANGELOG.md).
 
 ## Documentation

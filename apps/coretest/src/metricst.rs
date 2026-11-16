@@ -17,6 +17,22 @@ pub fn run(t: &mut T) {
     layout(t);
     quantiles(t);
     window(t);
+    window_edges(t);
+}
+
+// a bucket of a window counts past u32::MAX like the total does; an interval that ends past the
+// newest slot keeps the older slots the ring still holds
+fn window_edges(t: &mut T) {
+    let mut w = Window::new(1, 1);
+    let ok = w.record_n(0, 1, u32::MAX) && w.record_n(0, 1, u32::MAX) && w.record(0, 100);
+    let h = w.hist_between(0, 1);
+    let total: u64 = h.buckets().iter().map(|b| b.2).sum();
+    t.check("window: a bucket over u32::MAX keeps its weight", ok && total == h.count() && h.count() == 2 * u32::MAX as u64 + 1);
+    t.eq("window: the median is the bulk's value", h.quantile(500), Some(1));
+    let mut w = Window::new(3, 1);
+    w.record(0, 7);
+    t.eq("hist_between(0, 3)", w.hist_between(0, 3).count(), 1);
+    t.eq("hist_between(0, 4): a wider interval keeps it", w.hist_between(0, 4).count(), 1);
 }
 
 fn counters(t: &mut T) {

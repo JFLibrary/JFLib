@@ -41,7 +41,8 @@ only `jflib = "0.2"`, offline, with nothing of this repository on their paths:
           its session, a saved change builds and starts it again, a broken source keeps the
           old build and fills build.txt, Ctrl+Break ends watch.
   hallo3  made by `cargo jflib new --std` (docs/CRATES.md, CR6) with a std crate from a path:
-          `cargo jflib test`; its crate forbids unsafe code and has a unit test (`cargo test --lib`
+          `cargo jflib test`; its crate forbids unsafe code and has a unit test (`cargo test --lib`,
+          linked by ui::main!), as has a style crate with std beside it (stdstyle, without main!:
           through ui::test_main!); a release program whose std::thread, std::fs and print! work next to
           JFLib, whose std crate's thread_local! counts on a thread of plat, whose panic ends as
           JFLib's crash report (exit 3), and which imports no C runtime DLL (+crt-static); the
@@ -189,6 +190,11 @@ def forget_changed(out, crates, target_dirs):
         for fp in (f for pat in ("*/.fingerprint", "*/*/.fingerprint", "*/*/*/.fingerprint") for f in d.glob(pat)):
             for f in fp.iterdir():
                 if f.name.rsplit("-", 1)[0] in changed:
+                    shutil.rmtree(f, ignore_errors=True)
+        # newer Cargo keeps every unit's fingerprint and output in <profile>/build/PACKAGE/HASH
+        for b in (f for pat in ("*/build", "*/*/build", "*/*/*/build") for f in d.glob(pat)):
+            for f in b.iterdir():
+                if f.is_dir() and f.name in changed:
                     shutil.rmtree(f, ignore_errors=True)
     stamp.write_text(json.dumps(new, indent=1, sort_keys=True), encoding="utf-8")
     return changed
@@ -678,17 +684,37 @@ STD_CHECK = """    if jflib::plat::args().iter().any(|a| a == "--std-panic") {
 """
 STD_WANT = "std words=2 calls=1 tls=1,2 fs=true"
 
-# at the end of hallo3's src/lib.rs, whose crate forbids unsafe code: a unit test of a library crate
-# with std links through ui::test_main! (E16), and neither macro needs an allow there
+# at the end of hallo3's src/lib.rs, whose crate forbids unsafe code: a unit test of the app's library
+# crate with std, which has ui::main!: its jfgui_main links the test binary, its panic check leaves
+# the test build out (no ui::test_main!, which would define jfgui_main a second time)
 STD_UNIT_TEST = """
-#[cfg(test)]
-ui::test_main!();
-
 #[cfg(test)]
 mod tests {
     #[test]
     fn std_next_to_jflib() {
         assert_eq!(stdcrate::count_words("a b a").0, 2);
+    }
+}
+"""
+
+# hallo3/stdstyle: a library crate with std and without main! (an app's own style crate) that forbids
+# unsafe code: its unit test links through ui::test_main! (E16), which needs no allow there
+STD_STYLE = """//! stdstyle -- a library crate with std and without main! (an app's own style crate)
+#![forbid(unsafe_code)]
+
+/// the accent, lighter
+pub fn lighter(rgb: u32) -> u32 {
+    jflib::ui::color_mix(rgb, 0xffffff, 128)
+}
+
+#[cfg(test)]
+jflib::ui::test_main!();
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn lighter_than_black() {
+        assert_ne!(super::lighter(0), 0);
     }
 }
 """
@@ -755,8 +781,15 @@ def check_std(run, made, vendor, targets, jenv, target_dir):
     (app / "stdcrate" / "Cargo.toml").write_text('[package]\nname = "stdcrate"\nversion = "0.1.0"\nedition = "2024"\n', encoding="utf-8")
     (app / "stdcrate" / "src" / "lib.rs").write_text(STD_CRATE, encoding="utf-8")
     toml = app / "Cargo.toml"
-    toml.write_text(toml.read_text(encoding="utf-8").replace("[dependencies]\n", '[dependencies]\nstdcrate = { path = "stdcrate" }\n', 1),
-                    encoding="utf-8")
+    text = toml.read_text(encoding="utf-8")
+    toml.write_text(text.replace("[dependencies]\n", '[dependencies]\nstdcrate = { path = "stdcrate" }\n', 1), encoding="utf-8")
+    # the style crate: hallo3's jflib and profiles (its tests take the crates compiled for hallo3's)
+    jflib = next(line for line in text.splitlines() if line.startswith("jflib = "))
+    (app / "stdstyle" / "src").mkdir(parents=True)
+    (app / "stdstyle" / "Cargo.toml").write_text(
+        f'[package]\nname = "stdstyle"\nversion = "0.1.0"\nedition = "2024"\n\n[dependencies]\n{jflib}\n\n{text[text.index("[profile."):]}',
+        encoding="utf-8")
+    (app / "stdstyle" / "src" / "lib.rs").write_text(STD_STYLE, encoding="utf-8")
     lib = app / "src" / "lib.rs"
     text = lib.read_text(encoding="utf-8")
     run.check("ui::main!({\n" in text and "#![deny(unsafe_code)]\n" in text, "hallo3's src/lib.rs has ui::main! and denies unsafe code")
@@ -766,6 +799,7 @@ def check_std(run, made, vendor, targets, jenv, target_dir):
     if "win" in targets:
         run.cmd("hallo3-test", ["cargo", "jflib", "test"], app, jenv)
         run.cmd("hallo3-unit-test", ["cargo", "test", "--lib", "--target", WIN], app, jenv)
+        run.cmd("hallo3-style-unit-test", ["cargo", "test", "--lib", "--target", WIN], app / "stdstyle", jenv)
         if run.cmd("hallo3-win-release", ["cargo", "build", "--release", "--target", WIN], app, jenv):
             exe = target_dir / WIN / "release" / "hallo3.exe"
             r = subprocess.run([exe, "--std-check"], cwd=app, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
@@ -822,13 +856,14 @@ def check_unwind(run, app, jenv, target_dir, package=False):
         r = subprocess.run([exe, arg], cwd=app, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
         run.check(r.returncode == 3 and "panic: panicked at" in r.stderr and msg in r.stderr,
                   f"hallo3 {arg} with unwind: JFLib's crash report, exit 3 (exit {r.returncode}: {r.stderr.strip()[-200:]})")
-    # the setup of an app with panic = "unwind": its stub (no std) is built with panic = "abort"
+    # the setup of an app with panic = "unwind": its stub (no std) is built with panic = "abort"; the
+    # stub takes only the app's [profile.release*] (cargo-jflib's stub_profiles), so one abort line
     if package and os.name == "nt":
         setup = target_dir / "jflib-package" / "hallo3_Setup.exe"
         setup.unlink(missing_ok=True)
         if run.cmd("hallo3-unwind-package", ["cargo", "jflib", "package", "--formats", "setup"], app, jenv):
             stub = (target_dir / "jflib-package" / "installer-stub" / "Cargo.toml").read_text(encoding="utf-8")
-            run.check(setup.is_file() and 'panic = "unwind"' not in stub and stub.count('panic = "abort"') >= 2,
+            run.check(setup.is_file() and '\n[profile.release]\npanic = "abort"\n' in stub and "unwind" not in stub,
                       "cargo jflib package of an app with panic = \"unwind\": the setup, its stub with panic = \"abort\"")
 
 # ---------------------------------------------------------------- the docs as docs.rs builds them (CR7)
@@ -914,8 +949,10 @@ def check_docs(run, vendor, toolchain):
         run.notes.append("docs: much output (docs.rs keeps 102.4 kB of log): " + "; ".join(chatty))
 
 def out_file(project, target_dir, triple, profile, name):
-    """a file the build script of the project wrote to its OUT_DIR"""
-    found = sorted((target_dir / triple / profile / "build").glob(f"{project}-*/out/{name}"), key=lambda p: p.stat().st_mtime)
+    """a file the build script of the project wrote to its OUT_DIR (Cargo's build folder: NAME-HASH/out
+    up to 1.98, NAME/HASH/out in newer versions)"""
+    build = target_dir / triple / profile / "build"
+    found = sorted([*build.glob(f"{project}-*/out/{name}"), *build.glob(f"{project}/*/out/{name}")], key=lambda p: p.stat().st_mtime)
     return found[-1] if found else None
 
 
@@ -966,8 +1003,15 @@ def accept(targets, out, docs_toolchain="nightly"):
             jfa = out_file("probe", target_dir, WIN, "debug", "app.jfa")
             run.check(jfa is not None and jfa.read_bytes() == assetpack.pack(probe / "assets"), "the probe's bundle is assetpack.py's")
     if "linux" in targets:
-        if run.cmd("hallo-linux", ["cargo", "build", "--target", LINUX], hallo, env):
+        # the template has no Linux flags: on Linux plain `cargo build`, as a user builds it; elsewhere
+        # rust-lld appended for the cross build, as `cargo jflib package` does it
+        if sys.platform.startswith("linux"):
+            hallo_linux, exe = ["cargo", "build"], target_dir / "debug" / "hallo"
+        else:
+            hallo_linux = ["cargo", "build", "--target", LINUX, "--config",
+                           f'target.{LINUX}.rustflags=["-C", "linker=rust-lld", "-C", "linker-flavor=ld.lld"]']
             exe = target_dir / LINUX / "debug" / "hallo"
+        if run.cmd("hallo-linux", hallo_linux, hallo, env):
             r = run_linux([linux_path(exe), "--script", "tests/smoke.uis"], cwd=hallo, timeout=600)
             run.check(r.returncode == 0, f"hallo-linux-smoke (exit {r.returncode})" + ("" if r.returncode == 0 else "\n    " + (r.stdout + r.stderr).strip()[-600:]))
         if run.cmd("probe-linux", ["cargo", "build", "--target", LINUX], probe, env):

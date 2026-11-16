@@ -304,6 +304,11 @@ enum Node {
 
 const REP_MAX: u32 = 255;
 const PROG_MAX: usize = 20_000;
+// groups inside groups, repetitions of one atom ("a{2}{2}"), compile steps (a part that emits
+// nothing still costs a step each time a repetition copies it)
+const DEPTH_MAX: u32 = 32;
+const REPS_MAX: u32 = 8;
+const WORK_MAX: usize = 16 * PROG_MAX;
 
 struct Parser<'a> {
     p: &'a [char],
@@ -404,6 +409,7 @@ impl Parser<'_> {
     }
     /// the repetitions after an atom
     fn reps(&mut self, mut atom: Node) -> Result<Node, ReErr> {
+        let mut reps = 0;
         loop {
             // an anchor does not repeat: the "*" after it is a character (GNU)
             if matches!(atom, Node::Edge(_)) {
@@ -450,11 +456,25 @@ impl Parser<'_> {
                 }
                 _ => return Ok(atom),
             };
+            // x{0} and any repetition of nothing match the empty string alone: "(a*){0}" is no
+            // "a*", and "(){255}{255}..." builds nothing (it took 255^n compile steps)
+            if hi == Some(0) || atom == Node::Empty {
+                atom = Node::Empty;
+                continue;
+            }
             // a repetition of a repetition that may be empty makes no new strings: x** is x*
             if let Node::Rep(_, 0, None) = atom
                 && lo <= 1
             {
                 continue;
+            }
+            // x{1} is x; a longer chain of repetitions is refused (its tree would be as deep)
+            if (lo, hi) == (1, Some(1)) {
+                continue;
+            }
+            reps += 1;
+            if reps > REPS_MAX {
+                return Err(ReErr::TooBig);
             }
             atom = Node::Rep(Box::new(atom), lo, hi);
         }
@@ -520,6 +540,10 @@ impl Parser<'_> {
         }
     }
     fn group(&mut self) -> Result<Node, ReErr> {
+        // groups in groups: the parser and the compiler go down one call per level
+        if self.depth >= DEPTH_MAX {
+            return Err(ReErr::TooBig);
+        }
         self.depth += 1;
         let inner = self.alt()?;
         self.depth -= 1;
@@ -553,6 +577,7 @@ pub struct Regex {
 struct Comp {
     prog: Vec<Inst>,
     sets: Vec<Set>,
+    work: usize,
 }
 
 impl Comp {
@@ -564,6 +589,10 @@ impl Comp {
         Ok(self.prog.len() - 1)
     }
     fn node(&mut self, n: &Node) -> Result<(), ReErr> {
+        self.work += 1;
+        if self.work > WORK_MAX {
+            return Err(ReErr::TooBig);
+        }
         match n {
             Node::Empty => {}
             Node::Char(c) => {
@@ -648,7 +677,7 @@ impl Regex {
         if ps.i < p.len() {
             return Err(if ps.at_close() { ReErr::CloseParen } else { ReErr::Paren });
         }
-        let mut c = Comp { prog: Vec::new(), sets: Vec::new() };
+        let mut c = Comp { prog: Vec::new(), sets: Vec::new(), work: 0 };
         c.node(&node)?;
         c.emit(Inst::Match)?;
         Ok(Regex { prog: c.prog, sets: c.sets, icase })

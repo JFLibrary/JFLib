@@ -10,6 +10,16 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-16
+
+### Changed
+
+- The template: `.cargo/config.toml` has no Linux tables any more, so `cargo run` builds the app on
+  Linux as on Windows and macOS, without `--target`; one static file keeps its two rustflags
+  (commented there) and `--target`. A project made from a template up to 0.2.0 drops the
+  `[target.*-unknown-linux-gnu]` tables of its `.cargo/config.toml` (with them it still builds
+  with `--target`). Building a Linux program on Windows goes through `cargo jflib package` now.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added
@@ -110,6 +120,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0

@@ -52,14 +52,11 @@ and are released together.
 
 Windows and Linux, on x86-64 and ARM64: the systems where JFLib's programs load modules.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Modules run on ARM64, on Linux and on Windows: modrt takes rt's ARM64 versions of the CPU
-features, the float conversions and the math, and has `memcpy` and its relatives for ARM64. The
-new `plugin_abi!` gives the export and the records the right calling convention on each processor,
-the same as before on x86-64. `SpinLock::try_lock` no longer releases a lock another thread holds
-when it fails. Everything is in the
-[changelog](https://docs.rs/crate/jflib-modrt/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-modrt/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

@@ -8,9 +8,24 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-16
+
+### Added
+
+- `cargo jflib mac` and `cargo jflib package --formats dmg` build one program for Apple Silicon and Intel Macs (both targets, joined by lipo; the Intel part needs `rustup target add x86_64-apple-darwin`), `cargo jflib mac --arch aarch64|x86_64` only one of them; the disk image is `NAME-VERSION-universal.dmg` (was `-arm64.dmg`), the update channel names it and the bundle for `macos-aarch64` and `macos-x86_64`; the helpers cargo jflib runs on the Mac itself are built for its own processor
+
+### Changed
+
+- `cargo jflib new`: the template's `.cargo/config.toml` has no Linux tables any more, `cargo run`
+  builds the app on Linux too. `cargo jflib package` adds rust-lld itself for a Linux program built
+  on another system; `test` and `watch` keep `--target` on Linux, so apps from older templates
+  build too.
+
 ### Security
 
 - `cargo jflib web --serve` serves only plain names below the bundle, and only to the Host 127.0.0.1 or localhost. On Windows `GET /C:/...` and `..\` reached any file, and a web page could read the bundle through DNS rebinding.
+- cargo jflib android: --release refuses a manifest that sets android:debuggable, debug APKs are debuggable through aapt2 --debug-mode; a copied clipboard image is shared as a new file each time and earlier copies are deleted, so an app that kept a descriptor of an earlier image cannot read later ones
+- The browser loader passes ?theme= only as a plain theme name and the worker drops arguments containing line breaks, so the page address can no longer add arguments or grant files
 
 ## [0.2.0] - 2026-11-14
 
@@ -91,6 +106,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0

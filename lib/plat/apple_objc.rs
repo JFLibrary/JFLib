@@ -4,7 +4,11 @@
 //   class("NSWindow") -> Id        sel("setTitle:") -> Sel (NUL-terminated names: c"..")
 //   msg!(obj, c"sel:", a => T, ..; R)  objc_msgSend cast to exactly fn(Id, Sel, T..) -> R: on Apple's
 //                                  arm64 a variadic call would put the arguments on the stack, so
-//                                  every call has its own exact signature (docs/APPLE.md, Fallen)
+//                                  every call has its own exact signature (docs/APPLE.md, Fallen).
+//                                  Intel Macs (docs/INTEL_MAC.md): an R over 16 bytes (NSRect) comes
+//                                  back in memory, through objc_msgSend_stret; R = bool reads the
+//                                  BOOL as a byte (x86-64's BOOL is a signed char, any value)
+//   msg_super!(&ObjcSuper, sel, a => T, ..; R)  the same for [super sel]
 //   subclass(super, name, methods, ivar) -> (class, ivar offset)   a class of ours: an isize
 //                                  instance variable (the window's index), the methods' IMPs
 //   ivar_get / ivar_set            that variable of an object
@@ -52,9 +56,23 @@ impl NSRect {
     }
 }
 
+/// objc_msgSendSuper's first argument: the object and the class whose superclass answers
+#[repr(C)]
+pub struct ObjcSuper {
+    pub receiver: Id,
+    pub class: Id,
+}
+
 #[link(name = "objc")]
 unsafe extern "C" {
     pub fn objc_msgSend();
+    pub fn objc_msgSendSuper();
+    // x86-64: a result returned in memory (over 16 bytes) needs these entries, the hidden pointer to
+    // it is the first argument; arm64 has none (objc_msgSend covers every result)
+    #[cfg(target_arch = "x86_64")]
+    pub fn objc_msgSend_stret();
+    #[cfg(target_arch = "x86_64")]
+    pub fn objc_msgSendSuper_stret();
     pub fn objc_getClass(name: *const c_char) -> Id;
     pub fn objc_getProtocol(name: *const c_char) -> Id;
     pub fn sel_registerName(name: *const c_char) -> Sel;
@@ -84,15 +102,60 @@ pub fn sel(name: &CStr) -> Sel {
     unsafe { sel_registerName(name.as_ptr()) }
 }
 
+/// the runtime's entry for a message whose result has `size` bytes: on x86-64 objc_msgSend_stret above
+/// 16 bytes (the System V ABI returns those in memory), else objc_msgSend
+#[inline(always)]
+pub fn msg_entry(size: usize) -> *const () {
+    #[cfg(target_arch = "x86_64")]
+    if size > 16 {
+        return objc_msgSend_stret as *const ();
+    }
+    let _ = size;
+    objc_msgSend as *const ()
+}
+
+/// msg_entry for [super ...]: objc_msgSendSuper, on x86-64 above 16 bytes objc_msgSendSuper_stret
+#[inline(always)]
+pub fn super_entry(size: usize) -> *const () {
+    #[cfg(target_arch = "x86_64")]
+    if size > 16 {
+        return objc_msgSendSuper_stret as *const ();
+    }
+    let _ = size;
+    objc_msgSendSuper as *const ()
+}
+
+/// a BOOL read as a byte (msg!'s results of type bool)
+#[inline(always)]
+pub fn bool_of(b: i8) -> bool {
+    b != 0
+}
+
 /// objc_msgSend with the exact signature of the call: msg!(obj, c"sel:", a => T, b => U; R)
 macro_rules! objc_msg {
+    // BOOL: a signed char on x86-64 (any value may come back), C's bool on arm64: read as a byte
+    ($obj:expr, $sel:expr $(, $a:expr => $t:ty)* ; bool) => {{
+        $crate::apple::objc::bool_of($crate::apple::objc::msg!($obj, $sel $(, $a => $t)* ; i8))
+    }};
     ($obj:expr, $sel:expr $(, $a:expr => $t:ty)* ; $r:ty) => {{
         let f: unsafe extern "C" fn($crate::apple::objc::Id, $crate::apple::objc::Sel $(, $t)*) -> $r =
-            core::mem::transmute($crate::apple::objc::objc_msgSend as *const ());
+            core::mem::transmute($crate::apple::objc::msg_entry(core::mem::size_of::<$r>()));
         f($obj as $crate::apple::objc::Id, $crate::apple::objc::sel($sel) $(, $a)*)
     }};
 }
 pub(crate) use objc_msg as msg;
+
+/// [super sel] with the exact signature: msg_super!(&ObjcSuper { receiver, class }, sel, a => T; R)
+/// (sel: a Sel, such as the method's own _cmd)
+macro_rules! objc_msg_super {
+    ($sup:expr, $sel:expr $(, $a:expr => $t:ty)* ; $r:ty) => {{
+        let f: unsafe extern "C" fn(*const $crate::apple::objc::ObjcSuper, $crate::apple::objc::Sel $(, $t)*) -> $r =
+            core::mem::transmute($crate::apple::objc::super_entry(core::mem::size_of::<$r>()));
+        f($sup, $sel $(, $a)*)
+    }};
+}
+#[cfg_attr(target_os = "ios", allow(unused_imports))]
+pub(crate) use objc_msg_super as msg_super;
 
 /// a class of ours: super, name, the methods (selector, IMP, type encoding), one isize instance
 /// variable "jf" -> (class, offset of the variable).  An existing class of that name is reused.

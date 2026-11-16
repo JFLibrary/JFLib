@@ -160,7 +160,9 @@ impl Session<'_> {
         let mut cmd = cargo::command();
         cmd.current_dir(&self.p.package.dir).args(["build", "-p", &self.p.package.name, "--color", "never", "--message-format=json-render-diagnostics"]);
         // as `cargo run` builds here (its build is taken again): Windows for the machine itself,
-        // Linux always with --target (the template's rustflags must not reach the build scripts)
+        // Linux with --target: an app made from a template up to jflib 0.2.0 has Linux rustflags in
+        // its .cargo/config.toml that must not reach the build scripts (with today's template it
+        // makes no difference)
         if self.triple == LINUX {
             cmd.args(["--target", LINUX]);
         }

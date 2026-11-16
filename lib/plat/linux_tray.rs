@@ -14,6 +14,7 @@
 // com.canonical.dbusmenu at /MenuBar (GetLayout, GetGroupProperties, Event "clicked" ->
 // Menu(id), AboutToShow); every tray_set raises the layout revision.  tray_remove gives the
 // name back.  Notifications: org.freedesktop.Notifications.Notify with the action "default";
+// its signals count only from the unique name that answered the Notify:
 // ActionInvoked -> NoteClicked (the ActivationToken signal before it -> the token, as for the
 // symbol), NotificationClosed -> NoteClosed (unless it was clicked).
 // The UI thread hands its requests over in a queue and wakes the thread with an eventfd.
@@ -134,8 +135,9 @@ struct Item {
     revision: u32,
     /// dbusmenu id -> the row (ids from 1 in depth-first order)
     rows: Vec<(i32, TrayItem, Vec<i32>)>,
-    /// server id -> our id, our id -> server id
-    notes: BTreeMap<u32, u32>,
+    /// server id -> (our id, the unique name of the server that answered its Notify: the
+    /// note's signals count only from there), our id -> server id
+    notes: BTreeMap<u32, (u32, String)>,
     note_srv: BTreeMap<u32, u32>,
     /// Notify call serial -> our id (until the answer)
     pending: BTreeMap<u32, u32>,
@@ -153,7 +155,7 @@ fn run() {
         return;
     };
     let rule = |r: &str| Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "AddMatch", alloc::vec![Value::str(r)]);
-    c.send(&rule("type='signal',interface='org.freedesktop.Notifications'"));
+    c.send(&rule("type='signal',sender='org.freedesktop.Notifications',interface='org.freedesktop.Notifications'"));
     c.send(&rule("type='signal',sender='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.kde.StatusNotifierWatcher'"));
     // (after the match: a watcher that starts meanwhile is seen either way)
     let has = c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "NameHasOwner", alloc::vec![Value::str(WATCHER)]));
@@ -416,6 +418,14 @@ fn arg_s(m: &Msg, k: usize) -> &str {
     m.body.get(k).and_then(|v| v.as_str()).unwrap_or("")
 }
 
+// (server id, our id) of the live notification a signal of the notification server names --
+// only when it comes from the server that made that notification: any client of the bus may
+// send signals with its interface, also to us alone past the match rule
+fn note_of(it: &Item, m: &Msg) -> Option<(u32, u32)> {
+    let srv = m.body.first().and_then(|v| v.as_u32())?;
+    it.notes.get(&srv).filter(|n| !n.1.is_empty() && n.1 == m.sender).map(|n| (srv, n.0))
+}
+
 fn handle(c: &mut Conn, it: &mut Item, m: &Msg) {
     match m.typ {
         T_RETURN | T_ERROR if it.has != 0 && m.reply_to == it.has => {
@@ -434,7 +444,7 @@ fn handle(c: &mut Conn, it: &mut Item, m: &Msg) {
         T_RETURN | T_ERROR => {
             if let Some(id) = it.pending.remove(&m.reply_to) {
                 if let Some(srv) = m.body.first().and_then(|v| v.as_u32()).filter(|_| m.typ == T_RETURN) {
-                    it.notes.insert(srv, id);
+                    it.notes.insert(srv, (id, m.sender.clone()));
                     it.note_srv.insert(id, srv);
                 }
             }
@@ -442,25 +452,24 @@ fn handle(c: &mut Conn, it: &mut Item, m: &Msg) {
         T_SIGNAL => match (m.iface.as_str(), m.member.as_str()) {
             (NOTES, "ActivationToken") => {
                 // (spec 1.2) before ActionInvoked: the window the app raises may come forward
-                if m.body.first().and_then(|v| v.as_u32()).is_some_and(|s| it.notes.contains_key(&s)) {
+                if note_of(it, m).is_some() {
                     crate::act_provide(arg_s(m, 1));
                 }
             }
             (NOTES, "ActionInvoked") => {
-                if let Some(&id) = m.body.first().and_then(|v| v.as_u32()).and_then(|s| it.notes.get(&s)) {
+                if let Some((_, id)) = note_of(it, m) {
                     it.clicked.push(id);
                     tray::push(TrayEvent::NoteClicked(id));
                 }
             }
             (NOTES, "NotificationClosed") => {
-                if let Some(srv) = m.body.first().and_then(|v| v.as_u32()) {
-                    if let Some(id) = it.notes.remove(&srv) {
-                        it.note_srv.remove(&id);
-                        if let Some(k) = it.clicked.iter().position(|&x| x == id) {
-                            it.clicked.remove(k);
-                        } else {
-                            tray::push(TrayEvent::NoteClosed(id));
-                        }
+                if let Some((srv, id)) = note_of(it, m) {
+                    it.notes.remove(&srv);
+                    it.note_srv.remove(&id);
+                    if let Some(k) = it.clicked.iter().position(|&x| x == id) {
+                        it.clicked.remove(k);
+                    } else {
+                        tray::push(TrayEvent::NoteClosed(id));
                     }
                 }
             }

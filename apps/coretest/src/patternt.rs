@@ -25,7 +25,29 @@ fn err(p: &str, syn: Syntax) -> Option<ReErr> {
     Regex::new(p, syn, false).err()
 }
 
+// x{0} matches only the empty string (also over a star); repetitions of nothing and deep
+// patterns are refused or built without blowing up
+fn limits(t: &mut T) {
+    t.eq("(a*){0} against aaa", find("^(a*){0}$", Syntax::Extended, "aaa"), None);
+    t.eq("(a*){0} against nothing", find("^(a*){0}$", Syntax::Extended, ""), Some((0, 0)));
+    t.eq("BRE \\(a*\\)\\{0,0\\}", find("^\\(a*\\)\\{0,0\\}$", Syntax::Basic, "a"), None);
+    t.check("(a*){0,1} still matches a", ere("^(a*){0,1}$", "aa"));
+    let t0 = plat::time_us();
+    let r1 = Regex::new("(){255}{255}{255}{255}", Syntax::Extended, false);
+    let r2 = Regex::new("(a{0}){255}{255}{255}{255}", Syntax::Extended, false);
+    let ms = (plat::time_us() - t0) / 1000;
+    t.check(&alloc::format!("repetitions of nothing: built at once ({ms} ms)"), ms < 500 && r1.as_ref().is_ok_and(|r| r.is_match("x")) && r2.is_ok_and(|r| r.is_match("")));
+    let deep = alloc::format!("{}a{}", "(".repeat(5000), ")".repeat(5000));
+    t.eq("5000 nested groups: too big, no stack overflow", err(&deep, Syntax::Extended), Some(ReErr::TooBig));
+    let chain = alloc::format!("a{}", "{2}".repeat(5000));
+    t.eq("5000 repetitions of one atom: too big", err(&chain, Syntax::Extended), Some(ReErr::TooBig));
+    let ones = alloc::format!("a{}", "{1}".repeat(5000));
+    t.check("a{1}{1}... is a", ere(&ones, "a") && !ere(&ones, "b"));
+    t.check("32 nested groups still work", ere(&alloc::format!("{}a{}", "(".repeat(32), ")".repeat(32)), "a"));
+}
+
 pub fn run(t: &mut T) {
+    limits(t);
     // wildcards
     let yes = [("*", ""), ("*", "abc"), ("a*", "a"), ("*.txt", "notiz.txt"), ("a*b*c", "aXbYc"), ("a*b*c", "abbbc"), ("?", "x"), ("??", "äö"), ("[abc]x", "bx"), ("[a-c]", "b"), ("[!a-c]", "d"), ("[^a-c]", "d"), ("[]]", "]"), ("[a-]", "-"), ("[[:digit:]]*", "7z"), ("\\*", "*"), ("[*]", "*"), ("x[", "x["), (".*", ".hidden"), ("*/*", "a/b")];
     for (p, s) in yes {

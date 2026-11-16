@@ -154,6 +154,8 @@ fn parts(t: &mut T) {
         && find("Software\\Classes\\.jpe", "Content Type") == Some("image/jpeg")
         && find("Software\\Classes\\jfx", "") == Some("URL:My App")
         && find("Software\\Classes\\jfx", "URL Protocol") == Some("")
+        // a scheme's URL after "--": one argument, never options
+        && find("Software\\Classes\\jfx\\shell\\open\\command", "") == Some("\"C:\\a\\App.exe\" -- \"%1\"")
         && find("Software\\Classes\\App.jpg\\DefaultIcon", "") == Some("C:\\a\\App.exe,0"), "assoc: reg_entries: the setup's keys");
     let none = Package::parse("");
     t.check(none.app == "plattest" && none.display == "plattest" && none.app_id == "org.jflib.plattest"
@@ -178,7 +180,7 @@ fn parts(t: &mut T) {
     let e = package_entries(&web, "C:\\n\\Netz.exe");
     let find = |k: &str, n: &str| e.iter().find(|v| v.key == k && v.name == n).map(|v| v.value.as_str());
     let smi = "Software\\Clients\\StartMenuInternet\\plattest";
-    t.check(find("Software\\Classes\\plattestURL\\shell\\open\\command", "") == Some("\"C:\\n\\Netz.exe\" \"%1\"")
+    t.check(find("Software\\Classes\\plattestURL\\shell\\open\\command", "") == Some("\"C:\\n\\Netz.exe\" -- \"%1\"")
         && find("Software\\Classes\\plattestURL", "URL Protocol") == Some("")
         && find("Software\\Classes\\plattestURL\\Application", "ApplicationName") == Some("Netz")
         && find("Software\\Classes\\plattestURL", "AppUserModelID") == Some("org.jflib.Netz")
@@ -244,6 +246,7 @@ fn windows(t: &mut T, pkg: &Package) {
     win_cleanup();
     let exe = plat::current_exe().unwrap_or_default().replace('/', "\\");
     let cmd = format!("\"{exe}\" \"%1\"");
+    let url_cmd = format!("\"{exe}\" -- \"%1\"");
     t.check(assoc_conflicts(pkg) == Ok(Vec::new()), "assoc: no conflicts in a clean HKCU");
     let mut asked = 0;
     let r = assoc_register(pkg, &mut |_| {
@@ -263,7 +266,7 @@ fn windows(t: &mut T, pkg: &Package) {
             && get(".jfltest2", "").is_none()
             && get("jflibtest", "").as_deref() == Some("URL:JFLib Assoc Test")
             && get("jflibtest", "URL Protocol").as_deref() == Some("")
-            && get("jflibtest\\shell\\open\\command", "").as_deref() == Some(cmd.as_str()), what);
+            && get("jflibtest\\shell\\open\\command", "").as_deref() == Some(url_cmd.as_str()), what);
     };
     keys_ok(t, "assoc: HKCU: ProgIDs, Open with, the own type's default and Content Type, the scheme");
     t.check(assoc_registered().as_deref() == Some(exe.as_str()), "assoc: assoc_registered names the program");
@@ -380,7 +383,7 @@ fn windows_browser(t: &mut T) {
     win_browser_cleanup();
     let clients_before = has("Software\\Clients\\StartMenuInternet");
     let exe = plat::current_exe().unwrap_or_default().replace('/', "\\");
-    let cmd = format!("\"{exe}\" \"%1\"");
+    let cmd = format!("\"{exe}\" -- \"%1\"");
     let http_before = get("Software\\Classes\\http\\shell\\open\\command", "");
     t.check(browser_request(&pkg) == Err(AssocError::NotRegistered), "assoc: browser: the request before registering -> NotRegistered");
     t.check(assoc_conflicts(&pkg) == Ok(Vec::new()), "assoc: browser: no conflicts in a clean HKCU");

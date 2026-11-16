@@ -3,7 +3,8 @@
 // EPRT and the 229 reply to EPSV (RFC 2428), FEAT's list (RFC 2389)
 //
 //   Command { verb, arg }     Command::parse(line) (the verb in capitals, the argument as
-//                             typed), Command::new(verb, arg), to_line() ("USER anna\r\n")
+//                             typed), Command::new(verb, arg), to_line() ("USER anna\r\n"; CR,
+//                             LF and NUL of the fields left out)
 //   Reply { code, lines }     to_bytes(): one line "220 text", or "211-first" ... "211 last"
 //                             (the inner lines start with a space when they could look like
 //                             the end); is_final / is_ok (1xx preliminary, 2xx done, 3xx more)
@@ -62,9 +63,11 @@ impl Command {
         let (v, a) = l.split_once(' ').unwrap_or((l, ""));
         Some(Command { verb: v.to_ascii_uppercase(), arg: String::from(a) })
     }
-    /// the line on the wire, CRLF included
+    /// the line on the wire, CRLF included; CR, LF and NUL of verb and argument are left out (they
+    /// would end the line and start another command)
     pub fn to_line(&self) -> String {
-        if self.arg.is_empty() { format!("{}\r\n", self.verb) } else { format!("{} {}\r\n", self.verb, self.arg) }
+        let (verb, arg) = (crate::one_line(&self.verb), crate::one_line(&self.arg));
+        if arg.is_empty() { format!("{}\r\n", verb) } else { format!("{} {}\r\n", verb, arg) }
     }
 }
 

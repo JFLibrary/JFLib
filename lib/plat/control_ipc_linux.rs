@@ -2,7 +2,7 @@
 // New code; socket paths never accept external directory or filename input.
 
 use alloc::{format, string::String};
-use rt::os::{syscall6, AT_FDCWD, O_CLOEXEC, O_DIRECTORY, O_NOFOLLOW, O_NONBLOCK, SYS_ACCEPT4, SYS_BIND, SYS_CLOSE, SYS_CONNECT, SYS_FCHMODAT, SYS_FCNTL, SYS_FSTAT, SYS_GETEUID, SYS_GETPID, SYS_GETSOCKOPT, SYS_LISTEN, SYS_MKDIRAT, SYS_OPENAT, SYS_READ, SYS_SENDTO, SYS_SOCKET, SYS_UNLINKAT, Stat};
+use rt::os::{syscall6, AT_FDCWD, O_CLOEXEC, O_DIRECTORY, O_NOFOLLOW, O_NONBLOCK, SYS_ACCEPT4, SYS_BIND, SYS_CLOSE, SYS_CONNECT, SYS_FCHMODAT, SYS_FCNTL, SYS_FSTAT, SYS_GETEUID, SYS_GETPID, SYS_GETSOCKOPT, SYS_LISTEN, SYS_MKDIRAT, SYS_NEWFSTATAT, SYS_OPENAT, SYS_READ, SYS_SENDTO, SYS_SOCKET, SYS_UNLINKAT, Stat};
 
 const EAGAIN: isize = -11;
 
@@ -224,7 +224,12 @@ fn unlink(path: &str) {
 // ---------------------------------------------------------------- the app's single instance
 // (instance.rs): the abstract socket "jfgui-instance-<uid>-<app>" (no file, gone with the
 // process); the process that binds it first is the app's running instance.  Both sides check
-// the other's uid with SO_PEERCRED: a socket of another user under this name is refused.
+// the other with SO_PEERCRED: a socket of another user under this name is refused, and so is
+// a process of this user in another mount namespace -- an abstract name is reachable from
+// every sandbox that shares the network namespace (Flatpak with network access, bubblewrap,
+// Firejail), and a confined process must not hand the instance files to grant (fs.user) or
+// receive a start's arguments.  Snap keeps all processes of a snap in one mount namespace;
+// two Flatpak sandboxes of the same app each run alone.
 
 /// the listening side of the instance socket (blocking accept)
 pub(crate) struct InstServer {
@@ -253,13 +258,40 @@ fn inst_addr(app: &str) -> Result<([u8; 110], usize), i32> {
     Ok((address, 3 + name.len()))
 }
 
-// the uid of the process at the other end of fd
-fn peer_uid(fd: i32) -> Option<u32> {
+// the process at the other end of fd runs as this user in this process's mount namespace.
+// SO_PEERCRED's pid is 0 for a process outside this pid namespace (refused); SO_PEERPIDFD
+// (Linux 6.5) proves afterwards that the pid still names that process, not a later one
+fn peer_ok(fd: i32) -> bool {
     let mut credentials = [0u32; 3];
     let mut length = 12u32;
     // SAFETY: SO_PEERCRED writes at most the supplied 12-byte ucred record and length.
     let status = unsafe { syscall6(SYS_GETSOCKOPT, fd as usize, 1, 17, credentials.as_mut_ptr() as usize, &mut length as *mut u32 as usize, 0) };
-    (status == 0 && length == 12).then_some(credentials[1])
+    if status != 0 || length != 12 || credentials[1] != euid() || credentials[0] == 0 {
+        return false;
+    }
+    let mut pidfd = -1i32;
+    let mut length = 4u32;
+    // SAFETY: SO_PEERPIDFD writes at most one int and its length (ENOPROTOOPT before 6.5).
+    let status = unsafe { syscall6(SYS_GETSOCKOPT, fd as usize, 1, 77, &mut pidfd as *mut i32 as usize, &mut length as *mut u32 as usize, 0) };
+    let pidfd = if status == 0 && length == 4 && pidfd >= 0 { Some(pidfd) } else { None };
+    let own = mount_ns("/proc/self/ns/mnt");
+    let same = own.is_some() && own == mount_ns(&format!("/proc/{}/ns/mnt", credentials[0]));
+    let Some(pidfd) = pidfd else { return same };
+    // a pidfd turns readable once its process has ended (its pid may then be another's)
+    let mut pfd = [pidfd as u32 as u64 | (1u64 << 32)]; // struct pollfd {fd, events POLLIN, revents}
+    // SAFETY: one pollfd record, no waiting.
+    let alive = unsafe { rt::os::poll(pfd.as_mut_ptr() as usize, 1, 0) } == 0;
+    close(pidfd);
+    same && alive
+}
+
+// (device, inode) of a namespace link
+fn mount_ns(path: &str) -> Option<(u64, u64)> {
+    let path = format!("{path}\0");
+    let mut stat = Stat::default();
+    // SAFETY: newfstatat follows the terminated path and writes exactly the kernel's stat record.
+    let status = unsafe { syscall6(SYS_NEWFSTATAT, AT_FDCWD, path.as_ptr() as usize, &mut stat as *mut Stat as usize, 0, 0, 0) };
+    (status == 0).then_some((stat.st_dev, stat.st_ino))
 }
 
 /// bind the instance socket -> None when another process already has it
@@ -299,7 +331,7 @@ impl InstServer {
                 return Err((-fd) as i32);
             }
             let fd = fd as i32;
-            if peer_uid(fd) == Some(euid()) {
+            if peer_ok(fd) {
                 return Ok(InstConn { fd });
             }
             close(fd);
@@ -327,7 +359,7 @@ pub(crate) fn inst_connect(app: &str) -> Result<InstConn, i32> {
     if status < 0 {
         return Err((-status) as i32);
     }
-    if peer_uid(conn.fd) != Some(euid()) {
+    if !peer_ok(conn.fd) {
         return Err(13);
     }
     // SAFETY: fcntl(F_SETFL, O_NONBLOCK) on the own socket.

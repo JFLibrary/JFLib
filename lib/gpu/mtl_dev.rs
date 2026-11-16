@@ -313,6 +313,7 @@ fn probe(inst: &Arc<InstShared>, dev: Obj) -> Adapter {
         ray_pipeline: false,
     };
     let big = max_buffer.min(u32::MAX as usize) as u32;
+    let simd32 = apple || cfg!(target_os = "ios"); // (the simulator's device names no family)
     let limits = Limits {
         max_texture_2d: 16384,
         max_texture_3d: 2048,
@@ -334,9 +335,11 @@ fn probe(inst: &Arc<InstShared>, dev: Obj) -> Adapter {
         max_draw_indirect_count: if voll { 65535 } else { 1 },
         max_anisotropy: 16.0,
         timestamp_period_ns: 1.0,
+        // Apple's GPUs: SIMD groups of 32; Intel Macs' GPUs (Mac2 without an Apple family) choose per
+        // pipeline -- Intel 8 to 32, AMD 32 or 64 (docs/INTEL_MAC.md IM5, not checked on such a GPU)
         subgroup_size: 32,
-        subgroup_min_size: 32,
-        subgroup_max_size: 32,
+        subgroup_min_size: if simd32 { 32 } else { 8 },
+        subgroup_max_size: if simd32 { 32 } else { 64 },
         // (argument buffers of tier 2: 500 000 resources, samplers as the device says)
         max_bindless_textures: if voll { 500_000 } else { 0 },
         max_bindless_samplers: if voll { samplers_max } else { 0 },

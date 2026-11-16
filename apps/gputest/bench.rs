@@ -17,7 +17,7 @@ fn median(v: &mut [f64]) -> f64 {
 }
 
 pub fn bench() {
-    let mut t = T { fails: 0, validate: false, expected: 0 };
+    let mut t = T { fails: 0, validate: false, expected: 0, inst: None };
     // instance and device creation: the first time (driver load) and the median of 5 more
     let mut inst_ms = Vec::new();
     let mut dev_ms = Vec::new();

@@ -293,7 +293,8 @@ self.onmessage = async ({data:m}) => {
       if (m.screens && wasm.jfgui_screens) { const s = encode.encode(m.screens); inbox(s); wasm.jfgui_screens(s.length); }
       // the system's settings (system.js, lib/plat/web_system.rs) before the app's first frame
       if (m.system && wasm.jfgui_system) { const s = encode.encode(m.system); inbox(s); wasm.jfgui_system(s.length); }
-      const args = encode.encode(m.args.join("\n")); inbox(args);
+      // one argument per line: an argument with a line break would become several
+      const args = encode.encode(m.args.filter(a => !/[\r\n]/.test(a)).join("\n")); inbox(args);
       const code = wasm.jfgui_start(m.width, m.height, m.dpi, args.length);
       if (code) throw new Error(`Anwendung konnte nicht starten (${code}).`);
       ready=true; tick(); postMessage({type:"ready",compute:{mode:selected,simd:selected!=="scalar",shared:threaded,workers:workers.size}});

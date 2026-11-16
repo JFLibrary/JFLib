@@ -70,13 +70,11 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::img_svg`. All of JFLib's crates share one
 version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Two limits close ways in which a small hostile file could cost minutes and gigabytes. The
-selectors of a style sheet's list now share one copy of their declarations, every declaration
-counts toward the cascade's budget, and a cascade beyond 128 MB fails with `ERR_LIMIT`. Rendering
-is bounded by its work, not only by the number of elements it visits. Everything is in the
-[changelog](https://docs.rs/crate/jflib-img-svg/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-img-svg/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

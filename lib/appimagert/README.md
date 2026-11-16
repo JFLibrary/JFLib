@@ -31,7 +31,9 @@ embedded GPG signature, which the runtime reads back for its options. The runtim
 4.0 images compressed with zstd or lz4 and checks every position and size in the image, so a
 damaged file gives an error, not a crash. It understands the usual options:
 
-- `--appimage-extract [PATTERN]`: unpack into `./squashfs-root`
+- `--appimage-extract [PATTERN]`: unpack into `./squashfs-root` (a folder of the user's own, in a
+  current folder no other user can rename entries in; the image's modes lose setuid, setgid and
+  sticky, and what the umask removes)
 - `--appimage-extract-and-run`: the same as a plain start, since this runtime always unpacks
 - `--appimage-offset`, `--appimage-updateinformation`, `--appimage-signature`
 - `--appimage-portable-home`, `--appimage-portable-config`: a home or config folder next to the
@@ -39,11 +41,14 @@ damaged file gives an error, not a crash. It understands the usual options:
 - `--appimage-version`, `--appimage-help`
 - `--appimage-mount` is refused: this runtime does not mount
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
-together. The [changelog](https://docs.rs/crate/jflib-appimagert/latest/source/CHANGELOG.md) says
-the same.
+The runtime is safer on machines with several users. Without `$XDG_CACHE_HOME` and `$HOME` it
+unpacks into a folder of this user's own (`$TMPDIR/appimage-run-<uid>`) instead of
+`/tmp/appimage-run`, which any user could prepare. Extracting an image drops setuid, setgid, sticky
+and world-write bits and respects the umask, and `--appimage-extract` refuses a `squashfs-root` that
+is not the user's own. Everything is in the
+[changelog](https://docs.rs/crate/jflib-appimagert/latest/source/CHANGELOG.md).
 
 ## Documentation
 

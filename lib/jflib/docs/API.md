@@ -65,7 +65,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
-  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [text.rs](#render2dtextrs)
+  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [text.rs](#render2dtextrs)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -182,7 +182,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [File dialog](#file-dialog): `filedlg`, `filedlg_paths`
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
-- [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `set_theme`, `clear_theme`, `app_theme`, `load_theme`, `styles_add`, `style_names`, `style_name`, `set_style`, `dp_text`, `ts_base`
+- [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `wheel_lines`, `wheel_chars`, `wheel_notch_px`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `set_theme`, `clear_theme`, `app_theme`, `load_theme`, `styles_add`, `style_names`, `style_name`, `set_style`, `dp_text`, `ts_base`
 - [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_next`, `cursor_replace`, `cursor_free`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_pos_px`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_effect_set`, `drop_accept`, `drag_over`, `drag_over_px`, `drag_allowed`, `drop_defer`, `drop_finish`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
 
 ### App, AppDesc, Ui, run, async tasks
@@ -226,19 +226,27 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   nor `#![no_main]`.  In a library crate (the template's app) that `fn main` stays unused and
   the program's own calls `jflib::plat::std_start()`.
 
+  The unit tests of the crate that holds it (the template's app with std, `cargo test --lib`)
+  need no `test_main!`: this `jfgui_main` links their test binary (never called there), and the
+  panic check leaves the test build out (`cfg(test)`: Cargo builds tests with unwind whatever the
+  profiles say; doc tests build the crate without it, docs/GUIDE.md "An app with std").  A
+  `test_main!` next to it would define `jfgui_main` twice (E0428)
+
 - **`main!(...)`**
   (see above)
 
 - **`test_main!(...)`**
   (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
-  std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
-  the tests do not link.  Never called (the test harness has its own main); no panic check
-  (tests unwind).  `#[cfg(test)] ui::test_main!();` in the crate's lib.rs, also under
-  `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros)
+  std and without main! (a style crate's `cargo test`): plat's start of a std program refers to
+  it, so without it the tests do not link.  Never called (the test harness has its own main); no
+  panic check (tests unwind).  `#[cfg(test)] ui::test_main!();` in the crate's lib.rs, also under
+  `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros).  A
+  crate with main! needs none: its main!'s `jfgui_main` links the tests
 
 - **`__ui_panic_check!(...)`**
   ui::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
-  std built with the feature `unwind` may unwind as well
+  std built with the feature `unwind` may unwind as well.  Not in the unit tests of the crate
+  with main! (`cfg(test)` is the app crate's, where this expands): Cargo builds tests with unwind
 
 - **`__ui_panic_check!(...)`**
   (see above)
@@ -634,6 +642,15 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
     extended keys), Linux's evdev code; 0 where the platform does not tell (macOS, the
     browser, Android)
   - `location: u32` -- KL_STANDARD, KL_LEFT / KL_RIGHT (the two Shift, Ctrl, Alt, Windows keys), KL_NUMPAD
+  - `ch: u32` -- the character the keyboard layout gives the key with Shift, Caps Lock and AltGr as they
+    are but without Ctrl, Alt and the Windows / Super key (0: none) -- what a browser names
+    the key (KeyboardEvent.key): "z" for Ctrl+Z on a German keyboard, "+" for its Ctrl++, "@"
+    for AltGr+Q, "Z" for Ctrl+Shift+Z.  Keys that type no character (Enter, Tab, Esc,
+    Backspace, the arrows, F1 ...) have none.  Windows (10 1607 and later: ToUnicodeEx),
+    Linux (the keymap), macOS (charactersIgnoringModifiers); 0 in the browser and on
+    Android; a headless run's keys have the US layout's (scripts: `keydown ... char "c"`)
+  - `dead: bool` -- the key is a dead key (´ ^ ~ ...): ch is its spacing character, the text it makes
+    comes with the next key
 
 - **`struct Sem`**
   semantic record (dump / expect)  [SR_\*]
@@ -2634,7 +2651,8 @@ list -- scroll views, scroll bars, lists, tabs and expanders (WinUI 3 style)
   scroll_begin(id, flags)                clipped viewport that takes its size like a box
        (next_size / parent) and lays its children out in a content area that may be
        larger; flags = SC_V (default) | SC_H | SC_NOBAR | SC_NOWHEEL | BOX_BG | BOX_CARD |
-       PAD_n ...  Mouse wheel (48 DIP per notch, smooth), overlay scroll bars (2 DIP, 6 DIP
+       PAD_n ...  Mouse wheel (the system's lines of 16 DIP per notch -- 48 DIP with three --
+       smooth; a touchpad's pixels at once), overlay scroll bars (2 DIP, 6 DIP
        while pointed at, draggable thumb, click on the track pages), Tab focus is scrolled
        into view.  A style whose bars stay visible (netlab) keeps their room free right of
        the content of a view that scrolls only vertically, always, so nothing moves when
@@ -4309,13 +4327,20 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                   then they lift
   pan2 S DX DY [MS]   two fingers around S (80 DIP apart) move by DX, DY (DIP) in MS ms (default 300),
                   then they lift
-  wheel S DY [shift|ctrl|alt]...   DY in wheel units (120 = one notch); the words hold
-                  those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
+  wheel S DY [DX] [fine|pixels] [shift|ctrl|alt]...   DY (DX: sideways, right positive) in
+                  wheel units (120 = one notch); the words hold those modifiers during the
+                  wheel event (e.g. Ctrl + wheel zoom); fine: a device in fine steps (a
+                  precision touchpad on Windows: plat::WHEEL_FINE), pixels: DY and DX are DIP
+                  of a device that scrolls by pixels (plat::WHEEL_PIXELS: a trackpad)
   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
-  keydown CHORD [scan N] [left|right|numpad]   (E2) the key goes down and stays down (a
-                  modifier key -- shift, ctrl, alt -- is held for the following events; once
-                  more while down: an auto-repeat); keyup CHORD [scan N] [left|right|numpad]
-                  lets it go; scan N and the location reach ui.key_event_take
+  keydown CHORD [scan N] [left|right|numpad] [char "c"|none] [dead]   (E2) the key goes down
+                  and stays down (a modifier key -- shift, ctrl, alt -- is held for the
+                  following events; once more while down: an auto-repeat); keyup CHORD [...]
+                  lets it go; scan N, the location and the character reach
+                  ui.key_event_take (KeyEvent::ch: the US layout's for the key and its Shift --
+                  `key` gives those too --, char "c" another layout's, e.g. a German
+                  keyboard's Ctrl++ `keydown ctrl++ char "+"` -- the key VK_OEM_PLUS, "=" on
+                  the US layout; dead: a dead key)
   preedit "text" [CURSOR]   (E4) an input method's composition (ui.ime_preedit; CURSOR a byte
                   offset, default the end; "" ends it); commit "text" commits
                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
@@ -4511,8 +4536,10 @@ theme -- colour tokens, accent colour and type ramp of the linked style  [src/ui
   text_scale() / set_text_scale(percent)   text sizes and line heights (not the controls)
   sys_apply(settings)        (runtime) plat::sys_settings: theme, accent, contrast, reduced
                              motion (anim_off), text scale, double-click and caret times,
-                             font smoothing and its subpixel order; what the app or the
-                             command line fixed stays
+                             font smoothing and its subpixel order, the wheel's lines and
+                             characters; what the app or the command line fixed stays
+  wheel_lines() / wheel_chars() / wheel_notch_px(line_px, page_px, horizontal)   what a
+                             notch of the wheel scrolls (the system's setting)
   color(tok) -> argb         0xAARRGGBB of a T_* token (byte offset)
   ts_font(ts)                select font and pixel size of a TS_* text style
   ts_line(ts) -> px          line height of a text style
@@ -4578,6 +4605,19 @@ The values come from the style (Style::tokens, accent, ts_size / ts_line / ts_fo
   where the system says nothing; smoothing off (ui.text.antialias()) and the subpixel
   order (ui.text.subpixel(): subpixel smoothing on the window's framebuffer) are applied,
   hinting is not
+- **`fn wheel_lines(&self) -> u32`**
+  the lines a notch of the wheel scrolls as the system says it (1..=100; plat::WHEEL_PAGE:
+  a page): Windows' mouse settings (SPI_GETWHEELSCROLLLINES), KDE's WheelScrollLines; 3
+  elsewhere and in headless runs (jfgui_WHEEL_LINES).  The library's views scroll that many
+  lines per notch (120 of UiInput::wheel_y): WHEEL_LINE_DIP each, their text's lines in text
+  views; an app that scrolls by lines of its own takes this many per notch too
+- **`fn wheel_chars(&self) -> u32`**
+  the characters a notch of the horizontal wheel scrolls (1..=100; Windows
+  SPI_GETWHEELSCROLLCHARS; 3 elsewhere and in headless runs, jfgui_WHEEL_CHARS)
+- **`fn wheel_notch_px(&self, line_px: i32, page_px: i32, horizontal: bool) -> i32`**
+  the pixels a notch of the wheel scrolls in a view whose lines are line_px high and whose
+  page is page_px: wheel_lines lines (a page for plat::WHEEL_PAGE); horizontal: wheel_chars
+  characters of line_px
 - **`fn set_text_scale(&mut self, percent: u32)`**
   scale text sizes and line heights (50..300 %); the system's scale no longer applies
 - **`fn color(&self, tok: u32) -> u32`**
@@ -5881,6 +5921,14 @@ PART_BASE: u32 = 0x6000_0000  // part_id(id, k): ids of the parts of composite w
   - `press_y: i32`
   - `wheel_x: i32` -- wheel delta (120 per notch)
   - `wheel_y: i32`
+  - `wheel_precise: bool` -- the turn came from a device that scrolls by pixels or in fine steps (a touchpad, a
+    trackpad, a high-resolution wheel: plat::WHEEL_PIXELS / WHEEL_FINE): scroll by
+    wheel_px_x / wheel_px_y, at once (no smooth scrolling); wheel_x / wheel_y say the same
+    turn in notches (120 = what a notch scrolls: Ui::wheel_notch_px)
+  - `wheel_px_x: i32` -- a precise turn in physical pixels (up / right positive, as wheel_x / wheel_y): the
+    platform's pixels (macOS, Wayland) or, from Windows' fine steps, 120 = wheel_lines() lines
+    (wheel_chars() for wheel_px_x) of WHEEL_LINE_DIP; 0 for a notched wheel
+  - `wheel_px_y: i32`
   - `mods: u32`
   - `pts: alloc::vec::Vec<[i32; 2]>` -- move points since the last frame (relative px)
   - `rect: [i32; 4]` -- widget rectangle (absolute px)
@@ -5894,6 +5942,10 @@ PART_BASE: u32 = 0x6000_0000  // part_id(id, k): ids of the parts of composite w
 
 ```rust
 UI_PRESSURE_ONE: u32 = 65535
+/// a line of the wheel in the library's views (DIP): a notch scrolls Ui::wheel_lines of them
+/// (48 DIP with the usual three); where a device scrolls in fine steps without pixels of its own
+/// (Windows), 120 of them are wheel_lines such lines of pixels
+WHEEL_LINE_DIP: i32 = 16
 ```
 
 *containers*
@@ -21296,8 +21348,9 @@ built yet (level Basis; Features says so).
 
 - **`fn create_compute_pipeline(&self, desc: &ComputePipelineDesc) -> Result<ComputePipeline>`**
 - **`fn create_compute_pipeline_sized(&self, desc: &ComputePipelineDesc, size: u32) -> Result<ComputePipeline>`**
-  create_compute_pipeline with a required subgroup size: Metal's SIMD groups have one size
-  (32), so only 0 (the driver's choice) and that size work
+  create_compute_pipeline with a required subgroup size: Metal's SIMD groups have one size on
+  Apple's GPUs (32), so only 0 (the driver's choice) and that size work; on an Intel Mac's GPU
+  the driver picks it per pipeline (min and max of the limits differ), so only 0
 - **`fn create_render_pipeline(&self, desc: &RenderPipelineDesc) -> Result<RenderPipeline>`**
 
 - **`struct Timestamps`**
@@ -22214,6 +22267,21 @@ STROKE_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block. ..
 /// / fs_text_all for text among anything else)
 TEXT_WGSL: &str = concat!(include_str!("common.wgsl"), include_str!("block. ...
 TEXTC_WGSL: &str = include_str!("textc.wgsl")
+/// (G6d) the highlight's look (behind the stroke and text shaders: hl_wgsl) and the write pass with highlights (behind
+/// CULL_WGSL: write_hl_wgsl)
+HL_WGSL: &str = include_str!("hl.wgsl")
+HL_WRITE_WGSL: &str = include_str!("hl_write.wgsl")
+```
+
+- **`fn hl_wgsl(base: &str) -> alloc::string::String`**
+  (G6d) the vertex shaders that read the highlight: STROKE_WGSL or TEXT_WGSL with every visible list's word through
+  hl_take, ink through hl_ink, half_width through hl_wider, and hl.wgsl behind them (the entries keep their names: vs,
+  vs_full, vs_fill, vs_text, vs_text_all).  The plain sources and their shaders stay as they are
+
+- **`fn write_hl_wgsl() -> alloc::string::String`**
+  (G6d) CULL_WGSL with the write pass that puts the highlight into the visible list (entry write_hl)
+
+```rust
 COUNT_SPV: &[u32] = spv::COUNT
 SCAN_SPV: &[u32] = spv::SCAN
 WRITE_SPV: &[u32] = spv::WRITE
@@ -22229,6 +22297,13 @@ VS_TEXT_SPV: &[u32] = spv::VS_TEXT
 FS_TEXT_SPV: &[u32] = spv::FS_TEXT
 VS_TEXT_ALL_SPV: &[u32] = spv::VS_TEXT_ALL
 FS_TEXT_ALL_SPV: &[u32] = spv::FS_TEXT_ALL
+/// (G6d) the vertex shaders of hl_wgsl and write_hl
+VS_HL_SPV: &[u32] = spv::VS_HL
+VS_FULL_HL_SPV: &[u32] = spv::VS_FULL_HL
+VS_FILL_HL_SPV: &[u32] = spv::VS_FILL_HL
+VS_TEXT_HL_SPV: &[u32] = spv::VS_TEXT_HL
+VS_TEXT_ALL_HL_SPV: &[u32] = spv::VS_TEXT_ALL_HL
+WRITE_HL_SPV: &[u32] = spv::WRITE_HL
 ```
 
 - **`struct RendererDesc`**
@@ -22901,6 +22976,324 @@ TEXT_BAR_BELOW: f64 = 7.0
   target's in pixels
 - **`fn submitted(&mut self, id: SubmitId)`**
   the frame went to the GPU: Queue::submit's or Swapchain::present's answer
+
+### `render2d/hl.rs`
+
+Source: [`lib/render2d/hl.rs`](../lib/render2d/hl.rs)
+
+```text
+hl -- highlighting selected and hovered entities (G6d, decision 30; docs/RENDER2D.md "Hervorheben").  A child of
+scene.rs.
+
+Two bits per entity on a layer (an insert as a whole): selected, hovered.  On the GPU a mask of two bits per record of the
+pool and per instance of a block (u32 words: a header word with the instances' first word, then the records', then the
+instances'); changing a highlight sends the changed words only (runs, a copy each), never geometry.  While anything is
+highlighted the write pass of the visibility is write_hl, which puts a visible record's bits into bits 29 and 30 of its
+word in the visible list, and the layers holding a highlighted entity draw with vertex shaders that read them there
+(hl_wgsl: the same shaders with the colour mixed toward the highlight and strokes wider); every other pipeline, and
+every frame without a highlight, stays as it was.
+```
+
+```rust
+/// selected: the colour three quarters of the way to HL_SELECTED_RGB, strokes a quarter pixel wider on either side (a
+/// hairline stays on the fast way of short thin strokes)
+HL_SELECTED: u8 = 1
+/// hovered: the colour seven eighths of the way to HL_HOVER_RGB, strokes a pixel wider on either side (over a selection)
+HL_HOVER: u8 = 2
+/// the highlights' colours (sRGB, 0xRRGGBB) and the least alpha a highlighted colour gets (hl.wgsl)
+HL_SELECTED_RGB: u32 = 0x1E64FF
+HL_HOVER_RGB: u32 = 0xFF8C1A
+HL_ALPHA: u32 = 0xB0
+```
+
+- **`struct HighlightInfo`**
+  what the last prepare sent of the highlights (Scene::highlight_info).  It may grow
+  - `entities: u32` -- entities highlighted (selected, hovered or both)
+  - `words: u32` -- the mask's words on the GPU; the words and runs the last prepare sent; it made the mask anew
+  - `sent_words: u32`
+  - `runs: u32`
+  - `full: bool`
+
+**`impl Scene`**
+
+- **`fn set_highlight(&mut self, id: EntityId, bits: u8) -> Result<()>`**
+  an entity on a layer is highlighted (HL_SELECTED, HL_HOVER, both, or 0: not); an insert as a whole.  Only the
+  mask's changed words go up with the next prepare
+- **`fn set_highlights(&mut self, ids: &[EntityId], bits: u8) -> Result<()>`**
+  many at once (the same bits for each)
+- **`fn highlight(&self, id: EntityId) -> u8`**
+  an entity's highlight bits (0 for a dead id)
+- **`fn clear_highlights(&mut self, bits: u8)`**
+  these bits off on every entity (HL_HOVER: no hover left; HL_SELECTED | HL_HOVER: nothing highlighted)
+- **`fn highlighted(&self) -> Vec<EntityId>`**
+  the entities highlighted now
+- **`fn highlight_info(&self) -> HighlightInfo`**
+  what the last prepare sent of the highlights
+
+### `render2d/overlay.rs`
+
+Source: [`lib/render2d/overlay.rs`](../lib/render2d/overlay.rs)
+
+```text
+overlay -- an immediate-mode layer over the scene, made anew every frame (G6d, decision 24; docs/RENDER2D.md
+"Überlagerung"): rubber bands, window and crossing boxes, grips, snap markers.  A child of scene.rs.
+
+The app fills it between frames (Scene::overlay: clear, then lines, boxes, grips, markers in drawing units or in pixels);
+prepare maps everything into the target's pixels on the CPU in f64 (a drawing unit through the camera: at 1e7 and 1e-6
+units per pixel well within 1/1000 px), makes records (scene.rs records(): the same 64 bytes as every record), the
+styles, the visible list, the fills' edges in pixels (what count writes for the scene), all into the frame's own upload
+buffer, and Renderer::record copies them into the overlay's buffers under the barriers that cover the scene's uploads and
+draws them with fs_fill (strokes, arcs, dashes and fills: anti-aliased as everything else) after the scene's layers in the
+same render pass.  An empty overlay costs a test per frame: nothing goes up, nothing is drawn.  No culling: what lies
+beside the target the vertex shader clips away.
+```
+
+- **`enum Space`**
+  what overlay coordinates are: drawing units (through the camera at prepare) or pixels of the target (x right, y down
+  from its top left corner)
+  - `Drawing`
+  - `Px`
+
+- **`enum Grip`**
+  a grip's state: AutoCAD's cold (unselected), hover, hot (selected)
+  - `Cold`
+  - `Hover`
+  - `Hot`
+
+```rust
+/// a grip's side (px, odd: whole pixels around the pixel it sits on) and colours (cold, hover, hot, its outline)
+GRIP_PX: f64 = 9.0
+GRIP_COLD: u32 = 0xFF1E_64FF
+GRIP_HOVER: u32 = 0xFFFF_8C1A
+GRIP_HOT: u32 = 0xFFE0_2020
+GRIP_EDGE: u32 = 0xFF1A_1A1A
+/// a snap marker's size (px), its lines' width (px) and colour
+MARKER_PX: f64 = 12.0
+MARKER_WIDTH: f32 = 2.0
+MARKER_COLOR: u32 = 0xFFD8_9000
+/// AutoCAD's window box (solid, blue tint) and crossing box (dashed, green tint): outline, fill
+WINDOW_EDGE: u32 = 0xFF20_60FF
+WINDOW_FILL: u32 = 0x3020_60FF
+CROSSING_EDGE: u32 = 0xFF20_A040
+CROSSING_FILL: u32 = 0x3020_C040
+```
+
+- **`struct Overlay`**
+  the overlay of a scene: made anew every frame (Scene::overlay).  What it holds at prepare is drawn over the scene
+
+- **`struct OverlayInfo`**
+  what the last prepare made of the overlay (Scene::overlay_info).  It may grow
+  - `items: u32`
+  - `records: u32` -- its records and those drawn, its styles; the bytes it sent
+  - `drawn: u32`
+  - `styles: u32`
+  - `bytes: u64`
+
+**`impl Overlay`**
+
+- **`fn clear(&mut self)`**
+  nothing in it
+- **`fn is_empty(&self) -> bool`**
+- **`fn len(&self) -> usize`**
+- **`fn line(&mut self, a: [f64; 2], b: [f64; 2], space: Space, style: &Style)`**
+  a line (a rubber band) in the style's look (widths and dashes in pixels or drawing units)
+- **`fn polyline(&mut self, points: &[[f64; 2]], closed: bool, space: Space, style: &Style)`**
+  a polyline
+- **`fn arc(&mut self, center: [f64; 2], radius: f64, start: f64, sweep: f64, space: Space, style: &Style)`**
+  an arc (angles counter-clockwise from the x axis, in the drawing's sense: y up in drawing units, y down in pixels
+  turns them clockwise on the screen)
+- **`fn circle(&mut self, center: [f64; 2], radius: f64, space: Space, style: &Style)`**
+- **`fn rect(&mut self, a: [f64; 2], b: [f64; 2], space: Space, style: &Style)`**
+  a rectangle's outline (axis-aligned in its space)
+- **`fn fill(&mut self, points: &[[f64; 2]], space: Space, color: u32)`**
+  a filled polygon (even-odd) of a colour (0xAARRGGBB)
+- **`fn fill_rect(&mut self, a: [f64; 2], b: [f64; 2], space: Space, color: u32)`**
+- **`fn selection_box(&mut self, first: [f64; 2], second: [f64; 2], space: Space)`**
+  AutoCAD's selection box from the first corner to the second, axis-aligned on the screen: a window (the second
+  corner right of the first on the screen: solid outline, blue tint) or a crossing (left: dashed, green tint)
+- **`fn grip(&mut self, at: [f64; 2], space: Space, state: Grip)`**
+  a grip: a square of GRIP_PX pixels on the pixel the point lies on
+- **`fn marker(&mut self, kind: SnapKind, at: [f64; 2], space: Space)`**
+  a snap marker: AutoCAD's symbol of the kind (square endpoint, triangle midpoint, circle centre, diamond quadrant, X
+  intersection, the right angle of perpendicular, the circle and line of tangent, the hourglass of nearest, two squares
+  of insertion), MARKER_PX pixels, on the pixel the point lies on
+
+- **`fn box_is_window(first_px: [f64; 2], second_px: [f64; 2]) -> bool`**
+  a selection box is a window: its second corner (pixels) lies right of its first
+
+**`impl Scene`**
+
+- **`fn overlay(&mut self) -> &mut Overlay`**
+  the overlay: what is drawn over the scene with the next frames (clear it and fill it again for each frame)
+- **`fn overlay_info(&self) -> OverlayInfo`**
+  what the last prepare made of the overlay
+
+### `render2d/pick.rs`
+
+Source: [`lib/render2d/pick.rs`](../lib/render2d/pick.rs)
+
+```text
+pick -- a scene's spatial index, picking, area selection and object snaps on the CPU in f64 (G6d, decisions 24 and 30;
+docs/RENDER2D.md "Auswahl und Fang").  A child of scene.rs: it reads the scene's entities, layers and blocks.
+
+The index: an R-tree (index.rs) of the entities on layers by their boxes (the centre line's, grown by how far a width in
+drawing units reaches), and one per block of its entities in its own units.  An insert sits in the scene's tree by its
+copies' boxes (its block's box through each transform, an array's corner copies), never once per entity of its block:
+a query that meets it goes down into the block through the inverse transform (nested inserts likewise).  Texts in pixels
+and inserts of blocks that hold them have no fixed box in the drawing: they are looked at by every query.  The tree is
+built in one go by the first query (or build_index) and then kept in step: every change of the scene notes what it
+touched, the next query applies it (a change of a block: its tree again, and its inserts' boxes when its box moved).
+
+What a query decides is exact against the geometry in f64: a stroke's drawn region (its width, at least a pixel; caps,
+joins, miters up to their limit; a dash pattern's gaps count as the stroke, as AutoCAD picks them), arcs and curves
+themselves (not their flattening), a fill's inside (even-odd, holes) and a hatched one's, a text's quad.  Hits are in the
+painter's order, topmost first.  Hidden layers are skipped; a filter can skip more (a layer lock of an app).
+```
+
+- **`struct Target`**
+  where a pick or a snap found something: the entity on a layer, its layer and, inside an insert, the way down to the
+  entity
+  - `entity: EntityId`
+  - `layer: LayerId`
+  - `path: Vec<(u32, EntityId)>` -- inside an insert, one step per level: the copy of the insert above (row \* columns + column; 0 for a single insert)
+    and the entity of its block the way goes on with (a nested insert, ..., last the entity itself).  Empty for an
+    entity on a layer
+
+- **`struct Hit`**
+  a hit of Scene::pick
+  - `target: Target`
+  - `distance: f64` -- pixels from the point to what is drawn of it (0: on it)
+
+- **`enum Region<'a>`**
+  an area selection's region in drawing units (Scene::select)
+  - `Rect([f64; 2], [f64; 2])` -- two opposite corners of an axis-aligned rectangle
+  - `Polygon(&'a [[f64; 2]])` -- a closed polygon (even-odd; AutoCAD's WPolygon and CPolygon)
+
+- **`enum SelectMode`**
+  AutoCAD's two area selections
+  - `Window` -- what lies wholly inside
+  - `Crossing` -- what lies inside or touches the boundary
+
+- **`enum SnapKind`**
+  the kinds of object snap (decision 30, and AutoCAD's insertion point)
+  - `Endpoint` -- a line's or arc's ends, a polyline's and a Bézier chain's vertices, a fill's corners
+  - `Midpoint` -- the middle of a line, of each segment of a polyline, of an arc, of each Bézier piece and of an open ellipse or spline
+    (by length)
+  - `Center` -- a circle's, arc's or ellipse's centre (looked for when the pointer is over the curve)
+  - `Quadrant` -- the points of a circle, arc or ellipse on its own axes (an ellipse made of a circle by an uneven insert: its axes'
+    ends)
+  - `Intersection` -- where two pieces near the pointer cross (also across inserts, fills' edges, a polyline with itself)
+  - `Perpendicular` -- the foot of the perpendicular from the base point (SnapOptions::base)
+  - `Tangent` -- where a line from the base point touches a circle, arc or curve
+  - `Nearest` -- the nearest point of what is near the pointer
+  - `Insertion` -- a text's alignment point, an insert's insertion point (each copy of an array)
+
+```rust
+SNAP_END: u32 = 1
+SNAP_MID: u32 = 2
+SNAP_CEN: u32 = 4
+SNAP_QUA: u32 = 8
+SNAP_INT: u32 = 16
+SNAP_PER: u32 = 32
+SNAP_TAN: u32 = 64
+SNAP_NEA: u32 = 128
+SNAP_INS: u32 = 256
+SNAP_ALL: u32 = 511
+```
+
+**`impl SnapKind`**
+
+- **`const fn bit(self) -> u32`**
+  its bit of SnapOptions::kinds
+- **`const fn rank(self) -> u32`**
+  its rank among kinds equally near the pointer (lower first): endpoint, intersection, midpoint, centre, quadrant,
+  insertion, perpendicular, tangent; nearest only when nothing else is there
+
+- **`struct SnapOptions`**
+  what Scene::snap looks for.  Made with `new` (it may grow)
+  - `aperture: f64` -- the aperture's radius in pixels: what lies within it of the pointer
+  - `kinds: u32` -- the kinds looked for (SNAP_\* bits)
+  - `base: Option<[f64; 2]>` -- the command's last point: perpendicular and tangent need it (None: they are not looked for)
+
+**`impl SnapOptions`**
+
+- **`const fn new(aperture: f64, kinds: u32) -> SnapOptions`**
+- **`const fn with_base(mut self, base: [f64; 2]) -> SnapOptions`**
+  the same with a base point for perpendicular and tangent
+
+- **`struct Snap`**
+  an object snap (Scene::snap): its kind, the point (drawing units, f64), how far from the pointer (px), what it lies on
+  (an intersection: both)
+  - `kind: SnapKind`
+  - `point: [f64; 2]`
+  - `distance: f64`
+  - `target: Target`
+  - `other: Option<Target>`
+
+- **`struct IndexInfo`**
+  what the spatial index holds (Scene::index_info).  It may grow
+  - `entries: u32` -- entities on layers in the scene's tree, its nodes, levels, bytes
+  - `nodes: u32`
+  - `height: u32`
+  - `bytes: u64`
+  - `block_trees: u32` -- blocks with a tree, their entries and bytes
+  - `block_entries: u32`
+  - `block_bytes: u64`
+  - `outside: u32` -- entities looked at by every query (texts in pixels, inserts of blocks holding them)
+  - `synced: u32` -- what the last sync applied: changes of entities on layers, blocks made again; the scene's tree made anew
+  - `blocks_synced: u32`
+  - `rebuilt: bool`
+
+**`impl Scene`**
+
+- **`fn build_index(&mut self)`**
+  builds the spatial index now (else the first pick, select or snap does)
+- **`fn index_info(&self) -> IndexInfo`**
+  what the index holds
+- **`fn index_check(&mut self) -> Result<u32, &'static str>`**
+  (tests) the trees' invariants hold
+
+**`impl Scene`**
+
+- **`fn pick(&mut self, at: [f64; 2], tolerance: f64) -> Vec<Hit>`**
+  what is drawn within `tolerance` pixels of a point of the drawing (f64), topmost first (the painter's order: an app
+  cycles through overlapping ones); inside an insert the hit names the insert and the way down to the entity
+- **`fn pick_filtered(&mut self, at: [f64; 2], tolerance: f64, filter: &dyn Fn(LayerId) -> bool) -> Vec<Hit>`**
+  pick with a filter of layers (false: skipped; hidden layers are skipped anyway): a layer lock of an app
+- **`fn pick_brute(&mut self, at: [f64; 2], tolerance: f64) -> Vec<Hit>`**
+  (tests) pick without the index: every entity, every entity of every block
+
+**`impl Scene`**
+
+- **`fn select(&mut self, region: Region, mode: SelectMode) -> Vec<EntityId>`**
+  the entities on layers a region selects (an insert as a whole): Window what lies wholly inside, Crossing what lies
+  inside or touches it (AutoCAD's); by the centre lines (widths do not count, as in AutoCAD), a fill by its rings (a
+  crossing region inside a fill touches it), a text by its quad.  In no particular order
+- **`fn select_filtered(&mut self, region: Region, mode: SelectMode, filter: &dyn Fn(LayerId) -> bool) -> Vec<EntityId>`**
+  select with a filter of layers (false: skipped)
+- **`fn select_brute(&mut self, region: Region, mode: SelectMode) -> Vec<EntityId>`**
+  (tests) select without the index
+
+**`impl Scene`**
+
+- **`fn snap(&mut self, at: [f64; 2], opt: &SnapOptions) -> Option<Snap>`**
+  the object snap at a point of the drawing (f64): of the kinds asked for within the aperture, the one nearest the
+  pointer (equally near: endpoint, intersection, midpoint, centre, quadrant, insertion, perpendicular, tangent),
+  nearest only where nothing else is
+- **`fn snaps(&mut self, at: [f64; 2], opt: &SnapOptions) -> Vec<Snap>`**
+  every snap candidate in that order (an app cycles through them)
+- **`fn snaps_filtered(&mut self, at: [f64; 2], opt: &SnapOptions, filter: &dyn Fn(LayerId) -> bool) -> Vec<Snap>`**
+  snaps with a filter of layers (false: skipped)
+- **`fn snaps_brute(&mut self, at: [f64; 2], opt: &SnapOptions) -> Vec<Snap>`**
+  (tests) snaps without the index
+
+**`impl Scene`**
+
+- **`fn grip_points(&self, id: EntityId) -> Vec<[f64; 2]>`**
+  AutoCAD's grips of an entity on a layer (drawing units): a line's ends and middle, a polyline's vertices and its
+  segments' middles, an arc's centre, ends and middle, a circle's centre and quadrants, an ellipse's centre and its
+  axes' ends (an open one's ends too), a Bézier chain's and a spline's control points, a fill's corners, a text's
+  alignment point, an insert's insertion point (each copy of an array).  Empty for a dead id or a block's entity
 
 ### `render2d/text.rs`
 
@@ -27014,6 +27407,10 @@ one thread may read while another writes (Arc<TcpStream>).
 - **`fn set_write_timeout(&self, ms: Option<u32>)`**
 - **`fn set_nodelay(&self, on: bool) -> NetResult<()>`**
 - **`fn set_keepalive(&self, on: bool) -> NetResult<()>`**
+- **`fn peer_uid(&self) -> Option<u32>`**
+  the user id of the process at the other end of a Unix socket, as the kernel recorded it
+  when it connected or listened (Linux SO_PEERCRED, macOS getpeereid): not what the socket
+  file's owner claims.  Unix sockets only (TCP has no meaningful answer); None on Windows
 - **`fn read(&self, buf: &mut [u8]) -> NetResult<usize>`**
   up to buf.len() bytes; Ok(0) = the peer closed its side
 - **`fn read_exact(&self, buf: &mut [u8]) -> NetResult<()>`**
@@ -27088,9 +27485,19 @@ fs -- file system access for backup and restore
                                                sibling is always a new file of its own
   join(dir, name) / parent(path)               '' separates on Windows only (and in vfs
                                                names); on Linux and macOS it is a character
-  mkdir_private(path)                          owner-only directory (with parents)
+  mkdir_private(path)                          owner-only directory (with parents); an
+                                               existing one must be a folder (no link) of
+                                               this user (Windows: also SYSTEM's or the
+                                               administrators') nobody else may write to
+                                               (Windows: has any access to), else false;
+                                               Linux, macOS: one others may only read is
+                                               made owner-only
   local_zone_id() -> "Europe/Berlin" | "win:W. Europe Standard Time"
   long_path(path) (Windows): the \\?\ form every call here uses
+  Dir                                          an open folder: entries below it reached
+                                               relative to it, never through a link (the
+                                               section "folders by handle")
+  set_file_times / set_file_mode (File)        through the open file's own handle
 
 Windows: reparse points count as links only for symbolic links and junctions; other tags
 (deduplication, cloud placeholders) are ordinary files whose data is read.  Files are
@@ -27192,7 +27599,87 @@ modes or free space.
   write (memory of this process)
 
 - **`fn mkdir_private(path: &str) -> bool`**
-  an owner-only folder (with parents)
+  an owner-only folder (with parents; existing parents are taken as they are).  An existing
+  folder must be the folder itself (no link or junction), belong to this user (Windows: or to
+  SYSTEM or the administrators) and let nobody else write to it (Windows: grant nobody else
+  anything), else false: someone else's folder, made before the program, may hold planted files.
+  Linux and macOS make one of this user that others may only read owner-only (0700).
+
+- **`struct Dir`**
+  An open folder: what lies below it is reached relative to it and never through a link, so
+  a folder on the way that is swapped for a link (or renamed) after a check cannot lead a
+  privileged read, write, change or removal out of it.
+
+  ```text
+  Dir::open(path)                   the folder as it is (a link to it is followed: the
+                                    trusted start, e.g. a shared folder); OS paths and
+                                    folder mounts only
+  open_dir(rel)                     a folder below ("a/b"; no "..", nothing absolute) with no
+                                    link on the way: Linux openat2 (RESOLVE_BENEATH |
+                                    RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS), else openat
+                                    with O_NOFOLLOW for every component (kernels before 5.6,
+                                    a seccomp filter that refuses openat2)
+  names                             one component: no separator, not "." or ".." (Windows:
+                                    no ':' either); "" is the folder itself where noted
+  lstat / read_link / read_dir      links are reported, never followed
+  open_file(name)                   a regular file, read only; a link or anything else: None
+  create_new(name)                  a new file (Linux, macOS 0600), never an existing name
+  mkdir / remove / rename / symlink a link is removed or renamed as the link
+  set_times / set_mode / set_attrs  on the entry itself, never on a link's target
+  set_file_times / set_file_mode    through an open File's own handle (whatever its name
+                                    has become meanwhile)
+  ```
+
+  macOS: openat with O_NOFOLLOW component by component, the \*at calls on the folder.  Windows
+  has no calls relative to an open folder in its API: a Dir holds every folder from its start
+  down open without FILE_SHARE_DELETE (checked to be a folder, not a junction or a link), so
+  none of them can be renamed, removed or replaced while it lives, and its entries are named
+  by path below them (with OPEN_REPARSE_POINT).  The manifest's rules (policy.rs) are checked
+  on the path an entry has below the start.
+
+**`impl Dir`**
+
+- **`fn open(path: &str) -> Option<Dir>`**
+  the folder `path` as it is (a link to it is followed); None when it is no folder
+- **`fn path(&self) -> &str`**
+  the path the folder was opened as (with the names below its start)
+- **`fn open_dir(&self, rel: &str) -> Option<Dir>`**
+  a folder below this one ("a/b"): no component may be a link (or a junction), none may
+  be ".." and the path may not be absolute
+- **`fn lstat(&self, name: &str) -> Option<Meta>`**
+  the metadata of an entry itself ("": the folder), a link not followed
+- **`fn read_link(&self, name: &str) -> Option<String>`**
+  the target of a symbolic link (Windows: also a junction)
+- **`fn read_dir(&self) -> Option<Vec<DirEntry>>`**
+  the entries of the folder ("." / ".." left out); None also when an error cut it short
+- **`fn open_file(&self, name: &str) -> Option<crate::File>`**
+  a regular file, read only (never through a link; a folder, device or pipe: None)
+- **`fn create_new(&self, name: &str) -> Option<crate::File>`**
+  a new file, read and write (Linux, macOS: 0600); an existing name, also a link: None
+- **`fn mkdir(&self, name: &str) -> bool`**
+  a new folder (Linux, macOS: 0777 less the umask); false also when the name exists
+- **`fn remove(&self, name: &str) -> bool`**
+  a file, a link (never what it points to) or an empty folder
+- **`fn rename(&self, name: &str, to: &Dir, to_name: &str) -> bool`**
+  rename `name` to `to_name` in `to` (this folder or another Dir on the same volume),
+  replacing an existing file there; a link is renamed as the link
+- **`fn symlink(&self, target: &str, name: &str, dir: bool) -> bool`**
+  a symbolic link `name` to `target` (dir: a folder's link on Windows); the rules as for
+  symlink: the target as the link leads to it must be writable
+- **`fn set_times(&self, name: &str, atime_ns: i64, mtime_ns: i64) -> bool`**
+  access and modification times (ns since 1970) of an entry itself ("": the folder)
+- **`fn set_mode(&self, name: &str, mode: u32) -> bool`**
+  permission bits (07777) of an entry ("": the folder); a link is left alone (Windows:
+  nothing to do)
+- **`fn set_attrs(&self, name: &str, attrs: u32) -> bool`**
+  FILE_ATTRIBUTE_\* of an entry ("": the folder; Linux, macOS: nothing to do)
+
+- **`fn set_file_times(f: &crate::File, atime_ns: i64, mtime_ns: i64) -> bool`**
+  access and modification times of an open file, through its handle; a mount's stream: false
+
+- **`fn set_file_mode(f: &crate::File, mode: u32) -> bool`**
+  permission bits (07777) of an open file, through its handle (Windows: nothing to do); a
+  mount's stream: false
 
 ### `plat/service.rs`
 
@@ -27212,6 +27699,9 @@ service -- programs that run as a system service
       Windows: the service control manager (automatic start as LocalSystem, restart after a
       failure); Linux: a systemd unit in /etc/systemd/system and systemctl.  Both need
       administrator / root rights; the errors say so.
+  program_path(&ServiceSpec) -> the program install registers: Windows: a program outside
+      Program Files is copied to %ProgramFiles%\<name>\ first (only administrators may change
+      it there; uninstall leaves the copy, a new install replaces it); Linux, macOS: the program
   unit_text(&ServiceSpec) -> the systemd unit install writes (Linux)
   plist_text(&ServiceSpec) -> the launchd property list install writes (macOS: a daemon in
       /Library/LaunchDaemons, launchctl bootstrap / bootout / kickstart; iOS has no services)
@@ -27405,7 +27895,7 @@ applies `--simd sse2` before the app starts.
 
 - **`fn cpu_brand() -> String`**
   the processor name from CPUID 0x80000002..4 (macOS, iOS: sysctl machdep.cpu.brand_string,
-  "Apple M2"), blanks trimmed  [cpu_brand]
+  "Apple M2", on an Intel Mac Intel's name; under Rosetta 2 the Mac's own chip), blanks trimmed  [cpu_brand]
 
 - **`fn avx2_probe() -> bool`**
   run two 256-bit AVX2 instructions (they fault without OS support); only call it when
@@ -27416,10 +27906,11 @@ applies `--simd sse2` before the app starts.
   it: a thread started with a misaligned stack shows here)  [plattest th_raw]
 
 - **`fn avx2_probe() -> bool`**
-  The browser does not advertise or execute native AVX2 instructions.
+  The browser does not advertise or execute native AVX2 instructions (nor do ARM64 processors).
 
 - **`fn stack_aligned() -> bool`**
-  WebAssembly's compiler-managed value/call stacks satisfy their platform ABI.
+  WebAssembly's compiler-managed value/call stacks satisfy their platform ABI (Apple Silicon: the
+  system starts every thread; Intel Macs read rsp as Windows and Linux do).
 
 - **`fn stack_aligned() -> bool`**
   the stack pointer is 16-byte aligned (ARM64 faults on a memory access through a misaligned sp: a
@@ -27533,7 +28024,9 @@ Questions to the user ("ask" lines; one decision per line):
                                          Nobody asks (headless runs, console programs): refused
   Key::answer(id, Answer)                Once / Deny: until the program ends; Always / Never:
                                          also stored (Key::set_store, env jfgui_PERM_STORE,
-                                         STORE in config://; the app cannot write that file)
+                                         STORE in config://; the app cannot write that file,
+                                         by no other name either -- 8.3, case, link -- and
+                                         STORE also not while another store is chosen)
   Key::set_answer(Some(a))               every question answered with a, without asking
                                          (scripts; env jfgui_PERM_ANSWER=once|always|deny|never)
   decisions() -> Vec<Decision>           every ask line and agent action with its answer
@@ -27696,7 +28189,8 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn user_doc_allowed(uri: &str) -> bool`**
   whether the app may reach a document the user chose by its URI (Android's content://
-  names; the system grants each one): with fs.user in the manifest, or without a manifest
+  names; the system grants each one): with fs.user in the manifest, or without a manifest;
+  inside on_behalf every plugin scope needs fs.user as well
 
 - **`fn process_allowed(program: &str) -> bool`**
   whether Command::spawn / run_elevated may start program (a path, or a name found in PATH)
@@ -27958,7 +28452,8 @@ own code runs (docs/PERMISSIONS.md, docs/VFS.md)
   name_and_assets(app, assets) -> Result<(), i32>    vfs::set_app_id, the JFA1 bundle as app://
   permissions(manifest) -> Result<Option<Key>, i32>  install the manifest; with fs.user the
                           paths on the command line are the user's (read + write, folders
-                          with everything below; a local file:// URI as its path); without
+                          with everything below; a local file:// URI as its path; not the
+                          values of the library's VALUE_OPTS but --theme-file, --shot, --script); without
                           a manifest the process's key (policy::take_key: it answers the
                           questions of agent actions).  A `sandbox` line then hands the
                           manifest to the OS as well (sandbox::apply)
@@ -28468,7 +28963,9 @@ Channel (control_ipc_win.rs / control_ipc_linux.rs): Windows the pipe
 \\.\pipe\jfgui-instance-<user SID>-<app> (current user, local clients, one pipe instance:
 the first process that creates it is the instance; the starting process lets it take the
 foreground); Linux the abstract socket jfgui-instance-<uid>-<app>.  Both ends make sure the
-other runs as the same user.  Message: "JFI1", u32 length of the rest, u32 count, count x
+other runs as the same user (Linux: also in the same mount namespace, so a sandboxed process
+of the user -- Flatpak, bubblewrap, Firejail -- is refused).  Message: "JFI1", u32 length of
+the rest, u32 count, count x
 (u32 length, UTF-8): the working folder, then the arguments (without the program), on Linux
 then "XAT1", u32 length, the start's $XDG_ACTIVATION_TOKEN when it has one (the running
 instance's window comes forward with it on Wayland: linux_wl_act.rs; an instance of an older
@@ -29289,7 +29786,8 @@ written) and puts back what was there.  Windows (win_assoc.rs): the setup's entr
 HKCU\Software\Classes -- the ProgID <app>.<ext> (description, DefaultIcon, shell\open\command
 = "<exe>" "%1", AppUserModelID = the app id: what Windows asks of a handler with an explicit
 id for the recent files of the type), .<ext>\OpenWithProgids, for own types the default and
-Content Type of .<ext>, a scheme's key (URL:<display>, URL Protocol) -- then SHChangeNotify.
+Content Type of .<ext>, a scheme's key (URL:<display>, URL Protocol, shell\open\command =
+"<exe>" -- "%1": the URL after "--" is one argument, never options) -- then SHChangeNotify.
 A default of another program is the extension's default value (HKCU or HKLM) or a key of the
 same name with another command; the user's own choice in Windows' dialog (UserChoice, hashed) is never
 changed (Conflict::fixed).  Linux (linux_assoc.rs): $XDG_DATA_HOME/applications/<app_id>.desktop
@@ -30767,7 +31265,11 @@ Overrides (tests, shots, users): jfgui_THEME=dark|light, jfgui_ACCENT=RRGGBB,
 jfgui_CONTRAST=high|normal, jfgui_REDUCE_MOTION=1|0, jfgui_TEXT_SCALE=PERCENT,
 jfgui_DOUBLE_CLICK_MS=N, jfgui_CARET_BLINK_MS=N (0: a steady caret),
 jfgui_FONT_AA=1|0, jfgui_FONT_HINTING=none|slight|medium|full,
-jfgui_FONT_RGBA=none|rgb|bgr|vrgb|vbgr.
+jfgui_FONT_RGBA=none|rgb|bgr|vrgb|vbgr, jfgui_WHEEL_LINES=N|page, jfgui_WHEEL_CHARS=N.
+
+The wheel (wheel_lines, wheel_chars: what a notch scrolls): Windows SPI_GETWHEELSCROLLLINES
+(WHEEL_PAGESCROLL: a page) and SPI_GETWHEELSCROLLCHARS; KDE's [KDE] WheelScrollLines of
+kdeglobals; GNOME, macOS, the browser and Android have no such setting (3 and 3).
 
 Font rendering (font_aa, font_hinting, font_rgba; None: the system says nothing): Windows
 SPI_GETFONTSMOOTHING, SPI_GETFONTSMOOTHINGTYPE (ClearType: subpixels) and
@@ -30871,6 +31373,19 @@ TB_ACT_MENU: u8 = 4
   - `font_hinting: Option<u8>` -- FONT_HINT_\*
   - `font_rgba: Option<u8>` -- FONT_RGBA_\* (subpixel smoothing and its order)
   - `titlebar: Titlebar` -- the title bar the library draws (Linux client-side decorations, AF_CUSTOM_TITLEBAR)
+  - `wheel_lines: u32` -- lines a notch of the wheel scrolls (1..=100), WHEEL_PAGE: a page (Windows
+    SPI_GETWHEELSCROLLLINES, KDE's WheelScrollLines; elsewhere 3)
+  - `wheel_chars: u32` -- characters a notch of the horizontal wheel scrolls (1..=100; Windows
+    SPI_GETWHEELSCROLLCHARS; elsewhere 3)
+
+```rust
+/// SysSettings::wheel_lines: a notch of the wheel scrolls a page
+WHEEL_PAGE: u32 = u32::MAX
+```
+
+- **`fn wheel_amount(n: u32) -> u32`**
+  a number of lines or characters per notch as the system says it: 1..=100, the page
+  (WHEEL_PAGE, Windows' WHEEL_PAGESCROLL) kept; 0 (Windows: the wheel does not scroll) is 1
 
 - **`fn sys_settings() -> SysSettings`**
   the system's settings and the jfgui_\* overrides
@@ -31760,6 +32275,16 @@ callbacks (refresh, hit hook) never hold a reference across a Win32 call.
 
 - **`fn win_create(title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x: i32, y: i32) -> i32`**
   a hidden window (see the file header) -> index / -1  [plat_win_create]
+
+- **`fn key_char_test(hkl: isize, vk: u32, mods: u8) -> (u32, bool)`**
+  (test aid, plattest --test keychar) the character layout hkl (one of key_layouts_test) gives
+  key vk with the modifiers MOD_SHIFT, MOD_CTRL, MOD_ALT, MOD_ALTGR (the right Alt: Ctrl + Alt as
+  Windows makes it), MOD_CAPS -> (character, dead key), as a key event of that layout says it;
+  the thread's keyboard state is not touched
+
+- **`fn key_layouts_test() -> Vec<isize>`**
+  (test aid) the keyboard layouts loaded for the user (GetKeyboardLayoutList), HKLs whose low
+  word is the language (0x0407 German, 0x0409 English (US)) and high word the layout
 
 - **`fn win_hit_hook(f: Option<fn(i32, i32, i32) -> u32>)`**
   f(w, x, y) -> HB_\* flags at a client point (None = no hit tests)
@@ -32884,7 +33409,8 @@ win_clr -- run a managed program on the CoreCLR another application ships
   clr_run(dir, app, args)        self-contained .NET applications bring coreclr.dll and their
                                  whole framework: load that runtime into this process, trust
                                  every assembly of dir, execute app's Main -> its exit code.
-                                 No installed .NET is involved.  Plugin policy applies; ARM64 refuses x64.
+                                 No installed .NET is involved.  Plugin policy applies (coreclr.dll, app
+                                 and every DLL of dir and of app's folder); ARM64 refuses x64.
   machine_reg_string(sub, name)  a string value of HKLM\sub (None: missing or another type)
 ```
 
@@ -33300,6 +33826,11 @@ KV_MODSHIFT: u32 = 24
 - **`fn xkb_key(evdev: u32) -> (u32, u32)`**
   evdev code -> (VK code, text codepoint (0 = none))  [xkb_key]
 
+- **`fn xkb_key_y(evdev: u32) -> i32`**
+  (E2) evdev code -> Event::y of its key event: the KL_\* location and the character the key
+  gives with the current Shift, Caps Lock, AltGr and Num Lock but without Ctrl, Alt and Super
+  (plat::key_y)
+
 - **`fn xkb_dead_reset()`**
   forget a pending dead key (the keyboard focus changed)
 
@@ -33520,7 +34051,8 @@ its own path (text-input-v3, linux_wl_ime.rs).
   ibus_available() -> bool        jfgui_IME=0 turns it off
   ibus_ready() -> bool            the input context exists (keys go to it only then)
 
-Signals of the context: CommitText -> ime_commit_text, UpdatePreeditText (cursor in
+Signals of the context (only from the portal connection that made it): CommitText ->
+ime_commit_text, UpdatePreeditText (cursor in
 characters -> bytes) / HidePreeditText -> ime_preedit_set, ForwardKeyEvent -> E_TEXT or the
 key's E_KEY_DOWN / E_KEY_UP.  Capabilities: preedit text and focus (IBus draws its own
 candidate window).  Every result wakes the UI thread.
@@ -33555,7 +34087,8 @@ linux_life -- lifecycle events on Linux
 
 SIGTERM (logout, shutdown, `kill`) sets a flag and wakes the loop: the app gets
 E_SESSION_END (UIC_SESSION_END), saves, and ends.  The watcher thread has connections of
-its own (linux_dbus.rs): logind's PrepareForSleep(b) on the system bus -> E_POWER (1
+its own (linux_dbus.rs): logind's PrepareForSleep(b) on the system bus (only from the unique
+name that owns org.freedesktop.login1, followed through NameOwnerChanged) -> E_POWER (1
 sleep, 0 woke up); the settings portal's SettingChanged(namespace, key, value) on the
 session bus -> E_SETTINGS with SET_THEME (color-scheme, accent-color, gtk-theme),
 SET_CONTRAST (contrast, high-contrast), SET_FONTS (font names, text-scaling-factor),
@@ -34312,7 +34845,8 @@ The view and the delegate never act: they push events into the ring (evq.rs), as
   modifiers Command is MOD_CTRL (the library's shortcuts are Ctrl+..), Control MOD_SUPER, Option
             MOD_ALT
   gestures  the trackpad's pinch becomes Ctrl + wheel (120 per 0.2 of magnification), as Windows
-            makes it of a touchpad's pinch; two-finger scrolling is the wheel with fine steps
+            makes it of a touchpad's pinch; two-finger scrolling is the wheel in physical pixels
+            (WHEEL_PIXELS)
   settings  a change of the appearance or the accent colour (distributed notifications) and of the
             screens push E_SETTINGS (SET_THEME, SET_MONITORS) for window 0
   frame     PWF_SYSFRAME: the system's title bar; otherwise the content reaches under a transparent
@@ -36220,9 +36754,9 @@ E_NONE: u8 = 0
 E_MOVE: u8 = 1
 E_DOWN: u8 = 2  // btn
 E_UP: u8 = 3  // btn
-E_WHEEL: u8 = 4  // data = (i16 dy) | (i16 dx << 16), 120 per notch, up / right positive
-E_KEY_DOWN: u8 = 5  // data = VK | (repeat << 31); (E2) x = scancode, y = KL_* location
-E_KEY_UP: u8 = 6  // data = VK; (E2) x = scancode, y = KL_* location
+E_WHEEL: u8 = 4  // data = (i16 dy) | (i16 dx << 16), 120 per notch, up / right positive; btn = WHEEL_*
+E_KEY_DOWN: u8 = 5  // data = VK | (repeat << 31); (E2) x = scancode, y = key_y(KL_* location, character)
+E_KEY_UP: u8 = 6  // data = VK; (E2) x = scancode, y = key_y(KL_* location, character)
 E_TEXT: u8 = 7  // data = Unicode codepoint
 E_RESIZE: u8 = 8  // x = width, y = height (physical pixels)
 E_DPI: u8 = 9  // data = dpi (96 = 100 %)
@@ -36251,6 +36785,19 @@ SET_MONITORS: u32 = 32  // monitors added, removed, moved, rescaled; work areas 
 EVQ_CAP: usize = 256  // event ring capacity (power of two)
 ```
 
+*E_WHEEL's btn: what kind of turn (0: a wheel's notches, 120 each)*
+
+```rust
+/// the 120 per notch come in fine steps: a device without notches or with finer ones (Windows: a
+/// precision touchpad's two fingers, a high-resolution wheel -- deltas that are no multiple of
+/// 120; Wayland: axis_value120 of such a wheel)
+WHEEL_FINE: u8 = 1
+/// data holds physical pixels of the window (the same i16 dy | i16 dx << 16, up / right
+/// positive) from a device that scrolls by pixels: Wayland's fingers and continuous axes, the
+/// trackpad and Magic Mouse on macOS
+WHEEL_PIXELS: u8 = 2
+```
+
 *pointer types, buttons, modifiers*
 
 ```rust
@@ -36272,7 +36819,7 @@ MOD_CAPS: u8 = 32
 MOD_NUM: u8 = 64
 ```
 
-*(E2) where a key sits (Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:*
+*(E2) where a key sits (key_location of Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:*
 
 ```rust
 // Windows' scan code (0xE0.. for extended keys), Linux's evdev code, 0 where unknown)
@@ -36281,6 +36828,31 @@ KL_LEFT: u32 = 1  // the left Shift, Ctrl, Alt, Windows key
 KL_RIGHT: u32 = 2
 KL_NUMPAD: u32 = 3  // the keys of the number block
 ```
+
+*(E2) the character of a key: Event::y of E_KEY_DOWN / E_KEY_UP holds the KL_\* location in*
+
+```rust
+// bits 0..7, the character the keyboard layout gives the key in bits 8..28 (key_char) and
+// KEY_DEAD.  The character is the one the key types with Shift, Caps Lock and AltGr as they are
+// but without Ctrl, Alt and the Windows / Super key -- what a browser names the key: "z" for
+// Ctrl+Z on a German keyboard (whose Z sits at the US layout's Y), "+" for Ctrl++ there, "@" for
+// AltGr+Q; 0 for a key that types nothing (Enter, Tab, Esc, Backspace, the arrows, F1 ...: control
+// characters are none) and where the platform does not say (the browser, Android, iOS)
+/// the key is a dead key; key_char is its spacing character (´ ^ ~ ...)
+KEY_DEAD: i32 = 1 << 29
+```
+
+- **`const fn key_y(location: u32, ch: u32, dead: bool) -> i32`**
+  (E2) Event::y of a key event: its KL_\* location and character (0: none)
+
+- **`const fn key_location(y: i32) -> u32`**
+  (E2) the KL_\* location of a key event's y
+
+- **`const fn key_char(y: i32) -> u32`**
+  (E2) the character of a key event's y (0: none)
+
+- **`const fn key_dead(y: i32) -> bool`**
+  (E2) a key event's y says a dead key
 
 - **`const fn evdev_location(code: u32) -> u32`**
   (E2) the KL_\* location of a Linux evdev key code (both sides' modifiers, the number block)
@@ -38425,7 +38997,8 @@ cron -- 5-field cron schedules evaluated in a time zone
                                 a-b, a-b/n, */n, lists a,b; month names jan..dec, weekday
                                 names sun..sat (0 and 7 = Sunday); @hourly @daily @midnight
                                 @weekly @monthly @yearly @annually.  Day of month and day of
-                                week restricted both: either matches (Vixie cron).
+                                week restricted both: either matches; one of them beginning
+                                with "*" (also "*/2"): both must match (Vixie cron).
   cron.next_after(ts, &zone)    the first run after ts: a wall time in a DST gap runs at the
                                 jump (right after the gap), a repeated wall time runs once
                                 (its first occurrence); None when nothing matches within
@@ -39401,7 +39974,8 @@ MSK and an EMSK.  Nothing of its packets here (netpkt::eap) and no state (eapm)
 
   GROUP, RAND_FUNC, PRF                       the ciphersuite this knows; ciphersuite() its bytes
   kdf(key, label, n)                          n bytes of the KDF of RFC 5931 2.5
-  pwe(token, peer_id, server_id, password)    the password element: hunting and pecking (2.8.3)
+  pwe(token, peer_id, server_id, password)    the password element: hunting and pecking (2.8.3),
+                                              at least ROUNDS rounds
   commit(pwe, rand, mask)                     (Scalar, Element) of one side, from its two random
                                               scalars (2.8.5.1); None to draw again
   shared(pwe, rand, peer_scalar, peer_element)   ss, the x coordinate of k (2.8.5.2); None for
@@ -39410,9 +39984,11 @@ MSK and an EMSK.  Nothing of its packets here (netpkt::eap) and no state (eapm)
                                               (2.8.5.3)
   keys(ss, confirm_p, confirm_s, scalar_p, scalar_s)   (MSK, EMSK) (2.9)
 
-H(x) is HMAC-SHA-256 with a key of 32 zero bytes.  This looks for PWE the plain way, which
-shows by its time how many rounds a password needs; RFC 8146 and later hostapd run a fixed
-number of them.  The simulator has no such observer.
+H(x) is HMAC-SHA-256 with a key of 32 zero bytes.  The plain search would show by its time how
+many rounds a password needs (Dragonblood, CVE-2019-9494); as RFC 8146 and hostapd, pwe runs
+ROUNDS rounds whatever round found the point, keeps the first one without a branch on it and
+only goes on beyond ROUNDS in the case (about 2^-40) that none of them found one.  The point is
+the same as the plain search's.
 ```
 
 ```rust
@@ -39422,6 +39998,8 @@ GROUP: u16 = 19
 RAND_FUNC: u8 = 1
 /// the PRF: HMAC-SHA-256
 PRF: u8 = 1
+/// the rounds pwe always runs (k = 40 of RFC 8146 and hostapd)
+ROUNDS: u8 = 40
 ```
 
 - **`fn ciphersuite() -> [u8; 4]`**
@@ -39433,7 +40011,8 @@ PRF: u8 = 1
 
 - **`fn pwe(token: &[u8; 4], peer_id: &[u8], server_id: &[u8], password: &[u8]) -> [u8; 64]`**
   the password element: a point both sides find from the password and their names; the counter
-  starts at 1, the lowest bit of pwd-seed picks y
+  starts at 1, the lowest bit of pwd-seed picks y; the first round's point that has one, after
+  ROUNDS rounds in any case
 
 - **`fn commit(pwe: &[u8; 64], rand: &[u8; 32], mask: &[u8; 32]) -> Option<([u8; 32], [u8; 64])>`**
   Scalar = rand + mask mod n, Element = -(mask \* PWE); None when a random value is no scalar or
@@ -40094,6 +40673,10 @@ MAX_HEADERS: usize = 100
 **`impl<'a> Reader<'a>`**
 
 - **`fn new(s: &'a dyn Stream) -> Reader<'a>`**
+- **`fn set_min_rate(&mut self, rate: Option<(u32, u32)>)`**
+  reads fail with TimedOut once fewer than `bytes_per_s` arrived on average since this
+  call, counted after a first `grace_ms` (a body that dribbles in a byte now and then, each
+  within the stream's timeout, must not hold the reader for hours); None: no such limit
 - **`fn set_deadline(&mut self, deadline_us: Option<u64>)`**
   reads fail with TimedOut once plat::time_us() is past this (a limit for a whole head,
   where the stream's timeout counts each read)
@@ -40164,13 +40747,23 @@ worker serves one connection at a time (keep-alive, pipelined requests in order)
 
 The handler runs on a worker thread; it must not panic (panics abort the process).
 Requests with both Content-Length and Transfer-Encoding are refused (request smuggling).
+A slow client holds a worker only so long: the head must arrive within read_ms, a body at
+MIN_BODY_RATE on average after a first read_ms (over TLS too: records without data end a read
+after read_ms).
+```
+
+```rust
+/// the slowest request body a server waits for, in bytes a second on average (after a first
+/// read_ms): slower ones end the connection
+MIN_BODY_RATE: u32 = 1024
 ```
 
 - **`struct ServerConfig`**
   - `threads: usize` -- worker threads (connections served at once)
   - `max_body: usize` -- the largest request body
   - `idle_ms: u32` -- how long an idle keep-alive connection stays open
-  - `read_ms: u32` -- the longest wait for the next bytes of a request in progress
+  - `read_ms: u32` -- the longest wait for the next bytes of a request in progress; the head must be complete
+    within it, a body must bring 1 KiB a second on average after it (MIN_BODY_RATE)
   - `write_ms: u32`
   - `max_requests: usize` -- requests per connection
 
@@ -40449,6 +41042,8 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
 
 **`impl TlsStream`**
 
+- **`fn test_send_empty_record(&self) -> NetResult<()>`**
+  (tests) send an application data record without data
 - **`fn peer_certs(&self) -> Vec<Cert>`**
   the peer's certificate chain (leaf first)
 - **`fn last_error(&self) -> Option<TlsError>`**
@@ -40530,6 +41125,8 @@ AL_CERTIFICATE_REQUIRED: u8 = 116
 - **`fn has_plain(&self) -> bool`**
 - **`fn read_plain(&mut self, buf: &mut [u8]) -> usize`**
 - **`fn write_plain(&mut self, data: &[u8]) -> Result<(), TlsError>`**
+- **`fn write_empty(&mut self) -> Result<(), TlsError>`**
+  (tests) an application data record without data
 - **`fn close(&mut self)`**
   send close_notify
 - **`fn feed(&mut self, data: &[u8]) -> Result<(), TlsError>`**
@@ -40838,11 +41435,18 @@ KU_CRL_SIGN: u8 = 0x02
   - `server_auth: bool`
   - `client_auth: bool`
 
+- **`fn extension(oid: &[u64], critical: bool, value: &[u8]) -> Vec<u8>`**
+  a DER Extension (oid, the critical flag, the DER value) for CertBuilder::sign_ext
+
 **`impl CertBuilder`**
 
 - **`fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8>`**
   the DER certificate, signed by `key`; `issuer`: the issuing certificate (None: self
   signed with the builder's own name)
+- **`fn sign_ext(&self, issuer: Option<&Cert>, key: &Keypair, extra: &[Vec<u8>]) -> Vec<u8>`**
+  sign with further extensions (each one from `extension`: name constraints, a CA's
+  extended key usage ...); one with the OID of an extension the builder writes itself
+  replaces that one (basic constraints without a path length, other key usages)
 
 - **`fn ed25519_pkcs8(seed: &[u8; 32]) -> Vec<u8>`**
   the PKCS#8 form of an Ed25519 private key (for interoperable PEM files)
@@ -44756,7 +45360,8 @@ lines, replies with their multi-line form, the host-port of PORT and of the 227 
 EPRT and the 229 reply to EPSV (RFC 2428), FEAT's list (RFC 2389)
 
   Command { verb, arg }     Command::parse(line) (the verb in capitals, the argument as
-                            typed), Command::new(verb, arg), to_line() ("USER anna\r\n")
+                            typed), Command::new(verb, arg), to_line() ("USER anna\r\n"; CR,
+                            LF and NUL of the fields left out)
   Reply { code, lines }     to_bytes(): one line "220 text", or "211-first" ... "211 last"
                             (the inner lines start with a space when they could look like
                             the end); is_final / is_ok (1xx preliminary, 2xx done, 3xx more)
@@ -44795,7 +45400,8 @@ PORT_FTP_DATA: u16 = 20
 - **`fn parse(line: &str) -> Option<Command>`**
   a line without its line end; None for an empty one
 - **`fn to_line(&self) -> String`**
-  the line on the wire, CRLF included
+  the line on the wire, CRLF included; CR, LF and NUL of verb and argument are left out (they
+  would end the line and start another command)
 
 - **`struct Reply`**
   a reply of a server
@@ -44866,10 +45472,12 @@ ENHANCEDSTATUSCODES (RFC 2034 with the codes of RFC 3463) and AUTH with PLAIN an
 (RFC 4954, 4616); no STARTTLS
 
   Command { verb, arg }     Command::parse(line) (the verb in capitals, the argument as
-                            typed), Command::new(verb, arg), to_line() ("EHLO pc1\r\n")
+                            typed), Command::new(verb, arg), to_line() ("EHLO pc1\r\n"; CR, LF
+                            and NUL of the fields left out)
   Path { addr, params }     parse_path(arg, "FROM" | "TO"): the address of MAIL FROM:<..> or
                             RCPT TO:<..> (empty for the null reverse path "<>") and the
-                            parameters after it (SIZE=1234, BODY=8BITMIME); fmt_path
+                            parameters after it (SIZE=1234, BODY=8BITMIME); fmt_path (without
+                            CR, LF, NUL, angle brackets in the address and blanks in parameters)
   Reply { code, lines }     Reply::new(code, text), Reply::enh(code, "2.1.0", text) (the
                             enhanced code before the text), to_bytes(): "250 text" or the
                             multi-line form "250-first" ... "250 last" of 4.2.1; text(),
@@ -44916,7 +45524,8 @@ LOGIN_PASS: &str = "UGFzc3dvcmQ6"
 - **`fn parse(line: &str) -> Option<Command>`**
   a line without its line end; None for an empty one
 - **`fn to_line(&self) -> String`**
-  the line on the wire, CRLF included
+  the line on the wire, CRLF included; CR, LF and NUL of verb and argument are left out (they
+  would end the line and start another command)
 
 - **`struct Path`**
   the address and parameters of MAIL FROM or RCPT TO
@@ -44936,7 +45545,9 @@ LOGIN_PASS: &str = "UGFzc3dvcmQ6"
   mailbox, 4.1.2)
 
 - **`fn fmt_path(key: &str, addr: &str, params: &[(&str, &str)]) -> String`**
-  "FROM:&lt;addr> SIZE=n" with the parameters given
+  "FROM:&lt;addr> SIZE=n" with the parameters given; the address loses CR, LF, NUL and angle
+  brackets, the parameters those and blanks, so that neither ends the path, adds a parameter or
+  starts another command
 
 - **`struct Reply`**
   a reply of a server
@@ -45048,7 +45659,8 @@ and USER / PASS, and CAPA of RFC 2449: command lines, the status line +OK / -ERR
 responses with their dot-stuffing
 
   Command { verb, args }    Command::parse(line) (the verb in capitals), Command::new(verb,
-                            args), to_line() ("RETR 1\r\n")
+                            args), to_line() ("RETR 1\r\n"; CR, LF and NUL of the fields left
+                            out)
   Response { ok, text, body }   Response::ok(text) / err(text), with_body(bytes) (a multi-
                             line response: the lines of the bytes follow the status line,
                             each with a leading dot doubled, then the line with the dot);
@@ -45084,7 +45696,8 @@ PORT_POP3: u16 = 110
 - **`fn parse(line: &str) -> Option<Command>`**
   a line without its line end; None for an empty one
 - **`fn to_line(&self) -> String`**
-  the line on the wire, CRLF included
+  the line on the wire, CRLF included; CR, LF and NUL of verb and arguments are left out
+  (they would end the line and start another command)
 - **`fn num(&self, k: usize) -> Option<u32>`**
   argument k as a number (a message number)
 
@@ -45158,7 +45771,8 @@ Message-ID, a text/plain body in UTF-8 as 7bit, 8bit or quoted-printable, multip
                                (MIME-Version 1.0, text/plain in UTF-8; 7bit for ASCII, 8bit
                                when the server takes 8BITMIME, else quoted-printable)
   fold(name, value)            "Name: value\r\n" with continuation lines that start with a
-                               space (2.2.3)
+                               space (2.2.3); CR and LF of a value become spaces, so no value
+                               adds a field or ends the header
 
 Lines of a header field are at most 78 characters where there is whitespace to break at
 (2.1.1); a word longer than that stays whole.  Display names and subjects with characters
@@ -45195,7 +45809,8 @@ part, other parts (attachments) are named but not decoded.
   a field at the top (trace fields: Received, Return-Path)
 - **`fn remove(&mut self, name: &str)`**
 - **`fn header_bytes(&self) -> Vec<u8>`**
-  the header as it travels (CRLF, folded), without the empty line
+  the header as it travels (CRLF, folded), without the empty line; a field whose name is
+  empty or holds other than printable characters but the colon is left out
 - **`fn to_bytes(&self) -> Vec<u8>`**
   header, empty line, body (the body as it is)
 - **`fn subject(&self) -> String`**
@@ -45215,7 +45830,8 @@ part, other parts (attachments) are named but not decoded.
 
 - **`fn fold(name: &str, value: &str) -> String`**
   "Name: value\\r\\n" folded at whitespace so that no line is longer than 78 characters where
-  that is possible
+  that is possible.  No text starts a field or the body of its own: the name keeps only its
+  printable characters but the colon, CR and LF in the value become spaces, NUL is left out
 
 - **`fn unfold(s: &str) -> String`**
   removes the line ends of folded lines (CRLF or LF before whitespace)
@@ -47255,7 +47871,8 @@ sets, flags, FETCH items, SEARCH keys and the ENVELOPE of a message
                             answers it)
   tokens(&Line) -> Vec<Item>   the values of a line
   Command { tag, verb, args }  Command::parse(&line) (the verb in capitals); line(tag, verb,
-                            args) the bytes of a simple command
+                            args) the bytes of a simple command (CR, LF, NUL left out but for
+                            whole literals)
   Status, Kind, Response    Response::parse(&line): a tagged status, an untagged one, untagged
                             data, a continuation; response code, text, the values
   ok / no / bad / untagged / cont   server lines ("a1 OK done\r\n")
@@ -47348,7 +47965,9 @@ RECENT: &str = "\\Recent"
   the text of argument k
 
 - **`fn line(tag: &str, verb: &str, args: &str) -> Vec<u8>`**
-  a simple command line of a client
+  a simple command line of a client; CR, LF and NUL of tag, verb and arguments are left out
+  (they would end the line and start another command), but for the line end after a literal's
+  "{n}" ("{n+}") in the arguments and the n bytes of the literal after it (astring)
 
 - **`enum Status`**
   the status of a response
@@ -47398,7 +48017,7 @@ RECENT: &str = "\\Recent"
   "+ text"
 
 - **`fn quoted(s: &str) -> String`**
-  a string in quotes
+  a string in quotes (without CR, LF and NUL, which a quoted string cannot hold)
 
 - **`fn astring(s: &str) -> String`**
   an atom when it can be one, else a quoted string, else a literal (for other bytes)
@@ -51304,19 +51923,27 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
   start of a std program (`jfgui_std_start`: crash handlers, the panic hook, then `jfgui_main`,
   the end through `std::process::exit`); the crate then has neither `#![no_std]` nor `#![no_main]`.
 
+  The unit tests of a library crate that holds it (`cargo test --lib`) need no `test_main!`: this
+  `jfgui_main` links their test binary (never called there), and the panic check leaves the test
+  build out (`cfg(test)`: Cargo builds tests with unwind whatever the profiles say; doc tests
+  build the crate without it, docs/GUIDE.md "An app with std").  A `test_main!` next to it
+  would define `jfgui_main` twice (E0428)
+
 - **`main!(...)`**
   (see above)
 
 - **`test_main!(...)`**
   (E16) the `jfgui_main` a program's main! defines, for the test binary of a library crate with
-  std (a style crate's `cargo test`): plat's start of a std program refers to it, so without it
-  the tests do not link.  Never called (the test harness has its own main); no panic check
-  (tests unwind).  `#[cfg(test)] rt::test_main!();` in the crate's lib.rs, also under
-  `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros)
+  std and without main! (a style crate's `cargo test`): plat's start of a std program refers to
+  it, so without it the tests do not link.  Never called (the test harness has its own main); no
+  panic check (tests unwind).  `#[cfg(test)] rt::test_main!();` in the crate's lib.rs, also under
+  `#![forbid(unsafe_code)]` (the expansion allows no lint: unsafe_code skips external macros).  A
+  crate with main! needs none: its main!'s `jfgui_main` links the tests
 
 - **`__rt_panic_check!(...)`**
   rt::main!'s check of the panic strategy: JFLib's runtime needs `panic = "abort"`, a program with
-  std built with the feature `unwind` may unwind as well
+  std built with the feature `unwind` may unwind as well.  Not in the unit tests of the crate
+  with main! (`cfg(test)` is the app crate's, where this expands): Cargo builds tests with unwind
 
 - **`__rt_panic_check!(...)`**
   (see above)

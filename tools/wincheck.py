@@ -22,6 +22,9 @@ own windows (never SendInput: the real mouse and keyboard are not touched):
   * modal dialog "Bild bearbeiten": owned, centred on the main window, IsWindowEnabled of
     the main and the tool window 0 while it is open, "Abbrechen" closes it and enables
     them again,
+  * the main window's title bar is the system's (no AF_CUSTOM_TITLEBAR): WM_NCHITTEST finds its X
+    (HTCLOSE), and the pointer on it stays Windows' (no UI event; plat made the caption buttons'
+    non-client messages UI events for every window, so the X of a system title bar did nothing),
   * WM_CLOSE to the main window ends the app with exit code 0.
 `edges`: the popups of the MAIN window (gallery --popup-edges): the calendar leaves the window
 as a popup window owned by it, below its button while the work area has room, above it with
@@ -58,7 +61,8 @@ import wincap  # noqa: E402  (capture, write_png)
 
 WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEWHEEL = 0x200, 0x201, 0x202, 0x20A
 WM_CLOSE, WM_NCHITTEST, WM_MOUSEACTIVATE, WM_NCACTIVATE, WM_ACTIVATEAPP = 0x10, 0x84, 0x21, 0x86, 0x1C
-HTCLIENT, HTCAPTION = 1, 2
+HTCLIENT, HTCAPTION, HTCLOSE = 1, 2, 20
+WM_NCMOUSEMOVE = 0xA0
 MA_ACTIVATE, MA_NOACTIVATE = 1, 3
 WS_EX_TOOLWINDOW, WS_EX_APPWINDOW = 0x80, 0x40000
 GW_OWNER = 4
@@ -128,6 +132,13 @@ def client(h):
     rc = wt.RECT()
     user32.GetClientRect(h, ctypes.byref(rc))
     return pt.x, pt.y, rc.right, rc.bottom
+
+
+def mainy0(h):
+    """the top of a window's client area on the screen (below a system title bar)"""
+    pt = wt.POINT(0, 0)
+    user32.ClientToScreen(h, ctypes.byref(pt))
+    return pt.y
 
 
 def dpi_of(h):
@@ -436,6 +447,26 @@ def run_checks(a, proc, log, dy, b_tool, b_dlg, w_tool, w_dlg, slider, textbox, 
     check(not user32.IsWindowVisible(dlg), "\"Abbrechen\" closes the dialog window")
     check(user32.IsWindowEnabled(main) and (tool2 is None or user32.IsWindowEnabled(tool2)),
           "main and tool window enabled again after the dialog")
+    # ---- the main window's system title bar: its buttons are Windows' own.  Only the pointer is
+    # moved over the X: a press would start Windows' own tracking of the button, which waits for the
+    # real mouse button
+    wr = wt.RECT()
+    user32.GetWindowRect(main, ctypes.byref(wr))
+    xb = None
+    for y in range(wr.top + int(6 * s), mainy0(main), 2):
+        for x in range(wr.right - 2, wr.right - int(200 * s), -2):
+            if user32.SendMessageW(main, WM_NCHITTEST, 0, lp(x, y)) == HTCLOSE:
+                xb = (x - int(12 * s), y)
+                break
+        if xb:
+            break
+    if check(xb is not None, "main window: WM_NCHITTEST finds the system title bar's X (HTCLOSE)"):
+        n0 = len(events(log))
+        user32.PostMessageW(main, WM_NCMOUSEMOVE, HTCLOSE, lp(*xb))
+        time.sleep(0.5)
+        ui_ev = [e for e in events(log)[n0:] if e.split(" ")[1:2] in (["type=1"], ["type=2"], ["type=3"])]
+        check(not ui_ev, "main window: the pointer on the system X is no UI event (Windows keeps its buttons)",
+              "; ".join(ui_ev))
     # ---- end
     user32.PostMessageW(main, WM_CLOSE, 0, 0)
     try:

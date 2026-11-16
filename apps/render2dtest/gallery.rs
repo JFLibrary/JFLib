@@ -531,12 +531,17 @@ pub struct Shot {
     pub b: Option<BlockDrawing>,
     /// (G6c) texts instead of `d`
     pub t: Option<Vec<crate::textdraw::TItem>>,
+    /// (G6d) a scene made by a function instead (highlights, the overlay)
+    pub x: Option<fn(&mut Scene) -> Result<()>>,
 }
 
 impl Shot {
     /// its drawing in a scene
     #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
     pub fn build(&self, s: &mut Scene) -> Result<()> {
+        if let Some(f) = self.x {
+            return f(s);
+        }
         if let Some(t) = &self.t {
             return crate::textdraw::build(s, t).map(|_| ());
         }
@@ -550,7 +555,7 @@ impl Shot {
 /// the images the browser is compared with Vulkan on: caps, joins, hairlines, units, overlap, every case of the tests
 pub fn shots() -> Vec<Shot> {
     let mut v = Vec::new();
-    let mut add = |name: String, w: u32, h: u32, d: Drawing, cam: Camera, alpha: Option<u32>| v.push(Shot { name, w, h, d, cam, alpha, b: None, t: None });
+    let mut add = |name: String, w: u32, h: u32, d: Drawing, cam: Camera, alpha: Option<u32>| v.push(Shot { name, w, h, d, cam, alpha, b: None, t: None, x: None });
     for cap in CAPS {
         for width in [1.0f32, 2.5, 6.0, 15.0] {
             add(format!("caps_{cap:?}_{width}"), 320, 240, caps_drawing(cap, width), pixel_camera(320, 240), None);
@@ -610,15 +615,18 @@ pub fn shots() -> Vec<Shot> {
     }
     // blocks inserted in every way, transparency (G6b2)
     for (name, b) in [("blocks", blocks_drawing(false)), ("blocks_uneven", blocks_drawing(true)), ("transparency", transparency_drawing([0, 40, 90]))] {
-        v.push(Shot { name: name.into(), w: 360, h: 270, d: Drawing::default(), cam: pixel_camera(360, 270), alpha: None, b: Some(b), t: None });
+        v.push(Shot { name: name.into(), w: 360, h: 270, d: Drawing::default(), cam: pixel_camera(360, 270), alpha: None, b: Some(b), t: None, x: None });
     }
     // text: sizes, turned and mirrored, large (class L, a fill), MTEXT, bidi and pixels; translucent (G6c)
     for k in 0..5 {
-        v.push(Shot { name: format!("text_{k}"), w: 640, h: 400, d: Drawing::default(), cam: pixel_camera(640, 400), alpha: None, b: None, t: Some(crate::textdraw::text_drawing(k)) });
+        v.push(Shot { name: format!("text_{k}"), w: 640, h: 400, d: Drawing::default(), cam: pixel_camera(640, 400), alpha: None, b: None, t: Some(crate::textdraw::text_drawing(k)), x: None });
     }
     let mut tr = crate::textdraw::TItem::new("Translucent AVAWAY fij", 1, [10.0, 40.0], 30.0);
     tr.color = 0x8020_40C0;
-    v.push(Shot { name: "text_translucent".into(), w: 360, h: 100, d: Drawing::default(), cam: pixel_camera(360, 100), alpha: Some(0x80), b: None, t: Some(vec![tr]) });
+    v.push(Shot { name: "text_translucent".into(), w: 360, h: 100, d: Drawing::default(), cam: pixel_camera(360, 100), alpha: Some(0x80), b: None, t: Some(vec![tr]), x: None });
+    // highlights and the overlay (G6d)
+    v.push(Shot { name: "highlight".into(), w: 360, h: 270, d: Drawing::default(), cam: pixel_camera(360, 270), alpha: None, b: None, t: None, x: Some(crate::hlov::highlight_shot) });
+    v.push(Shot { name: "overlay".into(), w: 340, h: 260, d: Drawing::default(), cam: pixel_camera(340, 260), alpha: None, b: None, t: None, x: Some(crate::hlov::overlay_shot) });
     v
 }
 
@@ -1942,7 +1950,7 @@ pub fn ink(color: u32, p: u32) -> u32 {
 /// alpha (by layer: `layer_t`), its widths and patterns in units scaled with the insert (sqrt |det|), its hatch through
 /// the transform
 #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
-fn style_in(own: &Style, ins: Option<&Style>, xf: &Aff, base: [f64; 2], layer_t: u32) -> Style {
+pub(crate) fn style_in(own: &Style, ins: Option<&Style>, xf: &Aff, base: [f64; 2], layer_t: u32) -> Style {
     let mut s = *own;
     if let Some(b) = ins {
         if own.by_block & render2d::BY_BLOCK_COLOR != 0 {
@@ -2035,6 +2043,12 @@ fn conic_spline(c: [f64; 2], a: [[f64; 2]; 2], start: f64, sweep: f64, xf: &Aff)
         }
     }
     let closed = sweep.abs() >= core::f64::consts::TAU - 1e-12;
+    if closed {
+        // (a full turn ends in its start's very bits, as render2d's ellipses do: else a ring of a fill would close with a
+        // segment of length 1e-16, a corner of its own)
+        let n = pts.len();
+        pts[n - 1] = pts[0];
+    }
     Geo::Spline(2, pts, ws, knots, closed)
 }
 

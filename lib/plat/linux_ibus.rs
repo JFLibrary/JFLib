@@ -14,7 +14,8 @@
 //   ibus_available() -> bool        jfgui_IME=0 turns it off
 //   ibus_ready() -> bool            the input context exists (keys go to it only then)
 //
-// Signals of the context: CommitText -> ime_commit_text, UpdatePreeditText (cursor in
+// Signals of the context (only from the portal connection that made it): CommitText ->
+// ime_commit_text, UpdatePreeditText (cursor in
 // characters -> bytes) / HidePreeditText -> ime_preedit_set, ForwardKeyEvent -> E_TEXT or the
 // key's E_KEY_DOWN / E_KEY_UP.  Capabilities: preedit text and focus (IBus draws its own
 // candidate window).  Every result wakes the UI thread.
@@ -113,6 +114,8 @@ pub fn ibus_key(keyval: u32, keycode: u32, state: u32) -> bool {
 
 struct Ctx {
     path: String,
+    /// the unique bus name of the portal that made the context (its signals come from there)
+    sender: String,
     win: u8,
     focused: bool,
     /// the input context is gone (ibus restarted, another engine): made anew
@@ -130,19 +133,20 @@ fn run() {
         STATE.store(3, Ordering::Release);
         return;
     };
-    let Some(path) = create(&mut c) else {
+    let Some((path, sender)) = create(&mut c) else {
         STATE.store(3, Ordering::Release);
         return;
     };
     STATE.store(2, Ordering::Release);
-    let mut ctx = Ctx { path, win: 0, focused: false, stale: false, keys: Vec::new() };
+    let mut ctx = Ctx { path, sender, win: 0, focused: false, stale: false, keys: Vec::new() };
     loop {
         if ctx.stale {
             // the old context's errors answered its keys; a new one, focused as before
             ctx.stale = false;
             match create(&mut c) {
-                Some(p) => {
+                Some((p, sender)) => {
                     ctx.path = p;
+                    ctx.sender = sender;
                     if ctx.focused {
                         c.send(&Msg::call(PORTAL, &ctx.path, IC, "FocusIn", Vec::new()));
                     }
@@ -177,14 +181,20 @@ fn run() {
     }
 }
 
-// CreateInputContext, the match for its signals, its capabilities -> its path
-fn create(c: &mut Conn) -> Option<String> {
+// CreateInputContext, the match for its signals, its capabilities -> its path and the unique
+// name of the portal that made it (the context's signals count only from there: any client
+// of the bus can send signals with the context's path)
+fn create(c: &mut Conn) -> Option<(String, String)> {
     let create = Msg::call(PORTAL, "/org/freedesktop/IBus", "org.freedesktop.IBus.Portal", "CreateInputContext", alloc::vec![Value::str("jfgui")]);
-    let path = c.send(&create).and_then(|s| c.wait_reply(s, 3000)).and_then(|r| r.body.first().and_then(|v| v.as_str()).map(String::from))?;
-    let rule = alloc::format!("type='signal',interface='{IC}',path='{path}'");
+    let r = c.send(&create).and_then(|s| c.wait_reply(s, 3000))?;
+    let path = r.body.first().and_then(|v| v.as_str()).map(String::from)?;
+    if r.sender.is_empty() {
+        return None;
+    }
+    let rule = alloc::format!("type='signal',sender='{}',interface='{IC}',path='{path}'", r.sender);
     c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "AddMatch", alloc::vec![Value::S(rule)]));
     c.send(&Msg::call(PORTAL, &path, IC, "SetCapabilities", alloc::vec![Value::U(CAPS)]));
-    Some(path)
+    Some((path, r.sender))
 }
 
 fn apply(c: &mut Conn, ctx: &mut Ctx, op: Op) {
@@ -241,7 +251,7 @@ fn handle(ctx: &mut Ctx, m: &Msg) {
                 }
             }
         }
-        T_SIGNAL if m.iface == IC && m.path == ctx.path => match m.member.as_str() {
+        T_SIGNAL if m.iface == IC && m.path == ctx.path && m.sender == ctx.sender => match m.member.as_str() {
             "CommitText" => {
                 if let Some(t) = ibus_text(m.body.first()) {
                     crate::ime_preedit_set(ctx.win, "", 0);

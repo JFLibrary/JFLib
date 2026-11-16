@@ -8,6 +8,19 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-16
+
+### Added
+
+- Metal on Intel Macs (`x86_64-apple-darwin`): `MTLSize` results through `objc_msgSend_stret`; built and run under Rosetta 2 (on the Mac's own GPU), not checked on an Intel or AMD GPU ([INTEL_MAC.md](https://github.com/JFLibrary/JFLib/blob/main/docs/INTEL_MAC.md))
+
+### Changed
+
+- Metal on an Intel Mac's GPU (Mac2 without an Apple family) reports subgroup sizes from 8 to 64 (`Limits::subgroup_min_size`, `subgroup_max_size`: the driver chooses per pipeline), and `Device::create_compute_pipeline_sized` takes only 0 there; Apple's GPUs stay at 32
+- Linux: the build script sets `--cfg jfgui_glibc` (Vulkan through the system's dynamic linker)
+  also without std, unless `-C target-feature=+crt-static` asks for one static file; so a JFLib
+  app builds on Linux with plain `cargo run`, no flags and no `--target`.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added
@@ -54,6 +67,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0

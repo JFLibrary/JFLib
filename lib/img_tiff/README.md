@@ -61,11 +61,11 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::img_tiff`. All of JFLib's crates share one
 version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-The decoder refuses files whose tiles are far larger than the image, more than 16 times its pixels
-plus 2^20 in all, with `ERR_LIMIT`; a 1 x 1 image with huge tiles could ask for 4 GB before. The
-[changelog](https://docs.rs/crate/jflib-img-tiff/latest/source/CHANGELOG.md) has the details.
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-img-tiff/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

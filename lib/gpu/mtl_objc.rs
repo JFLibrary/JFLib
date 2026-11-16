@@ -25,6 +25,10 @@ pub const NIL: Id = core::ptr::null_mut();
 #[link(name = "objc")]
 unsafe extern "C" {
     pub fn objc_msgSend();
+    // x86-64 (Intel Macs, docs/INTEL_MAC.md): a result over 16 bytes (MTLSize) comes back in memory,
+    // through this entry; arm64 has none
+    #[cfg(target_arch = "x86_64")]
+    pub fn objc_msgSend_stret();
     pub fn objc_getClass(name: *const c_char) -> Id;
     pub fn sel_registerName(name: *const c_char) -> Sel;
     pub fn objc_autoreleasePoolPush() -> *mut c_void;
@@ -54,11 +58,33 @@ pub fn sel(name: &CStr) -> Sel {
     unsafe { sel_registerName(name.as_ptr()) }
 }
 
+/// the runtime's entry for a message whose result has `size` bytes: on x86-64 objc_msgSend_stret above
+/// 16 bytes (the System V ABI returns those in memory), else objc_msgSend
+#[inline(always)]
+pub fn msg_entry(size: usize) -> *const () {
+    #[cfg(target_arch = "x86_64")]
+    if size > 16 {
+        return objc_msgSend_stret as *const ();
+    }
+    let _ = size;
+    objc_msgSend as *const ()
+}
+
+/// a BOOL read as a byte (msg!'s results of type bool)
+#[inline(always)]
+pub fn bool_of(b: i8) -> bool {
+    b != 0
+}
+
 /// objc_msgSend with the exact signature of the call: msg!(obj, c"sel:", a => T, b => U; R)
 macro_rules! objc_msg {
+    // BOOL: a signed char on x86-64 (any value may come back), C's bool on arm64: read as a byte
+    ($obj:expr, $sel:expr $(, $a:expr => $t:ty)* ; bool) => {{
+        $crate::mtl_objc::bool_of($crate::mtl_objc::msg!($obj, $sel $(, $a => $t)* ; i8))
+    }};
     ($obj:expr, $sel:expr $(, $a:expr => $t:ty)* ; $r:ty) => {{
         let f: unsafe extern "C" fn($crate::mtl_objc::Id, $crate::mtl_objc::Sel $(, $t)*) -> $r =
-            core::mem::transmute($crate::mtl_objc::objc_msgSend as *const ());
+            core::mem::transmute($crate::mtl_objc::msg_entry(core::mem::size_of::<$r>()));
         f($obj as $crate::mtl_objc::Id, $crate::mtl_objc::sel($sel) $(, $a)*)
     }};
 }

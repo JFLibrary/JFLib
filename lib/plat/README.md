@@ -152,29 +152,17 @@ target. jflib's features `std` (an app that uses crates with the standard librar
 (panics an app catches leave it running) turn on the features of the same names here. All of
 JFLib's crates share one version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-plat runs natively on macOS and iOS now: windows through AppKit and UIKit, the clipboard, the
-system's file dialogs, notifications, the keychain and VoiceOver on both, and on the Mac also drag
-and drop, the tray, the Dock, global shortcuts and services through launchd. Linux and Windows run
-on ARM64 as well, with crash reports that show the call chain and, on Linux, plugins and loadable
-modules. The accessibility tree carries what a web page needs (tables, landmarks, live regions,
-more actions) to UI Automation, AT-SPI2, TalkBack and the browser. New are the registration of an
-app as a web browser with its default status, print jobs of several pages, several files from one
-file dialog, more mouse cursors, raw key events, an input method for fields an app draws itself
-and drop effects per target, and large frames reach the screen faster. A drop target can give its
-answer to the source after the drop (`drop_hold`, `drop_finish`) and learns which effects the
-source allows (`drop_allowed`). Among the fixes:
-`open_url` takes only absolute URLs (a path could start a program), the UI thread's state panics
-on other threads instead of racing, deadlocks in channels and async tasks and races in the worker
-pool are gone, and the crash report no longer allocates or waits. `File::create_new` and
-`AtomicFile` check and create in one step on every mount, so a file another writer makes in
-between is no longer emptied or taken over, and content://, the Linux trash and Windows secrets
-no longer lose data to concurrent writes. A path with a NUL character is refused instead of
-reaching the system cut at the NUL, `UnixListener::bind` no longer removes what is at its path,
-and on Windows an app saves at logout before Windows may end it. `dl_sym` and `dl_close` are
-`unsafe fn` now.
-Everything is in the [changelog](https://docs.rs/crate/jflib-plat/latest/source/CHANGELOG.md).
+Intel Macs (`x86_64-apple-darwin`) are a target now, checked under Rosetta 2. A round of security
+fixes: `fs::Dir` works below an open folder without following links, private folders and the stored
+permission answers are checked by file identity, a service runs from Program Files, a URL scheme
+keeps the link as one argument, D-Bus, portal and X11 peers are verified on Linux, and `.bat` and
+`.cmd` programs refuse arguments cmd.exe would read as commands. Fixes for the watcher, the trash,
+`read_dir`, `write_file_private`, `join` and `parent`, and for replacing a file another program
+holds open on Windows; there the buttons of a system title bar work. On Linux the build script picks
+the build against glibc itself, so `cargo run` needs no flags. Everything is in the
+[changelog](https://docs.rs/crate/jflib-plat/latest/source/CHANGELOG.md).
 
 ## Documentation
 

@@ -115,11 +115,11 @@ img_all::use_all_codecs();                        // or use_core_codecs(): PNG, 
 transforms; an app's runtime passes the platform's worker pool. Without one everything runs on
 the calling thread and gives the same bytes.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-A small correction: the format table gives Paint.NET files the MIME type `image/x-paint.net`; it
-was `image/x-PaintCraft`, a leftover of a renaming. The
-[changelog](https://docs.rs/crate/jflib-img-core/latest/source/CHANGELOG.md) says the same.
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-img-core/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

@@ -40,12 +40,11 @@ version and are released together.
 
 Windows and Linux, on x86-64 and ARM64: the systems where JFLib's programs load modules.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-The loop items that the host calls use the calling convention of plugins and modules
-(`rt::plugin_abi!` of `jflib-modrt`), so modules with parallel loops run on ARM64 too; on x86-64
-nothing changes. Everything is in the
-[changelog](https://docs.rs/crate/jflib-modplat/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-modplat/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

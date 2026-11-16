@@ -156,7 +156,7 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
     if o.std {
         println!("    cargo build (on Linux)         for Linux: with std it is built on Linux itself");
     } else {
-        println!("    cargo build --target x86_64-unknown-linux-gnu    for Linux (always with --target)");
+        println!("    cargo build (on Linux)         for Linux; cargo jflib package from any system");
     }
     Ok(())
 }

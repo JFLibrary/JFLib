@@ -1,0 +1,31 @@
+#!args --verify-dirty
+# the wheel in the terminal (ui/term.rs): a notch scrolls the system's lines (three in a
+# headless run, five with jfgui_WHEEL_LINES 5); the fine steps of a precision touchpad add up to
+# whole rows -- six steps of 20 are a notch (each was cut off to no row: it never scrolled)
+size 760 520
+click tab:"Shell"
+click "Flut (10 000 Zeilen)"
+expect text:"Zeilen: 10001" exists
+key pgup
+# rows 09953 .. 09977 in view
+expect text:"Flutzeile 09953 #################################" exists
+expect text:"Flutzeile 09952 ################################" missing
+expect text:"Flutzeile 09977 #################" exists
+wheel #1100 20 fine
+wheel #1100 20 fine
+wheel #1100 20 fine
+expect text:"Flutzeile 09952 ################################" exists
+expect text:"Flutzeile 09951 ###############################" missing
+wheel #1100 20 fine
+wheel #1100 20 fine
+wheel #1100 20 fine
+expect text:"Flutzeile 09950 ##############################" exists
+expect text:"Flutzeile 09949 #############################" missing
+expect text:"Flutzeile 09975 ###############" missing
+system env jfgui_WHEEL_LINES 5
+system settings other
+wheel #1100 120
+expect text:"Flutzeile 09945 #########################" exists
+expect text:"Flutzeile 09944 ########################" missing
+system env jfgui_WHEEL_LINES -
+system settings other

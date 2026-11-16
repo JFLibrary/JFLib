@@ -46,7 +46,6 @@ use crate::{Sp, Ui};
 const NAT_W: i32 = 320;
 const NAT_H: i32 = 240;
 const EST_DIP: i32 = 40;
-const WHEEL_DIP: i32 = 48;
 const REVEAL_TRIES: u8 = 8;
 
 // ------------------------------------------------------------------ the height cache
@@ -817,22 +816,31 @@ impl Ui {
         let s = &mut o.st;
         // the wheel over the list (one of its hit boxes is hot)
         let c = &self.wp.ctx;
-        let wy = c.wheel_y;
+        let (wy, precise, py) = (c.wheel_y, c.wheel_precise, c.wheel_px_y);
         let hot = c.hot;
         let over = hot != 0 && c.hits[c.hit_cur].get(o.hit0..).is_some_and(|v| v.iter().any(|h| h.id == hot && h.layer as u32 == o.layer));
-        if (over || o.vev & EV_HOVER != 0) && wy != 0 {
-            let step = self.dp(WHEEL_DIP);
-            let d = wy.wrapping_neg().wrapping_mul(step) / 120;
+        if (over || o.vev & EV_HOVER != 0) && (wy != 0 || py != 0) {
+            // a notch: the system's lines (a page: the view); a touchpad's pixels at once
+            let d = if precise {
+                py.wrapping_neg()
+            } else {
+                wy.wrapping_neg().wrapping_mul(self.wheel_notch_px(self.dp(WHEEL_LINE_DIP), view, false)) / 120
+            };
             let p = s.rows.pos() + (s.pending + d) as i64;
             let max = (s.rows.total() - view as i64).max(0);
             if (d < 0 && s.rows.pos() > 0) || (d > 0 && s.rows.pos() < max) || p.clamp(0, max) != s.rows.pos() {
-                if s.pending == 0 {
-                    s.t0 = self.now_ms as i32;
+                if precise {
+                    s.rows.set_pos(p.clamp(0, max));
+                    s.pending = 0;
+                } else {
+                    if s.pending == 0 {
+                        s.t0 = self.now_ms as i32;
+                    }
+                    s.pending += d;
                 }
-                s.pending += d;
-                self.wp.ctx.wheel_y = 0;
+                self.wheel_take_y();
                 s.reveal = None;
-                if self.anim_off {
+                if self.anim_off || precise {
                     self.repass();
                 } else {
                     self.animating = true;

@@ -1,0 +1,40 @@
+# the wheel in a scroll view (ui/list.rs): a notch scrolls the system's lines of 16 DIP
+# (ui.wheel_lines: Windows' mouse settings, KDE's; three in a headless run), smoothly; a page
+# with plat::WHEEL_PAGE; a touchpad's pixels (a trackpad's WHEEL_PIXELS, Windows' fine steps
+# WHEEL_FINE) at once, the fine steps' fractions adding up
+size 900 620
+expect #7000 value 0
+wheel "Bereiche" -120
+wait 400
+expect #7000 value 48
+system env jfgui_WHEEL_LINES 5
+system settings other
+wheel "Bereiche" -120
+wait 400
+expect #7000 value 128
+# a trackpad: its pixels, at once (no wait)
+wheel "Bereiche" -30 pixels
+expect #7000 value 158
+wheel "Bereiche" 8 pixels
+expect #7000 value 150
+# a precision touchpad on Windows: three fine steps of 40 are a notch, five lines of 16 DIP
+wheel "Bereiche" -40 fine
+wheel "Bereiche" -40 fine
+wheel "Bereiche" -40 fine
+expect #7000 value 230
+# a page a notch: the view's height (548 DIP), half of it for half a notch
+system env jfgui_WHEEL_LINES page
+system settings other
+wheel "Bereiche" 1200
+wait 400
+expect #7000 value 0
+wheel "Bereiche" -60
+wait 400
+expect #7000 value 274
+wheel "Bereiche" 1200
+wait 400
+system env jfgui_WHEEL_LINES -
+system settings other
+wheel "Bereiche" -120
+wait 400
+expect #7000 value 48

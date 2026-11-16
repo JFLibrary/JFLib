@@ -11,6 +11,9 @@
 //       Windows: the service control manager (automatic start as LocalSystem, restart after a
 //       failure); Linux: a systemd unit in /etc/systemd/system and systemctl.  Both need
 //       administrator / root rights; the errors say so.
+//   program_path(&ServiceSpec) -> the program install registers: Windows: a program outside
+//       Program Files is copied to %ProgramFiles%\<name>\ first (only administrators may change
+//       it there; uninstall leaves the copy, a new install replaces it); Linux, macOS: the program
 //   unit_text(&ServiceSpec) -> the systemd unit install writes (Linux)
 //   plist_text(&ServiceSpec) -> the launchd property list install writes (macOS: a daemon in
 //       /Library/LaunchDaemons, launchctl bootstrap / bootout / kickstart; iOS has no services)
@@ -152,10 +155,13 @@ mod win {
         fn QueryServiceStatus(h: isize, status: *mut Status) -> i32;
         fn DeleteService(h: isize) -> i32;
         fn CloseServiceHandle(h: isize) -> i32;
+        fn RegGetValueW(key: isize, sub: *const u16, name: *const u16, flags: u32, typ: *mut u32, data: *mut u8, n: *mut u32) -> i32;
     }
     #[link(name = "kernel32", kind = "raw-dylib")]
     unsafe extern "system" {
         fn GetLastError() -> u32;
+        fn CreateDirectoryW(path: *const u16, sa: usize) -> i32;
+        fn CopyFileW(from: *const u16, to: *const u16, fail_if_exists: i32) -> i32;
     }
 
     const OWN_PROCESS: u32 = 0x10;
@@ -319,9 +325,62 @@ mod win {
         s
     }
 
+    /// the Program Files folder (the registry's ProgramFilesDir: an environment variable is the
+    /// caller's to choose)
+    fn program_files() -> Option<String> {
+        let (key, value) = (wide(r"SOFTWARE\Microsoft\Windows\CurrentVersion"), wide("ProgramFilesDir"));
+        let mut buf = [0u16; 520];
+        let mut len = (buf.len() * 2) as u32;
+        // SAFETY: HKEY_LOCAL_MACHINE, terminated names, a buffer of len bytes; RRF_RT_REG_SZ.
+        let e = unsafe { RegGetValueW(0x8000_0002u32 as i32 as isize, key.as_ptr(), value.as_ptr(), 0x2, core::ptr::null_mut(), buf.as_mut_ptr() as *mut u8, &mut len) };
+        let n = buf.iter().position(|&c| c == 0).unwrap_or(0);
+        let p = String::from_utf16_lossy(&buf[..n]);
+        (e == 0 && p.len() > 3 && p.as_bytes()[1] == b':').then(|| String::from(p.trim_end_matches('\\')))
+    }
+
+    /// the program the service control manager starts as LocalSystem: s.exe when it lies in the
+    /// Program Files folder (only administrators may change it), else its copy there,
+    /// %ProgramFiles%\<name>\<file> (a program in a folder of the user, as the per-user setup
+    /// installs it, could be replaced by any program of that user); None when Program Files or the
+    /// name are unusable
+    pub fn program_path(s: &ServiceSpec) -> Option<String> {
+        let pf = program_files()?;
+        let exe = s.exe.strip_prefix(r"\\?\").unwrap_or(s.exe).replace('/', "\\");
+        let low = exe.to_lowercase();
+        if low.starts_with(&format!("{}\\", pf.to_lowercase())) && !low.contains("\\..\\") && !low.contains("\\.\\") {
+            return Some(String::from(s.exe));
+        }
+        let bad = |c: char| c < ' ' || "<>:\"/\\|?*".contains(c);
+        let file = exe.rsplit('\\').next().unwrap_or("");
+        for n in [s.name, file] {
+            if n.is_empty() || n.trim_end_matches(['.', ' ']).is_empty() || n.contains(bad) {
+                return None;
+            }
+        }
+        Some(format!("{}\\{}\\{}", pf, s.name, file))
+    }
+
+    /// copy the program to its folder in Program Files (new folders and files there get its
+    /// rights: only administrators may change them)
+    fn copy_program(from: &str, to: &str) -> Result<(), String> {
+        let dir = crate::fs::parent(to);
+        let (d, f, t) = (wide(&crate::fs::long_path(dir)), wide(&crate::fs::long_path(from)), wide(&crate::fs::long_path(to)));
+        // SAFETY: terminated paths; default security (inherited from Program Files).
+        let made = unsafe { CreateDirectoryW(d.as_ptr(), 0) } != 0;
+        if !made && !crate::fs::lstat(dir).is_some_and(|m| m.is_dir()) {
+            return Err(format!("{} kann nicht angelegt werden", dir));
+        }
+        // SAFETY: as above; an older copy is replaced.
+        if unsafe { CopyFileW(f.as_ptr(), t.as_ptr(), 0) } == 0 {
+            return Err(format!("{} kann nicht nach {} kopiert werden", from, dir));
+        }
+        Ok(())
+    }
+
     pub fn install(s: &ServiceSpec) -> Result<(), String> {
+        let exe = program_path(s).ok_or_else(|| format!("{}: der Programmordner (Program Files) ist unbekannt", s.name))?;
         let m = scm(0x0002 | 0x0001)?; // create service, connect
-        let (name, display, path) = (wide(s.name), wide(s.display), wide(&command_line(s.exe, s.args)));
+        let (name, display, path) = (wide(s.name), wide(s.display), wide(&command_line(&exe, s.args)));
         // SAFETY: wide strings that live through the call; LocalSystem (no account).
         let h = unsafe {
             CreateServiceW(m.0, name.as_ptr(), display.as_ptr(), 0xF01FF, OWN_PROCESS, 2, 1, path.as_ptr(), core::ptr::null(), core::ptr::null_mut(), core::ptr::null(), core::ptr::null(), core::ptr::null())
@@ -330,6 +389,13 @@ mod win {
             return Err(error(s.name));
         }
         let h = Handle(h);
+        if exe != s.exe {
+            if let Err(e) = copy_program(s.exe, &exe) {
+                // SAFETY: a service handle with DELETE access (SERVICE_ALL_ACCESS).
+                unsafe { DeleteService(h.0) };
+                return Err(e);
+            }
+        }
         let text = wide(s.description);
         let d = Description { text: text.as_ptr() };
         let actions = [Action { kind: 1, delay: 5000 }, Action { kind: 1, delay: 15_000 }, Action { kind: 1, delay: 60_000 }];
@@ -460,6 +526,11 @@ mod linux {
 
     fn need_root() -> Result<(), String> {
         if is_root() { Ok(()) } else { Err(String::from("nur als root (sudo) möglich")) }
+    }
+
+    /// the program the unit starts: s.exe
+    pub fn program_path(s: &ServiceSpec) -> Option<String> {
+        Some(String::from(s.exe))
     }
 
     pub fn install(s: &ServiceSpec) -> Result<(), String> {
@@ -613,6 +684,11 @@ mod apple {
             return Err(String::from("iOS kennt keine Dienste"));
         }
         if is_root() { Ok(()) } else { Err(String::from("nur als root (sudo) möglich")) }
+    }
+
+    /// the program the daemon starts: s.exe
+    pub fn program_path(s: &ServiceSpec) -> Option<String> {
+        Some(String::from(s.exe))
     }
 
     pub fn install(s: &ServiceSpec) -> Result<(), String> {

@@ -25,7 +25,7 @@ use alloc::vec::Vec;
 
 use gpu::Result;
 use render2d::math::sincos;
-use render2d::{BlockId, Camera, Cap, EntityId, HatchLine, Insert, Join, Layer, LayerId, Scene, Shape, Style, StyleId, Unit, ARC_STEP};
+use render2d::{BlockId, Camera, Cap, EntityId, Grip, HatchLine, Insert, Join, Layer, LayerId, Scene, Shape, SnapKind, Space, Style, StyleId, Unit, ARC_STEP};
 
 use crate::gallery::Rng;
 
@@ -1074,4 +1074,33 @@ pub fn views(c: &Cad, size: (u32, u32)) -> [View; 3] {
         View { name: "district", cam: Camera::new([centre[0] + 0.13 * c.width, centre[1] - 0.09 * c.height], 0.25 * all) },
         View { name: "working zoom", cam: Camera::new([centre[0] + 0.13 * c.width, centre[1] - 0.09 * c.height], work) },
     ]
+}
+
+/// G6d: a window over the whole overview, up to 100 000 of what it holds selected (the first query builds the index; the
+/// browser's bench, the native one times each step itself)
+#[cfg(target_arch = "wasm32")]
+pub fn g6d_selection(s: &mut Scene, c: &Cad, size: (u32, u32)) -> Result<Vec<EntityId>> {
+    let v = &views(c, size)[0];
+    s.set_camera(&v.cam)?;
+    let a = v.cam.to_drawing([0.0, 0.0], size);
+    let b = v.cam.to_drawing([size.0 as f64, size.1 as f64], size);
+    let all = s.select(render2d::Region::Rect([a[0].min(b[0]), a[1].min(b[1])], [a[0].max(b[0]), a[1].max(b[1])]), render2d::SelectMode::Window);
+    let sel: Vec<EntityId> = all.into_iter().take(100_000).collect();
+    s.set_highlights(&sel, render2d::HL_SELECTED)?;
+    Ok(sel)
+}
+
+/// G6d: a full overlay for frame `k` of a pan over `v`: a rubber band, a selection window, 200 grips, a snap marker
+pub fn g6d_overlay(s: &mut Scene, k: usize, v: &View) {
+    let ov = s.overlay();
+    ov.clear();
+    let c = v.cam.center;
+    let st = Style::new(0xFF20_2020);
+    ov.line([c[0] - 50.0 * v.cam.scale, c[1]], [c[0] + 300.0 * v.cam.scale + k as f64, c[1] + 120.0 * v.cam.scale], Space::Drawing, &st);
+    ov.selection_box([200.0, 200.0], [900.0 + k as f64, 700.0], Space::Px);
+    for j in 0..200 {
+        let g = [c[0] + ((j % 20) as f64 * 40.0 - 400.0) * v.cam.scale, c[1] + ((j / 20) as f64 * 40.0 - 200.0) * v.cam.scale];
+        ov.grip(g, Space::Drawing, if j == 7 { Grip::Hover } else { Grip::Cold });
+    }
+    ov.marker(SnapKind::Intersection, c, Space::Drawing);
 }

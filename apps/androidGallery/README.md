@@ -59,7 +59,9 @@ Release-Schlüssel aus der Umgebung (`jfgui_ANDROID_KEYSTORE`, `jfgui_ANDROID_KE
 `jfgui_ANDROID_KEY_ALIAS`, ggf. `jfgui_ANDROID_KEY_PASS`; Ergebnis
 `androidGallery-arm64-v8a-release.apk`). Fehlen sie, bricht der Build ab und nennt sie;
 `jfgui_ANDROID_DEBUG_SIGN=1` nimmt für Testbuilds den lokalen Debug-Schlüssel (siehe
-`docs/PACKAGING.md`, Abschnitt „Signing“).
+`docs/PACKAGING.md`, Abschnitt „Signing“). Debuggbar (für die `jfgui_*`-Extras der Selbsttests
+und `run-as`) ist nur ein Bau mit dem Debug-Schlüssel; das Manifest setzt `android:debuggable`
+nicht, `aapt2 --debug-mode` fügt es dort ein.
 
 Installation, wenn gewünscht:
 
@@ -431,7 +433,7 @@ Rollen, Weiterrollen, Tippen und was den Finger selbst nimmt, stehen in
 
 ```powershell
 python build_rs.py app androidGallery --target win
-python build_rs.py test androidGallery --target win        # tests/touch.uis, touch_rtl.uis
+python build_rs.py test androidGallery --target win        # tests/touch.uis, touch_rtl.uis, touch_phone.uis
 node apps/androidGallery/tests/touch_web.mjs build --engines=chromium
 python build_rs.py app androidGallery --target android --android-abi arm64-v8a
 python apps/androidGallery/tests/android_touch.py --serial SERIAL

@@ -801,6 +801,8 @@ struct Out {
     dest: String,
     tmp: String,
     file: Option<plat::File>,
+    /// (local) the folder of tmp and dest, opened from the restore folder (bc_fs::open_parent)
+    dir: Option<bc_fs::Dir>,
     hash: crypto::blake3::Blake3,
     bad: bool,
 }
@@ -1159,14 +1161,13 @@ fn restore_set(o: &OpCtl, ctx: &Ctx, set: &TapeSet, items: &[String], sink: &Sin
 fn sink_dir(ctx: &Ctx, sink: &Sink, dest: &str, meta: Option<&bt::Entry>) -> Result<(), String> {
     match sink {
         Sink::Local { root } => {
+            // made and opened from the restore folder without following a link; times and mode
+            // through the open folder
+            let d = bc_fs::open_dir(root.as_deref(), dest, meta.is_none())?;
             if let Some(e) = meta {
-                bc_fs::apply_meta(dest, e.atime, e.mtime, e.mode, 0);
-                return Ok(());
+                bc_fs::apply_meta_in(&d, "", e.atime, e.mtime, e.mode, 0);
             }
-            if let Some(r) = root {
-                bc_fs::no_links(r, dest, false)?;
-            }
-            bc_fs::ensure_dir(dest)
+            Ok(())
         }
         Sink::Agent(h) => {
             let d = match meta {
@@ -1182,22 +1183,18 @@ fn sink_dir(ctx: &Ctx, sink: &Sink, dest: &str, meta: Option<&bt::Entry>) -> Res
 fn sink_begin(ctx: &Ctx, sink: &Sink, dest: &str, conflict: &str, e: &bt::Entry) -> Result<Option<(Out, bool)>, String> {
     match sink {
         Sink::Local { root } => {
-            if let Some(r) = root {
-                bc_fs::no_links(r, dest, false)?;
-            }
-            let parent = plat::fs::parent(dest);
-            if !parent.is_empty() {
-                bc_fs::ensure_dir(parent)?;
-            }
-            let (t, p) = bc_fs::free_target(dest, conflict);
+            // the folder made and opened from the restore folder: the temporary file is
+            // created, renamed and removed in it, never through a link
+            let (dir, _) = bc_fs::open_parent(root.as_deref(), dest, true)?;
+            let (t, p) = bc_fs::free_target_in(&dir, dest, conflict);
             let renamed = match t {
                 Target::Skip => return Ok(None),
                 Target::Renamed => true,
                 Target::Free => false,
             };
             let tmp = bc_fs::temp_name(&p);
-            let f = plat::File::create_new(&plat::fs::long_path(&tmp)).ok_or("kann nicht geschrieben werden")?;
-            Ok(Some((Out { i: e.i, e: e.clone(), dest: p, tmp, file: Some(f), hash: crypto::blake3::Blake3::new(), bad: false }, renamed)))
+            let f = dir.create_new(bc_fs::file_name(&tmp)).ok_or("kann nicht geschrieben werden")?;
+            Ok(Some((Out { i: e.i, e: e.clone(), dest: p, tmp, file: Some(f), dir: Some(dir), hash: crypto::blake3::Blake3::new(), bad: false }, renamed)))
         }
         Sink::Agent(h) => {
             let o = crate::agents::restore_open(ctx, h, dest, conflict)?;
@@ -1205,7 +1202,7 @@ fn sink_begin(ctx: &Ctx, sink: &Sink, dest: &str, conflict: &str, e: &bt::Entry)
                 return Ok(None);
             }
             let renamed = o.dest != dest;
-            Ok(Some((Out { i: e.i, e: e.clone(), dest: o.dest, tmp: o.tmp, file: None, hash: crypto::blake3::Blake3::new(), bad: false }, renamed)))
+            Ok(Some((Out { i: e.i, e: e.clone(), dest: o.dest, tmp: o.tmp, file: None, dir: None, hash: crypto::blake3::Blake3::new(), bad: false }, renamed)))
         }
     }
 }
@@ -1226,8 +1223,8 @@ fn sink_write(ctx: &Ctx, sink: &Sink, x: &mut Out, off: u64, data: &[u8]) -> Res
 fn sink_commit(ctx: &Ctx, sink: &Sink, x: Out) -> Result<(), String> {
     match sink {
         Sink::Local { .. } => {
-            let f = x.file.ok_or("keine Datei")?;
-            bc_fs::finish_file(f, &x.tmp, &x.dest, x.e.atime, x.e.mtime, x.e.mode, x.e.attrs)
+            let (f, d) = x.file.zip(x.dir).ok_or("keine Datei")?;
+            bc_fs::finish_file_in(f, &d, bc_fs::file_name(&x.tmp), bc_fs::file_name(&x.dest), x.e.atime, x.e.mtime, x.e.mode, x.e.attrs)
         }
         Sink::Agent(h) => {
             let c = RestoreCommit { tmp: x.tmp.clone(), dest: x.dest.clone(), atime_ns: x.e.atime, mtime_ns: x.e.mtime, mode: x.e.mode, attrs: x.e.attrs };
@@ -1240,7 +1237,9 @@ fn sink_abort(ctx: &Ctx, sink: &Sink, x: Out) {
     match sink {
         Sink::Local { .. } => {
             drop(x.file);
-            plat::delete(&plat::fs::long_path(&x.tmp));
+            if let Some(d) = x.dir {
+                d.remove(bc_fs::file_name(&x.tmp));
+            }
         }
         Sink::Agent(h) => crate::agents::restore_abort(ctx, h, &x.tmp),
     }
@@ -1250,16 +1249,10 @@ fn sink_link(ctx: &Ctx, sink: &Sink, dest: &str, e: &bt::Entry, conflict: &str) 
     let dir = e.attrs & bc_fs::ATTR_DIRECTORY != 0;
     match sink {
         Sink::Local { root } => {
-            if let Some(r) = root {
-                bc_fs::no_links(r, dest, false)?;
-            }
-            let parent = plat::fs::parent(dest);
-            if !parent.is_empty() {
-                bc_fs::ensure_dir(parent)?;
-            }
-            match bc_fs::free_target(dest, conflict) {
+            let (d, _) = bc_fs::open_parent(root.as_deref(), dest, true)?;
+            match bc_fs::free_target_in(&d, dest, conflict) {
                 (Target::Skip, _) => Ok(()),
-                (_, p) => bc_fs::make_link(&e.link, &p, true, dir),
+                (_, p) => bc_fs::make_link_in(&d, &e.link, bc_fs::file_name(&p), true, dir),
             }
         }
         Sink::Agent(h) => crate::agents::restore_symlink(ctx, h, &RestoreLink { path: String::from(dest), target: e.link.clone(), conflict: String::from(conflict), dir }),

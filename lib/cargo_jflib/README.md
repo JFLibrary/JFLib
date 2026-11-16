@@ -13,13 +13,13 @@ cargo install cargo-jflib
 | Command | What it does |
 | --- | --- |
 | `cargo jflib new [--std] NAME` | a new app from the template of the crate `jflib`: a window, its tests, the settings for Windows and Linux; `--std`: the same app with the standard library (`jflib`'s feature `std`), so it may use `std` crates; its `Cargo.toml` says how it catches panics instead (the feature `unwind`, `panic = "unwind"`) |
-| `cargo jflib test [--features F,..] [--no-default-features] [--dir DIR]` | builds the app (on Linux always with `--target`, this machine's when none is given: the template's flags must not reach the build scripts), then runs every `tests/*.uis` with `--script`; a line `#!only windows linux ..` among a script's first lines runs it on these systems only (`target_os` of `--target`, else of this machine), a line `only windows linux: COMMAND` one command (the app's script runner decides it, with the same names; `!macos`: everywhere but there); `--features` and `--no-default-features` go to the build, `--dir DIR` runs `DIR/*.uis` instead (relative to the package's folder) |
+| `cargo jflib test [--features F,..] [--no-default-features] [--dir DIR]` | builds the app (on Linux with `--target`, this machine's when none is given, so an app from a template up to 0.2.0 builds too), then runs every `tests/*.uis` with `--script`; a line `#!only windows linux ..` among a script's first lines runs it on these systems only (`target_os` of `--target`, else of this machine), a line `only windows linux: COMMAND` one command (the app's script runner decides it, with the same names; `!macos`: everywhere but there); `--features` and `--no-default-features` go to the build, `--dir DIR` runs `DIR/*.uis` instead (relative to the package's folder) |
 | `cargo jflib watch [-- ARGS]` | hot reload: each save of the project's files builds the app again and restarts it in its session, the input replayed so it comes back where it was; a failed build keeps the running version and shows the error in its inspector |
 | `cargo jflib web [--serve]` | the app for the browser in `target/jflib-web/NAME/`: scalar, SIMD and threads, the host page, the licences; `--serve` serves it with the headers threads need |
 | `cargo jflib package [--styles winui,kde] [--formats setup,deb,..\|all] [--sign] [--repo DIR] [--update DIR]` | the app with every style built in, in `target/jflib-package/`: by default `NAME_Setup.exe` for Windows (a preview of each style to pick from, folder, shortcuts, file types, an uninstaller) and `DEB_VERSION_amd64.deb` for Linux (debconf asks for the look), an app with jflib's feature `std` only the one of the system it is made on; with `--formats` also `msix`, `appimage` (one per style), `rpm` and `flatpak`, and on a Mac `dmg` (one per style); the licences of every crate inside |
 | `cargo jflib keygen FILE` | a key for the signed update channel (`package --update`) and its public key for the app |
 | `cargo jflib android [--abi arm64-v8a\|x86_64] [--release] [--install]` | the app as an APK in `target/jflib-android/NAME-ABI-debug.apk`: the code for one ABI, its Java and C bridge, the licences; signed with a debug key it makes itself, `--release` with yours; `--install` hands it to `adb` |
-| `cargo jflib mac [--release] [--run [-- ARGS]]` | on a Mac: the app as `target/jflib-mac/NAME.app` for Apple Silicon: `Info.plist` from `PACKAGE` (`display`, `version`, `app_id`, `filetypes` as document types, `schemes` as URL types, the languages of `src/locales/ui.tsv` as localizations, with `browser=1` the web's URL types and documents), the icon from `res/app_*.png` as `NAME.icns`, signed ad hoc (or with the certificate `jfgui_MAC_IDENTITY` names); with `sandbox` in `PERMISSIONS` the App Sandbox and the entitlements its rules need; `--run` starts it |
+| `cargo jflib mac [--release] [--arch aarch64\|x86_64] [--run [-- ARGS]]` | on a Mac: the app as `target/jflib-mac/NAME.app` for every Mac, one program for Apple Silicon and Intel Macs (`lipo`; the Intel part needs `rustup target add x86_64-apple-darwin`, `--arch` builds only one of them): `Info.plist` from `PACKAGE` (`display`, `version`, `app_id`, `filetypes` as document types, `schemes` as URL types, the languages of `src/locales/ui.tsv` as localizations, with `browser=1` the web's URL types and documents), the icon from `res/app_*.png` as `NAME.icns`, signed ad hoc (or with the certificate `jfgui_MAC_IDENTITY` names); with `sandbox` in `PERMISSIONS` the App Sandbox and the entitlements its rules need; `--run` starts it |
 
 The browser with threads needs the Rust sources once: `rustup component add rust-src`. Without
 them `web` builds the other two modes. An app with std has no threads mode (rustup ships no std
@@ -33,7 +33,9 @@ through `ANDROID_SDK_ROOT`, `ANDROID_HOME` or where Android Studio puts it, the 
 below the SDK or `ANDROID_NDK_HOME`. The manifest comes from `PACKAGE` (`app_id`, `display`,
 `version`) and `PERMISSIONS` (location), unless the app has its own `android/AndroidManifest.xml`;
 `android/res/` is compiled in when it is there. A release key: `jfgui_ANDROID_KEYSTORE`,
-`jfgui_ANDROID_KEYSTORE_PASS`, `jfgui_ANDROID_KEY_ALIAS` and `jfgui_ANDROID_KEY_PASS`.
+`jfgui_ANDROID_KEYSTORE_PASS`, `jfgui_ANDROID_KEY_ALIAS` and `jfgui_ANDROID_KEY_PASS`. The debug
+APK is debuggable (aapt2 `--debug-mode`), a `--release` APK never: a manifest of the app that sets
+`android:debuggable` stops it.
 
 `package` builds the app with `--release` once per style (`JFLIB_STYLE`) for Windows and for
 Linux, both from any machine (on a Mac also for macOS, with `--formats dmg`): the Linux program
@@ -52,7 +54,7 @@ program this machine runs (`--shot`).
 | `msix` | MakeAppx of the Windows SDK (`jfgui_MAKEAPPX` names another) | Windows; without it only the package's folder; signed like the setup |
 | `rpm` | the `.spec` and its tarball; `rpmbuild` makes the `.rpm` | Linux, on Windows a WSL distribution with `rpmbuild` |
 | `flatpak` | the manifest and its files; `flatpak-builder` makes `ID.flatpak` | Linux or WSL with `flatpak-builder` and the runtime `org.freedesktop.Platform//26.08` |
-| `dmg` | `cargo jflib` with Apple's tools: `NAME.app` (as `cargo jflib mac` makes it) on a compressed disk image beside a link to `/Applications`, `NAME-VERSION-arm64.dmg` (with several styles one per style) | a Mac (`hdiutil`, `codesign`); `all` leaves it out |
+| `dmg` | `cargo jflib` with Apple's tools: `NAME.app` (as `cargo jflib mac` makes it) on a compressed disk image beside a link to `/Applications`, `NAME-VERSION-universal.dmg` for Apple Silicon and Intel Macs (with several styles one per style) | a Mac (`hdiutil`, `codesign`); `all` leaves it out |
 
 On Windows the Linux tools run in the WSL distribution `JFLIB_WSL_DISTRO`, else in the first
 one that has the tool. What it reads from `PACKAGE` next to Cargo.toml:
@@ -110,17 +112,15 @@ commands and their options, the `PACKAGE` keys and the environment variables thi
 part of what JFLib's version number promises. Keep it at the version of the app's `jflib`; the
 host pages it puts around the app for the browser and Android belong to that version.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-`cargo jflib mac` makes the app a Mac app, `NAME.app` with its icon, file types, URL schemes and
-languages, signed ad hoc or with a Developer ID, and `package --formats dmg` puts it on a disk
-image that Apple can notarize; the update channel carries the Mac app too. `cargo jflib test`
-takes `--features`, `--no-default-features` and `--dir`, and skips a script whose `#!only` line
-names other systems. `package` builds a style of the app's own and registers an app with
-`browser=1` as a web browser, and an app with std is packaged for the system it runs on by
-default. Several fixes concern the stubs `package` builds next to the app: they take JFLib's
-crates from the app's paths or its checkout, take only its release profile and always build with
-`panic = "abort"`. Everything is in the
+`cargo jflib new` writes a `.cargo/config.toml` without Linux tables, so `cargo run` builds the app
+on Linux as on Windows and macOS, without `--target`; `cargo jflib package` adds rust-lld itself for
+a Linux program built on another system. `cargo jflib mac` and `cargo jflib package --formats dmg`
+build one program for Apple silicon and Intel Macs (`NAME-VERSION-universal.dmg`). Security: `web
+--serve` serves only plain names below the bundle and only to 127.0.0.1 or localhost, `android
+--release` refuses a debuggable manifest, and the browser loader takes `?theme=` only as a plain
+theme name. Everything is in the
 [changelog](https://docs.rs/crate/cargo-jflib/latest/source/CHANGELOG.md).
 
 ## Documentation

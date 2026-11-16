@@ -8,6 +8,9 @@
 //
 // The handler runs on a worker thread; it must not panic (panics abort the process).
 // Requests with both Content-Length and Transfer-Encoding are refused (request smuggling).
+// A slow client holds a worker only so long: the head must arrive within read_ms, a body at
+// MIN_BODY_RATE on average after a first read_ms (over TLS too: records without data end a read
+// after read_ms).
 
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -21,6 +24,10 @@ use plat::sync::{channel, Mutex, Receiver};
 use crate::http::{self, ReadError, Reader, Request, Response};
 use crate::Stream;
 
+/// the slowest request body a server waits for, in bytes a second on average (after a first
+/// read_ms): slower ones end the connection
+pub const MIN_BODY_RATE: u32 = 1024;
+
 #[derive(Clone, Copy, Debug)]
 pub struct ServerConfig {
     /// worker threads (connections served at once)
@@ -29,7 +36,8 @@ pub struct ServerConfig {
     pub max_body: usize,
     /// how long an idle keep-alive connection stays open
     pub idle_ms: u32,
-    /// the longest wait for the next bytes of a request in progress
+    /// the longest wait for the next bytes of a request in progress; the head must be complete
+    /// within it, a body must bring 1 KiB a second on average after it (MIN_BODY_RATE)
     pub read_ms: u32,
     pub write_ms: u32,
     /// requests per connection
@@ -220,7 +228,12 @@ fn serve(s: &dyn Stream, peer: SocketAddr, id: Option<String>, cfg: &ServerConfi
                 return;
             }
         }
-        let body = match rd.body(&headers, cfg.max_body, false) {
+        // the body must keep moving: MIN_BODY_RATE bytes a second on average after a first
+        // read_ms (the head has its deadline; a body sent a byte at a time held a worker)
+        rd.set_min_rate(Some((MIN_BODY_RATE, cfg.read_ms)));
+        let body = rd.body(&headers, cfg.max_body, false);
+        rd.set_min_rate(None);
+        let body = match body {
             Ok(b) => b,
             Err(ReadError::BodyTooLarge) => return error(s, 413, stop),
             Err(ReadError::Net(_)) | Err(ReadError::Closed) => return,

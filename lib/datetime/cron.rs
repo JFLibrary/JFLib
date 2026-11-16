@@ -4,7 +4,8 @@
 //                                 a-b, a-b/n, */n, lists a,b; month names jan..dec, weekday
 //                                 names sun..sat (0 and 7 = Sunday); @hourly @daily @midnight
 //                                 @weekly @monthly @yearly @annually.  Day of month and day of
-//                                 week restricted both: either matches (Vixie cron).
+//                                 week restricted both: either matches; one of them beginning
+//                                 with "*" (also "*/2"): both must match (Vixie cron).
 //   cron.next_after(ts, &zone)    the first run after ts: a wall time in a DST gap runs at the
 //                                 jump (right after the gap), a repeated wall time runs once
 //                                 (its first occurrence); None when nothing matches within
@@ -32,8 +33,12 @@ pub struct Cron {
     months: u16,
     /// bits 0..6, 0 = Sunday
     dow: u8,
+    /// the field is "*": every day (describe)
     dom_star: bool,
     dow_star: bool,
+    /// the field begins with "*" ("*", "*/2"): Vixie cron then wants both day fields to match
+    dom_lead: bool,
+    dow_lead: bool,
     src: String,
 }
 
@@ -94,9 +99,12 @@ fn field(s: &str, field: u8, min: u32, max: u32) -> Result<(u64, bool), CronErro
                 star = true;
             }
             (min, max)
-        } else if let Some((a, hi_s)) = range.split_once('-') {
-            let a = value(a, field, min, max)?;
+        } else if let Some((a_s, hi_s)) = range.split_once('-') {
+            let mut a = value(a_s, field, min, max)?;
             let mut b = value(hi_s, field, min, max)?;
+            if field == 4 && matches!(a_s, "7" | "07") {
+                a = 7; // "7-7" is Sunday alone, not 0-7
+            }
             if field == 4 && b == 0 && (a > 0 || matches!(hi_s, "7" | "07")) {
                 b = 7; // mon-sun, 0-7
             }
@@ -142,6 +150,7 @@ impl Cron {
         let (dom, dom_star) = field(f[2], 2, 1, 31)?;
         let (months, _) = field(f[3], 3, 1, 12)?;
         let (dow, dow_star) = field(f[4], 4, 0, 6)?;
+        let (dom_lead, dow_lead) = (f[2].starts_with('*'), f[4].starts_with('*'));
         Ok(Cron {
             minutes,
             hours: hours as u32,
@@ -150,6 +159,8 @@ impl Cron {
             dow: dow as u8,
             dom_star,
             dow_star,
+            dom_lead,
+            dow_lead,
             src: String::from(t),
         })
     }
@@ -170,12 +181,9 @@ impl Cron {
         let dom_ok = self.dom & (1 << d) != 0;
         let wd = (crate::weekday(y, m, d) + 1) % 7; // 0 = Sunday
         let dow_ok = self.dow & (1 << wd) != 0;
-        match (self.dom_star, self.dow_star) {
-            (true, true) => true,
-            (true, false) => dow_ok,
-            (false, true) => dom_ok,
-            (false, false) => dom_ok || dow_ok,
-        }
+        // Vixie cron: a day field that begins with "*" ("*", "*/2") makes both fields count
+        // (an "*" field allows every day, so the other decides); else either matches
+        if self.dom_lead || self.dow_lead { dom_ok && dow_ok } else { dom_ok || dow_ok }
     }
 
     /// the first run strictly after `after` in `zone`

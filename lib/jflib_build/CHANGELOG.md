@@ -8,6 +8,22 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux: a project in a folder with a blank in its path (`My Projects/app`) links again. The
+  path of the linker's map was split at the blank when lld links (`-C linker-flavor=ld.lld`: one
+  static file, `cargo jflib package`) and had the blank turned into a comma behind cc's `-Wl,`;
+  it is one argument now (through cc as `-Xlinker`).
+
+## [0.2.1] - 2026-11-16
+
+### Changed
+
+- Linux: a program links against glibc unless `-C target-feature=+crt-static` makes it one static
+  file, and is linked to a fixed address with `-no-pie`; `-C relocation-model=static` is only
+  needed for the static file. So `cargo run` needs no flags and no `--target` on Linux; the
+  rustflags of templates up to 0.2.0 still work with `--target`.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added
@@ -30,6 +46,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0

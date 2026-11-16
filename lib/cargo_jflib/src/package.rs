@@ -162,12 +162,13 @@ fn styles_check(styles: &[String], own: &BTreeMap<String, PathBuf>) -> Result<Ve
 fn build(p: &Project, triple: &str, style: &str, own: bool) -> Result<PathBuf, String> {
     let mut cmd = cargo::command();
     cmd.current_dir(&p.package.dir).args(["build", "--release", "-p", &p.package.name, "--target", triple]);
+    cross_linker(&mut cmd, triple);
     if own {
         cmd.env_remove("JFLIB_STYLE");
     } else {
         cmd.env("JFLIB_STYLE", style);
     }
-    if triple == crate::mac::TRIPLE {
+    if triple.ends_with("-apple-darwin") {
         cmd.env("MACOSX_DEPLOYMENT_TARGET", crate::mac::MAC_MIN);
     }
     let programs: Vec<PathBuf> = cargo::build(&mut cmd)?.into_iter().filter(|a| a.package_id == p.package.id).filter_map(|a| a.executable).collect();
@@ -261,7 +262,7 @@ pub(crate) const APPIMAGERT: Stub = Stub { name: "appimagert", deps: &["jflib-ap
 /// Ed25519 keys and signatures of an update channel with lib/crypto (cargo-jflib has no curve
 /// arithmetic of its own), for the machine it runs on
 pub(crate) const SIGNER: Stub = Stub { name: "jflib-sign", deps: &["jflib-rt", "jflib-plat", "jflib-crypto"], source: include_str!("signer.rs.in"),
-                                       console: true, triple: if cfg!(windows) { WIN } else if cfg!(target_os = "macos") { crate::mac::TRIPLE } else { LINUX },
+                                       console: true, triple: if cfg!(windows) { WIN } else if cfg!(target_os = "macos") { crate::mac::HOST_TRIPLE } else { LINUX },
                                        linux_static: false };
 
 /// a stub's dependency on `name`: from the folder where the app's project has the crate from a path
@@ -328,7 +329,7 @@ pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, Stri
     cmd.current_dir(&p.package.dir).arg("build").arg("--release").args(["--target", s.triple]).arg("--manifest-path").arg(&manifest);
     // panic = "abort" also over a [profile.release] of the app's .cargo/config.toml (stub_profiles)
     cmd.env("CARGO_PROFILE_RELEASE_PANIC", "abort");
-    if s.triple == crate::mac::TRIPLE {
+    if s.triple.ends_with("-apple-darwin") {
         cmd.env("MACOSX_DEPLOYMENT_TARGET", crate::mac::MAC_MIN);
     }
     if s.linux_static {
@@ -338,8 +339,19 @@ pub(crate) fn stub(p: &Project, version: &str, s: &Stub) -> Result<PathBuf, Stri
                                             "-C", "target-feature=+crt-static"].join("\u{1f}"));
     } else {
         cmd.arg("--target-dir").arg(&p.target_dir);
+        cross_linker(&mut cmd, s.triple);
     }
     cargo::build(&mut cmd)?.into_iter().filter_map(|a| a.executable).next().ok_or_else(|| format!("cargo built no {}", s.name))
+}
+
+/// A Linux program built on another system links with rust-lld (it comes with rustup), appended to
+/// the project's rustflags: there is no cc for Linux there.  On Linux itself Rust's default, cc,
+/// links the program as it links the build scripts (`cargo run` needs no flags).
+fn cross_linker(cmd: &mut Command, triple: &str) {
+    let native = cfg!(target_os = "linux") && triple.starts_with(std::env::consts::ARCH);
+    if triple.ends_with("-unknown-linux-gnu") && !native {
+        cmd.arg("--config").arg(format!(r#"target.{triple}.rustflags=["-C", "linker=rust-lld", "-C", "linker-flavor=ld.lld"]"#));
+    }
 }
 
 /// files by their path: the licences of the crates
@@ -757,13 +769,18 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
             "flatpak" => app.flatpak()?,
             "dmg" => {
                 for s in &app.styles {
-                    println!("[{s}] build mac");
-                    let exe = build(&p, crate::mac::TRIPLE, s, own_styles.contains(s))?;
+                    // one program for every Mac: Apple Silicon and Intel, joined by lipo (docs/INTEL_MAC.md)
+                    println!("[{s}] build mac (aarch64 + x86_64)");
+                    let mut exes = Vec::new();
+                    for t in crate::mac::TRIPLES {
+                        exes.push(build(&p, t, s, own_styles.contains(s)).map_err(|e| crate::mac::target_hint(t, e))?);
+                    }
                     let dir = app.work.join(s).join("mac");
                     fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+                    let exe = crate::mac::universal(&exes, &dir.join(".universal"))?;
                     let bundle = crate::mac::bundle(&p.package.dir, &app.version, &exe, &dir)?;
-                    let file = if app.styles.len() > 1 { format!("{}-{}-{s}-arm64.dmg", app.name, app.version) }
-                               else { format!("{}-{}-arm64.dmg", app.name, app.version) };
+                    let file = if app.styles.len() > 1 { format!("{}-{}-{s}-universal.dmg", app.name, app.version) }
+                               else { format!("{}-{}-universal.dmg", app.name, app.version) };
                     let out = app.dist.join(file);
                     crate::mac::dmg(&bundle, &out, &app.display)?;
                     app.dmgs.borrow_mut().insert(s.clone(), (out.clone(), bundle));

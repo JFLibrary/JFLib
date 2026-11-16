@@ -14,17 +14,33 @@ import android.os.ParcelFileDescriptor;
 import android.provider.OpenableColumns;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.UUID;
 
 public final class GalleryFiles extends ContentProvider {
     static String authority(Context context) { return context.getPackageName() + ".jfgui.files"; }
 
-    /** bytes as the shared file name (a fresh copy each time) -> its content:// URI, or null
-     *  when the manifest declares no provider */
+    /** bytes as a fresh file named after name (clip.png -> clip-RANDOM.png) -> its content:// URI,
+     *  or null when the manifest declares no provider.  A new file each time, never the old one
+     *  rewritten: a descriptor another app kept of an earlier copy reads that copy, not what the user
+     *  copies later.  The earlier copies are deleted. */
     static Uri share(Context context, String name, byte[] bytes) {
         if (context.getPackageManager().resolveContentProvider(authority(context), 0) == null) return null;
         File dir = GalleryHost.shareDir(context);
-        if (dir == null || !GalleryHost.write(new File(dir, name), bytes)) return null;
-        return new Uri.Builder().scheme("content").authority(authority(context)).appendPath(name)
+        if (dir == null) return null;
+        int dot = name.lastIndexOf('.');
+        String stem = (dot > 0 ? name.substring(0, dot) : name) + "-", ext = dot > 0 ? name.substring(dot) : "";
+        String fresh = stem + UUID.randomUUID() + ext;
+        File f = new File(dir, fresh);
+        if (!GalleryHost.write(f, bytes)) {
+            f.delete();
+            return null;
+        }
+        File[] old = dir.listFiles();
+        for (File o : old != null ? old : new File[0]) {
+            String n = o.getName();
+            if (!n.equals(fresh) && (n.equals(name) || n.startsWith(stem) && n.endsWith(ext))) o.delete();
+        }
+        return new Uri.Builder().scheme("content").authority(authority(context)).appendPath(fresh)
             .appendQueryParameter("t", Long.toString(System.currentTimeMillis())).build();
     }
 

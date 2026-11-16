@@ -32,11 +32,11 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::img_bmp`. All of JFLib's crates share one
 version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-One fix for 32-bit targets such as wasm32: the offset of an embedded ICC profile is checked
-without wrapping. Everything is in the
-[changelog](https://docs.rs/crate/jflib-img-bmp/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-img-bmp/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

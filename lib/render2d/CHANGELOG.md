@@ -8,9 +8,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-16
+
 ### Added
 
 - Text (G6c): fonts from TrueType or OpenType bytes (`Scene::add_font`, parsed by lib/text), text styles like DXF's STYLE (`TextStyle`: font, fallback fonts, a fixed height, width factor, oblique angle, drawing units or pixels), single lines with DXF TEXT's alignments (`Shape::Text`, `Text`, `HAlign`, `VAlign`, backward, upside down, aligned and fit between two points) and the basics of MTEXT (`Shape::MText`, `MText`: line breaks, a wrapping width, line spacing, the nine attachment points), shaped by HarfRust through lib/text_shape (kerning, ligatures, bidi, Arabic joining, fallback fonts per run). Glyphs come from an atlas of multi-channel signed distance fields made on the CPU from the outlines (two size classes, tiles on demand, the same bytes on every target); the coverage comes from the distance through the map's Jacobian, so width factors, oblique angles and uneven inserts stay sharp, and every pixel blends once per text; below 7 px per em a text is drawn as one bar per word, from 160 px per em as a fill of its outlines (texts in blocks stay glyphs); texts work in blocks like any entity. `text_layout` and the free `layout_text` / `layout_mtext` give the layout (the extent for picking, the outlines for a CPU path), `text_info`, `atlas_hash`. docs/RENDER2D.md section Text
+- Picking, area selection, object snaps, highlighting and an overlay (G6d): a spatial index of its own (an R-tree of f64 boxes, built in one go by the first query and kept in step with every change; each block indexed once in its own units, queries go down through the inserts' inverse transforms, arrays and nesting included) behind `Scene::pick` (exact against what is drawn: widths in pixels or units, caps, joins and miters, arcs and curves themselves rather than their flattening, fills even-odd with holes, hatched areas, texts by their quad; topmost first in the painter's order; inside blocks the insert and the path of nested inserts down to the entity; hidden layers skipped, a filter for an app's layer lock), `Scene::select` (window and crossing by rectangles and polygons, an insert as a whole) and `Scene::snap` / `snaps` (endpoint, midpoint, centre, quadrant, intersection, perpendicular, tangent, nearest and insertion; aperture, kinds, a base point, AutoCAD's priority), all in f64 and exact at 1e7 and 1e-6 units per pixel; `grip_points`; highlighting of selected and hovered entities and of inserts as a whole (`set_highlight`, `HL_SELECTED`, `HL_HOVER`) through a mask of two bits per record and instance, of which only the changed words go up, never geometry (without a highlight every pipeline, its SPIR-V and every image stay as they were); an overlay made anew every frame (`Scene::overlay`: rubber bands, window and crossing boxes, grips, snap markers, fills; in drawing units or pixels) drawn after the scene with the same anti-aliased stroke and fill code from its own per-frame buffers. docs/RENDER2D.md sections Auswahl und Fang, Hervorheben, Überlagerung
 
 ## [0.2.0] - 2026-11-14
 
@@ -41,5 +44,6 @@ First release on crates.io.
   cleaned, nested, oriented and triangulated in `f64`); `FrameStats`, `UploadInfo` and
   `InstanceInfo` for measuring.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0

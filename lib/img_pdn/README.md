@@ -66,13 +66,11 @@ for `img_core::io` to know `.pdn`, call `img_all::use_all_codecs()` once, since 
 only PNG, JPEG, BMP, GIF and SVG by itself. All of JFLib's crates share one version and are
 released together. It runs on every platform JFLib supports.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-The reader is safer against hostile documents. A block of pixels or an inline byte array that more
-than one layer points at is refused with `ERR_HDR`; before, every reference expanded the same data
-again. And the layers' names and metadata together are bounded by the size of the document
-(`ERR_LIMIT`). Everything is in the
-[changelog](https://docs.rs/crate/jflib-img-pdn/latest/source/CHANGELOG.md).
+Nothing in this crate. It is released again as 0.2.1 only because all of JFLib's crates move
+together. The [changelog](https://docs.rs/crate/jflib-img-pdn/latest/source/CHANGELOG.md) says the
+same.
 
 ## Documentation
 

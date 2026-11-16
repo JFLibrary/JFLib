@@ -1,0 +1,27 @@
+#!args --verify-dirty
+# the wheel of a diagram (ui/diagram.rs) from a touchpad: Ctrl + the fine steps of a precision
+# touchpad zoom a step per 120 (each step zoomed a whole one); a trackpad's pixels pan by those
+# pixels; with the system's five lines a notch pans 80 DIP
+theme light
+expect text:"Zoom: 100 %" exists
+expect text:"Mitte: 496,296" exists
+wheel 550,388 40 ctrl fine
+expect text:"Zoom: 100 %" exists
+wheel 550,388 40 ctrl fine
+wheel 550,388 40 ctrl fine
+expect text:"Zoom: 125 %" exists
+wheel 550,388 -60 ctrl fine
+wheel 550,388 -60 ctrl fine
+expect text:"Zoom: 100 %" exists
+# a trackpad: down by 10 DIP, right by 4
+wheel 550,388 -10 4 pixels
+expect text:"Mitte: 500,306" exists
+click "Einpassen"
+expect text:"Mitte: 496,296" exists
+# five lines a notch: 80 DIP
+system env jfgui_WHEEL_LINES 5
+system settings other
+wheel 550,388 -120
+expect text:"Mitte: 496,376" exists
+system env jfgui_WHEEL_LINES -
+system settings other

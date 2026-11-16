@@ -1777,7 +1777,8 @@ Fensterrand hinaus.
 - **P2** · *erledigt* (2026-11-13) · G6b2: Blöcke (Records einmal auf der GPU, jedes Insert eine Instanz; verschoben, gedreht, auch ungleich skaliert, gespiegelt, Felder wie MINSERT, Blöcke in Blöcken bis 16 Ebenen, Stile „von Block“ je Eigenschaft) und Transparenz je Ebene, Entität und Block (0 bis 90 %, je Objekt gemischt wie in AutoCAD) in [`lib/render2d`](RENDER2D.md). Inserts bis 0,021 px genau bei 10⁻⁶ Einheiten je Pixel; ein Block mit 1001 Records 10 000-mal: 0,7 statt 641 MB. Ein Absturz unter der Validierungsschicht, den der Agent sah, ließ sich nach dem Merge nicht nachstellen; `gputest` zeigt ihn auch ohne G6b2. Damit ist G6b fertig. Nicht geprüft: Android, Metal, Firefox.
 - **P2** · *erledigt* (2026-11-14) · G6c: Text in [`lib/render2d`](RENDER2D.md#text). Schriften aus ihren Bytes, Textstile wie DXFs STYLE, einzeilig mit allen Ausrichtungen von TEXT und mehrzeilig mit den Grundlagen von MTEXT, gesetzt über HarfRust (Kerning, Bidi, Arabisch, Ersatzschriften); gezeichnet aus einem eigenen Atlas mehrkanaliger Abstandsfelder (zwei Größenklassen auf Abruf, auf allen Zielen Byte für Byte gleich), unter 7 px je em als ein Balken je Wort, ab 160 px je em als Fläche seiner Umrisse; auch in Blöcken. Die Messszene hat 102 301 Zeichen; der Text kostet in der Übersicht auf der RTX 0,3 bis 1,0 ms, auf der Iris Xe 0,3 bis 0,7 ms. Lage bis 0,028 px bei 10⁻⁶ Einheiten je Pixel, die alten Bilder Byte für Byte gleich. Iris Xe 744 von 746 Prüfungen (offen nur `phase`), T500 und Browser bestanden. Nicht geprüft: die HD 610 (nicht erreichbar), Android, Metal, Firefox, Devanagari.
 - **P2** · *fehlt* · Nach G6c: Offen zur Entscheidung eine Detailstufe für schwache GPUs in der Übersicht (Entscheidung 32); das Messziel ist in der Übersicht auf der RTX (20 ms) und der Iris Xe (115 ms) verfehlt, schon ohne Text, im Browser erreicht. Auf Intel unter Linux (Mesa 26.0.8) sind zwei Fehler des Intel-Compilers umgangen (2026-11-13: die Strichmuster, zufällige Pixel in Strichen, die `fs_fill` zeichnet); offen dort: die Periode von einer Million Pixeln (0,1055 px statt höchstens 0,0625). Nicht geprüft: Chromium auf Vulkan mit NVIDIA, der Browser auf Intel, Firefox, Safari, die HD 610 seit G6b2.
-- **P2** · *fehlt* · G6d: Auswahl und Fang in `lib/render2d` (ein räumlicher Index, die Fangarten, Hervorheben ausgewählter Objekte, eine Überlagerung für Gummiband, Griffe und Fangmarke).
+- **P2** · *erledigt* (2026-11-15) · G6d: Auswahl und Fang in [`lib/render2d`](RENDER2D.md) (Entscheidungen 24 und 30). Ein eigener R-Baum in `f64` (ein Baum je Block, ein Eintrag je Insert, Änderungen bis zur nächsten Abfrage gesammelt); Auswahl per Klick genau gegen die gezeichnete Form, oberstes zuerst, Fenster und Kreuzen als Rechteck oder Polygon; Fang auf Endpunkt, Mitte, Zentrum, Quadrant, Schnittpunkt, Lot, Tangente, nächsten Punkt und Einfügepunkt, auch in Blöcken; Hervorheben über zwei Bits je Record und Instanz ohne neuen Upload der Geometrie; eine Überlagerung je Bild für Gummiband, Auswahlrechteck, Griffe und Fangmarken. Messszene (Übersicht, Median): Klick 0,12 ms, Fang 0,6 ms (99. Perzentil bis 7 ms unter fremder Last), 100 000 ausgewählte Objekte +3,5 bis +4,7 % GPU-Zeit. Gegen eine Rechnung über jedes Objekt 0 anders, auch bei 10⁷ und 10⁻⁶ Einheiten je Pixel. Nicht geprüft: die HD 610 (nicht erreichbar), Messungen auf Intel und T500.
+- **P2** · *fehlt* · G6e: der CPU-Weg von `lib/render2d` mit `lib/gfx` (dieselbe Szene ohne GPU, auch Hervorhebung und Überlagerung; zugleich die Referenz der Tests), ein DXF-Leser als eigene Bibliothek (TEXT, MTEXT mit Formatcodes, STYLE, BLOCK/INSERT, die Ausbuchtungen der Polylinien, SHX-Schriften; Beispieldateien laden nur mit Zustimmung des Nutzers), die anderen Ziele und GPUs.
 - **P3** · *fehlt* · G7: Spiel-Bausteine (Animation, Nachladen großer Welten, Physik, Werkzeuge). Später: D3D12-Rückfall, GPU-Rasterung der Widgets.
 - **P2** · *erledigt* (2026-10-22) · Stufe 0 des GPU-Plans, Teil 1: Scroll-Kopie
   (`lib/ui/scrollcopy.rs`). Hat sich in einer Scroll-Ansicht nur der Inhalt verschoben, werden
@@ -1906,10 +1907,19 @@ Fensterrand hinaus.
 
 ## 9. Plattformen
 
-- **P1** · *fehlt* · Native macOS-Version (Cocoa über `objc_msgSend`, gegen libSystem gelinkt, weil
-  macOS keine stabilen Syscalls hat); heute macOS nur über das Web. Plan mit den Meilensteinen AP0 bis
-  AP8, zusammen mit iOS: [APPLE.md](APPLE.md).
-- **P2** · *fehlt* · Native iOS-Version, auf dem Host-Weg von Android ([APPLE.md](APPLE.md) AP5).
+- **P1** · *erledigt* (2026-11-10) · Native macOS-Version auf Apple Silicon (Cocoa über `objc_msgSend`, gegen
+  libSystem gelinkt, weil macOS keine stabilen Syscalls hat), mit `.dmg`, Notarisierung, Updates, Metal (AP6) und
+  VoiceOver ([VOICEOVER.md](VOICEOVER.md)). Plan mit den Meilensteinen AP0 bis AP8, zusammen mit iOS:
+  [APPLE.md](APPLE.md).
+- **P2** · *erledigt* (2026-11-10) · Native iOS-Version, auf dem Host-Weg von Android ([APPLE.md](APPLE.md) AP5).
+- **P3** · *teilweise* (2026-11-14) · Intel-Macs (`x86_64-apple-darwin`) im selben Universal-Programm
+  ([INTEL_MAC.md](INTEL_MAC.md), IM0 bis IM6). Fertig: der Bau (`--target mac --arch x86_64`, `lipo` in
+  `tools/package.py` und `cargo jflib`, `-universal.dmg`, Update-Kanal für `macos-x86_64`), `rt` mit CPUID und x87
+  wie unter Windows, `plat` mit den `$INODE64`-Funktionen, `objc_msgSend_stret` und dem Absturzkontext von x86-64.
+  Geprüft unter Rosetta 2 auf dem Mac mini: `coretest`, `plattest` ohne und mit Fenstern, die Skripte von `gallery`,
+  `updatetest` in beiden Teilen, `portabletest` mit dem Digest von Windows. Auf GitHubs Intel-Runner (Job `intel` in
+  `apple.yml`, Core i7-8700B) dieselbe Suite ohne Fenster grün. Offen: die Website; Metal auf Intel- und AMD-GPUs
+  ist gebaut, aber nicht geprüft.
 - **P2** · *teilweise* · Native ARM64-Version für Windows und Linux (`aarch64-pc-windows-msvc`,
   `aarch64-unknown-linux-gnu`), vom x86-Rechner aus gebaut; heute läuft ARM64 auf Android, Linux und Windows (dort auf dem
   Runner `windows-11-arm` geprüft). Plan mit den Meilensteinen ARM0 bis ARM9: [ARM64.md](ARM64.md).

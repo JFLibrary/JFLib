@@ -7,11 +7,22 @@
 //   root_of / no_links       the shared folder of a path; no link (or junction) between that
 //                            folder and the path, so a link inside a shared folder cannot lead
 //                            a read or a write out of it (the folder itself may be a link)
+//   open_dir / open_parent   a folder in a shared folder opened (plat::fs::Dir) without
+//                            following a link on the way; what is read, written, changed or
+//                            removed in it after that is relative to the open folder, so a
+//                            folder swapped for a link after a check is not followed either
 //   ensure_dir               create the missing folders of a path; none of them may be a link,
 //                            so a link planted in the target cannot redirect restored data
 //   free_target              an existing entry: skip, "name (wiederhergestellt N).ext" or replace
 //   temp_name / finish_file  data goes to "<name>.bcrestore-<random>" and is renamed into
-//                            place when complete and synced; times, mode, attributes follow
+//                            place when complete and synced; times and mode set through the
+//                            file's own handle before, attributes after (set-user-ID and
+//                            set-group-ID never: the owner is not restored, the file belongs to
+//                            whoever restores it -- root)
+//   remove_tree_in           every listing and removal relative to the open folders
+//
+// The *_in / *_at forms work in an open folder; the forms with a path open its folder as it is
+// (a server's own folders, bcctl).
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -22,7 +33,8 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use bc_proto::agent::{AgentEntry, AgentListing};
-use plat::fs::FileKind;
+use plat::fs::{FileKind, Meta};
+pub use plat::fs::Dir;
 
 /// the wire name of a file kind
 pub fn kind_name(k: Option<FileKind>) -> &'static str {
@@ -34,11 +46,8 @@ pub fn kind_name(k: Option<FileKind>) -> &'static str {
     }
 }
 
-/// an entry with everything a backup keeps (links are not followed)
-pub fn entry(path: &str, name: &str) -> Option<AgentEntry> {
-    let m = plat::fs::lstat(path)?;
-    let link = if m.is_symlink() { plat::fs::read_link(path).unwrap_or_default() } else { String::new() };
-    Some(AgentEntry {
+fn entry_of(name: &str, m: Meta, link: String) -> AgentEntry {
+    AgentEntry {
         name: String::from(name),
         kind: String::from(kind_name(m.kind)),
         size: if m.is_dir() { 0 } else { m.size },
@@ -52,12 +61,38 @@ pub fn entry(path: &str, name: &str) -> Option<AgentEntry> {
         ino: m.ino,
         dev: m.dev,
         link,
-    })
+    }
 }
 
-/// a page of a folder: folders first, then by name (case-insensitive)
-pub fn listing(path: &str, offset: usize, limit: usize) -> Option<AgentListing> {
-    let mut items = plat::fs::read_dir(path)?;
+/// an entry with everything a backup keeps (links are not followed)
+pub fn entry(path: &str, name: &str) -> Option<AgentEntry> {
+    let m = plat::fs::lstat(path)?;
+    let link = if m.is_symlink() { plat::fs::read_link(path).unwrap_or_default() } else { String::new() };
+    Some(entry_of(name, m, link))
+}
+
+/// `entry` of `name` in an open folder ("": the folder itself), reported as `shown`
+pub fn entry_at(d: &Dir, name: &str, shown: &str) -> Option<AgentEntry> {
+    let m = d.lstat(name)?;
+    let link = if m.is_symlink() { d.read_link(name).unwrap_or_default() } else { String::new() };
+    Some(entry_of(shown, m, link))
+}
+
+/// `entry` of a path in the shared folder `root` (open_parent: no link on the way)
+pub fn entry_in(root: Option<&str>, path: &str) -> Option<AgentEntry> {
+    match open_parent(root, path, false) {
+        Ok((d, name)) => entry_at(&d, &name, &name),
+        // a root ("/", "C:\"): the folder itself
+        Err(_) if plat::fs::parent(path).is_empty() || file_name(path).is_empty() => entry_at(&open_dir(root, path, false).ok()?, "", file_name(path)),
+        Err(_) => None,
+    }
+}
+
+/// a page of a folder in the shared folder `root` (open_dir: no link on the way): folders
+/// first, then by name (case-insensitive)
+pub fn listing(root: Option<&str>, path: &str, offset: usize, limit: usize) -> Option<AgentListing> {
+    let d = open_dir(root, path, false).ok()?;
+    let mut items = d.read_dir()?;
     items.sort_by(|a, b| ((a.kind != FileKind::Dir), a.name.to_lowercase()).cmp(&((b.kind != FileKind::Dir), b.name.to_lowercase())));
     let limit = limit.max(1);
     let more = items.len() > offset.saturating_add(limit);
@@ -65,10 +100,7 @@ pub fn listing(path: &str, offset: usize, limit: usize) -> Option<AgentListing> 
         .iter()
         .skip(offset)
         .take(limit)
-        .map(|e| {
-            let p = plat::fs::join(path, &e.name);
-            entry(&p, &e.name).unwrap_or(AgentEntry { name: e.name.clone(), kind: String::from("other"), ..AgentEntry::default() })
-        })
+        .map(|e| entry_at(&d, &e.name, &e.name).unwrap_or(AgentEntry { name: e.name.clone(), kind: String::from("other"), ..AgentEntry::default() }))
         .collect();
     Some(AgentListing { path: String::from(path), entries, more })
 }
@@ -182,6 +214,85 @@ pub fn ensure_dir(dir: &str) -> Result<(), String> {
     }
 }
 
+// the separators of this machine's paths
+fn seps() -> &'static [char] {
+    if cfg!(windows) { &['/', '\\'] } else { &['/'] }
+}
+
+/// the last name of a path ("" for a root)
+pub fn file_name(path: &str) -> &str {
+    let t = path.trim_end_matches(seps());
+    t[plat::fs::parent(t).len()..].trim_start_matches(seps())
+}
+
+/// the folder `dir` opened (plat::fs::Dir).  In the shared folder `root`: no folder below it
+/// on the way may be a link, and none swapped for one later redirects what is done in the open
+/// folder (all of that is relative to it).  Without a root, or for a folder outside it (the
+/// shared folder's own parents): as it is.  `create`: missing folders are made (as ensure_dir:
+/// none of them may be a link).
+pub fn open_dir(root: Option<&str>, dir: &str, create: bool) -> Result<Dir, String> {
+    let r = match root {
+        Some(r) if inside(&[String::from(r)], dir) => r,
+        // the shared folder's own parents are taken as it is
+        Some(r) if !inside(&[String::from(dir)], r) => return Err(format!("{} liegt nicht in {}", dir, r)),
+        _ => {
+            if create {
+                ensure_dir(dir)?;
+            }
+            return Dir::open(dir).ok_or_else(|| format!("{} kann nicht geöffnet werden", dir));
+        }
+    };
+    // (the shared folder itself is taken as it is, also a link; made when missing, as before)
+    if create && plat::fs::stat(r).is_none() {
+        ensure_dir(r)?;
+    }
+    let start = Dir::open(r).ok_or_else(|| format!("{} kann nicht geöffnet werden", r))?;
+    let rest = dir.get(r.len()..).unwrap_or("").trim_start_matches(seps());
+    if rest.split(seps()).all(|p| p.is_empty()) {
+        return Ok(start);
+    }
+    // one call for the whole way when it exists (Linux: openat2); else step by step, making
+    // what is missing or naming why not
+    if let Some(d) = start.open_dir(rest) {
+        return Ok(d);
+    }
+    let (mut cur, mut path) = (start, String::from(r));
+    for name in rest.split(seps()).filter(|p| !p.is_empty()) {
+        path = plat::fs::join(&path, name);
+        cur = sub_dir(&cur, name, &path, create)?;
+    }
+    Ok(cur)
+}
+
+/// the folder `name` in the open folder `d` (`path`: its path, for messages), made when it is
+/// missing and `create`; a link or a file there is refused, and a link swapped in after that
+/// check is not opened
+pub fn sub_dir(d: &Dir, name: &str, path: &str, create: bool) -> Result<Dir, String> {
+    if create && d.lstat(name).is_none() && !d.mkdir(name) && d.lstat(name).is_none() {
+        return Err(format!("{} kann nicht angelegt werden", path));
+    }
+    match d.lstat(name) {
+        None => Err(format!("{}: nicht vorhanden", path)),
+        Some(m) if m.is_symlink() && create => Err(format!("{} ist eine Verknüpfung – dort wird nicht wiederhergestellt", path)),
+        Some(m) if m.is_symlink() => Err(format!("{} ist eine Verknüpfung", path)),
+        Some(m) if !m.is_dir() && create => Err(format!("{} ist eine Datei", path)),
+        Some(m) if !m.is_dir() => Err(format!("{} ist kein Ordner", path)),
+        Some(_) => d.open_dir(name).ok_or_else(|| format!("{} kann nicht geöffnet werden", path)),
+    }
+}
+
+/// the folder of `path` opened as open_dir does, and the name of `path` in it
+pub fn open_parent(root: Option<&str>, path: &str, create: bool) -> Result<(Dir, String), String> {
+    let name = file_name(path);
+    let parent = plat::fs::parent(path);
+    if name.is_empty() || parent.is_empty() {
+        return Err(format!("{}: kein Eintrag eines Ordners", path));
+    }
+    // "C:" is the drive's current folder, "C:\" its root
+    let parent = if cfg!(windows) && parent.ends_with(':') { format!("{}\\", parent) } else { String::from(parent) };
+    Ok((open_dir(root, &parent, create)?, String::from(name)))
+}
+
 /// what happens to an entry that exists at the destination
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Target {
@@ -195,7 +306,16 @@ pub enum Target {
 
 /// the destination of a restored entry under the conflict rule ("skip", "rename", "overwrite")
 pub fn free_target(dest: &str, conflict: &str) -> (Target, String) {
-    if plat::fs::lstat(dest).is_none() {
+    free_target_by(dest, conflict, &|p| plat::fs::lstat(p).is_some())
+}
+
+/// free_target for a destination in the open folder `d` (dest's folder)
+pub fn free_target_in(d: &Dir, dest: &str, conflict: &str) -> (Target, String) {
+    free_target_by(dest, conflict, &|p| d.lstat(file_name(p)).is_some())
+}
+
+fn free_target_by(dest: &str, conflict: &str, exists: &dyn Fn(&str) -> bool) -> (Target, String) {
+    if !exists(dest) {
         return (Target::Free, String::from(dest));
     }
     match conflict {
@@ -210,7 +330,7 @@ pub fn free_target(dest: &str, conflict: &str) -> (Target, String) {
             for k in 1..1000 {
                 let n = if k == 1 { format!("{} (wiederhergestellt){}", stem, ext) } else { format!("{} (wiederhergestellt {}){}", stem, k, ext) };
                 let p = plat::fs::join(dir, &n);
-                if plat::fs::lstat(&p).is_none() {
+                if !exists(&p) {
                     return (Target::Renamed, p);
                 }
             }
@@ -225,48 +345,102 @@ pub fn temp_name(dest: &str) -> String {
     format!("{}.bcrestore-{:08x}", dest, plat::random_u64() as u32)
 }
 
-/// times, permissions (Linux) and attributes (Windows) of a restored entry
+/// set-user-ID and set-group-ID: not restored, the owner is not restored either (a file of
+/// any user in a backup would come back as a set-user-ID file of root)
+const MODE_SETID: u32 = 0o6000;
+
+/// times, permissions (Linux, without MODE_SETID) and attributes (Windows) of a restored entry
+/// (by path: a folder of bcctl or of the server's own; in a shared folder apply_meta_in)
 pub fn apply_meta(path: &str, atime_ns: i64, mtime_ns: i64, mode: u32, attrs: u32) {
     if mtime_ns != 0 {
         plat::fs::set_times(&plat::fs::long_path(path), atime_ns, mtime_ns);
     }
     if cfg!(target_os = "linux") && mode != 0 {
-        plat::fs::set_mode(path, mode);
+        plat::fs::set_mode(path, mode & !MODE_SETID);
     }
     if cfg!(windows) && attrs & 0x27 != 0 {
         plat::fs::set_attrs(path, attrs);
     }
 }
 
-/// a complete temporary file into place: synced through its own handle (never reopened by
-/// name), renamed, its metadata applied
-pub fn finish_file(file: plat::File, tmp: &str, dest: &str, atime_ns: i64, mtime_ns: i64, mode: u32, attrs: u32) -> Result<(), String> {
-    let lp = plat::fs::long_path(tmp);
+/// apply_meta on `name` in an open folder ("": the folder itself), never through a link
+pub fn apply_meta_in(d: &Dir, name: &str, atime_ns: i64, mtime_ns: i64, mode: u32, attrs: u32) {
+    if mtime_ns != 0 {
+        d.set_times(name, atime_ns, mtime_ns);
+    }
+    if cfg!(target_os = "linux") && mode != 0 {
+        d.set_mode(name, mode & !MODE_SETID);
+    }
+    if cfg!(windows) && attrs & 0x27 != 0 {
+        d.set_attrs(name, attrs);
+    }
+}
+
+/// a complete temporary file `tmp` of the open folder `d` into place as `dest` (a name in the
+/// same folder): its times and mode set and its data synced through its own handle (never
+/// reopened by name), renamed in the open folder, its attributes applied; on failure it is
+/// removed
+pub fn finish_file_in(file: plat::File, d: &Dir, tmp: &str, dest: &str, atime_ns: i64, mtime_ns: i64, mode: u32, attrs: u32) -> Result<(), String> {
+    if mtime_ns != 0 {
+        plat::fs::set_file_times(&file, atime_ns, mtime_ns);
+    }
+    if cfg!(target_os = "linux") && mode != 0 {
+        plat::fs::set_file_mode(&file, mode & !MODE_SETID);
+    }
     let synced = file.sync();
     drop(file);
-    if !synced || !plat::rename(&lp, &plat::fs::long_path(dest)) {
-        plat::delete(&lp);
+    if !synced || !d.rename(tmp, d, dest) {
+        d.remove(tmp);
         return Err(String::from("konnte nicht an seinen Platz gelegt werden"));
     }
-    apply_meta(dest, atime_ns, mtime_ns, mode, attrs);
+    apply_meta_in(d, dest, 0, 0, 0, attrs);
     Ok(())
+}
+
+/// finish_file_in with the paths of the temporary file and the destination (in one folder,
+/// opened as it is)
+pub fn finish_file(file: plat::File, tmp: &str, dest: &str, atime_ns: i64, mtime_ns: i64, mode: u32, attrs: u32) -> Result<(), String> {
+    match open_parent(None, tmp, false) {
+        Ok((d, t)) => finish_file_in(file, &d, &t, file_name(dest), atime_ns, mtime_ns, mode, attrs),
+        Err(_) => {
+            drop(file);
+            plat::delete(&plat::fs::long_path(tmp));
+            Err(String::from("konnte nicht an seinen Platz gelegt werden"))
+        }
+    }
 }
 
 /// remove a file, a link (never what it points to) or a folder with everything below it (links
 /// below are removed as links)
 pub fn remove_tree(path: &str) -> Result<(), String> {
-    let m = plat::fs::lstat(path).ok_or_else(|| format!("{}: nicht vorhanden", path))?;
-    if m.is_dir() && !m.is_symlink() {
-        for e in plat::fs::read_dir(path).unwrap_or_default() {
-            remove_tree(&plat::fs::join(path, &e.name))?;
+    remove_tree_in(None, path)
+}
+
+/// remove_tree of a path in the shared folder `root`: its folder is opened without following a
+/// link on the way (open_parent), every listing and removal below happens in the open folders,
+/// so a folder swapped for a link meanwhile (a large tree gives time for it) is removed as the
+/// link instead of leading the removal out of the shared folder
+pub fn remove_tree_in(root: Option<&str>, path: &str) -> Result<(), String> {
+    let (d, name) = open_parent(root, path, false)?;
+    remove_tree_at(&d, &name, path)
+}
+
+/// remove_tree of `name` in the open folder `d` (`path`: its path, for messages)
+pub fn remove_tree_at(d: &Dir, name: &str, path: &str) -> Result<(), String> {
+    let m = d.lstat(name).ok_or_else(|| format!("{}: nicht vorhanden", path))?;
+    if m.is_dir() {
+        // (a link swapped in meanwhile is not opened: it is removed as the link below)
+        if let Some(sub) = d.open_dir(name) {
+            for e in sub.read_dir().unwrap_or_default() {
+                remove_tree_at(&sub, &e.name, &plat::fs::join(path, &e.name))?;
+            }
         }
     }
-    if plat::delete(&plat::fs::long_path(path)) { Ok(()) } else { Err(format!("{} kann nicht gelöscht werden", path)) }
+    if d.remove(name) { Ok(()) } else { Err(format!("{} kann nicht gelöscht werden", path)) }
 }
 
 /// FILE_ATTRIBUTE_DIRECTORY: on Windows a link to a folder carries it
 pub const ATTR_DIRECTORY: u32 = 0x10;
-
 /// a symbolic link at `dest` (an existing entry is replaced only when `replace`; `dir`: a link
 /// to a folder, which Windows creates differently)
 pub fn make_link(target: &str, dest: &str, replace: bool, dir: bool) -> Result<(), String> {
@@ -277,6 +451,17 @@ pub fn make_link(target: &str, dest: &str, replace: bool, dir: bool) -> Result<(
         plat::delete(&plat::fs::long_path(dest));
     }
     if plat::fs::symlink(target, dest, dir) { Ok(()) } else { Err(String::from("Verknüpfung konnte nicht angelegt werden")) }
+}
+
+/// make_link of `name` in an open folder
+pub fn make_link_in(d: &Dir, target: &str, name: &str, replace: bool, dir: bool) -> Result<(), String> {
+    if d.lstat(name).is_some() {
+        if !replace {
+            return Err(String::from("existiert bereits"));
+        }
+        d.remove(name);
+    }
+    if d.symlink(target, name, dir) { Ok(()) } else { Err(String::from("Verknüpfung konnte nicht angelegt werden")) }
 }
 
 /// a log file of a program: lines with the time (UTC), "<name>.log" in a folder, renamed to

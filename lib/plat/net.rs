@@ -610,6 +610,9 @@ mod sys {
         unsafe { getsockopt(s, level, name, &mut v as *mut i32 as *mut u8, &mut n) };
         v
     }
+    pub fn peer_uid(_s: Raw) -> Option<u32> {
+        None
+    }
     pub fn name(s: Raw, peer: bool, buf: &mut [u8; 128], len: &mut i32) -> NetResult<()> {
         // SAFETY: buf has room for any sockaddr.
         st(unsafe { if peer { getpeername(s, buf.as_mut_ptr(), len) } else { getsockname(s, buf.as_mut_ptr(), len) } })
@@ -851,6 +854,13 @@ mod sys {
         unsafe { syscall6(SYS_GETSOCKOPT, s, level as usize, name as usize, &mut v as *mut i32 as usize, &mut n as *mut u32 as usize, 0) };
         v
     }
+    pub fn peer_uid(s: Raw) -> Option<u32> {
+        let mut c = [0u32; 3]; // struct ucred: pid, uid, gid
+        let mut n = 12u32;
+        // SAFETY: a 12-byte option value; SO_PEERCRED = 17.
+        let r = unsafe { syscall6(SYS_GETSOCKOPT, s, SOL_SOCKET as usize, 17, c.as_mut_ptr() as usize, &mut n as *mut u32 as usize, 0) };
+        (r == 0 && n == 12).then_some(c[1])
+    }
     pub fn name(s: Raw, peer: bool, buf: &mut [u8; 128], len: &mut i32) -> NetResult<()> {
         let (bp, lp) = (buf.as_mut_ptr() as usize, len as *mut i32 as usize);
         let nr = if peer { SYS_GETPEERNAME } else { SYS_GETSOCKNAME };
@@ -942,6 +952,7 @@ mod sys {
         fn sendto(fd: c_int, b: *const c_void, n: usize, flags: c_int, to: *const u8, len: u32) -> isize;
         fn setsockopt(fd: c_int, level: c_int, name: c_int, v: *const c_void, len: u32) -> c_int;
         fn getsockopt(fd: c_int, level: c_int, name: c_int, v: *mut c_void, len: *mut u32) -> c_int;
+        fn getpeereid(fd: c_int, uid: *mut u32, gid: *mut u32) -> c_int;
         fn getsockname(fd: c_int, a: *mut u8, len: *mut u32) -> c_int;
         fn getpeername(fd: c_int, a: *mut u8, len: *mut u32) -> c_int;
         fn shutdown(fd: c_int, how: c_int) -> c_int;
@@ -1107,6 +1118,11 @@ mod sys {
         // SAFETY: a 4-byte option value.
         unsafe { getsockopt(s, level, name, (&mut v as *mut i32).cast(), &mut n) };
         v
+    }
+    pub fn peer_uid(s: Raw) -> Option<u32> {
+        let (mut uid, mut gid) = (0u32, 0u32);
+        // SAFETY: two plain out-parameters.
+        (unsafe { getpeereid(s, &mut uid, &mut gid) } == 0).then_some(uid)
     }
     pub fn name(s: Raw, peer: bool, buf: &mut [u8; 128], len: &mut i32) -> NetResult<()> {
         let lp = len as *mut i32 as *mut u32;
@@ -1391,6 +1407,13 @@ impl TcpStream {
         sys::set_opt(self.s.0, sys::SOL_SOCKET, sys::SO_KEEPALIVE, on as i32)
     }
 
+    /// the user id of the process at the other end of a Unix socket, as the kernel recorded it
+    /// when it connected or listened (Linux SO_PEERCRED, macOS getpeereid): not what the socket
+    /// file's owner claims.  Unix sockets only (TCP has no meaningful answer); None on Windows
+    pub fn peer_uid(&self) -> Option<u32> {
+        sys::peer_uid(self.s.0)
+    }
+
     /// up to buf.len() bytes; Ok(0) = the peer closed its side
     pub fn read(&self, buf: &mut [u8]) -> NetResult<usize> {
         if !self.s.wait(sys::POLLIN, ms_opt(self.read_ms.load(Ordering::Relaxed)))? {
@@ -1642,6 +1665,11 @@ pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
     }
     #[cfg(any(windows, target_vendor = "apple"))]
     {
+        // the system resolver reads the name up to a NUL: a name with control characters would
+        // be checked whole but looked up shortened
+        if h.bytes().any(|b| b < 0x20 || b == 0x7f) {
+            return Err(NetError::new(NetErrorKind::NotFound, 0));
+        }
         if !crate::policy::net_name_allowed(h) {
             return Err(denied());
         }

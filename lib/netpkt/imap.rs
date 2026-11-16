@@ -10,7 +10,8 @@
 //                             answers it)
 //   tokens(&Line) -> Vec<Item>   the values of a line
 //   Command { tag, verb, args }  Command::parse(&line) (the verb in capitals); line(tag, verb,
-//                             args) the bytes of a simple command
+//                             args) the bytes of a simple command (CR, LF, NUL left out but for
+//                             whole literals)
 //   Status, Kind, Response    Response::parse(&line): a tagged status, an untagged one, untagged
 //                             data, a continuation; response code, text, the values
 //   ok / no / bad / untagged / cont   server lines ("a1 OK done\r\n")
@@ -274,9 +275,39 @@ impl Command {
     }
 }
 
-/// a simple command line of a client
+/// a simple command line of a client; CR, LF and NUL of tag, verb and arguments are left out
+/// (they would end the line and start another command), but for the line end after a literal's
+/// "{n}" ("{n+}") in the arguments and the n bytes of the literal after it (astring)
 pub fn line(tag: &str, verb: &str, args: &str) -> Vec<u8> {
-    if args.is_empty() { format!("{} {}\r\n", tag, verb).into_bytes() } else { format!("{} {} {}\r\n", tag, verb, args).into_bytes() }
+    let mut out = format!("{} {}", crate::one_line(tag), crate::one_line(verb)).into_bytes();
+    if !args.is_empty() {
+        out.push(b' ');
+        let b = args.as_bytes();
+        let mut i = 0;
+        while i < b.len() {
+            let eol = match (b[i], b.get(i + 1)) {
+                (b'\r', Some(b'\n')) => 2,
+                (b'\n', _) => 1,
+                _ => 0,
+            };
+            if eol > 0
+                && let Some((_, n, _)) = literal_at_end(&out)
+                && n <= b.len() - i - eol
+            {
+                out.extend_from_slice(b"\r\n");
+                let end = i + eol + n;
+                out.extend_from_slice(&b[i + eol..end]);
+                i = end;
+                continue;
+            }
+            if !matches!(b[i], b'\r' | b'\n' | 0) {
+                out.push(b[i]);
+            }
+            i += 1;
+        }
+    }
+    out.extend_from_slice(b"\r\n");
+    out
 }
 
 /// the status of a response
@@ -411,11 +442,14 @@ pub fn cont(text: &str) -> Vec<u8> {
     format!("+ {}\r\n", text).into_bytes()
 }
 
-/// a string in quotes
+/// a string in quotes (without CR, LF and NUL, which a quoted string cannot hold)
 pub fn quoted(s: &str) -> String {
     let mut o = String::with_capacity(s.len() + 2);
     o.push('"');
     for c in s.chars() {
+        if matches!(c, '\r' | '\n' | '\0') {
+            continue;
+        }
         if c == '"' || c == '\\' {
             o.push('\\');
         }

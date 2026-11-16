@@ -36,6 +36,13 @@ fn a64(s: &str) -> [u8; 64] {
 }
 
 const PWE: &str = "bdfaa1b01ef6b4aea60b5e95bbf5ae271493085fe2fde534ce26a0107addb4616f7445063ed95fa4df1e712f8e9b6ce4a37098196de7d072b87e00d4c7980468";
+/// token 09080706, peer "peer", server "server": a password and its PWE
+const PWE_ROUNDS: [(&str, &str); 4] = [
+    ("pw0", "d0863830e6676522ca8046b372687453935505e1fd86b26d066ac69a48577379cc7ce9abe6ba0897eeb46b31cb6a5ec53e76fac2ffac874ea3d0e46747462bc1"),
+    ("pw6", "a6e429388056805fcd319f9648aa33d523dd25f0f1628b4001f11a15f8b8120ae588f4156255db9231bc34ac6d1395a3a2bb808738bb5433a0575ac60eb101c2"),
+    ("pw2", "847db9c9659addd18bc67ffb04c4d49a8f68a315b1e9dff7ce87b16b8de450654d18dff37719991d084bc664b61fa975d67a138745e4dd86da5ba27594b2de9e"),
+    ("pw36", "0a8717a546b4c314e470c05f02bba59b908b11e3b01582619ca7f80283fe2e2c875c7345c8c56905d3f9f5effa9c110e1e20eb32557e83af7c3cc1c3f44f6419"),
+];
 const RAND_S: &str = "50545e556f49bdae3f444822047794aaa5d665ec61136a947bda89363e58e47a";
 const MASK_S: &str = "7d81c9001ac69a7cbd3f324b2ed4df2e0034844462634bb27b281c64757c0907";
 const RAND_P: &str = "dee9f473001a721f1f079e390788d528f328e550ab0b524fe4beba9a403da613";
@@ -282,6 +289,12 @@ fn pwd_vectors(t: &mut T) {
     t.check("pwe on curve", p256::on_curve(&pwe));
     let other = eappwd::pwe(&token, b"anna", b"radius", b"falsch");
     t.check("another password: another pwe", other != pwe);
+    // passwords the plain search finds in round 1, 2, 4 and 9 (RFC 5931's search in Python): the
+    // fixed rounds keep the first point
+    for (pw, want) in PWE_ROUNDS {
+        let p = eappwd::pwe(&[9, 8, 7, 6], b"peer", b"server", pw.as_bytes());
+        t.eq(&alloc::format!("pwe of {pw}"), p.to_vec(), h(want));
+    }
     let (rs, ms, rp, mp) = (a32(RAND_S), a32(MASK_S), a32(RAND_P), a32(MASK_P));
     let (ss_s, es) = eappwd::commit(&pwe, &rs, &ms).expect("commit");
     let (ss_p, ep) = eappwd::commit(&pwe, &rp, &mp).expect("commit");

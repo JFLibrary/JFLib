@@ -11,7 +11,7 @@ screentest --title "Bildschirm-Test"` on 2026-10-22, then adapted.
 ## Build, run, test
 
 ```sh
-python build_rs.py run screentest                 # Windows (Linux: --target linux)
+cargo run -p screentest                           # Windows, Linux, macOS
 python build_rs.py test screentest                # tests/*.uis on Windows and Linux (WSL)
 python build_rs.py app screentest --target web    # then:
 node apps/screentest/tests/screen_web.mjs build --engines=chromium,firefox

@@ -120,9 +120,23 @@ pub struct TlsStream {
     /// keeps whole records together when two threads write
     wlock: Mutex<()>,
     last_error: Mutex<Option<TlsError>>,
+    /// the read timeout of set_timeouts (u32::MAX: none): records that carry no data (empty
+    /// ones, KeyUpdates) end a read with TimedOut after it, as silence would
+    read_ms: core::sync::atomic::AtomicU32,
 }
 
 impl TlsStream {
+    fn new(inner: Box<dyn Stream>, conn: Conn) -> TlsStream {
+        TlsStream { inner, conn: Mutex::new(conn), wlock: Mutex::new(()), last_error: Mutex::new(None), read_ms: core::sync::atomic::AtomicU32::new(u32::MAX) }
+    }
+
+    /// (tests) send an application data record without data
+    #[doc(hidden)]
+    pub fn test_send_empty_record(&self) -> NetResult<()> {
+        self.conn.lock().write_empty().map_err(to_net)?;
+        self.flush().map_err(to_net)
+    }
+
     /// sends what the connection has sealed; taking it and writing it happen under wlock, so
     /// records leave in the order of their sequence numbers
     fn flush(&self) -> Result<(), TlsError> {
@@ -184,14 +198,14 @@ impl TlsStream {
 
 /// client side: handshake over `inner`
 pub fn connect(inner: Box<dyn Stream>, cfg: ClientConfig) -> Result<TlsStream, TlsError> {
-    let s = TlsStream { inner, conn: Mutex::new(Conn::client(cfg)), wlock: Mutex::new(()), last_error: Mutex::new(None) };
+    let s = TlsStream::new(inner, Conn::client(cfg));
     s.handshake()?;
     Ok(s)
 }
 
 /// server side: handshake over `inner`
 pub fn accept(inner: Box<dyn Stream>, cfg: ServerConfig) -> Result<TlsStream, TlsError> {
-    let s = TlsStream { inner, conn: Mutex::new(Conn::server(cfg)), wlock: Mutex::new(()), last_error: Mutex::new(None) };
+    let s = TlsStream::new(inner, Conn::server(cfg));
     s.handshake()?;
     Ok(s)
 }
@@ -199,6 +213,8 @@ pub fn accept(inner: Box<dyn Stream>, cfg: ServerConfig) -> Result<TlsStream, Tl
 impl Stream for TlsStream {
     fn read(&self, buf: &mut [u8]) -> NetResult<usize> {
         let mut raw = alloc::vec![0u8; 16 * 1024 + 512];
+        let t0 = plat::time_us();
+        let read_ms = self.read_ms.load(core::sync::atomic::Ordering::Relaxed);
         loop {
             {
                 let mut c = self.conn.lock();
@@ -208,6 +224,11 @@ impl Stream for TlsStream {
                 if c.closed() {
                     return Ok(0);
                 }
+            }
+            // records without data do not keep a read going past the timeout (the caller's
+            // deadline is checked between reads)
+            if read_ms != u32::MAX && plat::time_us().saturating_sub(t0) >= read_ms as u64 * 1000 {
+                return Err(NetError::new(NetErrorKind::TimedOut, 0));
             }
             let n = self.inner.read(&mut raw)?;
             if n == 0 {
@@ -228,6 +249,7 @@ impl Stream for TlsStream {
     }
 
     fn set_timeouts(&self, read_ms: Option<u32>, write_ms: Option<u32>) {
+        self.read_ms.store(read_ms.unwrap_or(u32::MAX), core::sync::atomic::Ordering::Relaxed);
         self.inner.set_timeouts(read_ms, write_ms);
     }
 

@@ -67,6 +67,12 @@ impl Qmp {
         self.s.set_read_timeout(Some(ms));
     }
 
+    /// the user id of the QEMU at the other end (plat::net peer_uid: what the kernel recorded,
+    /// not the socket file's owner); None where the system does not say (Windows)
+    pub fn peer_uid(&self) -> Option<u32> {
+        self.s.peer_uid()
+    }
+
     /// the next message (None: nothing within the read timeout)
     fn read_line(&mut self) -> Result<Option<Value>, String> {
         loop {

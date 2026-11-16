@@ -127,13 +127,20 @@ panic = "unwind"
   where the payload holds the message alone. On Windows the file in it has backslashes
   (`"panicked at src\\page.rs:12:5:\n..."`, the path as Cargo hands it to rustc): compare the
   file with both separators or by its name.
-* Unit tests of a library crate with std (an app's own style crate, `cargo test`): the test binary
-  has the test harness's `main`, but plat's start of a std program asks for the `jfgui_main` a
-  program's `main!` defines, so it does not link (an unresolved `jfgui_main`). One line in the
-  crate's `lib.rs` gives it a stub that is never called: `#[cfg(test)] ui::test_main!();`
-  (`rt::test_main!()` for crates without ui). Tests unwind, the stub has no panic check. The
-  crate may keep `#![forbid(unsafe_code)]` (as the library's styles do): the stub's unsafe
-  attribute comes from the macro, the crate allows nothing for it.
+* Unit tests of a library crate with std: the test binary has the test harness's `main`, but
+  plat's start of a std program asks for the `jfgui_main` a program's `main!` defines.
+  - The app's own crate (the template's `src/lib.rs`, with `ui::main!`) has it: `cargo test --lib`
+    links, and `main!`'s panic check leaves the test build out (Cargo builds tests with unwind,
+    whatever the profiles say). Only `--lib`: a plain `cargo test` also builds the library itself
+    for the doc tests and the program's tests, with unwind and without `cfg(test)`, and the check
+    refuses that (unless the feature `unwind`).
+  - A crate without `main!` (an app's own style crate, `cargo test`) does not link (an unresolved
+    `jfgui_main`). One line in its `lib.rs` gives it a stub that is never called:
+    `#[cfg(test)] ui::test_main!();` (`rt::test_main!()` for crates without ui; next to a `main!`
+    it would define `jfgui_main` twice). Tests unwind, the stub has no panic check.
+
+  Both may keep `#![forbid(unsafe_code)]` (as the library's styles do): the unsafe attributes come
+  from the macros, the crate allows nothing for them.
 * A panic nobody catches ends the program as before: JFLib's crash report (stderr, the crash
   hook), exit code 3. That holds when it leaves the program's start (`App::frame`, `command`, the
   tasks of `ui.spawn`), a thread of JFLib's (`plat::thread_spawn`, the jobs of
@@ -299,8 +306,7 @@ depend on the host; never report a VFS write as durable before its completion ar
 **Build and run**, an app of your own:
 
 ```
-cargo run                                        # build and start (Windows)
-cargo run --target x86_64-unknown-linux-gnu      # Linux: always with --target (.cargo/config.toml says why)
+cargo run                                        # build and start (Windows, Linux, macOS)
 cargo build --release                            # opt-level 2 + LTO, the profile of Cargo.toml
 JFLIB_STYLE=kde cargo run                        # another style built in
 cargo jflib watch                                # hot reload (section 30)
@@ -745,6 +751,39 @@ if self.tab == 0 {
   under the pointer: set it every frame). `ui.canvas` returns a borrow of `ui`: clone the
   input before calling more `ui` methods. `canvas_damage(id, x, y, w, h)` redraws a part
   without a version change.
+* **The wheel** (`UiInput`): `wheel_x` / `wheel_y` count notches, 120 each (up and right
+  positive). What a notch scrolls is the system's setting: `ui.wheel_lines()` lines (Windows'
+  mouse settings, `SPI_GETWHEELSCROLLLINES`; KDE's `WheelScrollLines`; 3 elsewhere and in
+  headless runs; `plat::WHEEL_PAGE`: a page), `ui.wheel_chars()` characters sideways;
+  `ui.wheel_notch_px(line_px, page_px, horizontal)` is that in pixels for a view's lines. The
+  library's views follow it (scroll views, lists and documents: lines of `WHEEL_LINE_DIP` = 16 DIP,
+  48 DIP a notch with three; text boxes, editors and the terminal: their own lines); a change
+  reaches the app as `UIC_SETTINGS`. A touchpad, a trackpad or a high-resolution wheel scrolls by
+  pixels: `wheel_precise` is set and `wheel_px_x` / `wheel_px_y` hold the turn in physical pixels
+  (up and right positive), which an app scrolls by at once, without smooth scrolling -- macOS'
+  trackpad and Wayland's fingers give pixels (`plat::WHEEL_PIXELS`), Windows' precision touchpads
+  and high-resolution wheels fine steps of the 120 (`plat::WHEEL_FINE`: a delta that is no
+  multiple of 120, or one from a touchpad), turned into pixels as `wheel_lines()` lines of 16 DIP
+  per 120 (Chromium takes 100/3 DIP a line; a browser that wants its distances scales Windows'
+  pixels by 25/12); `wheel_x` / `wheel_y` say the same turn in notches, the fractions of both
+  carried to the next turn. X11 has notches only (its smooth scrolling through XInput 2 is not
+  read yet), the browser host 120 per notch as before:
+
+  ```rust
+  let inp = ui.canvas(ID_PAGE, Some(d), 0, self.ver).clone();
+  if inp.wheel_precise {
+      self.page.scroll_px(inp.wheel_px_x, -inp.wheel_px_y);        // a touchpad: at once
+  } else if inp.wheel_x != 0 || inp.wheel_y != 0 {
+      let (line, page) = (self.page.line_px(), self.page.height_px());
+      let dy = -inp.wheel_y * ui.wheel_notch_px(line, page, false) / 120; // a page: WHEEL_PAGE
+      let dx = inp.wheel_x * ui.wheel_notch_px(line, page, true) / 120;
+      self.page.scroll_smooth(dx, dy);
+  }
+  ```
+
+  Scripts turn the wheel with `wheel S DY [DX] [fine|pixels]` (`viewtest` `tests/wheel.uis`,
+  `gallery` `tests/wheel.uis`); `system env jfgui_WHEEL_LINES N|page` and `system settings
+  other` play the system's setting.
 * **More cursors** (a web page's CSS `cursor`): the 4 flag bits hold the first shapes
   (`CUR_ARROW` .. `CUR_NONE`, `CUR_CUSTOM`); `ui.cursor_next(shape)` gives the next hit box (a
   canvas, a button, `hit_rect`) any shape and wins over its flags -- `CUR_NOT_ALLOWED`,
@@ -805,28 +844,40 @@ if self.tab == 0 {
 
   `apps/viewtest` is such a page (`tests/keys.uis`).
 
-  A page that passes the keyboard on as it is (a web page's `keydown` / `keyup` with `repeat`,
-  `code` and `location`) takes `ui.key_event_take()` instead of `key_take`: the next
-  `KeyEvent { vk, mods, down, repeat, scancode, location }` of the batch until `None` -- downs
-  and ups, the system's auto-repeat, the key's place on the keyboard whatever the layout
+  A page that passes the keyboard on as it is (a web page's `keydown` / `keyup` with `key`,
+  `repeat`, `code` and `location`) takes `ui.key_event_take()` instead of `key_take`: the next
+  `KeyEvent { vk, mods, down, repeat, scancode, location, ch, dead }` of the batch until `None`
+  -- downs and ups, the system's auto-repeat, the key's place on the keyboard whatever the layout
   (`scancode`: Windows' scan code with 0xE0.. for extended keys, Linux's evdev code; 0 on macOS,
   Android and in the browser) and `location` (`KL_STANDARD`, `KL_LEFT` / `KL_RIGHT` for the two
-  Shift, Ctrl, Alt and Windows keys, `KL_NUMPAD`). A key's up gives a pass of its own while such
-  a canvas has the focus. A down taken here is taken for `key_take` too; the text still comes
-  through `text_take`:
+  Shift, Ctrl, Alt and Windows keys, `KL_NUMPAD`). `ch` is the character the keyboard layout
+  gives the key with Shift, Caps Lock and AltGr as they are but without Ctrl, Alt and the
+  Windows / Super key -- what a browser names the key also when Ctrl or Alt is held and the key
+  types nothing: Ctrl+Z on a German keyboard (whose Z sits at the US layout's Y) has `vk` `VK_Z`
+  and `ch` `'z'`, Ctrl++ there `VK_OEM_PLUS` (the US layout's "=") and `'+'`, AltGr+Q `'@'`,
+  Ctrl+Shift+Z `'Z'`; 0 for keys that type no character (Enter, Tab, Esc, Backspace, the arrows,
+  F1 ...). `dead`: a dead key, `ch` its spacing character (´ ^ ~). Windows asks the layout
+  (`ToUnicodeEx`, from Windows 10 1607 on: the pending dead key stays for the text), Linux the
+  keymap of X11 and Wayland, macOS `charactersIgnoringModifiers`; the browser and Android give 0.
+  A key's up gives a pass of its own while such a canvas has the focus. A down taken here is
+  taken for `key_take` too; the text still comes through `text_take`:
 
   ```rust
   while let Some(k) = ui.key_event_take() {
       if k.down && reserved(k.vk | k.mods << 16) {
           ui.accel_run(k.vk | k.mods << 16);
       } else {
-          self.page.key(k.down, k.vk, k.mods, k.repeat, k.scancode, k.location);
+          let key = char::from_u32(k.ch).filter(|_| k.ch != 0);   // None: a named key ("Enter")
+          self.page.key(k.down, k.vk, key, k.dead, k.mods, k.repeat, k.scancode, k.location);
       }
   }
   ```
 
-  Scripts hold keys with `keydown CHORD [scan N] [left|right|numpad]` and let them go with
-  `keyup CHORD ...` (`viewtest` `tests/keyraw.uis`).
+  Scripts hold keys with `keydown CHORD [scan N] [left|right|numpad] [char "c"|none] [dead]` and
+  let them go with `keyup CHORD ...`; a script's keys have the US layout's characters, `char "c"`
+  gives another layout's (`viewtest` `tests/keyraw.uis`, `tests/keychar.uis`). The platform's
+  events carry the character in `Event::y` with the location (`plat::key_y`, `key_location`,
+  `key_char`, `key_dead`).
 
   **An input method for a field the page draws itself** (a web page's `<input>`, Japanese or
   Chinese typed into it): while such a field has the focus, `ui.ime_enable(true, IP_TEXT)`
@@ -1910,7 +1961,9 @@ if (desc.render)(&args, &mut dst) == 0 {
 * System settings (`plat::sys_settings()`): in window mode the UI follows the system's light /
   dark choice (with `theme_set(2)`), its accent colour (unless the `AppDesc` or `--accent` set
   one), high contrast, "reduce motion" (`ui.anim_off()`), the text scale, the double-click and
-  caret blink times -- at start and live when they change (`UIC_SETTINGS`; Windows registry and
+  caret blink times, the lines and characters of a wheel notch (`ui.wheel_lines()`,
+  `ui.wheel_chars()`; Windows `SPI_GETWHEELSCROLLLINES` / `CHARS`, KDE's `[KDE]
+  WheelScrollLines` of `kdeglobals`, else 3) -- at start and live when they change (`UIC_SETTINGS`; Windows registry and
   system calls, Linux the settings portal; the browser its media queries `prefers-color-scheme`,
   `prefers-contrast`, `forced-colors` with the forced scheme's system colours,
   `prefers-reduced-motion` and the default font size as the text scale (`web/system.js`); Android
@@ -1927,7 +1980,8 @@ if (desc.render)(&args, &mut dst) == 0 {
   them. Headless runs take only the `jfgui_THEME`,
   `jfgui_ACCENT`, `jfgui_CONTRAST`, `jfgui_REDUCE_MOTION`, `jfgui_TEXT_SCALE`,
   `jfgui_DOUBLE_CLICK_MS`, `jfgui_CARET_BLINK_MS`, `jfgui_FONT_AA`, `jfgui_FONT_HINTING`,
-  `jfgui_FONT_RGBA`, `jfgui_BUTTON_LAYOUT`, `jfgui_TITLEBAR_*_CLICK` overrides, so shots stay
+  `jfgui_FONT_RGBA`, `jfgui_BUTTON_LAYOUT`, `jfgui_TITLEBAR_*_CLICK`, `jfgui_WHEEL_LINES`
+  (a number or `page`), `jfgui_WHEEL_CHARS` overrides, so shots stay
   the same. The system's font smoothing off draws
   black-and-white glyphs, its subpixel order (ClearType's orientation, the portal's or
   fontconfig's `rgba`) subpixel smoothed ones (below); `ui.font_prefs()` gives smoothing,
@@ -2105,9 +2159,9 @@ in DIP):
 | `finger [N] down S`, `finger [N] move S`, `finger [N] up`, `finger [N] cancel` | one raw finger event: it stays down across other commands; `N` its id (default 0), for a second one; `cancel`: the system took it |
 | `pinch S D0 D1 [MS]` | two fingers around S, D0 DIP apart, go to D1 DIP apart in MS ms (default 300), then they lift |
 | `pan2 S DX DY [MS]` | two fingers around S, 80 DIP apart, move by DX, DY (DIP) in MS ms (default 300), then they lift |
-| `wheel S DY [shift] [ctrl] [alt]` | raw wheel units (120 = one notch); the modifiers are held during the wheel event (Ctrl + wheel zoom) |
-| `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... (every key a pass of its own, as the platform delivers them) |
-| `keydown CHORD [scan N] [left\|right\|numpad]`, `keyup CHORD ...` | a key down and held (shift / ctrl / alt stay held for the following events; down again: an auto-repeat) and up again, with a scancode and location for `ui.key_event_take` |
+| `wheel S DY [DX] [fine\|pixels] [shift] [ctrl] [alt]` | raw wheel units (120 = one notch; DX sideways, right positive); the modifiers are held during the wheel event (Ctrl + wheel zoom); `fine`: a device in fine steps of the 120 (`plat::WHEEL_FINE`, a precision touchpad on Windows), `pixels`: DY and DX are DIP of a device that scrolls by pixels (`plat::WHEEL_PIXELS`, a trackpad) |
+| `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... (every key a pass of its own, as the platform delivers them; with the US layout's character, `KeyEvent::ch`) |
+| `keydown CHORD [scan N] [left\|right\|numpad] [char "c"\|none] [dead]`, `keyup CHORD ...` | a key down and held (shift / ctrl / alt stay held for the following events; down again: an auto-repeat) and up again, with a scancode, location and character for `ui.key_event_take` (the US layout's character for the key and its Shift; `char "c"` another layout's, `char none` none, `dead` a dead key) |
 | `keys [N] CHORD...` | the chords N times over, queued for ONE pass of the window with the keyboard (more keys than frames, as a tool window hands them on) |
 | `type "text"` | typed text (`"\n"` presses Enter), a character per event; the whole quoted string, as long as a script line (16 KiB) |
 | `commit "text" [N]` | an input method commits the text (N times over: one long commit, as the platform queues it); the text as long as a script line |
@@ -2690,12 +2744,18 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
 
 * `netio::Server::start(&addr, ServerConfig, handler)` -- an HTTP/1.1 server with a worker pool,
   keep-alive and limits; `start_with(.., Some(wrap))` puts TLS (or anything else) under it and
-  passes the identity it proved (a client certificate) to the handler.
+  passes the identity it proved (a client certificate) to the handler. A slow client holds a
+  worker only so long: the head within `read_ms`, a body at `server::MIN_BODY_RATE` (1 KiB a
+  second) on average after a first `read_ms`; over TLS, records without data end a read after
+  the stream's read timeout too.
 * `netio::Client` / `client::Session` -- requests with timeouts and size limits, kept-alive
   sessions; `with_connector(netio::trust::connector(..))` for https to a server with its own CA
   (a CA file, a pinned fingerprint, or trust on first use).
 * `netio::tls` -- TLS 1.3 (ChaCha20-Poly1305, X25519, Ed25519 certificates, mutual
-  authentication); `netio::x509` builds and checks the certificates of a private CA.
+  authentication); `netio::x509` builds and checks the certificates of a private CA
+  (`CertBuilder::sign_ext` adds or replaces extensions: name constraints, a CA's purposes).
+  The chain check honours name constraints for wildcards by the names they stand for and the
+  extended key usage of every CA on the path (a CA for client certificates certifies no server).
   `Trust::System(extra)` connects to public servers: TLS 1.3 (AES-GCM or ChaCha20, X25519 or
   P-256) or TLS 1.2 with ECDHE, RSA / ECDSA / Ed25519 certificates, the chain built and checked
   against the system's authorities (Windows CryptoAPI, Linux CA bundle) and extra CAs;
@@ -5782,7 +5842,8 @@ What the library does by itself on a phone or a tablet, and only there:
   as wide as in the last pass; fill widgets give way, but keep 64 DIP (an image list beside the bar
   stays visible);
 - the status bar's items roll sideways with the finger while they are wider than the bar;
-- a vertical scroll view whose content is wider than the view rolls sideways too;
+- a vertical scroll view whose content is laid out wider than the view rolls sideways too, as far as
+  that content reaches (a wrapping text or a view inside that rolls sideways itself is no reason);
 - windows are at most as large as the screen, and those of the main window lie inside it; a window or a
   content dialog cut shorter than its content rolls it, a dialog's footer stays below;
 - Android paints the status bar, the navigation bar and a cut-out's strip in the colours at the app's
@@ -5793,7 +5854,7 @@ What only the app knows it decides with `form_factor()`: which panels a phone sh
 (`scroll_begin(id, SC_H | SC_NOBAR | BOX_XCENTER)` around a tool bar row, only when `ui.mobile()`, keeps
 the desktop's row as it was), which hints speak of a mouse.
 
-Test it on the desktop: `system env jfgui_FORM phone` in a script (`apps/gallery/tests/form_factor.uis`),
-or a program started with `jfgui_FORM=phone` in a window of a phone's size. On Android a tablet comes from
-the emulator's `pixel_tablet` profile, a phone from the same emulator with `adb shell wm size 1080x2400`
-and `wm density 420`.
+Test it on the desktop: `system env jfgui_FORM phone` in a script (`apps/gallery/tests/form_factor.uis`,
+`apps/androidGallery/tests/touch_phone.uis`), or a program started with `jfgui_FORM=phone` in a window
+of a phone's size. On Android a tablet comes from the emulator's `pixel_tablet` profile, a phone from the
+same emulator with `adb shell wm size 1080x2400` and `wm density 420`.

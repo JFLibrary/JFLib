@@ -4,7 +4,8 @@
 //   scroll_begin(id, flags)                clipped viewport that takes its size like a box
 //        (next_size / parent) and lays its children out in a content area that may be
 //        larger; flags = SC_V (default) | SC_H | SC_NOBAR | SC_NOWHEEL | BOX_BG | BOX_CARD |
-//        PAD_n ...  Mouse wheel (48 DIP per notch, smooth), overlay scroll bars (2 DIP, 6 DIP
+//        PAD_n ...  Mouse wheel (the system's lines of 16 DIP per notch -- 48 DIP with three --
+//        smooth; a touchpad's pixels at once), overlay scroll bars (2 DIP, 6 DIP
 //        while pointed at, draggable thumb, click on the track pages), Tab focus is scrolled
 //        into view.  A style whose bars stay visible (netlab) keeps their room free right of
 //        the content of a view that scrolls only vertically, always, so nothing moves when
@@ -50,6 +51,7 @@
 // Widget ids used internally: (id << 3 | k) | 0x80000000 for sub parts (k = 1..7),
 // (id + 1 + i) | 0xC0000000 for the content box of custom list rows.
 
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use super::consts::*;
@@ -64,7 +66,6 @@ const LIST_MAX: usize = 4;
 const EXP_MAX: usize = 16;
 /// tab widths on the stack; more tabs (any number) use the heap
 const TABS_INLINE: usize = 32;
-const WHEEL_DIP: i32 = 48;
 
 // tab widths: on the stack up to TABS_INLINE tabs (no allocation), on the heap beyond
 #[derive(Default)]
@@ -128,6 +129,9 @@ pub(crate) struct Scr {
     ev: u32,
     /// its content is a scroll copy region (scrollcopy.rs)
     copy: bool,
+    /// (form.rs) a phone's or a tablet's view that the app lets roll only up and down: 1 its laid-out
+    /// width is measured (W::wide), 2 it rolls sideways too, as far as that width
+    fit: u8,
 }
 
 /// a list on the stack  [LS_*]
@@ -181,6 +185,9 @@ pub(crate) struct W {
     ldrag_to: i32,
     /// autoscroll clock
     ldrag_t: u32,
+    /// (form.rs) the views of fit 1 or 2 whose content the last pass laid out wider than them: that
+    /// width (px, padding included)
+    wide: BTreeMap<u32, i32>,
 }
 
 // clamp_mem(v, max) -> (v moved into 0 .. max, it had to be moved)
@@ -275,9 +282,19 @@ impl Ui {
             my = s.meash.wrapping_sub(e.rect[3]).max(0);
         }
         if e.flags & SC_H != 0 {
-            mx = s.measw.wrapping_sub(e.rect[2]).max(0);
+            mx = self.scr_width(e).wrapping_sub(e.rect[2]).max(0);
         }
         (mx, my)
+    }
+
+    // scr_width(entry) -> how wide its content is (px): the natural width; a phone's view that rolls
+    // sideways only because of form.rs: the room its content takes (the natural width counts a
+    // wrapping text unwrapped and a view inside at its content's width: it would roll into nothing)
+    fn scr_width(&mut self, e: &Scr) -> i32 {
+        if e.fit == 2 {
+            return self.wp.list.wide.get(&e.id).copied().unwrap_or(0);
+        }
+        self.slot(e.id).measw
     }
 
     // scr_open(id, flags, hbflags) -> EV of the viewport hit box: places the viewport (a
@@ -317,6 +334,7 @@ impl Ui {
             hit0: c.hits[c.hit_cur].len(),
             ev: 0,
             copy: false,
+            fit: 0,
         };
         self.slot(id);
         // viewport hit box (the content's hit boxes follow it)
@@ -442,8 +460,9 @@ impl Ui {
         let t = st.scrollbar_thickness(self); // bar thickness (hover area)
         let axes = scr_axes(e.flags);
         let s = *self.slot(e.id);
+        let cw = self.scr_width(e);
         let vneed = axes & 1 != 0 && s.meash > e.rect[3];
-        let hneed = axes & 2 != 0 && s.measw > e.rect[2];
+        let hneed = axes & 2 != 0 && cw > e.rect[2];
         let r = e.rect;
         if vneed {
             let h = if hneed { r[3].wrapping_sub(t) } else { r[3] };
@@ -462,7 +481,7 @@ impl Ui {
             let w = if vneed { r[2].wrapping_sub(t) } else { r[2] };
             self.wp.ctx.last_rect = [r[0], r[1].wrapping_add(r[3]).wrapping_sub(t), w, t];
             let id = e.id.wrapping_mul(8).wrapping_add(2) | 0x8000_0000;
-            let (p, _) = self.sbar_core(id, s.scrollx, s.measw, r[2], false);
+            let (p, _) = self.sbar_core(id, s.scrollx, cw, r[2], false);
             if p != s.scrollx {
                 let sl = self.slot(e.id);
                 sl.scrollx = p;
@@ -478,7 +497,7 @@ impl Ui {
             return;
         }
         let c = &self.wp.ctx;
-        if c.wheel_y | c.wheel_x == 0 {
+        if c.wheel_y | c.wheel_x | c.wheel_px_y | c.wheel_px_x == 0 {
             return;
         }
         // hovered: the hot widget is one of our hit boxes on our layer
@@ -491,10 +510,17 @@ impl Ui {
         if !found {
             return;
         }
-        let step = self.dp(WHEEL_DIP);
+        // a notch: the system's lines of WHEEL_LINE_DIP (a page: the view's); a precise turn
+        // (a touchpad) by its pixels, at once
+        let line = self.dp(WHEEL_LINE_DIP);
+        let (sy, sx) = (self.wheel_notch_px(line, e.rect[3], false), self.wheel_notch_px(line, e.rect[2], true));
         let c = &self.wp.ctx;
-        let mut dy = c.wheel_y.wrapping_neg().wrapping_mul(step) / 120; // wheel up = towards the start
-        let mut dx = c.wheel_x.wrapping_mul(step) / 120;
+        let precise = c.wheel_precise;
+        let (mut dy, mut dx) = if precise {
+            (c.wheel_px_y.wrapping_neg(), c.wheel_px_x)
+        } else {
+            (c.wheel_y.wrapping_neg().wrapping_mul(sy) / 120, c.wheel_x.wrapping_mul(sx) / 120) // wheel up = towards the start
+        };
         let axes = scr_axes(e.flags);
         // the vertical wheel scrolls sideways in horizontal views or with Shift
         if axes & 1 == 0 || (axes & 2 != 0 && self.mods & MOD_SHIFT != 0) {
@@ -522,13 +548,12 @@ impl Ui {
         }
         s.adur = ny as u32;
         s.at0 = nx as u32;
-        if anim_off {
+        if anim_off || precise {
             s.scrolly = ny;
             s.scrollx = nx;
         }
-        self.wp.ctx.wheel_y = 0;
-        self.wp.ctx.wheel_x = 0;
-        if anim_off {
+        self.wheel_take();
+        if anim_off || precise {
             self.repass();
         } else {
             self.animating = true;
@@ -545,6 +570,16 @@ impl Ui {
             self.scroll_copy_end();
         }
         self.box_end();
+        if e.fit != 0 {
+            // (form.rs) how wide the content is laid out: the next pass rolls sideways while it is
+            // wider than the view (a change is one more pass: the layout inside stays the same)
+            let w = self.wp.lay.ended_w;
+            let wide = &mut self.wp.list.wide;
+            let changed = if w > e.rect[2] { wide.insert(e.id, w) != Some(w) } else { wide.remove(&e.id).is_some() };
+            if changed {
+                self.repass();
+            }
+        }
         self.scr_follow(&e);
         if let Some(id) = self.agent_reveal() {
             self.scr_show(&e, id); // a click from outside (agent.rs)
@@ -588,13 +623,16 @@ impl Ui {
         let _src = self.src_scope();
         self.scr_open(id, flags & !SCR_F_LIST, 0);
         // (form.rs) on a phone or a tablet a view that rolls only up and down rolls sideways too
-        // while its content is wider than it (the last pass's): nothing is out of the finger's reach.
-        // A desktop's views never change.
+        // while its content is laid out wider than it (the last pass's, scr_close): nothing is out of
+        // the finger's reach.  Laid out, not natural: a wrapping text or a view that rolls sideways
+        // itself is no reason.  A desktop's views never change.
         if flags & SC_H == 0 && self.mobile() {
             let top = self.scr_top();
-            let e = self.wp.list.scr[top];
-            if self.slot(id).measw > e.rect[2] {
-                self.wp.list.scr[top].flags |= SC_H | SC_V;
+            let e = &mut self.wp.list.scr[top];
+            e.fit = 1;
+            if self.wp.list.wide.get(&id).is_some_and(|&w| w > e.rect[2]) {
+                e.flags |= SC_H | SC_V;
+                e.fit = 2;
             }
         }
         self.scr_offset();

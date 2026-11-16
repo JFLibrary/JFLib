@@ -50,11 +50,11 @@ Like all of JFLib, the crate comes through the one dependency
 [`jflib`](https://crates.io/crates/jflib), as `jflib::img_jpeg`. All of JFLib's crates share one
 version and are released together.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Nothing in this crate. It is released again as 0.2.0 only because all of JFLib's crates move
-together. The [changelog](https://docs.rs/crate/jflib-img-jpeg/latest/source/CHANGELOG.md) says
-the same.
+One fix: the scans of an image go over at most 64 times its blocks, so a small file with thousands
+of empty scans no longer keeps the decoder busy for minutes. Everything is in the
+[changelog](https://docs.rs/crate/jflib-img-jpeg/latest/source/CHANGELOG.md).
 
 ## Documentation
 

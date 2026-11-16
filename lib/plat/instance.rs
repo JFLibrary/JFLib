@@ -16,7 +16,9 @@
 // \\.\pipe\jfgui-instance-<user SID>-<app> (current user, local clients, one pipe instance:
 // the first process that creates it is the instance; the starting process lets it take the
 // foreground); Linux the abstract socket jfgui-instance-<uid>-<app>.  Both ends make sure the
-// other runs as the same user.  Message: "JFI1", u32 length of the rest, u32 count, count x
+// other runs as the same user (Linux: also in the same mount namespace, so a sandboxed process
+// of the user -- Flatpak, bubblewrap, Firejail -- is refused).  Message: "JFI1", u32 length of
+// the rest, u32 count, count x
 // (u32 length, UTF-8): the working folder, then the arguments (without the program), on Linux
 // then "XAT1", u32 length, the start's $XDG_ACTIVATION_TOKEN when it has one (the running
 // instance's window comes forward with it on Wayland: linux_wl_act.rs; an instance of an older

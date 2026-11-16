@@ -10,7 +10,36 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- `SysSettings::wheel_lines` and `wheel_chars`: what a notch of the wheel scrolls (Windows
+  `SPI_GETWHEELSCROLLLINES`, `WHEEL_PAGE` for a page, and `SPI_GETWHEELSCROLLCHARS`; KDE's
+  `[KDE] WheelScrollLines` of kdeglobals; 3 elsewhere), `wheel_amount`, the overrides
+  `jfgui_WHEEL_LINES=N|page` and `jfgui_WHEEL_CHARS=N`; Windows reports a change of them as
+  `E_SETTINGS` with `SET_OTHER`.
+- `E_WHEEL`'s `btn`: `WHEEL_FINE` -- the 120 a notch in fine steps (Windows: a delta that is no
+  multiple of 120 or one from a touchpad by `GetCurrentInputMessageSource`, over popups too;
+  Wayland: `axis_value120` that is no multiple of 120) -- and `WHEEL_PIXELS` -- data in physical
+  pixels (Wayland's continuous axes, the fraction kept for the next frame; macOS' precise
+  deltas).
+- (E2) The keyboard layout's character of a key event in `Event::y` of `E_KEY_DOWN` /
+  `E_KEY_UP`, above the location: `key_y`, `key_location`, `key_char`, `key_dead`, `KEY_DEAD`.
+  It is what the key gives with Shift, Caps Lock and AltGr but without Ctrl, Alt and the
+  Windows / Super key: Windows through `ToUnicodeEx` without touching the keyboard state (10 1607
+  and later), Linux from the keymap (`xkb_key_y`, X11 and Wayland), macOS
+  `charactersIgnoringModifiers`. `key_char_test` and `key_layouts_test` (Windows) for plattest.
+
+### Changed
+
+- (E2) `Event::y` of key events carries the key's character above its location: code that
+  compared it with a `KL_*` takes `key_location(y)`.
+- Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical
+  pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point).
+
+## [0.2.1] - 2026-11-16
+
+### Added
+
 - `watch::Watcher::watching()`: whether every root (Linux: every folder below them) is watched now
+- Intel Macs (`x86_64-apple-darwin`): libSystem's functions with 64-bit inodes (`stat$INODE64`, `readdir$INODE64`, `statfs$INODE64` ...), Objective-C messages that return structures over 16 bytes (`NSRect`) through `objc_msgSend_stret`, a BOOL read as a byte, crash reports from the x86-64 context (registers, the chain over rbp), `cpu_features` with AVX2 where the processor has it; checked under Rosetta 2 ([INTEL_MAC.md](https://github.com/JFLibrary/JFLib/blob/main/docs/INTEL_MAC.md))
 
 ### Changed
 
@@ -20,6 +49,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   a drop (`drop_allowed`) took it as every effect. A drag out that names no effects offers
   linking too; files are still never moved.
 - `watch::Watcher::take` reports `overflow` after each wait while a root or folder is not watched (`watching()` false), so a caller that rescans on `overflow` polls until the watcher sees everything again; before, a lost root reported one overflow and then nothing
+- Linux: the build script picks plat's build against glibc (`--cfg jfgui_glibc`: pthreads, the dynamic linker) also without std, unless `-C target-feature=+crt-static` asks for one static file; so a JFLib app builds on Linux with plain `cargo run`, no flags and no `--target`.
 
 ### Fixed
 
@@ -31,10 +61,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Linux: the watcher left the folders of a folder whose listing failed (no descriptors left) unwatched for good, and a root moved away kept its watches -- its changes came under the old path -- while a folder made at its path was never watched (also after a deleted root). Such folders and roots are tried again every second
 - `fs::write_file_private` reports true when a rule of the manifest allows the file but not its folder. The folder's fsync after the rename was checked as well and made it report false although the file had been replaced.
 - Windows: `rename`, `write_file` and the other writers that replace a file no longer fail while another program holds the old file open for a moment, as a virus scanner or the search indexer does with a file just written. They rename with POSIX semantics (FileRenameInfoEx), which replaces a file held with FILE_SHARE_DELETE, and wait up to about a quarter second for a holder that does not share deletion; elsewhere MoveFileEx as before.
+- Windows: the buttons of a system title bar work (a main window without AF_CUSTOM_TITLEBAR, windows with PWF_SYSFRAME): the window procedure made the non-client messages of every caption button (WM_NCMOUSEMOVE, WM_NCLBUTTONDOWN, WM_NCLBUTTONUP on HTCLOSE, HTMAXBUTTON, HTMINBUTTON) presses in the UI, so the X, maximize and minimize of such a window did nothing; only the library frame's buttons, which the UI draws, take that way now
 
 ### Security
 
-- `fs::symlink` and `fs::hard_link` want write access to the target as well; a relative symlink target counts from the link's folder. The rules check a path as it is written, so a link at a writable path led to files the app could only read or not reach at all.
+- `fs::symlink` and `fs::hard_link` want write access to the target as well; a relative symlink target counts from the link's folder. Without a manifest every target may be written; under one a target with `..` is refused (the system resolves it after links). The rules check a path as it is written, so a link at a writable path led to files the app could only read or not reach at all.
 - `assoc_unregister` plays back only record lines for the places a registration writes (Windows: Software\Classes, Software\Clients, RegisteredApplications; Linux: the .desktop and MIME files, the user's mimeapps.list). A changed config://assoc.list could set any HKCU value or delete and rename any file of the user.
 - `process::Command::spawn` with a relative program path and a `cwd` checks the file it starts on Linux and macOS (cwd/program), not the same name below this process's folder.
 - `watch::Watcher::new` checks its folders against the manifest on Windows too.
@@ -42,6 +73,13 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Windows: `process::Command::spawn` and `process::launch` refuse a `.bat` or `.cmd` program (87) when it or an argument holds `"`, `%`, `!`, `^`, `&`, `|`, `<`, `>` or a line break. cmd.exe reads its command line by its own rules, and the quoted arguments could run further commands (the class of CVE-2024-24576).
 - `open_folder` shows a file or a package selected in the Finder (`open -R`) instead of opening it, which started apps and .command scripts (macOS); on Windows it starts the Windows folder's explorer.exe.
 - Linux: a portal's `Response` counts only when it comes from the portal itself, the sender of its reply to the request. Another client on the session bus could answer a file dialog with files of its choice.
+- plat::net::resolve on Windows and Apple refuses host names with NUL or other control characters, so the system resolver can no longer look up a shorter name than the one the net.connect rules allowed; plat::clr_run checks the plugins rules for the managed program and every DLL of the runtime's and the program's folders, not only coreclr.dll; with fs.user the values of the library's options (plat::VALUE_OPTS, e.g. --theme /) are no longer granted as user files (--theme-file, --shot and --script still are)
+- plat::trash on Linux opens and checks a mount's trash folder by folder through descriptors (no links; .Trash must be owned by root or the user, files/ and info/ by the user), so another local user can no longer redirect a trashed item by swapping a folder
+- The stored permission answers (config://permission-decisions.txt) stay protected from the app's writes while another store or memory is chosen (--script, perm store, jfgui_PERM_STORE), as does every store chosen in the run, and they can no longer be written through another name of the same file (a Windows 8.3 name, another case on macOS, a hard or symbolic link); Android content:// documents opened on behalf of a plugin need the plugin's own fs.user as well
+- Linux: the single-instance socket refuses same-user peers from another mount or process namespace (sandboxed apps) and checks the peer pid was not reused; IBus input-context signals, logind PrepareForSleep and notification signals are accepted only from the bus name that owns the service; the X11 client sends its MIT-MAGIC-COOKIE-1 over the abstract socket only to a peer running as the user or root
+- fs::mkdir_private refuses an existing folder that is a link, belongs to another user or that others may write to (Windows: whose DACL grants anyone but SYSTEM, the administrators or the owner access), and makes an own folder that others may only read owner-only; Windows: service::install copies a program outside Program Files to %ProgramFiles%\<name> and registers that copy, so a LocalSystem service no longer runs a program its user can replace (new service::program_path)
+- Windows: URL schemes are registered as `"<exe>" -- "%1"` and plat::args keeps the URL after -- as one argument, so a quote in a link cannot add options; ui stops reading options at --. Apps registered before keep the old command until they are registered again
+- New plat::fs::Dir works below an open folder without ever following a link (Linux openat2 with a step-by-step O_NOFOLLOW fallback, macOS openat walk, Windows folders held open without share-delete), with set_file_times / set_file_mode through a file's own handle; TcpStream::peer_uid returns the user id of the other end of a Unix socket (SO_PEERCRED, getpeereid)
 
 ## [0.2.0] - 2026-11-14
 
@@ -301,6 +339,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0

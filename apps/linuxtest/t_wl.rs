@@ -24,7 +24,7 @@ use alloc::vec;
 use gfx::{Dc, FMT_XRGB, Surface};
 use plat::{
     BTN_LEFT, BTN_RIGHT, BTN_X1, E_DOWN, E_FOCUS_IN, E_FOCUS_OUT, E_KEY_DOWN, E_KEY_UP, E_LEAVE, E_MOVE, E_TEXT, E_UP,
-    E_WHEEL, MOD_SHIFT,
+    E_WHEEL, KL_LEFT, KL_STANDARD, MOD_SHIFT, WHEEL_FINE, WHEEL_PIXELS, key_y,
 };
 
 use crate::{Lt, out};
@@ -147,11 +147,17 @@ pub fn test_synth(t: &mut Lt) {
     t.expect(tb(E_WHEEL, 0), 200, -6, 0xFF88, "wheel down one notch -> dy -120");
     ptr("axis", &[0, 1, 5 * 256]);
     ptr("frame", &[]);
-    t.expect(tb(E_WHEEL, 0), 200, -6, 60 << 16, "touchpad right 5 px -> dx 60");
+    t.expect(tb(E_WHEEL, WHEEL_PIXELS), 200, -6, 10 << 16, "touchpad right 5 px at scale 2 -> dx 10 physical px (WHEEL_PIXELS)");
+    ptr("axis", &[0, 0, 128 + 64]);
+    ptr("frame", &[]);
+    ptr("axis", &[0, 0, 128 + 64]);
+    ptr("frame", &[]);
+    t.expect(tb(E_WHEEL, WHEEL_PIXELS), 200, -6, 0xFFFF, "touchpad down 0.75 px at scale 2 -> dy -1 (the half waits)");
+    t.expect(tb(E_WHEEL, WHEEL_PIXELS), 200, -6, 0xFFFE, "... 0.75 px more -> dy -2 (with the half)");
     ptr("axis_value120", &[0, -60]);
     ptr("axis", &[0, 0, -5 * 256]);
     ptr("frame", &[]);
-    t.expect(tb(E_WHEEL, 0), 200, -6, 60, "value120 up half notch -> dy 60");
+    t.expect(tb(E_WHEEL, WHEEL_FINE), 200, -6, 60, "value120 up half notch -> dy 60 (WHEEL_FINE: a high-resolution wheel)");
     ptr("frame", &[]);
     ptr("leave", &[12, 0]);
     t.expect(tb(E_UP, BTN_LEFT), 200, -6, 0, "leave releases left");
@@ -161,21 +167,30 @@ pub fn test_synth(t: &mut Lt) {
     plat::xkb_use_fallback();
     kb("enter", &[20, 0, 0]);
     t.expect(tb(E_FOCUS_IN, 0), 0, 0, 0, "keyboard enter -> E_FOCUS_IN");
+    // (E2) key events: x the evdev code, y its place and the layout's character (plat::key_y)
+    let q = key_y(KL_STANDARD, 'Q' as u32, false);
     kb("key", &[21, 0, 42, 1]);
-    t.expect(tb(E_KEY_DOWN, 0), 0, 0, VK_SHIFT, "Shift down");
+    t.expect(tb(E_KEY_DOWN, 0), 42, KL_LEFT as i32, VK_SHIFT, "Shift down (evdev 42, the left one, no character)");
     t.check(plat::wl_mods() & MOD_SHIFT as u32 != 0, "Shift key event already carries MOD_SHIFT (like Win32)");
     kb("modifiers", &[22, 1, 0, 0]);
     kb("key", &[23, 0, 16, 1]);
-    t.expect(tb(E_KEY_DOWN, 0), 0, 0, 'Q' as u32, "Shift+q -> E_KEY_DOWN Q");
+    t.expect(tb(E_KEY_DOWN, 0), 16, q, 'Q' as u32, "Shift+q -> E_KEY_DOWN Q, the character Q");
     t.expect(tb(E_TEXT, 0), 0, 0, 'Q' as u32, "Shift+q -> E_TEXT Q");
     plat::wl_input_service(plat::time_us() + 700_000);
-    t.expect(tb(E_KEY_DOWN, 0), 0, 0, 0x8000_0051, "held 700 ms -> repeat E_KEY_DOWN Q | repeat");
+    t.expect(tb(E_KEY_DOWN, 0), 16, q, 0x8000_0051, "held 700 ms -> repeat E_KEY_DOWN Q | repeat");
     t.expect(tb(E_TEXT, 0), 0, 0, 'Q' as u32, "repeat -> E_TEXT Q");
     kb("key", &[24, 0, 16, 0]);
-    t.expect(tb(E_KEY_UP, 0), 0, 0, 'Q' as u32, "q release -> E_KEY_UP");
+    t.expect(tb(E_KEY_UP, 0), 16, q, 'Q' as u32, "q release -> E_KEY_UP");
     let r = plat::wl_input_service(plat::time_us() + 2_000_000);
     t.check(r == u64::MAX, "release stops the repeat");
-    kb("leave", &[25, 0]);
+    // Ctrl+Z: no text, but the key's character z
+    kb("modifiers", &[25, 4, 0, 0]);
+    kb("key", &[26, 0, 44, 1]);
+    t.expect(tb(E_KEY_DOWN, 0), 44, key_y(KL_STANDARD, 'z' as u32, false), 'Z' as u32, "Ctrl+z -> E_KEY_DOWN Z, the character z, no text");
+    kb("key", &[27, 0, 44, 0]);
+    t.expect(tb(E_KEY_UP, 0), 44, key_y(KL_STANDARD, 'z' as u32, false), 'Z' as u32, "Ctrl+z release -> E_KEY_UP Z, the character z");
+    kb("modifiers", &[28, 0, 0, 0]);
+    kb("leave", &[29, 0]);
     t.expect(tb(E_FOCUS_OUT, 0), 0, 0, 0, "keyboard leave -> E_FOCUS_OUT");
     t.check(plat::evq_count() == 0, "no stray events");
 }

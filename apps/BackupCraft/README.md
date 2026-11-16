@@ -25,8 +25,7 @@ the NBD server) and `bc_volume` (volumes, VSS / LVM snapshots).
 ## Quick start
 
 ```sh
-python build_rs.py app BackupCraft --target win          # or --target linux / both
-build/win/BackupCraft.exe --fixture                      # the console with demo data
+cargo run -p BackupCraft -- --fixture                    # the console with demo data (Windows, Linux)
 ```
 
 ### Setup assistant
@@ -98,12 +97,21 @@ bc-server service status | start | stop | uninstall
 ```
 
 `--report FILE` (server and `bc-agent pair`) writes the outcome as JSON for the setup
-assistant: `ok`, `message` and, for a new server, its setup token and CA fingerprint.
+assistant: `ok`, `message` and, for a new server, its setup token and CA fingerprint. On Linux
+and macOS the token is written only into a file and folder nobody else may read (the setup
+assistant makes both, owner-only, in the temporary folder).
 
 Windows registers `BackupCraftServer` / `BackupCraftAgent` (automatic start as LocalSystem,
-restart after a failure); Linux writes the systemd units `backupcraft-server` /
-`backupcraft-agent`. Both log to standard output and `<data>/logs/*.log` (10 MB, five older
-files kept).
+restart after a failure); a program outside Program Files (the per-user setup's folder) is first
+copied to `%ProgramFiles%\BackupCraftServer` / `%ProgramFiles%\BackupCraftAgent` (with the server
+the Linux agent for the SSH push), where only administrators may change it, and registered from
+there: after an update, `service uninstall` and `service install` again. Linux writes the systemd
+units `backupcraft-server` / `backupcraft-agent`. Both log to standard output and
+`<data>/logs/*.log` (10 MB, five older files kept).
+
+The data folder (and its `db`, `keys`, `journal` folders) must be the service's own: an existing
+one that is a link, belongs to another user or that others may write to (Windows: that grants
+anyone but SYSTEM, the administrators and the owner access) is refused.
 
 ### Packages
 
@@ -158,11 +166,15 @@ repack), `check`, a recovery kit (X25519 sealed box over the repository key).
 30 s with their own certificate. An agent reads only inside its backup folders, writes only
 inside its backup and restore folders, never follows a link below them (reads, folder
 listings, restores), writes restored files to temporary files it names itself and renames them
-when complete, and runs no commands. Removing a host revokes its certificate.
+when complete, and runs no commands. It opens the folder of each entry from the shared folder
+without following a link and works relative to that open folder (`plat::fs::Dir`), so a folder
+swapped for a link after its checks cannot redirect a read, write, permission change or
+removal. Removing a host revokes its certificate.
 
 **Restores.** Users with the restore role restore only into allowed folders and never replace
 files; operators may restore to the original place and replace. Names from a restore point are
-checked; a link planted in the target cannot redirect the data; existing files are skipped,
+checked; a link planted in the target cannot redirect the data, neither before nor during the
+restore (the server works relative to open folders, as agents do); existing files are skipped,
 renamed (`name (wiederhergestellt).ext`) or replaced.
 
 **The libraries it brought into JFLib.** `crypto` (SHA-2 incl. SHA-384, BLAKE2b, BLAKE3,
@@ -225,7 +237,9 @@ reads tapes without any server (encrypted sets with the recovery kit).
 (setting `hypervisor.qmp`). A running VM is backed up by QEMU itself in one transaction over its
 disks (crash-consistent) with a persistent dirty bitmap: the next run reads only the changed
 blocks. Disks are stored in 1 MiB blocks, block i = chunk i. A VM that is off is read from its
-disk files.
+disk files, but only when the QEMU that reported them runs as root or as the server's user (the
+owner of its QMP socket and, on Linux and macOS, the process the kernel reports at its other
+end); the server does not read files another QEMU names.
 
 **Instant start.** A VM boots straight from a restore point: the server exports its disks
 over NBD from the repository (read-only), a qcow2 overlay takes the guest's writes. *Merge*

@@ -75,16 +75,10 @@ Like all of JFLib, the crate comes through the one dependency
 GIF and SVG at start-up by itself; JPEG XL needs `img_all::use_all_codecs()` once. All of JFLib's
 crates share one version and are released together. It runs on every platform JFLib supports.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
 
-Five fixes protect the decoder against hostile files. A container box whose 64-bit size reaches
-the end of the number range no longer crashes `probe` and `decode`. A frame with a size of its own
-counts against the pixel budget like the image. And palettes, patches and the splines' cache can
-no longer make the decoder allocate gigabytes or compute for minutes from a small file; such files
-fail with `ERR_LIMIT` or `ERR_NOMEM`; plane sizes on 32-bit targets and the splines' area
-estimate no longer wrap either. Valid files with chroma subsampling whose width is no multiple
-of 16 decode with the right colours now (the edge-preserving filter read the chroma rows from
-the wrong place). Everything is in the
+One fix: the bit reader's position saturates instead of wrapping, so a crafted stream can no longer
+make it read from the start again without an error. Everything is in the
 [changelog](https://docs.rs/crate/jflib-img-jxl/latest/source/CHANGELOG.md).
 
 ## Documentation

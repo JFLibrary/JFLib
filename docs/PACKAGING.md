@@ -128,7 +128,8 @@ packaged setup is that exe with a payload and a trailer appended.
   `HKCU\Software\Classes` (description, `DefaultIcon`, `shell\open\command` = `"<exe>" "%1"`) and
   the app in `.<ext>\OpenWithProgids` ("Open with"). An `own` type also becomes the default of its
   extensions (`.<ext>` default value and `Content Type`). A scheme gets `HKCU\Software\Classes\<scheme>`
-  (`URL:<display>`, `URL Protocol`, `DefaultIcon`, the open command). `SHChangeNotify` tells
+  (`URL:<display>`, `URL Protocol`, `DefaultIcon`, the open command `"<exe>" -- "%1"`: the URL
+  after `--` reaches the program as one argument, and a quote in it adds no options). `SHChangeNotify` tells
   Explorer. `install.ini` `assoc=` lists what was added (`T:` key trees, `V:` values), and
   `uninstall.exe` removes exactly that. In test mode the values go to
   `<ASMINST_SHELL_DIR>\assoc.txt` (`subkey|name=value` lines).
@@ -256,7 +257,7 @@ ignored by git. The code is in [`tools/codesign.py`](../tools/codesign.py).
 | AppImage | the type-2 signature as `appimagetool --sign` writes it: an armored detached GPG signature of the file's SHA-256 (the two sections taken as zeros, 64 hex digits) in `.sha256_sig`, the armored public key in `.sig_key` (gpg in Linux / WSL) | `jfgui_GPG_KEY`, `jfgui_GPG_HOME`, `jfgui_GPG_PASSPHRASE` (as the apt repository) | unsigned, "jfgui_GPG_KEY setzen" |
 | Flatpak | the commits and the summary of the repository `flatpak/repo` (flatpak-builder / `build-update-repo --gpg-sign`) and the bundle (`build-bundle --gpg-sign`), which carries the public key (`--gpg-keys`) and the repository's address (`--repo-url`, PACKAGE `flatpak_repo_url=`); the key as `flatpak/<app id>.gpg` and a `<app id>.flatpakrepo` beside it | `jfgui_GPG_KEY`, `jfgui_GPG_HOME` (flatpak signs through gpg-agent: a key with a passphrase must be unlocked there) | unsigned repository and bundle |
 | RPM | not signed: `rpmsign` (and rpmbuild) are missing in the test system | -- | -- |
-| Android | `build_rs.py app NAME --target android --release` signs with the release key (apksigner reads the passwords from the environment) | `jfgui_ANDROID_KEYSTORE`, `jfgui_ANDROID_KEYSTORE_PASS`, `jfgui_ANDROID_KEY_ALIAS`, optional `jfgui_ANDROID_KEY_PASS` | the build fails and names the variables; `jfgui_ANDROID_DEBUG_SIGN=1` signs a release build with the debug key (tests only). Debug builds keep the local debug key |
+| Android | `build_rs.py app NAME --target android --release` signs with the release key (apksigner reads the passwords from the environment) | `jfgui_ANDROID_KEYSTORE`, `jfgui_ANDROID_KEYSTORE_PASS`, `jfgui_ANDROID_KEY_ALIAS`, optional `jfgui_ANDROID_KEY_PASS` | the build fails and names the variables; `jfgui_ANDROID_DEBUG_SIGN=1` signs a release build with the debug key (tests only). Debug builds keep the local debug key. Only builds under the debug key are debuggable (aapt2 `--debug-mode`: the self-tests' `jfgui_*` extras, `run-as`); a manifest that sets `android:debuggable` stops a release-key build |
 
 A user adds the signed repository with:
 
@@ -341,10 +342,13 @@ Linux and macOS only the app offers it.
 ### macOS: .dmg
 
 `--formats dmg` (on a Mac only, alone: `tools/package.py APP --formats dmg`, `cargo jflib package
---formats dmg`) builds the program for `aarch64-apple-darwin` per style and puts `NAME.app`
-(Info.plist from PACKAGE, the icon, the entitlements of PERMISSIONS: [APPLE.md](APPLE.md) AP7c) on a
-compressed disk image beside a link to `/Applications`: `<App>-<ver>-<style>-arm64.dmg` (one style:
-`<App>-<ver>-arm64.dmg`).  `all` leaves it out (it names the formats of Windows and Linux).  The
+--formats dmg`) builds the program per style for `aarch64-apple-darwin` and `x86_64-apple-darwin` and joins
+both into one program for every Mac (a universal program, `lipo`; [INTEL_MAC.md](INTEL_MAC.md)), then puts
+`NAME.app` (Info.plist from PACKAGE, the icon, the entitlements of PERMISSIONS: [APPLE.md](APPLE.md) AP7c) on a
+compressed disk image beside a link to `/Applications`: `<App>-<ver>-<style>-universal.dmg` (one style:
+`<App>-<ver>-universal.dmg`).  The Intel part needs Rust's target (`rustup target add x86_64-apple-darwin`);
+the program is about twice as large, fonts and images are in it once.  `all` leaves it out (it names the
+formats of Windows and Linux).  The
 signature is ad hoc unless `jfgui_MAC_IDENTITY` names a certificate of the keychain ("Developer ID
 Application: NAME (TEAM)"): then the bundle is signed with it, the hardened runtime and a secure time
 stamp, and the image is signed too.  An ad-hoc signed app downloaded from the internet does not start
@@ -352,7 +356,8 @@ on another Mac without the user's consent (Gatekeeper); that needs Developer ID 
 `jfgui_MAC_NOTARY` names a notarytool profile in the keychain: then the bundle and, after it, the
 image go to Apple's notary service, and both get their ticket stapled (a copy dragged out of the
 image starts offline too).  With `--update` the channel gets the bundle (kind `app`) and the image
-(kind `package`), [UPDATES.md](UPDATES.md) "macOS app bundles".
+(kind `package`), the same two files for `macos-aarch64` and `macos-x86_64`, [UPDATES.md](UPDATES.md)
+"macOS app bundles".  Signature and notarization cover both parts of the program.
 
 Setting it up once, on the Mac (a membership of the Apple Developer Program; [APPLE.md](APPLE.md) AP8c):
 

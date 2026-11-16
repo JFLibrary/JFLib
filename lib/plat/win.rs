@@ -106,6 +106,15 @@ pub fn args() -> Vec<String> {
         }
         core::slice::from_raw_parts(p, n)
     };
+    split_command_line(cl)
+}
+
+// the arguments of a command line.  One exception to CommandLineToArgvW: a first argument "--"
+// followed by one quoted rest ("<exe>" -- "%1", the command of a URL scheme, assoc.rs) gives
+// "--" and that rest as it stands between its outer quotes, so that a quote in a link's text
+// cannot end it and add options
+fn split_command_line(cl: &[u16]) -> Vec<String> {
+    let blank = |c: u16| c == b' ' as u16 || c == b'\t' as u16;
     let mut out = Vec::new();
     let mut i = 0;
     let n = cl.len();
@@ -130,6 +139,21 @@ pub fn args() -> Vec<String> {
         }
         if i >= n {
             break;
+        }
+        if out.len() == 1 && cl[i..].starts_with(&[b'-' as u16, b'-' as u16]) && cl.get(i + 2).is_some_and(|&c| blank(c)) {
+            let mut s = i + 2;
+            while s < n && blank(cl[s]) {
+                s += 1;
+            }
+            let mut e = n;
+            while e > s && blank(cl[e - 1]) {
+                e -= 1;
+            }
+            if e >= s + 2 && cl[s] == b'"' as u16 && cl[e - 1] == b'"' as u16 {
+                out.push(String::from("--"));
+                out.push(from_wide(&cl[s + 1..e - 1]));
+                return out;
+            }
         }
         cur.clear();
         let mut q = false;

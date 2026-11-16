@@ -8,9 +8,18 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-16
+
 ### Added
 
 - `Stream::end_is_clean()` (default true): after a read gave 0, whether the peer ended the stream in order. `TlsStream` answers whether close_notify came.
+- `x509::CertBuilder::sign_ext` (further extensions; one with the OID of a built-in one replaces it) and `x509::extension`; `server::MIN_BODY_RATE` and `http::Reader::set_min_rate`
+
+### Fixed
+
+- Server: a request body sent a byte at a time (each within `read_ms`) held a worker as long as the client liked; a body must now bring `MIN_BODY_RATE` (1 KiB a second) on average after a first `read_ms`, else the connection ends
+- TLS: records that carry no data (empty application data records) kept `TlsStream::read` going without end, past the read timeout and the HTTP deadlines, which are checked between reads; a read now ends with TimedOut after the stream's read timeout without data
+- X.509: a wildcard certificate (`*.example.com`) passed a CA's excluded name constraint for a host it stands for (`secret.example.com`) or for the subdomains of its base (`.example.com`); and the extended key usage of the CAs on the path was not checked, so a CA for client certificates (also a trusted one) could certify a server
 
 ### Security
 
@@ -28,6 +37,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 First release on crates.io.
 
-[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JFLibrary/JFLib/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/JFLibrary/JFLib/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/JFLibrary/JFLib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JFLibrary/JFLib/releases/tag/v0.1.0
