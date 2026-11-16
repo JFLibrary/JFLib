@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>ShapeSheet anzeigen, 32 px</title>
+  <rect class="body" fill="#DCDEE1" x="4" y="7" width="24" height="4"/>
+  <rect class="ink" stroke="#1D2228" x="3.5" y="6.5" width="25" height="20"/>
+  <path class="ink" stroke="#1D2228" d="M4 11.5H28M4 16.5H28M4 21.5H28M12.5 12V26M20.5 12V26"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="12.5" y="16.5" width="8" height="5"/>
+</svg>

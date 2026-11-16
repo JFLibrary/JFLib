@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Neue Schablone, 32 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="4.5" y="5.5" width="9" height="9"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="18.5" y="5.5" width="9" height="9"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="4.5" y="19.5" width="9" height="9"/>
+  <path class="tint" fill="#1F5FA8" d="M22 19H24V23H28V25H24V29H22V25H18V23H22Z"/>
+</svg>

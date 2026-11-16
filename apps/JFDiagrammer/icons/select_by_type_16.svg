@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Nach Typ markieren, 16 px</title>
+  <rect class="ink" fill="#1D2228" x="7" y="2" width="2" height="2"/>
+  <rect class="tint" fill="#1F5FA8" x="7" y="7" width="2" height="2"/>
+  <rect class="ink" fill="#1D2228" x="7" y="12" width="2" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M10 2.5H14M10 12.5H13"/>
+  <path class="tint" stroke="#1F5FA8" d="M10 7.5H15"/>
+  <path class="ink" stroke="#1D2228" d="M1 7.5H3"/>
+  <polygon class="ink" fill="#1D2228" points="3,5.0 3,10.0 5.5,7.5"/>
+</svg>

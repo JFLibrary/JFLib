@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Schulung, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="10,15.68 16,18.68 22,15.68 22,22 10,22"/>
+  <path class="ink" stroke="#1D2228" d="M9.5 16V22.5H22.5V16"/>
+  <polygon class="body" fill="#DCDEE1" stroke="#1D2228" points="16,5 28,11 16,17 4,11"/>
+  <path class="tint" stroke="#1F5FA8" d="M16 11L25.5 15.75V21"/>
+  <rect class="tint" fill="#1F5FA8" x="24" y="21" width="3" height="4"/>
+</svg>

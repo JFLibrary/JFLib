@@ -291,15 +291,20 @@ def icon(path, size):
     return [(r, ru, p) for r, ru, p, *_ in layers], art, warns
 
 
+TITLES = {}  # part -> its title (icons.txt)
+
+
 def table():
     """icons/icons.txt -> rows {part, n, cp, stem, const, sizes, prio, name, place, motif}"""
     rows, part, seen = [], None, {}
+    TITLES.clear()
     for k, line in enumerate((HERE / "icons" / "icons.txt").read_text(encoding="utf-8").splitlines(), 1):
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        if line.startswith("[") and line.endswith("]"):
-            part = line[1:-1]
+        if line.startswith("[") and "]" in line:
+            part, title = line[1:].split("]", 1)
+            TITLES[part] = title.strip() or part
             continue
         f = [c.strip() for c in line.split("|")]
         if len(f) != 7 or part is None:
@@ -519,17 +524,25 @@ def overview(rows, path, what, zoom=1):
     import refrender as rr
     with tempfile.TemporaryDirectory() as work:
         f = {k: rr.load_font(str(v)) for k, v in sgf_fonts(work).items()}
-        ncol, cw, ch, head = 4, 200, 86, 64
-        nrow = (len(rows) + ncol - 1) // ncol
-        width, height = 16 + ncol * cw, head + nrow * ch + 16
+        ncol, cw, ch, head, sec = 4, 200, 86, 64, 30
+        parts = list(dict.fromkeys(r["part"] for r in rows))
+        nrow = sum((sum(1 for r in rows if r["part"] == p) + ncol - 1) // ncol for p in parts)
+        width, height = 16 + ncol * cw, head + nrow * ch + len(parts) * sec + 16
         light, dark = THEMES["hell"], THEMES["dunkel"]
         cv = rr.Canvas(width, height, rgb(light["page"]))
         drawn = sum(1 for r in rows if all(s in r for s in r["sizes"]))
         cv.text(f["semi"], f"JFDiagrammer – Menüband-Icons: {what}", 16, 16, 28, rgb(light["ink"]))
         cv.text(f["reg"], f"{len(rows)} Icons, {drawn} fertig gezeichnet; je Feld 32 und 16 px, hell und dunkel",
                 11, 16, 46, rgb(light["sub"]))
-        for j, r in enumerate(rows):
-            x, y = 16 + (j % ncol) * cw, head + (j // ncol) * ch
+        cells, y0 = [], head
+        for p in parts:  # each part from a new row, under its title
+            cv.text(f["semi"], TITLES.get(p, p), 13, 16, y0 + 18, rgb(light["ink"]))
+            cv.rect(16, y0 + 23, width - 32, 1, rgb(light["line"]))
+            y0 += sec
+            mine = [r for r in rows if r["part"] == p]
+            cells += [(r, 16 + (j % ncol) * cw, y0 + (j // ncol) * ch) for j, r in enumerate(mine)]
+            y0 += (len(mine) + ncol - 1) // ncol * ch
+        for r, x, y in cells:
             cv.text(f["semi"], r["name"][:30], 11, x, y + 12, rgb(light["ink"]))
             cv.text(f["reg"], f"{r['stem']} · {r['prio']}", 10, x, y + 25, rgb(light["sub"]))
             for k, t in enumerate((light, dark)):

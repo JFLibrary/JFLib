@@ -1,6 +1,6 @@
 # icons.txt -- every ribbon icon of JFDiagrammer (FEATURES.md 7): the table mkicons.py reads
 #
-# [part] starts a part; a row:   n | stem | sizes | prio | Name | Ort | Motiv
+# [part] Title starts a part; a row:   n | stem | sizes | prio | Name | Ort | Motiv
 #   n      hex number: code point 0x10F200 + n (16 px), 0x10F600 + n (32 px); never reused
 #   stem   the files icons/STEM_16.svg and STEM_32.svg, the constants JD_STEM and JD_STEM_L
 #   sizes  16, 32 or "16 32": 16 for every ribbon command (any may land in the quick access
@@ -13,7 +13,7 @@
 # (bold, italic, underline) come once per letter; the app picks by UI language:
 #   bold de F, en B, es N, it/fr G -- italic de/es K, en/fr I, it C -- underline de/en U, es/it/fr S
 
-[rahmen]
+[rahmen] Fenster, Backstage, Statusleiste, Seitenleiste
 010 | save | 16 32 | P1 | Speichern | Schnellzugriff, Backstage | Diskette
 011 | undo | 16 | P1 | Rückgängig | Schnellzugriff | Bogenpfeil nach links
 012 | redo | 16 | P1 | Wiederholen | Schnellzugriff | Bogenpfeil nach rechts
@@ -47,7 +47,7 @@
 02E | dialog_launcher | 16 | P1 | Dialogstarter | Menüband, Gruppen | Ecke mit Pfeil nach rechts unten
 02F | ribbon_collapse | 16 | P2 | Menüband reduzieren | Menüband | Winkel nach oben
 
-[start_text]
+[start_text] Start: Zwischenablage, Schriftart, Absatz
 005 | format_painter | 16 32 | P1 | Format übertragen | Start · Zwischenablage | flacher Pinsel (abgenommen)
 040 | paste | 16 32 | P1 | Einfügen | Start · Zwischenablage | Klemmbrett mit Blatt
 041 | paste_special | 16 | P1 | Inhalte einfügen | Start · Zwischenablage | Klemmbrett mit Liste
@@ -81,7 +81,7 @@
 05D | indent_more | 16 | P2 | Einzug vergrößern | Start · Absatz | Linien mit Pfeil nach rechts
 05E | text_rotate | 16 | P2 | Text drehen | Start · Absatz | A mit Bogenpfeil
 
-[start_shape]
+[start_shape] Start: Tools, Formenarten, Anordnen, Bearbeiten
 000 | pointer | 16 32 | P1 | Zeigertool | Start · Tools | Mauszeiger (abgenommen)
 001 | connector | 16 32 | P1 | Verbinder | Start · Tools, Entwurf · Layout | rechtwinkliger Verbinder zwischen Kästen (abgenommen)
 002 | text | 16 32 | P1 | Text | Start · Tools | A und Textcursor (abgenommen)
@@ -136,7 +136,7 @@
 0AB | select_area | 16 | P1 | Bereichsauswahl | Start · Bearbeiten | gestricheltes Rechteck
 0AC | lasso | 16 32 | P2 | Lassoauswahl | Start · Bearbeiten, Zeichnen · Tools | gestrichelte Schlinge
 
-[einfuegen]
+[einfuegen] Einfügen, Zeichnen
 009 | new_page | 16 32 | P1 | Neue Seite | Einfügen · Seiten | Blatt mit Plus (abgenommen)
 00A | container | 16 32 | P1 | Container | Einfügen · Diagrammteile | Rahmen mit Kopfleiste (abgenommen)
 0E0 | page_blank | 16 | P1 | Leere Seite | Einfügen · Seiten | leeres Blatt
@@ -161,7 +161,7 @@
 0F3 | ink_to_text | 32 | P3 | Freihand in Text | Zeichnen · Konvertieren | geschriebenes a, Pfeil, gedrucktes a
 0F4 | ink_to_shapes | 32 | P3 | Freihand in Shapes | Zeichnen · Konvertieren | Kritzel, Pfeil, Kasten
 
-[entwurf]
+[entwurf] Entwurf
 00B | relayout | 16 32 | P1 | Seite neu layouten | Entwurf · Layout | Kastenhierarchie (abgenommen)
 110 | orientation | 32 | P1 | Ausrichtung | Entwurf · Seite einrichten | Blatt hoch und Blatt quer
 111 | portrait | 16 | P1 | Hochformat | Entwurf · Seite einrichten | Blatt hoch
@@ -192,7 +192,7 @@
 12A | connector_curved | 16 | P1 | Gebogen | Entwurf · Layout | geschwungene Linie
 12B | line_jumps | 16 | P1 | Sprünge | Entwurf · Layout | Linie mit Bogen über eine andere
 
-[daten]
+[daten] Daten, Prozess, Überprüfen
 150 | quick_import | 32 | P2 | Schnellimport | Daten · Externe Daten | Tabelle mit Pfeil zu einer Raute
 151 | custom_import | 32 | P3 | Benutzerdefinierter Import | Daten · Externe Daten | Zylinder mit Pfeil zu einer Raute
 152 | refresh_all | 16 32 | P2 | Alle aktualisieren | Daten · Externe Daten | Tabelle mit Kreispfeil
@@ -225,7 +225,7 @@
 16D | shape_reports | 32 | P2 | Shape-Berichte | Überprüfen · Berichte | Blatt mit Balken
 16E | protect_document | 32 | P3 | Dokument schützen | Überprüfen · Schützen | Blatt mit Schloss
 
-[ansicht]
+[ansicht] Ansicht, Entwicklertools, Hilfe
 00C | task_panes | 16 32 | P1 | Aufgabenbereiche | Ansicht · Fenster | Fenster mit Seitenbereich (abgenommen)
 190 | ruler | 16 | P1 | Lineal | Ansicht · Anzeigen | Lineal mit Teilstrichen
 191 | grid | 16 | P1 | Gitternetz | Ansicht · Anzeigen | Gitter
@@ -263,7 +263,7 @@
 1B1 | training | 32 | P3 | Schulung | Hilfe | Doktorhut
 1B2 | feedback | 32 | P3 | Feedback | Hilfe | Sprechblase mit Herz
 
-[kontext]
+[kontext] Kontextregister
 1F0 | ct_margins | 16 32 | P1 | Ränder | Container-Tools | Rahmen mit Innenabstand
 1F1 | ct_fit_contents | 16 32 | P1 | An Inhalt anpassen | Container-Tools | Rahmen eng um Kästen, Pfeile nach innen
 1F2 | ct_auto_size | 16 32 | P1 | Automatische Größe | Container-Tools | Rahmen mit Pfeilen nach außen

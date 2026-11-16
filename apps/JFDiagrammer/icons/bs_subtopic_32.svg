@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Unterthema, 32 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="3.5" width="16" height="8"/>
+  <path class="ink" stroke="#1D2228" d="M6.5 12V22.5H13"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="13.5" y="17.5" width="16" height="10"/>
+</svg>

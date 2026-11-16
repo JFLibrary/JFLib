@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Datengrafikfelder, 16 px</title>
+  <path class="ink" fill="#1D2228" d="M2 3H4V5H2Z M2 7H4V9H2Z M2 11H4V13H2Z"/>
+  <path class="tint" fill="#1F5FA8" d="M6 3H14V5H6Z M6 7H11V9H6Z M6 11H9V13H6Z"/>
+</svg>

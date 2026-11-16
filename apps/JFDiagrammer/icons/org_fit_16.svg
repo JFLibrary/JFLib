@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>An Seite anpassen, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M2.5 1.5H10.5L13.5 4.5V14.5H2.5Z M10.5 2V4.5H13"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="6.5" y="4.5" width="2" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M7.5 7V8M5.5 10V8.5H9.5V10"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="4.5" y="10.5" width="2" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="8.5" y="10.5" width="2" height="2"/>
+</svg>

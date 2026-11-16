@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Verbinden, 16 px</title>
+  <path class="tint" stroke="#1F5FA8" d="M4 11L9.5 5.5H12"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="1.5" y="11.5" width="2" height="2"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="12.5" y="4.5" width="2" height="2"/>
+</svg>

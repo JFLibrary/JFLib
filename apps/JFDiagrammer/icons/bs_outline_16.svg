@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Gliederungsfenster, 16 px</title>
+  <rect class="body" fill="#DCDEE1" x="2" y="3" width="12" height="1"/>
+  <rect class="ink" stroke="#1D2228" x="1.5" y="2.5" width="13" height="11"/>
+  <path class="ink" stroke="#1D2228" d="M2 4.5H14"/>
+  <path class="tint" stroke="#1F5FA8" d="M3 6.5H11M5 8.5H12M5 10.5H10"/>
+</svg>

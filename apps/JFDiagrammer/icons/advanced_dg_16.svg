@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Erweiterte Datengrafiken, 16 px</title>
+  <path class="body" fill="#DCDEE1" stroke="#1D2228" d="M2 11.5A6 6 0 0 1 14 11.5Z"/>
+  <path class="tint" stroke="#1F5FA8" d="M8.5 10.5L10.5 8.5"/>
+  <rect class="ink" fill="#1D2228" x="7" y="10" width="2" height="2"/>
+</svg>

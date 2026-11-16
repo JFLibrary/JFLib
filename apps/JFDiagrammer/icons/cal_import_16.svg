@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Termine importieren, 16 px</title>
+  <rect class="body" fill="#DCDEE1" x="2" y="3" width="12" height="3"/>
+  <path class="ink" stroke="#1D2228" d="M2 6.5H14"/>
+  <path class="ink" stroke="#1D2228" d="M4.5 1V4M11.5 1V4"/>
+  <path class="ink" stroke="#1D2228" d="M9 14.5H1.5V2.5H14.5V9"/>
+  <path class="shade" fill="#B9BBBE" d="M3 8H5V10H3Z M7 8H9V10H7Z M3 11H5V13H3Z"/>
+  <path class="tint" stroke="#1F5FA8" d="M12 12.5H15"/>
+  <polygon class="tint" fill="#1F5FA8" points="12,10 12,15 9.5,12.5"/>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Nach oben verschieben, 16 px</title>
+  <path class="ink" stroke="#1D2228" d="M7.5 4V6"/>
+  <polygon class="ink" fill="#1D2228" points="5.0,4 10.0,4 7.5,1.5"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="4.5" y="7.5" width="6" height="7"/>
+</svg>

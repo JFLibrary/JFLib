@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Alle aktualisieren, 32 px</title>
+  <rect class="body" fill="#DCDEE1" x="3" y="4" width="24" height="2"/>
+  <path class="ink" stroke="#1D2228" d="M17 26.5H2.5V3.5H27.5V15"/>
+  <path class="ink" stroke="#1D2228" d="M3 6.5H27M15.5 7V26M3 9.5H27M3 12.5H27M3 15.5H17M3 18.5H17M3 21.5H17M3 24.5H17"/>
+  <path class="tint" stroke="#1F5FA8" stroke-width="2" d="M19 24V26L22 29H26L29 26V22L26 19H24"/>
+  <polygon class="tint" fill="#1F5FA8" points="24,16 24,22 21,19"/>
+</svg>

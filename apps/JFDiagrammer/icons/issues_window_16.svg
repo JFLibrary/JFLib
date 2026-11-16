@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Problemfenster, 16 px</title>
+  <rect class="body" fill="#DCDEE1" x="2" y="3" width="12" height="1"/>
+  <path class="ink" stroke="#1D2228" d="M7 13.5H1.5V2.5H14.5V7"/>
+  <path class="ink" stroke="#1D2228" d="M2 4.5H14"/>
+  <path class="tint" fill="#1F5FA8" fill-rule="evenodd" d="M8 15L11.5 8L15 15Z M11 10H12V12H11Z M11 13H12V14H11Z"/>
+</svg>

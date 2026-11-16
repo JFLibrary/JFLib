@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Automatischer Abstand, 16 px</title>
+  <polygon class="hi" fill="#C2D2E5" points="7,2 9,2 9,7 14,7 14,9 9,9 9,14 7,14 7,9 2,9 2,7 7,7"/>
+  <path class="tint" stroke="#1F5FA8" d="M7 1.5H9M7 14.5H9M1.5 7V9M14.5 7V9"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="2.5" width="3" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="10.5" y="2.5" width="3" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="2.5" y="10.5" width="3" height="3"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="10.5" y="10.5" width="3" height="3"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Nummerieren, 32 px</title>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="12.5" y="2.5" width="16" height="7"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="12.5" y="12.5" width="16" height="7"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="12.5" y="22.5" width="16" height="7"/>
+  <path class="tint" fill="#1F5FA8" d="M3 6L7 2H8V10H6V5L4 7Z"/>
+  <path class="tint" stroke="#1F5FA8" stroke-width="2" d="M3 13H7V15L4 18V19H8 M3 23H7V29H3 M4 26H7"/>
+</svg>

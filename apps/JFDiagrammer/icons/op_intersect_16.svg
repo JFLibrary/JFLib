@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Schneiden, 16 px</title>
+  <path class="ink" fill="#1D2228" d="M1 1h1v1h-1Z M3 1h1v1h-1Z M5 1h1v1h-1Z M7 1h1v1h-1Z M9 1h1v1h-1Z M1 3h1v1h-1Z M1 5h1v1h-1Z M1 7h1v1h-1Z M1 9h1v1h-1Z M9 3h1v1h-1Z M3 9h1v1h-1Z M6 14h1v1h-1Z M8 14h1v1h-1Z M10 14h1v1h-1Z M12 14h1v1h-1Z M14 14h1v1h-1Z M14 6h1v1h-1Z M14 8h1v1h-1Z M14 10h1v1h-1Z M14 12h1v1h-1Z M12 6h1v1h-1Z M6 12h1v1h-1Z"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="6.5" y="6.5" width="3" height="3"/>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Fenster wechseln, 32 px</title>
+  <rect class="body" fill="#DCDEE1" x="3" y="4" width="17" height="3"/>
+  <path class="ink" stroke="#1D2228" d="M9 18.5H2.5V3.5H20.5V11"/>
+  <path class="ink" stroke="#1D2228" d="M3 7.5H20"/>
+  <rect class="hi" fill="#C2D2E5" x="11" y="13" width="18" height="3"/>
+  <rect class="tint" stroke="#1F5FA8" x="10.5" y="12.5" width="19" height="16"/>
+  <path class="tint" stroke="#1F5FA8" d="M11 16.5H29"/>
+</svg>

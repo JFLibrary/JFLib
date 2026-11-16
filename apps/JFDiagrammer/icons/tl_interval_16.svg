@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64"
+     fill="none" stroke-width="1">
+  <title>Intervall, 16 px</title>
+  <path class="ink" stroke="#1D2228" d="M1 10.5H15M2.5 11V13M7.5 11V13M12.5 11V13"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="2.5" y="5.5" width="10" height="3"/>
+</svg>

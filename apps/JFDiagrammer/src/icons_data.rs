@@ -3,14 +3,150 @@
 // Each art is filled layers for ui::Symbol::parse(art, [grid, grid]) (lib/ui/symbol.rs);
 // roles: 0 ink, 1 body, 2 shade, 4 tint (the accent), 9 hi (the accent surface).
 
+/// Speichern (Schnellzugriff, Backstage), 16 px
+pub(crate) const JD_SAVE: u32 = 0x10_F210;
+/// Speichern (Schnellzugriff, Backstage), 32 px
+pub(crate) const JD_SAVE_L: u32 = 0x10_F610;
+/// Rückgängig (Schnellzugriff), 16 px
+pub(crate) const JD_UNDO: u32 = 0x10_F211;
+/// Wiederholen (Schnellzugriff), 16 px
+pub(crate) const JD_REDO: u32 = 0x10_F212;
+/// Symbolleiste anpassen (Schnellzugriff), 16 px
+pub(crate) const JD_QAT_CUSTOMIZE: u32 = 0x10_F213;
+/// Menüband-Anzeigeoptionen (Titelleiste), 16 px
+pub(crate) const JD_RIBBON_DISPLAY: u32 = 0x10_F214;
 /// Suchen (Registerzeile, Seitenleiste, Start · Bearbeiten), 16 px
 pub(crate) const JD_SEARCH: u32 = 0x10_F215;
+/// Kommentare (Registerzeile, Überprüfen · Kommentare), 16 px
+pub(crate) const JD_COMMENTS: u32 = 0x10_F216;
+/// Zurück (Backstage), 32 px
+pub(crate) const JD_BACK_L: u32 = 0x10_F617;
+/// Startseite (Backstage), 32 px
+pub(crate) const JD_HOME_L: u32 = 0x10_F618;
+/// Neu (Backstage, Schnellzugriff), 16 px
+pub(crate) const JD_NEW: u32 = 0x10_F219;
+/// Neu (Backstage, Schnellzugriff), 32 px
+pub(crate) const JD_NEW_L: u32 = 0x10_F619;
+/// Öffnen (Backstage, Schnellzugriff), 16 px
+pub(crate) const JD_OPEN: u32 = 0x10_F21A;
+/// Öffnen (Backstage, Schnellzugriff), 32 px
+pub(crate) const JD_OPEN_L: u32 = 0x10_F61A;
+/// Informationen (Backstage), 32 px
+pub(crate) const JD_INFO_L: u32 = 0x10_F61B;
+/// Speichern unter (Backstage), 32 px
+pub(crate) const JD_SAVE_AS_L: u32 = 0x10_F61C;
+/// Drucken (Backstage, Schnellzugriff), 16 px
+pub(crate) const JD_PRINT: u32 = 0x10_F21D;
+/// Drucken (Backstage, Schnellzugriff), 32 px
+pub(crate) const JD_PRINT_L: u32 = 0x10_F61D;
+/// Exportieren (Backstage), 32 px
+pub(crate) const JD_EXPORT_L: u32 = 0x10_F61E;
+/// Schließen (Backstage), 32 px
+pub(crate) const JD_CLOSE_L: u32 = 0x10_F61F;
 /// Optionen (Backstage), 32 px
 pub(crate) const JD_OPTIONS_L: u32 = 0x10_F620;
+/// Zeichnung (Backstage, Dateilisten), 32 px
+pub(crate) const JD_FILE_DRAWING_L: u32 = 0x10_F621;
+/// Kopie senden (Backstage · Freigeben), 32 px
+pub(crate) const JD_SEND_COPY_L: u32 = 0x10_F622;
+/// Als PDF senden (Backstage · Freigeben), 32 px
+pub(crate) const JD_SEND_PDF_L: u32 = 0x10_F623;
+/// Präsentationsmodus (Statusleiste, Ansicht · Ansichten), 16 px
+pub(crate) const JD_PRESENTATION: u32 = 0x10_F224;
+/// Präsentationsmodus (Statusleiste, Ansicht · Ansichten), 32 px
+pub(crate) const JD_PRESENTATION_L: u32 = 0x10_F624;
+/// Verkleinern (Statusleiste), 16 px
+pub(crate) const JD_ZOOM_OUT: u32 = 0x10_F225;
+/// Vergrößern (Statusleiste), 16 px
+pub(crate) const JD_ZOOM_IN: u32 = 0x10_F226;
+/// An Fenster anpassen (Statusleiste, Ansicht · Zoom), 16 px
+pub(crate) const JD_FIT_WINDOW: u32 = 0x10_F227;
+/// Fenster wechseln (Statusleiste, Ansicht · Fenster), 16 px
+pub(crate) const JD_SWITCH_WINDOW: u32 = 0x10_F228;
+/// Fenster wechseln (Statusleiste, Ansicht · Fenster), 32 px
+pub(crate) const JD_SWITCH_WINDOW_L: u32 = 0x10_F628;
+/// Seite einfügen (Seitenregister), 16 px
+pub(crate) const JD_PAGE_ADD: u32 = 0x10_F229;
+/// Alle Seiten (Seitenregister), 16 px
+pub(crate) const JD_PAGES_ALL: u32 = 0x10_F22A;
+/// Einklappen (Seitenleiste), 16 px
+pub(crate) const JD_SIDEBAR_COLLAPSE: u32 = 0x10_F22B;
+/// Schablonen (Seitenleiste), 16 px
+pub(crate) const JD_STENCIL_MENU: u32 = 0x10_F22C;
+/// Weitere Shapes (Seitenleiste), 16 px
+pub(crate) const JD_MORE_SHAPES: u32 = 0x10_F22D;
+/// Dialogstarter (Menüband, Gruppen), 16 px
+pub(crate) const JD_DIALOG_LAUNCHER: u32 = 0x10_F22E;
+/// Menüband reduzieren (Menüband), 16 px
+pub(crate) const JD_RIBBON_COLLAPSE: u32 = 0x10_F22F;
 /// Format übertragen (Start · Zwischenablage), 16 px
 pub(crate) const JD_FORMAT_PAINTER: u32 = 0x10_F205;
 /// Format übertragen (Start · Zwischenablage), 32 px
 pub(crate) const JD_FORMAT_PAINTER_L: u32 = 0x10_F605;
+/// Einfügen (Start · Zwischenablage), 16 px
+pub(crate) const JD_PASTE: u32 = 0x10_F240;
+/// Einfügen (Start · Zwischenablage), 32 px
+pub(crate) const JD_PASTE_L: u32 = 0x10_F640;
+/// Inhalte einfügen (Start · Zwischenablage), 16 px
+pub(crate) const JD_PASTE_SPECIAL: u32 = 0x10_F241;
+/// Als Link einfügen (Start · Zwischenablage), 16 px
+pub(crate) const JD_PASTE_LINK: u32 = 0x10_F242;
+/// Duplizieren (Start · Zwischenablage), 16 px
+pub(crate) const JD_DUPLICATE: u32 = 0x10_F243;
+/// Ausschneiden (Start · Zwischenablage), 16 px
+pub(crate) const JD_CUT: u32 = 0x10_F244;
+/// Kopieren (Start · Zwischenablage), 16 px
+pub(crate) const JD_COPY: u32 = 0x10_F245;
+/// Schrift vergrößern (Start · Schriftart), 16 px
+pub(crate) const JD_FONT_GROW: u32 = 0x10_F246;
+/// Schrift verkleinern (Start · Schriftart), 16 px
+pub(crate) const JD_FONT_SHRINK: u32 = 0x10_F247;
+/// Fett (F) (Start · Schriftart), 16 px
+pub(crate) const JD_BOLD_F: u32 = 0x10_F248;
+/// Fett (B) (Start · Schriftart), 16 px
+pub(crate) const JD_BOLD_B: u32 = 0x10_F249;
+/// Fett (N) (Start · Schriftart), 16 px
+pub(crate) const JD_BOLD_N: u32 = 0x10_F24A;
+/// Fett (G) (Start · Schriftart), 16 px
+pub(crate) const JD_BOLD_G: u32 = 0x10_F24B;
+/// Kursiv (K) (Start · Schriftart), 16 px
+pub(crate) const JD_ITALIC_K: u32 = 0x10_F24C;
+/// Kursiv (I) (Start · Schriftart), 16 px
+pub(crate) const JD_ITALIC_I: u32 = 0x10_F24D;
+/// Kursiv (C) (Start · Schriftart), 16 px
+pub(crate) const JD_ITALIC_C: u32 = 0x10_F24E;
+/// Unterstrichen (U) (Start · Schriftart), 16 px
+pub(crate) const JD_UNDERLINE_U: u32 = 0x10_F24F;
+/// Unterstrichen (S) (Start · Schriftart), 16 px
+pub(crate) const JD_UNDERLINE_S: u32 = 0x10_F250;
+/// Durchgestrichen (Start · Schriftart), 16 px
+pub(crate) const JD_STRIKETHROUGH: u32 = 0x10_F251;
+/// Groß-/Kleinschreibung (Start · Schriftart), 16 px
+pub(crate) const JD_CHANGE_CASE: u32 = 0x10_F252;
+/// Schriftfarbe (Start · Schriftart), 16 px
+pub(crate) const JD_FONT_COLOR: u32 = 0x10_F253;
+/// Oben ausrichten (Start · Absatz), 16 px
+pub(crate) const JD_VALIGN_TOP: u32 = 0x10_F254;
+/// Mittig ausrichten (Start · Absatz), 16 px
+pub(crate) const JD_VALIGN_MIDDLE: u32 = 0x10_F255;
+/// Unten ausrichten (Start · Absatz), 16 px
+pub(crate) const JD_VALIGN_BOTTOM: u32 = 0x10_F256;
+/// Linksbündig (Start · Absatz), 16 px
+pub(crate) const JD_TEXT_LEFT: u32 = 0x10_F257;
+/// Zentriert (Start · Absatz), 16 px
+pub(crate) const JD_TEXT_CENTER: u32 = 0x10_F258;
+/// Rechtsbündig (Start · Absatz), 16 px
+pub(crate) const JD_TEXT_RIGHT: u32 = 0x10_F259;
+/// Blocksatz (Start · Absatz), 16 px
+pub(crate) const JD_TEXT_JUSTIFY: u32 = 0x10_F25A;
+/// Aufzählungszeichen (Start · Absatz), 16 px
+pub(crate) const JD_BULLETS: u32 = 0x10_F25B;
+/// Einzug verkleinern (Start · Absatz), 16 px
+pub(crate) const JD_INDENT_LESS: u32 = 0x10_F25C;
+/// Einzug vergrößern (Start · Absatz), 16 px
+pub(crate) const JD_INDENT_MORE: u32 = 0x10_F25D;
+/// Text drehen (Start · Absatz), 16 px
+pub(crate) const JD_TEXT_ROTATE: u32 = 0x10_F25E;
 /// Zeigertool (Start · Tools), 16 px
 pub(crate) const JD_POINTER: u32 = 0x10_F200;
 /// Zeigertool (Start · Tools), 32 px
@@ -43,6 +179,100 @@ pub(crate) const JD_BRING_FRONT_L: u32 = 0x10_F607;
 pub(crate) const JD_GROUP: u32 = 0x10_F208;
 /// Gruppieren (Start · Anordnen), 32 px
 pub(crate) const JD_GROUP_L: u32 = 0x10_F608;
+/// Ellipse (Start · Tools), 16 px
+pub(crate) const JD_ELLIPSE: u32 = 0x10_F280;
+/// Linie (Start · Tools), 16 px
+pub(crate) const JD_LINE: u32 = 0x10_F281;
+/// Freihandform (Start · Tools), 16 px
+pub(crate) const JD_FREEFORM: u32 = 0x10_F282;
+/// Bogen (Start · Tools), 16 px
+pub(crate) const JD_ARC: u32 = 0x10_F283;
+/// Bleistift (Start · Tools), 16 px
+pub(crate) const JD_PENCIL: u32 = 0x10_F284;
+/// Textblock (Start · Tools), 16 px
+pub(crate) const JD_TEXT_BLOCK: u32 = 0x10_F285;
+/// Schnellformatvorlagen (Start · Formenarten), 32 px
+pub(crate) const JD_QUICK_STYLES_L: u32 = 0x10_F686;
+/// Füllung (Start · Formenarten), 16 px
+pub(crate) const JD_FILL: u32 = 0x10_F287;
+/// Linie (Start · Formenarten, Zeichnen · Stifte), 16 px
+pub(crate) const JD_LINE_COLOR: u32 = 0x10_F288;
+/// Effekte (Start · Formenarten), 16 px
+pub(crate) const JD_EFFECTS: u32 = 0x10_F289;
+/// Stärke (Start · Formenarten, Zeichnen · Stifte), 16 px
+pub(crate) const JD_LINE_WEIGHT: u32 = 0x10_F28A;
+/// Striche (Start · Formenarten), 16 px
+pub(crate) const JD_LINE_DASH: u32 = 0x10_F28B;
+/// Pfeile (Start · Formenarten), 16 px
+pub(crate) const JD_LINE_ARROWS: u32 = 0x10_F28C;
+/// Linienoptionen (Start · Formenarten), 16 px
+pub(crate) const JD_LINE_OPTIONS: u32 = 0x10_F28D;
+/// Weitere Farben (Start · Formenarten), 16 px
+pub(crate) const JD_MORE_COLORS: u32 = 0x10_F28E;
+/// Positionieren (Start · Anordnen), 16 px
+pub(crate) const JD_POSITION: u32 = 0x10_F28F;
+/// Positionieren (Start · Anordnen), 32 px
+pub(crate) const JD_POSITION_L: u32 = 0x10_F68F;
+/// Links ausrichten (Start · Anordnen), 16 px
+pub(crate) const JD_ALIGN_LEFT: u32 = 0x10_F290;
+/// Zentriert ausrichten (Start · Anordnen), 16 px
+pub(crate) const JD_ALIGN_CENTER: u32 = 0x10_F291;
+/// Rechts ausrichten (Start · Anordnen), 16 px
+pub(crate) const JD_ALIGN_RIGHT: u32 = 0x10_F292;
+/// Oben ausrichten (Start · Anordnen), 16 px
+pub(crate) const JD_ALIGN_TOP: u32 = 0x10_F293;
+/// Mittig ausrichten (Start · Anordnen), 16 px
+pub(crate) const JD_ALIGN_MIDDLE: u32 = 0x10_F294;
+/// Unten ausrichten (Start · Anordnen), 16 px
+pub(crate) const JD_ALIGN_BOTTOM: u32 = 0x10_F295;
+/// Automatischer Abstand (Start · Anordnen, Daten · Datengrafiken), 16 px
+pub(crate) const JD_AUTO_SPACE: u32 = 0x10_F296;
+/// Auto-Ausrichten und Abstand (Start · Anordnen), 16 px
+pub(crate) const JD_AUTO_ALIGN_SPACE: u32 = 0x10_F297;
+/// Abstandsoptionen (Start · Anordnen), 16 px
+pub(crate) const JD_SPACING_OPTIONS: u32 = 0x10_F298;
+/// Horizontal verteilen (Start · Anordnen), 16 px
+pub(crate) const JD_DISTRIBUTE_H: u32 = 0x10_F299;
+/// Vertikal verteilen (Start · Anordnen), 16 px
+pub(crate) const JD_DISTRIBUTE_V: u32 = 0x10_F29A;
+/// Von Seitenumbrüchen verschieben (Start · Anordnen), 16 px
+pub(crate) const JD_MOVE_OFF_BREAKS: u32 = 0x10_F29B;
+/// 90° nach links drehen (Start · Anordnen), 16 px
+pub(crate) const JD_ROTATE_LEFT: u32 = 0x10_F29C;
+/// 90° nach rechts drehen (Start · Anordnen), 16 px
+pub(crate) const JD_ROTATE_RIGHT: u32 = 0x10_F29D;
+/// Horizontal spiegeln (Start · Anordnen), 16 px
+pub(crate) const JD_FLIP_H: u32 = 0x10_F29E;
+/// Vertikal spiegeln (Start · Anordnen), 16 px
+pub(crate) const JD_FLIP_V: u32 = 0x10_F29F;
+/// Eine Ebene nach vorne (Start · Anordnen), 16 px
+pub(crate) const JD_BRING_FORWARD: u32 = 0x10_F2A0;
+/// In den Hintergrund (Start · Anordnen), 16 px
+pub(crate) const JD_SEND_BACK: u32 = 0x10_F2A1;
+/// Eine Ebene nach hinten (Start · Anordnen), 16 px
+pub(crate) const JD_SEND_BACKWARD: u32 = 0x10_F2A2;
+/// Gruppierung aufheben (Start · Anordnen), 16 px
+pub(crate) const JD_UNGROUP: u32 = 0x10_F2A3;
+/// Shape ändern (Start · Bearbeiten), 32 px
+pub(crate) const JD_CHANGE_SHAPE_L: u32 = 0x10_F6A4;
+/// Ersetzen (Start · Bearbeiten), 16 px
+pub(crate) const JD_REPLACE: u32 = 0x10_F2A5;
+/// Ebene zuweisen (Start · Bearbeiten), 16 px
+pub(crate) const JD_LAYER_ASSIGN: u32 = 0x10_F2A6;
+/// Ebeneneigenschaften (Start · Bearbeiten), 16 px
+pub(crate) const JD_LAYER_PROPERTIES: u32 = 0x10_F2A7;
+/// Markieren (Start · Bearbeiten), 16 px
+pub(crate) const JD_SELECT: u32 = 0x10_F2A8;
+/// Alles markieren (Start · Bearbeiten), 16 px
+pub(crate) const JD_SELECT_ALL: u32 = 0x10_F2A9;
+/// Nach Typ markieren (Start · Bearbeiten), 16 px
+pub(crate) const JD_SELECT_BY_TYPE: u32 = 0x10_F2AA;
+/// Bereichsauswahl (Start · Bearbeiten), 16 px
+pub(crate) const JD_SELECT_AREA: u32 = 0x10_F2AB;
+/// Lassoauswahl (Start · Bearbeiten, Zeichnen · Tools), 16 px
+pub(crate) const JD_LASSO: u32 = 0x10_F2AC;
+/// Lassoauswahl (Start · Bearbeiten, Zeichnen · Tools), 32 px
+pub(crate) const JD_LASSO_L: u32 = 0x10_F6AC;
 /// Neue Seite (Einfügen · Seiten), 16 px
 pub(crate) const JD_NEW_PAGE: u32 = 0x10_F209;
 /// Neue Seite (Einfügen · Seiten), 32 px
@@ -51,18 +281,434 @@ pub(crate) const JD_NEW_PAGE_L: u32 = 0x10_F609;
 pub(crate) const JD_CONTAINER: u32 = 0x10_F20A;
 /// Container (Einfügen · Diagrammteile), 32 px
 pub(crate) const JD_CONTAINER_L: u32 = 0x10_F60A;
+/// Leere Seite (Einfügen · Seiten), 16 px
+pub(crate) const JD_PAGE_BLANK: u32 = 0x10_F2E0;
+/// Hintergrundseite (Einfügen · Seiten), 16 px
+pub(crate) const JD_PAGE_BACKGROUND: u32 = 0x10_F2E1;
+/// Seite duplizieren (Einfügen · Seiten), 16 px
+pub(crate) const JD_PAGE_DUPLICATE: u32 = 0x10_F2E2;
+/// Bilder (Einfügen · Illustrationen), 16 px
+pub(crate) const JD_PICTURES: u32 = 0x10_F2E3;
+/// Bilder (Einfügen · Illustrationen), 32 px
+pub(crate) const JD_PICTURES_L: u32 = 0x10_F6E3;
+/// Piktogramme (Einfügen · Illustrationen), 32 px
+pub(crate) const JD_PICTOGRAMS_L: u32 = 0x10_F6E4;
+/// Diagramm (Einfügen · Illustrationen), 32 px
+pub(crate) const JD_CHART_L: u32 = 0x10_F6E5;
+/// CAD-Zeichnung (Einfügen · Illustrationen), 32 px
+pub(crate) const JD_CAD_L: u32 = 0x10_F6E6;
+/// Beschriftung (Einfügen · Diagrammteile), 16 px
+pub(crate) const JD_CALLOUT: u32 = 0x10_F2E7;
+/// Beschriftung (Einfügen · Diagrammteile), 32 px
+pub(crate) const JD_CALLOUT_L: u32 = 0x10_F6E7;
+/// Verbinder (Einfügen · Diagrammteile), 32 px
+pub(crate) const JD_INSERT_CONNECTOR_L: u32 = 0x10_F6E8;
+/// Link (Einfügen · Links), 16 px
+pub(crate) const JD_LINK: u32 = 0x10_F2E9;
+/// Link (Einfügen · Links), 32 px
+pub(crate) const JD_LINK_L: u32 = 0x10_F6E9;
+/// Textfeld (Einfügen · Text), 32 px
+pub(crate) const JD_TEXT_BOX_L: u32 = 0x10_F6EA;
+/// Horizontales Textfeld (Einfügen · Text), 16 px
+pub(crate) const JD_TEXT_BOX_H: u32 = 0x10_F2EB;
+/// Vertikales Textfeld (Einfügen · Text), 16 px
+pub(crate) const JD_TEXT_BOX_V: u32 = 0x10_F2EC;
+/// QuickInfo (Einfügen · Text), 32 px
+pub(crate) const JD_SCREEN_TIP_L: u32 = 0x10_F6ED;
+/// Objekt (Einfügen · Text), 32 px
+pub(crate) const JD_OBJECT_L: u32 = 0x10_F6EE;
+/// Feld (Einfügen · Text), 32 px
+pub(crate) const JD_FIELD_L: u32 = 0x10_F6EF;
+/// Symbol (Einfügen · Text), 32 px
+pub(crate) const JD_SYMBOL_L: u32 = 0x10_F6F0;
+/// Mit Finger zeichnen (Zeichnen · Tools), 32 px
+pub(crate) const JD_INK_FINGER_L: u32 = 0x10_F6F1;
+/// Radierer (Zeichnen · Tools), 32 px
+pub(crate) const JD_ERASER_L: u32 = 0x10_F6F2;
+/// Freihand in Text (Zeichnen · Konvertieren), 32 px
+pub(crate) const JD_INK_TO_TEXT_L: u32 = 0x10_F6F3;
+/// Freihand in Shapes (Zeichnen · Konvertieren), 32 px
+pub(crate) const JD_INK_TO_SHAPES_L: u32 = 0x10_F6F4;
 /// Seite neu layouten (Entwurf · Layout), 16 px
 pub(crate) const JD_RELAYOUT: u32 = 0x10_F20B;
 /// Seite neu layouten (Entwurf · Layout), 32 px
 pub(crate) const JD_RELAYOUT_L: u32 = 0x10_F60B;
+/// Ausrichtung (Entwurf · Seite einrichten), 32 px
+pub(crate) const JD_ORIENTATION_L: u32 = 0x10_F710;
+/// Hochformat (Entwurf · Seite einrichten), 16 px
+pub(crate) const JD_PORTRAIT: u32 = 0x10_F311;
+/// Querformat (Entwurf · Seite einrichten), 16 px
+pub(crate) const JD_LANDSCAPE: u32 = 0x10_F312;
+/// Format (Entwurf · Seite einrichten), 32 px
+pub(crate) const JD_PAGE_SIZE_L: u32 = 0x10_F713;
+/// Papierformat (Entwurf · Seite einrichten), 16 px
+pub(crate) const JD_PAPER_SIZE: u32 = 0x10_F314;
+/// An Zeichnung anpassen (Entwurf · Seite einrichten), 16 px
+pub(crate) const JD_FIT_DRAWING: u32 = 0x10_F315;
+/// Weitere Formate (Entwurf · Seite einrichten), 16 px
+pub(crate) const JD_MORE_SIZES: u32 = 0x10_F316;
+/// Automatisch anpassen (Entwurf · Seite einrichten), 32 px
+pub(crate) const JD_AUTO_SIZE_L: u32 = 0x10_F717;
+/// Farben (Entwurf · Varianten), 16 px
+pub(crate) const JD_VAR_COLORS: u32 = 0x10_F318;
+/// Effekte (Entwurf · Varianten), 16 px
+pub(crate) const JD_VAR_EFFECTS: u32 = 0x10_F319;
+/// Verbinder (Entwurf · Varianten), 16 px
+pub(crate) const JD_VAR_CONNECTORS: u32 = 0x10_F31A;
+/// Schriftarten (Entwurf · Varianten), 16 px
+pub(crate) const JD_VAR_FONTS: u32 = 0x10_F31B;
+/// Verzierung (Entwurf · Varianten), 16 px
+pub(crate) const JD_VAR_EMBELLISHMENT: u32 = 0x10_F31C;
+/// Hintergründe (Entwurf · Hintergründe), 32 px
+pub(crate) const JD_BACKGROUNDS_L: u32 = 0x10_F71D;
+/// Rahmen und Titel (Entwurf · Hintergründe), 32 px
+pub(crate) const JD_BORDERS_TITLES_L: u32 = 0x10_F71E;
+/// Hintergrundfarbe (Entwurf · Hintergründe), 16 px
+pub(crate) const JD_BACKGROUND_COLOR: u32 = 0x10_F31F;
+/// Fluss nach unten (Entwurf · Layout), 16 px
+pub(crate) const JD_LAYOUT_FLOW_DOWN: u32 = 0x10_F320;
+/// Fluss nach oben (Entwurf · Layout), 16 px
+pub(crate) const JD_LAYOUT_FLOW_UP: u32 = 0x10_F321;
+/// Fluss nach rechts (Entwurf · Layout), 16 px
+pub(crate) const JD_LAYOUT_FLOW_RIGHT: u32 = 0x10_F322;
+/// Fluss nach links (Entwurf · Layout), 16 px
+pub(crate) const JD_LAYOUT_FLOW_LEFT: u32 = 0x10_F323;
+/// Hierarchie (Entwurf · Layout), 16 px
+pub(crate) const JD_LAYOUT_HIERARCHY: u32 = 0x10_F324;
+/// Kompakter Baum (Entwurf · Layout), 16 px
+pub(crate) const JD_LAYOUT_COMPACT: u32 = 0x10_F325;
+/// Radial (Entwurf · Layout), 16 px
+pub(crate) const JD_LAYOUT_RADIAL: u32 = 0x10_F326;
+/// Kreisförmig (Entwurf · Layout), 16 px
+pub(crate) const JD_LAYOUT_CIRCULAR: u32 = 0x10_F327;
+/// Rechtwinklig (Entwurf · Layout), 16 px
+pub(crate) const JD_CONNECTOR_RIGHT_ANGLE: u32 = 0x10_F328;
+/// Gerade (Entwurf · Layout), 16 px
+pub(crate) const JD_CONNECTOR_STRAIGHT: u32 = 0x10_F329;
+/// Gebogen (Entwurf · Layout), 16 px
+pub(crate) const JD_CONNECTOR_CURVED: u32 = 0x10_F32A;
+/// Sprünge (Entwurf · Layout), 16 px
+pub(crate) const JD_LINE_JUMPS: u32 = 0x10_F32B;
+/// Schnellimport (Daten · Externe Daten), 32 px
+pub(crate) const JD_QUICK_IMPORT_L: u32 = 0x10_F750;
+/// Benutzerdefinierter Import (Daten · Externe Daten), 32 px
+pub(crate) const JD_CUSTOM_IMPORT_L: u32 = 0x10_F751;
+/// Alle aktualisieren (Daten · Externe Daten), 16 px
+pub(crate) const JD_REFRESH_ALL: u32 = 0x10_F352;
+/// Alle aktualisieren (Daten · Externe Daten), 32 px
+pub(crate) const JD_REFRESH_ALL_L: u32 = 0x10_F752;
+/// Position (Daten · Datengrafiken), 16 px
+pub(crate) const JD_DG_POSITION: u32 = 0x10_F353;
+/// Konfigurieren (Daten · Datengrafiken), 16 px
+pub(crate) const JD_DG_CONFIGURE: u32 = 0x10_F354;
+/// Legende einfügen (Daten · Daten anzeigen), 32 px
+pub(crate) const JD_LEGEND_L: u32 = 0x10_F755;
+/// Legende horizontal (Daten · Daten anzeigen), 32 px
+pub(crate) const JD_LEGEND_H_L: u32 = 0x10_F756;
+/// Legende vertikal (Daten · Daten anzeigen), 32 px
+pub(crate) const JD_LEGEND_V_L: u32 = 0x10_F757;
+/// Shape-Daten (Daten · Einblenden), 16 px
+pub(crate) const JD_SHAPE_DATA: u32 = 0x10_F358;
+/// Externe Daten (Daten · Einblenden), 16 px
+pub(crate) const JD_EXTERNAL_DATA: u32 = 0x10_F359;
+/// Datengrafikfelder (Daten · Einblenden), 16 px
+pub(crate) const JD_DG_FIELDS: u32 = 0x10_F35A;
+/// Daten verknüpfen (Daten · Erweitert), 16 px
+pub(crate) const JD_LINK_DATA: u32 = 0x10_F35B;
+/// Erweiterte Datengrafiken (Daten · Erweitert), 16 px
+pub(crate) const JD_ADVANCED_DG: u32 = 0x10_F35C;
+/// Neu erstellen (Prozess · Teilprozess), 32 px
+pub(crate) const JD_SUBPROCESS_NEW_L: u32 = 0x10_F75D;
+/// Mit vorhandenem verknüpfen (Prozess · Teilprozess), 32 px
+pub(crate) const JD_SUBPROCESS_LINK_L: u32 = 0x10_F75E;
+/// Aus Auswahl erstellen (Prozess · Teilprozess), 32 px
+pub(crate) const JD_SUBPROCESS_SELECTION_L: u32 = 0x10_F75F;
+/// Diagramm überprüfen (Prozess · Überprüfung), 32 px
+pub(crate) const JD_CHECK_DIAGRAM_L: u32 = 0x10_F760;
+/// Zu überprüfende Regeln (Prozess · Überprüfung), 16 px
+pub(crate) const JD_RULES_CHECK: u32 = 0x10_F361;
+/// Regeln importieren (Prozess · Überprüfung), 16 px
+pub(crate) const JD_RULES_IMPORT: u32 = 0x10_F362;
+/// Problem ignorieren (Prozess · Überprüfung), 16 px
+pub(crate) const JD_ISSUE_IGNORE: u32 = 0x10_F363;
+/// Problemfenster (Prozess · Überprüfung), 16 px
+pub(crate) const JD_ISSUES_WINDOW: u32 = 0x10_F364;
+/// Regeln bearbeiten (Prozess · Überprüfung), 32 px
+pub(crate) const JD_RULES_EDIT_L: u32 = 0x10_F765;
+/// Rechtschreibung (Überprüfen · Dokumentprüfung), 32 px
+pub(crate) const JD_SPELLING_L: u32 = 0x10_F766;
+/// Thesaurus (Überprüfen · Dokumentprüfung), 32 px
+pub(crate) const JD_THESAURUS_L: u32 = 0x10_F767;
+/// Barrierefreiheit überprüfen (Überprüfen · Barrierefreiheit), 32 px
+pub(crate) const JD_ACCESSIBILITY_L: u32 = 0x10_F768;
+/// Sprache (Überprüfen · Sprache), 32 px
+pub(crate) const JD_LANGUAGE_L: u32 = 0x10_F769;
+/// Korrektursprache (Überprüfen · Sprache), 16 px
+pub(crate) const JD_PROOF_LANGUAGE: u32 = 0x10_F36A;
+/// Neuer Kommentar (Überprüfen · Kommentare), 32 px
+pub(crate) const JD_COMMENT_NEW_L: u32 = 0x10_F76B;
+/// Tags anzeigen (Überprüfen · Kommentare), 16 px
+pub(crate) const JD_SHOW_TAGS: u32 = 0x10_F36C;
+/// Shape-Berichte (Überprüfen · Berichte), 32 px
+pub(crate) const JD_SHAPE_REPORTS_L: u32 = 0x10_F76D;
+/// Dokument schützen (Überprüfen · Schützen), 32 px
+pub(crate) const JD_PROTECT_DOCUMENT_L: u32 = 0x10_F76E;
 /// Aufgabenbereiche (Ansicht · Fenster), 16 px
 pub(crate) const JD_TASK_PANES: u32 = 0x10_F20C;
 /// Aufgabenbereiche (Ansicht · Fenster), 32 px
 pub(crate) const JD_TASK_PANES_L: u32 = 0x10_F60C;
+/// Lineal (Ansicht · Anzeigen), 16 px
+pub(crate) const JD_RULER: u32 = 0x10_F390;
+/// Gitternetz (Ansicht · Anzeigen), 16 px
+pub(crate) const JD_GRID: u32 = 0x10_F391;
+/// Führungslinien (Ansicht · Anzeigen), 16 px
+pub(crate) const JD_GUIDES: u32 = 0x10_F392;
+/// Ausrichten und Kleben (Ansicht · Visuelle Hilfsmittel), 16 px
+pub(crate) const JD_SNAP_GLUE: u32 = 0x10_F393;
 /// Zoom (Ansicht · Zoom), 16 px
 pub(crate) const JD_ZOOM: u32 = 0x10_F394;
 /// Zoom (Ansicht · Zoom), 32 px
 pub(crate) const JD_ZOOM_L: u32 = 0x10_F794;
+/// Seitenbreite (Ansicht · Zoom), 16 px
+pub(crate) const JD_PAGE_WIDTH: u32 = 0x10_F395;
+/// Neues Fenster (Ansicht · Fenster), 32 px
+pub(crate) const JD_NEW_WINDOW_L: u32 = 0x10_F796;
+/// Alle anordnen (Ansicht · Fenster), 32 px
+pub(crate) const JD_ARRANGE_ALL_L: u32 = 0x10_F797;
+/// Überlappend (Ansicht · Fenster), 32 px
+pub(crate) const JD_CASCADE_L: u32 = 0x10_F798;
+/// Shapes anordnen (Ansicht · Werkzeuge), 16 px
+pub(crate) const JD_ARRAY_SHAPES: u32 = 0x10_F399;
+/// Shapes anordnen (Ansicht · Werkzeuge), 32 px
+pub(crate) const JD_ARRAY_SHAPES_L: u32 = 0x10_F799;
+/// Nummerieren (Ansicht · Werkzeuge), 16 px
+pub(crate) const JD_NUMBER_SHAPES: u32 = 0x10_F39A;
+/// Nummerieren (Ansicht · Werkzeuge), 32 px
+pub(crate) const JD_NUMBER_SHAPES_L: u32 = 0x10_F79A;
+/// Maßlinie (Ansicht · Werkzeuge), 16 px
+pub(crate) const JD_DIMENSION: u32 = 0x10_F39B;
+/// Maßlinie (Ansicht · Werkzeuge), 32 px
+pub(crate) const JD_DIMENSION_L: u32 = 0x10_F79B;
+/// ShapeSheet anzeigen (Entwicklertools · Shape-Design), 16 px
+pub(crate) const JD_SHAPESHEET: u32 = 0x10_F39C;
+/// ShapeSheet anzeigen (Entwicklertools · Shape-Design), 32 px
+pub(crate) const JD_SHAPESHEET_L: u32 = 0x10_F79C;
+/// Vereinigen (Entwicklertools · Vorgänge), 16 px
+pub(crate) const JD_OP_UNION: u32 = 0x10_F39D;
+/// Kombinieren (Entwicklertools · Vorgänge), 16 px
+pub(crate) const JD_OP_COMBINE: u32 = 0x10_F39E;
+/// Fragmentieren (Entwicklertools · Vorgänge), 16 px
+pub(crate) const JD_OP_FRAGMENT: u32 = 0x10_F39F;
+/// Schneiden (Entwicklertools · Vorgänge), 16 px
+pub(crate) const JD_OP_INTERSECT: u32 = 0x10_F3A0;
+/// Subtrahieren (Entwicklertools · Vorgänge), 16 px
+pub(crate) const JD_OP_SUBTRACT: u32 = 0x10_F3A1;
+/// Verbinden (Entwicklertools · Vorgänge), 16 px
+pub(crate) const JD_OP_JOIN: u32 = 0x10_F3A2;
+/// Trimmen (Entwicklertools · Vorgänge), 16 px
+pub(crate) const JD_OP_TRIM: u32 = 0x10_F3A3;
+/// Versatz (Entwicklertools · Vorgänge), 16 px
+pub(crate) const JD_OP_OFFSET: u32 = 0x10_F3A4;
+/// Kurve anpassen (Entwicklertools · Vorgänge), 16 px
+pub(crate) const JD_OP_FIT_CURVE: u32 = 0x10_F3A5;
+/// Shape-Name (Entwicklertools · Shape-Design), 16 px
+pub(crate) const JD_SHAPE_NAME: u32 = 0x10_F3A6;
+/// Verhalten (Entwicklertools · Shape-Design), 16 px
+pub(crate) const JD_BEHAVIOR: u32 = 0x10_F3A7;
+/// Schutz (Entwicklertools · Shape-Design), 16 px
+pub(crate) const JD_PROTECTION: u32 = 0x10_F3A8;
+/// Neue Schablone (Entwicklertools · Schablone), 32 px
+pub(crate) const JD_NEW_STENCIL_L: u32 = 0x10_F7A9;
+/// Dokumentschablone (Entwicklertools · Einblenden), 16 px
+pub(crate) const JD_DOCUMENT_STENCIL: u32 = 0x10_F3AA;
+/// Zeichnungsexplorer (Entwicklertools · Einblenden), 16 px
+pub(crate) const JD_DRAWING_EXPLORER: u32 = 0x10_F3AB;
+/// Masterexplorer (Entwicklertools · Einblenden), 16 px
+pub(crate) const JD_MASTER_EXPLORER: u32 = 0x10_F3AC;
+/// Ereignisüberwachung (Entwicklertools · Debuggen), 16 px
+pub(crate) const JD_EVENT_MONITOR: u32 = 0x10_F3AD;
+/// Beständige Ereignisse (Entwicklertools · Debuggen), 16 px
+pub(crate) const JD_PERSISTENT_EVENTS: u32 = 0x10_F3AE;
+/// ShapeSheet drucken (Entwicklertools · Debuggen), 16 px
+pub(crate) const JD_PRINT_SHAPESHEET: u32 = 0x10_F3AF;
+/// Hilfe (Hilfe), 32 px
+pub(crate) const JD_HELP_L: u32 = 0x10_F7B0;
+/// Schulung (Hilfe), 32 px
+pub(crate) const JD_TRAINING_L: u32 = 0x10_F7B1;
+/// Feedback (Hilfe), 32 px
+pub(crate) const JD_FEEDBACK_L: u32 = 0x10_F7B2;
+/// Ränder (Container-Tools), 16 px
+pub(crate) const JD_CT_MARGINS: u32 = 0x10_F3F0;
+/// Ränder (Container-Tools), 32 px
+pub(crate) const JD_CT_MARGINS_L: u32 = 0x10_F7F0;
+/// An Inhalt anpassen (Container-Tools), 16 px
+pub(crate) const JD_CT_FIT_CONTENTS: u32 = 0x10_F3F1;
+/// An Inhalt anpassen (Container-Tools), 32 px
+pub(crate) const JD_CT_FIT_CONTENTS_L: u32 = 0x10_F7F1;
+/// Automatische Größe (Container-Tools), 16 px
+pub(crate) const JD_CT_AUTO_SIZE: u32 = 0x10_F3F2;
+/// Automatische Größe (Container-Tools), 32 px
+pub(crate) const JD_CT_AUTO_SIZE_L: u32 = 0x10_F7F2;
+/// Kopfzeilenstil (Container-Tools), 16 px
+pub(crate) const JD_CT_HEADING: u32 = 0x10_F3F3;
+/// Kopfzeilenstil (Container-Tools), 32 px
+pub(crate) const JD_CT_HEADING_L: u32 = 0x10_F7F3;
+/// Container sperren (Container-Tools), 16 px
+pub(crate) const JD_CT_LOCK: u32 = 0x10_F3F4;
+/// Container sperren (Container-Tools), 32 px
+pub(crate) const JD_CT_LOCK_L: u32 = 0x10_F7F4;
+/// Inhalt auswählen (Container-Tools), 16 px
+pub(crate) const JD_CT_SELECT_CONTENTS: u32 = 0x10_F3F5;
+/// Inhalt auswählen (Container-Tools), 32 px
+pub(crate) const JD_CT_SELECT_CONTENTS_L: u32 = 0x10_F7F5;
+/// Container auflösen (Container-Tools), 16 px
+pub(crate) const JD_CT_DISBAND: u32 = 0x10_F3F6;
+/// Container auflösen (Container-Tools), 32 px
+pub(crate) const JD_CT_DISBAND_L: u32 = 0x10_F7F6;
+/// Helligkeit (Bildtools), 16 px
+pub(crate) const JD_PIC_BRIGHTNESS: u32 = 0x10_F3F7;
+/// Kontrast (Bildtools), 16 px
+pub(crate) const JD_PIC_CONTRAST: u32 = 0x10_F3F8;
+/// Automatischer Ausgleich (Bildtools), 16 px
+pub(crate) const JD_PIC_AUTO_BALANCE: u32 = 0x10_F3F9;
+/// Komprimieren (Bildtools), 16 px
+pub(crate) const JD_PIC_COMPRESS: u32 = 0x10_F3FA;
+/// Zuschneiden (Bildtools), 16 px
+pub(crate) const JD_PIC_CROP: u32 = 0x10_F3FB;
+/// Zuschneiden (Bildtools), 32 px
+pub(crate) const JD_PIC_CROP_L: u32 = 0x10_F7FB;
+/// Bildrahmen (Bildtools), 16 px
+pub(crate) const JD_PIC_FRAME: u32 = 0x10_F3FC;
+/// Swimlane (Funktionsübergreifend), 16 px
+pub(crate) const JD_CFF_SWIMLANE: u32 = 0x10_F3FD;
+/// Swimlane (Funktionsübergreifend), 32 px
+pub(crate) const JD_CFF_SWIMLANE_L: u32 = 0x10_F7FD;
+/// Trennlinie (Phase) (Funktionsübergreifend), 16 px
+pub(crate) const JD_CFF_SEPARATOR: u32 = 0x10_F3FE;
+/// Trennlinie (Phase) (Funktionsübergreifend), 32 px
+pub(crate) const JD_CFF_SEPARATOR_L: u32 = 0x10_F7FE;
+/// Ausrichtung (Funktionsübergreifend), 16 px
+pub(crate) const JD_CFF_ORIENTATION: u32 = 0x10_F3FF;
+/// Richtung (Funktionsübergreifend), 16 px
+pub(crate) const JD_CFF_DIRECTION: u32 = 0x10_F400;
+/// Ränder (Funktionsübergreifend), 16 px
+pub(crate) const JD_CFF_MARGINS: u32 = 0x10_F401;
+/// Bahnbeschriftungen drehen (Funktionsübergreifend), 16 px
+pub(crate) const JD_CFF_ROTATE_LABELS: u32 = 0x10_F402;
+/// Titelleiste (Funktionsübergreifend), 16 px
+pub(crate) const JD_CFF_TITLE_BAR: u32 = 0x10_F403;
+/// Trennlinien (Funktionsübergreifend), 16 px
+pub(crate) const JD_CFF_SEPARATORS: u32 = 0x10_F404;
+/// Neu layouten (Organigramm), 16 px
+pub(crate) const JD_ORG_RELAYOUT: u32 = 0x10_F405;
+/// Neu layouten (Organigramm), 32 px
+pub(crate) const JD_ORG_RELAYOUT_L: u32 = 0x10_F805;
+/// An Seite anpassen (Organigramm), 16 px
+pub(crate) const JD_ORG_FIT: u32 = 0x10_F406;
+/// Abstand vergrößern (Organigramm), 16 px
+pub(crate) const JD_ORG_SPACE_MORE: u32 = 0x10_F407;
+/// Abstand verkleinern (Organigramm), 16 px
+pub(crate) const JD_ORG_SPACE_LESS: u32 = 0x10_F408;
+/// Nach links verschieben (Organigramm), 16 px
+pub(crate) const JD_ORG_MOVE_LEFT: u32 = 0x10_F409;
+/// Nach rechts verschieben (Organigramm), 16 px
+pub(crate) const JD_ORG_MOVE_RIGHT: u32 = 0x10_F40A;
+/// Nach oben verschieben (Organigramm), 16 px
+pub(crate) const JD_ORG_MOVE_UP: u32 = 0x10_F40B;
+/// Nach unten verschieben (Organigramm), 16 px
+pub(crate) const JD_ORG_MOVE_DOWN: u32 = 0x10_F40C;
+/// Untergeordnete ein-/ausblenden (Organigramm), 16 px
+pub(crate) const JD_ORG_SUBORDINATES: u32 = 0x10_F40D;
+/// Höhe vergrößern (Organigramm), 16 px
+pub(crate) const JD_ORG_HEIGHT_MORE: u32 = 0x10_F40E;
+/// Höhe verkleinern (Organigramm), 16 px
+pub(crate) const JD_ORG_HEIGHT_LESS: u32 = 0x10_F40F;
+/// Breite vergrößern (Organigramm), 16 px
+pub(crate) const JD_ORG_WIDTH_MORE: u32 = 0x10_F410;
+/// Breite verkleinern (Organigramm), 16 px
+pub(crate) const JD_ORG_WIDTH_LESS: u32 = 0x10_F411;
+/// Positionstyp (Organigramm), 16 px
+pub(crate) const JD_ORG_POSITION_TYPE: u32 = 0x10_F412;
+/// Bild einfügen (Organigramm), 16 px
+pub(crate) const JD_ORG_PICTURE_INSERT: u32 = 0x10_F413;
+/// Bild einfügen (Organigramm), 32 px
+pub(crate) const JD_ORG_PICTURE_INSERT_L: u32 = 0x10_F813;
+/// Mehrere Bilder (Organigramm), 16 px
+pub(crate) const JD_ORG_PICTURES_MULTIPLE: u32 = 0x10_F414;
+/// Bild ändern (Organigramm), 16 px
+pub(crate) const JD_ORG_PICTURE_CHANGE: u32 = 0x10_F415;
+/// Bild löschen (Organigramm), 16 px
+pub(crate) const JD_ORG_PICTURE_DELETE: u32 = 0x10_F416;
+/// Bild anzeigen (Organigramm), 16 px
+pub(crate) const JD_ORG_PICTURE_SHOW: u32 = 0x10_F417;
+/// Importieren (Organigramm), 16 px
+pub(crate) const JD_ORG_IMPORT: u32 = 0x10_F418;
+/// Importieren (Organigramm), 32 px
+pub(crate) const JD_ORG_IMPORT_L: u32 = 0x10_F818;
+/// Exportieren (Organigramm), 16 px
+pub(crate) const JD_ORG_EXPORT: u32 = 0x10_F419;
+/// Exportieren (Organigramm), 32 px
+pub(crate) const JD_ORG_EXPORT_L: u32 = 0x10_F819;
+/// Vergleichen (Organigramm), 16 px
+pub(crate) const JD_ORG_COMPARE: u32 = 0x10_F41A;
+/// Vergleichen (Organigramm), 32 px
+pub(crate) const JD_ORG_COMPARE_L: u32 = 0x10_F81A;
+/// Synchronisieren (Organigramm), 16 px
+pub(crate) const JD_ORG_SYNC: u32 = 0x10_F41B;
+/// Synchronisieren (Organigramm), 32 px
+pub(crate) const JD_ORG_SYNC_L: u32 = 0x10_F81B;
+/// Hauptthema (Brainstorming), 16 px
+pub(crate) const JD_BS_MAIN_TOPIC: u32 = 0x10_F41C;
+/// Hauptthema (Brainstorming), 32 px
+pub(crate) const JD_BS_MAIN_TOPIC_L: u32 = 0x10_F81C;
+/// Unterthema (Brainstorming), 16 px
+pub(crate) const JD_BS_SUBTOPIC: u32 = 0x10_F41D;
+/// Unterthema (Brainstorming), 32 px
+pub(crate) const JD_BS_SUBTOPIC_L: u32 = 0x10_F81D;
+/// Gleichrangiges Thema (Brainstorming), 16 px
+pub(crate) const JD_BS_PEER_TOPIC: u32 = 0x10_F41E;
+/// Gleichrangiges Thema (Brainstorming), 32 px
+pub(crate) const JD_BS_PEER_TOPIC_L: u32 = 0x10_F81E;
+/// Mehrere Unterthemen (Brainstorming), 16 px
+pub(crate) const JD_BS_MULTIPLE: u32 = 0x10_F41F;
+/// Thema ändern (Brainstorming), 16 px
+pub(crate) const JD_BS_CHANGE_TOPIC: u32 = 0x10_F420;
+/// Layout (Brainstorming), 16 px
+pub(crate) const JD_BS_LAYOUT: u32 = 0x10_F421;
+/// Diagrammformat (Brainstorming), 16 px
+pub(crate) const JD_BS_STYLE: u32 = 0x10_F422;
+/// Gliederungsfenster (Brainstorming), 16 px
+pub(crate) const JD_BS_OUTLINE: u32 = 0x10_F423;
+/// Daten exportieren (Brainstorming), 16 px
+pub(crate) const JD_BS_EXPORT: u32 = 0x10_F424;
+/// Daten importieren (Brainstorming), 16 px
+pub(crate) const JD_BS_IMPORT: u32 = 0x10_F425;
+/// Konfigurieren (Zeitachse), 16 px
+pub(crate) const JD_TL_CONFIGURE: u32 = 0x10_F426;
+/// Meilenstein (Zeitachse), 16 px
+pub(crate) const JD_TL_MILESTONE: u32 = 0x10_F427;
+/// Intervall (Zeitachse), 16 px
+pub(crate) const JD_TL_INTERVAL: u32 = 0x10_F428;
+/// Erweitern (Zeitachse), 16 px
+pub(crate) const JD_TL_EXPAND: u32 = 0x10_F429;
+/// Synchronisieren (Zeitachse), 16 px
+pub(crate) const JD_TL_SYNC: u32 = 0x10_F42A;
+/// Monat (Kalender), 16 px
+pub(crate) const JD_CAL_MONTH: u32 = 0x10_F42B;
+/// Termin (Kalender), 16 px
+pub(crate) const JD_CAL_APPOINTMENT: u32 = 0x10_F42C;
+/// Termine importieren (Kalender), 16 px
+pub(crate) const JD_CAL_IMPORT: u32 = 0x10_F42D;
+/// Neuer Master (Schablone bearbeiten), 16 px
+pub(crate) const JD_ST_MASTER_NEW: u32 = 0x10_F42E;
+/// Master-Eigenschaften (Schablone bearbeiten), 16 px
+pub(crate) const JD_ST_MASTER_PROPERTIES: u32 = 0x10_F42F;
+/// Master bearbeiten (Schablone bearbeiten), 16 px
+pub(crate) const JD_ST_MASTER_EDIT: u32 = 0x10_F430;
+/// Symbol bearbeiten (Schablone bearbeiten), 16 px
+pub(crate) const JD_ST_ICON_EDIT: u32 = 0x10_F431;
+/// Schablone speichern (Schablone bearbeiten), 16 px
+pub(crate) const JD_ST_SAVE: u32 = 0x10_F432;
 
 /// (code point, grid, art), sorted by code point
 pub(crate) static ARTS: &[(u32, f32, &str)] = &[
@@ -79,8 +725,242 @@ pub(crate) static ARTS: &[(u32, f32, &str)] = &[
     (JD_CONTAINER, 16.0, "#9FM2 3H14V6H2Z|#0FM4 4H9V5H4Z|#4FM1 2H15V14H1ZM2 13H14V3H2Z|#4FM2 6H14V7H2Z|#1FM5.5 8.5H10.5V11.5H5.5Z|#0FM5 8H11V12H5ZM6 11H10V9H6Z"),
     (JD_RELAYOUT, 16.0, "#4FM8 5V8H7V5ZM3 10V7H12V10H11V8H4V10Z|#1FM5.5 1.5H9.5V4.5H5.5Z|#0FM5 1H10V5H5ZM6 4H9V2H6Z|#1FM1.5 10.5H5.5V14.5H1.5Z|#0FM1 10H6V15H1ZM2 14H5V11H2Z|#1FM9.5 10.5H13.5V14.5H9.5Z|#0FM9 10H14V15H9ZM10 14H13V11H10Z"),
     (JD_TASK_PANES, 16.0, "#1FM2 3H14V4H2Z|#9FM10 5H14V13H10Z|#0FM1 2H15V14H1ZM2 13H14V3H2Z|#0FM2 4H14V5H2Z|#4FM10 5V13H9V5ZM11 7H13V8H11ZM11 9H13V10H11Z"),
+    (JD_SAVE, 16.0, "#1FM2 2H4V6H11V2H12L14 4V14H13V8H3V14H2Z|#2EM5 2H10V5H5ZM8 2H9V4H8Z|#0FM8 2H9V4H8Z|#0FM1 1H11.707L15 4.293V15H1ZM2 14H14V4.707L11.293 2H2Z|#0FM5 2V5H10V2H11V6H4V2Z|#0FM3 14V8H13V14H12V9H4V14Z"),
+    (JD_UNDO, 16.0, "#0FM5 4H10.707L14 7.293V9.707L10.707 13H4V12H10.293L13 9.293V7.707L10.293 5H5Z|#0FM5 2V7L2.5 4.5Z"),
+    (JD_REDO, 16.0, "#0FM11 5H5.707L3 7.707V9.293L5.707 12H12V13H5.293L2 9.707V7.293L5.293 4H11Z|#0FM11 2V7L13.5 4.5Z"),
+    (JD_QAT_CUSTOMIZE, 16.0, "#0FM3 5H13V6H3Z|#0FM4 8H12L8 12Z"),
+    (JD_RIBBON_DISPLAY, 16.0, "#1FM2 3H14V4H2Z|#0FM1 2H15V14H1ZM2 13H14V3H2Z|#0FM2 4H14V5H2Z|#4FM8 9V12H7V9Z|#4FM5 9H10L7.5 6.5Z"),
     (JD_SEARCH, 16.0, "#1FM11 6.5L10.771 7.922L10.132 9.158L9.158 10.132L7.922 10.771L6.5 11L5.078 10.771L3.842 10.132L2.868 9.158L2.229 7.922L2 6.5L2.229 5.078L2.868 3.842L3.842 2.868L5.078 2.229L6.5 2L7.922 2.229L9.158 2.868L10.132 3.842L10.771 5.078Z|#0FM11.506 6.5L11.251 8.081L10.54 9.456L9.456 10.54L8.081 11.251L6.5 11.506L4.919 11.251L3.544 10.54L2.46 9.456L1.749 8.081L1.494 6.5L1.749 4.919L2.46 3.544L3.544 2.46L4.919 1.749L6.5 1.494L8.081 1.749L9.456 2.46L10.54 3.544L11.251 4.919ZM10.29 5.236L9.723 4.141L8.859 3.277L7.764 2.71L6.5 2.506L5.236 2.71L4.141 3.277L3.277 4.141L2.71 5.236L2.506 6.5L2.71 7.764L3.277 8.859L4.141 9.723L5.236 10.29L6.5 10.494L7.764 10.29L8.859 9.723L9.723 8.859L10.29 7.764L10.494 6.5Z|#0FM10.707 9.293L14.707 13.293L13.293 14.707L9.293 10.707Z"),
+    (JD_COMMENTS, 16.0, "#1FM1.5 1.5H14.5V10.5H7.5L4.5 13.5V10.5H1.5Z|#0FM1 1H15V11H7.707L4 14.707V11H1ZM2 10H5V12.293L7.293 10H14V2H2Z"),
+    (JD_NEW, 16.0, "#1FM4 2H9V5H12V14H4Z|#2FM10 2L12 4H10Z|#0FM3 1H9.707L13 4.293V15H3ZM4 14H12V4.707L9.293 2H4Z|#0FM10 2V4H12V5H9V2Z"),
+    (JD_OPEN, 16.0, "#2FM2 3H6L8 5H12V7H2Z|#0FM1 15V2H5.707L7.707 4H13V7H12V5H7.293L5.293 3H2V15Z|#1FM2.2 14.5H11.5L13.5 8.5H4.2Z|#0FM3.84 8H14.194L11.86 15H1.506ZM2.894 14H11.14L12.806 9H4.56Z"),
+    (JD_PRINT, 16.0, "#1FM2 6H14V11H13V8H3V11H2Z|#0FM4 4V1H12V4H11V2H5V4Z|#0FM3 12H1V5H15V12H13V11H14V6H2V11H3Z|#9FM4.5 9.5H11.5V14.5H4.5Z|#4FM4 9H12V15H4ZM5 14H11V10H5Z"),
+    (JD_PRESENTATION, 16.0, "#0FM1 2H14V3H1Z|#1FM3 3H12V10H3Z|#0FM3 3V10H12V3H13V11H2V3Z|#4FM7 4V9L9.5 6.5Z|#0FM4.146 14.146L7.5 10.793L10.854 14.146L10.146 14.854L7.5 12.207L4.854 14.854Z"),
+    (JD_ZOOM_OUT, 16.0, "#0FM2 7H13V8H2Z"),
+    (JD_ZOOM_IN, 16.0, "#0FM2 7H13V8H2ZM8 2V13H7V2Z"),
+    (JD_FIT_WINDOW, 16.0, "#1FM5.5 5.5H10.5V10.5H5.5Z|#0FM5 5H11V11H5ZM6 10H10V6H6Z|#0FM1 1H5L1 5ZM15 1V5L11 1ZM15 15H11L15 11ZM1 15V11L5 15Z"),
+    (JD_SWITCH_WINDOW, 16.0, "#1FM2 2H10V3H2Z|#0FM4 9H1V1H11V5H10V2H2V8H4Z|#0FM2 3H10V4H2Z|#9FM6 7H14V8H6Z|#4FM5 6H15V15H5ZM6 14H14V7H6Z|#4FM6 8H14V9H6Z"),
+    (JD_PAGE_ADD, 16.0, "#1FM1.5 1.5H13.5V13.5H1.5Z|#0FM1 1H14V14H1ZM2 13H13V2H2Z|#4FM4 7H11V8H4ZM8 4V11H7V4Z"),
+    (JD_PAGES_ALL, 16.0, "#0FM4 6H12L8 2Z|#0FM3 9H13V10H3ZM3 12H13V13H3Z"),
+    (JD_SIDEBAR_COLLAPSE, 16.0, "#0FM9.854 3.854L6.207 7.5L9.854 11.146L9.146 11.854L4.793 7.5L9.146 3.146Z"),
+    (JD_STENCIL_MENU, 16.0, "#1FM2.5 2.5H6.5V6.5H2.5Z|#0FM2 2H7V7H2ZM3 6H6V3H3Z|#1FM9.5 2.5H13.5V6.5H9.5Z|#0FM9 2H14V7H9ZM10 6H13V3H10Z|#1FM2.5 9.5H6.5V13.5H2.5Z|#0FM2 9H7V14H2ZM3 13H6V10H3Z|#1FM9.5 9.5H13.5V13.5H9.5Z|#0FM9 9H14V14H9ZM10 13H13V10H10Z"),
+    (JD_MORE_SHAPES, 16.0, "#1FM1.5 3.5H4.5V6.5H1.5Z|#0FM1 3H5V7H1ZM2 6H4V4H2Z|#1FM6.5 3.5H9.5V6.5H6.5Z|#0FM6 3H10V7H6ZM7 6H9V4H7Z|#1FM1.5 8.5H4.5V11.5H1.5Z|#0FM1 8H5V12H1ZM2 11H4V9H2Z|#1FM6.5 8.5H9.5V11.5H6.5Z|#0FM6 8H10V12H6ZM7 11H9V9H7Z|#0FM11 4L14.5 7.5L11 11Z"),
+    (JD_DIALOG_LAUNCHER, 16.0, "#0FM2 10V2H10V3H3V10Z|#0FM5.854 5.146L10.854 10.146L10.146 10.854L5.146 5.854Z|#0FM13 8V13H8Z"),
+    (JD_RIBBON_COLLAPSE, 16.0, "#0FM3.146 9.146L7.5 4.793L11.854 9.146L11.146 9.854L7.5 6.207L3.854 9.854Z"),
+    (JD_PASTE, 16.0, "#1FM2 3H4V4H8V3H10V5H5V14H2Z|#0FM5 15H1V2H11V5H10V3H2V14H5Z|#0FM4 1H8V4H4Z|#9FM6.5 6.5H14.5V14.5H6.5Z|#4FM6 6H15V15H6ZM7 14H14V7H7Z|#4FM8 9H13V10H8ZM8 11H12V12H8Z"),
+    (JD_PASTE_SPECIAL, 16.0, "#1FM3 3H6V4H10V3H13V14H3Z|#0FM2 2H14V15H2ZM3 14H13V3H3Z|#0FM6 1H10V4H6Z|#4FM5 5H7V7H5ZM5 8H7V10H5ZM5 11H7V13H5Z|#0FM8 5H12V6H8ZM8 8H12V9H8ZM8 11H11V12H8Z"),
+    (JD_PASTE_LINK, 16.0, "#1FM2 3H4V4H8V3H10V4.5L3.19 11.31L5.88 14H2Z|#0FM5 15H1V2H11V3H2V14H5Z|#0FM4 1H8V4H4Z|#0FM9.854 11.854L7.5 14.207L4.793 11.5L7.146 9.146L7.854 9.854L6.207 11.5L7.5 12.793L9.146 11.146ZM9.146 7.146L11.5 4.793L14.207 7.5L11.854 9.854L11.146 9.146L12.793 7.5L11.5 6.207L9.854 7.854Z|#4FM7.146 11.146L11.146 7.146L11.854 7.854L7.854 11.854Z"),
+    (JD_DUPLICATE, 16.0, "#1FM1.5 2.5H9.5V7.5H1.5Z|#0FM1 2H10V8H1ZM2 7H9V3H2Z|#9FM6.5 9.5H14.5V14.5H6.5Z|#4FM6 9H15V15H6ZM7 14H14V10H7Z"),
+    (JD_CUT, 16.0, "#0FM3.854 3.146L10.854 10.146L10.146 10.854L3.146 3.854ZM12.854 3.854L5.854 10.854L5.146 10.146L12.146 3.146Z|#1FM2.5 10.5H5.5V13.5H2.5Z|#0FM2 10H6V14H2ZM3 13H5V11H3Z|#1FM10.5 10.5H13.5V13.5H10.5Z|#0FM10 10H14V14H10ZM11 13H13V11H11Z"),
+    (JD_COPY, 16.0, "#1FM3 2H9V3H5V11H3Z|#0FM5 12H2V1H10V3H9V2H3V11H5Z|#9FM7 5H10V8H13V14H7Z|#4FM6 4H10.707L14 7.293V15H6ZM7 14H13V7.707L10.293 5H7ZM11 5V7H13V8H10V5Z"),
+    (JD_FONT_GROW, 16.0, "#0EM1 14L4.5 4H5.5L9 14H7.5L6.8 12H3.2L2.5 14ZM3.55 11H6.45L5 6.857Z|#4FM13 6V10H12V6Z|#4FM10 6H15L12.5 3.5Z"),
+    (JD_FONT_SHRINK, 16.0, "#0EM1 14L4.5 4H5.5L9 14H7.5L6.8 12H3.2L2.5 14ZM3.55 11H6.45L5 6.857Z|#4FM13 4V8H12V4Z|#4FM10 8H15L12.5 10.5Z"),
+    (JD_BOLD_F, 16.0, "#0EM5 3H12V5H7V7H11V9H7V13H5Z"),
+    (JD_BOLD_B, 16.0, "#0EM4 3H9L11 5V6L12 7L11 8L12 9V11L10 13H4ZM6 5V7H9V5ZM6 9V11H10V9Z"),
+    (JD_BOLD_N, 16.0, "#0FM4 3H6.3L10 9.167V3H12V13H9.7L6 6.833V13H4Z"),
+    (JD_BOLD_G, 16.0, "#0EM6 3H10L12 5H6V11H10V9H8V7H12V11L10 13H6L4 11V5Z"),
+    (JD_ITALIC_K, 16.0, "#0FM5.25 3H6.25L4.875 8.5L11.75 3H13.75L7.812 7.75L11.75 13H9.75L6.562 8.75L4.375 10.5L3.75 13H2.75Z"),
+    (JD_ITALIC_I, 16.0, "#0EM6.75 3H11.75L11.5 4H9.5L7.5 12H9.5L9.25 13H4.25L4.5 12H6.5L8.5 4H6.5Z"),
+    (JD_ITALIC_C, 16.0, "#0EM5 4L6.25 3H12.25L13 4L12.75 5H11.75L12 4H6L4 12H10L10.25 11H11.25L11 12L9.75 13H3.75L3 12Z"),
+    (JD_UNDERLINE_U, 16.0, "#0EM4 2H5V11H11V2H12V11L11 12H5L4 11Z|#4FM3 13H13V14H3Z"),
+    (JD_UNDERLINE_S, 16.0, "#0EM4 3L5 2H11L12 3V4H11V3H5V6H11L12 7V11L11 12H5L4 11V10H5V11H11V7H5L4 6Z|#4FM3 13H13V14H3Z"),
+    (JD_STRIKETHROUGH, 16.0, "#0EM9 3H10V7H13L14 8V12L13 13H9ZM2 8L3 7H7V13H3L2 12ZM3 8V12H6V8ZM10 8V12H13V8Z|#4FM1 9H15V10H1Z"),
+    (JD_CHANGE_CASE, 16.0, "#0EM1 13L4 3H5L8 13H6.6L6 11H3L2.4 13ZM3.3 10H5.7L4.5 6Z|#0EM10 7H14L15 8V13H11L10 12V10L11 9H14V8H10ZM11 10V12H14V10Z"),
+    (JD_FONT_COLOR, 16.0, "#0EM4 11L7.5 1H8.5L12 11H10.5L9.8 9H6.2L5.5 11ZM6.55 8H9.45L8 3.857Z|#4FM2 12H14V15H2Z"),
+    (JD_VALIGN_TOP, 16.0, "#1FM1.5 1.5H14.5V14.5H1.5Z|#0FM1 1H15V15H1ZM2 14H14V2H2Z|#4FM4 4H12V5H4ZM5 7H11V8H5Z"),
+    (JD_VALIGN_MIDDLE, 16.0, "#1FM1.5 1.5H14.5V14.5H1.5Z|#0FM1 1H15V15H1ZM2 14H14V2H2Z|#4FM4 6H12V7H4ZM5 9H11V10H5Z"),
+    (JD_VALIGN_BOTTOM, 16.0, "#1FM1.5 1.5H14.5V14.5H1.5Z|#0FM1 1H15V15H1ZM2 14H14V2H2Z|#4FM4 8H12V9H4ZM5 11H11V12H5Z"),
+    (JD_TEXT_LEFT, 16.0, "#0FM2 3H14V4H2ZM2 6H10V7H2ZM2 9H14V10H2ZM2 12H8V13H2Z"),
+    (JD_TEXT_CENTER, 16.0, "#0FM2 3H14V4H2ZM4 6H12V7H4ZM2 9H14V10H2ZM5 12H11V13H5Z"),
+    (JD_TEXT_RIGHT, 16.0, "#0FM2 3H14V4H2ZM6 6H14V7H6ZM2 9H14V10H2ZM8 12H14V13H8Z"),
+    (JD_TEXT_JUSTIFY, 16.0, "#0FM2 3H14V4H2ZM2 6H14V7H2ZM2 9H14V10H2ZM2 12H14V13H2Z"),
+    (JD_BULLETS, 16.0, "#4FM2 3H4V5H2ZM2 7H4V9H2ZM2 11H4V13H2Z|#0FM6 3H14V4H6ZM6 7H14V8H6ZM6 11H12V12H6Z"),
+    (JD_INDENT_LESS, 16.0, "#0FM2 3H14V4H2ZM9 6H14V7H9ZM9 10H14V11H9ZM2 13H14V14H2Z|#4FM5 8H8V9H5Z|#4FM5 6V11L2.5 8.5Z"),
+    (JD_INDENT_MORE, 16.0, "#0FM2 3H14V4H2ZM9 6H14V7H9ZM9 10H14V11H9ZM2 13H14V14H2Z|#4FM2 8H5V9H2Z|#4FM5 6V11L7.5 8.5Z"),
+    (JD_TEXT_ROTATE, 16.0, "#0EM1 15L4 5H5L8 15H6.6L6 13H3L2.4 15ZM3.3 12H5.7L4.5 8Z|#4FM5 2H9.707L13 5.293V9H12V5.707L9.293 3H5Z|#4FM10 9H15L12.5 11.5Z"),
+    (JD_ELLIPSE, 16.0, "#9FM14.5 8L14.268 9.196L13.613 10.271L12.596 11.182L11.281 11.886L9.728 12.339L8 12.5L6.272 12.339L4.719 11.886L3.404 11.182L2.387 10.271L1.732 9.196L1.5 8L1.732 6.804L2.387 5.729L3.404 4.818L4.719 4.114L6.272 3.661L8 3.5L9.728 3.661L11.281 4.114L12.596 4.818L13.613 5.729L14.268 6.804Z|#4FM15.009 8L14.742 9.38L14.001 10.594L12.885 11.595L11.471 12.351L9.822 12.833L8 13.002L6.178 12.833L4.529 12.351L3.115 11.595L1.999 10.594L1.258 9.38L0.991 8L1.258 6.62L1.999 5.406L3.115 4.405L4.529 3.649L6.178 3.167L8 2.998L9.822 3.167L11.471 3.649L12.885 4.405L14.001 5.406L14.742 6.62ZM13.794 6.987L13.224 6.052L12.307 5.231L11.091 4.58L9.634 4.154L8 4.002L6.366 4.154L4.909 4.58L3.693 5.231L2.776 6.052L2.206 6.987L2.009 8L2.206 9.013L2.776 9.948L3.693 10.769L4.909 11.42L6.366 11.846L8 11.998L9.634 11.846L11.091 11.42L12.307 10.769L13.224 9.948L13.794 9.013L13.991 8Z"),
+    (JD_LINE, 16.0, "#4FM3.646 11.646L11.646 3.646L12.354 4.354L4.354 12.354Z|#1FM1.5 12.5H3.5V14.5H1.5Z|#0FM1 12H4V15H1ZM2 14H3V13H2Z|#1FM12.5 1.5H14.5V3.5H12.5Z|#0FM12 1H15V4H12ZM13 3H14V2H13Z"),
+    (JD_FREEFORM, 16.0, "#4FM2.001 10.963L2.16 8.838L2.605 7.146L3.284 5.895L4.151 5.074L5.145 4.705L6.148 4.811L7.017 5.352L7.653 6.246L7.981 7.364L8.227 8.277L8.611 8.946L9.09 9.41L9.602 9.654L10.106 9.682L10.605 9.485L11.106 8.989L11.556 8.109L11.878 6.789L12.001 4.966L12.999 5.034L12.869 6.942L12.5 8.459L11.923 9.588L11.163 10.339L10.269 10.693L9.35 10.642L8.511 10.243L7.813 9.566L7.296 8.662L7.019 7.636L6.741 6.689L6.318 6.095L5.815 5.781L5.273 5.724L4.69 5.941L4.087 6.512L3.542 7.517L3.15 9.004L2.999 11.037Z|#1FM1.5 11.5H3.5V13.5H1.5Z|#0FM1 11H4V14H1ZM2 13H3V12H2Z|#1FM12.5 2.5H14.5V4.5H12.5Z|#0FM12 2H15V5H12ZM13 4H14V3H13Z"),
+    (JD_ARC, 16.0, "#4FM2.006 11.922L2.35 9.738L3.147 7.683L4.336 5.865L5.865 4.336L7.683 3.147L9.738 2.35L11.922 2.006L12.078 2.994L10 3.321L8.143 4.041L6.499 5.116L5.116 6.499L4.041 8.143L3.321 10L2.994 12.078Z|#1FM1.5 12.5H3.5V14.5H1.5Z|#0FM1 12H4V15H1ZM2 14H3V13H2Z|#1FM12.5 1.5H14.5V3.5H12.5Z|#0FM12 1H15V4H12ZM13 3H14V2H13Z"),
+    (JD_PENCIL, 16.0, "#2FM10.5 2.5L13.5 5.5L12.5 6.5L9.5 3.5Z|#1FM9.5 3.5L12.5 6.5L6.5 12.5L3.5 9.5Z|#0FM3 11L5 13H3Z|#0FM10.5 1.793L14.207 5.5L6.707 13H3V9.293ZM4 9.707V12H6.293L12.793 5.5L10.5 3.207ZM9.854 3.146L12.854 6.146L12.146 6.854L9.146 3.854ZM3.854 9.146L6.854 12.146L6.146 12.854L3.146 9.854Z"),
+    (JD_TEXT_BLOCK, 16.0, "#4FM5 5H11V6H5ZM5 13H11V14H5ZM3 8V11H2V8ZM14 8V11H13V8Z|#1FM1.5 4.5H3.5V6.5H1.5Z|#0FM1 4H4V7H1ZM2 6H3V5H2Z|#1FM12.5 4.5H14.5V6.5H12.5Z|#0FM12 4H15V7H12ZM13 6H14V5H13Z|#1FM1.5 12.5H3.5V14.5H1.5Z|#0FM1 12H4V15H1ZM2 14H3V13H2Z|#1FM12.5 12.5H14.5V14.5H12.5Z|#0FM12 12H15V15H12ZM13 14H14V13H13Z|#0FM5 8H11V9H5ZM5 10H10V11H5Z|#0FM5 4V2H9V3H6V4Z|#0FM9 1V4L10.5 2.5Z"),
+    (JD_FILL, 16.0, "#1FM7.5 1.5L10.5 4.5L5.5 9.5L2.5 6.5Z|#0FM10.854 4.854L5.5 10.207L1.793 6.5L7.146 1.146L7.854 1.854L3.207 6.5L5.5 8.793L10.146 4.146Z|#0FM12 6L13 7V10H11V7Z|#4FM2 12H14V15H2Z"),
+    (JD_LINE_COLOR, 16.0, "#1FM10.5 2.5L13.5 5.5L8.5 10.5L5.5 7.5Z|#0FM5 7L9 11H5Z|#0FM10.5 1.793L14.207 5.5L8.707 11H5V7.293ZM6 7.707V10H8.293L12.793 5.5L10.5 3.207ZM5.854 7.146L8.854 10.146L8.146 10.854L5.146 7.854Z|#4FM2 12H14V15H2Z"),
+    (JD_EFFECTS, 16.0, "#9FM12 4H14V14H4V12H12Z|#1FM1.5 1.5H10.5V10.5H1.5Z|#0FM1 1H11V11H1ZM2 10H10V2H2Z"),
+    (JD_LINE_WEIGHT, 16.0, "#0FM1 3H15V6H1Z|#0FM1 8H15V10H1Z|#0FM1 12H15V13H1Z"),
+    (JD_LINE_DASH, 16.0, "#0FM1 2H7V3H1ZM9 2H15V3H9Z|#0FM1 7H3V8H1ZM5 7H7V8H5ZM9 7H11V8H9ZM13 7H15V8H13Z|#0FM1 12H2V13H1ZM3 12H4V13H3ZM5 12H6V13H5ZM7 12H8V13H7ZM9 12H10V13H9ZM11 12H12V13H11ZM13 12H14V13H13Z"),
+    (JD_LINE_ARROWS, 16.0, "#0FM1 4H12V5H1Z|#0FM12 2V7L14.5 4.5Z|#0FM4 11H12V12H4Z|#0FM4 9V14L1.5 11.5Z|#0FM12 9V14L14.5 11.5Z"),
+    (JD_LINE_OPTIONS, 16.0, "#0FM1.146 12.146L11.146 2.146L11.854 2.854L1.854 12.854Z|#4EM11.78 9.91L12.03 9L13.48 9.39L13.23 10.3L13.7 10.77L14.61 10.52L15 11.97L14.09 12.22L13.92 12.86L14.58 13.52L13.52 14.58L12.86 13.92L12.22 14.09L11.97 15L10.52 14.61L10.77 13.7L10.3 13.23L9.39 13.48L9 12.03L9.91 11.78L10.08 11.14L9.42 10.48L10.48 9.42L11.14 10.08ZM12.9 12L12.636 12.636L12 12.9L11.364 12.636L11.1 12L11.364 11.364L12 11.1L12.636 11.364Z"),
+    (JD_MORE_COLORS, 16.0, "#0FM2 2H5V6H2Z|#2FM6 2H10V6H6Z|#1FM11 2H14V6H11Z|#2FM2 7H5V11H2Z|#1FM6 7H10V11H6Z|#2FM11 7H14V11H11Z|#4FM2 12H14V15H2Z"),
+    (JD_POSITION, 16.0, "#9FM5 2H7V14H5Z|#9FM10 2H12V14H10Z|#4FM5 1H7V2H5ZM10 1H12V2H10ZM5 14H7V15H5ZM10 14H12V15H10Z|#1FM2.5 4.5H4.5V11.5H2.5Z|#0FM2 4H5V12H2ZM3 11H4V5H3Z|#1FM7.5 4.5H9.5V11.5H7.5Z|#0FM7 4H10V12H7ZM8 11H9V5H8Z|#1FM12.5 4.5H14.5V11.5H12.5Z|#0FM12 4H15V12H12ZM13 11H14V5H13Z"),
+    (JD_ALIGN_LEFT, 16.0, "#4FM2 1V15H1V1Z|#1FM3.5 2.5H13.5V4.5H3.5Z|#0FM3 2H14V5H3ZM4 4H13V3H4Z|#1FM3.5 7.5H9.5V9.5H3.5Z|#0FM3 7H10V10H3ZM4 9H9V8H4Z|#1FM3.5 12.5H11.5V14.5H3.5Z|#0FM3 12H12V15H3ZM4 14H11V13H4Z"),
+    (JD_ALIGN_CENTER, 16.0, "#1FM3 3H6V4H3Z|#1FM9 3H12V4H9Z|#0FM6 3H3V4H6V5H2V2H6ZM9 2H13V5H9V4H12V3H9Z|#1FM5 8H6V9H5Z|#1FM9 8H10V9H9Z|#0FM6 8H5V9H6V10H4V7H6ZM9 7H11V10H9V9H10V8H9Z|#1FM4 13H6V14H4Z|#1FM9 13H11V14H9Z|#0FM6 13H4V14H6V15H3V12H6ZM9 12H12V15H9V14H11V13H9Z|#4FM8 1V15H7V1Z"),
+    (JD_ALIGN_RIGHT, 16.0, "#4FM15 1V15H14V1Z|#1FM2.5 2.5H12.5V4.5H2.5Z|#0FM2 2H13V5H2ZM3 4H12V3H3Z|#1FM6.5 7.5H12.5V9.5H6.5Z|#0FM6 7H13V10H6ZM7 9H12V8H7Z|#1FM4.5 12.5H12.5V14.5H4.5Z|#0FM4 12H13V15H4ZM5 14H12V13H5Z"),
+    (JD_ALIGN_TOP, 16.0, "#4FM1 1H15V2H1Z|#1FM2.5 3.5H4.5V13.5H2.5Z|#0FM2 3H5V14H2ZM3 13H4V4H3Z|#1FM7.5 3.5H9.5V9.5H7.5Z|#0FM7 3H10V10H7ZM8 9H9V4H8Z|#1FM12.5 3.5H14.5V11.5H12.5Z|#0FM12 3H15V12H12ZM13 11H14V4H13Z"),
+    (JD_ALIGN_MIDDLE, 16.0, "#1FM3 3H4V6H3Z|#1FM3 9H4V12H3Z|#0FM2 6V2H5V6H4V3H3V6ZM3 9V12H4V9H5V13H2V9Z|#1FM8 5H9V6H8Z|#1FM8 9H9V10H8Z|#0FM7 6V4H10V6H9V5H8V6ZM8 9V10H9V9H10V11H7V9Z|#1FM13 4H14V6H13Z|#1FM13 9H14V11H13Z|#0FM12 6V3H15V6H14V4H13V6ZM13 9V11H14V9H15V12H12V9Z|#4FM1 7H15V8H1Z"),
+    (JD_ALIGN_BOTTOM, 16.0, "#4FM1 14H15V15H1Z|#1FM2.5 2.5H4.5V12.5H2.5Z|#0FM2 2H5V13H2ZM3 12H4V3H3Z|#1FM7.5 6.5H9.5V12.5H7.5Z|#0FM7 6H10V13H7ZM8 12H9V7H8Z|#1FM12.5 4.5H14.5V12.5H12.5Z|#0FM12 4H15V13H12ZM13 12H14V5H13Z"),
+    (JD_AUTO_SPACE, 16.0, "#9FM7 2H9V7H14V9H9V14H7V9H2V7H7Z|#4FM7 1H9V2H7ZM7 14H9V15H7ZM2 7V9H1V7ZM15 7V9H14V7Z|#1FM2.5 2.5H5.5V5.5H2.5Z|#0FM2 2H6V6H2ZM3 5H5V3H3Z|#1FM10.5 2.5H13.5V5.5H10.5Z|#0FM10 2H14V6H10ZM11 5H13V3H11Z|#1FM2.5 10.5H5.5V13.5H2.5Z|#0FM2 10H6V14H2ZM3 13H5V11H3Z|#1FM10.5 10.5H13.5V13.5H10.5Z|#0FM10 10H14V14H10ZM11 13H13V11H11Z"),
+    (JD_AUTO_ALIGN_SPACE, 16.0, "#9FM5 2H7V12H5Z|#9FM10 2H12V12H10Z|#4FM5 1H7V2H5ZM10 1H12V2H10Z|#1FM2.5 4.5H4.5V11.5H2.5Z|#0FM2 4H5V12H2ZM3 11H4V5H3Z|#1FM7.5 7.5H9.5V11.5H7.5Z|#0FM7 7H10V12H7ZM8 11H9V8H8Z|#1FM12.5 5.5H14.5V11.5H12.5Z|#0FM12 5H15V12H12ZM13 11H14V6H13Z|#0FM1 13H15V14H1Z"),
+    (JD_SPACING_OPTIONS, 16.0, "#9FM5 2H7V8H5Z|#4FM5 1H7V2H5ZM5 8H7V9H5Z|#1FM2.5 3.5H4.5V6.5H2.5Z|#0FM2 3H5V7H2ZM3 6H4V4H3Z|#1FM7.5 3.5H9.5V6.5H7.5Z|#0FM7 3H10V7H7ZM8 6H9V4H8Z|#4EM11.78 9.91L12.03 9L13.48 9.39L13.23 10.3L13.7 10.77L14.61 10.52L15 11.97L14.09 12.22L13.92 12.86L14.58 13.52L13.52 14.58L12.86 13.92L12.22 14.09L11.97 15L10.52 14.61L10.77 13.7L10.3 13.23L9.39 13.48L9 12.03L9.91 11.78L10.08 11.14L9.42 10.48L10.48 9.42L11.14 10.08ZM12.9 12L12.636 12.636L12 12.9L11.364 12.636L11.1 12L11.364 11.364L12 11.1L12.636 11.364Z"),
+    (JD_DISTRIBUTE_H, 16.0, "#1FM1.5 3.5H3.5V11.5H1.5Z|#0FM1 3H4V12H1ZM2 11H3V4H2Z|#9FM6.5 1.5H8.5V9.5H6.5Z|#4FM6 1H9V10H6ZM7 9H8V2H7Z|#1FM11.5 5.5H13.5V13.5H11.5Z|#0FM11 5H14V14H11ZM12 13H13V6H12Z"),
+    (JD_DISTRIBUTE_V, 16.0, "#1FM3.5 1.5H11.5V3.5H3.5Z|#0FM3 1H12V4H3ZM4 3H11V2H4Z|#9FM1.5 6.5H9.5V8.5H1.5Z|#4FM1 6H10V9H1ZM2 8H9V7H2Z|#1FM5.5 11.5H13.5V13.5H5.5Z|#0FM5 11H14V14H5ZM6 13H13V12H6Z"),
+    (JD_MOVE_OFF_BREAKS, 16.0, "#0FM2 1H10.707L14 4.293V15H2ZM3 14H13V4.707L10.293 2H3ZM11 2V4H13V5H10V2Z|#0FM3 10H5V11H3ZM6 10H8V11H6ZM9 10H11V11H9ZM12 10H13V11H12Z|#9FM4.5 4.5H9.5V8.5H4.5Z|#4FM4 4H10V9H4ZM5 8H9V5H5Z"),
+    (JD_ROTATE_LEFT, 16.0, "#0FM13 5V3H4V9H3V2H14V5Z|#0FM1 9H6L3.5 11.5Z|#9FM7.5 6.5H13.5V13.5H7.5Z|#4FM7 6H14V14H7ZM8 13H13V7H8Z"),
+    (JD_ROTATE_RIGHT, 16.0, "#0FM2 5V2H13V9H12V3H3V5Z|#0FM10 9H15L12.5 11.5Z|#9FM2.5 6.5H8.5V13.5H2.5Z|#4FM2 6H9V14H2ZM3 13H8V7H3Z"),
+    (JD_FLIP_H, 16.0, "#0FM8 1V3H7V1ZM8 4V6H7V4ZM8 7V9H7V7ZM8 10V12H7V10ZM8 13V15H7V13Z|#1FM1.5 3.5V12.5H5.5Z|#0FM6.269 13H1V3.5L1.957 3.297ZM1.043 3.703L2 3.5V12H4.731Z|#9FM13.5 3.5V12.5H9.5Z|#4FM13.043 3.297L14 3.5V13H8.731ZM10.269 12H13V3.5L13.957 3.703Z"),
+    (JD_FLIP_V, 16.0, "#0FM1 7H3V8H1ZM4 7H6V8H4ZM7 7H9V8H7ZM10 7H12V8H10ZM13 7H15V8H13Z|#1FM3.5 1.5H12.5V5.5Z|#0FM3.297 1.957L3.5 1H13V6.269ZM12 4.731V2H3.5L3.703 1.043Z|#9FM3.5 13.5H12.5V9.5Z|#4FM13 8.731V14H3.5L3.297 13.043ZM3.703 13.957L3.5 13H12V10.269Z"),
+    (JD_BRING_FORWARD, 16.0, "#1FM2 2H6V4H4V6H2Z|#0FM4 7H1V1H7V4H6V2H2V6H4Z|#1FM12 10H14V14H10V12H12Z|#0FM12 9H15V15H9V12H10V14H14V10H12Z|#9FM5.5 5.5H10.5V10.5H5.5Z|#4FM5 5H11V11H5ZM6 10H10V6H6Z"),
+    (JD_SEND_BACK, 16.0, "#9FM2 2H9V5H5V9H2Z|#4FM5 10H1V1H10V5H9V2H2V9H5Z|#1FM6.5 6.5H14.5V14.5H6.5Z|#0FM6 6H15V15H6ZM7 14H14V7H7Z"),
+    (JD_SEND_BACKWARD, 16.0, "#9FM7 5H11V9H9V11H5V7H7Z|#4FM7 4H12V9H11V5H7ZM9 12H4V7H5V11H9Z|#1FM1.5 1.5H5.5V5.5H1.5Z|#0FM1 1H6V6H1ZM2 5H5V2H2Z|#1FM10.5 10.5H14.5V14.5H10.5Z|#0FM10 10H15V15H10ZM11 14H14V11H11Z"),
+    (JD_UNGROUP, 16.0, "#4FM5 1H11V2H5ZM5 14H11V15H5ZM2 5V11H1V5ZM15 5V11H14V5Z|#1FM3.5 3.5H7.5V6.5H3.5Z|#0FM3 3H8V7H3ZM4 6H7V4H4Z|#1FM8.5 9.5H12.5V12.5H8.5Z|#0FM8 9H13V13H8ZM9 12H12V10H9Z"),
+    (JD_REPLACE, 16.0, "#0EM1 3H4L5 4V8H2L1 7V6L2 5H4V4H1ZM2 6V7H4V6ZM6 1H7V3H9L10 4V7L9 8H6ZM7 4V7H9V4Z|#0FM1 11H6V12H1Z|#0FM6 9V14L8.5 11.5Z|#4FM11 9H14V10H11V13H14V14H11L10 13V10Z"),
+    (JD_LAYER_ASSIGN, 16.0, "#1FM5 2H13L11 4H3Z|#0FM5.293 1H14.707L10.707 5H1.293ZM3.707 4H10.293L12.293 2H5.707Z|#1FM4 6H12L11 7H3Z|#0FM4.354 6.354L3.707 7H10.293L11.646 5.646L12.354 6.354L10.707 8H1.293L3.646 5.646Z|#1FM4 9H8V10H3Z|#0FM4.354 9.354L3.707 10H8V11H1.293L3.646 8.646Z|#4FM9.854 11.146L11.5 12.793L14.146 10.146L14.854 10.854L11.5 14.207L9.146 11.854Z"),
+    (JD_LAYER_PROPERTIES, 16.0, "#1FM5 2H13L11 4H3Z|#0FM5.293 1H14.707L10.707 5H1.293ZM3.707 4H10.293L12.293 2H5.707Z|#1FM4 6H12L11 7H3Z|#0FM4.354 6.354L3.707 7H10.293L11.646 5.646L12.354 6.354L10.707 8H1.293L3.646 5.646Z|#1FM4 9H8V10H3Z|#0FM4.354 9.354L3.707 10H8V11H1.293L3.646 8.646Z|#4EM11.78 9.91L12.03 9L13.48 9.39L13.23 10.3L13.7 10.77L14.61 10.52L15 11.97L14.09 12.22L13.92 12.86L14.58 13.52L13.52 14.58L12.86 13.92L12.22 14.09L11.97 15L10.52 14.61L10.77 13.7L10.3 13.23L9.39 13.48L9 12.03L9.91 11.78L10.08 11.14L9.42 10.48L10.48 9.42L11.14 10.08ZM12.9 12L12.636 12.636L12 12.9L11.364 12.636L11.1 12L11.364 11.364L12 11.1L12.636 11.364Z"),
+    (JD_SELECT, 16.0, "#4FM1 1H3V2H1ZM4 1H6V2H4ZM7 1H9V2H7ZM10 1H12V2H10ZM2 1V3H1V1ZM2 4V6H1V4ZM2 7V9H1V7ZM12 1V3H11V1ZM12 4V6H11V4ZM1 8H3V9H1ZM4 8H6V9H4Z|#1FM7.5 5.5V12.5L9.5 10.5L10.5 12.5H11.5L10.5 10.5H12.5Z|#0FM13.707 11H11.309L12.309 13H10.191L9.363 11.344L7 13.707V4.293ZM8 6.707V11.293L9.637 9.656L10.809 12H10.691L9.691 10H11.293Z"),
+    (JD_SELECT_ALL, 16.0, "#4FM1 1H3V2H1ZM4 1H6V2H4ZM7 1H9V2H7ZM10 1H12V2H10ZM13 1H15V2H13ZM1 14H3V15H1ZM4 14H6V15H4ZM7 14H9V15H7ZM10 14H12V15H10ZM13 14H15V15H13ZM2 1V3H1V1ZM2 4V6H1V4ZM2 7V9H1V7ZM2 10V12H1V10ZM2 13V15H1V13ZM15 1V3H14V1ZM15 4V6H14V4ZM15 7V9H14V7ZM15 10V12H14V10ZM15 13V15H14V13Z|#1FM3.5 3.5H7.5V6.5H3.5Z|#0FM3 3H8V7H3ZM4 6H7V4H4Z|#1FM9.5 3.5H12.5V6.5H9.5Z|#0FM9 3H13V7H9ZM10 6H12V4H10Z|#1FM4.5 9.5H12.5V12.5H4.5Z|#0FM4 9H13V13H4ZM5 12H12V10H5Z"),
+    (JD_SELECT_BY_TYPE, 16.0, "#0FM7 2H9V4H7Z|#4FM7 7H9V9H7Z|#0FM7 12H9V14H7Z|#0FM10 2H14V3H10ZM10 12H13V13H10Z|#4FM10 7H15V8H10Z|#0FM1 7H3V8H1Z|#0FM3 5V10L5.5 7.5Z"),
+    (JD_SELECT_AREA, 16.0, "#9FM2 2H11V11H2Z|#4FM1 1H3V2H1ZM4 1H6V2H4ZM7 1H9V2H7ZM10 1H12V2H10ZM2 1V3H1V1ZM2 4V6H1V4ZM2 7V9H1V7ZM2 10V12H1V10ZM1 11H3V12H1ZM4 11H6V12H4ZM7 11H9V12H7ZM12 1V3H11V1ZM12 4V6H11V4ZM12 7V9H11V7Z|#0FM13 10V15H12V10ZM10 12H15V13H10Z"),
+    (JD_LASSO, 16.0, "#4FM3.006 6.464L3.166 5.423L3.664 4.443L4.556 4.897L4.13 5.733L3.994 6.616ZM4.778 3.294L5.644 2.762L6.634 2.366L7.006 3.294L6.095 3.659L5.302 4.146ZM8.104 2.051L9.134 1.998L10.161 2.082L10.079 3.078L9.119 3L8.156 3.049ZM11.615 2.454L12.593 2.893L13.432 3.467L12.868 4.293L12.102 3.769L11.205 3.366ZM14.491 4.687L14.915 5.697L14.989 6.755L13.991 6.825L13.929 5.932L13.569 5.073ZM14.468 8.353L13.85 9.165L13.007 9.856L12.373 9.084L13.125 8.466L13.672 7.747ZM11.627 10.551L10.645 10.831L9.609 10.975L9.471 9.985L10.438 9.851L11.353 9.589ZM8.122 10.952L7.09 10.767L6.122 10.444L6.438 9.496L7.337 9.795L8.298 9.968Z|#0FM6.071 9.844L5.689 10.748L5.435 11.647L5.155 12.579L4.695 13.501L3.902 14.327L2.733 14.942L2.267 14.058L3.293 13.517L3.868 12.918L4.222 12.209L4.475 11.367L4.744 10.416L5.149 9.456Z"),
+    (JD_PAGE_BLANK, 16.0, "#1FM4 2H9V5H12V14H4Z|#2FM10 2L12 4H10Z|#0FM3 1H9.707L13 4.293V15H3ZM4 14H12V4.707L9.293 2H4ZM10 2V4H12V5H9V2Z"),
+    (JD_PAGE_BACKGROUND, 16.0, "#1FM4 2H9V5H12V8H4Z|#2FM10 2L12 4H10Z|#9FM4 9H12V14H4Z|#0FM3 1H9.707L13 4.293V15H3ZM4 14H12V4.707L9.293 2H4ZM10 2V4H12V5H9V2Z|#4FM4 8H12V9H4Z"),
+    (JD_PAGE_DUPLICATE, 16.0, "#1FM6 2H10V5L8 3H6ZM10 5H13V11H12V7Z|#2FM11 2L13 4H11Z|#0FM5 3V1H10.707L14 4.293V12H12V11H13V4.707L10.293 2H6V3ZM11 2V4H13V5H10V2Z|#9FM3 5H7V8H10V14H3Z|#4FM2 4H7.707L11 7.293V15H2ZM3 14H10V7.707L7.293 5H3ZM8 5V7H10V8H7V5Z"),
+    (JD_PICTURES, 16.0, "#9FM2 12L6 8L9 11L10 10L13 13H2Z|#4FM1.146 12.146L6 7.293L9 10.293L10 9.293L13.854 13.146L13.146 13.854L10 10.707L9 11.707L6 8.707L1.854 12.854Z|#0FM12.25 6L12.079 6.631L11.631 7.079L11 7.25L10.369 7.079L9.921 6.631L9.75 6L9.921 5.369L10.369 4.921L11 4.75L11.631 4.921L12.079 5.369Z|#0FM1 2H15V14H1ZM2 13H14V3H2Z"),
+    (JD_CALLOUT, 16.0, "#9FM5.5 1.5H14.5V7.5H10.5L7.5 10.5V7.5H5.5Z|#4FM5 1H15V8H10.707L7 11.707V8H5ZM6 7H8V9.293L10.293 7H14V2H6Z|#0FM8 3H12V4H8ZM8 5H11V6H8Z|#1FM1.5 11.5H5.5V14.5H1.5Z|#0FM1 11H6V15H1ZM2 14H5V12H2Z"),
+    (JD_LINK, 16.0, "#0FM8.854 10.854L5.5 14.207L1.793 10.5L5.146 7.146L5.854 7.854L3.207 10.5L5.5 12.793L8.146 10.146ZM7.146 5.146L10.5 1.793L14.207 5.5L10.854 8.854L10.146 8.146L12.793 5.5L10.5 3.207L7.854 5.854Z|#4FM5.146 10.146L10.146 5.146L10.854 5.854L5.854 10.854Z"),
+    (JD_TEXT_BOX_H, 16.0, "#4FM1 4H15V13H1ZM2 12H14V5H2Z|#0FM4 6H12V7H4ZM4 8H12V9H4ZM4 10H9V11H4Z"),
+    (JD_TEXT_BOX_V, 16.0, "#4FM4 1H13V15H4ZM5 14H12V2H5Z|#0FM11 4V12H10V4ZM9 4V12H8V4ZM7 4V9H6V4Z"),
+    (JD_PORTRAIT, 16.0, "#9FM4 2H9V5H12V14H4Z|#4FM3 1H9.707L13 4.293V15H3ZM4 14H12V4.707L9.293 2H4ZM10 2V4H12V5H9V2Z"),
+    (JD_LANDSCAPE, 16.0, "#9FM2 4H11V7H14V12H2Z|#4FM1 3H11.707L15 6.293V13H1ZM2 12H14V6.707L11.293 4H2ZM12 4V6H14V7H11V4Z"),
+    (JD_PAPER_SIZE, 16.0, "#2FM10 2L12 4H10Z|#0FM3 1H9.707L13 4.293V15H3ZM4 14H12V4.707L9.293 2H4ZM10 2V4H12V5H9V2Z"),
+    (JD_FIT_DRAWING, 16.0, "#1FM4.5 3.5H8.5V7.5H4.5Z|#0FM4 3H9V8H4ZM5 7H8V4H5Z|#1FM6.5 9.5H11.5V12.5H6.5Z|#0FM6 9H12V13H6ZM7 12H11V10H7Z|#4FM2 1H10.707L14 4.293V15H2ZM3 14H13V4.707L10.293 2H3ZM11 2V4H13V5H10V2Z"),
+    (JD_MORE_SIZES, 16.0, "#1FM3 2H8V5H11V8H8V14H3Z|#2FM9 2L11 4H9Z|#0FM9 15H2V1H8.707L12 4.293V8H11V4.707L8.293 2H3V14H9ZM9 2V4H11V5H8V2Z|#4EM11.78 9.91L12.03 9L13.48 9.39L13.23 10.3L13.7 10.77L14.61 10.52L15 11.97L14.09 12.22L13.92 12.86L14.58 13.52L13.52 14.58L12.86 13.92L12.22 14.09L11.97 15L10.52 14.61L10.77 13.7L10.3 13.23L9.39 13.48L9 12.03L9.91 11.78L10.08 11.14L9.42 10.48L10.48 9.42L11.14 10.08ZM12.9 12L12.636 12.636L12 12.9L11.364 12.636L11.1 12L11.364 11.364L12 11.1L12.636 11.364Z"),
+    (JD_VAR_COLORS, 16.0, "#4FM2 2H7V7H2Z|#0FM9 2H14V7H9Z|#2FM2 9H7V14H2Z|#1FM9.5 9.5H13.5V13.5H9.5Z|#0FM9 9H14V14H9ZM10 13H13V10H10Z"),
+    (JD_VAR_EFFECTS, 16.0, "#4FM8 2L9.59 6.32L14.18 6.49L10.57 9.33L11.82 13.76L8 11.2L4.18 13.76L5.43 9.33L1.82 6.49L6.41 6.32Z"),
+    (JD_VAR_CONNECTORS, 16.0, "#4FM4 11H7V4H11V5H8V12H4Z|#4FM11 2V7L13.5 4.5Z|#1FM1.5 10.5H3.5V12.5H1.5Z|#0FM1 10H4V13H1ZM2 12H3V11H2Z"),
+    (JD_VAR_FONTS, 16.0, "#0EM1 14L4.5 3H5.5L9 14H7.6L6.645 11H3.355L2.4 14ZM3.67 10H6.33L5 5.83Z|#4EM10 9H13L14 10V14H11L10 13V12L11 11H13V10H10ZM11 12V13H13V12Z"),
+    (JD_VAR_EMBELLISHMENT, 16.0, "#0FM1 14V1H14V2H2V14Z|#4FM4 12V4H12V5H5V12Z|#4FM6 6H8V8H6Z"),
+    (JD_BACKGROUND_COLOR, 16.0, "#9FM9 9H12V11H14V14H9Z|#0FM8 8H12.707L15 10.293V15H8ZM9 14H14V10.707L12.293 9H9ZM13 9V10H14V11H12V9Z|#1FM6 2L9 5L5 9L2 6Z|#0FM9.354 5.354L5 9.707L1.293 6L5.646 1.646L6.354 2.354L2.707 6L5 8.293L8.646 4.646Z|#0FM12 3L13 4V6H11V4Z"),
+    (JD_LAYOUT_FLOW_DOWN, 16.0, "#1FM1.5 1.5H7.5V3.5H1.5Z|#0FM1 1H8V4H1ZM2 3H7V2H2Z|#1FM1.5 6.5H7.5V8.5H1.5Z|#0FM1 6H8V9H1ZM2 8H7V7H2Z|#1FM1.5 11.5H7.5V13.5H1.5Z|#0FM1 11H8V14H1ZM2 13H7V12H2Z|#0FM5 4V6H4V4ZM5 9V11H4V9Z|#4FM12 1V11H11V1Z|#4FM9 11H14L11.5 13.5Z"),
+    (JD_LAYOUT_FLOW_UP, 16.0, "#1FM1.5 1.5H7.5V3.5H1.5Z|#0FM1 1H8V4H1ZM2 3H7V2H2Z|#1FM1.5 6.5H7.5V8.5H1.5Z|#0FM1 6H8V9H1ZM2 8H7V7H2Z|#1FM1.5 11.5H7.5V13.5H1.5Z|#0FM1 11H8V14H1ZM2 13H7V12H2Z|#0FM5 4V6H4V4ZM5 9V11H4V9Z|#4FM12 4V14H11V4Z|#4FM9 4H14L11.5 1.5Z"),
+    (JD_LAYOUT_FLOW_RIGHT, 16.0, "#1FM1.5 1.5H3.5V5.5H1.5Z|#0FM1 1H4V6H1ZM2 5H3V2H2Z|#1FM6.5 1.5H8.5V5.5H6.5Z|#0FM6 1H9V6H6ZM7 5H8V2H7Z|#1FM11.5 1.5H13.5V5.5H11.5Z|#0FM11 1H14V6H11ZM12 5H13V2H12Z|#0FM4 3H6V4H4ZM9 3H11V4H9Z|#4FM1 10H11V11H1Z|#4FM11 8V13L13.5 10.5Z"),
+    (JD_LAYOUT_FLOW_LEFT, 16.0, "#1FM1.5 1.5H3.5V5.5H1.5Z|#0FM1 1H4V6H1ZM2 5H3V2H2Z|#1FM6.5 1.5H8.5V5.5H6.5Z|#0FM6 1H9V6H6ZM7 5H8V2H7Z|#1FM11.5 1.5H13.5V5.5H11.5Z|#0FM11 1H14V6H11ZM12 5H13V2H12Z|#0FM4 3H6V4H4ZM9 3H11V4H9Z|#4FM4 10H14V11H4Z|#4FM4 8V13L1.5 10.5Z"),
+    (JD_LAYOUT_HIERARCHY, 16.0, "#4FM8 6V11H7V6ZM2 11V8H13V11H12V9H3V11Z|#1FM5.5 2.5H9.5V5.5H5.5Z|#0FM5 2H10V6H5ZM6 5H9V3H6Z|#1FM1.5 11.5H3.5V14.5H1.5Z|#0FM1 11H4V15H1ZM2 14H3V12H2Z|#1FM6.5 11.5H8.5V14.5H6.5Z|#0FM6 11H9V15H6ZM7 14H8V12H7Z|#1FM11.5 11.5H13.5V14.5H11.5Z|#0FM11 11H14V15H11ZM12 14H13V12H12Z"),
+    (JD_LAYOUT_COMPACT, 16.0, "#4FM4 6V13H6V14H3V6ZM4 8H6V9H4Z|#1FM1.5 2.5H6.5V5.5H1.5Z|#0FM1 2H7V6H1ZM2 5H6V3H2Z|#1FM6.5 7.5H13.5V9.5H6.5Z|#0FM6 7H14V10H6ZM7 9H13V8H7Z|#1FM6.5 12.5H13.5V14.5H6.5Z|#0FM6 12H14V15H6ZM7 14H13V13H7Z"),
+    (JD_LAYOUT_RADIAL, 16.0, "#4FM8 4V5H7V4ZM8 10V11H7V10ZM3 7H5V8H3ZM10 7H12V8H10Z|#1FM5.5 5.5H9.5V9.5H5.5Z|#0FM5 5H10V10H5ZM6 9H9V6H6Z|#1FM6.5 1.5H8.5V3.5H6.5Z|#0FM6 1H9V4H6ZM7 3H8V2H7Z|#1FM6.5 11.5H8.5V13.5H6.5Z|#0FM6 11H9V14H6ZM7 13H8V12H7Z|#1FM1.5 6.5H3.5V8.5H1.5Z|#0FM1 6H4V9H1ZM2 8H3V7H2Z|#1FM11.5 6.5H13.5V8.5H11.5Z|#0FM11 6H14V9H11ZM12 8H13V7H12Z"),
+    (JD_LAYOUT_CIRCULAR, 16.0, "#4FM13.01 10.256L12.341 11.379L11.379 12.341L10.256 13.01L9.744 12.15L10.76 11.546L11.546 10.76L12.15 9.744ZM5.744 13.01L4.621 12.341L3.659 11.379L2.99 10.256L3.85 9.744L4.454 10.76L5.24 11.546L6.256 12.15ZM2.99 5.744L3.659 4.621L4.621 3.659L5.744 2.99L6.256 3.85L5.24 4.454L4.454 5.24L3.85 6.256ZM10.256 2.99L11.379 3.659L12.341 4.621L13.01 5.744L12.15 6.256L11.546 5.24L10.76 4.454L9.744 3.85Z|#1FM6.5 1.5H9.5V4.5H6.5Z|#0FM6 1H10V5H6ZM7 4H9V2H7Z|#1FM11.5 6.5H14.5V9.5H11.5Z|#0FM11 6H15V10H11ZM12 9H14V7H12Z|#1FM6.5 11.5H9.5V14.5H6.5Z|#0FM6 11H10V15H6ZM7 14H9V12H7Z|#1FM1.5 6.5H4.5V9.5H1.5Z|#0FM1 6H5V10H1ZM2 9H4V7H2Z"),
+    (JD_CONNECTOR_RIGHT_ANGLE, 16.0, "#4FM1 12H6V4H11V5H7V13H1Z|#4FM11 2V7L13.5 4.5Z"),
+    (JD_CONNECTOR_STRAIGHT, 16.0, "#4FM1.646 13.646L11.646 3.646L12.354 4.354L2.354 14.354Z|#4FM10 2H14V6Z"),
+    (JD_CONNECTOR_CURVED, 16.0, "#4FM1.415 12.007L2.62 11.798L3.549 11.267L4.366 10.448L5.111 9.408L5.823 8.24L6.555 7.04L7.368 5.904L8.337 4.931L9.536 4.246L10.915 4.007L11.085 4.993L9.88 5.202L8.951 5.733L8.134 6.552L7.389 7.592L6.677 8.76L5.945 9.96L5.132 11.096L4.163 12.069L2.964 12.754L1.585 12.993Z|#4FM11 2V7L13.5 4.5Z"),
+    (JD_LINE_JUMPS, 16.0, "#0FM8 2V6H7V2ZM8 9V14H7V9Z|#4FM1 10H4V7H11V10H15V11H10V8H5V11H1Z"),
+    (JD_REFRESH_ALL, 16.0, "#1FM2 2H13V3H2Z|#0FM8 13H1V1H14V8H13V2H2V12H8Z|#0FM2 3H13V4H2ZM8 4V12H7V4ZM2 8H7V9H2Z|#4FM10 12V12.793L11.207 14H12.793L14 12.793V11.207L12.793 10H12V9H13.207L15 10.793V13.207L13.207 15H10.793L9 13.207V12Z|#4FM12 8V11L10.5 9.5Z"),
+    (JD_DG_POSITION, 16.0, "#1FM2 4H9V7H12V12H2Z|#0FM9 4H2V12H12V7H13V13H1V3H9Z|#9FM10.5 1.5H14.5V5.5H10.5Z|#4FM10 1H15V6H10ZM11 5H14V2H11Z"),
+    (JD_DG_CONFIGURE, 16.0, "#1FM1.5 1.5H13.5V3.5H1.5Z|#0FM1 1H14V4H1ZM2 3H13V2H2Z|#1FM1.5 5.5H10.5V7.5H1.5Z|#0FM1 5H11V8H1ZM2 7H10V6H2Z|#1FM1.5 9.5H6.5V11.5H1.5Z|#0FM1 9H7V12H1ZM2 11H6V10H2Z|#4EM11.78 9.91L12.03 9L13.48 9.39L13.23 10.3L13.7 10.77L14.61 10.52L15 11.97L14.09 12.22L13.92 12.86L14.58 13.52L13.52 14.58L12.86 13.92L12.22 14.09L11.97 15L10.52 14.61L10.77 13.7L10.3 13.23L9.39 13.48L9 12.03L9.91 11.78L10.08 11.14L9.42 10.48L10.48 9.42L11.14 10.08ZM12.9 12L12.636 12.636L12 12.9L11.364 12.636L11.1 12L11.364 11.364L12 11.1L12.636 11.364Z"),
+    (JD_SHAPE_DATA, 16.0, "#0FM1 3H5V4H1ZM1 8H4V9H1ZM1 13H5V14H1Z|#1FM6.5 2.5H14.5V4.5H6.5Z|#0FM6 2H15V5H6ZM7 4H14V3H7Z|#1FM6.5 7.5H14.5V9.5H6.5Z|#0FM6 7H15V10H6ZM7 9H14V8H7Z|#1FM6.5 12.5H14.5V14.5H6.5Z|#0FM6 12H15V15H6ZM7 14H14V13H7Z"),
+    (JD_EXTERNAL_DATA, 16.0, "#1FM2 3H14V4H2Z|#0FM1 2H15V14H1ZM2 13H14V3H2Z|#0FM2 4H14V5H2ZM9 5V13H8V5ZM2 9H14V10H2Z"),
+    (JD_DG_FIELDS, 16.0, "#0FM2 3H4V5H2ZM2 7H4V9H2ZM2 11H4V13H2Z|#4FM6 3H14V5H6ZM6 7H11V9H6ZM6 11H9V13H6Z"),
+    (JD_LINK_DATA, 16.0, "#1FM1.5 3.5L1.736 2.916L2.379 2.439L3.332 2.118L4.5 2L5.668 2.118L6.621 2.439L7.264 2.916L7.5 3.5V6.5L7.264 7.084L6.621 7.561L5.668 7.882L4.5 8L3.332 7.882L2.379 7.561L1.736 7.084L1.5 6.5Z|#0FM1 3.403L1.325 2.598L2.144 1.991L3.226 1.626L4.5 1.497L5.774 1.626L6.856 1.991L7.675 2.598L8 3.403V6.597L7.675 7.402L6.856 8.009L5.774 8.374L4.5 8.503L3.226 8.374L2.144 8.009L1.325 7.402L1 6.597ZM2 6.403L2.147 6.766L2.613 7.112L3.439 7.39L4.5 7.497L5.561 7.39L6.387 7.112L6.853 6.766L7 6.403V3.597L6.853 3.234L6.387 2.888L5.561 2.61L4.5 2.503L3.439 2.61L2.613 2.888L2.147 3.234L2 3.597Z|#0FM1.964 3.313L2.147 3.766L2.613 4.112L3.439 4.39L4.5 4.497L5.561 4.39L6.387 4.112L6.853 3.766L7.036 3.313L7.964 3.687L7.675 4.402L6.856 5.009L5.774 5.374L4.5 5.503L3.226 5.374L2.144 5.009L1.325 4.402L1.036 3.687Z|#0FM9.854 11.854L7.5 14.207L4.793 11.5L7.146 9.146L7.854 9.854L6.207 11.5L7.5 12.793L9.146 11.146ZM9.146 7.146L11.5 4.793L14.207 7.5L11.854 9.854L11.146 9.146L12.793 7.5L11.5 6.207L9.854 7.854Z|#4FM7.146 11.146L11.146 7.146L11.854 7.854L7.854 11.854Z"),
+    (JD_ADVANCED_DG, 16.0, "#1FM2 11.5L2.214 9.905L2.819 8.472L3.757 7.257L4.972 6.319L6.405 5.714L8 5.5L9.595 5.714L11.028 6.319L12.243 7.257L13.181 8.472L13.786 9.905L14 11.5Z|#0FM1.428 12L1.728 9.772L2.384 8.217L3.401 6.901L4.717 5.884L6.272 5.228L8 4.996L9.728 5.228L11.283 5.884L12.599 6.901L13.616 8.217L14.272 9.772L14.572 12ZM13.428 11L13.299 10.038L12.745 8.726L11.886 7.614L10.774 6.755L9.462 6.201L8 6.004L6.538 6.201L5.226 6.755L4.114 7.614L3.255 8.726L2.701 10.038L2.572 11Z|#4FM8.146 10.146L10.146 8.146L10.854 8.854L8.854 10.854Z|#0FM7 10H9V12H7Z"),
+    (JD_RULES_CHECK, 16.0, "#0FM2 2H4V4H2ZM2 6H4V8H2ZM2 10H4V12H2Z|#0FM6 2H14V3H6ZM6 6H14V7H6ZM6 10H8V11H6Z|#4FM9.854 11.146L11.5 12.793L14.146 10.146L14.854 10.854L11.5 14.207L9.146 11.854Z"),
+    (JD_RULES_IMPORT, 16.0, "#0FM2 2H4V4H2ZM2 6H4V8H2ZM2 10H4V12H2Z|#0FM6 2H14V3H6ZM6 6H14V7H6ZM6 10H8V11H6Z|#4FM12 12H15V13H12Z|#4FM12 10V15L9.5 12.5Z"),
+    (JD_ISSUE_IGNORE, 16.0, "#1FM6.5 4.5L2.25 13H9V9.5Z|#0FM8 14H1.191L6.5 3.382L8.947 8.276L8.053 8.724L6.5 5.618L2.809 13H8Z|#0FM7 7V10H6V7Z|#0FM6 11H7V12H6Z|#4FM10.854 10.146L14.854 14.146L14.146 14.854L10.146 10.854ZM14.854 10.854L10.854 14.854L10.146 14.146L14.146 10.146Z"),
+    (JD_ISSUES_WINDOW, 16.0, "#1FM2 3H14V4H2Z|#0FM7 14H1V2H15V7H14V3H2V13H7Z|#0FM2 4H14V5H2Z|#4EM8 15L11.5 8L15 15ZM11 10H12V12H11ZM11 13H12V14H11Z"),
+    (JD_PROOF_LANGUAGE, 16.0, "#1FM4 2H11V7H7V13H4Z|#0FM2 2H4V13H2Z|#0FM7 14H1V1H12V7H11V2H2V13H7Z|#9FM14.4 11.5L14.172 12.629L13.551 13.551L12.629 14.172L11.5 14.4L10.371 14.172L9.449 13.551L8.828 12.629L8.6 11.5L8.828 10.371L9.449 9.449L10.371 8.828L11.5 8.6L12.629 8.828L13.551 9.449L14.172 10.371Z|#4FM14.91 11.5L14.642 12.826L13.911 13.911L12.826 14.642L11.5 14.91L10.174 14.642L9.089 13.911L8.358 12.826L8.09 11.5L8.358 10.174L9.089 9.089L10.174 8.358L11.5 8.09L12.826 8.358L13.911 9.089L14.642 10.174ZM13.702 10.568L13.19 9.81L12.432 9.298L11.5 9.11L10.568 9.298L9.81 9.81L9.298 10.568L9.11 11.5L9.298 12.432L9.81 13.19L10.568 13.702L11.5 13.89L12.432 13.702L13.19 13.19L13.702 12.432L13.89 11.5Z|#4FM9 11H14V12H9Z|#4FM13.001 11.5L12.917 12.703L12.68 13.724L12.268 14.53L11.5 14.979L10.732 14.53L10.32 13.724L10.083 12.703L9.999 11.5L10.083 10.297L10.32 9.276L10.732 8.47L11.5 8.021L12.268 8.47L12.68 9.276L12.917 10.297ZM11.925 10.446L11.734 9.622L11.511 9.186L11.5 9.179L11.489 9.186L11.266 9.622L11.075 10.446L11.001 11.5L11.075 12.554L11.266 13.378L11.489 13.814L11.5 13.821L11.511 13.814L11.734 13.378L11.925 12.554L11.999 11.5Z"),
+    (JD_SHOW_TAGS, 16.0, "#1FM2 2H14V9H8V10L5 13V10H2Z|#0FM7.854 10.854L4 14.707V11H1V1H15V9H14V2H2V10H5V12.293L7.146 10.146Z|#4FM9 11.293L10.293 10H13.707L15 11.293V12.707L13.707 14H10.293L9 12.707ZM10 12.293L10.707 13H13.293L14 12.293V11.707L13.293 11H10.707L10 11.707Z|#4FM11 11H13V13H11Z"),
+    (JD_RULER, 16.0, "#1FM2.5 4.5H14.5V11.5H2.5Z|#0FM2 4H15V12H2ZM3 11H14V5H3Z|#0FM5 5V9H4V5ZM7 5V7H6V5ZM9 5V9H8V5ZM11 5V7H10V5ZM13 5V9H12V5Z"),
+    (JD_GRID, 16.0, "#0FM4 1V15H3V1ZM8 1V15H7V1ZM12 1V15H11V1ZM1 3H15V4H1ZM1 7H15V8H1ZM1 11H15V12H1Z"),
+    (JD_GUIDES, 16.0, "#4FM1 2H3V3H1ZM4 2H6V3H4ZM7 2H9V3H7ZM10 2H12V3H10ZM13 2H15V3H13ZM3 1V3H2V1ZM3 4V6H2V4ZM3 7V9H2V7ZM3 10V12H2V10ZM3 13V15H2V13Z|#1FM4.5 4.5H13.5V11.5H4.5Z|#0FM4 4H14V12H4ZM5 11H13V5H5Z"),
+    (JD_SNAP_GLUE, 16.0, "#4FM2 2H6V5H2Z|#4FM10 2H14V5H10Z|#1FM3 5H5V11H11V5H13V13H3Z|#0FM3 5V13H13V5H14V14H2V5ZM6 5V10H10V5H11V11H5V5Z"),
     (JD_ZOOM, 16.0, "#1FM11 6.5L10.771 7.922L10.132 9.158L9.158 10.132L7.922 10.771L6.5 11L5.078 10.771L3.842 10.132L2.868 9.158L2.229 7.922L2 6.5L2.229 5.078L2.868 3.842L3.842 2.868L5.078 2.229L6.5 2L7.922 2.229L9.158 2.868L10.132 3.842L10.771 5.078Z|#0FM11.506 6.5L11.251 8.081L10.54 9.456L9.456 10.54L8.081 11.251L6.5 11.506L4.919 11.251L3.544 10.54L2.46 9.456L1.749 8.081L1.494 6.5L1.749 4.919L2.46 3.544L3.544 2.46L4.919 1.749L6.5 1.494L8.081 1.749L9.456 2.46L10.54 3.544L11.251 4.919ZM10.29 5.236L9.723 4.141L8.859 3.277L7.764 2.71L6.5 2.506L5.236 2.71L4.141 3.277L3.277 4.141L2.71 5.236L2.506 6.5L2.71 7.764L3.277 8.859L4.141 9.723L5.236 10.29L6.5 10.494L7.764 10.29L8.859 9.723L9.723 8.859L10.29 7.764L10.494 6.5Z|#0FM10.707 9.293L14.707 13.293L13.293 14.707L9.293 10.707Z|#4FM4 6H9V7H4ZM7 4V9H6V4Z"),
+    (JD_PAGE_WIDTH, 16.0, "#1FM2 1H14V15H2Z|#0FM2 1V15H1V1ZM15 1V15H14V1Z|#4FM6 7H10V8H6Z|#4FM6 5V10L3.5 7.5Z|#4FM10 5V10L12.5 7.5Z"),
+    (JD_ARRAY_SHAPES, 16.0, "#1FM1.5 1.5H3.5V3.5H1.5Z|#0FM1 1H4V4H1ZM2 3H3V2H2Z|#9FM6.5 1.5H8.5V3.5H6.5ZM11.5 1.5H13.5V3.5H11.5ZM1.5 6.5H3.5V8.5H1.5ZM6.5 6.5H8.5V8.5H6.5ZM11.5 6.5H13.5V8.5H11.5ZM1.5 11.5H3.5V13.5H1.5ZM6.5 11.5H8.5V13.5H6.5ZM11.5 11.5H13.5V13.5H11.5Z|#4FM6 1H9V4H6ZM7 3H8V2H7ZM11 1H14V4H11ZM12 3H13V2H12ZM1 6H4V9H1ZM2 8H3V7H2ZM6 6H9V9H6ZM7 8H8V7H7ZM11 6H14V9H11ZM12 8H13V7H12ZM1 11H4V14H1ZM2 13H3V12H2ZM6 11H9V14H6ZM7 13H8V12H7ZM11 11H14V14H11ZM12 13H13V12H12Z"),
+    (JD_NUMBER_SHAPES, 16.0, "#1FM6.5 2.5H14.5V6.5H6.5Z|#0FM6 2H15V7H6ZM7 6H14V3H7Z|#1FM6.5 9.5H14.5V13.5H6.5Z|#0FM6 9H15V14H6ZM7 13H14V10H7Z|#4FM1.646 3.646L3.146 2.146L3.854 2.854L2.354 4.354ZM4 2V7H3V2ZM1 9H5V11.707L2.354 14.354L1.646 13.646L4 11.293V10H1ZM1 13H5V14H1Z"),
+    (JD_DIMENSION, 16.0, "#1FM2.5 2.5H13.5V6.5H2.5Z|#0FM2 2H14V7H2ZM3 6H13V3H3Z|#0FM3 8V15H2V8ZM14 8V15H13V8Z|#4FM6 11H10V12H6Z|#4FM3.5 11.5L6 9V14ZM12.5 11.5L10 9V14Z"),
+    (JD_SHAPESHEET, 16.0, "#1FM2 3H13V5H2Z|#0FM1 2H14V15H1ZM2 14H13V3H2Z|#0FM2 5H13V6H2ZM2 8H13V9H2ZM2 11H13V12H2ZM6 6V14H5V6ZM10 6V14H9V6Z|#9FM5.5 8.5H9.5V11.5H5.5Z|#4FM5 8H10V12H5ZM6 11H9V9H6Z"),
+    (JD_OP_UNION, 16.0, "#9FM1.5 1.5H9.5V6.5H14.5V14.5H6.5V9.5H1.5Z|#4FM1 1H10V6H15V15H6V10H1ZM2 9H7V14H14V7H9V2H2Z"),
+    (JD_OP_COMBINE, 16.0, "#9EM1.5 1.5H9.5V9.5H1.5ZM6.5 6.5H14.5V14.5H6.5Z|#4FM1 1H10V10H1ZM2 9H9V2H2ZM6 6H15V15H6ZM7 14H14V7H7Z"),
+    (JD_OP_FRAGMENT, 16.0, "#9FM1.5 1.5H9.5V4.5H4.5V9.5H1.5Z|#4FM1 1H10V5H5V10H1ZM2 9H4V4H9V2H2Z|#9FM6.5 6.5H9.5V9.5H6.5Z|#4FM6 6H10V10H6ZM7 9H9V7H7Z|#9FM14.5 14.5H6.5V11.5H11.5V6.5H14.5Z|#4FM15 15H6V11H11V6H15ZM14 7H12V12H7V14H14Z"),
+    (JD_OP_INTERSECT, 16.0, "#0FM1 1H2V2H1ZM3 1H4V2H3ZM5 1H6V2H5ZM7 1H8V2H7ZM9 1H10V2H9ZM1 3H2V4H1ZM1 5H2V6H1ZM1 7H2V8H1ZM1 9H2V10H1ZM9 3H10V4H9ZM3 9H4V10H3ZM6 14H7V15H6ZM8 14H9V15H8ZM10 14H11V15H10ZM12 14H13V15H12ZM14 14H15V15H14ZM14 6H15V7H14ZM14 8H15V9H14ZM14 10H15V11H14ZM14 12H15V13H14ZM12 6H13V7H12ZM6 12H7V13H6Z|#9FM6.5 6.5H9.5V9.5H6.5Z|#4FM6 6H10V10H6ZM7 9H9V7H7Z"),
+    (JD_OP_SUBTRACT, 16.0, "#0FM12 6H13V7H12ZM14 6H15V7H14ZM14 8H15V9H14ZM14 10H15V11H14ZM14 12H15V13H14ZM14 14H15V15H14ZM6 14H7V15H6ZM8 14H9V15H8ZM10 14H11V15H10ZM12 14H13V15H12ZM6 12H7V13H6Z|#9FM1.5 1.5H9.5V6.5H6.5V9.5H1.5Z|#4FM1 1H10V7H7V10H1ZM2 9H6V6H9V2H2Z"),
+    (JD_OP_JOIN, 16.0, "#4FM3.646 10.646L9.293 5H12V6H9.707L4.354 11.354Z|#1FM1.5 11.5H3.5V13.5H1.5Z|#0FM1 11H4V14H1ZM2 13H3V12H2Z|#1FM12.5 4.5H14.5V6.5H12.5Z|#0FM12 4H15V7H12ZM13 6H14V5H13Z"),
+    (JD_OP_TRIM, 16.0, "#0FM11 9H12V10H11ZM13 9H14V10H13ZM9 11H10V12H9ZM9 13H10V14H9Z|#4FM1 9H9V1H10V10H1Z"),
+    (JD_OP_OFFSET, 16.0, "#1FM5.5 4.5H8.5V8.5H11.5V11.5H5.5Z|#0FM5 4H9V8H12V12H5ZM6 11H11V9H8V5H6Z|#4FM3 2H11V6H14V14H3ZM4 13H13V7H10V3H4Z"),
+    (JD_OP_FIT_CURVE, 16.0, "#0FM1.146 6.146L4.5 2.793L7.5 5.793L10.5 2.793L13.854 6.146L13.146 6.854L10.5 4.207L7.5 7.207L4.5 4.207L1.854 6.854Z|#4FM1.037 13.312L1.728 11.61L2.529 10.363L3.472 9.579L4.552 9.307L5.662 9.544L6.753 10.18L7.83 11.124L8.834 12.005L9.703 12.512L10.429 12.666L11.064 12.506L11.713 11.967L12.381 10.928L13.037 9.312L13.963 9.688L13.272 11.39L12.471 12.637L11.528 13.421L10.448 13.693L9.338 13.456L8.247 12.82L7.17 11.876L6.166 10.995L5.297 10.488L4.571 10.334L3.936 10.494L3.287 11.033L2.619 12.072L1.963 13.688Z"),
+    (JD_SHAPE_NAME, 16.0, "#1FM6.5 2.5L10.5 6.5L9 8H8V9L6.5 10.5L2.5 6.5Z|#0FM8.646 7.646L9.793 6.5L6.5 3.207L3.207 6.5L6.5 9.793L7.646 8.646L8.354 9.354L6.5 11.207L1.793 6.5L6.5 1.793L11.207 6.5L9.354 8.354Z|#9FM9 12L11.5 9.5H14.5V14.5H11.5Z|#4FM8.293 12L11.293 9H15V15H11.293ZM11.707 14H14V10H11.707L9.707 12Z"),
+    (JD_BEHAVIOR, 16.0, "#1FM6.5 2.5L10.5 6.5L9 8H8V9L6.5 10.5L2.5 6.5Z|#0FM8.646 7.646L9.793 6.5L6.5 3.207L3.207 6.5L6.5 9.793L7.646 8.646L8.354 9.354L6.5 11.207L1.793 6.5L6.5 1.793L11.207 6.5L9.354 8.354Z|#4EM11.78 9.91L12.03 9L13.48 9.39L13.23 10.3L13.7 10.77L14.61 10.52L15 11.97L14.09 12.22L13.92 12.86L14.58 13.52L13.52 14.58L12.86 13.92L12.22 14.09L11.97 15L10.52 14.61L10.77 13.7L10.3 13.23L9.39 13.48L9 12.03L9.91 11.78L10.08 11.14L9.42 10.48L10.48 9.42L11.14 10.08ZM12.9 12L12.636 12.636L12 12.9L11.364 12.636L11.1 12L11.364 11.364L12 11.1L12.636 11.364Z"),
+    (JD_PROTECTION, 16.0, "#1FM6.5 2.5L10.5 6.5L9 8H8V9L6.5 10.5L2.5 6.5Z|#0FM8.646 7.646L9.793 6.5L6.5 3.207L3.207 6.5L6.5 9.793L7.646 8.646L8.354 9.354L6.5 11.207L1.793 6.5L6.5 1.793L11.207 6.5L9.354 8.354Z|#4FM10 11V9H14V11H13V10H11V11Z|#9FM9.5 11.5H14.5V14.5H9.5Z|#4FM9 11H15V15H9ZM10 14H14V12H10Z"),
+    (JD_DOCUMENT_STENCIL, 16.0, "#1FM4 2H9V5H12V14H4Z|#2FM10 2L12 4H10Z|#0FM3 1H9.707L13 4.293V15H3ZM4 14H12V4.707L9.293 2H4ZM10 2V4H12V5H9V2Z|#4FM5 7H7V9H5ZM9 7H11V9H9ZM5 11H7V13H5ZM9 11H11V13H9Z"),
+    (JD_DRAWING_EXPLORER, 16.0, "#1FM1.5 1.5H3.5V3.5H1.5Z|#0FM1 1H4V4H1ZM2 3H3V2H2Z|#0FM6 2H13V3H6Z|#1FM5.5 6.5H7.5V8.5H5.5Z|#0FM5 6H8V9H5ZM6 8H7V7H6Z|#0FM10 7H14V8H10Z|#0FM3 4V12H5V13H2V4ZM3 7H5V8H3Z|#1FM5.5 11.5H7.5V13.5H5.5Z|#0FM5 11H8V14H5ZM6 13H7V12H6Z|#0FM10 12H13V13H10Z"),
+    (JD_MASTER_EXPLORER, 16.0, "#1FM1.5 1.5H3.5V3.5H1.5Z|#0FM1 1H4V4H1ZM2 3H3V2H2Z|#0FM6 2H13V3H6Z|#1FM5.5 6.5H7.5V8.5H5.5Z|#0FM5 6H8V9H5ZM6 8H7V7H6Z|#0FM10 7H14V8H10Z|#0FM3 4V12H5V13H2V4ZM3 7H5V8H3Z|#1FM5.5 11.5H7.5V13.5H5.5Z|#0FM5 11H8V14H5ZM6 13H7V12H6Z|#4FM12 9L15 12L12 15L9 12Z"),
+    (JD_EVENT_MONITOR, 16.0, "#0FM1 2H3V4H1ZM1 6H3V8H1Z|#0FM5 2H14V3H5ZM5 6H11V7H5Z|#4FM1 11H3.732L6.043 7.534L9.079 13.101L10.76 11H15V12H11.24L8.921 14.899L5.957 9.466L4.268 12H1Z"),
+    (JD_PERSISTENT_EVENTS, 16.0, "#1FM3 2H8V5H11V8H8V14H3Z|#2FM9 2L11 4H9Z|#0FM9 15H2V1H8.707L12 4.293V8H11V4.707L8.293 2H3V14H9ZM9 2V4H11V5H8V2Z|#4FM12 9H15L13 11H15L10 15L11 12H9Z"),
+    (JD_PRINT_SHAPESHEET, 16.0, "#1FM2 6H14V11H13V8H3V11H2Z|#0FM4 4V1H12V4H11V2H5V4Z|#0FM3 12H1V5H15V12H13V11H14V6H2V11H3Z|#9FM4.5 9.5H11.5V14.5H4.5Z|#4FM4 9H12V15H4ZM5 14H11V10H5Z|#4FM5 11H11V12H5ZM8 10V14H7V10Z"),
+    (JD_CT_MARGINS, 16.0, "#9FM2 3H14V6H2Z|#0FM4 4H9V5H4Z|#4FM1 2H15V14H1ZM2 13H14V3H2Z|#4FM2 6H14V7H2Z|#1FM9.5 8.5H12.5V10.5H9.5Z|#0FM9 8H13V11H9ZM10 10H12V9H10Z|#0FM2.5 9.5L4 8V11ZM7.5 9.5L6 8V11Z|#0FM4 9H6V10H4Z"),
+    (JD_CT_FIT_CONTENTS, 16.0, "#9FM5 3H11V6H5Z|#0FM6 4H9V5H6Z|#4FM4 2H12V14H4ZM5 13H11V3H5Z|#4FM5 6H11V7H5Z|#1FM6.5 8.5H9.5V11.5H6.5Z|#0FM6 8H10V12H6ZM7 11H9V9H7Z|#0FM1 6L3 8L1 10ZM15 6L13 8L15 10Z"),
+    (JD_CT_AUTO_SIZE, 16.0, "#9FM5 3H11V6H5Z|#0FM6 4H9V5H6Z|#4FM4 2H12V14H4ZM5 13H11V3H5Z|#4FM5 6H11V7H5Z|#1FM6.5 8.5H9.5V10.5H6.5Z|#0FM6 8H10V11H6ZM7 10H9V9H7Z|#0FM3 6L1 8L3 10ZM13 6L15 8L13 10Z"),
+    (JD_CT_HEADING, 16.0, "#4FM1 2H15V7H1Z|#4FM2 7V13H14V7H15V14H1V7Z|#1FM5.5 8.5H10.5V11.5H5.5Z|#0FM5 8H11V12H5ZM6 11H10V9H6Z"),
+    (JD_CT_LOCK, 16.0, "#1FM2 3H14V6H2Z|#0FM4 4H9V5H4Z|#0FM8 14H1V2H15V8H14V3H2V13H8ZM2 6H14V7H2Z|#1FM3.5 8.5H6.5V11.5H3.5Z|#0FM3 8H7V12H3ZM4 11H6V9H4Z|#4FM10 11V9H14V11H13V10H11V11Z|#9FM9.5 11.5H14.5V14.5H9.5Z|#4FM9 11H15V15H9ZM10 14H14V12H10Z"),
+    (JD_CT_SELECT_CONTENTS, 16.0, "#1FM2 3H14V6H2Z|#0FM4 4H9V5H4Z|#0FM1 2H15V14H1ZM2 13H14V3H2Z|#0FM2 6H14V7H2Z|#9FM3.5 8.5H6.5V11.5H3.5ZM9.5 8.5H12.5V11.5H9.5Z|#4FM3 8H7V12H3ZM4 11H6V9H4ZM9 8H13V12H9ZM10 11H12V9H10Z"),
+    (JD_CT_DISBAND, 16.0, "#9FM3.5 1.5H12.5V5.5H3.5Z|#4FM3 1H13V6H3ZM4 5H12V2H4Z|#0FM5 3H9V4H5Z|#4FM2 7V12H1V7ZM15 7V12H14V7ZM4 14H12V15H4Z|#1FM5.5 8.5H10.5V11.5H5.5Z|#0FM5 8H11V12H5ZM6 11H10V9H6Z"),
+    (JD_PIC_BRIGHTNESS, 16.0, "#1FM10 7.5L9.804 8.473L9.268 9.268L8.473 9.804L7.5 10L6.527 9.804L5.732 9.268L5.196 8.473L5 7.5L5.196 6.527L5.732 5.732L6.527 5.196L7.5 5L8.473 5.196L9.268 5.732L9.804 6.527Z|#0FM10.51 7.5L10.274 8.67L9.628 9.628L8.67 10.274L7.5 10.51L6.33 10.274L5.372 9.628L4.726 8.67L4.49 7.5L4.726 6.33L5.372 5.372L6.33 4.726L7.5 4.49L8.67 4.726L9.628 5.372L10.274 6.33ZM9.333 6.724L8.908 6.092L8.276 5.667L7.5 5.51L6.724 5.667L6.092 6.092L5.667 6.724L5.51 7.5L5.667 8.276L6.092 8.908L6.724 9.333L7.5 9.49L8.276 9.333L8.908 8.908L9.333 8.276L9.49 7.5Z|#0FM8 1V3H7V1ZM8 12V14H7V12ZM1 7H3V8H1ZM12 7H14V8H12ZM3.854 3.146L4.854 4.146L4.146 4.854L3.146 3.854ZM11.854 3.854L10.854 4.854L10.146 4.146L11.146 3.146ZM3.146 11.146L4.146 10.146L4.854 10.854L3.854 11.854ZM11.146 11.854L10.146 10.854L10.854 10.146L11.854 11.146Z"),
+    (JD_PIC_CONTRAST, 16.0, "#1FM3 3H13L3 13Z|#0FM13 3V13H3Z|#0FM2 2H14V14H2ZM3 13H13V3H3Z"),
+    (JD_PIC_AUTO_BALANCE, 16.0, "#1FM2 12V11L5.5 7.5L7.5 9.5L8 10V12Z|#0FM1.646 10.646L5.5 6.793L7.854 9.146L7.146 9.854L5.5 8.207L2.354 11.354Z|#0FM11.75 5.5L11.579 6.131L11.131 6.579L10.5 6.75L9.869 6.579L9.421 6.131L9.25 5.5L9.421 4.869L9.869 4.421L10.5 4.25L11.131 4.421L11.579 4.869Z|#0FM8 13H1V2H14V8H13V3H2V12H8Z|#0FM12.854 12.146L14.854 14.146L14.146 14.854L12.146 12.854Z|#4FM11 9L11.42 10.58L13 11L11.42 11.42L11 13L10.58 11.42L9 11L10.58 10.58Z"),
+    (JD_PIC_COMPRESS, 16.0, "#0FM1 4L4 1V4ZM15 4L12 1V4ZM15 12L12 15V12ZM1 12L4 15V12Z|#9FM6 10L7.5 8.5L9 10Z|#4FM5.646 9.646L7.5 7.793L9.354 9.646L8.646 10.354L7.5 9.207L6.354 10.354Z|#0FM5 5H11V11H5ZM6 10H10V6H6Z"),
+    (JD_PIC_CROP, 16.0, "#9FM5 5H11V11H5Z|#0FM5 1V11H15V12H4V1ZM1 4H12V15H11V5H1Z"),
+    (JD_PIC_FRAME, 16.0, "#9EM2 2H14V14H2ZM4 4V12H12V4Z|#4FM1 1H15V15H1ZM2 14H14V2H2ZM4 4H12V12H4ZM5 11H11V5H5Z|#1FM5 11V10.5L7 8.5L9 10.5V11Z|#0FM4.646 10.146L7 7.793L9.354 10.146L8.646 10.854L7 9.207L5.354 10.854Z|#0FM10.5 6.5L10.363 7.005L10.005 7.363L9.5 7.5L8.995 7.363L8.637 7.005L8.5 6.5L8.637 5.995L8.995 5.637L9.5 5.5L10.005 5.637L10.363 5.995Z"),
+    (JD_CFF_SWIMLANE, 16.0, "#1FM2 3H4V6H2Z|#1FM2 7H4V10H2Z|#0FM14 10V3H2V10H1V2H15V10ZM2 6H14V7H2ZM5 3V10H4V3Z|#9FM2 11H4V14H2Z|#4FM1 10H15V15H1ZM2 14H14V11H2Z|#4FM5 11V14H4V11Z"),
+    (JD_CFF_SEPARATOR, 16.0, "#1FM2 3H4V6H2ZM2 7H4V10H2ZM2 11H4V14H2Z|#0FM1 2H15V15H1ZM2 14H14V3H2ZM2 6H14V7H2ZM2 10H14V11H2ZM5 3V14H4V3Z|#4FM10 1V15H9V1Z"),
+    (JD_CFF_ORIENTATION, 16.0, "#1FM2 4H3V6H2ZM2 7H3V9H2ZM2 10H3V12H2Z|#0FM1 3H8V13H1ZM2 12H7V4H2ZM2 6H7V7H2ZM2 9H7V10H2ZM4 4V12H3V4Z|#9FM10 4H11V5H10ZM12 4H14V5H12Z|#4FM9 3H15V13H9ZM10 12H14V4H10Z|#4FM10 5H14V6H10ZM12 4V12H11V4Z"),
+    (JD_CFF_DIRECTION, 16.0, "#1FM2 5H4V12H2Z|#0FM1 4H15V13H1ZM2 12H14V5H2Z|#0FM5 5V12H4V5Z|#4FM6 8H10V9H6Z|#4FM10 6V11L12.5 8.5Z"),
+    (JD_CFF_MARGINS, 16.0, "#9FM2 5H4V12H2Z|#4FM1 4H15V13H1ZM2 12H14V5H2Z|#4FM5 5V12H4V5Z|#1FM10.5 6.5H12.5V10.5H10.5Z|#0FM10 6H13V11H10ZM11 10H12V7H11Z|#0FM5 8.5L7 6.5V10.5ZM10 8.5L8 6.5V10.5Z|#0FM7 8H8V9H7Z"),
+    (JD_CFF_ROTATE_LABELS, 16.0, "#1FM2 2H12V14H2Z|#0FM15 2H2V14H15V15H1V1H15ZM13 2V14H12V2Z|#4EM3 7.5L11 3.5V4.618L9 5.618V10.382L11 11.382V12.5L3 8.5ZM8 6.118L4.236 8L8 9.882Z"),
+    (JD_CFF_TITLE_BAR, 16.0, "#1FM2 5H4V9H2ZM2 10H4V14H2Z|#0FM2 5V14H14V5H15V15H1V5ZM2 9H14V10H2ZM5 5V14H4V5Z|#9FM1.5 1.5H14.5V4.5H1.5Z|#4FM1 1H15V5H1ZM2 4H14V2H2Z"),
+    (JD_CFF_SEPARATORS, 16.0, "#1FM2 3H4V6H2ZM2 7H4V10H2ZM2 11H4V14H2Z|#0FM1 2H15V15H1ZM2 14H14V3H2Z|#0FM5 3V14H4V3Z|#4FM2 6H14V7H2ZM2 10H14V11H2ZM10 3V14H9V3Z"),
+    (JD_ORG_RELAYOUT, 16.0, "#1FM3.5 1.5H5.5V3.5H3.5Z|#0FM3 1H6V4H3ZM4 3H5V2H4Z|#0FM5 4V5H4V4ZM2 7V5H7V7H6V6H3V7Z|#1FM1.5 7.5H3.5V9.5H1.5Z|#0FM1 7H4V10H1ZM2 9H3V8H2Z|#1FM5.5 7.5H7.5V9.5H5.5Z|#0FM5 7H8V10H5ZM6 9H7V8H6Z|#4FM10 12V12.793L11.207 14H12.793L14 12.793V11.207L12.793 10H12V9H13.207L15 10.793V13.207L13.207 15H10.793L9 13.207V12Z|#4FM12 8V11L10.5 9.5Z"),
+    (JD_ORG_FIT, 16.0, "#4FM2 1H10.707L14 4.293V15H2ZM3 14H13V4.707L10.293 2H3ZM11 2V4H13V5H10V2Z|#1FM6.5 4.5H8.5V6.5H6.5Z|#0FM6 4H9V7H6ZM7 6H8V5H7Z|#0FM8 7V8H7V7ZM5 10V8H10V10H9V9H6V10Z|#1FM4.5 10.5H6.5V12.5H4.5Z|#0FM4 10H7V13H4ZM5 12H6V11H5Z|#1FM8.5 10.5H10.5V12.5H8.5Z|#0FM8 10H11V13H8ZM9 12H10V11H9Z"),
+    (JD_ORG_SPACE_MORE, 16.0, "#1FM1.5 2.5H5.5V7.5H1.5Z|#0FM1 2H6V8H1ZM2 7H5V3H2Z|#1FM10.5 2.5H14.5V7.5H10.5Z|#0FM10 2H15V8H10ZM11 7H14V3H11Z|#4FM4 11H7V12H4ZM9 11H12V12H9Z|#4FM4 9V14L1.5 11.5Z|#4FM12 9V14L14.5 11.5Z"),
+    (JD_ORG_SPACE_LESS, 16.0, "#1FM2.5 2.5H6.5V7.5H2.5Z|#0FM2 2H7V8H2ZM3 7H6V3H3Z|#1FM9.5 2.5H13.5V7.5H9.5Z|#0FM9 2H14V8H9ZM10 7H13V3H10Z|#4FM1 11H4V12H1ZM12 11H15V12H12Z|#4FM4 9V14L6.5 11.5Z|#4FM12 9V14L9.5 11.5Z"),
+    (JD_ORG_MOVE_LEFT, 16.0, "#0FM4 7H6V8H4Z|#0FM4 5V10L1.5 7.5Z|#9FM7.5 4.5H14.5V10.5H7.5Z|#4FM7 4H15V11H7ZM8 10H14V5H8Z"),
+    (JD_ORG_MOVE_RIGHT, 16.0, "#0FM10 7H12V8H10Z|#0FM12 5V10L14.5 7.5Z|#9FM1.5 4.5H8.5V10.5H1.5Z|#4FM1 4H9V11H1ZM2 10H8V5H2Z"),
+    (JD_ORG_MOVE_UP, 16.0, "#0FM8 4V6H7V4Z|#0FM5 4H10L7.5 1.5Z|#9FM4.5 7.5H10.5V14.5H4.5Z|#4FM4 7H11V15H4ZM5 14H10V8H5Z"),
+    (JD_ORG_MOVE_DOWN, 16.0, "#0FM8 10V12H7V10Z|#0FM5 12H10L7.5 14.5Z|#9FM4.5 1.5H10.5V8.5H4.5Z|#4FM4 1H11V9H4ZM5 8H10V2H5Z"),
+    (JD_ORG_SUBORDINATES, 16.0, "#1FM3.5 1.5H11.5V4.5H3.5Z|#0FM3 1H12V5H3ZM4 4H11V2H4Z|#4FM8 5V7H7V5ZM3 9V7H12V9H11V8H4V9ZM1 9H3V10H1ZM4 9H6V10H4ZM1 13H3V14H1ZM4 13H6V14H4ZM2 10V12H1V10ZM2 13V14H1V13ZM6 10V12H5V10ZM6 13V14H5V13ZM9 9H11V10H9ZM12 9H14V10H12ZM9 13H11V14H9ZM12 13H14V14H12ZM10 10V12H9V10ZM10 13V14H9V13ZM14 10V12H13V10ZM14 13V14H13V13Z"),
+    (JD_ORG_HEIGHT_MORE, 16.0, "#0FM5 4H10L7.5 1.5Z|#0FM5 12H10L7.5 14.5Z|#9FM3.5 5.5H11.5V10.5H3.5Z|#4FM3 5H12V11H3ZM4 10H11V6H4Z"),
+    (JD_ORG_HEIGHT_LESS, 16.0, "#0FM5 2H10L7.5 4.5Z|#0FM5 13H10L7.5 10.5Z|#9FM2.5 6.5H12.5V8.5H2.5Z|#4FM2 6H13V9H2ZM3 8H12V7H3Z"),
+    (JD_ORG_WIDTH_MORE, 16.0, "#0FM4 5V10L1.5 7.5Z|#0FM12 5V10L14.5 7.5Z|#9FM5.5 3.5H10.5V11.5H5.5Z|#4FM5 3H11V12H5ZM6 11H10V4H6Z"),
+    (JD_ORG_WIDTH_LESS, 16.0, "#0FM2 5V10L4.5 7.5Z|#0FM13 5V10L10.5 7.5Z|#9FM6.5 2.5H8.5V12.5H6.5Z|#4FM6 2H9V13H6ZM7 12H8V3H7Z"),
+    (JD_ORG_POSITION_TYPE, 16.0, "#1FM1.5 1.5H11.5V8.5H1.5Z|#0FM1 1H12V9H1ZM2 8H11V2H2Z|#9FM10.5 10.5H14.5V14.5H10.5L8.5 12.5Z|#4FM10.293 10H15V15H10.293L7.793 12.5ZM9.207 12.5L10.707 14H14V11H10.707Z|#4FM11 12H12V13H11Z"),
+    (JD_ORG_PICTURE_INSERT, 16.0, "#1FM2 12V11L5.5 7.5L7.5 9.5L8 10V12Z|#0FM1.646 10.646L5.5 6.793L7.854 9.146L7.146 9.854L5.5 8.207L2.354 11.354Z|#0FM11.75 5.5L11.579 6.131L11.131 6.579L10.5 6.75L9.869 6.579L9.421 6.131L9.25 5.5L9.421 4.869L9.869 4.421L10.5 4.25L11.131 4.421L11.579 4.869Z|#0FM8 13H1V2H14V8H13V3H2V12H8Z|#4FM12 10H13V12H15V13H13V15H12V13H10V12H12Z"),
+    (JD_ORG_PICTURES_MULTIPLE, 16.0, "#1FM2 2H10V4H4V8H2Z|#0FM4 9H1V1H11V4H10V2H2V8H4Z|#9FM6 13L9 10L11 12L12 11L14 13Z|#4FM5.646 12.646L9 9.293L11 11.293L12 10.293L14.354 12.646L13.646 13.354L12 11.707L11 12.707L9 10.707L6.354 13.354Z|#0FM12.5 8L12.363 8.505L12.005 8.863L11.5 9L10.995 8.863L10.637 8.505L10.5 8L10.637 7.495L10.995 7.137L11.5 7L12.005 7.137L12.363 7.495Z|#0FM5 5H15V14H5ZM6 13H14V6H6Z"),
+    (JD_ORG_PICTURE_CHANGE, 16.0, "#1FM2 12V11L5.5 7.5L7.5 9.5L8 10V12Z|#0FM1.646 10.646L5.5 6.793L7.854 9.146L7.146 9.854L5.5 8.207L2.354 11.354Z|#0FM11.75 5.5L11.579 6.131L11.131 6.579L10.5 6.75L9.869 6.579L9.421 6.131L9.25 5.5L9.421 4.869L9.869 4.421L10.5 4.25L11.131 4.421L11.579 4.869Z|#0FM8 13H1V2H14V8H13V3H2V12H8Z|#4FM10 12V12.793L11.207 14H12.793L14 12.793V11.207L12.793 10H12V9H13.207L15 10.793V13.207L13.207 15H10.793L9 13.207V12Z|#4FM12 8V11L10.5 9.5Z"),
+    (JD_ORG_PICTURE_DELETE, 16.0, "#1FM2 12V11L5.5 7.5L7.5 9.5L8 10V12Z|#0FM1.646 10.646L5.5 6.793L7.854 9.146L7.146 9.854L5.5 8.207L2.354 11.354Z|#0FM11.75 5.5L11.579 6.131L11.131 6.579L10.5 6.75L9.869 6.579L9.421 6.131L9.25 5.5L9.421 4.869L9.869 4.421L10.5 4.25L11.131 4.421L11.579 4.869Z|#0FM8 13H1V2H14V8H13V3H2V12H8Z|#4FM10.854 10.146L14.854 14.146L14.146 14.854L10.146 10.854ZM14.854 10.854L10.854 14.854L10.146 14.146L14.146 10.146Z"),
+    (JD_ORG_PICTURE_SHOW, 16.0, "#1FM2 12V11L5.5 7.5L7.5 9.5L8 10V12Z|#0FM1.646 10.646L5.5 6.793L7.854 9.146L7.146 9.854L5.5 8.207L2.354 11.354Z|#0FM11.75 5.5L11.579 6.131L11.131 6.579L10.5 6.75L9.869 6.579L9.421 6.131L9.25 5.5L9.421 4.869L9.869 4.421L10.5 4.25L11.131 4.421L11.579 4.869Z|#0FM8 13H1V2H14V8H13V3H2V12H8Z|#4FM9 11.293L10.293 10H13.707L15 11.293V12.707L13.707 14H10.293L9 12.707ZM10 12.293L10.707 13H13.293L14 12.293V11.707L13.293 11H10.707L10 11.707Z|#4FM11 11H13V13H11Z"),
+    (JD_ORG_IMPORT, 16.0, "#1FM2 2H7V3H2Z|#0FM1 1H8V7H1ZM2 6H7V2H2Z|#0FM2 3H7V4H2ZM5 4V6H4V4ZM2 5H7V6H2Z|#4FM4 8V13H5V14H3V8Z|#4FM5 12V15L6.5 13.5Z|#1FM10.5 6.5H12.5V8.5H10.5Z|#0FM10 6H13V9H10ZM11 8H12V7H11Z|#0FM12 9V10H11V9ZM9 12V10H14V12H13V11H10V12Z|#1FM8.5 12.5H10.5V14.5H8.5Z|#0FM8 12H11V15H8ZM9 14H10V13H9Z|#1FM12.5 12.5H14.5V14.5H12.5Z|#0FM12 12H15V15H12ZM13 14H14V13H13Z"),
+    (JD_ORG_EXPORT, 16.0, "#1FM3.5 1.5H5.5V3.5H3.5Z|#0FM3 1H6V4H3ZM4 3H5V2H4Z|#0FM5 4V5H4V4ZM2 7V5H7V7H6V6H3V7Z|#1FM1.5 7.5H3.5V9.5H1.5Z|#0FM1 7H4V10H1ZM2 9H3V8H2Z|#1FM5.5 7.5H7.5V9.5H5.5Z|#0FM5 7H8V10H5ZM6 9H7V8H6Z|#4FM7 2H12V5H11V3H7Z|#4FM10 5H13L11.5 6.5Z|#1FM9 9H14V10H9Z|#0FM8 8H15V15H8ZM9 14H14V9H9Z|#0FM9 10H14V11H9ZM12 11V14H11V11ZM9 13H14V14H9Z"),
+    (JD_ORG_COMPARE, 16.0, "#1FM3.5 1.5H5.5V3.5H3.5Z|#0FM3 1H6V4H3ZM4 3H5V2H4Z|#0FM5 4V5H4V4ZM2 7V5H7V7H6V6H3V7Z|#1FM1.5 7.5H3.5V9.5H1.5Z|#0FM1 7H4V10H1ZM2 9H3V8H2Z|#1FM5.5 7.5H7.5V9.5H5.5Z|#0FM5 7H8V10H5ZM6 9H7V8H6Z|#1FM10.5 6.5H12.5V8.5H10.5Z|#0FM10 6H13V9H10ZM11 8H12V7H11Z|#0FM12 9V10H11V9ZM9 12V10H14V12H13V11H10V12Z|#1FM8.5 12.5H10.5V14.5H8.5Z|#0FM8 12H11V15H8ZM9 14H10V13H9Z|#9FM12.5 12.5H14.5V14.5H12.5Z|#4FM12 12H15V15H12ZM13 14H14V13H13Z"),
+    (JD_ORG_SYNC, 16.0, "#1FM1.5 3.5H3.5V12.5H1.5Z|#0FM1 3H4V13H1ZM2 12H3V4H2Z|#1FM12.5 3.5H14.5V12.5H12.5Z|#0FM12 3H15V13H12ZM13 12H14V4H13Z|#4FM5 5H8V6H5ZM8 10H11V11H8Z|#4FM8 3V8L10.5 5.5Z|#4FM8 8V13L5.5 10.5Z"),
+    (JD_BS_MAIN_TOPIC, 16.0, "#9FM1.5 3.5H14.5V12.5H1.5Z|#4FM1 3H15V13H1ZM2 12H14V4H2Z|#0FM4 6H12V7H4ZM5 9H11V10H5Z"),
+    (JD_BS_SUBTOPIC, 16.0, "#1FM1.5 1.5H9.5V5.5H1.5Z|#0FM1 1H10V6H1ZM2 5H9V2H2Z|#0FM4 6V11H7V12H3V6Z|#9FM7.5 9.5H14.5V13.5H7.5Z|#4FM7 9H15V14H7ZM8 13H14V10H8Z"),
+    (JD_BS_PEER_TOPIC, 16.0, "#0FM3 7V4H13V7H12V5H4V7Z|#1FM1.5 7.5H5.5V11.5H1.5Z|#0FM1 7H6V12H1ZM2 11H5V8H2Z|#9FM10.5 7.5H14.5V11.5H10.5Z|#4FM10 7H15V12H10ZM11 11H14V8H11Z"),
+    (JD_BS_MULTIPLE, 16.0, "#1FM1.5 5.5H6.5V9.5H1.5Z|#0FM1 5H7V10H1ZM2 9H6V6H2Z|#0FM7 7H10V8H7ZM9 2V13H8V2ZM9 2H10V3H9ZM9 12H10V13H9Z|#9FM10.5 1.5H14.5V3.5H10.5ZM10.5 6.5H14.5V8.5H10.5ZM10.5 11.5H14.5V13.5H10.5Z|#4FM10 1H15V4H10ZM11 3H14V2H11ZM10 6H15V9H10ZM11 8H14V7H11ZM10 11H15V14H10ZM11 13H14V12H11Z"),
+    (JD_BS_CHANGE_TOPIC, 16.0, "#1FM2 3H12V7H8V12H2Z|#0FM8 13H1V2H13V7H12V3H2V12H8Z|#4FM10 12V12.793L11.207 14H12.793L14 12.793V11.207L12.793 10H12V9H13.207L15 10.793V13.207L13.207 15H10.793L9 13.207V12Z|#4FM12 8V11L10.5 9.5Z"),
+    (JD_BS_LAYOUT, 16.0, "#1FM1.5 4.5H6.5V8.5H1.5Z|#0FM1 4H7V9H1ZM2 8H6V5H2Z|#1FM9.5 1.5H14.5V3.5H9.5Z|#0FM9 1H15V4H9ZM10 3H14V2H10Z|#1FM9.5 5.5H14.5V7.5H9.5Z|#0FM9 5H15V8H9ZM10 7H14V6H10Z|#1FM1.5 11.5H6.5V13.5H1.5Z|#0FM1 11H7V14H1ZM2 13H6V12H2Z|#1FM9.5 11.5H14.5V13.5H9.5Z|#0FM9 11H15V14H9ZM10 13H14V12H10Z|#4FM7 6H9V7H7ZM8 2V13H7V2ZM8 2H9V3H8ZM8 12H9V13H8ZM4 9V11H3V9Z"),
+    (JD_BS_STYLE, 16.0, "#1FM1.5 4.5H6.5V8.5H1.5Z|#0FM1 4H7V9H1ZM2 8H6V5H2Z|#1FM9.5 1.5H14.5V3.5H9.5Z|#0FM9 1H15V4H9ZM10 3H14V2H10Z|#1FM9.5 5.5H14.5V7.5H9.5Z|#0FM9 5H15V8H9ZM10 7H14V6H10Z|#1FM1.5 11.5H6.5V13.5H1.5Z|#0FM1 11H7V14H1ZM2 13H6V12H2Z|#0FM7 6H9V7H7ZM7 6V2H9V3H8V6ZM4 9V11H3V9Z|#0FM11 9H13V11H11Z|#0FM10 11H14V12H10Z|#9FM9.5 12.5H14.5V14.5H9.5Z|#4FM9 12H15V15H9ZM10 14H14V13H10Z"),
+    (JD_BS_OUTLINE, 16.0, "#1FM2 3H14V4H2Z|#0FM1 2H15V14H1ZM2 13H14V3H2Z|#0FM2 4H14V5H2Z|#4FM3 6H11V7H3ZM5 8H12V9H5ZM5 10H10V11H5Z"),
+    (JD_BS_EXPORT, 16.0, "#1FM1.5 4.5H6.5V8.5H1.5Z|#0FM1 4H7V9H1ZM2 8H6V5H2Z|#1FM9.5 1.5H14.5V3.5H9.5Z|#0FM9 1H15V4H9ZM10 3H14V2H10Z|#1FM9.5 5.5H14.5V7.5H9.5Z|#0FM9 5H15V8H9ZM10 7H14V6H10Z|#1FM1.5 11.5H6.5V13.5H1.5Z|#0FM1 11H7V14H1ZM2 13H6V12H2Z|#0FM7 6H9V7H7ZM7 6V2H9V3H8V6ZM4 9V11H3V9Z|#4FM9 12H12V13H9Z|#4FM12 10V15L14.5 12.5Z"),
+    (JD_BS_IMPORT, 16.0, "#1FM1.5 4.5H6.5V8.5H1.5Z|#0FM1 4H7V9H1ZM2 8H6V5H2Z|#1FM9.5 1.5H14.5V3.5H9.5Z|#0FM9 1H15V4H9ZM10 3H14V2H10Z|#1FM9.5 5.5H14.5V7.5H9.5Z|#0FM9 5H15V8H9ZM10 7H14V6H10Z|#1FM1.5 11.5H6.5V13.5H1.5Z|#0FM1 11H7V14H1ZM2 13H6V12H2Z|#0FM7 6H9V7H7ZM7 6V2H9V3H8V6ZM4 9V11H3V9Z|#4FM12 12H15V13H12Z|#4FM12 10V15L9.5 12.5Z"),
+    (JD_TL_CONFIGURE, 16.0, "#0FM1 5H15V6H1ZM3 6V8H2V6ZM8 6V8H7V6ZM13 6V8H12V6Z|#4EM11.78 9.91L12.03 9L13.48 9.39L13.23 10.3L13.7 10.77L14.61 10.52L15 11.97L14.09 12.22L13.92 12.86L14.58 13.52L13.52 14.58L12.86 13.92L12.22 14.09L11.97 15L10.52 14.61L10.77 13.7L10.3 13.23L9.39 13.48L9 12.03L9.91 11.78L10.08 11.14L9.42 10.48L10.48 9.42L11.14 10.08ZM12.9 12L12.636 12.636L12 12.9L11.364 12.636L11.1 12L11.364 11.364L12 11.1L12.636 11.364Z"),
+    (JD_TL_MILESTONE, 16.0, "#0FM1 10H15V11H1ZM3 11V13H2V11ZM8 11V13H7V11ZM13 11V13H12V11Z|#9FM7.5 3.5L10.5 6.5L7.5 9.5L4.5 6.5Z|#4FM7.5 2.793L11.207 6.5L7.5 10.207L3.793 6.5ZM5.207 6.5L7.5 8.793L9.793 6.5L7.5 4.207Z"),
+    (JD_TL_INTERVAL, 16.0, "#0FM1 10H15V11H1ZM3 11V13H2V11ZM8 11V13H7V11ZM13 11V13H12V11Z|#9FM2.5 5.5H12.5V8.5H2.5Z|#4FM2 5H13V9H2ZM3 8H12V6H3Z"),
+    (JD_TL_EXPAND, 16.0, "#9FM1.5 2.5H14.5V6.5H1.5Z|#4FM1 2H15V7H1ZM2 6H14V3H2Z|#0FM1 13H15V14H1Z|#0FM6 13V11.707L2.146 7.854L2.854 7.146L7 11.293V13ZM9 13V11.293L13.146 7.146L13.854 7.854L10 11.707V13Z"),
+    (JD_TL_SYNC, 16.0, "#0FM1 3H15V4H1ZM3 4V6H2V4ZM13 4V6H12V4Z|#0FM1 12H15V13H1ZM3 13V15H2V13ZM13 13V15H12V13Z|#4FM8 4V8H7V4Z|#4FM5 8H10L7.5 10.5Z"),
+    (JD_CAL_MONTH, 16.0, "#1FM2 3H14V6H2Z|#0FM2 6H14V7H2Z|#0FM5 1V4H4V1ZM12 1V4H11V1Z|#0FM1 2H15V15H1ZM2 14H14V3H2Z|#2FM3 8H5V10H3ZM7 8H9V10H7ZM11 8H13V10H11ZM3 11H5V13H3ZM7 11H9V13H7ZM11 11H13V13H11Z"),
+    (JD_CAL_APPOINTMENT, 16.0, "#1FM2 3H14V6H2Z|#0FM2 6H14V7H2Z|#0FM5 1V4H4V1ZM12 1V4H11V1Z|#0FM1 2H15V15H1ZM2 14H14V3H2Z|#2FM3 8H5V10H3ZM7 8H9V10H7ZM11 8H13V10H11ZM3 11H5V13H3ZM11 11H13V13H11Z|#4FM7 11H9V13H7Z"),
+    (JD_CAL_IMPORT, 16.0, "#1FM2 3H14V6H2Z|#0FM2 6H14V7H2Z|#0FM5 1V4H4V1ZM12 1V4H11V1Z|#0FM9 15H1V2H15V9H14V3H2V14H9Z|#2FM3 8H5V10H3ZM7 8H9V10H7ZM3 11H5V13H3Z|#4FM12 12H15V13H12Z|#4FM12 10V15L9.5 12.5Z"),
+    (JD_ST_MASTER_NEW, 16.0, "#1FM6.5 2.5L10.5 6.5L9 8H8V9L6.5 10.5L2.5 6.5Z|#0FM8.646 7.646L9.793 6.5L6.5 3.207L3.207 6.5L6.5 9.793L7.646 8.646L8.354 9.354L6.5 11.207L1.793 6.5L6.5 1.793L11.207 6.5L9.354 8.354Z|#4FM12 10H13V12H15V13H13V15H12V13H10V12H12Z"),
+    (JD_ST_MASTER_PROPERTIES, 16.0, "#1FM6.5 2.5L10.5 6.5L9 8H8V9L6.5 10.5L2.5 6.5Z|#0FM8.646 7.646L9.793 6.5L6.5 3.207L3.207 6.5L6.5 9.793L7.646 8.646L8.354 9.354L6.5 11.207L1.793 6.5L6.5 1.793L11.207 6.5L9.354 8.354Z|#4FM9 10H10V11H9ZM11 10H15V11H11ZM9 12H10V13H9ZM11 12H15V13H11ZM9 14H10V15H9ZM11 14H14V15H11Z"),
+    (JD_ST_MASTER_EDIT, 16.0, "#1FM6.5 2.5L10.5 6.5L9 8H8V9L6.5 10.5L2.5 6.5Z|#0FM8.646 7.646L9.793 6.5L6.5 3.207L3.207 6.5L6.5 9.793L7.646 8.646L8.354 9.354L6.5 11.207L1.793 6.5L6.5 1.793L11.207 6.5L9.354 8.354Z|#4FM13 9L15 11L11 15H9V13Z"),
+    (JD_ST_ICON_EDIT, 16.0, "#2FM1 1H3V3H1Z|#0FM4 1H6V3H4Z|#2FM7 1H9V3H7Z|#1FM10 1H12V3H10Z|#0FM1 4H3V6H1Z|#0FM4 4H6V6H4Z|#0FM7 4H9V6H7Z|#2FM10 4H12V6H10Z|#2FM1 7H3V9H1Z|#0FM4 7H6V9H4Z|#1FM7 7H9V9H7Z|#1FM1 10H3V12H1Z|#2FM4 10H6V12H4Z|#4FM13 9L15 11L11 15H9V13Z"),
+    (JD_ST_SAVE, 16.0, "#1FM2.5 2.5H6.5V6.5H2.5Z|#0FM2 2H7V7H2ZM3 6H6V3H3Z|#1FM9.5 2.5H13.5V6.5H9.5Z|#0FM9 2H14V7H9ZM10 6H13V3H10Z|#1FM2.5 9.5H6.5V13.5H2.5Z|#0FM2 9H7V14H2ZM3 13H6V10H3Z|#4EM9 9H14L15 10V15H9ZM11 10H13V11H11ZM10 12H14V14H10Z"),
     (JD_POINTER_L, 32.0, "#1FM8.5 4.5V25.5L13.5 20.5L17.5 28.5L21.5 26.5L17.5 18.5H22.5Z|#0FM23.707 19H18.309L22.171 26.724L17.276 29.171L13.363 21.344L8 26.707V3.293ZM9 5.707V24.293L13.637 19.656L17.724 27.829L20.829 26.276L16.691 18H21.293Z"),
     (JD_CONNECTOR_L, 32.0, "#1FM2.5 4.5H12.5V12.5H2.5Z|#0FM2 4H13V13H2ZM3 12H12V5H3Z|#1FM19.5 19.5H29.5V27.5H19.5Z|#0FM19 19H30V28H19ZM20 27H29V20H20Z|#4FM13 8H25V15H24V9H13Z|#4FM20 15H29L24.5 19.5Z"),
     (JD_TEXT_L, 32.0, "#0EM3 26L10 6H12L19 26H16.5L14.4 20H7.6L5.5 26ZM8.3 18H13.7L11 10.286Z|#4FM23 6H28V7H23ZM26 6V26H25V6ZM23 25H28V26H23Z"),
@@ -94,6 +974,95 @@ pub(crate) static ARTS: &[(u32, f32, &str)] = &[
     (JD_CONTAINER_L, 32.0, "#9FM4 5H28V10H4Z|#0FM7 7H16V8H7Z|#4FM3 4H29V28H3ZM4 27H28V5H4Z|#4FM4 10H28V11H4Z|#1FM9.5 15.5H22.5V22.5H9.5Z|#0FM9 15H23V23H9ZM10 22H22V16H10Z"),
     (JD_RELAYOUT_L, 32.0, "#4FM17 11V17H16V11ZM8 21V16H25V21H24V17H9V21Z|#1FM11.5 3.5H21.5V10.5H11.5Z|#0FM11 3H22V11H11ZM12 10H21V4H12Z|#1FM3.5 21.5H13.5V28.5H3.5Z|#0FM3 21H14V29H3ZM4 28H13V22H4Z|#1FM19.5 21.5H29.5V28.5H19.5Z|#0FM19 21H30V29H19ZM20 28H29V22H20Z"),
     (JD_TASK_PANES_L, 32.0, "#1FM3 5H29V8H3Z|#9FM21 9H29V27H21Z|#0FM2 4H30V28H2ZM3 27H29V5H3Z|#0FM3 8H29V9H3Z|#4FM21 9V27H20V9ZM23 12H27V13H23ZM23 15H27V16H23ZM23 18H26V19H23Z"),
+    (JD_SAVE_L, 32.0, "#1FM4 4H8V12H22V4H24L28 8V28H25V16H7V28H4Z|#2EM9 4H21V11H9ZM16 6H19V10H16Z|#0FM16 6H19V10H16Z|#0FM3 3H23.707L29 8.293V29H3ZM4 28H28V8.707L23.293 4H4Z|#0FM9 4V11H21V4H22V12H8V4Z|#0FM7 28V16H25V28H24V17H8V28Z|#0FM11 20H21V21H11ZM11 23H18V24H11Z"),
+    (JD_BACK_L, 32.0, "#1FM3.5 3.5H28.5V28.5H3.5Z|#0FM3 3H29V29H3ZM4 28H28V4H4Z|#0FM8 16L13 11V15H24V17H13V21Z"),
+    (JD_HOME_L, 32.0, "#1FM8 28V12L16 4L24 12V28H19V20H13V28Z|#9FM14 21H18V28H14Z|#0FM4.146 15.146L16 3.293L27.854 15.146L27.146 15.854L16 4.707L4.854 15.854Z|#0FM8 13V28H24V13H25V29H7V13Z|#4FM13 28V20H19V28H18V21H14V28Z"),
+    (JD_NEW_L, 32.0, "#1FM7 3H19V9H25V29H7Z|#2FM20 3L25 8H20Z|#0FM6 2H19.707L26 8.293V30H6ZM7 29H25V8.707L19.293 3H7Z|#0FM20 3V8H25V9H19V3Z"),
+    (JD_OPEN_L, 32.0, "#2FM4 6H11L14 9H25V15H8.57L4 24.14Z|#0FM3 29V5H11.707L14.707 8H26V15H25V9H14.293L11.293 6H4V29Z|#1FM3.5 28.5H22.5L28.5 16.5H9.5Z|#0FM9.191 16H29.309L22.809 29H2.691ZM4.309 28H22.191L27.691 17H9.809Z"),
+    (JD_INFO_L, 32.0, "#1FM3.5 3.5H28.5V28.5H3.5Z|#0FM3 3H29V29H3ZM4 28H28V4H4Z|#0FM15 8H17V10H15ZM15 13H17V24H15Z"),
+    (JD_SAVE_AS_L, 32.0, "#1FM4 4H8V12H22V4H24L28 8V17H25V16H7V28H4Z|#2EM9 4H21V11H9ZM16 6H19V10H16Z|#0FM16 6H19V10H16Z|#0FM17 29H3V3H23.707L29 8.293V17H28V8.707L23.293 4H4V28H17Z|#0FM9 4V11H21V4H22V12H8V4Z|#0FM7 28V16H24V17H8V28Z|#0FM11 20H19V21H11ZM11 23H16V24H11Z|#9FM25 19L29 23L22.5 29.5H18.5V25.5Z|#4FM25 18.293L29.707 23L22.707 30H18V25.293ZM19 25.707V29H22.293L28.293 23L25 19.707Z|#4FM18 26V30H22Z"),
+    (JD_PRINT_L, 32.0, "#1FM4 11H28V23H24V17H8V23H4Z|#0FM9 9V3H23V9H22V4H10V9Z|#0FM8 24H3V10H29V24H24V23H28V11H4V23H8Z|#0FM23 14H26V15H23Z|#9FM9.5 18.5H22.5V28.5H9.5Z|#4FM9 18H23V29H9ZM10 28H22V19H10Z|#4FM12 22H20V23H12ZM12 25H17V26H12Z"),
+    (JD_EXPORT_L, 32.0, "#1FM4 3H16V9H22V29H4Z|#2FM17 3L22 8H17Z|#0FM23 26V30H3V2H16.707L23 8.293V22H22V8.707L16.293 3H4V29H22V26Z|#0FM17 3V8H22V9H16V3Z|#4FM12 23H25V19L30 24L25 29V25H12Z"),
+    (JD_CLOSE_L, 32.0, "#1FM4 3H16V9H22V17H17V29H4Z|#2FM17 3L22 8H17Z|#0FM17 30H3V2H16.707L23 8.293V17H22V8.707L16.293 3H4V29H17Z|#0FM17 3V8H22V9H16V3Z|#4FM19.707 18.293L28.707 27.293L27.293 28.707L18.293 19.707ZM28.707 19.707L19.707 28.707L18.293 27.293L27.293 18.293Z"),
     (JD_OPTIONS_L, 32.0, "#1EM14.5 7.73V4.5H18.5V7.73L19.94 8.19L21.29 8.88L23.57 6.6L26.4 9.43L24.12 11.71L24.81 13.06L25.27 14.5H28.5V18.5H25.27L24.81 19.94L24.12 21.29L26.4 23.57L23.57 26.4L21.29 24.12L19.94 24.81L18.5 25.27V28.5H14.5V25.27L13.06 24.81L11.71 24.12L9.43 26.4L6.6 23.57L8.88 21.29L8.19 19.94L7.73 18.5H4.5V14.5H7.73L8.19 13.06L8.88 11.71L6.6 9.43L9.43 6.6L11.71 8.88L13.06 8.19ZM20 16.5L19.725 17.862L18.975 18.975L17.862 19.725L16.5 20L15.138 19.725L14.025 18.975L13.275 17.862L13 16.5L13.275 15.138L14.025 14.025L15.138 13.275L16.5 13L17.862 13.275L18.975 14.025L19.725 15.138Z|#0FM14 7.365V4H19V7.365L20.131 7.726L21.194 8.269L23.57 5.893L27.107 9.43L24.731 11.806L25.274 12.869L25.635 14H29V19H25.635L25.274 20.131L24.731 21.194L27.107 23.57L23.57 27.107L21.194 24.731L20.131 25.274L19 25.635V29H14V25.635L12.869 25.274L11.806 24.731L9.43 27.107L5.893 23.57L8.269 21.194L7.726 20.131L7.365 19H4V14H7.365L7.726 12.869L8.269 11.806L5.893 9.43L9.43 5.893L11.806 8.269L12.869 7.726ZM13.251 8.654L11.614 9.491L9.43 7.307L7.307 9.43L9.491 11.614L8.654 13.251L8.095 15H5V18H8.095L8.654 19.749L9.491 21.386L7.307 23.57L9.43 25.693L11.614 23.509L13.251 24.346L15 24.905V28H18V24.905L19.749 24.346L21.386 23.509L23.57 25.693L25.693 23.57L23.509 21.386L24.346 19.749L24.905 18H28V15H24.905L24.346 13.251L23.509 11.614L25.693 9.43L23.57 7.307L21.386 9.491L19.749 8.654L18 8.095V5H15V8.095ZM20.51 16.5L20.195 18.059L19.335 19.335L18.059 20.195L16.5 20.51L14.941 20.195L13.665 19.335L12.805 18.059L12.49 16.5L12.805 14.941L13.665 13.665L14.941 12.805L16.5 12.49L18.059 12.805L19.335 13.665L20.195 14.941ZM19.255 15.334L18.615 14.385L17.666 13.745L16.5 13.51L15.334 13.745L14.385 14.385L13.745 15.334L13.51 16.5L13.745 17.666L14.385 18.615L15.334 19.255L16.5 19.49L17.666 19.255L18.615 18.615L19.255 17.666L19.49 16.5Z"),
+    (JD_FILE_DRAWING_L, 32.0, "#1FM7 3H19V9H25V29H7Z|#2FM20 3L25 8H20Z|#0FM6 2H19.707L26 8.293V30H6ZM7 29H25V8.707L19.293 3H7Z|#0FM20 3V8H25V9H19V3Z|#0FM9 10H16V15H9ZM10 14H15V11H10Z|#0FM15 20H24V25H15ZM16 24H23V21H16Z|#4FM16 12H20V18H19V13H16Z|#4FM17 18H22L19.5 20.5Z"),
+    (JD_SEND_COPY_L, 32.0, "#1FM2.5 13.5H20.5V27.5H2.5Z|#0FM2 13H21V28H2ZM3 27H20V14H3Z|#0FM2.854 13.146L11.5 21.793L20.146 13.146L20.854 13.854L11.5 23.207L2.146 13.854Z|#4FM26 12V20H27V7H23V24H29V10H30V25H22V6H28V21H25V12Z"),
+    (JD_SEND_PDF_L, 32.0, "#9FM5 3H17V9H23V15H11V26H5Z|#4FM11 27H4V2H17.707L24 8.293V15H23V8.707L17.293 3H5V26H11ZM18 3V8H23V9H17V3Z|#4FM8 7H14V8H8ZM8 10H19V11H8Z|#1FM12.5 16.5H29.5V28.5H12.5Z|#0FM12 16H30V29H12ZM13 28H29V17H13Z|#0FM12.854 16.146L21 24.293L29.146 16.146L29.854 16.854L21 25.707L12.146 16.854Z"),
+    (JD_PRESENTATION_L, 32.0, "#0FM2 4H29V6H2Z|#1FM5 6H26V21H5Z|#0FM5 6V21H26V6H27V22H4V6Z|#4FM14 9.5V17.5L18 13.5Z|#0FM16 22V29H15V22ZM9.146 28.146L15.5 21.793L21.854 28.146L21.146 28.854L15.5 23.207L9.854 28.854Z"),
+    (JD_SWITCH_WINDOW_L, 32.0, "#1FM3 4H20V7H3Z|#0FM9 19H2V3H21V11H20V4H3V18H9Z|#0FM3 7H20V8H3Z|#9FM11 13H29V16H11Z|#4FM10 12H30V29H10ZM11 28H29V13H11Z|#4FM11 16H29V17H11Z"),
+    (JD_PASTE_L, 32.0, "#1FM5 6H8V10H19V6H22V11H11V28H5Z|#0FM11 29H4V5H8V6H5V28H11ZM19 5H23V11H22V6H19Z|#2FM9.5 2.5H17.5V8.5H9.5Z|#0FM9 2H18V9H9ZM10 8H17V3H10Z|#9FM12.5 12.5H27.5V28.5H12.5Z|#4FM12 12H28V29H12ZM13 28H27V13H13Z|#4FM15 16H25V17H15ZM15 19H25V20H15ZM15 22H25V23H15ZM15 25H21V26H15Z"),
+    (JD_QUICK_STYLES_L, 32.0, "#9FM3.5 11.5H19.5V27.5H3.5Z|#4FM3 11H20V28H3ZM4 27H19V12H4Z|#1FM23.5 2.5H26.5V10.5H23.5Z|#0FM23 2H27V11H23ZM24 10H26V3H24Z|#2FM21 11H29V15H21Z|#0FM20 15V10H30V15H29V11H21V15Z|#1FM20.5 15.5H29.5V24.5H20.5Z|#0FM20 15H30V25H20ZM21 24H29V16H21Z|#0FM24 16V23H23V16ZM27 16V23H26V16Z"),
+    (JD_POSITION_L, 32.0, "#9FM9 4H13V28H9Z|#9FM19 4H23V28H19Z|#4FM9 3H13V4H9ZM19 3H23V4H19ZM9 28H13V29H9ZM19 28H23V29H19Z|#1FM2.5 8.5H8.5V23.5H2.5Z|#0FM2 8H9V24H2ZM3 23H8V9H3Z|#1FM13.5 8.5H18.5V23.5H13.5Z|#0FM13 8H19V24H13ZM14 23H18V9H14Z|#1FM23.5 8.5H29.5V23.5H23.5Z|#0FM23 8H30V24H23ZM24 23H29V9H24Z"),
+    (JD_CHANGE_SHAPE_L, 32.0, "#1FM3.5 3.5H14.5V14.5H3.5Z|#0FM3 3H15V15H3ZM4 14H14V4H4Z|#0FM17 8H24V16H22V10H17Z|#0FM19 16H27L23 20Z|#9FM29 25.5L28.786 26.563L28.181 27.519L27.243 28.328L26.028 28.954L24.595 29.357L23 29.5L21.405 29.357L19.972 28.954L18.757 28.328L17.819 27.519L17.214 26.563L17 25.5L17.214 24.437L17.819 23.481L18.757 22.672L19.972 22.046L21.405 21.643L23 21.5L24.595 21.643L26.028 22.046L27.243 22.672L28.181 23.481L28.786 24.437Z|#4FM29.51 25.5L29.258 26.753L28.564 27.849L27.524 28.746L26.212 29.422L24.686 29.851L23 30.002L21.314 29.851L19.788 29.422L18.476 28.746L17.436 27.849L16.742 26.753L16.49 25.5L16.742 24.247L17.436 23.151L18.476 22.254L19.788 21.578L21.314 21.149L23 20.998L24.686 21.149L26.212 21.578L27.524 22.254L28.564 23.151L29.258 24.247ZM28.314 24.626L27.798 23.811L26.961 23.089L25.844 22.514L24.504 22.137L23 22.002L21.496 22.137L20.156 22.514L19.039 23.089L18.202 23.811L17.686 24.626L17.51 25.5L17.686 26.374L18.202 27.189L19.039 27.911L20.156 28.486L21.496 28.863L23 28.998L24.504 28.863L25.844 28.486L26.961 27.911L27.798 27.189L28.314 26.374L28.49 25.5Z"),
+    (JD_LASSO_L, 32.0, "#4FM6.019 15.117L5.59 13.611L5.521 12.072L6.519 12.028L6.583 13.45L6.981 14.843ZM5.962 10.017L6.638 8.66L7.604 7.405L8.396 8.015L7.49 9.193L6.858 10.463ZM9.12 6.059L10.387 5.248L11.795 4.578L12.225 5.482L10.873 6.124L9.66 6.901ZM13.672 3.97L15.162 3.672L16.691 3.522L16.789 4.518L15.309 4.663L13.868 4.95ZM18.659 3.543L20.181 3.724L21.658 4.052L21.442 5.028L20.014 4.712L18.541 4.537ZM23.526 4.714L24.919 5.42L26.162 6.267L25.598 7.093L24.409 6.283L23.074 5.606ZM27.629 7.672L28.538 8.963L29.148 10.349L28.232 10.751L27.663 9.457L26.811 8.248ZM29.498 12.43L29.344 13.963L28.833 15.452L27.887 15.128L28.36 13.748L28.502 12.33ZM27.732 17.205L26.698 18.29L25.455 19.246L24.845 18.454L26.027 17.545L27.008 16.515ZM23.701 20.206L22.293 20.753L20.799 21.153L20.541 20.187L21.982 19.801L23.339 19.274ZM18.849 21.44L17.329 21.498L15.811 21.409L15.869 20.411L17.339 20.497L18.811 20.44ZM13.859 21.08L12.376 20.643L10.987 20.061L11.373 19.139L12.711 19.699L14.141 20.12Z|#0FM10.886 19.382L10.442 20.518L10.179 21.678L10.005 22.886L9.84 24.117L9.599 25.343L9.186 26.536L8.502 27.65L7.467 28.626L6.023 29.414L4.144 29.979L3.856 29.021L5.635 28.486L6.875 27.81L7.719 27.014L8.276 26.106L8.631 25.082L8.853 23.954L9.014 22.748L9.195 21.495L9.483 20.224L9.954 19.018Z"),
+    (JD_PICTURES_L, 32.0, "#9FM4 22L11 15L16 20L20 16L28 24V26H4Z|#4FM3.146 22.146L11 14.293L16 19.293L20 15.293L28.854 24.146L28.146 24.854L20 16.707L16 20.707L11 15.707L3.854 22.854Z|#1FM25 10.5L24.804 11.473L24.268 12.268L23.473 12.804L22.5 13L21.527 12.804L20.732 12.268L20.196 11.473L20 10.5L20.196 9.527L20.732 8.732L21.527 8.196L22.5 8L23.473 8.196L24.268 8.732L24.804 9.527Z|#0FM25.51 10.5L25.274 11.67L24.628 12.628L23.67 13.274L22.5 13.51L21.33 13.274L20.372 12.628L19.726 11.67L19.49 10.5L19.726 9.33L20.372 8.372L21.33 7.726L22.5 7.49L23.67 7.726L24.628 8.372L25.274 9.33ZM24.333 9.724L23.908 9.092L23.276 8.667L22.5 8.51L21.724 8.667L21.092 9.092L20.667 9.724L20.51 10.5L20.667 11.276L21.092 11.908L21.724 12.333L22.5 12.49L23.276 12.333L23.908 11.908L24.333 11.276L24.49 10.5Z|#0FM3 5H29V27H3ZM4 26H28V6H4Z"),
+    (JD_PICTOGRAMS_L, 32.0, "#1FM14 9.5L13.725 10.862L12.975 11.975L11.862 12.725L10.5 13L9.138 12.725L8.025 11.975L7.275 10.862L7 9.5L7.275 8.138L8.025 7.025L9.138 6.275L10.5 6L11.862 6.275L12.975 7.025L13.725 8.138Z|#0FM14.51 9.5L14.195 11.059L13.335 12.335L12.059 13.195L10.5 13.51L8.941 13.195L7.665 12.335L6.805 11.059L6.49 9.5L6.805 7.941L7.665 6.665L8.941 5.805L10.5 5.49L12.059 5.805L13.335 6.665L14.195 7.941ZM13.255 8.334L12.615 7.385L11.666 6.745L10.5 6.51L9.334 6.745L8.385 7.385L7.745 8.334L7.51 9.5L7.745 10.666L8.385 11.615L9.334 12.255L10.5 12.49L11.666 12.255L12.615 11.615L13.255 10.666L13.49 9.5Z|#1FM4.5 27.5V19.5L7.5 16.5H13.5L16.5 19.5V27.5Z|#0FM4 28V19.293L7.293 16H13.707L17 19.293V28ZM16 27V19.707L13.293 17H7.707L5 19.707V27Z|#9FM22.5 5.5L23.97 9.48L28.21 9.65L24.88 12.27L26.03 16.35L22.5 14L18.97 16.35L20.12 12.27L16.79 9.65L21.03 9.48Z|#4FM22.5 4.057L24.323 8.994L29.585 9.205L25.452 12.456L26.878 17.515L22.5 14.601L18.122 17.515L19.548 12.456L15.415 9.205L20.677 8.994ZM21.383 9.966L18.165 10.095L20.692 12.084L19.818 15.185L22.5 13.399L25.182 15.185L24.308 12.084L26.835 10.095L23.617 9.966L22.5 6.943Z"),
+    (JD_CHART_L, 32.0, "#1FM8.5 27V18.5H12.5V27Z|#0FM8 27V18H13V27H12V19H9V27Z|#9FM15.5 27V8.5H19.5V27Z|#4FM15 27V8H20V27H19V9H16V27Z|#1FM22.5 27V14.5H26.5V27Z|#0FM22 27V14H27V27H26V15H23V27Z|#0FM5 3V27H29V28H4V3Z"),
+    (JD_CAD_L, 32.0, "#1FM7 3H19V9H25V29H7Z|#2FM20 3L25 8H20Z|#0FM6 2H19.707L26 8.293V30H6ZM7 29H25V8.707L19.293 3H7ZM20 3V8H25V9H19V3Z|#0FM10 12H22V20H10ZM11 19H21V13H11Z|#4FM11 21V27H10V21ZM22 21V27H21V21ZM13 24H19V25H13Z|#4FM11 24.5L13 22.5V26.5ZM21 24.5L19 22.5V26.5Z"),
+    (JD_CALLOUT_L, 32.0, "#9FM9.5 3.5H28.5V17.5H18.5L13.5 22.5V17.5H9.5Z|#4FM9 3H29V18H18.707L13 23.707V18H9ZM10 17H14V21.293L18.293 17H28V4H10Z|#0FM13 8H25V9H13ZM13 12H21V13H13Z|#1FM3.5 23.5H10.5V28.5H3.5Z|#0FM3 23H11V29H3ZM4 28H10V24H4Z"),
+    (JD_INSERT_CONNECTOR_L, 32.0, "#1FM17.5 3.5H28.5V10.5H17.5Z|#0FM17 3H29V11H17ZM18 10H28V4H18Z|#1FM2.5 20.5H13.5V27.5H2.5Z|#0FM2 20H14V28H2ZM3 27H13V21H3Z|#0FM17 8H9V16H8V7H17Z|#0FM4 16H13L8.5 20.5Z|#4FM22 19H24V23H28V25H24V29H22V25H18V23H22Z"),
+    (JD_LINK_L, 32.0, "#0FM18.207 21.207L10 29.414L2.586 22L10.793 13.793L12.207 15.207L5.414 22L10 26.586L16.793 19.793ZM13.793 10.793L22 2.586L29.414 10L21.207 18.207L19.793 16.793L26.586 10L22 5.414L15.207 12.207Z|#4FM10.793 19.793L19.793 10.793L21.207 12.207L12.207 21.207Z"),
+    (JD_TEXT_BOX_L, 32.0, "#0EM10 23L15 9H17L22 23H19.5L18.071 19H13.929L12.5 23ZM14.643 17H17.357L16 13.2Z|#4FM4 5H28V27H4ZM5 26H27V6H5Z"),
+    (JD_SCREEN_TIP_L, 32.0, "#1FM4 13H13V18H19V27H4Z|#0FM13 13H4V27H19V18H20V28H3V12H13Z|#9FM14.5 4.5H28.5V16.5H14.5Z|#4FM14 4H29V17H14ZM15 16H28V5H15Z|#0FM17 8H26V9H17ZM17 12H23V13H17Z"),
+    (JD_OBJECT_L, 32.0, "#1FM3 5H29V8H3Z|#0FM2 4H30V28H2ZM3 27H29V5H3Z|#0FM3 8H29V9H3Z|#9FM12 13H17V16H20V24H12Z|#4FM11 12H17.707L21 15.293V25H11ZM12 24H20V15.707L17.293 13H12ZM18 13V15H20V16H17V13Z"),
+    (JD_FIELD_L, 32.0, "#0FM10 8H9V14.914L7.414 16.5L9 18.086V25H10V27H7V18.914L4.586 16.5L7 14.086V6H10ZM22 6H25V14.086L27.414 16.5L25 18.914V27H22V25H23V18.086L24.586 16.5L23 14.914V8H22Z|#9FM12.5 12.5H19.5V20.5H12.5Z|#4FM12 12H20V21H12ZM13 20H19V13H13Z"),
+    (JD_SYMBOL_L, 32.0, "#0FM5 25H11V21.422L9.603 20.346L8.189 18.49L7.303 16.351L6.991 14.039L7.298 11.67L8.216 9.465L9.643 7.619L11.48 6.209L13.632 5.309L16 4.993L18.368 5.309L20.52 6.209L22.357 7.619L23.784 9.465L24.702 11.67L25.009 14.039L24.697 16.351L23.811 18.49L22.397 20.346L21 21.422V25H27V27H19V20.438L20.967 18.923L22.062 17.485L22.75 15.826L22.992 14.034L22.753 12.192L22.039 10.478L20.934 9.047L19.509 7.954L17.84 7.256L16 7.011L14.16 7.256L12.491 7.954L11.066 9.047L9.961 10.478L9.247 12.192L9.008 14.034L9.25 15.826L9.938 17.485L11.033 18.923L13 20.438V27H5Z"),
+    (JD_INK_FINGER_L, 32.0, "#4FM2.064 21.649L2.994 19.17L3.977 17.148L5.012 15.579L6.124 14.435L7.352 13.727L8.671 13.528L9.94 13.863L11.052 14.615L12.018 15.679L12.829 16.94L13.592 18.019L14.203 18.475L14.692 18.564L15.272 18.378L16.039 17.771L16.912 16.676L17.814 15.111L18.702 13.11L19.556 10.67L21.444 11.33L20.563 13.847L19.6 16.019L18.57 17.805L17.46 19.197L16.228 20.172L14.826 20.621L13.383 20.358L12.143 19.432L11.171 18.06L10.425 16.9L9.732 16.137L9.101 15.71L8.561 15.568L8.023 15.648L7.364 16.029L6.577 16.838L5.719 18.14L4.833 19.961L3.936 22.351Z|#1EM18 30V17.5L18.275 16.138L19.025 15.025L20.138 14.275L21.5 14L22.862 14.275L23.975 15.025L24.725 16.138L25 17.5V30ZM19 17.5L19.196 16.527L19.732 15.732L20.527 15.196L21.5 15L22.473 15.196L23.268 15.732L23.804 16.527L24 17.5V20H19Z|#2FM19 17.5L19.196 16.527L19.732 15.732L20.527 15.196L21.5 15L22.473 15.196L23.268 15.732L23.804 16.527L24 17.5V20H19Z|#0FM17 30V17.46L17.223 16.077L17.863 14.839L18.839 13.863L20.077 13.223L21.5 12.994L22.923 13.223L24.161 13.863L25.137 14.839L25.777 16.077L26 17.46V30H25V17.54L24.815 16.394L24.32 15.436L23.564 14.68L22.606 14.185L21.5 14.006L20.394 14.185L19.436 14.68L18.68 15.436L18.185 16.394L18 17.54V30Z"),
+    (JD_ERASER_L, 32.0, "#1FM8 17L15 10L22 17L15 24Z|#2FM4 21L8 17L15 24L11 28Z|#0FM3.293 21L15 9.293L22.707 17L11 28.707ZM11 27.293L21.293 17L15 10.707L4.707 21ZM8.354 16.646L15.354 23.646L14.646 24.354L7.646 17.354Z|#0FM15 28H29V29H15Z"),
+    (JD_INK_TO_TEXT_L, 32.0, "#0FM9.75 16.661L9.225 16.066L8.64 15.733L7.91 15.558L7.111 15.573L6.329 15.794L5.631 16.219L5.063 16.862L4.664 17.768L4.509 18.989L4.681 20.145L5.071 20.834L5.575 21.188L6.216 21.293L7.017 21.106L7.914 20.546L8.8 19.563L9.618 18.03L11.382 18.97L10.45 20.72L9.211 22.094L7.795 22.978L6.284 23.332L4.8 23.087L3.554 22.212L2.757 20.807L2.491 19.011L2.717 17.228L3.358 15.771L4.332 14.669L5.522 13.943L6.816 13.579L8.127 13.553L9.383 13.855L10.505 14.493L11.25 15.339ZM12 14V20.931L12.144 21.975L12.409 22.437L12.676 22.577L13.401 22.505L13.599 24.495L12.277 24.626L10.966 23.938L10.216 22.634L10 21.069V14Z|#0FM15 19H17V20H15Z|#0FM17 17V22L19.5 19.5Z|#4EM21 14H27L29 16V24H23L21 22V20L23 18H27V16H21ZM23 20V22H27V20Z"),
+    (JD_INK_TO_SHAPES_L, 32.0, "#0FM3.105 14.616L4.679 14.016L6.146 13.906L7.595 14.001L9.017 14.092L10.406 13.996L12.454 13.325L12.607 15.534L12.517 17.165L12.374 18.781L12.316 20.354L12.469 21.856L13.143 23.836L11.112 24.418L9.598 24.494L8.173 24.35L6.832 24.142L5.571 24.009L4.38 24.074L2.449 24.707L2.605 22.497L2.52 21.038L2.376 19.534L2.314 17.983L2.486 16.389ZM3.468 16.611L3.316 18.017L3.374 19.466L3.517 20.962L3.608 22.503L3.551 23.293L4.194 23.083L5.596 23.006L6.961 23.15L8.3 23.358L9.623 23.491L10.947 23.425L11.857 23.164L11.485 22.07L11.314 20.386L11.376 18.719L11.52 17.094L11.606 15.541L11.546 14.675L10.599 14.985L9.02 15.094L7.53 14.999L6.151 14.909L4.899 15.002L3.895 15.384Z|#0FM15 19H17V20H15Z|#0FM17 17V22L19.5 19.5Z|#9FM21.5 14.5H29.5V23.5H21.5Z|#4FM21 14H30V24H21ZM22 23H29V15H22Z"),
+    (JD_ORIENTATION_L, 32.0, "#1FM3 3H11V8H16V13H8V22H3Z|#2FM12 3L16 7H12Z|#0FM8 23H2V2H11.707L17 7.293V13H16V7.707L11.293 3H3V22H8ZM12 3V7H16V8H11V3Z|#9FM10 15H24V20H29V28H10Z|#4FM9 14H24.707L30 19.293V29H9ZM10 28H29V19.707L24.293 15H10ZM25 15V19H29V20H24V15Z"),
+    (JD_PAGE_SIZE_L, 32.0, "#1FM4 3H15V8H20V29H4Z|#2FM16 3L20 7H16Z|#0FM3 2H15.707L21 7.293V30H3ZM4 29H20V7.707L15.293 3H4ZM16 3V7H20V8H15V3Z|#4FM27 6V26H26V6Z|#4FM26.5 2.5L30 6H23ZM26.5 29.5L23 26H30Z"),
+    (JD_AUTO_SIZE_L, 32.0, "#1FM11 10H17V14H21V22H11Z|#2FM18 10L21 13H18Z|#0FM10 9H17.707L22 13.293V23H10ZM11 22H21V13.707L17.293 10H11ZM18 10V13H21V14H17V10Z|#4FM2 16L5 13V15H9V17H5V19ZM30 16L27 13V15H23V17H27V19ZM16 2L19 5H17V8H15V5H13ZM16 30L13 27H15V24H17V27H19Z"),
+    (JD_BACKGROUNDS_L, 32.0, "#1FM7 3H19V9H25V20H7Z|#2FM20 3L25 8H20Z|#9FM7 21H25V29H7Z|#0FM6 2H19.707L26 8.293V30H6ZM7 29H25V8.707L19.293 3H7ZM20 3V8H25V9H19V3Z|#4FM7 20H25V21H7Z"),
+    (JD_BORDERS_TITLES_L, 32.0, "#1FM7 3H19V9H25V29H7Z|#2FM20 3L25 8H20Z|#0FM6 2H19.707L26 8.293V30H6ZM7 29H25V8.707L19.293 3H7ZM20 3V8H25V9H19V3Z|#9FM10 23H22V26H10Z|#4FM9 11H23V27H9ZM10 26H22V12H10Z|#4FM10 22H22V23H10Z|#0FM12 24H18V25H12Z"),
+    (JD_QUICK_IMPORT_L, 32.0, "#1FM3 4H15V6H3Z|#0FM2 3H16V16H2ZM3 15H15V4H3Z|#0FM3 6H15V7H3ZM10 7V15H9V7ZM3 9H15V10H3ZM3 12H15V13H3Z|#4FM16 9H24V15H23V10H16Z|#4FM20 15H27L23.5 18.5Z|#1FM23.5 18.5L28.5 23.5L23.5 28.5L18.5 23.5Z|#0FM23.5 17.793L29.207 23.5L23.5 29.207L17.793 23.5ZM19.207 23.5L23.5 27.793L27.793 23.5L23.5 19.207Z"),
+    (JD_CUSTOM_IMPORT_L, 32.0, "#1FM3.5 6L3.714 5.335L4.319 4.738L5.257 4.232L6.472 3.841L7.905 3.589L9.5 3.5L11.095 3.589L12.528 3.841L13.743 4.232L14.681 4.738L15.286 5.335L15.5 6V13L15.286 13.665L14.681 14.262L13.743 14.768L12.528 15.159L11.095 15.411L9.5 15.5L7.905 15.411L6.472 15.159L5.257 14.768L4.319 14.262L3.714 13.665L3.5 13Z|#0FM3 5.921L3.276 5.066L4.019 4.332L5.06 3.77L6.351 3.355L7.847 3.092L9.5 2.999L11.153 3.092L12.649 3.355L13.94 3.77L14.981 4.332L15.724 5.066L16 5.921V13.079L15.724 13.934L14.981 14.668L13.94 15.23L12.649 15.645L11.153 15.908L9.5 16.001L7.847 15.908L6.351 15.645L5.06 15.23L4.019 14.668L3.276 13.934L3 13.079ZM4 12.921L4.153 13.395L4.62 13.856L5.454 14.306L6.592 14.672L7.962 14.913L9.5 14.999L11.038 14.913L12.408 14.672L13.546 14.306L14.38 13.856L14.847 13.395L15 12.921V6.079L14.847 5.605L14.38 5.144L13.546 4.694L12.408 4.328L11.038 4.087L9.5 4.001L7.962 4.087L6.592 4.328L5.454 4.694L4.62 5.144L4.153 5.605L4 6.079Z|#0FM3.976 5.847L4.153 6.395L4.62 6.856L5.454 7.306L6.592 7.672L7.962 7.913L9.5 7.999L11.038 7.913L12.408 7.672L13.546 7.306L14.38 6.856L14.847 6.395L15.024 5.847L15.976 6.153L15.724 6.934L14.981 7.668L13.94 8.23L12.649 8.645L11.153 8.908L9.5 9.001L7.847 8.908L6.351 8.645L5.06 8.23L4.019 7.668L3.276 6.934L3.024 6.153Z|#4FM16 9H24V15H23V10H16Z|#4FM20 15H27L23.5 18.5Z|#1FM23.5 18.5L28.5 23.5L23.5 28.5L18.5 23.5Z|#0FM23.5 17.793L29.207 23.5L23.5 29.207L17.793 23.5ZM19.207 23.5L23.5 27.793L27.793 23.5L23.5 19.207Z"),
+    (JD_REFRESH_ALL_L, 32.0, "#1FM3 4H27V6H3Z|#0FM17 27H2V3H28V15H27V4H3V26H17Z|#0FM3 6H27V7H3ZM16 7V26H15V7ZM3 9H27V10H3ZM3 12H27V13H3ZM3 15H17V16H3ZM3 18H17V19H3ZM3 21H17V22H3ZM3 24H17V25H3Z|#4FM20 24V25.586L22.414 28H25.586L28 25.586V22.414L25.586 20H24V18H26.414L30 21.586V26.414L26.414 30H21.586L18 26.414V24Z|#4FM24 16V22L21 19Z"),
+    (JD_LEGEND_L, 32.0, "#1FM4 4H28V8H4Z|#0FM3 3H29V29H3ZM4 28H28V4H4Z|#0FM4 8H28V9H4ZM13 9V28H12V9Z|#9FM6.5 10.5H10.5V14.5H6.5Z|#4FM6 10H11V15H6ZM7 14H10V11H7Z|#2FM6.5 16.5H10.5V20.5H6.5Z|#0FM6 16H11V21H6ZM7 20H10V17H7Z|#1FM6.5 22.5H10.5V26.5H6.5Z|#0FM6 22H11V27H6ZM7 26H10V23H7Z|#0FM15 12H25V13H15ZM15 18H23V19H15ZM15 24H24V25H15Z"),
+    (JD_LEGEND_H_L, 32.0, "#0FM2 9H30V23H2ZM3 22H29V10H3Z|#9FM5.5 12.5H10.5V17.5H5.5Z|#4FM5 12H11V18H5ZM6 17H10V13H6Z|#2FM13.5 12.5H18.5V17.5H13.5Z|#0FM13 12H19V18H13ZM14 17H18V13H14Z|#1FM21.5 12.5H26.5V17.5H21.5Z|#0FM21 12H27V18H21ZM22 17H26V13H22Z|#0FM5 20H11V21H5ZM13 20H19V21H13ZM21 20H27V21H21Z"),
+    (JD_LEGEND_V_L, 32.0, "#0FM7 2H25V30H7ZM8 29H24V3H8Z|#9FM10.5 5.5H15.5V10.5H10.5Z|#4FM10 5H16V11H10ZM11 10H15V6H11Z|#2FM10.5 13.5H15.5V18.5H10.5Z|#0FM10 13H16V19H10ZM11 18H15V14H11Z|#1FM10.5 21.5H15.5V26.5H10.5Z|#0FM10 21H16V27H10ZM11 26H15V22H11Z|#0FM18 8H22V9H18ZM18 16H22V17H18ZM18 24H22V25H18Z"),
+    (JD_SUBPROCESS_NEW_L, 32.0, "#1FM3 7H26V17H17V23H3Z|#0FM17 24H2V6H27V17H26V7H3V23H17Z|#0FM7 7V23H6V7ZM23 7V17H22V7Z|#4FM22 19H24V23H28V25H24V29H22V25H18V23H22Z"),
+    (JD_SUBPROCESS_LINK_L, 32.0, "#1FM3 7H26V14.5L17.5 23H3Z|#0FM16 24H2V6H27V13H26V7H3V23H16Z|#0FM7 7V23H6V7ZM23 7V17H22V7Z|#0FM23.854 25.854L20.5 29.207L16.793 25.5L20.146 22.146L20.854 22.854L18.207 25.5L20.5 27.793L23.146 25.146ZM22.146 20.146L25.5 16.793L29.207 20.5L25.854 23.854L25.146 23.146L27.793 20.5L25.5 18.207L22.854 20.854Z|#4FM20.146 25.146L25.146 20.146L25.854 20.854L20.854 25.854Z"),
+    (JD_SUBPROCESS_SELECTION_L, 32.0, "#4FM2 4H5V5H2ZM27 4H30V5H27ZM7 4H9V5H7ZM11 4H13V5H11ZM15 4H17V5H15ZM19 4H21V5H19ZM23 4H25V5H23ZM2 27H5V28H2ZM27 27H30V28H27ZM7 27H9V28H7ZM11 27H13V28H11ZM15 27H17V28H15ZM19 27H21V28H19ZM23 27H25V28H23ZM3 5V7H2V5ZM3 25V27H2V25ZM3 9V11H2V9ZM3 13V15H2V13ZM3 17V19H2V17ZM3 21V23H2V21ZM30 5V7H29V5ZM30 25V27H29V25ZM30 9V11H29V9ZM30 13V15H29V13ZM30 17V19H29V17ZM30 21V23H29V21Z|#4FM7 7V9H6V7ZM7 11V13H6V11ZM7 15V17H6V15ZM7 19V21H6V19ZM7 23V25H6V23ZM26 7V9H25V7ZM26 11V13H25V11ZM26 15V17H25V15ZM26 19V21H25V19ZM26 23V25H25V23Z|#1FM8.5 12.5H13.5V18.5H8.5Z|#0FM8 12H14V19H8ZM9 18H13V13H9Z|#1FM18.5 12.5H23.5V18.5H18.5Z|#0FM18 12H24V19H18ZM19 18H23V13H19Z|#0FM14 15H18V16H14Z"),
+    (JD_CHECK_DIAGRAM_L, 32.0, "#1FM6.5 3.5H14.5V8.5H6.5Z|#0FM6 3H15V9H6ZM7 8H14V4H7Z|#0FM11 9V11H10V9ZM11 20V22H10V20Z|#1FM10.5 11.5L14.5 15.5L10.5 19.5L6.5 15.5Z|#0FM10.5 10.793L15.207 15.5L10.5 20.207L5.793 15.5ZM7.207 15.5L10.5 18.793L13.793 15.5L10.5 12.207Z|#1FM6.5 22.5H14.5V27.5H6.5Z|#0FM6 22H15V28H6ZM7 27H14V23H7Z|#4FM19.707 22.293L22 24.586L27.293 19.293L28.707 20.707L22 27.414L18.293 23.707Z"),
+    (JD_RULES_EDIT_L, 32.0, "#0FM4 4H7V7H4ZM4 11H7V14H4ZM4 18H7V21H4ZM4 25H7V28H4Z|#0FM10 5H28V6H10ZM10 12H28V13H10ZM10 19H21V20H10ZM10 26H14V27H10Z|#9FM25 19L29 23L22.5 29.5H18.5V25.5Z|#4FM25 18.293L29.707 23L22.707 30H18V25.293ZM19 25.707V29H22.293L28.293 23L25 19.707Z|#4FM18 26V30H22Z"),
+    (JD_SPELLING_L, 32.0, "#0EM6 9H11V18H6L4 16V11ZM6 11V16H9V11ZM13 4H15V9H18L20 11V16L18 18H13ZM15 11V16H18V11ZM24 9H28V11H24V16H28V18H24L22 16V11Z|#4FM11.707 24.293L14 26.586L20.293 20.293L21.707 21.707L14 29.414L10.293 25.707Z"),
+    (JD_THESAURUS_L, 32.0, "#1FM15.5 9.5L12.5 6.5H3.5V24.5H12.5L15.5 27.5Z|#0FM16 28.707L12.293 25H3V6H12.707L16 9.293ZM15 9.707L12.293 7H4V24H12.707L15 26.293Z|#1FM16.5 9.5L19.5 6.5H28.5V24.5H19.5L16.5 27.5Z|#0FM16 9.293L19.293 6H29V25H19.707L16 28.707ZM17 26.293L19.293 24H28V7H19.707L17 9.707Z|#0FM6 11H12V12H6ZM6 14H13V15H6ZM6 17H13V18H6ZM6 20H11V21H6ZM20 11H26V12H20ZM19 14H26V15H19ZM19 17H26V18H19ZM19 20H24V21H19Z"),
+    (JD_ACCESSIBILITY_L, 32.0, "#0FM12.5 6L12.304 6.973L11.768 7.768L10.973 8.304L10 8.5L9.027 8.304L8.232 7.768L7.696 6.973L7.5 6L7.696 5.027L8.232 4.232L9.027 3.696L10 3.5L10.973 3.696L11.768 4.232L12.304 5.027Z|#0FM2 11H18V13H11V18H9V13H2Z|#0FM10.707 17.707L4.707 23.707L3.293 22.293L9.293 16.293ZM10.707 16.293L16.707 22.293L15.293 23.707L9.293 17.707Z|#4FM19.707 22.293L22 24.586L27.293 19.293L28.707 20.707L22 27.414L18.293 23.707Z"),
+    (JD_LANGUAGE_L, 32.0, "#0EM2 20L7 4H9L14 20H11.5L10.25 16H5.75L4.5 20ZM6.375 14H9.625L8 8.8Z|#4FM22 12H24V15H22ZM17 16H29V18H17Z|#4FM19.707 18.293L28.707 27.293L27.293 28.707L18.293 19.707ZM27.707 19.707L18.707 28.707L17.293 27.293L26.293 18.293Z"),
+    (JD_COMMENT_NEW_L, 32.0, "#1FM4 4H28V17H17V19H15L9 25V19H4Z|#0FM17 20H14.707L8 26.707V20H3V3H29V17H28V4H4V19H9V24.293L14.293 19H17Z|#4FM22 19H24V23H28V25H24V29H22V25H18V23H22Z"),
+    (JD_SHAPE_REPORTS_L, 32.0, "#1FM7 3H19V9H25V29H7Z|#2FM20 3L25 8H20Z|#0FM6 2H19.707L26 8.293V30H6ZM7 29H25V8.707L19.293 3H7Z|#0FM20 3V8H25V9H19V3Z|#0FM9 25H23V26H9Z|#0FM10 19H13V25H10Z|#4FM15 13H18V25H15Z|#0FM20 16H23V25H20Z"),
+    (JD_PROTECT_DOCUMENT_L, 32.0, "#1FM4 3H16V9H22V18H19V29H4Z|#0FM19 30H3V2H16.707L23 8.293V18H22V8.707L16.293 3H4V29H19Z|#2FM17 3L22 8H17Z|#0FM17 3V8H22V9H16V3Z|#4FM22 23V19H28V23H26V21H24V23Z|#9FM20.5 23.5H29.5V29.5H20.5Z|#4FM20 23H30V30H20ZM21 29H29V24H21Z|#4FM24 25H26V28H24Z"),
     (JD_ZOOM_L, 32.0, "#1FM23 14L22.762 16.064L22.085 17.958L21.023 19.629L19.629 21.023L17.958 22.085L16.064 22.762L14 23L11.936 22.762L10.042 22.085L8.371 21.023L6.977 19.629L5.915 17.958L5.238 16.064L5 14L5.238 11.936L5.915 10.042L6.977 8.371L8.371 6.977L10.042 5.915L11.936 5.238L14 5L16.064 5.238L17.958 5.915L19.629 6.977L21.023 8.371L22.085 10.042L22.762 11.936Z|#0FM23.503 14L23.252 16.178L22.537 18.179L21.415 19.944L19.944 21.415L18.179 22.537L16.178 23.252L14 23.503L11.822 23.252L9.821 22.537L8.056 21.415L6.585 19.944L5.463 18.179L4.748 16.178L4.497 14L4.748 11.822L5.463 9.821L6.585 8.056L8.056 6.585L9.821 5.463L11.822 4.748L14 4.497L16.178 4.748L18.179 5.463L19.944 6.585L21.415 8.056L22.537 9.821L23.252 11.822ZM22.272 12.051L21.633 10.263L20.63 8.686L19.314 7.37L17.737 6.367L15.949 5.728L14 5.503L12.051 5.728L10.263 6.367L8.686 7.37L7.37 8.686L6.367 10.263L5.728 12.051L5.503 14L5.728 15.949L6.367 17.737L7.37 19.314L8.686 20.63L10.263 21.633L12.051 22.272L14 22.497L15.949 22.272L17.737 21.633L19.314 20.63L20.63 19.314L21.633 17.737L22.272 15.949L22.497 14Z|#0FM21.207 19.793L28.707 27.293L27.293 28.707L19.793 21.207Z|#4FM13 9H15V13H19V15H15V19H13V15H9V13H13Z"),
+    (JD_NEW_WINDOW_L, 32.0, "#1FM3 5H29V8H3Z|#0FM17 28H2V4H30V17H29V5H3V27H17ZM3 8H29V9H3Z|#4FM22 19H24V23H28V25H24V29H22V25H18V23H22Z"),
+    (JD_ARRANGE_ALL_L, 32.0, "#1FM3 7H14V10H3ZM18 7H29V10H18Z|#0FM2 6H15V27H2ZM3 26H14V7H3ZM3 10H14V11H3ZM17 6H30V27H17ZM18 26H29V7H18ZM18 10H29V11H18Z"),
+    (JD_CASCADE_L, 32.0, "#1FM3 3H20V6H3ZM7 9H24V12H7Z|#0FM5 18H2V2H21V7H20V3H3V17H5ZM3 6H20V7H3ZM9 24H6V8H25V13H24V9H7V23H9ZM7 12H24V13H7Z|#9FM11 15H28V18H11Z|#4FM10 14H29V30H10ZM11 29H28V15H11Z|#4FM11 18H28V19H11Z"),
+    (JD_ARRAY_SHAPES_L, 32.0, "#1FM3.5 3.5H8.5V8.5H3.5Z|#0FM3 3H9V9H3ZM4 8H8V4H4Z|#9FM13.5 3.5H18.5V8.5H13.5ZM23.5 3.5H28.5V8.5H23.5ZM3.5 13.5H8.5V18.5H3.5ZM13.5 13.5H18.5V18.5H13.5ZM23.5 13.5H28.5V18.5H23.5ZM3.5 23.5H8.5V28.5H3.5ZM13.5 23.5H18.5V28.5H13.5ZM23.5 23.5H28.5V28.5H23.5Z|#4FM13 3H19V9H13ZM14 8H18V4H14ZM23 3H29V9H23ZM24 8H28V4H24ZM3 13H9V19H3ZM4 18H8V14H4ZM13 13H19V19H13ZM14 18H18V14H14ZM23 13H29V19H23ZM24 18H28V14H24ZM3 23H9V29H3ZM4 28H8V24H4ZM13 23H19V29H13ZM14 28H18V24H14ZM23 23H29V29H23ZM24 28H28V24H24Z"),
+    (JD_NUMBER_SHAPES_L, 32.0, "#1FM12.5 2.5H28.5V9.5H12.5Z|#0FM12 2H29V10H12ZM13 9H28V3H13Z|#1FM12.5 12.5H28.5V19.5H12.5Z|#0FM12 12H29V20H12ZM13 19H28V13H13Z|#1FM12.5 22.5H28.5V29.5H12.5Z|#0FM12 22H29V30H12ZM13 29H28V23H13Z|#4FM3 6L7 2H8V10H6V5L4 7Z|#4FM3 12H8V15.414L5 18.414V18H8V20H3V17.586L6 14.586V14H3ZM3 22H8V30H3V28H6V24H3ZM4 25H7V27H4Z"),
+    (JD_DIMENSION_L, 32.0, "#1FM4.5 4.5H27.5V13.5H4.5Z|#0FM4 4H28V14H4ZM5 13H27V5H5Z|#0FM5 16V29H4V16ZM28 16V29H27V16Z|#4FM9 22H23V23H9Z|#4FM5.5 22.5L9 19V26ZM26.5 22.5L23 19V26Z"),
+    (JD_SHAPESHEET_L, 32.0, "#1FM4 7H28V11H4Z|#0FM3 6H29V27H3ZM4 26H28V7H4Z|#0FM4 11H28V12H4ZM4 16H28V17H4ZM4 21H28V22H4ZM13 12V26H12V12ZM21 12V26H20V12Z|#9FM12.5 16.5H20.5V21.5H12.5Z|#4FM12 16H21V22H12ZM13 21H20V17H13Z"),
+    (JD_NEW_STENCIL_L, 32.0, "#1FM4.5 5.5H13.5V14.5H4.5Z|#0FM4 5H14V15H4ZM5 14H13V6H5Z|#1FM18.5 5.5H27.5V14.5H18.5Z|#0FM18 5H28V15H18ZM19 14H27V6H19Z|#1FM4.5 19.5H13.5V28.5H4.5Z|#0FM4 19H14V29H4ZM5 28H13V20H5Z|#4FM22 19H24V23H28V25H24V29H22V25H18V23H22Z"),
+    (JD_HELP_L, 32.0, "#1FM3.5 3.5H28.5V28.5H3.5Z|#0FM3 3H29V29H3ZM4 28H28V4H4Z|#0FM11 12V8H21V16H17V19H15V14H19V10H13V12Z|#0FM15 22H17V24H15Z"),
+    (JD_TRAINING_L, 32.0, "#1FM10 15.68L16 18.68L22 15.68V22H10Z|#0FM10 16V22H22V16H23V23H9V16Z|#1FM16 5L28 11L16 17L4 11Z|#0FM16 4.441L29.118 11L16 17.559L2.882 11ZM5.118 11L16 16.441L26.882 11L16 5.559Z|#4FM16.224 10.553L26 15.441V21H25V16.059L15.776 11.447Z|#4FM24 21H27V25H24Z"),
+    (JD_FEEDBACK_L, 32.0, "#1FM3.5 4.5H28.5V22.5H13.5L8.5 27.5V22.5H3.5Z|#0FM3 4H29V23H13.707L8 28.707V23H3ZM4 22H9V26.293L13.293 22H28V5H4Z|#4FM16 19.24L10.88 14.12L10.178 13.016L10.01 11.746L10.402 10.498L11.287 9.534L12.47 9.044L13.778 9.1L14.937 9.706L15.716 10.723L16 12L16.284 10.723L17.063 9.706L18.222 9.1L19.53 9.044L20.713 9.534L21.598 10.498L21.99 11.746L21.822 13.016L21.12 14.12Z"),
+    (JD_CT_MARGINS_L, 32.0, "#9FM4 5H28V10H4Z|#0FM7 7H16V8H7Z|#4FM3 4H29V28H3ZM4 27H28V5H4Z|#4FM4 10H28V11H4Z|#1FM13.5 14.5H18.5V22.5H13.5Z|#0FM13 14H19V23H13ZM14 22H18V15H14Z|#0FM4.5 18.5L7 16V21ZM12.5 18.5L10 16V21ZM19.5 18.5L22 16V21ZM27.5 18.5L25 16V21Z|#0FM7 18H10V19H7ZM22 18H25V19H22Z"),
+    (JD_CT_FIT_CONTENTS_L, 32.0, "#9FM9 5H23V10H9Z|#0FM11 7H17V8H11Z|#4FM8 4H24V28H8ZM9 27H23V5H9Z|#4FM9 10H23V11H9Z|#1FM10.5 12.5H17.5V17.5H10.5Z|#0FM10 12H18V18H10ZM11 17H17V13H11Z|#1FM14.5 20.5H21.5V25.5H14.5Z|#0FM14 20H22V26H14ZM15 25H21V21H15Z|#0FM2 15H4V13L7 16L4 19V17H2ZM30 15H28V13L25 16L28 19V17H30Z"),
+    (JD_CT_AUTO_SIZE_L, 32.0, "#9FM10 5H22V10H10Z|#0FM12 7H17V8H12Z|#4FM9 4H23V28H9ZM10 27H22V5H10Z|#4FM10 10H22V11H10Z|#1FM13.5 16.5H18.5V21.5H13.5Z|#0FM13 16H19V22H13ZM14 21H18V17H14Z|#0FM2 16L5 13V15H8V17H5V19ZM30 16L27 13V15H24V17H27V19Z"),
+    (JD_CT_HEADING_L, 32.0, "#4FM3 4H29V11H3Z|#4FM4 11V27H28V11H29V28H3V11Z|#1FM9.5 15.5H22.5V22.5H9.5Z|#0FM9 15H23V23H9ZM10 22H22V16H10Z"),
+    (JD_CT_LOCK_L, 32.0, "#1FM4 5H28V10H4Z|#0FM7 7H16V8H7Z|#0FM16 28H3V4H29V16H28V5H4V27H16ZM4 10H28V11H4Z|#1FM7.5 14.5H15.5V21.5H7.5Z|#0FM7 14H16V22H7ZM8 21H15V15H8Z|#4FM21 22V18H27V22H25V20H23V22Z|#9FM19.5 22.5H28.5V28.5H19.5Z|#4FM19 22H29V29H19ZM20 28H28V23H20Z|#4FM23 24H25V27H23Z"),
+    (JD_CT_SELECT_CONTENTS_L, 32.0, "#1FM4 5H28V10H4Z|#0FM7 7H16V8H7Z|#0FM3 4H29V28H3ZM4 27H28V5H4Z|#0FM4 10H28V11H4Z|#9FM7.5 15.5H14.5V22.5H7.5ZM17.5 15.5H24.5V22.5H17.5Z|#4FM7 15H15V23H7ZM8 22H14V16H8ZM17 15H25V23H17ZM18 22H24V16H18Z"),
+    (JD_CT_DISBAND_L, 32.0, "#9FM5.5 3.5H26.5V9.5H5.5Z|#4FM5 3H27V10H5ZM6 9H26V4H6Z|#0FM9 6H17V7H9Z|#4FM3 12V25H2V12ZM30 12V25H29V12ZM6 28H26V29H6Z|#1FM9.5 15.5H22.5V22.5H9.5Z|#0FM9 15H23V23H9ZM10 22H22V16H10Z"),
+    (JD_PIC_CROP_L, 32.0, "#9FM10 10H22V22H10Z|#0FM10 2V22H30V24H8V2ZM2 8H24V30H22V10H2Z"),
+    (JD_CFF_SWIMLANE_L, 32.0, "#1FM3 6H8V12H3Z|#1FM3 13H8V19H3Z|#0FM29 19V6H3V19H2V5H30V19ZM3 12H29V13H3ZM9 6V19H8V6Z|#9FM3 20H8V26H3Z|#4FM2 19H30V27H2ZM3 26H29V20H3Z|#4FM9 20V26H8V20Z"),
+    (JD_CFF_SEPARATOR_L, 32.0, "#1FM3 6H8V12H3ZM3 13H8V19H3ZM3 20H8V26H3Z|#0FM2 5H30V27H2ZM3 26H29V6H3ZM3 12H29V13H3ZM3 19H29V20H3ZM9 6V26H8V6Z|#4FM20 3V29H19V3Z"),
+    (JD_ORG_RELAYOUT_L, 32.0, "#1FM7.5 2.5H13.5V6.5H7.5Z|#0FM7 2H14V7H7ZM8 6H13V3H8Z|#0FM11 7V9H10V7ZM5 12V9H16V12H15V10H6V12Z|#1FM2.5 12.5H8.5V16.5H2.5Z|#0FM2 12H9V17H2ZM3 16H8V13H3Z|#1FM12.5 12.5H18.5V16.5H12.5Z|#0FM12 12H19V17H12ZM13 16H18V13H13Z|#4FM20 24V25.586L22.414 28H25.586L28 25.586V22.414L25.586 20H24V18H26.414L30 21.586V26.414L26.414 30H21.586L18 26.414V24Z|#4FM24 16V22L21 19Z"),
+    (JD_ORG_PICTURE_INSERT_L, 32.0, "#0FM17 25H3V5H29V18H28V6H4V24H17Z|#0FM6 8H16V21H6ZM7 20H15V9H7Z|#1FM7 20V18L10 15L12 17L13 16L15 18V20Z|#0FM6.646 17.646L10 14.293L12 16.293L13 15.293L15.354 17.646L14.646 18.354L13 16.707L12 17.707L10 15.707L7.354 18.354Z|#0FM13.75 11.5L13.579 12.131L13.131 12.579L12.5 12.75L11.869 12.579L11.421 12.131L11.25 11.5L11.421 10.869L11.869 10.421L12.5 10.25L13.131 10.421L13.579 10.869Z|#0FM18 10H26V11H18ZM18 13H24V14H18Z|#4FM22 19H24V23H28V25H24V29H22V25H18V23H22Z"),
+    (JD_ORG_IMPORT_L, 32.0, "#1FM3 3H13V5H3Z|#0FM2 2H14V13H2ZM3 12H13V3H3Z|#0FM3 5H13V6H3ZM9 6V12H8V6ZM3 8H13V9H3ZM3 11H13V12H3Z|#4FM16 6H22V14H20V8H16Z|#4FM17 14H25L21 18Z|#1FM17.5 18.5H25.5V21.5H17.5Z|#0FM17 18H26V22H17ZM18 21H25V19H18Z|#0FM22 22V23H21V22ZM16 25V23H27V25H26V24H17V25Z|#1FM13.5 25.5H19.5V28.5H13.5Z|#0FM13 25H20V29H13ZM14 28H19V26H14Z|#1FM23.5 25.5H29.5V28.5H23.5Z|#0FM23 25H30V29H23ZM24 28H29V26H24Z"),
+    (JD_ORG_EXPORT_L, 32.0, "#1FM6.5 2.5H14.5V5.5H6.5Z|#0FM6 2H15V6H6ZM7 5H14V3H7Z|#0FM11 6V7H10V6ZM5 9V7H16V9H15V8H6V9Z|#1FM2.5 9.5H8.5V12.5H2.5Z|#0FM2 9H9V13H2ZM3 12H8V10H3Z|#1FM12.5 9.5H18.5V12.5H12.5Z|#0FM12 9H19V13H12ZM13 12H18V10H13Z|#4FM16 3H26V13H24V5H16Z|#4FM21 13H29L25 17Z|#1FM19 19H29V21H19Z|#0FM18 18H30V30H18ZM19 29H29V19H19Z|#0FM19 21H29V22H19ZM25 22V29H24V22ZM19 24H29V25H19ZM19 27H29V28H19Z"),
+    (JD_ORG_COMPARE_L, 32.0, "#1FM6.5 8.5H10.5V12.5H6.5Z|#0FM6 8H11V13H6ZM7 12H10V9H7Z|#0FM9 13V15H8V13ZM4 18V15H13V18H12V16H5V18Z|#1FM2.5 18.5H6.5V22.5H2.5Z|#0FM2 18H7V23H2ZM3 22H6V19H3Z|#1FM10.5 18.5H14.5V22.5H10.5Z|#0FM10 18H15V23H10ZM11 22H14V19H11Z|#1FM21.5 8.5H25.5V12.5H21.5Z|#0FM21 8H26V13H21ZM22 12H25V9H22Z|#0FM24 13V15H23V13ZM19 18V15H28V18H27V16H20V18Z|#1FM17.5 18.5H21.5V22.5H17.5Z|#0FM17 18H22V23H17ZM18 22H21V19H18Z|#9FM25.5 18.5H29.5V22.5H25.5Z|#4FM25 18H30V23H25ZM26 22H29V19H26Z"),
+    (JD_ORG_SYNC_L, 32.0, "#1FM2.5 6.5H9.5V25.5H2.5Z|#0FM2 6H10V26H2ZM3 25H9V7H3Z|#1FM22.5 6.5H29.5V25.5H22.5Z|#0FM22 6H30V26H22ZM23 25H29V7H23Z|#4FM12 11H16V13H12ZM16 19H20V21H16Z|#4FM16 8V16L20 12Z|#4FM16 16V24L12 20Z"),
+    (JD_BS_MAIN_TOPIC_L, 32.0, "#9FM3.5 8.5H28.5V23.5H3.5Z|#4FM3 8H29V24H3ZM4 23H28V9H4Z|#0FM8 13H24V14H8ZM10 18H22V19H10Z"),
+    (JD_BS_SUBTOPIC_L, 32.0, "#1FM2.5 3.5H18.5V11.5H2.5Z|#0FM2 3H19V12H2ZM3 11H18V4H3Z|#0FM7 12V22H13V23H6V12Z|#9FM13.5 17.5H29.5V27.5H13.5Z|#4FM13 17H30V28H13ZM14 27H29V18H14Z"),
+    (JD_BS_PEER_TOPIC_L, 32.0, "#0FM8 13V8H24V13H23V9H9V13Z|#1FM2.5 13.5H14.5V23.5H2.5Z|#0FM2 13H15V24H2ZM3 23H14V14H3Z|#9FM17.5 13.5H29.5V23.5H17.5Z|#4FM17 13H30V24H17ZM18 23H29V14H18Z"),
 ];
