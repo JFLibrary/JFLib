@@ -170,6 +170,26 @@ pub struct Part {
     pub data: Vec<u8>,
 }
 
+/// a relationship of the package as read: which part (or the package) points to which target
+/// with which type.  The model derives the ones it owns (pages, masters, themes, pictures)
+/// from its own links when it writes; the list keeps every relationship so that parts it only
+/// keeps as bytes (Part), external targets and ids that kept XML refers to (r:id) survive
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Relationship {
+    /// the source part (`/visio/document.xml`), "" for the package itself
+    pub source: Sym,
+    /// the id (`rId3`), unique per source
+    pub id: Sym,
+    /// the type, a URI
+    pub kind: Sym,
+    /// the target as written: relative to the source, or a URI when external
+    pub target: Sym,
+    /// TargetMode="External": outside the package, never followed
+    pub external: bool,
+    /// the part an internal target names (`/visio/media/image1.png`); None when external
+    pub part: Option<Sym>,
+}
+
 /// why an object could not be put into the document
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum DocError {
@@ -321,6 +341,8 @@ pub struct Document {
     pub themes: Vec<Theme>,
     /// the other package parts, as bytes
     pub parts: Vec<Part>,
+    /// every relationship of the package as read (see Relationship)
+    pub rels: Vec<Relationship>,
     /// the attributes of the VisioDocument element
     pub attrs: Vec<(Sym, Sym)>,
     /// unknown items of the VisioDocument element (EventList, HeaderFooter, PublishSettings ...
@@ -330,6 +352,12 @@ pub struct Document {
     pub pages_extras: Extras,
     /// unknown items of the Masters element
     pub masters_extras: Extras,
+    /// unknown items of the Colors element (a ColorEntry with more than IX and RGB too)
+    pub colors_extras: Extras,
+    /// unknown items of the FaceNames element (a FaceName with children too)
+    pub faces_extras: Extras,
+    /// unknown items of the StyleSheets element
+    pub styles_extras: Extras,
 }
 
 impl Default for Document {
@@ -354,10 +382,14 @@ impl Document {
             styles: Arena::new(0),
             themes: Vec::new(),
             parts: Vec::new(),
+            rels: Vec::new(),
             attrs: Vec::new(),
             extras: Extras::new(),
             pages_extras: Extras::new(),
             masters_extras: Extras::new(),
+            colors_extras: Extras::new(),
+            faces_extras: Extras::new(),
+            styles_extras: Extras::new(),
         }
     }
 
@@ -366,6 +398,12 @@ impl Document {
     /// the string table
     pub fn strings(&self) -> &Strings {
         &self.strings
+    }
+
+    /// the string table to add to (loaders hand it to Value::parse, Formula::parse,
+    /// ShapeKind::parse); it only grows, so every Sym stays valid
+    pub fn strings_mut(&mut self) -> &mut Strings {
+        &mut self.strings
     }
 
     /// the handle of a text, added when new

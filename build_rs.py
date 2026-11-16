@@ -1881,6 +1881,31 @@ def py_check(*args):
                           encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
 
 
+def unit_test_packages():
+    """the library crates with unit tests of their own (`#[cfg(test)] mod tests` in the crate root) -> their
+    packages (diagram_core so far).  No app can reach a crate's cfg(test) items, so the suite runs them itself"""
+    pkgs = []
+    for c in LIBS:
+        for f in (ROOT / "lib" / c / "src" / "lib.rs", ROOT / "lib" / c / "lib.rs"):
+            if f.exists() and re.search(r"#\[cfg\(test\)\]\s*mod tests\b", f.read_text(encoding="utf-8")):
+                pkgs.append(f"jflib-{c.replace('_', '-')}")
+                break
+    return pkgs
+
+
+def unit_tests():
+    """`cargo test --lib` of those crates on the host, in a target folder of its own (build/unit-tests: the suite's
+    builds run beside it) -> its CompletedProcess"""
+    pkgs = unit_test_packages()
+    cmd = ["cargo", "test", "--locked", "--offline", "--lib"] + [x for p in pkgs for x in ("-p", p)]
+    if not pkgs:
+        cmd = [sys.executable, "-c", "print('unit tests: none')"]
+    env = {k: v for k, v in os.environ.items() if k != "RUSTFLAGS"}
+    env["CARGO_TARGET_DIR"] = str(ROOT / "build" / "unit-tests")
+    return subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          stdin=subprocess.DEVNULL)
+
+
 def suite_checks(exes):
     """the checks after the scripts -> [(run, show)]: run() gives a CompletedProcess, show(r) what the suite prints
     and the failure it counts (or None).  They run beside the scripts (SUITE_CHECKS_JOBS), their output comes after
@@ -1902,9 +1927,19 @@ def suite_checks(exes):
         return ((r.stdout.strip() + ("\n" + r.stderr.strip() if r.stderr.strip() else "")).strip(),
                 "tools/i18n_check.py --check" if r.returncode else None)
 
+    def units(r):
+        passed = sum(int(m) for m in re.findall(r"test result: \w+\. (\d+) passed", r.stdout))
+        crates = ", ".join(p.removeprefix("jflib-").replace("-", "_") for p in unit_test_packages())
+        if r.returncode:
+            tail = "\n".join((r.stdout + r.stderr).strip().splitlines()[-30:])
+            return f"FAIL unit tests ({crates})\n{tail}", "cargo test --lib (unit tests)"
+        return f"unit tests: {passed} passed ({crates or 'none'})", None
+
     tools = RS / "tools"
     rt = exes.get(("linux", "appimagert"))
     return [
+        # the unit tests of the library crates that have them (cargo test --lib on the host)
+        (unit_tests, units),
         # docs/API.md generated from the Rust doc comments must be current (R13); --api: the API
         # changes since the last release, for information (docs/VERSIONING.md)
         (lambda: py_check(tools / "gendoc.py", "--check", "--api"), gendoc),

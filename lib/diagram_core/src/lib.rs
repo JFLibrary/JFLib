@@ -50,8 +50,8 @@ mod views;
 
 pub use cell::{Cell, CellError, Formula, Origin, Value};
 pub use document::{
-    ColorEntry, DocError, DocKind, DocSettings, DocSheet, Document, FaceName, MasterRef, Owner, PageRef, Part, Shape,
-    ShapeRef, SheetRef, StyleRef, Theme,
+    ColorEntry, DocError, DocKind, DocSettings, DocSheet, Document, FaceName, MasterRef, Owner, PageRef, Part,
+    Relationship, Shape, ShapeRef, SheetRef, StyleRef, Theme,
 };
 pub use edit::{Change, EditError, Transaction};
 pub use inherit::{guarded, EffRow, Resolved};
@@ -59,7 +59,7 @@ pub use names::{named_rows, Category};
 pub use page::{attr, Connect, Master, MasterHeader, Page, PageHeader, Style, StyleHeader};
 pub use shape::{
     ForeignData, ForeignPayload, ShapeData, ShapeHeader, ShapeKind, ShapeTree, StyleRefs, Text, TextItem, TreeError,
-    TreeIter,
+    TreeIter, NO_ID,
 };
 pub use sheet::{CellAddr, Extra, ExtraItem, Extras, Local, Place, Row, RowKey, SecKey, Section, Sheet, Trigger};
 pub use strings::{Strings, Sym};

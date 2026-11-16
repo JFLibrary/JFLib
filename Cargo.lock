@@ -332,6 +332,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "diagramiotest"
+version = "0.1.0"
+dependencies = [
+ "jflib-archive",
+ "jflib-build",
+ "jflib-diagram-core",
+ "jflib-diagram-io",
+ "jflib-img-core",
+ "jflib-plat",
+ "jflib-rt",
+]
+
+[[package]]
 name = "diagramtest"
 version = "0.0.0"
 dependencies = [
@@ -677,6 +690,7 @@ version = "0.2.1"
 name = "jflib-diagram-io"
 version = "0.2.1"
 dependencies = [
+ "jflib-archive",
  "jflib-diagram-core",
 ]
 

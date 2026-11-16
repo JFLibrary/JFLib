@@ -107,6 +107,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
   <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/page.rs](#diagram_coresrcpagers) · [src/shape.rs](#diagram_coresrcshapers) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
+  <br>[src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 
@@ -52256,6 +52257,18 @@ instance "<master's NameU>.<ID>"; without Name it shows its NameU.
   - `rel_type: Sym` -- the type of the relationship that points to it
   - `data: Vec<u8>` -- its bytes
 
+- **`struct Relationship`**
+  a relationship of the package as read: which part (or the package) points to which target
+  with which type.  The model derives the ones it owns (pages, masters, themes, pictures)
+  from its own links when it writes; the list keeps every relationship so that parts it only
+  keeps as bytes (Part), external targets and ids that kept XML refers to (r:id) survive
+  - `source: Sym` -- the source part (`/visio/document.xml`), "" for the package itself
+  - `id: Sym` -- the id (`rId3`), unique per source
+  - `kind: Sym` -- the type, a URI
+  - `target: Sym` -- the target as written: relative to the source, or a URI when external
+  - `external: bool` -- TargetMode="External": outside the package, never followed
+  - `part: Option<Sym>` -- the part an internal target names (`/visio/media/image1.png`); None when external
+
 - **`enum DocError`**
   why an object could not be put into the document
   - `DuplicateId(u32)` -- another object of the same kind has this ID
@@ -52269,11 +52282,15 @@ instance "<master's NameU>.<ID>"; without Name it shows its NameU.
   - `faces: Vec<FaceName>` -- the fonts
   - `themes: Vec<Theme>` -- the theme parts (Page::theme indexes them)
   - `parts: Vec<Part>` -- the other package parts, as bytes
+  - `rels: Vec<Relationship>` -- every relationship of the package as read (see Relationship)
   - `attrs: Vec<(Sym, Sym)>` -- the attributes of the VisioDocument element
   - `extras: Extras` -- unknown items of the VisioDocument element (EventList, HeaderFooter, PublishSettings ...
     until they are typed)
   - `pages_extras: Extras` -- unknown items of the Pages element
   - `masters_extras: Extras` -- unknown items of the Masters element
+  - `colors_extras: Extras` -- unknown items of the Colors element (a ColorEntry with more than IX and RGB too)
+  - `faces_extras: Extras` -- unknown items of the FaceNames element (a FaceName with children too)
+  - `styles_extras: Extras` -- unknown items of the StyleSheets element
 
 **`impl Document`**
 
@@ -52281,6 +52298,9 @@ instance "<master's NameU>.<ID>"; without Name it shows its NameU.
   an empty document of this kind
 - **`fn strings(&self) -> &Strings`**
   the string table
+- **`fn strings_mut(&mut self) -> &mut Strings`**
+  the string table to add to (loaders hand it to Value::parse, Formula::parse,
+  ShapeKind::parse); it only grows, so every Sym stays valid
 - **`fn intern(&mut self, text: &str) -> Sym`**
   the handle of a text, added when new
 - **`fn sym(&self, text: &str) -> Option<Sym>`**
@@ -52440,7 +52460,7 @@ position, which holds because undo and redo replay them in exact reverse order o
 they left; an untracked change in between (the *_mut functions) breaks that, a step that no
 longer fits is refused (undo returns false) and the steps run before it are taken back; when
 even that fails the change is_broken and refuses from then on.  IDs, like slots, are never
-handed out twice (NoIds once a file used the largest one); a step that would give two pages,
+handed out twice (NoIds once a file used the largest one, 4294967294; NO_ID is none); a step that would give two pages,
 masters or styles one ID is refused.
 
 Structure keeps inheritance: a subshape of an instance stays in its instance, the master
@@ -52471,7 +52491,7 @@ a Del="1" mark; restore_row and restore_section remove it again.
   - `NotBackground` -- the page is not a background page
   - `Invalid` -- the request does not fit the object
   - `Stale` -- the document no longer matches (changed outside transactions)
-  - `NoIds` -- no free ID is left (a file used the largest ID, 4294967295)
+  - `NoIds` -- no free ID is left (a file used the largest ID, 4294967294)
 
 - **`struct Change`**
   a committed transaction: one undo step
@@ -52914,6 +52934,10 @@ A shape lives in a slot of its tree; the slot is its handle (ShapeRef) and never
 even when the shape is deleted and the deletion undone.  Slots are not reused.  The file's
 shape ID is unique per page or master (by_id, a BTreeMap: thousands of shapes, no linear
 search).  Children are kept in z-order, the last one on top.
+
+One ID is no ID: Visio writes the deleted subshapes of an instance (Del="1", no Type) with
+ID 4294967295 (NO_ID), several of them on one page.  A tree takes any number of shapes with
+it; by_id does not find them, they do not raise the next ID, and NO_ID is never handed out.
 ```
 
 - **`enum ShapeKind`**
@@ -53009,6 +53033,12 @@ search).  Children are kept in z-order, the last one on top.
 - **`fn new(kind: ShapeKind) -> ShapeData`**
   a shape of this kind with nothing set
 
+```rust
+/// the ID of the deleted subshapes Visio writes (Del="1", no Type): no ID of its own, any number
+/// of shapes of a tree may have it (see ShapeTree)
+NO_ID: u32 = u32::MAX
+```
+
 - **`enum TreeError`**
   why a shape could not be put into a tree
   - `DuplicateId(u32)` -- another shape of the tree has this ID
@@ -53023,13 +53053,13 @@ search).  Children are kept in z-order, the last one on top.
   an empty tree; new shapes get IDs from 4 on ([MS-VSDX] ShapeSheet_Type: an ID is at least 4)
 - **`fn insert(&mut self, parent: Option<u32>, id: u32, data: ShapeData) -> Result<u32, TreeError>`**
   add a shape with its file ID under `parent` (None: top level), on top of its siblings
-  -> its slot (untracked: no undo step; loaders build trees with it)
+  -> its slot (untracked: no undo step; loaders build trees with it); NO_ID may repeat
 - **`fn get(&self, slot: u32) -> Option<&ShapeData>`**
   the shape in a slot
 - **`fn id(&self, slot: u32) -> Option<u32>`**
   the file ID of the shape in a slot
 - **`fn by_id(&self, id: u32) -> Option<u32>`**
-  the slot of the shape with this file ID
+  the slot of the shape with this file ID (None for NO_ID)
 - **`fn top(&self) -> &[u32]`**
   the top-level shapes in z-order (bottom first)
 - **`fn children(&self, slot: u32) -> &[u32]`**
@@ -53041,7 +53071,8 @@ search).  Children are kept in z-order, the last one on top.
 - **`fn is_empty(&self) -> bool`**
   whether the tree has no shapes
 - **`fn next_id(&self) -> Option<u32>`**
-  the ID the next new shape gets (None: the tree has had the ID 4294967295, no new IDs)
+  the ID the next new shape gets (None: the tree has had the ID 4294967294, no new IDs;
+  NO_ID is never handed out)
 - **`fn iter(&self) -> TreeIter<'_>`**
   every shape slot, each group before its subshapes, in z-order
 - **`fn is_within(&self, mut slot: u32, ancestor: u32) -> bool`**
@@ -53075,8 +53106,10 @@ or style would pass on is deleted here.  Cells keep the file's order.
 
 Extras: diagram_io fills them while reading (JD3) and writes them back at their place (JD5):
 unknown attributes of the element, unknown child elements and text after the n-th known
-child, and what stood inside a cell (RefBy, text) by the cell's position.  The model never
-looks into them.
+child, what stood inside a cell (RefBy, text) by the cell's position, and what stood inside
+the Shapes and Connects lists by the entries before it.  An element is kept as the file
+wrote it; a namespace prefix in it is declared on the part's root (kept with the root's
+attributes).  The model never looks into them.
 ```
 
 - **`enum Place`**
@@ -53084,6 +53117,10 @@ looks into them.
   - `Element` -- an attribute of the element itself
   - `AfterChild(u32)` -- a child after this many known children (0: before the first)
   - `InCell(u32)` -- inside the element's cell at this position (attributes, RefBy, text)
+  - `InShapes(u32)` -- inside the element's Shapes child (a page's, master's or group's), after this many
+    Shape elements; an attribute here is one of the Shapes element itself
+  - `InConnects(u32)` -- inside the element's Connects child, after this many Connect elements; an attribute
+    here is one of the Connects element itself
 
 - **`enum ExtraItem`**
   an unknown attribute, element or text
@@ -53235,6 +53272,10 @@ A drawing with thousands of shapes repeats a few hundred cell names and formulas
 (THEMEVAL(), GUARD(Width*0.5) ...); each text is kept once and a cell holds four-byte
 handles.  The table only grows: a Sym stays valid as long as its document, so undo steps can
 keep them.  A Sym belongs to one document; between documents texts go through str().
+
+The texts come from files, which are untrusted: the index is an ordered map, so no choice of
+texts makes a lookup slower than log n comparisons (a hash table with a fixed hash can be
+flooded with texts that all fall on one slot).
 ```
 
 - **`struct Sym(pub(crate) u32)`**
@@ -53454,12 +53495,15 @@ diagram_io -- Visio file formats (the VSDX family) and diagram exports
 Reads and writes the model of diagram_core (apps/JFDiagrammer, plan in its PLAN.md).  The
 format follows the public specification [MS-VSDX]; no code of other implementations is used.
 
-What is to come here, by stage of the plan (none of it exists yet):
-  JD3   reading the VSDX family into the model: .vsdx, .vssx, .vstx and the macro-enabled
-        .vsdm / .vssm, whose macro part is passed through unchanged and never run; document.xml
-        (styles, the document's ShapeSheet, colours, fonts), pages with their shapes and
-        connects, masters, themes, windows.xml, properties and media; comments and data
-        recordsets are kept
+  vsdx::read(&bytes, &vsdx::Limits::VSDX) -> Result<vsdx::Loaded, vsdx::Error>
+                      a .vsdx, .vsdm, .vstx, .vstm, .vssx or .vssm file into a Document:
+                      styles, the document sheet, colours and fonts, pages with shapes and
+                      connects, masters, themes (raw), windows.xml, properties, media,
+                      comments and data recordsets (kept as parts); unknown items in the
+                      Extras where they stood (DF-03); nothing recomputed or rerouted
+  vsdx::Format        the six formats by main content type or extension
+
+What is to come here, by stage of the plan:
   JD5   writing the model back with everything it does not know; new documents with the own
         default theme; .vssx stencils
   JD12  exports: SVG, PNG and PDF through the library's writers
@@ -53468,8 +53512,169 @@ What is to come here, by stage of the plan (none of it exists yet):
 The ZIP and OPC parts come from archive (archive::opc, JD1), shared with doc_io's DOCX.
 Every file is untrusted input: sizes, counts and nesting are bounded, a file that breaks a
 rule is an error and never a panic, external links are kept as data and never followed, and
-nothing in a file is ever run.
+nothing in a file is ever run (the macro project of a .vsdm is kept as bytes).
 ```
+
+### `diagram_io/src/vsdx.rs`
+
+Source: [`lib/diagram_io/src/vsdx.rs`](../lib/diagram_io/src/vsdx.rs)
+
+```text
+vsdx -- reading the VSDX family (.vsdx .vsdm .vstx .vstm .vssx .vssm) into diagram_core's model
+
+  vsdx::read(&bytes, &Limits::VSDX) -> Result<Loaded, Error>
+  Loaded { doc, format, warnings, more_warnings }
+  Format::from_content_type(ct) / from_extension("vsdx") / extension() / content_type()
+  Limits::VSDX                 the bounds of a file: ZIP (archive::Limits), XML nesting and
+                               attributes, counts of shapes, cells, rows and sections, the
+                               length of one formula and of one shape text
+  Error / Warning              why a file was refused / what was odd but kept
+
+What lands where (MS-VSDX; FEATURES.md 1.1 and 1.6):
+  document.xml   DocumentSettings, Colors, FaceNames, StyleSheets, DocumentSheet; EventList,
+                 HeaderFooter, PublishSettings and everything else unknown in doc.extras
+  pages.xml      the pages (PageSheet, the Rel to the page part), the page parts' shapes and
+                 Connect entries
+  masters.xml    the masters (PageSheet, Icon, Rel), the master parts' shapes and connects
+  themes         every part a theme relationship names, raw (doc.themes); a page part's own
+                 theme relationship sets Page::theme (Visio files pick a page's theme by its
+                 ThemeIndex cell: JD4 reads that)
+  everything else  windows.xml, docProps (core, app, custom), the thumbnail, media, comments,
+                 data connections and recordsets, validation, solutions, the macro project,
+                 unknown parts: doc.parts as bytes, in package order
+  relationships  every one as read in doc.rels (also the external ones, never followed)
+Unknown attributes, elements and text go into the Extras of the element they stood in
+(diagram_core's sheet.rs says how).  Nothing is computed on opening: values stay the cached
+values of the file, connectors are not rerouted, Cell::stale stays false.
+
+The macro project of a macro-enabled file (vbaProject.bin and its relationship) is kept as a
+part and never run; Document::macros says the file has the right for one.  A file whose main
+content type is not macro-enabled but that carries a macro project is refused (Error::Macros).
+
+Every file is untrusted input.  The ZIP and OPC rules come from archive::opc (names, content
+types, relationships, sizes, the ratio of compressed parts); this module adds the XML bounds,
+the counts, the structure (root elements, required attributes, IDs as numbers, r:id that name a
+relationship of the right type, a part used once), and refuses cycles: styles based on each
+other, masters that contain instances of each other, background pages of each other.  A
+reference that names nothing (a master, master shape, style, background page, connected shape)
+is kept as it is and reported as a Warning.  No panic, and no recursion: deep groups cost heap,
+never stack.
+```
+
+- **`struct Format`**
+  one of the six files of the VSDX family: drawing, template or stencil, with or without
+  the right to carry macros
+  - `kind: DocKind` -- drawing (.vsdx), template (.vstx) or stencil (.vssx)
+  - `macros: bool` -- macro-enabled (.vsdm, .vstm, .vssm)
+
+**`impl Format`**
+
+- **`fn from_content_type(content_type: &str) -> Option<Format>`**
+  the format of a main part's content type (exact, as [MS-VSDX] names them)
+- **`fn from_extension(ext: &str) -> Option<Format>`**
+  the format of a file extension without the dot, ASCII case ignored ("VSDX", "vssm")
+- **`fn extension(self) -> &'static str`**
+  the extension without the dot ("vsdx")
+- **`fn content_type(self) -> &'static str`**
+  the content type of the main part
+
+- **`struct Limits`**
+  the bounds of one file; Limits::VSDX is the default
+  - `zip: archive::Limits` -- the ZIP container: parts, sizes, the ratio of a compressed part (archive::Limits)
+  - `depth: usize` -- most open elements in one XML part (a group in a group costs two levels); the reader
+    does not recurse, so this bounds memory and time, never the stack
+  - `attrs: usize` -- most attributes on one element
+  - `shapes: usize` -- most shapes in the document (pages and masters, all levels)
+  - `cells: usize` -- most cells in the document (every sheet)
+  - `rows: usize` -- most rows in the document
+  - `sections: usize` -- most sections in the document
+  - `objects: usize` -- most pages, masters and styles together
+  - `items: usize` -- most other things kept: connects, triggers, text marks and runs, colours, fonts,
+    settings, relationships and unknown items (attributes, elements, text)
+  - `formula_bytes: usize` -- most bytes of one formula (F) or text value (V)
+  - `text_bytes: usize` -- most bytes of one shape text
+  - `warnings: usize` -- most warnings kept in Loaded::warnings (the others are only counted)
+
+**`impl Limits`**
+
+- **`const VSDX: Limits = Limits { zip: archive::Limits { entries: 100_000, part_by ...`**
+  large drawings: 100000 parts, 512 MiB a part, 2 GiB in all, archives up to 1 GiB, no part
+  denser than 200:1 (the proposal of archive::Limits); 256 levels of XML, 256 attributes, a
+  million shapes, 16 million cells, 4 million rows, 2 million sections, formulas and values
+  up to 1 MiB, shape texts up to 4 MiB, 100000 pages, masters and styles, 4 million other
+  items
+
+- **`enum Error`**
+  why a file was refused
+  - `Package(opc::Error)` -- the ZIP container or the OPC package: structure, names, content types, relationships,
+    sizes and ratios (archive::opc)
+  - `NotVisio` -- no main part of the VSDX family: not a Visio file (another OPC format, or no main part)
+  - `Macros` -- a macro project in a file whose main content type is not macro-enabled
+  - `Xml { part: String, line: u32, error: XmlError, }` -- a part is no XML this reader takes (`line` counts from 1)
+  - `Structure { part: String, line: u32, what: &'static str, }` -- a part breaks the structure of the format: another root element, a missing or malformed
+    attribute (an ID that is no number), an r:id that names no relationship of the right type,
+    a part used twice, a duplicate ID
+  - `Limit(&'static str)` -- the document needs more than Limits allows: "shapes", "cells", "rows", "sections",
+    "objects", "items", "formula", "text"
+  - `Cycle { what: &'static str, id: u32, }` -- a cycle: "style" (styles based on each other), "master" (masters containing instances of
+    each other), "background" (background pages of each other); the ID where it was found
+
+- **`enum Warning`**
+  something odd that was kept as it is
+  - `MissingMaster { part: String, shape: u32, master: u32, }` -- a shape names a master the document does not have
+  - `MissingMasterShape { part: String, shape: u32, master_shape: u32, }` -- a subshape of an instance names a shape its master does not have
+  - `MissingStyle { part: String, style: u32, }` -- a sheet or a setting names a style the document does not have
+  - `MissingBackPage { page: u32, back_page: u32, }` -- a page names a background page that does not exist or is no background page
+  - `MissingShape { part: String, shape: u32, }` -- a Connect entry names a shape the page or master does not have
+  - `NoContents { what: &'static str, id: u32, }` -- a page or master without a Rel to its contents: it has no shapes
+  - `ExternalPicture { part: String, shape: u32, }` -- a picture whose relationship points outside the package: kept, never fetched
+  - `UnusedPart { part: String, }` -- a page or master part that no Page or Master element names: kept as a plain part
+
+- **`struct Loaded`**
+  a file read into the model
+  - `doc: Document` -- the document
+  - `format: Format` -- which of the six formats the main content type says
+  - `warnings: Vec<Warning>` -- what was odd, at most Limits::warnings of them
+  - `more_warnings: usize` -- how many warnings more there were
+
+- **`fn read(bytes: &[u8], limits: &Limits) -> Result<Loaded, Error>`**
+  read a file of the VSDX family; `limits` bound everything (Limits::VSDX for real files)
+
+### `diagram_io/src/xml.rs`
+
+Source: [`lib/diagram_io/src/xml.rs`](../lib/diagram_io/src/xml.rs)
+
+```text
+xml -- a bounded pull reader for the XML parts of the VSDX family
+
+  Reader::new(text, depth, attrs)    a part's text (UTF-8 or UTF-16 decoded by text_of)
+  r.next() -> Event                  Start, End, Text, Eof; an empty element <a/> gives Start
+                                     (empty: true) and then End
+  r.skip(&start) -> &str             the rest of an element, returned as the file wrote it
+                                     (an unknown element kept for DF-03)
+
+Why not base::xml: shape text is mixed content (<Text>ab<cp IX='0'/>cd</Text>), and unknown
+elements must come back as written; base::xml builds trees of element-only or text-only nodes.
+
+What it reads: elements, attributes in ' or ", the five predefined entities and character
+references, CDATA, comments and processing instructions (both skipped), namespaces (each name
+is resolved to the few namespaces the reader knows, Ns).  Refused: a DOCTYPE (no entities,
+no external anything), an undefined entity, a character XML does not allow, an encoding other
+than UTF-8 / UTF-16 in the declaration, mismatched or unclosed tags, an unbound prefix, a
+duplicate attribute, more nesting than `depth` and more attributes on one element than
+`attrs`.  Line ends are normalised as XML says: CR LF and CR become LF in text; in attribute
+values a literal tab, line end or CR becomes a space (character references stay).  Nothing
+recurses: a reader's stack is its own Vec, bounded by `depth`.
+```
+
+- **`enum XmlError`**
+  what is wrong with a part's XML
+  - `Syntax` -- not well-formed: a broken tag, attribute, entity or character, tags that do not match,
+    text outside the root element, an unbound namespace prefix, a duplicate attribute
+  - `Depth` -- deeper nesting than Limits::depth
+  - `Attributes` -- more attributes on one element than Limits::attrs, or more than 64 namespace
+    declarations in scope
+  - `Unsupported` -- a DOCTYPE, or an encoding other than UTF-8 and UTF-16 (declared or as bytes)
 
 ## rt
 

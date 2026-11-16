@@ -35,7 +35,7 @@
 // they left; an untracked change in between (the *_mut functions) breaks that, a step that no
 // longer fits is refused (undo returns false) and the steps run before it are taken back; when
 // even that fails the change is_broken and refuses from then on.  IDs, like slots, are never
-// handed out twice (NoIds once a file used the largest one); a step that would give two pages,
+// handed out twice (NoIds once a file used the largest one, 4294967294; NO_ID is none); a step that would give two pages,
 // masters or styles one ID is refused.
 //
 // Structure keeps inheritance: a subshape of an instance stays in its instance, the master
@@ -96,7 +96,7 @@ pub enum EditError {
     Invalid,
     /// the document no longer matches (changed outside transactions)
     Stale,
-    /// no free ID is left (a file used the largest ID, 4294967295)
+    /// no free ID is left (a file used the largest ID, 4294967294)
     NoIds,
 }
 

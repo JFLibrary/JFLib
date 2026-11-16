@@ -1,27 +1,43 @@
 # jflib-diagram-io
 
 The file formats of [JFLib](https://jflib.org)'s diagram model: Visio's VSDX family (drawings,
-stencils and templates) in both directions, later the older XML formats and the binary stencils,
-and exports of diagrams. It reads and writes the documents of
+stencils and templates), later the older XML formats and the binary stencils, and exports of
+diagrams. It reads and writes the documents of
 [`jflib-diagram-core`](https://crates.io/crates/jflib-diagram-core). It is plain Rust, without
 the standard library and without a line of `unsafe` code.
 
-**The crate is a frame for now and has no API yet.** The codecs are being built in stages; the
-plan is [apps/JFDiagrammer/PLAN.md](https://github.com/JFLibrary/JFLib/blob/main/apps/JFDiagrammer/PLAN.md)
-(in German).
+The codecs are being built in stages; the plan is
+[apps/JFDiagrammer/PLAN.md](https://github.com/JFLibrary/JFLib/blob/main/apps/JFDiagrammer/PLAN.md)
+(in German). Reading is there; writing and the exports follow.
 
-## What it will hold
+## What it holds
 
-- Reading `.vsdx`, `.vssx` and `.vstx`, and the macro-enabled `.vsdm` and `.vssm`, whose macro
-  part is passed through unchanged and never run.
-- Writing the model back with every part it does not know, so a file keeps what it had.
-- Writing new drawings and stencils from scratch.
-- Exports of pages as SVG, PNG and PDF.
-- Later: `.vdx` and `.vsx` (the XML formats of 2003 to 2010) and importing `.vss` and `.vsd`.
+- **Reading the VSDX family:** `.vsdx`, `.vstx` and `.vssx`, and the macro-enabled `.vsdm`,
+  `.vstm` and `.vssm`, told apart by the main part's content type. The styles, the document
+  sheet, colours and fonts, the pages with their shapes, texts and `Connect` entries, the
+  masters with their icons, the themes, `windows.xml`, the document properties, pictures,
+  comments and data recordsets all come into the model; what it does not know (unknown
+  attributes, elements, text, parts and relationships) is kept at the place it stood.
+- **Nothing recomputed on opening:** values stay the cached values of the file, connectors are
+  not rerouted, so a drawing looks as it was saved.
+- **Macros are never run.** The macro project of a macro-enabled file is kept as bytes; a file
+  that may not carry macros but does is refused.
+
+```rust
+use jflib::diagram_io::vsdx::{self, Limits};
+
+/// pages and masters of a .vsdx / .vssx / ... file, or why it was refused
+fn summary(bytes: &[u8]) -> Result<(usize, usize), vsdx::Error> {
+    let loaded = vsdx::read(bytes, &Limits::VSDX)?;   // loaded.format: which of the six files
+    let doc = &loaded.doc;                              // a diagram_core::Document
+    Ok((doc.page_count(), doc.masters().count()))      // loaded.warnings: what was odd but kept
+}
+```
 
 The format follows the public specification [MS-VSDX]. Every file is treated as untrusted input:
-sizes, counts and nesting are bounded, external links are kept as data and never followed, and
-nothing in a file is ever run.
+the ZIP container, the XML nesting and the counts of shapes, cells, rows and sections are bounded
+(`Limits`), cycles of styles, masters and background pages are refused, a broken file is an
+error and never a panic, and external links are kept as data and never followed.
 
 [MS-VSDX]: https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-vsdx/
 
@@ -33,8 +49,9 @@ one version and are released together.
 
 ## What's new in 0.2.1
 
-jflib-diagram-io is new in this release, as an empty frame: the crate exists so that the codecs
-can grow in it; it has no public items yet.
+jflib-diagram-io is new: it reads the six files of Visio's VSDX family into the document model of
+`jflib-diagram-core`, keeps what it does not know, and refuses hostile files with a clear error.
+Writing and exports are still to come.
 Everything is in the [changelog](https://docs.rs/crate/jflib-diagram-io/latest/source/CHANGELOG.md).
 
 ## Documentation

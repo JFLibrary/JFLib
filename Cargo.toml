@@ -151,6 +151,7 @@ members = [
     "apps/viewtest",
     "apps/a11ytest",
     "apps/JFDiagrammer",
+    "apps/diagramiotest",
 ]
 
 # The one version of the library (rt::VERSION; `build_rs.py release` writes it, docs/VERSIONING.md)

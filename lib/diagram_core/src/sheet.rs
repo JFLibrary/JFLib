@@ -18,8 +18,10 @@
 //
 // Extras: diagram_io fills them while reading (JD3) and writes them back at their place (JD5):
 // unknown attributes of the element, unknown child elements and text after the n-th known
-// child, and what stood inside a cell (RefBy, text) by the cell's position.  The model never
-// looks into them.
+// child, what stood inside a cell (RefBy, text) by the cell's position, and what stood inside
+// the Shapes and Connects lists by the entries before it.  An element is kept as the file
+// wrote it; a namespace prefix in it is declared on the part's root (kept with the root's
+// attributes).  The model never looks into them.
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -38,6 +40,12 @@ pub enum Place {
     AfterChild(u32),
     /// inside the element's cell at this position (attributes, RefBy, text)
     InCell(u32),
+    /// inside the element's Shapes child (a page's, master's or group's), after this many
+    /// Shape elements; an attribute here is one of the Shapes element itself
+    InShapes(u32),
+    /// inside the element's Connects child, after this many Connect elements; an attribute
+    /// here is one of the Connects element itself
+    InConnects(u32),
 }
 
 /// an unknown attribute, element or text

@@ -18,7 +18,9 @@ doctest = false
 workspace = true
 
 [dependencies]
+# archive: ZIP and OPC (archive::opc)
 diagram_core.workspace = true
+archive.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
 # of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)

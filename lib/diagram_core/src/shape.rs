@@ -16,6 +16,10 @@
 // even when the shape is deleted and the deletion undone.  Slots are not reused.  The file's
 // shape ID is unique per page or master (by_id, a BTreeMap: thousands of shapes, no linear
 // search).  Children are kept in z-order, the last one on top.
+//
+// One ID is no ID: Visio writes the deleted subshapes of an instance (Del="1", no Type) with
+// ID 4294967295 (NO_ID), several of them on one page.  A tree takes any number of shapes with
+// it; by_id does not find them, they do not raise the next ID, and NO_ID is never handed out.
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -231,6 +235,10 @@ pub(crate) struct Node {
 // the first ID a new tree hands out
 const FIRST_ID: u32 = 4;
 
+/// the ID of the deleted subshapes Visio writes (Del="1", no Type): no ID of its own, any number
+/// of shapes of a tree may have it (see ShapeTree)
+pub const NO_ID: u32 = u32::MAX;
+
 /// why a shape could not be put into a tree
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum TreeError {
@@ -248,6 +256,8 @@ pub struct ShapeTree {
     top: Vec<u32>,
     // the next ID handed out: above every ID the tree ever had (u64: past u32::MAX none is left)
     next_id: u64,
+    // the shapes with NO_ID (not in by_id)
+    no_id: usize,
 }
 
 impl ShapeTree {
@@ -257,9 +267,9 @@ impl ShapeTree {
     }
 
     /// add a shape with its file ID under `parent` (None: top level), on top of its siblings
-    /// -> its slot (untracked: no undo step; loaders build trees with it)
+    /// -> its slot (untracked: no undo step; loaders build trees with it); NO_ID may repeat
     pub fn insert(&mut self, parent: Option<u32>, id: u32, data: ShapeData) -> Result<u32, TreeError> {
-        if self.by_id.contains_key(&id) {
+        if id != NO_ID && self.by_id.contains_key(&id) {
             return Err(TreeError::DuplicateId(id));
         }
         if let Some(p) = parent {
@@ -269,8 +279,7 @@ impl ShapeTree {
         }
         let slot = self.slots.len() as u32;
         self.slots.push(Some(Box::new(Node { id, parent, children: Vec::new(), data })));
-        self.by_id.insert(id, slot);
-        self.next_id = self.next_id.max(id as u64 + 1);
+        self.index(id, slot);
         match parent {
             Some(p) => self.node_mut(p).expect("checked").children.push(slot),
             None => self.top.push(slot),
@@ -288,9 +297,19 @@ impl ShapeTree {
         self.node(slot).map(|n| n.id)
     }
 
-    /// the slot of the shape with this file ID
+    /// the slot of the shape with this file ID (None for NO_ID)
     pub fn by_id(&self, id: u32) -> Option<u32> {
         self.by_id.get(&id).copied()
+    }
+
+    // a shape's ID into by_id and next_id (NO_ID only counted)
+    fn index(&mut self, id: u32, slot: u32) {
+        if id == NO_ID {
+            self.no_id += 1;
+        } else {
+            self.by_id.insert(id, slot);
+            self.next_id = self.next_id.max(id as u64 + 1);
+        }
     }
 
     /// the top-level shapes in z-order (bottom first)
@@ -310,17 +329,18 @@ impl ShapeTree {
 
     /// the number of shapes (all levels)
     pub fn len(&self) -> usize {
-        self.by_id.len()
+        self.by_id.len() + self.no_id
     }
 
     /// whether the tree has no shapes
     pub fn is_empty(&self) -> bool {
-        self.by_id.is_empty()
+        self.len() == 0
     }
 
-    /// the ID the next new shape gets (None: the tree has had the ID 4294967295, no new IDs)
+    /// the ID the next new shape gets (None: the tree has had the ID 4294967294, no new IDs;
+    /// NO_ID is never handed out)
     pub fn next_id(&self) -> Option<u32> {
-        u32::try_from(self.next_id.max(FIRST_ID as u64)).ok()
+        u32::try_from(self.next_id.max(FIRST_ID as u64)).ok().filter(|&id| id != NO_ID)
     }
 
     /// every shape slot, each group before its subshapes, in z-order
@@ -385,7 +405,11 @@ impl ShapeTree {
         let mut stack = alloc::vec![slot];
         while let Some(s) = stack.pop() {
             if let Some(node) = self.slots.get_mut(s as usize).and_then(|x| x.take()) {
-                self.by_id.remove(&node.id);
+                if node.id == NO_ID {
+                    self.no_id -= 1;
+                } else {
+                    self.by_id.remove(&node.id);
+                }
                 stack.extend(node.children.iter().rev());
                 out.push((s, node));
             }
@@ -400,8 +424,7 @@ impl ShapeTree {
             if self.slots.len() <= s {
                 self.slots.resize_with(s + 1, || None);
             }
-            self.by_id.insert(node.id, s as u32);
-            self.next_id = self.next_id.max(node.id as u64 + 1);
+            self.index(node.id, s as u32);
             self.slots[s] = Some(node);
         }
     }

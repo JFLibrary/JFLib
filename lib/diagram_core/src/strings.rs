@@ -9,9 +9,13 @@
 // (THEMEVAL(), GUARD(Width*0.5) ...); each text is kept once and a cell holds four-byte
 // handles.  The table only grows: a Sym stays valid as long as its document, so undo steps can
 // keep them.  A Sym belongs to one document; between documents texts go through str().
+//
+// The texts come from files, which are untrusted: the index is an ordered map, so no choice of
+// texts makes a lookup slower than log n comparisons (a hash table with a fixed hash can be
+// flooded with texts that all fall on one slot).
 
-use alloc::boxed::Box;
-use alloc::vec;
+use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 /// a text of a document's string table (cell and row names, formulas, values, raw XML)
@@ -28,24 +32,11 @@ impl Sym {
     }
 }
 
-const NONE: u32 = u32::MAX;
-
 /// the string table of a document
 #[derive(Clone)]
 pub struct Strings {
-    texts: Vec<Box<str>>,
-    // open addressing over the indices of texts (NONE = free); power of two, at most half full
-    slots: Vec<u32>,
-}
-
-fn hash(s: &str) -> u64 {
-    // FNV-1a: short keys, no allocation, the same on every target
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for &b in s.as_bytes() {
-        h ^= b as u64;
-        h = h.wrapping_mul(0x0100_0000_01b3);
-    }
-    h
+    texts: Vec<Arc<str>>,
+    index: BTreeMap<Arc<str>, u32>,
 }
 
 impl core::fmt::Debug for Strings {
@@ -63,7 +54,7 @@ impl Default for Strings {
 impl Strings {
     /// a table with the empty text and the names the crate itself refers to
     pub fn new() -> Self {
-        let mut s = Strings { texts: Vec::new(), slots: vec![NONE; 1024] };
+        let mut s = Strings { texts: Vec::new(), index: BTreeMap::new() };
         s.intern("");
         for name in crate::names::KNOWN {
             s.intern(name);
@@ -76,29 +67,16 @@ impl Strings {
         if let Some(sym) = self.get(text) {
             return sym;
         }
-        if (self.texts.len() + 1) * 2 > self.slots.len() {
-            self.grow();
-        }
         let id = self.texts.len() as u32;
-        self.texts.push(Box::from(text));
-        self.place(id);
+        let t: Arc<str> = Arc::from(text);
+        self.texts.push(t.clone());
+        self.index.insert(t, id);
         Sym(id)
     }
 
     /// the handle of `text` when the table has it
     pub fn get(&self, text: &str) -> Option<Sym> {
-        let mask = self.slots.len() - 1;
-        let mut i = hash(text) as usize & mask;
-        loop {
-            let id = self.slots[i];
-            if id == NONE {
-                return None;
-            }
-            if &*self.texts[id as usize] == text {
-                return Some(Sym(id));
-            }
-            i = (i + 1) & mask;
-        }
+        self.index.get(text).map(|&id| Sym(id))
     }
 
     /// the text of a handle ("" for a handle of another, larger table)
@@ -114,22 +92,5 @@ impl Strings {
     /// whether the table holds nothing but the empty text and the known names
     pub fn is_empty(&self) -> bool {
         self.texts.len() <= crate::names::KNOWN.len() + 1
-    }
-
-    fn place(&mut self, id: u32) {
-        let mask = self.slots.len() - 1;
-        let mut i = hash(&self.texts[id as usize]) as usize & mask;
-        while self.slots[i] != NONE {
-            i = (i + 1) & mask;
-        }
-        self.slots[i] = id;
-    }
-
-    fn grow(&mut self) {
-        let n = self.slots.len() * 2;
-        self.slots = vec![NONE; n];
-        for id in 0..self.texts.len() as u32 {
-            self.place(id);
-        }
     }
 }

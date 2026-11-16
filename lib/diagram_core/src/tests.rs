@@ -842,12 +842,44 @@ fn header_ids_stay_unique_on_redo() {
 fn ids_run_out_without_reuse() {
     let mut f = fixture();
     let tree = &mut f.doc.page_mut(f.page).unwrap().shapes;
-    tree.insert(None, u32::MAX, ShapeData::new(ShapeKind::Shape)).unwrap();
+    tree.insert(None, u32::MAX - 1, ShapeData::new(ShapeKind::Shape)).unwrap();
     assert_eq!(tree.next_id(), None);
     let mut tx = f.doc.transaction("neu");
     assert_eq!(tx.add_shape(Owner::Page(f.page), None, ShapeKind::Shape), Err(EditError::NoIds));
     assert_eq!(tx.add_instance(Owner::Page(f.page), f.master, 0.0, 0.0), Err(EditError::NoIds));
     assert!(tx.commit().is_none());
+}
+
+#[test]
+fn no_id_repeats_and_hands_out_nothing() {
+    // Visio's deleted subshapes: ID 4294967295 several times in one instance (Zeichnung 3)
+    let mut f = fixture();
+    let tree = &mut f.doc.page_mut(f.page).unwrap().shapes;
+    let n = tree.len();
+    let group = tree.insert(None, 900, ShapeData::new(ShapeKind::Group)).unwrap();
+    let mut gone = ShapeData::new(ShapeKind::Unspecified);
+    gone.header.del = true;
+    gone.header.master_shape = Some(6);
+    let a = tree.insert(Some(group), NO_ID, gone.clone()).unwrap();
+    let b = tree.insert(Some(group), NO_ID, gone).unwrap();
+    assert_ne!(a, b);
+    assert_eq!(tree.len(), n + 3);
+    assert_eq!(tree.by_id(NO_ID), None);
+    assert_eq!(tree.next_id(), Some(901));
+    // deleting the group takes both along, undo puts them back
+    let mut tx = f.doc.transaction("weg");
+    tx.delete_shapes(&[ShapeRef { owner: Owner::Page(f.page), slot: group }]).unwrap();
+    let mut change = tx.commit().unwrap();
+    assert_eq!(f.doc.page(f.page).unwrap().shapes.len(), n);
+    assert!(change.undo(&mut f.doc));
+    let tree = &f.doc.page(f.page).unwrap().shapes;
+    assert_eq!(tree.len(), n + 3);
+    assert_eq!(tree.children(group), &[a, b]);
+    // a new shape never gets NO_ID, the next ID stays 901
+    let mut tx = f.doc.transaction("neu");
+    let r = tx.add_shape(Owner::Page(f.page), None, ShapeKind::Shape).unwrap();
+    tx.commit();
+    assert_eq!(f.doc.shape(r).unwrap().id(), 901);
 }
 
 #[test]
