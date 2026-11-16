@@ -26,6 +26,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   Windows / Super key: Windows through `ToUnicodeEx` without touching the keyboard state (10 1607
   and later), Linux from the keymap (`xkb_key_y`, X11 and Wayland), macOS
   `charactersIgnoringModifiers`. `key_char_test` and `key_layouts_test` (Windows) for plattest.
+- Whether a process runs: `plat::process_alive(pid)` on every target (Windows `OpenProcess` and a
+  wait of 0 ms, Linux, Apple and Android `kill(pid, 0)`; a process of another user counts, the
+  browser has none), `plat::process_id()` for apps without std and `process::Child::id()`.
+  docs/GUIDE.md section 17.
 
 ### Changed
 
@@ -40,6 +44,9 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Windows: the open dialog's result is split into a folder and names only when it is such a list. One file chosen with multiple selection on came back with the rest of a longer suggested name as a second file.
 - Linux: reading the clipboard or a drop from another program ends after 30 s in all (Wayland, X11 with INCR). The 3 s deadline started anew with every piece, so a program sending slowly froze the app for as long as it liked.
 - macOS: a GUI app catches SIGTERM with a handler that does nothing instead of ignoring it (the dispatch source reports it as before). Its child processes inherited the ignored signal and could not be ended with a plain kill.
+- Android with std: `read` / `write` declared with `void *` buffers as libc and std declare them
+  (the clashing declarations warned); the workspace no longer lists the apps' style crates it never
+  uses (`unused workspace dependency` on every target).
 
 ### Security
 
