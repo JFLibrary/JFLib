@@ -1,0 +1,46 @@
+#!args --verify-dirty
+# a suggestion menu open in a window that closes (command 2) or whose state is freed (command 3,
+# window_destroy) goes with the window (charge 13): before, the menu stayed one app-wide entry of
+# a box no longer drawn, and the menu key opened no menu in any other window until a right click
+# replaced it.  "Zweites Fenster" (#120) has a "Betreff" box (#110) of the main window's id.
+theme light
+# the menu of the second window's box, then the window closes
+cmd 1
+expect window 120 open
+activate 120
+window 120
+click #110
+key home
+key apps
+expect menuitem:"Fehler" exists
+cmd 2
+expect window 120 closed
+# the main window's box opens its own menu with the menu key (the caret in "Hasu")
+window main
+activate main
+click 70,136
+key apps
+expect menuitem:"Haus" exists
+expect menuitem:"Haus" focused
+key esc
+expect menuitem:"Haus" missing
+# the same with the window's state freed while its menu is open
+cmd 1
+expect window 120 open
+activate 120
+window 120
+click #110
+key home
+key apps
+expect menuitem:"Fehler" exists
+cmd 3
+expect window 120 closed
+window main
+activate main
+click 70,136
+key apps
+expect menuitem:"Haus" exists
+expect menuitem:"Haus" focused
+key esc
+expect menuitem:"Haus" missing
+expect_nowarn

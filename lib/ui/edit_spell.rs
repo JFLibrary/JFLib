@@ -519,6 +519,15 @@ impl Ui {
         self.spell_menu(id);
     }
 
+    /// (win.rs) window index `win` is hidden or destroyed: the suggestion menu of a box in it
+    /// goes with it (the menu is one app-wide entry; left behind, it kept the menu key from
+    /// opening a menu in any other window until a right click replaced it)
+    pub(crate) fn spell_window_gone(&mut self, win: u32) {
+        if self.m.edit.spell.menu.as_ref().is_some_and(|m| m.win == win) {
+            self.m.edit.spell.menu = None;
+        }
+    }
+
     /// (runtime E_WAKE, auto `sync`) the suggestions of a worker reach the menu waiting for
     /// them; a menu opened with a key focuses the first one (unless the focus moved on)
     pub(crate) fn spell_poll(&mut self) {
