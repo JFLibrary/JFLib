@@ -18,7 +18,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ## [Unreleased]
 
-## [0.2.1] - 2026-11-15
+## [0.2.1] - 2026-11-16
 
 ### Added
 
