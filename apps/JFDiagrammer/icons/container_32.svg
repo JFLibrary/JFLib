@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>Container, 32 px</title>
+  <rect class="hi" fill="#C2D2E5" x="4" y="5" width="24" height="5"/>
+  <path class="ink" stroke="#1D2228" d="M7 7.5H16"/>
+  <rect class="tint" stroke="#1F5FA8" x="3.5" y="4.5" width="25" height="23"/>
+  <path class="tint" stroke="#1F5FA8" d="M4 10.5H28"/>
+  <rect class="body" fill="#DCDEE1" stroke="#1D2228" x="9.5" y="15.5" width="13" height="7"/>
+</svg>

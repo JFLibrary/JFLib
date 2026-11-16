@@ -13,6 +13,10 @@ Einfügen, Entwurf und Ansicht, das Menüband mit Platzhalter-Gruppen (alle Knö
 links die Seitenleiste „Shapes“ ohne Schablone, in der Mitte eine leere Zeichenfläche und unten
 die Statusleiste mit Seite und Zoom. Funktionen gibt es noch keine.
 
+**JD14 (Icons), Probeblatt:** 13 eigene Menüband-Icons im NetLab-Stil, je 32 und 16 px
+([`icons/probeblatt.png`](icons/probeblatt.png)), warten auf die Abnahme; die übrigen Icons
+entstehen danach. Die gezeichneten hängen schon an den Platzhaltern.
+
 ## Bauen, starten, testen
 
 ```sh
@@ -20,6 +24,20 @@ python build_rs.py app JFDiagrammer          # build/win/JFDiagrammer.exe und bu
 python build_rs.py run JFDiagrammer          # bauen und starten (Linux: --target linux)
 python build_rs.py test JFDiagrammer         # bauen und tests/*.uis ausführen
 python build_rs.py i18n JFDiagrammer         # der Sprachkatalog gegen die Quellen
+```
+
+## Icons
+
+Die Menüband-Icons sind eigene Zeichnungen (FEATURES.md Abschnitt 7), je Icon zwei SVG-Dateien von
+Hand auf dem Pixelraster: `icons/NAME_16.svg` (kleine Knöpfe) und `icons/NAME_32.svg` (große).
+Linien 1 px auf der Pixelmitte, Ecken eckig, vier Farbrollen über die Klassennamen (`ink`, `body`,
+`tint` für den Akzent, `hi` für die Akzentfläche; die Farben in den Dateien gelten nur fürs
+Ansehen). Die Regeln stehen in [`mkicons.py`](mkicons.py); das Skript macht aus den SVGs gefüllte
+Flächen für `ui::Symbol` (`src/icons_data.rs`) und auf Wunsch das Probeblatt:
+
+```sh
+python apps/JFDiagrammer/mkicons.py                                   # src/icons_data.rs
+python apps/JFDiagrammer/mkicons.py --sheet apps/JFDiagrammer/icons/probeblatt.png
 ```
 
 ## Sprachen
@@ -38,6 +56,8 @@ Wort mit zwei Bedeutungen trägt im Katalog einen Kontext nach `|` (`Einfügen|Z
 | `src/main.rs` | Einstieg, Katalog, Zustand der App |
 | `src/shell.rs` | das Fenster: Registerzeile, Menüband, Seitenleiste, Zeichenfläche, Statusleiste |
 | `src/ribbon.rs` | die Platzhalter-Gruppen der vier Register |
+| `src/icons.rs`, `src/icons_data.rs` | die eigenen Menüband-Icons (Hook, Farben; Daten aus `mkicons.py`) |
+| `icons/*.svg`, `mkicons.py` | die Quellen der Icons und ihr Skript, `icons/probeblatt.png` das Probeblatt |
 | `locales/ui.tsv` | die Texte in fünf Sprachen |
 | `tests/*.uis` | die Testskripte (`smoke.uis` deutsch, `lang_*.uis` je Sprache) |
 | `STYLE`, `TARGETS`, `PACKAGE`, `PERMISSIONS` | Stil (`netlab`), Zielplattformen, Identität (`org.jfreund.JFDiagrammer`), Rechte |

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"
+     fill="none" stroke-width="1">
+  <title>In den Vordergrund, 32 px</title>
+  <polygon class="body" fill="#DCDEE1" points="4,4 19,4 19,11 11,11 11,19 4,19"/>
+  <path class="ink" stroke="#1D2228" d="M11 19.5H3.5V3.5H19.5V11"/>
+  <rect class="hi tint" fill="#C2D2E5" stroke="#1F5FA8" x="12.5" y="12.5" width="16" height="16"/>
+</svg>
