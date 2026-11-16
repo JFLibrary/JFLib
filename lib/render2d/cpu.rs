@@ -1,4 +1,4 @@
-// cpu -- the CPU path (G6e1, decision 31; docs/RENDER2D.md "Der CPU-Weg"): a scene drawn through lib/gfx's rasterizer
+// cpu -- the CPU path (G6e1, decision 29; docs/RENDER2D.md "Der CPU-Weg"): a scene drawn through lib/gfx's rasterizer
 // without a device, with the camera, the painter's order, the visible layers and the look of a frame on the GPU.  A child
 // of scene.rs: it reads the scene's entities, layers, styles, blocks, texts, highlights and overlay, and its R-tree (pick.rs).
 //
@@ -1012,7 +1012,7 @@ impl<'a> Frame<'a> {
 }
 
 impl Scene {
-    /// the scene drawn on the CPU through lib/gfx (G6e1, decision 31): the camera's view of a target of r's size into the
+    /// the scene drawn on the CPU through lib/gfx (G6e1, decision 29): the camera's view of a target of r's size into the
     /// rectangle r (x, y, w, h, relative to dc's origin) of sf, clipped to dc's clip, blended over what is there (the app
     /// clears it first, as a frame's load does); the painter's order, the visible layers, the look, the highlights and the
     /// overlay of a frame on the GPU (docs/RENDER2D.md "Der CPU-Weg").  With and without a device.  dc keeps its colour,
