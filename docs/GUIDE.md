@@ -2230,7 +2230,9 @@ shot build/template.png
 * A first line `#!args --open file.png` adds program arguments when `build_rs.py test` runs
   the script (pass them yourself when you run it by hand). A line `#!timeout 1800` among the
   first five sets the seconds it may take there (600 otherwise); a script that takes longer
-  counts as failed and the others still run.
+  counts as failed and the others still run. A line `#!only windows linux` among the first five
+  runs it on these systems only, under `build_rs.py test` as under `cargo jflib test` (the names
+  below); on the other targets it is skipped and counted.
 * **Lines for some systems**: `only OS...: COMMAND` runs the command only on the systems it
   names, `!OS` on every system but that one (`only windows: key ctrl+q`, `only !macos: expect
   "Beenden" exists`, `only linux macos: ...`; blanks or commas between the names). The names are
