@@ -155,13 +155,21 @@ impl Target {
         } else {
             args.push("-static".to_string());
         }
-        let map = format!("-Map={}", out_dir.join("program.map").display());
-        for a in ["-e _start", "--gc-sections", "-z noexecstack", &map] {
+        for a in ["-e _start", "--gc-sections", "-z noexecstack"] {
             if ld {
                 args.extend(a.split(' ').map(String::from));
             } else {
                 args.push(wl(a));
             }
+        }
+        // The map's path is one argument whatever it holds: a project below "My Projects/" must
+        // not have it split at the blank (ld) nor the blank turned into a comma (cc's -Wl,).
+        // -Xlinker hands cc's next argument to the linker as it is.
+        let map = format!("-Map={}", out_dir.join("program.map").display());
+        if ld {
+            args.push(map);
+        } else {
+            args.extend(["-Xlinker".to_string(), map]);
         }
         if glibc {
             args.push(wl("--no-as-needed"));
@@ -245,4 +253,47 @@ fn rust_lld(rustc: &str) -> Result<PathBuf, String> {
     let exe = if cfg!(windows) { "rust-lld.exe" } else { "rust-lld" };
     let lld = sysroot.join("lib").join("rustlib").join(&host).join("bin").join(exe);
     if lld.is_file() { Ok(lld) } else { Err(format!("{}: not there; it comes with rustup's toolchains", lld.display())) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// one static file for Linux, linked by lld (`ld`) or through cc
+    fn static_linux(ld: bool) -> Target {
+        Target {
+            triple: "x86_64-unknown-linux-gnu".into(),
+            os: "linux".into(),
+            arch: "x86_64".into(),
+            env: "gnu".into(),
+            features: vec!["crt-static".into()],
+            glibc: false,
+            rustflags: format!("{}-C relocation-model=static", if ld { "-C linker-flavor=ld.lld " } else { "" }),
+            std: false,
+        }
+    }
+
+    #[test]
+    fn map_path_with_a_blank_stays_one_argument() {
+        let out = Path::new("My Projects").join("app").join("out");
+        let map = format!("-Map={}", out.join("program.map").display());
+        // lld takes it as it is
+        let args = static_linux(true).linux(&out).unwrap();
+        assert!(args.contains(&map), "{args:?}");
+        assert!(!args.iter().any(|a| a == "-Map=My"), "{args:?}");
+        // cc hands it on untouched: no -Wl, whose commas would stand for the blanks
+        let args = static_linux(false).linux(&out).unwrap();
+        let at = args.iter().position(|a| *a == map).expect("the map argument");
+        assert_eq!(args[at - 1], "-Xlinker", "{args:?}");
+        assert!(!args.iter().any(|a| a.starts_with("-Wl,-Map")), "{args:?}");
+    }
+
+    #[test]
+    fn the_other_linker_arguments_are_as_before() {
+        let out = Path::new("out");
+        let args = static_linux(true).linux(out).unwrap();
+        assert_eq!(&args[..7], ["-nostdlib", "-static", "-e", "_start", "--gc-sections", "-z", "noexecstack"]);
+        let args = static_linux(false).linux(out).unwrap();
+        assert_eq!(&args[..5], ["-nostdlib", "-static", "-Wl,-e,_start", "-Wl,--gc-sections", "-Wl,-z,noexecstack"]);
+    }
 }

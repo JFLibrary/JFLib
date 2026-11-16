@@ -41,6 +41,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** An image view whose wheel zooms panned twice as far with the horizontal wheel while the vertical one stood still (and not at all in a right-to-left window)
 - **ui:** The fine steps of a precision touchpad (Windows' wheel deltas below 120) were cut off one by one where whole lines count: the terminal never scrolled with steps below 40, the code completion list scrolled three rows on each of them (and on two notches at once), Ctrl + each of them zoomed a diagram a whole step; they add up now
 - **Tests:** linuxtest's Wayland synth test expected key events at x = 0, y = 0, as before the scan code and the location came (E2)
+- **build:** jflib-build: a project in a folder with a blank in its path (`My Projects/app`) links for Linux again -- the path of the linker's map was split at the blank when lld links (one static file, `cargo jflib package`) and had the blank turned into a comma behind cc's `-Wl,`; it is one argument now (through cc as `-Xlinker`)
 
 ## [0.2.1] - 2026-11-16
 

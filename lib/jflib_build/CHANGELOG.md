@@ -8,6 +8,13 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux: a project in a folder with a blank in its path (`My Projects/app`) links again. The
+  path of the linker's map was split at the blank when lld links (`-C linker-flavor=ld.lld`: one
+  static file, `cargo jflib package`) and had the blank turned into a comma behind cc's `-Wl,`;
+  it is one argument now (through cc as `-Xlinker`).
+
 ## [0.2.1] - 2026-11-16
 
 ### Changed
