@@ -29,15 +29,20 @@
 //        around it.
 //        LF_REORDER (U1): a row dragged more than 4 DIP is moved: an accent insertion line
 //        follows the pointer, the view scrolls near its edges, Esc cancels; on release
-//        list_end returns EV_DRAG with from | to << 16 (the app moves item `from` so that it
-//        ends at index `to`) and sel = to.  Widgets inside custom rows keep their clicks.
-//        The keyboard moves the selected row the same way: Ctrl+Up / Ctrl+Down one place,
-//        Ctrl+Home / Ctrl+End to the top / bottom.
+//        list_end_full reports EV_DRAG with drop = Some((from, to)) (the app moves item `from`
+//        so that it ends at index `to`) and sel = to.  Widgets inside custom rows keep their
+//        clicks.  The keyboard moves the selected row the same way: Ctrl+Up / Ctrl+Down one
+//        place, Ctrl+Home / Ctrl+End to the top / bottom.
 //   list_item(i, label) -> EV              text row (EV_ACT clicked, EV_DOUBLE, EV_RCLICK)
 //   list_item_begin(i) -> EV               custom row: opens a BOX_H inside the row
 //   list_item_end()
-//   list_end(&mut sel) -> (EV, sel)        EV_ACT if sel changed this pass, EV_DOUBLE;
-//                                          EV_DRAG: a row was dropped (from | to << 16)
+//   list_end_full(&mut sel) -> ListEnd     { ev, sel, drop }: EV_ACT if sel changed this pass,
+//                                          EV_DOUBLE; EV_DRAG with drop = Some((from, to)): a row
+//                                          was dropped (any number of rows)
+//   list_end(&mut sel) -> (EV, sel)        the same with the drop packed as from | to << 16 in
+//                                          place of sel -- 16 bits each: a drop that does not fit
+//                                          (a row from 65 536 on) is not reported, the selection
+//                                          stays on the row (lists that long: list_end_full)
 //        (Rust: list_begin reads the selection into the list, list_end writes it back --
 //        the asm keeps a pointer to the app's variable in between; list_sel() reads it in
 //        the rows)
@@ -154,8 +159,8 @@ pub(crate) struct Ls {
     y0: i32,
     /// LF_* flags
     flags: u32,
-    /// from | to << 16 of a drop in this pass, -1 = none
-    drop: i32,
+    /// (from, to) of a drop in this pass
+    drop: Option<(i32, i32)>,
     /// keyboard: Enter (the selected row reports EV_DOUBLE), Space (its check box acts)
     kdbl: bool,
     ktog: bool,
@@ -166,6 +171,19 @@ pub(crate) struct Ls {
 /// state shared by all windows (none: ui_list.s keeps everything per window)
 #[derive(Default)]
 pub(crate) struct S {}
+
+/// What `Ui::list_end_full` reports at the end of a list.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ListEnd {
+    /// EV_ACT the selection changed this pass, EV_DOUBLE (a double click or Enter on a row),
+    /// EV_DRAG a row was dropped (LF_REORDER)
+    pub ev: u32,
+    /// the selection (-1 = none), also written to the `sel` handed to list_end_full
+    pub sel: i32,
+    /// with EV_DRAG: (from, to) -- the app moves item `from` so that it ends at index `to`
+    pub drop: Option<(usize, usize)>,
+}
 
 /// per-window state (ui_list_wb0 .. ui_list_wb1, swapped by win.rs): scroll view, list and
 /// expander stacks, the dragged row
@@ -824,7 +842,7 @@ impl Ui {
             let to = to.clamp(0, count - 1);
             if to != cur {
                 let l = &mut self.wp.list.list[li];
-                l.drop = (to << 16) | cur;
+                l.drop = Some((cur, to));
                 l.sel = to;
                 self.wp.ctx.focus_visible = true;
                 self.repass();
@@ -947,7 +965,7 @@ impl Ui {
                 return;
             }
             let l = &mut self.wp.list.list[li];
-            l.drop = (to << 16) | from;
+            l.drop = Some((from, to));
             l.sel = to; // the moved item stays selected
             self.repass();
         } else {
@@ -993,7 +1011,7 @@ impl Ui {
             self.limit_hit(super::ctx::LIM_LISTS);
         }
         self.wp.list.list_sp = self.wp.list.list_sp.wrapping_add(1);
-        self.wp.list.list[li] = Ls { id, count, sel: *sel, ih, next: 0, old: *sel, ev: 0, vev: 0, y0: 0, flags, drop: -1, kdbl: false, ktog: false, notab: false };
+        self.wp.list.list[li] = Ls { id, count, sel: *sel, ih, next: 0, old: *sel, ev: 0, vev: 0, y0: 0, flags, drop: None, kdbl: false, ktog: false, notab: false };
         // viewport: a vertical scroll view that takes the keyboard focus (Space / Enter are the
         // list's; the menu key goes to the selected row)
         if *sel >= 0 && *sel < count {
@@ -1161,14 +1179,43 @@ impl Ui {
     }
 
     /// ui_list_end(&mut sel) -> (EV_* (EV_ACT if sel changed, EV_DOUBLE), sel); EV_DRAG: a
-    /// row was dropped, the second value is from | to << 16
+    /// row was dropped, the second value is from | to << 16.  Only while both fit in 16 bits:
+    /// a drop from or to a row past 65 535 is not reported (no EV_DRAG, the selection stays on
+    /// the row) -- `list_end_full` reports every drop as two numbers
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn list_end(&mut self, sel: &mut i32) -> (u32, i32) {
         let _src = self.src_scope();
+        let r = self.list_end_in(sel, true);
+        match r.drop {
+            Some((from, to)) => (r.ev, ((to as u32) << 16 | from as u32) as i32),
+            None => (r.ev, r.sel),
+        }
+    }
+
+    /// The end of a list: its events (EV_ACT the selection changed this pass, EV_DOUBLE,
+    /// EV_DRAG a row was dropped), the selection written back to `sel` (-1 = none) and, with
+    /// EV_DRAG, `drop = Some((from, to))`: the app moves item `from` so that it ends at index
+    /// `to` (sel is `to` then).  Any number of rows (`list_end` packs the drop into 16 bits each).
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn list_end_full(&mut self, sel: &mut i32) -> ListEnd {
+        let _src = self.src_scope();
+        self.list_end_in(sel, false)
+    }
+
+    // list_end / list_end_full; packed: a drop past 16 bits is dropped, the row stays selected
+    fn list_end_in(&mut self, sel: &mut i32, packed: bool) -> ListEnd {
         if self.wp.list.list_sp == 0 {
-            return (0, -1);
+            return ListEnd { ev: 0, sel: -1, drop: None };
         }
         let li = self.list_top();
+        if packed {
+            let l = &mut self.wp.list.list[li];
+            if let Some((from, _)) = l.drop.filter(|&(f, t)| f > 0xFFFF || t > 0xFFFF) {
+                // list_end cannot say it: the item stays where it is, selected
+                l.drop = None;
+                l.sel = from;
+            }
+        }
         let e = self.wp.list.list[li];
         // rows below the view
         let d = e.count.wrapping_sub(e.next);
@@ -1206,10 +1253,11 @@ impl Ui {
         }
         self.m.kbnav.toggle = false;
         self.wp.list.list_sp -= 1;
-        if e.drop != -1 {
-            return (ev | EV_DRAG, e.drop); // (U1) a dropped row
+        match e.drop {
+            // (U1) a dropped row
+            Some((from, to)) => ListEnd { ev: ev | EV_DRAG, sel: s, drop: Some((from as usize, to as usize)) },
+            None => ListEnd { ev, sel: s, drop: None },
         }
-        (ev, s)
     }
 
     // ------------------------------------------------------------------ tabs

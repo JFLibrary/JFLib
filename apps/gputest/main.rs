@@ -17,7 +17,8 @@
 //        bindless    (Voll) storage buffers and textures indexed from one table; a slot changed
 //                    after the GPU finished
 //        upload      the staging ring (t_upload.rs): small uploads stay in a few chunks, a large
-//                    one's buffer goes back after a second; write_texture_rects (stride, clipping,
+//                    one's buffer goes back after a second, a frame of canvas tiles keeps one of its
+//                    buffers and none a second later (Vulkan); write_texture_rects (stride, clipping,
 //                    errors), write_buffer across chunks; try_acquire and rebuild on a window (a
 //                    child window too: Surface::native), memory blocks that grow
 //        window      a plat window with a swapchain: FIFO frames (cleared colour + triangles,
@@ -33,7 +34,8 @@
 //                    queues is found by the values (the validation layer does not report it)
 //        syncval     (--validate only) a copy and a fill into one buffer without a barrier, then two
 //                    dispatches writing one buffer without one: the validation layer must report each
-//                    hazard with exactly one error (synchronization validation on)
+//                    hazard with exactly one error (synchronization validation on; Vulkan only:
+//                    Metal tracks hazards itself and its validation reports none, SKIP there)
 //        spec        pipeline constants (t_spec.rs): lib/shader's spec_fill as SPIR-V 1.3
 //                    (WorkgroupSize built-in) and 1.6 (LocalSizeId) with its defaults and with
 //                    constants for every override (workgroup sizes 1 .. the limit) = its CPU
@@ -191,6 +193,14 @@ pub struct Gpu {
     pub inst: Instance,
     pub adapter: Adapter,
     pub dev: Device,
+}
+
+/// the validation reports a hazard provoked on purpose: only Vulkan's layer has synchronization validation.  Metal's API
+/// validation (MTL_DEBUG_LAYER) stops the process at a misuse and counts nothing (gpu::validation_messages is (0, 0)), and
+/// Metal tracks the hazards between commands itself: no barrier is missing there.  Without it the provoked cases do not
+/// apply (SKIP); every other check of --validate stays
+pub fn sync_validation(adapter: &Adapter) -> bool {
+    adapter.info().backend == "Vulkan"
 }
 
 /// this program can show something on this device
@@ -554,6 +564,10 @@ fn syncval(t: &mut T) {
     let Some(g) = setup(t) else { return };
     if !g.inst.validating() {
         out("SKIP: no validation layer");
+        return;
+    }
+    if !sync_validation(&g.adapter) {
+        out(&format!("SKIP: {} has no synchronization validation (it tracks hazards itself)", g.adapter.info().backend));
         return;
     }
     let dev = &g.dev;

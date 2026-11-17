@@ -35,6 +35,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - `ui::dock_float_id(area, win, k)`: the window id of a dock area's floating window `k` -- `area + 1
   + k` in the main window as before, an id of its own hashed from area and window in any other.
   docs/GUIDE.md section 15.
+- `Ui::list_end_full(&mut sel) -> ListEnd { ev, sel, drop }`: the end of a list with a dropped row (LF_REORDER) as `drop = Some((from, to))`, for any number of rows.
 
 ### Changed
 
@@ -43,8 +44,17 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   pixels now, scroll the views by the fingers' way (4.8 times it on Wayland and 1.2 on macOS
   before).
 - The scripts' `commit` hands the text to `plat::ime_commit_text` in one call, as a platform does.
+- GPU canvases (`ui.canvas_gpu`, image views, diagrams): the tiles of a window take at most eight
+  times its framebuffer (`jfgui_GPU_CANVAS_MB`, 128 MiB, stays the upper limit): a 1900 x 1000
+  window holds 61 MB of tiles, no longer 128. A tile shows 254 x 254 pixels, its texture with the
+  border around them is 256 x 256, so it takes what the budget counts (NVIDIA laid the 258 x 258
+  one out as 408 KiB instead of 260).
 
 ### Fixed
+
+- GPU canvases: a tile evicted for a new one hands its texture over when no frame draws it any
+  more; a zoom over many levels made a new texture for every tile while the evicted ones lived on
+  until the GPU had finished the frame.
 
 - The code editor's horizontal wheel scrolled the wrong way: tilted right it scrolled left.
 - An image view whose wheel zooms panned twice as far with the horizontal wheel while the
@@ -71,6 +81,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Text box: undo to a state longer than a smaller capacity cuts it on a character's start (it could cut a UTF-8 character); a password box's accessibility record gives caret and anchor as indices of its dots, and a screen reader's selection in it maps back to the characters (they were byte indices of the hidden text).
 - `History`: `undo` / `redo` while a group is open close it first, its edits so far are the newest step (undo reverted the older step under them, redo did an undone step over newer edits); `can_undo`, `can_redo` and the labels count the open group.
 - A box nested beyond the layout's limit pushes no clip or disabled level and its `box_end` pops nothing (it took the parent's frame, clip and disabled level); an expander beyond the 16 kept ones opens no content card (its box stayed open).
+- `list_end` packs a drop into `from | to << 16` only while both fit in 16 bits: a move from or to a row past 65 535 is no longer reported (no EV_DRAG, the row stays selected) -- the packed value gave another item and another place (`list_end_full` reports them).
 
 ### Security
 
@@ -130,6 +141,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   first editor of the id that is built, and `canvas_damage` to the canvas in every window.
 - The syntax highlighter nests at most 32 levels within a line (template strings in `${..}`, Nest and Element rules); deeper, the rest of the line keeps the construct's colour. A long line of "`${" ran the stack out.
 - Terminal: cursor moves (`ESC[H`, `f`, `G`, `C`) reach column 1024 at most. The spaces up to a far column made 12 bytes into a scrollback line of 32000 cells.
+- The GPU output: a window whose swapchain could not be made because the device was lost (lost while no window showed on it: the others on the CPU path, hidden or kept at another size) no longer tries again on the lost device every 2, 4, 8 ... seconds; every window goes to the CPU path and a new device follows, as for a failure while showing. Test scripts: `gpu on` prints a SKIP when the screen's work area cannot hold the script's window (the system keeps it smaller, on the CPU path), instead of checks that cannot hold there.
 - On a phone or a tablet a vertical scroll view rolls sideways only while its content is laid
   out wider than the view, and only as far as that content reaches. Before, the natural width
   decided, where a wrapping text counts unwrapped and a view inside that rolls sideways itself

@@ -7,6 +7,10 @@
 //                                          wake latency and coalescing (headless wait), the
 //                                          UI thread's state refused to a second thread (a
 //                                          child: plattest --test uithread-child, exit code 3)
+//   plattest --test atomics [--secs N]     (t_atomics.rs, ARM7) the memory order under many
+//                                          threads: locks, Condvar, channel, Sem, the pool, the
+//                                          heap, the event and audio rings, litmus tests; long
+//                                          runs on ARM devices with --secs (docs/ARM64.md)
 //   plattest --test files                  mkdir / delete / rename, the streaming file API
 //                                          (also from 64 parallel items), temp files, the
 //                                          temp and config dirs, environment overrides
@@ -206,6 +210,7 @@ mod t_a11y_rich;
 // what that tree costs per frame
 mod t_a11y_cost;
 mod t_async;
+mod t_atomics;
 // plat-win: the R4 tests of the Windows platform layer
 mod t_cursor;
 // the user's folders, the log folder and the trash
@@ -386,6 +391,7 @@ fn plattest() -> i32 {
     let mut t = T { passes: 0, fails: 0, quiet: repeat > 1, base: String::new(), simd: args.value("--simd").map(String::from) };
     let test: fn(&mut T) = match args.value("--test") {
         Some("threads") => t_threads,
+        Some("atomics") => t_atomics::t_atomics,  // ARM7: memory order under load (--secs N for long runs)
         Some("files") => t_files,
         Some("kernel") => t_kernel::t_kernel,
         Some("ini") => t_ini,
@@ -762,8 +768,10 @@ fn th_sem(t: &mut T) {
     let t0 = plat::time_us();
     let got = s.wait(50);
     let dt = plat::time_us() - t0;
-    t.check(!got && (40000..3000000).contains(&dt), "sem: wait(50 ms) on a zero count times out after about 50 ms");
-    t.info(&format!("  (took {dt} us)\n"));
+    // (Windows may end a wait up to one timer tick early, 15.6 ms at the default resolution: windows-11-arm)
+    let ok = !got && (33000..3000000).contains(&dt);
+    t.check(ok, "sem: wait(50 ms) on a zero count times out after about 50 ms");
+    if ok { t.info(&format!("  (took {dt} us)\n")) } else { out(&format!("  (got {got}, took {dt} us)\n")) }
     // counting
     s.post(2);
     let (a, b, c) = (s.wait(0), s.wait(0), s.wait(0));

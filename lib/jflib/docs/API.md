@@ -169,7 +169,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `popup_close_id`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_preedit`, `ime_enable`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_reveal`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
-- [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
+- [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `list_end_full`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
 - [Data views: grid, tree, badges, meters](#data-views-grid-tree-badges-meters): `grid_begin`, `grid_row`, `grid_cell`, `grid_text`, `grid_text_ts`, `grid_end`, `tree`, `badge`, `status_dot`, `meter`
 - [Shell parts: navigation, command bar, splitter, breadcrumb, wizard steps](#shell-parts-navigation-command-bar-splitter-breadcrumb-wizard-steps): `nav_begin`, `nav_toggle`, `nav_section`, `nav_item`, `nav_footer`, `nav_end`, `command_bar`, `split_begin`, `split_next`, `split_end`, `breadcrumb`, `segmented`, `wizard_steps`, `page_header`, `key_value`, `empty_state`
 - [Docking: panels at the sides, tab groups, floating tool windows](#docking-panels-at-the-sides-tab-groups-floating-tool-windows): `dock_begin`, `dock_next`, `dock_end`
@@ -2678,15 +2678,20 @@ list -- scroll views, scroll bars, lists, tabs and expanders (WinUI 3 style)
        around it.
        LF_REORDER (U1): a row dragged more than 4 DIP is moved: an accent insertion line
        follows the pointer, the view scrolls near its edges, Esc cancels; on release
-       list_end returns EV_DRAG with from | to << 16 (the app moves item `from` so that it
-       ends at index `to`) and sel = to.  Widgets inside custom rows keep their clicks.
-       The keyboard moves the selected row the same way: Ctrl+Up / Ctrl+Down one place,
-       Ctrl+Home / Ctrl+End to the top / bottom.
+       list_end_full reports EV_DRAG with drop = Some((from, to)) (the app moves item `from`
+       so that it ends at index `to`) and sel = to.  Widgets inside custom rows keep their
+       clicks.  The keyboard moves the selected row the same way: Ctrl+Up / Ctrl+Down one
+       place, Ctrl+Home / Ctrl+End to the top / bottom.
   list_item(i, label) -> EV              text row (EV_ACT clicked, EV_DOUBLE, EV_RCLICK)
   list_item_begin(i) -> EV               custom row: opens a BOX_H inside the row
   list_item_end()
-  list_end(&mut sel) -> (EV, sel)        EV_ACT if sel changed this pass, EV_DOUBLE;
-                                         EV_DRAG: a row was dropped (from | to << 16)
+  list_end_full(&mut sel) -> ListEnd     { ev, sel, drop }: EV_ACT if sel changed this pass,
+                                         EV_DOUBLE; EV_DRAG with drop = Some((from, to)): a row
+                                         was dropped (any number of rows)
+  list_end(&mut sel) -> (EV, sel)        the same with the drop packed as from | to << 16 in
+                                         place of sel -- 16 bits each: a drop that does not fit
+                                         (a row from 65 536 on) is not reported, the selection
+                                         stays on the row (lists that long: list_end_full)
        (Rust: list_begin reads the selection into the list, list_end writes it back --
        the asm keeps a pointer to the app's variable in between; list_sel() reads it in
        the rows)
@@ -2700,6 +2705,13 @@ list -- scroll views, scroll bars, lists, tabs and expanders (WinUI 3 style)
 Widget ids used internally: (id << 3 | k) | 0x80000000 for sub parts (k = 1..7),
 (id + 1 + i) | 0xC0000000 for the content box of custom list rows.
 ```
+
+- **`struct ListEnd`**
+  What `Ui::list_end_full` reports at the end of a list.
+  - `ev: u32` -- EV_ACT the selection changed this pass, EV_DOUBLE (a double click or Enter on a row),
+    EV_DRAG a row was dropped (LF_REORDER)
+  - `sel: i32` -- the selection (-1 = none), also written to the `sel` handed to list_end_full
+  - `drop: Option<(usize, usize)>` -- with EV_DRAG: (from, to) -- the app moves item `from` so that it ends at index `to`
 
 **`impl Ui`**
 
@@ -2731,7 +2743,14 @@ Widget ids used internally: (id << 3 | k) | 0x80000000 for sub parts (k = 1..7),
   ui_list_item_end
 - **`fn list_end(&mut self, sel: &mut i32) -> (u32, i32)`**
   ui_list_end(&mut sel) -> (EV_\* (EV_ACT if sel changed, EV_DOUBLE), sel); EV_DRAG: a
-  row was dropped, the second value is from | to &lt;&lt; 16
+  row was dropped, the second value is from | to &lt;&lt; 16.  Only while both fit in 16 bits:
+  a drop from or to a row past 65 535 is not reported (no EV_DRAG, the selection stays on
+  the row) -- `list_end_full` reports every drop as two numbers
+- **`fn list_end_full(&mut self, sel: &mut i32) -> ListEnd`**
+  The end of a list: its events (EV_ACT the selection changed this pass, EV_DOUBLE,
+  EV_DRAG a row was dropped), the selection written back to `sel` (-1 = none) and, with
+  EV_DRAG, `drop = Some((from, to))`: the app moves item `from` so that it ends at index
+  `to` (sel is `to` then).  Any number of rows (`list_end` packs the drop into 16 bits each).
 - **`fn tabs_scrolling(&mut self, id: u32, sel: &mut i32, names: &[&str]) -> u32`**
   Tab strip with horizontal overflow arrows. Mouse scrolling and Left/Right,
   Home/End on the strip retain ordinary tab semantics; changed selections
@@ -9500,7 +9519,9 @@ is drawn by the output's render pass: every frame read back into the framebuffer
 lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 
 Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
-Linux program, the browser), or without a GPU, it prints a SKIP once and does nothing):
+Linux program, the browser), without a GPU, or when the screen's work area cannot hold the
+window at `gpu on` (the system keeps it smaller, on the CPU path), it prints a SKIP once and
+does nothing):
   gpu on [fast]          a real window per UI window (shown without activation) with
                          the output, every presented image compared with the framebuffer (fast:
                          not compared, for measurements), a render after every input edge; waits
@@ -19953,9 +19974,11 @@ copies into one upload command buffer that ends with a global barrier (copy writ
 later access) and is put before the caller's command buffers in the next vkQueueSubmit.
 The staging ring: 256 KiB chunks of Upload memory, filled front to back across submissions;
 a full chunk is reused once the GPU has passed the last submission that reads from it (two
-are kept free, more go back).  An upload above half a chunk gets a buffer of its own, reused
-by the next one that fits and released when none came for a second (Device::poll): a frame of
-small rectangles costs what they hold, not a full frame or a new allocation.
+are kept free, more go back).  An upload above half a chunk gets a buffer of its own (its size
+rounded up to 64 KiB), reused by a later one that fits it without wasting half of it; once the GPU
+is done with them only the largest free one stays, and only until a second after the last such
+upload (Device::poll): a frame of small rectangles costs what they hold, not a full frame or a new
+allocation, and a frame of many canvas tiles does not keep twice their bytes around afterwards.
 Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 call returns GpuError::DeviceLost (objects are still destroyed normally).
 (G5d) The compute queue comes only when asked for (DeviceOptions; without it a device is what it was in 0.1.0: one
@@ -30515,7 +30538,7 @@ SOUND_NOTIFY: u32 = 5
 
 - **`fn ring_check(n: usize, piece: usize, take: usize, threaded: bool) -> bool`**
   (tests) the ring of a push stream: n samples written in pieces of `piece` and read in
-  pieces of `take`, by turns or (threaded, Windows / Linux) by a writer thread while this one
+  pieces of `take`, by turns or (threaded, Windows / Linux / macOS / iOS) by a writer thread while this one
   reads -> whether every sample arrived once and in order.  The reader gives up after 20 s
   (a loaded machine): then it tells the writer to stop, which may wait at a full ring, and
   the check fails instead of waiting for it forever
@@ -52165,6 +52188,11 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
   that leaves it ends the program as an uncaught panic: JFLib's crash report, exit code 3.  plat
   runs its threads and the program's start through it.  Without that feature a panic never
   unwinds, and this is `f()`.
+
+- **`fn outline_lse() -> Option<bool>`**
+  (tests, docs/ARM64.md ARM7) the way compiler-builtins' outline atomics went: Some(true) LSE, Some(false)
+  the LL/SC loops (a CPU without LSE, or jfgui_ARM_LLSC=1); None where the program has none of them (x86-64;
+  Windows and Apple on ARM64 inline their atomics; Android, glibc and std leave it to the C library)
 
 **`mod portable`**
 

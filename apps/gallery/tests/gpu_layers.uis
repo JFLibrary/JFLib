@@ -5,7 +5,8 @@
 # window, a new size, a theme, a lost device.  Every presented image is read back and compared
 # with the framebuffer, --verify-dirty compares the framebuffer with a full redraw; `gpu expect
 # base` and `raster` count what reaches the base: what a button's hover changes, not what lies
-# below a layer.  Without a GPU `gpu` prints a SKIP once and does nothing.
+# below a layer.  Without a GPU, or on a screen too small for the 1000x900 window (GitHub's Mac
+# runners), `gpu` prints a SKIP once and does nothing.
 system env jfgui_GPU_VALIDATE 1
 system env jfgui_GPU_RETRY_MS 100
 size 1000 900

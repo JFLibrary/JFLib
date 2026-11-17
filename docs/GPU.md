@@ -625,7 +625,7 @@ ui.canvas_gpu_damage(ID, [x0, y0, x1, y1]);  // Inhalt geändert: die Kacheln da
 `ui.canvas_gpu_wanted()` sagt, ob sich das Bauen lohnt. **Auf jedem Ziel derselbe Code:** ohne GPU-Ausgabe, in statischen Linux-Programmen, in Skripten ohne `gpu on`, mit `jfgui_GPU=0` tut `canvas_gpu` nichts, das `Draw` malt jedes Bild wie bisher.
 `image_view` (`ImageViewState::gpu`) und `diagram` (`DiagramState::gpu`, also auch `diagramtest` und beide Leinwände von JFNetworker) tun das selbst.
 
-**Wie es läuft.** Die Kacheln sind 256 × 256 Texel plus ein Texel Rand, zu einer Stufe (Maßstab und Phase) gehörig, gezeichnet von `draw_view` auf dem UI-Thread, höchstens 5 ms je Bild, was übrig bleibt geht in diesem Bild den Weg der CPU.
+**Wie es läuft.** Die Kacheln sind 254 × 254 Texel plus ein Texel Rand, ihre Textur 256 × 256 (eine Seite, die keine Zweierpotenz ist, polstern Treiber auf: NVIDIA legte 258 × 258 als 384 × 272 Texel an, 408 statt 260 KiB), zu einer Stufe (Maßstab und Phase) gehörig, gezeichnet von `draw_view` auf dem UI-Thread, höchstens 5 ms je Bild, was übrig bleibt geht in diesem Bild den Weg der CPU.
 
 | Vorgang | CPU | GPU |
 | --- | --- | --- |
@@ -638,7 +638,7 @@ ui.canvas_gpu_damage(ID, [x0, y0, x1, y1]);  // Inhalt geändert: die Kacheln da
 
 Der Befehl einer Leinwand, die aus Kacheln kommt, geht mit seinem Ort statt seines Inhalts in den Hash der Zellen (`dirty.rs`), sonst wäre jede Zelle jedes Bild schmutzig. Sie wird genau wie ein Bild aus G3b vermerkt: in den Zellen, in denen sie als Letzte der Grundebene liegt, zeichnet die GPU, die CPU zeichnet und lädt nichts (`Split::owed`, `Split::stale`); auch in Randzellen, die sie nur teilweise füllt, dort mit dem Scissor an ihrem Rand. Zellen mit etwas darüber (Griffe, Bildlaufleisten, Auswahl) und Zellen ohne ihre Kachel laufen über ihr `Draw` und werden hochgeladen; unter einer offenen Ebene ebenso, damit die Ebene das Richtige über sich hält. `gp_settle` ruft das `Draw`, bevor jemand den Framebuffer liest: `Ui::gpu_settle()` außerhalb eines Durchgangs, `shot`, `expect pixel`, der Agent, `--verify-dirty` und die Wege zurück zum CPU-Pfad geben also immer die richtigen Pixel, auch mitten in einer Geste. PaintCrafts Drucken und Zwischenablage und Kritzels Export lesen den Framebuffer nicht, sie zeichnen in eigene Flächen.
 
-**Budget und Lebensdauer.** 128 MiB (`jfgui_GPU_CANVAS_MB`), verdrängt wird die am längsten nicht gezeichnete Kachel, nie eine des laufenden Bildes; passt nichts mehr hinein, läuft der Rest über die CPU. 30 s nach der letzten Bewegung gehen alle Kacheln, ohne ein Bild. Neue Größe, Inspektor, minimiert: das Fenster zeichnet über die CPU, die Kacheln bleiben. Gerät verloren: alle Kacheln weg, die nächste Geste füllt sie auf dem neuen Gerät neu. Ein gespiegeltes Fenster (RTL) zeichnet Leinwände auf der CPU.
+**Budget und Lebensdauer.** Höchstens das Achtfache des Framebuffers des Fensters, das sie zeichnet (eine auf 0,55 verkleinerte Stufe deckt 3,3 Ansichten, ihre Randkacheln etwa eine weitere; 1900 × 1000: 61 MB), und höchstens 128 MiB (`jfgui_GPU_CANVAS_MB`). Verdrängt wird die am längsten nicht gezeichnete Kachel, nie eine des laufenden Bildes, und ihre Textur nimmt die neue Kachel, sobald kein Bild sie mehr zeichnet (sonst lebten beide, bis die GPU das Bild fertig hat); passt nichts mehr hinein, läuft der Rest über die CPU. 30 s nach der letzten Bewegung gehen alle Kacheln, ohne ein Bild. Neue Größe, Inspektor, minimiert: das Fenster zeichnet über die CPU, die Kacheln bleiben. Gerät verloren: alle Kacheln weg, die nächste Geste füllt sie auf dem neuen Gerät neu. Ein gespiegeltes Fenster (RTL) zeichnet Leinwände auf der CPU.
 
 **Was während einer Geste anders aussieht.** Gemessen mit `gpu shot` (das zurückgelesene dargestellte Bild) gegen `shot` (die Pixel der CPU), 1920 × 1000; `jfgui_GPU_VERIFY` zählt dasselbe je Bild in `GpuOutput::canvas_diff_*`.
 
@@ -687,6 +687,8 @@ Beim Strich kein Unterschied (Streuung der Läufe 262–334 und 273–314 µs); 
 Wo der Gewinn kleiner ist: **unter 1 ms** bleibt nur, was keine Zellen über der Leinwand hat. Das Foto hat Bildlaufleisten und eine Statuszeile, deren Zellen je Bild `IvDraw` kosten (170 000 Pixel, 1,4 ms von 2 ms), PaintCraft Lineale und Leisten. Beim Rad in einem Zug zählen die neuen Stufen: das Foto 113 Kacheln in 16 Bildern (5 ms je Bild), das Diagramm 163. Das erste Bild einer Geste füllt seine Kacheln: das längste Bild war beim Foto 14,7 ms (vorher 39), Kritzel 11,9 (15), PaintCraft 12–15 (14,5), Diagramm 6,3 (26), hier ohne die 5-ms-Grenze, die für Skripte nicht gilt. Das Bild danach kostet genau ein Bild wie vorher, wer also alle 200 ms ruckelt, zahlt fast so viel wie zuvor. Bei einem kleinen Fenster oder einer kleinen Zeichnung bringt das alles entsprechend weniger.
 
 Speicher (`memory_reserved`, Blöcke der GPU und Staging): vorher 16–23 MiB je nach Zustand, mit Leinwänden je nach Zahl der Kacheln: 50 MiB (Kritzel, PaintCraft: 32 Kacheln, 8 MiB), 82 MiB (Foto 75 Kacheln, 19 MiB; Diagramm 82, 21 MiB), 146 MiB nach einem Zoom über viele Stufen (188–245 Kacheln, 48–62 MiB). Der Rest ist Staging des Hochladens (ein ganzes Bild im Ring) und Blockreste. Nach 30 s ohne Bewegung gehen die Kacheln ohne ein Bild (`uigputest --test canvas`, kleines Fenster: 21 → 17 MiB). Eine Leinwand, die nie bewegt wird, kostet nichts.
+
+Nachgemessen am 2026-11-17 (`diagramtest`, 1900 × 1000, RTX 2070 SUPER, ein Skript zoomt in acht Rasten auf 10 %, setzt Knoten, verschiebt; privater Arbeitssatz = die Spalte des Task-Managers): vorher 459 Kacheln, 235 MB Blöcke, Spitze 146 MB privat (Leerlauf 56), Commit 385 MB. Das Private war fast ganz Staging: jede Kachel lud über einen eigenen Puffer von 512 KiB hoch, alle Puffer eines Bildes blieben bis zur nächsten Sekunde, ihre Blöcke danach. Nachher (Kacheln 256 × 256, Puffer auf 64 KiB gerundet und nur einer behalten, Budget achtmal der Framebuffer, leere große Blöcke gehen): 231 Kacheln (60 MB, 168 MB Blöcke: der letzte Block von 64 MiB hält nur wenige), Spitze 113 MB privat, nach einer Sekunde 67–75 MB, Commit 287 MB in der Geste, 241 MB danach. Gerätespeicher zählt unter Windows zum Commit, nicht zum privaten Arbeitssatz; in Skripten zeichnet ein Bild alle Kacheln, interaktiv höchstens 5 ms davon, dort ist das Staging je Bild entsprechend kleiner.
 
 Größe, Release, gegen den Stand davor: gallery Windows 4 153 856 → 4 201 984 Byte (+48 128), PaintCraft 8 624 128 → 8 677 376 (+53 248), gallery Linux 4 441 480 → 4 442 808 (+1 328), Browser 3 542 127 → 3 584 472 (+42 345), simd 3 481 482 → 3 531 406 (+49 924), threads 3 490 369 → 3 496 433 (+6 064). Unter Linux kommt fast nichts dazu, im Browser ist die Spanne so groß, dass das nach Inlining-Schwankung aussieht; nachgegangen bin ich dem nicht. Keine Vulkan-Zeichenkette in beiden.
 
@@ -1315,7 +1317,7 @@ Was das heißt:
 | `jfgui_GPU_CANVAS_CPU=a,b` | die so benannten Leinwände (`image`, `diagram`, `kritzel`, `paintcraft`) zeichnen auf der CPU |
 | `jfgui_GPU_CANVAS_PAN=a,b` | sie verschieben nur aus Kacheln, ein Zoom läuft über die CPU |
 | `jfgui_GPU_CANVAS_ZOOM=a,b` | sie zoomen auch aus Kacheln, was immer das Widget gewählt hat |
-| `jfgui_GPU_CANVAS_MB=n` | Budget der Kacheln (Vorgabe 128) |
+| `jfgui_GPU_CANVAS_MB=n` | Budget der Kacheln (Vorgabe 128; höchstens das Achtfache des Framebuffers gilt immer) |
 | `jfgui_GPU_CANVAS_SETTLE_MS=n` | wann das Bild der CPU der letzten Bewegung folgt (Vorgabe 180) |
 | `jfgui_GPU_OUTPUT=0` (oder `off`) | (G5e1) die Fenster über den CPU-Pfad, die GPU bleibt für 3D-Ansichten: sie zeichnen auf einem eigenen Gerät und lesen jedes Bild zurück ([3D-Ansicht](#3d-ansicht-g5e1)) |
 | `jfgui_GPU_VIEWS=0` | (G5e1) kein Render-Durchgang der Ausgabe zeichnet eine 3D-Ansicht: jedes ihrer Bilder wird in den Framebuffer zurückgelesen |
@@ -1357,6 +1359,12 @@ andere Fehler lässt den Lauf scheitern (Exit 1), auch einer, der zwischen den B
 Befehlspuffer meldet die Schicht schon im `vkCmd…`-Aufruf, einen zwischen Übergaben erst bei `vkQueueSubmit`, und
 der zählt nie als provoziert. So besteht keine Schicht zufällig, die die Lücke übersieht, aber bei der Übergabe
 etwas meldet (so geschehen mit der alten Schicht unter Linux, unten).
+
+Auf Metal gibt es keine Synchronisationsprüfung: Metal verfolgt die Konflikte zwischen Befehlen selbst (es fehlt dort
+keine Barriere), seine API-Validierung (`MTL_DEBUG_LAYER`) hält den Prozess bei einem Fehlgebrauch an und zählt
+nichts, `gpu::validation_messages()` bleibt `(0, 0)`. Die provozierten Lücken gelten dort als nicht anwendbar:
+`syncval` meldet `SKIP`, `queues` baut seine nicht ein (Metal hat ohnehin keine Rechen-Warteschlange); alle anderen
+Prüfungen von `--validate` bleiben (`apps/gputest/main.rs`, `sync_validation`, 2026-11-14).
 
 Die Meldungen der Schicht gehen auf stderr, und `build_rs.py run` und `test` geben stderr erst nach stdout aus.
 Die drei absichtlichen Meldungen stehen deshalb am Ende der Ausgabe, hinter `all checks passed`, jede nach

@@ -138,10 +138,10 @@ fn name_id(name: &str) -> u64 {
 
 fn monitor_dpi(mon: isize) -> u32 {
     static GDFM: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(1);
-    let mut p = GDFM.load(core::sync::atomic::Ordering::Relaxed);
+    let mut p = GDFM.load(core::sync::atomic::Ordering::Acquire);
     if p == 1 {
         p = dll_proc(b"shcore.dll\0", b"GetDpiForMonitor\0");
-        GDFM.store(p, core::sync::atomic::Ordering::Relaxed);
+        GDFM.store(p, core::sync::atomic::Ordering::Release);
     }
     if p != 0 {
         let (mut x, mut y) = (0u32, 0u32);

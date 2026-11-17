@@ -156,7 +156,9 @@
 // lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 //
 // Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
-// Linux program, the browser), or without a GPU, it prints a SKIP once and does nothing):
+// Linux program, the browser), without a GPU, or when the screen's work area cannot hold the
+// window at `gpu on` (the system keeps it smaller, on the CPU path), it prints a SKIP once and
+// does nothing):
 //   gpu on [fast]          a real window per UI window (shown without activation) with
 //                          the output, every presented image compared with the framebuffer (fast:
 //                          not compared, for measurements), a render after every input edge; waits
@@ -284,13 +286,19 @@ const IMAGE_STEP_BYTES: u64 = 4 << 20;
 const IMAGES_KEPT: usize = 64;
 /// an image texture not drawn for this long goes with the next frame (us)
 const IMAGE_UNUSED_US: u64 = 30_000_000;
-/// a canvas's tile: its content, a texel of its neighbours around it (fs_tile reads them)
-const TILE: i32 = 256;
+/// a canvas's tile: its content, a texel of its neighbours around it (fs_tile reads them).  The
+/// texture is 256 x 256: drivers pad other sides (NVIDIA laid 258 x 258 out as 384 x 272 texels,
+/// 408 KiB instead of 260), so TILE_BYTES is what a tile really takes
+const TILE: i32 = 254;
 const TILE_BORDER: i32 = 1;
 const TILE_TEX: i32 = TILE + 2 * TILE_BORDER;
 const TILE_BYTES: u64 = TILE_TEX as u64 * TILE_TEX as u64 * 4;
 /// the bytes canvas tiles may take (jfgui_GPU_CANVAS_MB)
 const CANVAS_BUDGET: u64 = 128 << 20;
+/// ... and at most this many times the framebuffer of the window that draws them: a level minified to
+/// K_MIN covers 1 / K_MIN^2 = 3.3 views, its edge tiles about one more; what lies beyond is the levels a
+/// zoom passed, kept for the way back (1900 x 1000: 61 MB, not 128)
+const CANVAS_SCREENS: u64 = 8;
 /// a frame draws tiles for at most this long; what is left goes the CPU's way in this frame (us)
 const FILL_US: u64 = 5_000;
 /// this long after a canvas's last move the CPU draws its picture (us)
@@ -840,33 +848,41 @@ impl S {
     }
 
     /// a texture for a new tile: a free one, a new one, the one of the tile drawn longest ago
-    /// (not one of this frame) -> None: the budget is full of this frame's tiles
-    fn tile_texture(&mut self, tick: u64) -> Option<Rc<TileTex>> {
-        if self.tile_bytes + TILE_BYTES <= self.canvas_budget {
+    /// (not one of this frame) -> None: the budget (at most `limit` bytes) is full of this frame's tiles
+    fn tile_texture(&mut self, tick: u64, limit: u64) -> Option<Rc<TileTex>> {
+        let budget = self.canvas_budget.min(limit);
+        if self.tile_bytes + TILE_BYTES <= budget {
             if let Some(k) = self.tile_free.iter().position(|t| Rc::strong_count(t) == 1) {
                 return Some(self.tile_free.swap_remove(k));
             }
         }
         // (the budget may have become smaller: as many as it takes)
-        while self.tile_bytes + TILE_BYTES > self.canvas_budget {
-            if self.tile_free.pop().is_some() {
-                self.tile_bytes -= TILE_BYTES; // (dies with the frame that still draws it)
-                continue;
-            }
-            let mut old: Option<(usize, usize, (i32, i32), u64)> = None;
-            for (ci, c) in self.canvases.iter().enumerate() {
-                for (li, l) in c.levels.iter().enumerate() {
-                    for (key, t) in l.tiles.iter() {
-                        if t.tick != tick && old.is_none_or(|o| t.tick < o.3) {
-                            old = Some((ci, li, *key, t.tick));
+        while self.tile_bytes + TILE_BYTES > budget {
+            let tex = match self.tile_free.pop() {
+                Some(t) => t,
+                None => {
+                    let mut old: Option<(usize, usize, (i32, i32), u64)> = None;
+                    for (ci, c) in self.canvases.iter().enumerate() {
+                        for (li, l) in c.levels.iter().enumerate() {
+                            for (key, t) in l.tiles.iter() {
+                                if t.tick != tick && old.is_none_or(|o| t.tick < o.3) {
+                                    old = Some((ci, li, *key, t.tick));
+                                }
+                            }
                         }
                     }
+                    let (ci, li, key, _) = old?;
+                    self.tile_evicted += 1;
+                    self.canvases[ci].levels[li].tiles.remove(&key)?.tex
                 }
+            };
+            // no frame draws it any more and the budget holds it: it serves the new tile (a new
+            // texture beside it would live as long as the GPU still reads this frame: twice the bytes
+            // while a zoom evicts)
+            if self.tile_bytes <= budget && Rc::strong_count(&tex) == 1 {
+                return Some(tex);
             }
-            let (ci, li, key, _) = old?;
-            self.canvases[ci].levels[li].tiles.remove(&key)?;
-            self.tile_evicted += 1;
-            self.tile_bytes -= TILE_BYTES;
+            self.tile_bytes -= TILE_BYTES; // (dies with the frame that still draws it)
         }
         let Dev::Ready(core) = &self.dev else { return None };
         let t = core.dev.create_texture(&TextureDesc::d2(TILE_TEX as u32, TILE_TEX as u32, Format::Bgra8Unorm, TextureUsage::COPY_DST | TextureUsage::SAMPLED)).ok()?;
@@ -1969,6 +1985,16 @@ impl Ui {
                     }
                     match r {
                         Ok(b) => self.gp_built(win, b),
+                        // a device lost while no window showed on it (the others on the CPU path, hidden, kept at
+                        // another size): nobody noticed it before.  It goes for every window, a new device follows;
+                        // this window's swapchain tried again on the lost one would fail for good
+                        Err(e @ GpuError::DeviceLost) => {
+                            if let Some(w) = self.m.gout.win(win) {
+                                w.stage = Stage::Cpu;
+                                w.lost = false;
+                            }
+                            self.gp_failed(win, e);
+                        }
                         Err(e) => {
                             let now = plat::time_us();
                             let s = &mut self.m.gout;
@@ -2867,6 +2893,7 @@ impl Ui {
         s.tick += 1;
         let (tick, t0) = (s.tick, plat::time_us());
         let fill_end = if s.script { u64::MAX } else { t0 + FILL_US };
+        let limit = CANVAS_SCREENS * fw.max(0) as u64 * fh.max(0) as u64 * 4;
         let d = &wp.dirty;
         let (cols, rows) = (d.cols as usize, d.rows as usize);
         let Some(Some(w)) = s.wins.get_mut(i) else { return false };
@@ -2935,7 +2962,7 @@ impl Ui {
                         continue;
                     }
                     let t1 = plat::time_us();
-                    let tex = if t1 < fill_end { s.tile_texture(tick) } else { None };
+                    let tex = if t1 < fill_end { s.tile_texture(tick, limit) } else { None };
                     let Some(tex) = tex else {
                         missing.push(b);
                         continue;
@@ -3834,6 +3861,26 @@ impl Ui {
         }
     }
 
+    /// `gpu on`: the screen cannot hold the script's window (GitHub's Mac runners: a screen of 1024 x 768).  The system
+    /// keeps the window smaller than the frame and it stays on the CPU path, so none of the script's GPU checks would
+    /// mean anything -> why, for a SKIP.  A window kept at another size on a screen large enough (a window manager
+    /// that is late) stays as it was: notes, the checks that need no swapchain still count
+    fn gp_no_room(&mut self) -> Option<String> {
+        let (fw, fh) = (self.wp.rt.fb.w, self.wp.rt.fb.h);
+        let i = self.gp_scoped();
+        let w = self.m.gout.win(i)?;
+        if w.stage == Stage::Gpu || !kept_at_other_size(w) {
+            return None;
+        }
+        let work = plat::monitors().first()?.work;
+        if fw <= work[2] && fh <= work[3] {
+            return None;
+        }
+        let (kw, kh) = plat::win_size(w.pw);
+        let (ww, wh) = (work[2], work[3]);
+        Some(format!("the screen's work area of {ww}x{wh} cannot hold the {fw}x{fh} window (the system keeps it at {kw}x{kh}, on the CPU path)"))
+    }
+
     fn gp_skip(&mut self, why: &str) {
         self.m.gout.skip = true;
         plat::write_stdout(format!("SKIP gpu: {why}\n").as_bytes());
@@ -3867,6 +3914,8 @@ impl Ui {
                 } else {
                     self.fail(why.as_bytes());
                 }
+            } else if let Some(why) = self.gp_no_room() {
+                self.gp_skip(&why);
             }
             return;
         }

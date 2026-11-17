@@ -3,9 +3,10 @@
 # the UI's output through the GPU (lib/ui/gpu_out.rs, docs/GPU.md "Ausgabe der UI") on real gallery
 # pages: real windows (shown without activation, the script's events stay virtual), every
 # presented image read back and compared byte for byte with the framebuffer; under the validation
-# layer when it is installed.  Without a GPU (and on other targets) `gpu` prints a SKIP once and
-# does nothing, the script still passes.  Partial updates, scroll copies, resizes, DPI, themes, a
-# second window, a lost device.
+# layer when it is installed.  Without a GPU (and on other targets), or on a screen too small for
+# the 1000x800 window (GitHub's Mac runners), `gpu` prints a SKIP once and does nothing, the
+# script still passes.  Partial updates, scroll copies, resizes, DPI, themes, a second window, a
+# lost device.
 system env jfgui_GPU_VALIDATE 1
 system env jfgui_GPU_RETRY_MS 100
 size 1000 800

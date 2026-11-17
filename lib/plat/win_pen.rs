@@ -120,11 +120,11 @@ fn pen_api() -> PenApi {
     if !p.loaded.get() {
         p.loaded.set(true);
         let u = b"user32.dll\0";
-        P_TYPE.store(dll_proc(u, b"GetPointerType\0"), Ordering::Relaxed);
-        P_INFO.store(dll_proc(u, b"GetPointerPenInfo\0"), Ordering::Relaxed);
-        P_HIST.store(dll_proc(u, b"GetPointerPenInfoHistory\0"), Ordering::Relaxed);
-        P_DEVS.store(dll_proc(u, b"GetPointerDevices\0"), Ordering::Relaxed);
-        let on = |a: &AtomicUsize| a.load(Ordering::Relaxed) != 0;
+        P_TYPE.store(dll_proc(u, b"GetPointerType\0"), Ordering::Release);
+        P_INFO.store(dll_proc(u, b"GetPointerPenInfo\0"), Ordering::Release);
+        P_HIST.store(dll_proc(u, b"GetPointerPenInfoHistory\0"), Ordering::Release);
+        P_DEVS.store(dll_proc(u, b"GetPointerDevices\0"), Ordering::Release);
+        let on = |a: &AtomicUsize| a.load(Ordering::Acquire) != 0;
         p.api.set(PenApi {
             ptype: if on(&P_TYPE) { Some(real_type) } else { None },
             info: if on(&P_INFO) { Some(real_info) } else { None },
@@ -156,14 +156,14 @@ fn ppi(b: &[u8]) -> PenInfo {
 fn real_type(id: u32) -> Option<u32> {
     let mut t = 0u32;
     // SAFETY: GetPointerType(UINT32, POINTER_INPUT_TYPE*) -> BOOL (loaded: P_TYPE != 0).
-    let f: unsafe extern "system" fn(u32, *mut u32) -> i32 = unsafe { core::mem::transmute(P_TYPE.load(Ordering::Relaxed)) };
+    let f: unsafe extern "system" fn(u32, *mut u32) -> i32 = unsafe { core::mem::transmute(P_TYPE.load(Ordering::Acquire)) };
     if unsafe { f(id, &mut t) } != 0 { Some(t) } else { None }
 }
 
 fn real_info(id: u32) -> Option<PenInfo> {
     let mut b = [0u8; PPI_SIZE];
     // SAFETY: GetPointerPenInfo(UINT32, POINTER_PEN_INFO*) -> BOOL; b holds one record.
-    let f: unsafe extern "system" fn(u32, *mut u8) -> i32 = unsafe { core::mem::transmute(P_INFO.load(Ordering::Relaxed)) };
+    let f: unsafe extern "system" fn(u32, *mut u8) -> i32 = unsafe { core::mem::transmute(P_INFO.load(Ordering::Acquire)) };
     if unsafe { f(id, b.as_mut_ptr()) } != 0 { Some(ppi(&b)) } else { None }
 }
 
@@ -174,7 +174,7 @@ fn real_hist(id: u32, count: &mut u32, out: &mut [PenInfo]) -> bool {
     // SAFETY: GetPointerPenInfoHistory(UINT32, UINT32*, POINTER_PEN_INFO*) -> BOOL; b holds
     // `room` records, the system writes at most *count of them.
     let f: unsafe extern "system" fn(u32, *mut u32, *mut u8) -> i32 =
-        unsafe { core::mem::transmute(P_HIST.load(Ordering::Relaxed)) };
+        unsafe { core::mem::transmute(P_HIST.load(Ordering::Acquire)) };
     if unsafe { f(id, &mut c, b.as_mut_ptr()) } == 0 {
         return false;
     }
@@ -187,7 +187,7 @@ fn real_hist(id: u32, count: &mut u32, out: &mut [PenInfo]) -> bool {
 
 fn real_devs(count: &mut u32, types: Option<&mut [u32]>) -> bool {
     // SAFETY: GetPointerDevices(UINT32*, POINTER_DEVICE_INFO*) -> BOOL.
-    let f: unsafe extern "system" fn(*mut u32, *mut u8) -> i32 = unsafe { core::mem::transmute(P_DEVS.load(Ordering::Relaxed)) };
+    let f: unsafe extern "system" fn(*mut u32, *mut u8) -> i32 = unsafe { core::mem::transmute(P_DEVS.load(Ordering::Acquire)) };
     match types {
         None => unsafe { f(count, core::ptr::null_mut()) != 0 },
         Some(t) => {

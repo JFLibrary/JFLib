@@ -1449,7 +1449,7 @@ impl Test {
     }
 
     fn t_canvas(&mut self, ui: &mut Ui) {
-        const TILE_BYTES: u64 = 258 * 258 * 4;
+        const TILE_BYTES: u64 = 256 * 256 * 4;
         let o = ui.gpu_output(0);
         match self.pc {
             0 => {
