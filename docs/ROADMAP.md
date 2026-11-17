@@ -1937,8 +1937,12 @@ Fensterrand hinaus.
     `CONTEXT`, Unwind-Daten des Trampolins; `coretest`, `plattest` und die `gallery` auf `windows-11-arm` grün bis auf
     `screen.uis`, Workflow `arm64-windows.yml`); das Speichermodell (ARM7, 2026-11-17: jedes `Relaxed` in `lib/` durchgesehen,
     Funktionszeiger-Caches unter Windows mit Release/Acquire, `plattest --test atomics` auf Mac mini, `ubuntu-24.04-arm` und
-    `windows-11-arm` mit LSE und LL/SC ohne Fehler, ebenso auf dem A56, Workflow `arm64-atomics.yml`).
-  - Zu tun: Fenster und GPU (ARM8), Pakete und CI (ARM9). Die Arbeit nützt später auch macOS und iOS auf ARM.
+    `windows-11-arm` mit LSE und LL/SC ohne Fehler, ebenso auf dem A56, Workflow `arm64-atomics.yml`); Fenster und GPU (ARM8,
+    2026-11-17: alle Skripte von `gallery` und `jfWord`, `gputest` und `uigputest` in der VM unter Wayland und X11, auf
+    `ubuntu-24.04-arm` und `windows-11-arm`, dazu mit lavapipe; ohne Vulkan oder Treiber bleibt die UI auf dem CPU-Weg und nennt den
+    Grund im Log).
+  - Zu tun: ein echtes ARM-Gerät mit GPU von Hand (ARM8, Paket für das Surface bereit), Pakete und CI (ARM9). Die Arbeit nützt später
+    auch macOS und iOS auf ARM.
   - Getestet wird mit QEMU in WSL und den ARM-Runnern von GitHub; für das Speichermodell und die GPU
     braucht es echte Hardware.
 - **P2** · *erledigt* (2026-10-20) · Android vervollständigen: Dateiauswahl, dauerhafter

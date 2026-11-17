@@ -3,12 +3,12 @@
 # ARM5: every script of coretest and plattest, the crash handler (plattest --test crash, guardcrash, panic) and
 # the module jxlenc against the linked writer; the x64 build of the module comes along, the ARM64 program must
 # refuse it (LIBE_ARCH). ARM8: every script of gallery, jfWord, gputest and uigputest in three rounds of the
-# GPU: (a) the runner as it is (it has no vulkan-1.dll: the case without Vulkan), (b) the Khronos loader built
-# here for ARM64 and put into System32, no driver (the case without a driver), (c) lavapipe for ARM64 (Mesa,
-# mmozeiko/build-mesa) as the driver: the GPU's own paths, the UI's output with jfgui_GPU_ADAPTER=llvmpipe (a CPU
-# adapter is never chosen for windows by itself). Downloads only on the runner. And ARM8 on Linux: the Linux programs
-# (static plattest, the others against glibc) on ubuntu-24.04-arm (Neoverse N2, real hardware) with Ubuntu's lavapipe,
-# under Weston headless and Xvfb (the ARM64 VM runs them under QEMU's TCG, slow and with its own NEON).
+# GPU: (a) the runner as it is (a vulkan-1.dll in System32 but no driver; a missing loader: the noloader tests with
+# jfgui_GPU_DLL), (b) the Khronos loader of a known version built here for ARM64 in its place, still no driver,
+# (c) lavapipe for ARM64 (Mesa, mmozeiko/build-mesa) as the driver: the GPU's own paths, the UI's output with
+# jfgui_GPU_ADAPTER=llvmpipe (a CPU adapter is never chosen for windows by itself). Downloads only on the runner.
+# And ARM8 on Linux: the Linux programs (static plattest, the others against glibc) on ubuntu-24.04-arm (Neoverse
+# N2, real hardware) with Ubuntu's lavapipe, under Weston headless and Xvfb (the ARM64 VM runs them under QEMU's TCG).
 # Started by hand, or by a push to a branch arm64-test/... (workflow_dispatch needs the file on main).
 name: ARM64 Windows
 
@@ -110,7 +110,7 @@ jobs:
           Copy-Item build\win-arm64\jfWord.exe build\a64\win\
           python -u apps/jfWord/tests/check.py --target win --build-dir build/a64 *>&1 | Tee-Object build/jfword_check.txt
           exit $LASTEXITCODE
-      - name: Round A, the runner as it is (no vulkan-1.dll) -- ARM5's checks, gallery, jfWord, gputest, uigputest
+      - name: Round A, the runner as it is (a loader, no driver) -- ARM5's checks, gallery, jfWord, gputest, uigputest
         id: a
         continue-on-error: true
         run: |
