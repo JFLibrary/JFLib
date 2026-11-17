@@ -522,13 +522,22 @@ impl Bench {
 
 // ---------------------------------------------------------------- the page
 
+/// two fingers on the view: which (the host's ids), their midpoint (px of the window) and distance when this pair came
+/// down, the camera then
+#[derive(Clone, Copy)]
+struct Pinch {
+    ids: [u8; 2],
+    mid: [f64; 2],
+    dist: f64,
+    cam: Camera,
+}
+
 pub struct View2d {
     content: Rc<RefCell<Content>>,
     ver: u32,
     rect: [i32; 4],
     drag: Option<(i32, i32)>,
-    /// the camera when two fingers came down
-    pinch: Option<Camera>,
+    pinch: Option<Pinch>,
     check: Option<Box<Check>>,
     bench: Option<Box<Bench>>,
     /// jfgui_GPU_R2DCHECK / R2DBENCH: started by itself (once), waits for the view's device since then
@@ -562,16 +571,28 @@ impl View2d {
         self.rect = inp.rect;
         let size = (inp.rect[2].max(1) as u32, inp.rect[3].max(1) as u32);
         let mut moved = false;
-        if let Some(two) = ui.touch_two() {
+        // Two fingers whose first came down on the view zoom and pan together, however late the second one came.
+        // ui.touch_two holds a second finger back once the first one's drag is older than 200 ms (meant for a stroke
+        // that goes on), and a pinch whose fingers came down a little apart became a pan with one of them (found in the
+        // user's hand check on the phone, G6e3).  So the pair comes from ui.touch_fingers, as TF_TWO allows; a new pair
+        // (other ids) starts from the camera of that moment, the first finger's drag waits meanwhile
+        let f = ui.touch_fingers();
+        let r = inp.rect;
+        let on_view = |x: i32, y: i32| x >= r[0] && y >= r[1] && x < r[0] + r[2] && y < r[1] + r[3];
+        let pair = if f.len() >= 2 && on_view(f[0].down_x, f[0].down_y) { Some((f[0], f[1])) } else { None };
+        if let Some((a, b)) = pair {
+            let mid = [(a.x + b.x) as f64 / 2.0, (a.y + b.y) as f64 / 2.0];
+            let (dx, dy) = ((a.x - b.x) as f64, (a.y - b.y) as f64);
+            let dist = sqrt(dx * dx + dy * dy).max(1.0);
             let mut c = self.content.borrow_mut();
             c.size = size;
-            if two.began || self.pinch.is_none() {
-                self.pinch = Some(c.camera());
+            if self.pinch.is_none_or(|p| p.ids != [a.id, b.id]) {
+                self.pinch = Some(Pinch { ids: [a.id, b.id], mid, dist, cam: c.camera() });
             }
-            if let Some(mut cam) = self.pinch {
-                let at = [(two.start_x - inp.rect[0]) as f64, (two.start_y - inp.rect[1]) as f64];
-                cam.zoom_at(at, two.scale.clamp(0.05, 20.0), size);
-                cam.pan((two.x - two.start_x) as f64, (two.y - two.start_y) as f64);
+            if let Some(p) = self.pinch {
+                let mut cam = p.cam;
+                cam.zoom_at([p.mid[0] - r[0] as f64, p.mid[1] - r[1] as f64], (dist / p.dist).clamp(0.05, 20.0), size);
+                cam.pan(mid[0] - p.mid[0], mid[1] - p.mid[1]);
                 c.cam = Some(cam);
                 moved = true;
             }
@@ -754,6 +775,18 @@ impl View2d {
         ui.invalidate();
         true
     }
+}
+
+/// the square root for the fingers' distance (no libm): Newton from half the exponent
+fn sqrt(v: f64) -> f64 {
+    if v <= 0.0 || !v.is_finite() {
+        return if v.is_finite() { 0.0 } else { v };
+    }
+    let mut x = f64::from_bits((v.to_bits() >> 1) + (1023u64 << 51));
+    for _ in 0..6 {
+        x = 0.5 * (x + v / x);
+    }
+    x
 }
 
 /// 2^x for the wheel's zoom (no libm): a notch zooms by 2^(1/4)

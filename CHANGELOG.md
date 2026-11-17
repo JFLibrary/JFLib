@@ -50,6 +50,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point); the UI makes notches of them as `wheel_lines()` lines of 16 DIP, so its views follow the fingers' way (they scrolled 4.8 times it on Wayland, 1.2 times on macOS)
 - **ui:** A notch of the wheel scrolls the system's lines (`ui.wheel_lines()`) in the library's views, no longer always three; headless runs stay at three
 - **ui:** The scripts' `commit` hands the text to `plat::ime_commit_text` in one call, as a platform does (editortest code_commit: 100000 bytes)
+- Tests: render2dtest --bench-dxf names a lost device and measures the next view on a new one (on the HD 610 the kernel reset the whole of Zurich's first frame after 3 s) (G6e3)
 
 ### Fixed
 
@@ -129,6 +130,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netio:** SSH: a peer that sends only messages to skip (ignore, debug, banners, global requests) while an answer is due ends the session after 1024 of them (login and opening a channel never returned); data past the channel window the client granted is a protocol error
 - **rt:** Portable `pow(1.0, y)` is 1 for every finite y (from |y| > ~1.3e300 on it was NaN), NaN for an infinite one as on the x87
 - **simd:** WebAssembly SIMD128: float arithmetic and square roots follow SSE's NaN rule (the first NaN operand quieted, else the negative indefinite) like the NEON and scalar code; WebAssembly's own NaN made results differ on ARM machines
+- Tests: androidGallery's page "2D-Zeichnung": two fingers zoom and pan together however late the second one comes down (ui.touch_two holds a second finger back once the first one's drag is older than 200 ms, meant for strokes; the page takes the pair from ui.touch_fingers), found in the user's hand check on a Galaxy A56 (G6e3)
 
 ### Security
 
