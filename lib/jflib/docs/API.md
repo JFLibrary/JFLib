@@ -12979,7 +12979,8 @@ rcurveline, rlinecurve, flex, hflex, hflex1, flex1), hint operators (stems are c
 hintmask / cntrmask and skipped), callsubr / callgsubr (bias 107 / 1131 / 32768, nesting
 <= 10), return, endchar (a seac accent is ignored), the arithmetic / storage operators
 (abs add sub div neg eq drop put get ifelse random mul sqrt dup exch index roll and or
-not).  Argument stack 48, transient array 32, at most 200000 operators per glyph.  The
+not).  Argument stack 48, transient array 32, at most 200000 operators per glyph, at most
+256 font DICTs, a Private DICT read to at most 64 KiB.  The
 width argument is dropped (advances come from hmtx).  Like the assembly, the transient
 array and the random generator are process-wide.
 
@@ -14006,7 +14007,8 @@ WK_PUNCT: u32 = 2
   fit, hyph(word, &mut offsets) gives the places where that whole word (UAX #29) may break
   (byte offsets inside it, ascending) and the line ends at the last one that fits with a
   hyphen -- also inside a single word too long for a line, before graphemes are cut.  Words
-  with a digit or a soft hyphen of their own are never hyphenated.  fits(a, b, hyphen):
+  with a digit or a soft hyphen of their own, or longer than about 256 characters, are never
+  hyphenated.  fits(a, b, hyphen):
   the text a..b fits (with a hyphen after it).
 
 - **`fn unicode_version() -> &'static str`**
@@ -42529,8 +42531,8 @@ RFC 2308; the EDNS(0) OPT record of RFC 6891 is kept as raw data)
   RData            A, Aaaa, Ns, Cname, Ptr, Mx { pref, host }, Soa(Soa), Txt(strings),
                    Other(bytes); rtype() / text()
   Message { header, questions, answers, authority, additional }
-                   parse(b) (names with compression pointers; loops, forward pointers and
-                   names over 255 bytes are refused) / to_bytes() (names compressed against
+                   parse(b) (names with compression pointers; loops, forward pointers, more
+                   than 126 pointers and names over 255 bytes are refused) / to_bytes() (names compressed against
                    earlier ones, RFC 1035 4.1.4) / to_bytes_max(limit) -> (bytes, truncated):
                    whole records only, TC set when something was left out /
                    query(id, name, qtype, rd) / reply_to(&query)
