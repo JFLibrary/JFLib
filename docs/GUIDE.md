@@ -1029,6 +1029,26 @@ ui.menubar(None);                        // the menu bar of the AppDesc
   `ribbon_end()`. Groups first shrink, then collapse into labeled flyouts from the right.
   `ribbon_button` provides compact icon actions; `ribbon_tile` adds typography previews.
   The app still provides real command availability and actions. See `apps/jfWord/ribbon_ui.rs`.
+* The window parts around a ribbon (`ribbon_shell.rs`): `ribbon_tabs(id, &mut sel, &tabs)` is
+  the register row above it, as wide as its box. `RibbonTab::file(label)` is the File register
+  (activating it returns `EV_OPEN`, `sel` stays), `RibbonTab::new(label)` a register,
+  `RibbonTab::context(label, set, argb)` a register of a context set (a coloured edge, the set's
+  name in its tooltip) that the app lists only while its selection asks for it; `EV_ACT` when
+  `sel` changed. Registers are `K_TAB` records (`click tab:"Start"`), ids `id + 1 + i`. The
+  selected register opens toward the ribbon (`Style::ribbon_tab`, `ribbon_tabs_strip`; a style
+  that paints the band itself returns 0 from `ribbon_box_flags` and draws it in `ribbon_band`).
+  The row also runs the access keys (key tips): a tap of Alt or F10 shows a badge on every
+  register, a register's keys show a badge on every command of its ribbon (the ribbon's buttons
+  register themselves; other controls call `keytip(2, label)`, quick access buttons
+  `keytip_keys(1, "1")`), a command's keys activate it in the next pass like a click, Esc steps
+  back, a click ends the mode (`keytips_level()`, `keytips_off()`). Keys come from the labels of
+  the current language: the first free letter (accents dropped), then "0A".."0Z".
+  `backstage_begin(id, back, &items, &mut sel, nav_w)` is the File register's page: a
+  navigation pane with a back item, the `BackstageItem`s (`BS_FOOTER` at its bottom, `BS_ACTION`
+  for an action that is no page, `BS_SEP`) and a scrolling area the app fills until
+  `backstage_end()`; it returns `Some(-1)` for back (and Esc), `Some(i)` for an activated item.
+  `settings_section(id, &mut settings, section)` shows one section of a settings schema, for an
+  options page per section. See `apps/JFDiagrammer/src/shell.rs`, `ribbon.rs`, `backstage.rs`.
 * Flyouts of your own: a button's `EV_ACT` -> `popup_open(id)` (drop-down buttons do this
   themselves); then `flyout_begin(id, FL_*)` -> `true`: emit `menu_item(id, label)`,
   `menu_cmd(cmd)`, `menu_sep()` or any widgets; always `flyout_end()`:

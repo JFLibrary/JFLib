@@ -10,9 +10,8 @@
 // theme's accent, hi = the accent at 24 %.  A disabled icon draws its accent in the ink; high
 // contrast draws everything in the ink without surfaces.
 //
-// Sizes: the small art (16 grid) fills the em box the style asks for.  The large art (32 grid)
-// is drawn 4/3 the size of the box and centred on it: NetLab's large ribbon buttons ask for a
-// 24 DIP icon, the art is drawn for 32 (until JD8 gives the large buttons their 32 DIP box).
+// Sizes: the art fills the em box the style asks for: the small art (16 grid) the 16 DIP box of
+// small buttons, the large art (32 grid) the 32 DIP box of NetLab's large ribbon buttons (JD8).
 // At 100 % and 200 % every line falls on whole pixels.
 
 // the whole drawn set; the ribbon takes the ones it has buttons for so far
@@ -54,11 +53,10 @@ impl Icons {
         ui.icon_hook(Some(Rc::new(move |g: &mut Gfx, cp: u32, x: i32, y: i32, size: i32, argb: u32| {
             let Ok(i) = syms.binary_search_by_key(&cp, |s| s.0) else { return false };
             let (_, grid, sym) = &syms[i];
-            let em = size as f32 / 256.0; // the em box in px
-            let (w, off) = if *grid > 16.0 { (em * 4.0 / 3.0, em / 6.0) } else { (em, 0.0) };
+            let em = size as f32 / 256.0; // the em box in px: the art fills it
             // x, y are target pixels; paint wants the draw context's coordinates
-            let (px, py) = ((x - g.dc.ox) as f32 - off, (y - g.dc.oy) as f32 - off);
-            sym.paint(g, px, py, w / grid, &palette(argb, seen.get()));
+            let (px, py) = ((x - g.dc.ox) as f32, (y - g.dc.oy) as f32);
+            sym.paint(g, px, py, em / grid, &palette(argb, seen.get()));
             true
         })));
         let icons = Icons { theme };

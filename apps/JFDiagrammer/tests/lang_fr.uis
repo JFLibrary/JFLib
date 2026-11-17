@@ -1,5 +1,5 @@
 #!args --lang fr
-# JFDiagrammer, JD0: the window in French (--lang fr): the four areas show the catalogue's
+# JFDiagrammer, JD0/JD8: the window in French (--lang fr): the four areas show the catalogue's
 # column fr (locales/ui.tsv), the library's own texts follow the same language
 expect tab:"Accueil" selected
 expect tab:"Insertion" exists
@@ -7,11 +7,11 @@ expect tab:"Création" exists
 expect tab:"Affichage" exists
 expect text:"Presse-papiers" exists
 expect button:"Coller" disabled
-expect text:"Formes" exists
+expect tab:"Formes" exists
 expect text:"Aucune bibliothèque de formes ouverte." exists
 expect button:"Plus de formes" disabled
 expect canvas:"Zone de dessin" exists
-expect text:"Page 1 sur 1" exists
+expect button:"Page 1 sur 1" exists
 expect text:"100 %" exists
 click tab:"Insertion"
 expect text:"Illustrations" exists

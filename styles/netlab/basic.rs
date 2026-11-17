@@ -7,7 +7,8 @@
 //                            toward the accent on hover; primary (ST_ACCENT): accent fill with
 //                            a darker accent frame; checked: the selection (16 % accent tint,
 //                            accent frame); subtle: flat, on hover a shade with a frame (the
-//                            classic tool button); ST_LARGE: 24 DIP icon over a caption
+//                            classic tool button); ST_LARGE (ribbons): 32 DIP icon over up
+//                            to two caption lines, 66 DIP high
 //   checkbox / radio         16 DIP on a 22 DIP row: field fill with a strong frame (accent
 //                            on hover); checked: accent fill with an on-accent check / an
 //                            accent ring with an accent dot
@@ -17,6 +18,8 @@
 //   progress                 a framed 8 DIP bar with the accent inside; separator: a divider
 //                            hairline
 
+use alloc::string::String;
+use alloc::vec::Vec;
 use ui::consts::*;
 use ui::keys::IC_CHECK_MARK;
 use ui::theme::color_mix;
@@ -131,13 +134,62 @@ fn button_size(ui: &mut Ui, sp: &mut Sp) -> (i32, i32) {
         w = ww;
         h = btn_height(ui, flags);
     } else {
-        ip = ui.dp(24);
-        w = tw.max(ip) + ui.dp(16);
-        h = ui.dp(52);
+        // (ribbons) a 32 DIP icon over up to two caption lines ('\n' breaks; a long caption
+        // breaks at its middle blank), a menu's chevron after the last line; 66 DIP, the
+        // height of a ribbon group's controls
+        ip = ui.dp(LARGE_ICON);
+        let lw = match sp.label {
+            Some(l) if flags & ST_ICON_ONLY == 0 => large_lines(ui, l, flags & ST_MENU != 0),
+            _ => 0,
+        };
+        w = lw.max(ip) + ui.dp(12);
+        h = ui.dp(66);
+        sp.s[0] = lw;
+        sp.s[1] = ip;
+        return (w, h);
     }
     sp.s[0] = tw;
     sp.s[1] = ip;
     (w, h)
+}
+
+/// the icon of a large (ribbon) button, DIP
+const LARGE_ICON: i32 = 32;
+/// the chevron after a large menu button's caption and its gap, DIP
+const LARGE_CHEV: i32 = 8;
+const LARGE_CHEV_GAP: i32 = 3;
+
+/// a single-line caption wider than this breaks into two lines at the blank nearest its
+/// middle (DIP)
+const LARGE_WRAP: i32 = 72;
+
+// the lines of a large button's caption: its own '\n' breaks, else a long caption in two
+// lines at the blank nearest the middle (the font set to TS_CAPTION)
+fn large_split(ui: &mut Ui, label: &str) -> Vec<String> {
+    ui.ts_font(TS_CAPTION);
+    if !label.contains('\n') && label.contains(' ') && ui.text.width(label) > ui.dp(LARGE_WRAP) {
+        let mid = label.len() / 2;
+        if let Some(at) = label.match_indices(' ').map(|(i, _)| i).min_by_key(|&i| i.abs_diff(mid)) {
+            return alloc::vec![label[..at].into(), label[at + 1..].into()];
+        }
+    }
+    label.split('\n').map(String::from).collect()
+}
+
+// the widest caption line of a large button (the font set to TS_CAPTION), the chevron added
+// to the last line of a menu
+fn large_lines(ui: &mut Ui, label: &str, menu: bool) -> i32 {
+    let lines = large_split(ui, label);
+    let n = lines.len();
+    let mut w = 0;
+    for (i, line) in lines.iter().enumerate() {
+        let mut lw = ui.text.width(line);
+        if menu && i + 1 == n {
+            lw += ui.dp(LARGE_CHEV_GAP + LARGE_CHEV);
+        }
+        w = w.max(lw);
+    }
+    w
 }
 
 /// the frame colours of a standard control in a state (0 rest, 1 hover, 2 pressed,
@@ -206,18 +258,33 @@ fn button(ui: &mut Ui, sp: &Sp) {
     }
     let icon_c = if icon_c == 0 { text } else { icon_c };
     if flags & ST_LARGE != 0 {
+        // the icon 1 DIP from the top, the caption lines below it (15 DIP each), centred
         if icon != 0 {
             let x = r[0] + ((r[2] - ip) >> 1);
-            let y = r[1] + ui.dp(6);
+            let y = r[1] + ui.dp(1);
             ui.draw_color(icon_c);
             ui.draw_icon(icon, x, y, ip << 8);
         }
-        if tw != 0 {
+        let menu = flags & ST_MENU != 0;
+        if tw != 0 || menu {
             let base = ui.ts_base(TS_CAPTION);
+            let line = ui.ts_line(TS_CAPTION);
             ui.ts_font(TS_CAPTION);
-            let x = r[0] + ((r[2] - tw) >> 1);
-            let y = r[1] + ui.dp(33) + base;
-            ui.emit_text(x, y, label, text);
+            let lines = large_split(ui, if flags & ST_ICON_ONLY != 0 { "" } else { label });
+            let n = lines.len();
+            let mut y = r[1] + ui.dp(1) + ip + ui.dp(2);
+            for (i, l) in lines.iter().enumerate() {
+                let lw = ui.text.width(l);
+                let chev = if menu && i + 1 == n { ui.dp(LARGE_CHEV_GAP + LARGE_CHEV) } else { 0 };
+                let x = r[0] + ((r[2] - lw - chev) >> 1);
+                ui.emit_text(x, y + base, l, text);
+                if chev != 0 {
+                    let s = ui.dp(LARGE_CHEV);
+                    ui.draw_color(text);
+                    ui.draw_icon(ui::keys::IC_CHEV_DOWN, x + lw + ui.dp(LARGE_CHEV_GAP), y + ((line - s) >> 1), s << 8);
+                }
+                y += line;
+            }
         }
         return;
     }

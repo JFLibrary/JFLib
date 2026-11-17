@@ -156,10 +156,19 @@ impl Ui {
             self.style.ribbon_padding()
         };
         self.next_size(-1, self.style.ribbon_height());
+        let deco = self.style.ribbon_box_flags() & (BOX_BG | BOX_CARD | BOX_LAYER);
         self.scroll_begin(
             id,
-            SC_H | BOX_H | BOX_LAYER | pad(py) | if m.collapse_groups { 0 } else { SC_NOBAR },
+            SC_H | BOX_H | deco | pad(py) | if m.collapse_groups { 0 } else { SC_NOBAR },
         );
+        if deco == 0 {
+            // the style paints the band itself (below the groups)
+            let mut sp = Sp::default();
+            sp.place(self.scr_rect());
+            let st = self.style;
+            st.ribbon_band(self, &sp);
+        }
+        self.wp.rshell.in_ribbon = true;
         if m.inset_x > py as i32 {
             self.spacer(m.inset_x - py as i32);
         }
@@ -287,6 +296,7 @@ impl Ui {
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_end(&mut self) {
         let _src = self.src_scope();
+        self.wp.rshell.in_ribbon = false;
         let id = self.box_id();
         let m = self.style.ribbon_metrics();
         let py = if m.inset_y > 0 {
@@ -395,6 +405,7 @@ impl Ui {
         }
         self.sem(K_BUTTON, id, Some(label), 0);
         self.tooltip(label);
+        self.keytip_ribbon(id, r, label, flags & ST_DISABLED != 0);
         ev
     }
 
@@ -494,6 +505,7 @@ impl Ui {
         self.draw_clip(whole[0], whole[1], whole[2], whole[3]);
         st.button(self, &sp);
         self.draw_unclip();
+        self.keytip_ribbon(id, whole, label, flags & ST_DISABLED != 0);
         self.wp.ctx.last_rect = whole;
         ev | if self.popup_is_open(menu_id) {
             EV_OPEN

@@ -16,7 +16,7 @@
 // Files: lib.rs (tokens, accent, type ramp, fonts), palette.rs (the colour tables),
 // common.rs (drawing helpers), basic.rs, value.rs, edit.rs, list.rs, popup.rs, chrome.rs,
 // misc.rs (the widget families of ui::Style), data.rs (StyleData), shell.rs (StyleShell),
-// icons.rs (the vector icons).
+// ribbon.rs (the ribbon: band, register row, key tips), icons.rs (the vector icons).
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -32,6 +32,7 @@ mod list;
 mod misc;
 mod palette;
 mod popup;
+mod ribbon;
 mod shell;
 mod value;
 
@@ -92,6 +93,34 @@ impl Style for Netlab {
     fn paint_icon(&self, g: &mut ui::Gfx, cp: u32, x: i32, y: i32, size_fx: i32, color: u32, accent: u32,
                   _dark: bool, _disabled: bool, _dpi: u32) -> bool {
         icons::paint(g, cp, x, y, size_fx, color, accent)
+    }
+    // the ribbon (ribbon.rs; only ribbons use these, JFNetworker has none)
+    fn ribbon_height(&self) -> i32 {
+        ribbon::HEIGHT
+    }
+    fn ribbon_padding(&self) -> u32 {
+        ribbon::METRICS.inset_y as u32
+    }
+    fn ribbon_metrics(&self) -> ui::RibbonMetrics {
+        ribbon::METRICS
+    }
+    fn ribbon_box_flags(&self) -> u32 {
+        0
+    }
+    fn ribbon_band(&self, ui: &mut ui::Ui, sp: &ui::Sp) {
+        ribbon::band(ui, sp)
+    }
+    fn ribbon_tabs_height(&self) -> i32 {
+        ribbon::TABS_H
+    }
+    fn ribbon_tabs_strip(&self, ui: &mut ui::Ui, sp: &ui::Sp) {
+        ribbon::strip(ui, sp)
+    }
+    fn ribbon_tab(&self, ui: &mut ui::Ui, sp: &ui::Sp) {
+        ribbon::tab(ui, sp)
+    }
+    fn keytip(&self, ui: &mut ui::Ui, sp: &ui::Sp) {
+        ribbon::keytip(ui, sp)
     }
     fn data(&self) -> &'static dyn StyleData {
         &data::DATA

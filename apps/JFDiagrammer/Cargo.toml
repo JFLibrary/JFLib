@@ -20,6 +20,9 @@ workspace = true
 
 [dependencies]
 ui.workspace = true
+base.workspace = true
+plat.workspace = true
+rt.workspace = true
 style = { package = "jflib-style-netlab", path = "../../styles/netlab" }
 
 [build-dependencies]

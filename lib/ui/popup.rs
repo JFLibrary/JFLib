@@ -509,7 +509,7 @@ impl Ui {
 
     // last_widget -> (id, rect) of the last semantic record with an id (0 = none); the rect
     // logical again (sems are physical right-to-left; the mirror is its own inverse)
-    fn last_widget(&self) -> (u32, [i32; 4]) {
+    pub(crate) fn last_widget(&self) -> (u32, [i32; 4]) {
         self.sems.iter().rev().find(|r| r.id != 0).map_or((0, [0; 4]), |r| (r.id, self.phys_rect(r.rect)))
     }
 
