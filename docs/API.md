@@ -41089,6 +41089,9 @@ ssh -- SSH-2 for running commands on a machine (RFC 4253 / 4252 / 4254)
   client.host_key()                                    type, blob, "SHA256:..." fingerprint
   client.auth_password(user, pw) / auth_key(user, &Keypair)
   client.exec(command, stdin, max_out) -> Exec { status, stdout, stderr }
+  client.set_time_limit(Some(ms))                       auth_* and exec end with TimedOut after
+                                                       ms in all (a server that keeps sending
+                                                       held them forever); None: no limit
   Transport::accept(stream, &host_key)                 the server side of the transport
                                                        (tests drive it with OpenSSH's client)
   private_key(text) -> Keypair      an unencrypted Ed25519 key ("OPENSSH PRIVATE KEY")
@@ -41100,6 +41103,9 @@ the Terrapin prefix truncation), ssh-ed25519 host and user keys, chacha20-poly13
 The host key is checked by the caller's rule: HostKeyCheck::Pinned(fingerprint) or Any (only
 to learn the fingerprint).  Not here: RSA / ECDSA keys, compression, port forwarding, PTYs,
 rekeying (a peer that starts a new key exchange ends the session; commands here are short).
+A peer that sends only messages to skip (ignore, debug, banners, global requests) while an
+answer is due ends the session after MAX_SKIPPED of them in a row; data past the window the
+client granted is a protocol error.
 ```
 
 ```rust
@@ -41216,11 +41222,17 @@ MSG_CHANNEL_FAILURE: u8 = 100
 **`impl Client`**
 
 - **`fn connect(s: Box<dyn Stream>, check: HostKeyCheck) -> Result<Client, SshError>`**
+- **`fn set_time_limit(&mut self, ms: Option<u32>)`**
+  Each following `auth_password`, `auth_key` and `exec` ends with `SshError::Net` (TimedOut)
+  when it takes longer than `ms` in all; `None` (the default): no limit.  The stream's read
+  timeout only limits each wait: a server that keeps sending (banners, endless output)
+  held these calls forever.  After a TimedOut the session is in an unknown state: close it.
 - **`fn host_key(&self) -> &HostKey`**
 - **`fn auth_password(&mut self, user: &str, password: &str) -> Result<(), SshError>`**
 - **`fn auth_key(&mut self, user: &str, key: &Keypair) -> Result<(), SshError>`**
 - **`fn exec(&mut self, command: &str, stdin: &[u8], max_out: usize) -> Result<Exec, SshError>`**
-  run a command, feed it `stdin`, collect at most `max_out` bytes of each output
+  run a command, feed it `stdin`, collect at most `max_out` bytes of each output (the rest
+  is read and dropped until the command ends: set_time_limit bounds a command that does not)
 - **`fn close(mut self)`**
 
 ### `netio/tls/mod.rs`
