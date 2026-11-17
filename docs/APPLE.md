@@ -310,10 +310,11 @@ Android (`web_sensors.rs`) aus Core Motion und Core Location
 Nord (mit Magnetometer, sonst beliebig), der Standort „beim Verwenden“ (`NSLocationWhenInUseUsageDescription` setzt
 `tools/apple.py` für Apps, deren PERMISSIONS `location` nennen oder die keine haben).
 
-- **Noch offen:** Teilen (`UIActivityViewController`; die Bibliothek hat noch keine Schnittstelle dafür), markierter
-  Text der Tastatur (`UITextInput` statt `UIKeyInput`: Diktat, Vorschläge, Tastaturen mit Zusammensetzung),
+- **Noch offen:** Teilen (`UIActivityViewController`; die Bibliothek hat noch keine Schnittstelle dafür),
   Mausbewegung ohne Taste auf dem iPad (`UIHoverGestureRecognizer`), dauerhafte Freigaben gewählter Dateien über einen
-  Neustart (Lesezeichen), Bildschirm anlassen, Textgröße des Systems, Accessibility. Das Bild geht bei jedem Frame
+  Neustart (Lesezeichen), Bildschirm anlassen, Textgröße des Systems. Markierter Text der Tastatur (`UITextInput`:
+  Diktat, Vorschläge, Tastaturen mit Zusammensetzung) und Accessibility kamen mit VoiceOver ([VOICEOVER.md](VOICEOVER.md)
+  VO4). Das Bild geht bei jedem Frame
   ganz als Kopie an den Layer; mit Metal (AP6) entfällt das.
 
 ### AP6: Metal (L)
