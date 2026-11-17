@@ -39501,7 +39501,8 @@ argon2 -- Argon2id (RFC 9106, version 0x13) and PHC strings
   argon2id(password, salt, &Params, out)          raw tag (secret / associated data empty)
   argon2id_ex(password, salt, secret, ad, &Params, out)
   hash(password, salt, &Params) -> "$argon2id$v=19$m=..,t=..,p=..$salt$hash"
-  verify(phc, password) -> bool                   (constant-time comparison)
+  verify(phc, password) -> bool                   (constant-time comparison; a string that
+                                                   asks for more than VERIFY_WORK is refused)
 
 Lanes are filled one after the other in each slice (the result is the same as with
 threads); memory is m KiB, allocated per call.
@@ -39533,8 +39534,15 @@ threads); memory is m KiB, allocated per call.
 - **`fn parse(phc: &str) -> Option<(Params, Vec<u8>, Vec<u8>)>`**
   the parameters, salt and tag of a PHC string
 
+```rust
+/// the most work verify does for a PHC string, in KiB times passes (memory m_kib x passes t):
+/// 2^24, so 1 GiB with 16 passes or 64 MiB with 256.  A stored string comes from outside; valid()
+/// alone let it ask for 4 GiB and 2^32 - 1 passes
+VERIFY_WORK: u64 = 1 << 24
+```
+
 - **`fn verify(phc: &str, password: &[u8]) -> bool`**
-  whether the password matches a PHC string
+  whether the password matches a PHC string (false beyond VERIFY_WORK)
 
 ### `crypto/b64.rs`
 
@@ -40241,7 +40249,8 @@ ROUNDS: u8 = 40
 
 - **`fn shared(pwe: &[u8; 64], rand: &[u8; 32], peer_scalar: &[u8; 32], peer_element: &[u8; 64]) -> Option<[u8; 32]>`**
   the x coordinate of k = rand \* (peer_scalar \* PWE + peer_element); None for a scalar out of
-  range, an element off the curve, or k at the identity
+  range or of 1 (RFC 8146 2.1: a scalar of 1 lets the element reveal mask \* PWE, as hostapd
+  refuses it since CVE-2019-9497), an element off the curve, or k at the identity
 
 - **`fn confirm(ss: &[u8; 32], element_a: &[u8; 64], scalar_a: &[u8; 32], element_b: &[u8; 64], scalar_b: &[u8; 32]) -> [u8; 32]`**
   Confirm of a side: H(ss | its element | its scalar | the other's element | scalar | ciphersuite)
@@ -47394,8 +47403,11 @@ Algorithms: curve25519-sha256 (also under the name @libssh.org), host and user k
 and rsa-sha2-256 (host keys; user keys too), ciphers chacha20-poly1305@openssh.com, aes128-ctr
 and aes256-ctr with hmac-sha2-256, compression none.  Not here: encrypted key files, the older
 ssh-rsa with SHA-1, port forwarding (a channel of another type is the embedder's to refuse),
-the extension negotiation of RFC 8308 (SSH_MSG_EXT_INFO is tolerated, none is sent) and
-OpenSSH's strict key exchange (ignored when offered).
+the extension negotiation of RFC 8308 (SSH_MSG_EXT_INFO is tolerated, none is sent).
+OpenSSH's strict key exchange (kex-strict-c/s-v00@openssh.com, against the Terrapin prefix
+truncation, CVE-2023-48795) is offered in the first KEXINIT and kept when the peer offers it
+too: the peer's KEXINIT must be its first packet, nothing but key exchange messages may come
+during the first exchange, and each direction counts its packets from 0 again after a NEWKEYS.
 
 The embedder decides what the protocol leaves open: which host key to trust, who logs in, which
 channels and requests to take.  A protocol error from the peer sends SSH_MSG_DISCONNECT and
@@ -48910,7 +48922,8 @@ format "bcrepo-1")
 Signers: snapshots are saved and loaded only with trusted keys -- CreateOptions::signer and
 the keys given to trust_signer (save_snapshot: UntrustedSigner, load_snapshot: Corrupt).
 The list sits in repo.json under the MAC of the repository key, so it keeps out other keys
-and mistakes, not someone who holds the repository key (who could call trust_signer).
+and mistakes, not someone who holds the repository key (who could call trust_signer).  A
+repo.json without a MAC (taken away) does not open (Corrupt).
 
 Layout:  repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
 Keys:    one random repository key, wrapped in repo.json for the server's master key, for
@@ -49332,7 +49345,9 @@ back a version that does not start
                                restart, max_size, ca_pem, timeout_ms
   startup(&cfg) -> Startup     first thing in main (before ui::launch): puts a downloaded
                                update in place and restarts into it, counts the starts of a
-                               new version, rolls back one that never reported healthy
+                               new version, rolls back one that never reported healthy;
+                               a program that calls itself neither the trial's version nor
+                               the old one ends the trial (the version recorded as bad)
   healthy(&cfg) -> bool        the health marker: the new version works (after its first
                                frame, for example); without it the next start rolls back
   Updater::new(cfg)            check() / download() / apply() (blocking), start_check() /
@@ -49542,7 +49557,9 @@ Re-exports: `plat::pkg::Packaged`
 - **`fn startup(cfg: &Config) -> Startup`**
   at the start of the program, before its UI: a staged update is put in place and the
   program restarted into it; a new version on trial counts its start, and one that already
-  had cfg.attempts starts without healthy() is rolled back (the old version restarted).
+  had cfg.attempts starts without healthy() is rolled back (the old version restarted).  A
+  program whose version is neither the trial's nor the one before (the package's own number
+  differs from its manifest's) ends the trial: Normal, the trial's version recorded as bad.
   Another process holding the updater's lock: Normal.
 
 - **`fn healthy(cfg: &Config) -> bool`**
@@ -49591,7 +49608,9 @@ the new version and the way back
   healthy(cfg) -> bool         (lib.rs) the health marker
 
 Every file of an update is written next to its target as NAME.jfupd-new; the old file is
-copied to backup/files/ (backup/list: "R path" replaced, "N path" new), renamed away
+copied to backup/files/ (backup/list: "H sha256 path" replaced, with the copy's SHA-256, which
+the way back checks for every copy before it puts one back, and again while it copies -- "R
+path" of earlier versions without one; "N path" new), renamed away
 (NAME.jfupd-old-<n>: Windows can rename a running exe, not replace it) and the new file takes
 its name.  Leftover .jfupd-* files are removed at a later start, once no process uses them.
 An AppImage update has one file, the .AppImage itself ($APPIMAGE): copied (and hashed on the
