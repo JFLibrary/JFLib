@@ -1,0 +1,25 @@
+# inputtest: the pointer lock as a headless run plays it (ui.pointer_lock: locked at once), the
+# raw motion of `motion DX DY` (ui.pointer_motion, summed by the app), Esc lets it go and is no key
+# of the app, motion without the lock goes nowhere
+expect text:"Zeiger: aus" exists
+motion 5 5
+expect text:"Summe: 0 0" exists
+click "Zeiger fangen"
+expect text:"Zeiger: gefangen" exists
+motion 10 -4
+motion 3 2
+expect text:"Summe: 13 -2" exists
+expect text:"Letzte Bewegung: 3.0 2.0 · Bewegungen: 2" exists
+key esc
+expect text:"Zeiger: aus" exists
+motion 7 7
+expect text:"Summe: 13 -2" exists
+# a press in the field asks again (a new sum); "Freigeben" lets it go
+click canvas:"Feld"
+expect text:"Zeiger: gefangen" exists
+expect text:"Summe: 0 0" exists
+motion -6 1
+expect text:"Summe: -6 1" exists
+click "Freigeben"
+expect text:"Zeiger: aus" exists
+shot build/inputtest.png

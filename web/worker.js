@@ -201,6 +201,9 @@ function dispatch(m) {
     case "gpu-test": {const n=wasm.jfgui_gpu_test(m.op>>>0);postMessage({type:"gpu-test",id:m.id,text:decode.decode(bytes(wasm.jfgui_response(),n).slice())});break;}
     // (L7) the page's full screen of the canvas changed (or was refused): lib/plat/web_windows.rs
     case "fullscreen": if(wasm.jfgui_fullscreen) {wasm.jfgui_fullscreen(+!!m.on);input();} break;
+    // (G7a) the canvas's pointer lock (1 held, 0 let go, 2 refused) and the locked pointer's motion: lib/plat/web_windows.rs
+    case "pointerlock": if(wasm.jfgui_pointer_lock) {wasm.jfgui_pointer_lock(m.state>>>0);input();} break;
+    case "motion": if(wasm.jfgui_motion) {wasm.jfgui_motion(Number(m.dx)||0,Number(m.dy)||0);input();} break;
     case "closeSession": {
       if(typeof m.session!=="string" || m.session.length>128) throw new Error("Ungültige Agentensitzung.");
       const data=encode.encode(JSON.stringify({session:m.session,close:true}));

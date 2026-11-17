@@ -707,6 +707,9 @@ pub(crate) fn wlh_drag_done(wl: &mut Wl, id: u32, _a: &Args, _u: u64) {
 /// zwp_relative_pointer_v1.relative_motion(utime_hi, utime_lo, dx, dy, dx_unaccel,
 /// dy_unaccel): the pointer's motion during a mouse drag (finding out the model)
 pub(crate) fn wlh_rel_motion(wl: &mut Wl, id: u32, a: &Args, _u: u64) {
+    if wl.lock_motion(id, a) {
+        return; // (G7a) the pointer lock's motion (linux_wl_lock.rs)
+    }
     if wl.drag.on && wl.drag.rp == id {
         wl.child_drag_rel(a.i(2), a.i(3));
     }

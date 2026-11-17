@@ -105,6 +105,20 @@ unsafe extern "C" {
     fn CGImageCreate(w: usize, h: usize, bpc: usize, bpp: usize, stride: usize, cs: CfRef, info: u32, provider: CfRef,
                      decode: *const f64, interpolate: bool, intent: i32) -> CfRef;
     fn CGImageRelease(i: CfRef);
+    // (G7a) the pointer lock
+    fn CGAssociateMouseAndMouseCursorPosition(connected: i32) -> i32;
+    fn CGWarpMouseCursorPosition(p: NSPoint) -> i32;
+}
+// (G7a) where a key sits (the ISO keyboard's swapped keys) and what the layout prints on it
+#[link(name = "Carbon", kind = "framework")]
+unsafe extern "C" {
+    static kTISPropertyUnicodeKeyLayoutData: CfRef;
+    fn LMGetKbdType() -> u8;
+    fn KBGetLayoutType(kbd: i16) -> u32;
+    fn TISCopyCurrentKeyboardLayoutInputSource() -> CfRef;
+    fn TISGetInputSourceProperty(src: CfRef, key: CfRef) -> CfRef;
+    fn UCKeyTranslate(layout: *const u8, code: u16, action: u16, mods: u32, kbd: u32, options: u32, dead: *mut u32, max: usize,
+                      len: *mut usize, out: *mut u16) -> i32;
 }
 #[link(name = "ImageIO", kind = "framework")]
 unsafe extern "C" {
@@ -541,6 +555,7 @@ pub fn win_create(title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x
 }
 
 pub fn win_destroy(w: i32) {
+    lock_release(w); // (G7a) its pointer lock goes first
     for k in 0..PPW_MAX as usize {
         if with(|s| s.pops[k].owner == w) == Some(true) {
             pop_hide(k);
@@ -709,7 +724,10 @@ pub fn win_cmd(w: i32, cmd: u32) {
     // SAFETY: window commands of our window.
     unsafe {
         match cmd {
-            WCMD_MINIMIZE => msg!(win, c"miniaturize:", NIL => Id; ()),
+            WCMD_MINIMIZE => {
+                lock_release(w); // (G7a) minimized: the pointer lock goes
+                msg!(win, c"miniaturize:", NIL => Id; ())
+            }
             WCMD_MAXIMIZE => {
                 if !msg!(win, c"isZoomed"; bool) {
                     msg!(win, c"zoom:", NIL => Id; ());
@@ -1769,6 +1787,15 @@ extern "C" fn v_mouse_moved(this: Id, _cmd: Sel, ev: Id) {
     if !enabled(w) {
         return;
     }
+    if LOCK_ON.load(Ordering::Relaxed) && crate::plock_win() == w && !is_popup(this) {
+        // (G7a) the locked pointer's motion (points, after the system's acceleration); the first
+        // event after a warp carries the warp
+        // SAFETY: deltaX / deltaY of a mouse event.
+        let (dx, dy) = unsafe { (msg!(ev, c"deltaX"; f64), msg!(ev, c"deltaY"; f64)) };
+        if !LOCK_SKIP.swap(false, Ordering::Relaxed) {
+            crate::plock_motion(w, dx, dy);
+        }
+    }
     // SAFETY: the type of an event.
     if !is_popup(this) && unsafe { msg!(ev, c"type"; u64) } == EV_LEFT_DRAGGED {
         dnd::note_mouse(ev);
@@ -1852,8 +1879,13 @@ extern "C" fn v_key_down(this: Id, _cmd: Sel, ev: Id) {
         let code: u16 = msg!(ev, c"keyCode"; u16);
         let repeat: bool = msg!(ev, c"isARepeat"; bool);
         let vk = vk_of(code, ev);
+        if crate::plock_key(vk, true) {
+            lock_release(crate::plock_win()); // (G7a) Esc lets the pointer lock go, the app gets no key
+            return;
+        }
         if vk != 0 {
-            push(w, E_KEY_DOWN, 0, 0, key_y_of(ev), vk | if repeat { 1 << 31 } else { 0 });
+            // (G7a) Event::x: where the key sits (a USB HID usage)
+            push(w, E_KEY_DOWN, 0, mac_code(code) as i32, key_y_of(ev), vk | if repeat { 1 << 31 } else { 0 });
         }
         let f: u64 = msg!(ev, c"modifierFlags"; u64);
         if f & FLAG_COMMAND == 0 {
@@ -1867,8 +1899,121 @@ extern "C" fn v_key_up(this: Id, _cmd: Sel, ev: Id) {
     // SAFETY: keyCode of a key event.
     let code: u16 = unsafe { msg!(ev, c"keyCode"; u16) };
     let vk = vk_of(code, ev);
+    if crate::plock_key(vk, false) {
+        return; // (G7a) the up of the Esc that let the pointer lock go
+    }
     if vk != 0 {
-        push(view_win(this), E_KEY_UP, 0, 0, key_y_of(ev), vk);
+        push(view_win(this), E_KEY_UP, 0, mac_code(code) as i32, key_y_of(ev), vk);
+    }
+}
+
+/// (G7a) a key code (kVK_*) -> where the key sits (USB HID usage): an ISO keyboard reports its key
+/// left of 1 and the one left of Z the other way round than their ANSI names say
+fn mac_code(code: u16) -> u32 {
+    let mut k = code as u32;
+    // SAFETY: plain queries of the keyboard type.
+    if (k == 0x0A || k == 0x32) && unsafe { KBGetLayoutType(LMGetKbdType() as i16) } == 0x4953_4F20 {
+        k ^= 0x0A ^ 0x32; // kKeyboardISO ('ISO ')
+    }
+    crate::key_code_mac(k)
+}
+
+/// (G7a, keycode.rs key_label) what the current input source prints on the key with code kvk: its
+/// character without modifiers (UCKeyTranslate, kUCKeyActionDisplay, no dead keys)
+pub(crate) fn mac_key_label(kvk: u32) -> Option<String> {
+    let mut out = None;
+    // SAFETY: the current input source (released below), its layout data (owned by it), a buffer of
+    // 8 UTF-16 units; the main thread (AppKit's, where the UI calls in).
+    unsafe {
+        let src = TISCopyCurrentKeyboardLayoutInputSource();
+        if src.is_null() {
+            return None;
+        }
+        let data = TISGetInputSourceProperty(src, kTISPropertyUnicodeKeyLayoutData);
+        if !data.is_null() {
+            let (mut dead, mut n, mut buf) = (0u32, 0usize, [0u16; 8]);
+            let st = UCKeyTranslate(CFDataGetBytePtr(data), kvk as u16, 3, 0, LMGetKbdType() as u32, 1, &mut dead, buf.len(), &mut n,
+                                    buf.as_mut_ptr());
+            if st == 0 && n > 0 {
+                let c = core::char::decode_utf16(buf[..n.min(buf.len())].iter().copied()).next().and_then(|r| r.ok());
+                out = c.and_then(|c| crate::keycode::label_of(c as u32));
+            }
+        }
+        CFRelease(src);
+    }
+    out
+}
+
+// ---------------------------------------------------------------- (G7a) the pointer lock
+
+// the pointer is locked (disassociated from the cursor, the cursor hidden); the next motion event
+// carries the warp to the middle of the window
+static LOCK_ON: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+static LOCK_SKIP: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+
+/// (plock.rs) lock the pointer to window w or let it go -> the state now: at once while the window
+/// is the key window, else Pending until it becomes it
+pub(crate) fn mac_pointer_lock(w: i32, on: bool) -> crate::PointerLock {
+    use crate::PointerLock;
+    if !on {
+        lock_release(w);
+        return PointerLock::Off;
+    }
+    let Some((win, _, _)) = ids(w) else { return PointerLock::Refused };
+    let cur = crate::plock_win();
+    if cur >= 0 && cur != w {
+        lock_release(cur); // one window at a time
+    }
+    if cur == w && LOCK_ON.load(Ordering::Relaxed) {
+        return PointerLock::Locked;
+    }
+    // SAFETY: isKeyWindow of our window.
+    if unsafe { msg!(win, c"isKeyWindow"; bool) } {
+        lock_engage(w);
+    } else {
+        crate::plock_set(w, PointerLock::Pending);
+    }
+    crate::plock_state()
+}
+
+// the lock takes effect: the pointer into the window if it is outside, disassociated, hidden
+fn lock_engage(w: i32) {
+    let Some((win, view, _)) = ids(w) else { return };
+    // SAFETY: our window and view; the CG calls take plain values; NSCursor's hide is counted
+    // (unhide in lock_release).
+    unsafe {
+        let p: NSPoint = msg!(win, c"mouseLocationOutsideOfEventStream"; NSPoint);
+        let v: NSPoint = msg!(view, c"convertPoint:fromView:", p => NSPoint, NIL => Id; NSPoint);
+        let b: NSRect = msg!(view, c"bounds"; NSRect);
+        let inside = v.x >= 0.0 && v.y >= 0.0 && v.x < b.size.w && v.y < b.size.h;
+        if !inside {
+            let f: NSRect = msg!(win, c"frame"; NSRect);
+            let c = NSPoint { x: f.origin.x + f.size.w / 2.0, y: primary_height() - (f.origin.y + f.size.h / 2.0) };
+            CGWarpMouseCursorPosition(c);
+            LOCK_SKIP.store(true, Ordering::Relaxed);
+        }
+        CGAssociateMouseAndMouseCursorPosition(0);
+        msg!(class(c"NSCursor"), c"hide"; ());
+    }
+    LOCK_ON.store(true, Ordering::Relaxed);
+    crate::plock_set(w, crate::PointerLock::Locked);
+}
+
+// window w lets the lock go (the app, Esc, it resigned key, was minimized or closed)
+fn lock_release(w: i32) {
+    if w < 0 || crate::plock_win() != w {
+        return;
+    }
+    if LOCK_ON.swap(false, Ordering::Relaxed) {
+        // SAFETY: the pointer moves the cursor again; the hide of lock_engage undone.
+        unsafe {
+            CGAssociateMouseAndMouseCursorPosition(1);
+            msg!(class(c"NSCursor"), c"unhide"; ());
+        }
+    }
+    LOCK_SKIP.store(false, Ordering::Relaxed);
+    if crate::plock_state() != crate::PointerLock::Off {
+        crate::plock_set(w, crate::PointerLock::Off);
     }
 }
 
@@ -1896,7 +2041,13 @@ extern "C" fn v_flags_changed(this: Id, _cmd: Sel, ev: Id) {
     };
     if f & bit != old & bit || bit == FLAG_CAPS {
         let down = f & bit != 0;
-        push(view_win(this), if down { E_KEY_DOWN } else { E_KEY_UP }, 0, 0, 0, vk);
+        // (G7a) where the key sits and which side
+        let loc = match code {
+            0x38 | 0x37 | 0x3A | 0x3B => crate::KL_LEFT,
+            0x3C | 0x36 | 0x3D | 0x3E => crate::KL_RIGHT,
+            _ => crate::KL_STANDARD,
+        };
+        push(view_win(this), if down { E_KEY_DOWN } else { E_KEY_UP }, 0, mac_code(code) as i32, crate::key_y(loc, 0, false), vk);
     }
 }
 
@@ -2135,10 +2286,17 @@ fn pos_changed(w: i32) {
     push(w, E_WINPOS, 0, rr[0], rr[1], 0);
 }
 extern "C" fn d_did_become_key(this: Id, _cmd: Sel, _n: Id) {
-    push(del_win(this), E_FOCUS_IN, 0, 0, 0, 0);
+    let w = del_win(this);
+    push(w, E_FOCUS_IN, 0, 0, 0, 0);
+    // (G7a) a pointer lock that waited for the window
+    if crate::plock_win() == w && crate::plock_state() == crate::PointerLock::Pending && !LOCK_ON.load(Ordering::Relaxed) {
+        lock_engage(w);
+    }
 }
 extern "C" fn d_did_resign_key(this: Id, _cmd: Sel, _n: Id) {
-    push(del_win(this), E_FOCUS_OUT, 0, 0, 0, 0);
+    let w = del_win(this);
+    lock_release(w); // (G7a) the focus went elsewhere: so does the pointer lock
+    push(w, E_FOCUS_OUT, 0, 0, 0, 0);
 }
 extern "C" fn d_backing_changed(this: Id, _cmd: Sel, _n: Id) {
     size_changed(del_win(this), false);

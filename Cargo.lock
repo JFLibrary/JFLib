@@ -486,6 +486,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "inputtest"
+version = "0.1.0"
+dependencies = [
+ "jflib-build",
+ "jflib-plat",
+ "jflib-rt",
+ "jflib-style-winui",
+ "jflib-ui",
+]
+
+[[package]]
 name = "installer"
 version = "0.0.0"
 dependencies = [

@@ -484,6 +484,16 @@ impl X11 {
             return; // Esc ends the app's drag (linux_x11_dnd.rs)
         }
         let (w, m) = ((kc >> 5) as usize, 1u32 << (kc & 31));
+        if crate::plock_key(vk, pressed) {
+            // (G7a) Esc lets the pointer lock go; the key is the lock's
+            if pressed {
+                self.held[w] |= m;
+                self.lock_release(crate::plock_win());
+            } else {
+                self.held[w] &= !m;
+            }
+            return;
+        }
         // an input method (IBus) sees the key first while a text field has the focus
         let ime = self.ime_on && crate::ibus_ready();
         let dead = text != 0 && crate::xkb_is_dead(ev);
@@ -597,11 +607,14 @@ impl X11 {
             let w = self.evwin;
             self.hide_owned(w, false); // windows hidden while it was minimized
             self.push(E_FOCUS_IN, 0, 0, 0, 0);
+            self.lock_try(); // (G7a) a pointer lock that waited for the focus
         } else {
             if detail == 2 || !self.xw[i].focus {
                 return; // NotifyInferior
             }
             self.xw[i].focus = false;
+            let w = self.evwin;
+            self.lock_release(w); // (G7a) the focus went elsewhere: so does the pointer lock
             self.held = [0; 8];
             self.rep_merge = 0;
             crate::xkb_dead_reset(); // a dead key does not carry over to another window

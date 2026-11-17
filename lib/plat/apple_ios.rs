@@ -1147,7 +1147,9 @@ fn presses_do(presses: Id, down: bool) {
         if shown && typed {
             continue;
         }
-        jfgui_event((if down { E_KEY_DOWN } else { E_KEY_UP }) as u32, 0, mods as u32, 0, 0, 0, vk);
+        // (G7a) Event::x: where the key sits -- UIKit's keyCode is the USB HID usage already
+        let code = if (1..256).contains(&hid) { hid as i32 } else { 0 };
+        jfgui_event((if down { E_KEY_DOWN } else { E_KEY_UP }) as u32, 0, mods as u32, 0, code, 0, vk);
         any = true;
     }
     if any {

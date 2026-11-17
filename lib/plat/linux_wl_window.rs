@@ -110,7 +110,8 @@ pub(crate) struct Globals {
     pub dialogm: u32,
     pub tabm: u32,
     pub subc: u32, // wl_subcompositor (child windows)
-    pub rpm: u32,  // zwp_relative_pointer_manager_v1 (child windows' drags)
+    pub rpm: u32,  // zwp_relative_pointer_manager_v1 (child windows' drags, (G7a) the pointer lock's motion)
+    pub pcm: u32,  // (G7a) zwp_pointer_constraints_v1 (the pointer lock, linux_wl_lock.rs)
     pub actm: u32, // xdg_activation_v1 (linux_wl_act.rs)
     pub toolwin_top: bool, // jfgui_WL_TOOLWIN=toplevel: tool windows are toplevels
     pub zc: u32,           // stacking counter of the child windows
@@ -595,6 +596,7 @@ impl Wl {
     /// destroy the window's objects and buffers, free its record  [wl_plat_win_destroy]
     pub(crate) fn win_destroy(&mut self, w: i32) {
         let Some(i) = self.rec(w) else { return };
+        self.lock_release(w); // (G7a) its pointer lock goes first
         self.owned_orphan(i); // (as on Windows, owned windows go with their owner)
         self.objects_destroy(i);
         self.present_free(i);
@@ -770,6 +772,7 @@ impl Wl {
                 if self.win[i].wm_caps & (1 | 1 << 4) == 1 {
                     return; // the compositor cannot minimize (sway): nothing happens, nothing is hidden
                 }
+                self.lock_release(w); // (G7a) minimized: the pointer lock goes
                 self.w.send(top, &TOPLEVEL_SET_MINIMIZED, &[]);
                 self.win[i].state |= WST_MINIMIZED;
                 self.hide_owned(i, true);
@@ -975,6 +978,13 @@ pub(crate) fn wlh_global(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
     let name = a.u(0);
     let Some(iface) = a.s(1) else { return };
     let ver = a.u(2);
+    // (G7a) the pointer lock (linux_wl_lock.rs)
+    if iface == b"zwp_pointer_constraints_v1" {
+        if wl.g.pcm == 0 {
+            wl.g.pcm = wl.w.send(wl.g.reg, &REGISTRY_BIND, &[A::U(name), A::B(&IFACE_ZWP_PC, 1)]);
+        }
+        return;
+    }
     if iface == b"zwp_text_input_manager_v3" && wl.ime.manager==0 {
         wl.ime.manager=wl.w.send(wl.g.reg,&REGISTRY_BIND,&[A::U(name),A::B(&super::ime::MANAGER,1)]);
         wl.ime_setup(); return;

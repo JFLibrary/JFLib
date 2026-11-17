@@ -422,6 +422,7 @@ impl X11 {
     /// x11_plat_win_destroy(w): destroy the window and its presentation buffers
     pub(super) fn win_destroy(&mut self, w: i32) {
         let Some(i) = self.rec(w) else { return };
+        self.lock_release(w); // (G7a) its pointer lock goes first
         let (o, _) = self.req(XR_DESTROY_WINDOW, 8);
         let win = self.xw[i].win;
         wr32(&mut self.out, o, win);
@@ -601,6 +602,7 @@ impl X11 {
                 self.push(E_CLOSE, 0, 0, 0, 0);
             }
             WCMD_MINIMIZE => {
+                self.lock_release(w); // (G7a) minimized: the pointer lock goes
                 self.wm_message(w, self.atoms[A_WM_CHANGE_STATE], &[X11_WM_ICONIC, 0, 0, 0, 0]);
                 self.xw[i].state |= WST_MINIMIZED; // until activated again
                 self.hide_owned(w, true);

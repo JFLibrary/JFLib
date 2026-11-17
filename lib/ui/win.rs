@@ -1457,7 +1457,7 @@ impl Ui {
                 }
                 w
             }
-            plat::E_FOCUS_OUT => w,
+            plat::E_FOCUS_OUT | plat::E_RAW_MOTION | plat::E_POINTER_LOCK => w, // ((G7a) the lock's own window)
             _ => {
                 // pointer: another window than the last one -> that one is left first
                 let last = self.m.win.ptr;
