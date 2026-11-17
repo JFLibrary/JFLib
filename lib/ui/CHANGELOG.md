@@ -39,6 +39,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Test scripts: `wheel S DY [DX] [fine|pixels]` (a horizontal turn, fine steps, a trackpad's
   pixels) and `keydown` / `keyup ... [char "c"|none] [dead]`; a script's keys have the US layout's
   characters.
+- `GpuContent::paints()` (default false): a view's content that paints itself on the CPU (render2d's CPU path) is painted wherever there is no device, also where a lost device left its last frame read back, which would otherwise stay whatever changes
+- `ui::dock_float_id(area, win, k)`: the window id of a dock area's floating window `k` -- `area + 1
+  + k` in the main window as before, an id of its own hashed from area and window in any other.
+  docs/GUIDE.md section 15.
 
 ### Changed
 
@@ -55,6 +59,17 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - The fine steps of a precision touchpad were cut off one by one where whole lines count: the
   terminal never scrolled with steps below 40, the code completion list scrolled three rows on
   each of them, Ctrl + each of them zoomed a diagram a whole step. They add up now.
+- Dock: a floating window is found by its slot when the dock's windows are walked. The app changing the layout in the same pass made the stored index name another floating window or none.
+- A suggestion menu open in a window that closes or whose state is freed (`ui.window_destroy`) goes
+  with the window: it stayed an app-wide entry, and the menu key opened no menu in any other window
+  until a right click replaced it.
+- Esc in a text box inside the top popup closes the popup and gives the focus back to where it was
+  when the popup opened, as Esc anywhere else in it does: in the font picker's search box it only
+  took the focus away and left the family list open (the next click then closed it instead of
+  opening it).
+- A dock area of the same id in a second window floats its panels in windows of its own: both used
+  the window ids `id + 1 ..`, and the second one took over the main window's floating windows
+  ("window 501 begun twice in one pass").
 
 ## [0.2.1] - 2026-11-16
 

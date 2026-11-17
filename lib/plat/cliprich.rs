@@ -8,6 +8,11 @@ use alloc::vec::Vec;
 /// Maximum combined payload of an opt-in multi-format clipboard write (64 MiB).
 pub const CLIP_RICH_MAX: usize = 64 << 20;
 
+// (Linux) the longest one read of another program's clipboard or drop data may take in all
+// (each piece has 3 s; a program trickling bytes held the UI thread for good otherwise)
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub(crate) const CLIP_READ_TOTAL_US: u64 = 30_000_000;
+
 /// Validate a multi-format text clipboard before replacing the previous contents.
 /// Formats must be distinct TEXT/HTML/RTF/DOCX; text and HTML are NUL-free UTF-8.
 pub fn clip_many_valid(entries: &[(u32, &[u8])]) -> bool {

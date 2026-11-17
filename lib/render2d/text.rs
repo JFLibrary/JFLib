@@ -346,6 +346,11 @@ impl Fonts {
         self.fonts.get(f.0 as usize).map_or(0, |d| d.tt.glyph(c as u32))
     }
 
+    /// a glyph's contours as shape left them in the cache (the CPU path, G6e1: every glyph of a laid-out text is there)
+    pub(crate) fn shape_cached(&self, f: FontId, g: u32) -> Option<&GlyphShape> {
+        self.fonts.get(f.0 as usize)?.shapes.get(&g)
+    }
+
     /// a glyph's contours in em units (y up) and what is known of them (cached)
     pub fn shape(&mut self, f: FontId, g: u32) -> Option<&GlyphShape> {
         let d = self.fonts.get_mut(f.0 as usize)?;

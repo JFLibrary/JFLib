@@ -17,6 +17,7 @@
 // guess).
 
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use img_core::{ERR_CODE, ERR_HDR, ERR_LIMIT, ERR_NOMEM};
 
@@ -31,6 +32,45 @@ pub const JM_MAXTOT: u64 = 1 << 32;
 pub const JM_MAXCH: u32 = 1 << 16;
 /// samples the palette channels of one image may take beyond the image's own (jm_decode)
 const PAL_ROOM: u64 = 1 << 20;
+/// channel moves the squeeze steps of one decode may make in all, over its frames and groups
+/// (each step's residuals go in as a block; what is behind it and the block count): the default
+/// steps make at most about 0.63 million (4099 channels within JM_MAXTOT: 17 steps); crafted
+/// steps on a channel near the front of a long list are refused after about 5800 (0.4 s)
+pub const SQ_WORK: u64 = 1 << 24;
+
+/// the channel moves the squeeze steps may still make (SQ_WORK at first); one per decode, in
+/// its frame (Jf), handed on from frame to frame and shared by the groups' threads
+pub struct SqWork(pub AtomicU64);
+
+impl Default for SqWork {
+    fn default() -> SqWork {
+        SqWork(AtomicU64::new(SQ_WORK))
+    }
+}
+
+impl SqWork {
+    /// a budget of n moves
+    pub fn of(n: u64) -> SqWork {
+        SqWork(AtomicU64::new(n))
+    }
+
+    /// the moves left
+    pub fn left(&self) -> u64 {
+        self.0.load(Ordering::Relaxed)
+    }
+
+    /// take n moves -> false when fewer are left
+    fn take(&self, n: u64) -> bool {
+        let mut w = self.0.load(Ordering::Relaxed);
+        loop {
+            let Some(rest) = w.checked_sub(n) else { return false };
+            match self.0.compare_exchange_weak(w, rest, Ordering::Relaxed, Ordering::Relaxed) {
+                Ok(_) => return true,
+                Err(now) => w = now,
+            }
+        }
+    }
+}
 pub const MTR_RCT: u32 = 0;
 pub const MTR_PALETTE: u32 = 1;
 pub const MTR_SQUEEZE: u32 = 2;
@@ -123,25 +163,30 @@ impl Mi {
         if self.nch() >= JM_MAXCH {
             return ERR_LIMIT;
         }
-        let pos = (pos as usize).min(self.ch.len());
-        self.ch.insert(pos, Mc { w, h, hs, vs, d: Vec::new() });
-        let n = w as u64 * h as u64;
-        if n == 0 {
-            return 0;
-        }
-        if n > JM_MAXPIX {
-            return ERR_LIMIT;
-        }
-        if n >= 1 << 20 && n + self.ch.iter().map(|c| c.d.len() as u64).sum::<u64>() > JM_MAXTOT {
-            return ERR_LIMIT;
-        }
-        match zvec::<i32>(n as usize) {
-            Ok(v) => {
-                self.ch[pos].d = v;
+        match self.channel(w, h, hs, vs, 0) {
+            Ok(c) => {
+                let pos = (pos as usize).min(self.ch.len());
+                self.ch.insert(pos, c);
                 0
             }
             Err(e) => e,
         }
+    }
+
+    /// a new zeroed channel for this image (`more`: samples of channels made for it and not in
+    /// it yet)
+    fn channel(&self, w: u32, h: u32, hs: i32, vs: i32, more: u64) -> Result<Mc, i32> {
+        let n = w as u64 * h as u64;
+        if n == 0 {
+            return Ok(Mc { w, h, hs, vs, d: Vec::new() });
+        }
+        if n > JM_MAXPIX {
+            return Err(ERR_LIMIT);
+        }
+        if n >= 1 << 20 && n + more + self.ch.iter().map(|c| c.d.len() as u64).sum::<u64>() > JM_MAXTOT {
+            return Err(ERR_LIMIT);
+        }
+        Ok(Mc { w, h, hs, vs, d: zvec::<i32>(n as usize)? })
     }
 
     /// mi_delete: remove n channels at pos
@@ -370,8 +415,9 @@ fn jm_defsqueeze(mi: &Mi, mt: &mut Mt) -> i32 {
     0
 }
 
-/// jm_meta: MetaApply; room = the samples the palette channels may still take
-fn jm_meta(mi: &mut Mi, mt: &mut Mt, room: &mut u64) -> i32 {
+/// jm_meta: MetaApply; room = the samples the palette channels may still take, work = the
+/// channel moves the squeeze steps may still make
+fn jm_meta(mi: &mut Mi, mt: &mut Mt, room: &mut u64, work: &SqWork) -> i32 {
     match mt.id {
         MTR_RCT => mi.checkeq(mt.begin, mt.begin.wrapping_add(2)),
         MTR_PALETTE => {
@@ -427,8 +473,26 @@ fn jm_meta(mi: &mut Mi, mt: &mut Mt, room: &mut u64) -> i32 {
                     mi.nbmeta += nc;
                 }
                 let offset = if st[1] != 0 { ec + 1 } else { mi.nch() };
+                // the step's residuals go in as one block at offset; what is behind it moves,
+                // counted against `work` (each step moved up to the whole list: a palette's meta
+                // channel, which has no shift to count, squeezed 65000 times took a minute)
+                let cost = (mi.nch() - offset) as u64 + nc as u64;
+                if mi.nch() as u64 + nc as u64 > JM_MAXCH as u64 || !work.take(cost) {
+                    return ERR_LIMIT;
+                }
+                let mut block: Vec<Mc> = Vec::new();
+                if block.try_reserve_exact(nc as usize).is_err() {
+                    return ERR_NOMEM;
+                }
+                let mut more = 0u64;
                 for c in bc..=ec {
                     let ch = &mut mi.ch[c as usize];
+                    // too many squeezes (libjxl: shift > 30): a 1 x 1 channel squeezed over and
+                    // over added an empty channel each time, up to JM_MAXCH, each one inserted
+                    // into the middle of the list (minutes from a few KB)
+                    if ch.hs > 30 || ch.vs > 30 {
+                        return ERR_HDR;
+                    }
                     let (w, h) = (ch.w, ch.h);
                     if w == 0 || h == 0 {
                         return ERR_HDR;
@@ -456,11 +520,16 @@ fn jm_meta(mi: &mut Mi, mt: &mut Mt, room: &mut u64) -> i32 {
                     if r != 0 {
                         return r;
                     }
-                    let r = mi.insert(c - bc + offset, rw, rh, hs, vs);
-                    if r != 0 {
-                        return r;
+                    match mi.channel(rw, rh, hs, vs, more) {
+                        Ok(r) => {
+                            more += r.d.len() as u64;
+                            block.push(r);
+                        }
+                        Err(e) => return e,
                     }
                 }
+                let at = offset as usize;
+                mi.ch.splice(at..at, block);
             }
             0
         }
@@ -468,7 +537,8 @@ fn jm_meta(mi: &mut Mi, mt: &mut Mt, room: &mut u64) -> i32 {
 }
 
 /// jm_decode: ModularGenericDecompress (see the module header); hdr receives the group
-/// header (the caller's JMH, or a local one)
+/// header (the caller's JMH, or a local one); its squeeze steps have a budget of their own
+/// (SQ_WORK)
 #[allow(clippy::too_many_arguments)]
 pub fn jm_decode(
     jb: &mut Jb,
@@ -479,6 +549,22 @@ pub fn jm_decode(
     gcode: Option<&Jc>,
     undo: bool,
     hdr: Option<&mut Jmh>,
+) -> i32 {
+    jm_decode_in(jb, mi, stream, maxsize, gtree, gcode, undo, hdr, &SqWork::default())
+}
+
+/// jm_decode with the decode's squeeze budget (its frame's Jf::sq_work)
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn jm_decode_in(
+    jb: &mut Jb,
+    mi: &mut Mi,
+    stream: u32,
+    maxsize: u32,
+    gtree: Option<&Ma>,
+    gcode: Option<&Jc>,
+    undo: bool,
+    hdr: Option<&mut Jmh>,
+    work: &SqWork,
 ) -> i32 {
     let mut local = Jmh::default();
     let hdr = match hdr {
@@ -510,7 +596,7 @@ pub fn jm_decode(
     let mut room = mi.ch.iter().map(|c| c.d.len() as u64).sum::<u64>() + PAL_ROOM;
     for i in 0..nt as usize {
         let mut mt = core::mem::take(&mut mi.tr[i]);
-        let r = jm_meta(mi, &mut mt, &mut room);
+        let r = jm_meta(mi, &mut mt, &mut room, work);
         mi.tr[i] = mt;
         if r != 0 {
             return r;

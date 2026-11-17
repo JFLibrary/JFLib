@@ -3,7 +3,10 @@
 // compares them with the images of the Vulkan path on this machine (render2dtest --dump, offscreen, both levels) and
 // prints the difference as numbers.  The coordinates (the same drawing at the origin and at 1e7, the deep zoom to 1e-6
 // units per pixel) and the visibility are judged in the browser, by the code of the Vulkan tests (gallery.rs).  In a
-// browser without a working WebGPU it says SKIP.  Playwright: tools/tests/playwright.mjs.
+// browser without a working WebGPU it says SKIP.  G6e1, in every bundle and without WebGPU (?gpu=0): the CPU path's images
+// (jfgui_GPU_PROBE=cpu: Scene::draw_cpu of scenes without a device) byte for byte against the native program's
+// (render2dtest --dump: cpu_NAME.bgra), and the demo without a device (its view painted by the CPU path: the drawing's
+// colours in a screenshot).  Playwright: tools/tests/playwright.mjs.
 //   python build_rs.py app render2dtest --target win
 //   python build_rs.py app render2dtest --target web
 //   node apps/render2dtest/tests/engine_web.mjs [build] [--modes=simd,threads,scalar] [--native=FILE] [--gpu=d3d12|vulkan|swiftshader] [--save=DIR]
@@ -151,6 +154,61 @@ try {
         if(!good) failures++;
       }
       await page.close();
+      // (G6e1) the CPU path in this bundle, without WebGPU: its images byte for byte as the native program's
+      if(!benchRun) {
+        const cpage=await browser.newPage(), clines=[], cimages={};
+        let cpiece='';
+        const cdone=new Promise(ok=>cpage.on('console',m=>{
+          const t=m.text().trimEnd();
+          if(t.startsWith('part ')) {
+            if(t==='part end') {const [,name,hex]=cpiece.split(' '); cimages[name]=Buffer.from(hex,'hex'); cpiece='';}
+            else cpiece+=t.slice(t.indexOf(' ',5)+1);
+            return;
+          }
+          clines.push(t);
+          if(/^render2dtest: /.test(t)) ok(t);
+        }));
+        cpage.on('pageerror',e=>clines.push(`pageerror ${e}`));
+        await cpage.goto(`http://127.0.0.1:${server.address().port}/index.html?compute=${mode}&gpu=0&gpuenv=jfgui_GPU_PROBE=cpu`);
+        const cend=await Promise.race([cdone,new Promise(ok=>setTimeout(()=>ok('timeout'),300000).unref())]);
+        const names=Object.keys(reference).filter(k=>k.startsWith('cpu_'));
+        let same=0, differ=0, worst=null;
+        for(const key of names) {
+          if(!cimages[key]) {console.log(`  FAIL ${mode}: no CPU image ${key}`); differ++; continue;}
+          const c=compare(cimages[key],reference[key]);
+          if(c.pixels) {
+            differ++;
+            if(!worst||c.pixels>worst.pixels) worst={...c,name:key};
+            if(option('save')) await writeFile(join(option('save'),`web_${mode}_${key}.bgra`),cimages[key]);
+          } else same++;
+        }
+        for(const l of clines.filter(l=>l.startsWith('FAIL')||l.startsWith('pageerror'))) console.log(`${mode}: ${l}`);
+        const cgood=cend.startsWith('render2dtest: ')&&/ 0 failed/.test(cend)&&names.length>0&&!differ;
+        console.log(`${cgood?'PASS':'FAIL'} ${mode} CPU path (gpu=0): ${same} of ${names.length} images byte for byte as the native program's${worst?`; the worst: ${worst.name}: ${worst.pixels} pixels, largest ${worst.largest}`:''} (${clines.find(l=>l.startsWith('ok '))||cend})`);
+        if(!cgood) failures++;
+        ran++;
+        await cpage.close();
+        // the demo without a device: its view painted by the CPU path (paper, the red and the blue axis, the drawing)
+        const dpage=await browser.newPage({viewport:{width:720,height:512}});
+        const derr=[];
+        dpage.on('pageerror',e=>derr.push(String(e)));
+        await dpage.goto(`http://127.0.0.1:${server.address().port}/index.html?compute=${mode}&gpu=0`);
+        await dpage.waitForTimeout(4000);
+        const shot=await dpage.screenshot({type:'png'});
+        const px=await dpage.evaluate(async b64=>{
+          const img=new Image(); img.src='data:image/png;base64,'+b64; await img.decode();
+          const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
+          const g=c.getContext('2d'); g.drawImage(img,0,0);
+          const d=g.getImageData(0,0,img.width,img.height).data;
+          const count=(r,gg,b)=>{let n=0; for(let i=0;i<d.length;i+=4) if(Math.abs(d[i]-r)<=2&&Math.abs(d[i+1]-gg)<=2&&Math.abs(d[i+2]-b)<=2) n++; return n;};
+          return {paper:count(0xF4,0xF1,0xEA),red:count(0xD0,0x20,0x20),blue:count(0x20,0x40,0xC0),grey:count(0x30,0x34,0x38)};
+        },shot.toString('base64'));
+        const dgood=px.paper>50000&&px.red>1500&&px.blue>1500&&!derr.length;
+        console.log(`${dgood?'PASS':'FAIL'} ${mode} the demo without a device (gpu=0): paper ${px.paper} pixels, the red axis ${px.red}, the blue one ${px.blue}, the no-device grey ${px.grey}${derr.length?`; ${derr.join('; ')}`:''}`);
+        if(option('save')) await writeFile(join(option('save'),`web_${mode}_demo_gpu0.png`),shot);
+        if(!dgood) failures++;
+        await dpage.close();
+      }
     }
   } finally {await browser.close();}
 } finally {

@@ -5,6 +5,9 @@
 // starts plattest --test launched --marker FILE ARGS..., which writes its arguments to FILE,
 // one per line: the words arrive as they were given (blanks, quotes, backslashes, an empty
 // one, non-ASCII); process::find; a program that does not exist
+// plattest --test alive: plat::process_id / process_alive: this process and System / init run,
+// 0 and u32::MAX do not; a child (plattest --test alive-child, which sleeps) runs until it is
+// ended; Child::id
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -93,4 +96,43 @@ pub fn t_launched(_: &mut T) {
     let Some(m) = a.get(k + 1) else { return };
     let words: Vec<String> = a[k + 2..].iter().map(|w| alloc::format!("{}\n", w)).collect();
     write_file(m, words.concat().as_bytes());
+}
+
+pub fn t_alive(t: &mut T) {
+    let me = plat::process_id();
+    t.check(me != 0, "alive: process_id of this process");
+    t.check(plat::process_alive(me), "alive: this process runs");
+    t.check(!plat::process_alive(0), "alive: 0 is no process");
+    t.check(!plat::process_alive(u32::MAX), "alive: u32::MAX is no process");
+    // a process this one may not open or signal still runs: Windows' System (4), init (1)
+    let other = if cfg!(windows) { 4 } else { 1 };
+    t.check(plat::process_alive(other), "alive: a process of the system runs (System / init)");
+    let exe = plat::current_exe().unwrap_or_default();
+    let command = plat::process::Command { program: &exe, args: &["--test", "alive-child"], cwd: None, env: &[] };
+    let Ok(mut child) = command.spawn() else {
+        t.check(false, "alive: the child starts");
+        return;
+    };
+    let pid = child.id();
+    t.check(pid != 0 && pid != me, "alive: Child::id");
+    t.check(plat::process_alive(pid), "alive: the child runs");
+    // terminate reaps the child on Linux and Apple; on Windows the Child still holds the ended
+    // process, so its id is not reused meanwhile
+    child.terminate();
+    let mut gone = false;
+    for _ in 0..100 {
+        // 100 x 50 ms
+        if !plat::process_alive(pid) {
+            gone = true;
+            break;
+        }
+        sleep_ms(50);
+    }
+    t.check(gone, "alive: the ended child no longer runs");
+    drop(child);
+}
+
+/// the child of --test alive: sleeps until it is ended (at most 30 s)
+pub fn t_alive_child(_: &mut T) {
+    sleep_ms(30_000);
 }

@@ -1929,7 +1929,11 @@ impl Ui {
                 }
                 VK_RETURN => self.m.edit.tb_ev |= EV_COMMIT,
                 VK_ESCAPE => {
-                    self.wp.ctx.focus = 0;
+                    // in the top popup (a picker's search box) Esc closes the popup, else the
+                    // box gives up the focus
+                    if !self.pp_escape_in_content() {
+                        self.wp.ctx.focus = 0;
+                    }
                     self.m.edit.ed_id = 0;
                     self.m.edit.tb_ev |= EV_COMMIT;
                     self.repass();

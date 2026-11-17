@@ -15,6 +15,9 @@
 // layout: per side its groups ("[shown]+other"), "(zu)" for a collapsed side, the floating
 // windows, the hidden panels, the side sizes and how often dock_end reported a change.  The
 // document shows the saved text.  Floating windows have the window ids 501 .. 506.
+// Commands (cmd in scripts): 7 opens "Zweites Fenster" (600), a dock area of the same id with
+// its own layout; 8 floats Eigenschaften of the main window, 9 that of the second window (in
+// window dock_float_id(500, 600, 0), its caption shows the number).
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -28,7 +31,8 @@ use alloc::vec::Vec;
 use ui::*;
 use ui::i18n::{t, tf, Catalog};
 
-const ID_DOCK: u32 = 500; // floating windows: 501 ..
+const ID_DOCK: u32 = 500; // floating windows: 501 .. (in the second window: dock_float_id)
+const ID_SECOND: u32 = 600; // command 7: "Zweites Fenster", a dock area of the same id
 const ID_SAVE: u32 = 101;
 const ID_LOAD: u32 = 102;
 const ID_RESET: u32 = 103;
@@ -48,6 +52,9 @@ const P_HISTORY: u32 = 16;
 const PANELS: [u32; 6] = [P_FILES, P_OUTLINE, P_PROPS, P_OUTPUT, P_SEARCH, P_HISTORY];
 
 const CMD_FOCUS0: u32 = 1; // .. 6: focus panel k
+const CMD_SECOND: u32 = 7; // the second window opens
+const CMD_FLOAT_MAIN: u32 = 8; // Eigenschaften of the main window floats
+const CMD_FLOAT_SECOND: u32 = 9; // Eigenschaften of the second window floats
 static CMDS: [Command; 6] = [
     Command::new(CMD_FOCUS0, "Dateien", 0, MOD_CTRL, b'1' as u32, 0),
     Command::new(CMD_FOCUS0 + 1, "Gliederung", 0, MOD_CTRL, b'2' as u32, 0),
@@ -81,6 +88,9 @@ fn title(p: u32) -> &'static str {
 #[derive(Default)]
 struct Dock {
     dock: DockState,
+    /// the dock area of the second window (command 7)
+    dock2: DockState,
+    second_open: Shared<i32>,
     saved: String,
     changes: u32,
     clicked: String,
@@ -230,6 +240,25 @@ impl App for Dock {
         ui.text(TS_CAPTION, &tf("Änderungen: {}", &[&format!("{}", self.changes)]));
         ui.box_end();
         ui.box_end();
+        // command 7: the same dock area id in another window, with floating windows of its own
+        let open = self.second_open.clone();
+        if ui.window_begin(ID_SECOND, t("Zweites Fenster"), Some(&open), WF_RESIZABLE, None) {
+            ui.next_size(SIZE_FILL, SIZE_FILL);
+            ui.box_begin(0, BOX_V, 0);
+            ui.next_size(SIZE_FILL, SIZE_FILL);
+            ui.dock_begin(ID_DOCK, &mut self.dock2, &panels);
+            while let Some(p) = ui.dock_next(&mut self.dock2) {
+                self.panel(ui, p);
+            }
+            ui.dock_end(&mut self.dock2);
+            ui.box_begin(0, BOX_H | PAD_8, 16);
+            let fs: Vec<String> = self.dock2.floats().iter().flatten().map(|&p| String::from(title(p))).collect();
+            let f = if fs.is_empty() { String::from("-") } else { fs.join("+") };
+            ui.text(TS_CAPTION, &tf("Schwebend: {} in Fenster {}", &[&f, &format!("{}", dock_float_id(ID_DOCK, ID_SECOND, 0))]));
+            ui.box_end();
+            ui.box_end();
+        }
+        ui.window_end();
     }
 
     fn command(&mut self, _ui: &mut Ui, id: u32, _arg: u32) -> bool {
@@ -237,7 +266,17 @@ impl App for Dock {
             self.dock.focus(PANELS[(id - CMD_FOCUS0) as usize]);
             return true;
         }
-        false
+        match id {
+            CMD_SECOND => self.second_open.set(1),
+            CMD_FLOAT_MAIN => {
+                self.dock.float(P_PROPS, Some([700, 120, 260, 300]));
+            }
+            CMD_FLOAT_SECOND => {
+                self.dock2.float(P_PROPS, Some([720, 460, 260, 300]));
+            }
+            _ => return false,
+        }
+        true
     }
 }
 

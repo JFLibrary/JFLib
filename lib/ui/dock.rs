@@ -29,7 +29,8 @@
 // A drag shows drop markers at the three edges of the area (a new group on that side) and on the
 // group under the pointer (as a tab, before, after it); a release over a tab strip inserts it
 // there; anywhere else -- also outside the window -- the panel floats in a tool window at the
-// pointer (WF_TOOL, window ids id + 1 .. id + DOCK_FLOAT_MAX).  Tabs of a floating window drag the
+// pointer (WF_TOOL, window ids dock_float_id(id, window, k): id + 1 .. id + DOCK_FLOAT_MAX in the
+// main window, ids of their own in any other).  Tabs of a floating window drag the
 // same way onto the main window's markers (the pointer stays with the floating window); its pin
 // button or a double click docks it where it came from, its close button hides its panels.  Esc
 // cancels a hold and a drag (the release is no click then).
@@ -40,8 +41,8 @@
 // Structural changes (clicks, drops, menu rows) are applied at dock_end, followed by another
 // pass; splitters change the sizes at once.  Widget ids are parts of the area id (pid).
 // Every window keeps the state of its dock areas (WinParts::dock): an area of the same id in two
-// windows lays out, drags and floats by itself.  The ids of the floating windows are the app's
-// window ids, though: areas that float panels in two windows need ids of their own.
+// windows lays out, drags and floats by itself, in floating windows of its own (dock_float_id
+// hashes the area and the window outside the main window).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -74,6 +75,15 @@ pub const DP_HIDDEN: u32 = 4;
 pub const DP_GROUP: u32 = 8;
 /// floating windows of one dock area at most (fixed: each is a window, WIN_MAX)
 pub const DOCK_FLOAT_MAX: usize = 6;
+
+/// The window id of floating window `k` (0 .. DOCK_FLOAT_MAX) of the dock area `area` in the app
+/// window `win` (0 = the main window): area + 1 + k in the main window; in any other window an id
+/// of its own hashed from area and win (ID_HASH_BASE and up, like ui.id), so an area of the same
+/// id in two windows floats its panels in windows of their own.
+pub const fn dock_float_id(area: u32, win: u32, k: usize) -> u32 {
+    let base = if win == 0 { area } else { super::ids::pair_id(area, win) };
+    base.wrapping_add(1 + k as u32)
+}
 /// drop marker kinds (StyleShell::dock_marker, sp.value): the part of the place it fills
 pub const DOCK_MK_LEFT: i32 = 0;
 pub const DOCK_MK_RIGHT: i32 = 1;
@@ -849,7 +859,9 @@ enum Act {
 enum Slot {
     Center,
     Group(usize),
-    Float(usize),
+    /// a floating window by its slot, not its index: the app may change the DockState between
+    /// dock_next calls (close a panel, float or dock one), which moves the indices
+    Float(u8),
 }
 
 // the library's side of a floating window: its open flag and placement
@@ -865,6 +877,8 @@ struct WinSlot {
 #[derive(Default)]
 pub(crate) struct Rt {
     id: u32,
+    /// the app id of the window the area is in (0: the main window; dock_float_id)
+    owner: u32,
     panels: Vec<PInfo>,
     area: [i32; 4],
     center: [i32; 4],
@@ -1019,6 +1033,7 @@ impl Ui {
         let _src = self.src_scope();
         let win = self.uiw_cur;
         let mut rt = self.dk_take(win, id);
+        rt.owner = self.window_current();
         let cur = &mut self.m.dock.cur;
         cur.retain(|&c| c != (win, id)); // (a dock_end the app left out)
         cur.push((win, id));
@@ -1067,7 +1082,7 @@ impl Ui {
         }
         for f in 0..st.floats.len() {
             if st.floats[f].group.panels.iter().any(|&p| rt.present(p)) {
-                rt.slots.push(Slot::Float(f));
+                rt.slots.push(Slot::Float(st.floats[f].slot));
             }
         }
         rt.next = 0;
@@ -1110,7 +1125,12 @@ impl Ui {
                     rt.hits0 = self.wp.ctx.hits[self.wp.ctx.hit_cur].len();
                     out = Some(geo.active);
                 }
-                Slot::Float(f) => out = self.dk_float_open(&mut rt, st, f),
+                Slot::Float(s) => {
+                    // (gone meanwhile: nothing to fill)
+                    if let Some(f) = st.floats.iter().position(|x| x.slot == s) {
+                        out = self.dk_float_open(&mut rt, st, f);
+                    }
+                }
             }
         }
         self.dk_put(win, rt);
@@ -1709,7 +1729,7 @@ impl Ui {
             }
             w.open.set(1);
         }
-        let wid = rt.id.wrapping_add(1 + k as u32);
+        let wid = dock_float_id(rt.id, rt.owner, k);
         let title = rt.title(active);
         let (open, rect) = (rt.wins[k].open.clone(), rt.wins[k].rect.clone());
         if !self.window_begin(wid, &title, Some(&open), WF_TOOL | WF_RESIZABLE, Some(&rect)) {

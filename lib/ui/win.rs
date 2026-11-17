@@ -1022,6 +1022,7 @@ impl Ui {
 
     /// uiw_hide(i): the window disappears (its state and buffers stay)
     pub(crate) fn uiw_hide(&mut self, i: u32) {
+        self.spell_window_gone(i);
         let iu = (i as usize) & (WIN_MAX - 1);
         let r = &mut self.m.win.recs[iu];
         r.state &= !(UWI_VISIBLE | UWI_NEWSHOW);
@@ -2019,6 +2020,7 @@ impl Ui {
                 self.uwp_destroy(i);
             }
         }
+        self.spell_window_gone(i);
         self.m.win.used &= !(1 << i);
         self.m.win.recs[iu] = Rec::default();
         if !self.headless {

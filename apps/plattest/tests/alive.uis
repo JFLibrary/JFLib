@@ -1,0 +1,6 @@
+#!args --test alive
+#!only windows linux macos
+# (Rust only) plattest --test alive: plat::process_id and plat::process_alive (charge 13): this
+# process runs, 0 and u32::MAX do not, a child (plattest --test alive-child) runs until
+# Child::terminate ends it (iOS starts no child processes).  The whole test runs before the UI starts and ends the process with
+# the number of failures.

@@ -248,33 +248,41 @@ pub fn spec_constants(words: &[u32]) -> Result<Vec<SpecConst>, String> {
     Ok(out)
 }
 
+// words the constants of a module may hold together (and a type of one): a module of a few
+// composites of composites (or a ConstantNull of a huge array) asked for any amount of memory,
+// and nested structs took exponential time to measure
+const MAX_WORDS: usize = 1 << 22;
+
 struct Eval {
     tys: BTreeMap<u32, Ty>,
     vty: BTreeMap<u32, u32>,
     vals: BTreeMap<u32, Vec<u32>>,
+    /// words of a value of each type a constant may have, measured once where the type is
+    /// declared (its parts and an array's length come before it)
+    sizes: BTreeMap<u32, usize>,
+    /// words of every constant so far
+    total: usize,
 }
 
 impl Eval {
     /// words of a value of type t
     fn size(&self, t: u32) -> Result<usize, String> {
-        Ok(match self.tys.get(&t) {
-            Some(Ty::Bool) => 1,
-            Some(Ty::Int { width, .. } | Ty::Float { width }) => if *width == 64 { 2 } else { 1 },
-            Some(Ty::Vector { elem, n }) => *n as usize * self.size(elem.0)?,
-            Some(Ty::Matrix { col, cols }) => *cols as usize * self.size(col.0)?,
-            Some(Ty::Array { elem, len }) => {
-                let l = self.vals.get(&len.0).and_then(|w| w.first()).copied().ok_or("an array length without a value")?;
-                l as usize * self.size(elem.0)?
-            }
-            Some(Ty::Struct { members }) => {
-                let mut s = 0;
-                for m in members {
-                    s += self.size(m.0)?;
-                }
-                s
-            }
-            _ => return Err(format!("%{} is no type of a constant", t)),
-        })
+        self.sizes.get(&t).copied().ok_or_else(|| format!("%{} is no type of a constant (or one of more than {} words)", t, MAX_WORDS))
+    }
+
+    /// the words of type t from its parts' (None: no constant's type, or too large)
+    fn type_size(&self, t: u32) -> Option<usize> {
+        let part = |p: u32| self.sizes.get(&p).copied();
+        let w = match self.tys.get(&t)? {
+            Ty::Bool => 1,
+            Ty::Int { width, .. } | Ty::Float { width } => if *width == 64 { 2 } else { 1 },
+            Ty::Vector { elem, n } => (*n as usize).checked_mul(part(elem.0)?)?,
+            Ty::Matrix { col, cols } => (*cols as usize).checked_mul(part(col.0)?)?,
+            Ty::Array { elem, len } => (*self.vals.get(&len.0)?.first()? as usize).checked_mul(part(elem.0)?)?,
+            Ty::Struct { members } => members.iter().try_fold(0usize, |s, m| s.checked_add(part(m.0)?))?,
+            _ => return None,
+        };
+        (w <= MAX_WORDS).then_some(w)
     }
 
     /// (word offset, type) of the element `idx` selects inside type t
@@ -480,10 +488,17 @@ pub fn constant_values(words: &[u32], set: &[(u32, u64)]) -> Result<BTreeMap<u32
         }
     }
     let given = |id: u32| spec_ids.get(&id).and_then(|s| set.iter().find(|x| x.0 == *s)).map(|x| x.1);
-    let mut e = Eval { tys: types(&ins), vty: BTreeMap::new(), vals: BTreeMap::new() };
+    let mut e = Eval { tys: types(&ins), vty: BTreeMap::new(), vals: BTreeMap::new(), sizes: BTreeMap::new(), total: 0 };
+    let too_large = || format!("the constants hold more than {} words", MAX_WORDS);
     for i in &ins {
         if i.op == op::Function {
             break;
+        }
+        if i.ty == 0 && e.tys.contains_key(&i.res) {
+            if let Some(s) = e.type_size(i.res) {
+                e.sizes.insert(i.res, s);
+            }
+            continue;
         }
         if i.ty != 0 {
             e.vty.insert(i.res, i.ty);
@@ -495,7 +510,11 @@ pub fn constant_values(words: &[u32], set: &[(u32, u64)]) -> Result<BTreeMap<u32
             op::ConstantComposite | op::SpecConstantComposite => {
                 let mut w = Vec::new();
                 for p in i.ops {
-                    w.extend_from_slice(e.value(*p)?);
+                    let part = e.value(*p)?;
+                    if w.len() + part.len() > MAX_WORDS {
+                        return Err(too_large());
+                    }
+                    w.extend_from_slice(part);
                 }
                 w
             }
@@ -513,6 +532,10 @@ pub fn constant_values(words: &[u32], set: &[(u32, u64)]) -> Result<BTreeMap<u32
             op::SpecConstantOp => e.spec_op(i.ty, i.ops)?,
             _ => continue,
         };
+        e.total = e.total.saturating_add(v.len());
+        if e.total > MAX_WORDS {
+            return Err(too_large());
+        }
         e.vals.insert(i.res, v);
     }
     Ok(e.vals)

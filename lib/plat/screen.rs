@@ -188,7 +188,9 @@ pub fn pick_start() -> Result<(), ScreenError> {
     if PICKING.swap(true, Ordering::SeqCst) {
         return Err(ScreenError::Busy);
     }
-    let test = TEST_POINT.lock().take();
+    // a test point reads the screen without the user choosing: a capture, so only with
+    // screen.capture (else the user picks as always)
+    let test = TEST_POINT.lock().take().filter(|_| crate::policy::screen_capture_allowed());
     let r = native::pick_start(test);
     if r.is_err() {
         PICKING.store(false, Ordering::SeqCst);
@@ -198,7 +200,7 @@ pub fn pick_start() -> Result<(), ScreenError> {
 
 /// (test aid) the next pick_start answers the pixel at the desktop point x, y at once,
 /// without asking the user (Windows, X11; the portal and the browser ignore it); None: ask
-/// again
+/// again.  With a manifest only where `screen.capture` allows pictures of the screen
 pub fn pick_test_point(p: Option<(i32, i32)>) {
     *TEST_POINT.lock() = p;
 }

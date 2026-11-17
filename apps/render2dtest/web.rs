@@ -480,8 +480,37 @@ impl Probe {
         Ok(false)
     }
 
+    /// (G6e1) the CPU path's images of gallery::shots() (scenes without a device; no WebGPU needed), as hex lines: the test
+    /// compares them byte for byte with the native program's (render2dtest --dump: DIR/cpu_NAME.bgra)
+    fn cpu_probe(&mut self) {
+        let mut hash = 0xcbf2_9ce4_8422_2325u64;
+        let mut n = 0;
+        let t0 = plat::time_us();
+        for sh in shots() {
+            let img = match cpu_shot(&sh) {
+                Ok(v) => v,
+                Err(e) => {
+                    self.yes(false, &format!("{}: {e}", sh.name));
+                    continue;
+                }
+            };
+            hash = fnv(hash, &img);
+            n += 1;
+            let line: String = hex_line(&format!("cpu_{}", sh.name), &img);
+            for (i, piece) in line.as_bytes().chunks(16000).enumerate() {
+                let text = core::str::from_utf8(piece).unwrap_or("");
+                say(&format!("part {i} {text}"));
+            }
+            say("part end");
+        }
+        let ms = (plat::time_us() - t0) as f64 / 1000.0;
+        self.yes(n > 0, &format!("the CPU path drew {n} images of scenes without a device in {ms:.0} ms: FNV-1a {hash:016x}"));
+        self.end();
+    }
+
     fn step(&mut self) -> Result<()> {
         match self.step {
+            0 if self.probe == "cpu" => self.cpu_probe(),
             0 => {
                 match Instance::new() {
                     Ok(i) => self.inst = Some(i),

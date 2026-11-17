@@ -119,7 +119,37 @@ fn textured(texture: u32, sampling: Sampling) -> Material {
 const NO_TURN: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
 
 pub fn textures(t: &mut T) {
+    tall_fit(t);
     on_levels(t, &mut |t, dev, level| { let _ = textures_on(t, dev, level); });
+}
+
+/// (no device) a tall texture is resampled columns first: 1 x 64 gives the 64 x 1 picture's
+/// levels transposed, byte for byte (rows first held h x size floats: 1 GiB for 1 x 32768)
+fn tall_fit(t: &mut T) {
+    let wide: Vec<u8> = (0..64u32).flat_map(|x| [(x * 4) as u8, (255 - x * 3) as u8, (x * 7) as u8, 255]).collect();
+    for srgb in [false, true] {
+        let a = render3d::mip_chain(&TextureData { width: 64, height: 1, rgba: &wide, srgb, nearest: false });
+        let b = render3d::mip_chain(&TextureData { width: 1, height: 64, rgba: &wide, srgb, nearest: false });
+        // the class size: a power of two, n x n texels
+        let n = a.first().map_or(0, |l| {
+            let mut n = 1usize;
+            while n * n * 4 < l.len() {
+                n *= 2;
+            }
+            n
+        });
+        let transposed = |l: &[u8]| -> Vec<u8> {
+            let mut o = vec![0u8; l.len()];
+            for y in 0..n {
+                for x in 0..n {
+                    o[(x * n + y) * 4..(x * n + y) * 4 + 4].copy_from_slice(&l[(y * n + x) * 4..(y * n + x) * 4 + 4]);
+                }
+            }
+            o
+        };
+        let same = n > 0 && a.len() == b.len() && transposed(&a[0]) == b[0];
+        t.ok(same, &format!("textures: 1 x 64 resampled as 64 x 1 transposed (srgb {srgb}, {n} x {n})"));
+    }
 }
 
 fn textures_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {

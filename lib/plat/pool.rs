@@ -489,7 +489,20 @@ fn loop_items(count: usize, f: &(dyn Fn(usize, &JobCtl) + Sync)) -> Result<(), C
         if let Some(s) = work_sem() {
             s.post((count - 1).min(n as usize) as u32);
         }
+        // an item of this thread that panics (feature unwind, under catch_unwind) unwinds this
+        // frame, and the job on its stack must not go while workers still use it: cancelled,
+        // left and waited for first (with panic = "abort" the guard never runs)
+        struct Unwinding<'a>(&'a JobCtl);
+        impl Drop for Unwinding<'_> {
+            fn drop(&mut self) {
+                self.0.cancel.swap(1, SeqCst);
+                leave(self.0);
+                wait_done(self.0);
+            }
+        }
+        let guard = Unwinding(&job);
         run_items(&job);
+        core::mem::forget(guard);
         leave(&job);
         wait_done(&job);
     }

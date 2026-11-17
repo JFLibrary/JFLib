@@ -46,6 +46,7 @@ impl Run {
 /// run every check -> exit code
 pub fn run() -> i32 {
     let mut r = Run { fails: 0 };
+    bmp_embedded(&mut r);
     heif_checks(&mut r);
     tiff(&mut r);
     pdn(&mut r);
@@ -54,6 +55,42 @@ pub fn run() -> i32 {
         return 1;
     }
     0
+}
+
+// ================================================================== BMP
+
+/// a BMP whose header says 1 x 1 around a 1024 x 1024 PNG (BI_PNG): in an OS/2 2.x header the
+/// metadata scan took the header's size while the decoder unpacked the PNG, so the caller's
+/// pixel limit saw one pixel; the same in a V3 header, and an embedded file the scan cannot read
+fn bmp_embedded(r: &mut Run) {
+    let png = img_png::encode(&vec![0x80u8; 1024 * 1024], 1024, 1024, 1024, true);
+    let bmp = |hsz: u32, emb: &[u8]| {
+        let off = 14 + hsz;
+        let mut d = Vec::new();
+        d.extend_from_slice(b"BM");
+        d.extend_from_slice(&(off + emb.len() as u32).to_le_bytes());
+        d.extend_from_slice(&[0, 0, 0, 0]);
+        d.extend_from_slice(&off.to_le_bytes());
+        let mut h = vec![0u8; hsz as usize];
+        h[0..4].copy_from_slice(&hsz.to_le_bytes());
+        h[4..8].copy_from_slice(&1u32.to_le_bytes()); // 1 x 1
+        h[8..12].copy_from_slice(&1u32.to_le_bytes());
+        h[12..14].copy_from_slice(&1u16.to_le_bytes()); // planes
+        h[14..16].copy_from_slice(&0u16.to_le_bytes()); // bpp 0 (the embedded file's)
+        h[16..20].copy_from_slice(&5u32.to_le_bytes()); // BI_PNG
+        h[20..24].copy_from_slice(&(emb.len() as u32).to_le_bytes());
+        d.extend_from_slice(&h);
+        d.extend_from_slice(emb);
+        d
+    };
+    let dec = |file: &[u8]| {
+        let dec = ImgDec { maxpx: 1000, ..Default::default() };
+        let (mut sf, mut meta) = (Surface::default(), ImgMeta::default());
+        img_bmp::decode_ex(file, &mut sf, &dec, &mut meta)
+    };
+    r.check("bmp: BI_PNG 1024 x 1024 in an OS/2 header saying 1 x 1, max 1000 pixels", ERR_LIMIT, || dec(&bmp(64, &png)));
+    r.check("bmp: the same in a V3 header", ERR_LIMIT, || dec(&bmp(56, &png)));
+    r.check("bmp: BI_PNG whose embedded file is no PNG", ERR_HDR, || dec(&bmp(56, b"not a png at all, just bytes")));
 }
 
 // ================================================================== HEIF / AVIF

@@ -42,9 +42,14 @@
 //                district, working zoom, hairlines and the plan's widths; with arcs, circles and dash patterns, or
 //                (--plain) without, as in G6a2a
 //   render2dtest --dump DIR                  gallery::shots() of both levels as DIR/voll_NAME.bgra, DIR/basis_NAME.bgra
-//                (rows of B, G, R, A): what tests/engine_web.mjs compares the browser with
+//                (rows of B, G, R, A): what tests/engine_web.mjs compares the browser with; G6e1: the CPU path's as
+//                DIR/cpu_NAME.bgra (scenes without a device; also without a GPU)
 //   render2dtest --demo                      the demo: a drawing in a view, pan by dragging, zoom with the wheel at
 //                                            the pointer (in the browser and on Android the app is this)
+//   render2dtest --demo --no-gpu             the same without a device (jfgui_GPU=0): the view paints through the CPU
+//                                            path (G6e1)
+//   render2dtest --test cpu                  the CPU path (Scene::draw_cpu) against the GPU on every image of --dump, by
+//                                            category; a scene without a device; detach and attach (cpucmp.rs)
 //   render2dtest --gen-shaders FILE          lib/render2d/shaders_spv.rs from lib/render2d/*.wgsl
 //
 // Without Vulkan or a usable GPU every test prints SKIP and passes.  Exit code 1 when a check failed.
@@ -56,6 +61,8 @@ extern crate alloc;
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 mod blocks;
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+mod cpucmp;
 mod demo;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 mod bench;

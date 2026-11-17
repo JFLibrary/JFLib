@@ -638,8 +638,13 @@ pub fn meta(d: &[u8], m: &mut ImgMeta, flags: u32) -> i32 {
     m.bits = bpp as u8;
     m.model = IMM_PAL;
     m.channels = 1;
-    if (comp == 4 || comp == 5) && hsz != 64 {
-        embed_meta(d, m, comp); // embedded file: its own header decides
+    // an embedded file exactly where decode_fl decodes one (BI_PNG in an OS/2 header too); its
+    // own header decides, and one the scan cannot read is an error -- the BMP header's size
+    // would pass the caller's pixel limit while the decoder unpacks the embedded image
+    if comp == 5 || (comp == 4 && hsz != 64) {
+        if !embed_meta(d, m, comp) {
+            return ERR_HDR;
+        }
     } else if comp == 4 {
         m.model = IMM_YCC; // OS/2 RLE24
         m.channels = 3;
@@ -677,14 +682,14 @@ pub fn meta(d: &[u8], m: &mut ImgMeta, flags: u32) -> i32 {
 
 // bmp_embed_meta: BI_JPEG (4) / BI_PNG (5): scan the embedded file (bfOffBits, biSizeImage bytes
 // or up to the end) and take its size, depth, model, channels and alpha / lossless / interlace /
-// HDR flags, so that img_decode_ex checks the real size
-fn embed_meta(d: &[u8], m: &mut ImgMeta, comp: u32) {
+// HDR flags, so that img_decode_ex checks the real size -> false: no embedded file it reads
+fn embed_meta(d: &[u8], m: &mut ImgMeta, comp: u32) -> bool {
     if d.len() < 54 {
-        return;
+        return false;
     }
     let off = u32_at(d, 10) as usize;
     if off > d.len() {
-        return;
+        return false;
     }
     let mut n = d.len() - off;
     let s = u32_at(d, 34) as usize;
@@ -694,7 +699,7 @@ fn embed_meta(d: &[u8], m: &mut ImgMeta, comp: u32) {
     let mut e = ImgMeta::default();
     let ok = if comp == 5 { png_meta(&d[off..off + n], &mut e) } else { jpeg_meta(&d[off..off + n], &mut e) };
     if !ok {
-        return;
+        return false;
     }
     m.w = e.w;
     m.h = e.h;
@@ -702,6 +707,7 @@ fn embed_meta(d: &[u8], m: &mut ImgMeta, comp: u32) {
     m.model = e.model;
     m.channels = e.channels;
     m.flags |= e.flags & (IMF_ALPHA | IMF_LOSSLESS | IMF_INTERLACED | IMF_HDR);
+    true
 }
 
 // png_meta with flags 0

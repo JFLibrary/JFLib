@@ -19,7 +19,7 @@ use crate::blend::Patch;
 use crate::rnd::Jrn;
 use crate::ent::{je_read, Jr};
 use crate::hdr::{unpack_signed, Jx, JX_MAXDIM};
-use crate::modular::{Ma, Mi, WH_DEF};
+use crate::modular::{Ma, Mi, SqWork, WH_DEF};
 use crate::tab;
 use crate::vdc::Jv;
 
@@ -157,6 +157,8 @@ pub struct Jf {
     pub nonvis: u32,
     pub newref: Option<Box<Jrn>>,
     pub newdc: Option<Box<Jrn>>, // jxl-plus: the output of a DC frame (before the colour transform)
+    /// the decode's squeeze budget: what the frames before left (decode hands it on)
+    pub sq_work: SqWork,
 }
 
 impl Jf {

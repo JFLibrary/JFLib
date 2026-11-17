@@ -65,7 +65,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
-  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [text.rs](#render2dtextrs)
+  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [cpu.rs](#render2dcpurs) · [text.rs](#render2dtextrs)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -3007,7 +3007,8 @@ the tab.  Clicks, double clicks, the menu and the splitters need no hold.
 A drag shows drop markers at the three edges of the area (a new group on that side) and on the
 group under the pointer (as a tab, before, after it); a release over a tab strip inserts it
 there; anywhere else -- also outside the window -- the panel floats in a tool window at the
-pointer (WF_TOOL, window ids id + 1 .. id + DOCK_FLOAT_MAX).  Tabs of a floating window drag the
+pointer (WF_TOOL, window ids dock_float_id(id, window, k): id + 1 .. id + DOCK_FLOAT_MAX in the
+main window, ids of their own in any other).  Tabs of a floating window drag the
 same way onto the main window's markers (the pointer stays with the floating window); its pin
 button or a double click docks it where it came from, its close button hides its panels.  Esc
 cancels a hold and a drag (the release is no click then).
@@ -3018,8 +3019,8 @@ and gives its tab strip the focus (the app binds it to its commands).
 Structural changes (clicks, drops, menu rows) are applied at dock_end, followed by another
 pass; splitters change the sizes at once.  Widget ids are parts of the area id (pid).
 Every window keeps the state of its dock areas (WinParts::dock): an area of the same id in two
-windows lays out, drags and floats by itself.  The ids of the floating windows are the app's
-window ids, though: areas that float panels in two windows need ids of their own.
+windows lays out, drags and floats by itself, in floating windows of its own (dock_float_id
+hashes the area and the window outside the main window).
 ```
 
 ```rust
@@ -3045,6 +3046,15 @@ DP_HIDDEN: u32 = 4
 DP_GROUP: u32 = 8
 /// floating windows of one dock area at most (fixed: each is a window, WIN_MAX)
 DOCK_FLOAT_MAX: usize = 6
+```
+
+- **`const fn dock_float_id(area: u32, win: u32, k: usize) -> u32`**
+  The window id of floating window `k` (0 .. DOCK_FLOAT_MAX) of the dock area `area` in the app
+  window `win` (0 = the main window): area + 1 + k in the main window; in any other window an id
+  of its own hashed from area and win (ID_HASH_BASE and up, like ui.id), so an area of the same
+  id in two windows floats its panels in windows of their own.
+
+```rust
 /// drop marker kinds (StyleShell::dock_marker, sp.value): the part of the place it fills
 DOCK_MK_LEFT: i32 = 0
 DOCK_MK_RIGHT: i32 = 1
@@ -9690,6 +9700,8 @@ texture of the view's size, and the frame is read back from there.
   GpuContent::draw(e, target, size)            a frame into target (GPU_VIEW_FORMAT, the view's size)
   GpuContent::submitted(id)                    the frame went to the queue
   GpuContent::paint(g, r)                      what the view shows without a device
+  GpuContent::paints()                         paint draws what a frame would (render2d's CPU path): without a
+                                               device the view paints, not the last frame of a device that is gone
   ui.gpu_view_info(win, id)                    what a view does now (tests, measurements)
   AF_GPU_3D                                    the app shows views: the UI's device at level Voll on the
                                                fastest adapter (without it, as ever: Basis, the frugal one)
@@ -9705,7 +9717,8 @@ Where a frame shows (gpu_out.rs "views"):
     jfgui_GPU_OUTPUT=0, jfgui_GPU_VIEWS=0, a script without `gpu on`): the frame is read back at once and the
     Draw copies it into the framebuffer, in the cells the CPU draws.
   - no device (jfgui_GPU=0, no Vulkan or no usable adapter, a static Linux program, a lost device not back
-    yet): the last frame read back, else GpuContent::paint.
+    yet): the last frame read back, else GpuContent::paint (a content that paints itself, GpuContent::paints:
+    always its painting).
 The device is the UI output's (one for all windows); without an output in this run (not wanted, never
 possible) the views make one of their own on first use.  A new device (generation) detaches the content from
 the old one and attaches it to the new one; its next frame follows.
@@ -9745,6 +9758,10 @@ GPU_VIEW_FORMAT: gpu::Format = gpu::Format::Bgra8Unorm
   - `fn paint(&self, g: &mut Gfx, r: [i32; 4])`
     what the view shows without a device (no GPU, jfgui_GPU=0, before the first frame): painted on the CPU into
     g, clipped to r (x, y, w, h); a dark grey unless the content says otherwise
+  - `fn paints(&self) -> bool`
+    paint draws what a frame would (render2d's CPU path, G6e1): without a device the view paints, also where it holds a
+    frame read back from an earlier device (a lost one); false (the default): that last frame stays until a device draws
+    again
 
 - **`struct GpuViewInfo`**
   what a view does now (Ui::gpu_view_info; tests and measurements)
@@ -20054,8 +20071,9 @@ The timeline: one timeline semaphore per device; every submit signals the next v
 (SubmitId).  completed caches the last value seen reached (vkGetSemaphoreCounterValue at
 submits, polls and waits).  A dropped resource goes to the garbage with the value of the
 latest submit and is destroyed once that value is reached -- earlier if no submit is
-pending; a buffer or image, which the open upload command buffer may name, with the value of
-the next submit, which runs it.  Command buffers come from slots (a transient command pool with one buffer each),
+pending; a buffer or image, which the open upload command buffer (or one another thread took
+and has not submitted yet) may name, waits until every such upload is submitted and then takes
+the value reached by then (State::pending).  Command buffers come from slots (a transient command pool with one buffer each),
 reused once their submission completed.  Uploads: the data goes into the staging ring, the
 copies into one upload command buffer that ends with a global barrier (copy writes -> every
 later access) and is put before the caller's command buffers in the next vkQueueSubmit.
@@ -22999,7 +23017,8 @@ TEXT_BAR_BELOW: f64 = 7.0
 ```
 
 - **`struct Scene`**
-  entities, layers, styles and the camera of one scene of a Renderer
+  entities, layers, styles and the camera of one scene: on a Renderer's device, or without one (Scene::new_cpu; draw_cpu
+  draws it through lib/gfx)
 
 - **`struct TextInfo`**
   what a scene's text holds (Scene::text_info).  It may grow
@@ -23021,6 +23040,21 @@ TEXT_BAR_BELOW: f64 = 7.0
 **`impl Scene`**
 
 - **`fn new(r: &Renderer) -> Result<Scene>`**
+  a scene on a renderer's device (Scene::new_cpu, then attach)
+- **`fn new_cpu() -> Scene`**
+  a scene without a device (G6e1): everything but a frame on the GPU works on it (entities, layers, styles, blocks,
+  text, picking, selection, snaps, highlights, the overlay), and draw_cpu draws it through lib/gfx.  attach puts it on
+  a renderer's device (all of it goes up with the next prepare), detach takes it off again (a lost device: the drawing
+  stays)
+- **`fn attach(&mut self, r: &Renderer) -> Result<()>`**
+  the scene on a renderer's device (G6e1): its buffers made there, everything it holds goes up with the next prepare.
+  Attached to another renderer before, it leaves that one first; to the same one, nothing happens.  An error leaves it
+  without a device
+- **`fn detach(&mut self)`**
+  the scene off its device (G6e1; a lost device, another renderer next): what it made there goes, what it holds stays;
+  draw_cpu draws it, attach puts it on a device again
+- **`fn attached(&self) -> bool`**
+  the scene is on a renderer's device (Scene::new, attach); else only draw_cpu draws it
 - **`fn add_style(&mut self, s: &Style) -> Result<StyleId>`**
   a style for entities; the next frame shows it
 - **`fn set_style(&mut self, id: StyleId, s: &Style) -> Result<()>`**
@@ -23093,7 +23127,8 @@ TEXT_BAR_BELOW: f64 = 7.0
   what the last prepare sent
 - **`fn lists_buffer(&self) -> &Buffer`**
   (tests, tools) after a frame's visibility: per visible layer in draw order (drawn_layers) its first place in the
-  visible list and its count (16 bytes each); the visible list (record places in the pool); the indirect draws
+  visible list and its count (16 bytes each); the visible list (record places in the pool); the indirect draws.  These
+  and pool_buffer panic on a scene without a device (Scene::attached)
 - **`fn visible_buffer(&self) -> &Buffer`**
 - **`fn draws_buffer(&self) -> &Buffer`**
 - **`fn pool_buffer(&self) -> &Buffer`**
@@ -23430,6 +23465,61 @@ SNAP_ALL: u32 = 511
   segments' middles, an arc's centre, ends and middle, a circle's centre and quadrants, an ellipse's centre and its
   axes' ends (an open one's ends too), a Bézier chain's and a spline's control points, a fill's corners, a text's
   alignment point, an insert's insertion point (each copy of an array).  Empty for a dead id or a block's entity
+
+### `render2d/cpu.rs`
+
+Source: [`lib/render2d/cpu.rs`](../lib/render2d/cpu.rs)
+
+```text
+cpu -- the CPU path (G6e1, decision 29; docs/RENDER2D.md "Der CPU-Weg"): a scene drawn through lib/gfx's rasterizer
+without a device, with the camera, the painter's order, the visible layers and the look of a frame on the GPU.  A child
+of scene.rs: it reads the scene's entities, layers, styles, blocks, texts, highlights and overlay, and its R-tree (pick.rs).
+
+A frame: the view's box in the drawing (f64), grown by the widest reach in pixels, through the R-tree; the entities found
+sorted into the painter's order (layer, then place in the layer), inserts walked down into their blocks through the
+inverse transforms as pick.rs walks them (the copies of an array that meet the view, each block's own tree, nested
+inserts).  Every point goes from its units to pixels relative to the view in f64 (a block's through its insert's
+transform, the camera's centre taken off before anything is scaled), so ±1e7 at 1e-6 units per pixel stays exact; centre
+lines are clipped in f64 to the target grown by the stroke's reach, and every piece handed to lib/gfx is clipped to the
+target and GUARD px around it: lib/gfx sees small f32 numbers only.  Each entity is one fill of lib/gfx (exact area
+coverage by signed accumulation), blended once in its colour as the GPU blends it (premultiplied sRGB codes).
+
+Strokes are convex pieces whose areas add up to the union the GPU computes: per segment its strip, cut at the bisector of
+each join where the cut fits both segments (miter: the tip comes from the cut, bevel: its line cuts too, round: the
+perpendicular through the vertex, the outer sector a piece of its own), else the GPU's union |a| + |w| + |b| - |a ∩ b|
+(both strips end at the perpendicular, the join's piece beyond both, their intersection subtracted: the accumulation's
+sign takes it); caps as planes (butt, square) or half disks.  Arcs are flattened within ARC_TOL px only where they come
+near the view; curves and fills as the GPU flattens them (the scene's flattening while it holds for the camera, else the
+same function for this camera; a block's per zoom band), fills even-odd from oriented rings.  Dash patterns cut in f64
+along each entity's lengths, flat tones and mixes at the GPU's thresholds; hatches clipped to the fill in f64 and
+multiplied by its coverage as the GPU does; text from its glyphs' outlines in G6c's layout, bars below TEXT_BAR_BELOW px
+per em; highlights and the overlay as G6d draws them.
+```
+
+- **`struct CpuInfo`**
+  what the last draw_cpu did (Scene::draw_cpu, cpu_info).  It may grow
+  - `found: u32` -- entities on layers the index found near the view (an insert once), and what was drawn: entities on layers, each copy
+    of a block's entity in an insert once
+  - `drawn: u32`
+  - `fills: u32` -- fills lib/gfx made (an entity one, a bar of small text one, a hatch's coverages more) and the lines it rasterized
+  - `lines: u64`
+  - `flattened: u32` -- curves and fills flattened on the way (the scene's flattening was made for another zoom band or window; a block's
+    curves and fills each time)
+  - `overlay: u32` -- overlay items drawn
+
+**`impl Scene`**
+
+- **`fn draw_cpu(&mut self, dc: &mut Dc, sf: &mut Surface, r: [i32; 4]) -> CpuInfo`**
+  the scene drawn on the CPU through lib/gfx (G6e1, decision 29): the camera's view of a target of r's size into the
+  rectangle r (x, y, w, h, relative to dc's origin) of sf, clipped to dc's clip, blended over what is there (the app
+  clears it first, as a frame's load does); the painter's order, the visible layers, the look, the highlights and the
+  overlay of a frame on the GPU (docs/RENDER2D.md "Der CPU-Weg").  With and without a device.  dc keeps its colour,
+  clip and origin
+- **`fn set_cpu_single(&mut self, single: bool)`**
+  draw_cpu on one thread (false: row bands on lib/gfx's parallel loop where one is set, gfx::set_parallel: lib/ui sets
+  its worker pool there; the same bytes either way)
+- **`fn cpu_info(&self) -> CpuInfo`**
+  what the last draw_cpu did
 
 ### `render2d/text.rs`
 
@@ -27238,6 +27328,8 @@ Windows child pipes and job ownership; no console window and only explicit handl
 
 **`impl Child`**
 
+- **`fn id(&self) -> u32`**
+  The child's process id (as plat::process_alive takes it).
 - **`fn read_stdout(&mut self, bytes: &mut [u8]) -> Result<Option<usize>, u32>`**
   Read stdout without waiting; None means no data, Some(0) means EOF.
 - **`fn read_stderr(&mut self, bytes: &mut [u8]) -> Result<Option<usize>, u32>`**
@@ -27270,6 +27362,8 @@ Linux child pipes, exec and owned process groups. All allocations precede fork.
   Read stderr without waiting; None means no data, Some(0) means EOF.
 - **`fn write_stdin(&mut self, bytes: &[u8]) -> Result<Option<usize>, u32>`**
   Write available bytes; retry None or the unwritten suffix.
+- **`fn id(&self) -> u32`**
+  The child's process id (as plat::process_alive takes it).
 - **`fn close_stdin(&mut self)`**
   Close stdin to request orderly helper shutdown.
 - **`fn try_wait(&mut self) -> Result<Option<i32>, u32>`**
@@ -27300,6 +27394,8 @@ processes: there every start fails with the system's error.
   Read stderr without waiting; None means no data, Some(0) means EOF.
 - **`fn write_stdin(&mut self, bytes: &[u8]) -> Result<Option<usize>, u32>`**
   Write available bytes; retry None or the unwritten suffix.
+- **`fn id(&self) -> u32`**
+  The child's process id (as plat::process_alive takes it).
 - **`fn close_stdin(&mut self)`**
   Close stdin to request orderly helper shutdown.
 - **`fn try_wait(&mut self) -> Result<Option<i32>, u32>`**
@@ -27982,6 +28078,28 @@ randomness is worse than no key).
 
 - **`fn random_u64() -> u64`**
   a random 64-bit number
+
+### `plat/pid.rs`
+
+Source: [`lib/plat/pid.rs`](../lib/plat/pid.rs)
+
+```text
+Whether a process runs (process_alive) and this process's id (process_id), on every target:
+Windows OpenProcess and a wait of 0 ms, Linux the kill system call with signal 0, Apple and
+Android libc's kill; the browser has no processes.
+```
+
+- **`fn process_id() -> u32`**
+  This process's id, as `std::process::id()` gives it (for apps without std); 0 in the browser.
+
+- **`fn process_alive(pid: u32) -> bool`**
+  Whether a process with this id runs now: the owner of a lock file, a helper started earlier.
+  A process of another user that this one may not open or signal counts too.  Ids are reused:
+  once a process ended, another one may get its id, so a lock file should hold more than the
+  id where that matters (the program, its start time).  A child of this process that ended
+  still counts on Linux, Apple and Android until it is reaped (`process::Child::try_wait`
+  keeps it, dropping the `Child` reaps it).  Inside a Flatpak sandbox only the sandbox's own
+  processes are seen (its PID namespace).  0 is never a process; the browser has none (false).
 
 ### `plat/hosted.rs`
 
@@ -30620,7 +30738,7 @@ pick, no capture.  Android: the host's DisplayManager displays, no pick, no capt
 - **`fn pick_test_point(p: Option<(i32, i32)>)`**
   (test aid) the next pick_start answers the pixel at the desktop point x, y at once,
   without asking the user (Windows, X11; the portal and the browser ignore it); None: ask
-  again
+  again.  With a manifest only where `screen.capture` allows pictures of the screen
 
 - **`fn capture_available() -> bool`**
   whether pictures of the screen can be taken here (the permission is checked when taking)

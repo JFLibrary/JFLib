@@ -20,7 +20,7 @@ use crate::bits::Jb;
 use crate::ent::{ceillog2, je_read, Jr};
 use crate::frm::Jf;
 use crate::hdr::{unpack_signed, Jx};
-use crate::modular::{jm_decode, zvec, Mi};
+use crate::modular::{jm_decode_in, zvec, Mi};
 use crate::tab;
 use crate::vdc::{Jv, Qe, ACSCX, ACSCY};
 
@@ -140,7 +140,7 @@ fn qenc(jf: &Jf, jv: &mut Jv, jb: &mut Jb) -> i32 {
                 let gtree = if jf.gtree.nodes.is_empty() { None } else { Some(&jf.gtree) };
                 let gcode = jf.gcode.as_deref();
                 let stream = jf.ndg.wrapping_mul(3).wrapping_add(i as u32).wrapping_add(1);
-                let r = jm_decode(jb, &mut mi, stream, 0xFF_FFFF, gtree, gcode, true, None);
+                let r = jm_decode_in(jb, &mut mi, stream, 0xFF_FFFF, gtree, gcode, true, None, &jf.sq_work);
                 if r != 0 {
                     return r;
                 }

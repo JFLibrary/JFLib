@@ -27,7 +27,8 @@
 // (spell_language); the status lines: language and backend, the misspelled words of each box
 // (spell_errors), the personal word list.  Command 1 opens "Zweites Fenster" (#120) with a
 // "Betreff" box of the same id (#110) and other text: each window checks its own box and opens
-// the menu of its own (tests/windows.uis).
+// the menu of its own (tests/windows.uis).  Command 2 closes it, command 3 frees its state
+// (window_destroy): a menu open in it goes with it (tests/window_gone.uis).
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -55,6 +56,8 @@ const ID_PLAIN: u32 = 112;
 const ID_PW: u32 = 113;
 const ID_SECOND: u32 = 120; // command 1: "Zweites Fenster", a "Betreff" box of the same id
 const CMD_SECOND: u32 = 1;
+const CMD_SECOND_CLOSE: u32 = 2; // the second window closes (hidden)
+const CMD_SECOND_DESTROY: u32 = 3; // the second window's state is freed (ui.window_destroy)
 const SECOND: &str = "Fehlr und das Haus";
 
 const DESC: AppDesc = AppDesc { title: "JFLib Rechtschreibung", flags: AF_RESIZABLE, w: 640, h: 560, min_w: 360, min_h: 300, ..AppDesc::NONE }; // i18n
@@ -191,11 +194,16 @@ impl App for Spell {
         ui.window_end();
     }
 
-    fn command(&mut self, _ui: &mut Ui, id: u32, _arg: u32) -> bool {
-        if id != CMD_SECOND {
-            return false;
+    fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
+        match id {
+            CMD_SECOND => self.second_open.set(1),
+            CMD_SECOND_CLOSE => self.second_open.set(0),
+            CMD_SECOND_DESTROY => {
+                self.second_open.set(0);
+                ui.window_destroy(ID_SECOND);
+            }
+            _ => return false,
         }
-        self.second_open.set(1);
         true
     }
 }

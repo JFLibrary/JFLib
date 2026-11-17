@@ -14,6 +14,8 @@ use agent_core::json::{self, Value};
 
 use crate::*;
 
+// different notes a document keeps (Document::notes)
+const MAX_NOTES: usize = 64;
 const FLOAT: u64 = 5126;
 const UBYTE: u64 = 5121;
 const USHORT: u64 = 5123;
@@ -107,7 +109,8 @@ fn f32s<const N: usize>(a: [f64; N]) -> [f32; N] {
 
 impl Ctx<'_> {
     fn note(&mut self, s: String) {
-        if !self.notes.contains(&s) {
+        // at most MAX_NOTES different ones: each is compared with those before it
+        if self.notes.len() < MAX_NOTES && !self.notes.contains(&s) {
             self.notes.push(s);
         }
     }
@@ -381,20 +384,27 @@ pub(crate) fn document(json_bytes: &[u8], bin: Option<&[u8]>, files: &mut dyn Fn
         lights,
         notes: Vec::new(),
     };
-    // a scene's instances are bounded before anyone asks for them
+    // a scene's instances are bounded before anyone asks for them: the instances below each
+    // node counted once (a node has one parent: a forest; a pre-order backwards has every child
+    // before its parent), then each scene sums its roots -- walking every scene's tree again was
+    // scenes x nodes, and nodes without a mesh never reached the limit
+    let roots: Vec<usize> = (0..doc.nodes.len()).filter(|&i| doc.nodes[i].parent.is_none()).collect();
+    let mut order = Vec::with_capacity(doc.nodes.len());
+    let mut stack = roots.clone();
+    while let Some(i) = stack.pop() {
+        order.push(i);
+        stack.extend_from_slice(&doc.nodes[i].children);
+    }
+    let mut below = vec![0u64; doc.nodes.len()];
+    for &i in order.iter().rev() {
+        let node = &doc.nodes[i];
+        let own = node.mesh.map_or(0, |m| doc.meshes[m].primitives.len() as u64);
+        below[i] = node.children.iter().fold(own, |a, &c| a.saturating_add(below[c]));
+    }
     for s in 0..doc.scenes.len().max(1) {
-        let mut n = 0u64;
-        let mut stack: Vec<usize> = match doc.scenes.get(s) {
-            Some(sc) => sc.nodes.clone(),
-            None => (0..doc.nodes.len()).filter(|&i| doc.nodes[i].parent.is_none()).collect(),
-        };
-        while let Some(i) = stack.pop() {
-            let node = &doc.nodes[i];
-            n += node.mesh.map_or(0, |m| doc.meshes[m].primitives.len() as u64);
-            if n > limits.instances {
-                return Err(Error::Limit(format!("scene {s} has more than {} instances", limits.instances)));
-            }
-            stack.extend_from_slice(&node.children);
+        let list = doc.scenes.get(s).map_or(&roots[..], |sc| &sc.nodes[..]);
+        if list.iter().fold(0u64, |a, &r| a.saturating_add(below[r])) > limits.instances {
+            return Err(Error::Limit(format!("scene {s} has more than {} instances", limits.instances)));
         }
     }
     doc.notes = cx.notes;
@@ -891,14 +901,17 @@ fn read_nodes(cx: &mut Ctx, meshes: usize, lights: usize) -> Result<Vec<Node>> {
 fn read_scenes(cx: &mut Ctx, nodes: &[Node]) -> Result<(Vec<SceneDef>, Option<usize>)> {
     let root = cx.root;
     let mut out = Vec::new();
+    // the scene that took each node last (its index + 1): one array for every scene, not one
+    // per scene (scenes x nodes)
+    let mut taken = vec![0u32; nodes.len()];
     for (i, s) in arr(root, "scenes").iter().enumerate() {
         let w = format!("scene {i}");
         let mut list = Vec::new();
-        let mut taken = vec![false; nodes.len()];
+        let mark = i as u32 + 1;
         for n in arr(s, "nodes") {
             match n.as_u64().and_then(|u| usize::try_from(u).ok()) {
-                Some(n) if n < nodes.len() && nodes[n].parent.is_none() && !taken[n] => {
-                    taken[n] = true;
+                Some(n) if n < nodes.len() && nodes[n].parent.is_none() && taken[n] != mark => {
+                    taken[n] = mark;
                     list.push(n);
                 }
                 _ => return invalid(format!("{w}: a node that is not a root of its own, or twice")),

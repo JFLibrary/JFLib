@@ -515,7 +515,7 @@ fn decode_body(data: &[u8], sf: &mut Surface, dec: &ImgDec, mut meta: Option<&mu
             return r;
         }
         br.pos = jf.end << 3;
-        jf = Jf::default();
+        jf = next_frame(&jf);
     }
     let mut k = 0u32;
     loop {
@@ -585,8 +585,14 @@ fn decode_body(data: &[u8], sf: &mut Surface, dec: &ImgDec, mut meta: Option<&mu
             return ERR_LIMIT; // past the last frame
         }
         br.pos = jf.end << 3;
-        jf = Jf::default();
+        jf = next_frame(&jf);
     }
+}
+
+/// a fresh record for the next frame of a decode, with the squeeze budget the frames so far left
+/// (a new budget per frame let many small frames take any time)
+fn next_frame(jf: &Jf) -> Jf {
+    Jf { sq_work: modular::SqWork::of(jf.sq_work.left()), ..Jf::default() }
 }
 
 /// the writer's reconstruction for its EPF sharpness search (jxl-plus; img_jxl_enc): the displayed frame

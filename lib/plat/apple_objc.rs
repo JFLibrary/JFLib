@@ -146,7 +146,8 @@ macro_rules! objc_msg {
 pub(crate) use objc_msg as msg;
 
 /// [super sel] with the exact signature: msg_super!(&ObjcSuper { receiver, class }, sel, a => T; R)
-/// (sel: a Sel, such as the method's own _cmd)
+/// (sel: a Sel, such as the method's own _cmd); iOS calls no superclass this way
+#[cfg_attr(target_os = "ios", allow(unused_macros))]
 macro_rules! objc_msg_super {
     ($sup:expr, $sel:expr $(, $a:expr => $t:ty)* ; $r:ty) => {{
         let f: unsafe extern "C" fn(*const $crate::apple::objc::ObjcSuper, $crate::apple::objc::Sel $(, $t)*) -> $r =

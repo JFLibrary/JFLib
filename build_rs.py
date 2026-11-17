@@ -22,7 +22,7 @@ The crates, their dependencies and the library's version come from the Cargo man
                                                                 N at a time, Windows and Linux together (section
                                                                 "test-jobs": default half the logical CPUs or
                                                                 jfgui_TEST_JOBS, 1 = one after the other; markers #!serial,
-                                                                #!lock, apps/NAME/tests/jobs.txt), the checks beside them;
+                                                                #!lock, #!only, apps/NAME/tests/jobs.txt), the checks beside them;
                                                                 then the crates' acceptance test (tools/crates_accept.py)
                                                                 and parity with asm (both not with --quick); at the end
                                                                 the times (build, scripts, the slowest scripts and apps)
@@ -1550,13 +1550,17 @@ def script_timeout(uis):
 #    output device, one at a time on both targets (WSLg plays into Windows' mix)
 #  * "#!serial WHY" (or "serial WHY" in apps/NAME/tests/jobs.txt): alone, after the parallel part (it leaves its app's
 #    order): what fails under the load of the others
+#  * "#!only OS..." among a script's first five lines: it runs on these systems only, as with `cargo jflib test`
+#    (windows linux macos ios android wasm32: SCRIPT_OS); on the other targets it is skipped and counted
 #  * the order: the most work behind a lock first, after the times of the last run (<out>/test-times.json; a
 #    script without one counts as the median); <out>/test-report.json keeps every result of the last run with its
 #    times
 #  * Linux scripts from Windows: each thread keeps one WSL process that starts its programs (tools/host_exec.py
 #    LinuxRunner, linux_task.py serve) instead of a wsl.exe and two Pythons per script (0.4 s on a quiet machine,
 #    2-3 s on a busy one)
-TEST_MARKERS = ("#!args", "#!timeout", "#!serial", "#!lock")
+TEST_MARKERS = ("#!args", "#!timeout", "#!serial", "#!lock", "#!only")
+# build_rs.py's targets as the names of "#!only" (and of a script's "only OS: COMMAND" lines): target_os
+SCRIPT_OS = {"win": "windows", "linux": "linux", "web": "wasm32", "android": "android", "mac": "macos", "ios": "ios"}
 TEST_LOCKS = ("desktop", "audio")
 TEST_TARGET_LOCKS = ("desktop",)        # one per target
 TEST_DEFAULT_S = 5.0
@@ -1578,6 +1582,20 @@ def script_markers(uis):
         elif line.startswith("#!lock"):
             locks.update(line[len("#!lock"):].split())
     return serial, locks
+
+
+def script_only(uis):
+    """section "test-jobs": the systems of a "#!only OS..." line among a script's first five lines, None without one"""
+    for line in uis.read_text(encoding="utf-8").splitlines()[:5]:
+        if line.startswith("#!only"):
+            return set(line[len("#!only"):].replace(",", " ").split())
+    return None
+
+
+def script_runs_on(uis, target):
+    """does a script run on target (win, linux, ...)?  Not when its "#!only" line leaves the target's system out"""
+    only = script_only(uis)
+    return only is None or SCRIPT_OS.get(target, target) in only
 
 
 def app_test_rules(name):
@@ -1618,6 +1636,9 @@ def test_marker_lint():
                 if line.startswith("#!") and not line.startswith(TEST_MARKERS):
                     bad.append(f"{uis.relative_to(ROOT).as_posix()}:{i}: unknown marker {line.split()[0]} ({', '.join(TEST_MARKERS)})")
             locks |= script_markers(uis)[1]
+            unknown = sorted((script_only(uis) or set()) - set(SCRIPT_OS.values()))
+            if unknown:
+                bad.append(f"{uis.relative_to(ROOT).as_posix()}: #!only knows no {', '.join(unknown)} ({' '.join(SCRIPT_OS.values())})")
         bad += [f"apps/{name}: unknown test lock {lk} ({', '.join(TEST_LOCKS)})" for lk in sorted(locks - set(TEST_LOCKS))]
     return bad
 
@@ -1641,9 +1662,10 @@ class TestUnit:
 
 
 def test_units(runs, jobs):
-    """[(folder, target, app, exe)] in the suite's order -> (units, pending): every script of each app, its locks
-    and the unit before it (section "test-jobs"); pending = how many scripts parity.txt holds back"""
-    units, skipped = [], 0
+    """[(folder, target, app, exe)] in the suite's order -> (units, pending, only): every script of each app, its
+    locks and the unit before it (section "test-jobs"); pending = how many scripts parity.txt holds back, only = how
+    many a "#!only" line keeps off their target"""
+    units, skipped, only = [], 0, 0
     for folder, target, name, exe in runs:
         rules = app_test_rules(name)
         pending = pending_scripts(name)
@@ -1651,6 +1673,9 @@ def test_units(runs, jobs):
         for script in sorted((ROOT / "apps" / name / "tests").glob("*.uis")):
             if script.name in pending:
                 skipped += 1
+                continue
+            if not script_runs_on(script, target):
+                only += 1
                 continue
             serial, locks = script_markers(script)
             serial = (serial or rules["serial"]) and jobs > 1
@@ -1661,7 +1686,7 @@ def test_units(runs, jobs):
             if not serial and not rules["independent"]:
                 u.prev, prev = prev, u
             units.append(u)
-    return units, skipped
+    return units, skipped, only
 
 
 def load_test_times(out):
@@ -1867,6 +1892,8 @@ def run_app_tests(name, target, exe, verify_dirty=False, report=None):
     for script in sorted((ROOT / "apps" / name / "tests").glob("*.uis")):
         if script.name in pending:
             record = dict(script=script.name, status="skipped", reason="pending")
+        elif not script_runs_on(script, target):
+            record = dict(script=script.name, status="skipped", reason="#!only")
         else:
             record = run_script(target, exe, script, verify_dirty)
         records.append(record)
@@ -1978,7 +2005,7 @@ def run_tests(builders, out, quick, jobs=1):
     check_runs = [check_pool.submit(run) for run, _ in checks] if jobs > 1 else None
     runs = [(b.folder, b.target, name, exes[(b.target, name)]) for b in builders for name in apps()
             if exes[(b.target, name)] is not None]
-    units, skipped = test_units(runs, jobs)
+    units, skipped, only = test_units(runs, jobs)
     times = load_test_times(out)
     printing = threading.Lock()
 
@@ -1992,7 +2019,8 @@ def run_tests(builders, out, quick, jobs=1):
     t_scripts = time.monotonic() - t1
     save_test_report(out, units, records, times, t1)
     total = len(units)
-    print(f"{total - len(fails)} of {total} scripts passed" + (f" ({skipped} pending)" if skipped else ""))
+    print(f"{total - len(fails)} of {total} scripts passed" + (f" ({skipped} pending)" if skipped else "")
+          + (f" ({only} skipped: #!only)" if only else ""))
     # what only runs on a device (G4c): the serial of a device or emulator in jfgui_TEST_ANDROID, its builds
     # with `app androidGallery|gputest --target android`; nobody's phone is touched without it
     serial = os.environ.get("jfgui_TEST_ANDROID")
@@ -2055,7 +2083,7 @@ def run_app_suite(builders, name, jobs=1):
             print(f"[{b.folder}] {name}: not built for this target (apps/{name}/TARGETS)")
             continue
         runs.append((b.folder, "ios-sim" if getattr(b, "ios_sim", False) else b.target, name, exe))
-    units, _ = test_units(runs, jobs)
+    units, _, only = test_units(runs, jobs)
     out = builders[0].out if builders else ROOT / "build"
     times = load_test_times(out)
     printing = threading.Lock()
@@ -2071,7 +2099,7 @@ def run_app_suite(builders, name, jobs=1):
     t1 = time.monotonic()
     records = run_test_units(order_test_units(units, times, jobs), jobs, report)
     save_test_report(out, units, records, times, t1)
-    print(f"{len(units) - len(fails)} of {len(units)} scripts passed")
+    print(f"{len(units) - len(fails)} of {len(units)} scripts passed" + (f" ({only} skipped: #!only)" if only else ""))
     return not fails
 
 

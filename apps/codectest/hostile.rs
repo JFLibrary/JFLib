@@ -7,6 +7,8 @@
 //   jxl_box64        a container box with a 64-bit size reaching to the end of u64 (28 bytes)
 //   jxl_crop         a frame of its own size (custom crop) larger than the pixel budget
 //   jxl_palettes     273 palette transforms of 137727 entries each on a 1 x 1 image
+//   jxl_squeeze      65416 squeeze steps on one channel of a 1 x 1 image (74 KB), 65120 on a
+//                    palette's meta channel (no shift to count)
 //   jxl_spline_rows  the spline draw cache of a frame 2^30 rows high
 //   jxl_patch_area   20480 patches of 128 x 128 on a 128 x 128 frame
 //   jxr_index        a 16384 x 16384 image with an index table and no tile data (86 bytes)
@@ -42,6 +44,8 @@ static D_BEGIN: [u32; 8] = [0, 3, 8, 6, 72, 10, 1096, 13];
 static D_NUMC: [u32; 8] = [1, 0, 3, 0, 4, 0, 1, 13];
 static D_NBCOL: [u32; 8] = [0, 8, 256, 10, 1280, 12, 5376, 16];
 static D_NBDELTA: [u32; 8] = [0, 0, 1, 8, 257, 10, 1281, 16];
+static D_NSQ: [u32; 8] = [0, 0, 1, 4, 9, 6, 41, 8];
+static D_SQNC: [u32; 8] = [1, 0, 2, 0, 3, 0, 4, 4];
 
 const JFT_REGULAR: u32 = 0;
 const JFT_REFONLY: u32 = 2;
@@ -230,35 +234,76 @@ fn ent_const(w: &mut Jw, vals: &[u32]) {
     w.bits(0x13_0000, 32); // ANS state (stays: one symbol)
 }
 
+/// a modular transform of the group header
+#[derive(Clone)]
+enum Tr {
+    /// a palette of channel 0: nb_colours, nb_deltas
+    Pal(u32, u32),
+    /// squeeze steps: horizontal, in place, begin channel, number of channels
+    Sq(Vec<[u32; 4]>),
+}
+
 /// the rest of a single-group modular frame's section: default DC quantisation, no global
-/// tree; the group header with these palette transforms (channel 0, nb_colours, nb_deltas), a
-/// one-leaf tree (zero predictor), every sample 0
-fn jxl_modular(w: &mut Jw, palettes: &[(u32, u32)]) {
+/// tree; the group header with these transforms, a one-leaf tree (zero predictor), every
+/// sample 0
+fn jxl_modular(w: &mut Jw, trs: &[Tr]) {
     w.bits(1, 1); // default DC quantisation
     w.bits(0, 1); // no global tree
     w.bits(0, 1); // group: local tree
     w.bits(1, 1); // default weighted predictor header
-    w.u32(palettes.len() as u32, &D_NT);
-    for &(nc, nd) in palettes {
-        w.u32(1, &D_0123); // palette
-        w.u32(0, &D_BEGIN);
-        w.u32(1, &D_NUMC);
-        w.u32(nc, &D_NBCOL);
-        w.u32(nd, &D_NBDELTA);
-        w.bits(0, 4); // predictor 0
+    w.u32(trs.len() as u32, &D_NT);
+    for tr in trs {
+        match tr {
+            Tr::Pal(nc, nd) => {
+                w.u32(1, &D_0123); // palette
+                w.u32(0, &D_BEGIN);
+                w.u32(1, &D_NUMC);
+                w.u32(*nc, &D_NBCOL);
+                w.u32(*nd, &D_NBDELTA);
+                w.bits(0, 4); // predictor 0
+            }
+            Tr::Sq(steps) => {
+                w.u32(2, &D_0123); // squeeze
+                w.u32(steps.len() as u32, &D_NSQ);
+                for s in steps {
+                    w.bits(s[0] as u64, 1);
+                    w.bits(s[1] as u64, 1);
+                    w.u32(s[2], &D_BEGIN);
+                    w.u32(s[3], &D_SQNC);
+                }
+            }
+        }
     }
     ent_zero(w, 6); // tree: one leaf
     ent_zero(w, 1); // samples
 }
 
-/// a w x h RGB image of one modular frame with these palettes
-fn jxl_palette_file(xs: u32, ys: u32, palettes: &[(u32, u32)]) -> Vec<u8> {
-    let mut s = Jw::new();
-    jxl_modular(&mut s, palettes);
+/// a w x h RGB image of one modular frame with these transforms
+fn jxl_modular_file(xs: u32, ys: u32, trs: &[Tr]) -> Vec<u8> {
+    jxl_modular_frames(xs, ys, &[trs.to_vec()])
+}
+
+/// a w x h RGB image of modular frames, each with its transforms (all but the last saved as
+/// reference 0, not shown)
+fn jxl_modular_frames(xs: u32, ys: u32, frames: &[Vec<Tr>]) -> Vec<u8> {
     let mut w = Jw::new();
     jxl_head(&mut w, xs, ys);
-    jxl_frame(&mut w, JFT_REGULAR, 0, None, true, &done(s));
+    for (i, trs) in frames.iter().enumerate() {
+        let mut s = Jw::new();
+        jxl_modular(&mut s, trs);
+        jxl_frame(&mut w, JFT_REGULAR, 0, None, i + 1 == frames.len(), &done(s));
+    }
     done(w)
+}
+
+/// a w x h RGB image of one modular frame with these palettes (nb_colours, nb_deltas)
+fn jxl_palette_file(xs: u32, ys: u32, palettes: &[(u32, u32)]) -> Vec<u8> {
+    jxl_modular_file(xs, ys, &palettes.iter().map(|&(c, d)| Tr::Pal(c, d)).collect::<Vec<_>>())
+}
+
+/// the steps in transforms of at most 296 (D_NSQ's largest)
+fn sq_transforms(steps: &[[u32; 4]]) -> Vec<Tr> {
+    steps.chunks(296).map(|c| Tr::Sq(c.to_vec())).collect()
 }
 
 /// a 16 x 16 image whose frame has its own size xs x ys (origin 0, 0); data: with the section
@@ -418,6 +463,31 @@ pub fn run(only: Option<&str>) -> i32 {
         t.check("jxl_palettes/control", r == 0 && w == 1 && h == 1, format!("one palette: result {r}, {w} x {h}"));
         let d = jxl_palette_file(1, 1, &[(70911, 66816); 273]);
         t.refuse("jxl_palettes/273", ERR_LIMIT, || jxl_dec(&d, 0).0);
+    }
+
+    // 3b: squeeze steps on one 1 x 1 channel, each adding an empty channel (up to 65536, each
+    // inserted into the middle of the list: 232 s from 74 KB); refused like libjxl: shift > 30
+    if t.on("jxl_squeeze") {
+        let d = jxl_modular_file(16, 16, &[Tr::Sq(vec![[1, 1, 0, 3], [0, 1, 0, 3]])]);
+        let (r, w, h) = jxl_dec(&d, 0);
+        t.check("jxl_squeeze/control", r == 0 && w == 16 && h == 16, format!("two squeezes: result {r}, {w} x {h}"));
+        let d = jxl_modular_file(1, 1, &sq_transforms(&vec![[1, 1, 0, 1]; 221 * 296]));
+        t.refuse("jxl_squeeze/1x1", ERR_HDR, || jxl_dec(&d, 0).0);
+        // a palette's meta channel has no shift to count: the channel moves are (56 s before),
+        // over all frames of the decode
+        let meta = |steps: usize| {
+            let mut trs = vec![Tr::Pal(1, 0)];
+            trs.extend(sq_transforms(&vec![[1, 1, 0, 1]; steps]));
+            trs
+        };
+        let (r, w, h) = jxl_dec(&jxl_modular_file(1, 1, &meta(1000)), 0);
+        t.check("jxl_squeeze/meta_1000", r == 0 && w == 1 && h == 1, format!("1000 steps on the meta channel: result {r}, {w} x {h}"));
+        let d = jxl_modular_file(1, 1, &meta(220 * 296));
+        t.refuse("jxl_squeeze/meta", ERR_LIMIT, || jxl_dec(&d, 0).0);
+        let (r, w, h) = jxl_dec(&jxl_modular_frames(1, 1, &[meta(4000)]), 0);
+        t.check("jxl_squeeze/frames_1", r == 0 && w == 1 && h == 1, format!("one frame of 4000 steps: result {r}, {w} x {h}"));
+        let d = jxl_modular_frames(1, 1, &vec![meta(4000); 6]);
+        t.refuse("jxl_squeeze/frames_6", ERR_LIMIT, || jxl_dec(&d, 0).0);
     }
 
     // 4: the spline draw cache of a 2^30 rows high frame (no blobs)

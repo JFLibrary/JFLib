@@ -126,6 +126,10 @@ pub mod certs;
 mod rand;
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple", target_os = "android"))]
 pub use rand::*;
+// whether a process runs and this process's id (process_alive, process_id): every target, the
+// browser has no processes
+mod pid;
+pub use pid::{process_alive, process_id};
 
 use alloc::string::String;
 
@@ -325,6 +329,9 @@ pub use pool::*;
 mod win;
 #[cfg(windows)]
 pub use win::*;
+// functions of System32 DLLs that are no KnownDLLs, loaded on first use (DLL planting)
+#[cfg(windows)]
+pub(crate) mod win_dll;
 // a managed program on the runtime another application ships; values of HKLM
 #[cfg(windows)]
 mod win_clr;

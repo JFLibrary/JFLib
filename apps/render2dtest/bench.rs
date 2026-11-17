@@ -7,6 +7,9 @@
 //   render2dtest --bench N --scene cad --g6d [..]          G6d: the index (build, memory), picks, windows and snaps per view
 //                (CPU), then each view's frame with nothing highlighted against 100 000 entities selected, one hovered and
 //                a full overlay (rounds in turn), what the highlight's change sends
+//   render2dtest --bench N --scene cad --cpu [--cpu-frames F] [--shot DIR]   G6e1: each view on the CPU path (Scene::draw_cpu,
+//                one thread, the median of F frames, 3 by default) against the GPU's image of it (pixels beyond 2 codes,
+//                the largest difference, the ink), a change of one entity painted again; --shot writes the CPU's images too
 //
 // GPU times are the scene's timestamps (FrameStats): uploads, visibility (the three compute passes), the draw; each
 // frame is waited for before the next (no frames in flight: the times are the frame's own), medians over F frames.
@@ -208,6 +211,9 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level, 
         if plat::args().iter().any(|a| a == "--g6d") {
             g6d(dev, &mut r, &mut s, &mut t, size, frames, &views, level, wname, c.trees.first().map(|x| (x.1.block, c.trees.len())))?;
         }
+        if plat::args().iter().any(|a| a == "--cpu") {
+            cpu(dev, &mut r, &mut s, size, &views, level, wname)?;
+        }
         // (blocks) 1000 inserts moved per frame, at the district: their transforms alone go up
         if c.trees.len() >= 1000 {
             s.set_camera(&views[1].cam)?;
@@ -239,6 +245,93 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level, 
         }
         dev.wait_idle()?;
     }
+    Ok(())
+}
+
+/// G6e1: each view on the CPU path against the GPU's image, its time per frame (one thread); one entity changed, painted
+/// again
+fn cpu(dev: &Device, r: &mut Renderer, s: &mut Scene, size: (u32, u32), views: &[cad::View], level: Level, wname: &str) -> Result<()> {
+    let frames: usize = plat::arg_value("--cpu-frames").and_then(|v| v.parse().ok()).unwrap_or(3);
+    let mut off = crate::gallery::Off::new(dev, size.0, size.1)?;
+    // (row bands on lib/gfx's parallel loop: plat's worker pool, as lib/ui sets it)
+    gfx::set_parallel(crate::cpucmp::par);
+    let t0 = plat::time_us();
+    s.build_index();
+    out(&format!("{level:?}, {wname}, G6e1 CPU path: the index {:.1} ms (once)", (plat::time_us() - t0) as f64 / 1000.0));
+    for (k, v) in views.iter().enumerate() {
+        s.set_camera(&v.cam)?;
+        let id = off.submit(r, s)?;
+        dev.wait(id, 30_000_000_000)?;
+        let gpu = off.read()?;
+        s.set_cpu_single(true);
+        let (ms, cmp, info, img) = crate::cpucmp::bench_view(s, &v.cam, size, frames, Some(&gpu), BG);
+        s.set_cpu_single(false);
+        let (msb, _, binfo, bimg) = crate::cpucmp::bench_view(s, &v.cam, size, frames, None, BG);
+        let c = cmp.unwrap_or_default();
+        out(&format!("{level:?}, {wname}, {} G6e1 CPU path: {ms:.1} ms per frame on one thread, {msb:.1} ms in {} row bands ({}; median of {frames}; {} found, {} drawn, {} fills of lib/gfx, {} lines, \
+                      {} flattened; the bands drew {} entities); against the GPU {}",
+                     v.name, if size.1 >= 512 { 16 } else { size.1 / 32 }, if bimg == img { "the same bytes" } else { "OTHER BYTES" }, info.found, info.drawn, info.fills, info.lines, info.flattened,
+                     binfo.drawn, c.text()));
+        if let Some(dir) = plat::arg_value("--shot") {
+            for (tag, im) in [("gpu", &gpu), ("cpu", &img)] {
+                let mut f = Vec::with_capacity(im.len() + 8);
+                f.extend_from_slice(&size.0.to_le_bytes());
+                f.extend_from_slice(&size.1.to_le_bytes());
+                f.extend_from_slice(im);
+                let _ = plat::write_file(&format!("{dir}/cadcpu_{level:?}_{wname}_{k}_{tag}.bgra"), &f);
+            }
+        }
+    }
+    // (--cpu-layers: where the time goes, layer by layer, at each view: the others hidden)
+    if plat::args().iter().any(|a| a == "--cpu-layers") {
+        let layers = s.drawn_layers();
+        let saved: Vec<render2d::Layer> = layers.iter().map(|&l| s.layer(l).unwrap_or(Layer::new(0))).collect();
+        for v in views {
+            let mut rows = Vec::new();
+            for k in 0..layers.len() {
+                for (j, &o) in layers.iter().enumerate() {
+                    let mut x = saved[j];
+                    x.visible = j == k;
+                    s.set_layer(o, &x)?;
+                }
+                let (ms, _, info, _) = crate::cpucmp::bench_view(s, &v.cam, size, 2, None, BG);
+                rows.push((ms, k, info));
+            }
+            for (j, &o) in layers.iter().enumerate() {
+                s.set_layer(o, &saved[j])?;
+            }
+            rows.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(core::cmp::Ordering::Equal));
+            let all: f64 = rows.iter().map(|r| r.0).sum();
+            let mut line = String::new();
+            for (ms, k, info) in rows.iter().take(8) {
+                line.push_str(&format!(" layer {k} {ms:.1} ms ({} drawn, {} fills, {} lines);", info.drawn, info.fills, info.lines));
+            }
+            out(&format!("{level:?}, {wname}, {} G6e1 CPU path by layer (sum {all:.1} ms):{line}", v.name));
+        }
+    }
+    // one entity changed (a line near the working view's middle, moved a little each time): painted again, the index's
+    // update included
+    let v = &views[2];
+    let lay = s.drawn_layers()[0];
+    let st = s.add_style(&Style::new(0xFF20_2020))?;
+    let c0 = v.cam.center;
+    let id = s.insert(lay, st, &Shape::Line { a: c0, b: [c0[0] + 3.0, c0[1] + 1.0] })?;
+    let mut sf = gfx::Surface::new(size.0 as i32, size.1 as i32, gfx::FMT_XRGB);
+    let mut dc = gfx::Dc::new(size.0 as i32, size.1 as i32);
+    dc.begin(&sf);
+    let mut times = Vec::new();
+    for k in 0..frames.max(1) + 1 {
+        let t0 = plat::time_us();
+        let d = k as f64 * 0.01;
+        s.update(id, &Shape::Line { a: [c0[0] + d, c0[1]], b: [c0[0] + 3.0 + d, c0[1] + 1.0] })?;
+        dc.clear(&mut sf, BG | 0xFF00_0000);
+        s.draw_cpu(&mut dc, &mut sf, [0, 0, size.0 as i32, size.1 as i32]);
+        if k > 0 {
+            times.push((plat::time_us() - t0) as f64 / 1000.0);
+        }
+    }
+    s.remove(id)?;
+    out(&format!("{level:?}, {wname}, G6e1 CPU path: one entity changed at the {}, painted again: {:.1} ms (update, the index, the whole frame)", v.name, median(&mut times)));
     Ok(())
 }
 

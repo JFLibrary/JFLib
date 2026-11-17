@@ -2250,7 +2250,9 @@ shot build/template.png
 * A first line `#!args --open file.png` adds program arguments when `build_rs.py test` runs
   the script (pass them yourself when you run it by hand). A line `#!timeout 1800` among the
   first five sets the seconds it may take there (600 otherwise); a script that takes longer
-  counts as failed and the others still run.
+  counts as failed and the others still run. A line `#!only windows linux` among the first five
+  runs it on these systems only, under `build_rs.py test` as under `cargo jflib test` (the names
+  below); on the other targets it is skipped and counted.
 * **Lines for some systems**: `only OS...: COMMAND` runs the command only on the systems it
   names, `!OS` on every system but that one (`only windows: key ctrl+q`, `only !macos: expect
   "Beenden" exists`, `only linux macos: ...`; blanks or commas between the names). The names are
@@ -2540,8 +2542,10 @@ self.dock.focus(P_PROPS);
   clicks, double clicks, the menu and the splitters need no hold. A drag shows drop markers at the
   three edges of the area and on the group under the pointer (as a tab, before, after); a
   release over a strip inserts the tab there, anywhere else -- also outside the window -- the
-  panel floats in a tool window (`WF_TOOL`, window ids `ID + 1 .. ID + DOCK_FLOAT_MAX`, six at
-  most). A floating window's tabs drag back onto the markers, its pin button or a double click
+  panel floats in a tool window (`WF_TOOL`, six at most; window ids `ID + 1 .. ID +
+  DOCK_FLOAT_MAX` in the main window, `dock_float_id(ID, window, k)` in general: an area of the
+  same id in another window floats in windows of its own). A floating window's tabs drag back
+  onto the markers, its pin button or a double click
   docks it where it came from, its close button hides its panels. Esc cancels a hold and a drag
   (the release is no click then). Painters: `StyleShell::dock_*` (stock ones from the tokens).
 * Panels that belong together (an app's developer tools in one group): with `DP_GROUP` on the
@@ -2821,7 +2825,11 @@ crates that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)
   file nobody listens on any more; a file, a folder or a socket that is listened on stays and
   `bind` fails. A dropped listener removes its socket file, not a name taken again meanwhile.
 * `plat::process::Command { program, args, cwd, env }.spawn()` -- a child process with pipes
-  (no shell); dropping the `Child` ends its process tree.
+  (no shell); dropping the `Child` ends its process tree, `Child::id()` gives its process id.
+* `plat::process_alive(pid)` -- whether a process with this id runs (the owner of a lock file,
+  a helper started earlier; a process of another user counts too), on every target, false in
+  the browser; `plat::process_id()` is this process's id. Ids are reused once a process ended,
+  so a lock file should hold more than the id where that matters.
 * `netpkt` -- packets byte for byte, without I/O (written for JFNetworker's simulator): `Mac`,
   `Ipv4`, `Ipv6` (RFC 5952 text), `Prefix4` / `Prefix6`; the Internet checksum
   (`checksum::sum` / `finish` / `verify`, pseudo headers, `update16` for incremental changes)

@@ -33,6 +33,8 @@ pub const PDO_LINE: u64 = 2;
 pub const PDO_CUBIC: u64 = 3;
 pub const PDO_CLOSE: u64 = 4;
 pub const MAX_SLOTS: usize = 0x40_0000; // 4 Mi slots per PData
+// points the cubics of one walk may flatten to (walk); past it a cubic is its chord
+const FLAT_POINTS_MAX: u32 = 1 << 20;
 pub const MAX_TEXT: usize = 0x100_0000; // parse input limit (16 MB)
 pub const COORD_MAX: f64 = 10_000_000.0; // |coordinate| limit of the builder
 pub const PDE_SYNTAX: i32 = -40; // unexpected character / missing command
@@ -406,6 +408,10 @@ impl PData {
         let n = s.len();
         let f = |k: usize| f64::from_bits(s[k]);
         let mut cur = (0.0f64, 0.0f64);
+        // the points the curves may still add: a cubic of a few bytes flattens to up to 1000
+        // points, so a large SVG path of tight curves made hundreds of MB; past the budget a
+        // cubic is its chord (the drawing coarser, nothing refused)
+        let mut budget = FLAT_POINTS_MAX;
         let mut i = 0;
         while i < n {
             match s[i] {
@@ -439,6 +445,8 @@ impl PData {
                     let d2 = bx * bx + by * by;
                     let segs = minsd(sqrtd(sqrtd(maxsd(d1, d2)) * 0.75 / tol), 999.0);
                     let segs = ((cvttd(segs) + 1) as u32).min(1000);
+                    let segs = if segs <= budget { segs } else { 1 };
+                    budget -= segs.min(budget);
                     for k in 1..=segs {
                         let t = k as f64 / segs as f64;
                         let u = 1.0 - t;

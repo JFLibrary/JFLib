@@ -88,17 +88,16 @@ mod win {
         pub extra: *mut c_void,
     }
 
-    #[link(name = "crypt32", kind = "raw-dylib")]
-    unsafe extern "system" {
-        pub fn CertCreateCertificateContext(enc: u32, der: *const u8, len: u32) -> *const c_void;
-        pub fn CertFreeCertificateContext(ctx: *const c_void) -> i32;
-        pub fn CertOpenStore(provider: usize, enc: u32, prov: usize, flags: u32, para: *const c_void) -> *mut c_void;
-        pub fn CertCloseStore(store: *mut c_void, flags: u32) -> i32;
-        pub fn CertAddEncodedCertificateToStore(store: *mut c_void, enc: u32, der: *const u8, len: u32, disposition: u32, out: *mut *const c_void) -> i32;
-        pub fn CertGetCertificateChain(engine: *mut c_void, ctx: *const c_void, time: *const c_void, extra: *mut c_void, para: *const ChainPara, flags: u32, reserved: *mut c_void, chain: *mut *const c_void) -> i32;
-        pub fn CertFreeCertificateChain(chain: *const c_void);
-        pub fn CertVerifyCertificateChainPolicy(policy: usize, chain: *const c_void, para: *const PolicyPara, status: *mut PolicyStatus) -> i32;
-    }
+    crate::win_dll::system_dll! { "crypt32.dll" {
+        pub fn CertCreateCertificateContext(enc: u32, der: *const u8, len: u32) -> *const c_void = core::ptr::null();
+        pub fn CertFreeCertificateContext(ctx: *const c_void) -> i32 = 0;
+        pub fn CertOpenStore(provider: usize, enc: u32, prov: usize, flags: u32, para: *const c_void) -> *mut c_void = core::ptr::null_mut();
+        pub fn CertCloseStore(store: *mut c_void, flags: u32) -> i32 = 0;
+        pub fn CertAddEncodedCertificateToStore(store: *mut c_void, enc: u32, der: *const u8, len: u32, disposition: u32, out: *mut *const c_void) -> i32 = 0;
+        pub fn CertGetCertificateChain(engine: *mut c_void, ctx: *const c_void, time: *const c_void, extra: *mut c_void, para: *const ChainPara, flags: u32, reserved: *mut c_void, chain: *mut *const c_void) -> i32 = 0;
+        pub fn CertFreeCertificateChain(chain: *const c_void) = ();
+        pub fn CertVerifyCertificateChainPolicy(policy: usize, chain: *const c_void, para: *const PolicyPara, status: *mut PolicyStatus) -> i32 = 0;
+    } }
 }
 
 #[cfg(windows)]

@@ -23,7 +23,7 @@ use crate::bits::Jb;
 use crate::ent::{je_ctxmap, Jc};
 use crate::frm::Jf;
 use crate::hdr::{unpack_signed, Jx};
-use crate::modular::{jm_decode, zvec, Mi};
+use crate::modular::{jm_decode_in, zvec, Mi};
 use rt::fx::maxss;
 
 static D_GSCALE: [u32; 8] = [1, 11, 2049, 11, 4097, 12, 8193, 16];
@@ -271,7 +271,7 @@ pub fn jv_global(jx: &Jx, jf: &mut Jf, jb: &mut Jb) -> i32 {
 fn modimg(jf: &Jf, jb: &mut Jb, mi: &mut Mi, stream: u32) -> i32 {
     let gtree = if jf.gtree.nodes.is_empty() { None } else { Some(&jf.gtree) };
     let gcode = jf.gcode.as_deref();
-    jm_decode(jb, mi, stream, 0xFF_FFFF, gtree, gcode, true, None)
+    jm_decode_in(jb, mi, stream, 0xFF_FFFF, gtree, gcode, true, None, &jf.sq_work)
 }
 
 /// jv_dcgroup: VarDCT DC of DC group g

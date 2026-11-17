@@ -198,27 +198,27 @@ pub struct IndexInfo {
 // ---------------------------------------------------------------- the index
 
 #[derive(Clone, Default)]
-struct BlockIdx {
-    tree: RTree,
+pub(super) struct BlockIdx {
+    pub(super) tree: RTree,
     /// its geometry's box in its units (relative to its base); None: nothing drawn
-    bbox: Option<Bx>,
+    pub(super) bbox: Option<Bx>,
     /// how far its widths in units reach beyond its geometry (its units: nested inserts' scaled)
-    reach: f64,
+    pub(super) reach: f64,
     /// it holds a text in pixels (also below): its inserts are looked at by every query
-    px: bool,
+    pub(super) px: bool,
     dirty: bool,
     built: bool,
 }
 
 pub(crate) struct Index {
-    top: RTree,
+    pub(super) top: RTree,
     /// entity slots changed since the last sync
     pending: Vec<u32>,
     /// everything anew with the next sync
     all: bool,
-    blocks: Vec<BlockIdx>,
+    pub(super) blocks: Vec<BlockIdx>,
     /// entities on layers looked at by every query
-    px: Vec<u32>,
+    pub(super) px: Vec<u32>,
     info: IndexInfo,
 }
 
@@ -247,7 +247,7 @@ fn pts_box(p: &[[f64; 2]], shift: P) -> Bx {
 }
 
 /// a copy's transform of an insert (block::insert_xfs, one copy)
-fn copy_xf(ins: &Insert, origin: P, col: u32, row: u32) -> Xf {
+pub(super) fn copy_xf(ins: &Insert, origin: P, col: u32, row: u32) -> Xf {
     let (s, c) = sincos(ins.rotation);
     let m = [[c * ins.scale[0], -s * ins.scale[1]], [s * ins.scale[0], c * ins.scale[1]]];
     let (dx, dy) = (col as f64 * ins.spacing[0], row as f64 * ins.spacing[1]);
@@ -260,7 +260,7 @@ fn xf_box(xf: &Xf, b: &Bx) -> Bx {
 }
 
 /// a box back through a transform (the box of its corners' preimages)
-fn inv_box(xf: &Xf, b: &Bx) -> Bx {
+pub(super) fn inv_box(xf: &Xf, b: &Bx) -> Bx {
     let n = xf.inv();
     let back = |p: P| {
         let v = sub(p, xf.t);
@@ -285,7 +285,7 @@ fn insert_boxes(ins: &Insert, origin: P, bbox: &Bx) -> (Bx, Bx) {
 
 /// the copies (columns, rows; ends included) of an array whose block box (grown by m in the parent's units) may meet q
 /// (q in the units the insert sits in, less origin)
-fn copies_meeting(ins: &Insert, origin: P, bbox: &Bx, q: &Bx, m: f64) -> (u32, u32, u32, u32) {
+pub(super) fn copies_meeting(ins: &Insert, origin: P, bbox: &Bx, q: &Bx, m: f64) -> (u32, u32, u32, u32) {
     let (cols, rows) = (ins.columns.max(1), ins.rows.max(1));
     if cols == 1 && rows == 1 {
         return (0, 0, 0, 0);
@@ -399,7 +399,7 @@ impl Scene {
     }
 
     /// the index brought up to date with the scene
-    fn sync_index(&mut self) {
+    pub(super) fn sync_index(&mut self) {
         if self.idx.as_ref().is_none_or(|ix| ix.all) {
             self.idx = Some(alloc::boxed::Box::new(Index { top: RTree::new(), pending: Vec::new(), all: false, blocks: Vec::new(), px: Vec::new(), info: IndexInfo::default() }));
             let nb = self.blocks.len();
@@ -663,7 +663,7 @@ struct View {
 
 impl Scene {
     /// the draw order of the live layers (by order, then by when they were added): rank per layer slot
-    fn layer_ranks(&self) -> Vec<u32> {
+    pub(super) fn layer_ranks(&self) -> Vec<u32> {
         let mut v: Vec<usize> = (0..self.layers.len()).filter(|&i| self.layers[i].live).collect();
         v.sort_by_key(|&i| (self.layers[i].order, self.layers[i].seq));
         let mut r = vec![0u32; self.layers.len()];
@@ -1090,7 +1090,7 @@ impl Scene {
     }
 
     /// the most any stroke reaches in pixels beyond its centre line (widths in pixels, hairlines), and of the style by block
-    fn max_px_reach(&self) -> f64 {
+    pub(super) fn max_px_reach(&self) -> f64 {
         self.styles.iter().map(px_reach).fold(0.5 * core::f64::consts::SQRT_2, f64::max)
     }
 

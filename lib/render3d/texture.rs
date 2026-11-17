@@ -227,6 +227,37 @@ pub(crate) fn fit(d: &TextureData, size: u32, srgb: &Srgb) -> Vec<u8> {
         return out;
     }
     let lin = |c: u8, k: usize| if d.srgb && k < 3 { srgb.decode[c as usize] } else { c as f32 / 255.0 };
+    let enc = |acc: f32, k: usize| if d.srgb && k < 3 { srgb.encode(acc) } else { (acc.clamp(0.0, 1.0) * 255.0 + 0.5) as u8 };
+    if h > w {
+        // a tall image: columns first, size x w, then rows -- rows first would hold h x size
+        // (1 x 32768 at 2048: 1 GiB for 128 KB of texels)
+        let (w, sz) = (w as usize, size as usize);
+        let mut cols = vec![0f32; sz * w * 4];
+        for (y, (first, wts)) in ty.iter().enumerate() {
+            for x in 0..w {
+                for k in 0..4 {
+                    let mut acc = 0.0;
+                    for (j, wt) in wts.iter().enumerate() {
+                        acc += wt * lin(d.rgba[((*first as usize + j) * w + x) * 4 + k], k);
+                    }
+                    cols[(y * w + x) * 4 + k] = acc;
+                }
+            }
+        }
+        let mut out = vec![0u8; sz * sz * 4];
+        for y in 0..sz {
+            for (x, (first, wts)) in tx.iter().enumerate() {
+                for k in 0..4 {
+                    let mut acc = 0.0;
+                    for (j, wt) in wts.iter().enumerate() {
+                        acc += wt * cols[(y * w + *first as usize + j) * 4 + k];
+                    }
+                    out[(y * sz + x) * 4 + k] = enc(acc, k);
+                }
+            }
+        }
+        return out;
+    }
     // rows first: h x size, then columns
     let mut rows = vec![0f32; (h * size * 4) as usize];
     for y in 0..h as usize {
@@ -248,7 +279,7 @@ pub(crate) fn fit(d: &TextureData, size: u32, srgb: &Srgb) -> Vec<u8> {
                 for (j, wt) in wts.iter().enumerate() {
                     acc += wt * rows[((*first as usize + j) * size as usize + x) * 4 + k];
                 }
-                out[(y * size as usize + x) * 4 + k] = if d.srgb && k < 3 { srgb.encode(acc) } else { (acc.clamp(0.0, 1.0) * 255.0 + 0.5) as u8 };
+                out[(y * size as usize + x) * 4 + k] = enc(acc, k);
             }
         }
     }

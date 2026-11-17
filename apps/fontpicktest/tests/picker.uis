@@ -18,7 +18,7 @@ type "jfgui"
 expect text:"Auswahl: jfgui CID 400 normal 11" exists
 # a click on a row takes it and closes the list
 click "jfgui Mini CFF"
-expect #258540448 enabled
+expect #258540448 closed
 expect text:"Auswahl: jfgui Mini CFF 400 normal 11" exists
 expect text:"Geladen: jfgui Mini CFF" exists
 # the size box
@@ -33,5 +33,21 @@ focus #169874962
 key up
 expect text:"Auswahl: jfgui Mini 400 normal 20" exists
 key esc
-expect #258540448 enabled
+expect #258540448 closed
+expect #258540448 focused
+# Esc in the search box closes the list as well (charge 13: the focused box kept Esc, the
+# list stayed open without focus), also after typing (the match stays chosen); the next click
+# opens it again at once
+click "jfgui Mini"
+expect #258540448 open
+expect #201308612 focused
+key esc
+expect #258540448 closed
+expect #258540448 focused
+click "jfgui Mini"
+expect #258540448 open
+type "DejaVu S"
+key esc
+expect #258540448 closed
+expect text:"Auswahl: DejaVu Sans Mono 400 normal 20" exists
 expect_nowarn

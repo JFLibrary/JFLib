@@ -2220,10 +2220,9 @@ pub fn win_destroy(w: i32) {
     }
 }
 
-#[link(name = "dwmapi", kind = "raw-dylib")]
-unsafe extern "system" {
-    fn DwmSetWindowAttribute(h: isize, attr: u32, value: *const u32, size: u32) -> i32;
-}
+crate::win_dll::system_dll! { "dwmapi.dll" {
+    fn DwmSetWindowAttribute(h: isize, attr: u32, value: *const u32, size: u32) -> i32 = crate::win_dll::E_FAIL;
+} }
 
 /// PWS_HIDE / PWS_SHOW (activates) / PWS_SHOWNA
 pub fn win_show(w: i32, mode: u32) {

@@ -201,6 +201,8 @@ impl Child {
         if r >= 0 { return Ok(Some(r as usize)); }
         match ffi::errno() { EAGAIN | EINTR => Ok(None), e => Err(e as u32) }
     }
+    /// The child's process id (as plat::process_alive takes it).
+    pub fn id(&self) -> u32 { self.pid as u32 }
     /// Close stdin to request orderly helper shutdown.
     pub fn close_stdin(&mut self) { self.input = None; }
     /// Poll exit status; signals map to 128 + signal.

@@ -68,8 +68,9 @@ unsafe extern "C" {
 #[link(name = "c")]
 unsafe extern "C" {
     fn close(fd: i32) -> i32;
-    fn read(fd: i32, buf: *mut u8, n: usize) -> isize;
-    fn write(fd: i32, buf: *const u8, n: usize) -> isize;
+    // (the buffer as `void *`, as libc and std declare it: with std both link the same symbols)
+    fn read(fd: i32, buf: *mut core::ffi::c_void, n: usize) -> isize;
+    fn write(fd: i32, buf: *const core::ffi::c_void, n: usize) -> isize;
     fn pread(fd: i32, buf: *mut u8, n: usize, off: i64) -> isize;
     fn pwrite(fd: i32, buf: *const u8, n: usize, off: i64) -> isize;
     fn lseek(fd: i32, off: i64, whence: i32) -> i64;
@@ -284,7 +285,7 @@ impl FdStream {
         let mut buf = alloc::vec![0u8; 64 * 1024];
         loop {
             // SAFETY: buf is writable; fd is open
-            let n = unsafe { read(fd, buf.as_mut_ptr(), buf.len()) };
+            let n = unsafe { read(fd, buf.as_mut_ptr().cast(), buf.len()) };
             if n < 0 {
                 // SAFETY: fd is ours, closed once
                 unsafe { close(fd) };
@@ -324,7 +325,7 @@ impl Stream for FdStream {
             }
             while done < buf.len() {
                 // SAFETY: the rest of buf is readable; fd is open
-                let n = unsafe { write(self.fd, buf[done..].as_ptr(), buf.len() - done) };
+                let n = unsafe { write(self.fd, buf[done..].as_ptr().cast(), buf.len() - done) };
                 if n <= 0 {
                     break;
                 }

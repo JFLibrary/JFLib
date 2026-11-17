@@ -1620,6 +1620,8 @@ class ModImage:
                     self.nb_meta += nc
                 offset = ec + 1 if ip else len(ch)
                 for c in range(bc, ec + 1):
+                    if ch[c].hshift > 30 or ch[c].vshift > 30:
+                        raise JXLError("too many squeezes")  # (libjxl: shift > 30)
                     w, h = ch[c].w, ch[c].h
                     if w == 0 or h == 0:
                         raise JXLError("squeezing empty channel")

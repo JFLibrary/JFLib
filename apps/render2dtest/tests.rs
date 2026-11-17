@@ -899,6 +899,19 @@ fn shaders(t: &mut T) {
 fn dump_all(dir: &str) -> i32 {
     let mut t = T { fails: 0, validate: false, inst: None };
     let mut files = 0;
+    // (G6e1) the CPU path's images, of scenes without a device: DIR/cpu_NAME.bgra (no GPU needed)
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for shot in shots() {
+        let Some(img) = t.res(cpu_shot(&shot), &shot.name) else { continue };
+        hash = fnv(hash, &img);
+        let path = format!("{dir}/cpu_{}.bgra", shot.name);
+        if !plat::write_file(&path, &img) {
+            t.ok(false, &format!("cannot write {path}"));
+            return 1;
+        }
+        files += 1;
+    }
+    out(&format!("the CPU path's images: FNV-1a {hash:016x}"));
     on_levels(&mut t, &mut |t, dev, level| {
         let Some(mut r) = t.res(Renderer::new(dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new") else { return };
         for shot in shots() {
@@ -956,6 +969,10 @@ pub fn run() -> i32 {
         return crate::textcpu::text_error();
     }
     if args.iter().any(|a| a == "--demo") {
+        // (G6e1: --no-gpu: no device, the view paints through the CPU path)
+        if args.iter().any(|a| a == "--no-gpu") {
+            plat::setenv("jfgui_GPU", Some("0"));
+        }
         return crate::demo::launch();
     }
     if let Some(n) = plat::arg_value("--bench").and_then(|v| v.parse::<u32>().ok()).filter(|&n| n > 0) {
@@ -966,12 +983,13 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate, inst: None };
-    let list: [(&str, fn(&mut T)); 30] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
+    let list: [(&str, fn(&mut T)); 31] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
                                           ("arcs", arcs), ("dashes", dashes), ("curves", curves), ("fills", fills), ("hatches", hatches), ("layers", layers),
                                           ("changes", crate::scenes::changes), ("churn", crate::scenes::churn), ("visibility", crate::scenes::visibility), ("coords", crate::scenes::coords),
                                           ("phase", crate::scenes::phase), ("blocks", crate::blocks::blocks), ("transparency", crate::blocks::transparency), ("levels", levels), ("errors", errors),
                                           ("text", crate::textgpu::text), ("textdeep", crate::textgpu::textdeep), ("pick", crate::picks::pick), ("select", crate::picks::select),
-                                          ("snap", crate::picks::snap), ("pickchurn", crate::picks::churn), ("highlight", crate::hlov::highlight), ("overlay", crate::hlov::overlay)];
+                                          ("snap", crate::picks::snap), ("pickchurn", crate::picks::churn), ("highlight", crate::hlov::highlight), ("overlay", crate::hlov::overlay),
+                                          ("cpu", crate::cpucmp::cpu)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {

@@ -1,0 +1,8 @@
+#!only linux
+# viewtest: a whole script for some systems only.  `#!only OS...` among the first five lines runs it
+# on these systems only, under build_rs.py test as under cargo jflib test (charge 13); on Windows
+# the suite skips it and counts it ("skipped: #!only").  "Notiz" (#117) types what it got.
+focus #117
+type "linux"
+expect #117 text "linux"
+expect_nowarn

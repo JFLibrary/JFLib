@@ -26,6 +26,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   Windows / Super key: Windows through `ToUnicodeEx` without touching the keyboard state (10 1607
   and later), Linux from the keymap (`xkb_key_y`, X11 and Wayland), macOS
   `charactersIgnoringModifiers`. `key_char_test` and `key_layouts_test` (Windows) for plattest.
+- Whether a process runs: `plat::process_alive(pid)` on every target (Windows `OpenProcess` and a
+  wait of 0 ms, Linux, Apple and Android `kill(pid, 0)`; a process of another user counts, the
+  browser has none), `plat::process_id()` for apps without std and `process::Child::id()`.
+  docs/GUIDE.md section 17.
 
 ### Changed
 
@@ -33,6 +37,22 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   compared it with a `KL_*` takes `key_location(y)`.
 - Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical
   pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point).
+
+### Fixed
+
+- `parallel_for` with the feature `unwind`: a panic in an item of the calling thread cancels the job and waits for the workers before it unwinds. Caught with `catch_unwind`, they went on using the freed job.
+- Windows: the open dialog's result is split into a folder and names only when it is such a list. One file chosen with multiple selection on came back with the rest of a longer suggested name as a second file.
+- Linux: reading the clipboard or a drop from another program ends after 30 s in all (Wayland, X11 with INCR). The 3 s deadline started anew with every piece, so a program sending slowly froze the app for as long as it liked.
+- macOS: a GUI app catches SIGTERM with a handler that does nothing instead of ignoring it (the dispatch source reports it as before). Its child processes inherited the ignored signal and could not be ended with a plain kill.
+- Android and macOS with std: `read` / `write` (Android) and `free` (macOS) declared with `void *`
+  buffers as libc and std declare them (the clashing declarations warned); the workspace no longer
+  lists the apps' style crates it never uses (`unused workspace dependency` on every target); iOS no
+  longer warns of the unused `objc_msg_super`.
+
+### Security
+
+- Windows: dwmapi, crypt32, winmm, iphlpapi, bcrypt and avrt are loaded from System32 when first used instead of being imported by the program. A DLL of such a name beside the program (a setup in the download folder) was loaded in their place.
+- `screen::pick_test_point`, the colour picker's test aid, obeys `screen.capture` like the picker. It read screen pixels without the permission.
 
 ## [0.2.1] - 2026-11-16
 
