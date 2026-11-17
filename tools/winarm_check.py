@@ -2,8 +2,11 @@
 They are built beforehand in build/win-arm64 (on an x64 PC or runner: build_rs.py app NAME --target win --arch
 aarch64), so the machine needs no compiler.  .github/workflows/arm64-windows.yml runs this there.
 
-    python tools/winarm_check.py [--dir DIR] [--other-module FILE] [--only scripts|crash|module|gpu]
-                                 [--gallery-all] [--scripts APP[/SCRIPT.uis],...]
+    python tools/winarm_check.py [--target win|linux] [--dir DIR] [--other-module FILE]
+                                 [--only scripts|crash|module|gpu] [--gallery-all] [--scripts APP[/SCRIPT.uis],...]
+
+--target linux (ARM8): the Linux programs of build/linux-arm64 on an ARM64 Linux machine (ubuntu-24.04-arm, the
+ARM64 VM), with a display of its own (WAYLAND_DISPLAY or DISPLAY); scripts, crash and gpu as below, no module.
 
     scripts  every script of coretest and plattest, and a start of the gallery (basic.uis, with a picture;
              --gallery-all: every script of the gallery; --scripts: these apps' scripts instead, an app with
@@ -32,6 +35,12 @@ from tools import host_exec
 
 ROOT = build_rs.ROOT
 SCRIPTS = {"coretest": None, "plattest": None, "gallery": ["basic.uis"]}   # None: every script (--gallery-all)
+TARGET = "win"          # --target
+
+
+def prog(d, name):
+    """the program name of folder d (Windows: name.exe)"""
+    return d / (f"{name}.exe" if TARGET == "win" else name)
 FIXTURES = ROOT / "apps" / "codectest" / "fixtures"
 
 
@@ -52,7 +61,7 @@ def run(exe, args, timeout=600, env=None):
     e = dict(os.environ, **(env or {}))
     try:
         r = subprocess.run([str(exe), *map(str, args)], cwd=ROOT, timeout=timeout, env=e, capture_output=True,
-                           text=True, encoding="utf-8", errors="replace", creationflags=subprocess.CREATE_NO_WINDOW)
+                           text=True, encoding="utf-8", errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         return r.returncode, r.stdout + r.stderr
     except subprocess.TimeoutExpired as x:
         out = (x.stdout or b"").decode("utf-8", "replace") if isinstance(x.stdout, bytes) else (x.stdout or "")
@@ -70,8 +79,8 @@ def scripts(t, d):
 
     build_rs.run_exe = run_exe
     for app, only in SCRIPTS.items():
-        exe = d / f"{app}.exe"
-        records = build_rs.run_app_tests(app, "win", exe) if only is None else [one_script(app, exe, s) for s in only]
+        exe = prog(d, app)
+        records = build_rs.run_app_tests(app, TARGET, exe) if only is None else [one_script(app, exe, s) for s in only]
         for r in records:
             if r["status"] == "skipped":
                 continue
@@ -88,7 +97,7 @@ def one_script(app, exe, name):
             (ROOT / line.split()[1]).parent.mkdir(parents=True, exist_ok=True)
     args = build_rs.script_args(script) + ["--script", script.relative_to(ROOT).as_posix()]
     started = time.monotonic()
-    r = build_rs.run_exe("win", exe, args, timeout=build_rs.script_timeout(script))
+    r = build_rs.run_exe(TARGET, exe, args, timeout=build_rs.script_timeout(script))
     return dict(script=name, status="passed" if r.returncode == 0 else "failed", exit_code=r.returncode,
                 duration=time.monotonic() - started, output=r.stdout + r.stderr)
 
@@ -96,16 +105,16 @@ def one_script(app, exe, name):
 def gpu(t, d):
     """gputest --info, then uigputest's output starting (--test switch, jfgui_GPU_TRACE=1): what the machine has and
     what the UI does with it"""
-    code, out = run(d / "gputest.exe", ["--info"], timeout=300)
+    code, out = run(prog(d, "gputest"), ["--info"], timeout=300)
     lines = [ln.rstrip() for ln in out.splitlines() if ln.strip()]
     t.check(code == 0 and "FAIL" not in out, f"gputest --info: exit {code}", "\n   ".join(lines[:40]))
-    code, out = run(d / "uigputest.exe", ["--test", "switch"], timeout=300, env={"jfgui_GPU_TRACE": "1"})
+    code, out = run(prog(d, "uigputest"), ["--test", "switch"], timeout=300, env={"jfgui_GPU_TRACE": "1"})
     lines = [ln.rstrip() for ln in out.splitlines() if ln.startswith(("SKIP", "FAIL", "gpu:", "  ok", "jfgui:", "all checks"))]
     t.check(code == 0, f"uigputest --test switch with jfgui_GPU_TRACE=1: exit {code}", "\n   ".join(lines[:40]))
 
 
 def crash(t, d):
-    exe = d / "plattest.exe"
+    exe = prog(d, "plattest")
     for test in ("crash", "guardcrash", "panic"):
         code, out = run(exe, ["--test", test], timeout=300)
         fails = [ln for ln in out.splitlines() if ln.startswith("FAIL")]
@@ -146,8 +155,10 @@ def module(t, d, other):
 
 
 def main():
+    global TARGET
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--dir", default=str(ROOT / "build" / "win-arm64"), help="the built programs")
+    ap.add_argument("--target", choices=("win", "linux"), default="win", help="the programs' system (linux: ARM8)")
+    ap.add_argument("--dir", help="the built programs (default build/win-arm64, build/linux-arm64)")
     ap.add_argument("--other-module", help="jxlenc.dll built for x64 (must be refused)")
     ap.add_argument("--only", choices=("scripts", "crash", "module", "gpu"))
     ap.add_argument("--gallery-all", action="store_true", help="every script of the gallery, not only a start")
@@ -163,14 +174,16 @@ def main():
                 SCRIPTS.setdefault(app, []).append(one)
             else:
                 SCRIPTS[app] = None
-    d = Path(a.dir)
-    print(f"host {host_exec.host_arch()}, programs in {d} for {host_exec.exe_arch(d / 'plattest.exe')}", flush=True)
+    TARGET = a.target
+    d = Path(a.dir or ROOT / "build" / ("win-arm64" if TARGET == "win" else "linux-arm64"))
+    first = next((prog(d, n) for n in [*SCRIPTS, "plattest"] if prog(d, n).is_file()), prog(d, "plattest"))
+    print(f"host {host_exec.host_arch()}, programs in {d} for {host_exec.exe_arch(first)}", flush=True)
     t = Tally()
     if a.only in (None, "crash"):
         crash(t, d)
-    if a.only in (None, "module"):
+    if a.only == "module" or a.only is None and TARGET == "win":
         module(t, d, a.other_module)
-    if a.only == "gpu" or a.only is None and (d / "gputest.exe").is_file():     # (ARM5's runs built no gputest)
+    if a.only == "gpu" or a.only is None and prog(d, "gputest").is_file():     # (ARM5's runs built no gputest)
         gpu(t, d)
     if a.only in (None, "scripts"):
         scripts(t, d)
