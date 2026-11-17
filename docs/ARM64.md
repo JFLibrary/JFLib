@@ -858,6 +858,24 @@ jeden Test der Ausgabe ein SKIP (23 bis 24 von 31), die Tests ohne Ausgabe laufe
 `viewoff`, `shaders`). Ohne Treiber sagt `gputest --info` „SKIP: no usable GPU“ mit Exit-Code 0, der Rest von `gputest` ebenso; `noloader`
 (Loader fehlt, Datei kein Loader) und `glibc` laufen.
 
+**Mit lavapipe** (Ubuntus `mesa-vulkan-drivers` 25.2.8, in der VM `llvmpipe (LLVM 20.1.2, 128 bits)`, Vulkan 1.4.318, Stufe Voll, unter Weston):
+
+| Kernel | `gputest` | `uigputest` | GPU-Skripte der `gallery` |
+|---|---|---|---|
+| 4 KB (erster Lauf, Mesas Shader-Cache leer) | 18 von 21 | 30 von 31 | 3 von 3 |
+| 64 KB (Cache gefüllt) | 19 von 21 | 31 von 31 | 3 von 3 |
+
+`gputest` rechnet damit alles auf dem Gerät, was ohne Fenster geht, auch `wgsl`, `scene`, `msl`, `bench_smoke` und `--validate` (ohne
+Validierungsschicht). Die 3D-Ansichten von `uigputest` laufen mit eigenem Gerät auf lavapipe (`viewcpu`, 114 s); die Tests der Ausgabe geben
+weiter ein SKIP (siehe oben). Rot:
+
+- **`textures`** (und damit `validate`) in beiden Runden gleich: Bilinear bei LOD 0 weicht bis 4,41e-3 ab, trilinear bei LOD 1,5 bis 4,66e-3, die
+  Toleranz ist 3,91e-3 (1/256). lavapipe derselben Mesa- und LLVM-Version auf x86-64 (WSL) bleibt bei 1,47e-3 und 3,19e-3, auch mit 128-Bit-Vektoren
+  (`LP_NATIVE_VECTOR_WIDTH=128`). Die Abweichung kommt also aus dem ARM64-Code von llvmpipe oder aus QEMUs Nachbildung von NEON; die
+  Bibliothek lädt die Textur nur hoch und liest das Ergebnis zurück, wie in den grünen Tests.
+- **`scene`** („GPU did not finish within 10 s“) und **`viewcpu`** (404 s) nur im ersten Lauf: Mesa übersetzte die Shader unter TCG zum ersten Mal.
+  Mit gefülltem Cache grün.
+
 ### ARM9: Pakete, Updates, CI, Dokumentation (M)
 
 - `.deb` `arm64`, RPM und AppImage `aarch64`, MSIX `arm64`, Flatpak `--arch=aarch64`, Setup pro
