@@ -1231,13 +1231,15 @@ widgets                                                             [src/ui/ui_e
        the asm's buffer in bytes incl. the NUL (bits 0..22: the text holds at most cap - 1
        bytes) | TB_PASSWORD | TB_READONLY | TB_DIGITS | TB_SIGNED.  placeholder (or None)
        TB_PASSWORD: while it has the keyboard the input method's purpose is IP_PASSWORD (set
-       by the box itself, the purpose of before put back after; no plat::ime_purpose needed).
+       by the box itself, the purpose of before put back after; no plat::ime_purpose needed);
+       always one line (TB_MULTI with it is ignored).
        shows while the text is empty (cut with "…" where the box is narrower).
        ST_DISABLED via next_flags.
        EV_ACT: the text changed this frame; EV_COMMIT: Enter, Esc or focus lost; EV_FOCUS
        while it has the keyboard focus.
        Semantic record K_TEXTBOX: label = the text (one dot per character for passwords),
-       value = caret, max = selection anchor (byte indices; 0 while not focused), min = the
+       value = caret, max = selection anchor (byte indices of the label, of the dots for
+       passwords; 0 while not focused), min = the
        kind of box: (TB_MULTI | TB_PASSWORD | TB_READONLY) >> 24.
        TB_MULTI (U1): several lines (natural height 5 lines): Enter inserts a line break,
        Ctrl+Enter commits, Up / Down keep the preferred x, PgUp / PgDn move a view, Home /
@@ -8858,7 +8860,9 @@ history -- undo / redo for an app's own state
   h.undo(&mut state) / h.redo(&mut state) -> bool
   h.can_undo() / can_redo()            undo_label() / redo_label() -> the step's label;
                                        undo_value() / redo_value() -> the step as data
-  h.group_begin(label) / group_end()   the edits between them are one step
+  h.group_begin(label) / group_end()   the edits between them are one step (undo / redo
+                                       while one is open close it first: its edits so far
+                                       are the newest step, a later group_end does nothing)
   h.mark_saved() / dirty()             whether the state differs from the saved one
   h.mark_unsaved()                     the state counts as unsaved (a recovered copy)
   h.clear()
@@ -8905,13 +8909,15 @@ all back.  Text fields keep their own undo; the edits here are the app's.
 - **`fn record(&mut self, mut edit: Box<dyn Edit<S>>)`**
   record an edit that was already applied
 - **`fn undo(&mut self, s: &mut S) -> bool`**
-  take the newest step back -> false when there is none
+  take the newest step back -> false when there is none (an open group is closed first)
 - **`fn redo(&mut self, s: &mut S) -> bool`**
-  do the last undone step again -> false when there is none
+  do the last undone step again -> false when there is none (an open group is closed
+  first: with edits in it there is nothing to redo any more)
 - **`fn can_undo(&self) -> bool`**
 - **`fn can_redo(&self) -> bool`**
 - **`fn undo_label(&self) -> Option<&str>`**
-  the label of the step undo would take back
+  the label of the step undo would take back (an open group with edits: the outermost
+  group's)
 - **`fn redo_label(&self) -> Option<&str>`**
   the label of the step redo would do again
 - **`fn undo_value(&self) -> Option<&dyn core::any::Any>`**
@@ -10626,7 +10632,9 @@ TK_KEY: u32 = 0x8000_0000  // TermEv::Raw: a key (VK | MOD_* << 16), not a chara
 - **`fn set_prompt(&mut self, s: &str)`**
   the prompt before the input (SGR allowed)
 - **`fn set_mode(&mut self, mode: u8)`**
-  TM_LINE, TM_BUSY, TM_RAW or TM_SECRET
+  TM_LINE, TM_BUSY, TM_RAW or TM_SECRET; into or out of TM_SECRET the input typed so far
+  is dropped (overwritten): a hidden line showed in the next mode's input line, a visible
+  one became part of the secret
 - **`fn input_set(&mut self, s: &str, caret: usize)`**
   replace the input line; caret: a byte index (clamped to a character start)
 - **`fn input(&self) -> &str`**
@@ -10993,7 +11001,7 @@ state_save / state_load work there as well (the main window: its size only).
 and ignores them), w / h (DIP, the size before maximizing or minimizing), max (0 / 1).  A
 position off every monitor (a monitor that is gone) is centred on the work area of the
 nearest one.  [window ID] (decimal id): open (0 / 1) and x / y / w / h (DIP, relative to
-the owner's client area: the WinRect).  Only tool windows (WF_TOOL, not WF_DIALOG /
+the owner's client area: the WinRect; off every monitor: centred like the main window).  Only tool windows (WF_TOOL, not WF_DIALOG /
 WF_MODAL) are kept; sections of windows that did not run this time stay in the file.
 ```
 
@@ -23735,7 +23743,7 @@ folder (absolute paths, "..", a scheme) are refused before the closure sees them
   - `json_bytes: usize` -- bytes of the JSON part, and the values in it (objects, arrays, numbers, ...)
   - `json_values: usize`
   - `buffer_bytes: u64` -- bytes of all buffers together, as given (a file two buffers name counts twice), and the zeros of
-    accessors without a buffer view
+    accessors without a buffer view; the image files read count against it too (apart)
   - `vertices: u64` -- vertices and indices of all primitives together, as the model holds them (flat normals split vertices)
   - `indices: u64`
   - `nodes: usize` -- nodes, and how deep they nest
@@ -36928,10 +36936,11 @@ DE_ALL: u32 = 7  // every effect
   effect's action; Wayland: taken wl_data_offer.finish (the action stays the one negotiated
   before the drop), not taken the offer destroyed without finish
 
-- **`fn drag_start(data: DragData) -> bool`**
+- **`fn drag_start(mut data: DragData) -> bool`**
   drag `data` out of the app (call while the left button is held) -> started; E_DRAG_END
   (data = the effect, 0 = cancelled or refused) follows.  Only the standard kinds leave
-  the app.
+  the app; files only when the manifest lets the app read them (false otherwise), a move only
+  when it may write them all (else the drag offers copy and link).
 
 - **`fn drag_running() -> bool`**
   an outgoing drag runs (until its E_DRAG_END is queued)
@@ -37358,8 +37367,8 @@ Source: [`lib/plat/ime.rs`](../lib/plat/ime.rs)
 
 - **`fn ime_commit_text(win:u8,text:&str) -> usize`**
   Committed text of any length: commits of at most 4096 bytes, split between characters ->
-  the bytes queued (fewer: the commit queue or the event ring is full, the rest can follow
-  once the app took these).
+  the bytes taken (queued now, or waiting until the app took the commits before them; fewer
+  only past PENDING_MAX waiting bytes or for a window number out of range).
 
 *(E4) what the text being typed is (ime_purpose): the input method and an on-screen*
 
@@ -39503,7 +39512,8 @@ argon2 -- Argon2id (RFC 9106, version 0x13) and PHC strings
   argon2id(password, salt, &Params, out)          raw tag (secret / associated data empty)
   argon2id_ex(password, salt, secret, ad, &Params, out)
   hash(password, salt, &Params) -> "$argon2id$v=19$m=..,t=..,p=..$salt$hash"
-  verify(phc, password) -> bool                   (constant-time comparison)
+  verify(phc, password) -> bool                   (constant-time comparison; a string that
+                                                   asks for more than VERIFY_WORK is refused)
 
 Lanes are filled one after the other in each slice (the result is the same as with
 threads); memory is m KiB, allocated per call.
@@ -39535,8 +39545,15 @@ threads); memory is m KiB, allocated per call.
 - **`fn parse(phc: &str) -> Option<(Params, Vec<u8>, Vec<u8>)>`**
   the parameters, salt and tag of a PHC string
 
+```rust
+/// the most work verify does for a PHC string, in KiB times passes (memory m_kib x passes t):
+/// 2^24, so 1 GiB with 16 passes or 64 MiB with 256.  A stored string comes from outside; valid()
+/// alone let it ask for 4 GiB and 2^32 - 1 passes
+VERIFY_WORK: u64 = 1 << 24
+```
+
 - **`fn verify(phc: &str, password: &[u8]) -> bool`**
-  whether the password matches a PHC string
+  whether the password matches a PHC string (false beyond VERIFY_WORK)
 
 ### `crypto/b64.rs`
 
@@ -40243,7 +40260,8 @@ ROUNDS: u8 = 40
 
 - **`fn shared(pwe: &[u8; 64], rand: &[u8; 32], peer_scalar: &[u8; 32], peer_element: &[u8; 64]) -> Option<[u8; 32]>`**
   the x coordinate of k = rand \* (peer_scalar \* PWE + peer_element); None for a scalar out of
-  range, an element off the curve, or k at the identity
+  range or of 1 (RFC 8146 2.1: a scalar of 1 lets the element reveal mask \* PWE, as hostapd
+  refuses it since CVE-2019-9497), an element off the curve, or k at the identity
 
 - **`fn confirm(ss: &[u8; 32], element_a: &[u8; 64], scalar_a: &[u8; 32], element_b: &[u8; 64], scalar_b: &[u8; 32]) -> [u8; 32]`**
   Confirm of a side: H(ss | its element | its scalar | the other's element | scalar | ciphersuite)
@@ -41073,6 +41091,9 @@ ssh -- SSH-2 for running commands on a machine (RFC 4253 / 4252 / 4254)
   client.host_key()                                    type, blob, "SHA256:..." fingerprint
   client.auth_password(user, pw) / auth_key(user, &Keypair)
   client.exec(command, stdin, max_out) -> Exec { status, stdout, stderr }
+  client.set_time_limit(Some(ms))                       auth_* and exec end with TimedOut after
+                                                       ms in all (a server that keeps sending
+                                                       held them forever); None: no limit
   Transport::accept(stream, &host_key)                 the server side of the transport
                                                        (tests drive it with OpenSSH's client)
   private_key(text) -> Keypair      an unencrypted Ed25519 key ("OPENSSH PRIVATE KEY")
@@ -41084,6 +41105,9 @@ the Terrapin prefix truncation), ssh-ed25519 host and user keys, chacha20-poly13
 The host key is checked by the caller's rule: HostKeyCheck::Pinned(fingerprint) or Any (only
 to learn the fingerprint).  Not here: RSA / ECDSA keys, compression, port forwarding, PTYs,
 rekeying (a peer that starts a new key exchange ends the session; commands here are short).
+A peer that sends only messages to skip (ignore, debug, banners, global requests) while an
+answer is due ends the session after MAX_SKIPPED of them in a row; data past the window the
+client granted is a protocol error.
 ```
 
 ```rust
@@ -41200,11 +41224,17 @@ MSG_CHANNEL_FAILURE: u8 = 100
 **`impl Client`**
 
 - **`fn connect(s: Box<dyn Stream>, check: HostKeyCheck) -> Result<Client, SshError>`**
+- **`fn set_time_limit(&mut self, ms: Option<u32>)`**
+  Each following `auth_password`, `auth_key` and `exec` ends with `SshError::Net` (TimedOut)
+  when it takes longer than `ms` in all; `None` (the default): no limit.  The stream's read
+  timeout only limits each wait: a server that keeps sending (banners, endless output)
+  held these calls forever.  After a TimedOut the session is in an unknown state: close it.
 - **`fn host_key(&self) -> &HostKey`**
 - **`fn auth_password(&mut self, user: &str, password: &str) -> Result<(), SshError>`**
 - **`fn auth_key(&mut self, user: &str, key: &Keypair) -> Result<(), SshError>`**
 - **`fn exec(&mut self, command: &str, stdin: &[u8], max_out: usize) -> Result<Exec, SshError>`**
-  run a command, feed it `stdin`, collect at most `max_out` bytes of each output
+  run a command, feed it `stdin`, collect at most `max_out` bytes of each output (the rest
+  is read and dropped until the command ends: set_time_limit bounds a command that does not)
 - **`fn close(mut self)`**
 
 ### `netio/tls/mod.rs`
@@ -45059,8 +45089,9 @@ KDE_IGTK: u8 = 9
 - **`fn to_bytes(&self) -> Vec<u8>`**
   the element with its id and length (22 bytes)
 - **`fn parse(elems: &[u8]) -> Option<Rsne>`**
-  the first RSN element of a list of elements (key data); one pairwise and one AKM suite
-  of 00-0F-AC are read, the counts are little endian as in every element
+  the first RSN element of a list of elements (key data): the first AKM suite's type (of
+  00-0F-AC) and the capabilities after every AKM suite; the counts are little endian as in
+  every element
 
 - **`fn elements(b: &[u8]) -> Vec<(u8, &[u8])>`**
   the elements of a list: (id, contents); stops at one that does not fit
@@ -47396,8 +47427,11 @@ Algorithms: curve25519-sha256 (also under the name @libssh.org), host and user k
 and rsa-sha2-256 (host keys; user keys too), ciphers chacha20-poly1305@openssh.com, aes128-ctr
 and aes256-ctr with hmac-sha2-256, compression none.  Not here: encrypted key files, the older
 ssh-rsa with SHA-1, port forwarding (a channel of another type is the embedder's to refuse),
-the extension negotiation of RFC 8308 (SSH_MSG_EXT_INFO is tolerated, none is sent) and
-OpenSSH's strict key exchange (ignored when offered).
+the extension negotiation of RFC 8308 (SSH_MSG_EXT_INFO is tolerated, none is sent).
+OpenSSH's strict key exchange (kex-strict-c/s-v00@openssh.com, against the Terrapin prefix
+truncation, CVE-2023-48795) is offered in the first KEXINIT and kept when the peer offers it
+too: the peer's KEXINIT must be its first packet, nothing but key exchange messages may come
+during the first exchange, and each direction counts its packets from 0 again after a NEWKEYS.
 
 The embedder decides what the protocol leaves open: which host key to trust, who logs in, which
 channels and requests to take.  A protocol error from the peer sends SSH_MSG_DISCONNECT and
@@ -48912,7 +48946,8 @@ format "bcrepo-1")
 Signers: snapshots are saved and loaded only with trusted keys -- CreateOptions::signer and
 the keys given to trust_signer (save_snapshot: UntrustedSigner, load_snapshot: Corrupt).
 The list sits in repo.json under the MAC of the repository key, so it keeps out other keys
-and mistakes, not someone who holds the repository key (who could call trust_signer).
+and mistakes, not someone who holds the repository key (who could call trust_signer).  A
+repo.json without a MAC (taken away) does not open (Corrupt).
 
 Layout:  repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
 Keys:    one random repository key, wrapped in repo.json for the server's master key, for
@@ -49334,7 +49369,9 @@ back a version that does not start
                                restart, max_size, ca_pem, timeout_ms
   startup(&cfg) -> Startup     first thing in main (before ui::launch): puts a downloaded
                                update in place and restarts into it, counts the starts of a
-                               new version, rolls back one that never reported healthy
+                               new version, rolls back one that never reported healthy;
+                               a program that calls itself neither the trial's version nor
+                               the old one ends the trial (the version recorded as bad)
   healthy(&cfg) -> bool        the health marker: the new version works (after its first
                                frame, for example); without it the next start rolls back
   Updater::new(cfg)            check() / download() / apply() (blocking), start_check() /
@@ -49544,7 +49581,9 @@ Re-exports: `plat::pkg::Packaged`
 - **`fn startup(cfg: &Config) -> Startup`**
   at the start of the program, before its UI: a staged update is put in place and the
   program restarted into it; a new version on trial counts its start, and one that already
-  had cfg.attempts starts without healthy() is rolled back (the old version restarted).
+  had cfg.attempts starts without healthy() is rolled back (the old version restarted).  A
+  program whose version is neither the trial's nor the one before (the package's own number
+  differs from its manifest's) ends the trial: Normal, the trial's version recorded as bad.
   Another process holding the updater's lock: Normal.
 
 - **`fn healthy(cfg: &Config) -> bool`**
@@ -49593,7 +49632,9 @@ the new version and the way back
   healthy(cfg) -> bool         (lib.rs) the health marker
 
 Every file of an update is written next to its target as NAME.jfupd-new; the old file is
-copied to backup/files/ (backup/list: "R path" replaced, "N path" new), renamed away
+copied to backup/files/ (backup/list: "H sha256 path" replaced, with the copy's SHA-256, which
+the way back checks for every copy before it puts one back, and again while it copies -- "R
+path" of earlier versions without one; "N path" new), renamed away
 (NAME.jfupd-old-<n>: Windows can rename a running exe, not replace it) and the new file takes
 its name.  Leftover .jfupd-* files are removed at a later start, once no process uses them.
 An AppImage update has one file, the .AppImage itself ($APPIMAGE): copied (and hashed on the

@@ -35,7 +35,13 @@ impl Listener {
                 syscall6(SYS_GETPID, 0, 0, 0, 0, 0, 0),
             )
         };
-        let directory = format!("/tmp/jfgui-agent-{uid}");
+        // $XDG_RUNTIME_DIR (the user's own, made at login: no other user can take the name
+        // first) when it is a plain absolute path, else /tmp/jfgui-agent-<uid> (another user may
+        // make that one first: then there is no listener, Err(13))
+        let directory = match crate::env("XDG_RUNTIME_DIR").filter(|d| d.starts_with('/') && d.len() <= 48 && !d.split('/').any(|c| c == "..")) {
+            Some(d) => format!("{}/jfgui-agent", d.trim_end_matches('/')),
+            None => format!("/tmp/jfgui-agent-{uid}"),
+        };
         let dir_z = format!("{directory}\0");
         // SAFETY: mkdirat/openat receive a valid terminated path; flags forbid following a symlink.
         let dir_fd = unsafe {

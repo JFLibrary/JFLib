@@ -462,6 +462,14 @@ impl AtomicFile {
                         Created::Unsupported if p.kind(&tmp) != 0 => continue,
                         Created::Unsupported => open_in(&p, &tmp, FO_WRITE)?,
                     };
+                    // a folder mount's file keeps its permission bits (the rename made a 0600
+                    // file 0644, the sibling's usual mode)
+                    #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+                    if let (Some(d), Some(t)) = (p.os_path(&rest), p.os_path(&tmp))
+                        && let Some(m) = crate::fs::stat(&d).filter(|m| m.kind == Some(crate::fs::FileKind::File))
+                    {
+                        crate::fs::set_mode(&t, m.mode & 0o7777);
+                    }
                     return Some(AtomicFile(Some(AtomicInner::Vfs { p, tmp, dst: rest, f: Some(f) })));
                 }
                 None

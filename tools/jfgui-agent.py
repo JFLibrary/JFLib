@@ -49,14 +49,25 @@ def protocol(address: str) -> str:
     return "mcp" if re.search(r"-mcp-\d+-\d+(?:\.sock)?$", address) else "json"
 
 
+def agent_dirs():
+    """the folders of the agent sockets (Linux, macOS): $XDG_RUNTIME_DIR/jfgui-agent first (what
+    lib/plat/control_ipc_linux.rs uses when it is set), then /tmp/jfgui-agent-<uid>"""
+    dirs = []
+    run = os.environ.get("XDG_RUNTIME_DIR", "")
+    if sys.platform.startswith("linux") and run.startswith("/") and len(run) <= 48 and ".." not in run.split("/"):
+        dirs.append(Path(run.rstrip("/")) / "jfgui-agent")
+    dirs.append(Path(f"/tmp/jfgui-agent-{os.geteuid()}"))
+    return dirs
+
+
 def validate_address(address: str) -> None:
     if os.name == "nt":
         if not address.startswith(PIPE_PREFIX) or not re.fullmatch(r"[A-Za-z0-9_-]+", address[len(PIPE_PREFIX):]):
             raise ValueError("Expected a local jfguiLib named-pipe address")
     else:
-        directory = Path(f"/tmp/jfgui-agent-{os.geteuid()}")
         path = Path(address)
-        if path.parent != directory or not re.fullmatch(r"[A-Za-z0-9_-]+\.sock", path.name):
+        directory = path.parent
+        if directory not in agent_dirs() or not re.fullmatch(r"[A-Za-z0-9_-]+\.sock", path.name):
             raise ValueError("Expected an jfguiLib socket in the current user's private directory")
         info = directory.lstat()
         if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700:
@@ -204,13 +215,15 @@ class Connection:
 def addresses():
     if os.name == "nt":
         return sorted("\\\\.\\pipe\\" + name for name in os.listdir("\\\\.\\pipe\\") if name.startswith("jfgui-agent-"))
-    directory = Path(f"/tmp/jfgui-agent-{os.geteuid()}")
-    if not directory.exists():
-        return []
-    info = directory.lstat()
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700:
-        raise PermissionError("Agent discovery directory is not private")
-    return sorted(str(path) for path in directory.glob("*.sock") if path.is_socket())
+    found = []
+    for directory in agent_dirs():
+        if not directory.exists():
+            continue
+        info = directory.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700:
+            raise PermissionError("Agent discovery directory is not private")
+        found += [str(path) for path in directory.glob("*.sock") if path.is_socket()]
+    return sorted(found)
 
 
 def emit(value):

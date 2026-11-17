@@ -2081,7 +2081,8 @@ impl Ui {
     }
 
     // commit "text" [N]: the commits of an input method (plat::ime_commit_text) to the window
-    // with the keyboard, as the platform queues them
+    // with the keyboard, in one call as a platform hands them over (what the queue cannot take
+    // yet waits and follows as the commits are taken)
     fn sc_commit(&mut self, app: &mut dyn App, a: &[u8]) {
         let Some((s, r)) = parse_qstring(a, LINE_MAX) else {
             self.fail(b"expected a quoted string");
@@ -2089,16 +2090,11 @@ impl Ui {
         };
         let text = String::from_utf8_lossy(&s).repeat(parse_int(r).0.max(1) as usize);
         let w = (self.m.win.active & (WIN_MAX as u32 - 1)) as u8;
-        let mut at = 0;
-        while at < text.len() {
-            let n = plat::ime_commit_text(w, &text[at..]);
-            if n == 0 {
-                self.fail(b"the commit was not queued");
-                return;
-            }
-            at += n;
-            self.process_events(app);
+        if plat::ime_commit_text(w, &text) < text.len() {
+            self.fail(b"the commit was not taken whole");
+            return;
         }
+        self.process_events(app);
     }
 
     // (E4) preedit "text" [CURSOR]: an input method's composition in the window with the keyboard

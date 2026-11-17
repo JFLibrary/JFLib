@@ -16,6 +16,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - Modular images: a squeeze of a channel whose shift is already above 30 is refused (`ERR_HDR`, as libjxl does). Squeeze steps on a 1 x 1 channel added an empty channel each, up to 65536, each inserted into the middle of the list (74 KB took 232 s).
 - Modular images: the squeeze steps of a decode may move at most 2^24 channel entries in all, over its frames and groups (each step's residuals go in as one block), beyond that `ERR_LIMIT`. Steps on a palette's meta channel, which has no shift to count, inserted a channel each near the front of the list (74 KB took 56 s; now refused in about 0.3 s).
+- A file with 32-bit float samples is a JPEG XL (probe and meta work, IMF_FLOAT) whose decode is ERR_UNSUPPORTED; it was ERR_HDR.
 
 ## [0.2.1] - 2026-11-16
 

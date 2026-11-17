@@ -89,7 +89,9 @@ pub fn unit_text(s: &ServiceSpec) -> String {
     }
     format!(
         "[Unit]\nDescription={}\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nExecStart={}\nRestart=on-failure\nRestartSec=5\nUMask=0077\n\n[Install]\nWantedBy=multi-user.target\n",
-        s.description.replace('\n', " "),
+        // every control character a space: systemd ends a line at \r as well as at \n, so a
+        // \r in the text let it add directives of its own
+        s.description.chars().map(|c| if c.is_control() { ' ' } else { c }).collect::<String>(),
         exec
     )
 }

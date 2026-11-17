@@ -1120,7 +1120,7 @@ impl Ui {
         let (a, c) = (byte(a), byte(c));
         let cur = self.uiw_cur;
         self.uiw_use(win as u32);
-        if self.textbox_select(id, &text, a, c) {
+        if self.textbox_select_record(id, &text, a, c) {
             // another frame (after the passes of a11y_frame the window loop waits for events)
             self.need = true;
             if !self.headless {

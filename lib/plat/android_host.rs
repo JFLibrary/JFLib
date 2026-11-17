@@ -281,18 +281,22 @@ impl FdStream {
         if mode != FO_READ {
             return Some(FdStream { fd, writable, pipe: Some(SpinLock::new((Vec::new(), 0))) });
         }
+        // a streaming provider's document is held in memory: at most PIPE_MAX bytes, and growing
+        // the copy may fail (an endless or huge stream ended the process)
+        const PIPE_MAX: usize = 256 << 20;
         let mut all = Vec::new();
         let mut buf = alloc::vec![0u8; 64 * 1024];
         loop {
             // SAFETY: buf is writable; fd is open
             let n = unsafe { read(fd, buf.as_mut_ptr().cast(), buf.len()) };
-            if n < 0 {
+            if n == 0 {
+                break;
+            }
+            let room = n > 0 && all.len() + n as usize <= PIPE_MAX && all.try_reserve(n as usize).is_ok();
+            if !room {
                 // SAFETY: fd is ours, closed once
                 unsafe { close(fd) };
                 return None;
-            }
-            if n == 0 {
-                break;
             }
             all.extend_from_slice(&buf[..n as usize]);
         }

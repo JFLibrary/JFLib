@@ -74,6 +74,7 @@ fn portal(c: &mut Conn, reason: &str, flags: u32) -> Option<Part> {
     let m = Msg::call(PORTAL, PORTAL_PATH, "org.freedesktop.portal.Inhibit", "Inhibit", alloc::vec![Value::str(""), Value::U(flags), opts]);
     let serial = c.send(&m)?;
     let (mut answered, mut ok) = (false, false);
+    let mut portal = String::new();
     let mut end = crate::time_us() + PORTAL_MS * 1000;
     loop {
         let now = crate::time_us();
@@ -85,6 +86,7 @@ fn portal(c: &mut Conn, reason: &str, flags: u32) -> Option<Part> {
             T_RETURN if r.reply_to == serial => {
                 if let Some(Value::O(p)) = r.body.first() {
                     handle = p.clone();
+                    portal = r.sender.clone();
                     (answered, ok) = (true, true);
                     end = crate::time_us() + SETTLE_MS * 1000;
                 } else {
@@ -92,7 +94,8 @@ fn portal(c: &mut Conn, reason: &str, flags: u32) -> Option<Part> {
                 }
             }
             T_ERROR if r.reply_to == serial => break,
-            T_SIGNAL if r.member == "Response" && r.path == handle => {
+            // only the portal's Response (any client may send one on the request's path)
+            T_SIGNAL if r.member == "Response" && r.path == handle && answered && r.sender == portal => {
                 // the backend refused: the portal drops the request itself
                 ok = r.body.first().and_then(|v| v.as_u32()) == Some(0) && answered;
                 break;

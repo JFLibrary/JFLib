@@ -53,8 +53,9 @@ The endpoint is private to the user on every system:
 
 - **Windows**: a named pipe with a unique name, a security descriptor that grants access only to
   the user of the process, and remote clients refused.
-- **Linux and macOS**: a Unix socket with mode 0600 in `/tmp/jfgui-agent-<uid>`, a folder that
-  must be a real directory owned by the user with mode 0700; the peer's user id is checked on
+- **Linux and macOS**: a Unix socket with mode 0600 in a folder that must be a real directory
+  owned by the user with mode 0700 (Linux: `$XDG_RUNTIME_DIR/jfgui-agent`, without that variable
+  `/tmp/jfgui-agent-<uid>`; macOS: `/tmp/jfgui-agent-<uid>`); the peer's user id is checked on
   every connection (`SO_PEERCRED` on Linux, `getpeereid` on macOS).
 - **iOS**: the same in the app's own temporary folder.
 

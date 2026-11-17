@@ -283,8 +283,9 @@ impl Rsne {
         v.extend_from_slice(&self.caps.to_le_bytes());
         v
     }
-    /// the first RSN element of a list of elements (key data); one pairwise and one AKM suite
-    /// of 00-0F-AC are read, the counts are little endian as in every element
+    /// the first RSN element of a list of elements (key data): the first AKM suite's type (of
+    /// 00-0F-AC) and the capabilities after every AKM suite; the counts are little endian as in
+    /// every element
     pub fn parse(elems: &[u8]) -> Option<Rsne> {
         let e = elements(elems).into_iter().find(|e| e.0 == EID_RSN)?.1;
         if e.len() < 18 || e[0] != 1 || e[1] != 0 {
@@ -295,8 +296,15 @@ impl Rsne {
         if e.len() < at + 6 {
             return None;
         }
+        // the AKM count: the capabilities follow all of the suites (they were read as if there
+        // were always one)
+        let na = u16::from_le_bytes([e[at], e[at + 1]]) as usize;
+        if na == 0 || e[at + 2..at + 5] != OUI {
+            return None;
+        }
         let akm = e[at + 5];
-        let caps = if e.len() >= at + 8 { u16::from_le_bytes([e[at + 6], e[at + 7]]) } else { 0 };
+        let c = at + 2 + 4 * na;
+        let caps = if e.len() >= c + 2 { u16::from_le_bytes([e[c], e[c + 1]]) } else { 0 };
         Some(Rsne { akm, caps })
     }
 }

@@ -53,6 +53,21 @@ fn var(name: &str) -> Option<String> {
     env::var(name).ok().filter(|v| !v.is_empty())
 }
 
+// the PFX password, taken out of the environment when the program starts (take_secrets): the
+// processes it starts (cargo, linkers, gpg, the app under `run`) no longer inherit it.  signtool
+// takes it only on its command line (/p), where other processes of the same user can read it;
+// a certificate in the store (jfgui_SIGN_THUMBPRINT) needs none
+static PFX_PASS: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
+/// takes jfgui_SIGN_PFX_PASS out of the environment (first thing in main, before any thread)
+#[allow(unsafe_code)]
+pub(crate) fn take_secrets() {
+    let pw = var("jfgui_SIGN_PFX_PASS");
+    // SAFETY: main calls this before it starts a thread; nothing reads the environment meanwhile.
+    unsafe { env::remove_var("jfgui_SIGN_PFX_PASS") };
+    let _ = PFX_PASS.set(pw);
+}
+
 /// the certificate table of a signed PE file: (offset, size), None when unsigned
 pub(crate) fn pe_signature(b: &[u8]) -> Option<(usize, usize)> {
     let u16_at = |at: usize| b.get(at..at + 2).map(|x| u16::from_le_bytes([x[0], x[1]]) as usize);
@@ -86,7 +101,7 @@ impl Signing {
                         s.skip(&format!("Authenticode: jfgui_SIGN_PFX names no file ({pfx})"))?;
                     } else {
                         let mut args = vec!["/f".to_string(), pfx.clone()];
-                        if let Some(pw) = var("jfgui_SIGN_PFX_PASS") {
+                        if let Some(pw) = PFX_PASS.get().cloned().flatten().or_else(|| var("jfgui_SIGN_PFX_PASS")) {
                             args.extend(["/p".to_string(), pw]);
                         }
                         let name = Path::new(&pfx).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();

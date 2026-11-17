@@ -203,7 +203,6 @@ fn probes() -> Vec<(&'static str, usize, [usize; 5], &'static str)> {
     let pid = unsafe { syscall3(SYS_GETPID, 0, 0, 0) } as usize;
     alloc::vec![
         ("ptrace", SYS_PTRACE, [PEEKDATA, 0, 0, 0, 0], "ESRCH: pid 0"),
-        ("process_vm_readv", SYS_PROCESS_VM_READV, [pid, 0, 0, 0, 0], "0: nothing to read"),
         ("process_vm_writev", SYS_PROCESS_VM_WRITEV, [pid, 0, 0, 0, 0], "0: nothing to write"),
         ("kexec_load", SYS_KEXEC_LOAD, [0; 5], "EPERM too: CAP_SYS_BOOT"),
         ("kexec_file_load", SYS_KEXEC_FILE_LOAD, [NO_FD, NO_FD, 0, 0, 0], "EPERM too: CAP_SYS_BOOT"),
@@ -214,6 +213,13 @@ fn probes() -> Vec<(&'static str, usize, [usize; 5], &'static str)> {
         ("umount2", SYS_UMOUNT2, [0, 0x8000_0000, 0, 0, 0], "EINVAL: unknown flag"),
         ("pivot_root", SYS_PIVOT_ROOT, [0; 5], "EPERM too: CAP_SYS_ADMIN"),
         ("chroot", SYS_CHROOT, [0; 5], "EFAULT: no path"),
+        ("open_tree", SYS_OPEN_TREE, [NO_FD, 0, 0, 0, 0], "EBADF / EFAULT: no path"),
+        ("move_mount", SYS_MOVE_MOUNT, [NO_FD, 0, NO_FD, 0, 0], "EBADF / EFAULT"),
+        ("fsopen", SYS_FSOPEN, [0; 5], "EFAULT: no name (EPERM too without CAP_SYS_ADMIN)"),
+        ("fsconfig", SYS_FSCONFIG, [NO_FD, 0, 0, 0, 0], "EBADF (EPERM too without CAP_SYS_ADMIN)"),
+        ("fsmount", SYS_FSMOUNT, [NO_FD, 0, 0, 0, 0], "EBADF (EPERM too without CAP_SYS_ADMIN)"),
+        ("fspick", SYS_FSPICK, [NO_FD, 0, 0, 0, 0], "EBADF / EFAULT (EPERM too without CAP_SYS_ADMIN)"),
+        ("mount_setattr", SYS_MOUNT_SETATTR, [NO_FD, 0, 0, 0, 0], "EBADF / EFAULT"),
         ("bpf", SYS_BPF, [0x7FFF_FFFF, 0, 0, 0, 0], "EINVAL: unknown command (EPERM before Linux 5.19 without CAP_BPF)"),
         ("perf_event_open", SYS_PERF_EVENT_OPEN, [0, 0, NO_FD, NO_FD, 0x8000_0000], "EINVAL: unknown flag"),
         ("userfaultfd", SYS_USERFAULTFD, [0xFFFF_FFFF, 0, 0, 0, 0], "EINVAL: unknown flags"),
@@ -223,6 +229,10 @@ fn probes() -> Vec<(&'static str, usize, [usize; 5], &'static str)> {
         ("open_by_handle_at", SYS_OPEN_BY_HANDLE_AT, [NO_FD, 0, 0, 0, 0], "EBADF / EFAULT (EPERM before Linux 6.9)"),
         ("setns", SYS_SETNS, [NO_FD, 0, 0, 0, 0], "EBADF"),
         ("unshare", SYS_UNSHARE, [0; 5], "0: nothing to unshare"),
+        ("io_uring_setup", SYS_IO_URING_SETUP, [0; 5], "EINVAL / EFAULT: no entries"),
+        ("io_uring_enter", SYS_IO_URING_ENTER, [NO_FD, 0, 0, 0, 0], "EBADF"),
+        ("io_uring_register", SYS_IO_URING_REGISTER, [NO_FD, 0, 0, 0, 0], "EBADF"),
+        ("pidfd_getfd", SYS_PIDFD_GETFD, [NO_FD, 0, 0, 0, 0], "EBADF"),
         ("execve", SYS_EXECVE, [0; 5], "EFAULT: no program"),
         ("execveat", SYS_EXECVEAT, [NO_FD, 0, 0, 0, 0], "EFAULT / EBADF: no program"),
     ]
@@ -246,6 +256,21 @@ fn deny_list(t: &mut T, st: &Status) {
         refused += (r == EPERM) as usize;
         t.check(r == EPERM, &alloc::format!("sandboxtest: seccomp refuses {name} ({nr}): {r}, without the filter {without}"));
     }
-    t.check(refused == list.len() && list.len() >= 21,
+    t.check(refused == list.len() && list.len() >= 31,
             &alloc::format!("sandboxtest: all {} denied system calls fail with EPERM", list.len()));
+    // the calls the filter looks into: process_vm_readv on this process only (the crash handler's
+    // reads), clone without a new namespace, clone3 answered ENOSYS (libc then uses clone)
+    // SAFETY: getpid; process_vm_readv with no iovecs reads nothing; clone with CLONE_THREAD but
+    // without CLONE_SIGHAND / CLONE_VM is EINVAL without the filter (no child); clone3 with no
+    // arguments is EFAULT / EINVAL without the filter.
+    unsafe {
+        let pid = syscall3(rt::os::SYS_GETPID, 0, 0, 0) as usize;
+        let own = syscall6(rt::os::SYS_PROCESS_VM_READV, pid, 0, 0, 0, 0, 0);
+        let init = syscall6(rt::os::SYS_PROCESS_VM_READV, 1, 0, 0, 0, 0, 0);
+        t.check(own == 0 && init == EPERM, &alloc::format!("sandboxtest: process_vm_readv on this process works ({own}), on pid 1 EPERM ({init})"));
+        let newuser = syscall6(rt::os::SYS_CLONE, 0x1000_0000 | 0x0001_0000, 0, 0, 0, 0, 0);
+        t.check(newuser == EPERM, &alloc::format!("sandboxtest: clone with CLONE_NEWUSER fails with EPERM ({newuser}; EINVAL without the filter)"));
+        let c3 = syscall6(rt::os::SYS_CLONE3, 0, 0, 0, 0, 0, 0);
+        t.check(c3 == -38, &alloc::format!("sandboxtest: clone3 answers ENOSYS ({c3})"));
+    }
 }

@@ -520,8 +520,21 @@ impl Queue {
         if layout.offset > data.len() as u64 {
             return Err(GpuError::Invalid("write_texture: the offset lies outside the data"));
         }
+        // the bytes the region reads after the offset (as the native copy_region counts them):
+        // only the offset was checked, and the data's whole length went to JS from base, so
+        // writeTexture read past the slice
+        let bw = f.block_dim().max(1);
+        let (bx, by) = (dst.size[0].div_ceil(bw) as u64, dst.size[1].div_ceil(bw) as u64);
+        let (bpr, per_image) = (row as u64, (rows as u64).max(by));
+        let rest = data.len() as u64 - layout.offset;
+        let span = (bx > 0 && by > 0)
+            .then(|| bpr.checked_mul(per_image)?.checked_mul(d as u64 - 1)?.checked_add(bpr * (by - 1) + bx * f.block_bytes() as u64))
+            .flatten();
+        if span.is_none_or(|s| s > rest) {
+            return Err(GpuError::Invalid("write_texture: data smaller than the region"));
+        }
         let base = data.as_ptr() as u32 + layout.offset as u32;
-        call(CALL_WRITE_TEXTURE, &[self.d.h, dst.texture.handle(), dst.mip, dst.origin[0], dst.origin[1], z, dst.size[0], dst.size[1], d, base, data.len() as u32, row, rows]);
+        call(CALL_WRITE_TEXTURE, &[self.d.h, dst.texture.handle(), dst.mip, dst.origin[0], dst.origin[1], z, dst.size[0], dst.size[1], d, base, rest as u32, row, rows]);
         Ok(())
     }
 

@@ -8,6 +8,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `argon2::VERIFY_WORK`: the most work `verify` does for a PHC string.
+
+### Security
+
+- `eappwd::shared` refuses a peer scalar of 1 (RFC 8146 2.1; hostapd since CVE-2019-9497). `argon2::verify` refuses a PHC string that asks for more than the new `VERIFY_WORK` (2^24 KiB times passes) instead of running it; 4 GiB with 2^32 - 1 passes passed `valid()`. `aes::Aes::new` overwrites the expanded key words with a store the compiler keeps.
+
 ## [0.2.1] - 2026-11-16
 
 ### Security

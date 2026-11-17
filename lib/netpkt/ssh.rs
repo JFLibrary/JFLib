@@ -46,8 +46,11 @@
 // and rsa-sha2-256 (host keys; user keys too), ciphers chacha20-poly1305@openssh.com, aes128-ctr
 // and aes256-ctr with hmac-sha2-256, compression none.  Not here: encrypted key files, the older
 // ssh-rsa with SHA-1, port forwarding (a channel of another type is the embedder's to refuse),
-// the extension negotiation of RFC 8308 (SSH_MSG_EXT_INFO is tolerated, none is sent) and
-// OpenSSH's strict key exchange (ignored when offered).
+// the extension negotiation of RFC 8308 (SSH_MSG_EXT_INFO is tolerated, none is sent).
+// OpenSSH's strict key exchange (kex-strict-c/s-v00@openssh.com, against the Terrapin prefix
+// truncation, CVE-2023-48795) is offered in the first KEXINIT and kept when the peer offers it
+// too: the peer's KEXINIT must be its first packet, nothing but key exchange messages may come
+// during the first exchange, and each direction counts its packets from 0 again after a NEWKEYS.
 //
 // The embedder decides what the protocol leaves open: which host key to trust, who logs in, which
 // channels and requests to take.  A protocol error from the peer sends SSH_MSG_DISCONNECT and
@@ -183,6 +186,9 @@ const AES256: &str = "aes256-ctr";
 const HMAC256: &str = "hmac-sha2-256";
 const KEX: &str = "curve25519-sha256";
 const KEX_OLD: &str = "curve25519-sha256@libssh.org";
+/// the strict key exchange's markers in the kex lists (OpenSSH's PROTOCOL 1.10)
+const KEX_STRICT_C: &str = "kex-strict-c-v00@openssh.com";
+const KEX_STRICT_S: &str = "kex-strict-s-v00@openssh.com";
 const ED25519: &str = "ssh-ed25519";
 const RSA_SHA2: &str = "rsa-sha2-256";
 const RSA_TYPE: &str = "ssh-rsa";
@@ -615,8 +621,10 @@ pub fn negotiate(c: &KexInit, s: &KexInit) -> Option<Algos> {
     };
     let enc_cs = first_common(&c.enc_cs, &s.enc_cs)?;
     let enc_sc = first_common(&c.enc_sc, &s.enc_sc)?;
+    // markers in the kex lists (strict key exchange, RFC 8308's ext-info) are no methods
+    let marker = |k: &String| k.starts_with("kex-strict-") || k.starts_with("ext-info-");
     Some(Algos {
-        kex: first_common(&c.kex, &s.kex)?,
+        kex: c.kex.iter().find(|k| !marker(k) && s.kex.contains(k)).cloned()?,
         host_key: first_common(&c.host_key, &s.host_key)?,
         mac_cs: mac(&enc_cs, &c.mac_cs, &s.mac_cs)?,
         mac_sc: mac(&enc_sc, &c.mac_sc, &s.mac_sc)?,
@@ -1045,6 +1053,8 @@ pub struct Core {
     theirs: Vec<u8>,
     /// a wrongly guessed first key exchange packet of the peer is to be skipped
     skip_guess: bool,
+    /// both sides offered the strict key exchange in the first KEXINIT
+    strict: bool,
     secret: [u8; 32],
     algos: Algos,
     session_id: Vec<u8>,
@@ -1100,6 +1110,7 @@ impl Core {
             ours: Vec::new(),
             theirs: Vec::new(),
             skip_guess: false,
+            strict: false,
             secret: [0; 32],
             algos: Algos::default(),
             session_id: Vec::new(),
@@ -1291,6 +1302,11 @@ impl Core {
     fn on_packet(&mut self, p: &[u8]) {
         let t = p.first().copied().unwrap_or(0);
         let mut r = R::new(p.get(1..).unwrap_or(&[]));
+        // strict: nothing but the key exchange during the first one
+        if self.strict && self.phase == Phase::Kex && !matches!(t, MSG_KEXINIT | MSG_NEWKEYS | MSG_KEX_ECDH_INIT | MSG_KEX_ECDH_REPLY | MSG_DISCONNECT) {
+            self.fail(DISC_PROTOCOL_ERROR, "strict key exchange: a message that has no place in the first key exchange");
+            return;
+        }
         match t {
             MSG_DISCONNECT => {
                 let reason = r.u32().unwrap_or(0);
@@ -1346,9 +1362,12 @@ impl Core {
             Role::Client => self.cfg.host_key_algs.clone(),
             Role::Server => self.keys.iter().map(|k| String::from(k.alg())).collect(),
         };
+        // the strict key exchange is offered in the first KEXINIT only
+        let strict = if self.role == Role::Client { KEX_STRICT_C } else { KEX_STRICT_S };
+        let kex = if self.session_id.is_empty() { v(&[KEX, KEX_OLD, strict]) } else { v(&[KEX, KEX_OLD]) };
         KexInit {
             cookie: self.random_cookie(),
-            kex: v(&[KEX, KEX_OLD]),
+            kex,
             host_key,
             enc_cs: self.cfg.ciphers.clone(),
             enc_sc: self.cfg.ciphers.clone(),
@@ -1394,6 +1413,15 @@ impl Core {
             return;
         };
         self.theirs = Vec::from(p);
+        if self.session_id.is_empty() {
+            self.strict = peer.kex.iter().any(|k| k == if self.role == Role::Client { KEX_STRICT_S } else { KEX_STRICT_C });
+            // strict: the peer's KEXINIT is its first packet (an IGNORE slipped in before it
+            // would shift the sequence numbers: Terrapin)
+            if self.strict && self.seq_in != 1 {
+                self.fail(DISC_PROTOCOL_ERROR, "strict key exchange: KEXINIT was not the first packet");
+                return;
+            }
+        }
         let (c, s) = if self.role == Role::Client { (&me, &peer) } else { (&peer, &me) };
         let Some(a) = negotiate(c, s) else {
             self.fail(DISC_KEY_EXCHANGE_FAILED, "no matching algorithms");
@@ -1517,6 +1545,9 @@ impl Core {
         let sc = Cipher::make(&a.enc_sc, &se, &si, &sm);
         let (mine, peer) = if self.role == Role::Client { (cs, sc) } else { (sc, cs) };
         self.send_packet(&[MSG_NEWKEYS]);
+        if self.strict {
+            self.seq_out = 0;
+        }
         self.enc = mine;
         self.next_dec = Some(peer);
         self.kex = Kex::NewKeys;
@@ -1525,6 +1556,9 @@ impl Core {
     fn on_newkeys(&mut self) {
         if let Some(d) = self.next_dec.take() {
             self.dec = d;
+        }
+        if self.strict {
+            self.seq_in = 0;
         }
         self.kex = Kex::Idle;
         self.ours.clear();

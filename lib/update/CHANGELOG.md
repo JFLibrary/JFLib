@@ -11,6 +11,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - An apply that ended in the middle (a crash between two files, or after the app bundle's exchange) keeps its backup of the old version at the next start and finishes there, also when the new program is the one starting. The second attempt backed up files already replaced as the old ones, and a rollback then kept the new version.
+- `startup`: a program on trial whose version is neither the trial's nor the one it replaced (the package's own number differs from its manifest's) ends the trial and records the manifest's version as bad. healthy() could never end it, and an older number had the same update offered and applied at every start.
+
+### Security
+
+- The backup of a replaced file carries its SHA-256 (backup/list "H sha256 path"); the way back checks every copy before it puts one back and again while it copies, so a changed copy leaves the new version whole ("R path" of earlier backups still works).
 
 ## [0.2.1] - 2026-11-16
 

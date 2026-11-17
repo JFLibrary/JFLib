@@ -48,9 +48,12 @@ const MSG_NOSIGNAL: usize = 0x4000;
 
 const MB_CAP: usize = 32768; // body builder (file filters: every letter as [xX])
 const MM_CAP: usize = MB_CAP + 4096; // whole message
-const RB_CAP: usize = 65536; // receive buffer
+const RB_CAP: usize = 65536; // receive buffer at first
 const URI_CAP: usize = 2048;
 const URIS_MAX: usize = 4096; // (E8) files of one OpenFile with "multiple"
+// the receive buffer grows to this for a longer message: a Response with URIS_MAX URIs of URI_CAP
+// bytes (64 KiB lost a large multiple selection)
+const RB_MAX: usize = URIS_MAX * (URI_CAP + 8) + RB_CAP;
 const UID_CAP: usize = 16;
 const HDR_CAP: usize = MM_CAP - MB_CAP - 32; // header fields end below this
 const T_HELLO: i32 = 2000; // ms
@@ -112,7 +115,7 @@ enum Field {
 
 struct Bus {
     fd: i32,
-    rbuf: Vec<u8>, // RB_CAP + 16
+    rbuf: Vec<u8>, // its capacity + 16 (RB_CAP at first, up to RB_MAX)
     rlen: usize,
     mlen: usize, // current message length (msg_ready)
     mhdr: usize, // its body offset
@@ -251,6 +254,12 @@ impl Bus {
 
     /// connect and authenticate -> true  [bus_open]
     fn bus_open(&mut self) -> bool {
+        // a print connection still open (prn_prepare until prn_end) ends here: its descriptor was
+        // lost, and Print went out on the new connection
+        if self.fd >= 0 {
+            self.bus_close();
+            self.prn_open = false;
+        }
         self.fd = -1;
         self.rlen = 0;
         let mut sa = [0u8; 112];
@@ -407,10 +416,11 @@ impl Bus {
             if r == 0 {
                 return 0;
             }
-            if self.rlen >= RB_CAP {
+            let cap = self.rbuf.len() - 16;
+            if self.rlen >= cap {
                 return -1;
             }
-            let room = RB_CAP - self.rlen;
+            let room = cap - self.rlen;
             // SAFETY: read into the free part of rbuf.
             let n = unsafe {
                 syscall6(SYS_READ, self.fd as usize, self.rbuf.as_mut_ptr().add(self.rlen) as usize, room, 0, 0, 0)
@@ -610,15 +620,18 @@ impl Bus {
     }
 
     /// rbuf starts with a complete message (mlen, mhdr set; the lengths come from the peer:
-    /// one that cannot fit reads as RB_CAP + 1 long)  [msg_ready]
+    /// one that cannot fit reads as RB_MAX + 1 long; rbuf grows for a longer one)  [msg_ready]
     fn msg_ready(&mut self) -> bool {
         if self.rlen < 16 {
             return false;
         }
         let hdr = (self.rd32(12) as u64 + 16 + 7) & !7;
         let len = self.rd32(4) as u64 + hdr;
-        self.mhdr = hdr.min(RB_CAP as u64 + 1) as usize;
-        self.mlen = len.min(RB_CAP as u64 + 1) as usize;
+        self.mhdr = hdr.min(RB_MAX as u64 + 1) as usize;
+        self.mlen = len.min(RB_MAX as u64 + 1) as usize;
+        if self.mlen <= RB_MAX && self.mlen + 16 > self.rbuf.len() {
+            self.rbuf.resize(self.mlen + 16, 0);
+        }
         self.mlen <= self.rlen
     }
 
@@ -628,7 +641,7 @@ impl Bus {
             if self.msg_ready() {
                 return 1;
             }
-            if self.mlen > RB_CAP {
+            if self.mlen > RB_MAX {
                 return -1;
             }
             let r = self.bus_fill(timeout_ms);
