@@ -61,7 +61,8 @@
 //                    Metal translated and compiled by ShaderModule::from_spirv, elsewhere translated
 //        all         every test above
 //        churn       (not in all) 200 times an instance and a device, created and dropped: with
-//                    --validate it reproduces the NVIDIA driver's crash (docs/GPU.md, Validierung)
+//                    --validate it reproduces the NVIDIA driver's crash with 610.88, not with
+//                    621.24 (docs/GPU.md, Validierung)
 //        churn_shared (not in all) 200 devices on the shared instance, each with a compute
 //                    pipeline and a dispatch: the driver's threads of devices and pipelines
 //   gputest --test A,B,... [--except C,D,...] [--validate]   several tests in the list's order, `all` without
@@ -199,8 +200,9 @@ pub fn windows(dev: &Device) -> bool {
 
 /// the GPU for a test, on the instance the tests share; None (SKIP, not a failure) without Vulkan or
 /// a usable GPU.  One instance per process: a new one per test loads and unloads the Vulkan loader and
-/// its layers each time, and under the validation layer the NVIDIA driver then crashes in a worker
-/// thread of a destroyed device (docs/GPU.md, "Absturz im NVIDIA-Treiber"; churn still does that)
+/// its layers each time, and under the validation layer the NVIDIA driver 610.88 then crashes in a
+/// worker thread of a destroyed device (docs/GPU.md, "Absturz im NVIDIA-Treiber"; churn still does
+/// that; fixed in 621.24)
 pub fn setup(t: &mut T) -> Option<Gpu> {
     let inst = match &t.inst {
         Some(i) => i.clone(),

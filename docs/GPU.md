@@ -1385,6 +1385,13 @@ für Messungen den Configurator ausschalten.
 
 ### Absturz im NVIDIA-Treiber unter Validierung
 
+**Behoben im Treiber 621.24** (2026-11-17). Gemeldet an NVIDIA am 2026-11-15 (Driver Feedback); NVIDIA bat, es mit
+621.24 zu versuchen. Mit 621.24 (DriverStore 32.0.16.2124, Vulkan meldet `NVIDIA 621.24`) stürzte
+`gputest --test churn --validate` in 0 von 13 Läufen ab, während andere Sessions die CPU zu 50 bis 100 % belegten
+(gemessen nach jedem Lauf); mit 610.88 waren es 10 von 12, und Last machte ihn häufiger. Was folgt, beschreibt den
+Fehler mit 610.88. Die geteilte Instanz der Tests (Abhilfe unten) bleibt: Sie kostet nichts und schützt auf älteren
+Treibern.
+
 Auf dem Entwicklungs-PC (RTX 2070 SUPER, Treiber 32.0.16.1088, Vulkan SDK 1.4.363.0) stürzte
 `gputest --test all --validate` sporadisch mit Exit 3 ab, immer beim Abbau eines Tests (nach seiner letzten
 Prüfung) und immer in einem Thread des Treibers. Seit dem 2026-11-13 nennt der Absturzbericht unter Windows das
@@ -1430,6 +1437,7 @@ DLL-Protokoll und dem Haken auf `CreateThread`, die das Timing verschieben):
 | `--validate`, OBS-Hook aus (`DISABLE_VULKAN_OBS_CAPTURE=1`) | 6 von 8; Diagnose 0 von 14 |
 | ohne `--validate` | 0 von 4; Diagnose 0 von 4 (je 400-mal) |
 | `--validate`, Schicht und `vulkan-1.dll` festgehalten (`GET_MODULE_HANDLE_EX_FLAG_PIN`) | Diagnose 1 von 6 (nur die Schicht: 2 von 6) |
+| `--validate`, Treiber 621.24 (2026-11-17) | 0 von 13 |
 
 Die Folge `info,compute,copies,upload,…,scene,wgsl` (alle Tests außer `window`, `bench_smoke`, `glibc`, `noloader`)
 stürzte vorher in 5 von 24 Läufen ab (beim Abbau von `upload`, `copies`, `scene`), `info,compute,copies` allein in
@@ -1437,8 +1445,8 @@ stürzte vorher in 5 von 24 Läufen ab (beim Abbau von `upload`, `copies`, `scen
 
 **Abhilfe:** Die Tests von gputest, `render2dtest` und `render3dtest` teilen sich je Prozess eine Instanz
 (`setup`, `T::inst`); jeder Test legt weiter seine eigenen Geräte an. Eigene Instanzen legen nur `info`, `errors`
-(mit `noloader`) und `churn` von gputest an. `gputest --test churn --validate` zeigt den Fehler weiter; nach einem
-neuen Treiber so nachprüfen. Mit einer Instanz trat er nicht auf (0 von 10 Läufen mit je 200 Geräten); wer unter
+(mit `noloader`) und `churn` von gputest an. `gputest --test churn --validate` zeigt den Fehler mit 610.88 weiter,
+mit 621.24 nicht mehr; so auch künftige Treiber nachprüfen. Mit einer Instanz trat er nicht auf (0 von 10 Läufen mit je 200 Geräten); wer unter
 Validierung Instanzen in schneller Folge anlegt und abbaut, kann ihn treffen. Danach lief die Testfolge ohne
 Fenster 10-mal ohne Absturz und `validate.uis` in der Suite grün.
 
@@ -1447,8 +1455,8 @@ jedes mit einer Compute-Pipeline und einem Dispatch: kein Absturz in 4 Läufen. 
 damit, stürzte an diesem Tag aber auch nicht ab (0 von 2; fremde Last, 30 bis 280 s je Lauf statt 20 bis 50 s am
 Vortag). Das sagt also nichts: Ob die Threads der Pipelines den Absturz auf einer geteilten Instanz auslösen, ist
 offen (render2d sah ihn in G6b2 beim Anlegen einer Pipeline, mit je einer Instanz pro Test). Nachprüfen, wenn
-`churn` wieder abstürzt: `gputest --test churn_shared --validate` abwechselnd mit `--test churn --validate`. Der
-Fehler gehört an NVIDIA gemeldet.
+`churn` wieder abstürzt (mit 621.24 tut er es nicht): `gputest --test churn_shared --validate` abwechselnd mit
+`--test churn --validate`.
 
 ## Tests
 
