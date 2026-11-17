@@ -100,6 +100,16 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Windows clipboard: another program's block (up to 1 GiB) is copied with an allocation that may fail (no room: nothing read) instead of ending the process
 - **plat:** `ime_commit_text` takes text of any length (up to 16 MiB): what the queue of 16 commits cannot hold yet waits and follows as the app takes them; a paste or dictation over 64 KiB was cut there without a word (iOS, macOS while composing, Linux IBus, the browser)
 - **plat:** `AtomicFile` on a folder mount (Linux, macOS) keeps the file's permission bits (a 0600 file became 0644); a systemd unit's Description has every control character as a space (a \r let it add directives)
+- **gpu:** Vulkan: a dropped timestamp query pool waits for the open upload like a buffer (a device without hostQueryReset records its reset there); a swapchain whose images or semaphores could not all be made is not kept half (the next acquire indexed its empty lists); a swapchain's surface is kept until the swapchain is destroyed (the Swapchain's own surface went first when it was dropped)
+- **gpu:** Browser: `write_texture` checks that the region's bytes lie inside the data after the offset (only the offset was checked, and writeTexture read past the slice)
+- **render3d:** `Scene`: a buffer that could not be made while growing makes every capacity start again at the next frame (the raised ones no longer fit the buffers); `wait_slot` after a timeout waits again at the next call (it went on writing into a slot the GPU still used)
+- **img_av1:** A frame size larger than the sequence header's max_frame_width / height is ERR_HDR (5.9.5)
+- **img_hevc:** pps_cb/cr_qp_offset and slice_cb/cr_qp_offset (also with the PPS's) outside -12 ..= 12 are ERR_HDR
+- **img_webp:** The decoders' frame-sized buffers (VP8 planes, VP8L pixels and groups, the alpha plane) are allocated with ERR_NOMEM when there is no room instead of ending the process
+- **img_jxl:** A file with 32-bit float samples is a JPEG XL (probe and meta work, IMF_FLOAT) whose decode is ERR_UNSUPPORTED; it was ERR_HDR
+- **shader:** The validator refuses a composite type that names itself or a type declared after it (`Rule::Type`): the layout's walks over such a cycle overflowed the stack; layout sizes past u32 are None, a scalar of no whole bytes has no layout (a divisor of 0). shadertest fuzzes the validator and the disassembler with 6000 mutated modules
+- **wgsl:** `false && f()` / `true || f()` with a runtime right side is no const-expression (as Tint): it was folded to the constant, so `const c = false && f();` was accepted
+- **netpkt:** `eapol::Rsne::parse` reads the AKM count: the capabilities come after every AKM suite (they were read as if there were always one), no AKM suite is no element
 
 ### Security
 
@@ -120,6 +130,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Linux: `process::run_elevated` looks for a bare program name in the system's folders only (/usr/local/sbin ... /bin) and hands pkexec the full path: pkexec searched the caller's PATH, so a program the user's PATH put first ran as root
 - **plat:** Linux session bus: the portal's Response of autostart and the power inhibit, the GlobalShortcuts Activated, the Flatpak update monitor's signals and the Secret Service prompt's Completed count only from the service's own unique name (any client may send a signal of that name on the predictable path)
 - **plat:** `dnd::drag_start` hands the system only files the manifest lets the app read, and offers a move (the target deletes the original) only when it may write them all; the browser's `download` / `persist` and Android's `persist` check the manifest (read / write) like a file access; Android reads a streaming provider's document to at most 256 MiB, with allocations that may fail
+- **gltf:** The image files read count against `Limits::buffer_bytes` together (each file again for every image naming it): only each file's size was limited
 
 ## [0.2.1] - 2026-11-16
 

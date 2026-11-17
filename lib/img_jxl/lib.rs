@@ -497,6 +497,10 @@ fn decode_body(data: &[u8], sf: &mut Surface, dec: &ImgDec, mut meta: Option<&mu
     if dec.flags & IMGD_PROBE != 0 {
         return 0;
     }
+    // binary32 samples (32 bits) do not fit the decoder's integer channels
+    if jx.bits > 31 || jx.ec.iter().any(|e| e.bits > 31) {
+        return img_core::ERR_UNSUPPORTED;
+    }
     match surf_alloc(jx.w, jx.h, FMT_ARGB, dec) {
         Ok(s) => *sf = s,
         Err(e) => return e,

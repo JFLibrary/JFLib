@@ -11,6 +11,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - Vulkan, several threads: a buffer or image dropped while another thread has taken the pending uploads but not submitted them yet is destroyed only after their submission. It took the next submission's value, which could be another thread's submission without the uploads, and the driver then copied from or into a destroyed buffer.
+- Vulkan: a dropped timestamp query pool waits for the open upload like a buffer (a device without hostQueryReset records its reset there); a swapchain whose images or semaphores could not all be made is not kept half (the next acquire indexed its empty lists); a swapchain's surface is kept until the swapchain is destroyed (the Swapchain's own surface went first when it was dropped).
+- Browser: `write_texture` checks that the region's bytes lie inside the data after the offset (only the offset was checked, and writeTexture read past the slice).
 
 ## [0.2.1] - 2026-11-16
 

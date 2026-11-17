@@ -426,6 +426,9 @@ fn read_images(cx: &mut Ctx, files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> 
     }
     let mut out = Vec::new();
     let mut bytes = 0u64;
+    // the image files read, together (each file again for every image naming it): against
+    // buffer_bytes like the buffers' files -- every image could name the largest file
+    let mut fetched = 0u64;
     for (i, im) in arr(root, "images").iter().enumerate() {
         let w = format!("image {i}");
         let name = text(im, "name");
@@ -435,7 +438,14 @@ fn read_images(cx: &mut Ctx, files: &mut dyn FnMut(&str) -> Option<Vec<u8>>) -> 
             continue;
         }
         let data: Vec<u8> = match (im.get("uri").and_then(|u| u.as_str()), index(im, "bufferView", &w)?) {
-            (Some(uri), _) => fetch(uri, files, cx.limits)?,
+            (Some(uri), _) => {
+                let d = fetch(uri, files, cx.limits)?;
+                fetched = fetched.saturating_add(d.len() as u64);
+                if fetched > cx.limits.buffer_bytes {
+                    return Err(Error::Limit(format!("image files of more than {} bytes together", cx.limits.buffer_bytes)));
+                }
+                d
+            }
             (None, Some(v)) => {
                 let Some(view) = cx.views.get(v) else { return invalid(format!("{w}: no buffer view {v}")) };
                 cx.buffers[view.buffer][view.offset..view.offset + view.length].to_vec()

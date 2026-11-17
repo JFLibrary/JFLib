@@ -676,6 +676,10 @@ impl<'a> Av1Dec<'a> {
         if h.fso != 0 {
             w = b.f(h.fwbits).wrapping_add(1);
             hh = b.f(h.fhbits).wrapping_add(1);
+            // (5.9.5) at most the sequence header's max_frame_width / height: a caller sizes by those
+            if w > h.maxw || hh > h.maxh {
+                return Err(ERR_HDR);
+            }
         }
         h.upw = w;
         h.fh = hh;
