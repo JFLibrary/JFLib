@@ -32,9 +32,20 @@
 // sRGB (G5e2): an 8-bit target without sRGB (Rgba8Unorm, Bgra8Unorm: a window's swapchain, a view of lib/ui) would
 // show the linear light too dark, so the main pass's fragment shaders encode it here when the pipeline sets
 // ENCODE_SRGB (RendererDesc::encode_srgb); an sRGB target's hardware encodes by itself, a float target stays linear.
+//
+// (G7f) Double-sided materials (glTF doubleSided): their lists are drawn without culling by pipelines that set
+// DOUBLE_SIDED; a back face (front_facing false: the pipelines of mirrored lists take clockwise faces as front) is lit
+// with the whole shading normal turned round, as the glTF sample viewer turns the tangent frame.  Blended materials (glTF
+// BLEND): vs_blend draws the sorted list of all blended instances in view in one draw (cull.wgsl, sort.wgsl), each
+// instance with the largest blended mesh's number of vertices; it pulls the indices itself from the pools (beyond its
+// mesh's indices it puts the triangle outside the view) and the mesh from its list's draw record.  fs_blend drops the
+// back faces of single-sided materials (the draw has no culling: it holds mirrored instances and both kinds of faces)
+// and returns premultiplied alpha.
 
 // (G5e2) encode the colour to sRGB before it goes to the target (lib.rs sets it for 8-bit targets without sRGB)
 @id(0) override ENCODE_SRGB: bool = false;
+// (G7f) the pipeline draws double-sided materials: back faces are lit from their side
+@id(1) override DOUBLE_SIDED: bool = false;
 
 struct View {
     view_proj: mat4x4f,
@@ -89,7 +100,8 @@ struct Material {
     alpha_cutoff: f32,
     textures: vec4u,
     emissive_texture: u32,
-    reserved0: u32,
+    // (G7f) 1: blended, 2: double-sided
+    flags: u32,
     reserved1: u32,
     reserved2: u32,
 }
@@ -507,8 +519,9 @@ fn base_color(m: Material, uv: vec2f, dx: vec2f, dy: vec2f) -> vec4f {
 
 // everything after the base colour: the other textures, glTF's BRDF for the sun (its shadow), the point and spot
 // lights, the ambient light or the environment, emission, exposure, the tone mapper.  dx, dy: the derivatives of uv,
-// px, py: those of the world position (taken in uniform control flow by the caller)
-fn shade(m: Material, c: vec4f, normal: vec3f, uv: vec2f, world: vec3f, dx: vec2f, dy: vec2f, px: vec3f, py: vec3f) -> vec4f {
+// px, py: those of the world position (taken in uniform control flow by the caller); (G7f) back: a back face of a
+// double-sided material, lit with the shading normal (and the normal the shadow's bias takes) turned round
+fn shade(m: Material, c: vec4f, normal: vec3f, uv: vec2f, world: vec3f, dx: vec2f, dy: vec2f, px: vec3f, py: vec3f, back: bool) -> vec4f {
     var metallic = m.metallic;
     var roughness = m.roughness;
     if m.textures.y != NO_TEXTURE {
@@ -518,11 +531,15 @@ fn shade(m: Material, c: vec4f, normal: vec3f, uv: vec2f, world: vec3f, dx: vec2
     }
     metallic = clamp(metallic, 0.0, 1.0);
     roughness = clamp(roughness, 0.0, 1.0);
-    let ng = normalize(normal);
+    var ng = normalize(normal);
     var n = ng;
     if m.textures.z != NO_TEXTURE {
         let t = sample_texture(m.textures.z, uv, dx, dy).xyz * 2.0 - 1.0;
         n = bumped(ng, t * vec3f(m.normal_scale, m.normal_scale, 1.0), px, py, dx, dy);
+    }
+    if back {
+        n = -n;
+        ng = -ng;
     }
     var ao = 1.0;
     if m.textures.w != NO_TEXTURE {
@@ -574,19 +591,19 @@ fn srgb_encode(c: vec3f) -> vec3f {
 
 // opaque lists: nothing is dropped, no discard anywhere (alpha_cutoff is not read)
 @fragment
-fn fs(f: VsOut) -> @location(0) vec4f {
+fn fs(f: VsOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     // (derivatives in uniform control flow, before anything depends on the material)
     let dx = dpdxFine(f.uv);
     let dy = dpdyFine(f.uv);
     let px = dpdxFine(f.world);
     let py = dpdyFine(f.world);
     let m = materials[f.material];
-    return shade(m, base_color(m, f.uv, dx, dy), f.normal, f.uv, f.world, dx, dy, px, py);
+    return shade(m, base_color(m, f.uv, dx, dy), f.normal, f.uv, f.world, dx, dy, px, py, DOUBLE_SIDED && !front);
 }
 
 // MASK lists: fragments whose alpha is below the cutoff are dropped
 @fragment
-fn fs_mask(f: VsOut) -> @location(0) vec4f {
+fn fs_mask(f: VsOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
     let dx = dpdxFine(f.uv);
     let dy = dpdyFine(f.uv);
     let px = dpdxFine(f.world);
@@ -596,5 +613,98 @@ fn fs_mask(f: VsOut) -> @location(0) vec4f {
     if c.w < m.alpha_cutoff {
         discard;
     }
-    return shade(m, c, f.normal, f.uv, f.world, dx, dy, px, py);
+    return shade(m, c, f.normal, f.uv, f.world, dx, dy, px, py, DOUBLE_SIDED && !front);
+}
+
+// ---------------------------------------------------------------- blended instances (G7f)
+
+// cull.wgsl's BlendList (sorted by sort.wgsl): per instance key, slot, its list's draw record, the list's flags (1: 32-bit
+// indices, 2: double-sided, 4: mirrored)
+struct BlendList {
+    vertex_count: u32,
+    count: u32,
+    first_vertex: u32,
+    first_instance: u32,
+    items: array<vec4u>,
+}
+
+// a list's VkDrawIndexedIndirectCommand: its mesh's indices and base vertex
+struct DrawRecord {
+    index_count: u32,
+    instance_count: u32,
+    first_index: u32,
+    vertex_offset: i32,
+    first_instance: u32,
+}
+
+// (vs_blend's own bindings; group 0 of the blended draw has no `visible`)
+@group(0) @binding(7) var<storage, read> blend: BlendList;
+@group(0) @binding(8) var<storage, read> records: array<DrawRecord>;
+// the index pools: 16-bit indices two to a word (the first in the low half), 32-bit ones
+@group(0) @binding(9) var<storage, read> indices16: array<u32>;
+@group(0) @binding(10) var<storage, read> indices32: array<u32>;
+
+struct BlendOut {
+    @builtin(position) position: vec4f,
+    @location(0) normal: vec3f,
+    @location(1) @interpolate(flat) material: u32,
+    @location(2) uv: vec2f,
+    @location(3) world: vec3f,
+    // the list's flags
+    @location(4) @interpolate(flat) flags: u32,
+}
+
+// vertex vi of the instance ii places from the back of the sorted list
+@vertex
+fn vs_blend(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> BlendOut {
+    var out: BlendOut;
+    // (more instances than the list holds cannot be counted: cull.wgsl adds each at most once)
+    out.position = vec4f(2.0, 2.0, 2.0, 1.0);
+    if ii >= arrayLength(&blend.items) {
+        return out;
+    }
+    let e = blend.items[ii];
+    let r = records[e.z];
+    if vi >= r.index_count {
+        // beyond this mesh's triangles: outside the view (all three corners), nothing drawn
+        return out;
+    }
+    let k = r.first_index + vi;
+    var index = 0u;
+    if (e.w & 1u) != 0u {
+        index = indices32[k];
+    } else {
+        index = (indices16[k >> 1u] >> ((k & 1u) * 16u)) & 0xffffu;
+    }
+    let inst = instances[e.y];
+    let v = vertices[u32(i32(index) + r.vertex_offset)];
+    let p = vec4f(v.position_u.xyz, 1.0);
+    let world = vec4f(dot(inst.m0, p), dot(inst.m1, p), dot(inst.m2, p), 1.0);
+    let n = v.normal_v.xyz * inst.normal_scale;
+    out.position = view.view_proj * world;
+    out.normal = vec3f(dot(inst.m0.xyz, n), dot(inst.m1.xyz, n), dot(inst.m2.xyz, n));
+    out.material = inst.material;
+    out.uv = vec2f(v.position_u.w, v.normal_v.w);
+    out.world = world.xyz;
+    out.flags = e.w;
+    return out;
+}
+
+// blended over what is there: premultiplied alpha (the base colour's alpha times its texture's)
+@fragment
+fn fs_blend(f: BlendOut, @builtin(front_facing) ccw: bool) -> @location(0) vec4f {
+    let dx = dpdxFine(f.uv);
+    let dy = dpdyFine(f.uv);
+    let px = dpdxFine(f.world);
+    let py = dpdyFine(f.world);
+    // the instance's outside faces the eye: counter-clockwise, clockwise for a mirrored one
+    let front = ccw != ((f.flags & 4u) != 0u);
+    if !front && (f.flags & 2u) == 0u {
+        discard;
+    }
+    let m = materials[f.material];
+    let c = base_color(m, f.uv, dx, dy);
+    let a = clamp(c.w, 0.0, 1.0);
+    let s = shade(m, c, f.normal, f.uv, f.world, dx, dy, px, py, !front);
+    return vec4f(s.xyz * a, a);
 }

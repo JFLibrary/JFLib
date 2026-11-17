@@ -1071,6 +1071,7 @@ version = "0.2.1"
 dependencies = [
  "jflib-gltf",
  "jflib-gpu",
+ "jflib-rt",
 ]
 
 [[package]]

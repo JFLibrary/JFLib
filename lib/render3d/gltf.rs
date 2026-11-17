@@ -1,8 +1,8 @@
 // gltf -- a jflib-gltf Document into a Renderer (G5b; docs/GLTF.md): each primitive as a mesh, each image as a
 // texture (once per image, colour space and filter: base colour and emissive sRGB, the others linear), each
 // material as a row, and the instances of a scene with their world matrices taken apart (gltf::decompose)
-// for Scene::add.  What the engine cannot show yet is counted in notes: BLEND drawn opaque, double-sided
-// materials drawn from the front, uv sets other than 0, world matrices with shear (drawn without it).
+// for Scene::add.  (G7f) BLEND and doubleSided go through MaterialDesc.  What the engine cannot show yet is counted in
+// notes: uv sets other than 0, world matrices with shear (drawn without it).
 //
 //   let doc = ::gltf::load(&bytes, &mut |uri| read(dir, uri), &::gltf::Limits::DEFAULT)?;
 //   let imported = render3d::gltf::upload(&mut renderer, &doc, None)?;
@@ -16,7 +16,8 @@ use alloc::vec::Vec;
 use ::gltf as g;
 use gpu::*;
 
-use crate::{Instance, Light, LightKind, Material, MaterialId, MeshData, MeshId, Mip, Renderer, Sampling, Sun, TextureData, TextureId, TextureRef, Transform, Wrap};
+use crate::{Instance, Light, LightKind, Material, MaterialDesc, MaterialId, MeshData, MeshId, Mip, Renderer, Sampling, Sun, TextureData, TextureId, TextureRef, Transform,
+            Wrap};
 
 /// what upload made of a Document
 #[derive(Clone, Debug, Default)]
@@ -112,18 +113,18 @@ pub fn upload(r: &mut Renderer, doc: &g::Document, scene: Option<usize>) -> Resu
         mat.normal_texture = tex(r, &mut out, &m.normal_texture, false)?;
         mat.occlusion_texture = tex(r, &mut out, &m.occlusion_texture, false)?;
         mat.emissive_texture = tex(r, &mut out, &m.emissive_texture, true)?;
+        // (G7f) BLEND: blended, sorted back to front per instance; doubleSided: both faces (MaterialDesc)
+        let mut d = MaterialDesc::new(mat);
         match m.alpha_mode {
             g::AlphaMode::Opaque => {}
-            g::AlphaMode::Mask => mat.alpha_cutoff = Some(m.alpha_cutoff),
-            g::AlphaMode::Blend => note(&mut out, String::from("BLEND materials are drawn opaque")),
+            g::AlphaMode::Mask => d.material.alpha_cutoff = Some(m.alpha_cutoff),
+            g::AlphaMode::Blend => d.blend = true,
         }
-        if m.double_sided {
-            note(&mut out, String::from("double-sided materials are drawn from the front only"));
-        }
-        if mat.normal_texture.is_some() {
+        d.double_sided = m.double_sided;
+        if d.material.normal_texture.is_some() {
             note(&mut out, String::from("normal maps take the triangle's tangent frame from derivatives, not MikkTSpace (docs/RENDER3D.md)"));
         }
-        out.materials.push(r.add_material(&mat)?);
+        out.materials.push(r.add_material_desc(&d)?);
     }
     // (a Document's fields are public: one built by hand is checked here, not trusted)
     let insts = doc.instances(scene);

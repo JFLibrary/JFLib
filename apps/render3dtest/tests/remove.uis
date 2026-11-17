@@ -1,0 +1,4 @@
+#!args --test remove
+# (G7f) meshes, materials and textures removed: invalid ids, places and ranges used again, what is refused, a removal
+# between prepare and record, a place's generations spent; the churn against the same contents in a fresh renderer; 400
+# random steps against a model, every 40 the image against the model's contents in a fresh renderer; Voll and Basis

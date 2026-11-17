@@ -17,17 +17,26 @@
 // 4096 changes and an eighth of the slots at once, a new origin, new capacities: everything, from a
 // temporary buffer.  Queue::write_buffer would not do for this: its copies run ahead of the frame's
 // commands without a barrier against the frames still on the GPU.
+//
+// (G7f) Removal (store.rs): a scene counts its instances per mesh and material and tells the renderer's shared table
+// when it has the first or no longer any of one (and when it goes); lists belong to a mesh's slot, so a removed mesh's
+// lists serve the next mesh in that slot.  Lists per side, class and faces: double-sided materials have lists of their
+// own (drawn without culling).  Blended instances (class Blend) have lists for their mesh like the others, without room in
+// the visible lists: the camera's culling puts them into one list for all of them (`blend`), sort.wgsl sorts it, one draw
+// draws it (lib.rs draw_blend).
 
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::sync::atomic::Ordering;
+
 
 use gpu::*;
 
 use crate::math::{self, V3};
 use crate::shadow::{self, CASCADES_MAX, Cascade, Shadows};
-use crate::{ALPHA_CLASSES, AlphaClass, CASCADE_AT, CASCADE_STRIDE, CHANGE_WORDS, Counts, DRAW_BYTES, INSTANCE_WORDS, LIGHTS_AT, MaterialId, MeshId, Renderer, STAMPS};
+use crate::store::{Use, give, give_all, take};
+use crate::{ALPHA_CLASSES, AlphaClass, BLEND_AT, BLEND_HEAD, BLEND_ITEM, CASCADE_AT, CASCADE_STRIDE, CHANGE_WORDS, Counts, DRAW_BYTES, INSTANCE_WORDS, Kind, MaterialId,
+            LIGHTS_AT, MeshId, Renderer, SORT_TILE, STAMPS, slot};
 
 /// where an instance is: position in the world (f64), rotation (quaternion x, y, z, w), scale per axis.
 /// Negative scales mirror: an odd number of them turns the winding round, the instance goes to its mesh's
@@ -237,6 +246,14 @@ pub struct UploadInfo {
     pub bytes: u64,
 }
 
+/// (G7f) what ListInfo cannot say (it is not #[non_exhaustive]): more about a list, in the order of Scene::lists
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ListKind {
+    /// its instances' materials are double-sided: drawn without culling, back faces lit with their normal turned round
+    pub double_sided: bool,
+}
+
 /// a list of the scene
 #[derive(Clone, Copy, Debug)]
 pub struct ListInfo {
@@ -245,7 +262,8 @@ pub struct ListInfo {
     pub mirrored: bool,
     /// the alpha class of its instances' materials (drawn with or without a discard)
     pub class: AlphaClass,
-    /// the instances of this mesh, side and class, and the room for them in the visible list
+    /// the instances of this mesh, side and class, and the room for them in the visible list (G7f: none for blended
+    /// instances, they go into the blended instances' list)
     pub count: u32,
     pub capacity: u32,
     /// (G5d) the instances that may land here: its own and those of meshes that take it as a detail level
@@ -292,9 +310,13 @@ pub(crate) struct Slot {
 }
 
 pub(crate) struct List {
+    /// (G7f) its mesh's slot, and the mesh's id (the last one seen there)
     mesh: u32,
+    id: u32,
     pub mirrored: bool,
     pub class: AlphaClass,
+    /// (G7f) for double-sided materials
+    pub double: bool,
     pub count: u32,
     /// (G5d) its own instances and those that may pick its mesh as a detail level
     pub room: u32,
@@ -318,7 +340,17 @@ pub(crate) struct Run {
     pub wide: bool,
     pub mirrored: bool,
     pub class: AlphaClass,
+    pub double: bool,
     pub room: bool,
+}
+
+/// (G7f) the blended instances' list: draw record and entries (BLEND_HEAD + cap * BLEND_ITEM bytes, cap a power of two
+/// and a multiple of SORT_TILE), its group for the draw and for the sort
+pub(crate) struct BlendList {
+    pub buf: Buffer,
+    pub cap: u32,
+    pub render: Option<BindGroup>,
+    pub sort: Option<BindGroup>,
 }
 
 /// one view's data of a frame: its uniform block, its lists, its bind groups for culling and drawing.  The
@@ -355,8 +387,19 @@ pub struct Scene {
     /// the lists in the order of their draw records, and the runs of those records (Run)
     pub(crate) order: Vec<u32>,
     pub(crate) runs: Vec<Run>,
-    /// the list of each mesh per side (as it is, mirrored) and alpha class
-    list_of_mesh: Vec<[[u32; ALPHA_CLASSES]; 2]>,
+    /// the list of each mesh's slot per side (as it is, mirrored), alpha class and (G7f) faces (single, double-sided)
+    list_of_mesh: Vec<[[[u32; 2]; ALPHA_CLASSES]; 2]>,
+    /// (G7f) its instances per slot of a mesh and of a material (store.rs)
+    mesh_use: Vec<Use>,
+    material_use: Vec<Use>,
+    /// (G7f) the renderer's removals and new meshes in old slots, as the last prepare saw them
+    pub(crate) seen_removals: u32,
+    seen_mesh_gen: u32,
+    /// (G7f) the blended instances: their list, it is drawn this frame (a list of them has room), vertices per instance
+    pub(crate) blend: BlendList,
+    pub(crate) blend_on: bool,
+    blend_k: u32,
+    blend_need: u32,
     lists_dirty: bool,
     /// the renderer's count of materials that changed their class, as the last prepare saw it
     seen_classes: u32,
@@ -433,12 +476,17 @@ fn entry(binding: u32, buffer: &Buffer) -> BindEntry<'_> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn cull_group(dev: &Device, r: &Renderer, ubo: &Buffer, spheres: &Buffer, list_of: &Buffer, first: &Buffer, draws: &Buffer, visible: &Buffer, hidden: &Buffer)
-              -> Result<BindGroup> {
+fn cull_group(dev: &Device, r: &Renderer, ubo: &Buffer, spheres: &Buffer, list_of: &Buffer, first: &Buffer, draws: &Buffer, visible: &Buffer, hidden: &Buffer,
+              blend: &Buffer) -> Result<BindGroup> {
     dev.create_bind_group(&BindGroupDesc {
         layout: &r.cull_layout,
-        entries: &[entry(0, ubo), entry(1, spheres), entry(2, list_of), entry(3, first), entry(4, draws), entry(5, visible), entry(6, hidden)],
+        entries: &[entry(0, ubo), entry(1, spheres), entry(2, list_of), entry(3, first), entry(4, draws), entry(5, visible), entry(6, hidden), entry(7, blend)],
     })
+}
+
+/// (G7f) a blended instances' list of room for cap of them
+fn blend_buf(dev: &Device, cap: u32) -> Result<Buffer> {
+    dev.create_buffer(&BufferDesc { size: BLEND_HEAD + cap as u64 * BLEND_ITEM, usage: BufferUsage::STORAGE | BufferUsage::INDIRECT, memory: MemoryKind::Device })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -453,14 +501,14 @@ fn render_group(dev: &Device, r: &Renderer, ubo: &Buffer, instances: &Buffer, li
 /// the buffers of a view of the scene's sizes, and its groups (ubo: another view's uniform block, else its own)
 #[allow(clippy::too_many_arguments)]
 fn view_lists(dev: &Device, r: &Renderer, list_cap: u32, visible_cap: u32, spheres: &Buffer, list_of: &Buffer, list_first: &Buffer, instances: &Buffer,
-              lights: &Buffer, punctual: &Buffer, hidden: &Buffer, ubo: Option<&Buffer>) -> Result<ViewLists> {
+              lights: &Buffer, punctual: &Buffer, hidden: &Buffer, blend: &Buffer, ubo: Option<&Buffer>) -> Result<ViewLists> {
     let ubo = match ubo {
         Some(u) => u.clone(),
         None => dev.create_buffer(&BufferDesc { size: crate::VIEW_BYTES, usage: BufferUsage::UNIFORM, memory: MemoryKind::Device })?,
     };
     let draws = storage(dev, list_cap as u64 * DRAW_BYTES, BufferUsage::INDIRECT)?;
     let visible = storage(dev, visible_cap as u64 * 4, BufferUsage::NONE)?;
-    let group = cull_group(dev, r, &ubo, spheres, list_of, list_first, &draws, &visible, hidden)?;
+    let group = cull_group(dev, r, &ubo, spheres, list_of, list_first, &draws, &visible, hidden, blend)?;
     let render = render_group(dev, r, &ubo, instances, lights, &visible, punctual)?;
     Ok(ViewLists { ubo, draws, visible, group, render })
 }
@@ -469,7 +517,7 @@ fn view_lists(dev: &Device, r: &Renderer, list_cap: u32, visible_cap: u32, spher
 /// visible may go missing), and its instance words
 fn records(s: &Slot, r: &Renderer, origin: V3) -> ([f32; 4], [u32; INSTANCE_WORDS]) {
     // (G5d) the sphere grown to hold the mesh's detail levels
-    let (mc, mr) = r.bounds[s.mesh as usize];
+    let (mc, mr) = r.bounds[slot(s.mesh)];
     let t = &s.t;
     let rot = math::rotation(t.rot);
     let (sx, sy, sz) = (t.scale[0] as f64, t.scale[1] as f64, t.scale[2] as f64);
@@ -482,7 +530,7 @@ fn records(s: &Slot, r: &Renderer, origin: V3) -> ([f32; 4], [u32; INSTANCE_WORD
     let inv = |v: f64| if v != 0.0 { (1.0 / (v * v)) as f32 } else { 0.0 };
     let b = |v: f32| v.to_bits();
     let words = [b(r0[0]), b(r0[1]), b(r0[2]), b(r0[3]), b(r1[0]), b(r1[1]), b(r1[2]), b(r1[3]), b(r2[0]), b(r2[1]), b(r2[2]), b(r2[3]),
-                 b(inv(sx)), b(inv(sy)), b(inv(sz)), s.material];
+                 b(inv(sx)), b(inv(sy)), b(inv(sz)), slot(s.material) as u32];
     let center = math::add(p, [c[0][0] * sx * mc[0] + c[1][0] * sy * mc[1] + c[2][0] * sz * mc[2],
                                c[0][1] * sx * mc[0] + c[1][1] * sy * mc[1] + c[2][1] * sz * mc[2],
                                c[0][2] * sx * mc[0] + c[1][2] * sy * mc[1] + c[2][2] * sz * mc[2]]);
@@ -513,11 +561,12 @@ impl Scene {
         let punctual_cap = 16u32;
         let punctual_buf = storage(&dev, punctual_cap as u64 * PUNCTUAL_BYTES, none)?;
         let hidden = storage(&dev, hidden_bytes(cap), none)?;
-        let view = view_lists(&dev, r, list_cap, visible_cap, &spheres, &list_of, &list_first, &instances, &lights, &punctual_buf, &hidden, None)?;
-        let late = view_lists(&dev, r, list_cap, visible_cap, &spheres, &list_of, &list_first, &instances, &lights, &punctual_buf, &hidden, Some(&view.ubo))?;
+        let blend = BlendList { buf: blend_buf(&dev, SORT_TILE)?, cap: SORT_TILE, render: None, sort: None };
+        let view = view_lists(&dev, r, list_cap, visible_cap, &spheres, &list_of, &list_first, &instances, &lights, &punctual_buf, &hidden, &blend.buf, None)?;
+        let late = view_lists(&dev, r, list_cap, visible_cap, &spheres, &list_of, &list_first, &instances, &lights, &punctual_buf, &hidden, &blend.buf, Some(&view.ubo))?;
         let mut frames = Vec::new();
         for _ in 0..r.desc.frames_in_flight {
-            let stage = dev.create_buffer(&BufferDesc { size: CASCADE_AT + CASCADE_STRIDE * CASCADES_MAX as u64, usage: none, memory: MemoryKind::Upload })?;
+            let stage = dev.create_buffer(&BufferDesc { size: BLEND_AT + BLEND_HEAD, usage: none, memory: MemoryKind::Upload })?;
             frames.push(FrameSlot { stage, punctual: None, changes: None, scatter_group: None, readback: None, last: None });
         }
         Ok(Scene {
@@ -530,6 +579,14 @@ impl Scene {
             order: Vec::new(),
             runs: Vec::new(),
             list_of_mesh: Vec::new(),
+            mesh_use: Vec::new(),
+            material_use: Vec::new(),
+            seen_removals: r.removals,
+            seen_mesh_gen: r.mesh_gen,
+            blend,
+            blend_on: false,
+            blend_k: 0,
+            blend_need: 0,
             lists_dirty: false,
             seen_classes: r.class_gen,
             live: 0,
@@ -599,34 +656,21 @@ impl Scene {
         Ok(())
     }
 
-    fn check_mesh(&self, m: MeshId) -> Result<()> {
-        if m.0 < self.counts.meshes.load(Ordering::Relaxed) {
-            Ok(())
-        } else {
-            Err(GpuError::Invalid("Scene: a mesh its Renderer does not have"))
-        }
-    }
-
-    fn check_material(&self, m: MaterialId) -> Result<()> {
-        if m.0 < self.counts.materials.load(Ordering::Relaxed) {
-            Ok(())
-        } else {
-            Err(GpuError::Invalid("Scene: a material its Renderer does not have"))
-        }
-    }
-
-    fn list_for(&mut self, mesh: u32, mirrored: bool, class: AlphaClass) -> u32 {
-        let m = mesh as usize;
+    /// (G7f) the list of a mesh (its id), side, alpha class and faces
+    fn list_for(&mut self, mesh: u32, mirrored: bool, class: AlphaClass, double: bool) -> u32 {
+        let m = slot(mesh);
         if self.list_of_mesh.len() <= m {
-            self.list_of_mesh.resize(m + 1, [[NO_LIST; ALPHA_CLASSES]; 2]);
+            self.list_of_mesh.resize(m + 1, [[[NO_LIST; 2]; ALPHA_CLASSES]; 2]);
         }
-        let (side, c) = (mirrored as usize, class.index());
-        if self.list_of_mesh[m][side][c] == NO_LIST {
-            self.list_of_mesh[m][side][c] = self.lists.len() as u32;
-            self.lists.push(List { mesh, mirrored, class, count: 0, room: 0, cap: 0, first: 0, wide: false, record: 0 });
+        let (side, c, d) = (mirrored as usize, class.index(), double as usize);
+        if self.list_of_mesh[m][side][c][d] == NO_LIST {
+            self.list_of_mesh[m][side][c][d] = self.lists.len() as u32;
+            self.lists.push(List { mesh: m as u32, id: mesh, mirrored, class, double, count: 0, room: 0, cap: 0, first: 0, wide: false, record: 0 });
             self.lists_dirty = true;
         }
-        self.list_of_mesh[m][side][c]
+        let l = self.list_of_mesh[m][side][c][d];
+        self.lists[l as usize].id = mesh;
+        l
     }
 
     /// every changed slot into the list of its mesh, side and its material's alpha class (out of the one it was in);
@@ -646,15 +690,15 @@ impl Scene {
                 }
                 continue;
             }
-            let class = r.alpha_class(MaterialId(s.material));
+            let k = r.kind_of(s.material);
             if s.list != NO_LIST {
                 let l = &self.lists[s.list as usize];
-                if l.mesh == s.mesh && l.mirrored == s.mirrored && l.class == class {
+                if l.mesh as usize == slot(s.mesh) && l.mirrored == s.mirrored && l.class == k.class && l.double == k.double {
                     continue;
                 }
                 self.lists[s.list as usize].count -= 1;
             }
-            let to = self.list_for(s.mesh, s.mirrored, class);
+            let to = self.list_for(s.mesh, s.mirrored, k.class, k.double);
             self.lists[to as usize].count += 1;
             self.slots[i].list = to;
             // (list_of changes: up again)
@@ -671,23 +715,33 @@ impl Scene {
             l.room = l.count;
         }
         for i in 0..self.lists.len() {
-            let (mesh, mirrored, class, count) = (self.lists[i].mesh, self.lists[i].mirrored, self.lists[i].class, self.lists[i].count);
+            let (mesh, mirrored, class, double, count) = (self.lists[i].mesh, self.lists[i].mirrored, self.lists[i].class, self.lists[i].double, self.lists[i].count);
             if count == 0 {
                 continue;
             }
             for k in 0..r.lods[mesh as usize].len() {
                 if let Some(t) = r.lods[mesh as usize][k].mesh {
-                    let to = self.list_for(t.0, mirrored, class) as usize;
+                    let to = self.list_for(t.0, mirrored, class, double) as usize;
                     self.lists[to].room += count;
                 }
             }
         }
+        // (G7f) blended instances have no room in the visible lists: they are counted for their own list
+        let mut blended = 0u64;
         for l in &mut self.lists {
+            if l.class == AlphaClass::Blend {
+                blended += l.count as u64;
+                continue;
+            }
             if l.room > l.cap {
                 l.cap = l.room.max(l.cap * 2).max(16);
                 self.lists_dirty = true;
             }
         }
+        // (G7f) the vertices of the largest blended mesh that may be drawn (the draw takes that many per instance)
+        self.blend_k = self.lists.iter().filter(|l| l.class == AlphaClass::Blend && l.room > 0).map(|l| r.meshes[l.mesh as usize].indices).max().unwrap_or(0);
+        self.blend_on = self.blend_k > 0;
+        self.blend_need = blended.min(u32::MAX as u64) as u32;
     }
 
     fn mark(&mut self, slot: u32) {
@@ -701,8 +755,12 @@ impl Scene {
     /// a new instance, on a place that came free if there is one (its list: with the next prepare)
     pub fn add(&mut self, i: Instance) -> Result<InstanceId> {
         Scene::check_transform(&i.transform)?;
-        self.check_mesh(i.mesh)?;
-        self.check_material(i.material)?;
+        // (G7f) the ids alive, and counted: a mesh or material a scene uses is not removed
+        take(&self.counts, &mut self.mesh_use, Kind::Mesh, i.mesh.0)?;
+        if let Err(e) = take(&self.counts, &mut self.material_use, Kind::Material, i.material.0) {
+            give(&self.counts, &mut self.mesh_use, Kind::Mesh, i.mesh.0);
+            return Err(e);
+        }
         self.stale = true;
         let mirrored = i.transform.mirrored();
         let slot = match self.free.pop() {
@@ -736,6 +794,9 @@ impl Scene {
     /// the instance goes; its place comes free (and its list loses it with the next prepare)
     pub fn remove(&mut self, id: InstanceId) -> Result<()> {
         let i = self.get(id)?;
+        let (mesh, material) = (self.slots[i].mesh, self.slots[i].material);
+        give(&self.counts, &mut self.mesh_use, Kind::Mesh, mesh);
+        give(&self.counts, &mut self.material_use, Kind::Material, material);
         let s = &mut self.slots[i];
         s.live = false;
         s.era = s.era.wrapping_add(1);
@@ -767,8 +828,9 @@ impl Scene {
     /// a material of another alpha class moves the instance to the list of that class with the next prepare (until then
     /// a frame shows the old material: it goes up with prepare too)
     pub fn set_material(&mut self, id: InstanceId, m: MaterialId) -> Result<()> {
-        self.check_material(m)?;
         let i = self.get(id)?;
+        take(&self.counts, &mut self.material_use, Kind::Material, m.0)?;
+        give(&self.counts, &mut self.material_use, Kind::Material, self.slots[i].material);
         self.slots[i].material = m.0;
         self.mark(id.slot);
         Ok(())
@@ -776,8 +838,9 @@ impl Scene {
 
     /// the instance's list of the new mesh, with the next prepare
     pub fn set_mesh(&mut self, id: InstanceId, m: MeshId) -> Result<()> {
-        self.check_mesh(m)?;
         let i = self.get(id)?;
+        take(&self.counts, &mut self.mesh_use, Kind::Mesh, m.0)?;
+        give(&self.counts, &mut self.mesh_use, Kind::Mesh, self.slots[i].mesh);
         self.stale = true;
         self.slots[i].mesh = m.0;
         self.mark(id.slot);
@@ -912,8 +975,26 @@ impl Scene {
     /// the lists as the last prepare settled them, in order (list i is what list_of holds for its instances; its draw
     /// record: ListInfo::record)
     pub fn lists(&self) -> Vec<ListInfo> {
-        self.lists.iter().map(|l| ListInfo { mesh: MeshId(l.mesh), mirrored: l.mirrored, class: l.class, count: l.count, capacity: l.cap, room: l.room, first: l.first,
+        self.lists.iter().map(|l| ListInfo { mesh: MeshId(l.id), mirrored: l.mirrored, class: l.class, count: l.count, capacity: l.cap, room: l.room, first: l.first,
                                              record: l.record }).collect()
+    }
+
+    /// (G7f) more about the lists, in the order of lists(): double-sided or not
+    pub fn list_kinds(&self) -> Vec<ListKind> {
+        self.lists.iter().map(|l| ListKind { double_sided: l.double }).collect()
+    }
+
+    /// (G7f; tests, tools) the blended instances' list after a frame: a VkDrawIndirectCommand (vertices per instance, the
+    /// instances), then per instance 4 u32: the bits of !(distance squared from the eye; f32), its slot, the draw record of
+    /// its list (lists().record), the list's flags (1: 32-bit indices, 2: double-sided, 4: mirrored); sorted, farthest
+    /// first.  Its draw: blend_drawn()
+    pub fn blend_buffer(&self) -> &Buffer {
+        &self.blend.buf
+    }
+
+    /// (G7f) the last prepare found blended instances that may be drawn (a list of them has room)
+    pub fn blend_drawn(&self) -> bool {
+        self.blend_on
     }
 
     /// (tests, tools) the camera's draw records after a frame's culling: 5 u32 per list at ListInfo::record,
@@ -962,11 +1043,13 @@ impl Scene {
         if rb.read(0, &mut draws).is_err() {
             return;
         }
-        // phase 1's records, phase 2's in the second half
-        let half = draws.len() / 2;
+        // phase 1's records, phase 2's in the second half, (G7f) the blended instances' draw last (drawn with phase 2)
+        let words = draws.len() - (BLEND_HEAD / 4) as usize;
+        let half = words / 2;
         let n = self.lists.len().min(half / 5);
+        let blended = draws[words + 1] as u64;
         let early: u64 = (0..n).map(|i| draws[i * 5 + 1] as u64).sum();
-        let late: u64 = (0..n).map(|i| draws[half + i * 5 + 1] as u64).sum();
+        let late: u64 = (0..n).map(|i| draws[half + i * 5 + 1] as u64).sum::<u64>() + blended;
         let v = self.ts.as_ref().and_then(|ts| ts.read_ms(slot as u32 * STAMPS, STAMPS).ok());
         let mut cascades = [[0.0; 2]; CASCADES_MAX];
         let (mut draw, mut occlusion) = (0.0, [0.0; 3]);
@@ -1038,6 +1121,10 @@ impl Scene {
             self.template = dev.create_buffer(&BufferDesc { size: self.list_cap as u64 * DRAW_BYTES, usage: none, memory: MemoryKind::Device })?;
             draws_new = true;
             self.lists_dirty = true;
+            // (G7f) the culling's groups bind the draw records: new ones with them.  Until G7f only a list_first that grew at
+            // the same time made them anew; once detail levels had grown it earlier, the culling counted into the old
+            // records and the frame drew nothing (found by the random sequence of the test `remove`)
+            groups = true;
         }
         // (G5d) the lists' records and their detail levels
         let info = lists + self.lists.iter().map(|l| r.lods[l.mesh as usize].len() as u32).sum::<u32>();
@@ -1050,6 +1137,14 @@ impl Scene {
         let room: u64 = self.lists.iter().map(|l| l.cap as u64).sum();
         if room > u32::MAX as u64 {
             return Err(GpuError::Unsupported("Scene: the visible lists have grown too large"));
+        }
+        // (G7f) room for every blended instance in the blended instances' list (a power of two of tiles: the sort's)
+        let mut blend_new = false;
+        if self.blend_need > self.blend.cap {
+            let cap = self.blend_need.checked_next_power_of_two().ok_or(GpuError::Unsupported("Scene: too many blended instances"))?.max(SORT_TILE);
+            self.blend = BlendList { buf: blend_buf(&dev, cap)?, cap, render: None, sort: None };
+            blend_new = true;
+            groups = true;
         }
         let mut visible_new = false;
         if room as u32 > self.visible_cap {
@@ -1069,7 +1164,7 @@ impl Scene {
         let want = self.shadows.map_or(0, |s| s.cascades as usize);
         while self.cascades.len() < want {
             let v = view_lists(&dev, r, self.list_cap, self.visible_cap, &self.spheres, &self.list_of, &self.list_first, &self.instances, &self.lights, &self.punctual_buf,
-                               &self.hidden, None)?;
+                               &self.hidden, &self.blend.buf, None)?;
             self.cascades.push(v);
         }
         let (list_cap, visible_cap) = (self.list_cap, self.visible_cap);
@@ -1081,11 +1176,23 @@ impl Scene {
                 v.visible = storage(&dev, visible_cap as u64 * 4, BufferUsage::NONE)?;
             }
             if groups {
-                v.group = cull_group(&dev, r, &v.ubo, &self.spheres, &self.list_of, &self.list_first, &v.draws, &v.visible, &self.hidden)?;
+                v.group = cull_group(&dev, r, &v.ubo, &self.spheres, &self.list_of, &self.list_first, &v.draws, &v.visible, &self.hidden, &self.blend.buf)?;
             }
             if groups || punctual_new || self.seen_materials != r.bindings_gen {
                 v.render = render_group(&dev, r, &v.ubo, &self.instances, &self.lights, &v.visible, &self.punctual_buf)?;
             }
+        }
+        // (G7f) the blended instances' groups: their draw (the camera's uniform block, instances, lights, materials, their
+        // list, vertices, the lists' draw records, both index pools) and their sort, when something in them changed
+        if self.blend_on && (self.blend.render.is_none() || groups || draws_new || punctual_new || self.seen_materials != r.bindings_gen) {
+            self.blend.render = Some(dev.create_bind_group(&BindGroupDesc {
+                layout: &r.blend_layout,
+                entries: &[entry(0, &self.view.ubo), entry(1, &self.instances), entry(2, &self.lights), entry(3, &r.material_buf), entry(5, &r.vertices.buf),
+                           entry(6, &self.punctual_buf), entry(7, &self.blend.buf), entry(8, &self.late.draws), entry(9, &r.indices16.buf), entry(10, &r.indices32.buf)],
+            })?);
+        }
+        if self.blend_on && (self.blend.sort.is_none() || blend_new) {
+            self.blend.sort = Some(dev.create_bind_group(&BindGroupDesc { layout: &r.sort_layout, entries: &[entry(0, &self.blend.buf)] })?);
         }
         if groups {
             for f in &mut self.frames {
@@ -1107,6 +1214,8 @@ impl Scene {
         let n = self.lists.len();
         for l in &mut self.lists {
             l.wide = r.meshes[l.mesh as usize].wide;
+            // (G7f) the id in its slot now (a removed mesh's list serves the next one there)
+            l.id = r.mesh_ids.id(l.mesh as usize);
         }
         // the draw records by width of indices, alpha class and side: each combination's lists side by side (one
         // multi-draw per side and class in the main pass, and the shadow passes' pipelines take both sides)
@@ -1115,7 +1224,7 @@ impl Scene {
         let lists = &self.lists;
         self.order.sort_by_key(|&i| {
             let l = &lists[i as usize];
-            (l.wide, l.class.index(), l.mirrored, i)
+            (l.wide, l.class.index(), l.double, l.mirrored, i)
         });
         for (k, &i) in self.order.iter().enumerate() {
             self.lists[i as usize].record = k as u32;
@@ -1129,9 +1238,11 @@ impl Scene {
             // (G5d) its detail levels: threshold and list (u32::MAX: not drawn), after the lists: the lists of the
             // same side and class
             let lods = &r.lods[l.mesh as usize];
-            places.push([first, (n + levels.len()) as u32, lods.len() as u32, l.record]);
+            // (G7f) the number of levels and the list's flags (cull.wgsl: 32-bit indices, double-sided, mirrored, blended)
+            let flags = (l.wide as u32) << 28 | (l.double as u32) << 29 | (l.mirrored as u32) << 30 | ((l.class == AlphaClass::Blend) as u32) << 31;
+            places.push([first, (n + levels.len()) as u32, lods.len() as u32 | flags, l.record]);
             for d in lods {
-                let to = d.mesh.map_or(NO_LIST, |t| self.list_of_mesh.get(t.0 as usize).map_or(NO_LIST, |x| x[l.mirrored as usize][l.class.index()]));
+                let to = d.mesh.map_or(NO_LIST, |t| self.list_of_mesh.get(slot(t.0)).map_or(NO_LIST, |x| x[l.mirrored as usize][l.class.index()][l.double as usize]));
                 levels.push([d.below.to_bits(), to, 0, 0]);
             }
             // (Basis: no first instance is sure to work: the list's start is an offset of the vertex buffer)
@@ -1144,8 +1255,8 @@ impl Scene {
         for &i in &self.order {
             let l = &self.lists[i as usize];
             match self.runs.last_mut() {
-                Some(r) if r.wide == l.wide && r.mirrored == l.mirrored && r.class == l.class => r.count += 1,
-                _ => self.runs.push(Run { first: l.record, count: 1, wide: l.wide, mirrored: l.mirrored, class: l.class, room: false }),
+                Some(r) if r.wide == l.wide && r.mirrored == l.mirrored && r.class == l.class && r.double == l.double => r.count += 1,
+                _ => self.runs.push(Run { first: l.record, count: 1, wide: l.wide, mirrored: l.mirrored, class: l.class, double: l.double, room: false }),
             }
         }
         let info = self.info_len as u64 * 16;
@@ -1270,6 +1381,12 @@ impl Scene {
             return Err(GpuError::Invalid("Scene::prepare: another Renderer than its own"));
         }
         self.wait_slot()?;
+        // (G7f) a removed mesh, or a new one in an old slot: the lists' draw records again
+        if self.seen_mesh_gen != r.mesh_gen {
+            self.seen_mesh_gen = r.mesh_gen;
+            self.lists_dirty = true;
+        }
+        self.seen_removals = r.removals;
         // (G5d) new detail levels: new spheres and new tables of the lists
         if self.seen_lods != r.lod_gen {
             self.seen_lods = r.lod_gen;
@@ -1304,8 +1421,8 @@ impl Scene {
             if self.ts.is_none() && self.dev.features().timestamps {
                 self.ts = Some(self.dev.create_timestamps(STAMPS * self.frames.len() as u32)?);
             }
-            // (G5d) phase 1's records, then phase 2's
-            let size = 2 * self.list_cap as u64 * DRAW_BYTES;
+            // (G5d) phase 1's records, then phase 2's, (G7f) then the blended instances' draw
+            let size = 2 * self.list_cap as u64 * DRAW_BYTES + BLEND_HEAD;
             let f = &mut self.frames[slot];
             if f.readback.as_ref().is_none_or(|b| b.size() < size) {
                 f.readback = Some(self.dev.create_buffer(&BufferDesc { size, usage: BufferUsage::NONE, memory: MemoryKind::Readback })?);
@@ -1368,6 +1485,10 @@ impl Scene {
         }
         f.stage.write(0, &view)?;
         f.stage.write(LIGHTS_AT, &lights)?;
+        // (G7f) the blended instances' draw: the largest blended mesh's vertices per instance, none counted yet
+        if self.blend_on {
+            f.stage.write(BLEND_AT, &[self.blend_k, 0u32, 0, 0])?;
+        }
         self.upload.bytes += crate::VIEW_BYTES * (1 + self.cascade_info.len() as u64) + crate::LIGHTS_BYTES;
         self.prepared = true;
         Ok(())
@@ -1381,5 +1502,12 @@ impl Scene {
         self.prepared = false;
         self.sent = false;
         self.waited = false;
+    }
+}
+
+/// (G7f) a scene that goes uses no mesh or material any more
+impl Drop for Scene {
+    fn drop(&mut self) {
+        give_all(&self.counts, &self.mesh_use, &self.material_use);
     }
 }

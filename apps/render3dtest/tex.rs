@@ -57,7 +57,12 @@ pub fn look_of(m: &Material) -> Look {
     Look { factor: [f[0] as f64, f[1] as f64, f[2] as f64, f[3] as f64], texture: tex(m.base_color_texture), cutoff: m.alpha_cutoff.map(|c| c as f64),
            metallic: m.metallic as f64, roughness: m.roughness as f64, mr_texture: tex(m.metallic_roughness_texture), normal_texture: tex(m.normal_texture),
            normal_scale: m.normal_scale as f64, occlusion_texture: tex(m.occlusion_texture), occlusion: m.occlusion_strength as f64,
-           emissive: [e[0] as f64, e[1] as f64, e[2] as f64], emissive_texture: tex(m.emissive_texture) }
+           emissive: [e[0] as f64, e[1] as f64, e[2] as f64], emissive_texture: tex(m.emissive_texture), double_sided: false, blend: false }
+}
+
+/// (G7f) what the reference makes of a material with glTF's BLEND and doubleSided
+pub fn look_of_desc(d: &render3d::MaterialDesc) -> Look {
+    Look { double_sided: d.double_sided, blend: d.blend, ..look_of(&d.material) }
 }
 
 pub struct Built {
