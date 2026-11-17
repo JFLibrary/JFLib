@@ -141,7 +141,7 @@ jobs:
           Get-ChildItem -Recurse "$env:RUNNER_TEMP\lvp" -File | Format-Table FullName, Length
           $json = (Get-ChildItem -Recurse "$env:RUNNER_TEMP\lvp" -Filter "*.json" | Select-Object -First 1).FullName
           "driver: $json"; Get-Content $json
-          New-Item -Force HKLM:\SOFTWARE\Khronos\Vulkan\Drivers | Out-Null
+          if (-not (Test-Path HKLM:\SOFTWARE\Khronos\Vulkan\Drivers)) { New-Item -Force HKLM:\SOFTWARE\Khronos\Vulkan\Drivers | Out-Null }
           New-ItemProperty -Force -Path HKLM:\SOFTWARE\Khronos\Vulkan\Drivers -Name $json -PropertyType DWord -Value 0 | Out-Null
       - name: Round C, lavapipe -- gputest, uigputest (as chosen, and with jfgui_GPU_ADAPTER=llvmpipe), the gallery's GPU scripts
         id: c
