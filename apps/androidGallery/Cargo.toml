@@ -30,6 +30,10 @@ render3d.workspace = true
 gltf.workspace = true
 img_core.workspace = true
 img_jpeg.workspace = true
+# (G6e3) the page "2D-Zeichnung" (pg_r2d.rs, Android): a render2d drawing in a view, its check against the CPU path on
+# the device's GPU and its measurement take render2dtest's drawings (gallery.rs, textdraw.rs, hlov.rs, cad.rs, included as
+# they are); elsewhere unused (main.rs: use render2d as _), build_rs.py's derived workspaces take [dependencies] only
+render2d.workspace = true
 
 [build-dependencies]
 jflib-build.workspace = true

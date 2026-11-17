@@ -1706,13 +1706,21 @@ pub fn bench(path: &str) -> i32 {
         return 1;
     }
     s.set_stats(true);
-    let Ok(tex) = dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET)) else { return 1 };
+    // (G6e3: every failure says what failed; on the M2 the GPU part of Zürich ended without a word)
+    let tex = match dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET)) {
+        Ok(t) => t,
+        Err(e) => {
+            out(&format!("FAIL the target: {e}"));
+            return 1;
+        }
+    };
     let mut used = false;
     let mut layers = l.clone();
     for (name, cam) in [("whole", full), (zname.as_str(), zoom)] {
         let _ = s.set_camera(&cam);
         let mut cpu_ms = Vec::new();
         let mut gpu_ms = Vec::new();
+        let mut wall_ms = Vec::new();
         let mut first = 0.0;
         for k in 0..frames + 1 {
             let t0 = plat::time_us();
@@ -1721,20 +1729,42 @@ pub fn bench(path: &str) -> i32 {
                 return 1;
             }
             let prep = (plat::time_us() - t0) as f64 / 1000.0;
-            let Ok(mut e) = dev.encoder() else { return 1 };
+            let mut e = match dev.encoder() {
+                Ok(e) => e,
+                Err(e) => {
+                    out(&format!("FAIL encoder: {e}"));
+                    return 1;
+                }
+            };
             let color = ColorAttachment { view: tex.view(), load: Load::Clear, clear: bg_clear(BG), store: true, before: if used { Layout::ColorTarget } else { Layout::Undefined },
                                           after: Layout::ColorTarget };
-            if r.record(&mut e, &s, color).is_err() {
+            if let Err(err) = r.record(&mut e, &s, color) {
+                out(&format!("FAIL record: {err}"));
                 return 1;
             }
-            let Ok(cmd) = e.finish() else { return 1 };
-            let Ok(id) = dev.queue().submit([cmd]) else { return 1 };
+            let cmd = match e.finish() {
+                Ok(c) => c,
+                Err(err) => {
+                    out(&format!("FAIL finish: {err}"));
+                    return 1;
+                }
+            };
+            // (G6e3) the wall time from the submission until the wait came back: what Metal (no timestamps in lib/gpu) says
+            let t1 = plat::time_us();
+            let id = match dev.queue().submit([cmd]) {
+                Ok(id) => id,
+                Err(err) => {
+                    out(&format!("FAIL submit: {err}"));
+                    return 1;
+                }
+            };
             s.submitted(id);
             used = true;
             if !dev.wait(id, 60_000_000_000).unwrap_or(false) {
                 out("FAIL a frame did not finish within 60 s");
                 return 1;
             }
+            let wall = (plat::time_us() - t1) as f64 / 1000.0;
             s.collect_stats();
             let st = s.take_stats();
             let gms = st.last().and_then(|f| f.stamps).map_or(0.0, |v| v[3] - v[0]);
@@ -1743,10 +1773,11 @@ pub fn bench(path: &str) -> i32 {
             } else {
                 cpu_ms.push(prep);
                 gpu_ms.push(gms);
+                wall_ms.push(wall);
             }
         }
-        out(&format!("GPU, {name}, {}x{}: {:.2} ms per frame on the GPU (median of {frames}), prepare {:.2} ms (the first frame's: {first:.0} ms)", size.0, size.1, median(&mut gpu_ms),
-                     median(&mut cpu_ms)));
+        out(&format!("GPU, {name}, {}x{}: {:.2} ms per frame on the GPU (median of {frames}), prepare {:.2} ms (the first frame's: {first:.0} ms), submit to done {:.2} ms (wall)", size.0,
+                     size.1, median(&mut gpu_ms), median(&mut cpu_ms), median(&mut wall_ms)));
     }
     // --per-layer: the whole view's GPU time with each DXF layer hidden in turn (what each costs)
     if plat::args().iter().any(|a| a == "--per-layer") {
