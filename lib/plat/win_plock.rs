@@ -179,14 +179,17 @@ pub(super) fn input(w: i32, lp: isize) {
     if !locked(w) {
         return;
     }
-    let mut buf = [0u8; 64];
-    let mut size = buf.len() as u32;
+    // (aligned like RAWINPUT, whose header holds handles)
+    #[repr(C, align(8))]
+    struct Rec([u8; 64]);
+    let mut buf = Rec([0u8; 64]);
+    let mut size = buf.0.len() as u32;
     // SAFETY: the record of this WM_INPUT into a buffer of `size` bytes (the header's size: x64).
-    let n = unsafe { GetRawInputData(lp, RID_INPUT, buf.as_mut_ptr(), &mut size, crate::plock::RAW_HDR as u32) };
-    if n == u32::MAX || n as usize > buf.len() {
+    let n = unsafe { GetRawInputData(lp, RID_INPUT, buf.0.as_mut_ptr(), &mut size, crate::plock::RAW_HDR as u32) };
+    if n == u32::MAX || n as usize > buf.0.len() {
         return;
     }
-    let Some((flags, x, y)) = raw_mouse_decode(&buf[..n as usize]) else { return };
+    let Some((flags, x, y)) = raw_mouse_decode(&buf.0[..n as usize]) else { return };
     let k = WK.get();
     if flags & MOUSE_MOVE_ABSOLUTE != 0 {
         if x == 0 && y == 0 {

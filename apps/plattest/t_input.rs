@@ -272,6 +272,10 @@ fn linux(t: &mut T) {
     x11t::event_bytes(&xi_raw(131, 9, 9, 2000, &[0b11], &[20.0, -10.0], &[5.5, -2.25])); // (the same of the slave)
     t.check(pop_typ(E_RAW_MOTION).is_some(), "input x11: XI_RawMotion -> E_RAW_MOTION");
     t.check(win_raw_motion_take(0) == (5.5, -2.25), "input x11: the raw values, a repeat once");
+    // a fast mouse (over 1000 Hz): two events of one millisecond with the same values are both motion
+    x11t::event_bytes(&xi_raw(131, 2, 9, 2000, &[0b11], &[1.0, 0.0], &[1.0, 0.0]));
+    x11t::event_bytes(&xi_raw(131, 2, 9, 2000, &[0b11], &[1.0, 0.0], &[1.0, 0.0]));
+    t.check(win_raw_motion_take(0) == (2.0, 0.0), "input x11: two equal events of one millisecond count twice");
     // an absolute device: the first position starts, the next moves (scaled to the screen; 1 px wide
     // without a server)
     x11t::event_bytes(&xi_raw(131, 2, 12, 2001, &[0b11], &[0.0, 0.0], &[0.0, 0.0]));

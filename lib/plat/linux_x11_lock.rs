@@ -13,9 +13,11 @@
 // before the server's acceleration (axisvalues_raw); valuators 0 and 1 are x and y.  For a
 // relative device (a mouse, a touchpad) they are the motion; an absolute one (a tablet, the
 // pointer of a virtual machine: valuator mode Absolute in XIQueryDevice) gives positions, whose
-// differences scaled from the valuator's range to the screen are the motion in pixels.  A raw
-// event that repeats the last one (same time, same values: a device's event for both its master
-// and itself) counts once.  The release ungrabs, deselects the raw events and warps the pointer
+// differences scaled from the valuator's range to the screen are the motion in pixels.  Only a
+// master's raw events count (deviceid differs from sourceid): the server makes one for the slave
+// device itself too, and two events of the same millisecond with the same values are the real
+// motion of a fast mouse (over 1000 Hz), not a repeat.  The release ungrabs, deselects the raw
+// events and warps the pointer
 // back to where it was in the window when the lock began.  Without XInput 2 the request is
 // Unsupported; a grab another client holds makes it Refused.
 
@@ -46,8 +48,6 @@ pub(super) struct XLock {
     win: i32,
     /// where the pointer was in the window when it began (None: outside)
     at: Option<[i32; 2]>,
-    /// the last raw event (time, x, y): a repeat counts once
-    last: (u32, f64, f64),
     /// lock_try at the next lock_deferred
     soon: bool,
     abs: [Abs; ABS_MAX],
@@ -129,7 +129,6 @@ impl X11 {
         self.lk.at = if inside { Some([self.mx, self.my]) } else { None };
         self.lk.on = true;
         self.lk.win = w;
-        self.lk.last = (0, f64::NAN, f64::NAN);
         plock_set(w, PointerLock::Locked);
     }
 
@@ -224,11 +223,10 @@ impl X11 {
         if !self.lk.on {
             return;
         }
-        let Some((_dev, src, time, x, y, have)) = xi_raw_decode(b) else { return };
-        if have == 0 || (time, x, y) == self.lk.last {
-            return; // nothing of x / y, or the same event again
+        let Some((dev, src, _time, x, y, have)) = xi_raw_decode(b) else { return };
+        if have == 0 || dev == src {
+            return; // nothing of x / y, or a slave device's own copy (its master's event counts)
         }
-        self.lk.last = (time, x, y);
         let n = self.lk.nabs;
         let (dx, dy) = match self.lk.abs[..n].iter().position(|a| a.id == src) {
             Some(k) => {
@@ -250,7 +248,7 @@ impl X11 {
 /// (test aid, plattest --test input) play the X11 side without a server: a lock of window w held
 /// (on) or none; absolute devices (id, x range, y range) for lock_raw
 pub(super) fn lock_test(x: &mut X11, w: i32, on: bool, abs: &[(u16, [i32; 2], [i32; 2])]) {
-    x.lk = XLock { on, win: w, last: (0, f64::NAN, f64::NAN), ..XLock::default() };
+    x.lk = XLock { on, win: w, ..XLock::default() };
     for &(id, rx, ry) in abs.iter().take(ABS_MAX) {
         x.lk.abs[x.lk.nabs] = Abs { id, range: [rx, ry], last: None };
         x.lk.nabs += 1;
