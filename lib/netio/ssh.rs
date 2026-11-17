@@ -221,7 +221,18 @@ pub fn public_key_line(k: &Keypair, comment: &str) -> String {
 /// an unencrypted Ed25519 key in OpenSSH's format ("-----BEGIN OPENSSH PRIVATE KEY-----")
 pub fn private_key(text: &str) -> Option<Keypair> {
     let body: String = text.lines().filter(|l| !l.starts_with("-----")).map(|l| l.trim()).collect();
-    let b = crypto::b64::decode(&body)?;
+    let b = crypto::b64::decode(&body);
+    // the file's text and bytes hold the secret: overwritten, not just freed
+    let mut body = body.into_bytes();
+    crypto::zeroize(&mut body);
+    let mut b = b?;
+    let k = key_of(&b);
+    crypto::zeroize(&mut b);
+    k
+}
+
+// the key of a decoded OpenSSH key file
+fn key_of(b: &[u8]) -> Option<Keypair> {
     let rest = b.strip_prefix(b"openssh-key-v1\0")?;
     let mut r = R::new(rest);
     if r.str()? != "none" || r.str()? != "none" {
@@ -740,7 +751,11 @@ impl Client {
 
     pub fn auth_password(&mut self, user: &str, password: &str) -> Result<(), SshError> {
         self.userauth_service()?;
-        self.t.send(&W::msg(MSG_USERAUTH_REQUEST).str(user).str("ssh-connection").str("password").bool(false).str(password).0)?;
+        // the message holds the password: overwritten once sent
+        let mut m = W::msg(MSG_USERAUTH_REQUEST).str(user).str("ssh-connection").str("password").bool(false).str(password).0;
+        let r = self.t.send(&m);
+        crypto::zeroize(&mut m);
+        r?;
         self.auth_answer()
     }
 

@@ -63,6 +63,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - Windows: dwmapi, crypt32, winmm, iphlpapi, bcrypt and avrt are loaded from System32 when first used instead of being imported by the program. A DLL of such a name beside the program (a setup in the download folder) was loaded in their place.
 - `screen::pick_test_point`, the colour picker's test aid, obeys `screen.capture` like the picker. It read screen pixels without the permission.
+- Linux `secret`: the plain copies of a secret in the messages it builds and reads are overwritten (the D-Bus connection overwrites every encoded message once written and the bytes it has read), and sealing no longer grows a copy of the value.
 
 ## [0.2.1] - 2026-11-16
 

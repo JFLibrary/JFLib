@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Security
+
+- `ssh`: `private_key` overwrites the key file's decoded bytes and text, `auth_password` the message with the password, once used.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

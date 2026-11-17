@@ -3,7 +3,7 @@
     python tools/ssh_interop.py [--distro Ubuntu-24.04] [--core] [--bin FILE] [--windows-only]
 
 --core: against netpkt::ssh instead (coretest --ssh-core-serve, the I/O-free core on a socket),
-each of its ciphers and without the strict key exchange, which that core does not take part in.
+each of its ciphers; the strict key exchange must be in use there too.
 --bin: the coretest to run on Windows (another output folder than build/win).
 
 coretest --ssh-serve runs a small server on netio::ssh (key exchange, encryption, logins and
@@ -128,9 +128,8 @@ def main():
                 check(r.returncode == 3 and r.stderr.strip() == "boom", f"exit code and stderr ({r.returncode} {r.stderr.strip()!r})")
                 r = s.run(base + ["-vvv", "-o", "BatchMode=yes", "-i", key, "bc@127.0.0.1", "echo x"], text=True)
                 check(fp in r.stderr, f"ssh sees the fingerprint the library shows ({fp})")
-                if not a.core:
-                    check("will use strict KEX ordering" in r.stderr, "strict key exchange in use (Terrapin)")
-                else:
+                check("will use strict KEX ordering" in r.stderr, "strict key exchange in use (Terrapin)")
+                if a.core:
                     for cipher in ("chacha20-poly1305@openssh.com", "aes128-ctr", "aes256-ctr"):
                         opts = [o.replace("Ciphers=chacha20-poly1305@openssh.com", "Ciphers=" + cipher) for o in withkey] + ["-o", "MACs=hmac-sha2-256"]
                         data = os.urandom(1 << 20)

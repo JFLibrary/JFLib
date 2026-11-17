@@ -636,7 +636,7 @@ pub fn set_response_auth(b: &mut [u8], req_auth: &[u8; 16], secret: &[u8], md5: 
 
 /// the answer's Response Authenticator is right for the request
 pub fn check_response_auth(b: &[u8], req_auth: &[u8; 16], secret: &[u8], md5: Md5Fn) -> bool {
-    b.len() >= HDR && b[4..20] == response_auth(b, req_auth, secret, md5)
+    b.len() >= HDR && crypto::ct_eq(&b[4..20], &response_auth(b, req_auth, secret, md5))
 }
 
 /// the Request Authenticator of an Accounting-Request (RFC 2866 3: over 16 zero bytes)
@@ -654,7 +654,7 @@ pub fn set_accounting_auth(b: &mut [u8], secret: &[u8], md5: Md5Fn) {
 
 /// an Accounting-Request's Request Authenticator fits the secret
 pub fn check_accounting_auth(b: &[u8], secret: &[u8], md5: Md5Fn) -> bool {
-    b.len() >= HDR && b[4..20] == accounting_auth(b, secret, md5)
+    b.len() >= HDR && crypto::ct_eq(&b[4..20], &accounting_auth(b, secret, md5))
 }
 
 /// where the Message-Authenticator's value sits in a written packet
@@ -700,7 +700,7 @@ pub fn check_message_auth(b: &[u8], auth: Option<&[u8; 16]>, secret: &[u8], hmac
     let mut own = [0u8; 16];
     own.copy_from_slice(&b[4..20]);
     let m = message_auth(b, auth.unwrap_or(&own), secret, hmac);
-    Some(b[at..at + 16] == m)
+    Some(crypto::ct_eq(&b[at..at + 16], &m))
 }
 
 // ---------------------------------------------------------------- EAP and what comes with it

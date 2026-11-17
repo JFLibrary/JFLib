@@ -651,9 +651,16 @@ impl Conn {
         }
         self.serial = self.serial.wrapping_add(1).max(1);
         let s = self.serial;
-        let b = encode(m, s);
+        let mut b = encode(m, s);
+        // the encoded message is overwritten once written (a secret's value passes through here)
+        let r = self.send_encoded(m, s, &b);
+        crypto::zeroize(&mut b);
+        r
+    }
+
+    fn send_encoded(&mut self, m: &Msg, s: u32, b: &[u8]) -> Option<u32> {
         if m.fds.is_empty() {
-            return self.write_all(&b).then_some(s);
+            return self.write_all(b).then_some(s);
         }
         // the descriptors ride with the first bytes (SCM_RIGHTS), the rest follows plainly
         let iov = [b.as_ptr() as usize, b.len()];
@@ -687,6 +694,10 @@ impl Conn {
             match decode(&self.rbuf) {
                 Ok(Some((m, n))) => {
                     self.rbuf.drain(..n);
+                    // the bytes moved down leave a stale copy past the end: overwritten
+                    for x in self.rbuf.spare_capacity_mut().iter_mut().take(n) {
+                        x.write(0);
+                    }
                     return Some(m);
                 }
                 Ok(None) => {}

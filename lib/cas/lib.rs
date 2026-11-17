@@ -19,7 +19,8 @@
 // Signers: snapshots are saved and loaded only with trusted keys -- CreateOptions::signer and
 // the keys given to trust_signer (save_snapshot: UntrustedSigner, load_snapshot: Corrupt).
 // The list sits in repo.json under the MAC of the repository key, so it keeps out other keys
-// and mistakes, not someone who holds the repository key (who could call trust_signer).
+// and mistakes, not someone who holds the repository key (who could call trust_signer).  A
+// repo.json without a MAC (taken away) does not open (Corrupt).
 //
 // Layout:  repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
 // Keys:    one random repository key, wrapped in repo.json for the server's master key, for
@@ -368,17 +369,13 @@ impl Repo {
     fn open_with_key(path: &str, repo_key: &[u8; 32], cfg: Value) -> CasResult<Repo> {
         let lock = plat::FileLock::acquire(&join(path, "LOCK")).ok_or(CasError::InUse)?;
         let keys = Keys::derive(repo_key);
-        let mut cfg = cfg;
+        // every published version writes the MAC; one taken away is not sealed again (whoever
+        // could write repo.json could otherwise change signers, retention and keys and have them
+        // sealed as genuine on the next open)
         match cfg.get("mac").and_then(|m| m.as_str()) {
             Some(m) if crypto::ct_eq(m.as_bytes(), cfg_mac(&keys, &cfg)?.as_bytes()) => {}
             Some(_) => return Err(CasError::Corrupt(String::from("repo.json does not authenticate"))),
-            // a repository from before the config was authenticated: seal it now (best effort)
-            None => {
-                let mut sealed = cfg.clone();
-                if write_cfg(path, &mut sealed, &keys).is_ok() {
-                    cfg = sealed;
-                }
-            }
+            None => return Err(CasError::Corrupt(String::from("repo.json is not authenticated (no mac)"))),
         }
         let avg = cfg.get("chunk_avg").and_then(|x| x.as_u64()).unwrap_or(1 << 20).clamp(MIN_CHUNK_AVG as u64, MAX_CHUNK_AVG as u64) as usize;
         let codec = Codec::from_name(str_of(&cfg, "compression")).unwrap_or(Codec::Lz4);

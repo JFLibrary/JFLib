@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Security
+
+- jfgui_SIGN_PFX_PASS is taken out of the environment when cargo-jflib starts, so the processes it starts (cargo, linkers, gpg, the app under `run`) no longer inherit it. signtool still gets it on its command line (it has no other way); a certificate from the store (jfgui_SIGN_THUMBPRINT) needs none.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

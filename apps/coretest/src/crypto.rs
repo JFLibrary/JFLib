@@ -394,6 +394,11 @@ fn argon(t: &mut T) {
     t.check("argon2id verify", argon2::verify(&phc, b"correct horse battery"));
     t.check("argon2id wrong password", !argon2::verify(&phc, b"correct horse batterz"));
     t.check("argon2id bad string", !argon2::verify("$argon2i$v=19$m=64,t=2,p=1$AAAA$AAAA", b"x"));
+    // a stored string asking for 4 GiB and 4e9 passes: refused at once (VERIFY_WORK), not run
+    let t0 = plat::time_us();
+    let huge = "$argon2id$v=19$m=4194304,t=4000000000,p=1$MDEyMzQ1Njc4OWFiY2RlZg$MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY";
+    let refused = !argon2::verify(huge, b"x");
+    t.check(&alloc::format!("argon2id: a string beyond VERIFY_WORK refused ({} ms)", (plat::time_us() - t0) / 1000), refused && plat::time_us() - t0 < 1_000_000);
 }
 
 fn misc(t: &mut T) {

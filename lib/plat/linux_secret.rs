@@ -67,6 +67,22 @@ fn bytes(b: &[u8]) -> Value {
     Value::A(String::from("y"), b.iter().map(|&x| Value::Y(x)).collect())
 }
 
+// overwrites the bytes in a value: the copies of a secret in the messages this file builds and
+// reads (the connection's buffers are overwritten by linux_dbus itself)
+fn wipe(v: &mut Value) {
+    match v {
+        Value::Y(b) => *b = 0,
+        Value::V(inner) => wipe(inner),
+        Value::A(_, items) | Value::R(items) => items.iter_mut().for_each(wipe),
+        Value::E(k, x) => {
+            wipe(k);
+            wipe(x);
+        }
+        _ => {}
+    }
+    core::hint::black_box(&*v);
+}
+
 fn as_bytes(v: &Value) -> Option<Vec<u8>> {
     match v {
         Value::V(inner) => as_bytes(inner),
@@ -114,9 +130,13 @@ fn fail(e: &str) -> SecretError {
     }
 }
 
-// a method call -> the reply's body, Err(error name; "" when no answer came)
+// a method call -> the reply's body, Err(error name; "" when no answer came); the bytes in the
+// call's body are overwritten once it is sent
 fn call(c: &mut Conn, dest: &str, path: &str, iface: &str, member: &str, body: Vec<Value>) -> Result<Vec<Value>, String> {
-    let serial = c.send(&Msg::call(dest, path, iface, member, body)).ok_or_else(String::new)?;
+    let mut m = Msg::call(dest, path, iface, member, body);
+    let sent = c.send(&m);
+    m.body.iter_mut().for_each(wipe);
+    let serial = sent.ok_or_else(String::new)?;
     let end = crate::time_us() + CALL_MS * 1000;
     loop {
         let now = crate::time_us();
@@ -256,7 +276,9 @@ impl Session {
                 let mut iv = [0u8; 16];
                 crate::fill_random(&mut iv);
                 let pad = 16 - data.len() % 16;
-                let mut buf = data.to_vec();
+                // room for the padding at once: growing the copy left the plain text behind
+                let mut buf = Vec::with_capacity(data.len() + pad);
+                buf.extend_from_slice(data);
                 buf.resize(data.len() + pad, pad as u8);
                 let mut prev = iv;
                 for block in buf.chunks_mut(16) {
@@ -271,7 +293,10 @@ impl Session {
                 (iv.to_vec(), buf)
             }
         };
-        Value::R(vec![Value::O(self.path.clone()), bytes(&iv), bytes(&value), Value::str(ctype)])
+        let v = Value::R(vec![Value::O(self.path.clone()), bytes(&iv), bytes(&value), Value::str(ctype)]);
+        let mut value = value;
+        crypto::zeroize(&mut value);
+        v
     }
 
     // the value of a (oayays) the service sent
@@ -285,8 +310,8 @@ impl Session {
         }
         let mut prev = [0u8; 16];
         prev.copy_from_slice(&iv);
+        let mut b = [0u8; 16];
         for block in value.chunks_mut(16) {
-            let mut b = [0u8; 16];
             b.copy_from_slice(block);
             let cipher = b;
             aes.decrypt(&mut b);
@@ -295,6 +320,7 @@ impl Session {
             }
             prev = cipher;
         }
+        crypto::zeroize(&mut b);
         let pad = *value.last()? as usize;
         if pad == 0 || pad > 16 || value[value.len() - pad..].iter().any(|&b| b as usize != pad) {
             crypto::zeroize(&mut value);
@@ -391,14 +417,20 @@ pub fn set(n: &Name, secret: &[u8]) -> Result<(), SecretError> {
     let mut s = open()?;
     let col = s.collection()?;
     let props = Value::dict(vec![("org.freedesktop.Secret.Item.Label", Value::str(&label(n))), ("org.freedesktop.Secret.Item.Attributes", attributes(n, true))]);
-    let value = s.seal(secret);
+    let mut value = s.seal(secret);
+    let r = create_item(&mut s, &col, &props, &value);
+    wipe(&mut value);
+    r
+}
+
+fn create_item(s: &mut Session, col: &str, props: &Value, value: &Value) -> Result<(), SecretError> {
     for again in [false, true] {
-        match call(&mut s.c, DEST, &col, I_COLLECTION, "CreateItem", vec![props.clone(), value.clone(), Value::B(true)]) {
+        match call(&mut s.c, DEST, col, I_COLLECTION, "CreateItem", vec![props.clone(), value.clone(), Value::B(true)]) {
             Ok(b) => {
                 s.maybe_prompt(&as_path(b.get(1)))?;
                 return Ok(());
             }
-            Err(e) if e == E_LOCKED && !again => s.unlock(core::slice::from_ref(&col))?,
+            Err(e) if e == E_LOCKED && !again => s.unlock(&[String::from(col)])?,
             Err(e) => return Err(fail(&e)),
         }
     }
@@ -418,8 +450,9 @@ pub fn get(n: &Name) -> Result<Option<Vec<u8>>, SecretError> {
         (None, None) => return Ok(None),
     };
     let session = Value::O(s.path.clone());
-    let b = s.call(&item, I_ITEM, "GetSecret", vec![session])?;
+    let mut b = s.call(&item, I_ITEM, "GetSecret", vec![session])?;
     let v = b.first().and_then(|v| s.unseal(v));
+    b.iter_mut().for_each(wipe);
     v.map(Some).ok_or_else(|| SecretError::Failed(String::from("the Secret Service sent a value that does not decrypt")))
 }
 
