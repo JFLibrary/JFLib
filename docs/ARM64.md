@@ -4,7 +4,7 @@ Stand 2026-11-17, auf Basis von `main` 7c44e9cf. Umgesetzt sind ARM0 bis ARM7: `
 auf Linux ARM64, statisch und gegen glibc; `plattest`, `linuxtest`, `lifetest` und `sandboxtest` sind in einer ARM64-VM
 grün, seit ARM4 auch Plugins und das Modul `jxlenc`. Seit ARM5 laufen `coretest`, `plattest` und die `gallery` auf
 `windows-11-arm` (bis auf `screen.uis`, das der Bildschirm des Runners verhindert). Seit ARM7 ist das Speichermodell auf echter
-Hardware geprüft: Mac mini (M2), `ubuntu-24.04-arm` und `windows-11-arm`, jeweils mit LSE und mit LL/SC. Für den Rest gilt: Die Zahlen sind
+Hardware geprüft: A56, Mac mini (M2), `ubuntu-24.04-arm` und `windows-11-arm`, jeweils mit LSE und mit LL/SC. Für den Rest gilt: Die Zahlen sind
 aus dem Code gezählt, die Aufwände
 geschätzt. Syscalls, Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`),
 die Relocations mit ARM3 an einem Test-Plugin. Der Eintrag in der Roadmap steht in
@@ -750,6 +750,8 @@ sich als Wartezeit von 10 s, die abläuft. Geprüft wird:
 | | LL/SC (`jfgui_ARM_LLSC=1`) | 15 min | 2209 | 0 | 660 + 455, 0 Fehler | 8 003 693 / 517 050 von 44,2 Mio., 85 424 769 von 110 Mio. |
 | `windows-11-arm` (Cobalt 100, 4 Kerne) | LL/SC (inline, wie gebaut) | 15 min | 3572 | 0 | 660 + 450, 0 Fehler | 18 078 404 / 921 537 von 71,4 Mio., 135 878 573 von 179 Mio. |
 | | LSE (`+lse` gebaut) | 15 min | 3676 | 0 | 654 von 660 (eine Zeitprüfung, unten) + 450 | 44 418 054 / 951 657 von 73,5 Mio., 139 757 050 von 184 Mio. |
+| A56 (SM-A566B, Cortex-A720/A520, 8 Kerne, Android 16, Kernel 6.6), `adb` | LSE (Outline-Atomics, `AT_HWCAP`) | 20 min | 986 | 0 | 660 + 455 (dazu unten) | 4 084 321 / 9 742 von 19,7 Mio., 1 127 479 von 49,3 Mio. |
+| | LL/SC (`jfgui_ARM_LLSC=1`) | 20 min | 872 | 0 | 660 + 455 | 5 127 602 / 9 485 von 17,4 Mio., 1 084 532 von 43,6 Mio. |
 Was ein Durchgang auf dem M2 in 20 min mit LSE bewegte: 713 Mio. Sperren je mit `SpinLock` und `Mutex`, 232 Mio. mit `RwLock`, 89 Mio.
 Items durch die Condvar-Warteschlange, 125 Mio. Nachrichten über `channel`, 22 Mio. Übergaben per `Sem`, 859 Mio. Items von
 `parallel_for` und 229 Mio. eines `Job`, 53 Mio. Heap-Blöcke zwischen Threads, 624 Mio. Ereignisse, 3,6 Mrd. Audio-Samples, je 89 Mio.
@@ -769,13 +771,19 @@ dauerte es 61,6 ms). Die Grenze ist jetzt 33 ms, und ein Fehlschlag nennt die Ze
 (Run 43977942326): 56 von 57, darunter `atomics.uis` (0,3 s), `pen.uis`, `touch.uis` und `guard.uis`; rot nur `screen.uis`, wie seit ARM0
 am Runner (die Windows-Einrichtung, Grau `8a898a`, liegt über dem Bildschirm).
 
+Das A56 (2026-11-17, statisches `plattest` aus `/data/local/tmp`, über `adb shell` gestartet; vorher geprüft, dass das Telefon seit zwei
+Minuten unbedient war, keine Eingaben, der Ordner danach gelöscht) bestätigt den Weg aus dem Merker selbst: „LSE (outline atomics,
+AT_HWCAP)“ ohne, „LL/SC“ mit `jfgui_ARM_LLSC=1`. Auch dort ordnet die Hardware sichtbar um (Message Passing mit Relaxed in 0,05 %, zerrissene
+Seqlock-Kopien in 2,3 bis 2,5 %), Store Buffering mit Release/Acquire nie (`ldar`). `--test async` ×5 war im ersten Lauf in beiden Wegen gleich rot:
+Das Kind „async-policy“ las eine Datei, die sein Manifest verweigern sollte. Unter einem Manifest ist der Ordner des Programms immer
+lesbar (`plat::policy`), und auf dem Telefon lag das Programm im Arbeitsordner, unter dem der Test seine Dateien anlegt; mit dem Programm
+in einem eigenen Unterordner ist `async` je Weg dreimal grün (91 von 91). Kein Fehler der Bibliothek, nur der Aufbau des Laufs.
+
 Unter x86-64 (Windows, Linux in WSL) ist `--test atomics` in 1,5 bis 15 s grün (je nach Last); die SB-Kontrolle mit Relaxed sieht auch
 dort Umordnungen (136 bis 526 von 20 000 Runden), MP und der Seqlock ohne Fences nicht (TSO).
 
-Offen: **das A56** (Cortex-A720/A520, LSE). Es war während ARM7 nicht per `adb` angesteckt; die statischen Programme, das Skript
-dafür (Ruhe des Telefons prüfen, beide Wege mit `--secs 1200`, `threads` und `async`, aufräumen) und die Befehle stehen in den
-Übergabenotizen von ARM7. Echte LSE-Hardware mit Outline-Atomics prüfte so nur `ubuntu-24.04-arm`. Ebenfalls offen: die neue
-Grenze von 33 ms in `plattest --test threads` auf `windows-11-arm` (die volle Suite prüft sie unter Windows x86-64).
+Offen: die neue Grenze von 33 ms in `plattest --test threads` auf `windows-11-arm` (die volle Suite prüft sie unter Windows
+x86-64).
 
 **QEMU ordnet `stlr` → `ldar` nicht:** Unter `qemu-aarch64` (8.2, TCG auf x86-64) scheitert Store Buffering mit SeqCst, 1 bis 2 von
 20 000 Runden sehen beide den alten Wert, mit LSE wie mit LL/SC und mit `-cpu cortex-a53`. Rust übersetzt einen SeqCst-Store als

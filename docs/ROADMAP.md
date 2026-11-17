@@ -1930,7 +1930,7 @@ Fensterrand hinaus.
     `CONTEXT`, Unwind-Daten des Trampolins; `coretest`, `plattest` und die `gallery` auf `windows-11-arm` grün bis auf
     `screen.uis`, Workflow `arm64-windows.yml`); das Speichermodell (ARM7, 2026-11-17: jedes `Relaxed` in `lib/` durchgesehen,
     Funktionszeiger-Caches unter Windows mit Release/Acquire, `plattest --test atomics` auf Mac mini, `ubuntu-24.04-arm` und
-    `windows-11-arm` mit LSE und LL/SC ohne Fehler, Workflow `arm64-atomics.yml`; das A56 steht noch aus).
+    `windows-11-arm` mit LSE und LL/SC ohne Fehler, ebenso auf dem A56, Workflow `arm64-atomics.yml`).
   - Zu tun: Fenster und GPU (ARM8), Pakete und CI (ARM9). Die Arbeit nützt später auch macOS und iOS auf ARM.
   - Getestet wird mit QEMU in WSL und den ARM-Runnern von GitHub; für das Speichermodell und die GPU
     braucht es echte Hardware.
