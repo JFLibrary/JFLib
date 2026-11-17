@@ -36926,10 +36926,11 @@ DE_ALL: u32 = 7  // every effect
   effect's action; Wayland: taken wl_data_offer.finish (the action stays the one negotiated
   before the drop), not taken the offer destroyed without finish
 
-- **`fn drag_start(data: DragData) -> bool`**
+- **`fn drag_start(mut data: DragData) -> bool`**
   drag `data` out of the app (call while the left button is held) -> started; E_DRAG_END
   (data = the effect, 0 = cancelled or refused) follows.  Only the standard kinds leave
-  the app.
+  the app; files only when the manifest lets the app read them (false otherwise), a move only
+  when it may write them all (else the drag offers copy and link).
 
 - **`fn drag_running() -> bool`**
   an outgoing drag runs (until its E_DRAG_END is queued)
@@ -37356,8 +37357,8 @@ Source: [`lib/plat/ime.rs`](../lib/plat/ime.rs)
 
 - **`fn ime_commit_text(win:u8,text:&str) -> usize`**
   Committed text of any length: commits of at most 4096 bytes, split between characters ->
-  the bytes queued (fewer: the commit queue or the event ring is full, the rest can follow
-  once the app took these).
+  the bytes taken (queued now, or waiting until the app took the commits before them; fewer
+  only past PENDING_MAX waiting bytes or for a window number out of range).
 
 *(E4) what the text being typed is (ime_purpose): the input method and an on-screen*
 
