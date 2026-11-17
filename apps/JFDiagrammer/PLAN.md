@@ -7,7 +7,13 @@ Klammern (DF-01, CN-05 …) verweisen auf die Feature-Liste. Aufwände sind gesc
 
 **Erledigt** (2026-11-16, Branch `claude/jfdiagrammer-base`): JD0 Gerüst, JD1 ZIP und OPC
 (`archive::opc`, DEFLATE, ZIP64, `Limits::ratio`), JD2 Dokumentmodell (`diagram_core`, Rückgängig
-über inverse Schritte) und JD14 alle 303 Menüband-Icons. Nächste Welle: C.
+über inverse Schritte) und JD14 alle 303 Menüband-Icons.
+
+**Erledigt** (2026-11-17, Welle C): JD3 VSDX lesen (`diagram_io::vsdx::read`, Test-App
+`diagramiotest`, `build_rs.py test` führt die Unit-Tests der Crates aus), JD8 App-Hülle (Menüband mit allen
+P1-Befehlen, 17 von 182 mit Handler; Backstage, Optionen, Sprachwechsel zur Laufzeit, Aufgabenbereiche;
+`ui.ribbon_tabs`, `ui.backstage_begin`, `ui.settings_section` in der Bibliothek) und der Vektor-PDF-Schreiber
+(`lib/pdf`, Test-App `pdftest`). Nächste Welle: D.
 
 ## Ziel
 
