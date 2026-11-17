@@ -56,6 +56,7 @@ function flush() {
 function send(message) {
   if(message.type==="start") {worker.postMessage(message);return;}
   const last=outgoing[outgoing.length-1];
+  if(message.type==="motion" && last?.type==="motion") {last.dx+=message.dx;last.dy+=message.dy;schedule();return;}
   if(message.hover && last?.hover && last.event[2]===message.event[2]) outgoing[outgoing.length-1]=message;
   else outgoing.push(message);
   schedule();
@@ -173,6 +174,37 @@ function event(type,button=0,x=0,y=0,data=0,mods=0,hover=false) { if(started) se
 const mods=e=>(e.shiftKey?1:0)|(e.ctrlKey||e.metaKey?2:0)|(e.altKey?4:0)|(e.getModifierState?.("AltGraph")?16:0);
 const pos=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)*devicePixelRatio,(e.clientY-r.top)*devicePixelRatio];};
 const button=e=>[1,3,2,4,5][e.button]||1;
+// (G7a) where a key sits: KeyboardEvent.code as its USB HID usage (lib/plat/keycode.rs, the same rows: build_rs.py checks
+// them), the key event's x
+const CODES={KeyA:4,KeyB:5,KeyC:6,KeyD:7,KeyE:8,KeyF:9,KeyG:10,KeyH:11,KeyI:12,KeyJ:13,KeyK:14,KeyL:15,KeyM:16,KeyN:17,KeyO:18,KeyP:19,KeyQ:20,KeyR:21,KeyS:22,KeyT:23,KeyU:24,KeyV:25,KeyW:26,KeyX:27,KeyY:28,KeyZ:29,Digit1:30,Digit2:31,Digit3:32,Digit4:33,Digit5:34,Digit6:35,Digit7:36,Digit8:37,Digit9:38,Digit0:39,Enter:40,Escape:41,Backspace:42,Tab:43,Space:44,Minus:45,Equal:46,BracketLeft:47,BracketRight:48,Backslash:49,Semicolon:51,Quote:52,Backquote:53,Comma:54,Period:55,Slash:56,CapsLock:57,F1:58,F2:59,F3:60,F4:61,F5:62,F6:63,F7:64,F8:65,F9:66,F10:67,F11:68,F12:69,PrintScreen:70,ScrollLock:71,Pause:72,Insert:73,Home:74,PageUp:75,Delete:76,End:77,PageDown:78,ArrowRight:79,ArrowLeft:80,ArrowDown:81,ArrowUp:82,NumLock:83,NumpadDivide:84,NumpadMultiply:85,NumpadSubtract:86,NumpadAdd:87,NumpadEnter:88,Numpad1:89,Numpad2:90,Numpad3:91,Numpad4:92,Numpad5:93,Numpad6:94,Numpad7:95,Numpad8:96,Numpad9:97,Numpad0:98,NumpadDecimal:99,IntlBackslash:100,ContextMenu:101,Power:102,NumpadEqual:103,F13:104,F14:105,F15:106,F16:107,F17:108,F18:109,F19:110,F20:111,F21:112,F22:113,F23:114,F24:115,AudioVolumeMute:127,AudioVolumeUp:128,AudioVolumeDown:129,NumpadComma:133,IntlRo:135,KanaMode:136,IntlYen:137,Convert:138,NonConvert:139,Lang1:144,Lang2:145,ControlLeft:224,ShiftLeft:225,AltLeft:226,MetaLeft:227,ControlRight:228,ShiftRight:229,AltRight:230,MetaRight:231,OSLeft:227,OSRight:231,VolumeMute:127,VolumeUp:128,VolumeDown:129};
+// (G7a) the pointer lock of the canvas (lib/plat/web_windows.rs): the app asks (service 31); the page asks the browser from
+// the user's gesture -- at once while the page still has the activation of the press that made the app ask, else with the
+// next press in the canvas -- with unadjustedMovement (raw motion) where the browser has it; movementX / movementY go to
+// the app summed per batch.  The browser lets go with Esc and when the page loses the focus.
+let lockWanted=false, lockTried=false, lockEsc=false;
+function lockNow(press) {
+  if(!lockWanted || document.pointerLockElement===canvas) return;
+  lockTried=press;
+  const plain=()=>{try {canvas.requestPointerLock()?.catch?.(()=>{});} catch {}};
+  let p=null;
+  try {p=canvas.requestPointerLock({unadjustedMovement:true});} catch {plain();return;}
+  p?.catch?.(e=>{if(e?.name==="NotSupportedError")plain();});
+}
+function lockCancel() {
+  lockWanted=false;
+  if(document.pointerLockElement===canvas) document.exitPointerLock();
+  else if(started) send({type:"pointerlock",state:0});
+}
+document.addEventListener("pointerlockchange",()=>{
+  const on=document.pointerLockElement===canvas;
+  if(!on) {lockWanted=false;lockEsc=true;} // (the browser's own Esc: its up is the lock's too)
+  if(started) send({type:"pointerlock",state:on?1:0});
+});
+document.addEventListener("pointerlockerror",()=>{
+  // (a browser that does not know unadjustedMovement may try again without it first)
+  const press=lockTried;
+  setTimeout(()=>{if(document.pointerLockElement!==canvas && lockWanted && press) {lockWanted=false;if(started)send({type:"pointerlock",state:2});}},100);
+});
 const pen=e=>{
   const type=e.pointerType==="pen"?(e.button===5?2:1):e.pointerType==="touch"?3:0;
   if(!type)return 0;
@@ -207,12 +239,14 @@ function finger(phase,e) {
 canvas.onpointerdown=e=>{
   const touch=e.pointerType==="touch";
   if(!e.isPrimary && !touch)return;
+  if(lockWanted && !touch && document.pointerLockElement!==canvas) lockNow(true); // (G7a) the user's gesture
   e.preventDefault();if(shadow)shadow.follow=false;input.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);
   if(touch) finger(0,e); else event(2,button(e),...pos(e),pen(e),mods(e));
 };
 canvas.onpointermove=e=>{
   const touch=e.pointerType==="touch";
   if(!e.isPrimary && !touch)return;
+  if(document.pointerLockElement===canvas) {if(e.movementX||e.movementY)send({type:"motion",dx:e.movementX,dy:e.movementY});return;} // (G7a)
   const samples=e.buttons ? e.getCoalescedEvents?.() : null;
   for(const sample of samples?.length ? samples : [e]) {if(touch) finger(1,sample); else event(1,0,...pos(sample),pen(sample),mods(e),!e.buttons);}
 };
@@ -247,10 +281,16 @@ function charKey(e) {
 }
 function key(e,down) {
   if(e.isComposing || composing) return;
+  // (G7a) Esc while the canvas holds the pointer lock or waits for it: the lock's, down and up (the browser lets go itself)
+  if(e.key==="Escape") {
+    if(down && (lockWanted || document.pointerLockElement===canvas)) {lockEsc=true;lockCancel();e.preventDefault();return;}
+    if(down) lockEsc=false;
+    else if(lockEsc) {lockEsc=false;e.preventDefault();return;}
+  }
   // Ordinary paste belongs to the DOM clipboard event; Alt-modified app shortcuts do not.
   if((e.ctrlKey||e.metaKey) && !e.altKey && e.key.toLowerCase()==="v") {pasteModifiers=down?2|(e.shiftKey?1:0):2;return;}
   const k=keys[e.key] || (/^F\d+$/.test(e.key)?111+Number(e.key.slice(1)):e.key.length===1?charKey(e):0);
-  if(k) event(down?5:6,0,0,0,k | (e.repeat?0x80000000:0),mods(e));
+  if(k) event(down?5:6,0,CODES[e.code]||0,0,k | (e.repeat?0x80000000:0),mods(e));
   // Printable characters, Enter and paste use beforeinput, avoiding duplicated text.
   const clipboardKey=["v","c","x"].includes(e.key.toLowerCase()) && !e.altKey && (!e.shiftKey || e.key.toLowerCase()==="v");
   if(e.key==="Tab" || e.key.startsWith("Arrow") || ["Backspace","Delete","Escape"].includes(e.key) || ((e.ctrlKey||e.metaKey)&&!clipboardKey)) e.preventDefault();
@@ -394,6 +434,11 @@ async function service(m) {
       input.style.left=Math.max(0,Math.min(canvas.clientWidth-2,v.getInt32(0,true)/devicePixelRatio))+"px";input.style.top=Math.max(0,Math.min(canvas.clientHeight-20,v.getInt32(4,true)/devicePixelRatio))+"px";input.style.height=Math.max(16,v.getInt32(8,true)/devicePixelRatio)+"px";}
     else if(m.kind===7){const c=new DataView(m.data).getUint32(0,true);canvas.style.cursor=(c>=64?["not-allowed","no-drop","grab","grabbing","help","progress","zoom-in","zoom-out","cell","vertical-text","alias","copy","context-menu","all-scroll","col-resize","row-resize","n-resize","s-resize","e-resize","w-resize","ne-resize","nw-resize","se-resize","sw-resize"][c-64]:["default","text","pointer","crosshair","move","wait","ns-resize","ew-resize","nwse-resize","nesw-resize","none"][c])||"default";}
     else if(m.kind===8) document.title=value();
+    // (G7a) the pointer lock: 1 lock (at once with the user's activation, else with the next press), 0 let go
+    else if(m.kind===31) {
+      if(data[0]===1) {lockWanted=true;if(navigator.userActivation?.isActive!==false)lockNow(false);}
+      else {lockWanted=false;if(document.pointerLockElement===canvas)document.exitPointerLock();}
+    }
     // unsaved work (plat::set_unsaved): leaving the page asks first
     else if(m.kind===22) unsaved=data[0]===1;
     // (L7) full screen of the page (lib/plat/web_windows.rs): the answer comes with fullscreenchange / -error

@@ -32,6 +32,13 @@ the monitors with their scale, the system's settings the UI follows (dark or lig
 high contrast, reduced motion, text scale) and the user's languages. For `jflib-gpu` it provides
 the surface of a window to draw into.
 
+For games it locks the pointer to a window and hands over its raw relative motion
+(`win_pointer_lock`, `win_raw_motion_take`: Raw Input on Windows, the pointer constraints of
+Wayland, XInput 2 on X11, the events' deltas on macOS, `requestPointerLock` in the browser; Esc and
+the focus going elsewhere always let it go), and it says where a key sits on the keyboard as a USB
+HID usage whatever the layout prints on it (`KC_W` stays the key right of Q on a French keyboard),
+with `key_label` for what the layout prints there.
+
 ## Files, the app's folders and permissions
 
 Every file function takes paths of the operating system and names with a scheme: `app://` for

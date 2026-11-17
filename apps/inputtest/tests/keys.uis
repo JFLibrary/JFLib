@@ -1,0 +1,31 @@
+# inputtest: keys by where they sit (KeyEvent::code, ui.key_code_down).  `code N` presses the key
+# at USB HID usage N (this platform's scan code for it) whatever VK the layout makes of it: here
+# the keys of a French keyboard at the places of W, A, S, D (Z, Q, S, D)
+click canvas:"Feld"
+expect text:"Zeiger: gefangen" exists
+keydown z code 26
+expect text:"WASD gehalten: W" exists
+keyup z code 26
+expect text:"WASD gehalten: –" exists
+keydown q code 4
+keydown s code 22
+keydown d code 7
+expect text:"WASD gehalten: ASD" exists
+keyup q code 4
+keyup s code 22
+keyup d code 7
+expect text:"WASD gehalten: –" exists
+expect text:"Tasten: +KeyW -KeyW +KeyA +KeyS +KeyD -KeyA -KeyS -KeyD" exists
+# Esc lets the lock go and is the lock's; without the lock it is a key of the app
+key esc
+expect text:"Zeiger: aus" exists
+expect text:"Tasten: +KeyW -KeyW +KeyA +KeyS +KeyD -KeyA -KeyS -KeyD" exists
+keydown esc code 41
+keyup esc code 41
+expect text:"Tasten: +KeyW -KeyW +KeyA +KeyS +KeyD -KeyA -KeyS -KeyD +Escape -Escape" exists
+# a key without a place (a script's plain key): code 0
+click "Liste leeren"
+click canvas:"Feld"
+key esc
+key f2
+expect text:"Tasten: +? -?" exists

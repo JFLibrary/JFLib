@@ -98,6 +98,10 @@ pub use popup::*;
 #[path = "win_gpuout.rs"]
 mod gpuout;
 pub use gpuout::*;
+// (G7a) the pointer lock: Raw Input, ClipCursor (plock.rs)
+#[path = "win_plock.rs"]
+mod plock;
+pub use plock::win_plock_set;
 #[path = "win_shell.rs"]
 mod shell;
 pub use shell::*;
@@ -360,6 +364,7 @@ const WM_CHAR: u32 = 0x0102;
 const WM_SYSKEYDOWN: u32 = 0x0104;
 const WM_SYSKEYUP: u32 = 0x0105;
 const WM_SYSCHAR: u32 = 0x0106;
+const WM_INPUT: u32 = 0x00FF;
 const WM_MOUSEMOVE: u32 = 0x0200;
 const WM_LBUTTONDOWN: u32 = 0x0201;
 const WM_LBUTTONUP: u32 = 0x0202;
@@ -1359,6 +1364,11 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             }
             0
         }
+        WM_SYSKEYDOWN | WM_KEYDOWN if crate::plock_key(wp as u32, true) => {
+            plock::release(crate::plock_win()); // (G7a) Esc lets the pointer lock go, the app gets no key
+            0
+        }
+        WM_KEYUP | WM_SYSKEYUP if crate::plock_key(wp as u32, false) => 0,
         WM_SYSKEYDOWN => {
             push_key(E_KEY_DOWN, wp, lp);
             if wp as u32 as usize == VK_F4 { def() } else { 0 } // keep Alt+F4; no system menu on Alt / F10
@@ -1405,6 +1415,11 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
         }
         WM_SYSCHAR => 0,
         WM_SETCURSOR => {
+            if plock::locked(w) {
+                // SAFETY: no cursor while the pointer is locked.
+                unsafe { SetCursor(0) };
+                return 1;
+            }
             if lp as u16 as isize != HTCLIENT {
                 return def();
             }
@@ -1412,11 +1427,19 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             unsafe { SetCursor(cur_handle(r.cursor.get(), r.dpi.get())) };
             1
         }
+        WM_INPUT => {
+            if wp & 0xFF == 0 {
+                plock::input(w, lp); // (G7a) RIM_INPUT: raw motion of the locked pointer
+            }
+            def() // (the system's clean-up of the record)
+        }
         WM_SIZE => {
             if wp == SIZE_MINIMIZED {
                 r.min.set(true);
+                plock::release(w); // (G7a) minimized: the lock goes
                 return 0;
             }
+            plock::follow(w);
             if r.min.replace(false) {
                 win_push(E_PAINT, 0, 0, 0, 0); // restored: a window on the GPU shows what it missed
             }
@@ -1449,6 +1472,7 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             if r.selfp.get() != SELF_CREATE {
                 ww_follow(w, x, y); // docked tool windows move along (live, also in the move loop)
             }
+            plock::follow(w); // (G7a) the clip of a locked pointer moves along
             r.px.set(x);
             r.py.set(y);
             if r.selfp.get() == SELF_CREATE {
@@ -1529,6 +1553,7 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             def()
         }
         WM_DESTROY => {
+            plock::release(w); // (G7a) closed: the lock goes
             win_uia::destroyed(hwnd);
             win_dnd::revoke(hwnd);
             r.hwnd.set(0);
@@ -1542,9 +1567,11 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
         WM_SETFOCUS => {
             clip::ime_context_focus(hwnd); // a password field keeps the input method away here too
             win_push(E_FOCUS_IN, 0, 0, 0, 0);
+            plock::focus_in(w); // (G7a) a pointer lock that waited for the focus
             0
         }
         WM_KILLFOCUS => {
+            plock::release(w); // (G7a) the focus goes elsewhere: so does the pointer lock
             release_all_buttons();
             clip::caret_focus_lost(hwnd); // magnifiers: no caret in a window without the keyboard
             win_push(E_FOCUS_OUT, 0, 0, 0, 0);
@@ -1591,6 +1618,9 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             0
         }
         WM_NCHITTEST => {
+            if plock::locked(w) {
+                return HTCLIENT; // (G7a) a hidden, locked pointer never drags or sizes the window
+            }
             if r.flags.get() & WWF_CUSTOM == 0 {
                 return def();
             }
@@ -1873,6 +1903,42 @@ pub fn key_layouts_test() -> Vec<isize> {
     let got = unsafe { f(n, v.as_mut_ptr()) }.clamp(0, n);
     v.truncate(got as usize);
     v
+}
+
+#[link(name = "user32", kind = "raw-dylib")]
+unsafe extern "system" {
+    fn MapVirtualKeyExW(code: u32, map: u32, hkl: isize) -> u32;
+    fn GetKeyNameTextW(lp: i32, buf: *mut u16, n: i32) -> i32;
+}
+
+/// (G7a, keycode.rs key_label) what the thread's keyboard layout prints on the key with scan code
+/// sc (0xE0.. extended): its character without Shift in upper case, else the system's name of the
+/// key (GetKeyNameTextW: "Esc", "Enter" in the system's language); None for an unknown key
+pub(crate) fn win_key_label(sc: u32) -> Option<String> {
+    if sc == 0 {
+        return None;
+    }
+    // SAFETY: no memory arguments (0: this thread's layout).
+    let hkl = unsafe { GetKeyboardLayout(0) };
+    // MAPVK_VSC_TO_VK_EX (3): the extended scan codes as 0xE0..
+    // SAFETY: no memory arguments.
+    let vk = unsafe { MapVirtualKeyExW(sc, 3, hkl) };
+    let numpad = matches!(crate::key_code_set1(sc), 0x54..=0x63 | crate::KC_NUMPAD_EQUAL | crate::KC_NUMPAD_COMMA);
+    if vk != 0 && !numpad {
+        let ks = [0u8; 256];
+        let (c, _) = to_unicode(vk, sc & 0xFF, hkl, &ks);
+        if let Some(s) = crate::keycode::label_of(c) {
+            return Some(s);
+        }
+    }
+    let lp = ((sc & 0xFF) << 16 | if sc & 0xE000 == 0xE000 { 1 << 24 } else { 0 }) as i32;
+    let mut buf = [0u16; 64];
+    // SAFETY: a buffer of 64 UTF-16 units.
+    let n = unsafe { GetKeyNameTextW(lp, buf.as_mut_ptr(), buf.len() as i32) };
+    if n <= 0 {
+        return None;
+    }
+    Some(super::from_wide(&buf[..(n as usize).min(buf.len())]))
 }
 
 /// E_WHEEL's btn and data of a WM_MOUSEWHEEL / WM_MOUSEHWHEEL: fine (WHEEL_FINE) when the delta
@@ -2494,7 +2560,7 @@ pub fn win_set_cursor(w: i32, shape: u32) {
         return;
     }
     r.cursor.set(shape);
-    if st().ptr_win.get() == w {
+    if st().ptr_win.get() == w && !plock::locked(w) {
         // SAFETY: a cursor handle (0 hides it).
         unsafe { SetCursor(cur_handle(shape, r.dpi.get())) };
     }
