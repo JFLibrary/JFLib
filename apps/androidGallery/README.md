@@ -174,6 +174,15 @@ Gerät) und schreibt Zeilen `viewcheck: ...` ins Log (Logcat, Tag `jfgui`; im Br
 `jfgui_GPU_VIEWBENCH=300` misst die Seite stattdessen die Galerie von render3dtest in einer Ansicht von 700 px Höhe
 (eine Zeile `viewcheck: bench ...`). Beide Variablen beginnen mit `jfgui_GPU_`, damit `?gpuenv=` im Browser sie setzt.
 
+**Die 2D-Zeichnung** (seit 17.11.2026, G6e3; `pg_r2d.rs`, Seite „2D-Zeichnung“, nur Android): der Stadtplan von render2dtest
+(40 000 Records) in einer Ansicht von render2d, ein Finger schiebt, zwei zoomen, „+“, „−“, „Ganz“. „Prüfen“ (oder
+`jfgui_GPU_R2DCHECK=1`) zeichnet auf dem Gerät der Ansicht die 91 Bilder von `render2dtest --dump` gegen den CPU-Weg (die
+Schranken des Tests `cpu`), prüft die Bytes des CPU-Wegs, die Zeichnung bei 1e7, Linien, Ringe und Strichenden bei 1e-6
+Einheiten je Pixel und zwei Zeichnungen von ezdxf; Zeilen `r2dcheck: ...`, am Ende `r2dcheck: done: N checks, M failed`.
+„Messen“ (oder `jfgui_GPU_R2DBENCH=1`) misst den Stadtplan von 1 Mio. Records mit und ohne Text (Zeilen `r2dbench: ...`).
+`python apps/androidGallery/tests/android_r2d.py [--serial S] [--apk APK] [--package org.jflib.gallery.g4c] [--check] [--bench
+--runs 3]` startet beides und liest das Log ([docs/RENDER2D.md](../../docs/RENDER2D.md#android)).
+
 ## Grenzen dieses Prototyps
 
 Der Adapter bietet eine einzelne Android-Activity und darin die Library-Oberflächen.

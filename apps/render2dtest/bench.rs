@@ -36,6 +36,9 @@ fn median(v: &mut [f64]) -> f64 {
 struct Target {
     color: Texture,
     used: bool,
+    /// (G6e3) the last frame's wall time from its submission until the wait came back (ms): where the device has no
+    /// timestamps (Metal in lib/gpu), what the GPU took, plus the submission's and the wait's own time
+    wall: f64,
 }
 
 /// one frame, waited for: (prepare's CPU ms, the frame's stamps relative to its start: uploads, visibility, draw ms,
@@ -48,12 +51,15 @@ fn frame(dev: &Device, r: &mut Renderer, s: &mut Scene, t: &mut Target, size: (u
     let color = ColorAttachment { view: t.color.view(), load: Load::Clear, clear: bg_clear(BG), store: true, before: if t.used { Layout::ColorTarget } else { Layout::Undefined },
                                   after: Layout::ColorTarget };
     r.record(&mut e, s, color)?;
-    let id = dev.queue().submit([e.finish()?])?;
+    let cb = e.finish()?;
+    let t1 = plat::time_us();
+    let id = dev.queue().submit([cb])?;
     s.submitted(id);
     t.used = true;
     if !dev.wait(id, 30_000_000_000)? {
         return Err(GpuError::Timeout);
     }
+    t.wall = (plat::time_us() - t1) as f64 / 1000.0;
     s.collect_stats();
     let st = s.take_stats();
     let f = st.last().copied();
@@ -164,7 +170,7 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level, 
             out(&format!("{level:?}, {wname}: {} texts of {} characters ({} records: glyphs and bars); {} glyphs, {} tiles S, {} pages", c.texts, c.chars, c.text_records, ti.glyphs, ti.tiles_s,
                          ti.pages));
         }
-        let mut t = Target { color: dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?, used: false };
+        let mut t = Target { color: dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?, used: false, wall: 0.0 };
         let views = cad::views(&c, size);
         s.set_camera(&views[0].cam)?;
         let (prep, st0, vis0) = frame(dev, &mut r, &mut s, &mut t, size)?;
@@ -188,7 +194,7 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level, 
             }
         }
         for v in &views {
-            let (mut a, mut b, mut d, mut p) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+            let (mut a, mut b, mut d, mut p, mut wl) = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
             let mut vis = 0;
             for k in 0..frames + 3 {
                 // (the camera moves a little: a frame of a pan)
@@ -201,12 +207,13 @@ fn run_cad(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level, 
                     b.push(st[1]);
                     d.push(st[2]);
                     p.push(prep);
+                    wl.push(t.wall);
                     vis = n;
                 }
             }
-            let (ma, mb, mc, mp) = (median(&mut a), median(&mut b), median(&mut d), median(&mut p));
-            out(&format!("{level:?}, {wname}, {} (scale {:.3}): GPU per frame {:.3} ms (uploads {ma:.3}, visibility {mb:.3}, draw {mc:.3}); prepare {mp:.3} ms CPU; {vis} visible",
-                         v.name, v.cam.scale, ma + mb + mc));
+            let (ma, mb, mc, mp, mw) = (median(&mut a), median(&mut b), median(&mut d), median(&mut p), median(&mut wl));
+            out(&format!("{level:?}, {wname}, {} (scale {:.3}): GPU per frame {:.3} ms (uploads {ma:.3}, visibility {mb:.3}, draw {mc:.3}); prepare {mp:.3} ms CPU; {vis} visible; \
+                          submit to done {mw:.3} ms (wall)", v.name, v.cam.scale, ma + mb + mc));
         }
         if plat::args().iter().any(|a| a == "--g6d") {
             g6d(dev, &mut r, &mut s, &mut t, size, frames, &views, level, wname, c.trees.first().map(|x| (x.1.block, c.trees.len())))?;
@@ -573,7 +580,7 @@ fn run(dev: &Device, n: u32, size: (u32, u32), frames: usize, level: Level) -> R
             segs += m as u32 - 1;
         }
         let insert_ms = (plat::time_us() - t0) as f64 / 1000.0;
-        let mut t = Target { color: dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?, used: false };
+        let mut t = Target { color: dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET))?, used: false, wall: 0.0 };
         s.set_camera(&Camera::new([0.0, 0.0], 1.0))?;
         // the first frame: every record goes up
         let (prep, st0, vis0) = frame(dev, &mut r, &mut s, &mut t, size)?;

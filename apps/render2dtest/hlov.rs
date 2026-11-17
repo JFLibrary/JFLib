@@ -8,24 +8,24 @@
 //              polygon: against the same geometry as plain entities (GPU) and against lib/gfx; an empty overlay changes no
 //              pixel and sends nothing; a rubber band to a point at 1e7 seen at 1e-6 units per pixel where the camera puts it
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use alloc::format;
 use alloc::vec;
 use alloc::vec::Vec;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use gpu::*;
 use render2d::{Cap, Join, Layer, Scene, SnapKind, Space, Style, Unit};
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use render2d::{Camera, Renderer, RendererDesc, Shape};
 
 use crate::gallery::*;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use crate::refimg::{self, Tol};
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use crate::tests::{dump, gpu_image, on_levels, shot, T};
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 /// hl.wgsl's colour on the CPU: selected 3/4 of the way to blue, hovered 7/8 of the way to orange, alpha at least 0xB0
 pub fn hl_ink(c: u32, bits: u8) -> u32 {
     if bits == 0 {
@@ -37,7 +37,7 @@ pub fn hl_ink(c: u32, bits: u8) -> u32 {
     (a << 24) | ch(16) | ch(8) | ch(0)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 /// a style as the highlight draws it at a camera's scale: hl_ink's colour, the half width in pixels (as the vertex shader
 /// has it: at least half a pixel) wider by a quarter pixel (selected) or a pixel (hovered)
 pub fn hl_style(st: &Style, bits: u8, scale: f64) -> Style {
@@ -81,7 +81,7 @@ pub fn hl_drawing() -> (Drawing, Vec<u8>) {
     (d, bits)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub fn highlight(t: &mut T) {
     let mut shots: Vec<(&str, Vec<u8>)> = Vec::new();
     on_levels(t, &mut |t, dev, level| {
@@ -95,7 +95,7 @@ pub fn highlight(t: &mut T) {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 fn highlight_on(t: &mut T, dev: &Device, level: &str) -> Option<Vec<u8>> {
     let (w, h) = (360u32, 270u32);
     let mut off = t.res(Off::new(dev, w, h), "target")?;
@@ -245,7 +245,7 @@ fn fill_overlay(s: &mut Scene, h: u32) -> Drawing {
     d
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub fn overlay(t: &mut T) {
     let mut shots: Vec<Vec<u8>> = Vec::new();
     on_levels(t, &mut |t, dev, level| {
@@ -259,7 +259,7 @@ pub fn overlay(t: &mut T) {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 fn overlay_on(t: &mut T, dev: &Device, level: &str) -> Option<Vec<u8>> {
     let (w, h) = (340u32, 260u32);
     let mut off = t.res(Off::new(dev, w, h), "target")?;
@@ -383,7 +383,7 @@ fn overlay_on(t: &mut T, dev: &Device, level: &str) -> Option<Vec<u8>> {
     Some(img)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 /// pixels whose colour differs, and the largest difference
 pub fn differ(a: &[u8], b: &[u8]) -> (u32, u8) {
     let (mut n, mut m) = (0u32, 0u8);

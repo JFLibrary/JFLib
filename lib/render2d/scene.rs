@@ -1079,7 +1079,8 @@ pub(crate) struct FrameSlot {
     changes: Option<Buffer>,
     styles: Option<Buffer>,
     hatch: Option<Buffer>,
-    pub scatter_group: Option<BindGroup>,
+    /// (G6e3) the change buffer's bindings, one per piece of Renderer::scatter_chunk changes
+    pub scatter_groups: Vec<BindGroup>,
     runs: Option<Buffer>,
     insts: Option<Buffer>,
     pub readback: Option<Buffer>,
@@ -1531,7 +1532,7 @@ impl Scene {
         let (entries_cap, layers_cap) = (64u32, 16u32);
         let mut frames = Vec::new();
         for _ in 0..r.desc.frames_in_flight {
-            frames.push(FrameSlot { stage: upload(&dev, VIEW_BYTES)?, changes: None, styles: None, hatch: None, scatter_group: None, runs: None, insts: None, readback: None, last: None, atlas: None,
+            frames.push(FrameSlot { stage: upload(&dev, VIEW_BYTES)?, changes: None, styles: None, hatch: None, scatter_groups: Vec::new(), runs: None, insts: None, readback: None, last: None, atlas: None,
                                     gtab: None, hl: None, ov: None });
         }
         let hatch_buf = storage(&dev, HATCH_BYTES, none)?;
@@ -2958,7 +2959,7 @@ impl Scene {
         self.up.rebuild = old.0.map(|o| (o, moves));
         self.groups = None;
         for f in &mut self.frames {
-            f.scatter_group = None;
+            f.scatter_groups.clear();
         }
         self.layout_dirty = false;
         self.filled = true;
@@ -3091,7 +3092,7 @@ impl Scene {
             },
         });
         for f in &mut self.frames {
-            f.scatter_group = None;
+            f.scatter_groups.clear();
         }
         // (G6d: write_hl's group names the write pass's buffers too)
         self.hl_group = None;
@@ -4063,7 +4064,7 @@ impl Scene {
                 let size = rows.len() as u64 * CHANGE_WORDS as u64 * 4;
                 if f.changes.as_ref().is_none_or(|b| b.size() < size) {
                     f.changes = Some(dev.create_buffer(&BufferDesc { size: size.next_power_of_two().max(1 << 14), usage: BufferUsage::STORAGE, memory: MemoryKind::Upload })?);
-                    f.scatter_group = None;
+                    f.scatter_groups.clear();
                 }
                 let Some(buf) = &f.changes else { return Err(GpuError::Invalid("Scene::prepare")) };
                 let words: Vec<[u32; CHANGE_WORDS]> = rows.iter().map(|r| {
@@ -4073,8 +4074,20 @@ impl Scene {
                     w
                 }).collect();
                 buf.write(0, &words)?;
-                if f.scatter_group.is_none() {
-                    f.scatter_group = Some(dev.create_bind_group(&BindGroupDesc { layout: &r.scatter_layout, entries: &[entry(0, buf), entry(1, &self.pool)] })?);
+                // (G6e3) a binding per piece of the buffer that one dispatch reaches; one over the whole buffer where one does
+                let piece = r.scatter_chunk as u64 * CHANGE_WORDS as u64 * 4;
+                if f.scatter_groups.is_empty() {
+                    if buf.size() <= piece {
+                        f.scatter_groups.push(dev.create_bind_group(&BindGroupDesc { layout: &r.scatter_layout, entries: &[entry(0, buf), entry(1, &self.pool)] })?);
+                    } else {
+                        let mut at = 0u64;
+                        while at < buf.size() {
+                            let len = piece.min(buf.size() - at);
+                            let part = BindEntry { binding: 0, resource: Resource::Buffer { buffer: buf, offset: at, size: len } };
+                            f.scatter_groups.push(dev.create_bind_group(&BindGroupDesc { layout: &r.scatter_layout, entries: &[part, entry(1, &self.pool)] })?);
+                            at += len;
+                        }
+                    }
                 }
                 self.up.scatter = rows.len() as u32;
                 self.upload_info.scatter = true;

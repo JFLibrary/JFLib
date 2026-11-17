@@ -67,6 +67,7 @@ dependencies = [
  "jflib-img-core",
  "jflib-img-jpeg",
  "jflib-plat",
+ "jflib-render2d",
  "jflib-render3d",
  "jflib-style-winui",
  "jflib-ui",

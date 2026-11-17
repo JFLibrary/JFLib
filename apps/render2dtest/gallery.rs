@@ -663,6 +663,43 @@ pub fn cpu_shot(sh: &Shot) -> Result<Vec<u8>> {
     Ok(cpu_image(&mut s, sh.w, sh.h, BG))
 }
 
+/// the FNV-1a of the CPU path's 91 images of shots() (scenes without a device): the same on every target
+/// (docs/RENDER2D.md "Der CPU-Weg"; --dump, the cpu test, the browser, Android's page "2D-Zeichnung")
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub const CPU_HASH: u64 = 0xaa56_3121_8962_345e;
+
+/// a shot's category: its name up to the first '_'
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub fn category(name: &str) -> &str {
+    name.split('_').next().unwrap_or(name)
+}
+
+/// how far the GPU may be from the CPU path per category (the cpu test, Android's page "2D-Zeichnung"): the share of
+/// pixels beyond 2 codes, the largest difference, the ink (%) (docs/RENDER2D.md "Der CPU-Weg"): straight edges and fills
+/// alike; round caps and small circles the GPU's tangent; short segments its fast way; dash patterns its three dashes per
+/// pixel and side; dashed curves its caps two segments on; fills' edges through the middle of a pixel's side; text MSDF
+/// against outlines.  (G6e3) Flat tones: rows of one value each (3 images, 18 rows of 300 px), where one code in one
+/// channel of one row is 0.037 % of an image's ink; how the blend rounds moves whole rows: NVIDIA rounds the source colour
+/// and alpha to 8 bits before it blends (53 of 54 row-channels of flat_1.5), Apple's GPU blends exactly (54 of 54),
+/// lib/gfx in integers of its own.  So their ink is bounded by 0.2 % (the M2: +0.084 %, flat_1.5 alone +0.184 %), the
+/// pixels as strictly as before (none beyond 2 codes, the largest 1 everywhere)
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub fn cpu_bounds(category: &str) -> (f64, u8, f64) {
+    match category {
+        "flat" => (0.0005, 4, 0.2),
+        "miter" | "hairlines" | "fills" | "overlap" => (0.0005, 4, 0.05),
+        "joins" => (0.002, 16, 0.1),
+        "hatch" => (0.004, 16, 0.1),
+        "caps" | "arcs" => (0.002, 64, 0.2),
+        "blocks" => (0.012, 48, 0.4),
+        "units" | "dashes" => (0.006, 96, 0.3),
+        "curves" => (0.006, 150, 0.3),
+        "short" => (0.02, 210, 0.3),
+        "transparency" | "highlight" | "overlay" => (0.005, 160, 0.3),
+        _ => (0.012, 135, 0.5),
+    }
+}
+
 /// FNV-1a over bytes (the CPU path's images: the same hash on every target)
 pub fn fnv(h: u64, b: &[u8]) -> u64 {
     let mut h = h;

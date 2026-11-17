@@ -431,3 +431,13 @@ Prüfung	Check
 in Ordnung	fine
 abweichend	different
 Auf diesem System gibt es keine 3D-Ansicht.	There is no 3D view on this system.
+2D-Zeichnung	2D drawing
+Eine CAD-Zeichnung zwischen den Widgets: Ziehen verschiebt, zwei Finger zoomen, die GPU zeichnet sie (render2d).	A CAD drawing between the widgets: dragging moves it, two fingers zoom, the GPU draws it (render2d).
+Ganz	Whole
+Messen	Measure
+auf der CPU	on the CPU
+Kein GPU-Gerät: nichts zu prüfen oder zu messen.	No GPU device: nothing to check or measure.
+Prüfung läuft …	Checking …
+Messung läuft …	Measuring …
+Messung fertig (Protokoll: r2dbench)	Measurement done (log: r2dbench)
+Die 2D-Zeichnung gibt es hier nur auf Android (am Desktop: render2dtest --demo).	The 2D drawing is only on Android here (on the desktop: render2dtest --demo).
