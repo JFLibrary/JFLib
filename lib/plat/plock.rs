@@ -95,8 +95,9 @@ pub fn win_pointer_lock(w: i32, on: bool) -> PointerLock {
     return crate::web::web_pointer_lock(w, on);
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
-        let _ = w;
-        return if on { PointerLock::Unsupported } else { PointerLock::Off };
+        let s = if on { PointerLock::Unsupported } else { PointerLock::Off };
+        plock_set(w, s);
+        return s;
     }
 }
 
