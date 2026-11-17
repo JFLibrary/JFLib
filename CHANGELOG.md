@@ -47,6 +47,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **rt:** `os::SYS_IO_URING_SETUP` / `_ENTER` / `_REGISTER`, `SYS_OPEN_TREE`, `SYS_MOVE_MOUNT`, `SYS_FSOPEN`, `SYS_FSCONFIG`, `SYS_FSMOUNT`, `SYS_FSPICK`, `SYS_CLONE3`, `SYS_PIDFD_GETFD`, `SYS_MOUNT_SETATTR` (x86-64 and ARM64)
 - **netio:** `ssh::Client::set_time_limit(ms)`: each following `auth_password`, `auth_key` and `exec` ends with `TimedOut` after that time in all
 - **ui:** `Ui::list_end_full(&mut sel) -> ListEnd { ev, sel, drop }`: the end of a list with a dropped row (LF_REORDER) as `drop = Some((from, to))`, for any number of rows
+- **Tests:** tools/winarm_check.py --scripts APP[/SCRIPT.uis],... (any app's scripts) and --only gpu (gputest --info, uigputest's output starting with jfgui_GPU_TRACE=1); .github/workflows/arm64-windows.yml runs every script of gallery, jfWord, gputest and uigputest on windows-11-arm without Vulkan, with the Vulkan loader alone and with lavapipe for ARM64. gputest --test glibc checks the crash report with ARM64's offsets, uigputest --test viewcpu is a SKIP without a usable GPU like the other tests (docs/ARM64.md, ARM8)
 
 ### Changed
 
@@ -55,6 +56,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** A notch of the wheel scrolls the system's lines (`ui.wheel_lines()`) in the library's views, no longer always three; headless runs stay at three
 - **ui:** The scripts' `commit` hands the text to `plat::ime_commit_text` in one call, as a platform does (editortest code_commit: 100000 bytes)
 - Tests: render2dtest --bench-dxf names a lost device and measures the next view on a new one (on the HD 610 the kernel reset the whole of Zurich's first frame after 3 s) (G6e3)
+- **ui:** A run whose UI output stays on the CPU for good (no Vulkan loader, no usable adapter, a display that takes no dma-bufs, ...) says why in one line of the log at info level, `gpu: output: none in this run (REASON): the windows go through the CPU path`: in the ring for crash reports and `plat::log_recent` and in the log file, on stderr only with `jfgui_LOG=info`; the screen stays silent as before. On Linux `GpuOutput::error` names a display without dma-bufs so instead of "no child window" (docs/ARM64.md, ARM8)
 
 ### Fixed
 

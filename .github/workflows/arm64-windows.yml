@@ -1,8 +1,12 @@
-# ARM5 (docs/ARM64.md): the Windows programs for ARM64 on Windows on ARM. They are built on an x64 runner
-# as on the PC (build_rs.py --arch aarch64) and run on windows-11-arm (Cobalt 100) by tools/winarm_check.py:
-# every script of coretest and plattest, a start of the gallery (with a picture), the crash handler
-# (plattest --test crash, guardcrash, panic) and the module jxlenc against the linked writer. The x64
-# build of the module comes along: the ARM64 program must refuse it (LIBE_ARCH).
+# ARM5 and ARM8 (docs/ARM64.md): the Windows programs for ARM64 on Windows on ARM. They are built on an x64
+# runner as on the PC (build_rs.py --arch aarch64) and run on windows-11-arm (Cobalt 100) by tools/winarm_check.py.
+# ARM5: every script of coretest and plattest, the crash handler (plattest --test crash, guardcrash, panic) and
+# the module jxlenc against the linked writer; the x64 build of the module comes along, the ARM64 program must
+# refuse it (LIBE_ARCH). ARM8: every script of gallery, jfWord, gputest and uigputest in three rounds of the
+# GPU: (a) the runner as it is (it has no vulkan-1.dll: the case without Vulkan), (b) the Khronos loader built
+# here for ARM64 and put into System32, no driver (the case without a driver), (c) lavapipe for ARM64 (Mesa,
+# mmozeiko/build-mesa) as the driver: the GPU's own paths, the UI's output with jfgui_GPU_ADAPTER=llvmpipe (a CPU
+# adapter is never chosen for windows by itself). Downloads only on the runner.
 # Started by hand, or by a push to a branch arm64-test/... (workflow_dispatch needs the file on main).
 name: ARM64 Windows
 
@@ -34,7 +38,7 @@ jobs:
           "/c/Program Files/LLVM/bin/lld-link.exe" --version
       - name: Build for ARM64
         run: |
-          for a in coretest plattest gallery codectest; do
+          for a in coretest plattest gallery codectest jfWord gputest uigputest; do
             python -u build_rs.py app $a --target win --arch aarch64
           done
       - name: The module for x64 (the ARM64 programs must refuse it)
@@ -53,7 +57,7 @@ jobs:
   check:
     needs: build
     runs-on: windows-11-arm
-    timeout-minutes: 150
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -64,10 +68,17 @@ jobs:
         with:
           name: arm64-programs
           path: build
-      - name: The machine
+      - name: The machine (processor, display adapters, Vulkan, D3D12)
         run: |
           Get-CimInstance Win32_Processor | Format-List Name, Architecture, NumberOfLogicalProcessors
+          Get-CimInstance Win32_VideoController | Format-List Name, AdapterCompatibility, DriverVersion, PNPDeviceID, CurrentHorizontalResolution, CurrentVerticalResolution
           python -c "import platform; print('python', platform.machine(), platform.python_version())"
+          "vulkan-1.dll in System32: $(Test-Path C:\Windows\System32\vulkan-1.dll)"
+          Get-ChildItem C:\Windows\System32 -Filter "vulkan*" -ErrorAction SilentlyContinue | Format-Table Name, Length
+          foreach ($k in "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers", "HKLM:\SOFTWARE\Khronos\Vulkan\ImplicitLayers") {
+            "${k}:"; Get-ItemProperty $k -ErrorAction SilentlyContinue | Format-List
+          }
+          "d3d12.dll: $(Test-Path C:\Windows\System32\d3d12.dll), WARP (d3d10warp.dll): $(Test-Path C:\Windows\System32\d3d10warp.dll)"
       - name: The desktop before the checks
         continue-on-error: true
         run: |
@@ -79,10 +90,82 @@ jobs:
           $b.Save("$PWD\build\desktop.png")
       - name: Every import of the programs exists here (else Windows refuses to start them silently)
         run: python -u tools/winarm_imports.py build/win-arm64
-      - name: Checks
+      - name: jfWord's check.py (its own checks; it also writes the fixtures two of its scripts open)
+        id: jfwcheck
+        continue-on-error: true
         run: |
-          python -u tools/winarm_check.py --other-module build/win/jxlenc.dll *>&1 | Tee-Object build/winarm_check.txt
+          New-Item -ItemType Directory -Force build\a64\win | Out-Null
+          Copy-Item build\win-arm64\jfWord.exe build\a64\win\
+          python -u apps/jfWord/tests/check.py --target win --build-dir build/a64 *>&1 | Tee-Object build/jfword_check.txt
           exit $LASTEXITCODE
+      - name: Round A, the runner as it is (no vulkan-1.dll) -- ARM5's checks, gallery, jfWord, gputest, uigputest
+        id: a
+        continue-on-error: true
+        run: |
+          python -u tools/winarm_check.py --other-module build/win/jxlenc.dll --scripts coretest,plattest,gallery,jfWord,gputest,uigputest *>&1 | Tee-Object build/round_a.txt
+          exit $LASTEXITCODE
+      - name: The Vulkan loader for ARM64 (Khronos, vulkan-sdk-1.4.363.0, built here) into System32
+        id: loader
+        continue-on-error: true
+        run: |
+          $src = "$env:RUNNER_TEMP\vkloader"
+          git clone --depth 1 --branch vulkan-sdk-1.4.363.0 https://github.com/KhronosGroup/Vulkan-Loader.git $src
+          cmake -S $src -B "$src\build" -A ARM64 -D UPDATE_DEPS=ON -D BUILD_TESTS=OFF
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build "$src\build" --config Release --parallel
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $dll = (Get-ChildItem -Recurse "$src\build" -Filter vulkan-1.dll | Select-Object -First 1).FullName
+          "loader: $dll"
+          Copy-Item $dll C:\Windows\System32\vulkan-1.dll
+          python -c "import sys; sys.path.insert(0, '.'); from tools import host_exec; print('vulkan-1.dll for', host_exec.exe_arch(r'C:\Windows\System32\vulkan-1.dll'))"
+      - name: Round B, the loader without a driver -- gputest, uigputest, the gallery's GPU scripts
+        id: b
+        if: steps.loader.outcome == 'success'
+        continue-on-error: true
+        run: |
+          $bad = 0
+          python -u tools/winarm_check.py --only gpu *>&1 | Tee-Object build/round_b_gpu.txt
+          $bad += [int]($LASTEXITCODE -ne 0)
+          python -u tools/winarm_check.py --only scripts --scripts gputest,uigputest,gallery/gpu_output.uis,gallery/gpu_layers.uis,gallery/gpu_layers_rtl.uis *>&1 | Tee-Object build/round_b.txt
+          $bad += [int]($LASTEXITCODE -ne 0)
+          exit $bad
+      - name: lavapipe for ARM64 (Mesa 26.3.0 of mmozeiko/build-mesa) as the Vulkan driver
+        id: lvp
+        if: steps.loader.outcome == 'success'
+        continue-on-error: true
+        run: |
+          $f = "$env:RUNNER_TEMP\lvp.7z"
+          Invoke-WebRequest https://github.com/mmozeiko/build-mesa/releases/download/26.3.0/mesa-lavapipe-arm64-26.3.0.7z -OutFile $f
+          "sha256 $((Get-FileHash $f -Algorithm SHA256).Hash), $((Get-Item $f).Length) bytes"
+          if (Get-Command 7z -ErrorAction SilentlyContinue) { 7z x -y -o"$env:RUNNER_TEMP\lvp" $f | Out-Null } else { New-Item -ItemType Directory "$env:RUNNER_TEMP\lvp" | Out-Null; tar -xf $f -C "$env:RUNNER_TEMP\lvp" }
+          Get-ChildItem -Recurse "$env:RUNNER_TEMP\lvp" -File | Format-Table FullName, Length
+          $json = (Get-ChildItem -Recurse "$env:RUNNER_TEMP\lvp" -Filter "*.json" | Select-Object -First 1).FullName
+          "driver: $json"; Get-Content $json
+          New-Item -Force HKLM:\SOFTWARE\Khronos\Vulkan\Drivers | Out-Null
+          New-ItemProperty -Force -Path HKLM:\SOFTWARE\Khronos\Vulkan\Drivers -Name $json -PropertyType DWord -Value 0 | Out-Null
+      - name: Round C, lavapipe -- gputest, uigputest (as chosen, and with jfgui_GPU_ADAPTER=llvmpipe), the gallery's GPU scripts
+        id: c
+        if: steps.lvp.outcome == 'success'
+        continue-on-error: true
+        run: |
+          $bad = 0
+          python -u tools/winarm_check.py --only gpu *>&1 | Tee-Object build/round_c_gpu.txt
+          $bad += [int]($LASTEXITCODE -ne 0)
+          python -u tools/winarm_check.py --only scripts --scripts gputest,uigputest,gallery/gpu_output.uis,gallery/gpu_layers.uis,gallery/gpu_layers_rtl.uis *>&1 | Tee-Object build/round_c.txt
+          $bad += [int]($LASTEXITCODE -ne 0)
+          $env:jfgui_GPU_ADAPTER = "llvmpipe"
+          python -u tools/winarm_check.py --only gpu *>&1 | Tee-Object build/round_c_lvp_gpu.txt
+          $bad += [int]($LASTEXITCODE -ne 0)
+          python -u tools/winarm_check.py --only scripts --scripts uigputest,gallery/gpu_output.uis,gallery/gpu_layers.uis,gallery/gpu_layers_rtl.uis *>&1 | Tee-Object build/round_c_lvp.txt
+          $bad += [int]($LASTEXITCODE -ne 0)
+          "parts of round C that failed: $bad of 4"
+          exit $bad
+      - name: The rounds
+        if: always()
+        run: |
+          $r = [ordered]@{ "jfWord check.py" = "${{ steps.jfwcheck.outcome }}"; "round A" = "${{ steps.a.outcome }}"; "loader" = "${{ steps.loader.outcome }}"; "round B" = "${{ steps.b.outcome }}"; "lavapipe" = "${{ steps.lvp.outcome }}"; "round C" = "${{ steps.c.outcome }}" }
+          $r.GetEnumerator() | ForEach-Object { "$($_.Key): $($_.Value)" }
+          if ($r.Values -contains "failure") { exit 1 }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -90,4 +173,4 @@ jobs:
           retention-days: 7
           path: |
             build/*.png
-            build/winarm_check.txt
+            build/*.txt

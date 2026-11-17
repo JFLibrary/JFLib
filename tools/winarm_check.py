@@ -2,15 +2,20 @@
 They are built beforehand in build/win-arm64 (on an x64 PC or runner: build_rs.py app NAME --target win --arch
 aarch64), so the machine needs no compiler.  .github/workflows/arm64-windows.yml runs this there.
 
-    python tools/winarm_check.py [--dir DIR] [--other-module FILE] [--only scripts|crash|module] [--gallery-all]
+    python tools/winarm_check.py [--dir DIR] [--other-module FILE] [--only scripts|crash|module|gpu]
+                                 [--gallery-all] [--scripts APP[/SCRIPT.uis],...]
 
     scripts  every script of coretest and plattest, and a start of the gallery (basic.uis, with a picture;
-             --gallery-all: every script of the gallery)
+             --gallery-all: every script of the gallery; --scripts: these apps' scripts instead, an app with
+             all of them, APP/SCRIPT.uis one; ARM8 runs gallery, jfWord, gputest and uigputest so)
     crash    what no script runs: plattest --test crash, guardcrash and panic end in the crash handler with
              exit code 3 and no FAIL (the CONTEXT of ARM64, RtlVirtualUnwind, the trampoline's unwind data)
     module   codectest with the module jxlenc: its files equal the linked writer's byte for byte, a panic and
              a fault inside the module end with exit code 3 and a report naming it; --other-module FILE (the
              x64 build of jxlenc.dll) must be refused with LIBE_ARCH while the linked writer saves
+    gpu      (ARM8) what the machine offers the GPU: gputest --info and a start of uigputest's output with
+             jfgui_GPU_TRACE=1 (what the UI does without vulkan-1.dll or without a driver: the CPU path and
+             the reason); both end with exit code 0, their lines are printed
 
 Exit code 1 when something failed."""
 import argparse
@@ -88,6 +93,17 @@ def one_script(app, exe, name):
                 duration=time.monotonic() - started, output=r.stdout + r.stderr)
 
 
+def gpu(t, d):
+    """gputest --info, then uigputest's output starting (--test switch, jfgui_GPU_TRACE=1): what the machine has and
+    what the UI does with it"""
+    code, out = run(d / "gputest.exe", ["--info"], timeout=300)
+    lines = [ln.rstrip() for ln in out.splitlines() if ln.strip()]
+    t.check(code == 0 and "FAIL" not in out, f"gputest --info: exit {code}", "\n   ".join(lines[:40]))
+    code, out = run(d / "uigputest.exe", ["--test", "switch"], timeout=300, env={"jfgui_GPU_TRACE": "1"})
+    lines = [ln.rstrip() for ln in out.splitlines() if ln.startswith(("SKIP", "FAIL", "gpu:", "  ok", "jfgui:", "all checks"))]
+    t.check(code == 0, f"uigputest --test switch with jfgui_GPU_TRACE=1: exit {code}", "\n   ".join(lines[:40]))
+
+
 def crash(t, d):
     exe = d / "plattest.exe"
     for test in ("crash", "guardcrash", "panic"):
@@ -133,11 +149,20 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--dir", default=str(ROOT / "build" / "win-arm64"), help="the built programs")
     ap.add_argument("--other-module", help="jxlenc.dll built for x64 (must be refused)")
-    ap.add_argument("--only", choices=("scripts", "crash", "module"))
+    ap.add_argument("--only", choices=("scripts", "crash", "module", "gpu"))
     ap.add_argument("--gallery-all", action="store_true", help="every script of the gallery, not only a start")
+    ap.add_argument("--scripts", help="APP or APP/SCRIPT.uis, separated by commas: these scripts instead of the default")
     a = ap.parse_args()
     if a.gallery_all:
         SCRIPTS["gallery"] = None
+    if a.scripts:
+        SCRIPTS.clear()
+        for name in a.scripts.split(","):
+            app, _, one = name.strip().partition("/")
+            if one:
+                SCRIPTS.setdefault(app, []).append(one)
+            else:
+                SCRIPTS[app] = None
     d = Path(a.dir)
     print(f"host {host_exec.host_arch()}, programs in {d} for {host_exec.exe_arch(d / 'plattest.exe')}", flush=True)
     t = Tally()
@@ -145,6 +170,8 @@ def main():
         crash(t, d)
     if a.only in (None, "module"):
         module(t, d, a.other_module)
+    if a.only == "gpu" or a.only is None and (d / "gputest.exe").is_file():     # (ARM5's runs built no gputest)
+        gpu(t, d)
     if a.only in (None, "scripts"):
         scripts(t, d)
     print(f"winarm_check: {t.passed} of {t.passed + t.failed} passed")

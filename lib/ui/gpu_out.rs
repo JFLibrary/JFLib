@@ -138,9 +138,9 @@
 //
 // A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 // frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
-// usable adapter or surface, a display that takes or imports no dma-bufs: the CPU path for good,
-// silently.  plat::gpu_out_state tells the platform how the first start went (Android keeps it across
-// runs: a driver that killed the program does not get a third chance).
+// usable adapter or surface, a display that takes or imports no dma-bufs: the CPU path for good, silently
+// (dev_never: one info line in the log says why).  plat::gpu_out_state tells the platform how the first
+// start went (Android keeps it across runs: a driver that killed the program does not get a third chance).
 //
 // Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX, DEFAULT_ON_BROWSER; Android:
 // GalleryActivity always sets it, GPU_DEFAULT there; the browser: ?gpu=0|1), jfgui_GPU_VERIFY=1 (every presented
@@ -973,7 +973,7 @@ impl S {
                     if let Some(w) = self.win(i) {
                         w.out.error = Some(format!("{e}"));
                     }
-                    self.dev = Dev::Never(format!("{e}"));
+                    self.dev = dev_never(format!("{e}"));
                     return true;
                 }
             }
@@ -992,7 +992,7 @@ impl S {
                     self.retry_ms = (self.retry_ms * 2).min(RETRY_MAX_MS);
                     Dev::Retry(at)
                 } else {
-                    Dev::Never(format!("{e}")) // no adapter: the CPU path for good
+                    dev_never(format!("{e}")) // no adapter: the CPU path for good
                 };
                 return true;
             }
@@ -1910,7 +1910,7 @@ impl Ui {
         s.canvases_gone();
         let now = plat::time_us();
         if matches!(e, GpuError::Invalid(_) | GpuError::Unsupported(_)) {
-            s.dev = Dev::Never(format!("{e}"));
+            s.dev = dev_never(format!("{e}"));
             return;
         }
         // a device that lives for a minute starts the waits over
@@ -1963,7 +1963,7 @@ impl Ui {
                                     plat::gpu_out_state(plat::GPU_STATE_UNKNOWN);
                                 }
                                 _ => {
-                                    s.dev = Dev::Never(format!("{e}")); // no Vulkan, no usable adapter: the CPU path for good
+                                    s.dev = dev_never(format!("{e}")); // no Vulkan, no usable adapter: the CPU path for good
                                     plat::gpu_out_state(plat::GPU_STATE_NEVER);
                                 }
                             }
@@ -2218,7 +2218,7 @@ impl Ui {
             };
             let Some(nw) = plat::win_gpu_child(pw) else {
                 if !plat::win_gpu_child_later(pw) {
-                    s.dev = Dev::Never(String::from("no child window"));
+                    s.dev = dev_never(String::from(if cfg!(target_os = "linux") { "the display takes no dma-bufs" } else { "no child window" }));
                 }
                 return;
             };
@@ -2237,7 +2237,7 @@ impl Ui {
                     w.job = job;
                 }
             } else {
-                s.dev = Dev::Never(String::from("no thread"));
+                s.dev = dev_never(String::from("no thread"));
             }
             return;
         }
@@ -4302,4 +4302,11 @@ fn script_pump() {
     for e in keep {
         plat::evq_push(e);
     }
+}
+
+/// (ARM8) the CPU path for good in this run, and why: a line in the log at info level, so the ring (crash reports,
+/// plat::log_recent) and the log file have it, stderr only with jfgui_LOG=info; the screen stays as it was
+fn dev_never(why: String) -> Dev {
+    plat::log_info("gpu", &format!("output: none in this run ({why}): the windows go through the CPU path"));
+    Dev::Never(why)
 }
