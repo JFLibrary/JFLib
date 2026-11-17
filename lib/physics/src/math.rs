@@ -140,42 +140,51 @@ pub(crate) fn abs(x: f64) -> f64 {
 /// render3d's positions.
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Vec3 {
+    /// metres (or a direction's component)
     pub x: f64,
     pub y: f64,
     pub z: f64,
 }
 
 impl Vec3 {
+    /// (0, 0, 0)
     pub const ZERO: Vec3 = Vec3::new(0.0, 0.0, 0.0);
+    /// the unit vectors along the axes (Y is up)
     pub const X: Vec3 = Vec3::new(1.0, 0.0, 0.0);
     pub const Y: Vec3 = Vec3::new(0.0, 1.0, 0.0);
     pub const Z: Vec3 = Vec3::new(0.0, 0.0, 1.0);
 
+    /// (x, y, z)
     #[inline]
     pub const fn new(x: f64, y: f64, z: f64) -> Vec3 {
         Vec3 { x, y, z }
     }
 
+    /// (v, v, v)
     #[inline]
     pub const fn splat(v: f64) -> Vec3 {
         Vec3 { x: v, y: v, z: v }
     }
 
+    /// the dot product, summed x, y, z in this order
     #[inline]
     pub fn dot(self, o: Vec3) -> f64 {
         self.x * o.x + self.y * o.y + self.z * o.z
     }
 
+    /// the cross product (right-handed)
     #[inline]
     pub fn cross(self, o: Vec3) -> Vec3 {
         Vec3::new(self.y * o.z - self.z * o.y, self.z * o.x - self.x * o.z, self.x * o.y - self.y * o.x)
     }
 
+    /// the squared length
     #[inline]
     pub fn length_sq(self) -> f64 {
         self.dot(self)
     }
 
+    /// the length (correctly rounded root)
     #[inline]
     pub fn length(self) -> f64 {
         sqrt(self.dot(self))
@@ -194,16 +203,19 @@ impl Vec3 {
         self.try_normalize().unwrap_or(Vec3::ZERO)
     }
 
+    /// the smaller component by component
     #[inline]
     pub fn min(self, o: Vec3) -> Vec3 {
         Vec3::new(min(self.x, o.x), min(self.y, o.y), min(self.z, o.z))
     }
 
+    /// the larger component by component
     #[inline]
     pub fn max(self, o: Vec3) -> Vec3 {
         Vec3::new(max(self.x, o.x), max(self.y, o.y), max(self.z, o.z))
     }
 
+    /// the absolute value of each component
     #[inline]
     pub fn abs(self) -> Vec3 {
         Vec3::new(abs(self.x), abs(self.y), abs(self.z))
@@ -233,6 +245,7 @@ impl Vec3 {
         self.x.is_finite() && self.y.is_finite() && self.z.is_finite()
     }
 
+    /// [x, y, z] (render3d's positions)
     #[inline]
     pub const fn to_array(self) -> [f64; 3] {
         [self.x, self.y, self.z]
@@ -360,9 +373,11 @@ impl MulAssign<f64> for Vec3 {
 /// order: [`Quat::from_f32`], [`Quat::to_f32`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Quat {
+    /// the vector part (sin of half the angle times the axis)
     pub x: f64,
     pub y: f64,
     pub z: f64,
+    /// the scalar part (cos of half the angle)
     pub w: f64,
 }
 
@@ -373,6 +388,7 @@ impl Default for Quat {
 }
 
 impl Quat {
+    /// no rotation
     pub const IDENTITY: Quat = Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
 
     /// as given (normalise it with [`Quat::normalize`] unless it is a unit quaternion already)
@@ -403,11 +419,13 @@ impl Quat {
         Quat::new(c.x, c.y, c.z, 1.0 + d).normalize()
     }
 
+    /// from render3d's `[f32; 4]` (x, y, z, w)
     #[inline]
     pub fn from_f32(q: [f32; 4]) -> Quat {
         Quat::new(q[0] as f64, q[1] as f64, q[2] as f64, q[3] as f64)
     }
 
+    /// to render3d's `[f32; 4]` (x, y, z, w)
     #[inline]
     pub fn to_f32(self) -> [f32; 4] {
         [self.x as f32, self.y as f32, self.z as f32, self.w as f32]
@@ -482,10 +500,12 @@ impl Quat {
 /// A 3 x 3 matrix by columns (a rotation from [`Quat::to_mat3`])
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Mat3 {
+    /// the columns: the images of X, Y and Z
     pub cols: [Vec3; 3],
 }
 
 impl Mat3 {
+    /// the unit matrix
     pub const IDENTITY: Mat3 = Mat3 { cols: [Vec3::X, Vec3::Y, Vec3::Z] };
 
     /// M v
@@ -506,13 +526,17 @@ impl Mat3 {
 /// A placement: rotate, then move (no scale).  The pose of a body and of a query shape.
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct Iso {
+    /// where the local origin lies
     pub pos: Vec3,
+    /// the rotation (a unit quaternion)
     pub rot: Quat,
 }
 
 impl Iso {
+    /// at the origin, not rotated
     pub const IDENTITY: Iso = Iso { pos: Vec3::ZERO, rot: Quat::IDENTITY };
 
+    /// rotated by `rot`, then moved to `pos`
     #[inline]
     pub const fn new(pos: Vec3, rot: Quat) -> Iso {
         Iso { pos, rot }
@@ -565,7 +589,9 @@ impl Iso {
 /// An axis-aligned box in metres
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Aabb {
+    /// the corner with the smallest coordinates
     pub min: Vec3,
+    /// the corner with the largest coordinates
     pub max: Vec3,
 }
 
@@ -573,6 +599,7 @@ impl Aabb {
     /// the empty box (min above max), the start of a union
     pub const EMPTY: Aabb = Aabb { min: Vec3::splat(f64::INFINITY), max: Vec3::splat(f64::NEG_INFINITY) };
 
+    /// the box between two corners
     #[inline]
     pub const fn new(min: Vec3, max: Vec3) -> Aabb {
         Aabb { min, max }
@@ -584,11 +611,13 @@ impl Aabb {
         Aabb { min: c - h, max: c + h }
     }
 
+    /// the box around both
     #[inline]
     pub fn union(&self, o: &Aabb) -> Aabb {
         Aabb { min: self.min.min(o.min), max: self.max.max(o.max) }
     }
 
+    /// the box around this one and `p`
     #[inline]
     pub fn add_point(&self, p: Vec3) -> Aabb {
         Aabb { min: self.min.min(p), max: self.max.max(p) }
@@ -622,16 +651,19 @@ impl Aabb {
             && self.max.z >= o.max.z
     }
 
+    /// `p` lies inside (or on the border)
     #[inline]
     pub fn contains_point(&self, p: Vec3) -> bool {
         p.x >= self.min.x && p.x <= self.max.x && p.y >= self.min.y && p.y <= self.max.y && p.z >= self.min.z && p.z <= self.max.z
     }
 
+    /// the middle
     #[inline]
     pub fn center(&self) -> Vec3 {
         (self.min + self.max) * 0.5
     }
 
+    /// half the size on each axis
     #[inline]
     pub fn half_extents(&self) -> Vec3 {
         (self.max - self.min) * 0.5

@@ -104,6 +104,7 @@ impl TriMesh {
         TriMesh::with_options(positions, indices, &MeshOptions::default())
     }
 
+    /// a mesh as [`TriMesh::new`] makes it, with the threshold of the active edges and the leaf size of `opt`
     pub fn with_options(positions: &[[f32; 3]], indices: &[u32], opt: &MeshOptions) -> Result<TriMesh, MeshError> {
         if indices.len() % 3 != 0 || indices.len() / 3 > MAX_TRIANGLES {
             return Err(MeshError::IndexCount);
@@ -255,6 +256,7 @@ impl TriMesh {
         self.tris.len()
     }
 
+    /// the positions as given, in the mesh's frame
     pub fn vertices(&self) -> &[[f32; 3]] {
         &self.vertices
     }

@@ -64,6 +64,7 @@ impl<T: Copy> Stack<T> {
 }
 
 impl DynamicTree {
+    /// an empty tree
     pub fn new() -> DynamicTree {
         DynamicTree { nodes: Vec::new(), root: NULL, free: NULL, leaves: 0 }
     }
@@ -129,6 +130,7 @@ impl DynamicTree {
         self.leaves as usize
     }
 
+    /// no leaves
     pub fn is_empty(&self) -> bool {
         self.leaves == 0
     }

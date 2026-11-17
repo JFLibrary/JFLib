@@ -2,7 +2,7 @@
 //
 //   Shape          sphere, capsule, box, convex hull (ConvexHull::new: quickhull), static triangle mesh
 //                  (TriMesh: f32 vertices, a binned-SAH tree, active edges against ghost collisions)
-//   World          bodies (shape, Iso, layers) in a dynamic AABB tree; ray_cast, ray_cast_all, cast (a
+//   World          bodies (shape, Iso, layers) in dynamic AABB trees; ray_cast, ray_cast_all, cast (a
 //                  swept convex shape: time of impact, normal, contact point), overlap, contacts
 //                  (penetration depth and normal per body and triangle), closest_point
 //   query          the same for one shape against one placed shape, without a world
@@ -24,8 +24,10 @@ mod bvh;
 mod convex;
 mod gjk;
 mod hull;
+/// Vec3, Quat, Mat3, Iso, Aabb in f64 and the scalar functions, the same bits on every target
 pub mod math;
 mod mesh;
+/// one shape against one placed shape, without a world
 pub mod query;
 mod ray;
 mod shape;

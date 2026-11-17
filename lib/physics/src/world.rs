@@ -27,11 +27,13 @@ pub struct BodyId {
 }
 
 impl BodyId {
+    /// the slot (used again after a remove)
     #[inline]
     pub fn index(self) -> u32 {
         self.index
     }
 
+    /// how often the slot was used before
     #[inline]
     pub fn generation(self) -> u32 {
         self.generation
@@ -41,7 +43,9 @@ impl BodyId {
 /// a body: what [`World::add`] took, readable through [`World::body`]
 #[derive(Clone, Debug)]
 pub struct Body {
+    /// its shape
     pub shape: Shape,
+    /// where it is (set with [`World::set_iso`])
     pub iso: Iso,
     /// the layers the body is in (bit mask); a query sees it when its filter's mask shares a bit
     pub layers: u32,
@@ -218,6 +222,7 @@ impl World {
         true
     }
 
+    /// a body's layers -> false when the id is dead
     pub fn set_layers(&mut self, id: BodyId, layers: u32) -> bool {
         match self.slot_mut(id) {
             Some(b) => {
@@ -228,6 +233,7 @@ impl World {
         }
     }
 
+    /// a body's value for the caller -> false when the id is dead
     pub fn set_user(&mut self, id: BodyId, user: u64) -> bool {
         match self.slot_mut(id) {
             Some(b) => {
@@ -243,6 +249,7 @@ impl World {
         self.count
     }
 
+    /// no bodies
     pub fn is_empty(&self) -> bool {
         self.count == 0
     }

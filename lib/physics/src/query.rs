@@ -19,6 +19,7 @@ pub const NO_TRIANGLE: u32 = u32::MAX;
 pub struct RayHit {
     /// the ray parameter: point = origin + dir * t (metres when dir is a unit vector)
     pub t: f64,
+    /// origin + dir * t
     pub point: Vec3,
     /// the unit normal, against the ray (a ray starting inside a convex shape: t = 0, normal = -dir)
     pub normal: Vec3,
@@ -37,6 +38,7 @@ pub struct CastHit {
     pub point: Vec3,
     /// the unit normal of that surface towards the moving shape
     pub normal: Vec3,
+    /// the triangle's index in the mesh's index list, or [`NO_TRIANGLE`]
     pub triangle: u32,
     /// > 0: the shapes overlapped at the start by this much (then fraction = 0)
     pub depth: f64,
@@ -53,6 +55,7 @@ pub struct Contact {
     pub normal: Vec3,
     /// the overlap; negative: the gap (contacts within a margin)
     pub depth: f64,
+    /// the triangle's index in the mesh's index list, or [`NO_TRIANGLE`]
     pub triangle: u32,
 }
 
@@ -63,9 +66,11 @@ pub struct Separation {
     pub distance: f64,
     /// the nearest (or deepest) points on the query shape and on the other one
     pub point_a: Vec3,
+    /// on the other shape
     pub point_b: Vec3,
     /// the unit normal from the other shape towards the query shape
     pub normal: Vec3,
+    /// the nearest triangle of a mesh, or [`NO_TRIANGLE`]
     pub triangle: u32,
 }
 
@@ -76,7 +81,9 @@ pub struct PointHit {
     pub point: Vec3,
     /// 0 inside
     pub distance: f64,
+    /// the point lies inside a convex shape
     pub inside: bool,
+    /// the nearest triangle of a mesh, or [`NO_TRIANGLE`]
     pub triangle: u32,
 }
 
@@ -318,30 +325,37 @@ fn around(p: Vec3, c: Vec3, r: f64) -> (Vec3, f64, bool, u32) {
 pub mod brute {
     use super::*;
 
+    /// the first hit, every triangle of a mesh tested
     pub fn ray(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64) -> Option<RayHit> {
         ray_b(true, target, target_iso, origin, dir, max_t)
     }
 
+    /// every hit, every triangle of a mesh tested
     pub fn ray_all(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64, out: &mut Vec<RayHit>) {
         ray_all_b(true, target, target_iso, origin, dir, max_t, out)
     }
 
+    /// the first contact, every triangle of a mesh tested
     pub fn cast(shape: &Shape, iso: &Iso, motion: Vec3, target: &Shape, target_iso: &Iso) -> Option<CastHit> {
         cast_b(true, shape, iso, motion, target, target_iso)
     }
 
+    /// the nearest triangle of a mesh without its tree
     pub fn separation(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, max_dist: f64) -> Option<Separation> {
         separation_b(true, shape, iso, target, target_iso, max_dist)
     }
 
+    /// touch or overlap, every triangle of a mesh tested
     pub fn intersects(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso) -> bool {
         intersects_b(true, shape, iso, target, target_iso)
     }
 
+    /// the contacts, every triangle of a mesh tested
     pub fn contacts(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, margin: f64, out: &mut Vec<Contact>) {
         contacts_b(true, shape, iso, target, target_iso, margin, out)
     }
 
+    /// the nearest point, every triangle of a mesh tested
     pub fn closest_point(target: &Shape, target_iso: &Iso, point: Vec3, max_dist: f64) -> Option<PointHit> {
         closest_point_b(true, target, target_iso, point, max_dist)
     }

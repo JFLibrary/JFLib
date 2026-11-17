@@ -57,7 +57,8 @@ same on Windows, Linux, macOS, in the browser and on Android.
 GJK for distances, EPA for penetration depths, GJK ray casting with conservative advancement for the
 swept shapes (the radii of spheres and capsules stay outside GJK as margins, so a cast stops within
 a nanometre of contact), watertight ray/triangle tests, quickhull for the convex hulls, a binned SAH
-tree with 32-byte nodes for the meshes, a balanced dynamic AABB tree for the bodies. Triangle meshes
+tree with 32-byte nodes for the meshes, dynamic AABB trees for the bodies (one for the meshes that stand still, one
+for the other bodies that stand still, one for those that move). Triangle meshes
 know their active edges: a shape that slides over the seam between two triangles of a flat or concave
 surface is not stopped by the edge ("ghost collisions").
 

@@ -18,17 +18,20 @@ pub enum Shape {
     Capsule { half_height: f64, radius: f64 },
     /// a box around the origin with half sizes `half`
     Box { half: Vec3 },
+    /// a convex hull (shared)
     Hull(Arc<ConvexHull>),
     /// a static triangle mesh (only as a body, not as a query shape)
     Mesh(Arc<TriMesh>),
 }
 
 impl Shape {
+    /// a ball of `radius`
     #[inline]
     pub fn sphere(radius: f64) -> Shape {
         Shape::Sphere { radius }
     }
 
+    /// an upright capsule: the segment (0, ±half_height, 0) grown by `radius`
     #[inline]
     pub fn capsule(half_height: f64, radius: f64) -> Shape {
         Shape::Capsule { half_height, radius }
@@ -40,6 +43,7 @@ impl Shape {
         Shape::Box { half }
     }
 
+    /// a convex hull, shared
     #[inline]
     pub fn hull(hull: ConvexHull) -> Shape {
         Shape::Hull(Arc::new(hull))
@@ -50,6 +54,7 @@ impl Shape {
         Ok(Shape::hull(ConvexHull::new(points)?))
     }
 
+    /// a static triangle mesh, shared
     #[inline]
     pub fn mesh(mesh: TriMesh) -> Shape {
         Shape::Mesh(Arc::new(mesh))

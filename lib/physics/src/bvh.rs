@@ -15,9 +15,12 @@ use alloc::vec::Vec;
 /// `first + 1`), else a leaf with the triangles `first .. first + count`
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BvhNode {
+    /// the box, in the mesh's frame
     pub min: [f32; 3],
     pub max: [f32; 3],
+    /// the left child (an inner node) or the first triangle (a leaf)
     pub first: u32,
+    /// 0 for an inner node, else the number of triangles
     pub count: u32,
 }
 
@@ -27,6 +30,7 @@ impl BvhNode {
         Aabb::new(Vec3::from(self.min), Vec3::from(self.max))
     }
 
+    /// a leaf (it has triangles)
     #[inline]
     pub fn is_leaf(&self) -> bool {
         self.count > 0
