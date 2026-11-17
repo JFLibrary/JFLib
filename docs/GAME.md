@@ -1,6 +1,6 @@
 # Spiel-Engine: Plan für G7
 
-Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a und G7c (siehe dort). Die Zahl der Läufe je Stufe ist
+Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1, siehe dort). Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -51,7 +51,7 @@ Was es gibt (Code auf `main` ab7e77e1):
 - **Was `render3d` fehlt** ([Was nicht gebaut ist](RENDER3D.md#was-nicht-gebaut-ist)): Durchsichtiges (glTFs BLEND
   wird deckend), Skinning, Kantenglättung, Nachbearbeitung, viele Lichter (je Licht rund 0,1 ms bei 1 Mio. Würfeln),
   Schatten für Punkt- und Spotlichter, komprimierte Texturen, Meshes und Texturen entfernen (die Pools wachsen nur),
-  doppelseitige Materialien, Partikel.
+  doppelseitige Materialien, Partikel. Durchsichtiges, Entfernen und doppelseitige Materialien bringt G7f Teil 1.
 - **glTF:** [`lib/gltf`](GLTF.md) liest keine Animationen, Skins und Morph-Ziele und schreibt nur `.glb` für Tests.
 - **Eingabe:** Tastatur, Maus und Touch auf allen Zielen. Kein Gamepad, keine relative Maus, kein Pointer-Lock
   (die beiden letzten bringt G7a Teil 1).
@@ -71,7 +71,7 @@ Was es gibt (Code auf `main` ab7e77e1):
 
 | Crate | Inhalt | hängt an | Lage nach dem Auszug (G7p) |
 | --- | --- | --- | --- |
-| `render3d` (wächst) | nur Zeichnen, auch Durchsichtiges, Partikel, Skinning auf der GPU, Nachbearbeitung | `gpu`, `gltf` | JFLib (E2) |
+| `render3d` (wächst) | nur Zeichnen, auch Durchsichtiges, Partikel, Skinning auf der GPU, Nachbearbeitung | `gpu`, `gltf`, `rt` (seit G7f) | JFLib (E2) |
 | `plat` (wächst) | Gamepad, relative Maus, Pointer-Lock, Tasten nach Lage; WebSocket im Browser | – | JFLib |
 | `lib/physics` (neu) | Formen, Kollision, Abfragen, Character-Controller, später Starrkörper | nur Mathematik | Vorschlag: JFLib |
 | `lib/anim` (neu, G7i) | Skelette, Clips, Überblenden, IK (die CPU-Seite) | `gltf` | Vorschlag: JFLib |
@@ -227,6 +227,17 @@ anfassen:
   ersten richtigen 3D-App), vorher und nachher gemessen.
 - Fertig, wenn: jedes Stück einen Test in `render3dtest` hat (gegen den Strahlenwerfer, wo er es kann), auf Basis und
   Voll, im Browser und auf den Intel-GPUs, und die alten Bilder Byte für Byte gleich bleiben.
+- **Stand 2026-11-18: Teil 1 fertig** ([RENDER3D.md](RENDER3D.md)). Meshes, Materialien und Texturen entfernen
+  (`remove_mesh`, `remove_material`, `remove_texture`; Ids mit Generation, die Pools nehmen freie Bereiche wieder);
+  `MaterialDesc` mit `blend` und `double_sided`, glTFs BLEND und `doubleSided` kommen jetzt durch. Durchsichtiges:
+  die Sichtbarkeit sammelt alle durchsichtigen Instanzen in eine Liste, ein bitonisches Sortieren auf der GPU legt sie
+  von hinten nach vorn, ein Zeichenbefehl zeichnet sie alle (vormultipliziertes Alpha, bereit für additive Partikel);
+  sie werfen keine Schatten und verdecken nichts. Die Zähler der Listen addieren in vier Runden je Liste statt
+  vorgesammelt in Arbeitsgruppen-Speicher (der war in drei Varianten langsamer): ohne Verdeckung 0,067 statt 0,145
+  ms bei 10 % MASK, 0,067 statt 0,317 ms bei zwei Listen im Wechsel. `render3dtest --test all` bestanden auf der RTX,
+  Quadro T500, Iris Xe und dem M2, im Browser; die alten Bilder Byte für Byte gleich. Nicht geprüft: die HD 610.
+  Offen: Teil 2 (Cartoon-Material, Partikel, Waffe vor der Kamera, FXAA/SMAA); dabei beachten, dass jede
+  durchsichtige Instanz mit den Ecken des größten durchsichtigen Meshes läuft.
 
 **G7g Modellieren mit JFScript 1** (`lib/geom`, `apps/modeltool`)
 
