@@ -1,6 +1,6 @@
 # Spiel-Engine: Plan für G7
 
-Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt ist noch nichts. Die Zahl der Läufe je Stufe ist
+Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt ist Teil 1 von G7a (siehe dort). Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -53,7 +53,8 @@ Was es gibt (Code auf `main` ab7e77e1):
   Schatten für Punkt- und Spotlichter, komprimierte Texturen, Meshes und Texturen entfernen (die Pools wachsen nur),
   doppelseitige Materialien, Partikel.
 - **glTF:** [`lib/gltf`](GLTF.md) liest keine Animationen, Skins und Morph-Ziele und schreibt nur `.glb` für Tests.
-- **Eingabe:** Tastatur, Maus und Touch auf allen Zielen. Kein Gamepad, keine relative Maus, kein Pointer-Lock.
+- **Eingabe:** Tastatur, Maus und Touch auf allen Zielen. Kein Gamepad, keine relative Maus, kein Pointer-Lock
+  (die beiden letzten bringt G7a Teil 1).
 - **Klang:** [`plat::audio`](../lib/plat/audio.rs) mit einem gemeinsamen Mischer (`play(&Sound) -> Voice`), ohne
   Raumklang.
 - **Netz:** `plat::net::UdpSocket` und TCP auf Windows, Linux und Apple; [`netio`](../lib/netio/README.md) mit
@@ -70,7 +71,7 @@ Was es gibt (Code auf `main` ab7e77e1):
 | Crate | Inhalt | hängt an | Lage nach dem Auszug (G7p) |
 | --- | --- | --- | --- |
 | `render3d` (wächst) | nur Zeichnen, auch Durchsichtiges, Partikel, Skinning auf der GPU, Nachbearbeitung | `gpu`, `gltf` | JFLib (E2) |
-| `plat` (wächst) | Gamepad, relative Maus, Pointer-Lock; WebSocket im Browser | – | JFLib |
+| `plat` (wächst) | Gamepad, relative Maus, Pointer-Lock, Tasten nach Lage; WebSocket im Browser | – | JFLib |
 | `lib/physics` (neu) | Formen, Kollision, Abfragen, Character-Controller, später Starrkörper | nur Mathematik | Vorschlag: JFLib |
 | `lib/anim` (neu, G7i) | Skelette, Clips, Überblenden, IK (die CPU-Seite) | `gltf` | Vorschlag: JFLib |
 | `lib/geom` (neu, G7g) | der Modellierkern: Netze, Grundkörper, Extrudieren, CSG, UV, Vereinfachen | nur Mathematik | Vorschlag: JFLib |
@@ -138,6 +139,15 @@ anfassen:
   liegt; prüfen, was `plat` heute meldet.
 - Fertig, wenn: ein Test mit eingespeisten Ereignissen je Ziel läuft und der Nutzer Maus, Pointer-Lock und ein Pad
   einmal von Hand auf Windows, Linux, macOS und im Browser geprüft hat. Keine echten Eingaben durch Agenten.
+- **Stand 2026-11-17: Teil 1 fertig.** Pointer-Lock und rohe Bewegung auf Windows, Wayland, X11, macOS und im
+  Browser: `plat::win_pointer_lock`, `win_pointer_lock_state`, `win_raw_motion_take`, `PointerLock`, die Ereignisse
+  `E_RAW_MOTION` und `E_POINTER_LOCK`; in der UI `ui.pointer_lock`, `ui.pointer_motion`. Tasten nach ihrer Lage als
+  USB-HID-Usage (`KC_*`, `key_code`, `key_label`, `KeyEvent::code`, `ui.key_code_down`), außer auf Android (der
+  Java-Host schickt keinen Scancode). Die Bewegung hat je Plattform eigene Einheiten: Zählwerte der Maus (Windows,
+  X11), unbeschleunigte libinput-Werte (Wayland), Punkte nach der Beschleunigung (macOS), CSS-Pixel oder rohe Werte
+  (Browser). Test-App `apps/inputtest` mit einer Checkliste für die Prüfung von Hand. Wayland kann nur von Hand
+  geprüft werden: ein Compositor ohne Bildschirm hat keinen Zeiger und gewährt den Lock nicht. Offen: die Prüfung
+  von Hand und Teil 2 (Gamepads).
 
 **G7b Spielkern und Spielfenster** (`lib/game`)
 
