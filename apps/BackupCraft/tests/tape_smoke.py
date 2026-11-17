@@ -157,6 +157,17 @@ def main():
         check(r.returncode == 1 and "--kit" in r.stderr, f"encrypted needs the kit: {r.stderr}")
         r = bcctl("tape", "extract", *files2, "--to", str(tmp / "ctl2"), "--kit", str(tmp / "kit.txt"))
         check(r.returncode == 0 and tree_of(tmp / "ctl2" / rel) == tree_of(src), f"bcctl with the recovery kit: {r.stdout} {r.stderr}")
+        # a link planted in the target (the first folder of the paths leads elsewhere): nothing
+        # is written through it
+        (tmp / "ctl3").mkdir()
+        (tmp / "outside").mkdir()
+        try:
+            os.symlink(str(tmp / "outside"), str(tmp / "ctl3" / rel.split("/")[0]), target_is_directory=True)
+        except OSError:
+            print("   (no symbolic links here: the planted-link check is left out)")
+        else:
+            r = bcctl("tape", "extract", *files1, "--to", str(tmp / "ctl3"))
+            check(r.returncode == 1 and "Verknüpfung" in r.stderr and not any((tmp / "outside").iterdir()), f"bcctl does not write through a link in the target: {r.stdout} {r.stderr}")
 
         # ---- a tape job follows its source job
         tj = api.ok("POST", "/api/jobs", dict(base, name="Auf Band", kind="tape", source_job=job["id"], pool_id=weekly["id"], repository_id="", sources=[], host_id="",

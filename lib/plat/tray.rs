@@ -18,7 +18,11 @@
 // with TrackPopupMenuEx, notifications as the symbol's balloon (Windows 10 / 11 show it as a
 // toast; without a visible symbol a hidden one is added for the time it is shown).  Linux
 // (linux_tray.rs): StatusNotifierItem with a com.canonical.dbusmenu menu and
-// org.freedesktop.Notifications, on a session-bus connection of its own thread.  Browser and
+// org.freedesktop.Notifications, on a session-bus connection of its own thread; clicks on the
+// symbol and its menu count only from the program that shows it (the owner of the
+// StatusNotifierWatcher or of a StatusNotifierHost name -- a program of the same user that
+// claims such a name passes too, so a tray command that destroys something should still ask in
+// a window).  Browser and
 // Android (web_notify.rs): notifications only -- the Notification API (the permission asked for
 // from the user's gesture), NotificationManager with POST_NOTIFICATIONS; no symbol.  macOS
 // (apple_mac_services.rs): an NSStatusItem in the menu bar (with a menu a click opens it, the Mac's
