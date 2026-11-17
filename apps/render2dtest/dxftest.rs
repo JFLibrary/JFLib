@@ -1713,6 +1713,7 @@ pub fn bench(path: &str) -> i32 {
         let _ = s.set_camera(&cam);
         let mut cpu_ms = Vec::new();
         let mut gpu_ms = Vec::new();
+        let mut wall_ms = Vec::new();
         let mut first = 0.0;
         for k in 0..frames + 1 {
             let t0 = plat::time_us();
@@ -1728,6 +1729,8 @@ pub fn bench(path: &str) -> i32 {
                 return 1;
             }
             let Ok(cmd) = e.finish() else { return 1 };
+            // (G6e3) the wall time from the submission until the wait came back: what Metal (no timestamps in lib/gpu) says
+            let t1 = plat::time_us();
             let Ok(id) = dev.queue().submit([cmd]) else { return 1 };
             s.submitted(id);
             used = true;
@@ -1735,6 +1738,7 @@ pub fn bench(path: &str) -> i32 {
                 out("FAIL a frame did not finish within 60 s");
                 return 1;
             }
+            let wall = (plat::time_us() - t1) as f64 / 1000.0;
             s.collect_stats();
             let st = s.take_stats();
             let gms = st.last().and_then(|f| f.stamps).map_or(0.0, |v| v[3] - v[0]);
@@ -1743,10 +1747,11 @@ pub fn bench(path: &str) -> i32 {
             } else {
                 cpu_ms.push(prep);
                 gpu_ms.push(gms);
+                wall_ms.push(wall);
             }
         }
-        out(&format!("GPU, {name}, {}x{}: {:.2} ms per frame on the GPU (median of {frames}), prepare {:.2} ms (the first frame's: {first:.0} ms)", size.0, size.1, median(&mut gpu_ms),
-                     median(&mut cpu_ms)));
+        out(&format!("GPU, {name}, {}x{}: {:.2} ms per frame on the GPU (median of {frames}), prepare {:.2} ms (the first frame's: {first:.0} ms), submit to done {:.2} ms (wall)", size.0,
+                     size.1, median(&mut gpu_ms), median(&mut cpu_ms), median(&mut wall_ms)));
     }
     // --per-layer: the whole view's GPU time with each DXF layer hidden in turn (what each costs)
     if plat::args().iter().any(|a| a == "--per-layer") {

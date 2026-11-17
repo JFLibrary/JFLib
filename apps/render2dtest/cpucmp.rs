@@ -138,8 +138,14 @@ pub fn cpu(t: &mut T) {
         // difference, the ink (%): straight edges and fills alike; round caps and small circles the GPU's tangent; short
         // segments its fast way; dash patterns its three dashes per pixel and side; dashed curves its caps two segments on;
         // fills' edges through the middle of a pixel's side; text MSDF against outlines
+        // (G6e3) flat tones: rows of one value each (3 images, 18 rows of 300 px), where one code in one channel of one row
+        // is 0.037 % of an image's ink; how the blend rounds moves whole rows: NVIDIA rounds the source colour and alpha to
+        // 8 bits before it blends (53 of 54 row-channels of flat_1.5), Apple's GPU blends exactly (54 of 54), lib/gfx in
+        // integers of its own.  So the ink here is bounded by 0.2 % (the M2: +0.084 %, flat_1.5 alone +0.184 %), the
+        // pixels as strictly as before (none beyond 2 codes, the largest 1 everywhere)
         let (share, most, inkl) = match su.name.as_str() {
-            "miter" | "hairlines" | "flat" | "fills" | "overlap" => (0.0005, 4, 0.05),
+            "flat" => (0.0005, 4, 0.2),
+            "miter" | "hairlines" | "fills" | "overlap" => (0.0005, 4, 0.05),
             "joins" => (0.002, 16, 0.1),
             "hatch" => (0.004, 16, 0.1),
             "caps" | "arcs" => (0.002, 64, 0.2),
