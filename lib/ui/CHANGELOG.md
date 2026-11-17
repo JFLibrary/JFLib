@@ -42,6 +42,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   headless runs stay at three. A trackpad on macOS and a touchpad on Wayland, which plat gives in
   pixels now, scroll the views by the fingers' way (4.8 times it on Wayland and 1.2 on macOS
   before).
+- The scripts' `commit` hands the text to `plat::ime_commit_text` in one call, as a platform does.
 
 ### Fixed
 

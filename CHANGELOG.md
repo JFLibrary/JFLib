@@ -47,6 +47,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** (E2) `Event::y` of key events carries the key's character above its location: code that compared it with a `KL_*` takes `plat::key_location(y)` (`KeyEvent::location` is as before)
 - **plat:** Wayland's touchpad (its continuous axes) and macOS' trackpad deliver `E_WHEEL` in physical pixels with `WHEEL_PIXELS` instead of 120ths (Wayland: 12 a pixel, macOS: 3 a point); the UI makes notches of them as `wheel_lines()` lines of 16 DIP, so its views follow the fingers' way (they scrolled 4.8 times it on Wayland, 1.2 times on macOS)
 - **ui:** A notch of the wheel scrolls the system's lines (`ui.wheel_lines()`) in the library's views, no longer always three; headless runs stay at three
+- **ui:** The scripts' `commit` hands the text to `plat::ime_commit_text` in one call, as a platform does (editortest code_commit: 100000 bytes)
 
 ### Fixed
 
@@ -94,6 +95,11 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Linux: `spawn_self` / `restart_self` fork twice, so no zombie stays behind while the app runs on, and a failed exec comes back as -1 (it was invisible)
 - **plat:** Linux portal: the receive buffer grows for a long Response (a multiple selection of up to 4096 files; over 64 KiB it was lost), and a print connection still open is closed before another portal call instead of losing its descriptor
 - **plat:** X11: the end of a clipboard transfer whose requestor was the root window no longer clears our event mask on it (work area and Xft.dpi changes stopped arriving); Wayland: a finger or pen on a popup no longer marks the popup as the pointer's (later mouse positions were off), and a transfer to a client that reads nothing gives up after 30 s instead of holding its slot
+- **plat:** Windows tray: the symbol's window is a hidden top-level one, so TaskbarCreated arrives and the symbol comes back after Explorer restarts (a message-only window gets no broadcast); a notification's balloon or that message arriving while Shell_NotifyIconW runs on the same thread is handled afterwards instead of spinning on the tray's lock for good
+- **plat:** Windows: the colour pick ends as cancelled when its overlay is closed from outside (Alt+F4); it stayed open for good and every later `screen::pick_start` was refused
+- **plat:** Windows clipboard: another program's block (up to 1 GiB) is copied with an allocation that may fail (no room: nothing read) instead of ending the process
+- **plat:** `ime_commit_text` takes text of any length (up to 16 MiB): what the queue of 16 commits cannot hold yet waits and follows as the app takes them; a paste or dictation over 64 KiB was cut there without a word (iOS, macOS while composing, Linux IBus, the browser)
+- **plat:** `AtomicFile` on a folder mount (Linux, macOS) keeps the file's permission bits (a 0600 file became 0644); a systemd unit's Description has every control character as a space (a \r let it add directives)
 
 ### Security
 
@@ -113,6 +119,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Linux sandbox (seccomp): io_uring, the new mount API (open_tree, move_mount, fsopen, fsconfig, fsmount, fspick, mount_setattr) and pidfd_getfd are denied; clone with a flag for a new namespace is denied, clone3 answered ENOSYS (its flags sit behind a pointer; libc then uses clone); process_vm_readv is allowed on this process only, so the crash handler gets its backtrace again
 - **plat:** Linux: `process::run_elevated` looks for a bare program name in the system's folders only (/usr/local/sbin ... /bin) and hands pkexec the full path: pkexec searched the caller's PATH, so a program the user's PATH put first ran as root
 - **plat:** Linux session bus: the portal's Response of autostart and the power inhibit, the GlobalShortcuts Activated, the Flatpak update monitor's signals and the Secret Service prompt's Completed count only from the service's own unique name (any client may send a signal of that name on the predictable path)
+- **plat:** `dnd::drag_start` hands the system only files the manifest lets the app read, and offers a move (the target deletes the original) only when it may write them all; the browser's `download` / `persist` and Android's `persist` check the manifest (read / write) like a file access; Android reads a streaming provider's document to at most 256 MiB, with allocations that may fail
 
 ## [0.2.1] - 2026-11-16
 
