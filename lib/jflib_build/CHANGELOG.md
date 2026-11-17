@@ -14,6 +14,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   path of the linker's map was split at the blank when lld links (`-C linker-flavor=ld.lld`: one
   static file, `cargo jflib package`) and had the blank turned into a comma behind cc's `-Wl,`;
   it is one argument now (through cc as `-Xlinker`).
+- A program with std gets the linker map's path through `-Xlinker` as one argument too (behind `-Wl,` a comma in the path split it).
 
 ## [0.2.1] - 2026-11-16
 

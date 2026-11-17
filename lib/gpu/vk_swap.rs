@@ -306,7 +306,7 @@ impl Swapchain {
         else {
             return Err(GpuError::Unsupported("surface queries"));
         };
-        let (Some(create), Some(images_fn)) = (sh.f.create_swapchain_khr, sh.f.get_swapchain_images_khr) else {
+        let (Some(create), Some(_)) = (sh.f.create_swapchain_khr, sh.f.get_swapchain_images_khr) else {
             return Err(GpuError::Unsupported("VK_KHR_swapchain"));
         };
         let surf = self.surf.0.h;
@@ -329,7 +329,7 @@ impl Swapchain {
             // minimised / no area: keep nothing, acquire returns None until there is an area
             self.release();
             if old != 0 {
-                sh.defer(Garbage::Swapchain(old));
+                sh.defer(Garbage::Swapchain(old, self.surf.clone()));
             }
             self.h = 0;
             self.extent = (0, 0);
@@ -392,13 +392,31 @@ impl Swapchain {
         let r = unsafe { create(sh.dev, &ci, core::ptr::null(), &mut h) };
         self.release();
         if old != 0 {
-            sh.defer(Garbage::Swapchain(old));
+            sh.defer(Garbage::Swapchain(old, self.surf.clone()));
         }
         self.h = 0;
         sh.vk(r)?;
+        // the images and semaphores first, the handle only when all are there: a failure between
+        // them left a handle with empty lists, and the next acquire indexed them (a panic)
+        if let Err(e) = self.fill(&sh, h, (ext.width, ext.height), copy_src) {
+            self.release();
+            sh.defer(Garbage::Swapchain(h, self.surf.clone()));
+            return Err(e);
+        }
         self.h = h;
         self.extent = (ext.width, ext.height);
         self.generation = self.generation.wrapping_add(1);
+        for v in &self.slot_value {
+            v.set(0);
+        }
+        Ok(())
+    }
+
+    // the images of swapchain h (w x h) and the acquire / done semaphores
+    fn fill(&mut self, sh: &Arc<Shared>, h: vk::Handle, (w, ht): (u32, u32), copy_src: bool) -> Result<()> {
+        let Some(images_fn) = sh.f.get_swapchain_images_khr else {
+            return Err(GpuError::Unsupported("VK_KHR_swapchain"));
+        };
         let mut n = 0u32;
         // SAFETY: the two-call enumeration.
         sh.vk(unsafe { images_fn(sh.dev, h, &mut n, core::ptr::null_mut()) })?;
@@ -413,9 +431,9 @@ impl Swapchain {
         if copy_src {
             tu = tu | TextureUsage::COPY_SRC;
         }
-        let td = TextureDesc::d2(ext.width, ext.height, self.format, tu);
+        let td = TextureDesc::d2(w, ht, self.format, tu);
         for &img in &imgs {
-            self.images.push(crate::vk_res::wrap_image(&sh, img, td)?);
+            self.images.push(crate::vk_res::wrap_image(sh, img, td)?);
         }
         for _ in 0..self.desc.frames_in_flight {
             let s = self.semaphore()?;
@@ -424,9 +442,6 @@ impl Swapchain {
         for _ in 0..imgs.len() {
             let s = self.semaphore()?;
             self.done.push(s);
-        }
-        for v in &self.slot_value {
-            v.set(0);
         }
         Ok(())
     }
@@ -644,7 +659,7 @@ impl Drop for Swapchain {
         let _ = self.sh.queue_idle(); // presents included: their semaphores and images are free
         self.release();
         if self.h != 0 {
-            self.sh.defer(Garbage::Swapchain(self.h));
+            self.sh.defer(Garbage::Swapchain(self.h, self.surf.clone()));
         }
     }
 }

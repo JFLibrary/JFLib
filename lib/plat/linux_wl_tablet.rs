@@ -275,13 +275,12 @@ pub(crate) fn wlh_tool_frame(wl: &mut Wl, _id: u32, _a: &Args, u: u64) {
         let surf = wl.tab.tools[k].surf;
         let mut w = wl.find(surf); // the window of the tool
         if w < 0 {
-            // a popup: its owner and offset (the pointer's offset is kept)
-            let (px, py) = (wl.inp.off_x, wl.inp.off_y);
-            w = wl.popup_ptr(surf);
-            wl.tab.tools[k].offx = wl.inp.off_x;
-            wl.tab.tools[k].offy = wl.inp.off_y;
-            wl.inp.off_x = px;
-            wl.inp.off_y = py;
+            // a popup: its owner and offset (the pointer's state stays)
+            if let Some((owner, at)) = wl.popup_of(surf) {
+                w = owner;
+                wl.tab.tools[k].offx = at[0];
+                wl.tab.tools[k].offy = at[1];
+            }
         }
         wl.tab.tools[k].win = w;
         if w >= 0 {

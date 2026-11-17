@@ -260,6 +260,13 @@ struct Cipher {
     seq: u64,
 }
 
+impl Drop for Cipher {
+    fn drop(&mut self) {
+        crypto::zeroize(&mut self.key);
+        crypto::zeroize(&mut self.iv);
+    }
+}
+
 impl Cipher {
     fn of(secret: &[u8; 32]) -> Cipher {
         let (key, iv) = traffic_keys(secret);
@@ -509,6 +516,15 @@ pub struct Core {
     failure: Option<Failure>,
     peer_closed: bool,
     key_updates: u32,
+}
+
+// the secrets of a connection are overwritten when it goes (its traffic keys with each Cipher)
+impl Drop for Core {
+    fn drop(&mut self) {
+        for k in [&mut self.c_hs, &mut self.s_hs, &mut self.c_ap, &mut self.s_ap, &mut self.master, &mut self.eph, &mut self.seed] {
+            crypto::zeroize(k);
+        }
+    }
 }
 
 impl fmt::Debug for Core {

@@ -247,6 +247,8 @@ pub fn clip_dib_to_bmp(dib: &[u8]) -> Option<Vec<u8>> {
         f[1] = b'M';
         f[2..6].copy_from_slice(&(total as u32).to_le_bytes());
         f[10..14].copy_from_slice(&((off + BF_SIZE) as u32).to_le_bytes());
+        // (a block of another program, up to 1 GiB: no room is None, not the end of the process)
+        f.try_reserve_exact(len).ok()?;
         f.extend_from_slice(dib);
         return Some(f);
     }
@@ -283,6 +285,7 @@ pub fn clip_dib_to_bmp(dib: &[u8]) -> Option<Vec<u8>> {
     }
     v[56..60].copy_from_slice(&0x7352_4742u32.to_le_bytes()); // LCS_sRGB
     v[108..112].copy_from_slice(&4u32.to_le_bytes()); // LCS_GM_IMAGES
+    f.try_reserve_exact(px.len()).ok()?;
     f.extend_from_slice(px);
     Some(f)
 }

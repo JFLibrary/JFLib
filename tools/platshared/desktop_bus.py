@@ -58,12 +58,18 @@ class Conn:
             self.c.sendall(message(mtype, self.ser, fields + ([(8, "g", sig)] if sig else []), body))
             return self.ser
 
+    # the sender of an answer: the bus for its own methods, else the service (:1.7), as on a real
+    # bus (plat takes a portal's Response only from the sender of its reply)
+    @staticmethod
+    def answerer(m):
+        return "org.freedesktop.DBus" if m["fields"].get(6) in (None, "org.freedesktop.DBus") else ":1.7"
+
     def reply(self, m, sig="", body=b""):
         if not m["raw"][2] & 1:  # unless NO_REPLY_EXPECTED
-            self.send(2, [(5, "u", m["serial"]), (6, "s", self.unique), (7, "s", "org.freedesktop.DBus")], sig, body)
+            self.send(2, [(5, "u", m["serial"]), (6, "s", self.unique), (7, "s", self.answerer(m))], sig, body)
 
     def error(self, m, name, text="no"):
-        self.send(3, [(4, "s", name), (5, "u", m["serial"]), (6, "s", self.unique), (7, "s", "org.freedesktop.DBus")], "s", W().all("s", [text]))
+        self.send(3, [(4, "s", name), (5, "u", m["serial"]), (6, "s", self.unique), (7, "s", self.answerer(m))], "s", W().all("s", [text]))
 
     def signal(self, path, iface, member, sig, body):
         self.send(4, [(1, "o", path), (2, "s", iface), (3, "s", member), (6, "s", self.unique), (7, "s", ":1.7")], sig, body)
@@ -143,6 +149,12 @@ class Bus:
                 self.log("returns", (unique, fl.get(5), sig, body))
             elif m["type"] == 1 and fl.get(3) == "Hello":
                 conn.reply(m, "s", W().all("s", [unique]))
+            elif m["type"] == 1 and fl.get(3) == "GetNameOwner" and fl.get(6) == "org.freedesktop.DBus":
+                # a portal is the service :1.7 (its replies and signals come from that name)
+                if body and str(body[0]).startswith("org.freedesktop.portal."):
+                    conn.reply(m, "s", W().all("s", [":1.7"]))
+                else:
+                    conn.error(m, "org.freedesktop.DBus.Error.NameHasNoOwner", "no owner")
             elif m["type"] == 1:
                 self.log("calls", (unique, fl.get(6), fl.get(1), fl.get(2), fl.get(3), body))
                 self.handler(conn, m, body)

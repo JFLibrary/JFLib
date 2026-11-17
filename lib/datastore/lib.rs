@@ -305,7 +305,7 @@ fn replay(bytes: &[u8], after: u64, data: &mut Data, last_seq: &mut u64, replaye
         let rest = &bytes[i..];
         if rest.len() < FRAME_HEAD + FRAME_TAIL || &rest[..4] != WAL_MAGIC {
             // an incomplete header, or garbage: torn when nothing valid can follow
-            return if rest.len() < FRAME_HEAD + FRAME_TAIL || find_frame(rest) .is_none() {
+            return if rest.len() < FRAME_HEAD + FRAME_TAIL || find_frame(rest).is_none() {
                 Scan::Torn(i as u64)
             } else {
                 Scan::Damaged(i as u64, format!("bad frame header at {}", i))
@@ -346,9 +346,27 @@ fn replay(bytes: &[u8], after: u64, data: &mut Data, last_seq: &mut u64, replaye
     Scan::Clean
 }
 
-/// the offset of a plausible frame start (magic) in the bytes
+/// the offset of a whole valid frame in the bytes (its magic, length and checksum): only that
+/// makes a damaged frame one with more behind it.  A bare "BCW1" was enough, and the payload of
+/// a torn last frame holding those bytes made the store refuse to open instead of cutting it
 fn find_frame(b: &[u8]) -> Option<usize> {
-    b.windows(4).position(|w| w == WAL_MAGIC)
+    let mut from = 0;
+    while let Some(k) = b[from..].windows(4).position(|w| w == WAL_MAGIC) {
+        let at = from + k;
+        let rest = &b[at..];
+        if rest.len() >= FRAME_HEAD + FRAME_TAIL {
+            let len = u32::from_le_bytes([rest[4], rest[5], rest[6], rest[7]]) as usize;
+            let total = FRAME_HEAD + len + FRAME_TAIL;
+            if len <= MAX_FRAME && rest.len() >= total {
+                let want = digest16(&[&rest[4..16], &rest[FRAME_HEAD..FRAME_HEAD + len]]);
+                if crypto::ct_eq(&want, &rest[FRAME_HEAD + len..total]) {
+                    return Some(at);
+                }
+            }
+        }
+        from = at + 1;
+    }
+    None
 }
 
 fn parse_hex_name(name: &str, prefix: &str, suffix: &str) -> Option<u64> {

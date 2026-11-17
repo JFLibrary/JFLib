@@ -51,7 +51,8 @@ Fensterkopf. Protokollantworten gehen über stdout, Diagnosen über stderr.
 
 Unter Windows verwendet der Transport eine lokale Named Pipe mit einer geschützten DACL
 für den Benutzer-SID des Prozesses und weist entfernte Clients ab. Unter Linux verwendet
-er einen geprüften privaten Ordner `/tmp/jfgui-agent-UID`, Unix-Sockets und eine Prüfung
+er einen geprüften privaten Ordner (`$XDG_RUNTIME_DIR/jfgui-agent`, ohne die Variable
+`/tmp/jfgui-agent-UID`), Unix-Sockets und eine Prüfung
 der Benutzeridentität des Peers. Mehrere aktive Instanzen haben getrennte Adressen und
 Protokollzustände. Die native Verbindung öffnet keinen TCP-Port.
 

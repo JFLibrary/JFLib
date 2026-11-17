@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - `reflect::constant_values` measures each type once and refuses constants of more than 4 Mi words in all: nested composites, a ConstantNull of a huge array or nested structs took any amount of memory or exponential time when a compute pipeline was made.
+- The validator refuses a composite type that names itself or a type declared after it (`Rule::Type`): the layout's walks over such a cycle overflowed the stack; layout sizes past u32 are None, a scalar of no whole bytes has no layout (a divisor of 0).
 
 ## [0.2.1] - 2026-11-16
 

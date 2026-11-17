@@ -556,6 +556,7 @@ pub fn run(t: &mut T) {
         t.check(&format!("fragment features 1.{} validate", minor), validate(&crate::basics::frag_features(minor)).is_ok());
     }
     t.check("compute features validate", validate(&crate::basics::features()).is_ok());
+    fuzz(t);
     let mut rules = alloc::collections::BTreeSet::new();
     for case in cases() {
         match validate(&case.words) {
@@ -573,4 +574,44 @@ pub fn run(t: &mut T) {
         }
     }
     t.eq("every rule has a case", rules.len(), 15);
+}
+
+// the validator and the disassembler on mutated modules (one to three words of a valid module
+// changed: small numbers, ids nearby, any value): every one ends with an answer, never a panic
+// or a hang -- a crafted module crashed both (they are tools, but they read files)
+fn fuzz(t: &mut T) {
+    let mut seed = 0x9E37_79B9_7F4A_7C15u64;
+    let mut next = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let mut bases: Vec<Vec<u32>> = Shader::ALL.iter().map(|sh| sh.build(6)).collect();
+    bases.push(crate::basics::features());
+    bases.push(crate::basics::frag_features(6));
+    let t0 = plat::time_us();
+    let mut runs = 0u32;
+    for k in 0..6000u32 {
+        let mut w = bases[k as usize % bases.len()].clone();
+        if w.len() <= 5 {
+            continue;
+        }
+        let bound = w[3];
+        for _ in 0..1 + next() % 3 {
+            let at = 5 + (next() as usize) % (w.len() - 5);
+            let r = next();
+            w[at] = match r % 4 {
+                0 => (r >> 8) as u32 % 16,
+                1 => ((r >> 8) as u32 % bound.max(1)).wrapping_add(((r >> 40) % 3) as u32).wrapping_sub(1),
+                2 => (w[at] & 0xFFFF) | (((r >> 8) as u32 % 64) << 16),
+                _ => (r >> 16) as u32,
+            };
+        }
+        let _ = validate(&w);
+        let _ = shader::dis::disassemble(&w);
+        runs += 1;
+    }
+    let ms = (plat::time_us() - t0) / 1000;
+    t.check(&format!("fuzz: {runs} mutated modules validated and disassembled ({ms} ms)"), runs > 5000 && ms < 60_000);
 }

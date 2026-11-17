@@ -723,7 +723,10 @@ impl<'a> Checker<'a> {
         let a = self.convert(a, sig.p[0])?;
         let b = self.convert(b, sig.p[1])?;
         let short_circuit = matches!(op, BinOp::LogAnd | BinOp::LogOr);
-        if a.stage == Phase::Const && (b.stage == Phase::Const || short_circuit && a.val == Some(Value::Bool(op == BinOp::LogOr))) {
+        // a const-expression only when both sides are (as Tint): `false && f()` with a runtime
+        // f is not one -- the right side is skipped at run time, and `const c = false && f();`
+        // is an error (it was folded to the constant false)
+        if a.stage == Phase::Const && b.stage == Phase::Const {
             if short_circuit && a.val == Some(Value::Bool(op == BinOp::LogOr)) {
                 return Ok(TE { id: NONE, ty: BOOL, stage: Phase::Const, val: a.val.clone(), span: sp });
             }

@@ -960,6 +960,7 @@ impl Ui {
     // wc_pop_to(id): close boxes up to and including the box `id` (boxes the app left open
     // inside it are closed with a warning); nothing when it is not open
     fn wc_pop_to(&mut self, id: u32) {
+        self.wp.lay.over = 0; // boxes beyond the limit left open inside it: they pushed nothing
         for _ in 0..BOX_STACK_MAX {
             let b = self.box_id();
             if b == id {

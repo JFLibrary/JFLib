@@ -29,9 +29,12 @@ the fake accepts any number of them.  For every mode it starts plattest --test s
             session's shared value starts with a zero byte, so plat must give it up (and every
             other such one) and open another; then the round trip of dh
   none      the bus has no org.freedesktop.secrets: ServiceUnknown
+  noise     the calls of locked, and before every answer of the service a message of 2 MiB and a
+            big-endian one (plat skips them: the connection stays) and, before every real
+            Completed, one from another sender saying "dismissed" (plat takes only the service's)
 Exit code 0 = passed.
 """
-import argparse, hashlib, hmac, os, socket, subprocess, sys, tempfile, threading
+import argparse, hashlib, hmac, os, socket, struct, subprocess, sys, tempfile, threading
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -42,7 +45,7 @@ try:
 except ImportError:
     Cipher = None
 
-MODES = ["dh", "plain", "locked", "dismiss", "nodefault", "badkey", "ksecretd", "none"]
+MODES = ["dh", "plain", "locked", "dismiss", "nodefault", "badkey", "ksecretd", "none", "noise"]
 P = int("FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A0879"
         "8E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B"
         "0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF", 16)
@@ -86,6 +89,10 @@ class Store:
     """the fake service's state; one per mode"""
 
     def __init__(self, mode):
+        # noise: the service of locked, with messages around its answers
+        self.noise = mode == "noise"
+        self.noise_sent = 0
+        mode = "locked" if self.noise else mode
         self.mode = mode
         self.lock = threading.RLock()
         self.items = {}         # path -> {attrs, label, value, ctype, col}
@@ -319,6 +326,16 @@ def connection(c, st):
         def error(m, name, text):
             send(3, [(4, "s", name), (5, "u", m["serial"]), (6, "s", uniq), (7, "s", ":1.0")], "s", [text])
 
+        def noise():
+            # a signal with a body of 2 MiB (over plat's 1 MiB) and a big-endian one: framed
+            # messages a bus would route; plat must skip them, not close the connection
+            ser[0] += 1
+            big = 2 << 20
+            c.sendall(b"l\x04\x00\x01" + struct.pack("<III", big, ser[0], 0) + b"\x00" * big)
+            ser[0] += 1
+            c.sendall(b"B\x04\x00\x01" + struct.pack(">III", 8, ser[0], 0) + b"\x00" * 8)
+            st.noise_sent += 2
+
         while True:
             m, buf = parse(buf)
             if m is None:
@@ -345,6 +362,11 @@ def connection(c, st):
                         reply(m, "b", [args[0] == DEST and st.mode != "none"])
                     elif member == "ListActivatableNames":
                         reply(m, "as", [["org.freedesktop.DBus"]])
+                    elif member == "GetNameOwner":
+                        if args[0] == DEST and st.mode != "none":
+                            reply(m, "s", [":1.0"])
+                        else:
+                            error(m, "org.freedesktop.DBus.Error.NameHasNoOwner", f"no owner of {args[0]}")
                     else:
                         error(m, "org.freedesktop.DBus.Error.UnknownMethod", member)
                 continue
@@ -361,6 +383,8 @@ def connection(c, st):
                     if not no_reply:
                         error(m, e.name, e.text)
                     continue
+                if st.noise:
+                    noise()
                 if not no_reply:
                     reply(m, rsig, vals)
                 if iface == "org.freedesktop.Secret.Prompt":
@@ -368,6 +392,10 @@ def connection(c, st):
                     dismissed = st.mode == "dismiss" or member == "Dismiss"
                     result = ("s", "") if dismissed else action()
                     st.completed.append(dismissed)
+                    if st.noise and not dismissed:
+                        send(4, [(1, "o", path), (2, "s", "org.freedesktop.Secret.Prompt"), (3, "s", "Completed"), (7, "s", ":1.66")],
+                             "bv", [True, ("s", "")])
+                        st.noise_sent += 1
                     send(4, [(1, "o", path), (2, "s", "org.freedesktop.Secret.Prompt"), (3, "s", "Completed"), (7, "s", ":1.0")],
                          "bv", [dismissed, result])
     except (socket.timeout, OSError):
@@ -384,7 +412,7 @@ def run(exe, mode):
         t.start()
         env = dict(os.environ, DBUS_SESSION_BUS_ADDRESS=f"unix:path={sock}")
         try:
-            p = subprocess.run([str(exe), "--test", "secret-bus", "--mode", mode], env=env, capture_output=True, text=True, timeout=120)
+            p = subprocess.run([str(exe), "--test", "secret-bus", "--mode", "locked" if mode == "noise" else mode], env=env, capture_output=True, text=True, timeout=120)
             out, code = p.stdout + p.stderr, p.returncode
         except subprocess.TimeoutExpired as e:
             out, code = (e.stdout or b"").decode() if isinstance(e.stdout, bytes) else (e.stdout or ""), "timeout"
@@ -433,6 +461,9 @@ def verify(mode, st):
         check("plain: DH tried first, then plain", refused and all(k is None for k in st.sessions.values()) and st.sessions)
         check("plain: values stored as sent", st.wire and all(w[0] == w[2] for w in st.wire))
         check("plain: no item left", not st.items)
+    if mode == "noise":
+        check("noise: messages of 2 MiB, big-endian ones and false Completed signals were sent", st.noise_sent >= 10, st.noise_sent)
+        mode = "locked"
     if mode == "locked":
         check("locked: get, set and delete each went through a prompt", len(st.completed) >= 4 and not any(st.completed), st.completed)
         check("locked: Unlock was asked", "Unlock" in members)

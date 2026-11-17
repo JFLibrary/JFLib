@@ -174,6 +174,27 @@ fn store(t: &mut T) {
     let by_kit = Repo::open(&dir, Unlock::Recovery(&rec_secret));
     t.check("recovery kit unlock", by_kit.as_ref().is_ok_and(|r| content(r, &ida) == a));
     drop(by_kit);
+    // repo.json with its MAC taken away (and a signer changed): not sealed again, refused
+    let cfg_path = alloc::format!("{dir}/repo.json");
+    let cfg_text = plat::read_file(&cfg_path).unwrap_or_default();
+    let text = String::from_utf8_lossy(&cfg_text).into_owned();
+    let stripped = match text.find("\"mac\":\"") {
+        Some(i) => {
+            let end = text[i + 7..].find('"').map_or(text.len(), |k| i + 8 + k);
+            let (head, tail) = (text[..i].trim_end(), &text[end..]);
+            match (head.strip_suffix(','), tail.trim_start().strip_prefix(',')) {
+                (Some(h), _) => format!("{h}{tail}"),
+                (None, Some(t2)) => format!("{head}{t2}"),
+                _ => format!("{head}{tail}"),
+            }
+        }
+        None => text.clone(),
+    };
+    t.check("repo.json holds a MAC", stripped != text);
+    plat::write_file(&cfg_path, stripped.as_bytes());
+    t.check("repo.json without its MAC refused", matches!(Repo::open(&dir, Unlock::Master(&master)), Err(CasError::Corrupt(_))));
+    t.check("... and left as it was", plat::read_file(&cfg_path).is_some_and(|b| !String::from_utf8_lossy(&b).contains("\"mac\"")));
+    plat::write_file(&cfg_path, &cfg_text);
     let Ok(repo) = Repo::open(&dir, Unlock::Master(&master)) else {
         t.check("reopen", false);
         return;

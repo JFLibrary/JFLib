@@ -543,7 +543,20 @@ unsafe extern "system" fn pick_proc(hwnd: isize, msg: u32, wp: usize, lp: isize)
             }
             return 0;
         }
-        WM_CAPTURECHANGED | WM_DESTROY => {}
+        WM_CAPTURECHANGED => {}
+        WM_DESTROY => {
+            // closed from outside (Alt+F4, the system): the pick ends as cancelled -- it stayed
+            // open for good and every later pick_start was refused.  pick_end took the overlay
+            // before it destroyed the window, so this finds none then
+            let gone = {
+                let mut g = OV.lock();
+                if g.as_ref().is_some_and(|o| o.hwnd == hwnd) { g.take() } else { None }
+            };
+            if gone.is_some() {
+                drop(gone);
+                push_color(Err(ScreenError::Cancelled));
+            }
+        }
         _ => {}
     }
     // SAFETY: the default handling of every other message.

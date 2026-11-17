@@ -24,7 +24,7 @@ pub enum Rule {
 }
 
 fn up(x: u32, a: u32) -> u32 {
-    x.div_ceil(a) * a
+    x.div_ceil(a).saturating_mul(a)
 }
 
 fn ext(a: u32, rule: Rule) -> u32 {
@@ -34,7 +34,8 @@ fn ext(a: u32, rule: Rule) -> u32 {
 /// the alignment of a type under rule (None: no layout)
 pub fn align(t: &dyn Types, ty: u32, rule: Rule) -> Option<u32> {
     Some(match t.ty(ty)? {
-        Ty::Int { width, .. } | Ty::Float { width } => width / 8,
+        // (a width that is no whole number of bytes has no layout: 0 was a divisor)
+        Ty::Int { width, .. } | Ty::Float { width } => bytes_of(*width)?,
         Ty::Vector { elem, n } => {
             let s = align(t, elem.0, rule)?;
             if *n == 2 { 2 * s } else { 4 * s }
@@ -50,6 +51,11 @@ pub fn align(t: &dyn Types, ty: u32, rule: Rule) -> Option<u32> {
         }
         _ => return None,
     })
+}
+
+// a scalar's bytes: 8, 16, 32 or 64 bits
+fn bytes_of(width: u32) -> Option<u32> {
+    matches!(width, 8 | 16 | 32 | 64).then_some(width / 8)
 }
 
 /// the column stride of a column-major matrix type
@@ -70,17 +76,18 @@ pub fn stride(t: &dyn Types, elem: u32, rule: Rule) -> Option<u32> {
 /// a runtime array: the size without it)
 pub fn size(t: &dyn Types, ty: u32, rule: Rule) -> Option<u32> {
     Some(match t.ty(ty)? {
-        Ty::Int { width, .. } | Ty::Float { width } => width / 8,
-        Ty::Vector { elem, n } => n * size(t, elem.0, rule)?,
-        Ty::Matrix { cols, .. } => cols * matrix_stride(t, ty, rule)?,
-        Ty::Array { elem, len } => t.const_u32(len.0)? * stride(t, elem.0, rule)?,
+        Ty::Int { width, .. } | Ty::Float { width } => bytes_of(*width)?,
+        // (sizes from a module's numbers: None past u32 rather than a wrap or a panic)
+        Ty::Vector { elem, n } => n.checked_mul(size(t, elem.0, rule)?)?,
+        Ty::Matrix { cols, .. } => cols.checked_mul(matrix_stride(t, ty, rule)?)?,
+        Ty::Array { elem, len } => t.const_u32(len.0)?.checked_mul(stride(t, elem.0, rule)?)?,
         Ty::Struct { members } => {
             let raw: Vec<u32> = members.iter().map(|m| m.0).collect();
             let offs = offsets(t, &raw, rule)?;
             let mut end = 0;
             for (k, m) in raw.iter().enumerate() {
                 if let Some(s) = size(t, *m, rule) {
-                    end = end.max(offs[k] + s);
+                    end = end.max(offs[k].checked_add(s)?);
                 }
             }
             up(end, align(t, ty, rule)?)
@@ -98,7 +105,7 @@ pub fn offsets(t: &dyn Types, members: &[u32], rule: Rule) -> Option<Vec<u32>> {
         out.push(at);
         match (t.ty(m)?, size(t, m, rule)) {
             (Ty::RuntimeArray { .. }, _) if k + 1 == members.len() => {}
-            (_, Some(s)) => at += s,
+            (_, Some(s)) => at = at.checked_add(s)?,
             _ => return None,
         }
     }

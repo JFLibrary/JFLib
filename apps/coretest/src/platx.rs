@@ -561,5 +561,9 @@ fn service(t: &mut T) {
     let u = plat::service::unit_text(&spec);
     t.check("unit: ExecStart quoted", u.contains("ExecStart=/opt/x/bin run --data \"/srv/backup data\" 50%% $$HOME\n"));
     t.check("unit: restart and install", u.contains("Restart=on-failure") && u.contains("WantedBy=multi-user.target") && u.contains("Description=Ein Dienst"));
+    // a \r (systemd ends a line there too) or another control character cannot add a directive
+    let spec = plat::service::ServiceSpec { name: "x", display: "X", description: "Ein\rExecStartPre=/bin/evil\n\tDienst", exe: "/opt/x/bin", args: &[] };
+    let u = plat::service::unit_text(&spec);
+    t.check("unit: control characters in the description are spaces", u.contains("Description=Ein ExecStartPre=/bin/evil  Dienst\n") && !u.contains('\r'));
     t.check("not a service: no stop request", !plat::service::stop_requested());
 }

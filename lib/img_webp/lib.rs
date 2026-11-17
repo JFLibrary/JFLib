@@ -24,6 +24,15 @@ use img_core::{Codec, IFC_DECODE, IFC_ENCODE, IOM_EFFORT, IOM_EXIF, IOM_ICC, IOM
 
 pub mod container;
 pub mod tab;
+
+/// n copies of v, or ERR_NOMEM when there is no room: a decoder's frame-sized buffers (an
+/// allocation that cannot fail ended the process past the memory budget's estimate)
+pub(crate) fn filled<T: Clone>(n: usize, v: T) -> Result<alloc::vec::Vec<T>, i32> {
+    let mut out = alloc::vec::Vec::new();
+    out.try_reserve_exact(n).map_err(|_| img_core::ERR_NOMEM)?;
+    out.resize(n, v);
+    Ok(out)
+}
 pub mod vp8;
 pub mod vp8_enc;
 pub mod vp8l;

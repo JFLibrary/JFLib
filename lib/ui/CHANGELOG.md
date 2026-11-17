@@ -42,6 +42,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   headless runs stay at three. A trackpad on macOS and a touchpad on Wayland, which plat gives in
   pixels now, scroll the views by the fingers' way (4.8 times it on Wayland and 1.2 on macOS
   before).
+- The scripts' `commit` hands the text to `plat::ime_commit_text` in one call, as a platform does.
 
 ### Fixed
 
@@ -63,6 +64,19 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   the window ids `id + 1 ..`, and the second one took over the main window's floating windows
   ("window 501 begun twice in one pass").
 - Wrapped labels and multi-line text boxes check the text for UTF-8 once per layout, not once per line, and do not measure the rest of the paragraph before each line (both quadratic over a long paragraph).
+- Agent interface: `ui.command` of a command bound to a domain action whose input schema needs fields is `invalid_input` (the action ran with an empty input past the check every other call has).
+- Code editor: accepting a completion checks again that its start is still where the word at the caret begins, else the list closes (after an edit since it opened the cut went from a stale position, on another line or past its end).
+- Terminal: the local echo of a line is written apart from the peer's escape state (an open sequence of its output took the echo in, or the echo ended the peer's sequence); closing the search bar clears its hits (they stayed marked in the text).
+- Window state: a tool window restored at a place where (almost) nothing of it is on a monitor is moved onto the nearest monitor's work area, as the main window (it opened off-screen after a monitor was gone).
+- Text box: undo to a state longer than a smaller capacity cuts it on a character's start (it could cut a UTF-8 character); a password box's accessibility record gives caret and anchor as indices of its dots, and a screen reader's selection in it maps back to the characters (they were byte indices of the hidden text).
+- `History`: `undo` / `redo` while a group is open close it first, its edits so far are the newest step (undo reverted the older step under them, redo did an undone step over newer edits); `can_undo`, `can_redo` and the labels count the open group.
+- A box nested beyond the layout's limit pushes no clip or disabled level and its `box_end` pops nothing (it took the parent's frame, clip and disabled level); an expander beyond the 16 kept ones opens no content card (its box stayed open).
+
+### Security
+
+- Permission dialog: the target, plugin, reason and rule are wrapped and whole, control characters and the characters that change the writing direction show as `<U+XXXX>` (a long target lost its end at the dialog's edge, U+202E could turn a file name around, NUL ended the text).
+- Terminal: a change into or out of `TM_SECRET` drops (overwrites) the input typed so far: a hidden line showed in the next mode's input line, a visible one became part of the secret.
+- `TB_MULTI | TB_PASSWORD` is a one-line password box: the multi-line box ignored `TB_PASSWORD` and showed the password in plain text.
 
 ## [0.2.1] - 2026-11-16
 

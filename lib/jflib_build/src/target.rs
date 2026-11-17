@@ -188,7 +188,8 @@ impl Target {
                  [target.{triple}] from .cargo/config.toml (rust-lld and crt-static are for JFLib's own runtime)"
             ));
         }
-        Ok(vec![format!("-Wl,-Map={}", out_dir.join("program.map").display())])
+        // through -Xlinker as one argument: behind -Wl, a comma in the path split it
+        Ok(vec!["-Xlinker".to_string(), format!("-Map={}", out_dir.join("program.map").display())])
     }
 
     /// the three libraries a program against glibc links with: rustc assembles the stubs, the lld
@@ -286,6 +287,15 @@ mod tests {
         let at = args.iter().position(|a| *a == map).expect("the map argument");
         assert_eq!(args[at - 1], "-Xlinker", "{args:?}");
         assert!(!args.iter().any(|a| a.starts_with("-Wl,-Map")), "{args:?}");
+    }
+
+    // with std (glibc through cc): -Xlinker, as -Wl, would split the path at a comma
+    #[test]
+    fn std_map_path_with_a_comma_stays_one_argument() {
+        let out = Path::new("a,b").join("out");
+        let t = Target { features: vec![], rustflags: String::new(), glibc: true, std: true, ..static_linux(false) };
+        let args = t.linux(&out).unwrap();
+        assert_eq!(args, ["-Xlinker".to_string(), format!("-Map={}", out.join("program.map").display())]);
     }
 
     #[test]

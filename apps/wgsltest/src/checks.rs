@@ -31,6 +31,7 @@ pub const PASS: &[(&str, &str)] = &[
     ("u32 of a big abstract", "const a = u32(4 * 1000 * 1000 * 1000);"),
     ("short-circuit is not evaluated", "const a = false && (10i < i32(5 * 1000 * 1000 * 1000));\nconst b = true || (1 / 0 == 0);"),
     ("short-circuit still types the array size", "const a = false && array<u32, 1 + 2>(0, 1, 2)[0] == 0;"),
+    ("short-circuit with a runtime right side in a let", "fn f() -> bool { return true; }\nfn g() -> bool { let x = false && f(); let y = true || f(); return x || y; }"),
     ("select with runtime cond", "fn f(c: bool) -> i32 { return select(1, 2, c); }"),
     ("vector compare", "const a = all(vec2(1, 2) == vec2(1, 2));"),
     ("matrix products", "fn f(m: mat2x3f, v: vec2f, w: vec3f, n: mat3x2f) -> f32 { let a: vec3f = m * v; let b: vec2f = w * m; let c: mat3x3f = m * n; let d = m * 2.0; return a.x + b.y + c[0][0] + d[1][2]; }"),
@@ -96,6 +97,8 @@ pub const PASS: &[(&str, &str)] = &[
 
 /// (name, source with `$` at the error, a part of the message)
 pub const FAIL: &[(&str, &str, &str)] = &[
+    // short-circuit with a runtime right side: no const-expression
+    ("false && runtime is no const-expression", "fn f() -> bool { return true; }\nfn g() { const c = $false && f(); }", "muss ein const-Ausdruck sein"),
     // names and scopes
     ("unknown name", "fn f() -> i32 { return $x; }", "`x` ist hier nicht bekannt"),
     ("duplicate module name", "const a = 1;\nconst $a = 2;", "schon deklariert"),
