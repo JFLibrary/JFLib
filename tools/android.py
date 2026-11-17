@@ -2,8 +2,10 @@
 
 The shared Java/JNI host presents the library's pixels and forwards input. Apps opt in
 with `android` in TARGETS and supply android/AndroidManifest.xml and android/res/.
-A program without a UI (`android` in TARGETS, ui not among its crates: apps/gputest) is a
-plain executable for `adb shell` instead (build_exe, android/exe_main.c).
+A program without a UI (`android` in TARGETS, ui not among its crates: apps/gputest; or without
+android/AndroidManifest.xml: plattest, asynctest) is a plain executable for `adb shell` instead
+(build_exe, android/exe_main.c), with a test APK that runs it in an app's process (build_console_apk,
+tools/android_console.py).
 jfgui_ANDROID_PACKAGE=NAME (test builds): the APK under another package, beside what is installed
 on a phone, which it leaves alone (other debug keys, the user's data there).
 """
@@ -178,8 +180,9 @@ def native_link_flags():
 
 def build_exe(builder, name, archive):
     """a program without a UI -> <out>/android/NAME-<abi>: `adb push` it to /data/local/tmp and run it
-    from `adb shell` (the driver of a GPU needs no app for that); no APK, no Java.  archive: the
-    static library Cargo built (build_rs.py's derived_workspace)"""
+    from `adb shell` (the driver of a GPU needs no app for that); no APK, no Java.  Beside it its test
+    APK NAME-<abi>-console.apk (build_console_apk), which runs the same program in an app's process.
+    archive: the static library Cargo built (build_rs.py's derived_workspace)"""
     build = sys.modules[builder.__class__.__module__]
     error, run = build.BuildError, build.run_cmd
     try:
@@ -195,13 +198,93 @@ def build_exe(builder, name, archive):
     digest.update(f'{ndk}'.encode())
     stamp = work / 'exe.sha256'
     fingerprint = digest.hexdigest()
+    if not (output.exists() and stamp.exists() and stamp.read_text() == fingerprint):
+        triple = 'aarch64-linux-android' if builder.android_abi == 'arm64-v8a' else 'x86_64-linux-android'
+        run([llvm / 'bin' / ('clang' + suffix), f'--target={triple}{MIN_API}', f'--sysroot={llvm / "sysroot"}', '-std=c11', '-O2',
+             '-fPIE', '-pie', '-Wall', '-Wextra', '-Werror', ROOT / 'android' / 'exe_main.c', archive, *native_link_flags(),
+             '-llog', '-landroid', '-ldl', '-lm', '-o', output])
+        run([llvm / 'bin' / ('llvm-strip' + suffix), '--strip-unneeded', output])
+        stamp.write_text(fingerprint)
+    build_console_apk(builder, name, archive)
+    return output
+
+
+CONSOLE = ROOT / 'tools' / 'android_console'
+
+
+def console_package(name):
+    """the package of an app's test APK (build_console_apk): org.jflib.console.<name in lower case>"""
+    return 'org.jflib.console.' + re.sub(r'[^a-z0-9]', '', name.lower())
+
+
+def build_console_apk(builder, name, archive):
+    """the test APK of a program without a UI (docs/ANDROID.md, AN0) -> <out>/android/NAME-<abi>-console.apk:
+    android/exe_main.c with -DJFGUI_CONSOLE_APK and the program as libjfgui_console.so, started by
+    tools/android_console/ConsoleInstrumentation.java in the app's process (untrusted_app, Zygote's
+    seccomp filter); no activity, no resources, debuggable (run-as reads its output), the debug key.
+    Package console_package(name), beside every other app.  tools/android_console.py runs it."""
+    build = sys.modules[builder.__class__.__module__]
+    error, run = build.BuildError, build.run_cmd
+    try:
+        sdk, ndk, llvm, sdkbuild, platform, java, suffix = sdk_tools()
+    except RuntimeError as exc:
+        raise error(str(exc)) from exc
+    work = builder.dir / 'apps' / name / 'console'
+    work.mkdir(parents=True, exist_ok=True)
+    output = builder.android_output / f'{name}-{builder.android_abi}-console.apk'
+    package = console_package(name)
+    sources = [Path(__file__), ROOT / 'build_rs.py', ROOT / 'android' / 'exe_main.c', *sorted(CONSOLE.glob('*.java'))]
+    digest = hashlib.sha256(Path(archive).read_bytes())
+    for path in sources:
+        digest.update(path.read_bytes())
+    digest.update(f'{ndk}:{sdkbuild}:{platform}:{java}:{package}'.encode())
+    stamp = work / 'apk.sha256'
+    fingerprint = digest.hexdigest()
     if output.exists() and stamp.exists() and stamp.read_text() == fingerprint:
         return output
     triple = 'aarch64-linux-android' if builder.android_abi == 'arm64-v8a' else 'x86_64-linux-android'
+    native = work / 'libjfgui_console.so'
     run([llvm / 'bin' / ('clang' + suffix), f'--target={triple}{MIN_API}', f'--sysroot={llvm / "sysroot"}', '-std=c11', '-O2',
-         '-fPIE', '-pie', '-Wall', '-Wextra', '-Werror', ROOT / 'android' / 'exe_main.c', archive, *native_link_flags(),
-         '-llog', '-ldl', '-lm', '-o', output])
-    run([llvm / 'bin' / ('llvm-strip' + suffix), '--strip-unneeded', output])
+         '-fPIC', '-fvisibility=hidden', '-Wall', '-Wextra', '-Werror', '-shared', '-DJFGUI_CONSOLE_APK',
+         ROOT / 'android' / 'exe_main.c', archive, *native_link_flags(), '-llog', '-landroid', '-ldl', '-lm', '-o', native])
+    run([llvm / 'bin' / ('llvm-strip' + suffix), '--strip-unneeded', native])
+    try:
+        verify_elf(native, builder.android_abi)
+    except RuntimeError as exc:
+        raise error(str(exc)) from exc
+    classes, dex = work / 'classes', work / 'dex'
+    for folder in (classes, dex):
+        shutil.rmtree(folder, ignore_errors=True)
+        folder.mkdir()
+    run([java / ('javac' + suffix), '--release', '8', '-Xlint:-options', '-encoding', 'UTF-8', '-classpath', platform,
+         '-d', classes, *sorted(CONSOLE.glob('*.java'))])
+    run([java / ('java' + suffix), '-cp', sdkbuild / 'lib' / 'd8.jar', 'com.android.tools.r8.D8',
+         '--min-api', str(MIN_API), '--lib', platform, '--output', dex, *sorted(classes.rglob('*.class'))])
+    manifest = work / 'AndroidManifest.xml'
+    manifest.write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<!-- made by tools/android.py (build_console_apk): the test APK of a program without a UI -->\n'
+        f'<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="{package}"\n'
+        '    android:versionCode="1" android:versionName="0.1">\n'
+        f'    <application android:label="{name} (console)" android:allowBackup="false" android:extractNativeLibs="false" />\n'
+        '    <instrumentation android:name="org.jflib.console.ConsoleInstrumentation"\n'
+        f'        android:targetPackage="{package}" android:functionalTest="true" />\n'
+        '</manifest>\n', encoding='utf-8')
+    unsigned = work / 'unsigned.apk'
+    run([sdkbuild / ('aapt2' + suffix), 'link', '-o', unsigned, '-I', platform, '--manifest', manifest,
+         '--min-sdk-version', str(MIN_API), '--target-sdk-version', '35', '--debug-mode'])
+    with zipfile.ZipFile(unsigned, 'a') as apk:
+        apk.write(dex / 'classes.dex', 'classes.dex', compress_type=zipfile.ZIP_DEFLATED)
+        apk.write(native, f'lib/{builder.android_abi}/libjfgui_console.so', compress_type=zipfile.ZIP_STORED)
+    aligned = work / 'aligned.apk'
+    run([sdkbuild / ('zipalign' + suffix), '-f', '-P', '16', '4', unsigned, aligned])
+    try:
+        keystore = debug_key(builder.android_output, java, suffix, run)
+    except RuntimeError as exc:
+        raise error(str(exc)) from exc
+    signer = [java / ('java' + suffix), '-jar', sdkbuild / 'lib' / 'apksigner.jar']
+    run(signer + ['sign', '--ks', keystore, '--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out', output, aligned])
+    run(signer + ['verify', output], quiet=True)
     stamp.write_text(fingerprint)
     return output
 

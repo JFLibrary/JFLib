@@ -42,6 +42,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   headless runs stay at three. A trackpad on macOS and a touchpad on Wayland, which plat gives in
   pixels now, scroll the views by the fingers' way (4.8 times it on Wayland and 1.2 on macOS
   before).
+- `ui::launch` on Android takes a headless run (--shot, --script, --agent-json, --agent-mcp) as on the desktop, like iOS; the rest stays the Java host's. The desktop's runner adds about 290 KB to an APK
 
 ### Fixed
 

@@ -15,8 +15,10 @@
 //                                  --no-portal-files (the fake answers without appearance keys):
 //                                  what the portal does not say comes from the files
 
+#[cfg_attr(target_os = "android", allow(unused_imports))] // (the system's values: Windows and Linux)
 use alloc::format;
 
+#[cfg_attr(target_os = "android", allow(unused_imports))]
 use plat::{SysSettings, sys_settings, sys_settings_env};
 use plat::{Titlebar, titlebar_action_parse, titlebar_layout_parse, TB_ACT_LOWER, TB_ACT_MAXIMIZE, TB_ACT_MENU, TB_ACT_MINIMIZE, TB_ACT_NONE};
 use plat::{TB_BTN_CLOSE as C, TB_BTN_MAX as X, TB_BTN_MIN as N};

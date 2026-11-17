@@ -176,6 +176,11 @@
 //   --repeat N                             run the selected tests N times (only failures are
 //                                          printed then) -- a stress loop for races
 //
+// Android (docs/ANDROID.md, AN0): a program without a UI, python tools/android_console.py plattest -- --test all;
+// what needs plat's fs, net, sync, threads or child processes says "not on Android yet" (AN1 to
+// AN4) or, what Android does not have, "not on Android" (docs/ANDROID.md, "Bewusst nicht").
+//   plattest --test syscalls               (t_syscalls.rs, Android) every system call of rt's kernel table in
+//                                          a child: allowed, or ended by the seccomp filter (SIGSYS)
 // Scratch files live in build/plattest/<os>-<id>/ and are removed at the end; the config
 // directory is redirected there (APPDATA / XDG_CONFIG_HOME) before anything is written.
 // Every check prints PASS / FAIL with the same text as the assembly version; the exit code
@@ -184,8 +189,9 @@
 #![no_main]
 #![deny(unsafe_code)]
 // macOS and iOS: the tests of windows, pens, fingers and screens wait for AP4 (docs/APPLE.md); their helpers
-// stay unused until then
-#![cfg_attr(target_vendor = "apple", allow(dead_code, unused_imports))]
+// stay unused until then.  Android (a program without a UI there): the same, and what needs fs, net, sync
+// or child processes waits for AN1 to AN4 (docs/ANDROID.md)
+#![cfg_attr(any(target_vendor = "apple", target_os = "android"), allow(dead_code, unused_imports))]
 
 extern crate alloc;
 
@@ -210,7 +216,14 @@ mod t_async;
 mod t_cursor;
 // the user's folders, the log folder and the trash
 mod t_dirs;
+#[cfg(not(target_os = "android"))]
 mod t_trash;
+#[cfg(target_os = "android")]
+mod t_trash {
+    pub fn t_trash(t: &mut crate::T) {
+        crate::later(t, "trash: plat::fs");
+    }
+}
 // clipboard_platform: deterministic rich clipboard framing checks.
 mod t_cliprich;
 // the system's clipboard for real (test devices: the iOS simulator)
@@ -219,7 +232,29 @@ mod t_clip;
 mod t_dnd;
 mod t_pen;
 mod t_touch;
+#[cfg(not(target_os = "android"))]
 mod t_spawn;
+#[cfg(target_os = "android")]
+mod t_spawn {
+    pub fn t_spawn(t: &mut crate::T) {
+        crate::never(t, "spawn: child processes");
+    }
+    pub fn t_spawned(t: &mut crate::T) {
+        crate::never(t, "spawn: child processes");
+    }
+    pub fn t_launch(t: &mut crate::T) {
+        crate::never(t, "spawn: child processes");
+    }
+    pub fn t_launched(t: &mut crate::T) {
+        crate::never(t, "spawn: child processes");
+    }
+    pub fn t_alive(t: &mut crate::T) {
+        crate::never(t, "spawn: child processes");
+    }
+    pub fn t_alive_child(t: &mut crate::T) {
+        crate::never(t, "spawn: child processes");
+    }
+}
 mod t_window;
 // what a present costs in a real window (4K frames)
 mod t_present;
@@ -256,10 +291,31 @@ mod t_lib {
     }
 }
 mod t_log;
+#[cfg(not(target_os = "android"))]
 mod t_policy;
+#[cfg(target_os = "android")]
+mod t_policy {
+    pub fn t_policy(t: &mut crate::T) {
+        crate::later(t, "policy: plat::fs, net, process");
+    }
+}
 mod t_permask;
+#[cfg(not(target_os = "android"))]
 mod t_plugperm;
+#[cfg(target_os = "android")]
+mod t_plugperm {
+    pub fn t_plugperm(t: &mut crate::T) {
+        crate::later(t, "plugperm: plat::net");
+    }
+}
+#[cfg(not(target_os = "android"))]
 mod t_vfs;
+#[cfg(target_os = "android")]
+mod t_vfs {
+    pub fn t_vfs(t: &mut crate::T) {
+        crate::later(t, "vfs: plat::fs, File::create_new");
+    }
+}
 mod t_content;
 mod t_docs;
 mod t_portal;
@@ -271,19 +327,38 @@ mod t_settings;
 mod t_keychar;
 mod t_tray;
 // the desktop integration: keeping awake, autostart, the taskbar button
+#[cfg(not(target_os = "android"))]
 mod t_autostart;
+#[cfg(target_os = "android")]
+mod t_autostart {
+    pub fn t_autostart(t: &mut crate::T) {
+        crate::never(t, "autostart");
+    }
+    pub fn t_autostart_bus(t: &mut crate::T) {
+        crate::never(t, "autostart");
+    }
+}
 mod t_power;
 mod t_taskbar;
 // the system's spell checker (Windows ISpellChecker)
 mod t_spell;
 // file types without a setup, the system's recent files
+#[cfg(not(target_os = "android"))]
 mod t_assoc;
+#[cfg(target_os = "android")]
+mod t_assoc {
+    pub fn t_assoc(t: &mut crate::T) {
+        crate::never(t, "assoc: file types and URL schemes of the desktop (Android: intents in the manifest)");
+    }
+}
 // sound output without a device: WAV, ring, resampler, Vorbis, the PulseAudio wire format
 mod t_audio;
 mod t_recent;
 // the monitors, pictures of the screen, the colour pick, global shortcuts
 mod t_screen;
 mod t_sensors;
+#[cfg(target_os = "android")]
+mod t_syscalls;
 
 use plat::{
     CPU_AVX2, CPU_BMI2, CPU_FMA, CPU_POPCNT, CPU_SSE41, Cancelled, E_WAKE, FO_READ, FO_RW, FO_WRITE, File, Job,
@@ -305,6 +380,18 @@ const CFGVAR: &str = if cfg!(windows) { "APPDATA" } else if cfg!(target_vendor =
 const CFGSUB: &str = if cfg!(target_vendor = "apple") { "/Library/Application Support" } else { "" };
 
 ui::main!(plattest());
+
+/// (Android) T::later for the modules of stubs below
+#[cfg(target_os = "android")]
+fn later(t: &T, what: &str) {
+    t.later(what);
+}
+
+/// (Android) what Android does not have (docs/ANDROID.md, "Bewusst nicht")
+#[cfg(target_os = "android")]
+fn never(_: &T, what: &str) {
+    out(&format!("SKIP {what}: not on Android (docs/ANDROID.md, \"Bewusst nicht\")\n"));
+}
 
 struct T {
     passes: u32,
@@ -330,6 +417,12 @@ impl T {
             self.fails += 1;
             out(&format!("FAIL {name}\n"));
         }
+    }
+
+    /// (Android) one line for what needs what plat lacks there so far (docs/ANDROID.md, AN1 to AN4)
+    #[cfg(target_os = "android")]
+    fn later(&self, what: &str) {
+        out(&format!("SKIP {what}: not on Android yet\n"));
     }
 
     fn info(&self, s: &str) {
@@ -388,6 +481,8 @@ fn plattest() -> i32 {
         Some("threads") => t_threads,
         Some("files") => t_files,
         Some("kernel") => t_kernel::t_kernel,
+        #[cfg(target_os = "android")]
+        Some("syscalls") => t_syscalls::t_syscalls, // Android: what Zygote's seccomp filter allows an app
         Some("ini") => t_ini,
         Some("cpu") => t_cpu,
         Some("evq") => t_evq,
@@ -611,6 +706,11 @@ static INI_BAD: AtomicU32 = AtomicU32::new(0);
 
 /// all thread tests, then stop the pool (the next run starts a new one)
 fn t_threads(t: &mut T) {
+    #[cfg(target_os = "android")]
+    if !plat::capabilities().supports(plat::CAP_THREADS) {
+        t.later("threads: thread_spawn, semaphores between threads, the pool on threads (AN1)");
+        return;
+    }
     th_raw(t);
     th_sem(t);
     th_pool(t);
@@ -659,6 +759,14 @@ fn th_stop(t: &mut T) {
 /// the UI thread's state: the first thread that touches it owns it, another thread panics before
 /// it reaches it (exit code 3) -- in a child process
 fn th_ui_gate(t: &mut T) {
+    #[cfg(target_os = "android")]
+    return never(t, "ui thread: the child that tries a second thread (child processes)");
+    #[cfg(not(target_os = "android"))]
+    th_ui_gate_child(t);
+}
+
+#[cfg(not(target_os = "android"))]
+fn th_ui_gate_child(t: &mut T) {
     let (code, text) = t_async::child(&["--test", "uithread-child"]);
     t.check(text.contains("uithread: the UI thread twice"), "ui thread: the first thread reaches the UI state, twice");
     let refused = code == Some(3) && text.contains("the UI thread's state used on thread") && !text.contains("second thread got through");
@@ -1183,7 +1291,10 @@ fn t_files(t: &mut T) {
     // ---- a relative link that climbs out of its folder (an AppImage's usr/bin/NAME ->
     // ../lib/NAME/NAME): without rules it is made as written; under rules ".." is refused
     // (t_policy)
-    if !cfg!(windows) {
+    #[cfg(target_os = "android")]
+    t.later("files: a symlink to ../lib/x (plat::fs)");
+    #[cfg(not(any(windows, target_os = "android")))]
+    {
         plat::mkdir(&t.subp("ln/bin"));
         plat::mkdir(&t.subp("ln/lib"));
         let made = plat::fs::symlink("../lib/x", &t.subp("ln/bin/x"), false);
@@ -1199,6 +1310,11 @@ fn t_files(t: &mut T) {
     t_env(t);
     // ---- memory, CPUs
     let mt = plat::mem_total();
+    #[cfg(target_os = "android")]
+    if mt == 0 {
+        t.later("sys: plat_mem_total (AN1: /proc/meminfo)");
+    }
+    #[cfg(not(target_os = "android"))]
     t.check(mt > 0x400_0000, "sys: plat_mem_total > 64 MB");
     t.info(&format!("  ({} MB, {} CPUs)\n", mt >> 20, plat::cpu_count()));
     t.scratch_done();
@@ -1218,7 +1334,8 @@ fn t_env(t: &mut T) {
     let orig = plat::env(CFGVAR);
     // expected = cwd/base/cfg with '/'; the value set in the native form
     let raw = format!("{}/{}/cfg", plat::cwd(), t.base);
-    let expected = raw.replace('\\', "/") + CFGSUB;
+    // (Android: the app's /config whatever the variable says, lib/plat/android_files.rs)
+    let expected = if cfg!(target_os = "android") { String::from("/config") } else { raw.replace('\\', "/") + CFGSUB };
     let native = if cfg!(windows) { raw.replace('/', "\\") } else { raw };
     let s = plat::setenv(CFGVAR, Some(&native));
     let cd = plat::config_dir().unwrap_or_default();
@@ -1245,7 +1362,15 @@ fn t_env(t: &mut T) {
     // without the variable: the fallback
     plat::setenv(CFGVAR, None);
     let cd = plat::config_dir();
-    let tail = if cfg!(windows) { "/AppData/Roaming" } else if cfg!(target_vendor = "apple") { "/Library/Application Support" } else { "/.config" };
+    let tail = if cfg!(windows) {
+        "/AppData/Roaming"
+    } else if cfg!(target_vendor = "apple") {
+        "/Library/Application Support"
+    } else if cfg!(target_os = "android") {
+        "/config"
+    } else {
+        "/.config"
+    };
     t.check(cd.as_deref().is_some_and(|c| c.ends_with(tail)), "env: plat_config_dir fallback without the variable");
     t.info(&format!("  ({})\n", cd.unwrap_or_default()));
     // settings through the redirected config dir
@@ -1693,6 +1818,11 @@ fn t_cpu(t: &mut T) {
     t.info(&format!("  cpu: {brand}\n"));
     t.info(&format!("  features: SSE4.1 {}  AVX2 {}  FMA {}  POPCNT {}  BMI2 {}\n", f & 1, f >> 1 & 1, f >> 2 & 1,
                     f >> 3 & 1, f >> 4 & 1));
+    #[cfg(target_os = "android")]
+    if brand.is_empty() {
+        t.later("cpu: cpu_brand (rt's portable CPU code there; /proc/cpuinfo)");
+    }
+    #[cfg(not(target_os = "android"))]
     t.check(!brand.is_empty(), "cpu: cpu_brand");
     if f & CPU_AVX2 != 0 {
         t.check(plat::avx2_probe(), "cpu: AVX2 instructions run when CPU_AVX2 is reported");

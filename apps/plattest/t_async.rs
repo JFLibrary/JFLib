@@ -90,6 +90,7 @@ fn returns_within(ms: u64, f: impl FnOnce() -> bool + Send + 'static) -> Option<
 }
 
 // a value that holds a sender of the channel it travels in
+#[cfg(not(target_os = "android"))]
 struct Carried(#[allow(dead_code)] plat::sync::Sender<Carried>);
 
 // cancels its token when dropped
@@ -123,6 +124,12 @@ fn noop_waker() -> core::task::Waker {
     core::task::Waker::from(Arc::new(Noop))
 }
 
+#[cfg(target_os = "android")]
+fn drops(t: &mut T) {
+    t.later("async: drops (plat::sync's channels)");
+}
+
+#[cfg(not(target_os = "android"))]
 fn drops(t: &mut T) {
     // the receiver goes while a sender of the same channel waits in its queue: the queued value
     // (and the sender in it) is dropped after the lock is released
@@ -808,6 +815,7 @@ fn dropped_write(t: &mut T, gate: &Arc<Gate>) {
 // ---------------------------------------------------------------- children
 
 // run plattest with args -> (exit code, stdout + stderr)
+#[cfg(not(target_os = "android"))]
 pub(crate) fn child(args: &[&str]) -> (Option<i32>, String) {
     let exe = plat::current_exe().unwrap_or_default();
     let cmd = plat::process::Command { program: &exe, args, cwd: None, env: &[] };
@@ -839,6 +847,12 @@ pub(crate) fn child(args: &[&str]) -> (Option<i32>, String) {
     (code, String::from_utf8_lossy(&out).into_owned())
 }
 
+#[cfg(target_os = "android")]
+fn children(t: &mut T) {
+    crate::never(t, "async: panics in tasks and jobs, aio under a manifest (child processes)");
+}
+
+#[cfg(not(target_os = "android"))]
 fn children(t: &mut T) {
     let (code, out) = child(&["--test", "async-panic"]);
     t.check(code == Some(3) && out.contains("panic: ") && out.contains("task panic test"), "async: a panic in a task: exit code 3");

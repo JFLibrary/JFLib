@@ -11,9 +11,11 @@
 // netio's client against the core over TCP.  --ssh-core-serve PORT is the test server of
 // tools/ssh_interop.py --core, where OpenSSH's own client logs in
 
+#[cfg(not(target_os = "android"))]
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
+#[cfg(not(target_os = "android"))]
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -24,6 +26,7 @@ use netpkt::pkt::{Pkt, HEADROOM};
 use netpkt::ssh::{self, AuthMethod, Cipher, Config, Core, Event, KexInit, KeyPair, Request, R, W};
 use netpkt::tcp::{TcpHdr, TcpOpts, ACK, PSH};
 use netpkt::{Ipv4, Mac};
+#[cfg(not(target_os = "android"))]
 use plat::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
 
 use crate::T;
@@ -573,6 +576,7 @@ fn dissector(t: &mut T) {
 // ---------------------------------------------------------------- over TCP
 
 /// runs a core over a socket until it is dead or the socket ends
+#[cfg(not(target_os = "android"))]
 fn drive(s: &TcpStream, core: &mut Core, on: &mut dyn FnMut(&mut Core, Event)) -> bool {
     let mut buf = alloc::vec![0u8; 65536];
     loop {
@@ -594,6 +598,7 @@ fn drive(s: &TcpStream, core: &mut Core, on: &mut dyn FnMut(&mut Core, Event)) -
 }
 
 /// the commands of the test server over the core (sshd.rs's); `logins` the keys it takes
+#[cfg(not(target_os = "android"))]
 pub fn serve_core(s: TcpStream, logins: &crate::sshd::Logins, ciphers: &[&str]) {
     let mut core = Core::server(cfg(ciphers), alloc::vec![crate::sshd::host_key_pair()], &crypto::sha256(b"sshcore server"));
     let mut stdin: Vec<u8> = Vec::new();
@@ -660,6 +665,7 @@ pub fn serve_core(s: TcpStream, logins: &crate::sshd::Logins, ciphers: &[&str]) 
     drive(&s, &mut core, &mut on);
 }
 
+#[cfg(not(target_os = "android"))]
 fn tcp(t: &mut T) {
     let logins = Arc::new(crate::sshd::Logins { keys: alloc::vec![user_ed().blob()] });
     // the core as a client against netio's server
@@ -746,12 +752,16 @@ pub fn run(t: &mut T) {
     keys(t);
     memory(t);
     dissector(t);
+    #[cfg(not(target_os = "android"))]
     tcp(t);
+    #[cfg(target_os = "android")]
+    t.later("the core against netio's server and client over TCP");
     crate::snmpv3t::run(t);
 }
 
 /// --ssh-core-serve PORT [--authorized FILE] [--hostkey-out FILE] [--cipher NAME]: the core as a
 /// server for OpenSSH's client (tools/ssh_interop.py --core)
+#[cfg(not(target_os = "android"))]
 pub fn serve(port: u16) -> i32 {
     let mut keys = Vec::new();
     if let Some(f) = plat::arg_value("--authorized") {

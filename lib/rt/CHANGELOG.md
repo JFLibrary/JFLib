@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `rt::kernel` (the system call numbers, open flags and struct stat per architecture) on Android too, without rt::os's helpers
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

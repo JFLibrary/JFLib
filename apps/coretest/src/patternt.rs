@@ -50,6 +50,9 @@ fn limits(t: &mut T) {
     let opts = alloc::format!("^{}b$", "a?".repeat(6000));
     let built = (Regex::new(&alts, Syntax::Extended, false), Regex::new(&opts, Syntax::Extended, false));
     t.check("6000 alternatives, 6000 a?: built", built.0.is_ok() && built.1.is_ok());
+    #[cfg(target_os = "android")]
+    t.later("6000 alternatives, 6000 a? on a 64 KB stack (a thread)");
+    #[cfg(not(target_os = "android"))]
     if let (Ok(ra), Ok(ro)) = built {
         let res = alloc::sync::Arc::new(plat::sync::Mutex::new(None));
         let r2 = res.clone();

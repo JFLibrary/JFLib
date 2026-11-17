@@ -4,7 +4,8 @@
 //   rt::os::{pages_alloc, pages_free, write_stdout, write_stderr, exit, yield_now}   (and on
 //   Linux the raw syscall helpers plat builds on); write_stderr_crash: stderr for crash paths,
 //   which gives up a stuck non-blocking stderr instead of waiting for it (Linux)
-//   rt::kernel the Linux kernel ABI per architecture: SYS_*, O_*, Stat, clone_args (also as rt::os::*)
+//   rt::kernel the Linux kernel ABI per architecture: SYS_*, O_*, Stat, clone_args (also as rt::os::*;
+//            Android has the table too, without rt::os's helpers: docs/ANDROID.md, decision 2)
 //   rt::fx   cvtt / cvt / sqrt / minss / maxss / floor_i / ceil_i / div255
 //   rt::x87  the extended-precision steps of f64 <-> decimal text (ini.s), fpatan
 //   rt::sync SpinLock
@@ -205,7 +206,7 @@ pub mod cpu; // (Intel Macs: CPUID and x87 as on Windows and Linux, docs/INTEL_M
 pub mod crash;
 #[cfg_attr(target_arch = "aarch64", path = "aarch64/fx.rs")] #[cfg_attr(all(not(target_arch = "aarch64"), any(target_arch = "wasm32", target_os = "android")), path = "portable/fx.rs")]
 pub mod fx;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub mod kernel;
 // Android and Apple: the system's malloc and memory functions (android.rs, apple.rs)
 #[cfg(not(any(target_os = "android", target_vendor = "apple")))]
