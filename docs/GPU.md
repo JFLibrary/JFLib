@@ -890,6 +890,12 @@ verborgen, bis sein erstes Bild kommt; darunter bleibt das Bild des CPU-Wegs. St
   schreiben; wo die Tabelle gebunden ist, macht `useResources` ihren Inhalt resident. Auf Voll übersetzt Metal das MSL als 3.0.
 - **Darstellung.** Nur Fifo (`Immediate` und `Mailbox` werden zu Fifo: Ein Fenster zeigt ohnehin im Takt des Compositors). Immer drei Drawables, `try_acquire` wartet nie, die Presented-Handler zählen, was angekommen ist.
 - **Farben.** Der Layer hat den Farbraum sRGB wie das `CGImage` des CPU-Wegs: beide zeigen dieselben Pixel.
+- **Gefunden mit render2d (G6e3, [RENDER2D.md](RENDER2D.md#die-anderen-ziele-g6e3)).** Keine Zeitstempel (`Features::timestamps` aus): Wer auf
+  Metal misst, nimmt die Wandzeit vom Abschicken bis zum Ende des Wartens. Ein Dispatch hat höchstens 65 535 Arbeitsgruppen je Achse
+  (`Limits::max_compute_workgroups`, wie WebGPU); ein größerer gilt beim `finish` als Fehlgebrauch. Der M2 mischt in ein 8-Bit-Ziel
+  genau (das gerundete genaue Ergebnis), die NVIDIA-GPU rundet Quelle und Alpha vorher auf 8 Bit: Bilder beider liegen in einigen
+  Prozent der Pixel 1 Code auseinander. Metals API- und Shader-Validierung (`MTL_DEBUG_LAYER=1`, `MTL_SHADER_VALIDATION=1`) meldet über
+  render2d nur Hinweise „redundant setting“ (dieselben Puffer noch einmal gesetzt).
 - **iOS.** Nur Fenster 0, und nur, solange die Leinwand nichts anderes zeigt. Ohne aktive Szene keine GPU-Arbeit (`win_state` sagt `WST_HIDDEN`, die Ausgabe geht auf den CPU-Weg und kommt zurück).
 - **Tests.** macOS: `tools/apple.py gui build/mac/uigputest --test NAME` in der angemeldeten Sitzung. iOS: `tools/apple.py simapp build/ios-sim/uigputest --test NAME` (UIKit im Simulator), die Prüfung gegen den Bildschirm hat auf beiden kein Ergebnis, jedes dargestellte Bild wird zurückgelesen und mit dem Framebuffer verglichen.
 
