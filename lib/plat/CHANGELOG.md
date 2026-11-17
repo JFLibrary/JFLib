@@ -58,6 +58,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   again.
 - `a11y::Node::offset_at` walks the text once; char_rect for every offset counted from the start each time (quadratic: a screen reader's hit test on a long text box hung).
 - Windows: the backup of a file association's registry keys walks them with a list instead of recursion (keys nest up to 512 deep, each level held a 32 KB buffer on the stack).
+- Windows on ARM64: function pointers that plat looks up once (GetProcAddress: the drop functions of shell32, the pointer and touch functions of user32, Shell_NotifyIconW, GetDpiForMonitor) are published with Release and read with Acquire; with Relaxed another thread on a weakly ordered CPU could see the last of the three pointers of WM_DROPFILES before the first (docs/ARM64.md, ARM7). The cooperative Job of the browser and of Android hands its items' results to a thread that polls done() or items_done() (Release / Acquire)
 
 ### Security
 

@@ -105,10 +105,10 @@ static SHELL: AtomicUsize = AtomicUsize::new(0);
 static TASKBAR_MSG: AtomicUsize = AtomicUsize::new(0);
 
 fn shell_notify(msg: u32, d: &NotifyIconData) -> bool {
-    let mut p = SHELL.load(Ordering::Relaxed);
+    let mut p = SHELL.load(Ordering::Acquire);
     if p == 0 {
         p = dll_proc(b"shell32.dll\0", b"Shell_NotifyIconW\0");
-        SHELL.store(p, Ordering::Relaxed);
+        SHELL.store(p, Ordering::Release);
     }
     if p == 0 {
         return false;
