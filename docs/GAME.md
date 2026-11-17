@@ -30,8 +30,12 @@ Vom Nutzer am 17.11.2026:
 | E4 | Modelle und Welten werden in JFScript beschrieben; JFScript wird dafür ausgebaut. |
 | E5 | Die Physik ist eine eigene, keine Portierung. |
 | E6 | Spiel 1 hat Mehrspieler und läuft im Browser und auf dem Desktop. |
+| E7 | JFScript bleibt im eigenen Repository. JFLib nimmt es per git wie `editortest`; die Anbindung liegt in `apps/modeltool` und den Spielen, nicht in veröffentlichten Crates. Was die Sprache braucht, wird dort gebaut und eingespielt. |
+| E8 | Im Browser trägt WebSocket das Netz von Spiel 1. WebTransport (Datagramme über QUIC) erst, wenn `netio` QUIC kann; das wäre eine eigene Stufe. |
+| E9 | Das Crate des Spielkerns heißt `lib/game` (`jflib-game`). |
 
-Offene Vorschläge, die eine Antwort brauchen, stehen unter [Offen](#offen).
+E7 bis E9 waren Vorschläge dieses Plans, angenommen am selben Tag. Was später zu entscheiden ist, steht unter
+[Offen](#offen).
 
 ## Ausgangslage
 
@@ -82,8 +86,7 @@ Regeln:
 - **Die neuen Bibliotheken wie die übrigen:** `#![no_std]`, `#![forbid(unsafe_code)]`, keine fremden Crates,
   gebaut für Windows, Linux, Browser und Android, dazu die Apple-Ziele.
 - **Die JFScript-Anbindung liegt nicht in einem veröffentlichten Crate** (ein Crate auf crates.io darf nicht von
-  einem git-Stand abhängen), sondern in `apps/modeltool` und den Spielen. `lib/geom` hat eine reine Rust-API.
-  Vorschlag V1 unter [Offen](#offen).
+  einem git-Stand abhängen), sondern in `apps/modeltool` und den Spielen. `lib/geom` hat eine reine Rust-API (E7).
 
 ## Stufen
 
@@ -110,6 +113,16 @@ Welle nebeneinander laufen; G7b braucht G7a, G7e braucht G7b und G7d, G7h brauch
 | G7p | Auszug in eigene Repositories | 1–2 |
 
 Phase 1 sind rund 17 bis 22 Läufe, die Phasen danach sind grob geschätzt und werden vor ihrem Start neu geschnitten.
+
+Wellen in Phase 1, je höchstens drei Agenten, so geschnitten, dass in einer Welle keine zwei dieselben Dateien
+anfassen:
+
+| Welle | Stufen | Warum so |
+| --- | --- | --- |
+| 1 | G7a, G7c, G7f | `plat` (Eingabe), `lib/physics`, `render3d`: keine gemeinsamen Dateien. G7a liegt auf dem längsten Weg (G7a → G7b → G7e → G7h). |
+| 2 | G7b, G7d, G7g | G7b braucht G7a; G7d fasst den Browser-Host in `plat` an, den in Welle 1 G7a ändert. |
+| 3 | G7e | braucht G7b und G7d. |
+| 4 | G7h | braucht alles davor. |
 
 ### Phase 1: Grundlagen und Spiel 1
 
@@ -268,14 +281,6 @@ PaintCraft zu JFPainter. `render3d` bleibt (E2); für `physics`, `anim` und `geo
 [Crates](#crates), entschieden wird beim Auszug.
 
 ## Offen
-
-Vorschläge, die eine Antwort des Nutzers brauchen:
-
-| Nr. | Frage | Vorschlag |
-| --- | --- | --- |
-| V1 | Wo liegt JFScript während G7? | Im eigenen Repository, wie heute. JFLib nimmt es per git wie `editortest`; die Anbindung liegt in `apps/modeltool` und den Spielen, nicht in veröffentlichten Crates. Was die Sprache braucht, wird dort gebaut und eingespielt. |
-| V2 | Transport im Browser | WebSocket für Spiel 1. WebTransport (Datagramme über QUIC) erst, wenn `netio` QUIC kann; das wäre eine eigene Stufe. |
-| V3 | Name des Crates | `lib/game` (`jflib-game`), kurz wie `render3d`. |
 
 Später zu entscheiden: der Weg des Spielfensters (nach der Messung in G7b), der Look des Cartoon-Materials (G7f, an
 Bildern), Name und Server von Spiel 1 (G7h), Kartendaten aus OpenStreetMap für G7n (Lizenz ODbL), welche Crates beim
