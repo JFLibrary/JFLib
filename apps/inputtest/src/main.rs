@@ -20,6 +20,11 @@
 //
 // A headless run (scripts) plays the lock: Locked at once, Esc lets it go, `motion DX DY` moves
 // the pointer, `keydown w code 26` presses the key at W's place.
+//
+//   inputtest --lock [--auto-close MS]   asks for the lock in the first frame and writes every
+//                                        state of it to stdout ("lock: gefangen"), with the motion
+//                                        summed when it ends: whether a compositor grants it
+//                                        (a nested KWin without a screen; no input needed)
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -71,6 +76,8 @@ struct Inputtest {
     was: PointerLock,
     keys: Vec<String>,
     detail: String,
+    /// --lock: asked in the first frame, the states written to stdout
+    report: Option<bool>,
 }
 
 fn state_name(s: PointerLock) -> &'static str {
@@ -95,7 +102,18 @@ fn code_name(code: u32) -> String {
 impl App for Inputtest {
     fn frame(&mut self, ui: &mut Ui) {
         // the lock and its motion of this pass
+        if self.report.is_none() {
+            let on = plat::args().iter().any(|a| a == "--lock");
+            self.report = Some(on);
+            if on {
+                let s = ui.pointer_lock(true);
+                plat::write_stdout(format!("lock: asked -> {}\n", state_name(s)).as_bytes());
+            }
+        }
         let st = ui.pointer_lock_state();
+        if st != self.was && self.report == Some(true) {
+            plat::write_stdout(format!("lock: {} (motion so far {:.1} {:.1})\n", state_name(st), self.sum.0, self.sum.1).as_bytes());
+        }
         if st != self.was {
             if st == PointerLock::Locked {
                 self.sum = (0.0, 0.0);

@@ -1,7 +1,9 @@
 // linux_x11_lock -- (G7a) the pointer lock on X11 (the shared part: plock.rs)
 //
 //   X11::pointer_lock(w, on) -> PointerLock   the Display method (linux_disp.rs)
-//   X11::lock_try()           a request that waited: FocusIn of its window
+//   X11::lock_soon()          a request that waited may go (FocusIn of its window): lock_try from
+//                             X11::lock_deferred, outside the event handlers (GrabPointer waits
+//                             for its reply, which an event handler must not)
 //   X11::lock_release(w)      let it go (the app, Esc, FocusOut, minimized, destroyed)
 //   X11::lock_raw(ev)         an XI_RawMotion (linux_x11_xi.rs xi_event)
 //
@@ -46,6 +48,8 @@ pub(super) struct XLock {
     at: Option<[i32; 2]>,
     /// the last raw event (time, x, y): a repeat counts once
     last: (u32, f64, f64),
+    /// lock_try at the next lock_deferred
+    soon: bool,
     abs: [Abs; ABS_MAX],
     nabs: usize,
 }
@@ -77,7 +81,20 @@ impl X11 {
         plock_state()
     }
 
-    /// a request that waits: the grab once its window has the focus
+    /// (event handlers) a request that waits may go now: at the next lock_deferred
+    pub(super) fn lock_soon(&mut self) {
+        self.lk.soon = true;
+    }
+
+    /// (wait's deferred work) the request lock_soon marked
+    pub(super) fn lock_deferred(&mut self) {
+        if core::mem::take(&mut self.lk.soon) {
+            self.lock_try();
+        }
+    }
+
+    /// a request that waits: the grab once its window has the focus (not from an event handler:
+    /// it waits for replies)
     pub(super) fn lock_try(&mut self) {
         let w = plock_win();
         if w < 0 || plock_state() != PointerLock::Pending || self.lk.on {

@@ -607,7 +607,7 @@ impl X11 {
             let w = self.evwin;
             self.hide_owned(w, false); // windows hidden while it was minimized
             self.push(E_FOCUS_IN, 0, 0, 0, 0);
-            self.lock_try(); // (G7a) a pointer lock that waited for the focus
+            self.lock_soon(); // (G7a) a pointer lock that waited for the focus (after the dispatch)
         } else {
             if detail == 2 || !self.xw[i].focus {
                 return; // NotifyInferior

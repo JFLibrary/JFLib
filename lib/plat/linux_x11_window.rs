@@ -915,6 +915,7 @@ impl X11 {
     fn deferred(&mut self) {
         self.dnd_deferred(); // XDND: drops, positions, the app's drag (linux_x11_dnd.rs)
         self.xi_deferred(); // (PN1) pen devices changed
+        self.lock_deferred(); // (G7a) a pointer lock that waited for the focus
         self.screen_deferred(); // the pick's pixel, SET_MONITORS (linux_x11_screen.rs)
         if self.want & WANT_DPI != 0 {
             self.want &= !WANT_DPI;

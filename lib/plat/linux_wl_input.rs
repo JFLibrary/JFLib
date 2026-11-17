@@ -233,8 +233,10 @@ pub(crate) fn wlh_seat_caps(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
             if wl.g.csm != 0 {
                 wl.inp.csd = wl.w.send(wl.g.csm, &CSM_GET_POINTER, &[A::N(&IFACE_WP_CSD), A::O(p)]);
             }
+            wl.lock_try(); // (G7a) a pointer lock that waited for a pointer
         }
     } else if wl.inp.ptr != 0 {
+        wl.lock_release(crate::plock_win()); // (G7a) no pointer: no lock (its objects name the old one)
         let p = wl.inp.ptr;
         wl.inp.ptr = 0;
         wl.inp.ptr_in = false;
