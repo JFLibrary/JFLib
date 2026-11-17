@@ -1,0 +1,6 @@
+#!args --test atomics
+# (Rust only) plattest --test atomics: the memory order under many threads (docs/ARM64.md, ARM7):
+# SpinLock, Mutex, RwLock, Condvar, channel, Sem, the pool, the heap across threads, the event and
+# audio rings, litmus tests with SeqCst and Release / Acquire. One short pass; ARM devices run it
+# long with --secs N, with and without jfgui_ARM_LLSC=1. The whole test runs before the UI starts
+# and ends the process with the number of failures.

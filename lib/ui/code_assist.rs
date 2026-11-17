@@ -260,6 +260,11 @@ impl Pop {
 
     /// insert the chosen item (one undo step) and close
     pub(crate) fn accept(&mut self, doc: &mut CodeDoc) {
+        // the start still where the caret's word begins (an edit since the list opened moved
+        // or removed it: the cut went from a stale position, on another line or past its end)
+        if !self.filter(doc) {
+            return;
+        }
         let Some(it) = self.shown.get(self.sel).and_then(|&i| self.items.get(i)) else { return self.close() };
         let text = if it.insert.is_empty() { it.label.clone() } else { it.insert.clone() };
         let c = doc.selection().caret;

@@ -587,6 +587,12 @@ impl Demo {
         off.read().ok()
     }
 
+    /// (G6e3) the framebuffer can hold the view's newest frame: the output composes the view, or its newest frame is read back
+    fn newest(ui: &mut Ui) -> bool {
+        let i = ui.gpu_view_info(0, VIEW_ID).unwrap_or_default();
+        i.apart || i.read_frame >= i.frames
+    }
+
     /// the view in the framebuffer against offscreen -> the offscreen image
     fn check_view(&mut self, ui: &mut Ui, what: &str) -> Vec<u8> {
         let r = view_rect(ui.fb().w, ui.fb().h);
@@ -630,8 +636,12 @@ impl Demo {
         match pc {
             0 => {
                 let i = ui.gpu_view_info(0, VIEW_ID).unwrap_or_default();
-                if i.device && i.frames >= 1 && after(300) {
-                    say(&format!("  view {:?} on {:?}, output {}", i.size, i.level, i.output));
+                // (G6e3) without the UI's output (macOS by default) the view's frames come to the framebuffer when they are
+                // read back: wait for the newest there (Demo::newest).  The 300 ms count from the start, and under load the
+                // first frame came late in them: the framebuffer still held an older picture, presumably the CPU path's (1904
+                // pixels, up to 151 codes, on the M2 in the suite)
+                if i.device && i.frames >= 1 && Demo::newest(ui) && after(300) {
+                    say(&format!("  view {:?} on {:?}, output {}, apart {}, frame {} of {} read back", i.size, i.level, i.output, i.apart, i.read_frame, i.frames));
                     self.ok(i.device && i.attaches == 1, &format!("the view has a device ({} attach)", i.attaches));
                     let img = self.check_view(ui, "the first frame");
                     let paper = [(PAPER & 255) as u8, (PAPER >> 8) as u8, (PAPER >> 16) as u8];
@@ -661,7 +671,7 @@ impl Demo {
                 next(self);
             }
             2 => {
-                if after(300) {
+                if after(300) && Demo::newest(ui) {
                     let img = self.check_view(ui, "after the pan");
                     let before = self.test.as_ref().map_or(Vec::new(), |t| t.before.clone());
                     // the image moved: 40 px right and 25 px down, the same pixels where both show the drawing
@@ -695,7 +705,7 @@ impl Demo {
                 next(self);
             }
             4 => {
-                if after(300) {
+                if after(300) && Demo::newest(ui) {
                     let _ = self.check_view(ui, "after the zoom");
                     let i = ui.gpu_view_info(0, VIEW_ID).unwrap_or_default();
                     say(&format!("  {} frames of the view, {} read-backs, output {}", i.frames, i.reads, i.output));

@@ -1,5 +1,8 @@
 // Cooperative worker jobs for the browser. Parallel loops run sequentially in the app
 // worker; background jobs advance a bounded number of items between browser UI steps.
+// The host's one thread runs the items (Android: the UI thread); done() and items_done() read
+// with Acquire what step() stores with Release, so a thread of the app that polls them also sees
+// the items' results (docs/ARM64.md, ARM7).
 
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -41,7 +44,7 @@ impl JobCtl {
     }
     /// Number of completely processed items.
     pub fn items_done(&self) -> u64 {
-        self.done.load(Ordering::Relaxed) as u64
+        self.done.load(Ordering::Acquire) as u64
     }
 }
 
@@ -58,16 +61,16 @@ fn step(record: &Record) -> bool {
     }
     let i = ctl.done.load(Ordering::Relaxed);
     if i >= ctl.count || ctl.cancelled() || record.function.is_none() {
-        ctl.running.store(false, Ordering::Relaxed);
+        ctl.running.store(false, Ordering::Release);
         crate::wake();
         return false;
     }
     if let Some(function) = &record.function {
         function(i, ctl);
     }
-    ctl.done.store(i + 1, Ordering::Relaxed);
+    ctl.done.store(i + 1, Ordering::Release); // (the item's results before it)
     if i + 1 >= ctl.count || ctl.cancelled() {
-        ctl.running.store(false, Ordering::Relaxed);
+        ctl.running.store(false, Ordering::Release);
         crate::wake();
     }
     true
@@ -122,7 +125,7 @@ pub fn parallel_for(count: usize, f: &(dyn Fn(usize, &JobCtl) + Sync)) -> Result
             break;
         }
         f(i, &ctl);
-        ctl.done.store(i + 1, Ordering::Relaxed);
+        ctl.done.store(i + 1, Ordering::Release);
     }
     if ctl.cancelled() {
         Err(Cancelled)
@@ -207,7 +210,7 @@ impl Job {
     }
     /// Whether the job has completed or has not started.
     pub fn done(&self) -> bool {
-        !self.record.ctl.running.load(Ordering::Relaxed)
+        !self.record.ctl.running.load(Ordering::Acquire)
     }
     /// Completed item count.
     pub fn items_done(&self) -> u64 {

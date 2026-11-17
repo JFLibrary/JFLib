@@ -1,9 +1,10 @@
 # ARM64-Plan: Windows und Linux auf ARM-Prozessoren
 
-Stand 2026-11-11, auf Basis von `main` d6f5b137. Umgesetzt sind ARM0 bis ARM4 und ARM6: `rt` und `plat` laufen
+Stand 2026-11-17, auf Basis von `main` 7c44e9cf. Umgesetzt sind ARM0 bis ARM7: `rt` und `plat` laufen
 auf Linux ARM64, statisch und gegen glibc; `plattest`, `linuxtest`, `lifetest` und `sandboxtest` sind in einer ARM64-VM
 grün, seit ARM4 auch Plugins und das Modul `jxlenc`. Seit ARM5 laufen `coretest`, `plattest` und die `gallery` auf
-`windows-11-arm` (bis auf `screen.uis`, das der Bildschirm des Runners verhindert). Für den Rest gilt: Die Zahlen sind
+`windows-11-arm` (bis auf `screen.uis`, das der Bildschirm des Runners verhindert). Seit ARM7 ist das Speichermodell auf echter
+Hardware geprüft: A56, Mac mini (M2), `ubuntu-24.04-arm` und `windows-11-arm`, jeweils mit LSE und mit LL/SC. Für den Rest gilt: Die Zahlen sind
 aus dem Code gezählt, die Aufwände
 geschätzt. Syscalls, Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`),
 die Relocations mit ARM3 an einem Test-Plugin. Der Eintrag in der Roadmap steht in
@@ -679,6 +680,129 @@ NEON, gleiche Messung wie oben (die Zahlen schwanken von Tag zu Tag, deshalb imm
 **Fertig, wenn:** die Prüfung abgeschlossen ist und die Stresstests auf echter Hardware stabil laufen.
 QEMU reicht dafür nicht, siehe Fallen.
 
+**Umgesetzt** (2026-11-17).
+
+**Durchsicht.** In `lib/` stand `Relaxed` 349-mal in 341 Zeilen und 98 Dateien (der Plan schätzte 280; ein weiterer Treffer ist
+SPIR-V's `RelaxedPrecision`), 13 davon als Failure-Ordnung eines `compare_exchange` oder `try_update`. Jede Stelle ist gelesen,
+dazu jede `fence`, die Failure-Ordnungen und der Assembler in `rt` und `plat`. 32 Stellen sind jetzt Acquire oder Release, der Rest
+bleibt mit Grund Relaxed:
+
+| Gruppe | Stellen | Urteil |
+|---|---|---|
+| **Funktionszeiger aus `GetProcAddress`** in `win_clip`, `win_touch`, `win_pen`, `win_tray`, `win_screen` | 26 geändert | **Fehler:** Relaxed veröffentlicht. In `win_clip` kommen drei Zeiger nacheinander, `P_DFIN` als letzter: Ein anderer Thread, der `P_DFIN` schon sieht, durfte auf ARM für `P_DQF` noch 0 lesen und null aufrufen. Jetzt Release beim Speichern, Acquire beim Lesen, wie schon in `win_dnd`, `win_uia`, `win_shell` (und in std für `dlsym`). Auf x86-64 dieselben Befehle |
+| **`web_pool.rs`** (Browser, Android ohne Worker): Ende-Flag und Zähler eines `Job` | 6 geändert | **Vorsorge:** Die Items laufen auf dem einen Thread des Hosts (Android: UI-Thread, `android/bridge.c`). Fragt ein Thread der App `done()` oder `items_done()` ab, sieht er die Ergebnisse jetzt sicher: Release in `step`, Acquire beim Lesen |
+| Sperren: `rt::sync::SpinLock`, der Heap (`rt/mem.rs`), `plat::sync::Mutex` und `Condvar` | 4 und 7 Failure-Ordnungen | Acquire beim Nehmen, Release beim Freigeben. Relaxed nur für einen fehlgeschlagenen Versuch (er liest nichts), beim Spinnen und für den Zähler der `Condvar` – das sind die Futex-Algorithmen von std: Die Daten ordnet der Mutex, den Vergleich macht der Kernel. Jeder Zustand des Heaps liegt unter einer Sperre, auch ein Block, den ein anderer Thread freigibt. `RwLock` und `channel` bauen darauf |
+| `plat/pool.rs`, Linux-`Sem`, Weckflag (`linux_thread.rs`), `rt/crash.rs` | kein Relaxed | durchgehend SeqCst. Das Warten auf einen Job (`dwait.fetch_add` + `state.load` gegen `state.swap` + `dwait.swap`) ist ein Dekker-Muster und braucht es. Die Ergebnisse der Items erreichen den Aufrufer über `q_unlock` → `q_lock` des letzten Teilnehmers → `state.swap(DONE)` → `state.load` |
+| Ringe | 5 | Audio-Ring (`audio_dsp.rs`, ein Schreiber, ein Leser): die Samples Relaxed zwischen einem Acquire-Load und einem Release-Store der Indizes. Ereignis-Ring (`evq.rs`) und Log-Ring liegen unter `SpinLock` |
+| Ergebnisse von `parallel_for`-Items, nach der Schleife gelesen (`img_pdn`, `img_heif`, `img_dds`) | 18 | `parallel_for` ordnet sie (Zeile darüber) |
+| Abbruch- und Stopp-Flags ohne abhängige Daten (alle Codecs, `fx`, `netio` Server, `instance`, `web_pool`, `vk_dev` „lost“) | rund 30 | Relaxed reicht; ein Abbruch wird nur etwas später gesehen |
+| Zähler und Statistik (Audio: Unterläufe, gespielte Samples, Gerätewechsel; `present_time`; Meldungen der Validierung; Metal-Speicher; Budgets in `img_heif`, `img_svg`) | rund 50 | reine Zähler, niemand liest Daten über sie |
+| Kennungen und Namen (`TEMP_SEQ`, Portal-Tokens, `NEXT_ID`, Versionen in `ui`) | 17 | `fetch_add` gibt jedem Aufrufer eine eigene Zahl, mehr braucht es nicht |
+| Einstellungen und Flags, deren Wert die ganze Information ist (Log-Stufen, Probeläufe, Sprache, IME, Stift, dunkles Design, Lautstärke, Zeitlimits, Fähigkeiten des Hosts); Caches von Werten (Seitengröße, CPU-Merkmale, Auxiliary Vector vor dem ersten Thread, Clipboard-Formate, X11-Atome, Portal-Versionen, Fenstergrößen); Werte unter einer Sperre oder nach einem Acquire (`vk_dev` `submitted`, `win_shell` `SH_EXEC`, `a11y` `ACTIVE`, `policy` `ACTIVE` mit den Daten unter `POLICY`) | rund 175 | Relaxed reicht: Es hängen keine anderen Daten daran, oder eine Sperre ordnet sie |
+
+Fences und Assembler: In `lib/` gibt es kein handgeschriebenes `ldxr`/`stxr` und kein `dmb`. `sync_icache` im ELF-Loader nimmt die
+Folge des Arm ARM (`dc cvau`, `dsb ish`, `ic ivau`, `dsb ish`, `isb`), `crypto` nutzt `compiler_fence` (konstante Zeit), `simd` ein
+`sfence` nur auf x86-64. Keine Failure-Ordnung ist stärker als nötig oder zu schwach: Ein gescheiterter Versuch veröffentlicht nie
+etwas.
+
+**Beide Wege der Atomics.** Wie sie gebaut werden und wie der andere Weg auf derselben Hardware läuft:
+
+| Programm | wie gebaut | der andere Weg |
+|---|---|---|
+| Linux ARM64, statisch (ohne libc) | Outline-Atomics von compiler-rt: Im statischen `plattest` laufen alle 3080 Read-Modify-Writes über 21 Helfer, jeder fragt `__aarch64_have_lse_atomics` und hat beide Fassungen (21-mal LSE, 21 LL/SC-Schleifen, sonst keine solchen Befehle im Programm). Den Merker setzt ihr Konstruktor aus `AT_HWCAP` (seit ARM2) | **`jfgui_ARM_LLSC=1`** in der Umgebung: `rt::os::process_start` merkt es sich, `getauxval(AT_HWCAP)` antwortet ohne `HWCAP_ATOMICS`, alle Helfer nehmen LL/SC. Dasselbe Programm, nur der Weg der Helfer ist anders; `rt::outline_lse()` sagt, welchen sie nahmen. Unter `qemu-aarch64 -cpu max` übersetzt QEMU ohne den Schalter 17 LSE-Befehle und keinen LL/SC, mit ihm keinen LSE und 51 LL/SC (`-d in_asm`, Zählung wie bei ARM2) |
+| Linux ARM64 gegen glibc oder mit std | Outline-Atomics, den Merker setzt die libc | nicht nötig für die Tests (`plattest` ist statisch); ginge mit `-C target-feature=-outline-atomics` (LL/SC inline) |
+| Windows ARM64 | keine Outline-Atomics: LL/SC inline (ARMv8.0) | **`+lse`** gebaut: `JFLIB_EXTRA_RUSTFLAGS="-C target-feature=+lse"` (neu in `build_rs.py`, mit eigenem `--out`): LSE inline |
+| macOS ARM64 | `apple-m1`: LSE inline (3110 LSE, kein LL/SC in `plattest`) | **`-lse`** gebaut: 3144 LL/SC-Schleifen, kein LSE |
+
+Loads und Stores (`ldar`, `stlr`, auf Apple für Acquire `ldapr`) sind in beiden Wegen dieselben.
+
+**Stresstests:** `plattest --test atomics` (`apps/plattest/t_atomics.rs`), in der Suite als `tests/atomics.uis` (ein kurzer Durchgang,
+1 bis 3 s), lang mit `--secs N` (Durchgänge, bis N Sekunden um sind), `--threads N` (Standard: die CPUs, 2 bis 16, auch die Worker des
+Pools) und `--scale N`. Daten gehen in Relaxed-Atomics hin und her, nur das geprüfte Primitiv ordnet sie. Ein verlorenes Wecken zeigt
+sich als Wartezeit von 10 s, die abläuft. Geprüft wird:
+
+- `SpinLock`, `Mutex` (mit `try_lock`) und `RwLock`: 32 Wörter auf vier Cache-Zeilen unter der Sperre, jeder Zugriff prüft, dass alle
+  gleich sind, und zählt sie hoch; am Ende die Summe.
+- `Mutex` und zwei `Condvar` als Warteschlange (Erzeuger, Verbraucher), `channel` (Absender auf allen Threads außer einem, Nachrichten
+  mit Heap-Block, Reihenfolge pro Absender), `Sem` (Ping-Pong mit Übergabe eines Werts).
+- Der Pool: `parallel_for` mit 1 bis 256 Items, die Daten des Aufrufers lesen und Ergebnisse schreiben, verschachtelte Schleifen; ein
+  `Job`, mit `done()` abgefragt oder mit `wait()`.
+- Der Heap: jeder Thread schickt dem nächsten Blöcke jeder Größenklasse, Page-Runs bis 1 MB, 64-, 128- und 4096-fach ausgerichtete;
+  der Empfänger prüft Inhalt und Ausrichtung und gibt frei (ein anderer Shard); dazu eigene kleine Blöcke, außer der Reihe freigegeben.
+- Der Ereignis-Ring (`evq_push` von vielen Threads, ein Leser) und der Audio-Ring (`audio::ring_check` mit Schreib-Thread, jetzt auch
+  auf Apple).
+- Die asynchronen Teile (`plat::task`, `plat::aio`, der blockierende Pool, Wecken aus anderen Threads) prüft `plattest --test async`,
+  auf den Geräten 5-mal wiederholt, dazu `--test threads` 20-mal; `asynctest` selbst braucht ein Fenster (Skripte, `--selftest`) und
+  läuft deshalb in der Suite, nicht auf dem Telefon.
+- Litmus-Tests mit zwei Threads, die jede Runde zusammen beginnen: Store Buffering mit SeqCst-Stores und -Loads, Store Buffering so,
+  wie der Pool auf einen Job wartet (`fetch_add` + `load` gegen `swap` + `swap`), Message Passing mit Release/Acquire, ein Seqlock mit
+  Fences. **Kontrollen** (gezählt, nie ein Fehler): dieselben Muster mit Relaxed und ein Seqlock ohne Fences. Sie zeigen, ob die
+  CPU überhaupt umordnet und der Test es sehen kann.
+
+**Ergebnisse auf echter Hardware** (`plattest --test atomics --secs N`, je Weg; Fehler = Summe aller 15 Prüfungen; dazu
+`--test threads --repeat 20` und `--test async --repeat 5` in beiden Wegen):
+
+| Gerät | Weg | Dauer | Durchgänge | Fehler | `threads` ×20, `async` ×5 | Kontrollen: SB Relaxed, MP Relaxed, Seqlock ohne Fences |
+|---|---|---|---|---|---|---|
+| Mac mini M2 (macOS 27.2, 8 Kerne), `--scale 4` | LSE (inline, wie gebaut) | 20 min | 1114 | 0 | 660 + 450 Prüfungen, 0 Fehler | 89 054 742 / 32 von 89 Mio. Runden, 1 131 751 von 223 Mio. Kopien |
+| | LL/SC (`-lse` gebaut) | 20 min | 1388 | 0 | 660 + 450, 0 Fehler | 35 924 024 / 73 von 111 Mio., 1 404 209 von 278 Mio. |
+| `ubuntu-24.04-arm` (Neoverse N2, 4 Kerne, Kernel 7.0) | LSE (Outline-Atomics, `AT_HWCAP`) | 15 min | 2445 | 0 | 660 + 455, 0 Fehler | 25 836 952 / 531 749 von 48,9 Mio., 94 310 009 von 122 Mio. |
+| | LL/SC (`jfgui_ARM_LLSC=1`) | 15 min | 2209 | 0 | 660 + 455, 0 Fehler | 8 003 693 / 517 050 von 44,2 Mio., 85 424 769 von 110 Mio. |
+| `windows-11-arm` (Cobalt 100, 4 Kerne) | LL/SC (inline, wie gebaut) | 15 min | 3572 | 0 | 660 + 450, 0 Fehler | 18 078 404 / 921 537 von 71,4 Mio., 135 878 573 von 179 Mio. |
+| | LSE (`+lse` gebaut) | 15 min | 3676 | 0 | 654 von 660 (eine Zeitprüfung, unten) + 450 | 44 418 054 / 951 657 von 73,5 Mio., 139 757 050 von 184 Mio. |
+| A56 (SM-A566B, Cortex-A720/A520, 8 Kerne, Android 16, Kernel 6.6), `adb` | LSE (Outline-Atomics, `AT_HWCAP`) | 20 min | 986 | 0 | 660 + 455 (dazu unten) | 4 084 321 / 9 742 von 19,7 Mio., 1 127 479 von 49,3 Mio. |
+| | LL/SC (`jfgui_ARM_LLSC=1`) | 20 min | 872 | 0 | 660 + 455 | 5 127 602 / 9 485 von 17,4 Mio., 1 084 532 von 43,6 Mio. |
+Was ein Durchgang auf dem M2 in 20 min mit LSE bewegte: 713 Mio. Sperren je mit `SpinLock` und `Mutex`, 232 Mio. mit `RwLock`, 89 Mio.
+Items durch die Condvar-Warteschlange, 125 Mio. Nachrichten über `channel`, 22 Mio. Übergaben per `Sem`, 859 Mio. Items von
+`parallel_for` und 229 Mio. eines `Job`, 53 Mio. Heap-Blöcke zwischen Threads, 624 Mio. Ereignisse, 3,6 Mrd. Audio-Samples, je 89 Mio.
+Litmus-Runden und 223 Mio. Seqlock-Kopien. Die Kontrollen zeigen, dass die Hardware umordnet und der Test es sieht: Store Buffering mit
+Relaxed in 32 bis 100 % der Runden, mit Release/Acquire in 5 bis 40 % (das erlaubt das Modell; der Mac liest Acquire mit `ldapr`), Message Passing
+mit Relaxed selten (32 und 73 Runden), zerrissene Kopien eines Seqlocks ohne Fences in 0,5 %. Mit den Ordnungen der Bibliothek blieb
+alles bei 0. Nebenbei: Auf dem M2 war LL/SC nicht langsamer, mit LL/SC liefen 25 % mehr Durchgänge (die `SpinLock` doppelt so schnell,
+`Mutex` langsamer); ob Windows ARM64 `+lse` bekommen soll, entscheidet das nicht.
+
+Die Runner (Workflow `arm64-atomics.yml`, Run 43977942938, Programme mit rustc 1.98.1 auf `windows-latest` gebaut) ordnen noch stärker um:
+Message Passing mit Relaxed in gut 1 % der Runden, zerrissene Seqlock-Kopien ohne Fences in 77 %. Store Buffering mit Release/Acquire
+sahen sie nie: Für ARMv8.0 übersetzt Rust einen Acquire-Load als `ldar`, und `stlr` → `ldar` bleibt in Ordnung; der Mac nimmt `ldapr`
+(RCpc), dort ist es erlaubt und kommt vor. Rot war nur `plattest --test threads` mit dem `+lse`-Bau unter Windows, 6-mal von 20 dieselbe
+Zeitprüfung: `Sem::wait(50)` muss nach 40 ms bis 3 s enden. Das ist `WaitForSingleObject` gegen `QueryPerformanceCounter`, keine
+Atomics; Windows darf ein Warten um bis zu einen Timer-Tick zu früh beenden (15,6 ms beim Standardtakt, auf dem Entwicklungsrechner
+dauerte es 61,6 ms). Die Grenze ist jetzt 33 ms, und ein Fehlschlag nennt die Zeit. Derselbe Push ließ auch `arm64-windows.yml` laufen
+(Run 43977942326): 56 von 57, darunter `atomics.uis` (0,3 s), `pen.uis`, `touch.uis` und `guard.uis`; rot nur `screen.uis`, wie seit ARM0
+am Runner (die Windows-Einrichtung, Grau `8a898a`, liegt über dem Bildschirm).
+
+Das A56 (2026-11-17, statisches `plattest` aus `/data/local/tmp`, über `adb shell` gestartet; vorher geprüft, dass das Telefon seit zwei
+Minuten unbedient war, keine Eingaben, der Ordner danach gelöscht) bestätigt den Weg aus dem Merker selbst: „LSE (outline atomics,
+AT_HWCAP)“ ohne, „LL/SC“ mit `jfgui_ARM_LLSC=1`. Auch dort ordnet die Hardware sichtbar um (Message Passing mit Relaxed in 0,05 %, zerrissene
+Seqlock-Kopien in 2,3 bis 2,5 %), Store Buffering mit Release/Acquire nie (`ldar`). `--test async` ×5 war im ersten Lauf in beiden Wegen gleich rot:
+Das Kind „async-policy“ las eine Datei, die sein Manifest verweigern sollte. Unter einem Manifest ist der Ordner des Programms immer
+lesbar (`plat::policy`), und auf dem Telefon lag das Programm im Arbeitsordner, unter dem der Test seine Dateien anlegt; mit dem Programm
+in einem eigenen Unterordner ist `async` je Weg dreimal grün (91 von 91). Kein Fehler der Bibliothek, nur der Aufbau des Laufs.
+
+Unter x86-64 (Windows, Linux in WSL) ist `--test atomics` in 1,5 bis 15 s grün (je nach Last); die SB-Kontrolle mit Relaxed sieht auch
+dort Umordnungen (136 bis 526 von 20 000 Runden), MP und der Seqlock ohne Fences nicht (TSO).
+
+Offen: die neue Grenze von 33 ms in `plattest --test threads` auf `windows-11-arm` (die volle Suite prüft sie unter Windows
+x86-64).
+
+**QEMU ordnet `stlr` → `ldar` nicht:** Unter `qemu-aarch64` (8.2, TCG auf x86-64) scheitert Store Buffering mit SeqCst, 1 bis 2 von
+20 000 Runden sehen beide den alten Wert, mit LSE wie mit LL/SC und mit `-cpu cortex-a53`. Rust übersetzt einen SeqCst-Store als
+`stlr`, einen SeqCst-Load als `ldar`; ARMv8 verbietet, dass das `ldar` vor dem `stlr` wirkt, QEMU setzt dazwischen keine
+Store→Load-Barriere. Das ist ein Fehler von QEMU, kein Fehler im Code (auf echter Hardware 0, siehe oben); die Variante mit
+Read-Modify-Writes, die der Pool nutzt, besteht auch unter QEMU. Unter „Fallen“ nachgetragen.
+
+**x86-64:** Auf x86-64 sind Acquire-Loads und Release-Stores dieselben `mov` wie Relaxed, SeqCst ist nirgends dazugekommen. Release-Bau
+für Windows, Basis `7c44e9cf` und dieser Stand nacheinander aus demselben Ordner: `coretest` Byte für Byte gleich bis auf den
+Zeitstempel. In `gallery` ordnet LLVM genau eine Funktion anders an, die Liste der Monitore mit dem eingebetteten `monitor_dpi`, dessen
+Zeiger auf `GetDpiForMonitor` jetzt mit Acquire gelesen wird; ihr seltener Rückweg (`GetDC`, `GetDeviceCaps`) liegt nun im Rumpf,
+`.text` ist 32 Bytes kürzer. Sonst ist das Programm gleich (Disassembly mit herausgerechneten Adressen verglichen).
+
+Hier geprüft: `cargo check -p jflib` mit und ohne `std` für Windows, Linux, wasm32, Android, Linux ARM64 und Windows ARM64 (unter rustc
+1.100 warnt Android mit `std` vor den Deklarationen von `read` und `write` in `plat/android_host.rs`, schon vor ARM7);
+`build_rs.py check` mit Clippy, `gendoc --check --api`; `build_rs.py test asynctest` (4 von 4), `test coretest` für Windows, Linux
+und unter `qemu-aarch64`, `test plattest` für Windows und Linux 89 von 90 (rot `screen.uis` unter Windows in der Suite, allein 93 von 93
+grün: andere Fenster auf dem Desktop).
+
 ### ARM8: Fenster und GPU (M)
 
 - Wayland und X11 in der VM, `.uis`-Skripte der wichtigen Apps (`gallery`, `jfWord`; JFPainter in seinem Repository).
@@ -729,6 +853,11 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
   sonst zufällig abstürzen; QEMU zeigt das nicht.
 - **Speichermodell:** x86 verzeiht falsche `Relaxed`-Zugriffe. QEMU auf einem x86-Rechner verzeiht sie
   meist genauso, solche Fehler zeigen sich erst auf echter Hardware.
+- **QEMU und SeqCst:** `qemu-aarch64` (TCG auf x86-64) setzt zwischen `stlr` und ein folgendes `ldar` keine
+  Store→Load-Barriere: Store Buffering mit SeqCst-Stores und -Loads, auf ARMv8 verboten, kommt dort vor (ARM7).
+  Ein roter Litmus-Test unter QEMU heißt also nicht, dass der Code falsch ist; grün auf QEMU heißt nicht, dass er stimmt.
+- **Funktionszeiger aus `GetProcAddress` oder `dlsym`:** in einem Atomic mit Release speichern und mit Acquire lesen
+  (ARM7). Relaxed reicht auf x86-64 und fällt dort nie auf.
 - **Stack:** Auf ARM64 muss `sp` bei Speicherzugriffen 16-Byte-ausgerichtet sein, das betrifft jeden
   handgeschriebenen Einstieg.
 - **Seitengröße:** `4096` stand an 20 Stellen in 11 Linux-Dateien von `plat`, nicht alles davon meint Seiten. Seiten
@@ -756,6 +885,7 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
 | `coretest`, `portabletest`, Logik | `qemu-aarch64` in WSL: `build_rs.py test NAME --target linux --arch aarch64` | kein echtes Speichermodell, nur statische Programme; `-cpu cortex-a53` prüft ARMv8.0 ohne LSE |
 | Signale, Sandbox, Crash, glibc, Fenster, Plugins | `qemu-system-aarch64` in WSL: Ubuntu 24.04 arm64, Kernel mit 4- und 64-KB-Seiten (ARM3; Skripte in den Übergabenotizen von ARM3 und ARM4) | TCG, etwa so schnell wie `qemu-aarch64`, Start 5 Minuten; kein echtes Speichermodell, kein Befehlscache; Weston und Xvfb ohne volles RandR |
 | Echte ARM-CPU unter Linux | `ubuntu-24.04-arm`, statische Programme per `adb` auf dem A56 | Fenster auf dem Runner offen, das Telefon steckt nur auf Zuruf |
+| Speichermodell (ARM7) | `plattest --test atomics --secs N` auf A56, Mac mini (M2) und den Runnern: `.github/workflows/arm64-atomics.yml` (beide Wege: `jfgui_ARM_LLSC=1`, `JFLIB_EXTRA_RUSTFLAGS`) | nicht unter QEMU (siehe Fallen); ein Lauf beweist keine Freiheit von Fehlern |
 | Plugins | JFPainters Test-Plugins (`plugins/` in dessen Repository) für jede Architektur gebaut, `plattest --test lib --dir DIR`; für ARM64 bis zum Patch in JFPainter eine portierte Kopie (Notizen von ARM4) | JFLib lässt `--test lib` in keinem Skript laufen |
 | Windows ARM64 | `windows-11-arm`: `.github/workflows/arm64-windows.yml` mit `tools/winarm_check.py` (ARM5); lokal nur bauen und `tools/winarm_imports.py --libs` | Fenster-Skripte laufen, die Windows-Einrichtung verdeckt aber den Bildschirm (ARM0); lokal kein Start möglich |
 | Android und NEON | A56, Emulator | Emulator ist x86-64 |

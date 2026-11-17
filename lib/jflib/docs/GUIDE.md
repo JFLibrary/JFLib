@@ -666,9 +666,10 @@ if self.tab == 0 {
   a size, e.g. `next_size(0, -1)`); `scroll_to`, `scroll_pos`, `scroll_extent`.
 * `list_begin(id, &mut sel, count, row_h | LF_REORDER)` -> `(first, end)`: emit rows
   `first..end` with `list_item(i, label)` or `list_item_begin(i)` ... any widgets ...
-  `list_item_end()`; `list_end(&mut sel)` -> `(EV_*, value)`: `EV_ACT` selection changed,
-  `EV_DOUBLE`; with `LF_REORDER`, `EV_DRAG` and value = `from | to << 16` (the gallery's
-  "Listen" section moves the item).
+  `list_item_end()`; `list_end_full(&mut sel)` -> `ListEnd { ev, sel, drop }`: `EV_ACT`
+  selection changed, `EV_DOUBLE`; with `LF_REORDER`, `EV_DRAG` and `drop = Some((from, to))`
+  (the gallery's "Listen" section moves the item).  `list_end(&mut sel)` -> `(EV_*, value)` is
+  the older form: value = `from | to << 16`, so it reports no move from or to a row past 65 535.
 * `tabs(id, &mut sel, names)`, `expander_begin(id, header, &mut open)` (non-zero: emit the
   content) / `expander_end()`, `scrollbar(id, &mut pos, content, view, vertical)` for custom
   canvases.

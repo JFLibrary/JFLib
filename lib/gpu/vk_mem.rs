@@ -11,8 +11,10 @@
 // memory or 1 MiB of host memory first, each new block twice the last, up to 64 MiB / 16 MiB (at
 // most an eighth of the heap): a program with one small window reserves a few MiB, not 80.  A
 // request above an eighth of the largest block gets a block of its own.  Each block keeps a free
-// list sorted by offset (first fit, neighbours merged on free); one empty block per pool is kept
-// for reuse, further empty ones are released.
+// list sorted by offset (first fit, neighbours merged on free); one empty block per pool of at most
+// twice the first size is kept for reuse, further and larger empty ones are released, and a pool with
+// nothing left in it starts again at its first size: a burst (a zoom over canvas tiles grew the
+// blocks to 64 MiB) leaves nothing behind once it is freed.
 // Host-visible blocks are mapped once for their lifetime (Alloc::ptr).
 //
 // Memory kinds: Device = DEVICE_LOCAL (preferably not host-visible: the BAR window stays
@@ -50,6 +52,8 @@ struct Pool {
     type_index: u32,
     linear: bool,
     block_size: u64,
+    /// the size of its first block (and of the next one once it is empty)
+    first: u64,
     next_block: u64,
     blocks: Vec<Option<Block>>,
 }
@@ -127,7 +131,8 @@ impl Allocator {
         let host = t.property_flags & vk::MEMORY_PROPERTY_HOST_VISIBLE_BIT != 0;
         let (first, base) = if host { (MIB, 16 * MIB) } else { (4 * MIB, 64 * MIB) };
         let block_size = base.min((heap / 8) & !(MIB - 1)).max(MIB);
-        self.pools.push(Pool { type_index, linear, block_size, next_block: first.min(block_size), blocks: Vec::new() });
+        let first = first.min(block_size);
+        self.pools.push(Pool { type_index, linear, block_size, first, next_block: first, blocks: Vec::new() });
         self.pools.len() - 1
     }
 
@@ -232,8 +237,9 @@ impl Allocator {
         if b.live > 0 {
             return;
         }
-        // an empty block: keep one shared block per pool, release the rest
+        // an empty block: keep one small shared block per pool, release the rest
         let keep = !b.dedicated
+            && b.size <= pool.first * 2
             && !pool.blocks.iter().enumerate().any(|(i, o)| {
                 i != a.block as usize && o.as_ref().is_some_and(|o| o.live == 0 && !o.dedicated)
             });
@@ -244,6 +250,9 @@ impl Allocator {
         self.reserved -= b.size;
         // SAFETY: no range of the block is in use (live == 0); unmapped implicitly by the free.
         unsafe { (f.free_memory)(dev, b.mem, core::ptr::null()) };
+        if pool.blocks.iter().flatten().all(|o| o.live == 0) {
+            pool.next_block = pool.first;
+        }
     }
 
     pub fn destroy_all(&mut self, f: &vk::DeviceFns, dev: vk::Device) {

@@ -3,7 +3,8 @@
 //   argon2id(password, salt, &Params, out)          raw tag (secret / associated data empty)
 //   argon2id_ex(password, salt, secret, ad, &Params, out)
 //   hash(password, salt, &Params) -> "$argon2id$v=19$m=..,t=..,p=..$salt$hash"
-//   verify(phc, password) -> bool                   (constant-time comparison)
+//   verify(phc, password) -> bool                   (constant-time comparison; a string that
+//                                                    asks for more than VERIFY_WORK is refused)
 //
 // Lanes are filled one after the other in each slice (the result is the same as with
 // threads); memory is m KiB, allocated per call.
@@ -283,9 +284,17 @@ pub fn parse(phc: &str) -> Option<(Params, Vec<u8>, Vec<u8>)> {
     params.valid().then_some((params, salt, tag))
 }
 
-/// whether the password matches a PHC string
+/// the most work verify does for a PHC string, in KiB times passes (memory m_kib x passes t):
+/// 2^24, so 1 GiB with 16 passes or 64 MiB with 256.  A stored string comes from outside; valid()
+/// alone let it ask for 4 GiB and 2^32 - 1 passes
+pub const VERIFY_WORK: u64 = 1 << 24;
+
+/// whether the password matches a PHC string (false beyond VERIFY_WORK)
 pub fn verify(phc: &str, password: &[u8]) -> bool {
     let Some((params, salt, tag)) = parse(phc) else { return false };
+    if params.m_kib as u64 * params.t as u64 > VERIFY_WORK {
+        return false;
+    }
     let mut out = vec![0u8; tag.len()];
     argon2id(password, &salt, &params, &mut out) && crate::ct_eq(&out, &tag)
 }

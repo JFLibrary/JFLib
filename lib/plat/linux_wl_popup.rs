@@ -424,6 +424,16 @@ impl Wl {
         }
     }
 
+    /// (touch, tablet) the owner of popup `surface` and its offset; the pointer's offset and its
+    /// popup stay as they are (popup_ptr marked the popup as the pointer's: a finger on it made
+    /// the next mouse events land in the popup's coordinates)
+    pub(crate) fn popup_of(&self, surface: u32) -> Option<(i32, [i32; 2])> {
+        if surface == 0 {
+            return None;
+        }
+        self.wq.iter().find(|q| q.surf == surface).map(|q| (q.owner, [q.rect[0], q.rect[1]]))
+    }
+
     /// (pointer enter) the pointer is on none of the popups
     pub(crate) fn popup_ptr_reset(&mut self) {
         for q in self.wq.iter_mut() {

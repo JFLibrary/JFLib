@@ -1693,48 +1693,98 @@ pub fn bench(path: &str) -> i32 {
     // on the GPU
     let mut t = T { fails: 0, validate: false, inst: None };
     let Some(g) = setup(&mut t) else { return 0 };
-    let Ok(dev) = g.adapter.create_device(&DeviceDesc::DEFAULT) else {
-        out("SKIP: no device");
-        return 0;
-    };
-    let Ok(mut r) = Renderer::new(&dev, &RendererDesc::new(Format::Bgra8Unorm)) else {
-        out("FAIL Renderer::new");
-        return 1;
-    };
-    if s.attach(&r).is_err() {
-        out("FAIL attach");
-        return 1;
-    }
-    s.set_stats(true);
-    let Ok(tex) = dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET)) else { return 1 };
-    let mut used = false;
     let mut layers = l.clone();
+    let mut fails = 0;
+    // the device, its renderer, the target and whether it was drawn into; a view that loses the device ends there and the
+    // next one gets a new device (G6e3: the HD 610's kernel reset the whole of Zürich's first frame, i915 ends a context
+    // it cannot preempt within its time, and the zoomed view went unmeasured with it)
+    let mut gpu = None;
     for (name, cam) in [("whole", full), (zname.as_str(), zoom)] {
+        if gpu.is_none() {
+            let Ok(dev) = g.adapter.create_device(&DeviceDesc::DEFAULT) else {
+                out("SKIP: no device");
+                return fails;
+            };
+            let Ok(r) = Renderer::new(&dev, &RendererDesc::new(Format::Bgra8Unorm)) else {
+                out("FAIL Renderer::new");
+                return 1;
+            };
+            // (attach leaves a lost device first)
+            if s.attach(&r).is_err() {
+                out("FAIL attach");
+                return 1;
+            }
+            s.set_stats(true);
+            // (G6e3: every failure says what failed; on the M2 the GPU part of Zürich ended without a word)
+            let tex = match dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET)) {
+                Ok(t) => t,
+                Err(e) => {
+                    out(&format!("FAIL the target: {e}"));
+                    return 1;
+                }
+            };
+            gpu = Some((dev, r, tex, false));
+        }
+        let Some((dev, r, tex, used)) = gpu.as_mut() else { return 1 };
+        let mut lost = false;
         let _ = s.set_camera(&cam);
         let mut cpu_ms = Vec::new();
         let mut gpu_ms = Vec::new();
+        let mut wall_ms = Vec::new();
         let mut first = 0.0;
         for k in 0..frames + 1 {
             let t0 = plat::time_us();
-            if let Err(e) = s.prepare(&mut r, size) {
+            if let Err(e) = s.prepare(r, size) {
                 out(&format!("FAIL prepare: {e}"));
                 return 1;
             }
             let prep = (plat::time_us() - t0) as f64 / 1000.0;
-            let Ok(mut e) = dev.encoder() else { return 1 };
-            let color = ColorAttachment { view: tex.view(), load: Load::Clear, clear: bg_clear(BG), store: true, before: if used { Layout::ColorTarget } else { Layout::Undefined },
+            let mut e = match dev.encoder() {
+                Ok(e) => e,
+                Err(e) => {
+                    out(&format!("FAIL encoder: {e}"));
+                    return 1;
+                }
+            };
+            let color = ColorAttachment { view: tex.view(), load: Load::Clear, clear: bg_clear(BG), store: true, before: if *used { Layout::ColorTarget } else { Layout::Undefined },
                                           after: Layout::ColorTarget };
-            if r.record(&mut e, &s, color).is_err() {
+            if let Err(err) = r.record(&mut e, &s, color) {
+                out(&format!("FAIL record: {err}"));
                 return 1;
             }
-            let Ok(cmd) = e.finish() else { return 1 };
-            let Ok(id) = dev.queue().submit([cmd]) else { return 1 };
+            let cmd = match e.finish() {
+                Ok(c) => c,
+                Err(err) => {
+                    out(&format!("FAIL finish: {err}"));
+                    return 1;
+                }
+            };
+            // (G6e3) the wall time from the submission until the wait came back: what Metal (no timestamps in lib/gpu) says
+            let t1 = plat::time_us();
+            let id = match dev.queue().submit([cmd]) {
+                Ok(id) => id,
+                Err(err) => {
+                    out(&format!("FAIL submit: {err}"));
+                    return 1;
+                }
+            };
             s.submitted(id);
-            used = true;
-            if !dev.wait(id, 60_000_000_000).unwrap_or(false) {
-                out("FAIL a frame did not finish within 60 s");
-                return 1;
+            *used = true;
+            // (G6e3: a lost device said "did not finish within 60 s" before; the HD 610 lost it after 3 s)
+            match dev.wait(id, 60_000_000_000) {
+                Ok(true) => {}
+                Ok(false) => {
+                    out("FAIL a frame did not finish within 60 s");
+                    return 1;
+                }
+                Err(err) => {
+                    out(&format!("FAIL GPU, {name}: frame {k} of {}: {err} after {:.0} ms (wall); the next view on a new device", frames + 1, (plat::time_us() - t1) as f64 / 1000.0));
+                    fails = 1;
+                    lost = true;
+                    break;
+                }
             }
+            let wall = (plat::time_us() - t1) as f64 / 1000.0;
             s.collect_stats();
             let st = s.take_stats();
             let gms = st.last().and_then(|f| f.stamps).map_or(0.0, |v| v[3] - v[0]);
@@ -1743,20 +1793,25 @@ pub fn bench(path: &str) -> i32 {
             } else {
                 cpu_ms.push(prep);
                 gpu_ms.push(gms);
+                wall_ms.push(wall);
             }
         }
-        out(&format!("GPU, {name}, {}x{}: {:.2} ms per frame on the GPU (median of {frames}), prepare {:.2} ms (the first frame's: {first:.0} ms)", size.0, size.1, median(&mut gpu_ms),
-                     median(&mut cpu_ms)));
+        if lost {
+            gpu = None;
+            continue;
+        }
+        out(&format!("GPU, {name}, {}x{}: {:.2} ms per frame on the GPU (median of {frames}), prepare {:.2} ms (the first frame's: {first:.0} ms), submit to done {:.2} ms (wall)", size.0,
+                     size.1, median(&mut gpu_ms), median(&mut cpu_ms), median(&mut wall_ms)));
     }
     // --per-layer: the whole view's GPU time with each DXF layer hidden in turn (what each costs)
-    if plat::args().iter().any(|a| a == "--per-layer") {
+    if let Some((dev, r, tex, _)) = gpu.as_mut().filter(|_| plat::args().iter().any(|a| a == "--per-layer")) {
         let _ = s.set_camera(&full);
         let names: Vec<String> = layers.layers.iter().map(|x| x.name.clone()).collect();
         for n in names {
             let _ = layers.set_layer_visible(&mut s, &n, false);
             let mut gpu_ms = Vec::new();
             for _ in 0..3 {
-                if s.prepare(&mut r, size).is_err() {
+                if s.prepare(r, size).is_err() {
                     return 1;
                 }
                 let Ok(mut e) = dev.encoder() else { return 1 };
@@ -1776,5 +1831,5 @@ pub fn bench(path: &str) -> i32 {
             let _ = layers.set_layer_visible(&mut s, &n, true);
         }
     }
-    0
+    fails
 }

@@ -257,6 +257,17 @@ pub fn abort_on_unwind<R>(f: impl FnOnce() -> R) -> R {
     f()
 }
 
+/// (tests, docs/ARM64.md ARM7) the way compiler-builtins' outline atomics went: Some(true) LSE, Some(false)
+/// the LL/SC loops (a CPU without LSE, or jfgui_ARM_LLSC=1); None where the program has none of them (x86-64;
+/// Windows and Apple on ARM64 inline their atomics; Android, glibc and std leave it to the C library)
+#[doc(hidden)]
+pub fn outline_lse() -> Option<bool> {
+    #[cfg(all(target_os = "linux", target_arch = "aarch64", not(jfgui_glibc), not(feature = "std")))]
+    return Some(os::lse_atomics_flag());
+    #[allow(unreachable_code)]
+    None
+}
+
 pub(crate) fn panic_report(info: &dyn core::fmt::Display) -> ! {
     use core::fmt::Write;
     if crash::busy() {

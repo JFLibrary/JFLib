@@ -109,22 +109,37 @@ fn verify_elf(data: &[u8], abi: &str) -> Result<(), String> {
     if loads == 0 { Err("the Android library has no loadable segment".to_string()) } else { Ok(()) }
 }
 
+/// android:versionCode of MAJOR.MINOR.PATCH: MAJOR * 1 000 000 + MINOR * 1000 + PATCH, minor and
+/// patch below 1000, at most 2 100 000 000 (Android's limit).  With 10000 / 100 a minor or patch
+/// from 100 on gave the code of another version (1.0.100 = 1.1.0): Android refused the update or
+/// took an older one for newer
+fn version_code(version: &str) -> Result<u32, String> {
+    let core = version.split(['-', '+']).next().unwrap_or("");
+    let nums: Vec<u64> = core.split('.').take(3).map(|v| v.parse().unwrap_or(0)).collect();
+    let (major, minor, patch) = (nums.first().copied().unwrap_or(0), nums.get(1).copied().unwrap_or(0), nums.get(2).copied().unwrap_or(0));
+    let code = major * 1_000_000 + minor * 1000 + patch;
+    if minor >= 1000 || patch >= 1000 || code > 2_100_000_000 {
+        return Err(format!("version {version}: no android:versionCode (minor and patch below 1000, major at most 2100): \
+                            write android/AndroidManifest.xml with your own"));
+    }
+    Ok(code as u32)
+}
+
 /// the manifest of an app without android/AndroidManifest.xml: the shared host under the app's id
 /// (PACKAGE app_id=, else org.example.NAME), its display name, the location permission when
 /// PERMISSIONS names `location`
-fn default_manifest(dir: &Path, name: &str, version: &str, icon: bool) -> String {
+fn default_manifest(dir: &Path, name: &str, version: &str, icon: bool) -> Result<String, String> {
     let meta = crate::pkgmeta::Meta::read(dir);
     let get = |k: &str| meta.get(k).map(String::from);
     let id = get("app_id").unwrap_or_else(|| format!("org.example.{}", name.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect::<String>()));
     let label = get("display").unwrap_or_else(|| name.to_string()).replace('&', "&amp;").replace('<', "&lt;").replace('"', "&quot;");
-    let nums: Vec<u32> = version.split(['.', '-', '+']).take(3).map(|v| v.parse().unwrap_or(0)).collect();
-    let code = nums.first().unwrap_or(&0) * 10000 + nums.get(1).unwrap_or(&0) * 100 + nums.get(2).unwrap_or(&0);
+    let code = version_code(version)?;
     let location = fs::read_to_string(dir.join("PERMISSIONS")).unwrap_or_default().lines()
         .any(|l| l.split('#').next().unwrap_or("").split_whitespace().any(|w| w == "location"));
     let perms = if location {
         "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />\n    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\" />\n"
     } else { "" };
-    format!(r#"<?xml version="1.0" encoding="utf-8"?>
+    Ok(format!(r#"<?xml version="1.0" encoding="utf-8"?>
 <!-- made by cargo jflib android: JFLib's Java host (package org.jflib.gallery) under the app's id.
      Write android/AndroidManifest.xml to change it (and android/res/ for its icon). -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -146,7 +161,7 @@ fn default_manifest(dir: &Path, name: &str, version: &str, icon: bool) -> String
             android:exported="false" android:grantUriPermissions="true" />
     </application>
 </manifest>
-"#, icon = if icon { " android:icon=\"@drawable/ic_launcher\"" } else { "" })
+"#, icon = if icon { " android:icon=\"@drawable/ic_launcher\"" } else { "" }))
 }
 
 /// what PERMISSIONS allows but the manifest does not declare, and a manifest that hides the app
@@ -223,7 +238,7 @@ pub(crate) fn run_cmd(args: &[String]) -> Result<(), String> {
     let manifest = if manifest_file.is_file() {
         fs::read_to_string(&manifest_file).map_err(|e| format!("{}: {e}", manifest_file.display()))?
     } else {
-        default_manifest(&p.package.dir, &p.package.name, &p.package.version, res.join("drawable").is_dir())
+        default_manifest(&p.package.dir, &p.package.name, &p.package.version, res.join("drawable").is_dir())?
     };
     manifest_gaps(&manifest, &p.package.dir)?;
     if o.release && debuggable(&manifest) {
@@ -345,7 +360,19 @@ pub(crate) fn run_cmd(args: &[String]) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::debuggable;
+    use super::{debuggable, version_code};
+
+    // every version its own code, in the versions' order
+    #[test]
+    fn version_codes_do_not_collide() {
+        assert_eq!(version_code("0.2.1"), Ok(2001));
+        assert_eq!(version_code("1.0.100"), Ok(1_000_100));
+        assert!(version_code("1.0.100").unwrap() < version_code("1.1.0").unwrap());
+        assert!(version_code("1.99.999").unwrap() < version_code("2.0.0").unwrap());
+        assert_eq!(version_code("1.2.3-beta.4+build.5"), Ok(1_002_003));
+        assert!(version_code("1.1000.0").is_err());
+        assert!(version_code("2101.0.0").is_err());
+    }
 
     #[test]
     fn a_release_manifest_must_not_be_debuggable() {

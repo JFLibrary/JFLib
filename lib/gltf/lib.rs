@@ -72,7 +72,7 @@ pub struct Limits {
     pub json_bytes: usize,
     pub json_values: usize,
     /// bytes of all buffers together, as given (a file two buffers name counts twice), and the zeros of
-    /// accessors without a buffer view
+    /// accessors without a buffer view; the image files read count against it too (apart)
     pub buffer_bytes: u64,
     /// vertices and indices of all primitives together, as the model holds them (flat normals split vertices)
     pub vertices: u64,

@@ -120,11 +120,13 @@ fn opq(x: f32) -> f32 {
     return bitcast<f32>(bitcast<u32>(x) ^ bitcast<u32>(view.misc.y));
 }
 
-// a + b exactly as s + e (Knuth's two-sum; round to nearest, nothing reassociated, nothing simplified: opq)
+// a + b exactly as s + e (Knuth's two-sum; round to nearest, nothing reassociated, nothing simplified: opq).  Every
+// step goes through opq, the error's last sum too (G6e3): Firefox's WebGPU compiles HLSL without IEEE strictness (DXC
+// without -Gis: fast math), and it regrouped (a - x) + (b - bb), the error lost its bits, far lines moved and vanished
 fn two_sum(a: f32, b: f32) -> vec2f {
     let s = opq(a + b);
     let bb = opq(s - a);
-    let e = (a - opq(s - bb)) + (b - bb);
+    let e = opq(a - opq(s - bb)) + opq(b - bb);
     return vec2f(s, e);
 }
 
@@ -139,21 +141,26 @@ fn quick_sum(a: f32, b: f32) -> vec2f {
 // which lib/shader gives the arithmetic operations alone
 fn split_f(a: f32) -> vec2f {
     let t = opq(4097.0 * a);
-    let hi = t - opq(t - a);
+    let hi = opq(t - opq(t - a));
     return vec2f(hi, a - hi);
 }
 
+// (the error's partial sums each through opq, in this order: x.x y.x - p cancels exactly first; a fused multiply-add
+// of them gives the same, the products of the halves are exact)
 fn two_prod(a: f32, b: f32) -> vec2f {
     let p = opq(a * b);
     let x = split_f(a);
     let y = split_f(b);
-    return vec2f(p, ((x.x * y.x - p) + x.x * y.y + x.y * y.x) + x.y * y.y);
+    let e1 = opq(x.x * y.x - p);
+    let e2 = opq(e1 + x.x * y.y);
+    let e3 = opq(e2 + x.y * y.x);
+    return vec2f(p, e3 + x.y * y.y);
 }
 
 // double-f32 (hi, lo): sums and products to about 2^-47 (only in the passes compiled exact: lib.rs)
 fn dd_add(a: vec2f, b: vec2f) -> vec2f {
     let s = two_sum(a.x, b.x);
-    return quick_sum(s.x, s.y + (a.y + b.y));
+    return quick_sum(s.x, s.y + opq(a.y + b.y));
 }
 
 fn dd_add_f(a: vec2f, b: f32) -> vec2f {
@@ -163,7 +170,7 @@ fn dd_add_f(a: vec2f, b: f32) -> vec2f {
 
 fn dd_mul(a: vec2f, b: vec2f) -> vec2f {
     let p = two_prod(a.x, b.x);
-    return quick_sum(p.x, p.y + (a.x * b.y + a.y * b.x));
+    return quick_sum(p.x, p.y + opq(a.x * b.y + a.y * b.x));
 }
 
 fn dd_mul_f(a: vec2f, b: f32) -> vec2f {
@@ -177,7 +184,7 @@ fn dd_sqrt(a: vec2f) -> vec2f {
     }
     let x = sqrt(a.x);
     let p = two_prod(x, x);
-    return quick_sum(x, ((a.x - p.x) - p.y + a.y) / (2.0 * x));
+    return quick_sum(x, (opq(a.x - p.x) - p.y + a.y) / (2.0 * x));
 }
 
 fn dd_div(a: vec2f, b: vec2f) -> vec2f {
@@ -195,8 +202,8 @@ fn rel2(p: vec4f, view: View) -> vec4f {
     let y2 = two_sum(p.w, -view.center.w);
     let xs = two_sum(x1.x, x2.x);
     let ys = two_sum(y1.x, y2.x);
-    let x = two_sum(xs.x, ((xs.y + x1.y) + x2.y) - view.rest.x);
-    let y = two_sum(ys.x, ((ys.y + y1.y) + y2.y) - view.rest.y);
+    let x = two_sum(xs.x, opq(opq(xs.y + x1.y) + x2.y) - view.rest.x);
+    let y = two_sum(ys.x, opq(opq(ys.y + y1.y) + y2.y) - view.rest.y);
     return vec4f(x.x, y.x, x.y, y.y);
 }
 

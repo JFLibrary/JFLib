@@ -114,9 +114,7 @@ impl Lists {
             ui.checkbox(ID_RL_CB + it as u32, "", &mut self.rl_vis[it]);
             ui.list_item_end();
         }
-        let (ev, v) = ui.list_end(&mut self.rl_sel);
-        if ev & EV_DRAG != 0 {
-            let (from, to) = ((v as u32 & 0xFFFF) as usize, (v as u32 >> 16) as usize);
+        if let Some((from, to)) = ui.list_end_full(&mut self.rl_sel).drop {
             let item = self.rl_order[from];
             if from < to {
                 self.rl_order.copy_within(from + 1..=to, from);

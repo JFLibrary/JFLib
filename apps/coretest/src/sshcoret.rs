@@ -523,6 +523,53 @@ fn memory(t: &mut T) {
         wire
     };
     t.eq("deterministic", crypto::sha256(&run()), crypto::sha256(&run()));
+    strict(t);
+}
+
+// the strict key exchange (Terrapin, CVE-2023-48795): both sides offer it in the first KEXINIT;
+// an IGNORE slipped in before the client's KEXINIT, or between its key exchange messages, ends
+// the connection
+fn strict(t: &mut T) {
+    let ciphers = ["chacha20-poly1305@openssh.com"];
+    // the client's identification line and first packet (its KEXINIT, in the clear)
+    let mut c = Core::client(cfg(&ciphers), &seed(1));
+    c.push(b"SSH-2.0-JFNetworker_1\r\n");
+    let out = c.take_out();
+    let line = out.windows(2).position(|w| w == b"\r\n").map_or(0, |k| k + 2);
+    let (ident, kexinit) = out.split_at(line);
+    let mut rx = kexinit.to_vec();
+    let first = Cipher::None.open(0, &mut rx, &mut None);
+    let offered = matches!(&first, Ok(Some(p)) if KexInit::parse(p).is_some_and(|k| k.kex.iter().any(|x| x == "kex-strict-c-v00@openssh.com")));
+    t.check("strict: the client's first KEXINIT offers it", offered);
+    let ignore = |seq: u32| {
+        let mut n = Cipher::None;
+        let pad = [0u8; 32];
+        n.seal(seq, &[ssh::MSG_IGNORE, 0, 0, 0, 0], &pad[..Cipher::None.padding(5)])
+    };
+    // an IGNORE before the KEXINIT (the sequence numbers would be one off: Terrapin)
+    let mut s = Core::server(cfg(&ciphers), alloc::vec![host_ed()], &seed(2));
+    let _ = s.take_out();
+    s.push(ident);
+    s.push(&ignore(0));
+    s.push(kexinit);
+    let se = s.take_events();
+    t.check("strict: an IGNORE before the KEXINIT ends it", s.dead() && se.iter().any(|e| matches!(e, Event::Failed { reason: ssh::DISC_PROTOCOL_ERROR, .. })));
+    // an IGNORE after the KEXINIT, during the first exchange
+    let mut s = Core::server(cfg(&ciphers), alloc::vec![host_ed()], &seed(2));
+    let _ = s.take_out();
+    s.push(ident);
+    s.push(kexinit);
+    s.push(&ignore(1));
+    let se = s.take_events();
+    t.check("strict: an IGNORE during the first exchange ends it", s.dead() && se.iter().any(|e| matches!(e, Event::Failed { reason: ssh::DISC_PROTOCOL_ERROR, .. })));
+    // after it: IGNORE is fine, a new key exchange counts from 0 again on both sides
+    let (mut c, mut s) = logged_in(&ciphers, host_ed());
+    let (mut ce, mut se) = (Vec::new(), Vec::new());
+    c.rekey();
+    pump(&mut c, &mut s, &mut ce, &mut se);
+    let _ = c.open_session();
+    pump(&mut c, &mut s, &mut ce, &mut se);
+    t.check("strict: a new key exchange and a channel after it", !c.dead() && !s.dead() && ce.iter().any(|e| matches!(e, Event::Rekeyed)) && se.iter().any(|e| matches!(e, Event::ChannelOpen { .. })));
 }
 
 /// a frame with `tcp` on port 22
@@ -557,7 +604,7 @@ fn dissector(t: &mut T) {
     let l = ls.iter().find(|l| l.proto == decode::Proto::Ssh).expect("SSH layer");
     t.eq("message name", field(l, "Message Code"), Some("SSH_MSG_KEXINIT (20)"));
     t.eq("its ciphers", field(l, "Ciphers client to server"), Some("chacha20-poly1305@openssh.com"));
-    t.eq("its key exchange", field(l, "KEX Algorithms"), Some("curve25519-sha256,curve25519-sha256@libssh.org"));
+    t.eq("its key exchange", field(l, "KEX Algorithms"), Some("curve25519-sha256,curve25519-sha256@libssh.org,kex-strict-c-v00@openssh.com"));
     t.check("packet fields", field(l, "Packet Length").is_some() && field(l, "Padding Length").is_some() && field(l, "Padding").is_some());
     t.eq("KEXINIT summary", decode::info(&f).1, String::from("SSH_MSG_KEXINIT"));
     t.check("no problems", l.problems.is_empty());

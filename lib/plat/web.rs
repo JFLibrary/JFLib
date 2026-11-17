@@ -349,6 +349,10 @@ fn file_request(kind: u32, path: &str) -> Option<u32> {
 /// is returned while it is pending or done.
 #[cfg(all(not(target_os = "android"), not(target_os = "ios")))]
 pub fn persist(path: &str) -> Option<u32> {
+    // it writes the file (to the storage, or back to the user's own file): as a write
+    if !crate::policy::fs_allowed(path, crate::policy::FS_WRITE) {
+        return None;
+    }
     if let Some(file) = files::revision(path).filter(|(p, _)| files::bound(p)) {
         let requests = REQUESTS.lock();
         let same = requests.iter().rev().find(|r| r.kind == REQUEST_PERSIST && r.file.as_ref() == Some(&file));
@@ -380,6 +384,9 @@ pub fn reopen(path: &str) -> Option<u32> {
 /// request is Durable (Failed for a missing file) at once.
 #[cfg(target_os = "android")]
 pub fn persist(path: &str) -> Option<u32> {
+    if !crate::policy::fs_allowed(path, crate::policy::FS_WRITE) {
+        return None;
+    }
     let ok = files::sync_path(path);
     let id = NEXT_REQUEST.try_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1)).ok()?;
     let mut pending = REQUESTS.lock();
@@ -395,6 +402,10 @@ pub fn persist(path: &str) -> Option<u32> {
 /// "save a copy" through the system's picker (the user chooses where).
 #[cfg(not(target_os = "ios"))]
 pub fn download(path: &str) -> Option<u32> {
+    // the file leaves the app: only one the manifest lets it read
+    if !crate::policy::fs_allowed(path, crate::policy::FS_READ) {
+        return None;
+    }
     file_request(REQUEST_DOWNLOAD, path)
 }
 /// Request file selection. The host imports selected files before completing the request.

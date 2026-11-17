@@ -1,0 +1,38 @@
+#!args --page reorder --verify-dirty
+# --page reorder: two lists of 70 000 rows (LF_REORDER) whose rows move past what 16 bits hold.
+# List A (#33554432, rows #33554433 + i) ends with list_end_full: every move is reported as two
+# numbers.  List B (#50331648, rows #50331649 + i) ends with list_end (from | to << 16): moves
+# within 16 bits as before, a move from or to a row past 65 535 is not reported and the row
+# stays selected where it is.  Ctrl+arrows move the selected row like a drop.
+size 1000 720
+expect text:"A: list_end_full" exists
+expect #33554432 max 70000
+# list A: row 0 to the very end and back, then one place
+click #33554433
+expect #33554432 value 0
+key ctrl+end
+expect text:"A: 0 -> 69999" exists
+expect #33554432 value 69999
+key ctrl+home
+expect text:"A: 69999 -> 0" exists
+expect #33554432 value 0
+key ctrl+down
+expect text:"A: 0 -> 1" exists
+expect #33554432 value 1
+# list B: one place as before
+click #50331649
+expect #50331648 value 0
+key ctrl+down
+expect text:"B: 0 -> 1" exists
+expect #50331648 value 1
+# to the end: list_end cannot pack it -- no move, the row stays selected
+key ctrl+end
+expect text:"B: 0 -> 1" exists
+expect #50331648 value 1
+# from the end: neither
+key end
+expect #50331648 value 69999
+key ctrl+up
+expect text:"B: 0 -> 1" exists
+expect #50331648 value 69999
+expect_nowarn

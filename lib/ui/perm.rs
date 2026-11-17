@@ -193,6 +193,20 @@ fn state(a: Option<Answer>) -> &'static str {
     }
 }
 
+// a text of the question as the dialog shows it: control characters (also NUL, which ended the
+// text) and the characters that change the writing direction as <U+XXXX>
+fn shown(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if c.is_control() || matches!(c, '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}') {
+            out.push_str(&alloc::format!("<U+{:04X}>", c as u32));
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 impl Ui {
     /// (run_passes) the first open permission question as a content dialog (module header)
     pub(crate) fn perm_dialog(&mut self) {
@@ -212,17 +226,19 @@ impl Ui {
         let open = self.m.perm.open.clone();
         let mut picked = None;
         if self.dialog_begin(DLG, tr("Zugriff erlauben?"), &open) {
+            // the texts wrapped and whole, control and direction characters shown as codes: a
+            // long target lost its end at the dialog's edge, and U+202E could turn its name around
             self.text(TS_BODY_STRONG, what(q.kind));
             if !q.target.is_empty() {
-                self.text(TS_BODY, &q.target);
+                self.text(TS_BODY | TX_WRAP, &shown(&q.target));
             }
             if !q.plugin.is_empty() {
-                self.text(TS_BODY, &fill(tr("Für das Plugin: {}"), &[&q.plugin]));
+                self.text(TS_BODY | TX_WRAP, &fill(tr("Für das Plugin: {}"), &[&shown(&q.plugin)]));
             }
             if !q.reason.is_empty() {
-                self.text(TS_BODY, &fill(tr("Grund: {}"), &[&t_text(&q.reason)]));
+                self.text(TS_BODY | TX_WRAP, &fill(tr("Grund: {}"), &[&shown(&t_text(&q.reason))]));
             }
-            self.text(TS_CAPTION, &fill(tr("Regel: {}"), &[&q.rule]));
+            self.text(TS_CAPTION | TX_WRAP, &fill(tr("Regel: {}"), &[&shown(&q.rule)]));
             self.box_begin(0, BOX_H | BOX_WRAP, 8);
             if self.accent_button(B_ONCE, tr("Einmal erlauben")) & EV_ACT != 0 {
                 picked = Some(Answer::Once);

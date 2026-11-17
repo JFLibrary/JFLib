@@ -508,7 +508,7 @@ fn image_decode(i: &Info, d: &[u8], dec: &ImgDec) -> Result<Surface, i32> {
     if mem_check((w * h) as u64, dec) != 0 {
         return Err(ERR_LIMIT);
     }
-    let mut plane = vec![0u8; w * h + 64];
+    let mut plane = crate::filled(w * h + 64, 0u8)?;
     let r = alpha(&d[ao..ao + i.alen as usize], &mut plane, w as u32, h as u32, Some(dec));
     if r != 0 {
         return Err(r);

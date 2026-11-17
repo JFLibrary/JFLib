@@ -54,6 +54,8 @@
 //   render2dtest --test dxf                  (G6e2) lib/dxf and render2d::dxf on drawings written in dxftest.rs: tables,
 //                                            every kind, code pages, line ends, pieces of a byte, broken and damaged
 //                                            files, limits; the GPU against the CPU path on them
+//   render2dtest --test bigscatter           (G6e3; not in `all`) 4.5 million records going up in one frame: more than
+//                                            one dispatch of the scatter shader reaches on Metal, WebGPU and many phones
 //   render2dtest --test dxfcorpus            (G6e2; not in `all`) the corpus outside the repository (dxftest.rs; SKIP
 //                                            without it): loaded, kinds against an independent count, GPU against CPU
 //   render2dtest --dxf PATH [--no-gpu]       (G6e2) a DXF drawing in the demo's view: pan, zoom, pick, snap

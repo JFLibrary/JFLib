@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - Textures taller than wide are resampled columns first: rows first held height x size floats (a 1 x 32768 texture: 1 GiB for 128 KB of texels).
+- `Scene`: a buffer that could not be made while growing makes every capacity start again at the next frame (the raised ones no longer fit the buffers); `wait_slot` after a timeout waits again at the next call (it went on writing into a slot the GPU still used).
 
 ## [0.2.1] - 2026-11-16
 

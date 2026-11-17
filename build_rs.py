@@ -88,7 +88,9 @@ crates.io, 1 for the rest (quick rebuilds), stripped; lib/ui/build.rs gives ui -
 ui/hotreload.rs).  --release: opt-level 2, one codegen unit, fat LTO (as fast as opt-level 3 and
 6-10 % smaller, rewrite/REPORT.md section 2; R13 measured with 3).  --profile adds --config to
 it.  The rustflags are the tool's: -D warnings, no build paths in the panic locations, LLVM's
-linkers.  An incremental cache left by a rustc killed during ThinLTO is discarded before the next
+linkers; JFLIB_EXTRA_RUSTFLAGS (separated by blanks) adds to them, e.g. the other way of the atomics
+(docs/ARM64.md ARM7: -C target-feature=-lse on a Mac, =+lse for Windows ARM64), best with an --out of
+its own.  An incremental cache left by a rustc killed during ThinLTO is discarded before the next
 development build (incremental_flags).
 
 Rules checked before every build (`check`):
@@ -1007,7 +1009,8 @@ class Builder:
     def cargo_flags(self):
         """the rustflags of this target (the profile is Cargo's): warnings are errors, no build paths in
         the panic locations, the linker of LLVM, what the Linux and browser builds need"""
-        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}="] + list((self.profile or {}).get("rustflags", []))
+        flags = ["-D", "warnings", f"--remap-path-prefix={ROOT}{os.sep}="] + list((self.profile or {}).get("rustflags", [])) + \
+            os.environ.get("JFLIB_EXTRA_RUSTFLAGS", "").split()
         if self.target == "win":
             return flags + ["-C", f"linker={tool('lld-link')}"]
         if self.target == "android":

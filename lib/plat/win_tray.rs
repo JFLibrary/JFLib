@@ -82,7 +82,10 @@ const MF_POPUP: u32 = 0x10;
 const MF_SEPARATOR: u32 = 0x800;
 const TPM_RIGHTBUTTON: u32 = 2;
 const TPM_RETURNCMD: u32 = 0x100;
-const HWND_MESSAGE: isize = -3;
+// the tray's window: a hidden top-level one (never shown, no taskbar button) -- a message-only
+// window gets no broadcast, so TaskbarCreated after a restart of Explorer never arrived
+const WS_POPUP: u32 = 0x8000_0000;
+const WS_EX_TOOLWINDOW: u32 = 0x0000_0080;
 const ICON_ID: u32 = 1;
 
 struct State {
@@ -105,10 +108,10 @@ static SHELL: AtomicUsize = AtomicUsize::new(0);
 static TASKBAR_MSG: AtomicUsize = AtomicUsize::new(0);
 
 fn shell_notify(msg: u32, d: &NotifyIconData) -> bool {
-    let mut p = SHELL.load(Ordering::Relaxed);
+    let mut p = SHELL.load(Ordering::Acquire);
     if p == 0 {
         p = dll_proc(b"shell32.dll\0", b"Shell_NotifyIconW\0");
-        SHELL.store(p, Ordering::Relaxed);
+        SHELL.store(p, Ordering::Release);
     }
     if p == 0 {
         return false;
@@ -224,7 +227,7 @@ fn window(s: &mut State) -> isize {
             icon_sm: 0,
         };
         RegisterClassExW(&wc);
-        s.wnd = CreateWindowExW(0, class.as_ptr(), class.as_ptr(), 0, 0, 0, 0, 0, HWND_MESSAGE, 0, inst, 0);
+        s.wnd = CreateWindowExW(WS_EX_TOOLWINDOW, class.as_ptr(), class.as_ptr(), WS_POPUP, 0, 0, 0, 0, 0, 0, inst, 0);
         let name: Vec<u16> = "TaskbarCreated\0".encode_utf16().collect();
         TASKBAR_MSG.store(RegisterWindowMessageW(name.as_ptr()) as usize, Ordering::Relaxed);
     }
@@ -401,7 +404,13 @@ unsafe extern "system" fn tray_proc(wnd: isize, msg: u32, wp: usize, lp: isize) 
                 show_menu(wnd, x, y);
             }
             NIN_BALLOONUSERCLICK | NIN_BALLOONTIMEOUT | NIN_BALLOONHIDE => {
-                let mut s = ST.lock();
+                // (Shell_NotifyIconW, called with the state locked, can bring a sent message
+                // here on the same thread: the spin lock would wait for itself -- handled later)
+                let Some(mut s) = ST.try_lock() else {
+                    // SAFETY: our own window; the same message again, after the call returned.
+                    unsafe { PostMessageW(wnd, msg, wp, lp) };
+                    return 0;
+                };
                 let id = s.note;
                 if id != 0 {
                     note_gone(&mut s);
@@ -416,7 +425,11 @@ unsafe extern "system" fn tray_proc(wnd: isize, msg: u32, wp: usize, lp: isize) 
     let taskbar = TASKBAR_MSG.load(Ordering::Relaxed);
     if taskbar != 0 && msg as usize == taskbar {
         // Explorer started again: the symbol is gone, add it once more
-        let mut s = ST.lock();
+        let Some(mut s) = ST.try_lock() else {
+            // SAFETY: our own window; the same message again, after the state is free.
+            unsafe { PostMessageW(wnd, msg, wp, lp) };
+            return 0;
+        };
         if s.shown {
             apply(&mut s, true);
         }

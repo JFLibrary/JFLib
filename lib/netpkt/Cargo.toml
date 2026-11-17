@@ -18,7 +18,7 @@ doctest = false
 workspace = true
 
 [dependencies]
-# crypto: ssh
+# crypto: ssh, the constant-time compares of radius
 crypto.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none

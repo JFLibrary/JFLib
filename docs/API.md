@@ -169,7 +169,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `popup_close_id`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_preedit`, `ime_enable`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_reveal`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
-- [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
+- [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `list_end_full`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
 - [Data views: grid, tree, badges, meters](#data-views-grid-tree-badges-meters): `grid_begin`, `grid_row`, `grid_cell`, `grid_text`, `grid_text_ts`, `grid_end`, `tree`, `badge`, `status_dot`, `meter`
 - [Shell parts: navigation, command bar, splitter, breadcrumb, wizard steps](#shell-parts-navigation-command-bar-splitter-breadcrumb-wizard-steps): `nav_begin`, `nav_toggle`, `nav_section`, `nav_item`, `nav_footer`, `nav_end`, `command_bar`, `split_begin`, `split_next`, `split_end`, `breadcrumb`, `segmented`, `wizard_steps`, `page_header`, `key_value`, `empty_state`
 - [Docking: panels at the sides, tab groups, floating tool windows](#docking-panels-at-the-sides-tab-groups-floating-tool-windows): `dock_begin`, `dock_next`, `dock_end`
@@ -1231,13 +1231,15 @@ widgets                                                             [src/ui/ui_e
        the asm's buffer in bytes incl. the NUL (bits 0..22: the text holds at most cap - 1
        bytes) | TB_PASSWORD | TB_READONLY | TB_DIGITS | TB_SIGNED.  placeholder (or None)
        TB_PASSWORD: while it has the keyboard the input method's purpose is IP_PASSWORD (set
-       by the box itself, the purpose of before put back after; no plat::ime_purpose needed).
+       by the box itself, the purpose of before put back after; no plat::ime_purpose needed);
+       always one line (TB_MULTI with it is ignored).
        shows while the text is empty (cut with "…" where the box is narrower).
        ST_DISABLED via next_flags.
        EV_ACT: the text changed this frame; EV_COMMIT: Enter, Esc or focus lost; EV_FOCUS
        while it has the keyboard focus.
        Semantic record K_TEXTBOX: label = the text (one dot per character for passwords),
-       value = caret, max = selection anchor (byte indices; 0 while not focused), min = the
+       value = caret, max = selection anchor (byte indices of the label, of the dots for
+       passwords; 0 while not focused), min = the
        kind of box: (TB_MULTI | TB_PASSWORD | TB_READONLY) >> 24.
        TB_MULTI (U1): several lines (natural height 5 lines): Enter inserts a line break,
        Ctrl+Enter commits, Up / Down keep the preferred x, PgUp / PgDn move a view, Home /
@@ -2676,15 +2678,20 @@ list -- scroll views, scroll bars, lists, tabs and expanders (WinUI 3 style)
        around it.
        LF_REORDER (U1): a row dragged more than 4 DIP is moved: an accent insertion line
        follows the pointer, the view scrolls near its edges, Esc cancels; on release
-       list_end returns EV_DRAG with from | to << 16 (the app moves item `from` so that it
-       ends at index `to`) and sel = to.  Widgets inside custom rows keep their clicks.
-       The keyboard moves the selected row the same way: Ctrl+Up / Ctrl+Down one place,
-       Ctrl+Home / Ctrl+End to the top / bottom.
+       list_end_full reports EV_DRAG with drop = Some((from, to)) (the app moves item `from`
+       so that it ends at index `to`) and sel = to.  Widgets inside custom rows keep their
+       clicks.  The keyboard moves the selected row the same way: Ctrl+Up / Ctrl+Down one
+       place, Ctrl+Home / Ctrl+End to the top / bottom.
   list_item(i, label) -> EV              text row (EV_ACT clicked, EV_DOUBLE, EV_RCLICK)
   list_item_begin(i) -> EV               custom row: opens a BOX_H inside the row
   list_item_end()
-  list_end(&mut sel) -> (EV, sel)        EV_ACT if sel changed this pass, EV_DOUBLE;
-                                         EV_DRAG: a row was dropped (from | to << 16)
+  list_end_full(&mut sel) -> ListEnd     { ev, sel, drop }: EV_ACT if sel changed this pass,
+                                         EV_DOUBLE; EV_DRAG with drop = Some((from, to)): a row
+                                         was dropped (any number of rows)
+  list_end(&mut sel) -> (EV, sel)        the same with the drop packed as from | to << 16 in
+                                         place of sel -- 16 bits each: a drop that does not fit
+                                         (a row from 65 536 on) is not reported, the selection
+                                         stays on the row (lists that long: list_end_full)
        (Rust: list_begin reads the selection into the list, list_end writes it back --
        the asm keeps a pointer to the app's variable in between; list_sel() reads it in
        the rows)
@@ -2698,6 +2705,13 @@ list -- scroll views, scroll bars, lists, tabs and expanders (WinUI 3 style)
 Widget ids used internally: (id << 3 | k) | 0x80000000 for sub parts (k = 1..7),
 (id + 1 + i) | 0xC0000000 for the content box of custom list rows.
 ```
+
+- **`struct ListEnd`**
+  What `Ui::list_end_full` reports at the end of a list.
+  - `ev: u32` -- EV_ACT the selection changed this pass, EV_DOUBLE (a double click or Enter on a row),
+    EV_DRAG a row was dropped (LF_REORDER)
+  - `sel: i32` -- the selection (-1 = none), also written to the `sel` handed to list_end_full
+  - `drop: Option<(usize, usize)>` -- with EV_DRAG: (from, to) -- the app moves item `from` so that it ends at index `to`
 
 **`impl Ui`**
 
@@ -2729,7 +2743,14 @@ Widget ids used internally: (id << 3 | k) | 0x80000000 for sub parts (k = 1..7),
   ui_list_item_end
 - **`fn list_end(&mut self, sel: &mut i32) -> (u32, i32)`**
   ui_list_end(&mut sel) -> (EV_\* (EV_ACT if sel changed, EV_DOUBLE), sel); EV_DRAG: a
-  row was dropped, the second value is from | to &lt;&lt; 16
+  row was dropped, the second value is from | to &lt;&lt; 16.  Only while both fit in 16 bits:
+  a drop from or to a row past 65 535 is not reported (no EV_DRAG, the selection stays on
+  the row) -- `list_end_full` reports every drop as two numbers
+- **`fn list_end_full(&mut self, sel: &mut i32) -> ListEnd`**
+  The end of a list: its events (EV_ACT the selection changed this pass, EV_DOUBLE,
+  EV_DRAG a row was dropped), the selection written back to `sel` (-1 = none) and, with
+  EV_DRAG, `drop = Some((from, to))`: the app moves item `from` so that it ends at index
+  `to` (sel is `to` then).  Any number of rows (`list_end` packs the drop into 16 bits each).
 - **`fn tabs_scrolling(&mut self, id: u32, sel: &mut i32, names: &[&str]) -> u32`**
   Tab strip with horizontal overflow arrows. Mouse scrolling and Left/Right,
   Home/End on the strip retain ordinary tab semantics; changed selections
@@ -8858,7 +8879,9 @@ history -- undo / redo for an app's own state
   h.undo(&mut state) / h.redo(&mut state) -> bool
   h.can_undo() / can_redo()            undo_label() / redo_label() -> the step's label;
                                        undo_value() / redo_value() -> the step as data
-  h.group_begin(label) / group_end()   the edits between them are one step
+  h.group_begin(label) / group_end()   the edits between them are one step (undo / redo
+                                       while one is open close it first: its edits so far
+                                       are the newest step, a later group_end does nothing)
   h.mark_saved() / dirty()             whether the state differs from the saved one
   h.mark_unsaved()                     the state counts as unsaved (a recovered copy)
   h.clear()
@@ -8905,13 +8928,15 @@ all back.  Text fields keep their own undo; the edits here are the app's.
 - **`fn record(&mut self, mut edit: Box<dyn Edit<S>>)`**
   record an edit that was already applied
 - **`fn undo(&mut self, s: &mut S) -> bool`**
-  take the newest step back -> false when there is none
+  take the newest step back -> false when there is none (an open group is closed first)
 - **`fn redo(&mut self, s: &mut S) -> bool`**
-  do the last undone step again -> false when there is none
+  do the last undone step again -> false when there is none (an open group is closed
+  first: with edits in it there is nothing to redo any more)
 - **`fn can_undo(&self) -> bool`**
 - **`fn can_redo(&self) -> bool`**
 - **`fn undo_label(&self) -> Option<&str>`**
-  the label of the step undo would take back
+  the label of the step undo would take back (an open group with edits: the outermost
+  group's)
 - **`fn redo_label(&self) -> Option<&str>`**
   the label of the step redo would do again
 - **`fn undo_value(&self) -> Option<&dyn core::any::Any>`**
@@ -9494,7 +9519,9 @@ is drawn by the output's render pass: every frame read back into the framebuffer
 lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 
 Script command `gpu` (headless runs stay on the CPU path without it; on other targets (a static
-Linux program, the browser), or without a GPU, it prints a SKIP once and does nothing):
+Linux program, the browser), without a GPU, or when the screen's work area cannot hold the
+window at `gpu on` (the system keeps it smaller, on the CPU path), it prints a SKIP once and
+does nothing):
   gpu on [fast]          a real window per UI window (shown without activation) with
                          the output, every presented image compared with the framebuffer (fast:
                          not compared, for measurements), a render after every input edge; waits
@@ -10624,7 +10651,9 @@ TK_KEY: u32 = 0x8000_0000  // TermEv::Raw: a key (VK | MOD_* << 16), not a chara
 - **`fn set_prompt(&mut self, s: &str)`**
   the prompt before the input (SGR allowed)
 - **`fn set_mode(&mut self, mode: u8)`**
-  TM_LINE, TM_BUSY, TM_RAW or TM_SECRET
+  TM_LINE, TM_BUSY, TM_RAW or TM_SECRET; into or out of TM_SECRET the input typed so far
+  is dropped (overwritten): a hidden line showed in the next mode's input line, a visible
+  one became part of the secret
 - **`fn input_set(&mut self, s: &str, caret: usize)`**
   replace the input line; caret: a byte index (clamped to a character start)
 - **`fn input(&self) -> &str`**
@@ -10991,7 +11020,7 @@ state_save / state_load work there as well (the main window: its size only).
 and ignores them), w / h (DIP, the size before maximizing or minimizing), max (0 / 1).  A
 position off every monitor (a monitor that is gone) is centred on the work area of the
 nearest one.  [window ID] (decimal id): open (0 / 1) and x / y / w / h (DIP, relative to
-the owner's client area: the WinRect).  Only tool windows (WF_TOOL, not WF_DIALOG /
+the owner's client area: the WinRect; off every monitor: centred like the main window).  Only tool windows (WF_TOOL, not WF_DIALOG /
 WF_MODAL) are kept; sections of windows that did not run this time stay in the file.
 ```
 
@@ -19945,9 +19974,11 @@ copies into one upload command buffer that ends with a global barrier (copy writ
 later access) and is put before the caller's command buffers in the next vkQueueSubmit.
 The staging ring: 256 KiB chunks of Upload memory, filled front to back across submissions;
 a full chunk is reused once the GPU has passed the last submission that reads from it (two
-are kept free, more go back).  An upload above half a chunk gets a buffer of its own, reused
-by the next one that fits and released when none came for a second (Device::poll): a frame of
-small rectangles costs what they hold, not a full frame or a new allocation.
+are kept free, more go back).  An upload above half a chunk gets a buffer of its own (its size
+rounded up to 64 KiB), reused by a later one that fits it without wasting half of it; once the GPU
+is done with them only the largest free one stays, and only until a second after the last such
+upload (Device::poll): a frame of small rectangles costs what they hold, not a full frame or a new
+allocation, and a frame of many canvas tiles does not keep twice their bytes around afterwards.
 Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 call returns GpuError::DeviceLost (objects are still destroyed normally).
 (G5d) The compute queue comes only when asked for (DeviceOptions; without it a device is what it was in 0.1.0: one
@@ -23733,7 +23764,7 @@ folder (absolute paths, "..", a scheme) are refused before the closure sees them
   - `json_bytes: usize` -- bytes of the JSON part, and the values in it (objects, arrays, numbers, ...)
   - `json_values: usize`
   - `buffer_bytes: u64` -- bytes of all buffers together, as given (a file two buffers name counts twice), and the zeros of
-    accessors without a buffer view
+    accessors without a buffer view; the image files read count against it too (apart)
   - `vertices: u64` -- vertices and indices of all primitives together, as the model holds them (flat normals split vertices)
   - `indices: u64`
   - `nodes: usize` -- nodes, and how deep they nest
@@ -30507,7 +30538,7 @@ SOUND_NOTIFY: u32 = 5
 
 - **`fn ring_check(n: usize, piece: usize, take: usize, threaded: bool) -> bool`**
   (tests) the ring of a push stream: n samples written in pieces of `piece` and read in
-  pieces of `take`, by turns or (threaded, Windows / Linux) by a writer thread while this one
+  pieces of `take`, by turns or (threaded, Windows / Linux / macOS / iOS) by a writer thread while this one
   reads -> whether every sample arrived once and in order.  The reader gives up after 20 s
   (a loaded machine): then it tells the writer to stop, which may wait at a full ring, and
   the check fails instead of waiting for it forever
@@ -36926,10 +36957,11 @@ DE_ALL: u32 = 7  // every effect
   effect's action; Wayland: taken wl_data_offer.finish (the action stays the one negotiated
   before the drop), not taken the offer destroyed without finish
 
-- **`fn drag_start(data: DragData) -> bool`**
+- **`fn drag_start(mut data: DragData) -> bool`**
   drag `data` out of the app (call while the left button is held) -> started; E_DRAG_END
   (data = the effect, 0 = cancelled or refused) follows.  Only the standard kinds leave
-  the app.
+  the app; files only when the manifest lets the app read them (false otherwise), a move only
+  when it may write them all (else the drag offers copy and link).
 
 - **`fn drag_running() -> bool`**
   an outgoing drag runs (until its E_DRAG_END is queued)
@@ -37356,8 +37388,8 @@ Source: [`lib/plat/ime.rs`](../lib/plat/ime.rs)
 
 - **`fn ime_commit_text(win:u8,text:&str) -> usize`**
   Committed text of any length: commits of at most 4096 bytes, split between characters ->
-  the bytes queued (fewer: the commit queue or the event ring is full, the rest can follow
-  once the app took these).
+  the bytes taken (queued now, or waiting until the app took the commits before them; fewer
+  only past PENDING_MAX waiting bytes or for a window number out of range).
 
 *(E4) what the text being typed is (ime_purpose): the input method and an on-screen*
 
@@ -39501,7 +39533,8 @@ argon2 -- Argon2id (RFC 9106, version 0x13) and PHC strings
   argon2id(password, salt, &Params, out)          raw tag (secret / associated data empty)
   argon2id_ex(password, salt, secret, ad, &Params, out)
   hash(password, salt, &Params) -> "$argon2id$v=19$m=..,t=..,p=..$salt$hash"
-  verify(phc, password) -> bool                   (constant-time comparison)
+  verify(phc, password) -> bool                   (constant-time comparison; a string that
+                                                   asks for more than VERIFY_WORK is refused)
 
 Lanes are filled one after the other in each slice (the result is the same as with
 threads); memory is m KiB, allocated per call.
@@ -39533,8 +39566,15 @@ threads); memory is m KiB, allocated per call.
 - **`fn parse(phc: &str) -> Option<(Params, Vec<u8>, Vec<u8>)>`**
   the parameters, salt and tag of a PHC string
 
+```rust
+/// the most work verify does for a PHC string, in KiB times passes (memory m_kib x passes t):
+/// 2^24, so 1 GiB with 16 passes or 64 MiB with 256.  A stored string comes from outside; valid()
+/// alone let it ask for 4 GiB and 2^32 - 1 passes
+VERIFY_WORK: u64 = 1 << 24
+```
+
 - **`fn verify(phc: &str, password: &[u8]) -> bool`**
-  whether the password matches a PHC string
+  whether the password matches a PHC string (false beyond VERIFY_WORK)
 
 ### `crypto/b64.rs`
 
@@ -40241,7 +40281,8 @@ ROUNDS: u8 = 40
 
 - **`fn shared(pwe: &[u8; 64], rand: &[u8; 32], peer_scalar: &[u8; 32], peer_element: &[u8; 64]) -> Option<[u8; 32]>`**
   the x coordinate of k = rand \* (peer_scalar \* PWE + peer_element); None for a scalar out of
-  range, an element off the curve, or k at the identity
+  range or of 1 (RFC 8146 2.1: a scalar of 1 lets the element reveal mask \* PWE, as hostapd
+  refuses it since CVE-2019-9497), an element off the curve, or k at the identity
 
 - **`fn confirm(ss: &[u8; 32], element_a: &[u8; 64], scalar_a: &[u8; 32], element_b: &[u8; 64], scalar_b: &[u8; 32]) -> [u8; 32]`**
   Confirm of a side: H(ss | its element | its scalar | the other's element | scalar | ciphersuite)
@@ -41071,6 +41112,9 @@ ssh -- SSH-2 for running commands on a machine (RFC 4253 / 4252 / 4254)
   client.host_key()                                    type, blob, "SHA256:..." fingerprint
   client.auth_password(user, pw) / auth_key(user, &Keypair)
   client.exec(command, stdin, max_out) -> Exec { status, stdout, stderr }
+  client.set_time_limit(Some(ms))                       auth_* and exec end with TimedOut after
+                                                       ms in all (a server that keeps sending
+                                                       held them forever); None: no limit
   Transport::accept(stream, &host_key)                 the server side of the transport
                                                        (tests drive it with OpenSSH's client)
   private_key(text) -> Keypair      an unencrypted Ed25519 key ("OPENSSH PRIVATE KEY")
@@ -41082,6 +41126,9 @@ the Terrapin prefix truncation), ssh-ed25519 host and user keys, chacha20-poly13
 The host key is checked by the caller's rule: HostKeyCheck::Pinned(fingerprint) or Any (only
 to learn the fingerprint).  Not here: RSA / ECDSA keys, compression, port forwarding, PTYs,
 rekeying (a peer that starts a new key exchange ends the session; commands here are short).
+A peer that sends only messages to skip (ignore, debug, banners, global requests) while an
+answer is due ends the session after MAX_SKIPPED of them in a row; data past the window the
+client granted is a protocol error.
 ```
 
 ```rust
@@ -41198,11 +41245,17 @@ MSG_CHANNEL_FAILURE: u8 = 100
 **`impl Client`**
 
 - **`fn connect(s: Box<dyn Stream>, check: HostKeyCheck) -> Result<Client, SshError>`**
+- **`fn set_time_limit(&mut self, ms: Option<u32>)`**
+  Each following `auth_password`, `auth_key` and `exec` ends with `SshError::Net` (TimedOut)
+  when it takes longer than `ms` in all; `None` (the default): no limit.  The stream's read
+  timeout only limits each wait: a server that keeps sending (banners, endless output)
+  held these calls forever.  After a TimedOut the session is in an unknown state: close it.
 - **`fn host_key(&self) -> &HostKey`**
 - **`fn auth_password(&mut self, user: &str, password: &str) -> Result<(), SshError>`**
 - **`fn auth_key(&mut self, user: &str, key: &Keypair) -> Result<(), SshError>`**
 - **`fn exec(&mut self, command: &str, stdin: &[u8], max_out: usize) -> Result<Exec, SshError>`**
-  run a command, feed it `stdin`, collect at most `max_out` bytes of each output
+  run a command, feed it `stdin`, collect at most `max_out` bytes of each output (the rest
+  is read and dropped until the command ends: set_time_limit bounds a command that does not)
 - **`fn close(mut self)`**
 
 ### `netio/tls/mod.rs`
@@ -45057,8 +45110,9 @@ KDE_IGTK: u8 = 9
 - **`fn to_bytes(&self) -> Vec<u8>`**
   the element with its id and length (22 bytes)
 - **`fn parse(elems: &[u8]) -> Option<Rsne>`**
-  the first RSN element of a list of elements (key data); one pairwise and one AKM suite
-  of 00-0F-AC are read, the counts are little endian as in every element
+  the first RSN element of a list of elements (key data): the first AKM suite's type (of
+  00-0F-AC) and the capabilities after every AKM suite; the counts are little endian as in
+  every element
 
 - **`fn elements(b: &[u8]) -> Vec<(u8, &[u8])>`**
   the elements of a list: (id, contents); stops at one that does not fit
@@ -47394,8 +47448,11 @@ Algorithms: curve25519-sha256 (also under the name @libssh.org), host and user k
 and rsa-sha2-256 (host keys; user keys too), ciphers chacha20-poly1305@openssh.com, aes128-ctr
 and aes256-ctr with hmac-sha2-256, compression none.  Not here: encrypted key files, the older
 ssh-rsa with SHA-1, port forwarding (a channel of another type is the embedder's to refuse),
-the extension negotiation of RFC 8308 (SSH_MSG_EXT_INFO is tolerated, none is sent) and
-OpenSSH's strict key exchange (ignored when offered).
+the extension negotiation of RFC 8308 (SSH_MSG_EXT_INFO is tolerated, none is sent).
+OpenSSH's strict key exchange (kex-strict-c/s-v00@openssh.com, against the Terrapin prefix
+truncation, CVE-2023-48795) is offered in the first KEXINIT and kept when the peer offers it
+too: the peer's KEXINIT must be its first packet, nothing but key exchange messages may come
+during the first exchange, and each direction counts its packets from 0 again after a NEWKEYS.
 
 The embedder decides what the protocol leaves open: which host key to trust, who logs in, which
 channels and requests to take.  A protocol error from the peer sends SSH_MSG_DISCONNECT and
@@ -48910,7 +48967,8 @@ format "bcrepo-1")
 Signers: snapshots are saved and loaded only with trusted keys -- CreateOptions::signer and
 the keys given to trust_signer (save_snapshot: UntrustedSigner, load_snapshot: Corrupt).
 The list sits in repo.json under the MAC of the repository key, so it keeps out other keys
-and mistakes, not someone who holds the repository key (who could call trust_signer).
+and mistakes, not someone who holds the repository key (who could call trust_signer).  A
+repo.json without a MAC (taken away) does not open (Corrupt).
 
 Layout:  repo.json  data/<xx>/<pack>.pack  index/<pack>.idx  snapshots/<id>.snap  LOCK
 Keys:    one random repository key, wrapped in repo.json for the server's master key, for
@@ -49332,7 +49390,9 @@ back a version that does not start
                                restart, max_size, ca_pem, timeout_ms
   startup(&cfg) -> Startup     first thing in main (before ui::launch): puts a downloaded
                                update in place and restarts into it, counts the starts of a
-                               new version, rolls back one that never reported healthy
+                               new version, rolls back one that never reported healthy;
+                               a program that calls itself neither the trial's version nor
+                               the old one ends the trial (the version recorded as bad)
   healthy(&cfg) -> bool        the health marker: the new version works (after its first
                                frame, for example); without it the next start rolls back
   Updater::new(cfg)            check() / download() / apply() (blocking), start_check() /
@@ -49542,7 +49602,9 @@ Re-exports: `plat::pkg::Packaged`
 - **`fn startup(cfg: &Config) -> Startup`**
   at the start of the program, before its UI: a staged update is put in place and the
   program restarted into it; a new version on trial counts its start, and one that already
-  had cfg.attempts starts without healthy() is rolled back (the old version restarted).
+  had cfg.attempts starts without healthy() is rolled back (the old version restarted).  A
+  program whose version is neither the trial's nor the one before (the package's own number
+  differs from its manifest's) ends the trial: Normal, the trial's version recorded as bad.
   Another process holding the updater's lock: Normal.
 
 - **`fn healthy(cfg: &Config) -> bool`**
@@ -49591,7 +49653,9 @@ the new version and the way back
   healthy(cfg) -> bool         (lib.rs) the health marker
 
 Every file of an update is written next to its target as NAME.jfupd-new; the old file is
-copied to backup/files/ (backup/list: "R path" replaced, "N path" new), renamed away
+copied to backup/files/ (backup/list: "H sha256 path" replaced, with the copy's SHA-256, which
+the way back checks for every copy before it puts one back, and again while it copies -- "R
+path" of earlier versions without one; "N path" new), renamed away
 (NAME.jfupd-old-<n>: Windows can rename a running exe, not replace it) and the new file takes
 its name.  Leftover .jfupd-* files are removed at a later start, once no process uses them.
 An AppImage update has one file, the .AppImage itself ($APPIMAGE): copied (and hashed on the
@@ -52124,6 +52188,11 @@ VERSION_PATCH: u32 = version_part(VERSION, 2)
   that leaves it ends the program as an uncaught panic: JFLib's crash report, exit code 3.  plat
   runs its threads and the program's start through it.  Without that feature a panic never
   unwinds, and this is `f()`.
+
+- **`fn outline_lse() -> Option<bool>`**
+  (tests, docs/ARM64.md ARM7) the way compiler-builtins' outline atomics went: Some(true) LSE, Some(false)
+  the LL/SC loops (a CPU without LSE, or jfgui_ARM_LLSC=1); None where the program has none of them (x86-64;
+  Windows and Apple on ARM64 inline their atomics; Android, glibc and std leave it to the C library)
 
 **`mod portable`**
 

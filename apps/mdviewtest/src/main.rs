@@ -43,6 +43,11 @@
 //
 //   build/win/mdviewtest.exe --page css --script apps/mdviewtest/tests/css_shots.uis
 //
+// --page reorder: two lists of 70 000 rows whose rows move (LF_REORDER: dragged, or Ctrl+arrows),
+// past what 16 bits hold: list A ends with list_end_full (every drop as two numbers), list B with
+// list_end (from | to << 16: a drop it cannot pack is not reported, the row stays selected).
+// Below each: the last move ("A: from -> to") and the selection.
+//
 // --page css: an HTML page with a style sheet (rich_html.rs): a head bar, cards with border,
 // padding and background, a note with a coloured border on the left, a list with a background,
 // a dark box, a table with a border and a tinted head row, rules by tag, class, id, descendant
@@ -90,6 +95,10 @@ const ID_STEP: u32 = wid("step");
 // the list and its rows: ID_LIST + 1 + i
 const ID_LIST: u32 = 0x0100_0000;
 const ROWS: u32 = 100_000;
+// --page reorder: lists A and B, their rows ID_RA + 1 + i / ID_RB + 1 + i
+const ID_RA: u32 = 0x0200_0000;
+const ID_RB: u32 = 0x0300_0000;
+const RE_ROWS: u32 = 70_000;
 
 /// the Markdown sample (also parsed by unit.rs)
 pub(crate) const SAMPLE_MD: &str = r#"# Markdown-Betrachter
@@ -373,6 +382,11 @@ struct MdTest {
     // --page css: the page with a style sheet
     page_css: bool,
     css: MdViewState,
+    // --page reorder: the items in the rows of lists A and B, their selections, their last moves
+    page_reorder: bool,
+    re: [Vec<u32>; 2],
+    re_sel: [i32; 2],
+    re_last: [String; 2],
 }
 
 impl MdTest {
@@ -395,6 +409,8 @@ impl MdTest {
             dom.set_html(&dom_html());
         }
         let page_css = plat::arg_value("--page").as_deref() == Some("css");
+        let page_reorder = plat::arg_value("--page").as_deref() == Some("reorder");
+        let rows = || if page_reorder { (0..RE_ROWS).collect() } else { Vec::new() };
         let mut css = MdViewState::new();
         css.label = String::from(t("Gestaltet"));
         MdTest {
@@ -426,7 +442,44 @@ impl MdTest {
             step: 0,
             page_css,
             css,
+            page_reorder,
+            re: [rows(), rows()],
+            re_sel: [-1, -1],
+            re_last: [String::new(), String::new()],
         }
+    }
+
+    // --page reorder: list A (list_end_full) and B (list_end) side by side, below each its last
+    // move and its selection
+    fn reorder_page(&mut self, ui: &mut Ui) {
+        ui.text(TS_SUBTITLE, t("Sortieren"));
+        ui.box_begin(0, BOX_H, 24);
+        for k in 0..2 {
+            let name = ["A", "B"][k];
+            ui.box_begin(0, BOX_V, 8);
+            ui.text(TS_BODY_STRONG, &format!("{}: {}", name, ["list_end_full", "list_end"][k]));
+            ui.next_size(320, 420);
+            let id = [ID_RA, ID_RB][k];
+            let (first, end) = ui.list_begin(id, &mut self.re_sel[k], self.re[k].len() as i32, 32 | LF_REORDER);
+            for row in first..end {
+                ui.list_item(row, &tf("Eintrag {}", &[&format!("{}", self.re[k][row as usize])]));
+            }
+            let drop = if k == 0 {
+                ui.list_end_full(&mut self.re_sel[k]).drop
+            } else {
+                let (ev, v) = ui.list_end(&mut self.re_sel[k]);
+                (ev & EV_DRAG != 0).then(|| ((v as u32 & 0xFFFF) as usize, (v as u32 >> 16) as usize))
+            };
+            if let Some((from, to)) = drop {
+                let item = self.re[k].remove(from);
+                self.re[k].insert(to, item);
+                self.re_last[k] = format!("{} -> {}", from, to);
+            }
+            ui.text(TS_BODY, &format!("{}: {}", name, if self.re_last[k].is_empty() { "-" } else { &self.re_last[k] }));
+            ui.text(TS_BODY | TX_SECONDARY, &tf("Auswahl {}: {}", &[name, &format!("{}", self.re_sel[k])]));
+            ui.box_end();
+        }
+        ui.box_end();
     }
 
     // --page css: the styled page, what it reported
@@ -724,6 +777,11 @@ impl App for MdTest {
         }
         if self.page_css {
             self.css_page(ui);
+            ui.box_end();
+            return;
+        }
+        if self.page_reorder {
+            self.reorder_page(ui);
             ui.box_end();
             return;
         }

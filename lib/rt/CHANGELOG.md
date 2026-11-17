@@ -11,6 +11,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Added
 
 - `rt::kernel` (the system call numbers, open flags and struct stat per architecture) on Android too, without rt::os's helpers
+- rt::outline_lse(): the way the outline atomics of a static Linux ARM64 program went (LSE or the LL/SC loops; None where a program has none); jfgui_ARM_LLSC=1 in the environment makes them take LL/SC on a CPU with LSE, so the same program checks both ways (docs/ARM64.md, ARM7)
+- `os::SYS_IO_URING_SETUP` / `_ENTER` / `_REGISTER`, `SYS_OPEN_TREE`, `SYS_MOVE_MOUNT`, `SYS_FSOPEN`, `SYS_FSCONFIG`, `SYS_FSMOUNT`, `SYS_FSPICK`, `SYS_CLONE3`, `SYS_PIDFD_GETFD`, `SYS_MOUNT_SETATTR` (x86-64 and ARM64).
+
+### Fixed
+
+- Portable `pow(1.0, y)` is 1 for every finite y (from |y| > ~1.3e300 on it was NaN), NaN for an infinite one as on the x87.
 
 ## [0.2.1] - 2026-11-16
 

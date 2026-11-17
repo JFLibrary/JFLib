@@ -822,8 +822,16 @@ impl Dispatcher {
         let action = self.find(host, name)?;
         Ok(self.metadata(host, &action, true))
     }
+    // A Local action shows its name, description and access only: unavailable (forbidden), no
+    // schemas, as an external call of it reveals nothing about them (they were in describe and
+    // discover, its availability in the current state too)
     fn metadata(&self, host: &impl Host, action: &ActionSpec, schemas: bool) -> Value {
-        let availability = self.ready(host, action);
+        let local = matches!(host.access(action), Access::Local);
+        let availability = if local {
+            Err(ActionError::new(ErrorCode::Forbidden, "This action is not available to external control"))
+        } else {
+            self.ready(host, action)
+        };
         let mut value = Value::object([
             ("name", Value::string(action.name)),
             ("description", Value::string(action.description)),
@@ -853,7 +861,7 @@ impl Dispatcher {
                     .unwrap_or(Value::Null),
             ),
         ]);
-        if schemas {
+        if schemas && !local {
             value.insert("inputSchema", action.input.to_json());
             value.insert("outputSchema", action.output.to_json());
         }

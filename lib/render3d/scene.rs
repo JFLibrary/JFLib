@@ -936,11 +936,12 @@ impl Scene {
         if self.waited {
             return Ok(());
         }
-        self.waited = true;
         let slot = (self.frame % self.frames.len() as u64) as usize;
         if let Some((id, f)) = self.frames[slot].last {
             let done = self.dev.wait(id, 10_000_000_000)?;
             if !done && !cfg!(target_arch = "wasm32") {
+                // not marked as waited: the next call waits again (it went on writing into the
+                // slot the GPU still used)
                 return Err(GpuError::Timeout);
             }
             if done {
@@ -948,6 +949,7 @@ impl Scene {
             }
             self.frames[slot].last = None;
         }
+        self.waited = true;
         Ok(())
     }
 
@@ -998,6 +1000,20 @@ impl Scene {
 
     /// new capacities: new buffers, then every slot again
     fn grow(&mut self, r: &Renderer) -> Result<()> {
+        let res = self.grow_buffers(r);
+        if res.is_err() {
+            // a buffer that could not be made: the capacities raised before it no longer fit
+            // the buffers there are -- they all start again at the next frame (everything made
+            // anew and uploaded whole)
+            (self.cap, self.list_cap, self.info_cap, self.visible_cap, self.punctual_cap) = (0, 0, 0, 0, 0);
+            self.full_dirty = true;
+            self.lists_dirty = true;
+            self.punctual_dirty = true;
+        }
+        res
+    }
+
+    fn grow_buffers(&mut self, r: &Renderer) -> Result<()> {
         let dev = self.dev.clone();
         let none = BufferUsage::NONE;
         let mut groups = false;

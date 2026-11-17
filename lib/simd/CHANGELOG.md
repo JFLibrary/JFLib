@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- WebAssembly SIMD128: float arithmetic and square roots follow SSE's NaN rule (the first NaN operand quieted, else the negative indefinite) like the NEON and scalar code; WebAssembly's own NaN made results differ on ARM machines.
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

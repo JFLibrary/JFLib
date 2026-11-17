@@ -16,7 +16,7 @@
 // and ignores them), w / h (DIP, the size before maximizing or minimizing), max (0 / 1).  A
 // position off every monitor (a monitor that is gone) is centred on the work area of the
 // nearest one.  [window ID] (decimal id): open (0 / 1) and x / y / w / h (DIP, relative to
-// the owner's client area: the WinRect).  Only tool windows (WF_TOOL, not WF_DIALOG /
+// the owner's client area: the WinRect; off every monitor: centred like the main window).  Only tool windows (WF_TOOL, not WF_DIALOG /
 // WF_MODAL) are kept; sections of windows that did not run this time stay in the file.
 
 use alloc::format;
@@ -210,7 +210,7 @@ impl Ui {
         let r = &mut self.m.win.recs[i as usize & (WIN_MAX - 1)];
         let rc = r.rect.get();
         r.rect.set(WinRect { x: src.x, y: src.y, w: src.w, h: src.h, flags: (rc.flags & !(WRF_CHANGED | WRF_MAX)) | WRF_POS });
-        r.state &= !super::win::UWI_DEFPOS;
+        r.state = (r.state & !super::win::UWI_DEFPOS) | super::win::UWI_SAVEDPOS;
     }
 
     /// (window events of the main window) remember its placement while it is neither

@@ -4,8 +4,9 @@
 // main.rs: the start page (the cards 01 to 07) and the way between the pages (nav.rs).  The cards
 // files.rs, secrets.rs, system.rs; behind them what the big gallery (apps/gallery) has, for the
 // finger: pg_basic.rs, pg_menus.rs, pg_text.rs, pg_lists.rs, pg_boxes.rs, pg_colors.rs,
-// pg_windows.rs, pg_edge.rs, pg_image.rs, pg_view.rs (G5e2: a 3D view); the phone's own: pg_sensors.rs (Wasserwaage,
-// Handylage, Kompass, GPS).
+// pg_windows.rs, pg_edge.rs, pg_image.rs, pg_view.rs (G5e2: a 3D view), pg_r2d.rs (G6e3, Android: a render2d drawing,
+// its check against the CPU path and its measurement); the phone's own: pg_sensors.rs (Wasserwaage, Handylage, Kompass,
+// GPS).
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -42,6 +43,28 @@ mod cpu;
 #[allow(dead_code)]
 #[path = "../render3dtest/gltfgen.rs"]
 mod gltfgen;
+// (G6e3) a render2d drawing between the widgets (Android; the desktop has render2dtest --demo, the browser its own),
+// render2dtest's drawings, its town plan and its texts for the drawing, the check and the measurement, included as they are
+#[cfg(target_os = "android")]
+mod pg_r2d;
+#[cfg(not(target_os = "android"))]
+use render2d as _;
+#[cfg(target_os = "android")]
+#[allow(dead_code)]
+#[path = "../render2dtest/gallery.rs"]
+mod gallery;
+#[cfg(target_os = "android")]
+#[allow(dead_code)]
+#[path = "../render2dtest/textdraw.rs"]
+mod textdraw;
+#[cfg(target_os = "android")]
+#[allow(dead_code)]
+#[path = "../render2dtest/hlov.rs"]
+mod hlov;
+#[cfg(target_os = "android")]
+#[allow(dead_code)]
+#[path = "../render2dtest/cad.rs"]
+mod cad;
 mod pg_windows;
 mod secrets;
 mod system;
@@ -67,6 +90,8 @@ struct Gallery {
     images: pg_image::Images, sensors: pg_sensors::Sensors,
     #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
     view3d: pg_view::View3d,
+    #[cfg(target_os = "android")]
+    draw2d: pg_r2d::View2d,
 }
 impl Default for Gallery {
     fn default() -> Self {
@@ -77,7 +102,9 @@ impl Default for Gallery {
             boxes: Default::default(), colors: Default::default(), windows: Default::default(), edge: Default::default(),
             images: Default::default(), sensors: Default::default(),
             #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
-            view3d: Default::default() }
+            view3d: Default::default(),
+            #[cfg(target_os = "android")]
+            draw2d: Default::default() }
     }
 }
 impl Gallery {
@@ -132,6 +159,10 @@ impl Gallery {
                 Page::View3d => self.view3d.page(ui),
                 #[cfg(not(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32")))]
                 Page::View3d => ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, t("Auf diesem System gibt es keine 3D-Ansicht.")),
+                #[cfg(target_os = "android")]
+                Page::Draw2d => self.draw2d.page(ui),
+                #[cfg(not(target_os = "android"))]
+                Page::Draw2d => ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, t("Die 2D-Zeichnung gibt es hier nur auf Android (am Desktop: render2dtest --demo).")),
                 Page::Level => self.sensors.level(ui),
                 Page::Attitude => self.sensors.attitude(ui),
                 Page::Compass => self.sensors.compass(ui),
@@ -267,6 +298,11 @@ impl App for Gallery {
         // (G5e2) the 3D view's animation and check
         #[cfg(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32"))]
         if self.page == Page::View3d && self.view3d.command(ui, id, arg) {
+            return true;
+        }
+        // (G6e3) the 2D drawing's check and measurement
+        #[cfg(target_os = "android")]
+        if self.page == Page::Draw2d && self.draw2d.command(ui, id, arg) {
             return true;
         }
         // Esc and the back key (plat::back_trap): a page goes back when nothing took it

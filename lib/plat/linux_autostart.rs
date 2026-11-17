@@ -170,6 +170,8 @@ fn portal_set(on: bool, args: &[&str]) -> Result<(), AutostartError> {
     }
     let call = Msg::call(PORTAL, PORTAL_PATH, "org.freedesktop.portal.Background", "RequestBackground", alloc::vec![Value::str(""), Value::dict(opts)]);
     let serial = c.send(&call).ok_or(AutostartError::Unavailable)?;
+    // the portal's unique name, the sender of its reply: only its Response counts
+    let mut portal = String::new();
     let end = crate::time_us() + AUTOSTART_WAIT_MS as u64 * 1000;
     loop {
         let now = crate::time_us();
@@ -188,11 +190,12 @@ fn portal_set(on: bool, args: &[&str]) -> Result<(), AutostartError> {
                 return Err(if missing { AutostartError::Unavailable } else { AutostartError::Failed(m.error) });
             }
             T_RETURN if m.reply_to == serial => {
+                portal = m.sender.clone();
                 if let Some(p) = m.body.first().and_then(|v| v.as_str()) {
                     handle = String::from(p); // older portals choose the path themselves
                 }
             }
-            T_SIGNAL if m.member == "Response" && m.path == handle => {
+            T_SIGNAL if m.member == "Response" && m.path == handle && !portal.is_empty() && m.sender == portal => {
                 let code = m.body.first().and_then(|v| v.as_u32()).unwrap_or(2);
                 let granted = match m.body.get(1) {
                     Some(Value::A(_, kv)) => kv.iter().find_map(|e| match e {

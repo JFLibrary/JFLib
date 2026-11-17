@@ -118,9 +118,12 @@ pub fn commit(pwe: &[u8; 64], rand: &[u8; 32], mask: &[u8; 32]) -> Option<([u8; 
 }
 
 /// the x coordinate of k = rand * (peer_scalar * PWE + peer_element); None for a scalar out of
-/// range, an element off the curve, or k at the identity
+/// range or of 1 (RFC 8146 2.1: a scalar of 1 lets the element reveal mask * PWE, as hostapd
+/// refuses it since CVE-2019-9497), an element off the curve, or k at the identity
 pub fn shared(pwe: &[u8; 64], rand: &[u8; 32], peer_scalar: &[u8; 32], peer_element: &[u8; 64]) -> Option<[u8; 32]> {
-    if !p256::scalar_ok(peer_scalar) || !p256::on_curve(peer_element) {
+    let mut one = [0u8; 32];
+    one[31] = 1;
+    if !p256::scalar_ok(peer_scalar) || *peer_scalar == one || !p256::on_curve(peer_element) {
         return None;
     }
     let sum = p256::add_points(&p256::mul_point(peer_scalar, pwe)?, peer_element)?;

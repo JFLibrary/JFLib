@@ -6,7 +6,9 @@
 //   healthy(cfg) -> bool         (lib.rs) the health marker
 //
 // Every file of an update is written next to its target as NAME.jfupd-new; the old file is
-// copied to backup/files/ (backup/list: "R path" replaced, "N path" new), renamed away
+// copied to backup/files/ (backup/list: "H sha256 path" replaced, with the copy's SHA-256, which
+// the way back checks for every copy before it puts one back, and again while it copies -- "R
+// path" of earlier versions without one; "N path" new), renamed away
 // (NAME.jfupd-old-<n>: Windows can rename a running exe, not replace it) and the new file takes
 // its name.  Leftover .jfupd-* files are removed at a later start, once no process uses them.
 // An AppImage update has one file, the .AppImage itself ($APPIMAGE): copied (and hashed on the
@@ -581,10 +583,12 @@ pub(crate) fn apply_staged(cfg: &Config, st: &mut State) -> Result<(), Error> {
             for (rel, _) in &files {
                 let target = format!("{}/{}", dir, rel);
                 if plat::file_exists(&target) == 1 {
-                    if !copy_file(&target, &format!("{}/files/{}", fresh, rel)) {
+                    let copy = format!("{}/files/{}", fresh, rel);
+                    let hash = if copy_file(&target, &copy) { file_sha256(&copy) } else { None };
+                    let Some((_, hash)) = hash else {
                         return Err(Error::Io(format!("die Sicherung von {} in {} kann nicht geschrieben werden", target, backup)));
-                    }
-                    list.push_str(&format!("R {}\n", rel));
+                    };
+                    list.push_str(&format!("H {} {}\n", crypto::hex(&hash), rel));
                 } else {
                     list.push_str(&format!("N {}\n", rel));
                 }
@@ -721,21 +725,51 @@ fn apply_app(cfg: &Config, st: &mut State, bundle: &str) -> Result<(), Error> {
     trial(cfg, st, from)
 }
 
+// a line of backup/list -> (op, path, the SHA-256 of an "H" line); None: no such line, or an "H"
+// line whose hash does not read (Some((op, "", None)))
+fn list_line(line: &str) -> Option<(&str, &str, Option<[u8; 32]>)> {
+    let (op, rest) = line.split_once(' ')?;
+    if op != "H" {
+        return Some((op, rest, None));
+    }
+    let (h, rel) = rest.split_once(' ')?;
+    match crypto::unhex(h).and_then(|v| <[u8; 32]>::try_from(v).ok()) {
+        Some(w) => Some((op, rel, Some(w))),
+        None => Some((op, "", None)),
+    }
+}
+
 // the backed-up state of the files (only: of these; new ones removed)
 fn restore(cfg: &Config, dir: &str, only: Option<&[&str]>) -> bool {
     let backup = path(cfg, "backup");
     let Some(list) = plat::read_file(&format!("{}/list", backup)) else { return false };
+    let list = String::from_utf8_lossy(&list);
+    // every copy with a hash checked before anything is put back: a damaged one leaves the
+    // installed version whole instead of half the old one
+    for line in list.lines() {
+        if let Some(("H", rel, want)) = list_line(line)
+            && only.is_none_or(|o| o.contains(&rel))
+            && (want.is_none() || file_sha256(&format!("{}/files/{}", backup, rel)).map(|x| x.1) != want)
+        {
+            return false;
+        }
+    }
     let mut ok = true;
-    for line in String::from_utf8_lossy(&list).lines() {
-        let Some((op, rel)) = line.split_once(' ') else { continue };
+    for line in list.lines() {
+        // "H sha256 path": the copy must still have the hash it had when it was made
+        let Some((op, rel, want)) = list_line(line) else { continue };
+        if op == "H" && want.is_none() {
+            ok = false;
+            continue;
+        }
         if !rel_ok(rel) || only.is_some_and(|o| !o.contains(&rel)) {
             continue;
         }
         let target = format!("{}/{}", dir, rel);
         match op {
-            "R" => {
+            "R" | "H" => {
                 let old = format!("{}/files/{}", backup, rel);
-                ok &= plat::file_exists(&old) == 1 && swap(cfg, &target, &Src::File(old, None), false).is_ok();
+                ok &= plat::file_exists(&old) == 1 && swap(cfg, &target, &Src::File(old, want), false).is_ok();
             }
             "N" => retire(&target),
             // (macOS) the whole app bundle: the copy exchanged with the installed one
@@ -800,7 +834,7 @@ pub(crate) fn cleanup(cfg: &Config) {
     let mut dirs = alloc::vec![String::from(dir)];
     if let Some(list) = plat::read_file(&path(cfg, "backup/list")) {
         for line in String::from_utf8_lossy(&list).lines() {
-            if let Some((_, rel)) = line.split_once(' ').filter(|(_, r)| rel_ok(r) && r.contains('/')) {
+            if let Some((_, rel, _)) = list_line(line).filter(|(_, r, _)| rel_ok(r) && r.contains('/')) {
                 let d = format!("{}/{}", dir, split_dir(rel).0);
                 if !dirs.contains(&d) {
                     dirs.push(d);
