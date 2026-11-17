@@ -2,7 +2,9 @@
 // instance in view into one list with a key, the bits of !(distance squared from the eye to its sphere's centre): sorted
 // ascending by key, then by slot (a tie decides the same way in every frame), the farthest comes first.  A bitonic sort
 // over the list's room, a power of two and a multiple of TILE (Scene keeps it so); the places from the count on are
-// treated as the largest key (PAD) and end behind the instances.
+// treated as the largest key (PAD) and end behind the instances.  The work follows the count, not the room: only the
+// first `need` places take part (the count's next power of two, TILE at least); the passes beyond end at once (a
+// sorted part stays sorted under the later stages, which compare upwards within it).
 //
 //   sort_local, pc.k == 0: each tile of TILE places sorted in workgroup memory (the stages up to TILE; a tile's direction
 //                          by its place, so two neighbours form the bitonic sequence of the next stage)
@@ -31,6 +33,16 @@ var<immediate> pc: Push;
 const TILE: u32 = 512u;
 const PAD: vec4u = vec4u(0xffffffffu, 0xffffffffu, 0u, 0u);
 var<workgroup> tile: array<vec4u, 512>;
+var<workgroup> need_wg: u32;
+
+// the places that take part: the count's next power of two, TILE at least, the room at most
+fn need() -> u32 {
+    let c = min(blend.count, pc.n);
+    if c <= TILE {
+        return TILE;
+    }
+    return 1u << (firstLeadingBit(c - 1u) + 1u);
+}
 
 // a comes before b: the smaller key, then the smaller slot
 fn before(a: vec4u, b: vec4u) -> bool {
@@ -46,6 +58,13 @@ fn pair(p: u32, j: u32) -> vec2u {
 @compute @workgroup_size(256)
 fn sort_local(@builtin(local_invocation_index) li: u32, @builtin(workgroup_id) wid: vec3u) {
     let base = wid.x * TILE;
+    // (a tile beyond the places that take part: nothing; the same for the whole workgroup)
+    if li == 0u {
+        need_wg = need();
+    }
+    if base >= workgroupUniformLoad(&need_wg) {
+        return;
+    }
     let count = blend.count;
     for (var e = li; e < TILE; e += 256u) {
         let g = base + e;
@@ -88,6 +107,9 @@ fn sort_global(@builtin(global_invocation_id) gid: vec3u) {
         return;
     }
     let ij = pair(p, pc.j);
+    if ij.y >= need() {
+        return;
+    }
     let up = (ij.x & pc.k) == 0u;
     let a = blend.items[ij.x];
     let b = blend.items[ij.y];

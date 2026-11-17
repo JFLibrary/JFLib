@@ -327,8 +327,8 @@ fn blend_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     Some(())
 }
 
-/// many blended instances: 600 against the ray caster (the sort over two tiles), 3000 sorted (four tiles, the steps
-/// between them)
+/// many blended instances: 600 against the ray caster (the sort over two tiles), 3000 sorted, spread wider so that about
+/// half lie outside the view (room for 4096: the sort's work follows the count, the passes beyond it end at once)
 fn blend_many_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
     let (w, h) = (GALLERY_W, GALLERY_H);
     let cam = Camera::look_at([0.0, 0.0, 14.0], [0.0, 0.0, 0.0], [0.0, 1.0, 0.0], 1.0, w as f64 / h as f64, 0.1, f64::INFINITY);
@@ -349,7 +349,9 @@ fn blend_many_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
                 scale[0] = -s;
             }
             let axis = cpu::norm([rng.range(-1.0, 1.0), rng.range(-1.0, 1.0), rng.range(-1.0, 1.0) + 0.01]);
-            items.push((Spec { mesh, material: 0, pos: [q(&mut rng, -9.0, 9.0), q(&mut rng, -5.0, 5.0), q(&mut rng, -10.0, 4.0)], rot: quat(axis, rng.range(0.0, 6.0)), scale }, m));
+            let wide = if image { 1.0 } else { 6.0 };
+            items.push((Spec { mesh, material: 0, pos: [q(&mut rng, -9.0 * wide, 9.0 * wide), q(&mut rng, -5.0, 5.0), q(&mut rng, -10.0, 4.0)], rot: quat(axis, rng.range(0.0, 6.0)),
+                               scale }, m));
         }
         let d: Described = (vec![plate(), cube()], Vec::new(), items);
         let mut b = build_desc(t, dev, &Sun::DEFAULT, &d, &cam)?;
@@ -361,7 +363,8 @@ fn blend_many_on(t: &mut T, dev: &Device, level: &str) -> Option<()> {
         let got: Vec<u32> = items.iter().map(|e| e[1]).collect();
         // (an instance within a hair of a face may or may not be there)
         let fine = sorted(&items) && (got == want || doubt > 0 && want.iter().all(|s| got.contains(s)));
-        t.ok(fine, &format!("{level}: {n} blended instances: {count} in the list (CPU {} + {doubt} at a face), sorted back to front: {}", want.len(), sorted(&items)));
+        t.ok(fine, &format!("{level}: {n} blended instances: {count} in the list (CPU {} + {doubt} at a face; room {}), sorted back to front: {}", want.len(),
+                            (b.s.blend_buffer().size() - 16) / 16, sorted(&items)));
         if image {
             let c = cpu::compare_tol(&b.rs, &ref_camera(&cam), w, h, CLEAR8, &img, None, 3);
             t.ok(c.fine(), &format!("{level}: {n} blended instances against the ray caster (within 3: every layer rounds to 8 bits): {}", c.text()));
