@@ -27379,7 +27379,9 @@ Source: [`lib/plat/process_apple.rs`](../lib/plat/process_apple.rs)
 ```text
 macOS and iOS child processes through posix_spawn (docs/APPLE.md): no fork in a process with threads.
 A child gets its pipes on 0, 1 and 2, a process group of its own (killed as one, as on Linux),
-SIGPIPE back at its default and no blocked signals, and none of this process's other descriptors
+SIGPIPE and SIGTERM back at their default (plat ignores both: SIGPIPE always, SIGTERM in an app,
+which hears it through a dispatch source -- a child would keep them ignored, and so would all it
+starts) and no blocked signals, and none of this process's other descriptors
 (POSIX_SPAWN_CLOEXEC_DEFAULT).  posix_spawn reports a failed exec itself.  iOS allows no child
 processes: there every start fails with the system's error.
 ```

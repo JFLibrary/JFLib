@@ -150,6 +150,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **web:** Browser: a key that writes a punctuation mark gives the key code the native hosts give (+ , - . as VK_OEM_PLUS / COMMA / MINUS / PERIOD, the keypad as VK_NUMPAD*, others by the key's place) instead of its capital letter's code: typing "$" was Shift+Home and replaced the text before the caret, "." was Delete, "%" Shift+Left, "#" End
 - **web:** Browser: a stored file that cannot be imported at the start (too big, no memory) is left out and named in the console; it stopped the whole start, so the app never started again on that origin
 - **android:** Android: a text longer than 256 KiB goes to the keyboard as a window of 192 KiB around the caret, and its edits are put back into the whole text: such a text gave the keyboard no copy, and its next key replaced the text by an old one
+- **plat:** macOS: a child process (`Command::spawn`, `process::launch`, `process::exec`) starts with SIGTERM at its default, as with SIGPIPE: an app ignores SIGTERM (it hears it through a dispatch source), and every program it started ignored it as well, and all they started, so `kill` and `terminate()` did not end them.
 
 ### Security
 

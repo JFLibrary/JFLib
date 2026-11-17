@@ -1,6 +1,8 @@
 // macOS and iOS child processes through posix_spawn (docs/APPLE.md): no fork in a process with threads.
 // A child gets its pipes on 0, 1 and 2, a process group of its own (killed as one, as on Linux),
-// SIGPIPE back at its default and no blocked signals, and none of this process's other descriptors
+// SIGPIPE and SIGTERM back at their default (plat ignores both: SIGPIPE always, SIGTERM in an app,
+// which hears it through a dispatch source -- a child would keep them ignored, and so would all it
+// starts) and no blocked signals, and none of this process's other descriptors
 // (POSIX_SPAWN_CLOEXEC_DEFAULT).  posix_spawn reports a failed exec itself.  iOS allows no child
 // processes: there every start fails with the system's error.
 use alloc::{format, string::String, vec::Vec};
@@ -38,6 +40,7 @@ const POSIX_SPAWN_SETSIGMASK: i16 = 0x0008;
 const POSIX_SPAWN_SETSID: i16 = 0x0400;
 const POSIX_SPAWN_CLOEXEC_DEFAULT: i16 = 0x4000;
 const SIGPIPE: c_int = 13;
+const SIGTERM: c_int = 15;
 const SIGKILL: c_int = 9;
 const SIG_DFL: usize = 0;
 const SIG_IGN: usize = 1;
@@ -121,7 +124,8 @@ struct Spawn { actions: SpawnObj, attr: SpawnObj }
 impl Spawn {
     fn new(flags: i16) -> Result<Spawn, u32> {
         let mut s = Spawn { actions: core::ptr::null_mut(), attr: core::ptr::null_mut() };
-        let pipe_bit: u32 = 1 << (SIGPIPE - 1);
+        // what plat ignores, the child does not inherit (apple.rs: SIGPIPE; apple_mac_app.rs: SIGTERM)
+        let reset: u32 = (1 << (SIGPIPE - 1)) | (1 << (SIGTERM - 1));
         let none: u32 = 0;
         // SAFETY: init writes the two objects; the signal sets live during the calls.
         unsafe {
@@ -130,7 +134,7 @@ impl Spawn {
             let e = posix_spawnattr_init(&mut s.attr);
             if e != 0 { return Err(e as u32); }
             posix_spawnattr_setflags(&mut s.attr, flags | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_CLOEXEC_DEFAULT);
-            posix_spawnattr_setsigdefault(&mut s.attr, &pipe_bit);
+            posix_spawnattr_setsigdefault(&mut s.attr, &reset);
             posix_spawnattr_setsigmask(&mut s.attr, &none);
         }
         Ok(s)
@@ -237,21 +241,24 @@ pub(super) fn elevated() -> bool {
     // SAFETY: no arguments.
     unsafe { geteuid() == 0 }
 }
-/// execve in place of this process; SIGPIPE back to SIG_DFL first (an ignored signal would stay
-/// ignored in the new program) -> the error number when it failed
+/// execve in place of this process; SIGPIPE and SIGTERM back to SIG_DFL first (an ignored signal
+/// would stay ignored in the new program) -> the error number when it failed
 pub(super) fn exec(program: &str, args: &[&str], env: &[(&str, Option<&str>)]) -> u32 {
     let path = match resolve(program) { Ok(p) => p, Err(e) => return e };
     let exe = z(&path);
     let (_strs, argv) = argv_of(program, args);
     let envs = environment(env);
     let mut envp: Vec<usize> = envs.iter().map(|s| s.as_ptr() as usize).collect(); envp.push(0);
-    // SAFETY: signal with a constant handler; execve with the NUL-terminated strings and 0-terminated
-    // pointer arrays above, alive during the call.
+    // SAFETY: signal with a constant handler, or the one it gave back; execve with the
+    // NUL-terminated strings and 0-terminated pointer arrays above, alive during the call.
     unsafe {
         signal(SIGPIPE, SIG_DFL);
+        let term = signal(SIGTERM, SIG_DFL);
         execve(exe.as_ptr().cast(), argv.as_ptr().cast(), envp.as_ptr().cast());
         let e = ffi::errno();
-        signal(SIGPIPE, SIG_IGN); // the failed exec left this process running: ignored again as at start-up
+        // the failed exec left this process running: as it was before
+        signal(SIGPIPE, SIG_IGN);
+        signal(SIGTERM, term);
         e as u32
     }
 }

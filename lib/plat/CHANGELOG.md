@@ -74,6 +74,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - `ime_commit_text` takes text of any length (up to 16 MiB): what the queue of 16 commits cannot hold yet waits and follows as the app takes them; a paste or dictation over 64 KiB was cut there without a word (iOS, macOS while composing, Linux IBus, the browser).
 - `AtomicFile` on a folder mount (Linux, macOS) keeps the file's permission bits (a 0600 file became 0644); a systemd unit's Description has every control character as a space (a \r let it add directives).
 - Android: a text longer than 256 KiB goes to the keyboard as a window of 192 KiB around the caret, and its edits are put back into the whole text: such a text gave the keyboard no copy, and its next key replaced the text by an old one.
+- macOS: a child process (`Command::spawn`, `process::launch`, `process::exec`) starts with SIGTERM at its default, as with SIGPIPE: an app ignores SIGTERM (it hears it through a dispatch source), and every program it started ignored it as well, and all they started, so `kill` and `terminate()` did not end them.
 
 ### Security
 
