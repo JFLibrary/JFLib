@@ -23733,7 +23733,7 @@ folder (absolute paths, "..", a scheme) are refused before the closure sees them
   - `json_bytes: usize` -- bytes of the JSON part, and the values in it (objects, arrays, numbers, ...)
   - `json_values: usize`
   - `buffer_bytes: u64` -- bytes of all buffers together, as given (a file two buffers name counts twice), and the zeros of
-    accessors without a buffer view
+    accessors without a buffer view; the image files read count against it too (apart)
   - `vertices: u64` -- vertices and indices of all primitives together, as the model holds them (flat normals split vertices)
   - `indices: u64`
   - `nodes: usize` -- nodes, and how deep they nest
@@ -45067,8 +45067,9 @@ KDE_IGTK: u8 = 9
 - **`fn to_bytes(&self) -> Vec<u8>`**
   the element with its id and length (22 bytes)
 - **`fn parse(elems: &[u8]) -> Option<Rsne>`**
-  the first RSN element of a list of elements (key data); one pairwise and one AKM suite
-  of 00-0F-AC are read, the counts are little endian as in every element
+  the first RSN element of a list of elements (key data): the first AKM suite's type (of
+  00-0F-AC) and the capabilities after every AKM suite; the counts are little endian as in
+  every element
 
 - **`fn elements(b: &[u8]) -> Vec<(u8, &[u8])>`**
   the elements of a list: (id, contents); stops at one that does not fit
