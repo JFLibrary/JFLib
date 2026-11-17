@@ -148,16 +148,18 @@ dem Emulator (x86-64, API 35) und auf dem A56, und die Syscall-Liste die Kandida
 | Lauf (Emulator x86-64, API 35) | `adb shell` | App (`untrusted_app`, seccomp 2) |
 |---|---|---|
 | `coretest` | 3259 von 3259 Prüfungen | 3259 von 3259 |
-| `plattest --test all` | 182 bestanden, 2 Fehler (Funde 1, 2) | dasselbe |
+| `plattest --test all` | 183 bestanden, 1 Fehler (Fund 2) | dasselbe |
 | `asynctest --script tasks.uis`, `copy.uis` | grün | grün |
 | `plattest --test syscalls` | 114 von 114 erreichen den Kernel | 94 erreichen den Kernel, 20 enden mit SIGSYS |
 
-Funde von `plattest` (Fehler der Bibliothek auf Android, in AN0 nicht behoben):
+Funde von `plattest` (Fehler der Bibliothek auf Android):
 
-1. **`plat::date()` und `plat::unix_time_ns()` liefern immer 1970-01-01.** Der Kalender kommt aus `jfgui_date`
-   ([`web.rs`](../lib/plat/web.rs)), und das ruft nur der Browser-Host (`web/worker.js`), weder `bridge.c` noch der
-   Java-Host. Das trifft jede Android-App: Uhrzeit, Dateizeiten, Logs, in AN2 die Gültigkeit von Zertifikaten.
-2. **`plat::mkdir` über einer vorhandenen Datei meldet Erfolg.** `mkdirs` in
+1. **Behoben: `plat::date()` und `plat::unix_time_ns()` lieferten immer 1970-01-01.** Der Kalender kam aus
+   `jfgui_date` ([`web.rs`](../lib/plat/web.rs)), und das ruft nur der Browser-Host (`web/worker.js`), weder
+   `bridge.c` noch der Java-Host. Das traf jede Android-App (Uhrzeit, Dateizeiten, Logs, in AN2 die Gültigkeit von
+   Zertifikaten). Jetzt nimmt Android die Uhr des Systems (Bionics `CLOCK_REALTIME`), UTC wie Linux; die
+   Umrechnung teilen sich Linux, Apple und Android (`utc_date` in `plat`). Die Zone bleibt Sache von AN3.
+2. **Offen: `plat::mkdir` über einer vorhandenen Datei meldet Erfolg.** `mkdirs` in
    [`android_files.rs`](../lib/plat/android_files.rs) nimmt EEXIST auch hin, wenn der Name eine Datei ist.
 3. `plat::cpu_brand()` ist leer (rt nimmt auf Android den portablen CPU-Code); die Quelle wäre `/proc/cpuinfo`.
    `plattest` meldet das als „not on Android yet“, ebenso `mem_total()` (AN1).

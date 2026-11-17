@@ -253,29 +253,5 @@ pub fn mem_total() -> u64 {
 /// the date and time in UTC (as linux_thread.rs: no time zone database); the flag is true (UTC)
 /// [plat_date]
 pub fn date() -> (Date, bool) {
-    let ns = super::unix_time_ns().max(0) as u64;
-    let secs = ns / 1_000_000_000;
-    let days = secs / 86400;
-    let sod = secs % 86400;
-    // civil from days (H. Hinnant)
-    let z = days + 719468;
-    let era = z / 146097;
-    let doe = z - era * 146097;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let day = doy - (153 * mp + 2) / 5 + 1;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = yoe + era * 400 + (month <= 2) as u64;
-    let d = Date {
-        year: year as u16,
-        month: month as u16,
-        day: day as u16,
-        hour: (sod / 3600) as u16,
-        min: (sod % 3600 / 60) as u16,
-        sec: (sod % 60) as u16,
-        ms: (ns % 1_000_000_000 / 1_000_000) as u16,
-        wday: ((days + 4) % 7) as u16,
-    };
-    (d, true)
+    (crate::utc_date(super::unix_time_ns()), true)
 }

@@ -90,6 +90,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Windows: the backup of a file association's registry keys walks them with a list instead of recursion (keys nest up to 512 deep, each level held a 32 KB buffer on the stack)
 - **spell:** COMPOUNDRULE matches with a table over rule elements and parts (trying every way the `*` and `?` elements could share the parts was exponential in their number)
 - **base:** `pattern::Regex`: the matcher follows jumps and splits with a list instead of recursion, one level per alternative and per optional repetition (6000 alternatives took about a megabyte of stack)
+- **plat:** `plat::date()` and `plat::unix_time_ns()` on Android: the system's clock (Bionic's CLOCK_REALTIME, UTC as on Linux) instead of the browser's host calendar, which no Android host sets -- every Android app saw 1970-01-01 00:00 UTC (found by plattest in AN0, docs/ANDROID.md)
 
 ### Security
 
