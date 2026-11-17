@@ -94,6 +94,18 @@ pub(crate) const DRAW_BYTES: u64 = 20;
 pub(crate) const STAMPS: u32 = 4;
 pub(crate) const WG_SCATTER: u32 = 64;
 
+/// (G6e3) the scatter's changes in one dispatch: as many as its workgroups (of WG_SCATTER) and a storage binding reach, a
+/// piece's bytes a multiple of the binding offsets' alignment (the change buffer is bound per piece)
+fn scatter_chunk(l: &Limits) -> u32 {
+    let bytes = CHANGE_WORDS as u64 * 4;
+    let align = (l.min_storage_offset_alignment as u64).max(1);
+    let mut n = (l.max_compute_workgroups[0] as u64 * WG_SCATTER as u64).min(l.max_storage_binding as u64 / bytes).min(u32::MAX as u64 / 2).max(1);
+    while n > 1 && (n * bytes) % align != 0 {
+        n -= 1;
+    }
+    n as u32
+}
+
 /// the shaders, compiled from the *.wgsl beside this file with common.wgsl in front (render2dtest --test shaders
 /// compares them with what wgsl::compile makes of them, --gen-shaders writes them again); the browser takes the WGSL
 #[cfg(not(target_arch = "wasm32"))]
@@ -210,6 +222,9 @@ pub struct Renderer {
     pub(crate) multi: bool,
     pub(crate) max_records: u32,
     pub(crate) max_entries: u32,
+    /// (G6e3) the changes one dispatch of the scatter shader reaches: its workgroups and its binding (each piece's offset
+    /// aligned for a storage binding); more in one frame go up in pieces
+    pub(crate) scatter_chunk: u32,
     pub(crate) tag: Arc<Tag>,
     count: ComputePipeline,
     scan: ComputePipeline,
@@ -393,12 +408,14 @@ impl Renderer {
         let by_dispatch = max_entries as u64 * PAGE as u64;
         // (below 2^29: bits 29 and 30 of a visible list's word carry the highlight, G6d)
         let max_records = (by_binding / PAGE as u64 * PAGE as u64).min(by_dispatch).min(1 << 29) as u32;
+        let scatter_chunk = scatter_chunk(&l);
         Ok(Renderer {
             dev: dev.clone(),
             desc: *desc,
             multi,
             max_records,
             max_entries,
+            scatter_chunk,
             tag: Arc::new(Tag),
             count,
             scan,
@@ -597,11 +614,28 @@ impl Renderer {
             }
         }
         if s.up.scatter > 0 {
-            let Some(group) = &f.scatter_group else { return Err(GpuError::Invalid("record: Scene::prepare comes first")) };
+            // (G6e3) in pieces of what one dispatch reaches, each with its binding of the change buffer: one piece on most
+            // desktop GPUs, more on Metal, in the browser and on phones (65 535 workgroups) for millions of records
+            if f.scatter_groups.len() < s.up.scatter.div_ceil(self.scatter_chunk) as usize {
+                return Err(GpuError::Invalid("record: Scene::prepare comes first"));
+            }
             e.set_compute_pipeline(&self.scatter);
-            e.set_bind_group(0, group);
-            e.push_constants(0, &[s.up.scatter]);
-            e.dispatch(s.up.scatter.div_ceil(WG_SCATTER), 1, 1);
+            let mut left = s.up.scatter;
+            for (k, group) in f.scatter_groups.iter().enumerate() {
+                if left == 0 {
+                    break;
+                }
+                let n = left.min(self.scatter_chunk);
+                if k > 0 {
+                    // (the pieces write other records of the pool; the barrier keeps the validation's view of one buffer
+                    // written by two dispatches quiet)
+                    e.barrier(Access::COMPUTE_WRITE, Access::COMPUTE_WRITE);
+                }
+                e.set_bind_group(0, group);
+                e.push_constants(0, &[n]);
+                e.dispatch(n.div_ceil(WG_SCATTER), 1, 1);
+                left -= n;
+            }
         }
         // the uploads (copies, scatter) before the visibility and the vertex shader read them
         e.barrier(Access::COPY_WRITE | Access::COMPUTE_WRITE, Access::COMPUTE_READ | Access::GRAPHICS_READ);

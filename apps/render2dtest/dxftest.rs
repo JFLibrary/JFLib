@@ -1706,7 +1706,14 @@ pub fn bench(path: &str) -> i32 {
         return 1;
     }
     s.set_stats(true);
-    let Ok(tex) = dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET)) else { return 1 };
+    // (G6e3: every failure says what failed; on the M2 the GPU part of Zürich ended without a word)
+    let tex = match dev.create_texture(&TextureDesc::d2(size.0, size.1, Format::Bgra8Unorm, TextureUsage::COLOR_TARGET)) {
+        Ok(t) => t,
+        Err(e) => {
+            out(&format!("FAIL the target: {e}"));
+            return 1;
+        }
+    };
     let mut used = false;
     let mut layers = l.clone();
     for (name, cam) in [("whole", full), (zname.as_str(), zoom)] {
@@ -1722,16 +1729,35 @@ pub fn bench(path: &str) -> i32 {
                 return 1;
             }
             let prep = (plat::time_us() - t0) as f64 / 1000.0;
-            let Ok(mut e) = dev.encoder() else { return 1 };
+            let mut e = match dev.encoder() {
+                Ok(e) => e,
+                Err(e) => {
+                    out(&format!("FAIL encoder: {e}"));
+                    return 1;
+                }
+            };
             let color = ColorAttachment { view: tex.view(), load: Load::Clear, clear: bg_clear(BG), store: true, before: if used { Layout::ColorTarget } else { Layout::Undefined },
                                           after: Layout::ColorTarget };
-            if r.record(&mut e, &s, color).is_err() {
+            if let Err(err) = r.record(&mut e, &s, color) {
+                out(&format!("FAIL record: {err}"));
                 return 1;
             }
-            let Ok(cmd) = e.finish() else { return 1 };
+            let cmd = match e.finish() {
+                Ok(c) => c,
+                Err(err) => {
+                    out(&format!("FAIL finish: {err}"));
+                    return 1;
+                }
+            };
             // (G6e3) the wall time from the submission until the wait came back: what Metal (no timestamps in lib/gpu) says
             let t1 = plat::time_us();
-            let Ok(id) = dev.queue().submit([cmd]) else { return 1 };
+            let id = match dev.queue().submit([cmd]) {
+                Ok(id) => id,
+                Err(err) => {
+                    out(&format!("FAIL submit: {err}"));
+                    return 1;
+                }
+            };
             s.submitted(id);
             used = true;
             if !dev.wait(id, 60_000_000_000).unwrap_or(false) {
