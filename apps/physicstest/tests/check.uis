@@ -1,0 +1,4 @@
+#!args --check
+# physicstest is a console program: every test group of lib/physics against its references (math, hull,
+# ray, distance, cast, tunnel, seams, bvh, world, fuzz, edge); exit code 1 when a check fails.  The
+# determinism checksum (--checksum) is compared across the targets by hand (docs/PHYSICS.md, "Tests").
