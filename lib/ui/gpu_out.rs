@@ -139,7 +139,7 @@
 // A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 // frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
 // usable adapter or surface, a display that takes or imports no dma-bufs: the CPU path for good, silently
-// (dev_never: one info line in the log says why).  plat::gpu_out_state tells the platform how the first
+// but for one line in the log (level info) that says why.  plat::gpu_out_state tells the platform how the first
 // start went (Android keeps it across runs: a driver that killed the program does not get a third chance).
 //
 // Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON, DEFAULT_ON_LINUX, DEFAULT_ON_BROWSER; Android:
