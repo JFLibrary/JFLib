@@ -108,6 +108,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
   <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
+- [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
+  <br>[src/bvh.rs](#physicssrcbvhrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
 
 ## ui
 
@@ -53694,3 +53696,702 @@ strings -- a DXF's bytes as text: UTF-8 from AutoCAD 2007 (AC1021) on, before th
   TEXT's %% codes: %%c the diameter sign (U+2205), %%d the degree sign, %%p plus-minus, %%nnn the character of that
   code (Windows-1252 above 127), %%% a percent sign; %%u, %%o and %%k switch underline, overline and strike-through on
   and off (the runs they start).  Unknown codes stay as they are
+
+## physics
+
+*Collision shapes, broad phase and deterministic queries for games* -- crate root [`lib/physics/src/lib.rs`](../lib/physics/src/lib.rs)
+
+```text
+physics -- collision for games: shapes, broad phase, queries; deterministic, the same bits on every target
+
+  Shape          sphere, capsule, box, convex hull (ConvexHull::new: quickhull), static triangle mesh
+                 (TriMesh: f32 vertices, a binned-SAH tree, active edges against ghost collisions)
+  World          bodies (shape, Iso, layers) in dynamic AABB trees; ray_cast, ray_cast_all, cast (a
+                 swept convex shape: time of impact, normal, contact point), overlap, contacts
+                 (penetration depth and normal per body and triangle), closest_point
+  query          the same for one shape against one placed shape, without a world
+  math           Vec3, Quat, Iso, Aabb in f64; sqrt correctly rounded, sin / cos / atan2 from rt's
+                 portable math
+
+Narrow phase: GJK for distances, EPA for penetration, GJK ray casting with conservative advancement for
+the casts (radii as margins outside GJK), watertight ray/triangle tests, analytic rays against the other
+primitives.  Deterministic: only + - * / and correctly rounded square roots in f64, never a fused
+multiply-add, no unordered containers, no threads, fixed iteration limits and tie-breaks; checked by the
+checksums of apps/physicstest on every target.  docs/PHYSICS.md describes the design, the tests and the
+measurements.
+```
+
+### `physics/src/bvh.rs`
+
+Source: [`lib/physics/src/bvh.rs`](../lib/physics/src/bvh.rs)
+
+```text
+bvh -- the fixed bounding volume hierarchy of a triangle mesh: binned SAH, built once
+
+Boxes in f32 (a mesh's vertices are f32, so the box of a triangle is exact in f32 and so is every
+union).  A node is 32 bytes; the two children of an inner node sit next to each other.  The build splits
+a node where the surface area heuristic over 16 bins per axis is cheapest (cost of a node visit 1, of a
+triangle 1); a node becomes a leaf when that is not cheaper than testing its triangles (at most
+`max_leaf`).  Past depth 40 it splits at the median along the widest axis, which bounds the depth for
+any input.  Every choice has a tie-break by axis, bin or index: the same tree on every target.
+```
+
+- **`struct BvhNode`**
+  a node of a [`crate::TriMesh`]'s tree: an inner node when `count` is 0 (children at `first` and
+  `first + 1`), else a leaf with the triangles `first .. first + count`
+  - `min: [f32; 3]` -- the box, in the mesh's frame
+  - `max: [f32; 3]`
+  - `first: u32` -- the left child (an inner node) or the first triangle (a leaf)
+  - `count: u32` -- 0 for an inner node, else the number of triangles
+
+**`impl BvhNode`**
+
+- **`fn is_leaf(&self) -> bool`**
+  a leaf (it has triangles)
+
+### `physics/src/gjk.rs`
+
+Source: [`lib/physics/src/gjk.rs`](../lib/physics/src/gjk.rs)
+
+```text
+gjk -- distance, penetration and time of impact between two convex shapes given as support functions
+
+GJK (Gilbert, Johnson, Keerthi) finds the point of the Minkowski difference D = A - B closest to the
+origin; the simplex is reduced by the Voronoi regions of its vertices, edges and faces (Ericson,
+"Real-Time Collision Detection", 5.1.5 and 9.5).  EPA expands a polytope inside D to find the shallowest
+way out when the cores overlap.  The cast is GJK ray casting with conservative advancement (van den
+Bergen 2004, as in Box2D's b2ShapeCast): the support plane of D in the direction of the current closest
+point bounds the distance at every later time, so the time advances to where that bound meets the target
+distance and never beyond the first contact.  The radii of spheres and capsules stay outside GJK as
+margins: the cores of two such shapes are apart at contact, which keeps the casts well conditioned.
+```
+
+```rust
+/// two shapes without radius (boxes, hulls, triangles) stop a cast at this gap (metres): a positive
+/// distance keeps the direction of the closest points well defined
+CAST_SKIN: f64 = 1e-6
+```
+
+- **`fn cast_fallbacks() -> u32`**
+  how many casts so far fell back from GJK ray casting to Newton's method on the distance (GJK at one time
+  stalled by rounding, or its iterations ran out); the result is right either way, only slower
+
+### `physics/src/hull.rs`
+
+Source: [`lib/physics/src/hull.rs`](../lib/physics/src/hull.rs)
+
+```text
+hull -- a convex hull from points (quickhull in 3D) and its support function
+
+Quickhull: a first tetrahedron from extreme points, every other point in the outside set of the face it
+lies farthest above; then, as long as a face has an outside set, its farthest point (the eye) removes the
+faces it sees (a connected region from that face), the horizon around them gets new faces to the eye,
+and the points of the removed faces go to the new ones (or are inside now).  A point within `eps` of a
+face's plane counts as on it, so the hull can leave out points that lie that close to it.  Everything in
+a fixed order (faces and points by index, ties to the lower index): the same hull on every target.
+```
+
+```rust
+/// at most this many input points for [`ConvexHull::new`]
+MAX_HULL_POINTS: usize = 1 << 16
+```
+
+- **`enum HullError`**
+  why [`ConvexHull::new`] refused the points
+  - `Count` -- fewer than 4 points, or more than [`MAX_HULL_POINTS`]
+  - `NotFinite` -- a coordinate is NaN or infinite
+  - `Flat` -- all points lie on a plane (or a line or a point), within the tolerance: no volume
+
+- **`struct ConvexHull`**
+  A convex polyhedron: the hull of the points it was made from.  Vertices, triangles (counter-clockwise
+  seen from outside) and their planes, in its own coordinates.
+
+**`impl ConvexHull`**
+
+- **`fn new(points: &[Vec3]) -> Result<ConvexHull, HullError>`**
+  the convex hull of `points` (at least 4, not all on a plane)
+- **`fn points(&self) -> &[Vec3]`**
+  the vertices (a subset of the input points, in their order)
+- **`fn faces(&self) -> &[[u32; 3]]`**
+  the triangles, as indices into [`ConvexHull::points`], counter-clockwise seen from outside
+- **`fn planes(&self) -> &[(Vec3, f64)]`**
+  per face the outward unit normal n and d, with n . p = d on the face
+- **`fn aabb(&self) -> Aabb`**
+  the box around the hull in its own coordinates
+- **`fn tolerance(&self) -> f64`**
+  the tolerance of the construction: an input point lies at most this far outside the hull
+- **`fn support(&self, d: Vec3) -> Vec3`**
+  a vertex farthest in direction `d`: the first of equals among up to 32 vertices, beyond that by hill
+  climbing over the vertex adjacency (exact for a convex polyhedron, always the same path)
+- **`fn volume(&self) -> f64`**
+  the volume (for tests and mass properties later)
+
+### `physics/src/math.rs`
+
+Source: [`lib/physics/src/math.rs`](../lib/physics/src/math.rs)
+
+```text
+math -- the vectors, rotations and boxes of the crate, in f64, with operations that give the same bits on
+every target: + - * / and a correctly rounded square root, never a fused multiply-add (Rust does not
+contract a * b + c on its own); sin, cos and atan2 from rt's portable math (docs/ARM64.md, ARM2), which is
+the same code on every target.
+```
+
+- **`fn sqrt(x: f64) -> f64`**
+  The square root, correctly rounded (IEEE 754), so the same bits on every target: the processor's
+  instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64), elsewhere (the browser, the x86-64
+  Android emulator) [`sqrt_portable`].  A negative argument gives NaN, -0.0 gives -0.0.
+
+- **`fn sqrt_portable(x: f64) -> f64`**
+  The correctly rounded square root from f64 operations and one 64 x 64 bit product: Newton's method
+  gives an estimate within a few units in the last place, the integer test (R - 1/2)^2 &lt; X &lt; (R + 1/2)^2
+  on the significand picks the right neighbour.  Equal to the processor's square root for every input;
+  on the browser it is several times faster than rt's bit-by-bit root.  Public for the tests.
+
+- **`fn sincos(x: f64) -> (f64, f64)`**
+  sin and cos of `x` (radians) from rt's portable math: the same bits on every target (within half an
+  ulp of the exact value)
+
+- **`fn sin(x: f64) -> f64`**
+  sin of `x` (radians), the same bits on every target
+
+- **`fn cos(x: f64) -> f64`**
+  cos of `x` (radians), the same bits on every target
+
+- **`fn atan2(y: f64, x: f64) -> f64`**
+  atan2(y, x) in radians, the same bits on every target
+
+- **`fn min(a: f64, b: f64) -> f64`**
+  the smaller of two numbers (`b` when they are equal or one is NaN), the same on every target
+
+- **`fn max(a: f64, b: f64) -> f64`**
+  the larger of two numbers (`b` when they are equal or one is NaN)
+
+- **`fn clamp(x: f64, lo: f64, hi: f64) -> f64`**
+  `x` limited to [lo, hi] (lo when x is NaN)
+
+- **`struct Vec3`**
+  A point or a direction in metres, `f64` (docs/PHYSICS.md, "f64").  Converts from and to `[f64; 3]`,
+  render3d's positions.
+  - `x: f64` -- metres (or a direction's component)
+  - `y: f64`
+  - `z: f64`
+
+**`impl Vec3`**
+
+- **`const ZERO: Vec3 = Vec3::new(0.0, 0.0, 0.0)`**
+  (0, 0, 0)
+- **`const X: Vec3 = Vec3::new(1.0, 0.0, 0.0)`**
+  the unit vectors along the axes (Y is up)
+- **`const Y: Vec3 = Vec3::new(0.0, 1.0, 0.0)`**
+- **`const Z: Vec3 = Vec3::new(0.0, 0.0, 1.0)`**
+- **`const fn new(x: f64, y: f64, z: f64) -> Vec3`**
+  (x, y, z)
+- **`const fn splat(v: f64) -> Vec3`**
+  (v, v, v)
+- **`fn dot(self, o: Vec3) -> f64`**
+  the dot product, summed x, y, z in this order
+- **`fn cross(self, o: Vec3) -> Vec3`**
+  the cross product (right-handed)
+- **`fn length_sq(self) -> f64`**
+  the squared length
+- **`fn length(self) -> f64`**
+  the length (correctly rounded root)
+- **`fn try_normalize(self) -> Option<Vec3>`**
+  the unit vector in this direction, None for a zero (or not finite) vector
+- **`fn normalize_or_zero(self) -> Vec3`**
+  the unit vector in this direction; a zero vector stays zero
+- **`fn min(self, o: Vec3) -> Vec3`**
+  the smaller component by component
+- **`fn max(self, o: Vec3) -> Vec3`**
+  the larger component by component
+- **`fn abs(self) -> Vec3`**
+  the absolute value of each component
+- **`fn mul_elem(self, o: Vec3) -> Vec3`**
+  component by component
+- **`fn lerp(self, b: Vec3, t: f64) -> Vec3`**
+  a + (b - a) \* t
+- **`fn max_elem(self) -> f64`**
+  the largest component
+- **`fn is_finite(self) -> bool`**
+  every component is finite
+- **`const fn to_array(self) -> [f64; 3]`**
+  [x, y, z] (render3d's positions)
+- **`fn any_perpendicular(self) -> Vec3`**
+  a unit vector perpendicular to this unit vector (chosen the same way on every target)
+
+- **`struct Quat`**
+  A rotation as a unit quaternion (x, y, z, w), `f64`.  render3d keeps rotations as `[f32; 4]` in the same
+  order: [`Quat::from_f32`], [`Quat::to_f32`].
+  - `x: f64` -- the vector part (sin of half the angle times the axis)
+  - `y: f64`
+  - `z: f64`
+  - `w: f64` -- the scalar part (cos of half the angle)
+
+**`impl Quat`**
+
+- **`const IDENTITY: Quat = Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }`**
+  no rotation
+- **`const fn new(x: f64, y: f64, z: f64, w: f64) -> Quat`**
+  as given (normalise it with [`Quat::normalize`] unless it is a unit quaternion already)
+- **`fn from_axis_angle(axis: Vec3, angle: f64) -> Quat`**
+  the rotation by `angle` radians about the unit vector `axis` (right-handed)
+- **`fn from_yaw_pitch(yaw: f64, pitch: f64) -> Quat`**
+  the rotation about +Y by `yaw`, then about the rotated +X by `pitch` (a camera's or a figure's turn)
+- **`fn from_rotation_arc(from: Vec3, to: Vec3) -> Quat`**
+  the shortest rotation that turns the unit vector `from` into the unit vector `to`
+- **`fn from_f32(q: [f32; 4]) -> Quat`**
+  from render3d's `[f32; 4]` (x, y, z, w)
+- **`fn to_f32(self) -> [f32; 4]`**
+  to render3d's `[f32; 4]` (x, y, z, w)
+- **`fn normalize(self) -> Quat`**
+  the unit quaternion in this direction (the identity for a zero quaternion)
+- **`fn conjugate(self) -> Quat`**
+  the inverse rotation of a unit quaternion
+- **`fn mul(self, o: Quat) -> Quat`**
+  the product self \* o, which rotates by `o` first and then by `self`
+- **`fn rotate(self, v: Vec3) -> Vec3`**
+  `v` rotated (a unit quaternion)
+- **`fn inverse_rotate(self, v: Vec3) -> Vec3`**
+  `v` rotated back (by the conjugate)
+- **`fn to_mat3(self) -> Mat3`**
+  the rotation as a matrix
+- **`fn is_identity(self) -> bool`**
+  is this the identity, bit for bit (no rotation work needed)
+
+- **`struct Mat3`**
+  A 3 x 3 matrix by columns (a rotation from [`Quat::to_mat3`])
+  - `cols: [Vec3; 3]` -- the columns: the images of X, Y and Z
+
+**`impl Mat3`**
+
+- **`const IDENTITY: Mat3 = Mat3 { cols: [Vec3::X, Vec3::Y, Vec3::Z] }`**
+  the unit matrix
+- **`fn mul_vec(&self, v: Vec3) -> Vec3`**
+  M v
+- **`fn mul_vec_t(&self, v: Vec3) -> Vec3`**
+  M^T v (the inverse of a rotation)
+
+- **`struct Iso`**
+  A placement: rotate, then move (no scale).  The pose of a body and of a query shape.
+  - `pos: Vec3` -- where the local origin lies
+  - `rot: Quat` -- the rotation (a unit quaternion)
+
+**`impl Iso`**
+
+- **`const IDENTITY: Iso = Iso { pos: Vec3::ZERO, rot: Quat::IDENTITY }`**
+  at the origin, not rotated
+- **`const fn new(pos: Vec3, rot: Quat) -> Iso`**
+  rotated by `rot`, then moved to `pos`
+- **`const fn at(pos: Vec3) -> Iso`**
+  moved to `pos`, not rotated
+- **`fn transform_point(&self, p: Vec3) -> Vec3`**
+  a local point in world coordinates
+- **`fn inverse_transform_point(&self, p: Vec3) -> Vec3`**
+  a world point in local coordinates
+- **`fn transform_vector(&self, v: Vec3) -> Vec3`**
+  a local direction in world coordinates
+- **`fn inverse_transform_vector(&self, v: Vec3) -> Vec3`**
+  a world direction in local coordinates
+- **`fn mul(&self, o: &Iso) -> Iso`**
+  self \* o: first o, then self
+- **`fn inv_mul(&self, o: &Iso) -> Iso`**
+  the placement of `o` relative to self: self^-1 \* o
+
+- **`struct Aabb`**
+  An axis-aligned box in metres
+  - `min: Vec3` -- the corner with the smallest coordinates
+  - `max: Vec3` -- the corner with the largest coordinates
+
+**`impl Aabb`**
+
+- **`const EMPTY: Aabb = Aabb { min: Vec3::splat(f64::INFINITY), max: Vec3::splat( ...`**
+  the empty box (min above max), the start of a union
+- **`const fn new(min: Vec3, max: Vec3) -> Aabb`**
+  the box between two corners
+- **`fn from_center(c: Vec3, h: Vec3) -> Aabb`**
+  the box around `c` with half sizes `h`
+- **`fn union(&self, o: &Aabb) -> Aabb`**
+  the box around both
+- **`fn add_point(&self, p: Vec3) -> Aabb`**
+  the box around this one and `p`
+- **`fn expanded(&self, m: f64) -> Aabb`**
+  grown by `m` on every side
+- **`fn intersects(&self, o: &Aabb) -> bool`**
+  the boxes touch or overlap
+- **`fn contains(&self, o: &Aabb) -> bool`**
+  `o` lies inside (or on the border)
+- **`fn contains_point(&self, p: Vec3) -> bool`**
+  `p` lies inside (or on the border)
+- **`fn center(&self) -> Vec3`**
+  the middle
+- **`fn half_extents(&self) -> Vec3`**
+  half the size on each axis
+- **`fn half_area(&self) -> f64`**
+  half the surface (the cost measure of the trees; 0 for the empty box)
+- **`fn is_valid(&self) -> bool`**
+  the box is not empty and finite
+- **`fn ray_enter(&self, o: Vec3, inv: Vec3, tmax: f64) -> Option<f64>`**
+  where the ray o + t d (inv = 1 / d per axis) enters the box, if it does within [0, tmax]
+
+### `physics/src/mesh.rs`
+
+Source: [`lib/physics/src/mesh.rs`](../lib/physics/src/mesh.rs)
+
+```text
+mesh -- a static triangle mesh: vertices in f32 (as render3d's meshes), a fixed BVH, the active edges,
+and the queries against it in its own frame
+
+Seams: every triangle is tested as the closed triangle it is, so a shape sweeping across a shared edge
+meets the edge of one triangle or the other, there is no gap.  The opposite trouble -- a shape sliding over
+a flat or concave edge between two triangles hits the edge itself with a normal that leans backwards
+(a "ghost" collision) -- is handled by the active edges: an edge is active when the surface bends
+outwards there by more than the threshold angle (or the edge is open or shared by more than two
+triangles).  A contact on an inactive edge (or on a vertex whose two edges of this triangle are inactive)
+gets the triangle's normal, and a cast ignores it unless the shape moves into that face.  As in Jolt's
+"active edges"; the side matters, an edge that is concave from the front is convex from the back.
+```
+
+```rust
+/// at most this many triangles in one mesh
+MAX_TRIANGLES: usize = 1 << 28
+/// cos 5 degrees: two triangles whose normals differ by less than this meet at a flat edge
+ACTIVE_EDGE_COS: f64 = 0.996_194_698_091_745_5
+```
+
+- **`enum MeshError`**
+  why [`TriMesh::new`] refused the data
+  - `IndexCount` -- the index count is not a multiple of 3, or there are more than [`MAX_TRIANGLES`] triangles
+  - `IndexRange` -- an index is not below the vertex count
+  - `NotFinite` -- a coordinate is NaN or infinite
+
+- **`struct MeshOptions`**
+  how a [`TriMesh`] is built
+  - `active_edge_cos: f64` -- an edge between two triangles whose normals have a cosine of at least this is flat (inactive); above
+    1 every edge is active (no handling of ghost collisions)
+  - `max_leaf: usize` -- at most so many triangles in a leaf of the tree
+
+- **`struct TriMesh`**
+  A static triangle mesh with its tree.  Triangles have two sides.  Triangles without area (all three
+  corners on a line) are left out: they cannot be hit and their edges belong to their neighbours.
+
+**`impl TriMesh`**
+
+- **`fn new(positions: &[[f32; 3]], indices: &[u32]) -> Result<TriMesh, MeshError>`**
+  a mesh from positions and a triangle list (three indices per triangle), with [`MeshOptions`]'
+  defaults
+- **`fn with_options(positions: &[[f32; 3]], indices: &[u32], opt: &MeshOptions) -> Result<TriMesh, MeshError>`**
+  a mesh as [`TriMesh::new`] makes it, with the threshold of the active edges and the leaf size of `opt`
+- **`fn triangle_count(&self) -> usize`**
+  the number of triangles in the caller's list (with the ones left out for having no area)
+- **`fn stored_triangle_count(&self) -> usize`**
+  the number of triangles in the tree
+- **`fn vertices(&self) -> &[[f32; 3]]`**
+  the positions as given, in the mesh's frame
+- **`fn aabb(&self) -> Aabb`**
+  the box around the mesh in its own frame
+- **`fn nodes(&self) -> &[BvhNode]`**
+  the tree's nodes (the root first)
+- **`fn depth(&self) -> u32`**
+  the depth of the tree
+- **`fn triangles(&self) -> impl Iterator<Item = (u32, [Vec3; 3])> + '_`**
+  the stored triangles in tree order: their caller's index and corners (for brute-force references)
+- **`fn edge_flags(&self, id: u32) -> Option<u8>`**
+  the active-edge bits of the triangle with the caller's index `id` (bit e: edge e from the front,
+  bit 3 + e: from the back), None when it was left out
+- **`fn memory_bytes(&self) -> usize`**
+  the bytes the mesh holds (vertices, triangles, ids, flags, nodes)
+
+### `physics/src/query.rs`
+
+Source: [`lib/physics/src/query.rs`](../lib/physics/src/query.rs)
+
+```text
+query -- one shape against one placed shape, without a world: rays, casts, distance and contacts, the
+nearest point.  The work happens in the frame of the target shape (positions far from the origin cancel
+once, in the relative placement); results come back in world coordinates.  The query shape of a cast,
+a distance or a contact must be convex: with a mesh as the query shape these give nothing.
+```
+
+```rust
+/// `triangle` of a hit on anything but a mesh
+NO_TRIANGLE: u32 = u32::MAX
+```
+
+- **`struct RayHit`**
+  where a ray hits
+  - `t: f64` -- the ray parameter: point = origin + dir \* t (metres when dir is a unit vector)
+  - `point: Vec3` -- origin + dir \* t
+  - `normal: Vec3` -- the unit normal, against the ray (a ray starting inside a convex shape: t = 0, normal = -dir)
+  - `triangle: u32` -- the triangle's index in the mesh's index list, or [`NO_TRIANGLE`]
+
+- **`struct CastHit`**
+  where a moving shape first touches another
+  - `fraction: f64` -- how far along the motion: the shape stops at iso.pos + motion \* fraction (0..=1).  With a radius
+    (sphere, capsule) on either side the gap there is at most 1e-9 m, between two shapes without one
+    at most [`crate::CAST_SKIN`] + 1e-9 m; never a penetration that was not there at the start.
+  - `point: Vec3` -- the contact point on the other shape's surface
+  - `normal: Vec3` -- the unit normal of that surface towards the moving shape
+  - `triangle: u32` -- the triangle's index in the mesh's index list, or [`NO_TRIANGLE`]
+  - `depth: f64` -- > 0: the shapes overlapped at the start by this much (then fraction = 0)
+
+- **`struct Contact`**
+  how two shapes touch or nearly touch
+  - `point: Vec3` -- on the other shape's surface (with overlap: its deepest point)
+  - `normal: Vec3` -- the unit normal from the other shape towards the query shape: moving the query shape by
+    normal \* depth separates them (for a triangle of a mesh along the triangle's normal, unless the
+    contact is on an active edge)
+  - `depth: f64` -- the overlap; negative: the gap (contacts within a margin)
+  - `triangle: u32` -- the triangle's index in the mesh's index list, or [`NO_TRIANGLE`]
+
+- **`struct Separation`**
+  the distance between two shapes
+  - `distance: f64` -- the gap; negative: the penetration depth
+  - `point_a: Vec3` -- the nearest (or deepest) points on the query shape and on the other one
+  - `point_b: Vec3` -- on the other shape
+  - `normal: Vec3` -- the unit normal from the other shape towards the query shape
+  - `triangle: u32` -- the nearest triangle of a mesh, or [`NO_TRIANGLE`]
+
+- **`struct PointHit`**
+  the point of a shape nearest to a given point
+  - `point: Vec3` -- the nearest point of the surface, or the point itself when it is inside a convex shape
+  - `distance: f64` -- 0 inside
+  - `inside: bool` -- the point lies inside a convex shape
+  - `triangle: u32` -- the nearest triangle of a mesh, or [`NO_TRIANGLE`]
+
+- **`fn ray(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64) -> Option<RayHit>`**
+  the first hit of the ray origin + dir \* t (0 &lt;= t &lt;= max_t) on `target` placed by `target_iso`
+
+- **`fn ray_all(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64, out: &mut Vec<RayHit>)`**
+  every hit of the ray on `target` (one for a convex shape, one per triangle for a mesh), appended to
+  `out` sorted by t and then by triangle
+
+- **`fn cast(shape: &Shape, iso: &Iso, motion: Vec3, target: &Shape, target_iso: &Iso) -> Option<CastHit>`**
+  the first contact of convex `shape`, moved from `iso` by `motion`, with `target`.  Shapes that touch or
+  overlap at the start give a hit at fraction 0 only when the motion goes into the other shape (normal .
+  motion &lt; 0); a motion along or away from it is free, so sliding along a surface works.
+
+- **`fn separation(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, max_dist: f64) -> Option<Separation>`**
+  the gap (negative: depth) between convex `shape` and `target` if it is at most `max_dist`; for a mesh the
+  nearest triangle
+
+- **`fn intersects(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso) -> bool`**
+  do convex `shape` and `target` touch or overlap
+
+- **`fn contacts(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, margin: f64, out: &mut Vec<Contact>)`**
+  the contacts of convex `shape` with `target` whose gap is at most `margin` (0: only touching and
+  overlapping), appended to `out` (a mesh: one per triangle, by triangle)
+
+- **`fn closest_point(target: &Shape, target_iso: &Iso, point: Vec3, max_dist: f64) -> Option<PointHit>`**
+  the point of `target` nearest to `point`, if within `max_dist`
+
+**`mod brute`**
+
+The same queries without a mesh's tree: every triangle in turn, through the same per-triangle code and
+tie-breaks, so the results must equal those of the tree bit for bit.  For tests (apps/physicstest) and
+for checking a mesh that behaves oddly; for convex shapes they are the queries above.
+
+- **`fn ray(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64) -> Option<RayHit>`**
+  the first hit, every triangle of a mesh tested
+
+- **`fn ray_all(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64, out: &mut Vec<RayHit>)`**
+  every hit, every triangle of a mesh tested
+
+- **`fn cast(shape: &Shape, iso: &Iso, motion: Vec3, target: &Shape, target_iso: &Iso) -> Option<CastHit>`**
+  the first contact, every triangle of a mesh tested
+
+- **`fn separation(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, max_dist: f64) -> Option<Separation>`**
+  the nearest triangle of a mesh without its tree
+
+- **`fn intersects(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso) -> bool`**
+  touch or overlap, every triangle of a mesh tested
+
+- **`fn contacts(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, margin: f64, out: &mut Vec<Contact>)`**
+  the contacts, every triangle of a mesh tested
+
+- **`fn closest_point(target: &Shape, target_iso: &Iso, point: Vec3, max_dist: f64) -> Option<PointHit>`**
+  the nearest point, every triangle of a mesh tested
+
+### `physics/src/shape.rs`
+
+Source: [`lib/physics/src/shape.rs`](../lib/physics/src/shape.rs)
+
+```text
+shape -- the collision shapes: sphere, capsule, box, convex hull (convex, solid) and the static triangle
+mesh (two-sided triangles)
+```
+
+- **`enum Shape`**
+  A collision shape in its own frame.  Hulls and meshes are shared ([`Arc`]): cloning a shape is cheap,
+  one map mesh can sit in several worlds (server, prediction, tests).
+  - `Sphere { radius: f64 }` -- a ball around the origin
+  - `Capsule { half_height: f64, radius: f64 }` -- the points within `radius` of the segment (0, -half_height, 0) .. (0, half_height, 0): upright,
+    total height 2 (half_height + radius)
+  - `Box { half: Vec3 }` -- a box around the origin with half sizes `half`
+  - `Hull(Arc<ConvexHull>)` -- a convex hull (shared)
+  - `Mesh(Arc<TriMesh>)` -- a static triangle mesh (only as a body, not as a query shape)
+
+**`impl Shape`**
+
+- **`fn sphere(radius: f64) -> Shape`**
+  a ball of `radius`
+- **`fn capsule(half_height: f64, radius: f64) -> Shape`**
+  an upright capsule: the segment (0, ±half_height, 0) grown by `radius`
+- **`fn cuboid(half: Vec3) -> Shape`**
+  a box with half sizes `half`
+- **`fn hull(hull: ConvexHull) -> Shape`**
+  a convex hull, shared
+- **`fn hull_from_points(points: &[Vec3]) -> Result<Shape, HullError>`**
+  the convex hull of `points`
+- **`fn mesh(mesh: TriMesh) -> Shape`**
+  a static triangle mesh, shared
+- **`fn is_convex(&self) -> bool`**
+  everything but a mesh
+- **`fn margin(&self) -> f64`**
+  the radius around the core (spheres and capsules), 0 for the others
+- **`fn aabb(&self, iso: &Iso) -> Aabb`**
+  the box around the shape placed by `iso`
+
+### `physics/src/tree.rs`
+
+Source: [`lib/physics/src/tree.rs`](../lib/physics/src/tree.rs)
+
+```text
+tree -- the dynamic AABB tree of a world's bodies: leaves with (fattened) boxes, inserted where the
+growth of the surface is smallest, kept balanced by rotations on the way up (the scheme of Box2D's
+b2DynamicTree, written anew).  A moving body keeps its leaf while its box stays inside the fattened
+one.  Deterministic: the same sequence of inserts, moves and removes gives the same tree.
+```
+
+- **`struct DynamicTree`**
+  a dynamic AABB tree over items (u32)
+
+**`impl DynamicTree`**
+
+- **`fn new() -> DynamicTree`**
+  an empty tree
+- **`fn insert(&mut self, aabb: Aabb, item: u32) -> u32`**
+  a new leaf for `item` with box `aabb` -> its id
+- **`fn remove(&mut self, leaf: u32)`**
+  remove a leaf
+- **`fn update(&mut self, leaf: u32, aabb: Aabb)`**
+  give a leaf a new box (it keeps its id)
+- **`fn aabb(&self, leaf: u32) -> Aabb`**
+  the box of a leaf
+- **`fn len(&self) -> usize`**
+  the number of leaves
+- **`fn is_empty(&self) -> bool`**
+  no leaves
+- **`fn height(&self) -> u32`**
+  the height of the root (0 for one leaf or none)
+- **`fn query(&self, bx: &Aabb, mut f: impl FnMut(u32))`**
+  call `f(item)` for every leaf whose box touches `bx`
+- **`fn ray(&self, o: Vec3, d: Vec3, ext: Vec3, mut tmax: f64, mut f: impl FnMut(u32, f64) -> f64) -> f64`**
+  the leaves whose box, grown by `ext`, the ray o + t d enters at t &lt;= tmax, nearer subtrees first;
+  `f(item, tmax)` returns the new tmax -> the last tmax
+- **`fn validate(&self) -> Result<(), &'static str>`**
+  (tests) the tree is consistent: parents, heights, boxes holding their children, the leaf count -> an
+  error text
+
+### `physics/src/world.rs`
+
+Source: [`lib/physics/src/world.rs`](../lib/physics/src/world.rs)
+
+```text
+world -- bodies (a shape, a placement, layers) in three dynamic AABB trees, and the queries over all of them
+
+A body starts in a tree of the bodies that stand still, with its exact box: meshes in one, the other
+shapes in another; it goes to the tree of the moving bodies when it is first moved (with a box 0.05 m
+larger, so small moves keep their leaf).  So the large box of a map never widens the nodes of the props
+and figures: rays and casts look at the map's mesh first, and its hit prunes the other trees
+(docs/PHYSICS.md, measurements).
+
+Results never depend on the shape of the tree: a first hit is the smallest (t, body, triangle), lists
+are sorted by body and triangle (rays by t first).  So a client that holds only some of the server's
+bodies gets the same answer from them, as long as the bodies have the same ids.
+```
+
+- **`struct BodyId`**
+  a body of a [`World`]: an index and a generation (an id stays dead after remove, also when the index
+  is used again).  Ordered by index, then generation: the tie-break of the queries.
+
+**`impl BodyId`**
+
+- **`fn index(self) -> u32`**
+  the slot (used again after a remove)
+- **`fn generation(self) -> u32`**
+  how often the slot was used before
+
+- **`struct Body`**
+  a body: what [`World::add`] took, readable through [`World::body`]
+  - `shape: Shape` -- its shape
+  - `iso: Iso` -- where it is (set with [`World::set_iso`])
+  - `layers: u32` -- the layers the body is in (bit mask); a query sees it when its filter's mask shares a bit
+  - `user: u64` -- free for the caller (an entity id)
+
+**`impl Body`**
+
+- **`fn is_moving(&self) -> bool`**
+  has the body been moved since it was added (it is in the tree of the moving bodies)
+
+- **`struct Filter`**
+  which bodies a query sees
+  - `mask: u32` -- bodies with `layers & mask != 0`
+  - `exclude: Option<BodyId>` -- one body to leave out (the query's own, e.g. a figure's capsule)
+
+**`impl Filter`**
+
+- **`const ALL: Filter = Filter { mask: u32::MAX, exclude: None }`**
+  every body
+- **`const fn mask(mask: u32) -> Filter`**
+  the bodies in one of the layers of `mask`
+- **`const fn excluding(self, id: BodyId) -> Filter`**
+  the same without body `id`
+
+- **`struct World`**
+  A set of bodies and the queries over them.  Bodies move with [`World::set_iso`]; nothing moves by itself
+  (no dynamics in this stage).
+
+**`impl World`**
+
+- **`fn new() -> World`**
+  an empty world; a moving body's box in the tree is 0.05 m larger than the body on every side
+- **`fn with_margin(margin: f64) -> World`**
+  an empty world with this margin around a moving body's box (a body that has never moved has none)
+- **`fn add(&mut self, shape: Shape, iso: Iso) -> BodyId`**
+  add a body in layer 1
+- **`fn add_with_layers(&mut self, shape: Shape, iso: Iso, layers: u32) -> BodyId`**
+  add a body in `layers`
+- **`fn remove(&mut self, id: BodyId) -> Option<Body>`**
+  remove a body -> it, None when the id is dead
+- **`fn body(&self, id: BodyId) -> Option<&Body>`**
+  the body, None when the id is dead
+- **`fn set_iso(&mut self, id: BodyId, iso: Iso) -> bool`**
+  move a body -> false when the id is dead.  The first move takes it to the tree of the moving bodies.
+- **`fn set_layers(&mut self, id: BodyId, layers: u32) -> bool`**
+  a body's layers -> false when the id is dead
+- **`fn set_user(&mut self, id: BodyId, user: u64) -> bool`**
+  a body's value for the caller -> false when the id is dead
+- **`fn len(&self) -> usize`**
+  the number of bodies
+- **`fn is_empty(&self) -> bool`**
+  no bodies
+- **`fn bodies(&self) -> impl Iterator<Item = (BodyId, &Body)> + '_`**
+  every body with its id, by index
+- **`fn trees(&self) -> [&DynamicTree; 3]`**
+  the broad phase (for tests and statistics): the trees of the meshes and of the other bodies that
+  never moved, and the one of the moving bodies
+- **`fn ray_cast(&self, origin: Vec3, dir: Vec3, max_t: f64, filter: &Filter) -> Option<(BodyId, RayHit)>`**
+  the first hit of the ray origin + dir \* t, 0 &lt;= t &lt;= max_t
+- **`fn ray_cast_all(&self, origin: Vec3, dir: Vec3, max_t: f64, filter: &Filter, out: &mut Vec<(BodyId, RayHit)>)`**
+  every hit of the ray (one per convex body, one per triangle of a mesh), appended to `out` sorted by
+  t, body, triangle
+- **`fn cast(&self, shape: &Shape, iso: &Iso, motion: Vec3, filter: &Filter) -> Option<(BodyId, CastHit)>`**
+  the first body convex `shape`, moved from `iso` by `motion`, touches (see [`query::cast`])
+- **`fn overlap(&self, shape: &Shape, iso: &Iso, filter: &Filter, out: &mut Vec<BodyId>)`**
+  the bodies convex `shape` at `iso` touches or overlaps, appended to `out` by id
+- **`fn contacts(&self, shape: &Shape, iso: &Iso, margin: f64, filter: &Filter, out: &mut Vec<(BodyId, Contact)>)`**
+  the contacts of convex `shape` at `iso` with every body (every triangle) within `margin`, appended
+  to `out` by body and triangle: what pushes a figure out of the level
+- **`fn closest_point(&self, point: Vec3, max_dist: f64, filter: &Filter) -> Option<(BodyId, PointHit)>`**
+  the nearest point of any body to `point` within `max_dist` (equal distance: the lower body, triangle)
