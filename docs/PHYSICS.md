@@ -189,7 +189,8 @@ Gleitbewegungen einer 0,1 bis 10 µm eingesunkenen Kugel über ein flaches Gitte
 - **Dynamische AABB-Bäume** der Welt nach dem Schema von Box2Ds `b2DynamicTree` (neu geschrieben): Blätter mit Boxen, eingefügt,
   wo die Oberfläche am wenigsten wächst, auf dem Weg nach oben durch Rotationen ausgeglichen. Ein Körper beginnt in einem Baum
   der stillen Körper, mit seiner genauen Box: Netze in einem, die übrigen Formen in einem zweiten. Beim ersten `set_iso`
-  wechselt er in den Baum der bewegten Körper, mit einer um 0,05 m größeren Box, damit kleine Bewegungen sein Blatt behalten.
+  wechselt er in den Baum der bewegten Körper, mit einer um 0,05 m größeren Box, damit kleine Bewegungen sein Blatt behalten
+  (auch ein Netz, etwa eine fahrende Plattform; eine Karte bleibt besser still).
   Grund: In einem einzigen Baum vergrößert die Box der Karte jeden Knoten über ihr, und Strahlen, die in diesen großen Boxen
   beginnen, gehen viele Knoten ab, bevor die Karte sie kürzt: Strahlen durch Karte und 500 Körper schaffen in einem Baum
   354 000 je Sekunde, in den drei Bäumen 714 000 (Ryzen 5 3600; auf dem M2 444 000 gegen 947 000). Strahlen und
@@ -280,8 +281,8 @@ Browser für die eigene Figur samt Abgleich (zehn Takte nachrechnen) unter 1 ms 
   Dreiecksebene, zwei koplanare Dreiecke: Netze sind keine Abfrageformen).
 - Die Rückfalllösung der Casts (Newton auf dem Abstand) lief in allen Tests einmal; geprüft ist sie damit nur durch diesen
   Fall und durch denselben Vergleich mit der Referenz.
-- Gleichzeitige Abfragen aus mehreren Threads (`World` und die Formen sind `Send` und `Sync`, Abfragen nehmen `&self`; der
-  Zähler `cast_fallbacks` ist atomar).
+- Gleichzeitige Abfragen aus mehreren Threads (`World`, `Shape` und `TriMesh` sind `Send` und `Sync`, das prüft der Test beim
+  Übersetzen; Abfragen nehmen `&self`, der Zähler `cast_fallbacks` ist atomar).
 - Das Gefühl einer Bewegung: das kommt mit dem Controller und dem Nutzer.
 
 ## Was nicht gebaut ist

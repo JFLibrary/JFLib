@@ -382,9 +382,8 @@ pub(crate) fn epa(a: &Placed, b: &Placed, g: &Gjk, hint: Vec3) -> Pen {
         faces.push(eface(&verts, ids));
     }
     let mut edges: Vec<(usize, usize)> = Vec::new();
-    let mut best = 0usize;
     for _ in 0..MAX_ITERS {
-        best = 0;
+        let mut best = 0usize;
         for (i, f) in faces.iter().enumerate() {
             if f.d < faces[best].d {
                 best = i;
@@ -437,7 +436,13 @@ pub(crate) fn epa(a: &Placed, b: &Placed, g: &Gjk, hint: Vec3) -> Pen {
         let (pa, pb) = g.simplex.witness();
         return Pen { normal: if hint == Vec3::ZERO { Vec3::Y } else { hint.normalize_or_zero() }, depth: 0.0, pa, pb };
     }
-    let f = faces[best.min(faces.len() - 1)];
+    // the nearest face of the polytope as it is now (the loop may have changed it after choosing `best`)
+    let mut f = faces[0];
+    for g2 in &faces[1..] {
+        if g2.d < f.d {
+            f = *g2;
+        }
+    }
     let depth = max(f.d, 0.0);
     let (va, vb, vc) = (verts[f.i[0]], verts[f.i[1]], verts[f.i[2]]);
     let bc = tri_bary(va.w, vb.w, vc.w, f.n * f.d);

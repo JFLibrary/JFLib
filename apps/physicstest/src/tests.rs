@@ -1138,7 +1138,13 @@ fn fuzz_tests(c: &mut Ctx) {
 
 // ---------------------------------------------------------------- edge cases
 
+/// (at compile time) a world and its shapes can be shared between threads: queries take &self
+fn send_sync<T: Send + Sync>() {}
+
 fn edge_tests(c: &mut Ctx) {
+    send_sync::<World>();
+    send_sync::<Shape>();
+    send_sync::<TriMesh>();
     let mut rng = Rng::new(11);
     // meshes: refused input, nothing to hit
     c.check(TriMesh::new(&[[0.0; 3]; 3], &[0, 1]).err() == Some(MeshError::IndexCount), || "index count".into());
