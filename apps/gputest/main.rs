@@ -17,7 +17,8 @@
 //        bindless    (Voll) storage buffers and textures indexed from one table; a slot changed
 //                    after the GPU finished
 //        upload      the staging ring (t_upload.rs): small uploads stay in a few chunks, a large
-//                    one's buffer goes back after a second; write_texture_rects (stride, clipping,
+//                    one's buffer goes back after a second, a frame of canvas tiles keeps one of its
+//                    buffers and none a second later (Vulkan); write_texture_rects (stride, clipping,
 //                    errors), write_buffer across chunks; try_acquire and rebuild on a window (a
 //                    child window too: Surface::native), memory blocks that grow
 //        window      a plat window with a swapchain: FIFO frames (cleared colour + triangles,

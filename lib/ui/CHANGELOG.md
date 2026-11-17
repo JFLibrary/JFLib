@@ -43,8 +43,17 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   pixels now, scroll the views by the fingers' way (4.8 times it on Wayland and 1.2 on macOS
   before).
 - The scripts' `commit` hands the text to `plat::ime_commit_text` in one call, as a platform does.
+- GPU canvases (`ui.canvas_gpu`, image views, diagrams): the tiles of a window take at most eight
+  times its framebuffer (`jfgui_GPU_CANVAS_MB`, 128 MiB, stays the upper limit): a 1900 x 1000
+  window holds 61 MB of tiles, no longer 128. A tile shows 254 x 254 pixels, its texture with the
+  border around them is 256 x 256, so it takes what the budget counts (NVIDIA laid the 258 x 258
+  one out as 408 KiB instead of 260).
 
 ### Fixed
+
+- GPU canvases: a tile evicted for a new one hands its texture over when no frame draws it any
+  more; a zoom over many levels made a new texture for every tile while the evicted ones lived on
+  until the GPU had finished the frame.
 
 - The code editor's horizontal wheel scrolled the wrong way: tilted right it scrolled left.
 - An image view whose wheel zooms panned twice as far with the horizontal wheel while the

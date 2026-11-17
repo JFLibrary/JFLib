@@ -49,6 +49,9 @@ pub fn upload(t: &mut T) {
     let Some(g) = setup(t) else { return };
     rects(t, &g);
     ring(t, &g);
+    // (Vulkan's staging; Metal keeps its large buffers its own way)
+    #[cfg(not(target_vendor = "apple"))]
+    tiles(t, &g);
     buffers(t, &g);
     #[cfg(windows)]
     if crate::windows(&g.dev) {
@@ -181,6 +184,47 @@ fn ring(t: &mut T, g: &Gpu) -> Option<()> {
     t.res(dev.poll(), "poll")?;
     let after = dev.memory_reserved();
     t.ok(after <= base + 2 * MIB, &format!("a second later the large buffer is gone: {:.1} MiB reserved", after as f64 / MIB as f64));
+    Some(())
+}
+
+/// a frame of canvas tiles (lib/ui gpu_out.rs: 256 x 256 texels, one upload each, all in one
+/// submission): each upload its own buffer of its size, one of them kept while the GPU is done, none a
+/// second later, and the host blocks they grew go back with them
+#[cfg(not(target_vendor = "apple"))]
+fn tiles(t: &mut T, g: &Gpu) -> Option<()> {
+    const N: u64 = 32;
+    const TILE: u64 = 256 * 256 * 4;
+    let dev = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "create_device")?;
+    let mut texs = Vec::new();
+    for _ in 0..N {
+        texs.push(t.res(dev.create_texture(&TextureDesc::d2(256, 256, Format::Bgra8Unorm, TextureUsage::COPY_DST | TextureUsage::SAMPLED)), "create_texture")?);
+    }
+    let q = dev.queue();
+    let f = frame(256, 256, 1024, 5);
+    let base = dev.memory_reserved();
+    for tex in &texs {
+        t.res(q.write_texture_rects(tex, &[[0, 0, 256, 256]], &f, 1024, Layout::Undefined, Layout::Sampled), "a tile")?;
+    }
+    let peak = dev.memory_reserved();
+    let id = t.res(q.flush(), "flush")?;
+    t.res(dev.wait(id, 10_000_000_000), "wait")?;
+    t.res(dev.poll(), "poll")?;
+    let kept = dev.memory_reserved();
+    let (peak, kept) = (peak.saturating_sub(base), kept.saturating_sub(base));
+    out(&format!("  {N} tiles in one submission: {:.1} MiB more while it runs, {:.1} MiB once the GPU is done",
+                 peak as f64 / MIB as f64, kept as f64 / MIB as f64));
+    // their own buffers: 8 MiB in host blocks of 1, 2, 4, 8 MiB (at 512 KiB each: 16 MiB in blocks up to 16, 31 MiB)
+    t.ok(peak <= 3 * N * TILE, "a tile's upload takes a buffer of its size, not 512 KiB");
+    // one buffer stays, with the block it lies in and at most one small empty block (all 32 kept: 31 MiB)
+    t.ok(kept <= 12 * MIB, "the GPU done: one of the tiles' buffers stays");
+    let t2 = plat::time_us();
+    while plat::time_us() - t2 < 1_100_000 {
+        plat::thread_yield();
+    }
+    t.res(dev.poll(), "poll")?;
+    let after = dev.memory_reserved();
+    // (an empty block of at most 2 MiB stays for the next upload; a 16 MiB one stayed for good)
+    t.ok(after <= base + 2 * MIB, &format!("a second later the tiles' buffers and their blocks are gone: {:.1} MiB more", after.saturating_sub(base) as f64 / MIB as f64));
     Some(())
 }
 
