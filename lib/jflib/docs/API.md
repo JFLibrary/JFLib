@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -163,7 +163,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 
 - [App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks): `fb`, `client_size`, `anim_off`, `set_anim_off`, `headless`, `invalidate`, `quit`, `set_title`, `title`, `spawn`, `spawner`, `tasks_live`
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
-- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `key_event_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
+- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `pointer_lock`, `pointer_lock_state`, `pointer_motion`, `key_code_down`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `key_event_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`, `canvas_label`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `popup_close_id`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
@@ -196,6 +196,8 @@ Re-exports: `img_svg::Svg`
 Re-exports: `plat::{Preedit, IP_EMAIL, IP_NUMBER, IP_PASSWORD, IP_PHONE, IP_SEARCH, IP_TEXT, IP_URL}`
 
 Re-exports: `plat::BrowserStatus`
+
+Re-exports: `plat::PointerLock`
 
 Re-exports: `rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH}`
 
@@ -640,9 +642,9 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   - `mods: u32` -- MOD_\* at the time
   - `down: bool` -- down (true) or up
   - `repeat: bool` -- a down of the system's auto-repeat while the key is held
-  - `scancode: u32` -- the key's place on the keyboard, whatever the layout: Windows' scan code (0xE0.. for
-    extended keys), Linux's evdev code; 0 where the platform does not tell (macOS, the
-    browser, Android)
+  - `scancode: u32` -- the platform's code of the key's place on the keyboard, whatever the layout: Windows' scan
+    code (0xE0.. for extended keys), Linux's evdev code, (G7a) the USB HID usage on macOS,
+    iOS and in the browser; 0 where the platform does not tell (Android)
   - `location: u32` -- KL_STANDARD, KL_LEFT / KL_RIGHT (the two Shift, Ctrl, Alt, Windows keys), KL_NUMPAD
   - `ch: u32` -- the character the keyboard layout gives the key with Shift, Caps Lock and AltGr as they
     are but without Ctrl, Alt and the Windows / Super key (0: none) -- what a browser names
@@ -653,6 +655,9 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
     Android; a headless run's keys have the US layout's (scripts: `keydown ... char "c"`)
   - `dead: bool` -- the key is a dead key (´ ^ ~ ...): ch is its spacing character, the text it makes
     comes with the next key
+  - `code: u32` -- (G7a) where the key sits as a USB HID usage, the same on every platform and layout
+    (plat::KC_\*: KC_W is the key right of Q on a US keyboard, Z on a French one); 0 where the
+    platform does not tell (Android).  plat::key_label(code) says what the layout prints on it
 
 - **`struct Sem`**
   semantic record (dump / expect)  [SR_\*]
@@ -722,6 +727,26 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   ui_mouse: pointer position in px (-1 when outside)
 - **`fn pen(&self) -> (u32, u32)`**
   ui_pen: (pressure 0 = none / 1..UI_PRESSURE_ONE, PTR_\*) of the last pointer event
+- **`fn pointer_lock(&mut self, on: bool) -> plat::PointerLock`**
+  (G7a) lock the pointer to this window (on) or let it go (off) -> the state right after the
+  call (plat::win_pointer_lock): Locked, Pending while the platform waits (the window has no
+  focus yet, the browser waits for the next press in the page, Wayland for the compositor),
+  Unsupported (Android, iOS, a display without the means), Refused.  While locked the pointer
+  is hidden and stays put, ui.pointer_motion has its raw motion, a change of the state gives a
+  pass.  Esc, the window losing the focus, minimizing and closing it always let it go (Esc
+  then reaches the app as no key); it is never taken back by itself.  A headless run (scripts)
+  plays the lock: Locked at once, Esc lets it go, `motion DX DY` moves it
+- **`fn pointer_lock_state(&self) -> plat::PointerLock`**
+  (G7a) the state of this window's pointer lock (Off when another window holds it)
+- **`fn pointer_motion(&self) -> (f64, f64)`**
+  (G7a) the raw motion of the locked pointer since the last pass of this window: (dx, dy),
+  right and down positive, in the device's counts where the platform gives them (Windows,
+  Wayland, X11, the browser with unadjustedMovement), else in its accelerated pixels (macOS,
+  the browser without it); (0, 0) while the pointer is not locked.  A game turns its camera by
+  it times a sensitivity
+- **`fn key_code_down(&self, code: u32) -> bool`**
+  (G7a) the key at USB HID usage `code` (plat::KC_\*: where it sits, whatever the layout) is
+  held; KeyEvent::code of its down and up
 - **`fn focus(&mut self, id: u32)`**
   ui_focus(id): give the keyboard focus to a widget (focus ring shown).  The id is
   looked up in whichever window emits it in the next pass (that window is activated).
@@ -27101,6 +27126,9 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            signals, the stderr line of ASMLIB) and panics; crash_test() crashes on purpose
   windows: the window-indexed API of the assembly (win_create / win_show / win_present /
            wait ..., popups, clipboard, drops, pen, cursors; consts.rs, evq.rs, pwin0.rs)
+  input:   (G7a) win_pointer_lock / win_pointer_lock_state / win_raw_motion_take: the pointer
+           locked to a window, hidden, its raw relative motion (plock.rs); KC_* key_code /
+           key_label: where a key sits as a USB HID usage on every platform (keycode.rs)
   dnd:     drag and drop between programs: DragData (files, text, URLs, HTML, image),
            the drop target hook, the pending drop, drag_start (dragging out)    (dnd.rs)
   (plat-shared) print(job) + page layout / PDF writer (print.rs; win_print.rs,
@@ -32976,6 +33004,36 @@ the focus.  It is destroyed together with its parent.
   the PCI vendor and device id of the GPU that drives the monitor window w is on (None: not
   known, not a PCI device)
 
+### `plat/win_plock.rs` (Windows)
+
+Source: [`lib/plat/win_plock.rs`](../lib/plat/win_plock.rs)
+
+```text
+win_plock -- (G7a) the pointer lock on Windows (the shared part: plock.rs)
+
+  win_plock_set(w, on) -> PointerLock    lock the pointer to window w / let it go
+  (window procedure, win_api.rs)
+    input(w, lparam)        WM_INPUT of the mouse: raw motion -> plock_motion
+    focus_in(w)             WM_SETFOCUS: a request that waited (Pending) takes effect
+    release(w)              WM_KILLFOCUS, minimized, WM_DESTROY, Esc: the lock goes
+    follow(w)               WM_MOVE / WM_SIZE: the clip follows the window
+    locked(w) -> bool       WM_SETCURSOR (no cursor), WM_NCHITTEST (all client: a hidden
+                            pointer never drags the title bar), win_set_cursor (kept for later)
+
+Locked: the mouse's Raw Input (usage page 1, usage 2) goes to the window (WM_INPUT, only while
+it is in the foreground: no RIDEV_INPUTSINK), the cursor is clipped to one pixel in the middle
+of the client area (ClipCursor; again after every move and size) and hidden (WM_SETCURSOR sets
+none).  The legacy mouse messages stay (no RIDEV_NOLEGACY): buttons and the wheel come as
+before.  Relative devices give counts (lLastX / lLastY); absolute ones (MOUSE_MOVE_ABSOLUTE: a
+remote desktop, a tablet, a virtual machine's pointer) positions 0..65535 of the primary
+monitor or the whole desktop (MOUSE_VIRTUAL_DESKTOP), whose differences are the motion in
+pixels.  The release unregisters the device (RIDEV_REMOVE), lifts the clip and puts the
+cursor back where it was before the lock.
+```
+
+- **`fn win_plock_set(w: i32, on: bool) -> PointerLock`**
+  (plock.rs) lock the pointer to window w (on) or let it go -> the state now
+
 ### `plat/win_shell.rs` (Windows)
 
 Source: [`lib/plat/win_shell.rs`](../lib/plat/win_shell.rs)
@@ -33811,6 +33869,9 @@ BK_X11: u32 = 2
   - `fn drag_start(&mut self, _data: crate::DragData) -> bool`
     drag data out of the app (dnd.rs drag_start; the left button is held) -> started;
     E_DRAG_END follows -- added with a default for the drag and drop work (X11, Wayland)
+  - `fn pointer_lock(&mut self, w: i32, on: bool) -> crate::PointerLock`
+    (G7a) lock the pointer to window w (on) or let it go -> the state now (plock.rs: the
+    backend calls plock_set); default: Unsupported
 
 - **`fn disp_backend() -> u32`**
   0 none, 1 Wayland, 2 X11
@@ -33986,6 +34047,11 @@ UI thread calls in; wake() from other threads goes through the eventfd of linux_
 - **`fn wl_test_event_u(iface: &str, event: &str, args: &[u64], udata: u64) -> bool`**
   (main agent) wl_test_event with the handler's udata (a tablet tool's slot ...), as
   plattest --test pen does  [tcall in apps/plattest/src/pen.s]
+
+- **`fn wl_test_lock(w: i32)`**
+  (G7a, plattest --test input) play a pointer lock of window w without a compositor: its
+  zwp_locked_pointer_v1 and zwp_relative_pointer_v1 are object 1 (the id of wl_test_event's
+  events), the request Pending until a "locked" event; the protocols count as there
 
 - **`fn wl_test_scale(s120: i32)`**
   (main agent) the pointer scale while there is no window (g_wl_s120, 120ths) alone
@@ -34186,6 +34252,10 @@ plat::xkb_\*)
 - **`fn event_bytes(pkt: &[u8])`**
   one X event packet of any length (a GenericEvent: 32 bytes + its extra length)
   through the event handler (x11_event)
+
+- **`fn lock_setup(w: i32, on: bool, abs: &[(u16, [i32; 2], [i32; 2])])`**
+  (G7a, plattest --test input) play the pointer lock of window w without a server: held
+  (on) or not; absolute devices (id, range of valuator 0, of valuator 1) for its raw events
 
 - **`fn xi_setup(op: u32, atoms: [u32; 3])`**
   XInput 2 without a server: its major opcode and the valuator label atoms ("Abs
@@ -36142,6 +36212,10 @@ that frame (flush).
 it shows WST_FULLSCREEN at once, the page's answer jfgui_fullscreen confirms it or takes it
 back: refused without the user's gesture, left with Esc); a tool window covers the canvas
 (its place comes back after).  Android: nothing.
+(G7a) The pointer lock (plock.rs): the page locks the canvas (REQUEST_POINTER_LOCK; Pending) from
+the user's gesture -- at once while the page still has the activation of the press that made the
+app ask, else with the next press in it -- and answers with jfgui_pointer_lock; the raw motion
+comes through jfgui_motion.  Android and iOS: Unsupported.
 ```
 
 - **`fn win_create( title: &str, width: i32, height: i32, _flags: u32, _owner: i32, x: i32, y: i32, ) -> i32`**
@@ -36176,6 +36250,21 @@ back: refused without the user's gesture, left with Esc); a tool window covers t
 
 - **`fn win_cmd(id: i32, command: u32)`**
   Apply library-window commands; close is delivered to the normal app close workflow.
+
+```rust
+/// (G7a) (browser) ask the page for the pointer lock of the canvas (one byte, 1 lock / 0 let go):
+/// requestPointerLock from the user's gesture (with unadjustedMovement where the browser has it);
+/// the page answers with jfgui_pointer_lock, the motion comes with jfgui_motion
+REQUEST_POINTER_LOCK: u32 = 31
+```
+
+- **`extern "C" fn jfgui_pointer_lock(state: u32) -> u32`**
+  (G7a) the page's pointer lock changed: 1 the canvas holds it, 0 it let go (Esc, the browser, the
+  page lost the focus), 2 the browser refused it (pointerlockerror after a press) -> 1 taken
+
+- **`extern "C" fn jfgui_motion(dx: f64, dy: f64) -> u32`**
+  (G7a) the locked pointer's motion from the page (movementX / movementY, summed since the last
+  call): raw with unadjustedMovement, else the browser's CSS pixels -> 1 taken
 
 ```rust
 /// (L7) (browser) ask the page to show the canvas in full screen (one byte, 1 on / 0 off): the
@@ -37062,6 +37151,11 @@ E_SESSION_END: u8 = 21  // the user logs off, the system shuts down, SIGTERM: sa
 E_SETTINGS: u8 = 22  // data = SET_* bits: system settings changed
 E_DRAG: u8 = 23  // a drag over the window: x, y, data = DT_* | DE_* << 8 (0: it left; dnd.rs)
 E_DRAG_END: u8 = 24  // our outgoing drag (drag_start) ended: data = DE_* effect, 0 = none
+/// (G7a) raw relative motion of the pointer waits for win_raw_motion_take(win) while the window
+/// holds the pointer lock (one event until it is taken, however much motion comes)
+E_RAW_MOTION: u8 = 25
+/// (G7a) the pointer lock of the window changed (win_pointer_lock_state): data 1 locked now, 0 not
+E_POINTER_LOCK: u8 = 26
 // E_SETTINGS: what changed
 SET_THEME: u32 = 1  // light / dark, accent colour
 SET_LOCALE: u32 = 2  // language, regional format
@@ -37109,7 +37203,8 @@ MOD_NUM: u8 = 64
 *(E2) where a key sits (key_location of Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:*
 
 ```rust
-// Windows' scan code (0xE0.. for extended keys), Linux's evdev code, 0 where unknown)
+// Windows' scan code (0xE0.. for extended keys), Linux's evdev code, (G7a) the USB HID usage on macOS,
+// iOS and in the browser, 0 where unknown; keycode.rs key_code turns it into the same KC_* everywhere)
 KL_STANDARD: u32 = 0
 KL_LEFT: u32 = 1  // the left Shift, Ctrl, Alt, Windows key
 KL_RIGHT: u32 = 2
@@ -37408,6 +37503,321 @@ PRESSURE_ONE: i32 = 65535
   pen input on (default) / off (pens become plain mouse events)
 
 - **`fn pen_enabled() -> bool`**
+
+### `plat/keycode.rs`
+
+Source: [`lib/plat/keycode.rs`](../lib/plat/keycode.rs)
+
+```text
+keycode -- (G7a) where a key sits on the keyboard, the same number on every platform: the USB
+HID usage IDs of the keyboard page (page 7), whatever the layout prints on the key
+
+  KC_*                              the usages (KC_W is the key right of Q on a US keyboard: the
+                                    Z of a French one, still KC_W)
+  key_code(scancode) -> code        Event::x of a key event on this platform -> its usage
+                                    (0: unknown); KeyEvent::code of the UI
+  key_scancode(code) -> scancode    the other way (scripts, tests); 0: this platform has none
+  key_code_set1(sc) / key_code_evdev(code) / key_code_mac(kvk)   the tables of the
+                                    platforms, on every target (tests): Windows' scan codes
+                                    of set 1 (0xE0.. for the extended keys, as Event::x),
+                                    Linux's evdev codes, the virtual key codes of macOS (kVK_*)
+  key_code_name(code) / key_code_from_name(name)   the browser's KeyboardEvent.code names
+                                    ("KeyW", "ShiftLeft"); "" / 0 unknown
+  key_label(code) -> Option<String> what the current layout prints on that key ("Z" for KC_W
+                                    on a French keyboard), None where the platform does not
+                                    say (the browser, Android, iOS) or the key has no label
+
+What Event::x of E_KEY_DOWN / E_KEY_UP holds per platform: Windows' scan code (set 1, 0xE0..
+extended), Linux's evdev code (X11 and Wayland), the usage itself on macOS, iOS and in the
+browser (their own codes are turned into usages where the event is made); Android 0.
+
+The rows follow the USB HID usage tables (keyboard page) and the mapping of the UI Events
+KeyboardEvent.code specification (W3C) to the native codes of each system.
+```
+
+```rust
+/// (G7a) USB HID usages of the keyboard page: where a key sits (KeyEvent::code)
+KC_A: u32 = 0x04
+KC_B: u32 = 0x05
+KC_C: u32 = 0x06
+KC_D: u32 = 0x07
+KC_E: u32 = 0x08
+KC_F: u32 = 0x09
+KC_G: u32 = 0x0A
+KC_H: u32 = 0x0B
+KC_I: u32 = 0x0C
+KC_J: u32 = 0x0D
+KC_K: u32 = 0x0E
+KC_L: u32 = 0x0F
+KC_M: u32 = 0x10
+KC_N: u32 = 0x11
+KC_O: u32 = 0x12
+KC_P: u32 = 0x13
+KC_Q: u32 = 0x14
+KC_R: u32 = 0x15
+KC_S: u32 = 0x16
+KC_T: u32 = 0x17
+KC_U: u32 = 0x18
+KC_V: u32 = 0x19
+KC_W: u32 = 0x1A
+KC_X: u32 = 0x1B
+KC_Y: u32 = 0x1C
+KC_Z: u32 = 0x1D
+KC_1: u32 = 0x1E
+KC_2: u32 = 0x1F
+KC_3: u32 = 0x20
+KC_4: u32 = 0x21
+KC_5: u32 = 0x22
+KC_6: u32 = 0x23
+KC_7: u32 = 0x24
+KC_8: u32 = 0x25
+KC_9: u32 = 0x26
+KC_0: u32 = 0x27
+KC_ENTER: u32 = 0x28
+KC_ESCAPE: u32 = 0x29
+KC_BACKSPACE: u32 = 0x2A
+KC_TAB: u32 = 0x2B
+KC_SPACE: u32 = 0x2C
+KC_MINUS: u32 = 0x2D
+KC_EQUAL: u32 = 0x2E
+KC_BRACKET_LEFT: u32 = 0x2F
+KC_BRACKET_RIGHT: u32 = 0x30
+/// the US layout's backslash; on an ISO keyboard the key left of Enter (# on a German one)
+KC_BACKSLASH: u32 = 0x31
+KC_SEMICOLON: u32 = 0x33
+KC_QUOTE: u32 = 0x34
+/// left of 1 on a US keyboard (` ~), ^ on a German one
+KC_BACKQUOTE: u32 = 0x35
+KC_COMMA: u32 = 0x36
+KC_PERIOD: u32 = 0x37
+KC_SLASH: u32 = 0x38
+KC_CAPS_LOCK: u32 = 0x39
+KC_F1: u32 = 0x3A
+KC_F2: u32 = 0x3B
+KC_F3: u32 = 0x3C
+KC_F4: u32 = 0x3D
+KC_F5: u32 = 0x3E
+KC_F6: u32 = 0x3F
+KC_F7: u32 = 0x40
+KC_F8: u32 = 0x41
+KC_F9: u32 = 0x42
+KC_F10: u32 = 0x43
+KC_F11: u32 = 0x44
+KC_F12: u32 = 0x45
+KC_PRINT_SCREEN: u32 = 0x46
+KC_SCROLL_LOCK: u32 = 0x47
+KC_PAUSE: u32 = 0x48
+KC_INSERT: u32 = 0x49
+KC_HOME: u32 = 0x4A
+KC_PAGE_UP: u32 = 0x4B
+KC_DELETE: u32 = 0x4C
+KC_END: u32 = 0x4D
+KC_PAGE_DOWN: u32 = 0x4E
+KC_RIGHT: u32 = 0x4F
+KC_LEFT: u32 = 0x50
+KC_DOWN: u32 = 0x51
+KC_UP: u32 = 0x52
+KC_NUM_LOCK: u32 = 0x53
+KC_NUMPAD_DIVIDE: u32 = 0x54
+KC_NUMPAD_MULTIPLY: u32 = 0x55
+KC_NUMPAD_SUBTRACT: u32 = 0x56
+KC_NUMPAD_ADD: u32 = 0x57
+KC_NUMPAD_ENTER: u32 = 0x58
+KC_NUMPAD1: u32 = 0x59
+KC_NUMPAD2: u32 = 0x5A
+KC_NUMPAD3: u32 = 0x5B
+KC_NUMPAD4: u32 = 0x5C
+KC_NUMPAD5: u32 = 0x5D
+KC_NUMPAD6: u32 = 0x5E
+KC_NUMPAD7: u32 = 0x5F
+KC_NUMPAD8: u32 = 0x60
+KC_NUMPAD9: u32 = 0x61
+KC_NUMPAD0: u32 = 0x62
+KC_NUMPAD_DECIMAL: u32 = 0x63
+/// the ISO keyboard's key left of Z (< > on a German one)
+KC_INTL_BACKSLASH: u32 = 0x64
+KC_CONTEXT_MENU: u32 = 0x65
+KC_POWER: u32 = 0x66
+KC_NUMPAD_EQUAL: u32 = 0x67
+KC_F13: u32 = 0x68
+KC_F14: u32 = 0x69
+KC_F15: u32 = 0x6A
+KC_F16: u32 = 0x6B
+KC_F17: u32 = 0x6C
+KC_F18: u32 = 0x6D
+KC_F19: u32 = 0x6E
+KC_F20: u32 = 0x6F
+KC_F21: u32 = 0x70
+KC_F22: u32 = 0x71
+KC_F23: u32 = 0x72
+KC_F24: u32 = 0x73
+KC_VOLUME_MUTE: u32 = 0x7F
+KC_VOLUME_UP: u32 = 0x80
+KC_VOLUME_DOWN: u32 = 0x81
+KC_NUMPAD_COMMA: u32 = 0x85
+KC_INTL_RO: u32 = 0x87
+KC_KANA_MODE: u32 = 0x88
+KC_INTL_YEN: u32 = 0x89
+KC_CONVERT: u32 = 0x8A
+KC_NON_CONVERT: u32 = 0x8B
+KC_LANG1: u32 = 0x90
+KC_LANG2: u32 = 0x91
+KC_CONTROL_LEFT: u32 = 0xE0
+KC_SHIFT_LEFT: u32 = 0xE1
+KC_ALT_LEFT: u32 = 0xE2
+/// the left Windows / Super / Command key
+KC_META_LEFT: u32 = 0xE3
+KC_CONTROL_RIGHT: u32 = 0xE4
+KC_SHIFT_RIGHT: u32 = 0xE5
+/// the right Alt (AltGr on many layouts)
+KC_ALT_RIGHT: u32 = 0xE6
+KC_META_RIGHT: u32 = 0xE7
+```
+
+- **`fn key_code_set1(sc: u32) -> u32`**
+  (G7a) the usage of a Windows scan code of set 1 as a key event of Windows carries it in
+  Event::x (0xE0.. for the extended keys); 0 unknown.  Alt+Print (0x54) is Print, Ctrl+Pause
+  (0xE046) is Pause
+
+- **`fn key_code_evdev(code: u32) -> u32`**
+  (G7a) the usage of a Linux evdev key code (KEY_\*, the X keycode minus 8); 0 unknown
+
+- **`fn key_code_mac(kvk: u32) -> u32`**
+  (G7a) the usage of a macOS virtual key code (kVK_\*, NSEvent.keyCode; kVK_ANSI_A is 0); 0
+  unknown
+
+- **`fn key_code_name(code: u32) -> &'static str`**
+  (G7a) the browser's KeyboardEvent.code name of a usage ("KeyW", "ShiftLeft"); "" unknown
+
+- **`fn key_code_from_name(name: &str) -> u32`**
+  (G7a) the usage of a KeyboardEvent.code name; 0 unknown.  Older names of Firefox ("OSLeft",
+  "OSRight", "VolumeMute", "VolumeUp", "VolumeDown") too
+
+- **`fn key_code(scancode: u32) -> u32`**
+  (G7a) the usage (KC_\*) of a key event's Event::x on this platform: Windows' scan code, Linux's
+  and Android's evdev code, on macOS, iOS and in the browser the usage itself; 0 unknown
+
+- **`fn key_scancode(code: u32) -> u32`**
+  (G7a) Event::x of a key event on this platform for a usage (KC_\*): what key_code turns back
+  into it; 0 where this platform has no code for it
+
+- **`fn key_label(code: u32) -> Option<String>`**
+  (G7a) what the current keyboard layout prints on the key at usage `code`: its character
+  without Shift in upper case ("Z" for KC_W on a French keyboard, "Ü" for KC_BRACKET_LEFT on a
+  German one), else the system's name of the key where it has one (Windows: "Esc", "Enter" in
+  the system's language).  Windows (the thread's layout), Linux (the keymap of X11 or Wayland,
+  once a window has the keyboard), macOS (the current input source); None in the browser, on
+  Android and iOS and for keys the layout gives nothing
+
+- **`fn key_code_rows_test() -> alloc::vec::Vec<(u32, u32, u32, u32, &'static str)>`**
+  (test aid, plattest --test input) every row of the table: (usage, Windows scan code, evdev
+  code, macOS key code or 0xFF, the browser's name)
+
+### `plat/plock.rs`
+
+Source: [`lib/plat/plock.rs`](../lib/plat/plock.rs)
+
+```text
+plock -- (G7a) the pointer lock of a window and the raw relative motion while it holds it,
+the part every platform shares
+
+  win_pointer_lock(w, on) -> PointerLock    lock the pointer to window w (on) or let it go;
+                                            the state right after the call
+  win_pointer_lock_state(w) -> PointerLock  the state now
+  win_raw_motion_take(w) -> (dx, dy)        the raw motion since the last call (0, 0 when none
+                                            or w does not hold the lock)
+  E_POINTER_LOCK                            the state changed (data 1: locked now, 0: not)
+  E_RAW_MOTION                              raw motion waits (one event until it is taken)
+
+While a window holds the lock the pointer is hidden, stays where it is (or inside the window)
+and its motion comes raw: without the system's acceleration where the platform has it, in the
+device's counts.  Per platform:
+  Windows  Raw Input (WM_INPUT of usage page 1, usage 2), the cursor clipped to the middle of
+           the window (ClipCursor) and hidden; motion in mouse counts; absolute devices (a
+           remote desktop, a tablet, some virtual machines) as differences of their positions
+           in pixels (win_plock.rs)
+  Wayland  zwp_pointer_constraints_v1.lock_pointer and zwp_relative_pointer_v1's
+           unaccelerated motion; Unsupported when the compositor lacks one of them
+           (linux_wl_lock.rs)
+  X11      XInput 2.1 raw motion (XI_RawMotion: the device's values before acceleration) and a
+           pointer grab confined to the window with an invisible cursor; Unsupported without
+           XInput 2, Refused when another client holds a grab (linux_x11_lock.rs)
+  macOS    CGAssociateMouseAndMouseCursorPosition(false), the cursor hidden; motion from the
+           events' deltaX / deltaY (points, after the system's acceleration) (apple_mac.rs)
+  browser  requestPointerLock on the canvas (unadjustedMovement where the browser has it:
+           raw; else the browser's accelerated CSS pixels); the browser grants it only from a
+           user's gesture: Pending until the next press in the page (web_windows.rs, loader.js)
+  Android, iOS  Unsupported (touch controls are a later stage)
+
+The lock always lets go: Esc (the key goes to the lock, not to the app; the browser owns Esc
+itself), the window losing the keyboard focus, being minimized or closed, and
+win_pointer_lock(w, false).  It is never taken back by itself: after a release the app asks
+again (a click "to play").  A request while the window has no focus waits (Pending) and takes
+effect when it gets the focus.  One window holds the lock at a time (there is one pointer):
+asking for another lets the first go.
+```
+
+- **`enum PointerLock`**
+  (G7a) the state of a window's pointer lock (win_pointer_lock, ui.pointer_lock)
+  - `Off` -- not locked: never asked for, or let go (by the app, Esc, the focus going elsewhere, the
+    window minimized or closed)
+  - `Pending` -- asked for, not granted yet: the window has no focus yet, the browser waits for the next
+    press in the page, the Wayland compositor has not confirmed it
+  - `Locked` -- locked: the pointer is hidden and stays put, win_raw_motion_take has its motion
+  - `Unsupported` -- this platform or display cannot lock the pointer: Android, iOS; a Wayland compositor
+    without zwp_pointer_constraints_v1 or zwp_relative_pointer_manager_v1, an X server without
+    XInput 2.1
+  - `Refused` -- the system said no: the browser's pointerlockerror, another X11 client holds a grab, no
+    such window
+
+- **`fn win_pointer_lock(w: i32, on: bool) -> PointerLock`**
+  (G7a) lock the pointer to window w (on) or let it go (off) -> the state right after the call:
+  Locked at once where the platform grants it, Pending while it waits (see PointerLock), Off
+  after a release.  E_POINTER_LOCK follows every change.  The pointer is hidden while locked and
+  its motion comes through win_raw_motion_take; Esc, the focus going elsewhere, minimizing and
+  closing the window always let it go.  A window that is not the one holding (or waiting for)
+  the lock lets nothing go with off
+
+- **`fn win_pointer_lock_state(w: i32) -> PointerLock`**
+  (G7a) the state of window w's pointer lock (Off for a window that neither holds nor waits for
+  it; Unsupported / Refused stay until the next request)
+
+- **`fn win_raw_motion_take(w: i32) -> (f64, f64)`**
+  (G7a) the raw relative motion of window w's pointer since the last call, while w holds the
+  lock: (dx, dy), right and down positive, in the device's counts where the platform gives them
+  (Windows' Raw Input, Wayland's unaccelerated motion, X11's raw values, the browser with
+  unadjustedMovement), else in its accelerated pixels (macOS' deltas, the browser without it);
+  (0, 0) when there is none.  E_RAW_MOTION says that some waits
+
+- **`fn pointer_lock_test(w: i32, s: PointerLock)`**
+  (test aid, plattest --test input) the shared state without a platform: window w's lock is in
+  state s now, as a backend says it (E_POINTER_LOCK on a change)
+
+- **`fn raw_motion_test(w: i32, dx: f64, dy: f64)`**
+  (test aid) raw motion of window w as a backend reports it
+
+- **`fn pointer_lock_key_test(vk: u32, down: bool) -> bool`**
+  (test aid) a key as a backend asks the lock about it -> true: the key is the lock's (Esc)
+
+- **`fn raw_mouse_decode(rec: &[u8]) -> Option<(u16, i32, i32)>`**
+  (G7a) the motion of a Windows RAWINPUT record of a mouse (the bytes GetRawInputData fills: the
+  64-bit RAWINPUTHEADER, then RAWMOUSE) -> (usFlags, lLastX, lLastY); None for another device or
+  a short record.  MOUSE_MOVE_ABSOLUTE (usFlags bit 0) gives positions 0..65535 instead of
+  motion (MOUSE_VIRTUAL_DESKTOP, bit 1: of the whole desktop)
+
+- **`fn raw_abs_delta(prev: Option<[i32; 2]>, now: [i32; 2], span: [i32; 2]) -> (f64, f64)`**
+  (G7a) the motion of an absolute pointer (a remote desktop, a tablet, a virtual machine) between
+  two of its positions (0..65535 across the screen or the desktop of `span` pixels) -> pixels;
+  the first position after a pause (prev None) moves nothing
+
+- **`fn xi_raw_decode(ev: &[u8]) -> Option<(u16, u16, u32, f64, f64, u32)>`**
+  (G7a) the raw motion of an XInput 2 raw event (XI_RawMotion, the whole GenericEvent as the
+  server sends it) -> (deviceid, sourceid, time, raw value of valuator 0, of valuator 1, which
+  of the two it carries: bit 0 / bit 1); None for a short or malformed event.  The raw values
+  (FP3232, before acceleration) follow the mask and the transformed values
+
+- **`fn wl_fixed(v: i32) -> f64`**
+  (G7a) Wayland's fixed-point value (24.8) as a number
 
 ### `plat/ime.rs`
 
