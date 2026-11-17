@@ -91,6 +91,17 @@ fn new_round(h: &mut H, name: &str, doc: &Document, opts: &WriteOptions) -> Opti
     Some(l)
 }
 
+// whether a document has visio/windows.xml with its content type, named from the main part
+fn windows_part(d: &Document) -> bool {
+    let part = d.parts.iter().any(|p| s(d, p.name) == "/visio/windows.xml" && s(d, p.content_type) == "application/vnd.ms-visio.windows+xml");
+    let rel = d.rels.iter().any(|r| {
+        s(d, r.source) == "/visio/document.xml"
+            && s(d, r.kind) == "http://schemas.microsoft.com/visio/2010/relationships/windows"
+            && r.part.is_some_and(|p| s(d, p) == "/visio/windows.xml")
+    });
+    part && rel
+}
+
 fn new_docs(h: &mut H) {
     for kind in [DocKind::Drawing, DocKind::Template, DocKind::Stencil] {
         for measure in [Measure::Metric, Measure::Us] {
@@ -117,9 +128,21 @@ fn new_docs(h: &mut H) {
                     && d.faces.len() == 1
                     && theme
                     && main_rel
-                    && d.parts.len() == 2,
+                    && d.parts.len() == 3
+                    && windows_part(d),
                 format!("{} styles, page width {width:.4} in, {} warnings", styles.len(), l.warnings.len()),
             );
+        }
+    }
+    // a document without a windows part (Visio refuses such a file): the writer adds one, named
+    // from the main part; read back it is a part like any other and the second write is the same
+    for kind in [DocKind::Drawing, DocKind::Stencil] {
+        let mut doc = vsdx::new_document(kind, Measure::Metric);
+        let win = doc.sym("/visio/windows.xml");
+        doc.parts.retain(|p| Some(p.name) != win);
+        let name = format!("roundtrip/new {} without windows.xml", build::kind_name(kind));
+        if let Some(l) = new_round(h, &name, &doc, &WriteOptions::DEFAULT) {
+            h.check(&format!("{name} added"), windows_part(&l.doc) && l.warnings.is_empty(), format!("{} parts", l.doc.parts.len()));
         }
     }
     // every format: a drawing as macro drawing, template and macro template; a stencil as macro stencil

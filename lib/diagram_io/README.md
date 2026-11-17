@@ -21,7 +21,8 @@ The codecs are being built in stages; the plan is
 - **Writing the VSDX family:** the model goes back into any of the six files with everything
   it did not know at its place, relationship ids kept, deterministic and DEFLATE-compressed; a
   file read and written unchanged reads back as the same model. A drawing can be saved as a
-  template, a stencil's masters as a `.vssx`.
+  template, a stencil's masters as a `.vssx`. A document without `windows.xml` gets one, since
+  desktop Visio opens no file without it.
 - **New documents of its own:** `vsdx::new_document` makes a drawing, template or stencil (A4
   and millimetres or Letter and inches) with JFLib's own styles and document sheet and the own
   DrawingML theme "NetLab"; nothing in it comes from Visio's files.

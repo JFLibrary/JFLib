@@ -39,7 +39,9 @@
 // main part's relationship of Visio's own type, deleted subshapes with ID 4294967295, children
 // in [MS-VSDX]'s order, numbers in the shortest form that reads back the same.  The same model
 // always gives the same bytes, and a file read and written again reads as the same model and
-// writes the same bytes once more.  A macro project is written back unchanged into a format
+// writes the same bytes once more.  A document without windows.xml gets one of its own: desktop
+// Visio refuses a file without it (error 271), although [MS-VSDX] calls the part unused.  A
+// macro project is written back unchanged into a format
 // that may carry it (never run); into one that may not it is WriteError::Macros.  The writer
 // does not compute anything either: a cell whose formula changed (Cell::stale) keeps the value
 // it has until the formula engine sets one.  It does not recurse and never panics; XML the
@@ -393,6 +395,9 @@ pub(crate) const CT_PAGES: &str = "application/vnd.ms-visio.pages+xml";
 pub(crate) const CT_PAGE: &str = "application/vnd.ms-visio.page+xml";
 pub(crate) const CT_MASTERS: &str = "application/vnd.ms-visio.masters+xml";
 pub(crate) const CT_MASTER: &str = "application/vnd.ms-visio.master+xml";
+/// the windows part: desktop Visio refuses a file without it (error 271), although [MS-VSDX]
+/// calls it unused
+pub(crate) const CT_WINDOWS: &str = "application/vnd.ms-visio.windows+xml";
 pub(crate) const CT_THEME: &str = "application/vnd.openxmlformats-officedocument.theme+xml";
 
 // the type namespaces of the relationships a VSDX package uses

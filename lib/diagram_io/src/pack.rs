@@ -20,6 +20,10 @@
 // thumbnail from the package, Visio's own kinds from the main part).  New relationships use
 // Visio's types (the main part's is …/visio/2010/relationships/document).
 //
+// Desktop Visio refuses a file without a windows part (error 271; [MS-VSDX] calls the part
+// unused): a document without one gets visio/windows.xml of its own (blank::windows_xml), named
+// from the main part, written after the other parts -- reading the file keeps it as a Part.
+//
 // Order (deterministic): [Content_Types].xml, the relationship parts in the order doc.rels
 // names their sources (new sources after), the main part, pages, page parts, masters, master
 // parts, themes, then the Parts in model order.  Reading such a file gives the model back in
@@ -34,7 +38,8 @@ use archive::opc::{self, Package, Rules};
 use archive::Method;
 use diagram_core::{DocKind, Document, ForeignPayload, MasterRef, ShapeTree, Sym};
 
-use crate::vsdx::{self, Format, WriteError, WriteOptions, CT_MASTER, CT_MASTERS, CT_PAGE, CT_PAGES, CT_THEME};
+use crate::blank;
+use crate::vsdx::{self, Format, WriteError, WriteOptions, CT_MASTER, CT_MASTERS, CT_PAGE, CT_PAGES, CT_THEME, CT_WINDOWS};
 use crate::write;
 
 const VISIO_RELS: &str = "http://schemas.microsoft.com/visio/2010/relationships/";
@@ -45,6 +50,7 @@ const REL_MASTERS: &str = "http://schemas.microsoft.com/visio/2010/relationships
 const REL_MASTER: &str = "http://schemas.microsoft.com/visio/2010/relationships/master";
 const REL_THEME: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme";
 const REL_IMAGE: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+const REL_WINDOWS: &str = "http://schemas.microsoft.com/visio/2010/relationships/windows";
 // relationship kinds whose source is the package itself
 const PACKAGE_KINDS: [&str; 4] = [
     "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
@@ -63,6 +69,7 @@ enum Role {
     Master(usize),
     Theme(usize),
     Part(usize),
+    Windows,
 }
 
 // one relationship to write
@@ -127,6 +134,8 @@ struct Plan<'d> {
     page_parts: Vec<Option<String>>,
     master_parts: Vec<Option<String>>,
     theme_parts: Vec<String>,
+    // a windows part of its own when the document has none
+    windows: Option<String>,
     // relationships by source key ("" = the package), sources in output order
     order: Vec<String>,
     rels: BTreeMap<String, Vec<Out>>,
@@ -310,6 +319,10 @@ impl<'d> Plan<'d> {
             }
         }
         self.master_index = doc.masters().enumerate().map(|(i, m)| (m, i)).collect();
+        // desktop Visio opens no file without a windows part: one of its own when there is none
+        if !doc.parts.iter().any(|p| doc.str(p.content_type) == CT_WINDOWS) {
+            self.windows = Some(self.fresh(Some("visio/windows.xml"), "visio", "windows", Role::Windows));
+        }
         Ok(())
     }
 
@@ -431,6 +444,9 @@ impl<'d> Plan<'d> {
                 }
             }
         }
+        if let Some(w) = self.windows.as_deref().and_then(key) {
+            self.ensure(&main, &w, Some("windows"), REL_WINDOWS);
+        }
         // parts that say what names them
         for p in &doc.parts {
             let kind = doc.str(p.rel_type);
@@ -508,6 +524,7 @@ pub(crate) fn write(doc: &Document, options: &WriteOptions) -> Result<Vec<u8>, W
         page_parts: Vec::new(),
         master_parts: Vec::new(),
         theme_parts: Vec::new(),
+        windows: None,
         order: Vec::new(),
         rels: BTreeMap::new(),
         used: BTreeMap::new(),
@@ -588,6 +605,9 @@ pub(crate) fn write(doc: &Document, options: &WriteOptions) -> Result<Vec<u8>, W
     }
     for p in &doc.parts {
         pkg.set_part(bare(doc.str(p.name)), doc.str(p.content_type), p.data.clone()).map_err(WriteError::Package)?;
+    }
+    if let Some(w) = &plan.windows {
+        pkg.set_part(w, CT_WINDOWS, blank::windows_xml()).map_err(WriteError::Package)?;
     }
     let method = if options.level == 0 { Method::Stored } else { Method::Deflate(options.level) };
     pkg.write(options.zip, method).map_err(WriteError::Package)

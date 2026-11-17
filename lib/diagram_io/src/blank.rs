@@ -7,7 +7,9 @@
 // it), Colors and FaceNames with at least one entry each, a Pages part with one page whose
 // PageSheet is there (a drawing's and template's page has its own part, a stencil's none), the
 // theme part named by the document part, the document properties (optional, written with the
-// application's name only: no user data).
+// application's name only: no user data).  And windows.xml: [MS-VSDX] calls the windows part
+// unused, but desktop Visio refuses a file without it (error 271, found with the user's Visio
+// on 2026-11-17); an empty Windows element with the client size is enough (windows_xml).
 //
 // The styles (IDs as Visio's own documents number them, universal names as Visio knows them,
 // so that formulas and Visio's connector detection find them):
@@ -28,7 +30,18 @@ use diagram_core::{
 };
 
 use crate::theme;
+use crate::vsdx::CT_WINDOWS;
 use crate::xml::{NS_REL, NS_VISIO};
+
+/// the windows part of a document that has none: the Windows element with a client area of
+/// its own size and no window in it (Visio opens its drawing window by itself)
+pub(crate) fn windows_xml() -> Vec<u8> {
+    let s = alloc::format!(
+        "{}<Windows ClientWidth='1600' ClientHeight='900' xmlns='{NS_VISIO}' xmlns:r='{NS_REL}' xml:space='preserve'/>",
+        crate::write::DECL
+    );
+    s.into_bytes()
+}
 
 /// the measuring system of a new document (FEATURES LG-07, MS-07)
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
@@ -324,5 +337,12 @@ pub fn new_document(kind: DocKind, measure: Measure) -> Document {
         let part = Part { name: doc.intern(name), content_type: doc.intern(ct), rel_type: doc.intern(rel), data };
         doc.parts.push(part);
     }
+    let windows = Part {
+        name: doc.intern("/visio/windows.xml"),
+        content_type: doc.intern(CT_WINDOWS),
+        rel_type: doc.intern("http://schemas.microsoft.com/visio/2010/relationships/windows"),
+        data: windows_xml(),
+    };
+    doc.parts.push(windows);
     doc
 }

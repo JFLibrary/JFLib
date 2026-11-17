@@ -53785,7 +53785,9 @@ the document part with its root style sheet ID 0 "No Style" (every other style i
 it), Colors and FaceNames with at least one entry each, a Pages part with one page whose
 PageSheet is there (a drawing's and template's page has its own part, a stencil's none), the
 theme part named by the document part, the document properties (optional, written with the
-application's name only: no user data).
+application's name only: no user data).  And windows.xml: [MS-VSDX] calls the windows part
+unused, but desktop Visio refuses a file without it (error 271, found with the user's Visio
+on 2026-11-17); an empty Windows element with the client size is enough (windows_xml).
 
 The styles (IDs as Visio's own documents number them, universal names as Visio knows them,
 so that formulas and Visio's connector detection find them):
@@ -53854,7 +53856,9 @@ every element at their place, the relationships with their ids (raw XML may name
 main part's relationship of Visio's own type, deleted subshapes with ID 4294967295, children
 in [MS-VSDX]'s order, numbers in the shortest form that reads back the same.  The same model
 always gives the same bytes, and a file read and written again reads as the same model and
-writes the same bytes once more.  A macro project is written back unchanged into a format
+writes the same bytes once more.  A document without windows.xml gets one of its own: desktop
+Visio refuses a file without it (error 271), although [MS-VSDX] calls the part unused.  A
+macro project is written back unchanged into a format
 that may carry it (never run); into one that may not it is WriteError::Macros.  The writer
 does not compute anything either: a cell whose formula changed (Cell::stale) keeps the value
 it has until the formula engine sets one.  It does not recurse and never panics; XML the
