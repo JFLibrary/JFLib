@@ -21,11 +21,10 @@
 //                                 radians, days)
 //   Strings, Sym                  the document's string table (compact cells)
 //   Extras                        what the file had and the model does not know (DF-03)
+//   formula::Engine               the formula engine: parse, evaluate, recalculate (JD6)
 //
 // What is to come here, by stage of the plan:
 //   JD4   geometry rows and transforms (pin, local pin, angle, flips, groups) for drawing
-//   JD6   the formula engine: parser of the universal syntax, evaluation over a dependency graph
-//         with incremental recalculation, units, inheritance, GUARD and locks
 //   JD7   glue, the dynamic connector with right-angle routing around obstacles, layout
 //
 // Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
@@ -39,6 +38,7 @@ extern crate alloc;
 mod cell;
 mod document;
 mod edit;
+pub mod formula;
 mod inherit;
 mod names;
 mod page;

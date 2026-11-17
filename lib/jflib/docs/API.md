@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/page.rs](#diagram_coresrcpagers) · [src/shape.rs](#diagram_coresrcshapers) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/page.rs](#diagram_coresrcpagers) · [src/shape.rs](#diagram_coresrcshapers) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -52289,11 +52289,10 @@ a file loses nothing, and the behaviour Visio files carry works without translat
                                 radians, days)
   Strings, Sym                  the document's string table (compact cells)
   Extras                        what the file had and the model does not know (DF-03)
+  formula::Engine               the formula engine: parse, evaluate, recalculate (JD6)
 
 What is to come here, by stage of the plan:
   JD4   geometry rows and transforms (pin, local pin, angle, flips, groups) for drawing
-  JD6   the formula engine: parser of the universal syntax, evaluation over a dependency graph
-        with incremental recalculation, units, inheritance, GUARD and locks
   JD7   glue, the dynamic connector with right-angle routing around obstacles, layout
 
 Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
@@ -52928,6 +52927,603 @@ a Del="1" mark; restore_row and restore_section remove it again.
 - **`fn update_settings(&mut self, f: impl FnOnce(&mut DocSettings)) -> Result<(), EditError>`**
   change the document settings (snap, glue, protection, default styles ...)
 
+### `diagram_core/src/formula/color.rs`
+
+Source: [`lib/diagram_core/src/formula/color.rs`](../lib/diagram_core/src/formula/color.rs)
+
+```text
+color -- colours as formulas see them: indices of the document's colour table and RGB, the
+HSL scale of 0..240, and the tint and shade functions (FX-08)
+
+  Color::Index(n) / Color::Rgb(r, g, b)     V writes an index as a number, RGB as "#rrggbb"
+  Color::parse("#4d1e1a")
+  rgb_to_hsl(r, g, b) -> (h, s, l)          0..240 each, Windows' ColorRGBToHLS (HLSMAX 240)
+  hsl_to_rgb(h, s, l)                       its inverse (ColorHLSToRGB), integer rounding
+  tint / shade / tone / blend / mso_tint / mso_shade
+
+The 24 built-in indices are Visio's default colour table; a document's Colors element
+(ColorEntry IX RGB) overrides them, and indices past 23 exist only there.
+```
+
+- **`enum Color`**
+  a colour value
+  - `Index(u32)` -- an index into the document's colour table (0 black, 1 white ...)
+  - `Rgb(u8, u8, u8)` -- red, green, blue
+
+**`impl Color`**
+
+- **`fn parse(text: &str) -> Option<Color>`**
+  "#rrggbb" (any case) as an RGB colour
+- **`fn hex(r: u8, g: u8, b: u8) -> String`**
+  "#rrggbb" in lower case, as Visio writes V
+
+- **`fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (i32, i32, i32)`**
+  RGB -> hue, saturation, luminosity on 0..240 (Windows ColorRGBToHLS)
+
+- **`fn hsl_to_rgb(h: i32, s: i32, l: i32) -> (u8, u8, u8)`**
+  hue, saturation, luminosity on 0..240 -> RGB (Windows ColorHLSToRGB); out-of-range
+  arguments are clamped
+
+### `diagram_core/src/formula/engine.rs`
+
+Source: [`lib/diagram_core/src/formula/engine.rs`](../lib/diagram_core/src/formula/engine.rs)
+
+```text
+engine -- recalculation over the cells of a document (FX-02, FX-04)
+
+  let mut eng = Engine::new();                 one engine per document
+  let res = eng.calculate(&doc);               every formula, in dependency order; nothing
+                                               written (res.write(&mut tx) does)
+  eng.recalc(&mut tx, &sheets)                 after an edit in tx: the cells of these sheets
+                                               (stale ones included) and all that depend on
+                                               them, results written into tx (undo keeps them)
+  eng.recalc_cells(&mut tx, &cells)            the same for single cells
+  eng.refresh(&doc, &change.sheets())          after undo/redo: dependencies again
+  eng.user_set(&mut tx, sheet, addr, input)    a user's change: GUARD, SETATREF redirection
+  eng.run_action(&mut tx, sheet, addr)         an action or event cell: SETF and effects
+  eng.evaluate(&doc, sheet, addr)              one cell with stored inputs
+
+Nothing is recalculated on its own: opening a file computes nothing (PLAN.md, "Fallen").  A
+formula that cannot be computed here -- an unknown function, a glue helper, a cycle -- keeps
+its stored value and is reported (Keep); a value is written only with the formula it
+belongs to.
+
+Dependencies are recorded while formulas run: every cell a formula reads (also the ones
+THEMEVAL, PAR or TEXTWIDTH read behind the scenes, and the master or style cell an
+inherited formula comes from) becomes an edge.  The first recalc builds the graph with a
+full calculation; later ones follow the edges from the changed sheets.  Formulas are pulled
+in: a cell that reads another cell not computed yet computes that one first (depth-limited;
+a cell met again while it is being computed is a cycle and gives its stored value).
+```
+
+- **`struct NodeKey`**
+  a cell of a sheet as a sortable key
+  - `sheet: SheetRef` -- the sheet
+  - `sec: Option<SecKey>` -- the section (None: a single cell)
+  - `row: Option<RowKey>` -- the row (None: a single cell or a cell of the section itself)
+  - `cell: Sym` -- the cell name
+
+**`impl NodeKey`**
+
+- **`fn new(sheet: SheetRef, addr: &CellAddr) -> NodeKey`**
+  the key of a cell
+- **`fn addr(&self) -> CellAddr`**
+  the cell address
+
+- **`enum Effect`**
+  what an action asks for besides changing formulas (SETF is done by the engine itself);
+  the app carries them out -- or not: a RUNADDON the app does not know, a macro, CALLTHIS
+  are reported, never run
+  - `SetFormula(Target, String)` -- SETF: give the cell this formula (the engine applies it)
+  - `OpenTextWindow(SheetRef)` -- OPENTEXTWIN(): edit the shape's text
+  - `OpenShapeSheet(SheetRef)` -- OPENSHEETWIN(): show the shape's ShapeSheet
+  - `OpenGroup(SheetRef)` -- OPENGROUPWIN(): open the group in its own window
+  - `GotoPage(String)` -- GOTOPAGE(name)
+  - `Hyperlink(String, String)` -- HYPERLINK(address, sub-address)
+  - `PlaySound(String)` -- PLAYSOUND(file or sound name)
+  - `Command(i64)` -- DOCMD(n): one of Visio's command numbers, for the app to map to its own commands
+  - `AddOn(String)` -- RUNADDON(name): the app runs its own counterpart when it has one (e.g. the shape data
+    dialog), else reports it
+  - `Refused(String)` -- RUNMACRO, CALLTHIS: foreign code, never run (FX-15)
+
+- **`enum Outcome`**
+  how a cell came out
+  - `Value(Val)` -- computed
+  - `Kept(Keep)` -- not computed: the stored value stays
+
+- **`trait TextMetrics`**
+  the size of text in the app's fonts
+  - `fn measure(&self, text: &str, font: &str, size: f64, max_width: Option<f64>) -> (f64, f64)`
+    (width, height) in inches of `text` in `font` at `size` (inches); lines break at
+    `max_width` when given, and at line breaks
+
+- **`struct Estimate`**
+  the estimate used without the app's fonts: 0.45 em a character, lines of 1.2 em
+
+- **`struct Results`**
+  the result of a calculation
+  - `cells: Vec<(SheetRef, CellAddr, Outcome)>` -- every computed or kept cell in the order computed
+  - `cycles: Vec<(SheetRef, CellAddr)>` -- cells met while being computed (cycles); they used their stored value
+
+**`impl Results`**
+
+- **`fn get(&self, sheet: SheetRef, addr: &CellAddr) -> Option<&Outcome>`**
+  the outcome of one cell
+- **`fn write(&self, tx: &mut Transaction) -> Result<usize, EditError>`**
+  write every result that differs from the stored value into the transaction (cells
+  that inherit their formula get an F="Inh" cell); -> the number of cells written
+
+- **`struct Recalc`**
+  what a recalculation did
+  - `computed: usize` -- cells computed
+  - `written: usize` -- cells whose stored value changed
+  - `kept: Vec<(SheetRef, CellAddr, Keep)>` -- cells that kept their stored value, and why
+  - `cycles: usize` -- cells in cycles
+
+```rust
+/// the protection cells ([MS-VSDX] Protection section, SS-15)
+LOCKS: &[&str] = &[ "LockWidth", "LockHeight", "LockAspect", "LockMoveX", ...
+```
+
+- **`enum Input<'a>`**
+  a user's change of a cell (Engine::user_set)
+  - `Value(Value, Option<Unit>)` -- a value in internal units, shown in the unit
+  - `Length(f64, Unit)` -- a length or angle in a unit (25 mm)
+  - `Formula(&'a str)` -- a formula
+
+- **`struct Engine`**
+  the formula engine of one document
+
+**`impl Engine`**
+
+- **`fn new() -> Engine`**
+  an engine with the text estimate
+- **`fn with_metrics(metrics: Rc<dyn TextMetrics>) -> Engine`**
+  an engine that measures text with the app's fonts
+- **`fn reset(&mut self)`**
+  forget everything (the document was replaced, or its themes changed)
+- **`fn calculate(&mut self, doc: &Document) -> Results`**
+  compute every formula of the document (nothing is written; Results::write does);
+  this also records the dependencies later recalculations follow
+- **`fn evaluate(&mut self, doc: &Document, sheet: SheetRef, addr: &CellAddr) -> Outcome`**
+  compute one cell from the stored values of its inputs (nothing else is recomputed)
+- **`fn evaluate_text(&mut self, doc: &Document, sheet: SheetRef, addr: &CellAddr, text: &str) -> Result<Outcome, ParseError>`**
+  evaluate a formula text for a cell without storing anything (the formula editor's
+  preview); inputs as stored
+- **`fn recalc(&mut self, tx: &mut Transaction, sheets: &[SheetRef]) -> Result<Recalc, EditError>`**
+  recompute after an edit: the formula cells of these sheets (Change::sheets(); stale
+  cells among them) and every cell that depends on them; results go into `tx`
+- **`fn recalc_cells(&mut self, tx: &mut Transaction, cells: &[(SheetRef, CellAddr)]) -> Result<Recalc, EditError>`**
+  recompute these cells and every cell that depends on them
+- **`fn refresh(&mut self, doc: &Document, sheets: &[SheetRef])`**
+  after undo or redo (the stored values are right again): record the dependencies of
+  the cells of these sheets anew
+- **`fn locks(&mut self, doc: &Document, sheet: SheetRef) -> Vec<&'static str>`**
+  the protection cells of a sheet (SS-15) that are set, with inheritance: "LockWidth",
+  "LockMoveX", "LockThemeColors" ... -- gestures (JD7) and applying a theme (JD11) ask
+  them; a direct change in the ShapeSheet does not
+- **`fn guarded(&mut self, doc: &Document, sheet: SheetRef, addr: &CellAddr) -> bool`**
+  whether the effective formula of a cell is protected against the user's edits
+  (GUARD around it)
+- **`fn theme_guarded(&mut self, doc: &Document, sheet: SheetRef, addr: &CellAddr) -> bool`**
+  whether the formula keeps its value when a theme or style is applied (THEMEGUARD
+  around it, or GUARD)
+- **`fn user_set(&mut self, tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr, input: Input) -> Result<Recalc, EditError>`**
+  a user's change of a cell (a gesture or a dialog): a guarded formula refuses it
+  (EditError::Guarded); a formula with SETATREF keeps its formula and the change goes to
+  the cells SETATREF names; then everything that depends on it is recomputed
+- **`fn run_action(&mut self, tx: &mut Transaction, sheet: SheetRef, addr: &CellAddr) -> Result<Vec<Effect>, EditError>`**
+  run an action or event cell (Actions.Row_1.Action, EventDblClick ...): SETF changes
+  formulas in `tx`, also guarded ones (then dependents are recomputed); the other effects
+  are for the app
+- **`fn graph_size(&mut self) -> (usize, usize)`**
+  the number of cells in the dependency graph (for tests and statistics)
+
+- **`fn sheet_formula_cells(doc: &Document, s: SheetRef) -> Vec<NodeKey>`**
+  the cells of one sheet whose value comes from a formula: its own cells with a formula
+  (also F="Inh") and the cells it inherits a formula for from master shapes and styles
+
+- **`fn all_sheets(doc: &Document) -> Vec<SheetRef>`**
+  every sheet of the document: the document sheet, styles, pages, masters, the shapes of
+  masters and pages
+
+- **`fn formula_cells(doc: &Document) -> Vec<NodeKey>`**
+  every cell of the document whose value comes from a formula (sheet_formula_cells of all
+  sheets)
+
+### `diagram_core/src/formula/eval.rs`
+
+Source: [`lib/diagram_core/src/formula/eval.rs`](../lib/diagram_core/src/formula/eval.rs)
+
+```text
+eval -- evaluating a parsed formula for one cell of one sheet (FX-02, FX-03)
+
+Ev holds what a formula needs while it runs: the document, the engine's run (results so far,
+themes, text metrics, the effects an action collects), the sheet and cell it is evaluated
+for, and the sheet whose cell holds the formula text.  The last two differ for inherited
+formulas: a master shape's formula runs in the instance's context (Width is the instance's
+Width), and its Sheet.N references name shapes of the master, which the instance has under
+other IDs -- they are mapped to the instance's subshape with MasterShape = N.
+
+Arithmetic works on internal units (the parser converted "10 mm"), so units need no work
+here.  Errors propagate through operators and functions; IF, AND, OR and the like evaluate
+only what they need.
+```
+
+- **`enum Keep`**
+  why a formula's value cannot be computed here (the stored value stays and the cell is
+  marked)
+  - `Parse(super::parse::ParseError)` -- the formula does not parse
+  - `Unknown(String)` -- it calls a function the engine does not know (the first such name)
+  - `NotComputed(&'static str)` -- it calls a function the engine knows but does not compute here (glue helpers,
+    add-ons, macros, values that depend on the machine: fonts, random numbers)
+  - `Reference` -- it names a section the engine does not know
+  - `Deep` -- its inputs nest deeper than the engine follows at once
+
+### `diagram_core/src/formula/math.rs`
+
+Source: [`lib/diagram_core/src/formula/math.rs`](../lib/diagram_core/src/formula/math.rs)
+
+```text
+math -- the float functions formulas need, without std and without libm
+
+Accurate to a few units in the last place over the ranges drawings use (angles of a few
+turns, lengths up to kilometres): range reduction, then series on a small interval.  The
+engine compares results with the values Visio stored, so plain truncated series that lose
+digits are not good enough; these keep about 15 significant digits.
+```
+
+- **`fn floor(x: f64) -> f64`**
+  largest integer not above x
+
+- **`fn ceil(x: f64) -> f64`**
+  smallest integer not below x
+
+- **`fn trunc(x: f64) -> f64`**
+  x without its fraction
+
+- **`fn round(x: f64) -> f64`**
+  x rounded half away from zero
+
+- **`fn sqrt(x: f64) -> f64`**
+  the square root (NaN below 0)
+
+- **`fn pow2(e: i64) -> f64`**
+  2^e for integer e (exact while the result is a normal number)
+
+- **`fn sincos(x: f64) -> (f64, f64)`**
+  sine and cosine
+
+- **`fn sin(x: f64) -> f64`**
+  sine
+
+- **`fn cos(x: f64) -> f64`**
+  cosine
+
+- **`fn tan(x: f64) -> f64`**
+  tangent
+
+- **`fn atan(x: f64) -> f64`**
+  arc tangent
+
+- **`fn atan2(y: f64, x: f64) -> f64`**
+  the angle of (x, y): atan2(y, x) in -pi ..= pi
+
+- **`fn asin(x: f64) -> f64`**
+  arc sine (NaN outside -1..1)
+
+- **`fn acos(x: f64) -> f64`**
+  arc cosine (NaN outside -1..1)
+
+- **`fn exp(x: f64) -> f64`**
+  e^x
+
+- **`fn ln(x: f64) -> f64`**
+  the natural logarithm (NaN below 0, -inf at 0)
+
+- **`fn log10(x: f64) -> f64`**
+  the logarithm to base 10
+
+- **`fn pow(x: f64, y: f64) -> f64`**
+  x to the power y (integer y by repeated squaring, exactly as Visio's ^2 needs)
+
+- **`fn sinh(x: f64) -> f64`**
+  hyperbolic sine, cosine, tangent
+
+- **`fn cosh(x: f64) -> f64`**
+  hyperbolic cosine
+
+- **`fn tanh(x: f64) -> f64`**
+  hyperbolic tangent
+
+- **`fn modulus(x: f64, y: f64) -> f64`**
+  x modulo y with the sign of y (Visio's MODULUS); NaN for y = 0
+
+### `diagram_core/src/formula/parse.rs`
+
+Source: [`lib/diagram_core/src/formula/parse.rs`](../lib/diagram_core/src/formula/parse.rs)
+
+```text
+parse -- the universal formula syntax of a ShapeSheet cell into a small tree (FX-01)
+
+  parse("IF(Width>10 mm,Height*0.5,1 in)") -> Ok(Parsed) / Err(ParseError { pos, kind })
+  p.refs()                 the cell references as written (CellRef: sheet part + cell part)
+  p.functions()            the functions it calls (Func; Func::Unknown keeps the name)
+
+What the syntax has ([MS-VSDX] universal syntax, as the files write it):
+* numbers with an optional unit right after them ("180DEG", "0.25DL", "10 mm", "1.5E-3IN");
+  the value is kept in internal units (inches, radians, days), so "10 mm" is 0.3937...;
+  "60%" is 0.6 (% is a postfix operator, also after a bracket)
+* strings in double quotes, "" inside is one quote; TRUE and FALSE; error values (#REF! ...)
+* operators, loosest first ([MS-VSDX] 2.5.2): = <>, then < <= > >=, & (text), + -, * /, ^,
+  unary - and + (so -2^2 is 4); all left to right; % after a number ("60%" is 0.6; the
+  parser also takes it after a bracket)
+* references: Width, Geometry1.X2, Geometry1.NoFill, Char.Size, Char.Size[2], Para.HorzAlign,
+  Prop.Name, Prop.Name.Format, User.Name, User.Name.Prompt, Scratch.X1, Controls.Row_1,
+  Controls.Row_1.Y, Connections.X1, Connections.Name.Y, Actions.Row_1.Action; with a sheet in
+  front: Sheet.5!Width, ThePage!PageScale, TheDoc!DocLangID, Pages[Page-1]!Sheet.3!Width,
+  Masters[Name]!Width, Masters[Name]!Sheet.5!Width, Styles[Normal]!LineColor,
+  'Some name'!Width and Name.7!Width (a shape by its NameU)
+* function calls, also with a sheet in front (Sheet.5!SheetRef()); an empty argument is
+  allowed (SETATREF(User.X,,1)); unknown names parse as Func::Unknown
+
+Errors carry the byte position where the parser stopped.  Nothing here needs a document: the
+engine binds the names to a document's string table once per formula text.
+```
+
+- **`enum ParseErrorKind`**
+  why a formula did not parse
+  - `BadChar` -- a character that starts nothing
+  - `UnexpectedEnd` -- the formula ended in the middle of an expression
+  - `Unexpected` -- a token where it does not fit
+  - `Unclosed` -- a "(" or "[" without its closing bracket
+  - `UnclosedString` -- a string without its closing quote
+  - `BadNumber` -- a number that does not parse
+  - `BadReference` -- a reference that does not parse (Sheet.x!, Geometry.X1 ...)
+  - `Trailing` -- text after the end of the expression
+  - `TooComplex` -- the formula nests too deep or is too long
+
+- **`struct ParseError`**
+  a formula that did not parse, with the byte position where it stopped
+  - `pos: usize` -- byte offset into the formula text
+  - `kind: ParseErrorKind` -- what went wrong
+
+- **`enum BinOp`**
+  binary operators
+  - `Add` -- +
+  - `Sub` -- -
+  - `Mul` -- \*
+  - `Div` -- /
+  - `Pow` -- ^
+  - `Concat` -- & (text concatenation)
+  - `Eq` -- =
+  - `Ne` -- &lt;>
+  - `Lt` -- &lt;
+  - `Gt` -- >
+  - `Le` -- &lt;=
+  - `Ge` -- >=
+
+- **`enum SheetName`**
+  the sheet part of a reference (in front of "!")
+  - `Local` -- none: the sheet the formula belongs to
+  - `Id(u32)` -- Sheet.5!: the shape with this ID on the same page or in the same master
+  - `Named(Box<str>)` -- a shape by its NameU ("Name.7!", "'My name'!")
+  - `ThePage` -- ThePage!: the page sheet (in a master: the master's page sheet)
+  - `TheDoc` -- TheDoc!: the document sheet
+  - `Page(Box<str>, Option<u32>)` -- Pages[name]! with an optional Sheet.N! after it
+  - `Master(Box<str>, Option<u32>)` -- Masters[name]! (the master's page sheet) with an optional Sheet.N! after it
+  - `Style(Box<str>)` -- Styles[name]!
+
+- **`enum CellPart`**
+  the cell part of a reference
+  - `None` -- no cell: the sheet itself (Sheet.5!SheetRef())
+  - `Single(Box<str>)` -- a single cell: Width, PinX, EventXFMod, TheText
+  - `Section { section: &'static str, index: u32, cell: Box<str>, }` -- a cell of a section itself: Geometry1.NoFill (section index 0-based)
+  - `Indexed { section: &'static str, index: u32, row: u32, cell: Box<str>, }` -- a cell of an indexed row: Geometry1.X2, Connections.X1, Char.Size, Scratch.A1
+  - `Named { section: &'static str, row: Box<str>, cell: Box<str>, }` -- a cell of a named row: User.Name, Prop.Name.Format, Controls.Row_1.Y
+  - `Unknown(Box<str>)` -- a dotted name of a section the engine does not know, as written
+
+- **`struct CellRef`**
+  a reference as written: sheet part and cell part
+  - `sheet: SheetName` -- the sheet
+  - `cell: CellPart` -- the cell
+
+- **`struct Parsed`**
+  a parsed formula
+
+**`impl Parsed`**
+
+- **`fn refs(&self) -> &[CellRef]`**
+  the references in the order they are written
+- **`fn functions(&self) -> impl Iterator<Item = Func> + '_`**
+  the functions called, in the order they are written (with repeats)
+- **`fn func_name(&self, f: Func) -> &str`**
+  the name of a function call (also of an unknown one)
+- **`fn unknown(&self) -> impl Iterator<Item = &str> + '_`**
+  the names of the unknown functions it calls
+- **`fn top_is(&self, f: Func) -> bool`**
+  whether the whole formula is a call of `f` (GUARD(...), THEMEGUARD(...), SETATREF(...))
+- **`fn calls(&self, f: Func) -> bool`**
+  whether the formula calls `f` anywhere
+- **`fn constant(&self) -> Option<f64>`**
+  whether the formula is a plain number (with or without unit), and which
+
+- **`fn cell_part(name: &str, bracket: Option<u32>) -> Option<CellPart>`**
+  the cell part of a dotted name ("Geometry1.X2", "User.Name.Prompt", "Width") with an
+  optional [n] after it; None when the name does not fit a section's form
+
+- **`fn unit_code(code: &str) -> Option<Unit>`**
+  the unit of a code as written after a number ("MM", "mm", "Deg"); None: not a unit
+
+- **`fn parse(text: &str) -> Result<Parsed, ParseError>`**
+  parse a formula in the universal syntax
+
+### `diagram_core/src/formula/theme.rs`
+
+Source: [`lib/diagram_core/src/formula/theme.rs`](../lib/diagram_core/src/formula/theme.rs)
+
+```text
+theme -- THEMEVAL and its relatives over the document's themes (FX-08, TH-01)
+
+A document keeps its theme parts as a pool (Document::themes); a sheet picks five parts of
+them by number ([MS-VSDX] 2.2.7.4): ColorSchemeIndex the colour scheme, FontSchemeIndex the
+font scheme, EffectSchemeIndex the format scheme (fill, line and effect style lists),
+ConnectorSchemeIndex the connector scheme, ThemeIndex the theme as a whole -- each the
+component whose vt:schemeID schemeEnum has that number, in any part.  65534 means "the
+page's value", 0 no theme (also when any of the five is 0; a master has no page, so its
+shapes are unthemed).
+
+Within the components the shape's quick style cells choose: QuickStyleLineColor /
+FillColor / ShadowColor / FontColor a colour (0 dk1, 1 lt1, 2..7 accent1..6, 8 background,
+100..106 the variant colours of VariationColorIndex), QuickStyleLineMatrix / FillMatrix /
+EffectsMatrix / FontMatrix an entry of the style lists (1..6; 100..103 the variant style of
+VariationStyleIndex; 0 the root style sheet).  A DrawingML style colours its placeholder
+(phClr) with the chosen colour, through the modifiers it carries (lumMod, satMod, tint ...).
+
+  THEMEVAL()               the theme's value for the cell it stands in: V stores "Themed"
+  THEMEVAL(name [,dflt])   a named value (colours, line, fill, shadow, font properties);
+                           unthemed: dflt, else the "No Theme" colour or the root style's
+                           cell; numbers name quick style colours (THEMEVAL(QuickStyleFillColor))
+  THEMEPROP("MultiFormat" | "Embellishment"), ISTHEMED(), CELLISTHEMED(b), THEMERESTORE(x)
+
+Not known from the documentation and therefore estimated: FillColor2 of a solid fill (the
+fill colour itself), the font scheme used for text (the minor one), cap and compound line
+codes.  JD11 applies themes; this module only reads them.
+```
+
+- **`struct Theme`**
+  a theme part read for formulas: its element tree and the components it carries
+  - `tree: Tree` -- the element tree
+
+**`impl Theme`**
+
+- **`fn parse(data: &[u8]) -> Theme`**
+  read a theme part
+
+### `diagram_core/src/formula/val.rs`
+
+Source: [`lib/diagram_core/src/formula/val.rs`](../lib/diagram_core/src/formula/val.rs)
+
+```text
+val -- what a formula computes: typed values and how they meet cells (FX-02)
+
+  Val::Num(f64)              a number in internal units (inches, radians, days); TRUE is 1
+  Val::Str / Color / Point / Err / Themed / Shape / Font / Target / Missing
+  val.to_cell(cell name) -> (Value, Option<CellError>) text   what V stores for it
+  Val::from_value(value, error, strings)   a stored V read back as a Val
+
+The stored forms (as Visio writes V): numbers as numbers, an RGB colour "#rrggbb", a colour
+index as a number, a theme result "Themed", NURBS(...)/POLYLINE(...) as their text, a point
+as its X or Y depending on the cell (PNT in BeginX gives x), strings as they are.  An error
+leaves V alone and sets E.
+```
+
+- **`struct Target`**
+  a cell or sheet as a value (GetRef, SheetRef(), SETATREF targets)
+  - `sheet: SheetRef` -- the sheet
+  - `addr: Option<CellAddr>` -- the cell (None: the sheet itself)
+
+- **`enum Val`**
+  a computed value
+  - `Num(f64)` -- a number in internal units; also truth values (1, 0)
+  - `Str(Rc<str>)` -- a string
+  - `Color(Color)` -- a colour
+  - `Point(f64, f64)` -- a point (PNT, PAR, LOC)
+  - `Err(CellError)` -- an error value
+  - `Themed(Rc<Val>)` -- a value that comes from the theme: V stores "Themed", formulas use the value inside
+  - `Shape(Rc<str>)` -- a NURBS(...) or POLYLINE(...) result as V writes it
+  - `Font(Rc<str>)` -- a font (FONT("Calibri")): a Font cell stores the name
+  - `Target(Target)` -- a reference to a cell or sheet
+  - `Missing` -- an empty argument
+
+- **`enum Axis`**
+  which coordinate of a point a cell takes
+  - `X` -- X, BeginX, PinX, LocPinX, TxtPinX, XDyn ... (also the default)
+  - `Y` -- Y, BeginY, PinY, YDyn ...
+
+**`impl Axis`**
+
+- **`fn of(cell: &str) -> Axis`**
+  the axis of a cell name: Y when the name has a Y and no X
+
+**`impl Val`**
+
+- **`fn bool(b: bool) -> Val`**
+  a truth value
+- **`fn str(s: &str) -> Val`**
+  a string value
+- **`fn plain(&self) -> &Val`**
+  the value without its Themed wrapper
+- **`fn is_err(&self) -> bool`**
+  whether it is an error value
+- **`fn err(&self) -> Option<CellError>`**
+  the error, if it is one
+- **`fn from_value(value: Value, error: Option<&str>, strings: &Strings) -> Val`**
+  a stored value read back (E set: the error; "Themed" stays text here, the engine
+  computes what is behind it)
+- **`fn num(&self, axis: Axis) -> Result<f64, CellError>`**
+  the number of a value for arithmetic (a point gives the axis' coordinate)
+- **`fn text(&self) -> Result<String, CellError>`**
+  the text of a value (numbers in their shortest form, colours as "#rrggbb")
+- **`fn stored(&self, cell: &str) -> Stored`**
+  what V stores for this result in cell `cell` -> (V as text or number, error); None
+  value: keep V as it is
+
+- **`enum Stored`**
+  what a result stores in V
+  - `Num(f64)` -- a number
+  - `Text(String)` -- a text ("#rrggbb", "Themed", a string, NURBS(...))
+  - `Error(CellError)` -- an error: V stays, E is set
+
+**`impl Stored`**
+
+- **`fn matches(&self, value: Value, error: Option<&str>, strings: &Strings, tol: f64) -> bool`**
+  whether a stored V (with its E) equals this result: numbers within `tol` relative
+  (and 1e-12 absolute), texts exactly (colours in any case)
+
+- **`fn close(a: f64, b: f64, tol: f64) -> bool`**
+  whether two numbers agree within `tol` relative or 1e-12 absolute
+
+### `diagram_core/src/formula/xml.rs`
+
+Source: [`lib/diagram_core/src/formula/xml.rs`](../lib/diagram_core/src/formula/xml.rs)
+
+```text
+xml -- a small element tree of a theme part (DrawingML with Visio's extensions)
+
+Theme parts are a few dozen kilobytes of attributes; the engine reads colours, fonts and
+style lists from them.  This reader keeps elements (local names, attributes, children) and
+drops text, comments, processing instructions and the DOCTYPE; it refuses nothing: what it
+cannot read ends the tree there.  Limits: 200 000 elements, depth 256.
+```
+
+- **`struct Elem`**
+  one element: its local name (prefix removed), attributes (local names) and children
+  - `name: String` -- the name without prefix
+  - `attrs: Vec<(String, String)>` -- the attributes without prefixes, values with entities decoded
+  - `children: Vec<u32>` -- the children (indices into Tree::elems)
+
+- **`struct Tree`**
+  a parsed part
+  - `elems: Vec<Elem>` -- all elements; 0 is the root when the part had one
+
+**`impl Tree`**
+
+- **`fn parse(data: &[u8]) -> Tree`**
+  read a part (UTF-8; a BOM is skipped)
+- **`fn get(&self, i: u32) -> Option<&Elem>`**
+  an element
+- **`fn child(&self, i: u32, name: &str) -> Option<u32>`**
+  the first child of `i` named `name`
+- **`fn children<'a>(&'a self, i: u32, name: &'a str) -> impl Iterator<Item = u32> + 'a`**
+  the children of `i` named `name`
+- **`fn path(&self, i: u32, names: &[&str]) -> Option<u32>`**
+  the element at a path of names below `i` (each step the first match)
+- **`fn find(&self, i: u32, name: &str) -> Option<u32>`**
+  the first element named `name` anywhere below `i` (depth first)
+- **`fn attr(&self, i: u32, name: &str) -> Option<&str>`**
+  an attribute of `i`
+
 ### `diagram_core/src/inherit.rs`
 
 Source: [`lib/diagram_core/src/inherit.rs`](../lib/diagram_core/src/inherit.rs)
@@ -53031,7 +53627,10 @@ The categories follow the public format description [MS-VSDX] ("Style-to-Shape I
 "Line Properties", "Fill Properties", "Effect Properties", "Text"): LineStyle carries the
 line cells and the LineGradient section, FillStyle the fill and effect cells and the
 FillGradient section, TextStyle the Character, Paragraph and Tabs sections and the text block
-cells.
+cells.  The theme cells (ThemeIndex, ColorSchemeIndex ...) and the quick style cells have no
+category there; shapes take them from the document's "Theme" style, so they go with fill
+(the line and font quick style cells with line and text) -- an assumption the files cannot
+test, since every style in them names one style for all three (JD6).
 ```
 
 - **`enum Category`**

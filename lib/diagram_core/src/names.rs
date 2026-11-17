@@ -8,7 +8,10 @@
 // "Line Properties", "Fill Properties", "Effect Properties", "Text"): LineStyle carries the
 // line cells and the LineGradient section, FillStyle the fill and effect cells and the
 // FillGradient section, TextStyle the Character, Paragraph and Tabs sections and the text block
-// cells.
+// cells.  The theme cells (ThemeIndex, ColorSchemeIndex ...) and the quick style cells have no
+// category there; shapes take them from the document's "Theme" style, so they go with fill
+// (the line and font quick style cells with line and text) -- an assumption the files cannot
+// test, since every style in them names one style for all three (JD6).
 
 use crate::strings::Sym;
 
@@ -94,19 +97,26 @@ pub enum Category {
 const LINE_CELLS: &[&str] = &[
     "LineColor", "LinePattern", "LineWeight", "LineCap", "BeginArrow", "EndArrow", "LineColorTrans",
     "CompoundType", "BeginArrowSize", "EndArrowSize", "Rounding", "LineGradientDir",
-    "LineGradientAngle", "LineGradientEnabled",
+    "LineGradientAngle", "LineGradientEnabled", "QuickStyleLineColor", "QuickStyleLineMatrix",
 ];
 const FILL_CELLS: &[&str] = &[
     "FillForegnd", "FillForegndTrans", "FillBkgnd", "FillBkgndTrans", "FillPattern", "FillGradientDir",
     "FillGradientAngle", "FillGradientEnabled", "RotateGradientWithShape", "UseGroupGradient",
     "Perspective", "DistanceFromGround", "KeepTextFlat", "SoftEdgesSize",
+    // the quick style cells of fill and effects, and the theme cells (JD6: shapes take them from
+    // the document's "Theme" style; [MS-VSDX] names no category for them, the files' styles
+    // carry them for line, fill and text alike)
+    "QuickStyleFillColor", "QuickStyleFillMatrix", "QuickStyleShadowColor", "QuickStyleEffectsMatrix",
+    "QuickStyleType", "QuickStyleVariation", "ThemeIndex", "ColorSchemeIndex", "EffectSchemeIndex",
+    "ConnectorSchemeIndex", "FontSchemeIndex", "VariationColorIndex", "VariationStyleIndex",
+    "EmbellishmentIndex",
 ];
 // effect cells by their family: shadow, bevel, glow, reflection, sketch, 3D rotation
 const EFFECT_PREFIXES: &[&str] = &["Shdw", "ShapeShdw", "Bevel", "Glow", "Reflection", "Sketch", "RotationXAngle",
     "RotationYAngle", "RotationZAngle", "RotationType"];
 const TEXT_CELLS: &[&str] = &[
     "LeftMargin", "RightMargin", "TopMargin", "BottomMargin", "VerticalAlign", "TextBkgnd", "TextBkgndTrans",
-    "DefaultTabStop", "TextDirection",
+    "DefaultTabStop", "TextDirection", "QuickStyleFontColor", "QuickStyleFontMatrix",
 ];
 
 impl Category {
