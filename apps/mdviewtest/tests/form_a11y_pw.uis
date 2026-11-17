@@ -1,0 +1,27 @@
+#!args --page form --verify-dirty
+# a screen reader edits the password field (--page form): the text it sets is the field's dots
+# with the user's change -- the dots kept at the start and the end stand for the hidden
+# characters there, the rest is new.  The form sends the real password (the dots themselves
+# became it before: TalkBack's Backspace set "●●●●●").
+size 1000 720
+theme light
+click 600,330
+key tab
+key tab
+expect text:"Fokus: pw" exists
+type "geheim"
+expect textbox:"●●●●●●" focused
+# a Backspace: one dot less at the end
+a11y text textbox:"●●●●●●" "●●●●●"
+expect textbox:"●●●●●" focused
+# a character typed between the dots
+a11y text textbox:"●●●●●" "●●X●●●"
+expect textbox:"●●●●●●" focused
+key enter
+expect text:"Senden: post /login user=&pw=geXhei&farbe=rot&land=at&text=Hallo&ort=&token=abc123&aktion=senden" exists
+# a whole new text (a password manager): no dot kept
+a11y text textbox:"●●●●●●" "neu"
+expect textbox:"●●●" focused
+key enter
+expect text:"Senden: post /login user=&pw=neu&farbe=rot&land=at&text=Hallo&ort=&token=abc123&aktion=senden" exists
+expect_nowarn

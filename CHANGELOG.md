@@ -147,6 +147,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - Tests: androidGallery's page "2D-Zeichnung": two fingers zoom and pan together however late the second one comes down (ui.touch_two holds a second finger back once the first one's drag is older than 200 ms, meant for strokes; the page takes the pair from ui.touch_fingers), found in the user's hand check on a Galaxy A56 (G6e3)
 - **ui:** `list_end` packs a drop into `from | to << 16` only while both fit in 16 bits: a move from or to a row past 65 535 is no longer reported (no EV_DRAG, the row stays selected) -- the packed value gave another item and another place (`list_end_full` reports them)
 - **render2d:** On Intel's Gen9 under Mesa (HD 610: Mesa 26.0.3 and 26.2.6) a layer drawn with fs_full (arcs, dash patterns) and one drawn with fs_fill (fills) in one frame had blocks of 2 x 2 pixels wrong at random (highlighted strokes, the dash pieces of DXF linetypes): both fragment shaders spill registers, and the driver gave the two draws the same scratch memory with their own per-thread sizes (1 and 2 KB) while their threads ran side by side. On Intel under Vulkan such a run of layers (fs_full, fs_fill, fs_text_all, the overlay) now gets a render pass of its own after a barrier when the last such run took another pipeline (RendererDesc::separate_scratch); no pixel changes, elsewhere the command stream is as before (G6e3)
+- **web:** Browser: a key that writes a punctuation mark gives the key code the native hosts give (+ , - . as VK_OEM_PLUS / COMMA / MINUS / PERIOD, the keypad as VK_NUMPAD*, others by the key's place) instead of its capital letter's code: typing "$" was Shift+Home and replaced the text before the caret, "." was Delete, "%" Shift+Left, "#" End
+- **web:** Browser: a stored file that cannot be imported at the start (too big, no memory) is left out and named in the console; it stopped the whole start, so the app never started again on that origin
+- **android:** Android: a text longer than 256 KiB goes to the keyboard as a window of 192 KiB around the caret, and its edits are put back into the whole text: such a text gave the keyboard no copy, and its next key replaced the text by an old one
 
 ### Security
 
@@ -175,6 +178,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** Terminal: a change into or out of `TM_SECRET` drops (overwrites) the input typed so far: a hidden line showed in the next mode's input line, a visible one became part of the secret
 - **ui:** `TB_MULTI | TB_PASSWORD` is a one-line password box: the multi-line box ignored `TB_PASSWORD` and showed the password in plain text
 - **agent_core:** `describe` and `discover` show an `Access::Local` action's name, description and access only: unavailable (forbidden), without its schemas (they revealed what an external call of it does not)
+- **android:** Android: the keyboard gets the box's kind -- a password keyboard without personalised learning for TB_PASSWORD, a multi-line one whose Enter breaks the line for TB_MULTI, one line with Done (sent to the app as Enter, EV_COMMIT) otherwise -- and restarts when the focus goes to another kind of box; it was always a plain text field (Gboard learned passwords, no line break, Done never reached the app)
+- **ui:** A text a screen reader sets for a password box is taken as the box's dots with the user's change (the kept dots stand for the hidden characters): a Backspace of TalkBack (browser, Android) set the password to the dots
 
 ## [0.2.1] - 2026-11-16
 

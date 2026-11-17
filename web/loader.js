@@ -227,11 +227,29 @@ canvas.onpointerleave=e=>{if(e.pointerType!=="touch")event(12);};
 canvas.oncontextmenu=e=>e.preventDefault();
 canvas.onwheel=e=>{e.preventDefault();const factor=e.deltaMode===1?30:e.deltaMode===2?canvas.clientHeight:1;const dy=Math.max(-32768,Math.min(32767,Math.round(-e.deltaY*factor))),dx=Math.max(-32768,Math.min(32767,Math.round(e.deltaX*factor)));event(4,0,...pos(e),(dy&65535)|((dx&65535)<<16),mods(e));};
 const keys={Backspace:8,Tab:9,Enter:13,Shift:16,Control:17,Alt:18,Pause:19,CapsLock:20,Escape:27,' ':32,PageUp:33,PageDown:34,End:35,Home:36,ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40,Insert:45,Delete:46,Meta:91};
+// the virtual key of a key that writes a character, as the native hosts give it (linux_xkb.rs):
+// a letter or a digit by itself (the layout's letter: Ctrl+Z), + , - . as VK_OEM_PLUS / COMMA /
+// MINUS / PERIOD, the keypad's keys as VK_NUMPAD*, any other by the key's place (e.code, US
+// names).  Never the character's own code: "$" (36) was Home, "." (46) Delete, "%" Left ...
+const numpad={Numpad0:96,Numpad1:97,Numpad2:98,Numpad3:99,Numpad4:100,Numpad5:101,Numpad6:102,Numpad7:103,Numpad8:104,Numpad9:105,
+  NumpadMultiply:106,NumpadAdd:107,NumpadSubtract:109,NumpadDecimal:110,NumpadDivide:111};
+const placed={Backquote:192,Minus:189,Equal:187,BracketLeft:219,BracketRight:221,Backslash:220,Semicolon:186,Quote:222,Comma:188,
+  Period:190,Slash:191,IntlBackslash:226};
+function charKey(e) {
+  if(numpad[e.code]) return numpad[e.code];
+  const c=e.key.toUpperCase();
+  if(/^[A-Z0-9]$/.test(c)) return c.charCodeAt(0);
+  const oem={"+":187,",":188,"-":189,".":190}[e.key];
+  if(oem) return oem;
+  const m=/^(?:Key([A-Z])|Digit([0-9]))$/.exec(e.code||"");
+  if(m) return m[1] ? m[1].charCodeAt(0) : 48+Number(m[2]);
+  return placed[e.code] || 0;
+}
 function key(e,down) {
   if(e.isComposing || composing) return;
   // Ordinary paste belongs to the DOM clipboard event; Alt-modified app shortcuts do not.
   if((e.ctrlKey||e.metaKey) && !e.altKey && e.key.toLowerCase()==="v") {pasteModifiers=down?2|(e.shiftKey?1:0):2;return;}
-  const k=keys[e.key] || (/^F\d+$/.test(e.key)?111+Number(e.key.slice(1)):e.key.length===1?e.key.toUpperCase().charCodeAt(0):0);
+  const k=keys[e.key] || (/^F\d+$/.test(e.key)?111+Number(e.key.slice(1)):e.key.length===1?charKey(e):0);
   if(k) event(down?5:6,0,0,0,k | (e.repeat?0x80000000:0),mods(e));
   // Printable characters, Enter and paste use beforeinput, avoiding duplicated text.
   const clipboardKey=["v","c","x"].includes(e.key.toLowerCase()) && !e.altKey && (!e.shiftKey || e.key.toLowerCase()==="v");

@@ -89,6 +89,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Permission dialog: the target, plugin, reason and rule are wrapped and whole, control characters and the characters that change the writing direction show as `<U+XXXX>` (a long target lost its end at the dialog's edge, U+202E could turn a file name around, NUL ended the text).
 - Terminal: a change into or out of `TM_SECRET` drops (overwrites) the input typed so far: a hidden line showed in the next mode's input line, a visible one became part of the secret.
 - `TB_MULTI | TB_PASSWORD` is a one-line password box: the multi-line box ignored `TB_PASSWORD` and showed the password in plain text.
+- A text a screen reader sets for a password box is taken as the box's dots with the user's change (the kept dots stand for the hidden characters): a Backspace of TalkBack (browser, Android) set the password to the dots.
 
 ## [0.2.1] - 2026-11-16
 
