@@ -47,6 +47,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **rt:** `os::SYS_IO_URING_SETUP` / `_ENTER` / `_REGISTER`, `SYS_OPEN_TREE`, `SYS_MOVE_MOUNT`, `SYS_FSOPEN`, `SYS_FSCONFIG`, `SYS_FSMOUNT`, `SYS_FSPICK`, `SYS_CLONE3`, `SYS_PIDFD_GETFD`, `SYS_MOUNT_SETATTR` (x86-64 and ARM64)
 - **netio:** `ssh::Client::set_time_limit(ms)`: each following `auth_password`, `auth_key` and `exec` ends with `TimedOut` after that time in all
 - **ui:** `Ui::list_end_full(&mut sel) -> ListEnd { ev, sel, drop }`: the end of a list with a dropped row (LF_REORDER) as `drop = Some((from, to))`, for any number of rows
+- **render2d:** `RendererDesc::separate_scratch`: a render pass of its own for each run of layers whose fragment shader needs scratch memory when the last such run took another pipeline (None: on for Intel under Vulkan, Some forces it either way) (G6e3)
+- **Tests:** render2dtest --test repeat (tests/repeat.uis): the highlight test's drawing, a layer with an arc and one with fills, drawn twelve times with the same bytes each time, by the renderer as the adapter decides and with a pass of its own for each such run, and both alike (G6e3)
 
 ### Changed
 
@@ -137,6 +139,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **simd:** WebAssembly SIMD128: float arithmetic and square roots follow SSE's NaN rule (the first NaN operand quieted, else the negative indefinite) like the NEON and scalar code; WebAssembly's own NaN made results differ on ARM machines
 - Tests: androidGallery's page "2D-Zeichnung": two fingers zoom and pan together however late the second one comes down (ui.touch_two holds a second finger back once the first one's drag is older than 200 ms, meant for strokes; the page takes the pair from ui.touch_fingers), found in the user's hand check on a Galaxy A56 (G6e3)
 - **ui:** `list_end` packs a drop into `from | to << 16` only while both fit in 16 bits: a move from or to a row past 65 535 is no longer reported (no EV_DRAG, the row stays selected) -- the packed value gave another item and another place (`list_end_full` reports them)
+- **render2d:** On Intel's Gen9 under Mesa (HD 610: Mesa 26.0.3 and 26.2.6) a layer drawn with fs_full (arcs, dash patterns) and one drawn with fs_fill (fills) in one frame had blocks of 2 x 2 pixels wrong at random (highlighted strokes, the dash pieces of DXF linetypes): both fragment shaders spill registers, and the driver gave the two draws the same scratch memory with their own per-thread sizes (1 and 2 KB) while their threads ran side by side. On Intel under Vulkan such a run of layers (fs_full, fs_fill, fs_text_all, the overlay) now gets a render pass of its own after a barrier when the last such run took another pipeline (RendererDesc::separate_scratch); no pixel changes, elsewhere the command stream is as before (G6e3)
 
 ### Security
 
