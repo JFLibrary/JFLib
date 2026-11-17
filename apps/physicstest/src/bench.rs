@@ -6,6 +6,7 @@ use crate::{Rng, out};
 use alloc::format;
 use alloc::vec::Vec;
 use physics::{Filter, Iso, Shape, Vec3, World, query};
+use rt::fx as rtfx;
 
 fn median(v: &mut [f64]) -> f64 {
     v.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -13,6 +14,29 @@ fn median(v: &mut [f64]) -> f64 {
 }
 
 pub fn run(runs: usize) {
+    // the square root: what lib/physics uses here, its portable one, rt's (the processor's on x86-64 and
+    // ARM64, a bit-by-bit integer root in the browser)
+    let xs: Vec<f64> = {
+        let mut r = Rng::new(5);
+        (0..1_000_000).map(|_| r.range(0.0, 1e6)).collect()
+    };
+    let mut ns = [0.0f64; 3];
+    for (k, f) in [physics::math::sqrt as fn(f64) -> f64, physics::math::sqrt_portable, rtfx::sqrtd].iter().enumerate() {
+        let mut v = Vec::new();
+        for _ in 0..runs {
+            let t0 = plat::time_us();
+            let mut acc = 0.0f64;
+            for x in &xs {
+                acc += f(*x);
+            }
+            v.push((plat::time_us() - t0) as f64 * 1000.0 / xs.len() as f64);
+            if acc == 0.0 {
+                out("");
+            }
+        }
+        ns[k] = median(&mut v);
+    }
+    out(&format!("sqrt: {:.1} ns (math::sqrt), {:.1} ns (sqrt_portable), {:.1} ns (rt fx sqrtd)\n", ns[0], ns[1], ns[2]));
     let data = scene::map(155, 160);
     out(&format!("bench: map of {} triangles, {} vertices, {} runs\n", data.triangles(), data.pos.len(), runs));
     let mut build_ms = Vec::new();
@@ -139,16 +163,36 @@ pub fn run(runs: usize) {
         per_s.push(n_rays as f64 / s);
     }
     out(&format!("world rays: {:.0} per second (median; {} hit)\n", median(&mut per_s), hits));
-    let mut leaves = 0u64;
-    let t0 = plat::time_us();
-    for (o, d) in &rays {
-        w.trees()[1].ray(*o, *d * 40.0, Vec3::ZERO, 1.0, |_, t| {
-            leaves += 1;
-            t
-        });
+    // for comparison: the map and the 500 bodies in one tree, as a first version of World had them
+    let bodies: Vec<(Shape, Iso)> = w.bodies().map(|(_, b)| (b.shape.clone(), b.iso)).collect();
+    let mut one = physics::DynamicTree::new();
+    for (k, (s, iso)) in bodies.iter().enumerate() {
+        one.insert(s.aabb(iso), k as u32);
     }
-    let us = (plat::time_us() - t0) as f64 / n_rays as f64;
-    out(&format!("world tree of the 500 still bodies: height {}, {:.2} leaves per ray without pruning, {:.3} us per ray for the tree alone\n", w.trees()[1].height(), leaves as f64 / n_rays as f64, us));
+    let mut per_s = Vec::new();
+    for _ in 0..runs {
+        hits = 0;
+        let t0 = plat::time_us();
+        for (o, d) in &rays {
+            let mut best: Option<f64> = None;
+            one.ray(*o, *d * 40.0, Vec3::ZERO, 1.0, |item, t| {
+                let (s, iso) = &bodies[item as usize];
+                match query::ray(s, iso, *o, *d * 40.0, t) {
+                    Some(h) => {
+                        best = Some(h.t);
+                        h.t
+                    }
+                    None => t,
+                }
+            });
+            if best.is_some() {
+                hits += 1;
+            }
+        }
+        let s = (plat::time_us() - t0) as f64 / 1e6;
+        per_s.push(n_rays as f64 / s);
+    }
+    out(&format!("rays through one tree for the map and the bodies: {:.0} per second (median; {} hit; height {})\n", median(&mut per_s), hits, one.height()));
 }
 
 trait RoundDet {
