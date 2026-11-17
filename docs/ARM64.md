@@ -813,6 +813,51 @@ grün: andere Fenster auf dem Desktop).
 **Fertig, wenn:** die Skripte in der VM und auf `windows-11-arm` grün sind, soweit dort Fenster möglich
 sind, und ein echtes Gerät von Hand geprüft ist.
 
+**Umgesetzt** (2026-11-17). Für ARM64 musste die Bibliothek nichts lernen: Alle Skripte von `gallery` und `jfWord` laufen in der VM
+unter Wayland und X11. Rot waren nur drei Tests, die auf x86-64 nie auffielen, und eine fehlende Meldung:
+
+- **`lib/ui`, Meldung:** Bleibt die Ausgabe einer Sitzung für immer auf dem CPU-Weg (kein Vulkan-Loader, kein brauchbarer Adapter,
+  ein Display ohne dma-bufs …), war das bisher ganz still. Jetzt steht der Grund in einer Zeile des Logs auf Stufe Info, etwa
+  `gpu: output: none in this run (the display takes no dma-bufs): the windows go through the CPU path`. Damit landet er im Ring für
+  Absturzberichte (`plat::log_recent`) und in der Log-Datei, auf stderr nur mit `jfgui_LOG=info`. Der Bildschirm bleibt still wie bisher.
+  Unter Linux heißt der Grund in `GpuOutput::error` jetzt so statt „no child window“.
+- **`gputest --test glibc`** prüfte den Absturzbericht mit den Abständen von x86-64 (`crash_test + 5`). Auf ARM64 sind `mov` und `bl`
+  4 Bytes lang, wie `plattest` es schon rechnet.
+- **`uigputest --test viewcpu`** scheiterte ohne brauchbare GPU, statt wie die anderen Tests ein SKIP zu geben.
+- **`uigputest --test canvasoff`** prüfte das erste Bild der Leinwand nach 50 ms und zwei Durchläufen. Unter Xvfb (ohne Bildtakt) in der
+  langsamen VM kam das CPU-Bild später: 0 von 3 grün, mit Warten (höchstens 3 s) 3 von 3.
+- **Werkzeuge:** `tools/winarm_check.py --scripts APP[/SKRIPT.uis],…` (beliebige Skripte) und `--only gpu` (`gputest --info`, dazu der
+  Start der UI-Ausgabe mit `jfgui_GPU_TRACE=1`). `.github/workflows/arm64-windows.yml` lässt auf `windows-11-arm` alle Skripte von
+  `gallery`, `jfWord`, `gputest` und `uigputest` laufen, in drei Runden: ohne Vulkan, mit dem Loader allein, mit lavapipe.
+
+**In der VM** (wie ARM3: `qemu-system-aarch64` 8.2 mit TCG in WSL, 8 Kerne, 6 GB, Ubuntu 24.04 arm64, Weston 13 headless, Xvfb 21.1,
+XWayland 23.2; `libvulkan1` 1.3.275 ohne Treiber, also der Fall „kein Treiber“; Programme mit rustc 1.100 gebaut, die drei Fixes oben
+schon drin, außer in der ersten Runde):
+
+| Runde | `gallery` | `jfWord` | `plattest` | `gputest` | `uigputest` |
+|---|---|---|---|---|---|
+| 64 KB, Wayland (vor den Fixes) | 44 von 44 | 53 von 53 | 45 von 46 | 19 von 21 | 30 von 31 |
+| 64 KB, X11 (Xvfb) | 44 von 44 | 53 von 53 | 44 von 46 | 21 von 21 | 30 von 31 (`canvasoff`, danach 3 von 3) |
+| 64 KB, XWayland | 4 von 4 (die GPU-Skripte, `popup_edges`) | – | 43 von 46 | – | 31 von 31 |
+| 4 KB, Wayland | 44 von 44 | – | 44 von 46 | 21 von 21 | 31 von 31 |
+
+Was dort rot blieb, liegt an der VM, nicht an ARM64:
+
+- **`plattest/atomics.uis`** in jeder Runde: Store Buffering mit SeqCst, die bekannte Lücke von QEMU (siehe „Fallen“, ARM7). Auf echter
+  Hardware ist es grün.
+- **`plattest/screen.uis`**: unter Xvfb fehlt RandR die Bildwiederholrate, dem randlosen XWayland das Root-Bild und XTEST (wie ARM3). Unter
+  Weston grün.
+- **`plattest/audio.uis`** zweimal (XWayland, 4 KB): Der Ringpuffer-Test hat 20 s für 2 Millionen Samples in Stücken zu 3, der Vorbis-Test
+  eine Zeitgrenze. Die rote Runde dauerte 58 bis 84 s statt 17 bis 32 s; allein danach 3 von 4 grün. Auf echter Hardware lief derselbe Ring
+  bei ARM7 Milliarden Samples ohne Fehler.
+- Die Fehler von `gputest` und `uigputest` in der ersten Runde sind die Testfehler oben.
+
+**GPU in der VM.** Die Ausgabe der UI braucht unter Linux ein Display, das dma-bufs nimmt (`plat::win_gpu_child`). Weston headless (mit
+pixman) und Xvfb nehmen keine, die Ausgabe bleibt also vor jedem Gerät auf dem CPU-Weg, mit oder ohne Treiber. `uigputest` gibt dort für
+jeden Test der Ausgabe ein SKIP (23 bis 24 von 31), die Tests ohne Ausgabe laufen (`off`, `noloader`, `nodmabuf`, `refused`, `canvasoff`,
+`viewoff`, `shaders`). Ohne Treiber sagt `gputest --info` „SKIP: no usable GPU“ mit Exit-Code 0, der Rest von `gputest` ebenso; `noloader`
+(Loader fehlt, Datei kein Loader) und `glibc` laufen.
+
 ### ARM9: Pakete, Updates, CI, Dokumentation (M)
 
 - `.deb` `arm64`, RPM und AppImage `aarch64`, MSIX `arm64`, Flatpak `--arch=aarch64`, Setup pro
