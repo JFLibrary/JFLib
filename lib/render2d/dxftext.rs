@@ -20,6 +20,9 @@ use crate::scene::{HatchLine, Shape, Style, StyleId, BY_BLOCK_COLOR, HATCH_DASH_
 use crate::text::{layout_text, Attach, HAlign, Layout, MText, Text, TextStyle, TextStyleId, VAlign, LINE_SPACING};
 use crate::dxf::Family;
 
+/// the line families of a hatch drawn at most (16 fills of its boundary)
+const HATCH_FAMILIES: usize = 16 * HATCH_MAX;
+
 /// a text style of the file as drawn: the substitute's family, its width correction, the style's width, slant (radians),
 /// generation flags and fixed height
 #[derive(Clone, Copy)]
@@ -819,6 +822,12 @@ pub(crate) fn hatch(m: &mut Map, tgt: Tgt, p: &Props, o: &Ocs, h: &d::Hatch) -> 
         let st = m.fill_style(p)?;
         m.approx = true;
         return Some(m.put_fill(tgt, st, &rings));
+    }
+    if fams.len() > HATCH_FAMILIES {
+        // (every HATCH_MAX more is the whole boundary once more: a file's thousands of families would copy it as often)
+        m.approx = true;
+        m.note(alloc::format!("hatch patterns of more than {HATCH_FAMILIES} line families: the rest left out"));
+        fams.truncate(HATCH_FAMILIES);
     }
     if fams.len() > HATCH_MAX {
         m.approx = true;

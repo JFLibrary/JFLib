@@ -90,6 +90,11 @@ impl<'s> Pairs<'s> {
             }
             if i < self.end {
                 let b = self.buf[i];
+                let start = self.pos;
+                // (before a CR at the window's end asks for more: a window grown to its most and full gives no more)
+                if i - start > self.max_line {
+                    return Err(Error::Limit(format!("line {}: longer than {} bytes", self.lines + 1, self.max_line)));
+                }
                 if b == b'\r' && i + 1 == self.end && !self.eof {
                     // a CR at the window's end: LF may follow
                     let shift = self.pos;
@@ -97,11 +102,7 @@ impl<'s> Pairs<'s> {
                     from = i - shift;
                     continue;
                 }
-                let start = self.pos;
                 let next = if b == b'\r' && i + 1 < self.end && self.buf[i + 1] == b'\n' { i + 2 } else { i + 1 };
-                if i - start > self.max_line {
-                    return Err(Error::Limit(format!("line {}: longer than {} bytes", self.lines + 1, self.max_line)));
-                }
                 self.bytes += (next - start) as u64;
                 self.lines += 1;
                 self.pos = next;

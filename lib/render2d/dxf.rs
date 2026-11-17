@@ -1681,10 +1681,11 @@ fn deboor_points(deg: usize, ctrl: &[P], weights: &[f64], knots: &[f64], count: 
     let w = |k: usize| if weights.len() == n { weights[k] } else { 1.0 };
     let mut out = Vec::with_capacity(count + 1);
     let mut d: Vec<[f64; 3]> = vec![[0.0; 3]; deg + 1];
+    // the span: the last k with knots[k] <= t < knots[k + 1], within deg..n-1; t only grows, so k goes on from the last
+    // one (from deg each time it was about count * n / 2 steps: 3e10 for 65536 samples of 10^6 control points)
+    let mut k = deg;
     for s in 0..=count {
         let t = lo + (hi - lo) * s as f64 / count as f64;
-        // the span: the last k with knots[k] <= t < knots[k + 1], within deg..n-1
-        let mut k = deg;
         while k + 1 < n && knots[k + 1] <= t {
             k += 1;
         }

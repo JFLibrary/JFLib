@@ -1054,6 +1054,13 @@ fn crafted(t: &mut T) {
     long.push_str(&"x".repeat(2 << 20));
     let mut lim = dxf::Limits::DEFAULT;
     t.ok(matches!(dxf::load(long.as_bytes(), &lim), Err(dxf::Error::Limit(_))), "a line of 2 MiB: Error::Limit");
+    // a CR as the last byte of the window grown to its most (line_bytes + 1 MiB): Error::Limit, not a wait for its LF
+    let mut edge = String::from("  0\nSECTION\n  2\nENTITIES\n  0\nTEXT\n  1\n");
+    edge.push_str(&"x".repeat((2 << 20) - 1));
+    edge.push_str("\r\n  0\nENDSEC\n  0\nEOF\n");
+    let t0 = plat::time_us();
+    let r = dxf::load(edge.as_bytes(), &lim);
+    t.ok(matches!(r, Err(dxf::Error::Limit(_))), &format!("a line of 2 MiB whose CR ends the full window: Error::Limit ({} ms)", (plat::time_us() - t0) / 1000));
     lim.entity_points = 5;
     t.ok(matches!(dxf::load(text.as_bytes(), &lim), Err(dxf::Error::Limit(_))), "an entity of more points than Limits::entity_points: Error::Limit");
     let mut lim = dxf::Limits::DEFAULT;
@@ -1064,6 +1071,34 @@ fn crafted(t: &mut T) {
     let mut s = Scene::new_cpu();
     let r = render2d::dxf::load(&mut s, lies.as_bytes(), &options(BG, false));
     t.ok(r.is_ok(), &format!("counts that lie (2^31 vertices, a million paths, 2e9 knots, degree 999): read without allocating by them ({:?})", r.as_ref().map(|l| l.entities).ok()));
+    // a hatch of 1000 line families: at most 64 of them, in 16 fills of its boundary (not 250 copies of it)
+    let mut many = String::from("0 SECTION\n2 ENTITIES\n0 HATCH\n8 0\n2 MANY\n70 0\n71 0\n91 1\n92 2\n72 0\n73 1\n93 4\n10 0\n20 0\n10 10\n20 0\n10 10\n20 10\n10 0\n20 10\n97 0\n75 0\n76 1\n52 0\n41 1\n77 0\n78 1000\n");
+    for i in 0..1000 {
+        many.push_str(&format!("53 0\n43 0\n44 0\n45 0\n46 {}\n79 0\n", 1.0 + i as f64 * 0.01));
+    }
+    many.push_str("98 0\n0 ENDSEC\n0 EOF\n");
+    let mut s = Scene::new_cpu();
+    let r = render2d::dxf::load(&mut s, dxf_text(&many, "\n").as_bytes(), &options(BG, false));
+    let h = r.as_ref().map(|l| (l.entities, l.kinds.get("HATCH").copied().unwrap_or_default())).ok();
+    t.ok(h.is_some_and(|(n, c)| n == 16 && c.drawn == 1 && c.approximated == 1),
+         &format!("a hatch of 1000 line families: 64 of them in 16 fills ({:?} render2d entities)", h.map(|x| x.0)));
+    // a spline of degree 5 and 20 000 control points: evaluated in one pass over its knots (from the first knot for each
+    // of its 65 536 points it took about 6.5e8 steps)
+    let n = 20_000usize;
+    let mut sp = format!("0 SECTION\n2 ENTITIES\n0 SPLINE\n8 0\n70 8\n71 5\n72 {}\n73 {n}\n", n + 6);
+    for k in 0..n + 6 {
+        sp.push_str(&format!("40 {}\n", k.saturating_sub(5).min(n - 5)));
+    }
+    for k in 0..n {
+        sp.push_str(&format!("10 {k}\n20 {}\n30 0\n", (k % 7) as f64));
+    }
+    sp.push_str("0 ENDSEC\n0 EOF\n");
+    let mut s = Scene::new_cpu();
+    let t0 = plat::time_us();
+    let r = render2d::dxf::load(&mut s, dxf_text(&sp, "\n").as_bytes(), &options(BG, false));
+    let ms = (plat::time_us() - t0) / 1000;
+    let c = r.as_ref().map(|l| l.kinds.get("SPLINE").copied().unwrap_or_default()).ok();
+    t.ok(c.is_some_and(|c| c.drawn == 1 && c.approximated == 1), &format!("a spline of degree 5 and {n} control points: evaluated into a polyline ({ms} ms)"));
     // random damage: bytes changed, cut, repeated; never a panic or a hang, and in bounded time
     let base = text.as_bytes();
     let mut seed = 0x9E37_79B9_7F4A_7C15u64;
