@@ -1067,8 +1067,10 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
     let opt = wgsl::CompileOptions { robust: false, ..wgsl::CompileOptions::new(shader::BASIS) };
     let mut outv = Vec::new();
     for (src, list) in [(render3d::CULL_WGSL, &[("CULL", "main"), ("CULL_EARLY", "early"), ("CULL_LATE", "late")][..]), (render3d::SCATTER_WGSL, &[("SCATTER", "main")][..]),
-                        (render3d::DRAW_WGSL, &[("VS", "vs"), ("FS", "fs"), ("FS_MASK", "fs_mask"), ("VS_DEPTH", "vs_depth"), ("VS_SHADOW", "vs_shadow"), ("FS_SHADOW", "fs_shadow")][..]),
-                        (render3d::HIZ_WGSL, &[("HIZ_DEPTH", "from_depth"), ("HIZ_DOWN", "down")][..])] {
+                        (render3d::DRAW_WGSL, &[("VS", "vs"), ("FS", "fs"), ("FS_MASK", "fs_mask"), ("VS_DEPTH", "vs_depth"), ("VS_SHADOW", "vs_shadow"), ("FS_SHADOW", "fs_shadow"),
+                                                ("VS_BLEND", "vs_blend"), ("FS_BLEND", "fs_blend")][..]),
+                        (render3d::HIZ_WGSL, &[("HIZ_DEPTH", "from_depth"), ("HIZ_DOWN", "down")][..]),
+                        (render3d::SORT_WGSL, &[("SORT_LOCAL", "sort_local"), ("SORT_GLOBAL", "sort_global")][..])] {
         match wgsl::compile(src, &opt) {
             Ok(o) => {
                 for (name, entry) in list {
@@ -1086,7 +1088,7 @@ fn compile_shaders() -> Option<Vec<(&'static str, Vec<u32>)>> {
 
 fn gen_shaders(path: &str) -> i32 {
     let Some(v) = compile_shaders() else { return 1 };
-    let mut s = String::from("// written by render3dtest --gen-shaders from cull.wgsl, scatter.wgsl, draw.wgsl, hiz.wgsl (shader::BASIS, no robustness); do not edit\n");
+    let mut s = String::from("// written by render3dtest --gen-shaders from cull.wgsl, scatter.wgsl, draw.wgsl, hiz.wgsl, sort.wgsl (shader::BASIS, no robustness); do not edit\n");
     for (name, w) in &v {
         s.push_str(&format!("pub const {name}: &[u32] = &[\n"));
         for row in w.chunks(10) {
@@ -1113,11 +1115,12 @@ fn shaders(t: &mut T) {
         t.ok(false, "the WGSL compiles");
         return;
     };
-    let table: [(&str, &[u32]); 12] = [("CULL", render3d::CULL_SPV), ("CULL_EARLY", render3d::CULL_EARLY_SPV), ("CULL_LATE", render3d::CULL_LATE_SPV),
+    let table: [(&str, &[u32]); 16] = [("CULL", render3d::CULL_SPV), ("CULL_EARLY", render3d::CULL_EARLY_SPV), ("CULL_LATE", render3d::CULL_LATE_SPV),
                                        ("SCATTER", render3d::SCATTER_SPV), ("VS", render3d::VS_SPV), ("FS", render3d::FS_SPV), ("FS_MASK", render3d::FS_MASK_SPV),
                                        ("VS_DEPTH", render3d::VS_DEPTH_SPV),
                                        ("VS_SHADOW", render3d::VS_SHADOW_SPV), ("FS_SHADOW", render3d::FS_SHADOW_SPV), ("HIZ_DEPTH", render3d::HIZ_DEPTH_SPV),
-                                       ("HIZ_DOWN", render3d::HIZ_DOWN_SPV)];
+                                       ("HIZ_DOWN", render3d::HIZ_DOWN_SPV), ("VS_BLEND", render3d::VS_BLEND_SPV), ("FS_BLEND", render3d::FS_BLEND_SPV),
+                                       ("SORT_LOCAL", render3d::SORT_LOCAL_SPV), ("SORT_GLOBAL", render3d::SORT_GLOBAL_SPV)];
     for (name, embedded) in table {
         let made = v.iter().find(|x| x.0 == name).map_or(&[][..], |x| &x.1[..]);
         t.ok(made == embedded, &format!("{name}: {} words embedded, as wgsl::compile makes them (if not: render3dtest --gen-shaders lib/render3d/shaders_spv.rs)", embedded.len()));

@@ -21,6 +21,10 @@
 //        scene.submitted(id);
 //   gltf::upload(&mut renderer, &document) -> Result<Imported>  a jflib-gltf Document: meshes, textures,
 //        materials, and its instances for a Scene (gltf.rs)
+//   (G7f) renderer.remove_mesh(id), remove_material(id), remove_texture(id)   their places are used again, the ids stay
+//        invalid (store.rs); refused while a scene's instances, a material or a detail level use them
+//   (G7f) renderer.add_material_desc(&MaterialDesc)             glTF's BLEND (blended after the rest, sorted back to front
+//        per instance on the GPU: sort.wgsl) and doubleSided (no culling of back faces, their normal turned round)
 //
 // Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
 // of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
@@ -38,7 +42,6 @@ extern crate alloc;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cell::Cell;
-use core::sync::atomic::{AtomicU32, Ordering};
 
 use gpu::*;
 
@@ -49,12 +52,15 @@ mod hiz;
 pub mod math;
 mod scene;
 mod shadow;
+mod store;
 mod texture;
+
+pub(crate) use store::{Counts, Ids, Kind, Pool, slot};
 
 pub use dfg::{DFG, DFG_N, dfg_table};
 pub use env::{Environment, EnvironmentData, SKY_SIZE, Sky, env_dir, env_face, from_half, to_half};
 pub use shadow::{CASCADES_MAX, Cascade, Shadows};
-pub use scene::{Camera, FrameStats, Instance, InstanceId, Light, LightKind, ListInfo, Scene, Sun, Tonemap, Transform, UploadInfo};
+pub use scene::{Camera, FrameStats, Instance, InstanceId, Light, LightKind, ListInfo, ListKind, Scene, Sun, Tonemap, Transform, UploadInfo};
 pub use texture::{CLASSES, CLASS_MAX, CLASS_MIN, Mip, Sampling, TextureData, TextureId, TextureInfo, TextureRef, Wrap, class_of, mip_chain};
 
 /// what a depth attachment of this engine clears to (reverse Z: 0 is infinitely far)
@@ -74,6 +80,13 @@ pub(crate) const LIGHTS_AT: u64 = 256;
 /// (G5c) where the cascades' views lie in it, and how far apart
 pub(crate) const CASCADE_AT: u64 = 736;
 pub(crate) const CASCADE_STRIDE: u64 = 256;
+/// (G7f) where the blended instances' draw lies in it (VkDrawIndirectCommand: vertices per instance, instances 0, 0, 0)
+pub(crate) const BLEND_AT: u64 = CASCADE_AT + CASCADE_STRIDE * CASCADES_MAX as u64;
+/// (G7f) the blended instances' list: that draw, then 16 bytes per instance (key, slot, draw record, flags)
+pub(crate) const BLEND_HEAD: u64 = 16;
+pub(crate) const BLEND_ITEM: u64 = 16;
+/// (G7f) a tile of sort.wgsl's local sort: the list holds a multiple of it, a power of two
+pub(crate) const SORT_TILE: u32 = 512;
 /// timestamps per frame: start, uploads, the camera's culling (phase 1), 4 cascades' culling, 4 depth passes, the
 /// main pass (phase 1), (G5d) the pyramid, phase 2's culling, phase 2's pass
 pub(crate) const STAMPS: u32 = 15;
@@ -98,6 +111,17 @@ pub const SCATTER_WGSL: &str = include_str!("scatter.wgsl");
 pub const DRAW_WGSL: &str = include_str!("draw.wgsl");
 /// (G5d) the depth pyramid of the occlusion test
 pub const HIZ_WGSL: &str = include_str!("hiz.wgsl");
+/// (G7f) the blended instances sorted back to front
+pub const SORT_WGSL: &str = include_str!("sort.wgsl");
+#[cfg(not(target_arch = "wasm32"))]
+pub const SORT_LOCAL_SPV: &[u32] = spv::SORT_LOCAL;
+#[cfg(not(target_arch = "wasm32"))]
+pub const SORT_GLOBAL_SPV: &[u32] = spv::SORT_GLOBAL;
+/// (G7f) the blended instances' vertex and fragment shaders
+#[cfg(not(target_arch = "wasm32"))]
+pub const VS_BLEND_SPV: &[u32] = spv::VS_BLEND;
+#[cfg(not(target_arch = "wasm32"))]
+pub const FS_BLEND_SPV: &[u32] = spv::FS_BLEND;
 #[cfg(not(target_arch = "wasm32"))]
 pub const CULL_SPV: &[u32] = spv::CULL;
 #[cfg(not(target_arch = "wasm32"))]
@@ -170,7 +194,9 @@ pub struct MeshData<'a> {
     pub indices: &'a [u32],
 }
 
-/// a mesh of a Renderer
+/// a mesh of a Renderer.  (G7f) The low 24 bits are its place in the renderer's tables, the high 8 bits how often that
+/// place was used before (Renderer::remove_mesh): the id of a removed mesh stays invalid.  A renderer that removes nothing
+/// numbers its meshes 0, 1, 2, ...
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MeshId(pub u32);
 
@@ -182,12 +208,12 @@ pub struct Lod {
     pub below: f32,
 }
 
-/// a material of a Renderer
+/// a material of a Renderer.  (G7f) As MeshId: a place and how often it was used before (Renderer::remove_material)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MaterialId(pub u32);
 
 /// how a material's alpha is drawn, and so the lists and pipelines its instances take (docs/RENDER3D.md "Listen je
-/// Alpha-Modus"; Material::alpha_class).  glTF's BLEND is drawn opaque.  A third class (blended, sorted) may come
+/// Alpha-Modus"; Material::alpha_class, MaterialDesc::alpha_class)
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AlphaClass {
@@ -195,27 +221,43 @@ pub enum AlphaClass {
     Opaque,
     /// glTF's MASK: fragments whose alpha is below the cutoff are dropped
     Mask,
+    /// (G7f) glTF's BLEND (MaterialDesc::blend): drawn after the others, sorted back to front per instance, blended
+    /// (premultiplied alpha), the depth tested and not written; no shadows, not in the occlusion test's pyramid
+    Blend,
 }
 
-/// how many alpha classes there are (the lists of a mesh and side, the main pass's pipelines per side)
-pub(crate) const ALPHA_CLASSES: usize = 2;
+/// how many alpha classes there are (the lists of a mesh and side)
+pub(crate) const ALPHA_CLASSES: usize = 3;
 
 impl AlphaClass {
-    /// in the order of their pipelines and draw records
-    pub(crate) const ALL: [AlphaClass; ALPHA_CLASSES] = [AlphaClass::Opaque, AlphaClass::Mask];
+    /// the classes whose lists are drawn list by list, in the order of their pipelines and draw records (Blend's
+    /// instances are drawn by one draw of their own, sorted)
+    pub(crate) const LISTED: [AlphaClass; 2] = [AlphaClass::Opaque, AlphaClass::Mask];
 
     pub(crate) const fn index(self) -> usize {
         match self {
             AlphaClass::Opaque => 0,
             AlphaClass::Mask => 1,
+            AlphaClass::Blend => 2,
         }
     }
 
-    /// of a material row (its alpha_cutoff word: negative for opaque)
+    /// of a material row (its flags word, then its alpha_cutoff word: negative for opaque)
     fn of_words(w: &[u32; MATERIAL_WORDS]) -> AlphaClass {
-        if f32::from_bits(w[11]) >= 0.0 { AlphaClass::Mask } else { AlphaClass::Opaque }
+        if w[FLAGS_WORD] & FLAG_BLEND != 0 {
+            AlphaClass::Blend
+        } else if f32::from_bits(w[11]) >= 0.0 {
+            AlphaClass::Mask
+        } else {
+            AlphaClass::Opaque
+        }
     }
 }
+
+/// (G7f) a material row's word of flags (draw.wgsl Material::flags): blended, double-sided
+const FLAGS_WORD: usize = 17;
+const FLAG_BLEND: u32 = 1;
+const FLAG_DOUBLE: u32 = 2;
 
 /// where a mesh lies in the pools, and its bounding sphere in its own coordinates
 #[derive(Clone, Copy, Debug)]
@@ -274,69 +316,91 @@ impl Material {
         m
     }
 
-    /// the lists and pipelines its instances take: Mask with an alpha_cutoff, else Opaque
+    /// the lists and pipelines its instances take: Mask with an alpha_cutoff, else Opaque (blended: MaterialDesc)
     pub const fn alpha_class(&self) -> AlphaClass {
         if self.alpha_cutoff.is_some() { AlphaClass::Mask } else { AlphaClass::Opaque }
+    }
+}
+
+/// (G7f) a material with what a Material cannot hold (it is not #[non_exhaustive], a field more would break code that
+/// writes all of them): glTF's alpha mode BLEND and doubleSided.  Made with `new` (or `from` a Material) and changed field
+/// by field (it may grow); Renderer::add_material_desc, set_material_desc.  Renderer::add_material(m) is
+/// add_material_desc(&MaterialDesc::new(m))
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct MaterialDesc {
+    pub material: Material,
+    /// glTF's BLEND: the instances are drawn after the opaque and MASK ones, sorted back to front per instance (by the
+    /// distance of their bounding sphere's centre from the eye), over what is there: the shader multiplies its colour by
+    /// the base colour's alpha (times the texture's), blended as premultiplied alpha (One, OneMinusSrcAlpha), in the
+    /// target's code values; the depth is tested, not written.  They cast no shadows and hide nothing from the occlusion
+    /// test.  Not together with an alpha_cutoff (Invalid)
+    pub blend: bool,
+    /// glTF's doubleSided: back faces are not culled; they are lit with their normal turned round (the whole shading
+    /// normal, as the glTF sample viewer turns the tangent frame).  Both sides cast shadows (every material does)
+    pub double_sided: bool,
+}
+
+impl MaterialDesc {
+    pub const fn new(material: Material) -> MaterialDesc {
+        MaterialDesc { material, blend: false, double_sided: false }
+    }
+
+    /// the lists and pipelines its instances take: Blend when blended, else the Material's
+    pub const fn alpha_class(&self) -> AlphaClass {
+        if self.blend { AlphaClass::Blend } else { self.material.alpha_class() }
     }
 
     /// the 80 bytes of draw.wgsl's Material
     fn words(&self, t: &texture::Textures) -> Result<[u32; MATERIAL_WORDS]> {
+        let m = &self.material;
         let b = |v: f32| v.to_bits();
-        let (c, e) = (self.base_color, self.emissive);
-        let cutoff = match self.alpha_cutoff {
+        let (c, e) = (m.base_color, m.emissive);
+        let cutoff = match m.alpha_cutoff {
+            Some(_) if self.blend => return Err(GpuError::Invalid("MaterialDesc: a blended material has no alpha_cutoff (glTF: alphaCutoff is MASK's)")),
             Some(v) if v.is_finite() && v >= 0.0 => v,
             Some(_) => return Err(GpuError::Invalid("Material: alpha_cutoff must be finite and not negative")),
             None => -1.0,
         };
-        Ok([b(c[0]), b(c[1]), b(c[2]), b(c[3]), b(e[0]), b(e[1]), b(e[2]), b(self.metallic), b(self.roughness), b(self.normal_scale),
-            b(self.occlusion_strength), b(cutoff), t.word(&self.base_color_texture)?, t.word(&self.metallic_roughness_texture)?,
-            t.word(&self.normal_texture)?, t.word(&self.occlusion_texture)?, t.word(&self.emissive_texture)?, 0, 0, 0])
+        let flags = if self.blend { FLAG_BLEND } else { 0 } | if self.double_sided { FLAG_DOUBLE } else { 0 };
+        Ok([b(c[0]), b(c[1]), b(c[2]), b(c[3]), b(e[0]), b(e[1]), b(e[2]), b(m.metallic), b(m.roughness), b(m.normal_scale),
+            b(m.occlusion_strength), b(cutoff), t.word(&m.base_color_texture)?, t.word(&m.metallic_roughness_texture)?,
+            t.word(&m.normal_texture)?, t.word(&m.occlusion_texture)?, t.word(&m.emissive_texture)?, flags, 0, 0])
+    }
+
+    /// the textures it names (u32::MAX: none), for their counts of users
+    fn textures(&self) -> [u32; 5] {
+        let m = &self.material;
+        let id = |t: &Option<TextureRef>| t.map_or(u32::MAX, |t| t.texture.0);
+        [id(&m.base_color_texture), id(&m.metallic_roughness_texture), id(&m.normal_texture), id(&m.occlusion_texture), id(&m.emissive_texture)]
     }
 }
 
-/// how many meshes and materials a Renderer has: its scenes judge ids by them at once, and know by this
-/// object whose they are
-pub(crate) struct Counts {
-    pub(crate) meshes: AtomicU32,
-    pub(crate) materials: AtomicU32,
+impl From<Material> for MaterialDesc {
+    fn from(m: Material) -> MaterialDesc {
+        MaterialDesc::new(m)
+    }
 }
 
-/// one growing buffer of a pool: a new one takes over, the GPU copies the old contents across
-pub(crate) struct Pool {
-    pub(crate) buf: Buffer,
-    usage: BufferUsage,
-    /// bytes per element
-    size: u64,
-    used: u32,
-    cap: u32,
+/// (G7f) what decides a material's lists: its alpha class and whether it is double-sided
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Kindof {
+    pub(crate) class: AlphaClass,
+    pub(crate) double: bool,
 }
 
-impl Pool {
-    fn new(dev: &Device, usage: BufferUsage, size: u64, cap: u32) -> Result<Pool> {
-        let buf = dev.create_buffer(&BufferDesc { size: size * cap as u64, usage, memory: MemoryKind::Device })?;
-        Ok(Pool { buf, usage, size, used: 0, cap })
+impl Kindof {
+    fn of_words(w: &[u32; MATERIAL_WORDS]) -> Kindof {
+        Kindof { class: AlphaClass::of_words(w), double: w[FLAGS_WORD] & FLAG_DOUBLE != 0 }
     }
+}
 
-    /// room for n more elements.  Uploads still on their way run first (they lead the next submission),
-    /// so the copy has them; the old buffer goes when the GPU is done with it.
-    fn reserve(&mut self, dev: &Device, n: u32) -> Result<()> {
-        let need = self.used.checked_add(n).ok_or(GpuError::Invalid("the mesh pool is full"))?;
-        if need <= self.cap {
-            return Ok(());
-        }
-        let cap = need.max(self.cap.saturating_mul(2));
-        let buf = dev.create_buffer(&BufferDesc { size: self.size * cap as u64, usage: self.usage, memory: MemoryKind::Device })?;
-        if self.used > 0 {
-            let mut e = dev.encoder()?;
-            e.barrier(Access::COPY_WRITE, Access::COPY_READ);
-            e.copy_buffer(&self.buf, 0, &buf, 0, self.size * self.used as u64);
-            e.barrier(Access::COPY_WRITE, Access::COPY_READ | Access::COPY_WRITE | Access::INDEX_VERTEX | Access::GRAPHICS_READ);
-            dev.queue().submit([e.finish()?])?;
-        }
-        self.buf = buf;
-        self.cap = cap;
-        Ok(())
-    }
+/// (G7f) a pool of the meshes: the vertices, 16-bit or 32-bit indices
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PoolOf {
+    Vertices,
+    Indices16,
+    Indices32,
 }
 
 /// the pipelines of one colour format, the mesh pools and the material table of one device
@@ -355,9 +419,21 @@ pub struct Renderer {
     hiz: core::cell::OnceCell<alloc::boxed::Box<hiz::Node>>,
     hiz_clock: Cell<u64>,
     scatter: ComputePipeline,
-    /// per alpha class (fs without a discard, fs_mask with one): front faces counter-clockwise, and clockwise for the
-    /// lists of mirrored instances
-    draw: [[RenderPipeline; 2]; ALPHA_CLASSES],
+    /// per listed alpha class (fs without a discard, fs_mask with one): front faces counter-clockwise, and clockwise for
+    /// the lists of mirrored instances
+    draw: [[RenderPipeline; 2]; 2],
+    /// (G7f) the same for double-sided materials (no culling, DOUBLE_SIDED), made with the first such material
+    draw_double: Option<[[RenderPipeline; 2]; 2]>,
+    /// (G7f) the blended instances: their draw (vs_blend, fs_blend; made with the first blended material), its layout
+    /// and group 0's, the sort (sort.wgsl) and its group's layout
+    blend: Option<RenderPipeline>,
+    blend_pl: PipelineLayout,
+    pub(crate) blend_layout: BindGroupLayout,
+    sort_local: ComputePipeline,
+    sort_global: ComputePipeline,
+    pub(crate) sort_layout: BindGroupLayout,
+    /// the shader modules, for the pipelines made later
+    md: Modules,
     /// (G5c) the shadow passes: depth only (opaque casters; MASK casters without set_shadow_mask, full shadows), or with
     /// fs_shadow (MASK casters, their holes)
     shadow_depth: RenderPipeline,
@@ -370,19 +446,39 @@ pub struct Renderer {
     pub(crate) cull_layout: BindGroupLayout,
     pub(crate) scatter_layout: BindGroupLayout,
     pub(crate) draw_layout: BindGroupLayout,
+    /// the main pass's pipeline layout (G7f: for the double-sided pipelines made later)
+    draw_pl: PipelineLayout,
     pub(crate) vertices: Pool,
     /// 16-bit indices as long as a mesh's vertices allow it (they are relative to its base vertex): on the
-    /// RTX 2070 SUPER a draw of 32-bit indices takes a third to a half longer (docs/RENDER3D.md)
-    indices16: Pool,
-    indices32: Pool,
+    /// RTX 2070 SUPER a draw of 32-bit indices takes a third to a half longer (docs/RENDER3D.md).  (G7f) Storage too: the
+    /// blended instances' vertex shader reads them
+    pub(crate) indices16: Pool,
+    pub(crate) indices32: Pool,
+    /// per slot of a mesh (store.rs; a removed mesh's entries stay until the slot is used again)
     pub(crate) meshes: Vec<MeshInfo>,
+    /// (G7f) the meshes' ids; per slot the indices it holds in its pool (16-bit ones padded to an even count)
+    pub(crate) mesh_ids: Ids,
+    index_room: Vec<u32>,
+    /// (G7f) per slot: how many live meshes take it as a detail level
+    lod_users: Vec<u32>,
+    /// (G7f) the ranges of removed meshes (pool, first, count): frames in flight may still read them, so they come free
+    /// once a submission after the removal is done (Queue::write_buffer puts no barrier before its copies)
+    retired: Vec<(PoolOf, u32, u32)>,
+    fenced: Vec<(SubmitId, Vec<(PoolOf, u32, u32)>)>,
+    /// (G7f) counts removals of meshes, materials and textures (a scene prepared before one may not record), and
+    /// removals and new meshes in old slots (scenes write their lists' draw records again)
+    pub(crate) removals: u32,
+    pub(crate) mesh_gen: u32,
     /// (G5d) per mesh: its detail levels, the sphere culling takes (its own, grown to hold its levels), and a count of
     /// set_lods (scenes send their instances again)
     pub(crate) lods: Vec<Vec<Lod>>,
     pub(crate) bounds: Vec<([f64; 3], f64)>,
     pub(crate) lod_gen: u32,
+    /// per slot of a material: its row, (G7f) its id, the textures it names
     materials: Vec<[u32; MATERIAL_WORDS]>,
-    /// counts set_material calls that moved a material to another alpha class (scenes move its instances)
+    material_ids: Ids,
+    material_tex: Vec<[u32; 5]>,
+    /// counts set_material calls that moved a material to another alpha class or side (scenes move its instances)
     pub(crate) class_gen: u32,
     pub(crate) counts: Arc<Counts>,
     pub(crate) material_buf: Buffer,
@@ -410,6 +506,10 @@ struct Modules {
     vs_depth: ShaderModule,
     vs_shadow: ShaderModule,
     fs_shadow: ShaderModule,
+    vs_blend: ShaderModule,
+    fs_blend: ShaderModule,
+    sort_local: ShaderModule,
+    sort_global: ShaderModule,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -417,7 +517,7 @@ fn modules(dev: &Device) -> Result<Modules> {
     let m = |w: &[u32]| ShaderModule::from_spirv(dev, w);
     Ok(Modules { cull: m(CULL_SPV)?, cull_early: m(CULL_EARLY_SPV)?, cull_late: m(CULL_LATE_SPV)?, hiz_depth: m(HIZ_DEPTH_SPV)?, hiz_down: m(HIZ_DOWN_SPV)?,
                  scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, fs: m(FS_SPV)?, fs_mask: m(FS_MASK_SPV)?, vs_depth: m(VS_DEPTH_SPV)?, vs_shadow: m(VS_SHADOW_SPV)?,
-                 fs_shadow: m(FS_SHADOW_SPV)? })
+                 fs_shadow: m(FS_SHADOW_SPV)?, vs_blend: m(VS_BLEND_SPV)?, fs_blend: m(FS_BLEND_SPV)?, sort_local: m(SORT_LOCAL_SPV)?, sort_global: m(SORT_GLOBAL_SPV)? })
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -425,8 +525,38 @@ fn modules(dev: &Device) -> Result<Modules> {
     let d = ShaderModule::from_wgsl(dev, DRAW_WGSL)?;
     let c = ShaderModule::from_wgsl(dev, CULL_WGSL)?;
     let h = ShaderModule::from_wgsl(dev, HIZ_WGSL)?;
+    let s = ShaderModule::from_wgsl(dev, SORT_WGSL)?;
     Ok(Modules { cull: c.clone(), cull_early: c.clone(), cull_late: c, hiz_depth: h.clone(), hiz_down: h, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: d.clone(),
-                 fs: d.clone(), fs_mask: d.clone(), vs_depth: d.clone(), vs_shadow: d.clone(), fs_shadow: d })
+                 fs: d.clone(), fs_mask: d.clone(), vs_depth: d.clone(), vs_shadow: d.clone(), fs_shadow: d.clone(), vs_blend: d.clone(), fs_blend: d,
+                 sort_local: s.clone(), sort_global: s })
+}
+
+/// (G7f) the main pass's pipelines of one side for a listed class: back faces culled, or (double) none, the shading
+/// normal of back faces turned round (draw.wgsl's override DOUBLE_SIDED)
+fn main_pipeline(dev: &Device, md: &Modules, layout: &PipelineLayout, color: Format, encode: bool, class: AlphaClass, front_cw: bool, double: bool) -> Result<RenderPipeline> {
+    // (the order of AlphaClass::LISTED; G5e2: ENCODE_SRGB, draw.wgsl's override 0, for 8-bit targets without sRGB)
+    let mut constants: Vec<Constant> = Vec::new();
+    if encode {
+        constants.push(Constant { id: 0, value: 1.0 });
+    }
+    if double {
+        constants.push(Constant { id: 1, value: 1.0 });
+    }
+    let fragment = match class {
+        AlphaClass::Mask => ShaderStage { module: &md.fs_mask, entry: "fs_mask", constants: &constants },
+        _ => ShaderStage { module: &md.fs, entry: "fs", constants: &constants },
+    };
+    dev.create_render_pipeline(&RenderPipelineDesc {
+        layout,
+        vertex: ShaderStage::new(&md.vs, "vs"),
+        fragment: Some(fragment),
+        buffers: &[],
+        topology: Topology::Triangles,
+        cull: if double { Cull::None } else { Cull::Back },
+        front_cw,
+        targets: &[ColorTarget { format: color, blend: None, write_mask: 0xF }],
+        depth: Some(DepthState { format: Format::Depth32Float, write: true, compare: Compare::Greater }),
+    })
 }
 
 impl Renderer {
@@ -446,6 +576,8 @@ impl Renderer {
             b(5, BindingKind::StorageBuffer, cs),
             // (G5d) the slots phase 2 found hidden
             b(6, BindingKind::StorageBuffer, cs),
+            // (G7f) the blended instances in the view (the camera's main or late culling fills it)
+            b(7, BindingKind::StorageBuffer, cs),
         ])?;
         let scatter_layout = dev.create_bind_group_layout(&[
             b(0, BindingKind::StorageBufferRead, cs),
@@ -464,6 +596,21 @@ impl Renderer {
             // (G5c) the point and spot lights
             b(6, BindingKind::StorageBufferRead, Stages::FRAGMENT),
         ])?;
+        // (G7f) the blended instances' draw: the same without the visible list, with the sorted list, the lists' draw
+        // records and both index pools (its vertex shader pulls the indices itself)
+        let blend_layout = dev.create_bind_group_layout(&[
+            b(0, BindingKind::UniformBuffer, vf | Stages::FRAGMENT),
+            b(1, BindingKind::StorageBufferRead, vf),
+            b(2, BindingKind::UniformBuffer, Stages::FRAGMENT),
+            b(3, BindingKind::StorageBufferRead, Stages::FRAGMENT),
+            b(5, BindingKind::StorageBufferRead, vf),
+            b(6, BindingKind::StorageBufferRead, Stages::FRAGMENT),
+            b(7, BindingKind::StorageBufferRead, vf),
+            b(8, BindingKind::StorageBufferRead, vf),
+            b(9, BindingKind::StorageBufferRead, vf),
+            b(10, BindingKind::StorageBufferRead, vf),
+        ])?;
+        let sort_layout = dev.create_bind_group_layout(&[b(0, BindingKind::StorageBuffer, cs)])?;
         let hiz_maker = hiz::Maker::new(dev, &md.hiz_depth, &md.hiz_down)?;
         let cull_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&cull_layout], push_constants: 20 })?;
         let late_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&cull_layout, &hiz_maker.read], push_constants: 20 })?;
@@ -477,21 +624,14 @@ impl Renderer {
         let cull_early = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&md.cull_early, "early") })?;
         let cull_late = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &late_pl, shader: ShaderStage::new(&md.cull_late, "late") })?;
         let scatter = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &scatter_pl, shader: ShaderStage::new(&md.scatter, "main") })?;
-        let pipeline = |fragment: ShaderStage, front_cw| dev.create_render_pipeline(&RenderPipelineDesc {
-            layout: &draw_pl,
-            vertex: ShaderStage::new(&md.vs, "vs"),
-            fragment: Some(fragment),
-            buffers: &[],
-            topology: Topology::Triangles,
-            cull: Cull::Back,
-            front_cw,
-            targets: &[ColorTarget { format: desc.color, blend: None, write_mask: 0xF }],
-            depth: Some(DepthState { format: Format::Depth32Float, write: true, compare: Compare::Greater }),
-        });
-        // (the order of AlphaClass::ALL; G5e2: ENCODE_SRGB, draw.wgsl's override 0, for 8-bit targets without sRGB)
-        let encode: &[Constant] = if desc.encodes_srgb() { &[Constant { id: 0, value: 1.0 }] } else { &[] };
-        let (opaque, mask) = (|| ShaderStage { module: &md.fs, entry: "fs", constants: encode }, || ShaderStage { module: &md.fs_mask, entry: "fs_mask", constants: encode });
-        let draw = [[pipeline(opaque(), false)?, pipeline(opaque(), true)?], [pipeline(mask(), false)?, pipeline(mask(), true)?]];
+        let enc = desc.encodes_srgb();
+        let pipeline = |class, front_cw| main_pipeline(dev, &md, &draw_pl, desc.color, enc, class, front_cw, false);
+        let draw = [[pipeline(AlphaClass::Opaque, false)?, pipeline(AlphaClass::Opaque, true)?], [pipeline(AlphaClass::Mask, false)?, pipeline(AlphaClass::Mask, true)?]];
+        // (G7f) the blended instances: group 0 their own, then the textures and the shadow map like the main pass
+        let blend_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&blend_layout, &textures.layout, &shadow.layout], push_constants: 0 })?;
+        let sort_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&sort_layout], push_constants: 12 })?;
+        let sort_local = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &sort_pl, shader: ShaderStage::new(&md.sort_local, "sort_local") })?;
+        let sort_global = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &sort_pl, shader: ShaderStage::new(&md.sort_global, "sort_global") })?;
         // both sides of every triangle cast (glTF's single-sided plates too)
         let depth_only = |vertex: ShaderStage, fragment: Option<ShaderStage>| dev.create_render_pipeline(&RenderPipelineDesc {
             layout: &shadow_pl,
@@ -513,17 +653,28 @@ impl Renderer {
         let by_dispatch = l.max_compute_workgroups[0] as u64 * WG_CULL as u64;
         let max_instances = by_binding.min(by_dispatch).min(u32::MAX as u64) as u32;
         let vertex = BufferUsage::STORAGE;
+        // (G7f) the indices are read as storage too (vs_blend)
+        let index = BufferUsage::INDEX | BufferUsage::STORAGE;
         Ok(Renderer {
             vertices: Pool::new(dev, vertex, 32, 1 << 12)?,
-            indices16: Pool::new(dev, BufferUsage::INDEX, 2, 1 << 14)?,
-            indices32: Pool::new(dev, BufferUsage::INDEX, 4, 1 << 8)?,
+            indices16: Pool::new(dev, index, 2, 1 << 14)?,
+            indices32: Pool::new(dev, index, 4, 1 << 8)?,
             meshes: Vec::new(),
+            mesh_ids: Ids::new(),
+            index_room: Vec::new(),
+            lod_users: Vec::new(),
+            retired: Vec::new(),
+            fenced: Vec::new(),
+            removals: 0,
+            mesh_gen: 0,
             lods: Vec::new(),
             bounds: Vec::new(),
             lod_gen: 0,
             materials: Vec::new(),
+            material_ids: Ids::new(),
+            material_tex: Vec::new(),
             class_gen: 0,
-            counts: Arc::new(Counts { meshes: AtomicU32::new(0), materials: AtomicU32::new(0) }),
+            counts: Arc::new(Counts::new()),
             material_buf: dev.create_buffer(&BufferDesc { size: MATERIAL_BYTES * 64, usage: BufferUsage::STORAGE, memory: MemoryKind::Device })?,
             bindings_gen: 0,
             material_cap: 64,
@@ -544,6 +695,14 @@ impl Renderer {
             hiz_clock: Cell::new(0),
             scatter,
             draw,
+            draw_double: None,
+            blend: None,
+            blend_pl,
+            blend_layout,
+            sort_local,
+            sort_global,
+            sort_layout,
+            md,
             shadow_depth,
             shadow_mask,
             mask_in_shadow: true,
@@ -553,7 +712,34 @@ impl Renderer {
             cull_layout,
             scatter_layout,
             draw_layout,
+            draw_pl,
         })
+    }
+
+    /// (G7f) the pipelines a material of this kind needs, made with the first such material: the main pass's for
+    /// double-sided materials, the blended instances' draw
+    fn pipelines_for(&mut self, d: &MaterialDesc) -> Result<()> {
+        if d.blend && self.blend.is_none() {
+            let encode: &[Constant] = if self.desc.encodes_srgb() { &[Constant { id: 0, value: 1.0 }] } else { &[] };
+            // no culling: one draw holds both sides and mirrored instances, fs_blend drops the back faces of single-sided
+            // materials; the depth tested, not written; premultiplied alpha
+            self.blend = Some(self.dev.create_render_pipeline(&RenderPipelineDesc {
+                layout: &self.blend_pl,
+                vertex: ShaderStage::new(&self.md.vs_blend, "vs_blend"),
+                fragment: Some(ShaderStage { module: &self.md.fs_blend, entry: "fs_blend", constants: encode }),
+                buffers: &[],
+                topology: Topology::Triangles,
+                cull: Cull::None,
+                front_cw: false,
+                targets: &[ColorTarget { format: self.desc.color, blend: Some(Blend::PREMULTIPLIED), write_mask: 0xF }],
+                depth: Some(DepthState { format: Format::Depth32Float, write: false, compare: Compare::Greater }),
+            })?);
+        } else if d.double_sided && !d.blend && self.draw_double.is_none() {
+            let (dev, md, pl, color, enc) = (&self.dev, &self.md, &self.draw_pl, self.desc.color, self.desc.encodes_srgb());
+            let p = |class, front_cw| main_pipeline(dev, md, pl, color, enc, class, front_cw, true);
+            self.draw_double = Some([[p(AlphaClass::Opaque, false)?, p(AlphaClass::Opaque, true)?], [p(AlphaClass::Mask, false)?, p(AlphaClass::Mask, true)?]]);
+        }
+        Ok(())
     }
 
     pub fn device(&self) -> &Device {
@@ -632,45 +818,169 @@ impl Renderer {
         }
         let (dev, q) = (self.dev.clone(), self.dev.queue().clone());
         let (nv, ni) = (n as u32, m.indices.len() as u32);
-        let cap = self.vertices.cap;
-        self.vertices.reserve(&dev, nv)?;
-        if cap != self.vertices.cap {
+        let wide = n > 1 << 16;
+        // (uploads go in multiples of 4 bytes in WebGPU: an odd count of 16-bit indices is padded)
+        let room = if wide { ni } else { ni + (ni & 1) };
+        let index_pool = if wide { PoolOf::Indices32 } else { PoolOf::Indices16 };
+        // (G7f) ranges of removed meshes first; wait for frames that may read them rather than grow a pool
+        self.reclaim(false)?;
+        if !(self.vertices.fits(nv) && self.pool(index_pool).fits(room)) && !self.fenced.is_empty() {
+            self.reclaim(true)?;
+        }
+        let caps = (self.vertices.cap, self.indices16.cap, self.indices32.cap);
+        let base = self.vertices.alloc(&dev, nv)?;
+        let first = match self.pool_mut(index_pool).alloc(&dev, room) {
+            Ok(first) => first,
+            Err(e) => {
+                self.vertices.release(base, nv);
+                return Err(e);
+            }
+        };
+        let Some((slot, id)) = self.mesh_ids.make() else {
+            self.vertices.release(base, nv);
+            self.pool_mut(index_pool).release(first, room);
+            return Err(GpuError::Unsupported("add_mesh: no place left for a mesh (2^24)"));
+        };
+        // (G7f) the vertex and index pools are bound (scenes make their groups again when one grew)
+        if caps != (self.vertices.cap, self.indices16.cap, self.indices32.cap) {
             self.bindings_gen += 1;
         }
-        let base = self.vertices.used;
         let vertices: Vec<[f32; 8]> = (0..n).map(|i| {
             let (p, a, t) = (m.positions[i], m.normals[i], m.uvs[i]);
             [p[0], p[1], p[2], t[0], a[0], a[1], a[2], t[1]]
         }).collect();
         q.write_buffer(&self.vertices.buf, base as u64 * 32, &vertices)?;
-        let wide = n > 1 << 16;
-        let first = if wide {
-            self.indices32.reserve(&dev, ni)?;
-            let first = self.indices32.used;
+        if wide {
             q.write_buffer(&self.indices32.buf, first as u64 * 4, m.indices)?;
-            self.indices32.used += ni;
-            first
         } else {
-            // (uploads go in multiples of 4 bytes in WebGPU: an odd count is padded)
-            let room = ni + (ni & 1);
-            self.indices16.reserve(&dev, room)?;
-            let first = self.indices16.used;
             let mut short: Vec<u16> = m.indices.iter().map(|&v| v as u16).collect();
             short.resize(room as usize, 0);
             q.write_buffer(&self.indices16.buf, first as u64 * 2, &short)?;
-            self.indices16.used += room;
-            first
-        };
-        self.vertices.used += nv;
-        self.meshes.push(MeshInfo { first_index: first, indices: ni, base_vertex: base, vertices: nv, wide, center, radius: math::sqrt(r2) });
-        self.lods.push(Vec::new());
-        self.bounds.push((center, math::sqrt(r2)));
-        self.counts.meshes.store(self.meshes.len() as u32, Ordering::Relaxed);
-        Ok(MeshId(self.meshes.len() as u32 - 1))
+        }
+        let info = MeshInfo { first_index: first, indices: ni, base_vertex: base, vertices: nv, wide, center, radius: math::sqrt(r2) };
+        if slot == self.meshes.len() {
+            self.meshes.push(info);
+            self.lods.push(Vec::new());
+            self.bounds.push((center, math::sqrt(r2)));
+            self.index_room.push(room);
+            self.lod_users.push(0);
+        } else {
+            // (G7f) a place a removed mesh left: the scenes' lists of it take the new mesh's draw records
+            self.meshes[slot] = info;
+            self.lods[slot].clear();
+            self.bounds[slot] = (center, math::sqrt(r2));
+            self.index_room[slot] = room;
+            self.mesh_gen = self.mesh_gen.wrapping_add(1);
+        }
+        self.counts.reg.lock().set(Kind::Mesh, slot, id);
+        Ok(MeshId(id))
+    }
+
+    fn pool(&self, p: PoolOf) -> &Pool {
+        match p {
+            PoolOf::Vertices => &self.vertices,
+            PoolOf::Indices16 => &self.indices16,
+            PoolOf::Indices32 => &self.indices32,
+        }
+    }
+
+    fn pool_mut(&mut self, p: PoolOf) -> &mut Pool {
+        match p {
+            PoolOf::Vertices => &mut self.vertices,
+            PoolOf::Indices16 => &mut self.indices16,
+            PoolOf::Indices32 => &mut self.indices32,
+        }
+    }
+
+    /// (G7f) the ranges of removed meshes the GPU is done with go back to their pools.  A removal's ranges wait for a
+    /// submission after it (one flush stamps all of them); wait: until every one of them is done (rather than grow a
+    /// pool).  In the browser at once: writeBuffer runs in the queue's order, after every frame submitted before
+    fn reclaim(&mut self, wait: bool) -> Result<()> {
+        if cfg!(target_arch = "wasm32") {
+            for (p, first, n) in core::mem::take(&mut self.retired) {
+                self.pool_mut(p).release(first, n);
+            }
+            return Ok(());
+        }
+        if !self.retired.is_empty() {
+            let id = self.dev.queue().flush()?;
+            let r = core::mem::take(&mut self.retired);
+            self.fenced.push((id, r));
+        }
+        if wait {
+            if let Some(&(id, _)) = self.fenced.last() {
+                if !self.dev.wait(id, 10_000_000_000)? {
+                    return Err(GpuError::Timeout);
+                }
+            }
+        }
+        while let Some((id, _)) = self.fenced.first() {
+            if !self.dev.is_done(*id) {
+                break;
+            }
+            let (_, ranges) = self.fenced.remove(0);
+            for (p, first, n) in ranges {
+                self.pool_mut(p).release(first, n);
+            }
+        }
+        Ok(())
+    }
+
+    /// (G7f) a mesh goes: its id is invalid from now on, its vertices and indices are used again (once the frames that may
+    /// still draw it are done, store.rs), its place gets the next mesh with a new id.  Invalid for a mesh the renderer does
+    /// not have, one that instances of a scene use (Scene::remove them first; a dropped scene uses nothing) and one that
+    /// another mesh takes as a detail level (set_lods of that one first).  Its own detail levels go with it.  A scene
+    /// prepared before the removal does not record (Invalid): it prepares again
+    pub fn remove_mesh(&mut self, id: MeshId) -> Result<()> {
+        let Some(m) = self.mesh_ids.get(id.0) else { return Err(GpuError::Invalid("remove_mesh: no such mesh")) };
+        // (its own levels do not count: they go with it)
+        let own = self.lods[m].iter().filter(|l| l.mesh == Some(id)).count() as u32;
+        if self.lod_users[m] > own {
+            return Err(GpuError::Invalid("remove_mesh: another mesh takes it as a detail level"));
+        }
+        {
+            let mut reg = self.counts.reg.lock();
+            let e = &mut reg.meshes[m];
+            if e.scenes > 0 {
+                return Err(GpuError::Invalid("remove_mesh: instances of a scene use it"));
+            }
+            e.id = store::DEAD;
+        }
+        self.set_lod_users(m, false);
+        self.lods[m].clear();
+        let info = self.meshes[m];
+        self.retired.push((PoolOf::Vertices, info.base_vertex, info.vertices));
+        self.retired.push((if info.wide { PoolOf::Indices32 } else { PoolOf::Indices16 }, info.first_index, self.index_room[m]));
+        self.mesh_ids.kill(m);
+        self.removals = self.removals.wrapping_add(1);
+        self.mesh_gen = self.mesh_gen.wrapping_add(1);
+        Ok(())
+    }
+
+    /// (G7f) live meshes
+    pub fn mesh_count(&self) -> u32 {
+        self.mesh_ids.count()
+    }
+
+    /// (G7f; tests, tools) per pool (vertices, 16-bit, 32-bit indices): elements up to its end, its room, and the free
+    /// elements below the end that removals left (ranges, handed out again before the end grows)
+    pub fn pool_use(&self) -> [(u32, u32, u32); 3] {
+        let u = |p: &Pool| (p.used, p.cap, p.holes());
+        [u(&self.vertices), u(&self.indices16), u(&self.indices32)]
     }
 
     pub fn mesh_info(&self, id: MeshId) -> Option<MeshInfo> {
-        self.meshes.get(id.0 as usize).copied()
+        self.mesh_ids.get(id.0).map(|m| self.meshes[m])
+    }
+
+    /// (G7f) the meshes a mesh's detail levels take count one more (or one less) user
+    fn set_lod_users(&mut self, m: usize, add: bool) {
+        for k in 0..self.lods[m].len() {
+            if let Some(o) = self.lods[m][k].mesh {
+                let u = &mut self.lod_users[slot(o.0)];
+                *u = if add { *u + 1 } else { u.saturating_sub(1) };
+            }
+        }
     }
 
     /// (G5d) a mesh's detail levels: other meshes (or none) for its instances below a projected size, thresholds
@@ -679,9 +989,8 @@ impl Renderer {
     /// grows to hold every level (cull_sphere).  Scenes send all their instances again with their next frame.  Invalid
     /// for meshes the renderer does not have and thresholds not finite, not above 0 or not falling
     pub fn set_lods(&mut self, mesh: MeshId, lods: &[Lod]) -> Result<()> {
-        let m = mesh.0 as usize;
-        let n = self.meshes.len();
-        if m >= n || lods.iter().any(|l| l.mesh.is_some_and(|x| x.0 as usize >= n)) {
+        let Some(m) = self.mesh_ids.get(mesh.0) else { return Err(GpuError::Invalid("set_lods: a mesh the renderer does not have")) };
+        if lods.iter().any(|l| l.mesh.is_some_and(|x| self.mesh_ids.get(x.0).is_none())) {
             return Err(GpuError::Invalid("set_lods: a mesh the renderer does not have"));
         }
         let falling = lods.windows(2).all(|w| w[1].below < w[0].below);
@@ -691,39 +1000,53 @@ impl Renderer {
         let base = self.meshes[m];
         let mut radius = base.radius;
         for o in lods.iter().filter_map(|l| l.mesh) {
-            let o = self.meshes[o.0 as usize];
+            let o = self.meshes[slot(o.0)];
             radius = radius.max(math::len(math::sub(o.center, base.center)) + o.radius);
         }
+        self.set_lod_users(m, false);
         self.bounds[m] = (base.center, radius);
         self.lods[m] = lods.to_vec();
+        self.set_lod_users(m, true);
         self.lod_gen += 1;
         Ok(())
     }
 
     /// (G5d) a mesh's detail levels (empty: none)
     pub fn lods(&self, mesh: MeshId) -> &[Lod] {
-        self.lods.get(mesh.0 as usize).map_or(&[], |v| &v[..])
+        self.mesh_ids.get(mesh.0).map_or(&[], |m| &self.lods[m][..])
     }
 
     /// (G5d) the sphere (centre, radius in the mesh's coordinates) the visibility takes for a mesh's instances: its own,
     /// grown to hold its detail levels
     pub fn cull_sphere(&self, mesh: MeshId) -> Option<([f64; 3], f64)> {
-        self.bounds.get(mesh.0 as usize).copied()
+        self.mesh_ids.get(mesh.0).map(|m| self.bounds[m])
     }
 
     /// a texture into the array of its size class with all its mip levels (texture.rs: resampled when it is
-    /// not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission
+    /// not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission.  (G7f) A layer a removed
+    /// texture left is used first
     pub fn add_texture(&mut self, d: &TextureData) -> Result<TextureId> {
         let dev = self.dev.clone();
         self.textures.add(&dev, d)
     }
 
-    pub fn texture_info(&self, id: TextureId) -> Option<TextureInfo> {
-        self.textures.info.get(id.0 as usize).copied()
+    /// (G7f) a texture goes: its id is invalid from now on, its layer is used again by the next texture of its class and
+    /// colour space (the arrays do not shrink).  Invalid for a texture the renderer does not have and one that a material
+    /// names (set_material without it, or remove_material, first).  A scene prepared before the removal does not record
+    /// (Invalid): it prepares again
+    pub fn remove_texture(&mut self, id: TextureId) -> Result<()> {
+        self.textures.remove(id)?;
+        self.removals = self.removals.wrapping_add(1);
+        Ok(())
     }
 
+    pub fn texture_info(&self, id: TextureId) -> Option<TextureInfo> {
+        self.textures.info_of(id)
+    }
+
+    /// live textures
     pub fn texture_count(&self) -> u32 {
-        self.textures.info.len() as u32
+        self.textures.count()
     }
 
     /// bytes of GPU memory the texture arrays take
@@ -738,30 +1061,97 @@ impl Renderer {
 
     /// a row of the table; its textures must be this renderer's
     pub fn add_material(&mut self, m: &Material) -> Result<MaterialId> {
-        let i = self.materials.len() as u32;
-        let words = m.words(&self.textures)?;
-        self.materials.push(words);
-        self.mark_material(i);
-        self.counts.materials.store(i + 1, Ordering::Relaxed);
-        Ok(MaterialId(i))
+        self.add_material_desc(&MaterialDesc::new(*m))
+    }
+
+    /// (G7f) a row of the table with glTF's BLEND and doubleSided (MaterialDesc); its textures must be this renderer's.
+    /// The first blended or double-sided material makes the pipelines they need
+    pub fn add_material_desc(&mut self, d: &MaterialDesc) -> Result<MaterialId> {
+        let words = d.words(&self.textures)?;
+        self.pipelines_for(d)?;
+        let Some((i, id)) = self.material_ids.make() else { return Err(GpuError::Unsupported("add_material: no place left for a material (2^24)")) };
+        let tex = d.textures();
+        self.textures.use_all(&tex, true);
+        if i == self.materials.len() {
+            self.materials.push(words);
+            self.material_tex.push(tex);
+        } else {
+            // (G7f) a place a removed material left (no instance used it); scenes see its class with the instances that
+            // take the new id
+            self.materials[i] = words;
+            self.material_tex[i] = tex;
+        }
+        self.mark_material(i as u32);
+        self.counts.reg.lock().set(Kind::Material, i, id);
+        Ok(MaterialId(id))
     }
 
     /// a row of the table; the next frame shows it.  A new alpha class moves the material's instances to the lists of
-    /// that class with their scenes' next prepare
+    /// that class with their scenes' next prepare.  (G7f) The material stays blended and double-sided as it was
+    /// (set_material_desc changes those)
     pub fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()> {
-        let words = m.words(&self.textures)?;
-        let Some(row) = self.materials.get_mut(id.0 as usize) else { return Err(GpuError::Invalid("set_material: no such material")) };
-        if AlphaClass::of_words(row) != AlphaClass::of_words(&words) {
+        let Some(i) = self.material_ids.get(id.0) else { return Err(GpuError::Invalid("set_material: no such material")) };
+        let flags = self.materials[i][FLAGS_WORD];
+        self.set_material_desc(id, &MaterialDesc { material: *m, blend: flags & FLAG_BLEND != 0, double_sided: flags & FLAG_DOUBLE != 0 })
+    }
+
+    /// (G7f) a row of the table with glTF's BLEND and doubleSided; the next frame shows it.  A new alpha class or side
+    /// moves the material's instances to their new lists with their scenes' next prepare
+    pub fn set_material_desc(&mut self, id: MaterialId, d: &MaterialDesc) -> Result<()> {
+        let Some(i) = self.material_ids.get(id.0) else { return Err(GpuError::Invalid("set_material: no such material")) };
+        let words = d.words(&self.textures)?;
+        self.pipelines_for(d)?;
+        let row = &mut self.materials[i];
+        if Kindof::of_words(row) != Kindof::of_words(&words) {
             self.class_gen = self.class_gen.wrapping_add(1);
         }
         *row = words;
-        self.mark_material(id.0);
+        let tex = d.textures();
+        self.textures.use_all(&self.material_tex[i], false);
+        self.textures.use_all(&tex, true);
+        self.material_tex[i] = tex;
+        self.mark_material(i as u32);
         Ok(())
+    }
+
+    /// (G7f) a material goes: its id is invalid from now on, its textures lose a user, its place gets the next material
+    /// with a new id.  Invalid for a material the renderer does not have and one that instances of a scene use.  A scene
+    /// prepared before the removal does not record (Invalid): it prepares again
+    pub fn remove_material(&mut self, id: MaterialId) -> Result<()> {
+        let Some(i) = self.material_ids.get(id.0) else { return Err(GpuError::Invalid("remove_material: no such material")) };
+        {
+            let mut reg = self.counts.reg.lock();
+            let e = &mut reg.materials[i];
+            if e.scenes > 0 {
+                return Err(GpuError::Invalid("remove_material: instances of a scene use it"));
+            }
+            e.id = store::DEAD;
+        }
+        self.textures.use_all(&self.material_tex[i], false);
+        self.material_tex[i] = [u32::MAX; 5];
+        self.material_ids.kill(i);
+        self.removals = self.removals.wrapping_add(1);
+        Ok(())
+    }
+
+    /// (G7f) live materials
+    pub fn material_count(&self) -> u32 {
+        self.material_ids.count()
     }
 
     /// the alpha class of a material (Opaque for one the renderer does not have)
     pub fn alpha_class(&self, id: MaterialId) -> AlphaClass {
-        self.materials.get(id.0 as usize).map_or(AlphaClass::Opaque, AlphaClass::of_words)
+        self.material_ids.get(id.0).map_or(AlphaClass::Opaque, |i| AlphaClass::of_words(&self.materials[i]))
+    }
+
+    /// (G7f) a material is double-sided (false for one the renderer does not have)
+    pub fn double_sided(&self, id: MaterialId) -> bool {
+        self.material_ids.get(id.0).is_some_and(|i| self.materials[i][FLAGS_WORD] & FLAG_DOUBLE != 0)
+    }
+
+    /// (G7f) what decides a live material's lists (scenes: their instances' materials are alive)
+    pub(crate) fn kind_of(&self, id: u32) -> Kindof {
+        self.material_ids.get(id).map_or(Kindof { class: AlphaClass::Opaque, double: false }, |i| Kindof::of_words(&self.materials[i]))
     }
 
     fn mark_material(&mut self, i: u32) {
@@ -837,6 +1227,10 @@ impl Renderer {
         if s.stale {
             return Err(GpuError::Invalid("record: instances came or changed their mesh after Scene::prepare"));
         }
+        // (G7f) a place prepare's lists and rows name may already hold another mesh, material or texture
+        if s.seen_removals != self.removals {
+            return Err(GpuError::Invalid("record: a mesh, material or texture was removed after Scene::prepare"));
+        }
         if color.view.format() != self.desc.color {
             return Err(GpuError::Invalid("record: the colour target is not in the renderer's format"));
         }
@@ -911,6 +1305,10 @@ impl Renderer {
                 e.copy_buffer(up, 0, &self.material_buf, *at, *size);
             }
         }
+        // (G7f) the blended instances' draw: vertices per instance, no instances yet
+        if s.blend_on {
+            e.copy_buffer(&f.stage, BLEND_AT, &s.blend.buf, 0, BLEND_HEAD);
+        }
         if let Some(up) = &s.full_up {
             let n = s.slots.len() as u64;
             e.copy_buffer(up, 0, &s.spheres, 0, n * 16);
@@ -945,9 +1343,15 @@ impl Renderer {
         if let Some(ts) = ts {
             e.timestamp(ts, base + 1);
         }
-        // (G5d) with the occlusion test phase 1: what phase 2 of the frame before saw
+        // (G5d) with the occlusion test phase 1: what phase 2 of the frame before saw; (G7f) without it the camera's
+        // culling collects the blended instances (cull.wgsl's pc.all bit 1)
         let all = !s.culling as u32;
-        self.cull(e, s, &s.view, if pyramid.is_some() { &self.cull_early } else { &self.cull }, &[n, all], None);
+        let collect = if pyramid.is_none() && s.blend_on { 2 } else { 0 };
+        self.cull(e, s, &s.view, if pyramid.is_some() { &self.cull_early } else { &self.cull }, &[n, all | collect], None);
+        // (G7f) without the occlusion test: the blended instances sorted (each step waits for the writes before it)
+        if collect != 0 {
+            self.sort(e, s);
+        }
         if let Some(ts) = ts {
             e.timestamp(ts, base + 2);
         }
@@ -960,12 +1364,16 @@ impl Renderer {
                 e.timestamp(ts, base + 3 + k as u32);
             }
         }
-        // every view's counts and lists before the indirect draws and the vertex shaders read them
+        // every view's counts and lists before the indirect draws and the vertex shaders read them; (G7f) the sorted
+        // blended instances before their draw
         e.barrier(Access::COMPUTE_WRITE, Access::INDIRECT | Access::GRAPHICS_READ | Access::COPY_READ);
         if let (true, Some(rb), true) = (s.stats_on, &f.readback, lists > 0) {
             e.copy_buffer(&s.view.draws, 0, rb, 0, lists * DRAW_BYTES);
             if pyramid.is_none() {
-                e.copy_buffer(&s.late.draws, 0, rb, rb.size() / 2, lists * DRAW_BYTES);
+                e.copy_buffer(&s.late.draws, 0, rb, (rb.size() - BLEND_HEAD) / 2, lists * DRAW_BYTES);
+                if s.blend_on {
+                    e.copy_buffer(&s.blend.buf, 0, rb, rb.size() - BLEND_HEAD, BLEND_HEAD);
+                }
             }
         }
         // (G5c) a depth pass per cascade into its layer; the pass's barriers: Sampled -> DepthTarget waits for
@@ -991,6 +1399,10 @@ impl Renderer {
         };
         e.begin_render(&RenderPassDesc { color: &[c1], depth: Some(d1) });
         self.draw_lists(e, s, &s.view);
+        // (G7f) the blended instances last, over everything (with the occlusion test in phase 2)
+        if pyramid.is_none() {
+            self.draw_blend(e, s);
+        }
         e.end_render();
         if let Some(ts) = ts {
             e.timestamp(ts, base + 11);
@@ -1003,18 +1415,26 @@ impl Renderer {
             // phase 2: every instance in the view against the pyramid (its mips Layout::Sampled since the pyramid's
             // barriers); it reads and writes the bits phase 1 read (the barriers since have waited for phase 1)
             self.cull(e, s, &s.late, &self.cull_late, &[n, 0, p.w, p.h, p.levels], Some(&p.read));
+            // (G7f) phase 2 collected the blended instances: sorted
+            if s.blend_on {
+                self.sort(e, s);
+            }
             if let Some(ts) = ts {
                 e.timestamp(ts, base + 13);
             }
             // phase 2's counts and lists before its indirect draws and vertex shaders read them
             e.barrier(Access::COMPUTE_WRITE, Access::INDIRECT | Access::GRAPHICS_READ | Access::COPY_READ);
             if let (true, Some(rb)) = (s.stats_on, &f.readback) {
-                e.copy_buffer(&s.late.draws, 0, rb, rb.size() / 2, lists * DRAW_BYTES);
+                e.copy_buffer(&s.late.draws, 0, rb, (rb.size() - BLEND_HEAD) / 2, lists * DRAW_BYTES);
+                if s.blend_on {
+                    e.copy_buffer(&s.blend.buf, 0, rb, rb.size() - BLEND_HEAD, BLEND_HEAD);
+                }
             }
             let c2 = ColorAttachment { load: Load::Keep, before: Layout::ColorTarget, ..color };
             let d2 = DepthAttachment { load: Load::Keep, before: Layout::Sampled, ..depth };
             e.begin_render(&RenderPassDesc { color: &[c2], depth: Some(d2) });
             self.draw_lists(e, s, &s.late);
+            self.draw_blend(e, s);
             e.end_render();
         } else if let Some(ts) = ts {
             e.timestamp(ts, base + 12);
@@ -1037,6 +1457,8 @@ impl Renderer {
             return;
         }
         let holes = |c: AlphaClass| c == AlphaClass::Mask && self.mask_in_shadow;
+        // (G7f) blended instances cast no shadows (their lists are not in the cascades' either)
+        let casts = |c: AlphaClass| c != AlphaClass::Blend;
         let mut bound: Option<bool> = None;
         let mut set = |e: &mut CommandEncoder<'a>, h: bool| -> bool {
             if bound == Some(h) {
@@ -1051,7 +1473,7 @@ impl Renderer {
         if self.multi {
             // (first record, count, wide, holes, room) of the merged runs
             let mut merged: Vec<(u32, u32, bool, bool, bool)> = Vec::new();
-            for r in &s.runs {
+            for r in s.runs.iter().filter(|r| casts(r.class)) {
                 let h = holes(r.class);
                 match merged.last_mut() {
                     Some(m) if m.0 + m.1 == r.first && m.2 == r.wide && m.3 == h => {
@@ -1074,7 +1496,7 @@ impl Renderer {
             let mut wide = None;
             for &i in &s.order {
                 let l = &s.lists[i as usize];
-                if l.room > 0 {
+                if l.room > 0 && casts(l.class) {
                     if set(e, holes(l.class)) {
                         wide = None;
                     }
@@ -1114,42 +1536,89 @@ impl Renderer {
     }
 
     /// one view's lists into the running pass: per side (those of instances as they are, then those of mirrored ones with
-    /// the pipelines whose front faces are clockwise) and alpha class (opaque without a discard, then MASK), only the
-    /// combinations with room
+    /// the pipelines whose front faces are clockwise), alpha class (opaque without a discard, then MASK; blended ones are
+    /// draw_blend's) and (G7f) faces (back faces culled, then double-sided), only the combinations with room
     fn draw_lists<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene, v: &'a scene::ViewLists) {
         for mirrored in [false, true] {
-            for class in AlphaClass::ALL {
-                let mine = |r: &&scene::Run| r.mirrored == mirrored && r.class == class && r.room;
-                if !s.runs.iter().any(|r| mine(&r)) {
-                    continue;
-                }
-                e.set_render_pipeline(&self.draw[class.index()][mirrored as usize]);
-                e.set_bind_group(0, &v.render);
-                e.set_bind_group(1, &self.textures.group);
-                e.set_bind_group(2, &self.shadow.group);
-                if self.multi {
-                    // a combination's lists lie side by side, one run per width of indices (usually one)
-                    e.push_constants(0, &[0u32]);
-                    for r in s.runs.iter().filter(mine) {
-                        self.bind_indices(e, r.wide);
-                        e.draw_indexed_indirect_multi(&v.draws, r.first as u64 * DRAW_BYTES, r.count, DRAW_BYTES as u32);
+            for class in AlphaClass::LISTED {
+                for double in [false, true] {
+                    let mine = |r: &&scene::Run| r.mirrored == mirrored && r.class == class && r.double == double && r.room;
+                    if !s.runs.iter().any(|r| mine(&r)) {
+                        continue;
                     }
-                } else {
-                    // WebGPU and Vulkan 1.1: no first instance is sure to work; a list's start comes as a push constant
-                    let mut bound = None;
-                    for &i in &s.order {
-                        let l = &s.lists[i as usize];
-                        if l.room > 0 && l.mirrored == mirrored && l.class == class {
-                            if bound != Some(l.wide) {
-                                self.bind_indices(e, l.wide);
-                                bound = Some(l.wide);
+                    let pipe = if double {
+                        // (a double-sided material made them)
+                        let Some(d) = &self.draw_double else { continue };
+                        &d[class.index()][mirrored as usize]
+                    } else {
+                        &self.draw[class.index()][mirrored as usize]
+                    };
+                    e.set_render_pipeline(pipe);
+                    e.set_bind_group(0, &v.render);
+                    e.set_bind_group(1, &self.textures.group);
+                    e.set_bind_group(2, &self.shadow.group);
+                    if self.multi {
+                        // a combination's lists lie side by side, one run per width of indices (usually one)
+                        e.push_constants(0, &[0u32]);
+                        for r in s.runs.iter().filter(mine) {
+                            self.bind_indices(e, r.wide);
+                            e.draw_indexed_indirect_multi(&v.draws, r.first as u64 * DRAW_BYTES, r.count, DRAW_BYTES as u32);
+                        }
+                    } else {
+                        // WebGPU and Vulkan 1.1: no first instance is sure to work; a list's start comes as a push constant
+                        let mut bound = None;
+                        for &i in &s.order {
+                            let l = &s.lists[i as usize];
+                            if l.room > 0 && l.mirrored == mirrored && l.class == class && l.double == double {
+                                if bound != Some(l.wide) {
+                                    self.bind_indices(e, l.wide);
+                                    bound = Some(l.wide);
+                                }
+                                e.push_constants(0, &[l.first]);
+                                e.draw_indexed_indirect(&v.draws, l.record as u64 * DRAW_BYTES);
                             }
-                            e.push_constants(0, &[l.first]);
-                            e.draw_indexed_indirect(&v.draws, l.record as u64 * DRAW_BYTES);
                         }
                     }
                 }
             }
+        }
+    }
+
+    /// (G7f) the blended instances into the running pass: one draw of the sorted list for all of them (sorted back to
+    /// front, each instance with the vertices of the largest blended mesh, vs_blend leaves out what its mesh does not
+    /// have), blended over what is there, the depth tested and not written
+    fn draw_blend<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene) {
+        let (true, Some(pipe), Some(group)) = (s.blend_on, &self.blend, &s.blend.render) else { return };
+        e.set_render_pipeline(pipe);
+        e.set_bind_group(0, group);
+        e.set_bind_group(1, &self.textures.group);
+        e.set_bind_group(2, &self.shadow.group);
+        e.draw_indirect(&s.blend.buf, 0);
+    }
+
+    /// (G7f) the blended instances back to front (sort.wgsl): the tiles of SORT_TILE sorted in workgroup memory, then the
+    /// stages of a bitonic sort over the whole list (a power of two of them), the distances of SORT_TILE and more in
+    /// steps over the list, the shorter ones in the tiles.  Between the steps: their writes before the next one's reads
+    fn sort<'a>(&'a self, e: &mut CommandEncoder<'a>, s: &'a Scene) {
+        let Some(group) = &s.blend.sort else { return };
+        let cap = s.blend.cap;
+        let step = |e: &mut CommandEncoder<'a>, pipe: &'a ComputePipeline, k: u32, j: u32, groups: u32| {
+            e.barrier(Access::COMPUTE_WRITE, Access::COMPUTE_READ | Access::COMPUTE_WRITE);
+            e.set_compute_pipeline(pipe);
+            e.set_bind_group(0, group);
+            e.push_constants(0, &[k, j, cap]);
+            e.dispatch(groups, 1, 1);
+        };
+        step(e, &self.sort_local, 0, 0, cap / SORT_TILE);
+        let mut k = 2 * SORT_TILE;
+        while k <= cap {
+            let mut j = k / 2;
+            while j >= SORT_TILE {
+                step(e, &self.sort_global, k, j, cap / 2 / 256);
+                j /= 2;
+            }
+            step(e, &self.sort_local, k, 0, cap / SORT_TILE);
+            k *= 2;
         }
     }
 }

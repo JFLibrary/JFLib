@@ -13,6 +13,17 @@
 // the frame before found visible (a bit per slot in `hidden`, 0: visible or changed since), `late` tests every
 // instance in the view against the depth pyramid of what phase 1 drew (hiz.wgsl), adds what is visible and phase 1
 // did not draw, and writes the bits for the next frame.  `main` is the plain test (shadow cascades, no occlusion).
+//
+// (G7f) In `main` the invocations of a warp claim their places in four turns by their list (l & 3): the hardware merges
+// the atomicAdds of a warp's active invocations when they all have the same address, so lists that share warps (opaque
+// and MASK instances of a mesh, mirrored ones, a few meshes in turn) no longer cost an atomicAdd per instance
+// (docs/RENDER3D.md "Zähler der Listen").  `early` and `late` see few instances; there the turns cost more than they
+// save, as did every way of counting in workgroup memory that was measured.
+//
+// (G7f) BLEND: a list of blended instances (lists[l].z bit 31) is not drawn list by list.  The camera's culling (`main`
+// with pc.all bit 1, or `late`) puts each blended instance in view into one list for all of them, `blend`, with the
+// distance of its sphere's centre from the eye as the key of the sort that follows (sort.wgsl); `early` and the shadow
+// cascades leave them out (they write no depth and cast no shadows).
 
 struct View {
     view_proj: mat4x4f,
@@ -37,6 +48,7 @@ struct DrawCmd {
 
 struct Push {
     count: u32,
+    // bit 0: every live instance (Scene::set_culling(false)); (G7f) bit 1: this view collects the blended instances
     all: u32,
     // (G5d) late: the target's size in pixels, the pyramid's levels
     w: u32,
@@ -54,9 +66,25 @@ struct Push {
 @group(0) @binding(5) var<storage, read_write> visible: array<u32>;
 // (G5d) bit i & 31 of word i >> 5: slot i was hidden in phase 2 of the frame before
 @group(0) @binding(6) var<storage, read_write> hidden: array<u32>;
+// (G7f) the blended instances in view: a non-indexed indirect draw (vertices per instance from the CPU, the instances
+// counted here), then per instance its key (the bits of !distance squared: farthest first), slot, the draw record of its
+// list and the list's flags (bit 0 32-bit indices, 1 double-sided, 2 mirrored), for sort.wgsl and draw.wgsl's vs_blend
+struct BlendList {
+    vertex_count: u32,
+    count: atomic<u32>,
+    first_vertex: u32,
+    first_instance: u32,
+    items: array<vec4u>,
+}
+@group(0) @binding(7) var<storage, read_write> blend: BlendList;
 // (G5d) the depth pyramid of this frame's phase 1 (late only): mip m holds level m + 1
 @group(1) @binding(0) var pyramid: texture_2d<f32>;
 var<immediate> pc: Push;
+
+// (G7f) lists[l].z: the number of detail levels in the low 16 bits; bit 28 32-bit indices, 29 double-sided, 30 mirrored,
+// 31 blended
+const LEVELS: u32 = 0xffffu;
+const BLENDED: u32 = 0x80000000u;
 
 // (G5d) the bits of a workgroup's 256 slots, put together before they are written
 var<workgroup> hid: array<atomic<u32>, 8>;
@@ -79,9 +107,10 @@ const NONE: u32 = 0xffffffffu;
 fn pick(i: u32, s: vec4f) -> u32 {
     var l = list_of[i];
     let info = lists[l];
-    if info.z > 0u && view.lod.w > 0.0 {
+    let levels = info.z & LEVELS;
+    if levels > 0u && view.lod.w > 0.0 {
         let size = s.w * view.lod.w / max(distance(s.xyz, view.lod.xyz), 1e-30);
-        for (var k = 0u; k < info.z; k++) {
+        for (var k = 0u; k < levels; k++) {
             let e = lists[info.y + k];
             if size >= bitcast<f32>(e.x) {
                 break;
@@ -100,6 +129,34 @@ fn add(i: u32, l: u32) {
     visible[info.x + n] = i;
 }
 
+// (G7f) the same in four turns by list (the header says why)
+fn add_turns(i: u32, l: u32) {
+    let info = lists[l];
+    var n = 0u;
+    for (var c = 0u; c < 4u; c++) {
+        if (l & 3u) == c {
+            n = atomicAdd(&draws[info.w].instance_count, 1u);
+        }
+    }
+    visible[info.x + n] = i;
+}
+
+// (G7f) the list l is one of blended instances
+fn blended(l: u32) -> bool {
+    return (lists[l].z & BLENDED) != 0u;
+}
+
+// (G7f) slot i with sphere s, picked list l (blended), into the blended instances' list
+fn add_blend(i: u32, s: vec4f, l: u32) {
+    let d = s.xyz - view.eye.xyz;
+    let key = ~bitcast<u32>(dot(d, d));
+    let info = lists[l];
+    let n = atomicAdd(&blend.count, 1u);
+    if n < arrayLength(&blend.items) {
+        blend.items[n] = vec4u(key, i, info.w, (info.z >> 28u) & 7u);
+    }
+}
+
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
     let i = gid.x;
@@ -107,20 +164,28 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         return;
     }
     let s = spheres[i];
-    if pc.all != 0u {
+    var l = NONE;
+    if (pc.all & 1u) != 0u {
         if s.w < 0.0 {
             return;
         }
-        add(i, list_of[i]);
+        l = list_of[i];
+    } else {
+        if !in_view(s) {
+            return;
+        }
+        l = pick(i, s);
+    }
+    if l == NONE {
         return;
     }
-    if !in_view(s) {
+    if blended(l) {
+        if (pc.all & 2u) != 0u {
+            add_blend(i, s, l);
+        }
         return;
     }
-    let l = pick(i, s);
-    if l != NONE {
-        add(i, l);
-    }
+    add_turns(i, l);
 }
 
 // (G5d) phase 1: what the frame before saw (or what changed since), in the view
@@ -136,7 +201,8 @@ fn early(@builtin(global_invocation_id) gid: vec3u) {
     let s = spheres[i];
     if in_view(s) {
         let l = pick(i, s);
-        if l != NONE {
+        // (G7f) blended instances only in phase 2: they need the whole opaque depth, and draw nothing into it
+        if l != NONE && !blended(l) {
             add(i, l);
         }
     }
@@ -205,7 +271,10 @@ fn late(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
             let l = pick(i, s);
             if l != NONE {
                 hide = occluded(s);
-                if !hide && !drawn {
+                // (G7f) every blended instance phase 2 finds visible (phase 1 draws none)
+                if !hide && blended(l) {
+                    add_blend(i, s, l);
+                } else if !hide && !drawn {
                     add(i, l);
                 }
             }
