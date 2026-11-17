@@ -22332,6 +22332,12 @@ WRITE_HL_SPV: &[u32] = spv::WRITE_HL
   Renderer::new.  Made with `new` and changed field by field (it may grow)
   - `color: Format` -- the format of the colour targets: one without sRGB (the codes are blended as they are)
   - `frames_in_flight: usize` -- frames the CPU may record ahead of the GPU (1 ..= FRAMES_MAX)
+  - `separate_scratch: Option<bool>` -- (G6e3) a render pass of its own, after a barrier, for a run of layers whose fragment shader needs scratch memory
+    (fs_full, fs_fill, fs_text_all, the overlay's fs_fill) when the last such run before it took another pipeline: None
+    decides by the adapter (on for Intel under Vulkan: Mesa's driver gives such shaders of two draws the same scratch
+    memory with their own strides, on Gen9 they overwrote each other's spilled registers; docs/RENDER2D.md "Die anderen
+    Ziele (G6e3)"), Some forces it either way.  No pixel changes; on GPUs that draw in tiles each pass costs a store and
+    a load of the target
 
 **`impl RendererDesc`**
 

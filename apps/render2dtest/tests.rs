@@ -1058,12 +1058,12 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate, inst: None };
-    let list: [(&str, fn(&mut T)); 32] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
+    let list: [(&str, fn(&mut T)); 33] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
                                           ("arcs", arcs), ("dashes", dashes), ("curves", curves), ("fills", fills), ("hatches", hatches), ("layers", layers),
                                           ("changes", crate::scenes::changes), ("churn", crate::scenes::churn), ("visibility", crate::scenes::visibility), ("coords", crate::scenes::coords),
                                           ("phase", crate::scenes::phase), ("blocks", crate::blocks::blocks), ("transparency", crate::blocks::transparency), ("levels", levels), ("errors", errors),
                                           ("text", crate::textgpu::text), ("textdeep", crate::textgpu::textdeep), ("pick", crate::picks::pick), ("select", crate::picks::select),
-                                          ("snap", crate::picks::snap), ("pickchurn", crate::picks::churn), ("highlight", crate::hlov::highlight), ("overlay", crate::hlov::overlay),
+                                          ("snap", crate::picks::snap), ("pickchurn", crate::picks::churn), ("highlight", crate::hlov::highlight), ("repeat", crate::hlov::repeat), ("overlay", crate::hlov::overlay),
                                           ("cpu", crate::cpucmp::cpu), ("dxf", crate::dxftest::dxf)];
     let mut ran = false;
     for (name, f) in list {
