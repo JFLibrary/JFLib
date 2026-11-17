@@ -1231,13 +1231,15 @@ widgets                                                             [src/ui/ui_e
        the asm's buffer in bytes incl. the NUL (bits 0..22: the text holds at most cap - 1
        bytes) | TB_PASSWORD | TB_READONLY | TB_DIGITS | TB_SIGNED.  placeholder (or None)
        TB_PASSWORD: while it has the keyboard the input method's purpose is IP_PASSWORD (set
-       by the box itself, the purpose of before put back after; no plat::ime_purpose needed).
+       by the box itself, the purpose of before put back after; no plat::ime_purpose needed);
+       always one line (TB_MULTI with it is ignored).
        shows while the text is empty (cut with "…" where the box is narrower).
        ST_DISABLED via next_flags.
        EV_ACT: the text changed this frame; EV_COMMIT: Enter, Esc or focus lost; EV_FOCUS
        while it has the keyboard focus.
        Semantic record K_TEXTBOX: label = the text (one dot per character for passwords),
-       value = caret, max = selection anchor (byte indices; 0 while not focused), min = the
+       value = caret, max = selection anchor (byte indices of the label, of the dots for
+       passwords; 0 while not focused), min = the
        kind of box: (TB_MULTI | TB_PASSWORD | TB_READONLY) >> 24.
        TB_MULTI (U1): several lines (natural height 5 lines): Enter inserts a line break,
        Ctrl+Enter commits, Up / Down keep the preferred x, PgUp / PgDn move a view, Home /
@@ -8858,7 +8860,9 @@ history -- undo / redo for an app's own state
   h.undo(&mut state) / h.redo(&mut state) -> bool
   h.can_undo() / can_redo()            undo_label() / redo_label() -> the step's label;
                                        undo_value() / redo_value() -> the step as data
-  h.group_begin(label) / group_end()   the edits between them are one step
+  h.group_begin(label) / group_end()   the edits between them are one step (undo / redo
+                                       while one is open close it first: its edits so far
+                                       are the newest step, a later group_end does nothing)
   h.mark_saved() / dirty()             whether the state differs from the saved one
   h.mark_unsaved()                     the state counts as unsaved (a recovered copy)
   h.clear()
@@ -8905,13 +8909,15 @@ all back.  Text fields keep their own undo; the edits here are the app's.
 - **`fn record(&mut self, mut edit: Box<dyn Edit<S>>)`**
   record an edit that was already applied
 - **`fn undo(&mut self, s: &mut S) -> bool`**
-  take the newest step back -> false when there is none
+  take the newest step back -> false when there is none (an open group is closed first)
 - **`fn redo(&mut self, s: &mut S) -> bool`**
-  do the last undone step again -> false when there is none
+  do the last undone step again -> false when there is none (an open group is closed
+  first: with edits in it there is nothing to redo any more)
 - **`fn can_undo(&self) -> bool`**
 - **`fn can_redo(&self) -> bool`**
 - **`fn undo_label(&self) -> Option<&str>`**
-  the label of the step undo would take back
+  the label of the step undo would take back (an open group with edits: the outermost
+  group's)
 - **`fn redo_label(&self) -> Option<&str>`**
   the label of the step redo would do again
 - **`fn undo_value(&self) -> Option<&dyn core::any::Any>`**
@@ -10624,7 +10630,9 @@ TK_KEY: u32 = 0x8000_0000  // TermEv::Raw: a key (VK | MOD_* << 16), not a chara
 - **`fn set_prompt(&mut self, s: &str)`**
   the prompt before the input (SGR allowed)
 - **`fn set_mode(&mut self, mode: u8)`**
-  TM_LINE, TM_BUSY, TM_RAW or TM_SECRET
+  TM_LINE, TM_BUSY, TM_RAW or TM_SECRET; into or out of TM_SECRET the input typed so far
+  is dropped (overwritten): a hidden line showed in the next mode's input line, a visible
+  one became part of the secret
 - **`fn input_set(&mut self, s: &str, caret: usize)`**
   replace the input line; caret: a byte index (clamped to a character start)
 - **`fn input(&self) -> &str`**
@@ -10991,7 +10999,7 @@ state_save / state_load work there as well (the main window: its size only).
 and ignores them), w / h (DIP, the size before maximizing or minimizing), max (0 / 1).  A
 position off every monitor (a monitor that is gone) is centred on the work area of the
 nearest one.  [window ID] (decimal id): open (0 / 1) and x / y / w / h (DIP, relative to
-the owner's client area: the WinRect).  Only tool windows (WF_TOOL, not WF_DIALOG /
+the owner's client area: the WinRect; off every monitor: centred like the main window).  Only tool windows (WF_TOOL, not WF_DIALOG /
 WF_MODAL) are kept; sections of windows that did not run this time stay in the file.
 ```
 
