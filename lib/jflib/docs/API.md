@@ -105,13 +105,15 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/page.rs](#diagram_coresrcpagers) · [src/shape.rs](#diagram_coresrcshapers) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/shape.rs](#diagram_coresrcshapers) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
   <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers)
+- [diagram_view](#diagram_view) -- draws diagram pages (the display list of diagram_core) on render2d and gfx
+  <br>[src/fonts.rs](#diagram_viewsrcfontsrs) · [src/image.rs](#diagram_viewsrcimagers) · [src/view.rs](#diagram_viewsrcviewrs)
 
 ## ui
 
@@ -52290,8 +52292,12 @@ a file loses nothing, and the behaviour Visio files carry works without translat
   Strings, Sym                  the document's string table (compact cells)
   Extras                        what the file had and the model does not know (DF-03)
 
+  geometry::*                   (JD4) Geometry rows as paths of lines and cubic curves,
+                                transforms (pin, local pin, angle, flips, groups)
+  render::build(..) -> Drawing  (JD4) a page as a display list: fills, lines, line ends,
+                                texts laid out, pictures, in painter's order with a grid
+
 What is to come here, by stage of the plan:
-  JD4   geometry rows and transforms (pin, local pin, angle, flips, groups) for drawing
   JD6   the formula engine: parser of the universal syntax, evaluation over a dependency graph
         with incremental recalculation, units, inheritance, GUARD and locks
   JD7   glue, the dynamic connector with right-angle routing around obstacles, layout
@@ -52928,6 +52934,171 @@ a Del="1" mark; restore_row and restore_section remove it again.
 - **`fn update_settings(&mut self, f: impl FnOnce(&mut DocSettings)) -> Result<(), EditError>`**
   change the document settings (snap, glue, protection, default styles ...)
 
+### `diagram_core/src/geometry.rs`
+
+Source: [`lib/diagram_core/src/geometry.rs`](../lib/diagram_core/src/geometry.rs)
+
+```text
+geometry -- the Geometry sections of a shape as paths, and the transforms of shapes (JD4)
+
+  Xform                            an affine map (x, y) -> (a x + c y + e, b x + d y + f)
+  Path { subs } / Sub { start, segs, closed } / Seg::Line | Seg::Cubic
+                                   paths of straight lines and cubic Bézier curves: every row
+                                   type ends up as one of the two (arcs and ellipses as cubic
+                                   pieces of at most 90 degrees, NURBS and splines exactly as
+                                   Bézier pieces where they are polynomial, else sampled)
+  doc.geometry_paths(sheet, w, h)  the Geometry sections of a sheet with their flags (NoFill,
+                                   NoLine, NoShow, NoSnap) and paths in local coordinates
+  doc.local_xform(sheet)           local -> parent: Pin, LocPin, Angle, FlipX, FlipY
+  doc.page_xform(shape)            local -> page: the chain of groups up to the page
+  round_corners(path, r)           the Rounding cell: corners between straight lines rounded
+  nurbs_segments / parse_args      NURBS(...) and POLYLINE(...) values as the file keeps them
+
+Everything comes from the cached values (V) through inheritance (doc.resolve): nothing is
+recalculated (PLAN.md, "Fallen").  Local coordinates: inches, the origin at the bottom left
+corner of the shape's box, y up.  The row types follow [MS-VSDX] (Geometry section):
+MoveTo, LineTo, ArcTo (bow A: positive turns counter-clockwise, the arc's middle lies right
+of the chord), EllipticalArcTo (through the control point A, B; C the angle of the major
+axis, D major over minor), Ellipse (centre X, Y; ends of the two axes A, B and C, D),
+NURBSTo (E = NURBS(knotLast, degree, xType, yType, x, y, knot, weight, ...): the current
+point is the first control point with knot C and weight D, X, Y the last with knot A and
+weight B; type 0 means a fraction of Width / Height), PolylineTo (A = POLYLINE(xType, yType,
+x, y, ...)), SplineStart / SplineKnot, InfiniteLine (drawn 1000 inches each way), and the
+relative rows RelMoveTo, RelLineTo, RelCubBezTo, RelQuadBezTo, RelEllipticalArcTo in
+fractions of Width and Height.  Visio fills only closed sub-paths (end = start).
+
+A shape's transform to its parent (MS-VSDX, "Shape Transform"): move the local pin to the
+origin, flip (FlipX mirrors x, FlipY mirrors y), turn by Angle, move to the pin -- the pin
+lies in the parent's coordinates (the page, or the group's local ones).
+```
+
+- **`struct Xform`**
+  an affine map: (x, y) -> (a x + c y + e, b x + d y + f)
+  - `a: f64`
+  - `b: f64`
+  - `c: f64`
+  - `d: f64`
+  - `e: f64`
+  - `f: f64`
+
+**`impl Xform`**
+
+- **`const IDENTITY: Xform = Xform { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 0.0, f: 0.0 }`**
+- **`const fn translate(x: f64, y: f64) -> Xform`**
+- **`const fn scale(sx: f64, sy: f64) -> Xform`**
+- **`fn rotate(angle: f64) -> Xform`**
+  a turn by `angle` radians, counter-clockwise (y up)
+- **`fn then(&self, next: &Xform) -> Xform`**
+  first `self`, then `next`
+- **`fn apply(&self, p: [f64; 2]) -> [f64; 2]`**
+- **`fn apply_vec(&self, v: [f64; 2]) -> [f64; 2]`**
+  a direction (without the translation)
+- **`fn det(&self) -> f64`**
+- **`fn inverse(&self) -> Option<Xform>`**
+  the inverse (None: singular)
+- **`fn angle(&self) -> f64`**
+  the angle the x axis is turned to (radians, counter-clockwise)
+- **`fn scale_factor(&self) -> f64`**
+  how much lengths grow (the square root of |det|)
+
+- **`enum Seg`**
+  a piece of a sub-path: to a point, or a cubic Bézier curve (two control points, the end)
+  - `Line([f64; 2])`
+  - `Cubic([f64; 2], [f64; 2], [f64; 2])`
+
+**`impl Seg`**
+
+- **`fn end(&self) -> [f64; 2]`**
+
+- **`struct Sub`**
+  a sub-path: a start and pieces end to end; closed when it ends where it starts
+  - `start: [f64; 2]`
+  - `segs: Vec<Seg>`
+  - `closed: bool`
+
+**`impl Sub`**
+
+- **`fn end(&self) -> [f64; 2]`**
+- **`fn map(&self, m: &Xform) -> Sub`**
+  the same under a transform
+- **`fn reversed(&self) -> Sub`**
+  the same run backwards
+- **`fn hull(&self) -> [f64; 4]`**
+  the box of its points and control points (x0, y0, x1, y1)
+- **`fn flatten(&self, per_curve: usize, out: &mut Vec<[f64; 2]>)`**
+  the points along it, curves cut into `per_curve` straight pieces
+
+- **`struct Path`**
+  a path: sub-paths drawn together (filled even-odd)
+  - `subs: Vec<Sub>`
+
+**`impl Path`**
+
+- **`fn map(&self, m: &Xform) -> Path`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn hull(&self) -> Option<[f64; 4]>`**
+  the box of all points and control points (None: no points)
+
+- **`struct GeoSection`**
+  one Geometry section of a shape: its flags and its sub-paths in local coordinates
+  - `index: u32` -- IX of the section (Geometry1 is 0)
+  - `no_fill: bool`
+  - `no_line: bool`
+  - `no_show: bool`
+  - `no_snap: bool`
+  - `path: Path`
+
+```rust
+/// how far an infinite line is drawn each way (inches)
+INFINITE: f64 = 1000.0
+```
+
+**`impl Document`**
+
+- **`fn geometry_paths(&self, sheet: SheetRef, w: f64, h: f64) -> Vec<GeoSection>`**
+  the Geometry sections `sheet` really has (inherited ones included, deleted ones left out)
+  with their rows as paths in local coordinates; `w` and `h` are the shape's Width and
+  Height (the relative rows and the relative points of NURBS and POLYLINE need them)
+- **`fn local_xform(&self, sheet: SheetRef) -> Xform`**
+  the transform of a shape's local coordinates to its parent's (the page, or the local
+  coordinates of its group): T(Pin) R(Angle) Flip T(-LocPin)
+- **`fn page_xform(&self, shape: ShapeRef) -> Xform`**
+  the transform of a shape's local coordinates to its page's (or master's): its own,
+  then those of the groups around it
+
+- **`fn arc_cubics(c: [f64; 2], r: f64, start: f64, sweep: f64, out: &mut Vec<Seg>)`**
+  a circular arc (centre, radius, start angle, sweep in radians, positive counter-clockwise)
+  as cubic pieces of at most 90 degrees
+
+- **`fn parse_args(text: &str, name: &str) -> Option<Vec<f64>>`**
+  the numbers of a NURBS(...) or POLYLINE(...) value (None: not that function, or a part that
+  is no number)
+
+- **`struct Nurbs`**
+  a B-spline (rational where the weights differ) on a full knot vector
+  - `degree: usize`
+  - `points: Vec<[f64; 2]>`
+  - `weights: Vec<f64>`
+  - `knots: Vec<f64>`
+
+**`impl Nurbs`**
+
+- **`fn valid(&self) -> bool`**
+  degree 1 to 9, a positive weight per point, n + degree + 1 knots that do not fall
+- **`fn segments(&self, out: &mut Vec<Seg>)`**
+  the curve as pieces: exact cubic Béziers for a clamped polynomial spline of degree 1 to
+  3 (knots inserted until every piece is a Bézier), else straight pieces sampled on every
+  knot span; the first piece starts at the curve's start
+- **`fn at(&self, t: f64) -> [f64; 2]`**
+  the point at parameter t (de Boor, in homogeneous coordinates)
+
+- **`fn round_corners(path: &Path, r: f64) -> Path`**
+  the corners between two straight pieces rounded with radius r (the Rounding cell; at most
+  half of each piece is taken), in every sub-path
+
+- **`fn cubic_at(p0: [f64; 2], p1: [f64; 2], p2: [f64; 2], p3: [f64; 2], t: f64) -> [f64; 2]`**
+  the point of a cubic Bézier curve at t
+
 ### `diagram_core/src/inherit.rs`
 
 Source: [`lib/diagram_core/src/inherit.rs`](../lib/diagram_core/src/inherit.rs)
@@ -53162,6 +53333,368 @@ the sheets are shape IDs of the same page or master.
   - `header: StyleHeader` -- the attributes
   - `sheet: Sheet` -- its cells
   - `extras: Extras` -- unknown items of the StyleSheet element
+
+### `diagram_core/src/render/mod.rs`
+
+Source: [`lib/diagram_core/src/render/mod.rs`](../lib/diagram_core/src/render/mod.rs)
+
+```text
+render -- a page as a display list (JD4, milestone "viewer"): what is drawn where, in which
+order, with which look; the drawing itself is someone else's (diagram_view on render2d and
+gfx, later the exports of diagram_io)
+
+  render::build(&doc, page, &mut measure, &Options) -> Drawing
+  Drawing { width, height, scale, items, fonts, notes }   in paper inches, y up, the origin at
+                                  the page's bottom left corner; items in painter's order
+  drawing.query(rect, &mut out)   the items whose boxes touch a rectangle (a grid over the
+                                  page: culling and hit tests without looking at every item)
+  Item { shape, top, bbox, role, kind }   role: Shape | Arrow | Shadow | Text; kind: Fill { path, paint } | Stroke { path, stroke } |
+                                  Text(TextItem) | Image(ImageItem)
+  Paint::Solid | Hatch | Gradient, Stroke { color, width, dash, cap, join }
+  Measure / Face / ApproxMeasure  (text.rs) what the text layout asks of fonts
+  ThemeInfo                       (theme.rs) colours and fonts of a theme part
+  style::{dash, fill_pattern, arrow, PALETTE}   the tables behind lines and fills
+
+Everything comes from the cached values (decision: the viewer shows what the file cached,
+the formula engine of JD6 is not needed).  Per page: its background page first (and theirs),
+then its shapes in z-order; a group draws its children and its own geometry and text behind
+them (DisplayMode 1) or in front (2, the default; 0 hides the group's own geometry).  Per
+shape: the shadow (ShdwPattern above 0, offset by ShapeShdwOffsetX/Y), the fill of all
+closed sub-paths of the Geometry sections without NoFill (even-odd), a Foreign shape's
+picture, the lines of the sections without NoLine with their line ends, the text.  Not
+drawn: deleted subshapes (Del, ID 4294967295, no Type), guides, sections with NoShow,
+shapes whose layers are all hidden.  A layer's colour (Color not 255) colours its members.
+
+Values Visio caches as "Themed" (the Theme style and a few shapes) are resolved against the
+page's theme: the theme part whose schemeEnum the page's ThemeIndex names (colours by
+ColorSchemeIndex, fonts by FontSchemeIndex), the QuickStyle colour indices of the shape, the
+variation of VariationColorIndex; the rest falls back to plain values (solid, 0.75 pt,
+no gradient, no shadow).  On a page with a drawing scale, geometry is in drawing units and
+line weights, text sizes and margins are in page units: the display list is in paper
+inches (geometry times PageScale / DrawingScale).
+```
+
+- **`struct Options`**
+  what build draws
+  - `background: bool` -- draw the page's background pages under it
+  - `hidden_layers: bool` -- draw shapes on hidden layers too
+
+- **`struct Drawing`**
+  a page as items to draw
+  - `page: Option<PageRef>`
+  - `width: f64` -- the page's size in paper inches
+  - `height: f64`
+  - `scale: f64` -- paper inches per drawing inch (PageScale / DrawingScale)
+  - `color: u32` -- the page's colour (0xRRGGBB)
+  - `items: Vec<Item>`
+  - `fonts: BTreeSet<String>` -- the font families the texts ask for
+  - `notes: Vec<(Note, u32)>` -- what was left out or drawn only roughly, with counts
+
+**`impl Drawing`**
+
+- **`fn query(&self, rect: [f64; 4], out: &mut Vec<u32>)`**
+  the items whose boxes touch `rect` (x0, y0, x1, y1, paper inches), ascending
+- **`fn bounds(&self) -> Option<[f64; 4]>`**
+  the box of all items (None: nothing to draw)
+
+- **`enum Note`**
+  what the viewer does not draw (yet), or draws only roughly
+  - `Metafile` -- a picture in a format the drawing side does not decode (EMF, WMF, OLE): a placeholder
+  - `NoPicture` -- a Foreign shape without picture data
+  - `CompoundLine` -- a double or triple line (CompoundType): drawn single
+  - `LineGradient` -- a line gradient: drawn in the first stop's colour
+  - `Effects` -- 3D, bevel, glow, reflection, soft edges, sketch: left out
+  - `CustomLinePattern` -- a line pattern of a master (LinePattern above 23): drawn solid
+  - `Guide` -- a guide: not drawn
+  - `SimpleShadow` -- a shadow drawn without blur, oblique type or scale
+
+- **`struct Item`**
+  one thing to draw
+  - `shape: ShapeRef` -- the shape it belongs to
+  - `top: ShapeRef` -- that shape's top-level group (or itself): what a click selects
+  - `bbox: [f64; 4]` -- its box (paper inches), lines with half their width
+  - `role: Role` -- what it is part of
+  - `kind: ItemKind`
+
+- **`enum Role`**
+  what an item draws of its shape
+  - `Shape` -- the geometry, its fill and its lines, or the picture
+  - `Arrow` -- a line end
+  - `Shadow`
+  - `Text` -- the text, its background, its underlines
+
+- **`enum ItemKind`**
+  - `Fill { path: Path, paint: Paint }` -- closed sub-paths filled even-odd
+  - `Stroke { path: Path, stroke: Stroke }`
+  - `Text(Box<TextItem>)`
+  - `Image(Box<ImageItem>)`
+
+- **`enum Paint`**
+  how an area is filled
+  - `Solid(u32)` -- 0xAARRGGBB
+  - `Hatch { color: u32, lines: Vec<(f64, f64)> }` -- parallel lines in a colour (the background is an item of its own before it): angle
+    (radians, counter-clockwise) and spacing (inches) per family
+  - `Gradient(Box<Gradient>)`
+
+- **`struct Gradient`**
+  a gradient: linear from `from` (position 0) to `to` (1), or radial around `from` with the
+  radius |to - from|; stops ascending
+  - `radial: bool`
+  - `from: [f64; 2]`
+  - `to: [f64; 2]`
+  - `stops: Vec<(f64, u32)>` -- (position 0..1, 0xAARRGGBB)
+
+**`impl Gradient`**
+
+- **`fn at(&self, t: f64) -> u32`**
+  the colour at position t (0 .. 1), straight alpha
+
+- **`enum Cap`**
+  how a line ends and turns
+  - `Round`
+  - `Butt`
+  - `Square`
+
+- **`enum Join`**
+  - `Round`
+  - `Miter`
+  - `Bevel`
+
+- **`struct Stroke`**
+  a line's look
+  - `color: u32` -- 0xAARRGGBB
+  - `width: f64` -- inches; 0: a hairline (one pixel)
+  - `dash: Vec<f64>` -- lengths on and off in inches (empty: solid)
+  - `cap: Cap`
+  - `join: Join`
+
+- **`struct ImageItem`**
+  a picture: its pixels' rectangle (0..1 by 0..1 of the picture, y up) mapped to the page,
+  clipped to the shape's box
+  - `xform: Xform`
+  - `clip: [[f64; 2]; 4]` -- the shape's box on the page (the picture is cut there)
+  - `source: ImageSource`
+  - `format: String` -- what ForeignData says it is (CompressionType, ForeignType), lower case: "png", "jpeg",
+    "emf", "wmf", "bmp", "gif", "tiff" ... ("" unknown); the drawing side looks at the bytes
+
+- **`enum ImageSource`**
+  - `Part(Sym)` -- a part of the package: Document::parts, by name
+  - `Inline(Box<str>)` -- base64 as the file wrote it
+
+- **`fn build(doc: &Document, page: PageRef, measure: &mut dyn Measure, opts: &Options) -> Drawing`**
+  the display list of a page
+
+- **`fn parse_color(t: &str) -> Option<u32>`**
+  "#RRGGBB" (also "RGB(r,g,b)") -> 0xRRGGBB
+
+- **`fn with_alpha(rgb: u32, trans: f64) -> u32`**
+  0xRRGGBB with a transparency 0 .. 1 -> 0xAARRGGBB
+
+### `diagram_core/src/render/index.rs`
+
+Source: [`lib/diagram_core/src/render/index.rs`](../lib/diagram_core/src/render/index.rs)
+
+```text
+index -- a uniform grid over a drawing's items: which items touch a rectangle, without
+looking at all of them (culling for the drawing side, hit tests for JD7)
+
+  Grid::build(&items, bounds)     up to 128 x 128 cells over the bounds; an item lands in
+                                  every cell its box touches, an item over more than 1024
+                                  cells in a list that every query looks at
+  grid.query(rect, &mut out)      the items touching rect, ascending (painter's order)
+
+Building is linear in the items times their cells (bounded per item); a query costs the
+cells of its rectangle plus what lies in them.  Nothing is quadratic in the number of items.
+```
+
+- **`struct Grid`**
+
+**`impl Grid`**
+
+- **`fn build(items: &[Item], bounds: [f64; 4]) -> Grid`**
+- **`fn query(&self, rect: [f64; 4], out: &mut Vec<u32>)`**
+
+### `diagram_core/src/render/style.rs`
+
+Source: [`lib/diagram_core/src/render/style.rs`](../lib/diagram_core/src/render/style.rs)
+
+```text
+style -- the tables behind lines and fills (JD4): Visio's 24 colours, line patterns, fill
+patterns, and line ends drawn by JFDiagrammer itself
+
+  PALETTE[i]                      the colours of index 0 .. 23 (the document's Colors table
+                                  comes first)
+  dash(pattern) -> &[f64]         LinePattern 2 .. 23 in multiples of the line's weight
+  fill_pattern(p) -> FillKind     FillPattern 2 .. 24 as hatches, 25 .. 40 as the old
+                                  two-colour gradients
+  arrow(kind, size, weight)       BeginArrow / EndArrow 1 .. 45 with the size 0 (very small)
+                                  .. 6 (colossal): JFDiagrammer's own line ends, pointing to
+                                  +x with the tip at the origin, and how far the line stops
+                                  short of the tip
+
+The tables are JFDiagrammer's own approximations of what the numbers mean (FEATURES.md
+FM-01 .. FM-03); no artwork is taken from Visio.  Arrow kinds group into families (open,
+filled and hollow triangles, notched, circles, diamonds, squares, bars, crow's feet); where
+a number's look is unknown it gets the nearest family.  One place to tune them once the
+reference exports (PLAN.md, "Testen") show the differences.
+```
+
+```rust
+/// Visio's default colours 0 .. 23
+PALETTE: [u32; 24] = [ 0x000000, 0xFFFFFF, 0xFF0000, 0x00FF00, 0x0000FF, 0xFFF ...
+```
+
+- **`fn dash(pattern: u32) -> Option<&'static [f64]>`**
+  a line pattern as lengths on and off in multiples of the line's weight (at least 1 pt);
+  None: solid (1, unknown numbers, the patterns of masters above 23)
+
+- **`enum FillKind`**
+  what a FillPattern number draws
+  - `None`
+  - `Solid`
+  - `Hatch(&'static [(f64, f64)])` -- lines in the foreground colour over the background colour: up to two families (angle in
+    degrees, spacing in inches)
+  - `Legacy(Legacy)` -- the old gradients from the foreground to the background colour
+
+- **`enum Legacy`**
+  the old two-colour gradients (FillPattern 25 .. 40)
+  - `Linear(f64, bool)` -- along an angle (degrees, 0: left to right, 90: bottom to top), mirrored: background at
+    both ends
+  - `Radial(f64, f64)` -- from a point of the box (fractions, 0..1) outwards
+
+- **`fn fill_pattern(p: u32) -> FillKind`**
+
+- **`struct Arrow`**
+  a line end in its own space: the tip at the origin, the line coming in from -x
+  - `fill: Path` -- filled in the line's colour
+  - `stroke: Path` -- stroked with the line's style
+  - `setback: f64` -- how far the line stops short of the tip
+
+- **`fn arrow_length(size: u32, weight: f64) -> f64`**
+  how long a line end of `size` (0 .. 6) is on a line of `weight` inches
+
+- **`fn arrow(kind: u32, size: u32, weight: f64) -> Option<Arrow>`**
+  the line end `kind` (1 .. 45) of `size` on a line of `weight` inches
+
+### `diagram_core/src/render/text.rs`
+
+Source: [`lib/diagram_core/src/render/text.rs`](../lib/diagram_core/src/render/text.rs)
+
+```text
+text -- a shape's text laid out in its text block (JD4): runs of characters, paragraphs,
+wrapping, alignment, the text block's transform and margins
+
+  Measure                         what the layout asks of fonts: the advance of a text at a
+                                  font size of 1 inch, ascent and descent; the drawing side
+                                  (diagram_view) measures with the fonts it draws with
+  ApproxMeasure                   half an em per character (tests, no fonts at hand)
+  TextItem { xform, runs }        lines of runs in the text frame (paper inches, y up) and
+                                  the frame's map to the page; decorations and the text
+                                  background come as their own stroke and fill items
+
+The text comes as the file keeps it (Text: characters between cp, pp, tp and fld marks,
+JD3): a cp mark selects the Character row for what follows, a pp mark the Paragraph row; a
+field shows the text Visio cached in it (no formula is evaluated); LF ends a paragraph,
+U+2028 breaks a line inside one, the last LF of a text is Visio's end mark and makes no empty
+paragraph.  Character cells: Font, Size, Color, ColorTrans, Style (1 bold, 2 italic,
+4 underline, 8 small caps), Case (1 all caps, 2 initial caps), Pos (1 superscript,
+2 subscript), Strikethru, DblUnderline, Overline, FontScale, Letterspace.  Paragraph cells:
+IndFirst, IndLeft, IndRight, SpLine (below 0: a multiple of the font size, above 0: inches,
+0: 120 %), SpBefore, SpAfter, HorzAlign (0 left, 1 centre, 2 right, 3 justified and 4
+distributed drawn left), Bullet and BulletStr.  Text block cells: the four margins,
+VerticalAlign (0 top, 1 middle, 2 bottom), TextBkgnd (0 none, else a colour; a number is a
+colour index plus one), TextDirection (1: vertical), DefaultTabStop.  Lines wrap at spaces
+(a word wider than the line at characters); text that does not fit overflows the block
+the way VerticalAlign says.
+```
+
+- **`struct Face<'a>`**
+  a font as the text asks for it: the family the file names, bold, italic
+  - `family: &'a str`
+  - `bold: bool`
+  - `italic: bool`
+
+- **`trait Measure`**
+  what the layout needs of fonts
+  - `fn advance(&mut self, face: &Face, text: &str) -> f64`
+    the advance of `text` (one line, no control characters) at a font size of 1 inch, in
+    inches
+  - `fn metrics(&mut self, _face: &Face) -> (f64, f64)`
+    ascent and descent in em, both positive
+
+- **`struct ApproxMeasure`**
+  half an em per character, a fifth for a space
+
+- **`struct TextItem`**
+  a shape's text, laid out
+  - `xform: Xform` -- the text frame (paper inches, y up, its origin at the block's bottom left corner) to the
+    page: a turn and a move, never a mirror (a flipped shape's text stays readable)
+  - `runs: Vec<TextRun>`
+
+- **`struct TextRun`**
+  a piece of one line in one format
+  - `at: [f64; 2]` -- where its baseline starts (frame)
+  - `text: String`
+  - `family: String` -- the font family as the file names it (the drawing side substitutes)
+  - `bold: bool`
+  - `italic: bool`
+  - `size: f64` -- the font size (em) in inches
+  - `color: u32` -- 0xAARRGGBB
+  - `scale_x: f64` -- FontScale: how much wider the glyphs are (1: as they are)
+  - `spacing: f64` -- Letterspace: added after every character (inches)
+  - `width: f64` -- the measured advance with scale and spacing (inches)
+
+### `diagram_core/src/render/theme.rs`
+
+Source: [`lib/diagram_core/src/render/theme.rs`](../lib/diagram_core/src/render/theme.rs)
+
+```text
+theme -- what the viewer needs of a DrawingML theme with Visio's extensions (JD4)
+
+  ThemeInfo::parse(bytes)          colours (dk1, lt1, dk2, lt2, accent1-6, hlink, folHlink),
+                                   the variation colours (vt:variationClrScheme, 7 each), the
+                                   background (vt:bkgnd), the major and minor Latin fonts, the
+                                   line widths of the format scheme, and the scheme IDs
+                                   (vt:schemeID schemeEnum) a page's ThemeIndex and
+                                   ColorSchemeIndex cells point at
+  ThemeInfo::quick_color(index, variation)   a QuickStyle colour index -> RGB
+
+Pages do not name their theme by a relationship: Visio keeps all themes at the document and
+a page picks one by the schemeEnum of its ThemeIndex (the theme), ColorSchemeIndex (the
+colours) and FontSchemeIndex (the fonts) cells (JD3, finding).  The viewer draws the cached
+values; a theme is needed only where a value is literally "Themed" (the Theme style and a few
+shapes) and for the theme's background.  A small tolerant scanner reads the part: elements,
+attributes, nothing else; anything it does not understand is skipped.
+```
+
+- **`struct ThemeInfo`**
+  the parts of a theme the viewer uses
+  - `name: String` -- a:theme name
+  - `colors: [Option<u32>; 12]` -- 0xRRGGBB of dk1, lt1, dk2, lt2, accent1 .. accent6, hlink, folHlink (None: not given)
+  - `variations: Vec<[Option<u32>; 7]>` -- the variation colour schemes, 7 colours each
+  - `background: Option<u32>` -- vt:bkgnd
+  - `major_font: String` -- the Latin typefaces of the major (headings) and minor (body) fonts
+  - `minor_font: String`
+  - `line_widths: Vec<f64>` -- a:lnStyleLst widths in inches (the line style matrix 1, 2, 3 ...)
+  - `scheme_ids: [Option<u32>; 4]` -- the schemeEnum of the colour scheme, the font scheme, the format scheme and the theme
+    as a whole (vt:themeScheme), in that order; every other schemeID found after them
+  - `other_ids: Vec<u32>`
+
+**`impl ThemeInfo`**
+
+- **`fn parse(data: &[u8]) -> Option<ThemeInfo>`**
+  the theme of a theme part (None: not a theme)
+- **`fn has_scheme(&self, id: u32) -> bool`**
+  whether the theme's own scheme (vt:themeScheme), or else any of its schemes, has this ID
+- **`fn color(&self, i: usize) -> u32`**
+  a scheme colour 0 .. 11 (dk1, lt1, dk2, lt2, accent1-6, hlink, folHlink)
+- **`fn quick_color(&self, index: u32, variation: usize) -> Option<u32>`**
+  a QuickStyle colour index (QuickStyleLineColor, ...FillColor, ...FontColor): 0 dark 1,
+  1 light 1, 2 to 7 accent 1 to 6, 8 dark 2, 9 light 2, 100 to 106 the variation colours
+  1 to 7 of `variation`, 200 the background
+
+- **`fn no_theme_color(index: u32) -> u32`**
+  QuickStyle colours without a theme
 
 ### `diagram_core/src/shape.rs`
 
@@ -54944,3 +55477,188 @@ FlateDecode with PNG predictors and their alpha as a soft mask (SMask)
   width and height in pixels
 - **`fn is_jpeg(&self) -> bool`**
 - **`fn has_alpha(&self) -> bool`**
+
+## diagram_view
+
+*draws diagram pages (the display list of diagram_core) on render2d and gfx* -- crate root [`lib/diagram_view/src/lib.rs`](../lib/diagram_view/src/lib.rs)
+
+```text
+diagram_view -- draws diagram pages (the display list of diagram_core) on render2d and gfx
+
+  FontSet / Class / FontSource     the fonts texts are drawn with (the app hands them over:
+                                   its style's fonts, installed ones); missing families are
+                                   substituted by class with a width factor (TX-09)
+  PageView::new(&doc, page, &mut fonts, &opts)   a page as a render2d scene (made without a
+                                   device) plus gradients and pictures
+  view.draw(dc, sf, r, &cam)       on the CPU: render2d's CPU path, gfx in between
+  view.render(w, h) -> Surface     the whole page as an XRGB image (tests, exports, thumbnails)
+  view.fit(size, margin) -> Camera
+  image::{bytes, decode, base64}   Foreign shapes' pictures: PNG and JPEG decoded, EMF / WMF
+                                   and the rest as placeholders
+
+Why a crate of its own (JD4): diagram_core holds the model and the display list without any
+dependency, so that diagram_io's exports (SVG, PDF, JD12) and JD7's hit tests use the same
+list; drawing it needs render2d (and through it the GPU layer), gfx and the image codecs,
+which neither the model nor the file formats should pull in.  ui knows nothing of diagrams:
+the app connects a PageView to its canvas (ui.diagram's DgPaint, or a ui.gpu_view later).
+
+What render2d's scene cannot hold -- gradient fills and pictures -- is drawn by gfx between
+two of the scene's layers on the CPU path; a scene attached to a GPU (Scene::attach) shows
+everything else.  Coordinates: paper inches, y up, the origin at the page's bottom left
+corner (render2d's camera has y up too).
+```
+
+### `diagram_view/src/fonts.rs`
+
+Source: [`lib/diagram_view/src/fonts.rs`](../lib/diagram_view/src/fonts.rs)
+
+```text
+fonts -- the fonts a diagram's texts are drawn with, and the substitution of missing ones
+
+  FontSet::new()                          empty: the app adds what it has
+  set.add(Class::Sans, bold, italic, bytes)   a font of the substitution set (TrueType or
+                                           OpenType bytes); the app's own (its style's) fonts
+  set.add_family("Calibri", bold, italic, bytes, face)   a font under its own name (an
+                                           installed font the app found)
+  set.set_source(Box<dyn FontSource>)     asked once per family the set does not know (the
+                                           app looks at the installed fonts there)
+  class_of(family) -> Class               serif, monospaced or sans by the family's name
+  SAMPLE_WIDTHS                            how wide common fonts set a sample line (em)
+
+TX-09: a family the set does not have is drawn with the set's font of its class (sans when
+the class is missing too), stretched by the width factor that makes the sample line as wide
+as in the missing font (Calibri set in Inter: about 0.85), so lines wrap about where Visio
+wraps them.  An italic without its own face leans 0.2 radians (synthetic), a bold without its
+own face stays regular.  Only fonts the app hands over are used; the crate embeds none.
+```
+
+- **`enum Class`**
+  what kind of face a family is (the substitution goes by it)
+  - `Sans`
+  - `Serif`
+  - `Mono`
+
+- **`trait FontSource`**
+  installed fonts the app knows how to find
+  - `fn find(&mut self, family: &str, bold: bool, italic: bool) -> Option<(Vec<u8>, u32)>`
+    the bytes and face index of `family` in this style, if installed
+
+- **`struct FontSet`**
+  the fonts a page view may use
+
+**`impl FontSet`**
+
+- **`fn new() -> FontSet`**
+- **`fn add(&mut self, class: Class, bold: bool, italic: bool, data: &[u8])`**
+  a face of the substitution set
+- **`fn add_family(&mut self, family: &str, bold: bool, italic: bool, data: &[u8], index: u32)`**
+  a face under its family name
+- **`fn set_source(&mut self, source: Box<dyn FontSource>)`**
+  where faces of unknown families are looked for
+- **`fn is_empty(&self) -> bool`**
+
+- **`fn class_of(family: &str) -> Class`**
+  serif, monospaced or sans by the family's name
+
+```rust
+/// the sample line the widths are measured on
+SAMPLE: &str = "The quick brown fox jumps over the lazy dog 0123456789"
+/// how wide common fonts set SAMPLE (em, regular and bold): advance widths from the fonts'
+/// metrics, the numbers only
+SAMPLE_WIDTHS: &[(&str, f64, f64)] = &[ ("Calibri", 23.4209, 23.8364), ("Calibri Light", 23.0, ...
+```
+
+- **`fn sample_width(family: &str, bold: bool) -> Option<f64>`**
+  the sample width of a family (regular or bold), if the table knows it
+
+### `diagram_view/src/image.rs`
+
+Source: [`lib/diagram_view/src/image.rs`](../lib/diagram_view/src/image.rs)
+
+```text
+image -- the pictures of Foreign shapes: bytes from the package or inline base64, decoded
+
+  bytes(doc, &ImageSource) -> Option<Vec<u8>>   a part's bytes, or the inline data decoded
+  decode(bytes) -> Picture                      PNG and JPEG as pixels (straight ARGB rows);
+                                                EMF, WMF and anything else: a placeholder
+  base64(text)                                  RFC 4648 with padding and line breaks
+
+The format is told by the bytes (the signatures), not by the file's attributes.  A picture
+larger than MAX_SIDE on a side is not decoded (a placeholder): a page shows it scaled down
+anyway, and a hostile file must not make the view allocate gigabytes.
+```
+
+```rust
+/// the largest side of a picture the view decodes
+MAX_SIDE: u32 = 8192
+```
+
+- **`struct Picture`**
+  a decoded picture: w x h pixels, 0xAARRGGBB straight, rows top to bottom
+  - `w: u32`
+  - `h: u32`
+  - `px: Vec<u32>`
+
+- **`enum Decoded`**
+  what a picture became
+  - `Picture(Picture)`
+  - `Placeholder(&'static str)` -- not decodable here: the format's name ("EMF", "WMF", "?")
+
+- **`fn bytes(doc: &Document, src: &ImageSource) -> Option<Vec<u8>>`**
+  the bytes of a picture
+
+- **`fn decode(data: &[u8]) -> Decoded`**
+  decode a picture by its signature
+
+- **`fn base64(s: &[u8]) -> Option<Vec<u8>>`**
+  base64 with padding; whitespace is skipped; None: a character outside the alphabet
+
+### `diagram_view/src/view.rs`
+
+Source: [`lib/diagram_view/src/view.rs`](../lib/diagram_view/src/view.rs)
+
+```text
+view -- a page of a diagram as a render2d scene plus what the scene cannot hold
+
+  PageView::new(&doc, page, &mut fonts, &opts)   the display list (diagram_core::render,
+                                   texts measured with the fonts drawn), the scene made of
+                                   it, pictures decoded
+  view.draw(dc, sf, r, &cam)       the page on the CPU into the rectangle r of a surface
+                                   (render2d's CPU path; gradients and pictures in between)
+  view.render(w, h) -> Surface     the page fitted into w x h pixels on its colour (XRGB)
+  view.fit(size, margin_px) -> Camera   the camera showing the whole page
+  view.drawing() / substitutions() / scene()
+
+The scene: render2d layers in painter's order.  A run of items render2d can draw (solid and
+hatched fills, lines with dashes, caps and joins, texts) lies on one layer; a gradient fill or
+a picture ends the run and is drawn by gfx between two layers (direct.rs).  On the CPU each
+layer is drawn on its own while the others are hidden, so the order holds.  On a GPU
+(Scene::attach, the app's choice) the same scene shows everything but those items.
+```
+
+```rust
+/// how far a synthetic italic leans (radians)
+SYNTHETIC_ITALIC: f64 = 0.2
+```
+
+- **`struct PageView`**
+  a page ready to draw
+
+**`impl PageView`**
+
+- **`fn new(doc: &Document, page: PageRef, fonts: &mut FontSet, opts: &Options) -> PageView`**
+  the page as a scene without a device
+- **`fn drawing(&self) -> &Drawing`**
+- **`fn scene(&mut self) -> &mut Scene`**
+- **`fn substitutions(&self) -> &[String]`**
+  the font families drawn with a substitute (TX-09: shown to the user)
+- **`fn refused(&self) -> u32`**
+  items render2d did not take (geometry it calls invalid)
+- **`fn fit(&self, size: (u32, u32), margin: f64) -> Camera`**
+  the camera that shows the whole page in a target of `size`, `margin` pixels around it
+- **`fn draw(&mut self, dc: &mut Dc, sf: &mut Surface, r: [i32; 4], cam: &Camera)`**
+  the page on the CPU into the rectangle r (x, y, w, h relative to dc's origin) of sf,
+  over what is there (the app paints the page's paper first)
+- **`fn render(&mut self, w: u32, h: u32) -> Surface`**
+  the page fitted into w x h pixels (a margin of 2 % around it) on the canvas grey, the
+  page in its colour: an XRGB surface

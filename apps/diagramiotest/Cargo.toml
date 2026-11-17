@@ -25,6 +25,11 @@ archive.workspace = true
 img_core.workspace = true
 diagram_core.workspace = true
 diagram_io.workspace = true
+# the viewer tests (JD4): drawing pages, the pictures of the test drawings
+diagram_view.workspace = true
+gfx.workspace = true
+img_png.workspace = true
+img_jpeg.workspace = true
 
 [build-dependencies]
 jflib-build.workspace = true

@@ -7,8 +7,8 @@ plain Rust, without the standard library and without a line of `unsafe` code.
 
 The model is being built in stages; the plan is
 [apps/JFDiagrammer/PLAN.md](https://github.com/JFLibrary/JFLib/blob/main/apps/JFDiagrammer/PLAN.md)
-(in German). The document model is there; the formula engine, geometry, glue, connector routing
-and layout follow.
+(in German). The document model is there, and the geometry and display list a viewer draws; the
+formula engine, glue, connector routing and layout follow.
 
 ## What it holds
 
@@ -26,6 +26,14 @@ and layout follow.
   every unit code a cell can show (millimetres, points, degrees, feet, ciceros ...).
 - **Edits in transactions:** each transaction is one undo step, kept as the inverse of what it
   changed, so undo costs what the change costs, not what the drawing weighs.
+- **Geometry:** every row type of a Geometry section (lines, circular and elliptical arcs,
+  ellipses, NURBS, polylines, splines, infinite lines, the relative rows) as paths of lines and
+  cubic curves, and the transforms of shapes and groups (pin, local pin, angle, flips).
+- **A display list per page** (`render::build`): what a viewer draws, in order, from the values
+  the file cached -- fills, lines with patterns and line ends, texts laid out in their blocks,
+  pictures, background pages, layers, the page's theme -- with a grid to find items by place.
+  The drawing itself is someone else's ([`jflib-diagram-view`](https://crates.io/crates/jflib-diagram-view)
+  draws it on render2d; exports read the same list).
 
 ```rust
 use jflib::diagram_core::{CellAddr, Document, SheetRef, Unit};
@@ -55,8 +63,8 @@ one version and are released together.
 ## What's new in 0.2.1
 
 jflib-diagram-core is new: the document model of pages, layers, masters, shapes and styles on
-ShapeSheet cells, with inheritance, units and an edit API with undo and redo. The formula engine,
-geometry and routing are still to come.
+ShapeSheet cells, with inheritance, units and an edit API with undo and redo; the geometry of
+shapes and a page's display list for viewers. The formula engine and routing are still to come.
 Everything is in the [changelog](https://docs.rs/crate/jflib-diagram-core/latest/source/CHANGELOG.md).
 
 ## Documentation

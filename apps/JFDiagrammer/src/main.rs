@@ -18,6 +18,8 @@
 //   src/panes.rs      task panes (dock), canvas and page tabs, status bar, context menus
 //   src/lang.rs       the five languages, switching at run time, the letter icons
 //   src/icons.rs      the ribbon icons (JD14: own artwork in icons/*.svg, mkicons.py)
+//   src/viewer.rs     (JD4) the drawing opened read-only: loading, pages, the canvas' paint
+//                     (diagram_core's display list drawn by diagram_view on render2d)
 //   lang/shortcuts.tsv   the shortcuts of each language (Office conventions, LG-08)
 //   lang/glossary.tsv    the binding terms in five languages (LG-06)
 //   check_lang.py        the language check (LG-11): catalogue, glossary, shortcuts
@@ -30,7 +32,9 @@
 //
 // Test aids: --shell-preview shape|container|text stands in for a selection of that kind until
 // JD7 brings real ones (context registers, the shape's menu, the measures in the status bar);
-// --config PATH keeps the settings in that file (headless runs keep them in memory otherwise).
+// --config PATH keeps the settings in that file (headless runs keep them in memory otherwise);
+// a drawing on the command line opens at start (JD4); --no-system-fonts draws with the style's
+// fonts only (the same on every machine).
 //
 //   python build_rs.py run JFDiagrammer
 //   python build_rs.py test JFDiagrammer          tests/*.uis
@@ -51,6 +55,7 @@ mod options;
 mod panes;
 mod ribbon;
 mod shell;
+mod viewer;
 
 use base::settings::Settings;
 use ui::i18n::{self, Catalog};
@@ -97,6 +102,20 @@ pub(crate) struct Diagrammer {
     pub preview: u8,
     /// the ribbon icons' hook (set in init)
     icons: Option<icons::Icons>,
+    /// (JD4) the drawing shown, read-only (None: the empty drawing)
+    pub opened: Option<viewer::Opened>,
+    /// a file that could not be opened: title and message of the notice
+    pub error: Option<(alloc::string::String, alloc::string::String)>,
+    /// the fonts pages are drawn with
+    pub fonts: diagram_view::FontSet,
+    /// Backstage › Öffnen: the file dialog, its path
+    pub open_dlg: Shared<i32>,
+    pub open_path: alloc::string::String,
+    /// Alle Seiten: open the list of pages next pass
+    pub pages_menu: bool,
+    /// fit the page once more after the canvas was laid out (a notice that came with the
+    /// drawing changes the canvas' height after the first fit)
+    pub fit_again: bool,
 }
 
 impl Diagrammer {
@@ -117,6 +136,13 @@ impl Diagrammer {
             format_tab: 0,
             preview: ribbon::SEL_NONE,
             icons: None,
+            opened: None,
+            error: None,
+            fonts: diagram_view::FontSet::new(),
+            open_dlg: Shared::new(0),
+            open_path: alloc::string::String::new(),
+            pages_menu: false,
+            fit_again: false,
         }
     }
 
@@ -127,7 +153,27 @@ impl Diagrammer {
 
     /// the drawing's name in the title bar
     pub(crate) fn drawing_name(&self) -> alloc::string::String {
-        i18n::tf("Zeichnung{}", &["1"])
+        match &self.opened {
+            Some(o) => o.name.clone(),
+            None => i18n::tf("Zeichnung{}", &["1"]),
+        }
+    }
+
+    /// the page tab shown, as an index into the open drawing's tabs
+    pub(crate) fn page_index(&self) -> usize {
+        self.page_tab.max(0) as usize
+    }
+
+    /// the next (1) or previous (-1) page tab
+    pub(crate) fn page_step(&mut self, ui: &mut Ui, dir: i32) {
+        let n = self.opened.as_ref().map_or(1, |o| o.tabs.len().max(1)) as i32;
+        let k = (self.page_tab + dir).rem_euclid(n);
+        if k != self.page_tab {
+            self.page_tab = k;
+            self.canvas.request_fit();
+            self.fit_again = true;
+            ui.repass();
+        }
     }
 
     /// open the File register on `page`
@@ -141,10 +187,8 @@ impl Diagrammer {
 
     /// Neu › Leere Zeichnung: back to the (empty) drawing
     pub(crate) fn new_blank(&mut self, ui: &mut Ui) {
-        self.backstage = None;
         self.template = None;
-        self.canvas.request_fit();
-        ui.repass();
+        viewer::close(self, ui);
     }
 
     /// zoom a step in (1) or out (-1) around the canvas' middle
@@ -197,6 +241,11 @@ impl App for Diagrammer {
         let theme = self.opts.get(&options::THEME);
         if theme != 0 && !ui.headless() {
             ui.theme_set(options::theme_mode(theme));
+        }
+        self.fonts = viewer::fonts();
+        // a drawing named on the command line
+        if let Some(path) = viewer::command_line_file() {
+            viewer::open(self, ui, &path);
         }
         true
     }

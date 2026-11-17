@@ -66,6 +66,7 @@ members = [
     "lib/diagram_core",
     "lib/diagram_io",
     "lib/pdf",
+    "lib/diagram_view",
     "lib/jflib",
     "lib/jflib_build",
     "lib/cargo_jflib",
@@ -222,6 +223,7 @@ render3d = { package = "jflib-render3d", path = "lib/render3d", version = "=0.2.
 render2d = { package = "jflib-render2d", path = "lib/render2d", version = "=0.2.1" }
 gltf = { package = "jflib-gltf", path = "lib/gltf", version = "=0.2.1" }
 pdf = { package = "jflib-pdf", path = "lib/pdf", version = "=0.2.1" }
+diagram_view = { package = "jflib-diagram-view", path = "lib/diagram_view", version = "=0.2.1" }
 style_winui = { package = "jflib-style-winui", path = "styles/winui", version = "=0.2.1" }
 style_classic = { package = "jflib-style-classic", path = "styles/classic", version = "=0.2.1" }
 style_kde = { package = "jflib-style-kde", path = "styles/kde", version = "=0.2.1" }

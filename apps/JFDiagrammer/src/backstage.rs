@@ -8,9 +8,10 @@
 //
 // Pages today: Neu shows the P1 templates as placeholder previews (rendered previews come with
 // the templates, JD13); a click opens the template's preview with its description, metric or
-// US units and "Erstellen" (UI-04), which works for the blank drawing.  Öffnen, Speichern,
-// Drucken and Exportieren show their layout with the commands disabled until reading and
-// writing exist (JD3 .. JD5, JD12).  Info names the version, the licences and the place of the
+// US units and "Erstellen" (UI-04), which works for the blank drawing.  Öffnen (JD4) browses
+// with the file dialog and lists the drawings opened last; they open read-only (viewer.rs).
+// Speichern, Drucken and Exportieren show their layout with the commands disabled until
+// writing exists (JD5, JD12).  Info names the version, the licences and the place of the
 // AWS attribution.  Optionen lists its pages at the side (options.rs).
 
 use alloc::format;
@@ -83,7 +84,7 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
     }
     match page {
         PAGE_NEW => new_page(app, ui),
-        PAGE_OPEN => open_page(ui),
+        PAGE_OPEN => open_page(app, ui),
         PAGE_SAVE | PAGE_SAVE_AS => save_page(ui, page == PAGE_SAVE_AS),
         PAGE_PRINT => print_page(ui),
         PAGE_EXPORT => export_page(ui),
@@ -220,17 +221,38 @@ fn preview(app: &mut Diagrammer, ui: &mut Ui, k: usize) {
 
 // ------------------------------------------------------------------ Öffnen, Speichern
 
-fn open_page(ui: &mut Ui) {
+fn open_page(app: &mut Diagrammer, ui: &mut Ui) {
     title(ui, t("Öffnen"));
     ui.box_begin(ID_PAGE, BOX_H, 24);
-    unavailable(ui, ID_PAGE + 1, t("Durchsuchen"), JD_OPEN_L);
+    ui.next_size(96, 66);
+    if ui.ribbon_button(ID_PAGE + 1, t("Durchsuchen"), JD_OPEN_L, ST_LARGE) & EV_ACT != 0 {
+        app.open_dlg.set(1);
+        ui.repass();
+    }
+    ui.tooltip(t("Eine Zeichnung, Schablone oder Vorlage öffnen (schreibgeschützt)"));
     ui.next_size(420, 0);
     ui.box_begin(0, BOX_V, 6);
     ui.text(TS_BODY_STRONG, t("Zuletzt verwendet"));
-    ui.next_size(420, 0);
-    ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Hier erscheinen die Zeichnungen, die Sie zuletzt geöffnet oder gespeichert haben."));
+    let recent = ui.recent_files();
+    if recent.is_empty() {
+        ui.next_size(420, 0);
+        ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Hier erscheinen die Zeichnungen, die Sie zuletzt geöffnet oder gespeichert haben."));
+    }
+    let mut chosen = None;
+    for (k, path) in recent.iter().take(12).enumerate() {
+        ui.next_size(420, 0);
+        ui.next_flags(ST_SUBTLE | ST_ALIGN_START);
+        ui.next_icon(JD_OPEN);
+        if ui.button(ID_PAGE + 0x10 + k as u32, &plat::display_name(path)) & EV_ACT != 0 {
+            chosen = Some(path.clone());
+        }
+        ui.tooltip(path);
+    }
     ui.box_end();
     ui.box_end();
+    if let Some(p) = chosen {
+        crate::viewer::open(app, ui, &p);
+    }
 }
 
 // i18n

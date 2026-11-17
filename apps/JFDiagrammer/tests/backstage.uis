@@ -21,7 +21,8 @@ expect text:"Vorlagen" exists
 click button:"Öffnen"
 expect button:"Öffnen" selected
 expect text:"Zuletzt verwendet" exists
-expect button:"Durchsuchen" disabled
+# (JD4) Durchsuchen opens the file dialog, Schließen closes the drawing
+expect button:"Durchsuchen" enabled
 # (#24580: the pane's Speichern; the quick access toolbar has one too)
 click #24580
 expect text:"Zeichnungen lassen sich noch nicht speichern." exists
@@ -32,7 +33,7 @@ expect text:"Seitenansicht" exists
 expect text:"Exemplare" exists
 click button:"Exportieren"
 expect button:"PDF/XPS-Dokument erstellen" disabled
-expect button:"Schließen" disabled
+expect button:"Schließen" enabled
 click button:"Info"
 expect text:"JFDiagrammer" exists
 expect text:"Lizenzen" exists

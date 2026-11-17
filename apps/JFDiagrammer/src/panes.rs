@@ -8,7 +8,9 @@
 //                             Ansicht › Aufgabenbereiche shows them, the layout is kept in the
 //                             settings)
 //   panels() / content(app, ui, id)   the panels' descriptions and contents
-//   center(app, ui)           the canvas and the page tabs under it
+//   center(app, ui)           the canvas and the page tabs under it; with an open drawing
+//                             (JD4) the page of the tab drawn by viewer.rs, one tab per page
+//                             (background pages after the others), Alle Seiten as a list
 //   status(app, ui)           page, measures of the selection, zoom
 //
 // Contents are placeholders until their stages: the Shapes panel shows the empty state (JD9
@@ -34,6 +36,7 @@ pub(crate) const P_PANZOOM: u32 = 14;
 pub(crate) const ID_DOCK: u32 = 500;
 const ID_CANVAS: u32 = 300;
 const ID_PAGES: u32 = 310;
+const ID_PAGES_ALL: u32 = 0x5A00;
 const ID_PANE: u32 = 0x5000;
 const ID_STATUS: u32 = 0x5800;
 const SIDEBAR_W: i32 = 240;
@@ -113,19 +116,36 @@ pub(crate) fn center(app: &mut Diagrammer, ui: &mut Ui) {
         st.name = name.into();
     }
     st.grid = if app.view_grid { 16.0 } else { 0.0 };
-    let model = DModel { nodes: &[], ports: &[], edges: &[], wps: &[], ver: 0 };
+    // the open drawing's page (JD4): its sheet as the model's one node, its paint
+    let k = app.page_index();
+    let paint = crate::viewer::paint(app, k);
+    let nodes: alloc::vec::Vec<DNode> = crate::viewer::sheet_node(app, k).into_iter().collect();
+    let ver = app.opened.as_ref().map_or(0, |o| o.serial.wrapping_mul(4096).wrapping_add(k as u32 + 1));
+    let model = DModel { nodes: &nodes, ports: &[], edges: &[], wps: &[], ver };
+    let st = &mut app.canvas;
+    let paint: Option<alloc::rc::Rc<dyn DgPaint>> = paint.map(|p| p as alloc::rc::Rc<dyn DgPaint>);
     ui.next_size(-1, -1);
-    ui.diagram(ID_CANVAS, st, &model, DG_SELECT, None, 0);
+    ui.diagram(ID_CANVAS, st, &model, DG_SELECT, paint, ver);
+    if app.fit_again {
+        app.fit_again = false;
+        app.canvas.request_fit();
+        ui.repass();
+    }
     // the shape's menu while a shape is selected, else the page's
     let menu: &'static [Mi] = if matches!(app.selection_kind(), SEL_SHAPE | SEL_CONTAINER | SEL_TEXT) { &SHAPE_MENU } else { &PAGE_MENU };
     ui.context_menu(i18n::menu(menu));
     // the page tabs (ZF-14): the page, the plus button, all pages
     ui.next_size(-1, 26);
     ui.box_begin(0, BOX_H | BOX_LAYER, 0);
-    let names = [tf("Seite-{}", &["1"])];
+    let names = page_names(app);
     let names: alloc::vec::Vec<&str> = names.iter().map(|s| s.as_str()).collect();
+    let before = app.page_tab;
     ui.next_size(-1, 26);
     ui.tabs_scrolling(ID_PAGES, &mut app.page_tab, &names);
+    if app.page_tab != before {
+        app.canvas.request_fit();
+        app.fit_again = true;
+    }
     // the page tab's menu: the menu key on the strip, a right click on a tab (the strip's
     // record is the last widget, its tabs lie above it)
     let strip = ui.last_rect();
@@ -140,8 +160,40 @@ pub(crate) fn center(app: &mut Diagrammer, ui: &mut Ui) {
         ui.cmd_button(id, ST_SUBTLE | ST_ICON_ONLY | ST_COMPACT);
         ui.tooltip(&commands::tip(ui, id));
     }
+    // Alle Seiten: the pages as a list at its button
+    if app.pages_menu {
+        app.pages_menu = false;
+        ui.popup_open(ID_PAGES_ALL);
+    }
+    if ui.flyout_begin(ID_PAGES_ALL, 0) {
+        pages_list(app, ui, ID_PAGES_ALL + 1);
+    }
+    ui.flyout_end();
     ui.box_end();
     ui.box_end();
+}
+
+/// the page tabs' names: the open drawing's pages, else the empty drawing's one
+pub(crate) fn page_names(app: &Diagrammer) -> alloc::vec::Vec<alloc::string::String> {
+    match &app.opened {
+        Some(o) if !o.tabs.is_empty() => o.tabs.iter().map(|t| t.name.clone()).collect(),
+        Some(_) => alloc::vec::Vec::new(),
+        None => alloc::vec![tf("Seite-{}", &["1"])],
+    }
+}
+
+// the pages as menu items (the page shown checked); a click shows that page
+fn pages_list(app: &mut Diagrammer, ui: &mut Ui, id0: u32) {
+    let names = page_names(app);
+    for (k, n) in names.iter().enumerate() {
+        ui.next_flags(if k == app.page_index() { ST_CHECKED } else { 0 });
+        if ui.menu_item(id0 + k as u32, n) & EV_ACT != 0 && k != app.page_index() {
+            app.page_tab = k as i32;
+            app.canvas.request_fit();
+            app.fit_again = true;
+            ui.repass();
+        }
+    }
 }
 
 // ------------------------------------------------------------------ the panels
@@ -271,14 +323,14 @@ fn zoom_slider(app: &mut Diagrammer, ui: &mut Ui, id: u32, w: i32) {
 pub(crate) fn status(app: &mut Diagrammer, ui: &mut Ui) {
     let zoom = (app.canvas.vp.zoom * 100.0 + 0.5) as i32;
     ui.statusbar_begin();
-    let page = tf("Seite {} von {}", &["1", "1"]);
+    let n = page_names(app).len();
+    let page = tf("Seite {} von {}", &[&format!("{}", (app.page_index() + 1).min(n.max(1))), &format!("{}", n.max(1))]);
     ui.next_flags(ST_SUBTLE);
     if ui.label_button(ID_STATUS + 1, &page, TS_CAPTION, 0) & EV_ACT != 0 {
         ui.popup_open(ID_STATUS + 1);
     }
     if ui.flyout_begin(ID_STATUS + 1, 0) {
-        ui.next_flags(ST_CHECKED);
-        ui.menu_item(ID_STATUS + 2, &tf("Seite-{}", &["1"]));
+        pages_list(app, ui, ID_STATUS + 0x10);
     }
     ui.flyout_end();
     // the selection's measures; a click opens Größe und Position

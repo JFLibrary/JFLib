@@ -22,8 +22,12 @@
 //   Strings, Sym                  the document's string table (compact cells)
 //   Extras                        what the file had and the model does not know (DF-03)
 //
+//   geometry::*                   (JD4) Geometry rows as paths of lines and cubic curves,
+//                                 transforms (pin, local pin, angle, flips, groups)
+//   render::build(..) -> Drawing  (JD4) a page as a display list: fills, lines, line ends,
+//                                 texts laid out, pictures, in painter's order with a grid
+//
 // What is to come here, by stage of the plan:
-//   JD4   geometry rows and transforms (pin, local pin, angle, flips, groups) for drawing
 //   JD6   the formula engine: parser of the universal syntax, evaluation over a dependency graph
 //         with incremental recalculation, units, inheritance, GUARD and locks
 //   JD7   glue, the dynamic connector with right-angle routing around obstacles, layout
@@ -39,9 +43,11 @@ extern crate alloc;
 mod cell;
 mod document;
 mod edit;
+pub mod geometry;
 mod inherit;
 mod names;
 mod page;
+pub mod render;
 mod shape;
 mod sheet;
 mod strings;

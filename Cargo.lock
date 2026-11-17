@@ -23,9 +23,14 @@ version = "0.1.0"
 dependencies = [
  "jflib-base",
  "jflib-build",
+ "jflib-diagram-core",
+ "jflib-diagram-io",
+ "jflib-diagram-view",
  "jflib-plat",
+ "jflib-render2d",
  "jflib-rt",
  "jflib-style-netlab",
+ "jflib-text",
  "jflib-ui",
 ]
 
@@ -342,7 +347,11 @@ dependencies = [
  "jflib-build",
  "jflib-diagram-core",
  "jflib-diagram-io",
+ "jflib-diagram-view",
+ "jflib-gfx",
  "jflib-img-core",
+ "jflib-img-jpeg",
+ "jflib-img-png",
  "jflib-plat",
  "jflib-rt",
 ]
@@ -552,6 +561,7 @@ dependencies = [
  "jflib-datetime",
  "jflib-diagram-core",
  "jflib-diagram-io",
+ "jflib-diagram-view",
  "jflib-doc-core",
  "jflib-doc-io",
  "jflib-doc-layout",
@@ -696,6 +706,18 @@ version = "0.2.1"
 dependencies = [
  "jflib-archive",
  "jflib-diagram-core",
+]
+
+[[package]]
+name = "jflib-diagram-view"
+version = "0.2.1"
+dependencies = [
+ "jflib-diagram-core",
+ "jflib-gfx",
+ "jflib-img-jpeg",
+ "jflib-img-png",
+ "jflib-render2d",
+ "jflib-rt",
 ]
 
 [[package]]

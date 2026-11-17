@@ -273,6 +273,14 @@ static HANDLERS: &[(u32, Handler)] = &[
     (POINTER, |a, _| a.tool = POINTER),
     (GRID, |a, _| a.view_grid = !a.view_grid),
     (FIT_WINDOW, |a, _| a.canvas.request_fit()),
+    (PAGE_WIDTH, |a, _| crate::viewer::page_width(a)),
+    (PAGE_NEXT, |a, ui| a.page_step(ui, 1)),
+    (PAGE_PREV, |a, ui| a.page_step(ui, -1)),
+    (PAGES_ALL, |a, ui| {
+        a.pages_menu = true;
+        ui.repass();
+    }),
+    (CLOSE, |a, ui| crate::viewer::close(a, ui)),
     (ZOOM_IN, |a, _| a.zoom_step(1)),
     (ZOOM_OUT, |a, _| a.zoom_step(-1)),
     (FORMAT_PANE, |a, _| a.panes.show(crate::panes::P_FORMAT)),

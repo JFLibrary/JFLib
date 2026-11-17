@@ -23,6 +23,12 @@ ui.workspace = true
 base.workspace = true
 plat.workspace = true
 rt.workspace = true
+# (JD4) reading drawings, their display list, drawing it (render2d's camera), installed fonts
+diagram_core.workspace = true
+diagram_io.workspace = true
+diagram_view.workspace = true
+render2d.workspace = true
+text.workspace = true
 style = { package = "jflib-style-netlab", path = "../../styles/netlab" }
 
 [build-dependencies]

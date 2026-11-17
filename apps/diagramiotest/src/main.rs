@@ -7,6 +7,9 @@
 //                                         folder; skipped when there is none)
 //   diagramiotest --write-samples DIR     write the self-built sample files (.vsdx, .vssx, .vsdm ...)
 //                                         to DIR, to open them elsewhere
+//   diagramiotest --write-golden DIR      (JD4) the golden images of the viewer tests anew
+//   diagramiotest --write-drawings DIR    (JD4) the viewer tests' drawings as .vsdx
+//   diagramiotest --render-corpus DIR [--width PX]   (JD4) the local files' pages as PNG and SVG
 //
 // Groups:
 //   samples   self-built files of all six formats: what lands where in the model (fields,
@@ -19,6 +22,8 @@
 //   zip       ZIP bombs and lying archives through lib/archive (ratio, sizes, counts)
 //   corpus    the local files (Zeichnung2, Zeichnung 3, Favoriten): counts against FEATURES.md
 //             1.6; nothing is copied, only numbers are printed
+//   render    (JD4, render.rs, drawings.rs) the viewer: display lists of self-built drawings,
+//             golden images (tests/golden) through render2d's CPU path, the local pages drawn
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -34,9 +39,12 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 mod corpus;
+mod drawings;
 mod hostile;
 mod pkg;
+mod render;
 mod samples;
+mod svgdump;
 mod zipkit;
 
 /// a refusal must come within this many microseconds
@@ -85,10 +93,20 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-samples") {
         return samples::write(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-golden") {
+        return render::write_golden(&dir);
+    }
+    if let Some(dir) = arg(&args, "--write-drawings") {
+        return render::write_drawings(&dir);
+    }
+    if let Some(dir) = arg(&args, "--render-corpus") {
+        let width = arg(&args, "--width").and_then(|w| w.parse().ok()).unwrap_or(2000);
+        return render::render_corpus(&dir, arg(&args, "--corpus"), width);
+    }
     let check = args.iter().any(|a| a == "--check");
     let corpus_dir = arg(&args, "--corpus");
     if !check && corpus_dir.is_none() {
-        out("Aufruf: diagramiotest --check [--only NAME] [--corpus DIR] | --corpus DIR | --write-samples DIR\n");
+        out("Aufruf: diagramiotest --check [--only NAME] [--corpus DIR] | --corpus DIR | --write-samples DIR | --write-golden DIR | --write-drawings DIR | --render-corpus DIR [--width PX]\n");
         return 2;
     }
     let mut h = H { ok: 0, failed: 0, only: arg(&args, "--only") };
@@ -98,9 +116,15 @@ fn run() -> i32 {
             samples::run(&mut h);
         }
         hostile::run(&mut h);
+        if h.on("render") {
+            render::run(&mut h);
+        }
     }
     if h.on("corpus") {
-        corpus::run(&mut h, corpus_dir);
+        corpus::run(&mut h, corpus_dir.clone());
+    }
+    if h.on("render") || h.on("corpus") {
+        render::corpus(&mut h, corpus_dir);
     }
     out(&format!("diagramiotest: {} ok, {} failed ({} ms)\n", h.ok, h.failed, plat::time_us().wrapping_sub(t0) / 1000));
     if h.failed == 0 { 0 } else { 1 }

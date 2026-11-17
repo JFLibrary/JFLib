@@ -156,6 +156,7 @@ CRATES = [
     ("rt", "the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records",
      "full"),
     ("pdf", "vector PDF writer with embedded font subsets, links and outlines", "full"),
+    ("diagram_view", "draws diagram pages (the display list of diagram_core) on render2d and gfx", "full"),
 ]
 SKIP_FILES = {"rt": {"os.rs", "mem.rs"}}            # rt::os: the OS calls plat is built on
 # codec crates: further items to show, per module ("*" = all public items of the module)

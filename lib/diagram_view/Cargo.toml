@@ -1,0 +1,35 @@
+[package]
+name = "jflib-diagram-view"
+description = "draws diagram pages (the display list of diagram_core) on render2d and gfx"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "diagram_view"
+path = "src/lib.rs"
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+# the display list (diagram_core::render) and the model
+diagram_core.workspace = true
+# the scene: lines, fills, hatches, text; its CPU path draws through gfx
+render2d.workspace = true
+# gradients and pictures on the CPU path, surfaces
+gfx.workspace = true
+rt.workspace = true
+# the pictures of Foreign shapes
+img_png.workspace = true
+img_jpeg.workspace = true
+
+# docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
+# of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown", "aarch64-linux-android"]

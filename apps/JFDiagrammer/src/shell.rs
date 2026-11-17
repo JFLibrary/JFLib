@@ -9,7 +9,9 @@
 // Visio's (UI-30) and follows the theme, so it is dark in the dark theme on every system
 // (JD0's note 7: the system frame stayed light).  The register row is ui.ribbon_tabs: File,
 // the four registers, the context registers the selection asks for; it also runs the access
-// keys (Alt or F10, UI-37); the quick access buttons answer to 1, 2, 3.
+// keys (Alt or F10, UI-37); the quick access buttons answer to 1, 2, 3.  Under the ribbon (JD4)
+// the notice of an open drawing (read-only, substituted fonts, macros) or of a file that could
+// not be opened; the file dialog of Backstage › Öffnen runs here on every pass.
 
 use alloc::format;
 use ui::*;
@@ -20,6 +22,8 @@ use crate::{backstage, panes, ribbon, Diagrammer};
 
 const ID_TABS: u32 = 100;
 const ID_QAT_MORE: u32 = 120;
+const ID_NOTICE: u32 = 130;
+const ID_OPEN_DLG: u32 = 0x7000;
 
 /// the main window
 pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
@@ -30,6 +34,7 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 0);
     titlebar(ui, &title);
+    open_dialog(app, ui);
     if app.backstage.is_some() {
         backstage::frame(app, ui);
         ui.box_end();
@@ -45,6 +50,7 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
         app.open_backstage(ui, app.last_page);
     }
     ribbon::draw(app, ui, app.reg);
+    notice(app, ui);
     // the dock area: the Shapes panel, the canvas, the task panes
     let panels = panes::panels();
     ui.next_size(-1, -1);
@@ -61,6 +67,36 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
     }
     panes::status(app, ui);
     ui.box_end();
+}
+
+// the notice under the ribbon: a file that could not be opened, else the open drawing's (closable)
+fn notice(app: &mut Diagrammer, ui: &mut Ui) {
+    if let Some((title, msg)) = app.error.clone() {
+        ui.next_size(-1, 0);
+        if ui.infobar(ID_NOTICE, 3, &title, &msg) & EV_ACT != 0 {
+            app.error = None;
+            ui.repass();
+        }
+        return;
+    }
+    let Some((title, msg)) = app.opened.as_ref().and_then(|o| o.notice.clone()) else { return };
+    ui.next_size(-1, 0);
+    if ui.infobar(ID_NOTICE, 0, &title, &msg) & EV_ACT != 0 {
+        if let Some(o) = app.opened.as_mut() {
+            o.notice = None;
+        }
+        ui.repass();
+    }
+}
+
+// the file dialog of Backstage › Öffnen (shown while app.open_dlg is set)
+fn open_dialog(app: &mut Diagrammer, ui: &mut Ui) {
+    let dlg = app.open_dlg.clone();
+    let exts: alloc::vec::Vec<&str> = crate::viewer::EXTS.iter().map(|e| ui::i18n::t(e)).collect();
+    if ui.filedlg(ID_OPEN_DLG, FD_OPEN, &dlg, &mut app.open_path, 4096, &exts) & EV_ACT != 0 {
+        let path = app.open_path.clone();
+        crate::viewer::open(app, ui, &path);
+    }
 }
 
 // the title bar: the quick access toolbar (Speichern, Rückgängig, Wiederholen, its menu) and

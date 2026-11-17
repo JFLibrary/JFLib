@@ -320,3 +320,16 @@ Vorschauen folgen mit den Designs	Previews will come with the themes	Las vistas 
 # the settings (options.rs): labels, help texts and choice labels the settings page translates
 Hell	Light	Claro	Chiaro	Clair
 Dunkel	Dark	Oscuro	Scuro	Sombre
+Eine Zeichnung, Schablone oder Vorlage öffnen (schreibgeschützt)	Open a drawing, stencil or template (read-only)	Abrir un dibujo, una colección de formas o una plantilla (solo lectura)	Apri un disegno, una raccolta di forme o un modello (sola lettura)	Ouvrir un dessin, une bibliothèque de formes ou un modèle (lecture seule)
+=Alle Dateien	=All files	=Todos los archivos	=Tutti i file	=Tous les fichiers
+vsdx;vsdm=Visio-Zeichnung	vsdx;vsdm=Visio drawing	vsdx;vsdm=Dibujo de Visio	vsdx;vsdm=Disegno di Visio	vsdx;vsdm=Dessin Visio
+vssx;vssm=Visio-Schablone	vssx;vssm=Visio stencil	vssx;vssm=Colección de formas de Visio	vssx;vssm=Raccolta di forme di Visio	vssx;vssm=Bibliothèque de formes Visio
+vstx;vstm=Visio-Vorlage	vstx;vstm=Visio template	vstx;vstm=Plantilla de Visio	vstx;vstm=Modello di Visio	vstx;vstm=Modèle Visio
+Die Datei lässt sich nicht lesen.	The file cannot be read.	No se puede leer el archivo.	Impossibile leggere il file.	Le fichier ne peut pas être lu.
+„{}“ kann nicht geöffnet werden.	“{}” cannot be opened.	No se puede abrir «{}».	Impossibile aprire «{}».	Impossible d'ouvrir « {} ».
+Bearbeiten und Speichern kommen in einer späteren Version.	Editing and saving come in a later version.	La edición y el guardado llegarán en una versión posterior.	La modifica e il salvataggio arriveranno in una versione successiva.	La modification et l'enregistrement arriveront dans une version ultérieure.
+Die Makros der Datei bleiben erhalten und werden nie ausgeführt.	The file's macros are kept and never run.	Las macros del archivo se conservan y nunca se ejecutan.	Le macro del file vengono conservate e mai eseguite.	Les macros du fichier sont conservées et ne sont jamais exécutées.
+{} Hinweise beim Lesen.	{} notes while reading.	{} avisos al leer.	{} avvisi durante la lettura.	{} remarques lors de la lecture.
+Eine Schablone hat keine Seiten; ihre Shapes zeigt die Shapes-Seitenleiste in einer späteren Version.	A stencil has no pages; the Shapes pane shows its shapes in a later version.	Una colección de formas no tiene páginas; el panel Formas mostrará sus formas en una versión posterior.	Una raccolta di forme non ha pagine; il riquadro Forme ne mostrerà le forme in una versione successiva.	Une bibliothèque de formes n'a pas de pages ; le volet Formes affichera ses formes dans une version ultérieure.
+Schreibgeschützt geöffnet	Opened read-only	Abierto en modo de solo lectura	Aperto in sola lettura	Ouvert en lecture seule
+Ersetzte Schriften: {}.	Substituted fonts: {}.	Fuentes sustituidas: {}.	Tipi di carattere sostituiti: {}.	Polices remplacées : {}.
