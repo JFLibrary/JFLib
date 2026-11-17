@@ -51,6 +51,14 @@
 //   render2dtest --test cpu                  the CPU path (Scene::draw_cpu) against the GPU on every image of --dump, by
 //                                            category; a scene without a device; detach and attach (cpucmp.rs)
 //   render2dtest --gen-shaders FILE          lib/render2d/shaders_spv.rs from lib/render2d/*.wgsl
+//   render2dtest --test dxf                  (G6e2) lib/dxf and render2d::dxf on drawings written in dxftest.rs: tables,
+//                                            every kind, code pages, line ends, pieces of a byte, broken and damaged
+//                                            files, limits; the GPU against the CPU path on them
+//   render2dtest --test dxfcorpus            (G6e2; not in `all`) the corpus outside the repository (dxftest.rs; SKIP
+//                                            without it): loaded, kinds against an independent count, GPU against CPU
+//   render2dtest --dxf PATH [--no-gpu]       (G6e2) a DXF drawing in the demo's view: pan, zoom, pick, snap
+//   render2dtest --dxf-shot PATH OUT.png [--res WxH]   a DXF drawing whole through the CPU path, as PNG
+//   render2dtest --bench-dxf PATH [--res WxH] [--frames F]   a large DXF: read, insert, memory, GPU and CPU frames
 //
 // Without Vulkan or a usable GPU every test prints SKIP and passes.  Exit code 1 when a check failed.
 #![no_std]
@@ -64,6 +72,8 @@ mod blocks;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 mod cpucmp;
 mod demo;
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+mod dxftest;
 #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 mod bench;
 #[cfg(not(target_os = "android"))]

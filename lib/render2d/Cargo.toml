@@ -26,6 +26,8 @@ rt.workspace = true
 # fonts (outlines, metrics) and shaping (HarfRust, bidi) for text (G6c)
 text.workspace = true
 text_shape.workspace = true
+# DXF drawings into a scene (G6e2): the reader without a GPU, mapped in dxf.rs
+dxf.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
 # of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)

@@ -1,0 +1,5 @@
+#!args --test dxfcorpus
+# G6e2: the DXF corpus outside the repository (gdal, ezdxf, dxf-parser, qcad, librecad; not Zürich, whose gigabyte is
+# --bench-dxf's) from $JFLIB_DXF_CORPUS, else Documents/JFLib-dxf-korpus in the home folder; SKIP (and pass) without it.
+# Every file: loaded (errors only for the binary ones and the fuzzer cases), the reader's kinds against an independent count
+# of the file's entity markers, the GPU against the CPU path once without text (G6e1's bounds) and once with it

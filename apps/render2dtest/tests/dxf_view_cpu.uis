@@ -1,0 +1,25 @@
+#!args --dxf :fixture --no-gpu
+# G6e2 without a device (--no-gpu sets jfgui_GPU=0: the view paints through the CPU path): the same script as dxf_view.uis,
+# the same places and colours.  The drawing of --test dxf shown whole (0.234 units a pixel, the middle at (15.5, 40)): the
+# green solid hatch at x 563, y 425, the cyan SOLID at x 358, y 475, the blue 3DFACE at x 392.  A drag with the middle
+# button pans, the wheel zooms at the pointer (the hatch under it stays, hovered: orange over green), a click picks it
+# (selected: blue over green, the pointer away), Esc clears
+wait 600
+expect pixel 563 425 #00FF00
+expect pixel 358 475 #00FFFF
+expect pixel 392 475 #0000FF
+drag 300,300 350,300 middle
+wait 200
+expect pixel 613 425 #00FF00
+expect pixel 408 475 #00FFFF
+wheel 613,425 120
+wait 200
+expect pixel 613 425 #DF9A17
+click 613,425
+wait 200
+move 700,60
+wait 200
+expect pixel 613 425 #178BBF
+key esc
+wait 200
+expect pixel 613 425 #00FF00
