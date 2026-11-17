@@ -341,6 +341,10 @@ opt-level = 2
 [profile.dev.package.jflib-img-all]
 opt-level = 2
 
+# the formula engine recalculates whole drawings (JD6)
+[profile.dev.package.jflib-diagram-core]
+opt-level = 2
+
 [profile.dev.package.Kritzel]
 opt-level = 2
 

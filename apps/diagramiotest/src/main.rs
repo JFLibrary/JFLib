@@ -24,6 +24,8 @@
 //             1.6; nothing is copied, only numbers are printed
 //   render    (JD4, render.rs, drawings.rs) the viewer: display lists of self-built drawings,
 //             golden images (tests/golden) through render2d's CPU path, the local pages drawn
+//   formulas  the formula oracle (JD6): every formula cell of the local files recomputed and
+//             compared with the stored value (--show N prints N misses, locally)
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -40,6 +42,7 @@ use alloc::vec::Vec;
 
 mod corpus;
 mod drawings;
+mod formulas;
 mod hostile;
 mod pkg;
 mod render;
@@ -124,7 +127,10 @@ fn run() -> i32 {
         corpus::run(&mut h, corpus_dir.clone());
     }
     if h.on("render") || h.on("corpus") {
-        render::corpus(&mut h, corpus_dir);
+        render::corpus(&mut h, corpus_dir.clone());
+    }
+    if h.on("formulas") {
+        formulas::run(&mut h, corpus_dir, arg(&args, "--show").and_then(|n| n.parse().ok()).unwrap_or(0));
     }
     out(&format!("diagramiotest: {} ok, {} failed ({} ms)\n", h.ok, h.failed, plat::time_us().wrapping_sub(t0) / 1000));
     if h.failed == 0 { 0 } else { 1 }

@@ -7,8 +7,8 @@ plain Rust, without the standard library and without a line of `unsafe` code.
 
 The model is being built in stages; the plan is
 [apps/JFDiagrammer/PLAN.md](https://github.com/JFLibrary/JFLib/blob/main/apps/JFDiagrammer/PLAN.md)
-(in German). The document model is there, and the geometry and display list a viewer draws; the
-formula engine, glue, connector routing and layout follow.
+(in German). The document model, the formula engine, and the geometry and display list a
+viewer draws are there; glue, connector routing and layout follow.
 
 ## What it holds
 
@@ -34,6 +34,11 @@ formula engine, glue, connector routing and layout follow.
   pictures, background pages, layers, the page's theme -- with a grid to find items by place.
   The drawing itself is someone else's ([`jflib-diagram-view`](https://crates.io/crates/jflib-diagram-view)
   draws it on render2d; exports read the same list).
+- **Formulas** (`formula`): the universal ShapeSheet syntax, its functions (maths, logic, text,
+  colours, points, THEMEVAL over the document's themes, GUARD, SETATREF, SETF ...) and a
+  recalculation that follows the cells a formula really read. Inherited formulas run in the
+  inheriting shape; results go into the same transaction as the edit that caused them. Opening
+  a file computes nothing, and a formula the engine cannot compute keeps its stored value.
 
 ```rust
 use jflib::diagram_core::{CellAddr, Document, SheetRef, Unit};
@@ -63,8 +68,9 @@ one version and are released together.
 ## What's new in 0.2.1
 
 jflib-diagram-core is new: the document model of pages, layers, masters, shapes and styles on
-ShapeSheet cells, with inheritance, units and an edit API with undo and redo; the geometry of
-shapes and a page's display list for viewers. The formula engine and routing are still to come.
+ShapeSheet cells, with inheritance, units and an edit API with undo and redo; the formula
+engine that recalculates them; the geometry of shapes and a page's display list for viewers.
+Routing is still to come.
 Everything is in the [changelog](https://docs.rs/crate/jflib-diagram-core/latest/source/CHANGELOG.md).
 
 ## Documentation
