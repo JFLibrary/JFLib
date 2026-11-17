@@ -110,6 +110,14 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **shader:** The validator refuses a composite type that names itself or a type declared after it (`Rule::Type`): the layout's walks over such a cycle overflowed the stack; layout sizes past u32 are None, a scalar of no whole bytes has no layout (a divisor of 0). shadertest fuzzes the validator and the disassembler with 6000 mutated modules
 - **wgsl:** `false && f()` / `true || f()` with a runtime right side is no const-expression (as Tint): it was folded to the constant, so `const c = false && f();` was accepted
 - **netpkt:** `eapol::Rsne::parse` reads the AKM count: the capabilities come after every AKM suite (they were read as if there were always one), no AKM suite is no element
+- **ui:** Agent interface: `ui.command` of a command bound to a domain action whose input schema needs fields is `invalid_input` (the action ran with an empty input past the check every other call has)
+- **ui:** Code editor: accepting a completion checks again that its start is still where the word at the caret begins, else the list closes (after an edit since it opened the cut went from a stale position, on another line or past its end)
+- **ui:** Terminal: the local echo of a line is written apart from the peer's escape state (an open sequence of its output took the echo in, or the echo ended the peer's sequence); closing the search bar clears its hits (they stayed marked in the text)
+- **ui:** Window state: a tool window restored at a place where (almost) nothing of it is on a monitor is moved onto the nearest monitor's work area, as the main window (it opened off-screen after a monitor was gone)
+- **ui:** Text box: undo to a state longer than a smaller capacity cuts it on a character's start (it could cut a UTF-8 character); a password box's accessibility record gives caret and anchor as indices of its dots, and a screen reader's selection in it maps back to the characters (they were byte indices of the hidden text)
+- **ui:** `History`: `undo` / `redo` while a group is open close it first, its edits so far are the newest step (undo reverted the older step under them, redo did an undone step over newer edits); `can_undo`, `can_redo` and the labels count the open group
+- **ui:** A box nested beyond the layout's limit pushes no clip or disabled level and its `box_end` pops nothing (it took the parent's frame, clip and disabled level); an expander beyond the 16 kept ones opens no content card (its box stayed open)
+- **doc_layout:** A character or note mark wider than its line stands alone on a line, a line taller than the page alone on a page, both past the edge: content that can never fit made `paginate` fail with `Error::Limit` for the whole document (the note-aware paths keep their rules)
 
 ### Security
 
@@ -131,6 +139,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Linux session bus: the portal's Response of autostart and the power inhibit, the GlobalShortcuts Activated, the Flatpak update monitor's signals and the Secret Service prompt's Completed count only from the service's own unique name (any client may send a signal of that name on the predictable path)
 - **plat:** `dnd::drag_start` hands the system only files the manifest lets the app read, and offers a move (the target deletes the original) only when it may write them all; the browser's `download` / `persist` and Android's `persist` check the manifest (read / write) like a file access; Android reads a streaming provider's document to at most 256 MiB, with allocations that may fail
 - **gltf:** The image files read count against `Limits::buffer_bytes` together (each file again for every image naming it): only each file's size was limited
+- **ui:** Permission dialog: the target, plugin, reason and rule are wrapped and whole, control characters and the characters that change the writing direction show as `<U+XXXX>` (a long target lost its end at the dialog's edge, U+202E could turn a file name around, NUL ended the text)
+- **ui:** Terminal: a change into or out of `TM_SECRET` drops (overwrites) the input typed so far: a hidden line showed in the next mode's input line, a visible one became part of the secret
+- **ui:** `TB_MULTI | TB_PASSWORD` is a one-line password box: the multi-line box ignored `TB_PASSWORD` and showed the password in plain text
 
 ## [0.2.1] - 2026-11-16
 

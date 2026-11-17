@@ -177,6 +177,9 @@ pub(crate) struct W {
     /// box_end: how wide the content of the box it ended is laid out (px: its reach from the
     /// content start, BoxFrame::ext, + padding + gutter; scroll views read it, list.rs)
     pub(crate) ended_w: i32,
+    /// box_begin calls beyond BOX_STACK_MAX not ended yet: their box_end pops nothing (it took
+    /// the parent's frame, clip and disabled level)
+    pub(crate) over: u32,
 }
 
 impl Ui {
@@ -210,6 +213,7 @@ impl Ui {
         let s = *self.slot(id);
         let l = &mut self.wp.lay;
         l.boxes.clear();
+        l.over = 0;
         l.boxes.push(BoxFrame {
             id,
             flags: BOX_V,
@@ -235,6 +239,7 @@ impl Ui {
 
     /// layout_end_root: close unbalanced boxes and store the root measurements
     pub(crate) fn layout_end_root(&mut self) {
+        self.wp.lay.over = 0; // boxes beyond the limit left open: they pushed nothing
         while self.wp.lay.boxes.len() > 1 {
             self.warn("ui_box_begin without ui_box_end");
             self.box_end();
@@ -609,6 +614,12 @@ impl Ui {
         if flags & BOX_BLOCK != 0 {
             self.hit(id, HB_BLOCK);
         }
+        // too deep: no frame, no clip or disabled level (box_end of it pops nothing)
+        if self.wp.lay.boxes.len() >= BOX_STACK_MAX {
+            self.warn("boxes nested too deeply");
+            self.wp.lay.over = self.wp.lay.over.saturating_add(1);
+            return;
+        }
         if flags & BOX_DISABLED != 0 {
             self.disabled_push();
         }
@@ -616,10 +627,6 @@ impl Ui {
             self.clip_push(r[0], r[1], r[2], r[3]);
         }
         // push the frame
-        if self.wp.lay.boxes.len() >= BOX_STACK_MAX {
-            self.warn("boxes nested too deeply");
-            return;
-        }
         let a = (flags & BOX_V) as usize;
         let mut b = BoxFrame {
             id,
@@ -659,6 +666,10 @@ impl Ui {
     #[cfg_attr(jfgui_dev, track_caller)]
     pub fn box_end(&mut self) {
         let _src = self.src_scope();
+        if self.wp.lay.over != 0 {
+            self.wp.lay.over -= 1; // a box beyond BOX_STACK_MAX: it pushed nothing
+            return;
+        }
         if self.wp.lay.boxes.len() <= 1 {
             return; // never pop the root here
         }

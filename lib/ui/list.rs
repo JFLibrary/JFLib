@@ -1486,11 +1486,14 @@ impl Ui {
             self.limit_hit(super::ctx::LIM_EXPANDERS);
         }
         let l = &mut self.wp.list;
-        if (l.exp_sp as usize) < EXP_MAX {
+        let kept = (l.exp_sp as usize) < EXP_MAX;
+        if kept {
             l.exp[l.exp_sp as usize] = o as u32;
         }
         l.exp_sp = l.exp_sp.wrapping_add(1);
-        if o != 0 {
+        // beyond EXP_MAX no content card: expander_end could not know it was opened (its box
+        // stayed open, the rest of the window went into it)
+        if o != 0 && kept {
             // content card: square top corners, shared edge with the header
             self.box_begin(id.wrapping_mul(8).wrapping_add(2) | 0x8000_0000, BOX_V | PAD_16, 8);
             sp.place(self.wp.ctx.last_rect);

@@ -5,7 +5,9 @@
 //   h.undo(&mut state) / h.redo(&mut state) -> bool
 //   h.can_undo() / can_redo()            undo_label() / redo_label() -> the step's label;
 //                                        undo_value() / redo_value() -> the step as data
-//   h.group_begin(label) / group_end()   the edits between them are one step
+//   h.group_begin(label) / group_end()   the edits between them are one step (undo / redo
+//                                        while one is open close it first: its edits so far
+//                                        are the newest step, a later group_end does nothing)
 //   h.mark_saved() / dirty()             whether the state differs from the saved one
 //   h.mark_unsaved()                     the state counts as unsaved (a recovered copy)
 //   h.clear()
@@ -162,16 +164,33 @@ impl<S: 'static> History<S> {
         }
     }
 
-    /// take the newest step back -> false when there is none
+    // an open group holds edits already applied
+    fn pending(&self) -> bool {
+        self.groups.iter().any(|g| !g.1.is_empty())
+    }
+
+    // close the open groups (undo / redo in the middle of one): their edits are the newest step,
+    // so the steps are taken back in the order they happened (the older step under the group's
+    // edits reverted them wrongly, and redo did an undone step over newer edits)
+    fn close_groups(&mut self) {
+        while !self.groups.is_empty() {
+            self.group_end();
+        }
+    }
+
+    /// take the newest step back -> false when there is none (an open group is closed first)
     pub fn undo(&mut self, s: &mut S) -> bool {
+        self.close_groups();
         let Some(mut e) = self.done.pop() else { return false };
         e.revert(s);
         self.undone.push(e);
         true
     }
 
-    /// do the last undone step again -> false when there is none
+    /// do the last undone step again -> false when there is none (an open group is closed
+    /// first: with edits in it there is nothing to redo any more)
     pub fn redo(&mut self, s: &mut S) -> bool {
+        self.close_groups();
         let Some(mut e) = self.undone.pop() else { return false };
         e.apply(s);
         self.done.push(e);
@@ -179,26 +198,39 @@ impl<S: 'static> History<S> {
     }
 
     pub fn can_undo(&self) -> bool {
-        !self.done.is_empty()
+        !self.done.is_empty() || self.pending()
     }
     pub fn can_redo(&self) -> bool {
-        !self.undone.is_empty()
+        !self.undone.is_empty() && !self.pending()
     }
-    /// the label of the step undo would take back
+    /// the label of the step undo would take back (an open group with edits: the outermost
+    /// group's)
     pub fn undo_label(&self) -> Option<&str> {
+        if self.pending() {
+            return self.groups.first().map(|g| g.0.as_str());
+        }
         self.done.last().map(|e| e.label())
     }
     /// the label of the step redo would do again
     pub fn redo_label(&self) -> Option<&str> {
+        if self.pending() {
+            return None;
+        }
         self.undone.last().map(|e| e.label())
     }
     /// the step undo would take back as data (Edit::value; None for a group): the app can
     /// see what kind of edit it is before it runs
     pub fn undo_value(&self) -> Option<&dyn core::any::Any> {
+        if self.pending() {
+            return None;
+        }
         self.done.last().and_then(|e| e.value())
     }
     /// the step redo would do again as data (Edit::value)
     pub fn redo_value(&self) -> Option<&dyn core::any::Any> {
+        if self.pending() {
+            return None;
+        }
         self.undone.last().and_then(|e| e.value())
     }
 
