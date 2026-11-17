@@ -1,9 +1,10 @@
 # ARM64-Plan: Windows und Linux auf ARM-Prozessoren
 
-Stand 2026-11-11, auf Basis von `main` d6f5b137. Umgesetzt sind ARM0 bis ARM4 und ARM6: `rt` und `plat` laufen
+Stand 2026-11-17, auf Basis von `main` 7c44e9cf. Umgesetzt sind ARM0 bis ARM7: `rt` und `plat` laufen
 auf Linux ARM64, statisch und gegen glibc; `plattest`, `linuxtest`, `lifetest` und `sandboxtest` sind in einer ARM64-VM
 grün, seit ARM4 auch Plugins und das Modul `jxlenc`. Seit ARM5 laufen `coretest`, `plattest` und die `gallery` auf
-`windows-11-arm` (bis auf `screen.uis`, das der Bildschirm des Runners verhindert). Für den Rest gilt: Die Zahlen sind
+`windows-11-arm` (bis auf `screen.uis`, das der Bildschirm des Runners verhindert). Seit ARM7 ist das Speichermodell auf echter
+Hardware geprüft: Mac mini (M2), `ubuntu-24.04-arm` und `windows-11-arm`, jeweils mit LSE und mit LL/SC. Für den Rest gilt: Die Zahlen sind
 aus dem Code gezählt, die Aufwände
 geschätzt. Syscalls, Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`),
 die Relocations mit ARM3 an einem Test-Plugin. Der Eintrag in der Roadmap steht in
@@ -730,6 +731,9 @@ sich als Wartezeit von 10 s, die abläuft. Geprüft wird:
   der Empfänger prüft Inhalt und Ausrichtung und gibt frei (ein anderer Shard); dazu eigene kleine Blöcke, außer der Reihe freigegeben.
 - Der Ereignis-Ring (`evq_push` von vielen Threads, ein Leser) und der Audio-Ring (`audio::ring_check` mit Schreib-Thread, jetzt auch
   auf Apple).
+- Die asynchronen Teile (`plat::task`, `plat::aio`, der blockierende Pool, Wecken aus anderen Threads) prüft `plattest --test async`,
+  auf den Geräten 5-mal wiederholt, dazu `--test threads` 20-mal; `asynctest` selbst braucht ein Fenster (Skripte, `--selftest`) und
+  läuft deshalb in der Suite, nicht auf dem Telefon.
 - Litmus-Tests mit zwei Threads, die jede Runde zusammen beginnen: Store Buffering mit SeqCst-Stores und -Loads, Store Buffering so,
   wie der Pool auf einen Job wartet (`fetch_add` + `load` gegen `swap` + `swap`), Message Passing mit Release/Acquire, ein Seqlock mit
   Fences. **Kontrollen** (gezählt, nie ein Fehler): dieselben Muster mit Relaxed und ein Seqlock ohne Fences. Sie zeigen, ob die
@@ -767,6 +771,11 @@ am Runner (die Windows-Einrichtung, Grau `8a898a`, liegt über dem Bildschirm).
 
 Unter x86-64 (Windows, Linux in WSL) ist `--test atomics` in 1,5 bis 15 s grün (je nach Last); die SB-Kontrolle mit Relaxed sieht auch
 dort Umordnungen (136 bis 526 von 20 000 Runden), MP und der Seqlock ohne Fences nicht (TSO).
+
+Offen: **das A56** (Cortex-A720/A520, LSE). Es war während ARM7 nicht per `adb` angesteckt; die statischen Programme, das Skript
+dafür (Ruhe des Telefons prüfen, beide Wege mit `--secs 1200`, `threads` und `async`, aufräumen) und die Befehle stehen in den
+Übergabenotizen von ARM7. Echte LSE-Hardware mit Outline-Atomics prüfte so nur `ubuntu-24.04-arm`. Ebenfalls offen: die neue
+Grenze von 33 ms in `plattest --test threads` auf `windows-11-arm` (die volle Suite prüft sie unter Windows x86-64).
 
 **QEMU ordnet `stlr` → `ldar` nicht:** Unter `qemu-aarch64` (8.2, TCG auf x86-64) scheitert Store Buffering mit SeqCst, 1 bis 2 von
 20 000 Runden sehen beide den alten Wert, mit LSE wie mit LL/SC und mit `-cpu cortex-a53`. Rust übersetzt einen SeqCst-Store als
