@@ -21,11 +21,6 @@ pub fn par(n: usize, f: &(dyn Fn(usize) + Sync)) {
     let _ = plat::parallel_for(n, &|i, _| f(i));
 }
 
-/// the category of a shot: its name up to the first '_'
-fn category(name: &str) -> &str {
-    name.split('_').next().unwrap_or(name)
-}
-
 /// a category's sum of comparisons
 #[derive(Default, Clone)]
 struct Sum {
@@ -128,34 +123,15 @@ pub fn cpu(t: &mut T) {
         let (ms2, _, _, _) = bench_view_single(&mut s, false, (720, 480), 9);
         crate::tests::out(&format!("  the demo's scene on the CPU path, 720 x 480: {ms1:.2} ms per frame on one thread, {ms2:.2} ms in row bands (median of 9)"));
     }
-    crate::tests::out(&format!("  the CPU path's images: FNV-1a {hash:016x} (the same on every target)"));
+    // (G6e3: checked, no longer only printed: the bytes every target has, gallery::CPU_HASH)
+    t.ok(hash == CPU_HASH, &format!("the CPU path's images: FNV-1a {hash:016x} (the same on every target: {CPU_HASH:016x})"));
     let (mut over, mut px) = (0u64, 0u64);
     for su in &sums {
         over += su.over;
         px += su.pixels;
         let ink = 100.0 * (su.ink[0] - su.ink[1]) / su.ink[1].max(1.0);
-        // what may differ per category (docs/RENDER2D.md "Der CPU-Weg"): the share of pixels beyond 2 codes, the largest
-        // difference, the ink (%): straight edges and fills alike; round caps and small circles the GPU's tangent; short
-        // segments its fast way; dash patterns its three dashes per pixel and side; dashed curves its caps two segments on;
-        // fills' edges through the middle of a pixel's side; text MSDF against outlines
-        // (G6e3) flat tones: rows of one value each (3 images, 18 rows of 300 px), where one code in one channel of one row
-        // is 0.037 % of an image's ink; how the blend rounds moves whole rows: NVIDIA rounds the source colour and alpha to
-        // 8 bits before it blends (53 of 54 row-channels of flat_1.5), Apple's GPU blends exactly (54 of 54), lib/gfx in
-        // integers of its own.  So the ink here is bounded by 0.2 % (the M2: +0.084 %, flat_1.5 alone +0.184 %), the
-        // pixels as strictly as before (none beyond 2 codes, the largest 1 everywhere)
-        let (share, most, inkl) = match su.name.as_str() {
-            "flat" => (0.0005, 4, 0.2),
-            "miter" | "hairlines" | "fills" | "overlap" => (0.0005, 4, 0.05),
-            "joins" => (0.002, 16, 0.1),
-            "hatch" => (0.004, 16, 0.1),
-            "caps" | "arcs" => (0.002, 64, 0.2),
-            "blocks" => (0.012, 48, 0.4),
-            "units" | "dashes" => (0.006, 96, 0.3),
-            "curves" => (0.006, 150, 0.3),
-            "short" => (0.02, 210, 0.3),
-            "transparency" | "highlight" | "overlay" => (0.005, 160, 0.3),
-            _ => (0.012, 135, 0.5),
-        };
+        // what may differ per category: gallery::cpu_bounds (docs/RENDER2D.md "Der CPU-Weg")
+        let (share, most, inkl) = cpu_bounds(&su.name);
         let fine = (su.over as f64) <= share * su.pixels as f64 && su.max <= most && ink.abs() <= inkl;
         t.ok(fine, &format!("{:<13} {:>2} images: {:>6} of {:>8} pixels beyond 2 codes, largest {:>3} ({}), ink GPU against CPU {:+.3} % (at most {:.1} %, {most}, {inkl} %)", su.name, su.images, su.over,
                             su.pixels, su.max, su.at, ink, 100.0 * share));
