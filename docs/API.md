@@ -19955,9 +19955,11 @@ copies into one upload command buffer that ends with a global barrier (copy writ
 later access) and is put before the caller's command buffers in the next vkQueueSubmit.
 The staging ring: 256 KiB chunks of Upload memory, filled front to back across submissions;
 a full chunk is reused once the GPU has passed the last submission that reads from it (two
-are kept free, more go back).  An upload above half a chunk gets a buffer of its own, reused
-by the next one that fits and released when none came for a second (Device::poll): a frame of
-small rectangles costs what they hold, not a full frame or a new allocation.
+are kept free, more go back).  An upload above half a chunk gets a buffer of its own (its size
+rounded up to 64 KiB), reused by a later one that fits it without wasting half of it; once the GPU
+is done with them only the largest free one stays, and only until a second after the last such
+upload (Device::poll): a frame of small rectangles costs what they hold, not a full frame or a new
+allocation, and a frame of many canvas tiles does not keep twice their bytes around afterwards.
 Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
 call returns GpuError::DeviceLost (objects are still destroyed normally).
 (G5d) The compute queue comes only when asked for (DeviceOptions; without it a device is what it was in 0.1.0: one
