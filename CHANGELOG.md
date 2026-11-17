@@ -162,6 +162,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **android:** Android: a text longer than 256 KiB goes to the keyboard as a window of 192 KiB around the caret, and its edits are put back into the whole text: such a text gave the keyboard no copy, and its next key replaced the text by an old one
 - **render3d:** A scene whose draw records grew without its list_first (once detail levels had made that grow first) drew nothing: the culling counted into the old records
 - **plat:** Windows: files and folders made by `fs::write_file_private` and `fs::mkdir_private` grant the user the process runs as by name, besides SYSTEM, the administrators and the owner. Made by a process run as administrator, their owner is the administrators' group, and the same user without administrator rights could no longer open them.
+- **gpu:** Metal: binding a Bindless table keeps what it holds retained while useResources reads it; the ids were taken under the table's lock and handed to Metal after it, so a set_* on another thread could free a texture first (a dangling pointer to Metal)
+- **gpu:** Metal: the swapchain's throttle counts per layer what was presented and what reached the screen, and per swapchain only what is taken and not presented; the layer's entry goes with its last surface. A new swapchain on a window's layer (after a lost one) did not see the old one's drawables on their way, so nextDrawable could block up to a second, and dropping a second surface reset the count, so the window drew about once a second
+- **plat:** iOS: a text box of no width or height no longer panics when UIKit asks for the position at a point (VoiceOver, the space bar's trackpad): clamp got a minimum above its maximum
 
 ### Security
 
