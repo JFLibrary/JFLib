@@ -35,6 +35,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - `ui::dock_float_id(area, win, k)`: the window id of a dock area's floating window `k` -- `area + 1
   + k` in the main window as before, an id of its own hashed from area and window in any other.
   docs/GUIDE.md section 15.
+- `Ui::list_end_full(&mut sel) -> ListEnd { ev, sel, drop }`: the end of a list with a dropped row (LF_REORDER) as `drop = Some((from, to))`, for any number of rows.
 
 ### Changed
 
@@ -80,6 +81,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Text box: undo to a state longer than a smaller capacity cuts it on a character's start (it could cut a UTF-8 character); a password box's accessibility record gives caret and anchor as indices of its dots, and a screen reader's selection in it maps back to the characters (they were byte indices of the hidden text).
 - `History`: `undo` / `redo` while a group is open close it first, its edits so far are the newest step (undo reverted the older step under them, redo did an undone step over newer edits); `can_undo`, `can_redo` and the labels count the open group.
 - A box nested beyond the layout's limit pushes no clip or disabled level and its `box_end` pops nothing (it took the parent's frame, clip and disabled level); an expander beyond the 16 kept ones opens no content card (its box stayed open).
+- `list_end` packs a drop into `from | to << 16` only while both fit in 16 bits: a move from or to a row past 65 535 is no longer reported (no EV_DRAG, the row stays selected) -- the packed value gave another item and another place (`list_end_full` reports them).
 
 ### Security
 

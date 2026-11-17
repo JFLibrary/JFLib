@@ -46,6 +46,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **crypto:** `argon2::VERIFY_WORK`: the most work `verify` does for a PHC string
 - **rt:** `os::SYS_IO_URING_SETUP` / `_ENTER` / `_REGISTER`, `SYS_OPEN_TREE`, `SYS_MOVE_MOUNT`, `SYS_FSOPEN`, `SYS_FSCONFIG`, `SYS_FSMOUNT`, `SYS_FSPICK`, `SYS_CLONE3`, `SYS_PIDFD_GETFD`, `SYS_MOUNT_SETATTR` (x86-64 and ARM64)
 - **netio:** `ssh::Client::set_time_limit(ms)`: each following `auth_password`, `auth_key` and `exec` ends with `TimedOut` after that time in all
+- **ui:** `Ui::list_end_full(&mut sel) -> ListEnd { ev, sel, drop }`: the end of a list with a dropped row (LF_REORDER) as `drop = Some((from, to))`, for any number of rows
 
 ### Changed
 
@@ -133,6 +134,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netio:** SSH: a peer that sends only messages to skip (ignore, debug, banners, global requests) while an answer is due ends the session after 1024 of them (login and opening a channel never returned); data past the channel window the client granted is a protocol error
 - **rt:** Portable `pow(1.0, y)` is 1 for every finite y (from |y| > ~1.3e300 on it was NaN), NaN for an infinite one as on the x87
 - **simd:** WebAssembly SIMD128: float arithmetic and square roots follow SSE's NaN rule (the first NaN operand quieted, else the negative indefinite) like the NEON and scalar code; WebAssembly's own NaN made results differ on ARM machines
+- **ui:** `list_end` packs a drop into `from | to << 16` only while both fit in 16 bits: a move from or to a row past 65 535 is no longer reported (no EV_DRAG, the row stays selected) -- the packed value gave another item and another place (`list_end_full` reports them)
 
 ### Security
 

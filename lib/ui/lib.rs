@@ -181,6 +181,7 @@ mod kbnav;
 pub use ids::{ID_HASH_BASE, wid, wid_path};
 mod layout;
 mod list;
+pub use list::ListEnd;
 mod notify;
 mod office_gallery;
 mod perm;

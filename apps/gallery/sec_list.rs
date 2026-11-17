@@ -433,11 +433,8 @@ pub(crate) fn lists(g: &mut Gal, ui: &mut Ui) {
         ui.checkbox(ID_RL_CB + it as u32, "", &mut s.rl_vis[it]);
         ui.list_item_end();
     }
-    let (ev, v) = ui.list_end(&mut s.rl_sel);
-    if ev & EV_DRAG != 0 {
+    if let Some((from, to)) = ui.list_end_full(&mut s.rl_sel).drop {
         // move item `from` to `to` in the order
-        let from = (v as u32 & 0xFFFF) as usize;
-        let to = (v as u32 >> 16) as usize;
         let o = &mut s.rl_order;
         let item = o[from];
         let mut i = from;
