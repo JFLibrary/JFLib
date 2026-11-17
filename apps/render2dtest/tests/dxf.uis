@@ -6,4 +6,6 @@
 # 0 SECTION; code pages (ANSI_1251, ANSI_1252, UTF-8 from AC1021, a multi-byte page without a table), \U+XXXX, TEXT's %%
 # codes, MTEXT's format codes, the colour index, font substitutes, linetype patterns; the mapping per kind, the extents,
 # the runs of layers, groups, set_layer_visible; a binary DXF, not a DXF, a broken group code, a cut file, a long line,
-# limits, counts that lie, 600 randomly damaged files; the GPU against the CPU path on two drawings
+# limits, counts that lie, 600 randomly damaged files, a CR at the end of the full window, a hatch of 1000 line families,
+# a long spline of degree 5; four drawings of ezdxf (apps/render2dtest/dxf: clockwise arcs in a hatch's boundary, caret
+# codes, MTEXT's inline codes, a binary DXF); the GPU against the CPU path on five drawings

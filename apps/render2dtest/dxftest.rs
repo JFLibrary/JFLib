@@ -868,12 +868,112 @@ fn rng_next(s: &mut u64) -> u64 {
     *s
 }
 
+/// four small drawings of ezdxf (MIT; apps/render2dtest/dxf/README.md says where each comes from)
+const EZ_CW_HATCH: &[u8] = include_bytes!("dxf/clockwise_arcs_hatch.dxf");
+const EZ_CARET: &[u8] = include_bytes!("dxf/caret_encoding.dxf");
+const EZ_MTEXT: &[u8] = include_bytes!("dxf/mtext_complex_inline_codes.dxf");
+const EZ_BIN_R12: &[u8] = include_bytes!("dxf/bin_dxf_r12.dxf");
+
 /// render2dtest --test dxf
 pub fn dxf(t: &mut T) {
     reader(t);
     mapping(t);
     crafted(t);
+    ezdxf_files(t);
     gpu_cpu(t);
+}
+
+/// the text of a parsed MTEXT, its paragraphs one line each, a tab as '\t'
+fn mtext_plain(m: &dxf::mtext::Mtext) -> String {
+    let mut s = String::new();
+    for (i, p) in m.paragraphs.iter().enumerate() {
+        if i > 0 {
+            s.push('\n');
+        }
+        for it in &p.items {
+            match it {
+                dxf::mtext::Item::Text(x, _) => s.push_str(x),
+                dxf::mtext::Item::Tab(_) => s.push('\t'),
+                _ => {}
+            }
+        }
+    }
+    s
+}
+
+/// what the drawings of ezdxf show that the test's own drawings do not
+fn ezdxf_files(t: &mut T) {
+    use render2d::math::sincos;
+    t.ok(dxf::is_binary(EZ_BIN_R12) && matches!(dxf::load(EZ_BIN_R12, &dxf::Limits::DEFAULT), Err(dxf::Error::Binary)), "ezdxf bin_dxf_r12.dxf: Error::Binary");
+    // clockwise arcs in a hatch's boundary: DXF stores their angles mirrored (the arc runs from -start clockwise to
+    // -end), and only so does each path's chain of edges close; read as stored, it does not
+    match dxf::load(EZ_CW_HATCH, &dxf::Limits::DEFAULT) {
+        Ok(doc) => {
+            let hatch = doc.entities.iter().find_map(|e| if let dxf::Kind::Hatch(h) = &e.kind { Some(h) } else { None });
+            let gaps = |mirrored: bool| -> (usize, usize, f64) {
+                let (mut edges, mut cw, mut worst) = (0usize, 0usize, 0.0f64);
+                for p in hatch.map_or(&[][..], |h| &h.paths[..]) {
+                    let ends: Vec<([f64; 2], [f64; 2])> = p.edges.iter().filter_map(|e| match e {
+                        dxf::Edge::Line { a, b } => Some((*a, *b)),
+                        dxf::Edge::Arc { center, radius, start, end, ccw } => {
+                            let (a0, a1) = if *ccw || !mirrored { (*start, *end) } else { (-*start, -*end) };
+                            cw += !*ccw as usize;
+                            let (s0, c0) = sincos(a0.to_radians());
+                            let (s1, c1) = sincos(a1.to_radians());
+                            let p0 = [center[0] + radius * c0, center[1] + radius * s0];
+                            let p1 = [center[0] + radius * c1, center[1] + radius * s1];
+                            Some((p0, p1))
+                        }
+                        _ => None,
+                    }).collect();
+                    edges += ends.len();
+                    for i in 0..ends.len() {
+                        let (b, a) = (ends[i].1, ends[(i + 1) % ends.len()].0);
+                        worst = worst.max((b[0] - a[0]).abs().max((b[1] - a[1]).abs()));
+                    }
+                }
+                (edges, cw, worst)
+            };
+            let (n, cw, good) = gaps(true);
+            let (_, _, naive) = gaps(false);
+            t.ok(hatch.is_some_and(|h| h.paths.len() == 2) && n == 37 && cw == 4 && good < 1e-6 && naive > 1.0,
+                 &format!("ezdxf clockwise_arcs_hatch.dxf: 2 paths, {n} edges ({cw} clockwise arcs) close up to {good:.1e} with the mirrored angles, {naive:.2} apart as stored"));
+            let mut s = Scene::new_cpu();
+            let c = render2d::dxf::load(&mut s, EZ_CW_HATCH, &options(BG, false)).ok().map(|l| l.kinds.get("HATCH").copied().unwrap_or_default());
+            t.ok(c.is_some_and(|c| c.read == 1 && c.drawn == 1 && c.failed == 0), &format!("ezdxf clockwise_arcs_hatch.dxf into a scene: the hatch drawn ({:?})", c.map(|c| (c.read, c.drawn, c.failed))));
+        }
+        Err(e) => {
+            t.ok(false, &format!("ezdxf clockwise_arcs_hatch.dxf: {e}"));
+        }
+    }
+    // caret codes in MTEXT: ^J a new paragraph, ^I a tab, "^ " a caret
+    match dxf::load(EZ_CARET, &dxf::Limits::DEFAULT) {
+        Ok(doc) => {
+            let texts: Vec<String> = doc.entities.iter().filter_map(|e| if let dxf::Kind::MText(m) = &e.kind { Some(mtext_plain(&dxf::mtext::parse(&m.text, m.height))) } else { None }).collect();
+            let find = |head: &str| texts.iter().find(|x| x.starts_with(head)).cloned().unwrap_or_default();
+            let (j, i, sp) = (find("J: "), find("I: "), find(" : "));
+            t.ok(texts.len() == 61 && j == "J: abc\ndef" && i == "I: abc\tdef" && sp.ends_with("abc^def"),
+                 &format!("ezdxf caret_encoding.dxf: {} MTEXT; ^J {j:?}, ^I {i:?}, \"^ \" {sp:?}", texts.len()));
+            let mut s = Scene::new_cpu();
+            let c = render2d::dxf::load(&mut s, EZ_CARET, &options(BG, false)).ok().map(|l| l.kinds.get("MTEXT").copied().unwrap_or_default());
+            t.ok(c.is_some_and(|c| c.read == 61 && c.drawn == 61 && c.failed == 0), &format!("ezdxf caret_encoding.dxf into a scene: every MTEXT drawn ({:?})", c.map(|c| (c.read, c.drawn, c.failed))));
+        }
+        Err(e) => {
+            t.ok(false, &format!("ezdxf caret_encoding.dxf: {e}"));
+        }
+    }
+    // MTEXT with many inline codes and four mirrorings: all of it drawn
+    let mut s = Scene::new_cpu();
+    match render2d::dxf::load(&mut s, EZ_MTEXT, &options(BG, false)) {
+        Ok(l) => {
+            let (m, ln) = (l.kinds.get("MTEXT").copied().unwrap_or_default(), l.kinds.get("LINE").copied().unwrap_or_default());
+            t.ok(m.read == 8 && m.drawn == 8 && m.failed == 0 && ln.read == 4 && ln.drawn == 4,
+                 &format!("ezdxf mtext_complex_inline_codes.dxf: MTEXT {} of {} drawn, LINE {} of {}", m.drawn, m.read, ln.drawn, ln.read));
+        }
+        Err(e) => {
+            t.ok(false, &format!("ezdxf mtext_complex_inline_codes.dxf: {e}"));
+        }
+    }
 }
 
 fn reader(t: &mut T) {
@@ -1161,11 +1261,17 @@ fn gpu_cpu(t: &mut T) {
     let Some(dev) = t.res(g.adapter.create_device(&DeviceDesc::DEFAULT), "device") else { return };
     let Some(mut r) = t.res(Renderer::new(&dev, &RendererDesc::new(Format::Bgra8Unorm)), "Renderer::new") else { return };
     gfx::set_parallel(crate::cpucmp::par);
-    for (name, src, eol) in [("FIXTURE", FIXTURE, "\r\n"), ("R12", R12, "\n")] {
-        let text = dxf_text(src, eol);
-        let (w, h) = (640u32, 400u32);
+    let (fixture, r12) = (dxf_text(FIXTURE, "\r\n"), dxf_text(R12, "\n"));
+    // (the drawings of ezdxf that are mostly text: the bounds of text, TEXT_SHARE)
+    let files: [(&str, &[u8], bool); 5] = [("FIXTURE", fixture.as_bytes(), false), ("R12", r12.as_bytes(), false), ("ezdxf_clockwise_arcs_hatch", EZ_CW_HATCH, false),
+                                           ("ezdxf_caret_encoding", EZ_CARET, true), ("ezdxf_mtext_complex_inline_codes", EZ_MTEXT, true)];
+    for (name, bytes, text) in files {
+        let (share, max, ink_max) = if text { (TEXT_SHARE, TEXT_MAX, TEXT_INK) } else { (SHARE, MAX, INK) };
+        // (the drawings of ezdxf in the corpus test's 800 x 600: its bounds were set there; at 640 x 400 the 61 lines of
+        // caret_encoding.dxf are small enough text for 4.4 % of the pixels to differ)
+        let (w, h) = if name.starts_with("ezdxf") { (800u32, 600u32) } else { (640u32, 400u32) };
         let Some(mut s) = t.res(Scene::new(&r), "Scene::new") else { return };
-        let l = match render2d::dxf::load(&mut s, text.as_bytes(), &options(BG, false)) {
+        let l = match render2d::dxf::load(&mut s, bytes, &options(BG, false)) {
             Ok(l) => l,
             Err(e) => {
                 t.ok(false, &format!("{name}: {e}"));
@@ -1185,12 +1291,11 @@ fn gpu_cpu(t: &mut T) {
         let c = refimg::compare(&gimg, &cimg, w, BG, 2);
         let ink = 100.0 * (c.ink[0] - c.ink[1]) / c.ink[1].max(1.0);
         let px = (w * h) as f64;
-        let _ = (TEXT_SHARE, TEXT_INK, TEXT_MAX);
         let inked = cimg.chunks_exact(4).filter(|p| (p[0] as u32 | (p[1] as u32) << 8 | (p[2] as u32) << 16) != BG & 0xFF_FFFF).count();
         t.ok(inked > 2000, &format!("{name}: the CPU path drew {inked} pixels"));
-        t.ok((c.over as f64) <= SHARE * px && c.max <= MAX && ink.abs() <= INK,
-             &format!("{name}: the GPU against the CPU path: {} pixels beyond 2 codes ({:.3} %), largest {} at {:?}, ink {ink:+.3} % (at most {:.1} %, {MAX}, {INK} %)", c.over, 100.0 * c.over as f64 / px, c.max,
-                      c.at, 100.0 * SHARE));
+        t.ok((c.over as f64) <= share * px && c.max <= max && ink.abs() <= ink_max,
+             &format!("{name}: the GPU against the CPU path: {} pixels beyond 2 codes ({:.3} %), largest {} at {:?}, ink {ink:+.3} % (at most {:.1} %, {max}, {ink_max} %)", c.over, 100.0 * c.over as f64 / px, c.max,
+                      c.at, 100.0 * share));
     }
 }
 
