@@ -22,7 +22,7 @@ use rt::sync::SpinLock;
 
 #[link(name = "c")]
 unsafe extern "C" {
-    fn open(path: *const u8, flags: i32, ...) -> i32;
+    fn open(path: *const core::ffi::c_char, flags: i32, ...) -> i32; // (std's: c_char, i8 on x86_64)
     fn close(fd: i32) -> i32;
     fn pread(fd: i32, buf: *mut u8, n: usize, off: i64) -> isize;
     fn pwrite(fd: i32, buf: *const u8, n: usize, off: i64) -> isize;
@@ -379,7 +379,7 @@ impl OsAtomic {
             tmp.extend_from_slice(format!(".tmp-{pid:x}-{seq:x}-{:x}", crate::time_us() as u32).as_bytes());
             tmp.push(0);
             // SAFETY: NUL-terminated path; O_EXCL never opens an existing entry.
-            let fd = unsafe { open(tmp.as_ptr(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600u32) };
+            let fd = unsafe { open(tmp.as_ptr().cast(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600u32) };
             if fd < 0 {
                 if errno() == EEXIST {
                     continue;
@@ -441,7 +441,7 @@ impl OsFile {
             }
         }
         // SAFETY: NUL-terminated path; the descriptor is owned by the result.
-        let fd = unsafe { open(r.as_ptr(), flags, 0o600u32) };
+        let fd = unsafe { open(r.as_ptr().cast(), flags, 0o600u32) };
         (fd >= 0).then_some(Self { fd, writable: mode != FO_READ })
     }
     /// A scratch file in directory (None: /tmp), its name removed at once.
@@ -453,7 +453,7 @@ impl OsFile {
                 return None;
             }
             // SAFETY: NUL-terminated path; O_EXCL never opens an existing entry.
-            let fd = unsafe { open(r.as_ptr(), O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0o600u32) };
+            let fd = unsafe { open(r.as_ptr().cast(), O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0o600u32) };
             if fd < 0 {
                 if errno() == EEXIST {
                     continue;
