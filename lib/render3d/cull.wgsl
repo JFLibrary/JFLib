@@ -20,10 +20,12 @@
 // (docs/RENDER3D.md "Zähler der Listen").  `early` and `late` see few instances; there the turns cost more than they
 // save, as did every way of counting in workgroup memory that was measured.
 //
-// (G7f) BLEND: a list of blended instances (lists[l].z bit 31) is not drawn list by list.  The camera's culling (`main`
-// with pc.all bit 1, or `late`) puts each blended instance in view into one list for all of them, `blend`, with the
-// distance of its sphere's centre from the eye as the key of the sort that follows (sort.wgsl); `early` and the shadow
-// cascades leave them out (they write no depth and cast no shadows).
+// (G7f) BLEND: a list of blended instances (lists[l].z bit 31) is not drawn list by list.  The camera's culling
+// (`main_blend` without the occlusion test, `late` with it) puts each blended instance in view into one list for all of
+// them, `blend`, with the distance of its sphere's centre from the eye as the key of the sort that follows (sort.wgsl);
+// `main` (the shadow cascades, a scene without blended instances) and `early` leave them out (they write no depth and cast
+// no shadows).  `main` does not name `blend` at all: the validation's check of shader accesses goes by what an entry
+// point names, and the cascades' culling runs right after the camera's
 
 struct View {
     view_proj: mat4x4f,
@@ -48,7 +50,6 @@ struct DrawCmd {
 
 struct Push {
     count: u32,
-    // bit 0: every live instance (Scene::set_culling(false)); (G7f) bit 1: this view collects the blended instances
     all: u32,
     // (G5d) late: the target's size in pixels, the pyramid's levels
     w: u32,
@@ -157,35 +158,46 @@ fn add_blend(i: u32, s: vec4f, l: u32) {
     }
 }
 
+// the list slot i with sphere s takes in this view (NONE: none): every live instance with pc.all, else what is in view
+fn chosen(i: u32, s: vec4f) -> u32 {
+    if pc.all != 0u {
+        return select(NONE, list_of[i], s.w >= 0.0);
+    }
+    if !in_view(s) {
+        return NONE;
+    }
+    return pick(i, s);
+}
+
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
     let i = gid.x;
     if i >= pc.count {
         return;
     }
-    let s = spheres[i];
-    var l = NONE;
-    if (pc.all & 1u) != 0u {
-        if s.w < 0.0 {
-            return;
-        }
-        l = list_of[i];
-    } else {
-        if !in_view(s) {
-            return;
-        }
-        l = pick(i, s);
+    let l = chosen(i, spheres[i]);
+    if l != NONE && !blended(l) {
+        add_turns(i, l);
     }
+}
+
+// (G7f) the camera without the occlusion test: blended instances into their own list
+@compute @workgroup_size(256)
+fn main_blend(@builtin(global_invocation_id) gid: vec3u) {
+    let i = gid.x;
+    if i >= pc.count {
+        return;
+    }
+    let s = spheres[i];
+    let l = chosen(i, s);
     if l == NONE {
         return;
     }
     if blended(l) {
-        if (pc.all & 2u) != 0u {
-            add_blend(i, s, l);
-        }
-        return;
+        add_blend(i, s, l);
+    } else {
+        add_turns(i, l);
     }
-    add_turns(i, l);
 }
 
 // (G5d) phase 1: what the frame before saw (or what changed since), in the view

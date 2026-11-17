@@ -1,0 +1,4 @@
+#!args --test blend
+# (G7f) blended instances against the ray caster laying them back to front per instance; the sorted list read back with
+# and without the occlusion test, the depth buffer as without them, no shadows, a switch to opaque and back; 600 and 3000
+# instances (the sort over two and eight tiles); detail levels of blended balls; Voll and Basis

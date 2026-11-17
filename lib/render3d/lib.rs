@@ -126,6 +126,9 @@ pub const FS_BLEND_SPV: &[u32] = spv::FS_BLEND;
 pub const CULL_SPV: &[u32] = spv::CULL;
 #[cfg(not(target_arch = "wasm32"))]
 pub const CULL_EARLY_SPV: &[u32] = spv::CULL_EARLY;
+/// (G7f) the camera's culling without the occlusion test when the scene has blended instances
+#[cfg(not(target_arch = "wasm32"))]
+pub const CULL_BLEND_SPV: &[u32] = spv::CULL_BLEND;
 #[cfg(not(target_arch = "wasm32"))]
 pub const CULL_LATE_SPV: &[u32] = spv::CULL_LATE;
 #[cfg(not(target_arch = "wasm32"))]
@@ -411,6 +414,8 @@ pub struct Renderer {
     pub(crate) multi: bool,
     pub(crate) max_instances: u32,
     cull: ComputePipeline,
+    /// (G7f) the camera's without the occlusion test when there are blended instances (it collects them)
+    cull_blend: ComputePipeline,
     /// (G5d) the occlusion test's two phases (cull.wgsl) and the pyramid between them (hiz.rs)
     cull_early: ComputePipeline,
     cull_late: ComputePipeline,
@@ -461,10 +466,14 @@ pub struct Renderer {
     index_room: Vec<u32>,
     /// (G7f) per slot: how many live meshes take it as a detail level
     lod_users: Vec<u32>,
-    /// (G7f) the ranges of removed meshes (pool, first, count): frames in flight may still read them, so they come free
-    /// once a submission after the removal is done (Queue::write_buffer puts no barrier before its copies)
-    retired: Vec<(PoolOf, u32, u32)>,
+    /// (G7f) the ranges of removed meshes (pool, first, count) with a submission after their removal: frames in flight
+    /// may still read them, so they come free once it is done (Queue::write_buffer puts no barrier before its copies).
+    /// The last such submission with the records and meshes counted then (no record and no new mesh since: no frame can
+    /// have drawn a mesh since and no upload is pending, the same submission serves the next removal)
     fenced: Vec<(SubmitId, Vec<(PoolOf, u32, u32)>)>,
+    stamp: Option<(SubmitId, u64, u64)>,
+    records: Cell<u64>,
+    uploads: u64,
     /// (G7f) counts removals of meshes, materials and textures (a scene prepared before one may not record), and
     /// removals and new meshes in old slots (scenes write their lists' draw records again)
     pub(crate) removals: u32,
@@ -495,6 +504,7 @@ pub struct Renderer {
 
 struct Modules {
     cull: ShaderModule,
+    cull_blend: ShaderModule,
     cull_early: ShaderModule,
     cull_late: ShaderModule,
     hiz_depth: ShaderModule,
@@ -515,7 +525,7 @@ struct Modules {
 #[cfg(not(target_arch = "wasm32"))]
 fn modules(dev: &Device) -> Result<Modules> {
     let m = |w: &[u32]| ShaderModule::from_spirv(dev, w);
-    Ok(Modules { cull: m(CULL_SPV)?, cull_early: m(CULL_EARLY_SPV)?, cull_late: m(CULL_LATE_SPV)?, hiz_depth: m(HIZ_DEPTH_SPV)?, hiz_down: m(HIZ_DOWN_SPV)?,
+    Ok(Modules { cull: m(CULL_SPV)?, cull_blend: m(CULL_BLEND_SPV)?, cull_early: m(CULL_EARLY_SPV)?, cull_late: m(CULL_LATE_SPV)?, hiz_depth: m(HIZ_DEPTH_SPV)?, hiz_down: m(HIZ_DOWN_SPV)?,
                  scatter: m(SCATTER_SPV)?, vs: m(VS_SPV)?, fs: m(FS_SPV)?, fs_mask: m(FS_MASK_SPV)?, vs_depth: m(VS_DEPTH_SPV)?, vs_shadow: m(VS_SHADOW_SPV)?,
                  fs_shadow: m(FS_SHADOW_SPV)?, vs_blend: m(VS_BLEND_SPV)?, fs_blend: m(FS_BLEND_SPV)?, sort_local: m(SORT_LOCAL_SPV)?, sort_global: m(SORT_GLOBAL_SPV)? })
 }
@@ -526,7 +536,7 @@ fn modules(dev: &Device) -> Result<Modules> {
     let c = ShaderModule::from_wgsl(dev, CULL_WGSL)?;
     let h = ShaderModule::from_wgsl(dev, HIZ_WGSL)?;
     let s = ShaderModule::from_wgsl(dev, SORT_WGSL)?;
-    Ok(Modules { cull: c.clone(), cull_early: c.clone(), cull_late: c, hiz_depth: h.clone(), hiz_down: h, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: d.clone(),
+    Ok(Modules { cull: c.clone(), cull_blend: c.clone(), cull_early: c.clone(), cull_late: c, hiz_depth: h.clone(), hiz_down: h, scatter: ShaderModule::from_wgsl(dev, SCATTER_WGSL)?, vs: d.clone(),
                  fs: d.clone(), fs_mask: d.clone(), vs_depth: d.clone(), vs_shadow: d.clone(), fs_shadow: d.clone(), vs_blend: d.clone(), fs_blend: d,
                  sort_local: s.clone(), sort_global: s })
 }
@@ -621,6 +631,7 @@ impl Renderer {
         let draw_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&draw_layout, &textures.layout, &shadow.layout], push_constants: 4 })?;
         let shadow_pl = dev.create_pipeline_layout(&PipelineLayoutDesc { groups: &[&draw_layout, &textures.layout], push_constants: 4 })?;
         let cull = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&md.cull, "main") })?;
+        let cull_blend = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&md.cull_blend, "main_blend") })?;
         let cull_early = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &cull_pl, shader: ShaderStage::new(&md.cull_early, "early") })?;
         let cull_late = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &late_pl, shader: ShaderStage::new(&md.cull_late, "late") })?;
         let scatter = dev.create_compute_pipeline(&ComputePipelineDesc { layout: &scatter_pl, shader: ShaderStage::new(&md.scatter, "main") })?;
@@ -663,8 +674,10 @@ impl Renderer {
             mesh_ids: Ids::new(),
             index_room: Vec::new(),
             lod_users: Vec::new(),
-            retired: Vec::new(),
             fenced: Vec::new(),
+            stamp: None,
+            records: Cell::new(0),
+            uploads: 0,
             removals: 0,
             mesh_gen: 0,
             lods: Vec::new(),
@@ -688,6 +701,7 @@ impl Renderer {
             multi,
             max_instances,
             cull,
+            cull_blend,
             cull_early,
             cull_late,
             hiz_maker,
@@ -849,6 +863,8 @@ impl Renderer {
             let (p, a, t) = (m.positions[i], m.normals[i], m.uvs[i]);
             [p[0], p[1], p[2], t[0], a[0], a[1], a[2], t[1]]
         }).collect();
+        // (G7f) a pending upload: the next removal needs a submission after it
+        self.uploads += 1;
         q.write_buffer(&self.vertices.buf, base as u64 * 32, &vertices)?;
         if wide {
             q.write_buffer(&self.indices32.buf, first as u64 * 4, m.indices)?;
@@ -892,21 +908,9 @@ impl Renderer {
         }
     }
 
-    /// (G7f) the ranges of removed meshes the GPU is done with go back to their pools.  A removal's ranges wait for a
-    /// submission after it (one flush stamps all of them); wait: until every one of them is done (rather than grow a
-    /// pool).  In the browser at once: writeBuffer runs in the queue's order, after every frame submitted before
+    /// (G7f) the ranges of removed meshes the GPU is done with go back to their pools; wait: until all of them are
+    /// (rather than grow a pool)
     fn reclaim(&mut self, wait: bool) -> Result<()> {
-        if cfg!(target_arch = "wasm32") {
-            for (p, first, n) in core::mem::take(&mut self.retired) {
-                self.pool_mut(p).release(first, n);
-            }
-            return Ok(());
-        }
-        if !self.retired.is_empty() {
-            let id = self.dev.queue().flush()?;
-            let r = core::mem::take(&mut self.retired);
-            self.fenced.push((id, r));
-        }
         if wait {
             if let Some(&(id, _)) = self.fenced.last() {
                 if !self.dev.wait(id, 10_000_000_000)? {
@@ -926,6 +930,25 @@ impl Renderer {
         Ok(())
     }
 
+    /// (G7f) a submission after every frame recorded so far and every mesh's upload (Queue::write_buffer stages its copy
+    /// into the next submission: a removed mesh's own upload may still be pending): the one of the last removal when
+    /// neither came since, else a new one (Queue::flush).  In the browser none is needed (writeBuffer runs in the queue's
+    /// order, after every frame submitted before)
+    fn stamp(&mut self) -> Result<Option<SubmitId>> {
+        if cfg!(target_arch = "wasm32") {
+            return Ok(None);
+        }
+        let (n, u) = (self.records.get(), self.uploads);
+        if let Some((id, at, up)) = self.stamp {
+            if (at, up) == (n, u) {
+                return Ok(Some(id));
+            }
+        }
+        let id = self.dev.queue().flush()?;
+        self.stamp = Some((id, n, u));
+        Ok(Some(id))
+    }
+
     /// (G7f) a mesh goes: its id is invalid from now on, its vertices and indices are used again (once the frames that may
     /// still draw it are done, store.rs), its place gets the next mesh with a new id.  Invalid for a mesh the renderer does
     /// not have, one that instances of a scene use (Scene::remove them first; a dropped scene uses nothing) and one that
@@ -938,6 +961,8 @@ impl Renderer {
         if self.lod_users[m] > own {
             return Err(GpuError::Invalid("remove_mesh: another mesh takes it as a detail level"));
         }
+        // (before the shared table says it is gone: a failed submission changes nothing)
+        let fence = self.stamp()?;
         {
             let mut reg = self.counts.reg.lock();
             let e = &mut reg.meshes[m];
@@ -949,8 +974,18 @@ impl Renderer {
         self.set_lod_users(m, false);
         self.lods[m].clear();
         let info = self.meshes[m];
-        self.retired.push((PoolOf::Vertices, info.base_vertex, info.vertices));
-        self.retired.push((if info.wide { PoolOf::Indices32 } else { PoolOf::Indices16 }, info.first_index, self.index_room[m]));
+        let ranges = [(PoolOf::Vertices, info.base_vertex, info.vertices), (if info.wide { PoolOf::Indices32 } else { PoolOf::Indices16 }, info.first_index, self.index_room[m])];
+        match fence {
+            None => {
+                for (p, first, n) in ranges {
+                    self.pool_mut(p).release(first, n);
+                }
+            }
+            Some(id) => match self.fenced.last_mut() {
+                Some((f, v)) if *f == id => v.extend_from_slice(&ranges),
+                _ => self.fenced.push((id, ranges.to_vec())),
+            },
+        }
         self.mesh_ids.kill(m);
         self.removals = self.removals.wrapping_add(1);
         self.mesh_gen = self.mesh_gen.wrapping_add(1);
@@ -1223,6 +1258,8 @@ impl Renderer {
         if !s.prepared {
             return Err(GpuError::Invalid("record: Scene::prepare comes first"));
         }
+        // (G7f) a frame may draw meshes: the next removal needs a submission after it
+        self.records.set(self.records.get() + 1);
         // (what went up does not hold them: the visibility shader would read and write beyond its buffers)
         if s.stale {
             return Err(GpuError::Invalid("record: instances came or changed their mesh after Scene::prepare"));
@@ -1344,12 +1381,13 @@ impl Renderer {
             e.timestamp(ts, base + 1);
         }
         // (G5d) with the occlusion test phase 1: what phase 2 of the frame before saw; (G7f) without it the camera's
-        // culling collects the blended instances (cull.wgsl's pc.all bit 1)
+        // culling collects the blended instances (main_blend)
         let all = !s.culling as u32;
-        let collect = if pyramid.is_none() && s.blend_on { 2 } else { 0 };
-        self.cull(e, s, &s.view, if pyramid.is_some() { &self.cull_early } else { &self.cull }, &[n, all | collect], None);
+        let collect = pyramid.is_none() && s.blend_on;
+        let camera = if pyramid.is_some() { &self.cull_early } else if collect { &self.cull_blend } else { &self.cull };
+        self.cull(e, s, &s.view, camera, &[n, all], None);
         // (G7f) without the occlusion test: the blended instances sorted (each step waits for the writes before it)
-        if collect != 0 {
+        if collect {
             self.sort(e, s);
         }
         if let Some(ts) = ts {

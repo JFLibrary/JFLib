@@ -132,6 +132,9 @@ pub struct GMat {
     /// textures: base colour, metallic-roughness, normal, occlusion, emissive
     pub tex: [Option<usize>; 5],
     pub mask: Option<f32>,
+    /// (G7f) alphaMode BLEND, doubleSided
+    pub blend: bool,
+    pub double: bool,
 }
 
 /// a texture: an image and the sampler's glTF codes (mag, min, wrapS, wrapT)
@@ -406,6 +409,12 @@ impl GScene {
             if let Some(c) = m.mask {
                 s.push_str(&format!(",\"alphaMode\":\"MASK\",\"alphaCutoff\":{}", f32n(c)));
             }
+            if m.blend {
+                s.push_str(",\"alphaMode\":\"BLEND\"");
+            }
+            if m.double {
+                s.push_str(",\"doubleSided\":true");
+            }
             s.push('}');
             s
         }).collect();
@@ -532,13 +541,14 @@ pub fn test_scene() -> GScene {
         GTex { image: 3, sampler: [9729, 9729, 10497, 33648] },
         GTex { image: 0, sampler: [9729, 9986, 10497, 33071] },
     ];
-    let mat = |factor: [f32; 4], tex: [Option<usize>; 5], mask: Option<f32>| GMat { factor, metallic: 0.25, roughness: 0.75, emissive: [0.0; 3], tex, mask };
+    let mat = |factor: [f32; 4], tex: [Option<usize>; 5], mask: Option<f32>| GMat { factor, metallic: 0.25, roughness: 0.75, emissive: [0.0; 3], tex, mask, blend: false, double: false };
     let mats = vec![
         mat([1.0, 1.0, 1.0, 1.0], [Some(0), None, None, None, None], None),
         mat([0.9, 0.8, 1.0, 1.0], [Some(1), None, None, None, None], None),
         mat([0.3, 0.6, 0.9, 1.0], [None; 5], None),
         mat([1.0, 0.9, 0.8, 1.0], [Some(2), None, None, None, None], Some(0.5)),
-        GMat { factor: [0.8, 0.8, 0.8, 1.0], metallic: 1.0, roughness: 0.5, emissive: [0.1, 0.2, 0.3], tex: [Some(3), Some(4), Some(3), Some(4), Some(0)], mask: None },
+        GMat { factor: [0.8, 0.8, 0.8, 1.0], metallic: 1.0, roughness: 0.5, emissive: [0.1, 0.2, 0.3], tex: [Some(3), Some(4), Some(3), Some(4), Some(0)], mask: None, blend: false,
+               double: false },
     ];
     let enc = |idx, uv, normals, interleaved| Enc { idx, uv, normals, interleaved, sparse: None };
     let mut big = plate();

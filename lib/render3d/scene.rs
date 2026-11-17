@@ -1121,6 +1121,10 @@ impl Scene {
             self.template = dev.create_buffer(&BufferDesc { size: self.list_cap as u64 * DRAW_BYTES, usage: none, memory: MemoryKind::Device })?;
             draws_new = true;
             self.lists_dirty = true;
+            // (G7f) the culling's groups bind the draw records: new ones with them.  Until G7f only a list_first that grew at
+            // the same time made them anew; once detail levels had grown it earlier, the culling counted into the old
+            // records and the frame drew nothing (found by the random sequence of the test `remove`)
+            groups = true;
         }
         // (G5d) the lists' records and their detail levels
         let info = lists + self.lists.iter().map(|l| r.lods[l.mesh as usize].len() as u32).sum::<u32>();
