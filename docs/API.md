@@ -27731,6 +27731,8 @@ fs -- file system access for backup and restore
                                                relative to it, never through a link (the
                                                section "folders by handle")
   set_file_times / set_file_mode (File)        through the open file's own handle
+  fd_path(File) (Linux)                        a name of the open file itself for a program
+                                               this one starts (/proc/<pid>/fd/<n>)
 
 Windows: reparse points count as links only for symbolic links and junctions; other tags
 (deduplication, cloud placeholders) are ordinary files whose data is read.  Files are
@@ -27863,12 +27865,18 @@ modes or free space.
                                     has become meanwhile)
   ```
 
-  macOS: openat with O_NOFOLLOW component by component, the \*at calls on the folder.  Windows
-  has no calls relative to an open folder in its API: a Dir holds every folder from its start
-  down open without FILE_SHARE_DELETE (checked to be a folder, not a junction or a link), so
-  none of them can be renamed, removed or replaced while it lives, and its entries are named
-  by path below them (with OPEN_REPARSE_POINT).  The manifest's rules (policy.rs) are checked
-  on the path an entry has below the start.
+  macOS: openat with O_NOFOLLOW component by component, the \*at calls on the folder.  Windows:
+  the native calls relative to an open folder -- NtCreateFile with OBJECT_ATTRIBUTES.
+  RootDirectory = the folder's handle and FILE_OPEN_REPARSE_POINT, one name at a time (a
+  folder on the way that is a junction, a symbolic link or another name surrogate is refused,
+  one that is no folder too), renames to a name relative to the target folder's handle
+  (FILE_RENAME_INFORMATION.RootDirectory), removals through the entry's own handle, links as
+  reparse data set on the new entry (FSCTL_SET_REPARSE_POINT, what CreateSymbolicLinkW writes).
+  What lies below an open folder is found through the handles, never through a path, so a
+  folder on the way renamed or swapped for a junction -- also one another program holds open
+  with delete access -- changes nothing, and no folder is locked against renaming or removal
+  meanwhile.  On a network share the server looks the names up by path itself.  The
+  manifest's rules (policy.rs) are checked on the path an entry has below the start.
 
 **`impl Dir`**
 
@@ -27913,6 +27921,13 @@ modes or free space.
 - **`fn set_file_mode(f: &crate::File, mode: u32) -> bool`**
   permission bits (07777) of an open file, through its handle (Windows: nothing to do); a
   mount's stream: false
+
+- **`fn fd_path(f: &crate::File) -> Option<String>`**
+  A path that leads a program of this user (one this process starts, such as QEMU given a disk
+  file made through a Dir) to the open file `f` itself, whatever its name has become or was put
+  in its place meanwhile.  Linux: /proc/&lt;this process>/fd/&lt;n>, valid while `f` stays open and
+  this process runs (keep `f` as long as the other program may open the path again); None on
+  Windows and macOS and for a mount's stream.
 
 ### `plat/service.rs`
 
@@ -29347,7 +29362,11 @@ Windows (win_tray.rs): Shell_NotifyIconW on a message-only window of the UI thre
 with TrackPopupMenuEx, notifications as the symbol's balloon (Windows 10 / 11 show it as a
 toast; without a visible symbol a hidden one is added for the time it is shown).  Linux
 (linux_tray.rs): StatusNotifierItem with a com.canonical.dbusmenu menu and
-org.freedesktop.Notifications, on a session-bus connection of its own thread.  Browser and
+org.freedesktop.Notifications, on a session-bus connection of its own thread; clicks on the
+symbol and its menu count only from the program that shows it (the owner of the
+StatusNotifierWatcher or of a StatusNotifierHost name -- a program of the same user that
+claims such a name passes too, so a tray command that destroys something should still ask in
+a window).  Browser and
 Android (web_notify.rs): notifications only -- the Notification API (the permission asked for
 from the user's gesture), NotificationManager with POST_NOTIFICATIONS; no symbol.  macOS
 (apple_mac_services.rs): an NSStatusItem in the menu bar (with a menu a click opens it, the Mac's

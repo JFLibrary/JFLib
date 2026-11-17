@@ -231,7 +231,9 @@ one key per set when the media pool encrypts, that key also sealed to the recove
 tape). Media pools with write protection; a point is written completely, spanning tapes when
 one is full; tape jobs write a job's newest point; restore and verify read only the tapes;
 rescanning catalogs tapes that came back or came from elsewhere. `bcctl tape list|extract`
-reads tapes without any server (encrypted sets with the recovery kit).
+reads tapes without any server (encrypted sets with the recovery kit); `extract` takes its
+target folder as it is and works below it relative to open folders, as the server's restores:
+a link in it is not followed.
 
 **Virtual machines (QEMU/KVM, on the backup server).** VMs are found through their QMP sockets
 (setting `hypervisor.qmp`). A running VM is backed up by QEMU itself in one transaction over its
@@ -244,6 +246,9 @@ end); the server does not read files another QEMU names.
 **Instant start.** A VM boots straight from a restore point: the server exports its disks
 over NBD from the repository (read-only), a qcow2 overlay takes the guest's writes. *Merge*
 mirrors the disks into a folder while the VM runs and switches over; *stop* discards the overlay.
+The merge's folder lies in a restore folder and is opened from there without following a link;
+the server makes each disk file in it and hands QEMU that open file (Linux:
+`/proc/<server>/fd/<n>`), so QEMU writes exactly the file made there.
 
 **Boot checks.** A VM of a point starts without network access (or isolated, with one forwarded
 port) and is checked: it keeps running, its serial console shows a text, it answers on a port.
