@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
-  <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
+  <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
   <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
 
@@ -412,9 +412,11 @@ event carries its window (Event::win).
 
 - **`fn launch(desc: &AppDesc, app: impl App + 'static, style: &'static dyn Style) -> i32`**
   Launch the same owned app on a desktop event loop, browser worker, Android or iOS host.
-  Host-driven applications remain alive after their entrypoint returns.  iOS: a headless run
-  (--shot, --script, --agent-json, --agent-mcp) stays the desktop's, the rest is the UIKit host's
-  (plat apple_ios.rs, which takes the main thread when this returned 0).
+  Host-driven applications remain alive after their entrypoint returns.  iOS and Android: a
+  headless run (--shot, --script, --agent-json, --agent-mcp) stays the desktop's, the rest is the
+  UIKit host's (plat apple_ios.rs, which takes the main thread when this returned 0) or the Java
+  host's (Android: a program without a UI runs its scripts that way, docs/ANDROID.md AN0; the
+  desktop's runner adds about 290 KB to an APK).
 
 - **`struct Runtime`**
   An owned application driven one event/tick at a time. Browser hosts and automation
@@ -27182,7 +27184,7 @@ FO_RW: u32 = 2  // open or create (contents kept), read + write
 ```
 
 - **`struct Date`**
-  a date and time (date(): Windows local time, Linux UTC)
+  a date and time (date(): Windows local time, Linux, Apple and Android UTC, the browser the page's)
   - `year: u16`
   - `month: u16`
   - `day: u16`
@@ -35756,6 +35758,13 @@ REQUEST_UNSAVED: u32 = 22
 
 - **`fn date() -> (Date, bool)`**
   Host-supplied UTC calendar, updated independently from the monotonic clock.
+
+- **`fn date() -> (Date, bool)`**
+  (Android) the date and time in UTC from the system's clock, as on Linux; the flag is true (UTC).
+  The calendar jfgui_date sets is the browser's: no Android host calls it.
+
+- **`fn unix_time_ns() -> i64`**
+  (Android) wall-clock time: nanoseconds since 1970-01-01 00:00 UTC (Bionic's CLOCK_REALTIME)
 
 - **`fn unix_time_ns() -> i64`**
   Wall-clock time from the host calendar: nanoseconds since 1970-01-01 00:00 UTC.
@@ -52102,7 +52111,8 @@ semantics, the minimal OS calls the runtime itself needs, panic handling.
   rt::os::{pages_alloc, pages_free, write_stdout, write_stderr, exit, yield_now}   (and on
   Linux the raw syscall helpers plat builds on); write_stderr_crash: stderr for crash paths,
   which gives up a stuck non-blocking stderr instead of waiting for it (Linux)
-  rt::kernel the Linux kernel ABI per architecture: SYS_*, O_*, Stat, clone_args (also as rt::os::*)
+  rt::kernel the Linux kernel ABI per architecture: SYS_*, O_*, Stat, clone_args (also as rt::os::*;
+           Android has the table too, without rt::os's helpers: docs/ANDROID.md, decision 2)
   rt::fx   cvtt / cvt / sqrt / minss / maxss / floor_i / ceil_i / div255
   rt::x87  the extended-precision steps of f64 <-> decimal text (ini.s), fpatan
   rt::sync SpinLock
@@ -52400,7 +52410,7 @@ are bit-identical to ASMLIB.  Rust never fuses a multiply and an add into an FMA
 - **`fn cvttd64(x: f64) -> i64`**
   cvttsd2si (64-bit): truncate (i64::MIN for NaN / out of range)
 
-### `rt/kernel.rs` (Linux)
+### `rt/kernel.rs`
 
 Source: [`lib/rt/kernel.rs`](../lib/rt/kernel.rs)
 
