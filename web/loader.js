@@ -181,7 +181,7 @@ const CODES={KeyA:4,KeyB:5,KeyC:6,KeyD:7,KeyE:8,KeyF:9,KeyG:10,KeyH:11,KeyI:12,K
 // the user's gesture -- at once while the page still has the activation of the press that made the app ask, else with the
 // next press in the canvas -- with unadjustedMovement (raw motion) where the browser has it; movementX / movementY go to
 // the app summed per batch.  The browser lets go with Esc and when the page loses the focus.
-let lockWanted=false, lockTried=false;
+let lockWanted=false, lockTried=false, lockEsc=false;
 function lockNow(press) {
   if(!lockWanted || document.pointerLockElement===canvas) return;
   lockTried=press;
@@ -197,7 +197,7 @@ function lockCancel() {
 }
 document.addEventListener("pointerlockchange",()=>{
   const on=document.pointerLockElement===canvas;
-  if(!on) lockWanted=false;
+  if(!on) {lockWanted=false;lockEsc=true;} // (the browser's own Esc: its up is the lock's too)
   if(started) send({type:"pointerlock",state:on?1:0});
 });
 document.addEventListener("pointerlockerror",()=>{
@@ -263,8 +263,12 @@ canvas.onwheel=e=>{e.preventDefault();const factor=e.deltaMode===1?30:e.deltaMod
 const keys={Backspace:8,Tab:9,Enter:13,Shift:16,Control:17,Alt:18,Pause:19,CapsLock:20,Escape:27,' ':32,PageUp:33,PageDown:34,End:35,Home:36,ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40,Insert:45,Delete:46,Meta:91};
 function key(e,down) {
   if(e.isComposing || composing) return;
-  // (G7a) Esc while the canvas holds the pointer lock or waits for it: the lock's (the browser lets go itself)
-  if(e.key==="Escape" && (lockWanted || document.pointerLockElement===canvas)) {if(down)lockCancel();e.preventDefault();return;}
+  // (G7a) Esc while the canvas holds the pointer lock or waits for it: the lock's, down and up (the browser lets go itself)
+  if(e.key==="Escape") {
+    if(down && (lockWanted || document.pointerLockElement===canvas)) {lockEsc=true;lockCancel();e.preventDefault();return;}
+    if(down) lockEsc=false;
+    else if(lockEsc) {lockEsc=false;e.preventDefault();return;}
+  }
   // Ordinary paste belongs to the DOM clipboard event; Alt-modified app shortcuts do not.
   if((e.ctrlKey||e.metaKey) && !e.altKey && e.key.toLowerCase()==="v") {pasteModifiers=down?2|(e.shiftKey?1:0):2;return;}
   const k=keys[e.key] || (/^F\d+$/.test(e.key)?111+Number(e.key.slice(1)):e.key.length===1?e.key.toUpperCase().charCodeAt(0):0);
