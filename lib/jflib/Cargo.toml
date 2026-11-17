@@ -86,6 +86,7 @@ render2d.workspace = true
 gltf.workspace = true
 diagram_core.workspace = true
 diagram_io.workspace = true
+pdf.workspace = true
 style_winui.workspace = true
 style_classic.workspace = true
 style_kde.workspace = true
