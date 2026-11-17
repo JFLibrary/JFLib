@@ -48,6 +48,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   buffers as libc and std declare them (the clashing declarations warned); the workspace no longer
   lists the apps' style crates it never uses (`unused workspace dependency` on every target); iOS no
   longer warns of the unused `objc_msg_super`.
+- Windows: a service whose `run` ends with an error code is started again, as systemd
+  (`Restart=on-failure`) and launchd (`KeepAlive` with `SuccessfulExit` false) do it.
+  `service::install` set the failure actions but not `SERVICE_FAILURE_ACTIONS_FLAG`, without
+  which they only follow a process that ends without reporting `SERVICE_STOPPED`, and
+  `run_service` does report the stop (with error 1066), so the service stayed stopped. A stop
+  that was asked for is reported without an error whatever `run` returned, so it is never
+  answered with a restart. Services installed before keep their setting until they are installed
+  again.
 
 ### Security
 
