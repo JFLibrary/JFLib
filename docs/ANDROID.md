@@ -147,10 +147,10 @@ dem Emulator (x86-64, API 35) und auf dem A56, und die Syscall-Liste die Kandida
 
 | Lauf (Emulator x86-64, API 35) | `adb shell` | App (`untrusted_app`, seccomp 2) |
 |---|---|---|
-| `coretest` | 3259 von 3259 Prüfungen | 3259 von 3259 |
+| `coretest` | 3267 von 3267 Prüfungen (nach dem Merge von `origin/main`) | 3267 von 3267 |
 | `plattest --test all` | 183 bestanden, 1 Fehler (Fund 2) | dasselbe |
 | `asynctest --script tasks.uis`, `copy.uis` | grün | grün |
-| `plattest --test syscalls` | 114 von 114 erreichen den Kernel | 94 erreichen den Kernel, 20 enden mit SIGSYS |
+| `plattest --test syscalls` | 126 von 126 erreichen den Kernel | 96 erreichen den Kernel, 30 enden mit SIGSYS |
 
 Funde von `plattest` (Fehler der Bibliothek auf Android):
 
@@ -226,13 +226,14 @@ Liste des Filters, das zeigt erst der Lauf auf dem A56. AOSP-Listen wurden nicht
 - **Kandidat für Ärger: `openat2`.** `fs.rs` öffnet damit unter einem offenen Ordner ohne Links auf dem Weg
   (`plat::fs::Dir`); im App-Prozess endet der Aufruf mit SIGSYS. AN3 braucht auf Android einen Weg ohne `openat2`
   (etwa `openat` Schritt für Schritt mit `O_NOFOLLOW`). `renameat2` erreicht den Kernel.
-- Die übrigen 19 Treffer des Filters stammen aus Linux-Modulen, die auf Android nicht laufen: SysV-Shared-Memory der
+- Die übrigen 29 Treffer des Filters stammen aus Linux-Modulen, die auf Android nicht laufen: SysV-Shared-Memory der
   X11-Ausgabe (`shmget`, `shmat`, `shmctl`, `shmdt`) und die Sperrliste der Sandbox in `linux_sandbox.rs` (`chroot`,
-  `mount`, `umount2`, `init_module`, `delete_module`, `finit_module`, `kexec_load`, `kexec_file_load`, `add_key`,
-  `request_key`, `keyctl`, `open_by_handle_at`, `landlock_create_ruleset`, `landlock_add_rule`,
-  `landlock_restrict_self`). Die anderen 94 Aufrufe der Tabelle erreichen den Kernel, darunter `clone`, `execve`,
-  `ptrace`, `bpf`, `seccomp`, `unshare` und `memfd_create`. `rt_sigreturn` prüft die Probe nicht (Bionic braucht ihn
-  für jeden Signal-Handler).
+  `mount`, `umount2`, `init_module`, `delete_module`, `kexec_load`, `add_key`, `request_key`, `keyctl`,
+  `open_by_handle_at`, `finit_module`, `kexec_file_load`, `io_uring_setup`, `io_uring_enter`, `io_uring_register`,
+  `open_tree`, `move_mount`, `fsopen`, `fsconfig`, `fsmount`, `fspick`, `mount_setattr`, `landlock_create_ruleset`,
+  `landlock_add_rule`, `landlock_restrict_self`). Die anderen 96 Aufrufe der Tabelle erreichen den Kernel, darunter
+  `clone`, `execve`, `ptrace`, `bpf`, `seccomp`, `unshare` und `memfd_create`, aus der Sperrliste auch `clone3` und
+  `pidfd_getfd`. `rt_sigreturn` prüft die Probe nicht (Bionic braucht ihn für jeden Signal-Handler).
 - EACCES oder EPERM kämen von SELinux oder fehlenden Rechten, nicht vom Filter: Ohne `INTERNET` scheitert `socket()`
   mit EACCES. Die Probe gibt ungültige Argumente und sieht nur den Filter.
 
