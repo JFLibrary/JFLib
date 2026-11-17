@@ -283,6 +283,16 @@ fn compound_rules(t: &mut T) {
     let d = Dictionary::from_bytes(aff, dic);
     t.good(&d, &["foobaz", "foobarbarbaz"]);
     t.bad(&d, &["foobar", "barbaz"]);
+    // 40 starred elements before the last one: matching tried every way the stars could share
+    // the parts (exponential in the stars); a table over (element, part) now
+    let stars = "A*".repeat(40);
+    let aff = format!("COMPOUNDMIN 1\nCOMPOUNDRULE 2\nCOMPOUNDRULE {stars}C\nCOMPOUNDRULE {stars}B?D\n");
+    let d = Dictionary::from_bytes(aff.as_bytes(), b"4\na/A\nb/B\nc/C\nd/D\n");
+    let t0 = plat::time_us();
+    t.good(&d, &["aaaaaaac", "ac", "aaaaaabd", "aaad"]);
+    t.bad(&d, &["aaaaaaab", "aaaaaaaa", "aaaaaaca", "aaaaaabb"]);
+    let ms = plat::time_us().wrapping_sub(t0) / 1000;
+    t.check(ms < 1000, &format!("40 starred elements, 8 parts: {ms} ms"));
 }
 
 fn hunspell_rules(t: &mut T) {

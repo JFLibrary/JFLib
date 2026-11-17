@@ -1603,6 +1603,43 @@ impl Ft {
             let v = self.t.valid(s1 as u32);
             self.st_check(!v, "selftest: derived font survived font_unload\n");
         }
+        // ---- text_hit: one run gives the answers of measuring every prefix (kerned pairs, a soft
+        // hyphen, a newline, a length); 20000 characters at once (every prefix again: quadratic)
+        let id = self.t.load_file(&format!("{FX}mini.ttf"), 0);
+        if id >= 0 {
+            let f = id as u32;
+            self.t.set_font(f, 20 << 8);
+            let s = "AVOA\u{AD}VOAB C\nAV".as_bytes();
+            let prefixes = |t: &mut Text, len: Option<usize>, x: i32| {
+                let (xf, mut i, mut pen) = (x << 8, 0usize, 0i32);
+                while !len.is_some_and(|l| i >= l) && i < s.len() && s[i] != 0 && s[i] != b'\n' {
+                    let next = i + if s[i] < 0x80 { 1 } else { 2 };
+                    let p = t.measure_n(s, next);
+                    if xf < (pen + p) >> 1 {
+                        break;
+                    }
+                    pen = p;
+                    i = next;
+                }
+                i
+            };
+            let w = self.t.width_n(s, 13);
+            let mut differ = 0;
+            for x in -4..w + 8 {
+                for len in [None, Some(3), Some(6)] {
+                    if self.t.hit(s, len, x) != prefixes(&mut self.t, len, x) {
+                        differ += 1;
+                    }
+                }
+            }
+            self.st_check(differ == 0, &format!("selftest: text_hit differs from the prefixes {differ} times\n"));
+            let long = "AV".repeat(10_000);
+            let t0 = plat::time_us();
+            let k = self.t.hit(long.as_bytes(), None, 4_000_000);
+            let ms = plat::time_us().wrapping_sub(t0) / 1000;
+            self.st_check(k == long.len() && ms < 500, &format!("selftest: text_hit on 20000 characters -> {k} in {ms} ms\n"));
+            self.t.unload(f);
+        }
         // ---- fontdb on the fixtures folder
         plat::setenv("jfgui_FONTDIRS", Some("apps/fonttest/tests/fixtures"));
         let nf = self.db.scan(FDB_RESCAN);

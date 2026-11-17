@@ -386,30 +386,29 @@ impl Node {
     /// (caret_rect), around it estimated from the line height (lines after '\n', columns of
     /// about half a line height); without a caret the characters share the node's width
     pub fn char_rect(&self, k: i32) -> [i32; 4] {
-        let r = self.rect;
         let s = self.text_str();
         let n = s.chars().count() as i32;
         let k = k.clamp(0, n);
+        if !self.caret_known() {
+            return self.rect_at(k, n, (0, 0), (0, 0));
+        }
+        self.rect_at(k, n, line_col(s, k), line_col(s, self.caret))
+    }
+
+    // the caret and its rectangle are known (char_rect estimates around it)
+    fn caret_known(&self) -> bool {
+        self.caret >= 0 && self.caret_rect[3] > 0
+    }
+
+    // char_rect of character k (0 ..= n) at line lk, column ck; the caret at line lc, column cc
+    fn rect_at(&self, k: i32, n: i32, (lk, ck): (i32, i32), (lc, cc): (i32, i32)) -> [i32; 4] {
+        let r = self.rect;
         let c = self.caret_rect;
-        if self.caret < 0 || c[3] <= 0 {
+        if !self.caret_known() {
             let cw = if n > 0 { (r[2] / n).max(1) } else { r[2].max(1) };
             return [r[0] + cw * k.min((n - 1).max(0)), r[1], cw, r[3]];
         }
-        // line and column of a character offset
-        let at = |p: i32| {
-            let (mut line, mut col) = (0, 0);
-            for ch in s.chars().take(p.max(0) as usize) {
-                if ch == '\n' {
-                    line += 1;
-                    col = 0;
-                } else {
-                    col += 1;
-                }
-            }
-            (line, col)
-        };
         let cw = (c[3] * 11 / 20).max(1);
-        let ((lk, ck), (lc, cc)) = (at(k), at(self.caret));
         let x = if lk == lc { c[0] + (ck - cc) * cw } else { r[0] + (c[3] >> 2) + ck * cw };
         let y = c[1] + (lk - lc) * c[3];
         let x = x.clamp(r[0], (r[0] + r[2] - 1).max(r[0]));
@@ -422,10 +421,24 @@ impl Node {
         if x < r[0] || y < r[1] || x >= r[0] + r[2] || y >= r[1] + r[3] {
             return -1;
         }
-        let n = self.text_str().chars().count() as i32;
+        // one walk over the text with the line and column of each offset (char_rect for every
+        // offset counted from the start each time: quadratic in the text)
+        let s = self.text_str();
+        let n = s.chars().count() as i32;
+        let at_caret = if self.caret_known() { line_col(s, self.caret) } else { (0, 0) };
+        let (mut line, mut col) = (0, 0);
+        let mut it = s.chars();
         let mut best = (i64::MAX, 0);
         for k in 0..=n {
-            let q = self.char_rect(k);
+            let q = self.rect_at(k, n, (line, col), at_caret);
+            match it.next() {
+                Some('\n') => {
+                    line += 1;
+                    col = 0;
+                }
+                Some(_) => col += 1,
+                None => {}
+            }
             let dy = if y < q[1] { q[1] - y } else if y >= q[1] + q[3] { y - q[1] - q[3] + 1 } else { 0 };
             let d = (dy as i64) * 100_000 + (x - q[0]).abs() as i64;
             if d < best.0 {
@@ -434,6 +447,20 @@ impl Node {
         }
         best.1
     }
+}
+
+// line and column of character offset p of s (lines after '\n')
+fn line_col(s: &str, p: i32) -> (i32, i32) {
+    let (mut line, mut col) = (0, 0);
+    for ch in s.chars().take(p.max(0) as usize) {
+        if ch == '\n' {
+            line += 1;
+            col = 0;
+        } else {
+            col += 1;
+        }
+    }
+    (line, col)
 }
 
 impl WinTree {

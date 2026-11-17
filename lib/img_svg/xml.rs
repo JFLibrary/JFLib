@@ -9,10 +9,11 @@
 // a mismatched end tag closes up to the matching open element (or is ignored), unquoted
 // attribute values run to the next blank, an unterminated construct ends the document.
 // Limits: MAX_ELS elements, MAX_DEPTH nesting (deeper elements are dropped with their
-// content), MAX_ATTRS attributes per element, MAX_ENT entity declarations, MAX_EXPAND bytes
-// produced by entity references in all.  Element names "svg:x" become "x"; other prefixes
-// stay (inkscape:..., sodipodi:... are foreign elements that are not drawn).  Character data
-// is kept only where it matters (text, tspan, style, title, desc, textPath).
+// content), MAX_ATTRS attributes per element (a repeated one counts; the first stays), MAX_ENT
+// entity declarations, MAX_EXPAND bytes produced by entity references in all.  Element names
+// "svg:x" become "x"; other prefixes stay (inkscape:..., sodipodi:... are foreign elements that
+// are not drawn).  Character data is kept only where it matters (text, tspan, style, title,
+// desc, textPath).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -119,6 +120,35 @@ fn push_utf8(out: &mut String, b: &[u8]) {
     }
 }
 
+// a repeated attribute (not well-formed): the first one stays.  Sorted once per element; a
+// search per attribute cost up to MAX_ATTRS steps for each attribute of the file
+fn dedup_first(attrs: &mut Vec<(String, String)>) {
+    if attrs.len() <= 8 {
+        let mut k = 1;
+        while k < attrs.len() {
+            if attrs[..k].iter().any(|(x, _)| *x == attrs[k].0) {
+                attrs.remove(k);
+            } else {
+                k += 1;
+            }
+        }
+        return;
+    }
+    let mut ix: Vec<u32> = (0..attrs.len() as u32).collect();
+    ix.sort_unstable_by(|&a, &b| attrs[a as usize].0.cmp(&attrs[b as usize].0).then(a.cmp(&b)));
+    let mut dup = alloc::vec![false; attrs.len()];
+    for w in ix.windows(2) {
+        if attrs[w[0] as usize].0 == attrs[w[1] as usize].0 {
+            dup[w[1] as usize] = true;
+        }
+    }
+    let mut k = 0;
+    attrs.retain(|_| {
+        k += 1;
+        !dup[k - 1]
+    });
+}
+
 impl P<'_> {
     // decode entity / character references of raw text into out
     fn decode(&mut self, raw: &[u8], out: &mut String) {
@@ -149,7 +179,8 @@ impl P<'_> {
                     out.push(v.and_then(char::from_u32).filter(|&c| c != '\0').unwrap_or('\u{FFFD}'));
                 }
                 _ => {
-                    let found = self.ents.iter().position(|(n, _)| n.as_bytes() == name);
+                    // ents is sorted by name (entity): no walk over all of them per reference
+                    let found = self.ents.binary_search_by(|(n, _)| n.as_bytes().cmp(name)).ok();
                     match found {
                         Some(k) if self.expanded + self.ents[k].1.len() <= MAX_EXPAND => {
                             self.expanded += self.ents[k].1.len();
@@ -278,8 +309,9 @@ impl P<'_> {
         self.ents = saved;
         let mut nm = String::new();
         push_utf8(&mut nm, name);
-        if !self.ents.iter().any(|(n, _)| *n == nm) {
-            self.ents.push((nm, val));
+        // sorted by name; the first declaration of a name stays
+        if let Err(at) = self.ents.binary_search_by(|(n, _)| n.as_bytes().cmp(nm.as_bytes())) {
+            self.ents.insert(at, (nm, val));
         }
     }
 
@@ -380,11 +412,10 @@ impl P<'_> {
             if self.skip == 0 && attrs.len() < MAX_ATTRS {
                 let mut n = String::new();
                 push_utf8(&mut n, an);
-                if !attrs.iter().any(|(x, _)| *x == n) {
-                    attrs.push((n, val));
-                }
+                attrs.push((n, val));
             }
         }
+        dedup_first(&mut attrs);
         self.i = i;
         if self.skip > 0 {
             if !closed {

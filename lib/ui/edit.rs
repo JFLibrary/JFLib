@@ -1069,11 +1069,14 @@ impl Ui {
         let mut hyph = core::mem::take(&mut self.m.edit.ml_hyph);
         starts.clear();
         hyph.clear();
+        // the text, checked for UTF-8 once (for every visual line it walked the whole buffer)
+        let buf = core::mem::take(&mut self.m.edit.buf);
+        let st = core::str::from_utf8(&buf).ok();
         let mut pos = 0;
         'para: loop {
             // paragraph end: the next '\n' or the end
             let mut pe = pos;
-            while pe < len && self.m.edit.buf[pe] != b'\n' {
+            while pe < len && buf[pe] != b'\n' {
                 pe += 1;
             }
             loop {
@@ -1085,7 +1088,7 @@ impl Ui {
                 if !wrap {
                     break;
                 }
-                let (e, hy) = self.tbm_wrap(pos, pe);
+                let (e, hy) = self.tbm_wrap(&buf, st, pos, pe);
                 if e >= pe {
                     break;
                 }
@@ -1099,32 +1102,31 @@ impl Ui {
             }
             pos = pe + 1; // after the '\n'
         }
+        self.m.edit.buf = buf;
         self.m.edit.ml_start = starts;
         self.m.edit.ml_hyph = hyph;
     }
 
-    // tbm_wrap(pos, pe) -> (where the visual line starting at pos ends (pos < end <= pe),
-    // hyphenated): the last line break opportunity (UAX #14, a soft hyphen) whose text fits, a
-    // hyphenation point (TB_HYPHENATE), else grapheme clusters
-    fn tbm_wrap(&mut self, pos: usize, pe: usize) -> (usize, bool) {
-        if self.tw_fits(pos, pe - pos) {
-            return (pe, false);
-        }
+    // tbm_wrap(buf, st, pos, pe) -> (where the visual line starting at pos ends (pos < end <= pe),
+    // hyphenated): the whole rest when it fits, else the last line break opportunity (UAX #14, a
+    // soft hyphen) whose text fits, a hyphenation point (TB_HYPHENATE), else grapheme clusters.
+    // buf: the text (taken out of the box by tbm_layout), st: buf as a str (None: not UTF-8).
+    // The rest of the paragraph is not measured first: that was quadratic over a long one
+    fn tbm_wrap(&mut self, buf: &[u8], st: Option<&str>, pos: usize, pe: usize) -> (usize, bool) {
         let w = self.m.edit.ml_w;
         let hw = self.text.width("-");
         let hyph = self.m.edit.hyph.clone();
         let text = &mut self.text;
-        match core::str::from_utf8(&self.m.edit.buf) {
-            Ok(s) => {
+        match st {
+            Some(s) => {
                 let mut fits = |a: usize, b: usize, h: bool| text.width_n(&s.as_bytes()[a..], b - a) + if h { hw } else { 0 } <= w;
                 match hyph.as_deref() {
                     Some(hy) => segment::wrap_end_hyph(s, pos, pe, &mut fits, Some(&mut |wd: &str, out: &mut Vec<usize>| *out = hy.hyphenate(wd))),
                     None => segment::wrap_end_hyph(s, pos, pe, &mut fits, None),
                 }
             }
-            Err(_) => {
+            None => {
                 // not UTF-8: code points while they fit (at least one)
-                let buf = &self.m.edit.buf;
                 let mut best = u8_next(buf, pos);
                 while best < pe {
                     let n = u8_next(buf, best);
@@ -1136,11 +1138,6 @@ impl Ui {
                 (best, false)
             }
         }
-    }
-
-    // .tw_fits(pos, n): n bytes from pos fit into ml_w
-    fn tw_fits(&mut self, pos: usize, n: usize) -> bool {
-        self.text.width_n(&self.m.edit.buf[pos..], n) <= self.m.edit.ml_w
     }
 
     // tbm_line_of(index) -> visual line that shows the index (a soft break index belongs

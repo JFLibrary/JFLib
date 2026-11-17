@@ -221,26 +221,46 @@ const GENERATORS: [&str; 26] = [
 
 const ENUMERANTS: [&str; 9] = ["read", "write", "read_write", "function", "private", "workgroup", "uniform", "storage", "immediate"];
 
-/// the edit distance of two names, at most `max` (larger: max + 1), case-insensitive steps count
-fn distance(a: &str, b: &str, max: usize) -> usize {
-    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+/// the edit distance of two names, at most `max` (larger: max + 1), case-insensitive steps count.
+/// Only the cells within `max` of the diagonal are computed: a full table over two long names
+/// was quadratic in their length
+fn distance(a: &[char], b: &str, max: usize) -> usize {
+    let big = max + 1;
+    let b: Vec<char> = b.chars().collect();
     if a.len().abs_diff(b.len()) > max {
-        return max + 1;
+        return big;
     }
-    let mut row: Vec<usize> = (0..=b.len()).collect();
-    for (i, &ca) in a.iter().enumerate() {
-        let mut prev = row[0];
-        row[0] = i + 1;
-        let mut best = row[0];
-        for (j, &cb) in b.iter().enumerate() {
-            let cost = if ca == cb { 0 } else { 1 };
-            let v = (prev + cost).min(row[j] + 1).min(row[j + 1] + 1);
-            prev = row[j + 1];
-            row[j + 1] = v;
+    // row[j]: the distance of a[..i] and b[..j], capped at big; a cell outside the band of the
+    // row before still holds big (written only inside the band)
+    let mut row: Vec<usize> = (0..=b.len()).map(|j| j.min(big)).collect();
+    for i in 1..=a.len() {
+        let lo = i.saturating_sub(max);
+        let hi = (i + max).min(b.len());
+        let ca = a[i - 1];
+        // diag: row[j - 1] of the row before; left: row[j - 1] of this row
+        let (mut j, mut diag, mut left);
+        if lo == 0 {
+            diag = row[0];
+            row[0] = i.min(big);
+            left = row[0];
+            j = 1;
+        } else {
+            diag = row[lo - 1];
+            left = big;
+            j = lo;
+        }
+        let mut best = left;
+        while j <= hi {
+            let up = row[j];
+            let v = (diag + usize::from(ca != b[j - 1])).min(up + 1).min(left + 1).min(big);
+            diag = up;
+            row[j] = v;
+            left = v;
             best = best.min(v);
+            j += 1;
         }
         if best > max {
-            return max + 1;
+            return big;
         }
     }
     row[b.len()]
@@ -249,7 +269,8 @@ fn distance(a: &str, b: &str, max: usize) -> usize {
 /// " – meintest du `x`?" when a candidate is close to the name, else nothing (only when an
 /// error is reported, so a walk over the names costs nothing else)
 pub fn suggestion<'n>(name: &str, candidates: impl Iterator<Item = &'n str>) -> String {
-    let len = name.chars().count();
+    let chars: Vec<char> = name.chars().collect();
+    let len = chars.len();
     if len < 3 {
         return String::new();
     }
@@ -259,7 +280,7 @@ pub fn suggestion<'n>(name: &str, candidates: impl Iterator<Item = &'n str>) -> 
         if c == name {
             continue;
         }
-        let d = distance(name, c, max);
+        let d = distance(&chars, c, max);
         if d <= max && best.is_none_or(|b| d < b.0) {
             best = Some((d, c));
         }
@@ -1035,7 +1056,7 @@ impl<'a> Checker<'a> {
         match predeclared_kind(name) {
             Some(k) if k != "ein Typ" && k != "ein Typ-Generator" => self.err(sp, format!("`{}` ist {}, kein Typ", name, k)),
             _ => {
-                let names: Vec<&str> = self.names.keys().copied().collect();
+                let names: Vec<&str> = if self.errors >= MAX_ERRORS { Vec::new() } else { self.names.keys().copied().collect() };
                 let hint = suggestion(name, names.iter().copied().chain(PREDECL_TYPES.iter().copied()).chain(GENERATORS.iter().copied()));
                 self.err(sp, format!("unbekannter Typ `{}`{}", name, hint))
             }

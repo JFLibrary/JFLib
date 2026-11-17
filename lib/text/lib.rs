@@ -208,12 +208,12 @@ impl Text {
 
     /// text_measure: advance of the run (24.8), up to NUL / newline
     pub fn measure(&mut self, s: &str) -> i32 {
-        self.run(s.as_bytes(), 0, None, None)
+        self.run(s.as_bytes(), 0, None, None, None)
     }
 
     /// text_measure_n(s, len)
     pub fn measure_n(&mut self, s: &[u8], len: usize) -> i32 {
-        self.run(s, 0, Some(len), None)
+        self.run(s, 0, Some(len), None, None)
     }
 
     /// text_width: px, rounded up
@@ -238,13 +238,14 @@ impl Text {
     fn draw_impl(&mut self, dc: &mut Dc, sf: &mut Surface, x: i32, y: i32, s: &[u8], len: Option<usize>) -> i32 {
         let pen = x.wrapping_add(dc.ox) << 8;
         self.run_y = y.wrapping_add(dc.oy);
-        let w = self.run(s, pen, len, Some((dc, sf)));
+        let w = self.run(s, pen, len, Some((dc, sf)), None);
         (w + 255) >> 8
     }
 
     // text_run: pen positions with kerning; draws when a target is given.  Stops at NUL,
-    // newline, the end of s or after len bytes.
-    fn run(&mut self, s: &[u8], pen0: i32, len: Option<usize>, mut target: Option<(&mut Dc, &mut Surface)>) -> i32 {
+    // newline, the end of s or after len bytes, or when each(index after a character, advance
+    // so far) says false (after every character, before the next one's kerning)
+    fn run(&mut self, s: &[u8], pen0: i32, len: Option<usize>, mut target: Option<(&mut Dc, &mut Surface)>, mut each: Option<&mut dyn FnMut(usize, i32) -> bool>) -> i32 {
         if self.shape_line(s,len) { return self.shaped_draw(pen0,target); }
         let font = self.font;
         let classic = self.classic_metrics(font);
@@ -281,7 +282,13 @@ impl Text {
             }
             i = next;
             if cp == 0xAD {
-                continue; // SOFT HYPHEN: invisible (wrapping draws a hyphen where it breaks)
+                // SOFT HYPHEN: invisible (wrapping draws a hyphen where it breaks)
+                if let Some(f) = each.as_mut()
+                    && !f(i, pen.wrapping_sub(pen0))
+                {
+                    break;
+                }
+                continue;
             }
             // no-break, narrow and other spaces of number formats: a plain space when missing
             let cp = if matches!(cp, 0xA0 | 0x2000..=0x200A | 0x202F | 0x205F) && !self.has(font, cp) { 0x20 } else { cp };
@@ -313,6 +320,11 @@ impl Text {
             pen = pen.wrapping_add(spacing(self.units_fx_of(f, adv)));
             prev = g as i32;
             prev_font = f;
+            if let Some(f) = each.as_mut()
+                && !f(i, pen.wrapping_sub(pen0))
+            {
+                break;
+            }
         }
         pen.wrapping_sub(pen0)
     }
@@ -430,26 +442,20 @@ impl Text {
     pub fn hit(&mut self, s: &[u8], len: Option<usize>, x: i32) -> usize {
         if self.shape_line(s,len) { return self.shaped_hit(x); }
         let xf = x << 8;
+        // one run with the pen after every character (measuring every prefix again was
+        // quadratic in the index)
         let mut i = 0usize;
         let mut pen = 0i32;
-        loop {
-            if let Some(l) = len
-                && i >= l
-            {
-                break;
-            }
-            if i >= s.len() || s[i] == 0 || s[i] == b'\n' {
-                break;
-            }
-            let next = utf8_next(s, i);
-            let p = self.measure_n(s, next);
+        let mut each = |next: usize, p: i32| {
             // past the midpoint between pen(index) and pen(next)?
             if xf < (pen.wrapping_add(p)) >> 1 {
-                break;
+                return false;
             }
             pen = p;
             i = next;
-        }
+            true
+        };
+        self.run(s, 0, len, None, Some(&mut each));
         i
     }
 
@@ -492,11 +498,6 @@ fn png_decode(d: &[u8]) -> Option<Surface> {
 
 fn img_scale(src: &Surface, w: i32, h: i32) -> Option<Surface> {
     img_core::ops::scale(src, w, h, true).ok()
-}
-
-// the index after the UTF-8 sequence at i (utf8_next)
-fn utf8_next(s: &[u8], i: usize) -> usize {
-    base::utf8_decode(s, i).1
 }
 
 // blend a glyph mask with the colour of dc at pen x / baseline (absolute target

@@ -56,6 +56,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   that was asked for is reported without an error whatever `run` returned, so it is never
   answered with a restart. Services installed before keep their setting until they are installed
   again.
+- `a11y::Node::offset_at` walks the text once; char_rect for every offset counted from the start each time (quadratic: a screen reader's hit test on a long text box hung).
+- Windows: the backup of a file association's registry keys walks them with a list instead of recursion (keys nest up to 512 deep, each level held a 32 KB buffer on the stack).
 
 ### Security
 

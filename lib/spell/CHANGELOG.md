@@ -11,6 +11,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 ### Fixed
 
 - `token_errors` tries runs of at most 8 parts of a hyphenated word: a word of 1000 parts took 500 000 checks in the UI thread.
+- COMPOUNDRULE matches with a table over rule elements and parts; trying every way the `*` and `?` elements could share the parts was exponential in their number.
 
 ## [0.2.1] - 2026-11-16
 

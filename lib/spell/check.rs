@@ -935,14 +935,27 @@ impl Dictionary {
     }
 }
 
-// the flag sets match the rule r (full: completely; else they may be the beginning of a match)
+// the flag sets match the rule r (full: completely; else they may be the beginning of a match).
+// A table over (rule element, part) from the back, one row at a time: trying every way the
+// '*' and '?' elements could take parts was exponential in their number
 fn rule_at(r: &[RuleEl], seq: &[&[Flag]], full: bool) -> bool {
-    let Some(&(f, q)) = r.first() else { return seq.is_empty() };
-    let Some(&first) = seq.first() else { return !full || r.iter().all(|e| e.1 != b'1') };
-    let here = has(first, f);
-    match q {
-        b'*' => rule_at(&r[1..], seq, full) || (here && rule_at(r, &seq[1..], full)),
-        b'?' => rule_at(&r[1..], seq, full) || (here && rule_at(&r[1..], &seq[1..], full)),
-        _ => here && rule_at(&r[1..], &seq[1..], full),
+    let n = seq.len();
+    // next[j]: the elements after the current one match seq[j..]; after the last element only
+    // the empty rest does
+    let mut next: Vec<bool> = (0..=n).map(|j| j == n).collect();
+    let mut cur = alloc::vec![false; n + 1];
+    for &(f, q) in r.iter().rev() {
+        // the parts used up: the rest of the rule must be optional (full), else it may follow
+        cur[n] = !full || (q != b'1' && next[n]);
+        for j in (0..n).rev() {
+            let here = has(seq[j], f);
+            cur[j] = match q {
+                b'*' => next[j] || (here && cur[j + 1]),
+                b'?' => next[j] || (here && next[j + 1]),
+                _ => here && next[j + 1],
+            };
+        }
+        core::mem::swap(&mut cur, &mut next);
     }
+    next[0]
 }
