@@ -310,10 +310,11 @@ Android (`web_sensors.rs`) aus Core Motion und Core Location
 Nord (mit Magnetometer, sonst beliebig), der Standort „beim Verwenden“ (`NSLocationWhenInUseUsageDescription` setzt
 `tools/apple.py` für Apps, deren PERMISSIONS `location` nennen oder die keine haben).
 
-- **Noch offen:** Teilen (`UIActivityViewController`; die Bibliothek hat noch keine Schnittstelle dafür), markierter
-  Text der Tastatur (`UITextInput` statt `UIKeyInput`: Diktat, Vorschläge, Tastaturen mit Zusammensetzung),
+- **Noch offen:** Teilen (`UIActivityViewController`; die Bibliothek hat noch keine Schnittstelle dafür),
   Mausbewegung ohne Taste auf dem iPad (`UIHoverGestureRecognizer`), dauerhafte Freigaben gewählter Dateien über einen
-  Neustart (Lesezeichen), Bildschirm anlassen, Textgröße des Systems, Accessibility. Das Bild geht bei jedem Frame
+  Neustart (Lesezeichen), Bildschirm anlassen, Textgröße des Systems. Markierter Text der Tastatur (`UITextInput`:
+  Diktat, Vorschläge, Tastaturen mit Zusammensetzung) und Accessibility kamen mit VoiceOver ([VOICEOVER.md](VOICEOVER.md)
+  VO4). Das Bild geht bei jedem Frame
   ganz als Kopie an den Layer; mit Metal (AP6) entfällt das.
 
 ### AP6: Metal (L)
@@ -748,6 +749,19 @@ Simulator und ein `.dmg` von BackupCraft als Artefakt. Auf dem Mac zu Hause lief
 auf GitHub folgt nach dem Push. `build_rs.py` startet Programme mit `ui` auf dem Mac über ihr Bündel (`tools/apple.py
 gui`); updatetest nimmt dann eine Programmdatei außerhalb davon, sonst bekäme es nur `app`-Einträge. Der erste Lauf
 auf GitHub (2026-11-10) lief in 14 Minuten grün durch.
+
+**Nach Metal (2026-11-14):** Der erste Lauf mit der UI-Ausgabe auf Metal (43629546089) scheiterte an
+`gpu_layers.uis`, `gpu_layers_rtl.uis` und `gpu_output.uis` („gpu expect raster …“, „gpu wait -> not on the
+swapchain“). Ursache ist nicht die virtuelle GPU des Runners, sondern sein Bildschirm: Er fasst die Fenster der
+Skripte (1000×900, 1000×800) nicht, macOS hält sie kleiner, sie bleiben auf dem CPU-Pfad. Auf dem M2 mit
+1920×1080 entsteht mit Fenstern über der Bildschirmhöhe dasselbe Fehlerbild, bis zur selben Zeile. `gpu on`
+meldet in diesem Fall jetzt `SKIP` (die Arbeitsfläche des Bildschirms kleiner als das Fenster, das System hält es
+kleiner). Dabei gefunden: Wurde der Device verloren, während kein Fenster auf ihm zeigte, versuchte ein neues
+Fenster seine Swapchain immer wieder auf dem verlorenen Device; jetzt gilt das als Ausfall des Device, ein neuer
+folgt. Ein Schritt des Workflows zeigt Bildschirm und GPU des Runners (`NSScreen` über `osascript`, `gputest
+--info`). Der Lauf 43638582705 meldete „Apple Paravirtual device“, Familie Apple4, Metal 2.4, Stufe Basis, nutzbar
+(`missing` leer); die drei Skripte liefen dort mit `SKIP` in je rund einer Sekunde durch (vorher 26 s mit Fehlern).
+`system_profiler SPDisplaysDataType` gibt auf diesen Runnern nichts aus.
 
 **AP8c umgesetzt (2026-11-10):** Mit `jfgui_MAC_IDENTITY` („Developer ID Application: …“) und `jfgui_MAC_NOTARY`
 (ein Profil von `xcrun notarytool store-credentials`) notarisieren `tools/package.py --formats dmg` und `cargo jflib

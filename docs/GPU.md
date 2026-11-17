@@ -1358,6 +1358,12 @@ Befehlspuffer meldet die Schicht schon im `vkCmd…`-Aufruf, einen zwischen Übe
 der zählt nie als provoziert. So besteht keine Schicht zufällig, die die Lücke übersieht, aber bei der Übergabe
 etwas meldet (so geschehen mit der alten Schicht unter Linux, unten).
 
+Auf Metal gibt es keine Synchronisationsprüfung: Metal verfolgt die Konflikte zwischen Befehlen selbst (es fehlt dort
+keine Barriere), seine API-Validierung (`MTL_DEBUG_LAYER`) hält den Prozess bei einem Fehlgebrauch an und zählt
+nichts, `gpu::validation_messages()` bleibt `(0, 0)`. Die provozierten Lücken gelten dort als nicht anwendbar:
+`syncval` meldet `SKIP`, `queues` baut seine nicht ein (Metal hat ohnehin keine Rechen-Warteschlange); alle anderen
+Prüfungen von `--validate` bleiben (`apps/gputest/main.rs`, `sync_validation`, 2026-11-14).
+
 Die Meldungen der Schicht gehen auf stderr, und `build_rs.py run` und `test` geben stderr erst nach stdout aus.
 Die drei absichtlichen Meldungen stehen deshalb am Ende der Ausgabe, hinter `all checks passed`, jede nach
 einer Zeile `gputest: the next validation error is provoked on purpose: …`. Fehlende Barrieren sind das nicht.
