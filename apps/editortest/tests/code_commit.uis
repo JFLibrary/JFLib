@@ -14,4 +14,10 @@ key ctrl+a
 key delete
 commit "let x = 1; // 東京 🙂 é " 3
 expect #3000 text "let x = 1; // 東京 🙂 é let x = 1; // 東京 🙂 é let x = 1; // 東京 🙂 é "
+# 100000 bytes in one call: more than the 16 commits of 4096 bytes the queue holds -- the rest
+# waits and follows as the editor takes them (it was cut at 64 KiB)
+key ctrl+a
+key delete
+commit "abcdefghij" 10000
+expect text:"pos: 1:100001" exists
 expect_nowarn

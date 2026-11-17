@@ -296,6 +296,8 @@ pub fn decode(data: &[u8], dec: Option<&ImgDec>) -> Result<Surface, i32> {
         return Err(ERR_LIMIT);
     }
     let br0 = Br::new(data, 10, p0);
+    // the planes of the frame: allocations that may fail (ERR_NOMEM)
+    let (yp, up, vp) = (crate::filled(ysz as usize + 64, 0)?, crate::filled((ysz >> 2) as usize + 128, 0)?, crate::filled((ysz >> 2) as usize + 128, 0)?);
     let mut v = V8 {
         w,
         h,
@@ -324,9 +326,9 @@ pub fn decode(data: &[u8], dec: Option<&ImgDec>) -> Result<Surface, i32> {
         part0: br0,
         parts: [br0; 8],
         proba: [0; 1056],
-        yp: vec![0; ysz as usize + 64],
-        up: vec![0; (ysz >> 2) as usize + 128],
-        vp: vec![0; (ysz >> 2) as usize + 128],
+        yp,
+        up,
+        vp,
         ys: mbw as usize * 16,
         uvs: mbw as usize * 8,
         mbdata: vec![Mb::default(); mbw as usize],

@@ -6,13 +6,15 @@
 //        the asm's buffer in bytes incl. the NUL (bits 0..22: the text holds at most cap - 1
 //        bytes) | TB_PASSWORD | TB_READONLY | TB_DIGITS | TB_SIGNED.  placeholder (or None)
 //        TB_PASSWORD: while it has the keyboard the input method's purpose is IP_PASSWORD (set
-//        by the box itself, the purpose of before put back after; no plat::ime_purpose needed).
+//        by the box itself, the purpose of before put back after; no plat::ime_purpose needed);
+//        always one line (TB_MULTI with it is ignored).
 //        shows while the text is empty (cut with "…" where the box is narrower).
 //        ST_DISABLED via next_flags.
 //        EV_ACT: the text changed this frame; EV_COMMIT: Enter, Esc or focus lost; EV_FOCUS
 //        while it has the keyboard focus.
 //        Semantic record K_TEXTBOX: label = the text (one dot per character for passwords),
-//        value = caret, max = selection anchor (byte indices; 0 while not focused), min = the
+//        value = caret, max = selection anchor (byte indices of the label, of the dots for
+//        passwords; 0 while not focused), min = the
 //        kind of box: (TB_MULTI | TB_PASSWORD | TB_READONLY) >> 24.
 //        TB_MULTI (U1): several lines (natural height 5 lines): Enter inserts a line break,
 //        Ctrl+Enter commits, Up / Down keep the preferred x, PgUp / PgDn move a view, Home /
@@ -491,6 +493,19 @@ impl Ui {
         } else { None }
     }
 
+    // (a11y.rs) select bytes anchor..caret of the focused box's record text: a password box's
+    // record holds one dot per character, its indices map to the characters of the text
+    pub(crate) fn textbox_select_record(&mut self, id: u32, record: &str, anchor: usize, caret: usize) -> bool {
+        if self.ed_is(id) && self.focused() == id && self.m.edit.tb_flags & TB_PASSWORD != 0 {
+            let (a, c) = (self.tb_from_disp(anchor), self.tb_from_disp(caret));
+            let text = core::mem::take(&mut self.m.edit.buf);
+            let ok = core::str::from_utf8(&text).is_ok_and(|t| self.textbox_select(id, t, a, c));
+            self.m.edit.buf = text;
+            return ok;
+        }
+        self.textbox_select(id, record, anchor, caret)
+    }
+
     /// Select valid UTF-8 byte boundaries in an already focused/drawn textbox. Pass the
     /// same current text used by textbox(); returns false without changes for invalid ranges.
     pub fn textbox_select(&mut self, id: u32, text: &str, anchor: usize, caret: usize) -> bool {
@@ -567,10 +582,12 @@ impl Ui {
             self.repass();
         });
         let ph = placeholder.map(|p| p.split('\0').next().unwrap_or(""));
-        let ev = if cap_flags & TB_MULTI != 0 {
+        // TB_PASSWORD wins over TB_MULTI: the multi-line box has no hidden text (it showed the
+        // password in plain text), a password is one line
+        let ev = if cap_flags & (TB_MULTI | TB_PASSWORD) == TB_MULTI {
             self.tbm_core(id, ph, cap_flags)
         } else {
-            self.tb_core1(id, ph, cap_flags, icon)
+            self.tb_core1(id, ph, cap_flags & !TB_MULTI, icon)
         };
         core::mem::swap(buf, &mut self.m.edit.buf);
         if set.is_some() { ev | EV_ACT | EV_COMMIT } else { ev }
@@ -752,7 +769,12 @@ impl Ui {
         if !editing {
             self.wp.ctx.last_state &= !(SS_FOCUSED as u32);
         }
-        let (v, mx) = if editing { (self.m.edit.ed_caret as i32, self.m.edit.ed_anchor as i32) } else { (0, 0) };
+        // caret and anchor as indices of the record's text: a password box's are those of its dots
+        let (v, mx) = if editing {
+            (self.tb_to_disp(self.m.edit.ed_caret) as i32, self.tb_to_disp(self.m.edit.ed_anchor) as i32)
+        } else {
+            (0, 0)
+        };
         let pw = self.m.edit.tb_flags & TB_PASSWORD != 0;
         let d = core::mem::take(if pw { &mut self.m.edit.disp } else { &mut self.m.edit.buf });
         let n0 = self.sems.len();
@@ -2189,7 +2211,8 @@ impl Ui {
         let k = self.ud_slot(i);
         let e = &mut self.m.edit;
         let [len, caret, anchor] = e.ud_hdr[k];
-        let n = len.min(e.tb_max);
+        // at the capacity on a character's start (a smaller tb_max since the snapshot cut one)
+        let n = u8_clip(&e.ud_data[k], len.min(e.tb_max).min(e.ud_data[k].len()));
         e.buf.clear();
         e.buf.extend_from_slice(&e.ud_data[k][..n]);
         if e.surface.is_some() { e.surface_start = Some(0); }

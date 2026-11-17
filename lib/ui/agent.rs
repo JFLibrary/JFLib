@@ -206,6 +206,13 @@ impl Host for UiHost<'_> {
                 let domain = self.app.actions().iter().find(|s| s.command_id == Some(id)).copied();
                 if let Some(spec) = domain {
                     self.availability(&spec)?;
+                    // the action runs with an empty input: only when its schema allows that (an
+                    // action that needs fields got none past the check every other call has)
+                    let empty = Value::object([]);
+                    if let Err(e) = spec.input.validate(&empty) {
+                        return Err(error(ErrorCode::InvalidInput, "This command's action needs input: call the action itself")
+                            .with_details(Value::object([("action", Value::string(spec.name)), ("path", Value::string(e.path)), ("reason", Value::string(e.reason))])));
+                    }
                     // a command of a domain action has that action's access
                     match self.access(&spec) {
                         Access::Open => {}

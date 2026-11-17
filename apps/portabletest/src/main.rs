@@ -286,6 +286,10 @@ fn math_checks(hash: &mut u64) {
     assert!(math::log2(-1.0).is_nan());
     assert_eq!(math::pow(-1.0, 2.0), 0.0);
     assert_eq!(math::pow(f64::NAN, 0.0), 1.0);
+    // 1^y: 1 for every finite y (huge ones gave NaN), NaN for infinite y as on the x87
+    assert_eq!(math::pow(1.0, 1e308), 1.0);
+    assert_eq!(math::pow(1.0, -1.5e305), 1.0);
+    assert!(math::pow(1.0, f64::INFINITY).is_nan());
     assert_eq!(math::exp2(-1074.0).to_bits(), 1);
 }
 

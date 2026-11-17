@@ -81,6 +81,11 @@ expect #700 text ""
 click #701
 type "geheim"
 expect #701 text "●●●●●●"
+# caret indices of the record are those of its dots (3 bytes each), not of the hidden text
+expect #701 value 18
+key left
+expect #701 value 15
+key end
 key ctrl+a ctrl+c
 click #700
 key ctrl+v

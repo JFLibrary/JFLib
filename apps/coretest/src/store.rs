@@ -144,6 +144,41 @@ fn torn(t: &mut T) {
     let _ = plat::write_file(&wal, &full);
     t.check("intact log", Store::open_with(&dir, opts()).is_ok_and(|s| s.count("c") == 5));
     rm(&dir);
+
+    // a last frame whose payload holds the magic: torn at every byte all the same (a bare "BCW1"
+    // behind the cut made it a damaged frame with more data behind it)
+    let dir = tmp("store-torn-magic");
+    {
+        let Ok(s) = Store::open_with(&dir, opts()) else { return };
+        for i in 0..4 {
+            let _ = s.put("c", &format!("{}", i), rec(i));
+        }
+        let mut v = rec(4);
+        v.insert("note", Value::string("BCW1 BCW1BCW1 xBCW1"));
+        let _ = s.put("c", "4", v);
+    }
+    let wal = wal_of(&dir);
+    let full = plat::read_file(&wal).unwrap_or_default();
+    // the last frame's start by the lengths: magic, length (LE), seq, payload, 16 bytes digest
+    let (mut i, mut last) = (0usize, 0usize);
+    while i + 16 <= full.len() {
+        last = i;
+        i += 32 + u32::from_le_bytes([full[i + 4], full[i + 5], full[i + 6], full[i + 7]]) as usize;
+    }
+    let mut ok = i == full.len() && full[last..].windows(4).filter(|w| *w == b"BCW1").count() >= 5;
+    for cut in last..full.len() {
+        let _ = plat::write_file(&wal, &full[..cut]);
+        match Store::open_with(&dir, opts()) {
+            Ok(s) => {
+                if s.count("c") != 4 || s.recovery().truncated_bytes != (cut - last) as u64 {
+                    ok = false;
+                }
+            }
+            Err(_) => ok = false,
+        }
+    }
+    t.check("torn last frame with the magic in its payload", ok);
+    rm(&dir);
 }
 
 fn damage(t: &mut T) {

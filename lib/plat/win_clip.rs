@@ -132,6 +132,15 @@ const CF_DIBV5: u32 = 17;
 const GMEM_MOVEABLE: u32 = 2;
 const GMEM_ZEROINIT: u32 = 0x40;
 const CLIP_MAX: usize = 1 << 30; // larger clipboard blocks are refused (K1)
+
+// a copy of another program's block (up to CLIP_MAX): None when there is no room for it -- an
+// allocation that cannot fail ended the process
+fn copy_of(b: &[u8]) -> Option<Vec<u8>> {
+    let mut v = Vec::new();
+    v.try_reserve_exact(b.len()).ok()?;
+    v.extend_from_slice(b);
+    Some(v)
+}
 const DROP_FILES_MAX: u32 = 4096;
 const DROP_WCH_MAX: u32 = 32767;
 const DROPFILES_SIZE: usize = 20; // K1: win_drop_selftest
@@ -477,14 +486,14 @@ pub fn clip_get(fmt: u32) -> Option<Vec<u8>> {
             if !available(CF_UNICODETEXT) {
                 return None;
             }
-            get_block(CF_UNICODETEXT, |b| Some(text_from_wide(b)))
+            get_block(CF_UNICODETEXT, text_from_wide)
         }
         CLIP_PNG => {
             let f = png_format();
             if f == 0 || !available(f) {
                 return None;
             }
-            get_block(f, |b| Some(b.to_vec()))
+            get_block(f, copy_of)
         }
         CLIP_IMAGE => cg_image(),
         CLIP_HTML | CLIP_RTF | CLIP_DOCX => {
@@ -514,10 +523,14 @@ pub fn clip_get(fmt: u32) -> Option<Vec<u8>> {
 }
 
 /// UTF-16 up to the NUL (or the end of the block) -> UTF-8, "\r\n" -> "\n", bad surrogates ->
-/// U+FFFD
-fn text_from_wide(b: &[u8]) -> Vec<u8> {
-    let w: Vec<u16> = b.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).take_while(|&c| c != 0).collect();
-    let mut out = Vec::with_capacity(w.len() * 3);
+/// U+FFFD (None: no room for it)
+fn text_from_wide(b: &[u8]) -> Option<Vec<u8>> {
+    let n = b.chunks_exact(2).position(|c| c == [0, 0]).unwrap_or(b.len() / 2);
+    let mut w: Vec<u16> = Vec::new();
+    w.try_reserve_exact(n).ok()?;
+    w.extend(b.chunks_exact(2).take(n).map(|c| u16::from_le_bytes([c[0], c[1]])));
+    let mut out = Vec::new();
+    out.try_reserve(w.len().saturating_mul(3)).ok()?;
     let mut i = 0;
     while i < w.len() {
         let c = w[i] as u32;
@@ -544,7 +557,7 @@ fn text_from_wide(b: &[u8]) -> Vec<u8> {
         let mut b4 = [0u8; 4];
         out.extend_from_slice(char::from_u32(cp).unwrap_or('\u{FFFD}').encode_utf8(&mut b4).as_bytes());
     }
-    out
+    Some(out)
 }
 
 /// CLIP_IMAGE: "PNG", "image/png", CF_DIBV5, CF_DIB  [cg_image]
@@ -564,7 +577,7 @@ fn cg_image() -> Option<Vec<u8>> {
             return None;
         }
     };
-    get_block(fmt, |b| if dib { clip_dib_to_bmp(b) } else { Some(b.to_vec()) })
+    get_block(fmt, |b| if dib { clip_dib_to_bmp(b) } else { copy_of(b) })
 }
 
 /// the clipboard offers fmt (CLIP_TEXT / CLIP_PNG / CLIP_IMAGE)  [plat_clip_has]

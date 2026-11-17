@@ -8,6 +8,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- Debian package: a pre-release version is written with `~` (`1.2.0~beta.1`, older than `1.2.0` for dpkg; with `-` it counted as newer), the description's lines are indented and a multi-line summary is joined (a line break ended the field and broke `control`); Android: `versionCode` is MAJOR * 1 000 000 + MINOR * 1000 + PATCH (with 10000 / 100, 1.0.100 had the code of 1.1.0), a version outside that is an error.
+
+### Security
+
+- jfgui_SIGN_PFX_PASS is taken out of the environment when cargo-jflib starts, so the processes it starts (cargo, linkers, gpg, the app under `run`) no longer inherit it. signtool still gets it on its command line (it has no other way); a certificate from the store (jfgui_SIGN_THUMBPRINT) needs none.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

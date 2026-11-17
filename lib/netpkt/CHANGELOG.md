@@ -8,9 +8,15 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- `eapol::Rsne::parse` reads the AKM count: the capabilities come after every AKM suite (they were read as if there were always one), no AKM suite is no element.
+
 ### Security
 
 - `dns::read_name` (and so `Message::parse` and the dissector) follows at most 126 compression pointers per name, as Go's resolver. A chain of pointers, each one step back, let every name of a message walk the whole message (quadratic in its size).
+- `ssh`: the strict key exchange of OpenSSH (kex-strict-c/s-v00@openssh.com) against the Terrapin prefix truncation (CVE-2023-48795): offered in the first KEXINIT and used when the peer offers it too (its KEXINIT first, nothing else during the first exchange, sequence numbers from 0 after each NEWKEYS). OpenSSH uses it with the core.
+- `radius`: Response, Accounting and Message-Authenticator compared in constant time (`crypto::ct_eq`), not with `==`; `tls::Core` overwrites its handshake and traffic secrets when it is dropped.
 
 ## [0.2.1] - 2026-11-16
 

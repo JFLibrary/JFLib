@@ -4,6 +4,9 @@
 //   client.host_key()                                    type, blob, "SHA256:..." fingerprint
 //   client.auth_password(user, pw) / auth_key(user, &Keypair)
 //   client.exec(command, stdin, max_out) -> Exec { status, stdout, stderr }
+//   client.set_time_limit(Some(ms))                       auth_* and exec end with TimedOut after
+//                                                        ms in all (a server that keeps sending
+//                                                        held them forever); None: no limit
 //   Transport::accept(stream, &host_key)                 the server side of the transport
 //                                                        (tests drive it with OpenSSH's client)
 //   private_key(text) -> Keypair      an unencrypted Ed25519 key ("OPENSSH PRIVATE KEY")
@@ -15,6 +18,9 @@
 // The host key is checked by the caller's rule: HostKeyCheck::Pinned(fingerprint) or Any (only
 // to learn the fingerprint).  Not here: RSA / ECDSA keys, compression, port forwarding, PTYs,
 // rekeying (a peer that starts a new key exchange ends the session; commands here are short).
+// A peer that sends only messages to skip (ignore, debug, banners, global requests) while an
+// answer is due ends the session after MAX_SKIPPED of them in a row; data past the window the
+// client granted is a protocol error.
 
 use alloc::boxed::Box;
 use alloc::format;
@@ -64,6 +70,9 @@ const HOST_KEY_ALG: &str = "ssh-ed25519";
 /// our receive window and largest packet
 const WINDOW: u32 = 2 << 20;
 const CHUNK: u32 = 32 * 1024;
+/// messages to skip in a row while an answer is due (login, opening a channel; ignore / debug
+/// anywhere): a server that sends only those held the client forever
+const MAX_SKIPPED: u32 = 1024;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -221,7 +230,18 @@ pub fn public_key_line(k: &Keypair, comment: &str) -> String {
 /// an unencrypted Ed25519 key in OpenSSH's format ("-----BEGIN OPENSSH PRIVATE KEY-----")
 pub fn private_key(text: &str) -> Option<Keypair> {
     let body: String = text.lines().filter(|l| !l.starts_with("-----")).map(|l| l.trim()).collect();
-    let b = crypto::b64::decode(&body)?;
+    let b = crypto::b64::decode(&body);
+    // the file's text and bytes hold the secret: overwritten, not just freed
+    let mut body = body.into_bytes();
+    crypto::zeroize(&mut body);
+    let mut b = b?;
+    let k = key_of(&b);
+    crypto::zeroize(&mut b);
+    k
+}
+
+// the key of a decoded OpenSSH key file
+fn key_of(b: &[u8]) -> Option<Keypair> {
     let rest = b.strip_prefix(b"openssh-key-v1\0")?;
     let mut r = R::new(rest);
     if r.str()? != "none" || r.str()? != "none" {
@@ -315,6 +335,8 @@ pub struct Transport {
     /// the peer's version line
     pub peer_version: String,
     kex_done: bool,
+    /// reads fail with TimedOut once plat::time_us() is past this (Client::set_time_limit)
+    deadline_us: Option<u64>,
 }
 
 /// the other side's KEXINIT, as far as we need it
@@ -396,12 +418,19 @@ fn derive(k: &[u8], h: &[u8], letter: u8, sid: &[u8]) -> [u8; 64] {
 
 impl Transport {
     fn new(s: Box<dyn Stream>) -> Transport {
-        Transport { s, buf: Vec::new(), seq_out: 0, seq_in: 0, enc: None, dec: None, session_id: Vec::new(), peer_version: String::new(), kex_done: false }
+        Transport { s, buf: Vec::new(), seq_out: 0, seq_in: 0, enc: None, dec: None, session_id: Vec::new(), peer_version: String::new(), kex_done: false, deadline_us: None }
     }
 
     fn fill(&mut self, n: usize) -> Result<(), SshError> {
         let mut tmp = [0u8; 16384];
         while self.buf.len() < n {
+            if let Some(d) = self.deadline_us {
+                let now = plat::time_us();
+                let left_ms = (d.saturating_sub(now) / 1000).min(u32::MAX as u64) as u32;
+                if now >= d || !self.s.wait_readable(left_ms) {
+                    return Err(SshError::Net(NetError::new(plat::net::NetErrorKind::TimedOut, 0)));
+                }
+            }
             let k = self.s.read(&mut tmp)?;
             if k == 0 {
                 return Err(SshError::Disconnected(String::from("connection closed")));
@@ -516,7 +545,7 @@ impl Transport {
     /// the next message that matters: ignore / debug / extension info are skipped, a disconnect
     /// ends the session, a new key exchange is not supported
     pub fn recv(&mut self) -> Result<Vec<u8>, SshError> {
-        loop {
+        for _ in 0..MAX_SKIPPED {
             let m = self.recv_raw()?;
             match m.first().copied() {
                 None => return proto("empty message"),
@@ -531,6 +560,7 @@ impl Transport {
                 Some(_) => return Ok(m),
             }
         }
+        proto("the peer sends only messages to ignore")
     }
 
     /// the message after this one must be of type `t`
@@ -664,7 +694,7 @@ impl Transport {
 
     /// a key exchange message; with the strict exchange nothing else may come in between
     fn expect_kex(&mut self, t: u8, strict: bool) -> Result<Vec<u8>, SshError> {
-        loop {
+        for _ in 0..MAX_SKIPPED {
             let m = self.recv()?;
             if m[0] == t {
                 return Ok(m);
@@ -673,6 +703,7 @@ impl Transport {
                 return Err(SshError::Protocol(format!("unexpected message {} during the key exchange", m[0])));
             }
         }
+        proto("the peer sends only messages to ignore during the key exchange")
     }
 
     /// the server side: version, key exchange with this host key
@@ -704,13 +735,31 @@ pub struct Client {
     host_key: HostKey,
     service: bool,
     next_channel: u32,
+    /// ms for each auth_* / exec call in all (set_time_limit)
+    limit_ms: Option<u32>,
 }
 
 impl Client {
     pub fn connect(s: Box<dyn Stream>, check: HostKeyCheck) -> Result<Client, SshError> {
         let mut t = Transport::new(s);
         let host_key = t.kex(Role::Client, None, &check)?.ok_or(SshError::Protocol(String::from("no host key")))?;
-        Ok(Client { t, host_key, service: false, next_channel: 0 })
+        Ok(Client { t, host_key, service: false, next_channel: 0, limit_ms: None })
+    }
+
+    /// Each following `auth_password`, `auth_key` and `exec` ends with `SshError::Net` (TimedOut)
+    /// when it takes longer than `ms` in all; `None` (the default): no limit.  The stream's read
+    /// timeout only limits each wait: a server that keeps sending (banners, endless output)
+    /// held these calls forever.  After a TimedOut the session is in an unknown state: close it.
+    pub fn set_time_limit(&mut self, ms: Option<u32>) {
+        self.limit_ms = ms;
+    }
+
+    // run f with the deadline of the time limit (none afterwards)
+    fn limited<X>(&mut self, f: impl FnOnce(&mut Client) -> Result<X, SshError>) -> Result<X, SshError> {
+        self.t.deadline_us = self.limit_ms.map(|ms| plat::time_us().saturating_add(ms as u64 * 1000));
+        let r = f(self);
+        self.t.deadline_us = None;
+        r
     }
 
     pub fn host_key(&self) -> &HostKey {
@@ -727,7 +776,7 @@ impl Client {
     }
 
     fn auth_answer(&mut self) -> Result<(), SshError> {
-        loop {
+        for _ in 0..MAX_SKIPPED {
             let m = self.t.recv()?;
             match m[0] {
                 MSG_USERAUTH_SUCCESS => return Ok(()),
@@ -736,15 +785,28 @@ impl Client {
                 t => return Err(SshError::Protocol(format!("unexpected message {} during authentication", t))),
             }
         }
+        proto("the server sends banners without answering the login")
     }
 
     pub fn auth_password(&mut self, user: &str, password: &str) -> Result<(), SshError> {
+        self.limited(|c| c.auth_password_now(user, password))
+    }
+
+    fn auth_password_now(&mut self, user: &str, password: &str) -> Result<(), SshError> {
         self.userauth_service()?;
-        self.t.send(&W::msg(MSG_USERAUTH_REQUEST).str(user).str("ssh-connection").str("password").bool(false).str(password).0)?;
+        // the message holds the password: overwritten once sent
+        let mut m = W::msg(MSG_USERAUTH_REQUEST).str(user).str("ssh-connection").str("password").bool(false).str(password).0;
+        let r = self.t.send(&m);
+        crypto::zeroize(&mut m);
+        r?;
         self.auth_answer()
     }
 
     pub fn auth_key(&mut self, user: &str, key: &Keypair) -> Result<(), SshError> {
+        self.limited(|c| c.auth_key_now(user, key))
+    }
+
+    fn auth_key_now(&mut self, user: &str, key: &Keypair) -> Result<(), SshError> {
         self.userauth_service()?;
         let blob = ed25519_blob(&key.public);
         let signed = W::default().bytes(&self.t.session_id).u8(MSG_USERAUTH_REQUEST).str(user).str("ssh-connection").str("publickey").bool(true).str(HOST_KEY_ALG).bytes(&blob).0;
@@ -753,12 +815,22 @@ impl Client {
         self.auth_answer()
     }
 
-    /// run a command, feed it `stdin`, collect at most `max_out` bytes of each output
+    /// run a command, feed it `stdin`, collect at most `max_out` bytes of each output (the rest
+    /// is read and dropped until the command ends: set_time_limit bounds a command that does not)
     pub fn exec(&mut self, command: &str, stdin: &[u8], max_out: usize) -> Result<Exec, SshError> {
+        self.limited(|c| c.exec_now(command, stdin, max_out))
+    }
+
+    fn exec_now(&mut self, command: &str, stdin: &[u8], max_out: usize) -> Result<Exec, SshError> {
         let local = self.next_channel;
         self.next_channel += 1;
         self.t.send(&W::msg(MSG_CHANNEL_OPEN).str("session").u32(local).u32(WINDOW).u32(CHUNK).0)?;
+        let mut skipped = 0u32;
         let (remote, mut rwin, rmax) = loop {
+            skipped += 1;
+            if skipped > MAX_SKIPPED {
+                return proto("the server does not answer the channel request");
+            }
             let m = self.t.recv()?;
             let mut r = R::new(&m[1..]);
             match m[0] {
@@ -782,6 +854,8 @@ impl Client {
         let mut out = Exec::default();
         let (mut started, mut sent, mut eof_sent) = (false, 0usize, false);
         let mut consumed = 0u32;
+        // what the server may still send (our window): data past it breaks the protocol
+        let mut lwin = WINDOW as u64;
         loop {
             if started && !eof_sent {
                 while sent < stdin.len() && rwin > 0 {
@@ -812,12 +886,17 @@ impl Client {
                         r.u32();
                     }
                     let d = r.bytes().ok_or_else(bad)?;
+                    if d.len() as u64 > lwin {
+                        return proto("the server sent past the channel window");
+                    }
+                    lwin -= d.len() as u64;
                     let dst = if ext { &mut out.stderr } else { &mut out.stdout };
                     let room = max_out.saturating_sub(dst.len());
                     dst.extend_from_slice(&d[..d.len().min(room)]);
                     consumed += d.len() as u32;
                     if consumed >= WINDOW / 2 {
                         self.t.send(&W::msg(MSG_CHANNEL_WINDOW_ADJUST).u32(remote).u32(consumed).0)?;
+                        lwin += consumed as u64;
                         consumed = 0;
                     }
                 }

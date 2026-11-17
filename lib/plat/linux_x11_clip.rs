@@ -339,12 +339,13 @@ impl X11 {
     }
 
     /// xfer_end(k): free a transfer record; stop watching the requestor unless another
-    /// transfer goes there
+    /// transfer goes there, it is one of ours, or it is the root window (whose mask carries our
+    /// own watch of its properties: work area, Xft.dpi)
     fn xfer_end(&mut self, k: usize) {
         let req = self.xfers[k].req;
         self.xfers[k].req = 0;
         self.xfers[k].data = Vec::new();
-        if self.xfers.iter().any(|x| x.req == req) || self.is_our_window(req) {
+        if self.xfers.iter().any(|x| x.req == req) || self.is_our_window(req) || req == self.root {
             return;
         }
         self.select_events(req, 0);

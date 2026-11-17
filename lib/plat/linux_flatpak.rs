@@ -90,6 +90,9 @@ fn call(c: &mut Conn, m: &Msg, signal: &mut dyn FnMut(&Msg)) -> Result<Msg, Stri
 pub struct FlatpakMonitor {
     c: Conn,
     handle: String,
+    /// the portal's unique name: only its signals count (any client of the bus may send one
+    /// on the monitor's path)
+    owner: String,
     // an UpdateAvailable that arrived while waiting for something else
     seen: Option<FlatpakUpdate>,
 }
@@ -102,10 +105,11 @@ impl FlatpakMonitor {
         let handle = format!("{PORTAL_PATH}/update_monitor/{sender}/{token}");
         let rule = format!("type='signal',interface='{MONITOR}',path='{handle}'");
         c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "AddMatch", alloc::vec![Value::S(rule)]));
+        let owner = c.name_owner(PORTAL).unwrap_or_default();
         let m = Msg::call(PORTAL, PORTAL_PATH, PORTAL, "CreateUpdateMonitor", alloc::vec![Value::dict(alloc::vec![("handle_token", Value::S(token))])]);
         let mut early = None;
         let r = call(&mut c, &m, &mut |s| {
-            if s.member == "UpdateAvailable" && s.path == handle {
+            if s.member == "UpdateAvailable" && s.path == handle && s.sender == owner {
                 early = Some(update_of(s));
             }
         })?;
@@ -113,7 +117,8 @@ impl FlatpakMonitor {
         if got != handle {
             return Err(format!("CreateUpdateMonitor answered {got}, not {handle}"));
         }
-        Ok(FlatpakMonitor { c, handle, seen: early })
+        let owner = if owner.is_empty() { r.sender.clone() } else { owner };
+        Ok(FlatpakMonitor { c, handle, owner, seen: early })
     }
 
     /// the newest UpdateAvailable within ms (0: only what has arrived)
@@ -124,7 +129,7 @@ impl FlatpakMonitor {
             let now = crate::time_us();
             let left = if now >= end { 0 } else { ((end - now) / 1000) as i32 + 1 };
             let Some(m) = self.c.read(left) else { return got };
-            if m.typ == T_SIGNAL && m.member == "UpdateAvailable" && m.path == self.handle {
+            if m.typ == T_SIGNAL && m.member == "UpdateAvailable" && m.path == self.handle && m.sender == self.owner {
                 got = Some(update_of(&m));
             }
         }
@@ -160,7 +165,12 @@ impl FlatpakMonitor {
         };
         let m = Msg::call(PORTAL, &handle, MONITOR, "Update", alloc::vec![Value::str(""), Value::dict(Vec::new())]);
         let mut seen = self.seen.take();
-        call(&mut self.c, &m, &mut |s| on_signal(s, &mut seen, &mut end_state))?;
+        let owner = self.owner.clone();
+        call(&mut self.c, &m, &mut |s| {
+            if s.sender == owner {
+                on_signal(s, &mut seen, &mut end_state);
+            }
+        })?;
         loop {
             if let Some(r) = end_state.take() {
                 self.seen = seen;
@@ -171,7 +181,7 @@ impl FlatpakMonitor {
                 return Err(String::from("cancelled"));
             }
             match self.c.read(500) {
-                Some(s) if s.typ == T_SIGNAL => on_signal(&s, &mut seen, &mut end_state),
+                Some(s) if s.typ == T_SIGNAL && s.sender == self.owner => on_signal(&s, &mut seen, &mut end_state),
                 Some(_) => {}
                 None if self.c.broken => return Err(String::from("the session bus closed the connection")),
                 None => {}

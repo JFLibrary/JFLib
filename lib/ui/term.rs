@@ -208,6 +208,16 @@ struct Screen {
 }
 
 impl Screen {
+    // write with a parser of its own: the escape and UTF-8 state of the stream is kept aside and
+    // put back afterwards (a local echo between two pieces of the peer's output)
+    fn write_apart(&mut self, b: &[u8]) {
+        let saved = (self.esc, core::mem::take(&mut self.params), self.param.take(), self.utf, self.utf_need, self.utf_min);
+        self.esc = Esc::No;
+        self.utf_need = 0;
+        self.write(b);
+        (self.esc, self.params, self.param, self.utf, self.utf_need, self.utf_min) = saved;
+    }
+
     fn new(cap: usize) -> Screen {
         Screen {
             lines: VecDeque::new(),
@@ -677,8 +687,16 @@ impl TermState {
         }
     }
 
-    /// TM_LINE, TM_BUSY, TM_RAW or TM_SECRET
+    /// TM_LINE, TM_BUSY, TM_RAW or TM_SECRET; into or out of TM_SECRET the input typed so far
+    /// is dropped (overwritten): a hidden line showed in the next mode's input line, a visible
+    /// one became part of the secret
     pub fn set_mode(&mut self, mode: u8) {
+        if mode != self.mode && (mode == TM_SECRET || self.mode == TM_SECRET) {
+            let mut v = core::mem::take(&mut self.input).into_bytes();
+            v.iter_mut().for_each(|b| *b = 0);
+            core::hint::black_box(&v);
+            self.caret_want = Some(0);
+        }
         self.mode = mode;
     }
 
@@ -832,7 +850,9 @@ impl TermState {
         }
         s.push_str(suffix);
         s.push('\n');
-        self.scr.write(s.as_bytes());
+        // apart from the peer's escape state: an open sequence of its output took the echo in
+        // (or the echo's SGR ended the peer's sequence)
+        self.scr.write_apart(s.as_bytes());
         self.scr.attr = attr;
     }
 
@@ -952,6 +972,13 @@ impl TermState {
     }
 
     // the matches of the search text (case-insensitive), redone when text or output changed
+    // the search bar closes: its hits are no longer marked (they stayed in the text)
+    fn find_close(&mut self) {
+        self.find_open = false;
+        self.find_hits.clear();
+        self.find_key = None;
+    }
+
     fn find_update(&mut self) {
         let key = (self.find_text.clone(), self.scr.ver);
         if self.find_key.as_ref() == Some(&key) {
@@ -1752,7 +1779,7 @@ impl Ui {
                 self.repass();
             }
             if on_find && self.term_key(VK_ESCAPE, 0) {
-                st.find_open = false;
+                st.find_close();
                 self.wp.ctx.focus = id.wrapping_add(1);
                 self.wp.ctx.focus_visible = false;
                 self.repass();
@@ -1762,7 +1789,7 @@ impl Ui {
         // stays for the text box / the app)
         if !on_find && (st.find_open || st.sel.is_some() || st.pager_waiting()) && self.term_key(VK_ESCAPE, 0) {
             if st.find_open {
-                st.find_open = false;
+                st.find_close();
             } else if st.sel.is_some() {
                 st.sel = None;
             } else {
@@ -1991,7 +2018,7 @@ impl Ui {
                         st.find_step(o);
                     }
                     None => {
-                        st.find_open = false;
+                        st.find_close();
                         self.wp.ctx.focus = id.wrapping_add(1);
                         self.wp.ctx.focus_visible = false;
                     }

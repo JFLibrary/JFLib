@@ -247,6 +247,21 @@ pub(super) fn launch(program: &str, args: &[&str]) -> Result<(), u32> {
 }
 /// as root: the program itself; otherwise pkexec (polkit asks for the password)
 pub(super) fn run_elevated(program: &str, args: &[&str]) -> Result<i32, String> {
+    // a bare name only from the system's folders, never through the caller's PATH (pkexec would
+    // search it): what runs as root must not be a program the user's PATH puts first
+    let found_at;
+    let program = if program.contains('/') {
+        program
+    } else {
+        let dirs = ["/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin"];
+        match dirs.iter().map(|d| alloc::format!("{d}/{program}")).find(|p| crate::file_exists_raw(p) == 1) {
+            Some(p) => {
+                found_at = p;
+                found_at.as_str()
+            }
+            None => return Err(alloc::format!("{program} liegt in keinem Systemordner (/usr/bin, /usr/sbin, ...)")),
+        }
+    };
     let mut all: Vec<&str> = Vec::new();
     // pkexec only from the system directories, never through the caller's PATH
     let mut pkexec = false;

@@ -1914,6 +1914,10 @@ Fensterrand hinaus.
   VoiceOver ([VOICEOVER.md](VOICEOVER.md)). Plan mit den Meilensteinen AP0 bis AP8, zusammen mit iOS:
   [APPLE.md](APPLE.md).
 - **P2** · *erledigt* (2026-11-10) · Native iOS-Version, auf dem Host-Weg von Android ([APPLE.md](APPLE.md) AP5).
+- **P2** · *offen* · Android so weit wie Windows, Linux und Apple: echte Threads und der Pool (heute laufen Jobs auf
+  dem UI-Thread), `sync`, `net` mit `netio`, `fs` mit `datastore` und `cas`, `watch`, `certs`, Drucken und die
+  Schriften des Systems; was Android nicht kennt (Prozesse, Dienste, `update`, Tray, Hotkeys), antwortet
+  `Unsupported`. Plan mit den Meilensteinen AN0 bis AN5: [ANDROID.md](ANDROID.md).
 - **P3** · *teilweise* (2026-11-14) · Intel-Macs (`x86_64-apple-darwin`) im selben Universal-Programm
   ([INTEL_MAC.md](INTEL_MAC.md), IM0 bis IM6). Fertig: der Bau (`--target mac --arch x86_64`, `lipo` in
   `tools/package.py` und `cargo jflib`, `-universal.dmg`, Update-Kanal für `macos-x86_64`), `rt` mit CPUID und x87

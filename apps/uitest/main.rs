@@ -101,10 +101,23 @@ fn history(t: &mut T) {
     g.undo(&mut list);
     t.eq("undo reverts the whole group", list.len(), 0);
     g.redo(&mut list);
-    t.eq("redo applies it again in order", list, alloc::vec![1, 2, 3]);
+    t.eq("redo applies it again in order", list.clone(), alloc::vec![1, 2, 3]);
     g.group_begin("leer");
     g.group_end();
     t.eq("an empty group records nothing", g.len(), 1);
+    // undo / redo while a group is open: its edits so far are the newest step
+    g.group_begin("offen");
+    g.apply(&mut list, Box::new(Push(4)));
+    g.apply(&mut list, Box::new(Push(5)));
+    t.check("an open group can be undone", g.can_undo() && !g.can_redo() && g.undo_label() == Some("offen"));
+    t.check("undo closes the open group first", g.undo(&mut list) && list == alloc::vec![1, 2, 3] && g.redo_label() == Some("offen"));
+    g.group_end(); // closed already: nothing
+    t.check("redo applies the open group's edits", g.redo(&mut list) && list == alloc::vec![1, 2, 3, 4, 5] && g.len() == 2);
+    g.undo(&mut list);
+    g.group_begin("neu");
+    g.apply(&mut list, Box::new(Push(6)));
+    t.check("redo with edits in an open group: nothing to redo", !g.can_redo() && !g.redo(&mut list) && list == alloc::vec![1, 2, 3, 6]);
+    t.check("the older steps undo in order", g.undo(&mut list) && list == alloc::vec![1, 2, 3] && g.undo(&mut list) && list.is_empty());
     // the limit
     let mut n = 0i32;
     let mut l: History<i32> = History::new(3);

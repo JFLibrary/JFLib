@@ -7,7 +7,9 @@
 //                                restart, max_size, ca_pem, timeout_ms
 //   startup(&cfg) -> Startup     first thing in main (before ui::launch): puts a downloaded
 //                                update in place and restarts into it, counts the starts of a
-//                                new version, rolls back one that never reported healthy
+//                                new version, rolls back one that never reported healthy;
+//                                a program that calls itself neither the trial's version nor
+//                                the old one ends the trial (the version recorded as bad)
 //   healthy(&cfg) -> bool        the health marker: the new version works (after its first
 //                                frame, for example); without it the next start rolls back
 //   Updater::new(cfg)            check() / download() / apply() (blocking), start_check() /
@@ -773,7 +775,9 @@ fn restart(cfg: &Config, then: Startup) -> Startup {
 
 /// at the start of the program, before its UI: a staged update is put in place and the
 /// program restarted into it; a new version on trial counts its start, and one that already
-/// had cfg.attempts starts without healthy() is rolled back (the old version restarted).
+/// had cfg.attempts starts without healthy() is rolled back (the old version restarted).  A
+/// program whose version is neither the trial's nor the one before (the package's own number
+/// differs from its manifest's) ends the trial: Normal, the trial's version recorded as bad.
 /// Another process holding the updater's lock: Normal.
 pub fn startup(cfg: &Config) -> Startup {
     // nothing was ever downloaded: no folder is made, no lock taken
@@ -805,6 +809,22 @@ pub fn startup(cfg: &Config) -> Startup {
                     drop(lock);
                     restart(cfg, Startup::RollingBack(bad))
                 }
+                Err(e) => Startup::Failed(e),
+            }
+        }
+        // the program that runs is neither the version on trial nor the one it replaced: the
+        // package's own version is not its manifest's (or another one was installed meanwhile).
+        // healthy() could never end the trial, and an older number would have the same update
+        // offered again and again: the trial ends, the manifest's version recorded as bad
+        Stage::Trial if !st.from.is_empty() && cfg.version != st.from => {
+            if !st.bad.contains(&st.version) {
+                st.bad.push(st.version.clone());
+            }
+            st.stage = Stage::None;
+            st.starts = 0;
+            apply::remove_tree(&apply::path(cfg, "staged"));
+            match apply::save(cfg, &st) {
+                Ok(()) => Startup::Normal,
                 Err(e) => Startup::Failed(e),
             }
         }

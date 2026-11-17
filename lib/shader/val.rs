@@ -395,6 +395,21 @@ impl<'a> V<'a> {
             op::TypeSampledImage => Ty::SampledImage { image: Id(g(0)) },
             _ => return,
         };
+        // a composite only of types declared before it (2.4: no forward references but
+        // OpTypeForwardPointer's pointers): one naming itself or a later type made a cycle, and
+        // the layout's and the validator's walks over it never ended (a stack overflow)
+        let parts: Vec<u32> = match &t {
+            Ty::Vector { elem, .. } | Ty::Array { elem, .. } | Ty::RuntimeArray { elem } => alloc::vec![elem.0],
+            Ty::Matrix { col, .. } => alloc::vec![col.0],
+            Ty::Struct { members } => members.iter().map(|m| m.0).collect(),
+            Ty::SampledImage { image } => alloc::vec![image.0],
+            Ty::Function { ret, params } => core::iter::once(ret.0).chain(params.iter().map(|p| p.0)).collect(),
+            _ => Vec::new(),
+        };
+        if let Some(&bad) = parts.iter().find(|&&p| p == i.res || !self.tys.contains_key(&p)) {
+            self.err(Rule::Type, k, format!("{} names %{} before that type is declared", self.name(k), bad));
+            return;
+        }
         self.tys.insert(i.res, t);
     }
 
@@ -858,12 +873,12 @@ impl<'a> V<'a> {
             }
             let ms = match self.t(mt.0) {
                 Some(Ty::Matrix { cols, .. }) => {
-                    cols * has_dec(md.as_ref(), Dec::MatrixStride).and_then(|a| a.first().copied()).unwrap_or(16)
+                    cols.saturating_mul(has_dec(md.as_ref(), Dec::MatrixStride).and_then(|a| a.first().copied()).unwrap_or(16))
                 }
                 Some(Ty::RuntimeArray { .. }) => 0,
                 _ => self.decl_size(mt.0, rule).unwrap_or(0),
             };
-            end = off + ms;
+            end = off.saturating_add(ms);
             size = size.max(end);
         }
         size

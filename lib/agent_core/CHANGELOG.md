@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Security
+
+- `describe` and `discover` show an `Access::Local` action's name, description and access only: unavailable (forbidden), without its schemas (they revealed what an external call of it does not).
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

@@ -320,6 +320,9 @@ fn pwd_vectors(t: &mut T) {
     bad[63] ^= 1;
     t.eq("element off the curve", eappwd::shared(&pwe, &rs, &ss_p, &bad), None);
     t.eq("scalar zero", eappwd::shared(&pwe, &rs, &[0; 32], &ep), None);
+    let mut one = [0u8; 32];
+    one[31] = 1;
+    t.eq("scalar one (RFC 8146, CVE-2019-9497)", eappwd::shared(&pwe, &rs, &one, &ep), None);
     t.eq("kdf length", eappwd::kdf(b"k", b"l", 100).len(), 100);
 }
 

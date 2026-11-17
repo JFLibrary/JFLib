@@ -307,7 +307,7 @@ impl<'a> Vl<'a> {
         if self.pix.is_empty() {
             let n = xs0 as u64 * ys as u64;
             self.check(n * 4 + PIXPAD)?;
-            self.pix = vec![0u8; (n * 4 + PIXPAD) as usize];
+            self.pix = crate::filled((n * 4 + PIXPAD) as usize, 0u8)?;
         }
         let mut pix = core::mem::take(&mut self.pix);
         let r = self.decode_pixels(&mut pix, xs, ys, true);
@@ -391,7 +391,7 @@ impl<'a> Vl<'a> {
         self.read_codes(xs, ys, cb, false)?;
         let n = xs as u64 * ys as u64;
         self.check(n * 4 + PIXPAD)?;
-        let mut px = vec![0u8; (n * 4) as usize];
+        let mut px = crate::filled((n * 4) as usize, 0u8)?;
         self.decode_pixels(&mut px, xs, ys, false)?;
         Ok(px.chunks_exact(4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect())
     }
@@ -417,7 +417,7 @@ impl<'a> Vl<'a> {
                 nmax = nmax.max(*v + 1);
             }
             self.check(nmax as u64 * 4)?;
-            let mut map = vec![u32::MAX; nmax as usize];
+            let mut map = crate::filled(nmax as usize, u32::MAX)?;
             // slots in order of first use
             let mut used = 0u32;
             for v in himg[..tiles].iter_mut() {
@@ -436,7 +436,7 @@ impl<'a> Vl<'a> {
             return Err(ERR_TRUNC);
         }
         self.check((stored as u64) << 6)?;
-        self.grp = vec![Grp::default(); stored as usize];
+        self.grp = crate::filled(stored as usize, Grp::default())?;
         // read nmax groups of 5 codes
         for g in 0..nmax as usize {
             let (store, slot) = if self.map.is_empty() {
@@ -1417,7 +1417,7 @@ pub fn decode(data: &[u8], dec: Option<&ImgDec>) -> Result<Surface, i32> {
     let stride = (rowb + 63) & !63;
     let total = h as u64 * stride as u64 + PIXPAD;
     v.check(total)?;
-    v.pix = vec![0u8; total as usize];
+    v.pix = crate::filled(total as usize, 0u8)?;
     v.level0(w, h)?;
     let mut pix = core::mem::take(&mut v.pix);
     if stride != rowb {

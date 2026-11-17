@@ -561,7 +561,7 @@ impl App<'_> {
     fn deb(&self) -> Result<(), String> {
         println!("[linux] deb");
         let pkg = self.pkg()?;
-        let (ver, display) = (&self.version, &self.display);
+        let (ver, display) = (&deb_version(&self.version), &self.display);
         let default = self.default_style("linux");
         let (mut data, mut control) = (Tree::new(), Tree::new());
         let mut size = 0;
@@ -588,11 +588,11 @@ impl App<'_> {
         let desc = self.meta.or("description", "");
         control.insert("control".into(), format!(
             "Package: {pkg}\nVersion: {ver}\nArchitecture: amd64\nSection: {}\nPriority: optional\nMaintainer: {maintainer}\n\
-             Installed-Size: {}\nDepends: debconf (>= 0.5) | debconf-2.0{}Description: {}\n{} \
+             Installed-Size: {}\nDepends: debconf (>= 0.5) | debconf-2.0{}{} \
              Enthaelt das Programm in {} Stilen; die Auswahl erfolgt bei der Installation.\n",
             self.meta.or("section", "utils"), size / 1024 + 64,
             if self.glibc()? { ", libc6\nRecommends: libvulkan1, mesa-vulkan-drivers\n" } else { "\n" },
-            self.summary(), if desc.is_empty() { String::new() } else { format!(" {desc}\n .\n") }, self.styles.len()).into_bytes());
+            deb_description(self.summary(), desc), self.styles.len()).into_bytes());
         let labels: Vec<String> = self.styles.iter().map(|s| style_info(&self.infos, s).0).collect();
         control.insert("templates".into(), format!(
             "Template: {pkg}/style\nType: select\nChoices-C: {}\nChoices: {}\nDefault: {default}\nDescription: Aussehen von {display}:\n \
@@ -622,6 +622,47 @@ impl App<'_> {
         *self.deb_made.borrow_mut() = Some((path.clone(), String::from_utf8_lossy(&control["control"]).to_string()));
         self.made(path)
     }
+}
+
+/// a Cargo version as dpkg orders it: the pre-release after "~" (1.2.0-beta.1 -> 1.2.0~beta.1,
+/// older than 1.2.0; with its "-" dpkg took "beta.1" for a Debian revision, newer than 1.2.0),
+/// hyphens inside it as dots (dpkg splits a revision off at the last one); build metadata stays
+/// after "+"
+fn deb_version(v: &str) -> String {
+    let (main, build) = match v.split_once('+') {
+        Some((m, b)) => (m, Some(b)),
+        None => (v, None),
+    };
+    let mut out = match main.split_once('-') {
+        Some((core, pre)) => format!("{core}~{}", pre.replace('-', ".")),
+        None => main.to_string(),
+    };
+    if let Some(b) = build {
+        out.push('+');
+        out.push_str(&b.replace('-', "."));
+    }
+    out
+}
+
+/// the control file's Description: the summary on its one line, the description's lines after
+/// it indented by a blank, an empty one as " .", one starting with "." shown as it is (two
+/// blanks); a line break in either ended the field (the next line was read as a field of its own)
+fn deb_description(summary: &str, desc: &str) -> String {
+    let mut out = format!("Description: {}\n", summary.split_whitespace().collect::<Vec<_>>().join(" "));
+    let desc = desc.trim();
+    if !desc.is_empty() {
+        for line in desc.lines().map(str::trim_end) {
+            if line.trim().is_empty() {
+                out.push_str(" .\n");
+            } else {
+                out.push_str(if line.starts_with('.') { "  " } else { " " });
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+        out.push_str(" .\n");
+    }
+    out
 }
 
 /// a program that names an interpreter (PT_INTERP): built against glibc, a dynamic program
@@ -810,6 +851,26 @@ pub(crate) fn run(args: &[String]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // dpkg's order: a pre-release before its release, build metadata after it
+    #[test]
+    fn debian_versions() {
+        assert_eq!(deb_version("1.2.0"), "1.2.0");
+        assert_eq!(deb_version("1.2.0-beta.1"), "1.2.0~beta.1");
+        assert_eq!(deb_version("0.3.0-rc-2"), "0.3.0~rc.2");
+        assert_eq!(deb_version("1.0.0-alpha+build-5"), "1.0.0~alpha+build.5");
+        assert_eq!(deb_version("1.0.0+20261117"), "1.0.0+20261117");
+    }
+
+    // every line of the field belongs to it: the summary on one, the description's indented
+    #[test]
+    fn debian_description_lines() {
+        assert_eq!(deb_description("Ein\nProgramm", ""), "Description: Ein Programm\n");
+        assert_eq!(deb_description("Kurz", "Erste Zeile\r\n\nZweite\n.punkt\n"),
+                   "Description: Kurz\n Erste Zeile\n .\n Zweite\n  .punkt\n .\n");
+        let d = deb_description("Kurz", "a\nPackage: evil");
+        assert!(d.lines().skip(1).all(|l| l.starts_with(' ')), "{d:?}");
+    }
 
     #[test]
     fn payload_layout() {

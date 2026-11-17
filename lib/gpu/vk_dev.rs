@@ -83,8 +83,10 @@ pub(crate) enum Garbage {
     Query(vk::Handle),
     #[cfg_attr(jfgui_glibc, allow(dead_code))] // (vk_swap.rs)
     Semaphore(vk::Handle),
+    /// a swapchain and its surface, kept until the swapchain is gone (Vulkan: a surface outlives
+    /// its swapchains; the Swapchain's own surface went first when it was dropped)
     #[cfg_attr(jfgui_glibc, allow(dead_code))]
-    Swapchain(vk::Handle),
+    Swapchain(vk::Handle, crate::vk_swap::Surface),
     #[cfg_attr(not(jfgui_glibc), allow(dead_code))] // (vk_dmabuf.rs: an image's dedicated allocation)
     Memory(vk::Handle),
 }
@@ -635,9 +637,11 @@ impl Shared {
         let mut st = self.st.lock();
         // (G5d) and the compute queue's latest submission
         let vc = self.lane_submitted();
-        // an open upload, or one another thread took to submit, may name a buffer or image:
-        // it waits until every upload up to the newest of them is submitted (State::pending)
-        if matches!(g, Garbage::Buffer(..) | Garbage::Image(..)) && !self.lost.load(Ordering::Relaxed) {
+        // an open upload, or one another thread took to submit, may name a buffer or image, or
+        // reset a query pool (a device without hostQueryReset: Timestamps::new records the reset
+        // there): it waits until every upload up to the newest of them is submitted
+        // (State::pending)
+        if matches!(g, Garbage::Buffer(..) | Garbage::Image(..) | Garbage::Query(..)) && !self.lost.load(Ordering::Relaxed) {
             if let Some(num) = st.upload.as_ref().map(|u| u.num).or_else(|| st.in_flight.iter().max().copied()) {
                 st.pending.push((num, vc, g));
                 return;
@@ -700,10 +704,11 @@ impl Shared {
                 Garbage::Pool(h) => (f.destroy_descriptor_pool)(d, h, n),
                 Garbage::Query(h) => (f.destroy_query_pool)(d, h, n),
                 Garbage::Semaphore(h) => (f.destroy_semaphore)(d, h, n),
-                Garbage::Swapchain(h) => {
+                Garbage::Swapchain(h, surface) => {
                     if let Some(ds) = f.destroy_swapchain_khr {
                         ds(d, h, n);
                     }
+                    drop(surface); // only now
                 }
                 Garbage::Memory(h) => (f.free_memory)(d, h, n),
             }

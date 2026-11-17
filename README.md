@@ -657,6 +657,7 @@ rust-analyzer reads the Cargo workspace in the root `Cargo.toml` directly.
 | [Roadmap](docs/ROADMAP.md) | What the library still lacks, with priorities (German) |
 | [Linux test plan](docs/LINUX_TESTPLAN.md) | What is checked on real Linux desktops and what is still to check on KDE, GNOME and X11 (German) |
 | [ARM64 plan](docs/ARM64.md) | The planned port to ARM64 on Windows and Linux: milestones, traps, how it is tested (German) |
+| [Android plan](docs/ANDROID.md) | Bringing Android up to Windows, Linux and Apple: threads, network, file system, printing, system fonts; milestones, traps, tests (German) |
 | [Android Gallery](apps/androidGallery/README.md) | APKs, Android prerequisites, input, and port status |
 | [Web and agent control](docs/AGENT_WEB.md) | Browser host and explicit CLI/JSON/MCP interfaces |
 | [jfWord](apps/jfWord/README.md) | Document editing and current feature coverage |

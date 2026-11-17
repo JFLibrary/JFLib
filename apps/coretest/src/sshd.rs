@@ -141,6 +141,12 @@ pub fn serve_conn(s: Box<dyn Stream>, host: &Keypair, logins: &Logins) -> Result
             }
             ssh::MSG_USERAUTH_REQUEST => {
                 let user = r.str().unwrap_or("");
+                if user == "banners" {
+                    // a server that never answers the login: banners until the client goes
+                    loop {
+                        t.send(&W::msg(ssh::MSG_USERAUTH_BANNER).str("Willkommen\n").str("").0)?;
+                    }
+                }
                 let _service = r.str();
                 let method = r.str().unwrap_or("");
                 let ok = match method {
@@ -219,6 +225,13 @@ pub fn serve_conn(s: Box<dyn Stream>, host: &Keypair, logins: &Logins) -> Result
             }
             ssh::MSG_CHANNEL_EOF => {
                 let Some((remote, stdin, cmd)) = chan.take() else { continue };
+                if cmd == "spew" {
+                    // output without end, the window kept: until the client goes
+                    let block = [b'y'; 32768];
+                    loop {
+                        t.send(&W::msg(ssh::MSG_CHANNEL_DATA).u32(remote).bytes(&block).0)?;
+                    }
+                }
                 let (out, err, code) = run_command(&cmd, &stdin);
                 for part in out.chunks(32768) {
                     t.send(&W::msg(ssh::MSG_CHANNEL_DATA).u32(remote).bytes(part).0)?;
@@ -339,6 +352,28 @@ pub fn run(t: &mut T) {
             c.close();
         }
         Err(e) => t.check(&format!("unknown key: {}", e), false),
+    }
+    // 5: a server that sends banners instead of answering the login: the client stops
+    match connect(port, HostKeyCheck::Any) {
+        Ok(mut c) => {
+            let r = c.auth_password("banners", "x");
+            t.check(&format!("endless banners end the login ({:?})", r), matches!(r, Err(SshError::Protocol(_))));
+        }
+        Err(e) => t.check(&format!("banners: {}", e), false),
+    }
+    // 6: a command with endless output: the time limit ends exec
+    match connect(port, HostKeyCheck::Any) {
+        Ok(mut c) => {
+            c.set_time_limit(Some(10_000));
+            t.check("login within the time limit", c.auth_password(USER, PASSWORD).is_ok());
+            c.set_time_limit(Some(1500));
+            let t0 = plat::time_us();
+            let r = c.exec("spew", b"", 1 << 16);
+            let ms = (plat::time_us() - t0) / 1000;
+            t.check(&format!("endless output ends at the time limit ({:?}, {} ms)", r.as_ref().err(), ms),
+                    matches!(&r, Err(SshError::Net(e)) if e.kind == plat::net::NetErrorKind::TimedOut) && (1400..6000).contains(&ms));
+        }
+        Err(e) => t.check(&format!("spew: {}", e), false),
     }
 }
 
