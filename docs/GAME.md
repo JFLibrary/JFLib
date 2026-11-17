@@ -1,6 +1,6 @@
 # Spiel-Engine: Plan für G7
 
-Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt ist Teil 1 von G7a (siehe dort). Die Zahl der Läufe je Stufe ist
+Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a und G7c (siehe dort). Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -64,7 +64,8 @@ Was es gibt (Code auf `main` ab7e77e1):
   nimmt es per git, die Wurzel-`Cargo.toml` legt `jflib-agent-core` per `[patch.crates-io]` auf diesen Workspace.
   Deterministisch (Gleitkomma in Software, keine Uhr, kein Zufall), mit Brennstoff, Grenzen und Sprachdiensten. Für
   schwere Geometrie zu langsam; die Rechnung gehört deshalb in Rust, das Skript beschreibt.
-- **Nicht da:** Physik, Animation, ein Weltmodell, Netcode, Werkzeuge zum Modellieren.
+- **Nicht da:** Physik (seit G7c Teil 1 die Kollision in `lib/physics`), Animation, ein Weltmodell, Netcode,
+  Werkzeuge zum Modellieren.
 
 ## Crates
 
@@ -178,6 +179,16 @@ anfassen:
   Das macht die Vorhersage im Netz genau. Geprüft mit Prüfsummen derselben Läufe auf allen Zielen.
 - Fertig, wenn: Abfragen gegen Brute-Force-Referenzen stimmen, zufällige Läufe nichts durchtunneln (bis zu einer
   festen Geschwindigkeit) und die Prüfsummen auf Windows, Linux, macOS, Browser und Android gleich sind.
+- **Stand 2026-11-17: Teil 1 fertig** ([PHYSICS.md](PHYSICS.md)). `lib/physics` (`jflib-physics`, in der Fassade
+  `jflib::physics`) mit Kugel, Kapsel, Quader, konvexer Hülle (Quickhull) und Dreiecksnetz (binned SAH, aktive
+  Kanten gegen Hänger an Nähten); drei dynamische AABB-Bäume (feste Netze, Ruhendes, Bewegtes); Strahl, Sweep,
+  Überlappung, Kontakte und nächster Punkt, einzeln (`query`) und in der Welt (`World`). Alles in `f64`, Netze in
+  `f32` im eigenen Bezug wie in `render3d`; nur `+ − × ÷` und die korrekt gerundete Wurzel, Sinus, Kosinus und
+  Arkustangens aus `rt`. `apps/physicstest` prüft gegen eigene Referenzen (rund 1,5 Mio. Prüfungen); die Prüfsumme
+  ist auf Windows, Linux (x86-64 und ARM64), macOS (M2 und Rosetta), im Browser und im Android-Emulator gleich. Auf
+  dem Ryzen 5 3600 rund 1,3 Mio. Strahlen und 285 000 Kapsel-Sweeps je Sekunde gegen eine Karte mit 50 000
+  Dreiecken. Noch nicht gebaut: drehende Sweeps, Netz gegen Netz, Höhenfelder, zusammengesetzte Formen. Offen:
+  Teil 2, der Character-Controller.
 
 **G7d Transport** (`plat`, `netio`)
 
