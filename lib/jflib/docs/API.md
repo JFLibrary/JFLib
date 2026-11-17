@@ -65,7 +65,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [render3d](#render3d) -- the core of the 3D engine: meshes, textured materials, scenes of instances (mirrored ones too), visibility on the GPU, glTF scenes on the GPU
   <br>[lib.rs](#render3d-crate-root) · [dfg.rs](#render3ddfgrs) · [env.rs](#render3denvrs) · [gltf.rs](#render3dgltfrs) · [math.rs](#render3dmathrs) · [scene.rs](#render3dsceners) · [shadow.rs](#render3dshadowrs) · [texture.rs](#render3dtexturers)
 - [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
-  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [cpu.rs](#render2dcpurs) · [text.rs](#render2dtextrs)
+  <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [dxf.rs](#render2ddxfrs) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [cpu.rs](#render2dcpurs) · [text.rs](#render2dtextrs)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
   <br>[lib.rs](#gltf-crate-root)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
@@ -106,6 +106,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs (Linux)](#rtkernelrs-linux) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
+- [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
+  <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
 
 ## ui
 
@@ -22249,6 +22251,8 @@ same WGSL on every path: compiled ahead (shaders_spv.rs) on Vulkan, handed to th
   scene.add_block(&Block) -> BlockId, insert_in(block, style, &Shape); Shape::Insert(Insert) places a block on a
        layer or in another block (moved by update, arrays as DXF's MINSERT)
   scene.set_camera(&Camera)                                   centre (f64), scale (units per pixel), rotation
+  dxf::load(&mut scene, &bytes, &dxf::Options) -> Loaded      (G6e2) a DXF drawing into the scene (dxf.rs, dxftext.rs;
+       the reader is the crate jflib-dxf)
   a frame:
        scene.prepare(&mut renderer, (w, h))?;         waits for this slot's last frame, uploads what changed
        renderer.record(&mut encoder, &scene, color)?;
@@ -22436,6 +22440,100 @@ CURVE_MAX: usize = 16384
 
 - **`fn pow2(b: i32) -> f64`**
   2^b
+
+### `render2d/dxf.rs`
+
+Source: [`lib/render2d/dxf.rs`](../lib/render2d/dxf.rs)
+
+```text
+dxf -- a DXF drawing into a Scene (G6e2; docs/RENDER2D.md "DXF"): lib/dxf reads the file (streaming, bounded), this
+module maps what it reads onto render2d as it comes: a render2d layer per run of entities on one DXF layer (the file's
+order is the painter's order, as in AutoCAD), styles from colours, linetypes, lineweights and transparency resolved
+by layer and by block, blocks as blocks (DIMENSION and ACAD_TABLE through their anonymous blocks), the object
+coordinate systems projected onto the drawing's plane, polyline bulges as arcs, text in substitute fonts of the
+repository, MTEXT's format codes laid out here into single-line texts.
+
+  dxf::load(&mut scene, &bytes, &Options) -> Result<Loaded, ::dxf::Error>      a file in memory
+  dxf::read(&mut scene, &mut source, &Options) -> Result<Loaded, ::dxf::Error> piece by piece (a file of a gigabyte)
+  loaded.extents, kinds (per DXF kind: read, drawn, skipped in paper space, hidden, unsupported, failed, approximated),
+       layers (each DXF layer's render2d layers), set_layer_visible, group_of / members (the render2d entities one
+       DXF entity became)
+
+What render2d refuses of an entity (a degenerate arc, a ring without area) is counted as failed, the rest goes on.
+```
+
+Re-exports: `::dxf::Family`
+
+- **`struct Options<'a>`**
+  how a drawing is mapped.  Made with `new` and changed field by field (it may grow)
+  - `background: u32` -- the view's background (0xFFRRGGBB): colour 7 is black on a light one and white on a dark one, wipeouts take it
+  - `lineweights: Option<bool>` -- lineweights shown (None: as the header's $LWDISPLAY says, off without it); pixels per millimetre of lineweight
+    (96 / 25.4: 0.25 mm and less a hairline, as AutoCAD shows them in model space)
+  - `px_per_mm: f64`
+  - `fonts: Option<&'a dyn Fn(Family) -> Option<&'a [u8]>>` -- the bytes of a family of the repository's fonts (None, or a family without bytes: Family::Sans's; no fonts: no
+    text)
+  - `limits: d::Limits`
+  - `groups: bool` -- keep which render2d entities came from one DXF entity (Loaded::group_of, members; 12 bytes per entity)
+  - `max_layers: u32` -- render2d layers at most for the runs of DXF layers (beyond: an entity goes to the last run of its layer, the order
+    across layers then approximate)
+  - `order: i32` -- the order of the first render2d layer (the next ones count up)
+
+**`impl<'a> Options<'a>`**
+
+- **`fn new() -> Options<'a>`**
+
+- **`struct Count`**
+  what happened to the entities of one DXF kind (an entity in a block once, however often it is inserted)
+  - `read: u64` -- read (top level and in blocks), of which drawn (one render2d entity or more), skipped in paper space, hidden
+    (invisible, or in a block on a layer that is off or frozen), unsupported (a kind this module does not draw),
+    failed (render2d refused its geometry, or there was none), approximated (drawn, but simplified: see the notes)
+  - `drawn: u64`
+  - `paper: u64`
+  - `hidden: u64`
+  - `unsupported: u64`
+  - `failed: u64`
+  - `approximated: u64`
+
+- **`struct LayerOf`**
+  a DXF layer: its render2d layers (one per run of entities on it, in order), whether it is shown
+  - `name: String`
+  - `runs: Vec<LayerId>`
+  - `visible: bool`
+  - `transparency: u32`
+
+- **`struct Loaded`**
+  what a drawing became
+  - `header: d::Header`
+  - `layers: Vec<LayerOf>`
+  - `extents: Option<[f64; 4]>` -- the box of what was drawn in model space (min x, min y, max x, max y), without rays and xlines
+  - `kinds: BTreeMap<String, Count>` -- per DXF kind
+  - `entities: u64` -- render2d entities inserted (on layers and in blocks), blocks made
+  - `blocks: u32`
+  - `stats: d::Stats` -- the reader's counts and notes
+  - `notes: Vec<String>` -- what was simplified or skipped, each once (at most 64)
+
+**`impl Loaded`**
+
+- **`fn group_of(&self, id: EntityId) -> Option<u32>`**
+  the DXF entity a render2d entity on a layer came from (Options::groups): its group, numbered from 1 in the order
+  of the drawing's entities that drew something
+- **`fn members(&self, g: u32) -> &[EntityId]`**
+  the render2d entities a DXF entity became (group_of)
+- **`fn set_layer_visible(&mut self, scene: &mut Scene, name: &str, on: bool) -> gpu::Result<bool>`**
+  a DXF layer shown or hidden: its render2d layers (entities of blocks on other layers keep what they had when they
+  were read: docs/RENDER2D.md "DXF")
+
+- **`fn load(scene: &mut Scene, bytes: &[u8], o: &Options) -> Result<Loaded, d::Error>`**
+  a drawing in memory into a scene
+
+- **`fn read(scene: &mut Scene, source: &mut dyn FnMut(&mut [u8]) -> usize, o: &Options) -> Result<Loaded, d::Error>`**
+  a drawing read piece by piece into a scene (::dxf::read: only the tables and blocks are kept)
+
+- **`fn linetype_pattern(src: &[f64], scale: f64, max: usize) -> Option<(Vec<f64>, f64)>`**
+  a linetype's or hatch line's dashes as DXF has them (positive on, negative off, 0 a dot), scaled, as render2d's
+  pattern (on, off, ... at most `max` entries) and its phase; None: solid (no gap in it).  Runs of one sign merge, a
+  leading gap moves to the end (the phase says where an entity starts), too many entries lose their shortest dashes
+  (dots first) to the gaps around them, so the period stays
 
 ### `render2d/fill.rs`
 
@@ -52475,3 +52573,603 @@ callback such as a window procedure: core panics once more there, with one of NO
   (`"panicked at FILE:LINE:COL:\nMESSAGE"`), taken: for a panic the app caught with
   `std::panic::catch_unwind`, whose payload holds the message alone.  None when no panic came
   since the last call (or the program is built with `panic = "abort"`).
+
+## dxf
+
+*DXF import (ASCII): tables, blocks and entities of model space, without a GPU* -- crate root [`lib/dxf/src/lib.rs`](../lib/dxf/src/lib.rs)
+
+```text
+dxf -- DXF import (G6e2; docs/RENDER2D.md "DXF"): the ASCII format of AutoCAD R12 to 2018 read into a data model
+that needs no GPU: the header's variables, the tables of layers, linetypes, text styles, block records and
+dimension styles, blocks with their entities, and the entities of the drawing.  lib/render2d puts it into a scene
+(render2d::dxf); a converter or a test reads the same without a device.
+
+  dxf::load(bytes, &Limits) -> Result<Document>        the whole file in memory, every entity kept
+  dxf::read(&mut source, &Limits, &mut sink) -> Result<Stats>   streaming: the source hands out the file in pieces,
+       the sink gets the header, the tables, each block when it is complete and each entity of ENTITIES as it is
+       read (nothing of ENTITIES is kept: a file of a gigabyte loads in bounded memory)
+  mtext::parse(text, height) -> Mtext                   MTEXT's inline format codes as paragraphs of runs
+  specials(text) -> Vec<Special>                       TEXT's %% codes (degree, diameter, under- and overline)
+  aci_rgb(index), font_substitute(name)                AutoCAD's colour index, which repository font stands in
+
+Binary DXF is refused (Error::Binary).  Files are untrusted input: every count, length and size is bounded
+(Limits), a malformed value is skipped with a note, a group code that is no number ends the file with an error;
+nothing nests deeper than POLYLINE / VERTEX and INSERT / ATTRIB, so there is no recursion.  Strings before AutoCAD
+2007 are in the header's code page ($DWGCODEPAGE, codepages.rs), from AC1021 on UTF-8; \U+XXXX is decoded
+everywhere, %% codes and MTEXT's codes where the text is drawn (specials, mtext).
+```
+
+### `dxf` crate root
+
+- **`enum Error`**
+  what went wrong; the text says where
+  - `Binary` -- a binary DXF ("AutoCAD Binary DXF"): not read (decision 31: the ASCII format)
+  - `Invalid(String)` -- not a DXF: a group code that is no number, a pair cut off (the line in the text)
+  - `Limit(String)` -- a Limits value exceeded
+
+- **`type Result<T> = core::result::Result<T, Error>`**
+
+- **`struct Limits`**
+  the bounds a file must stay in (Limits::DEFAULT; raise them for large files you trust more)
+  - `line_bytes: usize` -- bytes of one line (a group code or a value)
+  - `entity_pairs: usize` -- group pairs of one entity (with its vertices and attributes) and the bytes of their values
+  - `entity_bytes: usize`
+  - `entity_points: usize` -- points of one entity: vertices, control points, knots, a hatch's edges and its pattern's dashes
+  - `kept_entities: u64` -- entities kept: all of a Document's, or the blocks' while streaming
+  - `kept_points: u64` -- points kept (as entity_points, summed over what is kept)
+  - `blocks: usize` -- blocks, distinct names (layers, linetypes, styles, blocks), entries of all tables
+  - `names: usize`
+  - `table_entries: usize`
+
+**`impl Limits`**
+
+- **`const DEFAULT: Limits = Limits { line_bytes: 1 << 20, entity_pairs: 1 << 24, enti ...`**
+
+- **`type P3 = [f64; 3]`**
+  a point (x, y, z)
+
+- **`struct Name(pub u32)`**
+  a name of the file (a layer, linetype, text style, block, an entity's kind): an index into Names; names that differ
+  only in the case of ASCII letters are one (AutoCAD's rule)
+
+- **`struct Names`**
+  the names of a file, in the order they were first seen (Name(0) is the layer "0")
+
+**`impl Names`**
+
+- **`fn get(&self, n: Name) -> &str`**
+  the name's text as the file first spelled it
+- **`fn find(&self, s: &str) -> Option<Name>`**
+  a name that is already known
+- **`fn len(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+
+- **`enum Color`**
+  an entity's colour (62, 420): by layer, by block, an index of AutoCAD's palette (1 to 255; aci_rgb) or a true
+  colour 0xRRGGBB (420 wins over 62)
+  - `ByLayer`
+  - `ByBlock`
+  - `Aci(u8)`
+  - `Rgb(u32)`
+
+- **`enum Linetype`**
+  an entity's linetype (6): by layer (also when absent), by block, or a linetype of the table ("CONTINUOUS" is one)
+  - `ByLayer`
+  - `ByBlock`
+  - `Named(Name)`
+
+- **`enum Lineweight`**
+  a lineweight (370): by layer, by block, the drawing's default ($LWDEFAULT), or hundredths of a millimetre
+  - `ByLayer`
+  - `ByBlock`
+  - `Default`
+  - `Mm100(u16)`
+
+- **`enum Transparency`**
+  a transparency (440): by layer, by block, or an alpha (255: opaque, 0: invisible)
+  - `ByLayer`
+  - `ByBlock`
+  - `Alpha(u8)`
+
+- **`struct Common`**
+  what every entity has
+  - `kind: Name` -- the entity's kind as the file names it (LINE, LWPOLYLINE, ...)
+  - `handle: u64` -- 5 (0: none)
+  - `layer: Name` -- 8 (the layer "0" when absent)
+  - `linetype: Linetype`
+  - `color: Color`
+  - `lineweight: Lineweight`
+  - `ltscale: f64` -- 48 (1 when absent)
+  - `transparency: Transparency`
+  - `extrusion: P3` -- 210 (0, 0, 1 when absent): the normal of the entity's object coordinate system (OCS)
+  - `thickness: f64` -- 39
+  - `invisible: bool` -- 60 = 1
+  - `paper: bool` -- 67 = 1: in paper space
+
+- **`struct Entity`**
+  an entity: what all have, and its kind's geometry
+  - `common: Common`
+  - `kind: Kind`
+
+- **`struct Vertex`**
+  a vertex of a polyline: its point (OCS for 2D polylines, WCS for 3D), the bulge of the segment that starts here (the
+  tangent of a quarter of its arc's angle, positive: counter-clockwise), the widths at its start and end
+  - `at: P3`
+  - `bulge: f64`
+  - `start_width: f64`
+  - `end_width: f64`
+
+- **`struct Polyline`**
+  LWPOLYLINE, and POLYLINE with its VERTEXes (2D and 3D; meshes are Kind::Mesh)
+  - `vertices: Vec<Vertex>`
+  - `closed: bool` -- 70 bit 1
+  - `plinegen: bool` -- 70 bit 128: the linetype's pattern runs on across the vertices (else it starts anew at each)
+  - `three_d: bool` -- a 3D polyline (POLYLINE 70 bit 8): points in WCS, no bulges, no widths
+  - `const_width: f64` -- 43 (LWPOLYLINE) or 40 / 41 of POLYLINE: the width where a vertex has none of its own
+  - `elevation: f64` -- 38 (LWPOLYLINE) or 30 of POLYLINE's point: the OCS z
+
+- **`struct Mesh`**
+  POLYLINE as a polyface mesh (70 bit 64: faces of up to four vertices, an edge invisible where its index is
+  negative) or a polygon mesh (70 bit 16: m by n vertices, closed in m or n)
+  - `vertices: Vec<P3>`
+  - `faces: Vec<[i32; 4]>` -- polyface: per face its vertex indices from 1 (negative: the edge from it is invisible; 0: none)
+  - `m: u32` -- polygon mesh: its size and whether it closes
+  - `n: u32`
+  - `closed_m: bool`
+  - `closed_n: bool`
+
+- **`struct Spline`**
+  SPLINE (and the spline of a HELIX): degree, knots, control points with weights, fit points
+  - `degree: u32`
+  - `flags: u32` -- 70: 1 closed, 2 periodic, 4 rational, 8 planar, 16 linear
+  - `knots: Vec<f64>`
+  - `control: Vec<P3>`
+  - `weights: Vec<f64>` -- one per control point, or empty (all 1)
+  - `fit: Vec<P3>`
+  - `start_tangent: Option<P3>`
+  - `end_tangent: Option<P3>`
+
+- **`struct Text`**
+  TEXT, ATTRIB and ATTDEF
+  - `text: String` -- 1, decoded (\\U+XXXX; the %% codes stay: specials())
+  - `style: Option<Name>` -- 7 (Standard when absent)
+  - `at: P3` -- 10, 11 (OCS)
+  - `at2: Option<P3>`
+  - `height: f64` -- 40
+  - `rotation: f64` -- 50 (degrees)
+  - `width: Option<f64>` -- 41, 51 (degrees): None when absent (the style's)
+  - `oblique: Option<f64>`
+  - `generation: Option<u32>` -- 71: 2 backward, 4 upside down (None: the style's)
+  - `halign: u32` -- 72 (0 left, 1 center, 2 right, 3 aligned, 4 middle, 5 fit), 73 (0 baseline, 1 bottom, 2 middle, 3 top)
+  - `valign: u32`
+  - `tag: Option<String>` -- ATTRIB and ATTDEF: the tag (2) and the flags (70: 1 invisible, 2 constant, 4 verify, 8 preset)
+  - `attr_flags: u32`
+  - `mtext: Option<alloc::boxed::Box<MText>>` -- ATTRIB / ATTDEF of several lines (R2018: an MTEXT inside them)
+
+- **`struct MText`**
+  MTEXT
+  - `text: String` -- 3 ... and 1, joined, decoded (\\U+XXXX); the format codes stay (mtext::parse)
+  - `style: Option<Name>`
+  - `at: P3` -- 10 (WCS)
+  - `height: f64` -- 40, 41 (the reference rectangle's width: 0, no wrapping), 46 (its height, for columns)
+  - `width: f64`
+  - `rect_height: f64`
+  - `attach: u32` -- 71 (1 top left to 9 bottom right), 72 (1 left to right, 3 top to bottom, 5 by style)
+  - `direction: u32`
+  - `x_dir: Option<P3>` -- 11 (WCS): the x axis' direction; else 50 (radians, in the OCS)
+  - `rotation: f64`
+  - `spacing_style: u32` -- 73 (1 at least, 2 exactly), 44 (the factor of the single spacing)
+  - `spacing: f64`
+  - `bg_flags: u32` -- 90 (1 a background fill, 2 in the background colour, 16 a text frame), 63 / 421 its colour, 45 how far
+    beyond the text (a factor of the height)
+  - `bg_color: Color`
+  - `bg_scale: f64`
+  - `column_type: u32` -- R2018's columns (75 type: 0 none, 1 static, 2 dynamic; 76 count; 48 width; 49 gutter; 50 heights)
+  - `column_count: u32`
+  - `column_width: f64`
+  - `column_gutter: f64`
+  - `column_heights: Vec<f64>`
+
+- **`struct Insert`**
+  INSERT (also MINSERT's array) with its ATTRIBs
+  - `block: Name` -- 2
+  - `at: P3` -- 10 (OCS), 41 42 43, 50 (degrees)
+  - `scale: P3`
+  - `rotation: f64`
+  - `columns: u32` -- 70, 71 (0 read as 1), 44, 45
+  - `rows: u32`
+  - `spacing: [f64; 2]`
+  - `attribs: Vec<Entity>` -- the ATTRIBs after it (each an Entity of Kind::Text)
+
+- **`enum Edge`**
+  an edge of a hatch's boundary path (angles in degrees, as the file has them)
+  - `Line { a: [f64; 2], b: [f64; 2] }`
+  - `Arc { center: [f64; 2], radius: f64, start: f64, end: f64, ccw: bool }`
+  - `Ellipse { center: [f64; 2], major: [f64; 2], ratio: f64, start: f64, end: f64, ccw: bool }` -- major: the end of the major axis relative to the centre; ratio: minor over major
+  - `Spline { degree: u32, rational: bool, periodic: bool, knots: Vec<f64>, control: Vec<[f64; 2]>, weights: Vec<f64>, fit: Vec<[f64; 2]> }`
+  - `Poly { vertices: Vec<[f64; 3]>, closed: bool }` -- a polyline path: its vertices (x, y, bulge), closed
+
+- **`struct Path`**
+  a hatch's boundary path: its flags (92: 1 external, 2 polyline, 4 derived, 8 textbox, 16 outermost) and edges
+  - `flags: u32`
+  - `edges: Vec<Edge>`
+
+- **`struct PatternLine`**
+  a line family of a hatch pattern as the file stores it, already scaled and turned: angle (53, degrees), a base
+  point (43, 44), the offset to the next line (45, 46) and dashes (49: positive on, negative off, 0 a dot)
+  - `angle: f64`
+  - `base: [f64; 2]`
+  - `offset: [f64; 2]`
+  - `dashes: Vec<f64>`
+
+- **`struct Hatch`**
+  HATCH
+  - `pattern: String` -- 2, 70 (solid fill), 75 (0 normal, 1 outer, 2 ignore islands), 52, 41, 77
+  - `solid: bool`
+  - `style: u32`
+  - `angle: f64`
+  - `scale: f64`
+  - `double: bool`
+  - `elevation: f64` -- 30: the OCS z of the boundary
+  - `paths: Vec<Path>`
+  - `lines: Vec<PatternLine>`
+  - `gradient: bool` -- 450 = 1: a gradient (its two colours, 63/421 after 453)
+  - `gradient_colors: Vec<Color>`
+
+- **`struct Quad`**
+  SOLID, TRACE (the outline 10, 11, 13, 12 in OCS) and 3DFACE (10, 11, 12, 13 in WCS; 70: invisible edges)
+  - `points: [P3; 4]`
+  - `face: bool`
+  - `invisible_edges: u32`
+
+- **`struct BlockRef`**
+  what draws through an anonymous block: DIMENSION (and its kinds ARC_DIMENSION, LARGE_RADIAL_DIMENSION) and
+  ACAD_TABLE (2: the block; 10 its insertion point for a table)
+  - `block: Option<Name>`
+  - `at: P3`
+  - `x_dir: Option<P3>` -- ACAD_TABLE's 11: its horizontal direction (WCS)
+
+- **`struct Leader`**
+  LEADER: its vertices (WCS), an arrowhead (71), a spline path (72), the dimension style (3)
+  - `vertices: Vec<P3>`
+  - `arrow: bool`
+  - `spline: bool`
+  - `dimstyle: Option<Name>`
+
+- **`struct Wipeout`**
+  WIPEOUT (and IMAGE's frame, read alike): insertion point, the u and v vectors of a pixel, the size in pixels, the
+  clip boundary in pixel coordinates (71: 1 a rectangle of two corners, 2 a polygon)
+  - `at: P3`
+  - `u: P3`
+  - `v: P3`
+  - `size: [f64; 2]`
+  - `clip_type: u32`
+  - `clip: Vec<[f64; 2]>`
+
+- **`enum Kind`**
+  an entity's geometry
+  - `Line { a: P3, b: P3 }`
+  - `Point { at: P3, angle: f64 }` -- POINT: WCS, 50 the angle of its symbol (degrees)
+  - `Circle { center: P3, radius: f64 }` -- CIRCLE and ARC (OCS centre; angles in degrees, counter-clockwise from start to end)
+  - `Arc { center: P3, radius: f64, start: f64, end: f64 }`
+  - `Ellipse { center: P3, major: P3, ratio: f64, start: f64, end: f64 }` -- ELLIPSE: WCS centre, the major axis' end relative to it, minor / major, the parameters (radians)
+  - `Spline(Spline)`
+  - `Polyline(Polyline)`
+  - `Mesh(Mesh)`
+  - `Text(Text)`
+  - `MText(MText)`
+  - `Insert(Insert)`
+  - `Hatch(Hatch)`
+  - `Quad(Quad)`
+  - `BlockRef(BlockRef)`
+  - `Leader(Leader)`
+  - `Wipeout(Wipeout)`
+  - `Ray { at: P3, dir: P3, both: bool }` -- RAY (from `at`) and XLINE (both ways)
+  - `Other` -- what this reader does not read (its kind in Common::kind): counted, not drawn
+
+- **`struct Layer`**
+  a layer of the table
+  - `name: Name`
+  - `color: Color` -- 62 (its magnitude) or 420
+  - `on: bool` -- 62 negative: off; 70 bit 1: frozen, bit 4: locked; 290: plotted
+  - `frozen: bool`
+  - `locked: bool`
+  - `plot: bool`
+  - `linetype: Option<Name>` -- 6 (None: CONTINUOUS)
+  - `lineweight: Lineweight` -- 370 (Default when absent)
+  - `transparency: Option<u8>` -- the XDATA AcCmTransparency (1071): an alpha
+
+- **`struct Dash`**
+  an element of a linetype: a dash (positive), a gap (negative) or a dot (0); a shape or text of a complex linetype
+  is kept as a flag (74) and its text
+  - `length: f64`
+  - `complex: u32`
+  - `text: Option<String>`
+
+- **`struct LinetypeDef`**
+  a linetype of the table
+  - `name: Name`
+  - `description: String`
+  - `dashes: Vec<Dash>`
+  - `total: f64` -- 40
+
+- **`struct StyleDef`**
+  a text style of the table
+  - `name: Name`
+  - `font: String` -- 3: the font file (txt, simplex.shx, arial.ttf, ...), 4 the big font file
+  - `bigfont: String`
+  - `family: Option<String>` -- the TrueType family the XDATA "ACAD" names (1000), if any
+  - `height: f64` -- 40 (0: none fixed), 41, 50 (degrees)
+  - `width: f64`
+  - `oblique: f64`
+  - `flags: u32` -- 70: 1 a shape file (not a text font), 4 vertical; 71: 2 backward, 4 upside down
+  - `generation: u32`
+
+- **`struct BlockRecord`**
+  a block record of the table
+  - `name: Name`
+  - `handle: u64`
+  - `units: i32` -- 70: the insertion units
+
+- **`struct DimStyle`**
+  a dimension style (what a LEADER's arrow needs)
+  - `name: Name`
+  - `arrow_size: f64` -- 41 DIMASZ, 40 DIMSCALE
+  - `scale: f64`
+
+- **`struct Tables`**
+  the tables
+  - `layers: Vec<Layer>`
+  - `linetypes: Vec<LinetypeDef>`
+  - `styles: Vec<StyleDef>`
+  - `block_records: Vec<BlockRecord>`
+  - `dimstyles: Vec<DimStyle>`
+
+**`impl Tables`**
+
+- **`fn layer(&self, n: Name) -> Option<&Layer>`**
+- **`fn linetype(&self, n: Name) -> Option<&LinetypeDef>`**
+- **`fn style(&self, n: Name) -> Option<&StyleDef>`**
+- **`fn dimstyle(&self, n: Name) -> Option<&DimStyle>`**
+
+- **`struct Header`**
+  the header's variables this reader uses
+  - `version: String` -- $ACADVER (AC1009 R12 ... AC1032 2018; empty without a header), $DWGCODEPAGE
+  - `codepage: String`
+  - `insunits: i32` -- $INSUNITS (0 unitless, 1 inch, 4 mm, 6 m, ...)
+  - `ltscale: f64` -- $LTSCALE, $CELTSCALE
+  - `lwdisplay: Option<bool>` -- $LWDISPLAY (None: not in the file), $LWDEFAULT (hundredths of a mm)
+  - `lwdefault: u16`
+  - `pdmode: i32` -- $PDMODE, $PDSIZE
+  - `pdsize: f64`
+  - `extmin: Option<P3>` -- $EXTMIN, $EXTMAX
+  - `extmax: Option<P3>`
+  - `dimscale: f64` -- $DIMSCALE, $DIMASZ, $TEXTSIZE, $MIRRTEXT
+  - `dimasz: f64`
+  - `textsize: f64`
+  - `mirrtext: bool`
+  - `present: bool` -- whether the file had a HEADER section
+
+- **`struct Block`**
+  a block: its name, base point, flags (70: 1 anonymous, 2 attributes, 4 xref, 8 xref overlay, 16 external,
+  32 resolved, 64 referenced), entities
+  - `name: Name`
+  - `base: P3`
+  - `flags: u32`
+  - `xref: String` -- 1: the file an xref names
+  - `entities: Vec<Entity>`
+  - `paper: bool` -- \*Paper_Space...: a layout's
+
+- **`enum Where`**
+  where an entity marker was
+  - `Entities`
+  - `Blocks`
+
+- **`struct Stats`**
+  what was read
+  - `kinds: BTreeMap<(Where, String), u64>` -- entity markers per section and kind as the reader took them (VERTEX, ATTRIB, SEQEND, BLOCK, ENDBLK count too)
+  - `paper: u64` -- entities of ENTITIES in paper space (67 = 1)
+  - `bytes: u64` -- bytes and lines read, group pairs
+  - `lines: u64`
+  - `pairs: u64`
+  - `sections: Vec<String>` -- sections seen
+  - `notes: Vec<String>` -- what was skipped or guessed, each once (at most 64)
+
+**`impl Stats`**
+
+- **`fn count(&self, w: Where, kind: &str) -> u64`**
+  the count of a kind in a section
+
+- **`trait Sink`**
+  what a streaming read hands out, in the file's order: the header (also an empty one, before anything else), the
+  tables (once, when the TABLES section ends, or empty before the first block or entity), each block when its ENDBLK
+  is read, each entity of ENTITIES (paper space too: Common::paper)
+  - `fn header(&mut self, _h: &Header, _names: &Names)`
+  - `fn tables(&mut self, _t: &Tables, _names: &Names)`
+  - `fn block(&mut self, _b: Block, _names: &Names)`
+  - `fn entity(&mut self, _e: Entity, _names: &Names)`
+
+- **`struct Document`**
+  a whole file
+  - `header: Header`
+  - `tables: Tables`
+  - `blocks: Vec<Block>`
+  - `entities: Vec<Entity>`
+  - `names: Names`
+  - `stats: Stats`
+
+**`impl Document`**
+
+- **`fn name(&self, n: Name) -> &str`**
+  a name's text
+- **`fn block(&self, n: Name) -> Option<&Block>`**
+  a block by its name
+
+- **`fn load(bytes: &[u8], limits: &Limits) -> Result<Document>`**
+  a whole file in memory into a Document (every entity kept: Limits::kept_entities and kept_points bound them)
+
+- **`fn read(source: &mut dyn FnMut(&mut [u8]) -> usize, limits: &Limits, sink: &mut dyn Sink) -> Result<(Stats, Names)>`**
+  a file read piece by piece: `source` fills a buffer and says how many bytes it put there (0: the end); the sink
+  gets what was read in the file's order.  Only the tables and the blocks are kept (Limits bound them); the entities
+  of ENTITIES go to the sink one by one
+
+- **`fn is_binary(bytes: &[u8]) -> bool`**
+  whether bytes begin like a binary DXF
+
+- **`fn aci_rgb(i: u8) -> u32`**
+  AutoCAD's colour index (ACI) as 0xRRGGBB: 1 red, 2 yellow, 3 green, 4 cyan, 5 blue, 6 magenta, 7 white (black on a
+  light background: the caller decides), 8 and 9 greys, 10 to 249 24 hues of 15 degrees, each in five brightnesses
+  (255, 204, 153, 127, 76) and each of those mixed half with white of that brightness, 250 to 255 greys; 0 and 256
+  (by block, by layer) are white
+
+### `dxf/src/fonts.rs`
+
+Source: [`lib/dxf/src/fonts.rs`](../lib/dxf/src/fonts.rs)
+
+```text
+fonts -- which font of the repository stands in for a text style's font (decision 31: SHX fonts belong to Autodesk,
+and there are no Microsoft fonts in the repository).  A substitute names a family (the caller has the bytes) and how
+wide the original runs: the advance of the sample "a..z A..Z 0..9" over its cap height, from the original's metrics
+(Helvetica / Arial, Times, Courier: their published advance widths; SHX fonts: estimates from their glyph grids,
+docs/RENDER2D.md "DXF").  render2d::dxf turns that into a width factor against the substitute's own advance.
+```
+
+- **`enum Family`**
+  a family of the fonts in the repository
+  - `Sans` -- Inter (styles/netlab/assets): sans-serif, for Arial, Helvetica, Calibri, Verdana, Tahoma and every SHX font
+  - `SansBold` -- Inter SemiBold: bold sans-serif (Arial Black, "... Bold")
+  - `Serif` -- DejaVu Serif (lib/doc_view/assets): Times, Georgia, Cambria, Garamond, Book Antiqua
+  - `SerifBold`
+  - `Mono` -- DejaVu Sans Mono: Courier, Consolas, Lucida Console, Source Code Pro, monotxt.shx
+  - `MonoBold`
+  - `Ui` -- Selawik (styles/winui/assets): Segoe UI
+
+- **`struct Substitute`**
+  a font's stand-in
+  - `family: Family`
+  - `sample_advance: f64` -- the original's advance of the sample "a..z A..Z 0..9" (62 characters) in cap heights; 0: keep the substitute's width
+  - `shx: bool` -- an SHX font (single strokes) or a shape file
+
+```rust
+/// the sample whose advance sets the width factor of a substitute
+SAMPLE: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123 ...
+```
+
+- **`fn font_substitute(file: &str, family: Option<&str>) -> Substitute`**
+  the stand-in of a style's font file (3) or TrueType family (its XDATA), compared without case and path: TrueType
+  names by their family, everything else (".shx", no extension, unknown) as an SHX font
+
+### `dxf/src/mtext.rs`
+
+Source: [`lib/dxf/src/mtext.rs`](../lib/dxf/src/mtext.rs)
+
+```text
+mtext -- MTEXT's inline format codes (G6e2): a text as paragraphs of runs, each run with its format.
+
+  \P paragraph   \N column break   \X (dimension text: a line break)   \~ no-break space   \\ \{ \} the characters
+  { } a group: the format inside ends with it
+  \L \l underline on, off   \O \o overline   \K \k strike-through
+  \f<family>|b<0|1>|i<0|1>|c<charset>|p<pitch>;  a TrueType family    \F<file>;  a font file (SHX)
+  \H<v>; \H<v>x;  height (absolute, or times the current)    \W<v>; \W<v>x;  width factor
+  \Q<deg>;  oblique   \T<v>; \T<v>x;  tracking (spacing of characters)   \A<0|1|2>;  bottom, centre, top
+  \C<aci>;  colour of the palette (0 by block, 256 by layer)   \c<bgr>;  a true colour (blue in the high byte)
+  \S<top><sep><bottom>;  stacked: / with a bar, # diagonal, ^ without a bar (tolerances)
+  \p...;  paragraph: i<first line indent>, l<left indent>, r<right>, q<l|c|r|j|d> alignment, t<tabs> (x: ignored)
+  \U+XXXX  a character   \M+NXXXX  a double-byte character (read as U+FFFD)   ^I tab, ^J line break, ^<c> control
+  %%c %%d %%p %%% %%nnn  as in TEXT (strings::specials)
+
+Unknown codes are dropped with their letter (a code with a ';' to its end); nothing recurses (the groups are a stack
+of at most GROUP_DEPTH formats; deeper ones share the deepest).
+```
+
+```rust
+/// the deepest nesting of { } groups that keeps formats of its own
+GROUP_DEPTH: usize = 64
+```
+
+- **`struct Format`**
+  how a run looks
+  - `font: Option<String>` -- \\f's family or \\F's file (None: the entity's style), \\f's bold and italic flags
+  - `shx: bool`
+  - `bold: bool`
+  - `italic: bool`
+  - `height: f64` -- the cap height (drawing units)
+  - `width: Option<f64>` -- width factor, oblique angle (degrees; None: the style's), tracking factor
+  - `oblique: Option<f64>`
+  - `tracking: f64`
+  - `color: Option<Color>` -- None: the entity's colour
+  - `underline: bool`
+  - `overline: bool`
+  - `strike: bool`
+  - `valign: u8` -- \\A: 0 bottom, 1 centre, 2 top (where a smaller run sits on the line)
+
+- **`enum StackKind`**
+  a stacked text's separator
+  - `Bar` -- '/': above and below a horizontal bar
+  - `Diagonal` -- '#': a diagonal fraction
+  - `Tolerance` -- '^': above and below, no bar (tolerances)
+
+- **`enum Item`**
+  a piece of a paragraph
+  - `Text(String, Format)`
+  - `Stack { top: String, bottom: String, kind: StackKind, format: Format }`
+  - `Tab(Format)`
+
+- **`enum Align`**
+  a paragraph's alignment (\\pq; Default: the attachment point's)
+  - `Default`
+  - `Left`
+  - `Center`
+  - `Right`
+  - `Justify`
+  - `Distribute`
+
+- **`struct Paragraph`**
+  a paragraph: its alignment, indents (drawing units), tab stops, items; whether a column break came before it
+  - `align: Align`
+  - `indent_first: f64`
+  - `indent_left: f64`
+  - `indent_right: f64`
+  - `tabs: Vec<f64>`
+  - `column_break: bool`
+  - `items: Vec<Item>`
+
+- **`struct Mtext`**
+  an MTEXT's content
+  - `paragraphs: Vec<Paragraph>`
+
+**`impl Mtext`**
+
+- **`fn plain(&self, height: f64) -> Option<String>`**
+  the text, paragraphs joined by '\\n', when it has nothing but text in the entity's own format, left aligned (what
+  render2d's MText draws as it is); None otherwise
+- **`fn text(&self) -> String`**
+  all text without formats (for counts and tests): paragraphs by '\\n', stacks as top/bottom, tabs as '\\t'
+
+- **`fn parse(text: &str, height: f64) -> Mtext`**
+  MTEXT's text (3 and 1 joined) as paragraphs of runs; `height` is the entity's cap height
+
+### `dxf/src/strings.rs`
+
+Source: [`lib/dxf/src/strings.rs`](../lib/dxf/src/strings.rs)
+
+```text
+strings -- a DXF's bytes as text: UTF-8 from AutoCAD 2007 (AC1021) on, before that the header's code page
+($DWGCODEPAGE; codepages.rs), \U+XXXX in any version; TEXT's %% codes (specials).
+```
+
+- **`fn decode_unicode_escapes(s: &str) -> String`**
+  \\U+XXXX (four or five hex digits) as the character it names; \\M+NXXXX (a double byte of an East Asian page) as
+  U+FFFD.  Everything else stays (also "\\\\": TEXT has no escapes; MTEXT is parsed by mtext::parse)
+
+- **`struct Special`**
+  a run of a TEXT after its %% codes: the text and how it is decorated
+  - `text: String`
+  - `underline: bool`
+  - `overline: bool`
+  - `strike: bool`
+
+- **`fn specials(s: &str) -> Vec<Special>`**
+  TEXT's %% codes: %%c the diameter sign (U+2205), %%d the degree sign, %%p plus-minus, %%nnn the character of that
+  code (Windows-1252 above 127), %%% a percent sign; %%u, %%o and %%k switch underline, overline and strike-through on
+  and off (the runs they start).  Unknown codes stay as they are

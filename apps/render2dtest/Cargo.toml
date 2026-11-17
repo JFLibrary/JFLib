@@ -26,6 +26,9 @@ wgsl.workspace = true
 gpu.workspace = true
 render2d.workspace = true
 gfx.workspace = true
+# (G6e2) DXF drawings: the reader directly in the tests; PNGs of the corpus for a person to look at
+dxf.workspace = true
+img_png.workspace = true
 # the window demo: the scene in a ui.gpu_view (demo.rs)
 ui.workspace = true
 style = { package = "jflib-style-winui", path = "../../styles/winui" }

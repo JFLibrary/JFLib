@@ -17,6 +17,8 @@
 //   scene.add_block(&Block) -> BlockId, insert_in(block, style, &Shape); Shape::Insert(Insert) places a block on a
 //        layer or in another block (moved by update, arrays as DXF's MINSERT)
 //   scene.set_camera(&Camera)                                   centre (f64), scale (units per pixel), rotation
+//   dxf::load(&mut scene, &bytes, &dxf::Options) -> Loaded      (G6e2) a DXF drawing into the scene (dxf.rs, dxftext.rs;
+//        the reader is the crate jflib-dxf)
 //   a frame:
 //        scene.prepare(&mut renderer, (w, h))?;         waits for this slot's last frame, uploads what changed
 //        renderer.record(&mut encoder, &scene, color)?;
@@ -39,6 +41,8 @@ use gpu::*;
 mod atlas;
 mod block;
 pub mod curve;
+pub mod dxf;
+mod dxftext;
 pub mod fill;
 mod geo;
 mod index;

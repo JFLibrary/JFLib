@@ -975,6 +975,24 @@ pub fn run() -> i32 {
         }
         return crate::demo::launch();
     }
+    // (G6e2) DXF drawings
+    if let Some(path) = plat::arg_value("--dxf") {
+        if args.iter().any(|a| a == "--no-gpu") {
+            plat::setenv("jfgui_GPU", Some("0"));
+        }
+        return crate::dxftest::viewer(&path);
+    }
+    if let Some(path) = plat::arg_value("--dxf-shot") {
+        let pos = args.iter().position(|a| a == "--dxf-shot").map_or(0, |p| p + 2);
+        let Some(png) = args.get(pos) else {
+            plat::write_stderr(b"render2dtest: --dxf-shot PATH OUT.png\n");
+            return 2;
+        };
+        return crate::dxftest::shot_file(&path, png);
+    }
+    if let Some(path) = plat::arg_value("--bench-dxf") {
+        return crate::dxftest::bench(&path);
+    }
     if let Some(n) = plat::arg_value("--bench").and_then(|v| v.parse::<u32>().ok()).filter(|&n| n > 0) {
         return crate::bench::bench(n);
     }
@@ -983,13 +1001,13 @@ pub fn run() -> i32 {
         return 2;
     };
     let mut t = T { fails: 0, validate, inst: None };
-    let list: [(&str, fn(&mut T)); 31] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
+    let list: [(&str, fn(&mut T)); 32] = [("shaders", shaders), ("caps", caps), ("joins", joins), ("short", short), ("hairlines", hairlines), ("units", units), ("overlap", overlap),
                                           ("arcs", arcs), ("dashes", dashes), ("curves", curves), ("fills", fills), ("hatches", hatches), ("layers", layers),
                                           ("changes", crate::scenes::changes), ("churn", crate::scenes::churn), ("visibility", crate::scenes::visibility), ("coords", crate::scenes::coords),
                                           ("phase", crate::scenes::phase), ("blocks", crate::blocks::blocks), ("transparency", crate::blocks::transparency), ("levels", levels), ("errors", errors),
                                           ("text", crate::textgpu::text), ("textdeep", crate::textgpu::textdeep), ("pick", crate::picks::pick), ("select", crate::picks::select),
                                           ("snap", crate::picks::snap), ("pickchurn", crate::picks::churn), ("highlight", crate::hlov::highlight), ("overlay", crate::hlov::overlay),
-                                          ("cpu", crate::cpucmp::cpu)];
+                                          ("cpu", crate::cpucmp::cpu), ("dxf", crate::dxftest::dxf)];
     let mut ran = false;
     for (name, f) in list {
         if test == "all" || test == name {
@@ -1001,6 +1019,12 @@ pub fn run() -> i32 {
     if test == "window" {
         out(&format!("== window{}", if validate { " (validation)" } else { "" }));
         return crate::demo::window_test(validate);
+    }
+    // (G6e2; not in `all`: it reads the corpus outside the repository)
+    if test == "dxfcorpus" {
+        out("== dxfcorpus");
+        crate::dxftest::corpus(&mut t);
+        ran = true;
     }
     if !ran {
         plat::write_stderr(format!("render2dtest: no test {test}\n").as_bytes());

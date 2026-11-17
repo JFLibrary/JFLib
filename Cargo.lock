@@ -528,6 +528,7 @@ dependencies = [
  "jflib-doc-io",
  "jflib-doc-layout",
  "jflib-doc-view",
+ "jflib-dxf",
  "jflib-eapm",
  "jflib-fx",
  "jflib-gfx",
@@ -694,6 +695,10 @@ dependencies = [
  "jflib-text",
  "jflib-ui",
 ]
+
+[[package]]
+name = "jflib-dxf"
+version = "0.2.1"
 
 [[package]]
 name = "jflib-eapm"
@@ -1032,6 +1037,7 @@ dependencies = [
 name = "jflib-render2d"
 version = "0.2.1"
 dependencies = [
+ "jflib-dxf",
  "jflib-gfx",
  "jflib-gpu",
  "jflib-rt",
@@ -1405,8 +1411,10 @@ name = "render2dtest"
 version = "0.1.0"
 dependencies = [
  "jflib-build",
+ "jflib-dxf",
  "jflib-gfx",
  "jflib-gpu",
+ "jflib-img-png",
  "jflib-plat",
  "jflib-render2d",
  "jflib-rt",

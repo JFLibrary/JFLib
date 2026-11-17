@@ -153,6 +153,7 @@ CRATES = [
     ("doc_io", "conservative DOCX interchange and bounded file I/O", "full"),
     ("rt", "the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records",
      "full"),
+    ("dxf", "DXF import (ASCII): tables, blocks and entities of model space, without a GPU", "full"),
 ]
 SKIP_FILES = {"rt": {"os.rs", "mem.rs"}}            # rt::os: the OS calls plat is built on
 # codec crates: further items to show, per module ("*" = all public items of the module)
