@@ -12,6 +12,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 - `os::SYS_IO_URING_SETUP` / `_ENTER` / `_REGISTER`, `SYS_OPEN_TREE`, `SYS_MOVE_MOUNT`, `SYS_FSOPEN`, `SYS_FSCONFIG`, `SYS_FSMOUNT`, `SYS_FSPICK`, `SYS_CLONE3`, `SYS_PIDFD_GETFD`, `SYS_MOUNT_SETATTR` (x86-64 and ARM64).
 
+### Fixed
+
+- Portable `pow(1.0, y)` is 1 for every finite y (from |y| > ~1.3e300 on it was NaN), NaN for an infinite one as on the x87.
+
 ## [0.2.1] - 2026-11-16
 
 ### Added

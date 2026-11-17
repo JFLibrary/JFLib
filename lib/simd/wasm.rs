@@ -1,8 +1,39 @@
 // WASM SIMD128 backend. The module is compiled only with +simd128; all callers
 // therefore have the required feature. SSE lane ordering, saturation, oversized
 // shifts and NaN/overflow conversion rules are preserved (no relaxed SIMD/FMA).
+// Float arithmetic: WebAssembly gives a NaN result its canonical (positive) or any NaN, SSE the
+// first NaN operand's (quieted) or its negative "indefinite"; a result with a NaN takes a cold
+// path with SSE's rule per lane (rt::fx, as neon.rs and the scalar code).
 use crate::Simd;
 use core::arch::wasm32::*;
+use rt::fx;
+
+// the lanes of a result with a NaN, by SSE's rule; a and b as in the operation
+#[cold]
+#[inline(never)]
+fn sse_nan32(a: v128, b: v128, r: v128) -> v128 {
+    let lanes = |v: v128| [u32x4_extract_lane::<0>(v), u32x4_extract_lane::<1>(v), u32x4_extract_lane::<2>(v), u32x4_extract_lane::<3>(v)];
+    let (x, y, z) = (lanes(a), lanes(b), lanes(r));
+    let f = |i: usize| fx::arithmetic32(f32::from_bits(x[i]), f32::from_bits(y[i]), f32::from_bits(z[i])).to_bits();
+    u32x4(f(0), f(1), f(2), f(3))
+}
+#[cold]
+#[inline(never)]
+fn sse_nan64(a: v128, b: v128, r: v128) -> v128 {
+    let lanes = |v: v128| [u64x2_extract_lane::<0>(v), u64x2_extract_lane::<1>(v)];
+    let (x, y, z) = (lanes(a), lanes(b), lanes(r));
+    let f = |i: usize| fx::arithmetic64(f64::from_bits(x[i]), f64::from_bits(y[i]), f64::from_bits(z[i])).to_bits();
+    u64x2(f(0), f(1))
+}
+// a NaN in an operand always is one in r
+#[inline(always)]
+fn result32(a: v128, b: v128, r: v128) -> v128 {
+    if v128_any_true(f32x4_ne(r, r)) { sse_nan32(a, b, r) } else { r }
+}
+#[inline(always)]
+fn result64(a: v128, b: v128, r: v128) -> v128 {
+    if v128_any_true(f64x2_ne(r, r)) { sse_nan64(a, b, r) } else { r }
+}
 
 /// Native 128-bit WebAssembly SIMD registers, selected by the browser bundle.
 #[derive(Clone, Copy)]
@@ -349,19 +380,19 @@ impl Simd for Wasm128 {
     }
     #[inline(always)]
     fn addf(self, a: Self::V, b: Self::V) -> Self::V {
-        f32x4_add(a, b)
+        result32(a, b, f32x4_add(a, b))
     }
     #[inline(always)]
     fn subf(self, a: Self::V, b: Self::V) -> Self::V {
-        f32x4_sub(a, b)
+        result32(a, b, f32x4_sub(a, b))
     }
     #[inline(always)]
     fn mulf(self, a: Self::V, b: Self::V) -> Self::V {
-        f32x4_mul(a, b)
+        result32(a, b, f32x4_mul(a, b))
     }
     #[inline(always)]
     fn divf(self, a: Self::V, b: Self::V) -> Self::V {
-        f32x4_div(a, b)
+        result32(a, b, f32x4_div(a, b))
     }
     #[inline(always)]
     fn splatd(self, v: f64) -> Self::V {
@@ -369,23 +400,23 @@ impl Simd for Wasm128 {
     }
     #[inline(always)]
     fn addd(self, a: Self::V, b: Self::V) -> Self::V {
-        f64x2_add(a, b)
+        result64(a, b, f64x2_add(a, b))
     }
     #[inline(always)]
     fn subd(self, a: Self::V, b: Self::V) -> Self::V {
-        f64x2_sub(a, b)
+        result64(a, b, f64x2_sub(a, b))
     }
     #[inline(always)]
     fn muld(self, a: Self::V, b: Self::V) -> Self::V {
-        f64x2_mul(a, b)
+        result64(a, b, f64x2_mul(a, b))
     }
     #[inline(always)]
     fn divd(self, a: Self::V, b: Self::V) -> Self::V {
-        f64x2_div(a, b)
+        result64(a, b, f64x2_div(a, b))
     }
     #[inline(always)]
     fn sqrtd(self, a: Self::V) -> Self::V {
-        f64x2_sqrt(a)
+        result64(a, a, f64x2_sqrt(a))
     }
     #[inline(always)]
     fn maxd(self, a: Self::V, b: Self::V) -> Self::V {
@@ -490,7 +521,7 @@ impl Simd for Wasm128 {
     }
     #[inline(always)]
     fn sqrtf(self, a: Self::V) -> Self::V {
-        f32x4_sqrt(a)
+        result32(a, a, f32x4_sqrt(a))
     }
     #[inline(always)]
     fn load_u16(self, b: &[u16]) -> Self::V {

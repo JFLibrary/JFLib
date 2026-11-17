@@ -8,6 +8,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Added
+
+- `ssh::Client::set_time_limit(ms)`: each following `auth_password`, `auth_key` and `exec` ends with `TimedOut` after that time in all.
+
+### Fixed
+
+- SSH: a peer that sends only messages to skip (ignore, debug, banners, global requests) while an answer is due ends the session after 1024 of them (login and opening a channel never returned); data past the channel window the client granted is a protocol error.
+
 ### Security
 
 - `ssh`: `private_key` overwrites the key file's decoded bytes and text, `auth_password` the message with the password, once used.

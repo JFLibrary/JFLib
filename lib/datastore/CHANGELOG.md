@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- A torn last log frame whose payload holds the bytes `BCW1` is cut like any torn frame: only a whole valid frame behind a damaged one makes it damaged (a bare magic made the store refuse to open).
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

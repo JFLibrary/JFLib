@@ -62,7 +62,9 @@ class Side:
         kw.setdefault("capture_output", True)
         kw.setdefault("timeout", 120)
         if "input" not in kw:
-            kw.setdefault("stdin", subprocess.DEVNULL)
+            # an empty pipe, not the null device: Windows' ssh.exe sent no EOF for NUL and the
+            # server waited for the command's stdin (the run hung or was cut)
+            kw["input"] = "" if kw.get("text") else b""
         return subprocess.run(self.pre + args, **kw)
 
     def write(self, name, text):

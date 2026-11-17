@@ -41,6 +41,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **Tests:** render2dtest `--test dxf` (tests/dxf.uis): lib/dxf and render2d::dxf on drawings written in the test (tables, every kind, code pages, line ends, a file handed out a byte at a time, broken, cut and 600 randomly damaged files, limits, counts that lie; four small drawings of ezdxf in apps/render2dtest/dxf, MIT: clockwise arcs in a hatch's boundary, caret codes, MTEXT's inline codes, a binary DXF), the GPU against the CPU path; `--test dxfcorpus` (tests/dxfcorpus.uis, SKIP without the corpus outside the repository: every file loaded, its kinds against an independent count of its entity markers, the GPU against the CPU path with and without text); `--dxf PATH [--no-gpu]` (a drawing in the demo's view: pan, zoom, pick and snap, a DXF entity highlighted as a whole; tests/dxf_view.uis and dxf_view_cpu.uis on the test's drawing), `--dxf-shot PATH OUT.png`, `--bench-dxf PATH` (read, insert, memory, GPU and CPU frames of a large drawing)
 - **crypto:** `argon2::VERIFY_WORK`: the most work `verify` does for a PHC string
 - **rt:** `os::SYS_IO_URING_SETUP` / `_ENTER` / `_REGISTER`, `SYS_OPEN_TREE`, `SYS_MOVE_MOUNT`, `SYS_FSOPEN`, `SYS_FSCONFIG`, `SYS_FSMOUNT`, `SYS_FSPICK`, `SYS_CLONE3`, `SYS_PIDFD_GETFD`, `SYS_MOUNT_SETATTR` (x86-64 and ARM64)
+- **netio:** `ssh::Client::set_time_limit(ms)`: each following `auth_password`, `auth_key` and `exec` ends with `TimedOut` after that time in all
 
 ### Changed
 
@@ -118,6 +119,12 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** `History`: `undo` / `redo` while a group is open close it first, its edits so far are the newest step (undo reverted the older step under them, redo did an undone step over newer edits); `can_undo`, `can_redo` and the labels count the open group
 - **ui:** A box nested beyond the layout's limit pushes no clip or disabled level and its `box_end` pops nothing (it took the parent's frame, clip and disabled level); an expander beyond the 16 kept ones opens no content card (its box stayed open)
 - **doc_layout:** A character or note mark wider than its line stands alone on a line, a line taller than the page alone on a page, both past the edge: content that can never fit made `paginate` fail with `Error::Limit` for the whole document (the note-aware paths keep their rules)
+- **datastore:** A torn last log frame whose payload holds the bytes `BCW1` is cut like any torn frame: only a whole valid frame behind a damaged one makes it damaged (a bare magic made the store refuse to open)
+- **cargo_jflib:** Debian package: a pre-release version is written with `~` (`1.2.0~beta.1`, older than `1.2.0` for dpkg; with `-` it counted as newer), the description's lines are indented and a multi-line summary is joined (a line break ended the field and broke `control`); Android: `versionCode` is MAJOR * 1 000 000 + MINOR * 1000 + PATCH (with 10000 / 100, 1.0.100 had the code of 1.1.0), a version outside that is an error
+- **jflib_build:** A program with std gets the linker map's path through `-Xlinker` as one argument too (behind `-Wl,` a comma in the path split it)
+- **netio:** SSH: a peer that sends only messages to skip (ignore, debug, banners, global requests) while an answer is due ends the session after 1024 of them (login and opening a channel never returned); data past the channel window the client granted is a protocol error
+- **rt:** Portable `pow(1.0, y)` is 1 for every finite y (from |y| > ~1.3e300 on it was NaN), NaN for an infinite one as on the x87
+- **simd:** WebAssembly SIMD128: float arithmetic and square roots follow SSE's NaN rule (the first NaN operand quieted, else the negative indefinite) like the NEON and scalar code; WebAssembly's own NaN made results differ on ARM machines
 
 ### Security
 
@@ -142,6 +149,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** Permission dialog: the target, plugin, reason and rule are wrapped and whole, control characters and the characters that change the writing direction show as `<U+XXXX>` (a long target lost its end at the dialog's edge, U+202E could turn a file name around, NUL ended the text)
 - **ui:** Terminal: a change into or out of `TM_SECRET` drops (overwrites) the input typed so far: a hidden line showed in the next mode's input line, a visible one became part of the secret
 - **ui:** `TB_MULTI | TB_PASSWORD` is a one-line password box: the multi-line box ignored `TB_PASSWORD` and showed the password in plain text
+- **agent_core:** `describe` and `discover` show an `Access::Local` action's name, description and access only: unavailable (forbidden), without its schemas (they revealed what an external call of it does not)
 
 ## [0.2.1] - 2026-11-16
 

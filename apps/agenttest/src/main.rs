@@ -47,6 +47,7 @@ static ACTIONS: &[ActionSpec] = &[
         ..ActionSpec::read("platform.file", "Read a platform file")
     },
     ActionSpec::read("result.invalid", "Return a deliberately broken host result"),
+    ActionSpec::read("notes.private", "Private notes").schemas(&INPUT, &COUNT).local_only(),
 ];
 
 #[derive(Default)]
@@ -594,6 +595,25 @@ fn action_checks(checks: &mut Checks) {
                 v.get("inputSchema").is_some()
                     && v.get("revisionRequired").and_then(Value::as_bool) == Some(true)
             }),
+    );
+    // a local action: its name and access, nothing about its schema or availability
+    let private = dispatch.describe(&host, "notes.private").ok();
+    checks.check(
+        "describe_local_hides_schema",
+        private.as_ref().is_some_and(|v| {
+            v.get("inputSchema").is_none()
+                && v.get("outputSchema").is_none()
+                && v.get("available").and_then(Value::as_bool) == Some(false)
+                && v.get("access").and_then(Value::as_str) == Some("local")
+        }),
+    );
+    checks.check(
+        "discover_local_unavailable",
+        dispatch
+            .discover(&host, "notes", None, 10)
+            .ok()
+            .and_then(|p| p.actions.first().cloned())
+            .is_some_and(|v| v.get("available").and_then(Value::as_bool) == Some(false)),
     );
     checks.check(
         "duplicate_registry",
