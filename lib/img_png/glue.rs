@@ -44,12 +44,15 @@ fn blob_mut(m: &mut ImgMeta, b: Blob) -> &mut Vec<u8> {
 }
 
 // zmeta: inflate the zlib stream src into a new blob unless one is there already (`set`:
-// an earlier zmeta stored one, possibly empty -- the assembly's blob pointer); the buffer
-// grows until the data fits (at most ZMETA_MAX bytes) -> 0 / ERR_*
+// an earlier zmeta stored one, possibly empty -- the assembly's blob pointer, or failed); the
+// buffer grows until the data fits (at most ZMETA_MAX bytes) -> 0 / ERR_*.  Only the first
+// chunk is tried: a failed one (a bomb over ZMETA_MAX) no longer lets every further chunk
+// inflate up to 32 MB again
 fn zmeta(m: &mut ImgMeta, which: Blob, src: &[u8], set: &mut bool) -> i32 {
     if *set || !blob_mut(m, which).is_empty() {
         return 0;
     }
+    *set = true;
     let mut cap = src.len() * 4 + 4096;
     loop {
         cap = cap.min(ZMETA_MAX);
@@ -58,7 +61,6 @@ fn zmeta(m: &mut ImgMeta, which: Blob, src: &[u8], set: &mut bool) -> i32 {
             Ok(n) => {
                 buf.truncate(n);
                 *blob_mut(m, which) = buf;
-                *set = true;
                 return 0;
             }
             Err(ERR_OVERFLOW) => {
@@ -85,7 +87,7 @@ pub fn scan(data: &[u8], m: &mut ImgMeta, flags: u32) -> i32 {
     let mut p = 8usize;
     let mut ihdr = false;
     let mut fctl = false;
-    let (mut zicc, mut zxmp) = (false, false); // a (possibly empty) inflated blob is there
+    let (mut zicc, mut zxmp) = (false, false); // tried: a (possibly empty) blob is there, or it failed
     loop {
         if len - p < 12 {
             break;

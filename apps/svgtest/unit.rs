@@ -827,6 +827,16 @@ fn malformed(t: &mut T) {
     s.push_str("</svg>");
     let svg = Svg::parse(s.as_bytes()).unwrap();
     t.check(svg.truncated() && svg.element_count() <= 250_000, "element limit");
+    // a repeated attribute: the first one counts, with few attributes and with many (sorted
+    // once per element instead of a search per attribute)
+    let few = r100("<rect width='100' height='100' fill='#ff0000' fill='#0000ff'/>");
+    let pad: String = (0..20).map(|k| format!(" data-x{k}='{k}'")).collect();
+    let many = r100(&format!("<rect width='100' height='100'{pad} fill='#ff0000'{pad} fill='#0000ff' fill='#00ff00'/>"));
+    t.check(px(&few, 50, 50) == RED && px(&many, 50, 50) == RED, "a repeated attribute: the first one counts");
+    // entities declared out of order, one twice (the first declaration counts), looked up by name
+    let s = "<!DOCTYPE svg [<!ENTITY zz 'Z'><!ENTITY b 'B'><!ENTITY mm 'M'><!ENTITY a 'A'><!ENTITY b 'X'><!ENTITY q 'Q'>]>\
+             <svg><title>&a;&b;&mm;&q;&zz;&nix;&#65;</title></svg>";
+    t.check(Svg::parse(s.as_bytes()).is_ok_and(|svg| svg.title() == "ABMQZ&nix;A"), "entities out of order, one declared twice, one unknown");
     // entity expansion (no recursion: each reference expands once)
     let mut s = String::from("<!DOCTYPE svg [<!ENTITY a 'aaaaaaaaaa'>");
     let names = ["b", "c", "d", "e", "f", "g", "h"];

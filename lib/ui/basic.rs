@@ -280,6 +280,8 @@ impl Ui {
     fn wrap_lines(&mut self, s: &[u8], width: i32, out: &mut Vec<Wl>, hyph: Option<&spell::Hyphenator>) -> i32 {
         out.clear();
         let mut widest = 0;
+        // checked once: for every line it walked the whole text (quadratic)
+        let st = core::str::from_utf8(s).ok();
         let mut pos = 0;
         'para: loop {
             // paragraph end: '\n' or the end
@@ -289,7 +291,7 @@ impl Ui {
                     self.limit_hit(super::ctx::LIM_WRAP);
                     break 'para;
                 }
-                let (end, hy) = self.wrap_break(s, pos, pe, width, hyph);
+                let (end, hy) = self.wrap_break(s, st, pos, pe, width, hyph);
                 // visible part: without the trailing blanks (ASCII and the ideographic space)
                 let mut v = end;
                 while v > pos && (s[v - 1] == b' ' || s[..v].ends_with("\u{3000}".as_bytes())) {
@@ -313,23 +315,23 @@ impl Ui {
         widest
     }
 
-    // wrap_break(s, pos, pe, width, hyph) -> (where the line starting at pos ends (pos < end
+    // wrap_break(s, st, pos, pe, width, hyph) -> (where the line starting at pos ends (pos < end
     // <= pe, or pe when pos == pe), hyphenated): the whole rest when it fits, else the last line
     // break opportunity (UAX #14: after spaces, after hyphens, after a soft hyphen, between
     // ideographs ...) whose text fits, a hyphenation point of the next word (hyph), else (one
-    // long word) the grapheme clusters that fit (at least one)
-    fn wrap_break(&mut self, s: &[u8], pos: usize, pe: usize, width: i32, hyph: Option<&spell::Hyphenator>) -> (usize, bool) {
+    // long word) the grapheme clusters that fit (at least one); st: s as a str (None: not UTF-8)
+    fn wrap_break(&mut self, s: &[u8], st: Option<&str>, pos: usize, pe: usize, width: i32, hyph: Option<&spell::Hyphenator>) -> (usize, bool) {
         let hw = self.text.width("-");
         let t = &mut self.text;
-        match core::str::from_utf8(s) {
-            Ok(st) => {
+        match st {
+            Some(st) => {
                 let mut fits = |a: usize, b: usize, h: bool| t.width_n(&s[a..], b - a) + if h { hw } else { 0 } <= width;
                 match hyph {
                     Some(hy) => text::segment::wrap_end_hyph(st, pos, pe, &mut fits, Some(&mut |w: &str, out: &mut Vec<usize>| *out = hy.hyphenate(w))),
                     None => text::segment::wrap_end_hyph(st, pos, pe, &mut fits, None),
                 }
             }
-            Err(_) => {
+            None => {
                 // not UTF-8: characters while they fit (at least one)
                 let mut best = next_char(s, pos);
                 while best < pe {

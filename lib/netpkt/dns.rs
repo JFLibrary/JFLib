@@ -7,8 +7,8 @@
 //   RData            A, Aaaa, Ns, Cname, Ptr, Mx { pref, host }, Soa(Soa), Txt(strings),
 //                    Other(bytes); rtype() / text()
 //   Message { header, questions, answers, authority, additional }
-//                    parse(b) (names with compression pointers; loops, forward pointers and
-//                    names over 255 bytes are refused) / to_bytes() (names compressed against
+//                    parse(b) (names with compression pointers; loops, forward pointers, more
+//                    than 126 pointers and names over 255 bytes are refused) / to_bytes() (names compressed against
 //                    earlier ones, RFC 1035 4.1.4) / to_bytes_max(limit) -> (bytes, truncated):
 //                    whole records only, TC set when something was left out /
 //                    query(id, name, qtype, rd) / reply_to(&query)
@@ -368,6 +368,10 @@ pub fn read_name(msg: &[u8], off: usize) -> Option<(String, usize)> {
     let mut p = off;
     let mut end = None;
     let mut wire = 1usize;
+    // pointers followed: a name of at most 255 bytes needs at most 126 (as Go's resolver);
+    // a chain of pointers, each one step back, otherwise made every name of a message walk
+    // the whole message (quadratic)
+    let mut jumps = 0u32;
     loop {
         let l = *msg.get(p)? as usize;
         match l & 0xC0 {
@@ -389,7 +393,8 @@ pub fn read_name(msg: &[u8], off: usize) -> Option<(String, usize)> {
             0xC0 => {
                 let q = ((l & 0x3F) << 8) | *msg.get(p + 1)? as usize;
                 // only backwards: no loops
-                if q >= p {
+                jumps += 1;
+                if q >= p || jumps > 126 {
                     return None;
                 }
                 if end.is_none() {

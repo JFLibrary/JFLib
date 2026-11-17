@@ -183,6 +183,15 @@ fn refused(t: &mut T) {
     t.eq("name of 255", dns::labels(&ok.join(".")).map(|l| l.len()), Some(127));
     t.eq("label of 64", dns::labels(&"x".repeat(64)), None);
     t.eq("empty label", dns::labels("a..b"), None);
+    // pointers in a row, each to the one before (the name "a" at 0): 126 are followed, 127 not
+    // -- a long chain let every name of a message walk the whole message
+    let mut c = vec![1u8, b'a', 0];
+    for k in 0..127usize {
+        let to = if k == 0 { 0 } else { 3 + 2 * (k - 1) };
+        c.extend_from_slice(&[0xC0 | (to >> 8) as u8, to as u8]);
+    }
+    t.eq("126 pointers in a row", dns::read_name(&c, 3 + 2 * 125).map(|x| x.0), Some(String::from("a")));
+    t.eq("127 pointers in a row", dns::read_name(&c, 3 + 2 * 126), None);
 }
 
 fn names(t: &mut T) {

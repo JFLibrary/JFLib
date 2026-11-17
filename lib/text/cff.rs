@@ -18,7 +18,8 @@
 // hintmask / cntrmask and skipped), callsubr / callgsubr (bias 107 / 1131 / 32768, nesting
 // <= 10), return, endchar (a seac accent is ignored), the arithmetic / storage operators
 // (abs add sub div neg eq drop put get ifelse random mul sqrt dup exch index roll and or
-// not).  Argument stack 48, transient array 32, at most 200000 operators per glyph.  The
+// not).  Argument stack 48, transient array 32, at most 200000 operators per glyph, at most
+// 256 font DICTs, a Private DICT read to at most 64 KiB.  The
 // width argument is dropped (advances come from hmtx).  Like the assembly, the transient
 // array and the random generator are process-wide.
 //
@@ -41,6 +42,10 @@ use crate::ttf::{Tb, ERR_HDR, ERR_UNSUPPORTED};
 use crate::var;
 
 const FD_MAX: u32 = 256;
+// a Private DICT is read to at most this many bytes (real ones hold a few dozen operators): each
+// of FD_MAX font DICTs may name its own, and walking each to the end of the file was FD_MAX
+// times the file
+const PRIV_MAX: u32 = 1 << 16;
 const CS_STACK: usize = 48;
 const CS2_STACK: usize = 513; // CFF2: the largest maxstack
 const CS2_DEFSTACK: i64 = 193; // CFF2: maxstack without the operator
@@ -324,7 +329,7 @@ fn cf2_private(t: Tb, start: u32, end: u32, vstore: u32, ix: &mut Index, ops: &m
         return 0;
     }
     let off = off as u32;
-    let e = off.saturating_add(size as u32).min(t.len());
+    let e = off.saturating_add((size as u32).min(PRIV_MAX)).min(t.len());
     let regions = |vsi: u32| if vstore == 0 { None } else { var::ivs_region_count(t, vstore, vsi) };
     let (mut subrs, mut vsi) = (None, 0u16);
     dict2_walk(t, off, e, &regions, &mut |o, a| {
@@ -503,7 +508,7 @@ fn cf_private(t: Tb, start: u32, end: u32, ix: &mut Index, ops: &mut [f64; OPS_M
         return;
     }
     let off = off as u32;
-    let e = off.wrapping_add(size as u32).min(t.len());
+    let e = off.saturating_add((size as u32).min(PRIV_MAX)).min(t.len());
     let n = dict_find(t, off, e, 19, ops); // Subrs (relative to the Private DICT)
     if n < 1 {
         return;

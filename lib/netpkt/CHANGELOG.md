@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Security
+
+- `dns::read_name` (and so `Message::parse` and the dissector) follows at most 126 compression pointers per name, as Go's resolver. A chain of pointers, each one step back, let every name of a message walk the whole message (quadratic in its size).
+
 ## [0.2.1] - 2026-11-16
 
 ### Fixed

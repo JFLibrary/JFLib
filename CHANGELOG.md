@@ -76,11 +76,24 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Android and macOS with std: `read` / `write` (Android) and `free` (macOS) declared with `void *` buffers as libc and std declare them (the clashing declarations warned); the workspace no longer lists the apps' style crates it never uses (`unused workspace dependency` on every target); iOS no longer warns of the unused `objc_msg_super`
 - **img_jxl:** Modular images: the squeeze steps of a decode may move at most 2^24 channel entries in all, over its frames and groups (each step's residuals go in as one block), beyond that `ERR_LIMIT`: steps on a palette's meta channel, which has no shift to count, inserted a channel each near the front of the list (74 KB took 56 s; now refused in about 0.3 s)
 - **plat:** Windows: a service whose `run` ends with an error code is started again, as systemd (`Restart=on-failure`) and launchd (`KeepAlive` with `SuccessfulExit` false) do it -- `service::install` set the failure actions but not `SERVICE_FAILURE_ACTIONS_FLAG`, without which they only follow a process that ends without reporting `SERVICE_STOPPED`, and `run_service` does report the stop (with error 1066), so the service stayed stopped. A stop that was asked for is reported without an error whatever `run` returned, so it is never answered with a restart. Services installed before keep their setting until they are installed again
+- **wgsl:** The "meintest du" suggestions compute the edit distance only near the diagonal (a whole table over two names of 50000 characters was 2.5e9 steps per candidate), and past `MAX_ERRORS`, whose messages are dropped, no unknown name walks every known one
+- **img_svg:** XML reader: a repeated attribute is found by sorting an element's attributes once (the first one counts, as before; with more than `MAX_ATTRS` attributes a repeated one now counts towards the limit), and entity references are looked up by binary search: both walked up to 512 and 256 entries for every attribute and every reference of the file
+- **text:** `segment::wrap_end` / `wrap_end_hyph` read the break opportunities in a window that grows while its text fits, and measure the rest of the paragraph only that far: every line scanned and measured the whole rest (quadratic over a long paragraph). A line start inside a character counts from that character's start (it panicked); words longer than about 256 characters are no longer hyphenated (they were found and hyphenated whole for every line)
+- **text:** `segment::word_bounds` counts a run of regional indicators along instead of walking back over it for every pair (quadratic in the run)
+- **text:** `Text::hit` measures the line once instead of every prefix up to the hit (quadratic in the index)
+- **ui:** Wrapped labels and multi-line text boxes check the text for UTF-8 once per layout, not once per line, and do not measure the rest of the paragraph before each line (both quadratic over a long paragraph)
+- **plat:** `a11y::Node::offset_at` walks the text once (char_rect for every offset counted from the start: quadratic, a screen reader's hit test on a long text box hung)
+- **plat:** Windows: the backup of a file association's registry keys walks them with a list instead of recursion (keys nest up to 512 deep, each level held a 32 KB buffer on the stack)
+- **spell:** COMPOUNDRULE matches with a table over rule elements and parts (trying every way the `*` and `?` elements could share the parts was exponential in their number)
+- **base:** `pattern::Regex`: the matcher follows jumps and splits with a list instead of recursion, one level per alternative and per optional repetition (6000 alternatives took about a megabyte of stack)
 
 ### Security
 
 - **plat:** Windows: dwmapi, crypt32, winmm, iphlpapi, bcrypt and avrt are loaded from System32 when first used instead of being imported by the program: a DLL of such a name beside the program (a setup in the download folder) was loaded in their place
 - **plat:** `screen::pick_test_point`, the colour picker's test aid, obeys `screen.capture` like the picker: it read screen pixels without the permission
+- **netpkt:** `dns::read_name` (and so `dns::Message::parse` and the dissector) follows at most 126 compression pointers per name, as Go's resolver: a chain of pointers, each one step back, let every name of a message walk the whole message (quadratic in its size)
+- **img_png:** Metadata: only the first iCCP chunk (and the first compressed XMP) is inflated, also when it fails: each further chunk with a bomb past the 16 MB limit was inflated again, up to about 32 MB of work each
+- **text:** CFF: a Private DICT is read to at most 64 KiB: each of up to 256 font DICTs may name its own, and walking each to the end of the file was 256 times the file
 
 ## [0.2.1] - 2026-11-16
 

@@ -300,6 +300,10 @@ impl<'a> Checker<'a> {
 
     /// " – meintest du `x`?": the names in scope; for a call also the built-in functions
     fn name_hint(&self, name: &str, call: bool) -> String {
+        // past MAX_ERRORS the message is not kept: no walk over every name for each one
+        if self.errors >= MAX_ERRORS {
+            return String::new();
+        }
         let mut names: Vec<&str> = self.names.keys().copied().collect();
         if let Some(f) = self.f.as_ref() {
             names.extend(f.scopes.iter().flatten().map(|e| e.0.as_str()));
@@ -483,7 +487,7 @@ impl<'a> Checker<'a> {
                 let Some((k, mty)) = self.t.structs.get(si as usize).and_then(|s| s.members.iter().position(|m| m.name == name.name).map(|k| (k, s.members[k].ty))) else {
                     let sname = self.tn(store);
                     let members: Vec<&str> = self.t.structs[si as usize].members.iter().map(|m| m.name.as_str()).collect();
-                    let hint = suggestion(&name.name, members.iter().copied());
+                    let hint = if self.errors >= MAX_ERRORS { String::new() } else { suggestion(&name.name, members.iter().copied()) };
                     let dsp = self.t.structs[si as usize].span;
                     return Err(self.err_note(name.span, format!("die Struktur `{}` hat kein Member `{}`{}", sname, name.name, hint), dsp, String::from("hier deklariert")));
                 };

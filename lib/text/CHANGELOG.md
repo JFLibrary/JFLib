@@ -8,6 +8,16 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- `segment::wrap_end` / `wrap_end_hyph` read the break opportunities in a window that grows while its text fits, and measure the rest of the paragraph only that far; every line scanned and measured the whole rest (quadratic over a long paragraph). A line start inside a character counts from that character's start (it panicked); words longer than about 256 characters are no longer hyphenated (they were found and hyphenated whole for every line).
+- `segment::word_bounds` counts a run of regional indicators along instead of walking back over it for every pair (quadratic in the run).
+- `Text::hit` measures the line once instead of every prefix up to the hit (quadratic in the index).
+
+### Security
+
+- CFF: a Private DICT is read to at most 64 KiB. Each of up to 256 font DICTs may name its own, and walking each to the end of the file was 256 times the file.
+
 ## [0.2.1] - 2026-11-16
 
 ### Fixed

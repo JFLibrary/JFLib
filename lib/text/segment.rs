@@ -344,9 +344,15 @@ pub fn word_bounds(s: &str) -> Vec<usize> {
     let before = |k: usize| -> Option<usize> { (0..k).rev().find(|&j| !ignorable(w(j))) };
     let after = |k: usize| -> Option<usize> { (k + 1..n).find(|&j| !ignorable(w(j))) };
     let mut out = alloc::vec![0];
+    // regional indicators in a row up to the last non-ignorable character before k (WB15,
+    // WB16); counted along instead of walked back for every pair, which was quadratic in a run
+    let mut ri = 0usize;
     for k in 1..n {
         let a = w(k - 1);
         let b = w(k);
+        if !ignorable(a) {
+            ri = if a == W_RI { ri + 1 } else { 0 };
+        }
         let keep = if a == W_CR && b == W_LF {
             true // WB3
         } else if matches!(a, W_NEWLINE | W_CR | W_LF) || matches!(b, W_NEWLINE | W_CR | W_LF) {
@@ -364,18 +370,7 @@ pub fn word_bounds(s: &str) -> Vec<usize> {
             let x0 = p1.and_then(before).map(w); // the one before x
             let y = b;
             let y2 = after(k).map(w); // the one after y
-            let ri_odd = || {
-                let mut c = 0;
-                let mut j = p1;
-                while let Some(jj) = j {
-                    if w(jj) != W_RI {
-                        break;
-                    }
-                    c += 1;
-                    j = before(jj);
-                }
-                c % 2 == 1
-            };
+            let ri_odd = || ri % 2 == 1;
             (ahletter(x) && ahletter(y))                                                      // WB5
                 || (ahletter(x) && (y == W_MIDLETTER || midnumletq(y)) && y2.is_some_and(ahletter)) // WB6
                 || (x0.is_some_and(ahletter) && (x == W_MIDLETTER || midnumletq(x)) && ahletter(y)) // WB7
@@ -442,6 +437,12 @@ const WORD_REACH: usize = 256;
 // the word segments around i: (bounds, offset) between boundaries no rule looks across (a word
 // scan from there finds the bounds a scan of the whole paragraph finds), else the paragraph
 fn para_words(s: &str, i: usize) -> (Vec<usize>, usize) {
+    near_words(s, i, true).unwrap_or_default()
+}
+
+// para_words; whole false: None instead of the paragraph when no such boundary lies within
+// WORD_REACH characters
+fn near_words(s: &str, i: usize, whole: bool) -> Option<(Vec<usize>, usize)> {
     let mut a = i;
     let mut n = 0;
     while a > 0 && !word_hard(s, a) && n < WORD_REACH {
@@ -449,6 +450,9 @@ fn para_words(s: &str, i: usize) -> (Vec<usize>, usize) {
         n += 1;
     }
     if a > 0 && !word_hard(s, a) {
+        if !whole {
+            return None;
+        }
         a = para_start(s, i);
     }
     let mut e = i + s[i..].chars().next().map_or(0, |c| c.len_utf8());
@@ -458,9 +462,24 @@ fn para_words(s: &str, i: usize) -> (Vec<usize>, usize) {
         n += 1;
     }
     if e < s.len() && !word_hard(s, e) {
+        if !whole {
+            return None;
+        }
         e = s.as_bytes()[i..].iter().position(|&b| b == b'\n').map_or(s.len(), |k| i + k + 1);
     }
-    (word_bounds(&s[a..e]).into_iter().map(|x| x + a).collect(), a)
+    Some((word_bounds(&s[a..e]).into_iter().map(|x| x + a).collect(), a))
+}
+
+// word_at for hyphenation (i before the end): None for a word that reaches further than
+// WORD_REACH characters -- finding it took the whole paragraph, for every line of a long one
+fn word_near(s: &str, i: usize) -> Option<(usize, usize)> {
+    let i = floor(s, i);
+    if i >= s.len() {
+        return None;
+    }
+    let (b, _) = near_words(s, i, false)?;
+    let k = b.partition_point(|&x| x <= i);
+    Some((b[k.saturating_sub(1)], b.get(k).copied().unwrap_or(s.len())))
 }
 
 /// the word segment that holds i (at the end of the text: the last one)
@@ -653,32 +672,63 @@ pub fn line_breaks(s: &str) -> Vec<(usize, bool)> {
     out
 }
 
+// the first window of text wrap_end reads for a line (bytes; grows four times while it fits)
+const WRAP_WINDOW: usize = 256;
+
+// e without the white space before it (down to pos)
+fn visible_end(s: &str, pos: usize, mut e: usize) -> usize {
+    while e > pos {
+        let c = s[..e].chars().next_back().unwrap_or('a');
+        if char_props(c) & P_SPACE == 0 {
+            break;
+        }
+        e -= c.len_utf8();
+    }
+    e
+}
+
+// the break opportunities for a line from pos (a character start before pe): read in a window
+// that grows while its text fits (fits_to(e): pos..e fits), so a line costs about its own
+// length, not the whole rest of the paragraph (which made wrapping a long paragraph quadratic).
+// A break before k depends only on the text from pos to k, so the window's opportunities are
+// those of the whole rest; its end is no opportunity unless it is pe.  -> (opportunities
+// relative to pos, limit: the first mandatory break before pe, else pe, else the window's end,
+// whether pos..limit fits)
+fn line_window(s: &str, pos: usize, pe: usize, fits_to: &mut dyn FnMut(usize) -> bool) -> (Vec<(usize, bool)>, usize, bool) {
+    let mut win = WRAP_WINDOW;
+    loop {
+        let mut we = if pe - pos <= win { pe } else { pos + win };
+        while !s.is_char_boundary(we) {
+            we += 1;
+        }
+        let mut ops = line_breaks(&s[pos..we]);
+        if we < pe {
+            ops.pop();
+        }
+        let hard = ops.iter().find(|o| o.1 && pos + o.0 < pe).map(|o| pos + o.0);
+        let limit = hard.unwrap_or(we);
+        let all = fits_to(limit);
+        if all && hard.is_none() && we < pe {
+            win = win.saturating_mul(4);
+            continue;
+        }
+        return (ops, limit, all);
+    }
+}
+
 /// where a line starting at pos ends inside pos..pe (pos < end <= pe; pe when pos == pe): the
 /// whole rest when it fits, else the last break opportunity whose text before it (without
 /// trailing spaces) fits, else grapheme clusters while they fit (at least one); a mandatory
 /// break inside ends the line there.  fits(a, b): the text a..b fits.
 pub fn wrap_end(s: &str, pos: usize, pe: usize, fits: &mut dyn FnMut(usize, usize) -> bool) -> usize {
     let pe = floor(s, pe);
+    let pos = floor(s, pos);
     if pos >= pe {
         return pe;
     }
-    let seg = &s[pos..pe];
-    let ops = line_breaks(seg);
-    // a mandatory break before the end
-    let hard = ops.iter().find(|o| o.1 && pos + o.0 < pe).map(|o| pos + o.0);
-    let limit = hard.unwrap_or(pe);
-    let visible = |e: usize| {
-        let mut v = e;
-        while v > pos {
-            let c = s[..v].chars().next_back().unwrap_or('a');
-            if char_props(c) & P_SPACE == 0 {
-                break;
-            }
-            v -= c.len_utf8();
-        }
-        v
-    };
-    if fits(pos, visible(limit)) {
+    let visible = |e: usize| visible_end(s, pos, e);
+    let (ops, limit, all) = line_window(s, pos, pe, &mut |e| fits(pos, visible(e)));
+    if all {
         return limit;
     }
     let mut best = pos;
@@ -713,7 +763,8 @@ pub fn wrap_end(s: &str, pos: usize, pe: usize, fits: &mut dyn FnMut(usize, usiz
 /// fit, hyph(word, &mut offsets) gives the places where that whole word (UAX #29) may break
 /// (byte offsets inside it, ascending) and the line ends at the last one that fits with a
 /// hyphen -- also inside a single word too long for a line, before graphemes are cut.  Words
-/// with a digit or a soft hyphen of their own are never hyphenated.  fits(a, b, hyphen):
+/// with a digit or a soft hyphen of their own, or longer than about 256 characters, are never
+/// hyphenated.  fits(a, b, hyphen):
 /// the text a..b fits (with a hyphen after it).
 pub fn wrap_end_hyph(
     s: &str,
@@ -723,26 +774,14 @@ pub fn wrap_end_hyph(
     mut hyph: Option<&mut dyn FnMut(&str, &mut Vec<usize>)>,
 ) -> (usize, bool) {
     let pe = floor(s, pe);
+    let pos = floor(s, pos);
     if pos >= pe {
         return (pe, false);
     }
-    let seg = &s[pos..pe];
-    let ops = line_breaks(seg);
-    let hard = ops.iter().find(|o| o.1 && pos + o.0 < pe).map(|o| pos + o.0);
-    let limit = hard.unwrap_or(pe);
-    let visible = |e: usize| {
-        let mut v = e;
-        while v > pos {
-            let c = s[..v].chars().next_back().unwrap_or('a');
-            if char_props(c) & P_SPACE == 0 {
-                break;
-            }
-            v -= c.len_utf8();
-        }
-        v
-    };
+    let visible = |e: usize| visible_end(s, pos, e);
     let shy = |e: usize| s[..e].ends_with('\u{AD}');
-    if fits(pos, visible(limit), false) {
+    let (ops, limit, all) = line_window(s, pos, pe, &mut |e| fits(pos, visible(e), false));
+    if all {
         return (limit, false);
     }
     // the last opportunity that fits (after a soft hyphen: with the hyphen); the piece after
@@ -777,12 +816,13 @@ pub fn wrap_end_hyph(
     if next <= best {
         next = ops.iter().map(|o| pos + o.0).find(|&e| e > best && e <= limit).unwrap_or(limit);
     }
-    // hyphenation inside the words of the piece best..next
+    // hyphenation inside the words of the piece best..next (a word longer than about WORD_REACH
+    // characters is cut at graphemes: it was found and hyphenated whole again for every line)
     if let Some(h) = hyph.as_mut() {
         let mut words: Vec<(usize, usize)> = Vec::new();
         let mut q = best;
         while q < next {
-            let (a, b) = word_at(s, q);
+            let Some((a, b)) = word_near(s, q) else { break };
             if b <= q {
                 break;
             }

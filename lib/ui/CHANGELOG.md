@@ -62,6 +62,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - A dock area of the same id in a second window floats its panels in windows of its own: both used
   the window ids `id + 1 ..`, and the second one took over the main window's floating windows
   ("window 501 begun twice in one pass").
+- Wrapped labels and multi-line text boxes check the text for UTF-8 once per layout, not once per line, and do not measure the rest of the paragraph before each line (both quadratic over a long paragraph).
 
 ## [0.2.1] - 2026-11-16
 

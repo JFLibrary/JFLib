@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- XML reader: a repeated attribute is found by sorting an element's attributes once (the first one counts, as before; with more than `MAX_ATTRS` attributes a repeated one now counts towards the limit), and entity references are looked up by binary search. Both walked up to 512 and 256 entries for every attribute and every reference of the file.
+
 ## [0.2.1] - 2026-11-16
 
 No changes in this crate. It was released with the others because all of JFLib's crates move together.

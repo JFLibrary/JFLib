@@ -8,6 +8,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ## [Unreleased]
 
+### Fixed
+
+- `pattern::Regex`: the matcher follows jumps and splits with a list instead of recursion, one level per alternative and per optional repetition (6000 alternatives took about a megabyte of stack).
+
 ## [0.2.1] - 2026-11-16
 
 ### Changed
