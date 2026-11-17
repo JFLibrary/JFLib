@@ -21566,6 +21566,10 @@ ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
        scene.submitted(id);
   gltf::upload(&mut renderer, &document) -> Result<Imported>  a jflib-gltf Document: meshes, textures,
        materials, and its instances for a Scene (gltf.rs)
+  (G7f) renderer.remove_mesh(id), remove_material(id), remove_texture(id)   their places are used again, the ids stay
+       invalid (store.rs); refused while a scene's instances, a material or a detail level use them
+  (G7f) renderer.add_material_desc(&MaterialDesc)             glTF's BLEND (blended after the rest, sorted back to front
+       per instance on the GPU: sort.wgsl) and doubleSided (no culling of back faces, their normal turned round)
 
 Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
 of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
@@ -21592,8 +21596,17 @@ SCATTER_WGSL: &str = include_str!("scatter.wgsl")
 DRAW_WGSL: &str = include_str!("draw.wgsl")
 /// (G5d) the depth pyramid of the occlusion test
 HIZ_WGSL: &str = include_str!("hiz.wgsl")
+/// (G7f) the blended instances sorted back to front
+SORT_WGSL: &str = include_str!("sort.wgsl")
+SORT_LOCAL_SPV: &[u32] = spv::SORT_LOCAL
+SORT_GLOBAL_SPV: &[u32] = spv::SORT_GLOBAL
+/// (G7f) the blended instances' vertex and fragment shaders
+VS_BLEND_SPV: &[u32] = spv::VS_BLEND
+FS_BLEND_SPV: &[u32] = spv::FS_BLEND
 CULL_SPV: &[u32] = spv::CULL
 CULL_EARLY_SPV: &[u32] = spv::CULL_EARLY
+/// (G7f) the camera's culling without the occlusion test when the scene has blended instances
+CULL_BLEND_SPV: &[u32] = spv::CULL_BLEND
 CULL_LATE_SPV: &[u32] = spv::CULL_LATE
 HIZ_DEPTH_SPV: &[u32] = spv::HIZ_DEPTH
 HIZ_DOWN_SPV: &[u32] = spv::HIZ_DOWN
@@ -21632,7 +21645,9 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   - `indices: &'a [u32]`
 
 - **`struct MeshId(pub u32)`**
-  a mesh of a Renderer
+  a mesh of a Renderer.  (G7f) The low 24 bits are its place in the renderer's tables, the high 8 bits how often that
+  place was used before (Renderer::remove_mesh): the id of a removed mesh stays invalid.  A renderer that removes nothing
+  numbers its meshes 0, 1, 2, ...
 
 - **`struct Lod`**
   (G5d) a detail level of a mesh (Renderer::set_lods): an instance whose bounding sphere's projected diameter is less
@@ -21641,13 +21656,15 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   - `below: f32`
 
 - **`struct MaterialId(pub u32)`**
-  a material of a Renderer
+  a material of a Renderer.  (G7f) As MeshId: a place and how often it was used before (Renderer::remove_material)
 
 - **`enum AlphaClass`**
   how a material's alpha is drawn, and so the lists and pipelines its instances take (docs/RENDER3D.md "Listen je
-  Alpha-Modus"; Material::alpha_class).  glTF's BLEND is drawn opaque.  A third class (blended, sorted) may come
+  Alpha-Modus"; Material::alpha_class, MaterialDesc::alpha_class)
   - `Opaque` -- nothing is dropped: pipelines without a discard (the early depth test stays theirs)
   - `Mask` -- glTF's MASK: fragments whose alpha is below the cutoff are dropped
+  - `Blend` -- (G7f) glTF's BLEND (MaterialDesc::blend): drawn after the others, sorted back to front per instance, blended
+    (premultiplied alpha), the depth tested and not written; no shadows, not in the occlusion test's pyramid
 
 - **`struct MeshInfo`**
   where a mesh lies in the pools, and its bounding sphere in its own coordinates
@@ -21685,7 +21702,27 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`const fn textured(t: TextureRef) -> Material`**
   a dull material of a texture (white times the texture)
 - **`const fn alpha_class(&self) -> AlphaClass`**
-  the lists and pipelines its instances take: Mask with an alpha_cutoff, else Opaque
+  the lists and pipelines its instances take: Mask with an alpha_cutoff, else Opaque (blended: MaterialDesc)
+
+- **`struct MaterialDesc`**
+  (G7f) a material with what a Material cannot hold (it is not #[non_exhaustive], a field more would break code that
+  writes all of them): glTF's alpha mode BLEND and doubleSided.  Made with `new` (or `from` a Material) and changed field
+  by field (it may grow); Renderer::add_material_desc, set_material_desc.  Renderer::add_material(m) is
+  add_material_desc(&MaterialDesc::new(m))
+  - `material: Material`
+  - `blend: bool` -- glTF's BLEND: the instances are drawn after the opaque and MASK ones, sorted back to front per instance (by the
+    distance of their bounding sphere's centre from the eye), over what is there: the shader multiplies its colour by
+    the base colour's alpha (times the texture's), blended as premultiplied alpha (One, OneMinusSrcAlpha), in the
+    target's code values; the depth is tested, not written.  They cast no shadows and hide nothing from the occlusion
+    test.  Not together with an alpha_cutoff (Invalid)
+  - `double_sided: bool` -- glTF's doubleSided: back faces are not culled; they are lit with their normal turned round (the whole shading
+    normal, as the glTF sample viewer turns the tangent frame).  Both sides cast shadows (every material does)
+
+**`impl MaterialDesc`**
+
+- **`const fn new(material: Material) -> MaterialDesc`**
+- **`const fn alpha_class(&self) -> AlphaClass`**
+  the lists and pipelines its instances take: Blend when blended, else the Material's
 
 - **`struct Renderer`**
   the pipelines of one colour format, the mesh pools and the material table of one device
@@ -21715,6 +21752,17 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`fn add_mesh(&mut self, m: &MeshData) -> Result<MeshId>`**
   a mesh into the pools (they grow; nothing waits).  The vertices must be there in equal numbers, the
   indices in threes and in range, positions finite.
+- **`fn remove_mesh(&mut self, id: MeshId) -> Result<()>`**
+  (G7f) a mesh goes: its id is invalid from now on, its vertices and indices are used again (once the frames that may
+  still draw it are done, store.rs), its place gets the next mesh with a new id.  Invalid for a mesh the renderer does
+  not have, one that instances of a scene use (Scene::remove them first; a dropped scene uses nothing) and one that
+  another mesh takes as a detail level (set_lods of that one first).  Its own detail levels go with it.  A scene
+  prepared before the removal does not record (Invalid): it prepares again
+- **`fn mesh_count(&self) -> u32`**
+  (G7f) live meshes
+- **`fn pool_use(&self) -> [(u32, u32, u32); 3]`**
+  (G7f; tests, tools) per pool (vertices, 16-bit, 32-bit indices): elements up to its end, its room, and the free
+  elements below the end that removals left (ranges, handed out again before the end grows)
 - **`fn mesh_info(&self, id: MeshId) -> Option<MeshInfo>`**
 - **`fn set_lods(&mut self, mesh: MeshId, lods: &[Lod]) -> Result<()>`**
   (G5d) a mesh's detail levels: other meshes (or none) for its instances below a projected size, thresholds
@@ -21729,20 +21777,42 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   grown to hold its detail levels
 - **`fn add_texture(&mut self, d: &TextureData) -> Result<TextureId>`**
   a texture into the array of its size class with all its mip levels (texture.rs: resampled when it is
-  not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission
+  not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission.  (G7f) A layer a removed
+  texture left is used first
+- **`fn remove_texture(&mut self, id: TextureId) -> Result<()>`**
+  (G7f) a texture goes: its id is invalid from now on, its layer is used again by the next texture of its class and
+  colour space (the arrays do not shrink).  Invalid for a texture the renderer does not have and one that a material
+  names (set_material without it, or remove_material, first).  A scene prepared before the removal does not record
+  (Invalid): it prepares again
 - **`fn texture_info(&self, id: TextureId) -> Option<TextureInfo>`**
 - **`fn texture_count(&self) -> u32`**
+  live textures
 - **`fn texture_bytes(&self) -> u64`**
   bytes of GPU memory the texture arrays take
 - **`fn texture_array(&self, class: u32, srgb: bool) -> Option<&Texture>`**
   (tests) the array of a size class and colour space (layers: TextureInfo::layer), None without a texture
 - **`fn add_material(&mut self, m: &Material) -> Result<MaterialId>`**
   a row of the table; its textures must be this renderer's
+- **`fn add_material_desc(&mut self, d: &MaterialDesc) -> Result<MaterialId>`**
+  (G7f) a row of the table with glTF's BLEND and doubleSided (MaterialDesc); its textures must be this renderer's.
+  The first blended or double-sided material makes the pipelines they need
 - **`fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()>`**
   a row of the table; the next frame shows it.  A new alpha class moves the material's instances to the lists of
-  that class with their scenes' next prepare
+  that class with their scenes' next prepare.  (G7f) The material stays blended and double-sided as it was
+  (set_material_desc changes those)
+- **`fn set_material_desc(&mut self, id: MaterialId, d: &MaterialDesc) -> Result<()>`**
+  (G7f) a row of the table with glTF's BLEND and doubleSided; the next frame shows it.  A new alpha class or side
+  moves the material's instances to their new lists with their scenes' next prepare
+- **`fn remove_material(&mut self, id: MaterialId) -> Result<()>`**
+  (G7f) a material goes: its id is invalid from now on, its textures lose a user, its place gets the next material
+  with a new id.  Invalid for a material the renderer does not have and one that instances of a scene use.  A scene
+  prepared before the removal does not record (Invalid): it prepares again
+- **`fn material_count(&self) -> u32`**
+  (G7f) live materials
 - **`fn alpha_class(&self, id: MaterialId) -> AlphaClass`**
   the alpha class of a material (Opaque for one the renderer does not have)
+- **`fn double_sided(&self, id: MaterialId) -> bool`**
+  (G7f) a material is double-sided (false for one the renderer does not have)
 - **`fn set_size(&mut self, w: u32, h: u32) -> Result<()>`**
   a depth buffer the renderer keeps, for frames recorded with depth None (sampled too: the occlusion test builds
   its pyramid from it)
@@ -21854,8 +21924,8 @@ Source: [`lib/render3d/gltf.rs`](../lib/render3d/gltf.rs)
 gltf -- a jflib-gltf Document into a Renderer (G5b; docs/GLTF.md): each primitive as a mesh, each image as a
 texture (once per image, colour space and filter: base colour and emissive sRGB, the others linear), each
 material as a row, and the instances of a scene with their world matrices taken apart (gltf::decompose)
-for Scene::add.  What the engine cannot show yet is counted in notes: BLEND drawn opaque, double-sided
-materials drawn from the front, uv sets other than 0, world matrices with shear (drawn without it).
+for Scene::add.  (G7f) BLEND and doubleSided go through MaterialDesc.  What the engine cannot show yet is counted in
+notes: uv sets other than 0, world matrices with shear (drawn without it).
 
   let doc = ::gltf::load(&bytes, &mut |uri| read(dir, uri), &::gltf::Limits::DEFAULT)?;
   let imported = render3d::gltf::upload(&mut renderer, &doc, None)?;
@@ -21951,6 +22021,13 @@ slots through the scatter shader (a run of (slot, record) in the slot's own Uplo
 4096 changes and an eighth of the slots at once, a new origin, new capacities: everything, from a
 temporary buffer.  Queue::write_buffer would not do for this: its copies run ahead of the frame's
 commands without a barrier against the frames still on the GPU.
+
+(G7f) Removal (store.rs): a scene counts its instances per mesh and material and tells the renderer's shared table
+when it has the first or no longer any of one (and when it goes); lists belong to a mesh's slot, so a removed mesh's
+lists serve the next mesh in that slot.  Lists per side, class and faces: double-sided materials have lists of their
+own (drawn without culling).  Blended instances (class Blend) have lists for their mesh like the others, without room in
+the visible lists: the camera's culling puts them into one list for all of them (`blend`), sort.wgsl sorts it, one draw
+draws it (lib.rs draw_blend).
 ```
 
 - **`struct Transform`**
@@ -22036,12 +22113,17 @@ commands without a barrier against the frames still on the GPU.
   - `lists: bool` -- the lists' layout changed
   - `bytes: u64` -- everything prepare wrote for the GPU, view and lights included
 
+- **`struct ListKind`**
+  (G7f) what ListInfo cannot say (it is not #[non_exhaustive]): more about a list, in the order of Scene::lists
+  - `double_sided: bool` -- its instances' materials are double-sided: drawn without culling, back faces lit with their normal turned round
+
 - **`struct ListInfo`**
   a list of the scene
   - `mesh: MeshId`
   - `mirrored: bool` -- its instances are mirrored (drawn with clockwise front faces)
   - `class: AlphaClass` -- the alpha class of its instances' materials (drawn with or without a discard)
-  - `count: u32` -- the instances of this mesh, side and class, and the room for them in the visible list
+  - `count: u32` -- the instances of this mesh, side and class, and the room for them in the visible list (G7f: none for blended
+    instances, they go into the blended instances' list)
   - `capacity: u32`
   - `room: u32` -- (G5d) the instances that may land here: its own and those of meshes that take it as a detail level
   - `first: u32` -- its first place in the visible list
@@ -22123,6 +22205,15 @@ commands without a barrier against the frames still on the GPU.
 - **`fn lists(&self) -> Vec<ListInfo>`**
   the lists as the last prepare settled them, in order (list i is what list_of holds for its instances; its draw
   record: ListInfo::record)
+- **`fn list_kinds(&self) -> Vec<ListKind>`**
+  (G7f) more about the lists, in the order of lists(): double-sided or not
+- **`fn blend_buffer(&self) -> &Buffer`**
+  (G7f; tests, tools) the blended instances' list after a frame: a VkDrawIndirectCommand (vertices per instance, the
+  instances), then per instance 4 u32: the bits of !(distance squared from the eye; f32), its slot, the draw record of
+  its list (lists().record), the list's flags (1: 32-bit indices, 2: double-sided, 4: mirrored); sorted, farthest
+  first.  Its draw: blend_drawn()
+- **`fn blend_drawn(&self) -> bool`**
+  (G7f) the last prepare found blended instances that may be drawn (a list of them has room)
 - **`fn draws_buffer(&self) -> &Buffer`**
   (tests, tools) the camera's draw records after a frame's culling: 5 u32 per list at ListInfo::record,
   instance_count second
@@ -22222,6 +22313,11 @@ classes are powers of two.
 An array grows by doubling its layers: a new texture, the old layers copied through a buffer, the old one
 dropped once the GPU is done with it.  Uploads go through Queue::write_texture (staged before the next
 submission, after a barrier from Sampled: frames still reading the array finish first).
+
+(G7f) Removing a texture: its id becomes invalid (store.rs: a slot and a generation), its layer goes on its array's
+list of free layers and the next texture of that class and colour space takes it (the barrier from Sampled above is
+what makes that safe against frames in flight).  Refused while a material names it: each texture counts the material
+rows that do.
 ```
 
 ```rust
@@ -22240,7 +22336,7 @@ CLASS_MAX: u32 = CLASS_MIN << (CLASSES - 1)
   - `nearest: bool` -- it is drawn with a nearest filter: a resampling to its class keeps the texels (else bilinear)
 
 - **`struct TextureId(pub u32)`**
-  a texture of a Renderer
+  a texture of a Renderer.  (G7f) As MeshId: a place and how often it was used before (Renderer::remove_texture)
 
 - **`struct TextureInfo`**
   where a texture lies
