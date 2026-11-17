@@ -10,6 +10,9 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- `fs::fd_path(&File)`: a path that leads a program this one starts (QEMU given a disk file made
+  through a `Dir`) to the open file itself, whatever its name has become or was put in its
+  place. Linux `/proc/<pid>/fd/<n>`, valid while the file stays open; None on Windows and macOS.
 - `SysSettings::wheel_lines` and `wheel_chars`: what a notch of the wheel scrolls (Windows
   `SPI_GETWHEELSCROLLLINES`, `WHEEL_PAGE` for a page, and `SPI_GETWHEELSCROLLCHARS`; KDE's
   `[KDE] WheelScrollLines` of kdeglobals; 3 elsewhere), `wheel_amount`, the overrides
@@ -58,6 +61,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   again.
 - `a11y::Node::offset_at` walks the text once; char_rect for every offset counted from the start each time (quadratic: a screen reader's hit test on a long text box hung).
 - Windows: the backup of a file association's registry keys walks them with a list instead of recursion (keys nest up to 512 deep, each level held a 32 KB buffer on the stack).
+- `plat::date()` and `plat::unix_time_ns()` on Android: the system's clock (Bionic's CLOCK_REALTIME, UTC as on Linux) instead of the browser's host calendar, which no Android host sets -- every Android app saw 1970-01-01 00:00 UTC (found by plattest in AN0, docs/ANDROID.md)
 - Windows on ARM64: function pointers that plat looks up once (GetProcAddress: the drop functions of shell32, the pointer and touch functions of user32, Shell_NotifyIconW, GetDpiForMonitor) are published with Release and read with Acquire; with Relaxed another thread on a weakly ordered CPU could see the last of the three pointers of WM_DROPFILES before the first (docs/ARM64.md, ARM7). The cooperative Job of the browser and of Android hands its items' results to a thread that polls done() or items_done() (Release / Acquire)
 - Linux D-Bus: a message over 1 MiB, a big-endian one or one this reader cannot read is skipped; it closed the connection for good, so any client of the bus could cut off sleep, settings, IME and tray messages with a message of 2 MiB.
 - Linux: the agent control socket lives in $XDG_RUNTIME_DIR/jfgui-agent when that is set (another user could make /tmp/jfgui-agent-<uid> first and so block it); tools/jfgui-agent.py looks in both.
@@ -72,6 +76,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Security
 
+- Windows `fs::Dir` opens every entry relative to its folder's handle (`NtCreateFile` with `OBJECT_ATTRIBUTES.RootDirectory` and `FILE_OPEN_REPARSE_POINT`, one name at a time; a junction, symbolic link or other name surrogate on the way is refused, an entry that is no folder where one is expected too), renames to a name relative to the target folder's handle, removes through the entry's own handle and makes a link by setting its reparse data on the new entry (the same data `CreateSymbolicLinkW` writes; the privilege enabled for the thread alone when it is held but not enabled). What lies below an open folder is found through the handles, never through a path, and folders are no longer held open without `FILE_SHARE_DELETE`. A folder another program already held open with delete access could be renamed and replaced by a junction after the Dir opened it, and its entries were then named by a path through that junction.
+- Linux tray: `Activate`, `SecondaryActivate`, `ProvideXdgActivationToken` and the menu's clicks (dbusmenu `Event` / `EventGroup`) count only from the unique name that owns `org.kde.StatusNotifierWatcher` or an `org.kde.StatusNotifierHost-*` / `org.freedesktop.StatusNotifierHost-*` name (KDE: plasmashell; GNOME's AppIndicator extension: gnome-shell); a new sender waits until the bus said who owns those names (`ListNames`, `GetNameOwner`), and the bus's answers and `NameOwnerChanged` count only from `org.freedesktop.DBus`. Any client of the session bus could run the app's tray commands. A program of the same user that claims a host name still can (the session bus lets anyone own a free name); reading the item and its menu stays open.
 - Windows: dwmapi, crypt32, winmm, iphlpapi, bcrypt and avrt are loaded from System32 when first used instead of being imported by the program. A DLL of such a name beside the program (a setup in the download folder) was loaded in their place.
 - `screen::pick_test_point`, the colour picker's test aid, obeys `screen.capture` like the picker. It read screen pixels without the permission.
 - Linux `secret`: the plain copies of a secret in the messages it builds and reads are overwritten (the D-Bus connection overwrites every encoded message once written and the bytes it has read), and sealing no longer grows a copy of the value.

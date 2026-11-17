@@ -5,7 +5,9 @@
 //   plattest --test tray-bus   (Linux; tools/platshared/tray_bus.py starts it on a fake session
 //                              bus) a symbol with a menu and a notification; the fake bus clicks
 //                              the notification, activates the symbol and picks the menu row 2:
-//                              NoteClicked, Activate and Menu(2) must arrive within 10 s
+//                              NoteClicked, Activate and Menu(2) must arrive within 10 s; what
+//                              another client of the bus asks for (SecondaryActivate, row 1)
+//                              must not
 //   plattest --test tray-win   (Windows, by hand: the symbol appears for a moment) the real
 //                              Shell_NotifyIconW calls: add, update, remove
 
@@ -67,11 +69,14 @@ pub fn t_tray_bus(t: &mut T) {
     t.check(tray::tray_set(&sample()), "tray-bus: set");
     let id = tray::notify(&Note { title: String::from("Hallo"), body: String::from("vom Test"), icon: Some(TrayIcon { w: 2, h: 1, px: vec![0xFF00_00FF, 0x8000_FF00] }) });
     t.check(id != 0, "tray-bus: notify");
-    let got = wait_for(&[TrayEvent::NoteClicked(id), TrayEvent::Activate, TrayEvent::Menu(2)]);
+    let mut got = wait_for(&[TrayEvent::NoteClicked(id), TrayEvent::Activate, TrayEvent::Menu(2)]);
+    plat::sleep_ms(200);
+    got.extend(tray::tray_take());
     t.check(got.contains(&TrayEvent::NoteClicked(id)), "tray-bus: the notification was clicked");
     t.check(got.contains(&TrayEvent::Activate), "tray-bus: the symbol was activated");
     t.check(got.contains(&TrayEvent::Menu(2)), "tray-bus: menu row 2 was chosen");
     t.check(!got.iter().any(|e| matches!(e, TrayEvent::NoteClosed(_))), "tray-bus: a clicked notification is not reported closed");
+    t.check(!got.contains(&TrayEvent::SecondaryActivate) && !got.contains(&TrayEvent::Menu(1)), "tray-bus: what a client that does not show the symbol asks for is not done");
     tray::tray_remove();
     plat::sleep_ms(300); // the release of the name reaches the bus
     crate::out("tray-bus: done\n");

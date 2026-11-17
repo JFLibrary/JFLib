@@ -8,6 +8,11 @@
 //                                                    against its BLAKE3 on the tape; existing
 //                                                    files are not replaced
 //
+// DIR is taken as it is (made when missing); below it every folder is made and opened without
+// following a link (bc_fs::open_dir / open_parent), and the files, links, times and attributes
+// are written relative to those open folders -- as the server's restores -- so a link planted
+// in DIR, or a folder swapped for one meanwhile, does not lead the extract out of it.
+//
 // The tapes of a set may be given in any order; its parts are put together by their numbers.
 
 use alloc::collections::BTreeMap;
@@ -153,11 +158,12 @@ fn extract(files: &[String], to: &str, want: Option<String>, kit: Option<String>
         None
     };
     let win = cfg!(windows);
-    bc_fs::ensure_dir(to)?;
+    let root = Some(to);
+    bc_fs::open_dir(root, to, true)?;
     let (mut written, mut skipped, mut bad, mut bytes) = (0u64, 0u64, 0u64, 0u64);
     let mut dirs: Vec<(String, bt::Entry)> = Vec::new();
-    // the file being written: entry, temp, final name, file, hash
-    let mut cur: Option<(bt::Entry, String, String, plat::File, crypto::blake3::Blake3)> = None;
+    // the file being written: entry, temp name, final path, file, hash, its open folder
+    let mut cur: Option<(bt::Entry, String, String, plat::File, crypto::blake3::Blake3, bc_fs::Dir)> = None;
     for (p, (file, at)) in &s.parts {
         let tape = bt::Tape::open(file, false)?;
         let b = tape.read(*at)?.ok_or("Satzanfang fehlt")?;
@@ -176,9 +182,9 @@ fn extract(files: &[String], to: &str, want: Option<String>, kit: Option<String>
             match b.kind {
                 bt::K_ENTRY => {
                     let e = j::parse(&plain).and_then(|v| bt::Entry::from_json(&v)).ok_or("unlesbarer Eintrag")?;
-                    if let Some((_, tmp, _, f, _)) = cur.take() {
+                    if let Some((_, tmp, _, f, _, d)) = cur.take() {
                         drop(f);
-                        plat::delete(&tmp);
+                        d.remove(&tmp);
                     }
                     let full = bt::full_path(&h.roots, &e, h.windows);
                     let names = parts_of(&full);
@@ -192,25 +198,23 @@ fn extract(files: &[String], to: &str, want: Option<String>, kit: Option<String>
                     }
                     match e.k.as_str() {
                         "dir" => {
-                            bc_fs::ensure_dir(&dest)?;
+                            bc_fs::open_dir(root, &dest, true)?;
                             dirs.push((dest, e));
                         }
                         "file" => {
-                            let parent = plat::fs::parent(&dest);
-                            if !parent.is_empty() {
-                                bc_fs::ensure_dir(parent)?;
-                            }
-                            if plat::fs::lstat(&dest).is_some() {
+                            let (d, name) = bc_fs::open_parent(root, &dest, true)?;
+                            if d.lstat(&name).is_some() {
                                 skipped += 1;
                                 continue;
                             }
-                            let tmp = bc_fs::temp_name(&dest);
-                            let f = plat::File::create_new(&plat::fs::long_path(&tmp)).ok_or_else(|| format!("{}: kann nicht geschrieben werden", dest))?;
-                            cur = Some((e, tmp, dest, f, crypto::blake3::Blake3::new()));
+                            let tmp = bc_fs::temp_name(&name);
+                            let f = d.create_new(&tmp).ok_or_else(|| format!("{}: kann nicht geschrieben werden", dest))?;
+                            cur = Some((e, tmp, dest, f, crypto::blake3::Blake3::new(), d));
                         }
                         "link" => {
-                            if plat::fs::lstat(&dest).is_none() {
-                                if let Err(x) = bc_fs::make_link(&e.link, &dest, false, e.attrs & bc_fs::ATTR_DIRECTORY != 0) {
+                            let (d, name) = bc_fs::open_parent(root, &dest, true)?;
+                            if d.lstat(&name).is_none() {
+                                if let Err(x) = bc_fs::make_link_in(&d, &e.link, &name, false, e.attrs & bc_fs::ATTR_DIRECTORY != 0) {
                                     eprint(&format!("{}: {}\n", dest, x));
                                 }
                             }
@@ -220,7 +224,7 @@ fn extract(files: &[String], to: &str, want: Option<String>, kit: Option<String>
                 }
                 bt::K_DATA => {
                     let (i, off, data) = bt::parse_data(&plain).ok_or("unlesbarer Datenblock")?;
-                    if let Some((e, _, dest, f, hash)) = &mut cur {
+                    if let Some((e, _, dest, f, hash, _)) = &mut cur {
                         if e.i == i {
                             if f.write_at(off, data) != Some(data.len()) {
                                 return Err(format!("{}: Schreibfehler (Speicher voll?)", dest));
@@ -232,14 +236,14 @@ fn extract(files: &[String], to: &str, want: Option<String>, kit: Option<String>
                 }
                 bt::K_FILE_END => {
                     let fe = j::parse(&plain).and_then(|v| bt::FileEnd::from_json(&v)).ok_or("unlesbares Dateiende")?;
-                    if let Some((e, tmp, dest, f, hash)) = cur.take() {
+                    if let Some((e, tmp, dest, f, hash, d)) = cur.take() {
                         if e.i != fe.i || fe.hash.is_empty() || crypto::hex(&hash.finalize()) != fe.hash {
                             drop(f);
-                            plat::delete(&tmp);
+                            d.remove(&tmp);
                             eprint(&format!("{}: die Daten auf dem Band weichen ab\n", dest));
                             bad += 1;
                         } else {
-                            bc_fs::finish_file(f, &tmp, &dest, e.atime, e.mtime, e.mode, e.attrs)?;
+                            bc_fs::finish_file_in(f, &d, &tmp, bc_fs::file_name(&dest), e.atime, e.mtime, e.mode, e.attrs).map_err(|x| format!("{}: {}", dest, x))?;
                             written += 1;
                         }
                     }
@@ -249,8 +253,15 @@ fn extract(files: &[String], to: &str, want: Option<String>, kit: Option<String>
             }
         }
     }
-    for (d, e) in dirs.iter().rev() {
-        bc_fs::apply_meta(d, e.atime, e.mtime, e.mode, 0);
+    // the folders' times last (their files changed them), through the open folders
+    if let Some((_, tmp, _, f, _, d)) = cur.take() {
+        drop(f);
+        d.remove(&tmp);
+    }
+    for (path, e) in dirs.iter().rev() {
+        if let Ok(d) = bc_fs::open_dir(root, path, false) {
+            bc_fs::apply_meta_in(&d, "", e.atime, e.mtime, e.mode, 0);
+        }
     }
     let msg = format!("{} Dateien ({}) nach {} geschrieben, {} vorhandene übersprungen", written, size(bytes), to, skipped);
     if bad > 0 {

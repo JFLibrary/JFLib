@@ -497,12 +497,32 @@ pub fn setenv(name: &str, value: Option<&str>) -> bool {
     true
 }
 /// Host-supplied UTC calendar, updated independently from the monotonic clock.
-#[cfg(not(target_os = "ios"))]
+#[cfg(target_arch = "wasm32")]
 pub fn date() -> (Date, bool) {
     (*CALENDAR.lock(), true)
 }
+/// (Android) the date and time in UTC from the system's clock, as on Linux; the flag is true (UTC).
+/// The calendar jfgui_date sets is the browser's: no Android host calls it.
+#[cfg(target_os = "android")]
+pub fn date() -> (Date, bool) {
+    (crate::utc_date(unix_time_ns()), true)
+}
+/// (Android) wall-clock time: nanoseconds since 1970-01-01 00:00 UTC (Bionic's CLOCK_REALTIME)
+#[cfg(target_os = "android")]
+pub fn unix_time_ns() -> i64 {
+    #[link(name = "c")]
+    unsafe extern "C" {
+        fn clock_gettime(clock: i32, ts: *mut [i64; 2]) -> i32;
+    }
+    let mut ts = [0i64; 2]; // struct timespec on arm64-v8a and x86_64: tv_sec, tv_nsec
+    // SAFETY: CLOCK_REALTIME (0) into a struct timespec of 16 bytes.
+    if unsafe { clock_gettime(0, &mut ts) } != 0 {
+        return 0;
+    }
+    ts[0].wrapping_mul(1_000_000_000).wrapping_add(ts[1])
+}
 /// Wall-clock time from the host calendar: nanoseconds since 1970-01-01 00:00 UTC.
-#[cfg(not(target_os = "ios"))]
+#[cfg(target_arch = "wasm32")]
 pub fn unix_time_ns() -> i64 {
     let d = *CALENDAR.lock();
     let (y, m) = (d.year as i64, d.month as i64);

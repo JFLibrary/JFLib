@@ -12,6 +12,14 @@ activates the symbol, clicks the menu row "Beenden" (Event clicked) and clicks t
 notification (a NotificationClosed from another client, which must not count, then the
 server's ActionInvoked and NotificationClosed).  plattest must see NoteClicked, Activate
 and Menu(2); the fake checks what it was told.  Exit code 0 = passed.
+
+Who may act on the item, twice: "kde" -- the watcher's owner (:1.5, kded) is not the panel, the
+panel (:1.7, plasmashell) owns org.kde.StatusNotifierHost-77 -- and "gnome" -- the panel owns the
+watcher itself (gnome-shell with the AppIndicator extension).  Before the panel, another client
+(:1.66) sends a NameOwnerChanged of its own naming itself the watcher, then SecondaryActivate,
+a click on the row "Öffnen" and an activation token; it answers plattest's ListNames with a
+forged reply naming an org.kde.StatusNotifierHost-evil.  None of it may count: plattest must
+not see SecondaryActivate or Menu(1), and must not ask who owns the forged host name.
 """
 import argparse, os, socket, subprocess, sys, tempfile, threading
 from pathlib import Path
@@ -29,7 +37,13 @@ def check(name, ok, info=""):
     return ok
 
 
-def serve(path, rec):
+WATCHER = "org.kde.StatusNotifierWatcher"
+HOST = "org.kde.StatusNotifierHost-77"
+EVIL_HOST = "org.kde.StatusNotifierHost-evil"
+PANEL, KDED, EVIL = ":1.7", ":1.5", ":1.66"
+
+
+def serve(path, rec, mode="kde"):
     srv = listen_unix(path, 1)
     srv.settimeout(20)
     try:
@@ -60,9 +74,21 @@ def serve(path, rec):
     def reply(m, sig="", body=b"", sender="org.freedesktop.DBus"):
         send(2, [(5, "u", m["serial"]), (6, "s", ":1.42"), (7, "s", sender)], sig, body)
 
-    def ask(path, iface, member, sig="", body=b"", what=None):
-        s = send(1, [(1, "o", path), (2, "s", iface), (3, "s", member), (6, "s", ":1.42"), (7, "s", ":1.7")], sig, body)
+    def error(m, name):
+        send(3, [(4, "s", name), (5, "u", m["serial"]), (6, "s", ":1.42"), (7, "s", "org.freedesktop.DBus")])
+
+    def ask(path, iface, member, sig="", body=b"", what=None, sender=PANEL):
+        s = send(1, [(1, "o", path), (2, "s", iface), (3, "s", member), (6, "s", ":1.42"), (7, "s", sender)], sig, body)
         calls[s] = what or member
+
+    def attack():
+        # another client of the bus: a NameOwnerChanged of its own (unicast, past the match rule)
+        # naming itself the watcher, then the calls a panel would make
+        send(4, [(1, "o", "/org/freedesktop/DBus"), (2, "s", "org.freedesktop.DBus"), (3, "s", "NameOwnerChanged"),
+                 (6, "s", ":1.42"), (7, "s", EVIL)], "sss", W().all("sss", [WATCHER, KDED, EVIL]))
+        ask("/StatusNotifierItem", "org.kde.StatusNotifierItem", "SecondaryActivate", "ii", W().all("ii", [1, 2]), "attack", EVIL)
+        ask("/MenuBar", "com.canonical.dbusmenu", "Event", "isvu", W().all("isvu", [1, "clicked", ("i", 0), 0]), "attack", EVIL)
+        ask("/StatusNotifierItem", "org.kde.StatusNotifierItem", "ProvideXdgActivationToken", "s", W().all("s", ["evil-token"]), "attack", EVIL)
 
     while True:
         m, buf = parse(buf)
@@ -85,16 +111,29 @@ def serve(path, rec):
             elif member in ("AddMatch",):
                 rec.setdefault("matches", []).append(body[0])
                 reply(m)
-            elif member == "NameHasOwner":
-                # the watcher runs (this fake plays it): the symbol is supported
+            elif member == "GetNameOwner":
+                # the watcher runs (this fake plays it): the symbol is supported; KDE: kded owns
+                # it and plasmashell a host name, GNOME: the panel owns the watcher
                 rec.setdefault("has_owner", []).append(body[0])
-                reply(m, "b", W().all("b", [body[0] == "org.kde.StatusNotifierWatcher"]))
+                owner = {WATCHER: KDED if mode == "kde" else PANEL, HOST: PANEL, EVIL_HOST: EVIL}.get(body[0])
+                if owner and (body[0] != HOST or mode == "kde"):
+                    reply(m, "s", W().all("s", [owner]))
+                else:
+                    error(m, "org.freedesktop.DBus.Error.NameHasNoOwner")
+            elif member == "ListNames":
+                rec["list_names"] = rec.get("list_names", 0) + 1
+                # a forged answer first (from another client, with the serial of the call)
+                reply(m, "as", W().all("as", [[EVIL_HOST]]), sender=EVIL)
+                names = ["org.freedesktop.DBus", ":1.42", KDED, PANEL, EVIL, WATCHER, "org.freedesktop.Notifications",
+                         "org.kde.StatusNotifierHostile", "org.kde.plasmashell"] + ([HOST] if mode == "kde" else [])
+                reply(m, "as", W().all("as", [names]))
             elif member in ("RequestName", "ReleaseName"):
                 rec[member] = body[0]
                 reply(m, "u", W().all("u", [1]))
             elif member == "RegisterStatusNotifierItem":
                 rec["registered"] = body[0]
                 reply(m)
+                attack()
                 # the panel looks at the item
                 ask("/StatusNotifierItem", "org.freedesktop.DBus.Properties", "GetAll", "s",
                     W().all("s", ["org.kde.StatusNotifierItem"]))
@@ -114,6 +153,8 @@ def serve(path, rec):
                 reply(m)
         elif m["type"] in (2, 3):
             what = calls.pop(fl.get(5, 0), None)
+            if what == "attack":
+                continue
             if m["type"] == 3:
                 rec.setdefault("errors", []).append((what, fl.get(4)))
                 continue
@@ -134,21 +175,30 @@ def serve(path, rec):
             rec.setdefault("signals", []).append(member)
 
 
+def run(exe, mode):
+    rec = {}
+    with tempfile.TemporaryDirectory() as d:
+        sock = os.path.join(d, "bus")
+        t = threading.Thread(target=serve, args=(listen_unix(sock, 1), rec, mode), daemon=True)
+        t.start()
+        env = dict(os.environ, DBUS_SESSION_BUS_ADDRESS=f"unix:path={sock}")
+        r = subprocess.run([str(exe), "--test", "tray-bus"], env=env, capture_output=True, text=True, timeout=60)
+        t.join(5)
+    print(f"-- {mode}")
+    print(r.stdout.strip())
+    check(f"{mode}: plattest --test tray-bus passed", r.returncode == 0, r.stderr.strip())
+    check(f"{mode}: who owns the host names asked once (ListNames), the forged host name never",
+          rec.get("list_names") == 1 and EVIL_HOST not in rec.get("has_owner", []), rec)
+    return rec
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rs", default="build")
     a = ap.parse_args()
     exe = Path(a.rs) / "linux" / "plattest"
-    rec = {}
-    with tempfile.TemporaryDirectory() as d:
-        sock = os.path.join(d, "bus")
-        t = threading.Thread(target=serve, args=(listen_unix(sock, 1), rec), daemon=True)
-        t.start()
-        env = dict(os.environ, DBUS_SESSION_BUS_ADDRESS=f"unix:path={sock}")
-        r = subprocess.run([str(exe), "--test", "tray-bus"], env=env, capture_output=True, text=True, timeout=60)
-        t.join(5)
-    print(r.stdout.strip())
-    check("plattest --test tray-bus passed", r.returncode == 0, r.stderr.strip())
+    run(exe, "gnome")
+    rec = run(exe, "kde")
     check("SASL EXTERNAL", rec.get("auth"), rec)
     check("matches for notifications and the watcher",
           any("org.freedesktop.Notifications" in x for x in rec.get("matches", []))

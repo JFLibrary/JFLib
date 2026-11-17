@@ -16,6 +16,12 @@
 #[cfg(target_os = "linux")]
 pub use lx::t_pen;
 
+/// Android: the pens go through the app's host (apps/androidGallery/tests/android_touch.py)
+#[cfg(target_os = "android")]
+pub fn t_pen(t: &mut crate::T) {
+    t.info("pen: Android's pens through the app's host: apps/androidGallery/tests/android_touch.py\n");
+}
+
 /// macOS and iOS: no pen path before the window backends (docs/APPLE.md AP4, AP5)
 #[cfg(target_vendor = "apple")]
 pub fn t_pen(t: &mut crate::T) {

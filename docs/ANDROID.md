@@ -1,7 +1,8 @@
 # Android-Plan: Android so weit wie Windows, Linux und Apple
 
-Stand 2026-11-17, auf Basis von `main` 7cdabce4. Umgesetzt ist noch nichts, die Aufwände sind geschätzt. Der Plan
-wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen und `plat` auf Linux ARM64 ohne libc.
+Stand 2026-11-17, auf Basis von `main` 7cdabce4. AN0 ist umgesetzt (auf dem Emulator; das A56 steht aus), der Rest
+nicht; die Aufwände sind geschätzt. Der Plan wartete auf ARM1 bis ARM3 ([ARM64.md](ARM64.md)): die Kernel-Tabellen
+und `plat` auf Linux ARM64 ohne libc.
 
 ## Ziel
 
@@ -115,6 +116,127 @@ Größe: S klein, M mittel, L groß, nur relativ zueinander.
 **Fertig, wenn:** der heute auf Android lauffähige Teil von `coretest` per `adb shell` und im Test-APK läuft, auf
 dem Emulator (x86-64, API 35) und auf dem A56, und die Syscall-Liste die Kandidaten für Ärger nennt.
 
+**Stand 2026-11-17:** umgesetzt und auf dem Emulator grün; das A56 war nicht dran (nur auf Zuruf).
+
+- `coretest`, `plattest` und `asynctest` haben `android` in `TARGETS`. `build_rs.py app NAME --target android` baut
+  ein Programm ohne Oberfläche (`build_exe`; das gilt jetzt auch für Apps mit `ui`, aber ohne
+  `android/AndroidManifest.xml`) und daneben sein Test-APK `NAME-<abi>-console.apk` (`build_console_apk` in
+  `tools/android.py`): `android/exe_main.c` mit `-DJFGUI_CONSOLE_APK` als `libjfgui_console.so`, gestartet von
+  [`ConsoleInstrumentation.java`](../tools/android_console/ConsoleInstrumentation.java) (Paket
+  `org.jflib.console.NAME`, keine Activity, debuggable, Debug-Schlüssel) auf einem eigenen Thread mit 8 MiB Stack.
+  Die Ausgabe geht nach `files/console.txt` (sie übersteht ein SIGSYS), danach nach logcat (Tag `jfgui-console`), der
+  Exit-Code als letzte Zeile `exit=N`. Die erste Zeile nennt SELinux-Kontext und seccomp-Modus.
+- Der Läufer [`tools/android_console.py`](../tools/android_console.py) `APP [--mode shell|app|both] [-- ARGS]`:
+  `adb shell` in `/data/local/tmp/jfgui_APP/`, dann das APK über `am instrument`, die Ausgabe über `run-as`,
+  danach deinstalliert. Ein App-Lauf außerhalb von `untrusted_app` oder ohne seccomp-Filter zählt als Fehler. Auf
+  einem Gerät, das kein Emulator ist, installiert er das APK nur mit `--allow-install` (das geht über
+  `/data/local/tmp` hinaus). `--file` legt Dateien an die Wurzel der App-Dateien (`files/fs/`), `--dir` leere Ordner.
+  `build_rs.py test` nimmt mit `jfgui_TEST_ANDROID=SERIAL` `coretest` und `asynctest` (`tasks.uis`) mit.
+- Was Android fehlt, meldet sich per `cfg` als „not on Android yet“ (fs, net, sync, Threads: AN1 bis AN3) oder als
+  „not on Android“ mit Verweis auf [Bewusst nicht](#bewusst-nicht) (Kindprozesse, Autostart, Dateizuordnungen).
+  `coretest` lässt dafür `datastore`, `netio` und `cas` auf Android weg
+  (`[target.'cfg(not(target_os = "android"))'.dependencies]`; `derived_workspace` und `program_manifest_lint` in
+  `build_rs.py` kennen solche Abschnitte jetzt).
+- `ui::launch` nimmt auf Android wie auf iOS den Headless-Weg des Desktops für `--shot`, `--script` und die
+  Agent-Protokolle; so laufen die Skripte von `asynctest` im Programm ohne Oberfläche (AN1 braucht sie im Test-APK).
+  Das kostet jedes APK etwa 290 KB (die `androidGallery` als Debug-Build 5,97 statt 6,25 MB); ein Feature oder
+  eine `cfg` nur für Test-Builds wäre die Alternative (Offene Fragen, 6). `rt::kernel` gibt es auch auf
+  Android (nur die Tabelle, ohne die Helfer von `rt::os`). `exe_main.c` antwortet für den Klang „kein Gerät“.
+- `android_files.rs` braucht `jfgui_ANDROID_FILES` und `jfgui_ANDROID_CACHE`; Läufer und Test-APK setzen sie wie
+  `GalleryActivity`.
+
+| Lauf (Emulator x86-64, API 35) | `adb shell` | App (`untrusted_app`, seccomp 2) |
+|---|---|---|
+| `coretest` | 3267 von 3267 Prüfungen (nach dem Merge von `origin/main`) | 3267 von 3267 |
+| `plattest --test all` | 183 bestanden, 1 Fehler (Fund 2) | dasselbe |
+| `asynctest --script tasks.uis`, `copy.uis` | grün | grün |
+| `plattest --test syscalls` | 126 von 126 erreichen den Kernel | 96 erreichen den Kernel, 30 enden mit SIGSYS |
+
+Funde von `plattest` (Fehler der Bibliothek auf Android):
+
+1. **Behoben: `plat::date()` und `plat::unix_time_ns()` lieferten immer 1970-01-01.** Der Kalender kam aus
+   `jfgui_date` ([`web.rs`](../lib/plat/web.rs)), und das ruft nur der Browser-Host (`web/worker.js`), weder
+   `bridge.c` noch der Java-Host. Das traf jede Android-App (Uhrzeit, Dateizeiten, Logs, in AN2 die Gültigkeit von
+   Zertifikaten). Jetzt nimmt Android die Uhr des Systems (Bionics `CLOCK_REALTIME`), UTC wie Linux; die
+   Umrechnung teilen sich Linux, Apple und Android (`utc_date` in `plat`). Die Zone bleibt Sache von AN3.
+2. **Offen: `plat::mkdir` über einer vorhandenen Datei meldet Erfolg.** `mkdirs` in
+   [`android_files.rs`](../lib/plat/android_files.rs) nimmt EEXIST auch hin, wenn der Name eine Datei ist.
+3. `plat::cpu_brand()` ist leer (rt nimmt auf Android den portablen CPU-Code); die Quelle wäre `/proc/cpuinfo`.
+   `plattest` meldet das als „not on Android yet“, ebenso `mem_total()` (AN1).
+
+**Syscalls.** Alle Aufrufe von `rt` ([`os.rs`](../lib/rt/os.rs)) und den Linux-Modulen von `plat`
+([`net.rs`](../lib/plat/net.rs), [`fs.rs`](../lib/plat/fs.rs), [`sync.rs`](../lib/plat/sync.rs),
+[`watch.rs`](../lib/plat/watch.rs)), geprüft mit `plattest --test syscalls`: jeder Aufruf der Tabelle aus
+[`rt/kernel.rs`](../lib/rt/kernel.rs) in einem eigenen Kindprozess (`fork`), mit Argumenten, die nichts tun können
+(ein falscher Deskriptor, ein Null-Zeiger, abgelehnte Flags). Die Spalten nennen die Antwort des Kernels oder
+**SIGSYS** (vom Filter beendet). Geprüft nur auf x86-64 (Emulator, API 35); arm64 hat andere Nummern und eine eigene
+Liste des Filters, das zeigt erst der Lauf auf dem A56. AOSP-Listen wurden nicht heruntergeladen.
+
+| Syscall | x86-64 | arm64 | benutzt von | `adb shell` | App |
+|---|---|---|---|---|---|
+| `read` | 0 | 63 | watch | EBADF | EBADF |
+| `write` | 1 | 64 | fs, rt | EBADF | EBADF |
+| `close` | 3 | 57 | fs, net, watch | EBADF | EBADF |
+| `fstat` | 5 | 80 | fs | EBADF | EBADF |
+| `mmap` | 9 | 222 | rt | EINVAL | EINVAL |
+| `munmap` | 11 | 215 | rt | EINVAL | EINVAL |
+| `ioctl` | 16 | 29 | net | EBADF | EBADF |
+| `sched_yield` | 24 | 124 | rt | ok | ok |
+| `madvise` | 28 | 233 | rt | EINVAL | EINVAL |
+| `socket` | 41 | 198 | net | EINVAL | EINVAL |
+| `connect` | 42 | 203 | net | EBADF | EBADF |
+| `sendto` | 44 | 206 | net | EFAULT | EFAULT |
+| `recvfrom` | 45 | 207 | net | EFAULT | EFAULT |
+| `shutdown` | 48 | 210 | net | EBADF | EBADF |
+| `bind` | 49 | 200 | net | EBADF | EBADF |
+| `listen` | 50 | 201 | net | EBADF | EBADF |
+| `getsockname` | 51 | 204 | net | EBADF | EBADF |
+| `getpeername` | 52 | 205 | net | EBADF | EBADF |
+| `setsockopt` | 54 | 208 | net | EINVAL | EINVAL |
+| `getsockopt` | 55 | 209 | net | EBADF | EBADF |
+| `clone` | 56 | 220 | rt | EINVAL | EINVAL |
+| `fcntl` | 72 | 25 | net, rt | EBADF | EBADF |
+| `fsync` | 74 | 82 | fs | EBADF | EBADF |
+| `fchmod` | 91 | 52 | fs | EBADF | EBADF |
+| `geteuid` | 107 | 175 | fs | ok | ok |
+| `statfs` | 137 | 43 | fs | EFAULT | EFAULT |
+| `futex` | 202 | 98 | sync | EFAULT | EFAULT |
+| `getdents64` | 217 | 61 | fs | EBADF | EBADF |
+| `exit_group` | 231 | 94 | rt | ok | ok |
+| `inotify_add_watch` | 254 | 27 | watch | EINVAL | EINVAL |
+| `inotify_rm_watch` | 255 | 28 | watch | EBADF | EBADF |
+| `openat` | 257 | 56 | fs | EFAULT | EFAULT |
+| `mkdirat` | 258 | 34 | fs | EFAULT | EFAULT |
+| `fchownat` | 260 | 54 | fs | EINVAL | EINVAL |
+| `newfstatat` | 262 | 79 | fs | EINVAL | EINVAL |
+| `unlinkat` | 263 | 35 | fs | EINVAL | EINVAL |
+| `renameat` | 264 | 38 | fs, rt | EFAULT | EFAULT |
+| `linkat` | 265 | 37 | fs | EINVAL | EINVAL |
+| `symlinkat` | 266 | 36 | fs | EFAULT | EFAULT |
+| `readlinkat` | 267 | 78 | fs | EINVAL | EINVAL |
+| `fchmodat` | 268 | 53 | fs | EFAULT | EFAULT |
+| `ppoll` | 271 | 73 | rt | EFAULT | EFAULT |
+| `utimensat` | 280 | 88 | fs | EFAULT | EFAULT |
+| `accept4` | 288 | 242 | net | EBADF | EBADF |
+| `dup3` | 292 | 24 | rt | EINVAL | EINVAL |
+| `inotify_init1` | 294 | 26 | watch | EINVAL | EINVAL |
+| `renameat2` | 316 | 276 | fs, rt | EINVAL | EINVAL |
+| `openat2` | 437 | 437 | fs | EFAULT | **SIGSYS** |
+
+- **Kandidat für Ärger: `openat2`.** `fs.rs` öffnet damit unter einem offenen Ordner ohne Links auf dem Weg
+  (`plat::fs::Dir`); im App-Prozess endet der Aufruf mit SIGSYS. AN3 braucht auf Android einen Weg ohne `openat2`
+  (etwa `openat` Schritt für Schritt mit `O_NOFOLLOW`). `renameat2` erreicht den Kernel.
+- Die übrigen 29 Treffer des Filters stammen aus Linux-Modulen, die auf Android nicht laufen: SysV-Shared-Memory der
+  X11-Ausgabe (`shmget`, `shmat`, `shmctl`, `shmdt`) und die Sperrliste der Sandbox in `linux_sandbox.rs` (`chroot`,
+  `mount`, `umount2`, `init_module`, `delete_module`, `kexec_load`, `add_key`, `request_key`, `keyctl`,
+  `open_by_handle_at`, `finit_module`, `kexec_file_load`, `io_uring_setup`, `io_uring_enter`, `io_uring_register`,
+  `open_tree`, `move_mount`, `fsopen`, `fsconfig`, `fsmount`, `fspick`, `mount_setattr`, `landlock_create_ruleset`,
+  `landlock_add_rule`, `landlock_restrict_self`). Die anderen 96 Aufrufe der Tabelle erreichen den Kernel, darunter
+  `clone`, `execve`, `ptrace`, `bpf`, `seccomp`, `unshare` und `memfd_create`, aus der Sperrliste auch `clone3` und
+  `pidfd_getfd`. `rt_sigreturn` prüft die Probe nicht (Bionic braucht ihn für jeden Signal-Handler).
+- EACCES oder EPERM kämen von SELinux oder fehlenden Rechten, nicht vom Filter: Ohne `INTERNET` scheitert `socket()`
+  mit EACCES. Die Probe gibt ungültige Argumente und sieht nur den Filter.
+
 ### AN1: Threads, Pool, Wecken (M)
 
 - `thread_spawn`, `Thread::join` und `Sem` über Bionic (`pthread_create`, Futex), nach `android_gpu.rs` und
@@ -217,8 +339,8 @@ Fassade). AN4 braucht AN3 für die Schriften des Systems.
 - **`adb shell` ist nicht die App.** Andere SELinux-Domäne, kein seccomp-Filter. Was dort grün ist, kann im APK
   scheitern (Entscheidung 3).
 - **seccomp beendet statt abzulehnen.** Ein Syscall außerhalb der erlaubten Liste beendet die App mit SIGSYS,
-  ohne `ENOSYS` zum Ausweichen. Kandidaten aus dem Linux-Code: `openat2` (in `fs.rs`), `renameat2`, sonst alles,
-  was Bionic selbst nicht aufruft (AN0).
+  ohne `ENOSYS` zum Ausweichen. Aus den Modulen, die Android bekommen soll, trifft es `openat2` (in `fs.rs`);
+  `renameat2` geht (AN0, Tabelle dort; arm64 noch offen).
 - **Threads nur über `pthread_create`.** Ein eigener `clone` hat keinen TLS-Block von Bionic.
 - **fdsan** (ab Android 10) beendet die App, wenn sie einen Dateideskriptor schließt, der einem anderen gehört.
   Nur eigene Deskriptoren schließen.
@@ -266,3 +388,6 @@ Finger oder Zeiger des Nutzers.
    Vorschlag: nein, `process` bleibt `Unsupported`.
 4. **Zertifikate vom Nutzer** (etwa eine Firmen-CA) über die KeyChain von Android? Vorschlag: nein (Entscheidung 6).
 5. **`MIN_API` 26** (Android 8.0) beibehalten? Vorschlag: ja (Entscheidung 7).
+6. **Der Headless-Weg in jedem APK?** Seit AN0 linkt `ui::launch` auf Android den Script-Läufer des Desktops mit
+   (etwa 290 KB), wie auf iOS. Vorschlag: so lassen, solange niemand die Größe vermisst; sonst ein Feature von
+   `ui`, das nur die Test-Builds einschalten.

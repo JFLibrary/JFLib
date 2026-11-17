@@ -19,6 +19,9 @@
 //   python build_rs.py app coretest
 //   build/win/coretest.exe [--only NAME] [--bench] [--vectors FILE]  (FILE: tools/crypto_check.py)
 //   (build_rs.py test runs it through tests/all.uis; --script is ignored)
+//   Android (docs/ANDROID.md, AN0): a program without a UI, python tools/android_console.py coretest;
+//   the groups and parts that need what plat lacks there so far (fs, net, sync, threads: AN1 to
+//   AN3) say "not on Android yet" instead
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -28,25 +31,33 @@ extern crate alloc;
 use alloc::format;
 use alloc::string::String;
 
+#[cfg(not(target_os = "android"))]
 mod cast;
 mod crypto;
 mod dhcpt;
 mod dnsmsgt;
+#[cfg(not(target_os = "android"))]
 mod dnst;
 mod dt;
+#[cfg(not(target_os = "android"))]
 mod httpt;
 mod jmapt;
 mod lz;
 mod metricst;
 mod netpktt;
 mod ntpt;
+#[cfg(not(target_os = "android"))]
 mod platx;
 mod rngt;
+#[cfg(not(target_os = "android"))]
 mod sshd;
+#[cfg(not(target_os = "android"))]
 mod store;
+#[cfg(not(target_os = "android"))]
 mod tlst;
 mod sshcoret;
 mod cookiet;
+#[cfg(not(target_os = "android"))]
 mod tlscoret;
 mod snmpv3t;
 mod cmdtreet;
@@ -67,6 +78,21 @@ mod radiust;
 mod patternt;
 mod eapt;
 mod imapt;
+
+/// a group that needs what plat lacks on Android so far: fs, net, sync, threads (docs/ANDROID.md,
+/// AN1 to AN3) -> (name, None) there
+#[cfg(not(target_os = "android"))]
+macro_rules! native {
+    ($name:literal, $f:path) => {
+        ($name, Some($f as fn(&mut T)))
+    };
+}
+#[cfg(target_os = "android")]
+macro_rules! native {
+    ($name:literal, $f:path) => {
+        ($name, None)
+    };
+}
 
 /// the result collector of a check group
 pub struct T {
@@ -91,6 +117,10 @@ impl T {
             self.failed += 1;
             plat::write_stdout(format!("FAIL {}: {}: got {:?}, want {:?}\n", self.group, name, got, want).as_bytes());
         }
+    }    /// (Android) a part of the group that needs what plat lacks there so far (docs/ANDROID.md)
+    #[cfg(target_os = "android")]
+    pub fn later(&self, what: &str) {
+        plat::write_stdout(format!("SKIP {}: {}: not on Android yet\n", self.group, what).as_bytes());
     }
 }
 
@@ -119,81 +149,59 @@ fn run() -> i32 {
             _ => 2,
         };
     }
-    if let Some(d) = plat::arg_value("--tls-pki") {
-        return tlst::write_pki(&d);
+    #[cfg(not(target_os = "android"))]
+    if let Some(code) = server_modes(&args) {
+        return code;
     }
-    if let Some(p) = plat::arg_value("--tls-serve").and_then(|p| p.parse().ok()) {
-        return tlst::serve(p, args.iter().any(|a| a == "--mtls"));
-    }
-    if let Some(p) = plat::arg_value("--tls-get").and_then(|p| p.parse().ok()) {
-        return tlst::get(&plat::arg_value("--host").unwrap_or_else(|| String::from("localhost")), p, args.iter().any(|a| a == "--mtls"));
-    }
-    if let Some(u) = plat::arg_value("--tls-web") {
-        return tlst::web(&u, plat::arg_value("--ca").as_deref());
-    }
-    if let Some(d) = plat::arg_value("--tls-core-pki") {
-        return tlscoret::write_pki(&d);
-    }
-    if let Some(p) = plat::arg_value("--tls-core-serve").and_then(|p| p.parse().ok()) {
-        return tlscoret::serve(p);
-    }
-    if let Some(p) = plat::arg_value("--tls-core-get").and_then(|p| p.parse().ok()) {
-        return tlscoret::get(p);
-    }
-    if let Some(p) = plat::arg_value("--ssh-serve").and_then(|p| p.parse().ok()) {
-        return sshd::serve(p);
-    }
-    if let Some(p) = plat::arg_value("--ssh-core-serve").and_then(|p| p.parse().ok()) {
-        return sshcoret::serve(p);
-    }
-    if let Some(f) = plat::arg_value("--ssh-key") {
-        return sshd::key_line(&f);
-    }
-    let groups: [(&'static str, fn(&mut T)); 37] = [
-        ("datetime", dt::run),
-        ("crypto", crypto::run),
-        ("compress", lz::run),
-        ("plat", platx::run),
-        ("datastore", store::run),
-        ("http", httpt::run),
-        ("cas", cast::run),
-        ("tls", tlst::run),
-        ("ssh", sshd::run),
-        ("dns", dnst::run),
-        ("netpkt", netpktt::run),
-        ("rng", rngt::run),
-        ("jmap", jmapt::run),
-        ("dhcp", dhcpt::run),
-        ("dnsmsg", dnsmsgt::run),
-        ("ntp", ntpt::run),
-        ("metrics", metricst::run),
-        ("cmdtree", cmdtreet::run),
-        ("httpmsg", httpmsgt::run),
-        ("hashring", hashringt::run),
-        ("lru", lrut::run),
-        ("stp", stpt::run),
-        ("rip", ript::run),
-        ("icmpv6", icmpv6t::run),
-        ("ospf", ospft::run),
-        ("addrsel", addrselt::run),
-        ("bgp", bgpt::run),
-        ("tftp", tftpt::run),
-        ("ftp", ftpt::run),
-        ("mail", mailt::run),
-        ("snmp", snmpt::run),
-        ("radius", radiust::run),
-        ("pattern", patternt::run),
-        ("sshcore", sshcoret::run),
-        ("eap", eapt::run),
-        ("cookie", cookiet::run),
-        ("tlscore", tlscoret::run),
+    let groups: &[(&'static str, Option<fn(&mut T)>)] = &[
+        ("datetime", Some(dt::run)),
+        ("crypto", Some(crypto::run)),
+        ("compress", Some(lz::run)),
+        native!("plat", platx::run),
+        native!("datastore", store::run),
+        native!("http", httpt::run),
+        native!("cas", cast::run),
+        native!("tls", tlst::run),
+        native!("ssh", sshd::run),
+        native!("dns", dnst::run),
+        ("netpkt", Some(netpktt::run)),
+        ("rng", Some(rngt::run)),
+        ("jmap", Some(jmapt::run)),
+        ("dhcp", Some(dhcpt::run)),
+        ("dnsmsg", Some(dnsmsgt::run)),
+        ("ntp", Some(ntpt::run)),
+        ("metrics", Some(metricst::run)),
+        ("cmdtree", Some(cmdtreet::run)),
+        ("httpmsg", Some(httpmsgt::run)),
+        ("hashring", Some(hashringt::run)),
+        ("lru", Some(lrut::run)),
+        ("stp", Some(stpt::run)),
+        ("rip", Some(ript::run)),
+        ("icmpv6", Some(icmpv6t::run)),
+        ("ospf", Some(ospft::run)),
+        ("addrsel", Some(addrselt::run)),
+        ("bgp", Some(bgpt::run)),
+        ("tftp", Some(tftpt::run)),
+        ("ftp", Some(ftpt::run)),
+        ("mail", Some(mailt::run)),
+        ("snmp", Some(snmpt::run)),
+        ("radius", Some(radiust::run)),
+        ("pattern", Some(patternt::run)),
+        ("sshcore", Some(sshcoret::run)),
+        ("eap", Some(eapt::run)),
+        ("cookie", Some(cookiet::run)),
+        native!("tlscore", tlscoret::run),
     ];
     let mut failed = 0;
     let mut total = 0;
-    for (name, f) in groups {
+    for &(name, f) in groups {
         if only.as_deref().is_some_and(|o| o != name) {
             continue;
         }
+        let Some(f) = f else {
+            plat::write_stdout(format!("{:<10} not on Android yet\n", name).as_bytes());
+            continue;
+        };
         let mut t = T { group: name, ok: 0, failed: 0 };
         f(&mut t);
         plat::write_stdout(format!("{:<10} {} ok, {} failed\n", name, t.ok, t.failed).as_bytes());
@@ -202,6 +210,42 @@ fn run() -> i32 {
     }
     plat::write_stdout(format!("coretest: {} of {} checks passed\n", total - failed, total).as_bytes());
     if failed == 0 { 0 } else { 1 }
+}
+
+/// the servers and clients of other programs' tests (tools/tls_check.py, tools/ssh_interop.py ...)
+#[cfg(not(target_os = "android"))]
+fn server_modes(args: &[String]) -> Option<i32> {
+    if let Some(d) = plat::arg_value("--tls-pki") {
+        return Some(tlst::write_pki(&d));
+    }
+    if let Some(p) = plat::arg_value("--tls-serve").and_then(|p| p.parse().ok()) {
+        return Some(tlst::serve(p, args.iter().any(|a| a == "--mtls")));
+    }
+    if let Some(p) = plat::arg_value("--tls-get").and_then(|p| p.parse().ok()) {
+        return Some(tlst::get(&plat::arg_value("--host").unwrap_or_else(|| String::from("localhost")), p, args.iter().any(|a| a == "--mtls")));
+    }
+    if let Some(u) = plat::arg_value("--tls-web") {
+        return Some(tlst::web(&u, plat::arg_value("--ca").as_deref()));
+    }
+    if let Some(d) = plat::arg_value("--tls-core-pki") {
+        return Some(tlscoret::write_pki(&d));
+    }
+    if let Some(p) = plat::arg_value("--tls-core-serve").and_then(|p| p.parse().ok()) {
+        return Some(tlscoret::serve(p));
+    }
+    if let Some(p) = plat::arg_value("--tls-core-get").and_then(|p| p.parse().ok()) {
+        return Some(tlscoret::get(p));
+    }
+    if let Some(p) = plat::arg_value("--ssh-serve").and_then(|p| p.parse().ok()) {
+        return Some(sshd::serve(p));
+    }
+    if let Some(p) = plat::arg_value("--ssh-core-serve").and_then(|p| p.parse().ok()) {
+        return Some(sshcoret::serve(p));
+    }
+    if let Some(f) = plat::arg_value("--ssh-key") {
+        return Some(sshd::key_line(&f));
+    }
+    None
 }
 
 rt::main!(run());

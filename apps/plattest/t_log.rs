@@ -106,6 +106,16 @@ pub fn t_log(t: &mut T) {
     vfs::unmount("short");
 
     // a crash: the last lines on stderr, the crash in the file
+    #[cfg(target_os = "android")]
+    crate::never(t, "log: the crashing children (child processes)");
+    #[cfg(not(target_os = "android"))]
+    crash(t);
+    t.scratch_done();
+}
+
+// a crash: the last lines on stderr, the crash in the file
+#[cfg(not(target_os = "android"))]
+fn crash(t: &mut T) {
     let cp = t.subp("logs/crash.log");
     let (code, err) = crash_child("log-crash", &cp);
     t.check(code == Some(3), "log: the crashing child ends with exit code 3");
@@ -116,7 +126,6 @@ pub fn t_log(t: &mut T) {
         t.info(&format!("  child: {code:?}, stderr:\n{err}\n"));
     }
     crash_paths(t);
-    t.scratch_done();
 }
 
 // a provider with read and write only (no streams, no OS files)
@@ -180,6 +189,7 @@ impl vfs::Provider for Short {
 
 // the crash pre-hook neither allocates nor waits (Codex A013-C003, V054-C001): each child
 // crashes where the old pre-hook rotated the file or waited on stderr
+#[cfg(not(target_os = "android"))]
 fn crash_paths(t: &mut T) {
     // a file one byte below its limit: the crash line stays in it (rotation, keep 0, deleted it)
     let fp = t.subp("logs/full.log");
@@ -208,6 +218,7 @@ fn crash_paths(t: &mut T) {
 
 // run a child of t_log with jfgui_LOG_TEST_FILE = file; (exit code, stderr and stdout); a child
 // still running after 10 s is ended (None)
+#[cfg(not(target_os = "android"))]
 fn crash_child(test: &str, file: &str) -> (Option<i32>, String) {
     let exe = plat::current_exe().unwrap_or_default();
     let args = ["--test", test];
