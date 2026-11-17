@@ -492,7 +492,10 @@ pub(crate) fn spawn_file(path: &str, args: &[&str]) -> i32 {
     spawn_exe(&p, args)
 }
 
-// fork; the child execs exe (NUL-terminated) with argv[0], args and the environment
+// forked twice: the middle process ends at once (reaped here), so init adopts the program and no
+// zombie stays behind while this process runs on; the program execs exe (NUL-terminated) with
+// argv[0], args and the environment.  A failed exec comes back through a pipe that a successful
+// one closes -> 0 / -1
 fn spawn_exe(exe: &[u8], args: &[&str]) -> i32 {
     if args.len() >= SPAWN_ARGS {
         return -1;
@@ -517,19 +520,55 @@ fn spawn_exe(exe: &[u8], args: &[&str]) -> i32 {
     argv.push(0);
     let mut envp: Vec<usize> = envs.iter().map(|s| s.as_ptr() as usize).collect();
     envp.push(0);
-    // SAFETY: fork has no arguments; the child only calls execve with the NUL-terminated
-    // strings and 0-terminated pointer arrays built above, then exit_group.
-    unsafe {
+    let mut fail = [-1i32; 2];
+    // SAFETY: pipe2 writes two descriptors, both closed on exec (O_CLOEXEC).
+    if unsafe { rt::os::syscall3(rt::os::SYS_PIPE2, fail.as_mut_ptr() as usize, rt::os::O_CLOEXEC, 0) } < 0 {
+        return -1;
+    }
+    let (r, w) = (fail[0] as usize, fail[1] as usize);
+    // SAFETY: both forked processes call only syscalls with the NUL-terminated strings, the
+    // 0-terminated pointer arrays and the pipe made above, then exit_group.
+    let pid = unsafe {
         let pid = rt::os::fork();
-        if pid < 0 {
-            return -1;
-        }
         if pid == 0 {
-            rt::os::syscall3(rt::os::SYS_EXECVE, exe.as_ptr() as usize, argv.as_ptr() as usize, envp.as_ptr() as usize);
-            rt::os::syscall3(rt::os::SYS_EXIT_GROUP, 127, 0, 0);
+            let grand = rt::os::fork();
+            if grand == 0 {
+                let e = rt::os::syscall3(rt::os::SYS_EXECVE, exe.as_ptr() as usize, argv.as_ptr() as usize, envp.as_ptr() as usize);
+                let code = (-e) as u32;
+                rt::os::syscall3(rt::os::SYS_WRITE, w, &code as *const u32 as usize, 4);
+                rt::os::syscall3(rt::os::SYS_EXIT_GROUP, 127, 0, 0);
+                #[allow(clippy::empty_loop)] // not reached: exit_group does not return
+                loop {}
+            }
+            if grand < 0 {
+                let code = (-grand) as u32;
+                rt::os::syscall3(rt::os::SYS_WRITE, w, &code as *const u32 as usize, 4);
+            }
+            rt::os::syscall3(rt::os::SYS_EXIT_GROUP, 0, 0, 0);
             #[allow(clippy::empty_loop)] // not reached: exit_group does not return
             loop {}
         }
+        pid
+    };
+    // SAFETY: closing our write end; the read end below.
+    unsafe { rt::os::syscall3(rt::os::SYS_CLOSE, w, 0, 0) };
+    let mut code = 0u32;
+    let mut got = 0isize;
+    if pid > 0 {
+        let mut status = 0i32;
+        // SAFETY: reap the middle process (it ends at once), retry EINTR; then the pipe: EOF when
+        // the program's exec closed it, 4 bytes when the exec or the second fork failed.
+        unsafe {
+            while rt::os::syscall6(rt::os::SYS_WAIT4, pid as usize, &mut status as *mut i32 as usize, 0, 0, 0, 0) == -4 {}
+            got = loop {
+                let n = rt::os::syscall3(rt::os::SYS_READ, r, &mut code as *mut u32 as usize, 4);
+                if n != -4 {
+                    break n;
+                }
+            };
+        }
     }
-    0
+    // SAFETY: closing the read end.
+    unsafe { rt::os::syscall3(rt::os::SYS_CLOSE, r, 0, 0) };
+    if pid > 0 && got == 0 { 0 } else { -1 }
 }

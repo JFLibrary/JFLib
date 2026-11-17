@@ -58,12 +58,20 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   again.
 - `a11y::Node::offset_at` walks the text once; char_rect for every offset counted from the start each time (quadratic: a screen reader's hit test on a long text box hung).
 - Windows: the backup of a file association's registry keys walks them with a list instead of recursion (keys nest up to 512 deep, each level held a 32 KB buffer on the stack).
+- Linux D-Bus: a message over 1 MiB, a big-endian one or one this reader cannot read is skipped; it closed the connection for good, so any client of the bus could cut off sleep, settings, IME and tray messages with a message of 2 MiB.
+- Linux: the agent control socket lives in $XDG_RUNTIME_DIR/jfgui-agent when that is set (another user could make /tmp/jfgui-agent-<uid> first and so block it); tools/jfgui-agent.py looks in both.
+- Linux: `spawn_self` / `restart_self` fork twice, so no zombie stays behind while the app runs on, and a failed exec comes back as -1 (it was invisible).
+- Linux portal: the receive buffer grows for a long Response (a multiple selection of up to 4096 files; over 64 KiB it was lost), and a print connection still open is closed before another portal call instead of losing its descriptor.
+- X11: the end of a clipboard transfer whose requestor was the root window no longer clears our event mask on it (work area and Xft.dpi changes stopped arriving). Wayland: a finger or pen on a popup no longer marks the popup as the pointer's (later mouse positions were off), and a transfer to a client that reads nothing gives up after 30 s instead of holding its slot.
 
 ### Security
 
 - Windows: dwmapi, crypt32, winmm, iphlpapi, bcrypt and avrt are loaded from System32 when first used instead of being imported by the program. A DLL of such a name beside the program (a setup in the download folder) was loaded in their place.
 - `screen::pick_test_point`, the colour picker's test aid, obeys `screen.capture` like the picker. It read screen pixels without the permission.
 - Linux `secret`: the plain copies of a secret in the messages it builds and reads are overwritten (the D-Bus connection overwrites every encoded message once written and the bytes it has read), and sealing no longer grows a copy of the value.
+- Linux sandbox (seccomp): io_uring, the new mount API (open_tree, move_mount, fsopen, fsconfig, fsmount, fspick, mount_setattr) and pidfd_getfd are denied; clone with a flag for a new namespace is denied, clone3 answered ENOSYS (its flags sit behind a pointer; libc then uses clone); process_vm_readv is allowed on this process only, so the crash handler gets its backtrace again.
+- Linux: `process::run_elevated` looks for a bare program name in the system's folders only (/usr/local/sbin ... /bin) and hands pkexec the full path. pkexec searched the caller's PATH, so a program the user's PATH put first ran as root.
+- Linux session bus: the portal's Response of autostart and the power inhibit, the GlobalShortcuts Activated, the Flatpak update monitor's signals and the Secret Service prompt's Completed count only from the service's own unique name (any client may send a signal of that name on the predictable path).
 
 ## [0.2.1] - 2026-11-16
 

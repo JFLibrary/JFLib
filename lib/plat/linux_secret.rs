@@ -159,6 +159,8 @@ fn call(c: &mut Conn, dest: &str, path: &str, iface: &str, member: &str, body: V
 struct Session {
     c: Conn,
     path: String,
+    /// the service's unique name: only its prompts' Completed counts
+    owner: String,
     /// None: the plain algorithm (Aes clears its round keys when dropped)
     aes: Option<Aes>,
 }
@@ -231,7 +233,7 @@ fn open() -> Result<Session, SecretError> {
                 crypto::zeroize(&mut private);
                 let path = as_path(b.get(1));
                 match k {
-                    Ok(aes) => break Session { c, path, aes: Some(aes) },
+                    Ok(aes) => break Session { c, path, owner: String::new(), aes: Some(aes) },
                     // a shared value with a leading zero (1 in 256): close it, a new pair
                     Err(DhErr::LeadingZero) if tries < 8 => {
                         tries += 1;
@@ -240,7 +242,7 @@ fn open() -> Result<Session, SecretError> {
                         c.send(&close);
                     }
                     Err(_) => {
-                        drop(Session { c, path, aes: None }); // closes it
+                        drop(Session { c, path, owner: String::new(), aes: None }); // closes it
                         return Err(SecretError::Failed(String::from("the Secret Service sent an invalid public key")));
                     }
                 }
@@ -248,7 +250,7 @@ fn open() -> Result<Session, SecretError> {
             Err(e) if e == E_UNSUPPORTED => {
                 crypto::zeroize(&mut private);
                 let b = call(&mut c, DEST, ROOT, I_SERVICE, "OpenSession", vec![Value::str("plain"), Value::var(Value::str(""))]).map_err(|e| fail(&e))?;
-                break Session { c, path: as_path(b.get(1)), aes: None };
+                break Session { c, path: as_path(b.get(1)), owner: String::new(), aes: None };
             }
             Err(e) => {
                 crypto::zeroize(&mut private);
@@ -334,6 +336,11 @@ impl Session {
     fn prompt(&mut self, path: &str) -> Result<Value, SecretError> {
         let rule = format!("type='signal',interface='{I_PROMPT}',member='Completed',path='{path}'");
         call(&mut self.c, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "AddMatch", vec![Value::str(&rule)]).map_err(|e| fail(&e))?;
+        if self.owner.is_empty() {
+            self.owner = self.c.name_owner(DEST).unwrap_or_default();
+        }
+        // (no answer to GetNameOwner: the sender of the reply to Prompt)
+        let mut owner = self.owner.clone();
         let serial = self.c.send(&Msg::call(DEST, path, I_PROMPT, "Prompt", vec![Value::str("")])).ok_or_else(|| fail(""))?;
         let end = crate::time_us() + PROMPT_SECONDS as u64 * 1_000_000;
         loop {
@@ -346,7 +353,8 @@ impl Session {
             }
             match self.c.read(((end - now) / 1000).min(i32::MAX as u64) as i32 + 1) {
                 Some(m) if m.typ == T_ERROR && m.reply_to == serial => return Err(fail(&m.error)),
-                Some(m) if m.typ == T_SIGNAL && m.iface == I_PROMPT && m.member == "Completed" && m.path == path => {
+                Some(m) if m.typ == T_RETURN && m.reply_to == serial && owner.is_empty() => owner = m.sender,
+                Some(m) if m.typ == T_SIGNAL && m.iface == I_PROMPT && m.member == "Completed" && m.path == path && !owner.is_empty() && m.sender == owner => {
                     if matches!(m.body.first(), Some(Value::B(true))) {
                         return Err(SecretError::Dismissed);
                     }

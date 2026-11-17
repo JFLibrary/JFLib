@@ -10,7 +10,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_PATH, SYS_ADD_KEY, SYS_BPF, SYS_CHROOT, SYS_CLOSE, SYS_DELETE_MODULE, SYS_EXECVE, SYS_EXECVEAT, SYS_FINIT_MODULE, SYS_FSTAT, SYS_INIT_MODULE, SYS_KEXEC_FILE_LOAD, SYS_KEXEC_LOAD, SYS_KEYCTL, SYS_LANDLOCK_ADD_RULE, SYS_LANDLOCK_CREATE_RULESET, SYS_LANDLOCK_RESTRICT_SELF, SYS_MOUNT, SYS_OPENAT, SYS_OPEN_BY_HANDLE_AT, SYS_PERF_EVENT_OPEN, SYS_PIVOT_ROOT, SYS_PRCTL, SYS_PROCESS_VM_READV, SYS_PROCESS_VM_WRITEV, SYS_PTRACE, SYS_REQUEST_KEY, SYS_SECCOMP, SYS_SETNS, SYS_UMOUNT2, SYS_UNSHARE, SYS_USERFAULTFD, Stat};
+use rt::os::{syscall3, syscall6, AT_FDCWD, O_CLOEXEC, O_PATH, SYS_ADD_KEY, SYS_BPF, SYS_CHROOT, SYS_CLONE, SYS_CLONE3, SYS_CLOSE, SYS_FSCONFIG, SYS_FSMOUNT, SYS_FSOPEN, SYS_FSPICK, SYS_IO_URING_ENTER, SYS_IO_URING_REGISTER, SYS_IO_URING_SETUP, SYS_MOUNT_SETATTR, SYS_MOVE_MOUNT, SYS_OPEN_TREE, SYS_PIDFD_GETFD, SYS_DELETE_MODULE, SYS_EXECVE, SYS_EXECVEAT, SYS_FINIT_MODULE, SYS_FSTAT, SYS_GETPID, SYS_INIT_MODULE, SYS_KEXEC_FILE_LOAD, SYS_KEXEC_LOAD, SYS_KEYCTL, SYS_LANDLOCK_ADD_RULE, SYS_LANDLOCK_CREATE_RULESET, SYS_LANDLOCK_RESTRICT_SELF, SYS_MOUNT, SYS_OPENAT, SYS_OPEN_BY_HANDLE_AT, SYS_PERF_EVENT_OPEN, SYS_PIVOT_ROOT, SYS_PRCTL, SYS_PROCESS_VM_READV, SYS_PROCESS_VM_WRITEV, SYS_PTRACE, SYS_REQUEST_KEY, SYS_SECCOMP, SYS_SETNS, SYS_UMOUNT2, SYS_UNSHARE, SYS_USERFAULTFD, Stat};
 
 use crate::policy::LinuxPlan;
 use crate::sandbox::Status;
@@ -226,47 +226,82 @@ fn sf(code: u16, jt: u8, jf: u8, k: u32) -> SockFilter {
 const X32_BIT: u32 = 0x4000_0000;
 const SECCOMP_RET_ALLOW: u32 = 0x7FFF_0000;
 const SECCOMP_RET_ERRNO_EPERM: u32 = 0x0005_0001;
+const SECCOMP_RET_ERRNO_ENOSYS: u32 = 0x0005_0026;
 const SECCOMP_SET_MODE_FILTER: usize = 1;
 
-// syscalls denied with EPERM: tracing, cross-process memory, kexec, module loading, mount,
-// bpf, perf_event_open, userfaultfd, keyrings, handle reopen, namespace juggling
+// clone's flags for new namespaces (NEWNS, NEWCGROUP, NEWUTS, NEWIPC, NEWUSER, NEWPID, NEWNET)
+pub(crate) const CLONE_NEW_ANY: u32 = 0x0002_0000 | 0x0200_0000 | 0x0400_0000 | 0x0800_0000 | 0x1000_0000 | 0x2000_0000 | 0x4000_0000;
+
+// syscalls denied with EPERM: tracing, writing another process's memory, kexec, module loading,
+// mount (also the new mount API), bpf, perf_event_open, userfaultfd, keyrings, handle reopen,
+// namespace juggling, io_uring (its requests pass the filter), taking another process's
+// descriptors.  On top (seccomp): process_vm_readv only on this process (the crash handler reads
+// its own memory with it), clone without new namespaces, clone3 answered ENOSYS (its flags sit
+// behind a pointer the filter cannot read; libc then uses clone)
 pub(crate) const DENY: &[usize] = &[
     SYS_PTRACE,
-    SYS_PROCESS_VM_READV, SYS_PROCESS_VM_WRITEV,
+    SYS_PROCESS_VM_WRITEV,
     SYS_KEXEC_LOAD, SYS_KEXEC_FILE_LOAD,
     SYS_INIT_MODULE, SYS_FINIT_MODULE, SYS_DELETE_MODULE,
     SYS_MOUNT, SYS_UMOUNT2, SYS_PIVOT_ROOT, SYS_CHROOT,
+    SYS_OPEN_TREE, SYS_MOVE_MOUNT, SYS_FSOPEN, SYS_FSCONFIG, SYS_FSMOUNT, SYS_FSPICK, SYS_MOUNT_SETATTR,
     SYS_BPF,
     SYS_PERF_EVENT_OPEN,
     SYS_USERFAULTFD,
     SYS_KEYCTL, SYS_ADD_KEY, SYS_REQUEST_KEY,
     SYS_OPEN_BY_HANDLE_AT,
     SYS_SETNS, SYS_UNSHARE,
+    SYS_IO_URING_SETUP, SYS_IO_URING_ENTER, SYS_IO_URING_REGISTER,
+    SYS_PIDFD_GETFD,
 ];
+
+// where a filter instruction jumps: on to the next one, n further, or to a return
+#[derive(Clone, Copy)]
+enum To {
+    Next,
+    Skip(u8),
+    Allow,
+    Deny,
+    NoSys,
+}
 
 // install the deny-list filter; execve / execveat are added when no program is allowed
 fn seccomp(exec_allowed: bool, st: &mut Status) {
-    let mut prog: Vec<SockFilter> = Vec::new();
-    let n = DENY.len() + if exec_allowed { 0 } else { 2 };
-    let deny_idx = (5 + n) as u8; // the index of the EPERM return
-    prog.push(sf(0x20, 0, 0, 4)); // 0: load arch (offset 4)
-    prog.push(sf(0x15, 0, deny_idx - 2, AUDIT_ARCH)); // 1: another architecture -> deny
-    prog.push(sf(0x20, 0, 0, 0)); // 2: load nr (offset 0)
-    prog.push(sf(0x35, deny_idx - 4, 0, X32_BIT)); // 3: nr >= x32 bit -> deny
-    let mut i: u8 = 4;
-    let mut emit = |k: u32, prog: &mut Vec<SockFilter>| {
-        prog.push(sf(0x15, deny_idx - i - 1, 0, k)); // JEQ k -> deny
-        i += 1;
+    // SAFETY: getpid has no arguments.
+    let pid = unsafe { syscall3(SYS_GETPID, 0, 0, 0) } as u32;
+    let mut ins: Vec<(u16, To, To, u32)> = Vec::new();
+    ins.push((0x20, To::Next, To::Next, 4)); // load arch (offset 4)
+    ins.push((0x15, To::Next, To::Deny, AUDIT_ARCH)); // another architecture -> deny
+    ins.push((0x20, To::Next, To::Next, 0)); // load nr (offset 0)
+    ins.push((0x35, To::Deny, To::Next, X32_BIT)); // nr >= x32 bit -> deny
+    // process_vm_readv: only with this process's pid (args[0], its low half at offset 16)
+    ins.push((0x15, To::Next, To::Skip(2), SYS_PROCESS_VM_READV as u32));
+    ins.push((0x20, To::Next, To::Next, 16));
+    ins.push((0x15, To::Allow, To::Deny, pid));
+    // clone: no flag for a new namespace (args[0])
+    ins.push((0x15, To::Next, To::Skip(2), SYS_CLONE as u32));
+    ins.push((0x20, To::Next, To::Next, 16));
+    ins.push((0x45, To::Deny, To::Allow, CLONE_NEW_ANY)); // JSET
+    ins.push((0x15, To::NoSys, To::Next, SYS_CLONE3 as u32));
+    let exec: &[usize] = if exec_allowed { &[] } else { &[SYS_EXECVE, SYS_EXECVEAT] };
+    for &k in DENY.iter().chain(exec) {
+        ins.push((0x15, To::Deny, To::Next, k as u32)); // JEQ k -> deny
+    }
+    let (allow, deny, nosys) = (ins.len(), ins.len() + 1, ins.len() + 2);
+    let at = |i: usize, t: To| -> u8 {
+        let target = match t {
+            To::Next => return 0,
+            To::Skip(n) => return n,
+            To::Allow => allow,
+            To::Deny => deny,
+            To::NoSys => nosys,
+        };
+        (target - i - 1) as u8
     };
-    for &k in DENY {
-        emit(k as u32, &mut prog);
-    }
-    if !exec_allowed {
-        emit(SYS_EXECVE as u32, &mut prog);
-        emit(SYS_EXECVEAT as u32, &mut prog);
-    }
-    prog.push(sf(0x06, 0, 0, SECCOMP_RET_ALLOW)); // allow
-    prog.push(sf(0x06, 0, 0, SECCOMP_RET_ERRNO_EPERM)); // deny
+    let mut prog: Vec<SockFilter> = ins.iter().enumerate().map(|(i, &(code, jt, jf, k))| sf(code, at(i, jt), at(i, jf), k)).collect();
+    prog.push(sf(0x06, 0, 0, SECCOMP_RET_ALLOW));
+    prog.push(sf(0x06, 0, 0, SECCOMP_RET_ERRNO_EPERM));
+    prog.push(sf(0x06, 0, 0, SECCOMP_RET_ERRNO_ENOSYS));
     let fprog = SockFprog { len: prog.len() as u16, filter: prog.as_ptr() };
     // SAFETY: a classic BPF program that lives for the call; SET_MODE_FILTER, no flags.
     let r = unsafe { syscall3(SYS_SECCOMP, SECCOMP_SET_MODE_FILTER, 0, &fprog as *const _ as usize) };

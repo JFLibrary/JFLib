@@ -315,15 +315,10 @@ pub(crate) fn wlh_touch_down(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
     let mut w = wl.find(surf);
     let mut off = [0; 2];
     if w < 0 {
-        // a popup: its owner and offset (the pointer's offset is kept)
-        let (px, py) = (wl.inp.off_x, wl.inp.off_y);
-        w = wl.popup_ptr(surf);
-        off = [wl.inp.off_x, wl.inp.off_y];
-        wl.inp.off_x = px;
-        wl.inp.off_y = py;
-        if w < 0 {
-            return;
-        }
+        // a popup: its owner and offset (the pointer's state stays)
+        let Some((owner, at)) = wl.popup_of(surf) else { return };
+        w = owner;
+        off = at;
     }
     wl.inp.btn_serial = a.u(0);
     wl.inp.input_serial = a.u(0);

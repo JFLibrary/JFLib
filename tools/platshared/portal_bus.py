@@ -290,16 +290,21 @@ def serve(path, mode, log, raw):
         log.append(member)
         sser += 1
 
+        # the senders as on a real bus: the bus for its own methods, the portal (:1.7) for the
+        # rest -- plat takes a Response only from the sender of the portal's reply
+        bus_own = m["fields"].get(6) == "org.freedesktop.DBus" or member in ("Hello", "AddMatch")
+        frm = "org.freedesktop.DBus" if bus_own else ":1.7"
+
         def reply(sig, body):
-            return message(2, sser, [(5, "u", m["serial"]), (6, "s", ":1.42")] + ([(8, "g", sig)] if sig else []), body)
+            return message(2, sser, [(5, "u", m["serial"]), (6, "s", ":1.42"), (7, "s", frm)] + ([(8, "g", sig)] if sig else []), body)
 
         def error(name):
-            return message(3, sser, [(4, "s", name), (5, "u", m["serial"]), (6, "s", ":1.42")])
+            return message(3, sser, [(4, "s", name), (5, "u", m["serial"]), (6, "s", ":1.42"), (7, "s", frm)])
 
         def response(handle, code, results):
             body = W().all("ua{sv}", [code, results])
             return message(4, sser + 50, [(1, "o", handle), (2, "s", "org.freedesktop.portal.Request"),
-                                          (3, "s", "Response"), (6, "s", ":1.42"), (8, "g", "ua{sv}")], body)
+                                          (3, "s", "Response"), (6, "s", ":1.42"), (7, "s", ":1.7"), (8, "g", "ua{sv}")], body)
         sig = m["fields"].get(8, "")
         if member == "Hello":
             c.sendall(reply("s", W().all("s", [":1.42"])))
@@ -562,6 +567,14 @@ def suite_filedlg(rs):
     check("filedlg multi: the first in path, every one in file_dialog_paths",
           rr == 0 and result(out) == (1, 0, folder + "/a.png") and paths == ["|".join([folder + "/a.png", folder + "/b c.jpg", "/tmp/d.bmp"])],
           (out, paths))
+    # 1200 files of 100-byte paths: a Response of about 130 KB, over the first 64 KiB of plat's
+    # receive buffer (it grows; before, the selection was lost)
+    many = ["file:///tmp/" + ("m%04d-" % k) + "x" * 88 + ".png" for k in range(1200)]
+    FD_URI[0] = many
+    rr, lr, _, out = run(rust(4, folder + "/"), "ok")
+    paths = [l[15:] for l in out.splitlines() if l.startswith("filedlg paths: ")]
+    check("filedlg multi: 1200 files (a Response of 130 KB)",
+          rr == 0 and (result(out) or (None,))[0] == 1 and paths == ["|".join(u[7:] for u in many)], (out[-300:], len(paths[0]) if paths else 0))
     FD_URI[0] = "file:///tmp/one.png"
     rr, lr, _, out = run(rust(0, "/tmp/q.png"), "ok")
     got = args_of(lr, "OpenFile")

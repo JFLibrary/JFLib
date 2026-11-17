@@ -101,6 +101,9 @@ static MIME_TABLE: [(&[u8], u64); 13] = [(MIME_UTF8, MB_UTF8), (MIME_UTF8S, MB_U
 struct Writer {
     fd: i32,
     off: usize,
+    /// time_us when it gives up unless the reader takes more (CLIP_READ_TOTAL_US after the last
+    /// bytes it took): a client that never reads held the slot for good
+    until: u64,
     bmp: bool, // sends the image/bmp copy, else the data
     rich: u32, // clipboard_platform: rich format, 0 = primary text/image
     dnd: usize, // the app's drag: entry + 1 of ds_data (0 = the clipboard)
@@ -436,8 +439,23 @@ impl Wl {
         }
     }
 
-    /// (wait) a drop transfer whose source sends nothing gives up -> the next deadline
+    /// (wait) a drop transfer whose source sends nothing gives up, and so does a transfer to a
+    /// client that takes nothing -> the next deadline
     pub(crate) fn clip_tick(&mut self, now: u64) -> u64 {
+        let mut next = u64::MAX;
+        for wr in self.clip.writers.iter_mut().filter(|w| w.fd != 0) {
+            if now >= wr.until {
+                sys_close(wr.fd);
+                wr.fd = 0;
+            } else {
+                next = next.min(wr.until);
+            }
+        }
+        next.min(self.drop_tick(now))
+    }
+
+    // the drop transfer's part of clip_tick
+    fn drop_tick(&mut self, now: u64) -> u64 {
         if self.clip.dnd_rfd == 0 || self.clip.dnd_deadline == 0 {
             return u64::MAX;
         }
@@ -566,6 +584,7 @@ impl Wl {
                 break; // EPIPE etc.
             }
             self.clip.writers[k].off += r as usize;
+            self.clip.writers[k].until = crate::time_us() + crate::CLIP_READ_TOTAL_US;
         }
         sys_close(self.clip.writers[k].fd);
         self.clip.writers[k].fd = 0;
@@ -918,7 +937,7 @@ pub(crate) fn wlh_src_send(wl: &mut Wl, id: u32, a: &Args, _u: u64) {
     let bmp = dnd == 0 && wl.clip.src_bmp.is_some() && a.s(0) == Some(MIME_BMP); // image/bmp -> the BMP copy
     let rich = if dnd != 0 { 0 } else { RICH_MIMES.iter().find(|m| a.s(0) == Some(m.1)).map_or(0, |m| m.0) };
     if rich != 0 && !wl.clip.src_rich.iter().any(|e| e.0 == rich) { sys_close(fd); return; }
-    wl.clip.writers[k] = Writer { fd, off: 0, bmp, rich, dnd };
+    wl.clip.writers[k] = Writer { fd, off: 0, until: crate::time_us() + crate::CLIP_READ_TOTAL_US, bmp, rich, dnd };
     wl.writer_run(k);
 }
 
