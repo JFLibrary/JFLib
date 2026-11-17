@@ -33,9 +33,13 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+mod build;
 mod corpus;
+mod dump;
 mod hostile;
+mod hostile_write;
 mod pkg;
+mod roundtrip;
 mod samples;
 mod zipkit;
 
@@ -85,6 +89,9 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-samples") {
         return samples::write(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-probe") {
+        return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
+    }
     let check = args.iter().any(|a| a == "--check");
     let corpus_dir = arg(&args, "--corpus");
     if !check && corpus_dir.is_none() {
@@ -98,6 +105,7 @@ fn run() -> i32 {
             samples::run(&mut h);
         }
         hostile::run(&mut h);
+        roundtrip::run(&mut h, corpus_dir.as_deref());
     }
     if h.on("corpus") {
         corpus::run(&mut h, corpus_dir);

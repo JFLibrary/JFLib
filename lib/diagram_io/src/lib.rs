@@ -9,11 +9,15 @@
 //                       connects, masters, themes (raw), windows.xml, properties, media,
 //                       comments and data recordsets (kept as parts); unknown items in the
 //                       Extras where they stood (DF-03); nothing recomputed or rerouted
+//   vsdx::write(&doc, &vsdx::WriteOptions::DEFAULT) -> Result<Vec<u8>, vsdx::WriteError>
+//                       the model as a file of any of the six formats, with everything it does
+//                       not know where it stood; deterministic, DEFLATE; a file read and written
+//                       unchanged reads back as the same model
+//   vsdx::new_document(kind, Measure::Metric)   a new drawing, template or stencil with JFLib's
+//                       own styles, document sheet and DrawingML theme "NetLab"
 //   vsdx::Format        the six formats by main content type or extension
 //
 // What is to come here, by stage of the plan:
-//   JD5   writing the model back with everything it does not know; new documents with the own
-//         default theme; .vssx stencils
 //   JD12  exports: SVG, PNG and PDF through the library's writers
 //   later the XML formats of 2003-2010 (.vdx, .vsx) and importing the binary .vss / .vsd
 //
@@ -26,6 +30,10 @@
 
 extern crate alloc;
 
+mod blank;
+mod pack;
 mod read;
+mod theme;
 pub mod vsdx;
+mod write;
 mod xml;
