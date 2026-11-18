@@ -202,7 +202,7 @@ pub struct Measure {
     pub disconnected: usize,
 }
 
-/// a session of `players` bots in `w` for `secs`, measured after the joins (the first 3 s)
+/// a session of `players` bots in `w` for `secs`, measured after the joins
 pub fn measure(name: &str, seed: u64, players: usize, w: Weather, props: usize, moving: usize, every: u32, secs: u64, fire: bool) -> Measure {
     measure_rewind(name, seed, players, w, props, moving, every, secs, fire, 200)
 }
@@ -218,9 +218,16 @@ pub fn measure_rewind(name: &str, seed: u64, players: usize, w: Weather, props: 
     cfg.time_ticks = true;
     cfg.join_gap_ms = 20;
     let mut s = Session::new(cfg);
-    s.run(3000);
+    // until every bot plays (a storm can take seconds for a handshake), then a second more
+    for _ in 0..150 {
+        s.run(100);
+        if s.playing() == players {
+            break;
+        }
+    }
+    s.run(1000);
     // from here on
-    let peers0: Vec<_> = s.clients.iter().map(|k| s.net.peers[k.peer].stats).collect();
+    let peers0: Vec<_> = s.clients.iter().map(|k| s.net.peers.get(k.peer).map(|p| p.stats).unwrap_or_default()).collect();
     let mism0: Vec<u64> = s.clients.iter().map(|k| k.client.predictor().stats().mismatches).collect();
     let err0: Vec<usize> = s.clients.iter().map(|k| k.client.predictor().stats().errors.len()).collect();
     let sizes0 = s.server.stats().sizes.len();
@@ -236,7 +243,7 @@ pub fn measure_rewind(name: &str, seed: u64, players: usize, w: Weather, props: 
     let mut upp = 0u64;
     let mut downp = 0u64;
     for (k, cl) in s.clients.iter().enumerate() {
-        let p = s.net.peers[cl.peer].stats;
+        let p = s.net.peers.get(cl.peer).map(|p| p.stats).unwrap_or_default();
         up += p.up_bytes - peers0[k].up_bytes;
         down += p.down_bytes - peers0[k].down_bytes;
         upp += p.up_packets - peers0[k].up_packets;
