@@ -17,6 +17,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Fixed
 
+- `dns::resolve` (Linux, macOS): a numeric address or `localhost` no longer reads /etc/hosts and /etc/resolv.conf, which an app's rules do not grant on macOS (PERMDENY lines for every WebSocket and HTTP connection to an address).
 - SSH: a peer that sends only messages to skip (ignore, debug, banners, global requests) while an answer is due ends the session after 1024 of them (login and opening a channel never returned); data past the channel window the client granted is a protocol error.
 
 ### Security
