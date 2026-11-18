@@ -10,7 +10,13 @@ python build_rs.py test diagramiotest                    # build it, run tests/v
 python build_rs.py run diagramiotest -- --check --only xml    # one group
 python build_rs.py run diagramiotest -- --corpus DIR     # the local load tests with the files in DIR
 python build_rs.py run diagramiotest -- --write-samples DIR  # the self-built files, to open elsewhere
+python build_rs.py run diagramiotest -- --check --only roundtrip  # writing: all four roundtrip groups
+python build_rs.py run diagramiotest -- --write-probe DIR [--corpus DIR]  # files for a Visio check
 ```
+
+`--write-probe` writes a new empty drawing, a new drawing with own shapes and connectors, a new
+stencil and a round-trip copy of each local file to DIR, to open them in Visio. DIR must lie
+outside the repository: the copies are the user's files.
 
 ## Groups
 
@@ -23,8 +29,13 @@ python build_rs.py run diagramiotest -- --write-samples DIR  # the self-built fi
 | `rels` | wrong relationships and content types, parts used twice, macros, malformed IDs |
 | `zip` | ZIP bombs and lying archives through `lib/archive` (a trimmed copy of codectest's ZIP builder) |
 | `corpus` | `Zeichnung2.vsdx`, `Zeichnung 3.vsdx`, `Favoriten.vssx` from `apps/JFDiagrammer/context/files` (gitignored, never copied): counts against FEATURES.md 1.6; skipped when the folder is not found above the current folder |
+| `roundtrip/samples` | (JD5) writing: the self-built files of the six formats read, written, read and written again: the same model both times, the same bytes on the second write |
+| `roundtrip/new` | `vsdx::new_document` for drawing, template and stencil in both measures, written in every format: deterministic, the same model and bytes after a round trip, `visio/windows.xml` always there, only own content (no Office theme, no Calibri); a drawing with own shapes, connectors, a master instance, a group and a picture; a stencil with own masters |
+| `roundtrip/hostile` | models the reader never makes (extras at places that do not exist, broken raw XML, characters XML cannot carry, parts named twice or not at all, macros, missing pictures, odd numbers, 3000 nested groups, stale relationships, tight ZIP limits): no crash, a readable file or a `WriteError` |
+| `roundtrip/corpus` | the local files of `corpus` read, written and read again: the same model, the same bytes on the second write; only sizes and times are printed, nothing is written to disk; skipped like `corpus` |
 
-Only self-built files belong in the repository; the packages are made in `src/pkg.rs`.
+Only self-built files belong in the repository; the packages are made in `src/pkg.rs` and
+`src/build.rs`.
 
 ## Files
 
@@ -34,4 +45,7 @@ Only self-built files belong in the repository; the packages are made in `src/pk
 | `src/pkg.rs` | a builder of VSDX packages and the sample drawing |
 | `src/samples.rs`, `src/hostile.rs`, `src/corpus.rs` | the groups |
 | `src/zipkit.rs` | crafted ZIP archives |
+| `src/roundtrip.rs`, `src/hostile_write.rs` | the writing groups and `--write-probe` |
+| `src/build.rs` | new documents with own shapes, connectors, masters and a picture, through the model |
+| `src/dump.rs` | the whole model as text, every string resolved, to compare two reads |
 | `tests/vsdx.uis` | what `build_rs.py test` runs (`--check`) |
