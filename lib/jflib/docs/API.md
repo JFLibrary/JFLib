@@ -73,7 +73,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
   <br>[lib.rs](#wgsl-crate-root) · [ast.rs](#wgslastrs) · [bench.rs](#wgslbenchrs) · [check.rs](#wgslcheckrs) · [ir.rs](#wgslirrs) · [lex.rs](#wgsllexrs) · [parse.rs](#wgslparsers) · [pipeline.rs](#wgslpipeliners) · [print.rs](#wgslprintrs) · [spirv.rs](#wgslspirvrs) · [xid.rs](#wgslxidrs)
 - [plat](#plat) -- the platform layer: windows, input, files, threads, network, processes, desktop services
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [process_apple.rs (Apple)](#platprocess_applers-apple) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [pid.rs](#platpidrs) · [hosted.rs](#plathostedrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [sysmenu.rs](#platsysmenurs) · [power.rs](#platpowerrs) · [sensors.rs](#platsensorsrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [win_audio.rs (Windows)](#platwin_audiors-windows) · [linux_audio.rs (Linux)](#platlinux_audiors-linux) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [present_copy.rs](#platpresent_copyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [control_ipc_apple.rs (Apple)](#platcontrol_ipc_applers-apple) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_touch.rs (Windows)](#platwin_touchrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_gpuout.rs (Windows)](#platwin_gpuoutrs-windows) · [win_plock.rs (Windows)](#platwin_plockrs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [win_clr.rs (Windows)](#platwin_clrrs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [linux_glibc.rs (Linux)](#platlinux_glibcrs-linux) · [linux_gpuout.rs (Linux)](#platlinux_gpuoutrs-linux) · [apple.rs (Apple)](#platapplers-apple) · [apple_sys.rs (Apple)](#platapple_sysrs-apple) · [apple_thread.rs (Apple)](#platapple_threadrs-apple) · [apple_disp.rs (Apple)](#platapple_disprs-apple) · [apple_ios_services.rs (Apple)](#platapple_ios_servicesrs-apple) · [apple_ios_a11y.rs (Apple)](#platapple_ios_a11yrs-apple) · [apple_mac.rs (Apple)](#platapple_macrs-apple) · [apple_mac_test.rs (Apple)](#platapple_mac_testrs-apple) · [apple_mac_dnd.rs (Apple)](#platapple_mac_dndrs-apple) · [apple_mac_app.rs (Apple)](#platapple_mac_apprs-apple) · [apple_mac_gpu.rs (Apple)](#platapple_mac_gpurs-apple) · [apple_mac_a11y.rs (Apple)](#platapple_mac_a11yrs-apple) · [web.rs](#platwebrs) · [android_files.rs](#platandroid_filesrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [web_sensors.rs](#platweb_sensorsrs) · [android_gpu.rs](#platandroid_gpurs) · [apple_ios_gpu.rs](#platapple_ios_gpurs) · [web_gpu.rs](#platweb_gpurs) · [android_ime.rs](#platandroid_imers) · [android_edges.rs](#platandroid_edgesrs) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [keycode.rs](#platkeycoders) · [plock.rs](#platplockrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -108,6 +108,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#rt-crate-root) · [boot.rs](#rtbootrs) · [cpu.rs](#rtcpurs) · [crash.rs](#rtcrashrs) · [fx.rs](#rtfxrs) · [kernel.rs](#rtkernelrs) · [sync.rs](#rtsyncrs) · [x87.rs](#rtx87rs) · [portable/fx.rs](#rtportablefxrs) · [portable/math.rs](#rtportablemathrs) · [hosted.rs](#rthostedrs)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
   <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
+- [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
+  <br>[src/bvh.rs](#physicssrcbvhrs) · [src/gjk.rs](#physicssrcgjkrs) · [src/hull.rs](#physicssrchullrs) · [src/math.rs](#physicssrcmathrs) · [src/mesh.rs](#physicssrcmeshrs) · [src/query.rs](#physicssrcqueryrs) · [src/shape.rs](#physicssrcshapers) · [src/tree.rs](#physicssrctreers) · [src/world.rs](#physicssrcworldrs)
 
 ## ui
 
@@ -163,7 +165,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 
 - [App, AppDesc, Ui, run, async tasks](#app-appdesc-ui-run-async-tasks): `fb`, `client_size`, `anim_off`, `set_anim_off`, `headless`, `invalidate`, `quit`, `set_title`, `title`, `spawn`, `spawner`, `tasks_live`
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
-- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `key_event_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
+- [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `pointer_lock`, `pointer_lock_state`, `pointer_motion`, `key_code_down`, `focus`, `focus_quiet`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `key_take`, `key_event_take`, `text_take`, `cursor_at`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `sem_rect`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `checkbox_wrap`, `radio_wrap`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`, `canvas_label`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `accel_run`, `popup_is_open`, `popup_count`, `popup_open`, `popup_open_at`, `popup_close`, `popup_close_id`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_item_keys`, `key_text`, `menu_cmd`, `menu_sep`, `menu_list_empty`, `menu_list`, `menubar`, `menu_popup`, `menu_popup_at`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
@@ -196,6 +198,8 @@ Re-exports: `img_svg::Svg`
 Re-exports: `plat::{Preedit, IP_EMAIL, IP_NUMBER, IP_PASSWORD, IP_PHONE, IP_SEARCH, IP_TEXT, IP_URL}`
 
 Re-exports: `plat::BrowserStatus`
+
+Re-exports: `plat::PointerLock`
 
 Re-exports: `rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH}`
 
@@ -640,9 +644,9 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   - `mods: u32` -- MOD_\* at the time
   - `down: bool` -- down (true) or up
   - `repeat: bool` -- a down of the system's auto-repeat while the key is held
-  - `scancode: u32` -- the key's place on the keyboard, whatever the layout: Windows' scan code (0xE0.. for
-    extended keys), Linux's evdev code; 0 where the platform does not tell (macOS, the
-    browser, Android)
+  - `scancode: u32` -- the platform's code of the key's place on the keyboard, whatever the layout: Windows' scan
+    code (0xE0.. for extended keys), Linux's evdev code, (G7a) the USB HID usage on macOS,
+    iOS and in the browser; 0 where the platform does not tell (Android)
   - `location: u32` -- KL_STANDARD, KL_LEFT / KL_RIGHT (the two Shift, Ctrl, Alt, Windows keys), KL_NUMPAD
   - `ch: u32` -- the character the keyboard layout gives the key with Shift, Caps Lock and AltGr as they
     are but without Ctrl, Alt and the Windows / Super key (0: none) -- what a browser names
@@ -653,6 +657,9 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
     Android; a headless run's keys have the US layout's (scripts: `keydown ... char "c"`)
   - `dead: bool` -- the key is a dead key (´ ^ ~ ...): ch is its spacing character, the text it makes
     comes with the next key
+  - `code: u32` -- (G7a) where the key sits as a USB HID usage, the same on every platform and layout
+    (plat::KC_\*: KC_W is the key right of Q on a US keyboard, Z on a French one); 0 where the
+    platform does not tell (Android).  plat::key_label(code) says what the layout prints on it
 
 - **`struct Sem`**
   semantic record (dump / expect)  [SR_\*]
@@ -722,6 +729,26 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   ui_mouse: pointer position in px (-1 when outside)
 - **`fn pen(&self) -> (u32, u32)`**
   ui_pen: (pressure 0 = none / 1..UI_PRESSURE_ONE, PTR_\*) of the last pointer event
+- **`fn pointer_lock(&mut self, on: bool) -> plat::PointerLock`**
+  (G7a) lock the pointer to this window (on) or let it go (off) -> the state right after the
+  call (plat::win_pointer_lock): Locked, Pending while the platform waits (the window has no
+  focus yet, the browser waits for the next press in the page, Wayland for the compositor),
+  Unsupported (Android, iOS, a display without the means), Refused.  While locked the pointer
+  is hidden and stays put, ui.pointer_motion has its raw motion, a change of the state gives a
+  pass.  Esc, the window losing the focus, minimizing and closing it always let it go (Esc
+  then reaches the app as no key); it is never taken back by itself.  A headless run (scripts)
+  plays the lock: Locked at once, Esc lets it go, `motion DX DY` moves it
+- **`fn pointer_lock_state(&self) -> plat::PointerLock`**
+  (G7a) the state of this window's pointer lock (Off when another window holds it)
+- **`fn pointer_motion(&self) -> (f64, f64)`**
+  (G7a) the raw motion of the locked pointer since the last pass of this window: (dx, dy),
+  right and down positive, in the device's counts where the platform gives them (Windows,
+  Wayland, X11, the browser with unadjustedMovement), else in its accelerated pixels (macOS,
+  the browser without it); (0, 0) while the pointer is not locked.  A game turns its camera by
+  it times a sensitivity
+- **`fn key_code_down(&self, code: u32) -> bool`**
+  (G7a) the key at USB HID usage `code` (plat::KC_\*: where it sits, whatever the layout) is
+  held; KeyEvent::code of its down and up
 - **`fn focus(&mut self, id: u32)`**
   ui_focus(id): give the keyboard focus to a widget (focus ring shown).  The id is
   looked up in whichever window emits it in the next pass (that window is activated).
@@ -21432,8 +21459,9 @@ mtl_swap -- swapchains on Metal (AP6c, docs/APPLE.md): a CAMetalLayer on a plat 
   device.create_swapchain(&surface, &desc)   the layer gets the device, the format (BGRA8, sRGB
        when asked), framebufferOnly unless copy_src, three drawables, the window's size
   try_acquire() never waits: nextDrawable only while fewer drawables are in use than the layer
-       has (in use: taken and not yet on the screen, plus the one on the screen; the drawables'
-       presented handlers count what reached it); NotReady otherwise
+       has (in use: this swapchain's taken and not presented, the layer's presented and not yet
+       on the screen -- also those of an earlier swapchain on it --, plus the one on the screen;
+       the drawables' presented handlers count what reached it); NotReady otherwise
   present(frame, cmds)                   the last command buffer presents the drawable
 
 Present modes: Fifo only.  Without displaySyncEnabled a window on macOS still shows at the rate of
@@ -21539,6 +21567,10 @@ ahead (shaders_spv.rs) on Vulkan, handed to the browser as text on WebGPU.
        scene.submitted(id);
   gltf::upload(&mut renderer, &document) -> Result<Imported>  a jflib-gltf Document: meshes, textures,
        materials, and its instances for a Scene (gltf.rs)
+  (G7f) renderer.remove_mesh(id), remove_material(id), remove_texture(id)   their places are used again, the ids stay
+       invalid (store.rs); refused while a scene's instances, a material or a detail level use them
+  (G7f) renderer.add_material_desc(&MaterialDesc)             glTF's BLEND (blended after the rest, sorted back to front
+       per instance on the GPU: sort.wgsl) and doubleSided (no culling of back faces, their normal turned round)
 
 Conventions: reverse Z (depth 1 at the near plane, compare Greater, clear with DEPTH_CLEAR; a far plane
 of f64::INFINITY is the default), right-handed world, faces counter-clockwise from outside, light in the
@@ -21565,8 +21597,17 @@ SCATTER_WGSL: &str = include_str!("scatter.wgsl")
 DRAW_WGSL: &str = include_str!("draw.wgsl")
 /// (G5d) the depth pyramid of the occlusion test
 HIZ_WGSL: &str = include_str!("hiz.wgsl")
+/// (G7f) the blended instances sorted back to front
+SORT_WGSL: &str = include_str!("sort.wgsl")
+SORT_LOCAL_SPV: &[u32] = spv::SORT_LOCAL
+SORT_GLOBAL_SPV: &[u32] = spv::SORT_GLOBAL
+/// (G7f) the blended instances' vertex and fragment shaders
+VS_BLEND_SPV: &[u32] = spv::VS_BLEND
+FS_BLEND_SPV: &[u32] = spv::FS_BLEND
 CULL_SPV: &[u32] = spv::CULL
 CULL_EARLY_SPV: &[u32] = spv::CULL_EARLY
+/// (G7f) the camera's culling without the occlusion test when the scene has blended instances
+CULL_BLEND_SPV: &[u32] = spv::CULL_BLEND
 CULL_LATE_SPV: &[u32] = spv::CULL_LATE
 HIZ_DEPTH_SPV: &[u32] = spv::HIZ_DEPTH
 HIZ_DOWN_SPV: &[u32] = spv::HIZ_DOWN
@@ -21605,7 +21646,9 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   - `indices: &'a [u32]`
 
 - **`struct MeshId(pub u32)`**
-  a mesh of a Renderer
+  a mesh of a Renderer.  (G7f) The low 24 bits are its place in the renderer's tables, the high 8 bits how often that
+  place was used before (Renderer::remove_mesh): the id of a removed mesh stays invalid.  A renderer that removes nothing
+  numbers its meshes 0, 1, 2, ...
 
 - **`struct Lod`**
   (G5d) a detail level of a mesh (Renderer::set_lods): an instance whose bounding sphere's projected diameter is less
@@ -21614,13 +21657,15 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   - `below: f32`
 
 - **`struct MaterialId(pub u32)`**
-  a material of a Renderer
+  a material of a Renderer.  (G7f) As MeshId: a place and how often it was used before (Renderer::remove_material)
 
 - **`enum AlphaClass`**
   how a material's alpha is drawn, and so the lists and pipelines its instances take (docs/RENDER3D.md "Listen je
-  Alpha-Modus"; Material::alpha_class).  glTF's BLEND is drawn opaque.  A third class (blended, sorted) may come
+  Alpha-Modus"; Material::alpha_class, MaterialDesc::alpha_class)
   - `Opaque` -- nothing is dropped: pipelines without a discard (the early depth test stays theirs)
   - `Mask` -- glTF's MASK: fragments whose alpha is below the cutoff are dropped
+  - `Blend` -- (G7f) glTF's BLEND (MaterialDesc::blend): drawn after the others, sorted back to front per instance, blended
+    (premultiplied alpha), the depth tested and not written; no shadows, not in the occlusion test's pyramid
 
 - **`struct MeshInfo`**
   where a mesh lies in the pools, and its bounding sphere in its own coordinates
@@ -21658,7 +21703,27 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`const fn textured(t: TextureRef) -> Material`**
   a dull material of a texture (white times the texture)
 - **`const fn alpha_class(&self) -> AlphaClass`**
-  the lists and pipelines its instances take: Mask with an alpha_cutoff, else Opaque
+  the lists and pipelines its instances take: Mask with an alpha_cutoff, else Opaque (blended: MaterialDesc)
+
+- **`struct MaterialDesc`**
+  (G7f) a material with what a Material cannot hold (it is not #[non_exhaustive], a field more would break code that
+  writes all of them): glTF's alpha mode BLEND and doubleSided.  Made with `new` (or `from` a Material) and changed field
+  by field (it may grow); Renderer::add_material_desc, set_material_desc.  Renderer::add_material(m) is
+  add_material_desc(&MaterialDesc::new(m))
+  - `material: Material`
+  - `blend: bool` -- glTF's BLEND: the instances are drawn after the opaque and MASK ones, sorted back to front per instance (by the
+    distance of their bounding sphere's centre from the eye), over what is there: the shader multiplies its colour by
+    the base colour's alpha (times the texture's), blended as premultiplied alpha (One, OneMinusSrcAlpha), in the
+    target's code values; the depth is tested, not written.  They cast no shadows and hide nothing from the occlusion
+    test.  Not together with an alpha_cutoff (Invalid)
+  - `double_sided: bool` -- glTF's doubleSided: back faces are not culled; they are lit with their normal turned round (the whole shading
+    normal, as the glTF sample viewer turns the tangent frame).  Both sides cast shadows (every material does)
+
+**`impl MaterialDesc`**
+
+- **`const fn new(material: Material) -> MaterialDesc`**
+- **`const fn alpha_class(&self) -> AlphaClass`**
+  the lists and pipelines its instances take: Blend when blended, else the Material's
 
 - **`struct Renderer`**
   the pipelines of one colour format, the mesh pools and the material table of one device
@@ -21688,6 +21753,17 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
 - **`fn add_mesh(&mut self, m: &MeshData) -> Result<MeshId>`**
   a mesh into the pools (they grow; nothing waits).  The vertices must be there in equal numbers, the
   indices in threes and in range, positions finite.
+- **`fn remove_mesh(&mut self, id: MeshId) -> Result<()>`**
+  (G7f) a mesh goes: its id is invalid from now on, its vertices and indices are used again (once the frames that may
+  still draw it are done, store.rs), its place gets the next mesh with a new id.  Invalid for a mesh the renderer does
+  not have, one that instances of a scene use (Scene::remove them first; a dropped scene uses nothing) and one that
+  another mesh takes as a detail level (set_lods of that one first).  Its own detail levels go with it.  A scene
+  prepared before the removal does not record (Invalid): it prepares again
+- **`fn mesh_count(&self) -> u32`**
+  (G7f) live meshes
+- **`fn pool_use(&self) -> [(u32, u32, u32); 3]`**
+  (G7f; tests, tools) per pool (vertices, 16-bit, 32-bit indices): elements up to its end, its room, and the free
+  elements below the end that removals left (ranges, handed out again before the end grows)
 - **`fn mesh_info(&self, id: MeshId) -> Option<MeshInfo>`**
 - **`fn set_lods(&mut self, mesh: MeshId, lods: &[Lod]) -> Result<()>`**
   (G5d) a mesh's detail levels: other meshes (or none) for its instances below a projected size, thresholds
@@ -21702,20 +21778,42 @@ FS_SHADOW_SPV: &[u32] = spv::FS_SHADOW
   grown to hold its detail levels
 - **`fn add_texture(&mut self, d: &TextureData) -> Result<TextureId>`**
   a texture into the array of its size class with all its mip levels (texture.rs: resampled when it is
-  not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission
+  not 128, 256, 512, 1024 or 2048 square).  The upload goes with the next submission.  (G7f) A layer a removed
+  texture left is used first
+- **`fn remove_texture(&mut self, id: TextureId) -> Result<()>`**
+  (G7f) a texture goes: its id is invalid from now on, its layer is used again by the next texture of its class and
+  colour space (the arrays do not shrink).  Invalid for a texture the renderer does not have and one that a material
+  names (set_material without it, or remove_material, first).  A scene prepared before the removal does not record
+  (Invalid): it prepares again
 - **`fn texture_info(&self, id: TextureId) -> Option<TextureInfo>`**
 - **`fn texture_count(&self) -> u32`**
+  live textures
 - **`fn texture_bytes(&self) -> u64`**
   bytes of GPU memory the texture arrays take
 - **`fn texture_array(&self, class: u32, srgb: bool) -> Option<&Texture>`**
   (tests) the array of a size class and colour space (layers: TextureInfo::layer), None without a texture
 - **`fn add_material(&mut self, m: &Material) -> Result<MaterialId>`**
   a row of the table; its textures must be this renderer's
+- **`fn add_material_desc(&mut self, d: &MaterialDesc) -> Result<MaterialId>`**
+  (G7f) a row of the table with glTF's BLEND and doubleSided (MaterialDesc); its textures must be this renderer's.
+  The first blended or double-sided material makes the pipelines they need
 - **`fn set_material(&mut self, id: MaterialId, m: &Material) -> Result<()>`**
   a row of the table; the next frame shows it.  A new alpha class moves the material's instances to the lists of
-  that class with their scenes' next prepare
+  that class with their scenes' next prepare.  (G7f) The material stays blended and double-sided as it was
+  (set_material_desc changes those)
+- **`fn set_material_desc(&mut self, id: MaterialId, d: &MaterialDesc) -> Result<()>`**
+  (G7f) a row of the table with glTF's BLEND and doubleSided; the next frame shows it.  A new alpha class or side
+  moves the material's instances to their new lists with their scenes' next prepare
+- **`fn remove_material(&mut self, id: MaterialId) -> Result<()>`**
+  (G7f) a material goes: its id is invalid from now on, its textures lose a user, its place gets the next material
+  with a new id.  Invalid for a material the renderer does not have and one that instances of a scene use.  A scene
+  prepared before the removal does not record (Invalid): it prepares again
+- **`fn material_count(&self) -> u32`**
+  (G7f) live materials
 - **`fn alpha_class(&self, id: MaterialId) -> AlphaClass`**
   the alpha class of a material (Opaque for one the renderer does not have)
+- **`fn double_sided(&self, id: MaterialId) -> bool`**
+  (G7f) a material is double-sided (false for one the renderer does not have)
 - **`fn set_size(&mut self, w: u32, h: u32) -> Result<()>`**
   a depth buffer the renderer keeps, for frames recorded with depth None (sampled too: the occlusion test builds
   its pyramid from it)
@@ -21827,8 +21925,8 @@ Source: [`lib/render3d/gltf.rs`](../lib/render3d/gltf.rs)
 gltf -- a jflib-gltf Document into a Renderer (G5b; docs/GLTF.md): each primitive as a mesh, each image as a
 texture (once per image, colour space and filter: base colour and emissive sRGB, the others linear), each
 material as a row, and the instances of a scene with their world matrices taken apart (gltf::decompose)
-for Scene::add.  What the engine cannot show yet is counted in notes: BLEND drawn opaque, double-sided
-materials drawn from the front, uv sets other than 0, world matrices with shear (drawn without it).
+for Scene::add.  (G7f) BLEND and doubleSided go through MaterialDesc.  What the engine cannot show yet is counted in
+notes: uv sets other than 0, world matrices with shear (drawn without it).
 
   let doc = ::gltf::load(&bytes, &mut |uri| read(dir, uri), &::gltf::Limits::DEFAULT)?;
   let imported = render3d::gltf::upload(&mut renderer, &doc, None)?;
@@ -21924,6 +22022,13 @@ slots through the scatter shader (a run of (slot, record) in the slot's own Uplo
 4096 changes and an eighth of the slots at once, a new origin, new capacities: everything, from a
 temporary buffer.  Queue::write_buffer would not do for this: its copies run ahead of the frame's
 commands without a barrier against the frames still on the GPU.
+
+(G7f) Removal (store.rs): a scene counts its instances per mesh and material and tells the renderer's shared table
+when it has the first or no longer any of one (and when it goes); lists belong to a mesh's slot, so a removed mesh's
+lists serve the next mesh in that slot.  Lists per side, class and faces: double-sided materials have lists of their
+own (drawn without culling).  Blended instances (class Blend) have lists for their mesh like the others, without room in
+the visible lists: the camera's culling puts them into one list for all of them (`blend`), sort.wgsl sorts it, one draw
+draws it (lib.rs draw_blend).
 ```
 
 - **`struct Transform`**
@@ -22009,12 +22114,17 @@ commands without a barrier against the frames still on the GPU.
   - `lists: bool` -- the lists' layout changed
   - `bytes: u64` -- everything prepare wrote for the GPU, view and lights included
 
+- **`struct ListKind`**
+  (G7f) what ListInfo cannot say (it is not #[non_exhaustive]): more about a list, in the order of Scene::lists
+  - `double_sided: bool` -- its instances' materials are double-sided: drawn without culling, back faces lit with their normal turned round
+
 - **`struct ListInfo`**
   a list of the scene
   - `mesh: MeshId`
   - `mirrored: bool` -- its instances are mirrored (drawn with clockwise front faces)
   - `class: AlphaClass` -- the alpha class of its instances' materials (drawn with or without a discard)
-  - `count: u32` -- the instances of this mesh, side and class, and the room for them in the visible list
+  - `count: u32` -- the instances of this mesh, side and class, and the room for them in the visible list (G7f: none for blended
+    instances, they go into the blended instances' list)
   - `capacity: u32`
   - `room: u32` -- (G5d) the instances that may land here: its own and those of meshes that take it as a detail level
   - `first: u32` -- its first place in the visible list
@@ -22096,6 +22206,15 @@ commands without a barrier against the frames still on the GPU.
 - **`fn lists(&self) -> Vec<ListInfo>`**
   the lists as the last prepare settled them, in order (list i is what list_of holds for its instances; its draw
   record: ListInfo::record)
+- **`fn list_kinds(&self) -> Vec<ListKind>`**
+  (G7f) more about the lists, in the order of lists(): double-sided or not
+- **`fn blend_buffer(&self) -> &Buffer`**
+  (G7f; tests, tools) the blended instances' list after a frame: a VkDrawIndirectCommand (vertices per instance, the
+  instances), then per instance 4 u32: the bits of !(distance squared from the eye; f32), its slot, the draw record of
+  its list (lists().record), the list's flags (1: 32-bit indices, 2: double-sided, 4: mirrored); sorted, farthest
+  first.  Its draw: blend_drawn()
+- **`fn blend_drawn(&self) -> bool`**
+  (G7f) the last prepare found blended instances that may be drawn (a list of them has room)
 - **`fn draws_buffer(&self) -> &Buffer`**
   (tests, tools) the camera's draw records after a frame's culling: 5 u32 per list at ListInfo::record,
   instance_count second
@@ -22195,6 +22314,11 @@ classes are powers of two.
 An array grows by doubling its layers: a new texture, the old layers copied through a buffer, the old one
 dropped once the GPU is done with it.  Uploads go through Queue::write_texture (staged before the next
 submission, after a barrier from Sampled: frames still reading the array finish first).
+
+(G7f) Removing a texture: its id becomes invalid (store.rs: a slot and a generation), its layer goes on its array's
+list of free layers and the next texture of that class and colour space takes it (the barrier from Sampled above is
+what makes that safe against frames in flight).  Refused while a material names it: each texture counts the material
+rows that do.
 ```
 
 ```rust
@@ -22213,7 +22337,7 @@ CLASS_MAX: u32 = CLASS_MIN << (CLASSES - 1)
   - `nearest: bool` -- it is drawn with a nearest filter: a resampling to its class keeps the texels (else bilinear)
 
 - **`struct TextureId(pub u32)`**
-  a texture of a Renderer
+  a texture of a Renderer.  (G7f) As MeshId: a place and how often it was used before (Renderer::remove_texture)
 
 - **`struct TextureInfo`**
   where a texture lies
@@ -27101,6 +27225,9 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            signals, the stderr line of ASMLIB) and panics; crash_test() crashes on purpose
   windows: the window-indexed API of the assembly (win_create / win_show / win_present /
            wait ..., popups, clipboard, drops, pen, cursors; consts.rs, evq.rs, pwin0.rs)
+  input:   (G7a) win_pointer_lock / win_pointer_lock_state / win_raw_motion_take: the pointer
+           locked to a window, hidden, its raw relative motion (plock.rs); KC_* key_code /
+           key_label: where a key sits as a USB HID usage on every platform (keycode.rs)
   dnd:     drag and drop between programs: DragData (files, text, URLs, HTML, image),
            the drop target hook, the pending drop, drag_start (dragging out)    (dnd.rs)
   (plat-shared) print(job) + page layout / PDF writer (print.rs; win_print.rs,
@@ -32976,6 +33103,36 @@ the focus.  It is destroyed together with its parent.
   the PCI vendor and device id of the GPU that drives the monitor window w is on (None: not
   known, not a PCI device)
 
+### `plat/win_plock.rs` (Windows)
+
+Source: [`lib/plat/win_plock.rs`](../lib/plat/win_plock.rs)
+
+```text
+win_plock -- (G7a) the pointer lock on Windows (the shared part: plock.rs)
+
+  win_plock_set(w, on) -> PointerLock    lock the pointer to window w / let it go
+  (window procedure, win_api.rs)
+    input(w, lparam)        WM_INPUT of the mouse: raw motion -> plock_motion
+    focus_in(w)             WM_SETFOCUS: a request that waited (Pending) takes effect
+    release(w)              WM_KILLFOCUS, minimized, WM_DESTROY, Esc: the lock goes
+    follow(w)               WM_MOVE / WM_SIZE: the clip follows the window
+    locked(w) -> bool       WM_SETCURSOR (no cursor), WM_NCHITTEST (all client: a hidden
+                            pointer never drags the title bar), win_set_cursor (kept for later)
+
+Locked: the mouse's Raw Input (usage page 1, usage 2) goes to the window (WM_INPUT, only while
+it is in the foreground: no RIDEV_INPUTSINK), the cursor is clipped to one pixel in the middle
+of the client area (ClipCursor; again after every move and size) and hidden (WM_SETCURSOR sets
+none).  The legacy mouse messages stay (no RIDEV_NOLEGACY): buttons and the wheel come as
+before.  Relative devices give counts (lLastX / lLastY); absolute ones (MOUSE_MOVE_ABSOLUTE: a
+remote desktop, a tablet, a virtual machine's pointer) positions 0..65535 of the primary
+monitor or the whole desktop (MOUSE_VIRTUAL_DESKTOP), whose differences are the motion in
+pixels.  The release unregisters the device (RIDEV_REMOVE), lifts the clip and puts the
+cursor back where it was before the lock.
+```
+
+- **`fn win_plock_set(w: i32, on: bool) -> PointerLock`**
+  (plock.rs) lock the pointer to window w (on) or let it go -> the state now
+
 ### `plat/win_shell.rs` (Windows)
 
 Source: [`lib/plat/win_shell.rs`](../lib/plat/win_shell.rs)
@@ -33811,6 +33968,9 @@ BK_X11: u32 = 2
   - `fn drag_start(&mut self, _data: crate::DragData) -> bool`
     drag data out of the app (dnd.rs drag_start; the left button is held) -> started;
     E_DRAG_END follows -- added with a default for the drag and drop work (X11, Wayland)
+  - `fn pointer_lock(&mut self, w: i32, on: bool) -> crate::PointerLock`
+    (G7a) lock the pointer to window w (on) or let it go -> the state now (plock.rs: the
+    backend calls plock_set); default: Unsupported
 
 - **`fn disp_backend() -> u32`**
   0 none, 1 Wayland, 2 X11
@@ -33986,6 +34146,11 @@ UI thread calls in; wake() from other threads goes through the eventfd of linux_
 - **`fn wl_test_event_u(iface: &str, event: &str, args: &[u64], udata: u64) -> bool`**
   (main agent) wl_test_event with the handler's udata (a tablet tool's slot ...), as
   plattest --test pen does  [tcall in apps/plattest/src/pen.s]
+
+- **`fn wl_test_lock(w: i32)`**
+  (G7a, plattest --test input) play a pointer lock of window w without a compositor: its
+  zwp_locked_pointer_v1 and zwp_relative_pointer_v1 are object 1 (the id of wl_test_event's
+  events), the request Pending until a "locked" event; the protocols count as there
 
 - **`fn wl_test_scale(s120: i32)`**
   (main agent) the pointer scale while there is no window (g_wl_s120, 120ths) alone
@@ -34186,6 +34351,10 @@ plat::xkb_\*)
 - **`fn event_bytes(pkt: &[u8])`**
   one X event packet of any length (a GenericEvent: 32 bytes + its extra length)
   through the event handler (x11_event)
+
+- **`fn lock_setup(w: i32, on: bool, abs: &[(u16, [i32; 2], [i32; 2])])`**
+  (G7a, plattest --test input) play the pointer lock of window w without a server: held
+  (on) or not; absolute devices (id, range of valuator 0, of valuator 1) for its raw events
 
 - **`fn xi_setup(op: u32, atoms: [u32; 3])`**
   XInput 2 without a server: its major opcode and the valuator label atoms ("Abs
@@ -36142,6 +36311,10 @@ that frame (flush).
 it shows WST_FULLSCREEN at once, the page's answer jfgui_fullscreen confirms it or takes it
 back: refused without the user's gesture, left with Esc); a tool window covers the canvas
 (its place comes back after).  Android: nothing.
+(G7a) The pointer lock (plock.rs): the page locks the canvas (REQUEST_POINTER_LOCK; Pending) from
+the user's gesture -- at once while the page still has the activation of the press that made the
+app ask, else with the next press in it -- and answers with jfgui_pointer_lock; the raw motion
+comes through jfgui_motion.  Android and iOS: Unsupported.
 ```
 
 - **`fn win_create( title: &str, width: i32, height: i32, _flags: u32, _owner: i32, x: i32, y: i32, ) -> i32`**
@@ -36176,6 +36349,21 @@ back: refused without the user's gesture, left with Esc); a tool window covers t
 
 - **`fn win_cmd(id: i32, command: u32)`**
   Apply library-window commands; close is delivered to the normal app close workflow.
+
+```rust
+/// (G7a) (browser) ask the page for the pointer lock of the canvas (one byte, 1 lock / 0 let go):
+/// requestPointerLock from the user's gesture (with unadjustedMovement where the browser has it);
+/// the page answers with jfgui_pointer_lock, the motion comes with jfgui_motion
+REQUEST_POINTER_LOCK: u32 = 31
+```
+
+- **`extern "C" fn jfgui_pointer_lock(state: u32) -> u32`**
+  (G7a) the page's pointer lock changed: 1 the canvas holds it, 0 it let go (Esc, the browser, the
+  page lost the focus), 2 the browser refused it (pointerlockerror after a press) -> 1 taken
+
+- **`extern "C" fn jfgui_motion(dx: f64, dy: f64) -> u32`**
+  (G7a) the locked pointer's motion from the page (movementX / movementY, summed since the last
+  call): raw with unadjustedMovement, else the browser's CSS pixels -> 1 taken
 
 ```rust
 /// (L7) (browser) ask the page to show the canvas in full screen (one byte, 1 on / 0 off): the
@@ -37062,6 +37250,11 @@ E_SESSION_END: u8 = 21  // the user logs off, the system shuts down, SIGTERM: sa
 E_SETTINGS: u8 = 22  // data = SET_* bits: system settings changed
 E_DRAG: u8 = 23  // a drag over the window: x, y, data = DT_* | DE_* << 8 (0: it left; dnd.rs)
 E_DRAG_END: u8 = 24  // our outgoing drag (drag_start) ended: data = DE_* effect, 0 = none
+/// (G7a) raw relative motion of the pointer waits for win_raw_motion_take(win) while the window
+/// holds the pointer lock (one event until it is taken, however much motion comes)
+E_RAW_MOTION: u8 = 25
+/// (G7a) the pointer lock of the window changed (win_pointer_lock_state): data 1 locked now, 0 not
+E_POINTER_LOCK: u8 = 26
 // E_SETTINGS: what changed
 SET_THEME: u32 = 1  // light / dark, accent colour
 SET_LOCALE: u32 = 2  // language, regional format
@@ -37109,7 +37302,8 @@ MOD_NUM: u8 = 64
 *(E2) where a key sits (key_location of Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:*
 
 ```rust
-// Windows' scan code (0xE0.. for extended keys), Linux's evdev code, 0 where unknown)
+// Windows' scan code (0xE0.. for extended keys), Linux's evdev code, (G7a) the USB HID usage on macOS,
+// iOS and in the browser, 0 where unknown; keycode.rs key_code turns it into the same KC_* everywhere)
 KL_STANDARD: u32 = 0
 KL_LEFT: u32 = 1  // the left Shift, Ctrl, Alt, Windows key
 KL_RIGHT: u32 = 2
@@ -37408,6 +37602,321 @@ PRESSURE_ONE: i32 = 65535
   pen input on (default) / off (pens become plain mouse events)
 
 - **`fn pen_enabled() -> bool`**
+
+### `plat/keycode.rs`
+
+Source: [`lib/plat/keycode.rs`](../lib/plat/keycode.rs)
+
+```text
+keycode -- (G7a) where a key sits on the keyboard, the same number on every platform: the USB
+HID usage IDs of the keyboard page (page 7), whatever the layout prints on the key
+
+  KC_*                              the usages (KC_W is the key right of Q on a US keyboard: the
+                                    Z of a French one, still KC_W)
+  key_code(scancode) -> code        Event::x of a key event on this platform -> its usage
+                                    (0: unknown); KeyEvent::code of the UI
+  key_scancode(code) -> scancode    the other way (scripts, tests); 0: this platform has none
+  key_code_set1(sc) / key_code_evdev(code) / key_code_mac(kvk)   the tables of the
+                                    platforms, on every target (tests): Windows' scan codes
+                                    of set 1 (0xE0.. for the extended keys, as Event::x),
+                                    Linux's evdev codes, the virtual key codes of macOS (kVK_*)
+  key_code_name(code) / key_code_from_name(name)   the browser's KeyboardEvent.code names
+                                    ("KeyW", "ShiftLeft"); "" / 0 unknown
+  key_label(code) -> Option<String> what the current layout prints on that key ("Z" for KC_W
+                                    on a French keyboard), None where the platform does not
+                                    say (the browser, Android, iOS) or the key has no label
+
+What Event::x of E_KEY_DOWN / E_KEY_UP holds per platform: Windows' scan code (set 1, 0xE0..
+extended), Linux's evdev code (X11 and Wayland), the usage itself on macOS, iOS and in the
+browser (their own codes are turned into usages where the event is made); Android 0.
+
+The rows follow the USB HID usage tables (keyboard page) and the mapping of the UI Events
+KeyboardEvent.code specification (W3C) to the native codes of each system.
+```
+
+```rust
+/// (G7a) USB HID usages of the keyboard page: where a key sits (KeyEvent::code)
+KC_A: u32 = 0x04
+KC_B: u32 = 0x05
+KC_C: u32 = 0x06
+KC_D: u32 = 0x07
+KC_E: u32 = 0x08
+KC_F: u32 = 0x09
+KC_G: u32 = 0x0A
+KC_H: u32 = 0x0B
+KC_I: u32 = 0x0C
+KC_J: u32 = 0x0D
+KC_K: u32 = 0x0E
+KC_L: u32 = 0x0F
+KC_M: u32 = 0x10
+KC_N: u32 = 0x11
+KC_O: u32 = 0x12
+KC_P: u32 = 0x13
+KC_Q: u32 = 0x14
+KC_R: u32 = 0x15
+KC_S: u32 = 0x16
+KC_T: u32 = 0x17
+KC_U: u32 = 0x18
+KC_V: u32 = 0x19
+KC_W: u32 = 0x1A
+KC_X: u32 = 0x1B
+KC_Y: u32 = 0x1C
+KC_Z: u32 = 0x1D
+KC_1: u32 = 0x1E
+KC_2: u32 = 0x1F
+KC_3: u32 = 0x20
+KC_4: u32 = 0x21
+KC_5: u32 = 0x22
+KC_6: u32 = 0x23
+KC_7: u32 = 0x24
+KC_8: u32 = 0x25
+KC_9: u32 = 0x26
+KC_0: u32 = 0x27
+KC_ENTER: u32 = 0x28
+KC_ESCAPE: u32 = 0x29
+KC_BACKSPACE: u32 = 0x2A
+KC_TAB: u32 = 0x2B
+KC_SPACE: u32 = 0x2C
+KC_MINUS: u32 = 0x2D
+KC_EQUAL: u32 = 0x2E
+KC_BRACKET_LEFT: u32 = 0x2F
+KC_BRACKET_RIGHT: u32 = 0x30
+/// the US layout's backslash; on an ISO keyboard the key left of Enter (# on a German one)
+KC_BACKSLASH: u32 = 0x31
+KC_SEMICOLON: u32 = 0x33
+KC_QUOTE: u32 = 0x34
+/// left of 1 on a US keyboard (` ~), ^ on a German one
+KC_BACKQUOTE: u32 = 0x35
+KC_COMMA: u32 = 0x36
+KC_PERIOD: u32 = 0x37
+KC_SLASH: u32 = 0x38
+KC_CAPS_LOCK: u32 = 0x39
+KC_F1: u32 = 0x3A
+KC_F2: u32 = 0x3B
+KC_F3: u32 = 0x3C
+KC_F4: u32 = 0x3D
+KC_F5: u32 = 0x3E
+KC_F6: u32 = 0x3F
+KC_F7: u32 = 0x40
+KC_F8: u32 = 0x41
+KC_F9: u32 = 0x42
+KC_F10: u32 = 0x43
+KC_F11: u32 = 0x44
+KC_F12: u32 = 0x45
+KC_PRINT_SCREEN: u32 = 0x46
+KC_SCROLL_LOCK: u32 = 0x47
+KC_PAUSE: u32 = 0x48
+KC_INSERT: u32 = 0x49
+KC_HOME: u32 = 0x4A
+KC_PAGE_UP: u32 = 0x4B
+KC_DELETE: u32 = 0x4C
+KC_END: u32 = 0x4D
+KC_PAGE_DOWN: u32 = 0x4E
+KC_RIGHT: u32 = 0x4F
+KC_LEFT: u32 = 0x50
+KC_DOWN: u32 = 0x51
+KC_UP: u32 = 0x52
+KC_NUM_LOCK: u32 = 0x53
+KC_NUMPAD_DIVIDE: u32 = 0x54
+KC_NUMPAD_MULTIPLY: u32 = 0x55
+KC_NUMPAD_SUBTRACT: u32 = 0x56
+KC_NUMPAD_ADD: u32 = 0x57
+KC_NUMPAD_ENTER: u32 = 0x58
+KC_NUMPAD1: u32 = 0x59
+KC_NUMPAD2: u32 = 0x5A
+KC_NUMPAD3: u32 = 0x5B
+KC_NUMPAD4: u32 = 0x5C
+KC_NUMPAD5: u32 = 0x5D
+KC_NUMPAD6: u32 = 0x5E
+KC_NUMPAD7: u32 = 0x5F
+KC_NUMPAD8: u32 = 0x60
+KC_NUMPAD9: u32 = 0x61
+KC_NUMPAD0: u32 = 0x62
+KC_NUMPAD_DECIMAL: u32 = 0x63
+/// the ISO keyboard's key left of Z (< > on a German one)
+KC_INTL_BACKSLASH: u32 = 0x64
+KC_CONTEXT_MENU: u32 = 0x65
+KC_POWER: u32 = 0x66
+KC_NUMPAD_EQUAL: u32 = 0x67
+KC_F13: u32 = 0x68
+KC_F14: u32 = 0x69
+KC_F15: u32 = 0x6A
+KC_F16: u32 = 0x6B
+KC_F17: u32 = 0x6C
+KC_F18: u32 = 0x6D
+KC_F19: u32 = 0x6E
+KC_F20: u32 = 0x6F
+KC_F21: u32 = 0x70
+KC_F22: u32 = 0x71
+KC_F23: u32 = 0x72
+KC_F24: u32 = 0x73
+KC_VOLUME_MUTE: u32 = 0x7F
+KC_VOLUME_UP: u32 = 0x80
+KC_VOLUME_DOWN: u32 = 0x81
+KC_NUMPAD_COMMA: u32 = 0x85
+KC_INTL_RO: u32 = 0x87
+KC_KANA_MODE: u32 = 0x88
+KC_INTL_YEN: u32 = 0x89
+KC_CONVERT: u32 = 0x8A
+KC_NON_CONVERT: u32 = 0x8B
+KC_LANG1: u32 = 0x90
+KC_LANG2: u32 = 0x91
+KC_CONTROL_LEFT: u32 = 0xE0
+KC_SHIFT_LEFT: u32 = 0xE1
+KC_ALT_LEFT: u32 = 0xE2
+/// the left Windows / Super / Command key
+KC_META_LEFT: u32 = 0xE3
+KC_CONTROL_RIGHT: u32 = 0xE4
+KC_SHIFT_RIGHT: u32 = 0xE5
+/// the right Alt (AltGr on many layouts)
+KC_ALT_RIGHT: u32 = 0xE6
+KC_META_RIGHT: u32 = 0xE7
+```
+
+- **`fn key_code_set1(sc: u32) -> u32`**
+  (G7a) the usage of a Windows scan code of set 1 as a key event of Windows carries it in
+  Event::x (0xE0.. for the extended keys); 0 unknown.  Alt+Print (0x54) is Print, Ctrl+Pause
+  (0xE046) is Pause
+
+- **`fn key_code_evdev(code: u32) -> u32`**
+  (G7a) the usage of a Linux evdev key code (KEY_\*, the X keycode minus 8); 0 unknown
+
+- **`fn key_code_mac(kvk: u32) -> u32`**
+  (G7a) the usage of a macOS virtual key code (kVK_\*, NSEvent.keyCode; kVK_ANSI_A is 0); 0
+  unknown
+
+- **`fn key_code_name(code: u32) -> &'static str`**
+  (G7a) the browser's KeyboardEvent.code name of a usage ("KeyW", "ShiftLeft"); "" unknown
+
+- **`fn key_code_from_name(name: &str) -> u32`**
+  (G7a) the usage of a KeyboardEvent.code name; 0 unknown.  Older names of Firefox ("OSLeft",
+  "OSRight", "VolumeMute", "VolumeUp", "VolumeDown") too
+
+- **`fn key_code(scancode: u32) -> u32`**
+  (G7a) the usage (KC_\*) of a key event's Event::x on this platform: Windows' scan code, Linux's
+  and Android's evdev code, on macOS, iOS and in the browser the usage itself; 0 unknown
+
+- **`fn key_scancode(code: u32) -> u32`**
+  (G7a) Event::x of a key event on this platform for a usage (KC_\*): what key_code turns back
+  into it; 0 where this platform has no code for it
+
+- **`fn key_label(code: u32) -> Option<String>`**
+  (G7a) what the current keyboard layout prints on the key at usage `code`: its character
+  without Shift in upper case ("Z" for KC_W on a French keyboard, "Ü" for KC_BRACKET_LEFT on a
+  German one), else the system's name of the key where it has one (Windows: "Esc", "Enter" in
+  the system's language).  Windows (the thread's layout), Linux (the keymap of X11 or Wayland,
+  once a window has the keyboard), macOS (the current input source); None in the browser, on
+  Android and iOS and for keys the layout gives nothing
+
+- **`fn key_code_rows_test() -> alloc::vec::Vec<(u32, u32, u32, u32, &'static str)>`**
+  (test aid, plattest --test input) every row of the table: (usage, Windows scan code, evdev
+  code, macOS key code or 0xFF, the browser's name)
+
+### `plat/plock.rs`
+
+Source: [`lib/plat/plock.rs`](../lib/plat/plock.rs)
+
+```text
+plock -- (G7a) the pointer lock of a window and the raw relative motion while it holds it,
+the part every platform shares
+
+  win_pointer_lock(w, on) -> PointerLock    lock the pointer to window w (on) or let it go;
+                                            the state right after the call
+  win_pointer_lock_state(w) -> PointerLock  the state now
+  win_raw_motion_take(w) -> (dx, dy)        the raw motion since the last call (0, 0 when none
+                                            or w does not hold the lock)
+  E_POINTER_LOCK                            the state changed (data 1: locked now, 0: not)
+  E_RAW_MOTION                              raw motion waits (one event until it is taken)
+
+While a window holds the lock the pointer is hidden, stays where it is (or inside the window)
+and its motion comes raw: without the system's acceleration where the platform has it, in the
+device's counts.  Per platform:
+  Windows  Raw Input (WM_INPUT of usage page 1, usage 2), the cursor clipped to the middle of
+           the window (ClipCursor) and hidden; motion in mouse counts; absolute devices (a
+           remote desktop, a tablet, some virtual machines) as differences of their positions
+           in pixels (win_plock.rs)
+  Wayland  zwp_pointer_constraints_v1.lock_pointer and zwp_relative_pointer_v1's
+           unaccelerated motion; Unsupported when the compositor lacks one of them
+           (linux_wl_lock.rs)
+  X11      XInput 2.1 raw motion (XI_RawMotion: the device's values before acceleration) and a
+           pointer grab confined to the window with an invisible cursor; Unsupported without
+           XInput 2, Refused when another client holds a grab (linux_x11_lock.rs)
+  macOS    CGAssociateMouseAndMouseCursorPosition(false), the cursor hidden; motion from the
+           events' deltaX / deltaY (points, after the system's acceleration) (apple_mac.rs)
+  browser  requestPointerLock on the canvas (unadjustedMovement where the browser has it:
+           raw; else the browser's accelerated CSS pixels); the browser grants it only from a
+           user's gesture: Pending until the next press in the page (web_windows.rs, loader.js)
+  Android, iOS  Unsupported (touch controls are a later stage)
+
+The lock always lets go: Esc (the key goes to the lock, not to the app; the browser owns Esc
+itself), the window losing the keyboard focus, being minimized or closed, and
+win_pointer_lock(w, false).  It is never taken back by itself: after a release the app asks
+again (a click "to play").  A request while the window has no focus waits (Pending) and takes
+effect when it gets the focus.  One window holds the lock at a time (there is one pointer):
+asking for another lets the first go.
+```
+
+- **`enum PointerLock`**
+  (G7a) the state of a window's pointer lock (win_pointer_lock, ui.pointer_lock)
+  - `Off` -- not locked: never asked for, or let go (by the app, Esc, the focus going elsewhere, the
+    window minimized or closed)
+  - `Pending` -- asked for, not granted yet: the window has no focus yet, the browser waits for the next
+    press in the page, the Wayland compositor has not confirmed it
+  - `Locked` -- locked: the pointer is hidden and stays put, win_raw_motion_take has its motion
+  - `Unsupported` -- this platform or display cannot lock the pointer: Android, iOS; a Wayland compositor
+    without zwp_pointer_constraints_v1 or zwp_relative_pointer_manager_v1, an X server without
+    XInput 2.1
+  - `Refused` -- the system said no: the browser's pointerlockerror, another X11 client holds a grab, no
+    such window
+
+- **`fn win_pointer_lock(w: i32, on: bool) -> PointerLock`**
+  (G7a) lock the pointer to window w (on) or let it go (off) -> the state right after the call:
+  Locked at once where the platform grants it, Pending while it waits (see PointerLock), Off
+  after a release.  E_POINTER_LOCK follows every change.  The pointer is hidden while locked and
+  its motion comes through win_raw_motion_take; Esc, the focus going elsewhere, minimizing and
+  closing the window always let it go.  A window that is not the one holding (or waiting for)
+  the lock lets nothing go with off
+
+- **`fn win_pointer_lock_state(w: i32) -> PointerLock`**
+  (G7a) the state of window w's pointer lock (Off for a window that neither holds nor waits for
+  it; Unsupported / Refused stay until the next request)
+
+- **`fn win_raw_motion_take(w: i32) -> (f64, f64)`**
+  (G7a) the raw relative motion of window w's pointer since the last call, while w holds the
+  lock: (dx, dy), right and down positive, in the device's counts where the platform gives them
+  (Windows' Raw Input, Wayland's unaccelerated motion, X11's raw values, the browser with
+  unadjustedMovement), else in its accelerated pixels (macOS' deltas, the browser without it);
+  (0, 0) when there is none.  E_RAW_MOTION says that some waits
+
+- **`fn pointer_lock_test(w: i32, s: PointerLock)`**
+  (test aid, plattest --test input) the shared state without a platform: window w's lock is in
+  state s now, as a backend says it (E_POINTER_LOCK on a change)
+
+- **`fn raw_motion_test(w: i32, dx: f64, dy: f64)`**
+  (test aid) raw motion of window w as a backend reports it
+
+- **`fn pointer_lock_key_test(vk: u32, down: bool) -> bool`**
+  (test aid) a key as a backend asks the lock about it -> true: the key is the lock's (Esc)
+
+- **`fn raw_mouse_decode(rec: &[u8]) -> Option<(u16, i32, i32)>`**
+  (G7a) the motion of a Windows RAWINPUT record of a mouse (the bytes GetRawInputData fills: the
+  64-bit RAWINPUTHEADER, then RAWMOUSE) -> (usFlags, lLastX, lLastY); None for another device or
+  a short record.  MOUSE_MOVE_ABSOLUTE (usFlags bit 0) gives positions 0..65535 instead of
+  motion (MOUSE_VIRTUAL_DESKTOP, bit 1: of the whole desktop)
+
+- **`fn raw_abs_delta(prev: Option<[i32; 2]>, now: [i32; 2], span: [i32; 2]) -> (f64, f64)`**
+  (G7a) the motion of an absolute pointer (a remote desktop, a tablet, a virtual machine) between
+  two of its positions (0..65535 across the screen or the desktop of `span` pixels) -> pixels;
+  the first position after a pause (prev None) moves nothing
+
+- **`fn xi_raw_decode(ev: &[u8]) -> Option<(u16, u16, u32, f64, f64, u32)>`**
+  (G7a) the raw motion of an XInput 2 raw event (XI_RawMotion, the whole GenericEvent as the
+  server sends it) -> (deviceid, sourceid, time, raw value of valuator 0, of valuator 1, which
+  of the two it carries: bit 0 / bit 1); None for a short or malformed event.  The raw values
+  (FP3232, before acceleration) follow the mask and the transformed values
+
+- **`fn wl_fixed(v: i32) -> f64`**
+  (G7a) Wayland's fixed-point value (24.8) as a number
 
 ### `plat/ime.rs`
 
@@ -53284,3 +53793,702 @@ strings -- a DXF's bytes as text: UTF-8 from AutoCAD 2007 (AC1021) on, before th
   TEXT's %% codes: %%c the diameter sign (U+2205), %%d the degree sign, %%p plus-minus, %%nnn the character of that
   code (Windows-1252 above 127), %%% a percent sign; %%u, %%o and %%k switch underline, overline and strike-through on
   and off (the runs they start).  Unknown codes stay as they are
+
+## physics
+
+*Collision shapes, broad phase and deterministic queries for games* -- crate root [`lib/physics/src/lib.rs`](../lib/physics/src/lib.rs)
+
+```text
+physics -- collision for games: shapes, broad phase, queries; deterministic, the same bits on every target
+
+  Shape          sphere, capsule, box, convex hull (ConvexHull::new: quickhull), static triangle mesh
+                 (TriMesh: f32 vertices, a binned-SAH tree, active edges against ghost collisions)
+  World          bodies (shape, Iso, layers) in dynamic AABB trees; ray_cast, ray_cast_all, cast (a
+                 swept convex shape: time of impact, normal, contact point), overlap, contacts
+                 (penetration depth and normal per body and triangle), closest_point
+  query          the same for one shape against one placed shape, without a world
+  math           Vec3, Quat, Iso, Aabb in f64; sqrt correctly rounded, sin / cos / atan2 from rt's
+                 portable math
+
+Narrow phase: GJK for distances, EPA for penetration, GJK ray casting with conservative advancement for
+the casts (radii as margins outside GJK), watertight ray/triangle tests, analytic rays against the other
+primitives.  Deterministic: only + - * / and correctly rounded square roots in f64, never a fused
+multiply-add, no unordered containers, no threads, fixed iteration limits and tie-breaks; checked by the
+checksums of apps/physicstest on every target.  docs/PHYSICS.md describes the design, the tests and the
+measurements.
+```
+
+### `physics/src/bvh.rs`
+
+Source: [`lib/physics/src/bvh.rs`](../lib/physics/src/bvh.rs)
+
+```text
+bvh -- the fixed bounding volume hierarchy of a triangle mesh: binned SAH, built once
+
+Boxes in f32 (a mesh's vertices are f32, so the box of a triangle is exact in f32 and so is every
+union).  A node is 32 bytes; the two children of an inner node sit next to each other.  The build splits
+a node where the surface area heuristic over 16 bins per axis is cheapest (cost of a node visit 1, of a
+triangle 1); a node becomes a leaf when that is not cheaper than testing its triangles (at most
+`max_leaf`).  Past depth 40 it splits at the median along the widest axis, which bounds the depth for
+any input.  Every choice has a tie-break by axis, bin or index: the same tree on every target.
+```
+
+- **`struct BvhNode`**
+  a node of a [`crate::TriMesh`]'s tree: an inner node when `count` is 0 (children at `first` and
+  `first + 1`), else a leaf with the triangles `first .. first + count`
+  - `min: [f32; 3]` -- the box, in the mesh's frame
+  - `max: [f32; 3]`
+  - `first: u32` -- the left child (an inner node) or the first triangle (a leaf)
+  - `count: u32` -- 0 for an inner node, else the number of triangles
+
+**`impl BvhNode`**
+
+- **`fn is_leaf(&self) -> bool`**
+  a leaf (it has triangles)
+
+### `physics/src/gjk.rs`
+
+Source: [`lib/physics/src/gjk.rs`](../lib/physics/src/gjk.rs)
+
+```text
+gjk -- distance, penetration and time of impact between two convex shapes given as support functions
+
+GJK (Gilbert, Johnson, Keerthi) finds the point of the Minkowski difference D = A - B closest to the
+origin; the simplex is reduced by the Voronoi regions of its vertices, edges and faces (Ericson,
+"Real-Time Collision Detection", 5.1.5 and 9.5).  EPA expands a polytope inside D to find the shallowest
+way out when the cores overlap.  The cast is GJK ray casting with conservative advancement (van den
+Bergen 2004, as in Box2D's b2ShapeCast): the support plane of D in the direction of the current closest
+point bounds the distance at every later time, so the time advances to where that bound meets the target
+distance and never beyond the first contact.  The radii of spheres and capsules stay outside GJK as
+margins: the cores of two such shapes are apart at contact, which keeps the casts well conditioned.
+```
+
+```rust
+/// two shapes without radius (boxes, hulls, triangles) stop a cast at this gap (metres): a positive
+/// distance keeps the direction of the closest points well defined
+CAST_SKIN: f64 = 1e-6
+```
+
+- **`fn cast_fallbacks() -> u32`**
+  how many casts so far fell back from GJK ray casting to Newton's method on the distance (GJK at one time
+  stalled by rounding, or its iterations ran out); the result is right either way, only slower
+
+### `physics/src/hull.rs`
+
+Source: [`lib/physics/src/hull.rs`](../lib/physics/src/hull.rs)
+
+```text
+hull -- a convex hull from points (quickhull in 3D) and its support function
+
+Quickhull: a first tetrahedron from extreme points, every other point in the outside set of the face it
+lies farthest above; then, as long as a face has an outside set, its farthest point (the eye) removes the
+faces it sees (a connected region from that face), the horizon around them gets new faces to the eye,
+and the points of the removed faces go to the new ones (or are inside now).  A point within `eps` of a
+face's plane counts as on it, so the hull can leave out points that lie that close to it.  Everything in
+a fixed order (faces and points by index, ties to the lower index): the same hull on every target.
+```
+
+```rust
+/// at most this many input points for [`ConvexHull::new`]
+MAX_HULL_POINTS: usize = 1 << 16
+```
+
+- **`enum HullError`**
+  why [`ConvexHull::new`] refused the points
+  - `Count` -- fewer than 4 points, or more than [`MAX_HULL_POINTS`]
+  - `NotFinite` -- a coordinate is NaN or infinite
+  - `Flat` -- all points lie on a plane (or a line or a point), within the tolerance: no volume
+
+- **`struct ConvexHull`**
+  A convex polyhedron: the hull of the points it was made from.  Vertices, triangles (counter-clockwise
+  seen from outside) and their planes, in its own coordinates.
+
+**`impl ConvexHull`**
+
+- **`fn new(points: &[Vec3]) -> Result<ConvexHull, HullError>`**
+  the convex hull of `points` (at least 4, not all on a plane)
+- **`fn points(&self) -> &[Vec3]`**
+  the vertices (a subset of the input points, in their order)
+- **`fn faces(&self) -> &[[u32; 3]]`**
+  the triangles, as indices into [`ConvexHull::points`], counter-clockwise seen from outside
+- **`fn planes(&self) -> &[(Vec3, f64)]`**
+  per face the outward unit normal n and d, with n . p = d on the face
+- **`fn aabb(&self) -> Aabb`**
+  the box around the hull in its own coordinates
+- **`fn tolerance(&self) -> f64`**
+  the tolerance of the construction: an input point lies at most this far outside the hull
+- **`fn support(&self, d: Vec3) -> Vec3`**
+  a vertex farthest in direction `d`: the first of equals among up to 32 vertices, beyond that by hill
+  climbing over the vertex adjacency (exact for a convex polyhedron, always the same path)
+- **`fn volume(&self) -> f64`**
+  the volume (for tests and mass properties later)
+
+### `physics/src/math.rs`
+
+Source: [`lib/physics/src/math.rs`](../lib/physics/src/math.rs)
+
+```text
+math -- the vectors, rotations and boxes of the crate, in f64, with operations that give the same bits on
+every target: + - * / and a correctly rounded square root, never a fused multiply-add (Rust does not
+contract a * b + c on its own); sin, cos and atan2 from rt's portable math (docs/ARM64.md, ARM2), which is
+the same code on every target.
+```
+
+- **`fn sqrt(x: f64) -> f64`**
+  The square root, correctly rounded (IEEE 754), so the same bits on every target: the processor's
+  instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64), elsewhere (the browser, the x86-64
+  Android emulator) [`sqrt_portable`].  A negative argument gives NaN, -0.0 gives -0.0.
+
+- **`fn sqrt_portable(x: f64) -> f64`**
+  The correctly rounded square root from f64 operations and one 64 x 64 bit product: Newton's method
+  gives an estimate within a few units in the last place, the integer test (R - 1/2)^2 &lt; X &lt; (R + 1/2)^2
+  on the significand picks the right neighbour.  Equal to the processor's square root for every input;
+  on the browser it is several times faster than rt's bit-by-bit root.  Public for the tests.
+
+- **`fn sincos(x: f64) -> (f64, f64)`**
+  sin and cos of `x` (radians) from rt's portable math: the same bits on every target (within half an
+  ulp of the exact value)
+
+- **`fn sin(x: f64) -> f64`**
+  sin of `x` (radians), the same bits on every target
+
+- **`fn cos(x: f64) -> f64`**
+  cos of `x` (radians), the same bits on every target
+
+- **`fn atan2(y: f64, x: f64) -> f64`**
+  atan2(y, x) in radians, the same bits on every target
+
+- **`fn min(a: f64, b: f64) -> f64`**
+  the smaller of two numbers (`b` when they are equal or one is NaN), the same on every target
+
+- **`fn max(a: f64, b: f64) -> f64`**
+  the larger of two numbers (`b` when they are equal or one is NaN)
+
+- **`fn clamp(x: f64, lo: f64, hi: f64) -> f64`**
+  `x` limited to [lo, hi] (lo when x is NaN)
+
+- **`struct Vec3`**
+  A point or a direction in metres, `f64` (docs/PHYSICS.md, "f64").  Converts from and to `[f64; 3]`,
+  render3d's positions.
+  - `x: f64` -- metres (or a direction's component)
+  - `y: f64`
+  - `z: f64`
+
+**`impl Vec3`**
+
+- **`const ZERO: Vec3 = Vec3::new(0.0, 0.0, 0.0)`**
+  (0, 0, 0)
+- **`const X: Vec3 = Vec3::new(1.0, 0.0, 0.0)`**
+  the unit vectors along the axes (Y is up)
+- **`const Y: Vec3 = Vec3::new(0.0, 1.0, 0.0)`**
+- **`const Z: Vec3 = Vec3::new(0.0, 0.0, 1.0)`**
+- **`const fn new(x: f64, y: f64, z: f64) -> Vec3`**
+  (x, y, z)
+- **`const fn splat(v: f64) -> Vec3`**
+  (v, v, v)
+- **`fn dot(self, o: Vec3) -> f64`**
+  the dot product, summed x, y, z in this order
+- **`fn cross(self, o: Vec3) -> Vec3`**
+  the cross product (right-handed)
+- **`fn length_sq(self) -> f64`**
+  the squared length
+- **`fn length(self) -> f64`**
+  the length (correctly rounded root)
+- **`fn try_normalize(self) -> Option<Vec3>`**
+  the unit vector in this direction, None for a zero (or not finite) vector
+- **`fn normalize_or_zero(self) -> Vec3`**
+  the unit vector in this direction; a zero vector stays zero
+- **`fn min(self, o: Vec3) -> Vec3`**
+  the smaller component by component
+- **`fn max(self, o: Vec3) -> Vec3`**
+  the larger component by component
+- **`fn abs(self) -> Vec3`**
+  the absolute value of each component
+- **`fn mul_elem(self, o: Vec3) -> Vec3`**
+  component by component
+- **`fn lerp(self, b: Vec3, t: f64) -> Vec3`**
+  a + (b - a) \* t
+- **`fn max_elem(self) -> f64`**
+  the largest component
+- **`fn is_finite(self) -> bool`**
+  every component is finite
+- **`const fn to_array(self) -> [f64; 3]`**
+  [x, y, z] (render3d's positions)
+- **`fn any_perpendicular(self) -> Vec3`**
+  a unit vector perpendicular to this unit vector (chosen the same way on every target)
+
+- **`struct Quat`**
+  A rotation as a unit quaternion (x, y, z, w), `f64`.  render3d keeps rotations as `[f32; 4]` in the same
+  order: [`Quat::from_f32`], [`Quat::to_f32`].
+  - `x: f64` -- the vector part (sin of half the angle times the axis)
+  - `y: f64`
+  - `z: f64`
+  - `w: f64` -- the scalar part (cos of half the angle)
+
+**`impl Quat`**
+
+- **`const IDENTITY: Quat = Quat { x: 0.0, y: 0.0, z: 0.0, w: 1.0 }`**
+  no rotation
+- **`const fn new(x: f64, y: f64, z: f64, w: f64) -> Quat`**
+  as given (normalise it with [`Quat::normalize`] unless it is a unit quaternion already)
+- **`fn from_axis_angle(axis: Vec3, angle: f64) -> Quat`**
+  the rotation by `angle` radians about the unit vector `axis` (right-handed)
+- **`fn from_yaw_pitch(yaw: f64, pitch: f64) -> Quat`**
+  the rotation about +Y by `yaw`, then about the rotated +X by `pitch` (a camera's or a figure's turn)
+- **`fn from_rotation_arc(from: Vec3, to: Vec3) -> Quat`**
+  the shortest rotation that turns the unit vector `from` into the unit vector `to`
+- **`fn from_f32(q: [f32; 4]) -> Quat`**
+  from render3d's `[f32; 4]` (x, y, z, w)
+- **`fn to_f32(self) -> [f32; 4]`**
+  to render3d's `[f32; 4]` (x, y, z, w)
+- **`fn normalize(self) -> Quat`**
+  the unit quaternion in this direction (the identity for a zero quaternion)
+- **`fn conjugate(self) -> Quat`**
+  the inverse rotation of a unit quaternion
+- **`fn mul(self, o: Quat) -> Quat`**
+  the product self \* o, which rotates by `o` first and then by `self`
+- **`fn rotate(self, v: Vec3) -> Vec3`**
+  `v` rotated (a unit quaternion)
+- **`fn inverse_rotate(self, v: Vec3) -> Vec3`**
+  `v` rotated back (by the conjugate)
+- **`fn to_mat3(self) -> Mat3`**
+  the rotation as a matrix
+- **`fn is_identity(self) -> bool`**
+  is this the identity, bit for bit (no rotation work needed)
+
+- **`struct Mat3`**
+  A 3 x 3 matrix by columns (a rotation from [`Quat::to_mat3`])
+  - `cols: [Vec3; 3]` -- the columns: the images of X, Y and Z
+
+**`impl Mat3`**
+
+- **`const IDENTITY: Mat3 = Mat3 { cols: [Vec3::X, Vec3::Y, Vec3::Z] }`**
+  the unit matrix
+- **`fn mul_vec(&self, v: Vec3) -> Vec3`**
+  M v
+- **`fn mul_vec_t(&self, v: Vec3) -> Vec3`**
+  M^T v (the inverse of a rotation)
+
+- **`struct Iso`**
+  A placement: rotate, then move (no scale).  The pose of a body and of a query shape.
+  - `pos: Vec3` -- where the local origin lies
+  - `rot: Quat` -- the rotation (a unit quaternion)
+
+**`impl Iso`**
+
+- **`const IDENTITY: Iso = Iso { pos: Vec3::ZERO, rot: Quat::IDENTITY }`**
+  at the origin, not rotated
+- **`const fn new(pos: Vec3, rot: Quat) -> Iso`**
+  rotated by `rot`, then moved to `pos`
+- **`const fn at(pos: Vec3) -> Iso`**
+  moved to `pos`, not rotated
+- **`fn transform_point(&self, p: Vec3) -> Vec3`**
+  a local point in world coordinates
+- **`fn inverse_transform_point(&self, p: Vec3) -> Vec3`**
+  a world point in local coordinates
+- **`fn transform_vector(&self, v: Vec3) -> Vec3`**
+  a local direction in world coordinates
+- **`fn inverse_transform_vector(&self, v: Vec3) -> Vec3`**
+  a world direction in local coordinates
+- **`fn mul(&self, o: &Iso) -> Iso`**
+  self \* o: first o, then self
+- **`fn inv_mul(&self, o: &Iso) -> Iso`**
+  the placement of `o` relative to self: self^-1 \* o
+
+- **`struct Aabb`**
+  An axis-aligned box in metres
+  - `min: Vec3` -- the corner with the smallest coordinates
+  - `max: Vec3` -- the corner with the largest coordinates
+
+**`impl Aabb`**
+
+- **`const EMPTY: Aabb = Aabb { min: Vec3::splat(f64::INFINITY), max: Vec3::splat( ...`**
+  the empty box (min above max), the start of a union
+- **`const fn new(min: Vec3, max: Vec3) -> Aabb`**
+  the box between two corners
+- **`fn from_center(c: Vec3, h: Vec3) -> Aabb`**
+  the box around `c` with half sizes `h`
+- **`fn union(&self, o: &Aabb) -> Aabb`**
+  the box around both
+- **`fn add_point(&self, p: Vec3) -> Aabb`**
+  the box around this one and `p`
+- **`fn expanded(&self, m: f64) -> Aabb`**
+  grown by `m` on every side
+- **`fn intersects(&self, o: &Aabb) -> bool`**
+  the boxes touch or overlap
+- **`fn contains(&self, o: &Aabb) -> bool`**
+  `o` lies inside (or on the border)
+- **`fn contains_point(&self, p: Vec3) -> bool`**
+  `p` lies inside (or on the border)
+- **`fn center(&self) -> Vec3`**
+  the middle
+- **`fn half_extents(&self) -> Vec3`**
+  half the size on each axis
+- **`fn half_area(&self) -> f64`**
+  half the surface (the cost measure of the trees; 0 for the empty box)
+- **`fn is_valid(&self) -> bool`**
+  the box is not empty and finite
+- **`fn ray_enter(&self, o: Vec3, inv: Vec3, tmax: f64) -> Option<f64>`**
+  where the ray o + t d (inv = 1 / d per axis) enters the box, if it does within [0, tmax]
+
+### `physics/src/mesh.rs`
+
+Source: [`lib/physics/src/mesh.rs`](../lib/physics/src/mesh.rs)
+
+```text
+mesh -- a static triangle mesh: vertices in f32 (as render3d's meshes), a fixed BVH, the active edges,
+and the queries against it in its own frame
+
+Seams: every triangle is tested as the closed triangle it is, so a shape sweeping across a shared edge
+meets the edge of one triangle or the other, there is no gap.  The opposite trouble -- a shape sliding over
+a flat or concave edge between two triangles hits the edge itself with a normal that leans backwards
+(a "ghost" collision) -- is handled by the active edges: an edge is active when the surface bends
+outwards there by more than the threshold angle (or the edge is open or shared by more than two
+triangles).  A contact on an inactive edge (or on a vertex whose two edges of this triangle are inactive)
+gets the triangle's normal, and a cast ignores it unless the shape moves into that face.  As in Jolt's
+"active edges"; the side matters, an edge that is concave from the front is convex from the back.
+```
+
+```rust
+/// at most this many triangles in one mesh
+MAX_TRIANGLES: usize = 1 << 28
+/// cos 5 degrees: two triangles whose normals differ by less than this meet at a flat edge
+ACTIVE_EDGE_COS: f64 = 0.996_194_698_091_745_5
+```
+
+- **`enum MeshError`**
+  why [`TriMesh::new`] refused the data
+  - `IndexCount` -- the index count is not a multiple of 3, or there are more than [`MAX_TRIANGLES`] triangles
+  - `IndexRange` -- an index is not below the vertex count
+  - `NotFinite` -- a coordinate is NaN or infinite
+
+- **`struct MeshOptions`**
+  how a [`TriMesh`] is built
+  - `active_edge_cos: f64` -- an edge between two triangles whose normals have a cosine of at least this is flat (inactive); above
+    1 every edge is active (no handling of ghost collisions)
+  - `max_leaf: usize` -- at most so many triangles in a leaf of the tree
+
+- **`struct TriMesh`**
+  A static triangle mesh with its tree.  Triangles have two sides.  Triangles without area (all three
+  corners on a line) are left out: they cannot be hit and their edges belong to their neighbours.
+
+**`impl TriMesh`**
+
+- **`fn new(positions: &[[f32; 3]], indices: &[u32]) -> Result<TriMesh, MeshError>`**
+  a mesh from positions and a triangle list (three indices per triangle), with [`MeshOptions`]'
+  defaults
+- **`fn with_options(positions: &[[f32; 3]], indices: &[u32], opt: &MeshOptions) -> Result<TriMesh, MeshError>`**
+  a mesh as [`TriMesh::new`] makes it, with the threshold of the active edges and the leaf size of `opt`
+- **`fn triangle_count(&self) -> usize`**
+  the number of triangles in the caller's list (with the ones left out for having no area)
+- **`fn stored_triangle_count(&self) -> usize`**
+  the number of triangles in the tree
+- **`fn vertices(&self) -> &[[f32; 3]]`**
+  the positions as given, in the mesh's frame
+- **`fn aabb(&self) -> Aabb`**
+  the box around the mesh in its own frame
+- **`fn nodes(&self) -> &[BvhNode]`**
+  the tree's nodes (the root first)
+- **`fn depth(&self) -> u32`**
+  the depth of the tree
+- **`fn triangles(&self) -> impl Iterator<Item = (u32, [Vec3; 3])> + '_`**
+  the stored triangles in tree order: their caller's index and corners (for brute-force references)
+- **`fn edge_flags(&self, id: u32) -> Option<u8>`**
+  the active-edge bits of the triangle with the caller's index `id` (bit e: edge e from the front,
+  bit 3 + e: from the back), None when it was left out
+- **`fn memory_bytes(&self) -> usize`**
+  the bytes the mesh holds (vertices, triangles, ids, flags, nodes)
+
+### `physics/src/query.rs`
+
+Source: [`lib/physics/src/query.rs`](../lib/physics/src/query.rs)
+
+```text
+query -- one shape against one placed shape, without a world: rays, casts, distance and contacts, the
+nearest point.  The work happens in the frame of the target shape (positions far from the origin cancel
+once, in the relative placement); results come back in world coordinates.  The query shape of a cast,
+a distance or a contact must be convex: with a mesh as the query shape these give nothing.
+```
+
+```rust
+/// `triangle` of a hit on anything but a mesh
+NO_TRIANGLE: u32 = u32::MAX
+```
+
+- **`struct RayHit`**
+  where a ray hits
+  - `t: f64` -- the ray parameter: point = origin + dir \* t (metres when dir is a unit vector)
+  - `point: Vec3` -- origin + dir \* t
+  - `normal: Vec3` -- the unit normal, against the ray (a ray starting inside a convex shape: t = 0, normal = -dir)
+  - `triangle: u32` -- the triangle's index in the mesh's index list, or [`NO_TRIANGLE`]
+
+- **`struct CastHit`**
+  where a moving shape first touches another
+  - `fraction: f64` -- how far along the motion: the shape stops at iso.pos + motion \* fraction (0..=1).  With a radius
+    (sphere, capsule) on either side the gap there is at most 1e-9 m, between two shapes without one
+    at most [`crate::CAST_SKIN`] + 1e-9 m; never a penetration that was not there at the start.
+  - `point: Vec3` -- the contact point on the other shape's surface
+  - `normal: Vec3` -- the unit normal of that surface towards the moving shape
+  - `triangle: u32` -- the triangle's index in the mesh's index list, or [`NO_TRIANGLE`]
+  - `depth: f64` -- > 0: the shapes overlapped at the start by this much (then fraction = 0)
+
+- **`struct Contact`**
+  how two shapes touch or nearly touch
+  - `point: Vec3` -- on the other shape's surface (with overlap: its deepest point)
+  - `normal: Vec3` -- the unit normal from the other shape towards the query shape: moving the query shape by
+    normal \* depth separates them (for a triangle of a mesh along the triangle's normal, unless the
+    contact is on an active edge)
+  - `depth: f64` -- the overlap; negative: the gap (contacts within a margin)
+  - `triangle: u32` -- the triangle's index in the mesh's index list, or [`NO_TRIANGLE`]
+
+- **`struct Separation`**
+  the distance between two shapes
+  - `distance: f64` -- the gap; negative: the penetration depth
+  - `point_a: Vec3` -- the nearest (or deepest) points on the query shape and on the other one
+  - `point_b: Vec3` -- on the other shape
+  - `normal: Vec3` -- the unit normal from the other shape towards the query shape
+  - `triangle: u32` -- the nearest triangle of a mesh, or [`NO_TRIANGLE`]
+
+- **`struct PointHit`**
+  the point of a shape nearest to a given point
+  - `point: Vec3` -- the nearest point of the surface, or the point itself when it is inside a convex shape
+  - `distance: f64` -- 0 inside
+  - `inside: bool` -- the point lies inside a convex shape
+  - `triangle: u32` -- the nearest triangle of a mesh, or [`NO_TRIANGLE`]
+
+- **`fn ray(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64) -> Option<RayHit>`**
+  the first hit of the ray origin + dir \* t (0 &lt;= t &lt;= max_t) on `target` placed by `target_iso`
+
+- **`fn ray_all(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64, out: &mut Vec<RayHit>)`**
+  every hit of the ray on `target` (one for a convex shape, one per triangle for a mesh), appended to
+  `out` sorted by t and then by triangle
+
+- **`fn cast(shape: &Shape, iso: &Iso, motion: Vec3, target: &Shape, target_iso: &Iso) -> Option<CastHit>`**
+  the first contact of convex `shape`, moved from `iso` by `motion`, with `target`.  Shapes that touch or
+  overlap at the start give a hit at fraction 0 only when the motion goes into the other shape (normal .
+  motion &lt; 0); a motion along or away from it is free, so sliding along a surface works.
+
+- **`fn separation(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, max_dist: f64) -> Option<Separation>`**
+  the gap (negative: depth) between convex `shape` and `target` if it is at most `max_dist`; for a mesh the
+  nearest triangle
+
+- **`fn intersects(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso) -> bool`**
+  do convex `shape` and `target` touch or overlap
+
+- **`fn contacts(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, margin: f64, out: &mut Vec<Contact>)`**
+  the contacts of convex `shape` with `target` whose gap is at most `margin` (0: only touching and
+  overlapping), appended to `out` (a mesh: one per triangle, by triangle)
+
+- **`fn closest_point(target: &Shape, target_iso: &Iso, point: Vec3, max_dist: f64) -> Option<PointHit>`**
+  the point of `target` nearest to `point`, if within `max_dist`
+
+**`mod brute`**
+
+The same queries without a mesh's tree: every triangle in turn, through the same per-triangle code and
+tie-breaks, so the results must equal those of the tree bit for bit.  For tests (apps/physicstest) and
+for checking a mesh that behaves oddly; for convex shapes they are the queries above.
+
+- **`fn ray(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64) -> Option<RayHit>`**
+  the first hit, every triangle of a mesh tested
+
+- **`fn ray_all(target: &Shape, target_iso: &Iso, origin: Vec3, dir: Vec3, max_t: f64, out: &mut Vec<RayHit>)`**
+  every hit, every triangle of a mesh tested
+
+- **`fn cast(shape: &Shape, iso: &Iso, motion: Vec3, target: &Shape, target_iso: &Iso) -> Option<CastHit>`**
+  the first contact, every triangle of a mesh tested
+
+- **`fn separation(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, max_dist: f64) -> Option<Separation>`**
+  the nearest triangle of a mesh without its tree
+
+- **`fn intersects(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso) -> bool`**
+  touch or overlap, every triangle of a mesh tested
+
+- **`fn contacts(shape: &Shape, iso: &Iso, target: &Shape, target_iso: &Iso, margin: f64, out: &mut Vec<Contact>)`**
+  the contacts, every triangle of a mesh tested
+
+- **`fn closest_point(target: &Shape, target_iso: &Iso, point: Vec3, max_dist: f64) -> Option<PointHit>`**
+  the nearest point, every triangle of a mesh tested
+
+### `physics/src/shape.rs`
+
+Source: [`lib/physics/src/shape.rs`](../lib/physics/src/shape.rs)
+
+```text
+shape -- the collision shapes: sphere, capsule, box, convex hull (convex, solid) and the static triangle
+mesh (two-sided triangles)
+```
+
+- **`enum Shape`**
+  A collision shape in its own frame.  Hulls and meshes are shared ([`Arc`]): cloning a shape is cheap,
+  one map mesh can sit in several worlds (server, prediction, tests).
+  - `Sphere { radius: f64 }` -- a ball around the origin
+  - `Capsule { half_height: f64, radius: f64 }` -- the points within `radius` of the segment (0, -half_height, 0) .. (0, half_height, 0): upright,
+    total height 2 (half_height + radius)
+  - `Box { half: Vec3 }` -- a box around the origin with half sizes `half`
+  - `Hull(Arc<ConvexHull>)` -- a convex hull (shared)
+  - `Mesh(Arc<TriMesh>)` -- a static triangle mesh (only as a body, not as a query shape)
+
+**`impl Shape`**
+
+- **`fn sphere(radius: f64) -> Shape`**
+  a ball of `radius`
+- **`fn capsule(half_height: f64, radius: f64) -> Shape`**
+  an upright capsule: the segment (0, ±half_height, 0) grown by `radius`
+- **`fn cuboid(half: Vec3) -> Shape`**
+  a box with half sizes `half`
+- **`fn hull(hull: ConvexHull) -> Shape`**
+  a convex hull, shared
+- **`fn hull_from_points(points: &[Vec3]) -> Result<Shape, HullError>`**
+  the convex hull of `points`
+- **`fn mesh(mesh: TriMesh) -> Shape`**
+  a static triangle mesh, shared
+- **`fn is_convex(&self) -> bool`**
+  everything but a mesh
+- **`fn margin(&self) -> f64`**
+  the radius around the core (spheres and capsules), 0 for the others
+- **`fn aabb(&self, iso: &Iso) -> Aabb`**
+  the box around the shape placed by `iso`
+
+### `physics/src/tree.rs`
+
+Source: [`lib/physics/src/tree.rs`](../lib/physics/src/tree.rs)
+
+```text
+tree -- the dynamic AABB tree of a world's bodies: leaves with (fattened) boxes, inserted where the
+growth of the surface is smallest, kept balanced by rotations on the way up (the scheme of Box2D's
+b2DynamicTree, written anew).  A moving body keeps its leaf while its box stays inside the fattened
+one.  Deterministic: the same sequence of inserts, moves and removes gives the same tree.
+```
+
+- **`struct DynamicTree`**
+  a dynamic AABB tree over items (u32)
+
+**`impl DynamicTree`**
+
+- **`fn new() -> DynamicTree`**
+  an empty tree
+- **`fn insert(&mut self, aabb: Aabb, item: u32) -> u32`**
+  a new leaf for `item` with box `aabb` -> its id
+- **`fn remove(&mut self, leaf: u32)`**
+  remove a leaf
+- **`fn update(&mut self, leaf: u32, aabb: Aabb)`**
+  give a leaf a new box (it keeps its id)
+- **`fn aabb(&self, leaf: u32) -> Aabb`**
+  the box of a leaf
+- **`fn len(&self) -> usize`**
+  the number of leaves
+- **`fn is_empty(&self) -> bool`**
+  no leaves
+- **`fn height(&self) -> u32`**
+  the height of the root (0 for one leaf or none)
+- **`fn query(&self, bx: &Aabb, mut f: impl FnMut(u32))`**
+  call `f(item)` for every leaf whose box touches `bx`
+- **`fn ray(&self, o: Vec3, d: Vec3, ext: Vec3, mut tmax: f64, mut f: impl FnMut(u32, f64) -> f64) -> f64`**
+  the leaves whose box, grown by `ext`, the ray o + t d enters at t &lt;= tmax, nearer subtrees first;
+  `f(item, tmax)` returns the new tmax -> the last tmax
+- **`fn validate(&self) -> Result<(), &'static str>`**
+  (tests) the tree is consistent: parents, heights, boxes holding their children, the leaf count -> an
+  error text
+
+### `physics/src/world.rs`
+
+Source: [`lib/physics/src/world.rs`](../lib/physics/src/world.rs)
+
+```text
+world -- bodies (a shape, a placement, layers) in three dynamic AABB trees, and the queries over all of them
+
+A body starts in a tree of the bodies that stand still, with its exact box: meshes in one, the other
+shapes in another; it goes to the tree of the moving bodies when it is first moved (with a box 0.05 m
+larger, so small moves keep their leaf).  So the large box of a map never widens the nodes of the props
+and figures: rays and casts look at the map's mesh first, and its hit prunes the other trees
+(docs/PHYSICS.md, measurements).
+
+Results never depend on the shape of the tree: a first hit is the smallest (t, body, triangle), lists
+are sorted by body and triangle (rays by t first).  So a client that holds only some of the server's
+bodies gets the same answer from them, as long as the bodies have the same ids.
+```
+
+- **`struct BodyId`**
+  a body of a [`World`]: an index and a generation (an id stays dead after remove, also when the index
+  is used again).  Ordered by index, then generation: the tie-break of the queries.
+
+**`impl BodyId`**
+
+- **`fn index(self) -> u32`**
+  the slot (used again after a remove)
+- **`fn generation(self) -> u32`**
+  how often the slot was used before
+
+- **`struct Body`**
+  a body: what [`World::add`] took, readable through [`World::body`]
+  - `shape: Shape` -- its shape
+  - `iso: Iso` -- where it is (set with [`World::set_iso`])
+  - `layers: u32` -- the layers the body is in (bit mask); a query sees it when its filter's mask shares a bit
+  - `user: u64` -- free for the caller (an entity id)
+
+**`impl Body`**
+
+- **`fn is_moving(&self) -> bool`**
+  has the body been moved since it was added (it is in the tree of the moving bodies)
+
+- **`struct Filter`**
+  which bodies a query sees
+  - `mask: u32` -- bodies with `layers & mask != 0`
+  - `exclude: Option<BodyId>` -- one body to leave out (the query's own, e.g. a figure's capsule)
+
+**`impl Filter`**
+
+- **`const ALL: Filter = Filter { mask: u32::MAX, exclude: None }`**
+  every body
+- **`const fn mask(mask: u32) -> Filter`**
+  the bodies in one of the layers of `mask`
+- **`const fn excluding(self, id: BodyId) -> Filter`**
+  the same without body `id`
+
+- **`struct World`**
+  A set of bodies and the queries over them.  Bodies move with [`World::set_iso`]; nothing moves by itself
+  (no dynamics in this stage).
+
+**`impl World`**
+
+- **`fn new() -> World`**
+  an empty world; a moving body's box in the tree is 0.05 m larger than the body on every side
+- **`fn with_margin(margin: f64) -> World`**
+  an empty world with this margin around a moving body's box (a body that has never moved has none)
+- **`fn add(&mut self, shape: Shape, iso: Iso) -> BodyId`**
+  add a body in layer 1
+- **`fn add_with_layers(&mut self, shape: Shape, iso: Iso, layers: u32) -> BodyId`**
+  add a body in `layers`
+- **`fn remove(&mut self, id: BodyId) -> Option<Body>`**
+  remove a body -> it, None when the id is dead
+- **`fn body(&self, id: BodyId) -> Option<&Body>`**
+  the body, None when the id is dead
+- **`fn set_iso(&mut self, id: BodyId, iso: Iso) -> bool`**
+  move a body -> false when the id is dead.  The first move takes it to the tree of the moving bodies.
+- **`fn set_layers(&mut self, id: BodyId, layers: u32) -> bool`**
+  a body's layers -> false when the id is dead
+- **`fn set_user(&mut self, id: BodyId, user: u64) -> bool`**
+  a body's value for the caller -> false when the id is dead
+- **`fn len(&self) -> usize`**
+  the number of bodies
+- **`fn is_empty(&self) -> bool`**
+  no bodies
+- **`fn bodies(&self) -> impl Iterator<Item = (BodyId, &Body)> + '_`**
+  every body with its id, by index
+- **`fn trees(&self) -> [&DynamicTree; 3]`**
+  the broad phase (for tests and statistics): the trees of the meshes and of the other bodies that
+  never moved, and the one of the moving bodies
+- **`fn ray_cast(&self, origin: Vec3, dir: Vec3, max_t: f64, filter: &Filter) -> Option<(BodyId, RayHit)>`**
+  the first hit of the ray origin + dir \* t, 0 &lt;= t &lt;= max_t
+- **`fn ray_cast_all(&self, origin: Vec3, dir: Vec3, max_t: f64, filter: &Filter, out: &mut Vec<(BodyId, RayHit)>)`**
+  every hit of the ray (one per convex body, one per triangle of a mesh), appended to `out` sorted by
+  t, body, triangle
+- **`fn cast(&self, shape: &Shape, iso: &Iso, motion: Vec3, filter: &Filter) -> Option<(BodyId, CastHit)>`**
+  the first body convex `shape`, moved from `iso` by `motion`, touches (see [`query::cast`])
+- **`fn overlap(&self, shape: &Shape, iso: &Iso, filter: &Filter, out: &mut Vec<BodyId>)`**
+  the bodies convex `shape` at `iso` touches or overlaps, appended to `out` by id
+- **`fn contacts(&self, shape: &Shape, iso: &Iso, margin: f64, filter: &Filter, out: &mut Vec<(BodyId, Contact)>)`**
+  the contacts of convex `shape` at `iso` with every body (every triangle) within `margin`, appended
+  to `out` by body and triangle: what pushes a figure out of the level
+- **`fn closest_point(&self, point: Vec3, max_dist: f64, filter: &Filter) -> Option<(BodyId, PointHit)>`**
+  the nearest point of any body to `point` within `max_dist` (equal distance: the lower body, triangle)

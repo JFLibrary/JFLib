@@ -230,6 +230,10 @@ impl X11 {
     /// x11_xi_event(ev): a GenericEvent of XInput (the dispatcher checked its length)
     pub(super) fn xi_event(&mut self, b: &[u8]) {
         let et = rd16(b, 8) as u32; // evtype
+        if et == super::lock::XI_RAW_MOTION {
+            self.lock_raw(b); // (G7a) the locked pointer's motion
+            return;
+        }
         if et == XI_HIERARCHY {
             self.xi_want = true;
             return;

@@ -12,6 +12,10 @@
 // it shows WST_FULLSCREEN at once, the page's answer jfgui_fullscreen confirms it or takes it
 // back: refused without the user's gesture, left with Esc); a tool window covers the canvas
 // (its place comes back after).  Android: nothing.
+// (G7a) The pointer lock (plock.rs): the page locks the canvas (REQUEST_POINTER_LOCK; Pending) from
+// the user's gesture -- at once while the page still has the activation of the press that made the
+// app ask, else with the next press in it -- and answers with jfgui_pointer_lock; the raw motion
+// comes through jfgui_motion.  Android and iOS: Unsupported.
 
 use crate::*;
 use alloc::{string::String, vec::Vec};
@@ -176,6 +180,9 @@ pub fn win_create(
 }
 /// Destroy a library surface and return focus to the main window.
 pub fn win_destroy(id: i32) {
+    if crate::plock_win() == id {
+        web_pointer_lock(id, false); // (G7a) its pointer lock goes first
+    }
     let mut display = DISPLAY.lock();
     if let Some(slot) = usize::try_from(id)
         .ok()
@@ -327,6 +334,74 @@ pub fn win_cmd(id: i32, command: u32) {
         display.dirty = true;
     }
 }
+/// (G7a) (browser) ask the page for the pointer lock of the canvas (one byte, 1 lock / 0 let go):
+/// requestPointerLock from the user's gesture (with unadjustedMovement where the browser has it);
+/// the page answers with jfgui_pointer_lock, the motion comes with jfgui_motion
+pub const REQUEST_POINTER_LOCK: u32 = 31;
+
+/// (G7a, plock.rs) the pointer lock of window w: the page's canvas (one pointer for the page);
+/// Pending until the page says it holds it.  Android, iOS: Unsupported
+pub(crate) fn web_pointer_lock(w: i32, on: bool) -> crate::PointerLock {
+    use crate::PointerLock;
+    if !cfg!(target_arch = "wasm32") {
+        return if on { PointerLock::Unsupported } else { PointerLock::Off };
+    }
+    if !on {
+        if crate::plock_win() == w && crate::plock_state() != PointerLock::Off {
+            super::notice(REQUEST_POINTER_LOCK, &[0]);
+            crate::plock_set(w, PointerLock::Off);
+        }
+        return PointerLock::Off;
+    }
+    if window(&DISPLAY.lock(), w).is_none() {
+        return PointerLock::Refused;
+    }
+    let cur = crate::plock_win();
+    if cur == w && matches!(crate::plock_state(), PointerLock::Locked | PointerLock::Pending) {
+        return crate::plock_state();
+    }
+    crate::plock_set(w, PointerLock::Pending); // (another window's lock: the page's one canvas stays locked)
+    super::notice(REQUEST_POINTER_LOCK, &[1]);
+    PointerLock::Pending
+}
+
+/// (G7a) the page's pointer lock changed: 1 the canvas holds it, 0 it let go (Esc, the browser, the
+/// page lost the focus), 2 the browser refused it (pointerlockerror after a press) -> 1 taken
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub extern "C" fn jfgui_pointer_lock(state: u32) -> u32 {
+    use crate::PointerLock;
+    let w = crate::plock_win();
+    if w < 0 {
+        if state == 1 {
+            super::notice(REQUEST_POINTER_LOCK, &[0]); // nobody wants it (any more)
+        }
+        return 0;
+    }
+    let now = crate::plock_state();
+    match state {
+        1 if now == PointerLock::Pending || now == PointerLock::Locked => crate::plock_set(w, PointerLock::Locked),
+        1 => super::notice(REQUEST_POINTER_LOCK, &[0]), // the app let it go meanwhile
+        2 if now == PointerLock::Pending => crate::plock_set(w, PointerLock::Refused),
+        0 if now != PointerLock::Off && now != PointerLock::Refused => crate::plock_set(w, PointerLock::Off),
+        _ => return 0,
+    }
+    1
+}
+
+/// (G7a) the locked pointer's motion from the page (movementX / movementY, summed since the last
+/// call): raw with unadjustedMovement, else the browser's CSS pixels -> 1 taken
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub extern "C" fn jfgui_motion(dx: f64, dy: f64) -> u32 {
+    let w = crate::plock_win();
+    if w < 0 || crate::plock_state() != crate::PointerLock::Locked {
+        return 0;
+    }
+    crate::plock_motion(w, dx, dy);
+    1
+}
+
 /// (L7) (browser) ask the page to show the canvas in full screen (one byte, 1 on / 0 off): the
 /// Fullscreen API from the user's gesture; the page answers with jfgui_fullscreen
 pub const REQUEST_FULLSCREEN: u32 = 23;

@@ -33,6 +33,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   wait of 0 ms, Linux, Apple and Android `kill(pid, 0)`; a process of another user counts, the
   browser has none), `plat::process_id()` for apps without std and `process::Child::id()`.
   docs/GUIDE.md section 17.
+- (G7a) The pointer lock and raw relative motion of a window: `win_pointer_lock(w, on)`, `win_pointer_lock_state(w)`, `win_raw_motion_take(w)`, `PointerLock` (Off, Pending, Locked, Unsupported, Refused), the events `E_POINTER_LOCK` and `E_RAW_MOTION` (one until the motion is taken). Windows: Raw Input (`WM_INPUT`, absolute devices as pixels), the cursor clipped to the window's middle and hidden, back where it was afterwards; Wayland: `zwp_pointer_constraints_v1` and the unaccelerated motion of `zwp_relative_pointer_v1` (Unsupported without one of them); X11: XInput 2 `XI_RawMotion` and a confined grab with no cursor; macOS: `CGAssociateMouseAndMouseCursorPosition` and the events' deltas; the browser: `requestPointerLock` on the canvas (`unadjustedMovement` where there is one) from the user's press; Android and iOS: Unsupported. Esc (then no key of the app), the focus going elsewhere, minimizing and closing always let it go. Decoders and test aids for plattest: `raw_mouse_decode`, `raw_abs_delta`, `xi_raw_decode`, `wl_fixed`, `pointer_lock_test`, `raw_motion_test`, `pointer_lock_key_test`, `wl_test_lock`, `x11t::lock_setup`. docs/GUIDE.md section 39
+- (G7a) Where a key sits, the same on every platform: the USB HID usages of the keyboard page as `KC_*`, `key_code(scancode)` / `key_scancode(code)` for this platform's `Event::x` of a key event, the tables `key_code_set1` (Windows' scan codes), `key_code_evdev` (Linux) and `key_code_mac` (macOS' key codes, the ISO keyboard's swapped pair handled), `key_code_name` / `key_code_from_name` (the browser's `KeyboardEvent.code`), `key_label(code)`: what the current layout prints on the key (Windows, Linux, macOS). `Event::x` of a key event now carries the usage on macOS, iOS and in the browser (it was 0 there); macOS' modifier keys carry their side (`KL_LEFT` / `KL_RIGHT`). build_rs.py check compares the browser host's code table with lib/plat/keycode.rs
 
 ### Changed
 
@@ -73,6 +75,9 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 - Windows clipboard: another program's block (up to 1 GiB) is copied with an allocation that may fail (no room: nothing read) instead of ending the process.
 - `ime_commit_text` takes text of any length (up to 16 MiB): what the queue of 16 commits cannot hold yet waits and follows as the app takes them; a paste or dictation over 64 KiB was cut there without a word (iOS, macOS while composing, Linux IBus, the browser).
 - `AtomicFile` on a folder mount (Linux, macOS) keeps the file's permission bits (a 0600 file became 0644); a systemd unit's Description has every control character as a space (a \r let it add directives).
+- Android: a text longer than 256 KiB goes to the keyboard as a window of 192 KiB around the caret, and its edits are put back into the whole text: such a text gave the keyboard no copy, and its next key replaced the text by an old one.
+- Windows: files and folders made by `fs::write_file_private` and `fs::mkdir_private` grant the user the process runs as by name, besides SYSTEM, the administrators and the owner. Made by a process run as administrator, their owner is the administrators' group, and the same user without administrator rights could no longer open them.
+- iOS: a text box of no width or height no longer panics when UIKit asks for the position at a point (VoiceOver, the space bar's trackpad): clamp got a minimum above its maximum.
 
 ### Security
 

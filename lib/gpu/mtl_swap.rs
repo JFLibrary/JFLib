@@ -6,8 +6,9 @@
 //   device.create_swapchain(&surface, &desc)   the layer gets the device, the format (BGRA8, sRGB
 //        when asked), framebufferOnly unless copy_src, three drawables, the window's size
 //   try_acquire() never waits: nextDrawable only while fewer drawables are in use than the layer
-//        has (in use: taken and not yet on the screen, plus the one on the screen; the drawables'
-//        presented handlers count what reached it); NotReady otherwise
+//        has (in use: this swapchain's taken and not presented, the layer's presented and not yet
+//        on the screen -- also those of an earlier swapchain on it --, plus the one on the screen;
+//        the drawables' presented handlers count what reached it); NotReady otherwise
 //   present(frame, cmds)                   the last command buffer presents the drawable
 //
 // Present modes: Fifo only.  Without displaySyncEnabled a window on macOS still shows at the rate of
@@ -60,8 +61,11 @@ unsafe impl Sync for Block {}
 
 static BLOCK_DESC: BlockDesc = BlockDesc { reserved: 0, size: core::mem::size_of::<Block>() };
 
-/// how many drawables of each layer reached the screen: (layer, count)
-static SHOWN: SpinLock<Vec<(usize, i64)>> = SpinLock::new(Vec::new());
+/// per layer: (layer, drawables presented, of them on the screen, surfaces on the layer).  Per layer,
+/// not per swapchain: a new swapchain on the window's layer (after a lost one) still has the old one's
+/// drawables on their way; the entry goes with the layer's last surface (it was dropped with any
+/// surface while another one still drew into the layer, and the counts no longer matched)
+static LAYERS: SpinLock<Vec<(usize, i64, i64, u32)>> = SpinLock::new(Vec::new());
 
 /// the presented handler: one more drawable of its layer reached the screen
 unsafe extern "C" fn presented(_b: *const Block, drawable: Id) {
@@ -73,11 +77,16 @@ unsafe extern "C" fn presented(_b: *const Block, drawable: Id) {
     note_shown(layer);
 }
 
+// (a layer no surface holds any more: a late handler of a swapchain gone with it, nothing to count)
 fn note_shown(layer: usize) {
-    let mut s = SHOWN.lock();
-    match s.iter_mut().find(|x| x.0 == layer) {
-        Some(x) => x.1 += 1,
-        None => s.push((layer, 1)),
+    if let Some(x) = LAYERS.lock().iter_mut().find(|x| x.0 == layer) {
+        x.2 += 1;
+    }
+}
+
+fn note_presented(layer: usize) {
+    if let Some(x) = LAYERS.lock().iter_mut().find(|x| x.0 == layer) {
+        x.1 += 1;
     }
 }
 
@@ -93,8 +102,9 @@ fn presented_block() -> *const c_void {
     *b as *const c_void
 }
 
-fn shown(layer: usize) -> i64 {
-    SHOWN.lock().iter().find(|x| x.0 == layer).map_or(0, |x| x.1)
+/// the layer's drawables presented and not yet on the screen, and whether one is on it
+fn on_its_way(layer: usize) -> (i64, bool) {
+    LAYERS.lock().iter().find(|x| x.0 == layer).map_or((0, false), |x| ((x.1 - x.2).max(0), x.2 > 0))
 }
 
 /// run f in a Core Animation transaction without animation (any thread)
@@ -139,7 +149,13 @@ impl SurfInner {
 impl Drop for SurfInner {
     fn drop(&mut self) {
         let l = self.layer.id() as usize;
-        SHOWN.lock().retain(|x| x.0 != l);
+        let mut layers = LAYERS.lock();
+        if let Some(k) = layers.iter().position(|x| x.0 == l) {
+            layers[k].3 -= 1;
+            if layers[k].3 == 0 {
+                layers.swap_remove(k);
+            }
+        }
     }
 }
 
@@ -168,6 +184,14 @@ impl Surface {
         let layer = Obj::retained(nw.layer as Id).ok_or(GpuError::SurfaceLost)?;
         let size = core::sync::atomic::AtomicU64::new(((nw.size.0 as u32 as u64) << 32) | nw.size.1 as u32 as u64);
         drop(nw);
+        {
+            let l = layer.id() as usize;
+            let mut layers = LAYERS.lock();
+            match layers.iter_mut().find(|x| x.0 == l) {
+                Some(x) => x.3 += 1,
+                None => layers.push((l, 0, 0, 1)),
+            }
+        }
         Ok(Surface(Arc::new(SurfInner { layer, window, size })))
     }
 }
@@ -278,10 +302,11 @@ impl Swapchain {
         self.surf.0.layer.id()
     }
 
-    /// drawables in use: taken and not yet on the screen, plus the one on it
+    /// drawables in use: taken here and not presented, presented on the layer and not yet on the
+    /// screen, plus the one on it
     fn in_use(&self) -> i64 {
-        let s = shown(self.layer() as usize);
-        (self.taken.load(Ordering::Acquire) - s).max(0) + (s > 0) as i64
+        let (way, on) = on_its_way(self.layer() as usize);
+        self.taken.load(Ordering::Acquire).max(0) + way + on as i64
     }
 
     fn full(&self) -> bool {
@@ -383,6 +408,9 @@ impl Swapchain {
     /// submit the frame's commands; the last command buffer presents its drawable
     pub fn present<'a, I: IntoIterator<Item = CommandBuffer<'a>>>(&self, mut frame: Frame, cmds: I) -> Result<SubmitId> {
         let Some(d) = frame.drawable.take() else { return Err(GpuError::Invalid("present: a frame presented twice")) };
+        // no longer taken: on its way (the layer's count)
+        self.taken.fetch_sub(1, Ordering::AcqRel);
+        note_presented(self.layer() as usize);
         // SAFETY: addPresentedHandler: (macOS 10.15.4, iOS 10.3) with a global block; the simulator's
         // drawables do not have it: there every present counts as shown at once (nextDrawable waits).
         unsafe {

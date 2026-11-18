@@ -918,9 +918,13 @@ mod win {
         true // NTFS journals the directory change with the rename
     }
 
-    /// a security descriptor: full access for SYSTEM, the administrators and the owner only
+    /// A security descriptor: full access for SYSTEM, the administrators, the owner and the user
+    /// this process runs as.  That user by name as well: in a process run as administrator a new
+    /// object's owner is the administrators' group (an elevated token's default owner), so "the
+    /// owner" alone would lock the same user out of it in a process without those rights.
     fn private_sa() -> Option<(SecurityAttributes, usize)> {
-        let sddl = wz("D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;OW)");
+        let me = user_sid().map(|s| alloc::format!("(A;OICI;FA;;;{})", s)).unwrap_or_default();
+        let sddl = wz(&alloc::format!("D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;OW){}", me));
         let mut sd = 0usize;
         // SAFETY: valid SDDL; the descriptor is freed with LocalFree by the caller.
         if unsafe { ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.as_ptr(), 1, &mut sd, core::ptr::null_mut()) } == 0 {

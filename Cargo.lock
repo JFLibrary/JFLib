@@ -486,6 +486,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "inputtest"
+version = "0.1.0"
+dependencies = [
+ "jflib-build",
+ "jflib-plat",
+ "jflib-rt",
+ "jflib-style-winui",
+ "jflib-ui",
+]
+
+[[package]]
 name = "installer"
 version = "0.0.0"
 dependencies = [
@@ -556,6 +567,7 @@ dependencies = [
  "jflib-img-webp",
  "jflib-netio",
  "jflib-netpkt",
+ "jflib-physics",
  "jflib-plat",
  "jflib-render2d",
  "jflib-render3d",
@@ -1026,6 +1038,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "jflib-physics"
+version = "0.2.1"
+dependencies = [
+ "jflib-rt",
+]
+
+[[package]]
 name = "jflib-plat"
 version = "0.2.1"
 dependencies = [
@@ -1052,6 +1071,7 @@ version = "0.2.1"
 dependencies = [
  "jflib-gltf",
  "jflib-gpu",
+ "jflib-rt",
 ]
 
 [[package]]
@@ -1335,6 +1355,16 @@ dependencies = [
  "jflib-build",
  "jflib-plat",
  "jflib-ui",
+]
+
+[[package]]
+name = "physicstest"
+version = "0.1.0"
+dependencies = [
+ "jflib-build",
+ "jflib-physics",
+ "jflib-plat",
+ "jflib-rt",
 ]
 
 [[package]]

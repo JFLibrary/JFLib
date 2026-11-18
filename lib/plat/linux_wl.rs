@@ -55,6 +55,9 @@ mod cursor;
 mod ime;
 #[path = "linux_wl_input.rs"]
 mod input;
+// (G7a) the pointer lock (plock.rs)
+#[path = "linux_wl_lock.rs"]
+mod lock;
 #[path = "linux_wl_popup.rs"]
 mod popup;
 #[path = "linux_wl_present.rs"]
@@ -89,6 +92,7 @@ pub(crate) struct Wl {
     pub ime: ime::Ime,
     pub drag: child::Drag, // a child window moved / resized by the library
     pub act: act::Act,     // xdg-activation (linux_wl_act.rs)
+    pub lock: lock::Lock,  // (G7a) the pointer lock (linux_wl_lock.rs)
     #[cfg(jfgui_glibc)]
     pub dm: gpu::Dm,       // zwp_linux_dmabuf_v1 (linux_wl_gpu.rs)
 }
@@ -109,6 +113,7 @@ impl Wl {
             ime: Default::default(),
             drag: Default::default(),
             act: Default::default(),
+            lock: Default::default(),
             #[cfg(jfgui_glibc)]
             dm: Default::default(),
         }
@@ -246,6 +251,9 @@ impl Display for WlBackend {
     fn pen_devices(&mut self) -> i32 {
         with(|wl| wl.pen_devices())
     }
+    fn pointer_lock(&mut self, w: i32, on: bool) -> crate::PointerLock {
+        with(|wl| wl.pointer_lock(w, on))
+    }
 }
 
 // ------------------------------------------------------------------ test hooks (linuxtest)
@@ -261,6 +269,21 @@ pub fn wl_test_event(iface: &str, event: &str, args: &[u64]) -> bool {
 /// plattest --test pen does  [tcall in apps/plattest/src/pen.s]
 pub fn wl_test_event_u(iface: &str, event: &str, args: &[u64], udata: u64) -> bool {
     with(|wl| wl.test_event_u(iface, event, args, udata))
+}
+
+/// (G7a, plattest --test input) play a pointer lock of window w without a compositor: its
+/// zwp_locked_pointer_v1 and zwp_relative_pointer_v1 are object 1 (the id of wl_test_event's
+/// events), the request Pending until a "locked" event; the protocols count as there
+pub fn wl_test_lock(w: i32) {
+    with(|wl| {
+        wl.g.pcm = wl.g.pcm.max(1);
+        wl.g.rpm = wl.g.rpm.max(1);
+        wl.lock.lp = 1;
+        wl.lock.rp = 1;
+        wl.lock.win = w;
+        wl.lock.locked = false;
+        crate::plock_set(w, crate::PointerLock::Pending);
+    })
 }
 
 /// (main agent) the pointer scale while there is no window (g_wl_s120, 120ths) alone

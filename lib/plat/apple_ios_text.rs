@@ -411,7 +411,8 @@ fn offset_at(this: Id, p: NSPoint) -> Option<usize> {
         let (x, y) = ((p.x * s) as i32 - place[0], (p.y * s) as i32 - place[1]);
         // outside the box: its nearest end
         let r = n.rect;
-        let (x, y) = (x.clamp(r[0], r[0] + r[2] - 1), y.clamp(r[1], r[1] + r[3] - 1));
+        // (a box of no width or height: its corner; clamp with min > max panicked in UIKit's callback)
+        let (x, y) = (x.clamp(r[0], (r[0] + r[2] - 1).max(r[0])), y.clamp(r[1], (r[1] + r[3] - 1).max(r[1])));
         let k = n.offset_at(x, y);
         u16_at(n.text_str(), k.max(0))
     })

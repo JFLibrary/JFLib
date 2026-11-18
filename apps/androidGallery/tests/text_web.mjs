@@ -4,7 +4,8 @@
 // characters with emoji, a ZWJ sequence, a combining sequence, CJK and numbered marks) arrives
 // complete and in order, through the host's #input and through the field of the ARIA shadow
 // tree; typing, Backspace, Delete, a paste and an IME composition in the shadow tree's field
-// reach the app. Playwright (tools/tests/playwright.mjs, PLAYWRIGHT_MODULE; Firefox from
+// reach the app; punctuation typed with its keys (keydown) is text, not the key whose code its
+// capital letter has ("$" was Shift+Home and replaced the text before it, "." Delete, "%" Left). Playwright (tools/tests/playwright.mjs, PLAYWRIGHT_MODULE; Firefox from
 // PLAYWRIGHT_BROWSERS_PATH).
 //   python build_rs.py app androidGallery --target web
 //   node apps/androidGallery/tests/text_web.mjs [build] [--engines=chromium,firefox] [--threads] [--headed]
@@ -126,6 +127,15 @@ try {
         await expect('rüße 🙂 日本 Paste ✓日本','the committed composition');
       }
 
+      // punctuation typed with its keys, at the end and between other text
+      const PUNCT="Preis: 100$ (5.5%) #1 & 'x' -_=+[]{};:,<>/?|~!@^*`\\";
+      await clear();
+      await page.keyboard.type(PUNCT);
+      await expect(PUNCT,'punctuation typed with keydown');
+      await page.keyboard.press('Home');
+      await page.keyboard.type('$.%#(&');
+      await expect('$.%#(&'+PUNCT,'punctuation typed before other text');
+
       // a long insert into the shadow tree's field
       await clear();
       await page.keyboard.insertText(LONG);
@@ -144,7 +154,7 @@ try {
       console.log(`text web (${engine}${threads?', threads':''}): passed`);
     } finally {await browser.close();}
   }
-  console.log(`text web: ${checks} checks passed (${engines.join(', ')}: typing, Backspace, Delete, insert, paste and IME composition in the shadow tree's field, 5000 characters through it and through #input)`);
+  console.log(`text web: ${checks} checks passed (${engines.join(', ')}: typing, Backspace, Delete, punctuation, insert, paste and IME composition in the shadow tree's field, 5000 characters through it and through #input)`);
 } finally {
   server.close();
 }

@@ -247,6 +247,7 @@ pub use layout::{dp_at, px2dip_at};
 pub use perm::boot;
 pub use assoc::{assoc_switch, desk_boot};
 pub use plat::BrowserStatus; // (E13) ui.default_browser
+pub use plat::PointerLock; // (G7a) ui.pointer_lock
 pub use recent::{RECENT_KEEP, RecentOpen};
 // the library's version (the root Cargo.toml, docs/VERSIONING.md) and the app's own (apps/NAME/PACKAGE)
 pub use rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH};
@@ -693,6 +694,13 @@ pub struct Ui {
     pub(crate) semtext_len: usize,
     pub(crate) sem_dummy: Sem,
     pub(crate) keydown: [u8; 256],
+    /// (G7a) the keys held by their place (KeyEvent::code, a USB HID usage)
+    pub(crate) codedown: [u8; 256],
+    /// (G7a, headless) the pointer lock a script plays: (window, state), the Esc that let it go,
+    /// the motion of `motion DX DY` for the next E_RAW_MOTION
+    pub(crate) plock_sim: (i32, plat::PointerLock),
+    pub(crate) plock_sim_esc: bool,
+    pub(crate) plock_sim_motion: [f64; 2],
     pub(crate) mpts: Vec<[i32; 2]>,
     pub(crate) mprs: Vec<u32>,
     pub(crate) mtilt: [i32; 2],

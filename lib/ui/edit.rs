@@ -334,6 +334,40 @@ fn u8_clip(s: &[u8], n: usize) -> usize {
     k
 }
 
+// pw_apply(buf, t) -> (text, caret): the text a screen reader set for a password box applied to
+// its hidden text.  The box's record shows a dot per character (at most PW_MAX), so the reader's
+// text is those dots with the user's change: the dots kept at the start and at the end stand for
+// the hidden characters there (and the ones past PW_MAX), what lies between them is new.  The
+// caret goes after the new part.  (The dots themselves became the password before: a Backspace
+// of TalkBack set "●●●".)
+fn pw_apply(buf: &[u8], t: &str) -> (Vec<u8>, usize) {
+    const DOT: char = '\u{25CF}';
+    let Ok(old) = core::str::from_utf8(buf) else {
+        return (t.as_bytes().to_vec(), t.len());
+    };
+    // byte offset of every character of the hidden text, and its end
+    let at: Vec<usize> = old.char_indices().map(|(i, _)| i).chain(core::iter::once(old.len())).collect();
+    let shown = (at.len() - 1).min(PW_MAX);
+    let new: Vec<char> = t.chars().collect();
+    let mut p = 0;
+    while p < shown && p < new.len() && new[p] == DOT {
+        p += 1;
+    }
+    let mut s = 0;
+    while s < shown - p && s < new.len() - p && new[new.len() - 1 - s] == DOT {
+        s += 1;
+    }
+    let mut out = Vec::with_capacity(buf.len() + t.len());
+    out.extend_from_slice(&buf[..at[p]]);
+    for c in &new[p..new.len() - s] {
+        let mut b = [0u8; 4];
+        out.extend_from_slice(c.encode_utf8(&mut b).as_bytes());
+    }
+    let caret = out.len();
+    out.extend_from_slice(&buf[at[shown - s]..]);
+    (out, caret)
+}
+
 // utf8_encode(cp) appended (1..4 bytes; above U+10FFFF: U+FFFD).  (port) A surrogate code
 // point becomes U+FFFD too (the asm writes its 3-byte form, which a String cannot hold; the
 // platforms never deliver one: Win32 pairs WM_CHAR halves, xkb gives scalar values)
@@ -565,19 +599,24 @@ impl Ui {
             buf.truncate(p); // the asm's text ends at its NUL
         }
         core::mem::swap(buf, &mut self.m.edit.buf);
-        // a text a screen reader set (a11y.rs): replaces the content, the caret at its end
+        // a text a screen reader set (a11y.rs): replaces the content, the caret at its end; in a
+        // password box it is the dots of its record with the user's change (pw_apply)
         let set = self.a11y_text(id).map(|t| {
+            let (bytes, caret) = if cap_flags & TB_PASSWORD != 0 {
+                pw_apply(&self.m.edit.buf, &t)
+            } else {
+                let n = t.len();
+                (t.into_bytes(), n)
+            };
             let max = ((cap_flags & TB_CAP_MASK) as usize).saturating_sub(1);
-            let mut n = if max > 0 { t.len().min(max) } else { t.len() };
-            while !t.is_char_boundary(n) {
-                n -= 1;
-            }
+            let n = u8_clip(&bytes, if max > 0 { bytes.len().min(max) } else { bytes.len() });
+            let caret = u8_clip(&bytes, caret.min(n));
             let held = self.ed_is(id);
             let e = &mut self.m.edit;
-            e.buf = t.as_bytes()[..n].to_vec();
+            e.buf = bytes[..n].to_vec();
             if held {
-                e.ed_caret = n;
-                e.ed_anchor = n;
+                e.ed_caret = caret;
+                e.ed_anchor = caret;
             }
             self.repass();
         });

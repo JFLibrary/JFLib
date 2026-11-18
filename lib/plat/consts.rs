@@ -27,6 +27,11 @@ pub const E_SESSION_END: u8 = 21; // the user logs off, the system shuts down, S
 pub const E_SETTINGS: u8 = 22; // data = SET_* bits: system settings changed
 pub const E_DRAG: u8 = 23; // a drag over the window: x, y, data = DT_* | DE_* << 8 (0: it left; dnd.rs)
 pub const E_DRAG_END: u8 = 24; // our outgoing drag (drag_start) ended: data = DE_* effect, 0 = none
+/// (G7a) raw relative motion of the pointer waits for win_raw_motion_take(win) while the window
+/// holds the pointer lock (one event until it is taken, however much motion comes)
+pub const E_RAW_MOTION: u8 = 25;
+/// (G7a) the pointer lock of the window changed (win_pointer_lock_state): data 1 locked now, 0 not
+pub const E_POINTER_LOCK: u8 = 26;
 
 // E_SETTINGS: what changed
 pub const SET_THEME: u32 = 1; // light / dark, accent colour
@@ -66,7 +71,8 @@ pub const MOD_CAPS: u8 = 32;
 pub const MOD_NUM: u8 = 64;
 
 // ---- (E2) where a key sits (key_location of Event::y of E_KEY_DOWN / E_KEY_UP; Event::x is its scancode:
-// Windows' scan code (0xE0.. for extended keys), Linux's evdev code, 0 where unknown)
+// Windows' scan code (0xE0.. for extended keys), Linux's evdev code, (G7a) the USB HID usage on macOS,
+// iOS and in the browser, 0 where unknown; keycode.rs key_code turns it into the same KC_* everywhere)
 pub const KL_STANDARD: u32 = 0;
 pub const KL_LEFT: u32 = 1; // the left Shift, Ctrl, Alt, Windows key
 pub const KL_RIGHT: u32 = 2;

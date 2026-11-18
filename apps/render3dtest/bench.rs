@@ -12,7 +12,9 @@
 // draw per list instead of one multi-draw).  --verify: the last frame's lists against shader::bench::cull_ref.
 // --textures T (G5b): T textures of --tex-size S texels (256), sRGB, repeating and trilinear, the 1024
 // materials take them in turn; the cube's faces get uv 0 ..= 1.  --mask P: P of every 100 materials are MASK
-// (cutoff 0.5) with a texture of square holes (a quarter of its area, trilinear: far away the holes close).
+// (cutoff 0.5) with a texture of square holes (a quarter of its area, trilinear: far away the holes close).  (G7f) --blend
+// P: P of every 100 materials are blended (glTF BLEND, alpha 0.5), after the MASK ones; --double P: P of every 100
+// double-sided.
 //
 //   render3dtest --bench-upload              per class: the CPU's mip levels (render3d::mip_chain), add_texture
 //                                            and the GPU's copies until done, for exact and resampled sizes
@@ -93,6 +95,9 @@ pub fn bench(n: u32, validate: bool) -> i32 {
     let (moved, meshes) = (num("--moved", 0), num("--meshes", 1).max(1));
     let (textures, tex_size) = (num("--textures", 0), num("--tex-size", 256).clamp(1, 4096) as u32);
     let mask = num("--mask", 0).min(100);
+    // (G7f) blended and double-sided materials
+    let blend = num("--blend", 0).min(100);
+    let double = num("--double", 0).min(100);
     // (G5c) the sun's shadows: --shadows C cascades of --shadow-size S up to --shadow-distance D, --shadow-mask 0: no
     // fragment shader in the shadow passes
     let shadows = num("--shadows", 0).min(render3d::CASCADES_MAX);
@@ -117,7 +122,7 @@ pub fn bench(n: u32, validate: bool) -> i32 {
     out(&format!("{} ({}), level {:?}{}", dev.info().name, dev.info().driver_info, dev.level(),
                  if dev.compute_queue().is_some() { ", a compute queue" } else { "" }));
     let sh = if shadows > 0 { Some((shadow, shadow_mask)) } else { None };
-    if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size, mask, sh, lights, env, occlusion).is_none() && t.fails == 0 {
+    if run(&mut t, &dev, n, w, h, frames, warmup, k, moved, meshes, verify, textures, tex_size, mask, sh, lights, env, occlusion, [blend, double]).is_none() && t.fails == 0 {
         t.ok(false, "the run stopped");
     }
     if validate {
@@ -129,7 +134,7 @@ pub fn bench(n: u32, validate: bool) -> i32 {
 
 #[allow(clippy::too_many_arguments)]
 fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: usize, k: usize, moved: usize, meshes: usize, verify: bool, textures: usize, tex_size: u32,
-       mask: usize, shadows: Option<(render3d::Shadows, bool)>, lights: usize, env: bool, occlusion: bool) -> Option<()> {
+       mask: usize, shadows: Option<(render3d::Shadows, bool)>, lights: usize, env: bool, occlusion: bool, g7f: [usize; 2]) -> Option<()> {
     let extent = sb::extent_for(n);
     let push = sb::Push { time: 0.0, count: n, seed: 1, extent, object_index: 0 };
     let objs = sb::move_all(&push);
@@ -193,6 +198,7 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
         None
     };
     let mut masked = 0;
+    let (mut blended, mut doubled) = (0, 0);
     for (i, o) in objs.iter().take(1024).enumerate() {
         let mut m = Material::color(o.color[0], o.color[1], o.color[2]);
         if !tex.is_empty() {
@@ -203,7 +209,21 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
             m.alpha_cutoff = Some(0.5);
             masked += 1;
         }
-        t.res(r.add_material(&m), "add_material")?;
+        // (G7f) after the MASK ones in each hundred
+        let mut d = render3d::MaterialDesc::new(m);
+        if (mask..mask + g7f[0]).contains(&(i % 100)) && m.alpha_cutoff.is_none() {
+            d.material.base_color[3] = 0.5;
+            d.blend = true;
+            blended += 1;
+        }
+        if i % 100 >= 100 - g7f[1] {
+            d.double_sided = true;
+            doubled += 1;
+        }
+        t.res(r.add_material_desc(&d), "add_material")?;
+    }
+    if blended + doubled > 0 {
+        out(&format!("  blended: {blended}, double-sided: {doubled} of 1024 materials"));
     }
     let palette = objs.len().min(1024) as u32;
     if mask > 0 {
@@ -347,8 +367,8 @@ fn run(t: &mut T, dev: &Device, n: u32, w: u32, h: u32, frames: usize, warmup: u
     }
     let fps = if fs.mean > 0.0 { 1000.0 / fs.mean } else { 0.0 };
     out(&format!("  frame: {:.3} ms mean ({fps:.0} fps), {:.3} median, {:.3} p99", fs.mean, fs.med, fs.p99));
-    out(&format!("RESULT engine n={n} res={w}x{h} lists={meshes} moved={moved} textures={textures}x{tex_size} mask={mask} level={:?} inflight={k} frames={} occl={} ball={ball_n} lods={lods} minpx={min_px} vis={:.4} late={:.4} prep={:.4}/{:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} wait={:.4}/{:.4} up={:.4}/{:.4} cull={:.4}/{:.4} shcull={:.4}/{:.4} shdraw={:.4}/{:.4} draw={:.4}/{:.4} hiz={:.4}/{:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} frame={:.4}/{:.4} framemean={:.4} busy={:.3}",
-                 dev.level(), m.len(), occlusion as u32, vis.med / n as f64, late.med / n as f64, ps.med, ps.p99, rs.med, rs.p99, cs.med, cs.p99, ws.med, ws.p99, up.med, up.p99, cull.med, cull.p99,
+    out(&format!("RESULT engine n={n} res={w}x{h} lists={meshes} moved={moved} textures={textures}x{tex_size} mask={mask} blend={} double={} level={:?} inflight={k} frames={} occl={} ball={ball_n} lods={lods} minpx={min_px} vis={:.4} late={:.4} prep={:.4}/{:.4} rec={:.4}/{:.4} cpu={:.4}/{:.4} wait={:.4}/{:.4} up={:.4}/{:.4} cull={:.4}/{:.4} shcull={:.4}/{:.4} shdraw={:.4}/{:.4} draw={:.4}/{:.4} hiz={:.4}/{:.4}/{:.4} gpu={:.4}/{:.4} gpuframe={:.4}/{:.4} frame={:.4}/{:.4} framemean={:.4} busy={:.3}",
+                 g7f[0], g7f[1], dev.level(), m.len(), occlusion as u32, vis.med / n as f64, late.med / n as f64, ps.med, ps.p99, rs.med, rs.p99, cs.med, cs.p99, ws.med, ws.p99, up.med, up.p99, cull.med, cull.p99,
                  shcull.med, shcull.p99, shdraw.med, shdraw.p99, draw.med, draw.p99, hiz[0].med, hiz[1].med, hiz[2].med, all.med, all.p99, gap.med, gap.p99, fs.med, fs.p99, fs.mean, busy));
     if verify {
         // (G5d) the lists of a frame without the occlusion test at the last frame's camera: everything in the view
@@ -504,7 +524,7 @@ pub fn bench_gltf() -> i32 {
         (n, v) => (n.unwrap_or(0), v.unwrap_or(0)),
     };
     let enc = Enc { idx: Some(5125), uv: Some(5126), normals: true, interleaved: false, sparse: None };
-    let mat = GMat { factor: [0.8, 0.7, 0.6, 1.0], metallic: 0.0, roughness: 1.0, emissive: [0.0; 3], tex: [None; 5], mask: None };
+    let mat = GMat { factor: [0.8, 0.7, 0.6, 1.0], metallic: 0.0, roughness: 1.0, emissive: [0.0; 3], tex: [None; 5], mask: None, blend: false, double: false };
     let id = [0.0, 0.0, 0.0, 1.0];
     let mut sc = GScene { meshes: Vec::new(), mats: vec![mat], texs: Vec::new(), images: Vec::new(), nodes: Vec::new(), scenes: vec![vec![0]], scene: 0 };
     let what;

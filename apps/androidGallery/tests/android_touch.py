@@ -11,7 +11,10 @@ read from `uiautomator dump`:
   vertical swipe that starts on the slider rolls the page and leaves the value alone;
 - no scroll bars: the right margin of the start page stays one colour (`screencap`);
 - a tool window follows the finger, stays in reach, its close button works by finger;
-- the system's keyboard comes with a tap on a text field and not with a scroll.
+- the system's keyboard comes with a tap on a text field and not with a scroll;
+- its kind follows the box (page "Texteingabe", dumpsys input_method): a password one without
+  learning for the password box, a multi-line one (Enter breaks the line) for "Mehrzeilig", one
+  line with "Done" for the name -- also when the focus goes from one box to the other (restartInput).
 Changes nothing on the device but the app's own state; the app is stopped at the end.  The phone must
 be unlocked.  The APK must be a debug build (jfgui_* extras); without --apk it installs
 build/android/androidGallery-<ro.product.cpu.abi>-debug.apk when that exists.  Exit code 0 when
@@ -342,6 +345,42 @@ def main():
             ok(ime(), "a tap on the text field brings the keyboard")
             d.sh("input", "keyevent", "KEYCODE_BACK")
             time.sleep(1)
+
+        # ------------------------------------------------------------ the keyboard's kind
+        print("Tastaturtyp:", flush=True)
+        start("texts")
+
+        def editor_info():
+            # the EditorInfo the IME got for the focused editor: (inputType, imeOptions)
+            out = d.sh("dumpsys", "input_method")
+            m = re.findall(r"inputType=0x([0-9a-fA-F]+)\s+imeOptions=0x([0-9a-fA-F]+)", out)
+            return (int(m[-1][0], 16), int(m[-1][1], 16)) if m else (None, None)
+
+        def tap_field(match, what):
+            n = find(lambda x: x.get("class", "").endswith("EditText") and match(x), what, 15)
+            if n is not None:
+                d.sh("input", "tap", *map(str, center(n)))
+                time.sleep(1.5)
+            return n
+
+
+        PASSWORD, MULTI_LINE, DONE, NO_ENTER, NO_LEARNING = 0x80, 0x20000, 6, 0x40000000, 0x1000000
+        if ok(tap_field(lambda x: x.get("password") == "true", "the password box") is not None, "the password box"):
+            t, o = editor_info()
+            ok(t is not None and t & 0xFFF == 1 | PASSWORD, f"a password keyboard (inputType {t if t is None else hex(t)})")
+            ok(o is not None and o & NO_LEARNING != 0 and o & 0xFF == DONE, f"no learning, Done (imeOptions {o if o is None else hex(o)})")
+        if ok(tap_field(lambda x: (x.get("text") or "").startswith("Zeile 1"), 'the multi-line box ("Zeile 1 ...")') is not None, "the multi-line box"):
+            t, o = editor_info()
+            ok(t is not None and t & MULTI_LINE != 0 and t & 0xFF0 != PASSWORD, f"a multi-line keyboard after the password box (inputType {t if t is None else hex(t)})")
+            ok(o is not None and o & NO_ENTER != 0, f"Enter breaks the line (imeOptions {o if o is None else hex(o)})")
+        rest_swipe(w - dp(8), h // 3, w - dp(8), h * 2 // 3)
+        # (the first empty one-line box of the page: the name)
+        if ok(tap_field(lambda x: x.get("text") == "" and x.get("password") == "false", "the name box") is not None, "the name box"):
+            t, o = editor_info()
+            ok(t is not None and t & (MULTI_LINE | 0xFF0) == 0, f"a one-line text keyboard (inputType {t if t is None else hex(t)})")
+            ok(o is not None and o & 0xFF == DONE and o & NO_ENTER == 0, f"with Done (imeOptions {o if o is None else hex(o)})")
+        d.sh("input", "keyevent", "KEYCODE_BACK")
+        time.sleep(1)
     except KeyboardInterrupt:
         failures.append("interrupted")
     finally:

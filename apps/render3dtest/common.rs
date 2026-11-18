@@ -10,6 +10,7 @@ use render3d::{Camera, Instance, InstanceId, Light, LightKind, Material, Materia
 use crate::cpu;
 
 /// a mesh's data, owned
+#[derive(Clone)]
 pub struct Geo {
     pub pos: Vec<[f32; 3]>,
     pub nrm: Vec<[f32; 3]>,
@@ -442,6 +443,9 @@ pub fn later_gallery_in(name: &str, r: &mut Renderer, format: Format) -> Result<
         "lights" => lights_gallery(r),
         "env" => env_gallery(r),
         "occl" => occl_gallery(r, format),
+        "sides" => sides_gallery(r),
+        "blend" => blend_gallery(r),
+        "churn" => churn_gallery(r, format),
         _ => Err(GpuError::Invalid("no such gallery")),
     }
 }
@@ -768,4 +772,255 @@ pub fn gltf_gallery(r: &mut Renderer) -> Result<Scene> {
         sc.add(*i)?;
     }
     Ok(sc)
+}
+
+// ---------------------------------------------------------------- the galleries of G7f
+
+/// white, square holes: alpha 30 in a checker of 16 texels, 230 elsewhere (alphatest.rs's)
+pub fn holes_rgba() -> Vec<u8> {
+    (0..128u32 * 128).flat_map(|i| { let (x, y) = (i % 128, i / 128); [255u8, 255, 255, if (x / 16 + y / 16) % 2 == 0 { 30 } else { 230 }] }).collect()
+}
+
+/// (G7f) the galleries of G7f, after LATER: double-sided materials, blended instances, a renderer after removals.  Not in
+/// LATER: the test `srgb` compares LATER's images in an 8-bit target the shader encodes with their float images, and
+/// blending happens in the target's codes (docs/RENDER3D.md "Durchsichtiges")
+pub const G7F: [&str; 3] = ["sides", "blend", "churn"];
+
+/// the cube without its +z face: an open box, its inside seen from +z
+pub fn cup() -> Geo {
+    let mut g = cube();
+    // (the faces of cube(): +x, -x, +y, -y, +z, -z, six indices each)
+    g.idx.drain(24..30);
+    g
+}
+
+/// a texture (srgb) of 128 texels: white, alpha rising from 20 to 235 across, a dark square in each corner (nearest)
+pub fn alpha_ramp() -> Vec<u8> {
+    (0..128u32 * 128).flat_map(|i| {
+        let (x, y) = (i % 128, i / 128);
+        let corner = (x < 16 || x >= 112) && (y < 16 || y >= 112);
+        let c = if corner { 40u8 } else { 255 };
+        [c, c, if corner { 200 } else { 255 }, (20 + x * 215 / 127) as u8]
+    }).collect()
+}
+
+/// nearest, without levels (exact against the ray caster)
+pub const NEAREST_ONLY: render3d::Sampling = render3d::Sampling { mag_nearest: true, min_nearest: true, mip: render3d::Mip::None, wrap_u: render3d::Wrap::Repeat,
+                                                                  wrap_v: render3d::Wrap::Repeat };
+
+/// what a G7f scene holds: meshes, textures (size, rgba, sRGB; exact class sizes, nearest), items (the material's
+/// textures are indices into the list)
+pub type Described = (Vec<Geo>, Vec<(u32, Vec<u8>, bool)>, Vec<(Spec, render3d::MaterialDesc)>);
+
+fn desc(m: Material, blend: bool, double: bool) -> render3d::MaterialDesc {
+    let mut d = render3d::MaterialDesc::new(m);
+    d.blend = blend;
+    d.double_sided = double;
+    d
+}
+
+const TURNED: [f32; 4] = [0.0, 1.0, 0.0, 0.0];
+
+/// (G7f) plates seen from behind (single-sided: culled; double-sided: lit from their side, also MASK, mirrored, with a
+/// normal map), open boxes seen into (double-sided and not), before a plate; meshes plate, cup
+pub fn sides_scene() -> Described {
+    let geos = vec![plate(), cup()];
+    let texs = vec![(128, holes_rgba(), true), (128, bump_map(128, 71), false)];
+    let tex = |k: u32| Some(render3d::TextureRef { texture: render3d::TextureId(k), sampling: NEAREST_ONLY });
+    let s = |mesh: u32, pos: [f64; 3], rot: [f32; 4], scale: [f32; 3]| Spec { mesh, material: 0, pos, rot, scale };
+    let m = |r: f32, g: f32, b: f32| Material { roughness: 0.6, ..Material::color(r, g, b) };
+    let into = quat(cpu::norm([1.0, 0.4, 0.0]), 0.5);
+    let items = vec![
+        (s(0, [0.0, 0.0, -4.0], [0.0, 0.0, 0.0, 1.0], [9.0, 5.0, 1.0]), desc(m(0.55, 0.55, 0.6), false, false)),
+        (s(0, [-4.5, 1.6, 0.0], TURNED, [1.3; 3]), desc(m(0.9, 0.3, 0.2), false, false)),
+        (s(0, [-1.5, 1.6, 0.0], TURNED, [1.3; 3]), desc(m(0.3, 0.9, 0.3), false, true)),
+        (s(0, [1.5, 1.6, 0.0], TURNED, [1.3; 3]), desc(Material { base_color_texture: tex(0), alpha_cutoff: Some(0.5), ..m(0.9, 0.8, 0.3) }, false, true)),
+        (s(0, [4.5, 1.6, 0.0], TURNED, [-1.3, 1.3, 1.3]), desc(m(0.3, 0.4, 0.95), false, true)),
+        (s(1, [-3.5, -1.6, 1.0], into, [1.1; 3]), desc(m(0.9, 0.7, 0.4), false, true)),
+        (s(1, [0.0, -1.6, 1.0], into, [1.1; 3]), desc(m(0.6, 0.9, 0.8), false, false)),
+        (s(0, [3.5, -1.6, 1.0], quat([0.0, 1.0, 0.0], 3.0), [1.3; 3]), desc(Material { normal_texture: tex(1), roughness: 0.4, ..m(0.9, 0.9, 0.9) }, false, true)),
+    ];
+    (geos, texs, items)
+}
+
+pub fn sides_camera(aspect: f64) -> Camera {
+    Camera::look_at([0.5, 1.0, 10.0], [0.0, 0.0, 0.0], [0.0, 1.0, 0.0], 1.0, aspect, 0.1, f64::INFINITY)
+}
+
+/// (G7f) opaque ground, wall and a cube; blended plates at several depths, added out of their order, overlapping; a
+/// blended double-sided cube (front and back faces blended in their order), a mirrored single-sided one, a plate whose
+/// texture's alpha rises, one over the clear colour, one behind the wall; meshes plate, cube
+pub fn blend_scene() -> Described {
+    let geos = vec![plate(), cube()];
+    let texs = vec![(128, alpha_ramp(), true)];
+    let s = |mesh: u32, pos: [f64; 3], rot: [f32; 4], scale: [f32; 3]| Spec { mesh, material: 0, pos, rot, scale };
+    let none = [0.0f32, 0.0, 0.0, 1.0];
+    let flat = quat([1.0, 0.0, 0.0], -core::f64::consts::FRAC_PI_2);
+    let m = |r: f32, g: f32, b: f32, a: f32| Material { base_color: [r, g, b, a], roughness: 0.5, ..Material::color(r, g, b) };
+    let items = vec![
+        // opaque: the ground, the wall, a cube before the nearest plate
+        (s(0, [0.0, -2.0, -5.0], flat, [12.0, 9.0, 1.0]), desc(m(0.7, 0.7, 0.65, 1.0), false, false)),
+        (s(0, [0.0, 1.0, -12.0], none, [12.0, 3.0, 1.0]), desc(m(0.5, 0.55, 0.7, 1.0), false, false)),
+        (s(1, [-1.2, -0.6, 1.5], quat([0.0, 1.0, 0.0], 0.5), [0.5; 3]), desc(m(0.9, 0.9, 0.3, 1.0), false, false)),
+        // blended, out of their order
+        (s(0, [0.0, 1.0, -6.0], none, [2.5, 2.0, 1.0]), desc(m(0.1, 0.2, 0.8, 0.4), true, false)),
+        (s(1, [-4.5, 0.5, -1.0], quat([0.0, 1.0, 0.0], 0.5), [-1.0, 1.0, 1.0]), desc(m(0.3, 0.8, 0.8, 0.5), true, false)),
+        (s(0, [-2.0, 0.0, 0.0], none, [2.0, 1.5, 1.0]), desc(m(0.8, 0.15, 0.1, 0.5), true, false)),
+        (s(0, [2.6, 2.4, -1.0], quat([0.0, 1.0, 0.0], -0.3), [1.5; 3]), desc(Material { base_color_texture: Some(render3d::TextureRef { texture: render3d::TextureId(0), sampling: NEAREST_ONLY }),
+                                                                                         ..m(1.0, 0.9, 0.8, 1.0) }, true, false)),
+        // (small: its sphere's rectangle stays inside the wall at the level of the pyramid the test reads)
+        (s(0, [0.0, 1.0, -15.0], none, [0.8, 0.6, 1.0]), desc(m(1.0, 0.2, 0.9, 0.7), true, false)),
+        (s(1, [3.0, 0.3, -2.5], quat(cpu::norm([0.3, 1.0, 0.2]), 0.7), [1.0; 3]), desc(m(0.95, 0.6, 0.2, 0.35), true, true)),
+        (s(0, [-1.0, 0.5, -3.0], none, [2.0, 1.5, 1.0]), desc(m(0.1, 0.65, 0.15, 0.6), true, false)),
+        (s(0, [0.5, 5.2, -8.0], none, [3.5, 1.0, 1.0]), desc(m(0.95, 0.9, 0.2, 0.5), true, false)),
+    ];
+    (geos, texs, items)
+}
+
+pub fn blend_camera(aspect: f64) -> Camera {
+    Camera::look_at([0.5, 2.0, 12.0], [0.0, 0.5, -4.0], [0.0, 1.0, 0.0], 1.0, aspect, 0.1, f64::INFINITY)
+}
+
+/// a described scene into a renderer (textures, meshes, a material per item): the scene and its ids
+pub fn described_in(r: &mut Renderer, d: &Described, cam: &Camera, sun: &Sun) -> Result<(Scene, Vec<InstanceId>)> {
+    let (geos, texs, items) = d;
+    let mut meshes = Vec::new();
+    for g in geos {
+        meshes.push(r.add_mesh(&g.data())?);
+    }
+    let mut tex = Vec::new();
+    for (n, px, srgb) in texs {
+        tex.push(r.add_texture(&render3d::TextureData { width: *n, height: *n, rgba: px, srgb: *srgb, nearest: true })?);
+    }
+    let mut sc = Scene::new(r)?;
+    sc.set_camera(cam);
+    sc.set_sun(sun);
+    let mut ids = Vec::new();
+    for (spec, m) in items {
+        let mut m = *m;
+        // (the items name textures by their index in the list)
+        for t in [&mut m.material.base_color_texture, &mut m.material.metallic_roughness_texture, &mut m.material.normal_texture, &mut m.material.occlusion_texture,
+                  &mut m.material.emissive_texture].into_iter().flatten() {
+            t.texture = tex[t.texture.0 as usize];
+        }
+        let id = r.add_material_desc(&m)?;
+        ids.push(sc.add(Instance { mesh: meshes[spec.mesh as usize], material: id, ..spec.instance() })?);
+    }
+    Ok((sc, ids))
+}
+
+/// (G7f) the scene of double-sided materials
+pub fn sides_gallery(r: &mut Renderer) -> Result<Scene> {
+    Ok(described_in(r, &sides_scene(), &sides_camera(GALLERY_W as f64 / GALLERY_H as f64), &Sun::DEFAULT)?.0)
+}
+
+/// (G7f) the scene of blended instances
+pub fn blend_gallery(r: &mut Renderer) -> Result<Scene> {
+    Ok(described_in(r, &blend_scene(), &blend_camera(GALLERY_W as f64 / GALLERY_H as f64), &Sun::DEFAULT)?.0)
+}
+
+/// (G7f) the churn: what a renderer holds after removals and new meshes, textures and materials in their places (two
+/// frames drawn before, into a target without a read-back); the scene must look as the same contents put into a fresh
+/// renderer (test `remove`): the shadow scene with its MASK plate and four textured, blended plates
+pub fn churn_gallery(r: &mut Renderer, format: Format) -> Result<Scene> {
+    // first: other meshes, textures and materials, and a scene with them
+    let junk = [ball(6, 8), prism(7, 0.4), cube(), prism(30, 0.9)];
+    let mut old_meshes = Vec::new();
+    for g in &junk {
+        old_meshes.push(r.add_mesh(&g.data())?);
+    }
+    let mut old_tex = Vec::new();
+    for k in 0..3 {
+        old_tex.push(r.add_texture(&render3d::TextureData { width: 128, height: 128, rgba: &noise_rgba(128, 128, 600 + k), srgb: k != 1, nearest: false })?);
+    }
+    let mut old_mats = Vec::new();
+    for k in 0..5u32 {
+        let t = render3d::TextureRef { texture: old_tex[(k % 3) as usize], sampling: render3d::Sampling::LINEAR };
+        old_mats.push(r.add_material(&Material::textured(t))?);
+    }
+    let mut sc = Scene::new(r)?;
+    sc.set_camera(&shadow_camera([0.0; 3]));
+    sc.set_sun(&shadow_sun());
+    let mut old = Vec::new();
+    for k in 0..40u32 {
+        let pos = [(k % 8) as f64 * 2.0 - 7.0, 1.0 + (k / 8) as f64, -10.0];
+        old.push(sc.add(Instance { mesh: old_meshes[(k % 4) as usize], material: old_mats[(k % 5) as usize], transform: Transform::at(pos) })?);
+    }
+    let dev = r.device().clone();
+    let color = dev.create_texture(&TextureDesc::d2(GALLERY_W, GALLERY_H, format, TextureUsage::COLOR_TARGET))?;
+    let depth = dev.create_texture(&TextureDesc::d2(GALLERY_W, GALLERY_H, Format::Depth32Float, TextureUsage::DEPTH_TARGET | TextureUsage::SAMPLED))?;
+    let frame = |r: &mut Renderer, sc: &mut Scene, first: bool| -> Result<()> {
+        sc.prepare(r)?;
+        let mut e = dev.encoder()?;
+        let ca = ColorAttachment { view: color.view(), load: Load::Clear, clear: CLEAR, store: true, before: if first { Layout::Undefined } else { Layout::ColorTarget },
+                                   after: Layout::ColorTarget };
+        let da = DepthAttachment { view: depth.view(), load: Load::Clear, clear: render3d::DEPTH_CLEAR, store: false,
+                                   before: if first { Layout::Undefined } else { Layout::DepthTarget }, after: Layout::DepthTarget };
+        r.record(&mut e, sc, ca, Some(da))?;
+        let id = dev.queue().submit([e.finish()?])?;
+        sc.submitted(id);
+        Ok(())
+    };
+    frame(r, &mut sc, true)?;
+    frame(r, &mut sc, false)?;
+    // then everything of it goes: instances, materials (their textures lose them), textures, meshes; in a mixed order
+    for id in old {
+        sc.remove(id)?;
+    }
+    for &m in old_mats.iter().rev() {
+        r.remove_material(m)?;
+    }
+    r.remove_mesh(old_meshes[1])?;
+    r.remove_texture(old_tex[1])?;
+    r.remove_mesh(old_meshes[3])?;
+    r.remove_texture(old_tex[0])?;
+    r.remove_mesh(old_meshes[0])?;
+    r.remove_mesh(old_meshes[2])?;
+    r.remove_texture(old_tex[2])?;
+    // the shadow scene in the places they left (its texture, meshes and materials), and blended plates
+    churn_final(r, &mut sc)?;
+    Ok(sc)
+}
+
+/// (G7f) what the churn ends with, in a fresh renderer (test `remove`: the same image)
+pub fn churn_fresh(r: &mut Renderer) -> Result<Scene> {
+    let mut sc = Scene::new(r)?;
+    churn_final(r, &mut sc)?;
+    Ok(sc)
+}
+
+/// the churn's last contents: the shadow scene with two cascades, four blended plates (two double-sided)
+fn churn_final(r: &mut Renderer, sc: &mut Scene) -> Result<()> {
+    let (geos, pics, items) = shadow_scene([0.0; 3]);
+    let mut tex = Vec::new();
+    for (n, px, srgb) in &pics {
+        tex.push(r.add_texture(&render3d::TextureData { width: *n, height: *n, rgba: px, srgb: *srgb, nearest: true })?);
+    }
+    let ramp = r.add_texture(&render3d::TextureData { width: 128, height: 128, rgba: &alpha_ramp(), srgb: true, nearest: true })?;
+    let mut meshes = Vec::new();
+    for g in &geos {
+        meshes.push(r.add_mesh(&g.data())?);
+    }
+    sc.set_camera(&shadow_camera([0.0; 3]));
+    sc.set_sun(&shadow_sun());
+    sc.set_shadows(Some(&render3d::Shadows { cascades: 2, size: 1024, distance: 60.0, ..render3d::Shadows::DEFAULT }))?;
+    for (spec, m) in &items {
+        let mut m = *m;
+        if let Some(t) = &mut m.base_color_texture {
+            t.texture = tex[t.texture.0 as usize];
+        }
+        let id = r.add_material(&m)?;
+        sc.add(Instance { mesh: meshes[spec.mesh as usize], material: id, ..spec.instance() })?;
+    }
+    for k in 0..4u32 {
+        let mut d = render3d::MaterialDesc::new(Material { base_color: [0.4 + 0.15 * k as f32, 0.5, 0.9 - 0.2 * k as f32, 0.7],
+                                                           base_color_texture: Some(render3d::TextureRef { texture: ramp, sampling: NEAREST_ONLY }),
+                                                           ..Material::color(1.0, 1.0, 1.0) });
+        d.blend = true;
+        d.double_sided = k % 2 == 1;
+        let id = r.add_material_desc(&d)?;
+        let pos = [k as f64 * 2.4 - 3.6, 2.2, 3.0 - k as f64 * 1.5];
+        sc.add(Instance { mesh: meshes[0], material: id, transform: Transform { pos, rot: quat([0.0, 1.0, 0.0], 0.3 * k as f64 - 0.4), scale: [1.0, 0.8, 1.0] } })?;
+    }
+    Ok(())
 }

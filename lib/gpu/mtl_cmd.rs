@@ -424,7 +424,11 @@ impl<'a> CommandEncoder<'a> {
                             *x = tb.len.min(u32::MAX as u64) as u32;
                         }
                         if tb.usage != 0 {
-                            let ids: Vec<Id> = tb.keep.lock().iter().flatten().map(|o| o.id()).collect();
+                            // the objects retained while useResources reads them: a set_* of another thread
+                            // may release a slot's last reference right after the lock (the ids were handed
+                            // to Metal dangling)
+                            let held: Vec<Obj> = tb.keep.lock().iter().flatten().cloned().collect();
+                            let ids: Vec<Id> = held.iter().map(|o| o.id()).collect();
                             if !ids.is_empty() {
                                 if stage == 0 {
                                     msg!(e, c"useResources:count:usage:", ids.as_ptr() => *const Id, ids.len() => usize, tb.usage => usize; ());

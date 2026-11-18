@@ -43,6 +43,15 @@
 //        srgb        (G5e2) the fragment shaders encode sRGB for 8-bit targets without sRGB: the gallery against its float
 //                    images encoded on the CPU, Bgra8Unorm, an sRGB target, the linear way; five shapes against the ray
 //                    caster in sRGB codes (srgbtest.rs)
+//        sides       (G7f) double-sided materials against the ray caster: plates from behind (MASK, mirrored, a normal map),
+//                    open boxes seen into, single-sided ones culled; their lists, a switch, the occlusion test; back faces
+//                    lit by the sun with its shadows against exact shadow rays (g7ftest.rs)
+//        blend       (G7f) blended instances against the ray caster laying them back to front per instance; the sorted
+//                    list read back (with and without the occlusion test, 600 and 3000 instances), the depth buffer as
+//                    without them, no shadows, a switch to opaque and back, detail levels (g7ftest.rs)
+//        remove      (G7f) meshes, materials and textures removed: ids, places and ranges again, what is refused, a
+//                    removal between prepare and record, spent generations; the churn against a fresh renderer; 400 random
+//                    steps against a model and its images (g7ftest.rs)
 //        all         all of the above
 //        window      a real window (one, briefly; not in `all`): the presented image = the offscreen image, and (G5e2)
 //                    the float image encoded on the CPU: the shader encodes sRGB for the swapchain's 8-bit format
@@ -81,6 +90,8 @@ mod gltfgen;
 mod alphatest;
 #[cfg(not(target_arch = "wasm32"))]
 mod bench;
+#[cfg(not(target_arch = "wasm32"))]
+mod g7ftest;
 #[cfg(not(target_arch = "wasm32"))]
 mod gltftest;
 #[cfg(not(target_arch = "wasm32"))]

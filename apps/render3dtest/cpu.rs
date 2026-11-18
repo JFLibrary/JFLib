@@ -25,6 +25,14 @@
 // bitangent towards decreasing v), which is what the GPU's derivatives give.  At an edge, a single-coloured
 // instance may show any colour between those of its triangle's vertex normals and the hit's (the GPU's
 // normal there lies a little beyond the triangle).
+//
+// (G7f) Double-sided looks (glTF doubleSided): a ray also hits their back faces, lit with the whole shading normal
+// turned round (and the normal of the shadow's bias).  Blended looks (glTF BLEND, by the engine's rule): they hide
+// nothing and cast no shadows; over the colour of the nearest opaque hit (or the clear colour, RefScene::clear) the
+// blended instances in front of it are laid back to front by the distance of their bounding sphere's centre from the eye
+// (the engine's: the middle of the mesh's box under the transform; ties by the order they were added), each instance's
+// triangles in their order (a draw blends its primitives in order), premultiplied alpha over the 8-bit value before
+// (the target holds 8 bits between two layers), a single-sided look's back faces left out.
 
 use alloc::format;
 use alloc::vec::Vec;
@@ -486,12 +494,16 @@ pub struct Look {
     pub occlusion: f64,
     pub emissive: [f64; 3],
     pub emissive_texture: Option<(usize, RefSampling)>,
+    /// (G7f) glTF's doubleSided and BLEND
+    pub double_sided: bool,
+    pub blend: bool,
 }
 
 impl Look {
     /// render3d's Material::color: dull (metallic 0, roughness 1)
     pub const DULL: Look = Look { factor: [1.0; 4], texture: None, cutoff: None, metallic: 0.0, roughness: 1.0, mr_texture: None, normal_texture: None,
-                                  normal_scale: 1.0, occlusion_texture: None, occlusion: 1.0, emissive: [0.0; 3], emissive_texture: None };
+                                  normal_scale: 1.0, occlusion_texture: None, occlusion: 1.0, emissive: [0.0; 3], emissive_texture: None, double_sided: false,
+                                  blend: false };
 
     pub fn color(c: [f32; 3]) -> Look {
         Look { factor: [c[0] as f64, c[1] as f64, c[2] as f64, 1.0], ..Look::DULL }
@@ -508,6 +520,9 @@ struct RefInstance {
     r2: f64,
     first: usize,
     last: usize,
+    /// (G7f) where the engine's bounding sphere has its centre: the middle of the mesh's box under the transform (the key
+    /// of the blended instances' order)
+    sphere: V,
 }
 
 /// a scene for rays
@@ -530,6 +545,9 @@ pub struct RefScene {
     pub env: Option<RefEnv>,
     /// (G5e2) the image is 8-bit sRGB (the fragment shader encodes, or an sRGB target does): the codes by the definition
     pub srgb: bool,
+    /// (G7f) a look is blended; what blended layers lie over where no opaque hit is
+    pub has_blend: bool,
+    pub clear: [u8; 3],
 }
 
 /// (G5c) the environment as the GPU holds it (data like a texture's texels): the irradiance's harmonics over pi,
@@ -685,6 +703,10 @@ pub struct Hit {
     /// (G5c) of it, the sun's part unshadowed, and how much of the sun reaches the point (0 or 1)
     pub sun: [f64; 3],
     pub vis: f64,
+    /// (G7f) a double-sided look's back face; blended layers laid over it (rgb is theirs over it; z, linear, sun, vis stay
+    /// the opaque hit's; no opaque hit: z infinite)
+    pub back: bool,
+    pub layers: u32,
 }
 
 /// the rays through the centres of the pixel's 2 x 2 quad that the GPU's fine derivatives take: along x
@@ -700,7 +722,7 @@ pub struct Quad {
 impl RefScene {
     pub fn new(sun_dir: V, sun: [f64; 3], ambient: [f64; 3]) -> RefScene {
         RefScene { tris: Vec::new(), inst: Vec::new(), textures: Vec::new(), sun_dir: norm(sun_dir), sun, ambient, exposure: 1.0, tonemap: true, shadows: false, lights: Vec::new(),
-                   env: None, srgb: false }
+                   env: None, srgb: false, has_blend: false, clear: crate::common::CLEAR8 }
     }
 
     /// an instance of one colour: its triangles in the world
@@ -756,13 +778,24 @@ impl RefScene {
         }
         let center = mul(add(lo, hi), 0.5);
         let half = mul(sub(hi, lo), 0.5);
+        // (G7f) the engine's sphere: the middle of the mesh's own box, under the transform
+        let (mut ml, mut mh) = ([f64::MAX; 3], [f64::MIN; 3]);
+        for p in &geo.pos {
+            for k in 0..3 {
+                ml[k] = ml[k].min(p[k] as f64);
+                mh[k] = mh[k].max(p[k] as f64);
+            }
+        }
+        let mid = mul(add(ml, mh), 0.5);
+        let sphere = world([mid[0] as f32, mid[1] as f32, mid[2] as f32]);
+        self.has_blend |= look.blend;
         let uv = |i: usize| [geo.uv[i][0] as f64, geo.uv[i][1] as f64];
         for t in geo.idx.chunks_exact(3) {
             let (a, b, c) = if mirrored { (t[0] as usize, t[2] as usize, t[1] as usize) } else { (t[0] as usize, t[1] as usize, t[2] as usize) };
             let (v0, v1, v2) = (world(geo.pos[a]), world(geo.pos[b]), world(geo.pos[c]));
             self.tris.push(Tri { v0, e1: sub(v1, v0), e2: sub(v2, v0), n: [normal(geo.nrm[a]), normal(geo.nrm[b]), normal(geo.nrm[c])], uv: [uv(a), uv(b), uv(c)] });
         }
-        self.inst.push(RefInstance { look, center, r2: dot(half, half) * 1.0001, first, last: self.tris.len() });
+        self.inst.push(RefInstance { look, center, r2: dot(half, half) * 1.0001, first, last: self.tris.len(), sphere });
     }
 
     /// uv where a ray meets the plane of a triangle (inside or not), by its barycentric coordinates
@@ -821,8 +854,10 @@ impl RefScene {
         norm(add(add(mul(tg, tn[0]), mul(b, tn[1])), mul(ng, tn[2])))
     }
 
-    /// the material's inputs at a point; normal: the interpolated normal (or one given in its place)
-    fn surface(&self, look: &Look, t: &Tri, u: f64, v: f64, eye: V, quad: Option<&Quad>, normal: Option<V>) -> Surface {
+    /// the material's inputs at a point; normal: the interpolated normal (or one given in its place); (G7f) back: a back
+    /// face of a double-sided look, the shading normal turned round
+    #[allow(clippy::too_many_arguments)]
+    fn surface(&self, look: &Look, t: &Tri, u: f64, v: f64, eye: V, quad: Option<&Quad>, normal: Option<V>, back: bool) -> Surface {
         let base = self.base(look, t, u, v, eye, quad);
         let (mut metallic, mut roughness) = (look.metallic, look.roughness);
         if let Some(mr) = self.tex_at(look.mr_texture, t, u, v, eye, quad) {
@@ -835,6 +870,9 @@ impl RefScene {
         if let Some(c) = self.tex_at(look.normal_texture, t, u, v, eye, quad) {
             let k = look.normal_scale;
             n = RefScene::bumped(t, ng, [(c[0] * 2.0 - 1.0) * k, (c[1] * 2.0 - 1.0) * k, c[2] * 2.0 - 1.0]);
+        }
+        if back {
+            n = mul(n, -1.0);
         }
         let ao = self.tex_at(look.occlusion_texture, t, u, v, eye, quad).map_or(1.0, |c| 1.0 + look.occlusion * (c[0] - 1.0));
         let mut emissive = look.emissive;
@@ -885,7 +923,8 @@ impl RefScene {
     /// holes (base alpha at level 0) let it through
     pub fn occluded(&self, p: V, dir: V) -> bool {
         let dd = dot(dir, dir);
-        for inst in &self.inst {
+        // (G7f) blended instances cast no shadows
+        for inst in self.inst.iter().filter(|i| !i.look.blend) {
             let oc = sub(inst.center, p);
             let along = dot(oc, dir);
             if along < -sqrt(inst.r2) || dot(oc, oc) - along * along / dd > inst.r2 {
@@ -941,21 +980,88 @@ impl RefScene {
         [px(c[0]), px(c[1]), px(c[2])]
     }
 
-    /// the light of instance k's triangle ti at (u, v), seen from eye; the sun's part unshadowed; the sun's reach
-    fn shade_parts(&self, k: usize, ti: usize, u: f64, v: f64, eye: V, quad: Option<&Quad>, normal: Option<V>) -> ([f64; 3], [f64; 3], f64) {
+    /// the light of instance k's triangle ti at (u, v), seen from eye; the sun's part unshadowed; the sun's reach.  (G7f)
+    /// back: its back face (a double-sided look's)
+    #[allow(clippy::too_many_arguments)]
+    fn shade_parts(&self, k: usize, ti: usize, u: f64, v: f64, eye: V, quad: Option<&Quad>, normal: Option<V>, back: bool) -> ([f64; 3], [f64; 3], f64) {
         let t = &self.tris[ti];
-        let sf = self.surface(&self.inst[k].look, t, u, v, eye, quad, normal);
+        let sf = self.surface(&self.inst[k].look, t, u, v, eye, quad, normal, back);
         let p = add(add(t.v0, mul(t.e1, u)), mul(t.e2, v));
         let w = 1.0 - u - v;
-        let ng = norm(add(add(mul(t.n[0], w), mul(t.n[1], u)), mul(t.n[2], v)));
+        let mut ng = norm(add(add(mul(t.n[0], w), mul(t.n[1], u)), mul(t.n[2], v)));
+        if back {
+            ng = mul(ng, -1.0);
+        }
         let vis = self.sun_vis(p, ng);
         let (c, sun) = self.light(&sf, p, eye, vis);
         (c, sun, vis)
     }
 
     /// the light of instance k's triangle ti at (u, v), seen from eye
-    fn shade(&self, k: usize, ti: usize, u: f64, v: f64, eye: V, quad: Option<&Quad>, normal: Option<V>) -> [f64; 3] {
-        self.shade_parts(k, ti, u, v, eye, quad, normal).0
+    #[allow(clippy::too_many_arguments)]
+    fn shade(&self, k: usize, ti: usize, u: f64, v: f64, eye: V, quad: Option<&Quad>, normal: Option<V>, back: bool) -> [f64; 3] {
+        self.shade_parts(k, ti, u, v, eye, quad, normal, back).0
+    }
+
+    /// (G7f) light (times the exposure) as the shader returns it before blending: tone mapped, encoded for an 8-bit sRGB
+    /// image (clamped, as the encoding clamps)
+    fn to_unit(&self, c: [f64; 3]) -> [f64; 3] {
+        let c = if self.tonemap { neutral(c) } else { c };
+        if self.srgb {
+            c.map(|v| {
+                let v = v.clamp(0.0, 1.0);
+                if v <= 0.003_130_8 { v * 12.92 } else { 1.055 * exp(ln(v) / 2.4) - 0.055 }
+            })
+        } else {
+            c
+        }
+    }
+
+    /// (G7f) the blended layers along a ray between near and zmax, in the order the engine draws them: (premultiplied
+    /// colour as the target takes it, alpha), the farthest instance first, each instance's triangles in their order
+    fn blend_layers(&self, eye: V, d: V, near: f64, zmax: f64, quad: Option<&Quad>) -> Vec<([f64; 3], f64, usize)> {
+        let mut order: Vec<(f64, usize)> = self.inst.iter().enumerate().filter(|(_, i)| i.look.blend).map(|(k, i)| {
+            let e = sub(i.sphere, eye);
+            (dot(e, e), k)
+        }).collect();
+        // farthest first; a tie: in the order they were added
+        order.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(core::cmp::Ordering::Equal).then(a.1.cmp(&b.1)));
+        let dd = dot(d, d);
+        let mut out = Vec::new();
+        for &(_, k) in &order {
+            let inst = &self.inst[k];
+            let oc = sub(inst.center, eye);
+            let along = dot(oc, d);
+            if dot(oc, oc) - along * along / dd > inst.r2 {
+                continue;
+            }
+            for ti in inst.first..inst.last {
+                let t = &self.tris[ti];
+                let p = cross(d, t.e2);
+                let det = dot(t.e1, p);
+                if det == 0.0 || (det < 0.0 && !inst.look.double_sided) {
+                    continue;
+                }
+                let o = sub(eye, t.v0);
+                let u = dot(o, p) / det;
+                if !(0.0..=1.0).contains(&u) {
+                    continue;
+                }
+                let q = cross(o, t.e1);
+                let v = dot(d, q) / det;
+                if v < 0.0 || u + v > 1.0 {
+                    continue;
+                }
+                let z = dot(t.e2, q) / det;
+                if z < near || z >= zmax {
+                    continue;
+                }
+                let a = self.base(&inst.look, t, u, v, eye, quad)[3].clamp(0.0, 1.0);
+                let c = self.to_unit(self.shade(k, ti, u, v, eye, quad, None, det < 0.0));
+                out.push(([(c[0] * a).clamp(0.0, 1.0), (c[1] * a).clamp(0.0, 1.0), (c[2] * a).clamp(0.0, 1.0)], a, k));
+            }
+        }
+        out
     }
 
     /// (diagnostics) the uv of a hit
@@ -972,9 +1078,13 @@ impl RefScene {
 
     /// trace with the rays of the pixel's quad for the texture's level (and a MASK's alpha)
     pub fn trace_quad(&self, eye: V, d: V, near: f64, far: f64, quad: Option<&Quad>) -> Option<Hit> {
-        let mut best: Option<(f64, usize, usize, f64, f64)> = None;
+        let mut best: Option<(f64, usize, usize, f64, f64, bool)> = None;
         let dd = dot(d, d);
         for (k, inst) in self.inst.iter().enumerate() {
+            // (G7f) blended instances hide nothing: they are laid over the opaque hit below
+            if inst.look.blend {
+                continue;
+            }
             // past the box's sphere?
             let oc = sub(inst.center, eye);
             let along = dot(oc, d);
@@ -985,8 +1095,9 @@ impl RefScene {
                 let t = &self.tris[ti];
                 let p = cross(d, t.e2);
                 let det = dot(t.e1, p);
-                if det <= 0.0 {
-                    continue; // a back face
+                // a back face (G7f: a double-sided look's is drawn)
+                if det == 0.0 || (det < 0.0 && !inst.look.double_sided) {
+                    continue;
                 }
                 let o = sub(eye, t.v0);
                 let u = dot(o, p) / det;
@@ -1007,25 +1118,42 @@ impl RefScene {
                         continue; // not drawn: MASK
                     }
                 }
-                best = Some((z, k, ti, u, v));
+                best = Some((z, k, ti, u, v, det < 0.0));
             }
         }
-        let (z, k, ti, u, v) = best?;
-        let (linear, sun, vis) = self.shade_parts(k, ti, u, v, eye, quad, None);
-        Some(Hit { z, rgb: self.to_rgb8(linear), inst: k, tri: ti, u, v, linear, sun, vis })
+        let opaque = best.map(|(z, k, ti, u, v, back)| {
+            let (linear, sun, vis) = self.shade_parts(k, ti, u, v, eye, quad, None, back);
+            Hit { z, rgb: self.to_rgb8(linear), inst: k, tri: ti, u, v, linear, sun, vis, back, layers: 0 }
+        });
+        if !self.has_blend {
+            return opaque;
+        }
+        // (G7f) the blended layers in front of it, over its 8-bit colour, each layer rounded to 8 bits again
+        let layers = self.blend_layers(eye, d, near, opaque.map_or(far, |h| h.z.min(far)), quad);
+        let Some(&(_, _, front)) = layers.last() else { return opaque };
+        let mut px = opaque.map_or(self.clear, |h| h.rgb);
+        for (c, a, _) in &layers {
+            for i in 0..3 {
+                px[i] = ((c[i] + px[i] as f64 / 255.0 * (1.0 - a)).clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
+            }
+        }
+        let base = opaque.unwrap_or(Hit { z: f64::INFINITY, rgb: self.clear, inst: front, tri: self.inst[front].first, u: 0.0, v: 0.0, linear: [0.0; 3], sun: [0.0; 3], vis: 1.0,
+                                          back: false, layers: 0 });
+        Some(Hit { rgb: px, layers: layers.len() as u32, ..base })
     }
 
     /// this colour is one the hit's instance shows near the hit: between the colours of the hit and of its
     /// triangle's vertex normals there (one colour only: a textured instance relies on its neighbours' rays)
     fn could_show(&self, hit: &Hit, eye: V, got: [u8; 3]) -> bool {
-        if self.inst[hit.inst].look.textured() {
+        // (G7f) under blended layers: only what its neighbours' rays see
+        if self.inst[hit.inst].look.textured() || hit.layers > 0 || !hit.z.is_finite() {
             return false;
         }
         let t = &self.tris[hit.tri];
         let mut lo = hit.rgb;
         let mut hi = hit.rgb;
         for n in t.n {
-            let c = self.to_rgb8(self.shade(hit.inst, hit.tri, hit.u, hit.v, eye, None, Some(n)));
+            let c = self.to_rgb8(self.shade(hit.inst, hit.tri, hit.u, hit.v, eye, None, Some(if hit.back { mul(n, -1.0) } else { n }), hit.back));
             for k in 0..3 {
                 lo[k] = lo[k].min(c[k]);
                 hi[k] = hi[k].max(c[k]);
@@ -1046,14 +1174,14 @@ impl RefScene {
             ((centre[0] - a[0]) * ey - (centre[1] - a[1]) * ex).abs() / sqrt(ex * ex + ey * ey).max(1e-12)
         };
         for (k, inst) in self.inst.iter().enumerate() {
-            if !inst.look.textured() {
+            if !inst.look.textured() || inst.look.blend {
                 continue;
             }
             for ti in inst.first..inst.last {
                 let t = &self.tris[ti];
                 let p = cross(d, t.e2);
                 let det = dot(t.e1, p);
-                if det <= 0.0 {
+                if det == 0.0 || (det < 0.0 && !inst.look.double_sided) {
                     continue;
                 }
                 let o = sub(cam.eye, t.v0);
@@ -1069,7 +1197,7 @@ impl RefScene {
                 if inst.look.cutoff.is_some_and(|cut| self.base(&inst.look, t, u, v, cam.eye, Some(q))[3] < cut) {
                     continue;
                 }
-                let (light, _, _) = self.shade_parts(k, ti, u, v, cam.eye, Some(q), None);
+                let (light, _, _) = self.shade_parts(k, ti, u, v, cam.eye, Some(q), None, det < 0.0);
                 if near_rgb(got, self.to_rgb8(light), tol) {
                     return true;
                 }
@@ -1159,7 +1287,7 @@ pub fn compare_tol(sc: &RefScene, cam: &RefCamera, w: u32, h: u32, clear: [u8; 3
                     }
                     continue;
                 }
-                if let (Some(hit), Some(d)) = (c, depth) {
+                if let (Some(hit), Some(d), true) = (c, depth, c.is_some_and(|h| h.z.is_finite())) {
                     out.solid_hit += 1;
                     let (v, exact) = (d[(y * w + x) as usize] as f64, cam.depth(hit.z));
                     let e = (v - exact).abs() / exact.abs().max(1e-30);

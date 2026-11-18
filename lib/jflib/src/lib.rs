@@ -65,6 +65,7 @@ pub use render3d;
 pub use render2d;
 pub use gltf;
 pub use dxf;
+pub use physics;
 #[doc(hidden)]
 pub use style_assets;
 

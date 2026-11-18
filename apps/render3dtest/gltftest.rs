@@ -488,7 +488,7 @@ fn drawn(t: &mut T, dev: &Device, level: &str, sc: &GScene, doc: &g::Document) -
                 let e = gm.emissive;
                 Look { factor: [f[0] as f64, f[1] as f64, f[2] as f64, f[3] as f64], texture: srgb(0), cutoff: gm.mask.map(|c| c as f64), metallic: gm.metallic as f64,
                        roughness: gm.roughness as f64, mr_texture: lin(1), normal_texture: lin(2), normal_scale: 1.0, occlusion_texture: lin(3), occlusion: 1.0,
-                       emissive: [e[0] as f64, e[1] as f64, e[2] as f64], emissive_texture: srgb(4) }
+                       emissive: [e[0] as f64, e[1] as f64, e[2] as f64], emissive_texture: srgb(4), double_sided: false, blend: false }
             }
             // (glTF's default material: white, metallic 1, roughness 1)
             None => Look { metallic: 1.0, ..Look::color([1.0, 1.0, 1.0]) },

@@ -2,7 +2,7 @@
 display=3D-Test
 version=0.1.0
 publisher=JFLib
-summary=Tests und Messung des 3D-Engine-Kerns (lib/render3d): Vulkan unter Windows und WebGPU im Browser
+summary=Tests und Messung des 3D-Engine-Kerns (lib/render3d) auf Vulkan und WebGPU
 description=3D-Test: Bilder gegen einen Strahlenwerfer auf der CPU, Sichtbarkeit gegen den exakten Test, Änderungen, große Koordinaten, Bilder in Flug, Voll gegen Basis und die Messszene über die Engine; die Testanwendung von lib/render3d.
 generic=3D-Test
 categories=Development;

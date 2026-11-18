@@ -233,8 +233,10 @@ pub(crate) fn wlh_seat_caps(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
             if wl.g.csm != 0 {
                 wl.inp.csd = wl.w.send(wl.g.csm, &CSM_GET_POINTER, &[A::N(&IFACE_WP_CSD), A::O(p)]);
             }
+            wl.lock_try(); // (G7a) a pointer lock that waited for a pointer
         }
     } else if wl.inp.ptr != 0 {
+        wl.lock_release(crate::plock_win()); // (G7a) no pointer: no lock (its objects name the old one)
         let p = wl.inp.ptr;
         wl.inp.ptr = 0;
         wl.inp.ptr_in = false;
@@ -573,10 +575,12 @@ pub(crate) fn wlh_kb_enter(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
     wl.inp.evwin = wl.kb_target();
     wl.inp.kb_focus = true;
     wl.push(E_FOCUS_IN, 0, 0, 0, 0);
+    wl.lock_try(); // (G7a) a pointer lock that waited for the keyboard
 }
 
 /// [wlh_kb_leave]
 pub(crate) fn wlh_kb_leave(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
+    wl.lock_release(crate::plock_win()); // (G7a) the keyboard went elsewhere: so does the pointer lock
     xkb_dead_reset();
     wl.inp.kb_focus = false;
     wl.inp.rep_key = 0;
@@ -602,6 +606,16 @@ pub(crate) fn wlh_kb_key(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
         wl_mods_set(if down { wl_mods() | mb } else { wl_mods() & !mb });
     }
     wl.inp.evwin = wl.kb_target();
+    if crate::plock_key(xkb_key(key).0, down) {
+        // (G7a) Esc lets the pointer lock go; the key (and its repeat) is the lock's
+        if down {
+            wl.lock_release(crate::plock_win());
+        }
+        if key + 1 == wl.inp.rep_key {
+            wl.inp.rep_key = 0;
+        }
+        return;
+    }
     if down {
         let dead = xkb_is_dead(key);
         let (vk, text) = xkb_key_typed(key); // dead keys composed (´ e -> é)
