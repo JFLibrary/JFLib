@@ -1,6 +1,6 @@
 [package]
 name = "jflib-game"
-description = "The game core: a world of entities and components, a fixed tick, input actions, cameras"
+description = "The game core: a world of entities and components, a fixed tick, input actions, cameras, the netcode"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -22,6 +22,7 @@ rt.workspace = true
 plat.workspace = true
 base.workspace = true
 physics.workspace = true
+netchan.workspace = true
 
 # docs.rs: Linux, Windows, the browser and Android, not docs.rs's five defaults (32-bit Windows is none
 # of JFLib's targets; macOS and iOS are, their pages are not built on docs.rs yet)

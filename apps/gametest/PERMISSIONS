@@ -3,7 +3,10 @@
 # scripts and agent actions too).  The app's own folders (config://, data://, cache://,
 # logs://) and app:// need no line.  The build checks the syntax; the packages follow the file
 # (Flatpak finish-args, MSIX capabilities: docs/PACKAGING.md).
-# nothing: the tests compute, keep their settings files in mem:// and write to stdout
+# the tests compute, keep their settings files in mem:// and write to stdout; --loopback runs the
+# netcode's server and clients on the loopback address only
+net.listen localhost:*
+net.connect localhost:*
 #
 # Remove the # of a rule the program needs:
 # fs.read  $HOME/**                  read below the home folder
