@@ -1,0 +1,72 @@
+// Bauteile für haus.jfs: eine Wand mit Öffnungen, ein Fenster, eine Haustür, ein Satteldach.
+// Wände, Fenster und Tür entstehen in ihrem eigenen Bezug: von x = 0 nach +x, unten bei y = 0, die
+// Außenseite bei z = 0 (zeigt nach +Z), die Wand reicht nach hinten bis z = -staerke.  haus.jfs dreht
+// und verschiebt sie an ihre Seite.  Namen mit _ bleiben in diesem Modul.
+
+/// ein Stück Wand: links unten vorn bei (x, y, 0)
+fn _stueck(x, y, b, h, t) {
+  return geom.box(b, h, t).move(x + b / 2, y, -t / 2)
+}
+
+/// eine Wand laenge x hoehe x staerke mit Öffnungen [{x, y, b, h}] (nach x geordnet; x: linke Kante,
+/// y: Brüstungshöhe, b, h: lichte Maße), aus Stücken links und rechts, unter und über jeder Öffnung
+fn wand(laenge, hoehe, staerke, oeffnungen) {
+  let teile = []
+  let x = 0
+  for o in oeffnungen {
+    if o.x > x { teile.push(_stueck(x, 0, o.x - x, hoehe, staerke)) }
+    if o.y > 0 { teile.push(_stueck(o.x, 0, o.b, o.y, staerke)) }
+    let oben = o.y + o.h
+    if oben < hoehe { teile.push(_stueck(o.x, oben, o.b, hoehe - oben, staerke)) }
+    x = o.x + o.b
+  }
+  if x < laenge { teile.push(_stueck(x, 0, laenge - x, hoehe, staerke)) }
+  return geom.merge(teile)
+}
+
+/// ein Fenster für eine Öffnung b x h (links unten im Ursprung): Rahmen 6 cm rundum (ein Profil entlang
+/// der geschlossenen Kante der Öffnung), Pfosten und Kämpfer, Glas, außen eine Fensterbank.
+/// {rahmen, glas, bank}
+fn fenster(b, h) {
+  let tiefe = 0.07
+  let z = -0.06                                   // Mitte des Rahmens in der Wand
+  // Profil-x ist die Tiefe (z), Profil-y zeigt in die Öffnung
+  let profil = profile.move(profile.rect(tiefe, 0.06), 0, 0.03)
+  let kante = [[0, 0, z], [b, 0, z], [b, h, z], [0, h, z]]
+  let rahmen = geom.sweep(profil, kante, true, 0)
+  let pfosten = geom.box(0.05, h - 0.12, tiefe).move(b / 2, 0.06, z)
+  let kaempfer = geom.box(b - 0.12, 0.05, tiefe).move(b / 2, h * 0.62, z)
+  let glas = geom.box(b - 0.1, h - 0.1, 0.01).move(b / 2, 0.05, z)
+  let bank = geom.box(b + 0.08, 0.03, 0.1).move(b / 2, -0.03, 0.03)
+  return {rahmen: geom.merge(rahmen, pfosten, kaempfer), glas: glas, bank: bank}
+}
+
+/// eine Haustür für eine Öffnung b x h: Zarge (ein U-Profil entlang der Kante), Blatt, Griffstange.
+/// {zarge, blatt, griff}
+fn haustuer(b, h) {
+  let z = -0.08
+  let profil = profile.move(profile.rect(0.09, 0.07), 0.035, 0)   // Profil-x zeigt in die Öffnung
+  let kante = [[0, 0, z], [0, h, z], [b, h, z], [b, 0, z]]
+  let zarge = geom.sweep(profil, kante, false, 0)
+  let blatt = geom.box(b - 0.14, h - 0.08, 0.06).move(b / 2, 0.01, z)
+  let stange = geom.cylinder(0.015, 0.9, 16).move(b - 0.2, 0.6, z + 0.09)
+  let halter = geom.box(0.02, 0.02, 0.06).move(b - 0.2, 0.7, z + 0.05)
+  let griff = geom.merge(stange, halter, halter.move(0, 0.7, 0))
+  return {zarge: zarge, blatt: blatt, griff: griff}
+}
+
+/// ein Satteldach über einem Grundriss laenge (x) x breite (z), mittig über dem Ursprung, auf der Höhe
+/// traufe: neigung in Grad, ueberstand an allen Seiten, Deckung 20 cm stark.  Der First läuft entlang x.
+/// {giebel, deckung, hoehe} (hoehe: die Oberkante des Firsts)
+fn dach(laenge, breite, traufe, neigung, ueberstand) {
+  let tan = math.sin(neigung * math.pi / 180) / math.cos(neigung * math.pi / 180)
+  let first = breite / 2 * tan                      // über der Traufe, an der Außenseite der Wand
+  // die Giebelwände: ein Dreieck auf den Wänden, entlang x gezogen (Profil-x ist z, Profil-y ist y)
+  let giebel = geom.sweep([[-breite / 2, 0], [breite / 2, 0], [0, first]], [[-laenge / 2, traufe, 0], [laenge / 2, traufe, 0]], false, 0)
+  // eine Dachfläche: vom First bis über die Traufe hinaus, senkrecht gemessen 20 cm stark
+  let d = 0.2 / math.cos(neigung * math.pi / 180)
+  let aussen = breite / 2 + ueberstand
+  let flaeche = [[0, first], [aussen, first - aussen * tan], [aussen, first - aussen * tan + d], [0, first + d]]
+  let rechts = geom.sweep(flaeche, [[-laenge / 2 - ueberstand, traufe, 0], [laenge / 2 + ueberstand, traufe, 0]], false, 0)
+  return {giebel: giebel, deckung: geom.merge(rechts, rechts.mirror("z")), hoehe: traufe + first + d}
+}

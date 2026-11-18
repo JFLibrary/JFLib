@@ -70,6 +70,10 @@ pub use pdf;
 pub use diagram_view;
 pub use dxf;
 pub use physics;
+pub use game;
+pub use game_render3d;
+pub use geom;
+pub use netchan;
 #[doc(hidden)]
 pub use style_assets;
 

@@ -709,6 +709,9 @@ vk_structs! {
     pub struct Offset2D { pub x: i32, pub y: i32 }
     pub struct Offset3D { pub x: i32, pub y: i32, pub z: i32 }
     pub struct Rect2D { pub offset: Offset2D, pub extent: Extent2D }
+    // (clear_value: VkClearValue, colour as four 32-bit words, depth as f32 bits then the stencil)
+    pub struct ClearAttachment { pub aspect_mask: u32, pub color_attachment: u32, pub clear_value: [u32; 4] }
+    pub struct ClearRect { pub rect: Rect2D, pub base_array_layer: u32, pub layer_count: u32 }
     pub struct ImageCreateInfo {
         pub s_type: u32, pub p_next: *const c_void, pub flags: u32, pub image_type: u32,
         pub format: u32, pub extent: Extent3D, pub mip_levels: u32, pub array_layers: u32,
@@ -1132,6 +1135,7 @@ fn_table! {
             (CommandBuffer, Handle, u64, Handle, u64, u32, u32);
         cmd_begin_rendering req [b"vkCmdBeginRendering\0", b"vkCmdBeginRenderingKHR\0"] (CommandBuffer, *const RenderingInfo);
         cmd_end_rendering req [b"vkCmdEndRendering\0", b"vkCmdEndRenderingKHR\0"] (CommandBuffer);
+        cmd_clear_attachments req [b"vkCmdClearAttachments\0"] (CommandBuffer, u32, *const ClearAttachment, u32, *const ClearRect);
         create_query_pool req [b"vkCreateQueryPool\0"] (Device, *const QueryPoolCreateInfo, A, *mut Handle) -> VkResult;
         destroy_query_pool req [b"vkDestroyQueryPool\0"] (Device, Handle, A);
         cmd_reset_query_pool req [b"vkCmdResetQueryPool\0"] (CommandBuffer, Handle, u32, u32);

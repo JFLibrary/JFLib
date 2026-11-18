@@ -4,7 +4,9 @@ Stand 2026-11-17, auf Basis von `main` 7c44e9cf. Umgesetzt sind ARM0 bis ARM7: `
 auf Linux ARM64, statisch und gegen glibc; `plattest`, `linuxtest`, `lifetest` und `sandboxtest` sind in einer ARM64-VM
 grün, seit ARM4 auch Plugins und das Modul `jxlenc`. Seit ARM5 laufen `coretest`, `plattest` und die `gallery` auf
 `windows-11-arm` (bis auf `screen.uis`, das der Bildschirm des Runners verhindert). Seit ARM7 ist das Speichermodell auf echter
-Hardware geprüft: A56, Mac mini (M2), `ubuntu-24.04-arm` und `windows-11-arm`, jeweils mit LSE und mit LL/SC. Für den Rest gilt: Die Zahlen sind
+Hardware geprüft: A56, Mac mini (M2), `ubuntu-24.04-arm` und `windows-11-arm`, jeweils mit LSE und mit LL/SC. Seit ARM8 laufen alle Skripte von
+`gallery` und `jfWord`, die Fenster-Tests von `plattest` und `gputest` und `uigputest` in der VM unter Wayland und X11, auf `ubuntu-24.04-arm` und
+auf `windows-11-arm`, dazu mit lavapipe; ein echtes Gerät mit GPU fehlt noch. Für den Rest gilt: Die Zahlen sind
 aus dem Code gezählt, die Aufwände
 geschätzt. Syscalls, Flags und `struct stat` sind mit ARM1 gegen die Kernel-Header geprüft (`tools/kernel_table_check.py`),
 die Relocations mit ARM3 an einem Test-Plugin. Der Eintrag in der Roadmap steht in
@@ -813,6 +815,123 @@ grün: andere Fenster auf dem Desktop).
 **Fertig, wenn:** die Skripte in der VM und auf `windows-11-arm` grün sind, soweit dort Fenster möglich
 sind, und ein echtes Gerät von Hand geprüft ist.
 
+**Umgesetzt** (2026-11-17). Für ARM64 musste die Bibliothek nichts lernen: Alle Skripte von `gallery` und `jfWord` laufen in der VM
+unter Wayland und X11, auf `ubuntu-24.04-arm` und auf `windows-11-arm`, die GPU-Tests dort auch mit lavapipe. Rot waren nur drei Tests,
+die auf x86-64 nie auffielen, und eine fehlende Meldung:
+
+- **`lib/ui`, Meldung:** Bleibt die Ausgabe einer Sitzung für immer auf dem CPU-Weg (kein Vulkan-Loader, kein brauchbarer Adapter,
+  ein Display ohne dma-bufs …), war das bisher ganz still. Jetzt steht der Grund in einer Zeile des Logs auf Stufe Info, etwa
+  `gpu: output: none in this run (the display takes no dma-bufs): the windows go through the CPU path`. Damit landet er im Ring für
+  Absturzberichte (`plat::log_recent`) und in der Log-Datei, auf stderr nur mit `jfgui_LOG=info`. Der Bildschirm bleibt still wie bisher.
+  Unter Linux heißt der Grund in `GpuOutput::error` jetzt so statt „no child window“.
+- **`gputest --test glibc`** prüfte den Absturzbericht mit den Abständen von x86-64 (`crash_test + 5`). Auf ARM64 sind `mov` und `bl`
+  4 Bytes lang, wie `plattest` es schon rechnet.
+- **`uigputest --test viewcpu`** scheiterte ohne brauchbare GPU, statt wie die anderen Tests ein SKIP zu geben.
+- **`uigputest --test canvasoff`** prüfte das erste Bild der Leinwand nach 50 ms und zwei Durchläufen. Unter Xvfb (ohne Bildtakt) in der
+  langsamen VM kam das CPU-Bild später: 0 von 3 grün, mit Warten (höchstens 3 s) 3 von 3.
+- **Werkzeuge:** `tools/winarm_check.py --scripts APP[/SKRIPT.uis],…` (beliebige Skripte), `--only gpu` (`gputest --info`, dazu der
+  Start der UI-Ausgabe mit `jfgui_GPU_TRACE=1`) und `--target linux` (die Linux-Programme auf einem ARM64-Linux, Runner oder VM).
+  `.github/workflows/arm64-windows.yml` baut zusätzlich `jfWord`, `gputest`, `uigputest` und die Linux-Programme und lässt sie auf
+  `windows-11-arm` in drei Runden laufen (der Runner, wie er ist; ein eigener Loader; lavapipe), auf `ubuntu-24.04-arm` unter Weston und
+  Xvfb mit Ubuntus lavapipe. `arm64-atomics.yml` startet nur noch bei einem Push auf `arm64-test/atomics…`, nicht bei jedem Test-Zweig.
+
+**In der VM** (wie ARM3: `qemu-system-aarch64` 8.2 mit TCG in WSL, 8 Kerne, 6 GB, Ubuntu 24.04 arm64, Weston 13 headless, Xvfb 21.1,
+XWayland 23.2; `libvulkan1` 1.3.275 ohne Treiber, also der Fall „kein Treiber“; Programme mit rustc 1.100 gebaut, die drei Fixes oben
+schon drin, außer in der ersten Runde):
+
+| Runde | `gallery` | `jfWord` | `plattest` | `gputest` | `uigputest` |
+|---|---|---|---|---|---|
+| 64 KB, Wayland (vor den Fixes) | 44 von 44 | 53 von 53 | 45 von 46 | 19 von 21 | 30 von 31 |
+| 64 KB, X11 (Xvfb) | 44 von 44 | 53 von 53 | 44 von 46 | 21 von 21 | 30 von 31 (`canvasoff`, danach 3 von 3) |
+| 64 KB, XWayland | 4 von 4 (die GPU-Skripte, `popup_edges`) | – | 43 von 46 | – | 31 von 31 |
+| 4 KB, Wayland | 44 von 44 | – | 44 von 46 | 21 von 21 | 31 von 31 |
+
+Was dort rot blieb, liegt an der VM, nicht an ARM64:
+
+- **`plattest/atomics.uis`** in jeder Runde: Store Buffering mit SeqCst, die bekannte Lücke von QEMU (siehe „Fallen“, ARM7). Auf echter
+  Hardware ist es grün.
+- **`plattest/screen.uis`**: unter Xvfb fehlt RandR die Bildwiederholrate, dem randlosen XWayland das Root-Bild und XTEST (wie ARM3). Unter
+  Weston grün.
+- **`plattest/audio.uis`** zweimal (XWayland, 4 KB): Der Ringpuffer-Test hat 20 s für 2 Millionen Samples in Stücken zu 3, der Vorbis-Test
+  eine Zeitgrenze. Die rote Runde dauerte 58 bis 84 s statt 17 bis 32 s; allein danach 3 von 4 grün. Auf echter Hardware lief derselbe Ring
+  bei ARM7 Milliarden Samples ohne Fehler.
+- Die Fehler von `gputest` und `uigputest` in der ersten Runde sind die Testfehler oben.
+
+**GPU in der VM.** Die Ausgabe der UI braucht unter Linux ein Display, das dma-bufs nimmt (`plat::win_gpu_child`). Weston headless (mit
+pixman) und Xvfb nehmen keine, die Ausgabe bleibt also vor jedem Gerät auf dem CPU-Weg, mit oder ohne Treiber. `uigputest` gibt dort für
+jeden Test der Ausgabe ein SKIP (23 bis 24 von 31), die Tests ohne Ausgabe laufen (`off`, `noloader`, `nodmabuf`, `refused`, `canvasoff`,
+`viewoff`, `shaders`). Ohne Treiber sagt `gputest --info` „SKIP: no usable GPU“ mit Exit-Code 0, der Rest von `gputest` ebenso; `noloader`
+(Loader fehlt, Datei kein Loader) und `glibc` laufen.
+
+**Mit lavapipe** (Ubuntus `mesa-vulkan-drivers` 25.2.8, in der VM `llvmpipe (LLVM 20.1.2, 128 bits)`, Vulkan 1.4.318, Stufe Voll, unter Weston):
+
+| Kernel | `gputest` | `uigputest` | GPU-Skripte der `gallery` |
+|---|---|---|---|
+| 4 KB (erster Lauf, Mesas Shader-Cache leer) | 18 von 21 | 30 von 31 | 3 von 3 |
+| 64 KB (Cache gefüllt) | 19 von 21 | 31 von 31 | 3 von 3 |
+
+`gputest` rechnet damit alles auf dem Gerät, was ohne Fenster geht, auch `wgsl`, `scene`, `msl`, `bench_smoke` und `--validate` (ohne
+Validierungsschicht). Die 3D-Ansichten von `uigputest` laufen mit eigenem Gerät auf lavapipe (`viewcpu`, 114 s); die Tests der Ausgabe geben
+weiter ein SKIP (siehe oben). Rot:
+
+- **`textures`** (und damit `validate`) in beiden Runden gleich: Bilinear bei LOD 0 weicht bis 4,41e-3 ab, trilinear bei LOD 1,5 bis 4,66e-3, die
+  Toleranz ist 3,91e-3 (1/256). lavapipe derselben Mesa- und LLVM-Version auf x86-64 (WSL) bleibt bei 1,47e-3 und 3,19e-3, auch mit 128-Bit-Vektoren
+  (`LP_NATIVE_VECTOR_WIDTH=128`). Auf `ubuntu-24.04-arm` (echte Hardware, dasselbe Paket) kommen dieselben Werte, auf `windows-11-arm` mit
+  Mesa 26.3.0 (LLVM 23.1.5) ist `textures` grün. Es ist also der ARM64-Code von llvmpipe 25.2 (LLVM 20), nicht QEMU und nicht die
+  Bibliothek: Die CPU-Referenz rechnet reines f32 ohne Funktionen der Bibliothek, `lib/gpu` lädt die Textur nur hoch und liest zurück.
+- **`scene`** („GPU did not finish within 10 s“) und **`viewcpu`** (404 s) nur im ersten Lauf: Mesa übersetzte die Shader unter TCG zum ersten Mal.
+  Mit gefülltem Cache grün.
+
+**Auf echter Hardware unter Linux** (`ubuntu-24.04-arm`, Neoverse N2, 4 Kerne, Kernel mit 4-KB-Seiten; Workflow `arm64-windows.yml`, Job `linux`,
+Lauf 44178514471 auf `1a8da312`; Ubuntus `mesa-vulkan-drivers` 25.2.8, Weston und Xvfb per apt nur auf dem Runner):
+
+| Display | `gallery` | `jfWord` | `plattest` | `gputest` (lavapipe) | `uigputest` | dazu |
+|---|---|---|---|---|---|---|
+| Weston headless | 44 von 44 | 53 von 53 | 46 von 46 | 19 von 21 (`textures`, `validate`) | 31 von 31 | Crash-Handler 3 von 3, `--only gpu` 2 von 2 |
+| Xvfb | 3 von 3 (GPU-Skripte) | – | 45 von 46 (`screen.uis`, RandR) | – | 31 von 31 | |
+
+`jfWord`s eigenes `check.py` ist dort grün (529 Prozess-Prüfungen). Auf echter Hardware sind also auch `atomics.uis` (0,4 s), `audio.uis` (0,6 s),
+`scene` (1,4 s) und `viewcpu` (11 s) grün; was in der VM daran rot war, lag an QEMU.
+
+**Windows ARM64** (`windows-11-arm`, Cobalt 100, 4 Kerne; Grafik „Microsoft Hyper-V Video“, 1024 × 768; `d3d12.dll` und WARP sind da,
+JFLib spricht aber kein D3D12). Anders als bei ARM5 vermutet, liegt dort eine `vulkan-1.dll` in System32 (2 499 544 Bytes), aber kein
+Treiber ist eingetragen. Gleicher Lauf, Job `check`:
+
+| Runde | Was | Ergebnis |
+|---|---|---|
+| A | der Runner, wie er ist: Loader ohne Treiber | 207 von 208: `coretest` 1/1, `plattest` 45/46, `gallery` 44/44, `jfWord` 53/53, `gputest` 21/21 (ohne Treiber meist SKIP), `uigputest` 31/31 (SKIP), Crash-Handler 3/3, Modul `jxlenc` 7/7, `--only gpu` 2/2; `jfWord check.py` grün (528) |
+| B | der Khronos-Loader `vulkan-sdk-1.4.363.0`, auf dem Runner für ARM64 gebaut und an die Stelle der vorhandenen DLL gesetzt, kein Treiber | 55 von 55: `gputest` 21/21, `uigputest` 31/31, GPU-Skripte der `gallery` 3/3, `--only gpu` 2/2 |
+| C | lavapipe für ARM64: `mesa-lavapipe-arm64-26.3.0.7z` aus `mmozeiko/build-mesa` (Release 26.3.0, 10 302 751 Bytes, SHA256 `D476EAAF98895FDABC9D0D64E0DD2CBE512E04ADD677587C4B9FFA7D56CEA1AE`), in `HKLM\SOFTWARE\Khronos\Vulkan\Drivers` eingetragen; `llvmpipe (LLVM 23.1.5, 128 bits)`, Vulkan 1.4.363, Stufe Voll | 52 von 55: `gputest` 18/21, `uigputest` 31/31 (SKIP: ein CPU-Adapter zeigt nie Fenster), `gallery` 3/3 |
+| C mit `jfgui_GPU_ADAPTER=llvmpipe` | die UI-Ausgabe über die Swapchain von lavapipe | 33 von 34: `uigputest` 30/31, `gallery` 3/3; `uigputest --test switch`: „device ready: llvmpipe (Basis)“, „window 0: switched to the swapchain“ |
+
+Was rot blieb:
+
+- **`plattest/screen.uis`** wie seit ARM0: Die Windows-Einrichtung („Choose privacy settings“) liegt über dem Bildschirm (`desktop.png`).
+- **`gputest` mit lavapipe:** `window` („FIFO frame interval plausible (vsync: 2 .. 50 ms)“: 0,39 ms) und `upload` („the adapter of the
+  window's display“; „try_acquire: … NotReady instead of waiting for the display“), damit auch `validate_window`. lavapipe zeigt unter
+  Windows ohne Bildtakt und ist nicht der Adapter des Bildschirms; Swapchain, Present und das Zurücklesen der Bilder gehen.
+- **`uigputest --test viewsize`** mit lavapipe: Bei 150 % wäre das Fenster 1140 Pixel breit, der Bildschirm des Runners hat 1024; Windows
+  verkleinert es, zurück bei 100 % ist das Bild der UI 680 statt 760 Pixel breit („100 %: the frame is 680 wide“). Alle Bildvergleiche davor waren gleich.
+
+**Wenn Vulkan fehlt.** Kein Absturz auf keinem Weg, die Programme starten und zeichnen über den CPU-Weg:
+
+| Fall | `gputest --info` (Exit 0) | UI (`uigputest`, Log mit `jfgui_LOG=info`) | geprüft |
+|---|---|---|---|
+| keine `vulkan-1.dll` / `libvulkan.so.1` | „SKIP: no GPU API installed (Vulkan loader missing)“ | CPU-Weg für immer, Grund im Log | `noloader` von `gputest` (fehlender Name, fehlender Pfad, eine DLL ohne Loader, ein Kind mit `--info`) und `uigputest` überall grün; Windows x64 mit `jfgui_GPU_DLL` auf eine fehlende Datei |
+| Loader ohne Treiber | „SKIP: no usable GPU“ | „no device: no usable GPU“, CPU-Weg | Runner Runden A und B, VM ohne `mesa-vulkan-drivers`, Windows x64 mit `VK_DRIVER_FILES` auf eine fehlende Datei |
+| nur ein CPU-Treiber (lavapipe) | Gerät auf Stufe Voll | CPU-Weg (ein CPU-Adapter zeigt keine Fenster), mit `jfgui_GPU_ADAPTER` die Swapchain | Runde C, VM |
+| Linux-Display ohne dma-bufs | wie mit Treiber | „the display takes no dma-bufs“, CPU-Weg | VM (Weston headless, Xvfb), Runner |
+
+Eine fehlende `vulkan-1.dll` gab es auf dem Runner nicht; sie zu löschen hätte nichts anderes geprüft als `jfgui_GPU_DLL`, denn beide enden
+im selben `LoadLibraryExW`, das scheitert.
+
+**Echtes Gerät:** steht aus (offene Fragen 1 und 2). Ein Paket für das Surface liegt außerhalb des Repositories bereit (`start.cmd` mit
+`arm8_surface.ps1`: das Modell, `gputest --info` und seine Tests, die Tests von `uigputest`, der Crash-Handler, `atomics`, zum Schluss die
+`gallery` zum Ansehen; Ergebnis in `arm8_surface.txt`). Ist das Surface kein ARM-Gerät, bleibt der Punkt offen, bis eines da ist.
+
+Hier geprüft: `cargo check -p jflib` für Windows, Linux, wasm32, Android, Linux ARM64 und Windows ARM64; `build_rs.py check` (Lint,
+Clippy), `gendoc --check --api`; auf x86-64 `build_rs.py test gputest` 42/42, `test uigputest` 62/62, `test gallery` 88/88 (Windows und Linux).
+
 ### ARM9: Pakete, Updates, CI, Dokumentation (M)
 
 - `.deb` `arm64`, RPM und AppImage `aarch64`, MSIX `arm64`, Flatpak `--arch=aarch64`, Setup pro
@@ -874,6 +993,11 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
   zieht `getauxval` und einen Konstruktor in `.init_array` herein. Programme erledigen das seit ARM2 selbst, ein Plugin oder
   Modul darf aber nichts importieren und keinen Code beim Laden haben: `getauxval` fehlt beim Linken, sonst lehnt der Loader
   `DT_INIT_ARRAY` ab. Sie bauen mit `-C target-feature=-outline-atomics` (LL/SC inline, läuft auf jedem ARMv8.0).
+- **Tests in der VM:** Unter TCG ist alles vielfach langsamer, ohne Bildtakt (Xvfb) erst recht: Zeitgrenzen von Tests reißen dort
+  (`audio.uis`, der erste Lauf von lavapipe mit leerem Shader-Cache), und ein Test, der „zwei Durchläufe“ als „gezeichnet“ nimmt, sieht das
+  Bild noch nicht (`canvasoff`, ARM8). Vor einer Suche nach dem Fehler auf echter Hardware gegenprüfen (`ubuntu-24.04-arm`).
+- **lavapipe ist nicht überall gleich:** llvmpipe 25.2 (LLVM 20) filtert Texturen auf ARM64 ungenauer als auf x86-64 (bis 4,66e-3 statt
+  3,19e-3), Mesa 26.3 nicht mehr (ARM8). Ein CPU-Adapter zeigt nie Fenster (`adapters_low_power`), nur mit `jfgui_GPU_ADAPTER`.
 - **Division durch null:** Die ganzzahlige Division von ARM64 hat keinen Trap. Tests, die `GK_ARITH` erwarten, schicken sich
   unter Linux `SIGFPE` mit `tgkill`; unter Windows erzeugt `brk #0xF004` `STATUS_INTEGER_DIVIDE_BY_ZERO` (so macht es MSVC).
   `brk #0xF003` ist dort `__fastfail`: `STATUS_STACK_BUFFER_OVERRUN`, der Prozess endet sofort, kein VEH sieht es (ARM5).
@@ -883,20 +1007,21 @@ parallel zu ARM3 laufen, wenn ARM4 vorher festlegt, wie das Makro aussieht.
 | Was | Wo | Grenze |
 |---|---|---|
 | `coretest`, `portabletest`, Logik | `qemu-aarch64` in WSL: `build_rs.py test NAME --target linux --arch aarch64` | kein echtes Speichermodell, nur statische Programme; `-cpu cortex-a53` prüft ARMv8.0 ohne LSE |
-| Signale, Sandbox, Crash, glibc, Fenster, Plugins | `qemu-system-aarch64` in WSL: Ubuntu 24.04 arm64, Kernel mit 4- und 64-KB-Seiten (ARM3; Skripte in den Übergabenotizen von ARM3 und ARM4) | TCG, etwa so schnell wie `qemu-aarch64`, Start 5 Minuten; kein echtes Speichermodell, kein Befehlscache; Weston und Xvfb ohne volles RandR |
-| Echte ARM-CPU unter Linux | `ubuntu-24.04-arm`, statische Programme per `adb` auf dem A56 | Fenster auf dem Runner offen, das Telefon steckt nur auf Zuruf |
+| Signale, Sandbox, Crash, glibc, Fenster, Plugins | `qemu-system-aarch64` in WSL: Ubuntu 24.04 arm64, Kernel mit 4- und 64-KB-Seiten (ARM3; Skripte in den Übergabenotizen von ARM3, ARM4 und ARM8), lavapipe installiert (ARM8) | TCG, etwa so schnell wie `qemu-aarch64`, Start 5 Minuten; kein echtes Speichermodell, kein Befehlscache; Weston und Xvfb ohne volles RandR und ohne dma-bufs (die UI-Ausgabe bleibt auf dem CPU-Weg); Zeitgrenzen unter Last |
+| Echte ARM-CPU unter Linux | `ubuntu-24.04-arm` (seit ARM8 auch mit Weston, Xvfb und lavapipe: `arm64-windows.yml`, Job `linux`, `tools/winarm_check.py --target linux`), statische Programme per `adb` auf dem A56 | keine dma-bufs im Display; das Telefon steckt nur auf Zuruf |
 | Speichermodell (ARM7) | `plattest --test atomics --secs N` auf A56, Mac mini (M2) und den Runnern: `.github/workflows/arm64-atomics.yml` (beide Wege: `jfgui_ARM_LLSC=1`, `JFLIB_EXTRA_RUSTFLAGS`) | nicht unter QEMU (siehe Fallen); ein Lauf beweist keine Freiheit von Fehlern |
 | Plugins | JFPainters Test-Plugins (`plugins/` in dessen Repository) für jede Architektur gebaut, `plattest --test lib --dir DIR`; für ARM64 bis zum Patch in JFPainter eine portierte Kopie (Notizen von ARM4) | JFLib lässt `--test lib` in keinem Skript laufen |
-| Windows ARM64 | `windows-11-arm`: `.github/workflows/arm64-windows.yml` mit `tools/winarm_check.py` (ARM5); lokal nur bauen und `tools/winarm_imports.py --libs` | Fenster-Skripte laufen, die Windows-Einrichtung verdeckt aber den Bildschirm (ARM0); lokal kein Start möglich |
+| Windows ARM64 | `windows-11-arm`: `.github/workflows/arm64-windows.yml` mit `tools/winarm_check.py` (ARM5; seit ARM8 alle Skripte von `gallery`, `jfWord`, `gputest`, `uigputest`, dazu Loader und lavapipe für ARM64); lokal nur bauen und `tools/winarm_imports.py --libs` | Fenster-Skripte laufen, die Windows-Einrichtung verdeckt aber den Bildschirm (ARM0), 1024 × 768; eine `vulkan-1.dll` ohne Treiber; lokal kein Start möglich |
 | Android und NEON | A56, Emulator | Emulator ist x86-64 |
-| Echte GPU auf ARM | noch kein Gerät | Vulkan sonst nur mit lavapipe |
+| Echte GPU auf ARM | noch kein Gerät (Paket für das Surface bereit, ARM8) | Vulkan sonst nur mit lavapipe (VM, beide Runner); lavapipe 25.2 rechnet den Texturfilter auf ARM64 ungenauer (ARM8) |
 
 Die Regel gegen Fenster-Fluten gilt auch hier: dieselben Fenster-Tests nicht wiederholt laufen lassen,
 höchstens drei Runden pro Variante. Die Runner von GitHub sind für öffentliche Repositories kostenlos.
 
 ## Offene Fragen
 
-1. **Surface:** Welches Modell ist es? Ein Snapdragon-Gerät wäre ein echtes Testgerät für ARM5 und ARM8.
+1. **Surface:** Welches Modell ist es? Ein Snapdragon-Gerät wäre ein echtes Testgerät für ARM5 und ARM8. Für ARM8 liegt ein Paket bereit
+   (ARM8 „Umgesetzt“, „Echtes Gerät“).
 2. **Echtes ARM-Gerät für Linux:** Ein Raspberry Pi 5 oder Ähnliches wird spätestens für ARM8 nötig. Das
    kann bis dahin warten.
 3. **CI:** Sollen die ARM-Läufe später auch automatisch bei jedem Push laufen? Vorschlag: nur bei Releases

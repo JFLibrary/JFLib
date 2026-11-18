@@ -1,0 +1,24 @@
+# gametest's probe on the script's virtual clock: a FixedTick at 60 Hz on plat::task::now_us takes the input
+# per tick.  While the game plays the probe asks for frames; `wait` moves the virtual clock in frames of 16 ms,
+# so the ticks are the same in every run.  A key held across ticks counts in every tick, a tap between two
+# ticks once; nothing ticks while paused.
+click canvas:"Spiel"
+expect text:"Zustand: spielt" exists
+wait 1000
+expect text:"Takte: 60 · vor: 0 · Feuer: 0 · Sprünge: 0" exists
+keydown w code 26
+wait 500
+keyup w code 26
+wait 100
+expect text:"Takte: 96 · vor: 30 · Feuer: 0 · Sprünge: 0" exists
+# a tap of Space and a click within one frame: one tick each
+keydown space code 44
+keyup space code 44
+click canvas:"Spiel"
+wait 100
+expect text:"Takte: 102 · vor: 30 · Feuer: 1 · Sprünge: 1" exists
+# paused: the ticks stand
+key esc
+wait 1000
+expect text:"Takte: 102 · vor: 30 · Feuer: 1 · Sprünge: 1" exists
+expect text:"Zustand: Pause" exists

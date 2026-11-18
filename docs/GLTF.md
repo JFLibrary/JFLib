@@ -30,6 +30,7 @@ let imported = render3d::gltf::upload(&mut renderer, &doc, None)?;
 - **Modell**: `Document { version, generator, meshes, materials, textures, images, nodes, scenes, scene, notes }`, `Mesh { name, primitives }`, `Primitive { positions, normals, uvs, indices, material, flat_normals, has_uvs }`, `Material` (glTFs Vorgaben, wo die Datei schweigt: weiß, metallic 1, roughness 1), `TextureRef { texture, tex_coord }`, `Texture { name, image, sampler }`, `Sampler { mag, min, mip, wrap_s, wrap_t }` (`Sampler::DEFAULT`: linear, lineare Stufen, wiederholend), `Image { name, width, height, rgba }`, `Node { name, mesh, children, parent, local, world }`, `SceneDef`, `AlphaMode`, `Filter`, `Wrap`.
 - **Instanzen**: `doc.instances(szene) -> Vec<InstanceRef { node, mesh, primitive, world }>` (None: die Szene der Datei; ohne Szenen jeder Knoten ohne Eltern).
 - **Matrizen**: `decompose(&[f64; 16]) -> Trs { translation, rotation, scale, shear }`, `trs_matrix`, `mat_mul`, `IDENTITY`, `sqrt` (spaltenweise 4 × 4, wie glTF).
+- **Schreiben** (G7g): `write_document(&Document) -> Result<Vec<u8>>`: ein Dokument als `.glb` mit Meshes (Positionen mit `min`/`max`, Normalen, `TEXCOORD_0`, wenn das Primitiv UV hat, Indizes als `u16` oder `u32`), Materialien nach ihren Faktoren (Alpha-Modus, Grenze, doppelseitig), Knoten mit ihrer lokalen Matrix, Szenen; Zahlen als kürzester Text, der denselben Wert ergibt, also liest `load` dasselbe Dokument zurück. Texturen, Bilder und Lichter: `Unsupported` statt still weggelassen. `apps/modeltool` schreibt damit seine Modelle ([GEOM.md](GEOM.md)) und prüft den Rundweg.
 - **Werkzeuge**: `write_glb(json, bin)`, `base64_encode`, `base64_decode`.
 
 ## Was gelesen wird
@@ -82,4 +83,4 @@ Messungen (Laden einer großen Datei, Speicher): [RENDER3D.md](RENDER3D.md#g5b-t
 
 ## Was nicht gebaut ist
 
-Schreiben von glTF (außer `write_glb` für Tests), Animationen, Skins, Morph-Ziele, Kameras, Erweiterungen, die Daten umdeuten (Draco, meshopt, KTX2/basisu, `KHR_mesh_quantization`, `KHR_texture_transform`), weitere UV-Sätze, Tangenten, Farben je Ecke, Data-URIs ohne Base64, ein Lesen ohne JSON-Baum für Dateien mit Millionen Knoten.
+Schreiben von Texturen, Bildern und Lichtern (`write_document` schreibt Meshes, Materialien nach ihren Faktoren, Knoten und Szenen), Animationen, Skins, Morph-Ziele, Kameras, Erweiterungen, die Daten umdeuten (Draco, meshopt, KTX2/basisu, `KHR_mesh_quantization`, `KHR_texture_transform`), weitere UV-Sätze, Tangenten, Farben je Ecke, Data-URIs ohne Base64, ein Lesen ohne JSON-Baum für Dateien mit Millionen Knoten.

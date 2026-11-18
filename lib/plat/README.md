@@ -96,6 +96,9 @@ builds HTTP and TLS. Child processes start without a shell, with pipes, and drop
 whole process tree. A program can run as a system service (the Windows service control manager,
 systemd, launchd) and keep one instance per user that later starts hand their arguments to; on
 Windows and Linux it can start a helper with administrator rights after the system's prompt.
+In the browser `plat::net::WebSocket` is the page's own WebSocket, held by the web worker and
+checked against the app's `net.connect` rules; `jflib-netchan` builds one client type for every
+target on it and on netio's.
 
 ## The system around the app
 
@@ -147,7 +150,7 @@ log file that rotates.
 - **The browser** (wasm32): a JavaScript host runs the app in a web worker and shows its windows
   in a canvas.
 
-In the browser and on Android plat has no sockets, child processes, services, `plat::sync`,
+In the browser (but for its WebSocket) and on Android plat has no sockets, child processes, services, `plat::sync`,
 `plat::fs` or folder watching. The system's random numbers (`plat::fill_random`,
 `plat::random_bytes`) are there on Android too, but not in the browser, where a page has
 `crypto.getRandomValues`. Native plugins load on Windows and Linux only.

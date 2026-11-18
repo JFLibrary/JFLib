@@ -53,6 +53,7 @@ members = [
     "lib/netpkt",
     "lib/datastore",
     "lib/netio",
+    "lib/netchan",
     "lib/cas",
     "lib/update",
     "lib/gpu",
@@ -69,6 +70,9 @@ members = [
     "lib/diagram_view",
     "lib/dxf",
     "lib/physics",
+    "lib/game",
+    "lib/game_render3d",
+    "lib/geom",
     "lib/jflib",
     "lib/jflib_build",
     "lib/cargo_jflib",
@@ -159,6 +163,10 @@ members = [
     "apps/diagramiotest",
     "apps/inputtest",
     "apps/physicstest",
+    "apps/gametest",
+    "apps/gamedemo",
+    "apps/modeltool",
+    "apps/nettest",
 ]
 
 # The one version of the library (rt::VERSION; `build_rs.py release` writes it, docs/VERSIONING.md)
@@ -218,6 +226,7 @@ wgsl = { package = "jflib-wgsl", path = "lib/wgsl", version = "=0.2.1" }
 netpkt = { package = "jflib-netpkt", path = "lib/netpkt", version = "=0.2.1" }
 datastore = { package = "jflib-datastore", path = "lib/datastore", version = "=0.2.1" }
 netio = { package = "jflib-netio", path = "lib/netio", version = "=0.2.1" }
+netchan = { package = "jflib-netchan", path = "lib/netchan", version = "=0.2.1" }
 cas = { package = "jflib-cas", path = "lib/cas", version = "=0.2.1" }
 update = { package = "jflib-update", path = "lib/update", version = "=0.2.1" }
 gpu = { package = "jflib-gpu", path = "lib/gpu", version = "=0.2.1" }
@@ -230,6 +239,9 @@ pdf = { package = "jflib-pdf", path = "lib/pdf", version = "=0.2.1" }
 diagram_view = { package = "jflib-diagram-view", path = "lib/diagram_view", version = "=0.2.1" }
 dxf = { package = "jflib-dxf", path = "lib/dxf", version = "=0.2.1" }
 physics = { package = "jflib-physics", path = "lib/physics", version = "=0.2.1" }
+game = { package = "jflib-game", path = "lib/game", version = "=0.2.1" }
+game_render3d = { package = "jflib-game-render3d", path = "lib/game_render3d", version = "=0.2.1" }
+geom = { package = "jflib-geom", path = "lib/geom", version = "=0.2.1" }
 style_winui = { package = "jflib-style-winui", path = "styles/winui", version = "=0.2.1" }
 style_classic = { package = "jflib-style-classic", path = "styles/classic", version = "=0.2.1" }
 style_kde = { package = "jflib-style-kde", path = "styles/kde", version = "=0.2.1" }
@@ -266,7 +278,7 @@ strip = "symbols"
 
 # the crates whose speed matters in development builds too (build_rs.py's compute_crate): pixels and
 # codecs stay fast in the tests, Kritzel draws with its own pixel loops, physicstest's references run
-# hundreds of thousands of queries
+# hundreds of thousands of queries, modeltool's checks build meshes of a few 100 000 triangles
 [profile.dev.package.jflib-gfx]
 opt-level = 2
 
@@ -353,6 +365,9 @@ opt-level = 2
 opt-level = 2
 
 [profile.dev.package.jflib-physics]
+opt-level = 2
+
+[profile.dev.package.jflib-geom]
 opt-level = 2
 
 [profile.dev.package.Kritzel]

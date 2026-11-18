@@ -1,0 +1,35 @@
+[package]
+name = "gametest"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[[bin]]
+name = "gametest"
+path = "src/main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+rt.workspace = true
+plat.workspace = true
+base.workspace = true
+physics.workspace = true
+game.workspace = true
+# the bridge against render3d offscreen (src/bridge.rs); ui: the probe window the scripts drive (src/probe.rs)
+game_render3d.workspace = true
+render3d.workspace = true
+gpu.workspace = true
+ui.workspace = true
+style = { package = "jflib-style-winui", path = "../../styles/winui" }
+
+[build-dependencies]
+jflib-build.workspace = true

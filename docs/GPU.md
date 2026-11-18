@@ -1472,6 +1472,10 @@ offen (render2d sah ihn in G6b2 beim Anlegen einer Pipeline, mit je einer Instan
 `churn` wieder abstürzt (mit 621.24 tut er es nicht): `gputest --test churn_shared --validate` abwechselnd mit
 `--test churn --validate`.
 
+### Intel unter Windows: ein Pass, der nur löscht
+
+Auf dem Surface Go 3 (UHD 615, Windows 11, Intels Treiber 31.0.101.2135; 2026-11-18) las eine Kopie hinter einem Render-Pass, der nur löscht (kein Zeichenbefehl), das Bild von vorher, wenn früher im selben Befehlspuffer eine globale Barriere (`barrier`) stand: Das Löschen kam erst nach der Kopie an, jedes Bild zeigte die Löschfarbe des vorigen (render3d: eine leere Szene). Ohne die frühere Barriere, oder mit einem Zeichenbefehl im Pass, stimmte es. Die Barrieren entsprechen Vulkan (`ColorTarget → CopySrc`: die Farbausgabe und ihr Schreiben vor dem Lesen der Kopie). `end_render` löscht deshalb in einem Pass, der nichts gezeichnet hat, die Anhänge, die er löscht (`Load::Clear`), noch einmal als Befehl im Pass (`vkCmdClearAttachments`, Farbe und Tiefe), auf jedem Gerät: Es kostet nur leere Passes etwas. `gputest --test graphics` prüft es (drei Bilder auf einem Ziel, jedes mit eigener Farbe, nach einer Füllung und einer Barriere): ohne das Nachlöschen scheitern auf dem Surface alle drei, jedes mit der Farbe des vorigen, mit ihm bestehen sie. Ob ein Tiefen-Pass ohne Zeichenbefehl (eine leere Kaskade der Schatten) denselben Fehler hatte, ist nicht geprüft; er wird ebenso nachgelöscht. gputest ohne `window` besteht dort sonst alles bis auf „the adapter of the window's display“ (in der Sitzung von SSH hat das Fenster keinen Bildschirm).
+
 ## Tests
 
 `python -u build_rs.py test gputest` führt `apps/gputest/tests/*.uis` aus, unter Windows und Linux

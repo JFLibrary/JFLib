@@ -1,0 +1,20 @@
+# apps/nettest/PACKAGE: the app's identity and packages (docs/PACKAGING.md)
+#   python tools/package.py nettest --formats all
+# version= is the app's own version (MAJOR.MINOR.PATCH, docs/VERSIONING.md); the program reads it
+# as rt::app_version!(), the packages and lib/update use it.  The library has its own (Cargo.toml).
+# A program without a window: tools/package.py makes desktop packages for window apps; here
+# version= (rt::app_version!()) and app_id= matter.
+display=Netz-Test
+version=0.1.0
+publisher=JFLib
+summary=Tests und Messungen des Transports für Spiele
+description=Netz-Test: WebSocket in netio, der Kanal von lib/netchan über UDP und WebSocket, Fuzzing der Rahmen und Pakete, Umlaufzeit und Durchsatz, der Server für den Browser-Test.
+generic=Kommandozeilenprogramm
+categories=Utility;ConsoleOnly;
+deb_name=nettest
+# Flatpak, AppStream and the MSIX identity: reverse DNS of a domain or project you control
+app_id=org.jflib.nettest
+homepage=https://github.com/JFLibrary/JFLib
+default_win=winui
+default_linux=winui
+styles=winui

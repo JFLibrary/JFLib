@@ -71,6 +71,44 @@ function pixelBuffer(length) {
   if(index<0) return new ArrayBuffer(Math.max(65536,Math.ceil(length/65536)*65536));
   const [buffer]=buffers.splice(index,1); pooledBytes-=buffer.byteLength; return buffer;
 }
+// (G7d) the app's WebSockets (lib/plat/web_net.rs): this worker holds them, so frames do not pass the page.  Request 32
+// with the socket's id: op 1 open (the URL), 2 text, 3 binary, 4 close (u16 code, the reason); the events go to
+// jfgui_ws(id, kind, len) -- 1 open (the subprotocol), 2 text, 3 binary, 4 closed (u16 code, the reason) -- and a burst
+// of them ends in one input() (a MessageChannel's turn: no timer clamping), which runs the app's pass (E_WAKE).
+const sockets=new Map();
+let netPort=null, netPending=false;
+function netEvent(id,kind,data) {
+  if(!wasm.jfgui_ws) return;
+  try {if(data.length) inbox(data);} catch {data=new Uint8Array(0);}
+  wasm.jfgui_ws(id,kind,data.length);
+  if(!netPort) {const c=new MessageChannel();netPort=c.port2;c.port1.onmessage=()=>{netPending=false;try {input();} catch(error) {postMessage({type:"error",message:String(error?.message||error)});}};}
+  if(!netPending) {netPending=true;netPort.postMessage(0);}
+}
+const closeBytes=(code,reason)=>{const r=encode.encode(reason||""),b=new Uint8Array(2+r.length);b[0]=code&255;b[1]=code>>8;b.set(r,2);return b;};
+function netRequest(id,data) {
+  const op=data[0];
+  if(op===1) {
+    let ws;
+    try {
+      const url=new URL(decode.decode(data.subarray(1)),self.location.href);
+      if(url.protocol==="http:") url.protocol="ws:"; else if(url.protocol==="https:") url.protocol="wss:";
+      ws=new WebSocket(url.href);
+    } catch(error) {setTimeout(()=>netEvent(id,4,closeBytes(1006,String(error?.message||error))),0);return;}
+    ws.binaryType="arraybuffer";
+    sockets.set(id,ws);
+    ws.onopen=()=>netEvent(id,1,encode.encode(ws.protocol||""));
+    ws.onmessage=e=>netEvent(id,typeof e.data==="string"?2:3,typeof e.data==="string"?encode.encode(e.data):new Uint8Array(e.data));
+    ws.onclose=e=>{sockets.delete(id);netEvent(id,4,closeBytes(e.code||1006,e.reason));};
+    return;
+  }
+  const ws=sockets.get(id);
+  if(!ws) return;
+  try {
+    if(op===2) ws.send(decode.decode(data.subarray(1)));
+    else if(op===3) ws.send(data.slice(1));
+    else if(op===4) {const code=data[1]|(data[2]<<8);try {ws.close(code,decode.decode(data.subarray(3)));} catch {ws.close();}}
+  } catch {}
+}
 function importFile(path, data, dropped, durable) {
   const name = encode.encode(path), content = new Uint8Array(data);
   const input = new Uint8Array(name.length + content.length);
@@ -127,6 +165,8 @@ const imports = { jfgui: {
   },
   gpu_call: gpuCall,
   request(kind, id, ptr, len) {
+    // (G7d) a WebSocket of the app: handled here (only the app's own worker holds sockets)
+    if(kind===32) {if(!computeWorker) netRequest(id>>>0,bytes(ptr,len));return;}
     // the GPU output shows: the pixel buffers for the page wait unused, they go (lib/plat/web_gpu.rs);
     // the page watches the canvas from now on (watchGpuCanvas in loader.js)
     if(kind===30) {buffers.length=0;pooledBytes=0;}
@@ -297,6 +337,8 @@ self.onmessage = async ({data:m}) => {
       if (wasm.jfgui_env && langs.length) { const env = encode.encode("LANGUAGE="+langs.join(":")); inbox(env); wasm.jfgui_env(env.length); }
       // the GPU output's switches from the address (loader.js)
       if (wasm.jfgui_env) for (const value of m.env || []) { const env = encode.encode(value); inbox(env); wasm.jfgui_env(env.length); }
+      // (G7d) the page's origin: a WebSocket URL "/path" means the page's own server (lib/plat/web_net.rs)
+      if (wasm.jfgui_env) { const env = encode.encode("jfgui_PAGE_ORIGIN="+self.location.origin); inbox(env); wasm.jfgui_env(env.length); }
       // the monitors (lib/plat/web_screen.rs) before the app's first frame
       if (m.screens && wasm.jfgui_screens) { const s = encode.encode(m.screens); inbox(s); wasm.jfgui_screens(s.length); }
       // the system's settings (system.js, lib/plat/web_system.rs) before the app's first frame

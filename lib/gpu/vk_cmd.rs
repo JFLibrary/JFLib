@@ -169,6 +169,11 @@ struct Pass {
     n: usize,
     depth: u32,
     end: Vec<EndBarrier>,
+    /// a draw was recorded in it
+    drew: bool,
+    /// the attachments it clears (Load::Clear), cleared again at its end if it drew nothing (end_render)
+    clears: Vec<vk::ClearAttachment>,
+    size: (u32, u32),
 }
 
 /// records commands; finish() makes a CommandBuffer for Queue::submit
@@ -561,7 +566,14 @@ impl<'a> CommandEncoder<'a> {
             (self.sh.f.cmd_set_viewport)(self.cb, 0, 1, &vp);
             (self.sh.f.cmd_set_scissor)(self.cb, 0, 1, &sc);
         }
-        self.pass = Some(Pass { colors, n, depth, end });
+        let mut clears: Vec<vk::ClearAttachment> = desc.color.iter().enumerate().filter(|(_, c)| c.load == Load::Clear)
+            .map(|(i, c)| vk::ClearAttachment { aspect_mask: vk::IMAGE_ASPECT_COLOR_BIT, color_attachment: i as u32, clear_value: c.clear.map(f32::to_bits) })
+            .collect();
+        if let Some(d) = desc.depth.filter(|d| d.load == Load::Clear) {
+            let aspect = vk::IMAGE_ASPECT_DEPTH_BIT | if has_stencil { vk::IMAGE_ASPECT_STENCIL_BIT } else { 0 };
+            clears.push(vk::ClearAttachment { aspect_mask: aspect, color_attachment: 0, clear_value: [d.clear.to_bits(), 0, 0, 0] });
+        }
+        self.pass = Some(Pass { colors, n, depth, end, drew: false, clears, size: (w, h) });
         self.graphics = None;
         self.index = false;
     }
@@ -571,6 +583,16 @@ impl<'a> CommandEncoder<'a> {
             self.ok(false, "end_render without begin_render");
             return;
         };
+        // A pass that drew nothing clears its clearing attachments once more, as a command in the pass: on Intel's Windows
+        // driver (UHD 615, 31.0.101.2135) a pass that only cleared, after a global barrier earlier in the command buffer,
+        // was not written before a copy after the barrier at its end (the copy read the image before; render3d's empty
+        // scene, docs/GPU.md).  The barriers are Vulkan's; with a draw in the pass, or without the earlier barrier, it was.
+        if !pass.drew && !pass.clears.is_empty() {
+            let rect = vk::ClearRect { rect: vk::Rect2D { offset: vk::Offset2D { x: 0, y: 0 }, extent: vk::Extent2D { width: pass.size.0, height: pass.size.1 } },
+                                       base_array_layer: 0, layer_count: 1 };
+            // SAFETY: recording inside the pass; the attachments and their aspects are the pass's own, the rectangle its area.
+            unsafe { (self.sh.f.cmd_clear_attachments)(self.cb, pass.clears.len() as u32, pass.clears.as_ptr(), 1, &rect) };
+        }
         // SAFETY: recording inside the pass begun by begin_render.
         unsafe { (self.sh.f.cmd_end_rendering)(self.cb) };
         if pass.end.is_empty() {
@@ -650,6 +672,9 @@ impl<'a> CommandEncoder<'a> {
     #[inline]
     fn can_draw(&mut self, indexed: bool) -> Option<()> {
         let ok = self.pass.is_some() && self.graphics.is_some() && (!indexed || self.index);
+        if let (true, Some(p)) = (ok, self.pass.as_mut()) {
+            p.drew = true;
+        }
         self.ok(ok, "draw: outside a pass, without a render pipeline or index buffer")
     }
 
