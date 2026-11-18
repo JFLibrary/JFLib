@@ -13,7 +13,15 @@ Klammern (DF-01, CN-05 …) verweisen auf die Feature-Liste. Aufwände sind gesc
 `diagramiotest`, `build_rs.py test` führt die Unit-Tests der Crates aus), JD8 App-Hülle (Menüband mit allen
 P1-Befehlen, 17 von 182 mit Handler; Backstage, Optionen, Sprachwechsel zur Laufzeit, Aufgabenbereiche;
 `ui.ribbon_tabs`, `ui.backstage_begin`, `ui.settings_section` in der Bibliothek) und der Vektor-PDF-Schreiber
-(`lib/pdf`, Test-App `pdftest`). Nächste Welle: D.
+(`lib/pdf`, Test-App `pdftest`).
+
+**Erledigt** (2026-11-18, Welle D, Meilenstein M1 Betrachter): JD4 Darstellung (Darstellungsliste in
+`diagram_core::render`, Zeichnen in der neuen Crate `lib/diagram_view`, App öffnet Dateien schreibgeschützt),
+JD5 VSDX schreiben (`diagram_io::vsdx::write`, neue Dokumente mit eigenem Design „NetLab“; Visio braucht
+`windows.xml` in jeder Datei, sonst Fehler 271; Gegenprobe in Visio bestanden) und JD6 Formel-Engine
+(`diagram_core::formula`; Orakel 94,7 % eigene Formeln, 98,1 % mit geerbten Zellen). Theme-Erweiterungen von
+Visio: nur die Kennungen übernehmen, Werte aus NetLab (Entscheidung des Nutzers, umgesetzt in JD11).
+Nächste Welle: E.
 
 ## Ziel
 
