@@ -27871,7 +27871,9 @@ web_net -- the browser's WebSocket (G7d): plat::net::WebSocket through the JS ho
   WebSocket::connect(url) / connect_with(url, WsLimits) -> NetResult<WebSocket>
            "ws://host:port/path", "wss://...", or "/path": the page's own server (ws:// for a
            page over http, wss:// over https); net.connect is checked on the URL's host and
-           port first (policy::net_host_allowed), a refusal is NetErrorKind::Denied
+           port first (policy::net_host_allowed), a refusal is NetErrorKind::Denied.  The
+           page's own server (the host and port of the page's origin) needs no rule: it served
+           the app (the user's decision of 2026-11-18)
   ws.state() -> WsState (Connecting, Open, Closing, Closed)
   ws.send_text(&str) / send_binary(&[u8])     while Open
   ws.recv() -> Option<WsMessage>                never blocks
@@ -27917,6 +27919,13 @@ WS_MAX_SOCKETS: usize = 64
 - **`fn ws_url_split(url: &str, origin: Option<&str>) -> Option<(String, String, u16)>`**
   a WebSocket URL -> (the absolute URL, the host as written, the port); "/path" against the
   page's origin (jfgui_PAGE_ORIGIN, which the worker sets); None: not a ws:// / wss:// URL
+
+- **`fn page_origin() -> Option<String>`**
+  the page's origin (jfgui_PAGE_ORIGIN at the start); None outside a page
+
+- **`fn is_page_server(origin: Option<&str>, host: &str, port: u16) -> bool`**
+  whether host and port are the page's own server (the host and port of `origin`, its default port
+  when it names none)
 
 **`impl WebSocket`**
 
