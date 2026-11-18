@@ -1,6 +1,7 @@
 # Spiel-Engine: Plan für G7
 
-Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1, siehe dort; Stand 2026-11-18). Die Zahl der Läufe je Stufe ist
+Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1) und von G7b (Welle 2), siehe dort; Stand
+2026-11-18. Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -64,7 +65,7 @@ Was es gibt (Code auf `main` ab7e77e1):
   nimmt es per git, die Wurzel-`Cargo.toml` legt `jflib-agent-core` per `[patch.crates-io]` auf diesen Workspace.
   Deterministisch (Gleitkomma in Software, keine Uhr, kein Zufall), mit Brennstoff, Grenzen und Sprachdiensten. Für
   schwere Geometrie zu langsam; die Rechnung gehört deshalb in Rust, das Skript beschreibt.
-- **Nicht da:** Physik (seit G7c Teil 1 die Kollision in `lib/physics`), Animation, ein Weltmodell, Netcode,
+- **Nicht da:** Physik (seit G7c Teil 1 die Kollision in `lib/physics`), Animation, Netcode,
   Werkzeuge zum Modellieren.
 
 ## Crates
@@ -76,15 +77,18 @@ Was es gibt (Code auf `main` ab7e77e1):
 | `lib/physics` (neu) | Formen, Kollision, Abfragen, Character-Controller, später Starrkörper | nur Mathematik | Vorschlag: JFLib |
 | `lib/anim` (neu, G7i) | Skelette, Clips, Überblenden, IK (die CPU-Seite) | `gltf` | Vorschlag: JFLib |
 | `lib/geom` (neu, G7g) | der Modellierkern: Netze, Grundkörper, Extrudieren, CSG, UV, Vereinfachen | nur Mathematik | Vorschlag: JFLib |
-| `lib/game` (neu) | Weltmodell, Takt, Eingabe-Aktionen, Assets, Raumklang, Netcode; eine Brücke zu `render3d` | `physics`, `plat`, `netio`; `render3d` nur in der Brücke | eigenes Repository |
-| `apps/gametest` | Tests des Kerns ohne Fenster | `game` | eigenes Repository |
+| `lib/game` (neu, G7b) | Weltmodell, Takt, Eingabe-Aktionen, Kameras, Assets, Raumklang, Netcode | `physics`, `plat`, `base` (`netio` mit G7e); `render3d` nicht | eigenes Repository |
+| `lib/game_render3d` (neu, G7b) | Brücke: Entitäten mit Mesh → Instanzen von `render3d` | `game`, `render3d`, `gpu` | eigenes Repository (mit `game`) |
+| `apps/gametest`, `apps/gamedemo` | Tests des Kerns ohne Fenster; Demo mit Ego-Kamera | `game`, `game_render3d` | eigenes Repository |
 | `apps/modeltool` (G7g) | JFScript → Mesh → Bilder und Prüfungen, für KI und Mensch | `geom`, `render3d`, JFScript | eigenes Repository |
 | `apps/<spiel1>`, `apps/<spiel1>-server` | Spiel 1 | `game` | eigenes Repository |
 
 Regeln:
 
 - **Spiellogik, Physik und Netz ohne GPU.** Der Server läuft ohne Fenster; unter Linux bleibt er wie alle
-  Serverprogramme statisch ohne libc. Deshalb kennt `lib/game` `render3d` nur in seinem Brückenmodul.
+  Serverprogramme statisch ohne libc. Deshalb kennt `lib/game` `render3d` nicht; die Brücke ist das eigene Crate
+  `lib/game_render3d`. Ein Feature von `lib/game` ginge nicht: Cargo vereinigt die Features eines Crates über alles,
+  was ein Build baut, und hätte `render3d` mit `gpu` in den Server gezogen, der mit seinem Client gebaut wird.
 - **Die neuen Bibliotheken wie die übrigen:** `#![no_std]`, `#![forbid(unsafe_code)]`, keine fremden Crates,
   gebaut für Windows, Linux, Browser und Android, dazu die Apple-Ziele.
 - **Die JFScript-Anbindung liegt nicht in einem veröffentlichten Crate** (ein Crate auf crates.io darf nicht von
@@ -174,6 +178,14 @@ anfassen:
 - Brücke zu `render3d`: Entitäten mit Mesh ↔ Instanzen der Szene, nur Geändertes; der Ursprung folgt der Kamera.
 - Fertig, wenn: `apps/gametest` Takt, Weltmodell und Brücke ohne Fenster prüft (die Brücke gegen `render3d`
   offscreen) und eine Demo-Szene mit Ego-Kamera auf Windows, Linux, macOS und im Browser läuft.
+- **Stand 2026-11-18: Teil 1 fertig** ([GAMECORE.md](GAMECORE.md)). `lib/game` (`jflib-game`): Entitäten mit
+  Generation, Sparse-Sets mit einer Version je Änderung, Systeme in fester Reihenfolge; fester Takt mit genauem
+  Akkumulator und Interpolation (`Pose`); Eingabe-Aktionen nach der Lage der Tasten mit den Regeln des Pointer-Locks
+  (der auslösende Klick feuert nichts, das Ende des Locks ist die Pause), Empfindlichkeit in 0,022° je Zählwert und
+  ein Faktor je Plattform (macOS 2,5 nur geschätzt); Ego-, Verfolger- und freie Kamera. Die Brücke
+  `lib/game_render3d` schreibt nur Geändertes und lässt den Ursprung der Kamera folgen. `apps/gametest`: 901
+  Prüfungen auf Windows, Linux und macOS, Prüfsumme überall gleich; `apps/gamedemo` baut für alle Ziele, lief
+  aber nur ohne Fenster. Offen: Teil 2 (Spielfenster messen, Assets, Raumklang), die Prüfung von Hand.
 
 **G7c Physik 1** (`lib/physics`)
 
@@ -321,7 +333,8 @@ PaintCraft zu JFPainter. `render3d` bleibt (E2); für `physics`, `anim` und `geo
 
 ## Offen
 
-Später zu entscheiden: der Weg des Spielfensters (nach der Messung in G7b), der Look des Cartoon-Materials (G7f, an
+Später zu entscheiden: der Weg des Spielfensters (nach der Messung in G7b), der Faktor der Mausbewegung unter macOS
+(G7b Teil 2, von Hand), der Look des Cartoon-Materials (G7f, an
 Bildern), Name und Server von Spiel 1 (G7h), Kartendaten aus OpenStreetMap für G7n (Lizenz ODbL), welche Crates beim
 Auszug in JFLib bleiben (G7p).
 
