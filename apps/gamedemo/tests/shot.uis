@@ -1,0 +1,20 @@
+# gamedemo headless: the first-person scene in a gpu_view (offscreen on a device of its own, every frame read
+# back; without a GPU the view's grey).  The click locks the pointer and plays, W walks by its place, the mouse
+# turns, Esc pauses; then a shot of the frame.  The walk is on the virtual clock: 30 ticks with W held at 4.5 m/s
+# are 2.25 m from z 6 every run; 400 counts to the left and 120 down are 8.8 and 2.6 degrees at the factor 1 of
+# Windows and Linux, 22.0 and 6.6 at macOS' 2.5 (game::input::FACTOR_MACOS).
+expect text:"Klicken zum Spielen · WASD gehen, Umschalt rennen, Maus schaut" exists
+click canvas:"Spiel"
+expect text:"Esc: Pause" exists
+keydown w code 26
+wait 500
+keyup w code 26
+wait 50
+expect text:"Position 0.00 3.75 · Blick 0.0 0.0 · Takt 33" exists
+motion -400 120
+wait 50
+only windows linux: expect text:"Position 0.00 3.75 · Blick 8.8 -2.6 · Takt 36" exists
+only macos: expect text:"Position 0.00 3.75 · Blick 22.0 -6.6 · Takt 36" exists
+key esc
+expect text:"Pause – klicken zum Weiterspielen" exists
+shot build/gamedemo.png
