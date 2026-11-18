@@ -252,13 +252,14 @@ fn size_pos(app: &mut Diagrammer, ui: &mut Ui) {
     let m = crate::edit_canvas::measures(app);
     let sel = m.is_some();
     let unit = if crate::edit_canvas::metric(app) { "mm" } else { "in" };
-    let v = m.unwrap_or([0.0; 5]);
+    let v = m.unwrap_or([0.0; 6]);
     let rows = [
         ("X", length(v[0], unit)),
         ("Y", length(v[1], unit)),
         (t("Breite"), length(v[2], unit)),
         (t("Höhe"), length(v[3], unit)),
         (t("Winkel"), angle(v[4])),
+        (t("Drehpunkt"), alloc::string::String::from(if v[5] != 0.0 { t("Mitte") } else { t("Benutzerdefiniert") })),
     ];
     for (k, (label, v)) in rows.iter().enumerate() {
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
@@ -374,6 +375,7 @@ fn angle(v: f64) -> alloc::string::String {
 // an icon button of the status bar for a command (its own widget id: the ribbon may show the
 // same command)
 fn status_cmd(ui: &mut Ui, wid: u32, id: u32) {
+    // (the zoom commands: always usable)
     ui.next_size(24, 22);
     ui.next_flags(ST_SUBTLE | ST_ICON_ONLY | ST_COMPACT | if commands::enabled(id) { 0 } else { ST_DISABLED });
     ui.next_icon(commands::def(id).map_or(0, |d| d.icon));

@@ -240,7 +240,16 @@ pub(crate) fn save(app: &mut Diagrammer, ui: &mut Ui, as_new: bool) {
         _ => {
             let stem = o.name.clone();
             let ext = o.ed.format.extension();
-            app.save_path = format!("{stem}.{ext}");
+            // the folder of the file it came from, else --save-dir (a test aid), else the
+            // dialog's own start
+            let dir = match &o.ed.path {
+                Some(p) => p.rsplit_once(['/', '\\']).map(|x| String::from(x.0)),
+                None => plat::arg_value("--save-dir").map(|d| if d.starts_with('/') || d.get(1..2) == Some(":") { d } else { format!("{}/{}", plat::cwd(), d) }),
+            };
+            app.save_path = match dir {
+                Some(d) => format!("{d}/{stem}.{ext}"),
+                None => format!("{stem}.{ext}"),
+            };
             app.save_dlg.set(1);
             ui.repass();
         }

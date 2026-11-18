@@ -1,0 +1,78 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD7: Gruppieren makes one shape of the selection (its frame around both), a
+# second, slow click on the group selects the child under the pointer, Gruppierung aufheben
+# gives the shapes back; the clipboard inside the app (copy, paste a grid step further,
+# duplicate); the z-order (In den Hintergrund, In den Vordergrund); undo of each step
+cmd 4404
+drag 500,330 640,420
+drag 820,430 960,520
+cmd 4400
+key ctrl+a
+# Start › Anordnen › Gruppieren
+cmd 4453
+expect listitem:"Sheet.6" selected
+expect listitem:"Sheet.6" rect 500 324 453 201
+expect listitem:"Sheet.4" missing
+expect button:"Breite: 180 mm  Höhe: 80 mm  Winkel: 0°" exists
+# the second click picks the child
+wait 600
+click 900,480
+expect listitem:"Sheet.5" selected
+expect button:"Breite: 50 mm  Höhe: 40 mm  Winkel: 0°" exists
+# a move of the child moves it inside the group
+drag 900,480 900,530
+expect listitem:"Sheet.5" rect 827 475 126 100
+key ctrl+z
+# Gruppierung aufheben
+key esc
+click 570,375
+expect listitem:"Sheet.6" selected
+cmd 4454
+expect listitem:"Sheet.6" missing
+expect listitem:"Sheet.4" selected
+expect listitem:"Sheet.5" selected
+key ctrl+z
+expect listitem:"Sheet.6" exists
+key ctrl+y
+# the clipboard
+key esc
+click 570,375
+key ctrl+c
+key ctrl+v
+expect listitem:"Sheet.7" selected
+expect listitem:"Sheet.7" rect 525 349 151 100
+key ctrl+d
+expect listitem:"Sheet.8" selected
+# the z-order: the copy to the back and to the front again
+click 640,420
+expect listitem:"Sheet.8" selected
+expect listitem:"Sheet.8" value 3
+cmd 4450
+expect listitem:"Sheet.8" value 0
+cmd 4448
+expect listitem:"Sheet.8" value 3
+key ctrl+z
+expect listitem:"Sheet.8" value 0
+# the lasso (Start › Bearbeiten › Markieren › Lassoauswahl): a free outline around the first
+# shape and the first copy (the second copy reaches out of it)
+cmd 4474
+key esc
+down 480,300
+move 690,300
+move 690,465
+move 480,465
+up 480,300
+expect listitem:"Sheet.4" selected
+expect listitem:"Sheet.7" selected
+expect listitem:"Sheet.8" unselected
+cmd 4473
+# the shape's context menu: a right click selects the shape under the pointer first; Shift+F10
+key esc
+rclick 510,335
+expect listitem:"Sheet.4" selected
+expect menuitem:"Kopieren" enabled
+key esc
+focus canvas:"Zeichenfläche"
+key shift+f10
+expect menuitem:"Kopieren" exists
+key esc

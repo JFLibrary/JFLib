@@ -30,11 +30,18 @@ pub(crate) struct TextEdit {
     pub doc: RichDoc,
     /// the text it started with (unchanged: nothing is written)
     pub before: String,
+    /// a text box the text tool just made: left empty, it goes again (Visio's)
+    pub fresh: bool,
     focused: bool,
 }
 
 /// start editing the text of shape `key` (ch: a typed character that replaces the text)
 pub(crate) fn begin(app: &mut Diagrammer, ui: &mut Ui, key: u64, ch: Option<char>) {
+    begin_with(app, ui, key, ch, false);
+}
+
+/// the same for a text box the text tool just made (`fresh`: it goes again when left empty)
+pub(crate) fn begin_with(app: &mut Diagrammer, ui: &mut Ui, key: u64, ch: Option<char>, fresh: bool) {
     let (Some(o), Some(page)) = (app.opened.as_ref(), app.model.page) else { return };
     let s = shape_of(page, key);
     let Some(shape) = o.doc.shape(s) else { return };
@@ -54,7 +61,7 @@ pub(crate) fn begin(app: &mut Diagrammer, ui: &mut Ui, key: u64, ch: Option<char
     let end = doc.end();
     doc.set_selection(TextSel { anchor: if ch.is_some() { end } else { TextPos { line: 0, byte: 0 } }, caret: end });
     doc.clear_history();
-    app.text = Some(TextEdit { key, doc, before, focused: false });
+    app.text = Some(TextEdit { key, doc, before, fresh, focused: false });
     app.se.select(&[key]);
     ui.repass();
 }
@@ -105,6 +112,13 @@ fn end(app: &mut Diagrammer, ui: &mut Ui) {
     let Some(te) = app.text.take() else { return };
     let (Some(o), Some(page)) = (app.opened.as_mut(), app.model.page) else { return };
     let mut text: String = te.doc.paras().iter().map(|p| p.text()).collect::<Vec<_>>().join("\n");
+    // an empty text box of the text tool: its making is taken back
+    if te.fresh && text.trim().is_empty() {
+        edit_doc::undo(o);
+        app.se.select(&[]);
+        ui.repass();
+        return;
+    }
     if text == te.before.strip_suffix('\n').unwrap_or(&te.before) {
         ui.repass();
         return;

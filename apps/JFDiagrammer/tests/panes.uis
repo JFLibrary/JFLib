@@ -31,21 +31,27 @@ click button:"Breite: –  Höhe: –  Winkel: –"
 expect tab:"Größe und Position" selected
 expect text:"Drehpunkt" exists
 expect text:"Kein Shape ausgewählt." exists
-# the zoom in the status bar
-expect text:"100 %" exists
+# the zoom in the status bar (JD7: the new drawing's A4 page fits at 67 %, the next steps are
+# 66.7 % and 75 %)
+expect text:"67 %" exists
 click button:"Vergrößern"
-expect text:"125 %" exists
-click button:"Verkleinern"
-click button:"Verkleinern"
+click button:"Vergrößern"
 expect text:"75 %" exists
+click button:"Verkleinern"
+click button:"Verkleinern"
+expect text:"50 %" exists
 key alt+f6
-expect text:"100 %" exists
+expect text:"67 %" exists
 # the grid of the canvas
 click tab:"Ansicht"
 expect checkbox:"Gitternetz" unchecked
 click checkbox:"Gitternetz"
 expect checkbox:"Gitternetz" checked
-expect checkbox:"Lineal" disabled
+expect checkbox:"Lineal" checked
+click checkbox:"Lineal"
+expect checkbox:"Lineal" unchecked
+click checkbox:"Lineal"
+expect checkbox:"Lineal" checked
 # the page's context menu on the canvas, the page tab's, the stencils'
 rclick canvas:"Zeichenfläche"
 expect "Seite einrichten" disabled

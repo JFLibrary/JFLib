@@ -125,7 +125,8 @@ impl Ui {
             let w = vp.to_world(mx as f32 + 0.5, my as f32 + 0.5);
             ev = if inside { RulerEv::Guide { at: if v { w[0] } else { w[1] }, done: true } } else { RulerEv::GuideCancel };
         }
-        if ev != RulerEv::None {
+        // the end of a drag changes the app's drawing: one more pass (the moves bring their own)
+        if matches!(ev, RulerEv::Guide { done: true, .. } | RulerEv::GuideCancel) {
             self.repass();
         }
         // drawing

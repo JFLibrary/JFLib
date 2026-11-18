@@ -340,6 +340,14 @@ static HANDLERS: &[(u32, Handler)] = &[
     (CONN_STRAIGHT, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::Straight)),
     (CONN_CURVED, |a, ui| crate::edit_cmds::conn_style(a, ui, diagram_core::glue::Style::Curved)),
     (CONN_RESET, crate::edit_cmds::conn_reset),
+    (LASSO, |a, _| {
+        a.se.lasso = true;
+        a.tool = POINTER;
+    }),
+    (SELECT_AREA, |a, _| {
+        a.se.lasso = false;
+        a.tool = POINTER;
+    }),
     (REROUTE, crate::edit_cmds::conn_reset),
 ];
 
@@ -358,6 +366,8 @@ static CHECKED: &[(u32, fn(&Diagrammer) -> bool)] = &[
     (DYN_GRID, |a| a.se.dyn_grid),
     (CONN_POINTS, |a| a.se.show_points),
     (SNAP_GLUE, |a| a.snap),
+    (LASSO, |a| a.se.lasso),
+    (SELECT_AREA, |a| !a.se.lasso),
     (GRID, |a| a.view_grid),
     (PANE_SHAPES, |a| a.panes.visible(crate::panes::P_SHAPES)),
     (PANE_FORMAT, |a| a.panes.visible(crate::panes::P_FORMAT)),
@@ -374,6 +384,11 @@ pub(crate) fn handler(id: u32) -> Option<Handler> {
 /// the command exists and works
 pub(crate) fn enabled(id: u32) -> bool {
     handler(id).is_some()
+}
+
+/// (JD7) the command exists and can run now (a selection, something to undo ...)
+pub(crate) fn usable(app: &Diagrammer, id: u32) -> bool {
+    enabled(id) && crate::edit_cmds::available(app, id)
 }
 
 /// the toggle is on
@@ -396,7 +411,7 @@ pub(crate) fn run(app: &mut Diagrammer, ui: &mut Ui, id: u32) -> bool {
 /// every pass: the commands' states for the menus and the shortcuts
 pub(crate) fn states(app: &Diagrammer, ui: &mut Ui) {
     for d in DEFS {
-        let on = enabled(d.id) && crate::edit_cmds::available(app, d.id);
+        let on = usable(app, d.id);
         let f = if on { 0 } else { CF_DISABLED } | if checked(app, d.id) { CF_CHECKED } else { 0 };
         ui.cmd_state(d.id, f);
     }

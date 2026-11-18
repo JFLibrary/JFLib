@@ -39,6 +39,7 @@
 // Test aids: --shell-preview shape|container|text stands in for a selection of that kind (the
 // context registers without a drawing; JD7 brought the real selection);
 // --config PATH keeps the settings in that file (headless runs keep them in memory otherwise);
+// --save-dir DIR is where Speichern unter starts for a new drawing (JD7, scripts);
 // a drawing on the command line opens at start (JD4); --no-system-fonts draws with the style's
 // fonts only (the same on every machine).
 //
@@ -138,7 +139,7 @@ pub(crate) struct Diagrammer {
     pub guide_drag: Option<(bool, f32)>,
     /// the text being edited; a request to start editing (shape key, typed character)
     pub text: Option<edit_text::TextEdit>,
-    pub text_req: Option<(u64, Option<char>)>,
+    pub text_req: Option<(u64, Option<char>, bool)>,
     /// Speichern unter: the file dialog, its path
     pub save_dlg: Shared<i32>,
     pub save_path: alloc::string::String,
@@ -310,8 +311,8 @@ impl App for Diagrammer {
         if let Some(icons) = &self.icons {
             icons.update(ui); // the theme may have changed (the system, high contrast)
         }
-        if let Some((key, ch)) = self.text_req.take() {
-            edit_text::begin(self, ui, key, ch);
+        if let Some((key, ch, fresh)) = self.text_req.take() {
+            edit_text::begin_with(self, ui, key, ch, fresh);
         }
         commands::states(self, ui);
         shell::frame(self, ui);

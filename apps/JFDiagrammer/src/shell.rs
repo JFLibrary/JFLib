@@ -106,7 +106,8 @@ fn save_dialog(app: &mut Diagrammer, ui: &mut Ui) {
     let dlg = app.save_dlg.clone();
     let exts: alloc::vec::Vec<&str> = crate::viewer::SAVE_EXTS.iter().map(|e| ui::i18n::t(e)).collect();
     if ui.filedlg(ID_SAVE_DLG, FD_SAVE, &dlg, &mut app.save_path, 4096, &exts) & EV_ACT != 0 {
-        let path = app.save_path.clone();
+        // the path as the dialog granted it (fs.user)
+        let path = ui.filedlg_paths().into_iter().next().unwrap_or_else(|| app.save_path.clone());
         crate::edit_doc::save_to(app, ui, &path);
     }
 }

@@ -47,7 +47,7 @@
 // selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
 // guides; Alt: free); a second, slow click on a selected group selects the child under the
 // pointer; a double click edits the text (SeEv::Text); on the background a drag draws a marquee
-// (shapes fully inside; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
+// or, with SeState::lasso, a free outline (shapes fully inside; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
 // handles change one side (a locked aspect: both), Ctrl resizes about the middle; locked handles
 // are drawn grey and do nothing.  The rotation handle turns about the pin (one shape) or the
 // middle of the selection: in 15-degree steps near the shape, in single degrees farther away.
@@ -58,7 +58,9 @@
 // cancels the gesture, else clears the selection; Del deletes; Ctrl+A selects all; arrows nudge
 // by a grid step (Shift: a pixel) or pan without a selection; Tab / Shift+Tab walk the top-level
 // shapes; F2 and Enter edit the text of the single selection, so does typing a character (the
-// character is handed on); Shift+F10 and the menu key ask for the context menu.
+// character is handed on).  A right click selects the shape under the pointer first and reports
+// SeEv::Context; the menu itself (also from Shift+F10 and the menu key) is the app's
+// ui.context_menu right after this call.
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -302,6 +304,8 @@ enum G {
     End { key: u64, end: u8, at: [f32; 2], glue: SeGlue, dynamic: bool },
     Point { key: u64, idx: u32, tag: u32, at: [f32; 2], glue: SeGlue, glues: bool },
     Marquee { start: [f32; 2], cur: [f32; 2], mods: u32, base: BTreeSet<u64> },
+    /// the lasso: the pointer's way so far
+    Lasso { pts: Vec<[f32; 2]>, mods: u32, base: BTreeSet<u64> },
     Zoom { start: [f32; 2], cur: [f32; 2] },
     Connect { tool: u32, a: [f32; 2], ga: SeGlue, b: [f32; 2] },
     Draw { tool: u32, a: [f32; 2], b: [f32; 2] },
@@ -329,6 +333,8 @@ pub struct SeState {
     pub glue: bool,
     /// show every connection point of the hovered shape, not only while connecting (CN-01)
     pub show_points: bool,
+    /// a drag on the background draws a lasso (a free outline) instead of a rectangle (ZF-06)
+    pub lasso: bool,
     /// the vertex chosen with a click (Del removes it): its shape and tag
     pub vertex: Option<(u64, u32)>,
     // the shape whose rotation pin shows (after the pointer rested on its rotation handle, as
@@ -365,6 +371,7 @@ impl SeState {
             dyn_grid: true,
             glue: true,
             show_points: false,
+            lasso: false,
             vertex: None,
             pin_shown: 0,
             g: G::Idle,
@@ -609,6 +616,24 @@ fn align_box(sh: &SeShape) -> [f32; 4] {
     }
 }
 
+// a point inside a closed outline (even-odd)
+fn in_polygon(pts: &[[f32; 2]], p: [f32; 2]) -> bool {
+    let n = pts.len();
+    if n < 3 {
+        return false;
+    }
+    let mut inside = false;
+    let mut j = n - 1;
+    for i in 0..n {
+        let (a, b) = (pts[i], pts[j]);
+        if (a[1] > p[1]) != (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0] {
+            inside = !inside;
+        }
+        j = i;
+    }
+    inside
+}
+
 fn snap_angle(a: f32, step_deg: f32) -> f32 {
     let s = step_deg.to_radians();
     fl(a / s + 0.5) as f32 * s
@@ -686,13 +711,15 @@ impl Ui {
                 out.push(SeEv::Context { key: k, at: [i.wx, i.px[1]] });
             }
         }
-        if self.wp.ctx.focus == id {
+        // the keys while the canvas has the focus and no popup (a menu keeps its own keys)
+        if self.wp.ctx.focus == id && self.popup_count() == 0 {
             self.se_keys(st, dg, m, &mut out);
         }
         // the cursor for the next call of ui.diagram
         dg.ext_cursor = self.se_cursor(st, m, tool);
-        dg.ext_moving = st.live() || matches!(st.g, G::Marquee { .. } | G::Connect { .. } | G::Draw { .. } | G::Zoom { .. });
-        if !out.is_empty() || st.busy() {
+        dg.ext_moving = st.live() || matches!(st.g, G::Marquee { .. } | G::Lasso { .. } | G::Connect { .. } | G::Draw { .. } | G::Zoom { .. });
+        // (pointer moves bring the frames of a gesture: no pass is asked for while one runs)
+        if !out.is_empty() {
             self.repass();
         }
         // drawing
@@ -1024,7 +1051,11 @@ impl Ui {
             },
             SHit::None if tool == SE_POINTER => {
                 let base = if mods & (MOD_SHIFT | MOD_CTRL) != 0 { st.sel.clone() } else { BTreeSet::new() };
-                G::Marquee { start: at, cur: at, mods, base }
+                if st.lasso {
+                    G::Lasso { pts: alloc::vec![at], mods, base }
+                } else {
+                    G::Marquee { start: at, cur: at, mods, base }
+                }
             }
             _ => G::Hold,
         }
@@ -1135,6 +1166,36 @@ impl Ui {
                     out.push(SeEv::Select);
                 }
                 if held { G::Marquee { start, cur, mods, base } } else { G::Idle }
+            }
+            G::Lasso { mut pts, mods, base } => {
+                if pts.last().is_none_or(|q| dist(*q, i.p) * s >= 2.0) && pts.len() < 4096 {
+                    pts.push(i.p);
+                }
+                let toggle = mods & MOD_CTRL != 0;
+                let mut sel = base.clone();
+                for sh in m.shapes {
+                    if sh.parent != 0 || sh.flags & SEF_NOSELECT != 0 {
+                        continue;
+                    }
+                    // fully inside: the corners of its box inside the outline
+                    let b = sh.bbox;
+                    if ![[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].iter().all(|&c| in_polygon(&pts, c)) {
+                        continue;
+                    }
+                    if toggle && sel.contains(&sh.key) {
+                        sel.remove(&sh.key);
+                    } else {
+                        sel.insert(sh.key);
+                    }
+                }
+                if sel != st.sel {
+                    st.sel = sel;
+                    if !st.sel.contains(&st.primary) {
+                        st.primary = st.sel.iter().next().copied().unwrap_or(0);
+                    }
+                    out.push(SeEv::Select);
+                }
+                if held { G::Lasso { pts, mods, base } } else { G::Idle }
             }
             G::Zoom { start, .. } => {
                 let cur = i.p;
@@ -1256,7 +1317,7 @@ impl Ui {
                     st.g = G::Idle;
                     any
                 }
-                G::Marquee { base, .. } => {
+                G::Marquee { base, .. } | G::Lasso { base, .. } => {
                     if st.sel != base {
                         st.sel = base;
                         out.push(SeEv::Select);
@@ -1347,20 +1408,8 @@ impl Ui {
                 out.push(SeEv::Text { key: k, ch: None });
             }
         }
-        // the context menu from the keyboard
-        let ctx = self.dg_key_find(VK_APPS, 0, 0).or_else(|| self.dg_key_find(VK_F10, MOD_SHIFT, MOD_SHIFT | MOD_CTRL | MOD_ALT));
-        if let Some((i, _)) = ctx {
-            self.dg_key_take(i);
-            let (k, at) = match st.sel_bbox(m) {
-                Some(b) => {
-                    let q = dg.vp.to_screen([(b[0] + b[2]) * 0.5, (b[1] + b[3]) * 0.5]);
-                    (single.unwrap_or(st.primary), [fl(q[0]), fl(q[1])])
-                }
-                None => (0, [r[0] + r[2] / 2, r[1] + r[3] / 2]),
-            };
-            let at = [self.rtl_map(at[0], r[0], r[2]), at[1]];
-            out.push(SeEv::Context { key: k, at });
-        }
+        // (the menu key and Shift+F10 stay for ui.context_menu after this call: it opens the
+        // menu the app picks for the selection)
         // typing starts the text of the single selection with the character
         if let Some(k) = single {
             if self.mods & (MOD_CTRL | MOD_ALT) == 0 && !self.wp.ctx.textq.is_empty() {
@@ -1551,6 +1600,13 @@ impl Ui {
             }
             G::Connect { a, b, .. } => {
                 self.dg_poly(&vp, &[a, b], (hairf * 1.5).max(1.5), band);
+            }
+            G::Lasso { ref pts, .. } => {
+                let mut way = pts.clone();
+                if let Some(&first) = pts.first() {
+                    way.push(first);
+                }
+                self.dg_poly(&vp, &way, hairf, band);
             }
             G::Draw { tool, a, b } => {
                 let r = [a[0].min(b[0]), a[1].min(b[1]), a[0].max(b[0]), a[1].max(b[1])];

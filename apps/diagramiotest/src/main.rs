@@ -9,6 +9,7 @@
 //                                         to DIR, to open them elsewhere
 //   diagramiotest --write-golden DIR      (JD4) the golden images of the viewer tests anew
 //   diagramiotest --write-drawings DIR    (JD4) the viewer tests' drawings as .vsdx
+//   diagramiotest --write-gegenprobe DIR  (JD7) the glue drawing for the Visio counter-check
 //   diagramiotest --render-corpus DIR [--width PX]   (JD4) the local files' pages as PNG and SVG
 //
 // Groups:
@@ -28,6 +29,8 @@
 //             compared with the stored value (--show N prints N misses, locally)
 //   editview  (JD7, edit_view.rs) PageView::update against a page built anew, Metrics' text
 //             sizes against the drawn text, the time an edit of one of 1000 shapes takes
+//   edit      (JD7, gegenprobe.rs) static and dynamic glue through ops and glue, moved, written
+//             and read back: the Connect entries and glue formulas stay, ends follow again
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
 // assembly-parity protocol and every image codec linked); the diagram codecs grow with JD5
@@ -48,6 +51,7 @@ mod drawings;
 mod dump;
 mod edit_view;
 mod formulas;
+mod gegenprobe;
 mod hostile;
 mod hostile_write;
 mod pkg;
@@ -113,6 +117,9 @@ fn run() -> i32 {
         let width = arg(&args, "--width").and_then(|w| w.parse().ok()).unwrap_or(2000);
         return render::render_corpus(&dir, arg(&args, "--corpus"), width);
     }
+    if let Some(dir) = arg(&args, "--write-gegenprobe") {
+        return gegenprobe::write(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
     }
@@ -134,6 +141,9 @@ fn run() -> i32 {
         }
         if h.on("editview") {
             edit_view::run(&mut h);
+        }
+        if h.on("edit") {
+            gegenprobe::check(&mut h);
         }
         roundtrip::run(&mut h, corpus_dir.as_deref());
     }

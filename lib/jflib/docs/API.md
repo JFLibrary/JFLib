@@ -105,7 +105,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [doc_io](#doc_io) -- conservative DOCX interchange and bounded file I/O
   <br>[lib.rs](#doc_io-crate-root) · [bibliography.rs](#doc_iobibliographyrs) · [bibtex.rs](#doc_iobibtexrs) · [clipboard.rs](#doc_ioclipboardrs) · [html_import.rs](#doc_iohtml_importrs) · [fragment.rs](#doc_iofragmentrs) · [exchange.rs](#doc_ioexchangers) · [library.rs](#doc_iolibraryrs) · [preservation.rs](#doc_iopreservationrs) · [preserved_text.rs](#doc_iopreserved_textrs) · [ris.rs](#doc_iorisrs) · [preserved_stories.rs](#doc_iopreserved_storiesrs)
 - [diagram_core](#diagram_core) -- the diagram model: ShapeSheet cells, formulas, geometry, routing and layout
-  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/shape.rs](#diagram_coresrcshapers) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
+  <br>[src/cell.rs](#diagram_coresrccellrs) · [src/document.rs](#diagram_coresrcdocumentrs) · [src/edit.rs](#diagram_coresrceditrs) · [src/formula/color.rs](#diagram_coresrcformulacolorrs) · [src/formula/engine.rs](#diagram_coresrcformulaenginers) · [src/formula/eval.rs](#diagram_coresrcformulaevalrs) · [src/formula/math.rs](#diagram_coresrcformulamathrs) · [src/formula/parse.rs](#diagram_coresrcformulaparsers) · [src/formula/theme.rs](#diagram_coresrcformulathemers) · [src/formula/val.rs](#diagram_coresrcformulavalrs) · [src/formula/xml.rs](#diagram_coresrcformulaxmlrs) · [src/geometry.rs](#diagram_coresrcgeometryrs) · [src/glue.rs](#diagram_coresrcgluers) · [src/hit.rs](#diagram_coresrchitrs) · [src/inherit.rs](#diagram_coresrcinheritrs) · [src/names.rs](#diagram_coresrcnamesrs) · [src/ops.rs](#diagram_coresrcopsrs) · [src/ops/clip.rs](#diagram_coresrcopscliprs) · [src/ops/points.rs](#diagram_coresrcopspointsrs) · [src/page.rs](#diagram_coresrcpagers) · [src/render/mod.rs](#diagram_coresrcrendermodrs) · [src/render/index.rs](#diagram_coresrcrenderindexrs) · [src/render/rebuild.rs](#diagram_coresrcrenderrebuildrs) · [src/render/style.rs](#diagram_coresrcrenderstylers) · [src/render/text.rs](#diagram_coresrcrendertextrs) · [src/render/theme.rs](#diagram_coresrcrenderthemers) · [src/route.rs](#diagram_coresrcrouters) · [src/shape.rs](#diagram_coresrcshapers) · [src/sheet.rs](#diagram_coresrcsheetrs) · [src/strings.rs](#diagram_coresrcstringsrs) · [src/units.rs](#diagram_coresrcunitsrs) · [src/views.rs](#diagram_coresrcviewsrs)
 - [diagram_io](#diagram_io) -- Visio file formats (the VSDX family) and diagram exports
   <br>[src/blank.rs](#diagram_iosrcblankrs) · [src/vsdx.rs](#diagram_iosrcvsdxrs) · [src/xml.rs](#diagram_iosrcxmlrs)
 - [rt](#rt) -- the runtime parts apps use: SSE / x87 float semantics, CPU features, locks, crash records
@@ -113,7 +113,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [pdf](#pdf) -- vector PDF writer with embedded font subsets, links and outlines
   <br>[lib.rs](#pdf-crate-root) · [src/canvas.rs](#pdfsrccanvasrs) · [src/font.rs](#pdfsrcfontrs) · [src/geom.rs](#pdfsrcgeomrs) · [src/image.rs](#pdfsrcimagers)
 - [diagram_view](#diagram_view) -- draws diagram pages (the display list of diagram_core) on render2d and gfx
-  <br>[src/fonts.rs](#diagram_viewsrcfontsrs) · [src/image.rs](#diagram_viewsrcimagers) · [src/view.rs](#diagram_viewsrcviewrs)
+  <br>[src/fonts.rs](#diagram_viewsrcfontsrs) · [src/image.rs](#diagram_viewsrcimagers) · [src/measure.rs](#diagram_viewsrcmeasurers) · [src/view.rs](#diagram_viewsrcviewrs)
 - [dxf](#dxf) -- DXF import (ASCII): tables, blocks and entities of model space, without a GPU
   <br>[lib.rs](#dxf-crate-root) · [src/fonts.rs](#dxfsrcfontsrs) · [src/mtext.rs](#dxfsrcmtextrs) · [src/strings.rs](#dxfsrcstringsrs)
 - [physics](#physics) -- Collision shapes, broad phase and deterministic queries for games
@@ -7464,6 +7464,10 @@ DG_SELECT: u32 = 0  // select, move, connect from ports, waypoints
 DG_PAN: u32 = 1  // a left drag pans
 DG_CONNECT: u32 = 2  // a drag (or two clicks) from a node / port to another connects
 DG_PLACE: u32 = 3  // a click reports DEv::Click (snapped) to place something
+/// the view only (zoom, pan with the middle button, Space + drag and the wheel, the keys that zoom):
+/// the left button, the other keys, the cursor and the overlays belong to ui.shape_edit, called
+/// right after ui.diagram with the same DiagramState (shape_edit.rs)
+DG_EDIT: u32 = 4
 /// edge routes (DEdge::route)
 DR_STRAIGHT: u8 = 0
 DR_BEZIER: u8 = 1
@@ -7629,6 +7633,11 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `fn paint(&self, g: &mut Gfx, f: &DgFrame)`
   - `fn paint_under(&self, _g: &mut Gfx, _f: &DgFrame)`
     what lies under the grid (a backdrop image), painted before it; nothing by default
+  - `fn damage(&self, _from: u32, _to: u32) -> Option<[f32; 4]>`
+    the world rectangle x0, y0, x1, y1 whose look changed from the content version `from` to
+    `to` (ui.diagram's ver) while everything else stayed: only that part of the backing store
+    is painted again (an edit of a few shapes in a large drawing); None (the default): unknown,
+    all of it
 
 - **`struct DiagramState`**
   the widget's state, kept by the app: the view, the selection (node and edge keys), the
@@ -7638,6 +7647,7 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `focus: u64` -- the node with the keyboard focus (0 = none): Tab walks, Enter activates it
   - `grid: f32` -- grid step in world units (0 = no grid)
   - `snap: bool` -- moves, waypoints and DG_PLACE clicks snap to the grid (Alt held: free)
+  - `grid_lines: bool` -- the grid's lines are drawn (false: the grid only snaps, Visio's hidden grid)
   - `hover: DHit` -- what the pointer is over (after the last diagram call)
   - `edge_width: f32` -- the stroke width of the edges in world units (hit testing, the highlight)
   - `test_keys: u32` -- scripts cannot hold keys: 1 = as if Space were held, 2 = Ctrl
@@ -7718,6 +7728,272 @@ DPT_USED: u32 = 2  // shown filled (connected)
   call showed (label(key); value = the edge's index; selected / focused / hover states),
   a small box around the middle of its route cut to the canvas, after the nodes' records;
   a screen reader's click on one selects the edge (and focuses it with tab_edges)
+
+#### `ui/shape_edit.rs`
+
+Source: [`lib/ui/shape_edit.rs`](../lib/ui/shape_edit.rs)
+
+```text
+shape_edit -- editing shapes on a ui.diagram canvas (DG_EDIT): selection by click, marquee,
+keyboard, Shift and Ctrl; the eight handles and the rotation handle of turned and flipped
+frames, the rotation pin, yellow control points, vertices, the ends of 1D shapes with glue to
+connection points (static) or to whole shapes (dynamic); moving with the grid, the dynamic grid
+(alignment to other shapes' edges and middles) and guides; the connector and drawing tools; the
+magnifier (Ctrl + Shift + click); one semantic record per shape and per handle.  The app owns
+the model and applies what the user did, reported as SeEv events; the widget keeps the
+selection and the gesture in SeState.  It knows nothing of diagram files: an app maps its
+shapes to SeShape frames (diagram_core for JFDiagrammer).
+
+  ui.diagram(id, &mut dg, &m, DG_EDIT, paint, ver)     the view: the paint, zoom, pan
+  ui.shape_edit(id, &mut st, &mut dg, &model, tool) -> Vec<SeEv>
+                                  right after it with the same id and DiagramState: the left
+                                  button, the keys while the canvas has the focus, the cursor,
+                                  the overlays (selection, handles, glue, guides, rubber bands)
+  ui.shape_edit_sems(id, &mut st, &dg, &model, &label)   one K_LISTITEM record per visible
+                                  top-level shape (label(key)) and one K_BUTTON record per
+                                  handle of a single selection ("Größengriff unten rechts",
+                                  "Drehgriff", "Anfangspunkt", "Steuerpunkt 1" ...): scripts
+                                  click and drag them, screen readers name them
+  tools SE_POINTER, SE_CONNECT, SE_LINE, SE_RECT, SE_ELLIPSE, SE_TEXT
+
+Model (SeModel, borrowed per call; world units are the canvas's, y down):
+  SeShape { key, parent, bx, ends, pin, bbox, flags, points }
+  SeBox { o, u, v }   the frame: the point o + fx u + fy v for fx, fy in 0..1; u runs along the
+                      shape's width, v along its height (downwards on the screen for a shape
+                      that is neither turned nor flipped; a flip reverses u or v); handles at
+                      fx, fy in {0, 0.5, 1}, the rotation handle beyond the edge fy = 0
+  SePoint { at, kind, tag, dir, flags }   SP_CONTROL (yellow), SP_CONN (connection points:
+                      shown while connecting), SP_VERTEX (shown for a single selection when
+                      the app lists them: vertex editing)
+  SeGuide { key, vertical, at }   guides (blue, dashed, across the canvas); moves snap to them
+  hit(p, tol, within) -> key      the topmost shape at world point p within tol world units
+                      (within = 0: a top-level shape; a group's key: the child of that group
+                      under p, for the second click into a group), 0 = none; the app asks its
+                      display list
+
+Live gestures: Move, Resize, Rotate, Pin, End and Point report the whole change from the
+start of the drag with every step (done = false) and once more when released (done = true);
+Esc during one sends SeEv::Cancel.  So the app takes its preview back and applies the new
+total each step, and keeps the last one as the undo step.  The frames of the selection follow
+the model (the app's preview), the gesture keeps what it had at the start.  The connector and
+line tools and the drawing tools draw a rubber band and report Connect / Draw when released;
+a click with them selects like the pointer.
+
+Input (pointer tool): a press on a handle of the selection starts its drag; on a shape it
+selects it (Shift adds, Ctrl toggles) and a drag moves the selection (grid, dynamic grid,
+guides; Alt: free); a second, slow click on a selected group selects the child under the
+pointer; a double click edits the text (SeEv::Text); on the background a drag draws a marquee
+or, with SeState::lasso, a free outline (shapes fully inside; Shift adds, Ctrl toggles).  Corner handles keep the aspect ratio, edge
+handles change one side (a locked aspect: both), Ctrl resizes about the middle; locked handles
+are drawn grey and do nothing.  The rotation handle turns about the pin (one shape) or the
+middle of the selection: in 15-degree steps near the shape, in single degrees farther away.
+An end or a control point that can glue snaps to a connection point under the pointer (static
+glue); over a shape a dynamic connector's end glues to the whole shape (dynamic glue, the
+shape's frame is highlighted).  Ctrl + Shift + click zooms in at the pointer, + drag zooms to
+the rectangle, + right click zooms out (ZF-22).  Keys while the canvas has the focus: Esc
+cancels the gesture, else clears the selection; Del deletes; Ctrl+A selects all; arrows nudge
+by a grid step (Shift: a pixel) or pan without a selection; Tab / Shift+Tab walk the top-level
+shapes; F2 and Enter edit the text of the single selection, so does typing a character (the
+character is handed on).  A right click selects the shape under the pointer first and reports
+SeEv::Context; the menu itself (also from Shift+F10 and the menu key) is the app's
+ui.context_menu right after this call.
+```
+
+```rust
+/// tools of ui.shape_edit
+SE_POINTER: u32 = 0
+/// draw a dynamic connector: its ends glue to connection points or whole shapes
+SE_CONNECT: u32 = 1
+/// draw a line: its ends glue to connection points only (CN-12); vertex editing when the app
+/// lists vertices
+SE_LINE: u32 = 2
+SE_RECT: u32 = 3
+SE_ELLIPSE: u32 = 4
+/// a text box: drag its frame, or click for one of the app's default size
+SE_TEXT: u32 = 5
+/// shape flags (SeShape::flags)
+SEF_1D: u32 = 1  // the two ends instead of the eight handles
+SEF_GROUP: u32 = 2  // a group: a second click selects the child under the pointer
+SEF_DYNAMIC: u32 = 4  // a dynamic connector: its ends also glue to whole shapes
+SEF_LOCK_W: u32 = 8
+SEF_LOCK_H: u32 = 0x10
+SEF_LOCK_ASPECT: u32 = 0x20
+SEF_LOCK_ROTATE: u32 = 0x40
+SEF_LOCK_BEGIN: u32 = 0x80
+SEF_LOCK_END: u32 = 0x100
+SEF_LOCK_MOVE: u32 = 0x200  // LockMoveX and LockMoveY: no move by dragging
+SEF_NOSELECT: u32 = 0x400  // never selected (LockSelect)
+SEF_NOGLUE: u32 = 0x800  // nothing glues to it
+SEF_BEGIN_GLUED: u32 = 0x1000  // the begin is glued to a point (static)
+SEF_BEGIN_DYN: u32 = 0x2000  // the begin is glued to a whole shape (dynamic)
+SEF_END_GLUED: u32 = 0x4000
+SEF_END_DYN: u32 = 0x8000
+SEF_LOCK_PIN: u32 = 0x1_0000  // no rotation pin handle
+/// kinds of SePoint
+SP_CONTROL: u8 = 0
+SP_CONN: u8 = 1
+SP_VERTEX: u8 = 2
+/// point flags (SePoint::flags)
+SPF_GLUE: u32 = 1  // a control point that glues to connection points (SP-04)
+```
+
+- **`struct SeBox`**
+  a frame in world units: the point o + fx u + fy v for fx, fy in 0..1
+  - `o: [f32; 2]`
+  - `u: [f32; 2]`
+  - `v: [f32; 2]`
+
+**`impl SeBox`**
+
+- **`fn rect(r: [f32; 4]) -> SeBox`**
+  an axis-parallel frame x0, y0, x1, y1
+- **`fn at(&self, fx: f32, fy: f32) -> [f32; 2]`**
+  the point at fractions fx, fy
+- **`fn frac(&self, p: [f32; 2]) -> Option<[f32; 2]>`**
+  the fractions of a world point (None: a degenerate frame)
+- **`fn aabb(&self) -> [f32; 4]`**
+  the axis-parallel box x0, y0, x1, y1 around it
+- **`fn size(&self) -> [f32; 2]`**
+  the length of u and v
+
+- **`struct SeShape`**
+  a shape as the editor sees it
+  - `key: u64`
+  - `parent: u64` -- the group it belongs to (0: on the page; such a shape is what a click selects)
+  - `bx: SeBox` -- its frame (2D shapes)
+  - `ends: [[f32; 2]; 2]` -- begin and end (SEF_1D)
+  - `pin: [f32; 2]` -- the rotation pin
+  - `bbox: [f32; 4]` -- the box x0, y0, x1, y1 around what is drawn (marquee, alignment)
+  - `flags: u32`
+  - `points: Range<u32>` -- its control points, connection points and vertices (a range of SeModel::points)
+
+- **`struct SePoint`**
+  a point of a shape: a control point, a connection point or a vertex
+  - `at: [f32; 2]`
+  - `kind: u8`
+  - `tag: u32` -- the app's name for it (a row)
+  - `dir: [f32; 2]` -- a connection point's direction (world, unit; 0 0 = none)
+  - `flags: u32`
+
+- **`struct SeGuide`**
+  a guide: a vertical (x = at) or horizontal (y = at) line
+  - `key: u64`
+  - `vertical: bool`
+  - `at: f32`
+
+- **`struct SeModel<'a>`**
+  the app's shapes, borrowed for one call
+  - `shapes: &'a [SeShape]`
+  - `points: &'a [SePoint]`
+  - `guides: &'a [SeGuide]`
+  - `ver: u32` -- changes whenever shapes are added, removed or reordered
+  - `hit: &'a dyn Fn([f32; 2], f32, u64) -> u64` -- the topmost shape at a world point (see the file header)
+
+- **`enum SeGlue`**
+  what an end or a control point is glued to
+  - `None`
+  - `Point { key: u64, tag: u32 }` -- a connection point (its tag) of a shape: static glue
+  - `Shape(u64)` -- a whole shape: dynamic glue
+
+- **`enum SeEv`**
+  what the user did (ui.shape_edit's result, in order)
+  - `Select` -- st.sel changed
+  - `Move { keys: Vec<u64>, total: [f32; 2], done: bool }` -- move `keys` by total (world units, from the start of the drag; a key nudge: done at once)
+  - `Resize { keys: Vec<u64>, from: SeBox, to: SeBox, done: bool }` -- resize: the frame `from` (one shape: its frame; several: the box around them) became `to`
+  - `Rotate { keys: Vec<u64>, centre: [f32; 2], angle: f32, done: bool }` -- turn `keys` about `centre` by `angle` radians (counter-clockwise as seen)
+  - `Pin { key: u64, at: [f32; 2], done: bool }` -- the rotation pin of a shape goes to `at`
+  - `End { key: u64, end: u8, at: [f32; 2], glue: SeGlue, done: bool }` -- end 0 (begin) or 1 of a 1D shape goes to `at`, glued to `glue`
+  - `Point { key: u64, idx: u32, tag: u32, at: [f32; 2], glue: SeGlue, done: bool }` -- a control point or a vertex (index `idx` of SeModel::points, the app's tag) goes to `at`
+  - `PointInsert { key: u64, at: [f32; 2] }` -- Ctrl + click on the outline of a shape with vertices listed: add a vertex at `at`
+  - `PointDelete { key: u64, tag: u32 }` -- Del with a vertex chosen: remove it
+  - `Cancel` -- Esc during a live gesture: take the preview back
+  - `Connect { tool: u32, a: [f32; 2], ga: SeGlue, b: [f32; 2], gb: SeGlue }` -- the connector or line tool drew from a to b
+  - `Draw { tool: u32, a: [f32; 2], b: [f32; 2] }` -- a drawing tool drew the box from a to b (a == b: a click)
+  - `Text { key: u64, ch: Option<char> }` -- edit the text of a shape (double click, F2, Enter, or a typed character)
+  - `Context { key: u64, at: [i32; 2] }` -- right click, Shift+F10 or the menu key on a shape (0: the page); at = window px
+  - `Delete` -- Del with a selection
+
+- **`struct SeState`**
+  the editor's state, kept by the app: the selection, the focused shape, the options, the
+  gesture in progress
+  - `sel: BTreeSet<u64>` -- the selected shapes (keys)
+  - `primary: u64` -- the anchor of the selection (the first one selected; drawn thicker, ZF-06)
+  - `focus: u64` -- the shape with the keyboard focus (Tab walks)
+  - `dyn_grid: bool` -- the dynamic grid: moves snap to other shapes' edges and middles (ZF-05)
+  - `glue: bool` -- ends glue (Ansicht › Ausrichten und Kleben)
+  - `show_points: bool` -- show every connection point of the hovered shape, not only while connecting (CN-01)
+  - `lasso: bool` -- a drag on the background draws a lasso (a free outline) instead of a rectangle (ZF-06)
+  - `vertex: Option<(u64, u32)>` -- the vertex chosen with a click (Del removes it): its shape and tag
+
+**`impl SeState`**
+
+- **`fn new() -> SeState`**
+  nothing selected; dynamic grid and glue on
+- **`fn busy(&self) -> bool`**
+  a gesture is in progress
+- **`fn live(&self) -> bool`**
+  a live gesture is in progress (the app shows a preview of it)
+- **`fn select(&mut self, keys: &[u64])`**
+  select exactly these shapes (the app's commands: paste, group, a new shape)
+
+**`impl Ui`**
+
+- **`fn shape_edit(&mut self, id: u32, st: &mut SeState, dg: &mut DiagramState, m: &SeModel, tool: u32) -> Vec<SeEv>`**
+  ui_shape_edit(id, st, dg, m, tool) -> what the user did: the edit layer of the canvas
+  `id`, called right after ui.diagram(id, dg, .., DG_EDIT, ..) (see the file header)
+- **`fn shape_edit_sems(&mut self, id: u32, st: &mut SeState, dg: &DiagramState, m: &SeModel, label: &dyn Fn(u64) -> String)`**
+  ui_shape_edit_sems(id, st, dg, m, label): one K_LISTITEM record per visible top-level
+  shape (label(key); value = its index in the model; selected / focused states) and one
+  K_BUTTON record per handle of a single selection; a screen reader's click on a shape
+  selects it
+
+#### `ui/ruler.rs`
+
+Source: [`lib/ui/ruler.rs`](../lib/ui/ruler.rs)
+
+```text
+ruler -- a ruler along a canvas (ZF-02): ticks and numbers in the document's units for the
+view of a ui.diagram canvas, the page's extent lighter, marks (the selection's edges and
+middle while it moves or changes size), the pointer's position; dragging out of it makes a
+guide (SP-10)
+
+  ui.ruler(id, &vp, &RulerSpec) -> RulerEv   a horizontal ruler (above the canvas) or a
+                                  vertical one (left of it) in the next layout slot (size it
+                                  with next_size: the canvas' width or height, 20 DIP across)
+  RulerSpec { vertical, origin, per_world, page, marks, pointer }
+  RulerEv::None | Guide { at, done }   a guide dragged out of the ruler: its world position
+                                  (y of a horizontal guide from the top ruler, x of a vertical
+                                  one from the left ruler) while the button is held, done when
+                                  released over the canvas (Esc: none)
+
+Units: a world coordinate c (the canvas', y down) shows as (c - origin) * per_world; a vertical
+ruler whose numbers grow upwards (a page with its origin at the bottom) has per_world < 0.  The
+step between numbered ticks is 1, 2 or 5 times a power of ten, at least 48 DIP apart; between
+them 10, 5 or 2 smaller ticks as there is room.  The ruler has a semantic record (K_SLIDER-like
+K_BOX "Lineal") so scripts drag from it.
+```
+
+- **`struct RulerSpec<'a>`**
+  what a ruler shows
+  - `vertical: bool` -- a vertical ruler (left of the canvas) instead of a horizontal one
+  - `origin: f32` -- the world coordinate of 0
+  - `per_world: f64` -- units per world unit (negative: the numbers grow up / to the left)
+  - `page: [f32; 2]` -- the page's extent along the ruler (world, from .. to), drawn lighter
+  - `marks: &'a [f32]` -- world coordinates to mark (edges and middle of the selection)
+  - `pointer: Option<f32>` -- the pointer's world coordinate along the ruler
+
+- **`enum RulerEv`**
+  what the user did with a ruler
+  - `None`
+  - `Guide { at: f32, done: bool }` -- a guide is dragged out of the ruler: its world coordinate across the ruler; done =
+    released over the canvas
+  - `GuideCancel` -- the drag of a guide ended outside the canvas or with Esc
+
+**`impl Ui`**
+
+- **`fn ruler(&mut self, id: u32, vp: &Viewport, spec: &RulerSpec) -> RulerEv`**
+  ui_ruler(id, vp, spec) -> what the user did: a ruler for the view vp of a canvas (see the
+  file header)
 
 #### `ui/md_doc.rs`
 
@@ -53008,10 +53284,18 @@ a file loses nothing, and the behaviour Visio files carry works without translat
   geometry::*                   (JD4) Geometry rows as paths of lines and cubic curves,
                                 transforms (pin, local pin, angle, flips, groups)
   render::build(..) -> Drawing  (JD4) a page as a display list: fills, lines, line ends,
-                                texts laid out, pictures, in painter's order with a grid
+                                texts laid out, pictures, in painter's order with a grid;
+                                render::rebuild (JD7) builds some top-level shapes again
+  ops::*                        (JD7) gestures as cell writes: move, resize, rotate, flip,
+                                pin, control points, vertices, groups, z-order, new shapes,
+                                text, the clipboard inside an app
+  glue::* / route::*            (JD7) connection points, static and dynamic glue (Connect
+                                entries), the dynamic connector, right-angle routing around
+                                obstacles
+  hit::*                        (JD7) the shape under a point of a display list, shapes in a
+                                rectangle
 
-What is to come here, by stage of the plan:
-  JD7   glue, the dynamic connector with right-angle routing around obstacles, layout
+What is to come here, by stage of the plan: layout (JD10), containers and callouts (JD10)
 
 Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 opening a file (connectors, layout and containers move only when something moves), and a
@@ -53644,6 +53928,22 @@ a Del="1" mark; restore_row and restore_section remove it again.
   set the styles a style is based on (Cycle when a chain would lead back to it)
 - **`fn update_settings(&mut self, f: impl FnOnce(&mut DocSettings)) -> Result<(), EditError>`**
   change the document settings (snap, glue, protection, default styles ...)
+
+**`impl Transaction<'_>`**
+
+- **`fn insert_row(&mut self, sheet: SheetRef, sk: SecKey, at: RowKey, kind: Option<&str>) -> Result<RowKey, EditError>`**
+  insert a row of the sheet's own into an indexed section at `at` (an Index; past the
+  last row: after it): the rows from there on move one down (IX + 1) and the references
+  to them in the sheet's formulas follow; an inherited section is made the sheet's own
+  first (see above) -> the key of the new row.  `kind` is the row type (Geometry:
+  "LineTo" ...)
+- **`fn remove_row(&mut self, sheet: SheetRef, sk: SecKey, key: RowKey) -> Result<(), EditError>`**
+  take a row out of an indexed section: the rows after it move one up (IX - 1), the
+  references to them follow and references to the row itself become its values; an
+  inherited section is made the sheet's own first
+- **`fn set_row_kind(&mut self, sheet: SheetRef, sk: SecKey, key: RowKey, kind: &str) -> Result<(), EditError>`**
+  change the type (T) of a row the sheet has (Geometry: "MoveTo", "LineTo" ...); an
+  inherited row gets an entry of the sheet's own that names the type
 
 ### `diagram_core/src/formula/color.rs`
 
@@ -54407,6 +54707,216 @@ INFINITE: f64 = 1000.0
 - **`fn cubic_at(p0: [f64; 2], p1: [f64; 2], p2: [f64; 2], p3: [f64; 2], t: f64) -> [f64; 2]`**
   the point of a cubic Bézier curve at t
 
+### `diagram_core/src/glue.rs`
+
+Source: [`lib/diagram_core/src/glue.rs`](../lib/diagram_core/src/glue.rs)
+
+```text
+glue -- connection points, glue and the dynamic connector (CN-01..05, CN-12, CN-15)
+
+  connection_points(doc, shape) -> Vec<ConnPoint>   the Connection rows on the page: point,
+                                   direction (into the shape, as DirX/DirY mean it), Type
+  glued(doc, shape) -> [Target; 2]  what Begin and End are glued to (the Connect entries)
+  ends(doc, shape)                 Begin and End on the page
+  is_one_d / is_connector          a 1-D shape / one that routes (ObjType routable)
+  style(doc, shape) -> Style       right angle, straight or curved (its cells, else the page's)
+  path(doc, shape) -> points       the drawn way on the page (curves flattened)
+  glue(tx, eng, shape, end, at, to)          put an end at `at` and glue it (Target::None: free)
+  new_connector(tx, eng, owner, (at, to), (at, to)) / new_line(..)   new 1-D shapes
+  dependents(doc, owner, &moved)   the 1-D shapes glued to these shapes (or moved with them)
+  update(tx, eng, &shapes)         their ends follow, connectors route again (one gesture)
+  reset(tx, eng, &connectors)      route again, also where ConFixedCode keeps the way
+  set_style(tx, eng, &connectors, style)
+  detach(tx, eng, owner, &deleted) before deleting shapes: glue to them becomes constants
+
+Every point here is on the page in drawing units (y up); the cells hold the connector's
+parent coordinates (the page, or its group's local ones), the Geometry rows its local ones.
+
+The file's record of glue (CN-15), as Visio writes it ([MS-VSDX] Connect_Type and the cells
+of the 1-D Endpoints, Glue Info and Shape Layout sections; checked against Visio's own files):
+* static glue of Begin to connection point k (row IX k-1) of shape N:
+    BeginX, BeginY = PAR(PNT(Sheet.N!Connections.Xk,Sheet.N!Connections.Yk))
+    BegTrigger = _XFTRIGGER(Sheet.N!EventXFMod)
+    Connect FromSheet=<id> FromCell=BeginX FromPart=9 ToSheet=N ToCell=Connections.Xk
+            ToPart=100+k-1
+  (End: EndX, EndY, EndTrigger, FromCell=EndX, FromPart=12)
+* dynamic glue (to the whole shape): BeginX, BeginY = _WALKGLUE(BegTrigger,EndTrigger,
+  WalkPreference), EndX, EndY = _WALKGLUE(EndTrigger,BegTrigger,WalkPreference), the trigger as
+  above, Connect ToCell=PinX ToPart=3; the engine cannot compute _WALKGLUE, so the value comes
+  from here (Transaction::set_result, the formula stays)
+* a free end: a constant, its trigger _XFTRIGGER(EventXFMod); one Connect per glued end.
+The static formulas the engine computes itself: after the target moved, its recalculation has
+moved the end already; update() asks it again and then routes.
+
+The dynamic connector (ObjType 2 = routable, GlueType 2 = walking glue allowed) keeps its box
+on the line from Begin to End: PinX = GUARD((BeginX+EndX)/2), Width = GUARD(EndX-BeginX),
+LocPinX = GUARD(Width*0.5), Angle = GUARD(0DA), y alike; a side shorter than 5 mm becomes
+GUARD(+-0.19685039370079DL) as in Visio's files.  Its way is one Geometry section: MoveTo at
+Begin, a LineTo per corner, the last at End, constants in local coordinates (the curved style:
+MoveTo and one NURBSTo over the corners).  Controls.TextPosition goes to the middle of the
+way.  Rows of a master keep their indices where their type fits; else they get a Del mark
+and new rows follow.
+
+Dynamic glue docks in the middle of a side of the target, on its outline (the farthest point
+of its geometry on the line through its middle), on the side that gives the cheapest way
+among the obstacles (length + bends; one search over the sides of both ends, route::best);
+where the other end lies within a side's reach, the point straight opposite it is offered
+too (Visio's files show such straight connections).  The straight style docks where the line
+between the two ends leaves the outline.  Obstacles are the boxes of the page's top-level
+shapes that are not 1-D (route.rs keeps the page's LineToNodeX/Y as clearance, else 1/8 in).
+ConFixedCode 1 and 2 (reroute manually / never) keep the corners and only move the first and
+last pieces; reset() routes them anew.
+
+Nothing happens on its own: opening a file routes nothing, only the shapes handed to update.
+```
+
+- **`struct ConnPoint`**
+  a connection point of a shape on the page
+  - `row: u32` -- IX of its row (Connections.X&lt;row + 1>)
+  - `at: [f64; 2]` -- where it is on the page
+  - `dir: Option<[f64; 2]>` -- DirX/DirY turned onto the page, unit length: the direction the point faces into the
+    shape (a connector arrives along it, a route leaves against it); None: 0, 0
+  - `kind: u8` -- Type: 0 inward, 1 outward, 2 both
+
+- **`enum Target`**
+  what an end of a 1-D shape is glued to
+  - `None` -- nothing: a free end
+  - `Point { shape: ShapeRef, row: u32, }` -- a connection point (static glue): the shape and the IX of its Connection row
+  - `Shape(ShapeRef)` -- the whole shape (dynamic glue)
+
+- **`enum End`**
+  an end of a 1-D shape
+  - `Begin` -- BeginX, BeginY
+  - `End` -- EndX, EndY
+
+- **`enum Style`**
+  how a dynamic connector draws its way
+  - `RightAngle` -- right angles around obstacles (the default)
+  - `Straight` -- one straight line
+  - `Curved` -- a curve over the corners of the right-angle way
+
+- **`fn connection_points(doc: &Document, shape: ShapeRef) -> Vec<ConnPoint>`**
+  the connection points of a shape (its Connection rows with inheritance) on the page
+
+- **`fn is_one_d(doc: &Document, shape: ShapeRef) -> bool`**
+  whether the shape is 1-D (it has BeginX)
+
+- **`fn is_connector(doc: &Document, shape: ShapeRef) -> bool`**
+  whether the shape is a dynamic connector: 1-D and routable (ObjType has the routable flag)
+
+- **`fn ends(doc: &Document, shape: ShapeRef) -> Option<([f64; 2], [f64; 2])>`**
+  Begin and End of a 1-D shape on the page
+
+- **`fn glued(doc: &Document, shape: ShapeRef) -> [Target; 2]`**
+  what Begin and End are glued to, from the Connect entries of the page or master (glue to
+  something else -- a guide, a vertex -- reads as None)
+
+- **`fn style(doc: &Document, shape: ShapeRef) -> Style`**
+  how a dynamic connector draws its way: ConLineRouteExt 2 curved, ShapeRouteStyle 2 or 16
+  straight, else right angles; 0 asks the page (LineRouteExt, RouteStyle)
+
+- **`fn path(doc: &Document, shape: ShapeRef) -> Vec<[f64; 2]>`**
+  the drawn way of a shape on the page: the first shown Geometry section, curves flattened
+
+- **`fn glue(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, end: End, at: [f64; 2], to: Target) -> Result<(), EditError>`**
+  put an end of a 1-D shape at `at` (page coordinates) and glue it to `to`: a connection
+  point (static: PAR(PNT(..)) formulas), a whole shape (dynamic, connectors and walking glue
+  only: \_WALKGLUE), or nothing (constants); the Connect entries of the end are replaced.  A
+  dynamic connector routes again.  Invalid: not 1-D, a target on another page or inside the
+  shape, dynamic glue for a plain line; NoRow: no such connection point
+
+- **`fn dependents(doc: &Document, owner: Owner, moved: &[ShapeRef]) -> Vec<ShapeRef>`**
+  the 1-D shapes to update after these shapes moved (or were resized, turned ...): the ones
+  glued to them or to shapes inside them, and glued ones among them; in Connect order
+
+- **`fn detach(tx: &mut Transaction, eng: &mut Engine, owner: Owner, deleted: &[ShapeRef]) -> Result<(), EditError>`**
+  before shapes are deleted: the glue of other shapes to them (or to shapes inside them)
+  ends -- the glued cells keep their values as constants, triggers point to the shape itself,
+  the Connect entries go (Transaction::delete_shapes removes the deleted shapes' own)
+
+- **`fn new_connector(tx: &mut Transaction, eng: &mut Engine, owner: Owner, begin: ([f64; 2], Target), end: ([f64; 2], Target)) -> Result<ShapeRef, EditError>`**
+  add a dynamic connector on a page or in a master (no master shape: every cell of its own,
+  the style "Connector" when the document has one) from `begin` to `end` (page coordinates)
+  glued to the targets, routed -> its handle.  On an error the transaction holds what was
+  done so far: drop it
+
+- **`fn new_line(tx: &mut Transaction, eng: &mut Engine, owner: Owner, begin: ([f64; 2], Target), end: ([f64; 2], Target)) -> Result<ShapeRef, EditError>`**
+  add a straight line (1-D, not routed: CN-12) from `begin` to `end`, glued to connection
+  points (Target::Shape is refused: lines glue statically); its Geometry follows Width, so it
+  keeps its form when an end moves -> its handle
+
+- **`fn update(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef]) -> Result<(), EditError>`**
+  after a gesture: the ends of these 1-D shapes follow what they are glued to (static ends
+  through the engine, dynamic ones dock anew) and dynamic connectors route again; lines keep
+  their form.  Only these shapes change
+
+- **`fn reset(tx: &mut Transaction, eng: &mut Engine, connectors: &[ShapeRef]) -> Result<(), EditError>`**
+  "Verbinder zurücksetzen": route these connectors anew with few bends, also the ones whose
+  way ConFixedCode keeps
+
+- **`fn set_style(tx: &mut Transaction, eng: &mut Engine, connectors: &[ShapeRef], style: Style) -> Result<(), EditError>`**
+  give these connectors a style (ShapeRouteStyle and ConLineRouteExt: right angle 1/1,
+  straight 16/1, curved 1/2) and route them anew
+
+### `diagram_core/src/hit.rs`
+
+Source: [`lib/diagram_core/src/hit.rs`](../lib/diagram_core/src/hit.rs)
+
+```text
+hit -- hit tests on a page's display list: the shape under a point, shapes in a rectangle (JD7)
+
+  hit::at(&drawing, p, tol) -> Option<Hit>   the topmost shape drawn under p
+  hit::all_at(&drawing, p, tol) -> Vec<Hit>  every shape drawn under p, topmost first, each
+                                   once (the subselection in groups goes down this list)
+  hit::in_rect(&drawing, r, whole) -> Vec<ShapeRef>   the top-level shapes wholly inside r
+                                   (whole) or touching it, in z-order (FEATURES ZF-06)
+  hit::top_boxes(&drawing) -> Vec<(ShapeRef, [f64; 4])>   each top-level shape's box, in
+                                   z-order (alignment guides, selection frames)
+  hit::item_at(&item, p, tol) / item_box(&item)   one item: under p?  its exact box
+  Hit { shape, top, item }         the shape drawn (a subshape too), its top-level shape
+                                   (what a click selects), the item's index
+
+Everything works on render::Drawing: paper inches, y up, the origin at the page's bottom
+left corner (the app maps its pixels there: 96 DIP per inch, y down); `tol` is in paper
+inches.  Only the page's own shapes count: the items of its background pages (their shapes
+belong to another page) and shadows are never hit.  Under a point means: inside a fill
+(even-odd; curves cut into straight pieces within a hundredth of the tolerance, at least
+1e-4 in), within half its width plus tol of a line (a hairline: tol), inside a text's runs
+(each from the descent to the ascent, grown by tol), inside a picture's rectangle where the
+shape's box keeps it.  Line ends count with their line, a text background as text.
+A box (item_box) is the geometry's without the line width, a text's runs, a picture's
+visible part; a top-level shape's box is that of its geometry and line ends, of its texts
+where it has no geometry.  The drawing's grid (Drawing::query) finds the candidates: a test
+looks at the items near the point or rectangle, not at the whole page.
+```
+
+- **`struct Hit`**
+  a shape under a point
+  - `shape: ShapeRef` -- the shape the item draws (a subshape of a group too)
+  - `top: ShapeRef` -- its top-level shape: what a click selects
+  - `item: u32` -- the item's index in the drawing
+
+- **`fn at(d: &Drawing, p: [f64; 2], tol: f64) -> Option<Hit>`**
+  the topmost shape drawn under p
+
+- **`fn all_at(d: &Drawing, p: [f64; 2], tol: f64) -> Vec<Hit>`**
+  every shape drawn under p, the topmost first, each shape once (its topmost item)
+
+- **`fn in_rect(d: &Drawing, r: [f64; 4], whole: bool) -> Vec<ShapeRef>`**
+  the top-level shapes of the page wholly inside r (x0, y0, x1, y1; whole) or touching it
+  (not whole), in z-order; a shape that draws nothing is never inside
+
+- **`fn top_boxes(d: &Drawing) -> Vec<(ShapeRef, [f64; 4])>`**
+  the box of each top-level shape of the page that draws something, in z-order: its
+  geometry's and line ends' (without the line width), its texts' where it has no geometry
+
+- **`fn item_at(it: &Item, p: [f64; 2], tol: f64) -> bool`**
+  whether one item is drawn under p (see the module comment)
+
+- **`fn item_box(it: &Item) -> [f64; 4]`**
+  an item's exact box: the geometry's without the line width, a text's runs, a picture's
+  visible part
+
 ### `diagram_core/src/inherit.rs`
 
 Source: [`lib/diagram_core/src/inherit.rs`](../lib/diagram_core/src/inherit.rs)
@@ -54533,6 +55043,336 @@ test, since every style in them names one style for all three (JD6).
 - **`fn named_rows(section: &str) -> bool`**
   whether rows of this section are named (N) rather than indexed (IX), after [MS-VSDX] Row_Type
 
+### `diagram_core/src/ops.rs`
+
+Source: [`lib/diagram_core/src/ops.rs`](../lib/diagram_core/src/ops.rs)
+
+```text
+ops -- the editing gestures on shapes: move, size, turn, flip, pin, control points, vertices,
+groups, z-order, new shapes, text, copy and paste (JD7: SP-03..07, TX-01, TX-03, DM-02)
+
+  frame(doc, shape) -> Frame          where a shape is: local -> page, Width, Height
+  Frame::corners / bounds / centre / grip(gx, gy) / drag(gx, gy, to, keep_aspect)
+  bounds(doc, shapes)                 the box of a selection on the page
+  locks(eng, doc, shape) -> Locks     the protection cells that are set (Locks::MOVE_X ...)
+  move_shapes(tx, eng, shapes, d)     2D: the pin; 1D: BeginX/Y, EndX/Y of the free ends
+  set_frame(tx, eng, shape, &frame)   size and place, same turn (the eight grips)
+  scale_shapes(tx, eng, shapes, from, to)   a selection from one box into another
+  rotate_shapes(tx, eng, shapes, centre, angle) / flip_shapes(tx, eng, shapes, horizontal)
+  set_pin(tx, eng, shape, at)         the pin to another place, the shape stays
+  controls / set_control              the yellow control points (SP-04)
+  vertices / set_vertex / insert_vertex / delete_vertex     Geometry rows (SP-05)
+  group(tx, eng, owner, shapes) / ungroup(tx, eng, group)   (SP-06)
+  reorder(tx, shapes, Z::Front | Back | Forward | Backward) (SP-07)
+  new_shape(tx, eng, owner, Basic::Rectangle | Ellipse | TextBox, a, b)
+  set_text(tx, eng, shape, text) / text_frame / set_text_frame   (TX-01, TX-03)
+  copy(doc, shapes) -> Clip / paste(tx, eng, owner, &clip, offset)
+
+Every position is on the page in drawing units (PinX of a top-level shape as the file has
+it), y up; local coordinates have their origin at the bottom left of the shape's box.  A
+gesture runs inside the caller's transaction and becomes one undo step (DM-02):
+
+  let mut tx = doc.transaction("Verschieben");
+  ops::move_shapes(&mut tx, &mut eng, &sel, [dx, dy])?;
+  let conns = glue::dependents(tx.doc(), owner, &sel);
+  glue::update(&mut tx, &mut eng, &conns)?;
+  let change = tx.commit();            after undo/redo: eng.refresh(&doc, &change.sheets())
+
+How cells are written (as Visio writes them):
+* A value the user gives goes through the rules of a user's edit (Engine::user_set): a GUARD
+  formula refuses it and the cell is left alone (the gesture goes on without it), SETATREF
+  sends it on; the formula engine recomputes what depends on it once per step.
+* A formula of the proportional form keeps its form: a subshape's PinX "Sheet.7!Width*0.25"
+  becomes "Sheet.7!Width*<new k>", a LocPinX "Width*0.5" becomes "Width*<k>", a vertex
+  "Width*1" "Width*<k>".  Anything else becomes a constant.
+* Sizes first, then the pin: the local pin follows its own formula (mostly Width*0.5), and
+  the pin goes where the frame puts the local pin.
+* The protection cells are asked per shape (a formula is evaluated): LockMoveX/Y keep that
+  part of a move away, LockWidth/LockHeight keep a side, LockAspect the proportions,
+  LockRotate leaves a shape out of a turn, LockBegin/LockEnd keep an end of a 1D shape on a
+  resize; what only makes sense unlocked is refused with EditError::Invalid (text with
+  LockTextEdit, vertices with LockVtxEdit, ungrouping with LockGroup).
+* Glued ends of a 1D shape (a Connect entry with FromCell BeginX or EndX) are not moved here:
+  glue::update routes them.
+
+The transform of a shape (MS-VSDX "Shape Transform"; geometry.rs and formula/geom.rs use the
+same): parent = Pin + R(Angle) Flip (local - LocPin), and a subshape continues through its
+groups up to the page.  Flipping a turned shape changes its angle: a mirror M times R(a)
+equals R(-a) times M, so a horizontal flip toggles FlipX and makes the angle 2φ - a + 180°
+(φ the direction of the mirror line in the parent's coordinates, 90° on the page: -a), a
+vertical flip toggles FlipY and makes it 2φ - a.
+```
+
+- **`struct Frame`**
+  where a shape is: its local coordinates to the page and its size (a box from (0, 0) to
+  (w, h) in local coordinates; the transform is rigid, flips included)
+  - `xf: Xform` -- local -> page
+  - `w: f64` -- Width
+  - `h: f64` -- Height
+
+**`impl Frame`**
+
+- **`fn from_box(b: [f64; 4]) -> Frame`**
+  an upright box on the page (x0, y0, x1, y1)
+- **`fn at(&self, p: [f64; 2]) -> [f64; 2]`**
+  a local point on the page
+- **`fn local(&self, p: [f64; 2]) -> Option<[f64; 2]>`**
+  a page point in local coordinates (None: a degenerate transform)
+- **`fn corners(&self) -> [[f64; 2]; 4]`**
+  the corners on the page: (0, 0), (w, 0), (w, h), (0, h)
+- **`fn bounds(&self) -> [f64; 4]`**
+  the upright box around the corners (x0, y0, x1, y1)
+- **`fn centre(&self) -> [f64; 2]`**
+  the middle of the box on the page
+- **`fn grip(&self, gx: i8, gy: i8) -> [f64; 2]`**
+  a grip on the page: gx -1, 0, 1 is the left edge, the middle, the right edge of the
+  local box, gy -1, 0, 1 the bottom, the middle, the top (a flipped shape has its local
+  left edge on the right)
+- **`fn drag(&self, gx: i8, gy: i8, to: [f64; 2], keep_aspect: bool) -> Frame`**
+  the frame after grip (gx, gy) is dragged to the page point `to`: the opposite edges
+  stay, sizes stop at 0; `keep_aspect` (a corner grip, SP-03) scales both sides by the
+  larger factor and keeps the opposite corner
+
+- **`fn frame(doc: &Document, shape: ShapeRef) -> Frame`**
+  where a shape is on its page (cached values, nothing recomputed)
+
+- **`fn bounds(doc: &Document, shapes: &[ShapeRef]) -> Option<[f64; 4]>`**
+  the upright box of shapes on the page: the corners of 2D shapes, the ends of 1D shapes
+
+- **`struct Locks(pub u32)`**
+  the protection cells of a shape that are set (SS-15), one bit per name of formula::LOCKS
+
+**`impl Locks`**
+
+- **`const WIDTH: u32 = 1 << 0`**
+- **`const HEIGHT: u32 = 1 << 1`**
+- **`const ASPECT: u32 = 1 << 2`**
+- **`const MOVE_X: u32 = 1 << 3`**
+- **`const MOVE_Y: u32 = 1 << 4`**
+- **`const ROTATE: u32 = 1 << 5`**
+- **`const BEGIN: u32 = 1 << 6`**
+- **`const END: u32 = 1 << 7`**
+- **`const DELETE: u32 = 1 << 8`**
+- **`const SELECT: u32 = 1 << 9`**
+- **`const FORMAT: u32 = 1 << 10`**
+- **`const TEXT_EDIT: u32 = 1 << 11`**
+- **`const VTX_EDIT: u32 = 1 << 12`**
+- **`const CROP: u32 = 1 << 13`**
+- **`const GROUP: u32 = 1 << 14`**
+- **`const CALC_WH: u32 = 1 << 15`**
+- **`fn has(self, lock: u32) -> bool`**
+  whether a lock (one of the constants) is set
+- **`fn bit(name: &str) -> u32`**
+  the bit of a lock cell's name ("LockWidth" ...; 0: not a lock cell)
+
+- **`fn locks(eng: &mut Engine, doc: &Document, shape: ShapeRef) -> Locks`**
+  the protection cells of a shape that are set, with inheritance and formulas
+
+- **`fn move_shapes(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], d: [f64; 2]) -> Result<(), EditError>`**
+  move shapes by `d` (page): a 2D shape's pin, a 1D shape's free ends (glued ones stay for
+  glue::update); a shape inside another one of the list moves with it; LockMoveX/LockMoveY
+  keep that part of the move away
+
+- **`fn set_frame(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, to: &Frame) -> Result<(), EditError>`**
+  give a shape another size and place with the same turn and flips (`to` from Frame::drag
+  of frame(doc, shape)): Width and Height first, then the pin where the frame puts the local
+  pin; a 1D shape gets its free ends (not glued, no LockBegin/LockEnd) on the frame's line
+  through the local pin.  LockWidth, LockHeight keep a side, LockAspect the proportions
+
+- **`fn scale_shapes(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], from: [f64; 4], to: [f64; 4]) -> Result<(), EditError>`**
+  scale shapes from the page box `from` into `to` (x0, y0, x1, y1; a selection's grips):
+  each shape's middle goes where the boxes map it, its sides grow by how much the boxes
+  stretch them along its own axes (upright shapes exactly, turned ones by their axes); 1D
+  shapes map their ends
+
+- **`fn rotate_shapes(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], centre: [f64; 2], angle: f64) -> Result<(), EditError>`**
+  turn shapes by `angle` (radians, counter-clockwise) about the page point `centre`: Angle
+  grows (falls for a subshape in a mirrored group), the pin turns along; 1D shapes turn
+  their free ends; LockRotate leaves a shape out
+
+- **`fn flip_shapes(tx: &mut Transaction, eng: &mut Engine, shapes: &[ShapeRef], horizontal: bool) -> Result<(), EditError>`**
+  flip shapes about the middle of their box (`horizontal`: left and right change places):
+  a horizontal flip toggles FlipX, a vertical one FlipY, a turned shape's angle changes
+  with it (see the module comment), the pin is mirrored; a 1D shape mirrors its free ends
+  and toggles FlipY (its local y axis turns over)
+
+- **`fn set_pin(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, at: [f64; 2]) -> Result<(), EditError>`**
+  move the pin of a shape (its centre of rotation) to the page point `at` without moving
+  the shape: LocPinX/LocPinY get the local point (proportional "Width\*k" when their formula
+  has that form), the pin follows
+
+- **`fn group(tx: &mut Transaction, eng: &mut Engine, owner: Owner, shapes: &[ShapeRef]) -> Result<ShapeRef, EditError>`**
+  group shapes of one parent (SP-06): a new group shape (Type Group, the style "Normal",
+  ResizeMode 0) around the shapes, at the place of the topmost of them in the z-order; the
+  box is the upright hull of the shapes in the parent's coordinates (turned shapes with their
+  turned corners, 1D shapes with their ends).  The shapes move into it in their order and
+  get Visio's formulas for a group that scales its members: PinX "Sheet.&lt;group>!Width\*k",
+  PinY "Sheet.&lt;group>!Height\*k", and for upright members (turned by a multiple of 90°) whose
+  size is a constant Width/Height "Sheet.&lt;group>!Width\*k" (ResizeMode 1 of the member: only
+  the pin); free ends of 1D members alike, glued ends keep their formulas -> the group
+
+- **`fn ungroup(tx: &mut Transaction, eng: &mut Engine, group: ShapeRef) -> Result<Vec<ShapeRef>, EditError>`**
+  take a group apart (SP-06): its members go to the group's parent at the group's place in
+  the z-order, with the group's pin, angle and flips worked into their own; formulas that
+  name the group become their values, glue to the group is let go (Formula -> value, Connect
+  entry gone), the group shape goes -> the former members.  Instances of masters and groups
+  with LockGroup are refused (Invalid)
+
+- **`enum Z`**
+  where shapes go in the z-order among their siblings (SP-07)
+  - `Front` -- on top
+  - `Back` -- below all
+  - `Forward` -- one step up (past the next shape that is not moved too)
+  - `Backward` -- one step down
+
+- **`fn reorder(tx: &mut Transaction, shapes: &[ShapeRef], z: Z) -> Result<(), EditError>`**
+  change the z-order of shapes among their siblings; shapes of several groups move within
+  their own group, moved shapes keep their order among themselves
+
+- **`enum Basic`**
+  the shapes the drawing tools make
+  - `Rectangle` -- the rectangle tool: Geometry RelMoveTo/RelLineTo around the box, style "Normal"
+  - `Ellipse` -- the ellipse tool: one Ellipse row (X Width\*0.5, Y Height\*0.5, A Width\*1, B Height\*0.5,
+    C Width\*0.5, D Height\*1), style "Normal"
+  - `TextBox` -- the text tool: a box without line and fill (style "Text Only" for line and fill,
+    "Normal" for text) whose Height follows its text: TEXTHEIGHT(TheText,Width)
+
+- **`fn new_shape(tx: &mut Transaction, eng: &mut Engine, owner: Owner, kind: Basic, a: [f64; 2], b: [f64; 2]) -> Result<ShapeRef, EditError>`**
+  a new shape of a drawing tool between the page points `a` and `b` (the dragged box), on
+  top of the owner's shapes; a box without area is refused (Invalid), except for the text
+  tool, which makes a box 1 inch wide around `a` -> the shape
+
+- **`fn set_text(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, text: Text) -> Result<(), EditError>`**
+  give a shape its own text (TX-01) and recompute what depends on it (TEXTWIDTH,
+  TEXTHEIGHT: a text box's Height, TxtHeight ...); LockTextEdit refuses (Invalid)
+
+- **`fn text_frame(doc: &Document, shape: ShapeRef) -> Frame`**
+  where a shape's text block is (TX-03): the text transform (TxtPinX/Y, TxtLocPinX/Y,
+  TxtAngle inside the shape) to the page and TxtWidth/TxtHeight; cells the shape lacks have
+  Visio's defaults (the whole box, turned 0)
+
+- **`fn set_text_frame(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, to: &Frame) -> Result<(), EditError>`**
+  move and size a shape's text block (TX-03; `to` from Frame::drag of text_frame, same
+  turn): TxtWidth and TxtHeight, then TxtPinX/Y where the frame puts the text's local pin
+  (proportional formulas keep their form); LockTextEdit refuses (Invalid)
+
+### `diagram_core/src/ops/clip.rs`
+
+Source: [`lib/diagram_core/src/ops/clip.rs`](../lib/diagram_core/src/ops/clip.rs)
+
+```text
+ops::clip -- copy and paste of shapes inside the app
+
+  copy(doc, shapes) -> Clip                     the shapes with their subshapes, as top-level
+                                                shapes (a subshape takes its groups'
+                                                transforms into its own cells)
+  paste(tx, eng, owner, &clip, offset)          the copies on a page or in a master, moved by
+                                                `offset` -> the new top-level shapes
+
+Pasted shapes get new IDs; the formulas of the pasted shapes that name a copied shape by
+Sheet.N (or by a NameU that ends in .N) name its copy, Names and NameUs that end in .<old ID>
+end in the new one, UniqueIDs are dropped, the Connect entries between copied shapes come
+along with the new IDs.  Glue to a shape outside the copy is let go: the glued cells keep
+their values as constants, the Connect entry stays behind.  A Clip holds the document's
+string handles and refers to its masters and styles by ID: it pastes into the document it
+was copied from (an app with several documents copies across them through a file format).
+```
+
+- **`struct Clip`**
+  copied shapes (copy), ready to paste
+
+**`impl Clip`**
+
+- **`fn is_empty(&self) -> bool`**
+  whether nothing was copied
+- **`fn len(&self) -> usize`**
+  the number of top-level shapes in it
+- **`fn bounds(&self) -> Option<[f64; 4]>`**
+  the box of the copied shapes on the page where they were copied
+
+- **`fn copy(doc: &Document, shapes: &[ShapeRef]) -> Clip`**
+  copy shapes with their subshapes (shapes inside another one of the list go with it); a
+  subshape becomes a top-level shape with its groups' transforms in its own pin, angle and
+  flips (1D: its ends)
+
+- **`fn paste(tx: &mut Transaction, eng: &mut Engine, owner: Owner, clip: &Clip, offset: [f64; 2]) -> Result<Vec<ShapeRef>, EditError>`**
+  paste copied shapes on a page or in a master (into the document they were copied from),
+  on top of its shapes and moved by `offset` (page) -> the new top-level shapes
+
+### `diagram_core/src/ops/points.rs`
+
+Source: [`lib/diagram_core/src/ops/points.rs`](../lib/diagram_core/src/ops/points.rs)
+
+```text
+ops::points -- control points (SP-04) and vertices (SP-05) of a shape
+
+  controls(doc, shape) -> Vec<Control>         the visible control points on the page
+  set_control(tx, eng, shape, row, at)         a control point dragged to a page point
+  vertices(doc, shape) -> Vec<Vertex>          the points of the Geometry rows on the page
+  set_vertex / insert_vertex / delete_vertex   move one, add one after a row, take one out
+
+A control point is a row of the Controls section: X and Y in local coordinates, XDyn/YDyn
+the point its rubber band starts from, XCon/YCon how it behaves ([MS-VSDX] Controls; the
+Visio constants visCtlProportional 0, visCtlLocked 1, visCtlOffsetMin 2, visCtlOffsetMid 3,
+visCtlOffsetMax 4, the same plus 5 for a hidden point), CanGlue, Prompt (the tip).  Dragging
+writes X and Y the way Visio does (seen in the local files: X "Width*0.6734" for 0,
+"Width-0.217DL" for 4, a BOUND(...) keeps its form and gets the new value as its first
+argument): proportional "Width*k" / "Height*k" for 0, the value for 2, "Width*0.5+dDL" for 3,
+"Width-dDL" for 4; a locked direction stays.  A glued control point (a Connect entry with
+FromCell Controls.<row>) is let go.
+
+Vertices are the end points of the Geometry rows that have one (MoveTo, LineTo, ArcTo,
+EllipticalArcTo, NURBSTo, PolylineTo, the spline rows, the relative rows; not Ellipse and
+InfiniteLine); the last row of a closed sub-path, which repeats its start, is not a vertex of
+its own and moves with the start.  Relative rows keep fractions of Width and Height,
+absolute rows keep the proportional form of their formulas (Visio's "Width*0.5").  Adding and
+taking out a vertex inserts or removes a row in the middle of the section
+(Transaction::insert_row / remove_row: the rows after it are renumbered, formulas follow, an
+instance's inherited section becomes its own).  LockVtxEdit refuses (Invalid).
+```
+
+- **`struct Control`**
+  a control point of a shape
+  - `row: RowKey` -- its row of the Controls section (set_control takes it back)
+  - `name: String` -- the row name (Row_1, TextPosition ...)
+  - `at: [f64; 2]` -- where it is on the page
+  - `anchor: [f64; 2]` -- where its rubber band starts on the page (XDyn, YDyn)
+  - `tip: String` -- the tip (Prompt)
+  - `can_glue: bool` -- whether it can glue to other shapes (CanGlue)
+  - `x_locked: bool` -- whether it cannot move sideways (XCon 1 or 6)
+  - `y_locked: bool` -- whether it cannot move up and down (YCon 1 or 6)
+
+- **`fn controls(doc: &Document, shape: ShapeRef) -> Vec<Control>`**
+  the visible control points of a shape on the page (hidden ones, XCon or YCon 5 to 9, left
+  out)
+
+- **`fn set_control(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, row: RowKey, at: [f64; 2]) -> Result<(), EditError>`**
+  drag a control point (its row from controls()) to the page point `at`: X and Y as Visio
+  writes them for the point's behaviour (see the module comment), the point let go when it
+  was glued
+
+- **`struct Vertex`**
+  a vertex of a shape: Geometry section (0-based index, Geometry1 is 0), row (IX) and where it
+  is on the page
+  - `section: u32` -- the Geometry section's index
+  - `row: u32` -- the row's IX
+  - `at: [f64; 2]` -- where it is on the page
+
+- **`fn vertices(doc: &Document, shape: ShapeRef) -> Vec<Vertex>`**
+  the vertices of a shape on the page, section by section (hidden sections left out)
+
+- **`fn set_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, section: u32, row: u32, at: [f64; 2]) -> Result<(), EditError>`**
+  move a vertex to the page point `at`; the start of a closed sub-path takes its closing row
+  along
+
+- **`fn insert_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, section: u32, after: u32, at: [f64; 2]) -> Result<u32, EditError>`**
+  add a vertex at the page point `at` after row `after` (on the segment to the next row):
+  a LineTo (RelLineTo among relative rows) at IX after + 1 -> its IX
+
+- **`fn delete_vertex(tx: &mut Transaction, eng: &mut Engine, shape: ShapeRef, section: u32, row: u32) -> Result<(), EditError>`**
+  take a vertex out; at the start of a sub-path the next vertex becomes the start (and the
+  closing row of a closed one goes there); a sub-path keeps at least two vertices (Invalid)
+
 ### `diagram_core/src/page.rs`
 
 Source: [`lib/diagram_core/src/page.rs`](../lib/diagram_core/src/page.rs)
@@ -54655,14 +55495,21 @@ order, with which look; the drawing itself is someone else's (diagram_view on re
 gfx, later the exports of diagram_io)
 
   render::build(&doc, page, &mut measure, &Options) -> Drawing
+  render::rebuild(&doc, &mut drawing, &mut measure, &Options, &shapes) -> bool
+                                  (JD7, rebuild.rs) the items of some top-level shapes made
+                                  anew in their place; false: shapes came, went or changed
+                                  their order (build anew)
   Drawing { width, height, scale, items, fonts, notes }   in paper inches, y up, the origin at
                                   the page's bottom left corner; items in painter's order
   drawing.query(rect, &mut out)   the items whose boxes touch a rectangle (a grid over the
                                   page: culling and hit tests without looking at every item)
+  drawing.range_of(top) / tops()  the items of a top-level shape: they lie together
   Item { shape, top, bbox, role, kind }   role: Shape | Arrow | Shadow | Text; kind: Fill { path, paint } | Stroke { path, stroke } |
                                   Text(TextItem) | Image(ImageItem)
   Paint::Solid | Hatch | Gradient, Stroke { color, width, dash, cap, join }
   Measure / Face / ApproxMeasure  (text.rs) what the text layout asks of fonts
+  measure_text(&mut measure, &face, size, text, max_width)   (text.rs) a text's size as the
+                                  layout wraps it (the formula engine's TEXTWIDTH, JD7)
   ThemeInfo                       (theme.rs) colours and fonts of a theme part
   style::{dash, fill_pattern, arrow, PALETTE}   the tables behind lines and fills
 
@@ -54707,6 +55554,12 @@ inches (geometry times PageScale / DrawingScale).
   the items whose boxes touch `rect` (x0, y0, x1, y1, paper inches), ascending
 - **`fn bounds(&self) -> Option<[f64; 4]>`**
   the box of all items (None: nothing to draw)
+- **`fn range_of(&self, top: ShapeRef) -> Option<Range<usize>>`**
+  the items of a top-level shape (they lie together in painter's order; empty when it
+  draws nothing); None: not a top-level shape of this drawing
+- **`fn tops(&self) -> impl Iterator<Item = (ShapeRef, Range<usize>)> + '_`**
+  the top-level shapes in painter's order (those of the background pages first) with
+  their items
 
 - **`enum Note`**
   what the viewer does not draw (yet), or draws only roughly
@@ -54813,9 +55666,14 @@ looking at all of them (culling for the drawing side, hit tests for JD7)
                                   every cell its box touches, an item over more than 1024
                                   cells in a list that every query looks at
   grid.query(rect, &mut out)      the items touching rect, ascending (painter's order)
+  grid.replace(&changes, &items)  (JD7) ranges of items made anew (render::rebuild): the
+                                  grid keeps its cells, the items after a range that grew or
+                                  shrank are renumbered
 
 Building is linear in the items times their cells (bounded per item); a query costs the
 cells of its rectangle plus what lies in them.  Nothing is quadratic in the number of items.
+A cell's list need not be sorted (a query sorts what it found).  An item outside the bounds
+the grid was built for lies in the cells at the edge, where a query outside looks too.
 ```
 
 - **`struct Grid`**
@@ -54823,7 +55681,35 @@ cells of its rectangle plus what lies in them.  Nothing is quadratic in the numb
 **`impl Grid`**
 
 - **`fn build(items: &[Item], bounds: [f64; 4]) -> Grid`**
+- **`fn replace(&mut self, changes: &[(usize, usize, usize)], items: &[Item])`**
+  ranges of items made anew: (first item, old count, new count) each, ascending and apart,
+  in the old numbering; `items` the list as it is now
 - **`fn query(&self, rect: [f64; 4], out: &mut Vec<u32>)`**
+
+### `diagram_core/src/render/rebuild.rs`
+
+Source: [`lib/diagram_core/src/render/rebuild.rs`](../lib/diagram_core/src/render/rebuild.rs)
+
+```text
+rebuild -- the items of some top-level shapes made anew in their place (JD7: a shape that
+moves, grows or changes its look while it is dragged), the rest of the drawing kept
+
+  render::rebuild(&doc, &mut drawing, &mut measure, &opts, &shapes) -> bool
+
+A top-level shape's items lie together in painter's order (build draws a top-level shape
+with everything below it before the next one), so making one anew replaces a range of the
+items: the items after it move when the count changes, the grid follows (Grid::replace),
+the notes and the font families are added up again.  `shapes` may name subshapes: their
+top-level shape is made anew; shapes of pages the drawing does not show are passed over.
+The result is the list build would make of the document now, as long as only those shapes
+changed.  false (nothing changed in the drawing): a shape came or went, the top-level order
+changed, the page's size or scale changed, a named shape of the page is not in the drawing
+-- the caller builds anew.  Changes the shapes do not show (the page's layers, styles,
+masters, themes) are the caller's to know: they need build.
+```
+
+- **`fn rebuild(doc: &Document, d: &mut Drawing, measure: &mut dyn Measure, opts: &Options, shapes: &[ShapeRef]) -> bool`**
+  the items of the top-level shapes of `shapes` made anew in `d` -> false: build anew
 
 ### `diagram_core/src/render/style.rs`
 
@@ -54902,6 +55788,10 @@ wrapping, alignment, the text block's transform and margins
   TextItem { xform, runs }        lines of runs in the text frame (paper inches, y up) and
                                   the frame's map to the page; decorations and the text
                                   background come as their own stroke and fill items
+  measure_text(&mut m, &face, size, text, max_width) -> (w, h)   (JD7) a text in one format
+                                  wrapped as a shape's text wraps: the widest line and the
+                                  lines' height (the formula engine's TEXTWIDTH/TEXTHEIGHT
+                                  through diagram_view's Metrics)
 
 The text comes as the file keeps it (Text: characters between cp, pp, tp and fld marks,
 JD3): a cp mark selects the Character row for what follows, a pp mark the Paragraph row; a
@@ -54955,6 +55845,13 @@ the way VerticalAlign says.
   - `spacing: f64` -- Letterspace: added after every character (inches)
   - `width: f64` -- the measured advance with scale and spacing (inches)
 
+- **`fn measure_text(m: &mut dyn Measure, face: &Face, size: f64, text: &str, max_width: Option<f64>) -> (f64, f64)`**
+  the size of a text in one format as a shape's text block sets it: (the widest line, the
+  height of all lines), inches.  Paragraphs end at LF (the text's last LF is Visio's end mark),
+  U+2028 breaks a line, lines wrap at `max_width` the way the layout wraps them (at spaces and
+  after hyphens, a word wider than the line at characters), tabs go to stops 0.5 in apart;
+  a line is 120 % of the size high (SpLine's default).  An empty text is one empty line.
+
 ### `diagram_core/src/render/theme.rs`
 
 Source: [`lib/diagram_core/src/render/theme.rs`](../lib/diagram_core/src/render/theme.rs)
@@ -55006,6 +55903,101 @@ attributes, nothing else; anything it does not understand is skipped.
 
 - **`fn no_theme_color(index: u32) -> u32`**
   QuickStyle colours without a theme
+
+### `diagram_core/src/route.rs`
+
+Source: [`lib/diagram_core/src/route.rs`](../lib/diagram_core/src/route.rs)
+
+```text
+route -- the ways of connectors on the page: right angles around obstacles, straight, curved
+(CN-04, CN-05)
+
+  Port { at, dir, own }              an end of a route: the point; the direction the route
+                                     leaves it in (outward, any length; None: any); the box
+                                     of the shape the end is glued to (None: a free end)
+  Opts { clearance, bend }           the distance kept to obstacles; what a bend costs, as a
+                                     length (fewer bends against a longer way)
+  orthogonal(a, b, &obstacles, &opts) -> points   a right-angle way from a.at to b.at
+  best(&a_ports, &b_ports, &obstacles, &opts) -> (i, j, points)   the cheapest way between
+                                     any two of the ports (a dynamic end offers one or two
+                                     per side)
+  straight(a, b) -> points           the line between the two ends
+  cost(&points, &opts) / bends(&points) / length(&points)
+  spline_knots(n) -> (degree, knots) a clamped uniform B-spline over n control points: the
+                                     curved style takes the right-angle way's corners as the
+                                     control polygon of one NURBS (glue.rs writes the row)
+  hits_box(p, q, &b)                 whether a segment runs through a box's inside
+
+Everything is in page coordinates (drawing units, y up); boxes are [x0, y0, x1, y1].
+
+How orthogonal finds its way (deterministic, no state between calls):
+1. Obstacles grow by the clearance.  A box that holds one of the two ends (a container, the
+   group around a glued subshape) is no obstacle; the boxes of the glued shapes (Port::own)
+   are, unless one holds the other end inside it.
+   Glued shapes closer than twice the clearance keep half their distance instead.
+2. Each end leaves its own box: with a direction along it (snapped to the nearer axis) up to
+   the grown box, without one in each of the four axis directions; a free end starts where
+   it is, in any direction.  A direction that points into the own shape counts as none.
+   best() offers several ports for an end: all their exits start (or end) one search.
+3. A sparse grid: the x and y lines of the grown boxes, of the exit points and the lines
+   halfway between the two ends' exits (so a Z bends in the middle, as Visio's do).  Grid
+   points inside a grown box and grid edges through one are blocked; the lines of a grown box
+   itself stay open, so a way keeps exactly the clearance.
+4. A* over (grid point, direction of travel) with the cost length + bend * bends; the
+   estimate is the Manhattan distance plus the fewest bends any way to a goal needs (from
+   the direction of travel and the one the goal wants), so the way found is the cheapest.
+   Arriving at the far end against its direction costs a bend, turning back two.
+5. Only the obstacles near the two ends take part at first (a window around them); when the
+   way crosses one left out, the window grows to hold the way and the search runs again (the
+   third round takes all).  A way that cannot be found (an end inside an obstacle) comes from
+   the glued boxes alone, else from a plain L.
+6. Points on one line merge: the result has the two ends and the corners only; the middle
+   piece of a Z moves halfway between the pieces around it where that stays clear.
+```
+
+- **`struct Port`**
+  an end of a route
+  - `at: [f64; 2]` -- where the route ends (page coordinates)
+  - `dir: Option<[f64; 2]>` -- the direction it leaves the end in (outward; None: any direction)
+  - `own: Option<[f64; 4]>` -- the box of the shape the end is glued to: the way does not cross it (None: free)
+
+**`impl Port`**
+
+- **`fn free(at: [f64; 2]) -> Port`**
+  a free end: any direction, no shape
+
+- **`struct Opts`**
+  what a route keeps to
+  - `clearance: f64` -- the distance to obstacles and the length of the first and last piece (drawing units)
+  - `bend: f64` -- the cost of a bend, as a length
+
+- **`fn hits_box(p: [f64; 2], q: [f64; 2], b: &[f64; 4]) -> bool`**
+  whether the segment p-q runs through the inside of box b (touching its edge is not)
+
+- **`fn length(points: &[[f64; 2]]) -> f64`**
+  the length of a polyline
+
+- **`fn bends(points: &[[f64; 2]]) -> usize`**
+  the number of bends of a polyline (corners whose two pieces are not on one line)
+
+- **`fn cost(points: &[[f64; 2]], opts: &Opts) -> f64`**
+  length + bends \* opts.bend
+
+- **`fn straight(a: &Port, b: &Port) -> Vec<[f64; 2]>`**
+  the straight route: the two ends
+
+- **`fn spline_knots(n: usize) -> (usize, Vec<f64>)`**
+  a clamped uniform B-spline over n control points (n >= 2): its degree (at most 3) and its
+  n + degree + 1 knots from 0 to 1
+
+- **`fn orthogonal(a: Port, b: Port, obstacles: &[[f64; 4]], opts: &Opts) -> Vec<[f64; 2]>`**
+  a right-angle route from a.at to b.at around the obstacles (boxes in page coordinates):
+  the two ends and the corners
+
+- **`fn best(a: &[Port], b: &[Port], obstacles: &[[f64; 4]], opts: &Opts) -> (usize, usize, Vec<[f64; 2]>)`**
+  the cheapest right-angle route from any of the ports `a` to any of the ports `b` (one
+  search: a dynamic end offers a port per side) -> the indices of the two ports and the
+  route; both lists must not be empty
 
 ### `diagram_core/src/shape.rs`
 
@@ -56899,11 +57891,15 @@ diagram_view -- draws diagram pages (the display list of diagram_core) on render
                                    substituted by class with a width factor (TX-09)
   PageView::new(&doc, page, &mut fonts, &opts)   a page as a render2d scene (made without a
                                    device) plus gradients and pictures
+  view.update(&doc, &mut fonts, &shapes) -> Option<[f64; 4]>   (JD7) edited shapes made anew
+                                   in the list and the scene, the box of what changed
   view.draw(dc, sf, r, &cam)       on the CPU: render2d's CPU path, gfx in between
   view.render(w, h) -> Surface     the whole page as an XRGB image (tests, exports, thumbnails)
   view.fit(size, margin) -> Camera
   image::{bytes, decode, base64}   Foreign shapes' pictures: PNG and JPEG decoded, EMF / WMF
                                    and the rest as placeholders
+  Metrics::new(&fonts)             (JD7) the formula engine's TextMetrics (TEXTWIDTH,
+                                   TEXTHEIGHT) measured as the page views draw
 
 Why a crate of its own (JD4): diagram_core holds the model and the display list without any
 dependency, so that diagram_io's exports (SVG, PDF, JD12) and JD7's hit tests use the same
@@ -56931,6 +57927,8 @@ fonts -- the fonts a diagram's texts are drawn with, and the substitution of mis
                                            installed font the app found)
   set.set_source(Box<dyn FontSource>)     asked once per family the set does not know (the
                                            app looks at the installed fonts there)
+  set.clone()                             (JD7) another handle on the same set: what one adds
+                                           or finds, all see (Metrics keeps one)
   class_of(family) -> Class               serif, monospaced or sans by the family's name
   SAMPLE_WIDTHS                            how wide common fonts set a sample line (em)
 
@@ -56939,6 +57937,10 @@ the class is missing too), stretched by the width factor that makes the sample l
 as in the missing font (Calibri set in Inter: about 0.85), so lines wrap about where Visio
 wraps them.  An italic without its own face leans 0.2 radians (synthetic), a bold without its
 own face stays regular.  Only fonts the app hands over are used; the crate embeds none.
+
+The set lives behind a shared handle (Rc<RefCell<..>>): the page views and the formula
+engine's Metrics (which measures through `&self`) pick from the same faces and ask the
+source once for all of them.  One thread, as everything of a page view.
 ```
 
 - **`enum Class`**
@@ -56953,7 +57955,7 @@ own face stays regular.  Only fonts the app hands over are used; the crate embed
     the bytes and face index of `family` in this style, if installed
 
 - **`struct FontSet`**
-  the fonts a page view may use
+  the fonts a page view may use; a clone is another handle on the same set
 
 **`impl FontSet`**
 
@@ -57022,6 +58024,38 @@ MAX_SIDE: u32 = 8192
 - **`fn base64(s: &[u8]) -> Option<Vec<u8>>`**
   base64 with padding; whitespace is skipped; None: a character outside the alphabet
 
+### `diagram_view/src/measure.rs`
+
+Source: [`lib/diagram_view/src/measure.rs`](../lib/diagram_view/src/measure.rs)
+
+```text
+measure -- text measured with the fonts it is drawn with: the display list's Measure of a
+page view, and Metrics, the formula engine's TextMetrics (TEXTWIDTH, TEXTHEIGHT; JD7)
+
+  Metrics::new(&fonts)             measures with a handle on the app's FontSet (shared: faces
+                                   the set finds later count too); Engine::with_metrics(Rc::new(m))
+  metrics.measure(text, font, size, max_width) -> (w, h)   inches, through
+                                   render::measure_text: lines wrapped as a shape's text wraps
+
+Both measure alike: a family resolves through FontSet::pick (its own face, else the face of
+its class), a substitute is stretched by the sample line's width factor (fonts.rs), the
+advance comes from render2d's layout of the line (shaped: kerning, ligatures), in em.  So
+TEXTWIDTH(TheText) is the width the page view draws the same text with.  A family named
+nowhere ("" -- a Font cell the engine cannot name) is Calibri, the layout's default.  The
+faces resolved and the widths measured are kept (at most WIDTHS_MAX widths).
+```
+
+- **`struct Metrics`**
+  real text sizes for the formula engine (TEXTWIDTH, TEXTHEIGHT), measured as a page view
+  draws: Engine::with_metrics(Rc::new(Metrics::new(&fonts)))
+
+**`impl Metrics`**
+
+- **`fn new(fonts: &FontSet) -> Metrics`**
+  measuring with the fonts of `fonts` (a handle on the same set)
+- **`fn substitutions(&self) -> Vec<String>`**
+  the families measured with a substitute so far
+
 ### `diagram_view/src/view.rs`
 
 Source: [`lib/diagram_view/src/view.rs`](../lib/diagram_view/src/view.rs)
@@ -57032,17 +58066,35 @@ view -- a page of a diagram as a render2d scene plus what the scene cannot hold
   PageView::new(&doc, page, &mut fonts, &opts)   the display list (diagram_core::render,
                                    texts measured with the fonts drawn), the scene made of
                                    it, pictures decoded
+  view.update(&doc, &mut fonts, &shapes) -> Option<[f64; 4]>   (JD7) the named shapes (their
+                                   top-level shapes) made anew in the list and the scene; the
+                                   box of what changed, old and new place (paper inches;
+                                   a zero box: nothing drawn either way); None: shapes came,
+                                   went or changed their order -- the page was built anew
   view.draw(dc, sf, r, &cam)       the page on the CPU into the rectangle r of a surface
                                    (render2d's CPU path; gradients and pictures in between)
   view.render(w, h) -> Surface     the page fitted into w x h pixels on its colour (XRGB)
   view.fit(size, margin_px) -> Camera   the camera showing the whole page
-  view.drawing() / substitutions() / scene()
+  view.drawing() / substitutions() / refused() / scene()
 
 The scene: render2d layers in painter's order.  A run of items render2d can draw (solid and
-hatched fills, lines with dashes, caps and joins, texts) lies on one layer; a gradient fill or
-a picture ends the run and is drawn by gfx between two layers (direct.rs).  On the CPU each
-layer is drawn on its own while the others are hidden, so the order holds.  On a GPU
-(Scene::attach, the app's choice) the same scene shows everything but those items.
+hatched fills, lines with dashes, caps and joins, texts) lies on layers of at most
+LAYER_ITEMS items each; a gradient fill or a picture ends the run and is drawn by gfx between
+two layers (direct.rs).  On the CPU the layers between two such items are drawn in one go
+(render2d keeps the painter's order across layers) while the others are hidden, so the order
+holds; without such items every layer stays shown.  On a GPU (Scene::attach, the app's
+choice) the same scene shows everything but those items.
+
+An update (JD7): render::rebuild replaces the items of the named top-level shapes, then the
+scene follows, the cheapest way that keeps the order: (1) each item keeps its kind and its
+number of entities -> every entity updated in place (render2d keeps an entity's place);
+(2) the shape's items lie on one layer and none is drawn by gfx -> its entities updated in
+order, the surplus removed, more added at the layer's end when the shape is the layer's last;
+(3) else the layers holding the shape's items are made anew from their items, with orders
+between the neighbours' (Layer::order, GAP apart, renumbered when the room runs out).  The
+fonts, the measured widths, the styles and the scene's glyph outlines stay across updates and
+across a page built anew.  Measured (diagramiotest group editview): 1000 shapes, one moved:
+update well under a millisecond, the drawing of the page dominates.
 ```
 
 ```rust
@@ -57063,11 +58115,20 @@ SYNTHETIC_ITALIC: f64 = 0.2
   the font families drawn with a substitute (TX-09: shown to the user)
 - **`fn refused(&self) -> u32`**
   items render2d did not take (geometry it calls invalid)
+- **`fn update(&mut self, doc: &Document, fonts: &mut FontSet, shapes: &[ShapeRef]) -> Option<[f64; 4]>`**
+  the named shapes made anew (their top-level shapes; subshapes name their group, shapes
+  of other pages are passed over): the box of what changed (old and new, paper inches,
+  line widths and shadows included; a zero box: they draw nothing either way); None:
+  shapes came, went or changed their order, or the page's size changed -- the page was
+  built anew.  Changes the shapes do not show (the page's layers, styles, masters,
+  themes) need PageView::new
 - **`fn fit(&self, size: (u32, u32), margin: f64) -> Camera`**
   the camera that shows the whole page in a target of `size`, `margin` pixels around it
 - **`fn draw(&mut self, dc: &mut Dc, sf: &mut Surface, r: [i32; 4], cam: &Camera)`**
   the page on the CPU into the rectangle r (x, y, w, h relative to dc's origin) of sf,
-  over what is there (the app paints the page's paper first)
+  over what is there (the app paints the page's paper first).  Only the part of r that
+  dc's clip keeps is drawn, with a camera on that part alone (render2d culls by its view):
+  a changed box drawn again (update's area) costs what lies there
 - **`fn render(&mut self, w: u32, h: u32) -> Surface`**
   the page fitted into w x h pixels (a margin of 2 % around it) on the canvas grey, the
   page in its colour: an XRGB surface

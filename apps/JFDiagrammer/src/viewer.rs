@@ -315,7 +315,7 @@ pub(crate) fn command_line_file() -> Option<String> {
             skip = false;
             continue;
         }
-        if plat::VALUE_OPTS.contains(&a.as_str()) || a == "--shell-preview" || a == "--config" {
+        if plat::VALUE_OPTS.contains(&a.as_str()) || a == "--shell-preview" || a == "--config" || a == "--save-dir" {
             skip = true;
             continue;
         }

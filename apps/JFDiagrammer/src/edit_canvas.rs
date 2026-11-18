@@ -177,10 +177,15 @@ pub(crate) fn model(app: &mut Diagrammer) {
     m.ver = o.serial.wrapping_mul(7919).wrapping_add(o.ed.rev).wrapping_add(k as u32 * 104_729);
     // boxes of what is drawn, per top-level shape
     let boxes: BTreeMap<ShapeRef, [f64; 4]> = hit::top_boxes(d).into_iter().collect();
-    // the groups whose children are selectable now: those of the selection
+    // the groups whose children are selectable now: the selected groups (a second click picks a
+    // child) and the groups around a selected child
     let mut open: Vec<ShapeRef> = Vec::new();
     for &sk in &sel {
-        let mut cur = doc.shape(shape_of(page, sk)).and_then(|s| s.parent());
+        let r = shape_of(page, sk);
+        if doc.shape(r).is_some_and(|s| s.header().kind == ShapeKind::Group) {
+            open.push(r);
+        }
+        let mut cur = doc.shape(r).and_then(|s| s.parent());
         while let Some(p) = cur {
             open.push(p);
             cur = doc.shape(p).and_then(|s| s.parent());
@@ -266,7 +271,9 @@ pub(crate) fn model(app: &mut Diagrammer) {
         add(r, 0, &mut m, &mut o.ed.eng);
     }
     // the children of the open groups (sub-selection)
-    for g in open.iter().rev() {
+    open.sort();
+    open.dedup();
+    for g in open.iter() {
         let kids: Vec<ShapeRef> = doc.shape(*g).map(|s| s.children().collect()).unwrap_or_default();
         for c in kids {
             add(c, key_of(*g), &mut m, &mut o.ed.eng);
@@ -784,7 +791,7 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
                     Ok(s) => {
                         select = Some(alloc::vec![key_of(s)]);
                         if tool == SE_TEXT {
-                            app.text_req = Some((key_of(s), None));
+                            app.text_req = Some((key_of(s), None, true));
                         }
                         Ok(())
                     }
@@ -793,7 +800,7 @@ pub(crate) fn apply(app: &mut Diagrammer, ui: &mut Ui, ev: SeEv) {
             }
         }
         SeEv::Text { key, ch } => {
-            app.text_req = Some((key, ch));
+            app.text_req = Some((key, ch, false));
             Ok(())
         }
         SeEv::Context { .. } => Ok(()),
@@ -825,12 +832,26 @@ fn app_frame_matches(doc: &Document, geo: &Geo, s: ShapeRef, b: &SeBox) -> bool 
 }
 
 /// connectors glued to these shapes (and the shapes themselves when they are connectors)
-/// follow: routed again
+/// follow: routed again; so are the dynamic connectors whose way now runs through one of them
+/// (an obstacle moved into it, Visio's)
 pub(crate) fn follow(tx: &mut diagram_core::Transaction, eng: &mut diagram_core::formula::Engine, owner: Owner, shapes: &[ShapeRef]) -> Result<(), diagram_core::EditError> {
-    let mut deps = glue::dependents(tx.doc(), owner, shapes);
+    let doc = tx.doc();
+    let mut deps = glue::dependents(doc, owner, shapes);
     for &s in shapes {
-        if glue::is_one_d(tx.doc(), s) && !deps.contains(&s) {
+        if glue::is_one_d(doc, s) && !deps.contains(&s) {
             deps.push(s);
+        }
+    }
+    let boxes: Vec<[f64; 4]> = shapes.iter().filter(|&&s| !glue::is_one_d(doc, s)).map(|&s| ops::frame(doc, s).bounds()).collect();
+    if !boxes.is_empty() {
+        for c in doc.top_shapes(owner) {
+            if deps.contains(&c) || shapes.contains(&c) || !glue::is_connector(doc, c) {
+                continue;
+            }
+            let way = glue::path(doc, c);
+            if way.windows(2).any(|w| boxes.iter().any(|b| diagram_core::route::hits_box(w[0], w[1], b))) {
+                deps.push(c);
+            }
         }
     }
     if deps.is_empty() {
@@ -861,8 +882,9 @@ pub(crate) fn delete(o: &mut crate::viewer::Opened, owner: Owner, shapes: &[Shap
 }
 
 /// the measures of the single selection for the status bar and Größe und Position: x, y (the
-/// pin), width, height (drawing units in the page's unit), angle (degrees)
-pub(crate) fn measures(app: &Diagrammer) -> Option<[f64; 5]> {
+/// pin), width, height (drawing units in the page's unit), angle (degrees), whether the pin is
+/// in the middle (1) or elsewhere (0)
+pub(crate) fn measures(app: &Diagrammer) -> Option<[f64; 6]> {
     let o = app.opened.as_ref()?;
     let page = app.model.page?;
     if app.se.sel.len() != 1 {
@@ -878,5 +900,7 @@ pub(crate) fn measures(app: &Diagrammer) -> Option<[f64; 5]> {
     let angle = num(doc, sh, "Angle").unwrap_or(0.0).to_degrees();
     let angle = if angle.abs() < 1e-9 { 0.0 } else { angle };
     // a connector's box may run backwards (Width = EndX - BeginX): the sizes as lengths
-    Some([pin[0] * k, pin[1] * k, f.w.abs() * k, f.h.abs() * k, angle])
+    let lp = [num(doc, sh, "LocPinX").unwrap_or(f.w * 0.5), num(doc, sh, "LocPinY").unwrap_or(f.h * 0.5)];
+    let centred = (lp[0] - f.w * 0.5).abs() < 1e-9 && (lp[1] - f.h * 0.5).abs() < 1e-9;
+    Some([pin[0] * k, pin[1] * k, f.w.abs() * k, f.h.abs() * k, angle, if centred { 1.0 } else { 0.0 }])
 }
