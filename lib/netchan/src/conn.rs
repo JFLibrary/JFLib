@@ -60,7 +60,9 @@ pub struct Stats {
     pub stale: u64,
     /// packets dropped for the rate limits or their size
     pub dropped: u64,
+    /// bytes of DATA packets sent (headers included)
     pub bytes_sent: u64,
+    /// bytes of DATA packets taken in (headers included)
     pub bytes_received: u64,
     /// the smoothed round-trip time (0 before the first sample)
     pub rtt_ms: f32,

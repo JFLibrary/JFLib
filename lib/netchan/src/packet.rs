@@ -66,12 +66,19 @@ pub const BYE_SHUTDOWN: u8 = 5;
 /// one packet, borrowed from the bytes it was read from
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Packet<'a> {
+    /// a client asks: the app's protocol id, the nonce of this attempt
     Connect { protocol: u32, nonce: u64 },
+    /// the server's cookie for a UDP client: the time (seconds) and the MAC over address, nonce, time
     Challenge { nonce: u64, time: u32, mac: [u8; 16] },
+    /// the client returns the cookie
     Response { protocol: u32, nonce: u64, time: u32, mac: [u8; 16] },
+    /// the server took the client: the token of its packets, the largest payload it takes
     Accept { nonce: u64, token: u32, max_payload: u16 },
+    /// the server refused the client (DENY_*)
     Deny { nonce: u64, reason: u8 },
+    /// a message (empty: a keep-alive) with its number, the newest number received and the bits of the 32 before
     Data { token: u32, seq: u16, ack: u16, bits: u32, payload: &'a [u8] },
+    /// one side ends the connection (BYE_*)
     Disconnect { token: u32, reason: u8 },
 }
 

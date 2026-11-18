@@ -22,6 +22,7 @@ use crate::Error;
 pub enum WsState {
     /// connecting (TCP, TLS, the upgrade)
     Connecting,
+    /// connected: messages go both ways
     Open,
     /// close() was called; the end has not come yet
     Closing,
@@ -32,7 +33,9 @@ pub enum WsState {
 /// a whole message
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum WsMessage {
+    /// a text message
     Text(String),
+    /// a binary message
     Binary(Vec<u8>),
 }
 

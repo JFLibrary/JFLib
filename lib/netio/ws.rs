@@ -125,6 +125,7 @@ impl Default for Limits {
 pub enum WsError {
     /// not a ws:// or wss:// URL, or wss:// without a connector
     Url(String),
+    /// the network (connect, read, write)
     Net(NetError),
     /// the TLS layer refused (certificate, handshake)
     Tls(String),
@@ -166,7 +167,9 @@ impl From<NetError> for WsError {
 /// a whole message
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message {
+    /// a text message (UTF-8, checked)
     Text(String),
+    /// a binary message
     Binary(Vec<u8>),
 }
 
@@ -192,7 +195,9 @@ pub fn close_code_valid(code: u16) -> bool {
 /// unmasked frames from servers
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Role {
+    /// reads a client's frames: masked
     Server,
+    /// reads a server's frames: unmasked
     Client,
 }
 
@@ -201,7 +206,9 @@ pub enum Role {
 pub enum Frame {
     /// a whole message (its fragments put together)
     Message(Message),
+    /// a ping with its payload (at most 125 bytes)
     Ping(Vec<u8>),
+    /// a pong with its payload
     Pong(Vec<u8>),
     /// a close frame: its code and reason (None: it had no code)
     Close(Option<(u16, String)>),
@@ -925,6 +932,7 @@ pub fn accept_key(key: &str) -> String {
 /// how a client connects
 #[derive(Clone)]
 pub struct ClientConfig {
+    /// the connection's limits (handshake_ms for the whole handshake)
     pub limits: Limits,
     /// the TCP connection within this long (the handshake has limits.handshake_ms in all)
     pub connect_ms: u32,

@@ -46,6 +46,7 @@ pub const WS_MAX_SOCKETS: usize = 64;
 pub enum WsState {
     /// the browser connects (handshake on the way)
     Connecting,
+    /// connected: messages go both ways
     Open,
     /// close() was called, or a limit closed it; the browser's close has not come yet
     Closing,
@@ -56,7 +57,9 @@ pub enum WsState {
 /// a whole message from the server
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum WsMessage {
+    /// a text message
     Text(String),
+    /// a binary message
     Binary(Vec<u8>),
 }
 

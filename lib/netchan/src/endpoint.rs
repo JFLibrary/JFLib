@@ -587,6 +587,7 @@ impl Default for ClientConfig {
 pub enum State {
     /// the handshake is on its way
     Connecting,
+    /// the server took the connection
     Connected,
     /// ended, and why
     Disconnected(Reason),

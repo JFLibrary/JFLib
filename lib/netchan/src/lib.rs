@@ -29,14 +29,20 @@ extern crate alloc;
 
 use alloc::string::String;
 
+/// a game client's channel to its server (UDP or WebSocket, never blocking)
 pub mod client;
+/// one connection's sequence numbers, acks, keep-alives and round-trip time, without I/O
 pub mod conn;
+/// the server's and the client's protocol without I/O (the caller's clock)
 pub mod endpoint;
+/// the wire format
 pub mod packet;
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
 mod reap;
 #[cfg(any(windows, target_os = "linux", target_vendor = "apple"))]
+/// a game server's channels: UDP and WebSocket clients in one table
 pub mod server;
+/// one WebSocket client type for every target
 pub mod ws;
 
 pub use client::{Client, Endpoint};
