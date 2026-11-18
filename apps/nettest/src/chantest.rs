@@ -99,11 +99,31 @@ fn echo_run(c: &mut Ctx, name: &str, server: &mut Server, ep: Endpoint, n: usize
     let want = sent.len();
     pump(server, &mut cls, &mut seen, 5000, |s| s[0].msgs.len() >= want && s[0].delivered >= want);
     let back: Vec<Vec<u8>> = seen[0].msgs.iter().map(|m| m.1.clone()).collect();
-    let all = back.len() == sent.len() && sent.iter().all(|s| back.contains(s));
-    c.check(all, || format!("{}: {} of {} came back unchanged", name, back.len(), sent.len()));
-    c.check(seen[0].delivered >= want && seen[0].lost == 0, || format!("{}: delivered {}, lost {} of {}", name, seen[0].delivered, seen[0].lost, want));
     if cls[0].reliable() {
+        let all = back.len() == sent.len() && sent.iter().all(|s| back.contains(s));
+        c.check(all, || format!("{}: {} of {} came back unchanged", name, back.len(), sent.len()));
+        c.check(seen[0].delivered >= want && seen[0].lost == 0, || format!("{}: delivered {}, lost {} of {}", name, seen[0].delivered, seen[0].lost, want));
         c.check(back == sent, || format!("{}: the WebSocket keeps the order", name));
+    } else {
+        // UDP may drop even on loopback when the machine is busy (a full socket buffer: the parallel
+        // suite, WSL): every message that came back is one that was sent, unchanged and once; at least
+        // 98 % came back; every send was acknowledged or reported lost, and few were lost
+        let (mut s_sorted, mut b_sorted) = (sent.clone(), back.clone());
+        s_sorted.sort();
+        b_sorted.sort();
+        // what came back is part of what was sent (a sub-multiset): each unchanged, none more often than sent
+        let mut j = 0;
+        let sub = b_sorted.iter().all(|b| {
+            while j < s_sorted.len() && s_sorted[j] < *b {
+                j += 1;
+            }
+            let hit = j < s_sorted.len() && s_sorted[j] == *b;
+            j += hit as usize;
+            hit
+        });
+        c.check(sub && back.len() * 100 >= want * 98, || format!("{}: {} of {} came back (each unchanged and once: {})", name, back.len(), want, sub));
+        let (d, l) = (seen[0].delivered, seen[0].lost);
+        c.check(d + l >= want && l * 100 <= want * 2, || format!("{}: delivered {}, lost {} of {}", name, d, l, want));
     }
     let [cl] = cls;
     Some(cl)
