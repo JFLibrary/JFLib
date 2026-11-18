@@ -589,7 +589,7 @@ impl Change {
 
 /// edits that become one undo step (Document::transaction)
 pub struct Transaction<'d> {
-    doc: &'d mut Document,
+    pub(crate) doc: &'d mut Document,
     label: String,
     ops: Vec<Op>,
     open: bool,
@@ -646,7 +646,7 @@ impl<'d> Transaction<'d> {
     /// take every edit of the transaction back
     pub fn rollback(self) {}
 
-    fn run(&mut self, op: Op) -> Result<(), EditError> {
+    pub(crate) fn run(&mut self, op: Op) -> Result<(), EditError> {
         match op.exec(self.doc) {
             Ok(inv) => {
                 self.ops.push(inv);
@@ -657,7 +657,7 @@ impl<'d> Transaction<'d> {
     }
 
     // run an edit made of several steps: on an error its steps so far are taken back
-    fn atomic<T>(&mut self, f: impl FnOnce(&mut Self) -> Result<T, EditError>) -> Result<T, EditError> {
+    pub(crate) fn atomic<T>(&mut self, f: impl FnOnce(&mut Self) -> Result<T, EditError>) -> Result<T, EditError> {
         let mark = self.ops.len();
         let r = f(self);
         if r.is_err() && self.ops.len() > mark {
@@ -1591,5 +1591,241 @@ impl<'d> Transaction<'d> {
             return Ok(());
         }
         self.run(Op::Settings { settings: Box::new(s) })
+    }
+}
+
+// ---- rows in the middle of a section (JD7: vertices of a shape, SP-05)
+//
+// Indexed rows are numbered without gaps from 1 (Geometry) or 0 (every other indexed
+// section), and formulas name them by that number (Geometry1.X3 is row IX 3, Connections.X1
+// row IX 0).  So a row put in or taken out in the middle renumbers the rows after it, and the
+// sheet's formulas follow: their own cells, and the formulas they inherit (those get a cell of
+// the sheet's own with the new text).  A reference to a row taken out becomes the value it had
+// (Visio would write #REF!; a value keeps the shape drawable).  A section the sheet inherits
+// from its master shape is made the sheet's own first: every row it really has, with every
+// cell as the sheet sees it (formula and value), and Del="1" marks for the master's rows it no
+// longer has -- Visio does the same when the vertices of an instance are edited, since rows
+// are matched with the master's by IX and a renumbered row would otherwise mix its cells with
+// another master row's.  Formulas of the master that name other shapes by Sheet.N (mapped to
+// the instance's subshapes while inherited) are copied as written.  Changed formulas keep their
+// old values (stale) until the engine recomputes the sheet (Engine::recalc with it; ops does).
+impl Transaction<'_> {
+    /// insert a row of the sheet's own into an indexed section at `at` (an Index; past the
+    /// last row: after it): the rows from there on move one down (IX + 1) and the references
+    /// to them in the sheet's formulas follow; an inherited section is made the sheet's own
+    /// first (see above) -> the key of the new row.  `kind` is the row type (Geometry:
+    /// "LineTo" ...)
+    pub fn insert_row(&mut self, sheet: SheetRef, sk: SecKey, at: RowKey, kind: Option<&str>) -> Result<RowKey, EditError> {
+        let RowKey::Index(want) = at else { return Err(EditError::Invalid) };
+        if names::named_rows(self.doc.str(sk.name)) {
+            return Err(EditError::Invalid);
+        }
+        self.doc.sheet(sheet).ok_or(EditError::NoSheet)?;
+        let (rows, parent_keys) = self.full_rows(sheet, sk);
+        let first = if sk.name == names::GEOMETRY { 1 } else { 0 };
+        let next = rows
+            .iter()
+            .filter_map(|r| match r.key {
+                RowKey::Index(i) => Some(i + 1),
+                RowKey::Named(_) => None,
+            })
+            .max()
+            .unwrap_or(first);
+        let ix = want.max(first).min(next);
+        let texts = self.renumbered(sheet, sk, &|x| Some(if x >= ix { x + 1 } else { x }));
+        let kind = kind.map(|k| self.intern(k));
+        let mut new_rows: Vec<Row> = rows
+            .into_iter()
+            .map(|mut r| {
+                if let RowKey::Index(x) = r.key {
+                    if x >= ix {
+                        r.key = RowKey::Index(x + 1);
+                    }
+                }
+                r
+            })
+            .collect();
+        let mut row = Row::new(RowKey::Index(ix));
+        row.kind = kind;
+        new_rows.push(row);
+        self.atomic(|tx| {
+            tx.replace_rows(sheet, sk, new_rows, &parent_keys)?;
+            for (addr, text) in &texts {
+                tx.force_formula(sheet, addr, text)?;
+            }
+            Ok(RowKey::Index(ix))
+        })
+    }
+
+    /// take a row out of an indexed section: the rows after it move one up (IX - 1), the
+    /// references to them follow and references to the row itself become its values; an
+    /// inherited section is made the sheet's own first
+    pub fn remove_row(&mut self, sheet: SheetRef, sk: SecKey, key: RowKey) -> Result<(), EditError> {
+        let RowKey::Index(k) = key else { return Err(EditError::Invalid) };
+        if names::named_rows(self.doc.str(sk.name)) {
+            return Err(EditError::Invalid);
+        }
+        if !self.doc.has_row(sheet, sk, key) {
+            return Err(EditError::NoRow);
+        }
+        let (rows, parent_keys) = self.full_rows(sheet, sk);
+        let texts = self.renumbered(sheet, sk, &|x| match x {
+            x if x == k => None,
+            x if x > k => Some(x - 1),
+            x => Some(x),
+        });
+        let new_rows: Vec<Row> = rows
+            .into_iter()
+            .filter(|r| r.key != key)
+            .map(|mut r| {
+                if let RowKey::Index(x) = r.key {
+                    if x > k {
+                        r.key = RowKey::Index(x - 1);
+                    }
+                }
+                r
+            })
+            .collect();
+        self.atomic(|tx| {
+            tx.replace_rows(sheet, sk, new_rows, &parent_keys)?;
+            for (addr, text) in &texts {
+                tx.force_formula(sheet, addr, text)?;
+            }
+            Ok(())
+        })
+    }
+
+    /// change the type (T) of a row the sheet has (Geometry: "MoveTo", "LineTo" ...); an
+    /// inherited row gets an entry of the sheet's own that names the type
+    pub fn set_row_kind(&mut self, sheet: SheetRef, sk: SecKey, key: RowKey, kind: &str) -> Result<(), EditError> {
+        let eff = self.doc.rows(sheet, sk).into_iter().find(|r| r.key == key).ok_or(EditError::NoRow)?;
+        let k = self.intern(kind);
+        if eff.kind == Some(k) {
+            return Ok(());
+        }
+        self.atomic(|tx| {
+            let sp = tx.ensure_section(sheet, sk, true)?;
+            let sec = &tx.doc.sheet(sheet).ok_or(EditError::NoSheet)?.sections[sp as usize];
+            match sec.row_pos(key) {
+                Some(p) => {
+                    let mut row = sec.rows[p].clone();
+                    row.kind = Some(k);
+                    tx.run(Op::RowRemove { sheet, sec: sp, pos: p as u32 })?;
+                    tx.run(Op::RowInsert { sheet, sec: sp, pos: p as u32, row: Box::new(row) })
+                }
+                None => {
+                    let pos = sec.insert_pos(key) as u32;
+                    let mut row = Row::new(key);
+                    row.kind = Some(k);
+                    tx.run(Op::RowInsert { sheet, sec: sp, pos, row: Box::new(row) })
+                }
+            }
+        })
+    }
+
+    // the rows section `sk` really has for `sheet` as rows of its own (a row the parent passes
+    // on: with every cell as the sheet sees it), sorted by key, and the keys of the rows the
+    // parent sheet passes on
+    fn full_rows(&self, sheet: SheetRef, sk: SecKey) -> (Vec<Row>, Vec<RowKey>) {
+        let cat = Category::of_section(self.doc.str(sk.name));
+        let parent = self.doc.parent_sheet(sheet, cat);
+        let parent_keys: Vec<RowKey> = parent.map(|p| self.doc.rows(p, sk).iter().map(|r| r.key).collect()).unwrap_or_default();
+        let own = self.doc.sheet(sheet).and_then(|s| s.section(sk));
+        let mut out = Vec::new();
+        for e in self.doc.rows(sheet, sk) {
+            let mut row = own.and_then(|s| s.row(e.key)).cloned().unwrap_or_else(|| Row::new(e.key));
+            row.del = false;
+            row.kind = e.kind;
+            row.ix_written = true;
+            if parent_keys.contains(&e.key) {
+                // every cell the way up names for this row, as the sheet sees it
+                let mut cells: Vec<Sym> = row.cells.iter().map(|c| c.name).collect();
+                let mut cur = parent;
+                let mut depth = 0;
+                while let (Some(p), true) = (cur, depth < 64) {
+                    if let Some(r) = self.doc.sheet(p).and_then(|s| s.section(sk)).and_then(|s| s.row(e.key)) {
+                        for c in &r.cells {
+                            if !cells.contains(&c.name) {
+                                cells.push(c.name);
+                            }
+                        }
+                    }
+                    cur = self.doc.parent_sheet(p, cat);
+                    depth += 1;
+                }
+                row.cells = cells
+                    .into_iter()
+                    .filter_map(|n| {
+                        let r = self.doc.resolve(sheet, &CellAddr::row(sk, e.key, n));
+                        r.exists().then(|| Cell { name: n, value: r.value(), formula: r.formula(), unit: r.unit(), error: r.error(), stale: false })
+                    })
+                    .collect();
+            }
+            out.push(row);
+        }
+        out.sort_by_key(|r| r.key);
+        (out, parent_keys)
+    }
+
+    // put `rows` in place of the sheet's own rows of section `sk`, with Del="1" marks for the
+    // parent's rows they do not cover
+    fn replace_rows(&mut self, sheet: SheetRef, sk: SecKey, rows: Vec<Row>, parent_keys: &[RowKey]) -> Result<(), EditError> {
+        let sp = self.ensure_section(sheet, sk, false)?;
+        let n = self.doc.sheet(sheet).ok_or(EditError::NoSheet)?.sections[sp as usize].rows.len();
+        for pos in (0..n).rev() {
+            self.run(Op::RowRemove { sheet, sec: sp, pos: pos as u32 })?;
+        }
+        let keys: BTreeSet<RowKey> = rows.iter().map(|r| r.key).collect();
+        let mut all = rows;
+        for &k in parent_keys {
+            if !keys.contains(&k) {
+                let mut mark = Row::new(k);
+                mark.del = true;
+                all.push(mark);
+            }
+        }
+        all.sort_by_key(|r| r.key);
+        for (i, row) in all.into_iter().enumerate() {
+            self.run(Op::RowInsert { sheet, sec: sp, pos: i as u32, row: Box::new(row) })?;
+        }
+        Ok(())
+    }
+
+    // the formulas of `sheet` (own and inherited) whose references to rows of `sk` change when
+    // the rows are renumbered by `map` (None: the row goes): the address each will have
+    // afterwards and its new text
+    fn renumbered(&self, sheet: SheetRef, sk: SecKey, map: &dyn Fn(u32) -> Option<u32>) -> Vec<(CellAddr, String)> {
+        let doc = &*self.doc;
+        let Some((prefix, form)) = crate::ops::text::row_form(doc.str(sk.name), sk.index) else { return Vec::new() };
+        let own = match sheet {
+            SheetRef::Shape(r) => doc.shape(r).map(|s| s.id()),
+            _ => None,
+        };
+        let mut out = Vec::new();
+        for key in crate::formula::sheet_formula_cells(doc, sheet) {
+            let addr = key.addr();
+            let Formula::Expr(f) = doc.resolve(sheet, &addr).formula() else { continue };
+            let text = doc.str(f);
+            let mut gone = |cell: &str, ix: u32| -> String {
+                let v = doc.sym(cell).and_then(|c| doc.resolve(sheet, &CellAddr::row(sk, RowKey::Index(ix), c)).num());
+                match v {
+                    Some(x) => crate::ops::text::num(x),
+                    None => String::from("#REF!"),
+                }
+            };
+            let new = crate::ops::text::renumber_rows(text, own, &prefix, form, map, &mut gone);
+            if new == text {
+                continue;
+            }
+            let new_addr = match (addr.section, addr.row) {
+                (Some(s), Some(RowKey::Index(x))) if s == sk => match map(x) {
+                    Some(nx) => CellAddr::row(sk, RowKey::Index(nx), addr.cell),
+                    None => continue,
+                },
+                _ => addr,
+            };
+            out.push((new_addr, new));
+        }
+        out
     }
 }

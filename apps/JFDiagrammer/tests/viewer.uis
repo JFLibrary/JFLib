@@ -1,10 +1,10 @@
 #!args apps/JFDiagrammer/tests/viewer.vsdx --no-system-fonts
-# JFDiagrammer, JD4 (the viewer): a drawing named on the command line opens read-only -- the
-# notice under the ribbon, a tab per page (the background page after the others), the page
+# JFDiagrammer, JD4 (the viewer): a drawing named on the command line opens (editable since JD7,
+# no notice for a file without warnings) -- a tab per page (the background page after the others), the page
 # counter in the status bar, switching pages by tab, by Ctrl+PgDn / Ctrl+PgUp and by the list
 # of all pages, zooming and fitting.  viewer.vsdx is diagramiotest's self-built pages.vsdx
 # (--write-drawings): a page with themed values on a background page, a page at 1:10
-expect "Schreibgeschützt geöffnet" exists
+expect "Schreibgeschützt geöffnet" missing
 expect tab:"Seite-1" selected
 expect tab:"Massstab" exists
 expect tab:"Hintergrund-1" exists

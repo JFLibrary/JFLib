@@ -231,9 +231,10 @@ impl<'f> Sheets<'f> {
         }
         // the licence or the format refused: a face of the class, then any
         let class = class_of(family);
-        let mut cands: Vec<Face> = self.fonts.faces.iter().filter(|f| f.class == Some(class)).cloned().collect();
-        cands.extend(self.fonts.faces.iter().filter(|f| f.class == Some(Class::Sans)).cloned());
-        cands.extend(self.fonts.faces.iter().cloned());
+        let all = self.fonts.faces();
+        let mut cands: Vec<Face> = all.iter().filter(|f| f.class == Some(class)).cloned().collect();
+        cands.extend(all.iter().filter(|f| f.class == Some(Class::Sans)).cloned());
+        cands.extend(all.iter().cloned());
         cands.sort_by_key(|f| (f.bold != bold) as u8 * 2 + (f.italic != italic) as u8);
         for f in cands {
             if let Some(id) = self.embed(&f) {

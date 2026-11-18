@@ -13,8 +13,8 @@
 //                             (background pages after the others), Alle Seiten as a list
 //   status(app, ui)           page, measures of the selection, zoom
 //
-// Contents are placeholders until their stages: the Shapes panel shows the empty state (JD9
-// brings stencils), the format and data panes their layout with disabled fields (JD7, JD11),
+// Contents are placeholders until their stages: the Shapes panel shows the stencils (JD9,
+// stencils_panel.rs), the format and data panes their layout with disabled fields (JD7, JD11),
 // Verschieben und Zoomen the overview of the canvas and a working zoom slider.  The context
 // menus list their commands (disabled until a handler exists, commands.rs).
 
@@ -96,12 +96,6 @@ static TAB_MENU: [Mi; 8] = [
     Mi::Cmd(PAGE_INSERT), Mi::Cmd(PAGE_DELETE), Mi::Cmd(PAGE_RENAME), Mi::Cmd(PAGE_DUPLICATE), Mi::Cmd(PAGE_REORDER), Mi::Sep,
     Mi::Cmd(PAGE_SETUP), Mi::Cmd(DRAWING_SCALE),
 ];
-// i18n
-static STENCIL_MENU: [Mi; 7] = [
-    Mi::Cmd(STENCIL_CLOSE), Mi::Cmd(STENCIL_SAVE), Mi::Cmd(STENCIL_EDIT),
-    Mi::Sub("Ansichtsoptionen", &[Mi::Cmd(STENCIL_VIEW_ICONS), Mi::Cmd(STENCIL_VIEW_ICONS_ONLY), Mi::Cmd(STENCIL_VIEW_NAMES)]),
-    Mi::Sep, Mi::Cmd(STENCIL_NEW_MASTER), Mi::Cmd(STENCIL_ORDER),
-];
 
 // ------------------------------------------------------------------ the canvas and its pages
 
@@ -109,31 +103,17 @@ static STENCIL_MENU: [Mi; 7] = [
 pub(crate) fn center(app: &mut Diagrammer, ui: &mut Ui) {
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 0);
-    let st = &mut app.canvas;
-    // the name screen readers and scripts see (canvas:"Zeichenfläche"), in the current language
-    let name = t("Zeichenfläche");
-    if st.name != name {
-        st.name = name.into();
-    }
-    st.grid = if app.view_grid { 16.0 } else { 0.0 };
-    // the open drawing's page (JD4): its sheet as the model's one node, its paint
-    let k = app.page_index();
-    let paint = crate::viewer::paint(app, k);
-    let nodes: alloc::vec::Vec<DNode> = crate::viewer::sheet_node(app, k).into_iter().collect();
-    let ver = app.opened.as_ref().map_or(0, |o| o.serial.wrapping_mul(4096).wrapping_add(k as u32 + 1));
-    let model = DModel { nodes: &nodes, ports: &[], edges: &[], wps: &[], ver };
-    let st = &mut app.canvas;
-    let paint: Option<alloc::rc::Rc<dyn DgPaint>> = paint.map(|p| p as alloc::rc::Rc<dyn DgPaint>);
-    ui.next_size(-1, -1);
-    ui.diagram(ID_CANVAS, st, &model, DG_SELECT, paint, ver);
+    // (JD7) the canvas with the rulers and the edit layer (edit_canvas.rs); the shape's menu while
+    // a shape is selected, else the page's (the edit layer selects on the right click first)
+    crate::edit_canvas::canvas(app, ui, ID_CANVAS, |app, ui| {
+        let menu: &'static [Mi] = if matches!(app.selection_kind(), SEL_SHAPE | SEL_CONTAINER | SEL_TEXT) { &SHAPE_MENU } else { &PAGE_MENU };
+        ui.context_menu(i18n::menu(menu));
+    });
     if app.fit_again {
         app.fit_again = false;
         app.canvas.request_fit();
         ui.repass();
     }
-    // the shape's menu while a shape is selected, else the page's
-    let menu: &'static [Mi] = if matches!(app.selection_kind(), SEL_SHAPE | SEL_CONTAINER | SEL_TEXT) { &SHAPE_MENU } else { &PAGE_MENU };
-    ui.context_menu(i18n::menu(menu));
     // the page tabs (ZF-14): the page, the plus button, all pages
     ui.next_size(-1, 26);
     ui.box_begin(0, BOX_H | BOX_LAYER, 0);
@@ -198,41 +178,9 @@ fn pages_list(app: &mut Diagrammer, ui: &mut Ui, id0: u32) {
 
 // ------------------------------------------------------------------ the panels
 
-// Shapes: the title row with the stencils' menu, the search box, the empty state (SL-09)
-fn shapes(_app: &mut Diagrammer, ui: &mut Ui) {
-    ui.next_size(-1, -1);
-    ui.box_begin(ID_PANE, BOX_V | pad(10), 8);
-    ui.box_begin(0, BOX_H | BOX_XCENTER, 4);
-    ui.next_size(-1, 0);
-    ui.text(TS_BODY_STRONG, t("Schablonen"));
-    ui.next_size(28, 24);
-    ui.next_flags(ST_SUBTLE | ST_ICON_ONLY | ST_COMPACT);
-    ui.next_icon(JD_STENCIL_MENU);
-    ui.dropdown_button(ID_PANE + 1, t("Schablonenmenü"));
-    if ui.flyout_begin(ID_PANE + 1, 0) {
-        for id in [STENCIL_CLOSE, STENCIL_SAVE, STENCIL_EDIT, STENCIL_NEW_MASTER, STENCIL_ORDER] {
-            ui.menu_cmd(id);
-        }
-    }
-    ui.flyout_end();
-    ui.box_end();
-    let mut q = alloc::string::String::new();
-    ui.next_size(-1, 0);
-    ui.next_flags(ST_DISABLED);
-    ui.textbox_icon(ID_PANE + 2, IC_SEARCH, Some(t("Shapes suchen")), &mut q, 128);
-    ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Keine Schablone geöffnet."));
-    ui.next_size(-1, 28);
-    ui.cmd_button(MORE_SHAPES, 0);
-    ui.tooltip(&commands::tip(ui, MORE_SHAPES));
-    // the stencil's menu on a right click into the panel (SL-08)
-    ui.next_size(-1, -1);
-    ui.box_begin(ID_PANE + 3, BOX_V, 0);
-    ui.box_end();
-    let r = ui.last_rect();
-    ui.hit_rect(ID_PANE + 3, r[0], r[1], r[2], r[3], 0);
-    ui.sem(K_BOX, ID_PANE + 3, Some(t("Schablonenbereich")), 0);
-    ui.context_menu(i18n::menu(&STENCIL_MENU));
-    ui.box_end();
+// Shapes: the stencils (JD9, stencils_panel.rs)
+fn shapes(app: &mut Diagrammer, ui: &mut Ui) {
+    crate::stencils_panel::panel(app, ui);
 }
 
 // Shape formatieren (AB-05): its registers and sections, disabled until shapes have formats
@@ -262,20 +210,24 @@ fn format_pane(app: &mut Diagrammer, ui: &mut Ui) {
 fn size_pos(app: &mut Diagrammer, ui: &mut Ui) {
     ui.next_size(-1, -1);
     ui.scroll_begin(ID_PANE + 0x20, SC_V | BOX_V | pad(10));
-    let sel = app.selection_kind() != SEL_NONE;
+    // (JD7) the measures of the single selection
+    let m = crate::edit_canvas::measures(app);
+    let sel = m.is_some();
+    let unit = if crate::edit_canvas::metric(app) { "mm" } else { "in" };
+    let v = m.unwrap_or([0.0; 6]);
     let rows = [
-        ("X", "20 mm"),
-        ("Y", "40 mm"),
-        (t("Breite"), "40 mm"),
-        (t("Höhe"), "20 mm"),
-        (t("Winkel"), "0°"),
-        (t("Drehpunkt"), t("Mitte")),
+        ("X", length(v[0], unit)),
+        ("Y", length(v[1], unit)),
+        (t("Breite"), length(v[2], unit)),
+        (t("Höhe"), length(v[3], unit)),
+        (t("Winkel"), angle(v[4])),
+        (t("Drehpunkt"), alloc::string::String::from(if v[5] != 0.0 { t("Mitte") } else { t("Benutzerdefiniert") })),
     ];
     for (k, (label, v)) in rows.iter().enumerate() {
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
         ui.next_size(90, 0);
         ui.text(TS_BODY, label);
-        let mut s = alloc::string::String::from(if sel { *v } else { "" });
+        let mut s = if sel { v.clone() } else { alloc::string::String::new() };
         ui.next_size(-1, 0);
         ui.next_flags(ST_DISABLED);
         ui.textbox(ID_PANE + 0x21 + k as u32, None, &mut s, 32);
@@ -333,11 +285,12 @@ pub(crate) fn status(app: &mut Diagrammer, ui: &mut Ui) {
         pages_list(app, ui, ID_STATUS + 0x10);
     }
     ui.flyout_end();
-    // the selection's measures; a click opens Größe und Position
-    let dims = if app.selection_kind() == SEL_NONE {
-        tf("Breite: {}  Höhe: {}  Winkel: {}", &["–", "–", "–"])
-    } else {
-        tf("Breite: {}  Höhe: {}  Winkel: {}", &["40 mm", "20 mm", "0°"])
+    // the selection's measures (JD7: the single selection's); a click opens Größe und Position
+    let unit = if crate::edit_canvas::metric(app) { "mm" } else { "in" };
+    let dims = match crate::edit_canvas::measures(app) {
+        Some(v) => tf("Breite: {}  Höhe: {}  Winkel: {}", &[&length(v[2], unit), &length(v[3], unit), &angle(v[4])]),
+        None if app.selection_kind() == SEL_NONE || app.opened.is_some() => tf("Breite: {}  Höhe: {}  Winkel: {}", &["–", "–", "–"]),
+        None => tf("Breite: {}  Höhe: {}  Winkel: {}", &["40 mm", "20 mm", "0°"]),
     };
     ui.next_flags(ST_SUBTLE);
     if ui.label_button(ID_STATUS + 3, &dims, TS_CAPTION, 0) & EV_ACT != 0 {
@@ -355,9 +308,36 @@ pub(crate) fn status(app: &mut Diagrammer, ui: &mut Ui) {
     ui.statusbar_end();
 }
 
+// a length in the page's unit: whole millimetres, inches with two decimals (the region's decimal
+// sign)
+fn length(v: f64, unit: &str) -> alloc::string::String {
+    let s = if unit == "mm" { format!("{:.0}", v) } else { format!("{:.2}", v) };
+    let s = if s == "-0" { alloc::string::String::from("0") } else { s };
+    let dec = i18n::locale().decimal();
+    format!("{} {}", s.replace('.', dec.encode_utf8(&mut [0; 4])), unit)
+}
+
+// an angle in whole degrees, -179 .. 180 as Visio shows the Angle cell
+fn angle(v: f64) -> alloc::string::String {
+    // no float remainder without libm: whole turns off by steps (the angle is small)
+    let mut d = v;
+    let mut n = 0;
+    while d <= -180.0 && n < 64 {
+        d += 360.0;
+        n += 1;
+    }
+    while d > 180.0 && n < 64 {
+        d -= 360.0;
+        n += 1;
+    }
+    let r = if d >= 0.0 { (d + 0.5) as i64 } else { -((-d + 0.5) as i64) };
+    format!("{}°", if r == -180 { 180 } else { r })
+}
+
 // an icon button of the status bar for a command (its own widget id: the ribbon may show the
 // same command)
 fn status_cmd(ui: &mut Ui, wid: u32, id: u32) {
+    // (the zoom commands: always usable)
     ui.next_size(24, 22);
     ui.next_flags(ST_SUBTLE | ST_ICON_ONLY | ST_COMPACT | if commands::enabled(id) { 0 } else { ST_DISABLED });
     ui.next_icon(commands::def(id).map_or(0, |d| d.icon));

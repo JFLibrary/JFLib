@@ -230,3 +230,77 @@ Reihenfolge: {}	Order: {}
 Auswahl: {}   Verschoben: {}   Zuletzt: {}	Selected: {}   Moved: {}   Last: {}
 Liste im Flyout	List in a flyout
 Zeile {}	Line {}
+Nur Namen	Names only
+Nur Symbole	Icons only
+Symbole und Details	Icons and details
+Symbole und Namen	Icons and names
+Ansicht	View
+Schablone schließen	Close stencil
+Aus Favoriten entfernen	Remove from favorites
+Zu Favoriten hinzufügen	Add to favorites
+Alle Schablonen öffnen	Open all stencils
+Kategorien	Categories
+Meine Shapes	My shapes
+Neue Schablone	New stencil
+Ein Rechteck mit geraden Ecken	A rectangle with square corners
+Abgerundetes Rechteck	Rounded rectangle
+Ein Rechteck mit runden Ecken	A rectangle with round corners
+Eine Ellipse	An ellipse
+Ellipse	Ellipse
+Ein Kreis	A circle
+Ein gleichschenkliges Dreieck	An isosceles triangle
+Eine auf die Spitze gestellte Raute	A diamond standing on its tip
+Raute	Diamond
+Ein Stern mit fünf Zacken	A star with five points
+Fünfzackiger Stern	Five-point star
+Ein Blockpfeil	A block arrow
+Pfeil nach rechts	Right arrow
+Ein Feld für Text, ohne Vorschau	A box for text, without a preview
+Textfeld	Text box
+Ein Schritt im Ablauf	A step of the flow
+Prozess	Process
+Eine Verzweigung mit Ja und Nein	A branch with yes and no
+Entscheidung	Decision
+Anfang oder Ende des Ablaufs	Start or end of the flow
+Start/Ende	Start/End
+Daten	Data
+Ein- oder Ausgabe von Daten	Input or output of data
+Ein Dokument oder Bericht	A document or report
+Datenbank	Database
+Gespeicherte Daten	Stored data
+Externe Daten	External data
+Nicht verfügbar	Not available
+Shape {}	Shape {}
+Flussdiagramm	Flowchart
+Favoriten	Favorites
+Viele Shapes	Many shapes
+Shapes	Shapes
+Shapes suchen	Search shapes
+Letzte Suchen	Recent searches
+Weitere Shapes	More shapes
+Quick-Shapes	Quick shapes
+Suchergebnisse ({})	Search results ({})
+Hier Quick-Shapes ablegen	Drop quick shapes here
+Shapes hierher ziehen	Drag shapes here
+Keine Schablone geöffnet	No stencil open
+Öffnen Sie eine Schablone mit „Weitere Shapes“.	Open a stencil with “More shapes”.
+Keine Shapes gefunden	No shapes found
+Die Suche prüft die Namen aller offenen Schablonen.	The search looks at the names in every open stencil.
+Suchergebnisse	Search results
+Aktivieren: {}	Activate: {}
+Platzieren: {}	Place: {}
+Menü: {}	Menu: {}
+Schablonenmenü: {}	Stencil menu: {}
+Suche: {}	Search: {}
+{} an {}	{} at {}
+Abgelegt: {}	Dropped: {}
+Ziehen: {}	Drag: {}
+Ziehen beendet	Drag ended
+Ereignis: {}	Event: {}
+Aktiv: {}	Active: {}
+Favoriten: {}	Favorites: {}
+ja	yes
+nein	no
+Zeichenblatt: {}	Page: {}
+Ohne Schablonen	Without stencils
+Zeichenblatt	Page

@@ -60,6 +60,16 @@ click #26161
 expect text:"Die Seite ist als Bild in der Zwischenablage." exists
 click #26162
 expect text:"Die Seite ist als SVG in der Zwischenablage." exists
+# with a selection (JD7) the selection alone is copied, cut to its box
+key esc
+focus canvas:"Zeichenfläche"
+key ctrl+a
+click tab:"Datei"
+click button:"Exportieren"
+click #26161
+expect text:"Die Auswahl ist als Bild in der Zwischenablage." exists
+click #26162
+expect text:"Die Auswahl ist als SVG in der Zwischenablage." exists
 # without a drawing nothing can be exported
 key esc
 key ctrl+w

@@ -2011,3 +2011,25 @@ fn val_from_stored_value() {
     assert_eq!(Val::from_value(Value::Num(3.0), Some("#DIV/0!"), &st), Val::Err(CellError::DivZero));
     assert_eq!(Val::from_value(Value::Absent, None, &st), Val::Num(0.0));
 }
+
+// (JD7) a cell holds a number: a point computed for another cell (PAR(PNT()) in EndY) is that
+// cell's coordinate when a formula reads it -- Width = SQRT((EndX-BeginX)^2+(EndY-BeginY)^2) of a
+// glued line read x for EndY before, and its angle came out 45 degrees
+#[test]
+fn a_point_read_from_a_cell_is_that_cells_coordinate() {
+    let mut doc = Document::new(DocKind::Drawing);
+    let page = doc.insert_page(Page::new(PageHeader { id: 0, ..PageHeader::default() })).unwrap();
+    let mut d = ShapeData::new(ShapeKind::Shape);
+    xform(&mut doc, &mut d, (1.0, 1.0), (2.0, 1.0), 0.0, (false, false));
+    let bx = with_f(&mut doc, "BeginX", "PNT(3,4)", Value::Num(3.0));
+    let by = with_f(&mut doc, "BeginY", "PNT(3,4)", Value::Num(4.0));
+    d.sheet.cells.push(bx);
+    d.sheet.cells.push(by);
+    let slot = doc.page_mut(page).unwrap().shapes.insert(None, 1, d).unwrap();
+    let sh = SheetRef::Shape(ShapeRef { owner: Owner::Page(page), slot });
+    // the probe is a cell of the x axis (User.Label.Value): BeginY still gives y
+    assert_eq!(eval_in(&doc, sh, "BeginY-BeginX"), Val::Num(1.0));
+    assert_eq!(eval_in(&doc, sh, "BeginY*2"), Val::Num(8.0));
+    // a point made in the formula itself stays a point until it is stored
+    assert_eq!(eval_in(&doc, sh, "PNTY(PNT(BeginX,BeginY))"), Val::Num(4.0));
+}

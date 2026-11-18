@@ -85,7 +85,7 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
     match page {
         PAGE_NEW => new_page(app, ui),
         PAGE_OPEN => open_page(app, ui),
-        PAGE_SAVE | PAGE_SAVE_AS => save_page(ui, page == PAGE_SAVE_AS),
+        PAGE_SAVE | PAGE_SAVE_AS => save_page(app, ui, page == PAGE_SAVE_AS),
         PAGE_PRINT => crate::print_ui::page(app, ui),
         PAGE_EXPORT => crate::export_ui::page(app, ui),
         PAGE_INFO => info_page(ui),
@@ -98,13 +98,6 @@ pub(crate) fn frame(app: &mut Diagrammer, ui: &mut Ui) {
 fn title(ui: &mut Ui, s: &str) {
     ui.text(TS_TITLE, s);
     ui.spacer(12);
-}
-
-// a disabled large action with its QuickInfo
-fn unavailable(ui: &mut Ui, id: u32, label: &str, icon: u32) {
-    ui.next_size(96, 66);
-    ui.ribbon_button(id, label, icon, ST_LARGE | ST_DISABLED);
-    ui.tooltip(&format!("{} · {}", label, t("Noch nicht verfügbar")));
 }
 
 // ------------------------------------------------------------------ Neu
@@ -258,19 +251,32 @@ fn open_page(app: &mut Diagrammer, ui: &mut Ui) {
 // i18n
 static FILE_TYPES: [&str; 4] = ["Visio-Zeichnung (.vsdx)", "Visio-Schablone (.vssx)", "Visio-Vorlage (.vstx)", "Visio-Zeichnung mit Makros (.vsdm)"];
 
-fn save_page(ui: &mut Ui, as_new: bool) {
+// (JD7) Speichern / Speichern unter: the file it goes to, Durchsuchen opens the file dialog
+fn save_page(app: &mut Diagrammer, ui: &mut Ui, as_new: bool) {
     title(ui, t(if as_new { "Speichern unter" } else { "Speichern" }));
+    let path = app.opened.as_ref().and_then(|o| o.ed.path.clone());
     ui.next_size(480, 0);
-    ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Zeichnungen lassen sich noch nicht speichern."));
+    match (&path, as_new) {
+        (Some(p), false) => ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, &format!("{} {}", t("Speichert in"), p)),
+        _ => ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Wählen Sie den Ort und den Dateityp.")),
+    }
     ui.spacer(8);
     ui.box_begin(ID_PAGE, BOX_H | BOX_XCENTER, 16);
-    unavailable(ui, ID_PAGE + 1, t("Durchsuchen"), JD_SAVE_AS_L);
-    let mut sel = 0;
-    ui.text(TS_BODY, t("Dateityp"));
-    ui.next_size(260, 0);
-    ui.next_flags(ST_DISABLED);
+    let open = app.opened.is_some();
+    if !as_new && path.is_some() {
+        ui.next_size(96, 66);
+        if ui.ribbon_button(ID_PAGE + 3, t("Speichern"), JD_SAVE_L, ST_LARGE | if open { 0 } else { ST_DISABLED }) & EV_ACT != 0 {
+            app.backstage = None;
+            crate::edit_doc::save(app, ui, false);
+        }
+    }
+    ui.next_size(96, 66);
+    if ui.ribbon_button(ID_PAGE + 1, t("Durchsuchen"), JD_SAVE_AS_L, ST_LARGE | if open { 0 } else { ST_DISABLED }) & EV_ACT != 0 {
+        app.backstage = None;
+        crate::edit_doc::save(app, ui, true);
+    }
     let names: alloc::vec::Vec<&str> = FILE_TYPES.iter().map(|s| t(s)).collect();
-    ui.combobox(ID_PAGE + 2, &mut sel, &names);
+    let _ = names;
     ui.box_end();
 }
 

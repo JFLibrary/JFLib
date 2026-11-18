@@ -1,7 +1,8 @@
 // svg -- a page as an SVG document (EX-03)
 //
 //   write(doc, drawing, &SvgOptions) -> String     the display list of one page (PageView::
-//                                                  drawing: measured with the fonts drawn)
+//                                                  drawing: measured with the fonts drawn), or
+//                                                  of a region of it (a selection's box)
 //
 // The document: width and height in inches, the viewBox in points (1/72 inch) with y down;
 // the page's colour as a rectangle (unless transparent); per top-level shape a group
@@ -37,11 +38,14 @@ pub struct SvgOptions {
     pub shape_data: bool,
     /// the document's <title> (empty: none)
     pub title: String,
+    /// only this part of the page (paper inches, y up: x0, y0, x1, y1; None: the whole page),
+    /// e.g. the box of a selection
+    pub region: Option<[f64; 4]>,
 }
 
 impl Default for SvgOptions {
     fn default() -> SvgOptions {
-        SvgOptions { background: true, links: true, shape_data: false, title: String::new() }
+        SvgOptions { background: true, links: true, shape_data: false, title: String::new(), region: None }
     }
 }
 
@@ -51,7 +55,13 @@ pub fn write(doc: &Document, drawing: &Drawing, opts: &SvgOptions) -> String {
     let (pw, ph) = (drawing.width, drawing.height);
     w.o.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n");
     w.o.push_str("<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.1\"");
-    let _ = write!(w.o, " width=\"{}in\" height=\"{}in\" viewBox=\"0 0 {} {}\">\n", n(pw), n(ph), n(pw * 72.0), n(ph * 72.0));
+    // the part shown: the page, or the region (its viewBox in the page's points, y down)
+    let r = match opts.region {
+        Some(r) if r.iter().all(|v| v.is_finite()) && r[2] > r[0] && r[3] > r[1] => r,
+        _ => [0.0, 0.0, pw, ph],
+    };
+    let (rw, rh) = (r[2] - r[0], r[3] - r[1]);
+    let _ = write!(w.o, " width=\"{}in\" height=\"{}in\" viewBox=\"{} {} {} {}\">\n", n(rw), n(rh), n(r[0] * 72.0), n((ph - r[3]) * 72.0), n(rw * 72.0), n(rh * 72.0));
     if !opts.title.is_empty() {
         w.o.push_str("<title>");
         esc(&mut w.o, &opts.title, false);

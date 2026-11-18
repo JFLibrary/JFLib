@@ -1,6 +1,6 @@
 # JFDiagrammer, JD8: the task panes in the dock area (Ansicht › Aufgabenbereiche, the dialog
 # launcher of Formenarten, the measures in the status bar), the status bar's zoom, the grid
-# toggle and the context menus of the page, the page tab and the stencils
+# toggle and the context menus of the page, the page tab and a stencil's title
 expect tab:"Shapes" exists
 expect tab:"Shape-Daten" missing
 click tab:"Ansicht"
@@ -31,33 +31,45 @@ click button:"Breite: –  Höhe: –  Winkel: –"
 expect tab:"Größe und Position" selected
 expect text:"Drehpunkt" exists
 expect text:"Kein Shape ausgewählt." exists
-# the zoom in the status bar
-expect text:"100 %" exists
+# the zoom in the status bar (JD7: the new drawing's A4 page fits at 67 %, the next steps are
+# 66.7 % and 75 %)
+expect text:"67 %" exists
 click button:"Vergrößern"
-expect text:"125 %" exists
-click button:"Verkleinern"
-click button:"Verkleinern"
+click button:"Vergrößern"
 expect text:"75 %" exists
+click button:"Verkleinern"
+click button:"Verkleinern"
+expect text:"50 %" exists
 key alt+f6
-expect text:"100 %" exists
+expect text:"67 %" exists
 # the grid of the canvas
 click tab:"Ansicht"
 expect checkbox:"Gitternetz" unchecked
 click checkbox:"Gitternetz"
 expect checkbox:"Gitternetz" checked
-expect checkbox:"Lineal" disabled
+expect checkbox:"Lineal" checked
+click checkbox:"Lineal"
+expect checkbox:"Lineal" unchecked
+click checkbox:"Lineal"
+expect checkbox:"Lineal" checked
 # the page's context menu on the canvas, the page tab's, the stencils'
 rclick canvas:"Zeichenfläche"
 expect "Seite einrichten" enabled
-# (JD12) Seite einrichten without a drawing: the dialog says what is missing
+# (JD12) Seite einrichten from the page's menu: the dialog on its first register
 click "Seite einrichten"
 expect dialog:"Seite einrichten" exists
-expect text:"Öffnen Sie eine Zeichnung, um ihre Seiten einzurichten." exists
+expect tab:"Drucken einrichten" selected
 key esc
 expect dialog:"Seite einrichten" missing
 rclick tab:"Seite-1"
 expect "Seite umbenennen" disabled
 key esc
-rclick "Schablonenbereich"
-expect "Schablone schließen" disabled
+# (JD9) the stencil's menu on its title: closing works, saving only for own stencils
+click button:"Weitere Shapes"
+click "Allgemein"
+click "Standard-Shapes"
+rclick tab:"Standard-Shapes"
+expect "Schablone schließen" enabled
+expect "Schablone speichern" disabled
+expect "Neues Master-Shape" disabled
 key esc

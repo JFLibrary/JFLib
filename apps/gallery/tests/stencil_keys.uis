@@ -1,0 +1,102 @@
+# stencil_keys.uis -- the Shapes window by keyboard (test hook 9106): the titles are one Tab
+# stop (Up / Down / Home / End move and activate), the tiles another (the arrows move in the
+# grid: Down to the nearest column of the next row, across the quick part's line; Home / End),
+# Enter / Space place, Shift+F10 and the menu key open the menus at the widget, F8 reaches the
+# splitter; 300 tiles: only the rows in view are laid out, End scrolls to the last.
+size 720 560
+theme light
+cmd 9106
+focus tab:"Allgemein"
+expect tab:"Allgemein" focused
+key down
+expect tab:"Flussdiagramm" focused
+expect tab:"Flussdiagramm" selected
+expect text:"Aktiv: Flussdiagramm" exists
+key up
+expect tab:"Allgemein" selected
+key end
+expect tab:"Favoriten" selected
+key home
+expect tab:"Quick-Shapes" selected
+key down
+expect tab:"Allgemein" selected
+# the menu key on a title: its menu at the row
+key apps
+expect text:"Ereignis: Schablonenmenü: Allgemein" exists
+expect menuitem:"Ansicht" exists
+key esc
+expect menuitem:"Ansicht" missing
+# Tab: from the titles to the tiles (one stop: the first tile)
+key tab
+expect button:"Rechteck" focused
+key right
+expect button:"Abgerundetes Rechteck" focused
+# down across the line: the same column of the next row
+key down
+expect button:"Dreieck" focused
+key down
+expect button:"Pfeil nach rechts" focused
+key down
+expect button:"Pfeil nach rechts" focused
+key up
+key up
+expect button:"Abgerundetes Rechteck" focused
+key end
+expect button:"Textfeld" focused
+key left
+expect button:"Pfeil nach rechts" focused
+key home
+expect button:"Rechteck" focused
+key enter
+expect text:"Ereignis: Platzieren: Rechteck" exists
+key right
+key space
+expect text:"Ereignis: Platzieren: Abgerundetes Rechteck" exists
+# Shift+F10: the tile's menu at its lower left corner
+key shift+f10
+expect text:"Ereignis: Menü: Abgerundetes Rechteck" exists
+expect menuitem:"Zu Favoriten hinzufügen" rect 84 338 * *
+key esc
+# Shift+Tab back to the titles: the active one
+key shift+tab
+expect tab:"Allgemein" focused
+# F8: the splitter, the arrows move it
+key f8
+expect slider:"Teiler" focused
+key up
+expect slider:"Teiler" value 112
+key home
+expect slider:"Teiler" value 30
+key end
+expect slider:"Teiler" value 120
+key esc
+# an armed tile is where Tab enters the tiles
+click button:"Raute"
+expect button:"Raute" checked
+focus tab:"Allgemein"
+key tab
+expect button:"Raute" focused
+# ---- 300 tiles: the rows out of view are not laid out
+click checkbox:"Viele Shapes"
+# (the splitter keeps four rows: the fifth title is reached by scrolling or by the keys)
+focus tab:"Allgemein"
+key end
+expect tab:"Viele Shapes" selected
+expect tab:"Viele Shapes" rect 0 218 260 30
+expect button:"Shape 1" exists
+expect button:"Shape 300" missing
+focus button:"Shape 1"
+key end
+expect button:"Shape 300" focused
+expect button:"Shape 1" missing
+key home
+expect button:"Shape 1" focused
+expect button:"Shape 300" missing
+# the wheel rolls the rows in (the focused tile's row stays laid out)
+wheel button:"Shape 7" -1200
+wait 500
+expect button:"Shape 4" missing
+expect button:"Shape 22" exists
+expect button:"Shape 1" exists
+expect_nowarn
+bench 20 wheel button:"Shape 22" -120

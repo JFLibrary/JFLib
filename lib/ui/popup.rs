@@ -20,7 +20,8 @@
 //   accel_order_set(1): "Strg+Alt+Umschalt+S" (ui_accel_order)
 //   cmd_button(id, ST_*) -> EV          button from the table (icon, label, tooltip with
 //                                       the accelerator, disabled / checked); queues it
-// Menus (Mi records; Mi::List rows come from menu_list(base, rows), row k = id base + k; a
+// Menus (Mi records; Mi::List rows come from menu_list(base, rows), row k = id base + k with
+// the CF_CHECKED / CF_DISABLED state of cmd_state(base + k, ..); a
 // checked row with an icon gives the flyout a check column and an icon column):
 //   menubar(None | Some(bar)) -> EV_OPEN   WinUI MenuBar (None = AppDesc::menubar): items,
 //                                       flyouts, submenus, keys (Alt / F10, Alt+mnemonic,
@@ -135,7 +136,8 @@ pub enum Mi {
     Item(u32, &'static str, u32),
     /// MI_LIST base, max, "placeholder": one row per string of the rows set with
     /// Ui::menu_list(base, ..) (at most max); row k runs App::command(base + k, 0) and has
-    /// the widget id base + k; no rows: the placeholder as a disabled row ("" = none)  (U1)
+    /// the widget id base + k, checked or disabled by cmd_state(base + k, CF_*) like a command;
+    /// no rows: the placeholder as a disabled row ("" = none)  (U1)
     List(u32, u16, &'static str),
 }
 
@@ -1476,7 +1478,10 @@ impl Ui {
                             break;
                         }
                         let id = base.wrapping_add(k);
-                        let ev = self.mitem(id, s, 0, None, 0);
+                        // the row's state like a command's (cmd_state(base + k, CF_*))
+                        let cf = self.cmd_flags(id);
+                        let mf = if cf & CF_CHECKED != 0 { MIF_CHECKED } else { 0 } | if cf & CF_DISABLED != 0 { MIF_DISABLED } else { 0 };
+                        let ev = self.mitem(id, s, 0, None, mf);
                         if ev & EV_ACT != 0 {
                             activated = true;
                             self.cmd_run(id, 0);
@@ -1657,7 +1662,9 @@ impl Ui {
                         }
                     }
                     for (k, r) in rows.iter().take(max as usize).enumerate() {
-                        v.push(SysMenuItem { id: base + k as u32, label: r.clone(), ..Default::default() });
+                        let f = self.cmd_flags(base + k as u32);
+                        let flags = if f & CF_CHECKED != 0 { TI_CHECKED } else { 0 } | if f & CF_DISABLED != 0 { TI_DISABLED } else { 0 };
+                        v.push(SysMenuItem { id: base + k as u32, label: r.clone(), flags, ..Default::default() });
                     }
                 }
             }

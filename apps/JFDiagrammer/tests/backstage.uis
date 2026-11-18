@@ -23,16 +23,18 @@ expect button:"Öffnen" selected
 expect text:"Zuletzt verwendet" exists
 # (JD4) Durchsuchen opens the file dialog, Schließen closes the drawing
 expect button:"Durchsuchen" enabled
-# (#24580: the pane's Speichern; the quick access toolbar has one too)
+# (#24580: the pane's Speichern; the quick access toolbar has one too) -- JD7: a new drawing
+# has no file yet, both ask for one
 click #24580
-expect text:"Zeichnungen lassen sich noch nicht speichern." exists
+expect text:"Wählen Sie den Ort und den Dateityp." exists
 click button:"Speichern unter"
-expect text:"Dateityp" exists
+expect text:"Wählen Sie den Ort und den Dateityp." exists
 click button:"Drucken"
-expect text:"Keine Seite zum Drucken" exists
+# (JD7: the new drawing at start has one page; JD12: one sheet of A4)
+expect text:"Blatt 1 von 1" exists
 expect text:"Exemplare" exists
 click button:"Exportieren"
-expect text:"Öffnen Sie eine Zeichnung, um sie zu exportieren." exists
+expect text:"Vektorgrafik mit eingebetteten Schriften, Text zum Suchen und Kopieren, Hyperlinks und einem Lesezeichen je Seite." exists
 expect button:"Schließen" enabled
 click button:"Info"
 expect text:"JFDiagrammer" exists

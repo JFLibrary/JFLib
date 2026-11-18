@@ -1,0 +1,49 @@
+# Abgerundetes Rechteck: der Eckenradius folgt dem Steuerpunkt an der oberen Kante.  Er bleibt
+# beim Vergrößern gleich (Abstand von links) und wird höchstens halb so groß wie die kürzere Seite.
+master: Rounded rectangle
+name.de: Abgerundetes Rechteck
+name.en: Rounded rectangle
+name.es: Rectángulo redondeado
+name.it: Rettangolo arrotondato
+name.fr: Rectangle arrondi
+prompt.de: Rechteck mit runden Ecken. Den Radius ändern Sie mit dem gelben Steuerpunkt.
+prompt.en: Rectangle with round corners. Drag the yellow control handle to change the radius.
+prompt.es: Rectángulo con esquinas redondeadas. Arrastre el controlador amarillo para cambiar el radio.
+prompt.it: Rettangolo con angoli arrotondati. Trascina la maniglia di controllo gialla per cambiare il raggio.
+prompt.fr: Rectangle aux coins arrondis. Faites glisser la poignée de contrôle jaune pour modifier le rayon.
+keywords.de: Rechteck, abgerundet, Ecken, Radius, Kasten, Schaltfläche
+keywords.en: rectangle, rounded, corners, radius, box, button
+keywords.es: rectángulo, redondeado, esquinas, radio, caja, botón
+keywords.it: rettangolo, arrotondato, angoli, raggio, riquadro, pulsante
+keywords.fr: rectangle, arrondi, coins, rayon, boîte, bouton
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+Rounding = MIN(MAX(Controls.Row_1, 0), Width*0.5, Height*0.5)
+
+[Geometry]
+MoveTo  X = 0; Y = 0
+LineTo  X = Width; Y = 0
+LineTo  X = Width; Y = Height
+LineTo  X = 0; Y = Height
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = 5 mm; Y = Height
+        X.us = 0.2 in
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 2; YCon = 1; CanGlue = FALSE
+        Tip.de = "Eckenradius ändern"
+        Tip.en = "Change the corner radius"
+        Tip.es = "Cambiar el radio de las esquinas"
+        Tip.it = "Cambia il raggio degli angoli"
+        Tip.fr = "Modifier le rayon des coins"
+
+[Connection]
+Row  X = Width*0.5; Y = 0; DirX = 0; DirY = 1
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0
+Row  X = Width*0.5; Y = Height; DirX = 0; DirY = -1
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0

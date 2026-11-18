@@ -75,6 +75,16 @@ pub use diagram::{
 };
 pub use diagram::{dg_toggle_rect, DN_FRAME, DN_OUTLINE, DN_RESIZE, DN_STEP, DN_TOGGLE}; // frames, groups, a backdrop (G1)
 pub use diagram::DN_HITMIN; // a small text stays selectable at low zoom
+pub use diagram::DG_EDIT; // the view only: ui.shape_edit takes the rest
+mod shape_edit; // (JD7) editing shapes on a DG_EDIT canvas: handles, glue, snapping, tools
+mod ruler; // (JD7) a ruler along a canvas: ticks, marks, guides dragged out of it
+pub use ruler::{RulerEv, RulerSpec};
+pub use shape_edit::{
+    SeBox, SeEv, SeGlue, SeGuide, SeModel, SePoint, SeShape, SeState, SEF_1D, SEF_BEGIN_DYN, SEF_BEGIN_GLUED, SEF_DYNAMIC, SEF_END_DYN,
+    SEF_END_GLUED, SEF_GROUP, SEF_LOCK_ASPECT, SEF_LOCK_BEGIN, SEF_LOCK_END, SEF_LOCK_H, SEF_LOCK_MOVE, SEF_LOCK_PIN, SEF_LOCK_ROTATE,
+    SEF_LOCK_W, SEF_NOGLUE, SEF_NOSELECT, SE_CONNECT, SE_ELLIPSE, SE_LINE, SE_PLACE, SE_POINTER, SE_RECT, SE_TEXT, SPF_GLUE, SP_CONN, SP_CONTROL,
+    SP_VERTEX,
+};
 mod dirty;
 mod dnd;
 // (ROADMAP §6) the editors with a text model of their own: the shared core, rich text, code
@@ -195,6 +205,7 @@ mod ribbon_shell; // register row, key tips, backstage (ribbon_shell.rs)
 mod settings_page;
 mod shell;
 mod slider;
+mod stencil; // the Shapes window of a diagram editor: stencils, tiles, search (stencil.rs)
 // the system's sounds: ui.beep, the sound of a message dialog, the app's switch (sound.rs)
 mod sound;
 mod rtl;
@@ -257,6 +268,10 @@ pub use plat::{DE_ALL, DE_COPY, DE_LINK, DE_MOVE, DT_FILES, DT_HTML, DT_IMAGE, D
 pub use popup::{Command, Mi}; // ui-popup: the command table and menu records
 pub use ribbon::{RibbonGroup, RibbonGroupMode, RibbonLayout, RibbonMetrics, RibbonSample};
 pub use ribbon_shell::{BackstageItem, RibbonTab, BS_ACTION, BS_FOOTER, BS_SEP, RT_CONTEXT, RT_FILE};
+pub use stencil::{
+    stencil_drag_decode, StencilDef, StencilEvent, StencilHit, StencilLabels, StencilPanel, StencilState, StencilTile, SD_EDITABLE, SK_QUICK,
+    SK_SEARCH, SV_DETAILS, SV_ICONS, SV_ICONS_NAMES, SV_NAMES, TL_ARMED, TL_DISABLED, TL_QUICK,
+}; // the Shapes window (stencil.rs)
 pub use runtime::{Runtime, launch, run, run_window};
 pub use style::{Sp, Style, StyleBasic, StyleChrome, StyleData, StyleEdit, StyleList, StyleMisc, StylePopup, StyleShell, StyleValue};
 pub use data::{GridCol, GridEv, GridState, TreeEv, TreeRow, TreeState};

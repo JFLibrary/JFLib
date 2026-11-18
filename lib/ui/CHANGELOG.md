@@ -10,6 +10,19 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
 
 ### Added
 
+- The Shapes window of a diagram editor, modelled on Visio's but knowing nothing about diagrams:
+  `ui.stencil_panel(id, &mut StencilState, &StencilPanel) -> Vec<StencilEvent>`. The app hands in
+  stencils (`StencilDef`, `SD_EDITABLE` for favourites) of tiles (`StencilTile`: a name, a
+  QuickInfo, a preview drawn through `ui::Draw`; `TL_QUICK`, `TL_ARMED`, `TL_DISABLED`) and the
+  hits of its search (`StencilHit`); the panel shows a search box with a history, a "More shapes"
+  button, title rows (tabs) for the quick collection (`SK_QUICK`), the results (`SK_SEARCH`) and
+  each stencil, a splitter and the tiles of the active view in four modes (`SV_ICONS_NAMES`,
+  `SV_ICONS`, `SV_NAMES`, `SV_DETAILS`), the quick shapes above a line. It reports clicks
+  (`Activate`), placing (`Place`: Enter, Space, a double click), menus with their point
+  (`TileMenu`, `StencilMenu`, `More`), `Search`, drags of tiles (`DragStart`, `DragEnd`,
+  `stencil_drag_decode`) and drops onto editable stencils (`Dropped` with the index to insert
+  before). Titles and tiles are reachable by keyboard, tiles are buttons for screen readers, and
+  only the rows of tiles in view are laid out. Every text comes from the app (`StencilLabels`).
 - The window parts around a ribbon: `ui.ribbon_tabs(id, &mut sel, &tabs)`, the register row
   with the File register (`RibbonTab::file`, `EV_OPEN`), registers and context sets
   (`RibbonTab::context`, a coloured edge); the ribbon's access keys (key tips: Alt or F10,
@@ -45,6 +58,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) as JF
   docs/GUIDE.md section 15.
 - `Ui::list_end_full(&mut sel) -> ListEnd { ev, sel, drop }`: the end of a list with a dropped row (LF_REORDER) as `drop = Some((from, to))`, for any number of rows.
 - (G7a) `KeyEvent::code`: where the key sits as a USB HID usage (`plat::KC_*`), whatever the layout prints on it; `ui.key_code_down(code)`; `ui.pointer_lock(on)`, `ui.pointer_lock_state()`, `ui.pointer_motion()` (the raw motion of the locked pointer for the pass) for the window of the pass, `ui::PointerLock`; a change of the lock and the motion give passes. Scripts: `motion DX DY` and `keydown CHORD code N`; a headless run plays the lock (locked at once, Esc lets it go). docs/GUIDE.md section 39
+- (JD7) Editing shapes on a canvas: `DG_EDIT` makes `ui.diagram` the view only (zoom, pan, the paint) and `ui.shape_edit(id, &mut SeState, &mut DiagramState, &SeModel, tool) -> Vec<SeEv>` takes the left button, the keys, the cursor and the overlays: selection by click, marquee, keyboard, Shift and Ctrl; the eight handles and the rotation handle of turned and flipped frames (`SeBox`), locked handles grey, the rotation pin after the rotation handle was touched, yellow control points, vertices, the ends of 1D shapes; glue of ends and control points to connection points (static) or whole shapes (dynamic, `SeGlue`); moves snapped to the grid, the dynamic grid (other shapes' edges and middles, alignment lines) and guides (`SeGuide`); the connector, line, rectangle, ellipse and text tools; the magnifier (Ctrl + Shift + click, drag, right click); live gestures report totals for the app's preview and `SeEv::Cancel` on Esc; `ui.shape_edit_sems` gives one record per shape and per handle ("Größengriff unten rechts", "Drehgriff", "Anfangspunkt" ...: library texts in nine languages)
+- (JD7) `ui.ruler(id, &vp, &RulerSpec) -> RulerEv`: a ruler along a canvas in the document's units for the view of a ui.diagram canvas (ticks and numbers 1, 2 or 5 times a power of ten, the page's extent lighter, the selection's edges and middle marked, the pointer); dragging out of it reports a guide (`RulerEv::Guide { at, done }`, `GuideCancel`)
+- (JD7) `DgPaint::damage(from, to)`: the world rectangle an edit changed between two content versions; ui.diagram then paints only that part of its backing store again (one shape edited in a large drawing). `DiagramState::grid_lines`: false keeps the grid for snapping without drawing it (Visio's hidden grid)
+- `Mi::List` rows take the state of their id like a command: `cmd_state(base + k, CF_CHECKED | CF_DISABLED)` shows row k checked or disabled (in the window's menus and in macOS' system menu), e.g. the open stencils in JFDiagrammer's "Weitere Shapes"; before, list rows were always plain
+- `SE_PLACE`, a tool of `ui.shape_edit` for placing what the app holds (a shape from a stencil, click + click): a click anywhere, on a shape too, reports `SeEv::Draw { tool: SE_PLACE, a, b: a }` at the snapped point; no handles, a drag places nothing
 
 ### Changed
 

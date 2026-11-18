@@ -16,8 +16,9 @@
 // an own one, orientation, PR-06), Zeichnungsmaßstab (none, predefined, own; the page's size in
 // drawing units, PR-07), Seiteneigenschaften (type, name, background page, measuring unit, the
 // shadow direction shown, PR-08), Layout und Routing (the page's cells shown, PR-09; changing
-// them comes with the connectors, JD10).  OK writes the page registers' values into the page
-// (diagram_core transactions; the drawing is still read-only on disk: saving comes with JD7).
+// them comes with the connectors, JD10).  OK writes what changed of the page registers into
+// the page as one undo step of the editing layer (edit_doc::edit, JD7): Strg+Z takes it back,
+// Speichern writes it.
 
 use alloc::format;
 use alloc::rc::Rc;
@@ -50,8 +51,8 @@ pub(crate) struct PrintState {
     pub copies: i32,
     /// the preview's sheet (over the job's sheets, from 0)
     pub sheet: i32,
-    /// views of the pages for the preview: (serial, page, background, view)
-    views: Vec<(u32, PageRef, bool, PageView)>,
+    /// views of the pages for the preview: (drawing and edit version, page, background, view)
+    views: Vec<(u64, PageRef, bool, PageView)>,
     /// the preview's picture and what it shows
     preview: Option<(String, Rc<Surface>)>,
     ver: u32,
@@ -121,19 +122,25 @@ fn job_pages(app: &Diagrammer) -> Vec<PageRef> {
     diagram_view::export::pages(&o.doc, &sel)
 }
 
+/// the drawing and its edits (JD7): a preview built before an edit is stale after it
+fn version(o: &crate::viewer::Opened) -> u64 {
+    (o.serial as u64) << 32 | o.ed.rev as u64
+}
+
 /// the view of a page for the preview (kept while the drawing and the background flag stay)
 fn view_index(app: &mut Diagrammer, page: PageRef) -> Option<usize> {
     let o = app.opened.as_ref()?;
     let bg = app.print.setup.background;
-    if let Some(k) = app.print.views.iter().position(|v| v.0 == o.serial && v.1 == page && v.2 == bg) {
+    let ver = version(o);
+    if let Some(k) = app.print.views.iter().position(|v| v.0 == ver && v.1 == page && v.2 == bg) {
         return Some(k);
     }
-    app.print.views.retain(|v| v.0 == o.serial);
+    app.print.views.retain(|v| v.0 == ver);
     if app.print.views.len() > 8 {
         app.print.views.remove(0);
     }
     let view = PageView::new(&o.doc, page, &mut app.fonts, &Options { background: bg, hidden_layers: false });
-    app.print.views.push((o.serial, page, bg, view));
+    app.print.views.push((ver, page, bg, view));
     Some(app.print.views.len() - 1)
 }
 
@@ -281,7 +288,7 @@ fn preview(app: &mut Diagrammer, ui: &mut Ui) {
         // the sheet as large as the card allows
         let (bw, bh) = (ui.dp(316) as f64, ui.dp(380) as f64);
         let dpi = (bw / pw).min(bh / ph);
-        let key = format!("{:?}|{:?}|{}|{}|{}", page, app.print.setup, k, dpi as i64, app.opened.as_ref().map_or(0, |o| o.serial));
+        let key = format!("{:?}|{:?}|{}|{}|{}", page, app.print.setup, k, dpi as i64, app.opened.as_ref().map_or(0, version));
         if app.print.preview.as_ref().is_none_or(|p| p.0 != key) {
             if let Some((vk, tl)) = page_tiling(app, page) {
                 let gray = app.print.setup.gray;
@@ -791,9 +798,8 @@ fn apply(app: &mut Diagrammer, ui: &mut Ui, e: &PageEdit) {
         ui.repass();
         return;
     }
-    let ok = {
-        let mut tx = o.doc.transaction(t("Seite einrichten"));
-        let mut ok = true;
+    // one undo step through the editing layer (JD7): saved with the drawing, undone with Strg+Z
+    let r = crate::edit_doc::edit(o, t("Seite einrichten"), true, |tx, eng| {
         if resize {
             // drawing units: the paper size over the scale, in the chosen unit
             let to_unit = |inches: f64| diagram_core::convert(inches, Unit::Inches, unit).unwrap_or(inches);
@@ -801,28 +807,35 @@ fn apply(app: &mut Diagrammer, ui: &mut Ui, e: &PageEdit) {
             let ph = tx.single("PageHeight");
             let pscale = tx.single("PageScale");
             let dscale = tx.single("DrawingScale");
-            ok &= tx.set_length(sheet, &pw, to_unit(w / 25.4 / r), unit).is_ok();
-            ok &= tx.set_length(sheet, &ph, to_unit(h / 25.4 / r), unit).is_ok();
+            tx.set_length(sheet, &pw, to_unit(w / 25.4 / r), unit)?;
+            tx.set_length(sheet, &ph, to_unit(h / 25.4 / r), unit)?;
             // PageScale / DrawingScale = r: one page unit stands for 1 / r drawing units
-            ok &= tx.set_length(sheet, &pscale, to_unit(1.0), unit).is_ok();
-            ok &= tx.set_length(sheet, &dscale, to_unit(1.0 / r), unit).is_ok();
+            tx.set_length(sheet, &pscale, to_unit(1.0), unit)?;
+            tx.set_length(sheet, &dscale, to_unit(1.0 / r), unit)?;
         }
         if rename {
-            ok &= tx.rename_page(page, e.name.trim(), e.name.trim()).is_ok();
+            tx.rename_page(page, e.name.trim(), e.name.trim())?;
         }
         if want_bg != old_bg {
-            ok &= tx.set_background(page, want_bg).is_ok();
+            tx.set_background(page, want_bg)?;
         }
-        if ok {
-            let _ = tx.commit();
-        }
-        ok
-    };
-    if !ok {
+        // what depends on the page's cells (ThePage!PageWidth ...)
+        eng.recalc(tx, &[sheet])?;
+        Ok(())
+    });
+    if r.is_err() {
         app.print.status = Some((3, String::from(t("Die Seite ließ sich nicht ändern."))));
     }
-    crate::viewer::refresh(app);
-    app.print.serial = app.opened.as_ref().map_or(0, |o| o.serial);
+    // the tabs show the pages' names; a new size is fitted into the window
+    for tab in o.tabs.iter_mut() {
+        if let Some(n) = o.doc.page(tab.page).and_then(|pg| pg.header.name.or(pg.header.name_u)) {
+            tab.name = String::from(o.doc.str(n));
+        }
+    }
+    if resize {
+        app.canvas.request_fit();
+        app.fit_again = true;
+    }
     app.print.views.clear();
     ui.repass();
 }

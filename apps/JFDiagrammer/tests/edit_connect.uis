@@ -1,0 +1,40 @@
+#!args --no-system-fonts
+# JFDiagrammer, JD7: the connector tool draws a dynamic connector glued to both shapes (the
+# whole shapes: dynamic glue, both ends green); moving a shape reroutes it (right angles); undo
+# takes the move back with the route; an end dragged off a shape is free, so a move no longer
+# moves it; dragged back onto the shape it glues again and follows
+cmd 4404
+drag 500,330 640,420
+drag 820,430 960,520
+# Start › Tools › Verbinder
+cmd 4401
+drag 560,370 880,470
+expect listitem:"Sheet.6" selected
+expect listitem:"Sheet.6" rect 651 374 239 50
+expect button:"Anfangspunkt" exists
+expect button:"Endpunkt" exists
+shot build/JFDiagrammer-edit-connect.png
+# the pointer: move the second shape down by five grid steps, the connector follows
+cmd 4400
+drag 900,500 900,625
+expect listitem:"Sheet.5" rect 827 550 126 101
+expect listitem:"Sheet.6" rect 651 374 239 176
+key ctrl+z
+expect listitem:"Sheet.5" rect 827 424 126 101
+expect listitem:"Sheet.6" rect 651 374 239 50
+# a click on the line selects the connector; its end dragged into the free page
+click 760,375
+expect listitem:"Sheet.6" selected
+drag button:"Endpunkt" 760,640
+expect listitem:"Sheet.6" rect 651 374 101 277
+drag 900,500 900,550
+expect listitem:"Sheet.6" rect 651 374 101 277
+# back onto the second shape (its move undone first): glued again, it follows the next move
+key ctrl+z
+expect listitem:"Sheet.5" rect 827 424 126 101
+click 752,500
+expect listitem:"Sheet.6" selected
+drag button:"Endpunkt" 890,475
+expect listitem:"Sheet.6" rect 651 374 239 50
+drag 900,500 900,625
+expect listitem:"Sheet.6" rect 651 374 239 176

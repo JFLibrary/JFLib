@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- diagramiotest (JD9): a server tower in two formats for the stencil build tool's SVG import.
+     Own drawing for the tests; the body is dark with an outline, the details light without one,
+     so the master becomes a group of two subshapes.  It uses rect with rx, circle, ellipse,
+     polygon, a path with C S Q T A H V Z in both cases, and g transforms. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 64" width="48" height="64">
+  <title>Server</title>
+  <g fill="#2E3A46" stroke="#1D2228" stroke-width="1.5">
+    <rect x="6" y="2" width="36" height="60" rx="4"/>
+  </g>
+  <g style="fill:#6FA3E0;stroke:none">
+    <rect x="12" y="10" width="24" height="6"/>
+    <rect x="12" y="20" width="24" height="6"/>
+    <path d="M12 30 h24 v6 H12 Z"/>
+    <g transform="translate(16 50)">
+      <circle cx="0" cy="0" r="3"/>
+      <ellipse cx="16" cy="0" rx="3" ry="2" transform="scale(1 1.5)"/>
+    </g>
+    <path d="m14 42 c2 -2 4 -2 6 0 s4 2 6 0 q2 -2 4 0 t4 0 a2 2 0 0 1 -2 2 L14 44 z"/>
+    <polygon points="24,56 27,60 21,60" transform="matrix(1 0 0 1 0 0)"/>
+  </g>
+</svg>

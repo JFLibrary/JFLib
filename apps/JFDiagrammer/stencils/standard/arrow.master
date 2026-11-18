@@ -1,0 +1,61 @@
+# Pfeil (Blockpfeil nach rechts): zwei Steuerpunkte.  Row_1 auf der Schaftkante ändert die
+# Schaftbreite (nur senkrecht), Row_2 an der oberen Kante ändert die Länge der Spitze (nur
+# waagrecht).  User.Shaft und User.Head halten die Werte in den Grenzen des Kastens.
+master: Arrow
+name.de: Pfeil
+name.en: Arrow
+name.es: Flecha
+name.it: Freccia
+name.fr: Flèche
+prompt.de: Blockpfeil. Schaftbreite und Spitze ändern Sie mit den gelben Steuerpunkten.
+prompt.en: Block arrow. Drag the yellow control handles to change the shaft and the head.
+prompt.es: Flecha de bloque. Arrastre los controladores amarillos para cambiar el cuerpo y la punta.
+prompt.it: Freccia a blocco. Trascina le maniglie di controllo gialle per cambiare il corpo e la punta.
+prompt.fr: Flèche pleine. Faites glisser les poignées de contrôle jaunes pour modifier le corps et la pointe.
+keywords.de: Pfeil, Blockpfeil, Richtung, weiter, rechts, Schritt
+keywords.en: arrow, block arrow, direction, next, right, step
+keywords.es: flecha, dirección, siguiente, derecha, paso
+keywords.it: freccia, direzione, avanti, destra, passo
+keywords.fr: flèche, direction, suivant, droite, étape
+
+[Shape]
+Width = 40 mm
+Width.us = 1.5 in
+Height = 20 mm
+Height.us = 0.75 in
+
+[User]
+Shaft:  Value = MIN(MAX(Controls.Row_1.Y, Height*0.5), Height)
+Head:   Value = MIN(MAX(Controls.Row_2, 0), Width)
+
+[Geometry]
+MoveTo  X = 0; Y = Height-User.Shaft
+LineTo  X = User.Head; Y = Height-User.Shaft
+LineTo  X = User.Head; Y = 0
+LineTo  X = Width; Y = Height*0.5
+LineTo  X = User.Head; Y = Height
+LineTo  X = User.Head; Y = User.Shaft
+LineTo  X = 0; Y = User.Shaft
+LineTo  X = Geometry1.X1; Y = Geometry1.Y1
+
+[Controls]
+Row_1:  X = Width*0.2; Y = Height*0.7
+        XDyn = Controls.Row_1; YDyn = Controls.Row_1.Y
+        XCon = 1; YCon = 0; CanGlue = FALSE
+        Tip.de = "Schaftbreite ändern"
+        Tip.en = "Change the shaft width"
+        Tip.es = "Cambiar el ancho del cuerpo"
+        Tip.it = "Cambia la larghezza del corpo"
+        Tip.fr = "Modifier la largeur du corps"
+Row_2:  X = Width*0.65; Y = Height
+        XDyn = Controls.Row_2; YDyn = Controls.Row_2.Y
+        XCon = 0; YCon = 1; CanGlue = FALSE
+        Tip.de = "Länge der Spitze ändern"
+        Tip.en = "Change the length of the head"
+        Tip.es = "Cambiar la longitud de la punta"
+        Tip.it = "Cambia la lunghezza della punta"
+        Tip.fr = "Modifier la longueur de la pointe"
+
+[Connection]
+Row  X = 0; Y = Height*0.5; DirX = 1; DirY = 0
+Row  X = Width; Y = Height*0.5; DirX = -1; DirY = 0

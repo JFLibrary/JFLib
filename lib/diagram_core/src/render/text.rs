@@ -8,6 +8,10 @@
 //   TextItem { xform, runs }        lines of runs in the text frame (paper inches, y up) and
 //                                   the frame's map to the page; decorations and the text
 //                                   background come as their own stroke and fill items
+//   measure_text(&mut m, &face, size, text, max_width) -> (w, h)   (JD7) a text in one format
+//                                   wrapped as a shape's text wraps: the widest line and the
+//                                   lines' height (the formula engine's TEXTWIDTH/TEXTHEIGHT
+//                                   through diagram_view's Metrics)
 //
 // The text comes as the file keeps it (Text: characters between cp, pp, tp and fld marks,
 // JD3): a cp mark selects the Character row for what follows, a pp mark the Paragraph row; a
@@ -258,12 +262,7 @@ impl Builder<'_, '_> {
                 span_fmt.push(fi);
                 let shown = cased(text, &chars[fi]);
                 span_text.push(shown.clone());
-                for piece in split_words(&shown) {
-                    let brk = piece == "\u{2028}";
-                    let space = !brk && piece.chars().all(|c| c == ' ' || c == '\t');
-                    let width = if brk || piece.contains('\t') { 0.0 } else { self.measure_run(&chars[fi], &piece) };
-                    toks.push(Tok { span, text: piece, width, space, brk });
-                }
+                tokens(self.measure, &shown, span, &chars[fi], &mut toks);
             }
             // a bullet sits at the first line's indent (IndLeft + IndFirst, a hanging indent when
             // IndFirst is negative); the first line's text starts after it, at IndLeft at least
@@ -279,7 +278,7 @@ impl Builder<'_, '_> {
             } else {
                 None
             };
-            let ls = self.wrap(toks, &pf, inner_w, tab, &chars, &span_fmt);
+            let ls = wrap(self.measure, toks, &pf, inner_w, tab, &chars, &span_fmt);
             lines.push((pf, ls, bullet));
         }
         // heights
@@ -393,93 +392,6 @@ impl Builder<'_, '_> {
         }
     }
 
-    fn wrap(&mut self, toks: Vec<Tok>, pf: &ParaFmt, inner_w: f64, tab: f64, chars: &[CharFmt], span_fmt: &[usize]) -> Vec<Line> {
-        let mut lines = Vec::new();
-        let mut cur = Line { toks: Vec::new(), width: 0.0, height: 0.0, ascent: 0.0, first: true };
-        let avail = |first: bool| (inner_w - pf.ind_left - pf.ind_right - if first { pf.ind_first } else { 0.0 }).max(0.0);
-        let mut it = toks.into_iter().peekable();
-        while let Some(mut t) = it.next() {
-            if t.brk {
-                let first = cur.first;
-                let done = core::mem::replace(&mut cur, Line { toks: Vec::new(), width: 0.0, height: 0.0, ascent: 0.0, first: false });
-                lines.push(self.finish_line(done, pf, chars, span_fmt, Some(t.span)));
-                let _ = first;
-                continue;
-            }
-            if t.text.contains('\t') {
-                // to the next tab stop of the default spacing
-                let next = (crate::geometry::floor(cur.width / tab) + 1.0) * tab;
-                t.width = (next - cur.width).max(0.0) + tab * (t.text.matches('\t').count() as f64 - 1.0);
-                t.space = true;
-            }
-            let limit = avail(cur.first);
-            if !t.space && cur.width + t.width > limit + 1e-9 && cur.toks.iter().any(|x| !x.space) {
-                // break before the word; trailing spaces hang
-                let done = core::mem::replace(&mut cur, Line { toks: Vec::new(), width: 0.0, height: 0.0, ascent: 0.0, first: false });
-                lines.push(self.finish_line(done, pf, chars, span_fmt, None));
-            }
-            let limit = avail(cur.first);
-            if !t.space && t.width > limit + 1e-9 && limit > 0.0 && t.text.chars().count() > 1 {
-                // a word wider than the whole line: at characters
-                let f = &chars[span_fmt[t.span]];
-                let mut piece = String::new();
-                let mut pw = 0.0;
-                for c in t.text.chars() {
-                    let mut s = String::new();
-                    s.push(c);
-                    let cw = self.measure_run(f, &s);
-                    if !piece.is_empty() && cur.width + pw + cw > avail(cur.first) + 1e-9 {
-                        cur.toks.push(Tok { span: t.span, text: core::mem::take(&mut piece), width: pw, space: false, brk: false });
-                        cur.width += pw;
-                        pw = 0.0;
-                        let done = core::mem::replace(&mut cur, Line { toks: Vec::new(), width: 0.0, height: 0.0, ascent: 0.0, first: false });
-                        lines.push(self.finish_line(done, pf, chars, span_fmt, None));
-                    }
-                    piece.push(c);
-                    pw += cw;
-                }
-                t.text = piece;
-                t.width = pw;
-            }
-            cur.width += t.width;
-            cur.toks.push(t);
-        }
-        lines.push(self.finish_line(cur, pf, chars, span_fmt, None));
-        lines
-    }
-
-    /// a line's width without trailing spaces, its height and ascent; an empty line takes the
-    /// format of `empty_span` (or the paragraph's first)
-    fn finish_line(&mut self, mut l: Line, pf: &ParaFmt, chars: &[CharFmt], span_fmt: &[usize], empty_span: Option<usize>) -> Line {
-        let trailing: f64 = l.toks.iter().rev().take_while(|t| t.space).map(|t| t.width).sum();
-        l.width -= trailing;
-        let spans: Vec<usize> = if l.toks.is_empty() { empty_span.or(if span_fmt.is_empty() { None } else { Some(0) }).into_iter().collect() } else { l.toks.iter().map(|t| t.span).collect() };
-        let mut size: f64 = 0.0;
-        let mut asc: f64 = 0.0;
-        for s in spans {
-            let f = &chars[span_fmt[s]];
-            size = size.max(f.size);
-            let (a, d) = self.measure.metrics(&Face { family: &f.family, bold: f.bold, italic: f.italic });
-            let em = (a + d).max(0.1);
-            // the em box centred in the line, the baseline at its share of ascent
-            asc = asc.max(f.size * a / em);
-        }
-        if size <= 0.0 {
-            size = 12.0 / 72.0;
-            asc = size * 0.8;
-        }
-        let height = if pf.sp_line < 0.0 {
-            -pf.sp_line * size
-        } else if pf.sp_line > 0.0 {
-            pf.sp_line
-        } else {
-            1.2 * size
-        };
-        l.height = height;
-        l.ascent = (height - size) * 0.5 + asc;
-        l
-    }
-
     /// the index of Character row cp's format in `chars` (made on first use)
     fn fmt_index(&mut self, chars: &mut Vec<CharFmt>, char_ix: &mut Vec<u32>, sheet: SheetRef, cp: u32, layer_color: Option<u32>) -> usize {
         if let Some(i) = char_ix.iter().position(|&c| c == cp) {
@@ -492,12 +404,7 @@ impl Builder<'_, '_> {
     }
 
     fn measure_run(&mut self, f: &CharFmt, text: &str) -> f64 {
-        if text.is_empty() {
-            return 0.0;
-        }
-        let k = if f.pos != 0 { 0.67 } else { 1.0 };
-        let adv = self.measure.advance(&Face { family: &f.family, bold: f.bold, italic: f.italic }, text);
-        adv * f.size * k * f.scale_x + f.spacing * text.chars().count() as f64
+        run_width(self.measure, f, text)
     }
 
     fn char_fmt(&mut self, sheet: SheetRef, cp: u32, layer_color: Option<u32>) -> CharFmt {
@@ -600,6 +507,156 @@ impl Builder<'_, '_> {
 
 fn make_run(f: &CharFmt, at: [f64; 2], text: String, width: f64) -> TextRun {
     TextRun { at, text, family: f.family.clone(), bold: f.bold, italic: f.italic, size: if f.small_caps { f.size * 0.8 } else { f.size }, color: f.color, scale_x: f.scale_x, spacing: f.spacing, width }
+}
+
+/// the size of a text in one format as a shape's text block sets it: (the widest line, the
+/// height of all lines), inches.  Paragraphs end at LF (the text's last LF is Visio's end mark),
+/// U+2028 breaks a line, lines wrap at `max_width` the way the layout wraps them (at spaces and
+/// after hyphens, a word wider than the line at characters), tabs go to stops 0.5 in apart;
+/// a line is 120 % of the size high (SpLine's default).  An empty text is one empty line.
+pub fn measure_text(m: &mut dyn Measure, face: &Face, size: f64, text: &str, max_width: Option<f64>) -> (f64, f64) {
+    let size = if size.is_finite() && size > 0.0 { size } else { 12.0 / 72.0 };
+    let f = CharFmt {
+        family: String::from(face.family),
+        bold: face.bold,
+        italic: face.italic,
+        underline: false,
+        double_underline: false,
+        overline: false,
+        strike: false,
+        small_caps: false,
+        case: 0,
+        pos: 0,
+        size,
+        color: 0,
+        scale_x: 1.0,
+        spacing: 0.0,
+    };
+    let pf = ParaFmt { ind_first: 0.0, ind_left: 0.0, ind_right: 0.0, sp_line: -1.2, sp_before: 0.0, sp_after: 0.0, align: 0, bullet: false };
+    let inner_w = max_width.filter(|w| w.is_finite()).map_or(f64::INFINITY, |w| w.max(0.0));
+    let chars = [f];
+    let span_fmt = [0usize];
+    let mut paras: Vec<&str> = text.split('\n').collect();
+    if paras.len() > 1 && paras.last().is_some_and(|p| p.is_empty()) {
+        paras.pop();
+    }
+    let (mut w, mut h) = (0.0f64, 0.0f64);
+    for para in paras {
+        let clean: String = para.chars().filter(|c| *c == '\t' || *c == '\u{2028}' || !c.is_control()).collect();
+        let mut toks = Vec::new();
+        tokens(m, &clean, 0, &chars[0], &mut toks);
+        for l in wrap(m, toks, &pf, inner_w, 0.5, &chars, &span_fmt) {
+            w = w.max(l.width);
+            h += l.height;
+        }
+    }
+    (w, h)
+}
+
+/// the advance of a run's text in its format: the size, super- and subscript, FontScale and
+/// Letterspace
+fn run_width(m: &mut dyn Measure, f: &CharFmt, text: &str) -> f64 {
+    if text.is_empty() {
+        return 0.0;
+    }
+    let k = if f.pos != 0 { 0.67 } else { 1.0 };
+    let adv = m.advance(&Face { family: &f.family, bold: f.bold, italic: f.italic }, text);
+    adv * f.size * k * f.scale_x + f.spacing * text.chars().count() as f64
+}
+
+/// the measured pieces of a span's text (words, spaces, tabs, line breaks)
+fn tokens(m: &mut dyn Measure, shown: &str, span: usize, f: &CharFmt, toks: &mut Vec<Tok>) {
+    for piece in split_words(shown) {
+        let brk = piece == "\u{2028}";
+        let space = !brk && piece.chars().all(|c| c == ' ' || c == '\t');
+        let width = if brk || piece.contains('\t') { 0.0 } else { run_width(m, f, &piece) };
+        toks.push(Tok { span, text: piece, width, space, brk });
+    }
+}
+
+/// a paragraph's tokens in lines of the block's inner width
+fn wrap(m: &mut dyn Measure, toks: Vec<Tok>, pf: &ParaFmt, inner_w: f64, tab: f64, chars: &[CharFmt], span_fmt: &[usize]) -> Vec<Line> {
+    let mut lines = Vec::new();
+    let mut cur = Line { toks: Vec::new(), width: 0.0, height: 0.0, ascent: 0.0, first: true };
+    let avail = |first: bool| (inner_w - pf.ind_left - pf.ind_right - if first { pf.ind_first } else { 0.0 }).max(0.0);
+    for mut t in toks {
+        if t.brk {
+            let done = core::mem::replace(&mut cur, Line { toks: Vec::new(), width: 0.0, height: 0.0, ascent: 0.0, first: false });
+            lines.push(finish_line(m, done, pf, chars, span_fmt, Some(t.span)));
+            continue;
+        }
+        if t.text.contains('\t') {
+            // to the next tab stop of the default spacing
+            let next = (crate::geometry::floor(cur.width / tab) + 1.0) * tab;
+            t.width = (next - cur.width).max(0.0) + tab * (t.text.matches('\t').count() as f64 - 1.0);
+            t.space = true;
+        }
+        let limit = avail(cur.first);
+        if !t.space && cur.width + t.width > limit + 1e-9 && cur.toks.iter().any(|x| !x.space) {
+            // break before the word; trailing spaces hang
+            let done = core::mem::replace(&mut cur, Line { toks: Vec::new(), width: 0.0, height: 0.0, ascent: 0.0, first: false });
+            lines.push(finish_line(m, done, pf, chars, span_fmt, None));
+        }
+        let limit = avail(cur.first);
+        if !t.space && t.width > limit + 1e-9 && limit > 0.0 && t.text.chars().count() > 1 {
+            // a word wider than the whole line: at characters
+            let f = &chars[span_fmt[t.span]];
+            let mut piece = String::new();
+            let mut pw = 0.0;
+            for c in t.text.chars() {
+                let mut s = String::new();
+                s.push(c);
+                let cw = run_width(m, f, &s);
+                if !piece.is_empty() && cur.width + pw + cw > avail(cur.first) + 1e-9 {
+                    cur.toks.push(Tok { span: t.span, text: core::mem::take(&mut piece), width: pw, space: false, brk: false });
+                    cur.width += pw;
+                    pw = 0.0;
+                    let done = core::mem::replace(&mut cur, Line { toks: Vec::new(), width: 0.0, height: 0.0, ascent: 0.0, first: false });
+                    lines.push(finish_line(m, done, pf, chars, span_fmt, None));
+                }
+                piece.push(c);
+                pw += cw;
+            }
+            t.text = piece;
+            t.width = pw;
+        }
+        cur.width += t.width;
+        cur.toks.push(t);
+    }
+    lines.push(finish_line(m, cur, pf, chars, span_fmt, None));
+    lines
+}
+
+/// a line's width without trailing spaces, its height and ascent; an empty line takes the
+/// format of `empty_span` (or the paragraph's first)
+fn finish_line(m: &mut dyn Measure, mut l: Line, pf: &ParaFmt, chars: &[CharFmt], span_fmt: &[usize], empty_span: Option<usize>) -> Line {
+    let trailing: f64 = l.toks.iter().rev().take_while(|t| t.space).map(|t| t.width).sum();
+    l.width -= trailing;
+    let spans: Vec<usize> = if l.toks.is_empty() { empty_span.or(if span_fmt.is_empty() { None } else { Some(0) }).into_iter().collect() } else { l.toks.iter().map(|t| t.span).collect() };
+    let mut size: f64 = 0.0;
+    let mut asc: f64 = 0.0;
+    for s in spans {
+        let f = &chars[span_fmt[s]];
+        size = size.max(f.size);
+        let (a, d) = m.metrics(&Face { family: &f.family, bold: f.bold, italic: f.italic });
+        let em = (a + d).max(0.1);
+        // the em box centred in the line, the baseline at its share of ascent
+        asc = asc.max(f.size * a / em);
+    }
+    if size <= 0.0 {
+        size = 12.0 / 72.0;
+        asc = size * 0.8;
+    }
+    let height = if pf.sp_line < 0.0 {
+        -pf.sp_line * size
+    } else if pf.sp_line > 0.0 {
+        pf.sp_line
+    } else {
+        1.2 * size
+    };
+    l.height = height;
+    l.ascent = (height - size) * 0.5 + asc;
+    l
 }
 
 /// the text in the case its format says

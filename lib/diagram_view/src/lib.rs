@@ -5,12 +5,16 @@
 //                                    substituted by class with a width factor (TX-09)
 //   PageView::new(&doc, page, &mut fonts, &opts)   a page as a render2d scene (made without a
 //                                    device) plus gradients and pictures
+//   view.update(&doc, &mut fonts, &shapes) -> Option<[f64; 4]>   (JD7) edited shapes made anew
+//                                    in the list and the scene, the box of what changed
 //   view.draw(dc, sf, r, &cam)       on the CPU: render2d's CPU path, gfx in between
 //   view.render(w, h) -> Surface     the whole page as an XRGB image (tests, exports, thumbnails)
 //   view.fit(size, margin) -> Camera
 //   image::{bytes, decode, base64}   Foreign shapes' pictures: PNG and JPEG decoded, EMF / WMF
 //                                    and the rest as placeholders
 //   export::{pdf, svg, raster}       (JD12) pages as PDF (lib/pdf), SVG, PNG and JPEG
+//   Metrics::new(&fonts)             (JD7) the formula engine's TextMetrics (TEXTWIDTH,
+//                                    TEXTHEIGHT) measured as the page views draw
 //
 // Why a crate of its own (JD4): diagram_core holds the model and the display list without any
 // dependency, so that diagram_io's exports (SVG, PDF, JD12) and JD7's hit tests use the same
@@ -31,9 +35,11 @@ mod direct;
 pub mod export;
 pub mod fonts;
 pub mod image;
+mod measure;
 mod view;
 
 pub use fonts::{class_of, Class, FontSet, FontSource};
+pub use measure::Metrics;
 pub use view::{PageView, SYNTHETIC_ITALIC};
 
 pub(crate) fn sqrt(x: f64) -> f64 {

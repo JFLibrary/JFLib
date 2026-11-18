@@ -11,8 +11,8 @@
 //   dialogs(app, ui)           the save dialog, every pass
 //   export(app, path) -> Result<message, message>   write the files (several pages as SVG, PNG or
 //                              JPEG: one file each, "<name>-<n>.<ext>")
-//   copy_page(app, ui, svg)    EX-14 for the page shown: a picture (PNG with a DIB) or the SVG
-//                              as text; a selection comes with editing (JD7)
+//   copy_page(app, ui, svg)    EX-14: the selection, else the page shown, as a picture (PNG
+//                              with a DIB) or as SVG text
 //
 // The files come from diagram_view::export (PDF through lib/pdf, SVG, the CPU path for pixels):
 // pages as the screen draws them, texts measured with the same fonts.  Test aid: --export-dir
@@ -244,12 +244,12 @@ pub(crate) fn page(app: &mut Diagrammer, ui: &mut Ui) {
     if ui.ribbon_button(ID + 0x31, t("Als Bild kopieren"), JD_SEND_COPY_L, ST_LARGE | if has { 0 } else { ST_DISABLED }) & EV_ACT != 0 && has {
         copy_page(app, ui, false);
     }
-    ui.tooltip(t("Die aktuelle Seite als Bild (PNG) in die Zwischenablage kopieren"));
+    ui.tooltip(t("Die Auswahl (ohne Auswahl die aktuelle Seite) als Bild (PNG) in die Zwischenablage kopieren"));
     ui.next_size(96, 66);
     if ui.ribbon_button(ID + 0x32, t("Als SVG kopieren"), JD_PICTURES_L, ST_LARGE | if has { 0 } else { ST_DISABLED }) & EV_ACT != 0 && has {
         copy_page(app, ui, true);
     }
-    ui.tooltip(t("Die aktuelle Seite als SVG-Text in die Zwischenablage kopieren (für Grafikprogramme und Webseiten)"));
+    ui.tooltip(t("Die Auswahl (ohne Auswahl die aktuelle Seite) als SVG-Text in die Zwischenablage kopieren (für Grafikprogramme und Webseiten)"));
     ui.box_end();
     if let Some((sev, msg)) = app.export.status.clone() {
         ui.next_size(440, 0);
@@ -349,7 +349,7 @@ pub(crate) fn export(app: &mut Diagrammer, path: &str) -> Result<String, String>
         let mut view = PageView::new(doc, page, &mut app.fonts, &opts);
         let bytes = match f {
             1 => {
-                let so = svg::SvgOptions { background: paper, links, shape_data, title: export::page_name(doc, page) };
+                let so = svg::SvgOptions { background: paper, links, shape_data, title: export::page_name(doc, page), region: None };
                 Some(svg::write(doc, view.drawing(), &so).into_bytes())
             }
             _ => {
@@ -371,26 +371,72 @@ pub(crate) fn export(app: &mut Diagrammer, path: &str) -> Result<String, String>
     Ok(if written.len() == 1 { tf("Gespeichert: {}", &[&display]) } else { tf("Gespeichert: {} und weitere (Dateien: {})", &[&String::from(plat::display_name(&written[0])), &format!("{}", written.len())]) })
 }
 
-/// EX-14: the page shown on the clipboard as a picture (PNG + DIB, 150 DPI) or as SVG text (the
+/// EX-14: the selection (JD7) -- else the page shown -- on the clipboard as a picture (PNG + DIB,
+/// 150 DPI) or as SVG text.  A selection is drawn alone: a copy of the drawing without the page's
+/// other top-level shapes and without background pages, cut to the selection's box.  (The
 /// clipboard takes a picture or texts in one go; SVG as its own format, image/svg+xml, needs the
-/// platform layer)
+/// platform layer.)
 pub(crate) fn copy_page(app: &mut Diagrammer, ui: &mut Ui, as_svg: bool) {
     let Some(o) = app.opened.as_ref() else { return };
     let Some(tab) = o.tabs.get(app.page_index()).or_else(|| o.tabs.first()) else { return };
     let page = tab.page;
-    let doc = &o.doc;
-    let mut view = PageView::new(doc, page, &mut app.fonts, &Options::default());
+    let sel = selection_doc(app, page);
+    let Some(o) = app.opened.as_ref() else { return };
+    let is_sel = sel.is_some();
+    let doc = sel.as_ref().unwrap_or(&o.doc);
+    let opts = Options { background: !is_sel, hidden_layers: false };
+    let mut view = PageView::new(doc, page, &mut app.fonts, &opts);
+    // a selection: its box and two pixels around it
+    let pad = 2.0 / 150.0;
+    let region = if is_sel { view.drawing().bounds().map(|b| [b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad]) } else { None };
     let ok = if as_svg {
-        let text = svg::write(doc, view.drawing(), &svg::SvgOptions { title: export::page_name(doc, page), ..Default::default() });
+        let so = svg::SvgOptions { title: export::page_name(doc, page), background: !is_sel, region, ..Default::default() };
+        let text = svg::write(doc, view.drawing(), &so);
         ui.clip_set(CLIP_TEXT, text.as_bytes()) == 0
     } else {
-        let ro = raster::RasterOptions { dpi: 150.0, region: None, background: raster::Background::Page };
+        let ro = raster::RasterOptions { dpi: 150.0, region, background: raster::Background::Page };
         raster::render(&mut view, &ro).is_some_and(|sf| ui.clip_set_image(&sf) == 0)
     };
-    app.export.status = Some(match (ok, as_svg) {
-        (true, false) => (0, String::from(t("Die Seite ist als Bild in der Zwischenablage."))),
-        (true, true) => (0, String::from(t("Die Seite ist als SVG in der Zwischenablage."))),
+    app.export.status = Some(match (ok, as_svg, is_sel) {
+        (true, false, false) => (0, String::from(t("Die Seite ist als Bild in der Zwischenablage."))),
+        (true, true, false) => (0, String::from(t("Die Seite ist als SVG in der Zwischenablage."))),
+        (true, false, true) => (0, String::from(t("Die Auswahl ist als Bild in der Zwischenablage."))),
+        (true, true, true) => (0, String::from(t("Die Auswahl ist als SVG in der Zwischenablage."))),
         _ => (3, String::from(t("Die Seite ließ sich nicht kopieren."))),
     });
     ui.repass();
+}
+
+/// a copy of the drawing with only the selected shapes' top-level shapes left on `page` (None:
+/// nothing selected on it)
+fn selection_doc(app: &Diagrammer, page: diagram_core::PageRef) -> Option<diagram_core::Document> {
+    if app.model.page != Some(page) {
+        return None;
+    }
+    let sel = crate::edit_canvas::selected(app);
+    let o = app.opened.as_ref()?;
+    // the top-level shapes of the selection (a subshape keeps its whole group)
+    let mut tops: Vec<diagram_core::ShapeRef> = Vec::new();
+    for s in sel {
+        let mut top = s;
+        let mut cur = o.doc.shape(s).and_then(|x| x.parent());
+        while let Some(c) = cur {
+            top = c;
+            cur = o.doc.shape(c).and_then(|x| x.parent());
+        }
+        if o.doc.shape(top).is_some() && !tops.contains(&top) {
+            tops.push(top);
+        }
+    }
+    if tops.is_empty() {
+        return None;
+    }
+    let mut doc = o.doc.clone();
+    let others: Vec<diagram_core::ShapeRef> = doc.top_shapes(diagram_core::Owner::Page(page)).filter(|s| !tops.contains(s)).collect();
+    if !others.is_empty() {
+        let mut tx = doc.transaction("copy");
+        tx.delete_shapes(&others).ok()?;
+        let _ = tx.commit();
+    }
+    Some(doc)
 }
