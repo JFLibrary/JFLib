@@ -30,6 +30,8 @@ mod checksum;
 mod input_t;
 mod net_codec;
 mod net_lag;
+// (real sockets: not in the browser, where only the console paths run in Node: tests/web.mjs)
+#[cfg(not(target_arch = "wasm32"))]
 mod net_loop;
 mod net_room;
 mod net_session;
@@ -167,6 +169,7 @@ fn run() -> i32 {
     if args.iter().any(|a| a == "--netbench") {
         return net_sim::bench();
     }
+    #[cfg(not(target_arch = "wasm32"))]
     if args.iter().any(|a| a == "--loopback") {
         let num = |name: &str, d: u64| value(name).and_then(|v| v.parse::<u64>().ok()).unwrap_or(d);
         return net_loop::run(num("--secs", 6), num("--udp", 4) as usize, num("--ws", 4) as usize);

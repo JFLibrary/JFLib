@@ -304,7 +304,8 @@ eine Physik-Welt), ein Läufer mit Kapsel-Cast, interpolierte Posen. Die Maus mi
 | Linux x86-64 (glibc) in WSL Ubuntu 24.04 | Entwicklung | `8edfe993e4ffcb65` |
 | macOS ARM64 (Mac mini M2), Rust 1.98.1 | Entwicklung | `8edfe993e4ffcb65` |
 
-Nicht gelaufen: der Browser, Android, ARM64 unter Linux und Windows, iOS. Die Physik ist dort bitgleich gezeigt
+Im Browser (WebAssembly in Node 22.17, einfach, SIMD und Threads, `apps/gametest/tests/web.mjs`, seit G7e) ebenfalls
+`8edfe993e4ffcb65`. Nicht gelaufen: Android, ARM64 unter Linux und Windows, iOS. Die Physik ist dort bitgleich gezeigt
 ([PHYSICS.md](PHYSICS.md#prüfsummen)), der Kern nimmt nur `+ − × ÷` und deren Mathematik dazu.
 
 ## Was nicht getestet ist

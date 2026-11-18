@@ -127,7 +127,7 @@ Server; eine, die mehr als 64 Ticks voraus ist, auch.
 Jedes INPUT-Paket trägt die neueste Eingabe ganz und die älteren, die der Server noch nicht hat, jede gegen die nächstjüngere
 (ein Bit, wenn sie gleich ist; sonst eine Maske der Felder und ihre Differenzen): höchstens 16, mindestens die letzten drei. Der
 Server sagt in jedem Schnappschuss, bis zu welchem Tick er die Eingaben lückenlos hat (`have`). Ein verlorenes Datagramm kostet
-so nichts: Die nächste Eingabe bringt die verlorene mit. 16 Eingaben, die sich nur im Blick unterscheiden, sind 34 Bytes.
+so nichts: Die nächste Eingabe bringt die verlorene mit. 16 Eingaben, die sich nur im Blick unterscheiden, sind 41 Bytes.
 `NetInput` ist für Spiele wie Spiel 1 geschnitten: 16 Knöpfe (gehalten; Kanten aus dem Vergleich mit dem Tick davor), zwei
 Achsen (−127 bis 127), Gier (65 536 Schritte je Umdrehung), Nicken (dieselbe Schrittweite, ±90°) und die Sichtzeit für den
 Lag-Ausgleich.
@@ -165,7 +165,7 @@ dem Tod sind für den Client Abweichungen wie jede andere. Sichtbare Sprünge gl
   unter einer alten Id wird nie mit der alten verblendet), eine Art und bis zu 16 ganze Zahlen (`NetState`), schon
   quantisiert. `Schema` sagt, wie viele Felder eine Art hat. Die Arena hat Figuren (13 Felder: die 7 der Bewegung, Gier,
   Nicken, Leben, Abschüsse, Tode, der Tick des letzten Schusses) und Requisiten (7: Position, Drehung als kleinste drei
-  Komponenten mit je 11 Bits, 0,06°).
+  Komponenten mit je 12 Bits, an 20 000 Drehungen geprüft höchstens 0,1° daneben).
 - **Delta**: Gegen eine Basis (unten) gehen nur Änderungen: die Zahl der Änderungen, je Änderung die Lücke zur vorigen Id
   (meist 5 Bits), die Art der Änderung (2 Bits: Änderung, neu, weg), bei einer Änderung eine Maske der Felder und je
   geändertem Feld die Differenz in einem Code mit 7, 12, 19 oder 35 Bits (eine Figur, die 4,5 m/s läuft, verschiebt sich
@@ -215,8 +215,8 @@ letzten `max_rewind + 8` Ticks). Schießt eine Figur in Tick T, stellt er die an
 darum geblendet wie ein Client zwei Schnappschüsse blendet), höchstens `max_rewind_ms` (200 ms, 12 Ticks); was weiter zurück
 läge, wird auf die Grenze gezogen und gezählt (`ArenaStats::clamped`). Dann ein Strahl: gegen die Karte mit `World::ray_cast`,
 gegen jede zurückgestellte Kapsel mit `physics::query::ray`; der nächste Treffer zählt, der Schütze selbst nicht. Die Zeit hinter
-dem Tick enthält Marge, Umlauf und die 100 ms der Interpolation: Bei 200 ms Grenze wird schon ab rund 60 ms Umlauf gezogen (siehe
-[Messwerte](#messwerte) und die Frage im Bericht).
+dem Tick enthält Marge, Umlauf und die 100 ms der Interpolation: Bei 200 ms Grenze wird schon ab rund 50 ms Umlauf gezogen; wie
+weit das Ziel dann daneben steht, steht unter [Messwerte](#messwerte), mit der offenen Frage, wie die Grenze gemeint ist.
 
 ### Die anderen: Interpolation
 
@@ -270,19 +270,197 @@ nächsten anderen in 25 m.
 
 ## Tests
 
-TESTS_PLACEHOLDER
+`python build_rs.py test gametest` führt `apps/gametest/tests/check.uis` (`--check`: auch die fünf Gruppen des Netcodes) und
+`tests/loopback.uis` (`--loopback --secs 5`) aus. Die Referenzen teilen keinen Code mit `game::net`: eine einfache volle
+Kodierung in ganzen Bytes für die Schnappschüsse, Listen jedes aufgezeichneten Ticks für das Zurückstellen, ein eigener Schnitt
+von Strahl und Kapsel und ein Slab-Test für den Hitscan, eine eigene Bewegung aus ganzen Zahlen für den Abgleich; für die
+Vorhersage ist die Referenz der Server selbst (sein Zustand jeder Figur in jedem Tick).
+
+| Gruppe | Prüft | Ergebnis |
+| --- | --- | --- |
+| `netcodec` | Bitstrom: 20 000 zufällige Folgen von Werten mit 0 bis 32 Bits, die Codes an ihren Grenzen und ihre Größen, Lesen hinter dem Ende (Nullen und die Fehlermarke). Raster: 100 000 Positionen bis ±10⁵ m (höchstens ein halber Schritt, das Raster exakt), Winkel, Nicken, Achsen, 20 000 Drehungen (q und −q gleich). 4000 Paare von Schnappschüssen (bis 120 Entitäten, Arten mit 1 bis 16 Feldern, Ids mit großen Lücken, entfernt, geändert, neue Generation, neu, ein Drittel mit Grundlinie): Delta gegen die Basis und volle Kodierung gegen nichts ergeben beide den Stand der Referenzkodierung, die gemessene Größe ist die geschriebene. 3000 Schnitte durch zufällige Budgets mit zufälligen Prioritäten: nie über dem Budget, in Id-Reihenfolge, dekodiert gleich Basis + Gewähltes, jede Entität ist die der Basis oder die neue, „vollständig“ genau dann, wenn alles drin ist. 60 000 kaputte Byte-Folgen (zufällig, gekippte Bits, abgeschnitten, verlängert) an den Decoder und alle Leser der Nachrichten. 20 000 Eingabe-Pakete mit 1 bis 16 Eingaben; alle Nachrichten hin und zurück (ein Name, der mitten in einem Zeichen endet, verliert das Zeichen). Der Eingabepuffer über den Umlauf von u32: Reihenfolge, fehlend, zu spät, zu früh, Lücken, `have`, die Marge, ein weiter Sprung. Der Prädiktor gegen eine Neuberechnung: erster Stand, exakte Vorhersage, Abgleich, älterer Stand. Die Uhren: 60 Ticks je Sekunde, schneller und langsamer, Sprung, Halten; die Interpolation folgt über den Umlauf und hält ohne Nachschub | 67 Prüfungen, 0 falsch; Delta im Mittel 296 Bytes gegen 1248 voll; 10 046 der kaputten Folgen dekodierten noch (gültig), keine Panik; 16 Eingaben, die sich im Blick unterscheiden, 41 Bytes |
+| `lagcomp` | `view_time` an 3 Ticks (auch am Umlauf) × 732 Werten; 200 Runden mit 1 bis 16 Figuren über bis zu 65 Ticks (manche fehlen in manchen Ticks, gemischt aufgezeichnet), je 50 Zeiten auch vor und nach dem Gemerkten, Bit für Bit gegen die Liste; 16 000 Strahlen gegen 0 bis 5 Kisten und bis zu 16 Kapseln gegen die eigene Rechnung; die Arena: ein Schuss dorthin, wo der Schütze das Ziel vor 10 Ticks sah, trifft mit dem Zurückstellen (Schaden 25) und ohne nicht, eine Sicht über 200 ms wird gezogen und gezählt | 8 Prüfungen, 0 falsch |
+| `room` | 20 000 Codes (gültig, zurückgelesen, jede Schreibweise), verweigerte Codes, Links (Fragment, Abfrage, Pfad, nackt), acht Namen und ihre Säuberung, eindeutige Namen; der Server mit netchan-Ereignissen von Hand: HELLO macht einen Raum, zwei treten bei (Namen „Anna“, „anna 2“), voller Raum, unbekannter Raum, andere Version, leerer Name, der erste Schnappschuss eines WebSockets gegen die Grundlinie, Verlassen, der freie Platz mit Generation 1, eine stumme Verbindung nach 500 ms zu, ein leerer Raum nach 1 s zu, `max_rooms`; 300 bewegte Requisiten: Ticket für UDP, keines für WebSocket, ein falsches Ticket, FULL beim nächsten Schnappschuss-Tick und kein UDP-Schnappschuss in diesem Tick | 47 Prüfungen, 0 falsch; FULL 3146 Bytes |
+| `netsim` | Sitzungen mit Bots (ein Viertel über WebSocket, 40 Requisiten, 8 fahren): klar 6 s mit 8, typisch 10 s mit 8, rau 10 s mit 6, Sturm 10 s mit 4, dann klar; nach der Heilung (2 s) 3 s lang jede erste Vorhersage gegen den Zustand des Servers Bit für Bit, kein Abgleich mit Unterschied, jeder Client im Raum, keine fehlende Basis, kein kaputter Schnappschuss, keiner über 1200 Bytes. Der Umlauf der Ticks (Start 240 vor `u32::MAX`, rau). Der volle Stand mit 300 Requisiten (30 fahren, 150 stehen nicht am Platz der Karte): geholt über den WebSocket und ohne WebSocket nur nach Priorität aufgefüllt, danach ist der neueste Stand jedes Clients der Welt des Servers gleich. Verlassen (die anderen sehen die Figur gehen) und neu beitreten (dieselbe Id, Generation 1). 70 000 Schnappschüsse an einen Client über den Umlauf der Folgenummern (5 % Verlust), danach bitgleich | 51 Prüfungen, 0 falsch; siehe unten |
+| `bots` | 16 Bots, typisches Wetter, 300 Requisiten, Schießen: alle spielen, keiner getrennt, kein Schnappschuss über 1200 Bytes, aufwärts unter 300 Paketen und 256 KiB je Sekunde | 4 Prüfungen, 0 falsch |
+| Skript `loopback.uis` | echte Sockets: siehe [unten](#echte-sockets) | bestanden |
+
+Die Läufe der Gruppe `netsim` (dieselben auf allen Zielen):
+
+| Wetter | Spieler | schlechtes Wetter | Abweichungen der Vorhersage darin | nach der Heilung verglichen | verschieden |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| klar | 8 | 6 s | 0 von 5119 Ticks | 1440 | 0 |
+| typisch | 8 | 10 s | 11 von 6983 | 1440 | 0 |
+| rau | 6 | 10 s | 29 von 5242 | 1080 | 0 |
+| Sturm | 4 | 10 s | 88 von 3245 | 720 | 0 |
+| Umlauf der Ticks (rau) | 3 | 4 s | – | über 100 | 0 |
+| Umlauf der Folgenummern (5 % Verlust) | 1 | 1170 s, 70 494 Schnappschüsse | – | 180 | 0 |
+
+Beitreten mit 300 Requisiten (150 nicht am Platz der Karte, 30 fahren), typisches Wetter: Der volle Stand gegen die Grundlinie
+sind 1853 Bytes, passt also nicht in ein Datagramm. Vollständig (der neueste Stand des Clients gleich der Welt des Servers) nach
+rund 200 ms über UDP mit FULL über den WebSocket, ebenso schnell ohne WebSocket nur nach Priorität aufgefüllt (9 geschnittene
+Schnappschüsse), 50 ms für den Browser-Client über WebSocket (gemessen in Schritten von 100 ms).
+
+| Ziel | `--test netcodec,lagcomp,room,netsim,bots` | `--loopback` |
+| --- | --- | --- |
+| Windows x86-64 (Ryzen 5 3600), Rust 1.100, Entwicklung | 177 von 177 | bestanden (8 Clients, 8 s) |
+| Linux x86-64 (glibc) in WSL Ubuntu 24.04, Entwicklung | 176 von 176 (`--quick`) | bestanden (8 Clients, 6 s) |
+| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1, Entwicklung | 177 von 177 | bestanden (8 Clients, 6 s) |
+
+### Echte Sockets
+
+`gametest --loopback` (Skript `tests/loopback.uis`): ein `netchan::Server` auf 127.0.0.1 mit UDP und dem WebSocket-Pfad
+`/game`, die Arena mit 300 Requisiten (150 nicht am Platz der Karte), vier Bots über UDP (jeder holt seinen vollen Stand über
+einen eigenen WebSocket: FULL) und vier über WebSocket, alles in einem Thread (`link::serve`, `NetLink`; `Server::wait(1)`
+schläft, bis ein Paket kommt). Auf Windows (8 s), in WSL und auf dem M2 (je 6 s): alle acht spielen, jeder UDP-Client bekam
+genau ein FULL (rund 1800 Bytes), keine fehlende Basis, kein kaputter Schnappschuss, 160 bis 240 Schnappschüsse je Client, die
+Marge bei 2 Ticks, 2 bis 8 Abweichungen je Client (Tode: die Bots schießen), Umlauf über netchan 15 bis 23 ms (ein Ack reitet auf
+dem nächsten Paket der Gegenseite, Schnappschüsse kommen alle 33 ms).
 
 ## Prüfsumme
 
-CHECKSUM_PLACEHOLDER
+`gametest --netsum` faltet eine aufgezeichnete Sitzung mit festem Seed in eine Zahl (FNV-1a): ein Server mit der Arena (200
+Requisiten, 100 nicht am Platz der Karte, 10 fahren; die UDP-Clients holen ihren vollen Stand über einen WebSocket), sechs Bots
+(vier über UDP, zwei über WebSocket), die schießen, 10 s raues Wetter, dann 5 s klar, Start 600 Ticks vor dem Umlauf von u32.
+Gefaltet werden jede Nachricht des Servers (Verbindung und Bytes), der Zustand jeder Figur des Servers in jedem Tick, jede erste
+Vorhersage jedes Clients, die Zahl der Abweichungen und ihre Fehler, die interpolierten anderen jeder Sekunde, Schüsse, Treffer,
+Tode. Die Sitzung läuft über netchans Kerne auf der simulierten Leitung: Die Prüfsumme umfasst also auch den Handschlag (HMAC),
+die Folgenummern und die Acks.
+
+| Ziel | Build | `--netsum` | `--checksum` (der Kern, G7b) |
+| --- | --- | --- | --- |
+| Windows x86-64 (Ryzen 5 3600), Rust 1.100 | Entwicklung und Release | `52c4613d8ffdd103` (177 304 Werte) | `8edfe993e4ffcb65` |
+| Linux x86-64 (glibc) in WSL Ubuntu 24.04 | Entwicklung und Release | `52c4613d8ffdd103` | `8edfe993e4ffcb65` |
+| macOS ARM64 (Mac mini M2, macOS 27.2), Rust 1.98.1 | Entwicklung und Release | `52c4613d8ffdd103` | `8edfe993e4ffcb65` |
+| WebAssembly in Node 22.17 (V8): einfach, SIMD, Threads (`tests/web.mjs`) | Entwicklung | `52c4613d8ffdd103` (alle drei) | `8edfe993e4ffcb65` (alle drei; für den Kern neu) |
+
+Die Messungen von `--netbench` ergeben auf Windows und dem M2 dieselben Zahlen bis auf die Zeiten (siehe unten).
 
 ## Messwerte
 
-MEASURE_PLACEHOLDER
+`gametest --netbench` im Release-Build: 16 Bots in der Arena (60 × 60 m, 12 Kisten), je 30 s virtueller Zeit nach den
+Beitritten. Die Bots laufen, rennen, springen, drehen und schießen auf den nächsten in 25 m (zielen sehr gut: rund 93 % Treffer,
+also viele Tode und Neustarts). Requisiten: die Hälfte steht nicht mehr am Platz der Karte, ein Zehntel fährt Kreise.
+Schnappschüsse mit 30 Hz, wo nicht anders genannt. Alles außer den Zeiten der Ticks ist deterministisch: Windows und der M2
+messen dieselben Zahlen.
+
+**Vorhersage** (je Spieler; „Fehler“: wie weit die Vorhersage für den Tick des Servers daneben lag, über die Abweichungen;
+„Sprung“: wie weit der jetzige Zustand dabei springt):
+
+| Lauf | Abweichungen je Minute | Fehler Mittel / p99 / max | Sprung p99 |
+| --- | ---: | --- | ---: |
+| klar, ohne Schießen (Gruppe `netsim`) | 0 | – | – |
+| typisch, ohne Schießen | 10,6 | 0,007 / 0,18 / 0,18 m | 0,59 m |
+| klar, Schießen | 29–31 | 6,2 / 11,4 / 12,5 m | 11,6 m |
+| typisch, Schießen | 45,8 | 4,0 / 12,1 / 15,2 m | 12,1 m |
+| typisch, Schnappschüsse mit 60 Hz | 51,9 | 3,3 / 11,2 / 12,2 m | 11,4 m |
+| rau, Schießen | 54,9 | 3,1 / 11,2 / 14,1 m | 11,4 m |
+| Sturm, Schießen | 197,1 | 0,6 / 9,9 / 18,2 m | 9,8 m |
+
+Mit Schießen sind die meisten Abweichungen Neustarts nach einem Tod (ein Sprung an einen Startplatz, Meter weit); was das Netz
+selbst kostet, zeigt der Lauf ohne Schießen: Bei 1 % Verlust und ±5 ms Schwankung kommt rund alle 6 s eine Eingabe zu spät (die
+Marge von 2 Ticks reicht dann nicht), die Korrektur ist im Mittel 7 mm. Nach dem Ende schlechten Wetters ist jede Vorhersage
+wieder exakt (Gruppe `netsim`).
+
+**Bandbreite** je Spieler (Nutzlast und Kopf von netchan; „Leitung“: dazu 28 Bytes IPv4 und UDP je Paket):
+
+| Lauf | aufwärts | Pakete/s | Leitung | abwärts | Pakete/s | Leitung |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| klar, ohne Requisiten | 2,99 KB/s | 60 | 4,67 KB/s | 7,41 KB/s | 30 | 8,25 KB/s |
+| klar, 300 Requisiten | 3,00 KB/s | 60 | 4,68 KB/s | 12,8 KB/s | 30 | 13,6 KB/s |
+| typisch, 300 | 3,30 KB/s | 60 | 4,98 KB/s | 13,2 KB/s | 30 | 14,1 KB/s |
+| typisch, 300, 60 Hz | 3,17 KB/s | 60 | 4,85 KB/s | 25,4 KB/s | 60 | 27,1 KB/s |
+| rau, 300 | 3,34 KB/s | 60 | 5,02 KB/s | 13,1 KB/s | 30 | 14,0 KB/s |
+| Sturm, 300 | 5,13 KB/s | 60 | 6,81 KB/s | 14,0 KB/s | 30 | 14,8 KB/s |
+| typisch, 500 Requisiten (50 fahren) | 3,29 KB/s | 60 | 4,97 KB/s | 25,9 KB/s | 30 | 26,8 KB/s |
+| typisch, alle 300 fahren | 3,31 KB/s | 60 | 4,99 KB/s | 33,7 KB/s | 30 | 34,5 KB/s |
+
+Aufwärts sind es 60 Pakete je Sekunde (eines je Tick), weit unter netchans 300; im Sturm wachsen die Pakete, weil mehr Eingaben
+wiederholt werden. 16 Spieler kosten den Server abwärts rund 210 KB/s (30 Hz, 300 Requisiten).
+
+**Schnappschüsse** (Nutzlast in Bytes; „geschnitten“: das Budget von 1200 Bytes ließ Änderungen weg):
+
+| Lauf | Mittel | p50 | p99 | max | geschnitten |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| ohne Requisiten | 234 | 234 | 270 | 283 | 0 % |
+| 300 Requisiten, 30 fahren | 413–428 | 415–435 | 460–476 | 477–502 | 0 % |
+| dasselbe im Sturm | 453 | 464 | 553 | 600 | 0 % |
+| 500 Requisiten, 50 fahren | 851 | 868 | 911 | 950 | 0 % |
+| 300 Requisiten, alle fahren | 1109 | 1112 | 1120 | 1124 | 100 % |
+
+Die laufenden Stände passen also mit Spiel 1 (16 Spieler, einige hundert Requisiten, von denen wenige zugleich fahren) gut
+unter 1200 Bytes. Erst wenn rund hundert Dinge zugleich in Bewegung sind, schneidet das Budget jeden Schnappschuss: Ferne
+Requisiten bekommen dann seltener neue Stände (ihre Priorität wächst, bis sie dran sind).
+
+**Der volle Stand beim Beitreten** (16 Spieler, die Hälfte der Requisiten nicht am Platz der Karte, ein Zehntel fährt):
+
+| Requisiten | gegen die Grundlinie der Karte | gegen nichts (Neues gegen die Grundlinie) | ohne Grundlinie |
+| ---: | ---: | ---: | ---: |
+| 0 | 265 B | 265 B | 265 B |
+| 100 | 860 B | 1143 B | 1633 B |
+| 200 | 1443 B | 2008 B | 3031 B |
+| 300 | 2035 B | 2884 B | 4447 B |
+| 500 | 3217 B | 4629 B | 7200 B |
+
+Ein Beitritt passt in ein Datagramm, solange höchstens rund 150 Requisiten von ihrem Platz bewegt wurden; bei Spiel 1 mit
+einigen hundert, die im Lauf einer Runde umgestoßen werden, nicht. Deshalb der Weg über den WebSocket (FULL) und bis dahin das
+Auffüllen nach Priorität; beide brauchten in der Gruppe `netsim` rund 200 ms bis zum vollständigen Stand (300 Requisiten, 150
+bewegt). Die Grundlinie der Karte spart ein Drittel bis die Hälfte.
+
+**Lag-Ausgleich** (die Zeit, die der Schütze hinter dem Tick des Schusses sah, und wie weit das zurückgestellte Ziel von dem
+Platz entfernt stand, an dem der Schütze es sah):
+
+| Lauf | Sicht hinter dem Tick: Mittel / max | auf die Grenze gezogen | Abstand Mittel / p99 | ohne Grenze |
+| --- | --- | ---: | --- | --- |
+| klar, 200 ms | 185 / 195 ms | 0 % | 0,012 / 0,045 m | gleich |
+| typisch, 200 ms | 211 / 229 ms | 100 % | 0,079 / 0,29 m | 0,012 / 0,14 m |
+| rau, 200 ms | 204 / 277 ms | 38 % | 0,077 / 0,82 m | 0,020 / 0,32 m |
+| Sturm, 200 ms | 345 / 665 ms | 100 % | 1,13 / 10,1 m | 0,031 / 0,33 m |
+| typisch, 60 Hz, 200 ms | 210 / 226 ms | 100 % | 0,063 / 0,11 m | 0,000 / 0,001 m |
+| klar, 300 ms | 185 / 195 ms | 0 % | 0,011 / 0,025 m | gleich |
+| typisch, 300 ms | 210 / 226 ms | 0 % | 0,010 / 0,027 m | gleich |
+| typisch, 400 ms | 210 / 232 ms | 0 % | 0,009 / 0,029 m | gleich |
+
+Die Sicht liegt um Marge (33 ms), Umlauf und Alter des Schnappschusses und die 100 ms der Interpolation hinter dem Tick: schon bei
+20 ms je Richtung 185 ms. Mit der Grenze von 200 ms wird ab rund 25 ms je Richtung (50 ms Umlauf) gezogen, und das Ziel steht dann
+im Mittel 8 cm, im p99 fast eine Kapselbreite (30 cm) neben dem, was der Schütze sah. Mit 60-Hz-Schnappschüssen ist der Abstand
+ohne Grenze null (der Server blendet Ticks, der Client Schnappschüsse; mit einem Schnappschuss je Tick ist das dasselbe); mit 30 Hz
+bleiben im Mittel 1 cm (eine Figur, die innerhalb von zwei Ticks dreht, an einer Wand hält oder neu startet). Die Frage an den
+Nutzer steht im Bericht: die Grenze ohne den Puffer der Interpolation zählen (200 ms + 100 ms) oder 300 ms.
+
+**Der Server** (16 Bots, ein Raum, alles in einem Thread; die Zeit eines Ticks: die Eingaben, die Bewegung aller Figuren, die
+Requisiten, die Treffer, und jeden zweiten Tick 16 Schnappschüsse):
+
+| Lauf | M2, macOS: Mittel / p50 / p99 / max | Ryzen 5 3600, Windows: p50 / p99 |
+| --- | --- | --- |
+| ohne Requisiten | 40 / 57 / 68 / 72 µs | 121 / 581 µs |
+| 300 Requisiten (30 fahren) | 110 / 186 / 214 / 268 µs | 449 / 5511 µs |
+| 300, Schnappschüsse mit 60 Hz | 204 / 204 / 215 / 223 µs | 534 µs / – |
+| 500 Requisiten (50 fahren) | 358 / 581 / 743 / 779 µs | 1313 µs / – |
+| 300, alle fahren (jeder Schnappschuss geschnitten) | 1371 / 2614 / 2711 / 2733 µs | 3895 µs / – |
+
+Der p50 liegt bei den Ticks mit Schnappschüssen (jeder zweite), das Mittel darunter. Ein Raum mit 16 Spielern und 300 Requisiten
+braucht also auf dem M2 rund 0,7 % eines Kerns (110 µs je Tick bei 60 Hz), auf dem Ryzen rund 3 %; „ein Raum auf einem Kern“
+(G7h) hat viel Luft. Der Windows-Rechner wurde von anderen Sitzungen mitbenutzt: seine p99 und Maxima (bis über 100 ms) sind
+Planungslücken, nicht der Netcode. Wo die Zeit geht: das Delta je Client (zwei Basen verglichen, jede Entität Feld für Feld) und
+die Kopie des gesendeten Stands je Client; geschnittene Schnappschüsse kosten das Sortieren nach Priorität.
 
 ## Was nicht getestet ist
 
-UNTESTED_PLACEHOLDER
+- **Ein echtes Netz zwischen Rechnern**: alles lief auf der simulierten Leitung oder auf 127.0.0.1. Wie sich echte Schwankung
+  (WLAN, Mobilfunk) auf die Marge auswirkt, misst Teil 2.
+- **Der Browser als Client**: Der WebSocket-Weg des Clients ist derselbe Code wie auf dem Desktop (`netchan::Client` mit
+  `Endpoint::WebSocket`), gelaufen ist er im Browser nicht; die Prüfsumme lief in Node (in drei Varianten, auch die Gruppen netcodec bis bots mit `--quick`: 176 von 176).
+- **Android, iOS, statisches Linux**: `lib/game` mit `game::net` baut für `aarch64-linux-android`, `aarch64-apple-ios` (auf dem
+  Mac geprüft, auch netchan) und `wasm32-unknown-unknown`, mit und ohne `std`; gelaufen ist dort nichts. Ein statischer
+  Linux-Server mit dem Netcode ist noch nicht gebaut (gametest braucht glibc für die Brücke).
+- **Mehr als 16 Spieler, mehrere Räume unter Last, viele Server-Threads**: gemessen ist ein Raum mit 16 Bots; Räume laufen
+  nacheinander auf einem Thread.
+- **Böswillige Clients über die Fuzz-Tests hinaus**: ein Client, der Eingaben weit in der Zukunft schickt, wird begrenzt (64
+  Ticks), einer, der falsche Acks meldet, schadet nur sich (der Server nimmt nur Stände, die er gesendet hat); Geschwindigkeit
+  und Ziele prüft der Server, weil er rechnet. Schummeln mit Zielhilfen ist nicht Thema (GAME.md, „Bewusst nicht“).
+- **Das Gefühl**: Ob 100 ms Interpolation, eine Marge von 2 Ticks und Korrekturen ohne Glätten sich gut spielen, zeigt erst
+  Spiel 1 mit Menschen.
 
 ## Was nicht gebaut ist
 
@@ -300,4 +478,23 @@ UNTESTED_PLACEHOLDER
 
 ## Für Teil 2 und G7h
 
-FOR_G7H_PLACEHOLDER
+- **Den Controller einsetzen**: `walker::Walker` durch den Character-Controller von G7c Teil 2 ersetzen, hinter
+  `predict::Movement`: seinen Zustand als ganze Zahlen auf dem Raster halten (alles, was der nächste Schritt braucht, auch
+  Knöpfe des Ticks davor, Bodenkontakt, Ducken), `FIELDS` und `to_fields`/`from_fields` verlustfrei; die Karte des Spiels als
+  `physics::World` auf Server und Client gleich. Die Prüfung, dass nach der Heilung jede erste Vorhersage exakt ist
+  (`net_sim.rs`, `weather`), mit dem Controller wiederholen; ebenso `--netsum` auf allen Zielen.
+- **Ein RoomSim für Spiel 1**: die Arena zeigt, wie: die Figuren und ihre Zustände, Requisiten mit festen Netz-Ids aus der Karte
+  (die Grundlinie), `priority` nach Entfernung und Sichtbarkeit, Treffer mit `HitHistory` und `hitscan`. Teams, Runden,
+  Punktetafel, Waffen, Geschosse mit Flugzeit sind des Spiels. Ein Spiel mit `World` und `Pose` baut den Schnappschuss aus den
+  Spalten (eine Hilfe dafür gibt es noch nicht).
+- **Die Grenze des Lag-Ausgleichs** nach der Entscheidung des Nutzers setzen (`ServerOptions::max_rewind_ms` und dieselbe Zahl
+  im RoomSim).
+- **Korrekturen glätten**: ein abklingender Versatz im Bild der eigenen Figur nach `Outcome::Corrected` (die Physik bleibt beim
+  korrigierten Zustand).
+- **Treffermarken und Abschüsse** zuverlässig melden: heute stehen sie als Felder in den Figuren (das letzte Schuss-Tick, Leben,
+  Abschüsse); ein Ereigniskanal mit Wiederholung bis zur Bestätigung wäre der nächste Schritt.
+- **Der Browser-Client**: `NetLink` mit `Endpoint::WebSocket("/pfad")` im Web-Build; der Server mit `ws_endpoint` neben den
+  Dateien der Seite (wie `nettest --serve`).
+- **Teil 2 des Netcodes**: echtes Netz zwischen Rechnern (Windows, Fedora, ThinkPad, Mac, WLAN), die Marge und die
+  Interpolationszeit danach einstellen; die Verschlüsselung über UDP (netchan, entschieden); Deltas gegen eine Vorhersage;
+  mehrere Räume auf mehreren Threads.

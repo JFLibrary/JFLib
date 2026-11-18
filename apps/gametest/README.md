@@ -5,7 +5,8 @@ The tests and the determinism checksum of [lib/game](../../lib/game/README.md) a
 netcode `game::net` ([NETCODE.md](../../docs/NETCODE.md)): on a simulated link with bots, and on real sockets on
 127.0.0.1 (`--loopback`). `--check` runs in the console; without arguments it opens the probe window the scripts drive (headless): ui's real input path
 into a `game::Input`. It builds for Windows, Linux and macOS (on Linux against glibc: the bridge needs the GPU
-drivers).
+drivers) and for the browser, where `tests/web.mjs` runs its console paths in Node (the checksums, the groups but the
+bridge).
 
 ## Run
 
@@ -25,6 +26,8 @@ The checksums must be the same on every target:
 ```sh
 wsl.exe -d Ubuntu-24.04 -- build/linux/gametest --checksum     # Linux (and --netsum)
 python build_rs.py run gametest --target mac -- --checksum     # on a Mac
+python build_rs.py app gametest --target web
+node apps/gametest/tests/web.mjs build                         # WebAssembly in Node: --netsum (or -- --checksum ...)
 ```
 
 ## Files
@@ -48,6 +51,7 @@ python build_rs.py run gametest --target mac -- --checksum     # on a Mac
 | `tests/check.uis` | `--check` |
 | `tests/input.uis` | the lock's click fires nothing, keys by place (a French keyboard), the motion's angle, Esc pauses, a click plays on |
 | `tests/tick.uis` | 60 ticks a second on the virtual clock, a key held over 30 ticks, a tap in one tick, no ticks while paused |
-| `tests/loopback.uis` | `--loopback --secs 5`: four bots over UDP, four over WebSocket, five seconds on 127.0.0.1 |
+| `tests/loopback.uis` | `--loopback --secs 5`: four bots over UDP, four over WebSocket, five seconds on 127.0.0.1 (not in the browser) |
+| `tests/web.mjs` | the WebAssembly builds in Node without a browser: `--netsum` unless other arguments follow `--` |
 | `PERMISSIONS` | `net.listen` and `net.connect` on localhost (`--loopback`); the tests compute, keep their settings in `mem://` and print |
 | `PACKAGE`, `TARGETS`, `GLIBC`, `STYLE` | name, version, app id; the targets; glibc on Linux; the probe's style |

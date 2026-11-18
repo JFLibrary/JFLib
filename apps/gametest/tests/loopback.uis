@@ -1,5 +1,6 @@
 #!args --loopback --secs 5
+#!only windows linux macos
 # gametest --loopback runs the netcode on real sockets in the console: a netchan server on 127.0.0.1 (UDP and a
 # WebSocket path) with the arena of 300 props, four bots over UDP (each fetches its full state over a WebSocket of
 # its own) and four over WebSocket, five seconds of real time; exit code 1 when a client does not play, misses
-# its full state, cannot decode a snapshot or gets too few (docs/NETCODE.md, "Tests").
+# its full state, cannot decode a snapshot or gets too few (docs/NETCODE.md, "Tests").  Not in the browser: no UDP.
