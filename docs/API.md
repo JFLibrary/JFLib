@@ -67,7 +67,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
 - [render2d](#render2d) -- the core of the 2D renderer for CAD: a retained scene of lines, polylines, arcs and circles, curves, fills and hatches with layers and styles, dash patterns, blocks inserted many times, transparency, text from an atlas of multi-channel distance fields, strokes with analytic coverage, f64 coordinates relative to the camera, visibility on the GPU
   <br>[lib.rs](#render2d-crate-root) · [curve.rs](#render2dcurvers) · [dxf.rs](#render2ddxfrs) · [fill.rs](#render2dfillrs) · [math.rs](#render2dmathrs) · [msdf.rs](#render2dmsdfrs) · [scene.rs](#render2dsceners) · [hl.rs](#render2dhlrs) · [overlay.rs](#render2doverlayrs) · [pick.rs](#render2dpickrs) · [cpu.rs](#render2dcpurs) · [text.rs](#render2dtextrs)
 - [gltf](#gltf) -- glTF 2.0 import (.gltf, .glb): meshes, materials, textures, decoded images, nodes in f64, without a GPU
-  <br>[lib.rs](#gltf-crate-root)
+  <br>[lib.rs](#gltf-crate-root) · [write.rs](#gltfwriters)
 - [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
   <br>[lib.rs](#shader-crate-root) · [bench.rs](#shaderbenchrs) · [dis.rs](#shaderdisrs) · [layout.rs](#shaderlayoutrs) · [module.rs](#shadermodulers) · [msl.rs](#shadermslrs) · [parse.rs](#shaderparsers) · [reflect.rs](#shaderreflectrs) · [samples.rs](#shadersamplesrs) · [spv.rs](#shaderspvrs) · [val.rs](#shadervalrs)
 - [wgsl](#wgsl) -- the WGSL compiler: lexer, parser, semantic checker, constant evaluation, the typed IR, the SPIR-V back end, pipeline constants and checks, the benchmark shaders as WGSL
@@ -114,6 +114,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `lib/simd/README.md`)
   <br>[lib.rs](#game-crate-root) · [src/camera.rs](#gamesrccamerars) · [src/input.rs](#gamesrcinputrs) · [src/pose.rs](#gamesrcposers) · [src/sparse.rs](#gamesrcsparsers) · [src/tick.rs](#gamesrctickrs) · [src/world.rs](#gamesrcworldrs)
 - [game_render3d](#game_render3d) -- The bridge from the game core to render3d: entities with a mesh as scene instances
   <br>[lib.rs](#game_render3d-crate-root)
+- [geom](#geom) -- Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks
+  <br>[lib.rs](#geom-crate-root) · [src/build.rs](#geomsrcbuildrs) · [src/check.rs](#geomsrccheckrs) · [src/math.rs](#geomsrcmathrs) · [src/mesh.rs](#geomsrcmeshrs) · [src/normals.rs](#geomsrcnormalsrs) · [src/poly.rs](#geomsrcpolyrs)
 
 ## ui
 
@@ -23872,6 +23874,8 @@ Document on the GPU (render3d::gltf); a CAD or game tool can read the same witho
   doc.instances(scene) -> Vec<InstanceRef>      each node's mesh primitives with its world matrix
   doc.lights_of(scene) -> Vec<LightRef>         (G5c) each node's KHR_lights_punctual light with its world matrix
   gltf::decompose(&matrix) -> Trs               translation, rotation, scale (a mirror: x negative), shear
+  gltf::write_document(&doc) -> Result<Vec<u8>>   (G7g) a Document as a .glb: meshes, materials by their factors,
+       nodes, scenes; load reads the same Document back (textures, images and lights: Unsupported)
 
 Files are untrusted input: every index, offset, length and count is checked, sizes and counts are limited
 (Limits), and a file that breaks a rule is an Err, never a panic.  A file whose extensionsRequired names
@@ -24077,7 +24081,8 @@ IDENTITY: [f64; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0 
   the JSON and the BIN chunk of a .glb
 
 - **`fn write_glb(json: &[u8], bin: Option<&[u8]>) -> Vec<u8>`**
-  a .glb of a JSON text and a binary buffer (tools and tests): chunks padded with spaces and zeros
+  a .glb of a JSON text and a binary buffer (tools and tests; write_document builds both from a Document):
+  chunks padded with spaces and zeros
 
 - **`fn base64_decode(s: &[u8]) -> Option<Vec<u8>>`**
   standard base64 (padding optional); None for anything else
@@ -24104,6 +24109,26 @@ IDENTITY: [f64; 16] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0 
   - `shear: f64`
 
 - **`fn decompose(m: &[f64; 16]) -> Trs`**
+
+### `gltf/write.rs`
+
+Source: [`lib/gltf/write.rs`](../lib/gltf/write.rs)
+
+```text
+write -- a Document as a .glb (G7g): meshes with positions, normals and one uv set, materials by their
+factors, nodes with their local transforms, scenes.  What load reads back is the same Document (the
+numbers are written as the shortest text that parses to the same value).  Not written: textures,
+images and samplers, lights; a Document with any of them is Error::Unsupported rather than written
+without them.
+```
+
+- **`fn write_document(doc: &Document) -> Result<Vec<u8>>`**
+  The document as a .glb: meshes (positions with min and max, normals, TEXCOORD_0 when the primitive has
+  UV, indices as u16 or u32), materials (factors, alpha mode and cutoff, double-sided), nodes (name, mesh,
+  children, the local matrix unless it is the identity), scenes and the default scene; `asset.generator`
+  is the document's.  Err(Invalid) for arrays that do not fit (an index out of range, normals or UV of
+  another length, a number that is not finite, a reference to a mesh, material or node that is not
+  there), Err(Unsupported) for textures, images or lights, which this writer leaves to later.
 
 ## shader
 
@@ -55500,3 +55525,556 @@ ORIGIN_STEP: f64 = 512.0
   the scene's origin follows the eye: once the eye is more than one step from the origin on an
   axis, the origin moves to the eye rounded to the step (Scene::set_origin uploads every instance
   once) -> it moved
+
+## geom
+
+*Deterministic modelling kernel: meshes from primitives, profiles and operations, with checks* -- crate root [`lib/geom/src/lib.rs`](../lib/geom/src/lib.rs)
+
+```text
+geom -- the modelling kernel of the game engine (docs/GEOM.md, GAME.md stage G7g): indexed triangle meshes
+built from primitives, profiles and operations, checked, the same bits on every target
+
+  Mesh           positions, normals, UV (f64), indices and points (the topology: a hard edge does not
+                 open a surface, touching parts stay apart); transformed, translated, rotated (degrees,
+                 exact at multiples of 90), scaled, mirrored, flipped, merge, array, radial, weld; flat,
+                 smooth (angle threshold), uv_box (box projection in metres); bounds, area, volume,
+                 fingerprint; check() -> Report
+  build          cuboid, cylinder, cone, sphere, torus, stairs, arch (standing on y = 0, centred over
+                 the origin), extrude (front-view profile along Z), prism (floor plan up along Y), sweep
+                 (profile along a path, mitred corners, rotation-minimising frames), lathe (profile about Y)
+  poly           2D profiles: area, cleaning, triangulation (ear clipping), rect, circle, arc, rounded_rect
+  Report         closed, manifold, outward, degenerate triangles, normals, bounds, area, volume, Euler
+                 characteristic, components; json()
+  math           Vec3, Aabb, Affine in f64; sqrt correctly rounded, sin / cos / atan2 from rt's portable
+                 math, sin_cos_deg exact at multiples of 90 degrees
+
+Metres, right-handed, Y up, faces counter-clockwise from outside (render3d, lib/physics, glTF).  A script
+describes a model (apps/modeltool binds JFScript), this crate does the geometry: it has a plain Rust API and
+knows no script.  Deterministic: only + - * / and correctly rounded square roots in f64, trigonometry from
+rt's portable math, sorting with unique keys, no unordered containers, no threads, so the same calls give the
+same mesh bits on every target (the checksum of apps/modeltool).  Error texts are German, like JFScript's: they
+end up in front of whoever wrote the script.
+```
+
+### `geom` crate root
+
+```rust
+/// The most triangles a mesh may have (2^24): a limit against runaway parameters, far above a game model.
+MAX_TRIANGLES: usize = 1 << 24
+/// The most segments of a round primitive, a lathe or stairs.
+MAX_SEGMENTS: usize = 4096
+/// The most copies of an array.
+MAX_COPIES: usize = 100_000
+```
+
+- **`enum Error`**
+  Why an operation made no mesh; the text (German) says what to change.
+  - `Param(String)` -- a parameter out of range: a length not above 0, a segment count, an arch that does not fit
+  - `Profile(String)` -- a profile with too few points, no area, crossing edges or one that cannot be triangulated
+  - `Path(String)` -- a path with too few points or one that turns back on itself
+  - `TooBig(String)` -- more triangles, points or copies than the limits allow
+  - `Invalid(String)` -- arrays of a mesh that do not fit together (from_triangles, validate)
+
+**`impl Error`**
+
+- **`fn message(&self) -> &str`**
+  the text
+
+### `geom/src/build.rs`
+
+Source: [`lib/geom/src/build.rs`](../lib/geom/src/build.rs)
+
+```text
+build -- the generators: primitives (box, cylinder, cone, sphere, torus, stairs, arch) and the operations
+that make solids from profiles (extrude, prism, sweep along a path, lathe).  Every one gives a closed
+mesh whose faces point outward, with normals and box-projected UV in metres.  Every primitive stands on
+the ground: its lowest point at y = 0, centred over the origin (the rule a script relies on to stack
+parts); profiles are counter-clockwise or not, the generators turn them as needed.
+```
+
+```rust
+/// the threshold in degrees for the normals of extrusions, sweeps and lathes: edges sharper than it stay hard
+DEFAULT_SMOOTH_DEG: f64 = 30.0
+```
+
+- **`fn cuboid(w: f64, h: f64, d: f64) -> Result<Mesh, Error>`**
+  A box `w` x `h` x `d` (x, y, z) standing on y = 0, centred over the origin: 8 corners, 12 triangles, flat
+  normals (24 vertices), box UV in metres.
+
+- **`fn cylinder(r: f64, h: f64, n: usize) -> Result<Mesh, Error>`**
+  A cylinder of radius `r` and height `h` on y = 0 about the Y axis, `n` segments: smooth sides, flat caps.
+
+- **`fn cone(r: f64, h: f64, n: usize, top: f64) -> Result<Mesh, Error>`**
+  A cone (or with `top` > 0 a frustum) of base radius `r`, top radius `top` and height `h` on y = 0 about
+  the Y axis, `n` segments.
+
+- **`fn sphere(r: f64, n: usize, stacks: usize) -> Result<Mesh, Error>`**
+  A UV sphere of radius `r` resting on y = 0 (centre at y = r), `n` segments around and `stacks` from pole
+  to pole, smooth (flat where a step is 85 degrees or more).
+
+- **`fn torus(major: f64, minor: f64, n: usize, sides: usize) -> Result<Mesh, Error>`**
+  A torus lying flat on y = 0 about the Y axis: `major` from the axis to the middle of the tube, tube
+  radius `minor` (less than `major`), `n` segments around the axis and `sides` around the tube, smooth
+  (flat where a step is 85 degrees or more).
+
+- **`fn stairs(w: f64, h: f64, d: f64, steps: usize) -> Result<Mesh, Error>`**
+  Stairs `w` wide (x), `h` high and `d` deep (z) with `steps` steps on y = 0, centred over the origin: the
+  first riser at the front (z = d / 2), rising towards the back, a solid block under the steps.  Flat.
+
+- **`fn arch(w: f64, h: f64, d: f64, thickness: f64, n: usize) -> Result<Mesh, Error>`**
+  An arch `w` wide (x), `h` high and `d` deep (z) on y = 0, centred over the origin: two piers
+  `thickness` thick, the opening below a half circle of `n` segments, `thickness` of material over its
+  crown.  The opening is `w - 2 thickness` wide and needs room for the half circle.
+
+- **`fn extrude(profile: &[[f64; 2]], depth: f64) -> Result<Mesh, Error>`**
+  The profile (x, y; the front view) extruded `depth` along Z, centred on z = 0: the front cap at
+  z = depth / 2.  Smooth up to [`DEFAULT_SMOOTH_DEG`].
+
+- **`fn prism(footprint: &[[f64; 2]], height: f64) -> Result<Mesh, Error>`**
+  The footprint (x, z; the top view) raised `height` along Y from y = 0: walls from a floor plan.
+
+- **`fn sweep(profile: &[[f64; 2]], path: &[Vec3], closed: bool, smooth_deg: f64) -> Result<Mesh, Error>`**
+  The profile swept along a path of points.  The profile's x runs to the right of the path, y up (the
+  world's Y where the path is not vertical; for a vertical path x is X and y is Z), seen looking along
+  the path; frames turn with the path without twisting (rotation-minimising), corners are mitred, the ends
+  capped.  A closed path joins its last point to the first (no caps; a twist the loop leaves is spread
+  over its segments).  Smooth up to `smooth_deg` degrees (0: flat).
+
+- **`fn lathe(profile: &[[f64; 2]], n: usize, smooth_deg: f64) -> Result<Mesh, Error>`**
+  The profile (radius, height) turned about the Y axis in `n` segments: a solid of revolution.  The
+  profile is a closed polygon in the half plane radius >= 0; edges on the axis make no faces, points on it
+  become poles, so a profile from the axis around to the axis gives a solid without a hole (a column, a
+  vase), one away from the axis a ring.  Smooth up to `smooth_deg` degrees (0: flat).
+
+### `geom/src/check.rs`
+
+Source: [`lib/geom/src/check.rs`](../lib/geom/src/check.rs)
+
+```text
+check -- what a model must be, measured: closed and manifold (every edge between exactly two triangles,
+one fan around every point), consistently wound with the faces outward (positive volume per closed
+part), normals that agree with the faces, no degenerate triangles; bounds, area, volume, counts.  The
+topology is the mesh's points (Mesh::points), so hard edges and UV seams do not open a mesh and parts
+that only touch are not counted as non-manifold.  The report is plain data and JSON for tools
+(apps/modeltool).
+```
+
+```rust
+/// A triangle counts as degenerate when two corners are one point or its height above the longest edge is
+/// below this fraction of that edge (collinear corners, slivers no renderer shows)
+DEGENERATE_RATIO: f64 = 1e-9
+/// A stored normal counts as wrong when its length is off 1 by more than this, or when it points away from
+/// its triangle's face (a dot product of 0 or less)
+NORMAL_TOLERANCE: f64 = 1e-6
+```
+
+- **`struct Report`**
+  The checks of a mesh (see [`Mesh::check`]).  Counts of problems are 0 for a good mesh.
+  - `vertices: usize` -- vertices of the mesh
+  - `triangles: usize` -- triangles of the mesh
+  - `points: usize` -- points of the topology (`Mesh::points`)
+  - `edges: usize` -- distinct edges between points
+  - `bounds: Option<Aabb>` -- the bounds in metres (None for an empty mesh)
+  - `area: f64` -- square metres
+  - `volume: f64` -- cubic metres, signed (outward faces: positive); meaningful when closed
+  - `components: usize` -- parts connected across edges
+  - `euler: i64` -- V - E + F summed over the components (2 per closed part without a hole, 0 for a torus)
+  - `open_edges: usize` -- edges with one triangle: the mesh has a hole there
+  - `nonmanifold_edges: usize` -- edges with more than two triangles
+  - `flipped_edges: usize` -- edges whose two triangles run the same way: one of them is turned
+  - `nonmanifold_points: usize` -- points whose triangles form more than one fan (two parts touching at a point)
+  - `inverted_components: usize` -- closed components with a negative volume: inside out
+  - `degenerate: usize` -- triangles without area (see [`DEGENERATE_RATIO`])
+  - `bad_normals: usize` -- vertex normals that are not unit length or point away from their face (see [`NORMAL_TOLERANCE`])
+
+**`impl Report`**
+
+- **`fn closed(&self) -> bool`**
+  closed and manifold: no open, non-manifold or flipped edges, no pinched points
+- **`fn outward(&self) -> bool`**
+  faces point outward: consistently wound (no flipped edges) and no closed part inside out
+- **`fn ok(&self) -> bool`**
+  every check passed: closed, outward, no degenerate triangles, good normals
+- **`fn size(&self) -> Vec3`**
+  width, height, depth in metres (0 for an empty mesh)
+- **`fn json(&self) -> String`**
+  the report as one JSON object, keys in a fixed order, numbers rounded to 1e-9 (metres: a nanometre)
+
+- **`fn fnum(v: f64) -> String`**
+  a number for JSON: rounded to 9 decimals, without trailing zeros, -0 as 0, NaN and infinities as null
+
+**`impl Mesh`**
+
+- **`fn check(&self) -> Report`**
+  Measure the mesh: counts, bounds, area, volume and the topology checks of [`Report`].
+
+### `geom/src/math.rs`
+
+Source: [`lib/geom/src/math.rs`](../lib/geom/src/math.rs)
+
+```text
+math -- the vectors and affine maps of the crate, in f64, with operations that give the same bits on every
+target: + - * / and a correctly rounded square root, never a fused multiply-add (Rust does not contract
+a * b + c on its own); sin, cos and atan2 from rt's portable math (docs/ARM64.md, ARM2), the same code on
+every target.  Angles of the modelling API are degrees: a multiple of 90 degrees turns exactly (sin and cos
+are 0 and +-1 there), so a box turned by 90 degrees keeps exact corners and copies of a radial array in
+four meet without a gap.  The same scheme as lib/physics' math (docs/PHYSICS.md, "Bitgleich").
+```
+
+- **`fn sqrt(x: f64) -> f64`**
+  The square root, correctly rounded (IEEE 754), so the same bits on every target: the processor's
+  instruction where rt has it (`sqrtsd` on x86-64, `fsqrt` on ARM64), elsewhere (the browser, the x86-64
+  Android emulator) [`sqrt_portable`].  A negative argument gives NaN, -0.0 gives -0.0.
+
+- **`fn sqrt_portable(x: f64) -> f64`**
+  The correctly rounded square root from f64 operations and one 64 x 64 bit product (lib/physics has the
+  same function and its tests against the processor): Newton's method gives an estimate within a few units
+  in the last place, the integer test (R - 1/2)^2 &lt; X &lt;= (R + 1/2)^2 on the significand picks the right
+  neighbour.  Public for the tests.
+
+- **`fn sin(x: f64) -> f64`**
+  sin of `x` (radians), the same bits on every target (within half an ulp)
+
+- **`fn cos(x: f64) -> f64`**
+  cos of `x` (radians), the same bits on every target
+
+- **`fn atan2(y: f64, x: f64) -> f64`**
+  atan2(y, x) in radians, the same bits on every target
+
+```rust
+/// The largest angle in degrees [`sin_cos_deg`] takes (beyond it NaN): far more than any modelling needs, and
+/// small enough that the reduction stays exact.
+MAX_DEGREES: f64 = 1e12
+```
+
+- **`fn sin_cos_deg(deg: f64) -> (f64, f64)`**
+  (sin, cos) of an angle in degrees, the same bits on every target and exact at every multiple of 90
+  degrees (0 and +-1): the angle is reduced exactly to the nearest multiple of 90 and a rest of at most 45
+  degrees, whose sine and cosine come from rt's portable math.  NaN for a NaN angle or one beyond
+  [`MAX_DEGREES`].
+
+- **`fn floor(x: f64) -> f64`**
+  the largest integer not above `x` for |x| &lt; 2^62 (the crate's reductions; larger ones as they are), the
+  same on every target
+
+- **`fn abs(x: f64) -> f64`**
+  |x| (the sign bit cleared)
+
+- **`fn angle_deg(a: Vec3, b: Vec3) -> f64`**
+  the angle between two directions in degrees, 0 ..= 180 (atan2 of the cross product's length and the dot
+  product: accurate at 0 and 180 too); 0 when one of them is zero
+
+- **`fn min(a: f64, b: f64) -> f64`**
+  the smaller of two numbers (`b` when they are equal or one is NaN)
+
+- **`fn max(a: f64, b: f64) -> f64`**
+  the larger of two numbers (`b` when they are equal or one is NaN)
+
+- **`fn unsign_zero(x: f64) -> f64`**
+  `x` with -0.0 turned into +0.0 (the same bits for the same point; welding and hashing compare bits)
+
+- **`struct Vec3`**
+  A point or a direction in metres, `f64`; right-handed, Y up (render3d's and lib/physics' convention).
+  - `x: f64` -- metres (or a direction's component)
+  - `y: f64` -- metres, up
+  - `z: f64` -- metres, towards the viewer of the front view
+
+**`impl Vec3`**
+
+- **`const ZERO: Vec3 = Vec3::new(0.0, 0.0, 0.0)`**
+  (0, 0, 0)
+- **`const X: Vec3 = Vec3::new(1.0, 0.0, 0.0)`**
+  the unit vector along X
+- **`const Y: Vec3 = Vec3::new(0.0, 1.0, 0.0)`**
+  the unit vector along Y (up)
+- **`const Z: Vec3 = Vec3::new(0.0, 0.0, 1.0)`**
+  the unit vector along Z (towards the front view's camera)
+- **`const fn new(x: f64, y: f64, z: f64) -> Vec3`**
+  (x, y, z)
+- **`fn dot(self, o: Vec3) -> f64`**
+  the dot product, summed x, y, z in this order
+- **`fn cross(self, o: Vec3) -> Vec3`**
+  the cross product (right-handed)
+- **`fn length_sq(self) -> f64`**
+  the squared length
+- **`fn length(self) -> f64`**
+  the length (correctly rounded root)
+- **`fn try_normalize(self) -> Option<Vec3>`**
+  the unit vector in this direction, None for a zero (or not finite) vector
+- **`fn normalize_or_zero(self) -> Vec3`**
+  the unit vector in this direction; a zero vector stays zero
+- **`fn min(self, o: Vec3) -> Vec3`**
+  the smaller coordinates of both
+- **`fn max(self, o: Vec3) -> Vec3`**
+  the larger coordinates of both
+- **`fn is_finite(self) -> bool`**
+  whether every coordinate is finite
+- **`fn unsigned_zeros(self) -> Vec3`**
+  the same point with -0.0 coordinates as +0.0
+- **`fn key(self) -> [u64; 3]`**
+  the bits of the coordinates with -0.0 as +0.0: equal for equal points (the key of welding)
+- **`fn to_f32(self) -> [f32; 3]`**
+  the coordinates as f32 (render3d, glTF)
+- **`fn get(self, axis: Axis) -> f64`**
+  the coordinate along an axis
+
+- **`enum Axis`**
+  one of the three axes (mirror planes, rotations, the dominant axis of a normal)
+  - `X` -- left to right
+  - `Y` -- up
+  - `Z` -- back to front
+
+- **`struct Aabb`**
+  An axis-aligned box in metres (the bounds of a mesh).
+  - `min: Vec3` -- the smallest coordinates
+  - `max: Vec3` -- the largest coordinates
+
+**`impl Aabb`**
+
+- **`fn point(p: Vec3) -> Aabb`**
+  the box around one point
+- **`fn grow(&mut self, p: Vec3)`**
+  the box grown to hold `p`
+- **`fn union(self, o: Aabb) -> Aabb`**
+  the box around both
+- **`fn size(&self) -> Vec3`**
+  width, height, depth (max - min)
+- **`fn center(&self) -> Vec3`**
+  the middle
+
+- **`struct Affine`**
+  An affine map p -> m p + t in f64: rotations, scales, mirrors and moves of the modelling operations.
+  `m` holds rows.
+  - `m: [[f64; 3]; 3]` -- the linear part, rows
+  - `t: Vec3` -- the move after it
+
+**`impl Affine`**
+
+- **`const IDENTITY: Affine = Affine { m: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, ...`**
+  the map that changes nothing
+- **`fn translation(t: Vec3) -> Affine`**
+  a move by `t`
+- **`fn scale(s: Vec3) -> Affine`**
+  a scale along the axes (a negative factor mirrors)
+- **`fn mirror(axis: Axis) -> Affine`**
+  the mirror at the plane through the origin across `axis` (x -> -x for Axis::X)
+- **`fn rotation(axis: Axis, deg: f64) -> Affine`**
+  a rotation by `deg` degrees about an axis through the origin, counter-clockwise when the axis points
+  at the viewer (right-handed); exact at multiples of 90 degrees
+- **`fn rotation_about(axis: Vec3, deg: f64) -> Option<Affine>`**
+  a rotation by `deg` degrees about the direction `axis` (any length) through the origin, right-handed
+  (Rodrigues); None for a zero axis
+- **`fn then_after(&self, first: &Affine) -> Affine`**
+  `self` after `first`: p -> self(first(p))
+- **`fn apply(&self, p: Vec3) -> Vec3`**
+  m p + t, with -0.0 coordinates as +0.0
+- **`fn apply_vector(&self, v: Vec3) -> Vec3`**
+  m v (a direction: without the move)
+- **`fn determinant(&self) -> f64`**
+  the determinant of the linear part (negative: the map mirrors, faces must turn)
+- **`fn normal_matrix(&self) -> [[f64; 3]; 3]`**
+  the map of normals: the inverse transposed linear part up to a positive factor (the cofactor matrix,
+  times the determinant's sign), so that a normal maps to a normal pointing the same way out
+- **`fn is_finite(&self) -> bool`**
+  whether every number is finite
+- **`fn is_similarity(&self) -> bool`**
+  whether the linear part keeps angles: a rotation, a mirror or a uniform scale (m^T m = s^2 I to 1e-12),
+  so normals can simply be turned with it
+
+### `geom/src/mesh.rs`
+
+Source: [`lib/geom/src/mesh.rs`](../lib/geom/src/mesh.rs)
+
+```text
+mesh -- the indexed triangle mesh of the crate and the operations that keep its topology: moves,
+rotations, scales, mirrors, arrays, merging, turning the faces; bounds, area, volume; the fingerprint of
+its bits.  Normals and UV are in normals.rs, the checks in check.rs.
+```
+
+- **`struct Mesh`**
+  An indexed triangle mesh in metres: one normal and one UV per position, three indices per triangle,
+  counter-clockwise seen from outside (render3d's and glTF's convention), and the topology: each vertex
+  belongs to a point of the surface (`points`).  A hard edge or a UV seam is two vertices of one point, as a
+  GPU needs it; normals and the checks follow the points, so such a split does not open the mesh, while two
+  parts that only touch (the pieces of a wall) stay two closed parts.  [`Mesh::weld`] joins the points of
+  vertices at the same place (a half and its mirror image).
+  - `positions: Vec<Vec3>` -- metres
+  - `normals: Vec<Vec3>` -- unit vectors, one per position (zero until a normal operation ran on a raw mesh)
+  - `uvs: Vec<[f64; 2]>` -- texture coordinates, one per position; the box projection gives metres (normals.rs)
+  - `points: Vec<u32>` -- the point of each vertex, numbered 0 .. point count without gaps
+  - `indices: Vec<u32>` -- three per triangle
+
+**`impl Mesh`**
+
+- **`fn new() -> Mesh`**
+  an empty mesh
+- **`fn from_triangles(positions: Vec<Vec3>, indices: Vec<u32>) -> Result<Mesh, Error>`**
+  a mesh of positions and triangles, every vertex its own point, normals and UV zero (a raw mesh: the
+  generators share vertices where the surface is connected and give it to [`Mesh::smooth`] or
+  [`Mesh::flat`]); Err for an index count that is no multiple of 3, an index out of range or a position
+  that is not finite
+- **`fn validate(&self) -> Result<(), Error>`**
+  whether the arrays fit together: as many normals, UV and points as positions, points numbered without
+  gaps, whole triangles, indices in range, every number finite, at most [`MAX_TRIANGLES`]
+- **`fn vertex_count(&self) -> usize`**
+  the number of vertices (positions)
+- **`fn point_count(&self) -> usize`**
+  the number of points (vertices joined by the topology)
+- **`fn triangle_count(&self) -> usize`**
+  the number of triangles
+- **`fn triangle(&self, t: usize) -> [u32; 3]`**
+  the three indices of triangle `t`
+- **`fn corners(&self, t: usize) -> [Vec3; 3]`**
+  the three corners of triangle `t`
+- **`fn bounds(&self) -> Option<Aabb>`**
+  the box around every position, None for a mesh without positions
+- **`fn area(&self) -> f64`**
+  the surface area in square metres: the triangles' areas summed in order
+- **`fn volume(&self) -> f64`**
+  the signed volume in cubic metres (divergence theorem, relative to the middle of the bounds for
+  accuracy): positive for a closed mesh whose faces point outward, meaningless for an open one
+- **`fn transformed(&self, a: &Affine) -> Mesh`**
+  The mesh mapped by `a`: positions moved; a map that keeps angles (rotation, mirror, uniform scale)
+  turns the normals with it, any other (a scale that differs per axis) computes them again from the
+  mapped faces within the same smoothing groups, so hard edges stay hard and smooth ones smooth; a map
+  that mirrors (negative determinant) turns the triangles, so faces keep pointing outward.  UV stay
+  (call [`Mesh::uv_box`] again for metres in the new place).
+- **`fn translated(&self, v: Vec3) -> Mesh`**
+  moved by (x, y, z) metres
+- **`fn rotated(&self, axis: Axis, deg: f64) -> Mesh`**
+  turned by `deg` degrees about an axis through the origin (right-handed; exact at multiples of 90)
+- **`fn scaled(&self, s: Vec3) -> Mesh`**
+  scaled along the axes about the origin (a negative factor mirrors; faces are turned to stay outward)
+- **`fn mirrored(&self, axis: Axis) -> Mesh`**
+  mirrored at the plane through the origin across `axis` (x -> -x for Axis::X), faces turned so they
+  point outward
+- **`fn flipped(&self) -> Mesh`**
+  the triangles turned the other way (normals negated): inside out
+- **`fn append(&mut self, o: &Mesh)`**
+  append `o` (its indices and points shifted: its points stay its own)
+- **`fn merge(meshes: &[&Mesh]) -> Result<Mesh, Error>`**
+  the meshes as one, in order (each keeps its own vertices and points: parts that touch stay apart in the
+  topology; [`Mesh::weld`] joins them)
+- **`fn array(&self, count: usize, step: Vec3) -> Result<Mesh, Error>`**
+  `count` copies, copy i moved by i \* `step` (copy 0 where the mesh is), as one mesh
+- **`fn radial(&self, count: usize, step_deg: f64) -> Result<Mesh, Error>`**
+  `count` copies about the Y axis through the origin, copy i turned by i \* `step_deg` degrees (counter-
+  clockwise seen from above), as one mesh; 360 / count for a full circle
+- **`fn positions_f32(&self) -> Vec<[f32; 3]>`**
+  the positions as f32 (render3d's MeshData, glTF)
+- **`fn normals_f32(&self) -> Vec<[f32; 3]>`**
+  the normals as f32
+- **`fn uvs_f32(&self) -> Vec<[f32; 2]>`**
+  the UV as f32
+- **`fn fingerprint(&self) -> u64`**
+  FNV-1a (64 bits) over the bits of every position, normal, UV and index in order: equal for equal
+  meshes on every target (the determinism checksums, cache checks)
+- **`fn weld(&self, tolerance: f64) -> Mesh`**
+  The points of vertices at the same place joined: at the bit-equal position (-0.0 = +0.0) for
+  `tolerance` 0, else within `tolerance` metres on every axis (and through chains of such pairs).
+  Positions stay; only the topology changes, so a half and its mirror image merged and welded are one
+  closed surface.  Points are numbered again in the order of their first vertex.
+
+- **`struct Fnv(pub u64)`**
+  FNV-1a over 64-bit words, the hash of [`Mesh::fingerprint`] (public for checksums over several meshes and
+  numbers)
+
+**`impl Fnv`**
+
+- **`fn new() -> Fnv`**
+  the offset basis
+- **`fn u(&mut self, v: u64)`**
+  fold the 8 bytes of a word in, little-endian
+- **`fn f(&mut self, v: f64)`**
+  fold a number's bits in
+- **`fn v(&mut self, v: Vec3)`**
+  fold a vector's bits in, x, y, z
+
+### `geom/src/normals.rs`
+
+Source: [`lib/geom/src/normals.rs`](../lib/geom/src/normals.rs)
+
+```text
+normals -- vertex normals and texture coordinates: flat (each triangle its own normal), smooth with an
+angle threshold (the triangles around a point share a normal across every edge flatter than the
+threshold, split at sharper ones), and UV by box projection in metres.  Each rebuilds the vertices from
+the triangles' corners: corners with the same position, normal and UV become one vertex, in the order of
+their first corner, so the result is the same on every target.
+```
+
+**`impl Mesh`**
+
+- **`fn flat(&self) -> Mesh`**
+  Flat normals: every corner gets the normal of its triangle (hard edges everywhere).
+- **`fn smooth(&self, max_angle_deg: f64) -> Mesh`**
+  Smooth normals with an angle threshold in degrees: around each point the triangles that meet across
+  an edge whose faces differ by at most `max_angle_deg` share one normal (their normals weighted by
+  the corner angles), split at sharper edges, open edges and edges of more than two triangles.  Edges
+  are those of the points (`Mesh::points`), so a hard edge split before can become smooth again; parts
+  that only touch are never smoothed together.  0 gives flat normals except across exactly flat edges,
+  180 smooths every manifold edge.
+- **`fn uv_box(&self, metres_per_unit: f64) -> Mesh`**
+  UV by box projection in world scale: each triangle is projected along the axis its normal points
+  most along (ties: Y, then X), so one UV unit is `metres_per_unit` metres on every face, without
+  mirrored textures: +X faces (u, v) = (-z, y), -X (z, y), +Y (x, -z), -Y (x, z), +Z (x, y), -Z (-x, y).
+  Normals stay; vertices split where the projection changes.
+
+### `geom/src/poly.rs`
+
+Source: [`lib/geom/src/poly.rs`](../lib/geom/src/poly.rs)
+
+```text
+poly -- 2D profiles: signed area, orientation, cleaning, triangulation by ear clipping, and the profiles
+the modelling API offers (rectangle, circle, rounded rectangle, arc).  A profile is a simple polygon
+(no self-intersections, no holes) as a list of points; the closing edge from the last point to the
+first is implied.
+```
+
+```rust
+/// the most points a profile or path may have
+MAX_PROFILE_POINTS: usize = 65_536
+```
+
+- **`fn signed_area2(p: &[[f64; 2]]) -> f64`**
+  twice the signed area (shoelace): positive counter-clockwise (x right, y up)
+
+- **`fn area(p: &[[f64; 2]]) -> f64`**
+  the signed area in square metres: positive counter-clockwise
+
+```rust
+/// Points of a profile or path closer than this fraction of its extent count as one (a script's
+/// arithmetic, `(y + r) - r`, leaves such near-duplicates; they would make triangles without area).
+MERGE_RATIO: f64 = 1e-9
+```
+
+- **`fn clean(p: &[[f64; 2]], what: &str) -> Result<Vec<[f64; 2]>, Error>`**
+  the profile checked and cleaned: finite numbers, consecutive points closer than [`MERGE_RATIO`] of its
+  extent merged (the first one stays) and so a repeated first point at the end, at least 3 points with
+  an area; `what` names it in the message
+
+- **`fn ccw(mut p: Vec<[f64; 2]>) -> Vec<[f64; 2]>`**
+  the profile counter-clockwise (reversed if it ran clockwise)
+
+- **`fn check_simple(p: &[[f64; 2]], what: &str) -> Result<(), Error>`**
+  Err when two edges of the profile cross (it must be simple); O(n^2), profiles are small
+
+- **`fn triangulate(p: &[[f64; 2]]) -> Result<Vec<[u32; 3]>, Error>`**
+  Triangles of a simple counter-clockwise polygon by ear clipping: n - 2 triangles over its own points,
+  counter-clockwise, none without area (a point on a straight run is never the tip of an ear, so it stays
+  on the boundary and the walls next to a cap meet it).  Err when no ear is left (a self-intersecting or
+  degenerate polygon).  Deterministic: the first ear from where the last one was cut.
+
+- **`fn rect(w: f64, h: f64) -> Vec<[f64; 2]>`**
+  a rectangle `w` x `h` centred on the origin, counter-clockwise from the lower left corner
+
+- **`fn circle(r: f64, n: usize) -> Vec<[f64; 2]>`**
+  a regular polygon of `n` corners on a circle of radius `r` about the origin, counter-clockwise from
+  (r, 0); exact at the axes when n is a multiple of 4
+
+- **`fn arc(r: f64, from_deg: f64, to_deg: f64, n: usize) -> Vec<[f64; 2]>`**
+  points on an arc of radius `r` about the origin from `from_deg` to `to_deg` (counter-clockwise for
+  to > from), `n` segments, both ends included (n + 1 points): an open polyline for profiles and paths
+
+- **`fn rounded_rect(w: f64, h: f64, r: f64, n: usize) -> Vec<[f64; 2]>`**
+  a rectangle `w` x `h` centred on the origin with corners rounded by radius `r` (at most half the shorter
+  side), `n` segments per corner, counter-clockwise
