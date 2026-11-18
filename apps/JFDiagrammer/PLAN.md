@@ -21,7 +21,13 @@ JD5 VSDX schreiben (`diagram_io::vsdx::write`, neue Dokumente mit eigenem Design
 `windows.xml` in jeder Datei, sonst Fehler 271; Gegenprobe in Visio bestanden) und JD6 Formel-Engine
 (`diagram_core::formula`; Orakel 94,7 % eigene Formeln, 98,1 % mit geerbten Zellen). Theme-Erweiterungen von
 Visio: nur die Kennungen übernehmen, Werte aus NetLab (Entscheidung des Nutzers, umgesetzt in JD11).
-Nächste Welle: E.
+
+**Erledigt** (2026-11-19, Welle E): JD7 Bearbeiten (Auswahl, Griffe, Drehen, Steuerpunkte, Kleben, Verbinder-Routing,
+Text, Speichern, Rückgängig; Visio-Gegenprobe bestanden), JD9 Seitenleiste und Schablonen (Schablonen-Widget, `.vssx`,
+Schnell-Shapes, Favoriten, Suche, Ablegen, Bauwerkzeug mit Startsatz „Standard-Shapes“; Visio-Gegenprobe bestanden)
+und JD12 Export und Druck (`diagram_view::export` für PDF/SVG/PNG/JPEG, Verläufe und Schraffuren in `lib/pdf`; Druck unter
+Linux als Vektor-PDF, unter Windows als Raster mit 300 dpi). Offen: `formulas/growth` in diagramiotest schwankt unter
+Volllast (4-fache Shapes, 6,5- bis 17,8-fache Zeit). Nächste Welle: F.
 
 ## Ziel
 
