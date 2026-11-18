@@ -1094,8 +1094,18 @@ pub extern "C" fn jfgui_env(len: u32) -> u32 {
     let Some((name, value)) = core::str::from_utf8(&bytes).ok().and_then(|t| t.split_once('=')) else {
         return 0;
     };
+    page_origin_hook(name, value);
     setenv(name, Some(value)) as u32
 }
+/// (G7d) the page's origin goes to the browser's WebSocket once (its own server needs no net.connect rule)
+#[cfg(target_arch = "wasm32")]
+fn page_origin_hook(name: &str, value: &str) {
+    if name == "jfgui_PAGE_ORIGIN" {
+        crate::net::set_page_origin(value);
+    }
+}
+#[cfg(not(target_arch = "wasm32"))]
+fn page_origin_hook(_: &str, _: &str) {}
 /// Enqueue committed UTF-8 from the host composition element; uncommitted IME text stays in the DOM.
 /// The text goes as commits (whole strings, not one ring slot per character) -> the characters
 /// queued: fewer when the queue is full (the host calls again with the rest after jfgui_input),

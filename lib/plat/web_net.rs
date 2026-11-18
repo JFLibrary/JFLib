@@ -3,7 +3,9 @@
 //   WebSocket::connect(url) / connect_with(url, WsLimits) -> NetResult<WebSocket>
 //            "ws://host:port/path", "wss://...", or "/path": the page's own server (ws:// for a
 //            page over http, wss:// over https); net.connect is checked on the URL's host and
-//            port first (policy::net_host_allowed), a refusal is NetErrorKind::Denied
+//            port first (policy::net_host_allowed), a refusal is NetErrorKind::Denied.  The
+//            page's own server (the host and port of the page's origin) needs no rule: it served
+//            the app (the user's decision of 2026-11-18)
 //   ws.state() -> WsState (Connecting, Open, Closing, Closed)
 //   ws.send_text(&str) / send_binary(&[u8])     while Open
 //   ws.recv() -> Option<WsMessage>                never blocks
@@ -89,6 +91,9 @@ struct Slot {
 }
 
 static SOCKETS: SpinLock<Vec<Slot>> = SpinLock::new(Vec::new());
+/// the page's origin as the worker reported it at the start (jfgui_PAGE_ORIGIN): the first value counts,
+/// so an app's own setenv cannot widen what "the page's own server" means
+static PAGE_ORIGIN: SpinLock<Option<String>> = SpinLock::new(None);
 static NEXT_ID: AtomicU32 = AtomicU32::new(1);
 
 /// a WebSocket of the page (the browser's object lives in the worker).  Dropping it closes it
@@ -156,6 +161,25 @@ pub fn ws_url_split(url: &str, origin: Option<&str>) -> Option<(String, String, 
     Some((abs, host, port))
 }
 
+/// (web.rs, jfgui_env) the worker's jfgui_PAGE_ORIGIN, kept from its first report on
+pub(crate) fn set_page_origin(origin: &str) {
+    let mut g = PAGE_ORIGIN.lock();
+    if g.is_none() {
+        *g = Some(String::from(origin));
+    }
+}
+
+/// the page's origin (jfgui_PAGE_ORIGIN at the start); None outside a page
+pub fn page_origin() -> Option<String> {
+    PAGE_ORIGIN.lock().clone()
+}
+
+/// whether host and port are the page's own server (the host and port of `origin`, its default port
+/// when it names none)
+pub fn is_page_server(origin: Option<&str>, host: &str, port: u16) -> bool {
+    origin.and_then(|o| ws_url_split("/", Some(o))).is_some_and(|(_, h, p)| h == host && p == port)
+}
+
 impl WebSocket {
     /// connect to a WebSocket server with the default limits (see the top of this file)
     pub fn connect(url: &str) -> NetResult<WebSocket> {
@@ -164,9 +188,10 @@ impl WebSocket {
 
     /// connect with these limits: Connecting at once, Open when the browser's handshake is done
     pub fn connect_with(url: &str, lim: WsLimits) -> NetResult<WebSocket> {
-        let origin = crate::env("jfgui_PAGE_ORIGIN");
+        let origin = page_origin();
         let (abs, host, port) = ws_url_split(url, origin.as_deref()).ok_or_else(other)?;
-        if !crate::policy::net_host_allowed(&host, port) {
+        // the page's own server needs no rule (it served the app); every other host its net.connect rule
+        if !is_page_server(origin.as_deref(), &host, port) && !crate::policy::net_host_allowed(&host, port) {
             return Err(NetError::new(NetErrorKind::Denied, 0));
         }
         let id = {

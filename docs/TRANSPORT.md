@@ -136,6 +136,8 @@ Ein Schwall von Nachrichten endet in einem `input()` über einen `MessageChannel
 Eine URL `/pfad` meint den eigenen Server der Seite: Der Worker setzt beim Start `jfgui_PAGE_ORIGIN`, Rust baut daraus
 `ws://` oder `wss://`. Die Berechtigung prüft `policy::net_host_allowed(host, port)` vor der Anfrage an den Host: der
 Host so, wie er in der URL steht (ein Name, `localhost`, eine Adresse), gegen die Regeln von `net.connect`. Der
+eigene Server der Seite (Host und Port ihres Ursprungs) braucht keine Regel, er hat die App ausgeliefert (vom Nutzer
+entschieden am 18.11.2026); als Ursprung gilt, was der Worker beim Start meldet, ein `setenv` der App ändert ihn nicht. Der
 Browser löst Namen selbst auf, es gibt also keinen Schritt dazwischen, den `plat` sehen könnte. Was ein Socket für die
 App aufhebt, ist begrenzt (`WsLimits`: 1 MiB je Nachricht, 8 MiB in der Warteschlange); mehr schließt ihn, die App sieht
 1009 in `close_info`.

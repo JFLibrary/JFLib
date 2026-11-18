@@ -348,6 +348,24 @@ impl plat::web::WebApplication for Test {
 /// install the test as the page's app
 pub fn start() {
     say("start");
-    let t = Test { step: Step::Open, since: plat::time_us(), ws: None, chan: None, sent_at: 0, i: 0, got: 0, rtts: Vec::new(), big: Vec::new(), checks: 0, failed: 0, delivered: 0 };
+    let mut t = Test { step: Step::Open, since: plat::time_us(), ws: None, chan: None, sent_at: 0, i: 0, got: 0, rtts: Vec::new(), big: Vec::new(), checks: 0, failed: 0, delivered: 0 };
+    // the page's own server needs no net.connect rule (the user's decision of 2026-11-18): who counts as
+    // it, and the app cannot move it with setenv
+    use plat::net::{is_page_server, page_origin};
+    let origin = page_origin();
+    t.check(origin.is_some(), "the worker reported the page's origin");
+    t.check(
+        is_page_server(Some("http://localhost:8080"), "localhost", 8080) && is_page_server(Some("https://game.example.org"), "game.example.org", 443),
+        "the page's own server: the origin's host and port",
+    );
+    t.check(
+        !is_page_server(Some("http://localhost:8080"), "localhost", 8081)
+            && !is_page_server(Some("http://localhost:8080"), "example.org", 8080)
+            && !is_page_server(None, "localhost", 8080),
+        "another host or port is not the page's server",
+    );
+    plat::setenv("jfgui_PAGE_ORIGIN", Some("http://evil.example"));
+    t.check(page_origin() == origin, "the app's setenv does not move the page's origin");
+    plat::setenv("jfgui_PAGE_ORIGIN", origin.as_deref());
     plat::web::install(Box::new(t));
 }

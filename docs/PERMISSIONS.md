@@ -135,9 +135,9 @@ sandbox                               # let the OS enforce the manifest too (OS 
 - As soon as a rule names a host (or `*`), port 53 is open for the DNS queries of `netio`.
 - In the browser the page resolves names itself: a WebSocket (`plat::net::WebSocket::connect`)
   is checked on its URL's host as written and its port (`policy::net_host_allowed`), before the
-  page is asked to connect. A URL `/path` means the page's own server; its host needs a rule as
-  well (`net.connect localhost:*` for a test server, `net.connect game.example.org:443` for the
-  real one).
+  page is asked to connect. The page's own server (a URL `/path`, or the host and port of the
+  page's origin written out) needs no rule: it served the app (decided 2026-11-18). The origin is
+  the one the worker reported at the start; the app's own `setenv` does not change it.
 - Unix domain sockets (`UnixListener::bind`, `connect_unix`) are files. They need `fs.write` on
   the socket path.
 
