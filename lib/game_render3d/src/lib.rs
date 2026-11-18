@@ -22,8 +22,9 @@
 // What the bridge reads: the versions of the MeshRef and Pose columns (SparseSet::changed_since), the
 // MeshRef column's removals (a sweep over its own entries only when something left), World::pose_mark
 // (the poses that moved in the latest tick: between two states, written every frame).  Per frame that is
-// a scan of one u64 per pose, plus the work for what changed.  The bridge keeps per entity index its
-// instance and the transform it wrote last: a write that would change nothing is left out.
+// a scan of one u64 per pose while something moved in the latest tick (none when no column changed), plus
+// the work for what changed.  The bridge keeps per entity index its instance and the transform it wrote
+// last: a write that would change nothing is left out.
 
 #![no_std]
 #![forbid(unsafe_code)]
@@ -202,8 +203,8 @@ impl Bridge {
             self.mesh_removals = removals;
         }
 
-        // new and changed MeshRefs
-        if let Some(meshes) = meshes {
+        // new and changed MeshRefs (a column whose version did not move has none: no scan)
+        if let Some(meshes) = meshes.filter(|m| m.version() > self.mesh_seen) {
             for (e, m) in meshes.changed_since(self.mesh_seen) {
                 let i = e.index() as usize;
                 if self.slots.len() <= i {
@@ -248,8 +249,8 @@ impl Bridge {
         }
 
         // poses: changed since the last sync, or moved in the latest tick (between two states: every frame)
-        if let Some(poses) = poses {
-            let since = self.pose_seen.min(world.pose_mark());
+        let since = self.pose_seen.min(world.pose_mark());
+        if let Some(poses) = poses.filter(|p| p.version() > since) {
             for (e, p) in poses.changed_since(since) {
                 st.visited += 1;
                 if let Some(Some(s)) = self.slots.get_mut(e.index() as usize) {

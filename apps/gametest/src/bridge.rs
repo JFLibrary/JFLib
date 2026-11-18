@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 
 use game::{Entity, Pose, Quat, Transform, Vec3, View, World};
 use game_render3d::{Bridge, MeshRef, transform};
-use gpu::{Access, Buffer, BufferDesc, BufferUsage, ColorAttachment, DataLayout, DepthAttachment, Device, DeviceDesc, Format, GpuError, Layout, Load,
+use gpu::{Access, Buffer, BufferDesc, BufferUsage, ColorAttachment, DataLayout, DepthAttachment, Device, DeviceDesc, Format, GpuError, Layout, Level, Load,
           MemoryKind, Texture, TextureDesc, TextureRegion, TextureUsage};
 use render3d::{Camera, Material, MaterialId, MeshData, MeshId, Renderer, RendererDesc, Scene};
 
@@ -237,14 +237,68 @@ pub fn run(c: &mut Ctx) {
             return;
         }
     };
-    let res = adapter.create_device(&DeviceDesc::DEFAULT).and_then(|dev| {
-        let name = adapter.info().name.clone();
-        out(&format!("  bridge: {name}, level {:?}\n", dev.level()));
-        tests(c, &dev)
-    });
-    if let Err(e) = res {
-        c.check(false, || format!("bridge: {e}"));
+    // the adapter's own level, and a device limited to Basis (render3d's other way of drawing)
+    let mut descs = vec![DeviceDesc { max_level: Level::Basis }];
+    if adapter.level() == Level::Voll {
+        descs.insert(0, DeviceDesc::DEFAULT);
     }
+    for (i, d) in descs.iter().enumerate() {
+        let res = adapter.create_device(d).and_then(|dev| {
+            out(&format!("  bridge: {}, level {:?}\n", adapter.info().name, dev.level()));
+            tests(c, &dev)?;
+            if i == 0 { scale(c, &dev) } else { Ok(()) }
+        });
+        if let Err(e) = res {
+            c.check(false, || format!("bridge: {e}"));
+        }
+    }
+}
+
+/// what a sync costs at scale: 100 000 entities with a mesh (10 000 with --quick), 1 % moving per tick (no
+/// images: the CPU side of the bridge and render3d's bookkeeping)
+fn scale(c: &mut Ctx, dev: &Device) -> gpu::Result<()> {
+    let n = c.n(100_000);
+    let mut r = Renderer::new(dev, &RendererDesc::new(Format::Rgba8Unorm))?;
+    let k = kit(&mut r)?;
+    let mut w = World::new();
+    let mut ents = Vec::with_capacity(n);
+    for i in 0..n {
+        let p = Vec3::new((i % 400) as f64, 0.0, -((i / 400) as f64));
+        ents.push(w.spawn_with((Pose::at(p), MeshRef { mesh: k.meshes[i % 2], material: k.materials[i % 4] })));
+    }
+    w.begin_tick();
+    let mut s = Scene::new(&r)?;
+    let mut b = Bridge::new();
+    let t0 = plat::time_us();
+    let st = b.sync(&w, &mut s, 0.0)?;
+    let t1 = plat::time_us();
+    let (mut moving_us, mut moved, mut still_us) = (0u64, 0u64, 0u64);
+    let frames = 20u64;
+    for f in 0..frames {
+        w.begin_tick();
+        for e in ents.iter().skip(f as usize % 100).step_by(100) {
+            if let Some(mut p) = w.get_mut::<Pose>(*e) {
+                p.now.pos.y += 0.25;
+            }
+        }
+        let a = plat::time_us();
+        moved += b.sync(&w, &mut s, 0.5)?.moved as u64;
+        let m = plat::time_us();
+        b.sync(&w, &mut s, 0.5)?;
+        moving_us += m - a;
+        still_us += plat::time_us() - m;
+    }
+    w.begin_tick();
+    w.begin_tick();
+    b.sync(&w, &mut s, 0.0)?;
+    let a = plat::time_us();
+    let idle = b.sync(&w, &mut s, 0.0)?;
+    let idle_us = plat::time_us() - a;
+    let per = (n as u64).div_ceil(100);
+    c.check(st.added as usize == n && moved >= frames * (per - 1) && idle.visited == 0, || format!("scale: {st:?}, {moved} moved, idle {idle:?}"));
+    out(&format!("  bridge: {n} entities: first sync {} ms; a frame with 1 % moved ({} written: the new movers and the settled ones) {} us, the same alpha again {} us, nothing changed {} us\n",
+                 (t1 - t0) / 1000, moved / frames, moving_us / frames, still_us / frames, idle_us));
+    Ok(())
 }
 
 fn tests(c: &mut Ctx, dev: &Device) -> gpu::Result<()> {
