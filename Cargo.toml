@@ -154,6 +154,8 @@ members = [
     "apps/a11ytest",
     "apps/inputtest",
     "apps/physicstest",
+    "apps/gametest",
+    "apps/gamedemo",
 ]
 
 # The one version of the library (rt::VERSION; `build_rs.py release` writes it, docs/VERSIONING.md)

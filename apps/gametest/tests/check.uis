@@ -1,0 +1,4 @@
+#!args --check
+# gametest --check runs in the console: every test group of lib/game and its bridge against their references
+# (world, tick, input, camera, bridge; the bridge offscreen on the GPU, SKIP without one); exit code 1 when a check
+# fails.  The determinism checksum (--checksum) is compared across the targets by hand (docs/GAMECORE.md, "Tests").
