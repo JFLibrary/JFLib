@@ -239,6 +239,10 @@ pub struct ArenaStats {
     pub clamped: u64,
     /// figures ended
     pub kills: u64,
+    /// the shooters' view lag summed over the shots (1/256 ticks) and the largest
+    pub view_sum: u64,
+    /// see view_sum
+    pub view_max: u32,
 }
 
 /// the reference RoomSim (see the module header)
@@ -334,6 +338,8 @@ impl Arena {
         if input.view as u32 > self.cfg.max_rewind * 256 {
             self.stats.clamped += 1;
         }
+        self.stats.view_sum += input.view as u64;
+        self.stats.view_max = self.stats.view_max.max(input.view as u32);
         let (vt, frac) = view_time(tick, input.view, self.cfg.max_rewind);
         let mut figs = core::mem::take(&mut self.scratch);
         self.history.rewind(vt, frac, &mut figs);

@@ -197,17 +197,24 @@ pub struct Measure {
     pub shots: u64,
     pub hits: u64,
     pub clamped: u64,
+    pub view_ms: (f64, f64),
     pub playing: usize,
     pub disconnected: usize,
 }
 
 /// a session of `players` bots in `w` for `secs`, measured after the joins (the first 3 s)
 pub fn measure(name: &str, seed: u64, players: usize, w: Weather, props: usize, moving: usize, every: u32, secs: u64, fire: bool) -> Measure {
+    measure_rewind(name, seed, players, w, props, moving, every, secs, fire, 200)
+}
+
+/// measure with another limit of the lag compensation (ms)
+#[allow(clippy::too_many_arguments)]
+pub fn measure_rewind(name: &str, seed: u64, players: usize, w: Weather, props: usize, moving: usize, every: u32, secs: u64, fire: bool, rewind_ms: u32) -> Measure {
     let displaced = (props / 2).min(props - moving);
     let mut cfg = base_cfg(seed, players, w);
-    cfg.arena = ArenaConfig { props, moving, displaced, fire, ..ArenaConfig::default() };
+    cfg.arena = ArenaConfig { props, moving, displaced, fire, max_rewind: rewind_ms * 60 / 1000, ..ArenaConfig::default() };
     cfg.fire = fire;
-    cfg.server = ServerOptions { snapshot_every: every, ws_port: 7777, ..ServerOptions::default() };
+    cfg.server = ServerOptions { snapshot_every: every, ws_port: 7777, max_rewind_ms: rewind_ms, ..ServerOptions::default() };
     cfg.time_ticks = true;
     cfg.join_gap_ms = 20;
     let mut s = Session::new(cfg);
@@ -271,6 +278,7 @@ pub fn measure(name: &str, seed: u64, players: usize, w: Weather, props: usize, 
         shots: arena.shots - shots0.shots,
         hits: arena.hits - shots0.hits,
         clamped: arena.clamped - shots0.clamped,
+        view_ms: ((arena.view_sum - shots0.view_sum) as f64 / 256.0 / (arena.shots - shots0.shots).max(1) as f64 * 1000.0 / 60.0, arena.view_max as f64 / 256.0 * 1000.0 / 60.0),
         playing,
         disconnected,
     }
@@ -278,8 +286,8 @@ pub fn measure(name: &str, seed: u64, players: usize, w: Weather, props: usize, 
 
 pub fn print_measure(m: &Measure) {
     crate::out(&format!(
-        "  {:<22} {:>2} bots {:>3.0} s | predict: {:>6.1} mismatches/min/player, error mean {:.3} p99 {:.3} max {:.3} m, shift p99 {:.3} m | up {:>5.0} B/s {:>4.1} pkt/s (wire {:>5.0}), down {:>6.0} B/s {:>4.1} pkt/s (wire {:>6.0}) | snapshot mean {:>4.0} p50 {:>4.0} p99 {:>4.0} max {:>4.0} B, cut {:.1} % | tick mean {:>4.0} p50 {:>4.0} p99 {:>5.0} max {:>6.0} us | full {} B | shots {} hits {} clamped {} | playing {} closed {}\n",
-        m.name, m.players, m.secs, m.mismatch_per_min, m.err.0, m.err.2, m.err.3, m.shift.2, m.up_bps, m.up_pps, m.wire_up_bps, m.down_bps, m.down_pps, m.wire_down_bps, m.snap.0, m.snap.1, m.snap.2, m.snap.3, m.partial * 100.0, m.tick_us.0, m.tick_us.1, m.tick_us.2, m.tick_us.3, m.full_bytes, m.shots, m.hits, m.clamped, m.playing, m.disconnected
+        "  {:<22} {:>2} bots {:>3.0} s | predict: {:>6.1} mismatches/min/player, error mean {:.3} p99 {:.3} max {:.3} m, shift p99 {:.3} m | up {:>5.0} B/s {:>4.1} pkt/s (wire {:>5.0}), down {:>6.0} B/s {:>4.1} pkt/s (wire {:>6.0}) | snapshot mean {:>4.0} p50 {:>4.0} p99 {:>4.0} max {:>4.0} B, cut {:.1} % | tick mean {:>4.0} p50 {:>4.0} p99 {:>5.0} max {:>6.0} us | full {} B | shots {} hits {} clamped {} view lag mean {:.0} max {:.0} ms | playing {} closed {}\n",
+        m.name, m.players, m.secs, m.mismatch_per_min, m.err.0, m.err.2, m.err.3, m.shift.2, m.up_bps, m.up_pps, m.wire_up_bps, m.down_bps, m.down_pps, m.wire_down_bps, m.snap.0, m.snap.1, m.snap.2, m.snap.3, m.partial * 100.0, m.tick_us.0, m.tick_us.1, m.tick_us.2, m.tick_us.3, m.full_bytes, m.shots, m.hits, m.clamped, m.view_ms.0, m.view_ms.1, m.playing, m.disconnected
     ));
 }
 
@@ -311,6 +319,11 @@ pub fn bench() -> i32 {
     ];
     for (k, (name, w, props, moving, every, fire)) in rows.iter().enumerate() {
         let m = measure(name, 100 + k as u64, 16, *w, *props, *moving, *every, 30, *fire);
+        print_measure(&m);
+    }
+    let rewinds: [(&str, Weather, u32); 3] = [("clear, rewind 300 ms", Weather::CLEAR, 300), ("typical, rewind 300 ms", Weather::TYPICAL, 300), ("typical, rewind 400 ms", Weather::TYPICAL, 400)];
+    for (k, (name, w, ms)) in rewinds.iter().enumerate() {
+        let m = measure_rewind(name, 200 + k as u64, 16, *w, 300, 30, 2, 30, true, *ms);
         print_measure(&m);
     }
     // the size of a join's full state against the map's baseline and against nothing
