@@ -1,7 +1,7 @@
 # Spiel-Engine: Plan für G7
 
-Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1) und von G7b und G7g (Welle 2), siehe dort;
-Stand 2026-11-18. Die Zahl der Läufe je Stufe ist
+Stand 2026-11-17, auf Basis von `main` ab7e77e1. Umgesetzt sind die ersten Teile von G7a, G7c und G7f (Welle 1) und von G7b, G7d und G7g (Welle 2), siehe
+dort; Stand 2026-11-18. Die Zahl der Läufe je Stufe ist
 geschätzt (ein Lauf ist eine Arbeitsrunde eines Agenten mit Durchsicht, wie bei G5 und G6).
 
 ## Ziel
@@ -60,7 +60,8 @@ Was es gibt (Code auf `main` ab7e77e1):
 - **Klang:** [`plat::audio`](../lib/plat/audio.rs) mit einem gemeinsamen Mischer (`play(&Sound) -> Voice`), ohne
   Raumklang.
 - **Netz:** `plat::net::UdpSocket` und TCP auf Windows, Linux und Apple; [`netio`](../lib/netio/README.md) mit
-  HTTP/1.1-Server und -Client und TLS 1.3. Kein WebSocket. Im Browser und auf Android hat `plat` kein Netz
+  HTTP/1.1-Server und -Client und TLS 1.3. WebSocket seit G7d Teil 1 (`netio::ws`, im Browser
+  `plat::net::WebSocket`). Im Browser und auf Android hat `plat` kein Netz
   ([ANDROID.md](ANDROID.md) bringt es für Android).
 - **JFScript:** lebt im eigenen Repository [JFLibrary/JFScript](https://github.com/JFLibrary/JFScript); `editortest`
   nimmt es per git, die Wurzel-`Cargo.toml` legt `jflib-agent-core` per `[patch.crates-io]` auf diesen Workspace.
@@ -78,7 +79,8 @@ Was es gibt (Code auf `main` ab7e77e1):
 | `lib/physics` (neu) | Formen, Kollision, Abfragen, Character-Controller, später Starrkörper | nur Mathematik | Vorschlag: JFLib |
 | `lib/anim` (neu, G7i) | Skelette, Clips, Überblenden, IK (die CPU-Seite) | `gltf` | Vorschlag: JFLib |
 | `lib/geom` (neu, G7g) | der Modellierkern: Netze, Grundkörper, Extrudieren, CSG, UV, Vereinfachen | `rt` (nur Mathematik) | Vorschlag: JFLib |
-| `lib/game` (neu, G7b) | Weltmodell, Takt, Eingabe-Aktionen, Kameras, Assets, Raumklang, Netcode | `physics`, `plat`, `base` (`netio` mit G7e); `render3d` nicht | eigenes Repository |
+| `lib/game` (neu, G7b) | Weltmodell, Takt, Eingabe-Aktionen, Kameras, Assets, Raumklang, Netcode | `physics`, `plat`, `base` (`netchan` mit G7e); `render3d` nicht | eigenes Repository |
+| `lib/netchan` (neu, G7d) | Kanal mit Folgenummern über UDP und WebSocket; ein WebSocket-Typ für alle Ziele | `plat`, `crypto`; `netio` nur auf dem Desktop | Vorschlag: JFLib |
 | `lib/game_render3d` (neu, G7b) | Brücke: Entitäten mit Mesh → Instanzen von `render3d` | `game`, `render3d`, `gpu` | eigenes Repository (mit `game`) |
 | `apps/gametest`, `apps/gamedemo` | Tests des Kerns ohne Fenster; Demo mit Ego-Kamera | `game`, `game_render3d` | eigenes Repository |
 | `apps/modeltool` (G7g) | JFScript → Mesh → Bilder und Prüfungen, für KI und Mensch | `geom`, `render3d`, `gltf`, JFScript | eigenes Repository |
@@ -220,6 +222,17 @@ anfassen:
 - Grenzen wie überall in `netio`: Größe je Nachricht, Rate je Verbindung, Zeitlimits.
 - Fertig, wenn: Desktop und Browser denselben Server erreichen, gemessen mit Umlaufzeit und Durchsatz, und Fuzzing
   der Rahmen nichts zum Absturz bringt.
+- **Stand 2026-11-18: Teil 1 fertig** ([TRANSPORT.md](TRANSPORT.md)). WebSocket nach RFC 6455 in `netio`
+  (`ws::Acceptor` im HTTP-Server über `Body::Upgrade`, `ws::connect`, ein Decoder für fremde Bytes mit den
+  Schließcodes 1002/1007/1008/1009); `plat::net` auf allen Zielen, im Browser `plat::net::WebSocket` über den Worker
+  (Anfrage 32, die Sockets leben im Worker), geprüft gegen `net.connect` (`policy::net_host_allowed`). Das neue
+  Crate `lib/netchan` (`jflib-netchan`): Kanal mit Folgenummern und Bestätigungen, über UDP mit zustandslosem
+  Cookie-Handschlag ohne Verstärkung, über WebSocket zuverlässig mit demselben Kopf; das Protokoll auch ohne E/A für
+  Simulationen. Ein eigenes Crate, weil `netio` nicht für den Browser gebaut wird. `apps/nettest`: 475 Prüfungen
+  auf Windows, Linux und macOS, 2,12 Millionen Fuzz-Fälle ohne Absturz; Chrome und Firefox erreichen denselben
+  Server wie der Desktop. Umlauf auf Loopback: UDP etwa 0,05 ms, WebSocket 0,1 ms, Browser 0,3–0,4 ms.
+  Offen: Teil 2 (`wss:` prüfen, echtes Netz zwischen Rechnern, Grenzen abstimmen), iOS nicht gebaut, Android
+  `Unsupported`.
 
 **G7e Netcode** (`lib/game`)
 
