@@ -1794,7 +1794,7 @@ Fensterrand hinaus.
 - **P3** · *fehlt* · G7a: die Prüfung von Hand auf Windows, Linux (Wayland und X11), macOS und im Browser (Checkliste in `apps/inputtest/README.md`); Teil 2, Gamepads.
 - **P3** · *fehlt* · G7b: `apps/gamedemo` in echten Fenstern und im Browser, die Faktoren der Mausbewegung von Hand (macOS 2,5 nur geschätzt); Teil 2: Spielfenster messen (Eingabe bis Bild, Bildabstand, eigene Swapchain), Assets mit Handles, Raumklang.
 - **P3** · *fehlt* · G7g Teil 2: konvexe Booleans mit exakten Prädikaten (auch für die Triangulierung), Abschrägen, Beobachtungsmodus, der Bewertungslauf eines Agenten; die Wünsche an JFScript (GEOM.md), erst nach dem Ja des Nutzers.
-- **P3** · *fehlt* · G7d Teil 2: `wss:` mit dem TLS von `netio` prüfen (im Browser mit einem Zertifikat, dem er traut), Messungen zwischen Rechnern und über WLAN, Grenzen abstimmen; netchan für iOS bauen, Android mit Netz.
+- **P3** · *fehlt* · G7d Teil 2: `wss:` mit dem TLS von `netio` prüfen (im Browser mit einem Zertifikat, dem er traut), Messungen zwischen Rechnern und über WLAN, Grenzen abstimmen; Verschlüsselung über UDP (AEAD, entschieden 2026-11-18); netchan für iOS bauen, Android mit Netz.
 - **P3** · *fehlt* · Später: D3D12-Rückfall, GPU-Rasterung der Widgets.
 - **P2** · *erledigt* (2026-10-22) · Stufe 0 des GPU-Plans, Teil 1: Scroll-Kopie
   (`lib/ui/scrollcopy.rs`). Hat sich in einer Scroll-Ansicht nur der Inhalt verschoben, werden

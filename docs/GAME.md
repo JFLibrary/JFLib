@@ -189,6 +189,8 @@ anfassen:
   `lib/game_render3d` schreibt nur Geändertes und lässt den Ursprung der Kamera folgen. `apps/gametest`: 901
   Prüfungen auf Windows, Linux und macOS, Prüfsumme überall gleich; `apps/gamedemo` baut für alle Ziele, lief
   aber nur ohne Fenster. Offen: Teil 2 (Spielfenster messen, Assets, Raumklang), die Prüfung von Hand.
+- Vom Nutzer bestätigt am 18.11.2026: die Brücke bleibt das eigene Crate `lib/game_render3d` (statt eines Moduls
+  in `lib/game`), damit ein Server ohne GPU sie nie mitbaut.
 
 **G7c Physik 1** (`lib/physics`)
 
@@ -233,6 +235,13 @@ anfassen:
   Server wie der Desktop. Umlauf auf Loopback: UDP etwa 0,05 ms, WebSocket 0,1 ms, Browser 0,3–0,4 ms.
   Offen: Teil 2 (`wss:` prüfen, echtes Netz zwischen Rechnern, Grenzen abstimmen), iOS nicht gebaut, Android
   `Unsupported`.
+- Vom Nutzer entschieden am 18.11.2026 (Fragen nach Teil 1): der Name `lib/netchan` bleibt; der eigene Server der
+  Seite braucht im Browser keine `net.connect`-Regel (er hat die App ausgeliefert; umgesetzt); UDP bekommt später
+  eine Verschlüsselung mit Authentisierung (AEAD, ChaCha20-Poly1305 aus `crypto`, in Teil 2 oder danach);
+  netchan stückelt nicht: Karten und Assets kommen über HTTP, der volle Stand beim Beitreten über WebSocket, die
+  laufenden Stände bleiben mit Delta-Kompression unter 1200 Bytes (neu zu entscheiden, wenn G7e zeigt, dass sie
+  nicht passen); die Grenzen je Client (300 Pakete/s, 256 KiB/s, 64 Verbindungen, 16 je Adresse, 5 s) gelten als
+  Anfang und werden in Teil 2 mit Messungen abgestimmt.
 
 **G7e Netcode** (`lib/game`)
 
