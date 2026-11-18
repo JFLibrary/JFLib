@@ -204,10 +204,6 @@ pub(crate) fn states(app: &mut Diagrammer, ui: &mut Ui) {
 pub(crate) fn panel(app: &mut Diagrammer, ui: &mut Ui) {
     stencils::menu_rows(app, ui);
     open_dialog(app, ui);
-    // a stencil is open: the empty drawing becomes a document with its page (stencils_drop.rs)
-    if !app.stencils.open.is_empty() && app.opened.is_none() {
-        crate::stencils_drop::ensure_document(app, ui);
-    }
     let lang = stencils::lang();
     // the tiles of the open stencils and of the search hits, with their previews
     let open: Vec<u32> = app.stencils.open.clone();

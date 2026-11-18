@@ -1,18 +1,18 @@
-// viewer -- JD4, milestone "Betrachter": a drawing opened read-only and shown page by page
+// viewer -- JD4, milestone "Betrachter": a drawing opened and shown page by page; since JD7
+// editable (edit_doc.rs, edit_canvas.rs)
 //
-//   Opened                       the document (diagram_io::vsdx::read), its file, its pages
+//   Opened                       the document (diagram_io::vsdx::read or a new one), its pages
 //                                (foreground pages first, then the background pages, each a tab),
-//                                the notice shown under the ribbon
+//                                the notice shown under the ribbon, its edit state (edit_doc.rs)
 //   open(app, ui, path)          read a .vsdx/.vssx/.vstx (and the macro variants) from the file
-//                                dialog of Backstage › Öffnen or the command line; read-only
-//                                (DM-09): a notice says so, names substituted fonts (TX-09) and
-//                                macros (kept, never run, DF-04)
+//                                dialog of Backstage › Öffnen or the command line; a notice names
+//                                substituted fonts (TX-09), macros (kept, never run, DF-04) and
+//                                what the reader warned about; (JD9) a .vssx goes to the Shapes
+//                                panel instead
 //   close(app, ui)               back to the empty drawing
-//   adopt(app, ui, doc, name) / changed(app)   (JD9) a new document as the drawing (the first
-//                                shape dropped on the empty drawing), its pages drawn again
-//                                after a change; a .vssx opened here goes to the Shapes panel
 //   paint(app, k) -> PagePaint   page k as a ui.diagram content (DgPaint): built on first use,
-//                                kept while the document is open
+//                                kept while the document is open, brought up to date after edits
+//                                (sync: the changed top-level shapes again, else the page anew)
 //   model(app, k)                the canvas' model: one node, the page's sheet (fit, overview)
 //   page_width(app)              zoom to the page's width (Ansicht › Seitenbreite)
 //   fonts(ui)                    the fonts pages are drawn with: the style's Inter (sans) and
@@ -62,11 +62,29 @@ pub(crate) struct Opened {
     pub notice: Option<(String, String)>,
     /// counts every new document (the canvas' version)
     pub serial: u32,
+    /// (JD7) undo, the preview of a gesture, the file
+    pub ed: crate::edit_doc::EditState,
+}
+
+impl Opened {
+    pub(crate) fn new(doc: Document, name: String, tabs: Vec<PageTab>, notice: Option<(String, String)>, serial: u32, ed: crate::edit_doc::EditState) -> Opened {
+        let n = tabs.len();
+        Opened { doc, name, tabs, paints: (0..n).map(|_| None).collect(), notice, serial, ed }
+    }
+
+    /// page k's paint when it is built
+    pub(crate) fn paint_of(&self, k: usize) -> Option<Rc<PagePaint>> {
+        self.paints.get(k).and_then(|p| p.clone())
+    }
 }
 
 /// the extensions the file dialog offers
 // i18n
 pub(crate) static EXTS: [&str; 4] = ["vsdx;vsdm=Visio-Zeichnung", "vssx;vssm=Visio-Schablone", "vstx;vstm=Visio-Vorlage", "=Alle Dateien"];
+
+/// the file types Speichern unter offers (JD7)
+// i18n
+pub(crate) static SAVE_EXTS: [&str; 4] = ["vsdx=Visio-Zeichnung", "vssx=Visio-Schablone", "vstx=Visio-Vorlage", "vsdm=Visio-Zeichnung mit Makros"];
 
 /// whether a command-line argument names a drawing
 pub(crate) fn is_drawing(arg: &str) -> bool {
@@ -136,73 +154,30 @@ pub(crate) fn open(app: &mut Diagrammer, ui: &mut Ui, path: &str) -> bool {
         app.backstage = None;
         return crate::stencils::open_file(app, ui, path);
     }
-    let mut tabs: Vec<PageTab> = Vec::new();
-    for bg in [false, true] {
-        for p in doc.pages() {
-            let Some(pg) = doc.page(p) else { continue };
-            if pg.header.background != bg {
-                continue;
-            }
-            let n = pg.header.name.or(pg.header.name_u).map(|s| String::from(doc.str(s))).unwrap_or_else(|| tf("Seite-{}", &[&format!("{}", tabs.len() + 1)]));
-            tabs.push(PageTab { page: p, name: n });
-        }
-    }
-    // the notice: read-only, macros, what the reader warned about
-    let mut msg = String::from(t("Bearbeiten und Speichern kommen in einer späteren Version."));
+    // the notice: macros, what the reader warned about (editing is on since JD7)
+    let mut msg = String::new();
     if loaded.format.macros {
-        msg.push(' ');
         msg.push_str(t("Die Makros der Datei bleiben erhalten und werden nie ausgeführt."));
     }
     let warnings = loaded.warnings.len() + loaded.more_warnings as usize;
     if warnings > 0 {
-        msg.push(' ');
+        if !msg.is_empty() {
+            msg.push(' ');
+        }
         msg.push_str(&tf("{} Hinweise beim Lesen.", &[&format!("{warnings}")]));
     }
-    let serial = app.opened.as_ref().map_or(1, |o| o.serial.wrapping_add(1));
-    let n = tabs.len();
-    app.opened = Some(Opened { doc, name: stem, tabs, paints: (0..n).map(|_| None).collect(), notice: Some((String::from(t("Schreibgeschützt geöffnet")), msg)), serial });
-    app.error = None;
-    app.page_tab = 0;
-    app.backstage = None;
-    app.canvas.request_fit();
-    app.fit_again = true;
+    let notice = (!msg.is_empty()).then(|| (String::from(t("Hinweise zur Datei")), msg));
+    crate::edit_doc::install(app, ui, doc, stem, Some(String::from(path)), loaded.format, notice);
     ui.recent_add(path);
     ui.repass();
     true
 }
 
-/// (JD9) a new document as the open drawing, editable, without notice (the first shape
-/// dropped on the empty drawing creates it; JD7 replaces this with its own document state)
-pub(crate) fn adopt(app: &mut Diagrammer, ui: &mut Ui, doc: Document, name: &str) {
-    let mut tabs: Vec<PageTab> = Vec::new();
-    for p in doc.foreground_pages().chain(doc.background_pages()) {
-        let Some(pg) = doc.page(p) else { continue };
-        let n = pg.header.name.or(pg.header.name_u).map(|s| String::from(doc.str(s))).unwrap_or_else(|| tf("Seite-{}", &[&format!("{}", tabs.len() + 1)]));
-        tabs.push(PageTab { page: p, name: n });
-    }
-    let serial = app.opened.as_ref().map_or(1, |o| o.serial.wrapping_add(1));
-    let n = tabs.len();
-    app.opened = Some(Opened { doc, name: String::from(name), tabs, paints: (0..n).map(|_| None).collect(), notice: None, serial });
-    app.error = None;
-    app.page_tab = 0;
-    app.canvas.request_fit();
-    app.fit_again = true;
-    ui.repass();
-}
-
-/// (JD9) the document changed: its pages are drawn again
-pub(crate) fn changed(app: &mut Diagrammer) {
-    if let Some(o) = app.opened.as_mut() {
-        for p in o.paints.iter_mut() {
-            *p = None;
-        }
-        o.serial = o.serial.wrapping_add(1);
-    }
-}
-
 /// close the drawing: back to the empty one
 pub(crate) fn close(app: &mut Diagrammer, ui: &mut Ui) {
     app.opened = None;
+    app.se = SeState::new();
+    app.text = None;
     app.error = None;
     app.page_tab = 0;
     app.backstage = None;
@@ -210,8 +185,74 @@ pub(crate) fn close(app: &mut Diagrammer, ui: &mut Ui) {
     ui.repass();
 }
 
+/// (JD7) bring the built pages up to date with the edits since the last call: the top-level
+/// shapes of the changed sheets again (diagram_view's partial update), else the page anew
+pub(crate) fn sync(app: &mut Diagrammer) {
+    let Some(o) = app.opened.as_mut() else { return };
+    if !o.ed.rebuild && o.ed.changed.is_empty() {
+        return;
+    }
+    let changed = core::mem::take(&mut o.ed.changed);
+    let rebuild = core::mem::take(&mut o.ed.rebuild);
+    for (k, slot) in o.paints.iter_mut().enumerate() {
+        let Some(p) = slot.as_ref() else { continue };
+        let Some(tab) = o.tabs.get(k) else { continue };
+        if rebuild {
+            *slot = None;
+            continue;
+        }
+        // the top-level shapes of this page among the changed sheets
+        let mut tops: Vec<diagram_core::ShapeRef> = Vec::new();
+        let mut page_sheet = false;
+        for s in &changed {
+            match *s {
+                diagram_core::SheetRef::Shape(r) if r.owner == diagram_core::Owner::Page(tab.page) => {
+                    let mut top = r;
+                    let mut cur = o.doc.shape(r).and_then(|x| x.parent());
+                    while let Some(c) = cur {
+                        top = c;
+                        cur = o.doc.shape(c).and_then(|x| x.parent());
+                    }
+                    if !tops.contains(&top) {
+                        tops.push(top);
+                    }
+                }
+                diagram_core::SheetRef::Page(pg) if pg == tab.page => page_sheet = true,
+                diagram_core::SheetRef::Shape(_) | diagram_core::SheetRef::Page(_) => {}
+                // a master, a style, the document: everything may look different
+                _ => page_sheet = true,
+            }
+        }
+        if page_sheet {
+            *slot = None;
+            continue;
+        }
+        if tops.is_empty() {
+            continue;
+        }
+        let r = p.view.try_borrow_mut().ok().and_then(|mut v| v.update(&o.doc, &mut app.fonts, &tops));
+        match r {
+            // the changed part in world units for ui.diagram's backing store (DgPaint::damage)
+            Some(b) => p.note_damage(canvas_ver(o.serial, k, o.ed.rev), [(b[0] * DIP) as f32, ((p.h - b[3]) * DIP) as f32, (b[2] * DIP) as f32, ((p.h - b[1]) * DIP) as f32]),
+            None => *slot = None,
+        }
+    }
+}
+
+/// (JD7) the canvas version of page k: changes with the drawing and every edit of it
+pub(crate) fn canvas_ver(serial: u32, k: usize, rev: u32) -> u32 {
+    serial.wrapping_mul(4096).wrapping_add(k as u32 + 1).wrapping_add(rev.wrapping_mul(0x9E37_79B9))
+}
+
+/// (JD7) the text measures of the formula engine: the fonts pages are drawn with (TEXTWIDTH and
+/// TEXTHEIGHT give what is drawn)
+pub(crate) fn metrics(app: &Diagrammer) -> Rc<dyn diagram_core::formula::TextMetrics> {
+    Rc::new(diagram_view::Metrics::new(&app.fonts))
+}
+
 /// page k of the open drawing, built on first use
 pub(crate) fn paint(app: &mut Diagrammer, k: usize) -> Option<Rc<PagePaint>> {
+    sync(app);
     let o = app.opened.as_mut()?;
     let tab = o.tabs.get(k)?;
     if let Some(Some(p)) = o.paints.get(k) {
@@ -231,7 +272,7 @@ pub(crate) fn paint(app: &mut Diagrammer, k: usize) -> Option<Rc<PagePaint>> {
             }
         }
     }
-    let p = Rc::new(PagePaint { view: RefCell::new(view), w, h, color });
+    let p = Rc::new(PagePaint { view: RefCell::new(view), w, h, color, damage: RefCell::new(Vec::new()) });
     o.paints[k] = Some(p.clone());
     Some(p)
 }
@@ -273,7 +314,7 @@ pub(crate) fn command_line_file() -> Option<String> {
             skip = false;
             continue;
         }
-        if plat::VALUE_OPTS.contains(&a.as_str()) || a == "--shell-preview" || a == "--config" {
+        if plat::VALUE_OPTS.contains(&a.as_str()) || a == "--shell-preview" || a == "--config" || a == "--save-dir" {
             skip = true;
             continue;
         }
@@ -291,9 +332,25 @@ pub(crate) struct PagePaint {
     w: f64,
     h: f64,
     color: u32,
+    /// (JD7) what each edit changed: the canvas version after it, the world box
+    damage: RefCell<Vec<(u32, [f32; 4])>>,
 }
 
 impl PagePaint {
+    /// note the world box an edit changed, reaching version `ver`
+    fn note_damage(&self, ver: u32, b: [f32; 4]) {
+        let mut d = self.damage.borrow_mut();
+        if d.len() >= 64 {
+            d.remove(0);
+        }
+        d.push((ver, b));
+    }
+
+    /// the page view (its display list for hit tests)
+    pub(crate) fn view(&self) -> core::cell::Ref<'_, PageView> {
+        self.view.borrow()
+    }
+
     /// render2d's camera for the canvas' view: the paper point at the middle, inches per pixel
     fn camera(&self, vp: &Viewport) -> Camera {
         let s = vp.scale();
@@ -312,6 +369,17 @@ impl DgPaint for PagePaint {
         g.dc.fill(g.sf, x + sh, y + sh, w, h);
         g.dc.set_color(0xFF00_0000 | self.color);
         g.dc.fill(g.sf, x, y, w, h);
+    }
+
+    /// (JD7) the box the edits from version `from` to `to` changed (None: not known, all of it)
+    fn damage(&self, from: u32, to: u32) -> Option<[f32; 4]> {
+        let d = self.damage.borrow();
+        let start = d.iter().position(|e| e.0 == from)? + 1;
+        let end = d.iter().rposition(|e| e.0 == to)?;
+        if end < start {
+            return None;
+        }
+        d[start..=end].iter().map(|e| e.1).reduce(|a, b| [a[0].min(b[0]), a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])])
     }
 
     /// the page's shapes

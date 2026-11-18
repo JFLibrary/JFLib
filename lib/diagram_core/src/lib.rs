@@ -28,10 +28,18 @@
 //   geometry::*                   (JD4) Geometry rows as paths of lines and cubic curves,
 //                                 transforms (pin, local pin, angle, flips, groups)
 //   render::build(..) -> Drawing  (JD4) a page as a display list: fills, lines, line ends,
-//                                 texts laid out, pictures, in painter's order with a grid
+//                                 texts laid out, pictures, in painter's order with a grid;
+//                                 render::rebuild (JD7) builds some top-level shapes again
+//   ops::*                        (JD7) gestures as cell writes: move, resize, rotate, flip,
+//                                 pin, control points, vertices, groups, z-order, new shapes,
+//                                 text, the clipboard inside an app
+//   glue::* / route::*            (JD7) connection points, static and dynamic glue (Connect
+//                                 entries), the dynamic connector, right-angle routing around
+//                                 obstacles
+//   hit::*                        (JD7) the shape under a point of a display list, shapes in a
+//                                 rectangle
 //
-// What is to come here, by stage of the plan:
-//   JD7   glue, the dynamic connector with right-angle routing around obstacles, layout
+// What is to come here, by stage of the plan: layout (JD10), containers and callouts (JD10)
 //
 // Rules that hold from the start: no std (only alloc), no unsafe code, nothing recalculated on
 // opening a file (connectors, layout and containers move only when something moves), and a
@@ -46,11 +54,15 @@ mod document;
 mod edit;
 pub mod formula;
 pub mod geometry;
+pub mod glue;
+pub mod hit;
 mod inherit;
 pub mod instance;
 mod names;
+pub mod ops;
 mod page;
 pub mod render;
+pub mod route;
 mod shape;
 mod sheet;
 mod strings;

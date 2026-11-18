@@ -9,6 +9,7 @@
 //                                         to DIR, to open them elsewhere
 //   diagramiotest --write-golden DIR      (JD4) the golden images of the viewer tests anew
 //   diagramiotest --write-drawings DIR    (JD4) the viewer tests' drawings as .vsdx
+//   diagramiotest --write-gegenprobe DIR  (JD7) the glue drawing for the Visio counter-check
 //   diagramiotest --render-corpus DIR [--width PX]   (JD4) the local files' pages as PNG and SVG
 //   diagramiotest --write-stencils DIR   (JD9) the start set's stencils as .vssx (stencils.rs)
 //
@@ -27,6 +28,10 @@
 //             golden images (tests/golden) through render2d's CPU path, the local pages drawn
 //   formulas  the formula oracle (JD6): every formula cell of the local files recomputed and
 //             compared with the stored value (--show N prints N misses, locally)
+//   editview  (JD7, edit_view.rs) PageView::update against a page built anew, Metrics' text
+//             sizes against the drawn text, the time an edit of one of 1000 shapes takes
+//   edit      (JD7, gegenprobe.rs) static and dynamic glue through ops and glue, moved, written
+//             and read back: the Connect entries and glue formulas stay, ends follow again
 //   stencils  (JD9, stencils.rs) the stencil build tool: the start set, the SVG import, faults
 //
 // Why an app of its own and not codectest: codectest is the image codecs' runner (with the
@@ -46,7 +51,9 @@ mod build;
 mod corpus;
 mod drawings;
 mod dump;
+mod edit_view;
 mod formulas;
+mod gegenprobe;
 mod hostile;
 mod hostile_write;
 mod pkg;
@@ -116,13 +123,16 @@ fn run() -> i32 {
     if let Some(dir) = arg(&args, "--write-stencils") {
         return stencils::write(&dir);
     }
+    if let Some(dir) = arg(&args, "--write-gegenprobe") {
+        return gegenprobe::write(&dir);
+    }
     if let Some(dir) = arg(&args, "--write-probe") {
         return roundtrip::write_probe(&dir, arg(&args, "--corpus").as_deref());
     }
     let check = args.iter().any(|a| a == "--check");
     let corpus_dir = arg(&args, "--corpus");
     if !check && corpus_dir.is_none() {
-        out("Aufruf: diagramiotest --check [--only NAME] [--corpus DIR] | --corpus DIR | --write-samples DIR | --write-golden DIR | --write-drawings DIR | --render-corpus DIR [--width PX] | --write-stencils DIR\n");
+        out("Aufruf: diagramiotest --check [--only NAME] [--corpus DIR] | --corpus DIR | --write-samples DIR | --write-golden DIR | --write-drawings DIR | --render-corpus DIR [--width PX] | --write-stencils DIR | --write-gegenprobe DIR\n");
         return 2;
     }
     let mut h = H { ok: 0, failed: 0, only: arg(&args, "--only") };
@@ -134,6 +144,12 @@ fn run() -> i32 {
         hostile::run(&mut h);
         if h.on("render") {
             render::run(&mut h);
+        }
+        if h.on("editview") {
+            edit_view::run(&mut h);
+        }
+        if h.on("edit") {
+            gegenprobe::check(&mut h);
         }
         roundtrip::run(&mut h, corpus_dir.as_deref());
         if h.on("stencils") {

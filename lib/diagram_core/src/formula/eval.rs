@@ -247,6 +247,9 @@ impl<'a, 'd> Ev<'a, 'd> {
         let v = super::engine::cell_value(self.doc, self.run, sheet, &addr);
         match v {
             Val::Err(e) => Err(e),
+            // a cell holds a number: a point computed for it (PAR(PNT()) in EndY) is the
+            // coordinate of that cell's axis, whoever reads it (Width reading EndY gets y)
+            Val::Point(x, y) => Ok(Val::Num(if Axis::of(self.doc.str(addr.cell)) == Axis::Y { y } else { x })),
             v => Ok(v),
         }
     }

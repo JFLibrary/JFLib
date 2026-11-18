@@ -18,8 +18,14 @@
 //   src/panes.rs      task panes (dock), canvas and page tabs, status bar, context menus
 //   src/lang.rs       the five languages, switching at run time, the letter icons
 //   src/icons.rs      the ribbon icons (JD14: own artwork in icons/*.svg, mkicons.py)
-//   src/viewer.rs     (JD4) the drawing opened read-only: loading, pages, the canvas' paint
+//   src/viewer.rs     (JD4) the drawing opened: loading, pages, the canvas' paint
 //                     (diagram_core's display list drawn by diagram_view on render2d)
+//   src/edit_doc.rs   (JD7) editing: transactions with recalculation, the live preview of a
+//                     drag, undo / redo, a new drawing, saving
+//   src/edit_canvas.rs  (JD7) the canvas: ui.shape_edit's model, gestures -> diagram_core
+//                     (ops, glue), rulers, guides, page breaks
+//   src/edit_cmds.rs  (JD7) the editing commands: clipboard, arrange, group, tools, toggles
+//   src/edit_text.rs  (JD7) the text of a shape edited in place (ui.richtext)
 //   src/stencils.rs   (JD9) the stencils of the Shapes panel: built-in (build.rs builds them
 //                     from stencils/), files, favourites, "Weitere Shapes", the search
 //   src/stencils_panel.rs   (JD9) the panel (ui.stencil_panel), previews, its menus
@@ -37,9 +43,10 @@
 // through t() / tc() where they are shown and are never kept, so the next pass is all in the
 // new language.  Scripts run German unless their #!args say --lang.
 //
-// Test aids: --shell-preview shape|container|text stands in for a selection of that kind until
-// JD7 brings real ones (context registers, the shape's menu, the measures in the status bar);
+// Test aids: --shell-preview shape|container|text stands in for a selection of that kind (the
+// context registers without a drawing; JD7 brought the real selection);
 // --config PATH keeps the settings in that file (headless runs keep them in memory otherwise);
+// --save-dir DIR is where Speichern unter starts for a new drawing (JD7, scripts);
 // a drawing on the command line opens at start (JD4); --no-system-fonts draws with the style's
 // fonts only (the same on every machine); --write-stencils DIR writes the built-in stencils
 // (.vssx, metric and US) into DIR and ends (JD9: the user's check in Visio).
@@ -57,6 +64,10 @@ extern crate alloc;
 
 mod backstage;
 mod commands;
+mod edit_canvas;
+mod edit_cmds;
+mod edit_doc;
+mod edit_text;
 mod icons;
 mod lang;
 mod options;
@@ -127,6 +138,25 @@ pub(crate) struct Diagrammer {
     /// fit the page once more after the canvas was laid out (a notice that came with the
     /// drawing changes the canvas' height after the first fit)
     pub fit_again: bool,
+    /// (JD7) the edit layer's selection and gesture, its model of the page shown
+    pub se: SeState,
+    pub model: edit_canvas::Model,
+    /// Ansicht › Lineal, Seitenumbrüche; Ausrichten und Kleben (snap to the grid)
+    pub view_rulers: bool,
+    pub view_breaks: bool,
+    pub view_guides: bool,
+    pub snap: bool,
+    /// a guide being dragged out of a ruler: horizontal, world coordinate
+    pub guide_drag: Option<(bool, f32)>,
+    /// the text being edited; a request to start editing (shape key, typed character)
+    pub text: Option<edit_text::TextEdit>,
+    pub text_req: Option<(u64, Option<char>, bool)>,
+    /// Speichern unter: the file dialog, its path
+    pub save_dlg: Shared<i32>,
+    pub save_path: alloc::string::String,
+    /// shapes copied inside the app; how many grid steps the next paste is moved
+    pub clip: Option<diagram_core::ops::Clip>,
+    pub clip_offset: u32,
     /// (JD9) the Shapes panel: stencils, search, favourites, click-placing
     pub stencils: stencils::Stencils,
 }
@@ -156,13 +186,36 @@ impl Diagrammer {
             open_path: alloc::string::String::new(),
             pages_menu: false,
             fit_again: false,
+            se: SeState::new(),
+            model: edit_canvas::Model::default(),
+            view_rulers: true,
+            view_breaks: false,
+            view_guides: true,
+            snap: true,
+            guide_drag: None,
+            text: None,
+            text_req: None,
+            save_dlg: Shared::new(0),
+            save_path: alloc::string::String::new(),
+            clip: None,
+            clip_offset: 1,
             stencils: stencils::Stencils::new(),
         }
     }
 
-    /// the kind of the selection (ribbon::SEL_*): until JD7 only the shell preview
+    /// the kind of the selection (ribbon::SEL_*): the text being edited, a container, shapes;
+    /// without a drawing the shell preview (--shell-preview)
     pub(crate) fn selection_kind(&self) -> u8 {
-        self.preview
+        if self.preview != ribbon::SEL_NONE {
+            return self.preview;
+        }
+        if self.text.is_some() {
+            return ribbon::SEL_TEXT;
+        }
+        if self.se.sel.is_empty() {
+            return ribbon::SEL_NONE;
+        }
+        if edit_canvas::container_selected(self) { ribbon::SEL_CONTAINER } else { ribbon::SEL_SHAPE }
     }
 
     /// the drawing's name in the title bar
@@ -199,10 +252,10 @@ impl Diagrammer {
         ui.repass();
     }
 
-    /// Neu › Leere Zeichnung: back to the (empty) drawing
+    /// Neu › Leere Zeichnung: a new empty drawing
     pub(crate) fn new_blank(&mut self, ui: &mut Ui) {
         self.template = None;
-        viewer::close(self, ui);
+        edit_cmds::new_drawing(self, ui);
     }
 
     /// zoom a step in (1) or out (-1) around the canvas' middle
@@ -258,9 +311,13 @@ impl App for Diagrammer {
         }
         self.fonts = viewer::fonts();
         stencils::init(self);
-        // a drawing named on the command line
-        if let Some(path) = viewer::command_line_file() {
-            viewer::open(self, ui, &path);
+        // a drawing named on the command line, else a new empty one (JD7)
+        let opened = match viewer::command_line_file() {
+            Some(path) => viewer::open(self, ui, &path),
+            None => false,
+        };
+        if !opened && self.preview == ribbon::SEL_NONE {
+            edit_doc::new_drawing(self, ui, false);
         }
         true
     }
@@ -268,6 +325,9 @@ impl App for Diagrammer {
     fn frame(&mut self, ui: &mut Ui) {
         if let Some(icons) = &self.icons {
             icons.update(ui); // the theme may have changed (the system, high contrast)
+        }
+        if let Some((key, ch, fresh)) = self.text_req.take() {
+            edit_text::begin_with(self, ui, key, ch, fresh);
         }
         commands::states(self, ui);
         stencils_panel::states(self, ui);

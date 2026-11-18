@@ -12,7 +12,7 @@ expect text:"No stencil open." exists
 expect button:"More Shapes" enabled
 expect canvas:"Drawing canvas" exists
 expect button:"Page 1 of 1" exists
-expect text:"100%" exists
+expect text:"67%" exists
 click tab:"Insert"
 expect text:"Illustrations" exists
 expect text:"Clipboard" missing

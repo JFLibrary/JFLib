@@ -103,34 +103,17 @@ static TAB_MENU: [Mi; 8] = [
 pub(crate) fn center(app: &mut Diagrammer, ui: &mut Ui) {
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 0);
-    let st = &mut app.canvas;
-    // the name screen readers and scripts see (canvas:"Zeichenfläche"), in the current language
-    let name = t("Zeichenfläche");
-    if st.name != name {
-        st.name = name.into();
-    }
-    st.grid = if app.view_grid { 16.0 } else { 0.0 };
-    // the open drawing's page (JD4): its sheet as the model's one node, its paint
-    let k = app.page_index();
-    let paint = crate::viewer::paint(app, k);
-    let nodes: alloc::vec::Vec<DNode> = crate::viewer::sheet_node(app, k).into_iter().collect();
-    let ver = app.opened.as_ref().map_or(0, |o| o.serial.wrapping_mul(4096).wrapping_add(k as u32 + 1));
-    let model = DModel { nodes: &nodes, ports: &[], edges: &[], wps: &[], ver };
-    let paint: Option<alloc::rc::Rc<dyn DgPaint>> = paint.map(|p| p as alloc::rc::Rc<dyn DgPaint>);
-    ui.next_size(-1, -1);
-    let tool = crate::stencils_drop::tool(app);
-    let st = &mut app.canvas;
-    let events = ui.diagram(ID_CANVAS, st, &model, tool, paint, ver);
-    // (JD9) shapes from the Shapes panel: dropped, click + click
-    crate::stencils_drop::canvas(app, ui, ID_CANVAS, &events);
+    // (JD7) the canvas with the rulers and the edit layer (edit_canvas.rs); the shape's menu while
+    // a shape is selected, else the page's (the edit layer selects on the right click first)
+    crate::edit_canvas::canvas(app, ui, ID_CANVAS, |app, ui| {
+        let menu: &'static [Mi] = if matches!(app.selection_kind(), SEL_SHAPE | SEL_CONTAINER | SEL_TEXT) { &SHAPE_MENU } else { &PAGE_MENU };
+        ui.context_menu(i18n::menu(menu));
+    });
     if app.fit_again {
         app.fit_again = false;
         app.canvas.request_fit();
         ui.repass();
     }
-    // the shape's menu while a shape is selected, else the page's
-    let menu: &'static [Mi] = if matches!(app.selection_kind(), SEL_SHAPE | SEL_CONTAINER | SEL_TEXT) { &SHAPE_MENU } else { &PAGE_MENU };
-    ui.context_menu(i18n::menu(menu));
     // the page tabs (ZF-14): the page, the plus button, all pages
     ui.next_size(-1, 26);
     ui.box_begin(0, BOX_H | BOX_LAYER, 0);
@@ -227,20 +210,24 @@ fn format_pane(app: &mut Diagrammer, ui: &mut Ui) {
 fn size_pos(app: &mut Diagrammer, ui: &mut Ui) {
     ui.next_size(-1, -1);
     ui.scroll_begin(ID_PANE + 0x20, SC_V | BOX_V | pad(10));
-    let sel = app.selection_kind() != SEL_NONE;
+    // (JD7) the measures of the single selection
+    let m = crate::edit_canvas::measures(app);
+    let sel = m.is_some();
+    let unit = if crate::edit_canvas::metric(app) { "mm" } else { "in" };
+    let v = m.unwrap_or([0.0; 6]);
     let rows = [
-        ("X", "20 mm"),
-        ("Y", "40 mm"),
-        (t("Breite"), "40 mm"),
-        (t("Höhe"), "20 mm"),
-        (t("Winkel"), "0°"),
-        (t("Drehpunkt"), t("Mitte")),
+        ("X", length(v[0], unit)),
+        ("Y", length(v[1], unit)),
+        (t("Breite"), length(v[2], unit)),
+        (t("Höhe"), length(v[3], unit)),
+        (t("Winkel"), angle(v[4])),
+        (t("Drehpunkt"), alloc::string::String::from(if v[5] != 0.0 { t("Mitte") } else { t("Benutzerdefiniert") })),
     ];
     for (k, (label, v)) in rows.iter().enumerate() {
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
         ui.next_size(90, 0);
         ui.text(TS_BODY, label);
-        let mut s = alloc::string::String::from(if sel { *v } else { "" });
+        let mut s = if sel { v.clone() } else { alloc::string::String::new() };
         ui.next_size(-1, 0);
         ui.next_flags(ST_DISABLED);
         ui.textbox(ID_PANE + 0x21 + k as u32, None, &mut s, 32);
@@ -298,11 +285,12 @@ pub(crate) fn status(app: &mut Diagrammer, ui: &mut Ui) {
         pages_list(app, ui, ID_STATUS + 0x10);
     }
     ui.flyout_end();
-    // the selection's measures; a click opens Größe und Position
-    let dims = if app.selection_kind() == SEL_NONE {
-        tf("Breite: {}  Höhe: {}  Winkel: {}", &["–", "–", "–"])
-    } else {
-        tf("Breite: {}  Höhe: {}  Winkel: {}", &["40 mm", "20 mm", "0°"])
+    // the selection's measures (JD7: the single selection's); a click opens Größe und Position
+    let unit = if crate::edit_canvas::metric(app) { "mm" } else { "in" };
+    let dims = match crate::edit_canvas::measures(app) {
+        Some(v) => tf("Breite: {}  Höhe: {}  Winkel: {}", &[&length(v[2], unit), &length(v[3], unit), &angle(v[4])]),
+        None if app.selection_kind() == SEL_NONE || app.opened.is_some() => tf("Breite: {}  Höhe: {}  Winkel: {}", &["–", "–", "–"]),
+        None => tf("Breite: {}  Höhe: {}  Winkel: {}", &["40 mm", "20 mm", "0°"]),
     };
     ui.next_flags(ST_SUBTLE);
     if ui.label_button(ID_STATUS + 3, &dims, TS_CAPTION, 0) & EV_ACT != 0 {
@@ -320,9 +308,36 @@ pub(crate) fn status(app: &mut Diagrammer, ui: &mut Ui) {
     ui.statusbar_end();
 }
 
+// a length in the page's unit: whole millimetres, inches with two decimals (the region's decimal
+// sign)
+fn length(v: f64, unit: &str) -> alloc::string::String {
+    let s = if unit == "mm" { format!("{:.0}", v) } else { format!("{:.2}", v) };
+    let s = if s == "-0" { alloc::string::String::from("0") } else { s };
+    let dec = i18n::locale().decimal();
+    format!("{} {}", s.replace('.', dec.encode_utf8(&mut [0; 4])), unit)
+}
+
+// an angle in whole degrees, -179 .. 180 as Visio shows the Angle cell
+fn angle(v: f64) -> alloc::string::String {
+    // no float remainder without libm: whole turns off by steps (the angle is small)
+    let mut d = v;
+    let mut n = 0;
+    while d <= -180.0 && n < 64 {
+        d += 360.0;
+        n += 1;
+    }
+    while d > 180.0 && n < 64 {
+        d -= 360.0;
+        n += 1;
+    }
+    let r = if d >= 0.0 { (d + 0.5) as i64 } else { -((-d + 0.5) as i64) };
+    format!("{}°", if r == -180 { 180 } else { r })
+}
+
 // an icon button of the status bar for a command (its own widget id: the ribbon may show the
 // same command)
 fn status_cmd(ui: &mut Ui, wid: u32, id: u32) {
+    // (the zoom commands: always usable)
     ui.next_size(24, 22);
     ui.next_flags(ST_SUBTLE | ST_ICON_ONLY | ST_COMPACT | if commands::enabled(id) { 0 } else { ST_DISABLED });
     ui.next_icon(commands::def(id).map_or(0, |d| d.icon));

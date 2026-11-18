@@ -79,8 +79,6 @@ Visio-Schablone (.vssx)	Visio stencil (.vssx)	Colección de formas de Visio (.vs
 Visio-Vorlage (.vstx)	Visio template (.vstx)	Plantilla de Visio (.vstx)	Modello di Visio (.vstx)	Modèle Visio (.vstx)
 Visio-Zeichnung (.vsdx)	Visio drawing (.vsdx)	Dibujo de Visio (.vsdx)	Disegno di Visio (.vsdx)	Dessin Visio (.vsdx)
 Visio-Zeichnung mit Makros (.vsdm)	Visio drawing with macros (.vsdm)	Dibujo de Visio con macros (.vsdm)	Disegno di Visio con macro (.vsdm)	Dessin Visio avec macros (.vsdm)
-Zeichnungen lassen sich noch nicht speichern.	Drawings cannot be saved yet.	Todavía no se pueden guardar dibujos.	Non è ancora possibile salvare i disegni.	Les dessins ne peuvent pas encore être enregistrés.
-Dateityp	File type	Tipo de archivo	Tipo di file	Type de fichier
 Exemplare	Copies	Copias	Copie	Copies
 Drucker	Printer	Impresora	Stampante	Imprimante
 Standarddrucker	Default printer	Impresora predeterminada	Stampante predefinita	Imprimante par défaut
@@ -324,11 +322,32 @@ vssx;vssm=Visio-Schablone	vssx;vssm=Visio stencil	vssx;vssm=Colección de formas
 vstx;vstm=Visio-Vorlage	vstx;vstm=Visio template	vstx;vstm=Plantilla de Visio	vstx;vstm=Modello di Visio	vstx;vstm=Modèle Visio
 Die Datei lässt sich nicht lesen.	The file cannot be read.	No se puede leer el archivo.	Impossibile leggere il file.	Le fichier ne peut pas être lu.
 „{}“ kann nicht geöffnet werden.	“{}” cannot be opened.	No se puede abrir «{}».	Impossibile aprire «{}».	Impossible d'ouvrir « {} ».
-Bearbeiten und Speichern kommen in einer späteren Version.	Editing and saving come in a later version.	La edición y el guardado llegarán en una versión posterior.	La modifica e il salvataggio arriveranno in una versione successiva.	La modification et l'enregistrement arriveront dans une version ultérieure.
 Die Makros der Datei bleiben erhalten und werden nie ausgeführt.	The file's macros are kept and never run.	Las macros del archivo se conservan y nunca se ejecutan.	Le macro del file vengono conservate e mai eseguite.	Les macros du fichier sont conservées et ne sont jamais exécutées.
 {} Hinweise beim Lesen.	{} notes while reading.	{} avisos al leer.	{} avvisi durante la lettura.	{} remarques lors de la lecture.
-Schreibgeschützt geöffnet	Opened read-only	Abierto en modo de solo lectura	Aperto in sola lettura	Ouvert en lecture seule
 Ersetzte Schriften: {}.	Substituted fonts: {}.	Fuentes sustituidas: {}.	Tipi di carattere sostituiti: {}.	Polices remplacées : {}.
+Speichert in	Saves to	Se guarda en	Salva in	Enregistre dans
+Wählen Sie den Ort und den Dateityp.	Choose the location and the file type.	Elija la ubicación y el tipo de archivo.	Scegliere il percorso e il tipo di file.	Choisissez l'emplacement et le type de fichier.
+Führungslinie	Guide	Guía	Guida	Repère
+Die Führungslinie lässt sich nicht anlegen.	The guide cannot be created.	No se puede crear la guía.	Impossibile creare la guida.	Impossible de créer le repère.
+Verschieben	Move	Mover	Sposta	Déplacer
+Größe ändern	Resize	Cambiar tamaño	Ridimensiona	Redimensionner
+Drehen	Rotate	Girar	Ruota	Faire pivoter
+Drehpunkt verschieben	Move Rotation Pin	Mover el centro de giro	Sposta il centro di rotazione	Déplacer le centre de rotation
+Endpunkt verschieben	Move Endpoint	Mover el extremo	Sposta l'estremità	Déplacer l'extrémité
+Scheitelpunkt verschieben	Move Vertex	Mover el vértice	Sposta il vertice	Déplacer le sommet
+Steuerpunkt verschieben	Move Control Handle	Mover el controlador	Sposta la maniglia di controllo	Déplacer la poignée de contrôle
+Scheitelpunkt hinzufügen	Add Vertex	Agregar vértice	Aggiungi vertice	Ajouter un sommet
+Scheitelpunkt löschen	Delete Vertex	Eliminar vértice	Elimina vertice	Supprimer le sommet
+Linie	Line	Línea	Linea	Ligne
+Verbinder	Connector	Conector	Connettore	Connecteur
+„{}“ kann nicht gespeichert werden.	“{}” cannot be saved.	No se puede guardar «{}».	Impossibile salvare «{}».	Impossible d'enregistrer « {} ».
+Die Datei lässt sich nicht schreiben.	The file cannot be written.	No se puede escribir el archivo.	Impossibile scrivere il file.	Impossible d'écrire le fichier.
+Benutzerdefiniert	Custom	Personalizado	Personalizzato	Personnalisé
+vsdx=Visio-Zeichnung	vsdx=Visio drawing	vsdx=Dibujo de Visio	vsdx=Disegno di Visio	vsdx=Dessin Visio
+vssx=Visio-Schablone	vssx=Visio stencil	vssx=Colección de formas de Visio	vssx=Raccolta di forme di Visio	vssx=Bibliothèque de formes Visio
+vstx=Visio-Vorlage	vstx=Visio template	vstx=Plantilla de Visio	vstx=Modello di Visio	vstx=Modèle Visio
+vsdm=Visio-Zeichnung mit Makros	vsdm=Visio drawing with macros	vsdm=Dibujo de Visio con macros	vsdm=Disegno di Visio con macro	vsdm=Dessin Visio avec macros
+Hinweise zur Datei	About this file	Avisos sobre el archivo	Avvisi sul file	Remarques sur le fichier
 Favoriten	Favorites	Favoritos	Preferiti	Favoris
 „{}“ ist keine Schablone.	“{}” is not a stencil.	«{}» no es una colección de formas.	«{}» non è una raccolta di forme.	« {} » n'est pas une bibliothèque de formes.
 Schablone{}	Stencil{}	Colección de formas{}	Raccolta di forme{}	Bibliothèque de formes{}

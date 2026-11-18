@@ -239,14 +239,14 @@ fn groups(reg: Reg) -> &'static [Group] {
 
 // the flags of a command's control: disabled without a handler, checked when on
 fn cflags(app: &Diagrammer, id: u32) -> u32 {
-    (if commands::enabled(id) { 0 } else { ST_DISABLED }) | if commands::checked(app, id) { ST_CHECKED } else { 0 }
+    (if commands::usable(app, id) { 0 } else { ST_DISABLED }) | if commands::checked(app, id) { ST_CHECKED } else { 0 }
 }
 
 // a menu's rows lead somewhere: one of them (or of a submenu) has a handler
-fn any_enabled(items: &[It]) -> bool {
+fn any_enabled(app: &Diagrammer, items: &[It]) -> bool {
     items.iter().any(|i| match i {
-        C(id) => commands::enabled(*id),
-        Sub(_, sub) => any_enabled(sub),
+        C(id) => commands::usable(app, *id),
+        Sub(_, sub) => any_enabled(app, sub),
         Sep => false,
     })
 }
@@ -254,7 +254,7 @@ fn any_enabled(items: &[It]) -> bool {
 // the flags of a menu or split button: enabled when its command or one of its rows is
 fn mflags(app: &Diagrammer, id: u32, items: &[It]) -> u32 {
     let f = cflags(app, id);
-    if any_enabled(items) { f & !ST_DISABLED } else { f }
+    if any_enabled(app, items) { f & !ST_DISABLED } else { f }
 }
 
 // the icon of a command in the current language (the text formats' letters)
@@ -337,7 +337,7 @@ pub(crate) fn draw(app: &mut Diagrammer, ui: &mut Ui, reg: Reg) {
         let g = &groups[i];
         if g.1 != 0 {
             let name = alloc::format!("{}: {}", commands::label(g.1), d.label);
-            let f = if commands::enabled(g.1) { 0 } else { ST_DISABLED };
+            let f = if commands::usable(app, g.1) { 0 } else { ST_DISABLED };
             if ui.ribbon_group_end_launcher(mode, d.label, LAUNCH + rno * 32 + i as u32, &name, f) & EV_ACT != 0 {
                 ui.cmd_run(g.1, 0);
             }
@@ -373,7 +373,7 @@ fn column(app: &mut Diagrammer, ui: &mut Ui, col: &Col, width: i32, tiles: u32, 
             let label = commands::label(*id);
             let more = alloc::format!("{}: {}", label, t("Weitere Optionen"));
             let ev = ui.ribbon_stacked_split_button(*id, *id | SPLIT, l, &more, large_icon(*id), mflags(app, *id, items));
-            if ev & EV_ACT != 0 && commands::enabled(*id) {
+            if ev & EV_ACT != 0 && commands::usable(app, *id) {
                 ui.cmd_run(*id, 0);
             }
             ui.tooltip(&commands::tip(ui, *id));
@@ -461,7 +461,7 @@ fn small(app: &mut Diagrammer, ui: &mut Ui, s: &Sm, compact: bool) {
         Sm::Check(id) => {
             let mut v = commands::checked(app, *id) as i32;
             ui.next_size(-1, SMALL_H);
-            ui.next_flags(if commands::enabled(*id) { 0 } else { ST_DISABLED });
+            ui.next_flags(if commands::usable(app, *id) { 0 } else { ST_DISABLED });
             if ui.checkbox(*id, commands::label(*id), &mut v) & EV_ACT != 0 {
                 ui.cmd_run(*id, 0);
             }

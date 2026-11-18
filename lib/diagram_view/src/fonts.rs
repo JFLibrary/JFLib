@@ -7,6 +7,8 @@
 //                                            installed font the app found)
 //   set.set_source(Box<dyn FontSource>)     asked once per family the set does not know (the
 //                                            app looks at the installed fonts there)
+//   set.clone()                             (JD7) another handle on the same set: what one adds
+//                                            or finds, all see (Metrics keeps one)
 //   class_of(family) -> Class               serif, monospaced or sans by the family's name
 //   SAMPLE_WIDTHS                            how wide common fonts set a sample line (em)
 //
@@ -15,11 +17,16 @@
 // as in the missing font (Calibri set in Inter: about 0.85), so lines wrap about where Visio
 // wraps them.  An italic without its own face leans 0.2 radians (synthetic), a bold without its
 // own face stays regular.  Only fonts the app hands over are used; the crate embeds none.
+//
+// The set lives behind a shared handle (Rc<RefCell<..>>): the page views and the formula
+// engine's Metrics (which measures through `&self`) pick from the same faces and ask the
+// source once for all of them.  One thread, as everything of a page view.
 
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::cell::RefCell;
 
 /// what kind of face a family is (the substitution goes by it)
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -45,13 +52,18 @@ pub(crate) struct Face {
     pub index: u32,
 }
 
-/// the fonts a page view may use
 #[derive(Default)]
-pub struct FontSet {
-    pub(crate) faces: Vec<Face>,
-    pub(crate) source: Option<Box<dyn FontSource>>,
+struct Inner {
+    faces: Vec<Face>,
+    source: Option<Box<dyn FontSource>>,
     /// families the source was asked for (found or not)
-    pub(crate) asked: Vec<String>,
+    asked: Vec<String>,
+}
+
+/// the fonts a page view may use; a clone is another handle on the same set
+#[derive(Clone, Default)]
+pub struct FontSet {
+    inner: Rc<RefCell<Inner>>,
 }
 
 impl FontSet {
@@ -61,44 +73,46 @@ impl FontSet {
 
     /// a face of the substitution set
     pub fn add(&mut self, class: Class, bold: bool, italic: bool, data: &[u8]) {
-        self.faces.push(Face { family: String::new(), class: Some(class), bold, italic, data: Rc::from(data), index: 0 });
+        self.inner.borrow_mut().faces.push(Face { family: String::new(), class: Some(class), bold, italic, data: Rc::from(data), index: 0 });
     }
 
     /// a face under its family name
     pub fn add_family(&mut self, family: &str, bold: bool, italic: bool, data: &[u8], index: u32) {
-        self.faces.push(Face { family: String::from(family), class: None, bold, italic, data: Rc::from(data), index });
+        self.inner.borrow_mut().faces.push(Face { family: String::from(family), class: None, bold, italic, data: Rc::from(data), index });
     }
 
     /// where faces of unknown families are looked for
     pub fn set_source(&mut self, source: Box<dyn FontSource>) {
-        self.source = Some(source);
+        self.inner.borrow_mut().source = Some(source);
     }
 
     pub fn is_empty(&self) -> bool {
-        self.faces.is_empty()
+        self.inner.borrow().faces.is_empty()
     }
 
     /// the face for a family and style: (face, synthetic italic, substituted); asks the source
     /// once per family and style the set lacks
-    pub(crate) fn pick(&mut self, family: &str, bold: bool, italic: bool) -> Option<(Face, bool, bool)> {
+    pub(crate) fn pick(&self, family: &str, bold: bool, italic: bool) -> Option<(Face, bool, bool)> {
+        let mut inner = self.inner.try_borrow_mut().ok()?;
+        let s = &mut *inner;
         let same = |f: &Face| f.class.is_none() && f.family.eq_ignore_ascii_case(family);
-        if !self.faces.iter().any(|f| same(f) && f.bold == bold && f.italic == italic) {
+        if !s.faces.iter().any(|f| same(f) && f.bold == bold && f.italic == italic) {
             let key = alloc::format!("{family}\u{1}{bold}\u{1}{italic}");
-            if !self.asked.contains(&key) && self.asked.len() < 4096 {
-                self.asked.push(key);
-                if let Some(src) = self.source.as_mut() {
+            if !s.asked.contains(&key) && s.asked.len() < 4096 {
+                s.asked.push(key);
+                if let Some(src) = s.source.as_mut() {
                     if let Some((data, index)) = src.find(family, bold, italic) {
-                        self.add_family(family, bold, italic, &data, index);
+                        s.faces.push(Face { family: String::from(family), class: None, bold, italic, data: Rc::from(data.as_slice()), index });
                     }
                 }
             }
         }
-        if let Some(f) = best(self.faces.iter().filter(|f| same(f)), bold, italic) {
+        if let Some(f) = best(s.faces.iter().filter(|f| same(f)), bold, italic) {
             return Some((f.clone(), italic && !f.italic, false));
         }
         let class = class_of(family);
-        let in_class = best(self.faces.iter().filter(|f| f.class == Some(class)), bold, italic);
-        let f = in_class.or_else(|| best(self.faces.iter().filter(|f| f.class == Some(Class::Sans)), bold, italic)).or_else(|| best(self.faces.iter(), bold, italic))?;
+        let in_class = best(s.faces.iter().filter(|f| f.class == Some(class)), bold, italic);
+        let f = in_class.or_else(|| best(s.faces.iter().filter(|f| f.class == Some(Class::Sans)), bold, italic)).or_else(|| best(s.faces.iter(), bold, italic))?;
         Some((f.clone(), italic && !f.italic, true))
     }
 }

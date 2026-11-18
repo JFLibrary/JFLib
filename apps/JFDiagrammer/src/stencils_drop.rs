@@ -3,44 +3,37 @@
 // on a tile (the middle of the view)
 //
 //   DT_SHAPE                    the drag kind of the panel's tiles (stencil key, tile index)
-//   tool(app)                   the canvas' tool: DG_PLACE while a tile is armed
-//   canvas(app, ui, id, &events)   after ui.diagram: the canvas as the tiles' drop target, the
-//                               click of DG_PLACE, Esc disarms
+//   drop_target(app, ui, id)    (edit_canvas::canvas, right after ui.diagram) the canvas as the
+//                               tiles' drop target; Esc disarms an armed tile
+//   clicked(app, ui, at)        (edit_canvas::apply) the click of an armed tile: ui.shape_edit
+//                               runs SE_PLACE while one is armed (edit_canvas::tool_of)
 //   place_center(app, ui, key, k)   the shape in the middle of the view
 //
-// Each drop is one transaction of the drawing (one undo step once JD7 brings the history):
-// the master is taken into the drawing if it is not there (instance::import_master, matched
-// by UniqueID), the instance goes to the point (instance::place: Name in the current language,
-// NameU the master's), the formula engine recalculates the new shapes, and the page is drawn
-// again.  Until JD7 makes the empty drawing a document of its own, it becomes one as soon as a
-// stencil is open (ensure_document: vsdx::new_document in the region's units, viewer::adopt),
-// so the page is shown and fitted before the first shape arrives.
+// Each drop is one edit of the drawing (edit_doc::edit, JD7: one undo step, the drawing's
+// formula engine): the master is taken into the drawing if it is not there
+// (instance::import_master, matched by UniqueID), the instance goes to the point
+// (instance::place: Name in the current language, NameU the master's), the engine
+// recalculates the new shapes, connectors follow (edit_canvas::follow); then the new shape is
+// selected and viewer::sync draws the page again (a new master: the whole page).
 //
-// Coordinates: the canvas' world unit is a DIP at 100 %, 96 of them a paper inch, y down from
-// the page's top left corner (viewer.rs); the page's inches have y up from the bottom.
+// Coordinates: world points of the canvas (DIP at 100 %, y down) become the page's inches with
+// y up through edit_canvas's Geo (app.model.geo, which knows the drawing scale).
 
 use alloc::vec::Vec;
 
 use diagram_core::instance;
-use diagram_core::{DocKind, ShapeRef, SheetRef};
-use diagram_io::vsdx;
-use ui::i18n::{t, tf};
+use diagram_core::{Owner, ShapeRef, SheetRef};
+use ui::i18n::tf;
 use ui::*;
 
-use crate::viewer::DIP;
+use crate::edit_canvas;
 use crate::Diagrammer;
 
 /// the drag kind of the panel's tiles
 pub(crate) const DT_SHAPE: u32 = DT_USER0 << 2;
 
-/// the canvas' tool: placing while a tile is armed (SL-03)
-pub(crate) fn tool(app: &Diagrammer) -> u32 {
-    if app.stencils.armed.is_some() { DG_PLACE } else { DG_SELECT }
-}
-
-/// after ui.diagram (its rectangle is the last one): drops of tiles, the click of an armed
-/// tile, Esc
-pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, events: &[DEv]) {
+/// right after ui.diagram (its rectangle is the last one): drops of tiles; Esc disarms
+pub(crate) fn drop_target(app: &mut Diagrammer, ui: &mut Ui, id: u32) {
     if ui.drop_target(id, DT_SHAPE) == DS_DROP {
         let d = ui.drop_data();
         if d.app & DT_SHAPE != 0 {
@@ -51,21 +44,20 @@ pub(crate) fn canvas(app: &mut Diagrammer, ui: &mut Ui, id: u32, events: &[DEv])
             }
         }
     }
-    let Some((key, k)) = app.stencils.armed else { return };
-    for ev in events {
-        if let DEv::Click { at } = ev {
-            place_world(app, ui, key, k, *at);
-            // Shift keeps the tile armed for the next shape
-            if ui.mods() & MOD_SHIFT == 0 {
-                app.stencils.armed = None;
-            }
-            ui.repass();
-        }
-    }
     if app.stencils.armed.is_some() && ui.key(VK_ESCAPE) {
         app.stencils.armed = None;
         ui.repass();
     }
+}
+
+/// the click of an armed tile at world point `at`; Shift keeps the tile armed for the next one
+pub(crate) fn clicked(app: &mut Diagrammer, ui: &mut Ui, at: [f32; 2]) {
+    let Some((key, k)) = app.stencils.armed else { return };
+    place_world(app, ui, key, k, at);
+    if ui.mods() & MOD_SHIFT == 0 {
+        app.stencils.armed = None;
+    }
+    ui.repass();
 }
 
 /// the shape of tile (key, k) in the middle of the view (Enter on a tile)
@@ -77,34 +69,31 @@ pub(crate) fn place_center(app: &mut Diagrammer, ui: &mut Ui, key: u32, k: usize
 
 // the shape of tile (key, k) at world point `at`
 fn place_world(app: &mut Diagrammer, ui: &mut Ui, key: u32, k: usize, at: [f32; 2]) {
-    let Some(page) = ensure_document(app, ui) else { return };
+    let (Some(geo), Some(page)) = (app.model.geo, app.model.page) else { return };
+    let [x, y] = geo.page(at);
     let lang = crate::stencils::lang();
     let st = &app.stencils;
     let Some((l, e)) = st.entry(key, k) else { return };
     let Some(o) = app.opened.as_mut() else { return };
-    let h = o.doc.page(page).and_then(|p| o.doc.strings().get("PageHeight").and_then(|s| p.sheet.cell(s))).and_then(|c| c.value.num()).unwrap_or(8.5);
-    let (x, y) = (at[0] as f64 / DIP, h - at[1] as f64 / DIP);
-    let name = e.texts.name(lang);
-    let mut tx = o.doc.transaction(&tf("{} ablegen", &[name]));
-    let placed = (|| {
-        let m = instance::import_master(&mut tx, &l.doc, e.master)?;
-        let shape = instance::place(&mut tx, page, m, x, y, lang)?;
-        // the new shapes' values (their formulas come from the master)
+    let label = tf("{} ablegen", &[e.texts.name(lang)]);
+    let placed = crate::edit_doc::edit(o, &label, true, |tx, eng| {
+        let m = instance::import_master(tx, &l.doc, e.master)?;
+        let shape = instance::place(tx, page, m, x, y, lang)?;
+        // the new shapes' values (their formulas come from the master), connectors that follow
         let mut sheets = Vec::new();
         collect(tx.doc(), shape, &mut sheets);
-        diagram_core::formula::Engine::new().recalc(&mut tx, &sheets)?;
-        Ok::<ShapeRef, diagram_core::EditError>(shape)
-    })();
+        eng.recalc(tx, &sheets)?;
+        edit_canvas::follow(tx, eng, Owner::Page(page), &[shape])?;
+        Ok(shape)
+    });
     match placed {
         Ok(shape) => {
-            let said = tx.doc().shape(shape).map(|s| s.name()).unwrap_or_default();
-            tx.commit();
-            crate::viewer::changed(app);
+            let said = app.opened.as_ref().and_then(|o| o.doc.shape(shape)).map(|s| s.name()).unwrap_or_default();
+            app.se.select(&[edit_canvas::key_of(shape)]);
             // screen readers (and scripts) hear what was dropped
             ui.announce(&tf("„{}“ abgelegt", &[&said]), LIVE_POLITE);
         }
         Err(err) => {
-            drop(tx);
             app.stencils.error = Some(tf("Das Shape lässt sich nicht ablegen: {}", &[&alloc::format!("{err:?}")]));
         }
     }
@@ -119,24 +108,4 @@ fn collect(doc: &diagram_core::Document, s: ShapeRef, out: &mut Vec<SheetRef>) {
             collect(doc, c, out);
         }
     }
-}
-
-/// the page shapes go to: the page shown; the empty drawing becomes a document first (the
-/// panel calls it as soon as a stencil is open, so the page is there before the first drop)
-pub(crate) fn ensure_document(app: &mut Diagrammer, ui: &mut Ui) -> Option<diagram_core::PageRef> {
-    if app.opened.is_none() {
-        let mut doc = vsdx::new_document(DocKind::Drawing, crate::stencils::measure(app));
-        // the page's name in the current language, NameU stays Page-1 (LG-04)
-        let first = doc.pages().next();
-        if let Some(p) = first {
-            let mut tx = doc.transaction(t("Seite umbenennen"));
-            if tx.rename_page(p, &tf("Seite-{}", &["1"]), "Page-1").is_ok() {
-                tx.commit();
-            }
-        }
-        crate::viewer::adopt(app, ui, doc, &tf("Zeichnung{}", &["1"]));
-    }
-    let o = app.opened.as_ref()?;
-    let tab = o.tabs.get(app.page_tab.max(0) as usize).or(o.tabs.first())?;
-    Some(tab.page)
 }

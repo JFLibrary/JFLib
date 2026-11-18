@@ -75,6 +75,16 @@ pub use diagram::{
 };
 pub use diagram::{dg_toggle_rect, DN_FRAME, DN_OUTLINE, DN_RESIZE, DN_STEP, DN_TOGGLE}; // frames, groups, a backdrop (G1)
 pub use diagram::DN_HITMIN; // a small text stays selectable at low zoom
+pub use diagram::DG_EDIT; // the view only: ui.shape_edit takes the rest
+mod shape_edit; // (JD7) editing shapes on a DG_EDIT canvas: handles, glue, snapping, tools
+mod ruler; // (JD7) a ruler along a canvas: ticks, marks, guides dragged out of it
+pub use ruler::{RulerEv, RulerSpec};
+pub use shape_edit::{
+    SeBox, SeEv, SeGlue, SeGuide, SeModel, SePoint, SeShape, SeState, SEF_1D, SEF_BEGIN_DYN, SEF_BEGIN_GLUED, SEF_DYNAMIC, SEF_END_DYN,
+    SEF_END_GLUED, SEF_GROUP, SEF_LOCK_ASPECT, SEF_LOCK_BEGIN, SEF_LOCK_END, SEF_LOCK_H, SEF_LOCK_MOVE, SEF_LOCK_PIN, SEF_LOCK_ROTATE,
+    SEF_LOCK_W, SEF_NOGLUE, SEF_NOSELECT, SE_CONNECT, SE_ELLIPSE, SE_LINE, SE_PLACE, SE_POINTER, SE_RECT, SE_TEXT, SPF_GLUE, SP_CONN, SP_CONTROL,
+    SP_VERTEX,
+};
 mod dirty;
 mod dnd;
 // (ROADMAP §6) the editors with a text model of their own: the shared core, rich text, code

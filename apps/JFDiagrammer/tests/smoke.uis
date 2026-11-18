@@ -9,11 +9,12 @@ expect tab:"Entwurf" exists
 expect tab:"Ansicht" exists
 # no selection: no context registers
 expect tab:"Format" missing
-# the quick access toolbar: its commands have no function yet
-expect button:"Speichern" disabled
+# the quick access toolbar: a new drawing can be saved (JD7), there is nothing to undo yet
+expect button:"Speichern" enabled
 expect button:"Rückgängig" disabled
 expect button:"Wiederholen" disabled
-# the ribbon of Start: every P1 group, the commands disabled until their function exists
+# the ribbon of Start: every P1 group, the commands disabled until their function exists or
+# while they have nothing to work on (no selection, an empty clipboard)
 expect text:"Zwischenablage" exists
 expect text:"Schriftart" exists
 expect text:"Absatz" exists
@@ -37,7 +38,7 @@ expect button:"Weitere Shapes" enabled
 expect canvas:"Zeichenfläche" exists
 expect tab:"Seite-1" selected
 expect button:"Seite 1 von 1" exists
-expect text:"100 %" exists
+expect text:"67 %" exists
 shot build/JFDiagrammer.png
 # the registers switch the ribbon
 click tab:"Einfügen"
